@@ -38,7 +38,7 @@
   --kd-danger: #c0392b;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+.kd-body, .kd-body * { box-sizing: border-box; margin: 0; padding: 0; }
 
 .kd-body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -46,6 +46,25 @@
   color: var(--kd-text);
   line-height: 1.5;
   font-size: 13px;
+}
+
+/* Skip-to-content link (accessibility) */
+.kd-skip-link {
+  position: absolute;
+  top: -100px;
+  left: 8px;
+  z-index: 9999;
+  background: var(--kd-brand);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 0 0 6px 6px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: top 0.2s;
+}
+.kd-skip-link:focus {
+  top: 0;
 }
 
 /* ================================================================ */
@@ -331,6 +350,46 @@
   color: white;
   border-color: var(--kd-brand);
   opacity: 1;
+}
+
+/* ================================================================ */
+/* TABLE EXPORT BAR                                                  */
+/* ================================================================ */
+
+.kd-table-export-bar {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 10;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.kd-table-wrapper:hover .kd-table-export-bar {
+  opacity: 1;
+}
+
+.kd-table-export-btn {
+  background: rgba(255,255,255,0.92);
+  border: 1px solid var(--kd-border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--kd-text-faint);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  transition: all 0.15s;
+}
+
+.kd-table-export-btn:hover {
+  border-color: var(--kd-brand);
+  color: var(--kd-brand);
+  background: rgba(255,255,255,0.98);
 }
 
 /* ================================================================ */
@@ -882,6 +941,102 @@
   opacity: 0.4;
 }
 
+/* ================================================================ */
+/* QUALITATIVE SLIDES                                                */
+/* ================================================================ */
+
+.kd-qual-slides-container { margin-bottom: 16px; }
+
+.kd-qual-slide-card {
+  background: var(--kd-card);
+  border: 1px solid var(--kd-border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 10px;
+}
+
+.kd-qual-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.kd-qual-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--kd-text);
+  outline: none;
+  padding: 2px 4px;
+  border-radius: 4px;
+  min-width: 100px;
+}
+
+.kd-qual-title:focus {
+  background: #f1f5f9;
+}
+
+.kd-qual-actions { display: flex; gap: 4px; }
+
+.kd-qual-btn {
+  padding: 3px 8px;
+  border: 1px solid var(--kd-border);
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  background: white;
+  color: var(--kd-text-muted);
+  transition: all 0.15s;
+}
+
+.kd-qual-btn:hover { border-color: var(--kd-brand); color: var(--kd-brand); }
+
+.kd-qual-delete:hover { border-color: #ef4444; color: #ef4444; }
+
+.kd-qual-img-preview {
+  position: relative;
+  margin-bottom: 8px;
+  max-width: 400px;
+}
+
+.kd-qual-img-thumb {
+  max-width: 100%;
+  border-radius: 6px;
+  border: 1px solid var(--kd-border);
+}
+
+.kd-qual-img-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(0,0,0,0.6);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  font-size: 14px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.kd-qual-md-editor {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--kd-border);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  color: var(--kd-text);
+  line-height: 1.5;
+}
+
+.kd-qual-md-editor:focus {
+  outline: none;
+  border-color: var(--kd-brand);
+}
+
 .kd-pinned-card {
   background: var(--kd-card);
   border: 1px solid var(--kd-border);
@@ -1212,6 +1367,7 @@
 </head>
 <body class="kd-body">
 <body class="kd-body">
+  <a class="kd-skip-link" href="#kd-tab-content">Skip to content</a>
   <div class="kd-header" id="kd-header">
     <div class="kd-header-inner">
       <div class="kd-header-top">
@@ -1272,7 +1428,7 @@
           <div class="kd-insight-area" data-kd-insight-section="exec-summary" data-kd-insight-prefix="">
             <button class="kd-insight-toggle" id="kd-insight-toggle-exec-summary" onclick="kdToggleInsight(&#39;exec-summary&#39;,&#39;&#39;)">+ Add Insight</button>
             <div class="kd-insight-container" id="kd-insight-container-exec-summary">
-              <div class="kd-insight-editor" contenteditable="true" data-placeholder="Type your insight or comment here..." oninput="kdSyncInsight(&#39;exec-summary&#39;,&#39;&#39;)"></div>
+              <div class="kd-insight-editor" contenteditable="true" role="textbox" aria-label="Analyst insight for exec-summary section" data-placeholder="Type your insight or comment here..." oninput="kdSyncInsight(&#39;exec-summary&#39;,&#39;&#39;)"></div>
               <button class="kd-insight-dismiss" onclick="kdDismissInsight(&#39;exec-summary&#39;,&#39;&#39;)">×</button>
             </div>
           </div>
@@ -1283,37 +1439,37 @@
           <div style="margin-bottom:16px;">
             <h3 class="kd-key-insights-heading">Key Insights</h3>
             <ul style="padding-left:20px;">
-              <li class="kd-key-insight-item">Network Reliability is the leading driver of the outcome, explaining 39% of the model's variance (R²=52%, n=776).</li>
-              <li class="kd-key-insight-item">The top 3 drivers are: Network Reliability (39%), Customer Service (22%), Data Speed (14%).</li>
+              <li class="kd-key-insight-item">Network Reliability is the leading driver of the outcome, accounting for 40% of driver importance (R²=52%, n=776).</li>
+              <li class="kd-key-insight-item">The top 3 drivers are: Network Reliability (40%), Customer Service (21%), Data Speed (12%).</li>
               <li class="kd-key-insight-item">The model explains 52% of variance in the outcome, which is considered good for survey data (n=776, 8 drivers).</li>
               <li class="kd-key-insight-item">The model has good explanatory power (R² = 52%), supporting confident interpretation of driver rankings.</li>
             </ul>
           </div>
           <div class="kd-callout">
             <div class="kd-callout-title">#1 Network Reliability</div>
-            <div class="kd-callout-text">39% relative importance</div>
+            <div class="kd-callout-text">40% relative importance</div>
           </div>
           <div class="kd-callout">
             <div class="kd-callout-title">#2 Customer Service</div>
-            <div class="kd-callout-text">22% relative importance</div>
+            <div class="kd-callout-text">21% relative importance</div>
           </div>
           <div class="kd-callout">
             <div class="kd-callout-title">#3 Data Speed</div>
-            <div class="kd-callout-text">14% relative importance</div>
+            <div class="kd-callout-text">12% relative importance</div>
           </div>
           <div class="kd-finding-box">
             <h3 class="kd-top-drivers-label">Standout Findings</h3>
             <div class="kd-finding-item">
               <span class="kd-finding-icon" style="color:var(--kd-brand);">•</span>
-              <span class="kd-finding-text">#1 Network Reliability accounts for 39% of driver importance.</span>
+              <span class="kd-finding-text">#1 Network Reliability accounts for 40% of driver importance.</span>
             </div>
             <div class="kd-finding-item">
               <span class="kd-finding-icon" style="color:var(--kd-brand);">•</span>
-              <span class="kd-finding-text">#2 Customer Service accounts for 22% of driver importance.</span>
+              <span class="kd-finding-text">#2 Customer Service accounts for 21% of driver importance.</span>
             </div>
             <div class="kd-finding-item">
               <span class="kd-finding-icon" style="color:var(--kd-brand);">•</span>
-              <span class="kd-finding-text">#3 Data Speed accounts for 14% of driver importance.</span>
+              <span class="kd-finding-text">#3 Data Speed accounts for 12% of driver importance.</span>
             </div>
           </div>
         </div>
@@ -1325,7 +1481,7 @@
           <div class="kd-insight-area" data-kd-insight-section="importance" data-kd-insight-prefix="">
             <button class="kd-insight-toggle" id="kd-insight-toggle-importance" onclick="kdToggleInsight(&#39;importance&#39;,&#39;&#39;)">+ Add Insight</button>
             <div class="kd-insight-container" id="kd-insight-container-importance">
-              <div class="kd-insight-editor" contenteditable="true" data-placeholder="Type your insight or comment here..." oninput="kdSyncInsight(&#39;importance&#39;,&#39;&#39;)"></div>
+              <div class="kd-insight-editor" contenteditable="true" role="textbox" aria-label="Analyst insight for importance section" data-placeholder="Type your insight or comment here..." oninput="kdSyncInsight(&#39;importance&#39;,&#39;&#39;)"></div>
               <button class="kd-insight-dismiss" onclick="kdDismissInsight(&#39;importance&#39;,&#39;&#39;)">×</button>
             </div>
           </div>
@@ -1339,42 +1495,42 @@
             <div class="kd-chart-container"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 312" class="kd-chart kd-importance-chart" role="img" aria-label="Driver importance bar chart" style="font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;">
 <line x1="200.0" y1="20.0" x2="200.0" y2="307.0" stroke="#e2e8f0" stroke-width="1.0" opacity="1.00"/>
 <text x="200.0" y="15.0" text-anchor="middle" font-size="10" fill="#94a3b8" font-weight="400">0%</text>
-<line x1="453.1" y1="20.0" x2="453.1" y2="307.0" stroke="#e2e8f0" stroke-width="1.0" opacity="1.00"/>
-<text x="453.1" y="15.0" text-anchor="middle" font-size="10" fill="#94a3b8" font-weight="400">25%</text>
-<g class="kd-importance-row" data-kd-rank="1" data-kd-pct="38.6" data-kd-top3="yes">
+<line x1="445.4" y1="20.0" x2="445.4" y2="307.0" stroke="#e2e8f0" stroke-width="1.0" opacity="1.00"/>
+<text x="445.4" y="15.0" text-anchor="middle" font-size="10" fill="#94a3b8" font-weight="400">25%</text>
+<g class="kd-importance-row" data-kd-rank="1" data-kd-pct="39.8" data-kd-top3="yes">
 <text x="192.0" y="39.0" text-anchor="end" font-size="12" fill="#334155" font-weight="400" dominant-baseline="central">Network Reliability</text>
 <rect x="200.0" y="25.0" width="390.9" height="28.0" rx="4" fill="#4472C4" opacity="1.00"/>
-<text x="596.9" y="39.0" text-anchor="start" font-size="11" fill="#334155" font-weight="500" dominant-baseline="central">39%</text>
+<text x="596.9" y="39.0" text-anchor="start" font-size="11" fill="#334155" font-weight="500" dominant-baseline="central">40%</text>
 </g>
-<g class="kd-importance-row" data-kd-rank="2" data-kd-pct="22.5" data-kd-top3="yes">
+<g class="kd-importance-row" data-kd-rank="2" data-kd-pct="21.3" data-kd-top3="yes">
 <text x="192.0" y="73.0" text-anchor="end" font-size="12" fill="#334155" font-weight="400" dominant-baseline="central">Customer Service</text>
-<rect x="200.0" y="59.0" width="227.6" height="28.0" rx="4" fill="#4472C4" opacity="1.00"/>
-<text x="433.6" y="73.0" text-anchor="start" font-size="11" fill="#334155" font-weight="500" dominant-baseline="central">22%</text>
+<rect x="200.0" y="59.0" width="208.6" height="28.0" rx="4" fill="#4472C4" opacity="1.00"/>
+<text x="414.6" y="73.0" text-anchor="start" font-size="11" fill="#334155" font-weight="500" dominant-baseline="central">21%</text>
 </g>
-<g class="kd-importance-row" data-kd-rank="3" data-kd-pct="13.6" data-kd-top3="yes">
+<g class="kd-importance-row" data-kd-rank="3" data-kd-pct="12.4" data-kd-top3="yes">
 <text x="192.0" y="107.0" text-anchor="end" font-size="12" fill="#334155" font-weight="400" dominant-baseline="central">Data Speed</text>
-<rect x="200.0" y="93.0" width="138.1" height="28.0" rx="4" fill="#4472C4" opacity="1.00"/>
-<text x="344.1" y="107.0" text-anchor="start" font-size="11" fill="#334155" font-weight="500" dominant-baseline="central">14%</text>
+<rect x="200.0" y="93.0" width="121.4" height="28.0" rx="4" fill="#4472C4" opacity="1.00"/>
+<text x="327.4" y="107.0" text-anchor="start" font-size="11" fill="#334155" font-weight="500" dominant-baseline="central">12%</text>
 </g>
-<g class="kd-importance-row" data-kd-rank="4" data-kd-pct="10.0" data-kd-top3="no">
+<g class="kd-importance-row" data-kd-rank="4" data-kd-pct="11.0" data-kd-top3="no">
 <text x="192.0" y="141.0" text-anchor="end" font-size="12" fill="#334155" font-weight="400" dominant-baseline="central">Value for Money</text>
-<rect x="200.0" y="127.0" width="101.0" height="28.0" rx="4" fill="#d9e2f3" opacity="0.90"/>
-<text x="307.0" y="141.0" text-anchor="start" font-size="11" fill="#334155" font-weight="500" dominant-baseline="central">10%</text>
+<rect x="200.0" y="127.0" width="108.2" height="28.0" rx="4" fill="#d9e2f3" opacity="0.90"/>
+<text x="314.2" y="141.0" text-anchor="start" font-size="11" fill="#334155" font-weight="500" dominant-baseline="central">11%</text>
 </g>
-<g class="kd-importance-row" data-kd-rank="5" data-kd-pct="7.3" data-kd-top3="no">
+<g class="kd-importance-row" data-kd-rank="5" data-kd-pct="7.4" data-kd-top3="no">
 <text x="192.0" y="175.0" text-anchor="end" font-size="12" fill="#334155" font-weight="400" dominant-baseline="central">Coverage Area</text>
-<rect x="200.0" y="161.0" width="74.2" height="28.0" rx="4" fill="#d9e2f3" opacity="0.90"/>
-<text x="280.2" y="175.0" text-anchor="start" font-size="11" fill="#334155" font-weight="500" dominant-baseline="central">7%</text>
+<rect x="200.0" y="161.0" width="73.0" height="28.0" rx="4" fill="#d9e2f3" opacity="0.90"/>
+<text x="279.0" y="175.0" text-anchor="start" font-size="11" fill="#334155" font-weight="500" dominant-baseline="central">7%</text>
 </g>
-<g class="kd-importance-row" data-kd-rank="6" data-kd-pct="4.3" data-kd-top3="no">
-<text x="192.0" y="209.0" text-anchor="end" font-size="12" fill="#334155" font-weight="400" dominant-baseline="central">Billing Clarity</text>
-<rect x="200.0" y="195.0" width="43.4" height="28.0" rx="4" fill="#d9e2f3" opacity="0.90"/>
-<text x="249.4" y="209.0" text-anchor="start" font-size="11" fill="#334155" font-weight="500" dominant-baseline="central">4%</text>
+<g class="kd-importance-row" data-kd-rank="6" data-kd-pct="4.2" data-kd-top3="no">
+<text x="192.0" y="209.0" text-anchor="end" font-size="12" fill="#334155" font-weight="400" dominant-baseline="central">App Experience</text>
+<rect x="200.0" y="195.0" width="41.4" height="28.0" rx="4" fill="#d9e2f3" opacity="0.90"/>
+<text x="247.4" y="209.0" text-anchor="start" font-size="11" fill="#334155" font-weight="500" dominant-baseline="central">4%</text>
 </g>
-<g class="kd-importance-row" data-kd-rank="7" data-kd-pct="3.6" data-kd-top3="no">
-<text x="192.0" y="243.0" text-anchor="end" font-size="12" fill="#334155" font-weight="400" dominant-baseline="central">App Experience</text>
-<rect x="200.0" y="229.0" width="36.9" height="28.0" rx="4" fill="#d9e2f3" opacity="0.90"/>
-<text x="242.9" y="243.0" text-anchor="start" font-size="11" fill="#334155" font-weight="500" dominant-baseline="central">4%</text>
+<g class="kd-importance-row" data-kd-rank="7" data-kd-pct="3.9" data-kd-top3="no">
+<text x="192.0" y="243.0" text-anchor="end" font-size="12" fill="#334155" font-weight="400" dominant-baseline="central">Billing Clarity</text>
+<rect x="200.0" y="229.0" width="37.9" height="28.0" rx="4" fill="#d9e2f3" opacity="0.90"/>
+<text x="243.9" y="243.0" text-anchor="start" font-size="11" fill="#334155" font-weight="500" dominant-baseline="central">4%</text>
 </g>
 <g class="kd-importance-row" data-kd-rank="8" data-kd-pct="0.0" data-kd-top3="no">
 <text x="192.0" y="277.0" text-anchor="end" font-size="12" fill="#334155" font-weight="400" dominant-baseline="central">Contract Flexibility</text>
@@ -1406,67 +1562,67 @@
                   <td class="kd-td kd-td-label">Network Reliability</td>
                   <td class="kd-td kd-td-bar">
                     <div class="kd-bar-container">
-                      <div class="kd-bar-fill" style="width:38.6%;background:#2563EB;"></div>
+                      <div class="kd-bar-fill" style="width:39.8%;background:#2563EB;"></div>
                     </div>
                   </td>
-                  <td class="kd-td kd-td-num">39%</td>
+                  <td class="kd-td kd-td-num">40%</td>
                 </tr>
                 <tr class="kd-tr kd-tr-highlight">
                   <td class="kd-td kd-td-rank">2</td>
                   <td class="kd-td kd-td-label">Customer Service</td>
                   <td class="kd-td kd-td-bar">
                     <div class="kd-bar-container">
-                      <div class="kd-bar-fill" style="width:22.5%;background:#2563EB;"></div>
+                      <div class="kd-bar-fill" style="width:21.3%;background:#2563EB;"></div>
                     </div>
                   </td>
-                  <td class="kd-td kd-td-num">22%</td>
+                  <td class="kd-td kd-td-num">21%</td>
                 </tr>
                 <tr class="kd-tr kd-tr-highlight">
                   <td class="kd-td kd-td-rank">3</td>
                   <td class="kd-td kd-td-label">Data Speed</td>
                   <td class="kd-td kd-td-bar">
                     <div class="kd-bar-container">
-                      <div class="kd-bar-fill" style="width:13.6%;background:#3B82F6;"></div>
+                      <div class="kd-bar-fill" style="width:12.4%;background:#3B82F6;"></div>
                     </div>
                   </td>
-                  <td class="kd-td kd-td-num">14%</td>
+                  <td class="kd-td kd-td-num">12%</td>
                 </tr>
                 <tr class="kd-tr">
                   <td class="kd-td kd-td-rank">4</td>
                   <td class="kd-td kd-td-label">Value for Money</td>
                   <td class="kd-td kd-td-bar">
                     <div class="kd-bar-container">
-                      <div class="kd-bar-fill" style="width:10.0%;background:#93C5FD;"></div>
+                      <div class="kd-bar-fill" style="width:11.0%;background:#3B82F6;"></div>
                     </div>
                   </td>
-                  <td class="kd-td kd-td-num">10%</td>
+                  <td class="kd-td kd-td-num">11%</td>
                 </tr>
                 <tr class="kd-tr">
                   <td class="kd-td kd-td-rank">5</td>
                   <td class="kd-td kd-td-label">Coverage Area</td>
                   <td class="kd-td kd-td-bar">
                     <div class="kd-bar-container">
-                      <div class="kd-bar-fill" style="width:7.3%;background:#93C5FD;"></div>
+                      <div class="kd-bar-fill" style="width:7.4%;background:#93C5FD;"></div>
                     </div>
                   </td>
                   <td class="kd-td kd-td-num">7%</td>
                 </tr>
                 <tr class="kd-tr">
                   <td class="kd-td kd-td-rank">6</td>
-                  <td class="kd-td kd-td-label">Billing Clarity</td>
+                  <td class="kd-td kd-td-label">App Experience</td>
                   <td class="kd-td kd-td-bar">
                     <div class="kd-bar-container">
-                      <div class="kd-bar-fill" style="width:4.3%;background:#DBEAFE;"></div>
+                      <div class="kd-bar-fill" style="width:4.2%;background:#DBEAFE;"></div>
                     </div>
                   </td>
                   <td class="kd-td kd-td-num">4%</td>
                 </tr>
                 <tr class="kd-tr">
                   <td class="kd-td kd-td-rank">7</td>
-                  <td class="kd-td kd-td-label">App Experience</td>
+                  <td class="kd-td kd-td-label">Billing Clarity</td>
                   <td class="kd-td kd-td-bar">
                     <div class="kd-bar-container">
-                      <div class="kd-bar-fill" style="width:3.6%;background:#DBEAFE;"></div>
+                      <div class="kd-bar-fill" style="width:3.9%;background:#DBEAFE;"></div>
                     </div>
                   </td>
                   <td class="kd-td kd-td-num">4%</td>
@@ -1493,7 +1649,7 @@
           <div class="kd-insight-area" data-kd-insight-section="method-comparison" data-kd-insight-prefix="">
             <button class="kd-insight-toggle" id="kd-insight-toggle-method-comparison" onclick="kdToggleInsight(&#39;method-comparison&#39;,&#39;&#39;)">+ Add Insight</button>
             <div class="kd-insight-container" id="kd-insight-container-method-comparison">
-              <div class="kd-insight-editor" contenteditable="true" data-placeholder="Type your insight or comment here..." oninput="kdSyncInsight(&#39;method-comparison&#39;,&#39;&#39;)"></div>
+              <div class="kd-insight-editor" contenteditable="true" role="textbox" aria-label="Analyst insight for method-comparison section" data-placeholder="Type your insight or comment here..." oninput="kdSyncInsight(&#39;method-comparison&#39;,&#39;&#39;)"></div>
               <button class="kd-insight-dismiss" onclick="kdDismissInsight(&#39;method-comparison&#39;,&#39;&#39;)">×</button>
             </div>
           </div>
@@ -1596,32 +1752,32 @@
 <line x1="160.0" y1="155.0" x2="300.0" y2="185.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
 <line x1="300.0" y1="185.0" x2="440.0" y2="125.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
 <line x1="440.0" y1="125.0" x2="580.0" y2="185.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
-<line x1="580.0" y1="185.0" x2="720.0" y2="215.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
+<line x1="580.0" y1="185.0" x2="720.0" y2="185.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
 <circle cx="160.0" cy="155.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <circle cx="300.0" cy="185.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <circle cx="440.0" cy="125.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <circle cx="580.0" cy="185.0" r="3" fill="#94a3b8" opacity="0.40"/>
-<circle cx="720.0" cy="215.0" r="3" fill="#94a3b8" opacity="0.40"/>
-<text x="148.0" y="245.0" text-anchor="end" font-size="11" fill="#94a3b8" font-weight="400" dominant-baseline="central">billing_clarity</text>
-<line x1="160.0" y1="245.0" x2="300.0" y2="215.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
-<line x1="300.0" y1="215.0" x2="440.0" y2="245.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
-<line x1="440.0" y1="245.0" x2="580.0" y2="215.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
-<line x1="580.0" y1="215.0" x2="720.0" y2="185.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
-<circle cx="160.0" cy="245.0" r="3" fill="#94a3b8" opacity="0.40"/>
-<circle cx="300.0" cy="215.0" r="3" fill="#94a3b8" opacity="0.40"/>
-<circle cx="440.0" cy="245.0" r="3" fill="#94a3b8" opacity="0.40"/>
-<circle cx="580.0" cy="215.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <circle cx="720.0" cy="185.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <text x="148.0" y="215.0" text-anchor="end" font-size="11" fill="#94a3b8" font-weight="400" dominant-baseline="central">app_experience</text>
 <line x1="160.0" y1="215.0" x2="300.0" y2="245.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
 <line x1="300.0" y1="245.0" x2="440.0" y2="155.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
-<line x1="440.0" y1="155.0" x2="580.0" y2="245.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
-<line x1="580.0" y1="245.0" x2="720.0" y2="245.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
+<line x1="440.0" y1="155.0" x2="580.0" y2="215.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
+<line x1="580.0" y1="215.0" x2="720.0" y2="245.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
 <circle cx="160.0" cy="215.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <circle cx="300.0" cy="245.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <circle cx="440.0" cy="155.0" r="3" fill="#94a3b8" opacity="0.40"/>
-<circle cx="580.0" cy="245.0" r="3" fill="#94a3b8" opacity="0.40"/>
+<circle cx="580.0" cy="215.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <circle cx="720.0" cy="245.0" r="3" fill="#94a3b8" opacity="0.40"/>
+<text x="148.0" y="245.0" text-anchor="end" font-size="11" fill="#94a3b8" font-weight="400" dominant-baseline="central">billing_clarity</text>
+<line x1="160.0" y1="245.0" x2="300.0" y2="215.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
+<line x1="300.0" y1="215.0" x2="440.0" y2="245.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
+<line x1="440.0" y1="245.0" x2="580.0" y2="245.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
+<line x1="580.0" y1="245.0" x2="720.0" y2="215.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
+<circle cx="160.0" cy="245.0" r="3" fill="#94a3b8" opacity="0.40"/>
+<circle cx="300.0" cy="215.0" r="3" fill="#94a3b8" opacity="0.40"/>
+<circle cx="440.0" cy="245.0" r="3" fill="#94a3b8" opacity="0.40"/>
+<circle cx="580.0" cy="245.0" r="3" fill="#94a3b8" opacity="0.40"/>
+<circle cx="720.0" cy="215.0" r="3" fill="#94a3b8" opacity="0.40"/>
 <text x="148.0" y="275.0" text-anchor="end" font-size="11" fill="#94a3b8" font-weight="400" dominant-baseline="central">contract_flexibility</text>
 <line x1="160.0" y1="275.0" x2="300.0" y2="275.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
 <line x1="300.0" y1="275.0" x2="440.0" y2="275.0" stroke="#94a3b8" stroke-width="1.2" opacity="0.30"/>
@@ -1704,20 +1860,8 @@
                   <td class="kd-td kd-td-num">5</td>
                   <td class="kd-td kd-td-num">3</td>
                   <td class="kd-td kd-td-num">5</td>
-                  <td class="kd-td kd-td-num">6</td>
-                  <td class="kd-td kd-td-num">4.6</td>
-                  <td class="kd-td">
-                    <span class="kd-badge kd-agree-medium">Medium</span>
-                  </td>
-                </tr>
-                <tr class="kd-tr">
-                  <td class="kd-td kd-td-label">billing_clarity</td>
-                  <td class="kd-td kd-td-num">7</td>
-                  <td class="kd-td kd-td-num">6</td>
-                  <td class="kd-td kd-td-num">7</td>
-                  <td class="kd-td kd-td-num">6</td>
                   <td class="kd-td kd-td-num">5</td>
-                  <td class="kd-td kd-td-num">6.2</td>
+                  <td class="kd-td kd-td-num">4.4</td>
                   <td class="kd-td">
                     <span class="kd-badge kd-agree-high">High</span>
                   </td>
@@ -1727,11 +1871,23 @@
                   <td class="kd-td kd-td-num">6</td>
                   <td class="kd-td kd-td-num">7</td>
                   <td class="kd-td kd-td-num">4</td>
+                  <td class="kd-td kd-td-num">6</td>
                   <td class="kd-td kd-td-num">7</td>
-                  <td class="kd-td kd-td-num">7</td>
-                  <td class="kd-td kd-td-num">6.2</td>
+                  <td class="kd-td kd-td-num">6.0</td>
                   <td class="kd-td">
                     <span class="kd-badge kd-agree-medium">Medium</span>
+                  </td>
+                </tr>
+                <tr class="kd-tr">
+                  <td class="kd-td kd-td-label">billing_clarity</td>
+                  <td class="kd-td kd-td-num">7</td>
+                  <td class="kd-td kd-td-num">6</td>
+                  <td class="kd-td kd-td-num">7</td>
+                  <td class="kd-td kd-td-num">7</td>
+                  <td class="kd-td kd-td-num">6</td>
+                  <td class="kd-td kd-td-num">6.6</td>
+                  <td class="kd-td">
+                    <span class="kd-badge kd-agree-high">High</span>
                   </td>
                 </tr>
                 <tr class="kd-tr">
@@ -1758,7 +1914,7 @@
           <div class="kd-insight-area" data-kd-insight-section="effect-sizes" data-kd-insight-prefix="">
             <button class="kd-insight-toggle" id="kd-insight-toggle-effect-sizes" onclick="kdToggleInsight(&#39;effect-sizes&#39;,&#39;&#39;)">+ Add Insight</button>
             <div class="kd-insight-container" id="kd-insight-container-effect-sizes">
-              <div class="kd-insight-editor" contenteditable="true" data-placeholder="Type your insight or comment here..." oninput="kdSyncInsight(&#39;effect-sizes&#39;,&#39;&#39;)"></div>
+              <div class="kd-insight-editor" contenteditable="true" role="textbox" aria-label="Analyst insight for effect-sizes section" data-placeholder="Type your insight or comment here..." oninput="kdSyncInsight(&#39;effect-sizes&#39;,&#39;&#39;)"></div>
               <button class="kd-insight-dismiss" onclick="kdDismissInsight(&#39;effect-sizes&#39;,&#39;&#39;)">×</button>
             </div>
           </div>
@@ -1783,7 +1939,7 @@
                 <div style="font-size:11px;color:#64748b;">Negligible</div>
               </div>
             </div>
-            <p style="font-size:11px;color:var(--kd-text-muted);font-style:italic;">Effect size measures practical significance, not just statistical significance. A statistically significant driver with a negligible effect size may not warrant action.</p>
+            <p style="font-size:11px;color:var(--kd-text-muted);font-style:italic;">Effect size measures practical significance, not just statistical significance. A statistically significant driver with a negligible effect size may not warrant action. Thresholds follow Cohen (1988) for Small/Medium/Large, with an additional Negligible tier for values below the Small threshold.</p>
           </div>
           <div class="kd-chart-wrapper">
             <button class="kd-component-pin" data-kd-pin-section="effect-sizes" data-kd-pin-prefix="" data-kd-pin-component="chart" onclick="kdPinComponent(&#39;effect-sizes&#39;,&#39;chart&#39;,&#39;&#39;)" title="Pin chart only">📌 Chart</button>
@@ -1818,15 +1974,15 @@
 <rect x="200.0" y="179.0" width="19.2" height="28.0" rx="4" fill="#cbd5e1" opacity="0.85"/>
 <text x="225.2" y="193.0" text-anchor="start" font-size="10" fill="#334155" font-weight="500" dominant-baseline="central">0.015 (Negligible)</text>
 </g>
-<g class="kd-effect-row" data-kd-driver="billing_clarity">
-<text x="192.0" y="229.0" text-anchor="end" font-size="12" fill="#334155" font-weight="400" dominant-baseline="central">billing_clarity</text>
-<rect x="200.0" y="215.0" width="19.0" height="28.0" rx="4" fill="#cbd5e1" opacity="0.85"/>
-<text x="225.0" y="229.0" text-anchor="start" font-size="10" fill="#334155" font-weight="500" dominant-baseline="central">0.015 (Negligible)</text>
-</g>
 <g class="kd-effect-row" data-kd-driver="app_experience">
-<text x="192.0" y="265.0" text-anchor="end" font-size="12" fill="#334155" font-weight="400" dominant-baseline="central">app_experience</text>
-<rect x="200.0" y="251.0" width="10.0" height="28.0" rx="4" fill="#cbd5e1" opacity="0.85"/>
-<text x="216.0" y="265.0" text-anchor="start" font-size="10" fill="#334155" font-weight="500" dominant-baseline="central">0.008 (Negligible)</text>
+<text x="192.0" y="229.0" text-anchor="end" font-size="12" fill="#334155" font-weight="400" dominant-baseline="central">app_experience</text>
+<rect x="200.0" y="215.0" width="10.0" height="28.0" rx="4" fill="#cbd5e1" opacity="0.85"/>
+<text x="216.0" y="229.0" text-anchor="start" font-size="10" fill="#334155" font-weight="500" dominant-baseline="central">0.008 (Negligible)</text>
+</g>
+<g class="kd-effect-row" data-kd-driver="billing_clarity">
+<text x="192.0" y="265.0" text-anchor="end" font-size="12" fill="#334155" font-weight="400" dominant-baseline="central">billing_clarity</text>
+<rect x="200.0" y="251.0" width="19.0" height="28.0" rx="4" fill="#cbd5e1" opacity="0.85"/>
+<text x="225.0" y="265.0" text-anchor="start" font-size="10" fill="#334155" font-weight="500" dominant-baseline="central">0.015 (Negligible)</text>
 </g>
 <g class="kd-effect-row" data-kd-driver="contract_flexibility">
 <text x="192.0" y="301.0" text-anchor="end" font-size="12" fill="#334155" font-weight="400" dominant-baseline="central">contract_flexibility</text>
@@ -1888,20 +2044,20 @@
                   <td class="kd-td kd-td-label">coverage_area has negligible effect on the outcome (Cohen's f2 = 0.015)</td>
                 </tr>
                 <tr class="kd-tr">
-                  <td class="kd-td kd-td-label">billing_clarity</td>
-                  <td class="kd-td kd-td-num">0.015</td>
-                  <td class="kd-td">
-                    <span class="kd-badge kd-effect-negligible">Negligible</span>
-                  </td>
-                  <td class="kd-td kd-td-label">billing_clarity has negligible effect on the outcome (Cohen's f2 = 0.015)</td>
-                </tr>
-                <tr class="kd-tr">
                   <td class="kd-td kd-td-label">app_experience</td>
                   <td class="kd-td kd-td-num">0.008</td>
                   <td class="kd-td">
                     <span class="kd-badge kd-effect-negligible">Negligible</span>
                   </td>
                   <td class="kd-td kd-td-label">app_experience has negligible effect on the outcome (Cohen's f2 = 0.008)</td>
+                </tr>
+                <tr class="kd-tr">
+                  <td class="kd-td kd-td-label">billing_clarity</td>
+                  <td class="kd-td kd-td-num">0.015</td>
+                  <td class="kd-td">
+                    <span class="kd-badge kd-effect-negligible">Negligible</span>
+                  </td>
+                  <td class="kd-td kd-td-label">billing_clarity has negligible effect on the outcome (Cohen's f2 = 0.015)</td>
                 </tr>
                 <tr class="kd-tr">
                   <td class="kd-td kd-td-label">contract_flexibility</td>
@@ -1923,7 +2079,7 @@
           <div class="kd-insight-area" data-kd-insight-section="correlations" data-kd-insight-prefix="">
             <button class="kd-insight-toggle" id="kd-insight-toggle-correlations" onclick="kdToggleInsight(&#39;correlations&#39;,&#39;&#39;)">+ Add Insight</button>
             <div class="kd-insight-container" id="kd-insight-container-correlations">
-              <div class="kd-insight-editor" contenteditable="true" data-placeholder="Type your insight or comment here..." oninput="kdSyncInsight(&#39;correlations&#39;,&#39;&#39;)"></div>
+              <div class="kd-insight-editor" contenteditable="true" role="textbox" aria-label="Analyst insight for correlations section" data-placeholder="Type your insight or comment here..." oninput="kdSyncInsight(&#39;correlations&#39;,&#39;&#39;)"></div>
               <button class="kd-insight-dismiss" onclick="kdDismissInsight(&#39;correlations&#39;,&#39;&#39;)">×</button>
             </div>
           </div>
@@ -2126,7 +2282,7 @@
           <div class="kd-insight-area" data-kd-insight-section="quadrant" data-kd-insight-prefix="">
             <button class="kd-insight-toggle" id="kd-insight-toggle-quadrant" onclick="kdToggleInsight(&#39;quadrant&#39;,&#39;&#39;)">+ Add Insight</button>
             <div class="kd-insight-container" id="kd-insight-container-quadrant">
-              <div class="kd-insight-editor" contenteditable="true" data-placeholder="Type your insight or comment here..." oninput="kdSyncInsight(&#39;quadrant&#39;,&#39;&#39;)"></div>
+              <div class="kd-insight-editor" contenteditable="true" role="textbox" aria-label="Analyst insight for quadrant section" data-placeholder="Type your insight or comment here..." oninput="kdSyncInsight(&#39;quadrant&#39;,&#39;&#39;)"></div>
               <button class="kd-insight-dismiss" onclick="kdDismissInsight(&#39;quadrant&#39;,&#39;&#39;)">×</button>
             </div>
           </div>
@@ -2175,22 +2331,22 @@
 <text x="52" y="30" fill="#64748b" font-size="10" font-weight="400" text-anchor="end" dominant-baseline="central">100</text>
 <text x="365" y="494" fill="#64748b" font-size="12" font-weight="400" text-anchor="middle">Performance</text>
 <text x="14" y="240" fill="#64748b" font-size="12" font-weight="400" text-anchor="middle" transform="rotate(-90, 14, 240)">Importance</text>
-<circle cx="383.908" cy="410.588" r="6" fill="#4472C4" opacity="0.50" stroke="#ffffff" stroke-width="1.5"/>
-<circle cx="670" cy="403.572" r="6" fill="#4472C4" opacity="0.51" stroke="#ffffff" stroke-width="1.5"/>
-<circle cx="332.336" cy="450" r="6" fill="#4472C4" opacity="0.45" stroke="#ffffff" stroke-width="1.5"/>
-<circle cx="386.115" cy="370.46" r="6" fill="#4472C4" opacity="0.55" stroke="#ffffff" stroke-width="1.5"/>
-<circle cx="494.222" cy="205.587" r="6" fill="#4472C4" opacity="0.77" stroke="#ffffff" stroke-width="1.5"/>
-<circle cx="454.628" cy="301.732" r="6" fill="#4472C4" opacity="0.64" stroke="#ffffff" stroke-width="1.5"/>
+<circle cx="383.908" cy="405.813" r="6" fill="#4472C4" opacity="0.60" stroke="#ffffff" stroke-width="1.5"/>
+<circle cx="670" cy="409.608" r="6" fill="#4472C4" opacity="0.59" stroke="#ffffff" stroke-width="1.5"/>
+<circle cx="332.336" cy="450" r="6" fill="#4472C4" opacity="0.55" stroke="#ffffff" stroke-width="1.5"/>
+<circle cx="386.115" cy="371.793" r="6" fill="#4472C4" opacity="0.63" stroke="#ffffff" stroke-width="1.5"/>
+<circle cx="494.222" cy="226.014" r="6" fill="#4472C4" opacity="0.79" stroke="#ffffff" stroke-width="1.5"/>
+<circle cx="454.628" cy="319.736" r="6" fill="#4472C4" opacity="0.69" stroke="#ffffff" stroke-width="1.5"/>
 <circle cx="304.634" cy="30" r="6" fill="#4472C4" opacity="1.00" stroke="#ffffff" stroke-width="1.5"/>
-<circle cx="60" cy="341.71" r="6" fill="#4472C4" opacity="0.59" stroke="#ffffff" stroke-width="1.5"/>
-<text x="395.908" y="414.588" fill="#1e293b" font-size="11" font-weight="500" text-anchor="start">app_experience</text>
-<text x="658" y="407.572" fill="#1e293b" font-size="11" font-weight="500" text-anchor="end">billing_clarity</text>
+<circle cx="60" cy="334.016" r="6" fill="#4472C4" opacity="0.67" stroke="#ffffff" stroke-width="1.5"/>
+<text x="395.908" y="409.813" fill="#1e293b" font-size="11" font-weight="500" text-anchor="start">app_experience</text>
+<text x="660" y="399.608" fill="#1e293b" font-size="11" font-weight="500" text-anchor="end">billing_clarity</text>
 <text x="332.336" y="438" fill="#1e293b" font-size="11" font-weight="500" text-anchor="middle">contract_flexibility</text>
-<text x="398.115" y="374.46" fill="#1e293b" font-size="11" font-weight="500" text-anchor="start">coverage_area</text>
-<text x="506.222" y="209.587" fill="#1e293b" font-size="11" font-weight="500" text-anchor="start">customer_service</text>
-<text x="466.628" y="305.732" fill="#1e293b" font-size="11" font-weight="500" text-anchor="start">data_speed</text>
+<text x="398.115" y="375.793" fill="#1e293b" font-size="11" font-weight="500" text-anchor="start">coverage_area</text>
+<text x="506.222" y="230.014" fill="#1e293b" font-size="11" font-weight="500" text-anchor="start">customer_service</text>
+<text x="466.628" y="323.736" fill="#1e293b" font-size="11" font-weight="500" text-anchor="start">data_speed</text>
 <text x="304.634" y="55" fill="#1e293b" font-size="11" font-weight="500" text-anchor="middle">network_reliability</text>
-<text x="72" y="345.71" fill="#1e293b" font-size="11" font-weight="500" text-anchor="start">value_for_money</text>
+<text x="72" y="338.016" fill="#1e293b" font-size="11" font-weight="500" text-anchor="start">value_for_money</text>
 </svg>
           </div>
           <div class="kd-callout" style="margin-top:4px;">
@@ -2219,7 +2375,7 @@
             <table class="kd-quadrant-action-table" style="width:100%;border-collapse:collapse;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;font-size:13px;"><thead><tr style="border-bottom:2px solid #e2e8f0;"><th class="kd-quadrant-action-th" style="text-align:left;padding:8px 12px;color:#64748b;font-weight:600;font-size:11px;">Driver</th><th class="kd-quadrant-action-th" style="text-align:left;padding:8px 12px;color:#64748b;font-weight:600;font-size:11px;">Zone</th><th class="kd-quadrant-action-th" style="text-align:center;padding:8px 12px;color:#64748b;font-weight:600;font-size:11px;">Priority</th><th class="kd-quadrant-action-th" style="text-align:left;padding:8px 12px;color:#64748b;font-weight:600;font-size:11px;">Action</th></tr></thead><tbody><tr class="kd-quadrant-action-row"><td class="kd-quadrant-action-cell" style="font-weight:500;">network_reliability</td><td class="kd-quadrant-action-cell"><span class="kd-quadrant-badge" style="background-color:#ef4444;color:#fff;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600;">Concentrate Here</span></td><td class="kd-quadrant-action-cell" style="text-align:center;">1</td><td class="kd-quadrant-action-cell" style="text-align:center;"><span style="background:#fee2e2;color:#991b1b;padding:2px 10px;border-radius:10px;font-size:10px;font-weight:600;text-transform:uppercase;">IMPROVE</span></td></tr>
 <tr class="kd-quadrant-action-row"><td class="kd-quadrant-action-cell" style="font-weight:500;">value_for_money</td><td class="kd-quadrant-action-cell"><span class="kd-quadrant-badge" style="background-color:#94a3b8;color:#fff;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600;">Low Priority</span></td><td class="kd-quadrant-action-cell" style="text-align:center;">2</td><td class="kd-quadrant-action-cell" style="text-align:center;"><span style="background:#f1f5f9;color:#64748b;padding:2px 10px;border-radius:10px;font-size:10px;font-weight:600;text-transform:uppercase;">MONITOR</span></td></tr>
 <tr class="kd-quadrant-action-row"><td class="kd-quadrant-action-cell" style="font-weight:500;">customer_service</td><td class="kd-quadrant-action-cell"><span class="kd-quadrant-badge" style="background-color:#22c55e;color:#fff;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600;">Keep Up Good Work</span></td><td class="kd-quadrant-action-cell" style="text-align:center;">3</td><td class="kd-quadrant-action-cell" style="text-align:center;"><span style="background:#dcfce7;color:#166534;padding:2px 10px;border-radius:10px;font-size:10px;font-weight:600;text-transform:uppercase;">MAINTAIN</span></td></tr>
-<tr class="kd-quadrant-action-row"><td class="kd-quadrant-action-cell" style="font-weight:500;">data_speed</td><td class="kd-quadrant-action-cell"><span class="kd-quadrant-badge" style="background-color:#22c55e;color:#fff;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600;">Keep Up Good Work</span></td><td class="kd-quadrant-action-cell" style="text-align:center;">4</td><td class="kd-quadrant-action-cell" style="text-align:center;"><span style="background:#dcfce7;color:#166534;padding:2px 10px;border-radius:10px;font-size:10px;font-weight:600;text-transform:uppercase;">MAINTAIN</span></td></tr>
+<tr class="kd-quadrant-action-row"><td class="kd-quadrant-action-cell" style="font-weight:500;">data_speed</td><td class="kd-quadrant-action-cell"><span class="kd-quadrant-badge" style="background-color:#f59e0b;color:#fff;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600;">Possible Overkill</span></td><td class="kd-quadrant-action-cell" style="text-align:center;">4</td><td class="kd-quadrant-action-cell" style="text-align:center;"><span style="background:#dbeafe;color:#1e40af;padding:2px 10px;border-radius:10px;font-size:10px;font-weight:600;text-transform:uppercase;">ASSESS</span></td></tr>
 <tr class="kd-quadrant-action-row"><td class="kd-quadrant-action-cell" style="font-weight:500;">coverage_area</td><td class="kd-quadrant-action-cell"><span class="kd-quadrant-badge" style="background-color:#f59e0b;color:#fff;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600;">Possible Overkill</span></td><td class="kd-quadrant-action-cell" style="text-align:center;">5</td><td class="kd-quadrant-action-cell" style="text-align:center;"><span style="background:#dbeafe;color:#1e40af;padding:2px 10px;border-radius:10px;font-size:10px;font-weight:600;text-transform:uppercase;">ASSESS</span></td></tr>
 <tr class="kd-quadrant-action-row"><td class="kd-quadrant-action-cell" style="font-weight:500;">app_experience</td><td class="kd-quadrant-action-cell"><span class="kd-quadrant-badge" style="background-color:#94a3b8;color:#fff;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600;">Low Priority</span></td><td class="kd-quadrant-action-cell" style="text-align:center;">6</td><td class="kd-quadrant-action-cell" style="text-align:center;"><span style="background:#f1f5f9;color:#64748b;padding:2px 10px;border-radius:10px;font-size:10px;font-weight:600;text-transform:uppercase;">MONITOR</span></td></tr>
 <tr class="kd-quadrant-action-row"><td class="kd-quadrant-action-cell" style="font-weight:500;">billing_clarity</td><td class="kd-quadrant-action-cell"><span class="kd-quadrant-badge" style="background-color:#f59e0b;color:#fff;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600;">Possible Overkill</span></td><td class="kd-quadrant-action-cell" style="text-align:center;">7</td><td class="kd-quadrant-action-cell" style="text-align:center;"><span style="background:#dbeafe;color:#1e40af;padding:2px 10px;border-radius:10px;font-size:10px;font-weight:600;text-transform:uppercase;">ASSESS</span></td></tr>
@@ -2234,7 +2390,7 @@
           <div class="kd-insight-area" data-kd-insight-section="shap-summary" data-kd-insight-prefix="">
             <button class="kd-insight-toggle" id="kd-insight-toggle-shap-summary" onclick="kdToggleInsight(&#39;shap-summary&#39;,&#39;&#39;)">+ Add Insight</button>
             <div class="kd-insight-container" id="kd-insight-container-shap-summary">
-              <div class="kd-insight-editor" contenteditable="true" data-placeholder="Type your insight or comment here..." oninput="kdSyncInsight(&#39;shap-summary&#39;,&#39;&#39;)"></div>
+              <div class="kd-insight-editor" contenteditable="true" role="textbox" aria-label="Analyst insight for shap-summary section" data-placeholder="Type your insight or comment here..." oninput="kdSyncInsight(&#39;shap-summary&#39;,&#39;&#39;)"></div>
               <button class="kd-insight-dismiss" onclick="kdDismissInsight(&#39;shap-summary&#39;,&#39;&#39;)">×</button>
             </div>
           </div>
@@ -2245,31 +2401,31 @@
           </div>
           <div class="kd-chart-wrapper">
             <button class="kd-component-pin" data-kd-pin-section="shap-summary" data-kd-pin-prefix="" data-kd-pin-component="chart" onclick="kdPinComponent(&#39;shap-summary&#39;,&#39;chart&#39;,&#39;&#39;)" title="Pin chart only">📌 Chart</button>
-            <div class="kd-chart-container"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 302" width="100%" style="max-width:660px;display:block;">
+            <div class="kd-chart-container"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 302" width="100%" style="max-width:660px;display:block;" role="img" aria-label="SHAP importance bar chart">
 <text x="152.0" y="37.0" text-anchor="end" font-size="11" fill="#64748b" font-weight="500">network_reliability</text>
 <rect x="160.0" y="20.0" width="440.0" height="26.0" rx="4" fill="#4472C4" opacity="1.00"/>
-<text x="606.0" y="37.0" text-anchor="start" font-size="11" fill="#334155" font-weight="600">31%</text>
+<text x="606.0" y="37.0" text-anchor="start" font-size="11" fill="#334155" font-weight="600">30%</text>
 <text x="152.0" y="71.0" text-anchor="end" font-size="11" fill="#64748b" font-weight="500">customer_service</text>
-<rect x="160.0" y="54.0" width="283.7" height="26.0" rx="4" fill="#4472C4" opacity="0.82"/>
-<text x="449.7" y="71.0" text-anchor="start" font-size="11" fill="#334155" font-weight="600">20%</text>
+<rect x="160.0" y="54.0" width="290.2" height="26.0" rx="4" fill="#4472C4" opacity="0.83"/>
+<text x="456.2" y="71.0" text-anchor="start" font-size="11" fill="#334155" font-weight="600">20%</text>
 <text x="152.0" y="105.0" text-anchor="end" font-size="11" fill="#64748b" font-weight="500">value_for_money</text>
-<rect x="160.0" y="88.0" width="161.7" height="26.0" rx="4" fill="#4472C4" opacity="0.68"/>
-<text x="327.7" y="105.0" text-anchor="start" font-size="11" fill="#334155" font-weight="600">11%</text>
+<rect x="160.0" y="88.0" width="184.0" height="26.0" rx="4" fill="#4472C4" opacity="0.71"/>
+<text x="350.0" y="105.0" text-anchor="start" font-size="11" fill="#334155" font-weight="600">13%</text>
 <text x="152.0" y="139.0" text-anchor="end" font-size="11" fill="#64748b" font-weight="500">data_speed</text>
-<rect x="160.0" y="122.0" width="154.1" height="26.0" rx="4" fill="#4472C4" opacity="0.68"/>
-<text x="320.1" y="139.0" text-anchor="start" font-size="11" fill="#334155" font-weight="600">11%</text>
-<text x="152.0" y="173.0" text-anchor="end" font-size="11" fill="#64748b" font-weight="500">billing_clarity</text>
-<rect x="160.0" y="156.0" width="108.9" height="26.0" rx="4" fill="#4472C4" opacity="0.62"/>
-<text x="274.9" y="173.0" text-anchor="start" font-size="11" fill="#334155" font-weight="600">8%</text>
-<text x="152.0" y="207.0" text-anchor="end" font-size="11" fill="#64748b" font-weight="500">coverage_area</text>
-<rect x="160.0" y="190.0" width="99.5" height="26.0" rx="4" fill="#4472C4" opacity="0.61"/>
-<text x="265.5" y="207.0" text-anchor="start" font-size="11" fill="#334155" font-weight="600">7%</text>
+<rect x="160.0" y="122.0" width="158.9" height="26.0" rx="4" fill="#4472C4" opacity="0.68"/>
+<text x="324.9" y="139.0" text-anchor="start" font-size="11" fill="#334155" font-weight="600">11%</text>
+<text x="152.0" y="173.0" text-anchor="end" font-size="11" fill="#64748b" font-weight="500">coverage_area</text>
+<rect x="160.0" y="156.0" width="107.0" height="26.0" rx="4" fill="#4472C4" opacity="0.62"/>
+<text x="273.0" y="173.0" text-anchor="start" font-size="11" fill="#334155" font-weight="600">7%</text>
+<text x="152.0" y="207.0" text-anchor="end" font-size="11" fill="#64748b" font-weight="500">billing_clarity</text>
+<rect x="160.0" y="190.0" width="103.5" height="26.0" rx="4" fill="#4472C4" opacity="0.62"/>
+<text x="269.5" y="207.0" text-anchor="start" font-size="11" fill="#334155" font-weight="600">7%</text>
 <text x="152.0" y="241.0" text-anchor="end" font-size="11" fill="#64748b" font-weight="500">app_experience</text>
-<rect x="160.0" y="224.0" width="95.0" height="26.0" rx="4" fill="#4472C4" opacity="0.61"/>
-<text x="261.0" y="241.0" text-anchor="start" font-size="11" fill="#334155" font-weight="600">7%</text>
+<rect x="160.0" y="224.0" width="98.1" height="26.0" rx="4" fill="#4472C4" opacity="0.61"/>
+<text x="264.1" y="241.0" text-anchor="start" font-size="11" fill="#334155" font-weight="600">7%</text>
 <text x="152.0" y="275.0" text-anchor="end" font-size="11" fill="#64748b" font-weight="500">contract_flexibility</text>
-<rect x="160.0" y="258.0" width="70.1" height="26.0" rx="4" fill="#4472C4" opacity="0.58"/>
-<text x="236.1" y="275.0" text-anchor="start" font-size="11" fill="#334155" font-weight="600">5%</text>
+<rect x="160.0" y="258.0" width="74.1" height="26.0" rx="4" fill="#4472C4" opacity="0.58"/>
+<text x="240.1" y="275.0" text-anchor="start" font-size="11" fill="#334155" font-weight="600">5%</text>
 </svg></div>
           </div>
           <details style="margin-top:12px;">
@@ -2287,7 +2443,7 @@
           <div class="kd-insight-area" data-kd-insight-section="diagnostics" data-kd-insight-prefix="">
             <button class="kd-insight-toggle" id="kd-insight-toggle-diagnostics" onclick="kdToggleInsight(&#39;diagnostics&#39;,&#39;&#39;)">+ Add Insight</button>
             <div class="kd-insight-container" id="kd-insight-container-diagnostics">
-              <div class="kd-insight-editor" contenteditable="true" data-placeholder="Type your insight or comment here..." oninput="kdSyncInsight(&#39;diagnostics&#39;,&#39;&#39;)"></div>
+              <div class="kd-insight-editor" contenteditable="true" role="textbox" aria-label="Analyst insight for diagnostics section" data-placeholder="Type your insight or comment here..." oninput="kdSyncInsight(&#39;diagnostics&#39;,&#39;&#39;)"></div>
               <button class="kd-insight-dismiss" onclick="kdDismissInsight(&#39;diagnostics&#39;,&#39;&#39;)">×</button>
             </div>
           </div>
@@ -2443,7 +2599,7 @@
           <div class="kd-insight-area" data-kd-insight-section="bootstrap-ci" data-kd-insight-prefix="">
             <button class="kd-insight-toggle" id="kd-insight-toggle-bootstrap-ci" onclick="kdToggleInsight(&#39;bootstrap-ci&#39;,&#39;&#39;)">+ Add Insight</button>
             <div class="kd-insight-container" id="kd-insight-container-bootstrap-ci">
-              <div class="kd-insight-editor" contenteditable="true" data-placeholder="Type your insight or comment here..." oninput="kdSyncInsight(&#39;bootstrap-ci&#39;,&#39;&#39;)"></div>
+              <div class="kd-insight-editor" contenteditable="true" role="textbox" aria-label="Analyst insight for bootstrap-ci section" data-placeholder="Type your insight or comment here..." oninput="kdSyncInsight(&#39;bootstrap-ci&#39;,&#39;&#39;)"></div>
               <button class="kd-insight-dismiss" onclick="kdDismissInsight(&#39;bootstrap-ci&#39;,&#39;&#39;)">×</button>
             </div>
           </div>
@@ -2451,78 +2607,78 @@
           <div class="kd-chart-wrapper">
             <button class="kd-component-pin" data-kd-pin-section="bootstrap-ci" data-kd-pin-prefix="" data-kd-pin-component="chart" onclick="kdPinComponent(&#39;bootstrap-ci&#39;,&#39;chart&#39;,&#39;&#39;)" title="Pin chart only">📌 Chart</button>
             <div class="kd-chart-container"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 338" class="kd-chart kd-bootstrap-ci-chart" role="img" aria-label="Bootstrap confidence interval forest plot" style="font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;">
-<line x1="245.8" y1="25.0" x2="245.8" y2="328.0" stroke="#e2e8f0" stroke-width="1.0" opacity="1.00"/>
-<text x="245.8" y="18.0" text-anchor="middle" font-size="9" fill="#94a3b8" font-weight="400">0.0</text>
-<line x1="358.0" y1="25.0" x2="358.0" y2="328.0" stroke="#e2e8f0" stroke-width="1.0" opacity="1.00"/>
-<text x="358.0" y="18.0" text-anchor="middle" font-size="9" fill="#94a3b8" font-weight="400">0.2</text>
-<line x1="470.1" y1="25.0" x2="470.1" y2="328.0" stroke="#e2e8f0" stroke-width="1.0" opacity="1.00"/>
-<text x="470.1" y="18.0" text-anchor="middle" font-size="9" fill="#94a3b8" font-weight="400">0.4</text>
-<line x1="582.3" y1="25.0" x2="582.3" y2="328.0" stroke="#e2e8f0" stroke-width="1.0" opacity="1.00"/>
-<text x="582.3" y="18.0" text-anchor="middle" font-size="9" fill="#94a3b8" font-weight="400">0.6</text>
-<line x1="245.8" y1="25.0" x2="245.8" y2="328.0" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3" opacity="1.00"/>
+<line x1="248.0" y1="25.0" x2="248.0" y2="328.0" stroke="#e2e8f0" stroke-width="1.0" opacity="1.00"/>
+<text x="248.0" y="18.0" text-anchor="middle" font-size="9" fill="#94a3b8" font-weight="400">0.0</text>
+<line x1="359.3" y1="25.0" x2="359.3" y2="328.0" stroke="#e2e8f0" stroke-width="1.0" opacity="1.00"/>
+<text x="359.3" y="18.0" text-anchor="middle" font-size="9" fill="#94a3b8" font-weight="400">0.2</text>
+<line x1="470.6" y1="25.0" x2="470.6" y2="328.0" stroke="#e2e8f0" stroke-width="1.0" opacity="1.00"/>
+<text x="470.6" y="18.0" text-anchor="middle" font-size="9" fill="#94a3b8" font-weight="400">0.4</text>
+<line x1="581.9" y1="25.0" x2="581.9" y2="328.0" stroke="#e2e8f0" stroke-width="1.0" opacity="1.00"/>
+<text x="581.9" y="18.0" text-anchor="middle" font-size="9" fill="#94a3b8" font-weight="400">0.6</text>
+<line x1="248.0" y1="25.0" x2="248.0" y2="328.0" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3" opacity="1.00"/>
 <g class="kd-ci-row" data-kd-driver="network_reliability">
 <text x="192.0" y="44.0" text-anchor="end" font-size="11" fill="#334155" font-weight="400" dominant-baseline="central">network_reliability</text>
-<line x1="539.6" y1="44.0" x2="588.6" y2="44.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
-<line x1="539.6" y1="39.0" x2="539.6" y2="49.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
-<line x1="588.6" y1="39.0" x2="588.6" y2="49.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
-<circle cx="564.8" cy="44.0" r="4.0" fill="#4472C4" stroke="white" stroke-width="1.5"/>
-<text x="564.8" y="34.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.57</text>
+<line x1="536.9" y1="44.0" x2="588.9" y2="44.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
+<line x1="536.9" y1="39.0" x2="536.9" y2="49.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
+<line x1="588.9" y1="39.0" x2="588.9" y2="49.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
+<circle cx="564.4" cy="44.0" r="4.0" fill="#4472C4" stroke="white" stroke-width="1.5"/>
+<text x="564.4" y="34.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.57</text>
 </g>
 <g class="kd-ci-row" data-kd-driver="data_speed">
 <text x="192.0" y="80.0" text-anchor="end" font-size="11" fill="#334155" font-weight="400" dominant-baseline="central">data_speed</text>
-<line x1="431.3" y1="80.0" x2="495.8" y2="80.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
-<line x1="431.3" y1="75.0" x2="431.3" y2="85.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
-<line x1="495.8" y1="75.0" x2="495.8" y2="85.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
-<circle cx="463.9" cy="80.0" r="4.0" fill="#4472C4" stroke="white" stroke-width="1.5"/>
-<text x="463.9" y="70.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.39</text>
+<line x1="430.6" y1="80.0" x2="496.1" y2="80.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
+<line x1="430.6" y1="75.0" x2="430.6" y2="85.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
+<line x1="496.1" y1="75.0" x2="496.1" y2="85.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
+<circle cx="464.5" cy="80.0" r="4.0" fill="#4472C4" stroke="white" stroke-width="1.5"/>
+<text x="464.5" y="70.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.39</text>
 </g>
 <g class="kd-ci-row" data-kd-driver="customer_service">
 <text x="192.0" y="116.0" text-anchor="end" font-size="11" fill="#334155" font-weight="400" dominant-baseline="central">customer_service</text>
-<line x1="422.9" y1="116.0" x2="489.6" y2="116.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
-<line x1="422.9" y1="111.0" x2="422.9" y2="121.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
-<line x1="489.6" y1="111.0" x2="489.6" y2="121.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
-<circle cx="458.0" cy="116.0" r="4.0" fill="#4472C4" stroke="white" stroke-width="1.5"/>
-<text x="458.0" y="106.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.38</text>
+<line x1="428.0" y1="116.0" x2="490.6" y2="116.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
+<line x1="428.0" y1="111.0" x2="428.0" y2="121.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
+<line x1="490.6" y1="111.0" x2="490.6" y2="121.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
+<circle cx="458.5" cy="116.0" r="4.0" fill="#4472C4" stroke="white" stroke-width="1.5"/>
+<text x="458.5" y="106.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.38</text>
 </g>
 <g class="kd-ci-row" data-kd-driver="coverage_area">
 <text x="192.0" y="152.0" text-anchor="end" font-size="11" fill="#334155" font-weight="400" dominant-baseline="central">coverage_area</text>
-<line x1="387.0" y1="152.0" x2="451.7" y2="152.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
-<line x1="387.0" y1="147.0" x2="387.0" y2="157.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
-<line x1="451.7" y1="147.0" x2="451.7" y2="157.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
-<circle cx="417.5" cy="152.0" r="4.0" fill="#4472C4" stroke="white" stroke-width="1.5"/>
-<text x="417.5" y="142.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.31</text>
+<line x1="388.1" y1="152.0" x2="451.5" y2="152.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
+<line x1="388.1" y1="147.0" x2="388.1" y2="157.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
+<line x1="451.5" y1="147.0" x2="451.5" y2="157.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
+<circle cx="418.3" cy="152.0" r="4.0" fill="#4472C4" stroke="white" stroke-width="1.5"/>
+<text x="418.3" y="142.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.31</text>
 </g>
 <g class="kd-ci-row" data-kd-driver="value_for_money">
 <text x="192.0" y="188.0" text-anchor="end" font-size="11" fill="#334155" font-weight="400" dominant-baseline="central">value_for_money</text>
-<line x1="369.9" y1="188.0" x2="442.6" y2="188.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
-<line x1="369.9" y1="183.0" x2="369.9" y2="193.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
-<line x1="442.6" y1="183.0" x2="442.6" y2="193.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
-<circle cx="405.8" cy="188.0" r="4.0" fill="#4472C4" stroke="white" stroke-width="1.5"/>
-<text x="405.8" y="178.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.29</text>
+<line x1="368.3" y1="188.0" x2="441.9" y2="188.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
+<line x1="368.3" y1="183.0" x2="368.3" y2="193.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
+<line x1="441.9" y1="183.0" x2="441.9" y2="193.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
+<circle cx="406.7" cy="188.0" r="4.0" fill="#4472C4" stroke="white" stroke-width="1.5"/>
+<text x="406.7" y="178.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.29</text>
 </g>
 <g class="kd-ci-row" data-kd-driver="app_experience">
 <text x="192.0" y="224.0" text-anchor="end" font-size="11" fill="#334155" font-weight="400" dominant-baseline="central">app_experience</text>
-<line x1="348.0" y1="224.0" x2="415.1" y2="224.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
+<line x1="348.0" y1="224.0" x2="417.1" y2="224.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
 <line x1="348.0" y1="219.0" x2="348.0" y2="229.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
-<line x1="415.1" y1="219.0" x2="415.1" y2="229.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
-<circle cx="381.7" cy="224.0" r="4.0" fill="#4472C4" stroke="white" stroke-width="1.5"/>
-<text x="381.7" y="214.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.24</text>
+<line x1="417.1" y1="219.0" x2="417.1" y2="229.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
+<circle cx="382.8" cy="224.0" r="4.0" fill="#4472C4" stroke="white" stroke-width="1.5"/>
+<text x="382.8" y="214.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.24</text>
 </g>
 <g class="kd-ci-row" data-kd-driver="billing_clarity">
 <text x="192.0" y="260.0" text-anchor="end" font-size="11" fill="#334155" font-weight="400" dominant-baseline="central">billing_clarity</text>
-<line x1="316.2" y1="260.0" x2="385.1" y2="260.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
-<line x1="316.2" y1="255.0" x2="316.2" y2="265.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
-<line x1="385.1" y1="255.0" x2="385.1" y2="265.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
-<circle cx="352.6" cy="260.0" r="4.0" fill="#4472C4" stroke="white" stroke-width="1.5"/>
-<text x="352.6" y="250.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.19</text>
+<line x1="318.8" y1="260.0" x2="388.2" y2="260.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
+<line x1="318.8" y1="255.0" x2="318.8" y2="265.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
+<line x1="388.2" y1="255.0" x2="388.2" y2="265.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
+<circle cx="353.9" cy="260.0" r="4.0" fill="#4472C4" stroke="white" stroke-width="1.5"/>
+<text x="353.9" y="250.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">0.19</text>
 </g>
 <g class="kd-ci-row" data-kd-driver="contract_flexibility">
 <text x="192.0" y="296.0" text-anchor="end" font-size="11" fill="#334155" font-weight="400" dominant-baseline="central">contract_flexibility</text>
-<line x1="204.2" y1="296.0" x2="274.6" y2="296.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
-<line x1="204.2" y1="291.0" x2="204.2" y2="301.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
-<line x1="274.6" y1="291.0" x2="274.6" y2="301.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
-<circle cx="238.4" cy="296.0" r="4.0" fill="#4472C4" stroke="white" stroke-width="1.5"/>
-<text x="238.4" y="286.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">-0.01</text>
+<line x1="204.4" y1="296.0" x2="281.0" y2="296.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
+<line x1="204.4" y1="291.0" x2="204.4" y2="301.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
+<line x1="281.0" y1="291.0" x2="281.0" y2="301.0" stroke="#4472C4" stroke-width="1.5" opacity="0.60"/>
+<circle cx="240.6" cy="296.0" r="4.0" fill="#4472C4" stroke="white" stroke-width="1.5"/>
+<text x="240.6" y="286.0" text-anchor="middle" font-size="9" fill="#64748b" font-weight="500">-0.01</text>
 </g>
 </svg></div>
           </div>
@@ -2535,7 +2691,7 @@
           <div class="kd-insight-area" data-kd-insight-section="segment-comparison" data-kd-insight-prefix="">
             <button class="kd-insight-toggle" id="kd-insight-toggle-segment-comparison" onclick="kdToggleInsight(&#39;segment-comparison&#39;,&#39;&#39;)">+ Add Insight</button>
             <div class="kd-insight-container" id="kd-insight-container-segment-comparison">
-              <div class="kd-insight-editor" contenteditable="true" data-placeholder="Type your insight or comment here..." oninput="kdSyncInsight(&#39;segment-comparison&#39;,&#39;&#39;)"></div>
+              <div class="kd-insight-editor" contenteditable="true" role="textbox" aria-label="Analyst insight for segment-comparison section" data-placeholder="Type your insight or comment here..." oninput="kdSyncInsight(&#39;segment-comparison&#39;,&#39;&#39;)"></div>
               <button class="kd-insight-dismiss" onclick="kdDismissInsight(&#39;segment-comparison&#39;,&#39;&#39;)">×</button>
             </div>
           </div>
@@ -2562,7 +2718,7 @@
           </div>
           <div class="kd-chart-wrapper">
             <button class="kd-component-pin" data-kd-pin-section="segment-comparison" data-kd-pin-prefix="" data-kd-pin-component="chart" onclick="kdPinComponent(&#39;segment-comparison&#39;,&#39;chart&#39;,&#39;&#39;)" title="Pin chart only">📌 Chart</button>
-            <div class="kd-chart-container"><svg xmlns="http://www.w3.org/2000/svg" class="kd-segment-chart" viewBox="0 0 620 776" width="100%" style="max-width:620px;display:block;">
+            <div class="kd-chart-container"><svg xmlns="http://www.w3.org/2000/svg" class="kd-segment-chart" viewBox="0 0 620 776" width="100%" style="max-width:620px;display:block;" role="img" aria-label="Segment comparison grouped bar chart">
 <rect x="160" y="6" width="12" height="12" rx="2" fill="#64748b" data-kd-seg-legend="Total"/>
 <text x="176.0" y="16.0" text-anchor="start" font-size="10" fill="#64748b" font-weight="500">Total</text>
 <rect x="227" y="6" width="12" height="12" rx="2" fill="#4f86c6" data-kd-seg-legend="Business"/>
@@ -2832,6 +2988,199 @@
             </table>
           </div>
         </div>
+        <div class="kd-section" id="kd-elastic-net" data-kd-section="elastic-net">
+          <div class="kd-section-title-row">
+            <h2 class="kd-section-title">Elastic Net Variable Selection</h2>
+            <button class="kd-pin-btn" data-kd-pin-section="elastic-net" data-kd-pin-prefix="" onclick="kdPinSection(&#39;elastic-net&#39;,&#39;&#39;)" title="Pin this section">📌</button>
+          </div>
+          <p class="kd-section-intro">Elastic net regression (alpha = 0.50) identifies which drivers survive regularization. Drivers marked 'Zeroed' can be safely deprioritised. 7 of 8 drivers retained at lambda.1se (parsimonious model).</p>
+          <div class="kd-table-wrapper">
+            <table class="kd-table kd-elastic-net-table">
+              <thead>
+                <tr>
+                  <th class="kd-th kd-th-label">Driver</th>
+                  <th class="kd-th kd-th-num">Coefficient</th>
+                  <th class="kd-th kd-th-num">Importance %</th>
+                  <th class="kd-th kd-th-label">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="kd-tr">
+                  <td class="kd-td kd-td-label">network_reliability</td>
+                  <td class="kd-td kd-td-num">0.462</td>
+                  <td class="kd-td kd-td-num">40.2%</td>
+                  <td class="kd-td">
+                    <span class="kd-badge kd-agree-high">Retained</span>
+                  </td>
+                </tr>
+                <tr class="kd-tr">
+                  <td class="kd-td kd-td-label">customer_service</td>
+                  <td class="kd-td kd-td-num">0.295</td>
+                  <td class="kd-td kd-td-num">25.7%</td>
+                  <td class="kd-td">
+                    <span class="kd-badge kd-agree-high">Retained</span>
+                  </td>
+                </tr>
+                <tr class="kd-tr">
+                  <td class="kd-td kd-td-label">value_for_money</td>
+                  <td class="kd-td kd-td-num">0.177</td>
+                  <td class="kd-td kd-td-num">15.4%</td>
+                  <td class="kd-td">
+                    <span class="kd-badge kd-agree-high">Retained</span>
+                  </td>
+                </tr>
+                <tr class="kd-tr">
+                  <td class="kd-td kd-td-label">data_speed</td>
+                  <td class="kd-td kd-td-num">0.097</td>
+                  <td class="kd-td kd-td-num">8.4%</td>
+                  <td class="kd-td">
+                    <span class="kd-badge kd-agree-high">Retained</span>
+                  </td>
+                </tr>
+                <tr class="kd-tr">
+                  <td class="kd-td kd-td-label">coverage_area</td>
+                  <td class="kd-td kd-td-num">0.067</td>
+                  <td class="kd-td kd-td-num">5.8%</td>
+                  <td class="kd-td">
+                    <span class="kd-badge kd-agree-high">Retained</span>
+                  </td>
+                </tr>
+                <tr class="kd-tr">
+                  <td class="kd-td kd-td-label">billing_clarity</td>
+                  <td class="kd-td kd-td-num">0.037</td>
+                  <td class="kd-td kd-td-num">3.2%</td>
+                  <td class="kd-td">
+                    <span class="kd-badge kd-agree-high">Retained</span>
+                  </td>
+                </tr>
+                <tr class="kd-tr">
+                  <td class="kd-td kd-td-label">app_experience</td>
+                  <td class="kd-td kd-td-num">0.014</td>
+                  <td class="kd-td kd-td-num">1.2%</td>
+                  <td class="kd-td">
+                    <span class="kd-badge kd-agree-high">Retained</span>
+                  </td>
+                </tr>
+                <tr class="kd-tr">
+                  <td class="kd-td kd-td-label">contract_flexibility</td>
+                  <td class="kd-td kd-td-num">0.000</td>
+                  <td class="kd-td kd-td-num">0.0%</td>
+                  <td class="kd-td">
+                    <span class="kd-badge kd-concern-moderate">Zeroed</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="kd-insight-area" data-kd-insight-section="elastic-net" data-kd-insight-prefix="">
+            <button class="kd-insight-toggle" id="kd-insight-toggle-elastic-net" onclick="kdToggleInsight(&#39;elastic-net&#39;,&#39;&#39;)">+ Add Insight</button>
+            <div class="kd-insight-container" id="kd-insight-container-elastic-net">
+              <div class="kd-insight-editor" contenteditable="true" role="textbox" aria-label="Analyst insight for elastic-net section" data-placeholder="Type your insight or comment here..." oninput="kdSyncInsight(&#39;elastic-net&#39;,&#39;&#39;)"></div>
+              <button class="kd-insight-dismiss" onclick="kdDismissInsight(&#39;elastic-net&#39;,&#39;&#39;)">×</button>
+            </div>
+          </div>
+        </div>
+        <div class="kd-section" id="kd-gam" data-kd-section="gam">
+          <div class="kd-section-title-row">
+            <h2 class="kd-section-title">Nonlinear Effects (GAM)</h2>
+            <button class="kd-pin-btn" data-kd-pin-section="gam" data-kd-pin-prefix="" onclick="kdPinSection(&#39;gam&#39;,&#39;&#39;)" title="Pin this section">📌</button>
+          </div>
+          <p class="kd-section-intro">Generalized Additive Models test whether driver-outcome relationships are nonlinear. EDF (effective degrees of freedom) &gt; 1.5 with p &lt; 0.05 indicates meaningful curvature. 4 of 8 drivers show significant nonlinearity. The GAM explains 1.2% more variance than the linear model (53.0% vs 51.8%), suggesting actionable nonlinear patterns. (Wood, 2017).</p>
+          <div class="kd-table-wrapper">
+            <table class="kd-table kd-gam-table">
+              <thead>
+                <tr>
+                  <th class="kd-th kd-th-label">Driver</th>
+                  <th class="kd-th kd-th-num">EDF</th>
+                  <th class="kd-th kd-th-num">F-stat</th>
+                  <th class="kd-th kd-th-num">p-value</th>
+                  <th class="kd-th kd-th-label">Shape</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="kd-tr">
+                  <td class="kd-td kd-td-label">network_reliability</td>
+                  <td class="kd-td kd-td-num">2.9</td>
+                  <td class="kd-td kd-td-num">59.8</td>
+                  <td class="kd-td kd-td-num">&lt;0.001</td>
+                  <td class="kd-td">
+                    <span class="kd-badge kd-concern-high">Moderate curvature</span>
+                  </td>
+                </tr>
+                <tr class="kd-tr">
+                  <td class="kd-td kd-td-label">contract_flexibility</td>
+                  <td class="kd-td kd-td-num">2.4</td>
+                  <td class="kd-td kd-td-num">1.5</td>
+                  <td class="kd-td kd-td-num">0.316</td>
+                  <td class="kd-td">
+                    <span class="kd-badge kd-concern-none">Approximately linear</span>
+                  </td>
+                </tr>
+                <tr class="kd-tr">
+                  <td class="kd-td kd-td-label">value_for_money</td>
+                  <td class="kd-td kd-td-num">2.0</td>
+                  <td class="kd-td kd-td-num">27.5</td>
+                  <td class="kd-td kd-td-num">&lt;0.001</td>
+                  <td class="kd-td">
+                    <span class="kd-badge kd-concern-high">Moderate curvature</span>
+                  </td>
+                </tr>
+                <tr class="kd-tr">
+                  <td class="kd-td kd-td-label">data_speed</td>
+                  <td class="kd-td kd-td-num">1.8</td>
+                  <td class="kd-td kd-td-num">6.4</td>
+                  <td class="kd-td kd-td-num">0.001</td>
+                  <td class="kd-td">
+                    <span class="kd-badge kd-concern-high">Moderate curvature</span>
+                  </td>
+                </tr>
+                <tr class="kd-tr">
+                  <td class="kd-td kd-td-label">coverage_area</td>
+                  <td class="kd-td kd-td-num">1.8</td>
+                  <td class="kd-td kd-td-num">6.0</td>
+                  <td class="kd-td kd-td-num">0.002</td>
+                  <td class="kd-td">
+                    <span class="kd-badge kd-concern-high">Moderate curvature</span>
+                  </td>
+                </tr>
+                <tr class="kd-tr">
+                  <td class="kd-td kd-td-label">customer_service</td>
+                  <td class="kd-td kd-td-num">1.0</td>
+                  <td class="kd-td kd-td-num">146.2</td>
+                  <td class="kd-td kd-td-num">&lt;0.001</td>
+                  <td class="kd-td">
+                    <span class="kd-badge kd-concern-none">Approximately linear</span>
+                  </td>
+                </tr>
+                <tr class="kd-tr">
+                  <td class="kd-td kd-td-label">billing_clarity</td>
+                  <td class="kd-td kd-td-num">1.0</td>
+                  <td class="kd-td kd-td-num">12.2</td>
+                  <td class="kd-td kd-td-num">&lt;0.001</td>
+                  <td class="kd-td">
+                    <span class="kd-badge kd-concern-none">Approximately linear</span>
+                  </td>
+                </tr>
+                <tr class="kd-tr">
+                  <td class="kd-td kd-td-label">app_experience</td>
+                  <td class="kd-td kd-td-num">1.0</td>
+                  <td class="kd-td kd-td-num">5.4</td>
+                  <td class="kd-td kd-td-num">0.020</td>
+                  <td class="kd-td">
+                    <span class="kd-badge kd-concern-none">Approximately linear</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="kd-insight-area" data-kd-insight-section="gam" data-kd-insight-prefix="">
+            <button class="kd-insight-toggle" id="kd-insight-toggle-gam" onclick="kdToggleInsight(&#39;gam&#39;,&#39;&#39;)">+ Add Insight</button>
+            <div class="kd-insight-container" id="kd-insight-container-gam">
+              <div class="kd-insight-editor" contenteditable="true" role="textbox" aria-label="Analyst insight for gam section" data-placeholder="Type your insight or comment here..." oninput="kdSyncInsight(&#39;gam&#39;,&#39;&#39;)"></div>
+              <button class="kd-insight-dismiss" onclick="kdDismissInsight(&#39;gam&#39;,&#39;&#39;)">×</button>
+            </div>
+          </div>
+        </div>
         <div class="kd-section" id="kd-interpretation" data-kd-section="interpretation">
           <div class="kd-section-title-row">
             <h2 class="kd-section-title">How to Interpret These Results</h2>
@@ -2864,7 +3213,7 @@
           </div>
         </div>
         <div class="kd-footer">
-          Generated by TURAS Key Driver Module v1.0 | 05 March 2026 14:39
+          Generated by TURAS Key Driver Module v1.0 | 20 March 2026 16:35
           <br/>
           The Research LampPost (Pty) Ltd
         </div>
@@ -2877,6 +3226,7 @@
             <div class="kd-pinned-panel-title">📌 Pinned Views</div>
             <div class="kd-pinned-panel-actions">
               <button class="kd-pinned-panel-btn" onclick="kdAddSection()">➕ Add Section</button>
+              <button class="kd-pinned-panel-btn" onclick="kdAddQualSlide()">📝 Add Slide</button>
               <button class="kd-pinned-panel-btn" onclick="kdExportAllPinnedPNG()">📥 Export All as PNG</button>
               <button class="kd-pinned-panel-btn" onclick="kdPrintPinnedViews()">🖶 Print / PDF</button>
               <button class="kd-pinned-panel-btn" onclick="kdClearAllPinned()">🗑 Clear All</button>
@@ -2887,6 +3237,7 @@
             <div>No pinned views yet.</div>
             <div style="font-size:12px;margin-top:4px;">Click the pin icon on any section to save it here for export.</div>
           </div>
+          <div id="kd-qual-slides-container" class="kd-qual-slides-container"></div>
           <div id="kd-pinned-cards-container"></div>
         </div>
       </div>
@@ -3170,6 +3521,8 @@
     updateActiveNav();
     // Hydrate saved state
     kdHydratePage();
+    // Initialize table export buttons (CSV/Excel)
+    if (typeof kdInitTableExport === 'function') kdInitTableExport();
   });
 
   window.addEventListener('scroll', updateActiveNav, { passive: true });
@@ -3508,6 +3861,206 @@
 
 })();</script>
   <script>/* ==============================================================================
+ * KEYDRIVER HTML REPORT - TABLE EXPORT
+ * ==============================================================================
+ * Per-table CSV and Excel (XML Spreadsheet) export for all kd-table elements.
+ * Export buttons appear on hover over any .kd-table-wrapper container.
+ * All functions prefixed kd to avoid global namespace conflicts.
+ * ============================================================================== */
+
+(function() {
+  'use strict';
+
+  // --------------------------------------------------------------------------
+  // Extract table data as 2D array
+  // --------------------------------------------------------------------------
+
+  /**
+   * Extract all rows from a kd-table as a 2D string array.
+   * @param {HTMLTableElement} table
+   * @returns {string[][]}
+   */
+  function extractKdTableData(table) {
+    if (!table) return [];
+    var data = [];
+    var rows = table.querySelectorAll('tr');
+    rows.forEach(function(row) {
+      var cells = row.querySelectorAll('th, td');
+      var rowData = [];
+      cells.forEach(function(cell) {
+        if (cell.style.display === 'none') return;
+        var clone = cell.cloneNode(true);
+        // Remove inline bar fills (visual only)
+        var bars = clone.querySelectorAll('.kd-bar-container');
+        bars.forEach(function(b) { b.remove(); });
+        // Remove badges (keep text)
+        var badges = clone.querySelectorAll('.kd-badge');
+        badges.forEach(function(badge) {
+          var text = badge.textContent;
+          badge.parentNode.replaceChild(document.createTextNode(text), badge);
+        });
+        rowData.push(clone.textContent.trim());
+      });
+      if (rowData.length > 0) data.push(rowData);
+    });
+    return data;
+  }
+
+  /**
+   * Infer a filename from the closest section title.
+   * @param {HTMLElement} wrapper - The .kd-table-wrapper element
+   * @returns {string}
+   */
+  function inferTableName(wrapper) {
+    var section = wrapper.closest('.kd-section');
+    if (section) {
+      var title = section.querySelector('.kd-section-title');
+      if (title) {
+        return title.textContent.trim()
+          .replace(/[^a-zA-Z0-9_\- ]/g, '')
+          .replace(/\s+/g, '_')
+          .substring(0, 40);
+      }
+    }
+    return 'keydriver_table';
+  }
+
+  // --------------------------------------------------------------------------
+  // CSV Export
+  // --------------------------------------------------------------------------
+
+  /**
+   * Export a kd-table as CSV.
+   * @param {HTMLTableElement} table
+   * @param {string} filename
+   */
+  window.kdExportCSV = function(table, filename) {
+    var data = extractKdTableData(table);
+    if (data.length === 0) return;
+
+    var csv = data.map(function(row) {
+      return row.map(function(cell) {
+        var text = String(cell);
+        if (text.indexOf(',') >= 0 || text.indexOf('\n') >= 0 || text.indexOf('"') >= 0) {
+          text = '"' + text.replace(/"/g, '""') + '"';
+        }
+        return text;
+      }).join(',');
+    }).join('\n');
+
+    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    kdDownloadBlob(blob, (filename || 'table') + '.csv');
+  };
+
+  // --------------------------------------------------------------------------
+  // Excel XML Export
+  // --------------------------------------------------------------------------
+
+  /**
+   * Escape XML special characters.
+   * @param {string} s
+   * @returns {string}
+   */
+  function escXml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  /**
+   * Export a kd-table as Excel XML Spreadsheet (.xls).
+   * @param {HTMLTableElement} table
+   * @param {string} filename
+   */
+  window.kdExportExcel = function(table, filename) {
+    var data = extractKdTableData(table);
+    if (data.length === 0) return;
+
+    var sheetName = (filename || 'Table').substring(0, 31);
+
+    var xml = [];
+    xml.push('<?xml version="1.0" encoding="UTF-8"?>');
+    xml.push('<?mso-application progid="Excel.Sheet"?>');
+    xml.push('<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"');
+    xml.push(' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">');
+    xml.push('<Styles>');
+    xml.push('<Style ss:ID="header"><Font ss:Bold="1" ss:Size="11"/>');
+    xml.push('<Interior ss:Color="#F8F9FA" ss:Pattern="Solid"/></Style>');
+    xml.push('<Style ss:ID="normal"><Font ss:Size="11"/></Style>');
+    xml.push('</Styles>');
+    xml.push('<Worksheet ss:Name="' + escXml(sheetName) + '">');
+    xml.push('<Table>');
+
+    data.forEach(function(row, rowIdx) {
+      xml.push('<Row>');
+      row.forEach(function(cell) {
+        var styleId = rowIdx === 0 ? 'header' : 'normal';
+        // Detect numeric values
+        var cleaned = cell.replace(/[,%]/g, '');
+        var num = parseFloat(cleaned);
+        var isNum = !isNaN(num) && cleaned.trim() !== '' && /^[\d,.\-%\s]+$/.test(cell);
+        if (isNum) {
+          xml.push('<Cell ss:StyleID="' + styleId + '"><Data ss:Type="Number">' + num + '</Data></Cell>');
+        } else {
+          xml.push('<Cell ss:StyleID="' + styleId + '"><Data ss:Type="String">' + escXml(cell) + '</Data></Cell>');
+        }
+      });
+      xml.push('</Row>');
+    });
+
+    xml.push('</Table></Worksheet></Workbook>');
+
+    var blob = new Blob([xml.join('\n')], {
+      type: 'application/vnd.ms-excel;charset=utf-8'
+    });
+    kdDownloadBlob(blob, (filename || 'table') + '.xls');
+  };
+
+  // --------------------------------------------------------------------------
+  // Inject export buttons into all .kd-table-wrapper containers
+  // --------------------------------------------------------------------------
+
+  /**
+   * Initialize table export buttons. Called on DOMContentLoaded.
+   * Adds a small CSV | Excel button bar to each .kd-table-wrapper.
+   */
+  window.kdInitTableExport = function() {
+    var wrappers = document.querySelectorAll('.kd-table-wrapper');
+    wrappers.forEach(function(wrapper) {
+      // Skip if already initialized
+      if (wrapper.querySelector('.kd-table-export-bar')) return;
+
+      var table = wrapper.querySelector('.kd-table');
+      if (!table) return;
+
+      var bar = document.createElement('div');
+      bar.className = 'kd-table-export-bar';
+
+      var csvBtn = document.createElement('button');
+      csvBtn.className = 'kd-table-export-btn';
+      csvBtn.textContent = 'CSV';
+      csvBtn.title = 'Download as CSV';
+      csvBtn.onclick = function() {
+        var name = inferTableName(wrapper);
+        kdExportCSV(table, name);
+      };
+
+      var xlsBtn = document.createElement('button');
+      xlsBtn.className = 'kd-table-export-btn';
+      xlsBtn.textContent = 'Excel';
+      xlsBtn.title = 'Download as Excel';
+      xlsBtn.onclick = function() {
+        var name = inferTableName(wrapper);
+        kdExportExcel(table, name);
+      };
+
+      bar.appendChild(csvBtn);
+      bar.appendChild(xlsBtn);
+      wrapper.appendChild(bar);
+    });
+  };
+
+})();</script>
+  <script>/* ==============================================================================
  * KEYDRIVER HTML REPORT - PINNED VIEWS
  * ==============================================================================
  * Pin sections to a dedicated Pinned Views panel. Each pin captures:
@@ -3662,6 +4215,173 @@
       kdPinnedViews[idx].title = (newTitle || '').trim() || 'Untitled Section';
       kdSavePinnedData();
     }
+  };
+
+  // ============================================================================
+  // QUALITATIVE SLIDE SUPPORT
+  // ============================================================================
+
+  /**
+   * Add a qualitative slide to the pinned views panel.
+   * Creates a card with markdown editor, image upload, and pin functionality.
+   */
+  window.kdAddQualSlide = function() {
+    var container = document.getElementById('kd-qual-slides-container');
+    if (!container) return;
+    var id = 'kd-qual-' + Date.now();
+    var card = document.createElement('div');
+    card.className = 'kd-qual-slide-card editing';
+    card.setAttribute('data-slide-id', id);
+    card.innerHTML =
+      '<div class="kd-qual-header">' +
+        '<div class="kd-qual-title" contenteditable="true">New Slide</div>' +
+        '<div class="kd-qual-actions">' +
+          '<button class="kd-qual-btn" title="Add image" onclick="kdTriggerQualImage(\'' + id + '\')">&#x1F4F7;</button>' +
+          '<button class="kd-qual-btn" title="Pin to presentation" onclick="kdPinQualSlide(\'' + id + '\')">&#x1F4CC;</button>' +
+          '<button class="kd-qual-btn" title="Move up" onclick="kdMoveQualSlide(\'' + id + '\',-1)">&uarr;</button>' +
+          '<button class="kd-qual-btn" title="Move down" onclick="kdMoveQualSlide(\'' + id + '\',1)">&darr;</button>' +
+          '<button class="kd-qual-btn kd-qual-delete" title="Delete slide" onclick="kdRemoveQualSlide(\'' + id + '\')">&times;</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="kd-qual-img-preview" style="display:none;">' +
+        '<img class="kd-qual-img-thumb" src="" alt="Slide image"/>' +
+        '<button class="kd-qual-img-remove" onclick="kdRemoveQualImage(\'' + id + '\')">&times;</button>' +
+      '</div>' +
+      '<input type="file" class="kd-qual-img-input" accept="image/*" style="display:none" ' +
+        'onchange="kdHandleQualImage(\'' + id + '\',this)"/>' +
+      '<textarea class="kd-qual-md-editor" rows="4" placeholder="Enter commentary here (plain text or markdown)..."></textarea>' +
+      '<textarea class="kd-qual-img-store" style="display:none"></textarea>';
+    container.appendChild(card);
+    var editor = card.querySelector('.kd-qual-md-editor');
+    if (editor) editor.focus();
+  };
+
+  /**
+   * Trigger file picker for qualitative slide image.
+   */
+  window.kdTriggerQualImage = function(slideId) {
+    var card = document.querySelector('.kd-qual-slide-card[data-slide-id="' + slideId + '"]');
+    if (!card) return;
+    var input = card.querySelector('.kd-qual-img-input');
+    if (input) input.click();
+  };
+
+  /**
+   * Handle image file selection <e2><80><94> resize and store as base64.
+   */
+  window.kdHandleQualImage = function(slideId, input) {
+    if (!input.files || !input.files[0]) return;
+    var file = input.files[0];
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image too large (max 5 MB). Please use a smaller image or reduce its resolution.');
+      input.value = '';
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var img = new Image();
+      img.onerror = function() { input.value = ''; };
+      img.onload = function() {
+        var maxDim = 800;
+        var w = img.width, h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+          else { w = Math.round(w * maxDim / h); h = maxDim; }
+        }
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        var dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        var card = document.querySelector('.kd-qual-slide-card[data-slide-id="' + slideId + '"]');
+        if (!card) return;
+        var store = card.querySelector('.kd-qual-img-store');
+        if (store) {
+          store.value = dataUrl;
+          store.setAttribute('data-img-w', w);
+          store.setAttribute('data-img-h', h);
+        }
+        var preview = card.querySelector('.kd-qual-img-preview');
+        var thumb = card.querySelector('.kd-qual-img-thumb');
+        if (preview && thumb) {
+          thumb.src = dataUrl;
+          preview.style.display = 'block';
+        }
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+    input.value = '';
+  };
+
+  /**
+   * Remove image from qualitative slide.
+   */
+  window.kdRemoveQualImage = function(slideId) {
+    var card = document.querySelector('.kd-qual-slide-card[data-slide-id="' + slideId + '"]');
+    if (!card) return;
+    var store = card.querySelector('.kd-qual-img-store');
+    if (store) { store.value = ''; store.removeAttribute('data-img-w'); store.removeAttribute('data-img-h'); }
+    var preview = card.querySelector('.kd-qual-img-preview');
+    if (preview) preview.style.display = 'none';
+  };
+
+  /**
+   * Pin a qualitative slide to the pinned views panel.
+   */
+  window.kdPinQualSlide = function(slideId) {
+    var card = document.querySelector('.kd-qual-slide-card[data-slide-id="' + slideId + '"]');
+    if (!card) return;
+    var titleEl = card.querySelector('.kd-qual-title');
+    var editorEl = card.querySelector('.kd-qual-md-editor');
+    var storeEl = card.querySelector('.kd-qual-img-store');
+    var title = titleEl ? titleEl.textContent.trim() : 'Untitled';
+    var text = editorEl ? editorEl.value.trim() : '';
+    var imageData = storeEl ? storeEl.value : '';
+    var imgW = storeEl ? storeEl.getAttribute('data-img-w') : '';
+    var imgH = storeEl ? storeEl.getAttribute('data-img-h') : '';
+
+    kdPinnedViews.push({
+      type: 'text_box',
+      id: 'pin-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+      pinType: 'text_box',
+      qTitle: title,
+      insightText: '<p>' + text.replace(/\n/g, '</p><p>') + '</p>',
+      imageData: imageData,
+      imageWidth: imgW,
+      imageHeight: imgH,
+      sectionKey: 'qualitative',
+      label: title
+    });
+    kdSavePinnedData();
+    kdRenderPinnedCards();
+    kdUpdatePinBadge();
+  };
+
+  /**
+   * Move a qualitative slide up or down.
+   */
+  window.kdMoveQualSlide = function(slideId, direction) {
+    var container = document.getElementById('kd-qual-slides-container');
+    if (!container) return;
+    var cards = container.querySelectorAll('.kd-qual-slide-card');
+    for (var i = 0; i < cards.length; i++) {
+      if (cards[i].getAttribute('data-slide-id') === slideId) {
+        var target = i + direction;
+        if (target >= 0 && target < cards.length) {
+          if (direction < 0) container.insertBefore(cards[i], cards[target]);
+          else container.insertBefore(cards[target], cards[i]);
+        }
+        return;
+      }
+    }
+  };
+
+  /**
+   * Remove a qualitative slide.
+   */
+  window.kdRemoveQualSlide = function(slideId) {
+    var card = document.querySelector('.kd-qual-slide-card[data-slide-id="' + slideId + '"]');
+    if (card) card.remove();
   };
 
   /**

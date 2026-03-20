@@ -15,19 +15,31 @@
 #
 # ==============================================================================
 
+# Locate module root robustly (works with test_file and test_dir)
+.find_module_dir <- function() {
+  ofile <- tryCatch(sys.frame(1)$ofile, error = function(e) NULL)
+  if (!is.null(ofile)) {
+    return(normalizePath(file.path(dirname(ofile), "..", ".."), mustWork = FALSE))
+  }
+  tp <- tryCatch(testthat::test_path(), error = function(e) ".")
+  normalizePath(file.path(tp, "..", ".."), mustWork = FALSE)
+}
+module_dir <- .find_module_dir()
+project_root <- normalizePath(file.path(module_dir, "..", ".."), mustWork = FALSE)
+
 # Source test data generators
-source(file.path(dirname(dirname(testthat::test_path())), "fixtures", "generate_test_data.R"))
+source(file.path(module_dir, "tests", "fixtures", "generate_test_data.R"))
 
 # Source shared TRS infrastructure (required by config functions)
-shared_lib <- file.path(dirname(dirname(dirname(dirname(testthat::test_path())))), "shared", "lib")
+shared_lib <- file.path(project_root, "modules", "shared", "lib")
 source(file.path(shared_lib, "trs_refusal.R"))
 
 # Source the guard module (required by config - keydriver_refuse is defined there)
-guard_path <- file.path(dirname(dirname(dirname(testthat::test_path()))), "R", "00_guard.R")
+guard_path <- file.path(module_dir, "R", "00_guard.R")
 source(guard_path)
 
 # Source the config module under test
-config_path <- file.path(dirname(dirname(dirname(testthat::test_path()))), "R", "01_config.R")
+config_path <- file.path(module_dir, "R", "01_config.R")
 source(config_path)
 
 
@@ -361,5 +373,6 @@ test_that("validate_stated_importance_sheet passes with valid data", {
   )
 
   result <- validate_stated_importance_sheet(valid_si)
-  expect_true(result)
+  # BUG-6 fix: now returns a data frame instead of TRUE
+  expect_true(is.data.frame(result) || isTRUE(result))
 })

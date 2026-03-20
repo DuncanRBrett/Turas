@@ -1563,6 +1563,113 @@ for (finding in summary$key_findings) {
 }
 ```
 
+### 5.7 Elastic Net Variable Selection (NEW v10.4)
+
+Elastic net regression uses regularisation to identify which drivers
+can be safely deprioritised. Unlike traditional methods, it actively
+shrinks unimportant coefficients to zero.
+
+#### Enabling Elastic Net
+
+| Setting              | Value |
+|----------------------|-------|
+| enable_elastic_net   | TRUE  |
+| elastic_net_alpha    | 0.5   |
+| elastic_net_nfolds   | 10    |
+
+**Alpha controls the penalty type:**
+- `alpha = 1`: Lasso (aggressive variable selection)
+- `alpha = 0.5`: Elastic net (balanced, recommended)
+- `alpha = 0`: Ridge (keeps all variables, shrinks coefficients)
+
+#### Interpreting Results
+
+Drivers marked **Retained** have non-zero coefficients under
+regularisation. Drivers marked **Zeroed** contribute so little that the
+model performs equally well without them. This is powerful evidence for
+deprioritisation that traditional methods cannot provide.
+
+**Requires:** `glmnet` package (`renv::install("glmnet")`)
+
+### 5.8 Necessary Condition Analysis (NEW v10.4)
+
+NCA identifies "hygiene factors" — drivers that are *necessary* for
+high outcomes but may not be *sufficient*. A necessary condition means:
+you cannot achieve a high outcome without at least a moderate level of
+that driver.
+
+#### Enabling NCA
+
+| Setting      | Value |
+|-------------|-------|
+| enable_nca  | TRUE  |
+
+#### Interpreting Results
+
+A driver classified as a **Necessary Condition** has a significant
+ceiling effect (NCA effect size >= 0.1, p < 0.05). This means there is
+an empty upper-left corner in the driver-outcome scatter: no one scores
+high on the outcome without scoring at least moderately on that driver.
+
+**The Hygiene-Motivator Framework:** Combine NCA with traditional
+importance to classify drivers into four types:
+- **Hygiene Factor:** Necessary + low derived importance (must maintain)
+- **Key Driver:** Necessary + high derived importance (invest heavily)
+- **Motivator:** Not necessary + high derived importance (differentiator)
+- **Nice-to-Have:** Not necessary + low derived importance (deprioritise)
+
+**Requires:** `NCA` package (`renv::install("NCA")`)
+
+### 5.9 Dominance Analysis (NEW v10.4)
+
+Dominance analysis extends the existing Shapley decomposition with
+pairwise dominance rankings. General dominance equals Shapley values
+(already computed); this feature adds conditional dominance (by model
+size) and complete dominance (every pairwise comparison).
+
+#### Enabling Dominance Analysis
+
+| Setting            | Value |
+|--------------------|-------|
+| enable_dominance   | TRUE  |
+
+**Note:** Exact dominance analysis requires fitting 2^p sub-models. The
+module limits analysis to 15 drivers maximum for computational
+feasibility (2^15 = 32,768 models).
+
+**Requires:** `domir` package (`renv::install("domir")`)
+
+### 5.10 GAM Nonlinear Effects (NEW v10.4)
+
+Generalized Additive Models test whether driver-outcome relationships
+are linear or nonlinear. A GAM reveals diminishing returns, thresholds,
+and S-curves that a linear model cannot detect.
+
+#### Enabling GAMs
+
+| Setting      | Value |
+|-------------|-------|
+| enable_gam  | TRUE  |
+| gam_k       | 5     |
+
+**gam_k** controls the basis dimension (flexibility of the smooth). For
+typical survey data (200-2000 respondents), k=5 is appropriate. Higher
+values allow more complex curves but need more data.
+
+#### Interpreting Results
+
+**EDF (Effective Degrees of Freedom):**
+- EDF ≈ 1: Approximately linear relationship
+- EDF > 1.5 with p < 0.05: Significant nonlinearity
+- EDF > 3: Complex curvature (check visually)
+
+If the GAM explains substantially more variance than the linear model,
+the nonlinear patterns are real and actionable. A driver with
+diminishing returns above a threshold suggests a "good enough" target
+rather than continuous improvement.
+
+**Package:** `mgcv` (ships with base R, no installation needed)
+
 ------------------------------------------------------------------------
 
 ## 6. HTML Report Guide

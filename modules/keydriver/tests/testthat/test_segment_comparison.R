@@ -19,20 +19,32 @@ if (!exists("%||%")) {
   `%||%` <- function(a, b) if (is.null(a)) b else a
 }
 
+# Locate module root robustly (works with test_file and test_dir)
+.find_module_dir <- function() {
+  ofile <- tryCatch(sys.frame(1)$ofile, error = function(e) NULL)
+  if (!is.null(ofile)) {
+    return(normalizePath(file.path(dirname(ofile), "..", ".."), mustWork = FALSE))
+  }
+  tp <- tryCatch(testthat::test_path(), error = function(e) ".")
+  normalizePath(file.path(tp, "..", ".."), mustWork = FALSE)
+}
+module_dir <- .find_module_dir()
+project_root <- normalizePath(file.path(module_dir, "..", ".."), mustWork = FALSE)
+
 # Source test data generators
-fixtures_path <- file.path(dirname(dirname(testthat::test_path())), "fixtures", "generate_test_data.R")
+fixtures_path <- file.path(module_dir, "tests", "fixtures", "generate_test_data.R")
 if (file.exists(fixtures_path)) {
   source(fixtures_path)
 }
 
 # Source the module under test (with TRS infrastructure)
-trs_path <- file.path(dirname(dirname(dirname(dirname(testthat::test_path())))), "shared", "lib", "trs_refusal.R")
+trs_path <- file.path(project_root, "modules", "shared", "lib", "trs_refusal.R")
 if (file.exists(trs_path)) source(trs_path)
 
-guard_path <- file.path(dirname(dirname(dirname(testthat::test_path()))), "R", "00_guard.R")
+guard_path <- file.path(module_dir, "R", "00_guard.R")
 if (file.exists(guard_path)) source(guard_path)
 
-source_path <- file.path(dirname(dirname(dirname(testthat::test_path()))), "R", "07_segment_comparison.R")
+source_path <- file.path(module_dir, "R", "07_segment_comparison.R")
 if (file.exists(source_path)) source(source_path)
 
 

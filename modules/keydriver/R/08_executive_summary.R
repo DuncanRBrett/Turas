@@ -118,15 +118,18 @@ generate_executive_summary <- function(results, config = list()) {
   # 1. Headline
   headline <- .build_headline(importance_df, r_squared, n_obs)
 
-  # 2. Key findings
+  # 2. Compute reusable summaries (called once, used in key_findings + return list)
+  model_quality <- assess_model_quality(r_squared, n_obs, n_drivers,
+                                         thresholds = r2_thresholds)
+  method_agreement <- assess_method_agreement(importance_df)
+
+  # 3. Key findings
   key_findings <- character(0)
   key_findings <- c(key_findings, summarize_top_drivers(importance_df, top_n = top_n))
-  key_findings <- c(key_findings, assess_model_quality(r_squared, n_obs, n_drivers,
-                                                        thresholds = r2_thresholds))
-  key_findings <- c(key_findings, assess_method_agreement(importance_df))
+  key_findings <- c(key_findings, model_quality)
+  key_findings <- c(key_findings, method_agreement)
 
   # Add dominant driver finding if applicable
-
   dominant_msg <- detect_dominant_driver(importance_df, threshold = dominant_threshold)
   if (!is.null(dominant_msg)) {
     key_findings <- c(key_findings, dominant_msg)
@@ -148,13 +151,6 @@ generate_executive_summary <- function(results, config = list()) {
     )
     warnings_out <- c(warnings_out, low_r2_msg)
   }
-
-  # 3. Method agreement
-  method_agreement <- assess_method_agreement(importance_df)
-
-  # 4. Model quality
-  model_quality <- assess_model_quality(r_squared, n_obs, n_drivers,
-                                         thresholds = r2_thresholds)
 
   # 5. Recommendations
   effect_sizes <- .extract_effect_sizes(importance_df, r_squared)
@@ -629,7 +625,7 @@ format_executive_summary <- function(summary_list, format = "text") {
   }
 
   sprintf(
-    "%s is %s of %s, explaining %.0f%% of the model's variance (R\u00b2=%.0f%%, n=%d).",
+    "%s is %s of %s, accounting for %.0f%% of driver importance (R\u00b2=%.0f%%, n=%d).",
     top_label, descriptor, outcome_label, top_pct, r_squared * 100, n_obs
   )
 }

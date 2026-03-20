@@ -78,7 +78,18 @@ create_demo_config <- function(output_path = NULL) {
       "html_show_guide",
       # HTML report display options
       "correlation_display",
-      "bootstrap_display"
+      "bootstrap_display",
+      # v10.4 features
+      "enable_elastic_net",
+      "elastic_net_alpha",
+      "elastic_net_nfolds",
+      "enable_nca",
+      "enable_dominance",
+      "enable_gam",
+      "gam_k",
+      # Configurable thresholds
+      "vif_moderate_threshold",
+      "vif_high_threshold"
     ),
     Value = c(
       "demo_survey_data.csv",
@@ -117,7 +128,18 @@ create_demo_config <- function(output_path = NULL) {
       "TRUE",   # guide
       # Display modes
       "heatmap",   # correlation_display
-      "summary"    # bootstrap_display
+      "summary",   # bootstrap_display
+      # v10.4 features
+      "TRUE",      # enable_elastic_net
+      "0.5",       # elastic_net_alpha (0=ridge, 0.5=elastic net, 1=lasso)
+      "10",        # elastic_net_nfolds
+      "TRUE",      # enable_nca
+      "TRUE",      # enable_dominance
+      "TRUE",      # enable_gam
+      "5",         # gam_k (basis dimension)
+      # Configurable thresholds
+      "5",         # vif_moderate_threshold
+      "10"         # vif_high_threshold
     ),
     stringsAsFactors = FALSE
   )
@@ -210,6 +232,43 @@ create_demo_config <- function(output_path = NULL) {
   openxlsx::writeData(wb, "StatedImportance", stated, startRow = 1)
   openxlsx::addStyle(wb, "StatedImportance", header_style, rows = 1, cols = 1:2, gridExpand = TRUE)
   openxlsx::setColWidths(wb, "StatedImportance", cols = 1:2, widths = "auto")
+
+  # ------------------------------------------------------------------
+  # Sheet 5: CustomSlides (v10.4)
+  # ------------------------------------------------------------------
+  openxlsx::addWorksheet(wb, "CustomSlides")
+
+  custom_slides <- data.frame(
+    slide_title = c(
+      "Research Context",
+      "Methodology Note"
+    ),
+    slide_content = c(
+      paste0(
+        "## Telecom Customer Satisfaction Study\n\n",
+        "This key driver analysis examines what drives **overall satisfaction** ",
+        "across 800 respondents in three customer segments.\n\n",
+        "The study uses 8 service attributes rated on a 1-10 scale."
+      ),
+      paste0(
+        "## Statistical Methodology\n\n",
+        "Five complementary methods are used:\n\n",
+        "- **Shapley Values** - game-theoretic R-squared decomposition\n",
+        "- **Relative Weights** - handles multicollinearity\n",
+        "- **Beta Weights** - standardized regression coefficients\n",
+        "- **Elastic Net** - penalized variable selection\n",
+        "- **GAM** - nonlinear effect detection"
+      )
+    ),
+    slide_image = c(NA, NA),
+    slide_order = c(1, 2),
+    stringsAsFactors = FALSE
+  )
+
+  openxlsx::writeData(wb, "CustomSlides", custom_slides, startRow = 1)
+  openxlsx::addStyle(wb, "CustomSlides", header_style, rows = 1,
+                     cols = 1:ncol(custom_slides), gridExpand = TRUE)
+  openxlsx::setColWidths(wb, "CustomSlides", cols = 1:ncol(custom_slides), widths = c(20, 50, 20, 12))
 
   # ------------------------------------------------------------------
   # Save

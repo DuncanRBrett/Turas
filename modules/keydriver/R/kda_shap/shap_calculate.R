@@ -131,9 +131,10 @@ create_feature_map <- function(X_raw, X_encoded) {
 
   for (col in names(X_raw)) {
     if (is.factor(X_raw[[col]]) && !is.ordered(X_raw[[col]])) {
-      # Find dummy columns for this factor
-      dummy_pattern <- paste0("^", col)
-      matches <- grep(dummy_pattern, names(X_encoded), value = TRUE)
+      # Find dummy columns for this factor using exact prefix matching
+      # Anchor with word boundary to prevent "Q1" matching "Q10", "Q100", etc.
+      dummy_pattern <- paste0("^", col, "(?=$|[^[:alnum:]_])")
+      matches <- grep(dummy_pattern, names(X_encoded), value = TRUE, perl = TRUE)
       if (length(matches) > 0) {
         for (m in matches) {
           feature_map[[m]] <- col

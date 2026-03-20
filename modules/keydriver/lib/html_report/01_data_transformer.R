@@ -210,6 +210,14 @@ transform_keydriver_for_html <- function(results, config) {
   segment_comparison <- results$segment_comparison  # list pass-through
 
   # --------------------------------------------------------------------------
+  # 9b. Advanced features (v10.4, optional pass-through)
+  # --------------------------------------------------------------------------
+  elastic_net <- results$elastic_net   # list or NULL
+  nca         <- results$nca           # list or NULL
+  dominance   <- results$dominance     # list or NULL
+  gam         <- results$gam           # list or NULL
+
+  # --------------------------------------------------------------------------
   # 10. Narrative insights
   # --------------------------------------------------------------------------
   narrative <- generate_kd_narrative(
@@ -243,6 +251,15 @@ transform_keydriver_for_html <- function(results, config) {
     has_shap           = has_shap,
     has_quadrant       = has_quadrant,
     has_bootstrap      = has_bootstrap,
+    # v10.4 advanced features
+    elastic_net        = elastic_net,
+    nca                = nca,
+    dominance          = dominance,
+    gam                = gam,
+    has_elastic_net    = !is.null(elastic_net),
+    has_nca            = !is.null(nca),
+    has_dominance      = !is.null(dominance),
+    has_gam            = !is.null(gam),
     analysis_name      = config$analysis_name %||% "Key Driver Analysis",
     run_status         = results$run_status %||% "PASS"
   )

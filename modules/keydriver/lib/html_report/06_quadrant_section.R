@@ -264,7 +264,7 @@ build_kd_quadrant_chart <- function(quadrant_data, config) {
   for (i in seq_len(n)) {
     # Opacity based on importance (higher = more opaque)
     opacity <- if (imp_span > 0) {
-      0.45 + 0.55 * (qd$importance_normalized[i] - imp_range[1]) / imp_span
+      0.55 + 0.45 * (qd$importance_normalized[i] - imp_range[1]) / imp_span
     } else {
       0.75
     }
@@ -323,11 +323,22 @@ resolve_label_positions <- function(labels, px, py, r,
 
   n <- length(labels)
   offset <- r + 6  # distance from centre of point to label origin
+  diag   <- round(offset * 0.85)  # shorter offset for diagonal placements
   char_w <- 6.2    # approximate width per character at 11px
   label_h <- 13    # approximate label height
+  max_label_chars <- 24  # truncate long labels
+
+  # Truncate long labels for better fit
+  display_labels <- vapply(labels, function(lbl) {
+    if (nchar(lbl) > max_label_chars) {
+      paste0(substr(lbl, 1, max_label_chars - 1), "\u2026")
+    } else {
+      lbl
+    }
+  }, character(1))
 
   out <- data.frame(
-    label  = labels,
+    label  = display_labels,
     lx     = numeric(n),
     ly     = numeric(n),
     anchor = character(n),
@@ -337,43 +348,36 @@ resolve_label_positions <- function(labels, px, py, r,
   # Track placed bounding boxes: list of (x_min, y_min, x_max, y_max)
   placed <- vector("list", 0)
 
-  for (i in seq_len(n)) {
-    text_w <- nchar(labels[i]) * char_w
+  # Also track point bounding boxes as obstacles
+  point_bboxes <- lapply(seq_len(n), function(i) {
+    c(px[i] - r, py[i] - r, px[i] + r, py[i] + r)
+  })
 
-    # Candidate positions: (x, y, anchor, bbox)
+  # Helper: build candidate from (x, y, anchor)
+  make_cand <- function(x, y, anchor, tw) {
+    if (anchor == "start") {
+      bbox <- c(x, y - label_h / 2, x + tw, y + label_h / 2)
+    } else if (anchor == "end") {
+      bbox <- c(x - tw, y - label_h / 2, x, y + label_h / 2)
+    } else {
+      bbox <- c(x - tw / 2, y - label_h / 2, x + tw / 2, y + label_h / 2)
+    }
+    list(x = x, y = y, anchor = anchor, bbox = bbox)
+  }
+
+  for (i in seq_len(n)) {
+    text_w <- nchar(display_labels[i]) * char_w
+
+    # 8 candidate positions: cardinal + diagonal
     candidates <- list(
-      # Right
-      list(
-        x = px[i] + offset,
-        y = py[i] + 4,
-        anchor = "start",
-        bbox = c(px[i] + offset, py[i] - label_h / 2,
-                 px[i] + offset + text_w, py[i] + label_h / 2)
-      ),
-      # Above
-      list(
-        x = px[i],
-        y = py[i] - offset,
-        anchor = "middle",
-        bbox = c(px[i] - text_w / 2, py[i] - offset - label_h,
-                 px[i] + text_w / 2, py[i] - offset)
-      ),
-      # Below
-      list(
-        x = px[i],
-        y = py[i] + offset + label_h,
-        anchor = "middle",
-        bbox = c(px[i] - text_w / 2, py[i] + offset,
-                 px[i] + text_w / 2, py[i] + offset + label_h)
-      ),
-      # Left
-      list(
-        x = px[i] - offset,
-        y = py[i] + 4,
-        anchor = "end",
-        bbox = c(px[i] - offset - text_w, py[i] - label_h / 2,
-                 px[i] - offset, py[i] + label_h / 2)
-      )
+      make_cand(px[i] + offset, py[i] + 4, "start", text_w),           # Right
+      make_cand(px[i], py[i] - offset, "middle", text_w),               # Above
+      make_cand(px[i] + diag, py[i] - diag, "start", text_w),          # Top-right
+      make_cand(px[i] - diag, py[i] - diag, "end", text_w),            # Top-left
+      make_cand(px[i], py[i] + offset + label_h, "middle", text_w),    # Below
+      make_cand(px[i] + diag, py[i] + diag + label_h, "start", text_w),# Bottom-right
+      make_cand(px[i] - offset, py[i] + 4, "end", text_w),             # Left
+      make_cand(px[i] - diag, py[i] + diag + label_h, "end", text_w)   # Bottom-left
     )
 
     chosen <- NULL
@@ -390,6 +394,17 @@ resolve_label_positions <- function(labels, px, py, r,
         if (bb[1] < pb[3] && bb[3] > pb[1] && bb[2] < pb[4] && bb[4] > pb[2]) {
           has_overlap <- TRUE
           break
+        }
+      }
+      # Also check overlap with other point circles (not current point)
+      if (!has_overlap) {
+        for (j in seq_len(n)) {
+          if (j == i) next
+          pbj <- point_bboxes[[j]]
+          if (bb[1] < pbj[3] && bb[3] > pbj[1] && bb[2] < pbj[4] && bb[4] > pbj[2]) {
+            has_overlap <- TRUE
+            break
+          }
         }
       }
       if (!has_overlap) {

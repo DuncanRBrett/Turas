@@ -155,6 +155,173 @@
     }
   };
 
+  // ============================================================================
+  // QUALITATIVE SLIDE SUPPORT
+  // ============================================================================
+
+  /**
+   * Add a qualitative slide to the pinned views panel.
+   * Creates a card with markdown editor, image upload, and pin functionality.
+   */
+  window.kdAddQualSlide = function() {
+    var container = document.getElementById('kd-qual-slides-container');
+    if (!container) return;
+    var id = 'kd-qual-' + Date.now();
+    var card = document.createElement('div');
+    card.className = 'kd-qual-slide-card editing';
+    card.setAttribute('data-slide-id', id);
+    card.innerHTML =
+      '<div class="kd-qual-header">' +
+        '<div class="kd-qual-title" contenteditable="true">New Slide</div>' +
+        '<div class="kd-qual-actions">' +
+          '<button class="kd-qual-btn" title="Add image" onclick="kdTriggerQualImage(\'' + id + '\')">&#x1F4F7;</button>' +
+          '<button class="kd-qual-btn" title="Pin to presentation" onclick="kdPinQualSlide(\'' + id + '\')">&#x1F4CC;</button>' +
+          '<button class="kd-qual-btn" title="Move up" onclick="kdMoveQualSlide(\'' + id + '\',-1)">&uarr;</button>' +
+          '<button class="kd-qual-btn" title="Move down" onclick="kdMoveQualSlide(\'' + id + '\',1)">&darr;</button>' +
+          '<button class="kd-qual-btn kd-qual-delete" title="Delete slide" onclick="kdRemoveQualSlide(\'' + id + '\')">&times;</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="kd-qual-img-preview" style="display:none;">' +
+        '<img class="kd-qual-img-thumb" src="" alt="Slide image"/>' +
+        '<button class="kd-qual-img-remove" onclick="kdRemoveQualImage(\'' + id + '\')">&times;</button>' +
+      '</div>' +
+      '<input type="file" class="kd-qual-img-input" accept="image/*" style="display:none" ' +
+        'onchange="kdHandleQualImage(\'' + id + '\',this)"/>' +
+      '<textarea class="kd-qual-md-editor" rows="4" placeholder="Enter commentary here (plain text or markdown)..."></textarea>' +
+      '<textarea class="kd-qual-img-store" style="display:none"></textarea>';
+    container.appendChild(card);
+    var editor = card.querySelector('.kd-qual-md-editor');
+    if (editor) editor.focus();
+  };
+
+  /**
+   * Trigger file picker for qualitative slide image.
+   */
+  window.kdTriggerQualImage = function(slideId) {
+    var card = document.querySelector('.kd-qual-slide-card[data-slide-id="' + slideId + '"]');
+    if (!card) return;
+    var input = card.querySelector('.kd-qual-img-input');
+    if (input) input.click();
+  };
+
+  /**
+   * Handle image file selection — resize and store as base64.
+   */
+  window.kdHandleQualImage = function(slideId, input) {
+    if (!input.files || !input.files[0]) return;
+    var file = input.files[0];
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image too large (max 5 MB). Please use a smaller image or reduce its resolution.');
+      input.value = '';
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var img = new Image();
+      img.onerror = function() { input.value = ''; };
+      img.onload = function() {
+        var maxDim = 800;
+        var w = img.width, h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+          else { w = Math.round(w * maxDim / h); h = maxDim; }
+        }
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        var dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        var card = document.querySelector('.kd-qual-slide-card[data-slide-id="' + slideId + '"]');
+        if (!card) return;
+        var store = card.querySelector('.kd-qual-img-store');
+        if (store) {
+          store.value = dataUrl;
+          store.setAttribute('data-img-w', w);
+          store.setAttribute('data-img-h', h);
+        }
+        var preview = card.querySelector('.kd-qual-img-preview');
+        var thumb = card.querySelector('.kd-qual-img-thumb');
+        if (preview && thumb) {
+          thumb.src = dataUrl;
+          preview.style.display = 'block';
+        }
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+    input.value = '';
+  };
+
+  /**
+   * Remove image from qualitative slide.
+   */
+  window.kdRemoveQualImage = function(slideId) {
+    var card = document.querySelector('.kd-qual-slide-card[data-slide-id="' + slideId + '"]');
+    if (!card) return;
+    var store = card.querySelector('.kd-qual-img-store');
+    if (store) { store.value = ''; store.removeAttribute('data-img-w'); store.removeAttribute('data-img-h'); }
+    var preview = card.querySelector('.kd-qual-img-preview');
+    if (preview) preview.style.display = 'none';
+  };
+
+  /**
+   * Pin a qualitative slide to the pinned views panel.
+   */
+  window.kdPinQualSlide = function(slideId) {
+    var card = document.querySelector('.kd-qual-slide-card[data-slide-id="' + slideId + '"]');
+    if (!card) return;
+    var titleEl = card.querySelector('.kd-qual-title');
+    var editorEl = card.querySelector('.kd-qual-md-editor');
+    var storeEl = card.querySelector('.kd-qual-img-store');
+    var title = titleEl ? titleEl.textContent.trim() : 'Untitled';
+    var text = editorEl ? editorEl.value.trim() : '';
+    var imageData = storeEl ? storeEl.value : '';
+    var imgW = storeEl ? storeEl.getAttribute('data-img-w') : '';
+    var imgH = storeEl ? storeEl.getAttribute('data-img-h') : '';
+
+    kdPinnedViews.push({
+      type: 'text_box',
+      id: 'pin-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+      pinType: 'text_box',
+      qTitle: title,
+      insightText: '<p>' + text.replace(/\n/g, '</p><p>') + '</p>',
+      imageData: imageData,
+      imageWidth: imgW,
+      imageHeight: imgH,
+      sectionKey: 'qualitative',
+      label: title
+    });
+    kdSavePinnedData();
+    kdRenderPinnedCards();
+    kdUpdatePinBadge();
+  };
+
+  /**
+   * Move a qualitative slide up or down.
+   */
+  window.kdMoveQualSlide = function(slideId, direction) {
+    var container = document.getElementById('kd-qual-slides-container');
+    if (!container) return;
+    var cards = container.querySelectorAll('.kd-qual-slide-card');
+    for (var i = 0; i < cards.length; i++) {
+      if (cards[i].getAttribute('data-slide-id') === slideId) {
+        var target = i + direction;
+        if (target >= 0 && target < cards.length) {
+          if (direction < 0) container.insertBefore(cards[i], cards[target]);
+          else container.insertBefore(cards[target], cards[i]);
+        }
+        return;
+      }
+    }
+  };
+
+  /**
+   * Remove a qualitative slide.
+   */
+  window.kdRemoveQualSlide = function(slideId) {
+    var card = document.querySelector('.kd-qual-slide-card[data-slide-id="' + slideId + '"]');
+    if (card) card.remove();
+  };
+
   /**
    * Capture content from a section for pinning.
    * @param {string} sectionKey

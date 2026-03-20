@@ -375,12 +375,17 @@ calculate_single_bootstrap <- function(data, outcome, drivers, weights) {
   formula_str <- paste(outcome, "~", paste(drivers, collapse = " + "))
   model_formula <- stats::as.formula(formula_str)
 
+  # NOTE: When the outer bootstrap loop uses weighted resampling (prob = w_prob),
+
+  # applying weights again inside lm() would double-weight observations.
+  # The weighted resample already accounts for survey weights, so we fit
+
+  # an unweighted model on the resample. Weights are only used inside lm()
+  # when resampling was uniform (i.e., weights were not used for resampling).
+  # Since bootstrap_importance_ci() always uses weighted resampling when
+  # weights are provided, we fit unweighted models here.
   model <- tryCatch({
-    if (!is.null(weights)) {
-      stats::lm(model_formula, data = data, weights = data[[weights]])
-    } else {
-      stats::lm(model_formula, data = data)
-    }
+    stats::lm(model_formula, data = data)
   }, error = function(e) NULL)
 
   if (is.null(model)) return(NULL)
@@ -402,7 +407,8 @@ calculate_single_bootstrap <- function(data, outcome, drivers, weights) {
   names(beta_pct) <- drivers
 
   # ----- Relative Weights (Johnson's method) -----
-  R_xx <- stats::cor(data[, drivers, drop = FALSE], use = "pairwise.complete.obs")
+  # Use consistent observation handling for both matrices
+  R_xx <- stats::cor(data[, drivers, drop = FALSE], use = "complete.obs")
   r_xy <- vapply(drivers, function(d) {
     stats::cor(data[[d]], y, use = "complete.obs")
   }, numeric(1))

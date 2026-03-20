@@ -240,8 +240,33 @@ load_keydriver_config <- function(config_file, project_root = NULL) {
         )
       }
     )
-    validate_stated_importance_sheet(si_df)  # Will refuse on validation failure
+    si_df <- validate_stated_importance_sheet(si_df)  # Will refuse on validation failure, or return renamed df
     stated_importance <- si_df
+  }
+
+  # -----------------------------------------------------------------
+  # NEW v10.4: Load optional CustomSlides sheet
+  # Columns: slide_title, slide_content, image_path (optional)
+  # -----------------------------------------------------------------
+  custom_slides <- NULL
+  if ("CustomSlides" %in% available_sheets) {
+    cs_df <- tryCatch(
+      openxlsx::read.xlsx(config_file, sheet = "CustomSlides"),
+      error = function(e) {
+        cat(sprintf("    [WARN] CustomSlides sheet exists but could not be read: %s\n",
+                    e$message))
+        NULL
+      }
+    )
+    if (!is.null(cs_df) && nrow(cs_df) > 0) {
+      # Validate minimum columns
+      if ("slide_title" %in% names(cs_df) && "slide_content" %in% names(cs_df)) {
+        custom_slides <- cs_df
+        cat(sprintf("    [INFO] Loaded %d custom slide(s) from config\n", nrow(cs_df)))
+      } else {
+        cat("    [WARN] CustomSlides sheet missing required columns: slide_title, slide_content\n")
+      }
+    }
   }
 
   # -----------------------------------------------------------------
@@ -263,7 +288,9 @@ load_keydriver_config <- function(config_file, project_root = NULL) {
     # NEW v10.3: Explicit driver settings per TURAS-KD-CONTINUOUS-UPGRADE-v1.0
     driver_settings = driver_settings,
     # NEW v10.3: Feature policies (on_fail behavior)
-    feature_policies = feature_policies
+    feature_policies = feature_policies,
+    # NEW v10.4: Config-driven presentation slides
+    custom_slides = custom_slides
   )
 }
 
@@ -338,7 +365,8 @@ validate_stated_importance_sheet <- function(si_df) {
     names(si_df)[names(si_df) == num_col] <- "stated_importance"
   }
 
-  invisible(TRUE)
+  # Return the (possibly renamed) data frame so the caller gets the changes
+  invisible(si_df)
 }
 
 

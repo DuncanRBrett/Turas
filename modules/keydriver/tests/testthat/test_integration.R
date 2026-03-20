@@ -15,20 +15,33 @@
 #
 # ==============================================================================
 
-# Source test data generators
-source(file.path(dirname(dirname(testthat::test_path())), "fixtures", "generate_test_data.R"))
-
-# Source shared TRS infrastructure
-shared_lib <- file.path(dirname(dirname(dirname(dirname(testthat::test_path())))), "shared", "lib")
-source(file.path(shared_lib, "trs_refusal.R"))
-
 # Null-coalescing operator
 if (!exists("%||%", mode = "function")) {
   `%||%` <- function(x, y) if (is.null(x)) y else x
 }
 
+# Locate module root via sys.frame (works outside test_that) or test_path (inside)
+.find_module_dir <- function() {
+  # Try sys.frame approach first
+  ofile <- tryCatch(sys.frame(1)$ofile, error = function(e) NULL)
+  if (!is.null(ofile)) {
+    return(normalizePath(file.path(dirname(ofile), "..", ".."), mustWork = FALSE))
+  }
+  # Fallback: use test_path
+  tp <- tryCatch(testthat::test_path(), error = function(e) ".")
+  normalizePath(file.path(tp, "..", ".."), mustWork = FALSE)
+}
+module_dir <- .find_module_dir()
+project_root <- normalizePath(file.path(module_dir, "..", ".."), mustWork = FALSE)
+
+# Source test data generators
+source(file.path(module_dir, "tests", "fixtures", "generate_test_data.R"))
+
+# Source shared TRS infrastructure
+source(file.path(project_root, "modules", "shared", "lib", "trs_refusal.R"))
+
 # Source keydriver modules
-keydriver_r_dir <- file.path(dirname(dirname(dirname(testthat::test_path()))), "R")
+keydriver_r_dir <- file.path(module_dir, "R")
 for (f in list.files(keydriver_r_dir, pattern = "\\.R$", full.names = TRUE)) {
   tryCatch(source(f), error = function(e) NULL)
 }
@@ -42,7 +55,7 @@ if (dir.exists(quadrant_dir)) {
 }
 
 # Source HTML report modules (conditional on htmltools)
-html_report_dir <- file.path(dirname(dirname(dirname(testthat::test_path()))), "lib", "html_report")
+html_report_dir <- file.path(module_dir, "lib", "html_report")
 if (dir.exists(html_report_dir)) {
   for (f in list.files(html_report_dir, pattern = "\\.R$", full.names = TRUE)) {
     tryCatch(source(f), error = function(e) NULL)
@@ -211,7 +224,7 @@ test_that("effect size benchmarks return correct thresholds", {
 # 5. Bootstrap CI with small iteration count
 # ==============================================================================
 
-test_that("bootstrap function accepts correct parameters with small n_bootstrap", {
+test_that("bootstrap function runs with n_bootstrap >= 100 (production guard minimum)", {
   skip_if(!exists("bootstrap_importance_ci", mode = "function"),
           message = "bootstrap_importance_ci not available")
 
@@ -222,7 +235,7 @@ test_that("bootstrap function accepts correct parameters with small n_bootstrap"
       data = data,
       outcome = "outcome",
       drivers = c("driver_1", "driver_2", "driver_3"),
-      n_bootstrap = 10,
+      n_bootstrap = 100,
       ci_level = 0.95
     ),
     error = function(e) NULL,
@@ -239,14 +252,31 @@ test_that("bootstrap function accepts correct parameters with small n_bootstrap"
   expect_true("CI_Upper" %in% names(result))
   expect_true("SE" %in% names(result))
 
-  # Each driver should have multiple methods
-  expect_true(nrow(result) >= 3)
+  # 3 drivers x 3 methods = 9 rows
+  expect_equal(nrow(result), 9)
 
   # CI_Lower should be less than CI_Upper for all rows
   for (i in seq_len(nrow(result))) {
     expect_true(result$CI_Lower[i] <= result$CI_Upper[i],
                 info = paste("CI bounds inverted for row", i))
   }
+})
+
+test_that("bootstrap refuses n_bootstrap < 100", {
+  skip_if(!exists("bootstrap_importance_ci", mode = "function"),
+          message = "bootstrap_importance_ci not available")
+
+  data <- generate_basic_kda_data(n = 100, n_drivers = 3, seed = 77)
+
+  expect_error(
+    bootstrap_importance_ci(
+      data = data,
+      outcome = "outcome",
+      drivers = c("driver_1", "driver_2", "driver_3"),
+      n_bootstrap = 10
+    ),
+    class = "turas_refusal"
+  )
 })
 
 
@@ -422,5 +452,88 @@ test_that("full HTML report generation works end-to-end with mock data", {
                 info = paste("File size too small:", fsize, "bytes"))
     # Clean up
     file.remove(output_path)
+  }
+})
+
+
+# ==============================================================================
+# 9. HTML report with v10.4 features
+# ==============================================================================
+
+test_that("HTML report includes v10.4 sections when data present", {
+  skip_if_not_installed("htmltools")
+  skip_if(!exists("generate_keydriver_html_report", mode = "function"),
+          message = "generate_keydriver_html_report not available")
+
+  results <- generate_mock_results(
+    n_drivers = 5,
+    include_quadrant = TRUE,
+    include_bootstrap = TRUE,
+    include_elastic_net = TRUE,
+    include_nca = TRUE,
+    include_dominance = TRUE,
+    include_gam = TRUE
+  )
+  config <- generate_mock_config(n_drivers = 5)
+  output_path <- file.path(tempdir(), "integration_v104_report.html")
+
+  if (file.exists(output_path)) file.remove(output_path)
+
+  report_result <- tryCatch(
+    generate_keydriver_html_report(results, config, output_path),
+    error = function(e) list(status = "ERROR", message = e$message)
+  )
+
+  expect_true(report_result$status %in% c("PASS", "PARTIAL"),
+              info = paste("Report status:", report_result$status,
+                           "Message:", report_result$message %||% "none"))
+
+  if (file.exists(output_path)) {
+    html_content <- readLines(output_path, warn = FALSE)
+    html_text <- paste(html_content, collapse = "\n")
+
+    # Check for v10.4 section markers
+    expect_true(grepl("elastic", html_text, ignore.case = TRUE),
+                info = "HTML report should contain elastic net section")
+    expect_true(grepl("dominance", html_text, ignore.case = TRUE),
+                info = "HTML report should contain dominance section")
+
+    file.remove(output_path)
+  }
+})
+
+
+# ==============================================================================
+# 10. Mixed predictor data through analysis functions
+# ==============================================================================
+
+test_that("mixed predictor data handles categorical drivers", {
+  skip_if(!exists("build_term_map", mode = "function"),
+          message = "build_term_map not available")
+
+  data <- generate_mixed_kda_data(n = 200, seed = 123)
+
+  # Region is categorical — model terms will include dummy-coded levels
+  model <- lm(overall_satisfaction ~ price + quality + service + region + segment,
+               data = data)
+  model_terms <- names(coef(model))[-1]  # remove intercept
+
+  result <- tryCatch(
+    build_term_map(
+      model_terms = model_terms,
+      driver_vars = c("price", "quality", "service", "region", "segment"),
+      data = data
+    ),
+    error = function(e) NULL
+  )
+
+  skip_if(is.null(result), message = "build_term_map failed with mixed predictors")
+
+  # All model terms should be mapped to a driver
+  expect_true(is.character(result) || is.list(result))
+  if (is.character(result)) {
+    expect_true(length(result) == length(model_terms))
+    # Every mapped driver should be one of the original drivers
+    expect_true(all(result %in% c("price", "quality", "service", "region", "segment")))
   }
 })

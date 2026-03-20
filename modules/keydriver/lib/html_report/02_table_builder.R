@@ -334,7 +334,7 @@ build_kd_correlation_table <- function(correlations) {
 #' @param vif_values List or data.frame with driver, vif, concern fields
 #' @return htmltools tag object (table), or NULL if input is empty
 #' @keywords internal
-build_kd_vif_table <- function(vif_values) {
+build_kd_vif_table <- function(vif_values, vif_moderate = 5, vif_high = 10) {
 
   if (is.null(vif_values) || length(vif_values) == 0) return(NULL)
 
@@ -363,12 +363,12 @@ build_kd_vif_table <- function(vif_values) {
     driver_name <- d$driver %||% d$Driver %||% d$label %||% ""
     vif_val     <- as.numeric(d$vif %||% d$VIF %||% NA)
 
-    # Determine concern level
+    # Determine concern level using configurable thresholds
     concern <- d$concern %||% d$Concern
     if (is.null(concern)) {
       concern <- if (is.na(vif_val)) "Unknown"
-                 else if (vif_val >= 10) "High"
-                 else if (vif_val >= 5)  "Moderate"
+                 else if (vif_val >= vif_high) "High"
+                 else if (vif_val >= vif_moderate) "Moderate"
                  else "None"
     }
 

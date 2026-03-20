@@ -354,6 +354,10 @@ calculate_shapley_values <- function(model, data, config) {
     )
   }
 
+  # Resolve weights for consistent subset model fitting
+  weight_var <- config$weight_var
+  w <- if (!is.null(weight_var) && weight_var %in% names(data)) data[[weight_var]] else NULL
+
   # Store all subset R²
   r2_values <- list()
 
@@ -370,9 +374,13 @@ calculate_shapley_values <- function(model, data, config) {
     for (combo in combos) {
       combo_key <- paste(sort(combo), collapse = "|")
 
-      # Fit model with this subset
+      # Fit model with this subset (weighted if applicable, matching main model)
       formula_str <- paste(outcome_var, "~", paste(combo, collapse = " + "))
-      subset_model <- stats::lm(as.formula(formula_str), data = data)
+      if (!is.null(w)) {
+        subset_model <- stats::lm(as.formula(formula_str), data = data, weights = w)
+      } else {
+        subset_model <- stats::lm(as.formula(formula_str), data = data)
+      }
 
       r2_values[[combo_key]] <- summary(subset_model)$r.squared
     }

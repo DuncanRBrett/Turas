@@ -36,7 +36,7 @@
 #' }
 #'
 #' @keywords internal
-get_effect_size_benchmarks <- function(method) {
+get_effect_size_benchmarks <- function(method, config = NULL) {
 
   valid_methods <- c("cohen_f2", "standardized_beta", "correlation")
 
@@ -54,11 +54,23 @@ get_effect_size_benchmarks <- function(method) {
 
   method <- tolower(trimws(method))
 
+  # Default benchmarks (Cohen 1988 conventions with Turas negligible tier)
   benchmarks <- list(
     cohen_f2 = list(negligible = 0.02, small = 0.15, medium = 0.35),
     standardized_beta = list(negligible = 0.05, small = 0.10, medium = 0.30),
     correlation = list(negligible = 0.10, small = 0.30, medium = 0.50)
   )
+
+  # Allow config override for any method's thresholds
+  if (!is.null(config) && !is.null(config$effect_size_benchmarks)) {
+    custom <- config$effect_size_benchmarks
+    if (is.list(custom) && !is.null(custom[[method]])) {
+      cb <- custom[[method]]
+      if (is.list(cb) && all(c("negligible", "small", "medium") %in% names(cb))) {
+        benchmarks[[method]] <- cb
+      }
+    }
+  }
 
   if (!method %in% names(benchmarks)) {
     keydriver_refuse(
@@ -400,10 +412,11 @@ generate_effect_interpretation <- function(importance_df, model_summary = NULL) 
         effect_values[i] <- f2
         effect_sizes[i] <- classify_effect_size(f2, method = "cohen_f2")
         benchmark_methods[i] <- "cohen_f2"
+        es_label <- if (is.na(effect_sizes[i])) "an unclassified" else tolower(effect_sizes[i])
         interpretations[i] <- sprintf(
           "%s has %s effect on the outcome (Cohen's f2 = %.3f)",
           drv,
-          tolower(effect_sizes[i]) %||% "an unclassified",
+          es_label,
           f2
         )
       } else {
@@ -420,10 +433,11 @@ generate_effect_interpretation <- function(importance_df, model_summary = NULL) 
         } else {
           effect_sizes[i] <- classify_effect_size(val, method = "standardized_beta")
           benchmark_methods[i] <- "standardized_beta"
+          es_label2 <- if (is.na(effect_sizes[i])) "an unclassified" else tolower(effect_sizes[i])
           interpretations[i] <- sprintf(
             "%s has %s effect on the outcome (std. beta = %.2f)",
             drv,
-            tolower(effect_sizes[i]) %||% "an unclassified",
+            es_label2,
             val
           )
         }
@@ -443,10 +457,11 @@ generate_effect_interpretation <- function(importance_df, model_summary = NULL) 
       } else {
         effect_sizes[i] <- classify_effect_size(val, method = "standardized_beta")
         benchmark_methods[i] <- "standardized_beta"
+        es_label3 <- if (is.na(effect_sizes[i])) "an unclassified" else tolower(effect_sizes[i])
         interpretations[i] <- sprintf(
           "%s has %s effect on the outcome (std. beta = %.2f)",
           drv,
-          tolower(effect_sizes[i]) %||% "an unclassified",
+          es_label3,
           val
         )
       }

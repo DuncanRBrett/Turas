@@ -169,9 +169,14 @@ build_term_mapping <- function(formula, data, driver_vars, driver_settings = NUL
   }
 
   # Map each term to its originating driver
-  for (i in seq_along(driver_vars)) {
+  # Process drivers longest-name-first to prevent prefix collision
+  # (e.g., "price_premium" should match before "price")
+  driver_order <- order(nchar(driver_vars), decreasing = TRUE)
+  for (i in driver_order) {
     drv <- driver_vars[i]
-    matching <- find_matching_terms(terms_to_map, drv, data, predictor_info$type[i])
+    # Only match against terms not yet mapped to another driver
+    unmapped_terms <- names(term_map)[term_map == ""]
+    matching <- find_matching_terms(unmapped_terms, drv, data, predictor_info$type[i])
     for (term in matching) term_map[term] <- drv
     driver_terms[[drv]] <- matching
     predictor_info$n_terms[i] <- length(matching)
@@ -228,7 +233,7 @@ validate_term_mapping <- function(mapping, driver_vars) {
       expected = driver_vars,
       observed = observed_drivers,
       missing = if (length(missing_drivers) > 0) missing_drivers else NULL,
-      unmapped = if (length(unmapped_terms) > 0) unmapped_terms else NULL
+      details = if (length(unmapped_terms) > 0) list(unmapped_terms = unmapped_terms) else NULL
     )
   }
 

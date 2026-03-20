@@ -91,10 +91,25 @@ build_kd_html_page <- function(html_data, tables, charts, config) {
   segment_section <- if (show_seg) {
     build_kd_segment_section(charts, tables, html_data)
   }
+
+  # v10.4 advanced feature sections (shown only when data is present)
+  elastic_net_section <- if (isTRUE(html_data$has_elastic_net)) {
+    build_kd_elastic_net_section(html_data)
+  }
+  nca_section <- if (isTRUE(html_data$has_nca)) {
+    build_kd_nca_section(html_data)
+  }
+  dominance_section <- if (isTRUE(html_data$has_dominance)) {
+    build_kd_dominance_section(html_data)
+  }
+  gam_section <- if (isTRUE(html_data$has_gam)) {
+    build_kd_gam_section(html_data)
+  }
+
   interpretation_section <- if (show_guide) {
     build_kd_interpretation_guide()
   }
-  pinned_section <- build_kd_pinned_panel()
+  pinned_section <- build_kd_pinned_panel(config)
   footer_section <- build_kd_footer(config)
 
   # Hidden pinned views data store
@@ -153,6 +168,12 @@ build_kd_html_page <- function(html_data, tables, charts, config) {
     ),
     htmltools::tags$body(
       class = "kd-body",
+      # Skip-to-content link (accessibility)
+      htmltools::tags$a(
+        class = "kd-skip-link",
+        href = "#kd-tab-content",
+        "Skip to content"
+      ),
       header_section,
       action_bar,
       report_tab_bar,
@@ -175,6 +196,10 @@ build_kd_html_page <- function(html_data, tables, charts, config) {
             diagnostics_section,
             bootstrap_section,
             segment_section,
+            elastic_net_section,
+            nca_section,
+            dominance_section,
+            gam_section,
             interpretation_section,
             footer_section
           )
@@ -247,7 +272,7 @@ build_kd_css <- function(config) {
   --kd-danger: #c0392b;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+.kd-body, .kd-body * { box-sizing: border-box; margin: 0; padding: 0; }
 
 .kd-body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -255,6 +280,25 @@ build_kd_css <- function(config) {
   color: var(--kd-text);
   line-height: 1.5;
   font-size: 13px;
+}
+
+/* Skip-to-content link (accessibility) */
+.kd-skip-link {
+  position: absolute;
+  top: -100px;
+  left: 8px;
+  z-index: 9999;
+  background: var(--kd-brand);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 0 0 6px 6px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: top 0.2s;
+}
+.kd-skip-link:focus {
+  top: 0;
 }
 
 /* ================================================================ */
@@ -540,6 +584,46 @@ build_kd_css <- function(config) {
   color: white;
   border-color: var(--kd-brand);
   opacity: 1;
+}
+
+/* ================================================================ */
+/* TABLE EXPORT BAR                                                  */
+/* ================================================================ */
+
+.kd-table-export-bar {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 10;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.kd-table-wrapper:hover .kd-table-export-bar {
+  opacity: 1;
+}
+
+.kd-table-export-btn {
+  background: rgba(255,255,255,0.92);
+  border: 1px solid var(--kd-border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--kd-text-faint);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  transition: all 0.15s;
+}
+
+.kd-table-export-btn:hover {
+  border-color: var(--kd-brand);
+  color: var(--kd-brand);
+  background: rgba(255,255,255,0.98);
 }
 
 /* ================================================================ */
@@ -1089,6 +1173,102 @@ build_kd_css <- function(config) {
   font-size: 32px;
   margin-bottom: 8px;
   opacity: 0.4;
+}
+
+/* ================================================================ */
+/* QUALITATIVE SLIDES                                                */
+/* ================================================================ */
+
+.kd-qual-slides-container { margin-bottom: 16px; }
+
+.kd-qual-slide-card {
+  background: var(--kd-card);
+  border: 1px solid var(--kd-border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 10px;
+}
+
+.kd-qual-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.kd-qual-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--kd-text);
+  outline: none;
+  padding: 2px 4px;
+  border-radius: 4px;
+  min-width: 100px;
+}
+
+.kd-qual-title:focus {
+  background: #f1f5f9;
+}
+
+.kd-qual-actions { display: flex; gap: 4px; }
+
+.kd-qual-btn {
+  padding: 3px 8px;
+  border: 1px solid var(--kd-border);
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  background: white;
+  color: var(--kd-text-muted);
+  transition: all 0.15s;
+}
+
+.kd-qual-btn:hover { border-color: var(--kd-brand); color: var(--kd-brand); }
+
+.kd-qual-delete:hover { border-color: #ef4444; color: #ef4444; }
+
+.kd-qual-img-preview {
+  position: relative;
+  margin-bottom: 8px;
+  max-width: 400px;
+}
+
+.kd-qual-img-thumb {
+  max-width: 100%;
+  border-radius: 6px;
+  border: 1px solid var(--kd-border);
+}
+
+.kd-qual-img-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(0,0,0,0.6);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  font-size: 14px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.kd-qual-md-editor {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--kd-border);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  color: var(--kd-text);
+  line-height: 1.5;
+}
+
+.kd-qual-md-editor:focus {
+  outline: none;
+  border-color: var(--kd-brand);
 }
 
 .kd-pinned-card {
@@ -2080,7 +2260,7 @@ build_kd_effect_size_section <- function(charts, tables, html_data) {
     ),
     htmltools::tags$p(
       style = "font-size:11px;color:var(--kd-text-muted);font-style:italic;",
-      "Effect size measures practical significance, not just statistical significance. A statistically significant driver with a negligible effect size may not warrant action."
+      "Effect size measures practical significance, not just statistical significance. A statistically significant driver with a negligible effect size may not warrant action. Thresholds follow Cohen (1988) for Small/Medium/Large, with an additional Negligible tier for values below the Small threshold."
     )
   )
 
@@ -2502,24 +2682,53 @@ build_kd_diagnostics_section <- function(tables, html_data) {
   if (!is.null(r2) && !is.na(r2)) {
     is_sig <- !is.null(p_val) && !is.na(p_val) && p_val < 0.05
 
-    if (r2 >= 0.50 && is_sig) {
+    # Check for severe multicollinearity (VIF > 10)
+    has_severe_vif <- FALSE
+    vif_warning <- ""
+    vif_vals <- html_data$vif_values
+    if (!is.null(vif_vals) && is.data.frame(vif_vals) && "VIF" %in% names(vif_vals)) {
+      max_vif <- max(vif_vals$VIF, na.rm = TRUE)
+      if (!is.na(max_vif) && max_vif > 10) {
+        has_severe_vif <- TRUE
+        high_vif_drivers <- vif_vals$Driver[vif_vals$VIF > 10]
+        vif_warning <- sprintf(
+          " Note: severe multicollinearity detected (VIF > 10 for %s). Individual driver importance estimates may be unreliable.",
+          paste(high_vif_drivers, collapse = ", ")
+        )
+      }
+    }
+
+    if (r2 >= 0.50 && is_sig && !has_severe_vif) {
       verdict_text  <- "Reliable"
       verdict_desc  <- "The model explains a substantial share of variance and is statistically significant. Results can be used with confidence for decision-making."
       verdict_bg    <- "#dcfce7"; verdict_border <- "#22c55e"; verdict_fg <- "#166534"
+    } else if (r2 >= 0.50 && is_sig && has_severe_vif) {
+      verdict_text  <- "Directionally Reliable"
+      verdict_desc  <- paste0(
+        "The model explains a substantial share of variance and is significant, but severe multicollinearity undermines individual driver estimates.",
+        vif_warning
+      )
+      verdict_bg    <- "#dbeafe"; verdict_border <- "#3b82f6"; verdict_fg <- "#1e40af"
     } else if (r2 >= 0.25 && is_sig) {
       verdict_text  <- "Directionally Reliable"
-      verdict_desc  <- "The model explains a moderate share of variance and is significant. Rankings are directionally sound but exact percentages should be interpreted with care."
+      verdict_desc  <- paste0(
+        "The model explains a moderate share of variance and is significant. Rankings are directionally sound but exact percentages should be interpreted with care.",
+        vif_warning
+      )
       verdict_bg    <- "#dbeafe"; verdict_border <- "#3b82f6"; verdict_fg <- "#1e40af"
     } else if (r2 >= 0.10 && is_sig) {
       verdict_text  <- "Interpret with Caution"
-      verdict_desc  <- "The model has limited explanatory power. Driver rankings may be indicative but should be corroborated with other evidence before acting."
+      verdict_desc  <- paste0(
+        "The model has limited explanatory power. Driver rankings may be indicative but should be corroborated with other evidence before acting.",
+        vif_warning
+      )
       verdict_bg    <- "#fef9c3"; verdict_border <- "#eab308"; verdict_fg <- "#854d0e"
     } else {
       verdict_text  <- "Exploratory Only"
       verdict_desc  <- if (!is_sig) {
-        "The model is not statistically significant. These results should be treated as exploratory and not used for decision-making."
+        paste0("The model is not statistically significant. These results should be treated as exploratory and not used for decision-making.", vif_warning)
       } else {
-        "The model explains very little variance. Results are exploratory and should be validated with additional data."
+        paste0("The model explains very little variance. Results are exploratory and should be validated with additional data.", vif_warning)
       }
       verdict_bg    <- "#fef2f2"; verdict_border <- "#ef4444"; verdict_fg <- "#991b1b"
     }
@@ -2813,7 +3022,103 @@ build_kd_interpretation_guide <- function() {
 #'
 #' @return htmltools tag
 #' @keywords internal
-build_kd_pinned_panel <- function() {
+build_kd_pinned_panel <- function(config = list()) {
+
+  # --- Build config-driven slide cards from CustomSlides sheet ---
+  config_slides <- NULL
+  cs <- config$custom_slides
+  if (!is.null(cs) && is.data.frame(cs) && nrow(cs) > 0) {
+    config_slides <- lapply(seq_len(nrow(cs)), function(i) {
+      slide_id <- paste0("kd-cfgslide-", i)
+      title   <- as.character(cs$slide_title[i] %||% "Slide")
+      content <- as.character(cs$slide_content[i] %||% "")
+      img_path <- if ("image_path" %in% names(cs)) as.character(cs$image_path[i]) else NA
+
+      # Convert image to base64 if path exists
+      img_data <- ""
+      img_preview_style <- "display:none;"
+      if (!is.na(img_path) && nzchar(img_path)) {
+        full_path <- if (file.exists(img_path)) {
+          img_path
+        } else if (!is.null(config$project_root)) {
+          file.path(config$project_root, img_path)
+        } else {
+          NULL
+        }
+        if (!is.null(full_path) && file.exists(full_path)) {
+          raw <- readBin(full_path, "raw", file.info(full_path)$size)
+          ext <- tolower(tools::file_ext(full_path))
+          mime <- switch(ext,
+            "png" = "image/png", "jpg" = "image/jpeg",
+            "jpeg" = "image/jpeg", "gif" = "image/gif",
+            "image/png")
+          img_data <- paste0("data:", mime, ";base64,", base64enc::base64encode(raw))
+          img_preview_style <- ""
+        }
+      }
+
+      htmltools::tags$div(
+        class = "kd-qual-slide-card",
+        `data-slide-id` = slide_id,
+        htmltools::tags$div(
+          class = "kd-qual-header",
+          htmltools::tags$div(class = "kd-qual-title", contenteditable = "true", title),
+          htmltools::tags$div(
+            class = "kd-qual-actions",
+            htmltools::tags$button(
+              class = "kd-qual-btn", title = "Add image",
+              onclick = sprintf("kdTriggerQualImage('%s')", slide_id),
+              "\U0001F4F7"
+            ),
+            htmltools::tags$button(
+              class = "kd-qual-btn", title = "Pin to presentation",
+              onclick = sprintf("kdPinQualSlide('%s')", slide_id),
+              "\U0001F4CC"
+            ),
+            htmltools::tags$button(
+              class = "kd-qual-btn", title = "Move up",
+              onclick = sprintf("kdMoveQualSlide('%s',-1)", slide_id),
+              htmltools::HTML("&uarr;")
+            ),
+            htmltools::tags$button(
+              class = "kd-qual-btn", title = "Move down",
+              onclick = sprintf("kdMoveQualSlide('%s',1)", slide_id),
+              htmltools::HTML("&darr;")
+            ),
+            htmltools::tags$button(
+              class = "kd-qual-btn kd-qual-delete", title = "Delete slide",
+              onclick = sprintf("kdRemoveQualSlide('%s')", slide_id),
+              htmltools::HTML("&times;")
+            )
+          )
+        ),
+        htmltools::tags$div(
+          class = "kd-qual-img-preview", style = img_preview_style,
+          htmltools::tags$img(class = "kd-qual-img-thumb", src = img_data, alt = "Slide image"),
+          htmltools::tags$button(
+            class = "kd-qual-img-remove",
+            onclick = sprintf("kdRemoveQualImage('%s')", slide_id),
+            htmltools::HTML("&times;")
+          )
+        ),
+        htmltools::tags$input(
+          type = "file", class = "kd-qual-img-input",
+          accept = "image/*", style = "display:none",
+          onchange = sprintf("kdHandleQualImage('%s',this)", slide_id)
+        ),
+        htmltools::tags$textarea(
+          class = "kd-qual-md-editor", rows = "4",
+          placeholder = "Enter commentary here (plain text or markdown)...",
+          content
+        ),
+        htmltools::tags$textarea(
+          class = "kd-qual-img-store", style = "display:none",
+          img_data
+        )
+      )
+    })
+  }
+
   # Inline section — same approach as catdriver/tabs modules
   htmltools::tags$div(
     class = "kd-section", id = "kd-pinned-section",
@@ -2828,6 +3133,11 @@ build_kd_pinned_panel <- function() {
           class = "kd-pinned-panel-btn",
           onclick = "kdAddSection()",
           "\u2795 Add Section"
+        ),
+        htmltools::tags$button(
+          class = "kd-pinned-panel-btn",
+          onclick = "kdAddQualSlide()",
+          "\U0001F4DD Add Slide"
         ),
         htmltools::tags$button(
           class = "kd-pinned-panel-btn",
@@ -2855,6 +3165,10 @@ build_kd_pinned_panel <- function() {
         "Click the pin icon on any section to save it here for export."
       )
     ),
+    htmltools::tags$div(
+      id = "kd-qual-slides-container", class = "kd-qual-slides-container",
+      config_slides
+    ),
     htmltools::tags$div(id = "kd-pinned-cards-container")
   )
 }
@@ -2868,6 +3182,259 @@ build_kd_pinned_panel <- function() {
 #'
 #' Footer with Turas branding and generation timestamp.
 #'
+# ==============================================================================
+# ELASTIC NET SECTION (v10.4)
+# ==============================================================================
+
+#' Build Elastic Net Section
+#'
+#' Displays elastic net coefficients showing which drivers are retained/zeroed.
+#'
+#' @param html_data Transformed data with $elastic_net
+#' @return htmltools tag or NULL
+#' @keywords internal
+build_kd_elastic_net_section <- function(html_data) {
+  enet <- html_data$elastic_net
+  if (is.null(enet)) return(NULL)
+
+  coefs <- enet$coefficients
+  if (is.null(coefs) || !is.data.frame(coefs) || nrow(coefs) == 0) return(NULL)
+
+  # Build table rows
+  header <- htmltools::tags$tr(
+    htmltools::tags$th("Driver",     class = "kd-th kd-th-label"),
+    htmltools::tags$th("Coefficient", class = "kd-th kd-th-num"),
+    htmltools::tags$th("Importance %", class = "kd-th kd-th-num"),
+    htmltools::tags$th("Status",     class = "kd-th kd-th-label")
+  )
+
+  rows <- lapply(seq_len(nrow(coefs)), function(i) {
+    selected <- isTRUE(coefs$Selected_1se[i])
+    status_class <- if (selected) "kd-badge kd-agree-high" else "kd-badge kd-concern-moderate"
+    status_text  <- if (selected) "Retained" else "Zeroed"
+
+    htmltools::tags$tr(
+      class = "kd-tr",
+      htmltools::tags$td(coefs$Driver[i], class = "kd-td kd-td-label"),
+      htmltools::tags$td(sprintf("%.3f", coefs$Coefficient_1se[i]), class = "kd-td kd-td-num"),
+      htmltools::tags$td(sprintf("%.1f%%", coefs$Importance_Pct[i]), class = "kd-td kd-td-num"),
+      htmltools::tags$td(class = "kd-td", htmltools::tags$span(class = status_class, status_text))
+    )
+  })
+
+  table <- htmltools::tags$table(
+    class = "kd-table kd-elastic-net-table",
+    htmltools::tags$thead(header),
+    htmltools::tags$tbody(rows)
+  )
+
+  htmltools::tags$div(
+    class = "kd-section", id = "kd-elastic-net",
+    `data-kd-section` = "elastic-net",
+    build_kd_section_title_row("Elastic Net Variable Selection", "elastic-net", show_pin = TRUE),
+    htmltools::tags$p(
+      class = "kd-section-intro",
+      sprintf("Elastic net regression (alpha = %.2f) identifies which drivers survive regularization. Drivers marked 'Zeroed' can be safely deprioritised. %d of %d drivers retained at lambda.1se (parsimonious model).",
+              enet$alpha %||% 0.5,
+              length(enet$selected_drivers %||% character(0)),
+              nrow(coefs))
+    ),
+    htmltools::tags$div(class = "kd-table-wrapper", table),
+    build_kd_insight_area("elastic-net")
+  )
+}
+
+
+# ==============================================================================
+# NCA SECTION (v10.4)
+# ==============================================================================
+
+#' Build Necessary Condition Analysis Section
+#'
+#' @param html_data Transformed data with $nca
+#' @return htmltools tag or NULL
+#' @keywords internal
+build_kd_nca_section <- function(html_data) {
+  nca <- html_data$nca
+  if (is.null(nca)) return(NULL)
+
+  summary_df <- nca$nca_summary
+  if (is.null(summary_df) || !is.data.frame(summary_df) || nrow(summary_df) == 0) return(NULL)
+
+  header <- htmltools::tags$tr(
+    htmltools::tags$th("Driver",        class = "kd-th kd-th-label"),
+    htmltools::tags$th("NCA Effect",    class = "kd-th kd-th-num"),
+    htmltools::tags$th("p-value",       class = "kd-th kd-th-num"),
+    htmltools::tags$th("Classification", class = "kd-th kd-th-label")
+  )
+
+  rows <- lapply(seq_len(nrow(summary_df)), function(i) {
+    is_nec <- isTRUE(summary_df$Is_Necessary[i])
+    cls_class <- if (is_nec) "kd-badge kd-concern-high" else "kd-badge kd-concern-none"
+    p_display <- if (is.na(summary_df$NCA_p_value[i])) "-"
+                 else if (summary_df$NCA_p_value[i] < 0.001) "<0.001"
+                 else sprintf("%.3f", summary_df$NCA_p_value[i])
+
+    htmltools::tags$tr(
+      class = "kd-tr",
+      htmltools::tags$td(summary_df$Driver[i], class = "kd-td kd-td-label"),
+      htmltools::tags$td(sprintf("%.3f", summary_df$NCA_Effect_Size[i]), class = "kd-td kd-td-num"),
+      htmltools::tags$td(p_display, class = "kd-td kd-td-num"),
+      htmltools::tags$td(class = "kd-td",
+        htmltools::tags$span(class = cls_class, summary_df$Classification[i]))
+    )
+  })
+
+  table <- htmltools::tags$table(
+    class = "kd-table kd-nca-table",
+    htmltools::tags$thead(header),
+    htmltools::tags$tbody(rows)
+  )
+
+  htmltools::tags$div(
+    class = "kd-section", id = "kd-nca",
+    `data-kd-section` = "nca",
+    build_kd_section_title_row("Necessary Condition Analysis", "nca", show_pin = TRUE),
+    htmltools::tags$p(
+      class = "kd-section-intro",
+      sprintf(
+        "NCA identifies 'hygiene factors' \u2014 drivers that are necessary conditions for high outcomes. A driver is necessary if high outcome values require at least moderate levels of that driver. %d of %d drivers identified as necessary conditions (Dul, 2016).",
+        nca$n_necessary %||% 0, nca$n_analysed %||% 0)
+    ),
+    htmltools::tags$div(class = "kd-table-wrapper", table),
+    build_kd_insight_area("nca")
+  )
+}
+
+
+# ==============================================================================
+# DOMINANCE ANALYSIS SECTION (v10.4)
+# ==============================================================================
+
+#' Build Dominance Analysis Section
+#'
+#' @param html_data Transformed data with $dominance
+#' @return htmltools tag or NULL
+#' @keywords internal
+build_kd_dominance_section <- function(html_data) {
+  dom <- html_data$dominance
+  if (is.null(dom)) return(NULL)
+
+  summary_df <- dom$summary
+  if (is.null(summary_df) || !is.data.frame(summary_df) || nrow(summary_df) == 0) return(NULL)
+
+  header <- htmltools::tags$tr(
+    htmltools::tags$th("Rank",            class = "kd-th kd-th-rank"),
+    htmltools::tags$th("Driver",          class = "kd-th kd-th-label"),
+    htmltools::tags$th("General Dom. R\u00b2", class = "kd-th kd-th-num"),
+    htmltools::tags$th("Share %",         class = "kd-th kd-th-num")
+  )
+
+  rows <- lapply(seq_len(nrow(summary_df)), function(i) {
+    row_class <- if (summary_df$Rank[i] <= 3) "kd-tr kd-tr-highlight" else "kd-tr"
+    htmltools::tags$tr(
+      class = row_class,
+      htmltools::tags$td(summary_df$Rank[i], class = "kd-td kd-td-rank"),
+      htmltools::tags$td(summary_df$Driver[i], class = "kd-td kd-td-label"),
+      htmltools::tags$td(sprintf("%.4f", summary_df$General_Dominance[i]), class = "kd-td kd-td-num"),
+      htmltools::tags$td(sprintf("%.1f%%", summary_df$General_Pct[i]), class = "kd-td kd-td-num")
+    )
+  })
+
+  table <- htmltools::tags$table(
+    class = "kd-table kd-dominance-table",
+    htmltools::tags$thead(header),
+    htmltools::tags$tbody(rows)
+  )
+
+  htmltools::tags$div(
+    class = "kd-section", id = "kd-dominance",
+    `data-kd-section` = "dominance",
+    build_kd_section_title_row("Dominance Analysis", "dominance", show_pin = TRUE),
+    htmltools::tags$p(
+      class = "kd-section-intro",
+      sprintf(
+        "Dominance analysis decomposes model R\u00b2 (%.3f) into per-driver contributions using all possible subset models. General dominance is equivalent to Shapley values. This analysis examined %d drivers across %d sub-models (Budescu, 1993; Azen & Budescu, 2003).",
+        dom$total_r_squared %||% 0, dom$n_drivers %||% 0, 2^(dom$n_drivers %||% 0))
+    ),
+    htmltools::tags$div(class = "kd-table-wrapper", table),
+    build_kd_insight_area("dominance")
+  )
+}
+
+
+# ==============================================================================
+# GAM SECTION (v10.4)
+# ==============================================================================
+
+#' Build GAM Nonlinear Effects Section
+#'
+#' @param html_data Transformed data with $gam
+#' @return htmltools tag or NULL
+#' @keywords internal
+build_kd_gam_section <- function(html_data) {
+  gam_data <- html_data$gam
+  if (is.null(gam_data)) return(NULL)
+
+  summary_df <- gam_data$nonlinearity_summary
+  if (is.null(summary_df) || !is.data.frame(summary_df) || nrow(summary_df) == 0) return(NULL)
+
+  header <- htmltools::tags$tr(
+    htmltools::tags$th("Driver",    class = "kd-th kd-th-label"),
+    htmltools::tags$th("EDF",       class = "kd-th kd-th-num"),
+    htmltools::tags$th("F-stat",    class = "kd-th kd-th-num"),
+    htmltools::tags$th("p-value",   class = "kd-th kd-th-num"),
+    htmltools::tags$th("Shape",     class = "kd-th kd-th-label")
+  )
+
+  rows <- lapply(seq_len(nrow(summary_df)), function(i) {
+    is_nl <- isTRUE(summary_df$Is_Nonlinear[i])
+    shape_class <- if (is_nl) "kd-badge kd-concern-high" else "kd-badge kd-concern-none"
+    p_display <- if (summary_df$p_value[i] < 0.001) "<0.001"
+                 else sprintf("%.3f", summary_df$p_value[i])
+
+    htmltools::tags$tr(
+      class = "kd-tr",
+      htmltools::tags$td(summary_df$Driver[i], class = "kd-td kd-td-label"),
+      htmltools::tags$td(sprintf("%.1f", summary_df$EDF[i]), class = "kd-td kd-td-num"),
+      htmltools::tags$td(sprintf("%.1f", summary_df$F_statistic[i]), class = "kd-td kd-td-num"),
+      htmltools::tags$td(p_display, class = "kd-td kd-td-num"),
+      htmltools::tags$td(class = "kd-td",
+        htmltools::tags$span(class = shape_class, summary_df$Shape[i]))
+    )
+  })
+
+  table <- htmltools::tags$table(
+    class = "kd-table kd-gam-table",
+    htmltools::tags$thead(header),
+    htmltools::tags$tbody(rows)
+  )
+
+  improvement <- gam_data$improvement %||% 0
+  improvement_text <- if (improvement > 0.01) {
+    sprintf("The GAM explains %.1f%% more variance than the linear model (%.1f%% vs %.1f%%), suggesting actionable nonlinear patterns.",
+            improvement * 100, (gam_data$deviance_explained %||% 0) * 100,
+            (gam_data$linear_r_squared %||% 0) * 100)
+  } else {
+    "The GAM shows minimal improvement over the linear model, confirming that driver effects are approximately linear."
+  }
+
+  htmltools::tags$div(
+    class = "kd-section", id = "kd-gam",
+    `data-kd-section` = "gam",
+    build_kd_section_title_row("Nonlinear Effects (GAM)", "gam", show_pin = TRUE),
+    htmltools::tags$p(
+      class = "kd-section-intro",
+      sprintf(
+        "Generalized Additive Models test whether driver-outcome relationships are nonlinear. EDF (effective degrees of freedom) > 1.5 with p < 0.05 indicates meaningful curvature. %d of %d drivers show significant nonlinearity. %s (Wood, 2017).",
+        gam_data$n_nonlinear %||% 0, gam_data$n_analysed %||% 0, improvement_text)
+    ),
+    htmltools::tags$div(class = "kd-table-wrapper", table),
+    build_kd_insight_area("gam")
+  )
+}
+
+
 #' @param config Configuration list (optional, for company/client name)
 #' @return htmltools tag
 #' @keywords internal
@@ -2930,7 +3497,8 @@ build_kd_action_bar <- function(report_title = "Keydriver Report") {
 #' @keywords internal
 build_kd_js <- function(html_report_dir) {
   js_files <- c("kd_utils.js", "kd_navigation.js",
-                 "kd_pinned_views.js", "kd_slide_export.js")
+                 "kd_table_export.js", "kd_pinned_views.js",
+                 "kd_slide_export.js")
 
   js_tags <- lapply(js_files, function(fname) {
     js_path <- file.path(html_report_dir, "js", fname)
@@ -3039,6 +3607,8 @@ build_kd_insight_area <- function(section_key, prefix = "") {
       htmltools::tags$div(
         class = "kd-insight-editor",
         contenteditable = "true",
+        role = "textbox",
+        `aria-label` = paste("Analyst insight for", section_key, "section"),
         `data-placeholder` = "Type your insight or comment here...",
         oninput = sprintf("kdSyncInsight('%s','%s')", section_key, prefix)
       ),

@@ -44,6 +44,15 @@ if (!exists("%||%", mode = "function")) {
   x
 }
 
+#' Truncate label to fit within pixel width (approximate 6px/char at 11px font)
+#' @keywords internal
+.kd_truncate_label <- function(text, max_chars = 28) {
+  if (is.null(text) || is.na(text)) return("")
+  text <- as.character(text)
+  if (nchar(text) <= max_chars) return(text)
+  paste0(substr(text, 1, max_chars - 1), "\u2026")
+}
+
 #' @keywords internal
 .kd_svg_text <- function(x, y, text, size = 11, fill = .kd_label_colour,
                          weight = "400", anchor = "start", baseline = NULL) {
@@ -150,7 +159,7 @@ build_kd_importance_chart <- function(importance, brand_colour = "#323367") {
 
     s <- paste0(s, sprintf('\n<g class="kd-importance-row" data-kd-rank="%d" data-kd-pct="%.1f" data-kd-top3="%s">',
                            as.integer(d$rank %||% i), pv, if (t3) "yes" else "no"))
-    s <- paste0(s, "\n", .kd_svg_text(lbl_w - 8, y + bar_h/2, as.character(d$label %||% ""),
+    s <- paste0(s, "\n", .kd_svg_text(lbl_w - 8, y + bar_h/2, .kd_truncate_label(as.character(d$label %||% "")),
                                        size = 12, fill = .kd_value_colour, anchor = "end", baseline = "central"))
     s <- paste0(s, "\n", .kd_svg_bar(lbl_w, y, bw, bar_h, fill, op))
     s <- paste0(s, "\n", .kd_svg_text(lbl_w + bw + 6, y + bar_h/2, sprintf("%.0f%%", pv),
@@ -435,7 +444,7 @@ build_kd_effect_size_chart <- function(effect_sizes,
     bc <- cat_col(d$category)
 
     s <- paste0(s, sprintf('\n<g class="kd-effect-row" data-kd-driver="%s">', .kd_html_escape(d$label)))
-    s <- paste0(s, "\n", .kd_svg_text(lbl_w - 8, y + bar_h/2, d$label, size = 12,
+    s <- paste0(s, "\n", .kd_svg_text(lbl_w - 8, y + bar_h/2, .kd_truncate_label(d$label), size = 12,
                                        fill = .kd_value_colour, anchor = "end", baseline = "central"))
     s <- paste0(s, "\n", .kd_svg_bar(lbl_w, y, bw, bar_h, bc, 0.85))
     vt <- if (nzchar(d$category)) sprintf("%.3f (%s)", ev, d$category) else sprintf("%.3f", ev)
@@ -538,7 +547,7 @@ build_kd_bootstrap_ci_chart <- function(bootstrap_ci,
     xp <- to_x(d$pe); xl <- to_x(d$lo); xh <- to_x(d$hi)
 
     s <- paste0(s, sprintf('\n<g class="kd-ci-row" data-kd-driver="%s">', .kd_html_escape(d$label)))
-    s <- paste0(s, "\n", .kd_svg_text(lbl_w - 8, yc, d$label, size = 11,
+    s <- paste0(s, "\n", .kd_svg_text(lbl_w - 8, yc, .kd_truncate_label(d$label), size = 11,
                                        fill = .kd_value_colour, anchor = "end", baseline = "central"))
     # CI line
     s <- paste0(s, "\n", .kd_svg_line(xl, yc, xh, yc, stroke = brand_colour, width = 1.5, opacity = 0.6))
@@ -600,11 +609,11 @@ build_kd_shap_importance_chart <- function(shap_importance, brand_colour = "#323
   max_val <- max(shap_importance$pct_val, na.rm = TRUE)
   if (max_val <= 0) max_val <- 1
 
-  s <- sprintf('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" width="100%%" style="max-width:%dpx;display:block;">', tw, th, tw)
+  s <- sprintf('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" width="100%%" style="max-width:%dpx;display:block;" role="img" aria-label="SHAP importance bar chart">', tw, th, tw)
 
   for (i in seq_len(n)) {
     row <- shap_importance[i, ]
-    label <- as.character(row$driver)
+    label <- .kd_truncate_label(as.character(row$driver))
     val   <- row$pct_val
     bw    <- max(2, (val / max_val) * cw)
     by    <- mt + (i - 1) * rs
@@ -700,7 +709,7 @@ build_kd_segment_comparison_chart <- function(segment_comparison,
   if (max_val <= 0) max_val <- 1
 
   s <- sprintf(
-    '<svg xmlns="http://www.w3.org/2000/svg" class="kd-segment-chart" viewBox="0 0 %d %d" width="100%%" style="max-width:%dpx;display:block;">',
+    '<svg xmlns="http://www.w3.org/2000/svg" class="kd-segment-chart" viewBox="0 0 %d %d" width="100%%" style="max-width:%dpx;display:block;" role="img" aria-label="Segment comparison grouped bar chart">',
     tw, th, tw)
 
   # Legend row
@@ -721,7 +730,7 @@ build_kd_segment_comparison_chart <- function(segment_comparison,
                            htmltools::htmlEscape(drivers[di])))
     # Driver label
     s <- paste0(s, "\n", .kd_svg_text(ml - 8, gy + group_h / 2 + 4,
-                                       drivers[di], size = 11,
+                                       .kd_truncate_label(drivers[di]), size = 11,
                                        fill = .kd_label_colour,
                                        weight = "500", anchor = "end"))
     # Separator line

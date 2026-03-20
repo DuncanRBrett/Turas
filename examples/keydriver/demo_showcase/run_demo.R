@@ -11,7 +11,11 @@
 #   5. Effect Sizes        - Cohen's benchmarks and interpretation
 #   6. Segment Comparison  - Cross-segment driver importance
 #   7. Executive Summary   - Automated plain-English summary
-#   8. HTML Report         - Interactive standalone report
+#   8. Elastic Net         - Penalized variable selection (NEW v10.4)
+#   9. NCA                 - Necessary Condition Analysis (NEW v10.4)
+#  10. Dominance Analysis  - Complete & conditional dominance (NEW v10.4)
+#  11. GAM                 - Nonlinear effects detection (NEW v10.4)
+#  12. HTML Report         - Interactive standalone report
 #
 # Scenario:
 #   A telecommunications company surveys 800 customers to understand
@@ -102,7 +106,8 @@ kd_dir <- file.path(turas_root, "modules", "keydriver", "R")
 for (f in c("00_guard.R", "00_main.R", "01_config.R", "02_term_mapping.R",
             "02_validation.R", "03_analysis.R", "04_output.R",
             "05_bootstrap.R", "06_effect_size.R", "07_segment_comparison.R",
-            "08_executive_summary.R")) {
+            "08_executive_summary.R",
+            "09_elastic_net.R", "10_nca.R", "11_dominance.R", "12_gam.R")) {
   fpath <- file.path(kd_dir, f)
   if (file.exists(fpath)) {
     source(fpath)
@@ -283,9 +288,135 @@ writeLines(html_output, file.path(demo_dir, "Demo_Executive_Summary.html"))
 cat(sprintf("  Saved: Demo_Executive_Summary.html\n"))
 
 # ------------------------------------------------------------------
-# Step 7: HTML Report (if library available)
+# Step 7: Elastic Net Variable Selection (v10.4)
 # ------------------------------------------------------------------
-cat("\nSTEP 7: Interactive HTML Report\n")
+cat("\nSTEP 7: Elastic Net Variable Selection\n")
+cat(paste(rep("=", 60), collapse = ""), "\n")
+
+enet_config <- list(
+  outcome_var = "overall_satisfaction",
+  driver_vars = driver_vars,
+  weight_var = "weight",
+  settings = list(elastic_net_alpha = 0.5, elastic_net_nfolds = 10)
+)
+
+enet_result <- tryCatch(
+  run_elastic_net_analysis(demo$data, enet_config),
+  error = function(e) { cat(sprintf("  [SKIP] %s\n", e$message)); NULL }
+)
+
+if (!is.null(enet_result) && enet_result$status == "PASS") {
+  cat("\n  Elastic Net Results (lambda.1se):\n")
+  cat(paste(rep("-", 60), collapse = ""), "\n")
+  coefs <- enet_result$result$coefficients
+  for (i in seq_len(nrow(coefs))) {
+    sel <- if (coefs$Selected_1se[i]) "*" else " "
+    cat(sprintf("  %s %-22s  coef=%7.3f  importance=%5.1f%%\n",
+                sel, coefs$Driver[i], coefs$Coefficient_1se[i], coefs$Importance_Pct[i]))
+  }
+  cat(sprintf("\n  Selected: %d / %d drivers\n",
+              length(enet_result$result$selected_drivers), length(driver_vars)))
+  results$elastic_net <- enet_result$result
+}
+
+# ------------------------------------------------------------------
+# Step 8: Necessary Condition Analysis (v10.4)
+# ------------------------------------------------------------------
+cat("\nSTEP 8: Necessary Condition Analysis\n")
+cat(paste(rep("=", 60), collapse = ""), "\n")
+
+nca_config <- list(
+  outcome_var = "overall_satisfaction",
+  driver_vars = driver_vars
+)
+
+nca_result <- tryCatch(
+  run_nca_analysis(demo$data, nca_config),
+  error = function(e) { cat(sprintf("  [SKIP] %s\n", e$message)); NULL }
+)
+
+if (!is.null(nca_result) && nca_result$status == "PASS") {
+  cat("\n  NCA Results:\n")
+  cat(paste(rep("-", 60), collapse = ""), "\n")
+  nca_df <- nca_result$result$nca_summary
+  for (i in seq_len(nrow(nca_df))) {
+    cat(sprintf("  %-22s  effect=%.3f  p=%.4f  %s\n",
+                nca_df$Driver[i], nca_df$NCA_Effect_Size[i],
+                nca_df$NCA_p_value[i], nca_df$Classification[i]))
+  }
+  cat(sprintf("\n  Necessary conditions: %d of %d\n",
+              nca_result$result$n_necessary, nca_result$result$n_analysed))
+  results$nca <- nca_result$result
+}
+
+# ------------------------------------------------------------------
+# Step 9: Dominance Analysis (v10.4)
+# ------------------------------------------------------------------
+cat("\nSTEP 9: Dominance Analysis\n")
+cat(paste(rep("=", 60), collapse = ""), "\n")
+
+dom_config <- list(
+  outcome_var = "overall_satisfaction",
+  driver_vars = driver_vars,
+  weight_var = "weight"
+)
+
+dom_result <- tryCatch(
+  run_dominance_analysis(demo$data, dom_config),
+  error = function(e) { cat(sprintf("  [SKIP] %s\n", e$message)); NULL }
+)
+
+if (!is.null(dom_result) && dom_result$status == "PASS") {
+  cat("\n  General Dominance (Shapley-equivalent R-squared decomposition):\n")
+  cat(paste(rep("-", 60), collapse = ""), "\n")
+  dom_df <- dom_result$result$summary
+  for (i in seq_len(nrow(dom_df))) {
+    cat(sprintf("  #%d  %-22s  R2=%.4f  (%5.1f%%)\n",
+                dom_df$Rank[i], dom_df$Driver[i],
+                dom_df$General_Dominance[i], dom_df$General_Pct[i]))
+  }
+  cat(sprintf("\n  Total R-squared: %.4f\n", dom_result$result$total_r_squared))
+  results$dominance <- dom_result$result
+}
+
+# ------------------------------------------------------------------
+# Step 10: GAM Nonlinear Effects (v10.4)
+# ------------------------------------------------------------------
+cat("\nSTEP 10: GAM Nonlinear Effects\n")
+cat(paste(rep("=", 60), collapse = ""), "\n")
+
+gam_config <- list(
+  outcome_var = "overall_satisfaction",
+  driver_vars = driver_vars,
+  weight_var = "weight",
+  settings = list(gam_k = 5)
+)
+
+gam_result <- tryCatch(
+  run_gam_analysis(demo$data, gam_config),
+  error = function(e) { cat(sprintf("  [SKIP] %s\n", e$message)); NULL }
+)
+
+if (!is.null(gam_result) && gam_result$status == "PASS") {
+  cat("\n  Nonlinearity Assessment:\n")
+  cat(paste(rep("-", 60), collapse = ""), "\n")
+  gam_df <- gam_result$result$nonlinearity_summary
+  for (i in seq_len(nrow(gam_df))) {
+    cat(sprintf("  %-22s  EDF=%5.2f  p=%7.4f  %s\n",
+                gam_df$Driver[i], gam_df$EDF[i],
+                gam_df$p_value[i], gam_df$Shape[i]))
+  }
+  cat(sprintf("\n  Linear R2: %.3f | GAM deviance: %.3f | Improvement: %.3f\n",
+              gam_result$result$linear_r_squared,
+              gam_result$result$deviance_explained,
+              gam_result$result$improvement))
+  results$gam <- gam_result$result
+}
+
+# ------------------------------------------------------------------
+# Step 11: HTML Report (if library available)
+# ------------------------------------------------------------------
+cat("\nSTEP 11: Interactive HTML Report\n")
 cat(paste(rep("=", 60), collapse = ""), "\n")
 
 html_lib_dir <- file.path(turas_root, "modules", "keydriver", "lib", "html_report")
@@ -352,7 +483,8 @@ outputs <- c(
   "Demo_Segment_Comparison.csv - Cross-segment comparison matrix",
   "Demo_Executive_Summary.txt  - Plain text executive summary",
   "Demo_Executive_Summary.html - HTML executive summary",
-  "Demo_KeyDriver_Report.html  - Interactive HTML report (if available)"
+  "Demo_KeyDriver_Report.html  - Interactive HTML report (if available)",
+  "                               Includes v10.4: Elastic Net, NCA, Dominance, GAM"
 )
 for (o in outputs) {
   fname <- trimws(strsplit(o, " - ")[[1]][1])

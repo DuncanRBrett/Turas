@@ -479,6 +479,7 @@ run_segment_importance_comparison <- function(data,
 
   # --- Console header ---
   cat("\nSegment Comparison Analysis\n")
+  cat("- Method: Standardized Beta Weights (|beta| share)\n")
   cat(sprintf("- Analyzing %d segments: %s\n",
               length(segment_values), paste(segment_values, collapse = ", ")))
 
@@ -543,6 +544,7 @@ run_segment_importance_comparison <- function(data,
     seg_importance <- data.frame(
       Driver         = drivers,
       Importance_Pct = as.numeric(importance_pct),
+      Method         = "Standardized_Beta",
       stringsAsFactors = FALSE
     )
 

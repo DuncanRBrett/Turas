@@ -20,27 +20,32 @@ if (!exists("%||%")) {
   `%||%` <- function(a, b) if (is.null(a)) b else a
 }
 
-# Source test data generators
-fixtures_path <- file.path(dirname(dirname(testthat::test_path())), "fixtures", "generate_test_data.R")
-if (file.exists(fixtures_path)) {
-  source(fixtures_path)
+# Locate module root robustly (works with test_file and test_dir)
+.find_module_dir <- function() {
+  ofile <- tryCatch(sys.frame(1)$ofile, error = function(e) NULL)
+  if (!is.null(ofile)) {
+    return(normalizePath(file.path(dirname(ofile), "..", ".."), mustWork = FALSE))
+  }
+  tp <- tryCatch(testthat::test_path(), error = function(e) ".")
+  normalizePath(file.path(tp, "..", ".."), mustWork = FALSE)
 }
+module_dir <- .find_module_dir()
+project_root <- normalizePath(file.path(module_dir, "..", ".."), mustWork = FALSE)
+
+# Source test data generators
+source(file.path(module_dir, "tests", "fixtures", "generate_test_data.R"))
 
 # Source TRS infrastructure
-trs_path <- file.path(dirname(dirname(dirname(dirname(testthat::test_path())))), "shared", "lib", "trs_refusal.R")
-if (file.exists(trs_path)) source(trs_path)
+source(file.path(project_root, "modules", "shared", "lib", "trs_refusal.R"))
 
 # Source guard layer
-guard_path <- file.path(dirname(dirname(dirname(testthat::test_path()))), "R", "00_guard.R")
-if (file.exists(guard_path)) source(guard_path)
+tryCatch(source(file.path(module_dir, "R", "00_guard.R")), error = function(e) NULL)
 
 # Source output utilities (for calculate_vif)
-output_path <- file.path(dirname(dirname(dirname(testthat::test_path()))), "R", "04_output.R")
-if (file.exists(output_path)) tryCatch(source(output_path), error = function(e) NULL)
+tryCatch(source(file.path(module_dir, "R", "04_output.R")), error = function(e) NULL)
 
 # Source the module under test
-source_path <- file.path(dirname(dirname(dirname(testthat::test_path()))), "R", "08_executive_summary.R")
-if (file.exists(source_path)) source(source_path)
+source(file.path(module_dir, "R", "08_executive_summary.R"))
 
 
 # ==============================================================================

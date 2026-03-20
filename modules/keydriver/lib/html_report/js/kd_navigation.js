@@ -89,6 +89,8 @@
     updateActiveNav();
     // Hydrate saved state
     kdHydratePage();
+    // Initialize table export buttons (CSV/Excel)
+    if (typeof kdInitTableExport === 'function') kdInitTableExport();
   });
 
   window.addEventListener('scroll', updateActiveNav, { passive: true });

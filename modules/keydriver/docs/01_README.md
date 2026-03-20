@@ -1,7 +1,7 @@
 # Turas Key Driver Analysis Module
 
-**Version:** 10.3
-**Last Updated:** 4 March 2026
+**Version:** 10.4
+**Last Updated:** 20 March 2026
 
 Identifies which drivers have the greatest impact on key outcomes using multiple statistical methods.
 
@@ -46,6 +46,13 @@ source("launch_turas.R")
 - Executive summary generation (NEW v10.3)
 - Interactive HTML report (NEW v10.3)
 - Pinned views and slide export (NEW v10.3)
+- **Elastic Net variable selection** (NEW v10.4) - glmnet
+- **Necessary Condition Analysis** (NEW v10.4) - NCA package
+- **Dominance Analysis** (NEW v10.4) - domir package
+- **GAM nonlinear effects** (NEW v10.4) - mgcv
+- Config-driven custom slides (NEW v10.4)
+- Per-table CSV/Excel export (NEW v10.4)
+- Configurable analysis thresholds (NEW v10.4)
 
 ### Validation
 - Smart sample size rules: n >= max(30, 10 x k drivers)
@@ -83,6 +90,10 @@ keydriver/
 │   ├── 06_effect_size.R       # Effect size interpretation (NEW v10.3)
 │   ├── 07_segment_comparison.R # Enhanced segments (NEW v10.3)
 │   ├── 08_executive_summary.R # Executive summary (NEW v10.3)
+│   ├── 09_elastic_net.R       # Elastic Net (NEW v10.4)
+│   ├── 10_nca.R               # Necessary Condition Analysis (NEW v10.4)
+│   ├── 11_dominance.R         # Dominance Analysis (NEW v10.4)
+│   ├── 12_gam.R               # GAM nonlinear effects (NEW v10.4)
 │   ├── kda_shap/              # SHAP submodule (4 files)
 │   └── kda_quadrant/          # Quadrant/IPA submodule (5 files)
 ├── lib/
@@ -98,6 +109,7 @@ keydriver/
 │       └── js/                # Client-side interactivity
 │           ├── kd_utils.js
 │           ├── kd_navigation.js
+│           ├── kd_table_export.js  # Per-table CSV/Excel (NEW v10.4)
 │           ├── kd_pinned_views.js
 │           └── kd_slide_export.js
 ├── tests/
@@ -122,17 +134,25 @@ keydriver/
 
 ## Dependencies
 
-**Required:**
-- openxlsx (>= 4.2.5) - Excel I/O
-- Base R stats - Regression analysis
+| Package | Min Version | Required? | Purpose |
+|---------|-------------|-----------|---------|
+| stats | (base) | Yes | Regression, correlation, model fitting |
+| openxlsx | >= 4.2.5 | Yes | Excel config I/O, output workbook |
+| htmltools | >= 0.5.0 | Yes* | HTML report generation |
+| data.table | >= 1.14.0 | Recommended | Fast data manipulation |
+| haven | >= 2.5.0 | Optional | SPSS .sav data import |
+| xgboost | >= 1.7.0 | Optional | SHAP analysis (XGBoost/TreeSHAP) |
+| shapviz | >= 0.9.0 | Optional | SHAP visualisations |
+| ggplot2 | >= 3.4.0 | Optional | Quadrant charts (fallback) |
+| glmnet | >= 4.1.0 | Optional | Elastic Net variable selection (v10.4) |
+| NCA | >= 3.2.0 | Optional | Necessary Condition Analysis (v10.4) |
+| domir | >= 1.0.0 | Optional | Dominance Analysis (v10.4) |
+| mgcv | (recommended) | Optional | GAM nonlinear effects (v10.4) |
+| base64enc | >= 0.1 | Optional | Config-driven slide images (v10.4) |
+| shiny | >= 1.7.0 | Optional | GUI interface |
+| shinyFiles | >= 0.9.0 | Optional | GUI file browser |
 
-**Optional:**
-- htmltools - HTML report generation
-- haven (>= 2.5.0) - SPSS .sav support
-- xgboost - SHAP analysis
-- shapviz - SHAP visualizations
-- ggplot2 - Quadrant charts
-- shiny, shinyFiles - GUI interface
+\* Required when `enable_html_report = TRUE`
 
 ---
 
@@ -203,3 +223,9 @@ testthat::test_file("modules/keydriver/tests/testthat/test_core_importance.R")
 - Martilla, J. A., & James, J. C. (1977). Importance-performance analysis
 - Efron, B., & Tibshirani, R. J. (1993). An introduction to the bootstrap
 - Cohen, J. (1988). Statistical power analysis for the behavioral sciences
+- Tibshirani, R. (1996). Regression shrinkage and selection via the Lasso
+- Zou, H. & Hastie, T. (2005). Regularization and variable selection via the Elastic Net
+- Dul, J. (2016). Necessary Condition Analysis (NCA). Organizational Research Methods
+- Budescu, D. V. (1993). Dominance analysis. Psychological Bulletin
+- Azen, R. & Budescu, D. V. (2003). The dominance analysis approach. Psychological Methods
+- Wood, S. N. (2017). Generalized Additive Models. 2nd Ed. Chapman & Hall/CRC

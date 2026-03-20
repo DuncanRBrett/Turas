@@ -48,6 +48,12 @@
       "runtimeExecutable": "/bin/bash",
       "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && npx serve examples/maxdiff/demo_showcase/output -l 8800 --no-clipboard"],
       "port": 8800
+    },
+    {
+      "name": "keydriver-report",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && npx serve examples/keydriver/demo_showcase -l 8805 --no-clipboard"],
+      "port": 8805
     }
   ]
 }

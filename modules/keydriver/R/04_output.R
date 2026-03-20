@@ -139,21 +139,31 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
   # Add VIF diagnostics
   tryCatch({
     vif_vals <- calculate_vif(model)
-    vif_df <- data.frame(
-      Driver = names(vif_vals),
-      VIF = as.numeric(vif_vals),
-      stringsAsFactors = FALSE
-    )
-    vif_df$Warning <- ifelse(vif_df$VIF > 10, "High VIF (>10)",
-                             ifelse(vif_df$VIF > 5, "Moderate VIF (>5)", "OK"))
+    vif_start_row <- nrow(model_summary) + 3
 
     openxlsx::writeData(wb, "Model Summary", "VIF Diagnostics",
-                       startRow = nrow(model_summary) + 3, startCol = 1)
-    openxlsx::writeData(wb, "Model Summary", vif_df,
-                       startRow = nrow(model_summary) + 4, startCol = 1)
-    openxlsx::addStyle(wb, "Model Summary", header_style,
-                      rows = nrow(model_summary) + 4,
-                      cols = 1:3, gridExpand = TRUE)
+                       startRow = vif_start_row, startCol = 1)
+
+    if (is.null(vif_vals) || length(vif_vals) == 0) {
+      # < 2 predictors — VIF not applicable
+      openxlsx::writeData(wb, "Model Summary",
+                         "N/A — VIF requires at least 2 predictors.",
+                         startRow = vif_start_row + 1, startCol = 1)
+    } else {
+      vif_df <- data.frame(
+        Driver = names(vif_vals),
+        VIF = as.numeric(vif_vals),
+        stringsAsFactors = FALSE
+      )
+      vif_df$Warning <- ifelse(vif_df$VIF > 10, "High VIF (>10)",
+                               ifelse(vif_df$VIF > 5, "Moderate VIF (>5)", "OK"))
+
+      openxlsx::writeData(wb, "Model Summary", vif_df,
+                         startRow = vif_start_row + 1, startCol = 1)
+      openxlsx::addStyle(wb, "Model Summary", header_style,
+                        rows = vif_start_row + 1,
+                        cols = 1:3, gridExpand = TRUE)
+    }
   }, error = function(e) {
     # VIF calculation failed - log to console (no silent fails per TRS)
     cat(sprintf("   [WARN] VIF diagnostics failed and were skipped: %s\n", conditionMessage(e)))
@@ -417,6 +427,22 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
                      colNames = FALSE)
   openxlsx::setColWidths(wb, "README", cols = 1, widths = 100)
 
+  # Style the README: title row and section headers
+  title_style <- openxlsx::createStyle(
+    fontSize = 14, fontColour = "#323367", textDecoration = "bold"
+  )
+  section_style <- openxlsx::createStyle(
+    fontSize = 12, fontColour = "#323367", textDecoration = "bold",
+    border = "bottom", borderColour = "#e2e8f0"
+  )
+  # Row 1 is the title
+  openxlsx::addStyle(wb, "README", title_style, rows = 1, cols = 1)
+  # Find section header rows (lines starting with "===")
+  section_rows <- which(grepl("^===", readme_text))
+  for (sr in section_rows) {
+    openxlsx::addStyle(wb, "README", section_style, rows = sr, cols = 1)
+  }
+
   # Save workbook (TRS v1.0: Use atomic save if available)
   if (exists("turas_save_workbook_atomic", mode = "function")) {
     save_result <- turas_save_workbook_atomic(wb, output_file, module = "KDA")
@@ -436,6 +462,22 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
       )
     }
   } else {
-    openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE)
+    tryCatch(
+      openxlsx::saveWorkbook(wb, output_file, overwrite = TRUE),
+      error = function(e) {
+        keydriver_refuse(
+          code = "IO_OUTPUT_ERROR",
+          title = "Failed to Save Output File",
+          problem = sprintf("Could not save Excel output file to '%s'.", output_file),
+          why_it_matters = "Results cannot be delivered without the output file. Analysis is complete but unusable.",
+          how_to_fix = c(
+            "Check that the output directory exists and is writable",
+            "Ensure the file is not open in Excel or locked by another process",
+            sprintf("Error details: %s", e$message)
+          ),
+          details = sprintf("Attempted path: %s", output_file)
+        )
+      }
+    )
   }
 }

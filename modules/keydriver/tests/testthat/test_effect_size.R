@@ -161,9 +161,11 @@ test_that("classify_effect_size uses absolute value for negative inputs", {
 })
 
 
-test_that("classify_effect_size returns NA for NA input", {
-  result <- classify_effect_size(NA, method = "cohen_f2")
-  expect_true(is.na(result))
+test_that("classify_effect_size refuses NA input with TRS refusal", {
+  expect_error(
+    classify_effect_size(NA, method = "cohen_f2"),
+    class = "turas_refusal"
+  )
 })
 
 
@@ -200,9 +202,15 @@ test_that("calculate_cohens_f2 handles perfect fit edge case", {
 })
 
 
-test_that("calculate_cohens_f2 returns NA for NA inputs", {
-  expect_true(is.na(calculate_cohens_f2(NA, 0.30)))
-  expect_true(is.na(calculate_cohens_f2(0.45, NA)))
+test_that("calculate_cohens_f2 refuses NA inputs with TRS refusal", {
+  expect_error(
+    calculate_cohens_f2(NA, 0.30),
+    class = "turas_refusal"
+  )
+  expect_error(
+    calculate_cohens_f2(0.45, NA),
+    class = "turas_refusal"
+  )
 })
 
 

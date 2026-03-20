@@ -176,9 +176,11 @@ generate_keydriver_html_report <- function(results, config, output_path) {
     }
   )
 
-  # VIF diagnostics table
+  # VIF diagnostics table (configurable thresholds)
+  vif_mod <- as.numeric(config$vif_moderate_threshold %||% 5)
+  vif_hi  <- as.numeric(config$vif_high_threshold %||% 10)
   tables$vif <- tryCatch(
-    build_kd_vif_table(html_data$vif_values),
+    build_kd_vif_table(html_data$vif_values, vif_moderate = vif_mod, vif_high = vif_hi),
     error = function(e) {
       warnings <<- c(warnings, sprintf("VIF table failed: %s", e$message))
       NULL

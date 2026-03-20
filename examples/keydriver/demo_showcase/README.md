@@ -23,7 +23,11 @@ This runs the full demo and generates all outputs in approximately 30-60 seconds
 | **Effect Sizes** | `Demo_Effect_Sizes.csv` | Cohen's f-squared classifications (Negligible/Small/Medium/Large) |
 | **Segment Comparison** | `Demo_Segment_Comparison.csv` | Driver importance across Business/Residential/Premium |
 | **Executive Summary** | `Demo_Executive_Summary.txt/.html` | Automated headline, findings, recommendations |
-| **HTML Report** | `Demo_KeyDriver_Report.html` | Interactive standalone report with charts |
+| **Elastic Net** | (in Excel + HTML) | Penalized variable selection via glmnet (NEW v10.4) |
+| **NCA** | (in Excel + HTML) | Necessary Condition Analysis — hygiene vs motivator (NEW v10.4) |
+| **Dominance Analysis** | (in Excel + HTML) | General, conditional & complete dominance (NEW v10.4) |
+| **GAM** | (in Excel + HTML) | Nonlinear effects detection via mgcv (NEW v10.4) |
+| **HTML Report** | `Demo_KeyDriver_Report.html` | Interactive standalone report with all sections |
 
 ## Data Description
 
@@ -44,6 +48,20 @@ The synthetic data is designed so that:
 - Business customers prioritise reliability/speed
 - Premium customers prioritise service/app experience
 - All methods should agree on the top 3 drivers
+- Elastic Net should zero out Contract Flexibility (negligible driver)
+- GAM should show approximately linear relationships (survey scales)
+
+## Config File
+
+The demo config (`Demo_KeyDriver_Config.xlsx`) includes 5 sheets:
+
+| Sheet | Purpose |
+|-------|---------|
+| **Settings** | All analysis parameters including v10.4 feature toggles |
+| **Variables** | Outcome, drivers, weight definitions with DriverType |
+| **Segments** | Customer segment definitions |
+| **StatedImportance** | Stated importance values for quadrant analysis |
+| **CustomSlides** | Config-driven qualitative slides for HTML report (NEW v10.4) |
 
 ## Files
 

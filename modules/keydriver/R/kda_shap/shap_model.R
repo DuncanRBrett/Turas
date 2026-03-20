@@ -177,10 +177,20 @@ model_diagnostics <- function(model, prep) {
   cv_result <- attr(model, "cv_result")
   cv_best_score <- NULL
   if (!is.null(cv_result)) {
-    # Get the best iteration score
+    # Get the best iteration score from the TEST (holdout) fold, not training
     best_iter <- attr(model, "best_iteration")
     if (!is.null(best_iter) && best_iter <= nrow(cv_result$evaluation_log)) {
-      cv_best_score <- cv_result$evaluation_log[[2]][best_iter]  # test metric
+      eval_log <- cv_result$evaluation_log
+      # Find the test metric column (named test_<metric>_mean)
+      test_cols <- grep("^test_.*_mean$", names(eval_log), value = TRUE)
+      if (length(test_cols) > 0) {
+        cv_best_score <- eval_log[[test_cols[1]]][best_iter]
+      } else {
+        # Fallback: column 4 is typically the test mean in xgb.cv output
+        if (ncol(eval_log) >= 4) {
+          cv_best_score <- eval_log[[4]][best_iter]
+        }
+      }
     }
   }
 

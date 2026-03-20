@@ -228,6 +228,10 @@ generate_mock_results <- function(n_drivers = 5,
                                   include_shap = FALSE,
                                   include_quadrant = FALSE,
                                   include_bootstrap = FALSE,
+                                  include_elastic_net = FALSE,
+                                  include_nca = FALSE,
+                                  include_dominance = FALSE,
+                                  include_gam = FALSE,
                                   seed = 42) {
   set.seed(seed)
   driver_names <- paste0("driver_", seq_len(n_drivers))
@@ -337,6 +341,97 @@ generate_mock_results <- function(n_drivers = 5,
         )
       }))
     }))
+  }
+
+  # v10.4: Elastic Net mock results
+  if (include_elastic_net) {
+    abs_coefs <- sort(runif(n_drivers, 0, 0.8), decreasing = TRUE)
+    results$elastic_net <- list(
+      coefficients = data.frame(
+        Driver = driver_names,
+        Coefficient_1se = abs_coefs * sample(c(-1, 1), n_drivers, replace = TRUE),
+        Abs_Coefficient_1se = abs_coefs,
+        Importance_Pct = round(100 * abs_coefs / sum(abs_coefs), 1),
+        Selected_1se = abs_coefs > 0.1,
+        Coefficient_min = abs_coefs * 1.1 * sample(c(-1, 1), n_drivers, replace = TRUE),
+        Selected_min = TRUE,
+        stringsAsFactors = FALSE
+      ),
+      selected_drivers = driver_names[abs_coefs > 0.1],
+      zeroed_drivers = driver_names[abs_coefs <= 0.1],
+      alpha = 0.5,
+      lambda_1se = 0.05,
+      lambda_min = 0.01,
+      cv_mse_1se = 0.85,
+      cv_mse_min = 0.80,
+      n_obs = 200
+    )
+  }
+
+  # v10.4: NCA mock results
+  if (include_nca) {
+    nca_es <- runif(n_drivers, 0, 0.4)
+    nca_p <- runif(n_drivers, 0, 0.2)
+    is_nec <- nca_es >= 0.1 & nca_p < 0.05
+    results$nca <- list(
+      nca_summary = data.frame(
+        Driver = driver_names,
+        NCA_Effect_Size = round(nca_es, 3),
+        NCA_p_value = round(nca_p, 4),
+        Is_Necessary = is_nec,
+        Classification = ifelse(is_nec, "Necessary Condition", "Not Necessary"),
+        stringsAsFactors = FALSE
+      ),
+      bottleneck = NULL,
+      n_necessary = sum(is_nec),
+      n_analysed = n_drivers,
+      n_obs = 200
+    )
+  }
+
+  # v10.4: Dominance mock results
+  if (include_dominance) {
+    gen_dom <- sort(runif(n_drivers, 0.01, 0.2), decreasing = TRUE)
+    names(gen_dom) <- driver_names
+    results$dominance <- list(
+      summary = data.frame(
+        Driver = driver_names,
+        General_Dominance = round(gen_dom, 4),
+        General_Pct = round(100 * gen_dom / sum(gen_dom), 1),
+        Rank = rank(-gen_dom, ties.method = "min"),
+        stringsAsFactors = FALSE
+      ),
+      general_dominance = gen_dom,
+      conditional_dominance = matrix(0, nrow = 0, ncol = 0),
+      complete_dominance = matrix(0, nrow = 0, ncol = 0),
+      n_drivers = n_drivers,
+      n_obs = 200,
+      total_r_squared = sum(gen_dom)
+    )
+  }
+
+  # v10.4: GAM mock results
+  if (include_gam) {
+    edfs <- runif(n_drivers, 1.0, 4.0)
+    results$gam <- list(
+      nonlinearity_summary = data.frame(
+        Driver = driver_names,
+        EDF = round(edfs, 2),
+        F_statistic = round(runif(n_drivers, 1, 20), 2),
+        p_value = runif(n_drivers, 0.001, 0.2),
+        Is_Nonlinear = edfs > 1.5 & runif(n_drivers) < 0.5,
+        Shape = ifelse(edfs > 3, "Complex",
+                       ifelse(edfs > 1.5, "Moderate curvature", "Approximately linear")),
+        stringsAsFactors = FALSE
+      ),
+      deviance_explained = 0.75,
+      linear_r_squared = 0.72,
+      improvement = 0.03,
+      n_nonlinear = sum(edfs > 1.5),
+      n_analysed = n_drivers,
+      n_obs = 200,
+      k_basis = 5
+    )
   }
 
   results

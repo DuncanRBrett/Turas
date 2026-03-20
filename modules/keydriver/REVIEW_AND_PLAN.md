@@ -38,31 +38,12 @@ inconsistencies. The issues are fixable and well-defined.
 
 ## PART 2: CRITICAL BUGS (Must Fix)
 
-### BUG-1: Missing `return()` on `keydriver_refuse()` — Execution Continues After Refusal
+### ~~BUG-1: RETRACTED~~ — Not a Bug
 
-**Severity:** CRITICAL **Files affected:** `03_analysis.R`,
-`06_effect_size.R` **Impact:** After a validation failure, code
-continues executing with invalid data, causing division-by-zero errors,
-NA propagation, or incorrect results.
-
-**Details:** - `03_analysis.R` lines 181, 199, 212, 269, 344, 556:
-`keydriver_refuse()` is called but NOT wrapped in `return()`. After
-refusing for aliased coefficients (line 181), execution falls through to
-line 195 where it tries to compute standardized betas with NA
-coefficients. After refusing for zero-variance (line 199), `sd_x / sd_y`
-division-by-zero occurs at line 223. - `06_effect_size.R` lines 44, 64,
-122, 187, 194, 201, 217, 229, 323, 332: **Every single**
-`keydriver_refuse()` call in this file lacks `return()`. This is a
-systematic bug across the entire file.
-
-**Note:** The module uses `turas_refuse()` which throws a condition
-class, so callers that wrap in `tryCatch(... turas_refusal = ...)` do
-catch it. But any code path that doesn't catch the condition will see
-unpredictable downstream behaviour. The current tests pass by catching
-the condition, masking the missing `return()`.
-
-**Fix:** Add `return()` wrapper to every `keydriver_refuse()` call in
-both files.
+`keydriver_refuse()` calls `turas_refuse()` which calls `stop(cond)`.
+Execution always halts. The missing `return()` wrappers are cosmetically
+poor but functionally harmless since the error condition is thrown
+before the next line executes.
 
 ------------------------------------------------------------------------
 

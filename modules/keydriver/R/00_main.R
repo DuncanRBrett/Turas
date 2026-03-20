@@ -27,7 +27,7 @@
 #
 # ==============================================================================
 
-KEYDRIVER_VERSION <- "10.3"
+KEYDRIVER_VERSION <- "10.4"
 
 # ==============================================================================
 # TRS GUARD LAYER (Must be first)
@@ -467,6 +467,17 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   model <- step4$model; term_mapping <- step4$term_mapping; guard <- step4$guard
 
   cat(sprintf("   [OK] Model R-squared = %.3f\n", summary(model)$r.squared))
+
+  # Post-fit model assumption checks (VIF, residual normality)
+  if (exists("guard_validate_model_assumptions", mode = "function")) {
+    guard <- guard_validate_model_assumptions(model, data, config, guard)
+    if (length(guard$assumption_violations) > 0) {
+      for (av in guard$assumption_violations) {
+        cat(sprintf("   [WARN] %s\n", av$message))
+      }
+    }
+  }
+
   if (has_mixed) {
     cat("\n   [BUILDING TERM MAPPING]\n")
     if (!is.null(term_mapping)) print_term_mapping_summary(term_mapping)
@@ -651,8 +662,96 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
     }
   }
 
-  # --- Step 11: Executive Summary ---
-  step_num_exec <- step_num_effect + (if (!is.null(config$segments) && nrow(config$segments) > 0) 1 else 0) + 1
+  # --- Optional Advanced Features (v10.4) ---
+  # Each uses requireNamespace() internally and returns PARTIAL if unavailable.
+  next_step <- step_num_effect + (if (!is.null(config$segments) && nrow(config$segments) > 0) 1 else 0) + 1
+
+  # Elastic Net
+  enable_elastic_net <- isTRUE(as.logical(config$settings$enable_elastic_net))
+  if (enable_elastic_net) {
+    cat(sprintf("\n%d. Elastic Net analysis...\n", next_step))
+    source(file.path(turas_root, "modules/keydriver/R/09_elastic_net.R"), local = FALSE)
+    enet_result <- tryCatch(
+      run_elastic_net_analysis(data$data, config),
+      error = function(e) {
+        cat(sprintf("   [WARN] Elastic net failed: %s\n", e$message))
+        list(status = "PARTIAL", message = e$message, result = NULL)
+      }
+    )
+    if (!is.null(enet_result$result)) {
+      results$elastic_net <- enet_result$result
+      cat("   [OK] Elastic net analysis complete\n")
+    } else {
+      cat(sprintf("   [SKIP] %s\n", enet_result$message))
+    }
+    next_step <- next_step + 1
+  }
+
+  # Necessary Condition Analysis (NCA)
+  enable_nca <- isTRUE(as.logical(config$settings$enable_nca))
+  if (enable_nca) {
+    cat(sprintf("\n%d. Necessary Condition Analysis...\n", next_step))
+    source(file.path(turas_root, "modules/keydriver/R/10_nca.R"), local = FALSE)
+    nca_result <- tryCatch(
+      run_nca_analysis(data$data, config),
+      error = function(e) {
+        cat(sprintf("   [WARN] NCA failed: %s\n", e$message))
+        list(status = "PARTIAL", message = e$message, result = NULL)
+      }
+    )
+    if (!is.null(nca_result$result)) {
+      results$nca <- nca_result$result
+      cat("   [OK] NCA analysis complete\n")
+    } else {
+      cat(sprintf("   [SKIP] %s\n", nca_result$message))
+    }
+    next_step <- next_step + 1
+  }
+
+  # Dominance Analysis
+  enable_dominance <- isTRUE(as.logical(config$settings$enable_dominance))
+  if (enable_dominance) {
+    cat(sprintf("\n%d. Dominance Analysis...\n", next_step))
+    source(file.path(turas_root, "modules/keydriver/R/11_dominance.R"), local = FALSE)
+    dom_result <- tryCatch(
+      run_dominance_analysis(data$data, config),
+      error = function(e) {
+        cat(sprintf("   [WARN] Dominance analysis failed: %s\n", e$message))
+        list(status = "PARTIAL", message = e$message, result = NULL)
+      }
+    )
+    if (!is.null(dom_result$result)) {
+      results$dominance <- dom_result$result
+      cat("   [OK] Dominance analysis complete\n")
+    } else {
+      cat(sprintf("   [SKIP] %s\n", dom_result$message))
+    }
+    next_step <- next_step + 1
+  }
+
+  # GAM Nonlinear Effects
+  enable_gam <- isTRUE(as.logical(config$settings$enable_gam))
+  if (enable_gam) {
+    cat(sprintf("\n%d. GAM nonlinear effects...\n", next_step))
+    source(file.path(turas_root, "modules/keydriver/R/12_gam.R"), local = FALSE)
+    gam_result <- tryCatch(
+      run_gam_analysis(data$data, config),
+      error = function(e) {
+        cat(sprintf("   [WARN] GAM analysis failed: %s\n", e$message))
+        list(status = "PARTIAL", message = e$message, result = NULL)
+      }
+    )
+    if (!is.null(gam_result$result)) {
+      results$gam <- gam_result$result
+      cat("   [OK] GAM analysis complete\n")
+    } else {
+      cat(sprintf("   [SKIP] %s\n", gam_result$message))
+    }
+    next_step <- next_step + 1
+  }
+
+  # --- Executive Summary ---
+  step_num_exec <- next_step
   cat(sprintf("\n%d. Generating executive summary...\n", step_num_exec))
 
   source(file.path(turas_root, "modules/keydriver/R/08_executive_summary.R"), local = FALSE)
@@ -877,12 +976,12 @@ add_shap_to_importance <- function(importance, shap_importance) {
   shap_pct <- setNames(shap_importance$importance_pct, shap_importance$driver)
   shap_rank <- setNames(shap_importance$rank, shap_importance$driver)
 
-  importance$SHAP_Importance <- sapply(importance$Driver, function(d) {
+  importance$SHAP_Importance <- vapply(importance$Driver, function(d) {
     shap_pct[d] %||% NA_real_
-  })
-  importance$SHAP_Rank <- sapply(importance$Driver, function(d) {
-    shap_rank[d] %||% NA_integer_
-  })
+  }, numeric(1))
+  importance$SHAP_Rank <- vapply(importance$Driver, function(d) {
+    as.integer(shap_rank[d] %||% NA_integer_)
+  }, integer(1))
   importance
 }
 
