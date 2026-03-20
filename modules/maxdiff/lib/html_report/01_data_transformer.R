@@ -94,6 +94,12 @@ transform_maxdiff_for_html <- function(maxdiff_results, config) {
   # --- Insights from config ---
   insights <- config$insights %||% NULL
 
+  # --- Build segment filter options (for dropdown filters on analytical tabs) ---
+  segment_filter <- transform_segment_filter_options(maxdiff_results, config)
+
+  # --- Build individual utility distributions (for violin chart) ---
+  utility_distributions <- transform_utility_distributions(maxdiff_results)
+
   list(
     meta = meta,
     summary = summary_data,
@@ -101,6 +107,8 @@ transform_maxdiff_for_html <- function(maxdiff_results, config) {
     items = items_analysis,
     head_to_head = head_to_head,
     segments = segments,
+    segment_filter = segment_filter,
+    utility_distributions = utility_distributions,
     turf = turf,
     diagnostics = diagnostics,
     methodology = methodology,
@@ -183,11 +191,58 @@ transform_summary_section <- function(results, config, meta) {
     meta$method, method_note
   )
 
+  # Compute top share, bottom item, share range for overview KPI cards
+  top_share <- NA_real_
+  bottom_item <- "N/A"
+  share_range <- NA_real_
+
+  if (has_hb && !is.null(results$hb_results$individual_utilities)) {
+    if (exists("compute_preference_shares", mode = "function")) {
+      ov_shares <- tryCatch(
+        compute_preference_shares(individual_utils = results$hb_results$individual_utilities),
+        error = function(e) NULL
+      )
+      if (!is.null(ov_shares) && length(ov_shares) > 0) {
+        # ov_shares are already in percentage scale (0-100) from compute_preference_shares
+        top_share <- round(max(ov_shares), 1)
+        share_range <- round(max(ov_shares) - min(ov_shares), 1)
+        bottom_idx <- which.min(ov_shares)
+        bottom_id <- names(ov_shares)[bottom_idx]
+        pop_utils <- results$hb_results$population_utilities
+        bi <- which(pop_utils$Item_ID == bottom_id)
+        bottom_item <- if (length(bi) > 0) (pop_utils$Item_Label[bi[1]] %||% bottom_id) else bottom_id
+      }
+    }
+  } else if (has_logit && !is.null(results$logit_results$utilities)) {
+    lu <- results$logit_results$utilities
+    if (exists("compute_preference_shares", mode = "function")) {
+      agg <- setNames(lu$Logit_Utility, lu$Item_ID)
+      ov_shares <- tryCatch(compute_preference_shares(aggregate_utils = agg), error = function(e) NULL)
+      if (!is.null(ov_shares) && length(ov_shares) > 0) {
+        # ov_shares are already in percentage scale (0-100)
+        top_share <- round(max(ov_shares), 1)
+        share_range <- round(max(ov_shares) - min(ov_shares), 1)
+        bottom_idx <- which.min(ov_shares)
+        bottom_id <- names(ov_shares)[bottom_idx]
+        bi <- which(lu$Item_ID == bottom_id)
+        bottom_item <- if (length(bi) > 0) (lu$Item_Label[bi[1]] %||% bottom_id) else bottom_id
+      }
+    }
+  } else if (has_counts && "BW_Score" %in% names(results$count_scores)) {
+    cs <- results$count_scores
+    worst_idx <- which.min(cs$BW_Score)
+    bottom_item <- cs$Item_Label[worst_idx] %||% cs$Item_ID[worst_idx]
+  }
+
   list(
     method_label = meta$method,
     n_total = meta$n_total,
     n_items = meta$n_items,
+    n_tasks = meta$n_tasks %||% results$study_summary$n_tasks %||% NA,
     top_item = top_item,
+    bottom_item = bottom_item,
+    top_share = top_share,
+    share_range = share_range,
     callout = callout
   )
 }
@@ -672,5 +727,153 @@ transform_h2h_section <- function(results, config) {
     h2h_data = h2h_data,
     label_map = label_map,
     callout = callout
+  )
+}
+
+
+# ==============================================================================
+# SEGMENT FILTER OPTIONS (for dropdown on analytical tabs)
+# ==============================================================================
+
+#' Extract segment filter options for dropdown rendering
+#'
+#' @param results List. Full results from run_maxdiff()
+#' @param config List. Module configuration
+#'
+#' @return List with $variables (each containing levels + counts), or NULL
+#' @keywords internal
+transform_segment_filter_options <- function(results, config) {
+
+  if (is.null(results$segment_results)) return(NULL)
+
+  seg <- results$segment_results
+  seg_scores <- seg$segment_scores
+  if (is.null(seg_scores) || !is.data.frame(seg_scores) || nrow(seg_scores) == 0) return(NULL)
+
+  # Filter to in-segment rows only (Segment_Value == TRUE)
+  if ("Segment_Value" %in% names(seg_scores)) {
+    seg_scores <- seg_scores[seg_scores$Segment_Value == TRUE, , drop = FALSE]
+    if (nrow(seg_scores) == 0) return(NULL)
+  }
+
+  # Get segment config for variable grouping
+  seg_cfg <- config$segment_settings
+  variables <- list()
+
+  if (!is.null(seg_cfg) && is.data.frame(seg_cfg) && "Variable_Name" %in% names(seg_cfg)) {
+    # Group segments by Variable_Name from config
+    for (var_name in unique(seg_cfg$Variable_Name)) {
+      var_rows <- seg_cfg[seg_cfg$Variable_Name == var_name, , drop = FALSE]
+      levels_list <- list()
+      for (i in seq_len(nrow(var_rows))) {
+        seg_id <- var_rows$Segment_ID[i]
+        seg_label <- var_rows$Segment_Label[i]
+        # Get N from segment_scores (all rows for this segment have same Segment_N)
+        seg_rows <- seg_scores[seg_scores$Segment_ID == seg_id, , drop = FALSE]
+        n_val <- if (nrow(seg_rows) > 0 && "Segment_N" %in% names(seg_rows)) {
+          seg_rows$Segment_N[1]
+        } else {
+          NA
+        }
+        levels_list[[length(levels_list) + 1]] <- list(
+          value = seg_id,
+          label = seg_label,
+          n = n_val
+        )
+      }
+      variables[[var_name]] <- list(
+        variable = var_name,
+        levels = levels_list
+      )
+    }
+  } else {
+    # No config — infer from data, one group per Segment_ID
+    for (seg_id in unique(seg_scores$Segment_ID)) {
+      seg_rows <- seg_scores[seg_scores$Segment_ID == seg_id, , drop = FALSE]
+      seg_label <- if ("Segment_Label" %in% names(seg_rows)) seg_rows$Segment_Label[1] else seg_id
+      n_val <- if ("Segment_N" %in% names(seg_rows)) seg_rows$Segment_N[1] else NA
+      variables[[seg_id]] <- list(
+        variable = seg_id,
+        levels = list(list(value = seg_id, label = seg_label, n = n_val))
+      )
+    }
+  }
+
+  if (length(variables) == 0) return(NULL)
+
+  list(
+    variables = variables,
+    segment_scores = seg_scores
+  )
+}
+
+
+# ==============================================================================
+# INDIVIDUAL UTILITY DISTRIBUTIONS (for violin/raincloud chart)
+# ==============================================================================
+
+#' Compute per-item utility distribution summaries for violin chart
+#'
+#' @param results List. Full results from run_maxdiff()
+#'
+#' @return Data frame with Item_ID, Mean, Median, SD, Q25, Q75, Min, Max, or NULL
+#' @keywords internal
+transform_utility_distributions <- function(results) {
+
+  indiv <- results$hb_results$individual_utilities
+  if (is.null(indiv)) return(NULL)
+
+  # Get numeric columns only
+  if (is.data.frame(indiv)) {
+    numeric_cols <- vapply(indiv, is.numeric, logical(1))
+    item_ids <- names(indiv)[numeric_cols]
+    mat <- as.matrix(indiv[, numeric_cols, drop = FALSE])
+  } else {
+    mat <- as.matrix(indiv)
+    item_ids <- colnames(mat)
+  }
+
+  if (is.null(item_ids) || length(item_ids) < 2) return(NULL)
+
+  # Compute summary stats per item
+  dist_df <- data.frame(
+    Item_ID = item_ids,
+    Mean = vapply(item_ids, function(id) mean(mat[, id], na.rm = TRUE), numeric(1)),
+    Median = vapply(item_ids, function(id) median(mat[, id], na.rm = TRUE), numeric(1)),
+    SD = vapply(item_ids, function(id) sd(mat[, id], na.rm = TRUE), numeric(1)),
+    Q25 = vapply(item_ids, function(id) quantile(mat[, id], 0.25, na.rm = TRUE), numeric(1)),
+    Q75 = vapply(item_ids, function(id) quantile(mat[, id], 0.75, na.rm = TRUE), numeric(1)),
+    Min = vapply(item_ids, function(id) min(mat[, id], na.rm = TRUE), numeric(1)),
+    Max = vapply(item_ids, function(id) max(mat[, id], na.rm = TRUE), numeric(1)),
+    stringsAsFactors = FALSE
+  )
+  rownames(dist_df) <- NULL
+
+  # Compute density estimates for each item (for violin shape)
+  densities <- lapply(item_ids, function(id) {
+    vals <- mat[, id]
+    vals <- vals[!is.na(vals)]
+    if (length(vals) < 3) return(NULL)
+    d <- density(vals, n = 32)
+    list(x = d$x, y = d$y)
+  })
+  names(densities) <- item_ids
+
+  # Get labels from population utilities if available
+  pop <- results$hb_results$population_utilities
+  if (!is.null(pop) && "Item_Label" %in% names(pop)) {
+    label_map <- setNames(pop$Item_Label, pop$Item_ID)
+    dist_df$Item_Label <- label_map[dist_df$Item_ID]
+  } else {
+    dist_df$Item_Label <- dist_df$Item_ID
+  }
+
+  # Sort by mean descending
+  dist_df <- dist_df[order(-dist_df$Mean), ]
+  rownames(dist_df) <- NULL
+
+  list(
+    summary = dist_df,
+    densities = densities[dist_df$Item_ID]
   )
 }

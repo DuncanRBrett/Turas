@@ -133,16 +133,17 @@ build_insight_area <- function(panel_id, insights_list = NULL) {
 # ==============================================================================
 
 build_pin_button <- function(panel_id) {
+  pin_icon <- "&#x1F4CC;"
   sprintf(
     '<div class="pin-btn-wrapper">
-  <button class="pin-btn" data-panel="%s" onclick="window._mdTogglePin(\'%s\')" title="Pin this view">\U0001F4CC</button>
+  <button class="pin-btn" data-panel="%s" onclick="window._mdTogglePin(\'%s\')" title="Pin this view">%s</button>
   <div class="pin-mode-popover" style="display:none;">
     <button class="pin-mode-option" onclick="window._mdExecutePin(\'%s\',\'all\')">Table + Chart + Insight</button>
     <button class="pin-mode-option" onclick="window._mdExecutePin(\'%s\',\'chart_insight\')">Chart + Insight</button>
     <button class="pin-mode-option" onclick="window._mdExecutePin(\'%s\',\'table_insight\')">Table + Insight</button>
   </div>
 </div>',
-    panel_id, panel_id, panel_id, panel_id, panel_id
+    panel_id, panel_id, pin_icon, panel_id, panel_id, panel_id
   )
 }
 
@@ -152,12 +153,60 @@ build_pin_button <- function(panel_id) {
 # ==============================================================================
 
 build_panel_toolbar <- function(panel_id, insights_list = NULL) {
+  export_btn <- sprintf(
+    '<button class="md-export-btn" onclick="window._mdExportPanel(\'%s\')" title="Export table data to Excel"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 14h12M8 2v9M4 7l4 4 4-4"/></svg> Export Excel</button>',
+    panel_id)
   paste0(
     '<div class="md-panel-toolbar">',
     build_pin_button(panel_id),
+    export_btn,
     '</div>',
     build_insight_area(panel_id, insights_list)
   )
+}
+
+
+# ==============================================================================
+# SEGMENT DROPDOWN BUILDER
+# ==============================================================================
+
+#' Build a segment filter dropdown for an analytical panel
+#'
+#' @param panel_id Character. Panel identifier for data binding
+#' @param segment_filter List. Output of transform_segment_filter_options()
+#'
+#' @return HTML string with a dropdown, or "" if no segments
+#' @keywords internal
+build_segment_dropdown <- function(panel_id, segment_filter) {
+
+  if (is.null(segment_filter) || is.null(segment_filter$variables) || length(segment_filter$variables) == 0) {
+    return("")
+  }
+
+  options_html <- '<option value="all" selected>All Respondents</option>'
+
+  for (seg_var in names(segment_filter$variables)) {
+    sv <- segment_filter$variables[[seg_var]]
+    group_label <- gsub("_", " ", seg_var)
+    options_html <- paste0(options_html,
+      sprintf('\n<optgroup label="%s">', htmlEscape(group_label)))
+    for (lvl in sv$levels) {
+      n_text <- if (!is.na(lvl$n)) sprintf(" (n=%s)", format(lvl$n, big.mark = ",")) else ""
+      options_html <- paste0(options_html,
+        sprintf('\n<option value="%s:%s">%s%s</option>',
+                htmlEscape(seg_var), htmlEscape(lvl$value),
+                htmlEscape(lvl$label), n_text))
+    }
+    options_html <- paste0(options_html, '\n</optgroup>')
+  }
+
+  sprintf(
+    '<div class="md-segment-filter">
+  <label>Segment:
+    <select class="md-segment-select" data-panel="%s" onchange="window._mdFilterSegment(this)">%s</select>
+  </label>
+</div>',
+    panel_id, options_html)
 }
 
 
@@ -227,26 +276,43 @@ build_maxdiff_page <- function(html_data, tables, charts, config,
   has_preferences <- !is.null(html_data$preferences$scores)
   has_items <- !is.null(html_data$items$count_data)
   has_h2h <- !is.null(html_data$head_to_head)
-  has_segments <- !is.null(html_data$segments)
   has_turf <- !is.null(html_data$turf)
   has_simulator <- !is.null(simulator_html) && nzchar(simulator_html)
+  segment_filter <- html_data$segment_filter
 
-  # Build panels
+  # Build panels (segment dropdown passed to analytical panels)
   overview_panel   <- build_overview_panel(html_data, tables, charts, insights)
-  pref_panel       <- if (has_preferences) build_preferences_panel(html_data, tables, charts, insights) else ""
-  items_panel      <- if (has_items) build_items_panel(html_data, tables, charts, insights) else ""
-  h2h_panel        <- if (has_h2h) build_h2h_panel(html_data, tables, charts, insights) else ""
+  pref_panel       <- if (has_preferences) build_preferences_panel(html_data, tables, charts, insights, segment_filter) else ""
+  items_panel      <- if (has_items) build_items_panel(html_data, tables, charts, insights, segment_filter) else ""
+  h2h_panel        <- if (has_h2h) build_h2h_panel(html_data, tables, charts, insights, segment_filter) else ""
   turf_panel       <- if (has_turf) build_turf_panel(html_data, tables, charts, insights) else ""
-  segments_panel   <- if (has_segments) build_segments_panel(html_data, tables, charts, insights) else ""
   diag_panel       <- build_diagnostics_panel(html_data, tables, charts, insights)
   about_panel      <- build_md_about_panel(html_data$meta, config, html_data$methodology)
   help_overlay     <- build_md_help_overlay()
   pinned_panel     <- build_pinned_views_panel()
 
   # Simulator panel (embedded iframe)
+  # Only show H2H + Portfolio tabs in simulator; all other tabs belong in main menu
   simulator_panel <- ""
   if (has_simulator) {
-    sim_escaped <- gsub("&", "&amp;", simulator_html, fixed = TRUE)
+    # Inject CSS+JS into simulator to hide unwanted tabs and default to H2H
+    sim_hide_injection <- paste0(
+      '<style>',
+      '[data-tab="overview"],[data-tab="shares"],[data-tab="diagnostics"],[data-tab="pins"],[data-tab="about"]{display:none!important}',
+      '#panel-overview,#panel-shares,#panel-diagnostics,#panel-pins,#panel-about{display:none!important}',
+      '</style>',
+      '<script>',
+      'window.addEventListener("load",function(){',
+      'setTimeout(function(){',
+      'var h2hBtn=document.querySelector(\'[data-tab="h2h"]\');',
+      'if(h2hBtn){h2hBtn.click();}',
+      '},200);',
+      '});',
+      '</script>'
+    )
+    # Insert injection before </head> in simulator HTML
+    sim_modified <- sub("</head>", paste0(sim_hide_injection, "</head>"), simulator_html, fixed = TRUE)
+    sim_escaped <- gsub("&", "&amp;", sim_modified, fixed = TRUE)
     sim_escaped <- gsub("\"", "&quot;", sim_escaped, fixed = TRUE)
     simulator_panel <- sprintf(
       '<div class="md-panel" id="panel-simulator">
@@ -254,21 +320,27 @@ build_maxdiff_page <- function(html_data, tables, charts, config,
 </div>', sim_escaped)
   }
 
-  # Custom slide panels
+  # Added Slides panel — config-imported slides + interactive add/edit
   slides_df <- config$slides %||% config$custom_slides %||% NULL
-  custom_panels <- character()
-  custom_tab_buttons <- character()
+  imported_slides_html <- ""
   if (!is.null(slides_df) && is.data.frame(slides_df) && nrow(slides_df) > 0) {
+    slide_blocks <- character()
     for (i in seq_len(nrow(slides_df))) {
       slide <- as.list(slides_df[i, , drop = FALSE])
-      slide_id <- tolower(gsub("[^a-z0-9]", "-", tolower(slide$Title %||% "slide"), perl = TRUE))
-      slide_id <- paste0("custom-", slide_id)
-      custom_panels <- c(custom_panels, build_custom_slide_panel(slide, config))
-      custom_tab_buttons <- c(custom_tab_buttons, sprintf(
-        '<button class="md-tab-btn" data-tab="%s">%s</button>',
-        slide_id, htmlEscape(slide$Title %||% "Slide")))
+      slide_blocks <- c(slide_blocks, build_custom_slide_panel(slide, config))
     }
+    imported_slides_html <- paste(slide_blocks, collapse = "\n<hr style='border:none;border-top:1px solid #e2e8f0;margin:24px 0;'/>\n")
   }
+  added_slides_panel <- sprintf(
+    '<div class="md-panel" id="panel-added-slides">
+  <div class="md-section">
+    <h2>Added Slides</h2>
+    <button class="md-btn-secondary" onclick="window._mdAddSlide()" style="margin-bottom:16px;">+ Add Slide</button>
+    %s
+    <div id="md-slides-container"></div>
+    <p id="md-slides-empty" class="md-empty" style="text-align:center;color:#94a3b8;padding:20px 0;">No slides added yet. Click the button above to create a slide with markdown and images.</p>
+  </div>
+</div>', imported_slides_html)
 
   # Build tab navigation
   tab_buttons <- '<button class="md-tab-btn active" data-tab="overview">Overview</button>'
@@ -276,17 +348,13 @@ build_maxdiff_page <- function(html_data, tables, charts, config,
   if (has_items) tab_buttons <- paste0(tab_buttons, '\n<button class="md-tab-btn" data-tab="items">Item Analysis</button>')
   if (has_h2h) tab_buttons <- paste0(tab_buttons, '\n<button class="md-tab-btn" data-tab="h2h">Head-to-Head</button>')
   if (has_turf) tab_buttons <- paste0(tab_buttons, '\n<button class="md-tab-btn" data-tab="turf">Portfolio (TURF)</button>')
-  if (has_segments) tab_buttons <- paste0(tab_buttons, '\n<button class="md-tab-btn" data-tab="segments">Segments</button>')
   tab_buttons <- paste0(tab_buttons, '\n<button class="md-tab-btn" data-tab="diagnostics">Diagnostics</button>')
   if (has_simulator) tab_buttons <- paste0(tab_buttons, '\n<button class="md-tab-btn" data-tab="simulator">Simulator</button>')
-  if (length(custom_tab_buttons) > 0) {
-    tab_buttons <- paste0(tab_buttons, "\n", paste(custom_tab_buttons, collapse = "\n"))
-  }
+  # Added Slides tab — always present; shows custom slides or empty state
+  tab_buttons <- paste0(tab_buttons, '\n<button class="md-tab-btn" data-tab="added-slides">Added Slides</button>')
   tab_buttons <- paste0(tab_buttons,
     '\n<button class="md-tab-btn" data-tab="pinned">Pinned Views <span class="pin-count-badge" id="pin-count-badge" style="display:none;">0</span></button>',
     '\n<button class="md-tab-btn" data-tab="about">About</button>')
-
-  custom_panels_html <- paste(custom_panels, collapse = "\n")
 
   # Assemble page
   sprintf('<!DOCTYPE html>
@@ -303,7 +371,6 @@ build_maxdiff_page <- function(html_data, tables, charts, config,
 %s
 <div class="md-tab-nav">%s</div>
 <div class="md-container">
-%s
 %s
 %s
 %s
@@ -331,10 +398,9 @@ build_maxdiff_page <- function(html_data, tables, charts, config,
     items_panel,
     h2h_panel,
     turf_panel,
-    segments_panel,
     diag_panel,
     simulator_panel,
-    custom_panels_html,
+    added_slides_panel,
     pinned_panel,
     about_panel,
     help_overlay,
@@ -527,6 +593,7 @@ build_pinned_views_panel <- function() {
 <div class="pinned-header">
 <h2>Pinned Views</h2>
 <div class="pinned-header-actions">
+<button class="md-export-btn" onclick="window._mdExportAllPinned()"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 14h12M8 2v9M4 7l4 4 4-4"/></svg> Export All as SVG</button>
 <button class="md-btn-secondary" onclick="window._mdSaveReport()">Save Report</button>
 </div>
 </div>
@@ -573,30 +640,61 @@ build_overview_panel <- function(html_data, tables, charts, insights = NULL) {
 
   s <- html_data$summary
 
-  # KPI cards
-  metrics <- sprintf(
-    '<div class="md-metrics">
-  <div class="md-metric-card">
-    <div class="md-metric-value">%s</div>
-    <div class="md-metric-label">Respondents</div>
-  </div>
-  <div class="md-metric-card">
-    <div class="md-metric-value">%s</div>
-    <div class="md-metric-label">Items Tested</div>
-  </div>
-  <div class="md-metric-card">
-    <div class="md-metric-value">%s</div>
-    <div class="md-metric-label">Method</div>
-  </div>
-  <div class="md-metric-card">
-    <div class="md-metric-value" style="font-size:15px">%s</div>
-    <div class="md-metric-label">Top Item</div>
-  </div>
-</div>',
-    s$n_total %||% "0",
-    s$n_items %||% "0",
-    htmlEscape(s$method_label %||% ""),
-    htmlEscape(s$top_item %||% "N/A"))
+  # SVG icons for stat cards (matching simulator visual style)
+  icon_respondents <- '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>'
+  icon_items <- '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>'
+  icon_top <- '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>'
+  icon_range <- '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>'
+  icon_method <- '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>'
+
+  # Build stat cards with icons and sub-labels
+  top_share_val <- if (!is.null(s$top_share) && !is.na(s$top_share)) paste0(s$top_share, "%") else ""
+  share_range_val <- if (!is.null(s$share_range) && !is.na(s$share_range)) paste0(s$share_range, "pp") else ""
+
+  card1 <- sprintf(
+    '<div class="md-stat-card"><div class="md-stat-icon">%s</div><div class="md-stat-body"><div class="md-stat-value">%s</div><div class="md-stat-label">Respondents</div></div></div>',
+    icon_respondents, s$n_total %||% "0")
+
+  card2 <- sprintf(
+    '<div class="md-stat-card"><div class="md-stat-icon">%s</div><div class="md-stat-body"><div class="md-stat-value">%s</div><div class="md-stat-label">Items Tested</div></div></div>',
+    icon_items, s$n_items %||% "0")
+
+  card3 <- sprintf(
+    '<div class="md-stat-card"><div class="md-stat-icon">%s</div><div class="md-stat-body"><div class="md-stat-value" style="font-size:15px">%s</div><div class="md-stat-label">Top Item</div>%s</div></div>',
+    icon_top, htmlEscape(s$top_item %||% "N/A"),
+    if (nzchar(top_share_val)) sprintf('<div class="md-stat-sub">%s share</div>', top_share_val) else "")
+
+  card4 <- if (nzchar(share_range_val)) {
+    sprintf(
+      '<div class="md-stat-card"><div class="md-stat-icon">%s</div><div class="md-stat-body"><div class="md-stat-value">%s</div><div class="md-stat-label">Share Range</div><div class="md-stat-sub">Top &ndash; Bottom</div></div></div>',
+      icon_range, share_range_val)
+  } else {
+    sprintf(
+      '<div class="md-stat-card"><div class="md-stat-icon">%s</div><div class="md-stat-body"><div class="md-stat-value">%s</div><div class="md-stat-label">Method</div></div></div>',
+      icon_method, htmlEscape(s$method_label %||% ""))
+  }
+
+  metrics <- sprintf('<div class="md-stat-grid">%s%s%s%s</div>', card1, card2, card3, card4)
+
+  # Key findings mini-section
+  findings <- '<div class="md-key-findings"><h3>Key Findings</h3><div class="md-findings-grid">'
+
+  findings <- paste0(findings, sprintf(
+    '<div class="md-finding-card md-finding-best"><div class="md-finding-icon">%s</div><div class="md-finding-body"><div class="md-finding-label">Most Preferred</div><div class="md-finding-value">%s</div></div></div>',
+    icon_top, htmlEscape(s$top_item %||% "N/A")))
+
+  if (!is.null(s$bottom_item) && s$bottom_item != "N/A") {
+    icon_bottom <- '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'
+    findings <- paste0(findings, sprintf(
+      '<div class="md-finding-card md-finding-worst"><div class="md-finding-icon">%s</div><div class="md-finding-body"><div class="md-finding-label">Least Preferred</div><div class="md-finding-value">%s</div></div></div>',
+      icon_bottom, htmlEscape(s$bottom_item)))
+  }
+
+  findings <- paste0(findings, sprintf(
+    '<div class="md-finding-card"><div class="md-finding-icon">%s</div><div class="md-finding-body"><div class="md-finding-label">Estimation</div><div class="md-finding-value">%s</div></div></div>',
+    icon_method, htmlEscape(s$method_label %||% "")))
+
+  findings <- paste0(findings, '</div></div>')
 
   # Preference shares chart in overview
   chart_html <- ""
@@ -618,35 +716,54 @@ build_overview_panel <- function(html_data, tables, charts, insights = NULL) {
     %s
     %s
     %s
+    %s
   </div>
 </div>',
-    toolbar, metrics, s$callout %||% "", chart_html, images_html)
+    toolbar, metrics, findings, s$callout %||% "", chart_html, images_html)
 }
 
 
-build_preferences_panel <- function(html_data, tables, charts, insights = NULL) {
+build_preferences_panel <- function(html_data, tables, charts, insights = NULL, segment_filter = NULL) {
 
   callout <- html_data$preferences$callout %||% ""
   pref_table <- tables$preference_scores %||% ""
   toolbar <- build_panel_toolbar("preferences", insights)
+  seg_dropdown <- build_segment_dropdown("preferences", segment_filter)
 
   # Dual view: shares (primary) + utilities (toggle)
   shares_chart <- ""
   utils_chart <- ""
   toggle_btn <- ""
 
+  pin_icon <- "&#x1F4CC;"
   if (!is.null(charts$preference_chart) || !is.null(charts$preference_detail_chart)) {
     if (!is.null(charts$preference_chart)) {
       shares_chart <- sprintf(
-        '<div id="md-pref-shares-view"><div class="md-chart-container"><div class="md-chart-title">Preference Shares</div>%s</div></div>',
-        charts$preference_chart)
+        '<div id="md-pref-shares-view"><div class="md-chart-wrapper"><button class="md-chart-pin-btn" onclick="window._mdPinChart(this,\'Preference Shares\')" title="Pin chart">%s</button><div class="md-chart-container"><div class="md-chart-title">Preference Shares</div>%s</div></div></div>',
+        pin_icon, charts$preference_chart)
     }
     if (!is.null(charts$preference_detail_chart)) {
       utils_chart <- sprintf(
-        '<div id="md-pref-utils-view" style="display:none;"><div class="md-chart-container"><div class="md-chart-title">Utility Scores (0&ndash;100 Scale)</div>%s</div></div>',
-        charts$preference_detail_chart)
+        '<div id="md-pref-utils-view" style="display:none;"><div class="md-chart-wrapper"><button class="md-chart-pin-btn" onclick="window._mdPinChart(this,\'Utility Scores\')" title="Pin chart">%s</button><div class="md-chart-container"><div class="md-chart-title">Utility Scores (0&ndash;100 Scale)</div>%s</div></div></div>',
+        pin_icon, charts$preference_detail_chart)
     }
     toggle_btn <- '<button id="md-utility-toggle" class="md-btn-secondary" data-showing="shares" style="margin:8px 0;">Show Raw Utilities</button>'
+  }
+
+  # Utility distribution raincloud chart
+  dist_chart <- ""
+  if (!is.null(charts$utility_distribution)) {
+    dist_chart <- sprintf(
+      '<div class="md-chart-wrapper"><button class="md-chart-pin-btn" onclick="window._mdPinChart(this,\'Utility Distributions\')" title="Pin chart">%s</button><div class="md-chart-container"><div class="md-chart-title">Individual Utility Distributions</div>%s</div></div>',
+      pin_icon, charts$utility_distribution)
+  }
+
+  # Anchor threshold chart
+  anchor_chart <- ""
+  if (!is.null(charts$anchor_threshold) && nzchar(charts$anchor_threshold)) {
+    anchor_chart <- sprintf(
+      '<div class="md-chart-wrapper"><button class="md-chart-pin-btn" onclick="window._mdPinChart(this,\'Anchor Threshold\')" title="Pin chart">%s</button><div class="md-chart-container"><div class="md-chart-title">Anchored MaxDiff &mdash; Must-Have Threshold</div>%s</div></div>',
+      pin_icon, charts$anchor_threshold)
   }
 
   images_html <- build_panel_images(html_data$images, "preferences")
@@ -662,34 +779,46 @@ build_preferences_panel <- function(html_data, tables, charts, insights = NULL) 
     %s
     %s
     %s
+    %s
+    %s
+    %s
   </div>
 </div>',
-    toolbar, callout, toggle_btn, shares_chart, utils_chart, pref_table, images_html)
+    toolbar, seg_dropdown, callout, toggle_btn, shares_chart, utils_chart, dist_chart, anchor_chart, pref_table, images_html)
 }
 
 
-build_items_panel <- function(html_data, tables, charts, insights = NULL) {
+build_items_panel <- function(html_data, tables, charts, insights = NULL, segment_filter = NULL) {
 
   callout <- html_data$items$callout %||% ""
   count_table <- tables$count_scores %||% ""
   toolbar <- build_panel_toolbar("items", insights)
+  seg_dropdown <- build_segment_dropdown("items", segment_filter)
 
+  pin_icon <- "&#x1F4CC;"
   diverging_chart <- ""
   if (!is.null(charts$diverging_chart)) {
     diverging_chart <- sprintf(
-      '<div class="md-chart-container"><div class="md-chart-title">Best vs Worst Selection Frequency</div>%s</div>',
-      charts$diverging_chart)
+      '<div class="md-chart-wrapper"><button class="md-chart-pin-btn" onclick="window._mdPinChart(this,\'Best vs Worst\')" title="Pin chart">%s</button><div class="md-chart-container"><div class="md-chart-title">Best vs Worst Selection Frequency</div>%s</div></div>',
+      pin_icon, charts$diverging_chart)
   }
 
   # Item Strategy Quadrant
   quadrant_chart <- ""
   if (!is.null(charts$strategy_quadrant)) {
     quadrant_chart <- sprintf(
-      '<div class="md-chart-container"><div class="md-chart-title">Item Strategy Quadrant</div>%s</div>',
-      charts$strategy_quadrant)
+      '<div class="md-chart-wrapper"><button class="md-chart-pin-btn" onclick="window._mdPinChart(this,\'Strategy Quadrant\')" title="Pin chart">%s</button><div class="md-chart-container"><div class="md-chart-title">Item Strategy Quadrant</div>%s</div></div>',
+      pin_icon, charts$strategy_quadrant)
   }
 
   images_html <- build_panel_images(html_data$images, "items")
+
+  count_callout <- '<div class="md-callout" style="margin-top:4px;margin-bottom:12px;font-size:13px;line-height:1.6;color:#334155;background:#f8fafc;border-left:3px solid var(--md-accent);padding:10px 14px;border-radius:4px;">
+<strong>Reading this table:</strong> Each item is scored by how often respondents chose it as best or worst.<br/>
+<span style="color:#16a34a;font-weight:600;">&#x25CF; Green values</span> = positive BW Scores &mdash; the item was chosen as <em>best</em> more often than worst.<br/>
+<span style="color:#dc2626;font-weight:600;">&#x25CF; Red values</span> = negative BW Scores &mdash; the item was chosen as <em>worst</em> more often than best.<br/>
+<strong>Best %</strong> = times chosen as best &divide; times shown. <strong>Worst %</strong> = times chosen as worst &divide; times shown.<br/>
+<strong>BW Score</strong> = Best% &minus; Worst%. Higher scores indicate stronger overall preference.</div>'
 
   sprintf(
     '<div class="md-panel" id="panel-items">
@@ -699,20 +828,23 @@ build_items_panel <- function(html_data, tables, charts, insights = NULL) {
     %s
     %s
     %s
+    %s
     <h3>Detailed Count Scores</h3>
+    %s
     %s
     %s
   </div>
 </div>',
-    toolbar, callout, diverging_chart, quadrant_chart, count_table, images_html)
+    toolbar, seg_dropdown, callout, diverging_chart, quadrant_chart, count_callout, count_table, images_html)
 }
 
 
-build_h2h_panel <- function(html_data, tables, charts, insights = NULL) {
+build_h2h_panel <- function(html_data, tables, charts, insights = NULL, segment_filter = NULL) {
 
   callout <- html_data$head_to_head$callout %||% ""
   h2h_table <- tables$head_to_head %||% ""
   toolbar <- build_panel_toolbar("h2h", insights)
+  seg_dropdown <- build_segment_dropdown("h2h", segment_filter)
 
   sprintf(
     '<div class="md-panel" id="panel-h2h">
@@ -721,9 +853,10 @@ build_h2h_panel <- function(html_data, tables, charts, insights = NULL) {
     %s
     %s
     %s
+    %s
   </div>
 </div>',
-    toolbar, callout, h2h_table)
+    toolbar, seg_dropdown, callout, h2h_table)
 }
 
 
@@ -733,11 +866,12 @@ build_turf_panel <- function(html_data, tables, charts, insights = NULL) {
   turf_table <- tables$turf %||% ""
   toolbar <- build_panel_toolbar("turf", insights)
 
+  pin_icon <- "&#x1F4CC;"
   turf_chart <- ""
   if (!is.null(charts$turf_chart)) {
     turf_chart <- sprintf(
-      '<div class="md-chart-container"><div class="md-chart-title">Incremental Reach Curve</div>%s</div>',
-      charts$turf_chart)
+      '<div class="md-chart-wrapper"><button class="md-chart-pin-btn" onclick="window._mdPinChart(this,\'TURF Reach Curve\')" title="Pin chart">%s</button><div class="md-chart-container"><div class="md-chart-title">Incremental Reach Curve</div>%s</div></div>',
+      pin_icon, charts$turf_chart)
   }
 
   images_html <- build_panel_images(html_data$images, "turf")
@@ -795,6 +929,45 @@ build_diagnostics_panel <- function(html_data, tables, charts, insights = NULL) 
   diag_table <- tables$diagnostics %||% ""
   toolbar <- build_panel_toolbar("diagnostics", insights)
 
+  # Diagnostics KPI summary cards (matching simulator style)
+  d <- html_data$diagnostics
+  diag_cards <- ""
+  if (!is.null(d)) {
+    cards <- character()
+    # Model info
+    cards <- c(cards, sprintf(
+      '<div class="md-metric-card"><div class="md-metric-value">%s</div><div class="md-metric-label">Method</div></div>',
+      htmlEscape(html_data$meta$method %||% "N/A")))
+    cards <- c(cards, sprintf(
+      '<div class="md-metric-card"><div class="md-metric-value">%s</div><div class="md-metric-label">Respondents</div></div>',
+      format(d$n_total %||% 0, big.mark = ",")))
+    cards <- c(cards, sprintf(
+      '<div class="md-metric-card"><div class="md-metric-value">%s</div><div class="md-metric-label">Items</div></div>',
+      d$n_items %||% "0"))
+    # HB-specific cards
+    if (!is.null(d$hb_diagnostics)) {
+      hd <- d$hb_diagnostics
+      rhat_color <- if (!is.null(hd$max_rhat) && !is.na(hd$max_rhat) && hd$max_rhat <= 1.05) "color:#16a34a;" else "color:#dc2626;"
+      cards <- c(cards, sprintf(
+        '<div class="md-metric-card"><div class="md-metric-value" style="%s">%s</div><div class="md-metric-label">Max R-hat</div></div>',
+        rhat_color, if (!is.null(hd$max_rhat) && !is.na(hd$max_rhat)) sprintf("%.4f", hd$max_rhat) else "N/A"))
+      cards <- c(cards, sprintf(
+        '<div class="md-metric-card"><div class="md-metric-value">%s</div><div class="md-metric-label">Divergences</div></div>',
+        if (!is.null(hd$divergences) && !is.na(hd$divergences)) as.character(hd$divergences) else "N/A"))
+      cards <- c(cards, sprintf(
+        '<div class="md-metric-card"><div class="md-metric-value">%s</div><div class="md-metric-label">Quality Score</div></div>',
+        if (!is.null(hd$quality_score) && !is.na(hd$quality_score)) paste0(round(hd$quality_score), "/100") else "N/A"))
+    }
+    # Logit-specific cards
+    if (!is.null(d$logit_fit)) {
+      lf <- d$logit_fit
+      cards <- c(cards, sprintf(
+        '<div class="md-metric-card"><div class="md-metric-value">%s</div><div class="md-metric-label">Pseudo R&sup2;</div></div>',
+        if (!is.null(lf$pseudo_r2) && !is.na(lf$pseudo_r2)) sprintf("%.4f", lf$pseudo_r2) else "N/A"))
+    }
+    diag_cards <- sprintf('<div class="md-metrics" style="margin-bottom:16px;">%s</div>', paste(cards, collapse = "\n"))
+  }
+
   # Methodology folded in as collapsible section
   method_section <- ""
   if (!is.null(html_data$methodology)) {
@@ -827,11 +1000,13 @@ build_diagnostics_panel <- function(html_data, tables, charts, insights = NULL) 
     %s
     %s
     %s
+    <h3>Detailed Metrics</h3>
+    %s
     %s
     %s
   </div>
 </div>',
-    toolbar, callout, diag_table, method_section, images_html)
+    toolbar, callout, diag_cards, diag_table, method_section, images_html)
 }
 
 
@@ -964,6 +1139,48 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 }
 .md-metric-value { font-size: 24px; font-weight: 700; color: var(--md-brand); }
 .md-metric-label { font-size: 11px; color: var(--md-text-secondary); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.3px; }
+
+/* === OVERVIEW STAT CARDS (with icons) === */
+.md-stat-grid { display: flex; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
+.md-stat-card {
+  flex: 1; min-width: 150px; background: white; border-radius: 10px; padding: 16px 18px;
+  display: flex; align-items: flex-start; gap: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06); border: 1px solid var(--md-border);
+}
+.md-stat-icon { color: var(--md-brand); opacity: 0.7; flex-shrink: 0; margin-top: 2px; }
+.md-stat-body { flex: 1; min-width: 0; }
+.md-stat-value { font-size: 22px; font-weight: 700; color: var(--md-brand); line-height: 1.2; }
+.md-stat-label { font-size: 11px; color: var(--md-text-secondary); margin-top: 3px; text-transform: uppercase; letter-spacing: 0.3px; font-weight: 500; }
+.md-stat-sub { font-size: 11px; color: var(--md-text-secondary); margin-top: 2px; font-style: italic; }
+
+/* === KEY FINDINGS === */
+.md-key-findings { margin-bottom: 18px; }
+.md-key-findings h3 { font-size: 13px; font-weight: 600; color: var(--md-text-secondary); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 10px; }
+.md-findings-grid { display: flex; gap: 12px; flex-wrap: wrap; }
+.md-finding-card {
+  flex: 1; min-width: 180px; display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; border-radius: 8px; background: #f8fafc; border: 1px solid var(--md-border);
+}
+.md-finding-best { border-left: 3px solid #16a34a; }
+.md-finding-worst { border-left: 3px solid #dc2626; }
+.md-finding-icon { flex-shrink: 0; color: var(--md-text-secondary); }
+.md-finding-best .md-finding-icon { color: #16a34a; }
+.md-finding-worst .md-finding-icon { color: #dc2626; }
+.md-finding-body { min-width: 0; }
+.md-finding-label { font-size: 10px; color: var(--md-text-secondary); text-transform: uppercase; letter-spacing: 0.3px; font-weight: 600; }
+.md-finding-value { font-size: 14px; font-weight: 600; color: var(--md-text-primary); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; }
+
+/* === SEGMENT FILTER === */
+.md-segment-filter { margin: 8px 0 12px; }
+.md-segment-filter label { font-size: 12px; font-weight: 600; color: var(--md-text-secondary); text-transform: uppercase; letter-spacing: 0.3px; }
+.md-segment-select {
+  padding: 5px 10px; border: 1px solid var(--md-border); border-radius: 6px;
+  font-size: 13px; color: var(--md-text-primary); background: white;
+  cursor: pointer; margin-left: 6px; min-width: 180px;
+}
+.md-segment-select:focus { outline: none; border-color: var(--md-brand); box-shadow: 0 0 0 2px rgba(50,51,103,0.1); }
+.md-segment-tables > div { display: none; }
+.md-segment-tables > div[data-segment="all"] { display: block; }
 
 /* === CHARTS === */
 .md-chart-container { background: var(--md-bg-muted); border-radius: 8px; padding: 12px; margin: 12px 0; }
@@ -1151,6 +1368,78 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .md-embedded-image { max-width: 100%; height: auto; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
 .md-image-caption { font-size: 12px; color: var(--md-text-secondary); margin-top: 6px; font-style: italic; }
 
+/* === ADDED SLIDES === */
+.md-slide-card {
+  background: white; border-radius: 8px; padding: 20px; margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid var(--md-border);
+}
+.md-slide-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
+}
+.md-slide-title {
+  font-size: 14px; font-weight: 600; color: var(--md-text-primary);
+  border: none; background: transparent; flex: 1; padding: 4px 8px;
+  border-bottom: 1px dashed var(--md-border);
+}
+.md-slide-title:focus { outline: none; border-bottom-color: var(--md-brand); }
+.md-slide-actions { display: flex; gap: 4px; }
+.md-slide-btn {
+  width: 28px; height: 28px; border-radius: 4px; border: 1px solid var(--md-border);
+  background: white; cursor: pointer; display: flex; align-items: center;
+  justify-content: center; font-size: 12px; color: var(--md-text-secondary);
+}
+.md-slide-btn:hover { background: var(--md-bg-muted); }
+.md-slide-btn.remove:hover { background: #fee2e2; color: #dc2626; border-color: #fecaca; }
+.md-slide-md-editor {
+  width: 100%; min-height: 100px; border: 1px solid var(--md-border); border-radius: 6px;
+  padding: 10px 12px; font-family: inherit; font-size: 13px; line-height: 1.5;
+  resize: vertical; color: var(--md-text-primary);
+}
+.md-slide-md-editor:focus { outline: none; border-color: var(--md-brand); }
+.md-slide-md-rendered {
+  font-size: 13px; line-height: 1.6; color: var(--md-text-primary); cursor: pointer;
+  min-height: 40px; padding: 8px 0;
+}
+.md-slide-md-rendered p { margin-bottom: 6px; }
+.md-slide-md-rendered strong { font-weight: 600; }
+.md-slide-md-rendered ul { padding-left: 1.2em; margin: 4px 0; }
+.md-slide-img-preview {
+  margin-top: 12px; text-align: center; position: relative;
+}
+.md-slide-img-preview img {
+  max-width: 100%; max-height: 400px; border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+.md-slide-img-remove {
+  position: absolute; top: 4px; right: 4px; width: 24px; height: 24px;
+  border-radius: 50%; background: rgba(0,0,0,0.5); color: white; border: none;
+  cursor: pointer; font-size: 14px; display: flex; align-items: center;
+  justify-content: center; line-height: 1;
+}
+.md-slide-img-remove:hover { background: rgba(220,38,38,0.8); }
+
+/* === EXPORT BUTTON === */
+.md-export-btn {
+  display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px;
+  border-radius: 5px; border: 1px solid var(--md-border); background: white;
+  color: var(--md-text-secondary); font-size: 12px; font-weight: 500;
+  cursor: pointer; transition: all 200ms;
+}
+.md-export-btn:hover { background: var(--md-bg-muted); color: var(--md-text-primary); border-color: #cbd5e1; }
+.md-export-btn svg { flex-shrink: 0; }
+
+/* === CHART PIN BUTTON === */
+.md-chart-wrapper { position: relative; }
+.md-chart-pin-btn {
+  position: absolute; top: 6px; right: 6px; width: 28px; height: 28px;
+  border-radius: 4px; border: 1px solid var(--md-border); background: rgba(255,255,255,0.9);
+  cursor: pointer; font-size: 14px; display: flex; align-items: center;
+  justify-content: center; opacity: 0; transition: opacity 200ms;
+  z-index: 5;
+}
+.md-chart-wrapper:hover .md-chart-pin-btn { opacity: 1; }
+.md-chart-pin-btn:hover { background: white; border-color: var(--md-brand); }
+
 /* === CUSTOM SLIDES === */
 .md-slide-content { font-size: 14px; line-height: 1.7; color: var(--md-text-primary); }
 
@@ -1161,6 +1450,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 @media (max-width: 768px) {
   .md-header, .md-tab-nav, .md-container, .md-footer { padding-left: 16px; padding-right: 16px; }
   .md-metrics { flex-direction: column; }
+  .md-stat-grid { flex-direction: column; }
+  .md-findings-grid { flex-direction: column; }
   .md-tab-btn { padding: 8px 10px; font-size: 12px; }
 }'
 

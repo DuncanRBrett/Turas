@@ -24,7 +24,7 @@ fmt_num <- function(x, digits = 1) {
 #'
 #' @return HTML string
 #' @keywords internal
-build_preference_scores_table <- function(scores, anchor_data = NULL) {
+build_preference_scores_table <- function(scores, anchor_data = NULL, segment_data = NULL, segment_config = NULL) {
 
   if (is.null(scores) || nrow(scores) == 0) {
     return('<p class="md-empty">No preference scores available.</p>')
@@ -87,8 +87,20 @@ build_preference_scores_table <- function(scores, anchor_data = NULL) {
     sprintf('<tr>%s</tr>', cells)
   }, character(1))
 
-  sprintf('<table class="md-table">%s<tbody>%s</tbody></table>',
+  main_table <- sprintf('<table class="md-table">%s<tbody>%s</tbody></table>',
           header, paste(rows, collapse = "\n"))
+
+  # Wrap in segment-filterable container if segment data exists
+  if (!is.null(segment_data) && length(segment_data) > 0) {
+    seg_tables <- build_segment_variant_tables(segment_data, "preference", segment_config)
+    return(sprintf(
+      '<div class="md-segment-tables">
+        <div data-segment="all">%s</div>
+        %s
+      </div>', main_table, seg_tables))
+  }
+
+  main_table
 }
 
 
@@ -103,7 +115,7 @@ build_preference_scores_table <- function(scores, anchor_data = NULL) {
 #'
 #' @return HTML string
 #' @keywords internal
-build_count_scores_table <- function(count_data, discrimination = NULL) {
+build_count_scores_table <- function(count_data, discrimination = NULL, segment_data = NULL, segment_config = NULL) {
 
   if (is.null(count_data) || nrow(count_data) == 0) {
     return('<p class="md-empty">No count scores available.</p>')
@@ -153,8 +165,19 @@ build_count_scores_table <- function(count_data, discrimination = NULL) {
     sprintf('<tr>%s</tr>', cells)
   }, character(1))
 
-  sprintf('<table class="md-table">%s<tbody>%s</tbody></table>',
+  main_table <- sprintf('<table class="md-table">%s<tbody>%s</tbody></table>',
           header, paste(rows, collapse = "\n"))
+
+  if (!is.null(segment_data) && is.data.frame(segment_data) && nrow(segment_data) > 0) {
+    seg_tables <- build_segment_variant_tables(segment_data, "counts", segment_config)
+    return(sprintf(
+      '<div class="md-segment-tables">
+        <div data-segment="all">%s</div>
+        %s
+      </div>', main_table, seg_tables))
+  }
+
+  main_table
 }
 
 
@@ -378,7 +401,7 @@ build_h2h_table <- function(h2h_data, label_map = NULL) {
   header_cells <- '<th class="md-th md-label-col" style="min-width:120px;">vs</th>'
   for (j in seq_len(n)) {
     header_cells <- paste0(header_cells, sprintf(
-      '<th class="md-th md-h2h-cell" style="writing-mode:vertical-lr;transform:rotate(180deg);max-width:40px;font-size:10px;">%s</th>',
+      '<th class="md-th md-h2h-cell" style="writing-mode:vertical-rl;max-width:40px;font-size:10px;">%s</th>',
       get_label(items[j])))
   }
 
@@ -401,4 +424,75 @@ build_h2h_table <- function(h2h_data, label_map = NULL) {
   sprintf(
     '<div style="overflow-x:auto;"><table class="md-table md-table-compact" style="table-layout:fixed;"><thead><tr>%s</tr></thead><tbody>%s</tbody></table></div>',
     header_cells, paste(rows, collapse = "\n"))
+}
+
+
+# ==============================================================================
+# SEGMENT VARIANT TABLE BUILDER (hidden per-segment tables)
+# ==============================================================================
+
+#' Build hidden per-segment table variants for segment filtering
+#'
+#' Creates hidden <div> elements for each segment level, each containing
+#' a simple table of scores. Used by JS segment dropdown to show/hide.
+#'
+#' @param segment_data Long-format data frame with Segment_ID, Item_Label, BW_Score columns
+#' @param table_type Character. "preference" or "counts"
+#' @param segment_config Data frame from config$segment_settings (with Variable_Name, Segment_ID)
+#'
+#' @return HTML string of hidden segment table divs
+#' @keywords internal
+build_segment_variant_tables <- function(segment_data, table_type = "preference", segment_config = NULL) {
+
+  if (is.null(segment_data) || !is.data.frame(segment_data) || nrow(segment_data) == 0) return("")
+  if (!"Segment_ID" %in% names(segment_data) || !"BW_Score" %in% names(segment_data)) return("")
+
+  # Filter to in-segment rows only (Segment_Value == TRUE)
+  if ("Segment_Value" %in% names(segment_data)) {
+    segment_data <- segment_data[segment_data$Segment_Value == TRUE, , drop = FALSE]
+    if (nrow(segment_data) == 0) return("")
+  }
+
+  # Build lookup from Segment_ID -> Variable_Name
+  var_lookup <- list()
+  if (!is.null(segment_config) && is.data.frame(segment_config) &&
+      "Variable_Name" %in% names(segment_config) && "Segment_ID" %in% names(segment_config)) {
+    for (i in seq_len(nrow(segment_config))) {
+      var_lookup[[segment_config$Segment_ID[i]]] <- segment_config$Variable_Name[i]
+    }
+  }
+
+  all_divs <- character()
+
+  for (seg_id in unique(segment_data$Segment_ID)) {
+    seg_rows <- segment_data[segment_data$Segment_ID == seg_id, , drop = FALSE]
+    if (nrow(seg_rows) == 0) next
+
+    seg_label <- if ("Segment_Label" %in% names(seg_rows)) seg_rows$Segment_Label[1] else seg_id
+    item_labels <- seg_rows$Item_Label %||% seg_rows$Item_ID
+    vals <- seg_rows$BW_Score
+    ord <- order(-vals)
+
+    rows <- vapply(ord, function(i) {
+      label <- htmlEscape(item_labels[i])
+      val <- vals[i]
+      bw_class <- if (val > 0) "md-positive" else if (val < 0) "md-negative" else ""
+      sprintf('<tr><td class="md-td md-label-col">%s</td><td class="md-td md-num %s"><strong>%s</strong></td></tr>',
+              label, bw_class, fmt_num(val, 3))
+    }, character(1))
+
+    # Key must match dropdown option value: Variable_Name:Segment_ID
+    var_name <- var_lookup[[seg_id]] %||% seg_id
+    seg_key <- paste0(var_name, ":", seg_id)
+
+    table_html <- sprintf(
+      '<table class="md-table"><thead><tr><th class="md-th md-label-col">Item</th><th class="md-th md-num">BW Score (%s)</th></tr></thead><tbody>%s</tbody></table>',
+      htmlEscape(seg_label), paste(rows, collapse = "\n"))
+
+    all_divs <- c(all_divs, sprintf(
+      '<div data-segment="%s" style="display:none;">%s</div>',
+      htmlEscape(seg_key), table_html))
+  }
+
+  paste(all_divs, collapse = "\n")
 }

@@ -174,10 +174,16 @@ generate_maxdiff_html_report <- function(maxdiff_results, output_path, config,
   # --- Layer 2: Tables ---
   tables <- list()
 
+  # Extract segment data for per-segment table variants
+  seg_scores <- if (!is.null(html_data$segment_filter)) html_data$segment_filter$segment_scores else NULL
+  seg_config <- config$segment_settings
+
   tables$preference_scores <- tryCatch(
     build_preference_scores_table(
       html_data$preferences$scores,
-      html_data$preferences$anchor_data
+      html_data$preferences$anchor_data,
+      segment_data = seg_scores,
+      segment_config = seg_config
     ),
     error = function(e) { message(sprintf("  Table error (preferences): %s", e$message)); "" }
   )
@@ -185,7 +191,9 @@ generate_maxdiff_html_report <- function(maxdiff_results, output_path, config,
   tables$count_scores <- tryCatch(
     build_count_scores_table(
       html_data$items$count_data,
-      html_data$items$discrimination
+      html_data$items$discrimination,
+      segment_data = seg_scores,
+      segment_config = seg_config
     ),
     error = function(e) { message(sprintf("  Table error (counts): %s", e$message)); "" }
   )
@@ -260,6 +268,25 @@ generate_maxdiff_html_report <- function(maxdiff_results, output_path, config,
     charts$strategy_quadrant <- tryCatch(
       build_strategy_quadrant(maxdiff_results$hb_results$population_utilities, brand),
       error = function(e) { message(sprintf("  Chart error (strategy quadrant): %s", e$message)); "" }
+    )
+  }
+
+  # Anchored MaxDiff threshold chart
+  if (!is.null(html_data$preferences$anchor_data)) {
+    anchor_threshold <- config$output_settings$Anchor_Threshold %||% 0.50
+    anchor_threshold <- as.numeric(anchor_threshold)
+    if (is.na(anchor_threshold)) anchor_threshold <- 0.50
+    charts$anchor_threshold <- tryCatch(
+      build_anchor_threshold_chart(html_data$preferences$anchor_data, brand, anchor_threshold),
+      error = function(e) { message(sprintf("  Chart error (anchor threshold): %s", e$message)); "" }
+    )
+  }
+
+  # Utility distribution chart (raincloud — requires HB individual utilities)
+  if (!is.null(html_data$utility_distributions)) {
+    charts$utility_distribution <- tryCatch(
+      build_utility_distribution_chart(html_data$utility_distributions, brand),
+      error = function(e) { message(sprintf("  Chart error (utility distribution): %s", e$message)); "" }
     )
   }
 

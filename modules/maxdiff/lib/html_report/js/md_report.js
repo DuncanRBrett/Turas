@@ -520,6 +520,272 @@
   }
 
   // --------------------------------------------------------------------------
+  // SEGMENT FILTER
+  // --------------------------------------------------------------------------
+  function filterSegment(selectEl) {
+    var panel = selectEl.closest(".md-panel");
+    if (!panel) return;
+    var container = panel.querySelector(".md-segment-tables");
+    if (!container) return;
+    var val = selectEl.value;  // e.g. "Age_Group:young" or "all"
+    var divs = container.querySelectorAll("div[data-segment]");
+    var mainDiv = container.querySelector('div[data-segment="all"]');
+
+    if (!val || val === "all") {
+      // Show main (overall) table, hide all segment variants
+      if (mainDiv) mainDiv.style.display = "";
+      divs.forEach(function(d) { if (d.getAttribute("data-segment") !== "all") d.style.display = "none"; });
+    } else {
+      // Hide main, show matching segment variant
+      if (mainDiv) mainDiv.style.display = "none";
+      divs.forEach(function(d) {
+        var seg = d.getAttribute("data-segment");
+        if (seg === "all") { d.style.display = "none"; return; }
+        d.style.display = (seg === val) ? "" : "none";
+      });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // ADDED SLIDES (Markdown editor + image insert)
+  // --------------------------------------------------------------------------
+  function addSlide() {
+    var container = $("#md-slides-container");
+    if (!container) return;
+    var id = "slide-" + Date.now();
+    var card = document.createElement("div");
+    card.className = "md-slide-card editing";
+    card.setAttribute("data-slide-id", id);
+    card.innerHTML =
+      '<div class="md-slide-header">' +
+        '<div class="md-slide-title" contenteditable="true">New Slide</div>' +
+        '<div class="md-slide-actions">' +
+          '<button class="md-slide-btn" title="Add image" onclick="window._mdTriggerSlideImage(\'' + id + '\')">\u{1F5BC}</button>' +
+          '<button class="md-slide-btn" title="Pin this slide" onclick="window._mdPinSlide(\'' + id + '\')">\u{1F4CC}</button>' +
+          '<button class="md-slide-btn" title="Move up" onclick="window._mdMoveSlide(\'' + id + '\',\'up\')">\u25B2</button>' +
+          '<button class="md-slide-btn" title="Move down" onclick="window._mdMoveSlide(\'' + id + '\',\'down\')">\u25BC</button>' +
+          '<button class="md-slide-btn" title="Remove" style="color:#e74c3c;" onclick="window._mdRemoveSlide(\'' + id + '\')">\u2715</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="md-slide-img-preview" style="display:none;">' +
+        '<img class="md-slide-img-thumb"/>' +
+        '<button class="md-slide-img-remove" onclick="window._mdRemoveSlideImage(\'' + id + '\')">&times;</button>' +
+      '</div>' +
+      '<input type="file" class="md-slide-img-input" accept="image/*" style="display:none;" onchange="window._mdHandleSlideImage(\'' + id + '\', this)">' +
+      '<textarea class="md-slide-md-editor" rows="6" placeholder="Enter markdown... (**bold**, *italic*, > quote, - bullet, ## heading)"></textarea>' +
+      '<div class="md-slide-md-rendered" style="display:none;"></div>' +
+      '<textarea class="md-slide-md-store" style="display:none;"></textarea>' +
+      '<textarea class="md-slide-img-store" style="display:none;"></textarea>';
+    container.appendChild(card);
+    card.querySelector(".md-slide-md-editor").focus();
+    updateSlideEmptyState();
+  }
+
+  function triggerSlideImage(slideId) {
+    var card = $('[data-slide-id="' + slideId + '"]');
+    if (card) { var inp = card.querySelector(".md-slide-img-input"); if (inp) inp.click(); }
+  }
+
+  function handleSlideImage(slideId, input) {
+    if (!input.files || !input.files[0]) return;
+    var file = input.files[0];
+    if (file.size > 5 * 1024 * 1024) { alert("Image too large. Max 5MB."); input.value = ""; return; }
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var card = $('[data-slide-id="' + slideId + '"]');
+      if (!card) return;
+      var preview = card.querySelector(".md-slide-img-preview");
+      var thumb = card.querySelector(".md-slide-img-thumb");
+      var store = card.querySelector(".md-slide-img-store");
+      if (thumb) { thumb.src = e.target.result; }
+      if (preview) { preview.style.display = "block"; }
+      if (store) { store.value = e.target.result; }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function removeSlideImage(slideId) {
+    var card = $('[data-slide-id="' + slideId + '"]');
+    if (!card) return;
+    var preview = card.querySelector(".md-slide-img-preview");
+    var store = card.querySelector(".md-slide-img-store");
+    if (preview) preview.style.display = "none";
+    if (store) store.value = "";
+  }
+
+  function removeSlide(slideId) {
+    var card = $('[data-slide-id="' + slideId + '"]');
+    if (card) card.remove();
+    updateSlideEmptyState();
+  }
+
+  function moveSlide(slideId, direction) {
+    var card = $('[data-slide-id="' + slideId + '"]');
+    if (!card) return;
+    if (direction === "up" && card.previousElementSibling) {
+      card.parentNode.insertBefore(card, card.previousElementSibling);
+    } else if (direction === "down" && card.nextElementSibling) {
+      card.parentNode.insertBefore(card.nextElementSibling, card);
+    }
+  }
+
+  function pinSlide(slideId) {
+    var card = $('[data-slide-id="' + slideId + '"]');
+    if (!card) return;
+    var title = card.querySelector(".md-slide-title");
+    var editor = card.querySelector(".md-slide-md-editor");
+    var imgStore = card.querySelector(".md-slide-img-store");
+    var view = {
+      id: generateId(),
+      panelId: "added-slides",
+      title: title ? title.textContent : "Slide",
+      chartSvg: "",
+      tableHtml: "",
+      insightText: editor ? editor.value : "",
+      imageData: imgStore ? imgStore.value : "",
+      timestamp: Date.now(),
+      order: pinnedViews.length,
+      pinMode: "all"
+    };
+    pinnedViews.push(view);
+    savePinnedData();
+    updatePinBadge();
+    renderPinnedCards();
+    showToast("Slide pinned");
+  }
+
+  function updateSlideEmptyState() {
+    var container = $("#md-slides-container");
+    var empty = $("#md-slides-empty");
+    if (!container || !empty) return;
+    empty.style.display = container.children.length === 0 ? "block" : "none";
+  }
+
+  // --------------------------------------------------------------------------
+  // PIN INDIVIDUAL CHART
+  // --------------------------------------------------------------------------
+  function pinChart(btnEl, chartTitle) {
+    var wrapper = btnEl.closest(".md-chart-wrapper");
+    if (!wrapper) return;
+    var svg = wrapper.querySelector("svg");
+    if (!svg) { showToast("No chart found to pin"); return; }
+
+    var view = {
+      id: generateId(),
+      title: chartTitle || "Chart",
+      panelId: "chart",
+      pinMode: "chart_insight",
+      chartSvg: svg.outerHTML,
+      tableHtml: "",
+      insightText: "",
+      timestamp: new Date().toISOString()
+    };
+    pinnedViews.push(view);
+    savePinnedData();
+    updatePinBadge();
+    renderPinnedCards();
+    showToast("Chart pinned");
+  }
+
+  // --------------------------------------------------------------------------
+  // PANEL EXCEL EXPORT
+  // --------------------------------------------------------------------------
+  function escapeXml(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function exportPanelToExcel(panelId) {
+    var panel = $("#panel-" + panelId);
+    if (!panel) return;
+    var tables = panel.querySelectorAll(".md-table");
+    if (tables.length === 0) { showToast("No table data to export"); return; }
+
+    var meta = $('meta[name="turas-source-filename"]');
+    var base = meta ? meta.getAttribute("content").replace(/\.[^.]+$/, "") : "MaxDiff";
+    var sheetName = panelId.replace(/[^a-zA-Z0-9_]/g, "_").substring(0, 31);
+
+    var xml = [];
+    xml.push('<?xml version="1.0" encoding="UTF-8"?>');
+    xml.push('<?mso-application progid="Excel.Sheet"?>');
+    xml.push('<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"');
+    xml.push(' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">');
+    xml.push('<Styles>');
+    xml.push('<Style ss:ID="header"><Font ss:Bold="1" ss:Size="11"/>');
+    xml.push('<Interior ss:Color="#F8F9FA" ss:Pattern="Solid"/></Style>');
+    xml.push('<Style ss:ID="title"><Font ss:Bold="1" ss:Size="12"/></Style>');
+    xml.push('<Style ss:ID="normal"><Font ss:Size="11"/></Style>');
+    xml.push('</Styles>');
+    xml.push('<Worksheet ss:Name="' + escapeXml(sheetName) + '">');
+    xml.push('<Table>');
+
+    // Title row
+    var h2 = panel.querySelector("h2");
+    if (h2) {
+      xml.push('<Row><Cell ss:StyleID="title"><Data ss:Type="String">' +
+                escapeXml(base + " - " + h2.textContent.trim()) + '</Data></Cell></Row>');
+      xml.push('<Row></Row>');
+    }
+
+    tables.forEach(function(table, tIdx) {
+      if (tIdx > 0) xml.push('<Row></Row>');
+      var rows = table.querySelectorAll("tr");
+      rows.forEach(function(row, rowIdx) {
+        xml.push('<Row>');
+        var cells = row.querySelectorAll("th, td");
+        cells.forEach(function(c) {
+          var txt = c.textContent.trim();
+          var styleId = (row.querySelector("th") || rowIdx === 0) ? "header" : "normal";
+          var num = parseFloat(txt.replace(/[,%]/g, ""));
+          var isNum = !isNaN(num) && /^[\d,\.%\s\-]+$/.test(txt) && txt.trim() !== "";
+          if (isNum) {
+            xml.push('<Cell ss:StyleID="' + styleId + '"><Data ss:Type="Number">' + num + '</Data></Cell>');
+          } else {
+            xml.push('<Cell ss:StyleID="' + styleId + '"><Data ss:Type="String">' + escapeXml(txt) + '</Data></Cell>');
+          }
+        });
+        xml.push('</Row>');
+      });
+    });
+
+    xml.push('</Table></Worksheet></Workbook>');
+
+    var blob = new Blob([xml.join("\n")], { type: "application/vnd.ms-excel;charset=utf-8" });
+    downloadBlob(blob, base + "_" + panelId + ".xls");
+    showToast("Exported to Excel");
+  }
+
+  // --------------------------------------------------------------------------
+  // PIN EXPORT (PNG slide)
+  // --------------------------------------------------------------------------
+  function exportPinnedAsPng(pinId) {
+    var pin = pinnedViews.find(function(p) { return p.id === pinId; });
+    if (!pin) return;
+    // Build simple SVG slide for export
+    var width = 1280, height = 720;
+    var title = escapeHtml(pin.title || "Pinned View");
+    var insight = pin.insightText ? escapeHtml(pin.insightText).substring(0, 500) : "";
+
+    var svgContent = '<rect width="' + width + '" height="' + height + '" fill="white"/>' +
+      '<text x="40" y="60" font-size="28" font-weight="bold" fill="#1e293b">' + title + '</text>' +
+      '<text x="40" y="100" font-size="14" fill="#64748b">' + insight + '</text>';
+
+    if (pin.chartSvg) {
+      svgContent += '<g transform="translate(40,120) scale(0.8)">' + pin.chartSvg.replace(/<svg[^>]*>/, '').replace(/<\/svg>/, '') + '</g>';
+    }
+
+    var svgStr = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '">' + svgContent + '</svg>';
+    var blob = new Blob([svgStr], { type: "image/svg+xml" });
+    downloadBlob(blob, (pin.title || "pin") + "_slide.svg");
+    showToast("Exported as SVG");
+  }
+
+  function exportAllPinnedAsPng() {
+    if (pinnedViews.length === 0) { showToast("No pinned views to export"); return; }
+    pinnedViews.forEach(function(pin) { exportPinnedAsPng(pin.id); });
+  }
+
+  // --------------------------------------------------------------------------
   // COLLAPSIBLE SECTIONS
   // --------------------------------------------------------------------------
   function initCollapsibles() {
@@ -568,6 +834,18 @@
   window._mdMovePinned = movePinned;
   window._mdSaveReport = saveReportHTML;
   window._mdToggleHelp = toggleHelpOverlay;
+  window._mdFilterSegment = filterSegment;
+  window._mdAddSlide = addSlide;
+  window._mdTriggerSlideImage = triggerSlideImage;
+  window._mdHandleSlideImage = handleSlideImage;
+  window._mdRemoveSlideImage = removeSlideImage;
+  window._mdRemoveSlide = removeSlide;
+  window._mdMoveSlide = moveSlide;
+  window._mdPinSlide = pinSlide;
+  window._mdPinChart = pinChart;
+  window._mdExportPanel = exportPanelToExcel;
+  window._mdExportPinnedSvg = exportPinnedAsPng;
+  window._mdExportAllPinned = exportAllPinnedAsPng;
 
   // Run on DOMContentLoaded or immediately if already loaded
   if (document.readyState === "loading") {

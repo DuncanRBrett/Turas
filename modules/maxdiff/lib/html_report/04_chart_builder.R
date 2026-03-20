@@ -96,6 +96,89 @@ build_preference_chart <- function(scores, brand_colour = "#1e3a5f", use_shares 
 
 
 # ==============================================================================
+# ANCHORED MAXDIFF THRESHOLD CHART
+# ==============================================================================
+
+#' Build anchor threshold chart showing must-have rates per item
+#'
+#' Horizontal bar chart of anchor rates with a vertical dashed threshold line.
+#' Items above the threshold are highlighted as "must-haves".
+#'
+#' @param anchor_data Data frame with Item_Label, Anchor_Rate, Is_Must_Have
+#' @param brand_colour Hex colour for bars
+#' @param threshold Numeric. The must-have threshold (0-1 scale)
+#'
+#' @return SVG string, or "" if no anchor data
+#' @keywords internal
+build_anchor_threshold_chart <- function(anchor_data, brand_colour = "#1e3a5f", threshold = 0.50) {
+
+  if (is.null(anchor_data) || !is.data.frame(anchor_data) || nrow(anchor_data) == 0) return("")
+  if (!"Anchor_Rate" %in% names(anchor_data)) return("")
+
+  # Sort by anchor rate descending
+  anchor_data <- anchor_data[order(-anchor_data$Anchor_Rate), ]
+
+  n <- nrow(anchor_data)
+  bar_height <- 28
+  gap <- 6
+  ml <- 180
+  mr <- 60
+  mt <- 30
+  mb <- 20
+  chart_width <- 720
+  cw <- chart_width - ml - mr
+  ch <- n * (bar_height + gap)
+  total_height <- mt + ch + mb
+
+  max_val <- max(anchor_data$Anchor_Rate * 100, threshold * 100, na.rm = TRUE) * 1.1
+  if (max_val <= 0) max_val <- 100
+  scale_x <- function(v) ml + (v / max_val) * cw
+
+  # Grid lines
+  grid_vals <- pretty(c(0, max_val), 5)
+  grid_vals <- grid_vals[grid_vals >= 0 & grid_vals <= max_val]
+  grid_lines <- paste(vapply(grid_vals, function(gv) {
+    x <- scale_x(gv)
+    paste0(
+      sprintf('<line x1="%g" y1="%d" x2="%g" y2="%d" stroke="#e2e8f0" stroke-width="1"/>', x, mt, x, mt + ch),
+      sprintf('<text x="%g" y="%d" text-anchor="middle" fill="#94a3b8" font-size="10">%.0f%%</text>', x, mt + ch + 14, gv)
+    )
+  }, character(1)), collapse = "\n")
+
+  # Threshold line
+  threshold_x <- scale_x(threshold * 100)
+  threshold_line <- paste0(
+    sprintf('<line x1="%g" y1="%d" x2="%g" y2="%d" stroke="#e74c3c" stroke-width="2" stroke-dasharray="6,4"/>', threshold_x, mt - 5, threshold_x, mt + ch),
+    sprintf('<text x="%g" y="%d" text-anchor="middle" fill="#e74c3c" font-size="10" font-weight="600">Must-Have Threshold (%.0f%%)</text>', threshold_x, mt - 8, threshold * 100)
+  )
+
+  # Bars
+  bars <- paste(vapply(seq_len(n), function(i) {
+    y <- mt + (i - 1) * (bar_height + gap)
+    rate <- anchor_data$Anchor_Rate[i] * 100
+    is_must_have <- if ("Is_Must_Have" %in% names(anchor_data)) anchor_data$Is_Must_Have[i] else (rate >= threshold * 100)
+    w <- max(2, (rate / max_val) * cw)
+    label <- anchor_data$Item_Label[i] %||% anchor_data$Item_ID[i]
+    if (nchar(label) > 25) label <- paste0(substr(label, 1, 22), "...")
+
+    bar_colour <- if (is_must_have) "#27ae60" else brand_colour
+    label_weight <- if (is_must_have) "600" else "500"
+
+    paste0(
+      sprintf('<text x="%d" y="%g" text-anchor="end" fill="#1e293b" font-size="12" font-weight="%s" dominant-baseline="middle">%s</text>',
+              ml - 8, y + bar_height / 2, label_weight, htmlEscape(label)),
+      sprintf('<rect x="%d" y="%g" width="%g" height="%d" rx="4" fill="%s" opacity="0.8"/>',
+              ml, y, w, bar_height, bar_colour),
+      sprintf('<text x="%g" y="%g" fill="#1e293b" font-size="11" font-weight="500" dominant-baseline="middle">%.0f%%</text>',
+              ml + w + 6, y + bar_height / 2, rate)
+    )
+  }, character(1)), collapse = "\n")
+
+  svg_wrap(paste(grid_lines, threshold_line, bars, sep = "\n"), chart_width, total_height, "Anchored MaxDiff threshold chart")
+}
+
+
+# ==============================================================================
 # BEST/WORST DIVERGING BAR CHART
 # ==============================================================================
 
@@ -506,6 +589,149 @@ build_strategy_quadrant <- function(hb_pop, brand_colour = "#1e3a5f") {
 
   svg_wrap(paste(quadrants, grid_svg, med_lines, q_labels, border, axis_labels, dots, sep = "\n"),
            chart_width, chart_height, "Item Strategy Quadrant: Mean Utility vs Standard Deviation")
+}
+
+
+# ==============================================================================
+# COLOUR PALETTE
+# ==============================================================================
+
+# ==============================================================================
+# UTILITY DISTRIBUTION VIOLIN / RAINCLOUD CHART
+# ==============================================================================
+
+#' Build violin/raincloud chart showing HB utility distributions per item
+#'
+#' Shows the distribution of individual-level utilities for each item,
+#' revealing polarization patterns. Items with wide distributions or
+#' multiple peaks are polarizing; tight distributions indicate consensus.
+#'
+#' @param dist_data List with $summary (data.frame) and $densities (list of density estimates)
+#' @param brand_colour Hex colour
+#'
+#' @return SVG string
+#' @keywords internal
+build_utility_distribution_chart <- function(dist_data, brand_colour = "#1e3a5f") {
+
+  if (is.null(dist_data) || is.null(dist_data$summary) || nrow(dist_data$summary) < 2) return("")
+
+  df <- dist_data$summary
+  densities <- dist_data$densities
+
+  n <- nrow(df)
+  row_height <- 44
+  gap <- 4
+  ml <- 180   # left margin for labels
+  mr <- 40
+  mt <- 30
+  mb <- 40
+  chart_width <- 720
+  cw <- chart_width - ml - mr
+  ch <- n * (row_height + gap) - gap
+  total_height <- mt + ch + mb
+
+  # X scale: covers all utility values
+  x_min <- min(df$Min, na.rm = TRUE) - abs(diff(range(c(df$Min, df$Max)))) * 0.05
+  x_max <- max(df$Max, na.rm = TRUE) + abs(diff(range(c(df$Min, df$Max)))) * 0.05
+  if (x_max - x_min < 0.01) { x_min <- x_min - 1; x_max <- x_max + 1 }
+
+  scale_x <- function(v) ml + (v - x_min) / (x_max - x_min) * cw
+
+  # Grid lines
+  x_ticks <- pretty(c(x_min, x_max), 6)
+  x_ticks <- x_ticks[x_ticks >= x_min & x_ticks <= x_max]
+
+  grid_lines <- paste(vapply(x_ticks, function(xt) {
+    x <- scale_x(xt)
+    paste0(
+      sprintf('<line x1="%g" y1="%d" x2="%g" y2="%d" stroke="#e2e8f0" stroke-width="1"/>', x, mt, x, mt + ch),
+      sprintf('<text x="%g" y="%d" text-anchor="middle" fill="#94a3b8" font-size="10">%.2f</text>', x, mt + ch + 16, xt)
+    )
+  }, character(1)), collapse = "\n")
+
+  axis_label <- sprintf(
+    '<text x="%g" y="%d" text-anchor="middle" fill="#64748b" font-size="12" font-weight="500">Utility Score</text>',
+    ml + cw / 2, mt + ch + 34
+  )
+
+  # Zero line if range spans zero
+  zero_line <- ""
+  if (x_min < 0 && x_max > 0) {
+    zx <- scale_x(0)
+    zero_line <- sprintf(
+      '<line x1="%g" y1="%d" x2="%g" y2="%d" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="4,3"/>',
+      zx, mt, zx, mt + ch
+    )
+  }
+
+  # Rows: for each item, draw density violin + box plot
+  rows_svg <- paste(vapply(seq_len(n), function(i) {
+    y_center <- mt + (i - 1) * (row_height + gap) + row_height / 2
+    item_id <- df$Item_ID[i]
+    label <- df$Item_Label[i]
+    if (nchar(label) > 25) label <- paste0(substr(label, 1, 22), "...")
+
+    # Label
+    label_svg <- sprintf(
+      '<text x="%d" y="%g" text-anchor="end" fill="#1e293b" font-size="11" font-weight="500" dominant-baseline="middle">%s</text>',
+      ml - 8, y_center, htmlEscape(label)
+    )
+
+    # Density violin (half — raincloud style: density on top only)
+    violin_svg <- ""
+    d <- densities[[item_id]]
+    if (!is.null(d) && length(d$x) > 2) {
+      max_density <- max(d$y)
+      if (max_density > 0) {
+        half_h <- row_height * 0.38  # max height of the density curve
+        # Build path: bottom line then density curve on top
+        pts_top <- paste(vapply(seq_along(d$x), function(k) {
+          px <- scale_x(d$x[k])
+          py <- y_center - (d$y[k] / max_density) * half_h
+          sprintf("%g,%g", px, py)
+        }, character(1)), collapse = " ")
+        # Close path along the center line
+        x_start <- scale_x(d$x[1])
+        x_end <- scale_x(d$x[length(d$x)])
+        violin_svg <- sprintf(
+          '<polygon points="%g,%g %s %g,%g" fill="%s" opacity="0.25" stroke="%s" stroke-width="0.8" stroke-opacity="0.5"/>',
+          x_start, y_center, pts_top, x_end, y_center, brand_colour, brand_colour
+        )
+      }
+    }
+
+    # Box plot (below center line)
+    q25_x <- scale_x(df$Q25[i])
+    q75_x <- scale_x(df$Q75[i])
+    median_x <- scale_x(df$Median[i])
+    mean_x <- scale_x(df$Mean[i])
+    min_x <- scale_x(df$Min[i])
+    max_x <- scale_x(df$Max[i])
+    box_h <- 6
+    box_y <- y_center + 2
+
+    box_svg <- paste0(
+      # Whiskers
+      sprintf('<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="#94a3b8" stroke-width="1"/>', min_x, box_y + box_h/2, q25_x, box_y + box_h/2),
+      sprintf('<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="#94a3b8" stroke-width="1"/>', q75_x, box_y + box_h/2, max_x, box_y + box_h/2),
+      # Whisker caps
+      sprintf('<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="#94a3b8" stroke-width="1"/>', min_x, box_y + 1, min_x, box_y + box_h - 1),
+      sprintf('<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="#94a3b8" stroke-width="1"/>', max_x, box_y + 1, max_x, box_y + box_h - 1),
+      # Box (Q25 to Q75)
+      sprintf('<rect x="%g" y="%g" width="%g" height="%d" rx="2" fill="%s" opacity="0.5" stroke="%s" stroke-width="1"/>',
+              q25_x, box_y, q75_x - q25_x, box_h, brand_colour, brand_colour),
+      # Median line
+      sprintf('<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="white" stroke-width="1.5"/>', median_x, box_y, median_x, box_y + box_h),
+      # Mean dot
+      sprintf('<circle cx="%g" cy="%g" r="3" fill="white" stroke="%s" stroke-width="1.5"/>', mean_x, box_y + box_h/2, brand_colour)
+    )
+
+    paste0(label_svg, "\n", violin_svg, "\n", box_svg)
+  }, character(1)), collapse = "\n")
+
+  svg_wrap(paste(grid_lines, zero_line, axis_label, rows_svg, sep = "\n"),
+           chart_width, total_height,
+           "Utility distribution chart showing individual-level preference spread per item")
 }
 
 
