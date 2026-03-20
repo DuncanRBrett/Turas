@@ -42,6 +42,12 @@
       "runtimeExecutable": "/bin/bash",
       "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && npx serve modules/catdriver/examples/demo -l 8795 --no-clipboard"],
       "port": 8795
+    },
+    {
+      "name": "maxdiff-report",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && npx serve examples/maxdiff/demo_showcase/output -l 8800 --no-clipboard"],
+      "port": 8800
     }
   ]
 }

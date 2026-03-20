@@ -1,7 +1,7 @@
 # Turas MaxDiff Module
 
-**Version:** 10.0
-**Part of:** Turas Survey Analysis Suite
+**Version:** 11.1
+**Part of:** Turas Analytics Platform
 
 ## Overview
 
@@ -21,14 +21,22 @@ This approach forces trade-offs and produces more discriminating results than tr
 ## Key Features
 
 - Excel-based configuration for non-technical users
-- Balanced Incomplete Block Design (BIBD) generation with optimization
+- Balanced Incomplete Block Design (BIBD) generation with D-optimal optimization
 - Multiple scoring methods:
-  - Count-based scores (Best%, Worst%, Net Score)
-  - Aggregate conditional logit model
-  - Hierarchical Bayes individual-level utilities
-- Segment-level analysis
-- Publication-ready visualizations
-- Comprehensive validation and logging
+  - Count-based scores (Best%, Worst%, Net Score, BW Score)
+  - Aggregate conditional logit model (via survival::clogit)
+  - Hierarchical Bayes individual-level utilities (via Stan/cmdstanr)
+- **TURF portfolio optimization** — find the item combination that reaches the most people
+- **Anchored MaxDiff** — add absolute "must-have" benchmarks to relative preferences
+- **Item discrimination analysis** — classify items as universal favourites, polarizing, or niche
+- Segment-level analysis with grouped bar chart visualisations
+- **Self-contained HTML report** with tabbed navigation, interactive table sorting, and SVG charts
+- **Interactive preference simulator** with portfolio builder, head-to-head comparison, and export
+- Add-slides and add-images support for custom report content
+- Publication-ready ggplot2 visualizations (PNG)
+- Comprehensive Excel output with conditional formatting
+- Reach sensitivity analysis across threshold methods
+- TRS v1.0 compliant error handling and run status tracking
 
 ## Quick Start
 
@@ -74,12 +82,10 @@ run_maxdiff("path/to/maxdiff_config.xlsx")
 
 This module includes comprehensive documentation:
 
-1. **[Marketing Guide](MARKETING.md)** - Client-facing overview of MaxDiff capabilities
-2. **[Authoritative Guide](AUTHORITATIVE_GUIDE.md)** - Deep dive into Turas MaxDiff methodology
-3. **[User Manual](USER_MANUAL.md)** - Complete setup and usage guide
-4. **[Template Guide](maxdiff_config_template.xlsx)** - Excel configuration template
-5. **[Technical Reference](TECHNICAL_REFERENCE.md)** - Developer documentation
-6. **[Example Workflows](EXAMPLE_WORKFLOWS.md)** - Practical step-by-step examples
+1. **[User Manual](USER_MANUAL.md)** - Complete setup, usage guide, study design, troubleshooting
+2. **[Technical Reference](TECHNICAL_REFERENCE.md)** - Statistical methods, API reference, architecture
+3. **[Configuration Template](../templates/maxdiff_config_template.xlsx)** - Excel configuration template
+4. **[Demo Showcase](../../examples/maxdiff/demo_showcase/)** - Full working example with all features
 
 ## Configuration
 
@@ -153,43 +159,55 @@ Create an Excel workbook (.xlsx) with the following sheets:
 ```
 modules/maxdiff/
 ├── R/
-│   ├── 00_main.R          # Entry point
+│   ├── 00_guard.R         # TRS guard layer
+│   ├── 00_main.R          # Entry point & orchestration
 │   ├── 01_config.R        # Configuration loading
 │   ├── 02_validation.R    # Data validation
 │   ├── 03_data.R          # Data loading/reshaping
-│   ├── 04_design.R        # Design generation
+│   ├── 04_design.R        # Design generation (BALANCED/OPTIMAL/RANDOM)
 │   ├── 05_counts.R        # Count-based scoring
-│   ├── 06_logit.R         # Aggregate logit
-│   ├── 07_hb.R            # Hierarchical Bayes
+│   ├── 06_logit.R         # Aggregate conditional logit
+│   ├── 07_hb.R            # Hierarchical Bayes (Stan/cmdstanr)
 │   ├── 08_segments.R      # Segment analysis
-│   ├── 09_output.R        # Excel output
-│   ├── 10_charts.R        # Visualizations
-│   └── utils.R            # Utilities
+│   ├── 09_output.R        # Excel output with conditional formatting
+│   ├── 10_charts.R        # ggplot2 chart generation
+│   ├── 11_turf.R          # TURF portfolio optimisation
+│   └── utils.R            # Shared utilities
+├── lib/
+│   ├── html_report/       # Self-contained HTML report pipeline
+│   │   ├── 01_data_transformer.R
+│   │   ├── 02_table_builder.R
+│   │   ├── 03_page_builder.R
+│   │   ├── 04_chart_builder.R
+│   │   └── 99_html_report_main.R
+│   └── html_simulator/    # Interactive preference simulator
+│       ├── 01_simulator_data_transformer.R
+│       ├── 02_simulator_page_builder.R
+│       ├── 99_simulator_main.R
+│       └── js/            # 5 JavaScript modules
 ├── stan/
-│   └── maxdiff_hb.stan    # Stan model
+│   └── maxdiff_hb.stan    # HB Stan model
 ├── docs/
 │   ├── README.md              # This file
-│   ├── MARKETING.md           # Client-facing overview
-│   ├── AUTHORITATIVE_GUIDE.md # Deep methodology guide
-│   ├── USER_MANUAL.md         # Complete user guide
-│   ├── TECHNICAL_REFERENCE.md # Developer documentation
-│   ├── EXAMPLE_WORKFLOWS.md   # Practical examples
-│   └── maxdiff_config_template.xlsx  # Excel template
+│   ├── USER_MANUAL.md         # Complete user guide (v11.1)
+│   └── TECHNICAL_REFERENCE.md # Statistical methods & API (v11.1)
 ├── templates/
-│   └── create_maxdiff_template.R  # Template generator
+│   ├── create_maxdiff_template.R    # Template generator
+│   └── maxdiff_config_template.xlsx # Excel config template
 ├── tests/
-│   └── test_maxdiff.R     # Unit tests
+│   ├── testthat/          # 13 test files
+│   ├── test_maxdiff.R     # Standalone test runner
+│   └── run_full_tests.R   # Integration test suite
 ├── examples/
-│   └── basic/             # Example files
-└── run_maxdiff_gui.R      # Shiny GUI
+│   └── basic/             # Built-in example
+└── run_maxdiff_gui.R      # Shiny GUI launcher
 ```
 
 ## Support
 
 For detailed information:
 - **Users**: See [User Manual](USER_MANUAL.md) for step-by-step instructions
-- **Clients**: See [Marketing Guide](MARKETING.md) for capabilities overview
 - **Developers**: See [Technical Reference](TECHNICAL_REFERENCE.md) for API documentation
-- **Examples**: See [Example Workflows](EXAMPLE_WORKFLOWS.md) for practical use cases
+- **Demo**: See [Demo Showcase](../../examples/maxdiff/demo_showcase/) for a working example
 
 For issues or questions, consult the documentation or contact the development team.

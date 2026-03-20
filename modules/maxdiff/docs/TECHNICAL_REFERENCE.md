@@ -1,7 +1,7 @@
 # Turas MaxDiff Module - Technical Reference
 
-**Version:** 10.0
-**Last Updated:** December 2025
+**Version:** 11.1
+**Last Updated:** March 2026
 
 ---
 
@@ -52,7 +52,10 @@ The MaxDiff module follows these architectural principles:
             │       └── stan/maxdiff_hb.stan
             ├── 08_segments.R (Segment Analysis)
             ├── 09_output.R (Excel Output)
-            └── 10_charts.R (Visualisations)
+            ├── 10_charts.R (Visualisations)
+            ├── 11_turf.R (TURF Portfolio Optimisation)
+            ├── lib/html_report/ (HTML Report Pipeline)
+            └── lib/html_simulator/ (Interactive Simulator)
 ```
 
 ### 1.3 Package Dependencies
@@ -62,8 +65,11 @@ The MaxDiff module follows these architectural principles:
 | openxlsx | ≥4.2.5 | Excel read/write | Yes |
 | survival | ≥3.5.0 | Conditional logit | Yes* |
 | ggplot2 | ≥3.4.0 | Visualisations | Yes* |
-| cmdstanr | ≥0.6.0 | HB estimation | No |
-| AlgDesign | ≥1.2.1 | Optimal designs | No |
+| cmdstanr | ≥0.7.0 | HB estimation via Stan | No |
+| AlgDesign | ≥1.2.0 | D-optimal experimental designs | No |
+| base64enc | ≥0.1-3 | Logo embedding in HTML reports | No |
+| jsonlite | ≥1.8.0 | JSON output, base64 fallback | No |
+| data.table | ≥1.14.0 | Fast data manipulation | No |
 
 *Fallback methods available if not installed
 
@@ -866,12 +872,92 @@ For datasets > 10,000 respondents:
 | utils.R | `safe_integer()` | Safe type conversion |
 | utils.R | `parse_yes_no()` | Boolean parsing |
 
+| 11_turf.R | `run_turf_analysis()` | TURF portfolio optimisation |
+| 11_turf.R | `classify_appeal()` | Appeal threshold classification |
+| 11_turf.R | `calculate_reach()` | Portfolio reach calculation |
+| 11_turf.R | `calculate_portfolio_reach()` | Custom portfolio reach |
+| 11_turf.R | `compute_reach_sensitivity()` | Cross-method reach comparison |
+
+---
+
+## 11. TURF Analysis
+
+### 11.1 What is TURF?
+
+Total Unduplicated Reach and Frequency (TURF) is a portfolio optimisation technique. Given individual-level utility estimates, TURF identifies the combination of K items that maximises **reach** — the percentage of respondents for whom at least one item in the portfolio is appealing.
+
+### 11.2 Appeal Classification
+
+Before computing reach, each respondent's utilities must be converted to a binary "appealing/not appealing" classification. Four threshold methods are available:
+
+| Method | Rule | Use Case |
+|--------|------|----------|
+| `ABOVE_MEAN` | Item utility > respondent's mean utility | Default. Identifies items that stand out for each respondent |
+| `TOP_3` | Respondent's top 3 items | Fixed number of appealing items per respondent |
+| `TOP_K` | Respondent's top K items (configurable) | Flexible version of TOP_3 |
+| `ABOVE_ZERO` | Item utility > 0 | When zero-centred utilities have a natural threshold |
+
+### 11.3 Greedy Forward Selection
+
+The algorithm uses greedy forward selection:
+
+1. Start with empty portfolio
+2. For each candidate item not yet selected, compute the reach if that item were added
+3. Select the item providing the highest incremental reach
+4. Repeat until the portfolio reaches the maximum size or 100% reach
+
+This is a **greedy approximation** — it is not guaranteed to find the globally optimal combination, but it is optimal for portfolio sizes 1 and 2, and near-optimal for larger sizes. For practical purposes, the greedy solution is sufficient.
+
+### 11.4 Reach and Frequency
+
+- **Reach** = proportion of respondents for whom at least one portfolio item is appealing
+- **Frequency** = average number of appealing items per respondent within the portfolio
+
+### 11.5 Reach Sensitivity
+
+The `compute_reach_sensitivity()` function compares reach across multiple threshold methods for the same portfolio sizes, helping users understand how sensitive their conclusions are to the choice of threshold.
+
+---
+
+## 12. Anchored MaxDiff
+
+### 12.1 Purpose
+
+Standard MaxDiff produces relative preferences — items can be ranked, but there is no absolute threshold for "good enough." Anchored MaxDiff adds a direct question asking respondents which items they consider "must-haves," providing an absolute benchmark.
+
+### 12.2 Implementation
+
+The anchor variable contains each respondent's "must-have" items, either as a comma-separated list of Item IDs or as binary columns. The `process_anchor_data()` function computes the must-have rate for each item — the percentage of respondents who consider it essential.
+
+### 12.3 Interpretation
+
+Items with both high utility scores and high must-have rates are strong candidates for inclusion. Items with high utility but low must-have rates may be "nice-to-have" — preferred but not essential.
+
+---
+
+## 13. Item Discrimination
+
+### 13.1 Classification
+
+Items are classified based on their individual-level utility distributions from HB estimation:
+
+| Classification | Criteria | Meaning |
+|---------------|----------|---------|
+| Universal Favourite | High mean, low SD | Widely preferred across respondents |
+| Low Priority | Low mean, low SD | Widely disliked |
+| Polarising | Any mean, high SD | Strongly preferred by some, disliked by others |
+| Niche | Moderate mean, moderate SD | Moderate appeal with some variation |
+
+### 13.2 Coefficient of Variation
+
+The discrimination metric is the coefficient of variation (CV = SD / |Mean|) of individual-level utilities. High CV indicates the item differentiates strongly between respondent segments.
+
 ---
 
 ## Appendix B: Configuration Schema
 
-Complete JSON schema for configuration validation available on request.
+Complete configuration schema documented in USER_MANUAL.md.
 
 ---
 
-*End of Technical Reference*
+*End of Technical Reference — v11.1*

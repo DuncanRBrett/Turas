@@ -1,8 +1,8 @@
 # Turas Conjoint Module -- User Manual
 
-**Version:** 3.0.0
+**Version:** 3.1.0
 **Last Updated:** March 2026
-**Template:** Conjoint_Config_Template.xlsx (v3.1)
+**Template:** `examples/conjoint/Conjoint_Config_Template.xlsx` (6 sheets)
 
 ---
 
@@ -14,12 +14,37 @@
 4. [Step-by-Step Guide](#4-step-by-step-guide)
 5. [Configuration Reference](#5-configuration-reference)
 6. [Interpreting Results](#6-interpreting-results)
-7. [Market Simulator Guide](#7-market-simulator-guide)
-8. [Product Optimizer](#8-product-optimizer)
-9. [Willingness to Pay](#9-willingness-to-pay)
-10. [Alchemer Data Import](#10-alchemer-data-import)
-11. [Potential Issues and Troubleshooting](#11-potential-issues-and-troubleshooting)
-12. [Package Dependencies](#12-package-dependencies)
+7. [HTML Report Guide](#7-html-report-guide)
+8. [Market Simulator Guide](#8-market-simulator-guide)
+9. [Revenue Simulator](#9-revenue-simulator)
+10. [Product Optimizer](#10-product-optimizer)
+11. [Willingness to Pay](#11-willingness-to-pay)
+12. [Alchemer Data Import](#12-alchemer-data-import)
+13. [Pre-flight Validation](#13-pre-flight-validation)
+14. [Potential Issues and Troubleshooting](#14-potential-issues-and-troubleshooting)
+15. [Package Dependencies](#15-package-dependencies)
+
+---
+
+## What's New in Version 3.1.0
+
+This release adds several features to the HTML report and simulator. Here is a summary of the key changes:
+
+- **Revenue Simulator** -- A new simulator tab that shows revenue per product alongside market share. Configure a customer count and see Revenue = Price x Share% x Customers for each product.
+- **Scale factor slider** -- Calibrate simulated shares to real-world market data by adjusting a scale factor (0.1--3.0) in the HTML simulator.
+- **Purchase Likelihood method** -- A new simulation method where each product gets an independent purchase probability (they do not sum to 100%). Useful when products are not direct substitutes.
+- **Dot plot chart option** -- Toggle between horizontal bar charts and dot plots on the Utilities tab. Your preference persists as you move between attributes.
+- **Per-attribute sticky notes** -- Add analysis notes to individual attributes on the Utilities tab. Notes are saved when you navigate away and reappear when you return.
+- **Per-mode simulator annotations** -- Write notes that stick to each simulator mode (Market Shares, Revenue, Sensitivity, Source of Volume).
+- **WTP auto-detection** -- The module now auto-detects price attributes by looking for attribute names containing "price", "cost", or "fee". You no longer need to set `wtp_price_attribute` manually (though you still can).
+- **Snapshot-based pins** -- Pin multiple independent simulator views. Each pin is a full snapshot of the current configuration, so you can compare different scenarios side by side.
+- **Pre-flight check** -- Run `conjoint_preflight()` to validate that all module files, packages, and infrastructure are in place before starting an analysis.
+- **HB convergence diagnostics in plain language** -- The Diagnostics tab now explains convergence results in non-technical terms, including what to do if the model has not converged.
+- **Method Reference Guide** -- An expandable table in the Diagnostics tab comparing all estimation and simulation methods at a glance.
+- **Stats primers** -- Each simulator mode includes an expandable "How does it work?" section explaining the method in plain language.
+- **Custom slides with image import** -- Insert images from your computer into custom slides. Images are automatically compressed for fast loading.
+- **Config template** -- A ready-to-use 6-sheet config template is available at `examples/conjoint/Conjoint_Config_Template.xlsx`.
+- **`default_customers` config setting** -- Set the starting customer count for the Revenue Simulator in the Settings sheet.
 
 ---
 
@@ -38,6 +63,7 @@ For example, when buying a smartphone, a customer might value the Apple brand hi
 - **Optimal product design:** What combination of features produces the most attractive product?
 - **Market share prediction:** If we launch product X against competitors Y and Z, what share of preference will each capture?
 - **Price sensitivity:** How much market share do we lose if we raise the price by one level? What is the willingness to pay for a feature upgrade?
+- **Revenue modelling:** Given predicted shares and a customer base, what revenue does each product generate?
 - **Segmentation:** Are there distinct groups of customers with fundamentally different preferences?
 
 ### When to Use Conjoint
@@ -68,6 +94,7 @@ Conjoint is not the right tool when:
 | **Part-worth utility** | The numerical value representing preference for a specific level |
 | **Attribute importance** | The percentage influence each attribute has on overall choice |
 | **None option** | An opt-out alternative ("I would not choose any of these") |
+| **Scale factor** | A multiplier applied to utilities before computing shares, used to calibrate predictions to real market data |
 
 ---
 
@@ -327,7 +354,7 @@ generate_conjoint_config_template("lc_config.xlsx", method_template = "cbc_laten
 
 **Option B: Copy and edit the template manually**
 
-Copy `Conjoint_Config_Template.xlsx` to your project folder and edit the Settings and Attributes sheets.
+Copy `examples/conjoint/Conjoint_Config_Template.xlsx` to your project folder and edit the Settings and Attributes sheets. This 6-sheet template includes Settings, Attributes, Custom_Slides, Custom_Images, Design, and Instructions.
 
 ### Step 3: Set Up Attributes
 
@@ -374,7 +401,18 @@ Open the **Settings** sheet and set these key fields:
 
 See the full [Configuration Reference](#5-configuration-reference) for all available settings.
 
-### Step 5: Run the Analysis
+### Step 5: Validate Before Running (Recommended)
+
+Before running the full analysis, use the pre-flight check to confirm everything is in order:
+
+```r
+source("modules/conjoint/R/00_main.R")
+conjoint_preflight(verbose = TRUE)
+```
+
+This validates all module files, required packages, and infrastructure. See [Pre-flight Validation](#13-pre-flight-validation) for details.
+
+### Step 6: Run the Analysis
 
 **From the Turas GUI:**
 
@@ -407,19 +445,19 @@ results <- run_conjoint_analysis(
 )
 ```
 
-### Step 6: Interpret Results
+### Step 7: Interpret Results
 
 The analysis produces:
 
 - An **Excel workbook** with Utilities, Relative_Importance, Model_Summary, and Market Simulator sheets.
-- An **HTML report** (if `generate_html_report = TRUE`) with interactive charts and a built-in simulator.
+- An **HTML report** (if `generate_html_report = TRUE`) with interactive charts, a built-in market and revenue simulator, and annotation tools.
 - A **results object** in R with all computed outputs.
 
 See [Interpreting Results](#6-interpreting-results) for detailed guidance.
 
-### Step 7: Use the Market Simulator
+### Step 8: Use the Market Simulator
 
-The Market Simulator sheet in the output workbook lets you configure hypothetical products and see predicted market shares. See [Market Simulator Guide](#7-market-simulator-guide) for full instructions.
+The Market Simulator sheet in the output workbook lets you configure hypothetical products and see predicted market shares. The HTML report includes a richer interactive simulator with revenue modelling, sensitivity analysis, and scenario pinning. See [Market Simulator Guide](#8-market-simulator-guide) and [Revenue Simulator](#9-revenue-simulator) for full instructions.
 
 ---
 
@@ -435,6 +473,8 @@ The configuration file is an Excel workbook with the following sheets:
 | Custom_Images | No | Custom images for the HTML report |
 | Design | No | Experimental design matrix (Turas infers from data if omitted) |
 | Instructions | No | Documentation (not read by code) |
+
+A ready-to-use template with all six sheets is available at `examples/conjoint/Conjoint_Config_Template.xlsx`.
 
 ### Settings Sheet -- All Parameters
 
@@ -502,8 +542,9 @@ These settings apply only when `estimation_method = "latent_class"`.
 
 | Setting | Default | Description | Valid Values |
 |---------|---------|-------------|--------------|
-| `wtp_price_attribute` | (none) | Name of the price attribute. Leave blank to skip WTP calculation. | An attribute name from the Attributes sheet |
+| `wtp_price_attribute` | (none) | Name of the price attribute. **Leave blank for auto-detection** -- the module looks for attribute names containing "price", "cost", or "fee". | An attribute name from the Attributes sheet, or blank |
 | `wtp_method` | `marginal` | WTP calculation method | `marginal` or `simulation` |
+| `currency_symbol` | `$` | Currency symbol for WTP display | Any text (e.g., `$`, `R`, `EUR`) |
 
 #### Market Simulator
 
@@ -512,6 +553,12 @@ These settings apply only when `estimation_method = "latent_class"`.
 | `generate_market_simulator` | `TRUE` | Include an interactive market simulator sheet in the Excel output | `TRUE` or `FALSE` |
 | `simulation_method` | `logit` | Method for computing predicted market shares | `logit`, `first_choice`, or `rfc` |
 | `rfc_draws` | `1000` | Number of random draws for the Randomised First Choice method | Integer >= 100 |
+
+#### Revenue Simulator
+
+| Setting | Default | Description | Valid Values |
+|---------|---------|-------------|--------------|
+| `default_customers` | `1000` | Default hypothetical customer count for the Revenue Simulator tab. Users can change this in the HTML report. | Positive integer |
 
 #### None Option
 
@@ -556,7 +603,7 @@ Pre-populated analyst commentary that appears in the HTML report panels. Support
 | Setting | Default | Description | Valid Values |
 |---------|---------|-------------|--------------|
 | `include_custom_slides` | `FALSE` | Include custom slides from the Custom_Slides sheet in the HTML report | `TRUE` or `FALSE` |
-| `include_custom_images` | `FALSE` | Include custom images from the Custom_Images sheet in the HTML report | `TRUE` or `FALSE` |
+| `include_custom_images` | `FALSE` | Allow image import in custom slides (images are auto-compressed) | `TRUE` or `FALSE` |
 
 #### Analyst and About Page
 
@@ -589,6 +636,17 @@ The Attributes sheet defines the product features and their levels with three co
 | `AttributeName` | Yes | Name of the product attribute. Must match the data column name exactly (case-sensitive). |
 | `NumLevels` | Yes | Number of levels for this attribute. Must match the count of names in LevelNames. |
 | `LevelNames` | Yes | Comma-separated list of level values. Must match data values exactly. Order matters: the first level is the baseline. |
+
+### Custom_Slides Sheet
+
+For adding custom content panels to the HTML report. This is useful for adding methodology notes, appendices, or supporting charts from other tools.
+
+| Column | Required | Description |
+|--------|----------|-------------|
+| `Slide Title` | Yes | Title displayed at the top of the slide |
+| `Content` | Yes | Body text in Markdown format |
+| `Image Path` | No | Path to an image file to embed. Images are automatically compressed (max 800px wide, JPEG quality 0.7). You can also insert images from the file picker in the HTML report itself. |
+| `Position` | No | Ordering position (lower numbers appear first) |
 
 ---
 
@@ -692,6 +750,10 @@ When using Hierarchical Bayes estimation, additional diagnostics are available:
 
 If Rhat exceeds 1.10 for any parameter, increase `hb_iterations` and re-run.
 
+**Plain-language guidance in the HTML report:** The Diagnostics tab now provides non-technical explanations alongside every convergence metric. If the model has not converged, the report explains what that means in practical terms and recommends specific actions (such as increasing iterations or checking for problematic data). You do not need to be a statistician to understand the diagnostic output.
+
+[Screenshot: HB convergence diagnostics with plain-language trust callout and recommended actions]
+
 ### Latent Class Diagnostics
 
 When using latent class analysis:
@@ -732,7 +794,99 @@ WTP = -(Utility_level / Price_coefficient)
 
 ---
 
-## 7. Market Simulator Guide
+## 7. HTML Report Guide
+
+When `generate_html_report = TRUE`, Turas produces a single self-contained HTML file with all analysis panels and interactive tools. Open it in any modern browser -- no internet connection or server required.
+
+### Report Panels
+
+The report is organised into tabbed panels. Use the tabs at the top, or navigate with keyboard shortcuts (arrow keys, number keys).
+
+#### Overview
+
+Summary of the analysis: key performance indicators, an attribute importance chart, and a top-level callout highlighting the most and least important attributes.
+
+[Screenshot: Overview panel with KPI cards and importance chart]
+
+#### Utilities
+
+Detailed part-worth utility charts and data tables for each attribute. Two display options are available:
+
+- **Bar chart** (default) -- Horizontal bars showing utility values for each level.
+- **Dot plot** -- A cleaner alternative that shows utility values as dots on a number line. Better for attributes with many levels.
+
+Toggle between chart types using the control at the top of the panel. Your preference persists as you move between attributes.
+
+[Screenshot: Utility chart with bar/dot toggle control]
+
+**Per-attribute sticky notes:** Each attribute has a note field where you can record analysis observations. Click the note icon next to the attribute name to open it. Notes are saved automatically and reappear when you return to that attribute. A badge appears on attributes that have notes, so you can see at a glance where you have left comments.
+
+[Screenshot: Sticky note open on an attribute with badge visible on another attribute]
+
+#### Diagnostics
+
+Model fit statistics with trust verdicts (good, acceptable, poor), estimation method explanation, and a breakdown of what each metric means.
+
+**HB convergence diagnostics** are presented with plain-language guidance. Instead of raw numbers, the report tells you whether your model has converged and, if not, what to do about it.
+
+**Method Reference Guide:** An expandable table that compares all estimation methods (MNL, HB, Latent Class, etc.) and all simulation methods (Logit, RFC, Purchase Likelihood, First Choice) at a glance. This is a quick reference when you need to decide which method to use or explain your choice to a stakeholder.
+
+[Screenshot: Diagnostics panel with trust callout and expandable Method Reference Guide]
+
+#### WTP (Willingness to Pay)
+
+A bar chart with confidence interval whiskers showing how much respondents are willing to pay for each attribute level relative to the baseline. This tab appears automatically when a price attribute is detected.
+
+**New in 3.1.0:** WTP auto-detection means this tab will appear even if you did not manually set `wtp_price_attribute`. The module looks for attributes named "Price", "Cost", "Fee", or similar.
+
+#### Latent Class
+
+Appears when `estimation_method = "latent_class"`. Shows BIC comparison across class solutions, class size chart, per-class importance profiles, and comparison tables.
+
+#### Simulator
+
+The interactive market simulator. See [Market Simulator Guide](#8-market-simulator-guide) and [Revenue Simulator](#9-revenue-simulator) for detailed instructions.
+
+#### Custom Slides
+
+Appears when `include_custom_slides = TRUE`. Displays the custom content panels defined in the Custom_Slides sheet. Each slide has a title, body text (Markdown), and an optional image.
+
+**Image import:** If `include_custom_images = TRUE`, you can insert additional images from a file picker directly in the HTML report. Imported images are automatically compressed for fast loading (max 800px wide, JPEG quality 0.7).
+
+[Screenshot: Custom slide with imported image]
+
+#### Pinned Items
+
+Collect important views for a summary or presentation. The pin system works in two ways:
+
+- **Standard pins:** On most panels, clicking the pin icon saves a reference to that panel's current state.
+- **Snapshot-based pins (simulator):** On the Simulator tab, each pin is a **full independent snapshot** of your current product configuration and simulation results. You can pin multiple different scenarios and compare them side by side. Changing the simulator after pinning does not affect previously pinned snapshots.
+
+[Screenshot: Pinned Items panel showing two simulator snapshots and one utility chart pin]
+
+#### About
+
+Analyst contact information, closing notes (editable), and branding details.
+
+### Interactive Features
+
+| Feature | How to Use |
+|---------|------------|
+| **Keyboard navigation** | Arrow keys or number keys to switch tabs |
+| **Chart type toggle** | Switch between bar and dot plots on the Utilities tab |
+| **Per-attribute sticky notes** | Click the note icon on any attribute to add observations |
+| **Per-mode simulator annotations** | Write notes that persist separately for each simulator mode |
+| **Export** | PNG, CSV, and Excel export from any panel using the export controls |
+| **Pin** | Click the pushpin icon to save a view to the Pinned Items panel |
+| **Scale factor** | Adjust the slider on the Market Shares or Revenue tab to calibrate shares |
+| **Insight text** | Editable text areas on each panel for analyst commentary |
+| **Help overlay** | Press `?` or click the help icon for keyboard shortcut reference |
+| **Save report** | Use the Save button (File System Access API with download fallback) |
+| **Print** | Print-optimized CSS with targeted print for pinned items and slides |
+
+---
+
+## 8. Market Simulator Guide
 
 The market simulator is one of the most valuable outputs of conjoint analysis. It lets you define hypothetical products and predict their market shares.
 
@@ -742,22 +896,31 @@ The simulator uses the estimated part-worth utilities to calculate a total utili
 
 ### How to Set Up Products
 
-In the **Market Simulator** sheet of the output workbook:
+**In the Excel workbook:**
 
 1. Each column (Product 1 through Product 5) represents one product.
 2. Each row represents an attribute.
 3. Use the dropdown menus to select the level for each attribute for each product.
 4. Leave a product column blank to exclude it from the simulation.
 
-### Understanding Share Predictions
+**In the HTML report:**
 
-Shares are calculated using one of three methods:
+1. Click the **Simulator** tab, then select the **Market Shares** mode.
+2. Configure each product by selecting attribute levels from the dropdowns.
+3. Results update instantly as you change selections.
 
-| Method | Setting | Description |
-|--------|---------|-------------|
-| **Logit** | `logit` | Shares proportional to exp(utility). The standard and most commonly used method. Accounts for similarity between products. |
-| **First Choice** | `first_choice` | Each respondent is assigned 100% to the product with the highest utility. Simple but ignores the degree of preference. |
-| **Randomised First Choice (RFC)** | `rfc` | Adds random error to utilities before applying first-choice rule. Produces more realistic shares than pure first choice. Requires individual-level utilities (HB). |
+[Screenshot: HTML simulator with product configuration dropdowns and share bar chart]
+
+### Simulation Methods
+
+The simulator supports four methods. You can switch between them in the HTML report using the method dropdown.
+
+| Method | Description | Shares Sum to 100%? |
+|--------|-------------|---------------------|
+| **Logit (MNL)** | Shares proportional to exp(utility). The standard and most commonly used method. Accounts for similarity between products. | Yes |
+| **First Choice** | Each respondent is assigned 100% to the product with the highest utility. Simple but ignores the degree of preference. | Yes |
+| **Randomised First Choice (RFC)** | Adds random error to utilities before applying first-choice rule. Produces more realistic shares than pure first choice. | Yes |
+| **Purchase Likelihood** | Converts each product's utility to an independent purchase probability. Useful when products are not direct substitutes (e.g., add-on services). | **No** -- each product gets its own probability independently |
 
 **Logit share formula:**
 
@@ -765,23 +928,104 @@ Shares are calculated using one of three methods:
 Share_j = exp(Utility_j) / Sum(exp(Utility_k)) for all products k
 ```
 
-Shares always sum to 100% across all active products.
+**When to use Purchase Likelihood:** Use this method when the products in your scenario are not mutually exclusive. For example, if you are simulating add-on features or complementary services where a customer might choose more than one, Purchase Likelihood gives you the independent probability of each product being selected. Because the probabilities are independent, they will not sum to 100%.
+
+[Screenshot: Purchase Likelihood mode showing independent probabilities]
+
+### Scale Factor
+
+The **scale factor slider** (0.1 to 3.0) lets you calibrate simulated shares to match real-world market data. The scale factor multiplies all utilities before computing shares:
+
+- **At 1.0** (default): No adjustment. Shares reflect the raw model estimates.
+- **Above 1.0**: Amplifies differences between products. The leading product gets a larger share, and trailing products get smaller shares.
+- **Below 1.0**: Compresses differences. Shares move closer to equal.
+
+**When to use the scale factor:** If you have external market data (e.g., known brand shares), adjust the scale factor until the simulated shares roughly match the observed shares. This calibrates the simulator to be more realistic for "what if" scenarios.
+
+[Screenshot: Scale factor slider set to 1.5 with adjusted share bars]
 
 ### Sensitivity Analysis
 
-The simulator sheet includes a sensitivity analysis section that shows how market share changes when you vary one attribute level at a time. This helps identify which feature changes have the largest impact on competitive position.
+The **Sensitivity** mode shows how market share changes when you vary one attribute level at a time for a selected product. This helps identify which feature changes have the largest impact on competitive position.
+
+1. Select a product to analyse.
+2. Select an attribute to sweep.
+3. The chart shows the predicted share for each possible level of that attribute, holding all other products constant.
+
+[Screenshot: Sensitivity chart showing share vs. price level for Product 1]
 
 ### Source of Volume
 
-When you change one product's configuration and its share increases, that share must come from somewhere. Source of volume analysis shows which competing products lose share and by how much. This is critical for understanding competitive dynamics.
+The **Source of Volume** mode shows what happens when a new product enters the market. It compares the "before" shares (without the new product) to the "after" shares (with the new product), showing which competitors lose the most volume.
 
-### Demand Curves
+[Screenshot: Source of Volume before/after comparison bars]
 
-If your study includes a price attribute, you can construct a demand curve by varying the price level of one product while holding everything else constant. This shows how share declines as price increases, helping identify optimal price points.
+### Per-Mode Annotations
+
+Each simulator mode (Market Shares, Revenue, Sensitivity, Source of Volume) has its own annotation text field. Notes you write in one mode stay with that mode and do not appear in others. Use this to record observations about specific scenarios.
+
+### Pinning Simulator Views
+
+Click the pushpin icon to save the current simulator view as a snapshot. Each pin captures:
+
+- The product configurations
+- The selected simulation method and scale factor
+- The resulting shares and charts
+
+You can pin multiple views from different modes and compare them in the Pinned Items panel. Each pin is independent -- changing the simulator afterwards does not affect previously pinned snapshots.
 
 ---
 
-## 8. Product Optimizer
+## 9. Revenue Simulator
+
+The **Revenue** tab in the HTML simulator goes beyond market share to estimate revenue for each product. It appears automatically when a price attribute is detected in your study.
+
+### What It Shows
+
+[Screenshot: Revenue Simulator with stacked horizontal bars showing share and revenue per product]
+
+- **Stacked horizontal bars** for each product, showing both market share and revenue side by side.
+- A **summary table** with per-product breakdown: price, share %, estimated customer count, and revenue.
+- A **total revenue** row summarising the entire market scenario.
+
+### How Revenue Is Calculated
+
+```
+Revenue = Price x Share% x Customers
+```
+
+Where:
+
+- **Price** is the price level selected for each product in the simulator.
+- **Share%** is the predicted market share from the current simulation method.
+- **Customers** is the hypothetical customer base you specify.
+
+### Setting the Customer Count
+
+- **Default value:** Set via `default_customers` in the Settings sheet (default is 1,000).
+- **In the HTML report:** Edit the customer count field directly. The revenue figures update instantly.
+
+### Practical Uses
+
+- **Compare product line revenue:** See which product configuration generates the most total revenue, not just the highest share.
+- **Price optimisation:** A higher price reduces share but may increase revenue. The Revenue tab lets you see the net effect.
+- **Portfolio planning:** Configure all products in a planned portfolio and see total market revenue.
+
+### Example
+
+Suppose you have three products:
+
+| Product | Price | Share | Customers | Revenue |
+|---------|-------|-------|-----------|---------|
+| Economy | $299 | 45% | 10,000 | $1,345,500 |
+| Standard | $499 | 35% | 10,000 | $1,746,500 |
+| Premium | $699 | 20% | 10,000 | $1,398,000 |
+
+Even though Economy has the highest share, Standard generates the most revenue due to its higher price. This kind of insight is the purpose of the Revenue Simulator.
+
+---
+
+## 10. Product Optimizer
 
 The product optimizer searches through possible product configurations to find the one that maximises market share (or utility, or revenue).
 
@@ -805,7 +1049,7 @@ For large design spaces, the greedy optimizer starts with a random configuration
 
 ---
 
-## 9. Willingness to Pay
+## 11. Willingness to Pay
 
 ### What WTP Provides
 
@@ -814,7 +1058,7 @@ Willingness to Pay translates utility differences into monetary values. Instead 
 ### Requirements
 
 - A **price attribute** must be defined in your study with numeric levels (e.g., $299, $399, $499).
-- Set `wtp_price_attribute` to the name of your price attribute in the config file.
+- The module auto-detects price attributes by looking for attribute names containing **"price"**, **"cost"**, or **"fee"** (case-insensitive). If your price attribute uses a different name, set `wtp_price_attribute` explicitly in the config file.
 
 ### How It Works
 
@@ -834,12 +1078,13 @@ WTP confidence intervals are computed via the delta method (for MNL) or from the
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `wtp_price_attribute` | (none) | Name of the price attribute. Leave blank to skip WTP. |
+| `wtp_price_attribute` | (none) | Name of the price attribute. Leave blank for auto-detection. |
 | `wtp_method` | `marginal` | `marginal` (ratio method) or `simulation` (simulation-based) |
+| `currency_symbol` | `$` | Currency symbol for display |
 
 ---
 
-## 10. Alchemer Data Import
+## 12. Alchemer Data Import
 
 The module supports direct import of Alchemer (formerly SurveyGizmo) CBC exports.
 
@@ -882,7 +1127,49 @@ Make sure the **cleaned** level names match what you specify in the Attributes s
 
 ---
 
-## 11. Potential Issues and Troubleshooting
+## 13. Pre-flight Validation
+
+Before running a full analysis, you can validate that the module is correctly set up using the pre-flight check. This catches common problems early.
+
+### Running the Pre-flight Check
+
+```r
+source("modules/conjoint/R/00_main.R")
+conjoint_preflight(verbose = TRUE)
+```
+
+Or include it as part of your analysis run:
+
+```r
+results <- run_conjoint_analysis(
+  config_file = "my_config.xlsx",
+  run_preflight = TRUE
+)
+```
+
+### What It Validates
+
+| Check | What It Looks For |
+|-------|-------------------|
+| **R source files** | Verifies all 20 expected R files are present |
+| **JavaScript files** | Verifies all 7 JS modules for the HTML report |
+| **HTML report files** | Verifies all 7 report generator R files |
+| **Required packages** | Checks that mlogit, survival, openxlsx, data.table, jsonlite are installed |
+| **Optional packages** | Checks bayesm (for HB/Latent Class) and coda, reports status but does not fail |
+| **JS syntax** | Runs `node --check` on JavaScript files if Node.js is available |
+| **TRS infrastructure** | Confirms the refusal system (conjoint_refuse, refusal handler) is loaded |
+
+### When to Run It
+
+- **Before your first analysis** on a new machine or after updating Turas.
+- **After updating packages** to verify nothing was broken.
+- **When troubleshooting** an analysis that fails unexpectedly.
+
+The pre-flight check runs in seconds and provides clear pass/fail output for each component.
+
+---
+
+## 14. Potential Issues and Troubleshooting
 
 ### Perfect Separation
 
@@ -1008,9 +1295,45 @@ Make sure the **cleaned** level names match what you specify in the Attributes s
 3. Use `estimation_method = "clogit"` which is less memory-intensive than mlogit.
 4. Close other R sessions and memory-intensive applications.
 
+### WTP Not Appearing in Output
+
+**Cause:** No price attribute was detected.
+
+**Solutions:**
+
+1. Check that one of your attributes has "price", "cost", or "fee" in its name (auto-detection is case-insensitive).
+2. If your price attribute has an unusual name, set `wtp_price_attribute` explicitly in the config.
+3. Ensure the price attribute has numeric level values.
+
+### Scale Factor Has No Effect
+
+**Cause:** Scale factor only applies to the Market Shares and Revenue tabs in the HTML simulator.
+
+**Solutions:**
+
+1. Confirm you are on the Market Shares or Revenue tab.
+2. At 1.0 (default), there is no change. Move the slider above or below 1.0 to see an effect.
+
+### HTML Report Not Generated
+
+**Solutions:**
+
+1. Set `generate_html_report = TRUE` in the Settings sheet.
+2. Ensure jsonlite is installed: `install.packages("jsonlite")`.
+3. Run `conjoint_preflight()` to check for missing files or packages.
+
+### Revenue Tab Not Appearing
+
+**Cause:** The Revenue tab only appears when a price attribute is detected.
+
+**Solutions:**
+
+1. Ensure your study includes a price attribute (auto-detected or set via `wtp_price_attribute`).
+2. Price levels must contain numeric values.
+
 ---
 
-## 12. Package Dependencies
+## 15. Package Dependencies
 
 The following R packages are required or optional for the Turas Conjoint Module.
 
@@ -1042,6 +1365,7 @@ The following R packages are required or optional for the Turas Conjoint Module.
 | Package | Purpose | When Needed |
 |---------|---------|-------------|
 | **jsonlite** | JSON encoding for HTML report data embedding | `generate_html_report = TRUE` |
+| **base64enc** | Base64 encoding for config-driven slide images | `include_custom_images = TRUE` |
 
 ### Installing All Dependencies
 
@@ -1056,7 +1380,7 @@ install.packages(c("bayesm", "coda"))
 install.packages("haven")
 
 # HTML report (optional)
-install.packages("jsonlite")
+install.packages(c("jsonlite", "base64enc"))
 ```
 
 ---
@@ -1064,6 +1388,10 @@ install.packages("jsonlite")
 ## Validation Checklist
 
 Before running your analysis, verify the following:
+
+### Pre-flight
+
+- [ ] Run `conjoint_preflight(verbose = TRUE)` and confirm all checks pass.
 
 ### Configuration
 
@@ -1087,7 +1415,14 @@ Before running your analysis, verify the following:
 - [ ] Output directory exists.
 - [ ] No existing output file is locked/open in another application.
 
+### HTML Report (if enabled)
+
+- [ ] `generate_html_report` is set to `TRUE`.
+- [ ] jsonlite package is installed.
+- [ ] If using custom slides with images: `include_custom_slides = TRUE` and `include_custom_images = TRUE`.
+- [ ] If you want revenue simulation: verify a price attribute is present.
+
 ---
 
-**Turas Conjoint Module v3.0.0**
+**Turas Conjoint Module v3.1.0**
 **The Research LampPost (Pty) Ltd**

@@ -36,7 +36,7 @@
 # - cmdstanr (optional, for HB)
 # ==============================================================================
 
-MAXDIFF_VERSION <- "11.0"
+MAXDIFF_VERSION <- "11.1"
 
 # ==============================================================================
 # TRS GUARD LAYER (Must be first)
@@ -351,8 +351,16 @@ run_maxdiff_impl <- function(config_path, project_root = NULL, verbose = TRUE) {
 
   results <- if (config$mode == "DESIGN") {
     run_maxdiff_design_mode(config, verbose, trs_state)
-  } else {
+  } else if (config$mode == "ANALYSIS") {
     run_maxdiff_analysis_mode(config, verbose, trs_state)
+  } else {
+    maxdiff_refuse(
+      code = "CFG_INVALID_MODE",
+      title = "Invalid Mode",
+      problem = sprintf("Unrecognised mode: '%s'", config$mode),
+      why_it_matters = "Mode must be DESIGN or ANALYSIS",
+      how_to_fix = "Set Mode to DESIGN or ANALYSIS in the PROJECT_SETTINGS sheet"
+    )
   }
 
   # ==========================================================================
@@ -522,7 +530,11 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
     cat("--------------------------------------------------------------------------------\n")
   }
 
-  warnings_list <- character()
+  # Use an environment for warnings_list so tryCatch error handlers can append
+  # (plain <- inside error handler creates a local copy that is discarded)
+  .warn_env <- new.env(parent = emptyenv())
+  .warn_env$warnings_list <- character()
+  add_warning <- function(msg) .warn_env$warnings_list <- c(.warn_env$warnings_list, msg)
 
   # ==========================================================================
   # STEP 2: LOAD DESIGN FILE
@@ -615,7 +627,7 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
     )
   }
 
-  warnings_list <- c(warnings_list, data_validation$warnings)
+  add_warning( data_validation$warnings)
 
   # ==========================================================================
   # STEP 5: RESHAPE TO LONG FORMAT
@@ -668,7 +680,7 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
       )
     }, error = function(e) {
       message(sprintf("[TRS PARTIAL] MAXD_COUNT_SCORE_FAILED: Count score computation failed: %s", conditionMessage(e)))
-      warnings_list <- c(warnings_list, sprintf("Count scores: %s", conditionMessage(e)))
+      add_warning( sprintf("Count scores: %s", conditionMessage(e)))
       NULL
     })
   }
@@ -696,7 +708,7 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
       }
     }, error = function(e) {
       message(sprintf("[TRS PARTIAL] MAXD_LOGIT_FAILED: Logit model failed: %s", conditionMessage(e)))
-      warnings_list <- c(warnings_list, sprintf("Logit model: %s", conditionMessage(e)))
+      add_warning( sprintf("Logit model: %s", conditionMessage(e)))
       NULL
     })
 
@@ -729,7 +741,7 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
       )
     }, error = function(e) {
       message(sprintf("[TRS PARTIAL] MAXD_HB_FAILED: HB model failed: %s", conditionMessage(e)))
-      warnings_list <- c(warnings_list, sprintf("HB model: %s", conditionMessage(e)))
+      add_warning( sprintf("HB model: %s", conditionMessage(e)))
       NULL
     })
 
@@ -767,7 +779,7 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
       )
     }, error = function(e) {
       message(sprintf("[TRS PARTIAL] MAXD_SEGMENT_FAILED: Segment analysis failed: %s", conditionMessage(e)))
-      warnings_list <- c(warnings_list, sprintf("Segments: %s", conditionMessage(e)))
+      add_warning( sprintf("Segments: %s", conditionMessage(e)))
       NULL
     })
   }
@@ -793,7 +805,7 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
       generate_maxdiff_charts(results_for_charts, config, verbose)
     }, error = function(e) {
       message(sprintf("[TRS PARTIAL] MAXD_CHART_FAILED: Chart generation failed: %s", conditionMessage(e)))
-      warnings_list <- c(warnings_list, sprintf("Charts: %s", conditionMessage(e)))
+      add_warning( sprintf("Charts: %s", conditionMessage(e)))
       NULL
     })
   }
@@ -822,7 +834,7 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
       )
     }, error = function(e) {
       message(sprintf("[TRS PARTIAL] MAXD_TURF_FAILED: TURF analysis failed: %s", conditionMessage(e)))
-      warnings_list <- c(warnings_list, sprintf("TURF: %s", conditionMessage(e)))
+      add_warning( sprintf("TURF: %s", conditionMessage(e)))
       NULL
     })
   }
@@ -853,7 +865,7 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
       )
     }, error = function(e) {
       message(sprintf("[TRS PARTIAL] MAXD_ANCHOR_FAILED: Anchor processing failed: %s", conditionMessage(e)))
-      warnings_list <- c(warnings_list, sprintf("Anchor: %s", conditionMessage(e)))
+      add_warning( sprintf("Anchor: %s", conditionMessage(e)))
       NULL
     })
   }
@@ -878,8 +890,8 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
   # ==========================================================================
   # TRS: Log PARTIAL events for any warnings (before output generation)
   # ==========================================================================
-  if (!is.null(trs_state) && length(warnings_list) > 0) {
-    for (warn in warnings_list) {
+  if (!is.null(trs_state) && length(.warn_env$warnings_list) > 0) {
+    for (warn in .warn_env$warnings_list) {
       if (exists("turas_run_state_partial", mode = "function")) {
         turas_run_state_partial(
           trs_state,
@@ -920,7 +932,7 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
     anchor_data = anchor_data,
     discrimination_data = discrimination_data,
     chart_paths = chart_paths,
-    warnings = warnings_list,
+    warnings = .warn_env$warnings_list,
     run_result = run_result
   )
 
@@ -960,7 +972,7 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
       }
     }, error = function(e) {
       message(sprintf("[TRS PARTIAL] MAXD_HTML_FAILED: HTML report failed: %s", conditionMessage(e)))
-      warnings_list <- c(warnings_list, sprintf("HTML report: %s", conditionMessage(e)))
+      add_warning( sprintf("HTML report: %s", conditionMessage(e)))
     })
   }
 
@@ -990,7 +1002,7 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
       }
     }, error = function(e) {
       message(sprintf("[TRS PARTIAL] MAXD_SIM_FAILED: Simulator failed: %s", conditionMessage(e)))
-      warnings_list <- c(warnings_list, sprintf("Simulator: %s", conditionMessage(e)))
+      add_warning( sprintf("Simulator: %s", conditionMessage(e)))
     })
   }
 
@@ -998,11 +1010,11 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
   # WARNINGS SUMMARY
   # ==========================================================================
 
-  if (length(warnings_list) > 0 && verbose) {
+  if (length(.warn_env$warnings_list) > 0 && verbose) {
     cat("\n")
     cat("WARNINGS:\n")
-    for (i in seq_along(warnings_list)) {
-      cat(sprintf("  %d. %s\n", i, warnings_list[i]))
+    for (i in seq_along(.warn_env$warnings_list)) {
+      cat(sprintf("  %d. %s\n", i, .warn_env$warnings_list[i]))
     }
   }
 

@@ -7,16 +7,7 @@
 # All output is a self-contained HTML string — no htmltools dependency.
 # ==============================================================================
 
-htmlEscape <- function(x) {
-  x <- as.character(x)
-  x <- gsub("&", "&amp;", x, fixed = TRUE)
-  x <- gsub("<", "&lt;", x, fixed = TRUE)
-  x <- gsub(">", "&gt;", x, fixed = TRUE)
-  x <- gsub('"', "&quot;", x, fixed = TRUE)
-  x
-}
-
-`%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
+# htmlEscape() and %||% are defined in 01_data_transformer.R (loaded first by 99_html_report_main.R)
 
 
 # ==============================================================================
@@ -40,13 +31,109 @@ md_resolve_logo_uri <- function(logo_path) {
       gif = "image/gif",
       "image/png"
     )
-    if (requireNamespace("base64enc", quietly = TRUE)) {
-      base64enc::dataURI(file = logo_path, mime = mime)
+    raw_data <- readBin(logo_path, "raw", file.info(logo_path)$size)
+    b64 <- if (requireNamespace("base64enc", quietly = TRUE)) {
+      base64enc::base64encode(raw_data)
+    } else if (requireNamespace("jsonlite", quietly = TRUE)) {
+      jsonlite::base64_enc(raw_data)
     } else {
-      raw_data <- readBin(logo_path, "raw", file.info(logo_path)$size)
-      paste0("data:", mime, ";base64,", base64enc::base64encode(raw_data))
+      return(NULL)  # No base64 encoder available
     }
+    paste0("data:", mime, ";base64,", b64)
   }, error = function(e) NULL)
+}
+
+
+# ==============================================================================
+# PANEL IMAGES HELPER
+# ==============================================================================
+
+#' Build embedded images HTML for a specific panel
+#'
+#' Checks html_data$images for images keyed to the given panel name,
+#' converts each to base64, and wraps in a styled container with caption.
+#'
+#' @param images_list Named list where keys are panel names and values are
+#'   lists with \code{path} and optional \code{caption}
+#' @param panel_name Character string identifying the panel (e.g. "summary")
+#'
+#' @return Character string of HTML, or "" if no images for this panel
+#' @keywords internal
+build_panel_images <- function(images_list, panel_name) {
+  if (is.null(images_list)) return("")
+  panel_images <- images_list[[panel_name]]
+  if (is.null(panel_images)) return("")
+
+  # Normalise: if a single image (list with $path), wrap in a list
+
+  if (!is.null(panel_images$path)) {
+    panel_images <- list(panel_images)
+  }
+
+  img_blocks <- vapply(panel_images, function(img) {
+    uri <- md_resolve_logo_uri(img$path)
+    if (is.null(uri)) return("")
+    caption_html <- ""
+    if (!is.null(img$caption) && nzchar(img$caption)) {
+      caption_html <- sprintf(
+        '<div class="md-image-caption">%s</div>',
+        htmlEscape(img$caption)
+      )
+    }
+    sprintf(
+      '<div class="md-image-container"><img src="%s" alt="%s" class="md-embedded-image"/>%s</div>',
+      uri,
+      htmlEscape(img$caption %||% "Embedded image"),
+      caption_html
+    )
+  }, character(1))
+
+  paste(img_blocks[nzchar(img_blocks)], collapse = "\n")
+}
+
+
+# ==============================================================================
+# CUSTOM SLIDE BUILDER
+# ==============================================================================
+
+#' Build a custom slide panel from config$slides row
+#'
+#' @param slide A single-row list/data.frame with Title, Content,
+#'   and optional Image_Path
+#' @param config Module configuration
+#'
+#' @return Character string of panel HTML
+#' @keywords internal
+build_custom_slide_panel <- function(slide, config) {
+
+  title <- htmlEscape(slide$Title %||% "Custom Slide")
+  content <- slide$Content %||% ""
+  slide_id <- tolower(gsub("[^a-z0-9]", "-", tolower(slide$Title %||% "slide"), perl = TRUE))
+  slide_id <- paste0("custom-", slide_id)
+
+  # Embed image if provided
+  image_html <- ""
+  img_path <- slide$Image_Path %||% ""
+  if (nzchar(img_path)) {
+    uri <- md_resolve_logo_uri(img_path)
+    if (!is.null(uri)) {
+      image_html <- sprintf(
+        '<div class="md-image-container"><img src="%s" alt="%s" class="md-embedded-image"/></div>',
+        uri, title
+      )
+    }
+  }
+
+  sprintf(
+    '<div class="md-panel" id="panel-%s">
+      <div class="md-section">
+        <h2>%s</h2>
+        <div class="md-slide-content">%s</div>
+        %s
+      </div>
+    </div>',
+    slide_id, title, content, image_html
+  )
 }
 
 
@@ -67,7 +154,9 @@ build_maxdiff_page <- function(html_data, tables, charts, config) {
 
   brand <- html_data$meta$brand_colour %||% "#323367"
   accent <- html_data$meta$accent_colour %||% "#CC9900"
-  project_name <- htmlEscape(html_data$meta$project_name %||% "MaxDiff Analysis")
+  # Humanize project name: replace underscores with spaces for display
+  raw_name <- html_data$meta$project_name %||% "MaxDiff Analysis"
+  project_name <- htmlEscape(gsub("_", " ", raw_name))
 
   css <- build_md_css(brand, accent)
   print_css <- build_md_print_css()
@@ -79,6 +168,7 @@ build_maxdiff_page <- function(html_data, tables, charts, config) {
   has_items <- !is.null(html_data$items$count_data)
   has_segments <- !is.null(html_data$segments)
   has_turf <- !is.null(html_data$turf)
+  has_methodology <- !is.null(html_data$methodology)
 
   # Build panels
   summary_panel <- build_summary_panel(html_data, tables, charts)
@@ -86,20 +176,48 @@ build_maxdiff_page <- function(html_data, tables, charts, config) {
   items_panel <- if (has_items) build_items_panel(html_data, tables, charts) else ""
   segments_panel <- if (has_segments) build_segments_panel(html_data, tables, charts) else ""
   turf_panel <- if (has_turf) build_turf_panel(html_data, tables, charts) else ""
+  methodology_panel <- if (has_methodology) build_methodology_panel(html_data) else ""
   diag_panel <- build_diagnostics_panel(html_data, tables, charts)
   about_panel <- build_md_about_panel(html_data$meta, config)
   help_overlay <- build_md_help_overlay()
 
-  # Build tab navigation
+  # Build custom slide panels from config$slides or config$custom_slides
+  slides_df <- config$slides %||% config$custom_slides %||% NULL
+  custom_panels <- character()
+  custom_tab_buttons <- character()
+  if (!is.null(slides_df) && is.data.frame(slides_df) && nrow(slides_df) > 0) {
+    for (i in seq_len(nrow(slides_df))) {
+      slide <- as.list(slides_df[i, , drop = FALSE])
+      slide_id <- tolower(gsub("[^a-z0-9]", "-", tolower(slide$Title %||% "slide"), perl = TRUE))
+      slide_id <- paste0("custom-", slide_id)
+      custom_panels <- c(custom_panels, build_custom_slide_panel(slide, config))
+      custom_tab_buttons <- c(custom_tab_buttons, sprintf(
+        '<button class="md-tab-btn" data-tab="%s">%s</button>',
+        slide_id, htmlEscape(slide$Title %||% "Slide")
+      ))
+    }
+  }
+
+  # Build tab navigation - core tabs first
   tab_buttons <- '<button class="md-tab-btn active" data-tab="summary">Summary</button>'
   if (has_preferences) tab_buttons <- paste0(tab_buttons, '\n<button class="md-tab-btn" data-tab="preferences">Preference Scores</button>')
   if (has_items) tab_buttons <- paste0(tab_buttons, '\n<button class="md-tab-btn" data-tab="items">Item Analysis</button>')
   if (has_turf) tab_buttons <- paste0(tab_buttons, '\n<button class="md-tab-btn" data-tab="turf">Portfolio (TURF)</button>')
   if (has_segments) tab_buttons <- paste0(tab_buttons, '\n<button class="md-tab-btn" data-tab="segments">Segments</button>')
+  if (has_methodology) tab_buttons <- paste0(tab_buttons, '\n<button class="md-tab-btn" data-tab="methodology">Methodology</button>')
   tab_buttons <- paste0(tab_buttons, '\n<button class="md-tab-btn" data-tab="diagnostics">Diagnostics</button>')
+
+  # Insert custom slide tab buttons (before About)
+  if (length(custom_tab_buttons) > 0) {
+    tab_buttons <- paste0(tab_buttons, "\n", paste(custom_tab_buttons, collapse = "\n"))
+  }
+
   tab_buttons <- paste0(tab_buttons, '\n<button class="md-tab-btn" data-tab="about">About</button>')
 
   js <- build_md_js()
+
+  # Combine custom panels into single string
+  custom_panels_html <- paste(custom_panels, collapse = "\n")
 
   # Assemble page
   sprintf('<!DOCTYPE html>
@@ -116,6 +234,8 @@ build_maxdiff_page <- function(html_data, tables, charts, config) {
 %s
 <div class="md-tab-nav">%s</div>
 <div class="md-container">
+%s
+%s
 %s
 %s
 %s
@@ -140,7 +260,9 @@ build_maxdiff_page <- function(html_data, tables, charts, config) {
     items_panel,
     turf_panel,
     segments_panel,
+    methodology_panel,
     diag_panel,
+    custom_panels_html,
     about_panel,
     help_overlay,
     format(Sys.Date(), "%B %Y"),
@@ -250,7 +372,7 @@ build_md_header <- function(html_data, config) {
 </div>
 </header>',
     logo_html, help_btn,
-    htmlEscape(meta$project_name %||% "MaxDiff Analysis"),
+    htmlEscape(gsub("_", " ", meta$project_name %||% "MaxDiff Analysis")),
     prepared_html, badge_html
   )
 }
@@ -389,6 +511,9 @@ build_summary_panel <- function(html_data, tables, charts) {
     )
   }
 
+  # Check for custom images for this panel
+  images_html <- build_panel_images(html_data$images, "summary")
+
   sprintf(
     '<div class="md-panel active" id="panel-summary">
       <div class="md-section">
@@ -396,9 +521,10 @@ build_summary_panel <- function(html_data, tables, charts) {
         %s
         %s
         %s
+        %s
       </div>
     </div>',
-    metrics, s$callout %||% "", chart_html
+    metrics, s$callout %||% "", chart_html, images_html
   )
 }
 
@@ -415,6 +541,9 @@ build_preferences_panel <- function(html_data, tables, charts) {
     )
   }
 
+  # Check for custom images for this panel
+  images_html <- build_panel_images(html_data$images, "preferences")
+
   sprintf(
     '<div class="md-panel" id="panel-preferences">
       <div class="md-section">
@@ -422,9 +551,10 @@ build_preferences_panel <- function(html_data, tables, charts) {
         %s
         %s
         %s
+        %s
       </div>
     </div>',
-    callout, pref_chart, pref_table
+    callout, pref_chart, pref_table, images_html
   )
 }
 
@@ -441,6 +571,9 @@ build_items_panel <- function(html_data, tables, charts) {
     )
   }
 
+  # Check for custom images for this panel
+  images_html <- build_panel_images(html_data$images, "items")
+
   sprintf(
     '<div class="md-panel" id="panel-items">
       <div class="md-section">
@@ -449,9 +582,10 @@ build_items_panel <- function(html_data, tables, charts) {
         %s
         <h3>Detailed Count Scores</h3>
         %s
+        %s
       </div>
     </div>',
-    callout, diverging_chart, count_table
+    callout, diverging_chart, count_table, images_html
   )
 }
 
@@ -468,6 +602,9 @@ build_turf_panel <- function(html_data, tables, charts) {
     )
   }
 
+  # Check for custom images for this panel
+  images_html <- build_panel_images(html_data$images, "turf")
+
   sprintf(
     '<div class="md-panel" id="panel-turf">
       <div class="md-section">
@@ -476,9 +613,10 @@ build_turf_panel <- function(html_data, tables, charts) {
         %s
         <h3>Greedy Selection Order</h3>
         %s
+        %s
       </div>
     </div>',
-    callout, turf_chart, turf_table
+    callout, turf_chart, turf_table, images_html
   )
 }
 
@@ -488,15 +626,30 @@ build_segments_panel <- function(html_data, tables, charts) {
   callout <- html_data$segments$callout %||% ""
   seg_table <- tables$segments %||% ""
 
+  # Segment chart (grouped bar chart)
+  seg_chart_html <- ""
+  if (!is.null(charts$segment_chart) && nzchar(charts$segment_chart)) {
+    seg_chart_html <- sprintf(
+      '<div class="md-chart-container"><div class="md-chart-title">Segment Comparison</div>%s</div>',
+      charts$segment_chart
+    )
+  }
+
+  # Check for custom images for this panel
+  images_html <- build_panel_images(html_data$images, "segments")
+
   sprintf(
     '<div class="md-panel" id="panel-segments">
       <div class="md-section">
         <h2>Segment Analysis</h2>
         %s
         %s
+        <h3>Detailed Scores by Segment</h3>
+        %s
+        %s
       </div>
     </div>',
-    callout, seg_table
+    callout, seg_chart_html, seg_table, images_html
   )
 }
 
@@ -506,15 +659,38 @@ build_diagnostics_panel <- function(html_data, tables, charts) {
   callout <- html_data$diagnostics$callout %||% ""
   diag_table <- tables$diagnostics %||% ""
 
+  # Check for custom images for this panel
+  images_html <- build_panel_images(html_data$images, "diagnostics")
+
   sprintf(
     '<div class="md-panel" id="panel-diagnostics">
       <div class="md-section">
         <h2>Model Diagnostics</h2>
         %s
         %s
+        %s
       </div>
     </div>',
-    callout, diag_table
+    callout, diag_table, images_html
+  )
+}
+
+
+build_methodology_panel <- function(html_data) {
+
+  m <- html_data$methodology
+  if (is.null(m)) return("")
+
+  content <- m$content %||% ""
+
+  sprintf(
+    '<div class="md-panel" id="panel-methodology">
+      <div class="md-section">
+        <h2>Methodology</h2>
+        <div class="md-card">%s</div>
+      </div>
+    </div>',
+    content
   )
 }
 
@@ -689,6 +865,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .md-help-key { font-weight: 600; color: var(--md-brand); min-width: 140px; flex-shrink: 0; }
 .md-help-dismiss { text-align: center; margin-top: 20px; font-size: 12px; color: #94a3b8; }
 
+/* === TABLE SORTING === */
+.md-th { cursor: pointer; user-select: none; }
+.md-th:hover { background: #eef2f7; }
+.md-th .sort-arrow { font-size: 10px; margin-left: 4px; opacity: 0.5; }
+
+/* === EMBEDDED IMAGES === */
+.md-image-container { margin: 16px 0; text-align: center; }
+.md-embedded-image { max-width: 100%; height: auto; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.md-image-caption { font-size: 12px; color: var(--md-text-secondary); margin-top: 6px; font-style: italic; }
+
+/* === CUSTOM SLIDES === */
+.md-slide-content { font-size: 14px; line-height: 1.7; color: var(--md-text-primary); }
+
 /* === FOOTER === */
 .md-footer { text-align: center; padding: 20px 40px; color: #94a3b8; font-size: 11px; border-top: 1px solid var(--md-border); }
 
@@ -744,6 +933,69 @@ build_md_js <- function() {
       this.classList.add("active");
       var panel = document.getElementById("panel-" + target);
       if (panel) panel.classList.add("active");
+    });
+  });
+
+  /* --- Table column sorting --- */
+  document.querySelectorAll(".md-th").forEach(function(th) {
+    th.addEventListener("click", function() {
+      var table = this.closest(".md-table");
+      if (!table) return;
+      var headerRow = this.parentElement;
+      var headers = Array.prototype.slice.call(headerRow.children);
+      var colIdx = headers.indexOf(this);
+      if (colIdx < 0) return;
+
+      var tbody = table.querySelector("tbody") || table;
+      var rows = Array.prototype.slice.call(tbody.querySelectorAll("tr")).filter(function(r) {
+        return r.querySelector("td") && !r.classList.contains("md-tr-section");
+      });
+      if (rows.length === 0) return;
+
+      /* Determine current sort direction */
+      var currentDir = this.getAttribute("data-sort-dir");
+      var newDir = (currentDir === "asc") ? "desc" : "asc";
+
+      /* Clear all sort arrows in this table */
+      headers.forEach(function(h) {
+        h.setAttribute("data-sort-dir", "");
+        var arrow = h.querySelector(".sort-arrow");
+        if (arrow) arrow.remove();
+      });
+
+      /* Set new direction and arrow */
+      this.setAttribute("data-sort-dir", newDir);
+      var arrowSpan = document.createElement("span");
+      arrowSpan.className = "sort-arrow";
+      arrowSpan.textContent = (newDir === "asc") ? " \\u25B2" : " \\u25BC";
+      this.appendChild(arrowSpan);
+
+      /* Detect if column is numeric */
+      var isNumeric = rows.every(function(row) {
+        var cell = row.children[colIdx];
+        if (!cell) return false;
+        var txt = cell.textContent.replace(/[,%$\\s]/g, "").trim();
+        return txt === "" || !isNaN(parseFloat(txt));
+      });
+
+      rows.sort(function(a, b) {
+        var aCell = a.children[colIdx];
+        var bCell = b.children[colIdx];
+        var aVal = aCell ? aCell.textContent.trim() : "";
+        var bVal = bCell ? bCell.textContent.trim() : "";
+
+        if (isNumeric) {
+          var aNum = parseFloat(aVal.replace(/[,%$\\s]/g, "")) || 0;
+          var bNum = parseFloat(bVal.replace(/[,%$\\s]/g, "")) || 0;
+          return (newDir === "asc") ? aNum - bNum : bNum - aNum;
+        } else {
+          var cmp = aVal.localeCompare(bVal);
+          return (newDir === "asc") ? cmp : -cmp;
+        }
+      });
+
+      /* Re-append sorted rows */
+      rows.forEach(function(row) { tbody.appendChild(row); });
     });
   });
 })();

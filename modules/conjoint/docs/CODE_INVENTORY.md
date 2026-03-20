@@ -1,512 +1,500 @@
 # Conjoint Module - Code Inventory
 
-**Version:** 3.1.0 **Generated:** 2026-03-19 **Module:** `modules/conjoint/`
+**Version:** 3.1.0
+**Generated:** 2026-03-20
+**Module:** `modules/conjoint/`
 
-------------------------------------------------------------------------
+---
 
-## 1. Module Overview
+## Summary
 
 | Metric | Value |
-|----|----|
-| Core R files (`R/`) | 19 |
+|---|---|
+| Core R files (`R/`) | 20 |
 | HTML Report R files (`lib/html_report/`) | 7 |
-| HTML Simulator R files (`lib/html_simulator/`) | 4 |
-| JavaScript files (report) | 7 |
-| JavaScript files (simulator) | 3 |
-| **Total source files** | **40** |
-| Total R functions | 232 |
-| Total R lines of code | 15,424 |
-| Total JS lines of code | 2,546 |
-| Total HTML report R lines | 3,183 |
-| Total HTML simulator R lines | 345 |
-| **Grand total LOC** | **18,776** (across R + JS + HTML/R) |
-| Test files | 14 |
+| **Total R source files** | **27** |
+| **Total functions** | **178** |
+| **Total lines of code** | **17,154** |
 
-------------------------------------------------------------------------
+---
 
-## 2. Core R Files
+## Core R Files (`modules/conjoint/R/`)
 
-| File | Purpose | Functions | Lines | Key Dependencies |
-|----|----|----|----|----|
-| `00_main.R` | Entry point, module loader, orchestration | 4 | 636 | dplyr, openxlsx, mlogit, dfidx, survival |
-| `00_guard.R` | TRS guard layer, validation gates, status helpers | 20 | 768 | shared/lib/trs_refusal.R |
-| `01_config.R` | Config loading, autodetect heading, validation | 5 | 814 | openxlsx |
-| `02_data.R` | Data loading, validation, statistics | 5 | 521 | dplyr, haven (optional) |
-| `03_estimation.R` | MNL/clogit/rating estimation with fallback | 9 | 681 | mlogit, dfidx, survival |
-| `04_utilities.R` | Part-worth utilities, importance, diagnostics | 7 | 540 | dplyr |
-| `05_alchemer_import.R` | Alchemer CBC data transformer | 12 | 937 | openxlsx |
-| `05_simulator.R` | Market share prediction, sensitivity, SOV, demand curves | 18 | 796 | (none beyond base R) |
-| `06_interactions.R` | Config-driven interaction effects | 16 | 650 | mlogit |
-| `07_output.R` | Excel workbook writer (8-11 sheets) | 14 | 1,231 | openxlsx |
-| `08_market_simulator.R` | Interactive Excel simulator sheet | 8 | 572 | openxlsx |
-| `09_none_handling.R` | None/opt-out detection and handling | 9 | 393 | dplyr |
-| `10_best_worst.R` | Best-worst scaling estimation | 10 | 496 | (reuses 03_estimation) |
-| `11_hierarchical_bayes.R` | Individual-level HB via bayesm MCMC | 10 | 847 | bayesm, coda (optional) |
-| `12_config_template.R` | Branded Excel config template generator | 16 | 747 | openxlsx |
-| `13_latent_class.R` | Latent class segmentation | 11 | 699 | bayesm |
-| `14_willingness_to_pay.R` | WTP with delta-method CIs | 8 | 444 | (none beyond base R) |
-| `15_product_optimizer.R` | Exhaustive/greedy product optimization | 5 | 343 | (none beyond base R) |
-| `99_helpers.R` | Shared utilities, stats, formatting, logging | 29 | 587 | openxlsx |
-| **Totals** |  | **206** | **12,702** |  |
+### 00_guard.R (774 lines)
 
-------------------------------------------------------------------------
+TRS guard layer: refusal handling, guard state, validation gates for conjoint module.
 
-## 3. HTML Report Files (`lib/html_report/`)
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `conjoint_refuse` | 95 | internal | Module-specific TRS refusal wrapper with conjoint error codes |
+| `conjoint_with_refusal_handler` | 129 | exported | Wraps main analysis expression with TRS error handling |
+| `conjoint_guard_init` | 148 | exported | Initialize conjoint-specific guard state with design/estimation fields |
+| `guard_record_design_issue` | 169 | internal | Record a design issue for an attribute in guard state |
+| `guard_record_estimation_warning` | 182 | internal | Record an estimation warning in guard state |
+| `guard_record_convergence` | 197 | internal | Record model convergence status in guard state |
+| `conjoint_guard_summary` | 217 | exported | Get summary of conjoint guard state with all issue types |
+| `validate_conjoint_config` | 243 | internal | Validate that config is a properly structured list |
+| `validate_conjoint_attributes` | 263 | internal | Validate attribute definitions (min 2 attrs, min 2 levels each) |
+| `validate_conjoint_design` | 323 | internal | Validate experimental design matrix existence and structure |
+| `validate_conjoint_convergence` | 356 | internal | Validate model convergence status |
+| `guard_check_data_exists` | 401 | internal | Quick pre-check that choice data exists and is non-empty |
+| `validate_hb_config` | 431 | internal | Validate HB-specific settings (iterations, burn-in, thinning, bayesm) |
+| `validate_latent_class_config` | 490 | internal | Validate latent class settings (min/max classes, criterion) |
+| `validate_html_config` | 548 | internal | Validate HTML output settings (brand/accent colour hex codes) |
+| `validate_wtp_config` | 584 | internal | Validate WTP settings (price attribute, method) |
+| `conjoint_status_pass` | 631 | exported | Create TRS PASS status with conjoint-specific details |
+| `conjoint_status_partial` | 649 | exported | Create TRS PARTIAL status with degradation reasons |
+| `conjoint_status_refuse` | 673 | exported | Create TRS REFUSE status for user-fixable issues |
+| `conjoint_determine_status` | 700 | exported | Determine final TRS status from guard state and model fit |
 
-| File | Purpose | Functions | Lines | Key Dependencies |
-|----|----|----|----|----|
-| `00_html_guard.R` | Input validation for HTML generation | 7 | 145 | (none) |
-| `01_data_transformer.R` | Transform conjoint results to HTML data model | 10 | 264 | jsonlite |
-| `02_table_builder.R` | Build HTML tables for each panel | 11 | 390 | (none) |
-| `03_page_builder.R` | Full page assembly: CSS, header, panels, JS | 18 | 1,401 | (none) |
-| `04_html_writer.R` | Write final HTML file to disk | 1 | 49 | (none) |
-| `05_chart_builder.R` | Inline SVG chart generation | 14 | 665 | (none) |
-| `99_html_report_main.R` | Top-level orchestrator for HTML report | 4 | 269 | jsonlite |
-| **Totals** |  | **65** | **3,183** |  |
+### 00_main.R (698 lines)
 
-------------------------------------------------------------------------
+Main entry point: sources all components, runs the full conjoint analysis pipeline.
 
-## 4. HTML Simulator Files (`lib/html_simulator/`)
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `.get_guard_dir` | 30 | internal | Resolve directory containing 00_guard.R |
+| `.source_trs_infrastructure` | 51 | internal | Source shared TRS run state management files |
+| `run_conjoint_analysis` | 316 | exported | Main entry point for conjoint analysis with optional pre-flight |
+| `run_conjoint_analysis_impl` | 351 | internal | Internal implementation of the full analysis pipeline |
+| `conjoint` | 698 | exported | Alias for run_conjoint_analysis |
 
-| File | Purpose | Functions | Lines |
-|----|----|----|----|
-| `00_simulator_guard.R` | Validate simulator inputs | 1 | 29 |
-| `01_simulator_data_transformer.R` | Build simulator JSON data | 2 | 101 |
-| `02_simulator_page_builder.R` | Assemble standalone simulator HTML | 3 | 141 |
-| `99_simulator_main.R` | Top-level orchestrator | 1 | 74 |
-| **Totals** |  | **7** | **345** |
+### 00_preflight.R (381 lines)
 
-------------------------------------------------------------------------
+Pre-flight validation: checks files, packages, JS syntax, TRS infrastructure before analysis.
 
-## 5. JavaScript Modules
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `conjoint_preflight` | 40 | exported | Run all pre-flight checks and report pass/fail summary |
+| `.preflight_find_module_dir` | 326 | internal | Auto-detect conjoint module R/ directory from working directory |
+| `.preflight_print_summary` | 344 | internal | Print formatted pre-flight summary table to console |
 
-### HTML Report JS (`lib/html_report/js/`)
+### 01_config.R (880 lines)
 
-| File | Purpose | Lines |
-|----|----|----|
-| `conjoint_charts.js` | Chart rendering (SVG toggle visibility) | 145 |
-| `conjoint_export.js` | PNG/CSV export from report panels | 342 |
-| `conjoint_navigation.js` | Tab switching, sidebar scroll, keyboard nav | 561 |
-| `conjoint_pins.js` | Pin items to pinned-items panel | 370 |
-| `simulator_charts.js` | Simulator bar chart rendering | 272 |
-| `simulator_engine.js` | MNL share calculation in browser | 201 |
-| `simulator_ui.js` | Simulator dropdowns, product config UI | 288 |
-| **Total** |  | **2,179** |
+Configuration loader: reads Excel config with autodetect heading, validates all settings.
 
-### Standalone Simulator JS (`lib/html_simulator/js/`)
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `find_config_header_row` | 37 | internal | Scan first 20 rows of sheet for expected column headers |
+| `.clean_settings_df` | 73 | internal | Remove help rows, section dividers, and empty rows from settings |
+| `load_conjoint_config` | 119 | exported | Load and validate conjoint config from Excel (.xlsx) file |
+| `validate_config` | 593 | internal | Validate settings and attributes (types, ranges, consistency) |
+| `resolve_config_path` | 845 | internal | Resolve relative/absolute file paths from config |
 
-| File                  | Purpose                              | Lines   |
-|-----------------------|--------------------------------------|---------|
-| `simulator_charts.js` | Bar chart for standalone simulator   | 86      |
-| `simulator_engine.js` | MNL engine for standalone simulator  | 104     |
-| `simulator_ui.js`     | UI controls for standalone simulator | 177     |
-| **Total**             |                                      | **367** |
+### 02_data.R (521 lines)
 
-------------------------------------------------------------------------
+Data loading and validation: loads CSV/XLSX/SAV/DTA, validates structure and quality.
 
-## 6. Complete Function Index
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `load_conjoint_data` | 36 | exported | Load and validate conjoint data with auto source detection |
+| `load_data_by_type` | 166 | internal | Load data file based on extension (CSV, XLSX, SAV, DTA) |
+| `validate_conjoint_data` | 219 | internal | Comprehensive validation: columns, choices, levels, separation |
+| `get_required_columns` | 459 | internal | Get list of required column names from config |
+| `calculate_data_statistics` | 475 | internal | Calculate respondent/choice set/selection rate statistics |
 
-Alphabetical listing of all 232 R functions across the module.
+### 03_estimation.R (681 lines)
 
-| Function | File | Line | Description |
-|----|----|----|----|
-| `.build_all_charts` | `lib/html_report/99_html_report_main.R` | 216 | Generate all SVG charts for HTML report |
-| `.build_all_tables` | `lib/html_report/99_html_report_main.R` | 152 | Generate all HTML tables for report |
-| `.build_callout` | `lib/html_report/03_page_builder.R` | 1260 | Build a styled callout box |
-| `.build_diagnostics_callouts` | `lib/html_report/03_page_builder.R` | 1272 | Build diagnostics insight callouts |
-| `.build_export_bar` | `lib/html_report/03_page_builder.R` | 1324 | Build export button bar for a panel |
-| `.build_sidebar_nav` | `lib/html_report/01_data_transformer.R` | 251 | Build sidebar navigation from utilities |
-| `.build_simulator_data` | `lib/html_report/01_data_transformer.R` | 153 | Build simulator JSON data for embedded sim |
-| `.build_summary` | `lib/html_report/01_data_transformer.R` | 80 | Build summary statistics object |
-| `.chr_load_conjoint_submodules` | `lib/html_report/99_html_report_main.R` | 45 | Source HTML report submodule files |
-| `.clean_settings_df` | `R/01_config.R` | 73 | Remove help/divider/empty rows from settings |
-| `.extract_about` | `lib/html_report/01_data_transformer.R` | 233 | Extract about page data from config |
-| `.extract_hb_data` | `lib/html_report/01_data_transformer.R` | 95 | Extract HB-specific data for HTML |
-| `.extract_insights` | `lib/html_report/01_data_transformer.R` | 218 | Extract analyst insight text from config |
-| `.extract_lc_data` | `lib/html_report/01_data_transformer.R` | 119 | Extract latent class data for HTML |
-| `.extract_wtp_data` | `lib/html_report/01_data_transformer.R` | 133 | Extract WTP data for HTML |
-| `.generate_class_palette` | `lib/html_report/05_chart_builder.R` | 595 | Generate colour palette for LC classes |
-| `.get_conjoint_js_dir` | `lib/html_report/03_page_builder.R` | 1371 | Resolve JS directory path |
-| `.get_conjoint_settings_definition` | `R/12_config_template.R` | 154 | Define all config settings with metadata |
-| `.get_guard_dir` | `R/00_main.R` | 30 | Resolve guard file directory |
-| `.get_method_template_overrides` | `R/12_config_template.R` | 699 | Get preset overrides for method templates |
-| `.html_esc` | `lib/html_report/03_page_builder.R` | 1393 | Escape HTML special characters |
-| `.html_escape` | `lib/html_report/02_table_builder.R` | 9 | Escape HTML entities in strings |
-| `.load_hb_diagnostics` | `R/11_hierarchical_bayes.R` | 37 | Load shared HB diagnostics module |
-| `.make_tpl_example_style` | `R/12_config_template.R` | 141 | Template example row style |
-| `.make_tpl_header_style` | `R/12_config_template.R` | 49 | Template header style (navy) |
-| `.make_tpl_help_style` | `R/12_config_template.R` | 91 | Template help text style |
-| `.make_tpl_input_style` | `R/12_config_template.R` | 83 | Template input cell style (yellow) |
-| `.make_tpl_locked_style` | `R/12_config_template.R` | 100 | Template locked/read-only cell style |
-| `.make_tpl_optional_label_style` | `R/12_config_template.R` | 132 | Template optional label style (green) |
-| `.make_tpl_optional_style` | `R/12_config_template.R` | 75 | Template optional row style |
-| `.make_tpl_required_label_style` | `R/12_config_template.R` | 123 | Template required label style (red) |
-| `.make_tpl_required_style` | `R/12_config_template.R` | 67 | Template required row style |
-| `.make_tpl_section_style` | `R/12_config_template.R` | 58 | Template section header style |
-| `.make_tpl_subtitle_style` | `R/12_config_template.R` | 116 | Template subtitle style |
-| `.make_tpl_title_style` | `R/12_config_template.R` | 109 | Template title style |
-| `.nice_tick_step` | `lib/html_report/05_chart_builder.R` | 397 | Calculate nice axis tick spacing |
-| `.source_trs_infrastructure` | `R/00_main.R` | 51 | Source shared TRS run-state files |
-| `.svg_axis_label` | `lib/html_report/05_chart_builder.R` | 28 | SVG axis label element |
-| `.svg_gridline` | `lib/html_report/05_chart_builder.R` | 21 | SVG gridline element |
-| `.svg_value_label` | `lib/html_report/05_chart_builder.R` | 35 | SVG value label element |
-| `.svg_wrap` | `lib/html_report/05_chart_builder.R` | 14 | Wrap SVG content in container div |
-| `.validate_colours` | `lib/html_report/00_html_guard.R` | 119 | Validate hex colour codes |
-| `.validate_importance` | `lib/html_report/00_html_guard.R` | 78 | Validate importance data frame |
-| `.validate_insights` | `lib/html_report/00_html_guard.R` | 133 | Validate insight text fields |
-| `.validate_model_result` | `lib/html_report/00_html_guard.R` | 91 | Validate model result structure |
-| `.validate_utilities` | `lib/html_report/00_html_guard.R` | 59 | Validate utilities data frame |
-| `.validate_wtp` | `lib/html_report/00_html_guard.R` | 104 | Validate WTP data structure |
-| `add_interactions_to_config` | `R/06_interactions.R` | 198 | Add interaction attributes to config |
-| `analyze_interaction` | `R/06_interactions.R` | 302 | Analyze interaction coefficients |
-| `assess_hit_rate` | `R/99_helpers.R` | 333 | Interpret hit rate quality |
-| `assess_mcfadden_r2` | `R/99_helpers.R` | 302 | Interpret McFadden R-squared |
-| `build_bic_chart` | `lib/html_report/05_chart_builder.R` | 220 | SVG BIC comparison chart for LC |
-| `build_class_importance_chart` | `lib/html_report/05_chart_builder.R` | 506 | SVG grouped bar chart for class importance |
-| `build_class_importance_table` | `lib/html_report/02_table_builder.R` | 290 | HTML table of class-level importance |
-| `build_class_size_chart` | `lib/html_report/05_chart_builder.R` | 618 | SVG donut chart for class sizes |
-| `build_conjoint_css` | `lib/html_report/03_page_builder.R` | 122 | Generate full CSS stylesheet |
-| `build_conjoint_header` | `lib/html_report/03_page_builder.R` | 543 | Build HTML header with branding |
-| `build_conjoint_js` | `lib/html_report/03_page_builder.R` | 1343 | Assemble all JS into script block |
-| `build_conjoint_meta` | `lib/html_report/03_page_builder.R` | 99 | Build HTML meta tags |
-| `build_conjoint_page` | `lib/html_report/03_page_builder.R` | 21 | Assemble complete HTML page |
-| `build_conjoint_print_css` | `lib/html_report/03_page_builder.R` | 502 | Print-specific CSS rules |
-| `build_convergence_table` | `lib/html_report/02_table_builder.R` | 137 | HTML table of HB convergence metrics |
-| `build_demand_curve_chart` | `lib/html_report/05_chart_builder.R` | 415 | SVG demand curve line chart |
-| `build_demand_table` | `lib/html_report/02_table_builder.R` | 258 | HTML table of demand curve data |
-| `build_formula_with_interactions` | `R/06_interactions.R` | 521 | Build mlogit formula including interactions |
-| `build_help_overlay` | `lib/html_report/03_page_builder.R` | 1205 | Build keyboard shortcut help overlay |
-| `build_importance_chart` | `lib/html_report/05_chart_builder.R` | 55 | SVG horizontal bar chart for importance |
-| `build_importance_table` | `lib/html_report/02_table_builder.R` | 22 | HTML table of attribute importance |
-| `build_insight_area` | `lib/html_report/03_page_builder.R` | 1232 | Editable insight text area for a panel |
-| `build_interaction_formula` | `R/06_interactions.R` | 273 | Build formula with interaction-only terms |
-| `build_latent_class_result` | `R/13_latent_class.R` | 553 | Assemble LC result into standard model object |
-| `build_lc_comparison_table` | `lib/html_report/02_table_builder.R` | 171 | HTML table of K-class BIC/AIC comparison |
-| `build_mlogit_formula` | `R/03_estimation.R` | 359 | Build mlogit formula from config attributes |
-| `build_model_fit_table` | `lib/html_report/02_table_builder.R` | 95 | HTML table of model fit statistics |
-| `build_product_design_vector` | `R/05_simulator.R` | 571 | Build binary design vector for HB simulation |
-| `build_report_tab_nav` | `lib/html_report/03_page_builder.R` | 613 | Build tab navigation bar |
-| `build_respondent_quality_table` | `lib/html_report/02_table_builder.R` | 354 | HTML table of respondent RLH quality |
-| `build_simulator_css` | `lib/html_simulator/02_simulator_page_builder.R` | 101 | CSS for standalone simulator |
-| `build_simulator_data` | `lib/html_simulator/01_simulator_data_transformer.R` | 19 | Build standalone simulator data |
-| `build_simulator_page` | `lib/html_simulator/02_simulator_page_builder.R` | 16 | Assemble standalone simulator HTML |
-| `build_utilities_table` | `lib/html_report/02_table_builder.R` | 49 | HTML table of part-worth utilities |
-| `build_utility_chart` | `lib/html_report/05_chart_builder.R` | 124 | SVG horizontal bar chart per attribute |
-| `build_wtp_chart` | `lib/html_report/05_chart_builder.R` | 294 | SVG WTP bar chart with error bars |
-| `build_wtp_table` | `lib/html_report/02_table_builder.R` | 203 | HTML table of WTP values |
-| `build_about_panel` | `lib/html_report/03_page_builder.R` | 1081 | Build About/contact panel |
-| `build_diagnostics_panel` | `lib/html_report/03_page_builder.R` | 791 | Build diagnostics panel |
-| `build_lc_panel` | `lib/html_report/03_page_builder.R` | 869 | Build latent class panel |
-| `build_overview_panel` | `lib/html_report/03_page_builder.R` | 655 | Build overview panel |
-| `build_pinned_panel` | `lib/html_report/03_page_builder.R` | 1141 | Build pinned items panel |
-| `build_simulator_panel` | `lib/html_report/03_page_builder.R` | 1011 | Build embedded simulator panel |
-| `build_slides_panel` | `lib/html_report/03_page_builder.R` | 1173 | Build slides panel |
-| `build_utilities_panel` | `lib/html_report/03_page_builder.R` | 709 | Build utilities panel |
-| `build_wtp_panel` | `lib/html_report/03_page_builder.R` | 942 | Build WTP panel |
-| `calculate_aggregate_wtp` | `R/14_willingness_to_pay.R` | 265 | WTP table with delta-method CIs |
-| `calculate_attribute_diagnostics` | `R/04_utilities.R` | 515 | Per-attribute significance and range |
-| `calculate_attribute_importance` | `R/04_utilities.R` | 188 | Relative importance from utility ranges |
-| `calculate_attribute_importance_hb` | `R/11_hierarchical_bayes.R` | 722 | Individual-level importance, then average |
-| `calculate_best_worst_diagnostics` | `R/10_best_worst.R` | 401 | BWS model fit statistics |
-| `calculate_best_worst_utilities` | `R/10_best_worst.R` | 364 | Extract utilities from BWS model |
-| `calculate_choice_fit_stats` | `R/04_utilities.R` | 295 | McFadden R-squared, AIC, BIC, hit rate |
-| `calculate_ci` | `R/99_helpers.R` | 190 | Normal-approximation confidence interval |
-| `calculate_data_statistics` | `R/02_data.R` | 475 | Respondent counts, selection rates |
-| `calculate_entropy_r2` | `R/13_latent_class.R` | 496 | Classification quality metric for LC |
-| `calculate_hit_rate` | `R/04_utilities.R` | 354 | Prediction accuracy for mlogit/clogit |
-| `calculate_individual_wtp` | `R/14_willingness_to_pay.R` | 327 | Per-respondent WTP from HB betas |
-| `calculate_lc_log_likelihood` | `R/13_latent_class.R` | 451 | Point-estimate log-likelihood for LC |
-| `calculate_model_diagnostics` | `R/04_utilities.R` | 238 | Comprehensive model diagnostics |
-| `calculate_none_diagnostics` | `R/09_none_handling.R` | 367 | None-option specific statistics |
-| `calculate_product_utility` | `R/05_simulator.R` | 124 | Sum utilities for a product configuration |
-| `calculate_respondent_rlh` | `R/11_hierarchical_bayes.R` | 532 | Root-likelihood quality per respondent |
-| `calculate_utilities` | `R/04_utilities.R` | 25 | Extract part-worth utilities from model |
-| `calculate_wtp` | `R/14_willingness_to_pay.R` | 49 | Main WTP calculation entry point |
-| `check_hb_requirements` | `R/11_hierarchical_bayes.R` | 71 | Check bayesm/coda availability |
-| `check_perfect_separation` | `R/99_helpers.R` | 361 | Detect always/never chosen levels |
-| `clean_alchemer_level` | `R/05_alchemer_import.R` | 372 | Clean Alchemer compound level names |
-| `clean_levels_with_config` | `R/05_alchemer_import.R` | 427 | Apply custom cleaning rules to levels |
-| `compare_class_solutions` | `R/13_latent_class.R` | 523 | Add delta columns to LC comparison table |
-| `compare_scenarios` | `R/05_simulator.R` | 331 | Compare multiple product scenarios |
-| `compute_class_probabilities` | `R/13_latent_class.R` | 377 | Softmax on distances for class probs |
-| `conjoint` | `R/00_main.R` | 636 | Alias for run_conjoint_analysis |
-| `conjoint_determine_status` | `R/00_guard.R` | 694 | Final TRS status from guard state |
-| `conjoint_guard_init` | `R/00_guard.R` | 148 | Initialize conjoint guard state |
-| `conjoint_guard_summary` | `R/00_guard.R` | 217 | Summarize guard state |
-| `conjoint_refuse` | `R/00_guard.R` | 95 | Module-specific TRS refusal |
-| `conjoint_status_partial` | `R/00_guard.R` | 644 | Create PARTIAL status |
-| `conjoint_status_pass` | `R/00_guard.R` | 626 | Create PASS status |
-| `conjoint_status_refuse` | `R/00_guard.R` | 668 | Create REFUSE status |
-| `conjoint_with_refusal_handler` | `R/00_guard.R` | 129 | Wrap expression with TRS error handling |
-| `convert_best_worst_to_choice` | `R/10_best_worst.R` | 133 | Convert BWS to standard choice format |
-| `create_best_worst_template` | `R/10_best_worst.R` | 456 | Generate empty BWS data template |
-| `create_class_comparison_sheet` | `R/07_output.R` | 978 | Excel sheet: LC K-comparison |
-| `create_class_membership_sheet` | `R/07_output.R` | 1191 | Excel sheet: respondent class membership |
-| `create_class_profiles_sheet` | `R/07_output.R` | 1077 | Excel sheet: class-level utilities |
-| `create_config_from_alchemer` | `R/05_alchemer_import.R` | 794 | Auto-generate config from Alchemer data |
-| `create_configuration_sheet` | `R/07_output.R` | 539 | Excel sheet: study configuration |
-| `create_data_summary_sheet` | `R/07_output.R` | 484 | Excel sheet: response statistics |
-| `create_error` | `R/99_helpers.R` | 57 | Format error message |
-| `create_hb_diagnostics_sheet` | `R/07_output.R` | 693 | Excel sheet: MCMC convergence |
-| `create_header_style` | `R/99_helpers.R` | 390 | Standard Excel header style |
-| `create_importance_sheet` | `R/07_output.R` | 421 | Excel sheet: attribute importance |
-| `create_individual_utilities_sheet` | `R/07_output.R` | 577 | Excel sheet: per-respondent utilities |
-| `create_interaction_terms` | `R/06_interactions.R` | 174 | Add interaction columns to data |
-| `create_market_simulator_sheet` | `R/08_market_simulator.R` | 30 | Build interactive Excel simulator |
-| `create_negative_style` | `R/99_helpers.R` | 415 | Red cell style for Excel |
-| `create_none_rows` | `R/09_none_handling.R` | 267 | Create explicit none alternative rows |
-| `create_positive_style` | `R/99_helpers.R` | 405 | Green cell style for Excel |
-| `create_raw_coefficients_sheet` | `R/07_output.R` | 338 | Excel sheet: raw model coefficients |
-| `create_respondent_quality_sheet` | `R/07_output.R` | 844 | Excel sheet: RLH quality scores |
-| `create_simulator_data_sheet` | `R/08_market_simulator.R` | 499 | Hidden lookup sheet for simulator |
-| `create_title_style` | `R/99_helpers.R` | 425 | Title cell style for Excel |
-| `create_utilities_sheet` | `R/07_output.R` | 443 | Excel sheet: part-worth utilities |
-| `create_utility_chart_data_sheet` | `R/07_output.R` | 180 | Excel sheet: chart-ready data |
-| `create_warning` | `R/99_helpers.R` | 68 | Format warning message |
-| `detect_none_option` | `R/09_none_handling.R` | 26 | Auto-detect none/opt-out in data |
-| `escape_attr_for_formula` | `R/99_helpers.R` | 557 | Backtick-wrap special-char attributes |
-| `escape_attr_for_regex` | `R/99_helpers.R` | 574 | Escape regex metacharacters in attr names |
-| `estimate_auto_method` | `R/03_estimation.R` | 104 | Try mlogit then clogit fallback |
-| `estimate_best_worst_model` | `R/10_best_worst.R` | 191 | Main BWS estimation entry point |
-| `estimate_best_worst_sequential` | `R/10_best_worst.R` | 254 | Separate best/worst models, combine |
-| `estimate_best_worst_simultaneous` | `R/10_best_worst.R` | 324 | Joint best-worst estimation |
-| `estimate_choice_model` | `R/03_estimation.R` | 33 | Main estimation dispatcher |
-| `estimate_hierarchical_bayes` | `R/11_hierarchical_bayes.R` | 221 | HB estimation via bayesm MCMC |
-| `estimate_latent_class` | `R/13_latent_class.R` | 46 | Fit LC models for K=min..max |
-| `estimate_mlogit_with_interactions` | `R/06_interactions.R` | 221 | mlogit with interaction terms |
-| `estimate_price_coefficient` | `R/14_willingness_to_pay.R` | 126 | Regress utilities on numeric prices |
-| `estimate_price_coefficient_se` | `R/14_willingness_to_pay.R` | 179 | SE of price coefficient |
-| `estimate_rating_based_conjoint` | `R/03_estimation.R` | 616 | OLS for rating-based designs |
-| `estimate_with_clogit` | `R/03_estimation.R` | 494 | clogit fallback estimation |
-| `estimate_with_interactions` | `R/06_interactions.R` | 121 | Estimate model with interaction effects |
-| `estimate_with_mlogit` | `R/03_estimation.R` | 160 | Primary mlogit estimation |
-| `evaluate_product` | `R/15_product_optimizer.R` | 262 | Score a product against objective |
-| `excel_to_product` | `R/05_simulator.R` | 469 | Convert Excel selections to product list |
-| `extract_attribute_utilities` | `R/04_utilities.R` | 92 | Extract utilities for one attribute |
-| `extract_clogit_results` | `R/03_estimation.R` | 566 | Standardize clogit output |
-| `extract_hb_results` | `R/11_hierarchical_bayes.R` | 306 | Process bayesm output into standard form |
-| `extract_hb_utilities` | `R/11_hierarchical_bayes.R` | 621 | Convert HB betas to utilities data frame |
-| `extract_lc_solution` | `R/13_latent_class.R` | 205 | Extract solution for a given K |
-| `extract_lc_utilities` | `R/13_latent_class.R` | 656 | Aggregate and class-level utilities |
-| `extract_mlogit_results` | `R/03_estimation.R` | 422 | Standardize mlogit output |
-| `extract_numeric_prices` | `R/14_willingness_to_pay.R` | 208 | Parse numeric values from price labels |
-| `find_config_header_row` | `R/01_config.R` | 37 | Autodetect header row in config sheet |
-| `fit_latent_class_k` | `R/13_latent_class.R` | 154 | Fit single K-class model |
-| `format_interaction` | `R/06_interactions.R` | 641 | Format interaction term for display |
-| `format_p_value` | `R/99_helpers.R` | 215 | Format p-value for display |
-| `format_product` | `R/05_simulator.R` | 479 | Format product config as string |
-| `generate_conjoint_config_template` | `R/12_config_template.R` | 281 | Generate branded Excel config template |
-| `generate_conjoint_html_report` | `lib/html_report/99_html_report_main.R` | 93 | Main HTML report generator |
-| `generate_conjoint_html_simulator` | `lib/html_simulator/99_simulator_main.R` | 36 | Main standalone simulator generator |
-| `generate_demand_curve` | `R/05_simulator.R` | 765 | Sweep price levels for demand curve |
-| `get_alchemer_attributes` | `R/05_alchemer_import.R` | 753 | Extract attribute summary from data |
-| `get_attribute_levels` | `R/99_helpers.R` | 157 | Get levels for an attribute from config |
-| `get_conjoint_version` | `R/99_helpers.R` | 585 | Return module version string |
-| `get_interaction_terms` | `R/06_interactions.R` | 627 | Get interaction terms from model |
-| `get_product_cost` | `R/15_product_optimizer.R` | 320 | Look up product cost from cost data |
-| `get_product_price` | `R/15_product_optimizer.R` | 306 | Extract numeric price from product |
-| `get_required_columns` | `R/02_data.R` | 459 | List required data columns |
-| `get_significance_stars` | `R/99_helpers.R` | 227 | Convert p-value to significance stars |
-| `guard_record_convergence` | `R/00_guard.R` | 197 | Record convergence status in guard |
-| `guard_record_design_issue` | `R/00_guard.R` | 169 | Record design issue in guard |
-| `guard_record_estimation_warning` | `R/00_guard.R` | 182 | Record estimation warning in guard |
-| `handle_explicit_none` | `R/09_none_handling.R` | 149 | Flag explicit none rows |
-| `handle_implicit_none` | `R/09_none_handling.R` | 182 | Add explicit none rows for implicit none |
-| `handle_none_option` | `R/09_none_handling.R` | 115 | Main none-option handler |
-| `has_interactions` | `R/06_interactions.R` | 617 | Check if model has interactions |
-| `identify_none_rows` | `R/09_none_handling.R` | 231 | Find none rows by pattern matching |
-| `import_alchemer_conjoint` | `R/05_alchemer_import.R` | 81 | Main Alchemer import function |
-| `int2col` | `R/08_market_simulator.R` | 555 | Convert column number to Excel letter |
-| `interpret_importance` | `R/99_helpers.R` | 284 | Interpret importance percentage |
-| `interpret_interaction` | `R/06_interactions.R` | 437 | Interpret interaction effect magnitude |
-| `interpret_utility` | `R/99_helpers.R` | 262 | Interpret utility direction and significance |
-| `interpret_utility_magnitude` | `R/99_helpers.R` | 245 | Classify utility magnitude |
-| `is_best_worst_model` | `R/10_best_worst.R` | 443 | Check if model is BWS |
-| `likelihood_ratio_test` | `R/99_helpers.R` | 512 | LR test between two models |
-| `load_alchemer_file` | `R/05_alchemer_import.R` | 194 | Load Excel/CSV Alchemer export |
-| `load_conjoint_config` | `R/01_config.R` | 119 | Main config loader with autodetect |
-| `load_conjoint_data` | `R/02_data.R` | 36 | Main data loader with source dispatch |
-| `load_data_by_type` | `R/02_data.R` | 166 | Load data based on file extension |
-| `log_verbose` | `R/99_helpers.R` | 445 | Conditional message printing |
-| `normalize_score_column` | `R/05_alchemer_import.R` | 299 | Normalize Alchemer Score to 0/1 |
-| `optimize_product` | `R/05_simulator.R` | 376 | Greedy product optimization (legacy) |
-| `optimize_product_exhaustive` | `R/15_product_optimizer.R` | 48 | Exhaustive search optimization |
-| `optimize_product_greedy` | `R/15_product_optimizer.R` | 160 | Multi-start greedy hill-climbing |
-| `parse_interactions_from_config` | `R/06_interactions.R` | 475 | Parse interaction_terms config string |
-| `parse_level_names` | `R/99_helpers.R` | 133 | Parse comma-separated level string |
-| `predict_market_shares` | `R/05_simulator.R` | 32 | Aggregate market share prediction |
-| `predict_market_shares_individual` | `R/05_simulator.R` | 505 | Individual-level share prediction (HB/LC) |
-| `predict_shares_first_choice` | `R/05_simulator.R` | 183 | Deterministic first-choice rule |
-| `predict_shares_logit` | `R/05_simulator.R` | 161 | Multinomial logit share prediction |
-| `predict_shares_randomized_first_choice` | `R/05_simulator.R` | 204 | RFC with tie handling |
-| `prepare_bayesm_data` | `R/11_hierarchical_bayes.R` | 110 | Convert to bayesm lgtdata format |
-| `prepare_interaction_plot` | `R/06_interactions.R` | 400 | Prepare data for interaction plot |
-| `prepare_mlogit_data` | `R/03_estimation.R` | 260 | Convert to dfidx mlogit format |
-| `print_section` | `R/99_helpers.R` | 459 | Print formatted section header |
-| `read_simulator_js` | `lib/html_simulator/02_simulator_page_builder.R` | 88 | Read JS file for embedding |
-| `require_package` | `R/99_helpers.R` | 478 | Check and refuse if package missing |
-| `resolve_config_path` | `R/01_config.R` | 779 | Resolve relative/absolute config paths |
-| `run_conjoint_analysis` | `R/00_main.R` | 306 | Main entry point (public API) |
-| `run_conjoint_analysis_impl` | `R/00_main.R` | 326 | Internal implementation |
-| `run_hb_convergence_diagnostics` | `R/11_hierarchical_bayes.R` | 418 | Geweke test and ESS for MCMC |
-| `run_interaction_analysis` | `R/06_interactions.R` | 558 | Config-driven interaction pipeline |
-| `safe_logical` | `R/99_helpers.R` | 89 | Safe conversion to logical |
-| `safe_numeric` | `R/99_helpers.R` | 115 | Safe conversion to numeric |
-| `save_config_to_excel` | `R/05_alchemer_import.R` | 840 | Save config list to Excel |
-| `sensitivity_one_way` | `R/05_simulator.R` | 237 | One-way attribute sensitivity analysis |
-| `sensitivity_two_way` | `R/05_simulator.R` | 286 | Two-way attribute sensitivity analysis |
-| `simulate_first_choice_individual` | `R/05_simulator.R` | 633 | Deterministic first choice per respondent |
-| `simulate_logit_individual` | `R/05_simulator.R` | 651 | Softmax per respondent, then average |
-| `simulate_rfc` | `R/05_simulator.R` | 600 | Randomized first choice with Gumbel error |
-| `simulator_data_to_json` | `lib/html_report/01_data_transformer.R` | 207 | Serialize simulator data to JSON |
-| `simulator_data_to_json` | `lib/html_simulator/01_simulator_data_transformer.R` | 84 | Serialize standalone simulator to JSON |
-| `source_of_volume` | `R/05_simulator.R` | 692 | Share-shift analysis for new product |
-| `specify_interactions` | `R/06_interactions.R` | 50 | Define interaction terms |
-| `summarize_wtp_distribution` | `R/14_willingness_to_pay.R` | 401 | WTP percentiles across respondents |
-| `test_alchemer_import` | `R/05_alchemer_import.R` | 890 | Quick smoke test for Alchemer import |
-| `test_interaction_significance` | `R/06_interactions.R` | 362 | LR test for interaction significance |
-| `transform_conjoint_for_html` | `lib/html_report/01_data_transformer.R` | 21 | Transform results to HTML data model |
-| `validate_alchemer_columns` | `R/05_alchemer_import.R` | 246 | Check required Alchemer columns |
-| `validate_alchemer_data` | `R/05_alchemer_import.R` | 479 | Comprehensive Alchemer data validation |
-| `validate_alchemer_with_refusal` | `R/05_alchemer_import.R` | 692 | Validation wrapper with TRS refusal |
-| `validate_best_worst_data` | `R/10_best_worst.R` | 40 | Validate BWS data format |
-| `validate_config` | `R/01_config.R` | 527 | Validate settings and attributes |
-| `validate_conjoint_attributes` | `R/00_guard.R` | 263 | Gate: attribute definitions |
-| `validate_conjoint_config` | `R/00_guard.R` | 243 | Gate: config structure |
-| `validate_conjoint_convergence` | `R/00_guard.R` | 356 | Gate: model convergence |
-| `validate_conjoint_data` | `R/00_guard.R` | 396 | Gate: data sufficiency |
-| `validate_conjoint_data` | `R/02_data.R` | 219 | Comprehensive data validation |
-| `validate_conjoint_design` | `R/00_guard.R` | 323 | Gate: design matrix |
-| `validate_conjoint_html_inputs` | `lib/html_report/00_html_guard.R` | 17 | Validate all HTML report inputs |
-| `validate_hb_config` | `R/00_guard.R` | 426 | Gate: HB iteration/burn-in settings |
-| `validate_hb_data` | `R/11_hierarchical_bayes.R` | 799 | Validate data for HB estimation |
-| `validate_html_config` | `R/00_guard.R` | 543 | Gate: HTML colour codes |
-| `validate_latent_class_config` | `R/00_guard.R` | 485 | Gate: LC min/max/criterion |
-| `validate_none_choices` | `R/09_none_handling.R` | 304 | Validate choice integrity with none |
-| `validate_simulator_inputs` | `lib/html_simulator/00_simulator_guard.R` | 7 | Validate standalone simulator inputs |
-| `validate_wtp_config` | `R/00_guard.R` | 579 | Gate: WTP price attribute |
-| `write_conjoint_html_report` | `lib/html_report/04_html_writer.R` | 13 | Write HTML string to file |
-| `write_conjoint_output` | `R/07_output.R` | 40 | Main Excel output writer |
-| `write_market_share_section` | `R/08_market_simulator.R` | 194 | Excel simulator: share calculations |
-| `write_product_configuration` | `R/08_market_simulator.R` | 122 | Excel simulator: product dropdowns |
-| `write_sensitivity_analysis` | `R/08_market_simulator.R` | 416 | Excel simulator: sensitivity section |
-| `write_simulator_instructions` | `R/08_market_simulator.R` | 84 | Excel simulator: instructions header |
-| `write_utilities_breakdown` | `R/08_market_simulator.R` | 315 | Excel simulator: utility decomposition |
-| `zero_center_utilities` | `R/99_helpers.R` | 540 | Zero-center a utility vector |
+Model estimation: mlogit (primary), clogit (fallback), auto-selection, rating-based OLS.
 
-------------------------------------------------------------------------
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `estimate_choice_model` | 33 | exported | Main estimation function with multi-method dispatch |
+| `estimate_auto_method` | 104 | internal | Try mlogit first, fall back to clogit |
+| `estimate_with_mlogit` | 160 | internal | Estimate model using mlogit package |
+| `prepare_mlogit_data` | 260 | internal | Convert data to mlogit format with dfidx indexing |
+| `build_mlogit_formula` | 359 | internal | Build mlogit formula with optional interaction terms |
+| `extract_mlogit_results` | 422 | internal | Extract coefficients, vcov, log-likelihoods from mlogit model |
+| `estimate_with_clogit` | 494 | internal | Estimate model using survival::clogit |
+| `extract_clogit_results` | 566 | internal | Extract results from clogit model into standard format |
+| `estimate_rating_based_conjoint` | 616 | internal | OLS regression for rating-based conjoint designs |
 
-## 7. Package Dependency Matrix
+### 04_utilities.R (540 lines)
 
-| Package | 00_main | 01_config | 02_data | 03_estimation | 04_utilities | 05_alchemer | 05_simulator | 07_output | 08_market_sim | 11_hb | 12_template | 13_lc | 14_wtp | 99_helpers |
-|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
-| **dplyr** | load | \- | use | \- | use | \- | \- | \- | \- | \- | \- | \- | \- | \- |
-| **openxlsx** | load | use | \- | \- | \- | use | \- | use | use | \- | use | \- | \- | use |
-| **mlogit** | load | \- | \- | use | \- | \- | \- | \- | \- | \- | \- | \- | \- | \- |
-| **dfidx** | load | \- | \- | use | \- | \- | \- | \- | \- | \- | \- | \- | \- | \- |
-| **survival** | load | \- | \- | use | \- | \- | \- | \- | \- | \- | \- | \- | \- | \- |
-| **bayesm** | \- | \- | \- | \- | \- | \- | \- | \- | \- | use | \- | use | \- | \- |
-| **coda** | \- | \- | \- | \- | \- | \- | \- | \- | \- | optional | \- | \- | \- | \- |
-| **haven** | \- | \- | optional | \- | \- | \- | \- | \- | \- | \- | \- | \- | \- | \- |
-| **jsonlite** | \- | \- | \- | \- | \- | \- | \- | \- | \- | \- | \- | \- | \- | \- |
+Utility calculation: part-worth utilities, confidence intervals, importance, diagnostics.
 
-**jsonlite** is used by `lib/html_report/01_data_transformer.R` and `lib/html_simulator/01_simulator_data_transformer.R` for JSON serialization.
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `calculate_utilities` | 25 | exported | Extract and process part-worth utilities from estimated model |
+| `extract_attribute_utilities` | 92 | internal | Extract utilities for one attribute from model coefficients |
+| `calculate_attribute_importance` | 188 | exported | Calculate relative importance as % of total utility range |
+| `calculate_model_diagnostics` | 238 | exported | Comprehensive model fit statistics and diagnostics |
+| `calculate_choice_fit_stats` | 295 | internal | Calculate McFadden R-squared, hit rate, AIC, BIC |
+| `calculate_hit_rate` | 354 | internal | Percentage of choices correctly predicted by model |
+| `calculate_attribute_diagnostics` | 515 | internal | Per-attribute significance counts and ranges |
 
-------------------------------------------------------------------------
+### 05_alchemer_import.R (937 lines)
 
-## 8. Test Coverage Map
+Alchemer CBC data import: transforms Alchemer format to Turas internal format.
 
-| Test File | Lines | Covers |
-|----|----|----|
-| `tests/testthat/test_config.R` | \- | `01_config.R`: config loading, validation, autodetect |
-| `tests/testthat/test_estimation.R` | \- | `03_estimation.R`: mlogit, clogit, auto, rating-based |
-| `tests/testthat/test_utilities.R` | \- | `04_utilities.R`: utilities, importance, diagnostics |
-| `tests/testthat/test_simulation.R` | \- | `05_simulator.R`: market shares, logit, first-choice, RFC |
-| `tests/testthat/test_interactions.R` | \- | `06_interactions.R`: specify, estimate, analyze interactions |
-| `tests/testthat/test_edge_cases.R` | \- | Cross-cutting: NA handling, empty data, single-level attrs |
-| `tests/testthat/test_bws.R` | \- | `10_best_worst.R`: BWS validation, conversion, estimation |
-| `tests/testthat/test_wtp.R` | \- | `14_willingness_to_pay.R`: price parsing, WTP, delta method |
-| `tests/testthat/test_optimizer.R` | \- | `15_product_optimizer.R`: exhaustive, greedy, evaluation |
-| `tests/testthat/test_html_report.R` | \- | `lib/html_report/`: HTML generation pipeline |
-| `tests/testthat/test_html_simulator.R` | \- | `lib/html_simulator/`: standalone simulator |
-| `tests/test_unit_tests.R` | \- | Standalone unit test runner (no testthat dependency) |
-| `tests/test_integration.R` | \- | End-to-end: config -\> data -\> estimation -\> output |
-| `tests/fixtures/synthetic_data/generate_conjoint_test_data.R` | \- | Synthetic data generators for all test scenarios |
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `import_alchemer_conjoint` | 81 | exported | Main entry point for Alchemer CBC data import and transformation |
+| `load_alchemer_file` | 194 | internal | Load Alchemer export file (Excel or CSV) |
+| `validate_alchemer_columns` | 246 | internal | Check and fix required Alchemer column names |
+| `normalize_score_column` | 299 | internal | Convert Alchemer Score values (0/1 or 0/100) to binary |
+| `clean_alchemer_level` | 372 | exported | Clean Alchemer compound level names (Price_071 -> Price) |
+| `clean_levels_with_config` | 427 | internal | Apply custom cleaning rules from config to levels |
+| `validate_alchemer_data` | 479 | exported | Comprehensive validation of imported Alchemer data |
+| `validate_alchemer_with_refusal` | 692 | internal | Validation wrapper that issues TRS refusal on failure |
+| `get_alchemer_attributes` | 753 | exported | Extract attribute summary from imported Alchemer data |
+| `create_config_from_alchemer` | 794 | exported | Auto-generate config list from imported Alchemer data |
+| `save_config_to_excel` | 840 | internal | Save configuration list to formatted Excel file |
+| `test_alchemer_import` | 890 | exported | Quick test of Alchemer import functionality |
 
-**Notable gaps:** No dedicated test files for `05_alchemer_import.R`, `09_none_handling.R`, `11_hierarchical_bayes.R`, `12_config_template.R`, or `13_latent_class.R` (some are tested indirectly via integration tests).
+### 05_simulator.R (920 lines)
 
-------------------------------------------------------------------------
+Market simulator: share prediction (logit, first-choice, RFC), sensitivity, source of volume.
 
-## 9. Architecture Flow
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `predict_market_shares` | 32 | exported | Predict market shares using multinomial logit model |
+| `calculate_product_utility` | 124 | exported | Calculate total utility for a single product configuration |
+| `predict_shares_logit` | 161 | internal | MNL share prediction with log-sum-exp stability |
+| `predict_shares_first_choice` | 183 | internal | Deterministic first-choice rule (winner takes all) |
+| `predict_shares_randomized_first_choice` | 204 | internal | First-choice with tie-breaking tolerance |
+| `sensitivity_one_way` | 237 | exported | One-way sensitivity analysis for an attribute |
+| `sensitivity_two_way` | 286 | exported | Two-way sensitivity analysis for two attributes |
+| `compare_scenarios` | 331 | exported | Compare multiple product scenarios |
+| `optimize_product` | 376 | exported | Greedy product optimization to maximize market share |
+| `excel_to_product` | 469 | helper | Convert Excel dropdown selections to product list |
+| `format_product` | 479 | helper | Format product configuration for display |
+| `predict_market_shares_individual` | 505 | exported | Predict shares using individual-level HB/LC utilities |
+| `build_product_design_vector` | 571 | internal | Build design vector for a product from HB column map |
+| `simulate_rfc` | 600 | internal | Randomized First Choice with Gumbel error draws |
+| `simulate_first_choice_individual` | 633 | internal | Deterministic first choice per respondent |
+| `simulate_logit_individual` | 651 | internal | Logit share per respondent, then average |
+| `source_of_volume` | 692 | exported | Calculate share shifts when adding a new product |
+| `generate_demand_curve` | 765 | exported | Sweep price levels to generate demand curve |
+| `predict_shares_with_ci` | 824 | exported | Predict shares with bootstrap confidence intervals |
 
-```         
-Config Excel (.xlsx)
-    |
-    v
-[01_config.R] load_conjoint_config()
-    |-- Autodetect header row
-    |-- Validate settings + attributes
-    |-- Resolve file paths
-    |
-    v
-[05_alchemer_import.R] (if data_source = "alchemer")
-    |-- Transform Alchemer CBC format
-    |-- Clean level names
-    |-- Normalize Score column
-    |
-    v
-[02_data.R] load_conjoint_data()
-    |-- Load CSV/XLSX/SAV/DTA
-    |-- [09_none_handling.R] detect & handle none option
-    |-- Validate choice structure
-    |-- Calculate data statistics
-    |
-    v
-[03_estimation.R] estimate_choice_model()
-    |-- auto: mlogit -> clogit fallback
-    |-- hb: [11_hierarchical_bayes.R] bayesm MCMC
-    |-- latent_class: [13_latent_class.R] K-class search
-    |-- best_worst: [10_best_worst.R] exploded logit
-    |-- rating: OLS regression
-    |
-    v
-[04_utilities.R] calculate_utilities() + calculate_attribute_importance()
-    |-- Extract part-worth utilities
-    |-- Zero-center within attributes
-    |-- Confidence intervals + p-values
-    |-- McFadden R-squared + hit rate
-    |
-    v
-[06_interactions.R] (optional, if interaction_terms configured)
-    |-- Parse config, build formula
-    |-- Estimate with interactions
-    |-- LR test vs main-effects model
-    |
-    v
-[14_willingness_to_pay.R] (optional, if wtp_price_attribute set)
-    |-- Estimate price coefficient
-    |-- Delta-method CIs for WTP
-    |-- Individual-level WTP (HB)
-    |
-    v
-[07_output.R] write_conjoint_output()          Excel Workbook (8-11 sheets)
-    |-- Importance, Utilities, Model Fit
-    |-- [08_market_simulator.R] interactive simulator sheet
-    |-- HB: Individual Utilities, Diagnostics, Quality
-    |-- LC: Class Comparison, Profiles, Membership
-    |
-    v
-[lib/html_report/99_html_report_main.R]        HTML Analysis Report
-    |-- [01_data_transformer.R] transform data model
-    |-- [02_table_builder.R] build HTML tables
-    |-- [05_chart_builder.R] build SVG charts
-    |-- [03_page_builder.R] assemble full page
-    |-- [04_html_writer.R] write to disk
-    |-- js/: navigation, export, pins, charts, simulator
-    |
-    v
-[lib/html_simulator/99_simulator_main.R]        Standalone HTML Simulator
-    |-- [01_simulator_data_transformer.R] build JSON
-    |-- [02_simulator_page_builder.R] assemble page
-    |-- js/: engine, charts, ui
-```
+### 06_interactions.R (650 lines)
+
+Interaction effects: specification, estimation, analysis, config-driven pipeline.
+
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `specify_interactions` | 50 | exported | Specify interaction terms between attributes |
+| `estimate_with_interactions` | 121 | exported | Estimate choice model with interaction effects |
+| `create_interaction_terms` | 174 | internal | Create interaction columns in data frame |
+| `add_interactions_to_config` | 198 | internal | Add interaction attributes to configuration object |
+| `estimate_mlogit_with_interactions` | 221 | internal | Estimate mlogit model with interaction terms |
+| `build_interaction_formula` | 273 | internal | Build formula string with main and interaction terms |
+| `analyze_interaction` | 302 | exported | Analyze interaction effects from model coefficients |
+| `test_interaction_significance` | 362 | exported | Likelihood ratio test for interaction significance |
+| `prepare_interaction_plot` | 400 | exported | Create data frame for interaction effect plotting |
+| `interpret_interaction` | 437 | exported | Interpret interaction effect magnitude and direction |
+| `parse_interactions_from_config` | 475 | exported | Parse "Price:Brand,Size:Color" interaction string from config |
+| `build_formula_with_interactions` | 521 | internal | Build mlogit formula with main effects and interactions |
+| `run_interaction_analysis` | 558 | exported | Config-driven entry point for full interaction analysis |
+| `has_interactions` | 617 | helper | Check if model has interaction effects |
+| `get_interaction_terms` | 627 | helper | Get list of interaction terms from model |
+| `format_interaction` | 641 | helper | Format interaction term for display |
+
+### 07_output.R (1,231 lines)
+
+Excel output writer: creates formatted 8+ sheet workbook with results, simulator, diagnostics.
+
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `write_conjoint_output` | 40 | exported | Main function: create formatted Excel workbook with all results |
+| `create_utility_chart_data_sheet` | 180 | internal | Write pre-formatted chart data sheet for Excel charting |
+| `create_model_fit_sheet` | 253 | internal | Write model fit diagnostics sheet (McFadden R-sq, hit rate, etc.) |
+| `create_raw_coefficients_sheet` | 338 | internal | Write uncentered model coefficients with standard errors |
+| `create_importance_sheet` | 421 | internal | Write attribute importance scores sheet |
+| `create_utilities_sheet` | 443 | internal | Write zero-centered part-worth utilities sheet |
+| `create_data_summary_sheet` | 484 | internal | Write response counts and completion rates sheet |
+| `create_configuration_sheet` | 539 | internal | Write study design summary sheet |
+| `create_individual_utilities_sheet` | 577 | internal | Write per-respondent HB utilities sheet |
+| `create_hb_diagnostics_sheet` | 693 | internal | Write MCMC convergence metrics (Geweke, ESS) sheet |
+| `create_respondent_quality_sheet` | 844 | internal | Write RLH scores and quality flags sheet |
+| `create_class_comparison_sheet` | 978 | internal | Write latent class BIC/AIC comparison sheet |
+| `create_class_profiles_sheet` | 1077 | internal | Write class-level utility profiles sheet |
+| `create_class_membership_sheet` | 1191 | internal | Write respondent class membership assignments sheet |
+
+### 08_market_simulator.R (572 lines)
+
+Excel market simulator: interactive sheet with dropdowns, formulas, sensitivity analysis.
+
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `create_market_simulator_sheet` | 30 | exported | Create interactive market simulator sheet in Excel workbook |
+| `write_simulator_instructions` | 84 | internal | Write simulator instructions at top of sheet |
+| `write_product_configuration` | 122 | internal | Write product config section with dropdown cells |
+| `write_market_share_section` | 194 | internal | Write market share calculation section with formulas |
+| `write_utilities_breakdown` | 315 | internal | Write per-attribute utility contribution breakdown |
+| `write_sensitivity_analysis` | 416 | internal | Write sensitivity analysis section for Product 1 |
+| `create_simulator_data_sheet` | 499 | internal | Create hidden lookup table sheet for simulator formulas |
+| `int2col` | 555 | helper | Convert column number to Excel column letter (A, AA, etc.) |
+
+### 09_none_handling.R (393 lines)
+
+None option detection and handling: auto-detect, explicit/implicit none, validation.
+
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `detect_none_option` | 26 | exported | Auto-detect "none of these" option using multiple methods |
+| `handle_none_option` | 115 | exported | Process data based on detected none option method |
+| `handle_explicit_none` | 149 | internal | Handle data with explicit none rows (flag them) |
+| `handle_implicit_none` | 182 | internal | Handle implicit none (add explicit rows for unchosen sets) |
+| `identify_none_rows` | 231 | internal | Identify none rows by pattern matching in attribute values |
+| `create_none_rows` | 267 | internal | Create explicit none alternative rows for choice sets |
+| `validate_none_choices` | 304 | internal | Validate data integrity with none option present |
+| `calculate_none_diagnostics` | 367 | internal | Calculate none-specific diagnostics (selection rate, utility) |
+
+### 10_best_worst.R (496 lines)
+
+Best-worst scaling: BWS data validation, conversion, sequential/simultaneous estimation.
+
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `validate_best_worst_data` | 40 | internal | Validate best-worst data format (best/worst columns, exclusivity) |
+| `convert_best_worst_to_choice` | 133 | internal | Convert best-worst data to standard choice format |
+| `estimate_best_worst_model` | 191 | exported | Estimate BWS model (sequential or simultaneous method) |
+| `estimate_best_worst_sequential` | 254 | internal | Estimate best and worst models separately, then combine |
+| `estimate_best_worst_simultaneous` | 324 | internal | Joint best-worst estimation with choice type indicator |
+| `calculate_best_worst_utilities` | 364 | exported | Calculate utilities from best-worst model result |
+| `calculate_best_worst_diagnostics` | 401 | exported | Calculate BWS-specific diagnostics (LL, R-sq, best vs worst) |
+| `is_best_worst_model` | 443 | helper | Check if model is best-worst scaling |
+| `create_best_worst_template` | 456 | exported | Create empty BWS data template with attributes |
+
+### 11_hierarchical_bayes.R (896 lines)
+
+Hierarchical Bayes: individual-level utilities via bayesm MCMC, convergence diagnostics.
+
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `.load_hb_diagnostics` | 37 | internal | Load shared HB diagnostics infrastructure |
+| `check_hb_requirements` | 71 | exported | Check if bayesm and coda packages are available |
+| `prepare_bayesm_data` | 110 | internal | Convert Turas data to bayesm lgtdata list structure |
+| `estimate_hierarchical_bayes` | 270 | exported | Main HB estimation using bayesm::rhierMnlRwMixture |
+| `extract_hb_results` | 355 | internal | Process raw bayesm output into standard model result |
+| `run_hb_convergence_diagnostics` | 467 | internal | Check MCMC convergence (Geweke z, ESS) |
+| `calculate_respondent_rlh` | 581 | internal | Calculate respondent-level Root Likelihood for quality flagging |
+| `extract_hb_utilities` | 670 | internal | Convert HB results to standard utilities data frame |
+| `calculate_attribute_importance_hb` | 771 | internal | Compute importance at individual level, then average |
+| `validate_hb_data` | 848 | internal | Validate data suitability for HB estimation |
+
+### 12_config_template.R (751 lines)
+
+Configuration template generator: creates branded Excel config templates.
+
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `.make_tpl_header_style` | 49 | internal | Create navy header style for template |
+| `.make_tpl_section_style` | 58 | internal | Create section divider style |
+| `.make_tpl_required_style` | 67 | internal | Create orange required field style |
+| `.make_tpl_optional_style` | 75 | internal | Create green optional field style |
+| `.make_tpl_input_style` | 83 | internal | Create yellow user-input style |
+| `.make_tpl_help_style` | 91 | internal | Create grey italic help text style |
+| `.make_tpl_locked_style` | 100 | internal | Create read-only locked field style |
+| `.make_tpl_title_style` | 109 | internal | Create large navy title style |
+| `.make_tpl_subtitle_style` | 117 | internal | Create italic grey subtitle style |
+| `.make_tpl_required_label_style` | 123 | internal | Create bold red "REQUIRED" label style |
+| `.make_tpl_optional_label_style` | 132 | internal | Create green "Optional" label style |
+| `.make_tpl_example_style` | 141 | internal | Create light blue example row style |
+| `.get_conjoint_settings_definition` | 154 | internal | Return full settings definition data frame with all fields |
+| `generate_conjoint_config_template` | 285 | exported | Generate branded Excel configuration template |
+| `.get_method_template_overrides` | 703 | internal | Get preset overrides for standard_cbc, cbc_hb, etc. |
+
+### 13_latent_class.R (725 lines)
+
+Latent class analysis: discover preference segments, BIC/AIC model selection, membership.
+
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `estimate_latent_class` | 46 | exported | Fit LC models for K=min..max, select optimal by BIC/AIC |
+| `fit_latent_class_k` | 154 | internal | Fit a single K-class latent class model via bayesm |
+| `extract_lc_solution` | 205 | internal | Extract class assignments, betas, info criteria from bayesm output |
+| `compute_class_probabilities` | 380 | internal | Convert k-means distances to soft class probabilities |
+| `assign_respondents_to_classes` | 413 | internal | Provide modal (hard) and probability-weighted (soft) assignment |
+| `calculate_lc_log_likelihood` | 459 | internal | Compute mixture log-likelihood for BIC/AIC comparison |
+| `calculate_entropy_r2` | 522 | internal | Measure classification quality (0=poor, 1=clear separation) |
+| `compare_class_solutions` | 549 | internal | Create comparison table with delta columns across K solutions |
+| `build_latent_class_result` | 579 | internal | Assemble standardized turas_conjoint_model for optimal LC |
+| `extract_lc_utilities` | 682 | internal | Extract aggregate and class-level utilities in standard format |
+
+### 14_willingness_to_pay.R (448 lines)
+
+WTP estimation: marginal rate of substitution, individual-level WTP, confidence intervals.
+
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `calculate_wtp` | 49 | exported | Main WTP calculation with optional individual-level WTP |
+| `estimate_price_coefficient` | 126 | internal | Estimate price coefficient from part-worth utilities |
+| `estimate_price_coefficient_se` | 179 | internal | Estimate standard error of price coefficient |
+| `extract_numeric_prices` | 208 | internal | Extract numeric values from price level labels |
+| `calculate_aggregate_wtp` | 265 | internal | Calculate WTP table with full delta method CIs |
+| `calculate_individual_wtp` | 331 | internal | Calculate per-respondent WTP from HB betas |
+| `summarize_wtp_distribution` | 405 | internal | Summarize WTP distribution (mean, median, percentiles) |
+
+### 15_product_optimizer.R (343 lines)
+
+Product optimization: exhaustive search, greedy hill-climbing, revenue/profit objectives.
+
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `optimize_product_exhaustive` | 48 | exported | Exhaustive enumeration of all product configurations |
+| `optimize_product_greedy` | 160 | exported | Greedy hill-climbing with multiple random starts |
+| `evaluate_product` | 262 | internal | Evaluate product against objective (share, utility, revenue) |
+| `get_product_price` | 306 | internal | Extract numeric price from product configuration |
+| `get_product_cost` | 320 | internal | Get total cost from cost data lookup |
+
+### 99_helpers.R (589 lines)
+
+Shared utility functions: type conversion, statistics, formatting, logging.
+
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `%\|\|%` | 40 | internal | Null coalescing operator |
+| `create_error` | 57 | internal | Create formatted error message with module/problem/solution |
+| `create_warning` | 68 | internal | Create formatted warning message |
+| `safe_logical` | 89 | internal | Safely convert various TRUE/FALSE representations to logical |
+| `safe_numeric` | 115 | internal | Safely convert to numeric with default fallback |
+| `parse_level_names` | 133 | internal | Parse comma-separated level names string to vector |
+| `get_attribute_levels` | 157 | internal | Get levels for a specific attribute from config |
+| `calculate_ci` | 190 | internal | Calculate normal-approximation confidence interval |
+| `calculate_p_value` | 201 | internal | Calculate two-sided p-value from z-statistic |
+| `format_p_value` | 215 | internal | Format p-value for display ("<0.001" for small values) |
+| `get_significance_stars` | 227 | internal | Return significance stars (*, **, ***) for p-value |
+| `interpret_utility_magnitude` | 245 | internal | Interpret utility as Strongly/Moderately/Somewhat/Slightly |
+| `interpret_utility` | 262 | internal | Full interpretation with direction, magnitude, significance |
+| `interpret_importance` | 284 | internal | Interpret importance percentage as driver category |
+| `assess_mcfadden_r2` | 302 | internal | Assess McFadden R-squared quality level |
+| `assess_hit_rate` | 333 | internal | Assess hit rate quality relative to chance |
+| `check_perfect_separation` | 361 | internal | Check for levels always/never chosen |
+| `create_header_style` | 390 | internal | Create standard Excel header style |
+| `create_positive_style` | 405 | internal | Create green cell style for positive values |
+| `create_negative_style` | 415 | internal | Create red cell style for negative values |
+| `create_title_style` | 425 | internal | Create Excel title style |
+| `log_verbose` | 445 | internal | Print message only when verbose=TRUE |
+| `print_section` | 459 | internal | Print section header with line separators |
+| `require_package` | 478 | internal | Check if required package is available, refuse if not |
+| `likelihood_ratio_test` | 514 | internal | Compare two nested models using LR test |
+| `zero_center_utilities` | 542 | internal | Zero-center utilities within attribute |
+| `escape_attr_for_formula` | 559 | internal | Wrap special-character attribute names in backticks |
+| `escape_attr_for_regex` | 576 | internal | Escape regex special characters in attribute names |
+| `get_conjoint_version` | 587 | internal | Return current module version string ("3.1.0") |
+
+---
+
+## HTML Report Files (`modules/conjoint/lib/html_report/`)
+
+### 00_html_guard.R (145 lines)
+
+Input validation for HTML report generation.
+
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `validate_conjoint_html_inputs` | 17 | internal | Validate conjoint results and config before HTML generation |
+| `.validate_utilities` | 59 | internal | Validate utilities data frame structure |
+| `.validate_importance` | 78 | internal | Validate importance data frame structure |
+| `.validate_model_result` | 91 | internal | Validate model result method and convergence |
+| `.validate_wtp` | 104 | internal | Validate WTP table columns |
+| `.validate_colours` | 119 | internal | Validate hex colour codes for brand/accent |
+| `.validate_insights` | 133 | internal | Validate insight text fields are character type |
+
+### 01_data_transformer.R (282 lines)
+
+Transform conjoint results into HTML-ready data structures for all panels.
+
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `transform_conjoint_for_html` | 21 | internal | Main transformer: results to HTML-ready data for all panels |
+| `.build_summary` | 85 | internal | Build summary metadata (project name, method, respondent count) |
+| `.extract_hb_data` | 100 | internal | Extract HB-specific data (individual betas, convergence, quality) |
+| `.extract_lc_data` | 124 | internal | Extract latent class data (classes, sizes, entropy) |
+| `.extract_wtp_data` | 138 | internal | Extract WTP table and demand curve data |
+| `.build_simulator_data` | 159 | internal | Build JSON-ready simulator data from utilities and config |
+| `simulator_data_to_json` | 225 | internal | Convert simulator data list to JSON string |
+| `.extract_insights` | 236 | internal | Extract per-tab insight seed text from config |
+| `.extract_about` | 251 | internal | Extract about page fields (analyst, company, closing notes) |
+| `.build_sidebar_nav` | 269 | internal | Build sidebar navigation items from attribute list |
+
+### 02_table_builder.R (401 lines)
+
+HTML table construction with export-ready data attributes.
+
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `.html_escape` | 9 | internal | Escape HTML special characters in text |
+| `build_importance_table` | 22 | internal | Build importance summary table with interpretation column |
+| `build_utilities_table` | 54 | internal | Build utilities table for one attribute with baseline tags |
+| `build_model_fit_table` | 100 | internal | Build model fit metrics table (R-sq, hit rate, AIC, etc.) |
+| `build_convergence_table` | 142 | internal | Build HB convergence table (Geweke z, ESS per parameter) |
+| `build_lc_comparison_table` | 176 | internal | Build LC class comparison table (K, AIC, BIC, Entropy R-sq) |
+| `build_wtp_table` | 208 | internal | Build WTP table with currency formatting and CI columns |
+| `build_demand_table` | 268 | internal | Build demand curve table (price vs market share) |
+| `build_class_importance_table` | 301 | internal | Build LC class importance table with class size labels |
+| `build_respondent_quality_table` | 365 | internal | Build HB respondent quality metrics table |
+
+### 03_page_builder.R (1,716 lines)
+
+Full HTML page assembly: header, panels, CSS, JavaScript, navigation, overlays.
+
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `build_conjoint_page` | 21 | internal | Main orchestrator assembling all HTML components |
+| `build_conjoint_meta` | 120 | internal | Build HTML meta tags (charset, viewport, title) |
+| `build_conjoint_css` | 143 | internal | Build complete CSS stylesheet with brand/accent colours |
+| `build_conjoint_print_css` | 551 | internal | Build print-specific CSS media query styles |
+| `build_conjoint_header` | 597 | internal | Build dark gradient header with logo, title, KPIs |
+| `build_report_tab_nav` | 670 | internal | Build tab navigation bar with panel buttons |
+| `build_overview_panel` | 713 | internal | Build overview panel with importance chart and KPIs |
+| `build_utilities_panel` | 767 | internal | Build utilities panel with per-attribute charts and tables |
+| `build_diagnostics_panel` | 882 | internal | Build diagnostics panel with model fit, convergence, quality |
+| `build_lc_panel` | 1111 | internal | Build latent class panel with class comparison and profiles |
+| `build_wtp_panel` | 1184 | internal | Build WTP panel with chart, table, and demand curve |
+| `build_simulator_panel` | 1254 | internal | Build embedded market simulator panel with JS engine |
+| `build_about_panel` | 1367 | internal | Build about page with analyst info and closing notes |
+| `build_pinned_panel` | 1427 | internal | Build pinned insights sidebar panel |
+| `build_slides_panel` | 1459 | internal | Build custom slides presentation panel |
+| `build_help_overlay` | 1491 | internal | Build help overlay with keyboard shortcuts |
+| `build_insight_area` | 1518 | internal | Build editable insight text area for a tab |
+| `.build_callout` | 1546 | internal | Build callout box with title and body HTML |
+| `.build_diagnostics_callouts` | 1558 | internal | Build contextual diagnostic callouts (trust, method, quality) |
+| `.build_export_bar` | 1628 | internal | Build export toolbar (CSV, PNG, Excel buttons) |
+| `build_conjoint_js` | 1647 | internal | Load and inline all JavaScript modules from js/ directory |
+| `.get_conjoint_js_dir` | 1675 | internal | Resolve path to conjoint JS directory |
+| `.html_esc` | 1697 | internal | Escape HTML special characters (local variant) |
+
+### 04_html_writer.R (52 lines)
+
+Write assembled HTML to disk as UTF-8 file.
+
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `write_conjoint_html_report` | 13 | internal | Write complete HTML string to file with size reporting |
+
+### 05_chart_builder.R (852 lines)
+
+SVG chart construction following Turas visual standards (rounded bars, muted palette).
+
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `.svg_esc` | 15 | internal | Escape text for SVG text elements |
+| `.svg_wrap` | 25 | internal | Wrap SVG content in chart container div |
+| `.svg_gridline` | 32 | internal | Generate SVG gridline element |
+| `.svg_axis_label` | 39 | internal | Generate SVG axis label text element |
+| `.svg_value_label` | 46 | internal | Generate SVG data value label text element |
+| `build_importance_chart` | 66 | internal | Build horizontal importance bar chart (SVG) |
+| `build_utility_chart` | 165 | internal | Build vertical utility bar chart per attribute (SVG) |
+| `build_utility_dot_plot` | 268 | internal | Build horizontal lollipop chart per attribute (SVG) |
+| `build_bic_chart` | 363 | internal | Build BIC line chart for LC comparison (SVG) |
+| `build_wtp_chart` | 446 | internal | Build WTP horizontal bar chart with CI whiskers (SVG) |
+| `.nice_tick_step` | 579 | internal | Compute nice tick step for axis labels |
+| `build_demand_curve_chart` | 598 | internal | Build demand curve line chart (SVG) |
+| `build_class_importance_chart` | 693 | internal | Build grouped bar chart for class importance (SVG) |
+| `.generate_class_palette` | 782 | internal | Generate muted colour palette for latent classes |
+| `build_class_size_chart` | 805 | internal | Build class size horizontal bar chart (SVG) |
+
+### 99_html_report_main.R (280 lines)
+
+Lazy-load orchestrator: sources submodules, generates combined report + simulator.
+
+| Function | Line | Type | Description |
+|---|---|---|---|
+| `.chr_load_conjoint_submodules` | 45 | internal | Lazy-load all HTML report submodule files |
+| `generate_conjoint_html_report` | 93 | exported | Main entry point for HTML report generation |
+| `.build_all_tables` | 152 | internal | Build all HTML tables from transformed data |
+| `.build_all_charts` | 219 | internal | Build all SVG charts from transformed data |

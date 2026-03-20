@@ -14,20 +14,26 @@ run_maxdiff_gui <- function() {
   # Check for missing packages and refuse with clear instructions if any are missing
   missing_packages <- required_packages[!sapply(required_packages, requireNamespace, quietly = TRUE)]
   if (length(missing_packages) > 0) {
-    stop(
-      "\n================================================================================\n",
-      "  [REFUSE] PKG_MISSING_DEPENDENCY: Missing Required Packages\n",
-      "================================================================================\n\n",
-      "Problem:\n",
-      "  The following required packages are not installed: ", paste(missing_packages, collapse = ", "), "\n\n",
-      "Why it matters:\n",
-      "  The MaxDiff GUI cannot run without these packages.\n\n",
-      "How to fix:\n",
-      "  Run the following command in R:\n",
-      "    install.packages(c(", paste(sprintf('"%s"', missing_packages), collapse = ", "), "))\n\n",
-      "================================================================================\n",
-      call. = FALSE
-    )
+    # TRS v1.0: Print structured refusal to console then return invisible
+    cat("\n================================================================================\n")
+    cat("  [REFUSE] PKG_MISSING_DEPENDENCY: Missing Required Packages\n")
+    cat("================================================================================\n\n")
+    cat("Problem:\n")
+    cat(sprintf("  The following required packages are not installed: %s\n\n",
+                paste(missing_packages, collapse = ", ")))
+    cat("Why it matters:\n")
+    cat("  The MaxDiff GUI cannot run without these packages.\n\n")
+    cat("How to fix:\n")
+    cat(sprintf("  Run the following command in R:\n    install.packages(c(%s))\n\n",
+                paste(sprintf('"%s"', missing_packages), collapse = ", ")))
+    cat("================================================================================\n")
+    return(invisible(list(
+      status = "REFUSED",
+      code = "PKG_MISSING_DEPENDENCY",
+      message = sprintf("Missing packages: %s", paste(missing_packages, collapse = ", ")),
+      how_to_fix = sprintf("install.packages(c(%s))",
+                           paste(sprintf('"%s"', missing_packages), collapse = ", "))
+    )))
   }
 
   # Load packages

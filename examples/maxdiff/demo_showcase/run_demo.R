@@ -3,10 +3,13 @@
 # ==============================================================================
 # Demonstrates the full MaxDiff module v11.0 with all features:
 # - Count-based scores + Aggregate logit + HB estimation
+# - Weighted analysis (respondent-level weights)
 # - TURF portfolio optimization
 # - Anchored MaxDiff (must-have threshold)
 # - Item discrimination (consensus vs polarizing)
+# - Segment analysis (Age Group + Gender)
 # - HTML report + Interactive simulator
+# - Individual utility export
 #
 # PREREQUISITES:
 # 1. Run from Turas project root directory
@@ -27,37 +30,48 @@ cat("===========================================================================
 # ==============================================================================
 # SECTION 0: PREREQUISITES
 # ==============================================================================
+# Verify we are in the project root and all required files exist.
+# If demo data or config are missing, generate them automatically.
 
 cat("--- Section 0: Checking prerequisites ---\n\n")
 
 # Check working directory
 if (!file.exists("launch_turas.R") && !file.exists("CLAUDE.md")) {
-  stop("Please set working directory to the Turas project root.\n  Use: setwd('/path/to/Turas')")
+  cat("\n=== TURAS ERROR ===\n")
+  cat("Please set working directory to the Turas project root.\n")
+  cat("Use: setwd('/path/to/Turas')\n")
+  cat("==================\n\n")
+  stop("Wrong working directory", call. = FALSE)
 }
 
 demo_dir <- "examples/maxdiff/demo_showcase"
 
-# Check demo data
+# Generate demo data if not present
 if (!file.exists(file.path(demo_dir, "demo_data.csv"))) {
   cat("Demo data not found. Generating...\n")
   source(file.path(demo_dir, "generate_demo_data.R"))
 }
 
-# Check config
+# Generate config if not present
 config_path <- file.path(demo_dir, "Demo_MaxDiff_Config.xlsx")
 if (!file.exists(config_path)) {
   cat("Demo config not found. Creating...\n")
   source(file.path(demo_dir, "create_demo_config.R"))
 }
 
-# Check packages
+# Check required packages
 required_pkgs <- c("openxlsx")
 for (pkg in required_pkgs) {
   if (!requireNamespace(pkg, quietly = TRUE)) {
-    stop(sprintf("Required package '%s' not installed. Install with: install.packages('%s')", pkg, pkg))
+    cat(sprintf("\n=== TURAS ERROR ===\n"))
+    cat(sprintf("Required package '%s' not installed.\n", pkg))
+    cat(sprintf("Install with: install.packages('%s')\n", pkg))
+    cat("==================\n\n")
+    stop(sprintf("Missing package: %s", pkg), call. = FALSE)
   }
 }
 
+# Check optional packages (HB estimation quality depends on these)
 has_survival <- requireNamespace("survival", quietly = TRUE)
 has_cmdstanr <- requireNamespace("cmdstanr", quietly = TRUE)
 
@@ -65,11 +79,13 @@ cat("  Working directory: OK\n")
 cat("  Demo data: OK\n")
 cat("  Demo config: OK\n")
 cat(sprintf("  survival package: %s\n", if (has_survival) "Available" else "Not available (simple logit fallback)"))
-cat(sprintf("  cmdstanr package: %s\n", if (has_cmdstanr) "Available" else "Not available (approximate HB fallback)"))
+cat(sprintf("  cmdstanr package: %s\n", if (has_cmdstanr) "Available (full HB)" else "Not available (approximate HB fallback)"))
 
 # ==============================================================================
 # SECTION 1: SOURCE MODULE
 # ==============================================================================
+# Load shared utilities and the MaxDiff module.
+# script_dir_override tells the module where to find its own source files.
 
 cat("\n--- Section 1: Loading MaxDiff module ---\n\n")
 
@@ -90,6 +106,14 @@ cat("  Module loaded successfully.\n")
 # ==============================================================================
 # SECTION 2: RUN ANALYSIS
 # ==============================================================================
+# Execute the full MaxDiff analysis pipeline.
+# The module reads the config file which specifies:
+#   - All estimation methods (count, logit, HB)
+#   - TURF with max 8 items, above-mean threshold
+#   - Anchored MaxDiff using the Anchor_Items column
+#   - Weighted analysis using the Weight column
+#   - Segment tables for Age Group and Gender
+#   - HTML report, simulator, and individual utility export
 
 cat("\n--- Section 2: Running MaxDiff analysis ---\n\n")
 
@@ -98,13 +122,14 @@ results <- run_maxdiff(config_path, verbose = TRUE)
 # ==============================================================================
 # SECTION 3: PRINT KEY RESULTS
 # ==============================================================================
+# Display a summary of results from each analysis component.
 
 cat("\n")
 cat("================================================================================\n")
 cat("  RESULTS SUMMARY\n")
 cat("================================================================================\n\n")
 
-# Count scores
+# --- Count-based scores ---
 if (!is.null(results$count_scores)) {
   cat("--- COUNT-BASED SCORES (Top 5) ---\n")
   cs <- results$count_scores
@@ -120,7 +145,7 @@ if (!is.null(results$count_scores)) {
   cat("\n")
 }
 
-# Logit results
+# --- Aggregate logit model ---
 if (!is.null(results$logit_results)) {
   cat("--- AGGREGATE LOGIT ---\n")
   lu <- results$logit_results$utilities
@@ -139,7 +164,7 @@ if (!is.null(results$logit_results)) {
   cat("\n")
 }
 
-# HB results
+# --- Hierarchical Bayes ---
 if (!is.null(results$hb_results)) {
   cat("--- HIERARCHICAL BAYES ---\n")
   pop <- results$hb_results$population_utilities
@@ -160,7 +185,7 @@ if (!is.null(results$hb_results)) {
   cat("\n")
 }
 
-# Preference shares
+# --- Preference shares ---
 if (!is.null(results$hb_results$individual_utilities)) {
   tryCatch({
     cat("--- PREFERENCE SHARES ---\n")
@@ -179,7 +204,7 @@ if (!is.null(results$hb_results$individual_utilities)) {
   })
 }
 
-# TURF results
+# --- TURF portfolio optimization ---
 if (!is.null(results$turf_results) && results$turf_results$status == "PASS") {
   cat("--- TURF PORTFOLIO OPTIMIZATION ---\n")
   turf <- results$turf_results$incremental_table
@@ -191,7 +216,7 @@ if (!is.null(results$turf_results) && results$turf_results$status == "PASS") {
   cat("\n")
 }
 
-# Anchor data
+# --- Anchored MaxDiff (must-have items) ---
 if (!is.null(results$anchor_data)) {
   cat("--- ANCHORED MAXDIFF (Must-Haves) ---\n")
   ad <- results$anchor_data
@@ -209,7 +234,7 @@ if (!is.null(results$anchor_data)) {
   cat("\n")
 }
 
-# Item discrimination
+# --- Item discrimination ---
 if (!is.null(results$discrimination_data)) {
   cat("--- ITEM DISCRIMINATION ---\n")
   disc <- results$discrimination_data
@@ -226,18 +251,24 @@ if (!is.null(results$discrimination_data)) {
 # ==============================================================================
 # SECTION 4: OUTPUT FILES
 # ==============================================================================
+# List all generated output files with sizes.
 
 cat("--- OUTPUT FILES ---\n")
 
 output_dir <- file.path(demo_dir, "output")
 if (dir.exists(output_dir)) {
-  files <- list.files(output_dir, full.names = TRUE)
-  for (f in files) {
-    size_kb <- round(file.info(f)$size / 1024, 1)
-    cat(sprintf("  %s (%.1f KB)\n", basename(f), size_kb))
+  files <- list.files(output_dir, full.names = TRUE, recursive = TRUE)
+  if (length(files) > 0) {
+    for (f in files) {
+      size_kb <- round(file.info(f)$size / 1024, 1)
+      cat(sprintf("  %s (%.1f KB)\n", basename(f), size_kb))
+    }
+  } else {
+    cat("  (No output files found)\n")
   }
 }
 
+# Highlight key output paths
 if (!is.null(results$output_path)) {
   cat(sprintf("\n  Excel results: %s\n", results$output_path))
 }

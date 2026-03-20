@@ -51,7 +51,7 @@
 #
 # ==============================================================================
 
-HB_VERSION <- "10.1"
+HB_VERSION <- "11.1"
 
 # ==============================================================================
 # MAIN HB ESTIMATOR
@@ -142,7 +142,10 @@ fit_hb_model <- function(long_data, items, config, verbose = TRUE) {
       data = stan_data,
       seed = seed,
       chains = n_chains,
-      parallel_chains = min(n_chains, parallel::detectCores() - 1),
+      parallel_chains = {
+        n_cores <- parallel::detectCores(logical = FALSE)
+        if (is.na(n_cores) || n_cores < 2) 1L else min(n_chains, n_cores - 1L)
+      },
       iter_warmup = n_warmup,
       iter_sampling = n_iter,
       refresh = if (verbose) 500 else 0,

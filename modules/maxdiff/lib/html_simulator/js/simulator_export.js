@@ -123,7 +123,7 @@ var SimExport = (function() {
         exportExcelXML(buildSegmentExcelData(matrix), "MaxDiff_Shares");
       } else {
         var rows = [["Item", "Share (%)"]];
-        shares.forEach(function(s) { rows.push([s.label, s.share.toFixed(1)]); });
+        shares.forEach(function(s) { rows.push([s.label, Math.round(s.share * 10) / 10]); });
         exportExcelXML(rows, "MaxDiff_Shares");
       }
     } else if (tabId === "h2h") {

@@ -6,9 +6,15 @@
 # SCENARIO: Smartphone Feature Prioritization Study
 # - 12 features tested across 200 respondents
 # - 3 latent segments with distinct preference patterns
-# - Balanced design: 4 items per task, 12 tasks, 3 versions
-# - Includes anchor question (must-have features)
+# - Balanced design: 4 items per task, 10 tasks, 3 versions
+# - Includes weight variable (random weights 0.5 to 2.0)
+# - Includes anchor question (must-have features, comma-separated item IDs)
 # - Demographics: Age group, Gender
+#
+# OUTPUTS:
+#   demo_data.csv       - Survey responses with weights and anchor column
+#   true_utilities.csv  - Known true utilities per respondent (for validation)
+#   segment_truth.csv   - True segment assignments (for validation)
 #
 # USAGE:
 #   source("examples/maxdiff/demo_showcase/generate_demo_data.R")
@@ -43,7 +49,7 @@ items <- data.frame(
 
 n_items <- nrow(items)
 n_resp <- 200
-n_tasks <- 12
+n_tasks <- 10
 items_per_task <- 4
 n_versions <- 3
 
@@ -168,6 +174,18 @@ age_groups <- sample(c("18-34", "35-54", "55+"), n_resp, replace = TRUE,
                      prob = c(0.35, 0.40, 0.25))
 genders <- sample(c("Male", "Female"), n_resp, replace = TRUE, prob = c(0.48, 0.52))
 
+# Generate weight variable (random weights between 0.5 and 2.0)
+# Weights are correlated with demographics to be realistic:
+# younger respondents slightly over-weighted, older slightly under-weighted
+resp_weights <- numeric(n_resp)
+for (r in 1:n_resp) {
+  base_weight <- runif(1, 0.5, 2.0)
+  # Slight demographic adjustment for realism
+  if (age_groups[r] == "18-34") base_weight <- base_weight * 1.1
+  if (age_groups[r] == "55+") base_weight <- base_weight * 0.9
+  resp_weights[r] <- round(pmin(pmax(base_weight, 0.5), 2.0), 4)
+}
+
 # Build wide-format response data (one row per respondent)
 # Module expects separate columns per task: Best_T1, Worst_T1, Best_T2, Worst_T2, etc.
 resp_rows <- list()
@@ -216,6 +234,9 @@ survey_data$Age_Group <- age_groups
 survey_data$Gender <- genders
 survey_data$Segment_True <- segment_labels[segment_assignment]
 
+# Add weight variable
+survey_data$Weight <- resp_weights
+
 # ==============================================================================
 # ANCHOR QUESTION (Must-Have items)
 # ==============================================================================
@@ -223,6 +244,7 @@ survey_data$Segment_True <- segment_labels[segment_assignment]
 cat("Generating anchor responses...\n")
 
 # For each respondent, items with high utility are more likely to be flagged as must-have
+# Anchor_Items column contains comma-separated item IDs
 anchor_data <- character(n_resp)
 for (r in 1:n_resp) {
   # Probability of flagging as must-have based on utility
@@ -236,7 +258,7 @@ for (r in 1:n_resp) {
 }
 
 # Add anchor to survey data (already one row per respondent)
-survey_data$Must_Have_Items <- anchor_data
+survey_data$Anchor_Items <- anchor_data
 
 # ==============================================================================
 # SAVE FILES
@@ -245,10 +267,10 @@ survey_data$Must_Have_Items <- anchor_data
 demo_dir <- file.path("examples", "maxdiff", "demo_showcase")
 if (!dir.exists(demo_dir)) dir.create(demo_dir, recursive = TRUE)
 
-# Save survey data
+# Save survey data (includes weights and anchor column)
 data_path <- file.path(demo_dir, "demo_data.csv")
 write.csv(survey_data, data_path, row.names = FALSE)
-cat(sprintf("\nSaved: %s (%d rows)\n", data_path, nrow(survey_data)))
+cat(sprintf("\nSaved: %s (%d rows, %d columns)\n", data_path, nrow(survey_data), ncol(survey_data)))
 
 # Save design as xlsx (required by MaxDiff module)
 design_path <- file.path(demo_dir, "demo_design.xlsx")
@@ -280,8 +302,15 @@ cat(sprintf("Saved: %s\n", truth_utils_path))
 
 cat("\n=== Data generation complete ===\n")
 cat(sprintf("  %d respondents, %d items, %d tasks each\n", n_resp, n_items, n_tasks))
+cat(sprintf("  Weight range: %.2f to %.2f\n", min(resp_weights), max(resp_weights)))
+cat(sprintf("  Anchor column: Anchor_Items (comma-separated item IDs)\n"))
 cat(sprintf("  Segments: Tech-Focused (%.0f%%), Value-Focused (%.0f%%), Design-Focused (%.0f%%)\n",
             mean(segment_assignment == 1) * 100,
             mean(segment_assignment == 2) * 100,
             mean(segment_assignment == 3) * 100))
+cat("\nOutput files:\n")
+cat(sprintf("  - %s\n", data_path))
+cat(sprintf("  - %s\n", design_path))
+cat(sprintf("  - %s\n", truth_path))
+cat(sprintf("  - %s\n", truth_utils_path))
 cat("\n")

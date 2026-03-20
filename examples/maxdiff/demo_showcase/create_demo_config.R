@@ -2,11 +2,15 @@
 # CREATE DEMO MAXDIFF CONFIG FILE
 # ==============================================================================
 # Run this script to generate Demo_MaxDiff_Config.xlsx
+# Enables ALL module features for a full showcase demonstration.
 # Requires: openxlsx
 # ==============================================================================
 
 if (!requireNamespace("openxlsx", quietly = TRUE)) {
-  stop("Package 'openxlsx' is required. Install with: install.packages('openxlsx')")
+  cat("\n=== TURAS ERROR ===\n")
+  cat("Package 'openxlsx' is required. Install with: install.packages('openxlsx')\n")
+  cat("==================\n\n")
+  return(invisible(NULL))
 }
 
 library(openxlsx)
@@ -33,7 +37,7 @@ project_settings <- data.frame(
     "",
     "output",
     "Respondent_ID",
-    "",
+    "Weight",
     "",
     "42",
     "11.0",
@@ -73,7 +77,7 @@ design_settings <- data.frame(
     "Items_Per_Task", "Tasks_Per_Respondent", "Num_Versions",
     "Design_Type", "Randomise_Task_Order", "Randomise_Item_Order_Within_Task"
   ),
-  Value = c("4", "12", "3", "BALANCED", "YES", "YES"),
+  Value = c("4", "10", "3", "BALANCED", "YES", "YES"),
   stringsAsFactors = FALSE
 )
 writeData(wb, "DESIGN_SETTINGS", design_settings)
@@ -88,8 +92,8 @@ mapping_rows[[idx]] <- data.frame(Field_Type = "VERSION", Field_Name = "Version"
                                    Task_Number = NA, stringsAsFactors = FALSE)
 idx <- idx + 1
 
-# Best/Worst for each task (wide format: Best_T1, Worst_T1, Best_T2, Worst_T2, etc.)
-for (t in 1:12) {
+# Best/Worst for each task (wide format: Best_T1, Worst_T1, ..., Best_T10, Worst_T10)
+for (t in 1:10) {
   mapping_rows[[idx]] <- data.frame(Field_Type = "BEST_CHOICE",
                                      Field_Name = sprintf("Best_T%d", t),
                                      Task_Number = t, stringsAsFactors = FALSE)
@@ -101,7 +105,7 @@ for (t in 1:12) {
 }
 
 # Anchor
-mapping_rows[[idx]] <- data.frame(Field_Type = "ANCHOR", Field_Name = "Must_Have_Items",
+mapping_rows[[idx]] <- data.frame(Field_Type = "ANCHOR", Field_Name = "Anchor_Items",
                                    Task_Number = NA, stringsAsFactors = FALSE)
 
 survey_mapping <- do.call(rbind, mapping_rows)
@@ -126,25 +130,58 @@ segments <- data.frame(
 writeData(wb, "SEGMENT_SETTINGS", segments)
 
 # --- OUTPUT_SETTINGS ---
+# All features enabled for full showcase
 addWorksheet(wb, "OUTPUT_SETTINGS")
 output_settings <- data.frame(
   Setting_Name = c(
-    "Generate_Count_Scores", "Generate_Aggregate_Logit", "Generate_HB_Model",
-    "Generate_Segment_Tables", "Generate_Charts", "Generate_Design_File",
-    "Score_Rescale_Method", "Output_Item_Sort_Order", "Min_Respondents_Per_Segment",
-    "Export_Individual_Utils", "HB_Iterations", "HB_Warmup", "HB_Chains",
-    "Generate_HTML_Report", "Generate_Simulator", "Generate_TURF",
-    "TURF_Max_Items", "TURF_Threshold", "Score_Display",
-    "Has_Anchor_Question", "Anchor_Variable", "Anchor_Threshold", "Anchor_Format"
+    "Generate_Count_Scores",
+    "Generate_Aggregate_Logit",
+    "Generate_HB_Model",
+    "Generate_Segment_Tables",
+    "Generate_Charts",
+    "Generate_HTML_Report",
+    "Generate_Simulator",
+    "Generate_TURF",
+    "TURF_Max_Items",
+    "TURF_Threshold",
+    "Has_Anchor_Question",
+    "Anchor_Variable",
+    "Anchor_Threshold",
+    "Anchor_Format",
+    "Export_Individual_Utils",
+    "Generate_Design_File",
+    "Score_Rescale_Method",
+    "Output_Item_Sort_Order",
+    "Min_Respondents_Per_Segment",
+    "Score_Display",
+    "HB_Iterations",
+    "HB_Warmup",
+    "HB_Chains"
   ),
   Value = c(
-    "YES", "YES", "YES",
-    "YES", "YES", "NO",
-    "PROBABILITY", "UTILITY_DESC", "20",
-    "YES", "1000", "500", "2",
-    "YES", "YES", "YES",
-    "10", "ABOVE_MEAN", "BOTH",
-    "YES", "Must_Have_Items", "0.50", "COMMA_SEPARATED"
+    "YES",
+    "YES",
+    "YES",
+    "YES",
+    "YES",
+    "YES",
+    "YES",
+    "YES",
+    "8",
+    "ABOVE_MEAN",
+    "YES",
+    "Anchor_Items",
+    "0.50",
+    "COMMA_SEPARATED",
+    "YES",
+    "NO",
+    "PROBABILITY",
+    "UTILITY_DESC",
+    "20",
+    "BOTH",
+    "1000",
+    "500",
+    "2"
   ),
   stringsAsFactors = FALSE
 )
@@ -162,3 +199,17 @@ for (sheet in names(wb)) {
 # Save
 saveWorkbook(wb, config_path, overwrite = TRUE)
 cat(sprintf("Config saved: %s\n", config_path))
+cat("\nFeatures enabled:\n")
+cat("  - Count-based scores\n")
+cat("  - Aggregate logit model\n")
+cat("  - Hierarchical Bayes estimation\n")
+cat("  - Segment tables (Age Group + Gender)\n")
+cat("  - SVG charts\n")
+cat("  - Interactive HTML report\n")
+cat("  - Interactive simulator\n")
+cat("  - TURF portfolio optimization (max 8 items, above-mean threshold)\n")
+cat("  - Anchored MaxDiff (Anchor_Items column)\n")
+cat("  - Individual utility export\n")
+cat("  - Brand colour: #1e3a5f, Accent colour: #2aa198\n")
+cat("  - Weight variable: Weight\n")
+cat("  - Output folder: output/\n")

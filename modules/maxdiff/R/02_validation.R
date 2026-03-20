@@ -11,7 +11,7 @@
 # - utils.R
 # ==============================================================================
 
-VALIDATION_VERSION <- "10.0"
+VALIDATION_VERSION <- "11.1"
 
 # ==============================================================================
 # DESIGN VALIDATION
@@ -275,8 +275,12 @@ estimate_d_efficiency <- function(design, item_cols, items) {
   k <- length(item_cols)
   n_tasks <- nrow(design)
 
-  # Simple D-efficiency approximation
-  # Based on balance of item frequencies and pair frequencies
+  # NOTE: This is a heuristic balance score (0-1), NOT the true D-efficiency
+
+  # from information matrix determinant. It combines item frequency balance
+  # and pair frequency balance as a practical proxy. True D-efficiency would
+  # require computing the Fisher information matrix for the conditional logit model.
+  # Values above 0.85 indicate a well-balanced design.
 
   # Item balance component
   item_freq <- table(factor(unlist(design[, item_cols]), levels = items))

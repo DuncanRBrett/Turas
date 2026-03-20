@@ -294,7 +294,7 @@ var SimPins = (function() {
       var w = Math.max(2, (s.share / max) * 100);
       html += '<div class="sim-bar-row">' +
         '<div class="sim-bar-label">' + esc(s.label) + '</div>' +
-        '<div class="sim-bar-track"><div class="sim-bar-fill" style="width:' + w + '%;background:' + (SimCharts.brandColour || '#1e3a5f') + '"></div></div>' +
+        '<div class="sim-bar-track"><div class="sim-bar-fill" style="width:' + w + '%;background:' + ((SimCharts.getBrandColour ? SimCharts.getBrandColour() : '#1e3a5f')) + '"></div></div>' +
         '<div class="sim-bar-value">' + s.share.toFixed(1) + '%</div>' +
       '</div>';
     }
@@ -303,7 +303,7 @@ var SimPins = (function() {
   }
 
   function buildH2HSnapshot(results) {
-    var brand = SimCharts.brandColour || '#1e3a5f';
+    var brand = (SimCharts.getBrandColour ? SimCharts.getBrandColour() : '#1e3a5f');
     var html = '';
     for (var i = 0; i < results.length; i++) {
       var r = results[i];
@@ -321,7 +321,7 @@ var SimPins = (function() {
   }
 
   function buildTurfSnapshot(reach, selectedLabels, segLabel, topK, optHtml) {
-    var brand = SimCharts.brandColour || '#1e3a5f';
+    var brand = (SimCharts.getBrandColour ? SimCharts.getBrandColour() : '#1e3a5f');
 
     // Build SVG gauge (same as SimCharts.renderTurfReach)
     var angle = (reach.reach / 100) * 360;

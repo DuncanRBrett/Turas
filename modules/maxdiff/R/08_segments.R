@@ -12,7 +12,7 @@
 # - utils.R
 # ==============================================================================
 
-SEGMENTS_VERSION <- "10.1"
+SEGMENTS_VERSION <- "11.1"
 
 # ==============================================================================
 # SAFE EXPRESSION EVALUATION
@@ -536,13 +536,15 @@ test_segment_differences <- function(long_data, resp_data, segment_var, items,
   resp_b <- resp_data$resp_id[resp_data[[segment_var]] == level_b]
 
   for (b in seq_len(n_boot)) {
-    # Bootstrap sample within each group
+    # Bootstrap sample within each group (properly duplicate rows for resampled respondents)
     boot_resp_a <- sample(resp_a, length(resp_a), replace = TRUE)
     boot_resp_b <- sample(resp_b, length(resp_b), replace = TRUE)
 
-    # Calculate scores for each group
-    data_a <- long_data[long_data$resp_id %in% boot_resp_a, ]
-    data_b <- long_data[long_data$resp_id %in% boot_resp_b, ]
+    # Build bootstrap datasets: duplicate rows for multiply-sampled respondents
+    idx_a <- unlist(lapply(boot_resp_a, function(r) which(long_data$resp_id == r)))
+    idx_b <- unlist(lapply(boot_resp_b, function(r) which(long_data$resp_id == r)))
+    data_a <- long_data[idx_a, ]
+    data_b <- long_data[idx_b, ]
 
     for (item_id in included_items) {
       # Group A

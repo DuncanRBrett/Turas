@@ -273,7 +273,7 @@ var SimCharts = (function() {
     // Model Fit Summary cards
     html += '<div class="sim-diag-section"><h3 class="sim-section-title">Model Summary</h3>';
     html += '<div class="sim-stat-grid">';
-    html += diagCard("Method", diag.method, null, statIcon("items"));
+    html += diagCard(diag.method, "Method", null, statIcon("items"));
     html += diagCard(diag.nRespondents.toLocaleString(), "Respondents", null, statIcon("respondents"));
     html += diagCard(diag.nItems, "Items", null, statIcon("items"));
     html += diagCard(diag.nSegments, "Segments", null, statIcon("range"));
@@ -401,6 +401,7 @@ var SimCharts = (function() {
     renderDiagnostics: renderDiagnostics,
     eyeIcon: eyeIcon,
     eyeOffIcon: eyeOffIcon,
-    escapeHtml: escapeHtml
+    escapeHtml: escapeHtml,
+    getBrandColour: function() { return brandColour; }
   };
 })();

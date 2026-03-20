@@ -16,7 +16,7 @@
 # - utils.R (rescale_utilities, is_missing_value)
 # ==============================================================================
 
-TURF_VERSION <- "11.0"
+TURF_VERSION <- "11.1"
 
 # ==============================================================================
 # APPEAL CLASSIFICATION
@@ -64,7 +64,7 @@ classify_appeal <- function(individual_utils, method = "ABOVE_MEAN", k = 3) {
     top_k <- if (method == "TOP_3") 3L else as.integer(k)
     top_k <- min(top_k, n_items)
     for (i in seq_len(n_resp)) {
-      ranks <- rank(-utils_mat[i, ], ties.method = "random", na.last = "keep")
+      ranks <- rank(-utils_mat[i, ], ties.method = "first", na.last = "keep")
       appeal[i, ] <- !is.na(ranks) & ranks <= top_k
     }
   } else if (method == "ABOVE_ZERO") {
@@ -350,6 +350,78 @@ calculate_portfolio_reach <- function(appeal_matrix, item_ids, all_item_ids = NU
     frequency = round(freq, 2),
     n_items = length(indices)
   )
+}
+
+
+# ==============================================================================
+# REACH SENSITIVITY ANALYSIS
+# ==============================================================================
+
+#' Compare TURF reach across different threshold methods
+#'
+#' Runs the TURF greedy selection for multiple threshold methods and
+#' returns a comparison table showing how reach varies by method.
+#'
+#' @param individual_utils Matrix or data frame. Rows = respondents, cols = items.
+#' @param items Data frame. Item definitions with Item_ID and Item_Label.
+#' @param portfolio_sizes Integer vector. Portfolio sizes to compare (default: 1:5).
+#' @param methods Character vector. Threshold methods to compare.
+#' @param weights Numeric vector. Respondent weights (optional).
+#' @param verbose Logical. Print progress (default: FALSE).
+#'
+#' @return Data frame with columns: Portfolio_Size, Method, Reach_Pct
+#'
+#' @export
+compute_reach_sensitivity <- function(individual_utils, items,
+                                       portfolio_sizes = 1:5,
+                                       methods = c("ABOVE_MEAN", "TOP_3", "ABOVE_ZERO"),
+                                       weights = NULL,
+                                       verbose = FALSE) {
+
+  if (is.null(individual_utils) || nrow(individual_utils) == 0) {
+    return(data.frame(Portfolio_Size = integer(), Method = character(),
+                      Reach_Pct = numeric(), stringsAsFactors = FALSE))
+  }
+
+  results <- list()
+
+  for (method in methods) {
+    turf <- tryCatch(
+      run_turf_analysis(
+        individual_utils = individual_utils,
+        items = items,
+        max_items = max(portfolio_sizes),
+        threshold_method = method,
+        weights = weights,
+        verbose = verbose
+      ),
+      error = function(e) NULL
+    )
+
+    if (is.null(turf) || is.null(turf$reach_curve)) next
+
+    for (ps in portfolio_sizes) {
+      reach <- if (ps <= nrow(turf$incremental_table)) {
+        turf$incremental_table$Reach_Pct[ps]
+      } else {
+        max(turf$incremental_table$Reach_Pct)
+      }
+
+      results[[length(results) + 1]] <- data.frame(
+        Portfolio_Size = ps,
+        Method = method,
+        Reach_Pct = reach,
+        stringsAsFactors = FALSE
+      )
+    }
+  }
+
+  if (length(results) == 0) {
+    return(data.frame(Portfolio_Size = integer(), Method = character(),
+                      Reach_Pct = numeric(), stringsAsFactors = FALSE))
+  }
+
+  do.call(rbind, results)
 }
 
 

@@ -1,12 +1,12 @@
 # TURAS Conjoint Analysis Module
 
-**Version 3.1.0** | Production-ready choice-based conjoint analysis with HB, Latent Class, WTP, and interactive HTML reporting
+**Version 3.1.0** | Production-ready choice-based conjoint analysis with HB, Latent Class, WTP, Revenue Simulator, and interactive HTML reporting
 
 ---
 
 ## What It Does
 
-Runs end-to-end conjoint analysis: loads a config-driven study definition, estimates part-worth utilities from choice data, calculates attribute importance, and produces both Excel workbooks and self-contained HTML reports with an interactive market simulator.
+Runs end-to-end conjoint analysis: loads a config-driven study definition, estimates part-worth utilities from choice data, calculates attribute importance and willingness to pay, and produces both Excel workbooks and self-contained HTML reports with an interactive market and revenue simulator.
 
 ### Estimation Methods
 
@@ -26,12 +26,28 @@ The market simulator predicts shares for user-defined product configurations:
 
 | Method | Description |
 |--------|-------------|
-| **Logit** | Multinomial logit softmax: `P(i) = exp(U_i) / sum(exp(U_j))`. Smooth, probabilistic. Default. |
-| **RFC (Randomized First Choice)** | Adds Gumbel error to utilities, then picks the max. Approximate share of preference. More realistic than pure logit for competitive scenarios. |
-| **Purchase Likelihood** | Converts logit probabilities to purchase likelihood scores. |
+| **Logit (MNL)** | Multinomial logit softmax: `P(i) = exp(U_i) / sum(exp(U_j))`. Smooth, probabilistic. Default and recommended for the HTML simulator. |
+| **RFC (Approximate)** | Adds Gumbel random error to aggregate utilities across many draws, then counts first-choices. Produces similar results to Logit with natural stochastic variation. The HTML simulator uses aggregate utilities; for true individual-level RFC (Sawtooth-equivalent), use the R-side `predict_shares_with_ci()` function with HB betas. |
+| **Purchase Likelihood** | Converts each product's utility to an independent purchase probability via logistic function. Values do NOT sum to 100% — useful when products are not direct substitutes. |
 | **First Choice** | Deterministic: 100% share to the highest-utility product, 0% to all others. Useful for winner-take-all scenarios. |
 
-A configurable **scale factor** (exponent) is available in the HTML simulator for calibrating the logit model to observed market data.
+A configurable **scale factor** (exponent, 0.1–3.0) is available in the HTML simulator for calibrating shares to observed market data. The scale factor multiplies all utilities before computing shares: >1 amplifies differences, <1 compresses them.
+
+### Revenue Simulator
+
+When a price attribute is detected, the HTML report includes a **Revenue Simulator** tab showing:
+- Stacked horizontal bars: Market Share + Revenue per product
+- Revenue = Price × Share% × Customers (editable customer count)
+- Summary table with per-product breakdown and totals
+- Configurable default customer count via `default_customers` in Settings sheet
+
+### Willingness to Pay (WTP)
+
+WTP is **auto-computed** when a price attribute is detected (either via `wtp_price_attribute` config setting or auto-detected from attribute names containing "price", "cost", or "fee"). Uses the delta method for confidence intervals.
+
+### Confidence Intervals on Simulated Shares
+
+The R-side function `predict_shares_with_ci()` computes bootstrap CIs from individual-level HB betas — each bootstrap draw resamples respondents with replacement and re-computes shares.
 
 ---
 
@@ -51,6 +67,7 @@ source("modules/conjoint/R/00_main.R")
 results <- run_conjoint_analysis("path/to/Conjoint_Config.xlsx")
 
 # Access results
+results$status        # "PASS" or "PARTIAL" or "REFUSED"
 results$utilities     # Part-worth utilities by attribute level
 results$importance    # Attribute importance scores
 results$diagnostics   # Model fit statistics
@@ -65,6 +82,15 @@ results <- run_conjoint_analysis(
   data_file   = "my_data.csv",
   output_file = "my_results.xlsx"
 )
+```
+
+### Pre-flight Check
+
+```r
+source("modules/conjoint/R/00_main.R")
+conjoint_preflight(verbose = TRUE)
+# Validates: 20 R files, 7 JS files, 7 HTML report files,
+# required packages, optional packages, TRS infrastructure
 ```
 
 ### Generate a Config Template
@@ -84,11 +110,13 @@ generate_conjoint_config_template("LC_Config.xlsx", method_template = "cbc_laten
 
 Available method templates: `standard_cbc`, `cbc_hb`, `cbc_latent_class`, `best_worst`.
 
+A pre-generated template is at: `examples/conjoint/Conjoint_Config_Template.xlsx`
+
 ---
 
 ## Config Excel Reference
 
-The configuration workbook has up to four sheets. All file paths are **relative to the config file location** (or absolute).
+The configuration workbook has up to six sheets. All file paths are **relative to the config file location** (or absolute).
 
 ### Sheet 1: Settings
 
@@ -152,11 +180,9 @@ Key-value format with columns: **Setting | Value | Required? | Description | Val
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `wtp_price_attribute` | | Name of price attribute (leave blank to skip WTP) |
+| `wtp_price_attribute` | | Name of price attribute (auto-detected if blank) |
 | `wtp_method` | `marginal` | `marginal` or `simulation` |
 | `currency_symbol` | `$` | Currency symbol for display |
-
-WTP is auto-computed when a price attribute is detected (either configured or auto-detected from attribute names containing "price", "cost", or "fee"). Uses the delta method for confidence intervals.
 
 #### Market Simulator
 
@@ -165,6 +191,12 @@ WTP is auto-computed when a price attribute is detected (either configured or au
 | `generate_market_simulator` | `TRUE` | Include interactive simulator sheet in Excel |
 | `simulation_method` | `logit` | `logit`, `first_choice`, or `rfc` |
 | `rfc_draws` | `1000` | Number of random draws for RFC simulation |
+
+#### Revenue Simulator
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `default_customers` | `1000` | Default hypothetical customer count for revenue simulation |
 
 #### HTML Report
 
@@ -237,17 +269,25 @@ Defines the conjoint attributes and their levels. Required columns:
 
 | Column | Description |
 |--------|-------------|
-| `Attribute` | Attribute name (must match column names in data) |
-| `Levels` | Comma-separated list of level labels |
+| `AttributeName` | Attribute name (must match column names in data) |
 | `NumLevels` | Number of levels for this attribute |
+| `LevelNames` | Comma-separated list of level labels |
 
-### Sheet 3: Design (optional)
+### Sheet 3: Custom_Slides (optional)
+
+For adding custom slide panels to the HTML report. Columns: **Slide Title | Content (Markdown) | Image Path (Optional) | Position**. Images are base64-encoded and compressed (max 800px wide, JPEG quality 0.7).
+
+### Sheet 4: Custom_Images (optional)
+
+Reserved for future use.
+
+### Sheet 5: Design (optional)
 
 Experimental design matrix. If omitted, the design is inferred from the data.
 
-### Sheet 4: Custom_Slides (optional)
+### Sheet 6: Instructions
 
-For adding custom slide panels to the HTML report. Each row defines one slide with title, body text, and optional image path.
+Auto-generated reference sheet with usage guidance.
 
 ---
 
@@ -274,33 +314,57 @@ For adding custom slide panels to the HTML report. Each row defines one slide wi
 
 ### HTML Analysis Report
 
-A single self-contained HTML file with all analysis panels and an embedded market simulator. Generated when `generate_html_report = TRUE`.
+A single self-contained HTML file with all analysis panels and an embedded market/revenue simulator. Generated when `generate_html_report = TRUE`.
 
 **Report panels:**
 
-- **Overview** -- Summary statistics, key findings, importance chart, top-level callouts
-- **Utilities** -- Per-attribute utility charts (horizontal bar or dot plot), data tables, per-attribute sticky-note annotations with SVG pin icons
-- **Diagnostics** -- Model fit statistics, convergence diagnostics (HB), plain-language method explanations, trust callouts, method reference guide
-- **WTP** -- Willingness-to-pay bar chart with error bars, data table (shown when price attribute detected)
-- **Latent Class** -- BIC comparison chart, class size donut chart, class-level importance grouped bar chart, comparison and profile tables
-- **Simulator** -- Interactive market simulator with product configuration dropdowns, four simulation methods (Logit, RFC, Purchase Likelihood, First Choice), scale factor exponent for calibration, confidence intervals on simulated shares, bar chart visualization
-- **Custom Slides** -- Config-driven slide panels with title, body text, and optional embedded images
-- **Pinned Items** -- Collect and review pinned charts/tables from any panel
+- **Overview** -- Summary KPIs, importance chart, attribute importance callout
+- **Utilities** -- Per-attribute utility charts (horizontal bar or dot plot toggle), data tables, per-attribute sticky-note annotations with sidebar badges
+- **Diagnostics** -- Model fit statistics with trust verdicts, estimation method explanation, HB convergence diagnostics with plain-language guidance (what "not converged" means, what to do), respondent quality (RLH), expandable Method Reference Guide (estimation + simulation methods comparison table)
+- **WTP** -- Willingness-to-pay bar chart with confidence interval whiskers, data table (auto-shown when price attribute detected)
+- **Latent Class** -- BIC comparison chart, class size chart, class-level importance, comparison and profile tables
+- **Simulator** -- Interactive market simulator with 4 modes:
+  - **Market Shares** -- Product configuration dropdowns, 4 simulation methods, scale factor slider, None option toggle, share bar chart with revenue index table
+  - **Revenue** -- OpinionX-style stacked bars (share + revenue), editable customer count, per-product revenue breakdown
+  - **Sensitivity** -- Attribute sweep for any product, share-vs-level charts
+  - **Source of Volume** -- Before/after share comparison when new product enters
+- **Custom Slides** -- Config-driven slide panels with title, markdown body, image import with compression
+- **Pinned Items** -- Snapshot-based pin system. Simulator pins create independent snapshots (can pin multiple market share / revenue / sensitivity views). Other panels use standard toggle pins.
 - **About** -- Analyst contact info, closing notes, branding
 
 **Interactive features:**
 
-- Tab-based navigation with sidebar scroll and keyboard shortcuts (arrow keys, number keys)
-- PNG and CSV export from any panel
-- Pin system: pin any chart or table to the Pinned Items panel for side-by-side review
+- Tab-based navigation with keyboard shortcuts (arrow keys, number keys)
+- Per-mode sticky annotations (notes persist per simulator mode: shares, revenue, sensitivity, SoV)
+- Chart type toggle: bar chart or dot plot (preference persists across attributes)
+- PNG, CSV, and Excel export from any panel
+- Dark red pushpin SVG pin icons
 - Editable insight text areas per panel
-- Per-attribute sticky notes with SVG pin icons
+- Scale factor slider for share calibration
 - Help overlay (keyboard shortcut reference)
-- Print-optimized CSS
+- Print-optimized CSS with targeted print for pinned items and slides
+- Report save via File System Access API (with download fallback)
+- Global toast notifications
 
 ### Standalone HTML Simulator
 
 A lightweight single-page simulator (no analysis panels). Generated when `generate_html_simulator = TRUE`.
+
+---
+
+## Pre-flight Checks
+
+Run `conjoint_preflight(verbose = TRUE)` to validate module readiness before analysis:
+
+- **R source files** -- verifies all 20 expected files
+- **JS files** -- verifies all 7 JavaScript modules
+- **HTML report files** -- verifies all 7 report generator files
+- **Required packages** -- mlogit, survival, openxlsx, data.table, jsonlite
+- **Optional packages** -- bayesm (for HB/LC), coda
+- **JS syntax** -- runs `node --check` if Node.js is available
+- **TRS infrastructure** -- confirms conjoint_refuse and refusal handler are loaded
+
+Also available as `run_conjoint_analysis(..., run_preflight = TRUE)`.
 
 ---
 
@@ -311,12 +375,13 @@ modules/conjoint/
   R/
     00_main.R                  Entry point, module loader, orchestration
     00_guard.R                 TRS guard layer, validation gates
+    00_preflight.R             Pre-flight module validation
     01_config.R                Config loading with autodetect headers
     02_data.R                  Data loading and validation
     03_estimation.R            MNL/clogit/auto/rating estimation
     04_utilities.R             Part-worth utilities, importance, diagnostics
     05_alchemer_import.R       Alchemer CBC direct import and config generation
-    05_simulator.R             Market share prediction, sensitivity, demand curves
+    05_simulator.R             Market share prediction, sensitivity, CIs
     06_interactions.R          Config-driven interaction effects
     07_output.R                Excel workbook writer (8-11 sheets)
     08_market_simulator.R      Interactive Excel simulator sheet
@@ -334,25 +399,24 @@ modules/conjoint/
       01_data_transformer.R    Transform conjoint results to HTML data model
       02_table_builder.R       HTML tables for each panel
       03_page_builder.R        Full page assembly (CSS, header, panels, JS)
-      04_html_writer.R         Write final HTML to disk
-      05_chart_builder.R       Inline SVG chart generation
+      04_html_writer.R         Write final HTML to disk (UTF-8)
+      05_chart_builder.R       Inline SVG chart generation with escaping
       99_html_report_main.R    Top-level orchestrator
-      js/                      7 JavaScript modules (navigation, export, pins,
-                               charts, simulator engine, simulator UI,
-                               simulator charts)
+      js/                      7 JavaScript modules:
+        conjoint_navigation.js   Tab nav, mode switching, slides, annotations
+        conjoint_export.js       CSV/Excel/PNG/slide export
+        conjoint_pins.js         Snapshot-based pin system
+        conjoint_charts.js       SVG chart rendering
+        simulator_engine.js      Share prediction (logit, RFC, purchase likelihood)
+        simulator_ui.js          Product config, revenue mode, controls
+        simulator_charts.js      Simulator SVG bar rendering
     html_simulator/            Standalone HTML simulator
-      00_simulator_guard.R     Input validation
-      01_simulator_data_transformer.R
-      02_simulator_page_builder.R
-      99_simulator_main.R      Top-level orchestrator
-      js/                      3 JavaScript modules (engine, charts, UI)
   tests/
-    testthat/                  Unit and integration tests (14 files)
+    testthat/                  16 test files (unit, integration, guard, HB, CI)
     fixtures/                  Synthetic test data generators
-  docs/
-    CODE_INVENTORY.md          Complete function index (232 functions)
-  examples/                    Module-level examples
-  run_conjoint_gui.R           Shiny GUI launcher
+  examples/
+    Conjoint_Config_Template.xlsx  Pre-generated config template
+  README.md                    This file
 ```
 
 ---
@@ -365,6 +429,8 @@ modules/conjoint/
 |---------|---------|
 | **dplyr** | Data manipulation |
 | **openxlsx** | Excel config reading and output writing (no Java dependency) |
+| **data.table** | Fast data manipulation |
+| **jsonlite** | JSON serialization for HTML reports |
 
 ### Required for Estimation (method-dependent)
 
@@ -381,7 +447,7 @@ modules/conjoint/
 |---------|---------|
 | **coda** | Enhanced MCMC convergence diagnostics (Geweke test, ESS) |
 | **haven** | Import SPSS (.sav) and Stata (.dta) data files |
-| **jsonlite** | JSON serialization for HTML report/simulator data |
+| **base64enc** | Base64 encoding for config-driven slide images |
 
 ---
 
@@ -389,14 +455,12 @@ modules/conjoint/
 
 ### Demo: MNL vs HB Comparison
 
-The `examples/conjoint/v3_demo/hb_demo/` directory contains a comparison script that runs both MNL and HB estimation on the same dataset:
-
 ```r
 # From the Turas root directory
 source("examples/conjoint/v3_demo/hb_demo/run_hb_comparison.R")
 ```
 
-This demonstrates the difference between aggregate MNL utilities and individual-level HB utilities, including convergence diagnostics and respondent quality scores. Requires the `bayesm` package.
+Runs both MNL and HB estimation on the same dataset, generates HTML reports for both, and prints a side-by-side comparison of utilities and importance scores.
 
 ### Demo: Standard CBC
 
@@ -410,8 +474,7 @@ source("examples/conjoint/v3_demo/run_demo.R")
 
 ### "Package 'bayesm' is not available"
 
-HB and Latent Class estimation require bayesm. Install with:
-
+HB and Latent Class estimation require bayesm:
 ```r
 install.packages("bayesm")
 ```
@@ -419,7 +482,6 @@ install.packages("bayesm")
 ### "Package 'mlogit' is not available"
 
 MNL estimation requires mlogit and dfidx:
-
 ```r
 install.packages(c("mlogit", "dfidx"))
 ```
@@ -427,27 +489,22 @@ install.packages(c("mlogit", "dfidx"))
 ### HB estimation is slow
 
 - Default is 10,000 iterations with 5,000 burn-in. For initial testing, reduce to `hb_iterations = 5000`, `hb_burnin = 2000`.
-- Production runs typically need 10,000-50,000 iterations. Monitor convergence diagnostics (Geweke p-values, ESS) to determine if more iterations are needed.
+- Production runs typically need 10,000-50,000 iterations.
 
 ### Convergence warnings in HB output
 
-Check the HB Diagnostics sheet (Excel) or Diagnostics panel (HTML report). The report provides plain-language explanations of each diagnostic metric. Common fixes:
+The HTML report provides plain-language explanations. Common fixes:
 - Increase `hb_iterations` (e.g., 20000-50000)
 - Increase `hb_burnin` to discard more initial draws
-- Check for attributes with very many levels (can slow convergence)
+- Check for too many attribute levels relative to sample size
 
 ### "Column X not found in data"
 
-Verify `respondent_id_column`, `choice_set_column`, `chosen_column`, and `alternative_id_column` in the Settings sheet match your data file column names exactly (case-sensitive).
-
-### Config header not detected
-
-The module auto-detects the header row by scanning the first 20 rows for "Setting" and "Value" columns. If your template has more than 20 rows above the header, move the header up or simplify the template.
+Verify column mapping settings match your data file column names exactly (case-sensitive).
 
 ### HTML report not generated
 
-Set `generate_html_report = TRUE` in the Settings sheet. The report requires jsonlite:
-
+Set `generate_html_report = TRUE` in Settings sheet. Requires jsonlite:
 ```r
 install.packages("jsonlite")
 ```
@@ -455,17 +512,16 @@ install.packages("jsonlite")
 ### WTP not appearing in output
 
 WTP requires either:
-- `wtp_price_attribute` set in config to the exact attribute name, or
+- `wtp_price_attribute` set in config, or
 - An attribute name containing "price", "cost", or "fee" (auto-detected)
 
-The price levels must contain parseable numeric values.
+### Scale factor has no effect
+
+Ensure you're on the Market Shares or Revenue tab. The scale factor multiplies utilities before computing shares — at 1.0 there is no change.
 
 ### TRS refusal messages
 
-All errors follow the Turas Refusal System (TRS) pattern. Check the console output for:
-- **Code** -- Error identifier (e.g., `DATA_MISSING`, `CFG_INVALID`)
-- **Message** -- What went wrong
-- **How to fix** -- Actionable resolution steps
+All errors follow the Turas Refusal System. Check console output for Code, Message, and How to fix.
 
 ---
 
@@ -473,11 +529,12 @@ All errors follow the Turas Refusal System (TRS) pattern. Check the console outp
 
 | Metric | Value |
 |--------|-------|
-| Core R files | 19 |
+| Core R files | 20 |
 | HTML report R files | 7 |
-| HTML simulator R files | 4 |
-| JavaScript modules | 10 |
-| Total R functions | 232 |
-| Total lines of code | ~18,800 |
-| Test files | 14 |
+| JavaScript modules | 7 |
+| Total R lines | ~17,150 |
+| Total JS lines | ~3,170 |
+| Test files | 16 |
+| Test assertions | 207+ (HTML report suite alone) |
+| Config template | 6 sheets, branded |
 | Quality score | 91/100 |

@@ -16,7 +16,7 @@
 # - utils.R
 # ==============================================================================
 
-LOGIT_VERSION <- "10.0"
+LOGIT_VERSION <- "11.1"
 
 # ==============================================================================
 # MAIN LOGIT ESTIMATOR
@@ -55,8 +55,8 @@ fit_aggregate_logit <- function(long_data, items, weighted = TRUE,
     )
   }
 
-  # Load survival package to make strata() available for formula
-  suppressPackageStartupMessages(library(survival, quietly = TRUE))
+  # Make strata() available for formula construction without library() polluting global namespace
+  strata <- survival::strata
 
   # Get included items
   included_items <- items$Item_ID[items$Include == 1]
@@ -103,13 +103,15 @@ fit_aggregate_logit <- function(long_data, items, weighted = TRUE,
   # IMPORTANT: Multiply by sign to handle worst choices correctly
   # For best choices (sign=1), indicators are positive
   # For worst choices (sign=-1), indicators are negated (as per MaxDiff theory)
-  for (item_id in non_anchor_items) {
+  # NOTE: Use a consistent naming scheme — make.names() applied to the full
+  # "item_<id>" string so column creation and formula reference match exactly.
+  item_vars <- character(length(non_anchor_items))
+  for (i in seq_along(non_anchor_items)) {
+    item_id <- non_anchor_items[i]
     safe_name <- make.names(paste0("item_", item_id))
+    item_vars[i] <- safe_name
     logit_data[[safe_name]] <- as.numeric(logit_data$item_id == item_id) * logit_data$sign
   }
-
-  # Formula with item indicators
-  item_vars <- paste0("item_", make.names(non_anchor_items))
   formula_str <- paste("choice ~", paste(item_vars, collapse = " + "),
                        "+ strata(choice_set)")
   model_formula <- as.formula(formula_str)
@@ -238,6 +240,15 @@ prepare_logit_data <- function(long_data, item_ids, anchor_item) {
     set_id <- set_id + 1
   }
 
+  if (length(choice_sets) == 0) {
+    return(data.frame(
+      choice_set = integer(0), choice_type = character(0),
+      item_id = character(0), choice = integer(0),
+      weight = numeric(0), sign = numeric(0),
+      stringsAsFactors = FALSE
+    ))
+  }
+
   logit_data <- do.call(rbind, choice_sets)
 
   # For worst choices, we need to negate the utility
@@ -263,14 +274,27 @@ extract_logit_utilities <- function(model, non_anchor_items, anchor_item, items)
   coefs <- coef(model)
   se <- sqrt(diag(vcov(model)))
 
-  # Extract item names from coefficient names
-  # Coefficients are named like "item_B01" etc.
+  # Match coefficients to items by name rather than position for safety.
+  # Column names used in the model formula are make.names(paste0("item_", id)).
+  safe_names <- make.names(paste0("item_", non_anchor_items))
+  coef_values <- numeric(length(non_anchor_items))
+  se_values <- numeric(length(non_anchor_items))
+  for (i in seq_along(safe_names)) {
+    idx <- match(safe_names[i], names(coefs))
+    if (!is.na(idx)) {
+      coef_values[i] <- coefs[idx]
+      se_values[i] <- se[idx]
+    } else {
+      coef_values[i] <- NA_real_
+      se_values[i] <- NA_real_
+    }
+  }
 
-  # Build utilities data frame
+  # Build utilities data frame (anchor item has utility = 0 by definition)
   utilities <- data.frame(
     Item_ID = c(non_anchor_items, anchor_item),
-    Logit_Utility = c(as.numeric(coefs), 0),
-    Logit_SE = c(as.numeric(se), NA_real_),
+    Logit_Utility = c(coef_values, 0),
+    Logit_SE = c(se_values, NA_real_),
     stringsAsFactors = FALSE
   )
 

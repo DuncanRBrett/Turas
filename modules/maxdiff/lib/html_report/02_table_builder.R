@@ -5,14 +5,7 @@
 # Layer 2 of the 4-layer HTML report pipeline
 # ==============================================================================
 
-htmlEscape <- function(x) {
-  x <- as.character(x)
-  x <- gsub("&", "&amp;", x, fixed = TRUE)
-  x <- gsub("<", "&lt;", x, fixed = TRUE)
-  x <- gsub(">", "&gt;", x, fixed = TRUE)
-  x <- gsub('"', "&quot;", x, fixed = TRUE)
-  x
-}
+# htmlEscape() is defined in 01_data_transformer.R (loaded first by 99_html_report_main.R)
 
 fmt_num <- function(x, digits = 1) {
   if (is.null(x) || is.na(x)) return("&mdash;")

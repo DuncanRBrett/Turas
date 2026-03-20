@@ -20,7 +20,7 @@
 # - shared/config_utils.R
 # ==============================================================================
 
-CONFIG_VERSION <- "10.0"
+CONFIG_VERSION <- "11.1"
 
 # ==============================================================================
 # MAIN CONFIGURATION LOADER
@@ -159,7 +159,9 @@ load_maxdiff_config <- function(config_path, project_root = NULL) {
   design_settings <- NULL
   if ("DESIGN_SETTINGS" %in% available_sheets) {
     design_settings_raw <- load_config_sheet(config_path, "DESIGN_SETTINGS")
-    design_settings <- parse_design_settings(design_settings_raw, nrow(items))
+    # Use count of INCLUDED items (Include==1), not total rows
+    n_included <- sum(items$Include == 1, na.rm = TRUE)
+    design_settings <- parse_design_settings(design_settings_raw, n_included)
   } else if (mode == "DESIGN") {
     maxdiff_refuse(
       code = "CFG_DESIGN_SETTINGS_MISSING",

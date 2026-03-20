@@ -6,7 +6,7 @@
 # self-contained HTML report file.
 # ==============================================================================
 
-MAXDIFF_HTML_REPORT_VERSION <- "11.0"
+MAXDIFF_HTML_REPORT_VERSION <- "11.1"
 
 # Flag to prevent re-sourcing
 .md_html_loaded <- FALSE
@@ -197,6 +197,13 @@ generate_maxdiff_html_report <- function(maxdiff_results, output_path, config) {
     charts$turf_chart <- tryCatch(
       build_turf_chart(html_data$turf$reach_curve, brand),
       error = function(e) { message(sprintf("  Chart error (turf): %s", e$message)); "" }
+    )
+  }
+
+  if (!is.null(html_data$segments)) {
+    charts$segment_chart <- tryCatch(
+      build_segment_chart(html_data$segments$segment_data, brand),
+      error = function(e) { message(sprintf("  Chart error (segments): %s", e$message)); "" }
     )
   }
 

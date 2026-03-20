@@ -17,7 +17,7 @@
 # - utils.R
 # ==============================================================================
 
-COUNTS_VERSION <- "10.0"
+COUNTS_VERSION <- "11.1"
 
 # ==============================================================================
 # MAIN COUNT SCORER
@@ -225,14 +225,15 @@ compute_count_standard_errors <- function(long_data, items, n_boot = 1000, verbo
   colnames(boot_estimates) <- included_items
 
   for (b in seq_len(n_boot)) {
-    # Bootstrap sample of respondents
+    # Bootstrap sample of respondents (with replacement)
     boot_resp <- sample(respondents, size = n_resp, replace = TRUE)
 
-    # Get data for bootstrap sample
-    boot_data <- long_data[long_data$resp_id %in% boot_resp, ]
-
-    # If respondent appears multiple times in bootstrap, need to handle
-    # For simplicity, we'll just calculate scores on the subset
+    # Build bootstrap dataset: for each sampled respondent, include all their rows.
+    # When a respondent is sampled multiple times, their rows appear multiple times.
+    boot_indices <- unlist(lapply(boot_resp, function(r) {
+      which(long_data$resp_id == r)
+    }))
+    boot_data <- long_data[boot_indices, ]
 
     # Calculate scores
     for (item_id in included_items) {
@@ -290,16 +291,24 @@ add_count_confidence_intervals <- function(count_scores, n_respondents, conf_lev
   z <- qnorm(1 - alpha / 2)
 
   # Calculate SEs using normal approximation
-  # For Best%: SE = sqrt(p * (1-p) / n)
+  # Use Times_Shown (total item appearances) as denominator, not n_respondents,
+
+  # because Best%/Worst% are computed as proportions of times shown.
+  # Note: this is conservative — observations within respondent are correlated,
+  # so the effective sample size is smaller than Times_Shown. For design-corrected
+  # SEs, use compute_count_standard_errors() with bootstrap resampling.
+  effective_n <- count_scores$Times_Shown
+  effective_n[effective_n == 0] <- 1  # avoid division by zero
+
   count_scores$Best_Pct_SE <- sqrt(
-    (count_scores$Best_Pct / 100) * (1 - count_scores$Best_Pct / 100) / n_respondents
+    (count_scores$Best_Pct / 100) * (1 - count_scores$Best_Pct / 100) / effective_n
   ) * 100
 
   count_scores$Worst_Pct_SE <- sqrt(
-    (count_scores$Worst_Pct / 100) * (1 - count_scores$Worst_Pct / 100) / n_respondents
+    (count_scores$Worst_Pct / 100) * (1 - count_scores$Worst_Pct / 100) / effective_n
   ) * 100
 
-  # Net Score SE (assuming independence)
+  # Net Score SE (assuming independence between Best and Worst within item)
   count_scores$Net_Score_SE <- sqrt(
     count_scores$Best_Pct_SE^2 + count_scores$Worst_Pct_SE^2
   )

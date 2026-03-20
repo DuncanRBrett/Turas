@@ -12,7 +12,7 @@
 # Local versions retained for backward compatibility.
 # ==============================================================================
 
-MAXDIFF_UTILS_VERSION <- "10.1"
+MAXDIFF_UTILS_VERSION <- "11.1"
 
 # Load shared utilities if available
 if (!exists("safe_numeric", mode = "function")) {
@@ -747,6 +747,11 @@ compute_head_to_head <- function(individual_utils, item_a, item_b) {
     return(list(prob_a = 50, prob_b = 50))
   }
 
+  # Strip non-numeric columns (e.g., resp_id) before matrix conversion
+  if (is.data.frame(individual_utils)) {
+    numeric_cols <- vapply(individual_utils, is.numeric, logical(1))
+    individual_utils <- individual_utils[, numeric_cols, drop = FALSE]
+  }
   utils_mat <- as.matrix(individual_utils)
   col_names <- colnames(utils_mat)
 
@@ -822,12 +827,19 @@ classify_item_discrimination <- function(individual_utils, items = NULL) {
   for (j in seq_along(item_ids)) {
     high_mean <- means[j] > median_mean
     high_sd <- sds[j] > median_sd
+    positive_mean <- means[j] > 0
 
     if (high_mean && !high_sd) {
-      classification[j] <- "UNIVERSAL_FAVORITE"
-      label[j] <- "Universal Favorite"
+      # Only label as "Universal Favorite" if utility is actually positive
+      if (positive_mean) {
+        classification[j] <- "UNIVERSAL_FAVORITE"
+        label[j] <- "Universal Favorite"
+      } else {
+        classification[j] <- "MODERATE"
+        label[j] <- "Moderate"
+      }
     } else if (!high_mean && !high_sd) {
-      classification[j] <- "UNIVERSAL_REJECT"
+      classification[j] <- "LOW_PRIORITY"
       label[j] <- "Low Priority"
     } else if (high_sd) {
       classification[j] <- "POLARIZING"

@@ -18,35 +18,44 @@ create_maxdiff_template <- function(output_path = NULL) {
 
   wb <- createWorkbook()
 
-  # Define styles
+  # Turas brand palette (matches tabs module and platform identity)
+  .TPL_NAVY <- "#323367"
+  .TPL_NAVY_LIGHT <- "#e8e8f0"
+  .TPL_GOLD <- "#CC9900"
+  .TPL_GOLD_LIGHT <- "#fef3c7"
+  .TPL_GREEN <- "#ecfdf5"
+  .TPL_BLUE <- "#eff6ff"
+  .TPL_FONT <- "Calibri"
+
+  # Define styles - aligned with Turas platform brand
   headerStyle <- createStyle(
-    fontSize = 12, fontColour = "#FFFFFF", fgFill = "#6d28d9",
+    fontSize = 12, fontName = .TPL_FONT, fontColour = "#FFFFFF", fgFill = .TPL_NAVY,
     halign = "center", valign = "center", textDecoration = "bold",
-    border = "TopBottomLeftRight", borderColour = "#4c1d95"
+    border = "TopBottomLeftRight", borderColour = "#1a1a4e"
   )
 
   instructionStyle <- createStyle(
-    fontSize = 10, fgFill = "#f5f3ff", wrapText = TRUE,
-    valign = "top", border = "TopBottomLeftRight", borderColour = "#e9d5ff"
+    fontSize = 10, fontName = .TPL_FONT, fgFill = .TPL_NAVY_LIGHT, wrapText = TRUE,
+    valign = "top", border = "TopBottomLeftRight", borderColour = "#c8c8d8"
   )
 
   requiredStyle <- createStyle(
-    fontSize = 10, fgFill = "#fef3c7", fontColour = "#92400e",
+    fontSize = 10, fontName = .TPL_FONT, fgFill = .TPL_GOLD_LIGHT, fontColour = "#92400e",
     border = "TopBottomLeftRight", borderColour = "#fcd34d"
   )
 
   optionalStyle <- createStyle(
-    fontSize = 10, fgFill = "#ecfdf5", fontColour = "#065f46",
+    fontSize = 10, fontName = .TPL_FONT, fgFill = .TPL_GREEN, fontColour = "#065f46",
     border = "TopBottomLeftRight", borderColour = "#a7f3d0"
   )
 
   exampleStyle <- createStyle(
-    fontSize = 10, fgFill = "#eff6ff", fontColour = "#1e40af",
+    fontSize = 10, fontName = .TPL_FONT, fgFill = .TPL_BLUE, fontColour = "#1e40af",
     border = "TopBottomLeftRight", borderColour = "#bfdbfe"
   )
 
   sectionStyle <- createStyle(
-    fontSize = 11, fontColour = "#FFFFFF", fgFill = "#8b5cf6",
+    fontSize = 11, fontName = .TPL_FONT, fontColour = "#FFFFFF", fgFill = .TPL_GOLD,
     textDecoration = "bold", border = "TopBottomLeftRight"
   )
 
@@ -54,7 +63,7 @@ create_maxdiff_template <- function(output_path = NULL) {
   # SHEET 1: INSTRUCTIONS
   # ============================================================================
 
-  addWorksheet(wb, "INSTRUCTIONS")
+  addWorksheet(wb, "INSTRUCTIONS", gridLines = FALSE)
 
   instructions <- data.frame(
     Topic = c(
@@ -64,6 +73,9 @@ create_maxdiff_template <- function(output_path = NULL) {
       "",
       "",
       "SHEET DESCRIPTIONS",
+      "",
+      "",
+      "",
       "",
       "",
       "",
@@ -102,6 +114,9 @@ create_maxdiff_template <- function(output_path = NULL) {
       "SURVEY_MAPPING: Column mappings for survey data - Required for ANALYSIS mode",
       "SEGMENT_SETTINGS: Define segments for subgroup analysis - Optional",
       "OUTPUT_SETTINGS: Control what outputs are generated - Optional (has defaults)",
+      "REPORT_SETTINGS: Branding, logos, and report generation options - Optional",
+      "SLIDES: Custom report pages inserted before/after diagnostics - Optional",
+      "IMAGES: Embedded images for specific report panels - Optional",
       "",
       "1. Set Mode = DESIGN in PROJECT_SETTINGS",
       "2. Define your items in the ITEMS sheet",
@@ -128,15 +143,16 @@ create_maxdiff_template <- function(output_path = NULL) {
 
   writeData(wb, "INSTRUCTIONS", instructions, startRow = 1, startCol = 1)
   addStyle(wb, "INSTRUCTIONS", headerStyle, rows = 1, cols = 1:2, gridExpand = TRUE)
-  addStyle(wb, "INSTRUCTIONS", instructionStyle, rows = 2:31, cols = 1:2, gridExpand = TRUE)
+  addStyle(wb, "INSTRUCTIONS", instructionStyle, rows = 2:nrow(instructions) + 1, cols = 1:2, gridExpand = TRUE)
   setColWidths(wb, "INSTRUCTIONS", cols = 1, widths = 30)
   setColWidths(wb, "INSTRUCTIONS", cols = 2, widths = 100)
+  freezePane(wb, "INSTRUCTIONS", firstRow = TRUE)
 
   # ============================================================================
   # SHEET 2: PROJECT_SETTINGS
   # ============================================================================
 
-  addWorksheet(wb, "PROJECT_SETTINGS")
+  addWorksheet(wb, "PROJECT_SETTINGS", gridLines = FALSE)
 
   project_settings <- data.frame(
     Setting_Name = c(
@@ -234,12 +250,17 @@ create_maxdiff_template <- function(output_path = NULL) {
   setColWidths(wb, "PROJECT_SETTINGS", cols = 3, widths = 15)
   setColWidths(wb, "PROJECT_SETTINGS", cols = 4, widths = 60)
   setColWidths(wb, "PROJECT_SETTINGS", cols = 5, widths = 50)
+  freezePane(wb, "PROJECT_SETTINGS", firstRow = TRUE)
+
+  # Add data validation for Mode
+  dataValidation(wb, "PROJECT_SETTINGS", col = 2, rows = 3,
+                 type = "list", value = "'DESIGN,ANALYSIS'")
 
   # ============================================================================
   # SHEET 3: ITEMS
   # ============================================================================
 
-  addWorksheet(wb, "ITEMS")
+  addWorksheet(wb, "ITEMS", gridLines = FALSE)
 
   items <- data.frame(
     Item_ID = c("ITEM_01", "ITEM_02", "ITEM_03", "ITEM_04", "ITEM_05",
@@ -288,6 +309,7 @@ create_maxdiff_template <- function(output_path = NULL) {
   setColWidths(wb, "ITEMS", cols = 5, widths = 12)
   setColWidths(wb, "ITEMS", cols = 6, widths = 14)
   setColWidths(wb, "ITEMS", cols = 7, widths = 30)
+  freezePane(wb, "ITEMS", firstRow = TRUE)
 
   # Add column descriptions below data
   item_instructions <- data.frame(
@@ -313,7 +335,7 @@ create_maxdiff_template <- function(output_path = NULL) {
   # SHEET 4: DESIGN_SETTINGS
   # ============================================================================
 
-  addWorksheet(wb, "DESIGN_SETTINGS")
+  addWorksheet(wb, "DESIGN_SETTINGS", gridLines = FALSE)
 
   design_settings <- data.frame(
     Parameter_Name = c(
@@ -414,12 +436,25 @@ create_maxdiff_template <- function(output_path = NULL) {
   setColWidths(wb, "DESIGN_SETTINGS", cols = 4, widths = 50)
   setColWidths(wb, "DESIGN_SETTINGS", cols = 5, widths = 45)
   setColWidths(wb, "DESIGN_SETTINGS", cols = 6, widths = 40)
+  freezePane(wb, "DESIGN_SETTINGS", firstRow = TRUE)
+
+  # Add data validations for DESIGN_SETTINGS
+  dataValidation(wb, "DESIGN_SETTINGS", col = 2, rows = 5,
+                 type = "list", value = "'BALANCED,OPTIMAL,RANDOM'")
+  dataValidation(wb, "DESIGN_SETTINGS", col = 2, rows = 6,
+                 type = "list", value = "'YES,NO'")
+  dataValidation(wb, "DESIGN_SETTINGS", col = 2, rows = 8,
+                 type = "list", value = "'YES,NO'")
+  dataValidation(wb, "DESIGN_SETTINGS", col = 2, rows = 9,
+                 type = "list", value = "'YES,NO'")
+  dataValidation(wb, "DESIGN_SETTINGS", col = 2, rows = 10,
+                 type = "list", value = "'YES,NO'")
 
   # ============================================================================
   # SHEET 5: SURVEY_MAPPING
   # ============================================================================
 
-  addWorksheet(wb, "SURVEY_MAPPING")
+  addWorksheet(wb, "SURVEY_MAPPING", gridLines = FALSE)
 
   survey_mapping <- data.frame(
     Mapping_Type = c(
@@ -486,6 +521,7 @@ create_maxdiff_template <- function(output_path = NULL) {
   setColWidths(wb, "SURVEY_MAPPING", cols = 3, widths = 12)
   setColWidths(wb, "SURVEY_MAPPING", cols = 4, widths = 60)
   setColWidths(wb, "SURVEY_MAPPING", cols = 5, widths = 50)
+  freezePane(wb, "SURVEY_MAPPING", firstRow = TRUE)
 
   # Add explanation
   mapping_notes <- data.frame(
@@ -510,7 +546,7 @@ create_maxdiff_template <- function(output_path = NULL) {
   # SHEET 6: SEGMENT_SETTINGS
   # ============================================================================
 
-  addWorksheet(wb, "SEGMENT_SETTINGS")
+  addWorksheet(wb, "SEGMENT_SETTINGS", gridLines = FALSE)
 
   segment_settings <- data.frame(
     Segment_ID = c("Gender", "Gender", "Age_Group", "Age_Group", "Age_Group", "Region", "Region", "Region", "Region"),
@@ -532,6 +568,7 @@ create_maxdiff_template <- function(output_path = NULL) {
   setColWidths(wb, "SEGMENT_SETTINGS", cols = 4, widths = 15)
   setColWidths(wb, "SEGMENT_SETTINGS", cols = 5, widths = 10)
   setColWidths(wb, "SEGMENT_SETTINGS", cols = 6, widths = 14)
+  freezePane(wb, "SEGMENT_SETTINGS", firstRow = TRUE)
 
   # Add column descriptions
   segment_instructions <- data.frame(
@@ -556,10 +593,12 @@ create_maxdiff_template <- function(output_path = NULL) {
   # SHEET 7: OUTPUT_SETTINGS
   # ============================================================================
 
-  addWorksheet(wb, "OUTPUT_SETTINGS")
+  addWorksheet(wb, "OUTPUT_SETTINGS", gridLines = FALSE)
 
   output_settings <- data.frame(
     Setting_Name = c(
+      # --- Output Formats ---
+      "--- OUTPUT FORMATS ---",
       "Generate_Design_File",
       "Generate_Count_Scores",
       "Generate_Aggregate_Logit",
@@ -568,11 +607,19 @@ create_maxdiff_template <- function(output_path = NULL) {
       "Generate_Charts",
       "Generate_HTML_Report",
       "Generate_Simulator",
+      # --- TURF Analysis ---
+      "--- TURF ANALYSIS ---",
       "Generate_TURF",
       "TURF_Max_Items",
       "TURF_Threshold",
+      # --- Anchored MaxDiff ---
+      "--- ANCHORED MAXDIFF ---",
       "Has_Anchor_Question",
+      "Anchor_Variable",
       "Anchor_Threshold",
+      "Anchor_Format",
+      # --- Display & Formatting ---
+      "--- DISPLAY & FORMATTING ---",
       "Score_Display",
       "Utility_Scale",
       "Include_Raw_Data",
@@ -582,6 +629,7 @@ create_maxdiff_template <- function(output_path = NULL) {
       "Chart_Height"
     ),
     Value = c(
+      "",
       "YES",
       "YES",
       "YES",
@@ -590,11 +638,16 @@ create_maxdiff_template <- function(output_path = NULL) {
       "YES",
       "YES",
       "YES",
+      "",
       "YES",
       "10",
-      "AUTO",
+      "ABOVE_MEAN",
+      "",
       "NO",
+      "",
       "0.50",
+      "COMMA_SEPARATED",
+      "",
       "BOTH",
       "0_100",
       "NO",
@@ -604,6 +657,7 @@ create_maxdiff_template <- function(output_path = NULL) {
       "600"
     ),
     Description = c(
+      "",
       "Generate design file with task assignments (DESIGN mode)",
       "Calculate count-based scores (Best%, Worst%, Net Score)",
       "Fit aggregate multinomial logit model for utilities",
@@ -612,11 +666,16 @@ create_maxdiff_template <- function(output_path = NULL) {
       "Generate PNG/PDF visualization charts",
       "Generate interactive HTML report with SVG charts and tabbed layout",
       "Generate interactive HTML simulator (head-to-head, portfolio builder)",
+      "",
       "Run TURF (Total Unduplicated Reach & Frequency) portfolio optimization",
       "Maximum portfolio size for TURF analysis",
       "Method for classifying items as appealing in TURF",
+      "",
       "Whether the survey includes an anchor/must-have question",
+      "Column name containing anchor responses (leave blank if Has_Anchor_Question = NO)",
       "Proportion threshold for classifying items as must-have (0.0-1.0)",
+      "Format of anchor variable data",
+      "",
       "How to display preference scores in reports",
       "Scale for utility scores: RAW, 0_100, or PROBABILITY",
       "Include raw response data in output file",
@@ -626,6 +685,7 @@ create_maxdiff_template <- function(output_path = NULL) {
       "Chart height in pixels"
     ),
     Options = c(
+      "",
       "YES or NO",
       "YES or NO",
       "YES or NO",
@@ -634,11 +694,16 @@ create_maxdiff_template <- function(output_path = NULL) {
       "YES or NO",
       "YES or NO (produces self-contained .html file)",
       "YES or NO (requires HB or logit results)",
+      "",
       "YES or NO (requires individual-level utilities from HB)",
       "1 to n_items (default: min(10, n_items))",
-      "AUTO | TOP_3 | ABOVE_MEAN | ABOVE_ZERO",
+      "ABOVE_MEAN | TOP_3 | TOP_K | ABOVE_ZERO",
+      "",
       "YES or NO",
+      "Column name from data file",
       "0.0-1.0 (items with anchor rate above this = must-have)",
+      "COMMA_SEPARATED | BINARY",
+      "",
       "UTILITY | PREFERENCE_SHARE | BOTH",
       "RAW = logit scale | 0_100 = rescaled 0-100 | PROBABILITY = share of preference",
       "YES or NO",
@@ -652,12 +717,205 @@ create_maxdiff_template <- function(output_path = NULL) {
 
   writeData(wb, "OUTPUT_SETTINGS", output_settings, startRow = 1, startCol = 1)
   addStyle(wb, "OUTPUT_SETTINGS", headerStyle, rows = 1, cols = 1:4, gridExpand = TRUE)
-  addStyle(wb, "OUTPUT_SETTINGS", optionalStyle, rows = 2:(nrow(output_settings) + 1), cols = 1:4, gridExpand = TRUE)
+
+  # Style rows: section headers get sectionStyle, data rows get optionalStyle
+  section_rows <- which(grepl("^---", output_settings$Setting_Name)) + 1
+  data_rows <- setdiff(2:(nrow(output_settings) + 1), section_rows)
+  for (r in section_rows) {
+    addStyle(wb, "OUTPUT_SETTINGS", sectionStyle, rows = r, cols = 1:4, gridExpand = TRUE)
+  }
+  for (r in data_rows) {
+    addStyle(wb, "OUTPUT_SETTINGS", optionalStyle, rows = r, cols = 1:4, gridExpand = TRUE)
+  }
 
   setColWidths(wb, "OUTPUT_SETTINGS", cols = 1, widths = 28)
-  setColWidths(wb, "OUTPUT_SETTINGS", cols = 2, widths = 12)
+  setColWidths(wb, "OUTPUT_SETTINGS", cols = 2, widths = 20)
   setColWidths(wb, "OUTPUT_SETTINGS", cols = 3, widths = 60)
   setColWidths(wb, "OUTPUT_SETTINGS", cols = 4, widths = 50)
+  freezePane(wb, "OUTPUT_SETTINGS", firstRow = TRUE)
+
+  # Data validations for OUTPUT_SETTINGS
+  # YES/NO dropdowns for boolean fields
+  yn_setting_names <- c("Generate_Design_File", "Generate_Count_Scores",
+                        "Generate_Aggregate_Logit", "Generate_HB_Model",
+                        "Generate_Segment_Tables", "Generate_Charts",
+                        "Generate_HTML_Report", "Generate_Simulator",
+                        "Generate_TURF", "Has_Anchor_Question",
+                        "Include_Raw_Data", "Include_Diagnostics")
+  for (sname in yn_setting_names) {
+    row_idx <- which(output_settings$Setting_Name == sname) + 1
+    if (length(row_idx) == 1) {
+      dataValidation(wb, "OUTPUT_SETTINGS", col = 2, rows = row_idx,
+                     type = "list", value = "'YES,NO'")
+    }
+  }
+
+  # TURF_Threshold dropdown
+  turf_thresh_row <- which(output_settings$Setting_Name == "TURF_Threshold") + 1
+  if (length(turf_thresh_row) == 1) {
+    dataValidation(wb, "OUTPUT_SETTINGS", col = 2, rows = turf_thresh_row,
+                   type = "list", value = "'ABOVE_MEAN,TOP_3,TOP_K,ABOVE_ZERO'")
+  }
+
+  # Anchor_Format dropdown
+  anchor_fmt_row <- which(output_settings$Setting_Name == "Anchor_Format") + 1
+  if (length(anchor_fmt_row) == 1) {
+    dataValidation(wb, "OUTPUT_SETTINGS", col = 2, rows = anchor_fmt_row,
+                   type = "list", value = "'COMMA_SEPARATED,BINARY'")
+  }
+
+  # ============================================================================
+  # SHEET 8: REPORT_SETTINGS
+  # ============================================================================
+
+  addWorksheet(wb, "REPORT_SETTINGS", gridLines = FALSE)
+
+  report_settings <- data.frame(
+    Setting_Name = c(
+      "Brand_Colour",
+      "Accent_Colour",
+      "Researcher_Logo_Path",
+      "Client_Logo_Path",
+      "Report_Title",
+      "Include_Methodology"
+    ),
+    Value = c(
+      "#323367",
+      "#CC9900",
+      "",
+      "",
+      "",
+      "YES"
+    ),
+    Required = c(
+      "NO",
+      "NO",
+      "NO",
+      "NO",
+      "NO",
+      "NO"
+    ),
+    Description = c(
+      "Primary brand colour for report theme (hex format)",
+      "Accent colour for highlights and secondary elements (hex format)",
+      "File path to researcher/agency logo image (PNG/JPG, leave blank for none)",
+      "File path to client logo image (PNG/JPG, leave blank for none)",
+      "Custom report title (leave blank to use Project_Name from PROJECT_SETTINGS)",
+      "Include a methodology section in the HTML report"
+    ),
+    Options_Examples = c(
+      "#323367, #1e3a5f, #2c3e50",
+      "#CC9900, #e67e22, #27ae60",
+      "logos/agency_logo.png, C:/Logos/company.png",
+      "logos/client_logo.png, C:/Logos/client_brand.png",
+      "Brand Preference MaxDiff Study Q1 2024",
+      "YES or NO"
+    ),
+    stringsAsFactors = FALSE
+  )
+
+  writeData(wb, "REPORT_SETTINGS", report_settings, startRow = 1, startCol = 1)
+  addStyle(wb, "REPORT_SETTINGS", headerStyle, rows = 1, cols = 1:5, gridExpand = TRUE)
+  addStyle(wb, "REPORT_SETTINGS", optionalStyle,
+           rows = 2:(nrow(report_settings) + 1), cols = 1:5, gridExpand = TRUE)
+
+  setColWidths(wb, "REPORT_SETTINGS", cols = 1, widths = 25)
+  setColWidths(wb, "REPORT_SETTINGS", cols = 2, widths = 30)
+  setColWidths(wb, "REPORT_SETTINGS", cols = 3, widths = 12)
+  setColWidths(wb, "REPORT_SETTINGS", cols = 4, widths = 60)
+  setColWidths(wb, "REPORT_SETTINGS", cols = 5, widths = 50)
+  freezePane(wb, "REPORT_SETTINGS", firstRow = TRUE)
+
+  # Data validation for Include_Methodology
+  dataValidation(wb, "REPORT_SETTINGS", col = 2, rows = 7,
+                 type = "list", value = "'YES,NO'")
+
+  # ============================================================================
+  # SHEET 9: SLIDES
+  # ============================================================================
+
+  addWorksheet(wb, "SLIDES", gridLines = FALSE)
+
+  slides <- data.frame(
+    Title = c("About This Study"),
+    Content = c("<p>This MaxDiff study was conducted to understand customer preferences across key product attributes.</p><p>Results are based on a sample of N=500 respondents.</p>"),
+    Position = c("BEFORE_DIAGNOSTICS"),
+    Image_Path = c(""),
+    stringsAsFactors = FALSE
+  )
+
+  writeData(wb, "SLIDES", slides, startRow = 1, startCol = 1)
+  addStyle(wb, "SLIDES", headerStyle, rows = 1, cols = 1:4, gridExpand = TRUE)
+  addStyle(wb, "SLIDES", exampleStyle, rows = 2, cols = 1:4, gridExpand = TRUE)
+
+  setColWidths(wb, "SLIDES", cols = 1, widths = 30)
+  setColWidths(wb, "SLIDES", cols = 2, widths = 80)
+  setColWidths(wb, "SLIDES", cols = 3, widths = 25)
+  setColWidths(wb, "SLIDES", cols = 4, widths = 40)
+  freezePane(wb, "SLIDES", firstRow = TRUE)
+
+  # Add column descriptions below data
+  slides_instructions <- data.frame(
+    Column = c("Title", "Content", "Position", "Image_Path"),
+    Required = c("YES", "YES", "YES", "NO"),
+    Description = c(
+      "Slide title displayed as a heading in the report",
+      "HTML content for the slide body (supports <p>, <ul>, <li>, <b>, <em> tags)",
+      "Where to insert the slide in the report",
+      "Optional file path to an image displayed on the slide (PNG/JPG)"
+    ),
+    stringsAsFactors = FALSE
+  )
+
+  writeData(wb, "SLIDES", slides_instructions, startRow = 5, startCol = 1)
+  addStyle(wb, "SLIDES", sectionStyle, rows = 5, cols = 1:3, gridExpand = TRUE)
+  addStyle(wb, "SLIDES", instructionStyle, rows = 6:9, cols = 1:3, gridExpand = TRUE)
+
+  # Data validation for Position
+  dataValidation(wb, "SLIDES", col = 3, rows = 2:20,
+                 type = "list", value = "'BEFORE_DIAGNOSTICS,AFTER_DIAGNOSTICS'")
+
+  # ============================================================================
+  # SHEET 10: IMAGES
+  # ============================================================================
+
+  addWorksheet(wb, "IMAGES", gridLines = FALSE)
+
+  images <- data.frame(
+    Panel = c("summary"),
+    Image_Path = c("images/study_overview.png"),
+    Caption = c("Figure 1: Study overview and key findings"),
+    stringsAsFactors = FALSE
+  )
+
+  writeData(wb, "IMAGES", images, startRow = 1, startCol = 1)
+  addStyle(wb, "IMAGES", headerStyle, rows = 1, cols = 1:3, gridExpand = TRUE)
+  addStyle(wb, "IMAGES", exampleStyle, rows = 2, cols = 1:3, gridExpand = TRUE)
+
+  setColWidths(wb, "IMAGES", cols = 1, widths = 20)
+  setColWidths(wb, "IMAGES", cols = 2, widths = 50)
+  setColWidths(wb, "IMAGES", cols = 3, widths = 50)
+  freezePane(wb, "IMAGES", firstRow = TRUE)
+
+  # Add column descriptions below data
+  images_instructions <- data.frame(
+    Column = c("Panel", "Image_Path", "Caption"),
+    Required = c("YES", "YES", "NO"),
+    Description = c(
+      "Which report panel to embed the image in: summary, preferences, items, turf, segments, diagnostics",
+      "File path to the image file (PNG/JPG, relative to config or absolute)",
+      "Optional caption text displayed below the image"
+    ),
+    stringsAsFactors = FALSE
+  )
+
+  writeData(wb, "IMAGES", images_instructions, startRow = 5, startCol = 1)
+  addStyle(wb, "IMAGES", sectionStyle, rows = 5, cols = 1:3, gridExpand = TRUE)
+  addStyle(wb, "IMAGES", instructionStyle, rows = 6:8, cols = 1:3, gridExpand = TRUE)
+
+  # Data validation for Panel
+  dataValidation(wb, "IMAGES", col = 1, rows = 2:20,
+                 type = "list", value = "'summary,preferences,items,turf,segments,diagnostics'")
 
   # ============================================================================
   # SAVE WORKBOOK
@@ -672,18 +930,22 @@ create_maxdiff_template <- function(output_path = NULL) {
   cat(sprintf("File: %s\n", output_path))
   cat("\n")
   cat("Sheets included:\n")
-  cat("  1. INSTRUCTIONS     - How to use this template\n")
-  cat("  2. PROJECT_SETTINGS - Core project configuration\n")
-  cat("  3. ITEMS            - Item/attribute definitions\n")
-  cat("  4. DESIGN_SETTINGS  - Design generation parameters\n")
-  cat("  5. SURVEY_MAPPING   - Survey column mappings\n")
-  cat("  6. SEGMENT_SETTINGS - Segment definitions\n")
-  cat("  7. OUTPUT_SETTINGS  - Output options\n")
+  cat("  1. INSTRUCTIONS      - How to use this template\n")
+  cat("  2. PROJECT_SETTINGS  - Core project configuration\n")
+  cat("  3. ITEMS             - Item/attribute definitions\n")
+  cat("  4. DESIGN_SETTINGS   - Design generation parameters\n")
+  cat("  5. SURVEY_MAPPING    - Survey column mappings\n")
+  cat("  6. SEGMENT_SETTINGS  - Segment definitions\n")
+  cat("  7. OUTPUT_SETTINGS   - Output options (TURF, Anchor, Display)\n")
+  cat("  8. REPORT_SETTINGS   - Branding, logos, report options\n")
+  cat("  9. SLIDES            - Custom report pages\n")
+  cat(" 10. IMAGES            - Embedded panel images\n")
   cat("\n")
   cat("Color coding:\n")
-  cat("  Yellow = Required setting\n")
-  cat("  Green  = Optional setting (has default)\n")
-  cat("  Blue   = Example data (replace with your own)\n")
+  cat("  Yellow  = Required setting\n")
+  cat("  Green   = Optional setting (has default)\n")
+  cat("  Blue    = Example data (replace with your own)\n")
+  cat("  Purple  = Section header\n")
   cat("================================================================================\n")
 
   invisible(output_path)
