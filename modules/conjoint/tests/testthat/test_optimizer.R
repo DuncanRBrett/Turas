@@ -14,22 +14,27 @@ test_that("exhaustive optimizer finds best product", {
 
   utils <- generate_utilities_df(with_price = FALSE)
   config <- list(
-    attribute_levels = list(
-      Brand = c("Alpha", "Beta", "Gamma"),
-      Size  = c("Small", "Medium", "Large")
-    ),
-    simulation_method = "logit"
+    attributes = data.frame(
+      AttributeName = c("Brand", "Size"),
+      stringsAsFactors = FALSE
+    )
+  )
+  config$attributes$levels_list <- list(
+    c("Alpha", "Beta", "Gamma"),
+    c("Small", "Medium", "Large")
   )
 
   competitors <- list(
     list(Brand = "Alpha", Size = "Small")
   )
 
-  result <- optimize_product_exhaustive(utils, config, competitors, top_n = 3, verbose = FALSE)
+  result <- optimize_product_exhaustive(utils, config, competitors,
+                                         objective = "utility", top_n = 3, verbose = FALSE)
 
-  expect_is(result, "data.frame")
-  expect_true(nrow(result) <= 3)
-  expect_true("share" %in% names(result) || "utility" %in% names(result))
+  expect_is(result, "list")
+  expect_true("top_products" %in% names(result))
+  expect_true("best_product" %in% names(result))
+  expect_true(length(result$top_products) <= 3)
 })
 
 
@@ -38,11 +43,14 @@ test_that("greedy optimizer returns valid result", {
 
   utils <- generate_utilities_df(with_price = FALSE)
   config <- list(
-    attribute_levels = list(
-      Brand = c("Alpha", "Beta", "Gamma"),
-      Size  = c("Small", "Medium", "Large")
-    ),
-    simulation_method = "logit"
+    attributes = data.frame(
+      AttributeName = c("Brand", "Size"),
+      stringsAsFactors = FALSE
+    )
+  )
+  config$attributes$levels_list <- list(
+    c("Alpha", "Beta", "Gamma"),
+    c("Small", "Medium", "Large")
   )
 
   competitors <- list(
@@ -50,10 +58,13 @@ test_that("greedy optimizer returns valid result", {
   )
 
   result <- optimize_product_greedy(utils, config, competitors,
-                                     n_starts = 3, max_iter = 10, verbose = FALSE)
+                                     objective = "utility",
+                                     n_starts = 3, max_iterations = 10, verbose = FALSE)
 
-  expect_is(result, "data.frame")
-  expect_true(nrow(result) >= 1)
+  expect_is(result, "list")
+  expect_true("best_product" %in% names(result))
+  expect_true("best_score" %in% names(result))
+  expect_true(is.finite(result$best_score))
 })
 
 
@@ -72,7 +83,9 @@ test_that("product evaluation returns numeric score", {
   product <- list(Brand = "Beta", Size = "Large")
   competitors <- list(list(Brand = "Alpha", Size = "Small"))
 
-  score <- evaluate_product(product, utils, config, competitors, objective = "utility")
+  score <- evaluate_product(product, utils, competitors, objective = "utility",
+                             price_attribute = NULL, cost_data = NULL,
+                             model_result = NULL, config = NULL, method = "logit")
 
   expect_is(score, "numeric")
   expect_true(is.finite(score))

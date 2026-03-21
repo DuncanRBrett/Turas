@@ -38,11 +38,11 @@ test_that("single-attribute utilities work for simulation", {
     list(Brand = "C")
   )
 
-  shares <- predict_market_shares(products, utils, config)
-  expect_equal(sum(shares), 1.0, tolerance = 1e-6)
+  shares_df <- predict_market_shares(products, utils, method = "logit")
+  expect_equal(sum(shares_df$Probability), 1.0, tolerance = 1e-6)
   # B has highest utility → highest share
-  expect_true(shares[2] > shares[1])
-  expect_true(shares[2] > shares[3])
+  expect_true(shares_df$Probability[2] > shares_df$Probability[1])
+  expect_true(shares_df$Probability[2] > shares_df$Probability[3])
 })
 
 

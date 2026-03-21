@@ -413,14 +413,15 @@ test_that("Handle missing data in choices", {
   test_data$data$brand[c(1, 5, 10)] <- NA
 
   # Model fitting should handle NAs (typically by dropping those observations)
+  # Convergence warnings are expected with degenerate/missing data
   skip_if_not_installed("survival")
-  expect_warning(
+  suppressWarnings(
     model <- survival::clogit(
       choice ~ brand + price + strata(choice_id),
       data = test_data$data
-    ),
-    NA  # May warn about dropped observations
+    )
   )
+  expect_true(inherits(model, "clogit") || inherits(model, "coxph"))
 })
 
 # ==============================================================================

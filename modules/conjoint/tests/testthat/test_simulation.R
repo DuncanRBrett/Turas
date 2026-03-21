@@ -37,12 +37,12 @@ test_that("market share logit simulation sums to 1", {
     list(Brand = "Gamma", Size = "Large")
   )
 
-  shares <- predict_market_shares(products, utils, config)
+  shares_df <- predict_market_shares(products, utils, method = "logit")
 
-  expect_is(shares, "numeric")
-  expect_equal(length(shares), 3)
-  expect_equal(sum(shares), 1.0, tolerance = 1e-6)
-  expect_true(all(shares >= 0 & shares <= 1))
+  expect_is(shares_df, "data.frame")
+  expect_equal(nrow(shares_df), 3)
+  expect_equal(sum(shares_df$Probability), 1.0, tolerance = 1e-6)
+  expect_true(all(shares_df$Probability >= 0 & shares_df$Probability <= 1))
 })
 
 
@@ -95,10 +95,15 @@ test_that("demand curve returns valid price-share pairs", {
     list(Brand = "Beta",  Size = "Medium", Price = "$20")
   )
 
-  curve <- generate_demand_curve(products, 1, "Price", utils, config)
+  base_product <- list(Brand = "Alpha", Size = "Small", Price = "$10")
+  other_prods <- list(list(Brand = "Beta", Size = "Medium", Price = "$20"))
+
+  curve <- generate_demand_curve(base_product, "Price", c("$10", "$20", "$30"),
+                                  utilities = utils, other_products = other_prods,
+                                  method = "logit")
 
   expect_is(curve, "data.frame")
-  expect_true(all(c("level", "share") %in% names(curve)))
+  expect_true(all(c("Price", "Share_Percent") %in% names(curve)))
   expect_equal(nrow(curve), 3)  # 3 price levels
-  expect_true(all(curve$share >= 0 & curve$share <= 1))
+  expect_true(all(curve$Share_Percent >= 0 & curve$Share_Percent <= 100))
 })

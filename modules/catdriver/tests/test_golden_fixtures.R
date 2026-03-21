@@ -22,29 +22,57 @@ library(testthat)
 # SETUP - Load fixtures and module
 # ==============================================================================
 
-# Determine paths
-script_dir <- tryCatch({
-  if (!is.null(sys.frame(1)$ofile)) dirname(sys.frame(1)$ofile) else getwd()
-}, error = function(e) getwd())
-
-if (basename(script_dir) == "tests") {
-  module_root <- dirname(script_dir)
-  test_dir <- script_dir
-} else {
-  module_root <- script_dir
-  test_dir <- file.path(script_dir, "tests")
+# Determine paths - walk up from cwd to find catdriver module
+find_catdriver_root <- function() {
+  current <- getwd()
+  # Check if we're in the catdriver directory
+  if (basename(current) == "catdriver" && dir.exists(file.path(current, "R"))) {
+    return(current)
+  }
+  # Check if catdriver is a subdirectory (e.g., running from Turas root)
+  candidate <- file.path(current, "modules", "catdriver")
+  if (dir.exists(file.path(candidate, "R"))) {
+    return(candidate)
+  }
+  # Walk up
+  parent <- dirname(current)
+  while (parent != current) {
+    candidate <- file.path(parent, "modules", "catdriver")
+    if (dir.exists(file.path(candidate, "R"))) return(candidate)
+    if (basename(parent) == "catdriver" && dir.exists(file.path(parent, "R"))) return(parent)
+    current <- parent
+    parent <- dirname(current)
+  }
+  stop("Cannot locate catdriver module root")
 }
 
+module_root <- find_catdriver_root()
+test_dir <- file.path(module_root, "tests")
 fixtures_dir <- file.path(test_dir, "fixtures")
 
-# Source module files
-setwd(module_root)
-r_files <- list.files("R", pattern = "\\.R$", full.names = TRUE)
-r_files <- r_files[order(basename(r_files))]
-for (f in r_files) {
-  tryCatch(source(f), error = function(e) {
-    cat("Warning: Could not source", basename(f), ":", e$message, "\n")
-  })
+# Source shared utilities if not already loaded
+if (!exists("turas_refuse", mode = "function")) {
+  turas_root <- dirname(dirname(module_root))
+  shared_lib <- file.path(turas_root, "modules", "shared", "lib")
+  if (dir.exists(shared_lib)) {
+    for (f in sort(list.files(shared_lib, pattern = "\\.R$", full.names = TRUE))) {
+      tryCatch(source(f), error = function(e) NULL)
+    }
+  }
+}
+
+# Source module files if not already loaded
+if (!exists("run_catdriver", mode = "function")) {
+  old_wd <- getwd()
+  setwd(module_root)
+  r_files <- list.files("R", pattern = "\\.R$", full.names = TRUE)
+  r_files <- r_files[order(basename(r_files))]
+  for (f in r_files) {
+    tryCatch(source(f), error = function(e) {
+      cat("Warning: Could not source", basename(f), ":", e$message, "\n")
+    })
+  }
+  setwd(old_wd)
 }
 
 # ==============================================================================

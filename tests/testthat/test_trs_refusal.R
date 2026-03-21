@@ -16,12 +16,19 @@
 # Load testthat and TRS infrastructure
 library(testthat)
 
-# Source the TRS refusal module
-turas_root <- Sys.getenv("TURAS_ROOT", getwd())
-if (!grepl("Turas$", turas_root)) {
-  turas_root <- file.path(turas_root, "..")
+# TRS refusal module is sourced by helper-setup.R
+# Verify it's available
+if (!exists("turas_refuse", mode = "function")) {
+  # Fallback: find and source it
+  current <- getwd()
+  while (current != dirname(current)) {
+    if (file.exists(file.path(current, "launch_turas.R"))) {
+      source(file.path(current, "modules/shared/lib/trs_refusal.R"))
+      break
+    }
+    current <- dirname(current)
+  }
 }
-source(file.path(turas_root, "modules/shared/lib/trs_refusal.R"))
 
 
 # ==============================================================================
