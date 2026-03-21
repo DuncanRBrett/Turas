@@ -129,8 +129,7 @@ run_segment_gui <- function() {
     }
 
     # Setup file browser
-    volumes <- c(Home = normalizePath("~"),
-                getVolumes()())
+    volumes <- turas_gui_volumes()
 
     shinyFileChoose(input, "select_config_btn", roots = volumes,
                    filetypes = c("xlsx", "xls"))
@@ -178,7 +177,7 @@ run_segment_gui <- function() {
         div(class = "turas-file-display",
           strong("Selected: "), basename(config_file()),
           br(),
-          small(dirname(config_file()))
+          tags$small(dirname(config_file()))
         )
       )
     })

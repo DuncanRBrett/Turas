@@ -65,7 +65,7 @@ run_pricing_gui <- function() {
   })
 
   # Locate Turas root
-  turas_root <- getwd()
+  turas_root <- Sys.getenv("TURAS_ROOT", getwd())
   if (basename(turas_root) != "Turas") {
     if (file.exists(file.path(dirname(turas_root), "launch_turas.R"))) {
       turas_root <- dirname(turas_root)
@@ -241,9 +241,7 @@ run_pricing_gui <- function() {
     }
 
     # Set up directory browser
-    volumes <- c(Home = path.expand("~"),
-                 Documents = file.path(path.expand("~"), "Documents"),
-                 Desktop = file.path(path.expand("~"), "Desktop"))
+    volumes <- turas_gui_volumes()
 
     shinyDirChoose(input, "project_dir_btn", roots = volumes, session = session)
 

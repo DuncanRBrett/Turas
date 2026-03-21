@@ -634,7 +634,7 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
 .seg-tr:hover { background: #f8fafc; }
 
 /* Heatmap cell tinting — all numeric, all centred */
-.seg-td-high { background: #dbeafe; text-align: center; }
+.seg-td-high { background: #dcfce7; text-align: center; }
 .seg-td-mod-high { background: #eff6ff; text-align: center; }
 .seg-td-mod-low { background: #fef3c7; text-align: center; }
 .seg-td-low { background: #fee2e2; text-align: center; }
@@ -2282,6 +2282,54 @@ build_seg_importance_section <- function(tables, charts, html_data) {
     )
   }
 
+  # Question Reduction analysis — shows which variables can be dropped
+  # without losing segment discrimination power
+  reduction_el <- NULL
+  vi <- html_data$variable_importance
+  # Use eta_squared if available, fall back to importance_pct or f_statistic
+  vi_col <- if (!is.null(vi) && "eta_squared" %in% names(vi)) "eta_squared"
+            else if (!is.null(vi) && "importance_pct" %in% names(vi)) "importance_pct"
+            else if (!is.null(vi) && "f_statistic" %in% names(vi)) "f_statistic"
+            else NULL
+  if (!is.null(vi) && nrow(vi) > 1 && !is.null(vi_col)) {
+    imp <- vi[order(-vi[[vi_col]]), ]
+    cumulative <- cumsum(imp[[vi_col]]) / sum(imp[[vi_col]])
+    # Find how many variables capture 90% of discrimination
+    n_for_90 <- which(cumulative >= 0.90)[1]
+    if (is.na(n_for_90)) n_for_90 <- nrow(imp)
+    n_total <- nrow(imp)
+    n_reducible <- n_total - n_for_90
+
+    if (n_reducible > 0) {
+      reduction_el <- htmltools::tags$div(
+        class = "seg-subsection",
+        style = "margin-top:24px; padding:16px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;",
+        htmltools::tags$h4(
+          style = "margin:0 0 8px; font-size:14px; font-weight:600; color:#323367;",
+          "Question Reduction"
+        ),
+        htmltools::tags$p(
+          style = "margin:0; font-size:13px; color:#475569; line-height:1.5;",
+          htmltools::HTML(sprintf(
+            "The top %d variable%s capture%s 90%% of total segment discrimination power. ",
+            n_for_90,
+            if (n_for_90 == 1) "" else "s",
+            if (n_for_90 == 1) "s" else ""
+          )),
+          htmltools::HTML(sprintf(
+            "The remaining %d variable%s contribute%s less than 10%% and could potentially ",
+            n_reducible,
+            if (n_reducible == 1) "" else "s",
+            if (n_reducible == 1) "s" else ""
+          )),
+          htmltools::HTML(
+            "be removed in future waves to reduce survey length without materially affecting segment discrimination."
+          )
+        )
+      )
+    }
+  }
+
   htmltools::tags$div(
     class = "seg-section",
     id = "seg-importance",
@@ -2298,7 +2346,8 @@ build_seg_importance_section <- function(tables, charts, html_data) {
       ))
     ),
     chart_el,
-    table_el
+    table_el,
+    reduction_el
   )
 }
 
@@ -2712,6 +2761,16 @@ build_seg_overlap_section <- function(charts, html_data) {
     )
   )
 
+  # SVG overlap heatmap (if available from chart builder)
+  overlap_svg <- NULL
+  if (!is.null(charts$overlap)) {
+    overlap_svg <- htmltools::tags$div(
+      class = "seg-chart-wrapper",
+      build_seg_component_pin_btn("overlap", "chart"),
+      charts$overlap
+    )
+  }
+
   htmltools::tags$div(
     class = "seg-section",
     id = "seg-overlap",
@@ -2727,6 +2786,7 @@ build_seg_overlap_section <- function(charts, html_data) {
       ))
     ),
     colour_key,
+    overlap_svg,
     overlap_table,
     pair_insights
   )

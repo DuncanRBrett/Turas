@@ -211,17 +211,14 @@ check_segment_dependencies <- function(verbose = TRUE, install_missing = FALSE) 
     cat("\n")
   }
 
-  # Attempt installation if requested
-  if (install_missing && length(missing_required) > 0) {
-    cat("Attempting to install missing required packages...\n")
+  # Report missing packages (do not auto-install — breaks in Docker/renv environments)
+  if (length(missing_required) > 0) {
+    cat("MISSING REQUIRED PACKAGES:\n")
     for (pkg in missing_required) {
-      tryCatch({
-        install.packages(pkg, quiet = TRUE)
-        cat(sprintf("  Installed: %s\n", pkg))
-      }, error = function(e) {
-        cat(sprintf("  Failed to install: %s (%s)\n", pkg, e$message))
-      })
+      cat(sprintf("  - %s\n", pkg))
     }
+    cat("Install with: renv::install(c(", paste0('"', missing_required, '"', collapse = ", "), "))\n")
+    cat("Then run renv::snapshot() to update the lock file.\n")
   }
 
   return(invisible(list(

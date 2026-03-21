@@ -48,7 +48,7 @@ run_conjoint_gui <- function() {
   })
 
   # Get Turas root directory
-  turas_root <- getwd()
+  turas_root <- Sys.getenv("TURAS_ROOT", getwd())
   if (basename(turas_root) != "Turas") {
     if (file.exists(file.path(dirname(turas_root), "launch_turas.R"))) {
       turas_root <- dirname(turas_root)
@@ -189,9 +189,7 @@ run_conjoint_gui <- function() {
     }
 
     # Set up directory browser
-    volumes <- c(Home = path.expand("~"),
-                Documents = file.path(path.expand("~"), "Documents"),
-                Desktop = file.path(path.expand("~"), "Desktop"))
+    volumes <- turas_gui_volumes()
 
     shinyDirChoose(input, "project_dir_btn", roots = volumes, session = session)
 
@@ -317,66 +315,77 @@ run_conjoint_gui <- function() {
       # Capture output
       output_text <- ""
 
-      tryCatch({
-        # Get Turas root
-        turas_root <- getwd()
-        if (basename(turas_root) != "Turas") {
-          turas_root <- dirname(turas_root)
-        }
+      withProgress(message = "Running Conjoint Analysis...", value = 0, {
 
-        # Source module files (00_main.R loads all components)
-        output_text <- paste0(output_text, "Loading Conjoint module...\n\n")
-        console_text(output_text)
+        tryCatch({
+          # Get Turas root
+          turas_root <- Sys.getenv("TURAS_ROOT", getwd())
+          if (basename(turas_root) != "Turas") {
+            turas_root <- dirname(turas_root)
+          }
 
-        # Set working directory to Turas root for module loading
-        old_wd <- getwd()
-        setwd(turas_root)
+          # Source module files (00_main.R loads all components)
+          incProgress(0.05, detail = "Loading module files...")
+          output_text <- paste0(output_text, "Loading Conjoint module...\n\n")
+          console_text(output_text)
 
-        # Source main module file
-        source(file.path(turas_root, "modules/conjoint/R/00_main.R"))
+          # Set working directory to Turas root for module loading
+          old_wd <- getwd()
+          setwd(turas_root)
 
-        # Restore working directory
-        setwd(old_wd)
+          # Source main module file
+          source(file.path(turas_root, "modules/conjoint/R/00_main.R"))
 
-        # Verify config file exists
-        if (!file.exists(files$config_file)) {
-          early_refuse(
-            code = "IO_CONFIG_FILE_NOT_FOUND",
-            title = "Configuration File Not Found",
-            problem = sprintf("Config file not found: %s", files$config_file),
-            why_it_matters = "The configuration file defines the conjoint study design and analysis settings.",
-            how_to_fix = c(
-              "Verify the file path is correct",
-              "Check that the file exists at the specified location"
+          # Restore working directory
+          setwd(old_wd)
+
+          # Verify config file exists
+          if (!file.exists(files$config_file)) {
+            early_refuse(
+              code = "IO_CONFIG_FILE_NOT_FOUND",
+              title = "Configuration File Not Found",
+              problem = sprintf("Config file not found: %s", files$config_file),
+              why_it_matters = "The configuration file defines the conjoint study design and analysis settings.",
+              how_to_fix = c(
+                "Verify the file path is correct",
+                "Check that the file exists at the specified location"
+              )
             )
-          )
-        }
+          }
 
-        # Capture analysis output
-        # Paths are read from config file Settings sheet
-        output_text <- paste0(output_text, "Config file: ", basename(files$config_file), "\n\n")
-        console_text(output_text)
+          incProgress(0.10, detail = "Starting analysis...")
 
-        capture <- capture.output({
-          results <- run_conjoint_analysis(
-            config_file = files$config_file
-          )
-        }, type = "output")
+          # Capture analysis output
+          # Paths are read from config file Settings sheet
+          output_text <- paste0(output_text, "Config file: ", basename(files$config_file), "\n\n")
+          console_text(output_text)
 
-        output_text <- paste0(output_text, paste(capture, collapse = "\n"))
-        output_text <- paste0(output_text, "\n\n✓ Analysis complete!")
+          capture <- capture.output({
+            results <- run_conjoint_analysis(
+              config_file = files$config_file
+            )
+          }, type = "output")
 
-      }, error = function(e) {
-        output_text <<- paste0(output_text, "\n\n✗ Error: ", e$message)
-        output_text <<- paste0(output_text, "\n\nDebug info:")
-        output_text <<- paste0(output_text, "\n  - Turas root: ", turas_root)
-        output_text <<- paste0(output_text, "\n  - Config file: ", files$config_file)
-        output_text <<- paste0(output_text, "\n  - Config exists: ", file.exists(files$config_file))
-        if (exists("e")) {
-          output_text <<- paste0(output_text, "\n  - Error class: ", class(e)[1])
-          output_text <<- paste0(output_text, "\n  - Call stack: ", paste(head(sys.calls(), 5), collapse = " -> "))
-        }
-      })
+          incProgress(0.80, detail = "Finalising results...")
+
+          output_text <- paste0(output_text, paste(capture, collapse = "\n"))
+          output_text <- paste0(output_text, "\n\n✓ Analysis complete!")
+
+          incProgress(0.05, detail = "Done!")
+
+        }, error = function(e) {
+          output_text <<- paste0(output_text, "\n\n✗ Error: ", e$message)
+          output_text <<- paste0(output_text, "\n\nDebug info:")
+          output_text <<- paste0(output_text, "\n  - Turas root: ", turas_root)
+          output_text <<- paste0(output_text, "\n  - Config file: ", files$config_file)
+          output_text <<- paste0(output_text, "\n  - Config exists: ", file.exists(files$config_file))
+          if (exists("e")) {
+            output_text <<- paste0(output_text, "\n  - Error class: ", class(e)[1])
+            output_text <<- paste0(output_text, "\n  - Call stack: ", paste(head(sys.calls(), 5), collapse = " -> "))
+          }
+        })
+
+      })  # End withProgress
 
       console_text(output_text)
       is_running(FALSE)

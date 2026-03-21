@@ -663,385 +663,36 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
   study_summary <- compute_study_summary(long_data, config, verbose)
 
   # ==========================================================================
-  # STEP 6: COMPUTE COUNT SCORES
+  # STEPS 6-10D: OPTIONAL ANALYSES (PARTIAL on failure)
   # ==========================================================================
 
-  count_scores <- NULL
-
-  if (config$output_settings$Generate_Count_Scores) {
-    if (verbose) cat("\nSTEP 6: Computing count-based scores...\n")
-
-    count_scores <- tryCatch({
-      compute_maxdiff_counts(
-        long_data = long_data,
-        items = config$items,
-        weighted = !is.null(config$project_settings$Weight_Variable),
-        verbose = verbose
-      )
-    }, error = function(e) {
-      message(sprintf("[TRS PARTIAL] MAXD_COUNT_SCORE_FAILED: Count score computation failed: %s", conditionMessage(e)))
-      add_warning( sprintf("Count scores: %s", conditionMessage(e)))
-      NULL
-    })
-  }
+  optional <- run_maxdiff_optional_analyses(
+    long_data = long_data,
+    raw_data = raw_data,
+    config = config,
+    study_summary = study_summary,
+    add_warning = add_warning,
+    verbose = verbose
+  )
 
   # ==========================================================================
-  # STEP 7: FIT AGGREGATE LOGIT MODEL
+  # STEPS 11-13: OUTPUT GENERATION
   # ==========================================================================
 
-  logit_results <- NULL
-
-  if (config$output_settings$Generate_Aggregate_Logit) {
-    if (verbose) cat("\nSTEP 7: Fitting aggregate logit model...\n")
-
-    logit_results <- tryCatch({
-      # Try full logit first, fall back to simple
-      if (requireNamespace("survival", quietly = TRUE)) {
-        fit_aggregate_logit(
-          long_data = long_data,
-          items = config$items,
-          weighted = !is.null(config$project_settings$Weight_Variable),
-          verbose = verbose
-        )
-      } else {
-        fit_simple_logit(long_data, config$items, verbose)
-      }
-    }, error = function(e) {
-      message(sprintf("[TRS PARTIAL] MAXD_LOGIT_FAILED: Logit model failed: %s", conditionMessage(e)))
-      add_warning( sprintf("Logit model: %s", conditionMessage(e)))
-      NULL
-    })
-
-    # Add logit utilities to count_scores if available
-    if (!is.null(logit_results) && !is.null(count_scores)) {
-      count_scores <- merge(
-        count_scores,
-        logit_results$utilities[, c("Item_ID", "Logit_Utility", "Logit_SE")],
-        by = "Item_ID",
-        all.x = TRUE
-      )
-    }
-  }
-
-  # ==========================================================================
-  # STEP 8: FIT HIERARCHICAL BAYES MODEL
-  # ==========================================================================
-
-  hb_results <- NULL
-
-  if (config$output_settings$Generate_HB_Model) {
-    if (verbose) cat("\nSTEP 8: Fitting Hierarchical Bayes model...\n")
-
-    hb_results <- tryCatch({
-      fit_hb_model(
-        long_data = long_data,
-        items = config$items,
-        config = config,
-        verbose = verbose
-      )
-    }, error = function(e) {
-      message(sprintf("[TRS PARTIAL] MAXD_HB_FAILED: HB model failed: %s", conditionMessage(e)))
-      add_warning( sprintf("HB model: %s", conditionMessage(e)))
-      NULL
-    })
-
-    # Add HB utilities to count_scores if available
-    if (!is.null(hb_results) && !is.null(count_scores)) {
-      count_scores <- merge(
-        count_scores,
-        hb_results$population_utilities[, c("Item_ID", "HB_Utility_Mean", "HB_Utility_SD")],
-        by = "Item_ID",
-        all.x = TRUE
-      )
-    }
-  }
-
-  # ==========================================================================
-  # STEP 9: COMPUTE SEGMENT SCORES
-  # ==========================================================================
-
-  segment_results <- NULL
-
-  if (config$output_settings$Generate_Segment_Tables &&
-      !is.null(config$segment_settings) &&
-      nrow(config$segment_settings) > 0) {
-
-    if (verbose) cat("\nSTEP 9: Computing segment-level scores...\n")
-
-    segment_results <- tryCatch({
-      compute_segment_scores(
-        long_data = long_data,
-        raw_data = raw_data,
-        segment_settings = config$segment_settings,
-        items = config$items,
-        output_settings = config$output_settings,
-        verbose = verbose
-      )
-    }, error = function(e) {
-      message(sprintf("[TRS PARTIAL] MAXD_SEGMENT_FAILED: Segment analysis failed: %s", conditionMessage(e)))
-      add_warning( sprintf("Segments: %s", conditionMessage(e)))
-      NULL
-    })
-  }
-
-  # ==========================================================================
-  # STEP 10: GENERATE CHARTS
-  # ==========================================================================
-
-  chart_paths <- NULL
-
-  if (config$output_settings$Generate_Charts) {
-    if (verbose) cat("\nSTEP 10: Generating charts...\n")
-
-    results_for_charts <- list(
-      count_scores = count_scores,
-      logit_results = logit_results,
-      hb_results = hb_results,
-      segment_results = segment_results,
-      study_summary = study_summary
-    )
-
-    chart_paths <- tryCatch({
-      generate_maxdiff_charts(results_for_charts, config, verbose)
-    }, error = function(e) {
-      message(sprintf("[TRS PARTIAL] MAXD_CHART_FAILED: Chart generation failed: %s", conditionMessage(e)))
-      add_warning( sprintf("Charts: %s", conditionMessage(e)))
-      NULL
-    })
-  }
-
-  # ==========================================================================
-  # STEP 10B: TURF ANALYSIS
-  # ==========================================================================
-
-  turf_results <- NULL
-
-  generate_turf <- parse_yes_no(config$output_settings$Generate_TURF %||% FALSE)
-
-  if (generate_turf && !is.null(hb_results$individual_utilities)) {
-    if (verbose) cat("\nSTEP 10B: Running TURF analysis...\n")
-
-    turf_results <- tryCatch({
-      turf_max <- safe_integer(config$output_settings$TURF_Max_Items %||% 10, default = 10L)
-      turf_method <- config$output_settings$TURF_Threshold %||% "ABOVE_MEAN"
-
-      run_turf_analysis(
-        individual_utils = hb_results$individual_utilities,
-        items = config$items,
-        max_items = turf_max,
-        threshold_method = turf_method,
-        verbose = verbose
-      )
-    }, error = function(e) {
-      message(sprintf("[TRS PARTIAL] MAXD_TURF_FAILED: TURF analysis failed: %s", conditionMessage(e)))
-      add_warning( sprintf("TURF: %s", conditionMessage(e)))
-      NULL
-    })
-  }
-
-  # ==========================================================================
-  # STEP 10C: ANCHORED MAXDIFF
-  # ==========================================================================
-
-  anchor_data <- NULL
-
-  has_anchor <- parse_yes_no(config$output_settings$Has_Anchor_Question %||% FALSE)
-
-  if (has_anchor) {
-    if (verbose) cat("\nSTEP 10C: Processing anchor data...\n")
-
-    anchor_var <- config$output_settings$Anchor_Variable %||% NULL
-    anchor_threshold <- safe_numeric(config$output_settings$Anchor_Threshold %||% 0.50, default = 0.50)
-    anchor_format <- config$output_settings$Anchor_Format %||% "COMMA_SEPARATED"
-
-    anchor_data <- tryCatch({
-      process_anchor_data(
-        raw_data = raw_data,
-        anchor_variable = anchor_var,
-        items = config$items,
-        id_variable = config$project_settings$Respondent_ID_Variable,
-        anchor_format = anchor_format,
-        anchor_threshold = anchor_threshold
-      )
-    }, error = function(e) {
-      message(sprintf("[TRS PARTIAL] MAXD_ANCHOR_FAILED: Anchor processing failed: %s", conditionMessage(e)))
-      add_warning( sprintf("Anchor: %s", conditionMessage(e)))
-      NULL
-    })
-  }
-
-  # ==========================================================================
-  # STEP 10D: ITEM DISCRIMINATION
-  # ==========================================================================
-
-  discrimination_data <- NULL
-
-  if (!is.null(hb_results$individual_utilities)) {
-    if (verbose) cat("\nSTEP 10D: Computing item discrimination...\n")
-
-    discrimination_data <- tryCatch({
-      classify_item_discrimination(hb_results$individual_utilities, config$items)
-    }, error = function(e) {
-      message(sprintf("[TRS PARTIAL] MAXD_DISC_FAILED: Item discrimination failed: %s", conditionMessage(e)))
-      NULL
-    })
-  }
-
-  # ==========================================================================
-  # TRS: Log PARTIAL events for any warnings (before output generation)
-  # ==========================================================================
-  if (!is.null(trs_state) && length(.warn_env$warnings_list) > 0) {
-    for (warn in .warn_env$warnings_list) {
-      if (exists("turas_run_state_partial", mode = "function")) {
-        turas_run_state_partial(
-          trs_state,
-          "MAXD_WARNING",
-          "Analysis warning",
-          problem = warn
-        )
-      }
-    }
-  }
-
-  # ==========================================================================
-  # TRS: Get run result (before output generation for Run_Status sheet)
-  # ==========================================================================
-  run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
-    turas_run_state_result(trs_state)
-  } else {
-    NULL
-  }
-
-  # ==========================================================================
-  # STEP 11: GENERATE EXCEL OUTPUT
-  # ==========================================================================
-
-  if (verbose) cat("\nSTEP 11: Generating Excel output...\n")
-
-  results <- list(
-    mode = "ANALYSIS",
+  results <- run_maxdiff_generate_outputs(
     design = design,
     long_data = long_data,
     raw_data = raw_data,
     study_summary = study_summary,
-    count_scores = count_scores,
-    logit_results = logit_results,
-    hb_results = hb_results,
-    segment_results = segment_results,
-    turf_results = turf_results,
-    anchor_data = anchor_data,
-    discrimination_data = discrimination_data,
-    chart_paths = chart_paths,
-    warnings = .warn_env$warnings_list,
-    run_result = run_result
+    optional = optional,
+    config = config,
+    trs_state = trs_state,
+    add_warning = add_warning,
+    warnings_list = .warn_env$warnings_list,
+    verbose = verbose
   )
 
-  output_path <- tryCatch({
-    generate_maxdiff_output(results, config, verbose, run_result)
-  }, error = function(e) {
-    message(sprintf("[TRS PARTIAL] MAXD_OUTPUT_FAILED: Output generation failed: %s", conditionMessage(e)))
-    NULL
-  })
-
-  results$output_path <- output_path
-
-  # ==========================================================================
-  # STEP 12: GENERATE SIMULATOR HTML STRING (for embedding in report)
-  # ==========================================================================
-
-  generate_sim <- parse_yes_no(config$output_settings$Generate_Simulator %||% FALSE)
-  generate_html <- parse_yes_no(config$output_settings$Generate_HTML_Report %||% FALSE)
-  simulator_html <- NULL
-
-  if (generate_sim && !is.null(output_path)) {
-    if (verbose) cat("\nSTEP 12: Generating interactive simulator...\n")
-
-    tryCatch({
-      base_dir <- get_script_dir()
-      sim_main <- file.path(base_dir, "..", "lib", "html_simulator", "99_simulator_main.R")
-      if (!file.exists(sim_main)) {
-        # Try relative to cwd (when cwd is the module directory)
-        sim_main <- file.path(getwd(), "lib", "html_simulator", "99_simulator_main.R")
-      }
-      if (!file.exists(sim_main)) {
-        # Try from project root (when cwd is the project root)
-        sim_main <- file.path(getwd(), "modules", "maxdiff", "lib", "html_simulator", "99_simulator_main.R")
-      }
-      if (file.exists(sim_main)) {
-        source(sim_main, local = FALSE)
-        if (generate_html) {
-          # Build simulator HTML string for embedding in report (don't write separate file)
-          simulator_html <- build_simulator_html_string(results, config)
-        } else {
-          # No report — write standalone simulator file
-          sim_path <- sub("\\.xlsx$", "_simulator.html", output_path)
-          sim_result <- generate_maxdiff_html_simulator(results, config, sim_path)
-          results$simulator_path <- sim_result$output_file
-        }
-      } else {
-        message("[TRS PARTIAL] MAXD_SIM_NOT_FOUND: Simulator module not found")
-      }
-    }, error = function(e) {
-      message(sprintf("[TRS PARTIAL] MAXD_SIM_FAILED: Simulator failed: %s", conditionMessage(e)))
-      add_warning(sprintf("Simulator: %s", conditionMessage(e)))
-    })
-  }
-
-  # ==========================================================================
-  # STEP 13: GENERATE HTML REPORT (with embedded simulator)
-  # ==========================================================================
-
-  if (generate_html && !is.null(output_path)) {
-    if (verbose) cat("\nSTEP 13: Generating HTML report...\n")
-
-    html_report_path <- sub("\\.xlsx$", ".html", output_path)
-
-    # Source HTML report module
-    tryCatch({
-      base_dir <- get_script_dir()
-      html_main <- file.path(base_dir, "..", "lib", "html_report", "99_html_report_main.R")
-      cat(sprintf("  HTML report module path (primary): %s [exists: %s]\n", html_main, file.exists(html_main)))
-      if (!file.exists(html_main)) {
-        # Try relative to cwd (when cwd is the module directory)
-        html_main <- file.path(getwd(), "lib", "html_report", "99_html_report_main.R")
-        cat(sprintf("  HTML report module path (fallback 1): %s [exists: %s]\n", html_main, file.exists(html_main)))
-      }
-      if (!file.exists(html_main)) {
-        # Try from project root (when cwd is the project root)
-        html_main <- file.path(getwd(), "modules", "maxdiff", "lib", "html_report", "99_html_report_main.R")
-        cat(sprintf("  HTML report module path (fallback 2): %s [exists: %s]\n", html_main, file.exists(html_main)))
-      }
-      if (file.exists(html_main)) {
-        cat("  Sourcing HTML report module...\n")
-        source(html_main, local = FALSE)
-        cat(sprintf("  Generating HTML report to: %s\n", html_report_path))
-        html_result <- generate_maxdiff_html_report(
-          results, html_report_path, config,
-          simulator_html = simulator_html
-        )
-        cat(sprintf("  HTML report result status: %s\n", html_result$status))
-        if (html_result$status == "PASS") {
-          results$html_report_path <- html_result$output_file
-          cat(sprintf("  HTML report saved: %s\n", html_result$output_file))
-        } else {
-          cat(sprintf("  HTML report failed: %s\n", html_result$message %||% "unknown"))
-        }
-      } else {
-        cat("\n[TRS PARTIAL] MAXD_HTML_NOT_FOUND: HTML report module not found at any path\n")
-        message("[TRS PARTIAL] MAXD_HTML_NOT_FOUND: HTML report module not found")
-      }
-    }, error = function(e) {
-      cat(sprintf("\n[TRS PARTIAL] MAXD_HTML_FAILED: HTML report failed: %s\n", conditionMessage(e)))
-      cat(sprintf("  Traceback: %s\n", paste(capture.output(traceback()), collapse = "\n  ")))
-      message(sprintf("[TRS PARTIAL] MAXD_HTML_FAILED: HTML report failed: %s", conditionMessage(e)))
-      add_warning(sprintf("HTML report: %s", conditionMessage(e)))
-    })
-  }
-
-  # ==========================================================================
-  # WARNINGS SUMMARY
-  # ==========================================================================
-
+  # Warnings summary
   if (length(.warn_env$warnings_list) > 0 && verbose) {
     cat("\n")
     cat("WARNINGS:\n")
@@ -1091,6 +742,347 @@ run_maxdiff_analysis <- function(config_path) {
   config <- load_maxdiff_config(config_path)
   config$mode <- "ANALYSIS"  # Force analysis mode
   run_maxdiff_analysis_mode(config, verbose = TRUE)
+}
+
+
+# ==============================================================================
+# HELPER: Run Optional Analyses (Steps 6-10D)
+# ==============================================================================
+
+#' Run MaxDiff Optional Analyses
+#'
+#' Executes all optional/additive analysis steps: count scores, logit,
+#' HB, segments, charts, TURF, anchored MaxDiff, and discrimination.
+#' Each step uses tryCatch for PARTIAL status on failure.
+#'
+#' @param long_data Long-format survey data
+#' @param raw_data Original wide-format data
+#' @param config Configuration list
+#' @param study_summary Study summary from Step 5
+#' @param add_warning Function to accumulate warnings
+#' @param verbose Logical; whether to print progress
+#' @return List with all optional analysis results
+#' @keywords internal
+run_maxdiff_optional_analyses <- function(long_data, raw_data, config,
+                                          study_summary, add_warning,
+                                          verbose = TRUE) {
+
+  # Step 6: Count scores
+  count_scores <- NULL
+  if (config$output_settings$Generate_Count_Scores) {
+    if (verbose) cat("\nSTEP 6: Computing count-based scores...\n")
+    count_scores <- tryCatch({
+      compute_maxdiff_counts(
+        long_data = long_data,
+        items = config$items,
+        weighted = !is.null(config$project_settings$Weight_Variable),
+        verbose = verbose
+      )
+    }, error = function(e) {
+      message(sprintf("[TRS PARTIAL] MAXD_COUNT_SCORE_FAILED: Count score computation failed: %s", conditionMessage(e)))
+      add_warning(sprintf("Count scores: %s", conditionMessage(e)))
+      NULL
+    })
+  }
+
+  # Step 7: Aggregate logit
+  logit_results <- NULL
+  if (config$output_settings$Generate_Aggregate_Logit) {
+    if (verbose) cat("\nSTEP 7: Fitting aggregate logit model...\n")
+    logit_results <- tryCatch({
+      if (requireNamespace("survival", quietly = TRUE)) {
+        fit_aggregate_logit(long_data = long_data, items = config$items,
+                            weighted = !is.null(config$project_settings$Weight_Variable),
+                            verbose = verbose)
+      } else {
+        fit_simple_logit(long_data, config$items, verbose)
+      }
+    }, error = function(e) {
+      message(sprintf("[TRS PARTIAL] MAXD_LOGIT_FAILED: Logit model failed: %s", conditionMessage(e)))
+      add_warning(sprintf("Logit model: %s", conditionMessage(e)))
+      NULL
+    })
+    if (!is.null(logit_results) && !is.null(count_scores)) {
+      count_scores <- merge(count_scores,
+        logit_results$utilities[, c("Item_ID", "Logit_Utility", "Logit_SE")],
+        by = "Item_ID", all.x = TRUE)
+    }
+  }
+
+  # Step 8: Hierarchical Bayes
+  hb_results <- NULL
+  if (config$output_settings$Generate_HB_Model) {
+    if (verbose) cat("\nSTEP 8: Fitting Hierarchical Bayes model...\n")
+    hb_results <- tryCatch({
+      fit_hb_model(long_data = long_data, items = config$items,
+                   config = config, verbose = verbose)
+    }, error = function(e) {
+      message(sprintf("[TRS PARTIAL] MAXD_HB_FAILED: HB model failed: %s", conditionMessage(e)))
+      add_warning(sprintf("HB model: %s", conditionMessage(e)))
+      NULL
+    })
+    if (!is.null(hb_results) && !is.null(count_scores)) {
+      count_scores <- merge(count_scores,
+        hb_results$population_utilities[, c("Item_ID", "HB_Utility_Mean", "HB_Utility_SD")],
+        by = "Item_ID", all.x = TRUE)
+    }
+  }
+
+  # Step 9: Segment scores
+  segment_results <- NULL
+  if (config$output_settings$Generate_Segment_Tables &&
+      !is.null(config$segment_settings) &&
+      nrow(config$segment_settings) > 0) {
+    if (verbose) cat("\nSTEP 9: Computing segment-level scores...\n")
+    segment_results <- tryCatch({
+      compute_segment_scores(long_data = long_data, raw_data = raw_data,
+                             segment_settings = config$segment_settings,
+                             items = config$items,
+                             output_settings = config$output_settings,
+                             verbose = verbose)
+    }, error = function(e) {
+      message(sprintf("[TRS PARTIAL] MAXD_SEGMENT_FAILED: Segment analysis failed: %s", conditionMessage(e)))
+      add_warning(sprintf("Segments: %s", conditionMessage(e)))
+      NULL
+    })
+  }
+
+  # Step 10: Charts
+  chart_paths <- NULL
+  if (config$output_settings$Generate_Charts) {
+    if (verbose) cat("\nSTEP 10: Generating charts...\n")
+    results_for_charts <- list(
+      count_scores = count_scores, logit_results = logit_results,
+      hb_results = hb_results, segment_results = segment_results,
+      study_summary = study_summary
+    )
+    chart_paths <- tryCatch({
+      generate_maxdiff_charts(results_for_charts, config, verbose)
+    }, error = function(e) {
+      message(sprintf("[TRS PARTIAL] MAXD_CHART_FAILED: Chart generation failed: %s", conditionMessage(e)))
+      add_warning(sprintf("Charts: %s", conditionMessage(e)))
+      NULL
+    })
+  }
+
+  # Step 10B: TURF
+  turf_results <- NULL
+  generate_turf <- parse_yes_no(config$output_settings$Generate_TURF %||% FALSE)
+  if (generate_turf && !is.null(hb_results$individual_utilities)) {
+    if (verbose) cat("\nSTEP 10B: Running TURF analysis...\n")
+    turf_results <- tryCatch({
+      turf_max <- safe_integer(config$output_settings$TURF_Max_Items %||% 10, default = 10L)
+      turf_method <- config$output_settings$TURF_Threshold %||% "ABOVE_MEAN"
+      run_turf_analysis(individual_utils = hb_results$individual_utilities,
+                        items = config$items, max_items = turf_max,
+                        threshold_method = turf_method, verbose = verbose)
+    }, error = function(e) {
+      message(sprintf("[TRS PARTIAL] MAXD_TURF_FAILED: TURF analysis failed: %s", conditionMessage(e)))
+      add_warning(sprintf("TURF: %s", conditionMessage(e)))
+      NULL
+    })
+  }
+
+  # Step 10C: Anchored MaxDiff
+  anchor_data <- NULL
+  has_anchor <- parse_yes_no(config$output_settings$Has_Anchor_Question %||% FALSE)
+  if (has_anchor) {
+    if (verbose) cat("\nSTEP 10C: Processing anchor data...\n")
+    anchor_var <- config$output_settings$Anchor_Variable %||% NULL
+    anchor_threshold <- safe_numeric(config$output_settings$Anchor_Threshold %||% 0.50, default = 0.50)
+    anchor_format <- config$output_settings$Anchor_Format %||% "COMMA_SEPARATED"
+    anchor_data <- tryCatch({
+      process_anchor_data(raw_data = raw_data, anchor_variable = anchor_var,
+                          items = config$items,
+                          id_variable = config$project_settings$Respondent_ID_Variable,
+                          anchor_format = anchor_format,
+                          anchor_threshold = anchor_threshold)
+    }, error = function(e) {
+      message(sprintf("[TRS PARTIAL] MAXD_ANCHOR_FAILED: Anchor processing failed: %s", conditionMessage(e)))
+      add_warning(sprintf("Anchor: %s", conditionMessage(e)))
+      NULL
+    })
+  }
+
+  # Step 10D: Item discrimination
+  discrimination_data <- NULL
+  if (!is.null(hb_results$individual_utilities)) {
+    if (verbose) cat("\nSTEP 10D: Computing item discrimination...\n")
+    discrimination_data <- tryCatch({
+      classify_item_discrimination(hb_results$individual_utilities, config$items)
+    }, error = function(e) {
+      message(sprintf("[TRS PARTIAL] MAXD_DISC_FAILED: Item discrimination failed: %s", conditionMessage(e)))
+      NULL
+    })
+  }
+
+  list(
+    count_scores = count_scores,
+    logit_results = logit_results,
+    hb_results = hb_results,
+    segment_results = segment_results,
+    chart_paths = chart_paths,
+    turf_results = turf_results,
+    anchor_data = anchor_data,
+    discrimination_data = discrimination_data
+  )
+}
+
+
+# ==============================================================================
+# HELPER: Generate Outputs (Steps 11-13)
+# ==============================================================================
+
+#' Generate MaxDiff Outputs
+#'
+#' Handles TRS logging, Excel output, optional simulator, and optional
+#' HTML report generation.
+#'
+#' @param design Design object
+#' @param long_data Long-format data
+#' @param raw_data Original wide-format data
+#' @param study_summary Study summary
+#' @param optional List of optional analysis results from run_maxdiff_optional_analyses
+#' @param config Configuration list
+#' @param trs_state TRS run state (or NULL)
+#' @param add_warning Function to accumulate warnings
+#' @param warnings_list Current warnings list
+#' @param verbose Logical
+#' @return Results list with output paths
+#' @keywords internal
+run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
+                                          study_summary, optional, config,
+                                          trs_state, add_warning,
+                                          warnings_list, verbose = TRUE) {
+
+  # TRS: Log PARTIAL events
+  if (!is.null(trs_state) && length(warnings_list) > 0) {
+    for (warn in warnings_list) {
+      if (exists("turas_run_state_partial", mode = "function")) {
+        turas_run_state_partial(trs_state, "MAXD_WARNING", "Analysis warning", problem = warn)
+      }
+    }
+  }
+
+  run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
+    turas_run_state_result(trs_state)
+  } else {
+    NULL
+  }
+
+  # Step 11: Excel output
+  if (verbose) cat("\nSTEP 11: Generating Excel output...\n")
+
+  results <- list(
+    mode = "ANALYSIS",
+    design = design,
+    long_data = long_data,
+    raw_data = raw_data,
+    study_summary = study_summary,
+    count_scores = optional$count_scores,
+    logit_results = optional$logit_results,
+    hb_results = optional$hb_results,
+    segment_results = optional$segment_results,
+    turf_results = optional$turf_results,
+    anchor_data = optional$anchor_data,
+    discrimination_data = optional$discrimination_data,
+    chart_paths = optional$chart_paths,
+    warnings = warnings_list,
+    run_result = run_result
+  )
+
+  output_path <- tryCatch({
+    generate_maxdiff_output(results, config, verbose, run_result)
+  }, error = function(e) {
+    message(sprintf("[TRS PARTIAL] MAXD_OUTPUT_FAILED: Output generation failed: %s", conditionMessage(e)))
+    NULL
+  })
+  results$output_path <- output_path
+
+  # Step 12: Simulator
+  generate_sim <- parse_yes_no(config$output_settings$Generate_Simulator %||% FALSE)
+  generate_html <- parse_yes_no(config$output_settings$Generate_HTML_Report %||% FALSE)
+  simulator_html <- NULL
+
+  if (generate_sim && !is.null(output_path)) {
+    if (verbose) cat("\nSTEP 12: Generating interactive simulator...\n")
+    tryCatch({
+      sim_main <- find_module_file("lib/html_simulator/99_simulator_main.R", "maxdiff")
+      if (!is.null(sim_main)) {
+        source(sim_main, local = FALSE)
+        if (generate_html) {
+          simulator_html <- build_simulator_html_string(results, config)
+        } else {
+          sim_path <- sub("\\.xlsx$", "_simulator.html", output_path)
+          sim_result <- generate_maxdiff_html_simulator(results, config, sim_path)
+          results$simulator_path <- sim_result$output_file
+        }
+      } else {
+        message("[TRS PARTIAL] MAXD_SIM_NOT_FOUND: Simulator module not found")
+      }
+    }, error = function(e) {
+      message(sprintf("[TRS PARTIAL] MAXD_SIM_FAILED: Simulator failed: %s", conditionMessage(e)))
+      add_warning(sprintf("Simulator: %s", conditionMessage(e)))
+    })
+  }
+
+  # Step 13: HTML report
+  if (generate_html && !is.null(output_path)) {
+    if (verbose) cat("\nSTEP 13: Generating HTML report...\n")
+    html_report_path <- sub("\\.xlsx$", ".html", output_path)
+    tryCatch({
+      html_main <- find_module_file("lib/html_report/99_html_report_main.R", "maxdiff")
+      if (!is.null(html_main)) {
+        cat("  Sourcing HTML report module...\n")
+        source(html_main, local = FALSE)
+        cat(sprintf("  Generating HTML report to: %s\n", html_report_path))
+        html_result <- generate_maxdiff_html_report(
+          results, html_report_path, config,
+          simulator_html = simulator_html
+        )
+        cat(sprintf("  HTML report result status: %s\n", html_result$status))
+        if (html_result$status == "PASS") {
+          results$html_report_path <- html_result$output_file
+          cat(sprintf("  HTML report saved: %s\n", html_result$output_file))
+        } else {
+          cat(sprintf("  HTML report failed: %s\n", html_result$message %||% "unknown"))
+        }
+      } else {
+        cat("\n[TRS PARTIAL] MAXD_HTML_NOT_FOUND: HTML report module not found at any path\n")
+        message("[TRS PARTIAL] MAXD_HTML_NOT_FOUND: HTML report module not found")
+      }
+    }, error = function(e) {
+      cat(sprintf("\n[TRS PARTIAL] MAXD_HTML_FAILED: HTML report failed: %s\n", conditionMessage(e)))
+      cat(sprintf("  Traceback: %s\n", paste(capture.output(traceback()), collapse = "\n  ")))
+      message(sprintf("[TRS PARTIAL] MAXD_HTML_FAILED: HTML report failed: %s", conditionMessage(e)))
+      add_warning(sprintf("HTML report: %s", conditionMessage(e)))
+    })
+  }
+
+  results
+}
+
+
+#' Find a Module File Using Multi-Fallback Path Resolution
+#'
+#' Searches for a file relative to the module's script directory, cwd,
+#' and project root. Returns the first existing path, or NULL.
+#'
+#' @param relative_path Relative path from module root (e.g. "lib/html_report/99_html_report_main.R")
+#' @param module_name Module name (e.g. "maxdiff")
+#' @return Absolute path if found, NULL otherwise
+#' @keywords internal
+find_module_file <- function(relative_path, module_name) {
+  base_dir <- get_script_dir()
+  candidates <- c(
+    file.path(base_dir, "..", relative_path),
+    file.path(getwd(), relative_path),
+    file.path(getwd(), "modules", module_name, relative_path)
+  )
+  for (cand in candidates) {
+    if (file.exists(cand)) return(cand)
+  }
+  NULL
 }
 
 

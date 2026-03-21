@@ -30,7 +30,7 @@ settings <- data.frame(
     "#323367",
     "#CC9900",
     "sacap_logo.png",
-    "/Users/duncan/Library/CloudStorage/OneDrive-Personal/DB Files/Projects/SACAP/SACS/04_CrossWave",
+    "output",
     "SACAP_Combined_Report.html"
   ),
   stringsAsFactors = FALSE
@@ -41,8 +41,8 @@ settings <- data.frame(
 # ---------------------------------------------------------------------------
 reports <- data.frame(
   report_path = c(
-    "/Users/duncan/Library/CloudStorage/OneDrive-Personal/DB Files/Projects/SACAP/SACS/04_CrossWave/SACAP_Annual_Climate_Survey_TrackingCrosstab_20260226.html",
-    "/Users/duncan/Library/CloudStorage/OneDrive-Personal/DB Files/Projects/SACAP/SACS/03_Waves/SACS-2025/04_Analysis/Crosstabs/SACS-2025_Crosstabs.html"
+    "reports/SACAP_Annual_Climate_Survey_TrackingCrosstab.html",
+    "reports/SACS-2025_Crosstabs.html"
   ),
   report_label = c(
     "Tracker",
@@ -112,7 +112,7 @@ setColWidths(wb, "CrossRef", cols = 1:2, widths = 20)
 # Save
 # ---------------------------------------------------------------------------
 output_path <- file.path(
-  "/Users/duncan/Documents/Turas/examples/report_hub",
+  "examples", "report_hub",
   "SACAP_Combined_Config.xlsx"
 )
 

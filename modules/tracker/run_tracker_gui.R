@@ -11,7 +11,7 @@ run_tracker_gui <- function() {
   # ==============================================================================
   # TRS v1.0: Load shared refusal infrastructure for proper error handling
   # ==============================================================================
-  TURAS_HOME <- getwd()
+  TURAS_HOME <- Sys.getenv("TURAS_ROOT", getwd())
   trs_refusal_path <- file.path(TURAS_HOME, "modules", "shared", "lib", "trs_refusal.R")
 
   # Define local refusal function (used if shared infrastructure unavailable)
@@ -95,7 +95,7 @@ run_tracker_gui <- function() {
   # === CONFIGURATION ===
 
   # Turas home directory
-  TURAS_HOME <- getwd()
+  TURAS_HOME <- Sys.getenv("TURAS_ROOT", getwd())
 
   # Load shared GUI theme
   source(file.path(TURAS_HOME, "modules", "shared", "lib", "gui_theme.R"))
@@ -264,7 +264,7 @@ run_tracker_gui <- function() {
     }
 
     # File choosers
-    volumes <- c(Home = "~", Documents = "~/Documents", Desktop = "~/Desktop")
+    volumes <- turas_gui_volumes()
 
     shinyFileChoose(input, "tracking_config_btn", roots = volumes, session = session,
                    filetypes = c("", "xlsx"))

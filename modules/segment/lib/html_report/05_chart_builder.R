@@ -955,7 +955,8 @@ build_seg_overlap_heatmap <- function(html_data, brand_colour = "#323367") {
         raw_dist <- dist_matrix[i, j]
         norm_val <- norm_matrix[i, j]
         bg_colour <- overlap_colour(norm_val)
-        value_text <- sprintf("%.2f", raw_dist)
+        similarity_pct <- round((1 - norm_val) * 100)
+        value_text <- sprintf("%d%%", similarity_pct)
         txt_colour <- if (norm_val < 0.3) "#ffffff" else "#1e293b"
       }
 

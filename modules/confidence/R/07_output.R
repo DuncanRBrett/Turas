@@ -102,17 +102,10 @@ source_if_exists("sampling_labels.R")
 #' @author Confidence Module Team
 #' @date 2025-11-13
 #' @export
-write_confidence_output <- function(output_path,
-                                    study_level_stats = NULL,
-                                    proportion_results = list(),
-                                    mean_results = list(),
-                                    nps_results = list(),
-                                    config = list(),
-                                    warnings = character(),
-                                    decimal_sep = ".",
-                                    run_result = NULL) {
-
-  # Validate decimal separator
+# ---------------------------------------------------------------------------
+# Helper: Validate output path (directory exists, writable, file writable)
+# ---------------------------------------------------------------------------
+validate_confidence_output_path <- function(output_path, decimal_sep) {
   if (!decimal_sep %in% c(".", ",")) {
     confidence_refuse(
       code = "CFG_INVALID_DECIMAL_SEPARATOR",
@@ -123,67 +116,49 @@ write_confidence_output <- function(output_path,
     )
   }
 
-  # Validate output path before creating workbook
   output_dir <- dirname(output_path)
 
-  # Check if output directory exists
   if (!dir.exists(output_dir)) {
     confidence_refuse(
       code = "IO_OUTPUT_DIR_NOT_FOUND",
       title = "Output Directory Does Not Exist",
       problem = sprintf("Output directory does not exist: %s", output_dir),
       why_it_matters = "Output files cannot be created without a valid directory.",
-      how_to_fix = c(
-        "Create the output directory first",
-        "Or specify a different output path in the config"
-      )
+      how_to_fix = c("Create the output directory first",
+                     "Or specify a different output path in the config")
     )
   }
 
-  # Check if output directory is writable
   if (file.access(output_dir, mode = 2) != 0) {
     confidence_refuse(
       code = "IO_OUTPUT_DIR_NOT_WRITABLE",
       title = "Output Directory Not Writable",
       problem = sprintf("Output directory is not writable: %s", output_dir),
       why_it_matters = "Write permissions are required to save output files.",
-      how_to_fix = c(
-        "Check directory permissions",
-        "Ensure you have write access to the directory"
-      )
+      how_to_fix = c("Check directory permissions",
+                     "Ensure you have write access to the directory")
     )
   }
 
-  # Check if output file exists and is writable (if it exists)
   if (file.exists(output_path) && file.access(output_path, mode = 2) != 0) {
     confidence_refuse(
       code = "IO_OUTPUT_FILE_NOT_WRITABLE",
       title = "Cannot Overwrite Output File",
       problem = sprintf("Cannot overwrite existing output file: %s", output_path),
       why_it_matters = "File must be writable to save updated results.",
-      how_to_fix = c(
-        "Close the file if it's open in Excel",
-        "Check file permissions",
-        "Or specify a different filename in the config"
-      )
+      how_to_fix = c("Close the file if it's open in Excel",
+                     "Check file permissions",
+                     "Or specify a different filename in the config")
     )
   }
 
-  # Guard check: ensure we have some results to write
-  has_results <- (!is.null(study_level_stats) && nrow(study_level_stats) > 0) ||
-                 length(proportion_results) > 0 ||
-                 length(mean_results) > 0 ||
-                 length(nps_results) > 0
+  invisible(TRUE)
+}
 
-  if (!has_results) {
-    warning("No analysis results to write. Output file will contain summary/methodology only.", call. = FALSE)
-  }
-
-  # Create workbook
-  wb <- openxlsx::createWorkbook()
-
-  # Derive sampling-method-aware labels for presentation
-  # Fallback: try sourcing sampling_labels.R if not already loaded
+# ---------------------------------------------------------------------------
+# Helper: Source and resolve sampling-method-aware labels
+# ---------------------------------------------------------------------------
+resolve_sampling_labels <- function(output_path, config) {
   if (!exists("get_sampling_labels", mode = "function")) {
     sl_candidates <- c(
       file.path(dirname(output_path), "..", "R", "sampling_labels.R"),
@@ -198,62 +173,27 @@ write_confidence_output <- function(output_path,
       }
     }
   }
-  labels <- if (exists("get_sampling_labels", mode = "function")) {
+
+  if (exists("get_sampling_labels", mode = "function")) {
     get_sampling_labels(config$sampling_method %||% "Not_Specified")
   } else {
     NULL
   }
+}
 
-  # Sheet 1: Summary
-  add_summary_sheet(wb, study_level_stats, proportion_results, mean_results,
-                    nps_results, config, warnings, decimal_sep, labels = labels)
-
-  # Sheet 2: Study Level
-  if (!is.null(study_level_stats) && nrow(study_level_stats) > 0) {
-    add_study_level_sheet(wb, study_level_stats, decimal_sep)
-  }
-
-  # Sheet 3: Representativeness & Weights (if available)
-  if (!is.null(study_level_stats)) {
-    add_representativeness_sheet(wb, study_level_stats, decimal_sep)
-  }
-
-  # Sheet 4: Proportions Detail
-  if (length(proportion_results) > 0) {
-    add_proportions_detail_sheet(wb, proportion_results, decimal_sep, labels = labels)
-  }
-
-  # Sheet 5: Means Detail
-  if (length(mean_results) > 0) {
-    add_means_detail_sheet(wb, mean_results, decimal_sep, labels = labels)
-  }
-
-  # Sheet 6: NPS Detail
-  if (length(nps_results) > 0) {
-    add_nps_detail_sheet(wb, nps_results, decimal_sep, labels = labels)
-  }
-
-  # Sheet 7: Methodology
-  add_methodology_sheet(wb)
-
-  # Sheet 8: Warnings
-  add_warnings_sheet(wb, warnings)
-
-  # Sheet 9: Inputs
-  add_inputs_sheet(wb, config, decimal_sep)
-
-  # Sheet 10: TRS Run_Status (always write if run_result provided)
+# ---------------------------------------------------------------------------
+# Helper: Save workbook with TRS atomic save or fallback
+# ---------------------------------------------------------------------------
+save_confidence_workbook <- function(wb, output_path, run_result = NULL) {
+  # TRS Run_Status sheet
   if (!is.null(run_result)) {
-    # Source TRS run status writer if not already loaded
     tryCatch({
       if (!exists("turas_write_run_status_sheet", mode = "function")) {
         trs_writer_path <- file.path(dirname(getwd()), "shared", "lib", "trs_run_status_writer.R")
         if (!file.exists(trs_writer_path)) {
           trs_writer_path <- file.path(getwd(), "modules", "shared", "lib", "trs_run_status_writer.R")
         }
-        if (file.exists(trs_writer_path)) {
-          source(trs_writer_path)
-        }
+        if (file.exists(trs_writer_path)) source(trs_writer_path)
       }
       if (exists("turas_write_run_status_sheet", mode = "function")) {
         turas_write_run_status_sheet(wb, run_result)
@@ -263,7 +203,7 @@ write_confidence_output <- function(output_path,
     })
   }
 
-  # Save workbook (TRS v1.0: Use atomic save if available)
+  # Save with atomic save if available, otherwise direct
   if (exists("turas_save_workbook_atomic", mode = "function")) {
     save_result <- turas_save_workbook_atomic(wb, output_path, run_result = run_result, module = "CONF")
     if (!save_result$success) {
@@ -272,37 +212,83 @@ write_confidence_output <- function(output_path,
         title = "Failed to Save Excel File",
         problem = sprintf("Failed to save Excel file: %s", save_result$error),
         why_it_matters = "Output file could not be written to disk.",
-        how_to_fix = c(
-          "Check file is not open in Excel",
-          "Verify output directory exists",
-          "Check write permissions",
-          "Ensure sufficient disk space"
-        ),
+        how_to_fix = c("Check file is not open in Excel", "Verify output directory exists",
+                       "Check write permissions", "Ensure sufficient disk space"),
         details = sprintf("Output path: %s", output_path)
       )
     }
-    message(sprintf("\n[TRS INFO] Output written to: %s", output_path))
   } else {
-    # Fallback to direct save
     tryCatch({
       openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
-      message(sprintf("\n[TRS INFO] Output written to: %s", output_path))
     }, error = function(e) {
       confidence_refuse(
         code = "IO_EXCEL_SAVE_FAILED",
         title = "Failed to Save Excel File",
         problem = sprintf("Failed to save Excel file: %s", conditionMessage(e)),
         why_it_matters = "Output file could not be written to disk.",
-        how_to_fix = c(
-          "Check file is not open in Excel",
-          "Verify output directory exists",
-          "Check write permissions",
-          "Ensure sufficient disk space"
-        ),
+        how_to_fix = c("Check file is not open in Excel", "Verify output directory exists",
+                       "Check write permissions", "Ensure sufficient disk space"),
         details = sprintf("Output path: %s", output_path)
       )
     })
   }
+
+  message(sprintf("\n[TRS INFO] Output written to: %s", output_path))
+  invisible(TRUE)
+}
+
+write_confidence_output <- function(output_path,
+                                    study_level_stats = NULL,
+                                    proportion_results = list(),
+                                    mean_results = list(),
+                                    nps_results = list(),
+                                    config = list(),
+                                    warnings = character(),
+                                    decimal_sep = ".",
+                                    run_result = NULL) {
+
+  # Validate inputs and output path
+  validate_confidence_output_path(output_path, decimal_sep)
+
+  # Guard check: ensure we have some results to write
+  has_results <- (!is.null(study_level_stats) && nrow(study_level_stats) > 0) ||
+                 length(proportion_results) > 0 ||
+                 length(mean_results) > 0 ||
+                 length(nps_results) > 0
+
+  if (!has_results) {
+    warning("No analysis results to write. Output file will contain summary/methodology only.", call. = FALSE)
+  }
+
+  # Create workbook and resolve labels
+  wb <- openxlsx::createWorkbook()
+  labels <- resolve_sampling_labels(output_path, config)
+
+  # Add sheets
+  add_summary_sheet(wb, study_level_stats, proportion_results, mean_results,
+                    nps_results, config, warnings, decimal_sep, labels = labels)
+
+  if (!is.null(study_level_stats) && nrow(study_level_stats) > 0) {
+    add_study_level_sheet(wb, study_level_stats, decimal_sep)
+  }
+  if (!is.null(study_level_stats)) {
+    add_representativeness_sheet(wb, study_level_stats, decimal_sep)
+  }
+  if (length(proportion_results) > 0) {
+    add_proportions_detail_sheet(wb, proportion_results, decimal_sep, labels = labels)
+  }
+  if (length(mean_results) > 0) {
+    add_means_detail_sheet(wb, mean_results, decimal_sep, labels = labels)
+  }
+  if (length(nps_results) > 0) {
+    add_nps_detail_sheet(wb, nps_results, decimal_sep, labels = labels)
+  }
+  add_methodology_sheet(wb)
+  add_warnings_sheet(wb, warnings)
+  add_inputs_sheet(wb, config, decimal_sep)
+
+  # Save workbook with TRS run status
+  save_confidence_workbook(wb, output_path, run_result)
 
   invisible(TRUE)
 }

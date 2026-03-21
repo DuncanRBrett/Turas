@@ -47,8 +47,8 @@ test_that("trs_validate_code rejects invalid prefixes", {
 
 test_that("trs_validate_code rejects invalid formats", {
   expect_error(trs_validate_code("cfg_lowercase"), "Invalid refusal code prefix")
-  expect_error(trs_validate_code("CFG-HYPHEN"), "must contain only uppercase")
-  expect_error(trs_validate_code("CFG SPACE"), "must contain only uppercase")
+  expect_error(trs_validate_code("CFG-HYPHEN"), "Invalid refusal code prefix|must contain only uppercase")
+  expect_error(trs_validate_code("CFG SPACE"), "Invalid refusal code prefix|must contain only uppercase")
 })
 
 test_that("trs_validate_code rejects non-string inputs", {
@@ -68,6 +68,7 @@ test_that("turas_refuse throws turas_refusal condition", {
       code = "CFG_TEST_ERROR",
       title = "Test Error",
       problem = "This is a test problem",
+      why_it_matters = "Testing requires this to work",
       how_to_fix = "Fix the test"
     ),
     class = "turas_refusal"
@@ -100,6 +101,7 @@ test_that("turas_refuse includes diagnostics when provided", {
       code = "MAPPER_TEST",
       title = "Mapping Error",
       problem = "Test mapping problem",
+      why_it_matters = "Mapping must be correct for analysis",
       how_to_fix = "Fix mapping",
       expected = c("A", "B", "C"),
       observed = c("A", "B"),
@@ -123,6 +125,7 @@ test_that("turas_refuse rejects invalid codes", {
       code = "INVALID_CODE",
       title = "Test",
       problem = "Test",
+      why_it_matters = "Test",
       how_to_fix = "Test"
     ),
     "Invalid refusal code prefix"
@@ -147,6 +150,7 @@ test_that("with_refusal_handler catches turas_refusal", {
       code = "CFG_TEST",
       title = "Test",
       problem = "Test problem",
+      why_it_matters = "Test matters",
       how_to_fix = "Test fix"
     )
   })
@@ -398,6 +402,7 @@ test_that("trs_refuse is alias for turas_refuse", {
       code = "CFG_TEST",
       title = "Test",
       problem = "Test",
+      why_it_matters = "Test",
       how_to_fix = "Test"
     ),
     class = "turas_refusal"

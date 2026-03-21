@@ -150,8 +150,8 @@ test_that("validate_decimal_separator returns default for NULL", {
   expect_equal(validate_decimal_separator(NULL, ","), ",")
 })
 
-test_that("validate_decimal_separator warns on invalid", {
-  expect_warning(result <- validate_decimal_separator(";"))
+test_that("validate_decimal_separator falls back on invalid", {
+  expect_message(result <- validate_decimal_separator(";"), "FMT_INVALID_DECIMAL_SEP")
   expect_equal(result, ".")
 })
 
@@ -174,11 +174,11 @@ test_that("validate_decimal_places returns default for NULL", {
   expect_equal(validate_decimal_places(NULL, 2), 2L)
 })
 
-test_that("validate_decimal_places warns on invalid", {
-  expect_warning(result <- validate_decimal_places(-1))
+test_that("validate_decimal_places falls back on invalid", {
+  expect_message(result <- validate_decimal_places(-1), "FMT_INVALID_DECIMAL_PLACES")
   expect_equal(result, 1L)
 
-  expect_warning(result <- validate_decimal_places(10))
+  expect_message(result <- validate_decimal_places(10), "FMT_INVALID_DECIMAL_PLACES")
   expect_equal(result, 1L)
 })
 

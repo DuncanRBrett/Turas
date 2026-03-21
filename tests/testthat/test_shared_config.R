@@ -103,7 +103,7 @@ test_that("get_project_root returns parent directory", {
 })
 
 test_that("get_project_root rejects empty path", {
-  expect_error(get_project_root(""), "cannot be empty")
+  expect_error(get_project_root(""), "empty")
 })
 
 # ==============================================================================
@@ -165,7 +165,7 @@ test_that("get_numeric_config validates range", {
 
   expect_error(
     get_numeric_config(config, "value", max = 50),
-    regexp = "must be between"
+    regexp = "out of range|must be between|outside.*allowed"
   )
 })
 

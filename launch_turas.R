@@ -15,15 +15,24 @@ library(shinyjs)
 #' @export
 launch_turas <- function() {
 
-  # Get Turas root directory
-  turas_root <- getwd()
-  if (basename(turas_root) != "Turas") {
+  # Get Turas root directory (Docker-aware: checks TURAS_ROOT env var first)
+  turas_root <- Sys.getenv("TURAS_ROOT", "")
+  if (!nzchar(turas_root) || !dir.exists(turas_root)) {
+    turas_root <- getwd()
+  }
+
+  # Validate: must contain launch_turas.R (the marker file for Turas root)
+  if (!file.exists(file.path(turas_root, "launch_turas.R"))) {
+    # Try parent directory
     if (file.exists(file.path(dirname(turas_root), "launch_turas.R"))) {
       turas_root <- dirname(turas_root)
     } else {
-      stop("Please run from Turas directory or set working directory to Turas root")
+      stop("Cannot locate Turas root. Set TURAS_ROOT env var or run from the Turas directory.")
     }
   }
+
+  # Cache for child modules
+  Sys.setenv(TURAS_ROOT = turas_root)
 
   # ============================================================================
   # MODULE REGISTRY

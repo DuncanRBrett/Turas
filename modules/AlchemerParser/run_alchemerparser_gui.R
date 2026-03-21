@@ -262,7 +262,7 @@ run_alchemerparser_gui <- function() {
     })
 
     # Set up directory chooser
-    volumes <- c(Home = fs::path_home(), shinyFiles::getVolumes()())
+    volumes <- turas_gui_volumes()
     shinyFiles::shinyDirChoose(input, "browse_dir", roots = volumes, session = session)
 
     # Handle directory selection

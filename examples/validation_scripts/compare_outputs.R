@@ -4,8 +4,9 @@
 
 library(readxl)
 
-baseline_file <- "~/Documents/Turas_Test_Baseline/baseline_output.xlsx"
-comparison_file <- "~/Documents/Turas_Test_Baseline/chunk8_output.xlsx"
+# Set these paths before sourcing, or pass as arguments
+baseline_file <- Sys.getenv("TURAS_BASELINE_FILE", "examples/validation_scripts/baseline_output.xlsx")
+comparison_file <- Sys.getenv("TURAS_COMPARISON_FILE", "examples/validation_scripts/comparison_output.xlsx")
 
 cat("================================================================================\n")
 cat("COMPARING OUTPUTS: Baseline vs Chunk 8 (Utility Functions)\n")

@@ -12,7 +12,8 @@
 
 library(openxlsx)
 
-demo_dir   <- "/Users/duncan/Library/CloudStorage/OneDrive-Personal/DB Files/Projects/demo/waves/CCS-W4"
+# Set demo_dir before sourcing, or override with TURAS_DEMO_DIR env var
+demo_dir   <- Sys.getenv("TURAS_DEMO_DIR", "examples/confidence/demo")
 output_dir <- file.path(demo_dir, "output")
 if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 

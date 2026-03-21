@@ -12,7 +12,7 @@ if (exists("rstudioapi") && rstudioapi::isAvailable()) {
   # Otherwise assume we're already in the right directory
   # or set it manually before sourcing
   if (basename(getwd()) != "Turas") {
-    stop("Please run this from the Turas directory or use:\n  setwd('/Users/duncan/Documents/Turas')\n  source('launch_tracker_gui.R')")
+    stop("Please run this from the Turas root directory (the one containing launch_turas.R).\n  Alternatively, set the TURAS_ROOT environment variable before sourcing.")
   }
 }
 

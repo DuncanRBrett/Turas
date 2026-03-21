@@ -48,6 +48,37 @@ turas_gui_theme <- function(module_name, module_subtitle = NULL) {
 }
 
 
+#' Get file browser volumes for Shiny directory chooser
+#'
+#' Returns named volume roots that work in both desktop and Docker contexts.
+#' In Docker (detected via TURAS_DOCKER=1 env var or /.dockerenv file),
+#' returns /data and /app as roots. On desktop, returns Home/Documents/Desktop.
+#'
+#' @return Named character vector of root directories for shinyDirChoose
+turas_gui_volumes <- function() {
+  in_docker <- nzchar(Sys.getenv("TURAS_DOCKER", "")) ||
+    file.exists("/.dockerenv")
+
+  if (in_docker) {
+    vols <- c(Data = "/data", App = "/app")
+    # Only include volumes that exist
+    vols <- vols[dir.exists(vols)]
+    if (length(vols) == 0) vols <- c(Root = "/")
+    return(vols)
+  }
+
+  # Desktop context: standard user directories
+  home <- Sys.getenv("HOME", path.expand("~"))
+  vols <- c(
+    Home = home,
+    Documents = file.path(home, "Documents"),
+    Desktop = file.path(home, "Desktop")
+  )
+  # Only include directories that exist
+  vols[dir.exists(vols)]
+}
+
+
 #' Check if module was launched from the Turas hub
 #'
 #' Returns TRUE when TURAS_LAUNCHED_FROM_HUB env var is set.

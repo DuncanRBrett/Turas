@@ -176,22 +176,26 @@ read_segment_config <- function(config_file) {
 #' @param config Named list from read_segment_config()
 #' @return Validated configuration list with defaults applied
 #' @export
-validate_segment_config <- function(config) {
-  cat("Validating configuration...\n")
+# ---------------------------------------------------------------------------
+# Helper: Parse comma-or-semicolon-separated string into character vector
+# ---------------------------------------------------------------------------
+parse_delimited_vars <- function(str_val) {
+  if (is.null(str_val) || !nzchar(trimws(as.character(str_val)))) return(NULL)
+  vars <- trimws(unlist(strsplit(str_val, ",")))
+  if (length(vars) == 1) vars <- trimws(unlist(strsplit(str_val, ";")))
+  vars
+}
 
-  # ===========================================================================
-  # REQUIRED PARAMETERS
-  # ===========================================================================
-
+# ---------------------------------------------------------------------------
+# Helper: Validate required params and clustering method
+# ---------------------------------------------------------------------------
+validate_segment_required_and_method <- function(config) {
   data_file <- get_char_config(config, "data_file", required = TRUE)
   id_variable <- get_char_config(config, "id_variable", required = TRUE)
 
-  # Clustering variables (comma or semicolon separated)
-  clustering_vars_str <- get_char_config(config, "clustering_vars", required = TRUE)
-  clustering_vars <- trimws(unlist(strsplit(clustering_vars_str, ",")))
-  if (length(clustering_vars) == 1) {
-    clustering_vars <- trimws(unlist(strsplit(clustering_vars_str, ";")))
-  }
+  clustering_vars <- parse_delimited_vars(
+    get_char_config(config, "clustering_vars", required = TRUE)
+  )
 
   if (length(clustering_vars) < 2) {
     segment_refuse(
@@ -203,19 +207,13 @@ validate_segment_config <- function(config) {
     )
   }
 
-  # ===========================================================================
-  # CLUSTERING METHOD (v11.0)
-  # ===========================================================================
-
+  # Clustering method
   method <- tolower(get_char_config(config, "method", default_value = "kmeans"))
-
-  # Parse multiple methods (comma-separated or "all")
   methods <- trimws(unlist(strsplit(method, ",")))
   if (length(methods) == 1 && methods[1] == "all") {
     methods <- c("kmeans", "hclust", "gmm")
   }
 
-  # Validate each method
   valid_methods <- c("kmeans", "hclust", "gmm")
   invalid <- setdiff(methods, valid_methods)
   if (length(invalid) > 0) {
@@ -228,30 +226,24 @@ validate_segment_config <- function(config) {
     )
   }
 
-  # Determine if multi-method mode
   is_multi_method <- length(methods) > 1
-  # For backward compat, use first method as primary
   method <- methods[1]
 
-  # Method-specific parameters
-  linkage_method <- get_char_config(config, "linkage_method", default_value = "ward.D2")
-  gmm_model_type <- get_config_value(config, "gmm_model_type", default_value = NULL)
+  list(
+    data_file = data_file, id_variable = id_variable,
+    clustering_vars = clustering_vars,
+    method = method, methods = methods, is_multi_method = is_multi_method,
+    linkage_method = get_char_config(config, "linkage_method", default_value = "ward.D2"),
+    gmm_model_type = get_config_value(config, "gmm_model_type", default_value = NULL)
+  )
+}
 
-  # ===========================================================================
-  # OPTIONAL PARAMETERS WITH DEFAULTS
-  # ===========================================================================
-
+# ---------------------------------------------------------------------------
+# Helper: Validate K parameters, data handling, outliers, variable selection
+# ---------------------------------------------------------------------------
+validate_segment_analysis_params <- function(config, clustering_vars) {
   data_sheet <- get_char_config(config, "data_sheet", default_value = "Data")
-
-  # Profiling variables
-  profile_vars_str <- get_config_value(config, "profile_vars", default_value = NULL)
-  profile_vars <- if (!is.null(profile_vars_str) && nzchar(trimws(as.character(profile_vars_str)))) {
-    vars <- trimws(unlist(strsplit(profile_vars_str, ",")))
-    if (length(vars) == 1) vars <- trimws(unlist(strsplit(profile_vars_str, ";")))
-    vars
-  } else {
-    NULL
-  }
+  profile_vars <- parse_delimited_vars(get_config_value(config, "profile_vars", default_value = NULL))
 
   # K parameters
   k_fixed_val <- get_config_value(config, "k_fixed", default_value = NULL)
@@ -266,7 +258,6 @@ validate_segment_config <- function(config) {
   nstart <- get_numeric_config(config, "nstart", default_value = 50, min = 1, max = 200)
   seed <- get_numeric_config(config, "seed", default_value = 123, min = 1)
 
-  # Validate k
   if (k_min >= k_max) {
     segment_refuse(
       code = "CFG_INVALID_K_RANGE",
@@ -291,7 +282,6 @@ validate_segment_config <- function(config) {
   missing_data <- get_char_config(config, "missing_data",
     default_value = "listwise_deletion",
     allowed_values = c("listwise_deletion", "mean_imputation", "median_imputation", "refuse"))
-
   missing_threshold <- get_numeric_config(config, "missing_threshold", default_value = 15, min = 0, max = 100)
   standardize <- get_logical_config(config, "standardize", default_value = TRUE)
   min_segment_size_pct <- get_numeric_config(config, "min_segment_size_pct", default_value = 10, min = 0, max = 50)
@@ -357,51 +347,57 @@ validate_segment_config <- function(config) {
     }
   }
 
-  # ===========================================================================
-  # HTML REPORT SETTINGS (v11.0)
-  # ===========================================================================
+  list(
+    data_sheet = data_sheet, profile_vars = profile_vars,
+    k_fixed = k_fixed, k_min = k_min, k_max = k_max, nstart = nstart, seed = seed,
+    missing_data = missing_data, missing_threshold = missing_threshold,
+    standardize = standardize, min_segment_size_pct = min_segment_size_pct,
+    outlier_detection = outlier_detection, outlier_method = outlier_method,
+    outlier_threshold = outlier_threshold, outlier_min_vars = outlier_min_vars,
+    outlier_handling = outlier_handling, outlier_alpha = outlier_alpha,
+    variable_selection = variable_selection, variable_selection_method = variable_selection_method,
+    max_clustering_vars = max_clustering_vars, varsel_min_variance = varsel_min_variance,
+    varsel_max_correlation = varsel_max_correlation,
+    k_selection_metrics = k_selection_metrics,
+    output_folder = output_folder, output_prefix = output_prefix,
+    create_dated_folder = create_dated_folder, segment_names = segment_names,
+    save_model = save_model
+  )
+}
 
+# ---------------------------------------------------------------------------
+# Helper: Parse HTML report and enhanced feature settings
+# ---------------------------------------------------------------------------
+parse_segment_feature_params <- function(config, clustering_vars) {
+  # HTML report settings
   html_report <- get_logical_config(config, "html_report", default_value = FALSE)
   brand_colour <- get_char_config(config, "brand_colour", default_value = "#323367")
   accent_colour <- get_char_config(config, "accent_colour", default_value = "#CC9900")
   report_title <- get_char_config(config, "report_title", default_value = "Segmentation Report")
 
-  # Section visibility
-  html_show_exec_summary <- get_logical_config(config, "html_show_exec_summary", default_value = TRUE)
-  html_show_overview <- get_logical_config(config, "html_show_overview", default_value = TRUE)
-  html_show_validation <- get_logical_config(config, "html_show_validation", default_value = TRUE)
-  html_show_importance <- get_logical_config(config, "html_show_importance", default_value = TRUE)
-  html_show_profiles <- get_logical_config(config, "html_show_profiles", default_value = TRUE)
-  html_show_demographics <- get_logical_config(config, "html_show_demographics", default_value = TRUE)
-  html_show_rules <- get_logical_config(config, "html_show_rules", default_value = TRUE)
-  html_show_cards <- get_logical_config(config, "html_show_cards", default_value = TRUE)
-  html_show_stability <- get_logical_config(config, "html_show_stability", default_value = TRUE)
-  html_show_membership <- get_logical_config(config, "html_show_membership", default_value = TRUE)
-  html_show_guide <- get_logical_config(config, "html_show_guide", default_value = TRUE)
+  html_show <- list(
+    exec_summary = get_logical_config(config, "html_show_exec_summary", default_value = TRUE),
+    overview     = get_logical_config(config, "html_show_overview", default_value = TRUE),
+    validation   = get_logical_config(config, "html_show_validation", default_value = TRUE),
+    importance   = get_logical_config(config, "html_show_importance", default_value = TRUE),
+    profiles     = get_logical_config(config, "html_show_profiles", default_value = TRUE),
+    demographics = get_logical_config(config, "html_show_demographics", default_value = TRUE),
+    rules        = get_logical_config(config, "html_show_rules", default_value = TRUE),
+    cards        = get_logical_config(config, "html_show_cards", default_value = TRUE),
+    stability    = get_logical_config(config, "html_show_stability", default_value = TRUE),
+    membership   = get_logical_config(config, "html_show_membership", default_value = TRUE),
+    guide        = get_logical_config(config, "html_show_guide", default_value = TRUE)
+  )
 
-  # ===========================================================================
-  # ENHANCED FEATURES
-  # ===========================================================================
-
-  # Default to all clustering variables; analyst can filter in the HTML report
+  # Enhanced features
   n_clustering_vars <- length(clustering_vars)
   golden_questions_n <- get_numeric_config(config, "golden_questions_n",
                                             default_value = max(n_clustering_vars, 5),
                                             min = 1, max = 100)
   auto_name_style <- get_char_config(config, "auto_name_style", default_value = "descriptive",
     allowed_values = c("descriptive", "persona", "simple"))
+  demographic_vars <- parse_delimited_vars(get_config_value(config, "demographic_vars", default_value = NULL))
 
-  # Demographic variables
-  demo_vars_str <- get_config_value(config, "demographic_vars", default_value = NULL)
-  demographic_vars <- if (!is.null(demo_vars_str) && nzchar(trimws(as.character(demo_vars_str)))) {
-    vars <- trimws(unlist(strsplit(demo_vars_str, ",")))
-    if (length(vars) == 1) vars <- trimws(unlist(strsplit(demo_vars_str, ";")))
-    vars
-  } else {
-    NULL
-  }
-
-  # Stability / rules / cards
   run_stability_check <- get_logical_config(config, "run_stability_check", default_value = FALSE)
   stability_n_runs <- get_numeric_config(config, "stability_n_runs", default_value = 5, min = 3, max = 20)
   generate_rules <- get_logical_config(config, "generate_rules", default_value = FALSE)
@@ -422,87 +418,72 @@ validate_segment_config <- function(config) {
     question_labels <- load_question_labels(question_labels_file)
   }
 
-  # Segment names file (for reading edited names back from Excel)
   segment_names_file <- get_config_value(config, "segment_names_file", default_value = NULL)
 
-  # ===========================================================================
-  # CONSTRUCT VALIDATED CONFIG
-  # ===========================================================================
-
-  validated_config <- list(
-    # Data source
-    data_file = data_file, data_sheet = data_sheet, id_variable = id_variable,
-    # Variables
-    clustering_vars = clustering_vars, profile_vars = profile_vars,
-    # Method
-    method = method, methods = methods, is_multi_method = is_multi_method,
-    linkage_method = linkage_method, gmm_model_type = gmm_model_type,
-    # K parameters
-    k_fixed = k_fixed, k_min = k_min, k_max = k_max, nstart = nstart, seed = seed,
-    # Data handling
-    missing_data = missing_data, missing_threshold = missing_threshold,
-    standardize = standardize, min_segment_size_pct = min_segment_size_pct,
-    # Outliers
-    outlier_detection = outlier_detection, outlier_method = outlier_method,
-    outlier_threshold = outlier_threshold, outlier_min_vars = outlier_min_vars,
-    outlier_handling = outlier_handling, outlier_alpha = outlier_alpha,
-    # Variable selection
-    variable_selection = variable_selection, variable_selection_method = variable_selection_method,
-    max_clustering_vars = max_clustering_vars, varsel_min_variance = varsel_min_variance,
-    varsel_max_correlation = varsel_max_correlation,
-    # Validation
-    k_selection_metrics = k_selection_metrics,
-    # Output
-    output_folder = output_folder, output_prefix = output_prefix,
-    create_dated_folder = create_dated_folder, segment_names = segment_names,
-    save_model = save_model,
-    # HTML report
+  list(
     html_report = html_report, brand_colour = brand_colour, accent_colour = accent_colour,
     report_title = report_title,
-    html_show_exec_summary = html_show_exec_summary, html_show_overview = html_show_overview,
-    html_show_validation = html_show_validation, html_show_importance = html_show_importance,
-    html_show_profiles = html_show_profiles, html_show_demographics = html_show_demographics,
-    html_show_rules = html_show_rules, html_show_cards = html_show_cards,
-    html_show_stability = html_show_stability, html_show_membership = html_show_membership,
-    html_show_guide = html_show_guide,
-    # Enhanced features
+    html_show_exec_summary = html_show$exec_summary, html_show_overview = html_show$overview,
+    html_show_validation = html_show$validation, html_show_importance = html_show$importance,
+    html_show_profiles = html_show$profiles, html_show_demographics = html_show$demographics,
+    html_show_rules = html_show$rules, html_show_cards = html_show$cards,
+    html_show_stability = html_show$stability, html_show_membership = html_show$membership,
+    html_show_guide = html_show$guide,
     golden_questions_n = golden_questions_n, auto_name_style = auto_name_style,
     demographic_vars = demographic_vars, run_stability_check = run_stability_check,
     stability_n_runs = stability_n_runs, generate_rules = generate_rules,
     rules_max_depth = rules_max_depth, generate_action_cards = generate_action_cards,
     scale_max = scale_max, use_lca = use_lca,
-    # Metadata
     project_name = project_name, analyst_name = analyst_name, description = description,
     question_labels_file = question_labels_file, question_labels = question_labels,
-    segment_names_file = segment_names_file,
-    # Pre-configured content from Excel
-    insights = config$.insights, about = config$.about, slides = config$.slides,
-    # Mode detection
-    mode = if (is.null(k_fixed)) "exploration" else "final"
+    segment_names_file = segment_names_file
+  )
+}
+
+validate_segment_config <- function(config) {
+  cat("Validating configuration...\n")
+
+  # Step 1: Required params + clustering method
+  req <- validate_segment_required_and_method(config)
+
+  # Step 2: Analysis params (K, data handling, outliers, output)
+  analysis <- validate_segment_analysis_params(config, req$clustering_vars)
+
+  # Step 3: HTML report + enhanced features
+  features <- parse_segment_feature_params(config, req$clustering_vars)
+
+  # Assemble validated config
+  validated_config <- c(
+    req,
+    analysis,
+    features,
+    list(
+      insights = config$.insights,
+      about = config$.about,
+      slides = config$.slides,
+      mode = if (is.null(analysis$k_fixed)) "exploration" else "final"
+    )
   )
 
-  # ===========================================================================
-  # SUMMARY OUTPUT
-  # ===========================================================================
-
+  # Summary output
   cat(sprintf("  Configuration validated\n"))
   cat(sprintf("  Mode: %s\n", validated_config$mode))
-  if (is_multi_method) {
-    cat(sprintf("  Methods: %s (multi-method comparison)\n", paste(toupper(methods), collapse = ", ")))
+  if (req$is_multi_method) {
+    cat(sprintf("  Methods: %s (multi-method comparison)\n", paste(toupper(req$methods), collapse = ", ")))
   } else {
-    cat(sprintf("  Method: %s\n", toupper(method)))
+    cat(sprintf("  Method: %s\n", toupper(req$method)))
   }
-  cat(sprintf("  Clustering variables: %d\n", length(clustering_vars)))
+  cat(sprintf("  Clustering variables: %d\n", length(req$clustering_vars)))
 
   if (validated_config$mode == "exploration") {
-    cat(sprintf("  K range: %d to %d\n", k_min, k_max))
+    cat(sprintf("  K range: %d to %d\n", analysis$k_min, analysis$k_max))
   } else {
-    cat(sprintf("  Fixed K: %d\n", k_fixed))
+    cat(sprintf("  Fixed K: %d\n", analysis$k_fixed))
   }
 
-  if (method == "hclust") cat(sprintf("  Linkage: %s\n", linkage_method))
-  if (method == "gmm" && !is.null(gmm_model_type)) cat(sprintf("  GMM model: %s\n", gmm_model_type))
-  if (html_report) cat("  HTML report: enabled\n")
+  if (req$method == "hclust") cat(sprintf("  Linkage: %s\n", req$linkage_method))
+  if (req$method == "gmm" && !is.null(req$gmm_model_type)) cat(sprintf("  GMM model: %s\n", req$gmm_model_type))
+  if (features$html_report) cat("  HTML report: enabled\n")
 
   validated_config
 }

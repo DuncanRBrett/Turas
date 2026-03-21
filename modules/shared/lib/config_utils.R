@@ -357,12 +357,20 @@ get_project_root <- function(config_file_path) {
 #' @return Character, path to Turas root directory
 #' @export
 find_turas_root <- function() {
-  # Check cached value first
+  # Check cached value in .GlobalEnv first (fastest)
   if (exists("TURAS_ROOT", envir = .GlobalEnv)) {
     cached <- get("TURAS_ROOT", envir = .GlobalEnv)
     if (!is.null(cached) && nzchar(cached)) {
       return(cached)
     }
+  }
+
+  # Check TURAS_ROOT environment variable (set via Docker ENV or shell export)
+  env_root <- Sys.getenv("TURAS_ROOT", "")
+  if (nzchar(env_root) && dir.exists(env_root)) {
+    # Cache for future calls
+    assign("TURAS_ROOT", env_root, envir = .GlobalEnv)
+    return(env_root)
   }
 
   # Start from current working directory

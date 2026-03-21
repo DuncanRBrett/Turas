@@ -520,139 +520,18 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
       }
     }
 
-    # STEP 7: Generate Output
-    if (verbose) cat("\n7. Generating Excel output...\n")
-
-    # ==========================================================================
-    # TRS: Log PARTIAL events for any warnings
-    # ==========================================================================
-    all_warnings <- c(config$validation$warnings, data_list$validation$warnings)
-    if (!is.null(trs_state) && length(all_warnings) > 0) {
-      for (warn in all_warnings) {
-        if (exists("turas_run_state_partial", mode = "function")) {
-          turas_run_state_partial(
-            trs_state,
-            "CONJ_WARNING",
-            "Analysis warning",
-            problem = warn
-          )
-        }
-      }
-    }
-
-    # ==========================================================================
-    # TRS: Get run result for output
-    # ==========================================================================
-    run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
-      turas_run_state_result(trs_state)
-    } else {
-      NULL
-    }
-
-    write_conjoint_output(
+    # STEPS 7-8: Output, HTML Report, and Finalization
+    conjoint_generate_outputs(
       utilities = utilities,
       importance = importance,
       diagnostics = diagnostics,
       model_result = model_result,
       config = config,
-      data_info = data_list,
-      output_file = config$output_file,
-      run_result = run_result
-    )
-
-    if (verbose) {
-      cat(sprintf("   ✓ Results written to: %s\n", basename(config$output_file)))
-    }
-
-    # STEP 8: Generate Combined HTML Report + Simulator (if configured)
-    if (isTRUE(config$generate_html_report) || isTRUE(config$generate_html_simulator)) {
-      if (verbose) cat("\n8. Generating HTML analysis report (with simulator)...\n")
-
-      if (exists("generate_conjoint_html_report", mode = "function")) {
-        html_output_path <- sub("\\.xlsx$", "_report.html", config$output_file)
-
-        # Build comprehensive results for HTML generation
-        html_results <- list(
-          utilities = utilities,
-          importance = importance,
-          model_result = model_result,
-          diagnostics = diagnostics,
-          config = config,
-          wtp = if (exists("wtp_result") && !is.null(wtp_result)) wtp_result else NULL
-        )
-
-        # Build report config with all display fields
-        html_config <- list(
-          brand_colour = config$brand_colour,
-          accent_colour = config$accent_colour,
-          project_name = config$project_name %||% "Conjoint Analysis",
-          company_name = config$company_name %||% "",
-          client_name = config$client_name %||% "",
-          analyst_name = config$analyst_name %||% "",
-          analyst_email = config$analyst_email %||% "",
-          analyst_phone = config$analyst_phone %||% "",
-          closing_notes = config$closing_notes %||% "",
-          researcher_logo_base64 = config$researcher_logo_base64 %||% "",
-          insight_overview = config$insight_overview %||% "",
-          insight_utilities = config$insight_utilities %||% "",
-          insight_diagnostics = config$insight_diagnostics %||% "",
-          insight_simulator = config$insight_simulator %||% "",
-          insight_wtp = config$insight_wtp %||% "",
-          custom_slides = config$custom_slides %||% NULL,
-          currency_symbol = config$currency_symbol %||% "$"
-        )
-
-        tryCatch({
-          generate_conjoint_html_report(html_results, html_output_path, html_config)
-          if (verbose) cat(sprintf("   ✓ HTML report: %s\n", basename(html_output_path)))
-        }, error = function(e) {
-          message(sprintf("[TRS INFO] CONJ_HTML_REPORT_FAILED: %s", conditionMessage(e)))
-        })
-      } else {
-        if (verbose) cat("   ⚠ HTML report module not loaded\n")
-      }
-    }
-
-    # Calculate elapsed time
-    elapsed <- difftime(Sys.time(), start_time, units = "secs")
-
-    if (verbose) {
-      cat("\n")
-      cat(sprintf("Total time: %.1f seconds\n", as.numeric(elapsed)))
-    }
-
-    # ==========================================================================
-    # TRS FINAL BANNER (TRS v1.0)
-    # ==========================================================================
-    if (!is.null(run_result) && exists("turas_print_final_banner", mode = "function")) {
-      turas_print_final_banner(run_result)
-    } else if (verbose) {
-      cat(rep("=", 80), "\n", sep = "")
-      if (length(all_warnings) == 0) {
-        cat("[TRS PASS] CONJOINT - ANALYSIS COMPLETED SUCCESSFULLY\n")
-      } else {
-        cat(sprintf("[TRS PARTIAL] CONJOINT - ANALYSIS COMPLETED WITH %d WARNING(S)\n", length(all_warnings)))
-      }
-      cat(rep("=", 80), "\n", sep = "")
-      cat("\n")
-    }
-
-    # Return comprehensive results with top-level TRS status
-    # Status is PASS when no warnings, PARTIAL when warnings exist
-    top_status <- if (length(all_warnings) == 0) "PASS" else "PARTIAL"
-
-    list(
-      status = top_status,
-      utilities = utilities,
-      importance = importance,
-      diagnostics = diagnostics,
-      model_result = model_result,
-      config = config,
-      data_info = data_list,
-      elapsed_time = as.numeric(elapsed),
-      version = get_conjoint_version(),
-      run_result = run_result,
-      warnings = if (length(all_warnings) > 0) all_warnings else NULL
+      data_list = data_list,
+      wtp_result = wtp_result,
+      trs_state = trs_state,
+      start_time = start_time,
+      verbose = verbose
     )
 
   }, error = function(e) {
@@ -691,6 +570,126 @@ run_conjoint_analysis_impl <- function(config_file, data_file = NULL, output_fil
   })
 
   invisible(result)
+}
+
+
+# ==============================================================================
+# OUTPUT HELPER: Steps 7-8 + Finalization
+# ==============================================================================
+
+#' Generate Conjoint Outputs and Finalize
+#'
+#' Handles TRS logging, Excel output, optional HTML report generation,
+#' timing, and final banner. Returns the result list.
+#'
+#' @keywords internal
+conjoint_generate_outputs <- function(utilities, importance, diagnostics,
+                                       model_result, config, data_list,
+                                       wtp_result, trs_state, start_time,
+                                       verbose = TRUE) {
+
+  if (verbose) cat("\n7. Generating Excel output...\n")
+
+  # TRS: Log warnings
+  all_warnings <- c(config$validation$warnings, data_list$validation$warnings)
+  if (!is.null(trs_state) && length(all_warnings) > 0) {
+    for (warn in all_warnings) {
+      if (exists("turas_run_state_partial", mode = "function")) {
+        turas_run_state_partial(trs_state, "CONJ_WARNING", "Analysis warning", problem = warn)
+      }
+    }
+  }
+
+  run_result <- if (!is.null(trs_state) && exists("turas_run_state_result", mode = "function")) {
+    turas_run_state_result(trs_state)
+  } else {
+    NULL
+  }
+
+  write_conjoint_output(
+    utilities = utilities, importance = importance,
+    diagnostics = diagnostics, model_result = model_result,
+    config = config, data_info = data_list,
+    output_file = config$output_file, run_result = run_result
+  )
+
+  if (verbose) cat(sprintf("   \u2713 Results written to: %s\n", basename(config$output_file)))
+
+  # Step 8: HTML report
+  if (isTRUE(config$generate_html_report) || isTRUE(config$generate_html_simulator)) {
+    if (verbose) cat("\n8. Generating HTML analysis report (with simulator)...\n")
+
+    if (exists("generate_conjoint_html_report", mode = "function")) {
+      html_output_path <- sub("\\.xlsx$", "_report.html", config$output_file)
+
+      html_results <- list(
+        utilities = utilities, importance = importance,
+        model_result = model_result, diagnostics = diagnostics,
+        config = config, wtp = wtp_result
+      )
+
+      html_config <- list(
+        brand_colour = config$brand_colour, accent_colour = config$accent_colour,
+        project_name = config$project_name %||% "Conjoint Analysis",
+        company_name = config$company_name %||% "",
+        client_name = config$client_name %||% "",
+        analyst_name = config$analyst_name %||% "",
+        analyst_email = config$analyst_email %||% "",
+        analyst_phone = config$analyst_phone %||% "",
+        closing_notes = config$closing_notes %||% "",
+        researcher_logo_base64 = config$researcher_logo_base64 %||% "",
+        insight_overview = config$insight_overview %||% "",
+        insight_utilities = config$insight_utilities %||% "",
+        insight_diagnostics = config$insight_diagnostics %||% "",
+        insight_simulator = config$insight_simulator %||% "",
+        insight_wtp = config$insight_wtp %||% "",
+        custom_slides = config$custom_slides %||% NULL,
+        currency_symbol = config$currency_symbol %||% "$"
+      )
+
+      tryCatch({
+        generate_conjoint_html_report(html_results, html_output_path, html_config)
+        if (verbose) cat(sprintf("   \u2713 HTML report: %s\n", basename(html_output_path)))
+      }, error = function(e) {
+        message(sprintf("[TRS INFO] CONJ_HTML_REPORT_FAILED: %s", conditionMessage(e)))
+      })
+    } else {
+      if (verbose) cat("   \u26a0 HTML report module not loaded\n")
+    }
+  }
+
+  # Finalization
+  elapsed <- difftime(Sys.time(), start_time, units = "secs")
+  if (verbose) cat(sprintf("\nTotal time: %.1f seconds\n", as.numeric(elapsed)))
+
+  if (!is.null(run_result) && exists("turas_print_final_banner", mode = "function")) {
+    turas_print_final_banner(run_result)
+  } else if (verbose) {
+    cat(rep("=", 80), "\n", sep = "")
+    if (length(all_warnings) == 0) {
+      cat("[TRS PASS] CONJOINT - ANALYSIS COMPLETED SUCCESSFULLY\n")
+    } else {
+      cat(sprintf("[TRS PARTIAL] CONJOINT - ANALYSIS COMPLETED WITH %d WARNING(S)\n", length(all_warnings)))
+    }
+    cat(rep("=", 80), "\n", sep = "")
+    cat("\n")
+  }
+
+  top_status <- if (length(all_warnings) == 0) "PASS" else "PARTIAL"
+
+  list(
+    status = top_status,
+    utilities = utilities,
+    importance = importance,
+    diagnostics = diagnostics,
+    model_result = model_result,
+    config = config,
+    data_info = data_list,
+    elapsed_time = as.numeric(elapsed),
+    version = get_conjoint_version(),
+    run_result = run_result,
+    warnings = if (length(all_warnings) > 0) all_warnings else NULL
+  )
 }
 
 

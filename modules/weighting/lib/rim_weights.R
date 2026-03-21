@@ -78,6 +78,159 @@ check_survey_available <- function() {
 #'
 #' # Rim weighting on top of design weights
 #' result <- calculate_rim_weights(data, targets, base_weights = data$design_weight)
+
+# ==============================================================================
+# RIM WEIGHT HELPERS
+# ==============================================================================
+
+#' Validate Rim Weight Inputs
+#'
+#' Validates data, targets, base weights, bounds, and method.
+#' Returns parsed bounds vector.
+#'
+#' @keywords internal
+validate_rim_inputs <- function(data, target_list, base_weights, cap_weights, calibration_method) {
+  if (!is.data.frame(data) || nrow(data) == 0) {
+    weighting_refuse(
+      code = "DATA_INVALID_INPUT", title = "Invalid input data",
+      problem = "The data parameter must be a non-empty data frame.",
+      why_it_matters = "Rim weighting requires valid survey data to calculate weights.",
+      how_to_fix = "Ensure you pass a data frame with at least one row."
+    )
+  }
+
+  if (!is.list(target_list) || length(target_list) == 0) {
+    weighting_refuse(
+      code = "CFG_INVALID_TARGETS", title = "Invalid target list",
+      problem = "The target_list parameter must be a non-empty named list.",
+      why_it_matters = "Rim weighting requires target proportions to calibrate against.",
+      how_to_fix = "Provide a named list where each element contains target proportions."
+    )
+  }
+
+  missing_vars <- setdiff(names(target_list), names(data))
+  if (length(missing_vars) > 0) {
+    weighting_refuse(
+      code = "CFG_MISSING_VARS", title = "Target variables not found in data",
+      problem = sprintf("Missing: %s", paste(missing_vars, collapse = ", ")),
+      why_it_matters = "All weighting variables must exist in the data.",
+      how_to_fix = sprintf("Available: %s", paste(head(names(data), 15), collapse = ", "))
+    )
+  }
+
+  if (!is.null(base_weights)) {
+    if (length(base_weights) != nrow(data)) {
+      weighting_refuse(
+        code = "DATA_WEIGHT_MISMATCH", title = "Base weights length mismatch",
+        problem = sprintf("base_weights length (%d) must match data rows (%d)", length(base_weights), nrow(data)),
+        why_it_matters = "Each row must have a corresponding base weight.",
+        how_to_fix = sprintf("Provide a vector with exactly %d elements.", nrow(data))
+      )
+    }
+    if (any(base_weights[!is.na(base_weights)] <= 0)) {
+      weighting_refuse(
+        code = "DATA_INVALID_WEIGHTS", title = "Invalid base weights",
+        problem = "base_weights must be positive (or NA).",
+        why_it_matters = "Weights must be positive for calibration to work.",
+        how_to_fix = "Ensure all non-NA values are greater than 0."
+      )
+    }
+  }
+
+  # Parse cap_weights into bounds
+  if (is.null(cap_weights)) {
+    bounds <- c(0.3, 3.0)
+  } else if (length(cap_weights) == 1) {
+    bounds <- c(0.3, cap_weights)
+  } else if (length(cap_weights) == 2) {
+    bounds <- cap_weights
+  } else {
+    weighting_refuse(
+      code = "CFG_INVALID_BOUNDS", title = "Invalid weight bounds format",
+      problem = "cap_weights must be NULL, single value, or c(lower, upper).",
+      why_it_matters = "Weight bounds control the range of final weights.",
+      how_to_fix = "Provide NULL (defaults), a single number (upper), or c(lower, upper)."
+    )
+  }
+
+  valid_methods <- c("raking", "linear", "logit")
+  if (!tolower(calibration_method) %in% valid_methods) {
+    weighting_refuse(
+      code = "CFG_INVALID_METHOD", title = "Invalid calibration method",
+      problem = sprintf("Got '%s', must be one of: %s", calibration_method, paste(valid_methods, collapse = ", ")),
+      why_it_matters = "The calibration method determines how weights are adjusted.",
+      how_to_fix = sprintf("Use: %s", paste(valid_methods, collapse = ", "))
+    )
+  }
+
+  bounds
+}
+
+
+#' Prepare Data for Rim Calibration
+#'
+#' Converts variables to factors with target levels, removes incomplete cases,
+#' validates sample size, and sets up starting weights.
+#'
+#' @keywords internal
+prepare_rim_data <- function(data, target_list, base_weights, verbose = FALSE) {
+  rake_data <- data
+
+  for (var in names(target_list)) {
+    rake_data[[var]] <- as.character(rake_data[[var]])
+    target_levels <- names(target_list[[var]])
+    rake_data[[var]] <- factor(rake_data[[var]], levels = target_levels)
+
+    n_na <- sum(is.na(rake_data[[var]]))
+    if (n_na > 0) {
+      unmatched_vals <- paste(unique(as.character(data[[var]][is.na(rake_data[[var]])])), collapse = ", ")
+      weighting_refuse(
+        code = "DATA_UNMATCHED_VALUES", title = "Data values not in target categories",
+        problem = sprintf("Variable '%s': %d values not in target categories: %s", var, n_na, unmatched_vals),
+        why_it_matters = "All data values must match target categories for rim weighting.",
+        how_to_fix = "Add these categories to targets or recode data values."
+      )
+    }
+  }
+
+  complete_idx <- complete.cases(rake_data[, names(target_list), drop = FALSE])
+  if (!is.null(base_weights)) {
+    complete_idx <- complete_idx & !is.na(base_weights)
+  }
+
+  if (sum(!complete_idx) > 0) {
+    if (verbose) message(sprintf("  Excluding %d rows with missing values", sum(!complete_idx)))
+    rake_data <- rake_data[complete_idx, , drop = FALSE]
+  }
+
+  if (nrow(rake_data) == 0) {
+    weighting_refuse(
+      code = "DATA_NO_COMPLETE_CASES", title = "No complete cases for weighting",
+      problem = "No complete cases remain after removing rows with missing weighting variables.",
+      why_it_matters = "Rim weighting requires complete data for all weighting variables.",
+      how_to_fix = "Check for missing values and either impute or exclude variables."
+    )
+  }
+
+  n_target_cats <- sum(sapply(target_list, length))
+  if (nrow(rake_data) < n_target_cats) {
+    weighting_refuse(
+      code = "DATA_INSUFFICIENT_SAMPLE", title = "Insufficient sample size",
+      problem = sprintf("Sample (%d) < target categories (%d).", nrow(rake_data), n_target_cats),
+      why_it_matters = "More observations than categories required for reliable weights.",
+      how_to_fix = sprintf("Increase sample to at least %d or reduce categories.", n_target_cats)
+    )
+  } else if (nrow(rake_data) < n_target_cats * 10 && verbose) {
+    message(sprintf("  Warning: Small sample (%d) for %d categories (recommend %d+)",
+                   nrow(rake_data), n_target_cats, n_target_cats * 10))
+  }
+
+  starting_weights <- if (is.null(base_weights)) rep(1, nrow(rake_data)) else base_weights[complete_idx]
+
+  list(rake_data = rake_data, complete_idx = complete_idx, starting_weights = starting_weights)
+}
+
+
 calculate_rim_weights <- function(data,
                                   target_list,
                                   base_weights = NULL,
@@ -91,90 +244,8 @@ calculate_rim_weights <- function(data,
   # Check package availability
   check_survey_available()
 
-  # Validate inputs
-  if (!is.data.frame(data) || nrow(data) == 0) {
-    weighting_refuse(
-      code = "DATA_INVALID_INPUT",
-      title = "Invalid input data",
-      problem = "The data parameter must be a non-empty data frame.",
-      why_it_matters = "Rim weighting requires valid survey data to calculate weights.",
-      how_to_fix = "Ensure you pass a data frame with at least one row to the data parameter."
-    )
-  }
-
-  if (!is.list(target_list) || length(target_list) == 0) {
-    weighting_refuse(
-      code = "CFG_INVALID_TARGETS",
-      title = "Invalid target list",
-      problem = "The target_list parameter must be a non-empty named list.",
-      why_it_matters = "Rim weighting requires target proportions to calibrate weights against.",
-      how_to_fix = "Provide a named list where each element contains target proportions for a weighting variable."
-    )
-  }
-
-  # Validate all target variables exist
-  missing_vars <- setdiff(names(target_list), names(data))
-  if (length(missing_vars) > 0) {
-    weighting_refuse(
-      code = "CFG_MISSING_VARS",
-      title = "Target variables not found in data",
-      problem = sprintf("Target variables not found in data: %s", paste(missing_vars, collapse = ", ")),
-      why_it_matters = "All weighting variables must exist in the data to calculate rim weights.",
-      how_to_fix = sprintf("Check that these variables exist in your data. Available variables: %s", paste(head(names(data), 15), collapse = ", "))
-    )
-  }
-
-  # Validate base_weights if provided
-  if (!is.null(base_weights)) {
-    if (length(base_weights) != nrow(data)) {
-      weighting_refuse(
-        code = "DATA_WEIGHT_MISMATCH",
-        title = "Base weights length mismatch",
-        problem = sprintf("base_weights length (%d) must match data rows (%d)", length(base_weights), nrow(data)),
-        why_it_matters = "Each row in the data must have a corresponding base weight for rim-on-design weighting.",
-        how_to_fix = sprintf("Provide a base_weights vector with exactly %d elements to match your data.", nrow(data))
-      )
-    }
-    if (any(base_weights[!is.na(base_weights)] <= 0)) {
-      weighting_refuse(
-        code = "DATA_INVALID_WEIGHTS",
-        title = "Invalid base weights",
-        problem = "base_weights must be positive (or NA).",
-        why_it_matters = "Weights must be positive values for the calibration algorithm to work correctly.",
-        how_to_fix = "Check your base_weights vector and ensure all non-NA values are greater than 0."
-      )
-    }
-  }
-
-  # Handle cap_weights parameter
-  # Can be: NULL, single value (upper only), or c(lower, upper)
-  if (is.null(cap_weights)) {
-    bounds <- c(0.3, 3.0)  # Reasonable defaults
-  } else if (length(cap_weights) == 1) {
-    bounds <- c(0.3, cap_weights)  # Use provided upper, default lower
-  } else if (length(cap_weights) == 2) {
-    bounds <- cap_weights
-  } else {
-    weighting_refuse(
-      code = "CFG_INVALID_BOUNDS",
-      title = "Invalid weight bounds format",
-      problem = "cap_weights must be NULL, single value, or c(lower, upper).",
-      why_it_matters = "Weight bounds control the range of final weights during calibration.",
-      how_to_fix = "Provide cap_weights as NULL (for defaults), a single number (upper bound), or c(lower, upper)."
-    )
-  }
-
-  # Validate calibration method
-  valid_methods <- c("raking", "linear", "logit")
-  if (!tolower(calibration_method) %in% valid_methods) {
-    weighting_refuse(
-      code = "CFG_INVALID_METHOD",
-      title = "Invalid calibration method",
-      problem = sprintf("calibration_method must be one of: %s. Got: '%s'", paste(valid_methods, collapse = ", "), calibration_method),
-      why_it_matters = "The calibration method determines how weights are adjusted to match targets.",
-      how_to_fix = sprintf("Use one of the supported methods: %s", paste(valid_methods, collapse = ", "))
-    )
-  }
+  # Validate inputs and compute bounds
+  bounds <- validate_rim_inputs(data, target_list, base_weights, cap_weights, calibration_method)
 
   if (verbose) {
     message("\nCalculating rim weights using survey::calibrate()...")
@@ -183,86 +254,14 @@ calculate_rim_weights <- function(data,
     message("  Weight bounds: [", bounds[1], ", ", bounds[2], "]")
     message("  Max iterations: ", max_iterations)
     message("  Convergence epsilon: ", convergence_tolerance)
-    if (!is.null(base_weights)) {
-      message("  Base weights: Provided (rim-on-design mode)")
-    }
+    if (!is.null(base_weights)) message("  Base weights: Provided (rim-on-design mode)")
   }
 
   # Prepare data for calibration
-  # survey requires factors with levels matching target names
-  rake_data <- data
-
-  for (var in names(target_list)) {
-    # Convert to character, then to factor with target levels
-    rake_data[[var]] <- as.character(rake_data[[var]])
-    target_levels <- names(target_list[[var]])
-    rake_data[[var]] <- factor(rake_data[[var]], levels = target_levels)
-
-    # Check for unmatched levels - REFUSE if validation missed this
-    n_na <- sum(is.na(rake_data[[var]]))
-    if (n_na > 0) {
-      unmatched_vals <- paste(unique(as.character(data[[var]][is.na(rake_data[[var]])])), collapse = ", ")
-      weighting_refuse(
-        code = "DATA_UNMATCHED_VALUES",
-        title = "Data values not in target categories",
-        problem = sprintf("Variable '%s': %d values not in target categories. Unmatched values: %s", var, n_na, unmatched_vals),
-        why_it_matters = "All data values must match one of the defined target categories for rim weighting.",
-        how_to_fix = "Either add these categories to your targets or recode the data values to match existing target categories."
-      )
-    }
-  }
-
-  # Remove rows with any NA in weighting variables
-  complete_idx <- complete.cases(rake_data[, names(target_list), drop = FALSE])
-
-  # Also exclude rows with NA base weights if provided
-  if (!is.null(base_weights)) {
-    complete_idx <- complete_idx & !is.na(base_weights)
-  }
-
-  if (sum(!complete_idx) > 0) {
-    if (verbose) {
-      message(sprintf("  Excluding %d rows with missing weighting variables or base weights",
-                     sum(!complete_idx)))
-    }
-    rake_data <- rake_data[complete_idx, , drop = FALSE]
-  }
-
-  # Validate data frame size after complete case removal
-  if (nrow(rake_data) == 0) {
-    weighting_refuse(
-      code = "DATA_NO_COMPLETE_CASES",
-      title = "No complete cases for weighting",
-      problem = "No complete cases remain after removing rows with missing weighting variables. All rows have NA values in at least one weighting variable.",
-      why_it_matters = "Rim weighting requires complete data for all weighting variables.",
-      how_to_fix = "Check your data for missing values in the weighting variables and either impute them or exclude those variables from weighting."
-    )
-  }
-
-  # Minimum sample size check for reliable weighting
-  n_target_cats <- sum(sapply(target_list, length))
-  min_recommended <- n_target_cats * 10
-  if (nrow(rake_data) < n_target_cats) {
-    weighting_refuse(
-      code = "DATA_INSUFFICIENT_SAMPLE",
-      title = "Insufficient sample size",
-      problem = sprintf("Sample size (%d) is less than the number of target categories (%d).", nrow(rake_data), n_target_cats),
-      why_it_matters = "Weighting requires more observations than weighting cells for reliable estimates.",
-      how_to_fix = sprintf("Increase your sample size to at least %d cases or reduce the number of target categories.", n_target_cats)
-    )
-  } else if (nrow(rake_data) < min_recommended && verbose) {
-    message(sprintf(
-      "  Warning: Sample size (%d) is small relative to target categories (%d).\n  Recommended minimum: %d (10 per category)",
-      nrow(rake_data), n_target_cats, min_recommended
-    ))
-  }
-
-  # Set up starting weights
-  if (is.null(base_weights)) {
-    starting_weights <- rep(1, nrow(rake_data))
-  } else {
-    starting_weights <- base_weights[complete_idx]
-  }
+  prep <- prepare_rim_data(data, target_list, base_weights, verbose)
+  rake_data <- prep$rake_data
+  complete_idx <- prep$complete_idx
+  starting_weights <- prep$starting_weights
 
   # Create survey design object with starting weights
   svy_design <- survey::svydesign(

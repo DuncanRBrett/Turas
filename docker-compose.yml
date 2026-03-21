@@ -1,0 +1,30 @@
+# ==============================================================================
+# TURAS Analytics Platform - Docker Compose
+# ==============================================================================
+# Usage:
+#   docker-compose up -d          # Start Turas
+#   docker-compose down           # Stop Turas
+#   docker-compose logs -f turas  # View logs
+#
+# Access: http://localhost:3838
+# ==============================================================================
+
+services:
+  turas:
+    build: .
+    container_name: turas
+    ports:
+      - "3838:3838"
+    volumes:
+      # Mount project data directory — Jess puts config + data files here
+      - ./data:/data
+    environment:
+      - TURAS_ROOT=/srv/shiny-server/turas
+      - TURAS_DOCKER=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3838/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s

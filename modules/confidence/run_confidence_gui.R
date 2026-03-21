@@ -60,7 +60,7 @@ run_confidence_gui <- function() {
   # === CONFIGURATION ===
 
   # Turas home directory
-  TURAS_HOME <- getwd()
+  TURAS_HOME <- Sys.getenv("TURAS_ROOT", getwd())
 
   # Load shared GUI theme
   source(file.path(TURAS_HOME, "modules", "shared", "lib", "gui_theme.R"))
@@ -183,7 +183,7 @@ run_confidence_gui <- function() {
     }
 
     # Directory chooser
-    volumes <- c(Home = "~", Documents = "~/Documents", Desktop = "~/Desktop")
+    volumes <- turas_gui_volumes()
     shinyDirChoose(input, "project_btn", roots = volumes, session = session)
 
     # Handle directory selection

@@ -44,7 +44,7 @@ run_maxdiff_gui <- function() {
 
   # === CONFIGURATION ===
 
-  TURAS_HOME <- getwd()
+  TURAS_HOME <- Sys.getenv("TURAS_ROOT", getwd())
 
   # Load shared GUI theme
   source(file.path(TURAS_HOME, "modules", "shared", "lib", "gui_theme.R"))
@@ -183,7 +183,7 @@ run_maxdiff_gui <- function() {
     }
 
     # File chooser volumes
-    volumes <- c(Home = "~", Documents = "~/Documents", Desktop = "~/Desktop")
+    volumes <- turas_gui_volumes()
 
     shinyFileChoose(input, "config_btn", roots = volumes, session = session,
                    filetypes = c("", "xlsx", "xls"))

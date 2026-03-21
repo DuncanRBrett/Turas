@@ -348,7 +348,7 @@ run_weighting_gui <- function(launch_browser = TRUE) {
     })
 
     # Folder browser setup
-    volumes <- c(Home = fs::path_home(), getVolumes()())
+    volumes <- turas_gui_volumes()
     shinyDirChoose(input, "folder_browse", roots = volumes, session = session)
 
     # Update text input when folder is selected via browser

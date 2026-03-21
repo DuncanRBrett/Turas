@@ -1,0 +1,35 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.Rproj.user
+*.Rproj
+.vscode
+
+# Claude Code
+.claude
+
+# Archive (debug scripts, old code)
+archive/
+
+# Data files (mounted at runtime)
+data/
+
+# renv library cache (rebuilt in container)
+renv/library/
+renv/local/
+renv/cellar/
+renv/staging/
+renv/sandbox/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Recent project files (local state)
+.recent_*_projects.rds
+
+# Temporary files
+*.tmp
+*.log

@@ -821,3 +821,135 @@ create_output_folder <- function(base_folder, create_dated_folder = TRUE) {
 
   return(output_folder)
 }
+
+
+# ==============================================================================
+# HELPER FUNCTIONS FOR EXCEL OUTPUT
+# ==============================================================================
+
+#' Add Run_Status Sheet to Workbook
+#'
+#' Creates a formatted Run_Status sheet in an openxlsx workbook with
+#' status, degradation info, and guard summary.
+#'
+#' @param wb openxlsx workbook object
+#' @param run_status Character, one of "PASS", "PARTIAL", "REFUSED"
+#' @param degraded Logical, whether output is degraded
+#' @param degraded_reasons Character vector of degradation reasons
+#' @param affected_outputs Character vector of affected output names
+#' @param guard_summary List with warnings and stability_flags vectors
+#' @return Invisible NULL (modifies wb in place)
+#' @export
+add_segment_run_status_sheet <- function(wb, run_status = "PASS", degraded = FALSE,
+                                          degraded_reasons = NULL,
+                                          affected_outputs = NULL,
+                                          guard_summary = NULL) {
+  openxlsx::addWorksheet(wb, "Run_Status")
+
+  rows <- data.frame(
+    V1 = character(0), V2 = character(0), stringsAsFactors = FALSE
+  )
+
+  add_row <- function(label, value) {
+    rows[nrow(rows) + 1, ] <<- c(label, value)
+  }
+
+  add_row("SEGMENT RUN STATUS", "")
+  add_row("", "")
+  add_row("run_status:", run_status)
+  add_row("degraded:", as.character(degraded))
+  add_row("timestamp:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"))
+
+  if (!is.null(degraded_reasons) && length(degraded_reasons) > 0) {
+    add_row("", "")
+    add_row("DEGRADED REASONS:", "")
+    for (r in degraded_reasons) add_row(r, "")
+  }
+
+  if (!is.null(affected_outputs) && length(affected_outputs) > 0) {
+    add_row("", "")
+    add_row("AFFECTED OUTPUTS:", "")
+    for (o in affected_outputs) add_row(o, "")
+  }
+
+  if (!is.null(guard_summary) && is.list(guard_summary)) {
+    if (length(guard_summary$warnings) > 0) {
+      add_row("", "")
+      add_row("GUARD WARNINGS:", "")
+      for (w in guard_summary$warnings) add_row(w, "")
+    }
+    if (length(guard_summary$stability_flags) > 0) {
+      add_row("", "")
+      add_row("STABILITY FLAGS:", "")
+      for (f in guard_summary$stability_flags) add_row(f, "")
+    }
+  }
+
+  openxlsx::writeData(wb, "Run_Status", rows, colNames = FALSE)
+  invisible(NULL)
+}
+
+
+#' Create Segment Output Styles
+#'
+#' Returns a named list of openxlsx style objects for consistent Excel formatting.
+#'
+#' @param wb openxlsx workbook object (unused but kept for API consistency)
+#' @return Named list of Style objects: header, title, section, normal, success, warning, error
+#' @export
+create_segment_output_styles <- function(wb) {
+  list(
+    header  = seg_style_header(),
+    title   = seg_style_title(),
+    section = seg_style_section(),
+    normal  = seg_style_data(),
+    success = seg_style_conditional("green"),
+    warning = seg_style_conditional("amber"),
+    error   = seg_style_conditional("red")
+  )
+}
+
+
+#' Write Multiple Sheets to Workbook
+#'
+#' Takes a named list of data frames and writes each as a branded sheet.
+#' Empty data frames are skipped.
+#'
+#' @param wb openxlsx workbook object
+#' @param sheets Named list of data frames
+#' @param styles Style list from create_segment_output_styles() (used for header styling)
+#' @return Invisible NULL
+#' @export
+write_sheets_to_workbook <- function(wb, sheets, styles = NULL) {
+  for (sheet_name in names(sheets)) {
+    sheet_data <- sheets[[sheet_name]]
+    if (is.null(sheet_data) || !is.data.frame(sheet_data) || nrow(sheet_data) == 0) {
+      next
+    }
+    openxlsx::addWorksheet(wb, sheet_name)
+    seg_write_branded_sheet(wb, sheet_name, sheet_data)
+  }
+  invisible(NULL)
+}
+
+
+#' Save Workbook Safely
+#'
+#' Saves an openxlsx workbook using atomic write if available,
+#' falling back to standard saveWorkbook.
+#'
+#' @param wb openxlsx workbook object
+#' @param file_path Character, output file path
+#' @return Invisible NULL
+#' @export
+save_workbook_safe <- function(wb, file_path) {
+  if (exists("turas_save_workbook_atomic", mode = "function")) {
+    result <- turas_save_workbook_atomic(wb, file_path, module = "SEGMENT")
+    if (!result$success) {
+      warning(sprintf("[SEGMENT] save_workbook_safe failed: %s", result$error))
+    }
+  } else {
+    openxlsx::saveWorkbook(wb, file_path, overwrite = TRUE)
+  }
+  invisible(NULL)
+}

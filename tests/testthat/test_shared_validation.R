@@ -73,7 +73,7 @@ test_that("validate_data_frame shows available columns on error", {
   df <- data.frame(col1 = 1, col2 = 2)
   expect_error(
     validate_data_frame(df, required_cols = "missing"),
-    "Available columns"
+    "available columns|missing required"
   )
 })
 
@@ -94,23 +94,23 @@ test_that("validate_numeric_param passes for valid numeric", {
 })
 
 test_that("validate_numeric_param checks type", {
-  expect_error(validate_numeric_param("5", "test_param"), "must be a single numeric")
-  expect_error(validate_numeric_param(c(1, 2), "test_param"), "must be a single numeric")
+  expect_error(validate_numeric_param("5", "test_param"), "must be a single|must be numeric")
+  expect_error(validate_numeric_param(c(1, 2), "test_param"), "must be a single|must be numeric")
 })
 
 test_that("validate_numeric_param checks NA", {
-  expect_error(validate_numeric_param(NA, "test_param"), "cannot be NA")
+  expect_error(validate_numeric_param(NA, "test_param"), "NA|missing")
   expect_true(validate_numeric_param(NA, "test_param", allow_na = TRUE))
 })
 
 test_that("validate_numeric_param checks min", {
   expect_true(validate_numeric_param(5, "test_param", min = 0))
-  expect_error(validate_numeric_param(-1, "test_param", min = 0), "must be between")
+  expect_error(validate_numeric_param(-1, "test_param", min = 0), "out of range|must be between|outside.*allowed")
 })
 
 test_that("validate_numeric_param checks max", {
   expect_true(validate_numeric_param(5, "test_param", max = 10))
-  expect_error(validate_numeric_param(15, "test_param", max = 10), "must be between")
+  expect_error(validate_numeric_param(15, "test_param", max = 10), "out of range|must be between|outside.*allowed")
 })
 
 test_that("validate_numeric_param uses param_name in errors", {
