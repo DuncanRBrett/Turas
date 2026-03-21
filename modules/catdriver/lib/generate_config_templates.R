@@ -298,6 +298,16 @@ build_catdriver_settings_def <- function() {
           integer_range = NULL
         ),
         list(
+          name = "Generate_Stats_Pack",
+          required = FALSE,
+          default = "N",
+          description = "Generate a diagnostic stats pack workbook alongside main output. The stats pack provides a full audit trail of data received, methods used, assumptions, and reproducibility — designed for advanced partners and research statisticians. Output file is named {output}_stats_pack.xlsx.",
+          valid_values_text = "Y or N",
+          dropdown = c("Y", "N"),
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
           name = "probability_lifts",
           required = FALSE,
           default = "TRUE",
@@ -433,6 +443,45 @@ build_catdriver_settings_def <- function() {
           description = "Include the total (all subgroups combined) analysis alongside subgroup-specific results.",
           valid_values_text = "TRUE or FALSE",
           dropdown = c("TRUE", "FALSE"),
+          numeric_range = NULL,
+          integer_range = NULL
+        )
+      )
+    ),
+
+    # ------------------------------------------------------------------
+    # STUDY IDENTIFICATION
+    # ------------------------------------------------------------------
+    list(
+      section_name = "STUDY IDENTIFICATION",
+      fields = list(
+        list(
+          name = "Project_Name",
+          required = FALSE,
+          default = "",
+          description = "Project name — appears in the stats pack Declaration sheet for identification and sign-off purposes. Leave blank if not using stats pack.",
+          valid_values_text = "Free text",
+          dropdown = NULL,
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
+          name = "Analyst_Name",
+          required = FALSE,
+          default = "",
+          description = "Analyst name — appears in the stats pack Declaration sheet.",
+          valid_values_text = "Free text",
+          dropdown = NULL,
+          numeric_range = NULL,
+          integer_range = NULL
+        ),
+        list(
+          name = "Research_House",
+          required = FALSE,
+          default = "",
+          description = "Research organisation name — appears in the stats pack Declaration sheet. Use your company or white-label partner name.",
+          valid_values_text = "Free text",
+          dropdown = NULL,
           numeric_range = NULL,
           integer_range = NULL
         )

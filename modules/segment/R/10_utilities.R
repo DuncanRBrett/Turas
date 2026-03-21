@@ -1632,7 +1632,7 @@ generate_segment_config_template <- function(output_path = "Segment_Config_Templ
       "max_clustering_vars",
       # --- OUTPUT ---
       "output_folder", "output_prefix", "create_dated_folder",
-      "save_model", "segment_names", "auto_name_style", "scale_max",
+      "save_model", "generate_stats_pack", "segment_names", "auto_name_style", "scale_max",
       # --- HTML REPORT ---
       "html_report", "brand_colour", "accent_colour", "report_title",
       # --- ENHANCED FEATURES ---
@@ -1642,7 +1642,9 @@ generate_segment_config_template <- function(output_path = "Segment_Config_Templ
       "golden_questions_n",
       # --- METADATA ---
       "project_name", "analyst_name", "description",
-      "question_labels_file", "segment_names_file"
+      "question_labels_file", "segment_names_file",
+      # --- STUDY IDENTIFICATION ---
+      "research_house"
     ),
     Value = c(
       # DATA SOURCE
@@ -1662,7 +1664,7 @@ generate_segment_config_template <- function(output_path = "Segment_Config_Templ
       # VARIABLE SELECTION
       "FALSE", "variance_correlation", "10",
       # OUTPUT
-      "output/", "seg_", "TRUE", "TRUE",
+      "output/", "seg_", "TRUE", "TRUE", "N",
       "auto", "descriptive", "10",
       # HTML
       "TRUE", "#323367", "#CC9900", "Segmentation Report",
@@ -1671,7 +1673,9 @@ generate_segment_config_template <- function(output_path = "Segment_Config_Templ
       # METADATA
       if (include_sample_values) "My Segmentation Project" else "",
       if (include_sample_values) "Analyst Name" else "",
-      "", "", ""
+      "", "", "",
+      # STUDY IDENTIFICATION
+      ""
     ),
     Description = c(
       # DATA SOURCE
@@ -1711,6 +1715,7 @@ generate_segment_config_template <- function(output_path = "Segment_Config_Templ
       "Prefix for output file names",
       "Create date-stamped subfolder? TRUE/FALSE",
       "Save model object (.rds) for scoring? TRUE/FALSE",
+      "Generate a diagnostic stats pack workbook alongside main output. Provides a full audit trail of data received, methods used, assumptions, and reproducibility — designed for advanced partners and research statisticians. The random seed (set via 'seed' parameter) is captured in the Reproducibility sheet. Output file is named {output}_stats_pack.xlsx. Y or N.",
       "Segment names: 'auto' or comma-separated custom names",
       "Auto-naming style: descriptive, persona, or simple",
       "Maximum value on rating scale (for interpreting high/low scores)",
@@ -1731,7 +1736,9 @@ generate_segment_config_template <- function(output_path = "Segment_Config_Templ
       "Analyst name for report attribution",
       "Project description (optional)",
       "Path to Excel file with question labels (optional)",
-      "Path to Excel file with edited segment names (optional, Step 3 workflow)"
+      "Path to Excel file with edited segment names (optional, Step 3 workflow)",
+      # STUDY IDENTIFICATION
+      "Research organisation name — appears in the stats pack Declaration sheet. Use your company or white-label partner name."
     ),
     stringsAsFactors = FALSE
   )
@@ -1779,6 +1786,13 @@ generate_segment_config_template <- function(output_path = "Segment_Config_Templ
       type = "list", value = paste0('"', varsel_vals, '"'))
     openxlsx::dataValidation(wb, "Config", col = 2, rows = name_row,
       type = "list", value = paste0('"', name_style_vals, '"'))
+
+    # Y/N validation for stats pack
+    stats_pack_row <- which(params$Setting == "generate_stats_pack") + 1
+    if (length(stats_pack_row) == 1) {
+      openxlsx::dataValidation(wb, "Config", col = 2, rows = stats_pack_row,
+        type = "list", value = '"Y,N"')
+    }
 
     # Boolean validations
     bool_settings <- c("standardize", "outlier_detection", "variable_selection",

@@ -189,7 +189,14 @@ The module generates:
    - Segment toggle for total vs segment-specific views
    - PNG export for presentations
 
-4. **Visualizations** (PNG files):
+4. **Stats Pack Workbook** (if `Generate_Stats_Pack = Y`):
+   - `{output}_stats_pack.xlsx` — full audit trail for advanced partners and research statisticians
+   - Declaration sheet: project name, analyst, research house, and sign-off details
+   - Data Receipt sheet: column inventory, missing values, outlier flags, and exclusion log
+   - Methods sheet: methodology choices, assumptions, and parameter settings used
+   - Reproducibility sheet: software versions, random seeds, and re-run instructions
+
+5. **Visualizations** (PNG files):
    - Van Westendorp PSM plot with curves and intersections
    - Gabor-Granger demand and revenue curves
    - Monadic logistic demand curve with CI band
@@ -302,6 +309,7 @@ For issues or questions, consult the documentation or contact the development te
 
 ## Version History
 
+- **12.2** (2026-03): Added stats pack output (`Generate_Stats_Pack`) and STUDY IDENTIFICATION fields (`Analyst_Name`, `Research_House`) to config template
 - **12.1** (2026-03): Production upgrade — visual overhaul (gradient headers, dashboard gauges, heatmap tables, chart tooltips, keyboard nav, SVG export), simulator CSS/JS fix, comprehensive test suite (463 tests), questionnaire design guide, methodology comparison
 - **12.0** (2026-03): Added monadic price testing, interactive HTML reports, simulator dashboard
 - **11.0** (2025-12): Added NMS extension, segment analysis, price ladder builder, recommendation synthesis

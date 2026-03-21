@@ -53,6 +53,32 @@ Every module uses an **Excel configuration file** as its primary input. The Conf
 
 ---
 
+## Stats Pack (Diagnostic Workbook)
+
+All modules support an optional **stats pack** — a diagnostic workbook saved alongside the main output as `{output_name}_stats_pack.xlsx`. It provides a full audit trail of data received, methods used, assumptions, and reproducibility information. Designed for advanced partners and research statisticians.
+
+### Enabling the stats pack
+
+| Method | How |
+|--------|-----|
+| **GUI checkbox** | Tick "Generate stats pack" in the module panel before running |
+| **Config file** | Set `Generate_Stats_Pack = Y` in the Settings sheet |
+| **R option** | `options(turas.generate_stats_pack = TRUE)` — used by the legacy Tabs module |
+
+> **Note for Tabs module:** The config field documents intent but the stats pack is currently triggered by the R option only.
+
+### Study identification fields
+
+Add optional identity information to the config Settings sheet under the **STUDY IDENTIFICATION** section. These fields appear on the stats pack Declaration sheet for sign-off and provenance purposes.
+
+| Field | Purpose |
+|-------|---------|
+| `Project_Name` | Project name |
+| `Analyst_Name` | Analyst name |
+| `Research_House` | Research organisation or white-label partner name |
+
+---
+
 ## Typical Workflow
 
 1. **Prepare data** — Clean survey data in Excel/CSV format

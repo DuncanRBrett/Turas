@@ -607,6 +607,7 @@ create_maxdiff_template <- function(output_path = NULL) {
       "Generate_Charts",
       "Generate_HTML_Report",
       "Generate_Simulator",
+      "Generate_Stats_Pack",
       # --- TURF Analysis ---
       "--- TURF ANALYSIS ---",
       "Generate_TURF",
@@ -638,6 +639,7 @@ create_maxdiff_template <- function(output_path = NULL) {
       "YES",
       "YES",
       "YES",
+      "NO",
       "",
       "YES",
       "10",
@@ -666,6 +668,7 @@ create_maxdiff_template <- function(output_path = NULL) {
       "Generate PNG/PDF visualization charts",
       "Generate interactive HTML report with SVG charts and tabbed layout",
       "Generate interactive HTML simulator (head-to-head, portfolio builder)",
+      "Generate a diagnostic stats pack workbook alongside main output. The stats pack provides a full audit trail of data received, methods used, assumptions, and reproducibility — designed for advanced partners and research statisticians. Output file is named {output}_stats_pack.xlsx.",
       "",
       "Run TURF (Total Unduplicated Reach & Frequency) portfolio optimization",
       "Maximum portfolio size for TURF analysis",
@@ -694,6 +697,7 @@ create_maxdiff_template <- function(output_path = NULL) {
       "YES or NO",
       "YES or NO (produces self-contained .html file)",
       "YES or NO (requires HB or logit results)",
+      "YES or NO",
       "",
       "YES or NO (requires individual-level utilities from HB)",
       "1 to n_items (default: min(10, n_items))",
@@ -740,6 +744,7 @@ create_maxdiff_template <- function(output_path = NULL) {
                         "Generate_Aggregate_Logit", "Generate_HB_Model",
                         "Generate_Segment_Tables", "Generate_Charts",
                         "Generate_HTML_Report", "Generate_Simulator",
+                        "Generate_Stats_Pack",
                         "Generate_TURF", "Has_Anchor_Question",
                         "Include_Raw_Data", "Include_Diagnostics")
   for (sname in yn_setting_names) {
@@ -918,6 +923,53 @@ create_maxdiff_template <- function(output_path = NULL) {
                  type = "list", value = "'summary,preferences,items,turf,segments,diagnostics'")
 
   # ============================================================================
+  # SHEET 11: STUDY_IDENTIFICATION
+  # ============================================================================
+
+  addWorksheet(wb, "STUDY_IDENTIFICATION", gridLines = FALSE)
+
+  study_id <- data.frame(
+    Setting_Name = c(
+      "Project_Name",
+      "Analyst_Name",
+      "Research_House"
+    ),
+    Value = c(
+      "",
+      "",
+      ""
+    ),
+    Required = c(
+      "NO",
+      "NO",
+      "NO"
+    ),
+    Description = c(
+      "Project name — appears in the stats pack Declaration sheet for identification and sign-off purposes. Leave blank if not using stats pack.",
+      "Analyst name — appears in the stats pack Declaration sheet.",
+      "Research organisation name — appears in the stats pack Declaration sheet. Use your company or white-label partner name."
+    ),
+    Options_Examples = c(
+      "Brand Preference Study Q1 2026, Product Features MaxDiff",
+      "Jane Smith, John Doe",
+      "The Research LampPost, Acme Research Partners"
+    ),
+    stringsAsFactors = FALSE
+  )
+
+  writeData(wb, "STUDY_IDENTIFICATION", study_id, startRow = 1, startCol = 1)
+  addStyle(wb, "STUDY_IDENTIFICATION", headerStyle, rows = 1, cols = 1:5, gridExpand = TRUE)
+  addStyle(wb, "STUDY_IDENTIFICATION", optionalStyle,
+           rows = 2:(nrow(study_id) + 1), cols = 1:5, gridExpand = TRUE)
+
+  setColWidths(wb, "STUDY_IDENTIFICATION", cols = 1, widths = 20)
+  setColWidths(wb, "STUDY_IDENTIFICATION", cols = 2, widths = 35)
+  setColWidths(wb, "STUDY_IDENTIFICATION", cols = 3, widths = 12)
+  setColWidths(wb, "STUDY_IDENTIFICATION", cols = 4, widths = 75)
+  setColWidths(wb, "STUDY_IDENTIFICATION", cols = 5, widths = 50)
+  freezePane(wb, "STUDY_IDENTIFICATION", firstRow = TRUE)
+
+  # ============================================================================
   # SAVE WORKBOOK
   # ============================================================================
 
@@ -930,16 +982,17 @@ create_maxdiff_template <- function(output_path = NULL) {
   cat(sprintf("File: %s\n", output_path))
   cat("\n")
   cat("Sheets included:\n")
-  cat("  1. INSTRUCTIONS      - How to use this template\n")
-  cat("  2. PROJECT_SETTINGS  - Core project configuration\n")
-  cat("  3. ITEMS             - Item/attribute definitions\n")
-  cat("  4. DESIGN_SETTINGS   - Design generation parameters\n")
-  cat("  5. SURVEY_MAPPING    - Survey column mappings\n")
-  cat("  6. SEGMENT_SETTINGS  - Segment definitions\n")
-  cat("  7. OUTPUT_SETTINGS   - Output options (TURF, Anchor, Display)\n")
-  cat("  8. REPORT_SETTINGS   - Branding, logos, report options\n")
-  cat("  9. SLIDES            - Custom report pages\n")
-  cat(" 10. IMAGES            - Embedded panel images\n")
+  cat("  1. INSTRUCTIONS        - How to use this template\n")
+  cat("  2. PROJECT_SETTINGS    - Core project configuration\n")
+  cat("  3. ITEMS               - Item/attribute definitions\n")
+  cat("  4. DESIGN_SETTINGS     - Design generation parameters\n")
+  cat("  5. SURVEY_MAPPING      - Survey column mappings\n")
+  cat("  6. SEGMENT_SETTINGS    - Segment definitions\n")
+  cat("  7. OUTPUT_SETTINGS     - Output options (TURF, Anchor, Display, Stats Pack)\n")
+  cat("  8. REPORT_SETTINGS     - Branding, logos, report options\n")
+  cat("  9. SLIDES              - Custom report pages\n")
+  cat(" 10. IMAGES              - Embedded panel images\n")
+  cat(" 11. STUDY_IDENTIFICATION - Project, analyst, and research house for stats pack\n")
   cat("\n")
   cat("Color coding:\n")
   cat("  Yellow  = Required setting\n")

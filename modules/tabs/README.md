@@ -1,6 +1,6 @@
 # Turas Tabs Module
 
-**Version:** 10.0 **Date:** 22 December 2025
+**Version:** 10.1 **Date:** 21 March 2026
 
 Cross-tabulation and survey data analysis engine for market research.
 
@@ -85,6 +85,35 @@ modules/tabs/
 └── docs/                   # This documentation
     └── templates/          # Config and structure templates
 ```
+
+## Stats Pack
+
+The tabs module supports a diagnostic stats pack workbook. Because tabs
+is a legacy procedural module, the stats pack is enabled via an R
+option rather than the config file directly:
+
+```r
+options(turas.generate_stats_pack = TRUE)
+```
+
+The config template includes a `Generate_Stats_Pack` field (in the
+ANALYST & CLOSING SECTION) and a **STUDY IDENTIFICATION** section
+(`Project_Name`, `Analyst_Name`, `Research_House`) as a reference for
+analysts — these fields document intent and appear in the stats pack
+Declaration sheet when the option is active.
+
+Output is named `{output}_stats_pack.xlsx`.
+
+------------------------------------------------------------------------
+
+## Version History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 10.1 | March 2026 | Added `Generate_Stats_Pack` field and STUDY IDENTIFICATION section to config template; documented stats pack support |
+| 10.0 | December 2025 | Initial production release |
+
+------------------------------------------------------------------------
 
 ## Getting Help
 

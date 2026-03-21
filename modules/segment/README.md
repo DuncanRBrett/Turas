@@ -188,6 +188,8 @@ modules/segment/
 | `generate_rules` | FALSE | Generate classification rules |
 | `generate_action_cards` | FALSE | Generate segment action cards |
 | `run_stability_check` | FALSE | Run stability assessment |
+| `generate_stats_pack` | N | Generate a diagnostic stats pack workbook (`{output}_stats_pack.xlsx`) with audit trail of data received, methods used, assumptions, and reproducibility. The random seed is captured in the Reproducibility sheet. |
+| `research_house` | (blank) | Research organisation name — appears in the stats pack Declaration sheet. Use your company or white-label partner name. |
 
 See [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md) for complete parameter list.
 
@@ -277,6 +279,14 @@ See [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md) for complete parameter 
 | [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md) | Template field reference |
 | [07_EXAMPLE_WORKFLOWS.md](07_EXAMPLE_WORKFLOWS.md) | Practical examples |
 | [08_HTML_REPORT_GUIDE.md](08_HTML_REPORT_GUIDE.md) | HTML report configuration and usage |
+
+---
+
+## Version History
+
+- **11.2** (2026-03): Added `generate_stats_pack` output option and `research_house` STUDY IDENTIFICATION field to config template. The random seed is captured in the stats pack Reproducibility sheet.
+- **11.1** (2026-03): Multi-method comparison, vulnerability/switching analysis, golden question identification, executive summary
+- **11.0** (2025-12): LCA support, segment action cards, stability assessment, model scoring
 
 ---
 

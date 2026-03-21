@@ -454,6 +454,42 @@ generate_tracking_config_template <- function(output_path) {
           default = "",
           description = "Pre-configured chart annotations as JSON array (e.g., [{\"metricId\":\"Q01\",\"waveId\":\"W2\",\"text\":\"Campaign launched\"}])",
           valid_values_text = "JSON array string or leave blank"
+        ),
+        list(
+          name = "Generate_Stats_Pack",
+          required = FALSE,
+          default = "N",
+          description = "Generate a diagnostic stats pack workbook alongside main output. The stats pack provides a full audit trail of data received, methods used, assumptions, and reproducibility — designed for advanced partners and research statisticians. Output file is named {output}_stats_pack.xlsx.",
+          valid_values_text = "Y or N",
+          dropdown = c("Y", "N")
+        )
+      )
+    ),
+
+    # --- STUDY IDENTIFICATION section ---
+    list(
+      section_name = "STUDY IDENTIFICATION",
+      fields = list(
+        list(
+          name = "Project_Name",
+          required = FALSE,
+          default = "",
+          description = "Project name — appears in the stats pack Declaration sheet for identification and sign-off purposes. Leave blank if not using stats pack.",
+          valid_values_text = "Free text"
+        ),
+        list(
+          name = "Analyst_Name",
+          required = FALSE,
+          default = "",
+          description = "Analyst name — appears in the stats pack Declaration sheet.",
+          valid_values_text = "Free text"
+        ),
+        list(
+          name = "Research_House",
+          required = FALSE,
+          default = "",
+          description = "Research organisation name — appears in the stats pack Declaration sheet. Use your company or white-label partner name.",
+          valid_values_text = "Free text"
         )
       )
     )

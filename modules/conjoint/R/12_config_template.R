@@ -255,6 +255,14 @@
   add("ALCHEMER IMPORT", "alchemer_card_number_column", "CardNumber", "Alchemer card number column", FALSE, "", "Column name")
   add("ALCHEMER IMPORT", "alchemer_score_column", "Score", "Alchemer score column", FALSE, "", "Column name")
 
+  # --- STATS PACK ---
+  add("STATS PACK", "generate_stats_pack", "N", "Generate a diagnostic stats pack workbook alongside main output. The stats pack provides a full audit trail of data received, methods used, assumptions, and reproducibility — designed for advanced partners and research statisticians. Output file is named {output}_stats_pack.xlsx.", FALSE, "Y,N", "Y or N")
+
+  # --- STUDY IDENTIFICATION ---
+  add("STUDY IDENTIFICATION", "Project_Name", "", "Project name — appears in the stats pack Declaration sheet for identification and sign-off purposes. Leave blank if not using stats pack.", FALSE, "", "Free text")
+  add("STUDY IDENTIFICATION", "Analyst_Name", "", "Analyst name — appears in the stats pack Declaration sheet.", FALSE, "", "Free text")
+  add("STUDY IDENTIFICATION", "Research_House", "", "Research organisation name — appears in the stats pack Declaration sheet. Use your company or white-label partner name.", FALSE, "", "Free text")
+
   settings
 }
 

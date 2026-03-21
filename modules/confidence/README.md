@@ -54,6 +54,7 @@ run_confidence_analysis(
 | **Weighted Data**      | DEFF, effective n, weighted bootstrap              |
 | **Representativeness** | Quota checking with traffic-light flags            |
 | **HTML Report**        | Interactive report with charts, callouts, method notes |
+| **Stats Pack**         | Diagnostic audit workbook for advanced partners — data receipt, methods, assumptions, reproducibility |
 | **Sampling Context**   | Tailored CI interpretation by sampling method      |
 | **Output**             | Multi-sheet Excel workbook + optional HTML report  |
 
@@ -108,6 +109,15 @@ Create an Excel workbook with these sheets:
 | **Question_Analysis** | Yes | Questions to analyze (max 200) |
 | **Population_Margins** | No | Quota targets for representativeness |
 
+**New Study_Settings fields (v10.4):**
+
+| Field | Required | Description |
+|----|----|----|
+| **Generate_Stats_Pack** | No | `Y` or `N` — generate diagnostic stats pack workbook |
+| **Project_Name** | No | Project name for stats pack Declaration sheet |
+| **Analyst_Name** | No | Analyst name for stats pack Declaration sheet |
+| **Research_House** | No | Research organisation name for stats pack Declaration sheet |
+
 See [**USER_MANUAL.md**](USER_MANUAL.md) for detailed configuration.
 
 ------------------------------------------------------------------------
@@ -132,9 +142,17 @@ interactive navigation, SVG charts, method comparison tables,
 plain-English callouts, and sampling methodology notes tailored to
 your declared sampling method.
 
+**Optional Stats Pack:** Set `Generate_Stats_Pack = Y` in Study_Settings (or tick the GUI checkbox) to generate `{output}_stats_pack.xlsx` — a locked diagnostic workbook with Declaration, Data_Used, Assumptions, Warnings, Reproducibility, and Config_Echo sheets.
+
 ------------------------------------------------------------------------
 
 ## Version History
+
+### v10.4 (March 2026)
+
+-   **Stats pack:** Diagnostic audit workbook generation. Adds
+    `Generate_Stats_Pack`, `Project_Name`, `Analyst_Name`,
+    `Research_House` config fields.
 
 ### v10.3 (March 2026)
 

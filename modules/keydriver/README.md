@@ -53,6 +53,7 @@ source("launch_turas.R")
 - Config-driven custom slides (NEW v10.4)
 - Per-table CSV/Excel export (NEW v10.4)
 - Configurable analysis thresholds (NEW v10.4)
+- **Stats pack** — diagnostic audit workbook (Declaration, Data_Used, Assumptions, Warnings, Reproducibility, Config_Echo) (NEW v10.5)
 
 ### Validation
 - Smart sample size rules: n >= max(30, 10 x k drivers)
@@ -178,6 +179,9 @@ keydriver/
 **When Bootstrap enabled (NEW v10.3):**
 - Bootstrap_CIs, Bootstrap_Summary
 
+**Optional Stats Pack (NEW v10.5):**
+Set `Generate_Stats_Pack = Y` in Settings (or tick the GUI checkbox) to generate `{output}_stats_pack.xlsx` — a locked diagnostic workbook with Declaration, Data_Used, Assumptions, Warnings, Reproducibility, and Config_Echo sheets. Use `Project_Name`, `Analyst_Name`, and `Research_House` settings to populate the Declaration sheet.
+
 ### HTML Report (NEW v10.3)
 Self-contained interactive HTML file with:
 - All sections with SVG charts and tables
@@ -212,6 +216,14 @@ testthat::test_dir("modules/keydriver/tests")
 # Run specific test file
 testthat::test_file("modules/keydriver/tests/testthat/test_core_importance.R")
 ```
+
+---
+
+## Version History
+
+### v10.5 (March 2026)
+
+- **Stats pack:** Diagnostic audit workbook generation. Adds `Generate_Stats_Pack`, `Project_Name`, `Analyst_Name`, `Research_House` config fields.
 
 ---
 

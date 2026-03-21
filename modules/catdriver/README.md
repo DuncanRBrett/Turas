@@ -30,6 +30,7 @@ The Categorical Key Driver module identifies which factors most strongly influen
   (e.g., age, region) and compare driver importance across groups
 - **Multi-config GUI** — run multiple outcome analyses and generate a
   unified tabbed report from a single panel
+- **Stats pack** — diagnostic audit workbook (Declaration, Data_Used, Assumptions, Warnings, Reproducibility, Config_Echo) for advanced partners and research statisticians
 
 ---
 
@@ -122,6 +123,8 @@ The module generates an Excel workbook with:
 | Subgroup Summary | Driver importance across subgroups (if subgroup_var set) |
 | Subgroup OR Compare | Odds ratio comparison across subgroups (if subgroup_var set) |
 | Subgroup Model Fit | Per-subgroup model fit statistics (if subgroup_var set) |
+
+**Optional Stats Pack:** Set `Generate_Stats_Pack = Y` in Settings (or tick the GUI checkbox) to generate `{output}_stats_pack.xlsx` — a locked diagnostic workbook with Declaration, Data_Used, Assumptions, Warnings, Reproducibility, and Config_Echo sheets. Use `Project_Name`, `Analyst_Name`, and `Research_House` settings to populate the Declaration sheet.
 
 ---
 
@@ -230,6 +233,14 @@ install.packages("haven")
 | [06_TEMPLATE_REFERENCE.md](docs/06_TEMPLATE_REFERENCE.md) | Template field reference |
 | [07_EXAMPLE_WORKFLOWS.md](docs/07_EXAMPLE_WORKFLOWS.md) | Practical examples |
 | [08_BOOTSTRAP_GUIDE.md](docs/08_BOOTSTRAP_GUIDE.md) | Bootstrap confidence intervals |
+
+---
+
+## Version History
+
+### v14.1 (March 2026)
+
+- **Stats pack:** Diagnostic audit workbook generation. Adds `Generate_Stats_Pack`, `Project_Name`, `Analyst_Name`, `Research_House` config fields.
 
 ---
 

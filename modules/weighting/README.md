@@ -68,6 +68,10 @@ Key-value format (Setting | Value columns):
 | `diagnostics_file` | output/diagnostics.xlsx | If save_diagnostics=Y | Path for diagnostics workbook |
 | `html_report` | Y | No | Generate self-contained HTML report |
 | `html_report_file` | output/report.html | No | Path for HTML report (auto-generated if blank) |
+| `generate_stats_pack` | N | No | Generate a diagnostic stats pack workbook (`{output}_stats_pack.xlsx`) with full audit trail of data received, methods used, assumptions, and reproducibility |
+| `Project_Name` | (blank) | No | Project name for the stats pack Declaration sheet |
+| `Analyst_Name` | (blank) | No | Analyst name for the stats pack Declaration sheet |
+| `Research_House` | (blank) | No | Research organisation name for the stats pack Declaration sheet |
 | `brand_colour` | #1e3a5f | No | Brand hex colour for HTML report |
 | `accent_colour` | #2aa198 | No | Accent hex colour for HTML report |
 | `researcher_name` | Jane Smith | No | Researcher name shown in report header |
@@ -237,6 +241,7 @@ Trimming introduces a small bias (weighted distribution won't perfectly match ta
 | **Weighted data** | `output_file` | Your data with weight column(s) added (.csv or .xlsx) |
 | **Excel diagnostics** | `diagnostics_file` | Per-weight diagnostics, configuration summary, notes |
 | **HTML report** | `html_report_file` | Self-contained interactive report with 3 tabs: Summary, Weight Details, Method Notes |
+| **Stats pack** | `generate_stats_pack = N` | `{output}_stats_pack.xlsx` — full audit trail for advanced partners and research statisticians, including Declaration, Data Receipt, Methods, and Reproducibility sheets |
 
 The HTML report integrates with the Turas Report Hub — it can be combined with tabs, tracker, and driver reports into a single multi-module report.
 
@@ -366,3 +371,10 @@ weighted_data <- quick_rim_weight(
 | `diagnostics_file` | Character | Path to diagnostics workbook (if configured) |
 | `html_report_file` | Character | Path to HTML report (if configured) |
 | `run_state` | List | TRS run state with timing and events |
+
+---
+
+## Version History
+
+- **3.1** (2026-03): Added `generate_stats_pack` output option and STUDY IDENTIFICATION fields (`Project_Name`, `Analyst_Name`, `Research_House`) to config template
+- **3.0** (2026-01): Production-ready with design, rim, rake, and cell weighting; HTML report; TRS compliance

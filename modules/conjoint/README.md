@@ -210,6 +210,22 @@ Key-value format with columns: **Setting | Value | Required? | Description | Val
 | `client_name` | | Client name in header |
 | `company_name` | `The Research LampPost` | Company name in header |
 
+#### Stats Pack
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `generate_stats_pack` | `N` | Generate a diagnostic stats pack workbook alongside main output (`Y` or `N`). Output file is named `{output}_stats_pack.xlsx`. |
+
+#### Study Identification
+
+Used for the stats pack Declaration sheet. Leave blank if not using stats pack.
+
+| Setting | Description |
+|---------|-------------|
+| `Project_Name` | Project name for identification and sign-off |
+| `Analyst_Name` | Analyst name |
+| `Research_House` | Research organisation or white-label partner name |
+
 #### HTML Report Insights
 
 Pre-populated analyst commentary for each report panel:
@@ -538,3 +554,12 @@ All errors follow the Turas Refusal System. Check console output for Code, Messa
 | Test assertions | 207+ (HTML report suite alone) |
 | Config template | 6 sheets, branded |
 | Quality score | 91/100 |
+
+---
+
+## Version History
+
+### v3.2.0 (2026-03-21)
+
+- Added `generate_stats_pack` setting — generates a diagnostic stats pack workbook (`{output}_stats_pack.xlsx`) alongside main output, providing a full audit trail of data received, methods used, assumptions, and reproducibility for advanced partners and research statisticians.
+- Added `STUDY IDENTIFICATION` settings section (`Project_Name`, `Analyst_Name`, `Research_House`) to config template for stats pack Declaration sheet sign-off.

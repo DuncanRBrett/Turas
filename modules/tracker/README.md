@@ -6,7 +6,7 @@ editor_options:
 
 # Turas Tracker Module
 
-**Version:** 10.1 **Last Updated:** 28 December 2025
+**Version:** 10.2 **Last Updated:** 21 March 2026
 
 Time-series tracking and trend analysis for longitudinal survey studies.
 
@@ -119,3 +119,24 @@ Template files are located in the `templates/` subfolder:
 
 -   `Tracker_Config_Template.xlsx` - Configuration template
 -   `Tracker_Question_Mapping_Template.xlsx` - Question mapping template
+
+## Stats Pack
+
+Set `Generate_Stats_Pack = Y` in the Settings sheet to produce a
+diagnostic workbook alongside the main output. The stats pack is named
+`{output}_stats_pack.xlsx` and contains a full audit trail: data
+received, methods applied, assumptions, and reproducibility
+information. Intended for advanced partners and research statisticians.
+
+Optionally set `Project_Name`, `Analyst_Name`, and `Research_House` in
+the **STUDY IDENTIFICATION** section of the Settings sheet — these
+appear on the stats pack Declaration sheet for sign-off purposes.
+
+------------------------------------------------------------------------
+
+## Version History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 10.2 | March 2026 | Added `Generate_Stats_Pack` config field and STUDY IDENTIFICATION section (`Project_Name`, `Analyst_Name`, `Research_House`) to config template |
+| 10.1 | December 2025 | Extracted 4 new sub-modules (metric_types, trend_changes, trend_significance, output_formatting) |
