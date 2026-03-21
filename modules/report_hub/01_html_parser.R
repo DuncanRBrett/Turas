@@ -52,7 +52,7 @@ parse_html_report <- function(report_path, report_key) {
       status = "REFUSED",
       code = "DATA_INVALID",
       message = sprintf("Cannot detect report type for: %s", basename(report_path)),
-      how_to_fix = "The file must be a Turas-generated HTML report (tracker, tabs, catdriver, keydriver, weighting, or confidence)."
+      how_to_fix = "The file must be a Turas-generated HTML report (tracker, tabs, catdriver, keydriver, weighting, confidence, maxdiff, conjoint, segment, or pricing)."
     ))
   }
 
@@ -178,6 +178,15 @@ detect_report_type <- function(html) {
   if (grepl('class="seg-header"', html, fixed = TRUE)) {
     return("segment")
   }
+  if (grepl('class="pr-header"', html, fixed = TRUE)) {
+    return("pricing")
+  }
+  if (grepl('class="cd-header"', html, fixed = TRUE)) {
+    return("catdriver")
+  }
+  if (grepl('class="kd-header"', html, fixed = TRUE)) {
+    return("keydriver")
+  }
   message("Report hub: could not detect report type. Checked for: tracker, tabs, catdriver, keydriver, weighting, confidence, maxdiff, conjoint, segment, pricing")
   return(NULL)
 }
@@ -301,6 +310,10 @@ extract_header <- function(html, report_type) {
     # Segment: <div class="seg-header">...</div>
     m <- regexpr('<div class="seg-header">[\\s\\S]*?</div>\\s*</div>', html, perl = TRUE)
     if (m > 0) return(regmatches(html, m))
+  } else if (report_type == "pricing") {
+    # Pricing: <div class="pr-header">...</div>
+    m <- regexpr('<div class="pr-header">[\\s\\S]*?</div>\\s*</div>', html, perl = TRUE)
+    if (m > 0) return(regmatches(html, m))
   } else {
     # Tabs: <div class="header">...</div> (up to report-tabs)
     m <- regexpr('<div class="header">[\\s\\S]*?</div>\\s*</div>\\s*</div>', html, perl = TRUE)
@@ -338,14 +351,39 @@ extract_header <- function(html, report_type) {
 extract_report_tabs <- function(html) {
   tab_html <- ""
 
-  # Try module-specific section navs first (catdriver/keydriver)
+  # Try module-specific section navs (catdriver/keydriver)
+  # These use <nav class="{prefix}-section-nav"> with anchor links
   for (prefix in c("kd", "cd")) {
-    pattern <- sprintf('<div[^>]*class="[^"]*%s-section-nav[^"]*"[^>]*>[\\s\\S]*?</div>', prefix)
+    pattern <- sprintf('<nav[^>]*class="[^"]*%s-section-nav[^"]*"[^>]*>[\\s\\S]*?</nav>', prefix)
     m <- regexpr(pattern, html, perl = TRUE)
     if (m > 0) {
       tab_html <- regmatches(html, m)
       break
     }
+  }
+
+  # MaxDiff: <div class="md-tab-nav">...</div>
+  if (!nzchar(tab_html)) {
+    m <- regexpr('<div class="md-tab-nav">[\\s\\S]*?</div>', html, perl = TRUE)
+    if (m > 0) tab_html <- regmatches(html, m)
+  }
+
+  # Conjoint: <nav class="cj-report-tabs"...>...</nav>
+  if (!nzchar(tab_html)) {
+    m <- regexpr('<nav class="cj-report-tabs"[^>]*>[\\s\\S]*?</nav>', html, perl = TRUE)
+    if (m > 0) tab_html <- regmatches(html, m)
+  }
+
+  # Pricing: <div class="pr-tab-nav">...</div>
+  if (!nzchar(tab_html)) {
+    m <- regexpr('<div class="pr-tab-nav">[\\s\\S]*?</div>', html, perl = TRUE)
+    if (m > 0) tab_html <- regmatches(html, m)
+  }
+
+  # Segment: section nav <nav class="seg-section-nav"...>...</nav>
+  if (!nzchar(tab_html)) {
+    m <- regexpr('<nav class="seg-section-nav"[^>]*>[\\s\\S]*?</nav>', html, perl = TRUE)
+    if (m > 0) tab_html <- regmatches(html, m)
   }
 
   # Fallback: tracker/tabs use <div class="report-tabs">...</div>
@@ -354,9 +392,11 @@ extract_report_tabs <- function(html) {
     if (m > 0) tab_html <- regmatches(html, m)
   }
 
-  # Extract tab names from data-tab or data-kd-section or data-cd-section attributes
+  # Extract tab names from attributes in the nav HTML
   tab_names <- character(0)
-  for (attr_name in c("data-tab", "data-kd-section", "data-cd-section")) {
+
+  # Try data-tab, data-kd-section, data-cd-section, data-seg-section attributes first
+  for (attr_name in c("data-tab", "data-kd-section", "data-cd-section", "data-seg-section")) {
     pattern <- sprintf('%s="([^"]*)"', attr_name)
     tab_matches <- gregexpr(pattern, tab_html)[[1]]
     if (tab_matches[1] != -1) {
@@ -369,8 +409,26 @@ extract_report_tabs <- function(html) {
     }
   }
 
-  # Filter out "pinned" — the hub manages its own pinned tab
-  tab_names <- tab_names[tab_names != "pinned"]
+  # Fallback: extract from href="#prefix-{name}" anchors (catdriver/keydriver section navs)
+  if (length(tab_names) == 0 && nzchar(tab_html)) {
+    for (prefix in c("cd", "kd", "seg")) {
+      href_pattern <- sprintf('href="#%s-([^"]*)"', prefix)
+      href_matches <- gregexpr(href_pattern, tab_html, perl = TRUE)[[1]]
+      if (href_matches[1] != -1) {
+        for (i in seq_along(href_matches)) {
+          len <- attr(href_matches, "match.length")[i]
+          attr_str <- substr(tab_html, href_matches[i], href_matches[i] + len - 1)
+          name <- sub(sprintf('href="#%s-([^"]*)"', prefix), '\\1', attr_str, perl = TRUE)
+          tab_names <- c(tab_names, name)
+        }
+        break
+      }
+    }
+  }
+
+  # Filter out hub-managed tabs
+  hub_managed <- c("pinned", "pinned-section", "pinned-views", "about", "added-slides", "slides")
+  tab_names <- tab_names[!tab_names %in% hub_managed]
 
   return(list(
     html = tab_html,
@@ -406,10 +464,12 @@ extract_report_tabs <- function(html) {
 extract_content_panels <- function(html, report_type) {
   panels <- list()
 
-  # Catdriver/Keydriver: sections use class="cd-section"/"kd-section" with id="kd-section-*"
+  # Catdriver/Keydriver: sections use data-cd-section / data-kd-section attributes
+  # IDs follow pattern: id="cd-{name}" or id="kd-{name}" (not cd-section-{name})
   if (report_type %in% c("catdriver", "keydriver")) {
     prefix <- if (report_type == "catdriver") "cd" else "kd"
-    section_pattern <- sprintf('id="%s-section-([^"]*)"', prefix)
+    section_attr <- sprintf("data-%s-section", prefix)
+    section_pattern <- sprintf('%s="([^"]*)"', section_attr)
     id_matches <- gregexpr(section_pattern, html, perl = TRUE)[[1]]
     if (id_matches[1] == -1) return(panels)
 
@@ -417,17 +477,19 @@ extract_content_panels <- function(html, report_type) {
     for (i in seq_along(id_matches)) {
       len <- attr(id_matches, "match.length")[i]
       attr_str <- substr(html, id_matches[i], id_matches[i] + len - 1)
-      section_id <- sub(sprintf('id="%s-section-([^"]*)"', prefix), '\\1', attr_str, perl = TRUE)
-      section_ids <- c(section_ids, section_id)
+      section_id <- gsub(sprintf('%s="|"', section_attr), '', attr_str)
+      if (nzchar(section_id) && !grepl("[^a-zA-Z0-9_-]", section_id)) {
+        section_ids <- c(section_ids, section_id)
+      }
     }
 
     for (idx in seq_along(section_ids)) {
       sid <- section_ids[idx]
-      full_id <- sprintf("%s-section-%s", prefix, sid)
-      pattern <- sprintf('<div[^>]*id="%s"', full_id)
+      # Find the div with this data attribute
+      pattern <- sprintf('<div[^>]*%s="%s"', section_attr, sid)
       start <- regexpr(pattern, html, perl = TRUE)
       if (start == -1) {
-        message(sprintf("Report hub: panel '%s' not found in HTML, skipping", full_id))
+        message(sprintf("Report hub: panel '%s-%s' not found in HTML, skipping", prefix, sid))
         next
       }
 
@@ -436,13 +498,13 @@ extract_content_panels <- function(html, report_type) {
 
       # Next section
       if (idx < length(section_ids)) {
-        next_id <- sprintf('%s-section-%s', prefix, section_ids[idx + 1])
-        next_pos <- regexpr(sprintf('<div[^>]*id="%s"', next_id),
+        next_pattern <- sprintf('<div[^>]*%s="%s"', section_attr, section_ids[idx + 1])
+        next_pos <- regexpr(next_pattern,
                             substr(html, search_from, nchar(html)), perl = TRUE)
         if (next_pos > 0) end_markers <- c(end_markers, search_from + next_pos - 2)
       }
 
-      # Pinned panel or footer
+      # Footer
       footer_pattern <- sprintf('%s-footer', prefix)
       ft_pos <- regexpr(footer_pattern, substr(html, search_from, nchar(html)), fixed = TRUE)
       if (ft_pos > 0) end_markers <- c(end_markers, search_from + ft_pos - 2)
@@ -461,9 +523,153 @@ extract_content_panels <- function(html, report_type) {
       panel_html <- sub("\\s+$", "", panel_html)
 
       # Skip pinned panel — hub manages its own
-      if (sid != "pinned") {
+      if (!sid %in% c("pinned", "pinned-views")) {
         panels[[sid]] <- panel_html
       }
+    }
+    return(panels)
+  }
+
+  # --- Panel-based reports (maxdiff, conjoint, pricing): id="panel-{name}" ---
+  if (report_type %in% c("maxdiff", "conjoint", "pricing")) {
+    prefix_cls <- switch(report_type, maxdiff = "md", conjoint = "cj", pricing = "pr")
+    # Match: class="{prefix}-panel" ... id="panel-{name}" (or reversed order)
+    panel_pattern <- sprintf('id="panel-([^"]*)"', prefix_cls)
+    id_matches <- gregexpr(panel_pattern, html, perl = TRUE)[[1]]
+    if (id_matches[1] == -1) return(panels)
+
+    panel_ids <- character(0)
+    for (i in seq_along(id_matches)) {
+      len <- attr(id_matches, "match.length")[i]
+      attr_str <- substr(html, id_matches[i], id_matches[i] + len - 1)
+      pid <- sub('id="panel-([^"]*)"', '\\1', attr_str, perl = TRUE)
+      panel_ids <- c(panel_ids, pid)
+    }
+
+    for (idx in seq_along(panel_ids)) {
+      pid <- panel_ids[idx]
+      full_id <- paste0("panel-", pid)
+      pattern <- sprintf('<div[^>]*id="%s"', full_id)
+      start <- regexpr(pattern, html, perl = TRUE)
+      if (start == -1) next
+
+      search_from <- start + 10
+      end_markers <- c()
+
+      # Next panel
+      if (idx < length(panel_ids)) {
+        next_id <- paste0("panel-", panel_ids[idx + 1])
+        next_pos <- regexpr(sprintf('<div[^>]*id="%s"', next_id),
+                            substr(html, search_from, nchar(html)), perl = TRUE)
+        if (next_pos > 0) end_markers <- c(end_markers, search_from + next_pos - 2)
+      }
+
+      # Footer
+      footer_pattern <- sprintf('%s-footer', prefix_cls)
+      ft_pos <- regexpr(footer_pattern, substr(html, search_from, nchar(html)), fixed = TRUE)
+      if (ft_pos > 0) end_markers <- c(end_markers, search_from + ft_pos - 2)
+
+      # Help overlay
+      help_pattern <- sprintf('%s-help-overlay', prefix_cls)
+      hp_pos <- regexpr(help_pattern, substr(html, search_from, nchar(html)), fixed = TRUE)
+      if (hp_pos > 0) end_markers <- c(end_markers, search_from + hp_pos - 2)
+
+      # Script blocks
+      sc_pos <- regexpr('\n<script>', substr(html, search_from, nchar(html)), fixed = TRUE)
+      if (sc_pos > 0) end_markers <- c(end_markers, search_from + sc_pos - 2)
+
+      # Footer tag for maxdiff/conjoint which use <footer>
+      ftr_pos <- regexpr('\n<footer', substr(html, search_from, nchar(html)), fixed = TRUE)
+      if (ftr_pos > 0) end_markers <- c(end_markers, search_from + ftr_pos - 2)
+
+      if (length(end_markers) > 0) {
+        end_pos <- min(end_markers)
+      } else {
+        body_end <- regexpr('</body>', substr(html, search_from, nchar(html)), fixed = TRUE)
+        end_pos <- if (body_end > 0) search_from + body_end - 2 else nchar(html)
+      }
+
+      panel_html <- substr(html, start, end_pos)
+      panel_html <- sub("\\s+$", "", panel_html)
+
+      # Skip pinned/about/slides — hub manages its own
+      if (!pid %in% c("pinned", "about", "added-slides", "slides")) {
+        panels[[pid]] <- panel_html
+      }
+    }
+    return(panels)
+  }
+
+  # --- Segment: sections with data-seg-section attribute ---
+  if (report_type == "segment") {
+    section_pattern <- 'data-seg-section="([^"]*)"'
+    id_matches <- gregexpr(section_pattern, html, perl = TRUE)[[1]]
+
+    # Filter out pinned/about/slides and empty values before checking count
+    section_ids <- character(0)
+    if (id_matches[1] != -1) {
+      for (i in seq_along(id_matches)) {
+        len <- attr(id_matches, "match.length")[i]
+        attr_str <- substr(html, id_matches[i], id_matches[i] + len - 1)
+        section_id <- gsub('data-seg-section="|"', '', attr_str)
+        if (nzchar(section_id) && !grepl("[^a-zA-Z0-9_-]", section_id) &&
+            !section_id %in% c("pinned-views", "about", "slides")) {
+          section_ids <- c(section_ids, section_id)
+        }
+      }
+    }
+    # Deduplicate (JS code may contain data-seg-section in string literals)
+    section_ids <- unique(section_ids)
+
+    if (length(section_ids) > 0) {
+      for (idx in seq_along(section_ids)) {
+        sid <- section_ids[idx]
+        pattern <- sprintf('<div[^>]*data-seg-section="%s"', sid)
+        start <- regexpr(pattern, html, perl = TRUE)
+        if (start == -1) next
+
+        search_from <- start + 10
+        end_markers <- c()
+
+        # Next section
+        if (idx < length(section_ids)) {
+          next_pattern <- sprintf('<div[^>]*data-seg-section="%s"', section_ids[idx + 1])
+          next_pos <- regexpr(next_pattern, substr(html, search_from, nchar(html)), perl = TRUE)
+          if (next_pos > 0) end_markers <- c(end_markers, search_from + next_pos - 2)
+        }
+
+        # Pinned section as end marker
+        pv_pos <- regexpr('data-seg-section="pinned-views"', substr(html, search_from, nchar(html)), fixed = TRUE)
+        if (pv_pos > 0) end_markers <- c(end_markers, search_from + pv_pos - 2)
+
+        # Footer
+        ft_pos <- regexpr('class="seg-footer"', substr(html, search_from, nchar(html)), fixed = TRUE)
+        if (ft_pos > 0) end_markers <- c(end_markers, search_from + ft_pos - 2)
+
+        # Script blocks
+        sc_pos <- regexpr('\n<script>', substr(html, search_from, nchar(html)), fixed = TRUE)
+        if (sc_pos > 0) end_markers <- c(end_markers, search_from + sc_pos - 2)
+
+        if (length(end_markers) > 0) {
+          end_pos <- min(end_markers)
+        } else {
+          body_end <- regexpr('</body>', substr(html, search_from, nchar(html)), fixed = TRUE)
+          end_pos <- if (body_end > 0) search_from + body_end - 2 else nchar(html)
+        }
+
+        panel_html <- substr(html, start, end_pos)
+        panel_html <- sub("\\s+$", "", panel_html)
+        panels[[sid]] <- panel_html
+      }
+      return(panels)
+    }
+
+    # Fallback for segment reports without data-seg-section (e.g., method comparison):
+    # Extract the main analysis content div (id="seg-analysis-tab")
+    m <- regexpr('<div[^>]*id="seg-analysis-tab"', html, perl = TRUE)
+    if (m > 0) {
+      analysis_html <- extract_balanced_div(html, m)
+      panels[["analysis"]] <- analysis_html
     }
     return(panels)
   }
@@ -592,8 +798,16 @@ extract_footer <- function(html, report_type) {
     m <- regexpr('<div class="wt-footer">[\\s\\S]*?</div>', html, perl = TRUE)
     if (m > 0) return(regmatches(html, m))
   }
+  if (report_type == "maxdiff") {
+    m <- regexpr('<footer class="md-footer">[\\s\\S]*?</footer>', html, perl = TRUE)
+    if (m > 0) return(regmatches(html, m))
+  }
+  if (report_type == "conjoint") {
+    m <- regexpr('<footer class="cj-footer">[\\s\\S]*?</footer>', html, perl = TRUE)
+    if (m > 0) return(regmatches(html, m))
+  }
   # Expected: tabs footer is inside content panels (already captured), and some
-  # report types (e.g. maxdiff, conjoint, segment, pricing) have no footer block
+  # report types (e.g. segment, pricing) embed footers within sections
   return("")
 }
 
@@ -628,6 +842,12 @@ extract_help_overlay <- function(html, report_type) {
     open_pattern <- '<div\\s+class="help-overlay"\\s+id="help-overlay"[^>]*>'
   } else if (report_type == "tracker") {
     open_pattern <- '<div\\s+id="tk-help-overlay"[^>]*>'
+  } else if (report_type == "maxdiff") {
+    open_pattern <- '<div\\s+class="md-help-overlay"\\s+id="md-help-overlay"[^>]*>'
+  } else if (report_type == "conjoint") {
+    open_pattern <- '<div\\s+class="cj-help-overlay"\\s+id="cj-help-overlay"[^>]*>'
+  } else if (report_type == "segment") {
+    open_pattern <- '<div\\s+id="seg-help-overlay"[^>]*>'
   }
 
   if (is.null(open_pattern)) return("")

@@ -484,18 +484,5 @@ test_that("model fit statistics are within expected ranges", {
 
 
 # ==============================================================================
-# RUN TESTS IF NOT INTERACTIVE
+# NOTE: Run via run_tests.R or testthat::test_file() — do not self-invoke
 # ==============================================================================
-
-if (!interactive()) {
-  cat("\n========================================\n")
-  cat("GOLDEN FIXTURE TEST SUITE\n")
-  cat("========================================\n\n")
-
-  test_results <- tryCatch({
-    test_file(file.path(test_dir, "test_golden_fixtures.R"), reporter = "summary")
-  }, error = function(e) {
-    # Fallback: run tests in current file
-    test_dir(".", reporter = "summary", filter = "golden")
-  })
-}

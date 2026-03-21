@@ -55,7 +55,7 @@ var ReportHub = ReportHub || {};
     // (they may have been initialized while this panel was hidden)
     var panel = document.querySelector('.hub-panel[data-hub-panel="' + key + '"]');
     if (panel) {
-      var activeSubTab = panel.querySelector(".tab-panel.active");
+      var activeSubTab = panel.querySelector(".tab-panel.active, .md-panel.active, .cj-panel.active, .pr-panel.active, .seg-section.active, .kd-section.active, .cd-section.active");
       if (activeSubTab) {
         var subTabId = activeSubTab.id || "";
         // Check if the active sub-tab is "crosstabs" (ID pattern: "{key}--tab-crosstabs")
@@ -129,13 +129,23 @@ var ReportHub = ReportHub || {};
     }
 
     // Show/hide sub-panels within this report
+    // Supports all report types: tab-panel (tracker/tabs), md-panel (maxdiff),
+    // cj-panel (conjoint), pr-panel (pricing), seg-section (segment),
+    // kd-section (keydriver), cd-section (catdriver)
     var panel = document.querySelector('.hub-panel[data-hub-panel="' + reportKey + '"]');
     if (panel) {
-      var subPanels = panel.querySelectorAll(".tab-panel");
+      var panelSelectors = ".tab-panel, .md-panel, .cj-panel, .pr-panel, .seg-section, .kd-section, .cd-section";
+      var subPanels = panel.querySelectorAll(panelSelectors);
       for (var j = 0; j < subPanels.length; j++) {
         subPanels[j].classList.remove("active");
       }
-      var target = document.getElementById(prefix + "tab-" + tabName);
+      // Try multiple ID patterns for different report types
+      var target = document.getElementById(prefix + "tab-" + tabName)
+        || document.getElementById(prefix + "panel-" + tabName)
+        || document.getElementById(prefix + "seg-" + tabName)
+        || document.getElementById(prefix + "kd-" + tabName)
+        || document.getElementById(prefix + "cd-" + tabName)
+        || document.getElementById(prefix + "seg-analysis-tab");
       if (target) {
         target.classList.add("active");
       }

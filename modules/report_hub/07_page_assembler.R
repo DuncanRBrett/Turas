@@ -367,7 +367,19 @@ build_init_js <- function(parsed_reports) {
 
   # Initialize each report
   for (parsed in parsed_reports) {
-    ns_name <- if (parsed$report_type == "tracker") "TrackerReport" else "TabsReport"
+    ns_name <- switch(parsed$report_type,
+      tracker = "TrackerReport",
+      tabs = "TabsReport",
+      maxdiff = "MaxDiffReport",
+      conjoint = "ConjointReport",
+      pricing = "PricingReport",
+      segment = "SegmentReport",
+      catdriver = "CatDriverReport",
+      keydriver = "KeyDriverReport",
+      confidence = "ConfidenceReport",
+      weighting = "WeightingReport",
+      "TabsReport"
+    )
     init_calls <- c(init_calls, sprintf(
       "if (typeof %s !== 'undefined' && %s.init) { %s.init(); }",
       ns_name, ns_name, ns_name

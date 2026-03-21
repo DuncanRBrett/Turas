@@ -318,7 +318,33 @@ rewrite_html_onclick_conflicts <- function(html, report_key) {
     "exportPinnedCardPNG",
     "toggleSlideMenu",
     # --- Segment filter (tabs summary page) ---
-    "filterSigBySegment"
+    "filterSigBySegment",
+    # --- Conjoint-specific ---
+    "switchChartType",
+    "addSlide",
+    "switchSlide",
+    "switchSimMode",
+    # --- Pricing-specific ---
+    "exportTableExcel",
+    "addPrSlide",
+    "movePrSlide",
+    "removePrSlide",
+    "pinView",
+    "exportAllPinned",
+    "switchTab",
+    # --- Segment-specific ---
+    "segToggleHelp",
+    "segSaveReportHTML",
+    "segAddSlide",
+    "segAddSection",
+    "segPinComponent",
+    "segDismissInsight",
+    "segMovePinned",
+    "segRemovePinned",
+    "segClearAllPinned",
+    "segExportAllPinnedPNG",
+    "segExportAllSlidesPNG",
+    "segExportPinnedCardPNG"
   )
 
   for (fn in conflict_fns) {
@@ -490,7 +516,33 @@ remove_save_print_buttons <- function(html) {
     "toggleSlideMenu",
     "exportInsightsHTML",
     # --- Segment filter (tabs summary page) ---
-    "filterSigBySegment"
+    "filterSigBySegment",
+    # --- Conjoint-specific ---
+    "switchChartType",
+    "addSlide",
+    "switchSlide",
+    "switchSimMode",
+    # --- Pricing-specific ---
+    "exportTableExcel",
+    "addPrSlide",
+    "movePrSlide",
+    "removePrSlide",
+    "pinView",
+    "exportAllPinned",
+    "switchTab",
+    # --- Segment-specific ---
+    "segToggleHelp",
+    "segSaveReportHTML",
+    "segAddSlide",
+    "segAddSection",
+    "segPinComponent",
+    "segDismissInsight",
+    "segMovePinned",
+    "segRemovePinned",
+    "segClearAllPinned",
+    "segExportAllPinnedPNG",
+    "segExportAllSlidesPNG",
+    "segExportPinnedCardPNG"
   )
 }
 
@@ -608,7 +660,19 @@ wrap_js_in_iife <- function(js_blocks, report_key, report_type, report_label = N
   all_js <- .build_dom_helpers(all_js, report_key)
 
   # Step 3: Build namespace API object
-  namespace_name <- if (report_type == "tracker") "TrackerReport" else "TabsReport"
+  namespace_name <- switch(report_type,
+    tracker = "TrackerReport",
+    tabs = "TabsReport",
+    maxdiff = "MaxDiffReport",
+    conjoint = "ConjointReport",
+    pricing = "PricingReport",
+    segment = "SegmentReport",
+    catdriver = "CatDriverReport",
+    keydriver = "KeyDriverReport",
+    confidence = "ConfidenceReport",
+    weighting = "WeightingReport",
+    "TabsReport"  # fallback
+  )
   api_js <- build_namespace_api(namespace_name, report_key, report_type)
 
   # Step 4: Build pin bridge
@@ -637,8 +701,10 @@ build_pin_bridge <- function(report_key, report_type, report_label = NULL) {
 
   if (report_type == "tracker") {
     .build_tracker_pin_bridge(prefix, id_helper, qs_helper, label_js, report_key)
-  } else {
+  } else if (report_type == "tabs") {
     .build_tabs_pin_bridge(prefix, id_helper, qs_helper, label_js, report_key)
+  } else {
+    .build_generic_pin_bridge(prefix, id_helper, qs_helper, label_js, report_key)
   }
 }
 
@@ -997,6 +1063,53 @@ var _hubSrcLbl_%5$s = \'%4$s\';
 }
 
 
+#' Build Generic Pin Bridge JavaScript
+#'
+#' Generates a generic pin bridge for report types other than tracker and tabs
+#' (maxdiff, conjoint, pricing, segment, catdriver, keydriver, confidence, weighting).
+#' These reports use a common pin pattern: capture the current panel's visible content
+#' and route through the hub's unified store.
+#'
+#' @param prefix Report prefix (e.g., "maxdiff_")
+#' @param id_helper Name of the getElementById helper
+#' @param qs_helper Name of the querySelector helper
+#' @param label_js Escaped report label for JS embedding
+#' @param report_key Report key (e.g., "maxdiff")
+#' @return JavaScript string
+#' @keywords internal
+.build_generic_pin_bridge <- function(prefix, id_helper, qs_helper, label_js, report_key) {
+  sprintf('
+// ===== Hub Pin Bridge — Generic (%5$s) =====
+var _hubSrcLbl_%5$s = \'%4$s\';
+// Override togglePin if it exists
+if (typeof %1$stogglePin === "function") {
+  var _orig_%1$stogglePin = %1$stogglePin;
+  %1$stogglePin = function(pinId) {
+    var pinObj;
+    if (typeof %1$scaptureCurrentView === "function") {
+      pinObj = %1$scaptureCurrentView(pinId);
+    } else if (typeof _orig_%1$stogglePin === "function") {
+      pinObj = _orig_%1$stogglePin(pinId);
+    }
+    if (!pinObj) {
+      pinObj = {
+        id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2,5),
+        title: pinId || "Pinned View",
+        tableHtml: "", chartSvg: "", insight: "",
+        timestamp: Date.now()
+      };
+    }
+    pinObj.sourceLabel = _hubSrcLbl_%5$s;
+    ReportHub.addPin("%5$s", pinObj);
+  };
+}
+%1$shydratePinnedViews = function() {};
+%1$srenderPinnedCards = function() { ReportHub.renderPinnedCards(); };
+// ===== End Hub Pin Bridge =====
+', prefix, id_helper, qs_helper, label_js, report_key)
+}
+
+
 #' Build Namespace API Object
 #'
 #' Creates a convenience object that other code can use to call
@@ -1018,10 +1131,20 @@ var %s = {
   toggleHelpOverlay: typeof %stoggleHelpOverlay === "function" ? %stoggleHelpOverlay : function() {}
 };
 ', namespace_name, prefix, prefix, prefix, prefix, prefix, prefix)
-  } else {
+  } else if (report_type == "tabs") {
     sprintf('
 var %s = {
   selectQuestion: typeof selectQuestion === "function" ? selectQuestion : function() {},
+  togglePin: typeof %stogglePin === "function" ? %stogglePin : function() {},
+  updatePinButton: typeof %supdatePinButton === "function" ? %supdatePinButton : function() {},
+  toggleHelpOverlay: typeof %stoggleHelpOverlay === "function" ? %stoggleHelpOverlay : function() {}
+};
+', namespace_name, prefix, prefix, prefix, prefix, prefix, prefix)
+  } else {
+    # Generic namespace API for maxdiff, conjoint, pricing, segment, etc.
+    sprintf('
+var %s = {
+  init: function() {},
   togglePin: typeof %stogglePin === "function" ? %stogglePin : function() {},
   updatePinButton: typeof %supdatePinButton === "function" ? %supdatePinButton : function() {},
   toggleHelpOverlay: typeof %stoggleHelpOverlay === "function" ? %stoggleHelpOverlay : function() {}
