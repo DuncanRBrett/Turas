@@ -239,11 +239,11 @@ test_that("Baseline level correctly identified", {
 test_that("Baseline identification handles ties", {
   # If two levels tie for closest to 0, pick first one
 
-  utils_centered <- c(0.5, -0.5, 0.2)
+  utils_tied <- c(0.5, -0.5, 0.8)
 
   # Levels 1 and 2 both have abs = 0.5
   # which.min should return first occurrence
-  baseline_idx <- which.min(abs(utils_centered))
+  baseline_idx <- which.min(abs(utils_tied))
 
   expect_equal(baseline_idx, 1)
 })
