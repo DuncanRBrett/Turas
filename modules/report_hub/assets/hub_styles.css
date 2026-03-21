@@ -111,6 +111,7 @@ body {
   border-bottom: 1px solid var(--hub-border);
   padding: 0 32px;
   display: flex;
+  flex-wrap: wrap;
   gap: 0;
   max-width: 1600px;
   margin: 0 auto;
@@ -157,6 +158,7 @@ body {
   border-bottom: 1px solid var(--hub-border);
   padding: 0 32px;
   display: flex;
+  flex-wrap: wrap;
   gap: 0;
   max-width: 1600px;
   margin: 0 auto;
@@ -256,6 +258,26 @@ body {
 .hub-card-type-analysis {
   background: #d1fae5;
   color: #065f46;
+}
+
+.hub-card-type-maxdiff {
+  background: #fce7f3;
+  color: #9d174d;
+}
+
+.hub-card-type-conjoint {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.hub-card-type-pricing {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+
+.hub-card-type-segment {
+  background: #fef9c3;
+  color: #854d0e;
 }
 
 .hub-report-card-wave-range {
@@ -929,6 +951,27 @@ body {
 .hub-pin-table td,
 .hub-pin-table th {
   color: #1e293b;
+}
+
+/* --- Sub-panel visibility (hub overrides) --- */
+/* All panel types hidden by default; .active shows the current one. */
+.hub-panel .tab-panel,
+.hub-panel .md-panel,
+.hub-panel .cj-panel,
+.hub-panel .pr-panel,
+.hub-panel .seg-section,
+.hub-panel .kd-section,
+.hub-panel .cd-section {
+  display: none;
+}
+.hub-panel .tab-panel.active,
+.hub-panel .md-panel.active,
+.hub-panel .cj-panel.active,
+.hub-panel .pr-panel.active,
+.hub-panel .seg-section.active,
+.hub-panel .kd-section.active,
+.hub-panel .cd-section.active {
+  display: block;
 }
 
 /* --- Transitions for visibility toggles --- */

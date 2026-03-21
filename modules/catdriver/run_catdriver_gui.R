@@ -256,7 +256,11 @@ run_catdriver_gui <- function() {
           div(class = "turas-status-info",
             tags$strong("Note: "), "These settings are applied to the generated HTML report. ",
             "They override any brand/colour settings in individual config files."
-          )
+          ),
+
+          checkboxInput("generate_stats_pack",
+                        "Generate stats pack (diagnostic workbook for advanced review)",
+                        value = FALSE)
         )
       ),
 
@@ -638,6 +642,7 @@ run_catdriver_gui <- function() {
             }
 
             # Run with full output capture
+            options(turas.generate_stats_pack = isTRUE(input$generate_stats_pack))
             captured <- capture_console_all({
               run_categorical_keydriver(
                 config_file = config_path,

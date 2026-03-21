@@ -73,7 +73,11 @@ build_report_card <- function(parsed) {
     confidence = list(css = "hub-card-type-confidence",  label = "Confidence"),
     catdriver  = list(css = "hub-card-type-analysis",    label = "Driver Analysis"),
     keydriver  = list(css = "hub-card-type-analysis",    label = "Key Drivers"),
-    weighting  = list(css = "hub-card-type-analysis",    label = "Weighting")
+    weighting  = list(css = "hub-card-type-analysis",    label = "Weighting"),
+    maxdiff    = list(css = "hub-card-type-maxdiff",     label = "MaxDiff"),
+    conjoint   = list(css = "hub-card-type-conjoint",    label = "Conjoint"),
+    pricing    = list(css = "hub-card-type-pricing",     label = "Pricing"),
+    segment    = list(css = "hub-card-type-segment",     label = "Segmentation")
   )
   badge_info <- badge_map[[type]]
   if (is.null(badge_info)) badge_info <- badge_map[["tabs"]]  # fallback
@@ -197,8 +201,7 @@ build_summary_area <- function(parsed_reports) {
           id = sprintf("%s-execsummary", key)
         ),
         general = list(
-          label = sprintf("%s Summary",
-                          if (parsed$report_type == "tracker") "Tracker" else "Crosstabs"),
+          label = sprintf("%s Summary", report_label),
           id = sprintf("%s-general", key)
         )
       )
@@ -233,7 +236,7 @@ build_summary_area <- function(parsed_reports) {
       }
     } else {
       # No sections extracted — show empty editable area
-      label <- if (parsed$report_type == "tracker") "Tracker Summary" else "Crosstabs Summary"
+      label <- paste0(report_label, " Summary")
 
       parts <- paste0(parts, sprintf(
         '<div class="hub-summary-section">

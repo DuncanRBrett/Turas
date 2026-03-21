@@ -150,6 +150,9 @@ run_conjoint_gui <- function() {
       conditionalPanel(
         condition = "output.ready_to_run",
         div(class = "turas-card",
+          checkboxInput("generate_stats_pack",
+                        "Generate stats pack (diagnostic workbook for advanced review)",
+                        value = FALSE),
           actionButton("run_analysis", "Run Conjoint Analysis",
                       class = "btn turas-btn-run",
                       icon = icon("play"))
@@ -360,6 +363,7 @@ run_conjoint_gui <- function() {
           output_text <- paste0(output_text, "Config file: ", basename(files$config_file), "\n\n")
           console_text(output_text)
 
+          options(turas.generate_stats_pack = isTRUE(input$generate_stats_pack))
           capture <- capture.output({
             results <- run_conjoint_analysis(
               config_file = files$config_file

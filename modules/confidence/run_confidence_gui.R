@@ -291,6 +291,11 @@ run_confidence_gui <- function() {
 
       div(class = "turas-card",
         h3(class = "turas-card-title", "3. Run Analysis"),
+        div(style = "margin: 0 0 16px 0;",
+          checkboxInput("generate_stats_pack",
+                        "Generate stats pack (diagnostic workbook for advanced review)",
+                        value = FALSE)
+        ),
         div(style = "text-align: center; margin: 20px 0;",
           actionButton("run_btn",
                       "RUN ANALYSIS",
@@ -378,6 +383,9 @@ run_confidence_gui <- function() {
 
         # Source the confidence module
         source(file.path(confidence_dir, "R", "00_main.R"))
+
+        # Pass GUI options to module via R options
+        options(turas.generate_stats_pack = isTRUE(input$generate_stats_pack))
 
         # Capture ALL console output (cat, print, messages) including errors
         # This ensures output is displayed even if analysis fails

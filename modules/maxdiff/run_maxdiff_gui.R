@@ -295,6 +295,9 @@ run_maxdiff_gui <- function() {
             icon("exclamation-triangle"), " Please select a valid configuration file to continue"
           )
         },
+        checkboxInput("generate_stats_pack",
+                      "Generate stats pack (diagnostic workbook for advanced review)",
+                      value = FALSE),
         div(style = "text-align: center; margin: 20px 0;",
           actionButton("run_btn",
                       paste("RUN MAXDIFF", rv$mode),
@@ -376,6 +379,7 @@ run_maxdiff_gui <- function() {
         output_capture_file <- tempfile()
         sink(output_capture_file, type = "output")
 
+        options(turas.generate_stats_pack = isTRUE(input$generate_stats_pack))
         result <- tryCatch({
           run_maxdiff(config_path = config_path, verbose = TRUE)
         }, finally = {

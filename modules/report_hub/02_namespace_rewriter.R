@@ -16,6 +16,13 @@ rewrite_for_hub <- function(parsed, report_label = NULL) {
   # --- Rewrite content panel HTML ---
   panels <- parsed$content_panels
   for (name in names(panels)) {
+    # Strip embedded <script> tags — JS is extracted separately and rewritten
+    panels[[name]] <- gsub(
+      "<script[^>]*>[\\s\\S]*?</script>",
+      "",
+      panels[[name]],
+      perl = TRUE
+    )
     panels[[name]] <- rewrite_html_ids(panels[[name]], prefix)
     panels[[name]] <- rewrite_html_onclick_conflicts(panels[[name]], key)
     panels[[name]] <- remove_save_print_buttons(panels[[name]])
@@ -38,13 +45,21 @@ rewrite_for_hub <- function(parsed, report_label = NULL) {
     parsed$header <- rewrite_html_ids(parsed$header, prefix)
   }
 
+  # --- Rewrite body preamble ---
+  if (!is.null(parsed$body_preamble) && nzchar(parsed$body_preamble)) {
+    parsed$body_preamble <- gsub("<script[^>]*>[\\s\\S]*?</script>", "", parsed$body_preamble, perl = TRUE)
+    parsed$body_preamble <- rewrite_html_ids(parsed$body_preamble, prefix)
+  }
+
   # --- Rewrite footer ---
   if (nzchar(parsed$footer)) {
+    parsed$footer <- gsub("<script[^>]*>[\\s\\S]*?</script>", "", parsed$footer, perl = TRUE)
     parsed$footer <- rewrite_html_ids(parsed$footer, prefix)
   }
 
   # --- Rewrite help overlay ---
   if (!is.null(parsed$help_overlay) && nzchar(parsed$help_overlay)) {
+    parsed$help_overlay <- gsub("<script[^>]*>[\\s\\S]*?</script>", "", parsed$help_overlay, perl = TRUE)
     parsed$help_overlay <- rewrite_html_ids(parsed$help_overlay, prefix)
     parsed$help_overlay <- rewrite_html_onclick_conflicts(parsed$help_overlay, key)
   }
@@ -54,6 +69,31 @@ rewrite_for_hub <- function(parsed, report_label = NULL) {
     parsed$css_blocks[[i]]$content <- rewrite_css_ids(
       parsed$css_blocks[[i]]$content, prefix
     )
+  }
+
+  # --- Strip init-hide CSS rules ---
+  # Reports include CSS rules that hide panels by ID with `display: none !important`.
+  # In the hub, the `.active` class controls panel visibility, so these must go.
+  # Strip from ALL blocks — the regex targets specific rule patterns (#id or
+  # [data-tab] selectors) so it won't accidentally remove @media-scoped rules
+  # for print stylesheets.
+  for (i in seq_along(parsed$css_blocks)) {
+    css <- parsed$css_blocks[[i]]$content
+    # Strip #id { display: none !important } rules (outside @media blocks)
+    css <- gsub(
+      "#[^{]*\\{[^}]*display:\\s*none\\s*!important[^}]*\\}",
+      "",
+      css,
+      perl = TRUE
+    )
+    # Also strip [data-tab] init-hide rules (MaxDiff uses these)
+    css <- gsub(
+      "\\[data-tab[^{]*\\{[^}]*display:\\s*none\\s*!important[^}]*\\}",
+      "",
+      css,
+      perl = TRUE
+    )
+    parsed$css_blocks[[i]]$content <- css
   }
 
   # --- Collect data script ID mappings (before modifying HTML) ---
@@ -324,7 +364,27 @@ rewrite_html_onclick_conflicts <- function(html, report_key) {
     "addSlide",
     "switchSlide",
     "switchSimMode",
+    # --- Conjoint-specific ---
+    "switchChartType",
+    "addSlide",
+    "switchSlide",
+    "switchSimMode",
+    "SimEngine",
+    "SimUI",
+    "SimCharts",
+    "showToast",
+    "selectAttribute",
+    "filterAttributes",
+    "toggleAttrNote",
+    "saveAttrNote",
+    "syncAboutNotes",
+    "generateHSLPalette",
     # --- Pricing-specific ---
+    "PRICING_DATA",
+    "PRICING_CONFIG",
+    "PricingSimulator",
+    "PricingNav",
+    "TurasCharts",
     "exportTableExcel",
     "addPrSlide",
     "movePrSlide",
@@ -332,6 +392,9 @@ rewrite_html_onclick_conflicts <- function(html, report_key) {
     "pinView",
     "exportAllPinned",
     "switchTab",
+    "renderPrSlideMarkdown",
+    "renderAllPrSlides",
+    "togglePrSlideEdit",
     # --- Segment-specific ---
     "segToggleHelp",
     "segSaveReportHTML",
@@ -522,7 +585,22 @@ remove_save_print_buttons <- function(html) {
     "addSlide",
     "switchSlide",
     "switchSimMode",
+    "SimEngine",
+    "SimUI",
+    "SimCharts",
+    "showToast",
+    "selectAttribute",
+    "filterAttributes",
+    "toggleAttrNote",
+    "saveAttrNote",
+    "syncAboutNotes",
+    "generateHSLPalette",
     # --- Pricing-specific ---
+    "PRICING_DATA",
+    "PRICING_CONFIG",
+    "PricingSimulator",
+    "PricingNav",
+    "TurasCharts",
     "exportTableExcel",
     "addPrSlide",
     "movePrSlide",
@@ -530,6 +608,9 @@ remove_save_print_buttons <- function(html) {
     "pinView",
     "exportAllPinned",
     "switchTab",
+    "renderPrSlideMarkdown",
+    "renderAllPrSlides",
+    "togglePrSlideEdit",
     # --- Segment-specific ---
     "segToggleHelp",
     "segSaveReportHTML",

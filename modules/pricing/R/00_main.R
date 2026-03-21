@@ -52,7 +52,8 @@ if (file.exists(.guard_path)) {
     file.path(getwd(), "..", "shared", "lib")
   )
 
-  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R")
+  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R",
+                 "stats_pack_writer.R")
 
   for (shared_lib in possible_paths) {
     if (dir.exists(shared_lib)) {
@@ -547,6 +548,30 @@ run_pricing_analysis_from_config <- function(config) {
     }
   }
 
+  # --------------------------------------------------------------------------
+  # STEP 10: Generate Stats Pack (Optional)
+  # --------------------------------------------------------------------------
+  generate_stats_pack_flag <- isTRUE(
+    toupper(config$settings$Generate_Stats_Pack %||% "N") == "Y"
+  ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
+
+  if (generate_stats_pack_flag) {
+    cat("\n10. Generating stats pack...\n")
+    generate_pricing_stats_pack(
+      config          = config,
+      data_result     = data_result,
+      validation      = validation,
+      analysis_method = analysis_method,
+      vw_results      = vw_results,
+      gg_results      = gg_results,
+      monadic_results = monadic_results,
+      segment_results = segment_results,
+      run_result      = run_result,
+      output_file     = output_file,
+      start_time      = Sys.time()
+    )
+  }
+
   # ==========================================================================
   # TRS FINAL BANNER (TRS v1.0)
   # ==========================================================================
@@ -587,4 +612,125 @@ pricing <- run_pricing_analysis  # Alias for convenience
 # Helper operator for default values
 `%||%` <- function(x, y) {
   if (is.null(x) || length(x) == 0 || (length(x) == 1 && is.na(x))) y else x
+}
+
+
+# ==============================================================================
+# STATS PACK HELPER
+# ==============================================================================
+
+#' Generate Pricing Stats Pack
+#'
+#' Builds the diagnostic payload from pricing analysis results and writes
+#' the stats pack Excel workbook alongside the main output.
+#'
+#' @keywords internal
+generate_pricing_stats_pack <- function(config, data_result, validation,
+                                        analysis_method, vw_results, gg_results,
+                                        monadic_results, segment_results,
+                                        run_result, output_file, start_time) {
+
+  if (!exists("turas_write_stats_pack", mode = "function")) {
+    cat("  ! Stats pack writer not loaded - skipping\n")
+    return(invisible(NULL))
+  }
+
+  # Output path: same base as main output, with _stats_pack suffix
+  output_path <- sub("(\\.xlsx)$", "_stats_pack.xlsx", output_file, ignore.case = TRUE)
+  if (identical(output_path, output_file)) {
+    output_path <- paste0(tools::file_path_sans_ext(output_file), "_stats_pack.xlsx")
+  }
+
+  # Data receipt
+  raw_data <- data_result$data
+  data_receipt <- list(
+    file_name           = basename(config$data_file %||% "unknown"),
+    n_rows              = nrow(raw_data),
+    n_cols              = ncol(raw_data),
+    questions_in_config = 0L  # pricing does not use a question list
+  )
+
+  # Price points tested (from config ladder/grid)
+  n_price_points <- length(config$price_points %||%
+                           config$gabor_granger$price_points %||%
+                           config$van_westendorp$price_range %||%
+                           list())
+
+  # Segmentation status
+  seg_enabled <- !is.null(config$segmentation$segment_column) &&
+                 !is.na(config$segmentation$segment_column %||% NA) &&
+                 nzchar(config$segmentation$segment_column %||% "")
+  n_segments   <- if (seg_enabled && !is.null(segment_results)) {
+    length(segment_results$segment_results)
+  } else {
+    0L
+  }
+
+  # TRS execution summary
+  n_events   <- length(run_result$events %||% list())
+  n_refusals <- sum(vapply(run_result$events %||% list(),
+                           function(e) identical(e$level, "REFUSE"), logical(1)))
+  n_partials <- sum(vapply(run_result$events %||% list(),
+                           function(e) identical(e$level, "PARTIAL"), logical(1)))
+  trs_summary <- if (n_events == 0) {
+    "No events — ran cleanly"
+  } else {
+    parts <- character(0)
+    if (n_refusals > 0) parts <- c(parts, sprintf("%d refusal(s)", n_refusals))
+    if (n_partials > 0) parts <- c(parts, sprintf("%d partial(s)", n_partials))
+    remainder <- n_events - n_refusals - n_partials
+    if (remainder  > 0) parts <- c(parts, sprintf("%d info event(s)", remainder))
+    paste(parts, collapse = ", ")
+  }
+
+  assumptions <- list(
+    "Method"            = analysis_method,
+    "Van Westendorp"    = if (!is.null(vw_results))
+                            "Cumulative frequency intersections (base R)"
+                          else "Not used",
+    "Gabor-Granger"     = if (!is.null(gg_results))
+                            "Demand curve regression (base R lm())"
+                          else "Not used",
+    "Price Points tested" = if (n_price_points > 0L) as.character(n_price_points) else "—",
+    "Segmentation"      = if (seg_enabled) {
+                            sprintf("Enabled — %d segment(s)", n_segments)
+                          } else "Disabled",
+    "TRS Status"        = run_result$status %||% "PASS",
+    "TRS Events"        = trs_summary
+  )
+
+  duration_secs <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+
+  payload <- list(
+    module           = "PRICING",
+    project_name     = config$project_name %||% NULL,
+    analyst_name     = config$analyst_name %||% NULL,
+    research_house   = config$research_house %||% NULL,
+    run_timestamp    = start_time,
+    turas_version    = PRICING_VERSION,
+    r_version        = R.version$version.string,
+    status           = run_result$status %||% "PASS",
+    duration_seconds = duration_secs,
+    data_receipt     = data_receipt,
+    data_used        = list(
+      n_respondents = validation$n_valid %||% nrow(raw_data),
+      n_excluded    = validation$n_excluded %||% 0L,
+      n_variables   = n_price_points,
+      method        = analysis_method
+    ),
+    assumptions      = assumptions,
+    run_result       = run_result,
+    packages         = c("openxlsx", "data.table"),
+    config_echo      = list(settings = config[c("analysis_method", "currency_symbol",
+                                                 "project_name", "data_file",
+                                                 "output_file")])
+  )
+
+  result <- turas_write_stats_pack(payload, output_path)
+
+  if (!is.null(result)) {
+    cat(sprintf("   Stats pack written: %s\n", basename(output_path)))
+  }
+
+  invisible(result)
 }

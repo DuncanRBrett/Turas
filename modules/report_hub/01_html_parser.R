@@ -94,6 +94,9 @@ parse_html_report <- function(report_path, report_key) {
   # --- Extract metadata ---
   metadata <- extract_metadata(html, report_type)
 
+  # --- Extract body preamble (dashboards, meta-strips between header and panels) ---
+  body_preamble <- extract_body_preamble(html, report_type)
+
   # --- Extract pinned views data ---
   pinned_data <- "[]"
   for (ds in data_scripts) {
@@ -112,6 +115,7 @@ parse_html_report <- function(report_path, report_key) {
       js_blocks = js_blocks,
       data_scripts = data_scripts,
       header = header,
+      body_preamble = body_preamble,
       report_tabs = report_tabs,
       content_panels = content_panels,
       footer = footer,
@@ -324,6 +328,32 @@ extract_header <- function(html, report_type) {
 }
 
 
+#' Extract Body Preamble HTML
+#'
+#' Extracts content between the header and the first content panel, such as
+#' dashboard KPI cards and meta-strips (pricing reports) or other contextual
+#' elements that sit outside any panel.
+#'
+#' @param html Character string containing the full HTML content.
+#' @param report_type Character string indicating the report type.
+#' @return Character string of HTML, or empty string if none found.
+#' @keywords internal
+extract_body_preamble <- function(html, report_type) {
+  if (report_type == "pricing") {
+    # Pricing reports have a pr-dashboard and pr-meta-strip between header and panels
+    parts <- character(0)
+    # Extract dashboard (gauge cards with KPIs)
+    m <- regexpr('<div class="pr-dashboard">[\\s\\S]*?</div>\\s*</div>\\s*</div>', html, perl = TRUE)
+    if (m > 0) parts <- c(parts, regmatches(html, m))
+    # Extract meta-strip
+    m2 <- regexpr('<div class="pr-meta-strip">[\\s\\S]*?</div>', html, perl = TRUE)
+    if (m2 > 0) parts <- c(parts, regmatches(html, m2))
+    return(paste(parts, collapse = "\n"))
+  }
+  return("")
+}
+
+
 #' Extract Report Tab Navigation HTML
 #'
 #' Extracts the tab navigation bar from a Turas HTML report. Different
@@ -426,14 +456,32 @@ extract_report_tabs <- function(html) {
     }
   }
 
-  # Filter out hub-managed tabs
-  hub_managed <- c("pinned", "pinned-section", "pinned-views", "about", "added-slides", "slides")
-  tab_names <- tab_names[!tab_names %in% hub_managed]
+  # Keep all tabs — the hub must preserve full standalone functionality
 
   return(list(
     html = tab_html,
     tab_names = tab_names
   ))
+}
+
+
+#' Find the start of the HTML tag containing a given position.
+#'
+#' Walks backwards from \code{abs_pos} to find the nearest \code{<} character,
+#' returning the position just before it (suitable for use as an end-of-panel
+#' boundary so the tag is NOT included in the extracted panel).
+#'
+#' @param html_str Full HTML string.
+#' @param abs_pos Absolute position of the matched class/id within \code{html_str}.
+#' @return Position (1-indexed) just before the \code{<} that starts the tag.
+#' @keywords internal
+find_tag_start <- function(html_str, abs_pos) {
+  chunk_start <- max(1, abs_pos - 200)
+  chunk <- substr(html_str, chunk_start, abs_pos)
+  lt_pos <- gregexpr("<", chunk, fixed = TRUE)[[1]]
+  if (lt_pos[1] == -1) return(abs_pos - 1)
+  last_lt <- lt_pos[length(lt_pos)]
+  return(chunk_start + last_lt - 2)
 }
 
 
@@ -504,12 +552,16 @@ extract_content_panels <- function(html, report_type) {
         if (next_pos > 0) end_markers <- c(end_markers, search_from + next_pos - 2)
       }
 
-      # Footer
+      # Footer — back up to the '<' that starts the containing tag
       footer_pattern <- sprintf('%s-footer', prefix)
-      ft_pos <- regexpr(footer_pattern, substr(html, search_from, nchar(html)), fixed = TRUE)
-      if (ft_pos > 0) end_markers <- c(end_markers, search_from + ft_pos - 2)
+      remaining <- substr(html, search_from, nchar(html))
+      ft_pos <- regexpr(footer_pattern, remaining, fixed = TRUE)
+      if (ft_pos > 0) {
+        abs_ft <- search_from + ft_pos - 1
+        end_markers <- c(end_markers, find_tag_start(html, abs_ft))
+      }
 
-      sc_pos <- regexpr('\n<script>', substr(html, search_from, nchar(html)), fixed = TRUE)
+      sc_pos <- regexpr('\n<script>', remaining, fixed = TRUE)
       if (sc_pos > 0) end_markers <- c(end_markers, search_from + sc_pos - 2)
 
       if (length(end_markers) > 0) {
@@ -522,10 +574,7 @@ extract_content_panels <- function(html, report_type) {
       panel_html <- substr(html, start, end_pos)
       panel_html <- sub("\\s+$", "", panel_html)
 
-      # Skip pinned panel — hub manages its own
-      if (!sid %in% c("pinned", "pinned-views")) {
-        panels[[sid]] <- panel_html
-      }
+      panels[[sid]] <- panel_html
     }
     return(panels)
   }
@@ -554,48 +603,52 @@ extract_content_panels <- function(html, report_type) {
       if (start == -1) next
 
       search_from <- start + 10
+      remaining <- substr(html, search_from, nchar(html))
       end_markers <- c()
 
       # Next panel
       if (idx < length(panel_ids)) {
         next_id <- paste0("panel-", panel_ids[idx + 1])
         next_pos <- regexpr(sprintf('<div[^>]*id="%s"', next_id),
-                            substr(html, search_from, nchar(html)), perl = TRUE)
+                            remaining, perl = TRUE)
         if (next_pos > 0) end_markers <- c(end_markers, search_from + next_pos - 2)
       }
 
-      # Footer
+      # Footer class (e.g., cj-footer) — back up to tag start
       footer_pattern <- sprintf('%s-footer', prefix_cls)
-      ft_pos <- regexpr(footer_pattern, substr(html, search_from, nchar(html)), fixed = TRUE)
-      if (ft_pos > 0) end_markers <- c(end_markers, search_from + ft_pos - 2)
+      ft_pos <- regexpr(footer_pattern, remaining, fixed = TRUE)
+      if (ft_pos > 0) {
+        abs_ft <- search_from + ft_pos - 1
+        end_markers <- c(end_markers, find_tag_start(html, abs_ft))
+      }
 
-      # Help overlay
+      # Help overlay — back up to tag start
       help_pattern <- sprintf('%s-help-overlay', prefix_cls)
-      hp_pos <- regexpr(help_pattern, substr(html, search_from, nchar(html)), fixed = TRUE)
-      if (hp_pos > 0) end_markers <- c(end_markers, search_from + hp_pos - 2)
+      hp_pos <- regexpr(help_pattern, remaining, fixed = TRUE)
+      if (hp_pos > 0) {
+        abs_hp <- search_from + hp_pos - 1
+        end_markers <- c(end_markers, find_tag_start(html, abs_hp))
+      }
 
       # Script blocks
-      sc_pos <- regexpr('\n<script>', substr(html, search_from, nchar(html)), fixed = TRUE)
+      sc_pos <- regexpr('\n<script>', remaining, fixed = TRUE)
       if (sc_pos > 0) end_markers <- c(end_markers, search_from + sc_pos - 2)
 
       # Footer tag for maxdiff/conjoint which use <footer>
-      ftr_pos <- regexpr('\n<footer', substr(html, search_from, nchar(html)), fixed = TRUE)
+      ftr_pos <- regexpr('\n<footer', remaining, fixed = TRUE)
       if (ftr_pos > 0) end_markers <- c(end_markers, search_from + ftr_pos - 2)
 
       if (length(end_markers) > 0) {
         end_pos <- min(end_markers)
       } else {
-        body_end <- regexpr('</body>', substr(html, search_from, nchar(html)), fixed = TRUE)
+        body_end <- regexpr('</body>', remaining, fixed = TRUE)
         end_pos <- if (body_end > 0) search_from + body_end - 2 else nchar(html)
       }
 
       panel_html <- substr(html, start, end_pos)
       panel_html <- sub("\\s+$", "", panel_html)
 
-      # Skip pinned/about/slides — hub manages its own
-      if (!pid %in% c("pinned", "about", "added-slides", "slides")) {
-        panels[[pid]] <- panel_html
-      }
+      panels[[pid]] <- panel_html
     }
     return(panels)
   }
@@ -612,8 +665,7 @@ extract_content_panels <- function(html, report_type) {
         len <- attr(id_matches, "match.length")[i]
         attr_str <- substr(html, id_matches[i], id_matches[i] + len - 1)
         section_id <- gsub('data-seg-section="|"', '', attr_str)
-        if (nzchar(section_id) && !grepl("[^a-zA-Z0-9_-]", section_id) &&
-            !section_id %in% c("pinned-views", "about", "slides")) {
+        if (nzchar(section_id) && !grepl("[^a-zA-Z0-9_-]", section_id)) {
           section_ids <- c(section_ids, section_id)
         }
       }
@@ -638,13 +690,20 @@ extract_content_panels <- function(html, report_type) {
           if (next_pos > 0) end_markers <- c(end_markers, search_from + next_pos - 2)
         }
 
-        # Pinned section as end marker
-        pv_pos <- regexpr('data-seg-section="pinned-views"', substr(html, search_from, nchar(html)), fixed = TRUE)
-        if (pv_pos > 0) end_markers <- c(end_markers, search_from + pv_pos - 2)
+        # Pinned section as end marker — back up to tag start
+        remaining_seg <- substr(html, search_from, nchar(html))
+        pv_pos <- regexpr('data-seg-section="pinned-views"', remaining_seg, fixed = TRUE)
+        if (pv_pos > 0) {
+          abs_pv <- search_from + pv_pos - 1
+          end_markers <- c(end_markers, find_tag_start(html, abs_pv))
+        }
 
-        # Footer
-        ft_pos <- regexpr('class="seg-footer"', substr(html, search_from, nchar(html)), fixed = TRUE)
-        if (ft_pos > 0) end_markers <- c(end_markers, search_from + ft_pos - 2)
+        # Footer — back up to tag start
+        ft_pos <- regexpr('class="seg-footer"', remaining_seg, fixed = TRUE)
+        if (ft_pos > 0) {
+          abs_ft <- search_from + ft_pos - 1
+          end_markers <- c(end_markers, find_tag_start(html, abs_ft))
+        }
 
         # Script blocks
         sc_pos <- regexpr('\n<script>', substr(html, search_from, nchar(html)), fixed = TRUE)
@@ -746,10 +805,7 @@ extract_content_panels <- function(html, report_type) {
     # Trim trailing whitespace
     panel_html <- sub("\\s+$", "", panel_html)
 
-    # Skip the pinned panel — hub manages its own
-    if (panel_id != "pinned") {
-      panels[[panel_id]] <- panel_html
-    }
+    panels[[panel_id]] <- panel_html
   }
 
   return(panels)
@@ -1086,6 +1142,45 @@ extract_metadata <- function(html, report_type) {
     # Use title for fallback
     if (is.null(meta$project_title) && !is.null(meta$title)) {
       meta$project_title <- sub("^Turas Weighting Report - ", "", meta$title)
+    }
+  }
+
+  # --- MaxDiff report metadata ---
+  if (report_type == "maxdiff") {
+    meta$total_n <- extract_meta_tag("turas-total-n")
+    meta$n_items <- extract_meta_tag("turas-items")
+    meta$estimation_method <- extract_meta_tag("turas-estimation-method")
+    if (is.null(meta$project_title) && !is.null(meta$title)) {
+      meta$project_title <- meta$title
+    }
+  }
+
+  # --- Conjoint report metadata ---
+  if (report_type == "conjoint") {
+    meta$total_n <- extract_meta_tag("turas-total-n")
+    meta$n_attributes <- extract_meta_tag("turas-attributes")
+    meta$estimation_method <- extract_meta_tag("turas-estimation-method")
+    if (is.null(meta$project_title) && !is.null(meta$title)) {
+      meta$project_title <- meta$title
+    }
+  }
+
+  # --- Pricing report metadata ---
+  if (report_type == "pricing") {
+    meta$total_n <- extract_meta_tag("turas-total-n")
+    meta$pricing_method <- extract_meta_tag("turas-pricing-method")
+    if (is.null(meta$project_title) && !is.null(meta$title)) {
+      meta$project_title <- meta$title
+    }
+  }
+
+  # --- Segment report metadata ---
+  if (report_type == "segment") {
+    meta$total_n <- extract_meta_tag("turas-total-n")
+    meta$n_segments <- extract_meta_tag("turas-segments")
+    meta$clustering_method <- extract_meta_tag("turas-clustering-method")
+    if (is.null(meta$project_title) && !is.null(meta$title)) {
+      meta$project_title <- meta$title
     }
   }
 

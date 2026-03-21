@@ -10,7 +10,7 @@
     {
       "name": "hub-report",
       "runtimeExecutable": "/bin/bash",
-      "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && npx serve examples/report_hub -l 8770 --no-clipboard"],
+      "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && npx serve '/Users/duncan/Library/CloudStorage/OneDrive-Personal/DB Files/Projects/Turas Showreel' -l 8770 --no-clipboard"],
       "port": 8770
     },
     {

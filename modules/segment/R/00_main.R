@@ -40,6 +40,7 @@ tryCatch({
   source(file.path(turas_root, "modules/shared/lib/turas_log.R"))
   source(file.path(turas_root, "modules/shared/lib/turas_save_workbook_atomic.R"))
   source(file.path(turas_root, "modules/shared/lib/turas_excel_escape.R"))
+  source(file.path(turas_root, "modules/shared/lib/stats_pack_writer.R"))
 }, error = function(e) {
   message(sprintf("[TRS INFO] SEG_TRS_LOAD: Could not load TRS infrastructure: %s", e$message))
 })
@@ -573,6 +574,27 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
   }
 
   # ==========================================================================
+  # STATS PACK (Optional)
+  # ==========================================================================
+  generate_stats_pack_flag <- isTRUE(
+    toupper(config$generate_stats_pack %||% "N") == "Y"
+  ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
+
+  if (generate_stats_pack_flag) {
+    cat("  Generating stats pack...\n")
+    generate_segment_stats_pack(
+      config            = config,
+      data_list         = data_list,
+      cluster_result    = cluster_result,
+      validation_metrics = validation_metrics,
+      seed_used         = seed_used,
+      run_result        = run_result,
+      output_folder     = output_folder,
+      start_time        = start_time
+    )
+  }
+
+  # ==========================================================================
   # COMPLETION
   # ==========================================================================
 
@@ -1016,4 +1038,111 @@ run_multi_method_pipeline <- function(data_list, config, guard, trs_state, start
     run_result = run_result,
     guard_summary = segment_guard_summary(guard)
   ))
+}
+
+
+# ==============================================================================
+# STATS PACK HELPER
+# ==============================================================================
+
+#' Generate Segment Stats Pack
+#'
+#' Builds the diagnostic payload from segmentation results and writes
+#' the stats pack Excel workbook alongside the main outputs.
+#'
+#' @keywords internal
+generate_segment_stats_pack <- function(config, data_list, cluster_result,
+                                        validation_metrics, seed_used,
+                                        run_result, output_folder, start_time) {
+
+  if (!exists("turas_write_stats_pack", mode = "function")) {
+    cat("  ! Stats pack writer not loaded - skipping\n")
+    return(invisible(NULL))
+  }
+
+  output_path <- file.path(
+    output_folder,
+    paste0(config$output_prefix %||% "", "stats_pack.xlsx")
+  )
+
+  # Variables used
+  n_vars <- length(data_list$config$clustering_vars %||% character(0))
+
+  # Excluded respondents (outlier flags are logical; TRUE = excluded)
+  outlier_flags <- data_list$outlier_flags %||% logical(0)
+  n_excluded    <- sum(outlier_flags, na.rm = TRUE)
+  n_valid       <- nrow(data_list$data)
+  n_raw         <- n_valid + n_excluded
+
+  # TRS execution summary
+  n_events   <- length(run_result$events %||% list())
+  n_refusals <- sum(vapply(run_result$events %||% list(),
+                           function(e) identical(e$level, "REFUSE"), logical(1)))
+  n_partials <- sum(vapply(run_result$events %||% list(),
+                           function(e) identical(e$level, "PARTIAL"), logical(1)))
+  trs_summary <- if (n_events == 0) {
+    "No events — ran cleanly"
+  } else {
+    parts <- character(0)
+    if (n_refusals > 0) parts <- c(parts, sprintf("%d refusal(s)", n_refusals))
+    if (n_partials > 0) parts <- c(parts, sprintf("%d partial(s)", n_partials))
+    remainder <- n_events - n_refusals - n_partials
+    if (remainder  > 0) parts <- c(parts, sprintf("%d info event(s)", remainder))
+    paste(parts, collapse = ", ")
+  }
+
+  assumptions <- list(
+    "Clustering Method"       = config$method %||% "kmeans",
+    "k (segments)"            = as.character(cluster_result$k),
+    "nstart"                  = as.character(config$nstart %||% 25),
+    "Seed"                    = as.character(seed_used %||% "random"),
+    "Variables used"          = as.character(n_vars),
+    "Standardization"         = if (isTRUE(config$standardize)) "Yes" else "No",
+    "Missing data handling"   = config$missing_method %||% config$imputation_method %||% "listwise",
+    "Implementation"          = "base R kmeans() / hclust()",
+    "TRS Status"              = run_result$status %||% "PASS",
+    "TRS Events"              = trs_summary
+  )
+
+  duration_secs <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+
+  payload <- list(
+    module           = "SEGMENT",
+    project_name     = config$project_name %||% NULL,
+    analyst_name     = config$analyst_name %||% NULL,
+    research_house   = config$research_house %||% NULL,
+    run_timestamp    = start_time,
+    turas_version    = SEGMENT_VERSION,
+    r_version        = R.version$version.string,
+    status           = run_result$status %||% "PASS",
+    duration_seconds = duration_secs,
+    data_receipt     = list(
+      file_name           = basename(config$data_file %||% "unknown"),
+      n_rows              = n_raw,
+      n_cols              = ncol(data_list$data),
+      questions_in_config = n_vars
+    ),
+    data_used        = list(
+      n_respondents = n_valid,
+      n_excluded    = n_excluded,
+      n_variables   = n_vars,
+      k_final       = cluster_result$k
+    ),
+    assumptions      = assumptions,
+    seeds            = list("k-means / clustering" = as.character(seed_used %||% "random")),
+    run_result       = run_result,
+    packages         = c("openxlsx", "data.table"),
+    config_echo      = list(settings = config[c("method", "k", "k_min", "k_max",
+                                                  "nstart", "standardize",
+                                                  "missing_method", "output_folder",
+                                                  "project_name", "data_file")])
+  )
+
+  result <- turas_write_stats_pack(payload, output_path)
+
+  if (!is.null(result)) {
+    cat(sprintf("  Stats pack written: %s\n", basename(output_path)))
+  }
+
+  invisible(result)
 }

@@ -183,6 +183,9 @@ run_pricing_gui <- function() {
       conditionalPanel(
         condition = "output.ready_to_run",
         div(class = "turas-card",
+          checkboxInput("generate_stats_pack",
+                        "Generate stats pack (diagnostic workbook for advanced review)",
+                        value = FALSE),
           actionButton("run_analysis", "Run Pricing Analysis",
                        class = "btn turas-btn-run",
                        icon = icon("play"))
@@ -430,6 +433,9 @@ run_pricing_gui <- function() {
           }
 
           incProgress(0.10, detail = "Starting analysis...")
+
+          # Propagate stats pack flag
+          options(turas.generate_stats_pack = isTRUE(input$generate_stats_pack))
 
           # Capture analysis output
           captured <- capture.output({

@@ -42,7 +42,8 @@ source(file.path(script_dir, "lib", "00_guard.R"))
     file.path(Sys.getenv("TURAS_HOME"), "modules", "shared", "lib")
   )
 
-  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R", "turas_log.R")
+  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R", "turas_log.R",
+                 "stats_pack_writer.R")
 
   for (trs_file in trs_files) {
     loaded <- FALSE
@@ -673,6 +674,27 @@ run_tracker <- function(tracking_config_path,
 
 
   # ============================================================================
+  # STATS PACK (Optional)
+  # ============================================================================
+  stats_pack_file <- NULL
+  generate_stats_pack_flag <- isTRUE(
+    toupper(get_setting(config, "generate_stats_pack", default = "N") %||% "N") == "Y"
+  ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
+
+  if (generate_stats_pack_flag) {
+    cat("\n  Generating stats pack...\n")
+    stats_pack_file <- generate_tracker_stats_pack(
+      config           = config,
+      wave_data        = wave_data,
+      trend_results    = trend_results,
+      skipped_questions = skipped_questions,
+      run_result       = run_result,
+      start_time       = start_time,
+      output_files     = output_files
+    )
+  }
+
+  # ============================================================================
   # PHASE 2 COMPLETE - Analysis Complete
   # ============================================================================
   end_time <- Sys.time()
@@ -716,6 +738,158 @@ run_tracker <- function(tracking_config_path,
   } else {
     return(output_files)
   }
+}
+
+
+# ==============================================================================
+# STATS PACK HELPER
+# ==============================================================================
+
+#' Generate Tracker Stats Pack
+#'
+#' Builds the diagnostic payload from tracker results and writes the stats
+#' pack Excel workbook alongside the main output.
+#'
+#' @keywords internal
+generate_tracker_stats_pack <- function(config, wave_data, trend_results,
+                                        skipped_questions, run_result,
+                                        start_time, output_files) {
+
+  if (!exists("turas_write_stats_pack", mode = "function")) {
+    cat("  [INFO] Stats pack writer not loaded - skipping\n")
+    return(NULL)
+  }
+
+  # Output path: derive from first output file
+  first_output <- output_files[[1]] %||% NULL
+  if (!is.null(first_output) && nzchar(first_output)) {
+    output_path <- sub("(\\.xlsx)$", "_stats_pack.xlsx", first_output, ignore.case = TRUE)
+    if (identical(output_path, first_output)) {
+      output_path <- paste0(tools::file_path_sans_ext(first_output), "_stats_pack.xlsx")
+    }
+  } else {
+    config_dir <- dirname(config$config_path %||% getwd())
+    project_name <- gsub("[^A-Za-z0-9_-]", "_",
+                         get_setting(config, "project_name", default = "Tracking"))
+    output_path <- file.path(config_dir, paste0(project_name, "_stats_pack.xlsx"))
+  }
+
+  # Wave summary
+  wave_names <- config$waves$WaveName %||% character(0)
+  n_waves    <- length(wave_names)
+
+  # Respondent counts per wave
+  total_respondents <- sum(vapply(wave_names, function(wn) {
+    wd <- wave_data[[wn]]
+    if (is.null(wd) || !is.data.frame(wd)) 0L else nrow(wd)
+  }, integer(1)))
+
+  # Data receipt — use config file as source reference
+  first_wave_data <- if (n_waves > 0) wave_data[[wave_names[1]]] else NULL
+  data_receipt <- list(
+    file_name = basename(config$config_path %||% "unknown"),
+    n_rows    = total_respondents,
+    n_cols    = if (!is.null(first_wave_data)) ncol(first_wave_data) else 0L
+  )
+
+  data_used <- list(
+    n_respondents     = total_respondents,
+    n_excluded        = 0L,
+    questions_analysed = length(trend_results),
+    questions_skipped  = length(skipped_questions %||% list())
+  )
+
+  # Significance testing settings
+  sig_method <- get_setting(config, "sig_test_method", default = "z_test") %||% "z_test"
+  sig_label  <- switch(tolower(trimws(sig_method)),
+    "z_test"    = "Z-test (two-proportion)",
+    "chi_square" = "Chi-square test",
+    "chisq"     = "Chi-square test",
+    toupper(sig_method)
+  )
+
+  # Trend analysis enabled?
+  trend_enabled <- toupper(
+    get_setting(config, "trend_analysis", default = "Y") %||% "Y"
+  ) %in% c("Y", "YES", "TRUE", "1")
+
+  # Comparison baseline wave
+  baseline_wave <- get_setting(config, "comparison_wave", default = NULL) %||%
+                   get_setting(config, "baseline_wave",   default = NULL)
+
+  # TRS summary
+  n_events   <- length(run_result$events %||% list())
+  n_refusals <- sum(vapply(run_result$events %||% list(),
+                           function(e) identical(e$level, "REFUSE"), logical(1)))
+  n_partials <- sum(vapply(run_result$events %||% list(),
+                           function(e) identical(e$level, "PARTIAL"), logical(1)))
+  trs_summary <- if (n_events == 0) {
+    "No events — ran cleanly"
+  } else {
+    parts <- character(0)
+    if (n_refusals > 0) parts <- c(parts, sprintf("%d refusal(s)", n_refusals))
+    if (n_partials > 0) parts <- c(parts, sprintf("%d partial(s)", n_partials))
+    remainder <- n_events - n_refusals - n_partials
+    if (remainder  > 0) parts <- c(parts, sprintf("%d info event(s)", remainder))
+    paste(parts, collapse = ", ")
+  }
+
+  assumptions <- list(
+    "Number of waves"      = as.character(n_waves),
+    "Wave labels"          = paste(wave_names, collapse = ", "),
+    "Significance testing" = sig_label,
+    "Implementation"       = "base R prop.test() / chisq.test()",
+    "Trend analysis"       = if (trend_enabled) "Enabled" else "Disabled",
+    "Comparison baseline"  = if (!is.null(baseline_wave)) as.character(baseline_wave) else "First wave",
+    "TRS Status"           = run_result$status %||% "PASS",
+    "TRS Events"           = trs_summary
+  )
+
+  config_echo <- tryCatch({
+    settings_df <- config$settings
+    if (is.data.frame(settings_df)) {
+      list(settings = settings_df)
+    } else if (is.list(settings_df)) {
+      list(settings = settings_df)
+    } else {
+      NULL
+    }
+  }, error = function(e) NULL)
+
+  end_time     <- Sys.time()
+  duration_secs <- as.numeric(difftime(end_time, start_time, units = "secs"))
+
+  payload <- list(
+    module           = "TRACKER",
+    project_name     = get_setting(config, "project_name", default = NULL),
+    analyst_name     = get_setting(config, "analyst_name", default = NULL),
+    research_house   = get_setting(config, "research_house", default = NULL),
+    run_timestamp    = start_time,
+    turas_version    = "2.2",
+    r_version        = R.version$version.string,
+    status           = run_result$status %||% "PASS",
+    duration_seconds = duration_secs,
+    data_receipt     = data_receipt,
+    data_used        = data_used,
+    assumptions      = assumptions,
+    run_result       = run_result,
+    packages         = c("openxlsx", "readxl", "data.table"),
+    config_echo      = config_echo
+  )
+
+  result <- tryCatch(
+    turas_write_stats_pack(payload, output_path),
+    error = function(e) {
+      cat(sprintf("  [WARNING] Stats pack write failed: %s\n", e$message))
+      NULL
+    }
+  )
+
+  if (!is.null(result)) {
+    cat(sprintf("  Stats pack written: %s\n", basename(output_path)))
+  }
+
+  result
 }
 
 

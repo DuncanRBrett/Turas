@@ -77,7 +77,8 @@ if (file.exists(.guard_path)) {
     file.path(getwd(), "..", "shared", "lib")
   )
 
-  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R")
+  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R",
+                 "stats_pack_writer.R")
 
   for (shared_lib in possible_paths) {
     if (dir.exists(shared_lib)) {
@@ -406,6 +407,29 @@ run_maxdiff_impl <- function(config_path, project_root = NULL, verbose = TRUE) {
     cat("================================================================================\n\n")
   }
 
+  # ==========================================================================
+  # STATS PACK (Optional — analysis mode only)
+  # ==========================================================================
+
+  if (config$mode == "ANALYSIS") {
+    generate_stats_pack_flag <- isTRUE(
+      toupper(config$project_settings$Generate_Stats_Pack %||% "N") == "Y"
+    ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
+
+    if (generate_stats_pack_flag) {
+      if (verbose) cat("\nGenerating stats pack...\n")
+      results$stats_pack <- generate_maxdiff_stats_pack(
+        config       = config,
+        results      = results,
+        run_result   = run_result,
+        start_time   = start_time,
+        verbose      = verbose
+      )
+    } else {
+      if (verbose) cat("\nStats pack skipped (set Generate_Stats_Pack = Y in config to enable)\n")
+    }
+  }
+
   results$elapsed_seconds <- elapsed
   results$config <- config
   results$run_result <- run_result
@@ -702,6 +726,136 @@ run_maxdiff_analysis_mode <- function(config, verbose = TRUE, trs_state = NULL) 
   }
 
   return(results)
+}
+
+
+# ==============================================================================
+# STATS PACK HELPER
+# ==============================================================================
+
+#' Generate MaxDiff Stats Pack
+#'
+#' Builds the diagnostic payload from MaxDiff analysis results and writes the
+#' stats pack Excel workbook alongside the main output.
+#'
+#' @keywords internal
+generate_maxdiff_stats_pack <- function(config, results, run_result,
+                                         start_time, verbose) {
+
+  if (!exists("turas_write_stats_pack", mode = "function")) {
+    if (verbose) cat("  ! Stats pack writer not loaded - skipping\n")
+    return(NULL)
+  }
+
+  # Output path: same base as main output with _stats_pack suffix
+  main_out    <- results$output_path %||% config$project_settings$Output_File %||% "maxdiff_output.xlsx"
+  output_path <- sub("(\\.xlsx)$", "_stats_pack.xlsx", main_out, ignore.case = TRUE)
+  if (identical(output_path, main_out)) {
+    output_path <- paste0(tools::file_path_sans_ext(main_out), "_stats_pack.xlsx")
+  }
+
+  # Data sizes
+  raw_data       <- results$raw_data
+  n_respondents  <- if (!is.null(raw_data)) nrow(raw_data) else 0L
+  n_cols         <- if (!is.null(raw_data)) ncol(raw_data) else 0L
+  items_df       <- config$items %||% data.frame()
+  n_items        <- sum(items_df$Include == 1, na.rm = TRUE)
+
+  # Design info
+  design_df      <- results$design %||% data.frame()
+  tasks_per_resp <- if (nrow(design_df) > 0 && "Task" %in% names(design_df)) {
+    max(design_df$Task, na.rm = TRUE)
+  } else NA
+
+  # Model settings
+  has_hb      <- !is.null(results$hb_results)
+  has_logit   <- !is.null(results$logit_results)
+  method_str  <- if (has_hb) {
+    "HB (ChoiceModelR package)"
+  } else if (has_logit) {
+    "Aggregate logit"
+  } else {
+    "Count scores only"
+  }
+  hb_iters    <- if (has_hb) {
+    as.character(config$output_settings$HB_Iterations %||% config$project_settings$HB_Iterations %||% "—")
+  } else "N/A"
+  seed_val    <- as.character(config$project_settings$Seed %||% "Not set")
+  turf_flag   <- !is.null(results$turf_results)
+
+  # TRS summary
+  n_events   <- length(run_result$events %||% list())
+  n_refusals <- sum(vapply(run_result$events %||% list(),
+                           function(e) identical(e$level, "REFUSE"), logical(1)))
+  n_partials <- sum(vapply(run_result$events %||% list(),
+                           function(e) identical(e$level, "PARTIAL"), logical(1)))
+  trs_summary <- if (n_events == 0) {
+    "No events — ran cleanly"
+  } else {
+    parts <- character(0)
+    if (n_refusals > 0) parts <- c(parts, sprintf("%d refusal(s)", n_refusals))
+    if (n_partials > 0) parts <- c(parts, sprintf("%d partial(s)", n_partials))
+    remainder <- n_events - n_refusals - n_partials
+    if (remainder  > 0) parts <- c(parts, sprintf("%d info event(s)", remainder))
+    paste(parts, collapse = ", ")
+  }
+
+  assumptions <- list(
+    "Items"                = as.character(n_items),
+    "Tasks per respondent" = if (!is.na(tasks_per_resp)) as.character(tasks_per_resp) else "—",
+    "Method"               = method_str,
+    "HB Iterations"        = hb_iters,
+    "Seed"                 = seed_val,
+    "TURF Analysis"        = if (turf_flag) "Enabled" else "Disabled",
+    "TRS Status"           = run_result$status %||% "PASS",
+    "TRS Events"           = trs_summary
+  )
+
+  data_receipt <- list(
+    file_name           = basename(config$project_settings$Raw_Data_File %||% "unknown"),
+    n_rows              = n_respondents,
+    n_cols              = n_cols,
+    questions_in_config = n_items
+  )
+
+  data_used <- list(
+    n_respondents      = n_respondents,
+    n_excluded         = 0L,
+    weighted           = !is.null(config$project_settings$Weight_Variable),
+    questions_analysed = n_items,
+    questions_skipped  = 0L
+  )
+
+  duration_secs <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+
+  payload <- list(
+    module           = "MAXDIFF",
+    project_name     = config$project_settings$Project_Name %||% NULL,
+    analyst_name     = config$project_settings$Analyst_Name %||% NULL,
+    research_house   = config$project_settings$Research_House %||% NULL,
+    run_timestamp    = start_time,
+    turas_version    = MAXDIFF_VERSION,
+    r_version        = R.version$version.string,
+    status           = run_result$status %||% "PASS",
+    duration_seconds = duration_secs,
+    data_receipt     = data_receipt,
+    data_used        = data_used,
+    assumptions      = assumptions,
+    run_result       = run_result,
+    packages         = c("openxlsx", "survival", "ChoiceModelR"),
+    config_echo      = list(
+      project_settings = config$project_settings,
+      output_settings  = config$output_settings
+    )
+  )
+
+  result <- turas_write_stats_pack(payload, output_path)
+
+  if (!is.null(result) && verbose) {
+    cat(sprintf("  Stats pack written: %s\n", basename(output_path)))
+  }
+
+  result
 }
 
 

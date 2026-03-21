@@ -252,6 +252,14 @@ run_weighting_gui <- function(launch_browser = TRUE) {
           )
         ),
 
+        fluidRow(
+          column(12,
+            checkboxInput("generate_stats_pack",
+                          "Generate stats pack (diagnostic workbook for advanced review)",
+                          value = FALSE)
+          )
+        ),
+
         # Run Button
         div(style = "text-align: center; margin-top: 20px;",
           actionButton("run_weighting", "Calculate Weights",
@@ -536,6 +544,9 @@ run_weighting_gui <- function(launch_browser = TRUE) {
 
           # Run weighting with progress updates
           add_log("Loading configuration...")
+
+          # Set stats pack option before calling run_weighting
+          options(turas.generate_stats_pack = isTRUE(input$generate_stats_pack))
 
           # Use capture.output for TRS compliance - all console output visible in GUI
           output_capture <- capture.output({

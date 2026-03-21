@@ -59,7 +59,8 @@ if (file.exists(.guard_path)) {
     file.path(getwd(), "..", "shared", "lib")
   )
 
-  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R")
+  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R",
+                 "stats_pack_writer.R")
 
   for (shared_lib in possible_paths) {
     if (dir.exists(shared_lib)) {
@@ -658,6 +659,26 @@ conjoint_generate_outputs <- function(utilities, importance, diagnostics,
     }
   }
 
+  # Step 8b: Stats Pack (Optional)
+  stats_pack_result <- NULL
+  generate_stats_pack_flag <- isTRUE(
+    toupper(config$settings$Generate_Stats_Pack %||% "N") == "Y"
+  ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
+
+  if (generate_stats_pack_flag) {
+    if (verbose) cat("\n8b. Generating stats pack...\n")
+    stats_pack_result <- generate_conjoint_stats_pack(
+      config       = config,
+      data_list    = data_list,
+      model_result = model_result,
+      run_result   = run_result,
+      start_time   = start_time,
+      verbose      = verbose
+    )
+  } else {
+    if (verbose) cat("\n8b. Stats pack skipped (set Generate_Stats_Pack = Y in config to enable)\n")
+  }
+
   # Finalization
   elapsed <- difftime(Sys.time(), start_time, units = "secs")
   if (verbose) cat(sprintf("\nTotal time: %.1f seconds\n", as.numeric(elapsed)))
@@ -688,8 +709,122 @@ conjoint_generate_outputs <- function(utilities, importance, diagnostics,
     elapsed_time = as.numeric(elapsed),
     version = get_conjoint_version(),
     run_result = run_result,
-    warnings = if (length(all_warnings) > 0) all_warnings else NULL
+    warnings = if (length(all_warnings) > 0) all_warnings else NULL,
+    stats_pack = stats_pack_result
   )
+}
+
+
+#' Generate Conjoint Stats Pack
+#'
+#' Builds the diagnostic payload from conjoint analysis results and writes the
+#' stats pack Excel workbook alongside the main output.
+#'
+#' @keywords internal
+generate_conjoint_stats_pack <- function(config, data_list, model_result,
+                                          run_result, start_time, verbose) {
+
+  if (!exists("turas_write_stats_pack", mode = "function")) {
+    if (verbose) cat("  ! Stats pack writer not loaded - skipping\n")
+    return(NULL)
+  }
+
+  # Output path: same base as main output with _stats_pack suffix
+  main_out    <- config$output_file %||% "conjoint_output.xlsx"
+  output_path <- sub("(\\.xlsx)$", "_stats_pack.xlsx", main_out, ignore.case = TRUE)
+  if (identical(output_path, main_out)) {
+    output_path <- paste0(tools::file_path_sans_ext(main_out), "_stats_pack.xlsx")
+  }
+
+  # Data receipt
+  data_receipt <- list(
+    file_name           = basename(config$data_file %||% "unknown"),
+    n_rows              = data_list$n_respondents %||% 0L,
+    n_cols              = ncol(data_list$raw_data %||% data.frame()),
+    questions_in_config = nrow(config$attributes %||% data.frame())
+  )
+
+  # Data used
+  data_used <- list(
+    n_respondents      = data_list$n_respondents %||% 0L,
+    n_excluded         = 0L,
+    weighted           = FALSE,
+    questions_analysed = nrow(config$attributes %||% data.frame()),
+    questions_skipped  = 0L
+  )
+
+  # Model type
+  model_type  <- toupper(model_result$method %||% "MNL")
+  is_hb       <- grepl("HB|BAYES|bayesm", model_type, ignore.case = TRUE)
+  n_attr      <- nrow(config$attributes %||% data.frame())
+  n_levels    <- if (!is.null(config$attributes) && "NumLevels" %in% names(config$attributes)) {
+    sum(config$attributes$NumLevels, na.rm = TRUE)
+  } else 0L
+  n_tasks     <- data_list$n_choice_sets %||% NA
+  hb_iters    <- if (is_hb) as.character(config$hb_iterations %||% config$settings$HB_Iterations %||% "—") else "N/A"
+  seed_val    <- as.character(config$seed %||% config$settings$Seed %||% "Not set")
+  wtp_flag    <- isTRUE(config$enable_wtp) || isTRUE(config$settings$Enable_WTP)
+  sim_flag    <- isTRUE(config$generate_html_simulator) || isTRUE(config$settings$Generate_Simulator)
+  impl_label  <- if (is_hb) "ChoiceModelR package (HB)" else "base R clogit() (MNL)"
+
+  # TRS summary
+  n_events   <- length(run_result$events %||% list())
+  n_refusals <- sum(vapply(run_result$events %||% list(),
+                           function(e) identical(e$level, "REFUSE"), logical(1)))
+  n_partials <- sum(vapply(run_result$events %||% list(),
+                           function(e) identical(e$level, "PARTIAL"), logical(1)))
+  trs_summary <- if (n_events == 0) {
+    "No events — ran cleanly"
+  } else {
+    parts <- character(0)
+    if (n_refusals > 0) parts <- c(parts, sprintf("%d refusal(s)", n_refusals))
+    if (n_partials > 0) parts <- c(parts, sprintf("%d partial(s)", n_partials))
+    remainder <- n_events - n_refusals - n_partials
+    if (remainder  > 0) parts <- c(parts, sprintf("%d info event(s)", remainder))
+    paste(parts, collapse = ", ")
+  }
+
+  assumptions <- list(
+    "Model Type"            = model_type,
+    "Attributes"            = as.character(n_attr),
+    "Levels"                = as.character(n_levels),
+    "Tasks per respondent"  = if (!is.na(n_tasks)) as.character(n_tasks) else "—",
+    "HB Iterations"         = hb_iters,
+    "Seed"                  = seed_val,
+    "WTP Estimation"        = if (wtp_flag) "Enabled" else "Disabled",
+    "Market Simulation"     = if (sim_flag) "Enabled" else "Disabled",
+    "Implementation"        = impl_label,
+    "TRS Status"            = run_result$status %||% "PASS",
+    "TRS Events"            = trs_summary
+  )
+
+  duration_secs <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+
+  payload <- list(
+    module           = "CONJOINT",
+    project_name     = config$project_name %||% NULL,
+    analyst_name     = config$analyst_name %||% NULL,
+    research_house   = config$company_name %||% NULL,
+    run_timestamp    = start_time,
+    turas_version    = get_conjoint_version(),
+    r_version        = R.version$version.string,
+    status           = run_result$status %||% "PASS",
+    duration_seconds = duration_secs,
+    data_receipt     = data_receipt,
+    data_used        = data_used,
+    assumptions      = assumptions,
+    run_result       = run_result,
+    packages         = c("openxlsx", "mlogit", "survival", "dfidx"),
+    config_echo      = list(settings = config$settings, attributes = config$attributes)
+  )
+
+  result <- turas_write_stats_pack(payload, output_path)
+
+  if (!is.null(result) && verbose) {
+    cat(sprintf("   \u2713 Stats pack written: %s\n", basename(output_path)))
+  }
+
+  result
 }
 
 

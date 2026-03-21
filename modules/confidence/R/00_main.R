@@ -73,7 +73,8 @@ source_trs_infrastructure <- function() {
     file.path(getwd(), "..", "shared", "lib")
   )
 
-  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R")
+  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R",
+                 "stats_pack_writer.R")
 
   for (shared_lib in possible_paths) {
     if (dir.exists(shared_lib)) {
@@ -322,6 +323,32 @@ run_confidence_analysis_impl <- function(config_path,
   )
 
   # ==========================================================================
+  # STEP 6.5: GENERATE STATS PACK (Optional)
+  # ==========================================================================
+  stats_pack_result <- NULL
+  generate_stats_pack_flag <- isTRUE(
+    toupper(config$study_settings$Generate_Stats_Pack %||% "N") == "Y"
+  ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
+
+  if (generate_stats_pack_flag) {
+    if (verbose) cat("\nSTEP 6.5: Generating stats pack...\n")
+    stats_pack_result <- generate_stats_pack_step(
+      config             = config,
+      survey_data        = survey_data,
+      weight_var         = weight_var,
+      proportion_results = proportion_results,
+      mean_results       = mean_results,
+      nps_results        = nps_results,
+      study_stats        = study_stats,
+      run_result         = run_result,
+      start_time         = start_time,
+      verbose            = verbose
+    )
+  } else {
+    if (verbose) cat("\nSTEP 6.5: Stats pack skipped (set Generate_Stats_Pack = Y in config to enable)\n")
+  }
+
+  # ==========================================================================
   # STEP 7: GENERATE HTML REPORT (Optional)
   # ==========================================================================
   html_report_result <- NULL
@@ -359,15 +386,16 @@ run_confidence_analysis_impl <- function(config_path,
 
   # Return results
   invisible(list(
-    study_stats = study_stats,
+    study_stats        = study_stats,
     proportion_results = proportion_results,
-    mean_results = mean_results,
-    nps_results = nps_results,
-    warnings = warnings_list,
-    config = config,
-    elapsed_seconds = elapsed,
-    run_result = run_result,
-    html_report = html_report_result
+    mean_results       = mean_results,
+    nps_results        = nps_results,
+    warnings           = warnings_list,
+    config             = config,
+    elapsed_seconds    = elapsed,
+    run_result         = run_result,
+    html_report        = html_report_result,
+    stats_pack         = stats_pack_result
   ))
 }
 
@@ -728,6 +756,164 @@ generate_html_report_step <- function(config, study_stats, proportion_results,
       message = sprintf("HTML report generation failed: %s", conditionMessage(e))
     )
   })
+}
+
+
+#' Generate stats pack step
+#'
+#' Builds the diagnostic payload from confidence analysis results and writes
+#' the stats pack Excel workbook alongside the main output.
+#'
+#' @keywords internal
+generate_stats_pack_step <- function(config, survey_data, weight_var,
+                                     proportion_results, mean_results, nps_results,
+                                     study_stats, run_result, start_time, verbose) {
+
+  if (!exists("turas_write_stats_pack", mode = "function")) {
+    if (verbose) cat("  ! Stats pack writer not loaded - skipping\n")
+    return(NULL)
+  }
+
+  # Output path: same base as main output, with _stats_pack suffix
+  main_out   <- config$file_paths$Output_File %||% "output.xlsx"
+  output_path <- sub("(\\.xlsx)$", "_stats_pack.xlsx", main_out, ignore.case = TRUE)
+  if (identical(output_path, main_out)) {
+    output_path <- paste0(tools::file_path_sans_ext(main_out), "_stats_pack.xlsx")
+  }
+
+  # Question IDs from config
+  question_ids <- unique(config$question_analysis$Question_ID)
+  question_ids <- question_ids[!is.na(question_ids) & nzchar(question_ids)]
+
+  # Data receipt — what arrived from the data file
+  data_receipt <- list(
+    file_name           = basename(config$file_paths$Data_File %||% "unknown"),
+    n_rows              = nrow(survey_data),
+    n_cols              = ncol(survey_data),
+    questions_in_config = length(question_ids)
+  )
+
+  # Per-item response counts using existing check_data_quality()
+  item_stats_df <- NULL
+  if (exists("check_data_quality", mode = "function")) {
+    quality <- tryCatch(
+      check_data_quality(survey_data, question_ids),
+      error = function(e) NULL
+    )
+    if (!is.null(quality)) item_stats_df <- quality$question_quality
+  }
+
+  # Questions analysed vs skipped
+  n_analysed <- length(proportion_results) + length(mean_results) + length(nps_results)
+  n_skipped  <- max(0L, length(question_ids) - n_analysed)
+
+  # Data used — what was actually fed into the analysis
+  data_used <- list(
+    n_respondents      = nrow(survey_data),
+    n_excluded         = 0L,  # confidence processes per-question; no whole-row exclusions
+    weight_variable    = weight_var,
+    weighted           = !is.null(weight_var) && nzchar(weight_var %||% ""),
+    questions_analysed = n_analysed,
+    questions_skipped  = n_skipped,
+    per_item_stats     = item_stats_df
+  )
+
+  # Assumptions — all analytical parameters
+  conf_level <- suppressWarnings(as.numeric(config$study_settings$Confidence_Level %||% NA))
+  deff_val   <- if (!is.null(study_stats) && is.data.frame(study_stats) &&
+                    nrow(study_stats) > 0 && "DEFF" %in% names(study_stats)) {
+    study_stats$DEFF[1]
+  } else NA
+  eff_n_val  <- if (!is.null(study_stats) && is.data.frame(study_stats) &&
+                    nrow(study_stats) > 0 && "Effective_n" %in% names(study_stats)) {
+    study_stats$Effective_n[1]
+  } else NA
+  boot_iters <- config$study_settings$Bootstrap_Iterations
+
+  # TRS execution summary
+  n_events   <- length(run_result$events %||% list())
+  n_refusals <- sum(vapply(run_result$events %||% list(),
+                           function(e) identical(e$level, "REFUSE"), logical(1)))
+  n_partials <- sum(vapply(run_result$events %||% list(),
+                           function(e) identical(e$level, "PARTIAL"), logical(1)))
+  trs_summary <- if (n_events == 0) {
+    "No events — ran cleanly"
+  } else {
+    parts <- character(0)
+    if (n_refusals > 0) parts <- c(parts, sprintf("%d refusal(s)", n_refusals))
+    if (n_partials > 0) parts <- c(parts, sprintf("%d partial(s)", n_partials))
+    remainder <- n_events - n_refusals - n_partials
+    if (remainder  > 0) parts <- c(parts, sprintf("%d info event(s)", remainder))
+    paste(parts, collapse = ", ")
+  }
+
+  assumptions <- list(
+    # --- Confidence level & scope ---
+    "Confidence Level"           = if (!is.na(conf_level)) sprintf("%.0f%%", conf_level * 100) else "—",
+    "Tests: Proportion CIs"      = sprintf("%d  (Wilson score interval — base R formula)",
+                                           length(proportion_results)),
+    "Tests: Mean CIs"            = sprintf("%d  (t-distribution — base R t.test())",
+                                           length(mean_results)),
+    "Tests: NPS CIs"             = sprintf("%d  (Wilson score interval — base R formula)",
+                                           length(nps_results)),
+    "Total CI tests run"         = as.character(length(proportion_results) +
+                                                length(mean_results) +
+                                                length(nps_results)),
+    # --- Methods & implementation ---
+    "Proportions method"         = "Wilson score interval (base R formula)",
+    "Means method"               = "t-distribution (base R t.test())",
+    "Bootstrap (if used)"        = if (!is.null(boot_iters) && !is.na(boot_iters)) {
+                                     sprintf("%s iterations (base R sampling)", boot_iters)
+                                   } else "Not used",
+    "DEFF / Effective N"         = "survey package (design-aware variance estimation)",
+    # --- Sample & design ---
+    "Sampling Method"            = config$study_settings$Sampling_Method %||% "Not specified",
+    "Weighting"                  = if (!is.null(weight_var) && nzchar(weight_var %||% "")) {
+                                     sprintf("Yes — weight variable: %s", weight_var)
+                                   } else "No — unweighted analysis",
+    "Design Effect (DEFF)"       = if (!is.na(deff_val)) sprintf("%.3f", deff_val) else "—",
+    "Effective N"                = if (!is.na(eff_n_val)) {
+                                     format(round(eff_n_val), big.mark = ",")
+                                   } else "—",
+    "Multiple Comparison"        = config$study_settings$Multiple_Comparison_Method %||% "None",
+    # --- TRS execution ---
+    "TRS Status"                 = run_result$status %||% "PASS",
+    "TRS Events"                 = trs_summary
+  )
+
+  # Config echo — settings only (not raw data frames which may be large)
+  config_echo <- list(
+    file_paths     = config$file_paths,
+    study_settings = config$study_settings
+  )
+
+  duration_secs <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+
+  payload <- list(
+    module           = "CONFIDENCE",
+    project_name     = config$study_settings$Project_Name   %||% NULL,
+    analyst_name     = config$study_settings$Analyst_Name   %||% NULL,
+    research_house   = config$study_settings$Research_House %||% NULL,
+    run_timestamp    = start_time,
+    turas_version    = MAIN_VERSION,
+    r_version        = R.version$version.string,
+    status           = run_result$status %||% "PASS",
+    duration_seconds = duration_secs,
+    data_receipt     = data_receipt,
+    data_used        = data_used,
+    assumptions      = assumptions,
+    run_result       = run_result,
+    packages         = c("openxlsx", "readxl", "data.table", "survey"),
+    config_echo      = config_echo
+  )
+
+  result <- turas_write_stats_pack(payload, output_path)
+
+  if (!is.null(result) && verbose) {
+    cat(sprintf("  + Stats pack written: %s\n", basename(output_path)))
+  }
+
+  result
 }
 
 

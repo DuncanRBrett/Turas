@@ -476,7 +476,15 @@ run_tracker_gui <- function() {
                      "Generate interactive HTML report",
                      value = TRUE),
         p(style = "font-size: 13px; color: #666;",
-          "Creates a self-contained HTML report with charts, filtering, and export features alongside the Excel output")
+          "Creates a self-contained HTML report with charts, filtering, and export features alongside the Excel output"),
+
+        tags$hr(),
+
+        checkboxInput("generate_stats_pack",
+                      "Generate stats pack (diagnostic workbook for advanced review)",
+                      value = FALSE),
+        p(style = "font-size: 13px; color: #666;",
+          "Produces a standalone Excel workbook recording all assumptions, wave parameters, and TRS events for review")
       )
     })
 
@@ -626,6 +634,9 @@ run_tracker_gui <- function() {
         # Source run_tracker.R
         progress$set(value = 0.2, detail = "Loading tracker modules...")
         source("run_tracker.R")
+
+        # Set stats pack option before calling run_tracker
+        options(turas.generate_stats_pack = isTRUE(input$generate_stats_pack))
 
         # Run analysis and capture ALL console output
         progress$set(value = 0.3, detail = "Running tracker analysis...")

@@ -126,6 +126,18 @@ load_shared_infrastructure <- function(module_dir) {
   }
 
   source(shared_import, local = FALSE)
+
+  # Source stats pack writer (not included in import_all.R)
+  stats_pack_path <- file.path(turas_root, "modules", "shared", "lib", "stats_pack_writer.R")
+  if (file.exists(stats_pack_path)) {
+    tryCatch(
+      source(stats_pack_path, local = FALSE),
+      error = function(e) {
+        message(sprintf("[TRS INFO] WEIGHTING: Could not load stats_pack_writer.R: %s", e$message))
+      }
+    )
+  }
+
   return(turas_root)
 }
 
@@ -597,6 +609,27 @@ run_weighting <- function(config_file,
   }
 
   # ============================================================================
+  # Generate Stats Pack (Optional)
+  # ============================================================================
+  stats_pack_file <- NULL
+  generate_stats_pack_flag <- isTRUE(
+    toupper(config$general$generate_stats_pack %||% "N") == "Y"
+  ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
+
+  if (generate_stats_pack_flag) {
+    update_progress(0.93, "Generating stats pack...")
+    stats_pack_file <- generate_weighting_stats_pack(
+      config       = config,
+      data         = data,
+      weight_names = weight_names,
+      weight_results = weight_results,
+      run_state    = run_state,
+      start_time   = proc.time(),
+      verbose      = verbose
+    )
+  }
+
+  # ============================================================================
   # Build Return Value
   # ============================================================================
   update_progress(0.95, "Finalizing results...")
@@ -629,9 +662,177 @@ run_weighting <- function(config_file,
     output_file = output_file,
     diagnostics_file = diagnostics_file,
     html_report_file = html_report_file,
+    stats_pack_file = stats_pack_file,
     run_state = run_result
   ))
 }
+
+# ==============================================================================
+# STATS PACK HELPER
+# ==============================================================================
+
+#' Generate Weighting Stats Pack
+#'
+#' Builds the diagnostic payload from weighting results and writes the stats
+#' pack Excel workbook alongside the main output.
+#'
+#' @keywords internal
+generate_weighting_stats_pack <- function(config, data, weight_names,
+                                          weight_results, run_state,
+                                          start_time, verbose = TRUE) {
+
+  if (!exists("turas_write_stats_pack", mode = "function")) {
+    if (verbose) message("[TRS INFO] WEIGHTING: Stats pack writer not loaded - skipping")
+    return(NULL)
+  }
+
+  # Output path: derive from output file or data file
+  main_out <- config$general$output_file_resolved %||%
+              config$general$data_file_resolved %||% "weighting_output.xlsx"
+  output_path <- sub("(\\.xlsx|\\.csv|\\.sav)$", "_stats_pack.xlsx", main_out,
+                     ignore.case = TRUE)
+  if (identical(output_path, main_out)) {
+    output_path <- paste0(tools::file_path_sans_ext(main_out), "_stats_pack.xlsx")
+  }
+
+  # Data receipt
+  data_receipt <- list(
+    file_name = basename(config$general$data_file_resolved %||% "unknown"),
+    n_rows    = nrow(data),
+    n_cols    = ncol(data)
+  )
+
+  # Count excluded (zero or NA weight respondents across all weights)
+  n_excluded <- if (length(weight_names) > 0) {
+    n_bad <- sum(sapply(weight_names, function(wn) {
+      w <- data[[wn]]
+      sum(is.na(w) | w == 0)
+    }))
+    max(0L, n_bad)
+  } else 0L
+
+  data_used <- list(
+    n_respondents = nrow(data),
+    n_excluded    = n_excluded
+  )
+
+  # Build per-weight assumption rows
+  weight_specs <- config$weight_specifications
+  weight_detail_parts <- character(0)
+  for (wn in weight_names) {
+    wr <- weight_results[[wn]]
+    if (is.null(wr)) next
+    spec_row <- if (!is.null(weight_specs)) {
+      weight_specs[tolower(weight_specs$weight_name) == tolower(wn), , drop = FALSE]
+    } else NULL
+    method <- if (!is.null(spec_row) && nrow(spec_row) > 0) {
+      as.character(spec_row$method[1])
+    } else "unknown"
+    weight_detail_parts <- c(weight_detail_parts,
+                             sprintf("%s (%s)", wn, method))
+  }
+
+  # Effective N and DEFF (from first weight result's diagnostics, if available)
+  first_wr <- weight_results[[weight_names[1]]]
+  eff_n_val <- tryCatch({
+    first_wr$diagnostics$effective_n %||% NA
+  }, error = function(e) NA)
+  deff_val <- tryCatch({
+    first_wr$diagnostics$deff %||% NA
+  }, error = function(e) NA)
+
+  # Convergence info (from rim result if present)
+  first_rim <- tryCatch(first_wr$rim_result, error = function(e) NULL)
+  conv_tol   <- tryCatch(first_rim$convergence_tolerance %||% NA, error = function(e) NA)
+  conv_iters <- tryCatch(first_rim$iterations %||% NA, error = function(e) NA)
+
+  # Trimming info
+  first_trim <- tryCatch(first_wr$trimming_result, error = function(e) NULL)
+  trim_str <- if (!is.null(first_trim) && isTRUE(first_trim$trimming_applied)) {
+    lower <- tryCatch(first_trim$lower_bound %||% NA, error = function(e) NA)
+    upper <- tryCatch(first_trim$upper_bound %||% NA, error = function(e) NA)
+    sprintf("Applied — lower: %s, upper: %s",
+            if (!is.na(lower)) as.character(lower) else "—",
+            if (!is.na(upper)) as.character(upper) else "—")
+  } else "None"
+
+  # TRS summary
+  run_result <- if (!is.null(run_state) && exists("turas_run_state_result", mode = "function")) {
+    tryCatch(turas_run_state_result(run_state), error = function(e) NULL)
+  } else NULL
+  n_events   <- length(run_result$events %||% list())
+  n_refusals <- sum(vapply(run_result$events %||% list(),
+                           function(e) identical(e$level, "REFUSE"), logical(1)))
+  n_partials <- sum(vapply(run_result$events %||% list(),
+                           function(e) identical(e$level, "PARTIAL"), logical(1)))
+  trs_summary <- if (n_events == 0) {
+    "No events — ran cleanly"
+  } else {
+    parts <- character(0)
+    if (n_refusals > 0) parts <- c(parts, sprintf("%d refusal(s)", n_refusals))
+    if (n_partials > 0) parts <- c(parts, sprintf("%d partial(s)", n_partials))
+    remainder <- n_events - n_refusals - n_partials
+    if (remainder  > 0) parts <- c(parts, sprintf("%d info event(s)", remainder))
+    paste(parts, collapse = ", ")
+  }
+
+  # Dominant method string
+  methods_used <- if (!is.null(weight_specs)) {
+    unique(tolower(as.character(weight_specs$method)))
+  } else "unknown"
+
+  rim_method_str <- if ("rim" %in% methods_used || "rake" %in% methods_used) {
+    "Iterative Proportional Fitting (survey package)"
+  } else NA
+
+  assumptions <- list(
+    "Weight Type(s)"              = paste(unique(methods_used), collapse = ", "),
+    "Weights Calculated"          = paste(weight_detail_parts, collapse = "; "),
+    "Rim weighting"               = if (!is.na(rim_method_str)) rim_method_str else "Not used",
+    "Convergence tolerance"       = if (!is.na(conv_tol)) as.character(conv_tol) else "—",
+    "Iterations to convergence"   = if (!is.na(conv_iters)) as.character(conv_iters) else "—",
+    "Trimming"                    = trim_str,
+    "Effective N after weighting" = if (!is.na(eff_n_val)) format(round(eff_n_val), big.mark = ",") else "—",
+    "DEFF"                        = if (!is.na(deff_val)) sprintf("%.3f", deff_val) else "—",
+    "TRS Status"                  = run_result$status %||% "PASS",
+    "TRS Events"                  = trs_summary
+  )
+
+  config_echo <- list(
+    general = config$general[setdiff(names(config$general),
+                                     c("data_file_resolved", "output_file_resolved",
+                                       "diagnostics_file_resolved", "html_report_file_resolved"))]
+  )
+
+  duration_secs <- as.numeric(proc.time()["elapsed"] - start_time["elapsed"])
+
+  payload <- list(
+    module           = "WEIGHTING",
+    project_name     = config$general$project_name   %||% NULL,
+    analyst_name     = config$general$researcher_name %||% NULL,
+    research_house   = config$general$client_name    %||% NULL,
+    run_timestamp    = Sys.time(),
+    turas_version    = SCRIPT_VERSION,
+    r_version        = R.version$version.string,
+    status           = run_result$status %||% "PASS",
+    duration_seconds = if (duration_secs > 0 && duration_secs < 86400) duration_secs else NA,
+    data_receipt     = data_receipt,
+    data_used        = data_used,
+    assumptions      = assumptions,
+    run_result       = run_result,
+    packages         = c("openxlsx", "readxl", "survey", "data.table"),
+    config_echo      = config_echo
+  )
+
+  result <- turas_write_stats_pack(payload, output_path)
+
+  if (!is.null(result) && verbose) {
+    message(sprintf("[TRS INFO] WEIGHTING: Stats pack written: %s", basename(output_path)))
+  }
+
+  result
+}
+
 
 # ==============================================================================
 # COMMAND LINE INTERFACE

@@ -122,9 +122,25 @@ combine_reports <- function(config_file, output_file = NULL, auto_cross_ref = FA
       return(parsed)
     }
 
-    # Override type from config if specified
-    if (!is.null(report$type)) {
-      parsed$result$report_type <- report$type
+    # Override type from config if specified (normalise to internal codes)
+    if (!is.null(report$type) && nzchar(report$type)) {
+      type_map <- c(
+        "crosstabs" = "tabs", "tabs" = "tabs",
+        "tracker" = "tracker",
+        "maxdiff" = "maxdiff",
+        "conjoint" = "conjoint",
+        "pricing" = "pricing",
+        "segment" = "segment", "segmentation" = "segment",
+        "catdriver" = "catdriver", "catdriviver" = "catdriver", "categorical driver" = "catdriver",
+        "keydriver" = "keydriver", "key driver" = "keydriver",
+        "confidence" = "confidence",
+        "weighting" = "weighting"
+      )
+      config_type <- tolower(trimws(report$type))
+      if (config_type %in% names(type_map)) {
+        parsed$result$report_type <- type_map[[config_type]]
+      }
+      # If not in map, keep the auto-detected type
     }
 
     cat(sprintf("    Type: %s, Panels: %d, JS blocks: %d\n",

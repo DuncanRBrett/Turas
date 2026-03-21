@@ -107,6 +107,14 @@ var ReportHub = ReportHub || {};
             }
           }
         }
+        // Lazy-init pricing simulator when switching to a report where simulator is active
+        if (subTabId.indexOf("panel-simulator") !== -1 || subTabId.indexOf("tab-simulator") !== -1) {
+          var fnPrefix2 = key + "_";
+          var pricingSim = window[fnPrefix2 + "PricingSimulator"];
+          if (pricingSim && typeof pricingSim.lazyInit === "function") {
+            pricingSim.lazyInit();
+          }
+        }
       }
     }
   };
@@ -204,6 +212,29 @@ var ReportHub = ReportHub || {};
               if (btn2) btn2.style.display = "none";
             }
           }
+        }
+      }
+    }
+
+    // Lazy-init pricing simulator when its tab is first activated
+    if (tabName === "simulator") {
+      var fnPrefix = reportKey + "_";
+      var pricingSim = window[fnPrefix + "PricingSimulator"];
+      if (pricingSim && typeof pricingSim.lazyInit === "function") {
+        pricingSim.lazyInit();
+      }
+      // Conjoint simulator init
+      var simEngine = window[fnPrefix + "SimEngine"];
+      var simUI = window[fnPrefix + "SimUI"];
+      if (simEngine && typeof simEngine.init === "function" && !simEngine._initialized) {
+        // Conjoint data is in a JSON script element
+        var dataEl = document.getElementById(prefix + "cj-simulator-data");
+        if (dataEl) {
+          try {
+            var simData = JSON.parse(dataEl.textContent);
+            simEngine.init(simData);
+            if (simUI && typeof simUI.init === "function") simUI.init();
+          } catch(e) { /* conjoint data parse error */ }
         }
       }
     }

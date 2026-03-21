@@ -57,23 +57,74 @@ assemble_hub_html <- function(config, parsed_reports, overview_html, navigation_
   # --- Report panels ---
   for (parsed in parsed_reports) {
     key <- parsed$report_key
-    parts <- c(parts, sprintf('<div class="hub-panel" data-hub-panel="%s">', key))
+
+    # Collect all content for this hub-panel, then balance divs at the end
+    hub_content <- character(0)
+
+    # Include body preamble (dashboard, meta-strip) if present
+    if (!is.null(parsed$body_preamble) && nzchar(parsed$body_preamble)) {
+      hub_content <- c(hub_content, parsed$body_preamble)
+    }
 
     # Include report-specific content panels
-    for (panel_name in names(parsed$content_panels)) {
-      parts <- c(parts, parsed$content_panels[[panel_name]])
+    # Ensure exactly the first sub-panel has "active" class for hub visibility
+    panel_names <- names(parsed$content_panels)
+    for (pi in seq_along(panel_names)) {
+      panel_html <- parsed$content_panels[[panel_names[pi]]]
+      # Strip any existing "active" from the panel's root element class
+      panel_html <- sub(
+        'class="([a-z]+-(?:panel|section))\\s+active"',
+        'class="\\1"',
+        panel_html,
+        perl = TRUE
+      )
+      if (pi == 1L) {
+        # Add active to the first panel
+        panel_html <- sub(
+          'class="([a-z]+-(?:panel|section))"',
+          'class="\\1 active"',
+          panel_html,
+          perl = TRUE
+        )
+      }
+      hub_content <- c(hub_content, panel_html)
     }
 
     # Include footer if present
     if (nzchar(parsed$footer)) {
-      parts <- c(parts, parsed$footer)
+      hub_content <- c(hub_content, parsed$footer)
     }
 
     # Include help overlay if present (extracted separately from content panels)
     if (!is.null(parsed$help_overlay) && nzchar(parsed$help_overlay)) {
-      parts <- c(parts, parsed$help_overlay)
+      hub_content <- c(hub_content, parsed$help_overlay)
     }
 
+    # Fix unbalanced divs across the ENTIRE hub-panel content.
+    # Panels extracted from source reports may include extra </div> tags from
+    # wrapper elements (e.g., panels-wrap) not present in the hub.
+    content_str <- paste(hub_content, collapse = "\n")
+    n_open <- lengths(gregexpr("<div[\\s>]", content_str, perl = TRUE))
+    n_close <- lengths(gregexpr("</div>", content_str, fixed = TRUE))
+    if (n_close > n_open) {
+      excess <- n_close - n_open
+      for (x in seq_len(excess)) {
+        last_close <- regexpr("</div>(?!.*</div>)", content_str, perl = TRUE)
+        if (last_close > 0) {
+          content_str <- paste0(
+            substr(content_str, 1, last_close - 1),
+            substr(content_str, last_close + 6, nchar(content_str))
+          )
+        }
+      }
+      content_str <- sub("\\s+$", "", content_str)
+    } else if (n_open > n_close) {
+      deficit <- n_open - n_close
+      content_str <- paste0(content_str, paste(rep("\n</div>", deficit), collapse = ""))
+    }
+
+    parts <- c(parts, sprintf('<div class="hub-panel" data-hub-panel="%s">', key))
+    parts <- c(parts, content_str)
     parts <- c(parts, '</div>')
   }
 

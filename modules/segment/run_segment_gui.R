@@ -285,6 +285,10 @@ run_segment_gui <- function() {
         h3(class = "turas-card-title", "Step 3: Run Analysis"),
         p("Click the button below to start the segmentation analysis. This may take a few moments."),
 
+        checkboxInput("generate_stats_pack",
+                      "Generate stats pack (diagnostic workbook for advanced review)",
+                      value = FALSE),
+
         actionButton("run_analysis_btn", "Run Segmentation Analysis",
                     class = "turas-btn-run",
                     icon = icon("play-circle"))
@@ -331,6 +335,9 @@ run_segment_gui <- function() {
         # Capture console output using sink (stdout only like tracker)
         output_capture_file <- tempfile()
         sink(output_capture_file, type = "output")
+
+        # Propagate stats pack flag
+        options(turas.generate_stats_pack = isTRUE(input$generate_stats_pack))
 
         analysis_result_data <- tryCatch({
           # Run segmentation

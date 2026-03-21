@@ -74,7 +74,7 @@ if (file.exists(.guard_path)) {
     file.path(getwd(), "..", "shared", "lib")
   )
 
-  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R")
+  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R", "stats_pack_writer.R")
 
   for (shared_lib in possible_paths) {
     if (dir.exists(shared_lib)) {
@@ -1158,9 +1158,138 @@ run_catdriver_step_11_output <- function(model_result, importance, odds_ratios,
   cat(sprintf("\u2502 Time: %.1f seconds\n", elapsed))
   cat("\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n\n")
 
+  # Stats pack (optional)
+  generate_stats_pack_flag <- isTRUE(
+    toupper(config$settings$Generate_Stats_Pack %||% "N") == "Y"
+  ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
+
+  if (generate_stats_pack_flag) {
+    cat("\nGenerating stats pack...\n")
+    generate_catdriver_stats_pack(
+      config      = config,
+      survey_data = prep_data$data,
+      result      = results,
+      run_result  = run_result,
+      start_time  = start_time,
+      verbose     = TRUE
+    )
+  }
+
   print_console_summary(results, config, output_file = config$output_file)
 
   invisible(results)
+}
+
+
+# ==============================================================================
+# STATS PACK HELPER
+# ==============================================================================
+
+#' Generate CatDriver Stats Pack
+#'
+#' Builds the diagnostic payload from catdriver analysis results and writes
+#' the stats pack Excel workbook alongside the main output.
+#'
+#' @keywords internal
+generate_catdriver_stats_pack <- function(config, survey_data, result,
+                                          run_result, start_time, verbose = TRUE) {
+
+  if (!exists("turas_write_stats_pack", mode = "function")) {
+    if (verbose) cat("  ! Stats pack writer not loaded - skipping\n")
+    return(NULL)
+  }
+
+  # Output path: same base as main output, with _stats_pack suffix
+  main_out    <- config$output_file %||% "output.xlsx"
+  output_path <- sub("(\\.xlsx)$", "_stats_pack.xlsx", main_out, ignore.case = TRUE)
+  if (identical(output_path, main_out)) {
+    output_path <- paste0(tools::file_path_sans_ext(main_out), "_stats_pack.xlsx")
+  }
+
+  importance  <- result$importance
+  n_drivers   <- if (!is.null(importance) && is.data.frame(importance)) nrow(importance) else length(config$driver_vars)
+  n_subgroups <- if (!is.null(result$subgroup_results)) length(result$subgroup_results) else 0L
+  outcome_type <- result$prep_data$outcome_info$type %||% config$outcome_type %||% "—"
+  model_type_label <- switch(outcome_type,
+    binary      = "Binary logistic regression (base R glm())",
+    ordinal     = "Ordinal logistic regression (ordinal::clm())",
+    multinomial = "Multinomial logistic regression (nnet::multinom())",
+    nominal     = "Multinomial logistic regression (nnet::multinom())",
+    "Logistic/multinomial regression"
+  )
+  shap_enabled <- isTRUE(config$shap_enabled)
+
+  # TRS execution summary
+  n_events   <- length(run_result$events %||% list())
+  n_refusals <- sum(vapply(run_result$events %||% list(),
+                           function(e) identical(e$level, "REFUSE"), logical(1)))
+  n_partials <- sum(vapply(run_result$events %||% list(),
+                           function(e) identical(e$level, "PARTIAL"), logical(1)))
+  trs_summary <- if (n_events == 0) {
+    "No events — ran cleanly"
+  } else {
+    parts <- character(0)
+    if (n_refusals > 0) parts <- c(parts, sprintf("%d refusal(s)", n_refusals))
+    if (n_partials > 0) parts <- c(parts, sprintf("%d partial(s)", n_partials))
+    remainder <- n_events - n_refusals - n_partials
+    if (remainder  > 0) parts <- c(parts, sprintf("%d info event(s)", remainder))
+    paste(parts, collapse = ", ")
+  }
+
+  assumptions <- list(
+    "Outcome Variable"   = config$outcome_label %||% config$outcome_var %||% "—",
+    "Drivers tested"     = as.character(n_drivers),
+    "Model Type"         = model_type_label,
+    "SHAP Values"        = if (shap_enabled) "shapr package" else "Not used",
+    "Subgroup Analysis"  = if (n_subgroups > 0) sprintf("%d subgroups", n_subgroups) else "None",
+    "TRS Status"         = run_result$status %||% "PASS",
+    "TRS Events"         = trs_summary
+  )
+
+  data_receipt <- list(
+    file_name           = basename(config$data_file %||% "unknown"),
+    n_rows              = nrow(survey_data),
+    n_cols              = ncol(survey_data),
+    questions_in_config = length(config$driver_vars)
+  )
+
+  data_used <- list(
+    n_respondents      = nrow(survey_data),
+    n_excluded         = 0L,
+    weight_variable    = config$weight_var %||% "",
+    weighted           = !is.null(config$weight_var) && nzchar(config$weight_var %||% ""),
+    questions_analysed = n_drivers,
+    questions_skipped  = 0L
+  )
+
+  duration_secs <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+
+  payload <- list(
+    module           = "CATDRIVER",
+    project_name     = config$project_name   %||% NULL,
+    analyst_name     = config$analyst_name   %||% NULL,
+    research_house   = config$research_house %||% NULL,
+    run_timestamp    = start_time,
+    turas_version    = CATDRIVER_VERSION,
+    r_version        = R.version$version.string,
+    status           = run_result$status %||% "PASS",
+    duration_seconds = duration_secs,
+    data_receipt     = data_receipt,
+    data_used        = data_used,
+    assumptions      = assumptions,
+    run_result       = run_result,
+    packages         = c("openxlsx", "data.table", "nnet", "ordinal"),
+    config_echo      = list(settings = config[c("outcome_var", "outcome_type", "driver_vars",
+                                                 "weight_var", "subgroup_var", "bootstrap_ci")])
+  )
+
+  result_path <- turas_write_stats_pack(payload, output_path)
+
+  if (!is.null(result_path) && verbose) {
+    cat(sprintf("  + Stats pack written: %s\n", basename(output_path)))
+  }
+
+  result_path
 }
 
 

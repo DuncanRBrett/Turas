@@ -67,7 +67,7 @@ if (file.exists(.guard_path)) {
     file.path(getwd(), "modules", "shared", "lib"),
     file.path(getwd(), "..", "shared", "lib")
   )
-  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R")
+  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R", "stats_pack_writer.R")
   for (shared_lib in possible_paths) {
     if (dir.exists(shared_lib)) {
       for (f in trs_files) {
@@ -834,6 +834,23 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
     }
   }
 
+  # --- Generate Stats Pack (optional) ---
+  generate_stats_pack_flag <- isTRUE(
+    toupper(config$settings$Generate_Stats_Pack %||% "N") == "Y"
+  ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
+
+  if (generate_stats_pack_flag) {
+    cat("\nGenerating stats pack...\n")
+    generate_keydriver_stats_pack(
+      config      = config,
+      survey_data = data$data,
+      result      = results,
+      run_result  = run_result,
+      start_time  = start_time,
+      verbose     = TRUE
+    )
+  }
+
   # --- Completion ---
   end_time <- Sys.time()
   elapsed <- round(as.numeric(difftime(end_time, start_time, units = "secs")), 1)
@@ -894,6 +911,111 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
   cat("\n")
   invisible(results)
 }
+
+# ==============================================================================
+# STATS PACK HELPER
+# ==============================================================================
+
+#' Generate Key Driver Stats Pack
+#'
+#' Builds the diagnostic payload from key driver analysis results and writes
+#' the stats pack Excel workbook alongside the main output.
+#'
+#' @keywords internal
+generate_keydriver_stats_pack <- function(config, survey_data, result,
+                                          run_result, start_time, verbose = TRUE) {
+
+  if (!exists("turas_write_stats_pack", mode = "function")) {
+    if (verbose) cat("  ! Stats pack writer not loaded - skipping\n")
+    return(NULL)
+  }
+
+  # Output path: same base as main output, with _stats_pack suffix
+  main_out    <- config$output_file %||% "output.xlsx"
+  output_path <- sub("(\\.xlsx)$", "_stats_pack.xlsx", main_out, ignore.case = TRUE)
+  if (identical(output_path, main_out)) {
+    output_path <- paste0(tools::file_path_sans_ext(main_out), "_stats_pack.xlsx")
+  }
+
+  importance   <- result$importance
+  n_drivers    <- if (!is.null(importance) && is.data.frame(importance)) nrow(importance) else length(config$driver_vars)
+  r_squared    <- tryCatch(summary(result$model)$r.squared, error = function(e) NA_real_)
+  shap_enabled <- !is.null(result$shap)
+
+  # TRS execution summary
+  n_events   <- length(run_result$events %||% list())
+  n_refusals <- sum(vapply(run_result$events %||% list(),
+                           function(e) identical(e$level, "REFUSE"), logical(1)))
+  n_partials <- sum(vapply(run_result$events %||% list(),
+                           function(e) identical(e$level, "PARTIAL"), logical(1)))
+  trs_summary <- if (n_events == 0) {
+    "No events — ran cleanly"
+  } else {
+    parts <- character(0)
+    if (n_refusals > 0) parts <- c(parts, sprintf("%d refusal(s)", n_refusals))
+    if (n_partials > 0) parts <- c(parts, sprintf("%d partial(s)", n_partials))
+    remainder <- n_events - n_refusals - n_partials
+    if (remainder  > 0) parts <- c(parts, sprintf("%d info event(s)", remainder))
+    paste(parts, collapse = ", ")
+  }
+
+  assumptions <- list(
+    "Outcome Variable"  = config$outcome_var %||% "—",
+    "Drivers tested"    = as.character(n_drivers),
+    "Method"            = "Pearson/Spearman correlation (base R cor())",
+    "Regression"        = "OLS linear regression (base R lm())",
+    "Model R-squared"   = if (!is.na(r_squared)) sprintf("%.4f", r_squared) else "—",
+    "SHAP Values"       = if (shap_enabled) "shapr package" else "Not used",
+    "Quadrant Analysis" = if (!is.null(result$quadrant)) "Enabled" else "Disabled",
+    "TRS Status"        = run_result$status %||% "PASS",
+    "TRS Events"        = trs_summary
+  )
+
+  data_receipt <- list(
+    file_name           = basename(config$data_file %||% "unknown"),
+    n_rows              = nrow(survey_data),
+    n_cols              = ncol(survey_data),
+    questions_in_config = length(config$driver_vars)
+  )
+
+  data_used <- list(
+    n_respondents      = nrow(survey_data),
+    n_excluded         = 0L,
+    weight_variable    = config$weight_var %||% "",
+    weighted           = !is.null(config$weight_var) && nzchar(config$weight_var %||% ""),
+    questions_analysed = n_drivers,
+    questions_skipped  = 0L
+  )
+
+  duration_secs <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+
+  payload <- list(
+    module           = "KEYDRIVER",
+    project_name     = config$settings$Project_Name   %||% NULL,
+    analyst_name     = config$settings$Analyst_Name   %||% NULL,
+    research_house   = config$settings$Research_House %||% NULL,
+    run_timestamp    = start_time,
+    turas_version    = KEYDRIVER_VERSION,
+    r_version        = R.version$version.string,
+    status           = run_result$status %||% "PASS",
+    duration_seconds = duration_secs,
+    data_receipt     = data_receipt,
+    data_used        = data_used,
+    assumptions      = assumptions,
+    run_result       = run_result,
+    packages         = c("openxlsx", "data.table"),
+    config_echo      = list(settings = config$settings)
+  )
+
+  result_path <- turas_write_stats_pack(payload, output_path)
+
+  if (!is.null(result_path) && verbose) {
+    cat(sprintf("  + Stats pack written: %s\n", basename(output_path)))
+  }
+
+  result_path
+}
+
 
 # ==============================================================================
 # INTERNAL HELPERS (kept as-is)
