@@ -203,11 +203,11 @@ build_report_tab_nav <- function(brand_colour, has_about = FALSE) {
       "Explorer"
     ),
     htmltools::tags$button(
-      class = "report-tab",
+      class = "report-tab tab-disabled",
       onclick = "switchReportTab('visualise')",
       `data-tab` = "visualise",
       id = "tab-btn-visualise",
-      style = "display:none",
+      title = "Select metrics in Explorer, then click Visualise",
       "Visualise"
     ),
     htmltools::tags$button(

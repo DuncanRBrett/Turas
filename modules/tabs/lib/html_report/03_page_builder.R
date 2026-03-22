@@ -95,16 +95,6 @@ build_html_page <- function(html_data, tables, config_obj,
               class = "export-btn",
               onclick = "exportAllPinnedSlides()",
               "\U0001F4E4 Export All as PNG"
-            ),
-            htmltools::tags$button(
-              class = "export-btn",
-              onclick = "printPinnedViews()",
-              "\U0001F5A8 Print / PDF"
-            ),
-            htmltools::tags$button(
-              class = "export-btn",
-              onclick = "saveReportHTML()",
-              "\U0001F4BE Save Report"
             )
           )
         ),

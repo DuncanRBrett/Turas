@@ -50,6 +50,9 @@ build_overview_heatmap <- function(html_data, config) {
 
   # ---- Legend ----
   legend_html <- c(
+    '<div class="hm-legend-toggle">',
+    '<button class="hm-wave-action" onclick="var lg=document.getElementById(\'hm-scale-legend\');lg.style.display=lg.style.display===\'none\'?\'flex\':\'none\';this.textContent=lg.style.display===\'none\'?\'Show Legend\':\'Hide Legend\'">Hide Legend</button>',
+    '</div>',
     '<div class="hm-legend" id="hm-scale-legend">',
     '<span class="hm-legend-title">Scale:</span>',
     sprintf('<span class="hm-legend-item"><span class="hm-legend-swatch hm-swatch-green"></span> %s+%% / %s+ mean / %s+ NPS</span>',
@@ -100,6 +103,30 @@ build_overview_heatmap <- function(html_data, config) {
   banner_html <- c(banner_html, '</div>')
 
   banner_html <- c(banner_html, '</div>')
+
+  # ---- Wave chip bar ----
+  # Show toggleable chips for each wave; default last 3 active
+  wave_chip_html <- c('<div class="hm-wave-chips" id="hm-wave-chips">')
+  wave_chip_html <- c(wave_chip_html, '<label class="hm-control-label" style="margin-right:6px;">Waves:</label>')
+  default_active_start <- max(1, n_waves - 2)  # last 3 waves active by default
+  for (w_idx in seq_along(waves)) {
+    active_class <- if (w_idx >= default_active_start) " active" else ""
+    wave_chip_html <- c(wave_chip_html, sprintf(
+      '<button class="hm-wave-chip%s" data-wave="%s" onclick="hmToggleWave(\'%s\',this)">%s</button>',
+      active_class,
+      htmltools::htmlEscape(waves[w_idx]),
+      htmltools::htmlEscape(waves[w_idx]),
+      htmltools::htmlEscape(wave_labels[w_idx])
+    ))
+  }
+  # Show All / Last 3 quick actions
+  wave_chip_html <- c(wave_chip_html,
+    '<span class="hm-wave-actions">',
+    '<button class="hm-wave-action" onclick="hmWaveShowAll()">All</button>',
+    sprintf('<button class="hm-wave-action" onclick="hmWaveShowLast(3)">Last 3</button>'),
+    '</span>'
+  )
+  wave_chip_html <- c(wave_chip_html, '</div>')
 
   # ---- Build heatmap grid ----
   # Classify and order metrics by type group, then by section within type
@@ -291,6 +318,7 @@ build_overview_heatmap <- function(html_data, config) {
     '<p class="dash-section-sub">Click any row to view detailed metrics. Cells are coloured green/amber/red by configurable thresholds.</p>',
     paste(legend_html, collapse = "\n"),
     paste(banner_html, collapse = "\n"),
+    paste(wave_chip_html, collapse = "\n"),
     paste(grid_html, collapse = "\n"),
     '</div>'
   )
@@ -376,9 +404,9 @@ build_explorer_data_json <- function(html_data, config) {
   })
 
   blob <- list(
-    waves = waves,
-    waveLabels = wave_labels,
-    segments = segments,
+    waves = I(waves),            # I() forces JSON array even for length-1
+    waveLabels = I(wave_labels),
+    segments = I(segments),
     metrics = metrics_list,
     thresholds = hm_thresholds
   )

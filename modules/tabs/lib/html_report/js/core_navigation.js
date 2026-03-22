@@ -169,6 +169,15 @@ function switchBannerGroup(groupCode, btn) {
   });
 }
 
+// Dashboard section collapse/expand
+function toggleDashSection(headerEl) {
+  var section = headerEl.closest(".dash-collapsible");
+  if (!section) return;
+  var isCollapsed = section.classList.toggle("dash-collapsed");
+  var chevron = headerEl.querySelector(".dash-collapse-chevron");
+  if (chevron) chevron.innerHTML = isCollapsed ? "&#x25B6;" : "&#x25BC;";
+}
+
 // Heatmap toggle - reads data-heatmap attribute from cells
 function toggleHeatmap(enabled) {
   heatmapEnabled = enabled;
@@ -290,12 +299,56 @@ function toggleChart(enabled) {
   document.querySelectorAll(".chart-wrapper").forEach(function(div) {
     div.style.display = enabled ? "block" : "none";
   });
+  // Legacy standalone buttons (kept for backward compat)
   document.querySelectorAll(".export-chart-btn").forEach(function(btn) {
     btn.style.display = enabled ? "inline-block" : "none";
   });
   document.querySelectorAll(".slide-export-group").forEach(function(grp) {
     grp.style.display = enabled ? "inline-block" : "none";
   });
+  // New unified export menu: show/hide chart-related items
+  document.querySelectorAll(".export-chart-menu-item, .export-slide-menu-item, .export-menu-sep, .export-menu-label").forEach(function(el) {
+    el.style.display = enabled ? "" : "none";
+  });
+}
+
+// Unified export dropdown menu toggle
+function toggleExportMenu(qCode) {
+  var menuId = "export-menu-" + qCode.replace(/[^a-zA-Z0-9]/g, "-");
+  var menu = document.getElementById(menuId);
+  if (!menu) return;
+  // Close all other open menus first
+  document.querySelectorAll(".export-menu").forEach(function(m) {
+    if (m.id !== menuId) m.style.display = "none";
+  });
+  menu.style.display = menu.style.display === "none" ? "block" : "none";
+}
+
+// Close export menu on click outside
+document.addEventListener("click", function(e) {
+  if (!e.target.closest(".export-dropdown-group")) {
+    document.querySelectorAll(".export-menu").forEach(function(m) {
+      m.style.display = "none";
+    });
+  }
+  if (!e.target.closest(".display-options-wrap")) {
+    document.querySelectorAll(".display-options-menu").forEach(function(m) {
+      m.style.display = "none";
+    });
+  }
+});
+
+// Question card collapse/expand toggle
+function toggleQuestionCollapse(btn) {
+  var container = btn.closest(".question-container");
+  if (container) container.classList.toggle("q-collapsed");
+}
+
+// Display Options dropdown toggle
+function toggleDisplayOptions(btn) {
+  var menu = btn.nextElementSibling;
+  if (!menu) return;
+  menu.style.display = menu.style.display === "none" ? "block" : "none";
 }
 
 // ---- Utility: extract label text from a td, ignoring button elements ----

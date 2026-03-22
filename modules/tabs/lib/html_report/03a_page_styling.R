@@ -16,10 +16,13 @@
 # - modules/shared/lib/design_system/base_css.R
 # ==============================================================================
 
-# Source the shared design system (guard against re-sourcing)
+# Source the shared design system (TURAS_ROOT-aware)
 local({
-  ds_dir <- file.path("modules", "shared", "lib", "design_system")
-  if (!exists("turas_base_css", mode = "function")) {
+  turas_root <- Sys.getenv("TURAS_ROOT", "")
+  if (!nzchar(turas_root)) turas_root <- getwd()
+  ds_dir <- file.path(turas_root, "modules", "shared", "lib", "design_system")
+  if (!dir.exists(ds_dir)) ds_dir <- file.path("modules", "shared", "lib", "design_system")
+  if (!exists("turas_base_css", mode = "function") && dir.exists(ds_dir)) {
     source(file.path(ds_dir, "design_tokens.R"), local = FALSE)
     source(file.path(ds_dir, "font_embed.R"), local = FALSE)
     source(file.path(ds_dir, "base_css.R"), local = FALSE)
@@ -245,6 +248,17 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       align-items: baseline;
       gap: 10px;
     }
+    .q-collapse-btn {
+      background: none; border: none; cursor: pointer; font-size: 10px;
+      color: #94a3b8; padding: 2px 4px; transition: transform 0.2s;
+      flex-shrink: 0; line-height: 1;
+    }
+    .q-collapse-btn:hover { color: #64748b; }
+    .question-container.q-collapsed .q-collapse-btn { transform: rotate(-90deg); }
+    .question-container.q-collapsed .table-wrapper,
+    .question-container.q-collapsed .chart-wrapper,
+    .question-container.q-collapsed .insight-area,
+    .question-container.q-collapsed .table-actions { display: none; }
     .question-code {
       font-size: 11px;
       font-weight: 500;
@@ -291,6 +305,26 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     }
     .export-btn:hover { background: #f8fafc; color: #1e293b; }
     .slide-menu-item:hover { background: #f1f5f9; }
+    /* Unified export dropdown */
+    .export-menu-item {
+      display: block; width: 100%; text-align: left; padding: 8px 14px;
+      border: none; background: none; cursor: pointer; font-size: 12px;
+      font-family: inherit; color: #374151; transition: background 0.1s;
+    }
+    .export-menu-item:hover { background: #f1f5f9; }
+    .export-menu-sep { height: 1px; background: #e2e8f0; margin: 4px 0; }
+    .export-menu-label {
+      padding: 6px 14px 2px; font-size: 10px; font-weight: 600;
+      color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    /* Display options dropdown items */
+    .display-opt-item { display: block; padding: 4px 0; }
+    /* Drag and drop */
+    .pin-dragging { opacity: 0.4 !important; }
+    .pin-drop-target { outline: 2px dashed BRAND; outline-offset: 4px; }
+    [draggable="true"]:active { cursor: grabbing; }
+    /* Pin overflow menu */
+    .pin-overflow-item:hover { background: #f1f5f9; }
     /* Section dividers (pinned views) */
     .section-divider { display: flex; align-items: center; gap: 12px; padding: 12px 0; margin: 8px 0; border-bottom: 2px solid BRAND; }
     .section-divider-title { font-size: 16px; font-weight: 600; color: BRAND; flex: 1; outline: none; min-width: 100px; }
@@ -356,48 +390,68 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
   '
 
   css_tables <- '
-    /* ---- Crosstab Table Styles ---- */
+    /* ---- Crosstab Table Styles (Phase 3 - Premium) ---- */
+
+    /* Table container — card with subtle depth */
+    .table-wrapper {
+      background: #ffffff;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
+      overflow: hidden;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 1px;
+    }
+
     .ct-table {
       width: 100%;
       border-collapse: collapse;
       font-size: 13px;
       color: #1e293b;
       table-layout: auto;
+      line-height: 1.5;
     }
     .ct-table.ct-cols-hidden { width: auto; }
-    .ct-th {
-      padding: 10px 14px;
-      text-align: center;
-      font-weight: 600;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
-      border-bottom: 2px solid #e2e8f0;
-      background: #f8f9fa;
-      white-space: normal;
+
+    /* --- Header: dark, authoritative --- */
+    /* !important needed to override shared design system th[class*="-th"] rules */
+    .ct-table .ct-th {
+      padding: 12px 16px !important;
+      text-align: center !important;
+      font-weight: 600 !important;
+      font-size: 11px !important;
+      text-transform: none !important;
+      letter-spacing: 0.5px !important;
+      border-bottom: none !important;
+      background: #1a2744 !important;
+      color: #e2e8f0 !important;
+      white-space: normal !important;
       min-width: 80px;
       max-width: 160px;
-      vertical-align: bottom;
+      vertical-align: bottom !important;
     }
-    .ct-th.ct-label-col {
-      text-align: left;
+    .ct-table .ct-th.ct-label-col {
+      text-align: left !important;
       min-width: 180px;
       max-width: 320px;
-      white-space: normal;
+      white-space: normal !important;
       word-wrap: break-word;
       position: sticky;
       left: 0;
-      background: #f8f9fa;
+      background: #1a2744 !important;
       z-index: 2;
+      color: #e2e8f0 !important;
     }
+
+    /* --- Data cells --- */
     .ct-td {
-      padding: 8px 14px;
+      padding: 10px 16px;
       text-align: center;
-      border-bottom: 1px solid #f0f0f0;
+      border-bottom: 1px solid #f0f1f3;
       white-space: nowrap;
-      color: #1e293b;
+      color: #334155;
       font-size: 13px;
-      transition: background-color 0.15s;
+      transition: background-color 0.15s ease;
     }
     .ct-td.ct-label-col {
       text-align: left;
@@ -410,35 +464,84 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       left: 0;
       background: #ffffff;
       z-index: 1;
+      border-right: 1px solid #e5e7eb;
     }
-    .ct-header-text {
+
+    /* --- Zebra striping for data rows --- */
+    tr.ct-row-category:nth-child(even) > .ct-td { background: #f9fafb; }
+    tr.ct-row-category:nth-child(even) > .ct-td.ct-label-col { background: #f9fafb; }
+
+    /* --- Header text and letter badges --- */
+    .ct-table .ct-header-text {
       font-size: 11px;
       line-height: 1.3;
+      color: #e2e8f0 !important;
     }
-    .ct-letter {
+    .ct-table .ct-letter {
+      display: inline-block;
       font-size: 9px;
-      color: #94a3b8;
-      margin-top: 2px;
+      color: rgba(255,255,255,0.6) !important;
+      margin-top: 4px;
       font-weight: 700;
       font-family: ui-monospace, Consolas, monospace;
+      letter-spacing: 0;
     }
-    .ct-row-base { background: #fafbfc; }
-    .ct-row-base .ct-td { font-weight: 600; color: #64748b; border-bottom: 2px solid #e2e8f0; }
-    .ct-row-net { background: #f5f3ef; }
-    .ct-row-net .ct-label-col { font-weight: 700; color: #1e293b; background: #f5f3ef; }
-    .ct-row-mean .ct-label-col { background: #faf8f4; }
-    /* Separator line between individual items and NET/summary rows */
-    .ct-row-category + .ct-row-net > .ct-td { border-top: 2px solid #cbd5e1; }
-    /* Separator line between NET rows and mean/index rows */
-    .ct-row-net + .ct-row-mean > .ct-td { border-top: 2px solid #cbd5e1; }
-    .ct-row-category + .ct-row-mean > .ct-td { border-top: 2px solid #cbd5e1; }
+
+    /* --- Total column header: gold accent text on dark bg --- */
+    .ct-table .ct-th.bg-total .ct-header-text {
+      color: #e8c56d !important;
+    }
+
+    /* --- Base row: understated, structural --- */
+    .ct-row-base { background: #f8f9fa; }
+    .ct-row-base .ct-td {
+      font-weight: 600;
+      font-size: 12px;
+      color: #64748b;
+      border-bottom: 2px solid #e2e8f0;
+      border-top: none;
+      padding-top: 8px;
+      padding-bottom: 8px;
+    }
+    .ct-row-base .ct-td.ct-label-col {
+      background: #f8f9fa;
+      color: #64748b;
+      font-size: 12px;
+      letter-spacing: 0.3px;
+    }
+
+    /* --- NET rows: warm tint, strong --- */
+    .ct-row-net { background: #faf8f5; }
+    .ct-row-net .ct-td { font-weight: 600; color: #1e293b; }
+    .ct-row-net .ct-label-col {
+      font-weight: 700;
+      color: #1e293b;
+      background: #faf8f5;
+      border-left: 3px solid BRAND;
+      padding-left: 13px;
+    }
+
+    /* --- Mean / index rows: subtle distinction --- */
     .ct-row-mean { background: #faf8f4; }
-    .ct-row-mean .ct-td { font-style: italic; color: #475569; }
-    /* Row hover */
-    tr.ct-row-category:hover td { background: #f8f9fb; }
-    tr.ct-row-category:hover td.ct-label-col { background: #f8f9fb; }
-    /* Row exclusion from chart */
-    .ct-row-excluded { opacity: 0.35; }
+    .ct-row-mean .ct-td { font-style: italic; color: #475569; font-weight: 500; }
+    .ct-row-mean .ct-label-col {
+      background: #faf8f4;
+      font-style: italic;
+      border-left: 3px solid #c9a96e;
+      padding-left: 13px;
+    }
+
+    /* Separator lines between sections */
+    .ct-row-category + .ct-row-net > .ct-td { border-top: 2px solid #e2e8f0; }
+    .ct-row-net + .ct-row-mean > .ct-td { border-top: 1px solid #e2e8f0; }
+    .ct-row-category + .ct-row-mean > .ct-td { border-top: 2px solid #e2e8f0; }
+
+    /* --- Row hover: clear highlight --- */
+    tr.ct-row-category:hover > td { background: #eef2f7; }
+    tr.ct-row-category:hover > td.ct-label-col { background: #eef2f7; }
+
+    /* --- Row exclusion --- */
+    .ct-row-excluded { opacity: 0.3; }
     .ct-row-excluded .ct-label-col { text-decoration: line-through; }
     .ct-label-col .row-exclude-btn {
       display: none; cursor: pointer; border: none; background: none;
@@ -448,46 +551,49 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     tr.ct-row-category:hover .ct-label-col .row-exclude-btn,
     tr.ct-row-net:hover .ct-label-col .row-exclude-btn { display: inline; }
     tr.ct-row-excluded .ct-label-col .row-exclude-btn { display: inline; color: #dc2626; }
-    .ct-val { font-variant-numeric: tabular-nums; color: #1e293b; }
+
+    /* --- Data values --- */
+    .ct-val { font-variant-numeric: tabular-nums; color: #334155; }
     .ct-val-net { font-weight: 700; color: #1e293b; }
-    .ct-na { color: #cbd5e1; }
+    .ct-na { color: #d1d5db; font-size: 12px; }
     .ct-base-n { font-variant-numeric: tabular-nums; }
     .ct-low-base { color: #e8614d; font-weight: 700; }
     .ct-mean-val { font-variant-numeric: tabular-nums; }
     .ct-index-desc { font-size: 9px; font-style: normal; color: #94a3b8; font-weight: 400; margin-top: 2px; }
+
+    /* --- Significance markers: refined badge --- */
     .ct-sig {
       display: inline-block;
-      font-size: 9px;
+      font-size: 8px;
       font-weight: 700;
-      color: #059669;
-      background: rgba(5,150,105,0.08);
+      color: #047857;
+      background: rgba(5,150,105,0.1);
       border-radius: 3px;
-      padding: 0 3px;
-      margin-left: 4px;
+      padding: 1px 4px;
+      margin-left: 3px;
       font-family: ui-monospace, Consolas, monospace;
       vertical-align: middle;
+      letter-spacing: 0.3px;
     }
+
+    /* --- Frequency annotations --- */
     .ct-freq {
       display: none;
       font-size: 10px;
       color: #94a3b8;
-      margin-top: 1px;
+      margin-top: 2px;
     }
     .show-freq .ct-freq { display: block; }
     .ct-low-base-dim { opacity: 0.45; }
-    .ct-heatmap-cell { transition: background-color 0.15s; }
+    .ct-heatmap-cell { transition: background-color 0.15s ease; }
 
-    /* Banner group column visibility - Total always visible */
+    /* Banner group column visibility */
     .bg-total { /* always visible */ }
 
-    /* Safari fix: ensure last row is fully visible */
-    .table-wrapper {
-      -webkit-overflow-scrolling: touch;
-      padding-bottom: 1px;
-    }
+    /* Last row bottom border */
     .ct-table tbody tr:last-child td {
-      border-bottom: 2px solid #e2e8f0;
-      padding-bottom: 8px;
+      border-bottom: none;
+      padding-bottom: 10px;
     }
 
     /* Print button */
@@ -550,6 +656,7 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       text-decoration: line-through; opacity: 0.5;
     }
     .col-chip-off:hover { opacity: 0.7; }
+    .col-chip-more { background: #f1f5f9; color: #64748b; border-style: dashed; font-weight: 600; }
 
     /* Column sort indicators */
     .ct-sort-indicator {
@@ -614,6 +721,17 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       line-height: 1; border-radius: 3px;
     }
     .insight-dismiss:hover { color: #64748b; background: #e2e8f0; }
+    /* Hover hints for editable content */
+    .insight-md-rendered:not(:empty) { cursor: pointer; position: relative; }
+    .insight-md-rendered:not(:empty):hover::after {
+      content: "Double-click to edit"; position: absolute; top: -2px; right: 4px;
+      font-size: 10px; color: #94a3b8; font-weight: 500; pointer-events: none;
+    }
+    .closing-notes-editor:hover::after {
+      content: "Click to edit"; position: absolute; top: 4px; right: 8px;
+      font-size: 10px; color: #94a3b8; font-weight: 500; pointer-events: none;
+    }
+    .closing-notes-editor { position: relative; }
     .insight-container {
       border-left: 3px solid BRAND; background: #f8fafa;
       border-radius: 0 6px 6px 0;
@@ -705,11 +823,26 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       background: #fff;
       border: 1px solid #e2e8f0;
       border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
       padding: 4px 0;
-      min-width: 180px;
+      min-width: 190px;
       display: flex;
       flex-direction: column;
+      animation: fadeInPopover 0.15s ease;
+    }
+    @keyframes fadeInPopover {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .pin-mode-title {
+      padding: 6px 14px 4px;
+      font-size: 10px;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid #f1f5f9;
+      margin-bottom: 2px;
     }
     .pin-mode-option {
       display: block;
@@ -729,8 +862,9 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       background: #f0f4f8;
       color: BRAND;
     }
-    .pin-mode-option:first-child { border-radius: 8px 8px 0 0; }
     .pin-mode-option:last-child { border-radius: 0 0 8px 8px; }
+    .pin-mode-disabled { color: #cbd5e1; cursor: default; }
+    .pin-mode-disabled:hover { background: none; color: #cbd5e1; }
   '
 
   css_qualitative <- '

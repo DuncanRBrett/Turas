@@ -19,7 +19,7 @@ function savePinnedData() {
 }
 
 function togglePin(qCode) {
-  // Show a popover letting user choose which components to pin
+  // Show a tooltip-style popover on hover/click for pin mode selection
   // Close any existing popover first
   var existing = document.querySelector(".pin-mode-popover");
   if (existing) existing.remove();
@@ -27,32 +27,37 @@ function togglePin(qCode) {
   var btn = document.querySelector(".pin-btn[data-q-code=\"" + qCode + "\"]");
   if (!btn) return;
 
-  var popover = document.createElement("div");
-  popover.className = "pin-mode-popover";
-
   // Check what's available for this question
   var qContainer = document.querySelector("#q-container-" + getQuestionIndexByCode(qCode));
   if (!qContainer) qContainer = btn.closest(".question-container");
   var hasChart = qContainer && qContainer.querySelector(".chart-wrapper svg");
-  var hasTable = qContainer && qContainer.querySelector("table.ct-table");
-  var hasInsight = false;
-  if (qContainer) {
-    var editor = qContainer.querySelector(".insight-md-editor");
-    hasInsight = editor && editor.value && editor.value.trim();
-  }
+
+  var popover = document.createElement("div");
+  popover.className = "pin-mode-popover";
+
+  // Title
+  var title = document.createElement("div");
+  title.className = "pin-mode-title";
+  title.textContent = "Pin to Views";
+  popover.appendChild(title);
 
   var options = [
-    { id: "pin-opt-all", label: "Table + Chart + Insight", mode: "all" },
-    { id: "pin-opt-chart", label: "Chart + Insight", mode: "chart_insight" },
-    { id: "pin-opt-table", label: "Table + Insight", mode: "table_insight" }
+    { label: "Table + Chart + Insight", mode: "all" },
+    { label: "Chart + Insight", mode: "chart_insight", needsChart: true },
+    { label: "Table + Insight", mode: "table_insight" }
   ];
 
   options.forEach(function(opt) {
     var row = document.createElement("button");
     row.className = "pin-mode-option";
+    if (opt.needsChart && !hasChart) {
+      row.className += " pin-mode-disabled";
+      row.title = "No chart available";
+    }
     row.textContent = opt.label;
     row.onclick = function(e) {
       e.stopPropagation();
+      if (opt.needsChart && !hasChart) return;
       popover.remove();
       executePinWithMode(qCode, opt.mode);
     };
@@ -67,7 +72,7 @@ function togglePin(qCode) {
   popover.style.zIndex = "1000";
   btn.appendChild(popover);
 
-  // Close on click outside
+  // Close on click outside or mouse leave
   function closePopover(e) {
     if (!popover.contains(e.target) && e.target !== btn) {
       popover.remove();
@@ -219,6 +224,8 @@ function renderPinnedCards() {
       var divider = document.createElement("div");
       divider.className = "section-divider";
       divider.setAttribute("data-idx", idx);
+      divider.setAttribute("draggable", "true");
+      divider.setAttribute("data-pin-drag-idx", idx);
 
       var titleEl = document.createElement("div");
       titleEl.className = "section-divider-title";
@@ -261,7 +268,9 @@ function renderPinnedCards() {
     var card = document.createElement("div");
     card.className = "pinned-card";
     card.setAttribute("data-pin-id", pin.id);
-    card.style.cssText = "background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin-bottom:16px;";
+    card.setAttribute("draggable", "true");
+    card.setAttribute("data-pin-drag-idx", idx);
+    card.style.cssText = "background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin-bottom:16px;cursor:grab;";
 
     // Header with title, banner, base, controls
     var header = document.createElement("div");
@@ -280,41 +289,8 @@ function renderPinnedCards() {
     header.appendChild(titleDiv);
 
     var controls = document.createElement("div");
-    controls.style.cssText = "display:flex;gap:4px;flex-shrink:0;";
-    if (idx > 0) {
-      var upBtn = document.createElement("button");
-      upBtn.className = "export-btn";
-      upBtn.style.cssText = "padding:3px 8px;font-size:11px;";
-      upBtn.textContent = "\u25B2";
-      upBtn.title = "Move up";
-      upBtn.onclick = function() { movePinned(idx, idx - 1); };
-      controls.appendChild(upBtn);
-    }
-    if (idx < pinnedViews.length - 1) {
-      var downBtn = document.createElement("button");
-      downBtn.className = "export-btn";
-      downBtn.style.cssText = "padding:3px 8px;font-size:11px;";
-      downBtn.textContent = "\u25BC";
-      downBtn.title = "Move down";
-      downBtn.onclick = function() { movePinned(idx, idx + 1); };
-      controls.appendChild(downBtn);
-    }
-    if (window._clipboardAvailable) {
-      var clipBtn = document.createElement("button");
-      clipBtn.className = "export-btn clipboard-btn";
-      clipBtn.style.cssText = "padding:3px 8px;font-size:11px;";
-      clipBtn.innerHTML = "&#x1F4CB;";
-      clipBtn.title = "Copy to clipboard (paste into PowerPoint)";
-      clipBtn.onclick = (function(id) { return function() { copyPinnedCardToClipboard(id); }; })(pin.id);
-      controls.appendChild(clipBtn);
-    }
-    var exportBtn = document.createElement("button");
-    exportBtn.className = "export-btn";
-    exportBtn.style.cssText = "padding:3px 8px;font-size:11px;";
-    exportBtn.innerHTML = "&#128247;";
-    exportBtn.title = "Export as PNG";
-    exportBtn.onclick = (function(id) { return function() { exportPinnedCardPNG(id); }; })(pin.id);
-    controls.appendChild(exportBtn);
+    controls.style.cssText = "display:flex;gap:4px;flex-shrink:0;align-items:center;";
+    // Remove button always visible
     var removeBtn = document.createElement("button");
     removeBtn.className = "export-btn";
     removeBtn.style.cssText = "padding:3px 8px;font-size:11px;color:#e8614d;";
@@ -322,6 +298,52 @@ function renderPinnedCards() {
     removeBtn.title = "Remove pin";
     removeBtn.onclick = function() { removePinned(pin.id, pin.qCode); };
     controls.appendChild(removeBtn);
+    // Overflow menu (⋮) for secondary actions
+    var overflowWrap = document.createElement("div");
+    overflowWrap.className = "pin-overflow-wrap";
+    overflowWrap.style.cssText = "position:relative;display:inline-block;";
+    var overflowBtn = document.createElement("button");
+    overflowBtn.className = "export-btn pin-overflow-btn";
+    overflowBtn.style.cssText = "padding:3px 8px;font-size:14px;line-height:1;";
+    overflowBtn.innerHTML = "\u22EE";
+    overflowBtn.title = "More actions";
+    overflowBtn.onclick = function() { togglePinOverflow(this); };
+    overflowWrap.appendChild(overflowBtn);
+    var overflowMenu = document.createElement("div");
+    overflowMenu.className = "pin-overflow-menu";
+    overflowMenu.style.cssText = "display:none;position:absolute;right:0;top:100%;background:#fff;border:1px solid #e2e8f0;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:100;min-width:170px;padding:4px 0;margin-top:4px;";
+    if (window._clipboardAvailable) {
+      var cItem = document.createElement("button");
+      cItem.className = "pin-overflow-item";
+      cItem.style.cssText = "display:block;width:100%;text-align:left;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;font-family:inherit;color:#374151;";
+      cItem.innerHTML = "&#x1F4CB; Copy to clipboard";
+      cItem.onclick = (function(id) { return function() { copyPinnedCardToClipboard(id); }; })(pin.id);
+      overflowMenu.appendChild(cItem);
+    }
+    var eItem = document.createElement("button");
+    eItem.className = "pin-overflow-item";
+    eItem.style.cssText = "display:block;width:100%;text-align:left;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;font-family:inherit;color:#374151;";
+    eItem.innerHTML = "&#128247; Export as PNG";
+    eItem.onclick = (function(id) { return function() { exportPinnedCardPNG(id); }; })(pin.id);
+    overflowMenu.appendChild(eItem);
+    if (idx > 0) {
+      var uItem = document.createElement("button");
+      uItem.className = "pin-overflow-item";
+      uItem.style.cssText = "display:block;width:100%;text-align:left;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;font-family:inherit;color:#374151;";
+      uItem.innerHTML = "\u25B2 Move up";
+      uItem.onclick = (function(i) { return function() { movePinned(i, i - 1); }; })(idx);
+      overflowMenu.appendChild(uItem);
+    }
+    if (idx < pinnedViews.length - 1) {
+      var dItem = document.createElement("button");
+      dItem.className = "pin-overflow-item";
+      dItem.style.cssText = "display:block;width:100%;text-align:left;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;font-family:inherit;color:#374151;";
+      dItem.innerHTML = "\u25BC Move down";
+      dItem.onclick = (function(i) { return function() { movePinned(i, i + 1); }; })(idx);
+      overflowMenu.appendChild(dItem);
+    }
+    overflowWrap.appendChild(overflowMenu);
+    controls.appendChild(overflowWrap);
     header.appendChild(controls);
     card.appendChild(header);
 
@@ -372,10 +394,22 @@ function renderPinnedCards() {
     // Table (detailed reference) — respect pin mode
     if (pin.tableHtml && showTable) {
       var tableDiv = document.createElement("div");
-      tableDiv.style.cssText = "overflow-x:auto;font-size:11px;";
+      tableDiv.className = "table-wrapper";
+      tableDiv.style.cssText = "overflow-x:auto;font-size:11px;margin-top:8px;";
       tableDiv.innerHTML = pin.tableHtml;
       var tbl = tableDiv.querySelector("table");
-      if (tbl) tbl.style.cssText = "font-size:10px;width:100%;table-layout:fixed;word-wrap:break-word;overflow-wrap:break-word;";
+      if (tbl) {
+        // Preserve ct-table class for CSS matching; only set layout properties
+        if (!tbl.classList.contains("ct-table")) tbl.classList.add("ct-table");
+        tbl.style.cssText = "font-size:10px;width:100%;table-layout:fixed;word-wrap:break-word;overflow-wrap:break-word;";
+      }
+      // Ensure header cells don't have stale inline color overrides
+      var ths = tableDiv.querySelectorAll(".ct-th");
+      for (var ti = 0; ti < ths.length; ti++) {
+        ths[ti].style.removeProperty("color");
+        ths[ti].style.removeProperty("background");
+        ths[ti].style.removeProperty("background-color");
+      }
       card.appendChild(tableDiv);
     }
 
@@ -410,6 +444,90 @@ function updateSectionTitle(idx, newTitle) {
     savePinnedData();
   }
 }
+
+// Toggle pin overflow menu
+function togglePinOverflow(btn) {
+  var menu = btn.nextElementSibling;
+  if (!menu) return;
+  document.querySelectorAll(".pin-overflow-menu").forEach(function(m) {
+    if (m !== menu) m.style.display = "none";
+  });
+  menu.style.display = menu.style.display === "none" ? "block" : "none";
+}
+document.addEventListener("click", function(e) {
+  if (!e.target.closest(".pin-overflow-wrap")) {
+    document.querySelectorAll(".pin-overflow-menu").forEach(function(m) {
+      m.style.display = "none";
+    });
+  }
+});
+
+// ==============================================================================
+// DRAG AND DROP REORDERING
+// ==============================================================================
+(function() {
+  var dragFromIdx = null;
+
+  document.addEventListener("dragstart", function(e) {
+    var draggable = e.target.closest("[data-pin-drag-idx]");
+    if (!draggable) return;
+    if (e.target.isContentEditable || e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") {
+      e.preventDefault();
+      return;
+    }
+    dragFromIdx = parseInt(draggable.getAttribute("data-pin-drag-idx"), 10);
+    draggable.classList.add("pin-dragging");
+    e.dataTransfer.effectAllowed = "move";
+    try {
+      var title = draggable.querySelector(".pinned-card-title, .section-divider-title") ||
+                  draggable.querySelector("[style*='font-weight:600']");
+      var label = title ? title.textContent.substring(0, 30) : "Moving...";
+      var ghost = document.createElement("div");
+      ghost.style.cssText = "position:absolute;top:-999px;left:-999px;padding:8px 16px;background:#e2e8f0;border-radius:6px;font-size:13px;font-weight:500;color:#374151;white-space:nowrap;";
+      ghost.textContent = label;
+      document.body.appendChild(ghost);
+      e.dataTransfer.setDragImage(ghost, 0, 0);
+      setTimeout(function() { document.body.removeChild(ghost); }, 0);
+    } catch (err) {}
+  });
+
+  document.addEventListener("dragover", function(e) {
+    var target = e.target.closest("[data-pin-drag-idx]");
+    if (!target || dragFromIdx === null) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    document.querySelectorAll(".pin-drop-target").forEach(function(el) {
+      el.classList.remove("pin-drop-target");
+    });
+    target.classList.add("pin-drop-target");
+  });
+
+  document.addEventListener("dragleave", function(e) {
+    var target = e.target.closest("[data-pin-drag-idx]");
+    if (target) target.classList.remove("pin-drop-target");
+  });
+
+  document.addEventListener("drop", function(e) {
+    e.preventDefault();
+    document.querySelectorAll(".pin-drop-target, .pin-dragging").forEach(function(el) {
+      el.classList.remove("pin-drop-target", "pin-dragging");
+    });
+    var target = e.target.closest("[data-pin-drag-idx]");
+    if (!target || dragFromIdx === null) return;
+    var toIdx = parseInt(target.getAttribute("data-pin-drag-idx"), 10);
+    if (dragFromIdx !== toIdx) {
+      movePinned(dragFromIdx, toIdx);
+    }
+    dragFromIdx = null;
+  });
+
+  document.addEventListener("dragend", function() {
+    dragFromIdx = null;
+    document.querySelectorAll(".pin-drop-target, .pin-dragging").forEach(function(el) {
+      el.classList.remove("pin-drop-target", "pin-dragging");
+    });
+  });
+})();
 
 function movePinned(fromIdx, toIdx) {
   if (toIdx < 0 || toIdx >= pinnedViews.length) return;
@@ -458,8 +576,15 @@ function exportPinnedCardPNG(pinId) {
   }
   if (!pin || pin.type === "section") return;
 
+  // Dashboard sections and added slides use HTML-based export (their content is
+  // complex styled HTML that can't be reduced to plain SVG text)
+  if (pin.pinType === "dashboard_section" || pin.pinType === "text_box") {
+    exportDashboardPinPNG(pin);
+    return;
+  }
+
   var ns = "http://www.w3.org/2000/svg";
-  var W = 1280, fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
+  var W = 960, fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
   var pad = 20;
   var scale = 3;
   var usableW = W - pad * 2;
@@ -521,11 +646,11 @@ function exportPinnedCardPNG(pinId) {
   var tableH = 0;
   if (pngShowTable && pin.tableHtml) {
     var countRows = (pin.tableHtml.match(/<tr/g) || []).length;
-    tableH = countRows * 18 + 4;
+    tableH = 22 + Math.max(0, countRows - 1) * 20 + 8;
   }
 
+  // Initial estimate — will be tightened after rendering
   var totalH = tableTopY + tableH + pad + 8;
-  if (totalH < 200) totalH = 200;
 
   var svg = document.createElementNS(ns, "svg");
   svg.setAttribute("xmlns", ns);
@@ -615,9 +740,16 @@ function exportPinnedCardPNG(pinId) {
       querySelectorAll: function(sel) { return tDiv.querySelectorAll(sel); }
     });
     if (tRows) {
-      renderTableSVG(ns, svg, tRows, pad, tableTopY, usableW);
+      var actualTableH = renderTableSVG(ns, svg, tRows, pad, tableTopY, usableW);
+      if (actualTableH > 0) {
+        totalH = tableTopY + actualTableH + pad;
+      }
     }
   }
+
+  // Tighten SVG to actual content height (no wasted white space)
+  bg.setAttribute("height", totalH);
+  svg.setAttribute("viewBox", "0 0 " + W + " " + totalH);
 
   // Render SVG to PNG at 3x
   var svgData = new XMLSerializer().serializeToString(svg);
@@ -645,6 +777,178 @@ function exportPinnedCardPNG(pinId) {
 }
 
 /**
+ * Export a dashboard_section or text_box pin as PNG.
+ * These pins contain complex styled HTML that can't be rendered via SVG.
+ * Strategy: build a pure SVG slide from the pin's data fields using the same
+ * SVG-native approach as regular pin export, but adapted for these content types.
+ * @param {Object} pin - The pin object
+ */
+function exportDashboardPinPNG(pin) {
+  var ns = "http://www.w3.org/2000/svg";
+  var W = 960;
+  var scale = 3;
+  var pad = 20;
+  var usableW = W - pad * 2;
+  var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand-colour").trim() || BRAND_COLOUR;
+  var fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
+
+  // Title
+  var titleLines = wrapTextLines(pin.qTitle || "Pinned Content", usableW, 9.5);
+  var titleLineH = 20;
+  var titleStartY = pad + 12;
+  var titleBlockH = titleLines.length * titleLineH;
+  var contentTop = titleStartY + titleBlockH + 12;
+
+  // Extract plain text from the pin's HTML content
+  var htmlContent = pin.tableHtml || pin.insightText || "";
+  var plainText = htmlToPlainText(htmlContent);
+  var bodyLines = wrapTextLines(plainText, usableW - 16, 7);
+  var bodyLineH = 17;
+  var bodyBlockH = bodyLines.length > 0 ? bodyLines.length * bodyLineH + 24 : 0;
+
+  // Image (for text_box pins with attached images)
+  var imageTopY = contentTop + bodyBlockH + (bodyBlockH > 0 ? 8 : 0);
+  var imageH = 0;
+  if (pin.imageData && pin.imageWidth && pin.imageHeight) {
+    var imgScale = usableW / pin.imageWidth;
+    imageH = Math.round(pin.imageHeight * imgScale);
+  }
+
+  var totalH = imageTopY + imageH + pad + 8;
+  if (totalH < 200) totalH = 200;
+
+  // Build SVG
+  var svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("xmlns", ns);
+  svg.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+  svg.setAttribute("viewBox", "0 0 " + W + " " + totalH);
+  svg.setAttribute("style", "font-family:" + fontFamily + ";");
+
+  // White background
+  var bg = document.createElementNS(ns, "rect");
+  bg.setAttribute("width", W); bg.setAttribute("height", totalH);
+  bg.setAttribute("fill", "#ffffff");
+  svg.appendChild(bg);
+
+  // Brand accent bar
+  var accent = document.createElementNS(ns, "rect");
+  accent.setAttribute("x", "0"); accent.setAttribute("y", "0");
+  accent.setAttribute("width", W); accent.setAttribute("height", "4");
+  accent.setAttribute("fill", brandColour);
+  svg.appendChild(accent);
+
+  // Title
+  var titleResult = createWrappedText(ns, titleLines, pad, titleStartY, titleLineH,
+    { fill: "#1a2744", "font-size": "18", "font-weight": "700" });
+  svg.appendChild(titleResult.element);
+
+  // Body text
+  if (bodyLines.length > 0) {
+    var bodyBg = document.createElementNS(ns, "rect");
+    bodyBg.setAttribute("x", pad); bodyBg.setAttribute("y", contentTop + 2);
+    bodyBg.setAttribute("width", usableW);
+    bodyBg.setAttribute("height", Math.max(28, bodyLines.length * bodyLineH + 12));
+    bodyBg.setAttribute("rx", "4");
+    bodyBg.setAttribute("fill", pin.pinType === "text_box" ? "#f8fafc" : "#f0f4ff");
+    svg.appendChild(bodyBg);
+
+    if (pin.pinType !== "text_box") {
+      var accentBar = document.createElementNS(ns, "rect");
+      accentBar.setAttribute("x", pad); accentBar.setAttribute("y", contentTop + 2);
+      accentBar.setAttribute("width", "4");
+      accentBar.setAttribute("height", Math.max(28, bodyLines.length * bodyLineH + 12));
+      accentBar.setAttribute("fill", brandColour); accentBar.setAttribute("rx", "2");
+      svg.appendChild(accentBar);
+    }
+
+    var bodyResult = createWrappedText(ns, bodyLines, pad + 14, contentTop + 18, bodyLineH,
+      { fill: "#1a2744", "font-size": "13", "font-weight": pin.pinType === "text_box" ? "400" : "500" });
+    svg.appendChild(bodyResult.element);
+  }
+
+  // Image
+  if (pin.imageData && imageH > 0) {
+    var imgScale2 = usableW / pin.imageWidth;
+    var imgW = Math.round(pin.imageWidth * imgScale2);
+    var imgX = pad + Math.round((usableW - imgW) / 2);
+    var svgImg = document.createElementNS(ns, "image");
+    svgImg.setAttribute("x", imgX);
+    svgImg.setAttribute("y", imageTopY);
+    svgImg.setAttribute("width", imgW);
+    svgImg.setAttribute("height", imageH);
+    svgImg.setAttributeNS("http://www.w3.org/1999/xlink", "href", pin.imageData);
+    svgImg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    svg.appendChild(svgImg);
+  }
+
+  // For dashboard_section pins that have tableHtml with structured data,
+  // try to extract and render any embedded table
+  if (pin.pinType === "dashboard_section" && pin.tableHtml) {
+    var tDiv = document.createElement("div");
+    tDiv.innerHTML = pin.tableHtml;
+    var embeddedTable = tDiv.querySelector("table");
+    if (embeddedTable) {
+      var tContainer = { querySelector: function(s) { return tDiv.querySelector(s); },
+                         querySelectorAll: function(s) { return tDiv.querySelectorAll(s); } };
+      var tRows = extractSlideTableData(tContainer);
+      if (tRows && tRows.length > 0) {
+        var tableY = contentTop + bodyBlockH + (bodyBlockH > 0 ? 8 : 0);
+        var tableH = renderTableSVG(ns, svg, tRows, pad, tableY, usableW);
+        totalH = tableY + tableH + pad + 8;
+        // Update SVG viewBox to accommodate table
+        svg.setAttribute("viewBox", "0 0 " + W + " " + totalH);
+        bg.setAttribute("height", totalH);
+      }
+    }
+  }
+
+  // Render to PNG
+  var svgData = new XMLSerializer().serializeToString(svg);
+  var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+  var url = URL.createObjectURL(svgBlob);
+  var sImg = new Image();
+  sImg.onerror = function() {
+    URL.revokeObjectURL(url);
+    alert("PNG export failed. Try Chrome or Edge.");
+  };
+  sImg.onload = function() {
+    var canvas = document.createElement("canvas");
+    canvas.width = W * scale; canvas.height = totalH * scale;
+    var ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(sImg, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(url);
+    canvas.toBlob(function(blob) {
+      var slug = (pin.qTitle || "pin").replace(/[^a-zA-Z0-9]/g, "_").substring(0, 40);
+      downloadBlob(blob, "pin_" + slug + "_slide.png");
+    }, "image/png");
+  };
+  sImg.src = url;
+}
+
+/**
+ * Convert HTML string to plain text for SVG rendering.
+ * Strips tags, decodes entities, preserves line breaks.
+ */
+function htmlToPlainText(html) {
+  if (!html) return "";
+  var div = document.createElement("div");
+  div.innerHTML = html;
+  // Replace block elements with newlines
+  div.querySelectorAll("br, p, div, h1, h2, h3, h4, h5, h6, li").forEach(function(el) {
+    if (el.tagName === "BR") {
+      el.replaceWith("\n");
+    } else {
+      el.insertAdjacentText("afterend", "\n");
+    }
+  });
+  var text = div.textContent || div.innerText || "";
+  // Clean up multiple newlines and trim
+  return text.replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/**
  * Copy a pinned card to clipboard as PNG (for pasting into PowerPoint).
  * Re-uses the same SVG-native rendering as exportPinnedCardPNG but writes
  * to clipboard instead of downloading a file.
@@ -657,9 +961,15 @@ function copyPinnedCardToClipboard(pinId) {
   }
   if (!pin || pin.type === "section") return;
 
+  // Dashboard sections and added slides: use foreignObject approach for complex HTML
+  if (pin.pinType === "dashboard_section" || pin.pinType === "text_box") {
+    copyDashboardPinToClipboard(pin);
+    return;
+  }
+
   // Build the same SVG as exportPinnedCardPNG
   var ns = "http://www.w3.org/2000/svg";
-  var W = 1280, fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
+  var W = 960, fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
   var pad = 20;
   var scale = 3;
   var usableW = W - pad * 2;
@@ -718,11 +1028,11 @@ function copyPinnedCardToClipboard(pinId) {
   var tableH = 0;
   if (clipShowTable && pin.tableHtml) {
     var countRows = (pin.tableHtml.match(/<tr/g) || []).length;
-    tableH = countRows * 18 + 4;
+    tableH = 22 + Math.max(0, countRows - 1) * 20 + 8;
   }
 
+  // Initial estimate — will be tightened after rendering
   var totalH = tableTopY + tableH + pad + 8;
-  if (totalH < 200) totalH = 200;
 
   var svg = document.createElementNS(ns, "svg");
   svg.setAttribute("xmlns", ns);
@@ -812,9 +1122,16 @@ function copyPinnedCardToClipboard(pinId) {
       querySelectorAll: function(sel) { return tDiv.querySelectorAll(sel); }
     });
     if (tRows) {
-      renderTableSVG(ns, svg, tRows, pad, tableTopY, usableW);
+      var actualTableH = renderTableSVG(ns, svg, tRows, pad, tableTopY, usableW);
+      if (actualTableH > 0) {
+        totalH = tableTopY + actualTableH + pad;
+      }
     }
   }
+
+  // Tighten SVG to actual content height
+  bg.setAttribute("height", totalH);
+  svg.setAttribute("viewBox", "0 0 " + W + " " + totalH);
 
   // Render to canvas and copy to clipboard
   var svgData = new XMLSerializer().serializeToString(svg);
@@ -866,13 +1183,153 @@ function copyPinnedCardToClipboard(pinId) {
   sImg.src = url;
 }
 
+/**
+ * Copy a dashboard_section or text_box pin to clipboard as PNG.
+ * Uses the same SVG-native approach as exportDashboardPinPNG but writes to clipboard.
+ */
+function copyDashboardPinToClipboard(pin) {
+  var ns = "http://www.w3.org/2000/svg";
+  var W = 960;
+  var scale = 3;
+  var pad = 20;
+  var usableW = W - pad * 2;
+  var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand-colour").trim() || BRAND_COLOUR;
+  var fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
+
+  var titleLines = wrapTextLines(pin.qTitle || "Pinned Content", usableW, 9.5);
+  var titleLineH = 20;
+  var titleStartY = pad + 12;
+  var titleBlockH = titleLines.length * titleLineH;
+  var contentTop = titleStartY + titleBlockH + 12;
+
+  var htmlContent = pin.tableHtml || pin.insightText || "";
+  var plainText = htmlToPlainText(htmlContent);
+  var bodyLines = wrapTextLines(plainText, usableW - 16, 7);
+  var bodyLineH = 17;
+  var bodyBlockH = bodyLines.length > 0 ? bodyLines.length * bodyLineH + 24 : 0;
+
+  var imageTopY = contentTop + bodyBlockH + (bodyBlockH > 0 ? 8 : 0);
+  var imageH = 0;
+  if (pin.imageData && pin.imageWidth && pin.imageHeight) {
+    var imgScale = usableW / pin.imageWidth;
+    imageH = Math.round(pin.imageHeight * imgScale);
+  }
+
+  var totalH = imageTopY + imageH + pad + 8;
+  if (totalH < 200) totalH = 200;
+
+  var svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("xmlns", ns);
+  svg.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+  svg.setAttribute("viewBox", "0 0 " + W + " " + totalH);
+  svg.setAttribute("style", "font-family:" + fontFamily + ";");
+
+  var bg = document.createElementNS(ns, "rect");
+  bg.setAttribute("width", W); bg.setAttribute("height", totalH);
+  bg.setAttribute("fill", "#ffffff");
+  svg.appendChild(bg);
+
+  var accent = document.createElementNS(ns, "rect");
+  accent.setAttribute("x", "0"); accent.setAttribute("y", "0");
+  accent.setAttribute("width", W); accent.setAttribute("height", "4");
+  accent.setAttribute("fill", brandColour);
+  svg.appendChild(accent);
+
+  var titleResult = createWrappedText(ns, titleLines, pad, titleStartY, titleLineH,
+    { fill: "#1a2744", "font-size": "18", "font-weight": "700" });
+  svg.appendChild(titleResult.element);
+
+  if (bodyLines.length > 0) {
+    var bodyBgH = Math.max(28, bodyLines.length * bodyLineH + 12);
+    var bodyBg = document.createElementNS(ns, "rect");
+    bodyBg.setAttribute("x", pad); bodyBg.setAttribute("y", contentTop + 2);
+    bodyBg.setAttribute("width", usableW); bodyBg.setAttribute("height", bodyBgH);
+    bodyBg.setAttribute("rx", "4");
+    bodyBg.setAttribute("fill", pin.pinType === "text_box" ? "#f8fafc" : "#f0f4ff");
+    svg.appendChild(bodyBg);
+
+    if (pin.pinType !== "text_box") {
+      var ab = document.createElementNS(ns, "rect");
+      ab.setAttribute("x", pad); ab.setAttribute("y", contentTop + 2);
+      ab.setAttribute("width", "4"); ab.setAttribute("height", bodyBgH);
+      ab.setAttribute("fill", brandColour); ab.setAttribute("rx", "2");
+      svg.appendChild(ab);
+    }
+
+    var bodyResult = createWrappedText(ns, bodyLines, pad + 14, contentTop + 18, bodyLineH,
+      { fill: "#1a2744", "font-size": "13", "font-weight": pin.pinType === "text_box" ? "400" : "500" });
+    svg.appendChild(bodyResult.element);
+  }
+
+  if (pin.imageData && imageH > 0) {
+    var imgScale2 = usableW / pin.imageWidth;
+    var imgW = Math.round(pin.imageWidth * imgScale2);
+    var imgX = pad + Math.round((usableW - imgW) / 2);
+    var svgImg = document.createElementNS(ns, "image");
+    svgImg.setAttribute("x", imgX); svgImg.setAttribute("y", imageTopY);
+    svgImg.setAttribute("width", imgW); svgImg.setAttribute("height", imageH);
+    svgImg.setAttributeNS("http://www.w3.org/1999/xlink", "href", pin.imageData);
+    svgImg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    svg.appendChild(svgImg);
+  }
+
+  if (pin.pinType === "dashboard_section" && pin.tableHtml) {
+    var tDiv = document.createElement("div");
+    tDiv.innerHTML = pin.tableHtml;
+    var embeddedTable = tDiv.querySelector("table");
+    if (embeddedTable) {
+      var tContainer = { querySelector: function(s) { return tDiv.querySelector(s); },
+                         querySelectorAll: function(s) { return tDiv.querySelectorAll(s); } };
+      var tRows = extractSlideTableData(tContainer);
+      if (tRows && tRows.length > 0) {
+        var tableY = contentTop + bodyBlockH + (bodyBlockH > 0 ? 8 : 0);
+        var tableH = renderTableSVG(ns, svg, tRows, pad, tableY, usableW);
+        totalH = tableY + tableH + pad + 8;
+        svg.setAttribute("viewBox", "0 0 " + W + " " + totalH);
+        bg.setAttribute("height", totalH);
+      }
+    }
+  }
+
+  var svgData = new XMLSerializer().serializeToString(svg);
+  var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+  var url = URL.createObjectURL(svgBlob);
+  var sImg = new Image();
+  sImg.onerror = function() {
+    URL.revokeObjectURL(url);
+    alert("Clipboard copy failed. Try Chrome or Edge.");
+  };
+  sImg.onload = function() {
+    var canvas = document.createElement("canvas");
+    canvas.width = W * scale; canvas.height = totalH * scale;
+    var ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(sImg, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(url);
+    canvas.toBlob(function(blob) {
+      if (blob && navigator.clipboard && navigator.clipboard.write) {
+        navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]).then(function() {
+          var btn = document.querySelector('.pinned-card[data-pin-id="' + pin.id + '"] .clipboard-btn');
+          if (btn) { btn.innerHTML = "&#x2705;"; setTimeout(function() { btn.innerHTML = "&#x1F4CB;"; }, 1500); }
+        }).catch(function() {
+          alert("Clipboard write failed. Try the PNG export button instead.");
+        });
+      } else {
+        alert("Clipboard API not available. Try the PNG export button instead.");
+      }
+    }, "image/png");
+  };
+  sImg.src = url;
+}
+
 function exportAllPinnedSlides() {
   if (pinnedViews.length === 0) {
     alert("No pinned views to export.");
     return;
   }
   var ns = "http://www.w3.org/2000/svg";
-  var W = 1280, fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
+  var W = 960, fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
   var pad = 20;
   var scale = 3;
   var DOWNLOAD_DELAY_MS = 600;
@@ -880,18 +1337,24 @@ function exportAllPinnedSlides() {
 
   // Step 1: Build all SVG blobs upfront (synchronous)
   var slides = [];
+  var skippedPins = 0;
   pinnedViews.forEach(function(pin, idx) {
     // Skip section dividers
     if (pin.type === "section") return;
+    // Dashboard sections and added slides need DOM-based export — export individually
+    if (pin.pinType === "dashboard_section" || pin.pinType === "text_box") {
+      skippedPins++;
+      return;
+    }
     var usableW = W - pad * 2;
-    var titleFullText = (pin.pinType === "text_box" || pin.pinType === "heatmap")
+    var titleFullText = (pin.pinType === "heatmap")
       ? pin.qTitle
       : pin.qCode + " - " + pin.qTitle;
     var titleLines = wrapTextLines(titleFullText, usableW, 9.5);
     var titleLineH = 20;
     var titleStartY = pad + 12;
     var titleBlockH = titleLines.length * titleLineH;
-    var metaText = (pin.pinType === "text_box" || pin.pinType === "heatmap")
+    var metaText = (pin.pinType === "heatmap")
       ? ""
       : "Base: " + (pin.baseText || "\u2014") + " \u00B7 Banner: " + (pin.bannerLabel || "");
     var metaY = titleStartY + titleBlockH + 4;
@@ -941,11 +1404,11 @@ function exportAllPinnedSlides() {
     var tableH = 0;
     if (slideShowTable && pin.tableHtml) {
       var countRows = (pin.tableHtml.match(/<tr/g) || []).length;
-      tableH = countRows * 18 + 4;
+      tableH = 22 + Math.max(0, countRows - 1) * 20 + 8;
     }
 
+    // Initial estimate — tightened after table render
     var totalH = tableTopY + tableH + pad + 8;
-    if (totalH < 200) totalH = 200;
 
     var svg = document.createElementNS(ns, "svg");
     svg.setAttribute("xmlns", ns);
@@ -1035,9 +1498,16 @@ function exportAllPinnedSlides() {
       tDiv.innerHTML = pin.tableHtml;
       var tRows = extractSlideTableData({ querySelector: function(sel) { return tDiv.querySelector(sel); }, querySelectorAll: function(sel) { return tDiv.querySelectorAll(sel); } });
       if (tRows) {
-        renderTableSVG(ns, svg, tRows, pad, tableTopY, usableW);
+        var actualTableH = renderTableSVG(ns, svg, tRows, pad, tableTopY, usableW);
+        if (actualTableH > 0) {
+          totalH = tableTopY + actualTableH + pad;
+        }
       }
     }
+
+    // Tighten SVG to actual content height
+    bg.setAttribute("height", totalH);
+    svg.setAttribute("viewBox", "0 0 " + W + " " + totalH);
 
     // Serialise SVG to blob URL
     var svgData = new XMLSerializer().serializeToString(svg);
@@ -1058,9 +1528,14 @@ function exportAllPinnedSlides() {
 
   function downloadNext(i) {
     if (i >= slides.length) {
+      var msg = "";
       if (failed > 0) {
-        alert("Exported " + downloaded + " of " + slides.length + " slides. " + failed + " failed.");
+        msg += "Exported " + downloaded + " of " + slides.length + " slides. " + failed + " failed.\n";
       }
+      if (skippedPins > 0) {
+        msg += skippedPins + " dashboard/added-slide pin(s) must be exported individually using their export button.";
+      }
+      if (msg) alert(msg);
       return;
     }
     var s = slides[i];
@@ -1831,8 +2306,8 @@ function handleQualImage(slideId, input) {
     var img = new Image();
     img.onerror = function() { /* invalid image data — silently skip */ };
     img.onload = function() {
-      // Resize to max 800px on longest side (balances quality vs file size)
-      var maxDim = 800;
+      // Resize to max 1920px on longest side (high quality for PPT/export)
+      var maxDim = 1920;
       var w = img.width, h = img.height;
       if (w > maxDim || h > maxDim) {
         if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
@@ -1842,7 +2317,7 @@ function handleQualImage(slideId, input) {
       canvas.width = w; canvas.height = h;
       var ctx = canvas.getContext("2d");
       ctx.drawImage(img, 0, 0, w, h);
-      var dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+      var dataUrl = canvas.toDataURL("image/jpeg", 0.92);
 
       // Warn if large after resize (size check only, no console output)
       var sizeKB = Math.round(dataUrl.length * 0.75 / 1024);

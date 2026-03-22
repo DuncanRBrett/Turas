@@ -254,6 +254,10 @@ build_dashboard_css <- function(brand_colour) {
       display: flex; justify-content: space-between; align-items: center;
       margin-bottom: 4px;
     }
+    .dash-collapse-chevron { font-size: 12px; color: #94a3b8; margin-right: 4px; transition: transform 0.2s; }
+    .dash-collapsed .dash-heatmap,
+    .dash-collapsed .dash-section-sub { display: none; }
+    .dash-collapsed .dash-heatmap-header { margin-bottom: 0; }
     .dash-export-btn {
       display: inline-flex; align-items: center; gap: 6px;
       padding: 6px 14px; font-size: 12px; font-weight: 600;

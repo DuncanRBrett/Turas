@@ -38,6 +38,10 @@ if (file.exists(guard_path)) source(guard_path)
 config_loader_path <- file.path(tracker_root, "lib", "tracker_config_loader.R")
 if (file.exists(config_loader_path)) source(config_loader_path)
 
+# Source preflight validators (for check_tracking_specs_valid tests)
+preflight_path <- file.path(tracker_root, "lib", "validation", "preflight_validators.R")
+if (file.exists(preflight_path)) source(preflight_path)
+
 
 # ==============================================================================
 # HELPER: Create mock config objects for testing
@@ -177,6 +181,214 @@ test_that("TrackingSpecs preserves valid specs", {
   )
   expect_equal(tq$TrackingSpecs[1], "mean,top2_box")
   expect_equal(tq$TrackingSpecs[2], "nps_score,promoters_pct")
+})
+
+
+# ==============================================================================
+# TESTS: Config loader TrackingSpecs inline validation (comma-split, patterns)
+# ==============================================================================
+
+test_that("config loader TrackingSpecs validation: comma-separated specs do not warn", {
+  skip_if_not(exists("load_tracking_config", mode = "function"),
+              "load_tracking_config not loaded")
+  skip_if_not(requireNamespace("openxlsx", quietly = TRUE), "openxlsx not available")
+
+  tmp_dir <- tempdir()
+  config_path <- file.path(tmp_dir, "test_specs_config.xlsx")
+
+  wb <- openxlsx::createWorkbook()
+
+  openxlsx::addWorksheet(wb, "Waves")
+  openxlsx::writeData(wb, "Waves", data.frame(
+    WaveID = "W1", WaveName = "Wave 1", DataFile = "w1.csv",
+    FieldworkStart = "2024-01-01", FieldworkEnd = "2024-01-31",
+    stringsAsFactors = FALSE
+  ))
+
+  openxlsx::addWorksheet(wb, "TrackedQuestions")
+  openxlsx::writeData(wb, "TrackedQuestions", data.frame(
+    QuestionCode = c("Q1", "Q2", "Q3", "Q4"),
+    TrackingSpecs = c("mean,top2_box", "nps_score,promoters_pct",
+                      "box:Agree=Top Box", "range:4-5,category:Yes"),
+    stringsAsFactors = FALSE
+  ))
+
+  openxlsx::addWorksheet(wb, "Banner")
+  openxlsx::writeData(wb, "Banner", data.frame(
+    BreakVariable = "Gender", BreakLabel = "Gender",
+    stringsAsFactors = FALSE
+  ))
+
+  openxlsx::addWorksheet(wb, "Settings")
+  openxlsx::writeData(wb, "Settings", data.frame(
+    Setting = c("project_name"), Value = c("Test"),
+    stringsAsFactors = FALSE
+  ))
+
+  openxlsx::saveWorkbook(wb, config_path, overwrite = TRUE)
+
+  # Should not produce any "Unrecognized TrackingSpecs" warning
+  output <- capture.output({
+    config <- load_tracking_config(config_path)
+  })
+  warning_lines <- grep("Unrecognized TrackingSpecs", output, value = TRUE)
+  expect_equal(length(warning_lines), 0,
+               info = paste("Unexpected warnings:", paste(warning_lines, collapse = "\n")))
+
+  unlink(config_path)
+})
+
+test_that("config loader TrackingSpecs validation: invalid specs produce warning", {
+  skip_if_not(exists("load_tracking_config", mode = "function"),
+              "load_tracking_config not loaded")
+  skip_if_not(requireNamespace("openxlsx", quietly = TRUE), "openxlsx not available")
+
+  tmp_dir <- tempdir()
+  config_path <- file.path(tmp_dir, "test_specs_invalid_config.xlsx")
+
+  wb <- openxlsx::createWorkbook()
+
+  openxlsx::addWorksheet(wb, "Waves")
+  openxlsx::writeData(wb, "Waves", data.frame(
+    WaveID = "W1", WaveName = "Wave 1", DataFile = "w1.csv",
+    FieldworkStart = "2024-01-01", FieldworkEnd = "2024-01-31",
+    stringsAsFactors = FALSE
+  ))
+
+  openxlsx::addWorksheet(wb, "TrackedQuestions")
+  openxlsx::writeData(wb, "TrackedQuestions", data.frame(
+    QuestionCode = c("Q1"),
+    TrackingSpecs = c("totally_bogus_spec"),
+    stringsAsFactors = FALSE
+  ))
+
+  openxlsx::addWorksheet(wb, "Banner")
+  openxlsx::writeData(wb, "Banner", data.frame(
+    BreakVariable = "Gender", BreakLabel = "Gender",
+    stringsAsFactors = FALSE
+  ))
+
+  openxlsx::addWorksheet(wb, "Settings")
+  openxlsx::writeData(wb, "Settings", data.frame(
+    Setting = c("project_name"), Value = c("Test"),
+    stringsAsFactors = FALSE
+  ))
+
+  openxlsx::saveWorkbook(wb, config_path, overwrite = TRUE)
+
+  output <- capture.output({
+    config <- load_tracking_config(config_path)
+  })
+  warning_lines <- grep("Unrecognized TrackingSpecs", output, value = TRUE)
+  expect_true(length(warning_lines) > 0,
+              info = "Should warn about invalid TrackingSpecs")
+
+  unlink(config_path)
+})
+
+
+# ==============================================================================
+# TESTS: Preflight check_tracking_specs_valid (comma-split, patterns, =Label)
+# ==============================================================================
+
+test_that("preflight check_tracking_specs_valid: accepts all valid spec types", {
+  skip_if_not(exists("check_tracking_specs_valid", mode = "function"),
+              "check_tracking_specs_valid not loaded")
+  skip_if_not(exists("log_preflight_issue", mode = "function"),
+              "log_preflight_issue not loaded")
+
+  # Use the actual column structure from log_preflight_issue
+  error_log <- data.frame(Timestamp = character(0), Component = character(0),
+                          Issue_Type = character(0), Description = character(0),
+                          QuestionCode = character(0), Severity = character(0),
+                          stringsAsFactors = FALSE)
+
+  tracked_df <- data.frame(
+    QuestionCode = c("Q1", "Q2", "Q3", "Q4", "Q5", "Q6"),
+    TrackingSpecs = c(
+      "mean,top2_box,bottom_box",
+      "nps_score,promoters_pct,detractors_pct",
+      "distribution,all,top3",
+      "auto,any,count_mean,count_distribution",
+      "box:Agree=Top Box,range:4-5=High",
+      "category:Yes,option:Brand_A"
+    ),
+    stringsAsFactors = FALSE
+  )
+
+  result <- check_tracking_specs_valid(tracked_df, error_log)
+  errors <- result[result$Severity == "Error", ]
+  expect_equal(nrow(errors), 0,
+               info = paste("Unexpected errors:", paste(errors$Description, collapse = "\n")))
+})
+
+test_that("preflight check_tracking_specs_valid: rejects invalid specs", {
+  skip_if_not(exists("check_tracking_specs_valid", mode = "function"),
+              "check_tracking_specs_valid not loaded")
+  skip_if_not(exists("log_preflight_issue", mode = "function"),
+              "log_preflight_issue not loaded")
+
+  error_log <- data.frame(Timestamp = character(0), Component = character(0),
+                          Issue_Type = character(0), Description = character(0),
+                          QuestionCode = character(0), Severity = character(0),
+                          stringsAsFactors = FALSE)
+
+  tracked_df <- data.frame(
+    QuestionCode = c("Q1"),
+    TrackingSpecs = c("mean,pct_agree,bogus"),
+    stringsAsFactors = FALSE
+  )
+
+  result <- check_tracking_specs_valid(tracked_df, error_log)
+  errors <- result[result$Severity == "Error", ]
+  expect_true(nrow(errors) > 0, info = "Should flag pct_agree and bogus as invalid")
+  expect_true(grepl("pct_agree", errors$Description[1]))
+  expect_true(grepl("bogus", errors$Description[1]))
+})
+
+test_that("preflight check_tracking_specs_valid: strips =Label before validation", {
+  skip_if_not(exists("check_tracking_specs_valid", mode = "function"),
+              "check_tracking_specs_valid not loaded")
+  skip_if_not(exists("log_preflight_issue", mode = "function"),
+              "log_preflight_issue not loaded")
+
+  error_log <- data.frame(Timestamp = character(0), Component = character(0),
+                          Issue_Type = character(0), Description = character(0),
+                          QuestionCode = character(0), Severity = character(0),
+                          stringsAsFactors = FALSE)
+
+  tracked_df <- data.frame(
+    QuestionCode = c("Q1"),
+    TrackingSpecs = c("mean=Average,top2_box=Agree,box:Agree=Top Box"),
+    stringsAsFactors = FALSE
+  )
+
+  result <- check_tracking_specs_valid(tracked_df, error_log)
+  errors <- result[result$Severity == "Error", ]
+  expect_equal(nrow(errors), 0,
+               info = paste("Labels should be stripped:", paste(errors$Description, collapse = "\n")))
+})
+
+
+# ==============================================================================
+# TESTS: known_metadata_cols includes ResponseScale and ScalePoints
+# ==============================================================================
+
+test_that("known_metadata_cols: ResponseScale and ScalePoints excluded from wave detection", {
+  # Test the filtering logic directly — these columns should be in known_metadata_cols
+  # so they are excluded when detecting wave columns from the QuestionMap sheet
+  known_metadata_cols <- c("QuestionCode", "QuestionText", "QuestionType", "SourceQuestions",
+                           "TrackingSpecs", "ResponseScale", "ScalePoints")
+
+  all_cols <- c("QuestionCode", "QuestionText", "QuestionType", "W1", "W2",
+                "ResponseScale", "ScalePoints", "TrackingSpecs")
+  potential_wave_cols <- setdiff(all_cols, known_metadata_cols)
+
+  expect_true("W1" %in% potential_wave_cols)
+  expect_true("W2" %in% potential_wave_cols)
+  expect_false("ResponseScale" %in% potential_wave_cols)
+  expect_false("ScalePoints" %in% potential_wave_cols)
+  expect_equal(length(potential_wave_cols), 2)
 })
 
 

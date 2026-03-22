@@ -810,7 +810,7 @@ build_heatmap_grid <- function(metrics, banner_info, config_obj, thresholds,
 
   # Build table HTML as string
   html <- sprintf(
-    '<div class="dash-section"><div class="dash-heatmap-header"><div class="dash-section-title">%s</div>',
+    '<div class="dash-section dash-collapsible"><div class="dash-heatmap-header" onclick="toggleDashSection(this)" style="cursor:pointer"><span class="dash-collapse-chevron">&#x25BC;</span> <div class="dash-section-title" style="display:inline">%s</div>',
     htmltools::htmlEscape(section_label)
   )
   html <- paste0(html, sprintf(

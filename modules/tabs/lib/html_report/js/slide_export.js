@@ -82,8 +82,17 @@ function extractSlideTableData(container) {
     tr.querySelectorAll("td").forEach(function(td) {
       if (td.style.display === "none") return;
       var clone = td.cloneNode(true);
-      clone.querySelectorAll(".ct-freq, .ct-sig, .row-exclude-btn").forEach(function(el) { el.remove(); });
-      cells.push(clone.textContent.trim());
+      // Remove frequency annotations and exclude buttons, but preserve significance markers
+      clone.querySelectorAll(".ct-freq, .row-exclude-btn").forEach(function(el) { el.remove(); });
+      // Extract significance letters and append them to the cell value
+      var sigLetters = [];
+      clone.querySelectorAll(".ct-sig").forEach(function(sig) {
+        sigLetters.push(sig.textContent.trim());
+        sig.remove();
+      });
+      var cellVal = clone.textContent.trim();
+      if (sigLetters.length > 0) cellVal += " " + sigLetters.join("");
+      cells.push(cellVal);
     });
     if (cells.length > 0) {
       rows.push({ cells: cells, type: isBase ? "base" : (isMean ? "mean" : (isNet ? "net" : "data")) });
@@ -205,7 +214,7 @@ function exportSlidePNG(qCode, mode) {
   document.querySelectorAll(".slide-menu").forEach(function(m) { m.style.display = "none"; });
 
   var ns = "http://www.w3.org/2000/svg";
-  var W = 1280, fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
+  var W = 960, fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
   var pad = 20;
   var usableW = W - pad * 2;
   var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--brand-colour").trim() || BRAND_COLOUR;

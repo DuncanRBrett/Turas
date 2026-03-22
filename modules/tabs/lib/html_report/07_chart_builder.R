@@ -520,16 +520,16 @@ build_stacked_bar_svg <- function(items, bar_width = 680, chart_id = NULL) {
     pos <- legend_positions[[i]]
     legend_y <- legend_y_start + pos$row * legend_row_gap
 
-    # Colour dot swatch (circle)
+    # Colour swatch (rounded rectangle)
     svg_parts <- c(svg_parts, sprintf(
-      '<circle cx="%g" cy="%g" r="4.5" fill="%s"/>',
-      pos$x + 4.5, legend_y + 5, colour
+      '<rect x="%g" y="%g" width="10" height="10" rx="2" fill="%s"/>',
+      pos$x, legend_y, colour
     ))
 
     # Label text
     svg_parts <- c(svg_parts, sprintf(
-      '<text x="%g" y="%g" fill="#64748b" font-size="10.5">%s</text>',
-      pos$x + 13, legend_y + 9, htmltools::htmlEscape(pos$text)
+      '<text x="%g" y="%g" fill="#64748b" font-size="11" font-weight="400">%s</text>',
+      pos$x + 14, legend_y + 9, htmltools::htmlEscape(pos$text)
     ))
   }
 
@@ -583,12 +583,32 @@ build_horizontal_bars_svg <- function(items, brand_colour = "#323367",
     chart_width, total_height
   ))
 
+  # Faint reference grid lines (25%, 50%, 75%) behind bars
+  grid_top <- top_margin
+  grid_bottom <- top_margin + nrow(items) * (bar_height + bar_gap) - bar_gap
+  for (pct in c(25, 50, 75)) {
+    gx <- label_width + (pct / max_val) * bar_area_width
+    if (gx <= label_width || gx >= label_width + bar_area_width) next
+    svg_parts <- c(svg_parts, sprintf(
+      '<line x1="%g" y1="%d" x2="%g" y2="%d" stroke="#e9ecef" stroke-width="0.5" stroke-dasharray="3,3"/>',
+      gx, grid_top, gx, grid_bottom
+    ))
+  }
+
   for (i in seq_len(nrow(items))) {
     y <- top_margin + (i - 1) * (bar_height + bar_gap)
     label <- items$label[i]
     val <- items$value[i]
     pct_text <- sprintf("%g%%", round(val))
     bar_w <- max((val / max_val) * bar_area_width, 2)
+
+    # Subtle alternating row background
+    if (i %% 2 == 0) {
+      svg_parts <- c(svg_parts, sprintf(
+        '<rect x="%d" y="%g" width="%d" height="%d" fill="#f9fafb" rx="3"/>',
+        label_width - 4, y - 2, as.integer(bar_area_width + value_width + 12), bar_height + 4
+      ))
+    }
 
     # Wrap each bar in a <g> with data attributes for JS sort
     svg_parts <- c(svg_parts, sprintf(
@@ -598,19 +618,19 @@ build_horizontal_bars_svg <- function(items, brand_colour = "#323367",
 
     # Category label (right-aligned in label area)
     svg_parts <- c(svg_parts, sprintf(
-      '<text x="%d" y="%g" text-anchor="end" dominant-baseline="central" fill="#64748b" font-size="11" font-weight="400">%s</text>',
+      '<text x="%d" y="%g" text-anchor="end" dominant-baseline="central" fill="#374151" font-size="11" font-weight="500">%s</text>',
       label_width - 8, bar_height / 2, htmltools::htmlEscape(label)
     ))
 
     # Bar
     svg_parts <- c(svg_parts, sprintf(
-      '<rect x="%d" y="0" width="%g" height="%d" rx="4" fill="%s" opacity="0.85"/>',
+      '<rect x="%d" y="0" width="%g" height="%d" rx="4" fill="%s"/>',
       label_width, bar_w, bar_height, brand_colour
     ))
 
     # Value label (right of bar)
     svg_parts <- c(svg_parts, sprintf(
-      '<text x="%g" y="%g" dominant-baseline="central" fill="#334155" font-size="12" font-weight="500">%s</text>',
+      '<text x="%g" y="%g" dominant-baseline="central" fill="#334155" font-size="12" font-weight="600" style="font-variant-numeric:tabular-nums">%s</text>',
       label_width + bar_w + 8, bar_height / 2, pct_text
     ))
 

@@ -315,6 +315,10 @@ build_kpi_hero_cards <- function(html_data, config) {
       groups <- c(groups, list(
         htmltools::tags$div(class = "kpi-type-group",
           htmltools::tags$div(class = "kpi-type-header",
+            onclick = "toggleKpiTypeGroup(this)",
+            style = "cursor:pointer;",
+            htmltools::tags$span(class = "kpi-type-chevron",
+              htmltools::HTML("&#x25BC;")),
             type_labels[[type_key]] %||% type_key),
           htmltools::tags$div(class = "tk-hero-strip", type_cards_tags)
         )

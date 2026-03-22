@@ -303,9 +303,9 @@
     var data = loadExplorerData();
     if (!data) return;
 
-    // Show the Visualise tab button
+    // Enable the Visualise tab button (remove greyed-out state)
     var tabBtn = document.getElementById("tab-btn-visualise");
-    if (tabBtn) tabBtn.style.display = "";
+    if (tabBtn) tabBtn.classList.remove("tab-disabled");
 
     var placeholder = document.getElementById("visualise-placeholder");
     var content = document.getElementById("visualise-content");
@@ -351,9 +351,9 @@
     var data = loadExplorerData();
     if (!data) return;
 
-    // Show Visualise tab button
+    // Enable the Visualise tab button (remove greyed-out state)
     var tabBtn = document.getElementById("tab-btn-visualise");
-    if (tabBtn) tabBtn.style.display = "";
+    if (tabBtn) tabBtn.classList.remove("tab-disabled");
     var placeholder = document.getElementById("visualise-placeholder");
     var content = document.getElementById("visualise-content");
     if (placeholder) placeholder.style.display = "none";
@@ -505,7 +505,6 @@
     h.push('<button class="vis-axis-reset" onclick="visResetYAxis()" title="Reset to auto">&#x21BA;</button>');
     h.push('</div>');
     h.push('<div class="mv-control-group mv-action-buttons" style="border-right:none;margin-left:auto">');
-    h.push('<button class="export-btn" onclick="visExportExcel()">&#x2B73; Export Excel</button>');
     h.push('<div class="tk-pin-dropdown" style="display:inline-block;position:relative">');
     h.push('<button class="export-btn" onclick="visTogglePinMenu()">&#x1F4CC; Pin &#x25BE;</button>');
     h.push('<div class="tk-pin-menu" id="vis-pin-menu" style="display:none">');
@@ -513,8 +512,27 @@
     h.push('<button class="tk-pin-option" onclick="visPinView(\'chart\')">Insight + Chart</button>');
     h.push('<button class="tk-pin-option" onclick="visPinView(\'table\')">Insight + Table</button>');
     h.push('</div></div>');
-    h.push('<button class="export-btn" onclick="visExportSlide()">&#x1F4F8; Export Slide</button>');
+    h.push('<div style="display:inline-block;position:relative">');
+    h.push('<button class="export-btn" onclick="visToggleExportMenu()">&#x2B73; Export &#x25BE;</button>');
+    h.push('<div class="vis-export-menu" id="vis-export-menu" style="display:none;position:absolute;bottom:100%;right:0;background:#fff;border:1px solid #e2e8f0;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:100;min-width:160px;padding:4px 0;margin-bottom:4px;">');
+    h.push('<button class="export-menu-item" onclick="visExportExcel();visToggleExportMenu()">&#x2B73; Export Excel</button>');
+    h.push('<button class="export-menu-item" onclick="visExportSlide();visToggleExportMenu()">&#x1F4F8; Export Slide</button>');
     h.push('</div></div>');
+    h.push('</div></div>');
+
+    // Wave chip bar (toggle individual waves)
+    h.push('<div class="hm-wave-chips vis-wave-chips" id="vis-wave-chips">');
+    h.push('<label class="hm-control-label" style="margin-right:6px;">Waves:</label>');
+    for (var wi = 0; wi < data.waves.length; wi++) {
+      h.push('<button class="hm-wave-chip active" data-wave="' + escapeHtml(data.waves[wi]) +
+        '" onclick="visToggleWaveChip(\'' + escapeHtml(data.waves[wi]) + '\',this)">' +
+        escapeHtml(data.waveLabels[wi]) + '</button>');
+    }
+    h.push('<span class="hm-wave-actions">');
+    h.push('<button class="hm-wave-action" onclick="visWaveShowAll()">All</button>');
+    h.push('<button class="hm-wave-action" onclick="visWaveShowLast(3)">Last 3</button>');
+    h.push('</span>');
+    h.push('</div>');
 
     // Chart area
     h.push('<div class="vis-chart-area" id="vis-chart"></div>');
@@ -545,6 +563,12 @@
     h.push('</div>'); // vis-layout
 
     content.innerHTML = h.join("\n");
+
+    // Init wave chip state (all waves visible by default in Visualise)
+    visWaveState = {};
+    for (var wi2 = 0; wi2 < data.waves.length; wi2++) {
+      visWaveState[data.waves[wi2]] = true;
+    }
 
     // Render chart after DOM insertion
     if (visState.chartVisible) renderVisCombinedChart(data);
@@ -746,8 +770,24 @@
     var container = document.getElementById("vis-chart");
     if (!container) return;
 
+    // Filter waves by chip state (if chips exist)
     var waves = data.waves;
     var waveLabels = data.waveLabels;
+    var ws = (typeof getVisWaveState === "function") ? getVisWaveState() : {};
+    var hasWaveFilter = Object.keys(ws).length > 0;
+    if (hasWaveFilter) {
+      var filteredWaves = [], filteredLabels = [];
+      for (var fi = 0; fi < data.waves.length; fi++) {
+        if (ws[data.waves[fi]] !== false) {
+          filteredWaves.push(data.waves[fi]);
+          filteredLabels.push(data.waveLabels[fi]);
+        }
+      }
+      if (filteredWaves.length > 0) {
+        waves = filteredWaves;
+        waveLabels = filteredLabels;
+      }
+    }
 
     // Build series: each visible item becomes a line
     var series = [];
@@ -1315,6 +1355,18 @@
   window.visTogglePinMenu = function() {
     var menu = document.getElementById("vis-pin-menu");
     if (menu) menu.style.display = menu.style.display === "none" ? "" : "none";
+    // Close export menu if open
+    var expMenu = document.getElementById("vis-export-menu");
+    if (expMenu) expMenu.style.display = "none";
+  };
+
+  // ---- Unified Export dropdown ----
+  window.visToggleExportMenu = function() {
+    var menu = document.getElementById("vis-export-menu");
+    if (menu) menu.style.display = menu.style.display === "none" ? "" : "none";
+    // Close pin menu if open
+    var pinMenu = document.getElementById("vis-pin-menu");
+    if (pinMenu) pinMenu.style.display = "none";
   };
 
   window.visPinView = function(mode) {
@@ -1530,6 +1582,59 @@
     if (!text) return "";
     return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
+
+  // ---- Visualise wave chip toggle ----
+  var visWaveState = {};  // { waveId: true/false } for Visualise tab
+
+  function applyVisWaveVisibility() {
+    var data = loadExplorerData();
+    if (!data) return;
+    // Table columns
+    var tbl = document.getElementById("vis-tbl");
+    if (tbl) {
+      for (var wid in visWaveState) {
+        tbl.querySelectorAll('th[data-wave="' + wid + '"], td[data-wave="' + wid + '"]').forEach(function(el) {
+          el.classList.toggle("hm-wave-hidden", !visWaveState[wid]);
+        });
+      }
+    }
+    // Rebuild chart with only visible waves
+    if (visState.chartVisible && data) renderVisCombinedChart(data);
+  }
+
+  window.visToggleWaveChip = function(waveId, chipEl) {
+    // Prevent deselecting all
+    var activeCount = 0;
+    for (var k in visWaveState) { if (visWaveState[k]) activeCount++; }
+    if (activeCount <= 1 && visWaveState[waveId]) return;
+    chipEl.classList.toggle("active");
+    visWaveState[waveId] = chipEl.classList.contains("active");
+    applyVisWaveVisibility();
+  };
+
+  window.visWaveShowAll = function() {
+    document.querySelectorAll("#vis-wave-chips .hm-wave-chip").forEach(function(chip) {
+      chip.classList.add("active");
+      var wid = chip.getAttribute("data-wave");
+      if (wid) visWaveState[wid] = true;
+    });
+    applyVisWaveVisibility();
+  };
+
+  window.visWaveShowLast = function(n) {
+    var chips = document.querySelectorAll("#vis-wave-chips .hm-wave-chip");
+    var total = chips.length;
+    chips.forEach(function(chip, idx) {
+      var isActive = idx >= total - n;
+      chip.classList.toggle("active", isActive);
+      var wid = chip.getAttribute("data-wave");
+      if (wid) visWaveState[wid] = isActive;
+    });
+    applyVisWaveVisibility();
+  };
+
+  // Expose wave state for chart rendering
+  window.getVisWaveState = function() { return visWaveState; };
 
   // ---- Listen for annotation changes to refresh Visualise chart ----
   document.addEventListener("tk-annotation-changed", function() {

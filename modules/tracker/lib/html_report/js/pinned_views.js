@@ -195,7 +195,7 @@ function renderPinnedCards() {
 
     // Section divider
     if (item.type === "section") {
-      html += "<div class=\"section-divider\" data-idx=\"" + i + "\">";
+      html += "<div class=\"section-divider\" data-idx=\"" + i + "\" draggable=\"true\" data-pin-drag-idx=\"" + i + "\">";
       html += "<div class=\"section-divider-title\" contenteditable=\"true\" " +
         "onblur=\"updateSectionTitle(" + i + ", this.textContent)\">" +
         escapeHtml(item.title) + "</div>";
@@ -209,21 +209,28 @@ function renderPinnedCards() {
 
     // Pin card
     var pin = item;
-    html += "<div class=\"pinned-card\" data-pin-id=\"" + pin.id + "\">";
+    html += "<div class=\"pinned-card\" data-pin-id=\"" + pin.id + "\" draggable=\"true\" data-pin-drag-idx=\"" + i + "\">";
 
     // Header — use metricTitle for metric pins, qTitle for Added Slide pins
     var titleText = pin.metricTitle || pin.qTitle || "Untitled";
     html += "<div class=\"pinned-card-header\">";
     html += "<h3 class=\"pinned-card-title\">" + escapeHtml(titleText) + "</h3>";
     html += "<div class=\"pinned-card-actions\">";
-    html += "<button class=\"tk-btn tk-btn-sm\" onclick=\"exportPinnedCardPNG('" + pin.id + "')\" title=\"Export as PNG\">&#x1F4F8;</button>";
+    html += "<button class=\"tk-btn tk-btn-sm\" style=\"color:#e8614d;\" onclick=\"removePinned('" + pin.id + "','" + pin.metricId + "')\" title=\"Remove pin\">\u00d7</button>";
+    html += "<div class=\"pin-overflow-wrap\" style=\"position:relative;display:inline-block\">";
+    html += "<button class=\"tk-btn tk-btn-sm pin-overflow-btn\" onclick=\"togglePinOverflow(this)\" title=\"More actions\">\u22EE</button>";
+    html += "<div class=\"pin-overflow-menu\" style=\"display:none;position:absolute;right:0;top:100%;background:#fff;border:1px solid #e2e8f0;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:100;min-width:170px;padding:4px 0;margin-top:4px;\">";
+    if (navigator.clipboard && typeof ClipboardItem !== "undefined") {
+      html += "<button class=\"pin-overflow-item\" onclick=\"copyPinnedCardToClipboard('" + pin.id + "')\">&#x1F4CB; Copy to clipboard</button>";
+    }
+    html += "<button class=\"pin-overflow-item\" onclick=\"exportPinnedCardPNG('" + pin.id + "')\">&#x1F4F8; Export as PNG</button>";
     if (i > 0) {
-      html += "<button class=\"tk-btn tk-btn-sm\" onclick=\"movePinned(" + i + "," + (i - 1) + ")\" title=\"Move up\">\u2191</button>";
+      html += "<button class=\"pin-overflow-item\" onclick=\"movePinned(" + i + "," + (i - 1) + ")\">\u2191 Move up</button>";
     }
     if (i < total - 1) {
-      html += "<button class=\"tk-btn tk-btn-sm\" onclick=\"movePinned(" + i + "," + (i + 1) + ")\" title=\"Move down\">\u2193</button>";
+      html += "<button class=\"pin-overflow-item\" onclick=\"movePinned(" + i + "," + (i + 1) + ")\">\u2193 Move down</button>";
     }
-    html += "<button class=\"tk-btn tk-btn-sm\" onclick=\"removePinned('" + pin.id + "','" + pin.metricId + "')\" title=\"Remove pin\">\u00d7</button>";
+    html += "</div></div>";
     html += "</div></div>";
 
     // Editable insight (each pin has its own independent insight)
@@ -331,6 +338,98 @@ function updatePinBadge() {
     badge.style.display = pinnedViews.length > 0 ? "inline-block" : "none";
   }
 }
+
+/**
+ * Toggle the overflow menu on pinned cards
+ */
+function togglePinOverflow(btn) {
+  var menu = btn.nextElementSibling;
+  if (!menu) return;
+  // Close all other overflow menus first
+  document.querySelectorAll(".pin-overflow-menu").forEach(function(m) {
+    if (m !== menu) m.style.display = "none";
+  });
+  menu.style.display = menu.style.display === "none" ? "block" : "none";
+}
+
+// Close overflow menus on click outside
+document.addEventListener("click", function(e) {
+  if (!e.target.closest(".pin-overflow-wrap")) {
+    document.querySelectorAll(".pin-overflow-menu").forEach(function(m) {
+      m.style.display = "none";
+    });
+  }
+});
+
+// ==============================================================================
+// DRAG AND DROP REORDERING
+// ==============================================================================
+
+(function() {
+  var dragFromIdx = null;
+
+  document.addEventListener("dragstart", function(e) {
+    var draggable = e.target.closest("[data-pin-drag-idx]");
+    if (!draggable) return;
+    // Don't drag if user is in contenteditable
+    if (e.target.isContentEditable || e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") {
+      e.preventDefault();
+      return;
+    }
+    dragFromIdx = parseInt(draggable.getAttribute("data-pin-drag-idx"), 10);
+    draggable.classList.add("pin-dragging");
+    e.dataTransfer.effectAllowed = "move";
+    // Lightweight drag ghost
+    try {
+      var title = draggable.querySelector(".pinned-card-title, .section-divider-title");
+      var label = title ? title.textContent.substring(0, 30) : "Moving...";
+      var ghost = document.createElement("div");
+      ghost.style.cssText = "position:absolute;top:-999px;left:-999px;padding:8px 16px;background:#e2e8f0;border-radius:6px;font-size:13px;font-weight:500;color:#374151;white-space:nowrap;";
+      ghost.textContent = label;
+      document.body.appendChild(ghost);
+      e.dataTransfer.setDragImage(ghost, 0, 0);
+      setTimeout(function() { document.body.removeChild(ghost); }, 0);
+    } catch (err) { /* fallback to default ghost */ }
+  });
+
+  document.addEventListener("dragover", function(e) {
+    var target = e.target.closest("[data-pin-drag-idx]");
+    if (!target || dragFromIdx === null) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    // Visual feedback: add drop indicator
+    document.querySelectorAll(".pin-drop-target").forEach(function(el) {
+      el.classList.remove("pin-drop-target");
+    });
+    target.classList.add("pin-drop-target");
+  });
+
+  document.addEventListener("dragleave", function(e) {
+    var target = e.target.closest("[data-pin-drag-idx]");
+    if (target) target.classList.remove("pin-drop-target");
+  });
+
+  document.addEventListener("drop", function(e) {
+    e.preventDefault();
+    document.querySelectorAll(".pin-drop-target, .pin-dragging").forEach(function(el) {
+      el.classList.remove("pin-drop-target", "pin-dragging");
+    });
+    var target = e.target.closest("[data-pin-drag-idx]");
+    if (!target || dragFromIdx === null) return;
+    var toIdx = parseInt(target.getAttribute("data-pin-drag-idx"), 10);
+    if (dragFromIdx !== toIdx) {
+      movePinned(dragFromIdx, toIdx);
+    }
+    dragFromIdx = null;
+  });
+
+  document.addEventListener("dragend", function() {
+    dragFromIdx = null;
+    document.querySelectorAll(".pin-drop-target, .pin-dragging").forEach(function(el) {
+      el.classList.remove("pin-drop-target", "pin-dragging");
+    });
+  });
+})();
 
 /**
  * Show the insight editor on a pinned card
@@ -645,7 +744,7 @@ function exportPinnedCardPNG(pinId) {
   if (!pin) return;
 
   var ns = "http://www.w3.org/2000/svg";
-  var W = 1280;
+  var W = 960;
   var fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
   var pad = 20;
   var usableW = W - pad * 2;
@@ -904,6 +1003,245 @@ function exportPinnedCardPNG(pinId) {
     }, "image/png");
   };
   img.src = url;
+}
+
+/**
+ * Copy a pinned card to clipboard as PNG (for pasting into PowerPoint).
+ * Reuses the same SVG rendering as exportPinnedCardPNG, but writes to clipboard.
+ */
+function copyPinnedCardToClipboard(pinId) {
+  var pin = null;
+  for (var i = 0; i < pinnedViews.length; i++) {
+    if (pinnedViews[i].id === pinId) { pin = pinnedViews[i]; break; }
+  }
+  if (!pin) return;
+
+  // Find the clipboard button for visual feedback
+  var btnEl = document.querySelector('.pinned-card[data-pin-id="' + pinId + '"] .tk-btn-sm');
+
+  // Build the SVG using the same logic as exportPinnedCardPNG
+  // We call the export function internally but intercept the blob
+  var ns = "http://www.w3.org/2000/svg";
+  var W = 960;
+  var fontFamily = "'Inter',system-ui,-apple-system,'Segoe UI',sans-serif";
+  var pad = 20;
+  var usableW = W - pad * 2;
+  var brandColour = (typeof _tkBrand === "function") ? _tkBrand() : (getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#323367");
+
+  var titleText = pin.metricTitle || pin.qTitle || "Pinned View";
+  var titleLines = pinWrapTextLines(titleText, usableW, 9.5);
+  var titleLineH = 20;
+  var titleStartY = pad + 12;
+  var titleBlockH = titleLines.length * titleLineH;
+  var metaText = new Date(pin.timestamp).toLocaleDateString();
+  if (pin.visibleSegments && pin.visibleSegments.length > 0) {
+    metaText += "  \u00B7  Segments: " + pin.visibleSegments.join(", ");
+  }
+  var metaY = titleStartY + titleBlockH + 4;
+  var contentTop = metaY + 12;
+
+  var insightPlain = "";
+  if (pin.insightText) {
+    var tmpDiv = document.createElement("div");
+    tmpDiv.innerHTML = pin.insightText;
+    insightPlain = tmpDiv.textContent.trim();
+  }
+  var insightLines = pinWrapTextLines(insightPlain, usableW - 16, 7.5);
+  var insightLineH = 17;
+  var insightBlockH = insightLines.length > 0 ? insightLines.length * insightLineH + 24 : 0;
+  var insightY = contentTop;
+
+  var imageTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 8 : 0);
+  var imageDisplayH = 0;
+  if (pin.imageData) {
+    var imgW = pin.imageWidth || 800;
+    var imgH = pin.imageHeight || 400;
+    var imgScale = Math.min(1, usableW / imgW);
+    var renderW = Math.round(imgW * imgScale);
+    var renderH = Math.round(imgH * imgScale);
+    if (renderH > 500) { renderH = 500; renderW = Math.round(imgW * (500 / imgH)); }
+    imageDisplayH = renderH + 8;
+  }
+
+  var expMode = pin.pinMode || "all";
+  var expShowChart = (expMode === "all" || expMode === "chart_insight" || expMode === "chart");
+  var expShowTable = (expMode === "all" || expMode === "table_insight" || expMode === "table");
+
+  var chartTopY = imageTopY + imageDisplayH + (imageDisplayH > 0 ? 8 : 0);
+  var chartDisplayH = 0;
+  var chartClone = null;
+  var chartScale = 1;
+  var legendItems = [];
+  if (expShowChart && pin.chartSvg && pin.chartVisible !== false) {
+    var chartTempDiv = document.createElement("div");
+    chartTempDiv.innerHTML = pin.chartSvg;
+    var svgEl = chartTempDiv.querySelector("svg");
+    if (svgEl) {
+      chartClone = svgEl.cloneNode(true);
+      chartClone.querySelectorAll("*").forEach(function(el) {
+        ["fill", "stroke"].forEach(function(attr) {
+          var val = el.getAttribute(attr);
+          if (val && val.indexOf("var(") !== -1) {
+            var match = val.match(/var\(--[^,)]+,\s*([^)]+)\)/);
+            if (match) el.setAttribute(attr, match[1].trim());
+          }
+        });
+      });
+      var vb = chartClone.getAttribute("viewBox");
+      if (vb) {
+        var chartVB = vb.split(" ").map(Number);
+        chartScale = usableW / chartVB[2];
+        chartDisplayH = chartVB[3] * chartScale;
+      }
+    }
+    var legendDiv = chartTempDiv.querySelector(".vis-legend");
+    if (legendDiv) {
+      legendDiv.querySelectorAll(".vis-legend-item").forEach(function(item) {
+        var swatch = item.querySelector(".vis-legend-swatch");
+        var colour = swatch ? swatch.style.background || swatch.style.backgroundColor || "#333" : "#333";
+        legendItems.push({ colour: colour, label: item.textContent.trim() });
+      });
+      chartDisplayH += 24;
+    }
+  }
+
+  var tableTopY = chartTopY + chartDisplayH + (chartDisplayH > 0 ? 8 : 0);
+  var tableData = null;
+  var estimatedTableH = 0;
+  if (expShowTable && pin.tableHtml) {
+    tableData = extractPinTableData(pin.tableHtml);
+    if (tableData && tableData.length > 0) {
+      estimatedTableH = 26 + (tableData.length - 1) * 22 + 8;
+    }
+  }
+
+  var totalH = tableTopY + estimatedTableH + pad + 8;
+
+  var svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("xmlns", ns);
+  svg.setAttribute("viewBox", "0 0 " + W + " " + totalH);
+  svg.setAttribute("style", "font-family:" + fontFamily + ";");
+
+  var bg = document.createElementNS(ns, "rect");
+  bg.setAttribute("width", W); bg.setAttribute("height", totalH);
+  bg.setAttribute("fill", "#ffffff");
+  svg.appendChild(bg);
+
+  var accentBar = document.createElementNS(ns, "rect");
+  accentBar.setAttribute("x", "0"); accentBar.setAttribute("y", "0");
+  accentBar.setAttribute("width", W); accentBar.setAttribute("height", "4");
+  accentBar.setAttribute("fill", brandColour);
+  svg.appendChild(accentBar);
+
+  var titleResult = pinCreateWrappedText(ns, titleLines, pad, titleStartY, titleLineH,
+    { fill: "#1a2744", "font-size": "18", "font-weight": "700" });
+  svg.appendChild(titleResult.element);
+
+  var metaEl = document.createElementNS(ns, "text");
+  metaEl.setAttribute("x", pad); metaEl.setAttribute("y", metaY);
+  metaEl.setAttribute("fill", "#94a3b8"); metaEl.setAttribute("font-size", "12");
+  metaEl.textContent = metaText;
+  svg.appendChild(metaEl);
+
+  if (insightLines.length > 0) {
+    var accentH = Math.max(28, insightLines.length * insightLineH + 12);
+    var insBg = document.createElementNS(ns, "rect");
+    insBg.setAttribute("x", pad); insBg.setAttribute("y", insightY + 2);
+    insBg.setAttribute("width", usableW); insBg.setAttribute("height", accentH);
+    insBg.setAttribute("rx", "4"); insBg.setAttribute("fill", "#f0f4ff");
+    svg.appendChild(insBg);
+    var iBar = document.createElementNS(ns, "rect");
+    iBar.setAttribute("x", pad); iBar.setAttribute("y", insightY + 2);
+    iBar.setAttribute("width", "4"); iBar.setAttribute("height", accentH);
+    iBar.setAttribute("fill", brandColour); iBar.setAttribute("rx", "2");
+    svg.appendChild(iBar);
+    var insResult = pinCreateWrappedText(ns, insightLines, pad + 14, insightY + 18, insightLineH,
+      { fill: "#1a2744", "font-size": "13", "font-weight": "500" });
+    svg.appendChild(insResult.element);
+  }
+
+  if (pin.imageData && imageDisplayH > 0) {
+    var imgEl2 = document.createElementNS(ns, "image");
+    imgEl2.setAttribute("x", pad); imgEl2.setAttribute("y", imageTopY);
+    imgEl2.setAttribute("width", renderW || usableW); imgEl2.setAttribute("height", renderH || 400);
+    imgEl2.setAttributeNS("http://www.w3.org/1999/xlink", "href", pin.imageData);
+    imgEl2.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    svg.appendChild(imgEl2);
+  }
+
+  if (chartClone && chartDisplayH > 0) {
+    var chartG = document.createElementNS(ns, "g");
+    chartG.setAttribute("transform", "translate(" + pad + "," + chartTopY + ") scale(" + chartScale + ")");
+    while (chartClone.firstChild) chartG.appendChild(chartClone.firstChild);
+    svg.appendChild(chartG);
+    if (legendItems.length > 0) {
+      var legendY = chartTopY + chartDisplayH - 8;
+      var legendX = pad;
+      var legendG = document.createElementNS(ns, "g");
+      for (var li = 0; li < legendItems.length; li++) {
+        var lRect = document.createElementNS(ns, "rect");
+        lRect.setAttribute("x", legendX); lRect.setAttribute("y", legendY - 8);
+        lRect.setAttribute("width", "10"); lRect.setAttribute("height", "10");
+        lRect.setAttribute("rx", "2"); lRect.setAttribute("fill", legendItems[li].colour);
+        legendG.appendChild(lRect);
+        var lText = document.createElementNS(ns, "text");
+        lText.setAttribute("x", legendX + 14); lText.setAttribute("y", legendY + 1);
+        lText.setAttribute("fill", "#334155"); lText.setAttribute("font-size", "11");
+        lText.setAttribute("font-weight", "500");
+        lText.textContent = legendItems[li].label;
+        legendG.appendChild(lText);
+        legendX += legendItems[li].label.length * 6.5 + 30;
+      }
+      svg.appendChild(legendG);
+    }
+  }
+
+  if (tableData && tableData.length > 0) {
+    var actualTableH = renderPinTableSVG(ns, svg, tableData, pad, tableTopY, usableW);
+    var newTotalH = tableTopY + actualTableH + pad + 20;
+    if (newTotalH > totalH) {
+      totalH = newTotalH;
+      bg.setAttribute("height", totalH);
+      svg.setAttribute("viewBox", "0 0 " + W + " " + totalH);
+    }
+  }
+
+  // Render to canvas and copy to clipboard
+  var renderScale = 3;
+  var svgData = new XMLSerializer().serializeToString(svg);
+  var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+  var url = URL.createObjectURL(svgBlob);
+  var sImg = new Image();
+  sImg.onerror = function() {
+    URL.revokeObjectURL(url);
+    alert("Copy failed. Try Chrome or Edge.");
+  };
+  sImg.onload = function() {
+    var canvas = document.createElement("canvas");
+    canvas.width = W * renderScale;
+    canvas.height = totalH * renderScale;
+    var ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(sImg, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(url);
+    canvas.toBlob(function(blob) {
+      if (!blob) { alert("Copy failed."); return; }
+      navigator.clipboard.write([
+        new ClipboardItem({ "image/png": blob })
+      ]).then(function() {
+        // Visual feedback
+        if (btnEl) {
+          var orig = btnEl.innerHTML;
+          btnEl.innerHTML = "\u2713";
+          setTimeout(function() { btnEl.innerHTML = orig; }, 1500);
+        }
+      }).catch(function() {
+        alert("Clipboard access denied. Try Chrome or Edge.");
+      });
+    }, "image/png");
+  };
+  sImg.src = url;
 }
 
 /**

@@ -1113,6 +1113,28 @@
 })();
 
 // ==============================================================================
+// INSIGHT BOX CONTENT DETECTION (T3: hide buttons when empty)
+// ==============================================================================
+
+// Watch summary insight editors and add/remove has-content class
+(function() {
+  function checkInsightContent() {
+    document.querySelectorAll(".summary-insight-box .summary-editor").forEach(function(editor) {
+      var box = editor.closest(".summary-insight-box");
+      if (box) {
+        var hasContent = editor.textContent.trim().length > 0;
+        box.classList.toggle("has-content", hasContent);
+      }
+    });
+  }
+  // Check on load and on any input
+  document.addEventListener("DOMContentLoaded", checkInsightContent);
+  document.addEventListener("input", function(e) {
+    if (e.target.classList.contains("summary-editor")) checkInsightContent();
+  });
+})();
+
+// ==============================================================================
 // SUMMARY TAB COLLAPSIBLE SECTIONS
 // ==============================================================================
 

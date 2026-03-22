@@ -181,9 +181,44 @@ build_header <- function(project_title, brand_colour, total_n, n_questions,
     )
   )
 
+  # Action buttons (Save / Print) — ghost-style, right-aligned
+  btn_style <- paste0(
+    "background:rgba(255,255,255,0.15);color:#fff;",
+    "border:1px solid rgba(255,255,255,0.3);",
+    "padding:6px 14px;border-radius:4px;font-size:12px;",
+    "cursor:pointer;font-family:inherit;font-weight:500;",
+    "transition:background 0.2s;"
+  )
+  header_actions <- htmltools::tags$div(
+    style = "display:flex;align-items:center;gap:8px;",
+    htmltools::tags$button(
+      onclick = "saveReportHTML()",
+      style = btn_style,
+      htmltools::HTML(paste0(
+        "<svg width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" style=\"vertical-align:-1px;margin-right:5px;\">",
+        "<path d=\"M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z\"/>",
+        "<polyline points=\"17 21 17 13 7 13 7 21\"/>",
+        "<polyline points=\"7 3 7 8 15 8\"/>",
+        "</svg>Save Report"
+      ))
+    ),
+    htmltools::tags$button(
+      onclick = "printReport()",
+      style = btn_style,
+      htmltools::HTML(paste0(
+        "<svg width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" style=\"vertical-align:-1px;margin-right:5px;\">",
+        "<polyline points=\"6 9 6 2 18 2 18 9\"/>",
+        "<path d=\"M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2\"/>",
+        "<rect x=\"6\" y=\"14\" width=\"12\" height=\"8\"/>",
+        "</svg>Print Report"
+      ))
+    )
+  )
+
   top_row <- htmltools::tags$div(
     style = "display:flex;align-items:center;justify-content:space-between;",
-    branding_left
+    branding_left,
+    header_actions
   )
 
   # --- Study name ---
@@ -582,36 +617,19 @@ build_banner_tabs <- function(banner_groups, brand_colour = "#323367") {
 #' @return htmltools::div
 build_controls <- function(has_any_freq, has_any_pct, has_any_sig,
                            brand_colour = "#323367", has_charts = FALSE) {
-  controls <- list()
 
+  # Primary controls (always visible)
+  primary <- list()
   if (has_any_pct) {
-    controls <- c(controls, list(
+    primary <- c(primary, list(
       htmltools::tags$label(class = "toggle-label",
         htmltools::tags$input(type = "checkbox", checked = NA, onchange = "toggleHeatmap(this.checked)"),
         "Heatmap"
-      ),
-      htmltools::tags$label(class = "toggle-label",
-        htmltools::tags$input(type = "checkbox", onchange = "toggleAllRows(this.checked)"),
-        "Hide rows"
-      ),
-      htmltools::tags$label(class = "toggle-label",
-        htmltools::tags$input(type = "checkbox", onchange = "toggleAllColumns(this.checked)"),
-        "Hide columns"
       )
     ))
   }
-
-  if (has_any_freq && has_any_pct) {
-    controls <- c(controls, list(
-      htmltools::tags$label(class = "toggle-label",
-        htmltools::tags$input(type = "checkbox", onchange = "toggleFrequency(this.checked)"),
-        "Show count"
-      )
-    ))
-  }
-
   if (has_charts) {
-    controls <- c(controls, list(
+    primary <- c(primary, list(
       htmltools::tags$label(class = "toggle-label",
         htmltools::tags$input(type = "checkbox", onchange = "toggleChart(this.checked)"),
         "Chart"
@@ -619,10 +637,55 @@ build_controls <- function(has_any_freq, has_any_pct, has_any_sig,
     ))
   }
 
+  # Secondary controls (behind Display Options dropdown)
+  secondary <- list()
+  if (has_any_pct) {
+    secondary <- c(secondary, list(
+      htmltools::tags$label(class = "toggle-label display-opt-item",
+        htmltools::tags$input(type = "checkbox", onchange = "toggleAllRows(this.checked)"),
+        "Hide rows"
+      ),
+      htmltools::tags$label(class = "toggle-label display-opt-item",
+        htmltools::tags$input(type = "checkbox", onchange = "toggleAllColumns(this.checked)"),
+        "Hide columns"
+      )
+    ))
+  }
+  if (has_any_freq && has_any_pct) {
+    secondary <- c(secondary, list(
+      htmltools::tags$label(class = "toggle-label display-opt-item",
+        htmltools::tags$input(type = "checkbox", onchange = "toggleFrequency(this.checked)"),
+        "Show count"
+      )
+    ))
+  }
+
+  # Build the Display Options dropdown if there are secondary controls
+  display_opts <- NULL
+  if (length(secondary) > 0) {
+    display_opts <- htmltools::tags$div(
+      class = "display-options-wrap",
+      style = "position:relative;",
+      htmltools::tags$button(
+        class = "export-btn",
+        style = "font-size:11px;padding:4px 10px;",
+        onclick = "toggleDisplayOptions(this)",
+        htmltools::HTML("&#x2699; Options \u25BE")
+      ),
+      htmltools::tags$div(
+        class = "display-options-menu",
+        id = "display-options-menu",
+        style = "display:none;position:absolute;top:100%;right:0;background:#fff;border:1px solid #e2e8f0;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:100;padding:8px 12px;margin-top:4px;white-space:nowrap;",
+        secondary
+      )
+    )
+  }
+
   htmltools::tags$div(
     class = "controls-bar",
     htmltools::tags$div(style = "flex:1"),
-    controls
+    primary,
+    display_opts
   )
 }
 
@@ -817,6 +880,12 @@ build_question_containers <- function(questions, tables, banner_groups,
         class = "question-title-card",
         htmltools::tags$div(class = "question-title-row",
           style = "display:flex;align-items:center;",
+          htmltools::tags$button(
+            class = "q-collapse-btn",
+            onclick = "toggleQuestionCollapse(this)",
+            title = "Collapse/expand question",
+            htmltools::HTML("&#x25BC;")
+          ),
           htmltools::tags$span(class = "question-code", q_code),
           htmltools::tags$span(class = "question-text", style = "flex:1;", q_text),
           htmltools::tags$button(
@@ -848,59 +917,67 @@ build_question_containers <- function(questions, tables, banner_groups,
       chart_div,
       insight_div,
       htmltools::tags$div(class = "table-actions",
-        htmltools::tags$button(
-          class = "export-btn",
-          onclick = sprintf("exportExcel('%s')", js_esc(q_code)),
-          "\u2B73 Export Excel"
-        ),
-        htmltools::tags$button(
-          class = "export-btn",
-          style = "margin-left:8px",
-          onclick = sprintf("exportCSV('%s')", js_esc(q_code)),
-          "\u2B73 Export CSV"
-        ),
-        if (has_chart) {
+        htmltools::tags$div(
+          class = "export-dropdown-group",
+          style = "position:relative;",
           htmltools::tags$button(
-            class = "export-btn export-chart-btn",
-            style = "margin-left:8px;display:none",
-            onclick = sprintf("exportChartPNG('%s')", js_esc(q_code)),
-            "\U0001F4CA Export Chart"
-          )
-        },
-        if (has_chart) {
+            class = "export-btn",
+            onclick = sprintf("toggleExportMenu('%s')", js_esc(q_code)),
+            "\u2B73 Export \u25BE"
+          ),
           htmltools::tags$div(
-            class = "slide-export-group",
-            style = "display:none;position:relative;margin-left:8px;",
+            class = "export-menu",
+            id = sprintf("export-menu-%s", gsub("[^a-zA-Z0-9]", "-", q_code)),
+            style = "display:none;position:absolute;bottom:100%;right:0;background:#fff;border:1px solid #e2e8f0;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:100;min-width:180px;padding:4px 0;margin-bottom:4px;",
             htmltools::tags$button(
-              class = "export-btn export-slide-btn",
-              onclick = sprintf("toggleSlideMenu('%s')", js_esc(q_code)),
-              "\U0001F4C4 Export Slide \u25BE"
+              class = "export-menu-item",
+              onclick = sprintf("exportExcel('%s')", js_esc(q_code)),
+              "\u2B73 Export Excel"
             ),
-            htmltools::tags$div(
-              class = "slide-menu",
-              id = sprintf("slide-menu-%s", gsub("[^a-zA-Z0-9]", "-", q_code)),
-              style = "display:none;position:absolute;top:100%;right:0;background:#fff;border:1px solid #e2e8f0;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:100;min-width:160px;padding:4px 0;",
+            htmltools::tags$button(
+              class = "export-menu-item",
+              onclick = sprintf("exportCSV('%s')", js_esc(q_code)),
+              "\u2B73 Export CSV"
+            ),
+            if (has_chart) {
               htmltools::tags$button(
-                class = "slide-menu-item",
-                style = "display:block;width:100%;text-align:left;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;font-family:inherit;",
-                onclick = sprintf("exportSlidePNG('%s','chart_table')", js_esc(q_code)),
-                "Chart + Table"
-              ),
-              htmltools::tags$button(
-                class = "slide-menu-item",
-                style = "display:block;width:100%;text-align:left;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;font-family:inherit;",
-                onclick = sprintf("exportSlidePNG('%s','chart')", js_esc(q_code)),
-                "Chart Only"
-              ),
-              htmltools::tags$button(
-                class = "slide-menu-item",
-                style = "display:block;width:100%;text-align:left;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;font-family:inherit;",
-                onclick = sprintf("exportSlidePNG('%s','table')", js_esc(q_code)),
-                "Table Only"
+                class = "export-menu-item export-chart-menu-item",
+                onclick = sprintf("exportChartPNG('%s')", js_esc(q_code)),
+                "\U0001F4CA Export Chart PNG"
               )
-            )
+            },
+            if (has_chart) {
+              htmltools::tags$div(class = "export-menu-sep")
+            },
+            if (has_chart) {
+              htmltools::tags$div(
+                class = "export-menu-label",
+                "Slide Export"
+              )
+            },
+            if (has_chart) {
+              htmltools::tags$button(
+                class = "export-menu-item export-slide-menu-item",
+                onclick = sprintf("exportSlidePNG('%s','chart_table')", js_esc(q_code)),
+                "\U0001F4C4 Chart + Table"
+              )
+            },
+            if (has_chart) {
+              htmltools::tags$button(
+                class = "export-menu-item export-slide-menu-item",
+                onclick = sprintf("exportSlidePNG('%s','chart')", js_esc(q_code)),
+                "\U0001F4C4 Chart Only"
+              )
+            },
+            if (has_chart) {
+              htmltools::tags$button(
+                class = "export-menu-item export-slide-menu-item",
+                onclick = sprintf("exportSlidePNG('%s','table')", js_esc(q_code)),
+                "\U0001F4C4 Table Only"
+              )
+            }
           )
-        }
+        )
       )
     )
   })
@@ -970,10 +1047,11 @@ build_qualitative_panel <- function(slides = NULL, brand_colour = "#323367") {
           if (!is.null(slides) && length(slides) > 0) "display:none;" else "",
           "text-align:center;padding:60px 20px;color:#94a3b8;"
         ),
-        htmltools::tags$div(style = "font-size:36px;margin-bottom:12px;", "\U0001F4DD"),
-        htmltools::tags$div(style = "font-size:14px;font-weight:600;", "No slides yet"),
-        htmltools::tags$div(style = "font-size:12px;margin-top:4px;",
-          "Click 'Add Slide' to create narrative content, or add a 'Qualitative' sheet to your config Excel.")
+        htmltools::tags$div(
+          style = "width:48px;height:48px;border:2px dashed #cbd5e1;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;color:#94a3b8;font-size:24px;font-weight:300;",
+          "+"
+        ),
+        htmltools::tags$div(style = "font-size:13px;color:#94a3b8;", "Click 'Add Slide' to create content")
       )
     )
   )
@@ -1178,35 +1256,7 @@ build_export_actions <- function() {
   htmltools::tags$div(
     class = "closing-section",
     style = "margin-bottom:24px;",
-    htmltools::tags$div(class = "closing-divider"),
-    htmltools::tags$div(
-      class = "closing-content",
-      htmltools::tags$div(
-        class = "closing-label",
-        style = "margin-bottom:12px;",
-        "Export"
-      ),
-      htmltools::tags$div(
-        style = "display:flex;gap:10px;flex-wrap:wrap;",
-        htmltools::tags$button(
-          class = "export-btn",
-          onclick = "saveReportHTML()",
-          style = "font-size:13px;padding:8px 18px;",
-          "\U0001F4BE Save Report"
-        ),
-        htmltools::tags$button(
-          class = "export-btn",
-          onclick = "printReport()",
-          style = "font-size:13px;padding:8px 18px;",
-          "\U0001F5A8 Print / PDF"
-        )
-      ),
-      htmltools::tags$p(
-        style = "font-size:11px;color:#94a3b8;margin-top:8px;line-height:1.5;",
-        "Save embeds all edits (insights, notes, slides) into the HTML file. ",
-        "Print outputs Summary, Crosstabs, and Added Slides to PDF."
-      )
-    )
+    # Save/Print consolidated in tab bar — not duplicated here
   )
 }
 

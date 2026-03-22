@@ -226,7 +226,8 @@ validate_mapping_structure <- function(question_mapping, config) {
 
   # Check for wave columns - use flexible detection to support any wave naming
   # (W1, W2, W3 or Wave1, Wave2, Wave3 or custom names)
-  known_metadata_cols <- c("QuestionCode", "QuestionText", "QuestionType", "SourceQuestions", "TrackingSpecs")
+  known_metadata_cols <- c("QuestionCode", "QuestionText", "QuestionType", "SourceQuestions",
+                           "TrackingSpecs", "ResponseScale", "ScalePoints")
   potential_wave_cols <- setdiff(names(question_mapping), known_metadata_cols)
 
   wave_cols <- character(0)

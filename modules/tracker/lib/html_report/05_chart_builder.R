@@ -574,15 +574,23 @@ build_sparkline_svg <- function(values, width = 60, height = 16, colour = "#3233
     points <- c(points, sprintf("%.1f,%.1f", x, y))
   }
 
-  # End dot
+  # End dot coordinates
   last_x <- pad + (valid_idx[n] - 1) / max(1, total_points - 1) * plot_w
   last_y <- pad + plot_h - (valid_vals[n] - y_min) / y_range * plot_h
 
+  # First point coordinates (for area fill)
+  first_x <- pad + (valid_idx[1] - 1) / max(1, total_points - 1) * plot_w
+
+  # Build area fill polygon (line path + bottom edge)
+  area_points <- paste(points, collapse = " ")
+  area_close <- sprintf("%.1f,%d %.1f,%d", last_x, height, first_x, height)
+
+  # Premium sparkline: subtle area fill + smooth line + end dot with halo
   sprintf(
-    '<svg class="tk-sparkline" width="%d" height="%d" viewBox="0 0 %d %d"><polyline points="%s" fill="none" stroke="%s" stroke-width="1.5" stroke-linejoin="round"/><circle cx="%.1f" cy="%.1f" r="2" fill="%s"/></svg>',
+    '<svg class="tk-sparkline" width="%d" height="%d" viewBox="0 0 %d %d"><polygon points="%s %s" fill="%s" opacity="0.08"/><polyline points="%s" fill="none" stroke="%s" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/><circle cx="%.1f" cy="%.1f" r="2.5" fill="%s" stroke="#ffffff" stroke-width="1"/></svg>',
     width, height, width, height,
-    paste(points, collapse = " "),
-    colour,
+    area_points, area_close, colour,
+    area_points, colour,
     last_x, last_y, colour
   )
 }

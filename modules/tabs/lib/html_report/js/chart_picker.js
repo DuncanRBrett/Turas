@@ -54,8 +54,8 @@ function buildChartPickersForGroup(groupCode) {
     var keys = getChartKeysForGroup(data, groupCode);
     if (keys.length === 0) return;
 
-    // Only show column picker when multiple columns available
-    if (keys.length > 1) {
+    // Always show column picker when columns exist (even single column for clarity)
+    if (keys.length > 0) {
       var bar = document.createElement("div");
       bar.className = "chart-col-picker";
       bar.setAttribute("data-q-code", qCode);
@@ -64,6 +64,9 @@ function buildChartPickersForGroup(groupCode) {
       lbl.className = "col-chip-label";
       lbl.textContent = "Chart:";
       bar.appendChild(lbl);
+
+      var OVERFLOW_LIMIT = 8;
+      var showOverflow = keys.length > OVERFLOW_LIMIT + 2; // Only overflow if saves 3+ chips
 
       keys.forEach(function(key, idx) {
         var chip = document.createElement("button");
@@ -74,8 +77,27 @@ function buildChartPickersForGroup(groupCode) {
         chip.onclick = function() {
           toggleChartColumn(groupCode, key, chip);
         };
+        // Hide overflow chips initially
+        if (showOverflow && idx >= OVERFLOW_LIMIT) {
+          chip.classList.add("col-chip-overflow");
+          chip.style.display = "none";
+        }
         bar.appendChild(chip);
       });
+
+      // Add "+N more" button if overflowing
+      if (showOverflow) {
+        var moreBtn = document.createElement("button");
+        moreBtn.className = "col-chip col-chip-more";
+        moreBtn.textContent = "+" + (keys.length - OVERFLOW_LIMIT) + " more";
+        moreBtn.onclick = function() {
+          bar.querySelectorAll(".col-chip-overflow").forEach(function(c) {
+            c.style.display = "";
+          });
+          moreBtn.style.display = "none";
+        };
+        bar.appendChild(moreBtn);
+      }
 
       var svg = wrapper.querySelector("svg");
       if (svg) wrapper.insertBefore(bar, svg);
@@ -240,7 +262,7 @@ function buildMultiStackedSVG(data, selectedKeys, qCode) {
 
   var clipId = "mc-clip-" + qCode.replace(/[^a-zA-Z0-9]/g, "-");
   var p = [];
-  p.push("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 " + barW + " " + totalH + "\" role=\"img\" aria-label=\"Distribution chart\" style=\"font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;\">");
+  p.push("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 " + barW + " " + totalH + "\" role=\"img\" aria-label=\"Distribution chart\" style=\"font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;\">");
 
   // Priority metric header (centred above metric pill box)
   if (hasPM) {
@@ -322,8 +344,8 @@ function buildMultiStackedSVG(data, selectedKeys, qCode) {
   for (var li = 0; li < labels.length; li++) {
     var pos = legPositions[li];
     var legY = legendY + pos.row * 18;
-    p.push("<circle cx=\"" + (pos.x + 4.5) + "\" cy=\"" + (legY + 5) + "\" r=\"4.5\" fill=\"" + (colours[li] || "#999") + "\"/>");
-    p.push("<text x=\"" + (pos.x + 13) + "\" y=\"" + (legY + 9) + "\" fill=\"#64748b\" font-size=\"10.5\">" + escapeHtml(pos.text) + "</text>");
+    p.push("<rect x=\"" + pos.x + "\" y=\"" + legY + "\" width=\"10\" height=\"10\" rx=\"2\" fill=\"" + (colours[li] || "#999") + "\"/>");
+    p.push("<text x=\"" + (pos.x + 14) + "\" y=\"" + (legY + 9) + "\" fill=\"#64748b\" font-size=\"11\">" + escapeHtml(pos.text) + "</text>");
   }
 
   p.push("</svg>");
@@ -542,11 +564,25 @@ function buildMultiHorizontalSVG(data, selectedKeys) {
   }
 
   var p = [];
-  p.push("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 " + chartW + " " + totalH + "\" role=\"img\" aria-label=\"Bar chart\" style=\"font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;\">");
+  p.push("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 " + chartW + " " + totalH + "\" role=\"img\" aria-label=\"Bar chart\" style=\"font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;\">");
+
+  // Faint reference grid lines (25%, 50%, 75%) behind bars
+  var gridBottom = barsH - groupGap;
+  [25, 50, 75].forEach(function(pct) {
+    var gx = labelW + (pct / maxVal) * barAreaW;
+    if (gx > labelW && gx < labelW + barAreaW) {
+      p.push("<line x1=\"" + gx + "\" y1=\"" + topMargin + "\" x2=\"" + gx + "\" y2=\"" + gridBottom + "\" stroke=\"#e9ecef\" stroke-width=\"0.5\" stroke-dasharray=\"3,3\"/>");
+    }
+  });
 
   labels.forEach(function(label, li) {
     var groupY = groupPositions[li];
     var lines = wrappedLabels[li];
+
+    // Subtle alternating group background
+    if (li % 2 === 1) {
+      p.push("<rect x=\"" + (labelW - 4) + "\" y=\"" + (groupY - 2) + "\" width=\"" + (barAreaW + valueW + 12) + "\" height=\"" + (groupH + 4) + "\" fill=\"#f9fafb\" rx=\"3\"/>");
+    }
 
     // Wrap each category group in <g> with data attributes for sort sync
     var origIndex = keepIdx[li];
@@ -571,8 +607,8 @@ function buildMultiHorizontalSVG(data, selectedKeys) {
         }
       }
 
-      p.push("<rect x=\"" + labelW + "\" y=\"" + y + "\" width=\"" + barW + "\" height=\"" + barH + "\" rx=\"3\" fill=\"" + colour + "\" opacity=\"0.85\"/>");
-      p.push("<text x=\"" + (labelW + barW + 8) + "\" y=\"" + (y + barH / 2) + "\" dominant-baseline=\"central\" fill=\"#64748b\" font-size=\"11\" font-weight=\"600\">" + pctText + "</text>");
+      p.push("<rect x=\"" + labelW + "\" y=\"" + y + "\" width=\"" + barW + "\" height=\"" + barH + "\" rx=\"4\" fill=\"" + colour + "\"/>");
+      p.push("<text x=\"" + (labelW + barW + 8) + "\" y=\"" + (y + barH / 2) + "\" dominant-baseline=\"central\" fill=\"#334155\" font-size=\"11\" font-weight=\"600\" style=\"font-variant-numeric:tabular-nums\">" + pctText + "</text>");
 
       // Column name label (small, after percentage, only if multiple columns)
       if (nCols > 1) {

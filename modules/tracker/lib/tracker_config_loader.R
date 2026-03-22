@@ -335,21 +335,47 @@ load_tracking_config <- function(config_path) {
   }
 
   # Validate TrackingSpecs values
+  # Aligned with question_mapper.R validate_tracking_specs() as the authoritative source
   if ("TrackingSpecs" %in% names(tracked_questions)) {
-    valid_spec_types <- c("mean", "nps", "top_box", "top2_box", "top3_box",
-                          "bottom_box", "bottom2_box", "bottom3_box",
-                          "pct_agree", "pct_disagree", "pct_response",
-                          "net_score", "proportion", "composite")
+    valid_spec_keywords <- c(
+      # Rating / Composite
+      "mean", "top_box", "top2_box", "top3_box",
+      "bottom_box", "bottom2_box", "bottom3_box",
+      "distribution", "composite",
+      # NPS
+      "nps_score", "promoters_pct", "passives_pct", "detractors_pct", "full",
+      # Single choice
+      "all", "top3",
+      # Multi choice / Multi mention
+      "auto", "any", "count_mean", "count_distribution"
+    )
+    # Pattern prefixes accepted: range:X-Y, box:CATEGORY, category:VALUE, option:VALUE
+    pattern_prefixes <- c("range:", "box:", "category:", "option:")
+
     specs_to_check <- tracked_questions$TrackingSpecs[!is.na(tracked_questions$TrackingSpecs) &
                                                        trimws(tracked_questions$TrackingSpecs) != ""]
     if (length(specs_to_check) > 0) {
-      # Parse each spec: extract base type (before any parenthesized arguments)
-      spec_base_types <- gsub("\\(.*$", "", trimws(specs_to_check))
-      invalid_specs <- spec_base_types[!spec_base_types %in% valid_spec_types]
-      if (length(invalid_specs) > 0) {
-        cat(sprintf("[TURAS WARNING] Unrecognized TrackingSpecs values: %s. Valid types: %s\n",
-            paste(unique(invalid_specs), collapse = ", "),
-            paste(valid_spec_types, collapse = ", ")))
+      all_invalid <- character(0)
+      for (spec_str in specs_to_check) {
+        # Split comma-separated specs
+        tokens <- trimws(strsplit(spec_str, ",")[[1]])
+        for (token in tokens) {
+          if (token == "") next
+          # Strip optional =Label suffix (display-only)
+          core <- sub("=.*$", "", token)
+          core_lower <- tolower(trimws(core))
+          # Check keyword match or pattern prefix match
+          is_valid <- core_lower %in% valid_spec_keywords ||
+            any(vapply(pattern_prefixes, function(p) startsWith(core_lower, p), logical(1)))
+          if (!is_valid) {
+            all_invalid <- c(all_invalid, token)
+          }
+        }
+      }
+      if (length(all_invalid) > 0) {
+        cat(sprintf("[TURAS WARNING] Unrecognized TrackingSpecs values: %s. Valid keywords: %s. Also supports pattern specs: range:X-Y, box:CATEGORY, category:VALUE, option:VALUE\n",
+            paste(unique(all_invalid), collapse = ", "),
+            paste(valid_spec_keywords, collapse = ", ")))
       }
     }
   }
@@ -454,7 +480,8 @@ load_question_mapping <- function(mapping_path) {
   # Find wave columns
   # FIXED: More flexible wave column detection to support W1, W2, W3 or Wave1, Wave2, Wave3
   # Exclude known metadata columns to identify wave columns
-  known_metadata_cols <- c("QuestionCode", "QuestionText", "QuestionType", "SourceQuestions", "TrackingSpecs")
+  known_metadata_cols <- c("QuestionCode", "QuestionText", "QuestionType", "SourceQuestions",
+                           "TrackingSpecs", "ResponseScale", "ScalePoints")
   potential_wave_cols <- setdiff(names(mapping), known_metadata_cols)
 
   # Further filter: wave columns should have mostly non-NA values (question codes)

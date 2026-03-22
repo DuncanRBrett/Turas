@@ -6,10 +6,13 @@
 # Design: aligned with Turas shared design system (tabs/tracker modules).
 # ==============================================================================
 
-# Source the shared design system
+# Source the shared design system (TURAS_ROOT-aware)
 local({
-  ds_dir <- file.path("modules", "shared", "lib", "design_system")
-  if (!exists("turas_base_css", mode = "function")) {
+  turas_root <- Sys.getenv("TURAS_ROOT", "")
+  if (!nzchar(turas_root)) turas_root <- getwd()
+  ds_dir <- file.path(turas_root, "modules", "shared", "lib", "design_system")
+  if (!dir.exists(ds_dir)) ds_dir <- file.path("modules", "shared", "lib", "design_system")
+  if (!exists("turas_base_css", mode = "function") && dir.exists(ds_dir)) {
     source(file.path(ds_dir, "design_tokens.R"), local = FALSE)
     source(file.path(ds_dir, "font_embed.R"), local = FALSE)
     source(file.path(ds_dir, "base_css.R"), local = FALSE)

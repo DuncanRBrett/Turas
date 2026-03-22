@@ -433,6 +433,12 @@
     }
   };
 
+  // Collapsible KPI type groups
+  window.toggleKpiTypeGroup = function(headerEl) {
+    var group = headerEl.closest(".kpi-type-group");
+    if (group) group.classList.toggle("kpi-collapsed");
+  };
+
   // ---- Significant changes segment filter ----
   window.filterSigBySegment = function(segment) {
     var cards = document.querySelectorAll(".dash-sig-card");
@@ -493,6 +499,74 @@
       exportSummarySlide("overview-heatmap");
     }
   };
+
+  // ---- Wave chip toggle (show/hide individual wave columns) ----
+  var hmWaveState = {};  // { waveId: true/false }
+
+  // Initialise wave state from chip bar
+  function initHmWaveState() {
+    var chips = document.querySelectorAll(".hm-wave-chip");
+    chips.forEach(function(chip) {
+      var wid = chip.getAttribute("data-wave");
+      if (wid) hmWaveState[wid] = chip.classList.contains("active");
+    });
+  }
+
+  // Apply wave visibility to heatmap table + wave headers
+  function applyHmWaveVisibility() {
+    var table = document.getElementById("hm-overview-table");
+    if (!table) return;
+    for (var wid in hmWaveState) {
+      var isVisible = hmWaveState[wid];
+      // Header cells
+      table.querySelectorAll('th[data-wave="' + wid + '"]').forEach(function(el) {
+        el.classList.toggle("hm-wave-hidden", !isVisible);
+      });
+      // Data cells
+      table.querySelectorAll('td[data-wave="' + wid + '"]').forEach(function(el) {
+        el.classList.toggle("hm-wave-hidden", !isVisible);
+      });
+    }
+  }
+
+  window.hmToggleWave = function(waveId, chipEl) {
+    // Prevent deselecting all waves
+    var activeCount = 0;
+    for (var k in hmWaveState) { if (hmWaveState[k]) activeCount++; }
+    if (activeCount <= 1 && hmWaveState[waveId]) return;
+
+    chipEl.classList.toggle("active");
+    hmWaveState[waveId] = chipEl.classList.contains("active");
+    applyHmWaveVisibility();
+  };
+
+  window.hmWaveShowAll = function() {
+    var chips = document.querySelectorAll(".hm-wave-chip");
+    chips.forEach(function(chip) {
+      chip.classList.add("active");
+      var wid = chip.getAttribute("data-wave");
+      if (wid) hmWaveState[wid] = true;
+    });
+    applyHmWaveVisibility();
+  };
+
+  window.hmWaveShowLast = function(n) {
+    var chips = document.querySelectorAll(".hm-wave-chip");
+    var total = chips.length;
+    chips.forEach(function(chip, idx) {
+      var isActive = idx >= total - n;
+      chip.classList.toggle("active", isActive);
+      var wid = chip.getAttribute("data-wave");
+      if (wid) hmWaveState[wid] = isActive;
+    });
+    applyHmWaveVisibility();
+  };
+
+  // Initialise on load
+  document.addEventListener("DOMContentLoaded", function() {
+    initHmWaveState();
+    applyHmWaveVisibility();
+  });
 
   // ---- Expose shared utilities for Explorer module ----
   window.HmUtils = {

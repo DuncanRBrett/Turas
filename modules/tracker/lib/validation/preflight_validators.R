@@ -358,16 +358,23 @@ check_tracking_specs_valid <- function(tracked_df, error_log) {
   if (is.null(tracked_df) || nrow(tracked_df) == 0) return(error_log)
   if (!"TrackingSpecs" %in% names(tracked_df)) return(error_log)
 
+  # Aligned with question_mapper.R validate_tracking_specs() as the authoritative source
   valid_keywords <- c(
+    # Rating / Composite
     "mean", "top_box", "top2_box", "top3_box",
-    "bottom_box", "bottom2_box",
-    "distribution", "nps_score",
-    "promoters_pct", "passives_pct", "detractors_pct",
-    "full", "all", "top3", "auto", "any", "count_mean"
+    "bottom_box", "bottom2_box", "bottom3_box",
+    "distribution", "composite",
+    # NPS
+    "nps_score", "promoters_pct", "passives_pct", "detractors_pct", "full",
+    # Single choice
+    "all", "top3",
+    # Multi choice / Multi mention
+    "auto", "any", "count_mean", "count_distribution"
   )
 
-  # Patterns for parameterised specs
+  # Patterns for parameterised specs (including box: for rating/composite)
   range_pattern <- "^range:[0-9]+-[0-9]+$"
+  box_pattern <- "^box:.+$"
   category_pattern <- "^category:.+$"
   option_pattern <- "^option:.+$"
 
@@ -388,18 +395,23 @@ check_tracking_specs_valid <- function(tracked_df, error_log) {
     for (token in tokens) {
       if (token == "") next
 
-      is_valid <- token %in% valid_keywords ||
-        grepl(range_pattern, token, perl = TRUE) ||
-        grepl(category_pattern, token, perl = TRUE) ||
-        grepl(option_pattern, token, perl = TRUE)
+      # Strip optional =Label suffix (display-only) before validation
+      core <- sub("=.*$", "", token)
+      core_lower <- tolower(trimws(core))
+
+      is_valid <- core_lower %in% valid_keywords ||
+        grepl(range_pattern, core_lower, perl = TRUE) ||
+        grepl(box_pattern, core_lower, perl = TRUE) ||
+        grepl(category_pattern, core_lower, perl = TRUE) ||
+        grepl(option_pattern, core_lower, perl = TRUE)
 
       if (!is_valid) {
         invalid_tokens <- c(invalid_tokens, token)
       }
 
       # Validate range format (range:X-Y where X < Y)
-      if (grepl("^range:", token)) {
-        range_part <- sub("^range:", "", token)
+      if (grepl("^range:", core_lower)) {
+        range_part <- sub("^range:", "", core_lower)
         range_nums <- suppressWarnings(as.numeric(strsplit(range_part, "-")[[1]]))
         if (length(range_nums) != 2 || any(is.na(range_nums))) {
           invalid_tokens <- c(invalid_tokens, token)
@@ -417,7 +429,7 @@ check_tracking_specs_valid <- function(tracked_df, error_log) {
     if (length(invalid_tokens) > 0) {
       error_log <- log_preflight_issue(
         error_log, "Invalid TrackingSpecs",
-        sprintf("Question '%s': unrecognised TrackingSpecs token(s): %s. Valid keywords: %s. Parameterised: range:X-Y, category:VALUE, option:VALUE.",
+        sprintf("Question '%s': unrecognised TrackingSpecs token(s): %s. Valid keywords: %s. Parameterised: range:X-Y, box:CATEGORY, category:VALUE, option:VALUE.",
                 q_code,
                 paste(invalid_tokens, collapse = ", "),
                 paste(valid_keywords, collapse = ", ")),

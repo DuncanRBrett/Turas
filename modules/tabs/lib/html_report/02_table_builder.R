@@ -112,7 +112,7 @@ build_question_table <- function(question_data, banner_groups, config_obj,
       '<th class="ct-th ct-data-col %s" data-col-key="%s"%s><div class="ct-header-text">%s</div>%s</th>',
       css_class,
       htmltools::htmlEscape(key),
-      if (is_total) ' style="color:#d4a843"' else "",
+      "",  # colour now handled via CSS .ct-th.bg-total
       htmltools::htmlEscape(display),
       letter_html
     ))

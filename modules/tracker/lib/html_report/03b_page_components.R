@@ -71,7 +71,7 @@ build_tracker_header <- function(html_data, config, brand_colour) {
             htmltools::tags$div(class = "tk-brand-subtitle", "Interactive Tracking Report")
           )
         ),
-        htmltools::tags$div(class = "tk-header-actions")
+        # Save/Print buttons consolidated in tab bar (not duplicated here)
       ),
       # Project title
       htmltools::tags$div(class = "tk-header-project", project_name),
@@ -282,11 +282,7 @@ build_pinned_tab <- function() {
       htmltools::tags$button(class = "tk-btn", onclick = "addSection()",
                               htmltools::HTML("&#x2795; Add Section")),
       htmltools::tags$button(class = "tk-btn", onclick = "exportAllPinsPNG()",
-                              htmltools::HTML("&#x1F4F8; Export All as PNG")),
-      htmltools::tags$button(class = "tk-btn", onclick = "printAllPins()",
-                              htmltools::HTML("&#x1F5A8; Print / PDF")),
-      htmltools::tags$button(class = "tk-btn", onclick = "saveReportHTML()",
-                              htmltools::HTML("&#x1F4BE; Save Report"))
+                              htmltools::HTML("&#x1F4F8; Export All as PNG"))
     ),
     htmltools::tags$div(id = "pinned-cards-container"),
     htmltools::tags$div(

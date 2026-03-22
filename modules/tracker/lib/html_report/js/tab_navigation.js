@@ -10,6 +10,10 @@
  * @param {string} tabName - Tab identifier: summary, metrics, overview, pinned
  */
 function switchReportTab(tabName) {
+  // Prevent switching to disabled tabs (e.g. Visualise before data loaded)
+  var targetBtn = document.querySelector('.report-tab[data-tab="' + tabName + '"]');
+  if (targetBtn && targetBtn.classList.contains("tab-disabled")) return;
+
   // Deactivate all tab buttons
   document.querySelectorAll(".report-tab").forEach(function(btn) {
     btn.classList.toggle("active", btn.getAttribute("data-tab") === tabName);
