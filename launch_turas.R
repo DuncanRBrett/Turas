@@ -80,10 +80,10 @@ launch_turas <- function() {
          category = "advanced",
          script = "modules/conjoint/run_conjoint_gui.R",
          recent_file = ".recent_conjoint_projects.rds",
-         recent_key = "config_path"),
+         recent_key = "project_dir"),
 
     list(id = "maxdiff", name = "MaxDiff",
-         description = "Best-worst scaling design generation and preference analysis",
+         description = "Best-worst scaling preference analysis with Hierarchical Bayes estimation",
          category = "advanced",
          script = "modules/maxdiff/run_maxdiff_gui.R",
          recent_file = ".recent_maxdiff.rds",
@@ -93,8 +93,8 @@ launch_turas <- function() {
          description = "Price sensitivity using Van Westendorp, Gabor-Granger, and monadic methods",
          category = "advanced",
          script = "modules/pricing/run_pricing_gui.R",
-         recent_file = "modules/pricing/.recent_pricing_projects.rds",
-         recent_key = NULL),
+         recent_file = ".recent_pricing_projects.rds",
+         recent_key = "project_dir"),
 
     list(id = "segment", name = "Segment",
          description = "K-means clustering segmentation with automatic variable selection",
@@ -108,14 +108,14 @@ launch_turas <- function() {
          category = "advanced",
          script = "modules/keydriver/run_keydriver_gui.R",
          recent_file = ".recent_keydriver_projects.rds",
-         recent_key = "config_path"),
+         recent_key = "project_dir"),
 
     list(id = "catdriver", name = "Categorical Driver",
          description = "Driver analysis for categorical outcomes using logistic regression and SHAP",
          category = "advanced",
          script = "modules/catdriver/run_catdriver_gui.R",
          recent_file = ".recent_catdriver_projects.rds",
-         recent_key = "config_path"),
+         recent_key = "project_dir"),
 
     list(id = "confidence", name = "Confidence",
          description = "Confidence intervals for means and proportions with design effect adjustments",
@@ -129,6 +129,13 @@ launch_turas <- function() {
          category = "reporting",
          script = "modules/report_hub/run_report_hub_gui.R",
          recent_file = ".recent_hub_configs.rds",
+         recent_key = NULL),
+
+    list(id = "hub_app", name = "Hub App",
+         description = "Browse, annotate, and export across multiple Turas reports",
+         category = "reporting",
+         script = "modules/hub_app/run_hub_app_gui.R",
+         recent_file = NULL,
          recent_key = NULL)
   )
 
@@ -159,7 +166,9 @@ launch_turas <- function() {
 
     confidence = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="20"/><line x1="8" y1="4" x2="16" y2="4"/><line x1="8" y1="20" x2="16" y2="20"/><circle cx="12" cy="12" r="2"/></svg>',
 
-    report_hub = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="8" height="8" rx="1"/><rect x="14" y="3" width="8" height="8" rx="1"/><rect x="2" y="13" width="8" height="8" rx="1"/><rect x="14" y="13" width="8" height="8" rx="1"/><line x1="10" y1="7" x2="14" y2="7"/><line x1="6" y1="11" x2="6" y2="13"/><line x1="18" y1="11" x2="18" y2="13"/></svg>'
+    report_hub = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="8" height="8" rx="1"/><rect x="14" y="3" width="8" height="8" rx="1"/><rect x="2" y="13" width="8" height="8" rx="1"/><rect x="14" y="13" width="8" height="8" rx="1"/><line x1="10" y1="7" x2="14" y2="7"/><line x1="6" y1="11" x2="6" y2="13"/><line x1="18" y1="11" x2="18" y2="13"/></svg>',
+
+    hub_app = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="2" y1="9" x2="22" y2="9"/><line x1="8" y1="3" x2="8" y2="9"/><line x1="14" y1="3" x2="14" y2="9"/><circle cx="12" cy="15" r="2"/><path d="M8 15h-2"/><path d="M18 15h-2"/></svg>'
   )
 
   # ============================================================================
@@ -169,6 +178,7 @@ launch_turas <- function() {
   #' Read recent projects for a module, normalizing different storage formats
   read_module_recents <- function(mod) {
     tryCatch({
+      if (is.null(mod$recent_file)) return(character(0))
       rds_path <- if (isTRUE(mod$recent_absolute)) {
         mod$recent_file
       } else {

@@ -119,18 +119,9 @@ run_maxdiff_gui <- function() {
     # Main content
     div(class = "turas-content",
 
-        # Step 1: Mode Selection
+        # Step 1: File Selection
         div(class = "turas-card",
-          h3(class = "turas-card-title", "1. Select Mode"),
-          fluidRow(
-            column(6, actionButton("mode_design", "DESIGN\nGenerate experimental design", class = "mode-btn")),
-            column(6, actionButton("mode_analysis", "ANALYSIS\nAnalyze survey responses", class = "mode-btn active"))
-          )
-        ),
-
-        # Step 2: File Selection
-        div(class = "turas-card",
-          h3(class = "turas-card-title", "2. Select Configuration File"),
+          h3(class = "turas-card-title", "1. Select Configuration File"),
           p(style = "color: #666; font-size: 14px;",
             "Select your MaxDiff configuration Excel file"),
 
@@ -147,12 +138,12 @@ run_maxdiff_gui <- function() {
           if (!hide_recents) uiOutput("recent_ui")
         ),
 
-        # Step 3: Run Button
+        # Step 2: Run Button
         uiOutput("run_ui"),
 
-        # Step 4: Console Output (static UI - always visible)
+        # Step 3: Console Output (static UI - always visible)
         div(class = "turas-card",
-          h3(class = "turas-card-title", "4. Analysis Output"),
+          h3(class = "turas-card-title", "3. Analysis Output"),
           div(class = "turas-console",
             verbatimTextOutput("console_text")
           )
@@ -205,19 +196,6 @@ run_maxdiff_gui <- function() {
       })
     })
 
-    # Mode buttons
-    observeEvent(input$mode_design, {
-      rv$mode <- "DESIGN"
-      # Note: updateActionButton doesn't support class parameter
-      # Button styling is handled by CSS based on rv$mode
-    })
-
-    observeEvent(input$mode_analysis, {
-      rv$mode <- "ANALYSIS"
-      # Note: updateActionButton doesn't support class parameter
-      # Button styling is handled by CSS based on rv$mode
-    })
-
     # Handle recent project selection
     observeEvent(input$select_recent, {
       req(input$select_recent)
@@ -228,9 +206,6 @@ run_maxdiff_gui <- function() {
         config_path_expanded <- normalizePath(path.expand(proj$path),
                                               winslash = "/", mustWork = FALSE)
         rv$config_path <- config_path_expanded
-        rv$mode <- proj$mode
-        # Note: updateActionButton doesn't support class parameter
-        # Button styling is handled by CSS based on rv$mode
       }
     })
 
@@ -274,7 +249,6 @@ run_maxdiff_gui <- function() {
             class = "turas-recent-item",
             onclick = sprintf("Shiny.setInputValue('select_recent', %d, {priority: 'event'})", i),
             tags$strong(basename(proj$path)),
-            tags$span(style = "float:right; color:#4f46e5;", proj$mode),
             tags$br(),
             tags$small(style = "color: #666;", dirname(proj$path))
           )
@@ -289,7 +263,7 @@ run_maxdiff_gui <- function() {
       can_run <- !is.null(rv$config_path) && file.exists(rv$config_path)
 
       div(class = "turas-card",
-        h3(class = "turas-card-title", "3. Run MaxDiff"),
+        h3(class = "turas-card-title", "2. Run MaxDiff"),
         if (!can_run) {
           div(class = "turas-status-warning",
             icon("exclamation-triangle"), " Please select a valid configuration file to continue"
@@ -300,7 +274,7 @@ run_maxdiff_gui <- function() {
                       value = FALSE),
         div(style = "text-align: center; margin: 20px 0;",
           actionButton("run_btn",
-                      paste("RUN MAXDIFF", rv$mode),
+                      "RUN MAXDIFF ANALYSIS",
                       class = "turas-btn-run",
                       icon = icon("play-circle"),
                       disabled = !can_run || is_running())
@@ -337,7 +311,7 @@ run_maxdiff_gui <- function() {
 
       # Create progress indicator
       progress <- Progress$new(session)
-      progress$set(message = paste("Running MaxDiff", rv$mode), value = 0)
+      progress$set(message = "Running MaxDiff Analysis", value = 0)
       on.exit(progress$close())
 
       # Save current working directory
