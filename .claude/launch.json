@@ -2,58 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "conjoint-report",
-      "runtimeExecutable": "/usr/local/bin/Rscript",
-      "runtimeArgs": ["--vanilla", ".claude/serve.R"],
+      "name": "hub-preview",
+      "runtimeExecutable": "/usr/local/bin/node",
+      "runtimeArgs": ["-e", "const http=require('http'),fs=require('fs'),path=require('path');const f='/Users/duncan/Library/CloudStorage/OneDrive-Personal/DB Files/Projects/Turas Showreel/Turas_Showreel.html';http.createServer((q,r)=>{r.writeHead(200,{'Content-Type':'text/html;charset=utf-8'});fs.createReadStream(f).pipe(r)}).listen(8765,()=>console.log('Serving on 8765'))"],
       "port": 8765
-    },
-    {
-      "name": "hub-report",
-      "runtimeExecutable": "/bin/bash",
-      "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && npx serve '/Users/duncan/Library/CloudStorage/OneDrive-Personal/DB Files/Projects/Turas Showreel' -l 8770 --no-clipboard"],
-      "port": 8770
-    },
-    {
-      "name": "tabs-report",
-      "runtimeExecutable": "/bin/bash",
-      "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && npx serve examples/tabs/demo_survey/Output -l 8775 --no-clipboard"],
-      "port": 8775
-    },
-    {
-      "name": "tracker-report",
-      "runtimeExecutable": "/bin/bash",
-      "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && npx serve examples/tracker/full_test -l 8780 --no-clipboard"],
-      "port": 8780
-    },
-    {
-      "name": "demo-report",
-      "runtimeExecutable": "/bin/bash",
-      "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && npx serve '/Users/duncan/Library/CloudStorage/OneDrive-Personal/DB Files/Projects/demo/waves/CCS-W4/output' -l 8785 --no-clipboard"],
-      "port": 8785
-    },
-    {
-      "name": "ccpb-report",
-      "runtimeExecutable": "/bin/bash",
-      "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && npx serve '/Users/duncan/Library/CloudStorage/OneDrive-Personal/DB Files/Projects/CCPB/CCPB_CSAT/03_Waves/CSAT2025/04_Analysis/Crosstabs' -l 8790 --no-clipboard"],
-      "port": 8790
-    },
-    {
-      "name": "catdriver-report",
-      "runtimeExecutable": "/bin/bash",
-      "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && npx serve modules/catdriver/examples/demo -l 8795 --no-clipboard"],
-      "port": 8795
-    },
-    {
-      "name": "maxdiff-report",
-      "runtimeExecutable": "/bin/bash",
-      "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && npx serve examples/maxdiff/demo_showcase/output -l 8800 --no-clipboard"],
-      "port": 8800
-    },
-    {
-      "name": "keydriver-report",
-      "runtimeExecutable": "/bin/bash",
-      "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && npx serve examples/keydriver/demo_showcase -l 8805 --no-clipboard"],
-      "port": 8805
     }
   ]
 }

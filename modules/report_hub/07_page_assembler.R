@@ -1,22 +1,25 @@
-#' Page Assembler
+#' Page Assembler (iframe approach)
 #'
-#' Assembles the final combined HTML document from all parsed,
-#' rewritten components: header, navigation, content panels,
-#' CSS, JS, and the unified pinned views panel.
+#' Assembles the final combined HTML document using iframe isolation.
+#' Each report's complete HTML is stored as a JSON-encoded string and
+#' loaded into an iframe via srcdoc at runtime. This guarantees that
+#' reports behave identically to their standalone versions.
 
 #' Assemble the Combined Report HTML
 #'
 #' @param config Validated config from guard
-#' @param parsed_reports List of parsed and namespace-rewritten report objects
+#' @param parsed_reports List of parsed report objects (with raw_html)
 #' @param overview_html HTML for the overview front page
-#' @param navigation_html HTML for the two-tier navigation
+#' @param navigation_html HTML for the Level 1 navigation
 #' @return Complete HTML document string
 assemble_hub_html <- function(config, parsed_reports, overview_html, navigation_html) {
 
   parts <- character(0)
 
   # --- DOCTYPE and head ---
+  cat("  [hub-version: iframe-b64] Assembling with base64 iframe encoding\n")
   parts <- c(parts, '<!DOCTYPE html>')
+  parts <- c(parts, '<!-- hub-version: iframe-b64 -->')
   parts <- c(parts, '<html lang="en">')
   parts <- c(parts, '<head>')
   parts <- c(parts, '  <meta charset="UTF-8"/>')
@@ -27,21 +30,14 @@ assemble_hub_html <- function(config, parsed_reports, overview_html, navigation_
   parts <- c(parts, sprintf('  <title>%s</title>',
                              htmltools::htmlEscape(config$settings$project_title)))
 
-  # --- CSS: hub styles first, then per-report styles ---
+  # --- CSS: hub styles only (report styles live inside iframes) ---
   hub_css <- build_hub_css(config)
   parts <- c(parts, sprintf('  <style>\n%s\n  </style>', hub_css))
-
-  for (parsed in parsed_reports) {
-    for (css_block in parsed$css_blocks) {
-      parts <- c(parts, sprintf('  <style>/* %s styles */\n%s\n  </style>',
-                                 parsed$report_key, css_block$content))
-    }
-  }
 
   parts <- c(parts, '</head>')
 
   # --- Body ---
-  parts <- c(parts, sprintf('<body style="background:%s">', '#f8f7f5'))
+  parts <- c(parts, '<body>')
 
   # --- Hub header ---
   parts <- c(parts, build_hub_header(config))
@@ -54,78 +50,19 @@ assemble_hub_html <- function(config, parsed_reports, overview_html, navigation_
   parts <- c(parts, overview_html)
   parts <- c(parts, '</div>')
 
-  # --- Report panels ---
+  # --- Report panels (each contains an iframe) ---
   for (parsed in parsed_reports) {
     key <- parsed$report_key
-
-    # Collect all content for this hub-panel, then balance divs at the end
-    hub_content <- character(0)
-
-    # Include body preamble (dashboard, meta-strip) if present
-    if (!is.null(parsed$body_preamble) && nzchar(parsed$body_preamble)) {
-      hub_content <- c(hub_content, parsed$body_preamble)
-    }
-
-    # Include report-specific content panels
-    # Ensure exactly the first sub-panel has "active" class for hub visibility
-    panel_names <- names(parsed$content_panels)
-    for (pi in seq_along(panel_names)) {
-      panel_html <- parsed$content_panels[[panel_names[pi]]]
-      # Strip any existing "active" from the panel's root element class
-      panel_html <- sub(
-        'class="([a-z]+-(?:panel|section))\\s+active"',
-        'class="\\1"',
-        panel_html,
-        perl = TRUE
-      )
-      if (pi == 1L) {
-        # Add active to the first panel
-        panel_html <- sub(
-          'class="([a-z]+-(?:panel|section))"',
-          'class="\\1 active"',
-          panel_html,
-          perl = TRUE
-        )
-      }
-      hub_content <- c(hub_content, panel_html)
-    }
-
-    # Include footer if present
-    if (nzchar(parsed$footer)) {
-      hub_content <- c(hub_content, parsed$footer)
-    }
-
-    # Include help overlay if present (extracted separately from content panels)
-    if (!is.null(parsed$help_overlay) && nzchar(parsed$help_overlay)) {
-      hub_content <- c(hub_content, parsed$help_overlay)
-    }
-
-    # Fix unbalanced divs across the ENTIRE hub-panel content.
-    # Panels extracted from source reports may include extra </div> tags from
-    # wrapper elements (e.g., panels-wrap) not present in the hub.
-    content_str <- paste(hub_content, collapse = "\n")
-    n_open <- lengths(gregexpr("<div[\\s>]", content_str, perl = TRUE))
-    n_close <- lengths(gregexpr("</div>", content_str, fixed = TRUE))
-    if (n_close > n_open) {
-      excess <- n_close - n_open
-      for (x in seq_len(excess)) {
-        last_close <- regexpr("</div>(?!.*</div>)", content_str, perl = TRUE)
-        if (last_close > 0) {
-          content_str <- paste0(
-            substr(content_str, 1, last_close - 1),
-            substr(content_str, last_close + 6, nchar(content_str))
-          )
-        }
-      }
-      content_str <- sub("\\s+$", "", content_str)
-    } else if (n_open > n_close) {
-      deficit <- n_open - n_close
-      content_str <- paste0(content_str, paste(rep("\n</div>", deficit), collapse = ""))
-    }
-
-    parts <- c(parts, sprintf('<div class="hub-panel" data-hub-panel="%s">', key))
-    parts <- c(parts, content_str)
-    parts <- c(parts, '</div>')
+    parts <- c(parts, sprintf(
+      '<div class="hub-panel" data-hub-panel="%s">
+  <iframe id="hub-iframe-%s" class="hub-report-iframe"></iframe>
+  <div class="hub-iframe-loading" id="hub-loading-%s">
+    <div class="hub-loading-spinner"></div>
+    <div class="hub-loading-text">Loading report...</div>
+  </div>
+</div>',
+      key, key, key
+    ))
   }
 
   # --- Unified pinned views panel ---
@@ -137,36 +74,35 @@ assemble_hub_html <- function(config, parsed_reports, overview_html, navigation_
     parts <- c(parts, about_html)
   }
 
-  # --- Data scripts ---
-  # Unified pinned data store (pass report configs for source labels)
-  merged_pins <- merge_pinned_data(parsed_reports, config$reports)
-  parts <- c(parts, sprintf(
-    '<script type="application/json" id="hub-pinned-data">%s</script>',
-    merged_pins
-  ))
-
-  # Per-report data scripts (banner groups, segments, etc.)
+  # --- Report HTML data (base64-encoded, for iframe srcdoc) ---
+  # Base64 uses only A-Za-z0-9+/= characters, so it cannot interfere
+  # with HTML parsing (no < > / that could form closing tags)
   for (parsed in parsed_reports) {
-    for (ds in parsed$data_scripts) {
-      # Skip pinned-views-data (now unified)
-      if (!is.null(ds$id) && grepl("pinned-views-data", ds$id)) next
-      parts <- c(parts, sprintf('%s%s</script>', ds$open_tag, ds$content))
-    }
+    b64_html <- base64enc::base64encode(charToRaw(parsed$raw_html))
+    cat(sprintf("    Base64-encoded %s: %s -> %s\n",
+                parsed$report_key,
+                format_file_size(nchar(parsed$raw_html)),
+                format_file_size(nchar(b64_html))))
+
+    parts <- c(parts, paste0(
+      '<script type="text/plain" data-encoding="base64" id="hub-report-',
+      parsed$report_key, '">',
+      b64_html,
+      '</script>'
+    ))
   }
 
+  # --- Hub-level pinned data store ---
+  parts <- c(parts, '<script type="application/json" id="hub-pinned-data">[]</script>')
+
   # --- JavaScript ---
-  # Hub JS first
+  # Hub JS (navigation, pinned views, init)
   hub_js <- build_hub_js()
   parts <- c(parts, sprintf('<script>\n%s\n</script>', hub_js))
 
-  # Per-report namespaced JS
-  for (parsed in parsed_reports) {
-    parts <- c(parts, sprintf('<script>/* %s JS */\n%s\n</script>',
-                               parsed$report_key, parsed$wrapped_js))
-  }
-
   # Initialization script
-  init_js <- build_init_js(parsed_reports)
+  report_keys <- vapply(parsed_reports, function(p) p$report_key, character(1))
+  init_js <- build_init_js(report_keys)
   parts <- c(parts, sprintf('<script>\n%s\n</script>', init_js))
 
   # --- Close ---
@@ -179,21 +115,10 @@ assemble_hub_html <- function(config, parsed_reports, overview_html, navigation_
 
 #' Build Hub CSS from Template File
 #'
-#' Reads the hub stylesheet from the assets/hub_styles.css file and
-#' substitutes colour tokens (BRAND_COLOUR, ACCENT_COLOUR) with the
-#' values specified in the hub config. Falls back to a minimal inline
-#' CSS string if the file cannot be found.
-#'
-#' @param config Validated config list from \code{guard_validate_hub_config()}.
-#'   Must contain \code{config$settings$brand_colour} and
-#'   \code{config$settings$accent_colour} (both optional, with defaults).
-#'
-#' @return A single CSS string with colour tokens replaced, ready for
-#'   embedding in a \code{<style>} tag.
+#' @param config Validated config list
+#' @return CSS string with colour tokens replaced
 build_hub_css <- function(config) {
   css_path <- file.path(dirname(sys.frame(1)$ofile %||% "."), "assets", "hub_styles.css")
-
-  # Fallback: try relative to module root
   if (!file.exists(css_path)) {
     css_path <- file.path("modules", "report_hub", "assets", "hub_styles.css")
   }
@@ -201,11 +126,9 @@ build_hub_css <- function(config) {
   if (file.exists(css_path)) {
     css <- paste(readLines(css_path, warn = FALSE), collapse = "\n")
   } else {
-    # Inline fallback (minimal)
     css <- ":root { --hub-brand: #323367; --hub-accent: #CC9900; }"
   }
 
-  # Substitute colour tokens
   brand <- config$settings$brand_colour %||% "#323367"
   accent <- config$settings$accent_colour %||% "#CC9900"
 
@@ -218,29 +141,11 @@ build_hub_css <- function(config) {
 
 #' Build Hub Header HTML
 #'
-#' Generates the top-level header bar for the combined report hub.
-#' The header includes the project title, a "Prepared by / for" subtitle,
-#' a "Powered by Turas Analytics" line, a creation date (which the client-side
-#' JS updates to "Last saved {date}" on save), Save and Print action buttons,
-#' and an optional base64-encoded logo image.
-#'
-#' Header layout:
-#' \itemize{
-#'   \item Title (project_title)
-#'   \item Subtitle line 1: "Prepared by \{company_name\} for \{client_name\}"
-#'   \item Subtitle line 2: "Powered by Turas Analytics"
-#'   \item Date line: "Created \{date\}" (updates to "Last saved \{date\}" on save)
-#' }
-#'
-#' @param config Validated config list from \code{guard_validate_hub_config()}.
-#'   Uses \code{config$settings$project_title}, \code{config$settings$company_name},
-#'   \code{config$settings$client_name}, and \code{config$settings$logo_path}.
-#'
-#' @return A single HTML string containing the complete hub header \code{<div>}.
+#' @param config Validated config list
+#' @return HTML string for the hub header
 build_hub_header <- function(config) {
   logo_html <- ""
   if (!is.null(config$settings$logo_path) && file.exists(config$settings$logo_path)) {
-    # Read and base64 encode the logo
     logo_raw <- readBin(config$settings$logo_path, "raw",
                         file.info(config$settings$logo_path)$size)
     logo_ext <- tolower(tools::file_ext(config$settings$logo_path))
@@ -270,8 +175,6 @@ build_hub_header <- function(config) {
   }
   prepared_line <- paste(prepared_parts, collapse = " ")
 
-  # Date line: "Created {date}" — JS will update to "Last saved ..." on save
-
   created_date <- format(Sys.Date(), "%d %b %Y")
 
   sprintf(
@@ -300,7 +203,7 @@ build_hub_header <- function(config) {
 }
 
 
-#' Build the Unified Pinned Views Panel HTML
+#' Build the Unified Pinned Views Panel
 #'
 #' @return HTML string
 build_pinned_panel <- function() {
@@ -313,71 +216,18 @@ build_pinned_panel <- function() {
     </div>
     <div id="hub-pinned-cards"></div>
     <div id="hub-pinned-empty" class="hub-pinned-empty">
-      No pinned views yet. Pin items from the Tracker or Crosstabs reports to build your curated collection.
+      No pinned views yet. Pin charts, tables, or insights from any report tab &mdash; they will appear here as a curated collection.
     </div>
   </div>
 </div>'
 }
 
 
-#' Merge Pinned Data from All Reports
-#'
-#' @param parsed_reports List of parsed report objects
-#' @param report_configs List of report config objects (with $key and $label)
-#' @return JSON string of merged pinned items
-merge_pinned_data <- function(parsed_reports, report_configs = NULL) {
-  all_pins <- list()
-
-  # Build key -> label lookup from config
-  label_map <- list()
-  if (!is.null(report_configs)) {
-    for (rc in report_configs) {
-      label_map[[rc$key]] <- rc$label
-    }
-  }
-
-  for (parsed in parsed_reports) {
-    pins_json <- parsed$pinned_data
-    if (is.null(pins_json) || pins_json == "[]") next
-
-    pins <- tryCatch(
-      jsonlite::fromJSON(pins_json, simplifyVector = FALSE),
-      error = function(e) {
-        message(sprintf("Report hub: failed to parse pinned data for '%s': %s",
-                        parsed$report_key, e$message))
-        list()
-      }
-    )
-
-    for (pin in pins) {
-      pin$source <- parsed$report_key
-      pin$type <- "pin"
-      # Add human-readable source label from config
-      if (!is.null(label_map[[parsed$report_key]])) {
-        pin$sourceLabel <- label_map[[parsed$report_key]]
-      }
-      all_pins <- c(all_pins, list(pin))
-    }
-  }
-
-  if (length(all_pins) == 0) return("[]")
-  return(jsonlite::toJSON(all_pins, auto_unbox = TRUE))
-}
-
-
 #' Build Hub JavaScript from Source Files
 #'
-#' Reads and concatenates the hub-level JavaScript source files from the
-#' \code{js/} directory within the report_hub module. The files loaded are:
-#' \code{hub_id_resolver.js}, \code{hub_navigation.js}, and \code{hub_pinned.js}.
-#' Falls back to a relative path if the script-relative path cannot be resolved.
-#'
-#' @return A single JavaScript string containing all hub JS code, ready for
-#'   embedding in a \code{<script>} tag.
+#' @return JavaScript string
 build_hub_js <- function() {
   js_dir <- file.path(dirname(sys.frame(1)$ofile %||% "."), "js")
-
-  # Fallback path
   if (!dir.exists(js_dir)) {
     js_dir <- file.path("modules", "report_hub", "js")
   }
@@ -398,146 +248,26 @@ build_hub_js <- function() {
 
 #' Build Initialization JavaScript
 #'
-#' Generates a \code{DOMContentLoaded} event handler that initialises all
-#' hub components in the correct order: hub navigation, per-report init
-#' calls (TrackerReport or TabsReport), hub-level text sections and
-#' qualitative slides rendering, and pinned views hydration.
-#'
-#' @param parsed_reports List of parsed and namespace-rewritten report objects.
-#'   Each element must have a \code{report_type} field (either \code{"tracker"}
-#'   or \code{"tabs"}) to determine which namespace init function to call.
-#'
-#' @return A JavaScript string containing a \code{DOMContentLoaded} event
-#'   listener with all initialisation calls, ready for embedding in a
-#'   \code{<script>} tag.
-build_init_js <- function(parsed_reports) {
-  init_calls <- character(0)
-
-  # Initialize hub navigation
-  init_calls <- c(init_calls, "ReportHub.initNavigation();")
-
-  # Initialize each report
-  for (parsed in parsed_reports) {
-    ns_name <- switch(parsed$report_type,
-      tracker = "TrackerReport",
-      tabs = "TabsReport",
-      maxdiff = "MaxDiffReport",
-      conjoint = "ConjointReport",
-      pricing = "PricingReport",
-      segment = "SegmentReport",
-      catdriver = "CatDriverReport",
-      keydriver = "KeyDriverReport",
-      confidence = "ConfidenceReport",
-      weighting = "WeightingReport",
-      "TabsReport"
-    )
-    init_calls <- c(init_calls, sprintf(
-      "if (typeof %s !== 'undefined' && %s.init) { %s.init(); }",
-      ns_name, ns_name, ns_name
-    ))
-  }
-
-  # Render hub-level text sections (executive summary, background)
-  init_calls <- c(init_calls, "if (ReportHub.renderHubTextSections) ReportHub.renderHubTextSections();")
-
-  # Render hub-level qualitative slides
-  init_calls <- c(init_calls, "if (ReportHub.renderHubSlides) ReportHub.renderHubSlides();")
-
-  # Hydrate per-report insights (config-provided insights need rendering on load)
-  # Uses a robust fallback chain:
-  # 1. Call the report's own hydrateInsights() (reads from insight-store textarea)
-  # 2. If editors are still empty, fall back to insight-comments-data JSON
-  # 3. Auto-show any insight containers that have content
-  for (parsed in parsed_reports) {
-    key <- parsed$report_key
-    init_calls <- c(init_calls, sprintf(
-      'if (typeof %s_hydrateInsights === "function") { %s_hydrateInsights(); }',
-      key, key
-    ))
-    # Robust fallback: populate editors from insight-store or insight-comments-data
-    init_calls <- c(init_calls, sprintf(
-      paste0(
-        '(function() {',
-        '  var panel = document.querySelector(\'.hub-panel[data-hub-panel="%s"]\');',
-        '  if (!panel) return;',
-        '  var renderMd = window["%s_renderMarkdown"];',
-        '  var getBanner = window["%s_getActiveBannerName"];',
-        '  var bannerName = (typeof getBanner === "function") ? getBanner() : "_default";',
-        '  var areas = panel.querySelectorAll(".insight-area");',
-        '  for (var ai = 0; ai < areas.length; ai++) {',
-        '    var area = areas[ai];',
-        '    var editor = area.querySelector(".insight-md-editor");',
-        '    if (!editor) continue;',
-        '    var text = editor.value ? editor.value.trim() : "";',
-        # If editor empty, try reading insight-store textarea directly
-        '    if (!text) {',
-        '      var store = area.querySelector("textarea.insight-store");',
-        '      if (store && store.value && store.value.trim()) {',
-        '        try {',
-        '          var storeObj = JSON.parse(store.value);',
-        '          if (typeof storeObj === "string") { text = storeObj; }',
-        '          else if (storeObj[bannerName]) { text = storeObj[bannerName]; }',
-        '          else {',
-        '            var keys = Object.keys(storeObj);',
-        '            if (keys.length > 0) text = storeObj[keys[0]];',
-        '          }',
-        '        } catch(e) { text = store.value.trim(); }',
-        '      }',
-        '    }',
-        # If still empty, try insight-comments-data JSON
-        '    if (!text) {',
-        '      var scriptEl = area.querySelector("script.insight-comments-data");',
-        '      if (scriptEl) {',
-        '        try {',
-        '          var comments = JSON.parse(scriptEl.textContent);',
-        '          if (comments && comments.length) {',
-        '            for (var ci = 0; ci < comments.length; ci++) {',
-        '              if (comments[ci].banner && comments[ci].banner === bannerName) {',
-        '                text = comments[ci].text; break;',
-        '              }',
-        '            }',
-        '            if (!text) {',
-        '              for (var ci2 = 0; ci2 < comments.length; ci2++) {',
-        '                if (!comments[ci2].banner || !comments[ci2].banner.trim()) {',
-        '                  text = comments[ci2].text; break;',
-        '                }',
-        '              }',
-        '            }',
-        '            if (!text && comments[0] && comments[0].text) text = comments[0].text;',
-        '          }',
-        '        } catch(e) { /* ignore parse errors */ }',
-        '      }',
-        '    }',
-        # Populate editor and render
-        '    if (text) {',
-        '      editor.value = text;',
-        '      var cont = editor.closest(".insight-container");',
-        '      var rendered = cont ? cont.querySelector(".insight-md-rendered") : null;',
-        '      if (rendered && typeof renderMd === "function") {',
-        '        rendered.innerHTML = renderMd(text);',
-        '      }',
-        '      if (cont) cont.style.display = "block";',
-        '      var btn = area.querySelector(".insight-toggle");',
-        '      if (btn) btn.style.display = "none";',
-        '    }',
-        '  }',
-        '})();'
-      ), key, key, key
-    ))
-  }
-
-  # Hydrate pinned views
-  init_calls <- c(init_calls, "ReportHub.hydratePinnedViews();")
+#' @param report_keys Character vector of report keys
+#' @return JavaScript string
+build_init_js <- function(report_keys) {
+  # Build report keys array for JS
+  keys_js <- paste(sprintf('"%s"', report_keys), collapse = ", ")
 
   sprintf(
-    'document.addEventListener("DOMContentLoaded", function() {\n  %s\n});',
-    paste(init_calls, collapse = "\n  ")
+    'document.addEventListener("DOMContentLoaded", function() {
+  // Register report keys and initialize hub
+  ReportHub.reportKeys = [%s];
+  ReportHub.initNavigation();
+  ReportHub.hydratePinnedViews();
+
+  // Render hub-level markdown text sections
+  if (ReportHub.renderHubTextSections) ReportHub.renderHubTextSections();
+  if (ReportHub.renderHubSlides) ReportHub.renderHubSlides();
+});',
+    keys_js
   )
 }
 
 
-#' Null-coalescing operator
-#' @param x LHS
-#' @param y RHS (default)
-#' @return x if not NULL, else y
-`%||%` <- function(x, y) if (is.null(x)) y else x
+# %||% operator defined in 00_main.R (sourced first)

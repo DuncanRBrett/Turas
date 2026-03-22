@@ -1,34 +1,15 @@
-#' Report Hub — Main Orchestration
+#' Report Hub — Main Orchestration (iframe approach)
 #'
 #' Combines multiple Turas HTML reports into a single unified report.
+#' Each report is embedded as-is inside an iframe, guaranteeing that
+#' reports behave identically to their standalone versions.
+#'
 #' Entry point: combine_reports()
-
-# Ensure renv library is available (Shiny subprocess may skip renv activation)
-# Test with jpeg/png since these are needed for image compression and less
-# likely to be pre-loaded by Shiny compared to base64enc
-renv_activate <- file.path("renv", "activate.R")
-has_jpeg <- requireNamespace("jpeg", quietly = TRUE)
-has_png <- requireNamespace("png", quietly = TRUE)
-cat(sprintf("  [report_hub] Package check: jpeg=%s, png=%s, renv_exists=%s\n",
-            has_jpeg, has_png, file.exists(renv_activate)))
-if (file.exists(renv_activate) && (!has_jpeg || !has_png)) {
-  cat("  [report_hub] Activating renv for image packages...\n")
-  source(renv_activate)
-  # Verify packages are now available
-  has_jpeg2 <- requireNamespace("jpeg", quietly = TRUE)
-  has_png2 <- requireNamespace("png", quietly = TRUE)
-  cat(sprintf("  [report_hub] After renv: jpeg=%s, png=%s\n", has_jpeg2, has_png2))
-  if (!has_jpeg2 || !has_png2) {
-    cat("  [report_hub] WARNING: jpeg/png still not available after renv activation.\n")
-    cat("  [report_hub] .libPaths():", paste(.libPaths(), collapse = ", "), "\n")
-  }
-}
 
 # Source module files
 hub_dir <- file.path("modules", "report_hub")
 source(file.path(hub_dir, "00_guard.R"))
 source(file.path(hub_dir, "01_html_parser.R"))
-source(file.path(hub_dir, "02_namespace_rewriter.R"))
 source(file.path(hub_dir, "03_front_page_builder.R"))
 source(file.path(hub_dir, "04_navigation_builder.R"))
 source(file.path(hub_dir, "07_page_assembler.R"))
@@ -37,16 +18,14 @@ source(file.path(hub_dir, "08_html_writer.R"))
 #' Combine Multiple Turas HTML Reports
 #'
 #' Reads a config Excel file specifying which reports to combine,
-#' parses each HTML report, namespaces their DOM/JS to avoid conflicts,
-#' and assembles a single unified HTML report with two-tier navigation,
-#' a front page, and unified pinned views.
+#' parses each HTML report for metadata, and assembles a single
+#' unified HTML file with iframe-isolated reports.
 #'
 #' @param config_file Path to the Report Hub config Excel file
-#'   containing Settings, Reports, and optionally CrossRef sheets.
+#'   containing Settings and Reports sheets.
 #' @param output_file Path for the combined HTML output.
 #'   If NULL, auto-generated from project title + date.
-#' @param auto_cross_ref Logical. Reserved for future use — will enable
-#'   fuzzy question matching across reports. Currently ignored. Default FALSE.
+#' @param auto_cross_ref Reserved for future use. Default FALSE.
 #'
 #' @return TRS-compliant list with:
 #'   \item{status}{"PASS", "PARTIAL", or "REFUSED"}
@@ -90,7 +69,6 @@ combine_reports <- function(config_file, output_file = NULL, auto_cross_ref = FA
 
   # --- Step 2: Generate output file path if not provided ---
   if (is.null(output_file)) {
-    # Use config settings if available, otherwise auto-generate
     if (!is.null(config$settings$output_file)) {
       output_file <- config$settings$output_file
     } else {
@@ -98,31 +76,30 @@ combine_reports <- function(config_file, output_file = NULL, auto_cross_ref = FA
       output_file <- sprintf("%s_Combined_%s.html",
                              safe_title, format(Sys.Date(), "%Y%m%d"))
     }
-
-    # Prepend output_dir if configured and output_file is just a filename
     if (!is.null(config$settings$output_dir) && !grepl(.Platform$file.sep, output_file, fixed = TRUE)) {
       output_file <- file.path(config$settings$output_dir, output_file)
     }
   }
 
-  # --- Step 3: Parse each report ---
-  cat("Step 2: Parsing source reports...\n")
+  # --- Step 3: Parse each report (read file + extract metadata) ---
+  cat("Step 2: Reading source reports...\n")
   parsed_reports <- list()
+  total_report_size <- 0
 
   for (report in config$reports) {
-    cat(sprintf("  Parsing: %s (%s)\n", report$label, basename(report$path)))
+    cat(sprintf("  Reading: %s (%s)\n", report$label, basename(report$path)))
     parsed <- parse_html_report(report$path, report$key)
 
     if (parsed$status == "REFUSED") {
       cat("\n=== TURAS ERROR ===\n")
-      cat("Failed to parse:", report$label, "\n")
+      cat("Failed to read:", report$label, "\n")
       cat("Code:", parsed$code, "\n")
       cat("Message:", parsed$message, "\n")
       cat("==================\n\n")
       return(parsed)
     }
 
-    # Override type from config if specified (normalise to internal codes)
+    # Override type from config if specified
     if (!is.null(report$type) && nzchar(report$type)) {
       type_map <- c(
         "crosstabs" = "tabs", "tabs" = "tabs",
@@ -131,7 +108,7 @@ combine_reports <- function(config_file, output_file = NULL, auto_cross_ref = FA
         "conjoint" = "conjoint",
         "pricing" = "pricing",
         "segment" = "segment", "segmentation" = "segment",
-        "catdriver" = "catdriver", "catdriviver" = "catdriver", "categorical driver" = "catdriver",
+        "catdriver" = "catdriver", "categorical driver" = "catdriver",
         "keydriver" = "keydriver", "key driver" = "keydriver",
         "confidence" = "confidence",
         "weighting" = "weighting"
@@ -140,46 +117,44 @@ combine_reports <- function(config_file, output_file = NULL, auto_cross_ref = FA
       if (config_type %in% names(type_map)) {
         parsed$result$report_type <- type_map[[config_type]]
       }
-      # If not in map, keep the auto-detected type
     }
 
-    cat(sprintf("    Type: %s, Panels: %d, JS blocks: %d\n",
+    cat(sprintf("    Type: %s, Size: %s\n",
                 parsed$result$report_type,
-                length(parsed$result$content_panels),
-                length(parsed$result$js_blocks)))
+                format_file_size(parsed$result$file_size)))
 
+    total_report_size <- total_report_size + parsed$result$file_size
     parsed_reports <- c(parsed_reports, list(parsed$result))
   }
 
-  # --- Step 4: Namespace rewrite ---
-  cat("Step 3: Namespacing for conflict resolution...\n")
-  for (i in seq_along(parsed_reports)) {
-    cat(sprintf("  Rewriting: %s\n", parsed_reports[[i]]$report_key))
-    report_label <- if (i <= length(config$reports)) config$reports[[i]]$label else NULL
-    parsed_reports[[i]] <- rewrite_for_hub(parsed_reports[[i]], report_label)
+  cat(sprintf("  Total source size: %s\n", format_file_size(total_report_size)))
+  if (total_report_size > 50 * 1024 * 1024) {
+    cat("  [WARNING] Large source size — output file will be 50+ MB. Consider fewer reports per hub.\n")
+    warnings <- c(warnings, sprintf("Large combined size: %s. Consider splitting into multiple hub files.",
+                                     format_file_size(total_report_size)))
   }
 
-  # --- Step 5: Build navigation ---
-  cat("Step 4: Building navigation...\n")
+  # --- Step 4: Build navigation (Level 1 only — reports have their own internal nav) ---
+  cat("Step 3: Building navigation...\n")
   has_about <- any(!sapply(
     list(config$settings$analyst_name, config$settings$analyst_email,
          config$settings$analyst_phone, config$settings$appendices,
          config$settings$notes),
     is.null
   ))
-  navigation_html <- build_navigation(parsed_reports, config$reports, has_about = has_about)
+  navigation_html <- build_navigation(config$reports, has_about = has_about)
 
-  # --- Step 6: Build front page ---
-  cat("Step 5: Building overview page...\n")
+  # --- Step 5: Build front page ---
+  cat("Step 4: Building overview page...\n")
   overview_html <- build_front_page(config, parsed_reports)
 
-  # --- Step 7: Assemble final HTML ---
-  cat("Step 6: Assembling combined report...\n")
+  # --- Step 6: Assemble final HTML (iframe-based) ---
+  cat("Step 5: Assembling combined report (iframe isolation)...\n")
   config$original_filename <- basename(output_file)
   final_html <- assemble_hub_html(config, parsed_reports, overview_html, navigation_html)
 
-  # --- Step 8: Write output ---
-  cat(sprintf("Step 7: Writing output: %s\n", output_file))
+  # --- Step 7: Write output ---
+  cat(sprintf("Step 6: Writing output: %s\n", output_file))
   write_result <- write_hub_html(final_html, output_file)
 
   if (write_result$status == "REFUSED") {
@@ -204,7 +179,7 @@ combine_reports <- function(config_file, output_file = NULL, auto_cross_ref = FA
       output_path = write_result$result$output_path,
       file_size = write_result$result$file_size,
       n_reports = length(parsed_reports),
-      report_keys = sapply(parsed_reports, function(p) p$report_key)
+      report_keys = vapply(parsed_reports, function(p) p$report_key, character(1))
     ),
     warnings = warnings,
     message = sprintf("Combined %d reports into %s (%s)",

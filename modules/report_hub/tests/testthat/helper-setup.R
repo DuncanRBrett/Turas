@@ -11,7 +11,7 @@ if (!file.exists(file.path(hub_root, "00_guard.R"))) {
 
 source(file.path(hub_root, "00_guard.R"))
 source(file.path(hub_root, "01_html_parser.R"))
-source(file.path(hub_root, "02_namespace_rewriter.R"))
+# 02_namespace_rewriter.R is no longer used (iframe approach)
 source(file.path(hub_root, "03_front_page_builder.R"))
 source(file.path(hub_root, "04_navigation_builder.R"))
 source(file.path(hub_root, "07_page_assembler.R"))

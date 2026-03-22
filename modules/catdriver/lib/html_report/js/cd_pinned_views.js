@@ -50,6 +50,7 @@
           cdPinnedViews[i].sectionKey === sectionKey &&
           cdPinnedViews[i].prefix === prefix) {
         cdPinnedViews.splice(i, 1);
+        cdSavePinnedData();
         cdRenderPinnedCards();
         cdUpdatePinBadge();
         cdUpdatePinButtons();
@@ -74,6 +75,7 @@
     };
 
     cdPinnedViews.push(pin);
+    cdSavePinnedData();
     cdRenderPinnedCards();
     cdUpdatePinBadge();
     cdUpdatePinButtons();
@@ -95,6 +97,7 @@
           cdPinnedViews[i].prefix === prefix &&
           cdPinnedViews[i].component === component) {
         cdPinnedViews.splice(i, 1);
+        cdSavePinnedData();
         cdRenderPinnedCards();
         cdUpdatePinBadge();
         cdUpdatePinButtons();
@@ -124,6 +127,7 @@
     };
 
     cdPinnedViews.push(pin);
+    cdSavePinnedData();
     cdRenderPinnedCards();
     cdUpdatePinBadge();
     cdUpdatePinButtons();

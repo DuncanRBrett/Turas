@@ -30,7 +30,7 @@ body {
 .hub-header {
   background: linear-gradient(135deg, #1a2744 0%, #2a3f5f 100%);
   border-bottom: 3px solid var(--hub-accent);
-  padding: 20px 32px 16px;
+  padding: 10px 32px 8px;
   color: #fff;
 }
 
@@ -43,7 +43,7 @@ body {
 }
 
 .hub-logo img {
-  height: 36px;
+  height: 28px;
   width: auto;
 }
 
@@ -52,7 +52,7 @@ body {
 }
 
 .hub-header-title {
-  font-size: 22px;
+  font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
@@ -107,28 +107,50 @@ body {
 
 /* --- Level 1 Navigation --- */
 .hub-nav-level1 {
-  background: var(--hub-card);
-  border-bottom: 1px solid var(--hub-border);
-  padding: 0 32px;
+  background: #eef1f6;
+  border-bottom: 2px solid var(--hub-border);
+  padding: 4px 32px 0;
   display: flex;
   flex-wrap: wrap;
   gap: 0;
   max-width: 1600px;
   margin: 0 auto;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.hub-nav-level1::-webkit-scrollbar {
+  height: 3px;
+}
+
+.hub-nav-level1::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.hub-nav-level1::-webkit-scrollbar-thumb {
+  background: var(--hub-border);
+  border-radius: 3px;
 }
 
 .hub-tab {
   background: none;
   border: none;
   border-bottom: 3px solid transparent;
-  padding: 12px 20px 10px;
+  padding: 5px 12px 3px;
   font-family: var(--hub-font);
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--hub-text-muted);
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
   white-space: nowrap;
+  /* Scale down when many tabs present (15+ reports = 18+ tabs) */
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
 }
 
 .hub-tab:hover {
@@ -484,6 +506,46 @@ body {
 .hub-badge-confidence {
   background: #ede9fe;
   color: #5b21b6;
+}
+
+.hub-badge-conjoint {
+  background: #fce7f3;
+  color: #9d174d;
+}
+
+.hub-badge-maxdiff {
+  background: #ccfbf1;
+  color: #115e59;
+}
+
+.hub-badge-pricing {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+.hub-badge-segment {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.hub-badge-catdriver {
+  background: #fce4ec;
+  color: #880e4f;
+}
+
+.hub-badge-keydriver {
+  background: #e8f5e9;
+  color: #1b5e20;
+}
+
+.hub-badge-weighting {
+  background: #f3e5f5;
+  color: #6a1b9a;
+}
+
+.hub-badge-default {
+  background: #f1f5f9;
+  color: #475569;
 }
 
 .hub-pin-title {
@@ -953,30 +1015,48 @@ body {
   color: #1e293b;
 }
 
-/* --- Sub-panel visibility (hub overrides) --- */
-/* All panel types hidden by default; .active shows the current one. */
-.hub-panel .tab-panel,
-.hub-panel .md-panel,
-.hub-panel .cj-panel,
-.hub-panel .pr-panel,
-.hub-panel .seg-section,
-.hub-panel .kd-section,
-.hub-panel .cd-section {
-  display: none;
-}
-.hub-panel .tab-panel.active,
-.hub-panel .md-panel.active,
-.hub-panel .cj-panel.active,
-.hub-panel .pr-panel.active,
-.hub-panel .seg-section.active,
-.hub-panel .kd-section.active,
-.hub-panel .cd-section.active {
+/* --- iframe Report Panels --- */
+/* Each report lives inside an iframe — full isolation, zero conflicts. */
+.hub-report-iframe {
+  width: 100%;
+  height: calc(100vh - 120px);
+  border: none;
   display: block;
+  background: var(--hub-bg);
 }
 
-/* --- Transitions for visibility toggles --- */
-.tab-panel {
-  transition: opacity 0.15s ease;
+/* Loading indicator (shown while iframe content loads) */
+.hub-iframe-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: var(--hub-text-muted);
+}
+
+.hub-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--hub-border);
+  border-top-color: var(--hub-brand);
+  border-radius: 50%;
+  animation: hub-spin 0.8s linear infinite;
+  margin: 0 auto 12px;
+}
+
+@keyframes hub-spin {
+  to { transform: rotate(360deg); }
+}
+
+.hub-loading-text {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Report panels need relative positioning for the loading overlay */
+.hub-panel[data-hub-panel]:not([data-hub-panel="overview"]):not([data-hub-panel="pinned"]):not([data-hub-panel="about"]) {
+  position: relative;
 }
 
 /* --- Hub About Section --- */
@@ -1102,18 +1182,17 @@ body {
 /* --- Print Styles --- */
 @media print {
   .hub-nav-level1,
-  .hub-nav-level2,
   .hub-header-actions,
   .hub-pinned-toolbar,
   .hub-action-btn,
   .hub-remove-btn,
   .hub-save-btn,
   .hub-print-btn,
-  .hub-help-btn,
   .hub-slide-img-btn,
   .hub-slide-img-remove,
   .hub-slide-img-input,
-  .hub-about-export {
+  .hub-about-export,
+  .hub-iframe-loading {
     display: none !important;
   }
 
@@ -1123,6 +1202,11 @@ body {
 
   .hub-panel.active {
     display: block !important;
+  }
+
+  .hub-report-iframe {
+    height: auto;
+    min-height: 100vh;
   }
 
   .hub-header {
@@ -1143,14 +1227,12 @@ body {
 
 /* --- Responsive --- */
 @media (max-width: 768px) {
-  .hub-nav-level1,
-  .hub-nav-level2 {
+  .hub-nav-level1 {
     padding: 0 16px;
     overflow-x: auto;
   }
 
-  .hub-tab,
-  .hub-subtab {
+  .hub-tab {
     padding: 10px 12px;
     font-size: 13px;
   }

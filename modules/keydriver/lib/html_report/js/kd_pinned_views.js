@@ -50,6 +50,7 @@
           kdPinnedViews[i].sectionKey === sectionKey &&
           kdPinnedViews[i].prefix === prefix) {
         kdPinnedViews.splice(i, 1);
+        kdSavePinnedData();
         kdRenderPinnedCards();
         kdUpdatePinBadge();
         kdUpdatePinButtons();
@@ -73,6 +74,7 @@
     };
 
     kdPinnedViews.push(pin);
+    kdSavePinnedData();
     kdRenderPinnedCards();
     kdUpdatePinBadge();
     kdUpdatePinButtons();
@@ -94,6 +96,7 @@
           kdPinnedViews[i].prefix === prefix &&
           kdPinnedViews[i].component === component) {
         kdPinnedViews.splice(i, 1);
+        kdSavePinnedData();
         kdRenderPinnedCards();
         kdUpdatePinBadge();
         kdUpdatePinButtons();
@@ -122,6 +125,7 @@
     };
 
     kdPinnedViews.push(pin);
+    kdSavePinnedData();
     kdRenderPinnedCards();
     kdUpdatePinBadge();
     kdUpdatePinButtons();

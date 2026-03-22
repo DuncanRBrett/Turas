@@ -825,6 +825,20 @@ guard_validate_hub_config <- function(config_file) {
   if (!is.null(reports_check$status)) return(reports_check)
   reports_df <- reports_check$reports_df
 
+  # --- Step 4b: Report count guard ---
+  n_reports <- nrow(reports_df)
+  if (n_reports > 20) {
+    return(list(
+      status = "REFUSED",
+      code = "CFG_TOO_MANY_REPORTS",
+      message = sprintf("Config contains %d reports. Maximum supported is 20.", n_reports),
+      how_to_fix = "Reduce the number of reports or split into multiple hub files. Recommended: 5-10 reports per hub."
+    ))
+  }
+  if (n_reports > 15) {
+    cat(sprintf("  [WARNING] %d reports configured — hub may be slow to load. Recommended: 5-10.\n", n_reports))
+  }
+
   # --- Step 5: Parse optional sheets (CrossRef, Slides) ---
   optional <- .parse_optional_sheets(config_file, sheets)
   warnings <- optional$warnings

@@ -1,12 +1,10 @@
 /**
- * Hub ID Resolver - ReportHub Namespace Initialization
+ * Hub Namespace Initialization (iframe approach)
  *
- * Creates the ReportHub namespace object used by hub_navigation.js
- * and hub_pinned.js. Must be loaded first.
- *
- * ID resolution for prefixed elements is handled by per-report
- * scoped helper functions (_$id, _$qs) injected into each report's
- * JS block during assembly.
+ * Creates the ReportHub namespace object. Must be loaded first.
+ * Each report runs in its own iframe — no ID resolution needed.
  */
 
 var ReportHub = ReportHub || {};
+ReportHub.reportKeys = ReportHub.reportKeys || [];
+ReportHub.loadedIframes = ReportHub.loadedIframes || {};

@@ -23,11 +23,57 @@
       pinObj.id = "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5);
     }
     pinObj.timestamp = pinObj.timestamp || Date.now();
+
+    // Compress SVG to reduce storage size (strip excess whitespace/precision)
+    if (pinObj.chartSvg) {
+      pinObj.chartSvg = compressSvg(pinObj.chartSvg);
+    }
+
     ReportHub.pinnedItems.push(pinObj);
     ReportHub.renderPinnedCards();
     ReportHub.updatePinBadge();
     ReportHub.savePinnedData();
+
+    // Visual feedback: brief toast confirming pin was added
+    var toastLabel = pinObj.sourceLabel || source || "Report";
+    var toastTitle = pinObj.title || "View";
+    showPinToast("Pinned: " + toastTitle + " (" + toastLabel + ")");
   };
+
+  /** Show a brief confirmation toast for pin actions */
+  function showPinToast(message) {
+    var existing = document.getElementById("hub-pin-toast");
+    if (existing) existing.parentNode.removeChild(existing);
+    var toast = document.createElement("div");
+    toast.id = "hub-pin-toast";
+    toast.textContent = message;
+    toast.style.cssText = "position:fixed;bottom:24px;left:50%;transform:translateX(-50%);" +
+      "z-index:99999;background:#323367;color:#fff;padding:10px 24px;border-radius:8px;" +
+      "font-size:13px;font-weight:500;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;" +
+      "box-shadow:0 4px 16px rgba(0,0,0,0.2);opacity:0;transition:opacity 0.3s ease;" +
+      "white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis;";
+    document.body.appendChild(toast);
+    toast.offsetHeight;
+    toast.style.opacity = "1";
+    setTimeout(function() {
+      toast.style.opacity = "0";
+      setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 300);
+    }, 2500);
+  }
+
+  /** Compress SVG string by removing unnecessary whitespace and reducing coordinate precision.
+   *  Preserves 3 decimal places to maintain sub-pixel text alignment quality. */
+  function compressSvg(svg) {
+    // Collapse whitespace between tags
+    svg = svg.replace(/>\s+</g, "><");
+    // Reduce decimal precision to 3 places (enough for sub-pixel accuracy)
+    svg = svg.replace(/(\d+\.\d{3})\d+/g, "$1");
+    // Remove empty style/class attributes
+    svg = svg.replace(/\s+(style|class)=""/g, "");
+    // Collapse multiple spaces (but not inside text content)
+    svg = svg.replace(/\s{2,}/g, " ");
+    return svg;
+  }
 
   /**
    * Remove a pin by ID
@@ -113,12 +159,27 @@
     if (!store) return;
     try {
       var data = JSON.parse(store.textContent);
-      if (Array.isArray(data) && data.length > 0) {
-        ReportHub.pinnedItems = data;
+      if (!Array.isArray(data)) {
+        console.warn("[Turas Report Hub] Pinned data is not an array, ignoring.");
+        return;
+      }
+      // Validate each item — filter out corrupted entries
+      var valid = [];
+      for (var i = 0; i < data.length; i++) {
+        var item = data[i];
+        if (!item || typeof item !== "object") continue;
+        if (!item.type || !item.id) continue;
+        if (item.type !== "pin" && item.type !== "section") continue;
+        valid.push(item);
+      }
+      if (valid.length > 0) {
+        ReportHub.pinnedItems = valid;
         ReportHub.renderPinnedCards();
         ReportHub.updatePinBadge();
-
-        // Multi-pin: no need to restore per-report pin button states
+      }
+      if (valid.length < data.length) {
+        console.warn("[Turas Report Hub] Filtered " + (data.length - valid.length) +
+          " corrupted pin entries on load.");
       }
     } catch (e) {
       console.warn("[Turas Report Hub] Failed to parse pinned data:", e.message);
@@ -171,6 +232,7 @@
     var total = ReportHub.pinnedItems.length;
     return '<div class="hub-section-divider" data-idx="' + idx + '">' +
       '<div class="hub-section-title" contenteditable="true" ' +
+        'onpaste="event.preventDefault();document.execCommand(\'insertText\',false,event.clipboardData.getData(\'text/plain\'))" ' +
         'onblur="ReportHub.updateSectionTitle(' + idx + ', this.textContent)">' +
         escapeHtml(section.title) + '</div>' +
       '<div class="hub-section-actions">' +
@@ -223,19 +285,26 @@
 
     // Source badge: use sourceLabel if available, fall back to generic type label
     var badgeLabel = pin.sourceLabel || "";
-    var badgeClass = "hub-badge-tabs";
-    var sourceType = pin.sourceType || pin.source;
-    if (sourceType === "tracker") {
-      badgeClass = "hub-badge-tracker";
-      if (!badgeLabel) badgeLabel = "Tracker";
-    } else if (sourceType === "confidence") {
-      badgeClass = "hub-badge-confidence";
-      if (!badgeLabel) badgeLabel = "Confidence";
-    } else if (pin.source === "overview") {
-      badgeClass = "hub-badge-overview";
-      if (!badgeLabel) badgeLabel = "Overview";
+    var badgeClass = "hub-badge-default";
+    var sourceType = pin.sourceType || pin.source || "";
+    var badgeMap = {
+      tracker:    { cls: "hub-badge-tracker",    label: "Tracker" },
+      tabs:       { cls: "hub-badge-tabs",       label: "Crosstabs" },
+      confidence: { cls: "hub-badge-confidence", label: "Confidence" },
+      conjoint:   { cls: "hub-badge-conjoint",   label: "Conjoint" },
+      maxdiff:    { cls: "hub-badge-maxdiff",    label: "MaxDiff" },
+      pricing:    { cls: "hub-badge-pricing",    label: "Pricing" },
+      segment:    { cls: "hub-badge-segment",    label: "Segmentation" },
+      catdriver:  { cls: "hub-badge-catdriver",  label: "Cat Driver" },
+      keydriver:  { cls: "hub-badge-keydriver",  label: "Key Driver" },
+      weighting:  { cls: "hub-badge-weighting",  label: "Weighting" },
+      overview:   { cls: "hub-badge-overview",   label: "Overview" }
+    };
+    if (badgeMap[sourceType]) {
+      badgeClass = badgeMap[sourceType].cls;
+      if (!badgeLabel) badgeLabel = badgeMap[sourceType].label;
     } else {
-      if (!badgeLabel) badgeLabel = "Crosstabs";
+      if (!badgeLabel) badgeLabel = sourceType || "Report";
     }
     var sourceBadge = '<span class="hub-source-badge ' + badgeClass + '">' + escapeHtml(badgeLabel) + '</span>';
 
@@ -259,7 +328,8 @@
     }
 
     // Insight area with markdown support (dual-mode: rendered view + editor)
-    var insightRaw = pin.insight || "";
+    // Some modules use 'insightText', others use 'insight'
+    var insightRaw = pin.insight || pin.insightText || "";
     // Determine rendered HTML: if insight already contains HTML (from qual slides), use directly;
     // otherwise treat as markdown and render it
     var renderedHtml = "";
@@ -651,9 +721,9 @@
     var file = inputEl.files && inputEl.files[0];
     if (!file) return;
 
-    // File size guard (5MB raw)
-    if (file.size > 5 * 1024 * 1024) {
-      alert("Image too large (" + (file.size / 1024 / 1024).toFixed(1) + "MB). Maximum is 5MB.");
+    // File size guard (10MB raw)
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Image too large (" + (file.size / 1024 / 1024).toFixed(1) + "MB). Maximum is 10MB.");
       inputEl.value = "";
       return;
     }
@@ -663,8 +733,8 @@
       var img = new Image();
       img.onerror = function() { /* invalid image data — silently skip */ };
       img.onload = function() {
-        // Resize to max 800px on longest side + recompress as JPEG 0.7
-        var maxDim = 800;
+        // Resize to max 1600px on longest side, preserve quality
+        var maxDim = 1600;
         var w = img.width, h = img.height;
         if (w > maxDim || h > maxDim) {
           if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
@@ -674,7 +744,11 @@
         canvas.width = w; canvas.height = h;
         var ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, w, h);
-        var dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+        // Preserve format: PNG for PNGs (keeps transparency), JPEG for photos
+        var isPNG = file.type === "image/png" || file.name.toLowerCase().endsWith(".png");
+        var dataUrl = isPNG
+          ? canvas.toDataURL("image/png")
+          : canvas.toDataURL("image/jpeg", 0.92);
 
         var card = document.querySelector('.hub-slide-card[data-slide-id="' + slideId + '"]');
         if (!card) return;
@@ -1060,7 +1134,16 @@
     ];
 
     var baseRowH = 22, headerH = 26, fontSize = 10, padX = 6;
-    var firstColW = Math.min(Math.max(maxWidth * 0.25, 140), 260);
+    // Adaptive first column width: measure longest label across all rows
+    var maxLabelLen = 0;
+    for (var mi = 0; mi < tableData.length; mi++) {
+      if (tableData[mi].cells.length > 0) {
+        var len = tableData[mi].cells[0].length;
+        if (len > maxLabelLen) maxLabelLen = len;
+      }
+    }
+    var estimatedLabelW = maxLabelLen * (fontSize * 0.6) + padX * 2 + 20;
+    var firstColW = Math.min(Math.max(estimatedLabelW, 140), maxWidth * 0.4);
     var dataColW = nCols > 1 ? (maxWidth - firstColW) / (nCols - 1) : maxWidth;
 
     var curY = y;
@@ -1212,7 +1295,7 @@
     var fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
     var pad = 20;
     var usableW = W - pad * 2;
-    var brandColour = "#323367";
+    var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--hub-brand").trim() || "#323367";
 
     // ---- Resolve fields (handle both tracker and tabs field names) ----
     var titleText = pin.title || pin.metricTitle || pin.qTitle || pin.qCode || "Pinned View";
@@ -1297,13 +1380,26 @@
       var svgEl = chartTempDiv.querySelector("svg");
       if (svgEl) {
         chartClone = svgEl.cloneNode(true);
-        // Resolve CSS variable references in chart SVG
+        // Resolve CSS variable references in chart SVG.
+        // Handles both var(--name, fallback) and var(--name) without fallback.
+        var rootStyles = getComputedStyle(document.documentElement);
         chartClone.querySelectorAll("*").forEach(function(el) {
-          ["fill", "stroke"].forEach(function(attr) {
+          ["fill", "stroke", "stop-color", "color"].forEach(function(attr) {
             var val = el.getAttribute(attr);
             if (val && val.indexOf("var(") !== -1) {
-              var match = val.match(/var\(--[^,)]+,\s*([^)]+)\)/);
-              if (match) el.setAttribute(attr, match[1].trim());
+              // Try var(--name, fallback) first
+              var matchFb = val.match(/var\(--([^,)]+),\s*([^)]+)\)/);
+              if (matchFb) {
+                var resolved = rootStyles.getPropertyValue("--" + matchFb[1].trim()).trim();
+                el.setAttribute(attr, resolved || matchFb[2].trim());
+              } else {
+                // var(--name) without fallback
+                var matchNoFb = val.match(/var\(--([^)]+)\)/);
+                if (matchNoFb) {
+                  var resolved2 = rootStyles.getPropertyValue("--" + matchNoFb[1].trim()).trim();
+                  if (resolved2) el.setAttribute(attr, resolved2);
+                }
+              }
             }
           });
         });

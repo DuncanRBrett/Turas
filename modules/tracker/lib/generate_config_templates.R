@@ -24,8 +24,14 @@
 library(openxlsx)
 
 # Source shared template infrastructure
-source(file.path(dirname(dirname(dirname(sys.frame(1)$ofile %||%
-  "."))), "shared", "template_styles.R"))
+.tracker_gen_root <- tryCatch(
+  dirname(dirname(dirname(sys.frame(1)$ofile))),
+  error = function(e) getwd()
+)
+if (!nzchar(.tracker_gen_root) || .tracker_gen_root == ".") {
+  .tracker_gen_root <- getwd()
+}
+source(file.path(.tracker_gen_root, "shared", "template_styles.R"))
 
 
 # ==============================================================================
