@@ -347,73 +347,84 @@ build_help_overlay <- function() {
       htmltools::tags$div(class = "help-subtitle", "Everything you need to know to use this report"),
 
       # --- Navigating ---
-      htmltools::tags$h3("Navigating the Report"),
-      htmltools::tags$ul(
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Sidebar"),
-          "Browse all questions. Type in the search box to filter."),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Banner tabs"),
-          "Switch between cross-tabulation groups (e.g. Total, Age, Region)."),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Summary"),
-          "Dashboard with key metrics, gauges, and significant findings."),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Crosstabs"),
-          "Full data tables with charts for every question.")
+      htmltools::tags$div(class = "help-section", `data-help-tab` = "all",
+        htmltools::tags$h3("Navigating the Report"),
+        htmltools::tags$ul(
+          htmltools::tags$li(htmltools::tags$span(class = "help-key", "Sidebar"),
+            "Browse all questions. Type in the search box to filter."),
+          htmltools::tags$li(htmltools::tags$span(class = "help-key", "Banner tabs"),
+            "Switch between cross-tabulation groups (e.g. Total, Age, Region)."),
+          htmltools::tags$li(htmltools::tags$span(class = "help-key", "Summary"),
+            "Dashboard with key metrics, gauges, and significant findings."),
+          htmltools::tags$li(htmltools::tags$span(class = "help-key", "Crosstabs"),
+            "Full data tables with charts for every question.")
+        )
       ),
 
       # --- Tables ---
-      htmltools::tags$h3("Working with Tables"),
-      htmltools::tags$ul(
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Column headers"),
-          "Click any header to sort the table by that column."),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Column chips"),
-          "Toggle individual columns on or off to focus the view."),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Heatmap"),
-          "Tick the Heatmap checkbox to colour-code cells by value."),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Hide rows"),
-          "Tick to dim all data rows, then click individual rows to restore them."),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Hide columns"),
-          "Tick to dim all columns, then use column chips to restore individual columns."),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Show count"),
-          "Tick to display raw frequencies alongside percentages.")
+      htmltools::tags$div(class = "help-section", `data-help-tab` = "crosstabs",
+        htmltools::tags$h3("Working with Tables"),
+        htmltools::tags$ul(
+          htmltools::tags$li(htmltools::tags$span(class = "help-key", "Column headers"),
+            "Click any header to sort the table by that column."),
+          htmltools::tags$li(htmltools::tags$span(class = "help-key", "Column chips"),
+            "Toggle individual columns on or off to focus the view."),
+          htmltools::tags$li(htmltools::tags$span(class = "help-key", "Heatmap"),
+            "Tick the Heatmap checkbox to colour-code cells by value."),
+          htmltools::tags$li(htmltools::tags$span(class = "help-key", "Hide rows"),
+            "Tick to dim all data rows, then click individual rows to restore them."),
+          htmltools::tags$li(htmltools::tags$span(class = "help-key", "Hide columns"),
+            "Tick to dim all columns, then use column chips to restore individual columns."),
+          htmltools::tags$li(htmltools::tags$span(class = "help-key", "Show count"),
+            "Tick to display raw frequencies alongside percentages.")
+        )
       ),
 
       # --- Charts ---
-      htmltools::tags$h3("Charts"),
-      htmltools::tags$ul(
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Chart toggle"),
-          "Tick the Chart checkbox to show or hide the chart."),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Chart chips"),
-          "Select which columns appear in the chart to compare groups."),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "\u2715 on rows"),
-          "Hover a data row and click \u2715 to exclude it from the chart.")
+      htmltools::tags$div(class = "help-section", `data-help-tab` = "crosstabs",
+        htmltools::tags$h3("Charts"),
+        htmltools::tags$ul(
+          htmltools::tags$li(htmltools::tags$span(class = "help-key", "Chart toggle"),
+            "Tick the Chart checkbox to show or hide the chart."),
+          htmltools::tags$li(htmltools::tags$span(class = "help-key", "Chart chips"),
+            "Select which columns appear in the chart to compare groups."),
+          htmltools::tags$li(htmltools::tags$span(class = "help-key", "\u2715 on rows"),
+            "Hover a data row and click \u2715 to exclude it from the chart.")
+        )
       ),
 
       # --- Insights & Notes ---
-      htmltools::tags$h3("Adding Insights"),
-      htmltools::tags$ul(
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "+ Add Insight"),
-          "Click below any question to add your analysis or commentary."),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Summary text"),
-          "The Summary tab has editable text areas for Background and Executive Summary.")
+      htmltools::tags$div(class = "help-section", `data-help-tab` = "crosstabs,summary",
+        htmltools::tags$h3("Adding Insights"),
+        htmltools::tags$ul(
+          htmltools::tags$li(htmltools::tags$span(class = "help-key", "+ Add Insight"),
+            "Click below any question to add your analysis or commentary."),
+          htmltools::tags$li(htmltools::tags$span(class = "help-key", "Summary text"),
+            "The Summary tab has editable text areas for Background and Executive Summary.")
+        )
       ),
 
       # --- Pinning ---
-      htmltools::tags$h3("Pinning Key Findings"),
-      htmltools::tags$ul(
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "\U0001F4CC Pin"),
-          "Click the pin icon on any question to save it to your Pinned Views deck."),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Pinned Views"),
-          "A curated set of your key findings. Reorder with \u25B2\u25BC, remove with \u2715."),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Section dividers"),
-          "Use 'Add Section' in Pinned Views to organise pins into groups."),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Summary pins"),
-          "Pin gauge sections or sig findings from the Summary tab too.")
+      htmltools::tags$div(class = "help-section", `data-help-tab` = "crosstabs,pinned",
+        htmltools::tags$h3("Pinning Key Findings"),
+        htmltools::tags$ul(
+          htmltools::tags$li(htmltools::tags$span(class = "help-key", "\U0001F4CC Pin"),
+            "Click the pin icon on any question to save it to your Pinned Views deck."),
+          htmltools::tags$li(htmltools::tags$span(class = "help-key", "Pinned Views"),
+            "A curated set of your key findings. Drag to reorder, remove with \u2715."),
+          htmltools::tags$li(htmltools::tags$span(class = "help-key", "Section dividers"),
+            "Use 'Add Section' in Pinned Views to organise pins into groups."),
+          htmltools::tags$li(htmltools::tags$span(class = "help-key", "Summary pins"),
+            "Pin gauge sections or sig findings from the Summary tab too.")
+        )
       ),
 
       # --- Added Slides ---
-      htmltools::tags$h3("Added Slides"),
-      htmltools::tags$ul(
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Add Slide"),
-          "Create narrative slides with formatted text (supports **bold**, *italic*, bullets, headings)."),
+      htmltools::tags$div(class = "help-section", `data-help-tab` = "qualitative",
+        htmltools::tags$h3("Added Slides"),
+        htmltools::tags$ul(
+          htmltools::tags$li(htmltools::tags$span(class = "help-key", "Add Slide"),
+            "Create narrative slides with formatted text (supports **bold**, *italic*, bullets, headings)."),
         htmltools::tags$li(htmltools::tags$span(class = "help-key", "\U0001F5BC Add image"),
           "Upload a chart, screenshot, or diagram to any slide. Images are resized automatically."),
         htmltools::tags$li(htmltools::tags$span(class = "help-key", "\U0001F4CC Pin slide"),
@@ -421,22 +432,24 @@ build_help_overlay <- function() {
       ),
 
       # --- Exporting ---
-      htmltools::tags$h3("Exporting & Sharing"),
-      htmltools::tags$ul(
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Save Report"),
-          htmltools::HTML(paste0(
-            "Saves the report with all your insights, pins, and edits preserved. ",
-            "In Chrome/Edge a <em>Save As</em> dialog lets you choose the location and overwrite the original file. ",
-            "In other browsers the file downloads as <strong>&lt;filename&gt;_updated.html</strong>."
-          ))),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "\U0001F4F7 Export PNG"),
-          "Download any chart or pinned card as a high-resolution PNG image."),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "\U0001F4CB Copy"),
-          "Copy a chart or pin to your clipboard, then paste straight into PowerPoint."),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Print / PDF"),
-          "Print your Pinned Views as a paginated document (one finding per page)."),
-        htmltools::tags$li(htmltools::tags$span(class = "help-key", "CSV / Excel"),
-          "Export table data for any question in spreadsheet format.")
+      htmltools::tags$div(class = "help-section", `data-help-tab` = "all",
+        htmltools::tags$h3("Exporting & Sharing"),
+        htmltools::tags$ul(
+          htmltools::tags$li(htmltools::tags$span(class = "help-key", "Save Report"),
+            htmltools::HTML(paste0(
+              "Saves the report with all your insights, pins, and edits preserved. ",
+              "In Chrome/Edge a <em>Save As</em> dialog lets you choose the location and overwrite the original file. ",
+              "In other browsers the file downloads as <strong>&lt;filename&gt;_updated.html</strong>."
+            ))),
+          htmltools::tags$li(htmltools::tags$span(class = "help-key", "\U0001F4F7 Export PNG"),
+            "Download any chart or pinned card as a high-resolution PNG image."),
+          htmltools::tags$li(htmltools::tags$span(class = "help-key", "\U0001F4CB Copy"),
+            "Copy a chart or pin to your clipboard, then paste straight into PowerPoint."),
+          htmltools::tags$li(htmltools::tags$span(class = "help-key", "Print / PDF"),
+            "Print your Pinned Views as a paginated document (one finding per page)."),
+          htmltools::tags$li(htmltools::tags$span(class = "help-key", "CSV / Excel"),
+            "Export table data for any question in spreadsheet format.")
+        )
       ),
 
       # --- Tip ---

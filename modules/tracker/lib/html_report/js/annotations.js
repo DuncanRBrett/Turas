@@ -200,11 +200,13 @@
 
     // Position near the data point using fixed positioning for stability
     var rect = pointEl.getBoundingClientRect();
-    var popoverLeft = Math.max(8, Math.min(rect.left + rect.width / 2 - 120, window.innerWidth - 260));
+    var popoverW = 260;
+    var popoverH = 150; // estimated height for input + buttons + padding
+    var popoverLeft = Math.max(8, Math.min(rect.left + rect.width / 2 - popoverW / 2, window.innerWidth - popoverW - 8));
     var popoverTop = rect.bottom + 8;
     // If near bottom of viewport, show above instead
-    if (popoverTop + 120 > window.innerHeight) {
-      popoverTop = rect.top - 120;
+    if (popoverTop + popoverH > window.innerHeight) {
+      popoverTop = Math.max(8, rect.top - popoverH - 8);
     }
     popover.style.left = popoverLeft + "px";
     popover.style.top = popoverTop + "px";

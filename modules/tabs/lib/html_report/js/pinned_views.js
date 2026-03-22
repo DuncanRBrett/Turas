@@ -2422,12 +2422,21 @@ function pinQualSlide(slideId) {
   updatePinBadge();
 }
 
-/** Show/hide qualitative empty state. */
+/** Show/hide qualitative empty state and update move button visibility. */
 function updateQualEmptyState() {
   var container = document.getElementById("qual-slides-container");
   var emptyState = document.getElementById("qual-empty-state");
   if (!container || !emptyState) return;
-  var hasCards = container.querySelectorAll(".qual-slide-card").length > 0;
+  var cards = container.querySelectorAll(".qual-slide-card");
+  var hasCards = cards.length > 0;
   emptyState.style.display = hasCards ? "none" : "";
+  // X14: Hide move up/down buttons when only 1 slide
+  var showMove = cards.length > 1;
+  cards.forEach(function(card) {
+    var moveButtons = card.querySelectorAll('.export-btn[title="Move up"], .export-btn[title="Move down"]');
+    moveButtons.forEach(function(btn) {
+      btn.style.display = showMove ? "" : "none";
+    });
+  });
 }
 

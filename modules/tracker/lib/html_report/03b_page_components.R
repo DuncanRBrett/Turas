@@ -147,27 +147,47 @@ build_help_overlay <- function() {
       htmltools::tags$button(class = "tk-help-close", onclick = "toggleHelpOverlay()",
                               htmltools::HTML("&times;")),
       htmltools::tags$div(class = "tk-help-body",
-        htmltools::tags$h3("Report Tabs"),
-        htmltools::tags$ul(
-          htmltools::tags$li(htmltools::tags$strong("Summary"), " \u2014 Key findings and methodology notes"),
-          htmltools::tags$li(htmltools::tags$strong("Explorer"), " \u2014 Interactive heatmap table to explore metrics across waves and segments"),
-          htmltools::tags$li(htmltools::tags$strong("Added Slides"), " \u2014 Insert custom slides with images and commentary"),
-          htmltools::tags$li(htmltools::tags$strong("Pinned Views"), " \u2014 Save and compare specific metric views")
+        htmltools::tags$div(class = "tk-help-section", `data-help-tab` = "all",
+          htmltools::tags$h3("Report Tabs"),
+          htmltools::tags$ul(
+            htmltools::tags$li(htmltools::tags$strong("Summary"), " \u2014 Key findings and methodology notes"),
+            htmltools::tags$li(htmltools::tags$strong("Explorer"), " \u2014 Interactive heatmap table to explore metrics across waves and segments"),
+            htmltools::tags$li(htmltools::tags$strong("Added Slides"), " \u2014 Insert custom slides with images and commentary"),
+            htmltools::tags$li(htmltools::tags$strong("Pinned Views"), " \u2014 Save and compare specific metric views")
+          )
         ),
-        htmltools::tags$h3("Significance Indicators"),
-        htmltools::tags$ul(
-          htmltools::tags$li(htmltools::HTML("<span class='sig-up'>&#x2191;</span> Significant increase")),
-          htmltools::tags$li(htmltools::HTML("<span class='sig-down'>&#x2193;</span> Significant decrease")),
-          htmltools::tags$li(htmltools::HTML("<span class='not-sig'>&#x2192;</span> No significant change"))
+        htmltools::tags$div(class = "tk-help-section", `data-help-tab` = "summary,explorer",
+          htmltools::tags$h3("Significance Indicators"),
+          htmltools::tags$ul(
+            htmltools::tags$li(htmltools::HTML("<span class='sig-up'>&#x2191;</span> Significant increase")),
+            htmltools::tags$li(htmltools::HTML("<span class='sig-down'>&#x2193;</span> Significant decrease")),
+            htmltools::tags$li(htmltools::HTML("<span class='not-sig'>&#x2192;</span> No significant change"))
+          )
         ),
-        htmltools::tags$h3("Segment Chips"),
-        htmltools::tags$p("Click segment chips to show or hide individual segments. Total is shown by default."),
-        htmltools::tags$h3("Trend Annotations"),
-        htmltools::tags$p("Click a data point on any chart to add a contextual annotation (e.g., 'Campaign launched'). Annotations appear as labelled markers on the chart."),
-        htmltools::tags$h3("Metric Comparison"),
-        htmltools::tags$p("Select metrics in the Explorer tab and click Visualise to overlay up to 3 metrics on a single chart for correlation analysis."),
-        htmltools::tags$h3("Export"),
-        htmltools::tags$p("Export tables as CSV or Excel. Export charts and metrics as high-resolution PNG slides. Copy charts to clipboard for pasting into presentations.")
+        htmltools::tags$div(class = "tk-help-section", `data-help-tab` = "explorer,visualise",
+          htmltools::tags$h3("Segment Chips"),
+          htmltools::tags$p("Click segment chips to show or hide individual segments. Total is shown by default.")
+        ),
+        htmltools::tags$div(class = "tk-help-section", `data-help-tab` = "explorer,visualise",
+          htmltools::tags$h3("Wave Chips"),
+          htmltools::tags$p("Toggle individual waves on and off using the wave chip bar. Use 'All' or 'Last 3' for quick selection.")
+        ),
+        htmltools::tags$div(class = "tk-help-section", `data-help-tab` = "visualise",
+          htmltools::tags$h3("Trend Annotations"),
+          htmltools::tags$p("Click a data point on any chart to add a contextual annotation (e.g., 'Campaign launched'). Annotations appear as labelled markers on the chart.")
+        ),
+        htmltools::tags$div(class = "tk-help-section", `data-help-tab` = "explorer,visualise",
+          htmltools::tags$h3("Metric Comparison"),
+          htmltools::tags$p("Select metrics in the Explorer tab and click Visualise to overlay up to 3 metrics on a single chart for correlation analysis.")
+        ),
+        htmltools::tags$div(class = "tk-help-section", `data-help-tab` = "pinned",
+          htmltools::tags$h3("Pinned Views"),
+          htmltools::tags$p("Pin metric views for side-by-side comparison. Drag and drop to reorder. Use the overflow menu (\u22EE) to copy, export, or move pins.")
+        ),
+        htmltools::tags$div(class = "tk-help-section", `data-help-tab` = "all",
+          htmltools::tags$h3("Export"),
+          htmltools::tags$p("Export tables as CSV or Excel. Export charts and metrics as high-resolution PNG slides. Copy charts to clipboard for pasting into presentations.")
+        )
       )
     )
   )

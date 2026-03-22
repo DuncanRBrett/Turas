@@ -721,6 +721,20 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       line-height: 1; border-radius: 3px;
     }
     .insight-dismiss:hover { color: #64748b; background: #e2e8f0; }
+    /* Edit mode indicator — shows when content has been edited */
+    .insight-container.edited::before {
+      content: "KEY INSIGHT \u2022 edited";
+    }
+    .insight-container.editing {
+      border-left-color: #f59e0b;
+    }
+    .closing-notes-editor.edited {
+      border-color: #f59e0b;
+    }
+    .closing-notes-editor:focus {
+      border-color: BRAND;
+      box-shadow: 0 0 0 2px rgba(50,51,103,0.08);
+    }
     /* Hover hints for editable content */
     .insight-md-rendered:not(:empty) { cursor: pointer; position: relative; }
     .insight-md-rendered:not(:empty):hover::after {
@@ -773,6 +787,7 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     .help-card .help-dismiss {
       margin-top: 18px; text-align: center; color: #94a3b8; font-size: 12px;
     }
+    .help-section { transition: opacity 0.2s; }
     .help-card .help-tip {
       font-size: 12px; color: #64748b; background: #f8fafc; border-radius: 6px;
       padding: 10px 14px; margin-top: 14px; line-height: 1.5;

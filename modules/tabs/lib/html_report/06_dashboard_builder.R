@@ -167,7 +167,7 @@ build_dashboard_panel <- function(dashboard_data, config_obj) {
         "Columns significantly higher than others on headline metrics"
       ),
       htmltools::tags$div(class = "dash-sig-empty",
-        "There are no significant findings"
+        htmltools::HTML("No statistically significant differences were found between columns on the headline metrics. This can happen when sample sizes are small or differences between groups are minimal.")
       )
     )
   }

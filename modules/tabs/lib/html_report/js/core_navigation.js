@@ -205,9 +205,20 @@ function toggleFrequency(enabled) {
 function toggleHelpOverlay() {
   var overlay = document.getElementById("help-overlay");
   if (!overlay) return;
+  var isShowing = !overlay.classList.contains("active");
   overlay.classList.toggle("active");
-  if (!overlay.classList.contains("active")) {
+  if (!isShowing) {
     try { localStorage.setItem("turas-help-seen", "1"); } catch(e) {}
+  } else {
+    // Context-sensitive: highlight sections relevant to current tab
+    var activeTab = document.querySelector(".report-tab.active");
+    var currentTab = activeTab ? (activeTab.getAttribute("data-tab") || "all") : "all";
+    overlay.querySelectorAll(".help-section").forEach(function(section) {
+      var tabs = (section.getAttribute("data-help-tab") || "all").split(",");
+      var isRelevant = tabs.indexOf("all") >= 0 || tabs.indexOf(currentTab) >= 0;
+      section.style.opacity = isRelevant ? "1" : "0.4";
+      section.style.order = isRelevant ? "0" : "1";
+    });
   }
 }
 
@@ -842,4 +853,24 @@ function toggleDashEdit(boxId) {
     if (editor) editor.focus();
   }
 }
+
+// ---- Edit state tracking: mark containers as "edited" on input ----
+(function() {
+  document.addEventListener("input", function(e) {
+    // Insight editors
+    if (e.target.classList.contains("insight-md-editor")) {
+      var container = e.target.closest(".insight-container");
+      if (container) container.classList.add("edited");
+    }
+    // Closing notes
+    if (e.target.classList.contains("closing-notes-editor")) {
+      e.target.classList.add("edited");
+    }
+    // Dashboard text editors
+    if (e.target.classList.contains("dash-md-editor")) {
+      var content = e.target.closest(".dash-text-content");
+      if (content) content.classList.add("edited");
+    }
+  }, true);
+})();
 

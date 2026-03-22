@@ -1048,7 +1048,19 @@
   window.toggleHelpOverlay = function() {
     var overlay = document.getElementById("tk-help-overlay");
     if (overlay) {
-      overlay.style.display = overlay.style.display === "none" ? "flex" : "none";
+      var isShowing = overlay.style.display === "none";
+      overlay.style.display = isShowing ? "flex" : "none";
+      // Context-sensitive: highlight sections relevant to current tab
+      if (isShowing) {
+        var activeTab = document.querySelector(".report-tab.active");
+        var currentTab = activeTab ? (activeTab.getAttribute("data-tab") || "all") : "all";
+        overlay.querySelectorAll(".tk-help-section").forEach(function(section) {
+          var tabs = (section.getAttribute("data-help-tab") || "all").split(",");
+          var isRelevant = tabs.indexOf("all") >= 0 || tabs.indexOf(currentTab) >= 0;
+          section.style.opacity = isRelevant ? "1" : "0.4";
+          section.style.order = isRelevant ? "0" : "1";
+        });
+      }
     }
   };
 
@@ -1127,10 +1139,23 @@
       }
     });
   }
+  // Auto-apply scrollable class to segment chip bars with many segments
+  function autoScrollSegmentChips() {
+    document.querySelectorAll(".mv-segment-chips, .mv-chart-segment-chips").forEach(function(bar) {
+      var chips = bar.querySelectorAll(".tk-segment-chip");
+      if (chips.length > 8) bar.classList.add("mv-segment-chips-scrollable");
+    });
+  }
+
   // Check on load and on any input
-  document.addEventListener("DOMContentLoaded", checkInsightContent);
+  document.addEventListener("DOMContentLoaded", function() { checkInsightContent(); autoScrollSegmentChips(); });
   document.addEventListener("input", function(e) {
-    if (e.target.classList.contains("summary-editor")) checkInsightContent();
+    if (e.target.classList.contains("summary-editor")) {
+      checkInsightContent();
+      // Mark parent box as edited for visual indicator
+      var box = e.target.closest(".summary-insight-box");
+      if (box) box.classList.add("edited");
+    }
   });
 })();
 
