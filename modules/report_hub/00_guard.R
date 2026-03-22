@@ -36,6 +36,32 @@
 }
 
 # ==============================================================================
+# HELPER: Validate hex colour value
+# ==============================================================================
+
+#' Validate Hex Colour String
+#'
+#' Accepts 3-digit (#RGB) or 6-digit (#RRGGBB) hex colours.
+#' Returns the default if the value is NULL, empty, or invalid.
+#' Logs a warning to console for invalid values (does not refuse —
+#' a bad colour shouldn't block an entire report build).
+#'
+#' @param colour Character string to validate
+#' @param default Default colour to return if invalid
+#' @return Valid hex colour string
+#' @keywords internal
+.validate_hex_colour <- function(colour, default = "#323367") {
+  if (is.null(colour) || !nzchar(trimws(colour))) return(NULL)
+  colour <- trimws(colour)
+  if (grepl("^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$", colour)) {
+    return(colour)
+  }
+  cat(sprintf("  [WARNING] Invalid colour '%s' — using default %s\n", colour, default))
+  return(default)
+}
+
+
+# ==============================================================================
 # HELPER: Auto-detect header row (same approach as tabs module)
 # ==============================================================================
 
@@ -414,6 +440,24 @@
       ))
     }
 
+    # Check for JavaScript/HTML reserved words that would clash with globals
+    reserved_keys <- c(
+      "window", "document", "navigator", "location", "history", "console",
+      "self", "top", "parent", "frames", "screen", "alert", "confirm",
+      "overview", "pinned", "about",  # hub-internal panel names
+      "undefined", "null", "true", "false", "NaN", "Infinity",
+      "constructor", "prototype", "toString", "valueOf"
+    )
+    if (tolower(key_val) %in% reserved_keys) {
+      return(list(
+        status = "REFUSED",
+        code = "CFG_RESERVED_KEY",
+        message = sprintf("Reports row %d: report_key '%s' is a reserved word", i, key_val),
+        how_to_fix = sprintf("'%s' conflicts with browser/hub internals. Use a different key (e.g., '%s_report').",
+                             key_val, key_val)
+      ))
+    }
+
     if (is.na(row$order) || !is.numeric(row$order)) {
       return(list(
         status = "REFUSED",
@@ -765,8 +809,8 @@
       subtitle = .trim_or_null(settings$subtitle),
       company_name = trimws(settings$company_name),
       client_name = .trim_or_null(settings$client_name),
-      brand_colour = .trim_or_null(settings$brand_colour),
-      accent_colour = .trim_or_null(settings$accent_colour),
+      brand_colour = .validate_hex_colour(settings$brand_colour, "#323367"),
+      accent_colour = .validate_hex_colour(settings$accent_colour, "#CC9900"),
       logo_path = settings$logo_path,
       output_dir = .trim_or_null(settings$output_dir),
       output_file = .trim_or_null(settings$output_file),

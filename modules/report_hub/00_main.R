@@ -44,6 +44,9 @@ source(file.path(hub_dir, "08_html_writer.R"))
 #' }
 #'
 #' @export
+# Configuration constants
+HUB_MAX_SOURCE_SIZE_BYTES <- 50 * 1024 * 1024  # 50 MB — warn above this
+
 combine_reports <- function(config_file, output_file = NULL, auto_cross_ref = FALSE) {
 
   cat("\n=== Turas Report Hub ===\n")
@@ -128,7 +131,7 @@ combine_reports <- function(config_file, output_file = NULL, auto_cross_ref = FA
   }
 
   cat(sprintf("  Total source size: %s\n", format_file_size(total_report_size)))
-  if (total_report_size > 50 * 1024 * 1024) {
+  if (total_report_size > HUB_MAX_SOURCE_SIZE_BYTES) {
     cat("  [WARNING] Large source size — output file will be 50+ MB. Consider fewer reports per hub.\n")
     warnings <- c(warnings, sprintf("Large combined size: %s. Consider splitting into multiple hub files.",
                                      format_file_size(total_report_size)))

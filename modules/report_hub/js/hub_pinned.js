@@ -8,6 +8,12 @@
 (function() {
   "use strict";
 
+  // ---- Configuration constants ----
+  var EXPORT_WIDTH         = 1280;   // Export SVG canvas width (px)
+  var EXPORT_RENDER_SCALE  = 3;      // Canvas resolution multiplier for crisp PNGs
+  var SVG_COMPRESS_DIGITS  = 3;      // Decimal places kept in SVG coordinate compression
+  var EXPORT_ALL_DELAY_MS  = 600;    // Delay between sequential multi-pin exports
+
   // Unified pin store: array of {type, source, id, ...data}
   ReportHub.pinnedItems = [];
 
@@ -360,7 +366,7 @@
 
     // Image (custom slide image — always shown)
     if (pin.imageData) {
-      html += '<div style="margin-bottom:12px;text-align:center;">' +
+      html += '<div style="margin-bottom:4px;text-align:center;">' +
         '<img src="' + pin.imageData + '" style="max-width:100%;max-height:500px;border-radius:6px;border:1px solid #e2e8f0;" />' +
       '</div>';
     }
@@ -1017,6 +1023,8 @@
   /**
    * Extract table data from stored pin HTML.
    * Handles both tracker-style (tk-*) and tabs-style (ct-table) classes.
+   * Now also extracts per-cell inline styles (background, color, font-weight)
+   * so the SVG export can render cell-level formatting (significance colours, etc.).
    */
   function hubExtractPinTableData(tableHtml) {
     if (!tableHtml) return null;
@@ -1025,10 +1033,30 @@
     var table = tempDiv.querySelector("table");
     if (!table) return null;
 
+    // Helper: extract inline style properties from a cell element.
+    // inlineTableStyles() has already baked computed styles onto elements,
+    // so element.style.* reads from the style attribute (works in detached DOM).
+    function getCellStyle(el) {
+      if (!el) return { bg: "", color: "", fontWeight: "", align: "" };
+      // Walk up to nearest td/th to get background (spans inherit from parent cell)
+      var target = el;
+      while (target && target.tagName !== "TD" && target.tagName !== "TH" && target !== table) {
+        target = target.parentElement;
+      }
+      if (!target || target === table) target = el;
+      return {
+        bg: target.style.backgroundColor || "",
+        color: el.style.color || target.style.color || "",
+        fontWeight: el.style.fontWeight || target.style.fontWeight || "",
+        align: target.style.textAlign || ""
+      };
+    }
+
     var rows = [];
 
     // Header row
     var headerCells = [];
+    var headerStyles = [];
     var headerRow = table.querySelector("thead tr");
     if (headerRow) {
       headerRow.querySelectorAll("th").forEach(function(th) {
@@ -1036,9 +1064,10 @@
         // Tabs uses .ct-header-text; tracker uses plain text
         var text = th.querySelector(".ct-header-text");
         headerCells.push(text ? text.textContent.trim() : th.textContent.trim().split("\n")[0].trim());
+        headerStyles.push(getCellStyle(th));
       });
       if (headerCells.length > 0) {
-        rows.push({ cells: headerCells, type: "header" });
+        rows.push({ cells: headerCells, type: "header", cellStyles: headerStyles });
       }
     }
 
@@ -1047,34 +1076,40 @@
       if (tr.style.display === "none") return;
       if (tr.classList.contains("ct-row-excluded")) return;
 
-      var rowInfo = { cells: [], type: "data" };
+      var rowInfo = { cells: [], cellStyles: [], type: "data" };
 
       // Tracker-style rows
       if (tr.classList.contains("tk-base-row")) {
         rowInfo.type = "base";
         var baseLabel = tr.querySelector(".tk-base-label");
         rowInfo.cells.push(baseLabel ? baseLabel.textContent.trim() : "Base");
+        rowInfo.cellStyles.push(getCellStyle(tr.querySelector("td") || tr));
         tr.querySelectorAll("td.tk-base-cell").forEach(function(td) {
           if (td.style.display === "none") return;
           rowInfo.cells.push(td.textContent.trim());
+          rowInfo.cellStyles.push(getCellStyle(td));
         });
       } else if (tr.classList.contains("tk-change-row")) {
         rowInfo.type = "change";
         var changeLabel = tr.querySelector(".tk-change-label");
         rowInfo.cells.push(changeLabel ? changeLabel.textContent.trim() : "Change");
+        rowInfo.cellStyles.push(getCellStyle(tr.querySelector("td") || tr));
         tr.querySelectorAll("td.tk-change-cell").forEach(function(td) {
           if (td.style.display === "none") return;
           rowInfo.cells.push(td.textContent.trim());
+          rowInfo.cellStyles.push(getCellStyle(td));
         });
       } else if (tr.classList.contains("tk-metric-row")) {
         var segName = tr.getAttribute("data-segment") || "";
         rowInfo.type = segName === "Total" ? "total" : "data";
         var labelEl = tr.querySelector(".tk-metric-label");
         rowInfo.cells.push(labelEl ? labelEl.textContent.trim() : segName);
+        rowInfo.cellStyles.push(getCellStyle(tr.querySelector("td") || tr));
         tr.querySelectorAll("td.tk-value-cell").forEach(function(td) {
           if (td.style.display === "none") return;
           var valSpan = td.querySelector(".tk-val");
           rowInfo.cells.push(valSpan ? valSpan.textContent.trim() : td.textContent.trim());
+          rowInfo.cellStyles.push(getCellStyle(td));
         });
         var dot = tr.querySelector(".tk-seg-dot");
         if (dot) rowInfo.colour = dot.style.background || dot.style.backgroundColor || null;
@@ -1084,6 +1119,7 @@
         rowInfo.type = "base";
         tr.querySelectorAll("td").forEach(function(td) {
           if (td.style.display === "none") return;
+          rowInfo.cellStyles.push(getCellStyle(td));
           var clone = td.cloneNode(true);
           clone.querySelectorAll(".ct-freq, .ct-sig, .row-exclude-btn").forEach(function(el) { el.remove(); });
           rowInfo.cells.push(clone.textContent.trim());
@@ -1092,6 +1128,7 @@
         rowInfo.type = "mean";
         tr.querySelectorAll("td").forEach(function(td) {
           if (td.style.display === "none") return;
+          rowInfo.cellStyles.push(getCellStyle(td));
           var clone = td.cloneNode(true);
           clone.querySelectorAll(".ct-freq, .ct-sig, .row-exclude-btn").forEach(function(el) { el.remove(); });
           rowInfo.cells.push(clone.textContent.trim());
@@ -1100,6 +1137,7 @@
         rowInfo.type = "net";
         tr.querySelectorAll("td").forEach(function(td) {
           if (td.style.display === "none") return;
+          rowInfo.cellStyles.push(getCellStyle(td));
           var clone = td.cloneNode(true);
           clone.querySelectorAll(".ct-freq, .ct-sig, .row-exclude-btn").forEach(function(el) { el.remove(); });
           rowInfo.cells.push(clone.textContent.trim());
@@ -1108,6 +1146,7 @@
         // Generic row (works for both tracker and tabs)
         tr.querySelectorAll("th, td").forEach(function(cell) {
           if (cell.style.display === "none") return;
+          rowInfo.cellStyles.push(getCellStyle(cell));
           var clone = cell.cloneNode(true);
           clone.querySelectorAll(".ct-freq, .ct-sig, .row-exclude-btn, .ct-sort-indicator").forEach(function(el) { el.remove(); });
           rowInfo.cells.push(clone.textContent.trim());
@@ -1122,7 +1161,10 @@
     return rows.length > 0 ? rows : null;
   }
 
-  /** Render table as SVG rect+text elements */
+  /** Render table as SVG rect+text elements.
+   *  Now uses per-cell inline styles (from inlineTableStyles) to preserve
+   *  significance highlighting, header colours, and cell-level formatting
+   *  in the exported PNG. */
   function hubRenderPinTableSVG(ns, svgParent, tableData, x, y, maxWidth) {
     if (!tableData || tableData.length === 0) return 0;
     var nCols = tableData[0].cells.length;
@@ -1149,10 +1191,22 @@
     var curY = y;
     var colourIdx = 0;
 
+    // Helper: check if a background colour is visually significant
+    // (not empty, transparent, or plain white)
+    function isSignificantBg(bg) {
+      if (!bg) return false;
+      bg = bg.trim().toLowerCase();
+      if (bg === "" || bg === "transparent" || bg === "rgba(0, 0, 0, 0)") return false;
+      if (bg === "rgb(255, 255, 255)" || bg === "#ffffff" || bg === "#fff" || bg === "white") return false;
+      return true;
+    }
+
     tableData.forEach(function(row, ri) {
       var isHeader = row.type === "header";
       var rH = isHeader ? headerH : baseRowH;
+      var hasCellStyles = row.cellStyles && row.cellStyles.length > 0;
 
+      // Row-level background rect (default styling based on row type)
       var bgRect = document.createElementNS(ns, "rect");
       bgRect.setAttribute("x", x); bgRect.setAttribute("y", curY);
       bgRect.setAttribute("width", maxWidth); bgRect.setAttribute("height", rH);
@@ -1176,6 +1230,25 @@
       }
       svgParent.appendChild(bgRect);
 
+      // Per-cell background overlays: preserves significance highlighting,
+      // conditional formatting, and other cell-level background colours
+      if (hasCellStyles) {
+        row.cells.forEach(function(cellText, ci) {
+          var cs = row.cellStyles[ci];
+          if (cs && isSignificantBg(cs.bg)) {
+            var cellW = ci === 0 ? firstColW : dataColW;
+            var cellX = ci === 0 ? x : x + firstColW + (ci - 1) * dataColW;
+            var cellBg = document.createElementNS(ns, "rect");
+            cellBg.setAttribute("x", cellX);
+            cellBg.setAttribute("y", curY);
+            cellBg.setAttribute("width", cellW);
+            cellBg.setAttribute("height", rH);
+            cellBg.setAttribute("fill", cs.bg);
+            svgParent.appendChild(cellBg);
+          }
+        });
+      }
+
       // Segment colour dot for tracker data/total rows
       if (row.type === "data" || row.type === "total") {
         if (row.colour || tableData.some(function(r) { return r.colour; })) {
@@ -1190,8 +1263,10 @@
         }
       }
 
-      // Cell text
+      // Cell text — uses per-cell inline styles when available,
+      // falls back to row-type-based defaults
       row.cells.forEach(function(cellText, ci) {
+        var cs = hasCellStyles ? row.cellStyles[ci] : null;
         var cellW = ci === 0 ? firstColW : dataColW;
         var cellX;
         if (ci === 0) {
@@ -1210,28 +1285,47 @@
           textEl.setAttribute("x", cellX);
           textEl.setAttribute("text-anchor", "start");
         } else {
-          textEl.setAttribute("x", cellX + cellW / 2);
-          textEl.setAttribute("text-anchor", "middle");
+          // Respect inline text-align when available
+          var anchor = "middle";
+          if (cs && cs.align === "left") anchor = "start";
+          else if (cs && cs.align === "right") anchor = "end";
+          textEl.setAttribute("x", anchor === "middle" ? cellX + cellW / 2 :
+                                   anchor === "end"    ? cellX + cellW - padX :
+                                                         cellX + padX);
+          textEl.setAttribute("text-anchor", anchor);
         }
 
-        if (isHeader) {
-          textEl.setAttribute("fill", "#ffffff");
-          textEl.setAttribute("font-weight", "600");
-        } else if (row.type === "total" || row.type === "net") {
-          textEl.setAttribute("fill", ci === 0 ? "#1a2744" : "#1e293b");
-          textEl.setAttribute("font-weight", "600");
-        } else if (row.type === "base") {
-          textEl.setAttribute("fill", "#666666");
-          textEl.setAttribute("font-weight", "600");
-          textEl.setAttribute("font-size", fontSize - 1);
-        } else if (row.type === "change") {
-          textEl.setAttribute("fill", "#888888");
-          textEl.setAttribute("font-size", fontSize - 1);
-        } else if (row.type === "mean") {
-          textEl.setAttribute("fill", "#5c4a2a");
-          textEl.setAttribute("font-style", "italic");
-        } else {
-          textEl.setAttribute("fill", ci === 0 ? "#374151" : "#1e293b");
+        // Apply cell-level colour and weight from inline styles first;
+        // fall back to the existing row-type defaults for unstyled cells
+        var appliedInline = false;
+        if (cs && cs.color) {
+          textEl.setAttribute("fill", cs.color);
+          if (cs.fontWeight && (cs.fontWeight === "bold" || parseInt(cs.fontWeight) >= 600)) {
+            textEl.setAttribute("font-weight", "600");
+          }
+          appliedInline = true;
+        }
+
+        if (!appliedInline) {
+          if (isHeader) {
+            textEl.setAttribute("fill", "#ffffff");
+            textEl.setAttribute("font-weight", "600");
+          } else if (row.type === "total" || row.type === "net") {
+            textEl.setAttribute("fill", ci === 0 ? "#1a2744" : "#1e293b");
+            textEl.setAttribute("font-weight", "600");
+          } else if (row.type === "base") {
+            textEl.setAttribute("fill", "#666666");
+            textEl.setAttribute("font-weight", "600");
+            textEl.setAttribute("font-size", fontSize - 1);
+          } else if (row.type === "change") {
+            textEl.setAttribute("fill", "#888888");
+            textEl.setAttribute("font-size", fontSize - 1);
+          } else if (row.type === "mean") {
+            textEl.setAttribute("fill", "#5c4a2a");
+            textEl.setAttribute("font-style", "italic");
+          } else {
+            textEl.setAttribute("fill", ci === 0 ? "#374151" : "#1e293b");
+          }
         }
 
         var maxChars = Math.floor((cellW - padX * 2) / (fontSize * 0.55));
@@ -1291,9 +1385,9 @@
 
   ReportHub._buildPinExportSVG = function(pin, pinImageW, pinImageH) {
     var ns = "http://www.w3.org/2000/svg";
-    var W = 1280;
+    var W = EXPORT_WIDTH;
     var fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
-    var pad = 20;
+    var pad = 14;
     var usableW = W - pad * 2;
     var brandColour = getComputedStyle(document.documentElement).getPropertyValue("--hub-brand").trim() || "#323367";
 
@@ -1317,7 +1411,7 @@
     // ---- 1. Title ----
     var titleLines = hubWrapTextLines(titleText, usableW, 9.5);
     var titleLineH = 20;
-    var titleStartY = pad + 12;
+    var titleStartY = pad + 8;
     var titleBlockH = titleLines.length * titleLineH;
 
     // ---- 2. Meta line ----
@@ -1340,20 +1434,20 @@
     if (pin.baseText) metaParts.push("Base: " + pin.baseText);
 
     var metaText = metaParts.join("  \u00B7  ");
-    var metaY = titleStartY + titleBlockH + 4;
-    var contentTop = metaY + 12;
+    var metaY = titleStartY + titleBlockH + 2;
+    var contentTop = metaY + 10;
 
     // ---- 3. Insight (pre-render to measure height) ----
     var insightY = contentTop;
     var insightBlockH = 0;
     var insightRendered = null;
     if (insightBlocks.length > 0) {
-      insightRendered = hubRenderInsightSVG(ns, insightBlocks, pad + 14, insightY + 18, usableW - 16, 7.5);
-      insightBlockH = insightRendered.height + 24;
+      insightRendered = hubRenderInsightSVG(ns, insightBlocks, pad + 14, insightY + 14, usableW - 16, 7.5);
+      insightBlockH = insightRendered.height + 18;
     }
 
     // ---- 3b. Image dimensions (config-driven or manually uploaded slide image) ----
-    var imageTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 8 : 0);
+    var imageTopY = contentTop + insightBlockH + (insightBlockH > 0 ? 4 : 0);
     var imageDisplayH = 0;
     var imageDisplayW = 0;
     if (pin.imageData && pinImageW > 0 && pinImageH > 0) {
@@ -1369,7 +1463,7 @@
     var exportShowChart = (exportMode === "all" || exportMode === "chart_insight");
     var exportShowTable = (exportMode === "all" || exportMode === "table_insight");
 
-    var chartTopY = imageTopY + imageDisplayH + (imageDisplayH > 0 ? 8 : 0);
+    var chartTopY = imageTopY + imageDisplayH + (imageDisplayH > 0 ? 4 : 0);
     var chartDisplayH = 0;
     var chartClone = null;
     var chartScale = 1;
@@ -1413,20 +1507,20 @@
     }
 
     // ---- 5. Table dimensions ----
-    var tableTopY = chartTopY + chartDisplayH + (chartDisplayH > 0 ? 8 : 0);
+    var tableTopY = chartTopY + chartDisplayH + (chartDisplayH > 0 ? 4 : 0);
     var tableData = null;
     var estimatedTableH = 0;
 
     if (pin.tableHtml && exportShowTable) {
       tableData = hubExtractPinTableData(pin.tableHtml);
       if (tableData && tableData.length > 0) {
-        estimatedTableH = 26 + (tableData.length - 1) * 22 + 8;
+        estimatedTableH = 26 + (tableData.length - 1) * 22 + 4;
       }
     }
 
     // ---- 6. Total height ----
-    var totalH = tableTopY + estimatedTableH + pad + 8;
-    if (totalH < 200) totalH = 200;
+    var totalH = tableTopY + estimatedTableH + pad;
+    if (totalH < 160) totalH = 160;
 
     // ---- Build slide SVG ----
     var svg = document.createElementNS(ns, "svg");
@@ -1461,7 +1555,7 @@
 
     // Insight block (with formatting preserved: headings, bullets, bold, italic)
     if (insightRendered && insightBlockH > 0) {
-      var accentH = Math.max(28, insightRendered.height + 12);
+      var accentH = Math.max(24, insightRendered.height + 8);
       var insBg = document.createElementNS(ns, "rect");
       insBg.setAttribute("x", pad); insBg.setAttribute("y", insightY + 2);
       insBg.setAttribute("width", usableW); insBg.setAttribute("height", accentH);
@@ -1491,7 +1585,7 @@
     // Table — rendered as SVG rect+text elements
     if (tableData && tableData.length > 0) {
       var actualTableH = hubRenderPinTableSVG(ns, svg, tableData, pad, tableTopY, usableW);
-      var newTotalH = tableTopY + actualTableH + pad + 20;
+      var newTotalH = tableTopY + actualTableH + pad;
       if (newTotalH > totalH) {
         totalH = newTotalH;
         bg.setAttribute("height", totalH);
@@ -1500,7 +1594,7 @@
     }
 
     // ---- Render SVG to PNG at 3x resolution ----
-    var renderScale = 3;
+    var renderScale = EXPORT_RENDER_SCALE;
     var svgData = new XMLSerializer().serializeToString(svg);
     var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
     var url = URL.createObjectURL(svgBlob);
@@ -1573,7 +1667,7 @@
       if (idx >= pins.length) return;
       ReportHub.exportPinCard(pins[idx]);
       idx++;
-      setTimeout(exportNext, 600);
+      setTimeout(exportNext, EXPORT_ALL_DELAY_MS);
     }
     exportNext();
   };

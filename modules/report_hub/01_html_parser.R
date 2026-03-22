@@ -149,14 +149,38 @@ extract_meta_tags <- function(html) {
     title_match <- regmatches(html, regexpr("<title>([^<]+)</title>", html, perl = TRUE))
     if (length(title_match) > 0 && nzchar(title_match)) {
       raw_title <- sub("<title>([^<]+)</title>", "\\1", title_match, perl = TRUE)
-      # Decode common HTML entities so they don't get double-escaped later
-      raw_title <- gsub("&mdash;", "\u2014", raw_title, fixed = TRUE)
-      raw_title <- gsub("&ndash;", "\u2013", raw_title, fixed = TRUE)
-      raw_title <- gsub("&amp;", "&", raw_title, fixed = TRUE)
-      raw_title <- gsub("&lt;", "<", raw_title, fixed = TRUE)
-      raw_title <- gsub("&gt;", ">", raw_title, fixed = TRUE)
+      # Decode HTML entities so they don't get double-escaped later.
+      # Named entities (common set covering typical report titles)
+      raw_title <- gsub("&mdash;",  "\u2014", raw_title, fixed = TRUE)
+      raw_title <- gsub("&ndash;",  "\u2013", raw_title, fixed = TRUE)
+      raw_title <- gsub("&nbsp;",   " ",      raw_title, fixed = TRUE)
+      raw_title <- gsub("&copy;",   "\u00A9", raw_title, fixed = TRUE)
+      raw_title <- gsub("&reg;",    "\u00AE", raw_title, fixed = TRUE)
+      raw_title <- gsub("&trade;",  "\u2122", raw_title, fixed = TRUE)
+      raw_title <- gsub("&lsquo;",  "\u2018", raw_title, fixed = TRUE)
+      raw_title <- gsub("&rsquo;",  "\u2019", raw_title, fixed = TRUE)
+      raw_title <- gsub("&ldquo;",  "\u201C", raw_title, fixed = TRUE)
+      raw_title <- gsub("&rdquo;",  "\u201D", raw_title, fixed = TRUE)
+      raw_title <- gsub("&hellip;", "\u2026", raw_title, fixed = TRUE)
+      raw_title <- gsub("&bull;",   "\u2022", raw_title, fixed = TRUE)
+      # Numeric decimal references: &#NNN;
+      while (grepl("&#\\d+;", raw_title, perl = TRUE)) {
+        m <- regexpr("&#(\\d+);", raw_title, perl = TRUE)
+        code_str <- sub("&#(\\d+);", "\\1", regmatches(raw_title, m), perl = TRUE)
+        raw_title <- sub("&#\\d+;", intToUtf8(as.integer(code_str)), raw_title, perl = TRUE)
+      }
+      # Numeric hex references: &#xHH;
+      while (grepl("&#x[0-9a-fA-F]+;", raw_title, perl = TRUE)) {
+        m <- regexpr("&#x([0-9a-fA-F]+);", raw_title, perl = TRUE)
+        hex_str <- sub("&#x([0-9a-fA-F]+);", "\\1", regmatches(raw_title, m), perl = TRUE)
+        raw_title <- sub("&#x[0-9a-fA-F]+;", intToUtf8(strtoi(hex_str, 16L)), raw_title, perl = TRUE)
+      }
+      # XML base entities (must be last — they contain chars other entities decode to)
       raw_title <- gsub("&quot;", "\"", raw_title, fixed = TRUE)
-      raw_title <- gsub("&#39;", "'", raw_title, fixed = TRUE)
+      raw_title <- gsub("&#39;",  "'",  raw_title, fixed = TRUE)
+      raw_title <- gsub("&lt;",   "<",  raw_title, fixed = TRUE)
+      raw_title <- gsub("&gt;",   ">",  raw_title, fixed = TRUE)
+      raw_title <- gsub("&amp;",  "&",  raw_title, fixed = TRUE)  # must be very last
       meta$project_title <- raw_title
     }
   }

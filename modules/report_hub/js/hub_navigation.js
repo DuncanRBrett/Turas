@@ -13,6 +13,14 @@ var ReportHub = ReportHub || {};
 (function() {
   "use strict";
 
+  // ---- Configuration constants ----
+  var IFRAME_LOAD_TIMEOUT_MS  = 15000;  // Time before showing retry button
+  var PIN_STORE_POLL_MS       = 100;    // Interval between pin store discovery attempts
+  var PIN_STORE_MAX_ATTEMPTS  = 50;     // Max polls (50 × 100ms = 5 seconds)
+  var LATE_STORE_TIMEOUT_MS   = 30000;  // Body observer auto-disconnect timeout
+  var PATCH_POLL_MS           = 200;    // Interval for monkey-patch polling
+  var PATCH_MAX_ATTEMPTS      = 30;     // Max polls for function availability (6 seconds)
+
   var activeReport = "overview";
 
   /** Decode a base64 string to a UTF-8 string */
@@ -155,19 +163,18 @@ var ReportHub = ReportHub || {};
     }
 
     var attempts = 0;
-    var maxAttempts = 50; // 5 seconds — large reports may init slowly
     var interval = setInterval(function() {
       attempts++;
       var store = findStore();
       if (store) {
         clearInterval(interval);
         observePinnedStore(store, win, key);
-      } else if (attempts >= maxAttempts) {
+      } else if (attempts >= PIN_STORE_MAX_ATTEMPTS) {
         clearInterval(interval);
         // Final fallback: observe document body for late-created pin stores
         observeForLateStore(doc, win, key);
       }
-    }, 100);
+    }, PIN_STORE_POLL_MS);
   }
 
   /**
@@ -189,8 +196,13 @@ var ReportHub = ReportHub || {};
       }
     });
     bodyObserver.observe(doc.body, { childList: true, subtree: true });
-    // Auto-disconnect after 30 seconds to prevent memory leak
-    setTimeout(function() { bodyObserver.disconnect(); }, 30000);
+    // Store reference for cleanup; auto-disconnect after 30 seconds
+    var iframe = document.getElementById("hub-iframe-" + key);
+    if (iframe) {
+      if (!iframe._hubObservers) iframe._hubObservers = [];
+      iframe._hubObservers.push(bodyObserver);
+    }
+    setTimeout(function() { bodyObserver.disconnect(); }, LATE_STORE_TIMEOUT_MS);
   }
 
   /**
@@ -271,10 +283,10 @@ var ReportHub = ReportHub || {};
         }
       }
 
-      if (patched || attempts >= 30) {
+      if (patched || attempts >= PATCH_MAX_ATTEMPTS) {
         clearInterval(patchInterval);
       }
-    }, 200);
+    }, PATCH_POLL_MS);
   }
 
   /**
@@ -395,6 +407,15 @@ var ReportHub = ReportHub || {};
 
     // Observe all mutation types to catch both textContent and innerHTML updates
     observer.observe(store, { childList: true, characterData: true, subtree: true, attributes: true });
+
+    // Store observer reference on the iframe element for cleanup.
+    // Prevents memory leaks when many reports are loaded — observers
+    // watching detached/hidden DOM nodes accumulate without this.
+    var iframe = document.getElementById("hub-iframe-" + key);
+    if (iframe) {
+      if (!iframe._hubObservers) iframe._hubObservers = [];
+      iframe._hubObservers.push(observer);
+    }
   }
 
   /**
@@ -439,7 +460,7 @@ var ReportHub = ReportHub || {};
             'onclick="ReportHub.retryLoad(\'' + key + '\')">Retry</button>';
         }
       }
-    }, 15000);
+    }, IFRAME_LOAD_TIMEOUT_MS);
 
     iframe.addEventListener("load", function() {
       clearTimeout(loadTimer);
@@ -463,6 +484,14 @@ var ReportHub = ReportHub || {};
    * Retry loading a report that timed out
    */
   ReportHub.retryLoad = function(key) {
+    // Disconnect any existing observers before reload to prevent leaks
+    var iframe = document.getElementById("hub-iframe-" + key);
+    if (iframe && iframe._hubObservers) {
+      for (var oi = 0; oi < iframe._hubObservers.length; oi++) {
+        iframe._hubObservers[oi].disconnect();
+      }
+      iframe._hubObservers = [];
+    }
     ReportHub.loadedIframes[key] = false;
     var loading = document.getElementById("hub-loading-" + key);
     if (loading) {
@@ -556,6 +585,19 @@ var ReportHub = ReportHub || {};
           ReportHub.switchReport(allKeys[idx + 1]);
         } else if (e.key === "ArrowLeft" && idx > 0) {
           ReportHub.switchReport(allKeys[idx - 1]);
+        }
+      }
+    });
+
+    // Disconnect all MutationObservers on page unload to prevent memory leaks.
+    // Each loaded iframe accumulates observers — clean them up when the page closes.
+    window.addEventListener("unload", function() {
+      var iframes = document.querySelectorAll(".hub-report-iframe");
+      for (var ui = 0; ui < iframes.length; ui++) {
+        if (iframes[ui]._hubObservers) {
+          for (var oj = 0; oj < iframes[ui]._hubObservers.length; oj++) {
+            iframes[ui]._hubObservers[oj].disconnect();
+          }
         }
       }
     });
