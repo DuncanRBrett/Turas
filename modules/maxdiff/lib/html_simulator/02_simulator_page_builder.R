@@ -53,22 +53,33 @@ build_simulator_page <- function(sim_data, ...) {
 
   seg_table_btn <- if (has_segments) '<button id="seg-table-toggle" class="sim-btn sim-btn-outline">Show Segment Table</button>' else ""
 
-  css <- build_simulator_css(brand)
+  # --- Source shared design system ---
+  design_system_dir <- file.path(dirname(dirname(dirname(dirname(sys.frame(1)$ofile %||% ".")))),
+                                  "shared", "lib", "design_system")
+  for (f in c("design_tokens.R", "font_embed.R", "base_css.R")) {
+    fp <- file.path(design_system_dir, f)
+    if (file.exists(fp)) source(fp, local = TRUE)
+  }
+  shared_css <- tryCatch(
+    turas_base_css(brand_colour = brand, accent_colour = "#CC9900", prefix = "md"),
+    error = function(e) ""
+  )
+  css <- paste(shared_css, build_simulator_css(brand), sep = "\n")
   n_items <- sim_data$n_items %||% 0
   n_resp <- sim_data$n_respondents %||% 0
 
   # Build toolbar helper
   toolbar <- function(tab_id) {
     sprintf('<div class="sim-toolbar">
-      <button class="sim-pin-btn sim-btn sim-btn-icon" data-pin-tab="%s" title="Pin this view">%s Pin</button>
-      <button class="sim-export-png-btn sim-btn sim-btn-icon" data-export-tab="%s" title="Export as PNG">%s PNG</button>
-      <button class="sim-export-excel-btn sim-btn sim-btn-icon" data-export-tab="%s" title="Export to Excel">%s Excel</button>
+      <button class="sim-pin-btn sim-btn sim-btn-icon" data-pin-tab="%s" title="Pin to Views">%s Pin to Views</button>
+      <button class="sim-export-png-btn sim-btn sim-btn-icon" data-export-tab="%s" title="Export PNG">%s Export PNG</button>
+      <button class="sim-export-excel-btn sim-btn sim-btn-icon" data-export-tab="%s" title="Export Excel">%s Export Excel</button>
     </div>', tab_id, pin_icon(), tab_id, download_icon(), tab_id, table_icon())
   }
 
   pin_toolbar <- function(tab_id) {
     sprintf('<div class="sim-toolbar">
-      <button class="sim-pin-btn sim-btn sim-btn-icon" data-pin-tab="%s" title="Pin this view">%s Pin</button>
+      <button class="sim-pin-btn sim-btn sim-btn-icon" data-pin-tab="%s" title="Pin to Views">%s Pin to Views</button>
     </div>', tab_id, pin_icon())
   }
 
@@ -373,12 +384,11 @@ build_about_html <- function(sim_data) {
 
 build_simulator_css <- function(brand) {
   css <- ':root { --sim-brand: BRAND_TOKEN; --sim-brand-light: BRAND_TOKEN12; }
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #1e293b; line-height: 1.5; font-size: 14px; }
+body { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; background: #f8f7f5; color: #1e293b; line-height: 1.5; font-size: 14px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 
 /* Header */
-.sim-header { background: var(--sim-brand); color: white; padding: 24px 32px; }
-.sim-header h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+.sim-header { background: linear-gradient(135deg, #1a2744 0%, #2a3f5f 100%); color: white; padding: 28px 32px; border-bottom: 3px solid var(--sim-brand-light, #CC9900); }
+.sim-header h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.3px; }
 .sim-meta { display: flex; gap: 16px; font-size: 12px; opacity: 0.85; margin-top: 4px; }
 
 /* Layout */
@@ -386,7 +396,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .sim-tab-nav { display: flex; background: white; border-bottom: 1px solid #e2e8f0; border-radius: 10px 10px 0 0; margin-top: 24px; overflow-x: auto; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
 .sim-tab-btn { background: transparent; border: none; padding: 12px 18px; font-size: 13px; font-weight: 500; color: #64748b; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; transition: color 0.15s; position: relative; }
 .sim-tab-btn:hover { color: #334155; }
-.sim-tab-btn.active { color: var(--sim-brand); border-bottom-color: var(--sim-brand); }
+.sim-tab-btn:focus-visible { outline: 2px solid var(--sim-brand); outline-offset: -2px; }
+.sim-tab-btn.active { color: var(--sim-brand); border-bottom-color: var(--sim-brand); font-weight: 600; }
 .sim-content { background: white; border-radius: 0 0 10px 10px; padding: 28px 32px; min-height: 420px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
 .sim-panel { display: none; }
 .sim-panel.active { display: block; }
@@ -403,8 +414,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .sim-callout-text strong { color: #1e293b; }
 
 /* Buttons */
-.sim-btn { background: var(--sim-brand); color: white; border: none; padding: 7px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; transition: opacity 0.15s; display: inline-flex; align-items: center; gap: 5px; }
+.sim-btn { background: var(--sim-brand); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; transition: opacity 0.15s, box-shadow 0.15s; display: inline-flex; align-items: center; gap: 5px; font-family: inherit; }
 .sim-btn:hover { opacity: 0.88; }
+.sim-btn:focus-visible { outline: 2px solid var(--sim-brand); outline-offset: 2px; }
 .sim-btn-outline { background: transparent; color: var(--sim-brand); border: 1px solid #cbd5e1; }
 .sim-btn-outline:hover { background: #f8fafc; border-color: var(--sim-brand); opacity: 1; }
 .sim-btn-small { padding: 4px 10px; font-size: 12px; }
@@ -416,7 +428,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 
 /* Filter */
 .sim-filter { margin-bottom: 14px; }
-.sim-filter select { padding: 5px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; background: white; }
+.sim-filter select { padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; background: white; font-family: inherit; transition: border-color 0.15s; }
+.sim-filter select:focus { border-color: var(--sim-brand); outline: none; box-shadow: 0 0 0 2px rgba(30,58,95,0.08); }
 .sim-shares-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
 
 /* Share bars */
@@ -469,7 +482,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .sim-portfolio-options { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .sim-portfolio-options select { padding: 5px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; background: white; }
 .sim-turf-count { font-size: 13px; color: #64748b; font-weight: 500; }
-.sim-portfolio-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 4px; margin-bottom: 16px; }
+.sim-portfolio-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin-bottom: 16px; }
 .sim-check-label { display: flex; align-items: center; gap: 6px; font-size: 13px; padding: 7px 10px; border-radius: 6px; cursor: pointer; transition: background 0.1s; }
 .sim-check-label:hover { background: #f8fafc; }
 
@@ -485,7 +498,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 /* Segment comparison table */
 .sim-seg-table-wrap { overflow-x: auto; margin: 16px 0; }
 .sim-seg-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.sim-seg-table th { background: var(--sim-brand); color: white; padding: 8px 12px; text-align: right; font-weight: 500; white-space: nowrap; }
+.sim-seg-table th { background: var(--sim-brand); color: white; padding: 10px 14px; text-align: right; font-weight: 500; white-space: nowrap; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
 .sim-seg-table th:first-child { text-align: left; border-radius: 6px 0 0 0; }
 .sim-seg-table th:last-child { border-radius: 0 6px 0 0; }
 .sim-seg-table td { padding: 7px 12px; text-align: right; border-bottom: 1px solid #f1f5f9; }

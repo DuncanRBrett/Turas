@@ -19,7 +19,19 @@ build_simulator_page <- function(sim_data_json, config) {
   accent <- config$accent_colour %||% "#CC9900"
   project_name <- config$project_name %||% "Conjoint Simulator"
 
-  css <- build_simulator_css(brand, accent)
+  # --- Source shared design system ---
+  design_system_dir <- file.path(dirname(dirname(dirname(dirname(sys.frame(1)$ofile %||% ".")))),
+                                  "shared", "lib", "design_system")
+  for (f in c("design_tokens.R", "font_embed.R", "base_css.R")) {
+    fp <- file.path(design_system_dir, f)
+    if (file.exists(fp)) source(fp, local = TRUE)
+  }
+  shared_css <- tryCatch(
+    turas_base_css(brand_colour = brand, accent_colour = accent, prefix = "cj"),
+    error = function(e) ""
+  )
+
+  css <- paste(shared_css, build_simulator_css(brand, accent), sep = "\n")
   js_engine <- read_simulator_js("simulator_engine.js")
   js_charts <- read_simulator_js("simulator_charts.js")
   js_ui <- read_simulator_js("simulator_ui.js")
@@ -101,39 +113,44 @@ read_simulator_js <- function(filename) {
 build_simulator_css <- function(brand, accent) {
   css <- '
 :root { --sim-brand: BRAND; --sim-accent: ACCENT; }
-* { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:#f8fafc; color:#334155; }
-.sim-header { background:BRAND; color:white; padding:24px 40px; }
-.sim-header h1 { font-size:20px; font-weight:600; }
-.sim-subtitle { font-size:12px; opacity:0.7; margin-top:4px; }
-.sim-nav { display:flex; gap:0; background:white; border-bottom:2px solid #e2e8f0; padding:0 40px; position:sticky; top:0; z-index:10; }
-.sim-tab { padding:10px 18px; font-size:13px; font-weight:500; color:#64748b; cursor:pointer; border:none; border-bottom:3px solid transparent; background:none; transition:all 200ms; }
-.sim-tab:hover { color:BRAND; }
-.sim-tab.active { color:BRAND; border-bottom-color:BRAND; }
-.sim-container { padding:20px 40px 60px; max-width:1200px; margin:0 auto; }
-.sim-panel { display:none; }
-.sim-panel.active { display:block; }
-.sim-layout { display:flex; gap:24px; }
-.sim-config-col { flex:1; min-width:300px; }
-.sim-results-col { flex:1; min-width:300px; }
-.sim-card { background:white; border-radius:8px; padding:20px; margin-bottom:16px; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
-.sim-card h2 { font-size:15px; font-weight:600; margin-bottom:12px; color:#1e293b; }
-.sim-controls { display:flex; gap:12px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
-.sim-controls label { font-size:12px; color:#64748b; }
-.sim-controls select { padding:6px 10px; border:1px solid #e2e8f0; border-radius:6px; font-size:12px; }
-.sim-add-btn { padding:6px 14px; background:BRAND; color:white; border:none; border-radius:6px; font-size:12px; font-weight:500; cursor:pointer; }
-.sim-add-btn:hover { opacity:0.9; }
-.sim-product-card { background:white; border:1px solid #e2e8f0; border-radius:8px; padding:14px; margin-bottom:12px; }
-.sim-product-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; font-size:13px; }
-.sim-remove-btn { background:none; border:none; color:#94a3b8; font-size:18px; cursor:pointer; padding:0 4px; }
-.sim-remove-btn:hover { color:#ef4444; }
-.sim-attr-row { display:flex; justify-content:space-between; align-items:center; padding:4px 0; }
-.sim-attr-row label { font-size:12px; color:#64748b; flex:1; }
-.sim-attr-row select { flex:1; max-width:180px; padding:4px 8px; border:1px solid #e2e8f0; border-radius:4px; font-size:12px; }
-.sim-share-item { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #f1f5f9; font-size:13px; }
-.sim-share-value { font-weight:600; color:BRAND; }
-.sim-footer { text-align:center; padding:16px; color:#94a3b8; font-size:11px; border-top:1px solid #e2e8f0; }
-@media (max-width:768px) { .sim-layout { flex-direction:column; } .sim-header,.sim-nav,.sim-container { padding-left:16px; padding-right:16px; } }
+body { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; background: #f8f7f5; color: #334155; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+.sim-header { background: linear-gradient(135deg, #1a2744 0%, #2a3f5f 100%); color: white; padding: 28px 40px; border-bottom: 3px solid ACCENT; }
+.sim-header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.3px; }
+.sim-subtitle { font-size: 12px; opacity: 0.7; margin-top: 4px; }
+.sim-nav { display: flex; gap: 0; background: white; border-bottom: 2px solid #e2e8f0; padding: 0 40px; position: sticky; top: 0; z-index: 10; }
+.sim-tab { padding: 12px 20px; font-size: 13px; font-weight: 500; color: #64748b; cursor: pointer; border: none; border-bottom: 3px solid transparent; background: none; transition: color 0.15s, border-color 0.15s; }
+.sim-tab:hover { color: BRAND; }
+.sim-tab:focus-visible { outline: 2px solid BRAND; outline-offset: -2px; }
+.sim-tab.active { color: BRAND; border-bottom-color: BRAND; font-weight: 600; }
+.sim-container { padding: 24px 40px 60px; max-width: 1200px; margin: 0 auto; }
+.sim-panel { display: none; }
+.sim-panel.active { display: block; }
+.sim-layout { display: flex; gap: 28px; }
+.sim-config-col { flex: 1; min-width: 300px; }
+.sim-results-col { flex: 1; min-width: 300px; }
+.sim-card { background: white; border-radius: 8px; border: 1px solid #e2e8f0; padding: 24px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+.sim-card h2 { font-size: 15px; font-weight: 600; margin-bottom: 14px; color: #1e293b; letter-spacing: -0.2px; }
+.sim-controls { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+.sim-controls label { font-size: 12px; color: #64748b; font-weight: 500; }
+.sim-controls select { padding: 7px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; font-family: inherit; background: white; transition: border-color 0.15s; }
+.sim-controls select:focus { border-color: BRAND; outline: none; box-shadow: 0 0 0 2px rgba(50,51,103,0.08); }
+.sim-add-btn { padding: 8px 16px; background: BRAND; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit; transition: opacity 0.15s, box-shadow 0.15s; }
+.sim-add-btn:hover { opacity: 0.9; }
+.sim-add-btn:focus-visible { outline: 2px solid BRAND; outline-offset: 2px; }
+.sim-product-card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 18px; margin-bottom: 12px; transition: border-color 0.15s; }
+.sim-product-card:hover { border-color: #cbd5e1; }
+.sim-product-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 13px; font-weight: 600; color: #1e293b; }
+.sim-remove-btn { background: none; border: none; color: #94a3b8; font-size: 18px; cursor: pointer; padding: 2px 6px; border-radius: 4px; transition: color 0.15s, background 0.15s; }
+.sim-remove-btn:hover { color: #ef4444; background: #fef2f2; }
+.sim-remove-btn:focus-visible { outline: 2px solid #ef4444; outline-offset: 1px; }
+.sim-attr-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; }
+.sim-attr-row label { font-size: 12px; color: #64748b; flex: 1; }
+.sim-attr-row select { flex: 1; max-width: 200px; padding: 5px 10px; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 12px; font-family: inherit; transition: border-color 0.15s; }
+.sim-attr-row select:focus { border-color: BRAND; outline: none; box-shadow: 0 0 0 2px rgba(50,51,103,0.08); }
+.sim-share-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
+.sim-share-value { font-weight: 600; color: BRAND; font-variant-numeric: tabular-nums; }
+.sim-footer { text-align: center; padding: 20px; color: #94a3b8; font-size: 11px; border-top: 1px solid #e2e8f0; }
+@media (max-width: 768px) { .sim-layout { flex-direction: column; } .sim-header, .sim-nav, .sim-container { padding-left: 16px; padding-right: 16px; } }
 '
   css <- gsub("BRAND", brand, css, fixed = TRUE)
   css <- gsub("ACCENT", accent, css, fixed = TRUE)
