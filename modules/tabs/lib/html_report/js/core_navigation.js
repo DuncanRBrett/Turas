@@ -113,14 +113,23 @@ function switchBannerGroup(groupCode, btn) {
     });
   });
 
-  // Reset sort and row exclusions when switching banner groups
+  // Reset sort, row exclusions, and toggle checkboxes when switching banner groups
   sortState = {};
   excludedRows = {};
+  _hideAllRows = false;
   if (window._chartExclusions) window._chartExclusions = {};
   document.querySelectorAll(".ct-row-excluded").forEach(function(row) {
     row.classList.remove("ct-row-excluded");
     var btn = row.querySelector(".row-exclude-btn");
     if (btn) btn.textContent = "\u2715";
+  });
+  // Uncheck Hide rows and Hide columns toggles
+  document.querySelectorAll(".toggle-label input[type='checkbox']").forEach(function(cb) {
+    var label = cb.parentNode.textContent.trim();
+    if (label === "Hide rows" || label === "Hide columns") {
+      cb.checked = false;
+      cb.closest(".toggle-label").classList.remove("checked");
+    }
   });
   document.querySelectorAll(".ct-sort-indicator").forEach(function(ind) {
     ind.textContent = " \u21C5";
@@ -294,35 +303,59 @@ function getLabelText(cell) {
 }
 
 // ---- Toggle All Rows (Show/Hide All) ----
+// Global flag so the state persists across question navigation
+var _hideAllRows = false;
+
 function toggleAllRows(hideAll) {
-  var container = document.querySelector(".question-container:not([style*='display: none']):not([style*='display:none'])");
-  if (!container) return;
-  var table = container.querySelector("table.ct-table");
-  if (!table) return;
-  var rows = table.querySelectorAll("tr.ct-row-category, tr.ct-row-net");
-  var tableId = table.id;
-  if (!excludedRows[tableId]) excludedRows[tableId] = {};
-  rows.forEach(function(row) {
-    var labelCell = row.querySelector("td.ct-label-col");
-    if (!labelCell) return;
-    var label = getLabelText(labelCell);
-    var btn = row.querySelector(".row-exclude-btn");
-    if (hideAll) {
-      row.classList.add("ct-row-excluded");
-      excludedRows[tableId][label] = true;
-      if (btn) btn.textContent = "\u25CB";
-    } else {
-      row.classList.remove("ct-row-excluded");
-      delete excludedRows[tableId][label];
-      if (btn) btn.textContent = "\u2715";
+  _hideAllRows = hideAll;
+  // Apply to ALL tables so state is consistent when navigating questions
+  document.querySelectorAll("table.ct-table").forEach(function(table) {
+    var tableId = table.id;
+    if (!excludedRows[tableId]) excludedRows[tableId] = {};
+    var rows = table.querySelectorAll("tr.ct-row-category, tr.ct-row-net, tr.ct-row-mean");
+    rows.forEach(function(row) {
+      var labelCell = row.querySelector("td.ct-label-col");
+      if (!labelCell) return;
+      var label = getLabelText(labelCell);
+      var btn = row.querySelector(".row-exclude-btn");
+      if (hideAll) {
+        row.classList.add("ct-row-excluded");
+        excludedRows[tableId][label] = true;
+        if (btn) btn.textContent = "\u25CB";
+      } else {
+        row.classList.remove("ct-row-excluded");
+        delete excludedRows[tableId][label];
+        if (btn) btn.textContent = "\u2715";
+      }
+    });
+    // Rebuild chart for this table's question
+    var container = table.closest(".question-container");
+    if (container) {
+      var wrapper = container.querySelector(".chart-wrapper[data-q-code]");
+      if (wrapper) {
+        var qCode = wrapper.getAttribute("data-q-code");
+        rebuildChartWithExclusions(qCode, excludedRows[tableId]);
+      }
     }
   });
-  // Rebuild chart
-  var wrapper = container.querySelector(".chart-wrapper[data-q-code]");
-  if (wrapper) {
-    var qCode = wrapper.getAttribute("data-q-code");
-    rebuildChartWithExclusions(qCode, excludedRows[tableId]);
-  }
+}
+
+// ---- Toggle All Columns (Show/Hide All) ----
+function toggleAllColumns(hideAll) {
+  var chipBar = document.getElementById("col-chip-bar");
+  if (!chipBar) return;
+  var chips = chipBar.querySelectorAll(".col-chip");
+  chips.forEach(function(chip) {
+    var colKey = chip.getAttribute("data-col-key");
+    if (!colKey) return;
+    var isCurrentlyHidden = chip.classList.contains("col-chip-off");
+    // If hideAll and not already hidden, toggle off; if !hideAll and hidden, toggle on
+    if (hideAll && !isCurrentlyHidden) {
+      toggleColumn(currentGroup, colKey, chip);
+    } else if (!hideAll && isCurrentlyHidden) {
+      toggleColumn(currentGroup, colKey, chip);
+    }
+  });
 }
 
 // ---- Row Exclusion from Chart ----

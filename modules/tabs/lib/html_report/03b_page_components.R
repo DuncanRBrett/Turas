@@ -49,6 +49,19 @@ build_report_tab_nav <- function(brand_colour, has_qualitative = FALSE, has_abou
     )
   }
 
+  help_btn <- htmltools::tags$button(
+    class = "help-btn",
+    onclick = "toggleHelpOverlay()",
+    title = "Show help guide",
+    style = paste0(
+      "width:26px;height:26px;border-radius:50%;border:1.5px solid #cbd5e1;",
+      "background:transparent;color:#64748b;font-size:13px;font-weight:700;",
+      "cursor:pointer;display:flex;align-items:center;justify-content:center;",
+      "margin-left:auto;flex-shrink:0;"
+    ),
+    "?"
+  )
+
   htmltools::tags$div(
     class = "report-tabs",
     htmltools::tags$button(
@@ -71,7 +84,8 @@ build_report_tab_nav <- function(brand_colour, has_qualitative = FALSE, has_abou
       `data-tab` = "pinned",
       "Pinned Views",
       htmltools::tags$span(class = "pin-count-badge", id = "pin-count-badge", style = paste0("display:none;margin-left:4px;background:", brand_colour, ";color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;"), "0")
-    )
+    ),
+    help_btn
   )
 }
 
@@ -167,22 +181,9 @@ build_header <- function(project_title, brand_colour, total_n, n_questions,
     )
   )
 
-  help_btn <- htmltools::tags$button(
-    class = "help-btn",
-    onclick = "toggleHelpOverlay()",
-    title = "Show help guide",
-    style = paste0(
-      "width:28px;height:28px;border-radius:50%;border:1.5px solid rgba(255,255,255,0.5);",
-      "background:transparent;color:rgba(255,255,255,0.8);font-size:14px;font-weight:700;",
-      "cursor:pointer;display:flex;align-items:center;justify-content:center;"
-    ),
-    "?"
-  )
-
   top_row <- htmltools::tags$div(
     style = "display:flex;align-items:center;justify-content:space-between;",
-    branding_left,
-    help_btn
+    branding_left
   )
 
   # --- Study name ---
@@ -332,6 +333,10 @@ build_help_overlay <- function() {
           "Toggle individual columns on or off to focus the view."),
         htmltools::tags$li(htmltools::tags$span(class = "help-key", "Heatmap"),
           "Tick the Heatmap checkbox to colour-code cells by value."),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Hide rows"),
+          "Tick to dim all data rows, then click individual rows to restore them."),
+        htmltools::tags$li(htmltools::tags$span(class = "help-key", "Hide columns"),
+          "Tick to dim all columns, then use column chips to restore individual columns."),
         htmltools::tags$li(htmltools::tags$span(class = "help-key", "Show count"),
           "Tick to display raw frequencies alongside percentages.")
       ),
@@ -588,6 +593,10 @@ build_controls <- function(has_any_freq, has_any_pct, has_any_sig,
       htmltools::tags$label(class = "toggle-label",
         htmltools::tags$input(type = "checkbox", onchange = "toggleAllRows(this.checked)"),
         "Hide rows"
+      ),
+      htmltools::tags$label(class = "toggle-label",
+        htmltools::tags$input(type = "checkbox", onchange = "toggleAllColumns(this.checked)"),
+        "Hide columns"
       )
     ))
   }
