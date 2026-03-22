@@ -155,14 +155,18 @@ function switchBannerGroup(groupCode, btn) {
   // Update insight text for new banner group
   updateInsightsForBanner(activeName);
 
-  // Re-apply hidden columns for this group
-  if (hiddenColumns[groupCode]) {
+  // Re-apply hidden columns for this group and update table width class
+  var anyHidden = hiddenColumns[groupCode] && Object.keys(hiddenColumns[groupCode]).length > 0;
+  if (anyHidden) {
     Object.keys(hiddenColumns[groupCode]).forEach(function(colKey) {
       document.querySelectorAll("th[data-col-key=\"" + colKey + "\"], td[data-col-key=\"" + colKey + "\"]").forEach(function(el) {
         el.style.display = "none";
       });
     });
   }
+  document.querySelectorAll("table.ct-table").forEach(function(t) {
+    t.classList.toggle("ct-cols-hidden", anyHidden);
+  });
 }
 
 // Heatmap toggle - reads data-heatmap attribute from cells

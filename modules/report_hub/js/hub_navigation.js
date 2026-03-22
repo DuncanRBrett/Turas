@@ -430,7 +430,9 @@ var ReportHub = ReportHub || {};
 
     if (!dataEl || !iframe) return;
 
-    // Decode the base64-encoded HTML
+    // Decode the base64-encoded HTML.
+    // Base64 guarantees roundtrip safety through unlimited save cycles —
+    // no edge cases with closing script tags, escaping, or case variations.
     var html;
     try {
       html = decodeBase64(dataEl.textContent.trim());

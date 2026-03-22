@@ -359,6 +359,7 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       color: #1e293b;
       table-layout: auto;
     }
+    .ct-table.ct-cols-hidden { width: auto; }
     .ct-th {
       padding: 8px 12px;
       text-align: center;

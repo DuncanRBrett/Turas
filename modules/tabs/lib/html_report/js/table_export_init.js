@@ -208,6 +208,11 @@ function toggleColumn(groupCode, colKey, chipEl) {
       el.style.display = "none";
     });
   }
+  // Toggle table width class: auto when any columns hidden, full when all visible
+  var anyHidden = hiddenColumns[groupCode] && Object.keys(hiddenColumns[groupCode]).length > 0;
+  document.querySelectorAll("table.ct-table").forEach(function(t) {
+    t.classList.toggle("ct-cols-hidden", anyHidden);
+  });
 }
 
 // ---- Column Sort ----

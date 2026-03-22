@@ -35,6 +35,11 @@
       pinObj.chartSvg = compressSvg(pinObj.chartSvg);
     }
 
+    // Strip pngDataUrl — some source reports (e.g. tracker) include a full PNG
+    // snapshot alongside the SVG. The hub never displays it and regenerates PNGs
+    // from SVG at export time, so storing it is pure waste (~200-500KB per pin).
+    delete pinObj.pngDataUrl;
+
     ReportHub.pinnedItems.push(pinObj);
     ReportHub.renderPinnedCards();
     ReportHub.updatePinBadge();
@@ -208,6 +213,8 @@
         if (!item || typeof item !== "object") continue;
         if (!item.type || !item.id) continue;
         if (item.type !== "pin" && item.type !== "section") continue;
+        // Strip legacy pngDataUrl to save space on re-save
+        if (item.pngDataUrl) delete item.pngDataUrl;
         valid.push(item);
       }
       if (valid.length > 0) {
@@ -413,11 +420,6 @@
     // Chart (if captured and mode allows)
     if (pin.chartSvg && pin.chartVisible !== false && showChart) {
       html += '<div class="hub-pin-chart">' + sanitizeHtml(pin.chartSvg) + '</div>';
-    }
-
-    // PNG snapshot (hidden – used only for export, not displayed on screen)
-    if (pin.pngDataUrl) {
-      html += '<div class="hub-pin-snapshot" style="display:none"><img src="' + pin.pngDataUrl + '" alt="Pinned view"></div>';
     }
 
     // Table (if captured and mode allows)
@@ -647,7 +649,7 @@
       id: "pin-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7),
       title: titleEl ? (titleEl.value || titleEl.textContent || "").trim() || "Slide" : "Slide",
       sourceLabel: "Overview",
-      insight: rendered ? rendered.innerHTML : "",
+      insight: editor ? editor.value.trim() : "",
       imageData: imageData,
       tableHtml: null,
       chartSvg: null,
@@ -789,8 +791,9 @@
       var img = new Image();
       img.onerror = function() { /* invalid image data — silently skip */ };
       img.onload = function() {
-        // Resize to max 1600px on longest side, preserve quality
-        var maxDim = 1600;
+        // Resize to max 1200px on longest side — matches config-driven images.
+        // Keeps file size manageable while staying sharp at 3× export (1280px canvas).
+        var maxDim = 1200;
         var w = img.width, h = img.height;
         if (w > maxDim || h > maxDim) {
           if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
@@ -1755,10 +1758,16 @@
    */
   function sanitizeHtml(html) {
     if (!html) return "";
-    // Remove dangerous elements and their content
-    html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
-    html = html.replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, "");
-    html = html.replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, "");
+    // Remove dangerous elements and their content.
+    // IMPORTANT: Regex patterns are built with new RegExp() to avoid literal
+    // closing tags (e.g. script end tags) in source, which would break the HTML
+    // parser when this JS is inlined inside a <script> block.
+    var scriptRe = new RegExp("<script\\b[^<]*(?:(?!<\\/script>)<[^<]*)*<\\/script>", "gi");
+    var iframeRe = new RegExp("<iframe\\b[^<]*(?:(?!<\\/iframe>)<[^<]*)*<\\/iframe>", "gi");
+    var objectRe = new RegExp("<object\\b[^<]*(?:(?!<\\/object>)<[^<]*)*<\\/object>", "gi");
+    html = html.replace(scriptRe, "");
+    html = html.replace(iframeRe, "");
+    html = html.replace(objectRe, "");
     html = html.replace(/<embed\b[^>]*\/?>/gi, "");
     html = html.replace(/<link\b[^>]*\/?>/gi, "");
     // Remove event handler attributes (on*)

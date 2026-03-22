@@ -231,6 +231,19 @@ build_report_tab_nav <- function(brand_colour, has_about = FALSE) {
         )
       )
     ),
+    # Help button — in tab strip so it's accessible in combined reports
+    htmltools::tags$button(
+      class = "tk-help-btn",
+      onclick = "toggleHelpOverlay()",
+      title = "Show help guide",
+      style = paste0(
+        "width:26px;height:26px;border-radius:50%;border:1.5px solid #cbd5e1;",
+        "background:transparent;color:#64748b;font-size:13px;font-weight:700;",
+        "cursor:pointer;display:flex;align-items:center;justify-content:center;",
+        "margin-left:auto;flex-shrink:0;"
+      ),
+      "?"
+    ),
     # Spacer pushes action buttons to the right
     htmltools::tags$div(style = "flex:1"),
     # Save Report + Print buttons (body-level, not in header)

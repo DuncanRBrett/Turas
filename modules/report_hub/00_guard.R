@@ -535,8 +535,10 @@
     })
 
     if (!is.null(img)) {
-      # Downscale if wider than 800px (bilinear via approx on each channel)
-      max_w <- 800
+      # Downscale if wider than 1200px (bilinear via approx on each channel).
+      # 1200px keeps images sharp in pinned-view PNG exports (rendered at 3×
+      # into a 1280px canvas), while staying well under 150KB per image.
+      max_w <- 1200
       orig_h <- nrow(img)
       orig_w <- ncol(img)
       if (orig_w > max_w) {
@@ -570,10 +572,11 @@
       # Clamp values to [0, 1] (approx can produce slight overshoot)
       img <- pmin(pmax(img, 0), 1)
 
-      # Encode as JPEG at 0.85 quality
+      # Encode as JPEG at 0.90 quality — balances file size with visual
+      # clarity for presentation-grade slide images
       raw_con <- rawConnection(raw(0), open = "wb")
       on.exit(close(raw_con), add = TRUE)
-      jpeg::writeJPEG(img, raw_con, quality = 0.85)
+      jpeg::writeJPEG(img, raw_con, quality = 0.90)
       jpeg_bytes <- rawConnectionValue(raw_con)
 
       b64 <- base64enc::base64encode(jpeg_bytes)

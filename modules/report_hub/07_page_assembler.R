@@ -15,7 +15,6 @@
 assemble_hub_html <- function(config, parsed_reports, overview_html, navigation_html) {
 
   # Guard: htmltools is required for HTML escaping throughout assembly
-
   if (!requireNamespace("htmltools", quietly = TRUE)) {
     return(list(
       status = "REFUSED",
@@ -97,7 +96,9 @@ assemble_hub_html <- function(config, parsed_reports, overview_html, navigation_
 
   # --- Report HTML data (base64-encoded, for iframe srcdoc) ---
   # Base64 uses only A-Za-z0-9+/= characters, so it cannot interfere
-  # with HTML parsing (no < > / that could form closing tags)
+  # with HTML parsing (no < > / that could form closing tags).
+  # The ~33% size overhead is the cost of guaranteed roundtrip safety
+  # through unlimited create → edit → save → reopen cycles.
   for (parsed in parsed_reports) {
     b64_html <- base64enc::base64encode(charToRaw(enc2utf8(parsed$raw_html)))
     cat(sprintf("    Base64-encoded %s: %s -> %s\n",

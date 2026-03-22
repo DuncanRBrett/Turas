@@ -71,10 +71,7 @@ build_tracker_header <- function(html_data, config, brand_colour) {
             htmltools::tags$div(class = "tk-brand-subtitle", "Interactive Tracking Report")
           )
         ),
-        htmltools::tags$div(class = "tk-header-actions",
-          htmltools::tags$button(class = "tk-help-btn",
-                                  onclick = "toggleHelpOverlay()", "?")
-        )
+        htmltools::tags$div(class = "tk-header-actions")
       ),
       # Project title
       htmltools::tags$div(class = "tk-header-project", project_name),

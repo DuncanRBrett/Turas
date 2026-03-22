@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "hub-preview",
-      "runtimeExecutable": "/usr/local/bin/node",
-      "runtimeArgs": ["-e", "const http=require('http'),fs=require('fs'),path=require('path');const f='/Users/duncan/Library/CloudStorage/OneDrive-Personal/DB Files/Projects/Turas Showreel/Turas_Showreel.html';http.createServer((q,r)=>{r.writeHead(200,{'Content-Type':'text/html;charset=utf-8'});fs.createReadStream(f).pipe(r)}).listen(8765,()=>console.log('Serving on 8765'))"],
+      "name": "hub-test",
+      "runtimeExecutable": "/usr/bin/python3",
+      "runtimeArgs": ["-m", "http.server", "8765", "--directory", "/tmp"],
       "port": 8765
     }
   ]

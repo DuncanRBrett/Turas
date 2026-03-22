@@ -64,9 +64,9 @@ test_that("assemble_hub_html produces a complete HTML document with iframes", {
   # Loading indicator
   expect_true(grepl('id="hub-loading-tracker"', html))
 
-  # JSON-encoded report HTML stored for iframe injection
+  # Report HTML stored for iframe injection (base64 encoding)
   expect_true(grepl('id="hub-report-tracker"', html))
-  expect_true(grepl("application/json", html))
+  expect_true(grepl('data-encoding="base64"', html))
 
   # Pinned panel
   expect_true(grepl('data-hub-panel="pinned"', html))
