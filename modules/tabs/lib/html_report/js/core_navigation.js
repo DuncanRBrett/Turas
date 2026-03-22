@@ -306,6 +306,8 @@ function getLabelText(cell) {
 // Global flag so the state persists across question navigation
 var _hideAllRows = false;
 
+// By default skips mean/index/NPS summary rows — only hides category and net rows.
+// Users can still manually toggle summary rows via the per-row ✕ button.
 function toggleAllRows(hideAll) {
   _hideAllRows = hideAll;
   // Apply to ALL tables so state is consistent when navigating questions
@@ -314,6 +316,8 @@ function toggleAllRows(hideAll) {
     if (!excludedRows[tableId]) excludedRows[tableId] = {};
     var rows = table.querySelectorAll("tr.ct-row-category, tr.ct-row-net, tr.ct-row-mean");
     rows.forEach(function(row) {
+      // Skip mean/index/NPS rows by default — leave them visible
+      if (hideAll && row.classList.contains("ct-row-mean")) return;
       var labelCell = row.querySelector("td.ct-label-col");
       if (!labelCell) return;
       var label = getLabelText(labelCell);
@@ -341,6 +345,7 @@ function toggleAllRows(hideAll) {
 }
 
 // ---- Toggle All Columns (Show/Hide All) ----
+// By default skips the Total column — users can still manually toggle it via its chip.
 function toggleAllColumns(hideAll) {
   var chipBar = document.getElementById("col-chip-bar");
   if (!chipBar) return;
@@ -348,8 +353,10 @@ function toggleAllColumns(hideAll) {
   chips.forEach(function(chip) {
     var colKey = chip.getAttribute("data-col-key");
     if (!colKey) return;
+    // Skip the Total column — leave it visible by default
+    var isTotal = document.querySelector("th.bg-total[data-col-key=\"" + colKey + "\"]");
+    if (isTotal && hideAll) return;
     var isCurrentlyHidden = chip.classList.contains("col-chip-off");
-    // If hideAll and not already hidden, toggle off; if !hideAll and hidden, toggle on
     if (hideAll && !isCurrentlyHidden) {
       toggleColumn(currentGroup, colKey, chip);
     } else if (!hideAll && isCurrentlyHidden) {

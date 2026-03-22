@@ -686,7 +686,7 @@ test_that("toggleAllRows JS targets category, net, and mean rows", {
   js_path <- file.path(turas_root, "modules/tabs/lib/html_report/js/core_navigation.js")
   js_content <- paste(readLines(js_path, warn = FALSE), collapse = "\n")
 
-  # Must target all three row types
+  # Must target all three row types in the selector
   expect_true(grepl("ct-row-category", js_content, fixed = TRUE),
     info = "toggleAllRows must target ct-row-category rows")
   expect_true(grepl("ct-row-net", js_content, fixed = TRUE),
@@ -697,6 +697,26 @@ test_that("toggleAllRows JS targets category, net, and mean rows", {
   # The selector in toggleAllRows should include all three
   expect_true(grepl("ct-row-category.*ct-row-net.*ct-row-mean", js_content, perl = TRUE),
     info = "toggleAllRows selector should include category, net, and mean row types")
+})
+
+test_that("toggleAllRows skips mean rows by default when hiding", {
+  js_path <- file.path(turas_root, "modules/tabs/lib/html_report/js/core_navigation.js")
+  js_content <- paste(readLines(js_path, warn = FALSE), collapse = "\n")
+
+  # Should skip ct-row-mean when hideAll is true
+  expect_true(grepl("ct-row-mean.*return", js_content, perl = TRUE),
+    info = "toggleAllRows should skip mean rows when hiding (return early)")
+})
+
+test_that("toggleAllColumns skips Total column by default when hiding", {
+  js_path <- file.path(turas_root, "modules/tabs/lib/html_report/js/core_navigation.js")
+  js_content <- paste(readLines(js_path, warn = FALSE), collapse = "\n")
+
+  # Should check for bg-total and skip
+  expect_true(grepl("bg-total", js_content, fixed = TRUE),
+    info = "toggleAllColumns should check for Total column (bg-total)")
+  expect_true(grepl("isTotal.*hideAll.*return", js_content, perl = TRUE),
+    info = "toggleAllColumns should skip Total column when hiding")
 })
 
 test_that("toggleAllColumns JS function exists", {

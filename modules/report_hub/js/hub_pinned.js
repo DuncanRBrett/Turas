@@ -12,7 +12,7 @@
   var EXPORT_WIDTH         = 1280;   // Export SVG canvas width (px)
   var EXPORT_RENDER_SCALE  = 3;      // Canvas resolution multiplier for crisp PNGs
   var SVG_COMPRESS_DIGITS  = 3;      // Decimal places kept in SVG coordinate compression
-  var EXPORT_ALL_DELAY_MS  = 600;    // Delay between sequential multi-pin exports
+  var EXPORT_ALL_DELAY_MS  = 200;    // Delay between sequential multi-pin exports (ms)
 
   // Unified pin store: array of {type, source, id, ...data}
   ReportHub.pinnedItems = [];
@@ -83,8 +83,12 @@
       }
       return "><";
     });
-    // Reduce decimal precision to 3 places (enough for sub-pixel accuracy)
-    svg = svg.replace(/(\d+\.\d{3})\d+/g, "$1");
+    // Reduce decimal precision to 3 places in coordinate/path attributes only.
+    // Global replacement would corrupt data labels like "123.4567%" inside <text>.
+    var coordAttrs = /\b(d|x|y|x1|y1|x2|y2|cx|cy|r|rx|ry|width|height|viewBox|transform|points|offset|dx|dy|style)="([^"]*)"/g;
+    svg = svg.replace(coordAttrs, function(full, attr, val) {
+      return attr + '="' + val.replace(/(\d+\.\d{3})\d+/g, "$1") + '"';
+    });
     // Remove empty style/class attributes
     svg = svg.replace(/\s+(style|class)=""/g, "");
     return svg;
@@ -104,7 +108,6 @@
     }
     if (idx === -1) return;
 
-    var item = ReportHub.pinnedItems[idx];
     ReportHub.pinnedItems.splice(idx, 1);
 
     ReportHub.renderPinnedCards();
@@ -383,14 +386,14 @@
         renderedHtml = hubRenderMarkdown(insightRaw);
       }
     }
-    html += '<div class="hub-pin-insight" data-pin-id="' + pin.id + '">' +
+    html += '<div class="hub-pin-insight" data-pin-id="' + pid + '">' +
       '<div class="hub-insight-rendered hub-md-content" ' +
-        'ondblclick="ReportHub.toggleInsightEdit(\'' + pin.id + '\')" ' +
+        'ondblclick="ReportHub.toggleInsightEdit(\'' + pid + '\')" ' +
         'data-placeholder="Double-click to add insight...">' +
         (renderedHtml || '') +
       '</div>' +
       '<textarea class="hub-insight-editor" style="display:none" ' +
-        'onblur="ReportHub.finishInsightEdit(\'' + pin.id + '\')">' +
+        'onblur="ReportHub.finishInsightEdit(\'' + pid + '\')">' +
         escapeHtml(editorText) +
       '</textarea>' +
     '</div>';
@@ -533,8 +536,10 @@
     if (!rendered || !editor) return;
     // Re-render before pinning to capture latest edits
     rendered.innerHTML = hubRenderMarkdown(editor.value);
-    var text = rendered.innerHTML.trim();
-    if (!text) { alert("Add text before pinning."); return; }
+    // Store the markdown source (not rendered HTML) so it round-trips correctly
+    // on subsequent edits — consistent with finishInsightEdit behaviour.
+    var mdSource = editor.value.trim();
+    if (!mdSource) { alert("Add text before pinning."); return; }
     // Derive title from the section header label (works for both hub-level and per-report sections)
     var section = document.getElementById("hub-text-" + boxId);
     var labelEl = section ? section.querySelector(".hub-summary-label") : null;
@@ -543,7 +548,7 @@
       id: "pin-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7),
       title: title,
       sourceLabel: "Overview",
-      insight: text,
+      insight: mdSource,
       timestamp: Date.now()
     };
     ReportHub.addPin("overview", pinObj);
@@ -1735,41 +1740,11 @@
       idx++;
       // Small delay between downloads for browser download queue stability
       ReportHub.exportPinCard(currentId, function() {
-        setTimeout(exportNext, 200);
+        setTimeout(exportNext, EXPORT_ALL_DELAY_MS);
       });
     }
     exportNext();
   };
-
-  /**
-   * Download a data URL as a PNG file via Blob (reliable for large images).
-   */
-  function downloadDataUrlAsPng(dataUrl, filename) {
-    try {
-      var parts = dataUrl.split(",");
-      var mime = parts[0].match(/:(.*?);/)[1];
-      var bstr = atob(parts[1]);
-      var n = bstr.length;
-      var u8 = new Uint8Array(n);
-      for (var i = 0; i < n; i++) u8[i] = bstr.charCodeAt(i);
-      var blob = new Blob([u8], { type: mime });
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      var a2 = document.createElement("a");
-      a2.href = dataUrl;
-      a2.download = filename;
-      document.body.appendChild(a2);
-      a2.click();
-      document.body.removeChild(a2);
-    }
-  }
 
   /**
    * Sanitize HTML by removing script tags and event handler attributes.
@@ -1780,10 +1755,17 @@
    */
   function sanitizeHtml(html) {
     if (!html) return "";
-    // Remove <script> tags and their content
+    // Remove dangerous elements and their content
     html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
+    html = html.replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, "");
+    html = html.replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, "");
+    html = html.replace(/<embed\b[^>]*\/?>/gi, "");
+    html = html.replace(/<link\b[^>]*\/?>/gi, "");
     // Remove event handler attributes (on*)
     html = html.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+    // Remove javascript: and data: URI schemes from href/src/action attributes
+    html = html.replace(/(href|src|action)\s*=\s*["']?\s*javascript:/gi, "$1=\"");
+    html = html.replace(/(href|src|action)\s*=\s*["']?\s*data:text\/html/gi, "$1=\"");
     return html;
   }
 

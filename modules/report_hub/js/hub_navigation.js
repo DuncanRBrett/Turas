@@ -437,7 +437,8 @@ var ReportHub = ReportHub || {};
     } catch (e) {
       console.error("Failed to decode report HTML for " + key + ":", e);
       if (loading) {
-        loading.querySelector(".hub-loading-text").textContent = "Failed to load report";
+        var lt = loading.querySelector(".hub-loading-text");
+        if (lt) lt.textContent = "Failed to load report";
       }
       return;
     }
@@ -672,7 +673,9 @@ var ReportHub = ReportHub || {};
         // Sync iframe form values too (insight textareas inside reports)
         syncFormStateToDom(iDoc);
 
-        // 1. Remove bridge-injected styles (added by injectBridge)
+        // 1. Remove ALL bridge-injected styles (added by injectBridge).
+        //    Iterate backward and remove every match — retried iframes can
+        //    accumulate duplicates, so breaking after the first would leak.
         var bridgeStyles = iDoc.querySelectorAll("style");
         var removedStyles = [];
         for (var si = bridgeStyles.length - 1; si >= 0; si--) {
@@ -680,7 +683,6 @@ var ReportHub = ReportHub || {};
           if (s.textContent.indexOf("hub-pin-float") !== -1) {
             s.parentNode.removeChild(s);
             removedStyles.push(s);
-            break;
           }
         }
 
@@ -726,21 +728,30 @@ var ReportHub = ReportHub || {};
     // is already stored in base64 <script> elements and reloaded from there.
     // This prevents the full decoded report HTML from being duplicated in
     // the outer page's outerHTML, saving significant file size.
+    // Wrapped in try/finally: if outerHTML throws (OOM on large hubs),
+    // srcdoc is always restored so iframes don't go permanently blank.
     var iframes = document.querySelectorAll(".hub-report-iframe");
     var savedSrcdocs = [];
-    for (var fi = 0; fi < iframes.length; fi++) {
-      if (iframes[fi].hasAttribute("srcdoc")) {
-        savedSrcdocs.push({ el: iframes[fi], val: iframes[fi].getAttribute("srcdoc") });
-        iframes[fi].removeAttribute("srcdoc");
+    var html;
+    try {
+      for (var fi = 0; fi < iframes.length; fi++) {
+        if (iframes[fi].hasAttribute("srcdoc")) {
+          savedSrcdocs.push({ el: iframes[fi], val: iframes[fi].getAttribute("srcdoc") });
+          iframes[fi].removeAttribute("srcdoc");
+        }
       }
-    }
 
-    // Serialize the full page
-    var html = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
-
-    // Restore srcdoc so live iframes keep working
-    for (var sdi = 0; sdi < savedSrcdocs.length; sdi++) {
-      savedSrcdocs[sdi].el.setAttribute("srcdoc", savedSrcdocs[sdi].val);
+      // Serialize the full page
+      html = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+    } catch (serializeErr) {
+      console.error("[Hub Save] Serialization failed:", serializeErr.message);
+      alert("Save failed — the combined report may be too large. Try removing some reports.");
+      return;
+    } finally {
+      // Always restore srcdoc so live iframes keep working
+      for (var sdi = 0; sdi < savedSrcdocs.length; sdi++) {
+        savedSrcdocs[sdi].el.setAttribute("srcdoc", savedSrcdocs[sdi].val);
+      }
     }
 
     var blob = new Blob([html], { type: "text/html;charset=utf-8" });

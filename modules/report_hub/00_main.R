@@ -43,10 +43,10 @@ source(file.path(hub_dir, "08_html_writer.R"))
 #'   }
 #' }
 #'
-#' @export
 # Configuration constants
 HUB_MAX_SOURCE_SIZE_BYTES <- 50 * 1024 * 1024  # 50 MB — warn above this
 
+#' @export
 combine_reports <- function(config_file, output_file = NULL, auto_cross_ref = FALSE) {
 
   cat("\n=== Turas Report Hub ===\n")
@@ -156,6 +156,16 @@ combine_reports <- function(config_file, output_file = NULL, auto_cross_ref = FA
   config$original_filename <- basename(output_file)
   config$hub_dir <- hub_dir  # Pass module root so asset resolution doesn't depend on working directory
   final_html <- assemble_hub_html(config, parsed_reports, overview_html, navigation_html)
+
+  # Check for TRS refusal (e.g., missing htmltools or base64enc)
+  if (is.list(final_html) && identical(final_html$status, "REFUSED")) {
+    cat("\n=== TURAS ERROR ===\n")
+    cat("Code:", final_html$code, "\n")
+    cat("Message:", final_html$message, "\n")
+    cat("Fix:", final_html$how_to_fix, "\n")
+    cat("==================\n\n")
+    return(final_html)
+  }
 
   # --- Step 7: Write output ---
   cat(sprintf("Step 6: Writing output: %s\n", output_file))

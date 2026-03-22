@@ -29,7 +29,7 @@ build_dashboard_css <- function(brand_colour) {
   css_text <- '
     /* === REPORT TAB NAVIGATION === */
     .report-tabs {
-      display: flex; gap: 0; max-width: 1400px; margin: 0 auto;
+      display: flex; align-items: center; gap: 0; max-width: 1400px; margin: 0 auto;
       padding: 0 32px; background: #fff;
       border-bottom: 1px solid #e2e8f0;
     }
