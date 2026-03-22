@@ -65,8 +65,8 @@ if (!is.null(icon_block)) eval(parse(text = icon_block), envir = launcher_env)
 # TEST: Module Registry Structure
 # ==============================================================================
 
-test_that("module registry contains all 12 modules", {
-  expect_equal(length(launcher_env$modules), 12)
+test_that("module registry contains all 13 modules", {
+  expect_equal(length(launcher_env$modules), 13)
 })
 
 test_that("every module has required fields", {

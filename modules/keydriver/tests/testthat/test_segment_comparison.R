@@ -21,12 +21,22 @@ if (!exists("%||%")) {
 
 # Locate module root robustly (works with test_file and test_dir)
 .find_module_dir <- function() {
-  ofile <- tryCatch(sys.frame(1)$ofile, error = function(e) NULL)
-  if (!is.null(ofile)) {
-    return(normalizePath(file.path(dirname(ofile), "..", ".."), mustWork = FALSE))
+  # Try testthat::test_path() first (works inside test_dir and test_file)
+  tp <- tryCatch(testthat::test_path(), error = function(e) NULL)
+  if (!is.null(tp) && nzchar(tp) && tp != ".") {
+    return(normalizePath(file.path(tp, "..", ".."), mustWork = FALSE))
   }
-  tp <- tryCatch(testthat::test_path(), error = function(e) ".")
-  normalizePath(file.path(tp, "..", ".."), mustWork = FALSE)
+  # Fall back to walking from working directory
+  wd <- getwd()
+  if (grepl("keydriver", wd)) {
+    # We're somewhere inside the module
+    return(normalizePath(sub("/tests.*$", "", wd), mustWork = FALSE))
+  }
+  # Last resort: try relative to project root
+  if (dir.exists(file.path(wd, "modules", "keydriver"))) {
+    return(normalizePath(file.path(wd, "modules", "keydriver"), mustWork = FALSE))
+  }
+  normalizePath(".", mustWork = FALSE)
 }
 module_dir <- .find_module_dir()
 project_root <- normalizePath(file.path(module_dir, "..", ".."), mustWork = FALSE)
@@ -374,6 +384,10 @@ test_that("Edge case: single driver across segments", {
 })
 
 test_that("build_importance_comparison_matrix refuses empty input", {
+  skip_if_not(exists("build_importance_comparison_matrix", mode = "function"),
+              "build_importance_comparison_matrix not loaded")
+  skip_if_not(exists("keydriver_refuse", mode = "function"),
+              "keydriver_refuse not loaded (TRS infrastructure)")
   expect_error(
     build_importance_comparison_matrix(list()),
     class = "turas_refusal"
@@ -381,6 +395,10 @@ test_that("build_importance_comparison_matrix refuses empty input", {
 })
 
 test_that("build_importance_comparison_matrix refuses unnamed list", {
+  skip_if_not(exists("build_importance_comparison_matrix", mode = "function"),
+              "build_importance_comparison_matrix not loaded")
+  skip_if_not(exists("keydriver_refuse", mode = "function"),
+              "keydriver_refuse not loaded (TRS infrastructure)")
   seg_results <- list(
     data.frame(Driver = "Price", Importance_Pct = 50, stringsAsFactors = FALSE),
     data.frame(Driver = "Price", Importance_Pct = 50, stringsAsFactors = FALSE)

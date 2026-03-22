@@ -674,8 +674,7 @@ conjoint_status_refuse <- function(code = NULL, reason = NULL) {
   trs_status_refuse(
     module = "CONJOINT",
     code = code,
-    message = reason %||% "Conjoint analysis refused",
-    how_to_fix = "Check the error code and console output for details"
+    reason = reason %||% "Conjoint analysis refused"
   )
 }
 

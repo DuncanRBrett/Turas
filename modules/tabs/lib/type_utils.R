@@ -41,14 +41,8 @@
 #' safe_equal("NA", NA)         # FALSE (string vs real NA)
 #' safe_equal(c("A", NA), c("A", NA))  # c(TRUE, TRUE)
 safe_equal <- function(a, b) {
-  if (length(a) == 0 && length(b) == 0) {
+  if (length(a) == 0 || length(b) == 0) {
     return(logical(0))
-  }
-  if (length(a) == 0) {
-    return(rep(FALSE, length(b)))
-  }
-  if (length(b) == 0) {
-    return(rep(FALSE, length(a)))
   }
 
   # Vectorize to longer length

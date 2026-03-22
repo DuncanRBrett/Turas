@@ -93,7 +93,7 @@ modules <- list(
        test_dir = "modules/conjoint/tests/testthat",
        description = "Choice-based conjoint, HB estimation, WTP, simulators"),
   list(name = "Cat Driver", id = "catdriver",
-       test_dir = "modules/catdriver/tests/testthat",
+       test_dir = "modules/catdriver/tests",
        description = "Categorical driver analysis, SHAP, logistic regression"),
   list(name = "Key Driver", id = "keydriver",
        test_dir = "modules/keydriver/tests/testthat",
@@ -233,88 +233,116 @@ for (i in seq_along(modules)) {
 
   mod_start <- proc.time()
 
-  # --- Capture ALL output and run tests ---
-  # Run in a separate process to prevent session crashes from taking down RStudio
-  test_result <- NULL
-  captured_output <- character(0)
+  # --- Run each test file individually with progress feedback ---
+  mod_passed <- 0
+  mod_failed <- 0
+  mod_skipped <- 0
+  mod_warnings <- 0
+  mod_errors_detail <- character(0)
+  mod_had_crash <- FALSE
 
-  # Try in-process first with robust error handling
-  captured_output <- tryCatch({
-    utils::capture.output({
-      test_result <<- tryCatch(
-        testthat::test_dir(
-          test_path,
-          reporter = "silent",
-          stop_on_failure = FALSE
-        ),
+  for (fi in seq_along(test_files)) {
+    tf <- test_files[fi]
+    tf_name <- basename(tf)
+
+    # Show which file is running (overwrites progress bar line)
+    cat(sprintf("\r  [%d/%d] %-22s  > %-40s",
+                i, n_modules, mod$name, tf_name))
+    flush.console()
+
+    # Run single test file, capture output to log
+    # Use sink() instead of capture.output() to avoid breaking
+    # muffleWarning/muffleMessage restarts inside withCallingHandlers
+    file_result <- NULL
+    log_tmp <- tempfile(fileext = ".txt")
+    file_output <- tryCatch({
+      sink(log_tmp, type = "output")
+      on.exit(sink(NULL), add = TRUE)
+      file_result <<- tryCatch(
+        testthat::test_file(tf, reporter = testthat::SummaryReporter$new()),
         error = function(e) {
-          cat(sprintf("\n[ERROR] Test suite crashed: %s\n", conditionMessage(e)))
+          cat(sprintf("\n[ERROR] %s crashed: %s\n", tf_name, conditionMessage(e)))
           NULL
-        },
-        warning = function(w) {
-          invokeRestart("muffleWarning")
         }
       )
-    }, type = "output")
-  }, error = function(e) {
-    paste("[CAPTURE ERROR]", conditionMessage(e))
-  })
+      sink(NULL)
+      on.exit(NULL)
+      readLines(log_tmp, warn = FALSE)
+    }, error = function(e) {
+      tryCatch(sink(NULL), error = function(e2) NULL)
+      paste("[CAPTURE ERROR]", conditionMessage(e))
+    })
+
+    # Write to log immediately
+    if (length(file_output) > 0 && any(nzchar(file_output))) {
+      writeLines(sprintf("--- %s ---", tf_name), log_con)
+      writeLines(file_output, log_con)
+      writeLines("", log_con)
+      flush(log_con)
+    }
+
+    # Tally results
+    if (is.null(file_result)) {
+      mod_had_crash <- TRUE
+      mod_errors_detail <- c(mod_errors_detail,
+                             sprintf("  CRASH in %s", tf_name))
+    } else {
+      df <- as.data.frame(file_result)
+      fp <- sum(df$passed, na.rm = TRUE)
+      ff <- sum(df$failed, na.rm = TRUE)
+      fs <- sum(df$skipped, na.rm = TRUE)
+      fw <- sum(df$warning, na.rm = TRUE)
+      mod_passed <- mod_passed + fp
+      mod_failed <- mod_failed + ff
+      mod_skipped <- mod_skipped + fs
+      mod_warnings <- mod_warnings + fw
+
+      if (ff > 0) {
+        failed_rows <- df[df$failed > 0, , drop = FALSE]
+        for (j in seq_len(nrow(failed_rows))) {
+          row <- failed_rows[j, ]
+          detail <- sprintf("  FAIL in %s / %s: %d failure(s)",
+                            tf_name, row$context, row$failed)
+          mod_errors_detail <- c(mod_errors_detail, detail)
+        }
+      }
+    }
+  }
 
   mod_duration <- (proc.time() - mod_start)["elapsed"]
 
-  # Write captured output to log and flush immediately
-  writeLines(captured_output, log_con)
-  writeLines("", log_con)
-  flush(log_con)
-
-  # --- Extract results ---
-  if (is.null(test_result)) {
-    results[[mod$id]] <- list(
-      name = mod$name, status = "ERROR", reason = "Test suite crashed",
-      passed = 0, failed = 0, skipped = 0, warnings = 0,
-      n_files = n_files, duration = mod_duration, errors_detail = character(0)
-    )
-    writeLines(sprintf("[ERROR] %s — test suite crashed (%.1fs)", mod$name, mod_duration), log_con)
+  # Determine module status
+  if (mod_had_crash && mod_passed == 0 && mod_failed == 0) {
+    mod_status <- "ERROR"
+  } else if (mod_failed > 0 || mod_had_crash) {
+    mod_status <- "FAIL"
   } else {
-    df <- as.data.frame(test_result)
-    n_passed <- sum(df$passed, na.rm = TRUE)
-    n_failed <- sum(df$failed, na.rm = TRUE)
-    n_skipped <- sum(df$skipped, na.rm = TRUE)
-    n_warnings <- sum(df$warning, na.rm = TRUE)
-    status <- if (n_failed == 0) "PASS" else "FAIL"
-
-    # Collect failure details for the log
-    errors_detail <- character(0)
-    if (n_failed > 0) {
-      failed_rows <- df[df$failed > 0, , drop = FALSE]
-      for (j in seq_len(nrow(failed_rows))) {
-        row <- failed_rows[j, ]
-        detail <- sprintf("  FAIL in %s / %s: %d failure(s)",
-                          row$file, row$context, row$failed)
-        errors_detail <- c(errors_detail, detail)
-      }
-      writeLines("", log_con)
-      writeLines("FAILURES IN THIS MODULE:", log_con)
-      writeLines(errors_detail, log_con)
-    }
-
-    writeLines(sprintf("\n[%s] %s — %d passed, %d failed, %d skipped (%.1fs)",
-                       status, mod$name, n_passed, n_failed, n_skipped, mod_duration), log_con)
-
-    results[[mod$id]] <- list(
-      name = mod$name, status = status,
-      passed = n_passed, failed = n_failed, skipped = n_skipped,
-      warnings = n_warnings, n_files = n_files, duration = mod_duration,
-      errors_detail = errors_detail
-    )
+    mod_status <- "PASS"
   }
 
+  # Write module summary to log
+  if (length(mod_errors_detail) > 0) {
+    writeLines("", log_con)
+    writeLines("FAILURES IN THIS MODULE:", log_con)
+    writeLines(mod_errors_detail, log_con)
+  }
+  writeLines(sprintf("\n[%s] %s — %d passed, %d failed, %d skipped (%.1fs)",
+                     mod_status, mod$name, mod_passed, mod_failed, mod_skipped,
+                     mod_duration), log_con)
   writeLines("", log_con)
   flush(log_con)
+
+  results[[mod$id]] <- list(
+    name = mod$name, status = mod_status,
+    passed = mod_passed, failed = mod_failed, skipped = mod_skipped,
+    warnings = mod_warnings, n_files = n_files, duration = mod_duration,
+    errors_detail = mod_errors_detail
+  )
 }
 
-# Final progress bar
-progress_bar(n_modules, n_modules, "Complete!")
+# Final progress
+cat(sprintf("\r  %-75s\n", "All modules complete."))
+flush.console()
 cat("\n\n")
 
 overall_duration <- (proc.time() - overall_start)["elapsed"]
@@ -415,12 +443,15 @@ write_summary <- function(dest = "console") {
 # Write summary to console
 write_summary("console")
 
-# Write summary to log
-writeLines("", log_con)
-write_summary("log")
-
-# Close log file
-close(log_con)
+# Write summary to log and close safely
+tryCatch({
+  writeLines("", log_con)
+  write_summary("log")
+  flush(log_con)
+  close(log_con)
+}, error = function(e) {
+  tryCatch(close(log_con), error = function(e2) NULL)
+})
 
 cat(sprintf("  Full test output saved to:\n  %s\n\n", log_path))
 cat("  Share this file to review failures in detail.\n\n")

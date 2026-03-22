@@ -43,7 +43,7 @@ if (is.null(turas_root)) {
   # ============================================================================
   # TEST 1: conjoint_status_refuse returns correct TRS structure
   # ============================================================================
-  test_that("conjoint_status_refuse: returns REFUSED status with code and message", {
+  test_that("conjoint_status_refuse: returns REFUSE status with code and reason", {
     skip_if(!exists("conjoint_status_refuse", mode = "function"),
             "conjoint_status_refuse not loaded")
 
@@ -53,25 +53,24 @@ if (is.null(turas_root)) {
     )
 
     expect_true(is.list(result))
-    expect_equal(result$status, "REFUSED")
+    expect_equal(result$run_status, "REFUSE")
     expect_equal(result$module, "CONJOINT")
-    expect_equal(result$code, "DATA_INVALID")
-    expect_true("message" %in% names(result))
-    expect_true("how_to_fix" %in% names(result))
+    expect_equal(result$details$code, "DATA_INVALID")
+    expect_equal(result$details$reason, "Test refusal reason")
   })
 
   # ============================================================================
   # TEST 2: conjoint_status_refuse with default reason
   # ============================================================================
-  test_that("conjoint_status_refuse: uses default message when reason is NULL", {
+  test_that("conjoint_status_refuse: uses default reason when reason is NULL", {
     skip_if(!exists("conjoint_status_refuse", mode = "function"),
             "conjoint_status_refuse not loaded")
 
     result <- conjoint_status_refuse(code = "TEST_CODE")
 
-    expect_equal(result$status, "REFUSED")
-    expect_true(nchar(result$message) > 0,
-                info = "Default message should be non-empty")
+    expect_equal(result$run_status, "REFUSE")
+    expect_true(nchar(result$details$reason) > 0,
+                info = "Default reason should be non-empty")
   })
 
   # ============================================================================
@@ -228,7 +227,9 @@ if (is.null(turas_root)) {
     guard2 <- conjoint_guard_init()
     guard2 <- guard_record_convergence(guard2, converged = FALSE, iterations = 10000)
     expect_false(guard2$convergence_status$converged)
-    expect_false(guard2$stable, info = "Non-converged should flag stability")
+    # Non-convergence adds to stability_flags via guard_flag_stability
+    expect_true(length(guard2$stability_flags) > 0,
+                info = "Non-converged should flag stability")
   })
 
   # ============================================================================
@@ -244,7 +245,7 @@ if (is.null(turas_root)) {
       model_type = "mlogit"
     )
 
-    expect_equal(result$status, "PASS")
+    expect_equal(result$run_status, "PASS")
     expect_equal(result$module, "CONJOINT")
     expect_true(!is.null(result$details))
     expect_equal(result$details$attributes, 4)
@@ -265,7 +266,7 @@ if (is.null(turas_root)) {
       estimation_warnings = c("Some respondents had low variation")
     )
 
-    expect_equal(result$status, "PARTIAL")
+    expect_equal(result$run_status, "PARTIAL")
     expect_equal(result$module, "CONJOINT")
     expect_equal(length(result$degraded_reasons), 2)
     expect_true(!is.null(result$details))
@@ -292,7 +293,7 @@ if (is.null(turas_root)) {
       mcfadden_r2 = 0.35
     )
 
-    expect_equal(status$status, "PASS")
+    expect_equal(status$run_status, "PASS")
   })
 
   # ============================================================================
@@ -315,7 +316,7 @@ if (is.null(turas_root)) {
       mcfadden_r2 = 0.05  # Very poor fit
     )
 
-    expect_equal(status$status, "PARTIAL")
+    expect_equal(status$run_status, "PARTIAL")
     expect_true(any(grepl("Poor model fit", status$degraded_reasons)))
   })
 
