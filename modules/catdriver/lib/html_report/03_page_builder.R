@@ -6,6 +6,16 @@
 # Design: aligned with Turas shared design system (tabs/tracker modules).
 # ==============================================================================
 
+# Source the shared design system
+local({
+  ds_dir <- file.path("modules", "shared", "lib", "design_system")
+  if (!exists("turas_base_css", mode = "function")) {
+    source(file.path(ds_dir, "design_tokens.R"), local = FALSE)
+    source(file.path(ds_dir, "font_embed.R"), local = FALSE)
+    source(file.path(ds_dir, "base_css.R"), local = FALSE)
+  }
+})
+
 #' Build Complete Catdriver HTML Page
 #'
 #' Assembles all report components into a single browsable HTML page.
@@ -270,6 +280,12 @@ function cdCloseHelp() {
 #' @return Character string of CSS
 #' @keywords internal
 build_cd_css <- function(brand_colour, accent_colour) {
+  # Shared base CSS (Inter font, tokens, typography, common components)
+  shared_css <- tryCatch(
+    turas_base_css(brand_colour, accent_colour, prefix = "cd"),
+    error = function(e) ""
+  )
+
   css <- '
 /* ==== CATDRIVER REPORT CSS ==== */
 /* cd- namespace for Report Hub safety */
@@ -304,7 +320,7 @@ build_cd_css <- function(brand_colour, accent_colour) {
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 .cd-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: inherit;
   background: var(--cd-bg);
   color: var(--cd-text);
   line-height: 1.5;
@@ -381,7 +397,7 @@ build_cd_css <- function(brand_colour, accent_colour) {
 .cd-header-inner {
   max-width: 1100px;
   margin: 0 auto;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: inherit;
 }
 
 .cd-header-top {
@@ -1450,6 +1466,7 @@ build_cd_css <- function(brand_colour, accent_colour) {
 '
   css <- gsub("BRAND_COLOUR", brand_colour, css, fixed = TRUE)
   css <- gsub("ACCENT_COLOUR", accent_colour, css, fixed = TRUE)
+  css <- paste0(shared_css, "\n\n/* === CATDRIVER MODULE STYLES === */\n", css)
   css
 }
 

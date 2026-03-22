@@ -6,6 +6,16 @@
 # Uses gsub() token replacement for colours (avoids sprintf 8192 limit).
 # ==============================================================================
 
+# Source the shared design system
+local({
+  ds_dir <- file.path("modules", "shared", "lib", "design_system")
+  if (!exists("turas_base_css", mode = "function")) {
+    source(file.path(ds_dir, "design_tokens.R"), local = FALSE)
+    source(file.path(ds_dir, "font_embed.R"), local = FALSE)
+    source(file.path(ds_dir, "base_css.R"), local = FALSE)
+  }
+})
+
 # Null-coalescing operator (canonical definition in utils.R)
 if (!exists("%||%", mode = "function")) {
   `%||%` <- function(a, b) if (is.null(a)) b else a
@@ -86,6 +96,7 @@ build_ci_meta_tags <- function(summary, source_filename) {
 # ==============================================================================
 
 build_ci_css <- function(brand, accent) {
+  shared_css <- tryCatch(turas_base_css(brand, accent, prefix = "ci"), error = function(e) "")
   css <- '
 * { margin: 0; padding: 0; box-sizing: border-box; }
 :root {
@@ -98,7 +109,7 @@ build_ci_css <- function(brand, accent) {
   --ci-border: #e2e8f0;
 }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   background: #f8f7f5;
   color: var(--ci-text-primary);
   line-height: 1.6;
@@ -417,7 +428,7 @@ body {
   # Token replacement (avoids sprintf 8192 char limit)
   css <- gsub("BRAND", brand, css, fixed = TRUE)
   css <- gsub("ACCENT", accent, css, fixed = TRUE)
-  css
+  paste0(shared_css, "\n", css)
 }
 
 

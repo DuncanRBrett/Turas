@@ -8,6 +8,16 @@
 # Version: 2.0.0
 # ==============================================================================
 
+# Source the shared design system
+local({
+  ds_dir <- file.path("modules", "shared", "lib", "design_system")
+  if (!exists("turas_base_css", mode = "function")) {
+    source(file.path(ds_dir, "design_tokens.R"), local = FALSE)
+    source(file.path(ds_dir, "font_embed.R"), local = FALSE)
+    source(file.path(ds_dir, "base_css.R"), local = FALSE)
+  }
+})
+
 `%||%` <- function(x, y) if (is.null(x) || length(x) == 0 || (length(x) == 1 && is.na(x))) y else x
 
 # htmlEscape is defined in 99_html_report_main.R (sourced before this file)
@@ -173,6 +183,7 @@ build_pricing_meta_tags <- function(html_data, config) {
 # ==============================================================================
 
 build_pricing_css <- function(brand, accent, has_simulator = FALSE) {
+  shared_css <- tryCatch(turas_base_css(brand, accent, prefix = "pr"), error = function(e) "")
   css <- '
 :root {
   --pr-brand: BRAND_TOKEN;
@@ -198,7 +209,7 @@ build_pricing_css <- function(brand, accent, has_simulator = FALSE) {
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 14px;
   line-height: 1.6;
   color: var(--pr-text-primary);
@@ -643,9 +654,10 @@ body {
   cursor: pointer;
 }
 .pr-slide-md-rendered:empty::after {
-  content: "Double-click to add content...";
-  color: #94a3b8;
+  content: "Click to add content";
+  color: #cbd5e1;
   font-style: italic;
+  font-size: 13px;
 }
 .pr-slide-md-rendered h2 { font-size: 16px; font-weight: 600; margin: 12px 0 6px; color: var(--pr-text-primary); }
 .pr-slide-md-rendered p { margin: 6px 0; }
@@ -1092,7 +1104,7 @@ body {
 
   css <- gsub("BRAND_TOKEN", brand, css, fixed = TRUE)
   css <- gsub("ACCENT_TOKEN", accent, css, fixed = TRUE)
-  css
+  paste0(shared_css, "\n", css)
 }
 
 

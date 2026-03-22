@@ -222,8 +222,18 @@ build_dashboard_css <- function(brand_colour) {
       min-height: 40px; cursor: pointer;
     }
     .dash-md-rendered:empty::after {
-      content: "Double-click to add text (supports **bold**, *italic*, - bullets)";
-      color: #94a3b8; font-style: italic;
+      content: "+";
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 1.5px dashed #cbd5e1;
+      color: #cbd5e1;
+      font-size: 14px;
+      font-weight: 400;
+      font-style: normal;
     }
     .dash-md-rendered h2 { font-size: 15px; font-weight: 600; margin: 10px 0 5px; color: #1e293b; }
     .dash-md-rendered p { margin: 5px 0; }

@@ -135,16 +135,32 @@ build_conjoint_meta <- function(summary, config = list()) {
 }
 
 
+# Source the shared design system
+local({
+  ds_dir <- file.path("modules", "shared", "lib", "design_system")
+  if (!exists("turas_base_css", mode = "function")) {
+    source(file.path(ds_dir, "design_tokens.R"), local = FALSE)
+    source(file.path(ds_dir, "font_embed.R"), local = FALSE)
+    source(file.path(ds_dir, "base_css.R"), local = FALSE)
+  }
+})
+
 # ==============================================================================
 # CSS
 # ==============================================================================
 
 #' @keywords internal
 build_conjoint_css <- function(brand, accent) {
+
+  # Shared base CSS (Inter font, tokens, typography, common components)
+  shared_css <- tryCatch(
+    turas_base_css(brand, accent, prefix = "cj"),
+    error = function(e) ""
+  )
   css_root <- sprintf(':root { --cj-brand: %s; --cj-accent: %s; }', brand, accent)
   css <- paste0(css_root, '
 * { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; background:#f8f7f5; color:#1e293b; line-height:1.6; }
+body { font-family:"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background:#f8f7f5; color:#1e293b; line-height:1.6; }
 
 /* === HEADER === */
 .cj-header {
@@ -539,6 +555,7 @@ body { font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helve
   .cj-sim-layout { flex-direction:column; }
 }
 ')
+  css <- paste0(shared_css, "\n\n/* === CONJOINT MODULE STYLES === */\n", css)
   css
 }
 

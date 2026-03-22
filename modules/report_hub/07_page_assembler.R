@@ -5,6 +5,16 @@
 #' loaded into an iframe via srcdoc at runtime. This guarantees that
 #' reports behave identically to their standalone versions.
 
+# Source the shared design system
+local({
+  ds_dir <- file.path("modules", "shared", "lib", "design_system")
+  if (!exists("turas_base_css", mode = "function")) {
+    source(file.path(ds_dir, "design_tokens.R"), local = FALSE)
+    source(file.path(ds_dir, "font_embed.R"), local = FALSE)
+    source(file.path(ds_dir, "base_css.R"), local = FALSE)
+  }
+})
+
 #' Assemble the Combined Report HTML
 #'
 #' @param config Validated config from guard
@@ -160,6 +170,15 @@ build_hub_css <- function(config) {
 
   css <- gsub("BRAND_COLOUR", brand, css, fixed = TRUE)
   css <- gsub("ACCENT_COLOUR", accent, css, fixed = TRUE)
+
+  # Prepend shared design system CSS (with font embed for the hub shell)
+  shared_css <- turas_base_css(
+    brand_colour = brand,
+    accent_colour = accent,
+    prefix = "t",
+    include_font = TRUE
+  )
+  css <- paste(shared_css, css, sep = "\n\n")
 
   return(css)
 }

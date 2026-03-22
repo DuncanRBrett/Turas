@@ -13,6 +13,16 @@
 
 # htmlEscape() and %||% are defined in 01_data_transformer.R (loaded first)
 
+# Source the shared design system
+local({
+  ds_dir <- file.path("modules", "shared", "lib", "design_system")
+  if (!exists("turas_base_css", mode = "function")) {
+    source(file.path(ds_dir, "design_tokens.R"), local = FALSE)
+    source(file.path(ds_dir, "font_embed.R"), local = FALSE)
+    source(file.path(ds_dir, "base_css.R"), local = FALSE)
+  }
+})
+
 
 # ==============================================================================
 # LOGO RESOLUTION
@@ -1310,7 +1320,7 @@ build_md_css <- function(brand, accent) {
   --md-border: #e2e8f0;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8f7f5; color: var(--md-text-primary); line-height: 1.6; font-size: 14px; -webkit-font-smoothing: antialiased; }
+body { font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8f7f5; color: var(--md-text-primary); line-height: 1.6; font-size: 14px; -webkit-font-smoothing: antialiased; }
 
 /* === HEADER === */
 .md-header {
@@ -1758,6 +1768,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 
   css <- gsub("BRAND_TOKEN", brand, css, fixed = TRUE)
   css <- gsub("ACCENT_TOKEN", accent, css, fixed = TRUE)
+
+  # Prepend shared design system CSS
+  shared_css <- tryCatch(turas_base_css(brand, accent, prefix = "md"), error = function(e) "")
+  css <- paste0(shared_css, "\n", css)
+
   css
 }
 

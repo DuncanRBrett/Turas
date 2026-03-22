@@ -197,7 +197,7 @@ build_summary_area <- function(parsed_reports) {
   </div>
   <div class="hub-text-rendered hub-md-content" id="hub-text-rendered-%s-summary"
        ondblclick="ReportHub.toggleHubTextEdit(\'%s-summary\')">
-    <p style="color:#94a3b8;font-style:italic">Double-click to add summary notes for this report</p>
+    <p style="color:#cbd5e1;font-style:italic;font-size:13px">Click to add summary notes</p>
   </div>
   <textarea class="hub-text-editor" id="hub-text-editor-%s-summary"
             style="display:none"

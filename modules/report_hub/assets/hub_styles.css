@@ -11,7 +11,7 @@
   --hub-bg: #f8f7f5;
   --hub-card: #ffffff;
   --hub-border: #e2e8f0;
-  --hub-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --hub-font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 /* --- Base --- */

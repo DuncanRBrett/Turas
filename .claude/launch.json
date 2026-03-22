@@ -2,6 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "demo-tabs",
+      "runtimeExecutable": "/usr/local/bin/node",
+      "runtimeArgs": ["-e", "const http=require('http'),fs=require('fs'),path=require('path'),dir=path.join(process.cwd(),'examples/tabs/demo_survey/Output'),types={'.html':'text/html','.css':'text/css','.js':'application/javascript'};http.createServer((q,r)=>{let u=decodeURIComponent(q.url==='/'?'/Demo_CX_Crosstabs.html':q.url),f=path.join(dir,u);fs.readFile(f,(e,d)=>{if(e){r.writeHead(404);r.end('Not found');return}r.writeHead(200,{'Content-Type':types[path.extname(f)]||'text/html'});r.end(d)})}).listen(8764,()=>console.log('Serving demo tabs on 8764'))"],
+      "port": 8764
+    },
+    {
       "name": "hub-app-static",
       "runtimeExecutable": "/usr/local/bin/node",
       "runtimeArgs": ["-e", "const http=require('http'),fs=require('fs'),path=require('path'),dir=path.join(process.cwd(),'modules/hub_app/app'),types={'.html':'text/html','.css':'text/css','.js':'application/javascript'};http.createServer((q,r)=>{let f=path.join(dir,q.url==='/'?'index.html':q.url);fs.readFile(f,(e,d)=>{if(e){r.writeHead(404);r.end('Not found');return}r.writeHead(200,{'Content-Type':types[path.extname(f)]||'text/plain'});r.end(d)})}).listen(8765,()=>console.log('Serving on 8765'))"],

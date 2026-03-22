@@ -6,6 +6,16 @@
 # Version: 11.0
 # ==============================================================================
 
+# Source the shared design system
+local({
+  ds_dir <- file.path("modules", "shared", "lib", "design_system")
+  if (!exists("turas_base_css", mode = "function")) {
+    source(file.path(ds_dir, "design_tokens.R"), local = FALSE)
+    source(file.path(ds_dir, "font_embed.R"), local = FALSE)
+    source(file.path(ds_dir, "base_css.R"), local = FALSE)
+  }
+})
+
 
 #' Build Complete Segment HTML Page
 #'
@@ -338,7 +348,7 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 .seg-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background: var(--seg-bg);
   color: var(--seg-text);
   line-height: 1.5;
@@ -1380,6 +1390,11 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
 '
   css <- gsub("BRAND_COLOUR", brand_colour, css, fixed = TRUE)
   css <- gsub("ACCENT_COLOUR", accent_colour, css, fixed = TRUE)
+
+  # Prepend shared design system CSS
+  shared_css <- tryCatch(turas_base_css(brand_colour, accent_colour, prefix = "seg"), error = function(e) "")
+  css <- paste0(shared_css, "\n", css)
+
   css
 }
 

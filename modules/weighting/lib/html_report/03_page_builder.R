@@ -10,6 +10,16 @@
 # - Self-contained single-file HTML
 # ==============================================================================
 
+# Source the shared design system
+local({
+  ds_dir <- file.path("modules", "shared", "lib", "design_system")
+  if (!exists("turas_base_css", mode = "function")) {
+    source(file.path(ds_dir, "design_tokens.R"), local = FALSE)
+    source(file.path(ds_dir, "font_embed.R"), local = FALSE)
+    source(file.path(ds_dir, "base_css.R"), local = FALSE)
+  }
+})
+
 #' Build Complete HTML Page
 #'
 #' Assembles all components into a browsable htmltools tag list.
@@ -103,6 +113,7 @@ build_meta_tags <- function(html_data, source_filename = NULL) {
 
 #' @keywords internal
 build_weighting_css <- function(brand_colour, accent_colour) {
+  shared_css <- tryCatch(turas_base_css(brand_colour, accent_colour, prefix = "wt"), error = function(e) "")
   css_text <- '
 :root {
   --wt-brand: BRAND;
@@ -117,7 +128,7 @@ build_weighting_css <- function(brand_colour, accent_colour) {
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background: #f8f7f5;
   color: var(--wt-text-primary);
   line-height: 1.5;
@@ -533,7 +544,7 @@ body {
   css_text <- gsub("ACCENT", accent_colour, css_text, fixed = TRUE)
   css_text <- gsub("BRAND", brand_colour, css_text, fixed = TRUE)
 
-  htmltools::tags$style(htmltools::HTML(css_text))
+  htmltools::tags$style(htmltools::HTML(paste0(shared_css, "\n", css_text)))
 }
 
 

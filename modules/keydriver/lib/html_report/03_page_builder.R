@@ -5,6 +5,16 @@
 # self-contained HTML page using htmltools.
 # ==============================================================================
 
+# Source the shared design system
+local({
+  ds_dir <- file.path("modules", "shared", "lib", "design_system")
+  if (!exists("turas_base_css", mode = "function")) {
+    source(file.path(ds_dir, "design_tokens.R"), local = FALSE)
+    source(file.path(ds_dir, "font_embed.R"), local = FALSE)
+    source(file.path(ds_dir, "base_css.R"), local = FALSE)
+  }
+})
+
 # Null-coalescing operator (existence guard)
 if (!exists("%||%", mode = "function")) {
   `%||%` <- function(x, y) if (is.null(x)) y else x
@@ -241,6 +251,12 @@ build_kd_css <- function(config) {
   brand_colour  <- config$brand_colour %||% "#323367"
   accent_colour <- config$accent_colour %||% "#CC9900"
 
+  # Shared base CSS (Inter font, tokens, typography, common components)
+  shared_css <- tryCatch(
+    turas_base_css(brand_colour, accent_colour, prefix = "kd"),
+    error = function(e) ""
+  )
+
   css <- '
 /* ==== KEYDRIVER REPORT CSS ==== */
 /* kd- namespace for Report Hub safety */
@@ -275,7 +291,7 @@ build_kd_css <- function(config) {
 .kd-body, .kd-body * { box-sizing: border-box; margin: 0; padding: 0; }
 
 .kd-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: inherit;
   background: var(--kd-bg);
   color: var(--kd-text);
   line-height: 1.5;
@@ -371,7 +387,7 @@ build_kd_css <- function(config) {
 .kd-header-inner {
   max-width: 1100px;
   margin: 0 auto;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: inherit;
 }
 
 .kd-header-top {
@@ -1600,6 +1616,7 @@ build_kd_css <- function(config) {
 '
   css <- gsub("BRAND_COLOUR", brand_colour, css, fixed = TRUE)
   css <- gsub("ACCENT_COLOUR", accent_colour, css, fixed = TRUE)
+  css <- paste0(shared_css, "\n\n/* === KEYDRIVER MODULE STYLES === */\n", css)
   css
 }
 

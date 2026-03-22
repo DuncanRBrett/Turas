@@ -21,6 +21,16 @@
   }
 })()
 
+# Source the shared design system
+local({
+  ds_dir <- file.path("modules", "shared", "lib", "design_system")
+  if (!exists("turas_base_css", mode = "function")) {
+    source(file.path(ds_dir, "design_tokens.R"), local = FALSE)
+    source(file.path(ds_dir, "font_embed.R"), local = FALSE)
+    source(file.path(ds_dir, "base_css.R"), local = FALSE)
+  }
+})
+
 
 #' Minify JavaScript (R-based, no external dependencies)
 #'
@@ -95,9 +105,16 @@ build_tracker_css <- function(brand_colour, accent_colour) {
     return("")
   }
 
+  # Shared base CSS (Inter font, tokens, typography, common components)
+  shared_css <- tryCatch(
+    turas_base_css(brand_colour, accent_colour, prefix = "tr"),
+    error = function(e) ""
+  )
+
   css <- paste(readLines(css_path, warn = FALSE), collapse = "\n")
   css <- gsub("BRAND_COLOUR", brand_colour, css, fixed = TRUE)
   css <- gsub("ACCENT_COLOUR", accent_colour, css, fixed = TRUE)
+  css <- paste0(shared_css, "\n\n/* === TRACKER MODULE STYLES === */\n", css)
   minify_css(css)
 }
 

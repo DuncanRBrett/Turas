@@ -21,7 +21,7 @@
   --sidebar-w: 280px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
 
 /* Header — dark gradient matching Turas Tabs */
 .tk-header { background: linear-gradient(135deg, #1a2744 0%, #2a3f5f 100%); padding: 24px 32px; border-bottom: 3px solid var(--brand); color: #fff; }
@@ -269,7 +269,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
    selectors override for headers (#64748b) and base rows (#64748b).
    No !important needed — specificity handles priority cleanly. */
 .tk-table-wrapper { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); background: var(--card); }
-.tk-table { width: 100%; border-collapse: collapse; color: #1e293b; font-size: 13px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+.tk-table { width: 100%; border-collapse: collapse; color: #1e293b; font-size: 13px; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 .tk-table td, .tk-table th { font-family: inherit; }
 .tk-th { padding: 8px 10px; text-align: center; font-size: 11px; font-weight: 600; color: #64748b; border-bottom: 2px solid var(--border); white-space: normal; min-width: 80px; max-width: 160px; vertical-align: bottom; background: var(--ct-bg-muted); }
 .tk-td { padding: 6px 10px; text-align: center; border-bottom: 1px solid #f0f0f0; font-size: 13px; color: #1e293b; transition: background-color 0.15s; }
@@ -926,7 +926,7 @@ body.hide-sparklines .tk-sparkline-wrap { display: none; }
 /* Hover callout on data points */
 .vis-hover-callout { position: absolute; z-index: 1000; background: var(--card, #fff); border: 1px solid var(--border, #e2e8f0);
   border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); padding: 0; min-width: 180px; max-width: 260px;
-  pointer-events: none; display: none; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  pointer-events: none; display: none; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   overflow: hidden; }
 .vis-callout-header { padding: 10px 14px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .vis-callout-label { font-size: 13px; font-weight: 700; color: var(--text, #1e293b); line-height: 1.3; }

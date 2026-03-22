@@ -1,15 +1,30 @@
 # ==============================================================================
-# HTML REPORT - PAGE STYLING (V10.8)
+# HTML REPORT - PAGE STYLING (V11.0 - Design System)
 # ==============================================================================
 # CSS stylesheet generation for the HTML report.
-# Extracted from 03_page_builder.R for modularity.
+# Now uses the shared Turas Design System for base styles (typography,
+# tokens, font embedding, common components) and layers tabs-specific
+# styles on top.
 #
 # FUNCTIONS:
 # - build_css() - Main CSS stylesheet with brand colour substitution
 # - build_print_css() - Print/PDF optimized @media print styles
 #
-# DEPENDENCIES: None (pure CSS generation, no R function calls)
+# DEPENDENCIES:
+# - modules/shared/lib/design_system/design_tokens.R
+# - modules/shared/lib/design_system/font_embed.R
+# - modules/shared/lib/design_system/base_css.R
 # ==============================================================================
+
+# Source the shared design system (guard against re-sourcing)
+local({
+  ds_dir <- file.path("modules", "shared", "lib", "design_system")
+  if (!exists("turas_base_css", mode = "function")) {
+    source(file.path(ds_dir, "design_tokens.R"), local = FALSE)
+    source(file.path(ds_dir, "font_embed.R"), local = FALSE)
+    source(file.path(ds_dir, "base_css.R"), local = FALSE)
+  }
+})
 
 #' Build CSS Stylesheet
 #'
@@ -20,24 +35,15 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
   bc <- brand_colour
   ac <- accent_colour
 
+  # --- Shared base CSS (Inter font, tokens, typography, common components) ---
+  base_css <- tryCatch(
+    turas_base_css(brand_colour, accent_colour, prefix = "ct"),
+    error = function(e) ""
+  )
+
+  # --- Tabs-specific CSS (overrides and additions) ---
   css_layout <- '
-    :root {
-      --ct-brand: BRAND;
-      --brand-colour: BRAND;
-      --ct-accent: ACCENT;
-      --ct-text-primary: #1e293b;
-      --ct-text-secondary: #64748b;
-      --ct-bg-surface: #ffffff;
-      --ct-bg-muted: #f8f9fa;
-      --ct-border: #e2e8f0;
-    }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #f8f7f5;
-      color: #1e293b;
-      line-height: 1.5;
-    }
+    /* === TABS-SPECIFIC OVERRIDES === */
     .header {
       background: linear-gradient(135deg, #1a2744 0%, #2a3f5f 100%);
       padding: 24px 32px;
@@ -46,7 +52,6 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     .header-inner {
       max-width: 1400px;
       margin: 0 auto;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     .main-layout {
       max-width: 1400px;
@@ -575,8 +580,18 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       min-height: 24px; cursor: pointer;
     }
     .insight-md-rendered:empty::after {
-      content: "Click to add insight (supports **bold**, *italic*, - bullets, ## headings)";
-      color: #b0bec5; font-style: italic;
+      content: "+";
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 1.5px dashed #cbd5e1;
+      color: #cbd5e1;
+      font-size: 14px;
+      font-weight: 400;
+      font-style: normal;
     }
     .insight-md-rendered h2 { font-size: 15px; font-weight: 600; margin: 8px 0 4px; color: #1e293b; }
     .insight-md-rendered p { margin: 4px 0; }
@@ -760,7 +775,10 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       min-height: 24px; cursor: pointer;
     }
     .qual-md-rendered:empty::after {
-      content: "Double-click to add content..."; color: #94a3b8; font-style: italic;
+      content: "Click to add content";
+      color: #cbd5e1;
+      font-style: italic;
+      font-size: 13px;
     }
     .qual-md-rendered h2 { font-size: 16px; font-weight: 600; margin: 12px 0 6px; color: #1e293b; }
     .qual-md-rendered p { margin: 6px 0; }
@@ -775,9 +793,12 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
   '
 
   # Replace BRAND and ACCENT placeholders with actual colours
-  css_text <- paste0(css_layout, css_tables, css_closing, css_qualitative)
-  css_text <- gsub("ACCENT", ac, css_text, fixed = TRUE)
-  css_text <- gsub("BRAND", bc, css_text, fixed = TRUE)
+  tabs_css <- paste0(css_layout, css_tables, css_closing, css_qualitative)
+  tabs_css <- gsub("ACCENT", ac, tabs_css, fixed = TRUE)
+  tabs_css <- gsub("BRAND", bc, tabs_css, fixed = TRUE)
+
+  # Combine: shared base CSS first, then tabs-specific overrides
+  css_text <- paste0(base_css, "\n\n/* === TABS MODULE STYLES === */\n", tabs_css)
 
   htmltools::tags$style(htmltools::HTML(css_text))
 }
