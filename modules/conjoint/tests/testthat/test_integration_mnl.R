@@ -107,14 +107,14 @@ if (is.null(turas_root)) {
     expect_true("Attribute" %in% names(utils_df))
     expect_true("Level"     %in% names(utils_df))
     expect_true("Utility"   %in% names(utils_df))
-    expect_true("SE"        %in% names(utils_df))
+    expect_true("Std_Error" %in% names(utils_df))
 
     # Must have rows
     expect_gt(nrow(utils_df), 0)
 
-    # Utility and SE should be numeric
+    # Utility and Std_Error should be numeric
     expect_true(is.numeric(utils_df$Utility))
-    expect_true(is.numeric(utils_df$SE))
+    expect_true(is.numeric(utils_df$Std_Error))
 
     # There should be multiple attributes
     expect_gte(length(unique(utils_df$Attribute)), 2)
