@@ -53,17 +53,17 @@ This ensures that when users run the Shiny app and encounter errors, they can se
 
 | Module | Purpose | Status | Quality Score |
 |--------|---------|--------|---------------|
-| **AlchemerParser** | Parse Alchemer exports, generate configs | Production | 90/100 |
+| **AlchemerParser** | Parse Alchemer exports, generate configs, detect routing | Production | 85/100 |
 | **catdriver** | Categorical driver analysis (SHAP, regression) | Production | 92/100 |
-| **confidence** | Confidence intervals (Wilson, bootstrap, weighted) | Production | 90/100 |
+| **confidence** | Confidence intervals (Wilson, bootstrap, weighted) | Production | 91/100 |
 | **conjoint** | Choice-based conjoint analysis (HB, utilities) | Production | 91/100 |
 | **keydriver** | Key driver correlation analysis | Production | 93/100 |
-| **maxdiff** | MaxDiff estimation (HB & aggregate) | Production | 90/100 |
+| **maxdiff** | MaxDiff estimation (HB & aggregate) | Production | 91/100 |
 | **pricing** | Price sensitivity & optimization | Production | 90/100 |
-| **segment** | Clustering & segmentation | Production | 85/100 |
-| **tabs** | Cross-tabulation & significance testing | Production | 85/100 |
-| **tracker** | Longitudinal tracking & trend analysis | Production | 85/100 |
-| **weighting** | Sample weighting & rim weighting | Production | 85/100 |
+| **segment** | Clustering & segmentation | Production | 86/100 |
+| **tabs** | Cross-tabulation & significance testing | Production | 90/100 |
+| **tracker** | Longitudinal tracking & trend analysis | Production | 87/100 |
+| **weighting** | Sample weighting & rim weighting | Production | 86/100 |
 | **shared** | Common utilities (not counted in 11) | Utility | - |
 
 ### Standard Module Pattern

@@ -320,7 +320,7 @@ run_weighting_gui <- function(launch_browser = TRUE) {
 
     # Recent folders file location (persistent across sessions)
     # Use user's home directory to persist between sessions
-    recent_folders_file <- file.path(fs::path_home(), ".turas_weighting_recent_folders.rds")
+    recent_folders_file <- file.path(path.expand("~"), ".turas_weighting_recent_folders.rds")
 
     # Load recent folders on startup
     observe({

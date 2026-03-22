@@ -1257,8 +1257,10 @@ chi_square_test <- function(observed_matrix, min_expected = 5, alpha = 0.05) {
     # Check expected frequencies (delegated to helper)
     warning_msg <- check_expected_frequencies(expected_matrix, min_expected)
 
-    # Compute chi-square statistic
-    chi_sq <- sum((observed_matrix - expected_matrix)^2 / expected_matrix)
+    # Compute chi-square statistic (guard against zero expected frequencies)
+    expected_safe <- expected_matrix
+    expected_safe[expected_safe == 0] <- NA
+    chi_sq <- sum((observed_matrix - expected_matrix)^2 / expected_safe, na.rm = TRUE)
 
     # Degrees of freedom
     df <- (nrow(observed_matrix) - 1) * (ncol(observed_matrix) - 1)

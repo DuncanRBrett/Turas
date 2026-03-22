@@ -118,7 +118,10 @@ load_tracking_config <- function(config_path) {
   for (date_col in c("FieldworkStart", "FieldworkEnd")) {
     if (date_col %in% names(waves)) {
       vals <- waves[[date_col]]
-      if (is.numeric(vals)) {
+      if (inherits(vals, "POSIXct") || inherits(vals, "POSIXlt")) {
+        # POSIXct from openxlsx detectDates = TRUE
+        waves[[date_col]] <- as.Date(vals)
+      } else if (is.numeric(vals)) {
         # Numeric YYYYMMDD format (e.g. 20250916)
         waves[[date_col]] <- as.Date(as.character(as.integer(vals)), format = "%Y%m%d")
       } else if (is.character(vals)) {
@@ -129,6 +132,18 @@ load_tracking_config <- function(config_path) {
           parsed[still_na] <- as.Date(vals[still_na], format = "%Y%m%d")
         }
         waves[[date_col]] <- parsed
+      }
+    }
+  }
+
+  # Validate date parsing succeeded — catch malformed dates that silently become NA
+  for (date_col in c("FieldworkStart", "FieldworkEnd")) {
+    if (date_col %in% names(waves)) {
+      na_dates <- which(is.na(waves[[date_col]]))
+      if (length(na_dates) > 0) {
+        bad_waves <- waves$WaveID[na_dates]
+        cat(sprintf("\n[TURAS WARNING] %s could not be parsed for wave(s): %s. Check date format (expected YYYY-MM-DD or YYYYMMDD).\n",
+            date_col, paste(bad_waves, collapse = ", ")))
       }
     }
   }

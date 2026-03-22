@@ -167,8 +167,10 @@ var HubApp = (function() {
     var shiny = findShiny();
     if (shiny && shiny.setInputValue) {
       shiny.setInputValue(name, value, { priority: "event" });
+      return true;
     } else {
       console.warn("[Hub App] Shiny not available, cannot send:", name);
+      return false;
     }
   }
 

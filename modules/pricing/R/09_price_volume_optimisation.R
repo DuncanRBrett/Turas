@@ -154,6 +154,17 @@ find_constrained_optimal <- function(demand_curve, objective = c("revenue", "pro
     idx <- which.max(feasible_prices$profit_index)
   }
 
+  if (length(idx) == 0) {
+    return(data.frame(
+      price = NA_real_,
+      revenue_index = NA_real_,
+      profit_index = NA_real_,
+      volume = NA_real_,
+      feasible = FALSE,
+      objective = objective,
+      stringsAsFactors = FALSE
+    ))
+  }
   result <- feasible_prices[idx, , drop = FALSE]
   result$feasible <- TRUE
   result$objective <- objective

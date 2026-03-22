@@ -33,7 +33,7 @@ weighted_cor <- function(x, y, w) {
   my <- sum(w * y)
   sx <- sqrt(sum(w * (x - mx)^2))
   sy <- sqrt(sum(w * (y - my)^2))
-  if (sx == 0 || sy == 0) return(NA_real_)
+  if (sx < 1e-10 || sy < 1e-10) return(NA_real_)
   weighted_cov(x, y, w) / (sx * sy)
 }
 

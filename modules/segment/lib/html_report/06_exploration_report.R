@@ -554,7 +554,7 @@ build_seg_exploration_page <- function(html_data, tables, charts, config) {
           htmltools::tags$meta(name = "turas-report-type", content = "segment-exploration"),
           htmltools::tags$meta(name = "turas-module-version", content = "11.0"),
           htmltools::tags$title(paste(report_title, "- K Selection Report")),
-          css,
+          htmltools::tags$style(htmltools::HTML(css)),
           exploration_css
         ),
         htmltools::tags$body(

@@ -11,23 +11,33 @@
 # ==============================================================================
 
 early_refuse <- function(code, title, problem, why_it_matters, how_to_fix) {
-  msg <- paste0(
-    "\n", strrep("=", 80), "\n",
-    "  [REFUSE] ", code, ": ", title, "\n",
-    strrep("=", 80), "\n\n",
-    "Problem:\n",
-    "  ", problem, "\n\n",
-    "Why it matters:\n",
-    "  ", why_it_matters, "\n\n",
-    "How to fix:\n"
-  )
-
+  cat("\n", strrep("=", 80), "\n", sep = "")
+  cat("  [REFUSE] ", code, ": ", title, "\n", sep = "")
+  cat(strrep("=", 80), "\n\n", sep = "")
+  cat("Problem:\n")
+  cat("  ", problem, "\n\n", sep = "")
+  cat("Why it matters:\n")
+  cat("  ", why_it_matters, "\n\n", sep = "")
+  cat("How to fix:\n")
   for (i in seq_along(how_to_fix)) {
-    msg <- paste0(msg, "  ", i, ". ", how_to_fix[i], "\n")
+    cat("  ", i, ". ", how_to_fix[i], "\n", sep = "")
   }
+  cat("\n", strrep("=", 80), "\n\n", sep = "")
 
-  msg <- paste0(msg, "\n", strrep("=", 80), "\n")
-  stop(msg, call. = FALSE)
+  # Build a TRS-style condition and signal it (preserves class for upstream handlers)
+  cond <- structure(
+    class = c("turas_refusal", "error", "condition"),
+    list(
+      message = paste0("[", code, "] ", title, ": ", problem),
+      code = code,
+      title = title,
+      problem = problem,
+      why_it_matters = why_it_matters,
+      how_to_fix = how_to_fix,
+      call = NULL
+    )
+  )
+  stop(cond)
 }
 
 run_report_hub_gui <- function() {
@@ -384,8 +394,20 @@ run_report_hub_gui <- function() {
 
         result <- tryCatch({
           combine_reports(config_path())
+        }, turas_refusal = function(e) {
+          list(
+            status = "REFUSED",
+            code = e$code %||% "UNKNOWN",
+            message = conditionMessage(e),
+            how_to_fix = e$how_to_fix %||% "Check the console output above for details"
+          )
         }, error = function(e) {
-          list(status = "REFUSED", message = e$message)
+          list(
+            status = "REFUSED",
+            code = "CALC_UNEXPECTED_ERROR",
+            message = e$message,
+            how_to_fix = "Check the console output for details and report this as a bug if it persists"
+          )
         }, finally = {
           sink(type = "output")
         })

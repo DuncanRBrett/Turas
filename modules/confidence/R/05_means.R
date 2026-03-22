@@ -403,14 +403,25 @@ bootstrap_mean_ci <- function(values, weights = NULL, B = 5000,
     method <- "Bootstrap (percentile)"
   }
 
+  # Guard against NaN bootstrap iterations (e.g., zero-weight resamples)
+  valid_boots <- boot_means[is.finite(boot_means)]
+  if (length(valid_boots) < B * 0.5) {
+    return(list(
+      status = "REFUSED",
+      code = "CALC_BOOTSTRAP_FAILED",
+      message = sprintf("Too many bootstrap iterations produced invalid results (%d of %d).", B - length(valid_boots), B),
+      how_to_fix = "Check data for extreme weights or insufficient variation."
+    ))
+  }
+
   # Calculate percentile confidence interval
   alpha <- 1 - conf_level
-  lower <- quantile(boot_means, alpha/2, names = FALSE)
-  upper <- quantile(boot_means, 1 - alpha/2, names = FALSE)
+  lower <- quantile(valid_boots, alpha/2, names = FALSE)
+  upper <- quantile(valid_boots, 1 - alpha/2, names = FALSE)
 
   # Bootstrap statistics
-  boot_se <- sd(boot_means)
-  boot_mean <- mean(boot_means)
+  boot_se <- sd(valid_boots)
+  boot_mean <- mean(valid_boots)
 
   return(list(
     lower = lower,

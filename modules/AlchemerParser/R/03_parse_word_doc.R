@@ -50,8 +50,40 @@ parse_word_questionnaire <- function(file_path, verbose = FALSE) {
   }
 
   # Read Word document
-  doc <- officer::read_docx(file_path)
-  doc_content <- officer::docx_summary(doc)
+  doc <- tryCatch(
+    officer::read_docx(file_path),
+    error = function(e) {
+      alchemerparser_refuse(
+        code = "IO_FILE_CORRUPT",
+        title = "Cannot Read Word Questionnaire",
+        problem = sprintf("Failed to parse Word document: %s", e$message),
+        why_it_matters = "The Word questionnaire file may be corrupted, password-protected, or in an unsupported format (.doc instead of .docx).",
+        how_to_fix = c(
+          "Ensure the file is a valid .docx file (not .doc)",
+          "Check the file is not password-protected or corrupted",
+          "Try re-exporting the questionnaire from Alchemer",
+          "Open and re-save the file in Word to repair it"
+        ),
+        details = paste0("File: ", file_path)
+      )
+    }
+  )
+  doc_content <- tryCatch(
+    officer::docx_summary(doc),
+    error = function(e) {
+      alchemerparser_refuse(
+        code = "IO_FILE_CORRUPT",
+        title = "Cannot Parse Word Document Content",
+        problem = sprintf("Word document opened but content extraction failed: %s", e$message),
+        why_it_matters = "The document structure may be damaged or use unsupported formatting.",
+        how_to_fix = c(
+          "Open the file in Word and re-save as .docx",
+          "Try exporting a fresh copy from Alchemer"
+        ),
+        details = paste0("File: ", file_path)
+      )
+    }
+  )
 
   # Filter to text paragraphs AND table cells (for grid questions)
   text_paras <- doc_content[doc_content$content_type %in% c("paragraph", "table cell"), ]
@@ -94,6 +126,7 @@ parse_word_questionnaire <- function(file_path, verbose = FALSE) {
         brackets = NA_character_,
         type = NA_character_,
         has_rank_keyword = FALSE,
+        has_routing_hint = FALSE,
         full_text = text
       )
     }
@@ -129,6 +162,11 @@ parse_word_questionnaire <- function(file_path, verbose = FALSE) {
       # Check for ranking keyword
       if (grepl("rank", text_lower)) {
         current_hint$has_rank_keyword <- TRUE
+      }
+
+      # Check for routing/skip logic keywords
+      if (grepl("\\bif\\s+q\\.?\\s*\\d+|ask\\s+if|show\\s+if|skip\\s+to|go\\s+to|based\\s+on|those\\s+who|routing|filter|screener|qualifier", text_lower, perl = TRUE)) {
+        current_hint$has_routing_hint <- TRUE
       }
 
       # Append to full text
@@ -170,6 +208,7 @@ get_hint_for_question <- function(q_num, word_hints) {
     question_text = NA_character_,
     brackets = NA_character_,
     type = NA_character_,
-    has_rank_keyword = FALSE
+    has_rank_keyword = FALSE,
+    has_routing_hint = FALSE
   ))
 }

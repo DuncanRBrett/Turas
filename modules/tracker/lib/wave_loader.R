@@ -673,19 +673,39 @@ apply_wave_weights <- function(wave_df, weight_var, wave_id) {
   weights <- wave_df[[weight_var]]
 
   # Validate weights
-  if (any(is.na(weights))) {
-    n_missing <- sum(is.na(weights))
+  n_total <- length(weights)
+  n_missing <- sum(is.na(weights))
+  n_invalid <- sum(weights[!is.na(weights)] <= 0)
+  n_bad <- n_missing + n_invalid
+  pct_bad <- if (n_total > 0) 100 * n_bad / n_total else 0
+
+  if (n_missing > 0) {
     cat("[WARNING]", paste0("Wave ", wave_id, ": ", n_missing, " records have missing weights (will be excluded)"), "\n")
   }
 
-  if (any(weights[!is.na(weights)] <= 0)) {
-    n_invalid <- sum(weights[!is.na(weights)] <= 0)
+  if (n_invalid > 0) {
     cat("[WARNING]", paste0("Wave ", wave_id, ": ", n_invalid, " records have zero or negative weights (will be excluded)"), "\n")
     # Actually exclude invalid weights by setting to NA (use which() to avoid NA issues)
     invalid_idx <- which(!is.na(weights) & weights <= 0)
     if (length(invalid_idx) > 0) {
       weights[invalid_idx] <- NA
     }
+  }
+
+  # Refuse if too many weights are invalid (>20% threshold)
+  if (pct_bad > 20) {
+    tracker_refuse(
+      code = "DATA_INVALID_WEIGHTS",
+      title = "Too Many Invalid Weights",
+      problem = sprintf("Wave '%s': %.1f%% of records (%d of %d) have missing or invalid weights.",
+                        wave_id, pct_bad, n_bad, n_total),
+      why_it_matters = "With more than 20%% of weights invalid, weighted results will not be representative of the target population.",
+      how_to_fix = c(
+        "Check the weight variable in the data file for missing or invalid values",
+        "Re-run the weighting module to generate valid weights",
+        "If unweighted analysis is acceptable, remove the WeightVariable from config"
+      )
+    )
   }
 
   # Create standardized weight column

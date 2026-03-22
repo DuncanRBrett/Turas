@@ -463,8 +463,8 @@ validate_mean_data <- function(values, variable_name, guard) {
     guard <- guard_record_small_sample(guard, variable_name, length(valid_values))
   }
 
-  # Check for zero variance
-  if (sd(valid_values) == 0) {
+  # Check for zero or near-zero variance (tolerance-based for floating-point safety)
+  if (sd(valid_values) < 1e-10) {
     guard <- guard_flag_stability(guard, paste0("Zero variance in ", variable_name))
   }
 

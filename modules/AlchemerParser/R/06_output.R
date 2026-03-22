@@ -94,6 +94,21 @@ generate_output_files <- function(questions, project_name, output_dir,
                     rows = 1, cols = 1:ncol(survey_data$options),
                     gridExpand = TRUE)
 
+  # Routing sheet (if routing was detected)
+  routing_summary <- build_routing_summary(questions)
+  if (nrow(routing_summary) > 0) {
+    openxlsx::addWorksheet(wb_survey, "Routing")
+    openxlsx::writeData(wb_survey, "Routing", routing_summary,
+                       startRow = 1, startCol = 1, colNames = TRUE)
+    openxlsx::addStyle(wb_survey, "Routing",
+                      style = openxlsx::createStyle(textDecoration = "bold"),
+                      rows = 1, cols = 1:ncol(routing_summary),
+                      gridExpand = TRUE)
+    if (verbose) {
+      cat(sprintf("  Added Routing sheet (%d routed questions)\n", nrow(routing_summary)))
+    }
+  }
+
   openxlsx::saveWorkbook(wb_survey, survey_file, overwrite = TRUE)
 
   # ===========================================================================

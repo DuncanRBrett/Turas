@@ -249,8 +249,8 @@ calculate_cohens_f2 <- function(r_squared_full, r_squared_reduced) {
     )
   }
 
-  # Edge case: full model R-squared is 1 (perfect fit)
-  if (r_squared_full == 1) {
+  # Edge case: full model R-squared is 1 or near-1 (perfect fit)
+  if (r_squared_full >= 1 - 1e-10) {
     r2_diff <- r_squared_full - r_squared_reduced
     if (r2_diff > 0) {
       return(Inf)

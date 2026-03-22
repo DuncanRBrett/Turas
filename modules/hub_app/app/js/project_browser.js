@@ -1,15 +1,37 @@
 /**
  * Turas Hub App — Project Browser
  *
- * Renders project cards in a grid layout. Each card shows the project name,
- * path, report count, types, and last modified date. Clicking a card
- * tells the R backend to open that project.
+ * Renders project tiles in a responsive grid. Each tile shows the project
+ * name, coloured module badges (with counts), total report count, and
+ * relative last-modified date.
  */
 
 var ProjectBrowser = (function() {
   "use strict";
 
   var allProjects = [];
+
+  // --- Module type mapping ---
+  // Maps raw turas-report-type values to a display group.
+  // Sub-types (e.g. "segment-exploration") roll up to their parent module.
+  var TYPE_MAP = {
+    "tabs":                  { label: "Tabs",        badge: "tabs" },
+    "tracker":               { label: "Tracker",     badge: "tracker" },
+    "segment":               { label: "Segment",     badge: "segment" },
+    "segment-exploration":   { label: "Segment",     badge: "segment" },
+    "segment-combined":      { label: "Segment",     badge: "segment" },
+    "maxdiff":               { label: "MaxDiff",     badge: "maxdiff" },
+    "conjoint":              { label: "Conjoint",     badge: "conjoint" },
+    "pricing":               { label: "Pricing",     badge: "pricing" },
+    "pricing-simulator":     { label: "Pricing",     badge: "pricing" },
+    "confidence":            { label: "Confidence",  badge: "confidence" },
+    "keydriver":             { label: "Key Driver",  badge: "keydriver" },
+    "catdriver":             { label: "Cat Driver",  badge: "catdriver" },
+    "catdriver-unified":     { label: "Cat Driver",  badge: "catdriver" },
+    "catdriver-comparison":  { label: "Cat Driver",  badge: "catdriver" },
+    "hub":                   { label: "Hub",         badge: "default" },
+    "weighting":             { label: "Weighting",   badge: "weighting" }
+  };
 
   /**
    * Render the project grid from an array of project objects.
@@ -23,7 +45,6 @@ var ProjectBrowser = (function() {
     var loading = HubApp.dom.projectLoading;
     var count = HubApp.dom.projectCount;
 
-    // Hide loading
     if (loading) loading.style.display = "none";
 
     if (allProjects.length === 0) {
@@ -38,75 +59,142 @@ var ProjectBrowser = (function() {
     if (count) count.textContent = allProjects.length + " project" +
       (allProjects.length !== 1 ? "s" : "");
 
-    // Build card HTML
     var html = "";
     for (var i = 0; i < allProjects.length; i++) {
-      html += buildProjectCard(allProjects[i]);
+      html += buildTile(allProjects[i]);
     }
     grid.innerHTML = html;
 
     // Bind click handlers
-    var cards = grid.querySelectorAll(".project-card");
-    for (var c = 0; c < cards.length; c++) {
-      cards[c].addEventListener("click", handleCardClick);
+    var tiles = grid.querySelectorAll(".project-tile");
+    for (var c = 0; c < tiles.length; c++) {
+      tiles[c].addEventListener("click", handleTileClick);
     }
   }
 
   /**
-   * Build HTML string for a single project card.
-   * @param {object} project - Project object from R
+   * Build HTML for a single project tile.
+   * @param {object} project - Project object from R scanner
    * @returns {string} HTML string
    */
-  function buildProjectCard(project) {
+  function buildTile(project) {
     var reportCount = project.report_count || 0;
-    var types = getUniqueTypes(project.reports || []);
-    var typeBadges = "";
-    for (var t = 0; t < types.length; t++) {
-      typeBadges += '<span class="type-badge">' + escapeHtml(types[t]) + '</span>';
-    }
+    var modules = groupByModule(project.reports || []);
+    var badgesHtml = buildModuleBadges(modules);
+    var timeAgo = relativeTime(project.last_modified || "");
 
-    // Shorten path for display
-    var displayPath = project.path || "";
-    var home = "";
-    try {
-      // Try to detect home directory from path
-      var parts = displayPath.split("/");
-      if (parts.length > 3 && parts[1] === "Users") {
-        displayPath = "~/" + parts.slice(3).join("/");
-      }
-    } catch (e) { /* keep original */ }
-
-    return '<div class="project-card" data-path="' + escapeAttr(project.path) + '">' +
-      '<div class="project-card-name">' + escapeHtml(project.name) + '</div>' +
-      '<div class="project-card-path">' + escapeHtml(displayPath) + '</div>' +
-      '<div class="project-card-meta">' +
-        '<div class="project-card-meta-item">' +
-          '<span class="meta-dot"></span>' +
+    return '<div class="project-tile" data-path="' + escapeAttr(project.path) + '">' +
+      '<div class="tile-name">' + escapeHtml(project.name) + '</div>' +
+      (badgesHtml ? '<div class="tile-badges">' + badgesHtml + '</div>' : '') +
+      '<div class="tile-meta">' +
+        '<span class="tile-meta-item">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+            '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>' +
+            '<polyline points="14 2 14 8 20 8"/>' +
+          '</svg>' +
           reportCount + ' report' + (reportCount !== 1 ? 's' : '') +
-        '</div>' +
-        '<div class="project-card-meta-item">' +
-          escapeHtml(project.total_size_label || '') +
-        '</div>' +
-        '<div class="project-card-meta-item">' +
-          escapeHtml(project.last_modified || '') +
-        '</div>' +
+        '</span>' +
+        (timeAgo
+          ? '<span class="tile-meta-item">' +
+              '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+                '<circle cx="12" cy="12" r="10"/>' +
+                '<polyline points="12 6 12 12 16 14"/>' +
+              '</svg>' +
+              escapeHtml(timeAgo) +
+            '</span>'
+          : '') +
       '</div>' +
-      (typeBadges ? '<div class="project-card-types">' + typeBadges + '</div>' : '') +
     '</div>';
   }
 
   /**
-   * Handle click on a project card.
-   * Sends the project path to R to open it.
+   * Group reports by their parent module type.
+   * Returns array of { label, badge, count } sorted by count desc.
    */
-  function handleCardClick() {
+  function groupByModule(reports) {
+    var groups = {};
+
+    for (var i = 0; i < reports.length; i++) {
+      var rawType = (reports[i].type || "").toLowerCase();
+      var mapped = TYPE_MAP[rawType] || { label: rawType, badge: "default" };
+      var key = mapped.badge;
+
+      if (!groups[key]) {
+        groups[key] = { label: mapped.label, badge: mapped.badge, count: 0 };
+      }
+      groups[key].count++;
+    }
+
+    // Convert to sorted array (highest count first)
+    var arr = [];
+    for (var k in groups) {
+      arr.push(groups[k]);
+    }
+    arr.sort(function(a, b) { return b.count - a.count; });
+    return arr;
+  }
+
+  /**
+   * Build coloured badge HTML for module groups.
+   * Shows count in badge when > 1 (e.g. "Tabs (3)").
+   */
+  function buildModuleBadges(modules) {
+    var html = "";
+    for (var i = 0; i < modules.length; i++) {
+      var m = modules[i];
+      var text = m.label;
+      if (m.count > 1) text += " (" + m.count + ")";
+      html += '<span class="tile-badge tile-badge-' + m.badge + '">' +
+        escapeHtml(text) + '</span>';
+    }
+    return html;
+  }
+
+  /**
+   * Convert a date string like "2026-03-20 14:30" to relative text.
+   * Falls back to the raw string if parsing fails.
+   */
+  function relativeTime(dateStr) {
+    if (!dateStr) return "";
+    try {
+      var d = new Date(dateStr.replace(" ", "T"));
+      if (isNaN(d.getTime())) return dateStr;
+
+      var now = Date.now();
+      var diffMs = now - d.getTime();
+      if (diffMs < 0) return dateStr;
+
+      var mins = Math.floor(diffMs / 60000);
+      if (mins < 1) return "Just now";
+      if (mins < 60) return mins + " min" + (mins !== 1 ? "s" : "") + " ago";
+
+      var hrs = Math.floor(mins / 60);
+      if (hrs < 24) return hrs + " hour" + (hrs !== 1 ? "s" : "") + " ago";
+
+      var days = Math.floor(hrs / 24);
+      if (days === 1) return "Yesterday";
+      if (days < 7) return days + " days ago";
+      if (days < 30) {
+        var weeks = Math.floor(days / 7);
+        return weeks + " week" + (weeks !== 1 ? "s" : "") + " ago";
+      }
+
+      // Older than a month — show the date
+      return dateStr.split(" ")[0];
+    } catch (e) {
+      return dateStr;
+    }
+  }
+
+  /**
+   * Handle click on a project tile.
+   */
+  function handleTileClick() {
     var path = this.getAttribute("data-path");
     if (!path) return;
 
-    // Show loading state in the reports view
     var title = HubApp.dom.projectTitle;
     if (title) {
-      // Find project name from our data
       for (var i = 0; i < allProjects.length; i++) {
         if (allProjects[i].path === path) {
           title.textContent = allProjects[i].name;
@@ -121,31 +209,27 @@ var ProjectBrowser = (function() {
 
   /**
    * Filter displayed projects by search text.
-   * @param {string} query - Search string
+   * Matches against name, path, and module types.
    */
   function filter(query) {
     query = (query || "").toLowerCase().trim();
 
     var grid = HubApp.dom.projectGrid;
-    var cards = grid.querySelectorAll(".project-card");
-
+    var tiles = grid.querySelectorAll(".project-tile");
     var visibleCount = 0;
 
-    for (var i = 0; i < cards.length; i++) {
-      var name = (cards[i].querySelector(".project-card-name") || {}).textContent || "";
-      var path = (cards[i].querySelector(".project-card-path") || {}).textContent || "";
-      var types = (cards[i].querySelector(".project-card-types") || {}).textContent || "";
+    for (var i = 0; i < tiles.length; i++) {
+      var name = (tiles[i].querySelector(".tile-name") || {}).textContent || "";
+      var badges = (tiles[i].querySelector(".tile-badges") || {}).textContent || "";
 
       var match = !query ||
         name.toLowerCase().indexOf(query) !== -1 ||
-        path.toLowerCase().indexOf(query) !== -1 ||
-        types.toLowerCase().indexOf(query) !== -1;
+        badges.toLowerCase().indexOf(query) !== -1;
 
-      cards[i].style.display = match ? "" : "none";
+      tiles[i].style.display = match ? "" : "none";
       if (match) visibleCount++;
     }
 
-    // Update count
     var count = HubApp.dom.projectCount;
     if (count) {
       if (query) {
@@ -156,61 +240,24 @@ var ProjectBrowser = (function() {
       }
     }
 
-    // Show empty state if no matches
     var empty = HubApp.dom.projectEmpty;
     if (empty) {
       empty.style.display = (visibleCount === 0 && allProjects.length > 0) ? "" : "none";
     }
   }
 
-  /**
-   * Extract unique report types from a reports array.
-   * @param {Array} reports
-   * @returns {Array} Unique type strings
-   */
-  function getUniqueTypes(reports) {
-    var seen = {};
-    var types = [];
-    for (var i = 0; i < reports.length; i++) {
-      var t = reports[i].type;
-      if (t && !seen[t]) {
-        seen[t] = true;
-        types.push(t);
-      }
-    }
-    return types;
-  }
-
-  /**
-   * Escape HTML special characters.
-   * @param {string} str
-   * @returns {string}
-   */
   function escapeHtml(str) {
     if (!str) return "";
-    return str
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
-  /**
-   * Escape a string for use in an HTML attribute.
-   * @param {string} str
-   * @returns {string}
-   */
   function escapeAttr(str) {
     if (!str) return "";
-    return str
-      .replace(/&/g, "&amp;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+    return str.replace(/&/g, "&amp;").replace(/"/g, "&quot;")
+              .replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
-  // --- Public API ---
   return {
     render: render,
     filter: filter

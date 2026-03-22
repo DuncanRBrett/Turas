@@ -82,8 +82,9 @@ var ReportViewer = (function() {
       iframe.id = "report-iframe-" + key;
       iframe.setAttribute("data-key", key);
       iframe.setAttribute("data-url", report.url);
-      iframe.setAttribute("sandbox",
-        "allow-scripts allow-same-origin allow-popups allow-forms");
+      // No sandbox — reports are trusted Turas content served same-origin.
+      // Sandbox would block downloads, clipboard, modals, and other
+      // functionality the reports rely on.
       container.appendChild(iframe);
 
       // Track state

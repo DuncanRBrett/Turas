@@ -336,6 +336,7 @@ create_boxcat_single_indices <- function(data, banner_code, banner_data_info) {
     internal_key <- banner_data_info$internal_keys[box_cat_idx]
     
     # OR across options in category
+    if (length(option_texts) == 0) next
     matching_rows <- Reduce(`|`, lapply(option_texts, function(opt) {
       safe_equal(data[[banner_code]], opt) & !is.na(data[[banner_code]])
     }))

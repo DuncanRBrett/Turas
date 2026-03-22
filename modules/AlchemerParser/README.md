@@ -20,9 +20,9 @@ detection, code generation, and grid handling.
 
 **Status:** ✅ Production Ready
 
-**Version:** 1.0
+**Version:** 1.1
 
-**Last Updated:** 2025-11-20
+**Last Updated:** 2026-03-22
 
 ------------------------------------------------------------------------
 
@@ -38,6 +38,11 @@ Star rating grids - Automatic pivoting and code generation
 ✅ **Smart Code Generation** - Standardized question codes (Q01, Q02a,
 Q04_1) - Automatic padding for large surveys - Other/specify field
 detection
+
+✅ **Routing & Skip Logic Detection** - Detects conditional
+display patterns from questionnaire text - Identifies question
+dependencies (e.g., "If Q2 = Yes") - Exports routing metadata
+to Survey_Structure Routing sheet
 
 ✅ **Validation & Review** - Flags ambiguous questions - Identifies
 missing data - Text consistency checks

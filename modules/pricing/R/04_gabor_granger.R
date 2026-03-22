@@ -882,18 +882,25 @@ calculate_price_elasticity <- function(demand_curve) {
 
   # Arc elasticity formula
   # E = ((Q2-Q1)/((Q2+Q1)/2)) / ((P2-P1)/((P2+P1)/2))
-  elasticity$pct_change_demand <- (elasticity$demand_to - elasticity$demand_from) /
-    ((elasticity$demand_to + elasticity$demand_from) / 2)
+  demand_avg <- (elasticity$demand_to + elasticity$demand_from) / 2
+  price_avg <- (elasticity$price_to + elasticity$price_from) / 2
 
-  elasticity$pct_change_price <- (elasticity$price_to - elasticity$price_from) /
-    ((elasticity$price_to + elasticity$price_from) / 2)
+  elasticity$pct_change_demand <- ifelse(abs(demand_avg) < 1e-10, NA_real_,
+    (elasticity$demand_to - elasticity$demand_from) / demand_avg)
 
-  elasticity$arc_elasticity <- elasticity$pct_change_demand / elasticity$pct_change_price
+  elasticity$pct_change_price <- ifelse(abs(price_avg) < 1e-10, NA_real_,
+    (elasticity$price_to - elasticity$price_from) / price_avg)
+
+  elasticity$arc_elasticity <- ifelse(
+    is.na(elasticity$pct_change_price) | abs(elasticity$pct_change_price) < 1e-10,
+    NA_real_,
+    elasticity$pct_change_demand / elasticity$pct_change_price)
 
   # Classify elasticity
   elasticity$elasticity_type <- ifelse(
-    abs(elasticity$arc_elasticity) > 1, "Elastic",
-    ifelse(abs(elasticity$arc_elasticity) < 1, "Inelastic", "Unit Elastic")
+    is.na(elasticity$arc_elasticity), "Undefined",
+    ifelse(abs(elasticity$arc_elasticity) > 1, "Elastic",
+    ifelse(abs(elasticity$arc_elasticity) < 1, "Inelastic", "Unit Elastic"))
   )
 
   return(elasticity)

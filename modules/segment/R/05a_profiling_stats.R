@@ -144,8 +144,8 @@ calculate_index_scores <- function(data, clusters, variables) {
     # Overall mean
     overall_mean <- mean(var_data, na.rm = TRUE)
     
-    if (overall_mean == 0) {
-      # Avoid division by zero
+    if (!is.finite(overall_mean) || abs(overall_mean) < 1e-10) {
+      # Avoid division by zero or near-zero
       next
     }
     

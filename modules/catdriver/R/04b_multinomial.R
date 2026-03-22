@@ -216,7 +216,8 @@ run_multinomial_logistic_robust <- function(formula, data, weights = NULL, confi
   pred_class <- predict(model, type = "class")
 
   confusion <- table(Actual = data[[config$outcome_var]], Predicted = pred_class)
-  accuracy <- sum(diag(confusion)) / sum(confusion)
+  total_obs <- sum(confusion)
+  accuracy <- if (total_obs > 0) sum(diag(confusion)) / total_obs else NA_real_
 
   list(
     model = model,

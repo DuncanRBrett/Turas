@@ -495,12 +495,20 @@ fit_approximate_hb <- function(long_data, items, config, verbose = TRUE) {
   pop_mean <- colMeans(resp_wide[, -1], na.rm = TRUE)
   pop_var <- apply(resp_wide[, -1], 2, var, na.rm = TRUE)
 
+  # Replace NaN/NA/Inf variances with 0 (occurs when only 0 or 1 unique values per item)
+  pop_var[is.na(pop_var) | !is.finite(pop_var)] <- 0
+
   # Estimate individual variance (within-respondent noise)
   # Use average across items
   within_var <- mean(pop_var, na.rm = TRUE) / n_resp
 
   # Shrinkage factor (James-Stein type)
-  shrinkage <- pop_var / (pop_var + within_var)
+  # Guard against division by zero when both pop_var and within_var are 0
+  shrinkage <- ifelse(pop_var + within_var > 0,
+                      pop_var / (pop_var + within_var),
+                      0)
+  # Clip to valid [0, 1] range for numerical safety
+  shrinkage <- pmax(0, pmin(1, shrinkage))
 
   # Apply shrinkage to individual scores
   individual_utilities <- resp_wide
@@ -511,13 +519,17 @@ fit_approximate_hb <- function(long_data, items, config, verbose = TRUE) {
     }
   }
 
-  # Population utilities
+  # Population utilities (guard against items not in data)
+  safe_mean <- pop_mean[included_items]
+  safe_mean[is.na(safe_mean)] <- 0
+  safe_var <- pop_var[included_items]
+  safe_var[is.na(safe_var)] <- 0
   population_utilities <- data.frame(
     Item_ID = included_items,
-    HB_Utility_Mean = pop_mean[included_items],
-    HB_Utility_SD = sqrt(pop_var[included_items]),
-    HB_Utility_Q5 = pop_mean[included_items] - 1.645 * sqrt(pop_var[included_items]),
-    HB_Utility_Q95 = pop_mean[included_items] + 1.645 * sqrt(pop_var[included_items]),
+    HB_Utility_Mean = safe_mean,
+    HB_Utility_SD = sqrt(safe_var),
+    HB_Utility_Q5 = safe_mean - 1.645 * sqrt(safe_var),
+    HB_Utility_Q95 = safe_mean + 1.645 * sqrt(safe_var),
     HB_Rhat = NA_real_,
     HB_ESS = NA_real_,
     stringsAsFactors = FALSE

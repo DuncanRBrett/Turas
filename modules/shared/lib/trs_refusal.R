@@ -798,8 +798,8 @@ trs_exclusion_summary <- function(exclusions, total_before = NULL, total_after =
 #' @return Character string with absolute path to TURAS root
 #' @export
 turas_resolve_home <- function() {
-  # 1. Check environment variable
-  turas_home <- Sys.getenv("TURAS_HOME", "")
+  # 1. Check environment variables (TURAS_ROOT is canonical, TURAS_HOME for backwards compat)
+  turas_home <- Sys.getenv("TURAS_ROOT", Sys.getenv("TURAS_HOME", ""))
   if (nzchar(turas_home) && dir.exists(turas_home) &&
       dir.exists(file.path(turas_home, "modules"))) {
     return(normalizePath(turas_home, mustWork = FALSE))

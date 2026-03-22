@@ -159,84 +159,87 @@ body {
 /* --- Project Grid --- */
 .project-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 12px;
-  padding: 20px 24px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  padding: 24px;
   overflow-y: auto;
   flex: 1;
+  align-content: start;
 }
 
-/* --- Project Card --- */
-.project-card {
+/* --- Project Tile --- */
+.project-tile {
   background: var(--ha-surface);
   border: 1px solid var(--ha-border);
   border-radius: var(--ha-radius);
-  padding: 18px 20px;
+  padding: 20px 22px;
   cursor: pointer;
-  transition: border-color var(--ha-transition), box-shadow var(--ha-transition);
+  transition: border-color var(--ha-transition);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.project-card:hover {
+.project-tile:hover {
   border-color: var(--ha-border-hover);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
-.project-card:active {
+.project-tile:active {
   background: #fafafa;
 }
 
-.project-card-name {
-  font-size: 15px;
+.tile-name {
+  font-size: 16px;
   font-weight: 600;
   color: var(--ha-text);
-  margin-bottom: 6px;
+  line-height: 1.3;
 }
 
-.project-card-path {
-  font-size: 11.5px;
-  color: var(--ha-text-faint);
-  margin-bottom: 10px;
-  word-break: break-all;
-}
-
-.project-card-meta {
+/* --- Module Badges --- */
+.tile-badges {
   display: flex;
-  gap: 16px;
-  font-size: 12px;
-  color: var(--ha-text-muted);
-}
-
-.project-card-meta-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.meta-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--ha-brand);
-  opacity: 0.5;
-}
-
-/* --- Report Types Badge Row --- */
-.project-card-types {
-  display: flex;
-  gap: 4px;
-  margin-top: 10px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
-.type-badge {
-  font-size: 10px;
+.tile-badge {
+  font-size: 11px;
   font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 2px 6px;
-  border-radius: 3px;
-  background: #f1f5f9;
-  color: var(--ha-text-muted);
+  padding: 3px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+/* Badge colours — same palette as pin board source badges */
+.tile-badge-default    { background: #f1f5f9; color: var(--ha-text-muted); }
+.tile-badge-tracker    { background: #dbeafe; color: #1d4ed8; }
+.tile-badge-tabs       { background: #fef3c7; color: #92400e; }
+.tile-badge-confidence { background: #d1fae5; color: #065f46; }
+.tile-badge-conjoint   { background: #ede9fe; color: #5b21b6; }
+.tile-badge-maxdiff    { background: #fce7f3; color: #9d174d; }
+.tile-badge-pricing    { background: #ffedd5; color: #9a3412; }
+.tile-badge-segment    { background: #e0e7ff; color: #3730a3; }
+.tile-badge-catdriver  { background: #fef9c3; color: #854d0e; }
+.tile-badge-keydriver  { background: #ccfbf1; color: #134e4a; }
+.tile-badge-weighting  { background: #f3e8ff; color: #6b21a8; }
+
+/* --- Tile Meta Row --- */
+.tile-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--ha-text-faint);
+}
+
+.tile-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tile-meta-item svg {
+  opacity: 0.5;
+  flex-shrink: 0;
 }
 
 /* --- Report Tab Bar --- */
@@ -746,6 +749,7 @@ body {
 @media (max-width: 720px) {
   .project-grid {
     grid-template-columns: 1fr;
+    gap: 12px;
     padding: 16px;
   }
 

@@ -53,7 +53,39 @@ parse_data_export_map <- function(file_path, verbose = FALSE) {
   }
 
   # Read first two rows (no column names)
-  data_map <- readxl::read_excel(file_path, col_names = FALSE, n_max = 2)
+  data_map <- tryCatch(
+    readxl::read_excel(file_path, col_names = FALSE, n_max = 2),
+    error = function(e) {
+      alchemerparser_refuse(
+        code = "IO_FILE_CORRUPT",
+        title = "Cannot Read Data Export Map",
+        problem = sprintf("Failed to read Excel file: %s", e$message),
+        why_it_matters = "The data export map file may be corrupted, password-protected, or in an unsupported format (.xls instead of .xlsx).",
+        how_to_fix = c(
+          "Ensure the file is a valid .xlsx file (not .xls)",
+          "Check the file is not password-protected or corrupted",
+          "Try re-exporting the data map from Alchemer",
+          "Open and re-save the file in Excel to repair it"
+        ),
+        details = paste0("File: ", file_path)
+      )
+    }
+  )
+
+  # Validate minimum row count
+  if (nrow(data_map) < 2) {
+    alchemerparser_refuse(
+      code = "DATA_INVALID_STRUCTURE",
+      title = "Data Export Map Too Short",
+      problem = sprintf("Expected at least 2 rows (Q numbers and Q IDs) but found %d.", nrow(data_map)),
+      why_it_matters = "Row 1 must contain question numbers and row 2 must contain question IDs for the parser to work correctly.",
+      how_to_fix = c(
+        "Verify this is a valid Alchemer data export map file",
+        "Re-export the data map from Alchemer"
+      ),
+      details = paste0("File: ", file_path)
+    )
+  }
 
   # Skip column A (row labels)
   q_num_row <- data_map[1, -1]

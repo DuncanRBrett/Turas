@@ -326,8 +326,8 @@ validate_vw_data <- function(data, config, verbose = TRUE) {
     cat(paste(rep("=", 60), collapse = ""), "\n\n")
 
     cat(sprintf("Total respondents: %d\n", n_total))
-    cat(sprintf("Complete cases: %d (%.1f%%)\n", n_complete, n_complete/n_total * 100))
-    cat(sprintf("Logical responses: %d (%.1f%%)\n", n_logical, n_logical/n_complete * 100))
+    cat(sprintf("Complete cases: %d (%.1f%%)\n", n_complete, if (n_total > 0) n_complete/n_total * 100 else 0))
+    cat(sprintf("Logical responses: %d (%.1f%%)\n", n_logical, if (n_complete > 0) n_logical/n_complete * 100 else 0))
     cat(sprintf("Quality score: %d/100\n\n", quality_score))
 
     cat("Validation checks:\n")

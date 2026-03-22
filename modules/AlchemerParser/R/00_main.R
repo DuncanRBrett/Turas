@@ -212,6 +212,15 @@ run_alchemerparser <- function(project_dir,
   }
 
   # ==============================================================================
+  # STEP 5b: Detect routing and skip logic
+  # ==============================================================================
+  if (verbose) {
+    cat("\nStep 5b: Detecting routing/skip logic...\n")
+  }
+
+  questions <- detect_routing(questions, word_hints, verbose)
+
+  # ==============================================================================
   # STEP 6: Generate question codes
   # ==============================================================================
   if (verbose) {
@@ -291,11 +300,17 @@ run_alchemerparser <- function(project_dir,
     }
   }))
 
+  # Count routed questions
+  n_routed <- sum(sapply(questions, function(q) {
+    !is.null(q$routing) && isTRUE(q$routing$has_routing)
+  }))
+
   summary <- list(
     project_name = project_name,
     n_questions = length(questions),
     n_columns = total_columns,
     n_flags = length(validation$flags),
+    n_routed = n_routed,
     type_distribution = table(all_types)
   )
 
@@ -307,6 +322,7 @@ run_alchemerparser <- function(project_dir,
     cat(sprintf("  Total questions: %d\n", summary$n_questions))
     cat(sprintf("  Total data columns: %d\n", summary$n_columns))
     cat(sprintf("  Items flagged for review: %d\n", summary$n_flags))
+    cat(sprintf("  Questions with routing/skip logic: %d\n", summary$n_routed))
     cat("\n")
   }
 

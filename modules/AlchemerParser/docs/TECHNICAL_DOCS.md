@@ -197,6 +197,7 @@ modules/AlchemerParser/
 │   ├── 03_parse_word_doc.R            # Word questionnaire parser
 │   ├── 04_classify_questions.R        # Question type classifier
 │   ├── 05_generate_codes.R            # Question code generator
+│   ├── 04b_detect_routing.R            # Routing/skip logic detection
 │   └── 06_output.R                    # Output file generator
 ├── run_alchemerparser.R               # CLI entry point
 ├── run_alchemerparser_gui.R           # GUI (Shiny) entry point
@@ -216,10 +217,11 @@ modules/AlchemerParser/
 | **02_parse_translation.R** | ~350 | Parse translation file, extract options and labels |
 | **03_parse_word_doc.R** | ~600 | Parse Word questionnaire, extract question text |
 | **04_classify_questions.R** | ~500 | Classify question types using pattern matching |
+| **04b_detect_routing.R** | ~220 | Detect routing/skip logic from text patterns |
 | **05_generate_codes.R** | ~400 | Generate standardized question codes |
-| **06_output.R** | ~450 | Generate Survey_Structure and Tabs_Config Excel files |
+| **06_output.R** | ~470 | Generate Survey_Structure, Tabs_Config, and Routing Excel output |
 
-**Total:** ~3,000 lines of code
+**Total:** ~3,240 lines of code
 
 ---
 

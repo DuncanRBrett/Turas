@@ -200,7 +200,10 @@ var ExportManager = (function() {
         items: pinsWithImages
       });
 
-      HubApp.sendToShiny("hub_export_pptx", payload);
+      if (!HubApp.sendToShiny("hub_export_pptx", payload)) {
+        hideProgress();
+        HubApp.showToast("Export failed: Shiny not connected", 5000);
+      }
     }
 
     // If no SVGs to render, send immediately
@@ -246,7 +249,10 @@ var ExportManager = (function() {
             : "Turas Export",
           images: pngData
         });
-        HubApp.sendToShiny("hub_export_pngs_zip", payload);
+        if (!HubApp.sendToShiny("hub_export_pngs_zip", payload)) {
+          hideProgress();
+          HubApp.showToast("Export failed: Shiny not connected", 5000);
+        }
         return;
       }
 
@@ -270,11 +276,20 @@ var ExportManager = (function() {
   // Progress Indicator
   // ===========================================================================
 
+  var progressTimeout = null;
+
   function showProgress(message) {
     var overlay = document.getElementById("export-progress");
     var text = document.getElementById("export-progress-text");
     if (overlay) overlay.style.display = "flex";
     if (text) text.textContent = message || "Exporting...";
+
+    // Safety: auto-hide after 30 seconds to prevent stuck overlay
+    if (progressTimeout) clearTimeout(progressTimeout);
+    progressTimeout = setTimeout(function() {
+      hideProgress();
+      HubApp.showToast("Export timed out — check the R console for errors", 5000);
+    }, 30000);
   }
 
   function updateProgress(message) {
@@ -283,6 +298,7 @@ var ExportManager = (function() {
   }
 
   function hideProgress() {
+    if (progressTimeout) { clearTimeout(progressTimeout); progressTimeout = null; }
     var overlay = document.getElementById("export-progress");
     if (overlay) overlay.style.display = "none";
   }

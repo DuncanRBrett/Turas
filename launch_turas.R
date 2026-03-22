@@ -27,7 +27,18 @@ launch_turas <- function() {
     if (file.exists(file.path(dirname(turas_root), "launch_turas.R"))) {
       turas_root <- dirname(turas_root)
     } else {
-      stop("Cannot locate Turas root. Set TURAS_ROOT env var or run from the Turas directory.")
+      cat("\n")
+      cat("================================================================================\n")
+      cat("  [REFUSE] IO_TURAS_ROOT_NOT_FOUND: Cannot Locate Turas Root Directory\n")
+      cat("================================================================================\n\n")
+      cat("Problem:\n")
+      cat("  Cannot find launch_turas.R in the current or parent directory.\n\n")
+      cat("How to fix:\n")
+      cat("  1. Set the TURAS_ROOT environment variable: Sys.setenv(TURAS_ROOT = '/path/to/Turas')\n")
+      cat("  2. Or run from the Turas directory: setwd('/path/to/Turas')\n")
+      cat("  3. For Docker: ensure TURAS_ROOT is set in the container environment\n")
+      cat("================================================================================\n\n")
+      return(invisible(NULL))
     }
   }
 
@@ -672,11 +683,19 @@ launch_turas <- function() {
       mod <- Find(function(m) m$id == mod_id, modules)
       if (is.null(mod)) return()
 
+      script_file <- file.path(turas_root, mod$script)
+      if (!file.exists(script_file)) {
+        show_status(paste0("Error: Module script not found: ", mod$script))
+        later::later(function() {
+          tryCatch(hide_status(), error = function(e) NULL)
+        }, delay = 5)
+        return()
+      }
+
       show_status(paste0("Launching ", mod$name, "..."))
 
       tryCatch({
-        launch_module(mod$id,
-                     file.path(turas_root, mod$script))
+        launch_module(mod$id, script_file)
 
         later::later(function() {
           tryCatch(show_status(paste0(mod$name, " launched")), error = function(e) NULL)
@@ -710,18 +729,10 @@ launch_turas <- function() {
       show_status(paste0("Launching ", mod$name, " with ", basename(config_path), "..."))
 
       tryCatch({
-        # Set env var for module to pick up
-        Sys.setenv(TURAS_MODULE_CONFIG = config_path)
-        # Also set TURAS_HUB_CONFIG for Report Hub backwards compatibility
-        if (mod$id == "report_hub") {
-          Sys.setenv(TURAS_HUB_CONFIG = config_path)
-        }
-
+        # Pass config path directly into the launched script (no env var race condition)
         launch_module(mod$id,
-                     file.path(turas_root, mod$script))
-
-        Sys.unsetenv("TURAS_MODULE_CONFIG")
-        if (mod$id == "report_hub") Sys.unsetenv("TURAS_HUB_CONFIG")
+                     file.path(turas_root, mod$script),
+                     config_path = config_path)
 
         later::later(function() {
           tryCatch(show_status(paste0(mod$name, " launched")), error = function(e) NULL)
@@ -737,11 +748,18 @@ launch_turas <- function() {
     # ------------------------------------------------------------------
     # launch_module() — background Rscript launcher
     # ------------------------------------------------------------------
-    launch_module <- function(module_name, script_path) {
+    launch_module <- function(module_name, script_path, config_path = NULL) {
+      config_lines <- ""
+      if (!is.null(config_path) && nzchar(config_path)) {
+        config_lines <- sprintf('Sys.setenv(TURAS_MODULE_CONFIG = "%s")\n', config_path)
+        if (module_name == "report_hub") {
+          config_lines <- paste0(config_lines, sprintf('Sys.setenv(TURAS_HUB_CONFIG = "%s")\n', config_path))
+        }
+      }
       launch_script <- sprintf('
 Sys.setenv(TURAS_ROOT = "%s")
 Sys.setenv(TURAS_LAUNCHED_FROM_HUB = "1")
-setwd("%s")
+%ssetwd("%s")
 TURAS_LAUNCHER_ACTIVE <- TRUE
 source("%s")
 if ("%s" != "alchemerparser") {
@@ -750,6 +768,7 @@ if ("%s" != "alchemerparser") {
 }
 ',
       turas_root,
+      config_lines,
       turas_root,
       script_path,
       module_name,

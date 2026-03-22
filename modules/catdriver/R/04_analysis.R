@@ -112,9 +112,15 @@ run_binary_logistic_robust <- function(formula, data, weights = NULL, config, gu
     fallback_reason <- model$message
   } else if (!model$converged) {
     needs_fallback <- TRUE
-    fallback_reason <- "Model did not converge"
+    # Also check for separation — non-convergence is often caused by separation
+    separation_check <- tryCatch(check_separation(model), error = function(e) list(has_separation = FALSE))
+    if (separation_check$has_separation) {
+      fallback_reason <- paste0("Model did not converge (likely due to separation: ", separation_check$message, ")")
+    } else {
+      fallback_reason <- "Model did not converge"
+    }
   } else {
-    # Check for separation
+    # Check for separation even when model reports convergence
     separation_check <- check_separation(model)
     if (separation_check$has_separation) {
       needs_fallback <- TRUE
@@ -193,9 +199,16 @@ run_binary_logistic_robust <- function(formula, data, weights = NULL, config, gu
     }
   }
 
-  # Final check
+  # Final check — if model is still an error list, refuse
   if (is.list(model) && isTRUE(model$error)) {
-    guard_model_fit_success(model, fallback_available = TRUE)
+    catdriver_refuse(
+      reason = "MODEL_FIT_FAILED",
+      title = "MODEL FITTING FAILED",
+      problem = "All model fitting attempts failed (primary and fallback).",
+      why_it_matters = "Cannot produce results without a fitted model.",
+      fix = "Simplify the model by collapsing rare categories, removing correlated predictors, or increasing sample size.",
+      details = paste0("ERROR: ", model$message)
+    )
   }
 
   # Update guard
@@ -251,11 +264,14 @@ run_binary_logistic_robust <- function(formula, data, weights = NULL, config, gu
 
   confusion <- table(Actual = outcome_actual, Predicted = pred_class)
 
-  accuracy <- sum(diag(confusion)) / sum(confusion)
+  total_obs <- sum(confusion)
+  accuracy <- if (total_obs > 0) sum(diag(confusion)) / total_obs else NA_real_
 
   if (nrow(confusion) >= 2 && ncol(confusion) >= 2) {
-    sensitivity <- confusion[2, 2] / sum(confusion[2, ])
-    specificity <- confusion[1, 1] / sum(confusion[1, ])
+    row2_sum <- sum(confusion[2, ])
+    row1_sum <- sum(confusion[1, ])
+    sensitivity <- if (row2_sum > 0) confusion[2, 2] / row2_sum else NA_real_
+    specificity <- if (row1_sum > 0) confusion[1, 1] / row1_sum else NA_real_
   } else {
     sensitivity <- NA
     specificity <- NA

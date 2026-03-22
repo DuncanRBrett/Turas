@@ -37,13 +37,21 @@ generate_report_hub_config_template <- function(output_path) {
     shared_path <- file.path("modules", "shared", "template_styles.R")
     if (!file.exists(shared_path)) {
       # Try relative to this file
-      shared_path <- file.path(dirname(sys.frame(1)$ofile %||% "."),
+      ofile <- tryCatch(sys.frame(1)$ofile, error = function(e) NULL)
+      shared_path <- file.path(dirname(if (is.null(ofile)) "." else ofile),
                                "..", "..", "shared", "template_styles.R")
     }
     if (file.exists(shared_path)) {
       source(shared_path)
     } else {
-      stop("Cannot find shared template_styles.R. Source it before calling this function.")
+      cat("\n[REFUSE] PKG_MISSING_DEPENDENCY: Cannot find shared template_styles.R.\n")
+      cat("  Source modules/shared/template_styles.R before calling this function.\n\n")
+      return(list(
+        status = "REFUSED",
+        code = "PKG_MISSING_DEPENDENCY",
+        message = "Cannot locate shared template_styles.R",
+        how_to_fix = "Source modules/shared/template_styles.R before calling this function"
+      ))
     }
   }
 

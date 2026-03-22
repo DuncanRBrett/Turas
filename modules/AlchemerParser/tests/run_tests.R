@@ -21,6 +21,7 @@ source(file.path(module_dir, "R/01_parse_data_map.R"))
 source(file.path(module_dir, "R/02_parse_translation.R"))
 source(file.path(module_dir, "R/03_parse_word_doc.R"))
 source(file.path(module_dir, "R/04_classify_questions.R"))
+source(file.path(module_dir, "R/04b_detect_routing.R"))
 source(file.path(module_dir, "R/05_generate_codes.R"))
 source(file.path(module_dir, "R/06_output.R"))
 

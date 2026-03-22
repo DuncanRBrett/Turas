@@ -512,7 +512,9 @@ calculate_split_rhat <- function(draws_matrix) {
 prepare_trace_plot_data <- function(mcmc_draws, parameters = NULL, thin_factor = NULL) {
 
   if (is.null(mcmc_draws)) {
-    stop("No MCMC draws available for trace plots")
+    return(data.frame(iteration = integer(0), chain = integer(0),
+                      parameter = character(0), value = numeric(0),
+                      stringsAsFactors = FALSE))
   }
 
   draws <- as.matrix(mcmc_draws)
