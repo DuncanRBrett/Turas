@@ -24,12 +24,12 @@
 
 .svg_wrap <- function(chart_id, svg_content, chart_width, chart_height) {
   sprintf(
-    '<div class="cj-chart-wrap" data-chart-id="%s"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" width="100%%" style="max-width:%dpx;font-family:system-ui,-apple-system,sans-serif;">%s</svg></div>',
+    '<div class="cj-chart-wrap" data-chart-id="%s"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" width="100%%" style="max-width:%dpx;font-family:\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif;">%s</svg></div>',
     chart_id, chart_width, chart_height, chart_width, paste(svg_content, collapse = "\n")
   )
 }
 
-.svg_gridline <- function(x1, y1, x2, y2, colour = "#f1f5f9") {
+.svg_gridline <- function(x1, y1, x2, y2, colour = "#e2e8f0") {
   sprintf(
     '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="1"/>',
     x1, y1, x2, y2, colour
@@ -45,7 +45,7 @@
 
 .svg_value_label <- function(x, y, label, anchor = "middle", size = 12) {
   sprintf(
-    '<text x="%.1f" y="%.1f" text-anchor="%s" fill="#334155" font-size="%d" font-weight="600">%s</text>',
+    '<text x="%.1f" y="%.1f" text-anchor="%s" fill="#334155" font-size="%d" font-weight="500">%s</text>',
     x, y, anchor, size, .svg_esc(label)
   )
 }
@@ -134,12 +134,12 @@ build_importance_chart <- function(importance, brand_colour = "#323367") {
     # Value label: inside bar (white, right-aligned) if wide enough, else outside
     if (w > 80) {
       elements <- c(elements, sprintf(
-        '<text x="%.1f" y="%.1f" text-anchor="end" fill="#ffffff" font-size="12" font-weight="600" dominant-baseline="central">%s</text>',
+        '<text x="%.1f" y="%.1f" text-anchor="end" fill="#ffffff" font-size="12" font-weight="500" dominant-baseline="central">%s</text>',
         margin_left + w - 8, y + bar_height / 2, val_label
       ))
     } else {
       elements <- c(elements, sprintf(
-        '<text x="%.1f" y="%.1f" text-anchor="start" fill="#334155" font-size="12" font-weight="600" dominant-baseline="central">%s</text>',
+        '<text x="%.1f" y="%.1f" text-anchor="start" fill="#334155" font-size="12" font-weight="500" dominant-baseline="central">%s</text>',
         margin_left + w + 6, y + bar_height / 2, val_label
       ))
     }
@@ -232,15 +232,15 @@ build_utility_chart <- function(attr_utilities, attr_name, brand_colour = "#3233
     # Value label (font-weight 600 for bolder contrast)
     label_y <- if (u >= 0) bar_y - 6 else bar_y + bar_h + 14
     elements <- c(elements, sprintf(
-      '<text x="%.1f" y="%.1f" text-anchor="middle" fill="#334155" font-size="12" font-weight="600">%s</text>',
+      '<text x="%.1f" y="%.1f" text-anchor="middle" fill="#334155" font-size="12" font-weight="500">%s</text>',
       x_center, label_y, sprintf("%.3f", u)
     ))
 
-    # Level label (font-weight 400, colour #475569)
+    # Level label (font-weight 400, colour #64748b)
     label <- attr_utilities$Level[i]
     if (nchar(label) > 20) label <- paste0(substr(label, 1, 19), "\u2026")
     elements <- c(elements, sprintf(
-      '<text x="%.1f" y="%.1f" text-anchor="middle" fill="#475569" font-size="11" font-weight="400">%s</text>',
+      '<text x="%.1f" y="%.1f" text-anchor="middle" fill="#64748b" font-size="11" font-weight="400">%s</text>',
       x_center, chart_height - margin_bottom + 16, .svg_esc(label)
     ))
   }
@@ -302,7 +302,7 @@ build_utility_dot_plot <- function(attr_utilities, attr_name, brand_colour = "#3
       if (abs(gv) < 1e-10) next
       gx <- scale_x(gv)
       if (gx >= margin_left && gx <= chart_width - margin_right) {
-        elements <- c(elements, .svg_gridline(gx, margin_top, gx, chart_height - margin_bottom, "#f1f5f9"))
+        elements <- c(elements, .svg_gridline(gx, margin_top, gx, chart_height - margin_bottom, "#e2e8f0"))
         elements <- c(elements, .svg_axis_label(gx, chart_height - 4, sprintf("%.2f", gv), anchor = "middle", size = 10))
       }
     }
@@ -331,7 +331,7 @@ build_utility_dot_plot <- function(attr_utilities, attr_name, brand_colour = "#3
     label_x <- dot_x + if (u >= 0) 12 else -12
     label_anchor <- if (u >= 0) "start" else "end"
     elements <- c(elements, sprintf(
-      '<text x="%.1f" y="%.1f" text-anchor="%s" fill="#334155" font-size="11" font-weight="600">%s</text>',
+      '<text x="%.1f" y="%.1f" text-anchor="%s" fill="#334155" font-size="11" font-weight="500">%s</text>',
       label_x, y_center + 4, label_anchor, sprintf("%.3f", u)
     ))
 
@@ -339,7 +339,7 @@ build_utility_dot_plot <- function(attr_utilities, attr_name, brand_colour = "#3
     label <- attr_utilities$Level[i]
     if (nchar(label) > 16) label <- paste0(substr(label, 1, 15), "\u2026")
     elements <- c(elements, sprintf(
-      '<text x="%d" y="%.1f" text-anchor="end" fill="#475569" font-size="11" font-weight="400">%s</text>',
+      '<text x="%d" y="%.1f" text-anchor="end" fill="#64748b" font-size="11" font-weight="400">%s</text>',
       margin_left - 8, y_center + 4, .svg_esc(label)
     ))
   }
@@ -512,9 +512,9 @@ build_wtp_chart <- function(wtp_data, brand_colour = "#323367") {
     label <- sprintf("%s: %s", curr_attr, wtp$Level[i])
     if (nchar(label) > 34) label <- paste0(substr(label, 1, 33), "\u2026")
 
-    # Label (font-weight 400, colour #475569)
+    # Label (font-weight 400, colour #64748b)
     elements <- c(elements, sprintf(
-      '<text x="%d" y="%.1f" text-anchor="end" fill="#475569" font-size="11" font-weight="400" dominant-baseline="central">%s</text>',
+      '<text x="%d" y="%.1f" text-anchor="end" fill="#64748b" font-size="11" font-weight="400" dominant-baseline="central">%s</text>',
       margin_left - 8, y_pos + bar_height / 2, .svg_esc(label)
     ))
 
@@ -562,7 +562,7 @@ build_wtp_chart <- function(wtp_data, brand_colour = "#323367") {
     vx <- if (val >= 0) scale_x(val) + 4 else scale_x(val) - 4
     vanch <- if (val >= 0) "start" else "end"
     elements <- c(elements, sprintf(
-      '<text x="%.1f" y="%.1f" text-anchor="%s" fill="#334155" font-size="12" font-weight="600" dominant-baseline="central">%s</text>',
+      '<text x="%.1f" y="%.1f" text-anchor="%s" fill="#334155" font-size="12" font-weight="500" dominant-baseline="central">%s</text>',
       vx, y_pos + bar_height / 2, vanch, sprintf("%s%.2f", cs, val)
     ))
 
@@ -666,11 +666,11 @@ build_demand_curve_chart <- function(demand_curve, brand_colour = "#323367", cur
 
   # Axis title labels
   elements <- c(elements, sprintf(
-    '<text x="%.1f" y="%d" text-anchor="middle" fill="#475569" font-size="12" font-weight="400">Price</text>',
+    '<text x="%.1f" y="%d" text-anchor="middle" fill="#64748b" font-size="12" font-weight="400">Price</text>',
     chart_width / 2, chart_height - 5
   ))
   elements <- c(elements, sprintf(
-    '<text x="15" y="%.1f" text-anchor="middle" fill="#475569" font-size="12" font-weight="400" transform="rotate(-90,15,%.1f)">Market Share</text>',
+    '<text x="15" y="%.1f" text-anchor="middle" fill="#64748b" font-size="12" font-weight="400" transform="rotate(-90,15,%.1f)">Market Share</text>',
     margin_top + plot_h / 2, margin_top + plot_h / 2
   ))
 
@@ -765,7 +765,7 @@ build_class_importance_chart <- function(class_importance, brand_colour = "#3233
   for (j in seq_len(n_classes)) {
     ly <- margin_top + (j - 1) * 22
     elements <- c(elements, sprintf(
-      '<rect x="%.1f" y="%.1f" width="14" height="14" rx="3" fill="%s"/>',
+      '<rect x="%.1f" y="%.1f" width="14" height="14" rx="4" fill="%s"/>',
       legend_x, ly, palette[j]
     ))
     elements <- c(elements, .svg_axis_label(

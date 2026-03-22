@@ -444,7 +444,7 @@ build_stacked_bar_svg <- function(items, bar_width = 680, chart_id = NULL) {
 
   # SVG header
   svg_parts <- c(svg_parts, sprintf(
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" role="img" aria-label="Distribution chart" style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;">',
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" role="img" aria-label="Distribution chart" style="font-family:\'Inter\',system-ui,-apple-system,\'Segoe UI\',sans-serif;">',
     bar_width, total_height
   ))
 
@@ -579,7 +579,7 @@ build_horizontal_bars_svg <- function(items, brand_colour = "#323367",
   svg_parts <- character(0)
 
   svg_parts <- c(svg_parts, sprintf(
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" role="img" aria-label="Bar chart" style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;">',
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" role="img" aria-label="Bar chart" style="font-family:\'Inter\',system-ui,-apple-system,\'Segoe UI\',sans-serif;">',
     chart_width, total_height
   ))
 
@@ -598,19 +598,19 @@ build_horizontal_bars_svg <- function(items, brand_colour = "#323367",
 
     # Category label (right-aligned in label area)
     svg_parts <- c(svg_parts, sprintf(
-      '<text x="%d" y="%g" text-anchor="end" dominant-baseline="central" fill="#374151" font-size="11" font-weight="500">%s</text>',
+      '<text x="%d" y="%g" text-anchor="end" dominant-baseline="central" fill="#64748b" font-size="11" font-weight="400">%s</text>',
       label_width - 8, bar_height / 2, htmltools::htmlEscape(label)
     ))
 
     # Bar
     svg_parts <- c(svg_parts, sprintf(
-      '<rect x="%d" y="0" width="%g" height="%d" rx="3" fill="%s" opacity="0.85"/>',
+      '<rect x="%d" y="0" width="%g" height="%d" rx="4" fill="%s" opacity="0.85"/>',
       label_width, bar_w, bar_height, brand_colour
     ))
 
     # Value label (right of bar)
     svg_parts <- c(svg_parts, sprintf(
-      '<text x="%g" y="%g" dominant-baseline="central" fill="#64748b" font-size="11" font-weight="600">%s</text>',
+      '<text x="%g" y="%g" dominant-baseline="central" fill="#334155" font-size="12" font-weight="500">%s</text>',
       label_width + bar_w + 8, bar_height / 2, pct_text
     ))
 

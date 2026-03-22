@@ -47,11 +47,11 @@ build_chart_axes_svg <- function(n_waves, wave_labels, wave_ids,
   for (gv in grid_vals) {
     gy <- plot_h - scale_fn(gv)
     parts <- c(parts, sprintf(
-      '<line x1="0" y1="%.1f" x2="%d" y2="%.1f" stroke="#e2e8f0" stroke-width="0.75" stroke-dasharray="6,4"/>',
+      '<line x1="0" y1="%.1f" x2="%d" y2="%.1f" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4,3"/>',
       gy, plot_w, gy
     ))
     parts <- c(parts, sprintf(
-      '<text x="-10" y="%.1f" text-anchor="end" fill="#64748b" font-size="11" font-weight="500" dy="0.35em">%s</text>',
+      '<text x="-10" y="%.1f" text-anchor="end" fill="#64748b" font-size="11" font-weight="400" dy="0.35em">%s</text>',
       gy, htmltools::htmlEscape(format_fn(gv))
     ))
   }
@@ -60,7 +60,7 @@ build_chart_axes_svg <- function(n_waves, wave_labels, wave_ids,
   for (i in seq_len(n_waves)) {
     x_pos <- (i - 1) / (n_waves - 1) * plot_w
     parts <- c(parts, sprintf(
-      '<text x="%.1f" y="%d" text-anchor="middle" fill="#64748b" font-size="12" font-weight="600" class="tk-chart-xaxis" data-wave="%s">%s</text>',
+      '<text x="%.1f" y="%d" text-anchor="middle" fill="#64748b" font-size="11" font-weight="400" class="tk-chart-xaxis" data-wave="%s">%s</text>',
       x_pos, plot_h + 24, htmltools::htmlEscape(wave_ids[i]),
       htmltools::htmlEscape(wave_labels[i])
     ))
@@ -262,7 +262,7 @@ resolve_and_emit_labels_svg <- function(all_label_data, plot_h) {
       # Background pill for readability
       text_w <- nchar(lb$text) * 7.5 + 8
       svg_parts <- c(svg_parts, sprintf(
-        '<rect x="%.1f" y="%.1f" width="%.1f" height="16" rx="3" fill="#ffffff" opacity="0.85" class="tk-chart-label-bg" data-segment="%s" data-wave="%s"/>',
+        '<rect x="%.1f" y="%.1f" width="%.1f" height="16" rx="4" fill="#ffffff" opacity="0.85" class="tk-chart-label-bg" data-segment="%s" data-wave="%s"/>',
         lb$x - text_w / 2, lb$y - 11, text_w,
         htmltools::htmlEscape(lb$seg_name),
         htmltools::htmlEscape(lb$wave_id)
@@ -270,7 +270,7 @@ resolve_and_emit_labels_svg <- function(all_label_data, plot_h) {
 
       # Label text — larger and bolder for readability
       svg_parts <- c(svg_parts, sprintf(
-        '<text x="%.1f" y="%.1f" text-anchor="middle" fill="%s" font-size="13" font-weight="700" class="tk-chart-label" data-segment="%s" data-wave="%s">%s</text>',
+        '<text x="%.1f" y="%.1f" text-anchor="middle" fill="%s" font-size="12" font-weight="500" class="tk-chart-label" data-segment="%s" data-wave="%s">%s</text>',
         lb$x, lb$y, lb$colour,
         htmltools::htmlEscape(lb$seg_name),
         htmltools::htmlEscape(lb$wave_id),
@@ -384,7 +384,7 @@ build_line_chart <- function(chart_data, config, active_segment = NULL,
   # Build SVG
   svg_parts <- c()
   svg_parts <- c(svg_parts, sprintf(
-    '<svg class="tk-line-chart" width="100%%" height="auto" viewBox="0 0 %d %d" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">',
+    '<svg class="tk-line-chart" width="100%%" height="auto" viewBox="0 0 %d %d" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="font-family:\'Inter\',system-ui,-apple-system,\'Segoe UI\',sans-serif;">',
     width, height
   ))
 

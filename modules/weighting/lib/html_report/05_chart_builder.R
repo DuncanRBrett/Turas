@@ -50,7 +50,7 @@ build_histogram_svg <- function(histogram_data, weight_name = "",
     y <- margin_top + plot_h - bar_h
 
     bars <- paste0(bars, sprintf(
-      '<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="3" fill="%s" opacity="0.80"/>\n',
+      '<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="4" fill="%s" opacity="0.80"/>\n',
       x, y, bar_w, bar_h, brand_colour
     ))
   }
@@ -70,7 +70,7 @@ build_histogram_svg <- function(histogram_data, weight_name = "",
 
     # Label
     y_axis <- paste0(y_axis, sprintf(
-      '<text x="%d" y="%.1f" text-anchor="end" fill="#64748b" font-size="11" font-weight="500">%d</text>\n',
+      '<text x="%d" y="%.1f" text-anchor="end" fill="#64748b" font-size="11" font-weight="400">%d</text>\n',
       margin_left - 8, y_pos + 4, val
     ))
   }
@@ -98,17 +98,17 @@ build_histogram_svg <- function(histogram_data, weight_name = "",
 
   # Axis labels
   x_label <- sprintf(
-    '<text x="%.1f" y="%d" text-anchor="middle" fill="#64748b" font-size="11" font-weight="500">Weight Value</text>\n',
+    '<text x="%.1f" y="%d" text-anchor="middle" fill="#64748b" font-size="11" font-weight="400">Weight Value</text>\n',
     margin_left + plot_w / 2, chart_height - 2
   )
   y_label <- sprintf(
-    '<text transform="rotate(-90)" x="%.1f" y="14" text-anchor="middle" fill="#64748b" font-size="11" font-weight="500">Count</text>\n',
+    '<text transform="rotate(-90)" x="%.1f" y="14" text-anchor="middle" fill="#64748b" font-size="11" font-weight="400">Count</text>\n',
     -(margin_top + plot_h / 2)
   )
 
   # Assemble SVG
   sprintf(
-    '<svg viewBox="0 0 %d %d" style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif; width:100%%; max-width:700px; height:auto; display:block; margin:0 auto;">\n%s%s%s%s%s%s</svg>',
+    '<svg viewBox="0 0 %d %d" style="font-family:\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif; width:100%%; max-width:700px; height:auto; display:block; margin:0 auto;">\n%s%s%s%s%s%s</svg>',
     chart_width, chart_height,
     title_svg, y_axis, bars, x_axis, x_label, y_label
   )

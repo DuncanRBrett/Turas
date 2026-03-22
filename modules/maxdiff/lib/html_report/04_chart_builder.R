@@ -11,7 +11,7 @@
 # UTILITY HELPERS
 # ==============================================================================
 
-svg_font <- "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+svg_font <- "'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif"
 
 svg_wrap <- function(inner, width, height, aria_label) {
   sprintf(
@@ -82,11 +82,11 @@ build_preference_chart <- function(scores, brand_colour = "#1e3a5f", use_shares 
     val_label <- if (use_shares) sprintf("%.1f%%", val) else sprintf("%.0f", val)
 
     paste0(
-      sprintf('<text x="%d" y="%g" text-anchor="end" fill="#1e293b" font-size="12" font-weight="500" dominant-baseline="middle">%s</text>',
+      sprintf('<text x="%d" y="%g" text-anchor="end" fill="#64748b" font-size="12" font-weight="400" dominant-baseline="middle">%s</text>',
               ml - 8, y + bar_height / 2, label),
       sprintf('<rect x="%d" y="%g" width="%g" height="%d" rx="4" fill="%s" opacity="0.8"/>',
               ml, y, w, bar_height, brand_colour),
-      sprintf('<text x="%g" y="%g" fill="#1e293b" font-size="11" font-weight="500" dominant-baseline="middle">%s</text>',
+      sprintf('<text x="%g" y="%g" fill="#334155" font-size="11" font-weight="500" dominant-baseline="middle">%s</text>',
               ml + w + 6, y + bar_height / 2, val_label)
     )
   }, character(1)), collapse = "\n")
@@ -165,11 +165,11 @@ build_anchor_threshold_chart <- function(anchor_data, brand_colour = "#1e3a5f", 
     label_weight <- if (is_must_have) "600" else "500"
 
     paste0(
-      sprintf('<text x="%d" y="%g" text-anchor="end" fill="#1e293b" font-size="12" font-weight="%s" dominant-baseline="middle">%s</text>',
+      sprintf('<text x="%d" y="%g" text-anchor="end" fill="#64748b" font-size="12" font-weight="%s" dominant-baseline="middle">%s</text>',
               ml - 8, y + bar_height / 2, label_weight, htmlEscape(label)),
       sprintf('<rect x="%d" y="%g" width="%g" height="%d" rx="4" fill="%s" opacity="0.8"/>',
               ml, y, w, bar_height, bar_colour),
-      sprintf('<text x="%g" y="%g" fill="#1e293b" font-size="11" font-weight="500" dominant-baseline="middle">%.0f%%</text>',
+      sprintf('<text x="%g" y="%g" fill="#334155" font-size="11" font-weight="500" dominant-baseline="middle">%.0f%%</text>',
               ml + w + 6, y + bar_height / 2, rate)
     )
   }, character(1)), collapse = "\n")
@@ -237,7 +237,7 @@ build_diverging_chart <- function(count_data, brand_colour = "#1e3a5f") {
 
     paste0(
       # Label
-      sprintf('<text x="%d" y="%g" text-anchor="end" fill="#1e293b" font-size="11" font-weight="400" dominant-baseline="middle">%s</text>',
+      sprintf('<text x="%d" y="%g" text-anchor="end" fill="#64748b" font-size="11" font-weight="400" dominant-baseline="middle">%s</text>',
               ml - 8, y + bar_height / 2, label),
       # Worst bar (left of center, red)
       sprintf('<rect x="%g" y="%g" width="%g" height="%d" rx="4" fill="#e74c3c" opacity="0.7"/>',
@@ -326,7 +326,7 @@ build_turf_chart <- function(reach_curve, brand_colour = "#1e3a5f") {
     val <- reach_curve$Reach_Pct[i]
     paste0(
       sprintf('<circle cx="%g" cy="%g" r="4" fill="%s" stroke="white" stroke-width="1.5"/>', x, y, brand_colour),
-      if (i > 1) sprintf('<text x="%g" y="%g" text-anchor="middle" fill="#1e293b" font-size="10" font-weight="500">%.0f%%</text>',
+      if (i > 1) sprintf('<text x="%g" y="%g" text-anchor="middle" fill="#334155" font-size="10" font-weight="500">%.0f%%</text>',
               x, y - 10, val) else ""
     )
   }, character(1)), collapse = "\n")
@@ -431,7 +431,7 @@ build_segment_chart <- function(segment_data, brand_colour = "#1e3a5f") {
 
       # Item label centred vertically on the group
       label_svg <- sprintf(
-        '<text x="%d" y="%g" text-anchor="end" fill="#1e293b" font-size="11" font-weight="500" dominant-baseline="middle">%s</text>',
+        '<text x="%d" y="%g" text-anchor="end" fill="#64748b" font-size="11" font-weight="400" dominant-baseline="middle">%s</text>',
         ml - 8, group_y + group_height / 2, label
       )
 
@@ -552,14 +552,14 @@ build_strategy_quadrant <- function(hb_pop, brand_colour = "#1e3a5f") {
     vapply(x_ticks, function(xt) {
       x <- scale_x(xt)
       paste0(
-        sprintf('<line x1="%g" y1="%d" x2="%g" y2="%d" stroke="#f1f5f9" stroke-width="1"/>', x, mt, x, mt + ch),
+        sprintf('<line x1="%g" y1="%d" x2="%g" y2="%d" stroke="#e2e8f0" stroke-width="1"/>', x, mt, x, mt + ch),
         sprintf('<text x="%g" y="%d" text-anchor="middle" fill="#94a3b8" font-size="10">%.2f</text>', x, mt + ch + 16, xt)
       )
     }, character(1)),
     vapply(y_ticks, function(yt) {
       y <- scale_y(yt)
       paste0(
-        sprintf('<line x1="%d" y1="%g" x2="%d" y2="%g" stroke="#f1f5f9" stroke-width="1"/>', ml, y, ml + cw, y),
+        sprintf('<line x1="%d" y1="%g" x2="%d" y2="%g" stroke="#e2e8f0" stroke-width="1"/>', ml, y, ml + cw, y),
         sprintf('<text x="%d" y="%g" text-anchor="end" fill="#94a3b8" font-size="10">%.2f</text>', ml - 8, y + 4, yt)
       )
     }, character(1))
@@ -579,7 +579,7 @@ build_strategy_quadrant <- function(hb_pop, brand_colour = "#1e3a5f") {
     if (nchar(label) > 18) label <- paste0(substr(label, 1, 15), "...")
     paste0(
       sprintf('<circle cx="%g" cy="%g" r="6" fill="%s" opacity="0.7" stroke="white" stroke-width="1.5"/>', x, y, brand_colour),
-      sprintf('<text x="%g" y="%g" fill="#1e293b" font-size="10" font-weight="400">%s</text>', x + 10, y + 4, label)
+      sprintf('<text x="%g" y="%g" fill="#64748b" font-size="10" font-weight="400">%s</text>', x + 10, y + 4, label)
     )
   }, character(1)), collapse = "\n")
 
@@ -673,7 +673,7 @@ build_utility_distribution_chart <- function(dist_data, brand_colour = "#1e3a5f"
 
     # Label
     label_svg <- sprintf(
-      '<text x="%d" y="%g" text-anchor="end" fill="#1e293b" font-size="11" font-weight="500" dominant-baseline="middle">%s</text>',
+      '<text x="%d" y="%g" text-anchor="end" fill="#64748b" font-size="11" font-weight="400" dominant-baseline="middle">%s</text>',
       ml - 8, y_center, htmlEscape(label)
     )
 

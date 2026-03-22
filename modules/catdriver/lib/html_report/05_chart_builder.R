@@ -512,7 +512,7 @@ build_cd_probability_lift_chart <- function(probability_lifts,
       if (lift >= 0) {
         # Positive: bar extends right from zero
         elements <- paste0(elements, sprintf(
-          '<rect x="%.1f" y="%.1f" width="%.1f" height="%d" rx="3" fill="%s" opacity="%.2f"/>\n',
+          '<rect x="%.1f" y="%.1f" width="%.1f" height="%d" rx="4" fill="%s" opacity="%.2f"/>\n',
           zero_x, y_pos, bar_w, bar_height, bar_colour, bar_opacity
         ))
         # Value label to the right of bar
@@ -524,7 +524,7 @@ build_cd_probability_lift_chart <- function(probability_lifts,
         # Negative: bar extends left from zero
         bar_x <- zero_x - bar_w
         elements <- paste0(elements, sprintf(
-          '<rect x="%.1f" y="%.1f" width="%.1f" height="%d" rx="3" fill="%s" opacity="%.2f"/>\n',
+          '<rect x="%.1f" y="%.1f" width="%.1f" height="%d" rx="4" fill="%s" opacity="%.2f"/>\n',
           bar_x, y_pos, bar_w, bar_height, bar_colour, bar_opacity
         ))
         # Value label to the left of bar

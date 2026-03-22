@@ -118,7 +118,7 @@ build_vw_curves_chart <- function(vw_data, brand_colour = "#1e3a5f") {
       ml, y, width - mr, y
     ))
     grid_svg <- c(grid_svg, sprintf(
-      '<text x="%d" y="%.1f" text-anchor="end" fill="#64748b" font-size="11" font-weight="500">%.0f%%</text>',
+      '<text x="%d" y="%.1f" text-anchor="end" fill="#64748b" font-size="11" font-weight="400">%.0f%%</text>',
       ml - 8, y + 4, v * 100
     ))
   }
@@ -131,7 +131,7 @@ build_vw_curves_chart <- function(vw_data, brand_colour = "#1e3a5f") {
   for (tp in tick_prices) {
     x <- scale_x(tp)
     axis_svg <- c(axis_svg, sprintf(
-      '<text x="%.1f" y="%d" text-anchor="middle" fill="#64748b" font-size="11" font-weight="500">%.0f</text>',
+      '<text x="%.1f" y="%d" text-anchor="middle" fill="#64748b" font-size="11" font-weight="400">%.0f</text>',
       x, height - mb + 20, tp
     ))
   }
@@ -182,7 +182,7 @@ build_vw_curves_chart <- function(vw_data, brand_colour = "#1e3a5f") {
   }
 
   svg <- sprintf(
-    '<svg viewBox="0 0 %d %d" style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;width:100%%;height:auto;display:block;margin:0 auto;" role="img" aria-label="Van Westendorp Price Sensitivity Curves">
+    '<svg viewBox="0 0 %d %d" style="font-family:\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif;width:100%%;height:auto;display:block;margin:0 auto;" role="img" aria-label="Van Westendorp Price Sensitivity Curves">
       %s
       %s
       %s
@@ -284,7 +284,7 @@ build_demand_curve_chart <- function(prices, intents,
       ml, y, width - mr, y
     ))
     parts <- c(parts, sprintf(
-      '<text x="%d" y="%.1f" text-anchor="end" fill="#64748b" font-size="11" font-weight="500">%.0f%%</text>',
+      '<text x="%d" y="%.1f" text-anchor="end" fill="#64748b" font-size="11" font-weight="400">%.0f%%</text>',
       ml - 8, y + 4, v * 100
     ))
   }
@@ -296,7 +296,7 @@ build_demand_curve_chart <- function(prices, intents,
   for (tp in tick_prices) {
     x <- scale_x(tp)
     parts <- c(parts, sprintf(
-      '<text x="%.1f" y="%d" text-anchor="middle" fill="#64748b" font-size="11" font-weight="500">%s%.0f</text>',
+      '<text x="%.1f" y="%d" text-anchor="middle" fill="#64748b" font-size="11" font-weight="400">%s%.0f</text>',
       x, height - mb + 20, currency, tp
     ))
   }
@@ -401,7 +401,7 @@ build_demand_curve_chart <- function(prices, intents,
   }
 
   sprintf(
-    '<svg viewBox="0 0 %d %d" style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;width:100%%;height:auto;display:block;margin:0 auto;" role="img" aria-label="%s">
+    '<svg viewBox="0 0 %d %d" style="font-family:\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif;width:100%%;height:auto;display:block;margin:0 auto;" role="img" aria-label="%s">
       %s
       %s
      </svg>',
@@ -487,7 +487,7 @@ build_segment_comparison_chart <- function(segment_data, brand_colour = "#1e3a5f
 
     # Label
     parts <- c(parts, sprintf(
-      '<text x="%d" y="%.1f" text-anchor="end" fill="#1e293b" font-size="12" font-weight="500" dominant-baseline="middle">%s</text>',
+      '<text x="%d" y="%.1f" text-anchor="end" fill="#64748b" font-size="11" font-weight="400" dominant-baseline="middle">%s</text>',
       ml - 10, y_center, htmlEscape(segments[i])
     ))
 
@@ -502,13 +502,13 @@ build_segment_comparison_chart <- function(segment_data, brand_colour = "#1e3a5f
 
     # Value label
     parts <- c(parts, sprintf(
-      '<text x="%.1f" y="%.1f" fill="#1e293b" font-size="11" font-weight="500" dominant-baseline="middle">%s%.2f</text>',
+      '<text x="%.1f" y="%.1f" fill="#334155" font-size="12" font-weight="500" dominant-baseline="middle">%s%.2f</text>',
       scale_x(prices[i]) + 6, y_center, currency, prices[i]
     ))
   }
 
   sprintf(
-    '<svg viewBox="0 0 %d %d" style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;width:100%%;height:auto;display:block;margin:0 auto;" role="img" aria-label="Segment Price Comparison">
+    '<svg viewBox="0 0 %d %d" style="font-family:\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif;width:100%%;height:auto;display:block;margin:0 auto;" role="img" aria-label="Segment Price Comparison">
       %s
      </svg>',
     width, height,
@@ -630,7 +630,7 @@ build_elasticity_chart <- function(elasticity_data, brand_colour = "#1e3a5f",
   }
 
   sprintf(
-    '<svg viewBox="0 0 %d %d" style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;width:100%%;height:auto;display:block;margin:0 auto;" role="img" aria-label="Price Elasticity">
+    '<svg viewBox="0 0 %d %d" style="font-family:\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif;width:100%%;height:auto;display:block;margin:0 auto;" role="img" aria-label="Price Elasticity">
       %s
      </svg>',
     width, height,

@@ -49,7 +49,7 @@ build_seg_sizes_chart <- function(html_data, brand_colour = "#323367") {
       x_pos, x_pos, total_height - 5
     ))
     grid_lines <- paste0(grid_lines, sprintf(
-      '<text x="%.1f" y="12" text-anchor="middle" font-size="10" font-family="\'Segoe UI\', Arial, sans-serif" fill="#94a3b8" font-weight="400">%d%%</text>\n',
+      '<text x="%.1f" y="12" text-anchor="middle" font-size="10" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#94a3b8" font-weight="400">%d%%</text>\n',
       x_pos, g
     ))
   }
@@ -66,7 +66,7 @@ build_seg_sizes_chart <- function(html_data, brand_colour = "#323367") {
 
     # Segment name label
     bars <- paste0(bars, sprintf(
-      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="12" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="400" dominant-baseline="central">%s</text>\n',
+      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="12" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#334155" font-weight="400" dominant-baseline="central">%s</text>\n',
       label_width - 10, y + bar_height / 2, seg_label
     ))
 
@@ -80,7 +80,7 @@ build_seg_sizes_chart <- function(html_data, brand_colour = "#323367") {
     # Value label: n count and percentage
     value_text <- sprintf("n=%d (%.0f%%)", row$n, row$pct)
     bars <- paste0(bars, sprintf(
-      '<text x="%.1f" y="%.1f" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="500" dominant-baseline="central" data-seg-label-group="%s">%s</text>\n',
+      '<text x="%.1f" y="%.1f" font-size="11" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#334155" font-weight="500" dominant-baseline="central" data-seg-label-group="%s">%s</text>\n',
       label_width + bar_w + 8, y + bar_height / 2, group_id, value_text
     ))
   }
@@ -155,7 +155,7 @@ build_seg_silhouette_chart <- function(html_data, brand_colour = "#323367") {
       x_pos, x_pos, total_height - 5
     ))
     grid_lines <- paste0(grid_lines, sprintf(
-      '<text x="%.1f" y="15" text-anchor="middle" font-size="10" font-family="\'Segoe UI\', Arial, sans-serif" fill="#94a3b8" font-weight="400">%.2f</text>\n',
+      '<text x="%.1f" y="15" text-anchor="middle" font-size="10" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#94a3b8" font-weight="400">%.2f</text>\n',
       x_pos, g
     ))
   }
@@ -167,7 +167,7 @@ build_seg_silhouette_chart <- function(html_data, brand_colour = "#323367") {
     ref_x, ref_x, total_height - 5
   )
   ref_label <- sprintf(
-    '<text x="%.1f" y="%.0f" text-anchor="middle" font-size="9" font-family="\'Segoe UI\', Arial, sans-serif" fill="#d97706" font-weight="400">threshold</text>\n',
+    '<text x="%.1f" y="%.0f" text-anchor="middle" font-size="9" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#d97706" font-weight="400">threshold</text>\n',
     ref_x, total_height
   )
 
@@ -198,7 +198,7 @@ build_seg_silhouette_chart <- function(html_data, brand_colour = "#323367") {
     }
 
     bars <- paste0(bars, sprintf(
-      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="400" dominant-baseline="central">%s</text>\n',
+      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="11" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#334155" font-weight="400" dominant-baseline="central">%s</text>\n',
       label_width - 8, y + bar_height / 2, cluster_label
     ))
 
@@ -208,7 +208,7 @@ build_seg_silhouette_chart <- function(html_data, brand_colour = "#323367") {
     ))
 
     bars <- paste0(bars, sprintf(
-      '<text x="%.1f" y="%.1f" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="500" dominant-baseline="central">%.3f</text>\n',
+      '<text x="%.1f" y="%.1f" font-size="11" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#334155" font-weight="500" dominant-baseline="central">%.3f</text>\n',
       label_width + bar_w + 6, y + bar_height / 2, val
     ))
   }
@@ -310,7 +310,7 @@ build_seg_importance_chart <- function(html_data, brand_colour = "#323367") {
                   else if (has_eta) sprintf("%.2f", g)
                   else sprintf("%.0f", g)
     grid_lines <- paste0(grid_lines, sprintf(
-      '<text x="%.1f" y="15" text-anchor="middle" font-size="10" font-family="\'Segoe UI\', Arial, sans-serif" fill="#94a3b8" font-weight="400">%s</text>\n',
+      '<text x="%.1f" y="15" text-anchor="middle" font-size="10" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#94a3b8" font-weight="400">%s</text>\n',
       x_pos, grid_label
     ))
   }
@@ -333,7 +333,7 @@ build_seg_importance_chart <- function(html_data, brand_colour = "#323367") {
 
     # Label text
     bars <- paste0(bars, sprintf(
-      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="400" dominant-baseline="central" data-seg-label-group="%s">%s</text>\n',
+      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="11" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#334155" font-weight="400" dominant-baseline="central" data-seg-label-group="%s">%s</text>\n',
       label_width - 8, y + bar_height / 2, group_id, htmltools::htmlEscape(lbl)
     ))
 
@@ -346,7 +346,7 @@ build_seg_importance_chart <- function(html_data, brand_colour = "#323367") {
     # Value text
     val_x <- label_width + bar_w + 6
     bars <- paste0(bars, sprintf(
-      '<text x="%.1f" y="%.1f" font-size="10" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="500" dominant-baseline="central" data-seg-label-group="%s">%s</text>\n',
+      '<text x="%.1f" y="%.1f" font-size="10" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#334155" font-weight="500" dominant-baseline="central" data-seg-label-group="%s">%s</text>\n',
       val_x, y + bar_height / 2, group_id, fmt(val)
     ))
 
@@ -357,7 +357,7 @@ build_seg_importance_chart <- function(html_data, brand_colour = "#323367") {
       '<g class="seg-bar-x-btn" data-seg-target-group="%s" style="cursor:pointer;" onclick="segToggleBarByX(this,\'%s\')">\n',
       '  <circle cx="%.0f" cy="%.1f" r="9" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>\n',
       '  <text x="%.0f" y="%.1f" text-anchor="middle" dominant-baseline="central" font-size="11" ',
-      'font-family="\'Segoe UI\', Arial, sans-serif" fill="#94a3b8" font-weight="600">\u00D7</text>\n',
+      'font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#94a3b8" font-weight="600">\u00D7</text>\n',
       '</g>\n'
     ), group_id, group_id, x_centre, y_centre, x_centre, y_centre))
   }
@@ -468,7 +468,7 @@ build_seg_heatmap_chart <- function(html_data, brand_colour = "#323367",
     seg_label <- htmltools::htmlEscape(seg_names[seg_i])
     if (nchar(seg_label) > 12) seg_label <- paste0(substr(seg_label, 1, 11), "\u2026")
     header <- paste0(header, sprintf(
-      '<text x="%.1f" y="%.1f" text-anchor="middle" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="%s" font-weight="500" dominant-baseline="central">%s</text>\n',
+      '<text x="%.1f" y="%.1f" text-anchor="middle" font-size="11" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="%s" font-weight="500" dominant-baseline="central">%s</text>\n',
       x + cell_width / 2, header_height / 2, brand_colour, seg_label
     ))
   }
@@ -482,7 +482,7 @@ build_seg_heatmap_chart <- function(html_data, brand_colour = "#323367",
     vlbl <- var_labels[var_i]
     if (nchar(vlbl) > 30) vlbl <- paste0(substr(vlbl, 1, 28), "\u2026")
     cells <- paste0(cells, sprintf(
-      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="400" dominant-baseline="central">%s</text>\n',
+      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="11" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#334155" font-weight="400" dominant-baseline="central">%s</text>\n',
       label_width - 8, y + cell_height / 2, htmltools::htmlEscape(vlbl)
     ))
 
@@ -509,7 +509,7 @@ build_seg_heatmap_chart <- function(html_data, brand_colour = "#323367",
       }
 
       cells <- paste0(cells, sprintf(
-        '<text x="%.1f" y="%.1f" text-anchor="middle" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="%s" font-weight="500" dominant-baseline="central">%s</text>\n',
+        '<text x="%.1f" y="%.1f" text-anchor="middle" font-size="11" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="%s" font-weight="500" dominant-baseline="central">%s</text>\n',
         x + cell_width / 2, y + cell_height / 2, txt_colour, mean_text
       ))
     }
@@ -609,7 +609,7 @@ build_seg_elbow_chart <- function(html_data, brand_colour = "#323367") {
                  else if (wss_g >= 1000) sprintf("%.1fk", wss_g / 1000)
                  else sprintf("%.0f", wss_g)
     grid_lines <- paste0(grid_lines, sprintf(
-      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="10" font-family="\'Segoe UI\', Arial, sans-serif" fill="#94a3b8" font-weight="400" dominant-baseline="central">%s</text>\n',
+      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="10" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#94a3b8" font-weight="400" dominant-baseline="central">%s</text>\n',
       margin_left - 8, gy, label_val
     ))
   }
@@ -619,7 +619,7 @@ build_seg_elbow_chart <- function(html_data, brand_colour = "#323367") {
   for (k in k_vals) {
     kx <- to_x(k)
     x_labels <- paste0(x_labels, sprintf(
-      '<text x="%.1f" y="%.0f" text-anchor="middle" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="#64748b" font-weight="400">%d</text>\n',
+      '<text x="%.1f" y="%.0f" text-anchor="middle" font-size="11" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#64748b" font-weight="400">%d</text>\n',
       kx, chart_height - margin_bottom + 18, as.integer(k)
     ))
     # Tick mark
@@ -631,11 +631,11 @@ build_seg_elbow_chart <- function(html_data, brand_colour = "#323367") {
 
   # Axis titles
   x_title <- sprintf(
-    '<text x="%.1f" y="%.0f" text-anchor="middle" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="#64748b" font-weight="400">Number of clusters (k)</text>\n',
+    '<text x="%.1f" y="%.0f" text-anchor="middle" font-size="11" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#64748b" font-weight="400">Number of clusters (k)</text>\n',
     margin_left + plot_w / 2, chart_height - 5
   )
   y_title <- sprintf(
-    '<text x="12" y="%.1f" text-anchor="middle" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="#64748b" font-weight="400" transform="rotate(-90, 12, %.1f)">Within-SS</text>\n',
+    '<text x="12" y="%.1f" text-anchor="middle" font-size="11" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#64748b" font-weight="400" transform="rotate(-90, 12, %.1f)">Within-SS</text>\n',
     margin_top + plot_h / 2, margin_top + plot_h / 2
   )
 
@@ -668,7 +668,7 @@ build_seg_elbow_chart <- function(html_data, brand_colour = "#323367") {
       ))
       # Label
       points <- paste0(points, sprintf(
-        '<text x="%.1f" y="%.1f" text-anchor="middle" font-size="9" font-family="\'Segoe UI\', Arial, sans-serif" fill="#CC9900" font-weight="500">recommended</text>\n',
+        '<text x="%.1f" y="%.1f" text-anchor="middle" font-size="9" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#CC9900" font-weight="500">recommended</text>\n',
         px, py - 16
       ))
     } else {
@@ -767,7 +767,7 @@ build_seg_metrics_chart <- function(html_data, brand_colour = "#323367",
       margin_left, gy, chart_width - margin_right, gy
     ))
     grid_lines <- paste0(grid_lines, sprintf(
-      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="10" font-family="\'Segoe UI\', Arial, sans-serif" fill="#94a3b8" font-weight="400" dominant-baseline="central">%.2f</text>\n',
+      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="10" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#94a3b8" font-weight="400" dominant-baseline="central">%.2f</text>\n',
       margin_left - 6, gy, g
     ))
   }
@@ -777,7 +777,7 @@ build_seg_metrics_chart <- function(html_data, brand_colour = "#323367",
   for (k in k_vals) {
     kx <- to_x(k)
     x_labels <- paste0(x_labels, sprintf(
-      '<text x="%.1f" y="%.0f" text-anchor="middle" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="#64748b" font-weight="400">%d</text>\n',
+      '<text x="%.1f" y="%.0f" text-anchor="middle" font-size="11" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#64748b" font-weight="400">%d</text>\n',
       kx, chart_height - margin_bottom + 18, as.integer(k)
     ))
     x_labels <- paste0(x_labels, sprintf(
@@ -788,11 +788,11 @@ build_seg_metrics_chart <- function(html_data, brand_colour = "#323367",
 
   # Axis titles
   x_title <- sprintf(
-    '<text x="%.1f" y="%.0f" text-anchor="middle" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="#64748b" font-weight="400">Number of clusters (k)</text>\n',
+    '<text x="%.1f" y="%.0f" text-anchor="middle" font-size="11" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#64748b" font-weight="400">Number of clusters (k)</text>\n',
     margin_left + plot_w / 2, chart_height - 5
   )
   y_title <- sprintf(
-    '<text x="10" y="%.1f" text-anchor="middle" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="#64748b" font-weight="400" transform="rotate(-90, 10, %.1f)">Avg Silhouette</text>\n',
+    '<text x="10" y="%.1f" text-anchor="middle" font-size="11" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#64748b" font-weight="400" transform="rotate(-90, 10, %.1f)">Avg Silhouette</text>\n',
     margin_top + plot_h / 2, margin_top + plot_h / 2
   )
 
@@ -825,12 +825,12 @@ build_seg_metrics_chart <- function(html_data, brand_colour = "#323367",
       ))
       # Value label
       points <- paste0(points, sprintf(
-        '<text x="%.1f" y="%.1f" text-anchor="middle" font-size="9" font-family="\'Segoe UI\', Arial, sans-serif" fill="%s" font-weight="500">%.3f</text>\n',
+        '<text x="%.1f" y="%.1f" text-anchor="middle" font-size="9" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="%s" font-weight="500">%.3f</text>\n',
         px, py - 16, accent_colour, sil_vals[i]
       ))
       # "recommended" label
       points <- paste0(points, sprintf(
-        '<text x="%.1f" y="%.1f" text-anchor="middle" font-size="8" font-family="\'Segoe UI\', Arial, sans-serif" fill="%s" font-weight="400">recommended</text>\n',
+        '<text x="%.1f" y="%.1f" text-anchor="middle" font-size="8" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="%s" font-weight="400">recommended</text>\n',
         px, py - 25, accent_colour
       ))
     } else {
@@ -840,7 +840,7 @@ build_seg_metrics_chart <- function(html_data, brand_colour = "#323367",
       ))
       # Value label
       points <- paste0(points, sprintf(
-        '<text x="%.1f" y="%.1f" text-anchor="middle" font-size="9" font-family="\'Segoe UI\', Arial, sans-serif" fill="#64748b" font-weight="500">%.3f</text>\n',
+        '<text x="%.1f" y="%.1f" text-anchor="middle" font-size="9" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#64748b" font-weight="500">%.3f</text>\n',
         px, py - 10, sil_vals[i]
       ))
     }
@@ -926,7 +926,7 @@ build_seg_overlap_heatmap <- function(html_data, brand_colour = "#323367") {
     seg_label <- htmltools::htmlEscape(seg_names[j])
     if (nchar(seg_label) > 15) seg_label <- paste0(substr(seg_label, 1, 14), "\u2026")
     header <- paste0(header, sprintf(
-      '<text x="%.1f" y="%.0f" text-anchor="end" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="%s" font-weight="500" transform="rotate(-30, %.1f, %.0f)">%s</text>\n',
+      '<text x="%.1f" y="%.0f" text-anchor="end" font-size="11" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="%s" font-weight="500" transform="rotate(-30, %.1f, %.0f)">%s</text>\n',
       x, header_height - 8, brand_colour, x, header_height - 8, seg_label
     ))
   }
@@ -940,7 +940,7 @@ build_seg_overlap_heatmap <- function(html_data, brand_colour = "#323367") {
     row_label <- htmltools::htmlEscape(seg_names[i])
     if (nchar(row_label) > 14) row_label <- paste0(substr(row_label, 1, 13), "\u2026")
     cells <- paste0(cells, sprintf(
-      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="400" dominant-baseline="central">%s</text>\n',
+      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="11" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#334155" font-weight="400" dominant-baseline="central">%s</text>\n',
       label_width - 8, y + cell_size / 2, row_label
     ))
 
@@ -966,7 +966,7 @@ build_seg_overlap_heatmap <- function(html_data, brand_colour = "#323367") {
       ))
 
       cells <- paste0(cells, sprintf(
-        '<text x="%.1f" y="%.1f" text-anchor="middle" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="%s" font-weight="500" dominant-baseline="central">%s</text>\n',
+        '<text x="%.1f" y="%.1f" text-anchor="middle" font-size="11" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="%s" font-weight="500" dominant-baseline="central">%s</text>\n',
         x + cell_size / 2, y + cell_size / 2, txt_colour, value_text
       ))
     }
@@ -989,11 +989,11 @@ build_seg_overlap_heatmap <- function(html_data, brand_colour = "#323367") {
     ))
   }
   legend <- paste0(legend, sprintf(
-    '<text x="%.0f" y="%.0f" font-size="9" font-family="\'Segoe UI\', Arial, sans-serif" fill="#94a3b8">Overlapping</text>\n',
+    '<text x="%.0f" y="%.0f" font-size="9" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#94a3b8">Overlapping</text>\n',
     legend_x, legend_y + 20
   ))
   legend <- paste0(legend, sprintf(
-    '<text x="%.0f" y="%.0f" text-anchor="end" font-size="9" font-family="\'Segoe UI\', Arial, sans-serif" fill="#94a3b8">Distinct</text>\n',
+    '<text x="%.0f" y="%.0f" text-anchor="end" font-size="9" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#94a3b8">Distinct</text>\n',
     legend_x + legend_width, legend_y + 20
   ))
 
@@ -1064,7 +1064,7 @@ build_seg_golden_questions_chart <- function(html_data, brand_colour = "#323367"
   # Header: accuracy badge
   acc_text <- if (!is.na(accuracy)) sprintf("OOB Accuracy: %.0f%%", accuracy * 100) else ""
   header <- sprintf(
-    '<text x="%.0f" y="18" font-size="12" font-family="\'Segoe UI\', Arial, sans-serif" fill="%s" font-weight="600">%s</text>\n',
+    '<text x="%.0f" y="18" font-size="12" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="%s" font-weight="600">%s</text>\n',
     label_width, brand_colour, acc_text
   )
 
@@ -1095,7 +1095,7 @@ build_seg_golden_questions_chart <- function(html_data, brand_colour = "#323367"
 
     # Rank badge
     bars <- paste0(bars, sprintf(
-      '<text x="8" y="%.1f" font-size="10" font-family="\'Segoe UI\', Arial, sans-serif" fill="#94a3b8" font-weight="500" dominant-baseline="central">#%d</text>\n',
+      '<text x="8" y="%.1f" font-size="10" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#94a3b8" font-weight="500" dominant-baseline="central">#%d</text>\n',
       y + bar_height / 2, i
     ))
 
@@ -1103,7 +1103,7 @@ build_seg_golden_questions_chart <- function(html_data, brand_colour = "#323367"
     lbl <- labels[i]
     if (nchar(lbl) > 35) lbl <- paste0(substr(lbl, 1, 33), "\u2026")
     bars <- paste0(bars, sprintf(
-      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="11" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="400" dominant-baseline="central">%s</text>\n',
+      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="11" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#334155" font-weight="400" dominant-baseline="central">%s</text>\n',
       label_width - 8, y + bar_height / 2, htmltools::htmlEscape(lbl)
     ))
 
@@ -1115,7 +1115,7 @@ build_seg_golden_questions_chart <- function(html_data, brand_colour = "#323367"
 
     # Value
     bars <- paste0(bars, sprintf(
-      '<text x="%.1f" y="%.1f" font-size="10" font-family="\'Segoe UI\', Arial, sans-serif" fill="#334155" font-weight="500" dominant-baseline="central">%s</text>\n',
+      '<text x="%.1f" y="%.1f" font-size="10" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#334155" font-weight="500" dominant-baseline="central">%s</text>\n',
       label_width + bar_w + 6, y + bar_height / 2, fmt(val)
     ))
   }

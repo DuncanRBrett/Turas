@@ -21,7 +21,7 @@ if (!exists("%||%", mode = "function")) {
 }
 
 # Design Tokens
-.kd_font_family <- '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+.kd_font_family <- "'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif"
 .kd_label_colour <- "#64748b"
 .kd_value_colour <- "#334155"
 .kd_grid_colour  <- "#e2e8f0"

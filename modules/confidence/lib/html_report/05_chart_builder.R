@@ -122,7 +122,7 @@ build_forest_svg <- function(questions, brand_colour, title, is_proportion) {
       paste0(q$question_id, " \u2014 ", q$question_label) else q$question_id
     if (nchar(label) > 40) label <- paste0(substr(label, 1, 38), "...")
     elements <- c(elements, sprintf(
-      '<text x="%d" y="%.1f" font-size="11" fill="#1e293b" text-anchor="end" dominant-baseline="middle">%s</text>',
+      '<text x="%d" y="%.1f" font-size="11" fill="#64748b" text-anchor="end" font-weight="400" dominant-baseline="middle">%s</text>',
       margin_left - 8, y, htmlEscape(label)
     ))
 
@@ -162,7 +162,7 @@ build_forest_svg <- function(questions, brand_colour, title, is_proportion) {
   }
 
   sprintf(
-    '<svg viewBox="0 0 %d %d" style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif; width:100%%; max-width:720px; height:auto; display:block; margin:0 auto;" role="img" aria-label="%s forest plot">
+    '<svg viewBox="0 0 %d %d" style="font-family:\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif; width:100%%; max-width:720px; height:auto; display:block; margin:0 auto;" role="img" aria-label="%s forest plot">
       %s
     </svg>',
     chart_width, chart_height, htmlEscape(title),
@@ -240,7 +240,7 @@ build_method_comparison_chart <- function(q, brand_colour = "#1e3a5f") {
 
     # Label
     elements <- c(elements, sprintf(
-      '<text x="%d" y="%.1f" font-size="11" fill="#1e293b" text-anchor="end" dominant-baseline="middle">%s</text>',
+      '<text x="%d" y="%.1f" font-size="11" fill="#64748b" text-anchor="end" font-weight="400" dominant-baseline="middle">%s</text>',
       margin_left - 8, y, method_names[i]
     ))
 
@@ -272,7 +272,7 @@ build_method_comparison_chart <- function(q, brand_colour = "#1e3a5f") {
   }
 
   sprintf(
-    '<svg viewBox="0 0 %d %d" style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif; width:100%%; max-width:520px; height:auto; display:block; margin:8px auto;" role="img" aria-label="Method comparison chart">
+    '<svg viewBox="0 0 %d %d" style="font-family:\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif; width:100%%; max-width:520px; height:auto; display:block; margin:8px auto;" role="img" aria-label="Method comparison chart">
       %s
     </svg>',
     chart_width, chart_height,
