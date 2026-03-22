@@ -184,7 +184,7 @@ if (is.null(turas_root)) {
     # Should start clean
     expect_equal(length(guard$design_issues), 0)
     expect_equal(length(guard$estimation_warnings), 0)
-    expect_null(guard$convergence_status)
+    expect_null(guard$convergence_status$converged)
     expect_false(guard$none_option_included)
   })
 

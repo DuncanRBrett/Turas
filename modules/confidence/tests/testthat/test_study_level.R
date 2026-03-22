@@ -12,6 +12,17 @@ library(testthat)
 
 context("Study-Level Calculations")
 
+# Re-source 03_study_level.R to ensure confidence module's versions of
+# calculate_effective_n and calculate_deff are loaded (other modules like
+# maxdiff define functions with the same names but different behaviour)
+local({
+  root <- tryCatch(get("TURAS_ROOT", envir = .GlobalEnv), error = function(e) NULL)
+  if (!is.null(root)) {
+    sl <- file.path(root, "modules", "confidence", "R", "03_study_level.R")
+    if (file.exists(sl)) source(sl, local = FALSE)
+  }
+})
+
 # ==============================================================================
 # EFFECTIVE SAMPLE SIZE (KISH FORMULA)
 # ==============================================================================

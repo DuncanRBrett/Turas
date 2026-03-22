@@ -151,7 +151,7 @@ conjoint_guard_init <- function() {
   # Add Conjoint-specific fields
   guard$design_issues <- list()
   guard$estimation_warnings <- character(0)
-  guard$convergence_status <- NULL
+  guard$convergence_status <- list(converged = NULL)
   guard$attribute_issues <- list()
   guard$none_option_included <- FALSE
 
@@ -226,7 +226,7 @@ conjoint_guard_summary <- function(guard) {
   summary$has_issues <- summary$has_issues ||
                         length(guard$design_issues) > 0 ||
                         length(guard$estimation_warnings) > 0 ||
-                        (!is.null(guard$convergence_status) && !guard$convergence_status$converged)
+                        (!is.null(guard$convergence_status$converged) && !guard$convergence_status$converged)
 
   summary
 }
@@ -724,7 +724,7 @@ conjoint_determine_status <- function(guard,
   }
 
   # Check convergence status
-  if (!is.null(summary$convergence_status) && !summary$convergence_status$converged) {
+  if (!is.null(summary$convergence_status$converged) && !summary$convergence_status$converged) {
     degraded_reasons <- c(degraded_reasons, "Model did not fully converge")
     affected_outputs <- c(affected_outputs, "all_outputs")
   }
