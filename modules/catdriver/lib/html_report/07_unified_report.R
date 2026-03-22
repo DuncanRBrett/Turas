@@ -346,11 +346,7 @@ generate_catdriver_unified_report <- function(analyses,
         id = "cd-pinned-empty",
         class = "cd-pinned-empty",
         htmltools::tags$div(class = "cd-pinned-empty-icon", "\U0001F4CC"),
-        htmltools::tags$div("No pinned views yet."),
-        htmltools::tags$div(
-          style = "font-size:12px;margin-top:4px;",
-          "Click the pin icon on any section to save it here for export."
-        )
+        htmltools::tags$div("No pinned views yet.")
       ),
       htmltools::tags$div(id = "cd-pinned-cards-container")
     )

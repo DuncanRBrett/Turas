@@ -58,16 +58,19 @@ turas_base_css <- function(brand_colour = "#323367",
   # 4. Common components
   parts <- c(parts, turas_component_css(brand_colour, accent_colour))
 
-  # 5. Callout & insight styles
+  # 5. Table system
+  parts <- c(parts, turas_table_css())
+
+  # 6. Callout & insight styles
   parts <- c(parts, turas_callout_css(brand_colour))
 
-  # 6. Interaction refinements (progressive disclosure)
+  # 7. Interaction refinements (progressive disclosure)
   parts <- c(parts, turas_interaction_css(brand_colour))
 
-  # 7. Entry animations
+  # 8. Entry animations
   parts <- c(parts, turas_animation_css())
 
-  # 8. Print styles
+  # 9. Print styles
   parts <- c(parts, turas_print_css())
 
   paste(parts, collapse = "\n\n")
@@ -385,6 +388,275 @@ turas_component_css <- function(brand_colour = "#323367",
 
 
 #' Generate Callout & Insight CSS
+#' Generate Shared Table CSS
+#'
+#' Standardised table styling applied across all modules. Module-specific
+#' CSS can override these defaults as needed. Uses attribute selectors and
+#' low-specificity class names so module CSS (with prefixed classes) wins.
+#'
+#' @return Character CSS string
+#' @keywords internal
+turas_table_css <- function() {
+  '
+    /* === TURAS TABLE SYSTEM === */
+
+    /* --- Table container (card wrapper) --- */
+    .t-table-wrap {
+      background: #ffffff;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .t-table-scroll {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* --- Base table --- */
+    table[class*="-table"] {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      line-height: 1.5;
+      font-variant-numeric: tabular-nums;
+      -webkit-font-feature-settings: "tnum";
+      font-feature-settings: "tnum";
+    }
+
+    /* --- Header cells --- */
+    table[class*="-table"] thead th,
+    th[class*="-th"] {
+      padding: 10px 14px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: #64748b;
+      background: #f8f9fa;
+      border-bottom: 2px solid #e2e8f0;
+      text-align: left;
+      white-space: nowrap;
+      position: relative;
+    }
+
+    /* Numeric header alignment */
+    th[class*="-th-num"],
+    th[class*="-th-val"],
+    th[class*="-th-pct"],
+    th[class*="-th-score"] {
+      text-align: right;
+    }
+    th[class*="-th-center"] {
+      text-align: center;
+    }
+
+    /* --- Data cells --- */
+    table[class*="-table"] tbody td,
+    td[class*="-td"] {
+      padding: 8px 14px;
+      border-bottom: 1px solid #f0f0f0;
+      vertical-align: middle;
+      color: #334155;
+      transition: background-color 0.15s ease;
+    }
+
+    /* Numeric cell alignment */
+    td[class*="-num"],
+    td[class*="-val"],
+    td[class*="-pct"],
+    td[class*="-score"] {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    td[class*="-center"] {
+      text-align: center;
+    }
+
+    /* Label column (first column) */
+    td[class*="-label"] {
+      font-weight: 500;
+      color: #1e293b;
+    }
+
+    /* --- Row hover --- */
+    table[class*="-table"] tbody tr:hover {
+      background-color: #f8fafc;
+    }
+
+    /* --- Zebra striping (opt-in via .t-striped) --- */
+    table.t-striped tbody tr:nth-child(even) {
+      background-color: #f9fafb;
+    }
+    table.t-striped tbody tr:nth-child(even):hover {
+      background-color: #f1f5f9;
+    }
+
+    /* --- Base row (question label row in crosstabs) --- */
+    tr[class*="-row-base"],
+    tr[class*="-base-row"] {
+      border-top: 2px solid #e2e8f0;
+      background: #fafbfc;
+    }
+    tr[class*="-row-base"] td,
+    tr[class*="-base-row"] td {
+      font-weight: 600;
+      font-size: 11px;
+      color: #64748b;
+    }
+
+    /* --- Section header rows --- */
+    tr[class*="-section-row"] td,
+    tr[class*="-row-header"] td {
+      font-weight: 600;
+      font-size: 12px;
+      color: #1e293b;
+      padding-top: 14px;
+      background: #f8f9fa;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    /* --- Heatmap cells (standardised 4-level scale) --- */
+    .t-heat-high, [class*="-heat-high"] {
+      background-color: #dcfce7 !important;
+      color: #166534;
+    }
+    .t-heat-med-high, [class*="-heat-med-high"] {
+      background-color: #eff6ff !important;
+      color: #1e40af;
+    }
+    .t-heat-med-low, [class*="-heat-med-low"] {
+      background-color: #fef3c7 !important;
+      color: #92400e;
+    }
+    .t-heat-low, [class*="-heat-low"] {
+      background-color: #fee2e2 !important;
+      color: #991b1b;
+    }
+
+    /* --- Significance badges --- */
+    [class*="-sig"] {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 5px;
+      border-radius: 3px;
+      margin-left: 4px;
+      vertical-align: middle;
+      line-height: 1.4;
+    }
+    [class*="-sig-up"], .t-sig-up {
+      background: #dcfce7;
+      color: #166534;
+    }
+    [class*="-sig-down"], .t-sig-down {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    /* --- Status badges --- */
+    [class*="-badge"] {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+      letter-spacing: 0.2px;
+    }
+    [class*="-badge-good"], [class*="-badge-pass"] {
+      background: #dcfce7;
+      color: #166534;
+    }
+    [class*="-badge-warn"], [class*="-badge-moderate"] {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    [class*="-badge-poor"], [class*="-badge-fail"] {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    /* --- Sortable column headers --- */
+    [class*="-sortable"],
+    th[data-col-key] {
+      cursor: pointer;
+      user-select: none;
+    }
+    [class*="-sortable"]:hover,
+    th[data-col-key]:hover {
+      background: #eef2f7;
+    }
+    /* Sort indicator (idle state: ⇅, active: ▲ or ▼) */
+    [class*="-sort-indicator"],
+    .sort-arrow {
+      font-size: 10px;
+      color: #94a3b8;
+      margin-left: 3px;
+      vertical-align: middle;
+    }
+    [class*="-sort-active"],
+    .sort-arrow {
+      color: var(--brand, #323367);
+      font-weight: 700;
+    }
+    /* CSS-based sort arrows (tracker pattern) */
+    [class*="-sortable"].sort-asc::after {
+      content: " \25B2";
+      font-size: 9px;
+      color: var(--brand, #323367);
+    }
+    [class*="-sortable"].sort-desc::after {
+      content: " \25BC";
+      font-size: 9px;
+      color: var(--brand, #323367);
+    }
+
+    /* --- Low-base dimming --- */
+    [class*="-low-base-dim"] {
+      opacity: 0.5;
+    }
+    [class*="-low-base-dim"]:hover {
+      opacity: 0.8;
+    }
+
+    /* --- Sticky first column (for wide tables) --- */
+    [class*="-sticky-col"] {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      background: inherit;
+    }
+
+    /* --- Compact table variant --- */
+    table.t-compact th {
+      padding: 6px 10px;
+      font-size: 10px;
+    }
+    table.t-compact td {
+      padding: 5px 10px;
+      font-size: 12px;
+    }
+
+    /* --- Print table styles --- */
+    @media print {
+      table[class*="-table"] {
+        font-size: 11px;
+        page-break-inside: auto;
+      }
+      table[class*="-table"] tr {
+        page-break-inside: avoid;
+      }
+      table[class*="-table"] tbody tr:hover {
+        background-color: transparent;
+      }
+      [class*="-low-base-dim"] {
+        opacity: 0.5 !important;
+      }
+    }
+  '
+}
+
+
 #'
 #' Styles for three distinct content types:
 #' 1. Callouts (platform-generated educational guidance)

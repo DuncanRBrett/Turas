@@ -658,8 +658,8 @@ build_kd_css <- function(config) {
   font-weight: 600;
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
-  padding: 8px 10px;
+  letter-spacing: 0.4px;
+  padding: 10px 14px;
   text-align: left;
   border-bottom: 2px solid var(--kd-border);
   vertical-align: bottom;
@@ -671,7 +671,7 @@ build_kd_css <- function(config) {
 .kd-th-rank { text-align: center; width: 50px; }
 
 .kd-td {
-  padding: 8px 12px;
+  padding: 8px 14px;
   border-bottom: 1px solid #f0f0f0;
   vertical-align: middle;
   color: var(--kd-text);
@@ -3088,7 +3088,7 @@ build_kd_pinned_panel <- function(config = list()) {
               "\U0001F4F7"
             ),
             htmltools::tags$button(
-              class = "kd-qual-btn", title = "Pin to presentation",
+              class = "kd-qual-btn", title = "Pin to Views",
               onclick = sprintf("kdPinQualSlide('%s')", slide_id),
               "\U0001F4CC"
             ),
@@ -3176,11 +3176,7 @@ build_kd_pinned_panel <- function(config = list()) {
     htmltools::tags$div(
       id = "kd-pinned-empty", class = "kd-pinned-empty",
       htmltools::tags$div(class = "kd-pinned-empty-icon", "\U0001F4CC"),
-      htmltools::tags$div("No pinned views yet."),
-      htmltools::tags$div(
-        style = "font-size:12px;margin-top:4px;",
-        "Click the pin icon on any section to save it here for export."
-      )
+      htmltools::tags$div("No pinned views yet.")
     ),
     htmltools::tags$div(
       id = "kd-qual-slides-container", class = "kd-qual-slides-container",
@@ -3301,7 +3297,7 @@ build_kd_section_title_row <- function(title, section_key, prefix = "",
       `data-kd-pin-section` = section_key,
       `data-kd-pin-prefix` = prefix,
       onclick = sprintf("kdPinSection('%s','%s')", section_key, prefix),
-      title = "Pin this section",
+      title = "Pin to Views",
       "\U0001F4CC"
     )
   }

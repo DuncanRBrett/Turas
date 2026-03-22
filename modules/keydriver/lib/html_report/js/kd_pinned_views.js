@@ -179,7 +179,7 @@
         '<div class="kd-qual-title" contenteditable="true">New Slide</div>' +
         '<div class="kd-qual-actions">' +
           '<button class="kd-qual-btn" title="Add image" onclick="kdTriggerQualImage(\'' + id + '\')">&#x1F4F7;</button>' +
-          '<button class="kd-qual-btn" title="Pin to presentation" onclick="kdPinQualSlide(\'' + id + '\')">&#x1F4CC;</button>' +
+          '<button class="kd-qual-btn" title="Pin to Views" onclick="kdPinQualSlide(\'' + id + '\')">&#x1F4CC;</button>' +
           '<button class="kd-qual-btn" title="Move up" onclick="kdMoveQualSlide(\'' + id + '\',-1)">&uarr;</button>' +
           '<button class="kd-qual-btn" title="Move down" onclick="kdMoveQualSlide(\'' + id + '\',1)">&darr;</button>' +
           '<button class="kd-qual-btn kd-qual-delete" title="Delete slide" onclick="kdRemoveQualSlide(\'' + id + '\')">&times;</button>' +
@@ -637,7 +637,7 @@
         }
       }
       btn.classList.toggle('kd-pin-btn-active', isPinned);
-      btn.title = isPinned ? 'Unpin this section' : 'Pin this section';
+      btn.title = isPinned ? 'Unpin this section' : 'Pin to Views';
     });
 
     // Component-level pin buttons (chart/table)

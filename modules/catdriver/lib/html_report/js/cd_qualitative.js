@@ -225,7 +225,7 @@
                 '<path d="M7 3v8M3 7l4 4 4-4"/>' +
               '</svg>' +
             '</button>' +
-            '<button class="cd-qual-btn cd-qual-btn-pin" title="Pin to Pinned Views" ' +
+            '<button class="cd-qual-btn cd-qual-btn-pin" title="Pin to Views" ' +
               'onclick="cdPinQualSlide(\'' + slideId + '\')">' +
               '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">' +
                 '<path d="M7 1v8M4 4l3-3 3 3M2 13h10"/>' +

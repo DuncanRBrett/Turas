@@ -155,11 +155,7 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
       id = "seg-pinned-empty",
       class = "seg-pinned-empty",
       htmltools::tags$div(class = "seg-pinned-empty-icon", "\U0001F4CC"),
-      htmltools::tags$div("No pinned views yet."),
-      htmltools::tags$div(
-        style = "font-size:12px;margin-top:4px;",
-        "Click the pin icon on any section to save it here for export."
-      )
+      htmltools::tags$div("No pinned views yet.")
     ),
     htmltools::tags$div(id = "seg-pinned-cards-container")
   )
@@ -616,8 +612,8 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
   font-weight: 600;
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
-  padding: 10px 12px;
+  letter-spacing: 0.4px;
+  padding: 10px 14px;
   text-align: left;
   border-bottom: 2px solid var(--seg-border);
   vertical-align: bottom;
@@ -629,7 +625,7 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
 .seg-th-rank { text-align: center; width: 50px; }
 
 .seg-td {
-  padding: 8px 12px;
+  padding: 8px 14px;
   border-bottom: 1px solid #f0f0f0;
   vertical-align: middle;
   color: var(--seg-text);
@@ -1643,7 +1639,7 @@ build_seg_section_title_row <- function(title_text, section_key,
       class = "seg-pin-btn",
       `data-seg-pin-section` = section_key,
       onclick = sprintf("segPinSection('%s')", section_key),
-      title = "Pin this section",
+      title = "Pin to Views",
       "\U0001F4CC"
     )
   }
@@ -3657,7 +3653,7 @@ build_seg_slides_section <- function(config) {
               "color:#64748b; font-size:12px; cursor:pointer; padding:2px 8px;"
             ),
             onclick = "segPinSlide(this)",
-            title = "Pin this slide to Pinned Views",
+            title = "Pin to Views",
             "\U0001F4CC"
           ),
           htmltools::tags$button(

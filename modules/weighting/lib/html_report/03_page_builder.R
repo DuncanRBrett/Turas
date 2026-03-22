@@ -276,13 +276,13 @@ body {
   font-weight: 600;
   text-transform: uppercase;
   font-size: 11px;
-  letter-spacing: 0.5px;
-  padding: 10px 12px;
+  letter-spacing: 0.4px;
+  padding: 10px 14px;
   text-align: left;
   border-bottom: 2px solid #e2e8f0;
 }
 .wt-table tbody td {
-  padding: 8px 12px;
+  padding: 8px 14px;
   border-bottom: 1px solid #f1f5f9;
 }
 .wt-table tbody tr:hover {

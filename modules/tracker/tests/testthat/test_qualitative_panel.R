@@ -117,9 +117,9 @@ test_that("build_pinned_tab contains pinned-empty-state", {
   expect_true(grepl("pinned-empty-state", html, fixed = TRUE))
 })
 
-test_that("build_pinned_tab has Save Report HTML button", {
+test_that("build_pinned_tab has Save Report button", {
   html <- as.character(build_pinned_tab())
-  expect_true(grepl("Save Report HTML", html, fixed = TRUE))
+  expect_true(grepl("Save Report", html, fixed = TRUE))
   expect_true(grepl("saveReportHTML", html, fixed = TRUE))
 })
 

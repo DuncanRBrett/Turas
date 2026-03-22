@@ -262,9 +262,9 @@ body { font-family:"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Robot
 
 /* === TABLES === */
 .cj-table { width:100%; border-collapse:collapse; font-size:13px; }
-.cj-table th { text-align:left; padding:8px 12px; border-bottom:2px solid #e2e8f0; color:#64748b; font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; }
+.cj-table th { text-align:left; padding:10px 14px; border-bottom:2px solid #e2e8f0; color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.4px; }
 .cj-table th.cj-num-header { text-align:right; }
-.cj-table td { padding:8px 12px; border-bottom:1px solid #f1f5f9; }
+.cj-table td { padding:8px 14px; border-bottom:1px solid #f1f5f9; }
 .cj-label-col { font-weight:400; color:#334155; }
 .cj-num { font-variant-numeric:tabular-nums; text-align:right; }
 .cj-positive { color:#16a34a; font-weight:500; }
@@ -751,7 +751,7 @@ build_overview_panel <- function(html_data, tables, charts, config = list()) {
   )
 
   export_bar <- .build_export_bar("overview")
-  pin_btn <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-overview\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
+  pin_btn <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-overview\')" title="Pin to Views"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
   insight <- build_insight_area("overview", html_data$insights)
 
   sprintf(
@@ -819,7 +819,7 @@ build_utilities_panel <- function(html_data, tables, charts, brand, config = lis
     attr_id <- gsub("[^a-zA-Z0-9]", "-", attr_name)
     export_bar <- .build_export_bar(paste0("util-", attr_id))
     pin_btn <- sprintf(
-      '<button class="cj-pin-btn" onclick="togglePin(\'util-%s\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>',
+      '<button class="cj-pin-btn" onclick="togglePin(\'util-%s\')" title="Pin to Views"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>',
       .html_esc(attr_name)
     )
 
@@ -905,7 +905,7 @@ build_diagnostics_panel <- function(html_data, tables, charts, brand) {
   sections <- c(sections, diag_callouts)
 
   export_bar <- .build_export_bar("diagnostics")
-  pin_fit <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-diagnostics-fit\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
+  pin_fit <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-diagnostics-fit\')" title="Pin to Views"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
 
   # Model Fit
   sections <- c(sections, sprintf(
@@ -925,7 +925,7 @@ build_diagnostics_panel <- function(html_data, tables, charts, brand) {
     converged <- isTRUE(hb$convergence$converged)
     status_class <- if (converged) "cj-status-pass" else "cj-status-fail"
     status_text <- if (converged) "CONVERGED" else "NOT CONVERGED"
-    pin_conv <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-diagnostics-convergence\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
+    pin_conv <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-diagnostics-convergence\')" title="Pin to Views"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
 
     # Plain-language convergence explanation
     if (converged) {
@@ -972,7 +972,7 @@ build_diagnostics_panel <- function(html_data, tables, charts, brand) {
 
     # Respondent quality
     if (!is.null(hb$quality)) {
-      pin_quality <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-diagnostics-quality\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
+      pin_quality <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-diagnostics-quality\')" title="Pin to Views"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
 
       # Plain-language RLH explanation
       rlh_val <- hb$quality$mean_rlh %||% 0
@@ -1144,7 +1144,7 @@ build_lc_panel <- function(html_data, tables, charts, brand) {
   ))
 
   # BIC chart + comparison table
-  pin_bic <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-lc-bic\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
+  pin_bic <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-lc-bic\')" title="Pin to Views"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
   sections <- c(sections, sprintf(
     '<div class="cj-card">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -1160,7 +1160,7 @@ build_lc_panel <- function(html_data, tables, charts, brand) {
 
   # Class sizes
   if (!is.null(charts$class_sizes)) {
-    pin_sizes <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-lc-sizes\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
+    pin_sizes <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-lc-sizes\')" title="Pin to Views"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
     sections <- c(sections, sprintf(
       '<div class="cj-card">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -1174,7 +1174,7 @@ build_lc_panel <- function(html_data, tables, charts, brand) {
 
   # Class importance comparison
   if (!is.null(charts$class_importance)) {
-    pin_imp <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-lc-importance\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
+    pin_imp <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-lc-importance\')" title="Pin to Views"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
     sections <- c(sections, sprintf(
       '<div class="cj-card">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -1223,7 +1223,7 @@ build_wtp_panel <- function(html_data, tables, charts, brand) {
   } else ""
 
   # WTP chart + table
-  pin_wtp <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-wtp-main\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
+  pin_wtp <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-wtp-main\')" title="Pin to Views"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
   sections <- c(sections, sprintf(
     '<div class="cj-card">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -1241,7 +1241,7 @@ build_wtp_panel <- function(html_data, tables, charts, brand) {
 
   # Demand curve
   if (!is.null(charts$demand_curve) || !is.null(tables$demand_curve)) {
-    pin_demand <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-wtp-demand\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
+    pin_demand <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-wtp-demand\')" title="Pin to Views"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
     sections <- c(sections, sprintf(
       '<div class="cj-card">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -1331,7 +1331,7 @@ build_simulator_panel <- function(html_data, brand) {
 
   insight <- build_insight_area("simulator", html_data$insights)
 
-  pin_sim <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-simulator\')" title="Pin this view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
+  pin_sim <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-simulator\')" title="Pin to Views"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
 
   sprintf(
     '<div class="cj-panel" role="tabpanel" id="panel-simulator">
@@ -1452,16 +1452,15 @@ build_pinned_panel <- function() {
 </div>
 <div style="display:flex;gap:8px;">
 <button class="cj-export-btn" onclick="addSection()">+ Add Section</button>
-<button class="cj-export-btn" onclick="exportAllPinnedSlides()">Export All Slides</button>
-<button class="cj-export-btn" onclick="printPinnedViews()">Print / Save PDF</button>
+<button class="cj-export-btn" onclick="exportAllPinnedSlides()">Export All as PNG</button>
+<button class="cj-export-btn" onclick="printPinnedViews()">Print / PDF</button>
 <button class="cj-export-btn" onclick="saveReportHTML()">Save Report</button>
 </div>
 </div>
 <div id="cj-pinned-cards"></div>
 <div class="cj-pinned-empty" id="cj-pinned-empty">
 <div class="cj-pinned-empty-icon">&#128204;</div>
-<div style="font-size:14px;font-weight:600;">No pinned views yet</div>
-<div style="font-size:12px;margin-top:4px;">Click the Pin button on any chart or table to add it here.</div>
+<div style="font-size:14px;font-weight:600;">No pinned views yet.</div>
 </div>
 </div>
 </div>'
@@ -1484,7 +1483,7 @@ build_slides_panel <- function() {
 </div>
 <div style="display:flex;gap:8px;">
 <button class="cj-export-btn" onclick="addSlide()">+ Add Slide</button>
-<button class="cj-export-btn" onclick="exportAllSlidesPNG()">Export All PNGs</button>
+<button class="cj-export-btn" onclick="exportAllSlidesPNG()">Export All as PNG</button>
 <button class="cj-export-btn" onclick="printSlides()">Print Slides</button>
 </div>
 </div>

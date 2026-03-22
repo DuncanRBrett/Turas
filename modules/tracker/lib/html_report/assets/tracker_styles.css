@@ -271,8 +271,8 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Robo
 .tk-table-wrapper { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); background: var(--card); }
 .tk-table { width: 100%; border-collapse: collapse; color: #1e293b; font-size: 13px; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 .tk-table td, .tk-table th { font-family: inherit; }
-.tk-th { padding: 8px 10px; text-align: center; font-size: 11px; font-weight: 600; color: #64748b; border-bottom: 2px solid var(--border); white-space: normal; min-width: 80px; max-width: 160px; vertical-align: bottom; background: var(--ct-bg-muted); }
-.tk-td { padding: 6px 10px; text-align: center; border-bottom: 1px solid #f0f0f0; font-size: 13px; color: #1e293b; transition: background-color 0.15s; }
+.tk-th { padding: 10px 14px; text-align: center; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: #64748b; border-bottom: 2px solid var(--border); white-space: normal; min-width: 80px; max-width: 160px; vertical-align: bottom; background: var(--ct-bg-muted); }
+.tk-td { padding: 8px 14px; text-align: center; border-bottom: 1px solid #f0f0f0; font-size: 13px; color: #1e293b; transition: background-color 0.15s; }
 .tk-label-col { text-align: left; min-width: 180px; max-width: 320px; white-space: normal; word-wrap: break-word; }
 .tk-td.tk-label-col { font-weight: 500; color: #1e293b; }
 .tk-sticky-col { position: sticky; left: 0; z-index: 2; background: var(--card); }
@@ -941,10 +941,10 @@ body.hide-sparklines .tk-sparkline-wrap { display: none; }
 
 /* Visualise detail table */
 .vis-detail-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; }
-.vis-detail-table .tk-th { padding: 8px 12px; font-size: 11px; font-weight: 600; color: var(--text-muted);
+.vis-detail-table .tk-th { padding: 10px 14px; font-size: 11px; font-weight: 600; color: var(--text-muted);
   border-bottom: 2px solid var(--border); white-space: nowrap; text-align: center; }
 .vis-detail-table .tk-label-col { text-align: left; min-width: 140px; }
-.vis-detail-table .tk-td { padding: 8px 12px; border-bottom: 1px solid var(--border); text-align: center; }
+.vis-detail-table .tk-td { padding: 8px 14px; border-bottom: 1px solid var(--border); text-align: center; }
 .vis-detail-table .tk-value-cell .tk-val { font-weight: 600; }
 .vis-detail-table .tk-metric-row:hover { background: rgba(0,0,0,0.02); }
 .vis-detail-table .tk-base-row { background: var(--section-bg); }

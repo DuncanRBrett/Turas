@@ -94,12 +94,12 @@ build_html_page <- function(html_data, tables, config_obj,
             htmltools::tags$button(
               class = "export-btn",
               onclick = "exportAllPinnedSlides()",
-              "\U0001F4E4 Export All Slides"
+              "\U0001F4E4 Export All as PNG"
             ),
             htmltools::tags$button(
               class = "export-btn",
               onclick = "printPinnedViews()",
-              "\U0001F5A8 Print / Save PDF"
+              "\U0001F5A8 Print / PDF"
             ),
             htmltools::tags$button(
               class = "export-btn",
@@ -113,7 +113,7 @@ build_html_page <- function(html_data, tables, config_obj,
           id = "pinned-empty-state",
           style = "text-align:center;padding:60px 20px;color:#94a3b8;",
           htmltools::tags$div(style = "font-size:36px;margin-bottom:12px;", "\U0001F4CC"),
-          htmltools::tags$div(style = "font-size:14px;font-weight:600;", "No pinned views yet"),
+          htmltools::tags$div(style = "font-size:14px;font-weight:600;", "No pinned views yet."),
           htmltools::tags$div(style = "font-size:12px;margin-top:4px;",
             "Click the pin icon on any question in the Crosstabs tab to add it here.")
         ),

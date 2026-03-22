@@ -282,17 +282,17 @@ build_pinned_tab <- function() {
       htmltools::tags$button(class = "tk-btn", onclick = "addSection()",
                               htmltools::HTML("&#x2795; Add Section")),
       htmltools::tags$button(class = "tk-btn", onclick = "exportAllPinsPNG()",
-                              htmltools::HTML("&#x1F4F8; Export All as PNGs")),
+                              htmltools::HTML("&#x1F4F8; Export All as PNG")),
       htmltools::tags$button(class = "tk-btn", onclick = "printAllPins()",
-                              htmltools::HTML("&#x1F5A8; Print / Save PDF")),
+                              htmltools::HTML("&#x1F5A8; Print / PDF")),
       htmltools::tags$button(class = "tk-btn", onclick = "saveReportHTML()",
-                              htmltools::HTML("&#x1F4BE; Save Report HTML"))
+                              htmltools::HTML("&#x1F4BE; Save Report"))
     ),
     htmltools::tags$div(id = "pinned-cards-container"),
     htmltools::tags$div(
       id = "pinned-empty-state",
       class = "pinned-empty-state",
-      htmltools::HTML("&#x1F4CC; No pinned views yet. Go to the <strong>Explorer</strong> tab and click <strong>Pin</strong> to save a view here.")
+      htmltools::HTML("&#x1F4CC; No pinned views yet.")
     )
   )
 }

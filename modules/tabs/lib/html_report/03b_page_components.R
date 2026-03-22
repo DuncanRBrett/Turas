@@ -823,7 +823,7 @@ build_question_containers <- function(questions, tables, banner_groups,
             class = "pin-btn",
             `data-q-code` = q_code,
             onclick = sprintf("togglePin('%s')", js_esc(q_code)),
-            title = "Pin this view",
+            title = "Pin to Views",
             style = paste0(
               "background:none;border:1px solid #e2e8f0;border-radius:4px;cursor:pointer;",
               "font-size:14px;padding:3px 8px;margin-left:8px;color:#94a3b8;transition:all 0.15s;"
@@ -1004,7 +1004,7 @@ build_qual_slide_card <- function(slide_id, title, content_md, image_data = NULL
         htmltools::tags$button(class = "export-btn", title = "Add image",
                                onclick = sprintf("triggerQualImage('%s')", slide_id),
                                htmltools::HTML("&#x1F5BC;")),
-        htmltools::tags$button(class = "export-btn", title = "Pin this slide",
+        htmltools::tags$button(class = "export-btn", title = "Pin to Views",
                                onclick = sprintf("pinQualSlide('%s')", slide_id),
                                htmltools::HTML("&#x1F4CC;")),
         htmltools::tags$button(class = "export-btn", title = "Move up",
@@ -1198,7 +1198,7 @@ build_export_actions <- function() {
           class = "export-btn",
           onclick = "printReport()",
           style = "font-size:13px;padding:8px 18px;",
-          "\U0001F5A8 Print Report"
+          "\U0001F5A8 Print / PDF"
         )
       ),
       htmltools::tags$p(

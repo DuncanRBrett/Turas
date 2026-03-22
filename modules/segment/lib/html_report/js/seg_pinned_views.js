@@ -466,7 +466,7 @@
         }
       }
       btn.classList.toggle('seg-pin-btn-active', isPinned);
-      btn.title = isPinned ? 'Unpin this section' : 'Pin this section';
+      btn.title = isPinned ? 'Unpin this section' : 'Pin to Views';
     });
 
     // Component-level pin buttons (chart/table)

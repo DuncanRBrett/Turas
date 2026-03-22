@@ -366,10 +366,12 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     }
     .ct-table.ct-cols-hidden { width: auto; }
     .ct-th {
-      padding: 8px 12px;
+      padding: 10px 14px;
       text-align: center;
       font-weight: 600;
-      font-size: 12px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
       border-bottom: 2px solid #e2e8f0;
       background: #f8f9fa;
       white-space: normal;
@@ -389,7 +391,7 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       z-index: 2;
     }
     .ct-td {
-      padding: 8px 12px;
+      padding: 8px 14px;
       text-align: center;
       border-bottom: 1px solid #f0f0f0;
       white-space: nowrap;

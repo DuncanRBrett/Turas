@@ -42,7 +42,7 @@ function addQualSlide() {
       '<div class="qual-slide-number">Slide ' + (container.children.length + 1) + '</div>' +
       '<div class="qual-slide-actions">' +
         '<button title="Add image" onclick="triggerQualImage(\'' + id + '\')">&#x1F5BC; Image</button>' +
-        '<button title="Pin to Views" onclick="pinQualSlide(\'' + id + '\')">&#x1F4CC; Pin</button>' +
+        '<button title="Pin to Views" onclick="pinQualSlide(\'' + id + '\')">&#x1F4CC; Pin to Views</button>' +
         '<button title="Move up" onclick="moveQualSlide(\'' + id + '\',\'up\')">&#x25B2;</button>' +
         '<button title="Move down" onclick="moveQualSlide(\'' + id + '\',\'down\')">&#x25BC;</button>' +
         '<button title="Remove slide" style="color:#e8614d;" onclick="removeQualSlide(\'' + id + '\')">&#x2715;</button>' +

@@ -280,17 +280,17 @@ body {
 }
 .ci-table thead th {
   background: var(--ci-bg-muted);
-  padding: 8px 12px;
+  padding: 10px 14px;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
   color: var(--ci-text-secondary);
   border-bottom: 2px solid var(--ci-border);
   text-align: left;
 }
 .ci-table tbody td {
-  padding: 8px 12px;
+  padding: 8px 14px;
   border-bottom: 1px solid var(--ci-border);
   vertical-align: middle;
 }

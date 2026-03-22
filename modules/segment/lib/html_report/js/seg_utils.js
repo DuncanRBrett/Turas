@@ -382,7 +382,7 @@
     card.className = 'seg-slide-card';
     card.style.cssText = 'background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:20px; margin-bottom:16px; position:relative;';
     card.innerHTML = '<div style="position:absolute;top:8px;right:12px;display:flex;gap:6px;">' +
-      '<button style="background:none;border:1px solid #d1d5db;border-radius:4px;color:#64748b;font-size:12px;cursor:pointer;padding:2px 8px;" onclick="segPinSlide(this)" title="Pin to Pinned Views">\uD83D\uDCCC</button>' +
+      '<button style="background:none;border:1px solid #d1d5db;border-radius:4px;color:#64748b;font-size:12px;cursor:pointer;padding:2px 8px;" onclick="segPinSlide(this)" title="Pin to Views">\uD83D\uDCCC</button>' +
       '<button style="background:none;border:none;color:#94a3b8;font-size:18px;cursor:pointer;padding:4px;" onclick="this.closest(\'.seg-slide-card\').remove();segUpdateSlideCount();">\u00D7</button></div>' +
       '<div class="seg-slide-title" contenteditable="true" style="font-size:16px;font-weight:600;color:#323367;margin-bottom:8px;border-bottom:2px solid #323367;padding-bottom:6px;outline:none;" data-placeholder="Slide title..."></div>' +
       '<div class="seg-slide-content" contenteditable="true" style="font-size:13px;color:#334155;line-height:1.6;min-height:60px;outline:none;border:1px dashed transparent;padding:8px;border-radius:4px;" data-placeholder="Add slide content..."></div>' +

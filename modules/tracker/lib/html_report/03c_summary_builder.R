@@ -647,7 +647,7 @@ build_sig_changes_section <- function(html_data) {
         ),
         htmltools::tags$button(
           class = "sig-card-pin-btn",
-          title = "Pin this finding",
+          title = "Pin to Views",
           onclick = sprintf("pinSigCard('%s')", sig_id),
           htmltools::HTML("&#x1F4CC;")
         )

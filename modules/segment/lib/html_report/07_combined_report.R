@@ -510,11 +510,7 @@ build_seg_combined_page <- function(method_html_data,
       id = "seg-pinned-empty",
       class = "seg-pinned-empty",
       htmltools::tags$div(class = "seg-pinned-empty-icon", "\U0001F4CC"),
-      htmltools::tags$div("No pinned views yet."),
-      htmltools::tags$div(
-        style = "font-size:12px;margin-top:4px;",
-        "Click the pin icon on any section to save it here for export."
-      )
+      htmltools::tags$div("No pinned views yet.")
     ),
     htmltools::tags$div(id = "seg-pinned-cards-container")
   )

@@ -216,11 +216,7 @@ function cdCloseHelp() {
       id = "cd-pinned-empty",
       class = "cd-pinned-empty",
       htmltools::tags$div(class = "cd-pinned-empty-icon", "\U0001F4CC"),
-      htmltools::tags$div("No pinned views yet."),
-      htmltools::tags$div(
-        style = "font-size:12px;margin-top:4px;",
-        "Click the pin icon on any section to save it here for export."
-      )
+      htmltools::tags$div("No pinned views yet.")
     ),
     htmltools::tags$div(id = "cd-pinned-cards-container")
   )
@@ -621,8 +617,8 @@ build_cd_css <- function(brand_colour, accent_colour) {
   font-weight: 600;
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
-  padding: 8px 10px;
+  letter-spacing: 0.4px;
+  padding: 10px 14px;
   text-align: left;
   border-bottom: 2px solid var(--cd-border);
   vertical-align: bottom;
@@ -634,7 +630,7 @@ build_cd_css <- function(brand_colour, accent_colour) {
 .cd-th-rank { text-align: center; width: 50px; }
 
 .cd-td {
-  padding: 8px 12px;
+  padding: 8px 14px;
   border-bottom: 1px solid #f0f0f0;
   vertical-align: middle;
   color: var(--cd-text);
@@ -2400,7 +2396,7 @@ build_cd_section_title_row <- function(title_text, section_key, id_prefix = "",
       `data-cd-pin-section` = section_key,
       `data-cd-pin-prefix` = id_prefix,
       onclick = sprintf("cdPinSection('%s','%s')", section_key, id_prefix),
-      title = "Pin this section",
+      title = "Pin to Views",
       "\U0001F4CC"
     )
   }
@@ -2649,7 +2645,7 @@ build_cd_qual_slide_card <- function(slide_id, title, content_md, image_data = N
         htmltools::tags$button(class = "export-btn", title = "Add image",
                                onclick = sprintf("cdTriggerQualImage('%s')", slide_id),
                                htmltools::HTML("&#x1F5BC;")),
-        htmltools::tags$button(class = "export-btn", title = "Pin this slide",
+        htmltools::tags$button(class = "export-btn", title = "Pin to Views",
                                onclick = sprintf("cdPinQualSlide('%s')", slide_id),
                                htmltools::HTML("&#x1F4CC;")),
         htmltools::tags$button(class = "export-btn", title = "Move up",

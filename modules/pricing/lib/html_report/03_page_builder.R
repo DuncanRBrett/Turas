@@ -416,10 +416,10 @@ body {
   background: var(--pr-bg-muted);
   padding: 10px 14px;
   text-align: left;
-  font-weight: 700;
+  font-weight: 600;
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.4px;
   color: var(--pr-text-secondary);
   border-bottom: 2px solid var(--pr-border);
 }
@@ -1517,7 +1517,7 @@ build_slide_card <- function(slide_id, title, content_md, image_data = NULL) {
          <div class="pr-slide-title" contenteditable="true">%s</div>
          <div class="pr-slide-actions">
            <button class="pr-export-btn" title="Add image" onclick="triggerPrSlideImage(\'%s\')">&#x1F5BC;</button>
-           <button class="pr-export-btn" title="Pin this slide" onclick="pinPrSlide(\'%s\')">&#x1F4CC;</button>
+           <button class="pr-export-btn" title="Pin to Views" onclick="pinPrSlide(\'%s\')">&#x1F4CC;</button>
            <button class="pr-export-btn" title="Move up" onclick="movePrSlide(\'%s\',\'up\')">&#x25B2;</button>
            <button class="pr-export-btn" title="Move down" onclick="movePrSlide(\'%s\',\'down\')">&#x25BC;</button>
            <button class="pr-export-btn" title="Remove slide" style="color:#e8614d;" onclick="removePrSlide(\'%s\')">&#x2715;</button>
@@ -1553,12 +1553,12 @@ build_pinned_views_panel <- function() {
        <h2>Pinned Views</h2>
        <div id="pinned-empty-state" class="pr-pinned-empty">
          <div class="pr-pinned-empty-icon">&#128204;</div>
-         <div class="pr-pinned-empty-text">No pinned views yet</div>
+         <div class="pr-pinned-empty-text">No pinned views yet.</div>
          <div class="pr-pinned-empty-hint">Click the Pin button on any section to capture it here for curation and export.</div>
        </div>
        <div id="pinned-cards-container"></div>
        <div class="pr-pinned-actions" style="display:none" id="pinned-bulk-actions">
-         <button class="pr-btn-secondary" onclick="exportAllPinned()">Export All Charts</button>
+         <button class="pr-btn-secondary" onclick="exportAllPinned()">Export All as PNG</button>
        </div>
      </div>
      <script id="pinned-views-data" type="application/json">[]</script>
@@ -1573,10 +1573,10 @@ build_pinned_views_panel <- function() {
 build_export_toolbar <- function(section_id) {
   sprintf(
     '<div class="pr-export-toolbar">
-       <button class="pr-export-btn" onclick="exportChartPNG(\'%s\')" title="Export chart as PNG">PNG</button>
-       <button class="pr-export-btn" onclick="exportTableExcel(\'%s\')" title="Export table as Excel">Excel</button>
-       <button class="pr-export-btn" onclick="exportSlidePNG(\'%s\')" title="Export as slide">Slide</button>
-       <button class="pr-pin-btn" data-section="%s" onclick="togglePin(\'%s\')">Pin</button>
+       <button class="pr-export-btn" onclick="exportChartPNG(\'%s\')" title="Export chart as PNG">Export PNG</button>
+       <button class="pr-export-btn" onclick="exportTableExcel(\'%s\')" title="Export table as Excel">Export Excel</button>
+       <button class="pr-export-btn" onclick="exportSlidePNG(\'%s\')" title="Export as slide">Export Slide</button>
+       <button class="pr-pin-btn" data-section="%s" onclick="togglePin(\'%s\')" title="Pin to Views">\U0001F4CC Pin to Views</button>
      </div>',
     section_id, section_id, section_id, section_id, section_id
   )

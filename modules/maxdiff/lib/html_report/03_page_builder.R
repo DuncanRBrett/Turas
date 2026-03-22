@@ -146,7 +146,7 @@ build_pin_button <- function(panel_id) {
   pin_icon <- "&#x1F4CC;"
   sprintf(
     '<div class="pin-btn-wrapper">
-  <button class="pin-btn" data-panel="%s" onclick="window._mdTogglePin(\'%s\')" title="Pin this view">%s</button>
+  <button class="pin-btn" data-panel="%s" onclick="window._mdTogglePin(\'%s\')" title="Pin to Views">%s</button>
   <div class="pin-mode-popover" style="display:none;">
     <button class="pin-mode-option" onclick="window._mdExecutePin(\'%s\',\'all\')">Table + Chart + Insight</button>
     <button class="pin-mode-option" onclick="window._mdExecutePin(\'%s\',\'chart_insight\')">Chart + Insight</button>
@@ -603,14 +603,14 @@ build_pinned_views_panel <- function() {
 <div class="pinned-header">
 <h2>Pinned Views</h2>
 <div class="pinned-header-actions">
-<button class="md-export-btn" onclick="window._mdExportAllPinned()"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 14h12M8 2v9M4 7l4 4 4-4"/></svg> Export All as SVG</button>
+<button class="md-export-btn" onclick="window._mdExportAllPinned()"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 14h12M8 2v9M4 7l4 4 4-4"/></svg> Export All as PNG</button>
 <button class="md-btn-secondary" onclick="window._mdSaveReport()">Save Report</button>
 </div>
 </div>
 <div id="pinned-cards-container"></div>
 <div id="pinned-empty-state" style="text-align:center;padding:60px 20px;color:#94a3b8;">
 <div style="font-size:36px;margin-bottom:12px;">&#128204;</div>
-<div style="font-size:14px;">No pinned views yet</div>
+<div style="font-size:14px;">No pinned views yet.</div>
 <div style="font-size:12px;margin-top:6px;">Use the pin button on any tab to capture a view</div>
 </div>
 <script type="application/json" id="pinned-views-data">[]</script>
@@ -1464,12 +1464,12 @@ body { font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Robo
 /* === TABLES === */
 .md-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 8px 0; }
 .md-table-compact { font-size: 12px; }
-.md-th { background: var(--md-bg-muted); padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--md-text-secondary); border-bottom: 2px solid var(--md-border); cursor: pointer; user-select: none; }
+.md-th { background: var(--md-bg-muted); padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--md-text-secondary); border-bottom: 2px solid var(--md-border); cursor: pointer; user-select: none; }
 .md-th:hover { background: #eef2f7; }
 .md-th .sort-arrow { font-size: 10px; margin-left: 4px; opacity: 0.5; }
 .md-th.md-num { text-align: right; }
 .md-th.md-label-col { text-align: left; }
-.md-td { padding: 7px 12px; border-bottom: 1px solid var(--md-border); vertical-align: middle; }
+.md-td { padding: 8px 14px; border-bottom: 1px solid var(--md-border); vertical-align: middle; }
 .md-td.md-num { text-align: right; font-variant-numeric: tabular-nums; }
 .md-td.md-label-col { font-weight: 500; }
 .md-tr-section td { background: var(--md-bg-muted); font-weight: 600; padding-top: 12px; border-bottom: 1px solid var(--md-border); }
