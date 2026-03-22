@@ -454,14 +454,19 @@ var ReportHub = ReportHub || {};
         var spinner = loading.querySelector(".hub-loading-spinner");
         if (spinner) spinner.style.display = "none";
         if (text) {
-          text.innerHTML = 'Report is taking too long to load. ' +
-            '<button style="margin-top:8px;padding:6px 16px;border:1px solid #ccc;' +
-            'border-radius:6px;background:#fff;cursor:pointer;font-size:13px;" ' +
-            'onclick="ReportHub.retryLoad(\'' + key + '\')">Retry</button>';
+          // Build retry button via DOM API (not innerHTML) to avoid XSS on key
+          text.textContent = "Report is taking too long to load. ";
+          var retryBtn = document.createElement("button");
+          retryBtn.textContent = "Retry";
+          retryBtn.style.cssText = "margin-top:8px;padding:6px 16px;border:1px solid #ccc;" +
+            "border-radius:6px;background:#fff;cursor:pointer;font-size:13px;";
+          retryBtn.addEventListener("click", function() { ReportHub.retryLoad(key); });
+          text.appendChild(retryBtn);
         }
       }
     }, IFRAME_LOAD_TIMEOUT_MS);
 
+    // Use { once: true } to prevent duplicate load handlers on retry
     iframe.addEventListener("load", function() {
       clearTimeout(loadTimer);
 
@@ -475,7 +480,7 @@ var ReportHub = ReportHub || {};
       try {
         iframe.contentWindow.dispatchEvent(new Event("resize"));
       } catch (e) { /* cross-origin safety */ }
-    });
+    }, { once: true });
 
     ReportHub.loadedIframes[key] = true;
   }
@@ -555,8 +560,14 @@ var ReportHub = ReportHub || {};
    * Initialize the hub navigation
    */
   ReportHub.initNavigation = function() {
-    // Check URL hash for deep link
-    var hash = window.location.hash.replace("#", "");
+    // Check URL hash for deep link.
+    // Sanitize: strip non-identifier characters to prevent querySelector injection
+    // (a hash with " or ] would throw DOMException and kill init).
+    var rawHash = "";
+    try {
+      rawHash = decodeURIComponent(window.location.hash.replace(/^#/, ""));
+    } catch (e) { /* malformed URI — ignore */ }
+    var hash = rawHash.replace(/[^a-zA-Z0-9_-]/g, "");
     if (hash && hash !== "overview") {
       // Verify this key exists
       var panel = document.querySelector('.hub-panel[data-hub-panel="' + hash + '"]');
@@ -569,7 +580,7 @@ var ReportHub = ReportHub || {};
     ReportHub.switchReport("overview");
 
     // Keyboard navigation (arrow keys on hub tabs)
-    var allKeys = ["overview"].concat(ReportHub.reportKeys).concat(["pinned"]);
+    var allKeys = ["overview"].concat(ReportHub.reportKeys || []).concat(["pinned"]);
     document.addEventListener("keydown", function(e) {
       var focused = document.activeElement;
       var isTabFocused = focused && focused.classList &&
@@ -577,6 +588,8 @@ var ReportHub = ReportHub || {};
       var isBodyFocused = focused === document.body || focused.tagName === "BODY";
 
       if (!isTabFocused && !isBodyFocused) return;
+      // Don't intercept when modifier keys are held (Ctrl+Arrow = word jump, etc.)
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
 
       if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
         var idx = allKeys.indexOf(activeReport);
@@ -773,7 +786,8 @@ var ReportHub = ReportHub || {};
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // Delay revoke so Firefox has time to start the download
+      setTimeout(function() { URL.revokeObjectURL(url); }, 200);
       showSaveToast("Report downloaded as " + suggestedName);
     }
   };
@@ -791,10 +805,31 @@ var ReportHub = ReportHub || {};
     for (var i = 0; i < textareas.length; i++) {
       textareas[i].textContent = textareas[i].value;
     }
-    // Inputs: set attribute to match current .value
-    var inputs = doc.querySelectorAll('input[type="text"], input:not([type])');
+    // Text inputs: set attribute to match current .value
+    var inputs = doc.querySelectorAll('input[type="text"], input[type="number"], input[type="search"], input:not([type])');
     for (var j = 0; j < inputs.length; j++) {
       inputs[j].setAttribute("value", inputs[j].value);
+    }
+    // Checkboxes and radio buttons: sync checked attribute
+    var checkables = doc.querySelectorAll('input[type="checkbox"], input[type="radio"]');
+    for (var ci = 0; ci < checkables.length; ci++) {
+      if (checkables[ci].checked) {
+        checkables[ci].setAttribute("checked", "checked");
+      } else {
+        checkables[ci].removeAttribute("checked");
+      }
+    }
+    // Select elements: sync selected attribute on options
+    var selects = doc.querySelectorAll("select");
+    for (var si = 0; si < selects.length; si++) {
+      var options = selects[si].querySelectorAll("option");
+      for (var oi = 0; oi < options.length; oi++) {
+        if (options[oi].selected) {
+          options[oi].setAttribute("selected", "selected");
+        } else {
+          options[oi].removeAttribute("selected");
+        }
+      }
     }
     // Slide title inputs (specific class)
     var slideTitles = doc.querySelectorAll(".hub-slide-title");
@@ -837,9 +872,76 @@ var ReportHub = ReportHub || {};
 
   /**
    * Hub-level Print
+   *
+   * Browsers cannot print iframe content via window.print() — iframes render
+   * as blank rectangles. This implementation temporarily extracts the active
+   * report's HTML into a print-only container in the parent document, triggers
+   * print, then cleans up. The overview/pinned panels print normally since
+   * their content is in the parent DOM.
    */
   ReportHub.printReport = function() {
-    window.print();
+    var key = activeReport;
+
+    // Overview and pinned panels live in the parent DOM — print directly
+    if (key === "overview" || key === "pinned" || key === "about") {
+      window.print();
+      return;
+    }
+
+    // For report panels: extract iframe content into a temporary print container
+    var iframe = document.getElementById("hub-iframe-" + key);
+    if (!iframe || !iframe.contentDocument || !iframe.contentDocument.body) {
+      window.print();
+      return;
+    }
+
+    try {
+      var iDoc = iframe.contentDocument;
+
+      // Clone the iframe body content and all <style>/<link> from its <head>
+      var printContainer = document.createElement("div");
+      printContainer.id = "hub-print-container";
+      printContainer.style.cssText = "display:none;";
+
+      // Copy stylesheets from iframe head
+      var iStyles = iDoc.querySelectorAll("style, link[rel='stylesheet']");
+      for (var si = 0; si < iStyles.length; si++) {
+        printContainer.appendChild(iStyles[si].cloneNode(true));
+      }
+
+      // Copy body content
+      var bodyClone = iDoc.body.cloneNode(true);
+      // Remove bridge-injected elements
+      var bridgeEls = bodyClone.querySelectorAll(".hub-pin-float");
+      for (var bi = 0; bi < bridgeEls.length; bi++) bridgeEls[bi].remove();
+      printContainer.appendChild(bodyClone);
+
+      document.body.appendChild(printContainer);
+
+      // Add print-only CSS: hide everything except the print container
+      var printStyle = document.createElement("style");
+      printStyle.id = "hub-print-style";
+      printStyle.textContent =
+        "@media print { " +
+        "body > *:not(#hub-print-container) { display: none !important; } " +
+        "#hub-print-container { display: block !important; } " +
+        "#hub-print-container > body { display: block !important; } " +
+        "}";
+      document.head.appendChild(printStyle);
+
+      window.print();
+
+      // Cleanup after print dialog closes
+      setTimeout(function() {
+        var pc = document.getElementById("hub-print-container");
+        if (pc) pc.parentNode.removeChild(pc);
+        var ps = document.getElementById("hub-print-style");
+        if (ps) ps.parentNode.removeChild(ps);
+      }, 1000);
+    } catch (e) {
+      console.warn("Print extraction failed, falling back to basic print:", e.message);
+      window.print();
+    }
   };
 
 })();

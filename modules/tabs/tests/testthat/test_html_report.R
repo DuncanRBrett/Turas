@@ -583,3 +583,165 @@ test_that("load_comments_sheet uses NA for blank banner (not NULL)", {
   expect_false(grepl('"banner":{}', json_str, fixed = TRUE),
     info = "Should NOT serialize as empty object {}")
 })
+
+
+# ==============================================================================
+# UI CONTROLS: HELP ICON, HIDE ROWS, HIDE COLUMNS
+# ==============================================================================
+
+context("UI controls — help icon placement")
+
+test_that("help button is in report-tabs nav strip, not in header", {
+  # Build the tab nav and header
+  tab_nav_html <- as.character(build_report_tab_nav(
+    brand_colour = "#323367", has_qualitative = FALSE, has_about = TRUE
+  ))
+  header_html <- as.character(build_header(
+    project_title = "Test", brand_colour = "#323367",
+    total_n = 100, n_questions = 5
+  ))
+
+  # Help button should be inside the report-tabs nav
+  expect_true(grepl("help-btn", tab_nav_html, fixed = TRUE),
+    info = "Help button (?) should be rendered inside the report-tabs nav strip")
+  expect_true(grepl("toggleHelpOverlay", tab_nav_html, fixed = TRUE),
+    info = "Help button onclick should call toggleHelpOverlay()")
+
+ # Help button should NOT be in the header
+  expect_false(grepl("help-btn", header_html, fixed = TRUE),
+    info = "Help button should not be in the header banner")
+})
+
+test_that("help button appears after Pinned Views tab", {
+  tab_nav_html <- as.character(build_report_tab_nav(
+    brand_colour = "#323367", has_qualitative = FALSE, has_about = FALSE
+  ))
+
+  # Pinned Views should come before help-btn in the HTML
+  pinned_pos <- regexpr("Pinned Views", tab_nav_html)
+  help_pos <- regexpr("help-btn", tab_nav_html)
+  expect_true(pinned_pos < help_pos,
+    info = "Help button should appear after Pinned Views in the DOM")
+})
+
+
+context("UI controls — Hide rows and Hide columns toggles")
+
+test_that("controls bar includes Hide rows toggle", {
+  controls_html <- as.character(build_controls(
+    has_any_freq = TRUE, has_any_pct = TRUE,
+    has_any_sig = TRUE, brand_colour = "#323367"
+  ))
+
+  expect_true(grepl("Hide rows", controls_html, fixed = TRUE),
+    info = "Controls bar should include 'Hide rows' toggle")
+  expect_true(grepl("toggleAllRows", controls_html, fixed = TRUE),
+    info = "Hide rows should call toggleAllRows()")
+})
+
+test_that("controls bar includes Hide columns toggle", {
+  controls_html <- as.character(build_controls(
+    has_any_freq = TRUE, has_any_pct = TRUE,
+    has_any_sig = TRUE, brand_colour = "#323367"
+  ))
+
+  expect_true(grepl("Hide columns", controls_html, fixed = TRUE),
+    info = "Controls bar should include 'Hide columns' toggle")
+  expect_true(grepl("toggleAllColumns", controls_html, fixed = TRUE),
+    info = "Hide columns should call toggleAllColumns()")
+})
+
+test_that("Hide columns appears next to Hide rows in controls", {
+  controls_html <- as.character(build_controls(
+    has_any_freq = TRUE, has_any_pct = TRUE,
+    has_any_sig = TRUE, brand_colour = "#323367"
+  ))
+
+  rows_pos <- regexpr("Hide rows", controls_html)
+  cols_pos <- regexpr("Hide columns", controls_html)
+  count_pos <- regexpr("Show count", controls_html)
+
+  expect_true(rows_pos < cols_pos,
+    info = "Hide columns should appear after Hide rows")
+  expect_true(cols_pos < count_pos,
+    info = "Hide columns should appear before Show count")
+})
+
+test_that("controls with no percentages omit Hide rows and Hide columns", {
+  controls_html <- as.character(build_controls(
+    has_any_freq = TRUE, has_any_pct = FALSE,
+    has_any_sig = TRUE, brand_colour = "#323367"
+  ))
+
+  expect_false(grepl("Hide rows", controls_html, fixed = TRUE),
+    info = "Hide rows should not appear when has_any_pct is FALSE")
+  expect_false(grepl("Hide columns", controls_html, fixed = TRUE),
+    info = "Hide columns should not appear when has_any_pct is FALSE")
+})
+
+
+context("JavaScript — toggleAllRows targets all row types")
+
+test_that("toggleAllRows JS targets category, net, and mean rows", {
+  js_path <- file.path(turas_root, "modules/tabs/lib/html_report/js/core_navigation.js")
+  js_content <- paste(readLines(js_path, warn = FALSE), collapse = "\n")
+
+  # Must target all three row types
+  expect_true(grepl("ct-row-category", js_content, fixed = TRUE),
+    info = "toggleAllRows must target ct-row-category rows")
+  expect_true(grepl("ct-row-net", js_content, fixed = TRUE),
+    info = "toggleAllRows must target ct-row-net rows")
+  expect_true(grepl("ct-row-mean", js_content, fixed = TRUE),
+    info = "toggleAllRows must target ct-row-mean rows")
+
+  # The selector in toggleAllRows should include all three
+  expect_true(grepl("ct-row-category.*ct-row-net.*ct-row-mean", js_content, perl = TRUE),
+    info = "toggleAllRows selector should include category, net, and mean row types")
+})
+
+test_that("toggleAllColumns JS function exists", {
+  js_path <- file.path(turas_root, "modules/tabs/lib/html_report/js/core_navigation.js")
+  js_content <- paste(readLines(js_path, warn = FALSE), collapse = "\n")
+
+  expect_true(grepl("function toggleAllColumns", js_content, fixed = TRUE),
+    info = "toggleAllColumns function must be defined in core_navigation.js")
+})
+
+
+context("End-to-end HTML — UI controls in generated report")
+
+test_that("generated HTML has help button in nav strip and hide controls", {
+  tmp_html <- tempfile(fileext = ".html")
+  on.exit(unlink(tmp_html))
+
+  all_results <- make_html_test_results()
+  banner_info <- make_html_test_banner_info()
+  config <- make_html_test_config()
+  # Enable summary/dashboard so report-tabs nav strip is rendered
+  config$include_summary <- TRUE
+
+  result <- generate_html_report(all_results, banner_info, config, tmp_html)
+  expect_equal(result$status, "PASS")
+
+  html_text <- paste(readLines(tmp_html, warn = FALSE), collapse = "\n")
+
+  # Help button should exist in the HTML
+  expect_true(grepl("help-btn", html_text, fixed = TRUE),
+    info = "Generated HTML should contain the help button")
+
+  # Help button should be inside report-tabs div
+  tabs_start <- regexpr('class="report-tabs"', html_text, fixed = TRUE)
+  expect_true(tabs_start > 0, info = "report-tabs div should exist in HTML")
+  # Grab 3000 chars after the start of report-tabs to capture the full div content
+  tabs_chunk <- substr(html_text, tabs_start, tabs_start + 3000)
+  expect_true(grepl("help-btn", tabs_chunk, fixed = TRUE),
+    info = "Help button should be inside the report-tabs div")
+
+  # Hide rows and Hide columns toggles should exist
+  expect_true(grepl("toggleAllRows", html_text, fixed = TRUE),
+    info = "Generated HTML should contain toggleAllRows")
+  expect_true(grepl("toggleAllColumns", html_text, fixed = TRUE),
+    info = "Generated HTML should contain toggleAllColumns")
+  expect_true(grepl("Hide rows", html_text, fixed = TRUE))
+  expect_true(grepl("Hide columns", html_text, fixed = TRUE))
+})

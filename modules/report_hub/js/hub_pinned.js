@@ -26,7 +26,7 @@
     pinObj.source = source;
     pinObj.type = "pin";
     if (!pinObj.id) {
-      pinObj.id = "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5);
+      pinObj.id = "pin-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7);
     }
     pinObj.timestamp = pinObj.timestamp || Date.now();
 
@@ -68,16 +68,25 @@
   }
 
   /** Compress SVG string by removing unnecessary whitespace and reducing coordinate precision.
-   *  Preserves 3 decimal places to maintain sub-pixel text alignment quality. */
+   *  Preserves 3 decimal places to maintain sub-pixel text alignment quality.
+   *  Excludes whitespace between text/tspan elements to preserve label spacing. */
   function compressSvg(svg) {
-    // Collapse whitespace between tags
-    svg = svg.replace(/>\s+</g, "><");
+    // Collapse whitespace between tags — but NOT between </tspan> and <tspan>,
+    // or between </text> and <text>, where whitespace is semantically meaningful.
+    svg = svg.replace(/>([\s]+)</g, function(match, ws, offset) {
+      // Look at what comes before > and after <
+      var before = svg.substring(Math.max(0, offset - 7), offset + 1);
+      var after = svg.substring(offset + match.length - 1, offset + match.length + 7);
+      if (/tspan>$/.test(before) || /^<tspan/.test(after) ||
+          /text>$/.test(before) || /^<text/.test(after)) {
+        return ">" + (ws.indexOf("\n") !== -1 ? " " : ws.substring(0, 1)) + "<";
+      }
+      return "><";
+    });
     // Reduce decimal precision to 3 places (enough for sub-pixel accuracy)
     svg = svg.replace(/(\d+\.\d{3})\d+/g, "$1");
     // Remove empty style/class attributes
     svg = svg.replace(/\s+(style|class)=""/g, "");
-    // Collapse multiple spaces (but not inside text content)
-    svg = svg.replace(/\s{2,}/g, " ");
     return svg;
   }
 
@@ -112,7 +121,7 @@
     var section = {
       type: "section",
       title: title,
-      id: "sec-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5)
+      id: "sec-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7)
     };
     ReportHub.pinnedItems.push(section);
     ReportHub.renderPinnedCards();
@@ -125,6 +134,26 @@
    * @param {number} toIdx
    */
   ReportHub.moveItem = function(fromIdx, toIdx) {
+    if (toIdx < 0 || toIdx >= ReportHub.pinnedItems.length) return;
+    var item = ReportHub.pinnedItems.splice(fromIdx, 1)[0];
+    ReportHub.pinnedItems.splice(toIdx, 0, item);
+    ReportHub.renderPinnedCards();
+    ReportHub.savePinnedData();
+  };
+
+  /**
+   * Move an item by ID in a given direction.
+   * Safer than index-based moveItem because the ID is stable across re-renders.
+   * @param {string} itemId - Pin or section ID
+   * @param {number} direction - -1 for up, +1 for down
+   */
+  ReportHub.moveItemById = function(itemId, direction) {
+    var fromIdx = -1;
+    for (var i = 0; i < ReportHub.pinnedItems.length; i++) {
+      if (ReportHub.pinnedItems[i].id === itemId) { fromIdx = i; break; }
+    }
+    if (fromIdx === -1) return;
+    var toIdx = fromIdx + direction;
     if (toIdx < 0 || toIdx >= ReportHub.pinnedItems.length) return;
     var item = ReportHub.pinnedItems.splice(fromIdx, 1)[0];
     ReportHub.pinnedItems.splice(toIdx, 0, item);
@@ -236,15 +265,16 @@
    */
   function buildSectionDividerHTML(section, idx) {
     var total = ReportHub.pinnedItems.length;
-    return '<div class="hub-section-divider" data-idx="' + idx + '">' +
+    var sid = escapeHtml(section.id);
+    return '<div class="hub-section-divider" data-idx="' + idx + '" data-item-id="' + sid + '">' +
       '<div class="hub-section-title" contenteditable="true" ' +
         'onpaste="event.preventDefault();document.execCommand(\'insertText\',false,event.clipboardData.getData(\'text/plain\'))" ' +
-        'onblur="ReportHub.updateSectionTitle(' + idx + ', this.textContent)">' +
+        'onblur="ReportHub.updateSectionTitleById(\'' + sid + '\', this.textContent)">' +
         escapeHtml(section.title) + '</div>' +
       '<div class="hub-section-actions">' +
-        (idx > 0 ? '<button class="hub-action-btn" onclick="ReportHub.moveItem(' + idx + ',' + (idx - 1) + ')" title="Move up">\u25B2</button>' : '') +
-        (idx < total - 1 ? '<button class="hub-action-btn" onclick="ReportHub.moveItem(' + idx + ',' + (idx + 1) + ')" title="Move down">\u25BC</button>' : '') +
-        '<button class="hub-action-btn hub-remove-btn" onclick="ReportHub.removePin(\'' + section.id + '\')" title="Remove section">\u00D7</button>' +
+        (idx > 0 ? '<button class="hub-action-btn" onclick="ReportHub.moveItemById(\'' + sid + '\',-1)" title="Move up">\u25B2</button>' : '') +
+        (idx < total - 1 ? '<button class="hub-action-btn" onclick="ReportHub.moveItemById(\'' + sid + '\',1)" title="Move down">\u25BC</button>' : '') +
+        '<button class="hub-action-btn hub-remove-btn" onclick="ReportHub.removePin(\'' + sid + '\')" title="Remove section">\u00D7</button>' +
       '</div>' +
     '</div>';
   }
@@ -317,15 +347,16 @@
     var title = pin.title || pin.metricLabel || pin.qCode || "Pinned View";
     var subtitle = pin.subtitle || pin.questionText || "";
 
-    var html = '<div class="hub-pin-card" data-pin-id="' + pin.id + '" data-idx="' + idx + '">' +
+    var pid = escapeHtml(pin.id);
+    var html = '<div class="hub-pin-card" data-pin-id="' + pid + '" data-idx="' + idx + '">' +
       '<div class="hub-pin-header">' +
         sourceBadge +
         '<span class="hub-pin-title">' + escapeHtml(title) + '</span>' +
         '<div class="hub-pin-actions">' +
-          '<button class="hub-action-btn" onclick="ReportHub.exportPinCard(\'' + pin.id + '\')" title="Export as PNG">\uD83D\uDCF8</button>' +
-          (idx > 0 ? '<button class="hub-action-btn" onclick="ReportHub.moveItem(' + idx + ',' + (idx - 1) + ')" title="Move up">\u25B2</button>' : '') +
-          (idx < total - 1 ? '<button class="hub-action-btn" onclick="ReportHub.moveItem(' + idx + ',' + (idx + 1) + ')" title="Move down">\u25BC</button>' : '') +
-          '<button class="hub-action-btn hub-remove-btn" onclick="ReportHub.removePin(\'' + pin.id + '\')" title="Remove">\u00D7</button>' +
+          '<button class="hub-action-btn" onclick="ReportHub.exportPinCard(\'' + pid + '\')" title="Export as PNG">\uD83D\uDCF8</button>' +
+          (idx > 0 ? '<button class="hub-action-btn" onclick="ReportHub.moveItemById(\'' + pid + '\',-1)" title="Move up">\u25B2</button>' : '') +
+          (idx < total - 1 ? '<button class="hub-action-btn" onclick="ReportHub.moveItemById(\'' + pid + '\',1)" title="Move down">\u25BC</button>' : '') +
+          '<button class="hub-action-btn hub-remove-btn" onclick="ReportHub.removePin(\'' + pid + '\')" title="Remove">\u00D7</button>' +
         '</div>' +
       '</div>';
 
@@ -342,10 +373,10 @@
     var editorText = "";
     if (insightRaw) {
       if (containsHtml(insightRaw)) {
-        renderedHtml = insightRaw;
+        renderedHtml = sanitizeHtml(insightRaw);
         // Extract plain text for the editor (reverse: HTML -> text for re-editing)
         var tmp = document.createElement("div");
-        tmp.innerHTML = insightRaw;
+        tmp.innerHTML = renderedHtml;
         editorText = tmp.textContent.trim();
       } else {
         editorText = insightRaw;
@@ -378,7 +409,7 @@
 
     // Chart (if captured and mode allows)
     if (pin.chartSvg && pin.chartVisible !== false && showChart) {
-      html += '<div class="hub-pin-chart">' + pin.chartSvg + '</div>';
+      html += '<div class="hub-pin-chart">' + sanitizeHtml(pin.chartSvg) + '</div>';
     }
 
     // PNG snapshot (hidden – used only for export, not displayed on screen)
@@ -388,7 +419,7 @@
 
     // Table (if captured and mode allows)
     if (pin.tableHtml && showTable) {
-      html += '<div class="hub-pin-table">' + pin.tableHtml + '</div>';
+      html += '<div class="hub-pin-table">' + sanitizeHtml(pin.tableHtml) + '</div>';
     }
 
     html += '</div>';
@@ -403,6 +434,20 @@
         ReportHub.pinnedItems[idx].type === "section") {
       ReportHub.pinnedItems[idx].title = newTitle.trim() || "Untitled Section";
       ReportHub.savePinnedData();
+    }
+  };
+
+  /**
+   * Update a section's title by ID (safer than index-based)
+   */
+  ReportHub.updateSectionTitleById = function(sectionId, newTitle) {
+    for (var i = 0; i < ReportHub.pinnedItems.length; i++) {
+      if (ReportHub.pinnedItems[i].id === sectionId &&
+          ReportHub.pinnedItems[i].type === "section") {
+        ReportHub.pinnedItems[i].title = newTitle.trim() || "Untitled Section";
+        ReportHub.savePinnedData();
+        break;
+      }
     }
   };
 
@@ -469,7 +514,7 @@
     var section = editor.closest(".hub-summary-section");
     var title = section ? section.querySelector(".hub-summary-label").textContent : "Overview Summary";
     var pinObj = {
-      id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+      id: "pin-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7),
       title: title,
       sourceLabel: "Overview",
       insight: text,
@@ -495,7 +540,7 @@
     var labelEl = section ? section.querySelector(".hub-summary-label") : null;
     var title = labelEl ? labelEl.textContent.trim() : boxId;
     var pinObj = {
-      id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+      id: "pin-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7),
       title: title,
       sourceLabel: "Overview",
       insight: text,
@@ -594,7 +639,7 @@
       if (val.length > 0) imageData = val;
     }
     var pinObj = {
-      id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+      id: "pin-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7),
       title: titleEl ? (titleEl.value || titleEl.textContent || "").trim() || "Slide" : "Slide",
       sourceLabel: "Overview",
       insight: rendered ? rendered.innerHTML : "",
@@ -665,7 +710,7 @@
   ReportHub.addHubSlide = function() {
     var grid = document.getElementById("hub-slides-grid");
     if (!grid) return;
-    var slideId = "hub-slide-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5);
+    var slideId = "hub-slide-" + Date.now() + "-" + Math.random().toString(36).substring(2, 7);
     var card = document.createElement("div");
     card.className = "hub-slide-card";
     card.setAttribute("data-slide-id", slideId);
@@ -1359,31 +1404,36 @@
    * No foreignObject — single reliable code path.
    * @param {string} pinId - Pin ID
    */
-  ReportHub.exportPinCard = function(pinId) {
+  /**
+   * Export a single pin card as a PowerPoint-quality PNG using SVG-native approach.
+   * @param {string} pinId - Pin ID
+   * @param {function} [onComplete] - Optional callback invoked after export finishes
+   */
+  ReportHub.exportPinCard = function(pinId, onComplete) {
     // Find pin data in the store
     var pin = null;
     for (var i = 0; i < ReportHub.pinnedItems.length; i++) {
       if (ReportHub.pinnedItems[i].id === pinId) { pin = ReportHub.pinnedItems[i]; break; }
     }
-    if (!pin) return;
+    if (!pin) { if (onComplete) onComplete(); return; }
 
     // If pin has an image, pre-load it to get natural dimensions before building SVG
     if (pin.imageData) {
       var preImg = new Image();
       preImg.onload = function() {
-        ReportHub._buildPinExportSVG(pin, preImg.naturalWidth, preImg.naturalHeight);
+        ReportHub._buildPinExportSVG(pin, preImg.naturalWidth, preImg.naturalHeight, onComplete);
       };
       preImg.onerror = function() {
         // Image failed to load — export without it
-        ReportHub._buildPinExportSVG(pin, 0, 0);
+        ReportHub._buildPinExportSVG(pin, 0, 0, onComplete);
       };
       preImg.src = pin.imageData;
     } else {
-      ReportHub._buildPinExportSVG(pin, 0, 0);
+      ReportHub._buildPinExportSVG(pin, 0, 0, onComplete);
     }
   };
 
-  ReportHub._buildPinExportSVG = function(pin, pinImageW, pinImageH) {
+  ReportHub._buildPinExportSVG = function(pin, pinImageW, pinImageH, onComplete) {
     var ns = "http://www.w3.org/2000/svg";
     var W = EXPORT_WIDTH;
     var fontFamily = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
@@ -1499,9 +1549,16 @@
         });
         var vb = chartClone.getAttribute("viewBox");
         if (vb) {
-          var chartVB = vb.split(" ").map(Number);
-          chartScale = usableW / chartVB[2];
-          chartDisplayH = chartVB[3] * chartScale;
+          // Handle both space-separated and comma-separated viewBox values
+          var chartVB = vb.split(/[\s,]+/).map(Number);
+          // Guard against degenerate viewBox (0 width/height, NaN)
+          if (chartVB.length >= 4 && chartVB[2] > 0 && chartVB[3] > 0 &&
+              !isNaN(chartVB[2]) && !isNaN(chartVB[3])) {
+            chartScale = usableW / chartVB[2];
+            chartDisplayH = chartVB[3] * chartScale;
+          } else {
+            chartClone = null; // Skip broken chart
+          }
         }
       }
     }
@@ -1604,12 +1661,18 @@
       URL.revokeObjectURL(url);
       console.error("[Hub Pin PNG] SVG render failed for pin: " + pin.id);
       alert("PNG export failed. Please try using Chrome or Edge browser.");
+      if (onComplete) onComplete();
     };
     img.onload = function() {
       var canvas = document.createElement("canvas");
       canvas.width = W * renderScale;
       canvas.height = totalH * renderScale;
       var ctx = canvas.getContext("2d");
+      if (!ctx) {
+        console.error("[Hub Pin PNG] Canvas 2D context unavailable for pin: " + pin.id);
+        if (onComplete) onComplete();
+        return;
+      }
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
@@ -1618,7 +1681,7 @@
       // Composite pin image directly on canvas (avoids SVG <image> taint)
       var _finishExport = function() {
         canvas.toBlob(function(blob) {
-          if (!blob) return;
+          if (!blob) { if (onComplete) onComplete(); return; }
           var slug = titleText.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 40);
           var filename = "pinned_" + slug + ".png";
           var a = document.createElement("a");
@@ -1628,6 +1691,7 @@
           a.click();
           document.body.removeChild(a);
           URL.revokeObjectURL(a.href);
+          if (onComplete) onComplete();
         }, "image/png");
       };
 
@@ -1651,7 +1715,9 @@
   };
 
   /**
-   * Export all pinned cards as individual PNGs (sequential download)
+   * Export all pinned cards as individual PNGs (sequential callback chain).
+   * Each export waits for the previous one to complete before starting the next,
+   * ensuring downloads don't overlap and browser download limits aren't hit.
    */
   ReportHub.exportAllPins = function() {
     var pins = [];
@@ -1665,9 +1731,12 @@
     var idx = 0;
     function exportNext() {
       if (idx >= pins.length) return;
-      ReportHub.exportPinCard(pins[idx]);
+      var currentId = pins[idx];
       idx++;
-      setTimeout(exportNext, EXPORT_ALL_DELAY_MS);
+      // Small delay between downloads for browser download queue stability
+      ReportHub.exportPinCard(currentId, function() {
+        setTimeout(exportNext, 200);
+      });
     }
     exportNext();
   };
@@ -1700,6 +1769,22 @@
       a2.click();
       document.body.removeChild(a2);
     }
+  }
+
+  /**
+   * Sanitize HTML by removing script tags and event handler attributes.
+   * Used for content that will be injected via innerHTML from report pins.
+   * Since pins come from the user's own reports (same-origin), this is
+   * defence-in-depth rather than a trust boundary, but prevents accidental
+   * script execution when content is moved between contexts.
+   */
+  function sanitizeHtml(html) {
+    if (!html) return "";
+    // Remove <script> tags and their content
+    html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
+    // Remove event handler attributes (on*)
+    html = html.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+    return html;
   }
 
   /**

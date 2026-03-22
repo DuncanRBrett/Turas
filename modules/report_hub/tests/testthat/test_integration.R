@@ -83,47 +83,63 @@ test_that("write_hub_html preserves file content byte-for-byte", {
 # combine_reports() — Full Pipeline Integration Tests
 # ==============================================================================
 
-test_that("combine_reports produces a valid hub file from demo config", {
+test_that("combine_reports produces a valid hub file from bundled fixtures", {
   skip_if_not_installed("openxlsx")
   skip_if_not_installed("htmltools")
   skip_if_not_installed("base64enc")
   skip_if_not_installed("jsonlite")
 
-  config_file <- normalizePath(
-    file.path("examples", "report_hub", "Demo_Combined_Config.xlsx"),
-    mustWork = FALSE
-  )
-  # Try relative to project root
+  # Build a config file pointing to the bundled test HTML fixtures
+  fixtures_dir <- file.path(testthat::test_path(), "fixtures")
+  tabs_path <- file.path(fixtures_dir, "test_report_tabs.html")
+  tracker_path <- file.path(fixtures_dir, "test_report_tracker.html")
+  skip_if(!file.exists(tabs_path), "Test fixture not found")
+  skip_if(!file.exists(tracker_path), "Test fixture not found")
 
-  if (!file.exists(config_file)) {
-    config_file <- normalizePath(
-      file.path(testthat::test_path(), "..", "..", "..", "..", "examples",
-                "report_hub", "Demo_Combined_Config.xlsx"),
-      mustWork = FALSE
-    )
-  }
-  skip_if(!file.exists(config_file), "Demo config not found — run from project root")
+  tmp_config <- tempfile(fileext = ".xlsx")
+  tmp_output <- tempfile(fileext = ".html")
+  on.exit(unlink(c(tmp_config, tmp_output)), add = TRUE)
 
-  tmp <- tempfile(fileext = ".html")
-  on.exit(unlink(tmp), add = TRUE)
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "Settings")
+  openxlsx::writeData(wb, "Settings", data.frame(
+    field = c("project_title", "company_name"),
+    value = c("Integration Test Hub", "TestCo"),
+    stringsAsFactors = FALSE
+  ))
+  openxlsx::addWorksheet(wb, "Reports")
+  openxlsx::writeData(wb, "Reports", data.frame(
+    report_path = c(tabs_path, tracker_path),
+    report_label = c("Test Tabs", "Test Tracker"),
+    report_key = c("tabs", "tracker"),
+    order = c(1, 2),
+    stringsAsFactors = FALSE
+  ))
+  openxlsx::saveWorkbook(wb, tmp_config, overwrite = TRUE)
 
-  result <- combine_reports(config_file, output_file = tmp)
+  result <- combine_reports(tmp_config, output_file = tmp_output)
 
   # Should succeed (PASS or PARTIAL if warnings)
   expect_true(result$status %in% c("PASS", "PARTIAL"))
-  expect_true(file.exists(tmp))
+  expect_true(file.exists(tmp_output))
   expect_true(result$result$file_size > 0)
-  expect_true(result$result$n_reports > 0)
-  expect_true(length(result$result$report_keys) > 0)
+  expect_equal(result$result$n_reports, 2)
+  expect_equal(sort(result$result$report_keys), c("tabs", "tracker"))
 
   # Read output and verify structure
-  html <- paste(readLines(tmp, warn = FALSE), collapse = "\n")
+  html <- paste(readLines(tmp_output, warn = FALSE), collapse = "\n")
   expect_true(grepl("<!DOCTYPE html>", html, fixed = TRUE))
   expect_true(grepl('content="hub"', html))
   expect_true(grepl("hub-report-iframe", html))
   expect_true(grepl('data-encoding="base64"', html))
   expect_true(grepl("DOMContentLoaded", html))
   expect_true(grepl("ReportHub.initNavigation", html))
+
+  # Both reports should be embedded
+  expect_true(grepl('id="hub-report-tabs"', html))
+  expect_true(grepl('id="hub-report-tracker"', html))
+  expect_true(grepl('id="hub-iframe-tabs"', html))
+  expect_true(grepl('id="hub-iframe-tracker"', html))
 })
 
 test_that("combine_reports returns REFUSED for missing config file", {

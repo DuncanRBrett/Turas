@@ -154,6 +154,7 @@ combine_reports <- function(config_file, output_file = NULL, auto_cross_ref = FA
   # --- Step 6: Assemble final HTML (iframe-based) ---
   cat("Step 5: Assembling combined report (iframe isolation)...\n")
   config$original_filename <- basename(output_file)
+  config$hub_dir <- hub_dir  # Pass module root so asset resolution doesn't depend on working directory
   final_html <- assemble_hub_html(config, parsed_reports, overview_html, navigation_html)
 
   # --- Step 7: Write output ---

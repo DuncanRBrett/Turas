@@ -22,9 +22,15 @@ write_hub_html <- function(html, output_file) {
     }
   }
 
-  # Write file
+  # Write file as raw UTF-8 bytes.
+  # Using writeBin(charToRaw(enc2utf8(...))) instead of writeLines() ensures
+  # correct encoding on Windows (where R's native encoding may be Latin-1).
   result <- tryCatch({
-    writeLines(html, output_file, useBytes = TRUE)
+    con <- file(output_file, open = "wb")
+    tryCatch(
+      writeBin(charToRaw(enc2utf8(html)), con),
+      finally = close(con)
+    )
     TRUE
   }, error = function(e) {
     e$message
@@ -46,10 +52,16 @@ write_hub_html <- function(html, output_file) {
     sprintf("%.0f KB", file_size / 1024)
   }
 
+  # normalizePath can throw on symlinks or edge-case paths — protect it
+  norm_path <- tryCatch(
+    normalizePath(output_file, mustWork = FALSE),
+    error = function(e) output_file
+  )
+
   return(list(
     status = "PASS",
     result = list(
-      output_path = normalizePath(output_file),
+      output_path = norm_path,
       file_size = file_size,
       size_label = size_label
     ),

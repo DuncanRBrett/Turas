@@ -14,6 +14,27 @@
 #' @return Complete HTML document string
 assemble_hub_html <- function(config, parsed_reports, overview_html, navigation_html) {
 
+  # Guard: htmltools is required for HTML escaping throughout assembly
+
+  if (!requireNamespace("htmltools", quietly = TRUE)) {
+    return(list(
+      status = "REFUSED",
+      code = "PKG_MISSING_HTMLTOOLS",
+      message = "Package 'htmltools' is required for HTML assembly but is not installed.",
+      how_to_fix = "Install it with: install.packages('htmltools')"
+    ))
+  }
+
+  # Guard: base64enc is required for report embedding
+  if (!requireNamespace("base64enc", quietly = TRUE)) {
+    return(list(
+      status = "REFUSED",
+      code = "PKG_MISSING_BASE64ENC",
+      message = "Package 'base64enc' is required for report embedding but is not installed.",
+      how_to_fix = "Install it with: install.packages('base64enc')"
+    ))
+  }
+
   parts <- character(0)
 
   # --- DOCTYPE and head ---
@@ -78,7 +99,7 @@ assemble_hub_html <- function(config, parsed_reports, overview_html, navigation_
   # Base64 uses only A-Za-z0-9+/= characters, so it cannot interfere
   # with HTML parsing (no < > / that could form closing tags)
   for (parsed in parsed_reports) {
-    b64_html <- base64enc::base64encode(charToRaw(parsed$raw_html))
+    b64_html <- base64enc::base64encode(charToRaw(enc2utf8(parsed$raw_html)))
     cat(sprintf("    Base64-encoded %s: %s -> %s\n",
                 parsed$report_key,
                 format_file_size(nchar(parsed$raw_html)),
@@ -97,7 +118,7 @@ assemble_hub_html <- function(config, parsed_reports, overview_html, navigation_
 
   # --- JavaScript ---
   # Hub JS (navigation, pinned views, init)
-  hub_js <- build_hub_js()
+  hub_js <- build_hub_js(config)
   parts <- c(parts, sprintf('<script>\n%s\n</script>', hub_js))
 
   # Initialization script
@@ -118,7 +139,11 @@ assemble_hub_html <- function(config, parsed_reports, overview_html, navigation_
 #' @param config Validated config list
 #' @return CSS string with colour tokens replaced
 build_hub_css <- function(config) {
-  css_path <- file.path(dirname(sys.frame(1)$ofile %||% "."), "assets", "hub_styles.css")
+  # Resolve asset path: prefer explicit hub_dir from config (set by 00_main.R),
+  # fall back to sys.frame detection, then hard-coded path.
+  # This ensures correct resolution in Shiny, callr, and interactive sessions.
+  hub_base <- config$hub_dir %||% dirname(sys.frame(1)$ofile %||% ".")
+  css_path <- file.path(hub_base, "assets", "hub_styles.css")
   if (!file.exists(css_path)) {
     css_path <- file.path("modules", "report_hub", "assets", "hub_styles.css")
   }
@@ -226,8 +251,12 @@ build_pinned_panel <- function() {
 #' Build Hub JavaScript from Source Files
 #'
 #' @return JavaScript string
-build_hub_js <- function() {
-  js_dir <- file.path(dirname(sys.frame(1)$ofile %||% "."), "js")
+build_hub_js <- function(config = NULL) {
+  # Resolve JS directory: prefer explicit hub_dir from config (set by 00_main.R),
+  # fall back to sys.frame detection, then hard-coded path.
+  hub_base <- if (!is.null(config)) config$hub_dir else NULL
+  hub_base <- hub_base %||% dirname(sys.frame(1)$ofile %||% ".")
+  js_dir <- file.path(hub_base, "js")
   if (!dir.exists(js_dir)) {
     js_dir <- file.path("modules", "report_hub", "js")
   }

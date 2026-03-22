@@ -163,3 +163,73 @@ test_that("build_init_js handles single report", {
   expect_true(grepl("DOMContentLoaded", init_js))
   expect_true(grepl('"tracker"', init_js))
 })
+
+
+# ==============================================================================
+# build_hub_js() — JS asset loading
+# ==============================================================================
+
+test_that("build_hub_js returns non-empty JS with key markers", {
+  # Pass hub_dir via config so path resolution works regardless of working directory
+  test_hub_dir <- normalizePath(file.path(testthat::test_path(), "..", ".."), mustWork = FALSE)
+  if (!dir.exists(file.path(test_hub_dir, "js"))) {
+    test_hub_dir <- normalizePath("modules/report_hub", mustWork = FALSE)
+  }
+  skip_if(!dir.exists(file.path(test_hub_dir, "js")), "JS directory not found")
+
+  config <- list(hub_dir = test_hub_dir)
+  js <- build_hub_js(config)
+
+  # Must return non-empty content
+  expect_true(nzchar(js))
+  expect_true(nchar(js) > 100)  # Should be thousands of chars
+
+  # Must contain key ReportHub functions
+  expect_true(grepl("ReportHub", js))
+  expect_true(grepl("switchReport", js))
+  expect_true(grepl("pinnedItems", js))
+  expect_true(grepl("initNavigation", js))
+  expect_true(grepl("saveReportHTML", js))
+  expect_true(grepl("addPin", js))
+})
+
+test_that("build_hub_js loads all three JS files", {
+  test_hub_dir <- normalizePath(file.path(testthat::test_path(), "..", ".."), mustWork = FALSE)
+  if (!dir.exists(file.path(test_hub_dir, "js"))) {
+    test_hub_dir <- normalizePath("modules/report_hub", mustWork = FALSE)
+  }
+  skip_if(!dir.exists(file.path(test_hub_dir, "js")), "JS directory not found")
+
+  config <- list(hub_dir = test_hub_dir)
+  js <- build_hub_js(config)
+
+  # Content from hub_id_resolver.js (namespace init)
+  expect_true(grepl("ReportHub\\.reportKeys", js))
+  # Content from hub_navigation.js
+  expect_true(grepl("loadIframe|switchReport", js))
+  # Content from hub_pinned.js
+  expect_true(grepl("exportPinCard|hubRenderPinTableSVG|pinnedItems", js))
+})
+
+test_that("build_hub_css returns styled CSS with token replacement", {
+  test_hub_dir <- normalizePath(file.path(testthat::test_path(), "..", ".."), mustWork = FALSE)
+  if (!dir.exists(file.path(test_hub_dir, "assets"))) {
+    test_hub_dir <- normalizePath("modules/report_hub", mustWork = FALSE)
+  }
+  skip_if(!dir.exists(file.path(test_hub_dir, "assets")), "Assets directory not found")
+
+  config <- list(
+    hub_dir = test_hub_dir,
+    settings = list(brand_colour = "#FF0000", accent_colour = "#00FF00")
+  )
+  css <- build_hub_css(config)
+
+  expect_true(nzchar(css))
+  expect_true(nchar(css) > 100)
+  # Tokens should be replaced
+  expect_false(grepl("BRAND_COLOUR", css, fixed = TRUE))
+  expect_false(grepl("ACCENT_COLOUR", css, fixed = TRUE))
+  # Actual colours should be present
+  expect_true(grepl("#FF0000", css, fixed = TRUE))
+  expect_true(grepl("#00FF00", css, fixed = TRUE))
+})
