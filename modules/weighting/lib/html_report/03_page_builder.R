@@ -21,6 +21,12 @@ local({
     source(file.path(ds_dir, "font_embed.R"), local = FALSE)
     source(file.path(ds_dir, "base_css.R"), local = FALSE)
   }
+  # Source callout registry
+  callout_dir <- file.path(turas_root, "modules", "shared", "lib", "callouts")
+  if (!dir.exists(callout_dir)) callout_dir <- file.path("modules", "shared", "lib", "callouts")
+  if (!exists("turas_callout", mode = "function") && dir.exists(callout_dir)) {
+    source(file.path(callout_dir, "callout_registry.R"), local = FALSE)
+  }
 })
 
 #' Build Complete HTML Page
@@ -691,13 +697,17 @@ build_summary_panel <- function(html_data, summary_table) {
     paste(summary$weight_names, collapse = ", ")
   )
 
-  overview_callout <- '<div class="wt-callout" style="margin-bottom:12px;">
+  overview_callout <- if (exists("turas_callout", mode = "function")) {
+    turas_callout("weighting", "weight_metrics", collapsed = TRUE)
+  } else {
+    '<div class="wt-callout" style="margin-bottom:12px;">
     This table summarises all calculated weights. <strong>Eff. N</strong> (effective sample size) shows the
     equivalent unweighted sample size after accounting for weight variability &mdash; this is the sample size you
     should use when interpreting precision. <strong>DEFF</strong> (design effect due to weighting) quantifies the
     variance inflation factor. <strong>Quality</strong> is assessed based on efficiency and the presence of
     extreme weights. See the Weight Details tab for per-weight distributions and diagnostics.
-  </div>'
+    </div>'
+  }
 
   sprintf(
     '<div id="tab-summary" class="tab-panel active">
@@ -778,21 +788,27 @@ build_details_panel <- function(html_data, tables, charts) {
       ))
     }
 
-    # Margins table (rim weights)
+    # Margins table (rim weights) with registry callout
     margins_key <- paste0("margins_", detail$weight_name)
     if (!is.null(tables[[margins_key]]) && nzchar(tables[[margins_key]])) {
+      rim_callout <- if (exists("turas_callout", mode = "function")) {
+        turas_callout("weighting", "rim_targets", collapsed = TRUE)
+      } else ""
       panel_content <- paste0(panel_content, sprintf(
-        '<div class="wt-card">%s</div>',
-        tables[[margins_key]]
+        '<div class="wt-card">%s%s</div>',
+        rim_callout, tables[[margins_key]]
       ))
     }
 
-    # Stratum table (design weights)
+    # Stratum table (design weights) with registry callout
     stratum_key <- paste0("stratum_", detail$weight_name)
     if (!is.null(tables[[stratum_key]]) && nzchar(tables[[stratum_key]])) {
+      stratum_callout <- if (exists("turas_callout", mode = "function")) {
+        turas_callout("weighting", "stratum_weights", collapsed = TRUE)
+      } else ""
       panel_content <- paste0(panel_content, sprintf(
-        '<div class="wt-card">%s</div>',
-        tables[[stratum_key]]
+        '<div class="wt-card">%s%s</div>',
+        stratum_callout, tables[[stratum_key]]
       ))
     }
 

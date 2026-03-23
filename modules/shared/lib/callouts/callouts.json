@@ -212,5 +212,25 @@
       "text": "The heatmap shows values across waves with colour intensity indicating magnitude. Darker shades represent higher values. This view makes it easy to spot trends (consistent darkening or lightening across waves) and outliers (cells that stand out from their neighbours).",
       "context": "Heatmap view"
     }
+  },
+  "tabs": {
+    "significance_testing": {
+      "title": "Understanding Significance Tests",
+      "text": "Significance letters (a, b, c…) indicate which column's value is statistically significantly higher than another at the chosen confidence level. A cell showing <strong>'a'</strong> means that column's value is significantly higher than column a's value. No letter means no significant difference was detected. Significance depends on sample size — small sub-groups may show no differences even when values appear different.",
+      "context": "Crosstab tables",
+      "page": "Crosstabs"
+    },
+    "dashboard_overview": {
+      "title": "Reading the Dashboard",
+      "text": "The dashboard summarises key metrics across all questions. <strong>Gauge cards</strong> show Total-column values with colour coding: green (strong), amber (moderate), red (low). The <strong>heatmap grid</strong> shows values across banner groups with the same colour logic. Hover any cell for the exact value. Use the metric type tabs to switch between percentages, means, and other metric types.",
+      "context": "Dashboard tab",
+      "page": "Summary"
+    },
+    "composite_scores": {
+      "title": "Understanding Composite Scores",
+      "text": "Composite scores combine multiple survey questions into a single index. The score shown is typically a weighted or unweighted average of the component questions, rescaled to a 0–100 range. Higher scores indicate more positive responses across the combined questions. Component breakdowns show how each contributing question performs individually.",
+      "context": "Composite question containers",
+      "page": "Crosstabs"
+    }
   }
 }

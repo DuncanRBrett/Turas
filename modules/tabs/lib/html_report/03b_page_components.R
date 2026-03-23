@@ -671,10 +671,18 @@ build_controls <- function(has_any_freq, has_any_pct, has_any_sig,
     ))
   }
 
-  htmltools::tags$div(
-    class = "controls-bar",
-    htmltools::tags$div(style = "flex:1"),
-    toggles
+  # Significance testing callout (from shared registry, collapsed by default)
+  sig_callout <- if (has_any_sig && exists("turas_callout", mode = "function")) {
+    htmltools::HTML(turas_callout("tabs", "significance_testing", collapsed = TRUE))
+  }
+
+  htmltools::tagList(
+    htmltools::tags$div(
+      class = "controls-bar",
+      htmltools::tags$div(style = "flex:1"),
+      toggles
+    ),
+    sig_callout
   )
 }
 

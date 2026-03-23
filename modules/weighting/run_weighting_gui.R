@@ -313,9 +313,21 @@ run_weighting_gui <- function(launch_browser = TRUE) {
 
     # Auto-load config from launcher
     pre_config <- Sys.getenv("TURAS_MODULE_CONFIG", unset = "")
-    if (nzchar(pre_config) && file.exists(pre_config)) {
+    if (nzchar(pre_config)) {
       Sys.unsetenv("TURAS_MODULE_CONFIG")
-      rv$selected_config <- normalizePath(pre_config, winslash = "/", mustWork = FALSE)
+      if (dir.exists(pre_config)) {
+        # Directory passed — look for a weighting config xlsx inside
+        dir_path <- normalizePath(pre_config, winslash = "/", mustWork = FALSE)
+        xlsx_files <- list.files(dir_path, pattern = "\\.(xlsx|xls)$", full.names = TRUE, ignore.case = TRUE)
+        wt_files <- grep("weight", xlsx_files, value = TRUE, ignore.case = TRUE)
+        if (length(wt_files) > 0) {
+          rv$selected_config <- wt_files[1]
+        } else if (length(xlsx_files) > 0) {
+          rv$selected_config <- xlsx_files[1]
+        }
+      } else if (file.exists(pre_config)) {
+        rv$selected_config <- normalizePath(pre_config, winslash = "/", mustWork = FALSE)
+      }
     }
 
     # Recent folders file location (persistent across sessions)
@@ -379,10 +391,10 @@ run_weighting_gui <- function(launch_browser = TRUE) {
         # Remove if already exists (will re-add at top)
         rv$recent_folders <- setdiff(rv$recent_folders, folder_path)
 
-        # Add to front, limit to 10 most recent
+        # Add to front, limit to 5 most recent
         rv$recent_folders <- c(folder_path, rv$recent_folders)
-        if (length(rv$recent_folders) > 10) {
-          rv$recent_folders <- rv$recent_folders[1:10]
+        if (length(rv$recent_folders) > 5) {
+          rv$recent_folders <- rv$recent_folders[1:5]
         }
 
         # Save to file

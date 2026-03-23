@@ -184,10 +184,16 @@ build_dashboard_panel <- function(dashboard_data, config_obj) {
     `data-fieldwork` = fieldwork_dates,
     `data-company` = company_name,
     `data-brand-colour` = brand_colour,
+    # Dashboard overview callout (from shared registry)
+    dashboard_callout <- if (exists("turas_callout", mode = "function")) {
+      htmltools::HTML(turas_callout("tabs", "dashboard_overview", collapsed = TRUE))
+    },
+
     htmltools::tags$div(
       class = "dash-container",
       meta_strip,
       colour_legend,
+      dashboard_callout,
       build_dashboard_text_boxes(brand_colour, config_obj),
       section_blocks,
       sig_section,

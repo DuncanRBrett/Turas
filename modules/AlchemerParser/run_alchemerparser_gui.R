@@ -234,6 +234,20 @@ run_alchemerparser_gui <- function() {
       output_files = NULL
     )
 
+    # Auto-load project directory from launcher
+    pre_config <- Sys.getenv("TURAS_MODULE_CONFIG", unset = "")
+    if (nzchar(pre_config)) {
+      Sys.unsetenv("TURAS_MODULE_CONFIG")
+      if (dir.exists(pre_config)) {
+        updateTextInput(session, "project_dir",
+                        value = normalizePath(pre_config, winslash = "/", mustWork = FALSE))
+      } else if (file.exists(pre_config)) {
+        # If a file was passed, use its parent directory
+        updateTextInput(session, "project_dir",
+                        value = normalizePath(dirname(pre_config), winslash = "/", mustWork = FALSE))
+      }
+    }
+
     # Load recent projects on startup
     observe({
       if (file.exists(recent_projects_file)) {
@@ -368,7 +382,7 @@ run_alchemerparser_gui <- function() {
         # Add current project (will overwrite if name exists)
         new_entry <- setNames(input$project_dir, proj_name)
         recent <- c(new_entry, recent[names(recent) != proj_name])
-        recent <- head(recent, 10)  # Keep only 10 most recent
+        recent <- head(recent, 5)  # Keep only 5 most recent
 
         saveRDS(recent, recent_projects_file)
       }, error = function(e) {

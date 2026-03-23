@@ -84,6 +84,8 @@ source(file.path(script_dir, "lib", "formatting_utils.R"))
 # Load output modules
 source(file.path(script_dir, "lib", "output_formatting.R"))
 source(file.path(script_dir, "lib", "tracker_output.R"))
+source(file.path(script_dir, "lib", "tracker_output_banners.R"))
+source(file.path(script_dir, "lib", "tracker_output_extended.R"))
 source(file.path(script_dir, "lib", "tracker_dashboard_reports.R"))
 # Load tracking crosstab modules
 source(file.path(script_dir, "lib", "tracking_crosstab_engine.R"))

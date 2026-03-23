@@ -168,9 +168,21 @@ run_maxdiff_gui <- function() {
 
     # Auto-load config from launcher
     pre_config <- Sys.getenv("TURAS_MODULE_CONFIG", unset = "")
-    if (nzchar(pre_config) && file.exists(pre_config)) {
+    if (nzchar(pre_config)) {
       Sys.unsetenv("TURAS_MODULE_CONFIG")
-      rv$config_path <- normalizePath(pre_config, winslash = "/", mustWork = FALSE)
+      if (dir.exists(pre_config)) {
+        # Directory passed — look for a MaxDiff config xlsx inside
+        dir_path <- normalizePath(pre_config, winslash = "/", mustWork = FALSE)
+        xlsx_files <- list.files(dir_path, pattern = "\\.(xlsx|xls)$", full.names = TRUE, ignore.case = TRUE)
+        md_files <- grep("maxdiff|max_diff|MaxDiff", xlsx_files, value = TRUE, ignore.case = TRUE)
+        if (length(md_files) > 0) {
+          rv$config_path <- md_files[1]
+        } else if (length(xlsx_files) > 0) {
+          rv$config_path <- xlsx_files[1]
+        }
+      } else if (file.exists(pre_config)) {
+        rv$config_path <- normalizePath(pre_config, winslash = "/", mustWork = FALSE)
+      }
     }
 
     # File chooser volumes

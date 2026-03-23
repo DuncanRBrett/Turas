@@ -59,6 +59,9 @@
   "01_data_transformer.R",
   "02_table_builder.R",
   "03_page_builder.R",
+  "03a_page_styling.R",
+  "03b_page_components.R",
+  "03c_section_builders.R",
   "04_html_writer.R",
   "05_chart_builder.R"
 )
@@ -88,6 +91,10 @@ if (file.exists(.seg_html_exploration_path)) {
 .seg_html_combined_path <- file.path(.seg_html_report_dir, "07_combined_report.R")
 if (file.exists(.seg_html_combined_path)) {
   source(.seg_html_combined_path)
+}
+.seg_html_combined_builders_path <- file.path(.seg_html_report_dir, "07a_combined_builders.R")
+if (file.exists(.seg_html_combined_builders_path)) {
+  source(.seg_html_combined_builders_path)
 }
 
 

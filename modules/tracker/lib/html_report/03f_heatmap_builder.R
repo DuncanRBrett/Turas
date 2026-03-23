@@ -464,8 +464,15 @@ build_explorer_tab <- function(html_data, config) {
   # Master data blob
   data_json <- build_explorer_data_json(html_data, config)
 
+  # Heatmap callout (from shared registry)
+  heatmap_callout <- if (exists("turas_callout", mode = "function")) {
+    htmltools::HTML(turas_callout("tracker", "heatmap", collapsed = TRUE))
+  }
+
   htmltools::tags$div(id = "tab-explorer", class = "tab-panel",
     style = "padding: 20px 24px;",
+
+    heatmap_callout,
 
     # Mode toggle
     htmltools::tags$div(class = "explorer-mode-toggle",

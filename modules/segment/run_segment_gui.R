@@ -56,8 +56,8 @@ run_segment_gui <- function() {
     # Add new project (avoid duplicates)
     recent <- c(config_path, recent[recent != config_path])
 
-    # Keep only last 10
-    recent <- head(recent, 10)
+    # Keep only last 5
+    recent <- head(recent, 5)
 
     saveRDS(recent, recent_file)
   }
@@ -123,9 +123,21 @@ run_segment_gui <- function() {
 
     # Auto-load config from launcher
     pre_config <- Sys.getenv("TURAS_MODULE_CONFIG", unset = "")
-    if (nzchar(pre_config) && file.exists(pre_config)) {
+    if (nzchar(pre_config)) {
       Sys.unsetenv("TURAS_MODULE_CONFIG")
-      config_file(normalizePath(pre_config, winslash = "/", mustWork = FALSE))
+      if (dir.exists(pre_config)) {
+        # Directory passed — look for a segment config xlsx inside
+        dir_path <- normalizePath(pre_config, winslash = "/", mustWork = FALSE)
+        xlsx_files <- list.files(dir_path, pattern = "\\.(xlsx|xls)$", full.names = TRUE, ignore.case = TRUE)
+        seg_files <- grep("segment", xlsx_files, value = TRUE, ignore.case = TRUE)
+        if (length(seg_files) > 0) {
+          config_file(seg_files[1])
+        } else if (length(xlsx_files) > 0) {
+          config_file(xlsx_files[1])
+        }
+      } else if (file.exists(pre_config)) {
+        config_file(normalizePath(pre_config, winslash = "/", mustWork = FALSE))
+      }
     }
 
     # Setup file browser

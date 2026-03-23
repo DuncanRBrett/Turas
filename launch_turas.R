@@ -139,7 +139,7 @@ launch_turas <- function() {
          description = "Confidence intervals for means and proportions with design effect adjustments",
          category = "advanced",
          script = "modules/confidence/run_confidence_gui.R",
-         recent_file = ".recent_projects.rds",
+         recent_file = ".recent_confidence_projects.rds",
          recent_key = NULL),
 
     list(id = "report_hub", name = "Report Hub",
@@ -223,14 +223,6 @@ launch_turas <- function() {
 
       paths <- paths[!is.na(paths)]
       paths <- paths[file.exists(paths) | dir.exists(paths)]
-      # Filter out directories that have no xlsx files (stale parent dirs)
-      paths <- paths[sapply(paths, function(p) {
-        if (dir.exists(p)) {
-          length(list.files(p, pattern = "\\.xlsx$", ignore.case = TRUE)) > 0
-        } else {
-          TRUE
-        }
-      })]
       head(paths, 5)
     }, error = function(e) character(0))
   }
@@ -727,8 +719,8 @@ launch_turas <- function() {
       mod <- Find(function(m) m$id == mod_id, modules)
       if (is.null(mod)) return()
 
-      if (!file.exists(config_path)) {
-        show_status("Config file no longer exists")
+      if (!file.exists(config_path) && !dir.exists(config_path)) {
+        show_status("Project path no longer exists")
         later::later(function() {
           tryCatch(hide_status(), error = function(e) NULL)
         }, delay = 4)

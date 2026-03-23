@@ -28,6 +28,8 @@ if (!exists("%||%", mode = "function")) {
 # Source submodules
 .kd_required_files <- c("00_html_guard.R", "01_data_transformer.R",
                          "02_table_builder.R", "03_page_builder.R",
+                         "03a_page_styling.R", "03b_page_components.R",
+                         "03c_section_builders.R",
                          "04_html_writer.R", "05_chart_builder.R",
                          "06_quadrant_section.R", "07_v104_sections.R")
 

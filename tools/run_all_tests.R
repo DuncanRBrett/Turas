@@ -93,7 +93,7 @@ modules <- list(
        test_dir = "modules/conjoint/tests/testthat",
        description = "Choice-based conjoint, HB estimation, WTP, simulators"),
   list(name = "Cat Driver", id = "catdriver",
-       test_dir = "modules/catdriver/tests",
+       test_dir = "modules/catdriver/tests/testthat",
        description = "Categorical driver analysis, SHAP, logistic regression"),
   list(name = "Key Driver", id = "keydriver",
        test_dir = "modules/keydriver/tests/testthat",

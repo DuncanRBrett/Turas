@@ -113,6 +113,11 @@ build_summary_tab <- function(html_data, config) {
     # ---- 5. Wave-over-Wave Pulse Bar ----
     build_wave_pulse_bar(html_data),
 
+    # ---- 5b. Significant changes callout (from shared registry) ----
+    if (exists("turas_callout", mode = "function")) {
+      htmltools::HTML(turas_callout("tracker", "significant_changes", collapsed = TRUE))
+    },
+
     # ---- 6. Significant Changes Section (collapsible, first 6 visible) ----
     build_sig_changes_section(html_data),
 

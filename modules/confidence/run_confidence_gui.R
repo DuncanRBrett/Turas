@@ -68,7 +68,7 @@ run_confidence_gui <- function() {
   hide_recents <- turas_hide_recents()
 
   # Recent projects file
-  RECENT_PROJECTS_FILE <- file.path(TURAS_HOME, ".recent_projects.rds")
+  RECENT_PROJECTS_FILE <- file.path(TURAS_HOME, ".recent_confidence_projects.rds")
 
   # === HELPER FUNCTIONS ===
 

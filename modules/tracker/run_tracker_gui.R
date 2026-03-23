@@ -196,8 +196,23 @@ run_tracker_gui <- function() {
 
     # Auto-load config from launcher
     pre_config <- Sys.getenv("TURAS_MODULE_CONFIG", unset = "")
-    if (nzchar(pre_config) && file.exists(pre_config)) {
+    if (nzchar(pre_config)) {
       Sys.unsetenv("TURAS_MODULE_CONFIG")
+      # Handle directory paths — look for tracking config xlsx inside
+      if (dir.exists(pre_config) && !file.exists(pre_config)) {
+        dir_path <- normalizePath(pre_config, winslash = "/", mustWork = FALSE)
+        xlsx_files <- list.files(dir_path, pattern = "\\.(xlsx|xls)$", full.names = TRUE, ignore.case = TRUE)
+        tk_files <- grep("track", xlsx_files, value = TRUE, ignore.case = TRUE)
+        if (length(tk_files) > 0) {
+          pre_config <- tk_files[1]
+        } else if (length(xlsx_files) > 0) {
+          pre_config <- xlsx_files[1]
+        } else {
+          pre_config <- ""
+        }
+      }
+    }
+    if (nzchar(pre_config) && file.exists(pre_config)) {
       tracking_path <- normalizePath(pre_config, winslash = "/", mustWork = FALSE)
       files$tracking_config <- tracking_path
 

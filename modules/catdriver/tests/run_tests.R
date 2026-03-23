@@ -111,8 +111,8 @@ library(testthat)
 reporter <- if (verbose) "progress" else "summary"
 
 test_results <- tryCatch({
-  test_file(file.path(module_root, "tests", "test_catdriver.R"),
-            reporter = reporter)
+  test_dir(file.path(module_root, "tests", "testthat"),
+           reporter = reporter)
 }, error = function(e) {
   cat("\nERROR running tests:", e$message, "\n")
   NULL

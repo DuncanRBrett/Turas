@@ -7,6 +7,17 @@
 # Both files are auto-sourced by 99_html_report_main.R.
 # ==============================================================================
 
+# Source the callout registry (TURAS_ROOT-aware)
+local({
+  turas_root <- Sys.getenv("TURAS_ROOT", "")
+  if (!nzchar(turas_root)) turas_root <- getwd()
+  callout_dir <- file.path(turas_root, "modules", "shared", "lib", "callouts")
+  if (!dir.exists(callout_dir)) callout_dir <- file.path("modules", "shared", "lib", "callouts")
+  if (!exists("turas_callout", mode = "function") && dir.exists(callout_dir)) {
+    source(file.path(callout_dir, "callout_registry.R"), local = FALSE)
+  }
+})
+
 # File-level helper: escape strings for safe insertion into JS single-quoted literals
 js_esc <- function(s) gsub("'", "\\\\'", gsub("\\\\", "\\\\\\\\", as.character(s)))
 

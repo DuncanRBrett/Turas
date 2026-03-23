@@ -7,8 +7,19 @@
 #   03b_page_components.R - Header, footer, help overlay, about, pinned, qual
 #   03c_summary_builder.R - Summary/Dashboard tab (KPI heroes, pulse, heatmap)
 #   03f_heatmap_builder.R - Explorer tab (heatmap table with drill-down)
-# VERSION: 3.0.0
+# VERSION: 3.1.0
 # ==============================================================================
+
+# Source the callout registry (TURAS_ROOT-aware)
+local({
+  turas_root <- Sys.getenv("TURAS_ROOT", "")
+  if (!nzchar(turas_root)) turas_root <- getwd()
+  callout_dir <- file.path(turas_root, "modules", "shared", "lib", "callouts")
+  if (!dir.exists(callout_dir)) callout_dir <- file.path("modules", "shared", "lib", "callouts")
+  if (!exists("turas_callout", mode = "function") && dir.exists(callout_dir)) {
+    source(file.path(callout_dir, "callout_registry.R"), local = FALSE)
+  }
+})
 
 
 #' Build Tracker HTML Page

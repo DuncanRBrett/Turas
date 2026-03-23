@@ -190,11 +190,26 @@ run_report_hub_gui <- function() {
     pre_config <- Sys.getenv("TURAS_MODULE_CONFIG", unset = "")
     if (!nzchar(pre_config)) pre_config <- Sys.getenv("TURAS_HUB_CONFIG", unset = "")
     Sys.unsetenv("TURAS_MODULE_CONFIG")
-    if (nzchar(pre_config) && file.exists(pre_config)) {
+    if (nzchar(pre_config)) {
       Sys.unsetenv("TURAS_HUB_CONFIG")
-      config_path(normalizePath(pre_config, winslash = "/", mustWork = FALSE))
-      add_recent_config(normalizePath(pre_config, winslash = "/", mustWork = FALSE))
-      config_info(read_config_preview(pre_config))
+      if (dir.exists(pre_config) && !file.exists(pre_config)) {
+        # Directory passed — look for a hub config xlsx inside
+        dir_path <- normalizePath(pre_config, winslash = "/", mustWork = FALSE)
+        xlsx_files <- list.files(dir_path, pattern = "\\.(xlsx|xls)$", full.names = TRUE, ignore.case = TRUE)
+        hub_files <- grep("hub|report", xlsx_files, value = TRUE, ignore.case = TRUE)
+        if (length(hub_files) > 0) {
+          pre_config <- hub_files[1]
+        } else if (length(xlsx_files) > 0) {
+          pre_config <- xlsx_files[1]
+        } else {
+          pre_config <- ""
+        }
+      }
+      if (nzchar(pre_config) && file.exists(pre_config)) {
+        config_path(normalizePath(pre_config, winslash = "/", mustWork = FALSE))
+        add_recent_config(normalizePath(pre_config, winslash = "/", mustWork = FALSE))
+        config_info(read_config_preview(pre_config))
+      }
     }
 
     # File chooser
