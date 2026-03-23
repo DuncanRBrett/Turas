@@ -97,7 +97,8 @@ turas_callout <- function(module, key, collapsed = FALSE) {
   turas_callout_html(
     title = entry$title,
     body = entry$text,
-    collapsed = collapsed
+    collapsed = collapsed,
+    registry_key = paste0(module, " / ", key)
   )
 }
 
@@ -111,22 +112,32 @@ turas_callout <- function(module, key, collapsed = FALSE) {
 #' @param body Character. Callout body (can contain HTML)
 #' @param collapsed Logical. Start collapsed (default FALSE)
 #' @param id Character or NULL. Optional DOM id for the callout
+#' @param registry_key Character or NULL. Optional registry identifier shown as
+#'   a subtle tag (e.g. "confidence / results_overview") so users can match
+#'   the rendered callout to its entry in the Callout Editor.
 #' @return Character HTML string
 #' @export
-turas_callout_html <- function(title, body, collapsed = FALSE, id = NULL) {
+turas_callout_html <- function(title, body, collapsed = FALSE, id = NULL,
+                                registry_key = NULL) {
   collapsed_class <- if (collapsed) " collapsed" else ""
   id_attr <- if (!is.null(id)) paste0(' id="', id, '"') else ""
+  key_tag <- if (!is.null(registry_key)) {
+    sprintf('<span class="t-callout-key">%s</span>', registry_key)
+  } else {
+    ""
+  }
 
   sprintf(
     '<div class="t-callout%s" data-turas-callout="true"%s>
   <div class="t-callout-header" onclick="this.parentElement.classList.toggle(\'collapsed\')">
     <span class="t-callout-icon">i</span>
     <span class="t-callout-title">%s</span>
+    %s
     <span class="t-callout-chevron">&#x25BC;</span>
   </div>
   <div class="t-callout-body">%s</div>
 </div>',
-    collapsed_class, id_attr, title, body
+    collapsed_class, id_attr, title, key_tag, body
   )
 }
 

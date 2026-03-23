@@ -2,7 +2,7 @@
   "_meta": {
     "version": "1.0.0",
     "description": "Centralised callout text for all Turas HTML reports. Edit text here to update all reports at next generation. Callouts are educational guidance that help non-statisticians interpret results. They appear in reports but NOT in pinned views or exports.",
-    "format": "title: short heading shown in callout header. text: main body (plain text or simple HTML). context: where this appears in the report."
+    "format": "title: short heading shown in callout header. text: main body (plain text or simple HTML). context: where this appears in the report. page: which report tab/page this callout appears on."
   },
   "keydriver": {
     "shapley_importance": {
@@ -62,57 +62,68 @@
     "questions_summary": {
       "title": "Quality Assessment",
       "text": "The quality indicators show how reliable each estimate is based on sample size and variability. Green indicators mean the estimate is precise enough for confident decisions (bear in mind there may still be other forms of error). Amber suggests caution — the margin of error is notable. Red indicates wide confidence intervals where estimates should be treated as directional only.",
-      "context": "Questions summary section"
+      "context": "Above results table",
+      "page": "Summary"
     },
     "visualization_guide": {
-      "title": "Reading Confidence Interval Charts",
+      "title": "Reading the Charts",
       "text": "Each bar shows the estimated value with whiskers extending to the lower and upper confidence bounds. Shorter whiskers mean more precision. When two intervals don't overlap, the difference between those groups is likely statistically meaningful. When they overlap substantially, you cannot reliably conclude a difference exists.",
-      "context": "Visualization section"
+      "context": "Below forest plot",
+      "page": "Summary"
     },
     "representativeness": {
       "title": "Reading Representativeness",
       "text": "The representativeness assessment compares your sample to known population benchmarks. <strong>Green<\/strong> cells indicate the sample closely matches the population (&lt;2pp difference). <strong>Amber<\/strong> indicates moderate deviation (2-5pp). <strong>Red<\/strong> indicates substantial deviation (&gt;5pp) that may bias results if related to the survey topic.",
-      "context": "Representativeness section"
-    },
-    "confidence_level": {
-      "title": "What does 'confidence level' mean?",
-      "text": "A 95% confidence level means: if you repeated this survey 100 times under identical conditions, roughly 95 of those surveys would produce an interval containing the true population value. It does NOT mean there is a 95% probability the true value is in this specific interval. The interval is fixed once calculated; the true value either is or isn't inside it.",
-      "context": "Confidence level explanation"
-    },
-    "precision_accuracy": {
-      "title": "Precision vs. Accuracy",
-      "text": "Precision tells you how repeatable your estimates are (narrow confidence intervals = high precision). Accuracy tells you whether the estimates are centred on the true value. A biased sample can produce precise but inaccurate results. Confidence intervals capture precision but not all sources of inaccuracy — particularly non-response bias and measurement error.",
-      "context": "Precision vs accuracy explanation"
-    },
-    "non_sampling_error": {
-      "title": "Sources of Error Not Captured",
-      "text": "Confidence intervals only capture random sampling error. They do not account for: <strong>Non-response bias<\/strong> (people who didn't respond may differ systematically), <strong>Measurement error<\/strong> (poorly worded questions), <strong>Coverage error<\/strong> (population groups not reachable by the survey method), or <strong>Processing errors<\/strong> (data cleaning and coding mistakes).",
-      "context": "Error sources explanation"
-    },
-    "multiple_comparisons": {
-      "title": "Multiple Comparisons",
-      "text": "When testing many comparisons simultaneously, some will appear significant by chance alone. At 95% confidence, roughly 1 in 20 comparisons will show a 'significant' difference even when no real difference exists. If you are making many comparisons, consider which findings are substantively meaningful rather than relying solely on statistical significance.",
-      "context": "Multiple comparisons warning"
+      "context": "Representativeness card",
+      "page": "Summary"
     },
     "results_overview": {
       "title": "Understanding This Table",
-      "text": "This table summarises all questions analysed, showing the point estimate, interval bounds, interval width, and a quality assessment. The <strong>Method<\/strong> column shows which statistical method produced the displayed values (see Method Selection below). A <strong>+1<\/strong> or <strong>+2<\/strong> next to the method name means additional methods are available in the Question Details tab. <strong>Green<\/strong> quality means the estimate is precise enough for confident decisions. <strong>Amber<\/strong> suggests the margin of error is notable — interpret with care. <strong>Red<\/strong> indicates wide intervals where estimates should be treated as directional only.",
-      "context": "Summary tab, results overview table"
+      "text": "This table summarises all questions analysed, showing the point estimate, interval bounds, interval width, and a quality assessment. The <strong>Method<\/strong> column shows which statistical method produced the displayed values (see Method Selection below). A <strong>+1<\/strong> or <strong>+2<\/strong> next to the method name means additional methods are available in the Question Details tab. <strong>Green<\/strong> quality means the estimate is precise enough for confident decisions. (note: there may be other forms of error) <strong>Amber<\/strong> suggests the margin of error is notable — interpret with care. <strong>Red<\/strong> indicates wide intervals where estimates should be treated as directional only.",
+      "context": "Results overview card",
+      "page": "Summary"
     },
     "method_selection": {
       "title": "How the Primary Method is Chosen",
       "text": "The summary table displays results from a single <strong>primary method<\/strong> per question, chosen by a fixed priority order based on statistical best practice:<ul><li><strong>Proportions:<\/strong> Wilson score (preferred) → Normal approximation → Bootstrap → Bayesian. Wilson is preferred because it maintains reliable coverage even at extreme proportions (below 5% or above 95%) and small samples, unlike the Normal approximation which can produce impossible intervals.<\/li><li><strong>Means:<\/strong> t-Distribution (preferred) → Bootstrap → Bayesian. The t-distribution is the standard method when the population standard deviation is unknown, which is nearly always.<\/li><li><strong>NPS:<\/strong> Normal approximation (preferred) → Bootstrap → Bayesian. The Normal method is standard for the difference-of-proportions that defines NPS.<\/li><\/ul>The first method available in the results is used. All methods are compared side-by-side in the <strong>Question Details<\/strong> tab — if the methods disagree substantially, this may indicate the data violates assumptions of the primary method.",
-      "context": "Summary tab, results overview table"
+      "context": "Results overview card, below table",
+      "page": "Summary"
     },
     "forest_plot_guide": {
       "title": "Reading the Forest Plot",
       "text": "Each dot represents the point estimate (proportion, mean, or NPS score). The horizontal bar shows the confidence or stability interval — the range of plausible values for the true population parameter. <strong>Shorter bars = more precision.<\/strong> When two bars don't overlap, the difference between those questions is likely statistically meaningful. Very wide bars suggest the sample may be too small for that question.",
-      "context": "Summary tab, forest plot section"
+      "context": "Forest plot card",
+      "page": "Summary"
     },
     "study_level_weighting": {
       "title": "Understanding Weighting Effects",
       "text": "When survey responses carry unequal weights, some respondents contribute more to the estimate than others. The <strong>Design Effect (DEFF)<\/strong> measures precision loss due to weighting — a DEFF of 1.0 means no loss, while 2.0 means you'd need twice the sample for equivalent precision. <strong>Efficiency above 70%<\/strong> is generally acceptable; below 50% suggests the weighting scheme may need review. These calculations assume a probability-based sample — for non-probability designs, DEFF captures only the weighting effect, not the full extent of sampling bias.",
-      "context": "Summary tab, study-level statistics"
+      "context": "Study-level statistics card (weighted only)",
+      "page": "Summary"
+    },
+    "confidence_level": {
+      "title": "What does 'confidence level' mean?",
+      "text": "A 95% confidence level means: if you repeated this survey 100 times under identical conditions, roughly 95 of those surveys would produce an interval containing the true population value. It does NOT mean there is a 95% probability the true value is in this specific interval. The interval is fixed once calculated; the true value either is or isn't inside it.",
+      "context": "Statistical Methods card",
+      "page": "Method Notes"
+    },
+    "precision_accuracy": {
+      "title": "Precision vs. Accuracy",
+      "text": "Precision tells you how repeatable your estimates are (narrow confidence intervals = high precision). Accuracy tells you whether the estimates are centred on the true value. A biased sample can produce precise but inaccurate results. Confidence intervals capture precision but not all sources of inaccuracy — particularly non-response bias and measurement error.",
+      "context": "Understanding Limitations card",
+      "page": "Method Notes"
+    },
+    "non_sampling_error": {
+      "title": "Sources of Error Not Captured",
+      "text": "Confidence intervals only capture random sampling error. They do not account for: <strong>Non-response bias<\/strong> (people who didn't respond may differ systematically), <strong>Measurement error<\/strong> (poorly worded questions), <strong>Coverage error<\/strong> (population groups not reachable by the survey method), or <strong>Processing errors<\/strong> (data cleaning and coding mistakes).",
+      "context": "Understanding Limitations card",
+      "page": "Method Notes"
+    },
+    "multiple_comparisons": {
+      "title": "Multiple Comparisons",
+      "text": "When testing many comparisons simultaneously, some will appear significant by chance alone. At 95% confidence, roughly 1 in 20 comparisons will show a 'significant' difference even when no real difference exists. If you are making many comparisons, consider which findings are substantively meaningful rather than relying solely on statistical significance.",
+      "context": "Understanding Limitations card",
+      "page": "Method Notes"
     }
   },
   "conjoint": {

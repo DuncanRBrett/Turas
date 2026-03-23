@@ -704,11 +704,22 @@ turas_callout_css <- function(brand_colour = "#323367") {
       color: #64748b;
       letter-spacing: 0.3px;
     }
+    .t-callout-key {
+      font-size: 9px;
+      font-weight: 500;
+      color: #b0b8c4;
+      background: #f1f5f9;
+      padding: 1px 6px;
+      border-radius: 3px;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+      margin-left: auto;
+    }
     .t-callout-chevron {
       font-size: 8px;
       color: #94a3b8;
-      margin-left: auto;
       transition: transform 0.2s ease;
+      flex-shrink: 0;
     }
     .t-callout.collapsed .t-callout-chevron {
       transform: rotate(-90deg);

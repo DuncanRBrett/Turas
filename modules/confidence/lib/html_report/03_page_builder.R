@@ -549,6 +549,7 @@ body {
   .ci-card { box-shadow: none; border: 1px solid #ddd; break-inside: avoid; }
   .ci-stat-card { box-shadow: none; border-top-color: #999; }
   .t-callout { break-inside: avoid; }
+  .t-callout-key { display: none !important; }
 }
 
 /* Question Meta Bar */
@@ -760,6 +761,26 @@ build_ci_summary_panel <- function(html_data, tables, charts, labels = NULL) {
     '<div class="ci-stat-card"><div class="ci-stat-value">%d</div><div class="ci-stat-label">Questions</div></div>',
     summary$n_questions
   ))
+
+  # Sample type card — shows sampling method even when banner is hidden in hub
+  sm <- summary$sampling_method %||% "Not_Specified"
+  if (!is.na(sm) && nzchar(sm) && sm != "Not_Specified") {
+    sm_label <- switch(sm,
+      "Random" = "Random",
+      "Stratified" = "Stratified",
+      "Cluster" = "Cluster",
+      "Quota" = "Quota",
+      "Online_Panel" = "Online Panel",
+      "Self_Selected" = "Self-Selected",
+      "Census" = "Census",
+      sm  # fallback
+    )
+    stat_cards <- c(stat_cards, sprintf(
+      '<div class="ci-stat-card"><div class="ci-stat-value" style="font-size:18px;">%s</div><div class="ci-stat-label">Sample Type</div></div>',
+      htmlEscape(sm_label)
+    ))
+  }
+
   if (summary$is_weighted && !is.na(summary$deff)) {
     stat_cards <- c(stat_cards, sprintf(
       '<div class="ci-stat-card"><div class="ci-stat-value">%.2f</div><div class="ci-stat-label">Design Effect</div></div>',
@@ -802,20 +823,22 @@ build_ci_summary_panel <- function(html_data, tables, charts, labels = NULL) {
 
   # Summary table — registry callouts
   if (nzchar(tables$summary %||% "")) {
+    quality_callout <- turas_callout("confidence", "questions_summary", collapsed = TRUE)
     overview_callout <- turas_callout("confidence", "results_overview")
     method_callout <- turas_callout("confidence", "method_selection", collapsed = TRUE)
     parts <- c(parts, sprintf(
-      '<div class="ci-card"><h3>Results Overview</h3>%s\n%s\n%s</div>',
-      overview_callout, method_callout, tables$summary
+      '<div class="ci-card"><h3>Results Overview</h3>%s\n%s\n%s\n%s</div>',
+      quality_callout, overview_callout, method_callout, tables$summary
     ))
   }
 
-  # Forest plot — registry callout
+  # Forest plot — registry callouts
   if (nzchar(charts$forest_plot %||% "")) {
     forest_callout <- turas_callout("confidence", "forest_plot_guide", collapsed = TRUE)
+    viz_callout <- turas_callout("confidence", "visualization_guide", collapsed = TRUE)
     parts <- c(parts, sprintf(
-      '<div class="ci-card"><h3>%s</h3>%s\n%s</div>',
-      labels$overview_title, charts$forest_plot, forest_callout
+      '<div class="ci-card"><h3>%s</h3>%s\n%s\n%s</div>',
+      labels$overview_title, charts$forest_plot, forest_callout, viz_callout
     ))
   }
 

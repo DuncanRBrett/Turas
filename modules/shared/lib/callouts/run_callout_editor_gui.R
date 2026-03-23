@@ -62,6 +62,7 @@ run_callout_editor_gui <- function() {
           title = entry$title %||% "",
           text = entry$text %||% "",
           context = entry$context %||% "",
+          page = entry$page %||% "",
           stringsAsFactors = FALSE
         )
       }
@@ -70,7 +71,8 @@ run_callout_editor_gui <- function() {
       return(data.frame(module = character(), key = character(),
                         index = integer(), total_in_module = integer(),
                         title = character(), text = character(),
-                        context = character(), stringsAsFactors = FALSE))
+                        context = character(), page = character(),
+                        stringsAsFactors = FALSE))
     }
     do.call(rbind, rows)
   }
@@ -98,6 +100,12 @@ run_callout_editor_gui <- function() {
             selectInput("filter_module", NULL,
                         choices = c("All modules" = "all"),
                         width = "200px")
+          ),
+          div(class = "ce-filter-group",
+            tags$label("Page", `for` = "filter_page", class = "ce-label"),
+            selectInput("filter_page", NULL,
+                        choices = c("All pages" = "all"),
+                        width = "180px")
           ),
           div(class = "ce-filter-group",
             tags$label("Search", `for` = "search_text", class = "ce-label"),
@@ -145,6 +153,25 @@ run_callout_editor_gui <- function() {
       updateSelectInput(session, "filter_module", choices = choices)
     })
 
+    # Update page filter choices based on selected module
+    observe({
+      reg <- registry()
+      df <- flatten_registry(reg)
+      if (nrow(df) == 0) return()
+
+      # Filter to selected module first
+      if (!is.null(input$filter_module) && input$filter_module != "all") {
+        df <- df[df$module == input$filter_module, , drop = FALSE]
+      }
+
+      pages <- unique(df$page[nzchar(df$page)])
+      page_choices <- c("All pages" = "all")
+      if (length(pages) > 0) {
+        page_choices <- c(page_choices, setNames(pages, pages))
+      }
+      updateSelectInput(session, "filter_page", choices = page_choices)
+    })
+
     # Filtered data
     filtered_data <- reactive({
       reg <- registry()
@@ -154,6 +181,11 @@ run_callout_editor_gui <- function() {
       # Module filter
       if (!is.null(input$filter_module) && input$filter_module != "all") {
         df <- df[df$module == input$filter_module, , drop = FALSE]
+      }
+
+      # Page filter
+      if (!is.null(input$filter_page) && input$filter_page != "all") {
+        df <- df[df$page == input$filter_page, , drop = FALSE]
       }
 
       # Search filter
@@ -203,7 +235,8 @@ run_callout_editor_gui <- function() {
         # Position label: "Callout 3 of 5"
         position_label <- sprintf("%d of %d", row$index, row$total_in_module)
 
-        # Context / page label
+        # Page + context labels
+        page_label <- if (nzchar(row$page)) row$page else ""
         context_label <- if (nzchar(row$context)) row$context else "No location set"
 
         div(class = card_class,
@@ -214,12 +247,14 @@ run_callout_editor_gui <- function() {
           div(class = "ce-card-header",
             span(class = "ce-card-module", row$module),
             span(class = "ce-card-number", position_label),
+            if (nzchar(page_label)) span(class = "ce-card-page-tab", page_label) else NULL,
             span(class = "ce-card-page", HTML(paste0(
               '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-right:3px;"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="2" y1="9" x2="22" y2="9"/></svg>',
               context_label
             )))
           ),
           div(class = "ce-card-title", row$title),
+          div(class = "ce-card-key", paste0(row$module, " / ", row$key)),
           div(class = "ce-card-preview", preview)
         )
       })
@@ -271,11 +306,19 @@ run_callout_editor_gui <- function() {
             tags$label("Title", class = "ce-label"),
             textInput("edit_title", NULL, value = entry$title, width = "100%")
           ),
-          div(class = "ce-field",
-            tags$label("Context", class = "ce-label"),
-            textInput("edit_context", NULL, value = entry$context %||% "",
-                      width = "100%",
-                      placeholder = "Where does this callout appear? (e.g. 'Summary tab, after results table')")
+          div(class = "ce-field-row",
+            div(class = "ce-field", style = "flex: 1;",
+              tags$label("Page / Tab", class = "ce-label"),
+              textInput("edit_page", NULL, value = entry$page %||% "",
+                        width = "100%",
+                        placeholder = "e.g. Summary, Question Details, Method Notes")
+            ),
+            div(class = "ce-field", style = "flex: 2;",
+              tags$label("Context", class = "ce-label"),
+              textInput("edit_context", NULL, value = entry$context %||% "",
+                        width = "100%",
+                        placeholder = "Where on the page? (e.g. 'Results overview card')")
+            )
           ),
           div(class = "ce-field ce-field-text",
             tags$label("Text (supports basic HTML: <strong>, <ul>, <li>, <p>)", class = "ce-label"),
@@ -323,7 +366,8 @@ run_callout_editor_gui <- function() {
       reg[[sel$module]][[sel$key]] <- list(
         title = input$edit_title %||% "",
         text = input$edit_text %||% "",
-        context = input$edit_context %||% ""
+        context = input$edit_context %||% "",
+        page = input$edit_page %||% ""
       )
 
       write_registry(reg)
@@ -541,6 +585,11 @@ callout_editor_css <- function() {
     font-size: 10px; color: #94a3b8; font-weight: 600;
     background: #f1f5f9; padding: 1px 6px; border-radius: 3px;
   }
+  .ce-card-page-tab {
+    font-size: 10px; color: #1e6f50; font-weight: 600;
+    background: #ecfdf5; border: 1px solid #bbf7d0; border-radius: 4px;
+    padding: 1px 7px; letter-spacing: 0.3px;
+  }
   .ce-card-page {
     font-size: 10px; color: #64748b; margin-left: auto;
     display: flex; align-items: center;
@@ -548,7 +597,13 @@ callout_editor_css <- function() {
     padding: 1px 7px; font-weight: 500;
   }
 
-  .ce-card-title { font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 2px; }
+  .ce-card-title { font-size: 13px; font-weight: 600; color: #1e293b; margin-bottom: 1px; }
+  .ce-card-key {
+    font-size: 10px; color: #b0b8c4; font-weight: 500;
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+    background: #f1f5f9; display: inline-block; padding: 1px 6px; border-radius: 3px;
+    margin-bottom: 3px;
+  }
   .ce-card-preview {
     font-size: 11px; color: #94a3b8; line-height: 1.4;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
@@ -583,6 +638,8 @@ callout_editor_css <- function() {
   .ce-edit-body { padding: 20px; }
   .ce-field { margin-bottom: 16px; }
   .ce-field .form-group { margin-bottom: 0; }
+  .ce-field-row { display: flex; gap: 12px; margin-bottom: 16px; }
+  .ce-field-row .ce-field { margin-bottom: 0; }
 
   .ce-field-text textarea.form-control {
     font-size: 13px; font-family: inherit; line-height: 1.6;
