@@ -17,6 +17,12 @@ local({
     source(file.path(ds_dir, "font_embed.R"), local = FALSE)
     source(file.path(ds_dir, "base_css.R"), local = FALSE)
   }
+  # Source callout registry
+  callout_dir <- file.path(turas_root, "modules", "shared", "lib", "callouts")
+  if (!dir.exists(callout_dir)) callout_dir <- file.path("modules", "shared", "lib", "callouts")
+  if (!exists("turas_callout", mode = "function") && dir.exists(callout_dir)) {
+    source(file.path(callout_dir, "callout_registry.R"), local = FALSE)
+  }
 })
 
 #' Build Complete Catdriver HTML Page
@@ -77,70 +83,15 @@ build_cd_html_page <- function(html_data, tables, charts, config,
   # Action bar (save button)
   action_bar <- build_cd_action_bar(report_title)
 
-  # Help modal overlay — single container for all section help
-  help_modal <- htmltools::tags$div(
-    id = "cd-help-modal",
-    class = "cd-help-modal",
-    onclick = "if(event.target===this)cdCloseHelp()",
-    htmltools::tags$div(
-      class = "cd-help-modal-content",
-      htmltools::tags$div(class = "cd-help-modal-header",
-        htmltools::tags$span(id = "cd-help-modal-title"),
-        htmltools::tags$button(class = "cd-help-modal-close",
-                               onclick = "cdCloseHelp()",
-                               htmltools::HTML("&times;"))
-      ),
-      htmltools::tags$div(id = "cd-help-modal-body",
-                           class = "cd-help-modal-body")
-    )
-  )
+  # Help overlay — comprehensive quick guide (same pattern as tabs module)
+  help_overlay <- build_cd_help_overlay()
 
-  # Help content data — JSON keyed by section ID
-  help_data_json <- jsonlite::toJSON(list(
-    importance = list(
-      title = "Driver Importance",
-      body = "Driver Importance shows which factors have the strongest statistical relationship with your outcome. It uses Type II Wald chi-square tests to measure each factor's contribution. Higher percentage = stronger influence. This does not imply causation \u2014 it measures association strength in the model."
-    ),
-    `odds-ratios` = list(
-      title = "Odds Ratios",
-      body = "Odds Ratios show how each category compares to the reference category. An OR > 1 means higher odds of the outcome; OR < 1 means lower odds. The 95% confidence interval shows the range of plausible values. If the interval crosses 1.0, the difference is not statistically significant. The forest plot visualises these values \u2014 dots to the right of the centre line indicate higher odds."
-    ),
-    patterns = list(
-      title = "Factor Patterns",
-      body = "Factor Patterns show the distribution of your outcome across each driver's categories. This helps you see the raw data behind the model \u2014 which categories have the highest and lowest outcome rates. Look for clear gradients (outcome increasing/decreasing across ordered categories) as these indicate strong drivers."
-    ),
-    `probability-lifts` = list(
-      title = "Probability Lifts",
-      body = "Probability Lifts translate odds ratios into predicted percentage-point changes in outcome probability. This is more intuitive than odds ratios for non-technical audiences. A +5pp lift means the predicted probability increases by 5 percentage points compared to the reference category."
-    ),
-    diagnostics = list(
-      title = "Model Diagnostics",
-      body = "Diagnostics summarise model health: convergence (did the model solve?), sample size adequacy, multicollinearity (are drivers too correlated?), and small cell warnings (are any category combinations very rare?). Green = good, amber = acceptable, red = investigate."
-    )
-  ), auto_unbox = TRUE)
-
-  help_data_tag <- htmltools::tags$script(
-    id = "cd-help-data",
-    type = "application/json",
-    htmltools::HTML(help_data_json)
-  )
-
-  # Help modal JS
+  # Help toggle JS
   help_js <- htmltools::tags$script(htmltools::HTML('
-function cdShowHelp(sectionId) {
-  var modal = document.getElementById("cd-help-modal");
-  var dataEl = document.getElementById("cd-help-data");
-  if (!modal || !dataEl) return;
-  var data = JSON.parse(dataEl.textContent || "{}");
-  var info = data[sectionId];
-  if (!info) return;
-  document.getElementById("cd-help-modal-title").textContent = info.title;
-  document.getElementById("cd-help-modal-body").innerHTML = info.body;
-  modal.classList.add("active");
-}
-function cdCloseHelp() {
-  var modal = document.getElementById("cd-help-modal");
-  if (modal) modal.classList.remove("active");
+function cdToggleHelp() {
+  var overlay = document.getElementById("cd-help-overlay");
+  if (!overlay) return;
+  overlay.classList.toggle("active");
 }
 '))
 
@@ -162,7 +113,8 @@ function cdCloseHelp() {
 
   # Read JS files
   js_files <- c("cd_utils.js", "cd_navigation.js", "cd_insights.js",
-                 "cd_pinned_views.js", "cd_slide_export.js", "cd_qualitative.js")
+                 "cd_pinned_views.js", "cd_slide_export.js", "cd_qualitative.js",
+                 "cd_table_export.js")
   js_tags <- lapply(js_files, function(fname) {
     js_path <- file.path(.cd_html_report_dir, "js", fname)
     js_content <- if (file.exists(js_path)) {
@@ -254,8 +206,7 @@ function cdCloseHelp() {
           qualitative_section,
           pinned_section,
           footer_section,
-          help_modal,
-          help_data_tag,
+          help_overlay,
           insight_store,
           pinned_store
         )
@@ -295,22 +246,16 @@ build_cd_css <- function(brand_colour, accent_colour) {
   --cd-brand: BRAND_COLOUR;
   --cd-accent: ACCENT_COLOUR;
 
-  /* Shared Turas design tokens */
-  --ct-brand: BRAND_COLOUR;
-  --ct-accent: ACCENT_COLOUR;
-  --ct-text-primary: #1e293b;
-  --ct-text-secondary: #64748b;
-  --ct-bg-surface: #ffffff;
-  --ct-bg-muted: #f8f9fa;
-  --ct-border: #e2e8f0;
-
   /* Module variables */
   --cd-text: #1e293b;
   --cd-text-muted: #64748b;
   --cd-text-faint: #94a3b8;
   --cd-bg: #f8f7f5;
+  --cd-bg-muted: #f8f9fa;
+  --cd-bg-subtle: #f0f4f8;
   --cd-card: #ffffff;
   --cd-border: #e2e8f0;
+  --cd-border-subtle: #f0f0f0;
   --cd-success: #059669;
   --cd-warning: #F59E0B;
   --cd-danger: #c0392b;
@@ -502,6 +447,14 @@ build_cd_css <- function(brand_colour, accent_colour) {
   margin-bottom: 20px;
 }
 
+/* Page-based navigation: hide all sections, show only active */
+.cd-content .cd-section {
+  display: none;
+}
+.cd-content .cd-section.cd-page-active {
+  display: block;
+}
+
 .cd-section-title {
   font-size: 16px;
   font-weight: 700;
@@ -517,6 +470,15 @@ build_cd_css <- function(brand_colour, accent_colour) {
   font-size: 13px;
   line-height: 1.5;
 }
+.cd-effect-legend {
+  font-size: 11px; color: #64748b; background: #f8fafc;
+  border: 1px solid #e2e8f0; border-radius: 6px;
+  padding: 8px 14px; margin-bottom: 14px; line-height: 1.6;
+}
+.cd-effect-tag {
+  display: inline-block; background: #e2e8f0; border-radius: 3px;
+  padding: 1px 6px; font-weight: 600; color: #334155; font-size: 10px;
+}
 
 /* ================================================================ */
 /* MODEL FIT STATISTIC CARDS                                        */
@@ -530,8 +492,8 @@ build_cd_css <- function(brand_colour, accent_colour) {
 }
 
 .cd-fit-card {
-  background: #f8f9fa;
-  border: 1px solid #e2e8f0;
+  background: var(--cd-bg-muted);
+  border: 1px solid var(--cd-border);
   border-radius: 6px;
   padding: 12px 16px;
   border-left: 3px solid var(--cd-brand);
@@ -540,14 +502,14 @@ build_cd_css <- function(brand_colour, accent_colour) {
 .cd-fit-card-value {
   font-size: 18px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--cd-text);
   font-variant-numeric: tabular-nums;
 }
 
 .cd-fit-card-label {
   font-size: 12px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--cd-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.3px;
   margin-top: 2px;
@@ -582,7 +544,7 @@ build_cd_css <- function(brand_colour, accent_colour) {
 
 .cd-fit-card-note {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--cd-text-faint);
   line-height: 1.4;
   margin-top: 6px;
 }
@@ -614,14 +576,14 @@ build_cd_css <- function(brand_colour, accent_colour) {
   font-size: 13px;
 }
 
-.cd-th {
-  background: var(--ct-bg-muted);
+th.cd-th {
+  background: var(--cd-bg-muted, #f8f9fa);
   color: var(--cd-text-muted);
   font-weight: 600;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  padding: 10px 14px;
+  padding: 12px 16px;
   text-align: left;
   border-bottom: 2px solid var(--cd-border);
   vertical-align: bottom;
@@ -632,9 +594,9 @@ build_cd_css <- function(brand_colour, accent_colour) {
 .cd-th-bar { text-align: left; min-width: 150px; }
 .cd-th-rank { text-align: center; width: 50px; }
 
-.cd-td {
-  padding: 8px 14px;
-  border-bottom: 1px solid #f0f0f0;
+td.cd-td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--cd-border-subtle, #f0f0f0);
   vertical-align: middle;
   color: var(--cd-text);
   font-variant-numeric: tabular-nums;
@@ -648,8 +610,8 @@ build_cd_css <- function(brand_colour, accent_colour) {
 .cd-td-status { text-align: center; }
 .cd-td-interp { font-size: 12px; color: var(--cd-text-muted); }
 
-.cd-tr:nth-child(even) { background: #f9fafb; }
-.cd-tr:hover { background: #f8fafc; }
+.cd-tr:nth-child(even) { background: var(--cd-bg-muted, #f9fafb); }
+.cd-tr:hover { background: var(--cd-bg-subtle, #f8fafc); }
 .cd-tr-reference { background: #f0fdf4; }
 .cd-tr-reference:hover { background: #ecfdf5; }
 
@@ -659,7 +621,7 @@ build_cd_css <- function(brand_colour, accent_colour) {
 
 .cd-bar-container {
   height: 16px;
-  background: #f1f5f9;
+  background: var(--cd-bg-subtle, #f1f5f9);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -727,7 +689,8 @@ build_cd_css <- function(brand_colour, accent_colour) {
 .cd-badge-fail { background: #FEE2E2; color: #991B1B; }
 
 /* ================================================================ */
-/* EXECUTIVE SUMMARY — callout cards with left border               */
+/* EXECUTIVE SUMMARY — top-driver cards with left border            */
+/* Educational callouts now use shared .t-callout from base_css     */
 /* ================================================================ */
 
 .cd-callout {
@@ -748,6 +711,24 @@ build_cd_css <- function(brand_colour, accent_colour) {
 .cd-callout-text {
   font-size: 13px;
   color: var(--cd-text-muted);
+}
+
+/* Sample info bar — n= and weighting status */
+.cd-sample-info-bar {
+  display: flex; gap: 8px; align-items: center; margin-bottom: 12px;
+}
+.cd-sample-badge, .cd-weight-badge {
+  display: inline-block; padding: 4px 12px; border-radius: 4px;
+  font-size: 12px; font-weight: 600; line-height: 1;
+}
+.cd-sample-badge {
+  background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;
+}
+.cd-weight-badge {
+  background: #fef3c7; color: #92400e; border: 1px solid #fcd34d;
+}
+.cd-weight-badge.cd-weight-on {
+  background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd;
 }
 
 .cd-model-confidence {
@@ -861,7 +842,7 @@ build_cd_css <- function(brand_colour, accent_colour) {
 .cd-finding-box {
   margin-bottom: 16px;
   padding: 14px 16px;
-  background: var(--ct-bg-muted);
+  background: var(--cd-bg-muted);
   border-radius: 6px;
 }
 
@@ -1028,40 +1009,74 @@ build_cd_css <- function(brand_colour, accent_colour) {
   margin-bottom: 8px;
 }
 
-.cd-component-pin {
+/* Table export bar — CSV / Excel buttons */
+.cd-table-export-bar {
   position: absolute;
   top: 4px;
   right: 4px;
   z-index: 10;
-  background: rgba(255,255,255,0.85);
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.cd-table-wrapper:hover .cd-table-export-bar {
+  opacity: 1;
+}
+.cd-table-export-btn {
+  background: rgba(255,255,255,0.92);
   border: 1px solid var(--cd-border);
   border-radius: 4px;
-  padding: 2px 8px;
+  padding: 3px 10px;
   font-size: 11px;
   font-weight: 500;
   color: var(--cd-text-faint);
   cursor: pointer;
   font-family: inherit;
-  opacity: 0;
-  transition: all 0.15s;
+  line-height: 1;
 }
-
-.cd-chart-wrapper:hover .cd-component-pin,
-.cd-table-wrapper:hover .cd-component-pin {
-  opacity: 1;
-}
-
-.cd-component-pin:hover {
+.cd-table-export-btn:hover {
   border-color: var(--cd-brand);
   color: var(--cd-brand);
-  background: rgba(255,255,255,0.95);
+  background: rgba(255,255,255,0.98);
 }
 
-.cd-component-pin.cd-pin-btn-active {
-  background: var(--cd-brand);
-  color: white;
-  border-color: var(--cd-brand);
-  opacity: 1;
+/* Pin popover — table / chart / both selector */
+.cd-pin-popover {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 1000;
+  background: #fff;
+  border: 1px solid var(--cd-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.10);
+  min-width: 150px;
+  padding: 4px 0;
+  margin-top: 4px;
+}
+.cd-pin-popover-item {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--cd-text);
+  cursor: pointer;
+}
+.cd-pin-popover-item:hover {
+  background: var(--cd-bg-muted);
+  color: var(--cd-brand);
+}
+
+/* Drag-and-drop reordering for pinned cards */
+.cd-pin-dragging { opacity: 0.4; }
+.cd-pin-drop-target {
+  outline: 2px dashed var(--cd-brand);
+  outline-offset: -2px;
 }
 
 /* ================================================================ */
@@ -1357,7 +1372,7 @@ build_cd_css <- function(brand_colour, accent_colour) {
   /* Hide interactive elements in print */
   .cd-insight-area { display: none !important; }
   .cd-pin-btn { display: none !important; }
-  .cd-component-pin { display: none !important; }
+  .cd-pin-popover { display: none !important; }
   .cd-or-chip-bar { display: none !important; }
   .cd-action-bar { display: none !important; }
   .cd-pinned-card-actions { display: none !important; }
@@ -1429,38 +1444,54 @@ build_cd_css <- function(brand_colour, accent_colour) {
 /* HELP OVERLAY MODALS                                              */
 /* ================================================================ */
 
-.cd-help-btn {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 20px; height: 20px; border-radius: 50%; border: 1px solid #cbd5e1;
-  background: #f8fafc; color: #64748b; font-size: 12px; font-weight: 700;
-  cursor: pointer; margin-left: 8px; vertical-align: middle;
-  font-family: inherit; line-height: 1; padding: 0;
+/* Help ? button in the nav bar */
+.cd-help-btn-nav {
+  width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid #cbd5e1;
+  background: transparent; color: #64748b; font-size: 13px; font-weight: 700;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  margin-left: auto; flex-shrink: 0; font-family: inherit;
 }
-.cd-help-btn:hover { background: BRAND_COLOUR; color: #fff; border-color: BRAND_COLOUR; }
-.cd-help-modal {
-  display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(0,0,0,0.4); z-index: 10000; justify-content: center; align-items: center;
+.cd-help-btn-nav:hover { border-color: BRAND_COLOUR; color: BRAND_COLOUR; }
+
+/* Help overlay — full-screen modal */
+.cd-help-overlay {
+  display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.6); z-index: 9999; cursor: pointer;
 }
-.cd-help-modal.active { display: flex; }
-.cd-help-modal-content {
-  background: #fff; border-radius: 10px; max-width: 520px; width: 90%;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+.cd-help-overlay.active { display: flex; align-items: center; justify-content: center; }
+.cd-help-card {
+  background: #fff; border-radius: 12px; padding: 28px 32px; max-width: 640px; width: 92%;
+  max-height: 85vh; overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3); cursor: default;
 }
-.cd-help-modal-header {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 16px 20px; border-bottom: 1px solid #e2e8f0;
+.cd-help-card h2 { font-size: 20px; margin-bottom: 4px; color: BRAND_COLOUR; }
+.cd-help-card .cd-help-subtitle { font-size: 12px; color: #94a3b8; margin-bottom: 20px; }
+.cd-help-card h3 {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+  color: #94a3b8; margin: 18px 0 8px; padding-top: 14px; border-top: 1px solid #f1f5f9;
 }
-.cd-help-modal-header span { font-size: 16px; font-weight: 700; color: #1e293b; }
-.cd-help-modal-close {
-  background: none; border: none; font-size: 22px; cursor: pointer; color: #94a3b8;
-  padding: 0 4px; line-height: 1;
+.cd-help-card h3:first-of-type { border-top: none; padding-top: 0; margin-top: 8px; }
+.cd-help-card ul { list-style: none; padding: 0; margin: 0; }
+.cd-help-card li {
+  padding: 5px 0; font-size: 13px; color: #374151; line-height: 1.4;
 }
-.cd-help-modal-close:hover { color: #64748b; }
-.cd-help-modal-body { padding: 20px; font-size: 14px; line-height: 1.7; color: #334155; }
+.cd-help-card .cd-help-key {
+  display: inline-block; background: #f1f5f9; border-radius: 4px;
+  padding: 2px 8px; font-weight: 600; color: BRAND_COLOUR; margin-right: 8px;
+  font-size: 11px; min-width: 100px; text-align: center;
+}
+.cd-help-card .cd-help-dismiss {
+  margin-top: 18px; text-align: center; color: #94a3b8; font-size: 12px;
+}
+.cd-help-card .cd-help-tip {
+  font-size: 12px; color: #64748b; background: #f8fafc; border-radius: 6px;
+  padding: 10px 14px; margin-top: 14px; line-height: 1.5;
+}
+.cd-help-card .cd-help-tip strong { color: BRAND_COLOUR; }
 
 @media print {
-  .cd-help-btn { display: none !important; }
-  .cd-help-modal { display: none !important; }
+  .cd-help-btn-nav { display: none !important; }
+  .cd-help-overlay { display: none !important; }
 }
 '
   css <- gsub("BRAND_COLOUR", brand_colour, css, fixed = TRUE)
@@ -1482,31 +1513,50 @@ build_cd_css <- function(brand_colour, accent_colour) {
 build_cd_section_nav <- function(brand_colour = "#323367", id_prefix = "",
                                   has_subgroup = FALSE) {
 
+  # Page-based navigation (show/hide sections instead of scrolling)
   links <- list(
-    htmltools::tags$a(href = paste0("#", id_prefix, "cd-exec-summary"), "Summary", class = "active"),
-    htmltools::tags$a(href = paste0("#", id_prefix, "cd-importance"), "Importance"),
-    htmltools::tags$a(href = paste0("#", id_prefix, "cd-patterns"), "Patterns"),
-    htmltools::tags$a(href = paste0("#", id_prefix, "cd-probability-lifts"), "Prob. Lifts"),
-    htmltools::tags$a(href = paste0("#", id_prefix, "cd-odds-ratios"), "Odds Ratios"),
-    htmltools::tags$a(href = paste0("#", id_prefix, "cd-diagnostics"), "Diagnostics")
+    htmltools::tags$a(`data-cd-page` = "exec-summary",
+                      onclick = "cdSwitchPage('exec-summary')", "Summary", class = "active"),
+    htmltools::tags$a(`data-cd-page` = "importance",
+                      onclick = "cdSwitchPage('importance')", "Importance"),
+    htmltools::tags$a(`data-cd-page` = "patterns",
+                      onclick = "cdSwitchPage('patterns')", "Patterns"),
+    htmltools::tags$a(`data-cd-page` = "probability-lifts",
+                      onclick = "cdSwitchPage('probability-lifts')", "Prob. Lifts"),
+    htmltools::tags$a(`data-cd-page` = "odds-ratios",
+                      onclick = "cdSwitchPage('odds-ratios')", "Odds Ratios"),
+    htmltools::tags$a(`data-cd-page` = "diagnostics",
+                      onclick = "cdSwitchPage('diagnostics')", "Diagnostics")
   )
 
   if (isTRUE(has_subgroup)) {
     links <- c(links, list(
-      htmltools::tags$a(href = paste0("#", id_prefix, "cd-subgroup-comparison"), "Subgroups")
+      htmltools::tags$a(`data-cd-page` = "subgroup-comparison",
+                        onclick = "cdSwitchPage('subgroup-comparison')", "Subgroups")
     ))
   }
 
   links <- c(links, list(
-    htmltools::tags$a(href = paste0("#", id_prefix, "cd-interpretation"), "Guide"),
-    htmltools::tags$a(href = paste0("#", id_prefix, "cd-qualitative"), "Slides"),
-    htmltools::tags$a(href = paste0("#", id_prefix, "cd-pinned-section"), "Pinned Views")
+    htmltools::tags$a(`data-cd-page` = "interpretation",
+                      onclick = "cdSwitchPage('interpretation')", "Guide"),
+    htmltools::tags$a(`data-cd-page` = "qualitative",
+                      onclick = "cdSwitchPage('qualitative')", "Added Slides"),
+    htmltools::tags$a(`data-cd-page` = "pinned-views",
+                      onclick = "cdSwitchPage('pinned-views')", "Pinned Views")
   ))
+
+  help_btn <- htmltools::tags$button(
+    class = "cd-help-btn-nav",
+    onclick = "cdToggleHelp()",
+    title = "Show help guide",
+    "?"
+  )
 
   htmltools::tags$nav(
     class = "cd-section-nav",
     id = paste0(id_prefix, "cd-section-nav"),
-    links
+    links,
+    help_btn
   )
 }
 
@@ -1772,6 +1822,24 @@ build_cd_exec_summary <- function(html_data, brand_colour, id_prefix = "") {
     )
   }
 
+  # Sample info bar (n= and weighted/unweighted)
+  n_obs <- html_data$model_info$n_observations
+  weight_var <- html_data$model_info$weight_var
+  is_weighted <- !is.null(weight_var) && nzchar(weight_var %||% "")
+  weight_label <- if (is_weighted) "Weighted" else "Unweighted"
+
+  sample_info_html <- htmltools::tags$div(
+    class = "cd-sample-info-bar",
+    htmltools::tags$span(
+      class = "cd-sample-badge",
+      sprintf("n = %s", format(n_obs, big.mark = ","))
+    ),
+    htmltools::tags$span(
+      class = paste0("cd-weight-badge", if (is_weighted) " cd-weight-on" else ""),
+      weight_label
+    )
+  )
+
   # Top 3 driver callout cards
   top_n <- min(3, length(html_data$importance))
   driver_cards <- lapply(html_data$importance[1:top_n], function(d) {
@@ -1828,11 +1896,12 @@ build_cd_exec_summary <- function(html_data, brand_colour, id_prefix = "") {
   insight_area <- build_cd_insight_area("exec-summary", id_prefix = id_prefix)
 
   htmltools::tags$div(
-    class = "cd-section",
+    class = "cd-section cd-page-active",
     id = paste0(id_prefix, "cd-exec-summary"),
     `data-cd-section` = "exec-summary",
     title_row,
     insight_area,
+    sample_info_html,
     confidence_html,
     narrative_html,
     driver_cards,
@@ -1854,8 +1923,7 @@ build_cd_exec_summary <- function(html_data, brand_colour, id_prefix = "") {
 build_cd_importance_section <- function(tables, charts, brand_colour,
                                         id_prefix = "", n_drivers = 0) {
   title_row <- build_cd_section_title_row("Driver Importance", "importance",
-                                           id_prefix = id_prefix,
-                                           help_id = "importance")
+                                           id_prefix = id_prefix)
   insight_area <- build_cd_insight_area("importance", id_prefix = id_prefix)
 
   # Importance filter bar — show threshold options if many drivers
@@ -1868,7 +1936,6 @@ build_cd_importance_section <- function(tables, charts, brand_colour,
   chart_wrapper <- if (!is.null(charts$importance)) {
     htmltools::tags$div(
       class = "cd-chart-wrapper",
-      build_cd_component_pin_btn("importance", "chart", id_prefix),
       charts$importance
     )
   }
@@ -1876,11 +1943,15 @@ build_cd_importance_section <- function(tables, charts, brand_colour,
   table_wrapper <- if (!is.null(tables$importance)) {
     htmltools::tags$div(
       class = "cd-table-wrapper",
-      build_cd_component_pin_btn("importance", "table", id_prefix),
       filter_bar,
       tables$importance
     )
   }
+
+  # Callout from shared registry
+  importance_callout <- htmltools::HTML(
+    turas_callout("catdriver", "driver_importance", collapsed = TRUE)
+  )
 
   htmltools::tags$div(
     class = "cd-section",
@@ -1892,6 +1963,7 @@ build_cd_importance_section <- function(tables, charts, brand_colour,
       class = "cd-section-intro",
       "Relative importance of each driver in explaining the outcome, based on chi-square contribution. Higher percentage means stronger statistical relationship."
     ),
+    importance_callout,
     chart_wrapper,
     table_wrapper
   )
@@ -1981,8 +2053,7 @@ build_cd_patterns_section <- function(html_data, tables, id_prefix = "") {
   })
 
   title_row <- build_cd_section_title_row("Factor Patterns", "patterns",
-                                           id_prefix = id_prefix,
-                                           help_id = "patterns")
+                                           id_prefix = id_prefix)
   insight_area <- build_cd_insight_area("patterns", id_prefix = id_prefix)
 
   htmltools::tags$div(
@@ -1993,7 +2064,23 @@ build_cd_patterns_section <- function(html_data, tables, id_prefix = "") {
     insight_area,
     htmltools::tags$p(
       class = "cd-section-intro",
-      "Category-level breakdown showing how each level of a driver relates to the outcome. Odds ratios > 1.0 indicate higher likelihood compared to the reference category."
+      htmltools::HTML(paste0(
+        "Category-level breakdown for each driver. ",
+        "<strong>% of Sample</strong> = share of respondents in that category. ",
+        "Outcome columns = how those respondents split across the outcome. ",
+        "<strong>Odds Ratio</strong> compares each category to the reference (1.00 = no difference)."
+      ))
+    ),
+    htmltools::tags$div(
+      class = "cd-effect-legend",
+      htmltools::HTML(paste0(
+        "<strong>Effect Size key:</strong> ",
+        "<span class='cd-effect-tag'>Negligible</span> OR &lt; 1.1\u00D7 &nbsp; ",
+        "<span class='cd-effect-tag'>Small</span> 1.1\u2013\u200A1.5\u00D7 &nbsp; ",
+        "<span class='cd-effect-tag'>Medium</span> 1.5\u2013\u200A2\u00D7 &nbsp; ",
+        "<span class='cd-effect-tag'>Large</span> 2\u2013\u200A3\u00D7 &nbsp; ",
+        "<span class='cd-effect-tag'>Very Large</span> &gt; 3\u00D7"
+      ))
     ),
     htmltools::tags$div(class = "cd-factor-tabs", tabs),
     panels
@@ -2056,9 +2143,13 @@ build_cd_probability_lifts_section <- function(html_data, tables, charts,
   })
 
   title_row <- build_cd_section_title_row("Probability Lifts", "probability-lifts",
-                                           id_prefix = id_prefix,
-                                           help_id = "probability-lifts")
+                                           id_prefix = id_prefix)
   insight_area <- build_cd_insight_area("probability-lifts", id_prefix = id_prefix)
+
+  # Methodology callout (from shared registry)
+  lift_callout <- htmltools::HTML(
+    turas_callout("catdriver", "probability_lifts", collapsed = TRUE)
+  )
 
   # Chip bar for driver show/hide on the combined chart
   lift_chip_bar <- build_cd_lift_chip_bar(html_data$probability_lifts, id_prefix = id_prefix)
@@ -2068,7 +2159,6 @@ build_cd_probability_lifts_section <- function(html_data, tables, charts,
   if (!is.null(charts$probability_lift)) {
     chart_el <- htmltools::tags$div(
       class = "cd-chart-wrapper",
-      build_cd_component_pin_btn("probability-lifts", "chart", id_prefix),
       lift_chip_bar,
       charts$probability_lift
     )
@@ -2077,7 +2167,6 @@ build_cd_probability_lifts_section <- function(html_data, tables, charts,
   # Table wrapper (holds the tabbed panels)
   table_el <- htmltools::tags$div(
     class = "cd-table-wrapper",
-    build_cd_component_pin_btn("probability-lifts", "table", id_prefix),
     htmltools::tags$div(class = "cd-factor-tabs", tabs),
     panels
   )
@@ -2092,6 +2181,7 @@ build_cd_probability_lifts_section <- function(html_data, tables, charts,
       class = "cd-section-intro",
       "How each driver level changes the predicted probability of the outcome compared to the reference category. Values represent percentage-point changes."
     ),
+    lift_callout,
     chart_el,
     table_el,
     htmltools::tags$p(
@@ -2115,9 +2205,13 @@ build_cd_or_section <- function(tables, charts, has_bootstrap,
   }
 
   title_row <- build_cd_section_title_row("Odds Ratios", "odds-ratios",
-                                           id_prefix = id_prefix,
-                                           help_id = "odds-ratios")
+                                           id_prefix = id_prefix)
   insight_area <- build_cd_insight_area("odds-ratios", id_prefix = id_prefix)
+
+  # Methodology callout (from shared registry)
+  or_callout <- htmltools::HTML(
+    turas_callout("catdriver", "odds_ratios", collapsed = TRUE)
+  )
 
   # OR chip bar for factor filtering
   chip_bar <- build_cd_or_chip_bar(odds_ratios, id_prefix = id_prefix)
@@ -2126,7 +2220,6 @@ build_cd_or_section <- function(tables, charts, has_bootstrap,
   chart_wrapper <- if (!is.null(charts$forest)) {
     htmltools::tags$div(
       class = "cd-chart-wrapper",
-      build_cd_component_pin_btn("odds-ratios", "chart", id_prefix),
       charts$forest
     )
   }
@@ -2134,7 +2227,6 @@ build_cd_or_section <- function(tables, charts, has_bootstrap,
   table_wrapper <- if (!is.null(tables$odds_ratios)) {
     htmltools::tags$div(
       class = "cd-table-wrapper",
-      build_cd_component_pin_btn("odds-ratios", "table", id_prefix),
       chip_bar,
       tables$odds_ratios,
       bootstrap_note
@@ -2151,6 +2243,7 @@ build_cd_or_section <- function(tables, charts, has_bootstrap,
       class = "cd-section-intro",
       "Detailed coefficient table showing the odds ratio for each factor level compared to its reference category. OR > 1 means higher likelihood; OR < 1 means lower likelihood."
     ),
+    or_callout,
     chart_wrapper,
     table_wrapper
   )
@@ -2241,8 +2334,7 @@ build_cd_diagnostics_section <- function(tables, html_data, id_prefix = "") {
   }
 
   title_row <- build_cd_section_title_row("Model Diagnostics", "diagnostics",
-                                           id_prefix = id_prefix,
-                                           help_id = "diagnostics")
+                                           id_prefix = id_prefix)
   insight_area <- build_cd_insight_area("diagnostics", id_prefix = id_prefix)
 
   htmltools::tags$div(
@@ -2370,6 +2462,118 @@ build_cd_insight_area <- function(section_key, id_prefix = "") {
         onclick = sprintf("cdDismissInsight('%s','%s')", section_key, id_prefix),
         "\u00D7"
       )
+    )
+  )
+}
+
+
+# ==============================================================================
+# HELP OVERLAY — comprehensive quick guide
+# ==============================================================================
+
+#' Build Help Overlay
+#'
+#' Creates a modal overlay with a quick-reference guide to interactive features.
+#' Toggled via the ? button in the navigation bar.
+#'
+#' @return htmltools::tags$div
+#' @keywords internal
+build_cd_help_overlay <- function() {
+  htmltools::tags$div(
+    class = "cd-help-overlay",
+    id = "cd-help-overlay",
+    onclick = "cdToggleHelp()",
+    htmltools::tags$div(
+      class = "cd-help-card",
+      onclick = "event.stopPropagation()",
+      htmltools::tags$h2("Quick Guide"),
+      htmltools::tags$div(class = "cd-help-subtitle",
+        "Everything you need to know to use this report"),
+
+      # --- Navigating ---
+      htmltools::tags$h3("Navigating the Report"),
+      htmltools::tags$ul(
+        htmltools::tags$li(htmltools::tags$span(class = "cd-help-key", "Section tabs"),
+          "Switch between sections using the navigation bar. Each tab shows a different analysis page."),
+        htmltools::tags$li(htmltools::tags$span(class = "cd-help-key", "Summary"),
+          "Overview of the model with key metrics, top drivers, and standout findings."),
+        htmltools::tags$li(htmltools::tags$span(class = "cd-help-key", "Importance"),
+          "Which drivers matter most. Use filter chips to show top 3, 5, 8, or all drivers."),
+        htmltools::tags$li(htmltools::tags$span(class = "cd-help-key", "Patterns"),
+          "How each category of each driver relates to the outcome. Shows percentages, odds ratios, and effect sizes."),
+        htmltools::tags$li(htmltools::tags$span(class = "cd-help-key", "Prob. Lifts"),
+          "How each driver category shifts the predicted probability of the outcome."),
+        htmltools::tags$li(htmltools::tags$span(class = "cd-help-key", "Odds Ratios"),
+          "Forest plot and table of odds ratios with confidence intervals for each driver category."),
+        htmltools::tags$li(htmltools::tags$span(class = "cd-help-key", "Diagnostics"),
+          "Model fit statistics and validation checks.")
+      ),
+
+      # --- Tables & Charts ---
+      htmltools::tags$h3("Working with Tables & Charts"),
+      htmltools::tags$ul(
+        htmltools::tags$li(htmltools::tags$span(class = "cd-help-key", "Filter chips"),
+          "Click chips above charts to filter which drivers or categories are shown."),
+        htmltools::tags$li(htmltools::tags$span(class = "cd-help-key", "Callout boxes"),
+          "Expandable explanation boxes beneath sections. Click to expand or collapse."),
+        htmltools::tags$li(htmltools::tags$span(class = "cd-help-key", "CSV / Excel"),
+          "Export table data using the buttons above each table.")
+      ),
+
+      # --- Insights ---
+      htmltools::tags$h3("Adding Insights"),
+      htmltools::tags$ul(
+        htmltools::tags$li(htmltools::tags$span(class = "cd-help-key", "+ Add Insight"),
+          "Click below any section to add your analysis or commentary."),
+        htmltools::tags$li(htmltools::tags$span(class = "cd-help-key", "Editable text"),
+          "Type directly into the insight area. Your notes are saved with the report.")
+      ),
+
+      # --- Pinning ---
+      htmltools::tags$h3("Pinning Key Findings"),
+      htmltools::tags$ul(
+        htmltools::tags$li(htmltools::tags$span(class = "cd-help-key", "\U0001F4CC Pin"),
+          "Click the pin icon to save a section. Choose table, chart, or both."),
+        htmltools::tags$li(htmltools::tags$span(class = "cd-help-key", "Pinned Views"),
+          "A curated deck of your key findings. Drag to reorder, remove with \u2715."),
+        htmltools::tags$li(htmltools::tags$span(class = "cd-help-key", "Section dividers"),
+          "Use 'Add Section' in Pinned Views to organise pins into groups.")
+      ),
+
+      # --- Added Slides ---
+      htmltools::tags$h3("Added Slides"),
+      htmltools::tags$ul(
+        htmltools::tags$li(htmltools::tags$span(class = "cd-help-key", "Add Slide"),
+          "Create narrative slides with formatted text (bold, italic, bullets, headings)."),
+        htmltools::tags$li(htmltools::tags$span(class = "cd-help-key", "\U0001F5BC Add image"),
+          "Upload a chart, screenshot, or diagram to any slide.")
+      ),
+
+      # --- Exporting ---
+      htmltools::tags$h3("Exporting & Sharing"),
+      htmltools::tags$ul(
+        htmltools::tags$li(htmltools::tags$span(class = "cd-help-key", "Save Report"),
+          htmltools::HTML(paste0(
+            "Saves the report with all your insights, pins, and edits preserved. ",
+            "In Chrome/Edge a <em>Save As</em> dialog lets you choose the location."
+          ))),
+        htmltools::tags$li(htmltools::tags$span(class = "cd-help-key", "\U0001F4F7 Export PNG"),
+          "Download any pinned card as a high-resolution PNG image."),
+        htmltools::tags$li(htmltools::tags$span(class = "cd-help-key", "Print / PDF"),
+          "Print your Pinned Views as a paginated document (one finding per page).")
+      ),
+
+      # --- Tip ---
+      htmltools::tags$div(class = "cd-help-tip",
+        htmltools::HTML(paste0(
+          "<strong>Tip:</strong> This report is a live working document. ",
+          "Add insights, pin key findings, create slides, then <strong>Save Report</strong> ",
+          "to keep everything. Re-open the saved file any time to continue where you left off. ",
+          "Press <strong>?</strong> to show this guide again."
+        ))
+      ),
+
+      htmltools::tags$div(class = "cd-help-dismiss", "Click anywhere to close")
     )
   )
 }

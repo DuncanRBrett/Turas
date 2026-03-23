@@ -79,72 +79,57 @@
   }
 
   // =========================================================================
-  // Report-level tab switching (Analysis / Pinned Views)
+  // Report-level tab switching — shared convention (switchReportTab)
   // =========================================================================
 
   /**
-   * Initialize report-level tab buttons.
-   * Finds .seg-report-tab-btn elements and attaches click handlers that
-   * switch between the Analysis and Pinned Views panes.
+   * Switch the visible report tab and update button active states.
+   * Follows the shared Turas convention: .report-tab buttons with data-tab,
+   * .tab-panel divs with id="tab-{name}", toggled via .active class.
+   * @param {string} tabName - 'analysis', 'pinned', 'slides', or 'about'
+   */
+  window.switchReportTab = function(tabName) {
+    // Toggle active class on tab buttons
+    document.querySelectorAll('.report-tab').forEach(function(btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-tab') === tabName);
+    });
+
+    // Toggle active class on tab panels
+    document.querySelectorAll('.tab-panel').forEach(function(panel) {
+      panel.classList.remove('active');
+    });
+    var target = document.getElementById('tab-' + tabName);
+    if (target) target.classList.add('active');
+
+    // Show section nav only on analysis tab
+    var sectionNav = document.getElementById('seg-section-nav');
+    if (sectionNav) sectionNav.style.display = (tabName === 'analysis') ? '' : 'none';
+  };
+
+  /**
+   * Public alias for programmatic tab switching (e.g. from a pin button click).
+   * @param {string} tabName - 'analysis', 'pinned', etc.
+   */
+  window.segSwitchToTab = function(tabName) {
+    window.switchReportTab(tabName);
+  };
+
+  /**
+   * Initialize report-level tab buttons (for non-onclick fallback).
    */
   function initReportTabs() {
-    var tabBtns = document.querySelectorAll('.seg-report-tab-btn');
+    var tabBtns = document.querySelectorAll('.report-tab[data-tab]');
     if (!tabBtns.length) return;
 
     for (var i = 0; i < tabBtns.length; i++) {
       (function(btn) {
         btn.addEventListener('click', function() {
           var target = btn.getAttribute('data-tab');
-          switchReportTab(target, tabBtns);
+          if (target) window.switchReportTab(target);
         });
       })(tabBtns[i]);
     }
   }
-
-  /**
-   * Switch the visible report tab and update button active states.
-   * @param {string} tabName - 'analysis' or 'pinned'
-   * @param {NodeList|Array} tabBtns - the set of tab button elements
-   */
-  function switchReportTab(tabName, tabBtns) {
-    var analysisTab = document.getElementById('seg-analysis-tab');
-    var pinnedTab   = document.getElementById('seg-pinned-tab');
-    var slidesTab   = document.getElementById('seg-slides-tab');
-    var aboutTab    = document.getElementById('seg-about-tab');
-    var sectionNav  = document.getElementById('seg-section-nav');
-
-    // Toggle active class on tab buttons
-    for (var i = 0; i < tabBtns.length; i++) {
-      tabBtns[i].classList.toggle(
-        'active',
-        tabBtns[i].getAttribute('data-tab') === tabName
-      );
-    }
-
-    // Hide all tabs
-    if (analysisTab) analysisTab.style.display = 'none';
-    if (pinnedTab)   pinnedTab.style.display   = 'none';
-    if (slidesTab)   slidesTab.style.display   = 'none';
-    if (aboutTab)    aboutTab.style.display     = 'none';
-
-    // Show section nav only on analysis tab
-    if (sectionNav) sectionNav.style.display = (tabName === 'analysis') ? '' : 'none';
-
-    // Show the active tab
-    if (tabName === 'analysis' && analysisTab)  analysisTab.style.display = 'block';
-    else if (tabName === 'pinned' && pinnedTab) pinnedTab.style.display   = 'block';
-    else if (tabName === 'slides' && slidesTab) slidesTab.style.display   = 'block';
-    else if (tabName === 'about' && aboutTab)   aboutTab.style.display    = 'block';
-  }
-
-  /**
-   * Public helper for programmatic tab switching (e.g. from a pin button click).
-   * @param {string} tabName - 'analysis' or 'pinned'
-   */
-  window.segSwitchToTab = function(tabName) {
-    var tabBtns = document.querySelectorAll('.seg-report-tab-btn');
-    switchReportTab(tabName, tabBtns);
-  };
 
   // =========================================================================
   // Page utilities (hydrate, save, print)

@@ -11,84 +11,43 @@
   'use strict';
 
   // --------------------------------------------------------------------------
-  // Section navigation — horizontal bar(s) (.cd-section-nav)
-  // In single-report mode there is one nav bar; in unified mode there is
-  // one per analysis panel.  Each is independently tracked.
+  // Page-based section navigation (.cd-section-nav)
+  // Each nav link switches to a section page (show/hide) instead of scrolling.
   // --------------------------------------------------------------------------
 
-  var navGroups = [];  // array of { navBar, links, sections }
+  /**
+   * Switch to a specific section page.
+   * @param {string} pageName - The data-cd-section value (e.g., 'importance')
+   */
+  window.cdSwitchPage = function(pageName) {
+    var content = document.querySelector('.cd-content');
+    if (!content) return;
 
-  function initNavBars() {
-    var allNavBars = document.querySelectorAll('.cd-section-nav');
+    // Hide all sections, show target
+    content.querySelectorAll('.cd-section[data-cd-section]').forEach(function(section) {
+      section.classList.toggle('cd-page-active',
+        section.getAttribute('data-cd-section') === pageName);
+    });
 
-    allNavBars.forEach(function(navBar) {
-      var links = navBar.querySelectorAll('a');
-      var sections = [];
-
-      links.forEach(function(link) {
-        var href = link.getAttribute('href');
-        if (href && href.startsWith('#')) {
-          var section = document.getElementById(href.slice(1));
-          if (section) {
-            sections.push({ el: section, link: link });
-          }
-        }
-
-        link.addEventListener('click', function(e) {
-          e.preventDefault();
-          var target = document.getElementById(href.slice(1));
-          if (target) {
-            // Total sticky offset: tab bar (if present) + this nav bar
-            var tabBar = document.querySelector('.cd-analysis-tabs');
-            var tabBarHeight = tabBar ? tabBar.offsetHeight : 0;
-            var navHeight = navBar.offsetHeight;
-            var totalOffset = tabBarHeight + navHeight + 8;
-            var targetY = target.getBoundingClientRect().top + window.scrollY - totalOffset;
-            window.scrollTo({ top: targetY, behavior: 'smooth' });
-          }
-        });
+    // Update nav link active state
+    var navBar = document.querySelector('.cd-section-nav');
+    if (navBar) {
+      navBar.querySelectorAll('a[data-cd-page]').forEach(function(link) {
+        link.classList.toggle('active',
+          link.getAttribute('data-cd-page') === pageName);
       });
+    }
 
-      navGroups.push({ navBar: navBar, links: links, sections: sections });
-    });
-  }
-
-  function updateActiveNav() {
-    navGroups.forEach(function(group) {
-      if (group.sections.length === 0) return;
-
-      // Only update if this nav bar is visible (its panel is active)
-      var panel = group.navBar.closest('.cd-analysis-panel');
-      if (panel && !panel.classList.contains('active')) return;
-
-      var tabBar = document.querySelector('.cd-analysis-tabs');
-      var tabBarHeight = tabBar ? tabBar.offsetHeight : 0;
-      var navHeight = group.navBar.offsetHeight;
-      var scrollY = window.scrollY + tabBarHeight + navHeight + 40;
-      var active = null;
-
-      for (var i = group.sections.length - 1; i >= 0; i--) {
-        if (group.sections[i].el.offsetTop <= scrollY) {
-          active = group.sections[i];
-          break;
-        }
-      }
-
-      group.links.forEach(function(link) { link.classList.remove('active'); });
-      if (active) {
-        active.link.classList.add('active');
-      }
-    });
-  }
+    // Scroll to top of content area
+    window.scrollTo({ top: 0 });
+  };
 
   document.addEventListener('DOMContentLoaded', function() {
-    initNavBars();
-    updateActiveNav();
     // Hydrate saved state
     cdHydratePage();
+    // Initialize table export buttons (CSV/Excel)
+    if (typeof cdInitTableExport === 'function') cdInitTableExport();
   });
-
-  window.addEventListener('scroll', updateActiveNav, { passive: true });
 
   // --------------------------------------------------------------------------
   // Factor picker — scoped by optional id_prefix
@@ -516,6 +475,89 @@
       row.style.display = show ? '' : 'none';
     });
   };
+
+  // --------------------------------------------------------------------------
+  // Subgroup comparison — toggle visibility per subgroup
+  // --------------------------------------------------------------------------
+
+  /**
+   * Toggle a single subgroup on/off in the chart and table.
+   * @param {string} grpName - Subgroup name
+   */
+  window.cdToggleSubgroup = function(grpName) {
+    var section = document.getElementById('cd-subgroup-comparison');
+    if (!section) return;
+
+    // Toggle chip active state
+    var chip = section.querySelector('[data-cd-sg-chip="' + grpName + '"]');
+    if (chip) chip.classList.toggle('active');
+
+    // Update "All" chip
+    var allChips = section.querySelectorAll('[data-cd-sg-chip]:not([data-cd-sg-chip="all"])');
+    var allActive = true;
+    allChips.forEach(function(c) {
+      if (!c.classList.contains('active')) allActive = false;
+    });
+    var allChip = section.querySelector('[data-cd-sg-chip="all"]');
+    if (allChip) allChip.classList.toggle('active', allActive);
+
+    cdApplySubgroupFilter(section);
+  };
+
+  /**
+   * Toggle all subgroups on or off.
+   * @param {boolean} show
+   */
+  window.cdToggleAllSubgroups = function(show) {
+    var section = document.getElementById('cd-subgroup-comparison');
+    if (!section) return;
+
+    section.querySelectorAll('[data-cd-sg-chip]').forEach(function(chip) {
+      if (show) chip.classList.add('active');
+      else if (chip.getAttribute('data-cd-sg-chip') !== 'all') chip.classList.remove('active');
+    });
+
+    cdApplySubgroupFilter(section);
+  };
+
+  /**
+   * Apply subgroup filter based on active chips.
+   * Hides/shows columns in the table and bars in the chart.
+   */
+  function cdApplySubgroupFilter(section) {
+    // Determine which subgroups are active
+    var activeGroups = {};
+    section.querySelectorAll('[data-cd-sg-chip].active').forEach(function(chip) {
+      var grp = chip.getAttribute('data-cd-sg-chip');
+      if (grp !== 'all') activeGroups[grp] = true;
+    });
+
+    // Filter table columns
+    section.querySelectorAll('[data-cd-subgroup-col]').forEach(function(cell) {
+      var grp = cell.getAttribute('data-cd-subgroup-col');
+      cell.style.display = activeGroups[grp] ? '' : 'none';
+    });
+
+    // Filter chart bars
+    var chart = section.querySelector('.cd-subgroup-chart');
+    if (chart) {
+      chart.querySelectorAll('.cd-sg-bar').forEach(function(g) {
+        var grp = g.getAttribute('data-cd-subgroup');
+        g.style.display = activeGroups[grp] ? '' : 'none';
+      });
+      // Also toggle legend items
+      chart.querySelectorAll('[data-cd-sg-legend]').forEach(function(rect) {
+        var grp = rect.getAttribute('data-cd-sg-legend');
+        var show = activeGroups[grp];
+        rect.style.display = show ? '' : 'none';
+        // Hide corresponding text label (next sibling)
+        var next = rect.nextElementSibling;
+        if (next && next.tagName === 'text') {
+          next.style.display = show ? '' : 'none';
+        }
+      });
+    }
+  }
 
   // --------------------------------------------------------------------------
   // Print mode

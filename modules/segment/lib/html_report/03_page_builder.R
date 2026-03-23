@@ -17,6 +17,21 @@ local({
     source(file.path(ds_dir, "font_embed.R"), local = FALSE)
     source(file.path(ds_dir, "base_css.R"), local = FALSE)
   }
+  # Source callout registry
+  callout_dir <- file.path(turas_root, "modules", "shared", "lib", "callouts")
+  if (!dir.exists(callout_dir)) callout_dir <- file.path("modules", "shared", "lib", "callouts")
+  if (!exists("turas_callout", mode = "function") && dir.exists(callout_dir)) {
+    source(file.path(callout_dir, "callout_registry.R"), local = FALSE)
+    # Prime callout cache with TURAS_ROOT-resolved path (avoids getwd() issues)
+    json_path <- file.path(callout_dir, "callouts.json")
+    if (file.exists(json_path) && is.null(.callout_cache$data)) {
+      tryCatch({
+        cdata <- jsonlite::fromJSON(json_path, simplifyVector = FALSE)
+        cdata[["_meta"]] <- NULL
+        .callout_cache$data <- cdata
+      }, error = function(e) NULL)
+    }
+  }
 })
 
 
@@ -201,17 +216,21 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
     htmltools::tags$meta(name = "turas-source-filename", content = source_filename)
   )
 
-  # Report-level tab bar (Analysis | Pinned Views | Slides | About)
+  # Report-level tab bar — shared convention (report-tabs / report-tab)
+  save_icon <- htmltools::HTML('<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:5px;"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>')
+
   report_tab_bar <- htmltools::tags$div(
-    class = "seg-report-tabs",
+    class = "report-tabs",
     htmltools::tags$button(
-      class = "seg-report-tab-btn active",
+      class = "report-tab active",
       `data-tab` = "analysis",
+      onclick = "switchReportTab('analysis')",
       "Analysis"
     ),
     htmltools::tags$button(
-      class = "seg-report-tab-btn",
+      class = "report-tab",
       `data-tab` = "pinned",
+      onclick = "switchReportTab('pinned')",
       "Pinned Views",
       htmltools::tags$span(
         id = "seg-pin-count-badge",
@@ -220,8 +239,9 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
       )
     ),
     htmltools::tags$button(
-      class = "seg-report-tab-btn",
+      class = "report-tab",
       `data-tab` = "slides",
+      onclick = "switchReportTab('slides')",
       "Added Slides",
       htmltools::tags$span(
         id = "seg-slide-count-badge",
@@ -230,9 +250,21 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
       )
     ),
     htmltools::tags$button(
-      class = "seg-report-tab-btn",
+      class = "report-tab",
       `data-tab` = "about",
+      onclick = "switchReportTab('about')",
       "About"
+    ),
+    htmltools::tags$button(
+      class = "report-tab seg-save-tab",
+      onclick = "segSaveReportHTML()",
+      save_icon, "Save Report"
+    ),
+    htmltools::tags$button(
+      class = "seg-help-btn",
+      onclick = "toggleHelpOverlay()",
+      title = "Show help guide",
+      "?"
     )
   )
 
@@ -254,10 +286,10 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
       nav,
       htmltools::tags$main(
         class = "seg-main",
-        # Analysis tab content
+        # Analysis tab — active by default
         htmltools::tags$div(
-          id = "seg-analysis-tab",
-          class = "seg-content",
+          id = "tab-analysis",
+          class = "tab-panel active seg-content",
           exec_summary_section,
           overview_section,
           validation_section,
@@ -272,27 +304,24 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
           guide_section,
           footer_section
         ),
-        # Pinned Views tab content (hidden by default)
+        # Pinned Views tab
         htmltools::tags$div(
-          id = "seg-pinned-tab",
-          class = "seg-content",
-          style = "display:none;",
+          id = "tab-pinned",
+          class = "tab-panel seg-content",
           pinned_section,
           footer_section
         ),
-        # Slides tab content (hidden by default)
+        # Slides tab
         htmltools::tags$div(
-          id = "seg-slides-tab",
-          class = "seg-content",
-          style = "display:none;",
+          id = "tab-slides",
+          class = "tab-panel seg-content",
           build_seg_slides_section(config),
           footer_section
         ),
-        # About tab content (hidden by default)
+        # About tab
         htmltools::tags$div(
-          id = "seg-about-tab",
-          class = "seg-content",
-          style = "display:none;",
+          id = "tab-about",
+          class = "tab-panel seg-content",
           build_seg_about_section(config, html_data),
           footer_section
         ),
@@ -344,14 +373,11 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
   --seg-danger: #c0392b;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+/* Reset provided by turas_base_css() — only module overrides below */
 
 .seg-body {
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background: var(--seg-bg);
   color: var(--seg-text);
-  line-height: 1.5;
-  font-size: 13px;
 }
 
 /* ================================================================ */
@@ -398,42 +424,62 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
 }
 
 /* ================================================================ */
-/* REPORT-LEVEL TABS (Analysis | Pinned Views)                       */
+/* REPORT-LEVEL TABS — shared convention (report-tabs / report-tab)  */
 /* ================================================================ */
 
-.seg-report-tabs {
+.report-tabs {
   display: flex;
   align-items: center;
   gap: 0;
   padding: 0 24px;
   background: var(--seg-card);
   border-bottom: 1px solid var(--seg-border);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
 }
 
-.seg-report-tab-btn {
-  padding: 10px 24px;
+.report-tab {
+  padding: 14px 24px;
   font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-weight: 600;
   color: var(--seg-text-muted);
-  background: none;
+  background: transparent;
   border: none;
-  border-bottom: 3px solid transparent;
+  border-bottom: 2px solid transparent;
   cursor: pointer;
   font-family: inherit;
+  letter-spacing: 0.1px;
   transition: all 0.15s;
 }
 
-.seg-report-tab-btn:hover {
+.report-tab:hover:not(.active) {
   color: var(--seg-brand);
-  background: #f8fafc;
+  background: #fafbfc;
 }
 
-.seg-report-tab-btn.active {
+.report-tab.active {
   color: var(--seg-brand);
-  border-bottom-color: var(--seg-accent);
+  border-bottom-color: var(--seg-brand);
 }
+
+.seg-save-tab {
+  margin-left: auto;
+  color: var(--seg-brand);
+  border-bottom-color: transparent !important;
+}
+
+.seg-help-btn {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 1.5px solid var(--seg-border);
+  background: transparent; color: var(--seg-text-muted);
+  font-size: 14px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  margin-left: 8px; transition: all 0.15s;
+}
+.seg-help-btn:hover { border-color: var(--seg-brand); color: var(--seg-brand); }
+
+/* Tab panel visibility — shared convention */
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
 
 /* ================================================================ */
 /* MAIN CONTENT                                                      */
@@ -616,7 +662,7 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  padding: 10px 14px;
+  padding: 12px 16px;
   text-align: left;
   border-bottom: 2px solid var(--seg-border);
   vertical-align: bottom;
@@ -628,7 +674,7 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
 .seg-th-rank { text-align: center; width: 50px; }
 
 .seg-td {
-  padding: 8px 14px;
+  padding: 10px 16px;
   border-bottom: 1px solid #f0f0f0;
   vertical-align: middle;
   color: var(--seg-text);
@@ -642,11 +688,46 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
 .seg-tr:nth-child(even) { background: #f9fafb; }
 .seg-tr:hover { background: #f8fafc; }
 
-/* Heatmap cell tinting — all numeric, all centred */
-.seg-td-high { background: #dcfce7; text-align: center; }
-.seg-td-mod-high { background: #eff6ff; text-align: center; }
-.seg-td-mod-low { background: #fef3c7; text-align: center; }
-.seg-td-low { background: #fee2e2; text-align: center; }
+/* Heatmap cell tinting — all numeric, centred, tabular figures */
+.seg-td-high { background: #dcfce7; text-align: center; font-variant-numeric: tabular-nums; }
+.seg-td-mod-high { background: #eff6ff; text-align: center; font-variant-numeric: tabular-nums; }
+.seg-td-mod-low { background: #fef3c7; text-align: center; font-variant-numeric: tabular-nums; }
+.seg-td-low { background: #fee2e2; text-align: center; font-variant-numeric: tabular-nums; }
+
+/* Label column — explicitly left-aligned */
+.seg-td-label { text-align: left; }
+.seg-th-label { text-align: left; }
+
+/* Profile & overlap tables — all cells centred except labels */
+.seg-profile-table td,
+.seg-overlap-table td { text-align: center; font-variant-numeric: tabular-nums; }
+.seg-profile-table td.seg-td-label,
+.seg-overlap-table td.seg-td-label { text-align: left; }
+
+/* Heatmap legend strip */
+.seg-heatmap-legend {
+  display: flex; gap: 20px; align-items: center;
+  margin: 12px 0 16px; font-size: 12px; color: var(--seg-text-muted);
+}
+.seg-heatmap-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.seg-heatmap-legend-swatch {
+  display: inline-block; width: 16px; height: 16px;
+  border-radius: 3px; border: 1px solid var(--seg-border);
+}
+
+/* Overlap table — symmetrical matrix layout */
+.seg-overlap-table .seg-td-label { font-weight: 600; color: var(--seg-brand); background: #f8fafc; }
+
+/* Pairwise assessment cards */
+.seg-pair-insights { margin-top: 20px; }
+.seg-pair-insights-title {
+  font-weight: 600; color: var(--seg-brand);
+  margin-bottom: 10px; font-size: 14px;
+}
+.seg-pair-insight {
+  padding: 10px 14px; margin: 6px 0;
+  border-radius: 6px; font-size: 13px; line-height: 1.5;
+}
 
 /* ================================================================ */
 /* BADGES                                                            */
@@ -790,17 +871,17 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
 
 .seg-chart { width: 100%; max-width: 700px; height: auto; margin: 16px 0; display: block; }
 
-.seg-chart-wrapper,
-.seg-table-wrapper {
+.seg-chart-wrapper {
   position: relative;
   margin-bottom: 8px;
 }
 
+.seg-table-wrapper {
+  margin-bottom: 8px;
+}
+
+/* Pin button — absolute on charts, inline on tables */
 .seg-component-pin {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  z-index: 10;
   background: rgba(255,255,255,0.85);
   border: 1px solid var(--seg-border);
   border-radius: 4px;
@@ -810,16 +891,18 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
   color: var(--seg-text-faint);
   cursor: pointer;
   font-family: inherit;
-  opacity: 0;
   transition: all 0.15s;
 }
 
-.seg-chart-wrapper:hover .seg-component-pin,
-.seg-table-wrapper:hover .seg-component-pin {
-  opacity: 1;
+/* Chart wrappers: pin floats over content */
+.seg-chart-wrapper .seg-component-pin {
+  position: absolute; top: 4px; right: 4px; z-index: 10;
+  opacity: 0;
 }
+.seg-chart-wrapper:hover .seg-component-pin { opacity: 1; }
 
-.seg-component-pin:hover {
+.seg-component-pin:hover,
+.seg-table-export:hover {
   border-color: var(--seg-brand);
   color: var(--seg-brand);
   background: rgba(255,255,255,0.95);
@@ -829,7 +912,31 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
   background: var(--seg-brand);
   color: white;
   border-color: var(--seg-brand);
-  opacity: 1;
+}
+
+/* Table toolbar — right-aligned row above table, visible on hover */
+.seg-table-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-bottom: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.seg-table-wrapper:hover .seg-table-toolbar { opacity: 1; }
+
+/* Table export button — same style as pin */
+.seg-table-export {
+  background: rgba(255,255,255,0.85);
+  border: 1px solid var(--seg-border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--seg-text-faint);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
 }
 
 /* ================================================================ */
@@ -905,7 +1012,7 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
 
 .seg-fit-card {
   background: #f8f9fa;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--seg-border);
   border-radius: 6px;
   padding: 12px 16px;
   border-left: 3px solid var(--seg-brand);
@@ -914,14 +1021,14 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
 .seg-fit-card-value {
   font-size: 18px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--seg-text);
   font-variant-numeric: tabular-nums;
 }
 
 .seg-fit-card-label {
   font-size: 12px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--seg-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.3px;
   margin-top: 2px;
@@ -936,7 +1043,7 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
 
 .seg-fit-card-note {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--seg-text-faint);
   line-height: 1.4;
   margin-top: 6px;
 }
@@ -1355,7 +1462,7 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
 /* ================================================================ */
 
 @media print {
-  .seg-report-tabs { display: none !important; }
+  .report-tabs { display: none !important; }
   .seg-section-nav { display: none !important; }
   .seg-action-bar { display: none !important; }
   .seg-pin-btn { display: none !important; }
@@ -1753,6 +1860,56 @@ build_seg_component_pin_btn <- function(section_key, component, prefix = "") {
 }
 
 
+#' Build Table Toolbar
+#'
+#' Creates a toolbar row with export and pin buttons that appears on hover
+#' above a table wrapper. Keeps buttons out of the table header area.
+#'
+#' @param section_key Section identifier
+#' @param prefix Optional prefix for pin component
+#' @return htmltools tag — a div.seg-table-toolbar containing both buttons
+#' @keywords internal
+build_seg_table_toolbar <- function(section_key, prefix = "") {
+  htmltools::tags$div(
+    class = "seg-table-toolbar",
+    htmltools::tags$button(
+      class = "seg-table-export",
+      onclick = sprintf("segExportTableCSV(this, '%s')", section_key),
+      title = "Export table to Excel (CSV)",
+      htmltools::HTML("&#x1F4E5; Excel")
+    ),
+    htmltools::tags$button(
+      class = "seg-component-pin",
+      `data-seg-pin-section` = section_key,
+      `data-seg-pin-component` = "table",
+      onclick = sprintf("segPinComponent('%s','table','%s')", section_key, prefix),
+      title = "Pin table only",
+      "\U0001F4CC Table"
+    )
+  )
+}
+
+#' Build Table Export-Only Toolbar
+#'
+#' Creates a toolbar row with just an export button (no pin) for tables
+#' that don't have a pin button.
+#'
+#' @param section_key Section identifier
+#' @return htmltools tag
+#' @keywords internal
+build_seg_table_export_toolbar <- function(section_key) {
+  htmltools::tags$div(
+    class = "seg-table-toolbar",
+    htmltools::tags$button(
+      class = "seg-table-export",
+      onclick = sprintf("segExportTableCSV(this, '%s')", section_key),
+      title = "Export table to Excel (CSV)",
+      htmltools::HTML("&#x1F4E5; Excel")
+    )
+  )
+}
+
+
 # ==============================================================================
 # ACTION BAR
 # ==============================================================================
@@ -1788,7 +1945,7 @@ build_seg_action_bar <- function(report_title = "Segment Report") {
         "\u00D7"
       ),
       htmltools::tags$h3(
-        style = "color:#323367; margin:0 0 16px; font-size:18px;",
+        style = "color:var(--seg-brand); margin:0 0 16px; font-size:18px;",
         "\u2753 Navigating This Report"
       ),
       htmltools::tags$div(
@@ -1799,9 +1956,9 @@ build_seg_action_bar <- function(report_title = "Segment Report") {
           "presentation slides with images), and <em>About</em> (analyst &amp; project details).</p>",
           "<p><strong>Section Nav</strong> \u2014 Click any section name (Summary, Overview, etc.) ",
           "to jump directly to that section. The active section is highlighted.</p>",
-          "<p><strong>Pin Button</strong> <span style='color:#323367;'>\U0001F4CC</span> \u2014 ",
+          "<p><strong>Pin Button</strong> <span style='color:var(--seg-brand);'>\U0001F4CC</span> \u2014 ",
           "Click the pin icon on any chart or table to save it to Pinned Views for export.</p>",
-          "<p><strong>Add Insight</strong> <span style='color:#323367;'>\u270E</span> \u2014 ",
+          "<p><strong>Add Insight</strong> <span style='color:var(--seg-brand);'>\u270E</span> \u2014 ",
           "Click to add your own notes or commentary to any section. Insights are saved ",
           "when you save the report.</p>",
           "<p><strong>Variable Importance</strong> \u2014 Click the \u00D7 on any bar to hide ",
@@ -2018,7 +2175,7 @@ build_seg_overview_section <- function(tables, charts, html_data) {
   if (!is.null(tables$overview)) {
     table_el <- htmltools::tags$div(
       class = "seg-table-wrapper",
-      build_seg_component_pin_btn("overview", "table"),
+      build_seg_table_toolbar("overview"),
       tables$overview
     )
   }
@@ -2172,7 +2329,7 @@ build_seg_validation_section <- function(tables, charts, html_data) {
   if (!is.null(tables$validation)) {
     table_el <- htmltools::tags$div(
       class = "seg-table-wrapper",
-      build_seg_component_pin_btn("validation", "table"),
+      build_seg_table_toolbar("validation"),
       tables$validation
     )
   }
@@ -2291,7 +2448,7 @@ build_seg_importance_section <- function(tables, charts, html_data) {
   if (!is.null(tables$importance)) {
     table_el <- htmltools::tags$div(
       class = "seg-table-wrapper",
-      build_seg_component_pin_btn("importance", "table"),
+      build_seg_table_toolbar("importance"),
       tables$importance
     )
   }
@@ -2319,7 +2476,7 @@ build_seg_importance_section <- function(tables, charts, html_data) {
         class = "seg-subsection",
         style = "margin-top:24px; padding:16px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;",
         htmltools::tags$h4(
-          style = "margin:0 0 8px; font-size:14px; font-weight:600; color:#323367;",
+          style = "margin:0 0 8px; font-size:14px; font-weight:600; color:var(--seg-brand);",
           "Question Reduction"
         ),
         htmltools::tags$p(
@@ -2400,7 +2557,7 @@ build_seg_profiles_section <- function(tables, charts, html_data) {
   if (!is.null(tables$profiles)) {
     table_el <- htmltools::tags$div(
       class = "seg-table-wrapper",
-      build_seg_component_pin_btn("profiles", "table"),
+      build_seg_table_toolbar("profiles"),
       tables$profiles
     )
   }
@@ -2445,7 +2602,7 @@ build_seg_rules_section <- function(tables, html_data) {
   if (!is.null(tables$rules)) {
     table_el <- htmltools::tags$div(
       class = "seg-table-wrapper",
-      build_seg_component_pin_btn("rules", "table"),
+      build_seg_table_toolbar("rules"),
       tables$rules
     )
   }
@@ -2621,7 +2778,7 @@ build_seg_overlap_section <- function(charts, html_data) {
   title_row <- build_seg_section_title_row("Segment Distinctiveness", "overlap")
   insight_area <- build_seg_insight_area("overlap")
 
-  # Build HTML distance table instead of SVG heatmap
+  # Build clean heatmap table using standard seg-td-* classes
   centers <- html_data$centers
   overlap_table <- NULL
   pair_insights <- NULL
@@ -2638,51 +2795,47 @@ build_seg_overlap_section <- function(charts, html_data) {
       if (max_dist == 0) max_dist <- 1
 
       # Build table header
-      th_cells <- list(htmltools::tags$th(
-        class = "seg-th", style = "background:#f8fafc; min-width:120px;", ""
-      ))
+      th_cells <- list(htmltools::tags$th(class = "seg-th seg-th-label", ""))
       for (j in seq_len(k)) {
         th_cells[[j + 1]] <- htmltools::tags$th(
-          class = "seg-th",
-          style = "text-align:center; font-weight:600; color:#323367; min-width:100px;",
+          class = "seg-th seg-th-num",
           seg_names[j]
         )
       }
       header_row <- do.call(htmltools::tags$tr, th_cells)
 
-      # Build table rows
+      # Build table rows — use index-score heatmap classes
+      # High distance (>70% of max) = good separation = seg-td-high (green)
+      # Moderate-high (50-70%) = seg-td-mod-high (blue)
+      # Moderate-low (30-50%) = seg-td-mod-low (amber)
+      # Low distance (<30%) = overlapping = seg-td-low (red)
       table_rows <- lapply(seq_len(k), function(i) {
         cells <- list(htmltools::tags$td(
-          class = "seg-td",
-          style = "font-weight:600; color:#323367; background:#f8fafc;",
-          seg_names[i]
+          class = "seg-td seg-td-label",
+          htmltools::tags$strong(seg_names[i])
         ))
         for (j in seq_len(k)) {
           if (i == j) {
             cells[[j + 1]] <- htmltools::tags$td(
-              class = "seg-td",
-              style = "text-align:center; background:#f1f5f9; color:#94a3b8;",
+              class = "seg-td seg-td-num",
+              style = "background:#f1f5f9; color:#94a3b8;",
               "\u2014"
             )
           } else {
             raw_dist <- dist_matrix[i, j]
             norm_val <- raw_dist / max_dist
-            # Colour: red/pink for close, green for far
-            if (norm_val < 0.3) {
-              bg <- "#fef2f2"; txt_col <- "#dc2626"; border_col <- "#fecaca"
-            } else if (norm_val < 0.5) {
-              bg <- "#fffbeb"; txt_col <- "#d97706"; border_col <- "#fde68a"
-            } else if (norm_val < 0.7) {
-              bg <- "#f0fdf4"; txt_col <- "#16a34a"; border_col <- "#bbf7d0"
+            # Map normalised distance to heatmap class
+            td_class <- if (norm_val >= 0.7) {
+              "seg-td seg-td-high"
+            } else if (norm_val >= 0.5) {
+              "seg-td seg-td-mod-high"
+            } else if (norm_val >= 0.3) {
+              "seg-td seg-td-mod-low"
             } else {
-              bg <- "#ecfdf5"; txt_col <- "#059669"; border_col <- "#a7f3d0"
+              "seg-td seg-td-low"
             }
             cells[[j + 1]] <- htmltools::tags$td(
-              class = "seg-td",
-              style = sprintf(
-                "text-align:center; background:%s; color:%s; font-weight:600; border:1px solid %s;",
-                bg, txt_col, border_col
-              ),
+              class = td_class,
               sprintf("%.2f", raw_dist)
             )
           }
@@ -2692,9 +2845,9 @@ build_seg_overlap_section <- function(charts, html_data) {
 
       overlap_table <- htmltools::tags$div(
         class = "seg-table-wrapper",
-        build_seg_component_pin_btn("overlap", "table"),
+        build_seg_table_toolbar("overlap"),
         htmltools::tags$table(
-          class = "seg-table", style = "border-collapse:separate; border-spacing:2px;",
+          class = "seg-table seg-overlap-table",
           htmltools::tags$thead(header_row),
           htmltools::tags$tbody(table_rows)
         )
@@ -2715,38 +2868,34 @@ build_seg_overlap_section <- function(charts, html_data) {
 
       insight_items <- lapply(pairs, function(p) {
         if (p$norm < 0.3) {
-          icon <- "\u26A0\uFE0F"
+          td_class <- "seg-td-low"
           text <- sprintf(
-            "%s and %s are very similar (distance: %.2f). Consider whether these should be merged into a single segment.",
+            "%s and %s are very similar (distance: %.2f). Consider whether these should be merged.",
             p$seg_a, p$seg_b, p$dist
           )
-          bg <- "#fef2f2"
         } else if (p$norm < 0.5) {
-          icon <- "\u2139\uFE0F"
+          td_class <- "seg-td-mod-low"
           text <- sprintf(
-            "%s and %s show moderate separation (distance: %.2f). These are distinguishable but share some characteristics.",
+            "%s and %s show moderate separation (distance: %.2f). Distinguishable but share characteristics.",
             p$seg_a, p$seg_b, p$dist
           )
-          bg <- "#fffbeb"
         } else {
-          icon <- "\u2705"
+          td_class <- "seg-td-high"
           text <- sprintf(
             "%s and %s are well separated (distance: %.2f).",
             p$seg_a, p$seg_b, p$dist
           )
-          bg <- "#f0fdf4"
         }
         htmltools::tags$div(
-          style = sprintf("padding:8px 12px; margin:4px 0; background:%s; border-radius:6px; font-size:13px; line-height:1.5;", bg),
-          htmltools::tags$span(icon, " "),
+          class = paste0("seg-pair-insight ", td_class),
           text
         )
       })
 
       pair_insights <- htmltools::tags$div(
-        style = "margin-top:16px;",
+        class = "seg-pair-insights",
         htmltools::tags$div(
-          style = "font-weight:600; color:#323367; margin-bottom:8px; font-size:14px;",
+          class = "seg-pair-insights-title",
           "Pairwise Assessment"
         ),
         insight_items
@@ -2754,36 +2903,26 @@ build_seg_overlap_section <- function(charts, html_data) {
     }
   }
 
-  # Colour key
+  # Colour key using standard heatmap classes
   colour_key <- htmltools::tags$div(
-    style = "display:flex; gap:16px; align-items:center; margin:12px 0; font-size:12px; color:#64748b;",
-    htmltools::tags$span(style = "display:inline-flex; align-items:center; gap:4px;",
-      htmltools::tags$span(style = "display:inline-block; width:14px; height:14px; background:#fef2f2; border:1px solid #fecaca; border-radius:3px;"),
-      "Very similar"
+    class = "seg-heatmap-legend",
+    htmltools::tags$span(class = "seg-heatmap-legend-item",
+      htmltools::tags$span(class = "seg-heatmap-legend-swatch seg-td-low"),
+      "Overlapping"
     ),
-    htmltools::tags$span(style = "display:inline-flex; align-items:center; gap:4px;",
-      htmltools::tags$span(style = "display:inline-block; width:14px; height:14px; background:#fffbeb; border:1px solid #fde68a; border-radius:3px;"),
+    htmltools::tags$span(class = "seg-heatmap-legend-item",
+      htmltools::tags$span(class = "seg-heatmap-legend-swatch seg-td-mod-low"),
       "Moderate"
     ),
-    htmltools::tags$span(style = "display:inline-flex; align-items:center; gap:4px;",
-      htmltools::tags$span(style = "display:inline-block; width:14px; height:14px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:3px;"),
-      "Well separated"
+    htmltools::tags$span(class = "seg-heatmap-legend-item",
+      htmltools::tags$span(class = "seg-heatmap-legend-swatch seg-td-mod-high"),
+      "Good"
     ),
-    htmltools::tags$span(style = "display:inline-flex; align-items:center; gap:4px;",
-      htmltools::tags$span(style = "display:inline-block; width:14px; height:14px; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:3px;"),
-      "Highly distinct"
+    htmltools::tags$span(class = "seg-heatmap-legend-item",
+      htmltools::tags$span(class = "seg-heatmap-legend-swatch seg-td-high"),
+      "Distinct"
     )
   )
-
-  # SVG overlap heatmap (if available from chart builder)
-  overlap_svg <- NULL
-  if (!is.null(charts$overlap)) {
-    overlap_svg <- htmltools::tags$div(
-      class = "seg-chart-wrapper",
-      build_seg_component_pin_btn("overlap", "chart"),
-      charts$overlap
-    )
-  }
 
   htmltools::tags$div(
     class = "seg-section",
@@ -2800,7 +2939,6 @@ build_seg_overlap_section <- function(charts, html_data) {
       ))
     ),
     colour_key,
-    overlap_svg,
     overlap_table,
     pair_insights
   )
@@ -2830,7 +2968,7 @@ build_seg_golden_questions_section <- function(charts, html_data) {
   # Summary metrics
   accuracy <- round(gq$accuracy * 100, 1)
   n_top <- nrow(gq$top_questions)
-  accuracy_colour <- if (accuracy >= 80) "#22c55e" else if (accuracy >= 60) "#f59e0b" else "#ef4444"
+  accuracy_colour <- if (accuracy >= 80) "var(--seg-success)" else if (accuracy >= 60) "var(--seg-warning)" else "var(--seg-danger)"
 
   # Check for incremental accuracy data
   has_incremental <- !is.null(gq$incremental_accuracy) ||
@@ -2915,7 +3053,7 @@ build_seg_golden_questions_section <- function(charts, html_data) {
         htmltools::tags$input(
           type = "checkbox", checked = "checked",
           class = "seg-gq-checkbox",
-          style = "width:16px; height:16px; cursor:pointer; accent-color:#323367;",
+          style = "width:16px; height:16px; cursor:pointer; accent-color:var(--seg-brand);",
           onchange = "segToggleGoldenQuestion(this)"
         )
       ),
@@ -2965,7 +3103,7 @@ build_seg_golden_questions_section <- function(charts, html_data) {
       htmltools::tags$span(style = "font-size:13px; color:#64748b;", "Selected questions:"),
       htmltools::tags$span(
         id = "seg-gq-count",
-        style = "font-size:18px; font-weight:700; color:#323367;",
+        style = "font-size:18px; font-weight:700; color:var(--seg-brand);",
         as.character(n_top)
       ),
       htmltools::tags$span(style = "font-size:13px; color:#64748b;",
@@ -2984,7 +3122,7 @@ build_seg_golden_questions_section <- function(charts, html_data) {
 
   questions_table <- htmltools::tags$div(
     class = "seg-table-wrapper",
-    build_seg_component_pin_btn("golden-questions", "table"),
+    build_seg_table_toolbar("golden-questions"),
     accuracy_summary,
     htmltools::tags$table(
       class = "seg-table",
@@ -3022,10 +3160,10 @@ build_seg_golden_questions_section <- function(charts, html_data) {
     htmltools::tags$div(
       style = paste0(
         "margin:12px 0 16px; padding:12px 16px; background:#f8fafc; ",
-        "border-left:3px solid #323367; border-radius:0 4px 4px 0; ",
+        "border-left:3px solid var(--seg-brand); border-radius:0 4px 4px 0; ",
         "font-size:12px; line-height:1.6; color:#475569;"
       ),
-      htmltools::tags$strong(style = "color:#323367;",
+      htmltools::tags$strong(style = "color:var(--seg-brand);",
                             "Why do these percentages differ from Variable Importance? "),
       htmltools::HTML(paste0(
         "Variable Importance (above) uses ANOVA eta-squared &mdash; ",
@@ -3081,7 +3219,7 @@ build_seg_vulnerability_section <- function(html_data) {
   overall_conf <- round(vuln$overall_avg_confidence, 2)
   threshold <- vuln$threshold %||% 0.3
 
-  status_colour <- if (overall_pct > 30) "#ef4444" else if (overall_pct > 15) "#f59e0b" else "#22c55e"
+  status_colour <- if (overall_pct > 30) "var(--seg-danger)" else if (overall_pct > 15) "var(--seg-warning)" else "var(--seg-success)"
   status_label <- if (overall_pct > 30) "High" else if (overall_pct > 15) "Moderate" else "Low"
 
   summary_box <- htmltools::tags$div(
@@ -3125,7 +3263,7 @@ build_seg_vulnerability_section <- function(html_data) {
     rows <- lapply(seq_len(nrow(seg_summary)), function(i) {
       row <- seg_summary[i, ]
       pct_vuln <- round(row$pct_vulnerable, 1)
-      bar_colour <- if (pct_vuln > 30) "#ef4444" else if (pct_vuln > 15) "#f59e0b" else "#22c55e"
+      bar_colour <- if (pct_vuln > 30) "var(--seg-danger)" else if (pct_vuln > 15) "var(--seg-warning)" else "var(--seg-success)"
 
       htmltools::tags$tr(
         htmltools::tags$td(row$segment, class = "seg-td"),
@@ -3144,7 +3282,7 @@ build_seg_vulnerability_section <- function(html_data) {
 
     seg_table <- htmltools::tags$div(
       class = "seg-table-wrapper",
-      build_seg_component_pin_btn("vulnerability", "table"),
+      build_seg_table_toolbar("vulnerability"),
       htmltools::tags$table(
         class = "seg-table",
         htmltools::tags$thead(header),
@@ -3206,6 +3344,7 @@ build_seg_vulnerability_section <- function(html_data) {
 
     matrix_el <- htmltools::tags$div(
       class = "seg-table-wrapper",
+      build_seg_table_export_toolbar("switching-matrix"),
       htmltools::tags$h4(class = "seg-subsection-title", "Switching Matrix"),
       htmltools::tags$p(class = "seg-section-intro", style = "font-size:12px;",
                         "Percentage of borderline respondents in each segment (rows) who would switch to another segment (columns)."),
@@ -3215,7 +3354,7 @@ build_seg_vulnerability_section <- function(html_data) {
           style = "font-size:12px; color:#64748b; display:flex; align-items:center; gap:6px; cursor:pointer;",
           htmltools::tags$input(
             type = "checkbox",
-            style = "accent-color:#323367; cursor:pointer;",
+            style = "accent-color:var(--seg-brand); cursor:pointer;",
             onchange = "document.querySelectorAll('.seg-sw-count').forEach(function(el){el.style.display=this.checked?'inline':'none'}.bind(this))"
           ),
           "Show counts"
@@ -3269,7 +3408,7 @@ build_seg_gmm_section <- function(tables, html_data) {
   if (!is.null(tables$gmm)) {
     table_el <- htmltools::tags$div(
       class = "seg-table-wrapper",
-      build_seg_component_pin_btn("gmm", "table"),
+      build_seg_table_toolbar("gmm"),
       tables$gmm
     )
   }
@@ -3336,90 +3475,25 @@ build_seg_guide_section <- function(brand_colour = "#323367") {
                                             "guide",
                                             show_pin = FALSE)
 
+  # Use callout registry for interpretation guide and how-it-works
+  interp_callout <- if (exists("turas_callout", mode = "function")) {
+    turas_callout("segment", "interpretation_guide")
+  } else {
+    ""
+  }
+  how_callout <- if (exists("turas_callout", mode = "function")) {
+    turas_callout("segment", "how_it_works")
+  } else {
+    ""
+  }
+
   htmltools::tags$div(
     class = "seg-section",
     id = "seg-guide",
     `data-seg-section` = "guide",
     title_row,
-    htmltools::tags$div(
-      class = "seg-interp-grid",
-      htmltools::tags$div(
-        htmltools::tags$h3(
-          class = "seg-panel-heading-label",
-          style = "color:var(--seg-success);",
-          "DO"
-        ),
-        htmltools::tags$ul(
-          class = "seg-interp-list",
-          htmltools::tags$li("Use segment profiles to understand the defining characteristics of each group"),
-          htmltools::tags$li("Validate segments with qualitative research or external data before acting on them"),
-          htmltools::tags$li("Focus on large, actionable differences between segments rather than small variations"),
-          htmltools::tags$li("Consider multiple validation metrics together (silhouette, between-SS, variable importance)"),
-          htmltools::tags$li("Re-run segmentation periodically to check if the segment structure remains stable")
-        )
-      ),
-      htmltools::tags$div(
-        htmltools::tags$h3(
-          class = "seg-panel-heading-label",
-          style = "color:var(--seg-danger);",
-          "DON'T"
-        ),
-        htmltools::tags$ul(
-          class = "seg-interp-list",
-          htmltools::tags$li("Treat segments as fixed, immutable groups \u2014 they are statistical constructs"),
-          htmltools::tags$li("Over-interpret small sample segments (n < 30) as reliable market groups"),
-          htmltools::tags$li("Assume segment membership is binary \u2014 respondents may sit on boundaries"),
-          htmltools::tags$li("Ignore validation metrics; a poor silhouette score means the structure is unreliable"),
-          htmltools::tags$li("Use segments from non-representative samples to make population-level claims")
-        )
-      )
-    ),
-    htmltools::tags$div(
-      class = "seg-interp-note",
-      htmltools::tags$strong("Note: "),
-      "Cluster analysis finds structure in data, but the practical meaning and actionability of segments depends on domain knowledge. Always name and interpret segments in context of your research objectives."
-    ),
-    # Short primer on the technique
-    htmltools::tags$div(
-      style = paste0(
-        "margin-top:24px; background:#f8fafc; border:1px solid #e2e8f0; ",
-        "border-radius:8px; padding:20px; line-height:1.7;"
-      ),
-      htmltools::tags$h3(
-        style = "font-size:15px; color:#323367; margin:0 0 12px;",
-        "\U0001F4D6 How Segmentation Works"
-      ),
-      htmltools::tags$div(
-        style = "font-size:13px; color:#334155;",
-        htmltools::HTML(paste0(
-          "<p><strong>What is cluster analysis?</strong> Cluster analysis groups respondents ",
-          "who answered similarly across a set of survey questions. The goal is to find ",
-          "natural groupings where people within a group are similar to each other and ",
-          "different from people in other groups.</p>",
-          "<p><strong>K-Means</strong> is the most common method. It works in three steps: ",
-          "(1) place k centre points randomly, (2) assign each respondent to the nearest ",
-          "centre, (3) move each centre to the middle of its assigned respondents. ",
-          "Steps 2-3 repeat until assignments stabilise. The result is k non-overlapping ",
-          "groups of similar respondents.</p>",
-          "<p><strong>Hierarchical clustering</strong> builds a tree (dendrogram) by ",
-          "repeatedly merging the most similar respondents or groups. The tree is then ",
-          "cut at a level that produces the desired number of segments. This reveals ",
-          "which segments are most closely related.</p>",
-          "<p><strong>GMM (Gaussian Mixture Models)</strong> assumes data comes from ",
-          "overlapping bell-curve distributions. Unlike K-Means, it gives each respondent ",
-          "a probability of belonging to each segment, rather than a hard assignment.</p>",
-          "<p><strong>Choosing k</strong> (the number of segments): There is no single ",
-          "correct answer. Use the silhouette score (higher = better separation), ",
-          "business interpretability (can you name and act on each segment?), and ",
-          "minimum segment size (too small = not actionable) as guides.</p>",
-          "<p><strong>Silhouette score interpretation:</strong> ",
-          "> 0.50 = strong structure, ",
-          "0.35-0.50 = reasonable, ",
-          "0.25-0.35 = moderate (some overlap), ",
-          "< 0.25 = weak (consider fewer segments or a different approach).</p>"
-        ))
-      )
-    )
+    htmltools::HTML(interp_callout),
+    htmltools::HTML(how_callout)
   )
 }
 
@@ -3538,7 +3612,7 @@ build_seg_guide_section <- function(brand_colour = "#323367") {
       style = "display:flex; align-items:center; gap:10px; margin-bottom:10px;",
       htmltools::tags$span(style = "font-size:22px;", icon),
       htmltools::tags$span(
-        style = "font-size:15px; font-weight:600; color:#323367;",
+        style = "font-size:15px; font-weight:600; color:var(--seg-brand);",
         title
       )
     ),
@@ -3571,7 +3645,7 @@ build_seg_guide_section <- function(brand_colour = "#323367") {
     ),
     htmltools::tags$div(
       style = paste0(
-        "font-size:12px; color:#323367; font-style:italic; ",
+        "font-size:12px; color:var(--seg-brand); font-style:italic; ",
         "border-top:1px solid #e2e8f0; padding-top:10px; margin-top:4px;"
       ),
       htmltools::tags$strong("When to use: "),
@@ -3673,8 +3747,8 @@ build_seg_slides_section <- function(config) {
           class = "seg-slide-title",
           contenteditable = "true",
           style = paste0(
-            "font-size:16px; font-weight:600; color:#323367; margin-bottom:8px; ",
-            "border-bottom:2px solid #323367; padding-bottom:6px; outline:none;"
+            "font-size:16px; font-weight:600; color:var(--seg-brand); margin-bottom:8px; ",
+            "border-bottom:2px solid var(--seg-brand); padding-bottom:6px; outline:none;"
           ),
           `data-placeholder` = "Slide title...",
           sl$title
@@ -3719,8 +3793,8 @@ build_seg_slides_section <- function(config) {
         style = "display:flex; gap:8px;",
         htmltools::tags$button(
           style = paste0(
-            "font-size:12px; padding:6px 14px; border:1px solid #323367; ",
-            "border-radius:6px; background:#323367; color:#fff; cursor:pointer;"
+            "font-size:12px; padding:6px 14px; border:1px solid var(--seg-brand); ",
+            "border-radius:6px; background:var(--seg-brand); color:#fff; cursor:pointer;"
           ),
           onclick = "segAddSlide()",
           "\u2795 Add Slide"
@@ -3735,7 +3809,7 @@ build_seg_slides_section <- function(config) {
         )
       )
     ),
-    htmltools::tags$hr(style = "border:none; border-top:3px solid #323367; margin:8px 0 16px;"),
+    htmltools::tags$hr(style = "border:none; border-top:3px solid var(--seg-brand); margin:8px 0 16px;"),
     htmltools::tags$p(
       style = "font-size:13px; color:#64748b; margin-bottom:16px;",
       "Create presentation slides with custom titles, content, and images. ",
@@ -3807,7 +3881,7 @@ build_seg_about_section <- function(config, html_data) {
     if (is.null(value) || !nzchar(trimws(value))) return(NULL)
     htmltools::tags$tr(
       htmltools::tags$td(
-        style = "padding:10px 16px; font-weight:600; color:#323367; width:180px; vertical-align:top;",
+        style = "padding:10px 16px; font-weight:600; color:var(--seg-brand); width:180px; vertical-align:top;",
         label
       ),
       htmltools::tags$td(
@@ -3834,7 +3908,7 @@ build_seg_about_section <- function(config, html_data) {
       class = "seg-section-title-row",
       htmltools::tags$h2(class = "seg-section-title", "About This Report")
     ),
-    htmltools::tags$hr(style = "border:none; border-top:3px solid #323367; margin:8px 0 16px;"),
+    htmltools::tags$hr(style = "border:none; border-top:3px solid var(--seg-brand); margin:8px 0 16px;"),
 
     # Analyst / Project details card
     htmltools::tags$div(
@@ -3844,7 +3918,7 @@ build_seg_about_section <- function(config, html_data) {
       ),
       htmltools::tags$div(
         style = paste0(
-          "background:linear-gradient(135deg, #323367, #434380); color:#fff; ",
+          "background:linear-gradient(135deg, var(--seg-brand), #434380); color:#fff; ",
           "padding:16px 20px; font-size:15px; font-weight:600;"
         ),
         "Report Details"
@@ -3870,7 +3944,7 @@ build_seg_about_section <- function(config, html_data) {
           "padding:20px; margin-bottom:20px;"
         ),
         htmltools::tags$div(
-          style = "font-weight:600; color:#323367; margin-bottom:8px; font-size:14px;",
+          style = "font-weight:600; color:var(--seg-brand); margin-bottom:8px; font-size:14px;",
           "Methodology Notes"
         ),
         htmltools::tags$div(
@@ -3887,7 +3961,7 @@ build_seg_about_section <- function(config, html_data) {
         "padding:20px; margin-bottom:20px;"
       ),
       htmltools::tags$div(
-        style = "font-weight:600; color:#323367; margin-bottom:8px; font-size:14px;",
+        style = "font-weight:600; color:var(--seg-brand); margin-bottom:8px; font-size:14px;",
         "Additional Notes"
       ),
       htmltools::tags$div(

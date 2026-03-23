@@ -12,6 +12,13 @@
 # ==============================================================================
 
 
+# --- Design token constants (aligned with 05_chart_builder.R) ---
+.kd_quad_label_colour <- .kd_label_colour %||% "#64748b"
+.kd_quad_value_colour <- .kd_value_colour %||% "#334155"
+.kd_quad_grid_colour  <- .kd_grid_colour  %||% "#e2e8f0"
+.kd_quad_muted_colour <- .kd_muted_colour %||% "#94a3b8"
+.kd_quad_text_colour  <- "#1e293b"
+
 # ==============================================================================
 # QUADRANT CHART (PURE SVG)
 # ==============================================================================
@@ -96,8 +103,8 @@ build_kd_quadrant_chart <- function(quadrant_data, config) {
   scale_x <- function(v) margin_left + (v - x_min) / (x_max - x_min) * plot_w
   scale_y <- function(v) margin_top + plot_h - (v - y_min) / (y_max - y_min) * plot_h
 
-  # --- Font family ---
-  font_family <- "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+  # --- Font family (aligned with design system) ---
+  font_family <- .kd_font_family %||% "'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif"
 
   # === BUILD SVG ===
   svg <- character(0)
@@ -148,32 +155,32 @@ build_kd_quadrant_chart <- function(quadrant_data, config) {
     gy <- scale_y(tick)
     # Vertical gridline
     svg <- c(svg, sprintf(
-      '<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="#e2e8f0" stroke-width="0.5"/>',
-      gx, margin_top, gx, margin_top + plot_h
+      '<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="%s" stroke-width="0.5"/>',
+      gx, margin_top, gx, margin_top + plot_h, .kd_quad_grid_colour
     ))
     # Horizontal gridline
     svg <- c(svg, sprintf(
-      '<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="#e2e8f0" stroke-width="0.5"/>',
-      margin_left, gy, margin_left + plot_w, gy
+      '<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="%s" stroke-width="0.5"/>',
+      margin_left, gy, margin_left + plot_w, gy, .kd_quad_grid_colour
     ))
   }
 
   # --- Threshold lines (dashed) ---
   # Vertical: performance threshold
   svg <- c(svg, sprintf(
-    '<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="6,4"/>',
-    thresh_px, margin_top, thresh_px, margin_top + plot_h
+    '<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="%s" stroke-width="1.5" stroke-dasharray="6,4"/>',
+    thresh_px, margin_top, thresh_px, margin_top + plot_h, .kd_quad_muted_colour
   ))
   # Horizontal: importance threshold
   svg <- c(svg, sprintf(
-    '<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="6,4"/>',
-    margin_left, thresh_py, margin_left + plot_w, thresh_py
+    '<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="%s" stroke-width="1.5" stroke-dasharray="6,4"/>',
+    margin_left, thresh_py, margin_left + plot_w, thresh_py, .kd_quad_muted_colour
   ))
 
   # --- Plot border ---
   svg <- c(svg, sprintf(
-    '<rect x="%g" y="%g" width="%g" height="%g" fill="none" stroke="#e2e8f0" stroke-width="0.5"/>',
-    margin_left, margin_top, plot_w, plot_h
+    '<rect x="%g" y="%g" width="%g" height="%g" fill="none" stroke="%s" stroke-width="0.5"/>',
+    margin_left, margin_top, plot_w, plot_h, .kd_quad_grid_colour
   ))
 
   # --- Quadrant labels (corner annotations) ---
@@ -182,30 +189,30 @@ build_kd_quadrant_chart <- function(quadrant_data, config) {
 
   # Q1: upper-left corner
   svg <- c(svg, sprintf(
-    '<text x="%g" y="%g" fill="#94a3b8" font-size="12" font-weight="600" text-anchor="start">%s</text>',
+    '<text x="%g" y="%g" fill="%s" font-size="12" font-weight="600" text-anchor="start">%s</text>',
     margin_left + label_inset_x, margin_top + label_inset_y,
-    htmltools::htmlEscape(q1_name)
+    .kd_quad_muted_colour, htmltools::htmlEscape(q1_name)
   ))
 
   # Q2: upper-right corner
   svg <- c(svg, sprintf(
-    '<text x="%g" y="%g" fill="#94a3b8" font-size="12" font-weight="600" text-anchor="end">%s</text>',
+    '<text x="%g" y="%g" fill="%s" font-size="12" font-weight="600" text-anchor="end">%s</text>',
     margin_left + plot_w - label_inset_x, margin_top + label_inset_y,
-    htmltools::htmlEscape(q2_name)
+    .kd_quad_muted_colour, htmltools::htmlEscape(q2_name)
   ))
 
   # Q3: lower-left corner
   svg <- c(svg, sprintf(
-    '<text x="%g" y="%g" fill="#94a3b8" font-size="12" font-weight="600" text-anchor="start">%s</text>',
+    '<text x="%g" y="%g" fill="%s" font-size="12" font-weight="600" text-anchor="start">%s</text>',
     margin_left + label_inset_x, margin_top + plot_h - label_inset_x,
-    htmltools::htmlEscape(q3_name)
+    .kd_quad_muted_colour, htmltools::htmlEscape(q3_name)
   ))
 
   # Q4: lower-right corner
   svg <- c(svg, sprintf(
-    '<text x="%g" y="%g" fill="#94a3b8" font-size="12" font-weight="600" text-anchor="end">%s</text>',
+    '<text x="%g" y="%g" fill="%s" font-size="12" font-weight="600" text-anchor="end">%s</text>',
     margin_left + plot_w - label_inset_x, margin_top + plot_h - label_inset_x,
-    htmltools::htmlEscape(q4_name)
+    .kd_quad_muted_colour, htmltools::htmlEscape(q4_name)
   ))
 
   # --- Axis tick labels ---
@@ -214,27 +221,27 @@ build_kd_quadrant_chart <- function(quadrant_data, config) {
     gy <- scale_y(tick)
     # X-axis label (bottom)
     svg <- c(svg, sprintf(
-      '<text x="%g" y="%g" fill="#64748b" font-size="10" font-weight="400" text-anchor="middle">%d</text>',
-      gx, margin_top + plot_h + 16, tick
+      '<text x="%g" y="%g" fill="%s" font-size="10" font-weight="400" text-anchor="middle">%d</text>',
+      gx, margin_top + plot_h + 16, .kd_quad_label_colour, tick
     ))
     # Y-axis label (left)
     svg <- c(svg, sprintf(
-      '<text x="%g" y="%g" fill="#64748b" font-size="10" font-weight="400" text-anchor="end" dominant-baseline="central">%d</text>',
-      margin_left - 8, gy, tick
+      '<text x="%g" y="%g" fill="%s" font-size="10" font-weight="400" text-anchor="end" dominant-baseline="central">%d</text>',
+      margin_left - 8, gy, .kd_quad_label_colour, tick
     ))
   }
 
   # --- Axis titles ---
   # X-axis title (Performance)
   svg <- c(svg, sprintf(
-    '<text x="%g" y="%g" fill="#64748b" font-size="12" font-weight="400" text-anchor="middle">Performance</text>',
-    margin_left + plot_w / 2, svg_h - 6
+    '<text x="%g" y="%g" fill="%s" font-size="12" font-weight="400" text-anchor="middle">Performance</text>',
+    margin_left + plot_w / 2, svg_h - 6, .kd_quad_label_colour
   ))
 
   # Y-axis title (Importance) -- rotated
   svg <- c(svg, sprintf(
-    '<text x="%g" y="%g" fill="#64748b" font-size="12" font-weight="400" text-anchor="middle" transform="rotate(-90, %g, %g)">Importance</text>',
-    14, margin_top + plot_h / 2, 14, margin_top + plot_h / 2
+    '<text x="%g" y="%g" fill="%s" font-size="12" font-weight="400" text-anchor="middle" transform="rotate(-90, %g, %g)">Importance</text>',
+    14, margin_top + plot_h / 2, .kd_quad_label_colour, 14, margin_top + plot_h / 2
   ))
 
   # --- Driver points and labels ---
@@ -283,9 +290,9 @@ build_kd_quadrant_chart <- function(quadrant_data, config) {
 
   for (i in seq_len(nrow(placed_labels))) {
     svg <- c(svg, sprintf(
-      '<text x="%g" y="%g" fill="#1e293b" font-size="11" font-weight="500" text-anchor="%s">%s</text>',
+      '<text x="%g" y="%g" fill="%s" font-size="11" font-weight="500" text-anchor="%s">%s</text>',
       placed_labels$lx[i], placed_labels$ly[i],
-      placed_labels$anchor[i],
+      .kd_quad_text_colour, placed_labels$anchor[i],
       htmltools::htmlEscape(placed_labels$label[i])
     ))
   }
@@ -459,7 +466,7 @@ build_kd_quadrant_action_table <- function(quadrant_data) {
     "Possible Overkill" = "#f59e0b"
   )
 
-  font_family <- "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+  font_family <- .kd_font_family %||% "'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif"
 
   # Build table HTML
   rows_html <- character(0)
@@ -592,7 +599,7 @@ build_kd_quadrant_summary <- function(quadrant_data) {
       ),
       htmltools::tags$span(
         class = "kd-quadrant-summary-label",
-        style = "font-size:12px;color:#475569;font-weight:400;",
+        style = sprintf("font-size:12px;color:%s;font-weight:400;", .kd_quad_label_colour),
         q_names[q]
       )
     )
@@ -620,11 +627,11 @@ build_kd_quadrant_summary <- function(quadrant_data) {
       class = "kd-quadrant-summary-top",
       style = "margin-top:10px;padding:8px 12px;background-color:#fef2f2;border-left:3px solid #ef4444;border-radius:3px;",
       htmltools::tags$span(
-        style = "font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;",
+        style = sprintf("font-size:11px;color:%s;font-weight:600;text-transform:uppercase;", .kd_quad_label_colour),
         "Top Priority: "
       ),
       htmltools::tags$span(
-        style = "font-size:13px;color:#1e293b;font-weight:500;",
+        style = sprintf("font-size:13px;color:%s;font-weight:500;", .kd_quad_text_colour),
         top_driver
       )
     )

@@ -10,90 +10,44 @@
   'use strict';
 
   // --------------------------------------------------------------------------
-  // Section navigation — horizontal bar(s) (.kd-section-nav)
-  // In single-report mode there is one nav bar; in unified mode there is
-  // one per analysis panel.  Each is independently tracked.
+  // Page-based section navigation (.kd-section-nav)
+  // Each nav link switches to a section page (show/hide) instead of scrolling.
   // --------------------------------------------------------------------------
 
-  var navGroups = [];  // array of { navBar, links, sections }
+  /**
+   * Switch to a specific section page.
+   * @param {string} pageName - The data-kd-section value (e.g., 'importance')
+   */
+  window.kdSwitchPage = function(pageName) {
+    // Find the closest content container (supports unified mode)
+    var content = document.querySelector('.kd-content');
+    if (!content) return;
 
-  function initNavBars() {
-    var allNavBars = document.querySelectorAll('.kd-section-nav');
+    // Hide all sections, show target
+    content.querySelectorAll('.kd-section[data-kd-section]').forEach(function(section) {
+      section.classList.toggle('kd-page-active',
+        section.getAttribute('data-kd-section') === pageName);
+    });
 
-    allNavBars.forEach(function(navBar) {
-      var links = navBar.querySelectorAll('a');
-      var sections = [];
-
-      links.forEach(function(link) {
-        var href = link.getAttribute('href');
-        if (href && href.startsWith('#')) {
-          var section = document.getElementById(href.slice(1));
-          if (section) {
-            sections.push({ el: section, link: link });
-          }
-        }
-
-        link.addEventListener('click', function(e) {
-          e.preventDefault();
-          var target = document.getElementById(href.slice(1));
-          if (target) {
-            // Total sticky offset: report tabs + analysis tabs (if present) + this nav bar
-            var reportTabs = document.querySelector('.kd-report-tabs');
-            var reportTabsHeight = reportTabs ? reportTabs.offsetHeight : 0;
-            var tabBar = document.querySelector('.kd-analysis-tabs');
-            var tabBarHeight = tabBar ? tabBar.offsetHeight : 0;
-            var navHeight = navBar.offsetHeight;
-            var totalOffset = reportTabsHeight + tabBarHeight + navHeight + 8;
-            var targetY = target.getBoundingClientRect().top + window.scrollY - totalOffset;
-            window.scrollTo({ top: targetY, behavior: 'smooth' });
-          }
-        });
+    // Update nav link active state
+    var navBar = document.querySelector('.kd-section-nav');
+    if (navBar) {
+      navBar.querySelectorAll('a[data-kd-page]').forEach(function(link) {
+        link.classList.toggle('active',
+          link.getAttribute('data-kd-page') === pageName);
       });
+    }
 
-      navGroups.push({ navBar: navBar, links: links, sections: sections });
-    });
-  }
-
-  function updateActiveNav() {
-    navGroups.forEach(function(group) {
-      if (group.sections.length === 0) return;
-
-      // Only update if this nav bar is visible (its panel is active)
-      var panel = group.navBar.closest('.kd-analysis-panel');
-      if (panel && !panel.classList.contains('active')) return;
-
-      var reportTabs = document.querySelector('.kd-report-tabs');
-      var reportTabsHeight = reportTabs ? reportTabs.offsetHeight : 0;
-      var tabBar = document.querySelector('.kd-analysis-tabs');
-      var tabBarHeight = tabBar ? tabBar.offsetHeight : 0;
-      var navHeight = group.navBar.offsetHeight;
-      var scrollY = window.scrollY + reportTabsHeight + tabBarHeight + navHeight + 40;
-      var active = null;
-
-      for (var i = group.sections.length - 1; i >= 0; i--) {
-        if (group.sections[i].el.offsetTop <= scrollY) {
-          active = group.sections[i];
-          break;
-        }
-      }
-
-      group.links.forEach(function(link) { link.classList.remove('active'); });
-      if (active) {
-        active.link.classList.add('active');
-      }
-    });
-  }
+    // Scroll to top of content area
+    window.scrollTo({ top: 0 });
+  };
 
   document.addEventListener('DOMContentLoaded', function() {
-    initNavBars();
-    updateActiveNav();
     // Hydrate saved state
     kdHydratePage();
     // Initialize table export buttons (CSV/Excel)
     if (typeof kdInitTableExport === 'function') kdInitTableExport();
   });
-
-  window.addEventListener('scroll', updateActiveNav, { passive: true });
 
   // --------------------------------------------------------------------------
   // Importance bar filtering — show/hide bars by threshold
@@ -418,6 +372,42 @@
   window.kdHydratePage = function() {
     if (typeof kdHydrateInsights === 'function') kdHydrateInsights();
     if (typeof kdHydratePinnedViews === 'function') kdHydratePinnedViews();
+  };
+
+  // --------------------------------------------------------------------------
+  // Generic table sort — click header to toggle sort direction
+  // --------------------------------------------------------------------------
+  window.kdSortTable = function(th, colIdx, type) {
+    var table = th.closest('table');
+    if (!table) return;
+    var tbody = table.querySelector('tbody');
+    if (!tbody) return;
+
+    // Determine sort direction (toggle)
+    var asc = th.getAttribute('data-kd-sort-dir') !== 'asc';
+    // Clear other sort indicators in this table
+    table.querySelectorAll('.kd-sortable').forEach(function(h) {
+      h.removeAttribute('data-kd-sort-dir');
+      h.classList.remove('kd-sort-asc', 'kd-sort-desc');
+    });
+    th.setAttribute('data-kd-sort-dir', asc ? 'asc' : 'desc');
+    th.classList.add(asc ? 'kd-sort-asc' : 'kd-sort-desc');
+
+    var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+    rows.sort(function(a, b) {
+      var aCells = a.querySelectorAll('td');
+      var bCells = b.querySelectorAll('td');
+      if (colIdx >= aCells.length || colIdx >= bCells.length) return 0;
+      var aVal = (aCells[colIdx].textContent || '').trim();
+      var bVal = (bCells[colIdx].textContent || '').trim();
+      if (type === 'num') {
+        aVal = parseFloat(aVal) || 0;
+        bVal = parseFloat(bVal) || 0;
+        return asc ? aVal - bVal : bVal - aVal;
+      }
+      return asc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+    });
+    rows.forEach(function(row) { tbody.appendChild(row); });
   };
 
   // --------------------------------------------------------------------------

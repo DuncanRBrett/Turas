@@ -429,6 +429,7 @@ build_help_overlay <- function() {
           "Upload a chart, screenshot, or diagram to any slide. Images are resized automatically."),
         htmltools::tags$li(htmltools::tags$span(class = "help-key", "\U0001F4CC Pin slide"),
           "Pin an Added Slide to include it alongside your data findings in Pinned Views.")
+        )
       ),
 
       # --- Exporting ---
@@ -631,10 +632,10 @@ build_banner_tabs <- function(banner_groups, brand_colour = "#323367") {
 build_controls <- function(has_any_freq, has_any_pct, has_any_sig,
                            brand_colour = "#323367", has_charts = FALSE) {
 
-  # Primary controls (always visible)
-  primary <- list()
+  # All controls as inline pill toggles
+  toggles <- list()
   if (has_any_pct) {
-    primary <- c(primary, list(
+    toggles <- c(toggles, list(
       htmltools::tags$label(class = "toggle-label",
         htmltools::tags$input(type = "checkbox", checked = NA, onchange = "toggleHeatmap(this.checked)"),
         "Heatmap"
@@ -642,63 +643,38 @@ build_controls <- function(has_any_freq, has_any_pct, has_any_sig,
     ))
   }
   if (has_charts) {
-    primary <- c(primary, list(
+    toggles <- c(toggles, list(
       htmltools::tags$label(class = "toggle-label",
         htmltools::tags$input(type = "checkbox", onchange = "toggleChart(this.checked)"),
         "Chart"
       )
     ))
   }
-
-  # Secondary controls (behind Display Options dropdown)
-  secondary <- list()
-  if (has_any_pct) {
-    secondary <- c(secondary, list(
-      htmltools::tags$label(class = "toggle-label display-opt-item",
-        htmltools::tags$input(type = "checkbox", onchange = "toggleAllRows(this.checked)"),
-        "Hide rows"
-      ),
-      htmltools::tags$label(class = "toggle-label display-opt-item",
-        htmltools::tags$input(type = "checkbox", onchange = "toggleAllColumns(this.checked)"),
-        "Hide columns"
-      )
-    ))
-  }
   if (has_any_freq && has_any_pct) {
-    secondary <- c(secondary, list(
-      htmltools::tags$label(class = "toggle-label display-opt-item",
+    toggles <- c(toggles, list(
+      htmltools::tags$label(class = "toggle-label",
         htmltools::tags$input(type = "checkbox", onchange = "toggleFrequency(this.checked)"),
         "Show count"
       )
     ))
   }
-
-  # Build the Display Options dropdown if there are secondary controls
-  display_opts <- NULL
-  if (length(secondary) > 0) {
-    display_opts <- htmltools::tags$div(
-      class = "display-options-wrap",
-      style = "position:relative;",
-      htmltools::tags$button(
-        class = "export-btn",
-        style = "font-size:11px;padding:4px 10px;",
-        onclick = "toggleDisplayOptions(this)",
-        htmltools::HTML("&#x2699; Options \u25BE")
+  if (has_any_pct) {
+    toggles <- c(toggles, list(
+      htmltools::tags$label(class = "toggle-label",
+        htmltools::tags$input(type = "checkbox", onchange = "toggleAllRows(this.checked)"),
+        "Hide rows"
       ),
-      htmltools::tags$div(
-        class = "display-options-menu",
-        id = "display-options-menu",
-        style = "display:none;position:absolute;top:100%;right:0;background:#fff;border:1px solid #e2e8f0;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:100;padding:8px 12px;margin-top:4px;white-space:nowrap;",
-        secondary
+      htmltools::tags$label(class = "toggle-label",
+        htmltools::tags$input(type = "checkbox", onchange = "toggleAllColumns(this.checked)"),
+        "Hide columns"
       )
-    )
+    ))
   }
 
   htmltools::tags$div(
     class = "controls-bar",
     htmltools::tags$div(style = "flex:1"),
-    primary,
-    display_opts
+    toggles
   )
 }
 

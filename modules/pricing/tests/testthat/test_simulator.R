@@ -231,7 +231,7 @@ test_that("simulator HTML has correct structure", {
   expect_true(grepl("turas-report-type", content))
   expect_true(grepl("pricing-simulator", content))
   expect_true(grepl("sim-price-slider", content))
-  expect_true(grepl("sim-battle-section", content))
+  expect_true(grepl("sim-compare-section", content))
   expect_true(grepl("DOMContentLoaded", content))
 })
 

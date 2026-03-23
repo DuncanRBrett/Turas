@@ -467,7 +467,9 @@ export_exploration_report <- function(exploration_result, metrics_result,
 export_final_report <- function(final_result, profile_result, validation_metrics,
                                  output_path, run_result = NULL,
                                  enhanced = list(), segment_names = NULL,
-                                 exec_summary = NULL, gmm_membership = NULL) {
+                                 exec_summary = NULL, gmm_membership = NULL,
+                                 run_status_details = NULL,
+                                 guard_summary = NULL) {
   cat(sprintf("  Exporting segmentation report: %s\n", basename(output_path)))
 
   data_list <- final_result$data_list

@@ -8,6 +8,14 @@
 # ==============================================================================
 
 
+# --- Design token constants (aligned with shared design system) ---
+.cd_font_family  <- "'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif"
+.cd_label_colour <- "#64748b"
+.cd_value_colour <- "#334155"
+.cd_grid_colour  <- "#e2e8f0"
+.cd_muted_colour <- "#94a3b8"
+
+
 #' Build Importance Bar Chart (SVG)
 #'
 #' Horizontal bar chart showing driver importance, sorted by rank.
@@ -37,12 +45,12 @@ build_cd_importance_chart <- function(importance, brand_colour = "#323367") {
     if (g > max_pct * 1.1) break
     x_pos <- label_width + (g / max(max_pct * 1.1, 1)) * bar_area_width
     grid_lines <- paste0(grid_lines, sprintf(
-      '<line x1="%.1f" y1="20" x2="%.1f" y2="%.0f" stroke="#e2e8f0" stroke-width="1"/>\n',
-      x_pos, x_pos, total_height - 5
+      '<line x1="%.1f" y1="20" x2="%.1f" y2="%.0f" stroke="%s" stroke-width="1"/>\n',
+      x_pos, x_pos, total_height - 5, .cd_grid_colour
     ))
     grid_lines <- paste0(grid_lines, sprintf(
-      '<text x="%.1f" y="15" text-anchor="middle" font-size="10" fill="#94a3b8" font-weight="400">%d%%</text>\n',
-      x_pos, g
+      '<text x="%.1f" y="15" text-anchor="middle" font-size="10" fill="%s" font-weight="400">%d%%</text>\n',
+      x_pos, .cd_muted_colour, g
     ))
   }
 
@@ -72,8 +80,8 @@ build_cd_importance_chart <- function(importance, brand_colour = "#323367") {
     ))
 
     bars <- paste0(bars, sprintf(
-      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="12" fill="#334155" font-weight="400" dominant-baseline="central">%s</text>\n',
-      label_width - 8, y + bar_height / 2, htmltools::htmlEscape(d$label)
+      '<text x="%.0f" y="%.1f" text-anchor="end" font-size="12" fill="%s" font-weight="400" dominant-baseline="central">%s</text>\n',
+      label_width - 8, y + bar_height / 2, .cd_value_colour, htmltools::htmlEscape(d$label)
     ))
 
     bars <- paste0(bars, sprintf(
@@ -82,16 +90,16 @@ build_cd_importance_chart <- function(importance, brand_colour = "#323367") {
     ))
 
     bars <- paste0(bars, sprintf(
-      '<text x="%.1f" y="%.1f" font-size="11" fill="#334155" font-weight="500" dominant-baseline="central">%.1f%%</text>\n',
-      label_width + bar_w + 6, y + bar_height / 2, d$importance_pct
+      '<text x="%.1f" y="%.1f" font-size="11" fill="%s" font-weight="500" dominant-baseline="central">%.1f%%</text>\n',
+      label_width + bar_w + 6, y + bar_height / 2, .cd_value_colour, d$importance_pct
     ))
 
     bars <- paste0(bars, '</g>\n')
   }
 
   svg <- sprintf(
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %.0f" class="cd-chart cd-importance-chart" role="img" aria-label="Driver importance bar chart">\n%s\n%s\n</svg>',
-    chart_width, total_height, grid_lines, bars
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %.0f" class="cd-chart cd-importance-chart" role="img" aria-label="Driver importance bar chart" style="font-family:%s;">\n%s\n%s\n</svg>',
+    chart_width, total_height, .cd_font_family, grid_lines, bars
   )
 
   htmltools::HTML(svg)
@@ -149,24 +157,24 @@ build_cd_forest_plot <- function(odds_ratios, brand_colour = "#323367",
   # Reference line at OR = 1.0
   ref_x <- to_x(1.0)
   ref_line <- sprintf(
-    '<line x1="%.1f" y1="25" x2="%.1f" y2="%.0f" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3"/>\n',
-    ref_x, ref_x, total_height - 10
+    '<line x1="%.1f" y1="25" x2="%.1f" y2="%.0f" stroke="%s" stroke-width="1.5" stroke-dasharray="4,3"/>\n',
+    ref_x, ref_x, total_height - 10, .cd_muted_colour
   )
   ref_label <- sprintf(
-    '<text x="%.1f" y="18" text-anchor="middle" font-size="10" fill="#94a3b8" font-weight="400">OR = 1.0</text>\n',
-    ref_x
+    '<text x="%.1f" y="18" text-anchor="middle" font-size="10" fill="%s" font-weight="400">OR = 1.0</text>\n',
+    ref_x, .cd_muted_colour
   )
 
   # Zone labels
   less_x <- label_width + plot_area_width * 0.15
   more_x <- label_width + plot_area_width * 0.85
   zone_labels <- sprintf(
-    '<text x="%.0f" y="%.0f" text-anchor="middle" font-size="9" fill="#94a3b8" font-style="italic">Lower likelihood</text>\n',
-    less_x, total_height - 2
+    '<text x="%.0f" y="%.0f" text-anchor="middle" font-size="9" fill="%s" font-style="italic">Lower likelihood</text>\n',
+    less_x, total_height - 2, .cd_muted_colour
   )
   zone_labels <- paste0(zone_labels, sprintf(
-    '<text x="%.0f" y="%.0f" text-anchor="middle" font-size="9" fill="#94a3b8" font-style="italic">Higher likelihood</text>\n',
-    more_x, total_height - 2
+    '<text x="%.0f" y="%.0f" text-anchor="middle" font-size="9" fill="%s" font-style="italic">Higher likelihood</text>\n',
+    more_x, total_height - 2, .cd_muted_colour
   ))
 
   # Points and whiskers — each row wrapped in <g data-cd-factor="...">
@@ -198,14 +206,14 @@ build_cd_forest_plot <- function(odds_ratios, brand_colour = "#323367",
         line2 <- paste0("vs ", trimws(substr(label_text, vs_pos + 4, nchar(label_text))))
       }
       points <- paste0(points, sprintf(
-        '<text x="%.0f" y="%.1f" text-anchor="end" font-size="11" fill="#334155" font-weight="400"><tspan x="%.0f" dy="-0.5em">%s</tspan><tspan x="%.0f" dy="1.2em">%s</tspan></text>\n',
-        label_x, y_center, label_x, htmltools::htmlEscape(line1),
+        '<text x="%.0f" y="%.1f" text-anchor="end" font-size="11" fill="%s" font-weight="400"><tspan x="%.0f" dy="-0.5em">%s</tspan><tspan x="%.0f" dy="1.2em">%s</tspan></text>\n',
+        label_x, y_center, .cd_value_colour, label_x, htmltools::htmlEscape(line1),
         label_x, htmltools::htmlEscape(line2)
       ))
     } else {
       points <- paste0(points, sprintf(
-        '<text x="%.0f" y="%.1f" text-anchor="end" font-size="11" fill="#334155" font-weight="400" dominant-baseline="central">%s</text>\n',
-        label_x, y_center, htmltools::htmlEscape(label_text)
+        '<text x="%.0f" y="%.1f" text-anchor="end" font-size="11" fill="%s" font-weight="400" dominant-baseline="central">%s</text>\n',
+        label_x, y_center, .cd_value_colour, htmltools::htmlEscape(label_text)
       ))
     }
 
@@ -308,8 +316,8 @@ build_cd_forest_plot <- function(odds_ratios, brand_colour = "#323367",
         ))
         # OR value label
         points <- paste0(points, sprintf(
-          '<text x="%.1f" y="%.1f" font-size="10" fill="#64748b" font-weight="500" dominant-baseline="central">%.2f</text>\n',
-          x_center + 8, y_center - 10, or_val
+          '<text x="%.1f" y="%.1f" font-size="10" fill="%s" font-weight="500" dominant-baseline="central">%.2f</text>\n',
+          x_center + 8, y_center - 10, .cd_label_colour, or_val
         ))
       }
     }
@@ -319,8 +327,8 @@ build_cd_forest_plot <- function(odds_ratios, brand_colour = "#323367",
   }
 
   svg <- sprintf(
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %.0f" class="cd-chart cd-forest-plot" role="img" aria-label="Odds ratio forest plot">\n%s%s%s%s\n</svg>',
-    chart_width, total_height, ref_line, ref_label, zone_labels, points
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %.0f" class="cd-chart cd-forest-plot" role="img" aria-label="Odds ratio forest plot" style="font-family:%s;">\n%s%s%s%s\n</svg>',
+    chart_width, total_height, .cd_font_family, ref_line, ref_label, zone_labels, points
   )
 
   htmltools::HTML(svg)
@@ -424,12 +432,12 @@ build_cd_probability_lift_chart <- function(probability_lifts,
 
   # Zero line
   elements <- paste0(elements, sprintf(
-    '<line x1="%.1f" y1="25" x2="%.1f" y2="%.0f" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,3"/>\n',
-    zero_x, zero_x, total_height - 15
+    '<line x1="%.1f" y1="25" x2="%.1f" y2="%.0f" stroke="%s" stroke-width="1" stroke-dasharray="4,3"/>\n',
+    zero_x, zero_x, total_height - 15, .cd_muted_colour
   ))
   elements <- paste0(elements, sprintf(
-    '<text x="%.1f" y="18" text-anchor="middle" font-size="10" fill="#94a3b8" font-weight="400">0 pp</text>\n',
-    zero_x
+    '<text x="%.1f" y="18" text-anchor="middle" font-size="10" fill="%s" font-weight="400">0 pp</text>\n',
+    zero_x, .cd_muted_colour
   ))
 
   # Gridlines at regular intervals
@@ -442,24 +450,24 @@ build_cd_probability_lift_chart <- function(probability_lifts,
     gx_right <- zero_x + w
     if (gx_right <= chart_width - 20) {
       elements <- paste0(elements, sprintf(
-        '<line x1="%.1f" y1="25" x2="%.1f" y2="%.0f" stroke="#f0f0f0" stroke-width="1"/>\n',
-        gx_right, gx_right, total_height - 15
+        '<line x1="%.1f" y1="25" x2="%.1f" y2="%.0f" stroke="%s" stroke-width="1"/>\n',
+        gx_right, gx_right, total_height - 15, .cd_grid_colour
       ))
       elements <- paste0(elements, sprintf(
-        '<text x="%.1f" y="18" text-anchor="middle" font-size="9" fill="#c0c0c0">+%g</text>\n',
-        gx_right, g
+        '<text x="%.1f" y="18" text-anchor="middle" font-size="9" fill="%s">+%g</text>\n',
+        gx_right, .cd_muted_colour, g
       ))
     }
     # Left side gridline
     gx_left <- zero_x - w
     if (gx_left >= label_width) {
       elements <- paste0(elements, sprintf(
-        '<line x1="%.1f" y1="25" x2="%.1f" y2="%.0f" stroke="#f0f0f0" stroke-width="1"/>\n',
-        gx_left, gx_left, total_height - 15
+        '<line x1="%.1f" y1="25" x2="%.1f" y2="%.0f" stroke="%s" stroke-width="1"/>\n',
+        gx_left, gx_left, total_height - 15, .cd_grid_colour
       ))
       elements <- paste0(elements, sprintf(
-        '<text x="%.1f" y="18" text-anchor="middle" font-size="9" fill="#c0c0c0">-%g</text>\n',
-        gx_left, g
+        '<text x="%.1f" y="18" text-anchor="middle" font-size="9" fill="%s">-%g</text>\n',
+        gx_left, .cd_muted_colour, g
       ))
     }
   }
@@ -478,8 +486,8 @@ build_cd_probability_lift_chart <- function(probability_lifts,
       if (!is.null(r$reference)) {
         ref_text <- htmltools::htmlEscape(r$reference)
         header_label <- sprintf(
-          '%s <tspan font-size="9" fill="#94a3b8" font-weight="400">(ref: %s)</tspan>',
-          header_label, ref_text
+          '%s <tspan font-size="9" fill="%s" font-weight="400">(ref: %s)</tspan>',
+          header_label, .cd_muted_colour, ref_text
         )
       }
       elements <- paste0(elements, sprintf(
@@ -488,8 +496,8 @@ build_cd_probability_lift_chart <- function(probability_lifts,
       ))
       # Subtle separator line
       elements <- paste0(elements, sprintf(
-        '<line x1="%d" y1="%.1f" x2="%d" y2="%.1f" stroke="#e2e8f0" stroke-width="1"/>\n',
-        label_width, y_pos + header_height, chart_width - 20, y_pos + header_height
+        '<line x1="%d" y1="%.1f" x2="%d" y2="%.1f" stroke="%s" stroke-width="1"/>\n',
+        label_width, y_pos + header_height, chart_width - 20, y_pos + header_height, .cd_grid_colour
       ))
       elements <- paste0(elements, '</g>\n')
       y_pos <- y_pos + header_height + gap
@@ -505,8 +513,8 @@ build_cd_probability_lift_chart <- function(probability_lifts,
 
       # Category label
       elements <- paste0(elements, sprintf(
-        '<text x="%.0f" y="%.1f" text-anchor="end" font-size="11" fill="#334155" font-weight="400" dominant-baseline="central">%s</text>\n',
-        label_width - 8, y_pos + bar_height / 2, htmltools::htmlEscape(r$label)
+        '<text x="%.0f" y="%.1f" text-anchor="end" font-size="11" fill="%s" font-weight="400" dominant-baseline="central">%s</text>\n',
+        label_width - 8, y_pos + bar_height / 2, .cd_value_colour, htmltools::htmlEscape(r$label)
       ))
 
       if (lift >= 0) {
@@ -540,8 +548,8 @@ build_cd_probability_lift_chart <- function(probability_lifts,
   }
 
   svg <- sprintf(
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %.0f" class="cd-chart cd-lift-chart" role="img" aria-label="Probability lift diverging bar chart">\n%s\n</svg>',
-    chart_width, total_height, elements
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %.0f" class="cd-chart cd-lift-chart" role="img" aria-label="Probability lift diverging bar chart" style="font-family:%s;">\n%s\n</svg>',
+    chart_width, total_height, .cd_font_family, elements
   )
 
   htmltools::HTML(svg)

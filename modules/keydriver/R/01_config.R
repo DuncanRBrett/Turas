@@ -30,6 +30,20 @@
 #' @keywords internal
 load_keydriver_config <- function(config_file, project_root = NULL) {
 
+  # Guard: config_file must be an actual file, not a directory
+  if (dir.exists(config_file) && !file_test("-f", config_file)) {
+    keydriver_refuse(
+      code = "IO_CONFIG_IS_DIRECTORY",
+      title = "Configuration Path Is a Directory",
+      problem = sprintf("Expected a .xlsx config file but received a directory: %s", config_file),
+      why_it_matters = "Key driver analysis requires a configuration Excel file, not a directory path.",
+      how_to_fix = c(
+        "Select a specific .xlsx configuration file, not just the project folder",
+        "Ensure the config file is properly detected in the selected directory"
+      )
+    )
+  }
+
   if (!file.exists(config_file)) {
     keydriver_refuse(
       code = "IO_CONFIG_NOT_FOUND",

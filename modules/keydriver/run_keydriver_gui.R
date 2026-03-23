@@ -221,10 +221,21 @@ run_keydriver_gui <- function() {
 
     # Auto-load config from launcher
     pre_config <- Sys.getenv("TURAS_MODULE_CONFIG", unset = "")
-    if (nzchar(pre_config) && file.exists(pre_config)) {
+    if (nzchar(pre_config)) {
       Sys.unsetenv("TURAS_MODULE_CONFIG")
-      files$config_file <- normalizePath(pre_config, winslash = "/", mustWork = FALSE)
-      files$project_dir <- dirname(pre_config)
+      if (dir.exists(pre_config)) {
+        # Hub passed a project directory (from recent_key = "project_dir")
+        files$project_dir <- normalizePath(pre_config, winslash = "/", mustWork = FALSE)
+        # Auto-detect config file in the directory
+        detected <- detect_config_files(files$project_dir)
+        if (length(detected) > 0) {
+          files$config_file <- file.path(files$project_dir, detected[1])
+        }
+      } else if (file.exists(pre_config)) {
+        # Hub passed an actual config file path
+        files$config_file <- normalizePath(pre_config, winslash = "/", mustWork = FALSE)
+        files$project_dir <- dirname(files$config_file)
+      }
     }
 
     # Set up directory browser

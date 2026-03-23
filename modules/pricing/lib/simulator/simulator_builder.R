@@ -8,7 +8,7 @@
 # Features:
 #   - Price slider with real-time demand/revenue/profit updates
 #   - Preset scenario cards (from config)
-#   - Battle Mode: side-by-side scenario comparison
+#   - Scenario Comparison: multi-scenario table with indices and highlighting
 #   - Segment toggle (if segment data available)
 #   - Export chart to PNG
 #
@@ -34,7 +34,7 @@ build_pricing_simulator <- function(pricing_results, output_path,
 
   method <- tolower(pricing_results$method %||% config$analysis_method %||% "unknown")
   currency <- config$currency_symbol %||% "$"
-  brand <- config$brand_colour %||% "#1e3a5f"
+  brand <- config$brand_colour %||% "#323367"
   project_name <- config$project_name %||% "Pricing Simulator"
   unit_cost <- as.numeric(config$unit_cost %||% 0)
 
@@ -308,14 +308,12 @@ build_simulator_html <- function(project_name, css, js, pricing_json, config_jso
                                   brand, currency, unit_cost, has_segments) {
 
   # Replace brand token in CSS
-  css <- gsub("--sim-brand: #1e3a5f", sprintf("--sim-brand: %s", brand), css, fixed = TRUE)
+  css <- gsub("--sim-brand: #323367", sprintf("--sim-brand: %s", brand), css, fixed = TRUE)
 
-  profit_card <- if (unit_cost > 0) {
-    '<div class="sim-metric" id="sim-profit-card">
-       <div class="sim-metric-value" id="sim-profit-value">--</div>
+  profit_card <- '<div class="sim-metric" id="sim-profit-card">
+       <div class="sim-metric-value" id="sim-profit-value">N/A</div>
        <div class="sim-metric-label">Profit Index</div>
      </div>'
-  } else ""
 
   segment_section <- if (has_segments) {
     '<div id="sim-segment-section">
@@ -342,7 +340,6 @@ build_simulator_html <- function(project_name, css, js, pricing_json, config_jso
     <div class="sim-subtitle">Interactive Pricing Simulator &middot; TURAS Analytics</div>
   </div>
   <div class="sim-header-actions">
-    <button class="sim-btn" id="sim-battle-toggle">Battle Mode</button>
     <button class="sim-btn sim-btn-primary" onclick="TurasSimulator.exportPNG()">Export PNG</button>
   </div>
 </div>
@@ -370,6 +367,18 @@ build_simulator_html <- function(project_name, css, js, pricing_json, config_jso
       <div id="sim-scenarios-section" class="sim-scenarios">
         <h2>Preset Scenarios</h2>
         <div class="sim-scenario-grid" id="sim-scenario-cards"></div>
+      </div>
+
+      <div class="sim-control-group" style="margin-top:18px;">
+        <div class="sim-control-label">
+          <span>Unit Cost</span>
+        </div>
+        <input type="number" id="sim-unit-cost-input" step="0.01" min="0"
+          placeholder="Enter unit cost for profit calc"
+          style="width:100%%;padding:6px 8px;border:1px solid var(--sim-border);border-radius:4px;font-size:13px;">
+        <div style="font-size:10px;color:var(--sim-text-muted);margin-top:3px;">
+          Set unit cost to enable profit index calculations
+        </div>
       </div>
     </div>
 
@@ -399,31 +408,22 @@ build_simulator_html <- function(project_name, css, js, pricing_json, config_jso
     </div>
   </div>
 
-  <!-- Battle Mode Section -->
-  <div class="sim-battle" id="sim-battle-section">
-    <div class="sim-battle-grid">
-      <div class="sim-battle-column">
-        <h3>Scenario A</h3>
-        <div class="sim-control-group">
-          <div class="sim-control-label"><span>Price</span><span class="sim-control-value" id="sim-battle-price-0">--</span></div>
-          <input type="range" id="sim-battle-slider-0">
-        </div>
-        <div class="sim-metrics">
-          <div class="sim-metric"><div class="sim-metric-value" id="sim-battle-intent-0">--</div><div class="sim-metric-label">Intent</div></div>
-          <div class="sim-metric"><div class="sim-metric-value" id="sim-battle-revenue-0">--</div><div class="sim-metric-label">Revenue</div></div>
-        </div>
+  <!-- Scenario Comparison Section -->
+  <div class="sim-compare" id="sim-compare-section">
+    <div class="sim-compare-header">
+      <h3>Scenario Comparison</h3>
+      <div class="sim-compare-actions">
+        <button class="sim-btn sim-btn-outline" id="sim-compare-add">+ Add Scenario</button>
       </div>
-      <div class="sim-battle-column">
-        <h3>Scenario B</h3>
-        <div class="sim-control-group">
-          <div class="sim-control-label"><span>Price</span><span class="sim-control-value" id="sim-battle-price-1">--</span></div>
-          <input type="range" id="sim-battle-slider-1">
-        </div>
-        <div class="sim-metrics">
-          <div class="sim-metric"><div class="sim-metric-value" id="sim-battle-intent-1">--</div><div class="sim-metric-label">Intent</div></div>
-          <div class="sim-metric"><div class="sim-metric-value" id="sim-battle-revenue-1">--</div><div class="sim-metric-label">Revenue</div></div>
-        </div>
-      </div>
+    </div>
+    <div class="sim-compare-note">
+      Add pricing scenarios to compare side by side. Revenue and Profit indices are scaled to 100 at the revenue-maximising price &mdash; values below 100 indicate unrealised potential.
+    </div>
+    <div class="sim-compare-table-wrap">
+      <table class="sim-compare-table" id="sim-compare-table">
+        <thead><tr id="sim-compare-thead"></tr></thead>
+        <tbody id="sim-compare-tbody"></tbody>
+      </table>
     </div>
   </div>
 

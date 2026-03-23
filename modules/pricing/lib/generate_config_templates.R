@@ -135,9 +135,9 @@ build_settings_def <- function() {
         list(
           name = "Brand_Colour",
           required = FALSE,
-          default = "#1e3a5f",
+          default = "#323367",
           description = "Primary brand colour for HTML reports and simulator (hex code).",
-          valid_values_text = "Hex colour code (e.g., #1e3a5f)",
+          valid_values_text = "Hex colour code (e.g., #323367)",
           dropdown = NULL, numeric_range = NULL, integer_range = NULL
         ),
         list(

@@ -412,7 +412,7 @@
     overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;' +
       'background:rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;z-index:99999;';
     var msg = document.createElement('div');
-    msg.style.cssText = 'background:#fff;color:#323367;padding:16px 28px;border-radius:8px;' +
+    msg.style.cssText = 'background:#fff;color:var(--seg-brand, #323367);padding:16px 28px;border-radius:8px;' +
       'font-size:14px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;' +
       'box-shadow:0 4px 16px rgba(0,0,0,0.15);';
     msg.textContent = 'Rendering slide\u2026';

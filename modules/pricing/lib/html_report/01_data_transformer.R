@@ -24,7 +24,7 @@ transform_pricing_for_html <- function(pricing_results, config = list()) {
 
   method <- tolower(pricing_results$method %||% config$analysis_method %||% "unknown")
   currency <- config$currency_symbol %||% "$"
-  brand <- config$brand_colour %||% "#1e3a5f"
+  brand <- config$brand_colour %||% "#323367"
 
   # Extract sub-results
   results <- pricing_results$results

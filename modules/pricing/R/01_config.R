@@ -750,7 +750,7 @@ apply_pricing_defaults <- function(settings) {
   # Output options
   settings$generate_html_report <- as.logical(settings$generate_html_report %||% TRUE)
   settings$generate_simulator <- as.logical(settings$generate_simulator %||% FALSE)
-  settings$brand_colour <- settings$brand_colour %||% "#1e3a5f"
+  settings$brand_colour <- settings$brand_colour %||% "#323367"
 
   # Weighting and segmentation
   settings$weight_var <- settings$weight_var %||% NA_character_

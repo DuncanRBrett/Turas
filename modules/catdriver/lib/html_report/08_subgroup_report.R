@@ -56,6 +56,9 @@ build_cd_subgroup_section <- function(subgroup_comparison,
     )
   )
 
+  # Subgroup chip bar (toggle visibility per group)
+  chip_bar <- build_subgroup_chip_bar(comp$group_names, id_prefix)
+
   # 1. Overview cards
   overview_cards <- build_subgroup_overview_cards(comp, brand_colour)
 
@@ -76,10 +79,55 @@ build_cd_subgroup_section <- function(subgroup_comparison,
     title_row,
     insight_area,
     intro,
+    chip_bar,
     overview_cards,
     importance_chart,
     classification_table,
     insights_section
+  )
+}
+
+
+# ==============================================================================
+# SUBGROUP CHIP BAR — toggle visibility per group
+# ==============================================================================
+
+#' Build Subgroup Chip Bar
+#'
+#' Interactive chip buttons that toggle subgroup visibility in chart and table.
+#'
+#' @param group_names Character vector of subgroup names
+#' @param id_prefix ID prefix for namespace safety
+#' @return htmltools tag
+#' @keywords internal
+build_subgroup_chip_bar <- function(group_names, id_prefix = "") {
+  all_chip <- htmltools::tags$button(
+    class = "cd-or-chip active",
+    `data-cd-sg-chip` = "all",
+    onclick = "cdToggleAllSubgroups(true)",
+    "All"
+  )
+
+  group_chips <- lapply(group_names, function(grp) {
+    safe_grp <- gsub("'", "\\\\'", grp)
+    htmltools::tags$button(
+      class = "cd-or-chip active",
+      `data-cd-sg-chip` = grp,
+      onclick = sprintf("cdToggleSubgroup('%s')", safe_grp),
+      grp
+    )
+  })
+
+  htmltools::tags$div(
+    class = "cd-or-chip-bar",
+    id = paste0(id_prefix, "cd-subgroup-chips"),
+    style = "margin-bottom: 12px;",
+    htmltools::tags$span(
+      style = "font-size: 12px; color: #64748b; font-weight: 500; margin-right: 8px;",
+      "Show:"
+    ),
+    all_chip,
+    group_chips
   )
 }
 
@@ -240,7 +288,12 @@ build_subgroup_importance_chart <- function(comp, brand_colour) {
       bar_w <- max(0, (pct_val / scale_max) * bar_area_width)
       bar_y <- y_offset + (g - 1) * (bar_height + bar_gap)
 
-      # Bar
+      # Bar (wrapped in g with data-cd-subgroup for JS toggling)
+      safe_grp <- gsub("\"", "&quot;", grp)
+      svg_elements <- c(svg_elements, list(sprintf(
+        '<g class="cd-sg-bar" data-cd-subgroup="%s">',
+        safe_grp
+      )))
       svg_elements <- c(svg_elements, list(sprintf(
         '<rect x="%d" y="%.1f" width="%.1f" height="%d" rx="3" fill="%s" opacity="%.2f"/>',
         label_width, bar_y, bar_w, bar_height, brand_colour, opacities[g]
@@ -253,6 +306,7 @@ build_subgroup_importance_chart <- function(comp, brand_colour) {
           label_width + bar_w + 4, bar_y + bar_height - 3, pct_val
         )))
       }
+      svg_elements <- c(svg_elements, list('</g>'))
     }
 
     y_offset <- y_offset + group_height
@@ -262,9 +316,10 @@ build_subgroup_importance_chart <- function(comp, brand_colour) {
   legend_y <- total_height - 10
   legend_x <- label_width
   for (g in seq_along(group_names)) {
+    safe_grp <- gsub("\"", "&quot;", group_names[g])
     svg_elements <- c(svg_elements, list(sprintf(
-      '<rect x="%.1f" y="%d" width="12" height="12" rx="2" fill="%s" opacity="%.2f"/>',
-      legend_x, legend_y, brand_colour, opacities[g]
+      '<rect x="%.1f" y="%d" width="12" height="12" rx="2" fill="%s" opacity="%.2f" data-cd-sg-legend="%s"/>',
+      legend_x, legend_y, brand_colour, opacities[g], safe_grp
     )))
     svg_elements <- c(svg_elements, list(sprintf(
       '<text x="%.1f" y="%d" font-size="11" fill="#64748b" font-weight="400">%s</text>',
@@ -317,7 +372,9 @@ build_subgroup_classification_table <- function(comp, brand_colour) {
   )
   for (grp in group_names) {
     header_cells <- c(header_cells, list(
-      htmltools::tags$th(class = "cd-th", style = "text-align:center;", paste0(grp, " Rank"))
+      htmltools::tags$th(class = "cd-th", style = "text-align:center;",
+                         `data-cd-subgroup-col` = grp,
+                         paste0(grp, " Rank"))
     ))
   }
   header_cells <- c(header_cells, list(
@@ -351,6 +408,7 @@ build_subgroup_classification_table <- function(comp, brand_colour) {
         htmltools::tags$td(
           class = paste("cd-td", rank_class),
           style = "text-align:center; font-weight:600;",
+          `data-cd-subgroup-col` = grp,
           if (is.na(rank_val)) "-" else paste0("#", rank_val)
         )
       ))

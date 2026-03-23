@@ -453,23 +453,39 @@ build_seg_combined_page <- function(method_html_data,
   # --- Action bar with help ---
   action_bar <- build_seg_action_bar(report_title)
 
-  # --- Report-level tab bar (Analysis | Pinned Views | About) ---
+  # --- Report-level tab bar — shared convention ---
+  save_icon <- htmltools::HTML('<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:5px;"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>')
+
   report_tab_bar <- htmltools::tags$div(
-    class = "seg-report-tabs",
+    class = "report-tabs",
     htmltools::tags$button(
-      class = "seg-report-tab-btn active",
+      class = "report-tab active",
       `data-tab` = "analysis",
+      onclick = "switchReportTab('analysis')",
       "Analysis"
     ),
     htmltools::tags$button(
-      class = "seg-report-tab-btn",
+      class = "report-tab",
       `data-tab` = "pinned",
+      onclick = "switchReportTab('pinned')",
       "Pinned Views"
     ),
     htmltools::tags$button(
-      class = "seg-report-tab-btn",
+      class = "report-tab",
       `data-tab` = "about",
+      onclick = "switchReportTab('about')",
       "About"
+    ),
+    htmltools::tags$button(
+      class = "report-tab seg-save-tab",
+      onclick = "segSaveReportHTML()",
+      save_icon, "Save Report"
+    ),
+    htmltools::tags$button(
+      class = "seg-help-btn",
+      onclick = "toggleHelpOverlay()",
+      title = "Show help guide",
+      "?"
     )
   )
 
@@ -548,26 +564,24 @@ build_seg_combined_page <- function(method_html_data,
       report_tab_bar,
       htmltools::tags$main(
         class = "seg-main",
-        # Analysis tab content — comparison only (individual method reports are separate)
+        # Analysis tab — active by default
         htmltools::tags$div(
-          id = "seg-analysis-tab",
-          class = "seg-content",
+          id = "tab-analysis",
+          class = "tab-panel active seg-content",
           comparison_panel,
           footer
         ),
-        # Pinned Views tab content (hidden by default)
+        # Pinned Views tab
         htmltools::tags$div(
-          id = "seg-pinned-tab",
-          class = "seg-content",
-          style = "display:none;",
+          id = "tab-pinned",
+          class = "tab-panel seg-content",
           pinned_section,
           footer
         ),
-        # About tab content (hidden by default)
+        # About tab
         htmltools::tags$div(
-          id = "seg-about-tab",
-          class = "seg-content",
-          style = "display:none;",
+          id = "tab-about",
+          class = "tab-panel seg-content",
           build_seg_about_section(config, method_html_data[[1]]),
           footer
         ),

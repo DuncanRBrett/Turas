@@ -19,6 +19,12 @@ local({
     source(file.path(ds_dir, "font_embed.R"), local = FALSE)
     source(file.path(ds_dir, "base_css.R"), local = FALSE)
   }
+  # Source callout registry
+  callout_dir <- file.path(turas_root, "modules", "shared", "lib", "callouts")
+  if (!dir.exists(callout_dir)) callout_dir <- file.path("modules", "shared", "lib", "callouts")
+  if (!exists("turas_callout", mode = "function") && dir.exists(callout_dir)) {
+    source(file.path(callout_dir, "callout_registry.R"), local = FALSE)
+  }
 })
 
 `%||%` <- function(x, y) if (is.null(x) || length(x) == 0 || (length(x) == 1 && is.na(x))) y else x
@@ -39,8 +45,8 @@ build_pricing_page <- function(html_data, tables, charts, config,
                                 js_dir = NULL, simulator_data = NULL,
                                 added_slides = NULL) {
 
-  brand <- config$brand_colour %||% "#1e3a5f"
-  if (is.na(brand) || !nzchar(trimws(brand))) brand <- "#1e3a5f"
+  brand <- config$brand_colour %||% "#323367"
+  if (is.na(brand) || !nzchar(trimws(brand))) brand <- "#323367"
   accent <- "#2aa198"
   currency <- config$currency_symbol %||% "$"
   project_name <- config$project_name %||% "Pricing Analysis"
@@ -188,15 +194,8 @@ build_pricing_meta_tags <- function(html_data, config) {
 build_pricing_css <- function(brand, accent, has_simulator = FALSE) {
   shared_css <- tryCatch(turas_base_css(brand, accent, prefix = "pr"), error = function(e) "")
   css <- '
+/* Simulator aliases (pr-* tokens provided by turas_base_css) */
 :root {
-  --pr-brand: BRAND_TOKEN;
-  --pr-accent: ACCENT_TOKEN;
-  --pr-text-primary: #1e293b;
-  --pr-text-secondary: #64748b;
-  --pr-bg-surface: #ffffff;
-  --pr-bg-muted: #f8fafc;
-  --pr-border: #e2e8f0;
-  /* Simulator aliases */
   --sim-brand: BRAND_TOKEN;
   --sim-accent: ACCENT_TOKEN;
   --sim-text: #1e293b;
@@ -207,16 +206,6 @@ build_pricing_css <- function(brand, accent, has_simulator = FALSE) {
   --sim-red: #e74c3c;
   --sim-green: #27ae60;
   --sim-amber: #f39c12;
-}
-
-* { box-sizing: border-box; margin: 0; padding: 0; }
-
-body {
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--pr-text-primary);
-  background: #f1f5f9;
 }
 
 /* ── Header (gradient, matching tabs module) ── */
@@ -415,9 +404,9 @@ body {
   font-size: 13px;
 }
 .pr-table-compact { font-size: 12px; }
-.pr-th {
+th.pr-th {
   background: var(--pr-bg-muted);
-  padding: 10px 14px;
+  padding: 12px 16px;
   text-align: left;
   font-weight: 600;
   font-size: 11px;
@@ -428,8 +417,8 @@ body {
 }
 .pr-th.pr-num { text-align: right; }
 .pr-th.pr-label-col { text-align: left; }
-.pr-td {
-  padding: 8px 14px;
+td.pr-td {
+  padding: 10px 16px;
   border-bottom: 1px solid var(--pr-border);
 }
 .pr-td.pr-num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -705,7 +694,7 @@ body {
 
   .pr-tab-nav { display: none !important; }
   .pr-panel { display: block !important; page-break-inside: avoid; margin-bottom: 16px; }
-  #panel-pinned, #panel-slides, #panel-simulator .sim-battle { display: none !important; }
+  #panel-pinned, #panel-slides { display: none !important; }
 
   .pr-dashboard { page-break-after: avoid; }
   .pr-gauge-card { border-left-color: #1a2744 !important; box-shadow: none !important; }
@@ -898,26 +887,50 @@ body {
 #panel-simulator .sim-scenario-name { font-size: 13px; font-weight: 600; color: var(--sim-brand); }
 #panel-simulator .sim-scenario-price { font-size: 18px; font-weight: 700; color: var(--sim-text); margin: 4px 0; }
 #panel-simulator .sim-scenario-desc { font-size: 11px; color: var(--sim-text-muted); }
-#panel-simulator .sim-battle { display: none; margin-top: 16px; }
-#panel-simulator .sim-battle.active { display: block; }
-#panel-simulator .sim-battle-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
+/* ── Scenario Comparison Table ── */
+#panel-simulator .sim-compare { margin-top: 24px; }
+#panel-simulator .sim-compare-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
 }
-#panel-simulator .sim-battle-column {
-  background: var(--sim-surface);
-  border-radius: 8px;
-  padding: 16px;
-  border: 1px solid var(--sim-border);
+#panel-simulator .sim-compare-header h3 { font-size: 15px; font-weight: 600; color: var(--sim-text); margin: 0; }
+#panel-simulator .sim-compare-note {
+  font-size: 12px; color: var(--sim-text-muted); line-height: 1.5; margin-bottom: 12px;
 }
-#panel-simulator .sim-battle-column h4 {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--sim-brand);
-  margin-bottom: 12px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid var(--sim-border);
+#panel-simulator .sim-btn-outline {
+  background: var(--sim-surface); border: 1px solid var(--sim-brand); color: var(--sim-brand);
+}
+#panel-simulator .sim-btn-outline:hover { background: var(--sim-bg); }
+#panel-simulator .sim-compare-table-wrap { overflow-x: auto; }
+#panel-simulator .sim-compare-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+#panel-simulator .sim-compare-table th {
+  padding: 10px 14px; text-align: right; font-weight: 600; font-size: 11px;
+  text-transform: uppercase; letter-spacing: 0.3px; color: #64748b;
+  background: var(--sim-bg); border-bottom: 2px solid var(--sim-border);
+  white-space: nowrap;
+}
+#panel-simulator .sim-compare-table th:first-child { text-align: left; }
+#panel-simulator .sim-compare-table th .sim-remove-scenario {
+  cursor: pointer; color: #94a3b8; font-size: 14px; margin-left: 6px;
+  border: none; background: none; padding: 0 2px; vertical-align: middle;
+}
+#panel-simulator .sim-compare-table th .sim-remove-scenario:hover { color: #ef4444; }
+#panel-simulator .sim-compare-table td {
+  padding: 10px 14px; text-align: right; border-bottom: 1px solid #f1f5f9;
+  font-variant-numeric: tabular-nums;
+}
+#panel-simulator .sim-compare-table td:first-child {
+  text-align: left; font-weight: 500; color: var(--sim-text); white-space: nowrap;
+}
+#panel-simulator .sim-compare-table .sim-best { color: #059669; font-weight: 600; }
+#panel-simulator .sim-compare-table .sim-worst { color: #dc2626; }
+#panel-simulator .sim-compare-table .sim-at-opt { color: #059669; font-size: 10px; }
+#panel-simulator .sim-compare-table tbody tr:hover { background: #fafbfc; }
+#panel-simulator .sim-compare-table input[type="number"] {
+  width: 80px; padding: 4px 6px; border: 1px solid var(--sim-border);
+  border-radius: 4px; font-size: 13px; text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 #panel-simulator .sim-btn {
   padding: 7px 14px;
@@ -971,14 +984,17 @@ body {
   #panel-simulator .sim-actions,
   #panel-simulator input[type="range"],
   #panel-simulator .sim-price-input-row { display: none !important; }
-  #panel-simulator .sim-battle { display: none !important; }
+  #panel-simulator .sim-compare-actions { display: none !important; }
+  #panel-simulator .sim-compare-table input { display: none !important; }
+  #panel-simulator .sim-remove-scenario { display: none !important; }
   #panel-simulator .sim-control-value { font-size: 18px !important; }
   #panel-simulator .sim-chart-area { break-inside: avoid; }
+  #panel-simulator .sim-compare { break-inside: avoid; }
 }
 
 @media (max-width: 768px) {
   #panel-simulator .sim-grid { grid-template-columns: 1fr; }
-  #panel-simulator .sim-battle-grid { grid-template-columns: 1fr; }
+  #panel-simulator .sim-compare-table-wrap { overflow-x: auto; }
   #panel-simulator .sim-metrics { grid-template-columns: repeat(2, 1fr); }
 }
 
@@ -1081,9 +1097,8 @@ body {
 .pr-about-table { max-width: 500px; }
 .pr-about-table td { padding: 8px 16px 8px 0; border-bottom: 1px solid #f1f5f9; }
 .pr-about-label { font-weight: 500; color: #64748b; white-space: nowrap; }
-.pr-callout-method {
-  background: #f8fafc; border-left: 3px solid BRAND_TOKEN; padding: 14px 18px;
-  margin: 12px 0 24px; font-size: 13px; line-height: 1.6; color: #475569; border-radius: 0 6px 6px 0;
+#panel-about .pr-callout-method {
+  border-left-color: BRAND_TOKEN; margin-bottom: 24px;
 }
 .pr-about-branding {
   display: flex; align-items: center; gap: 14px; margin-top: 32px;
@@ -1631,7 +1646,7 @@ build_insight_area <- function(section_id, initial_text = NULL) {
 build_about_panel <- function(html_data, config) {
   project_name <- config$project_name %||% "Pricing Analysis"
   method <- html_data$meta$method
-  brand <- config$brand_colour %||% "#1e3a5f"
+  brand <- config$brand_colour %||% "#323367"
   currency <- config$currency_symbol %||% "$"
   analyst <- config$analyst_name %||% ""
   company <- config$company_name %||% config$client_name %||% ""
@@ -1711,12 +1726,10 @@ build_about_panel <- function(html_data, config) {
 build_simulator_panel <- function(unit_cost, simulator_data) {
   has_segments <- isTRUE(simulator_data$has_segments)
 
-  profit_card <- if (unit_cost > 0) {
-    '<div class="sim-metric" id="sim-profit-card">
-       <div class="sim-metric-value" id="sim-profit-value">--</div>
+  profit_card <- '<div class="sim-metric" id="sim-profit-card">
+       <div class="sim-metric-value" id="sim-profit-value">N/A</div>
        <div class="sim-metric-label">Profit Index</div>
      </div>'
-  } else ""
 
   segment_section <- if (has_segments) {
     '<div id="sim-segment-section">
@@ -1724,9 +1737,22 @@ build_simulator_panel <- function(unit_cost, simulator_data) {
      </div>'
   } else '<div id="sim-segment-section" style="display:none;"></div>'
 
-  profit_callout <- if (unit_cost > 0) {
-    '<div class="pr-sim-callout"><strong>Profit Index</strong> = (Price - Unit Cost) &times; Purchase Intent. Shows relative profitability at each price point.</div>'
-  } else ""
+  # Simulator callouts — pull text from registry where available
+  pi_entry <- tryCatch(turas_callout_text("pricing", "purchase_intent"), error = function(e) NULL)
+  ri_entry <- tryCatch(turas_callout_text("pricing", "revenue_index"), error = function(e) NULL)
+  pf_entry <- tryCatch(turas_callout_text("pricing", "profit_index"), error = function(e) NULL)
+
+  pi_callout <- sprintf('<div class="pr-sim-callout"><strong>%s</strong> &mdash; %s</div>',
+    pi_entry$title %||% "Purchase Intent",
+    pi_entry$text %||% "The estimated percentage of customers willing to buy at the selected price.")
+
+  ri_callout <- sprintf('<div class="pr-sim-callout"><strong>%s</strong> &mdash; %s</div>',
+    ri_entry$title %||% "Revenue Index",
+    ri_entry$text %||% "Revenue Index = Price &times; Purchase Intent. Identifies the price that maximises total revenue.")
+
+  profit_callout <- sprintf('<div class="pr-sim-callout"><strong>%s</strong> &mdash; %s</div>',
+    pf_entry$title %||% "Profit Index",
+    pf_entry$text %||% "Profit Index = (Price - Unit Cost) &times; Purchase Intent. Set a unit cost below to enable profit calculations.")
 
   segment_callout <- if (has_segments) {
     '<div class="pr-sim-callout"><strong>Segment Toggle</strong> &mdash; Switch between customer segments to see how price sensitivity varies across groups.</div>'
@@ -1738,15 +1764,13 @@ build_simulator_panel <- function(unit_cost, simulator_data) {
          <h2>Interactive Simulator</h2>
 
          <div class="pr-sim-callouts">
-           <div class="pr-sim-callout"><strong>Purchase Intent</strong> &mdash; The estimated percentage of customers willing to buy at the selected price.</div>
-           <div class="pr-sim-callout"><strong>Revenue Index</strong> = Price &times; Purchase Intent. Identifies the price that maximises total revenue.</div>
            %s
-           <div class="pr-sim-callout"><strong>Battle Mode</strong> &mdash; Compare two pricing scenarios side by side to evaluate trade-offs.</div>
+           %s
+           %s
            %s
          </div>
 
          <div class="sim-actions">
-           <button class="sim-btn" id="sim-battle-toggle">Battle Mode</button>
            <button class="sim-btn sim-btn-primary" onclick="PricingSimulator.exportPNG()">Export PNG</button>
          </div>
 
@@ -1776,6 +1800,18 @@ build_simulator_panel <- function(unit_cost, simulator_data) {
                <h3>Preset Scenarios</h3>
                <div class="sim-scenario-grid" id="sim-scenario-cards"></div>
              </div>
+
+             <div class="sim-control-group" style="margin-top:18px;">
+               <div class="sim-control-label">
+                 <span>Unit Cost</span>
+               </div>
+               <input type="number" id="sim-unit-cost-input" step="0.01" min="0"
+                 placeholder="Enter unit cost for profit calc"
+                 style="width:100%%;padding:6px 8px;border:1px solid var(--sim-border);border-radius:4px;font-size:13px;">
+               <div style="font-size:10px;color:var(--sim-text-muted);margin-top:3px;">
+                 Set unit cost to enable profit index calculations
+               </div>
+             </div>
            </div>
 
            <!-- Results Panel -->
@@ -1804,36 +1840,29 @@ build_simulator_panel <- function(unit_cost, simulator_data) {
            </div>
          </div>
 
-         <!-- Battle Mode Section -->
-         <div class="sim-battle" id="sim-battle-section">
-           <div class="sim-battle-grid">
-             <div class="sim-battle-column">
-               <h4>Scenario A</h4>
-               <div class="sim-control-group">
-                 <div class="sim-control-label"><span>Price</span><span class="sim-control-value" id="sim-battle-price-0">--</span></div>
-                 <input type="range" id="sim-battle-slider-0">
-               </div>
-               <div class="sim-metrics">
-                 <div class="sim-metric"><div class="sim-metric-value" id="sim-battle-intent-0">--</div><div class="sim-metric-label">Intent</div></div>
-                 <div class="sim-metric"><div class="sim-metric-value" id="sim-battle-revenue-0">--</div><div class="sim-metric-label">Revenue</div></div>
-               </div>
+         <!-- Scenario Comparison Section -->
+         <div class="sim-compare" id="sim-compare-section">
+           <div class="sim-compare-header">
+             <h3>Scenario Comparison</h3>
+             <div class="sim-compare-actions">
+               <button class="sim-btn sim-btn-outline" id="sim-compare-add">+ Add Scenario</button>
              </div>
-             <div class="sim-battle-column">
-               <h4>Scenario B</h4>
-               <div class="sim-control-group">
-                 <div class="sim-control-label"><span>Price</span><span class="sim-control-value" id="sim-battle-price-1">--</span></div>
-                 <input type="range" id="sim-battle-slider-1">
-               </div>
-               <div class="sim-metrics">
-                 <div class="sim-metric"><div class="sim-metric-value" id="sim-battle-intent-1">--</div><div class="sim-metric-label">Intent</div></div>
-                 <div class="sim-metric"><div class="sim-metric-value" id="sim-battle-revenue-1">--</div><div class="sim-metric-label">Revenue</div></div>
-               </div>
-             </div>
+           </div>
+           <div class="sim-compare-note">
+             Add pricing scenarios to compare side by side. Revenue and Profit indices are scaled to 100 at the revenue-maximising price &mdash; values below 100 indicate unrealised potential.
+           </div>
+           <div class="sim-compare-table-wrap">
+             <table class="sim-compare-table" id="sim-compare-table">
+               <thead><tr id="sim-compare-thead"></tr></thead>
+               <tbody id="sim-compare-tbody"></tbody>
+             </table>
            </div>
          </div>
 
        </div>
      </div>',
+    pi_callout,
+    ri_callout,
     profit_callout,
     segment_callout,
     segment_section,

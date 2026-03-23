@@ -426,9 +426,12 @@ build_kd_effect_size_table <- function(effect_sizes) {
   }
 
   header <- htmltools::tags$tr(
-    htmltools::tags$th("Driver",         class = "kd-th kd-th-label"),
-    htmltools::tags$th("Effect Value",   class = "kd-th kd-th-num"),
-    htmltools::tags$th("Effect Size",    class = "kd-th kd-th-label"),
+    htmltools::tags$th("Driver",         class = "kd-th kd-th-label kd-sortable",
+                       onclick = "kdSortTable(this, 0, 'text')"),
+    htmltools::tags$th("Effect Value",   class = "kd-th kd-th-num kd-sortable",
+                       onclick = "kdSortTable(this, 1, 'num')"),
+    htmltools::tags$th("Effect Size",    class = "kd-th kd-th-label kd-sortable",
+                       onclick = "kdSortTable(this, 2, 'text')"),
     htmltools::tags$th("Interpretation", class = "kd-th kd-th-label")
   )
 

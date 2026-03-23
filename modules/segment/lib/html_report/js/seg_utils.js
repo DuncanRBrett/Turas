@@ -265,7 +265,7 @@
       if (text) { text.textContent = '\u00D7'; text.setAttribute('fill', '#94a3b8'); }
     } else {
       xBtn.classList.add('seg-bar-x-hidden');
-      if (circle) { circle.setAttribute('fill', '#323367'); circle.setAttribute('stroke', '#323367'); }
+      if (circle) { var b = getComputedStyle(document.documentElement).getPropertyValue('--seg-brand').trim() || '#323367'; circle.setAttribute('fill', b); circle.setAttribute('stroke', b); }
       if (text) { text.textContent = '+'; text.setAttribute('fill', '#ffffff'); }
     }
   };
@@ -384,7 +384,7 @@
     card.innerHTML = '<div style="position:absolute;top:8px;right:12px;display:flex;gap:6px;">' +
       '<button style="background:none;border:1px solid #d1d5db;border-radius:4px;color:#64748b;font-size:12px;cursor:pointer;padding:2px 8px;" onclick="segPinSlide(this)" title="Pin to Views">\uD83D\uDCCC</button>' +
       '<button style="background:none;border:none;color:#94a3b8;font-size:18px;cursor:pointer;padding:4px;" onclick="this.closest(\'.seg-slide-card\').remove();segUpdateSlideCount();">\u00D7</button></div>' +
-      '<div class="seg-slide-title" contenteditable="true" style="font-size:16px;font-weight:600;color:#323367;margin-bottom:8px;border-bottom:2px solid #323367;padding-bottom:6px;outline:none;" data-placeholder="Slide title..."></div>' +
+      '<div class="seg-slide-title" contenteditable="true" style="font-size:16px;font-weight:600;color:var(--seg-brand);margin-bottom:8px;border-bottom:2px solid var(--seg-brand);padding-bottom:6px;outline:none;" data-placeholder="Slide title..."></div>' +
       '<div class="seg-slide-content" contenteditable="true" style="font-size:13px;color:#334155;line-height:1.6;min-height:60px;outline:none;border:1px dashed transparent;padding:8px;border-radius:4px;" data-placeholder="Add slide content..."></div>' +
       '<div style="margin-top:8px;text-align:right;"><label style="font-size:11px;color:#64748b;cursor:pointer;padding:4px 10px;border:1px solid #d1d5db;border-radius:4px;display:inline-block;">\uD83D\uDCF7 Add Image<input type="file" accept="image/*" style="display:none;" onchange="segSlideImageUpload(this)"></label></div>';
 
@@ -412,7 +412,7 @@
 
     // Build composite HTML for the pin
     var slideHtml = '<div style="padding:12px;">' +
-      '<div style="font-size:15px;font-weight:600;color:#323367;border-bottom:2px solid #323367;padding-bottom:6px;margin-bottom:8px;">' + segEscapeHtml(title) + '</div>' +
+      '<div style="font-size:15px;font-weight:600;color:var(--seg-brand);border-bottom:2px solid var(--seg-brand);padding-bottom:6px;margin-bottom:8px;">' + segEscapeHtml(title) + '</div>' +
       '<div style="font-size:13px;color:#334155;line-height:1.6;">' + content + '</div>' +
       imgHtml +
       '</div>';
@@ -508,5 +508,60 @@
     var isVisible = overlay.style.display !== 'none';
     overlay.style.display = isVisible ? 'none' : 'flex';
   };
+
+  // ==========================================================================
+  // Table CSV/Excel export
+  // ==========================================================================
+
+  /**
+   * Export the nearest <table> in the same wrapper as the clicked button to CSV.
+   * CSV is wrapped in a UTF-8 BOM Blob so Excel opens it correctly.
+   * @param {HTMLElement} btn - The button that was clicked
+   * @param {string} sectionKey - Used to build the filename
+   */
+  window.segExportTableCSV = function(btn, sectionKey) {
+    var wrapper = btn.closest('.seg-table-wrapper');
+    if (!wrapper) return;
+    var table = wrapper.querySelector('table');
+    if (!table) return;
+
+    var rows = table.querySelectorAll('tr');
+    var csvRows = [];
+
+    for (var i = 0; i < rows.length; i++) {
+      var cells = rows[i].querySelectorAll('th, td');
+      var csvCells = [];
+      for (var j = 0; j < cells.length; j++) {
+        var text = (cells[j].textContent || '').trim();
+        // Escape quotes and wrap in quotes if contains comma/quote/newline
+        if (text.indexOf('"') !== -1 || text.indexOf(',') !== -1 || text.indexOf('\n') !== -1) {
+          text = '"' + text.replace(/"/g, '""') + '"';
+        }
+        csvCells.push(text);
+      }
+      csvRows.push(csvCells.join(','));
+    }
+
+    var csv = csvRows.join('\n');
+    // UTF-8 BOM so Excel opens with correct encoding
+    var bom = '\uFEFF';
+    var blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
+
+    var meta = document.querySelector('meta[name="turas-source-filename"]');
+    var prefix = meta ? meta.getAttribute('content').replace(/\.[^.]+$/, '') : 'Segment';
+    var filename = prefix + '_' + sectionKey + '.csv';
+
+    window.segDownloadBlob(blob, filename);
+
+    // Brief visual feedback
+    var orig = btn.innerHTML;
+    btn.innerHTML = '&#x2705; Saved';
+    setTimeout(function() { btn.innerHTML = orig; }, 1500);
+  };
+
+  /**
+   * Alias for toggleHelpOverlay used by the tab bar ? button.
+   */
+  window.toggleHelpOverlay = window.toggleHelpOverlay || window.segToggleHelp;
 
 })();

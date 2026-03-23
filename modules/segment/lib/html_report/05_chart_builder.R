@@ -901,22 +901,15 @@ build_seg_overlap_heatmap <- function(html_data, brand_colour = "#323367") {
   chart_width <- label_width + k * cell_size + 10
   total_height <- header_height + k * cell_size + 10
 
-  # Colour interpolation: red (overlap/close) -> yellow -> green (distinct/far)
+  # Colour mapping: matches standard heatmap CSS classes
+  # Low distance (overlapping) = red, high distance (distinct) = green
   overlap_colour <- function(norm_val) {
     if (is.na(norm_val)) return("#f1f5f9")
     v <- max(0, min(1, norm_val))
-    if (v < 0.5) {
-      t <- v / 0.5
-      r <- 255
-      g <- round(180 * t)
-      b <- round(60 * (1 - t))
-    } else {
-      t <- (v - 0.5) / 0.5
-      r <- round(255 * (1 - t * 0.6))
-      g <- round(180 + 50 * t)
-      b <- round(60 * t)
-    }
-    sprintf("#%02x%02x%02x", r, g, b)
+    if (v >= 0.7) return("#dcfce7")       # seg-td-high (green)
+    if (v >= 0.5) return("#eff6ff")       # seg-td-mod-high (blue)
+    if (v >= 0.3) return("#fef3c7")       # seg-td-mod-low (amber)
+    return("#fee2e2")                      # seg-td-low (red)
   }
 
   # Header row (segment names rotated)
@@ -972,32 +965,35 @@ build_seg_overlap_heatmap <- function(html_data, brand_colour = "#323367") {
     }
   }
 
-  # Legend
-  legend_y <- header_height + k * cell_size + 2
-  legend_width <- k * cell_size
+  # Legend — 4 discrete swatches matching the heatmap classes
+  legend_y <- header_height + k * cell_size + 8
   legend_x <- label_width
-  n_steps <- 20
-  step_w <- legend_width / n_steps
+  swatch_w <- 16
+  swatch_gap <- 6
+  font_fam <- "'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif"
 
+  legend_items <- list(
+    list(colour = "#fee2e2", label = "Overlapping"),
+    list(colour = "#fef3c7", label = "Moderate"),
+    list(colour = "#eff6ff", label = "Good"),
+    list(colour = "#dcfce7", label = "Distinct")
+  )
   legend <- ""
-  for (s in seq_len(n_steps)) {
-    v <- (s - 1) / (n_steps - 1)
-    lx <- legend_x + (s - 1) * step_w
+  lx <- legend_x
+  for (item in legend_items) {
     legend <- paste0(legend, sprintf(
-      '<rect x="%.1f" y="%.0f" width="%.1f" height="8" fill="%s"/>\n',
-      lx, legend_y, step_w + 0.5, overlap_colour(v)
+      '<rect x="%.0f" y="%.0f" width="%d" height="%d" rx="3" fill="%s" stroke="#e2e8f0" stroke-width="1"/>\n',
+      lx, legend_y, swatch_w, swatch_w, item$colour
     ))
+    legend <- paste0(legend, sprintf(
+      '<text x="%.0f" y="%.0f" font-size="10" font-family="%s" fill="#94a3b8" dominant-baseline="central">%s</text>\n',
+      lx + swatch_w + 4, legend_y + swatch_w / 2, font_fam, item$label
+    ))
+    # Estimate text width + gap
+    lx <- lx + swatch_w + 4 + nchar(item$label) * 6 + 16
   }
-  legend <- paste0(legend, sprintf(
-    '<text x="%.0f" y="%.0f" font-size="9" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#94a3b8">Overlapping</text>\n',
-    legend_x, legend_y + 20
-  ))
-  legend <- paste0(legend, sprintf(
-    '<text x="%.0f" y="%.0f" text-anchor="end" font-size="9" font-family="\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif" fill="#94a3b8">Distinct</text>\n',
-    legend_x + legend_width, legend_y + 20
-  ))
 
-  total_height <- total_height + 25
+  total_height <- legend_y + swatch_w + 10
 
   svg <- sprintf(
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %.0f %.0f" class="seg-chart seg-overlap-heatmap" role="img" aria-label="Segment overlap heatmap showing pairwise distances between %d segments">\n%s\n%s\n%s\n</svg>',

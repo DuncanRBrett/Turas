@@ -98,7 +98,7 @@ generate_pricing_html_report <- function(pricing_results, output_path,
   }
 
   if (!is.null(html_data$gabor_granger)) {
-    tables$gg_optimal <- build_gg_optimal_table(html_data$gabor_granger, currency)
+    tables$gg_optimal <- build_gg_optimal_table(html_data$gabor_granger, currency, unit_cost = config$unit_cost)
     tables$gg_demand <- build_gg_demand_table(html_data$gabor_granger, currency)
     tables$gg_elasticity <- build_gg_elasticity_table(html_data$gabor_granger, currency)
   }
@@ -106,7 +106,7 @@ generate_pricing_html_report <- function(pricing_results, output_path,
   if (!is.null(html_data$monadic)) {
     tables$monadic_model <- build_monadic_model_table(html_data$monadic)
     tables$monadic_observed <- build_monadic_observed_table(html_data$monadic, currency)
-    tables$monadic_optimal <- build_monadic_optimal_table(html_data$monadic, currency)
+    tables$monadic_optimal <- build_monadic_optimal_table(html_data$monadic, currency, unit_cost = config$unit_cost)
   }
 
   if (!is.null(html_data$segments)) {
@@ -244,7 +244,7 @@ generate_pricing_html_report <- function(pricing_results, output_path,
         segment_demand <- extract_segment_demand(pricing_results$segment_results, analysis_method)
 
         currency <- config$currency_symbol %||% "$"
-        brand <- config$brand_colour %||% "#1e3a5f"
+        brand <- config$brand_colour %||% "#323367"
         unit_cost <- as.numeric(config$unit_cost %||% 0)
         project_name <- config$project_name %||% "Pricing Analysis"
         scenarios <- config$simulator$scenarios %||% list()

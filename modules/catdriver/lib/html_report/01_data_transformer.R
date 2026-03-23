@@ -125,6 +125,7 @@ transform_catdriver_for_html <- function(results, config) {
     n_categories = results$prep_data$outcome_info$n_categories,
     n_drivers = length(config$driver_vars),
     n_terms = results$prep_data$n_terms,
+    n_observations = results$model_result$n_observations %||% nrow(results$prep_data$data),
     fit_statistics = results$model_result$fit_statistics,
     has_bootstrap = has_bootstrap,
     weight_var = config$weight_var,

@@ -76,19 +76,24 @@ build_cd_importance_table <- function(importance, id_prefix = "") {
 #' @keywords internal
 build_cd_pattern_table <- function(pattern_data, var_name, id_prefix = "") {
 
-  # Build outcome headers
+  # Build outcome headers — prefix with "% " to clarify these are outcome splits
   outcome_ths <- lapply(pattern_data$outcome_categories, function(cat_name) {
-    htmltools::tags$th(cat_name, class = "cd-th cd-th-num")
+    htmltools::tags$th(paste0("% ", cat_name), class = "cd-th cd-th-num",
+                       title = sprintf("Percentage of respondents in this category who chose '%s'", cat_name))
   })
 
   header <- htmltools::tags$tr(
     htmltools::tags$th("Category", class = "cd-th cd-th-label"),
-    htmltools::tags$th("N", class = "cd-th cd-th-num"),
-    htmltools::tags$th("% of Total", class = "cd-th cd-th-num"),
+    htmltools::tags$th("N", class = "cd-th cd-th-num", title = "Number of respondents in this category"),
+    htmltools::tags$th("% of Sample", class = "cd-th cd-th-num",
+                       title = "What percentage of the total sample falls into this category"),
     outcome_ths,
-    htmltools::tags$th("OR vs Ref", class = "cd-th cd-th-num"),
-    htmltools::tags$th("95% CI", class = "cd-th cd-th-num"),
-    htmltools::tags$th("Effect", class = "cd-th cd-th-effect")
+    htmltools::tags$th("Odds Ratio", class = "cd-th cd-th-num",
+                       title = "Odds ratio vs reference category (1.00 = same as reference)"),
+    htmltools::tags$th("95% CI", class = "cd-th cd-th-num",
+                       title = "95% confidence interval for the odds ratio"),
+    htmltools::tags$th("Effect Size", class = "cd-th cd-th-effect",
+                       title = "Strength of effect: Negligible (<1.1x), Small (1.1-1.5x), Medium (1.5-2x), Large (2-3x), Very Large (>3x)")
   )
 
   rows <- lapply(pattern_data$categories, function(cat) {

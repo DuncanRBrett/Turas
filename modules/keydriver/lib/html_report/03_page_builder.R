@@ -16,6 +16,12 @@ local({
     source(file.path(ds_dir, "font_embed.R"), local = FALSE)
     source(file.path(ds_dir, "base_css.R"), local = FALSE)
   }
+  # Source callout registry
+  callout_dir <- file.path(turas_root, "modules", "shared", "lib", "callouts")
+  if (!dir.exists(callout_dir)) callout_dir <- file.path("modules", "shared", "lib", "callouts")
+  if (!exists("turas_callout", mode = "function") && dir.exists(callout_dir)) {
+    source(file.path(callout_dir, "callout_registry.R"), local = FALSE)
+  }
 })
 
 # Null-coalescing operator (existence guard)
@@ -270,22 +276,16 @@ build_kd_css <- function(config) {
   --kd-brand: BRAND_COLOUR;
   --kd-accent: ACCENT_COLOUR;
 
-  /* Shared Turas design tokens */
-  --ct-brand: BRAND_COLOUR;
-  --ct-accent: ACCENT_COLOUR;
-  --ct-text-primary: #1e293b;
-  --ct-text-secondary: #64748b;
-  --ct-bg-surface: #ffffff;
-  --ct-bg-muted: #f8f9fa;
-  --ct-border: #e2e8f0;
-
   /* Module variables */
   --kd-text: #1e293b;
   --kd-text-muted: #64748b;
   --kd-text-faint: #94a3b8;
   --kd-bg: #f8f7f5;
+  --kd-bg-muted: #f8f9fa;
+  --kd-bg-subtle: #f0f4f8;
   --kd-card: #ffffff;
   --kd-border: #e2e8f0;
+  --kd-border-subtle: #f0f0f0;
   --kd-success: #059669;
   --kd-warning: #F59E0B;
   --kd-danger: #c0392b;
@@ -361,6 +361,15 @@ build_kd_css <- function(config) {
 .kd-section-nav a.active {
   color: var(--kd-brand);
   border-bottom-color: var(--kd-brand);
+}
+
+/* Page-switching: sections hidden by default, shown when active */
+.kd-content .kd-section {
+  display: none;
+}
+
+.kd-content .kd-section.kd-page-active {
+  display: block;
 }
 
 /* ================================================================ */
@@ -569,40 +578,59 @@ build_kd_css <- function(config) {
   margin-bottom: 8px;
 }
 
-.kd-component-pin {
+/* Pin mode popover */
+.kd-pin-popover {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  z-index: 10;
-  background: rgba(255,255,255,0.85);
+  top: 100%;
+  right: 0;
+  z-index: 1000;
+  background: white;
   border: 1px solid var(--kd-border);
-  border-radius: 4px;
-  padding: 2px 8px;
-  font-size: 11px;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  padding: 4px 0;
+  min-width: 140px;
+  margin-top: 4px;
+}
+
+.kd-pin-popover-item {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  border: none;
+  background: none;
+  font-size: 12px;
   font-weight: 500;
-  color: var(--kd-text-faint);
+  color: var(--kd-text-primary);
   cursor: pointer;
+  text-align: left;
   font-family: inherit;
-  opacity: 0;
-  transition: all 0.15s;
+  transition: background 0.1s;
 }
 
-.kd-chart-wrapper:hover .kd-component-pin,
-.kd-table-wrapper:hover .kd-component-pin {
-  opacity: 1;
-}
-
-.kd-component-pin:hover {
-  border-color: var(--kd-brand);
+.kd-pin-popover-item:hover:not(:disabled) {
+  background: #f1f5f9;
   color: var(--kd-brand);
-  background: rgba(255,255,255,0.95);
 }
 
-.kd-component-pin.kd-pin-btn-active {
-  background: var(--kd-brand);
-  color: white;
-  border-color: var(--kd-brand);
-  opacity: 1;
+/* Drag-and-drop states */
+.kd-pin-dragging {
+  opacity: 0.4;
+}
+
+.kd-pin-drop-target {
+  outline: 2px dashed var(--kd-brand);
+  outline-offset: -2px;
+}
+
+.kd-pinned-card[draggable="true"],
+.kd-section-divider[draggable="true"] {
+  cursor: grab;
+}
+
+.kd-pinned-card[draggable="true"]:active,
+.kd-section-divider[draggable="true"]:active {
+  cursor: grabbing;
 }
 
 /* ================================================================ */
@@ -612,7 +640,7 @@ build_kd_css <- function(config) {
 .kd-table-export-bar {
   position: absolute;
   top: 4px;
-  left: 4px;
+  right: 4px;
   z-index: 10;
   display: flex;
   gap: 4px;
@@ -655,14 +683,14 @@ build_kd_css <- function(config) {
   font-size: 13px;
 }
 
-.kd-th {
-  background: var(--ct-bg-muted);
+th.kd-th {
+  background: var(--kd-bg-muted, #f8f9fa);
   color: var(--kd-text-muted);
   font-weight: 600;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  padding: 10px 14px;
+  padding: 12px 16px;
   text-align: left;
   border-bottom: 2px solid var(--kd-border);
   vertical-align: bottom;
@@ -673,9 +701,9 @@ build_kd_css <- function(config) {
 .kd-th-bar { text-align: left; min-width: 150px; }
 .kd-th-rank { text-align: center; width: 50px; }
 
-.kd-td {
-  padding: 8px 14px;
-  border-bottom: 1px solid #f0f0f0;
+td.kd-td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--kd-border-subtle, #f0f0f0);
   vertical-align: middle;
   color: var(--kd-text);
   font-variant-numeric: tabular-nums;
@@ -690,8 +718,24 @@ build_kd_css <- function(config) {
 .kd-td-interp { font-size: 12px; color: var(--kd-text-muted); }
 .kd-td-label { font-weight: 500; }
 
-.kd-tr:nth-child(even) { background: #f9fafb; }
-.kd-tr:hover { background: #f8fafc; }
+/* Sortable column headers */
+.kd-sortable {
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+}
+.kd-sortable:hover { color: var(--kd-brand); }
+.kd-sortable::after {
+  content: "\\2195";
+  margin-left: 4px;
+  opacity: 0.35;
+  font-size: 10px;
+}
+.kd-sort-asc::after { content: "\\25B2"; opacity: 0.8; }
+.kd-sort-desc::after { content: "\\25BC"; opacity: 0.8; }
+
+.kd-tr:nth-child(even) { background: var(--kd-bg-muted, #f9fafb); }
+.kd-tr:hover { background: var(--kd-bg-subtle, #f8fafc); }
 
 /* ================================================================ */
 /* IMPORTANCE BARS                                                   */
@@ -699,7 +743,7 @@ build_kd_css <- function(config) {
 
 .kd-bar-container {
   height: 16px;
-  background: #f1f5f9;
+  background: var(--kd-bg-subtle, #f1f5f9);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -784,7 +828,8 @@ build_kd_css <- function(config) {
 .kd-status-refused { background: #FEE2E2; color: #991B1B; }
 
 /* ================================================================ */
-/* EXECUTIVE SUMMARY — callout cards with left border                */
+/* EXECUTIVE SUMMARY — top-driver cards with left border             */
+/* Educational callouts now use shared .t-callout from base_css      */
 /* ================================================================ */
 
 .kd-callout {
@@ -832,8 +877,8 @@ build_kd_css <- function(config) {
 }
 
 .kd-fit-card {
-  background: #f8f9fa;
-  border: 1px solid #e2e8f0;
+  background: var(--kd-bg-muted);
+  border: 1px solid var(--kd-border);
   border-radius: 6px;
   padding: 12px 16px;
   border-left: 3px solid var(--kd-brand);
@@ -842,14 +887,14 @@ build_kd_css <- function(config) {
 .kd-fit-card-value {
   font-size: 18px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--kd-text);
   font-variant-numeric: tabular-nums;
 }
 
 .kd-fit-card-label {
   font-size: 12px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--kd-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.3px;
   margin-top: 2px;
@@ -864,7 +909,7 @@ build_kd_css <- function(config) {
 
 .kd-fit-card-note {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--kd-text-faint);
   line-height: 1.4;
   margin-top: 6px;
 }
@@ -937,7 +982,7 @@ build_kd_css <- function(config) {
 .kd-finding-box {
   margin-bottom: 16px;
   padding: 14px 16px;
-  background: var(--ct-bg-muted);
+  background: var(--kd-bg-muted);
   border-radius: 6px;
 }
 
@@ -1601,7 +1646,7 @@ build_kd_css <- function(config) {
   .kd-chart, .kd-importance-chart { max-width: 500px; }
   .kd-insight-area { display: none !important; }
   .kd-pin-btn { display: none !important; }
-  .kd-component-pin { display: none !important; }
+  .kd-pin-popover { display: none !important; }
   .kd-or-chip-bar { display: none !important; }
   .kd-action-bar { display: none !important; }
   .kd-pinned-card-actions { display: none !important; }
@@ -1827,49 +1872,82 @@ build_kd_nav <- function(html_data, settings = list()) {
 
   links <- list()
 
+  # Each link uses data-kd-page for page switching (not scroll anchors)
   if (.show("html_show_exec_summary")) {
     links <- c(links, list(
-      htmltools::tags$a(href = "#kd-exec-summary", "Summary", class = "active")))
+      htmltools::tags$a(`data-kd-page` = "exec-summary",
+                        onclick = "kdSwitchPage('exec-summary')", "Summary", class = "active")))
   }
   if (.show("html_show_importance")) {
     links <- c(links, list(
-      htmltools::tags$a(href = "#kd-importance", "Importance")))
+      htmltools::tags$a(`data-kd-page` = "importance",
+                        onclick = "kdSwitchPage('importance')", "Importance")))
   }
   if (.show("html_show_methods")) {
     links <- c(links, list(
-      htmltools::tags$a(href = "#kd-method-comparison", "Methods")))
+      htmltools::tags$a(`data-kd-page` = "method-comparison",
+                        onclick = "kdSwitchPage('method-comparison')", "Methods")))
   }
   if (has_effect_sizes && .show("html_show_effect_sizes")) {
     links <- c(links, list(
-      htmltools::tags$a(href = "#kd-effect-sizes", "Effect Sizes")))
+      htmltools::tags$a(`data-kd-page` = "effect-sizes",
+                        onclick = "kdSwitchPage('effect-sizes')", "Effect Sizes")))
   }
   if (.show("html_show_correlations")) {
     links <- c(links, list(
-      htmltools::tags$a(href = "#kd-correlations", "Correlations")))
+      htmltools::tags$a(`data-kd-page` = "correlations",
+                        onclick = "kdSwitchPage('correlations')", "Correlations")))
   }
   if (has_quadrant && .show("html_show_quadrant")) {
     links <- c(links, list(
-      htmltools::tags$a(href = "#kd-quadrant", "Quadrant")))
+      htmltools::tags$a(`data-kd-page` = "quadrant",
+                        onclick = "kdSwitchPage('quadrant')", "Quadrant")))
   }
   if (has_shap && .show("html_show_shap")) {
     links <- c(links, list(
-      htmltools::tags$a(href = "#kd-shap-summary", "SHAP")))
+      htmltools::tags$a(`data-kd-page` = "shap-summary",
+                        onclick = "kdSwitchPage('shap-summary')", "SHAP")))
   }
   if (.show("html_show_diagnostics")) {
     links <- c(links, list(
-      htmltools::tags$a(href = "#kd-diagnostics", "Diagnostics")))
+      htmltools::tags$a(`data-kd-page` = "diagnostics",
+                        onclick = "kdSwitchPage('diagnostics')", "Diagnostics")))
   }
   if (has_bootstrap && .show("html_show_bootstrap")) {
     links <- c(links, list(
-      htmltools::tags$a(href = "#kd-bootstrap-ci", "Bootstrap")))
+      htmltools::tags$a(`data-kd-page` = "bootstrap-ci",
+                        onclick = "kdSwitchPage('bootstrap-ci')", "Bootstrap")))
   }
   if (has_segments && .show("html_show_segments")) {
     links <- c(links, list(
-      htmltools::tags$a(href = "#kd-segment-comparison", "Segments")))
+      htmltools::tags$a(`data-kd-page` = "segment-comparison",
+                        onclick = "kdSwitchPage('segment-comparison')", "Segments")))
+  }
+  # v1.04 advanced sections
+  if (isTRUE(html_data$has_elastic_net)) {
+    links <- c(links, list(
+      htmltools::tags$a(`data-kd-page` = "elastic-net",
+                        onclick = "kdSwitchPage('elastic-net')", "Elastic Net")))
+  }
+  if (isTRUE(html_data$has_nca)) {
+    links <- c(links, list(
+      htmltools::tags$a(`data-kd-page` = "nca",
+                        onclick = "kdSwitchPage('nca')", "NCA")))
+  }
+  if (isTRUE(html_data$has_dominance)) {
+    links <- c(links, list(
+      htmltools::tags$a(`data-kd-page` = "dominance",
+                        onclick = "kdSwitchPage('dominance')", "Dominance")))
+  }
+  if (isTRUE(html_data$has_gam)) {
+    links <- c(links, list(
+      htmltools::tags$a(`data-kd-page` = "gam",
+                        onclick = "kdSwitchPage('gam')", "GAM")))
   }
   if (.show("html_show_guide")) {
     links <- c(links, list(
-      htmltools::tags$a(href = "#kd-interpretation", "Guide")))
+      htmltools::tags$a(`data-kd-page` = "interpretation",
+                        onclick = "kdSwitchPage('interpretation')", "Guide")))
   }
 
   htmltools::tags$nav(
@@ -2006,7 +2084,7 @@ build_kd_exec_summary_section <- function(html_data, config = list()) {
   insight_area <- build_kd_insight_area("exec-summary", config = config)
 
   htmltools::tags$div(
-    class = "kd-section", id = "kd-exec-summary",
+    class = "kd-section kd-page-active", id = "kd-exec-summary",
     `data-kd-section` = "exec-summary",
     title_row, insight_area,
     confidence_html, narrative_html, driver_cards, findings_html
@@ -2043,7 +2121,6 @@ build_kd_importance_section <- function(charts, tables, html_data, config = NULL
   chart_wrapper <- if (!is.null(charts$importance)) {
     htmltools::tags$div(
       class = "kd-chart-wrapper",
-      build_kd_component_pin_btn("importance", "chart"),
       charts$importance
     )
   }
@@ -2051,29 +2128,14 @@ build_kd_importance_section <- function(charts, tables, html_data, config = NULL
   table_wrapper <- if (!is.null(tables$importance)) {
     htmltools::tags$div(
       class = "kd-table-wrapper",
-      build_kd_component_pin_btn("importance", "table"),
       filter_bar,
       tables$importance
     )
   }
 
-  # Methodology callout
-  methodology_callout <- htmltools::tags$div(
-    class = "kd-callout",
-    htmltools::tags$div(class = "kd-callout-title",
-                        "How is the final importance list determined?"),
-    htmltools::tags$div(
-      class = "kd-callout-text",
-      paste0(
-        "The importance percentages shown are based on Shapley value decomposition, ",
-        "which fairly apportions the model's total explanatory power (R\u00B2) across ",
-        "all drivers. Unlike simple correlations or beta weights, Shapley values ",
-        "account for overlap between correlated drivers by averaging each driver's ",
-        "marginal contribution across every possible combination of other drivers. ",
-        "See the Method Comparison section for how consistently each driver ranks ",
-        "across all analytical methods."
-      )
-    )
+  # Methodology callout (from shared registry)
+  methodology_callout <- htmltools::HTML(
+    turas_callout("keydriver", "shapley_importance", collapsed = TRUE)
   )
 
   htmltools::tags$div(
@@ -2148,42 +2210,14 @@ build_kd_method_section <- function(charts, tables, html_data = NULL, config = N
                                               "method-comparison")
   insight_area <- build_kd_insight_area("method-comparison", config = config)
 
-  # Method explanation callout
-  method_items <- list(
-    htmltools::tags$li(htmltools::tags$strong("Correlation: "),
-      "Bivariate association between each driver and the outcome. Simple but ignores other drivers."),
-    htmltools::tags$li(htmltools::tags$strong("Beta Weight: "),
-      "Standardised regression coefficient. Shows unique contribution controlling for other drivers."),
-    htmltools::tags$li(htmltools::tags$strong("Relative Weight: "),
-      "Apportions R\u00B2 among drivers, handling multicollinearity better than raw betas."),
-    htmltools::tags$li(htmltools::tags$strong("Shapley Value: "),
-      "Game-theoretic decomposition of model fit across all possible driver subsets.")
-  )
-  has_shap <- if (!is.null(html_data)) isTRUE(html_data$has_shap) else FALSE
-  if (has_shap) {
-    method_items <- c(method_items, list(
-      htmltools::tags$li(htmltools::tags$strong("SHAP: "),
-        "Machine-learning based importance using additive explanations from an XGBoost model.")
-    ))
-  }
-
-  method_callout <- htmltools::tags$div(
-    class = "kd-callout",
-    htmltools::tags$div(class = "kd-callout-title", "Understanding the Methods"),
-    htmltools::tags$ul(
-      style = "margin:8px 0 8px 16px;font-size:12px;line-height:1.6;",
-      method_items
-    ),
-    htmltools::tags$p(
-      style = "font-size:11px;color:var(--kd-text-muted);margin-top:6px;font-style:italic;",
-      "When drivers rank consistently across methods, confidence in their importance is high. Large rank discrepancies may indicate multicollinearity or non-linear effects."
-    )
+  # Method explanation callout (from shared registry)
+  method_callout <- htmltools::HTML(
+    turas_callout("keydriver", "method_comparison", collapsed = TRUE)
   )
 
   chart_wrapper <- if (!is.null(charts$method_agreement)) {
     htmltools::tags$div(
       class = "kd-chart-wrapper",
-      build_kd_component_pin_btn("method-comparison", "chart"),
       charts$method_agreement
     )
   }
@@ -2191,7 +2225,6 @@ build_kd_method_section <- function(charts, tables, html_data = NULL, config = N
   table_wrapper <- if (!is.null(tables$method_comparison)) {
     htmltools::tags$div(
       class = "kd-table-wrapper",
-      build_kd_component_pin_btn("method-comparison", "table"),
       tables$method_comparison
     )
   }
@@ -2233,7 +2266,6 @@ build_kd_effect_size_section <- function(charts, tables, html_data, config = NUL
   chart_wrapper <- if (!is.null(charts$effect_sizes)) {
     htmltools::tags$div(
       class = "kd-chart-wrapper",
-      build_kd_component_pin_btn("effect-sizes", "chart"),
       charts$effect_sizes
     )
   }
@@ -2241,47 +2273,13 @@ build_kd_effect_size_section <- function(charts, tables, html_data, config = NUL
   table_wrapper <- if (!is.null(tables$effect_sizes)) {
     htmltools::tags$div(
       class = "kd-table-wrapper",
-      build_kd_component_pin_btn("effect-sizes", "table"),
       tables$effect_sizes
     )
   }
 
-  # Cohen's f-squared benchmark callout
-  benchmark_callout <- htmltools::tags$div(
-    class = "kd-callout",
-    htmltools::tags$div(class = "kd-callout-title",
-                        htmltools::HTML("Cohen's f\u00B2 Effect Size Benchmarks")),
-    htmltools::tags$div(
-      style = "display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0;",
-      htmltools::tags$div(
-        style = "text-align:center;padding:8px;background:#dcfce7;border-radius:6px;",
-        htmltools::tags$div(style = "font-weight:700;font-size:14px;color:#166534;",
-                            "\u2265 0.35"),
-        htmltools::tags$div(style = "font-size:11px;color:#166534;", "Large")
-      ),
-      htmltools::tags$div(
-        style = "text-align:center;padding:8px;background:#dbeafe;border-radius:6px;",
-        htmltools::tags$div(style = "font-weight:700;font-size:14px;color:#1e40af;",
-                            "\u2265 0.15"),
-        htmltools::tags$div(style = "font-size:11px;color:#1e40af;", "Medium")
-      ),
-      htmltools::tags$div(
-        style = "text-align:center;padding:8px;background:#fef9c3;border-radius:6px;",
-        htmltools::tags$div(style = "font-weight:700;font-size:14px;color:#854d0e;",
-                            "\u2265 0.02"),
-        htmltools::tags$div(style = "font-size:11px;color:#854d0e;", "Small")
-      ),
-      htmltools::tags$div(
-        style = "text-align:center;padding:8px;background:#f1f5f9;border-radius:6px;",
-        htmltools::tags$div(style = "font-weight:700;font-size:14px;color:#64748b;",
-                            "< 0.02"),
-        htmltools::tags$div(style = "font-size:11px;color:#64748b;", "Negligible")
-      )
-    ),
-    htmltools::tags$p(
-      style = "font-size:11px;color:var(--kd-text-muted);font-style:italic;",
-      "Effect size measures practical significance, not just statistical significance. A statistically significant driver with a negligible effect size may not warrant action. Thresholds follow Cohen (1988) for Small/Medium/Large, with an additional Negligible tier for values below the Small threshold."
-    )
+  # Cohen's f-squared benchmark callout (from shared registry)
+  benchmark_callout <- htmltools::HTML(
+    turas_callout("keydriver", "effect_sizes", collapsed = TRUE)
   )
 
   htmltools::tags$div(
@@ -2320,7 +2318,6 @@ build_kd_correlation_section <- function(charts, tables,
                        display_mode %in% c("heatmap", "both")) {
     htmltools::tags$div(
       class = "kd-chart-wrapper",
-      build_kd_component_pin_btn("correlations", "chart"),
       charts$correlation_heatmap
     )
   }
@@ -2329,29 +2326,13 @@ build_kd_correlation_section <- function(charts, tables,
                        display_mode %in% c("table", "both")) {
     htmltools::tags$div(
       class = "kd-table-wrapper",
-      build_kd_component_pin_btn("correlations", "table"),
       tables$correlations
     )
   }
 
-  # Correlation interpretation callout
-  corr_callout <- htmltools::tags$div(
-    class = "kd-callout",
-    htmltools::tags$div(class = "kd-callout-title",
-                        "What does the correlation matrix tell me?"),
-    htmltools::tags$div(
-      class = "kd-callout-text",
-      paste0(
-        "The correlation matrix shows the raw, bivariate relationship between every ",
-        "pair of drivers and the outcome variable. Unlike the importance rankings ",
-        "(which control for other drivers), correlations show the simple one-to-one ",
-        "association. This is useful for two reasons: (1) spotting which drivers are ",
-        "highly correlated with each other \u2014 when two drivers are strongly correlated, ",
-        "their individual importance may be diluted in the model, and (2) identifying ",
-        "drivers that have a strong standalone relationship with the outcome even if ",
-        "they appear less important when other drivers are accounted for."
-      )
-    )
+  # Correlation interpretation callout (from shared registry)
+  corr_callout <- htmltools::HTML(
+    turas_callout("keydriver", "correlation_matrix", collapsed = TRUE)
   )
 
   htmltools::tags$div(
@@ -2392,7 +2373,6 @@ build_kd_quadrant_section <- function(charts, tables, html_data, config = NULL) 
   chart_wrapper <- if (!is.null(charts$quadrant)) {
     htmltools::tags$div(
       class = "kd-chart-wrapper",
-      build_kd_component_pin_btn("quadrant", "chart"),
       charts$quadrant
     )
   }
@@ -2400,26 +2380,13 @@ build_kd_quadrant_section <- function(charts, tables, html_data, config = NULL) 
   table_wrapper <- if (!is.null(tables$quadrant_actions)) {
     htmltools::tags$div(
       class = "kd-table-wrapper",
-      build_kd_component_pin_btn("quadrant", "table"),
       tables$quadrant_actions
     )
   }
 
-  # Priority order callout
-  priority_callout <- htmltools::tags$div(
-    class = "kd-callout",
-    htmltools::tags$div(class = "kd-callout-title",
-                        "How are priorities determined?"),
-    htmltools::tags$div(
-      class = "kd-callout-text",
-      paste0(
-        "Drivers are prioritised by combining their importance weight with their ",
-        "performance gap (the difference between mean performance and the driver's ",
-        "current score). A driver ranked highly in importance that also has a large ",
-        "performance gap will receive a higher priority score. This ensures action ",
-        "is focused where improvement will have the greatest impact on the outcome."
-      )
-    )
+  # Priority order callout (from shared registry)
+  priority_callout <- htmltools::HTML(
+    turas_callout("keydriver", "priority_quadrant", collapsed = TRUE)
   )
 
   # Action legend callout
@@ -2500,7 +2467,6 @@ build_kd_shap_section <- function(html_data, charts = list(), config = NULL) {
   chart_wrapper <- if (!is.null(charts$shap_importance)) {
     htmltools::tags$div(
       class = "kd-chart-wrapper",
-      build_kd_component_pin_btn("shap-summary", "chart"),
       charts$shap_importance
     )
   }
@@ -2805,7 +2771,6 @@ build_kd_bootstrap_section <- function(charts, tables, html_data,
                        display_mode %in% c("summary", "full")) {
     htmltools::tags$div(
       class = "kd-chart-wrapper",
-      build_kd_component_pin_btn("bootstrap-ci", "chart"),
       charts$bootstrap_ci
     )
   }
@@ -2814,7 +2779,6 @@ build_kd_bootstrap_section <- function(charts, tables, html_data,
                        display_mode %in% c("table", "full")) {
     htmltools::tags$div(
       class = "kd-table-wrapper",
-      build_kd_component_pin_btn("bootstrap-ci", "table"),
       tables$bootstrap_ci
     )
   }
@@ -2936,7 +2900,6 @@ build_kd_segment_section <- function(charts, tables, html_data, config = NULL) {
   chart_wrapper <- if (!is.null(charts$segment_comparison)) {
     htmltools::tags$div(
       class = "kd-chart-wrapper",
-      build_kd_component_pin_btn("segment-comparison", "chart"),
       charts$segment_comparison
     )
   }
@@ -2944,7 +2907,6 @@ build_kd_segment_section <- function(charts, tables, html_data, config = NULL) {
   table_wrapper <- if (!is.null(tables$segment_comparison)) {
     htmltools::tags$div(
       class = "kd-table-wrapper",
-      build_kd_component_pin_btn("segment-comparison", "table"),
       tables$segment_comparison
     )
   }

@@ -35,16 +35,15 @@
   }
 
   /**
-   * Pin a section from an analysis panel.
+   * Pin a section — show mode popover (table/chart/both).
+   * If already pinned, unpin instead.
    * @param {string} sectionKey - Section key (e.g., 'importance')
    * @param {string} prefix - ID prefix (e.g., 'nps-')
    */
   window.kdPinSection = function(sectionKey, prefix) {
     prefix = prefix || '';
-    var content = kdCaptureSectionContent(sectionKey, prefix);
-    if (!content) return;
 
-    // Check for duplicate (toggle behaviour)
+    // Check for duplicate (toggle behaviour — unpin)
     for (var i = 0; i < kdPinnedViews.length; i++) {
       if (kdPinnedViews[i].type !== 'section' &&
           kdPinnedViews[i].sectionKey === sectionKey &&
@@ -54,57 +53,73 @@
         kdRenderPinnedCards();
         kdUpdatePinBadge();
         kdUpdatePinButtons();
+        kdClosePopover();
         return;
       }
     }
 
-    var pin = {
-      type: 'pin',
-      id: 'pin-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6),
-      sectionKey: sectionKey,
-      prefix: prefix,
-      panelLabel: content.panelLabel,
-      sectionTitle: content.sectionTitle,
-      insightText: content.insightText,
-      chartSvg: content.chartSvg,
-      tableHtml: content.tableHtml,
-      timestamp: new Date().toISOString(),
-      methodText: content.methodText,
-      sampleN: content.sampleN
-    };
+    // Show mode popover
+    var btn = document.querySelector('.kd-pin-btn[data-kd-pin-section="' + sectionKey + '"]');
+    if (!btn) { kdExecutePin(sectionKey, prefix, 'all'); return; }
 
-    kdPinnedViews.push(pin);
-    kdSavePinnedData();
-    kdRenderPinnedCards();
-    kdUpdatePinBadge();
-    kdUpdatePinButtons();
+    kdClosePopover();
+
+    var content = kdCaptureSectionContent(sectionKey, prefix);
+    var hasChart = content && content.chartSvg;
+    var hasTable = content && content.tableHtml;
+
+    var popover = document.createElement('div');
+    popover.className = 'kd-pin-popover';
+    popover.id = 'kd-pin-popover';
+
+    var options = [
+      { label: 'Table + Chart', mode: 'all', enabled: hasChart && hasTable },
+      { label: 'Chart only', mode: 'chart_insight', enabled: !!hasChart },
+      { label: 'Table only', mode: 'table_insight', enabled: !!hasTable }
+    ];
+
+    options.forEach(function(opt) {
+      var item = document.createElement('button');
+      item.className = 'kd-pin-popover-item';
+      item.textContent = opt.label;
+      if (!opt.enabled) {
+        item.disabled = true;
+        item.style.opacity = '0.4';
+        item.style.cursor = 'default';
+      } else {
+        item.onclick = function(e) {
+          e.stopPropagation();
+          kdExecutePin(sectionKey, prefix, opt.mode);
+          kdClosePopover();
+        };
+      }
+      popover.appendChild(item);
+    });
+
+    btn.parentElement.style.position = 'relative';
+    btn.parentElement.appendChild(popover);
+
+    // Close on outside click
+    setTimeout(function() {
+      document.addEventListener('click', kdClosePopoverOnOutside);
+    }, 10);
   };
 
+  function kdClosePopover() {
+    var p = document.getElementById('kd-pin-popover');
+    if (p) p.remove();
+    document.removeEventListener('click', kdClosePopoverOnOutside);
+  }
+
+  function kdClosePopoverOnOutside(e) {
+    var p = document.getElementById('kd-pin-popover');
+    if (p && !p.contains(e.target)) kdClosePopover();
+  }
+
   /**
-   * Pin a specific component (chart or table) from a section.
-   * @param {string} sectionKey - Section key (e.g., 'importance')
-   * @param {string} component - 'chart' or 'table'
-   * @param {string} prefix - ID prefix (e.g., 'nps-')
+   * Execute pin with selected mode.
    */
-  window.kdPinComponent = function(sectionKey, component, prefix) {
-    prefix = prefix || '';
-
-    // Check for duplicate (toggle behaviour) — match by sectionKey + prefix + component
-    for (var i = 0; i < kdPinnedViews.length; i++) {
-      if (kdPinnedViews[i].type !== 'section' &&
-          kdPinnedViews[i].sectionKey === sectionKey &&
-          kdPinnedViews[i].prefix === prefix &&
-          kdPinnedViews[i].component === component) {
-        kdPinnedViews.splice(i, 1);
-        kdSavePinnedData();
-        kdRenderPinnedCards();
-        kdUpdatePinBadge();
-        kdUpdatePinButtons();
-        return;
-      }
-    }
-
-    // Build partial capture
+  function kdExecutePin(sectionKey, prefix, mode) {
     var content = kdCaptureSectionContent(sectionKey, prefix);
     if (!content) return;
 
@@ -113,12 +128,12 @@
       id: 'pin-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6),
       sectionKey: sectionKey,
       prefix: prefix,
-      component: component,
+      pinMode: mode,
       panelLabel: content.panelLabel,
-      sectionTitle: content.sectionTitle + ' \u2014 ' + (component === 'chart' ? 'Chart' : 'Table'),
+      sectionTitle: content.sectionTitle,
       insightText: content.insightText,
-      chartSvg: component === 'chart' ? content.chartSvg : '',
-      tableHtml: component === 'table' ? content.tableHtml : '',
+      chartSvg: (mode === 'all' || mode === 'chart_insight') ? content.chartSvg : '',
+      tableHtml: (mode === 'all' || mode === 'table_insight') ? content.tableHtml : '',
       timestamp: new Date().toISOString(),
       methodText: content.methodText,
       sampleN: content.sampleN
@@ -129,7 +144,7 @@
     kdRenderPinnedCards();
     kdUpdatePinBadge();
     kdUpdatePinButtons();
-  };
+  }
 
   /**
    * Add a section header/divider.
@@ -453,8 +468,14 @@
     };
   }
 
+  // --------------------------------------------------------------------------
+  // Drag-and-drop state
+  // --------------------------------------------------------------------------
+  var kdDragFromIdx = null;
+
   /**
    * Render pinned cards into the pinned views container.
+   * Cards are draggable for reordering.
    */
   window.kdRenderPinnedCards = function() {
     var container = document.getElementById('kd-pinned-cards-container');
@@ -470,9 +491,8 @@
     }
 
     if (emptyState) emptyState.style.display = 'none';
-    var total = kdPinnedViews.length;
 
-    // Build DOM directly for section headers (contentEditable)
+    // Build DOM directly
     container.innerHTML = '';
 
     kdPinnedViews.forEach(function(item, idx) {
@@ -480,7 +500,8 @@
       if (item.type === 'section') {
         var divider = document.createElement('div');
         divider.className = 'kd-section-divider';
-        divider.setAttribute('data-idx', idx);
+        divider.setAttribute('draggable', 'true');
+        divider.setAttribute('data-kd-drag-idx', idx);
 
         var titleEl = document.createElement('div');
         titleEl.className = 'kd-section-divider-title';
@@ -491,35 +512,26 @@
 
         var sActions = document.createElement('div');
         sActions.className = 'kd-section-divider-actions';
-        if (idx > 0) {
-          var sUp = document.createElement('button');
-          sUp.className = 'kd-pinned-action-btn';
-          sUp.textContent = '\u25B2'; sUp.title = 'Move up';
-          sUp.onclick = function() { kdMovePinned(item.id, -1); };
-          sActions.appendChild(sUp);
-        }
-        if (idx < total - 1) {
-          var sDown = document.createElement('button');
-          sDown.className = 'kd-pinned-action-btn';
-          sDown.textContent = '\u25BC'; sDown.title = 'Move down';
-          sDown.onclick = function() { kdMovePinned(item.id, 1); };
-          sActions.appendChild(sDown);
-        }
         var sDel = document.createElement('button');
         sDel.className = 'kd-pinned-action-btn kd-pinned-remove-btn';
         sDel.textContent = '\u2715'; sDel.title = 'Remove section';
         sDel.onclick = function() { kdRemovePinned(item.id); };
         sActions.appendChild(sDel);
         divider.appendChild(sActions);
+
+        kdAttachDragHandlers(divider, idx);
         container.appendChild(divider);
         return;
       }
 
       // --- Pin card ---
       var pin = item;
+      var mode = pin.pinMode || 'all';
       var card = document.createElement('div');
       card.className = 'kd-pinned-card';
       card.setAttribute('data-pin-id', pin.id);
+      card.setAttribute('draggable', 'true');
+      card.setAttribute('data-kd-drag-idx', idx);
 
       var labelTag = pin.panelLabel
         ? '<span class="kd-pinned-card-label">' + kdEscapeHtml(pin.panelLabel) + '</span>'
@@ -529,21 +541,18 @@
         ? '<div class="kd-pinned-card-insight">' + kdEscapeHtml(pin.insightText) + '</div>'
         : '';
 
-      var chartBlock = pin.chartSvg
+      var showChart = (mode === 'all' || mode === 'chart_insight');
+      var showTable = (mode === 'all' || mode === 'table_insight');
+
+      var chartBlock = (showChart && pin.chartSvg)
         ? '<div class="kd-pinned-card-chart">' + pin.chartSvg + '</div>'
         : '';
 
-      var tableBlock = pin.tableHtml
+      var tableBlock = (showTable && pin.tableHtml)
         ? '<div class="kd-pinned-card-table">' + pin.tableHtml + '</div>'
         : '';
 
       var actionsHtml = '';
-      if (idx > 0) {
-        actionsHtml += '<button class="kd-pinned-action-btn" onclick="kdMovePinned(\'' + pin.id + '\', -1)" title="Move up">\u25B2</button>';
-      }
-      if (idx < total - 1) {
-        actionsHtml += '<button class="kd-pinned-action-btn" onclick="kdMovePinned(\'' + pin.id + '\', 1)" title="Move down">\u25BC</button>';
-      }
       actionsHtml += '<button class="kd-pinned-action-btn kd-pinned-export-btn" onclick="kdExportPinnedCardPNG(\'' + pin.id + '\')" title="Export as PNG">\uD83D\uDCE5</button>';
       actionsHtml += '<button class="kd-pinned-action-btn kd-pinned-remove-btn" onclick="kdRemovePinned(\'' + pin.id + '\')" title="Remove pin">\u2715</button>';
 
@@ -558,9 +567,50 @@
         + chartBlock
         + tableBlock;
 
+      kdAttachDragHandlers(card, idx);
       container.appendChild(card);
     });
   };
+
+  /**
+   * Attach drag-and-drop handlers to a card/divider element.
+   */
+  function kdAttachDragHandlers(el, idx) {
+    el.addEventListener('dragstart', function(e) {
+      kdDragFromIdx = idx;
+      el.classList.add('kd-pin-dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(idx));
+    });
+    el.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      el.classList.add('kd-pin-drop-target');
+    });
+    el.addEventListener('dragleave', function() {
+      el.classList.remove('kd-pin-drop-target');
+    });
+    el.addEventListener('drop', function(e) {
+      e.preventDefault();
+      el.classList.remove('kd-pin-drop-target');
+      var toIdx = parseInt(el.getAttribute('data-kd-drag-idx'), 10);
+      if (kdDragFromIdx !== null && kdDragFromIdx !== toIdx) {
+        var item = kdPinnedViews.splice(kdDragFromIdx, 1)[0];
+        kdPinnedViews.splice(toIdx, 0, item);
+        kdSavePinnedData();
+        kdRenderPinnedCards();
+      }
+      kdDragFromIdx = null;
+    });
+    el.addEventListener('dragend', function() {
+      el.classList.remove('kd-pin-dragging');
+      kdDragFromIdx = null;
+      // Clean up any lingering drop targets
+      document.querySelectorAll('.kd-pin-drop-target').forEach(function(t) {
+        t.classList.remove('kd-pin-drop-target');
+      });
+    });
+  }
 
   /**
    * Remove a pinned view or section by ID.
@@ -622,7 +672,6 @@
    * Update pin button states (active/inactive) based on pinned views.
    */
   function kdUpdatePinButtons() {
-    // Section-level pin buttons
     document.querySelectorAll('.kd-pin-btn').forEach(function(btn) {
       var sectionKey = btn.getAttribute('data-kd-pin-section');
       var prefix = btn.getAttribute('data-kd-pin-prefix') || '';
@@ -630,32 +679,13 @@
       for (var i = 0; i < kdPinnedViews.length; i++) {
         if (kdPinnedViews[i].type !== 'section' &&
             kdPinnedViews[i].sectionKey === sectionKey &&
-            kdPinnedViews[i].prefix === prefix &&
-            !kdPinnedViews[i].component) {
+            kdPinnedViews[i].prefix === prefix) {
           isPinned = true;
           break;
         }
       }
       btn.classList.toggle('kd-pin-btn-active', isPinned);
       btn.title = isPinned ? 'Unpin this section' : 'Pin to Views';
-    });
-
-    // Component-level pin buttons (chart/table)
-    document.querySelectorAll('.kd-component-pin').forEach(function(btn) {
-      var sectionKey = btn.getAttribute('data-kd-pin-section');
-      var prefix = btn.getAttribute('data-kd-pin-prefix') || '';
-      var component = btn.getAttribute('data-kd-pin-component') || '';
-      var isPinned = false;
-      for (var i = 0; i < kdPinnedViews.length; i++) {
-        if (kdPinnedViews[i].type !== 'section' &&
-            kdPinnedViews[i].sectionKey === sectionKey &&
-            kdPinnedViews[i].prefix === prefix &&
-            kdPinnedViews[i].component === component) {
-          isPinned = true;
-          break;
-        }
-      }
-      btn.classList.toggle('kd-pin-btn-active', isPinned);
     });
   }
 

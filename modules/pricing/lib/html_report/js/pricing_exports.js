@@ -156,7 +156,7 @@
     ctx.fillRect(0, 0, W, H);
 
     // Title bar
-    var brandColor = getComputedStyle(document.documentElement).getPropertyValue("--pr-brand").trim() || "#1e3a5f";
+    var brandColor = getComputedStyle(document.documentElement).getPropertyValue("--pr-brand").trim() || "#323367";
     ctx.fillStyle = brandColor;
     ctx.fillRect(0, 0, W, 56);
     ctx.fillStyle = "white";
@@ -203,13 +203,12 @@
     if (typeof syncAllInsights === "function") syncAllInsights();
 
     // Store simulator state if active
-    if (typeof PricingSimulator !== "undefined" && PricingSimulator._initialized) {
-      var state = PricingSimulator.getState();
-      if (state) {
+    if (typeof TurasSimulator !== "undefined") {
+      var simState = TurasSimulator.getState();
+      if (simState) {
         var simPanel = document.getElementById("panel-simulator");
         if (simPanel) {
-          simPanel.setAttribute("data-sim-price", state.price || "");
-          simPanel.setAttribute("data-sim-battle", state.battleMode ? "true" : "false");
+          simPanel.setAttribute("data-sim-price", simState.currentPrice || "");
         }
       }
     }

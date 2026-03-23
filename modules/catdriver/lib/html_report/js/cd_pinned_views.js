@@ -35,16 +35,15 @@
   }
 
   /**
-   * Pin a section from an analysis panel.
+   * Pin a section — show mode popover (table/chart/both).
+   * If already pinned, unpin instead.
    * @param {string} sectionKey - Section key (e.g., 'importance')
    * @param {string} prefix - ID prefix (e.g., 'nps-')
    */
   window.cdPinSection = function(sectionKey, prefix) {
     prefix = prefix || '';
-    var content = cdCaptureSectionContent(sectionKey, prefix);
-    if (!content) return;
 
-    // Check for duplicate (toggle behaviour)
+    // Check for duplicate (toggle behaviour — unpin)
     for (var i = 0; i < cdPinnedViews.length; i++) {
       if (cdPinnedViews[i].type !== 'section' &&
           cdPinnedViews[i].sectionKey === sectionKey &&
@@ -54,58 +53,72 @@
         cdRenderPinnedCards();
         cdUpdatePinBadge();
         cdUpdatePinButtons();
+        cdClosePopover();
         return;
       }
     }
 
-    var pin = {
-      type: 'pin',
-      id: 'pin-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6),
-      sectionKey: sectionKey,
-      prefix: prefix,
-      panelLabel: content.panelLabel,
-      sectionTitle: content.sectionTitle,
-      insightText: content.insightText,
-      chartSvg: content.chartSvg,
-      tableHtml: content.tableHtml,
-      timestamp: new Date().toISOString(),
-      modelType: content.modelType,
-      sampleN: content.sampleN,
-      r2Text: content.r2Text
-    };
+    // Show mode popover
+    var btn = document.querySelector('.cd-pin-btn[data-cd-pin-section="' + sectionKey + '"]');
+    if (!btn) { cdExecutePin(sectionKey, prefix, 'all'); return; }
 
-    cdPinnedViews.push(pin);
-    cdSavePinnedData();
-    cdRenderPinnedCards();
-    cdUpdatePinBadge();
-    cdUpdatePinButtons();
+    cdClosePopover();
+
+    var content = cdCaptureSectionContent(sectionKey, prefix);
+    var hasChart = content && content.chartSvg;
+    var hasTable = content && content.tableHtml;
+
+    var popover = document.createElement('div');
+    popover.className = 'cd-pin-popover';
+    popover.id = 'cd-pin-popover';
+
+    var options = [
+      { label: 'Table + Chart', mode: 'all', enabled: hasChart && hasTable },
+      { label: 'Chart only', mode: 'chart_insight', enabled: !!hasChart },
+      { label: 'Table only', mode: 'table_insight', enabled: !!hasTable }
+    ];
+
+    options.forEach(function(opt) {
+      var item = document.createElement('button');
+      item.className = 'cd-pin-popover-item';
+      item.textContent = opt.label;
+      if (!opt.enabled) {
+        item.disabled = true;
+        item.style.opacity = '0.4';
+        item.style.cursor = 'default';
+      } else {
+        item.onclick = function(e) {
+          e.stopPropagation();
+          cdExecutePin(sectionKey, prefix, opt.mode);
+          cdClosePopover();
+        };
+      }
+      popover.appendChild(item);
+    });
+
+    btn.parentElement.style.position = 'relative';
+    btn.parentElement.appendChild(popover);
+
+    setTimeout(function() {
+      document.addEventListener('click', cdClosePopoverOnOutside);
+    }, 10);
   };
 
+  function cdClosePopover() {
+    var p = document.getElementById('cd-pin-popover');
+    if (p) p.remove();
+    document.removeEventListener('click', cdClosePopoverOnOutside);
+  }
+
+  function cdClosePopoverOnOutside(e) {
+    var p = document.getElementById('cd-pin-popover');
+    if (p && !p.contains(e.target)) cdClosePopover();
+  }
+
   /**
-   * Pin a specific component (chart or table) from a section.
-   * @param {string} sectionKey - Section key (e.g., 'importance')
-   * @param {string} component - 'chart' or 'table'
-   * @param {string} prefix - ID prefix (e.g., 'nps-')
+   * Execute pin with selected mode.
    */
-  window.cdPinComponent = function(sectionKey, component, prefix) {
-    prefix = prefix || '';
-
-    // Check for duplicate (toggle behaviour) — match by sectionKey + prefix + component
-    for (var i = 0; i < cdPinnedViews.length; i++) {
-      if (cdPinnedViews[i].type !== 'section' &&
-          cdPinnedViews[i].sectionKey === sectionKey &&
-          cdPinnedViews[i].prefix === prefix &&
-          cdPinnedViews[i].component === component) {
-        cdPinnedViews.splice(i, 1);
-        cdSavePinnedData();
-        cdRenderPinnedCards();
-        cdUpdatePinBadge();
-        cdUpdatePinButtons();
-        return;
-      }
-    }
-
-    // Build partial capture
+  function cdExecutePin(sectionKey, prefix, mode) {
     var content = cdCaptureSectionContent(sectionKey, prefix);
     if (!content) return;
 
@@ -114,12 +127,12 @@
       id: 'pin-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6),
       sectionKey: sectionKey,
       prefix: prefix,
-      component: component,
+      pinMode: mode,
       panelLabel: content.panelLabel,
-      sectionTitle: content.sectionTitle + ' \u2014 ' + (component === 'chart' ? 'Chart' : 'Table'),
+      sectionTitle: content.sectionTitle,
       insightText: content.insightText,
-      chartSvg: component === 'chart' ? content.chartSvg : '',
-      tableHtml: component === 'table' ? content.tableHtml : '',
+      chartSvg: (mode === 'all' || mode === 'chart_insight') ? content.chartSvg : '',
+      tableHtml: (mode === 'all' || mode === 'table_insight') ? content.tableHtml : '',
       timestamp: new Date().toISOString(),
       modelType: content.modelType,
       sampleN: content.sampleN,
@@ -131,7 +144,7 @@
     cdRenderPinnedCards();
     cdUpdatePinBadge();
     cdUpdatePinButtons();
-  };
+  }
 
   /**
    * Add a section header/divider.
@@ -305,12 +318,20 @@
   /**
    * Render pinned cards into the pinned views container.
    */
+  // --------------------------------------------------------------------------
+  // Drag-and-drop state
+  // --------------------------------------------------------------------------
+  var cdDragFromIdx = null;
+
+  /**
+   * Render pinned cards into the pinned views container.
+   * Cards are draggable for reordering.
+   */
   window.cdRenderPinnedCards = function() {
     var container = document.getElementById('cd-pinned-cards-container');
     if (!container) return;
 
     var emptyState = document.getElementById('cd-pinned-empty');
-    var pinCount = countPins();
 
     if (cdPinnedViews.length === 0) {
       container.innerHTML = '';
@@ -319,9 +340,7 @@
     }
 
     if (emptyState) emptyState.style.display = 'none';
-    var total = cdPinnedViews.length;
 
-    // Build DOM directly for section headers (contentEditable)
     container.innerHTML = '';
 
     cdPinnedViews.forEach(function(item, idx) {
@@ -329,7 +348,8 @@
       if (item.type === 'section') {
         var divider = document.createElement('div');
         divider.className = 'cd-section-divider';
-        divider.setAttribute('data-idx', idx);
+        divider.setAttribute('draggable', 'true');
+        divider.setAttribute('data-cd-drag-idx', idx);
 
         var titleEl = document.createElement('div');
         titleEl.className = 'cd-section-divider-title';
@@ -340,35 +360,26 @@
 
         var sActions = document.createElement('div');
         sActions.className = 'cd-section-divider-actions';
-        if (idx > 0) {
-          var sUp = document.createElement('button');
-          sUp.className = 'cd-pinned-action-btn';
-          sUp.textContent = '\u25B2'; sUp.title = 'Move up';
-          sUp.onclick = function() { cdMovePinned(item.id, -1); };
-          sActions.appendChild(sUp);
-        }
-        if (idx < total - 1) {
-          var sDown = document.createElement('button');
-          sDown.className = 'cd-pinned-action-btn';
-          sDown.textContent = '\u25BC'; sDown.title = 'Move down';
-          sDown.onclick = function() { cdMovePinned(item.id, -1); };
-          sActions.appendChild(sDown);
-        }
         var sDel = document.createElement('button');
         sDel.className = 'cd-pinned-action-btn cd-pinned-remove-btn';
         sDel.textContent = '\u2715'; sDel.title = 'Remove section';
         sDel.onclick = function() { cdRemovePinned(item.id); };
         sActions.appendChild(sDel);
         divider.appendChild(sActions);
+
+        cdAttachDragHandlers(divider, idx);
         container.appendChild(divider);
         return;
       }
 
       // --- Pin card ---
       var pin = item;
+      var mode = pin.pinMode || 'all';
       var card = document.createElement('div');
       card.className = 'cd-pinned-card';
       card.setAttribute('data-pin-id', pin.id);
+      card.setAttribute('draggable', 'true');
+      card.setAttribute('data-cd-drag-idx', idx);
 
       var labelTag = pin.panelLabel
         ? '<span class="cd-pinned-card-label">' + cdEscapeHtml(pin.panelLabel) + '</span>'
@@ -378,21 +389,18 @@
         ? '<div class="cd-pinned-card-insight">' + cdEscapeHtml(pin.insightText) + '</div>'
         : '';
 
-      var chartBlock = pin.chartSvg
+      var showChart = (mode === 'all' || mode === 'chart_insight');
+      var showTable = (mode === 'all' || mode === 'table_insight');
+
+      var chartBlock = (showChart && pin.chartSvg)
         ? '<div class="cd-pinned-card-chart">' + pin.chartSvg + '</div>'
         : '';
 
-      var tableBlock = pin.tableHtml
+      var tableBlock = (showTable && pin.tableHtml)
         ? '<div class="cd-pinned-card-table">' + pin.tableHtml + '</div>'
         : '';
 
       var actionsHtml = '';
-      if (idx > 0) {
-        actionsHtml += '<button class="cd-pinned-action-btn" onclick="cdMovePinned(\'' + pin.id + '\', -1)" title="Move up">\u25B2</button>';
-      }
-      if (idx < total - 1) {
-        actionsHtml += '<button class="cd-pinned-action-btn" onclick="cdMovePinned(\'' + pin.id + '\', 1)" title="Move down">\u25BC</button>';
-      }
       actionsHtml += '<button class="cd-pinned-action-btn cd-pinned-export-btn" onclick="cdExportPinnedCardPNG(\'' + pin.id + '\')" title="Export as PNG">\uD83D\uDCE5</button>';
       actionsHtml += '<button class="cd-pinned-action-btn cd-pinned-remove-btn" onclick="cdRemovePinned(\'' + pin.id + '\')" title="Remove pin">\u2715</button>';
 
@@ -407,9 +415,49 @@
         + chartBlock
         + tableBlock;
 
+      cdAttachDragHandlers(card, idx);
       container.appendChild(card);
     });
   };
+
+  /**
+   * Attach drag-and-drop handlers to a card/divider element.
+   */
+  function cdAttachDragHandlers(el, idx) {
+    el.addEventListener('dragstart', function(e) {
+      cdDragFromIdx = idx;
+      el.classList.add('cd-pin-dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(idx));
+    });
+    el.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      el.classList.add('cd-pin-drop-target');
+    });
+    el.addEventListener('dragleave', function() {
+      el.classList.remove('cd-pin-drop-target');
+    });
+    el.addEventListener('drop', function(e) {
+      e.preventDefault();
+      el.classList.remove('cd-pin-drop-target');
+      var toIdx = parseInt(el.getAttribute('data-cd-drag-idx'), 10);
+      if (cdDragFromIdx !== null && cdDragFromIdx !== toIdx) {
+        var item = cdPinnedViews.splice(cdDragFromIdx, 1)[0];
+        cdPinnedViews.splice(toIdx, 0, item);
+        cdSavePinnedData();
+        cdRenderPinnedCards();
+      }
+      cdDragFromIdx = null;
+    });
+    el.addEventListener('dragend', function() {
+      el.classList.remove('cd-pin-dragging');
+      cdDragFromIdx = null;
+      document.querySelectorAll('.cd-pin-drop-target').forEach(function(t) {
+        t.classList.remove('cd-pin-drop-target');
+      });
+    });
+  }
 
   /**
    * Remove a pinned view or section by ID.
@@ -471,7 +519,6 @@
    * Update pin button states (active/inactive) based on pinned views.
    */
   function cdUpdatePinButtons() {
-    // Section-level pin buttons
     document.querySelectorAll('.cd-pin-btn').forEach(function(btn) {
       var sectionKey = btn.getAttribute('data-cd-pin-section');
       var prefix = btn.getAttribute('data-cd-pin-prefix') || '';
@@ -479,32 +526,13 @@
       for (var i = 0; i < cdPinnedViews.length; i++) {
         if (cdPinnedViews[i].type !== 'section' &&
             cdPinnedViews[i].sectionKey === sectionKey &&
-            cdPinnedViews[i].prefix === prefix &&
-            !cdPinnedViews[i].component) {
+            cdPinnedViews[i].prefix === prefix) {
           isPinned = true;
           break;
         }
       }
       btn.classList.toggle('cd-pin-btn-active', isPinned);
       btn.title = isPinned ? 'Unpin this section' : 'Pin to Views';
-    });
-
-    // Component-level pin buttons (chart/table)
-    document.querySelectorAll('.cd-component-pin').forEach(function(btn) {
-      var sectionKey = btn.getAttribute('data-cd-pin-section');
-      var prefix = btn.getAttribute('data-cd-pin-prefix') || '';
-      var component = btn.getAttribute('data-cd-pin-component') || '';
-      var isPinned = false;
-      for (var i = 0; i < cdPinnedViews.length; i++) {
-        if (cdPinnedViews[i].type !== 'section' &&
-            cdPinnedViews[i].sectionKey === sectionKey &&
-            cdPinnedViews[i].prefix === prefix &&
-            cdPinnedViews[i].component === component) {
-          isPinned = true;
-          break;
-        }
-      }
-      btn.classList.toggle('cd-pin-btn-active', isPinned);
     });
   }
 

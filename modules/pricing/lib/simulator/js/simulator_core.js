@@ -10,9 +10,10 @@ var TurasSimulator = (function() {
   var state = {
     currentPrice: 0,
     currentSegment: "total",
-    battleMode: false,
-    battlePrices: [0, 0]
+    scenarios: []  // Array of { price: number, label: string }
   };
+
+  var MAX_SCENARIOS = 8;
 
   var data = null;   // Will be set from PRICING_DATA
   var config = null;  // Will be set from PRICING_CONFIG
@@ -31,7 +32,8 @@ var TurasSimulator = (function() {
     setupSlider();
     setupScenarios();
     setupSegmentToggle();
-    setupBattleMode();
+    setupUnitCostInput();
+    setupScenarioComparison();
     updateAll();
   }
 
@@ -128,9 +130,8 @@ var TurasSimulator = (function() {
 
     if (config.unit_cost > 0) {
       setHTML("sim-profit-value", formatNum(profit));
-      showEl("sim-profit-card");
     } else {
-      hideEl("sim-profit-card");
+      setHTML("sim-profit-value", "N/A");
     }
 
     // Deltas vs optimal
@@ -143,9 +144,9 @@ var TurasSimulator = (function() {
     // Update chart
     updateChart(price, seg);
 
-    // Update battle mode if active
-    if (state.battleMode) {
-      updateBattle();
+    // Update scenario comparison table if populated
+    if (state.scenarios.length > 0) {
+      renderComparisonTable();
     }
 
     // Deselect scenario cards if price doesn't match
@@ -321,81 +322,188 @@ var TurasSimulator = (function() {
   }
 
   // =========================================================================
-  // UI: BATTLE MODE
+  // UI: UNIT COST INPUT
   // =========================================================================
 
-  function setupBattleMode() {
-    var btn = document.getElementById("sim-battle-toggle");
-    if (!btn) return;
+  function setupUnitCostInput() {
+    var input = document.getElementById("sim-unit-cost-input");
+    if (!input) return;
 
-    btn.addEventListener("click", function() {
-      state.battleMode = !state.battleMode;
-      var battleEl = document.getElementById("sim-battle-section");
-      if (battleEl) {
-        battleEl.classList.toggle("active", state.battleMode);
-      }
-      btn.textContent = state.battleMode ? "Exit Battle Mode" : "Battle Mode";
-      if (state.battleMode) {
-        state.battlePrices[0] = state.currentPrice;
-        state.battlePrices[1] = data.optimal_price || state.currentPrice;
-        setupBattleSliders();
-        updateBattle();
-      }
+    input.value = config.unit_cost > 0 ? config.unit_cost.toFixed(2) : "";
+
+    input.addEventListener("change", function() {
+      var val = parseFloat(this.value);
+      if (isNaN(val) || val < 0) val = 0;
+      config.unit_cost = val;
+      this.value = val > 0 ? val.toFixed(2) : "";
+      updateAll();
+      if (state.scenarios.length > 0) renderComparisonTable();
     });
   }
 
-  function setupBattleSliders() {
+  // =========================================================================
+  // UI: SCENARIO COMPARISON TABLE
+  // =========================================================================
+
+  function setupScenarioComparison() {
+    var addBtn = document.getElementById("sim-compare-add");
+    if (!addBtn) return;
+
+    addBtn.addEventListener("click", function() {
+      if (state.scenarios.length >= MAX_SCENARIOS) return;
+      state.scenarios.push({ price: state.currentPrice });
+      renderComparisonTable();
+    });
+  }
+
+  function removeScenario(idx) {
+    state.scenarios.splice(idx, 1);
+    renderComparisonTable();
+  }
+
+  function onScenarioPriceChange(idx, value) {
+    var p = parseFloat(value);
+    if (isNaN(p)) return;
     var minP = data.price_range[0];
     var maxP = data.price_range[data.price_range.length - 1];
-    var step = (maxP - minP) / 200;
-
-    for (var s = 0; s < 2; s++) {
-      var slider = document.getElementById("sim-battle-slider-" + s);
-      if (slider) {
-        slider.min = minP;
-        slider.max = maxP;
-        slider.step = step;
-        slider.value = state.battlePrices[s];
-        (function(idx) {
-          slider.addEventListener("input", function() {
-            state.battlePrices[idx] = parseFloat(this.value);
-            updateBattle();
-          });
-        })(s);
-      }
-    }
+    if (p < minP) p = minP;
+    if (p > maxP) p = maxP;
+    state.scenarios[idx].price = p;
+    renderComparisonTable();
   }
 
-  function updateBattle() {
-    var labels = ["A", "B"];
-    for (var b = 0; b < 2; b++) {
-      var p = state.battlePrices[b];
-      var intent = interpolateIntent(p);
-      var rev = calcRevenue(p);
-      var profit = calcProfit(p);
+  function renderComparisonTable() {
+    var thead = document.getElementById("sim-compare-thead");
+    var tbody = document.getElementById("sim-compare-tbody");
+    if (!thead || !tbody) return;
 
-      setHTML("sim-battle-price-" + b, config.currency + formatNum(p));
-      setHTML("sim-battle-intent-" + b, (intent * 100).toFixed(1) + "%");
-      setHTML("sim-battle-revenue-" + b, formatNum(rev));
-      if (config.unit_cost > 0) {
-        setHTML("sim-battle-profit-" + b, formatNum(profit));
+    var scenarios = state.scenarios;
+    if (scenarios.length === 0) {
+      thead.innerHTML = "";
+      tbody.innerHTML = "";
+      return;
+    }
+
+    var seg = state.currentSegment;
+    var optPrice = data.optimal_price || 0;
+    var optRevenue = optPrice > 0 ? calcRevenue(optPrice, seg) : 0;
+    var hasProfit = config.unit_cost > 0;
+    var optProfit = hasProfit && optPrice > 0 ? calcProfit(optPrice, seg) : 0;
+
+    // Compute metrics for all scenarios
+    var metrics = [];
+    for (var i = 0; i < scenarios.length; i++) {
+      var p = scenarios[i].price;
+      var intent = interpolateIntent(p, seg);
+      var rev = calcRevenue(p, seg);
+      var revIdx = optRevenue > 0 ? (rev / optRevenue * 100) : 0;
+      var profit = hasProfit ? calcProfit(p, seg) : 0;
+      var profIdx = optProfit > 0 ? (profit / optProfit * 100) : 0;
+      metrics.push({
+        price: p, intent: intent, revenue: rev,
+        revenueIndex: revIdx, profit: profit, profitIndex: profIdx
+      });
+    }
+
+    // Find best/worst for highlighting (only meaningful with 2+ scenarios)
+    var bestRev = -Infinity, worstRev = Infinity;
+    var bestProf = -Infinity, worstProf = Infinity;
+    if (metrics.length > 1) {
+      for (var j = 0; j < metrics.length; j++) {
+        if (metrics[j].revenueIndex > bestRev) bestRev = metrics[j].revenueIndex;
+        if (metrics[j].revenueIndex < worstRev) worstRev = metrics[j].revenueIndex;
+        if (hasProfit) {
+          if (metrics[j].profitIndex > bestProf) bestProf = metrics[j].profitIndex;
+          if (metrics[j].profitIndex < worstProf) worstProf = metrics[j].profitIndex;
+        }
       }
     }
 
-    // Highlight winner
-    var rev0 = calcRevenue(state.battlePrices[0]);
-    var rev1 = calcRevenue(state.battlePrices[1]);
-    highlightWinner("sim-battle-revenue-0", "sim-battle-revenue-1", rev0, rev1);
-  }
+    // Build header
+    var hdr = "<th>Metric</th>";
+    for (var h = 0; h < scenarios.length; h++) {
+      var removeBtn = '<button class="sim-remove-scenario" onclick="TurasSimulator._removeScenario(' + h + ')">&times;</button>';
+      hdr += "<th>Scenario " + (h + 1) + removeBtn + "</th>";
+    }
+    thead.innerHTML = hdr;
 
-  function highlightWinner(id0, id1, v0, v1) {
-    var el0 = document.getElementById(id0);
-    var el1 = document.getElementById(id1);
-    if (!el0 || !el1) return;
-    el0.style.fontWeight = v0 >= v1 ? "700" : "400";
-    el1.style.fontWeight = v1 >= v0 ? "700" : "400";
-    el0.style.color = v0 >= v1 ? "var(--sim-green)" : "var(--sim-text)";
-    el1.style.color = v1 >= v0 ? "var(--sim-green)" : "var(--sim-text)";
+    // Build rows
+    var rows = "";
+    var minP = data.price_range[0];
+    var maxP = data.price_range[data.price_range.length - 1];
+
+    // Price row (editable inputs)
+    rows += "<tr><td>Price (" + escHTML(config.currency) + ")</td>";
+    for (var r = 0; r < scenarios.length; r++) {
+      rows += '<td><input type="number" value="' + scenarios[r].price.toFixed(2) +
+        '" step="0.50" min="' + minP + '" max="' + maxP +
+        '" onchange="TurasSimulator._onPriceChange(' + r + ',this.value)"></td>';
+    }
+    rows += "</tr>";
+
+    // Purchase Intent
+    rows += "<tr><td>Purchase Intent</td>";
+    for (var a = 0; a < metrics.length; a++) {
+      rows += "<td>" + (metrics[a].intent * 100).toFixed(1) + "%</td>";
+    }
+    rows += "</tr>";
+
+    // Revenue Index
+    rows += "<tr><td>Revenue Index</td>";
+    for (var b = 0; b < metrics.length; b++) {
+      var rCls = "";
+      if (metrics.length > 1) {
+        if (metrics[b].revenueIndex === bestRev) rCls = ' class="sim-best"';
+        else if (metrics[b].revenueIndex === worstRev) rCls = ' class="sim-worst"';
+      }
+      var rLabel = metrics[b].revenueIndex.toFixed(0);
+      if (Math.abs(metrics[b].revenueIndex - 100) < 0.5) rLabel += ' <span class="sim-at-opt">(peak)</span>';
+      rows += "<td" + rCls + ">" + rLabel + "</td>";
+    }
+    rows += "</tr>";
+
+    // Profit Index (N/A if no unit cost)
+    rows += "<tr><td>Profit Index</td>";
+    if (hasProfit) {
+      for (var c = 0; c < metrics.length; c++) {
+        var pCls = "";
+        if (metrics.length > 1) {
+          if (metrics[c].profitIndex === bestProf) pCls = ' class="sim-best"';
+          else if (metrics[c].profitIndex === worstProf) pCls = ' class="sim-worst"';
+        }
+        var pLabel = metrics[c].profitIndex.toFixed(0);
+        if (Math.abs(metrics[c].profitIndex - 100) < 0.5) pLabel += ' <span class="sim-at-opt">(peak)</span>';
+        rows += "<td" + pCls + ">" + pLabel + "</td>";
+      }
+    } else {
+      for (var c2 = 0; c2 < metrics.length; c2++) {
+        rows += '<td style="color:#94a3b8;">N/A</td>';
+      }
+    }
+    rows += "</tr>";
+
+    // vs Optimal row
+    if (optPrice > 0) {
+      rows += "<tr><td>vs Optimal (" + escHTML(config.currency) + formatNum(optPrice) + ")</td>";
+      for (var d = 0; d < metrics.length; d++) {
+        var revDiff = metrics[d].revenueIndex - 100;
+        var label;
+        if (Math.abs(revDiff) < 0.5) {
+          label = '<span class="sim-best">at optimum</span>';
+        } else {
+          var sign = revDiff > 0 ? "+" : "";
+          label = sign + revDiff.toFixed(0) + "% revenue";
+          if (hasProfit) {
+            var profDiff = metrics[d].profitIndex - 100;
+            label += ", " + (profDiff > 0 ? "+" : "") + profDiff.toFixed(0) + "% profit";
+          }
+        }
+        rows += "<td>" + label + "</td>";
+      }
+      rows += "</tr>";
+    }
+
+    tbody.innerHTML = rows;
   }
 
   // =========================================================================
@@ -480,7 +588,9 @@ var TurasSimulator = (function() {
   return {
     init: init,
     exportPNG: exportPNG,
-    getState: function() { return state; }
+    getState: function() { return state; },
+    _removeScenario: removeScenario,
+    _onPriceChange: onScenarioPriceChange
   };
 
 })();

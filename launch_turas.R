@@ -657,9 +657,9 @@ launch_turas <- function() {
                 div(
                   class = "recent-item",
                   onclick = sprintf(
-                    "Shiny.setInputValue('launch_with_config', {mod_id: '%s', config: '%s'}, {priority: 'event'})",
-                    mod$id,
-                    gsub("'", "\\\\'", config_path)
+                    "Shiny.setInputValue('launch_with_config', {mod_id: %s, config: %s}, {priority: 'event'})",
+                    jsonlite::toJSON(mod$id, auto_unbox = TRUE),
+                    jsonlite::toJSON(config_path, auto_unbox = TRUE)
                   ),
                   div(class = "recent-name", basename(config_path)),
                   div(class = "recent-path", dirname(config_path))

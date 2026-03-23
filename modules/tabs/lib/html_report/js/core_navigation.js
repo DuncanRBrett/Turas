@@ -355,13 +355,6 @@ function toggleQuestionCollapse(btn) {
   if (container) container.classList.toggle("q-collapsed");
 }
 
-// Display Options dropdown toggle
-function toggleDisplayOptions(btn) {
-  var menu = btn.nextElementSibling;
-  if (!menu) return;
-  menu.style.display = menu.style.display === "none" ? "block" : "none";
-}
-
 // ---- Utility: extract label text from a td, ignoring button elements ----
 function getLabelText(cell) {
   var clone = cell.cloneNode(true);

@@ -24,7 +24,7 @@
 #' @param brand_colour Brand colour hex
 #' @return SVG string
 #' @keywords internal
-build_vw_curves_chart <- function(vw_data, brand_colour = "#1e3a5f") {
+build_vw_curves_chart <- function(vw_data, brand_colour = "#323367") {
   curves <- vw_data$curves
   if (is.null(curves) || !is.data.frame(curves) || nrow(curves) == 0) return("")
 
@@ -154,16 +154,37 @@ build_vw_curves_chart <- function(vw_data, brand_colour = "#1e3a5f") {
     list(price = safe_pp(pp$pme), label = "PME", desc = pp$pme$desc %||% "Point of Marginal Expensiveness", colour = "#64748b")
   )
 
+  # Collect valid markers with their x positions
+  valid_markers <- list()
   for (m in marker_defs) {
     if (is.na(m$price) || !is.numeric(m$price)) next
-    mx <- scale_x(m$price)
+    m$mx <- scale_x(m$price)
+    valid_markers <- c(valid_markers, list(m))
+  }
+
+  # Assign label y-offsets to avoid collisions (stagger when close)
+  min_gap <- 35  # minimum pixels between labels before staggering
+  label_offsets <- rep(mt - 8, length(valid_markers))
+  if (length(valid_markers) >= 2) {
+    for (i in 2:length(valid_markers)) {
+      for (j in 1:(i - 1)) {
+        if (abs(valid_markers[[i]]$mx - valid_markers[[j]]$mx) < min_gap &&
+            abs(label_offsets[i] - label_offsets[j]) < 10) {
+          label_offsets[i] <- label_offsets[j] + 14
+        }
+      }
+    }
+  }
+
+  for (i in seq_along(valid_markers)) {
+    m <- valid_markers[[i]]
     markers_svg <- c(markers_svg, sprintf(
       '<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="%s" stroke-width="1.5" stroke-dasharray="4,3" data-tooltip="%s: $%.2f"/>',
-      mx, mt, mx, height - mb, m$colour, m$desc, m$price
+      m$mx, mt, m$mx, height - mb, m$colour, m$desc, m$price
     ))
     markers_svg <- c(markers_svg, sprintf(
-      '<text x="%.1f" y="%d" text-anchor="middle" fill="%s" font-size="10" font-weight="600">%s</text>',
-      mx, mt - 8, m$colour, m$label
+      '<text x="%.1f" y="%.0f" text-anchor="middle" fill="%s" font-size="10" font-weight="600">%s</text>',
+      m$mx, label_offsets[i], m$colour, m$label
     ))
   }
 
@@ -229,7 +250,7 @@ build_demand_curve_chart <- function(prices, intents,
                                      observed_prices = NULL,
                                      observed_intents = NULL,
                                      optimal_price = NULL,
-                                     brand_colour = "#1e3a5f",
+                                     brand_colour = "#323367",
                                      title = "Demand Curve",
                                      currency = "$") {
 
@@ -426,7 +447,7 @@ build_demand_curve_chart <- function(prices, intents,
 #' @param currency Currency symbol
 #' @return SVG string
 #' @keywords internal
-build_segment_comparison_chart <- function(segment_data, brand_colour = "#1e3a5f",
+build_segment_comparison_chart <- function(segment_data, brand_colour = "#323367",
                                            currency = "$") {
   ct <- segment_data$comparison_table
   if (is.null(ct) || !is.data.frame(ct) || nrow(ct) == 0) return("")
@@ -528,7 +549,7 @@ build_segment_comparison_chart <- function(segment_data, brand_colour = "#1e3a5f
 #' @param currency Currency symbol
 #' @return SVG string
 #' @keywords internal
-build_elasticity_chart <- function(elasticity_data, brand_colour = "#1e3a5f",
+build_elasticity_chart <- function(elasticity_data, brand_colour = "#323367",
                                     currency = "$") {
   if (is.null(elasticity_data) || !is.data.frame(elasticity_data) || nrow(elasticity_data) == 0) return("")
 
@@ -648,7 +669,7 @@ build_elasticity_chart <- function(elasticity_data, brand_colour = "#1e3a5f",
 #' @param brand_colour Base brand colour hex
 #' @return Character vector of hex colours
 #' @keywords internal
-generate_palette <- function(n, brand_colour = "#1e3a5f") {
+generate_palette <- function(n, brand_colour = "#323367") {
   if (n <= 0) return(character(0))
 
   base_palette <- c(

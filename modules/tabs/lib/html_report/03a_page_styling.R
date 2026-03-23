@@ -186,7 +186,7 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     .controls-bar {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 8px;
       margin-bottom: 16px;
       flex-wrap: wrap;
     }
@@ -723,7 +723,7 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     .insight-dismiss:hover { color: #64748b; background: #e2e8f0; }
     /* Edit mode indicator — shows when content has been edited */
     .insight-container.edited::before {
-      content: "KEY INSIGHT \u2022 edited";
+      content: "KEY INSIGHT • edited";
     }
     .insight-container.editing {
       border-left-color: #f59e0b;

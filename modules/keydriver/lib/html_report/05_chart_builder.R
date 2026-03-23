@@ -320,7 +320,13 @@ build_kd_correlation_heatmap <- function(correlations, brand_colour = "#323367")
   n <- length(var_names)
   if (n < 2) return(NULL)
 
-  cs <- 40; lm <- 120; rm <- 80
+  # Truncate long labels for readability
+  max_label <- 20
+  display_names <- vapply(var_names, function(v) {
+    if (nchar(v) > max_label) paste0(substr(v, 1, max_label - 1), "\u2026") else v
+  }, character(1))
+
+  cs <- 44; lm <- 140; rm <- 100
   cw <- lm + n * cs + 20; ch <- rm + n * cs + 20
 
   # Red (#ef4444=239,68,68) <-> white <-> blue (#3b82f6=59,130,246)
@@ -339,14 +345,14 @@ build_kd_correlation_heatmap <- function(correlations, brand_colour = "#323367")
   # Rotated column headers
   for (j in seq_len(n)) {
     xc <- lm + (j - 1) * cs + cs / 2
-    s <- paste0(s, sprintf('\n<text x="%.1f" y="%.1f" text-anchor="start" font-size="10" fill="%s" font-weight="400" transform="rotate(-45,%.1f,%.1f)">%s</text>',
-                           xc, rm - 8, .kd_label_colour, xc, rm - 8, .kd_html_escape(var_names[j])))
+    s <- paste0(s, sprintf('\n<text x="%.1f" y="%.1f" text-anchor="start" font-size="11" fill="%s" font-weight="500" transform="rotate(-45,%.1f,%.1f)">%s</text>',
+                           xc, rm - 8, .kd_label_colour, xc, rm - 8, .kd_html_escape(display_names[j])))
   }
 
   # Row labels + cells
   for (i in seq_len(n)) {
     yt <- rm + (i - 1) * cs; yc <- yt + cs / 2
-    s <- paste0(s, "\n", .kd_svg_text(lm - 8, yc, var_names[i], size = 10,
+    s <- paste0(s, "\n", .kd_svg_text(lm - 10, yc, display_names[i], size = 11,
                                        fill = .kd_label_colour, anchor = "end", baseline = "central"))
     for (j in seq_len(n)) {
       xl <- lm + (j - 1) * cs; xc <- xl + cs / 2

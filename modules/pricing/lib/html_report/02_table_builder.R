@@ -177,7 +177,7 @@ build_gg_demand_table <- function(gg_data, currency = "$") {
 
 #' Build GG Optimal Price Table
 #' @keywords internal
-build_gg_optimal_table <- function(gg_data, currency = "$") {
+build_gg_optimal_table <- function(gg_data, currency = "$", unit_cost = 0) {
   op <- gg_data$optimal_price
   if (is.null(op)) return("")
 
@@ -188,6 +188,19 @@ build_gg_optimal_table <- function(gg_data, currency = "$") {
     currency, op$price, op$purchase_intent * 100, op$revenue_index
   )
 
+  # Unit cost row
+  uc <- as.numeric(unit_cost %||% 0)
+  if (uc > 0) {
+    rows <- c(rows, sprintf(
+      '<tr><td class="pr-td pr-label-col">Unit Cost</td><td class="pr-td pr-num">%s%.2f</td></tr>',
+      currency, uc
+    ))
+  } else {
+    rows <- c(rows,
+      '<tr><td class="pr-td pr-label-col">Unit Cost</td><td class="pr-td pr-num" style="color:#94a3b8;">N/A</td></tr>'
+    )
+  }
+
   if (!is.null(gg_data$optimal_price_profit)) {
     opp <- gg_data$optimal_price_profit
     rows <- c(rows, sprintf(
@@ -197,6 +210,11 @@ build_gg_optimal_table <- function(gg_data, currency = "$") {
        <tr><td class="pr-td pr-label-col">Margin</td><td class="pr-td pr-num">%.1f%%</td></tr>',
       currency, opp$price, opp$profit_index, opp$margin * 100
     ))
+  } else {
+    rows <- c(rows,
+      '<tr class="pr-tr-section"><td class="pr-td pr-label-col" colspan="2"><strong>Profit Optimisation</strong></td></tr>
+       <tr><td class="pr-td pr-label-col" colspan="2" style="color:#94a3b8;">Set Unit Cost in config to enable profit calculations</td></tr>'
+    )
   }
 
   sprintf(
@@ -330,7 +348,7 @@ build_monadic_observed_table <- function(monadic_data, currency = "$") {
 
 #' Build Monadic Optimal Price Table
 #' @keywords internal
-build_monadic_optimal_table <- function(monadic_data, currency = "$") {
+build_monadic_optimal_table <- function(monadic_data, currency = "$", unit_cost = 0) {
   op <- monadic_data$optimal_price
   if (is.null(op)) return("")
 
@@ -341,6 +359,19 @@ build_monadic_optimal_table <- function(monadic_data, currency = "$") {
     currency, op$price, op$predicted_intent * 100, op$revenue_index
   )
 
+  # Unit cost row
+  uc <- as.numeric(unit_cost %||% 0)
+  if (uc > 0) {
+    rows <- c(rows, sprintf(
+      '<tr><td class="pr-td pr-label-col">Unit Cost</td><td class="pr-td pr-num">%s%.2f</td></tr>',
+      currency, uc
+    ))
+  } else {
+    rows <- c(rows,
+      '<tr><td class="pr-td pr-label-col">Unit Cost</td><td class="pr-td pr-num" style="color:#94a3b8;">N/A</td></tr>'
+    )
+  }
+
   if (!is.null(monadic_data$optimal_price_profit)) {
     opp <- monadic_data$optimal_price_profit
     rows <- c(rows, sprintf(
@@ -350,6 +381,11 @@ build_monadic_optimal_table <- function(monadic_data, currency = "$") {
        <tr><td class="pr-td pr-label-col">Profit Index</td><td class="pr-td pr-num">%.2f</td></tr>',
       currency, opp$price, opp$predicted_intent * 100, opp$profit_index
     ))
+  } else {
+    rows <- c(rows,
+      '<tr class="pr-tr-section"><td class="pr-td pr-label-col" colspan="2"><strong>Profit Optimisation</strong></td></tr>
+       <tr><td class="pr-td pr-label-col" colspan="2" style="color:#94a3b8;">Set Unit Cost in config to enable profit calculations</td></tr>'
+    )
   }
 
   # Confidence intervals
