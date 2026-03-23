@@ -17,6 +17,12 @@ local({
     source(file.path(ds_dir, "font_embed.R"), local = FALSE)
     source(file.path(ds_dir, "base_css.R"), local = FALSE)
   }
+  # Source callout registry
+  callout_dir <- file.path(turas_root, "modules", "shared", "lib", "callouts")
+  if (!dir.exists(callout_dir)) callout_dir <- file.path("modules", "shared", "lib", "callouts")
+  if (!exists("turas_callout", mode = "function") && dir.exists(callout_dir)) {
+    source(file.path(callout_dir, "callout_registry.R"), local = FALSE)
+  }
 })
 
 # Null-coalescing operator (canonical definition in utils.R)
@@ -48,6 +54,7 @@ build_confidence_page <- function(html_data, tables, charts, config,
   css <- build_ci_css(brand, accent)
   header <- build_ci_header(html_data$summary, brand, config, labels = labels)
   nav <- build_ci_tab_nav()
+  help_overlay <- build_ci_help_overlay()
   summary_panel <- build_ci_summary_panel(html_data, tables, charts, labels = labels)
   details_panel <- build_ci_details_panel(html_data, tables, charts, brand, labels = labels)
   notes_panel <- build_ci_notes_panel(html_data, config)
@@ -64,6 +71,7 @@ build_confidence_page <- function(html_data, tables, charts, config,
     '</head>\n<body>\n',
     header, '\n',
     nav, '\n',
+    help_overlay, '\n',
     '<div class="ci-content">\n',
     summary_panel, '\n',
     details_panel, '\n',
@@ -107,29 +115,40 @@ build_ci_css <- function(brand, accent) {
   --ci-accent: ACCENT;
   --ci-text-primary: #1e293b;
   --ci-text-secondary: #64748b;
+  --ci-text-tertiary: #94a3b8;
   --ci-bg-surface: #ffffff;
   --ci-bg-muted: #f8f9fa;
+  --ci-bg-page: #f8f7f5;
   --ci-border: #e2e8f0;
+  --ci-border-light: #f1f5f9;
+  --ci-radius: 10px;
+  --ci-radius-sm: 6px;
+  --ci-shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
+  --ci-shadow-hover: 0 4px 12px rgba(0,0,0,0.07);
+  --ci-transition: 0.2s ease;
 }
 body {
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  background: #f8f7f5;
+  background: var(--ci-bg-page);
   color: var(--ci-text-primary);
   line-height: 1.6;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Header */
 .ci-header {
-  background: linear-gradient(135deg, #1a2744 0%, #2a3f5f 100%);
+  background: linear-gradient(135deg, #1a2744 0%, #2a3f5f 60%, #1e3a5f 100%);
   border-bottom: 3px solid BRAND;
-  padding: 24px 32px 20px;
+  padding: 28px 32px 24px;
 }
 .ci-header-inner {
   max-width: 1200px;
   margin: 0 auto;
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 24px;
 }
 .ci-header-logo {
   width: 56px; height: 56px;
@@ -138,35 +157,39 @@ body {
 }
 .ci-header-text { flex: 1; }
 .ci-header-title {
-  color: #fff; font-size: 24px; font-weight: 700;
+  color: #fff; font-size: 22px; font-weight: 700;
+  letter-spacing: -0.3px;
 }
 .ci-header-subtitle {
-  color: rgba(255,255,255,0.5); font-size: 12px; margin-top: 2px;
+  color: rgba(255,255,255,0.45); font-size: 11px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px;
 }
 .ci-header-project {
-  color: #fff; font-size: 20px; font-weight: 700; margin-top: 4px;
+  color: #fff; font-size: 18px; font-weight: 600; margin-top: 6px;
+  letter-spacing: -0.2px;
 }
 .ci-header-prepared {
-  color: rgba(255,255,255,0.65); font-size: 13px; margin-top: 4px;
+  color: rgba(255,255,255,0.6); font-size: 13px; font-weight: 400; margin-top: 4px;
 }
 .ci-header-badges {
   display: inline-flex; align-items: center;
-  margin-top: 12px;
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 6px;
-  background: rgba(255,255,255,0.05);
+  margin-top: 14px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: var(--ci-radius-sm);
+  background: rgba(255,255,255,0.04);
   overflow: hidden;
 }
 .ci-badge {
-  padding: 4px 12px;
-  color: rgba(255,255,255,0.85);
-  font-size: 12px;
+  padding: 5px 14px;
+  color: rgba(255,255,255,0.8);
+  font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
+  letter-spacing: 0.2px;
 }
 .ci-badge-sep {
   width: 1px; height: 16px;
-  background: rgba(255,255,255,0.20);
+  background: rgba(255,255,255,0.15);
 }
 #ci-save-badge {
   display: none;
@@ -180,24 +203,26 @@ body {
 .report-tabs {
   display: flex; align-items: center;
   background: #fff;
-  border-bottom: 2px solid var(--ci-border);
+  border-bottom: 1px solid var(--ci-border);
   padding: 0 24px;
   max-width: 1200px;
   margin: 0 auto;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
 }
 .report-tab {
-  padding: 12px 24px;
+  padding: 14px 24px;
   border: none; background: transparent;
-  color: var(--ci-text-primary);
-  font-size: 14px; font-weight: 600;
+  color: var(--ci-text-secondary);
+  font-size: 13px; font-weight: 600;
   cursor: pointer;
-  border-bottom: 3px solid transparent;
-  transition: all 0.15s;
+  border-bottom: 2px solid transparent;
+  transition: all var(--ci-transition);
   font-family: inherit;
+  letter-spacing: 0.1px;
 }
 .report-tab:hover:not(.active) {
-  background: #f8f8f8;
-  color: BRAND;
+  color: var(--ci-text-primary);
+  background: #fafbfc;
 }
 .report-tab.active {
   color: BRAND;
@@ -210,11 +235,49 @@ body {
 }
 .ci-save-tab:hover { background: #f0f9ff; }
 
+/* Help button */
+.ci-help-btn {
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 1.5px solid #cbd5e1; background: transparent;
+  color: #64748b; font-size: 13px; font-weight: 700;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  margin-left: 8px; flex-shrink: 0;
+  transition: all var(--ci-transition);
+}
+.ci-help-btn:hover { border-color: BRAND; color: BRAND; background: #f0f9ff; }
+
+/* Help overlay */
+.ci-help-overlay {
+  display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.6); z-index: 9999; cursor: pointer;
+}
+.ci-help-overlay.active { display: flex; align-items: center; justify-content: center; }
+.ci-help-card {
+  background: #fff; border-radius: 12px; padding: 28px 32px; max-width: 640px; width: 92%;
+  max-height: 85vh; overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3); cursor: default;
+}
+.ci-help-card h2 { font-size: 20px; margin-bottom: 4px; color: BRAND; }
+.ci-help-card .help-subtitle { font-size: 12px; color: #94a3b8; margin-bottom: 20px; }
+.ci-help-card h3 {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+  color: #94a3b8; margin: 18px 0 8px; padding-top: 14px; border-top: 1px solid #f1f5f9;
+}
+.ci-help-card h3:first-of-type { border-top: none; padding-top: 0; margin-top: 8px; }
+.ci-help-card ul { list-style: none; padding: 0; margin: 0; }
+.ci-help-card li { padding: 5px 0; font-size: 13px; color: #374151; line-height: 1.4; }
+.ci-help-card .help-key {
+  display: inline-block; background: #f1f5f9; border-radius: 4px;
+  padding: 2px 8px; font-weight: 600; color: BRAND; margin-right: 8px;
+  font-size: 11px; min-width: 110px; text-align: center;
+}
+.ci-help-card .help-dismiss { margin-top: 18px; text-align: center; color: #94a3b8; font-size: 12px; }
+
 /* Content */
 .ci-content {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 20px 24px;
+  padding: 24px;
 }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
@@ -222,30 +285,32 @@ body {
 /* Cards */
 .ci-card {
   background: var(--ci-bg-surface);
-  border-radius: 8px;
+  border-radius: var(--ci-radius);
   border: 1px solid var(--ci-border);
-  padding: 24px;
-  margin-bottom: 20px;
+  padding: 28px;
+  margin-bottom: 24px;
+  box-shadow: var(--ci-shadow-card);
 }
 .ci-card h3 {
-  font-size: 16px; font-weight: 700;
+  font-size: 15px; font-weight: 700;
   color: var(--ci-text-primary);
-  margin-bottom: 16px;
-  padding-bottom: 8px;
+  margin-bottom: 18px;
+  padding-bottom: 10px;
   border-bottom: 2px solid BRAND;
+  letter-spacing: -0.2px;
 }
 
-/* Callouts */
+/* Dynamic Callouts (per-question, data-driven) */
 .ci-callout {
-  background: #f0f9ff;
-  border: 1px solid #bae6fd;
-  border-left: 3px solid BRAND;
-  border-radius: 6px;
-  padding: 12px 16px;
+  border-radius: var(--ci-radius-sm);
+  padding: 14px 18px;
   margin-bottom: 16px;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.7;
   color: #334155;
+  background: #f0f7ff;
+  border: 1px solid #dbeafe;
+  border-left: 3px solid BRAND;
 }
 .ci-callout strong { color: #1e293b; }
 
@@ -255,24 +320,32 @@ body {
   border-left: 3px solid #f59e0b;
 }
 .ci-callout-result {
+  background: linear-gradient(135deg, #f0f7ff 0%, #f8fbff 100%);
+  border: 1px solid #dbeafe;
   border-left: 3px solid BRAND;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 .ci-callout-method {
   background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #e8ecf1;
   border-left: 3px solid #94a3b8;
-  margin-bottom: 8px;
-  font-size: 11.5px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: #475569;
 }
-.ci-callout-method p { margin: 0 0 6px 0; }
+.ci-callout-method p { margin: 0 0 8px 0; }
 .ci-callout-method p:last-child { margin-bottom: 0; }
 .ci-callout-sampling {
-  background: #fffbeb;
+  background: linear-gradient(135deg, #fffbeb 0%, #fffef5 100%);
   border: 1px solid #fde68a;
-  border-left: 3px solid #f59e0b;
-  font-size: 11.5px;
+  border-left: 3px solid #d4a853;
+  font-size: 12px;
+  color: #78350f;
 }
+
+/* Registry Callouts (t-callout from shared design system) */
+.t-callout { margin-bottom: 18px; }
+.ci-card .t-callout:last-child { margin-bottom: 0; }
 
 /* Tables */
 .ci-table {
@@ -280,10 +353,12 @@ body {
   border-collapse: collapse;
   font-size: 13px;
   margin-bottom: 16px;
+  border-radius: var(--ci-radius-sm);
+  overflow: hidden;
 }
 .ci-table thead th {
-  background: var(--ci-bg-muted);
-  padding: 10px 14px;
+  background: #f8f9fb;
+  padding: 12px 16px;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -293,51 +368,80 @@ body {
   text-align: left;
 }
 .ci-table tbody td {
-  padding: 8px 14px;
-  border-bottom: 1px solid var(--ci-border);
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--ci-border-light);
   vertical-align: middle;
+  transition: background-color 0.15s ease;
 }
-.ci-table tbody tr:hover { background: #fafbfc; }
+.ci-table tbody tr:hover { background: #eef2f7; }
+.ci-table tbody tr:last-child td { border-bottom: 1px solid var(--ci-border); }
 .ci-num {
   text-align: right;
   font-variant-numeric: tabular-nums;
+  font-weight: 500;
 }
 .ci-table thead th.ci-num {
   text-align: right;
 }
 .ci-label-col { font-weight: 600; color: var(--ci-text-primary); }
 .ci-table-compact { font-size: 12px; }
-.ci-table-compact td { padding: 6px 10px; }
+.ci-table-compact td { padding: 8px 12px; }
 .ci-row-highlight { background: #f8f9fa; }
 
 /* Quality Badges */
-.ci-quality-good { color: #27ae60; font-weight: 700; }
-.ci-quality-warn { color: #f39c12; font-weight: 700; }
-.ci-quality-poor { color: #e74c3c; font-weight: 700; }
-.ci-diff-good { color: #27ae60; font-weight: 600; }
-.ci-diff-warn { color: #f39c12; font-weight: 600; }
-.ci-diff-poor { color: #e74c3c; font-weight: 600; }
+.ci-quality-good {
+  color: #059669; font-weight: 700;
+  background: #ecfdf5; padding: 2px 8px; border-radius: 4px;
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px;
+  display: inline-block;
+}
+.ci-quality-warn {
+  color: #d97706; font-weight: 700;
+  background: #fffbeb; padding: 2px 8px; border-radius: 4px;
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px;
+  display: inline-block;
+}
+.ci-quality-poor {
+  color: #dc2626; font-weight: 700;
+  background: #fef2f2; padding: 2px 8px; border-radius: 4px;
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px;
+  display: inline-block;
+}
+.ci-diff-good { color: #059669; font-weight: 600; }
+.ci-diff-warn { color: #d97706; font-weight: 600; }
+.ci-diff-poor { color: #dc2626; font-weight: 600; }
 
 /* Question Navigation (Details Tab) */
 .ci-nav {
-  display: flex; flex-wrap: wrap; gap: 6px;
-  margin-bottom: 20px;
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin-bottom: 24px;
+  padding: 16px 20px;
+  background: var(--ci-bg-surface);
+  border-radius: var(--ci-radius);
+  border: 1px solid var(--ci-border);
+  box-shadow: var(--ci-shadow-card);
 }
 .ci-nav-btn {
-  padding: 8px 16px;
+  padding: 8px 18px;
   border: 1px solid var(--ci-border);
-  border-radius: 6px;
+  border-radius: 20px;
   background: var(--ci-bg-surface);
-  color: var(--ci-text-primary);
+  color: var(--ci-text-secondary);
   font-size: 12px; font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--ci-transition);
   font-family: inherit;
+  letter-spacing: 0.1px;
 }
-.ci-nav-btn:hover { background: #f8fafc; border-color: BRAND; }
+.ci-nav-btn:hover {
+  background: #f0f7ff;
+  border-color: BRAND;
+  color: BRAND;
+}
 .ci-nav-btn.active {
   background: BRAND; color: #fff;
   border-color: BRAND;
+  box-shadow: 0 2px 4px rgba(30,58,95,0.2);
 }
 .ci-detail-panel { display: none; }
 .ci-detail-panel.active { display: block; }
@@ -346,31 +450,32 @@ body {
 .ci-comments-box {
   width: 100%;
   min-height: 120px;
-  padding: 12px 16px;
+  padding: 14px 18px;
   border: 1px solid var(--ci-border);
-  border-radius: 6px;
+  border-radius: var(--ci-radius-sm);
   font-family: inherit;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.6;
   color: var(--ci-text-primary);
   background: #fff;
   resize: vertical;
+  transition: border-color var(--ci-transition), box-shadow var(--ci-transition);
 }
 .ci-comments-box:focus {
   outline: none;
   border-color: BRAND;
-  box-shadow: 0 0 0 2px rgba(30,58,95,0.10);
+  box-shadow: 0 0 0 3px rgba(30,58,95,0.08);
 }
 
 /* Footer */
 .ci-footer {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 16px 24px;
+  padding: 20px 24px;
   text-align: center;
   font-size: 11px;
-  color: #94a3b8;
-  border-top: 1px solid #e2e8f0;
+  color: var(--ci-text-tertiary);
+  border-top: 1px solid var(--ci-border);
 }
 
 /* Stats row */
@@ -378,54 +483,84 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 .ci-stat-card {
   background: var(--ci-bg-surface);
   border: 1px solid var(--ci-border);
-  border-radius: 8px;
-  padding: 16px;
+  border-top: 3px solid BRAND;
+  border-radius: var(--ci-radius);
+  padding: 20px 16px;
   text-align: center;
+  box-shadow: var(--ci-shadow-card);
+  transition: box-shadow var(--ci-transition);
+}
+.ci-stat-card:hover {
+  box-shadow: var(--ci-shadow-hover);
 }
 .ci-stat-value {
-  font-size: 28px; font-weight: 700;
+  font-size: 32px; font-weight: 700;
   color: BRAND;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
 }
 .ci-stat-label {
   font-size: 11px; font-weight: 600;
   color: var(--ci-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 /* Method docs */
 .ci-method-doc {
-  background: var(--ci-bg-muted);
+  background: var(--ci-bg-surface);
   border: 1px solid var(--ci-border);
-  border-radius: 6px;
-  padding: 16px;
-  margin-bottom: 12px;
+  border-left: 3px solid var(--ci-text-tertiary);
+  border-radius: 0 var(--ci-radius-sm) var(--ci-radius-sm) 0;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  transition: border-left-color var(--ci-transition);
+}
+.ci-method-doc:hover {
+  border-left-color: BRAND;
 }
 .ci-method-doc h4 {
   font-size: 14px; font-weight: 700;
   color: var(--ci-text-primary);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+  letter-spacing: -0.1px;
 }
 .ci-method-doc p {
-  font-size: 12px; line-height: 1.7;
-  color: #334155;
-  margin-bottom: 8px;
+  font-size: 13px; line-height: 1.7;
+  color: #475569;
+  margin-bottom: 10px;
 }
 .ci-method-doc p:last-child { margin-bottom: 0; }
 
 /* Print */
 @media print {
-  .report-tabs, .ci-save-tab, .ci-nav { display: none !important; }
+  body { background: #fff; }
+  .report-tabs, .ci-save-tab, .ci-nav, .ci-comments-box, .ci-help-overlay, .ci-help-btn { display: none !important; }
   .tab-panel { display: block !important; page-break-inside: avoid; }
   .ci-detail-panel { display: block !important; }
   .ci-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .ci-card { box-shadow: none; border: 1px solid #ddd; break-inside: avoid; }
+  .ci-stat-card { box-shadow: none; border-top-color: #999; }
+  .t-callout { break-inside: avoid; }
 }
+
+/* Question Meta Bar */
+.ci-question-meta {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 12px 16px;
+  background: #f8f9fb;
+  border-radius: var(--ci-radius-sm);
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+.ci-question-meta strong { font-weight: 600; }
 '
 
   # Token replacement (avoids sprintf 8192 char limit)
@@ -539,12 +674,62 @@ build_ci_header <- function(summary, brand, config, labels = NULL) {
 # ==============================================================================
 
 build_ci_tab_nav <- function() {
-  '<div class="report-tabs">
+  save_icon <- '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:5px;"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>'
+  paste0(
+    '<div class="report-tabs">
     <button class="report-tab active" data-tab="summary" onclick="switchReportTab(\'summary\')">Summary</button>
     <button class="report-tab" data-tab="details" onclick="switchReportTab(\'details\')">Question Details</button>
     <button class="report-tab" data-tab="notes" onclick="switchReportTab(\'notes\')">Method Notes</button>
-    <button class="report-tab ci-save-tab" onclick="saveReportHTML()">Save Report</button>
+    <button class="report-tab ci-save-tab" onclick="saveReportHTML()">', save_icon, 'Save Report</button>
+    <button class="ci-help-btn" onclick="toggleHelpOverlay()" title="Show help guide">?</button>
   </div>'
+  )
+}
+
+
+# ==============================================================================
+# HELP OVERLAY
+# ==============================================================================
+
+#' Build Help Overlay for Confidence Report
+#'
+#' Creates a modal overlay with a quick-reference guide to interactive features.
+#' Shown via the ? button in the tab bar.
+#'
+#' @return Character string of help overlay HTML
+#' @keywords internal
+build_ci_help_overlay <- function() {
+  '
+<div class="ci-help-overlay" id="ci-help-overlay" onclick="toggleHelpOverlay()">
+  <div class="ci-help-card" onclick="event.stopPropagation()">
+    <h2>Quick Guide</h2>
+    <div class="help-subtitle">Everything you need to know about this report</div>
+
+    <h3>Navigating</h3>
+    <ul>
+      <li><span class="help-key">Summary</span>Overview of all questions with quality ratings and forest plot</li>
+      <li><span class="help-key">Question Details</span>Per-question analysis with method comparisons and charts</li>
+      <li><span class="help-key">Method Notes</span>Statistical methodology, assumptions, and limitations</li>
+    </ul>
+
+    <h3>Understanding Results</h3>
+    <ul>
+      <li><span class="help-key">Stability Interval</span>The range of plausible values for the true population parameter</li>
+      <li><span class="help-key">Forest Plot</span>Dots = estimates, bars = intervals. Shorter bars = more precision</li>
+      <li><span class="help-key">Quality Badge</span><strong style="color:#059669;">Good</strong> = precise, <strong style="color:#d97706;">Caution</strong> = moderate width, <strong style="color:#dc2626;">Poor</strong> = wide intervals</li>
+    </ul>
+
+    <h3>Interactive Features</h3>
+    <ul>
+      <li><span class="help-key">Question Nav</span>Click question buttons in the Details tab to switch between questions</li>
+      <li><span class="help-key">Callouts</span>Click the <strong>i</strong> callout headers to expand/collapse educational notes</li>
+      <li><span class="help-key">Comments</span>Add analyst notes in the Method Notes tab — saved with the report</li>
+      <li><span class="help-key">Save Report</span>Downloads a self-contained HTML file with your comments preserved</li>
+    </ul>
+
+    <div class="help-dismiss">Click outside this panel or press Escape to close</div>
+  </div>
+</div>'
 }
 
 
@@ -585,64 +770,61 @@ build_ci_summary_panel <- function(html_data, tables, charts, labels = NULL) {
 
   # Study-level card (if weighted)
   if (summary$is_weighted && nzchar(tables$study_level %||% "")) {
+    # Registry callout for static educational text
+    study_callout <- turas_callout("confidence", "study_level_weighting", collapsed = TRUE)
+
+    # Dynamic data-specific summary
     deff_val <- summary$deff %||% 1
     efficiency <- if (!is.na(deff_val) && deff_val > 0) round(100 / deff_val, 1) else NA
-
-    callout_text <- sprintf(
-      '<strong>What these numbers mean:</strong> The Design Effect (DEFF) of %.2f means weighting reduces your effective sample from %s to %s. ',
+    deff_summary <- sprintf(
+      '<div class="ci-callout ci-callout-result"><strong>Your study:</strong> DEFF = %.2f, reducing your effective sample from %s to %s.',
       deff_val,
       format(summary$n_total, big.mark = ","),
       format(summary$n_effective, big.mark = ",")
     )
     if (!is.na(efficiency)) {
-      if (efficiency >= 85) {
-        callout_text <- paste0(callout_text, sprintf("An efficiency of %.0f%% is excellent &mdash; weighting has minimal impact on your results.", efficiency))
+      eff_text <- if (efficiency >= 85) {
+        sprintf(" Efficiency of %.0f%% is excellent &mdash; weighting has minimal impact.", efficiency)
       } else if (efficiency >= 70) {
-        callout_text <- paste0(callout_text, sprintf("An efficiency of %.0f%% is acceptable, though precision is somewhat reduced by weighting.", efficiency))
+        sprintf(" Efficiency of %.0f%% is acceptable, though precision is somewhat reduced.", efficiency)
       } else {
-        callout_text <- paste0(callout_text, sprintf("<strong>Warning:</strong> An efficiency of %.0f%% means weighting significantly reduces statistical power. Consider whether your weighting scheme is appropriate.", efficiency))
+        sprintf(" <strong>Warning:</strong> Efficiency of %.0f%% means weighting significantly reduces statistical power.", efficiency)
       }
+      deff_summary <- paste0(deff_summary, eff_text)
     }
-    callout_text <- paste0(callout_text,
-      " <strong>Important:</strong> These calculations assume a probability-based sample design. If respondents were not randomly selected, the design effect only captures the impact of weighting, not the full extent of sampling bias."
-    )
+    deff_summary <- paste0(deff_summary, "</div>")
 
     parts <- c(parts, sprintf(
-      '<div class="ci-card"><h3>Study-Level Statistics</h3><div class="ci-callout">%s</div>%s</div>',
-      callout_text, tables$study_level
+      '<div class="ci-card"><h3>Study-Level Statistics</h3>%s\n%s\n%s</div>',
+      deff_summary, study_callout, tables$study_level
     ))
   }
 
-  # Summary table
+  # Summary table — registry callouts
   if (nzchar(tables$summary %||% "")) {
+    overview_callout <- turas_callout("confidence", "results_overview")
+    method_callout <- turas_callout("confidence", "method_selection", collapsed = TRUE)
     parts <- c(parts, sprintf(
-      '<div class="ci-card"><h3>Results Overview</h3>
-        <div class="ci-callout">This table shows all questions analysed with their %ss and quality assessments. The Quality column indicates whether the sample is large enough for reliable estimates. Click the <strong>Question Details</strong> tab above for full method comparisons and explanations.</div>
-        %s
-      </div>',
-      labels$interval_term, tables$summary
+      '<div class="ci-card"><h3>Results Overview</h3>%s\n%s\n%s</div>',
+      overview_callout, method_callout, tables$summary
     ))
   }
 
-  # Forest plot
+  # Forest plot — registry callout
   if (nzchar(charts$forest_plot %||% "")) {
+    forest_callout <- turas_callout("confidence", "forest_plot_guide", collapsed = TRUE)
     parts <- c(parts, sprintf(
-      '<div class="ci-card"><h3>%s</h3>
-        <div class="ci-callout">Each dot shows the estimated value, and the horizontal bar shows the %s. Shorter bars indicate more precise estimates. If a bar is very wide, the true value is uncertain &mdash; a larger sample would narrow it.</div>
-        %s
-      </div>',
-      labels$overview_title, tolower(labels$interval_name), charts$forest_plot
+      '<div class="ci-card"><h3>%s</h3>%s\n%s</div>',
+      labels$overview_title, charts$forest_plot, forest_callout
     ))
   }
 
-  # Representativeness
+  # Representativeness — registry callout
   if (nzchar(tables$representativeness %||% "")) {
+    repr_callout <- turas_callout("confidence", "representativeness")
     parts <- c(parts, sprintf(
-      '<div class="ci-card"><h3>Sample Representativeness</h3>
-        <div class="ci-callout"><strong>Reading this table:</strong> Green (&lt;2pp) means the weighted sample closely matches the target population. Amber (2&ndash;5pp) is a moderate departure. Red (&gt;5pp) means a significant gap between sample and population, which may affect the accuracy of estimates for that subgroup. <strong>Note:</strong> Representativeness checks only verify known demographic quotas &mdash; they cannot detect biases in unmeasured characteristics.</div>
-        %s
-      </div>',
-      tables$representativeness
+      '<div class="ci-card"><h3>Sample Representativeness</h3>%s\n%s</div>',
+      repr_callout, tables$representativeness
     ))
   }
 
@@ -695,13 +877,17 @@ build_ci_details_panel <- function(html_data, tables, charts, brand, labels = NU
       panel_parts <- c(panel_parts, CLUSTER_WARNING_HTML)
     }
 
-    # Quality badge
+    # Quality meta bar
     badge_class <- paste0("ci-quality-", q$quality$badge)
     badge_label <- switch(q$quality$badge, good = "Good", warn = "Caution", poor = "Poor")
     type_label <- switch(q$type, proportion = "Proportion", mean = "Mean", nps = "NPS")
 
     panel_parts <- c(panel_parts, sprintf(
-      '<p style="margin-bottom:16px;">Type: <strong>%s</strong> | Quality: <span class="%s"><strong>%s</strong></span> | Effective N: <strong>%s</strong></p>',
+      '<div class="ci-question-meta">
+        <span>Type: <strong>%s</strong></span>
+        <span>Quality: <span class="%s">%s</span></span>
+        <span>Effective N: <strong>%s</strong></span>
+      </div>',
       type_label, badge_class, badge_label,
       if (!is.na(q$n_eff)) format(q$n_eff, big.mark = ",") else "N/A"
     ))
@@ -762,12 +948,8 @@ build_ci_notes_panel <- function(html_data, config) {
   # Method documentation
   parts <- c(parts, '<div class="ci-card"><h3>Statistical Methods</h3>')
 
-  # Coverage probability explanation
-  parts <- c(parts, sprintf(
-    '<div class="ci-callout"><strong>What "%d%% confidence" means:</strong> A %d%% confidence interval is constructed so that, across many hypothetical repetitions of the same survey using the same sampling method, approximately %d%% of the resulting intervals would contain the true population parameter. It does <em>not</em> mean there is a %d%% probability that <em>this particular</em> interval contains the truth &mdash; the true value is fixed, and the interval either contains it or does not. The %d%% refers to the long-run reliability of the <em>procedure</em>, not to any single result. This distinction matters because a single interval from a biased sample can be precise yet wrong.</div>',
-    round(conf_level * 100), round(conf_level * 100), round(conf_level * 100),
-    round(conf_level * 100), round(conf_level * 100)
-  ))
+  # Coverage probability explanation — from callout registry
+  parts <- c(parts, turas_callout("confidence", "confidence_level"))
 
   if ("Normal Approximation (MOE)" %in% methods_used || "Normal Approximation" %in% methods_used) {
     parts <- c(parts, sprintf(
@@ -862,19 +1044,13 @@ build_ci_notes_panel <- function(html_data, config) {
 
   parts <- c(parts, '</div>')
 
-  # General warnings callout — enhanced with precision vs accuracy framework
+  # Limitations — from callout registry
   parts <- c(parts,
-    '<div class="ci-card"><h3>Understanding Limitations</h3>
-      <div class="ci-callout ci-callout-warning">
-        <strong>Precision is not accuracy.</strong> A confidence interval measures <em>precision</em> &mdash; how repeatable the estimate would be across many samples drawn the same way. It does not measure <em>accuracy</em> &mdash; how close the estimate is to the truth. If your sample systematically over- or under-represents certain groups (selection bias), the interval can be very narrow (precise) but centred on the wrong value (inaccurate). Always assess whether your sample is representative before treating these intervals as definitive.
-      </div>
-      <div class="ci-callout ci-callout-warning">
-        <strong>Sources of error not captured.</strong> Confidence intervals reflect only <em>sampling error</em> &mdash; the variability due to observing a finite sample rather than the entire population. They do not account for: non-response bias (systematic differences between respondents and non-respondents), measurement error (ambiguous questions, social desirability, acquiescence bias), coverage error (populations that cannot be reached by the sampling frame), or processing errors (coding mistakes, data entry errors). In practice, these non-sampling errors often exceed sampling error, especially in large surveys where the margin of error is small but operational biases persist.
-      </div>
-      <div class="ci-callout ci-callout-warning">
-        <strong>Multiple comparisons.</strong> When many questions are analysed simultaneously, some intervals will fail to contain the true value by chance alone. At 95% confidence, roughly 1 in 20 intervals is expected to miss. If you are comparing results across many subgroups or questions, consider whether an adjustment for multiple testing (e.g., Bonferroni or Benjamini-Hochberg) is appropriate for your use case.
-      </div>
-    </div>'
+    '<div class="ci-card"><h3>Understanding Limitations</h3>',
+    turas_callout("confidence", "precision_accuracy"),
+    turas_callout("confidence", "non_sampling_error"),
+    turas_callout("confidence", "multiple_comparisons"),
+    '</div>'
   )
 
   # Warnings from analysis
@@ -957,7 +1133,49 @@ function saveReportHTML() {
   var a = document.createElement("a"); a.href = url; a.download = baseName + "_Updated.html";
   document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
 }
-document.addEventListener("DOMContentLoaded", function() { switchReportTab("summary"); });
+function toggleHelpOverlay() {
+  var overlay = document.getElementById("ci-help-overlay");
+  if (overlay) overlay.classList.toggle("active");
+}
+// --- Callout collapsibility with localStorage persistence ---
+document.addEventListener("DOMContentLoaded", function() {
+  switchReportTab("summary");
+
+  // Restore callout collapsed states from localStorage
+  var storageKey = "turas-ci-callout-states";
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(storageKey) || "{}"); } catch(e) {}
+
+  document.querySelectorAll(".t-callout").forEach(function(callout, idx) {
+    var key = callout.id || ("callout-" + idx);
+    if (saved[key] === "collapsed") {
+      callout.classList.add("collapsed");
+    } else if (saved[key] === "expanded") {
+      callout.classList.remove("collapsed");
+    }
+    // Click handler on header (remove inline onclick to avoid double-toggle)
+    var header = callout.querySelector(".t-callout-header");
+    if (header) {
+      header.removeAttribute("onclick");
+      header.addEventListener("click", function() {
+        callout.classList.toggle("collapsed");
+        // Persist state
+        try {
+          var states = JSON.parse(localStorage.getItem(storageKey) || "{}");
+          states[key] = callout.classList.contains("collapsed") ? "collapsed" : "expanded";
+          localStorage.setItem(storageKey, JSON.stringify(states));
+        } catch(e) {}
+      });
+    }
+  });
+  // Escape key closes help overlay
+  document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape") {
+      var overlay = document.getElementById("ci-help-overlay");
+      if (overlay && overlay.classList.contains("active")) overlay.classList.remove("active");
+    }
+  });
+});
 '
 }
 

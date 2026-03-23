@@ -165,7 +165,7 @@ run_confidence_gui <- function() {
         project_data(list(
           path = pre_config,
           configs = configs,
-          selected_configs = if (length(configs) > 0) configs else character(0)
+          selected_config = if (length(configs) > 0) configs[1] else NULL
         ))
         add_recent_project(pre_config)
       } else if (file.exists(pre_config)) {
@@ -176,7 +176,7 @@ run_confidence_gui <- function() {
         project_data(list(
           path = config_dir,
           configs = configs,
-          selected_configs = config_name
+          selected_config = config_name
         ))
         add_recent_project(config_dir)
       }

@@ -61,11 +61,53 @@ function saveReportHTML() {
   URL.revokeObjectURL(url);
 }
 
+function toggleHelpOverlay() {
+  var overlay = document.getElementById("ci-help-overlay");
+  if (overlay) overlay.classList.toggle("active");
+}
+
 document.addEventListener("DOMContentLoaded", function() {
   switchReportTab("summary");
 
   // Restore saved textarea values
   document.querySelectorAll("textarea[data-saved-value]").forEach(function(ta) {
     ta.value = ta.getAttribute("data-saved-value");
+  });
+
+  // Callout collapsibility with localStorage persistence
+  var storageKey = "turas-ci-callout-states";
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(storageKey) || "{}"); } catch(e) {}
+
+  document.querySelectorAll(".t-callout").forEach(function(callout, idx) {
+    var key = callout.id || ("callout-" + idx);
+    if (saved[key] === "collapsed") {
+      callout.classList.add("collapsed");
+    } else if (saved[key] === "expanded") {
+      callout.classList.remove("collapsed");
+    }
+    var header = callout.querySelector(".t-callout-header");
+    if (header) {
+      // Remove inline onclick to avoid double-toggle
+      header.removeAttribute("onclick");
+      header.addEventListener("click", function() {
+        callout.classList.toggle("collapsed");
+        try {
+          var states = JSON.parse(localStorage.getItem(storageKey) || "{}");
+          states[key] = callout.classList.contains("collapsed") ? "collapsed" : "expanded";
+          localStorage.setItem(storageKey, JSON.stringify(states));
+        } catch(e) {}
+      });
+    }
+  });
+
+  // Escape key closes help overlay
+  document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape") {
+      var overlay = document.getElementById("ci-help-overlay");
+      if (overlay && overlay.classList.contains("active")) {
+        overlay.classList.remove("active");
+      }
+    }
   });
 });

@@ -303,7 +303,7 @@ run_tabs_gui <- function() {
         checkboxGroupInput("config_select",
                     NULL,
                     choices = setNames(data$configs, paste("\U0001F4C4", data$configs)),
-                    selected = data$selected_configs)
+                    selected = if (length(data$selected_configs) > 0) data$selected_configs else NULL)
       )
     })
     

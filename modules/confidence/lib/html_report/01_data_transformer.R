@@ -37,6 +37,20 @@ transform_confidence_for_html <- function(confidence_results, config = list()) {
   n_eff <- if (!is.null(study_stats)) study_stats$Effective_n[1] else n_total
   deff <- if (!is.null(study_stats)) study_stats$DEFF[1] else 1.0
 
+  # Fallback: derive n_total from per-question n_eff when study_stats unavailable
+  if (is.na(n_total)) {
+    all_results <- c(
+      lapply(cr$proportion_results %||% list(), function(r) r$n_eff),
+      lapply(cr$mean_results %||% list(), function(r) r$n_eff),
+      lapply(cr$nps_results %||% list(), function(r) r$n_eff)
+    )
+    all_n <- unlist(all_results)
+    if (length(all_n) > 0 && any(!is.na(all_n))) {
+      n_total <- max(all_n, na.rm = TRUE)
+      if (is.na(n_eff)) n_eff <- n_total
+    }
+  }
+
   # Count question types
   prop_results <- cr$proportion_results %||% list()
   mean_results <- cr$mean_results %||% list()
@@ -138,22 +152,28 @@ transform_proportion_question <- function(q_id, result, conf_level, global_n_eff
                                            is_weighted, sampling_method = "Not_Specified") {
   methods_used <- character()
   best_ci <- NULL
+  best_method <- ""
 
-  # Find best available CI for summary
+  # PRIMARY METHOD SELECTION (fixed priority — first available wins)
+  # -----------------------------------------------------------------------
+  # Proportions: Wilson > Normal > Bootstrap > Bayesian
+  #   Wilson preferred: better coverage at extreme proportions and small n.
+  # Also documented in: callouts.json → confidence → method_selection
+  # -----------------------------------------------------------------------
   if (!is.null(result$wilson)) {
-    best_ci <- result$wilson
+    if (is.null(best_ci)) { best_ci <- result$wilson; best_method <- "Wilson" }
     methods_used <- c(methods_used, "Wilson Score")
   }
   if (!is.null(result$moe)) {
-    if (is.null(best_ci)) best_ci <- result$moe
+    if (is.null(best_ci)) { best_ci <- result$moe; best_method <- "Normal" }
     methods_used <- c(methods_used, "Normal Approximation (MOE)")
   }
   if (!is.null(result$bootstrap)) {
-    if (is.null(best_ci)) best_ci <- result$bootstrap
+    if (is.null(best_ci)) { best_ci <- result$bootstrap; best_method <- "Bootstrap" }
     methods_used <- c(methods_used, "Bootstrap")
   }
   if (!is.null(result$bayesian)) {
-    if (is.null(best_ci)) best_ci <- result$bayesian
+    if (is.null(best_ci)) { best_ci <- result$bayesian; best_method <- "Bayesian" }
     methods_used <- c(methods_used, "Bayesian Credible")
   }
 
@@ -189,6 +209,7 @@ transform_proportion_question <- function(q_id, result, conf_level, global_n_eff
     quality = quality,
     callout = callout,
     methods_used = methods_used,
+    best_method = best_method,
     is_subset = isTRUE(result$is_subset),
     subset_n = result$subset_n,
     filter_variable = result$filter_variable,
@@ -202,17 +223,24 @@ transform_mean_question <- function(q_id, result, conf_level, global_n_eff,
                                      is_weighted, sampling_method = "Not_Specified") {
   methods_used <- character()
   best_ci <- NULL
+  best_method <- ""
 
+  # PRIMARY METHOD SELECTION (fixed priority — first available wins)
+  # -----------------------------------------------------------------------
+  # Means: t-Dist > Bootstrap > Bayesian
+  #   t-dist preferred: standard when population SD is unknown.
+  # Also documented in: callouts.json → confidence → method_selection
+  # -----------------------------------------------------------------------
   if (!is.null(result$t_dist)) {
-    best_ci <- result$t_dist
+    if (is.null(best_ci)) { best_ci <- result$t_dist; best_method <- "t-Dist" }
     methods_used <- c(methods_used, "t-Distribution")
   }
   if (!is.null(result$bootstrap)) {
-    if (is.null(best_ci)) best_ci <- result$bootstrap
+    if (is.null(best_ci)) { best_ci <- result$bootstrap; best_method <- "Bootstrap" }
     methods_used <- c(methods_used, "Bootstrap")
   }
   if (!is.null(result$bayesian)) {
-    if (is.null(best_ci)) best_ci <- result$bayesian
+    if (is.null(best_ci)) { best_ci <- result$bayesian; best_method <- "Bayesian" }
     methods_used <- c(methods_used, "Bayesian Credible")
   }
 
@@ -248,6 +276,7 @@ transform_mean_question <- function(q_id, result, conf_level, global_n_eff,
     quality = quality,
     callout = callout,
     methods_used = methods_used,
+    best_method = best_method,
     is_subset = isTRUE(result$is_subset),
     subset_n = result$subset_n,
     filter_variable = result$filter_variable,
@@ -261,17 +290,24 @@ transform_nps_question <- function(q_id, result, conf_level, global_n_eff,
                                     is_weighted, sampling_method = "Not_Specified") {
   methods_used <- character()
   best_ci <- NULL
+  best_method <- ""
 
+  # PRIMARY METHOD SELECTION (fixed priority — first available wins)
+  # -----------------------------------------------------------------------
+  # NPS: Normal > Bootstrap > Bayesian
+  #   Normal preferred: standard for difference-of-proportions.
+  # Also documented in: callouts.json → confidence → method_selection
+  # -----------------------------------------------------------------------
   if (!is.null(result$moe_normal)) {
-    best_ci <- result$moe_normal
+    if (is.null(best_ci)) { best_ci <- result$moe_normal; best_method <- "Normal" }
     methods_used <- c(methods_used, "Normal Approximation")
   }
   if (!is.null(result$bootstrap)) {
-    if (is.null(best_ci)) best_ci <- result$bootstrap
+    if (is.null(best_ci)) { best_ci <- result$bootstrap; best_method <- "Bootstrap" }
     methods_used <- c(methods_used, "Bootstrap")
   }
   if (!is.null(result$bayesian)) {
-    if (is.null(best_ci)) best_ci <- result$bayesian
+    if (is.null(best_ci)) { best_ci <- result$bayesian; best_method <- "Bayesian" }
     methods_used <- c(methods_used, "Bayesian Credible")
   }
 
@@ -307,6 +343,7 @@ transform_nps_question <- function(q_id, result, conf_level, global_n_eff,
     quality = quality,
     callout = callout,
     methods_used = methods_used,
+    best_method = best_method,
     is_subset = isTRUE(result$is_subset),
     subset_n = result$subset_n,
     filter_variable = result$filter_variable,

@@ -42,10 +42,15 @@ build_ci_summary_table <- function(questions, labels = NULL) {
       else sprintf("%.2f", q$ci_width)
     } else "N/A"
 
+    method_label <- q$best_method %||% ""
+    n_methods <- length(q$methods_used)
+    method_extra <- if (n_methods > 1) sprintf(" <span style=\"color:#94a3b8;font-size:11px;\">+%d</span>", n_methods - 1) else ""
+
     rows <- c(rows, sprintf(
       '<tr>
         <td class="ci-td ci-label-col">%s</td>
         <td class="ci-td">%s</td>
+        <td class="ci-td">%s%s</td>
         <td class="ci-td ci-num">%s</td>
         <td class="ci-td ci-num">%s</td>
         <td class="ci-td ci-num">%s</td>
@@ -54,7 +59,7 @@ build_ci_summary_table <- function(questions, labels = NULL) {
       </tr>',
       htmlEscape(if (!is.null(q$question_label) && q$question_label != q$question_id)
         paste0(q$question_id, " \u2014 ", q$question_label) else q$question_id),
-      type_label, est, lower_str, upper_str,
+      type_label, method_label, method_extra, est, lower_str, upper_str,
       width_str, badge_class, badge_label
     ))
   }
@@ -65,6 +70,7 @@ build_ci_summary_table <- function(questions, labels = NULL) {
         <tr>
           <th class="ci-th ci-label-col">Question</th>
           <th class="ci-th">Type</th>
+          <th class="ci-th">Method</th>
           <th class="ci-th ci-num">Estimate</th>
           <th class="ci-th ci-num">%s Lower</th>
           <th class="ci-th ci-num">%s Upper</th>

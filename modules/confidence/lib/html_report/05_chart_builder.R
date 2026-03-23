@@ -54,7 +54,7 @@ build_forest_svg <- function(questions, brand_colour, title, is_proportion) {
   margin_right <- 60
   margin_top <- 40
   margin_bottom <- 30
-  row_height <- 32
+  row_height <- 34
   chart_width <- 760
   chart_height <- margin_top + n_items * row_height + margin_bottom
 
@@ -69,12 +69,12 @@ build_forest_svg <- function(questions, brand_colour, title, is_proportion) {
   if (!any(valid)) return("")
 
   if (is_proportion) {
-    x_min <- max(0, min(all_lower[valid]) - 0.05)
+    x_min <- max(0, min(all_lower[valid]) - 0.10)
     x_max <- min(1, max(all_upper[valid]) + 0.05)
   } else {
     range_vals <- c(all_lower[valid], all_upper[valid])
     x_range <- max(range_vals) - min(range_vals)
-    x_min <- min(range_vals) - x_range * 0.1
+    x_min <- min(range_vals) - x_range * 0.2
     x_max <- max(range_vals) + x_range * 0.1
   }
 
@@ -87,7 +87,7 @@ build_forest_svg <- function(questions, brand_colour, title, is_proportion) {
 
   # Title
   elements <- c(elements, sprintf(
-    '<text x="%.0f" y="20" font-size="13" font-weight="600" fill="#1e293b">%s</text>',
+    '<text x="%.0f" y="22" font-size="15" font-weight="600" fill="#1e293b" letter-spacing="-0.2">%s</text>',
     margin_left, title
   ))
 
@@ -100,13 +100,13 @@ build_forest_svg <- function(questions, brand_colour, title, is_proportion) {
     gy_bot <- margin_top + n_items * row_height
 
     elements <- c(elements, sprintf(
-      '<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="#e2e8f0" stroke-width="1"/>',
+      '<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="#e8ecf1" stroke-width="0.75"/>',
       gx, gy_top, gx, gy_bot
     ))
 
     label_val <- if (is_proportion) sprintf("%.0f%%", gv * 100) else sprintf("%.1f", gv)
     elements <- c(elements, sprintf(
-      '<text x="%.1f" y="%d" font-size="10" fill="#64748b" text-anchor="middle">%s</text>',
+      '<text x="%.1f" y="%d" font-size="11" fill="#94a3b8" font-weight="400" text-anchor="middle">%s</text>',
       gx, gy_bot + 16, label_val
     ))
   }
@@ -122,47 +122,69 @@ build_forest_svg <- function(questions, brand_colour, title, is_proportion) {
       paste0(q$question_id, " \u2014 ", q$question_label) else q$question_id
     if (nchar(label) > 40) label <- paste0(substr(label, 1, 38), "...")
     elements <- c(elements, sprintf(
-      '<text x="%d" y="%.1f" font-size="11" fill="#64748b" text-anchor="end" font-weight="400" dominant-baseline="middle">%s</text>',
+      '<text x="%d" y="%.1f" font-size="12" fill="#64748b" text-anchor="end" font-weight="400" dominant-baseline="middle">%s</text>',
       margin_left - 8, y, htmlEscape(label)
     ))
 
     if (is.na(q$ci_lower) || is.na(q$ci_upper) || is.na(q$estimate)) next
 
-    # CI bar (line)
+    # CI bar (rounded rectangle for premium look)
     x1 <- scale_x(q$ci_lower)
     x2 <- scale_x(q$ci_upper)
+    bar_height <- 8
     elements <- c(elements, sprintf(
-      '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="3" opacity="0.6" stroke-linecap="round"/>',
+      '<rect x="%.1f" y="%.1f" width="%.1f" height="%d" rx="4" fill="%s" opacity="0.25"/>',
+      x1, y - bar_height / 2, max(1, x2 - x1), bar_height, brand_colour
+    ))
+    # CI line through centre
+    elements <- c(elements, sprintf(
+      '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="2" opacity="0.5" stroke-linecap="round"/>',
       x1, y, x2, y, brand_colour
     ))
 
     # End caps
     elements <- c(elements, sprintf(
-      '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="2"/>',
+      '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="1.5" opacity="0.6"/>',
       x1, y - 5, x1, y + 5, brand_colour
     ))
     elements <- c(elements, sprintf(
-      '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="2"/>',
+      '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="%s" stroke-width="1.5" opacity="0.6"/>',
       x2, y - 5, x2, y + 5, brand_colour
     ))
 
     # Estimate dot
     xp <- scale_x(q$estimate)
     elements <- c(elements, sprintf(
-      '<circle cx="%.1f" cy="%.1f" r="5" fill="%s" stroke="white" stroke-width="1.5"/>',
+      '<circle cx="%.1f" cy="%.1f" r="5.5" fill="%s" stroke="white" stroke-width="2"/>',
       xp, y, brand_colour
     ))
 
-    # Value label
+    # Value labels — lower bound (left of bar), estimate (right of bar)
+    lower_label <- if (is_proportion) sprintf("%.1f%%", q$ci_lower * 100) else sprintf("%.2f", q$ci_lower)
     val_label <- if (is_proportion) sprintf("%.1f%%", q$estimate * 100) else sprintf("%.2f", q$estimate)
+    # Lower bound: muted, to the left of the left end-cap
     elements <- c(elements, sprintf(
-      '<text x="%.1f" y="%.1f" font-size="10" fill="#64748b" font-weight="500" dominant-baseline="middle">%s</text>',
-      x2 + 8, y, val_label
+      '<text x="%.1f" y="%.1f" font-size="11" fill="#94a3b8" font-weight="500" text-anchor="end" dominant-baseline="middle">%s</text>',
+      x1 - 8, y, lower_label
+    ))
+    # Estimate: bolder, to the right of bar
+    elements <- c(elements, sprintf(
+      '<text x="%.1f" y="%.1f" font-size="11" fill="#475569" font-weight="600" dominant-baseline="middle">%s</text>',
+      x2 + 10, y, val_label
+    ))
+
+    # Tooltip (hover title)
+    ci_label <- if (is_proportion) sprintf("%.1f%% [%.1f%%, %.1f%%]", q$estimate * 100, q$ci_lower * 100, q$ci_upper * 100)
+                else sprintf("%.2f [%.2f, %.2f]", q$estimate, q$ci_lower, q$ci_upper)
+    elements <- c(elements, sprintf(
+      '<rect x="%.1f" y="%.1f" width="%.1f" height="%d" fill="transparent" opacity="0"><title>%s: %s</title></rect>',
+      x1 - 5, y - row_height / 2, max(10, x2 - x1 + 20), row_height,
+      htmlEscape(q$question_label %||% q$question_id), ci_label
     ))
   }
 
   sprintf(
-    '<svg viewBox="0 0 %d %d" style="font-family:\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif; width:100%%; max-width:720px; height:auto; display:block; margin:0 auto;" role="img" aria-label="%s forest plot">
+    '<svg viewBox="0 0 %d %d" style="font-family: \'Inter\', -apple-system, BlinkMacSystemFont, \'Segoe UI\', sans-serif; width:100%%; max-width:720px; height:auto; display:block; margin:0 auto;" role="img" aria-label="%s forest plot">
       %s
     </svg>',
     chart_width, chart_height, htmlEscape(title),
@@ -240,7 +262,7 @@ build_method_comparison_chart <- function(q, brand_colour = "#1e3a5f") {
 
     # Label
     elements <- c(elements, sprintf(
-      '<text x="%d" y="%.1f" font-size="11" fill="#64748b" text-anchor="end" font-weight="400" dominant-baseline="middle">%s</text>',
+      '<text x="%d" y="%.1f" font-size="12" fill="#64748b" text-anchor="end" font-weight="400" dominant-baseline="middle">%s</text>',
       margin_left - 8, y, method_names[i]
     ))
 
@@ -248,16 +270,16 @@ build_method_comparison_chart <- function(q, brand_colour = "#1e3a5f") {
     x1 <- scale_x(m$lower)
     x2 <- scale_x(m$upper)
     elements <- c(elements, sprintf(
-      '<rect x="%.1f" y="%.1f" width="%.1f" height="14" rx="4" fill="%s" opacity="0.75"/>',
-      x1, y - 7, max(1, x2 - x1), colours[i]
+      '<rect x="%.1f" y="%.1f" width="%.1f" height="16" rx="4" fill="%s" opacity="0.7"/>',
+      x1, y - 8, max(2, x2 - x1), colours[i]
     ))
 
     # Width label
     width_val <- if (is_prop) sprintf("%.1f pp", (m$upper - m$lower) * 100)
                  else sprintf("%.2f", m$upper - m$lower)
     elements <- c(elements, sprintf(
-      '<text x="%.1f" y="%.1f" font-size="9" fill="#64748b" font-weight="500" dominant-baseline="middle">%s</text>',
-      x2 + 4, y, width_val
+      '<text x="%.1f" y="%.1f" font-size="11" fill="#475569" font-weight="600" dominant-baseline="middle">%s</text>',
+      x2 + 6, y, width_val
     ))
   }
 
@@ -272,7 +294,7 @@ build_method_comparison_chart <- function(q, brand_colour = "#1e3a5f") {
   }
 
   sprintf(
-    '<svg viewBox="0 0 %d %d" style="font-family:\'Inter\', system-ui, -apple-system, \'Segoe UI\', sans-serif; width:100%%; max-width:520px; height:auto; display:block; margin:8px auto;" role="img" aria-label="Method comparison chart">
+    '<svg viewBox="0 0 %d %d" style="font-family: \'Inter\', -apple-system, BlinkMacSystemFont, \'Segoe UI\', sans-serif; width:100%%; max-width:520px; height:auto; display:block; margin:8px auto;" role="img" aria-label="Method comparison chart">
       %s
     </svg>',
     chart_width, chart_height,

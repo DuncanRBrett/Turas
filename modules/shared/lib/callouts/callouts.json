@@ -4,35 +4,33 @@
     "description": "Centralised callout text for all Turas HTML reports. Edit text here to update all reports at next generation. Callouts are educational guidance that help non-statisticians interpret results. They appear in reports but NOT in pinned views or exports.",
     "format": "title: short heading shown in callout header. text: main body (plain text or simple HTML). context: where this appears in the report."
   },
-
   "keydriver": {
     "shapley_importance": {
       "title": "How is the final importance list determined?",
-      "text": "The importance percentages shown are based on Shapley value decomposition, which fairly apportions the model's total explanatory power (R\u00b2) across all drivers. Unlike simple correlations or beta weights, Shapley values account for overlap between correlated drivers by averaging each driver's marginal contribution across every possible combination of other drivers. See the Method Comparison section for how consistently each driver ranks across all analytical methods.",
+      "text": "The importance percentages shown are based on Shapley value decomposition, which fairly apportions the model's total explanatory power (R²) across all drivers. Unlike simple correlations or beta weights, Shapley values account for overlap between correlated drivers by averaging each driver's marginal contribution across every possible combination of other drivers. See the Method Comparison section for how consistently each driver ranks across all analytical methods.",
       "context": "Importance ranking section"
     },
     "method_comparison": {
       "title": "Understanding the Methods",
-      "text": "<ul><li><strong>Correlation:</strong> Simple bivariate association (Pearson r) — does not control for other drivers.</li><li><strong>Beta Weight:</strong> Standardised regression coefficient — shows unique contribution controlling for all other drivers simultaneously.</li><li><strong>Relative Weight:</strong> Decomposes R\u00b2 by orthogonalising the predictor space — handles multicollinearity better than raw betas.</li><li><strong>Shapley Value:</strong> Game-theory based fair division of R\u00b2 — the most robust single measure when drivers overlap.</li></ul><p style='font-size:11px;color:#94a3b8;margin-top:6px;font-style:italic;'>When drivers rank consistently across methods, confidence in their importance is high. Large rank discrepancies may indicate multicollinearity or non-linear effects.</p>",
+      "text": "<ul><li><strong>Correlation:<\/strong> Simple bivariate association (Pearson r) — does not control for other drivers.<\/li><li><strong>Beta Weight:<\/strong> Standardised regression coefficient — shows unique contribution controlling for all other drivers simultaneously.<\/li><li><strong>Relative Weight:<\/strong> Decomposes R² by orthogonalising the predictor space — handles multicollinearity better than raw betas.<\/li><li><strong>Shapley Value:<\/strong> Game-theory based fair division of R² — the most robust single measure when drivers overlap.<\/li><\/ul><p style='font-size:11px;color:#94a3b8;margin-top:6px;font-style:italic;'>When drivers rank consistently across methods, confidence in their importance is high. Large rank discrepancies may indicate multicollinearity or non-linear effects.<\/p>",
       "context": "Method comparison section"
     },
     "effect_sizes": {
-      "title": "Cohen's f\u00b2 Benchmarks",
-      "text": "Effect sizes show how much each driver contributes to the model beyond all others. Cohen's f\u00b2 benchmarks: <strong>Large \u2265 0.35</strong> (substantial practical impact), <strong>Medium \u2265 0.15</strong> (meaningful contribution), <strong>Small \u2265 0.02</strong> (detectable but modest). Drivers below 0.02 have negligible unique contribution after controlling for other predictors.",
+      "title": "Cohen's f² Benchmarks",
+      "text": "Effect sizes show how much each driver contributes to the model beyond all others. Cohen's f² benchmarks: <strong>Large ≥ 0.35<\/strong> (substantial practical impact), <strong>Medium ≥ 0.15<\/strong> (meaningful contribution), <strong>Small ≥ 0.02<\/strong> (detectable but modest). Drivers below 0.02 have negligible unique contribution after controlling for other predictors.",
       "context": "Effect sizes section"
     },
     "correlation_matrix": {
       "title": "What does the correlation matrix tell me?",
-      "text": "The correlation matrix shows the raw, bivariate relationship between every pair of drivers and the outcome variable. Unlike the importance rankings (which control for other drivers), correlations show the simple one-to-one association. This is useful for two reasons: (1) spotting which drivers are highly correlated with each other \u2014 when two drivers are strongly correlated, their individual importance may be diluted in the model, and (2) identifying drivers that have a strong standalone relationship with the outcome even if they appear less important when other drivers are accounted for.",
+      "text": "The correlation matrix shows the raw, bivariate relationship between every pair of drivers and the outcome variable. Unlike the importance rankings (which control for other drivers), correlations show the simple one-to-one association. This is useful for two reasons: (1) spotting which drivers are highly correlated with each other — when two drivers are strongly correlated, their individual importance may be diluted in the model, and (2) identifying drivers that have a strong standalone relationship with the outcome even if they appear less important when other drivers are accounted for.",
       "context": "Correlation matrix section"
     },
     "priority_quadrant": {
       "title": "How are priorities determined?",
-      "text": "The quadrant chart combines each driver's importance weight with its current performance gap. Drivers in the top-right quadrant are high-importance and high-gap \u2014 these are the priority areas where improvement will have the greatest impact. Drivers in the bottom-left are low-importance and low-gap \u2014 these are performing adequately relative to their weight.",
+      "text": "The quadrant chart combines each driver's importance weight with its current performance gap. Drivers in the top-right quadrant are high-importance and high-gap — these are the priority areas where improvement will have the greatest impact. Drivers in the bottom-left are low-importance and low-gap — these are performing adequately relative to their weight.",
       "context": "Priority quadrant section"
     }
   },
-
   "catdriver": {
     "driver_importance": {
       "title": "How is driver importance measured?",
@@ -41,7 +39,7 @@
     },
     "odds_ratios": {
       "title": "Reading Odds Ratios",
-      "text": "An odds ratio (OR) greater than 1 means higher scores on that driver increase the odds of a better outcome. An OR less than 1 means higher scores decrease the odds. The confidence interval shows the range of plausible values \u2014 if it crosses 1.0, the effect is not statistically significant. The forest plot visualises these intervals: markers to the right of the centre line indicate positive effects.",
+      "text": "An odds ratio (OR) greater than 1 means higher scores on that driver increase the odds of a better outcome. An OR less than 1 means higher scores decrease the odds. The confidence interval shows the range of plausible values — if it crosses 1.0, the effect is not statistically significant. The forest plot visualises these intervals: markers to the right of the centre line indicate positive effects.",
       "context": "Odds ratios section"
     },
     "factor_patterns": {
@@ -56,15 +54,14 @@
     },
     "diagnostics": {
       "title": "Model Diagnostics",
-      "text": "Diagnostics assess whether the model is reliable. <strong>Convergence</strong> (green = converged) confirms the model found a stable solution. <strong>Multicollinearity</strong> flags drivers that overlap too much (VIF > 5 is concerning). <strong>Small cells</strong> warns when too few responses fall in a category, which can produce unstable estimates.",
+      "text": "Diagnostics assess whether the model is reliable. <strong>Convergence<\/strong> (green = converged) confirms the model found a stable solution. <strong>Multicollinearity<\/strong> flags drivers that overlap too much (VIF > 5 is concerning). <strong>Small cells<\/strong> warns when too few responses fall in a category, which can produce unstable estimates.",
       "context": "Model diagnostics section"
     }
   },
-
   "confidence": {
     "questions_summary": {
       "title": "Quality Assessment",
-      "text": "The quality indicators show how reliable each estimate is based on sample size and variability. Green indicators mean the estimate is precise enough for confident decisions. Amber suggests caution \u2014 the margin of error is notable. Red indicates wide confidence intervals where estimates should be treated as directional only.",
+      "text": "The quality indicators show how reliable each estimate is based on sample size and variability. Green indicators mean the estimate is precise enough for confident decisions (bear in mind there may still be other forms of error). Amber suggests caution — the margin of error is notable. Red indicates wide confidence intervals where estimates should be treated as directional only.",
       "context": "Questions summary section"
     },
     "visualization_guide": {
@@ -74,7 +71,7 @@
     },
     "representativeness": {
       "title": "Reading Representativeness",
-      "text": "The representativeness assessment compares your sample to known population benchmarks. <strong>Green</strong> cells indicate the sample closely matches the population (&lt;2pp difference). <strong>Amber</strong> indicates moderate deviation (2-5pp). <strong>Red</strong> indicates substantial deviation (&gt;5pp) that may bias results if related to the survey topic.",
+      "text": "The representativeness assessment compares your sample to known population benchmarks. <strong>Green<\/strong> cells indicate the sample closely matches the population (&lt;2pp difference). <strong>Amber<\/strong> indicates moderate deviation (2-5pp). <strong>Red<\/strong> indicates substantial deviation (&gt;5pp) that may bias results if related to the survey topic.",
       "context": "Representativeness section"
     },
     "confidence_level": {
@@ -84,21 +81,40 @@
     },
     "precision_accuracy": {
       "title": "Precision vs. Accuracy",
-      "text": "Precision tells you how repeatable your estimates are (narrow confidence intervals = high precision). Accuracy tells you whether the estimates are centred on the true value. A biased sample can produce precise but inaccurate results. Confidence intervals capture precision but not all sources of inaccuracy \u2014 particularly non-response bias and measurement error.",
+      "text": "Precision tells you how repeatable your estimates are (narrow confidence intervals = high precision). Accuracy tells you whether the estimates are centred on the true value. A biased sample can produce precise but inaccurate results. Confidence intervals capture precision but not all sources of inaccuracy — particularly non-response bias and measurement error.",
       "context": "Precision vs accuracy explanation"
     },
     "non_sampling_error": {
       "title": "Sources of Error Not Captured",
-      "text": "Confidence intervals only capture random sampling error. They do not account for: <strong>Non-response bias</strong> (people who didn't respond may differ systematically), <strong>Measurement error</strong> (poorly worded questions), <strong>Coverage error</strong> (population groups not reachable by the survey method), or <strong>Processing errors</strong> (data cleaning and coding mistakes).",
+      "text": "Confidence intervals only capture random sampling error. They do not account for: <strong>Non-response bias<\/strong> (people who didn't respond may differ systematically), <strong>Measurement error<\/strong> (poorly worded questions), <strong>Coverage error<\/strong> (population groups not reachable by the survey method), or <strong>Processing errors<\/strong> (data cleaning and coding mistakes).",
       "context": "Error sources explanation"
     },
     "multiple_comparisons": {
       "title": "Multiple Comparisons",
       "text": "When testing many comparisons simultaneously, some will appear significant by chance alone. At 95% confidence, roughly 1 in 20 comparisons will show a 'significant' difference even when no real difference exists. If you are making many comparisons, consider which findings are substantively meaningful rather than relying solely on statistical significance.",
       "context": "Multiple comparisons warning"
+    },
+    "results_overview": {
+      "title": "Understanding This Table",
+      "text": "This table summarises all questions analysed, showing the point estimate, interval bounds, interval width, and a quality assessment. The <strong>Method<\/strong> column shows which statistical method produced the displayed values (see Method Selection below). A <strong>+1<\/strong> or <strong>+2<\/strong> next to the method name means additional methods are available in the Question Details tab. <strong>Green<\/strong> quality means the estimate is precise enough for confident decisions. <strong>Amber<\/strong> suggests the margin of error is notable — interpret with care. <strong>Red<\/strong> indicates wide intervals where estimates should be treated as directional only.",
+      "context": "Summary tab, results overview table"
+    },
+    "method_selection": {
+      "title": "How the Primary Method is Chosen",
+      "text": "The summary table displays results from a single <strong>primary method<\/strong> per question, chosen by a fixed priority order based on statistical best practice:<ul><li><strong>Proportions:<\/strong> Wilson score (preferred) → Normal approximation → Bootstrap → Bayesian. Wilson is preferred because it maintains reliable coverage even at extreme proportions (below 5% or above 95%) and small samples, unlike the Normal approximation which can produce impossible intervals.<\/li><li><strong>Means:<\/strong> t-Distribution (preferred) → Bootstrap → Bayesian. The t-distribution is the standard method when the population standard deviation is unknown, which is nearly always.<\/li><li><strong>NPS:<\/strong> Normal approximation (preferred) → Bootstrap → Bayesian. The Normal method is standard for the difference-of-proportions that defines NPS.<\/li><\/ul>The first method available in the results is used. All methods are compared side-by-side in the <strong>Question Details<\/strong> tab — if the methods disagree substantially, this may indicate the data violates assumptions of the primary method.",
+      "context": "Summary tab, results overview table"
+    },
+    "forest_plot_guide": {
+      "title": "Reading the Forest Plot",
+      "text": "Each dot represents the point estimate (proportion, mean, or NPS score). The horizontal bar shows the confidence or stability interval — the range of plausible values for the true population parameter. <strong>Shorter bars = more precision.<\/strong> When two bars don't overlap, the difference between those questions is likely statistically meaningful. Very wide bars suggest the sample may be too small for that question.",
+      "context": "Summary tab, forest plot section"
+    },
+    "study_level_weighting": {
+      "title": "Understanding Weighting Effects",
+      "text": "When survey responses carry unequal weights, some respondents contribute more to the estimate than others. The <strong>Design Effect (DEFF)<\/strong> measures precision loss due to weighting — a DEFF of 1.0 means no loss, while 2.0 means you'd need twice the sample for equivalent precision. <strong>Efficiency above 70%<\/strong> is generally acceptable; below 50% suggests the weighting scheme may need review. These calculations assume a probability-based sample — for non-probability designs, DEFF captures only the weighting effect, not the full extent of sampling bias.",
+      "context": "Summary tab, study-level statistics"
     }
   },
-
   "conjoint": {
     "reading_utilities": {
       "title": "Reading Utility Values",
@@ -112,46 +128,43 @@
     },
     "convergence_fail": {
       "title": "Model Convergence Warning",
-      "text": "The MCMC chains have not fully converged, which means the individual-level estimates may not be fully stable. This can happen when: the model is complex relative to sample size, there are too many attribute levels, or insufficient iterations were run. <strong>Recommendations:</strong> Increase the number of iterations, check the Geweke diagnostics for specific parameters, review the effective sample size (ESS), or simplify the model by reducing attributes. The aggregate-level results are likely directionally correct but use individual-level utilities with caution.",
+      "text": "The MCMC chains have not fully converged, which means the individual-level estimates may not be fully stable. This can happen when: the model is complex relative to sample size, there are too many attribute levels, or insufficient iterations were run. <strong>Recommendations:<\/strong> Increase the number of iterations, check the Geweke diagnostics for specific parameters, review the effective sample size (ESS), or simplify the model by reducing attributes. The aggregate-level results are likely directionally correct but use individual-level utilities with caution.",
       "context": "Diagnostics panel (not converged)"
     }
   },
-
   "maxdiff": {
     "how_to_read": {
       "title": "How to Read This Report",
-      "text": "MaxDiff (Maximum Difference Scaling) measures relative preference by asking respondents to choose the best and worst from sets of items. <strong>Preference Scores (0\u2013100)</strong> show each item's relative desirability \u2014 higher is more preferred. <strong>BW Scores</strong> show the raw best-minus-worst count. <strong>TURF</strong> (Total Unduplicated Reach and Frequency) identifies the optimal combination of items to maximise the number of people who find at least one attractive option.",
+      "text": "MaxDiff (Maximum Difference Scaling) measures relative preference by asking respondents to choose the best and worst from sets of items. <strong>Preference Scores (0–100)<\/strong> show each item's relative desirability — higher is more preferred. <strong>BW Scores<\/strong> show the raw best-minus-worst count. <strong>TURF<\/strong> (Total Unduplicated Reach and Frequency) identifies the optimal combination of items to maximise the number of people who find at least one attractive option.",
       "context": "Overview panel"
     },
     "item_analysis": {
       "title": "Reading this Table",
-      "text": "Items are ranked by preference score. <strong>Green shading</strong> indicates items that respondents consistently chose as 'best' \u2014 these are the most preferred. <strong>Red shading</strong> indicates items frequently chosen as 'worst'. The Best% and Worst% columns show how often each item was selected. The BW Score (Best% minus Worst%) provides a simple summary metric.",
+      "text": "Items are ranked by preference score. <strong>Green shading<\/strong> indicates items that respondents consistently chose as 'best' — these are the most preferred. <strong>Red shading<\/strong> indicates items frequently chosen as 'worst'. The Best% and Worst% columns show how often each item was selected. The BW Score (Best% minus Worst%) provides a simple summary metric.",
       "context": "Item analysis table"
     }
   },
-
   "segment": {
     "interpretation_guide": {
       "title": "How to Interpret These Results",
-      "text": "<strong>DO:</strong><ul><li>Validate segments against external criteria (behaviour, demographics)</li><li>Consider practical segment size \u2014 segments too small to target are not actionable</li><li>Look at the profile differences, not just statistical metrics</li><li>Test stability by running with different random seeds</li><li>Use multiple metrics (silhouette, gap statistic) to assess quality</li></ul><strong>DON'T:</strong><ul><li>Treat segments as rigid categories \u2014 boundaries are inherently fuzzy</li><li>Over-interpret small differences between adjacent segments</li><li>Assume the 'best' statistical solution is the most useful business solution</li><li>Ignore segments that don't fit your expectations \u2014 they may reveal something new</li><li>Use silhouette scores alone to choose the number of segments</li></ul>",
+      "text": "<strong>DO:<\/strong><ul><li>Validate segments against external criteria (behaviour, demographics)<\/li><li>Consider practical segment size — segments too small to target are not actionable<\/li><li>Look at the profile differences, not just statistical metrics<\/li><li>Test stability by running with different random seeds<\/li><li>Use multiple metrics (silhouette, gap statistic) to assess quality<\/li><\/ul><strong>DON'T:<\/strong><ul><li>Treat segments as rigid categories — boundaries are inherently fuzzy<\/li><li>Over-interpret small differences between adjacent segments<\/li><li>Assume the 'best' statistical solution is the most useful business solution<\/li><li>Ignore segments that don't fit your expectations — they may reveal something new<\/li><li>Use silhouette scores alone to choose the number of segments<\/li><\/ul>",
       "context": "Results interpretation section"
     },
     "how_it_works": {
       "title": "How Segmentation Works",
-      "text": "<strong>K-Means:</strong> Assigns each respondent to the nearest of k cluster centres, then recalculates centres, repeating until stable. Fast and effective for well-separated, spherical clusters.<br><br><strong>Hierarchical Clustering:</strong> Builds a tree (dendrogram) of nested clusters by progressively merging the most similar groups. Useful for exploring natural groupings at different levels.<br><br><strong>GMM (Gaussian Mixture Models):</strong> Models each segment as a statistical distribution, allowing 'soft' membership where respondents can partially belong to multiple segments. Best when segments overlap.<br><br><strong>Choosing k:</strong> There is no single 'correct' number of segments. The silhouette score measures how well-separated the segments are: <strong>&gt;0.50</strong> = strong structure, <strong>0.35\u20130.50</strong> = reasonable, <strong>0.25\u20130.35</strong> = weak, <strong>&lt;0.25</strong> = little meaningful structure.",
+      "text": "<strong>K-Means:<\/strong> Assigns each respondent to the nearest of k cluster centres, then recalculates centres, repeating until stable. Fast and effective for well-separated, spherical clusters.<br><br><strong>Hierarchical Clustering:<\/strong> Builds a tree (dendrogram) of nested clusters by progressively merging the most similar groups. Useful for exploring natural groupings at different levels.<br><br><strong>GMM (Gaussian Mixture Models):<\/strong> Models each segment as a statistical distribution, allowing 'soft' membership where respondents can partially belong to multiple segments. Best when segments overlap.<br><br><strong>Choosing k:<\/strong> There is no single 'correct' number of segments. The silhouette score measures how well-separated the segments are: <strong>&gt;0.50<\/strong> = strong structure, <strong>0.35–0.50<\/strong> = reasonable, <strong>0.25–0.35<\/strong> = weak, <strong>&lt;0.25<\/strong> = little meaningful structure.",
       "context": "Methodology explanation section"
     }
   },
-
   "weighting": {
     "weight_metrics": {
       "title": "Reading Weight Metrics",
-      "text": "<strong>Min/Max:</strong> The smallest and largest individual weights \u2014 extreme values (e.g., max &gt;5) suggest some respondents are being given disproportionate influence.<br><strong>CV (Coefficient of Variation):</strong> Measures weight variability relative to the mean. CV &lt;0.20 is good, 0.20\u20130.50 is acceptable, &gt;0.50 is problematic.<br><strong>DEFF (Design Effect):</strong> How much the weighting inflates variance compared to an unweighted sample (1 + CV\u00b2). DEFF of 1.5 means you need 50% more sample for equivalent precision.<br><strong>Efficiency:</strong> The inverse of DEFF as a percentage. &gt;70% is good, &lt;50% is concerning \u2014 the weighting is costing too much precision.",
+      "text": "<strong>Min/Max:<\/strong> The smallest and largest individual weights — extreme values (e.g., max &gt;5) suggest some respondents are being given disproportionate influence.<br><strong>CV (Coefficient of Variation):<\/strong> Measures weight variability relative to the mean. CV &lt;0.20 is good, 0.20–0.50 is acceptable, &gt;0.50 is problematic.<br><strong>DEFF (Design Effect):<\/strong> How much the weighting inflates variance compared to an unweighted sample (1 + CV²). DEFF of 1.5 means you need 50% more sample for equivalent precision.<br><strong>Efficiency:<\/strong> The inverse of DEFF as a percentage. &gt;70% is good, &lt;50% is concerning — the weighting is costing too much precision.",
       "context": "Weight diagnostics table"
     },
     "rim_targets": {
       "title": "Rim Target Achievement",
-      "text": "Shows how well the weighted sample matches population targets. <strong>Green</strong> cells achieved the target within 0.5 percentage points. <strong>Amber</strong> cells are within 2pp \u2014 acceptable for most purposes. <strong>Red</strong> cells deviate by more than 2pp, which may indicate insufficient sample in that category or conflicting rim targets.",
+      "text": "Shows how well the weighted sample matches population targets. <strong>Green<\/strong> cells achieved the target within 0.5 percentage points. <strong>Amber<\/strong> cells are within 2pp — acceptable for most purposes. <strong>Red<\/strong> cells deviate by more than 2pp, which may indicate insufficient sample in that category or conflicting rim targets.",
       "context": "Rim target comparison table"
     },
     "stratum_weights": {
@@ -160,29 +173,27 @@
       "context": "Stratum weight table"
     }
   },
-
   "pricing": {
     "profit_index": {
       "title": "Profit Index",
-      "text": "Profit Index = (Price \u2212 Unit Cost) \u00d7 Purchase Intent. It estimates relative profitability at each price point by combining margin with demand. The peak of the profit curve indicates the price that maximises return.",
+      "text": "Profit Index = (Price − Unit Cost) × Purchase Intent. It estimates relative profitability at each price point by combining margin with demand. The peak of the profit curve indicates the price that maximises return.",
       "context": "Simulator section"
     },
     "revenue_index": {
       "title": "Revenue Index",
-      "text": "Revenue Index = Price \u00d7 Purchase Intent. It estimates relative revenue at each price point without considering costs. Useful when unit costs are unknown or you want to see the demand-weighted revenue curve.",
+      "text": "Revenue Index = Price × Purchase Intent. It estimates relative revenue at each price point without considering costs. Useful when unit costs are unknown or you want to see the demand-weighted revenue curve.",
       "context": "Simulator section"
     },
     "purchase_intent": {
       "title": "Purchase Intent",
-      "text": "Purchase Intent is the percentage of respondents willing to buy at each price point. As price increases, intent typically decreases. The shape of this curve reveals price sensitivity \u2014 steep drops indicate price-sensitive segments.",
+      "text": "Purchase Intent is the percentage of respondents willing to buy at each price point. As price increases, intent typically decreases. The shape of this curve reveals price sensitivity — steep drops indicate price-sensitive segments.",
       "context": "Simulator section"
     }
   },
-
   "tracker": {
     "significant_changes": {
       "title": "Understanding Significant Changes",
-      "text": "Significant changes are flagged when the difference between two waves exceeds what would be expected by chance given the sample sizes. Green arrows indicate statistically significant increases, red arrows indicate significant decreases. Non-significant changes are shown without arrows \u2014 these movements may be normal fluctuation rather than real trends.",
+      "text": "Significant changes are flagged when the difference between two waves exceeds what would be expected by chance given the sample sizes. Green arrows indicate statistically significant increases, red arrows indicate significant decreases. Non-significant changes are shown without arrows — these movements may be normal fluctuation rather than real trends.",
       "context": "Summary dashboard"
     },
     "heatmap": {
