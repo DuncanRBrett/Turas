@@ -509,6 +509,7 @@ fit_approximate_hb <- function(long_data, items, config, verbose = TRUE) {
                       0)
   # Clip to valid [0, 1] range for numerical safety
   shrinkage <- pmax(0, pmin(1, shrinkage))
+  names(shrinkage) <- names(pop_var)  # Restore names stripped by ifelse/pmax
 
   # Apply shrinkage to individual scores
   individual_utilities <- resp_wide

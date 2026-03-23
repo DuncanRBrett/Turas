@@ -315,10 +315,11 @@ build_maxdiff_page <- function(html_data, tables, charts, config,
   simulator_panel <- ""
   if (has_simulator) {
     # Inject CSS+JS into simulator to hide unwanted tabs and default to H2H
+    # Keep pins tab visible so users can see their pinned views
     sim_hide_injection <- paste0(
       '<style>',
-      '[data-tab="overview"],[data-tab="shares"],[data-tab="diagnostics"],[data-tab="pins"],[data-tab="about"]{display:none!important}',
-      '#panel-overview,#panel-shares,#panel-diagnostics,#panel-pins,#panel-about{display:none!important}',
+      '[data-tab="overview"],[data-tab="shares"],[data-tab="diagnostics"],[data-tab="about"]{display:none!important}',
+      '#panel-overview,#panel-shares,#panel-diagnostics,#panel-about{display:none!important}',
       '</style>',
       '<script>',
       'window.addEventListener("load",function(){',
@@ -1474,12 +1475,12 @@ body { font-size: 14px; -webkit-font-smoothing: antialiased; }
 /* === TABLES === */
 .md-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 8px 0; }
 .md-table-compact { font-size: 12px; }
-.md-th { background: var(--md-bg-muted); padding: 12px 16px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--md-text-secondary); border-bottom: 2px solid var(--md-border); cursor: pointer; user-select: none; }
+.md-table .md-th, .md-th { background: var(--md-bg-muted); padding: 12px 16px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--md-text-secondary); border-bottom: 2px solid var(--md-border); cursor: pointer; user-select: none; }
 .md-th:hover { background: #eef2f7; }
 .md-th .sort-arrow { font-size: 10px; margin-left: 4px; opacity: 0.5; }
 .md-th.md-num { text-align: right; }
 .md-th.md-label-col { text-align: left; }
-.md-td { padding: 10px 16px; border-bottom: 1px solid var(--md-border); vertical-align: middle; }
+.md-table .md-td, .md-td { padding: 10px 16px; border-bottom: 1px solid var(--md-border); vertical-align: middle; }
 .md-td.md-num { text-align: right; font-variant-numeric: tabular-nums; }
 .md-td.md-label-col { font-weight: 500; }
 .md-tr-section td { background: var(--md-bg-muted); font-weight: 600; padding-top: 12px; border-bottom: 1px solid var(--md-border); }

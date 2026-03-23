@@ -33,7 +33,7 @@ var SimCharts = (function() {
     _injectBarAnimStyle();
 
     var n = shares.length;
-    var w = 540, barH = 38, gap = 14, ml = 180, mr = 70;
+    var w = 960, barH = 38, gap = 14, ml = 200, mr = 80;
     var h = n * (barH + gap) + 20;
     var pw = w - ml - mr;
     var maxShare = Math.max.apply(null, shares.concat([50]));
@@ -100,13 +100,25 @@ var SimCharts = (function() {
     var data = (typeof SimEngine !== "undefined") ? SimEngine.getData() : null;
     if (!data || !data.attributes) return "";
 
-    var html = '<table class="cj-table" style="margin-top:16px;font-size:12px;">';
+    // Detect price attribute for revenue column
+    var priceAttr = null;
+    for (var ai = 0; ai < data.attributes.length; ai++) {
+      var aName = data.attributes[ai].name.toLowerCase();
+      if (aName.indexOf("price") >= 0 || aName.indexOf("cost") >= 0 || aName.indexOf("fee") >= 0) {
+        priceAttr = data.attributes[ai].name;
+        break;
+      }
+    }
+
+    var html = '<div style="overflow-x:auto;">';
+    html += '<table class="cj-table" style="margin-top:16px;font-size:12px;width:100%;min-width:500px;">';
     html += '<thead><tr>';
     html += '<th>Product</th>';
     data.attributes.forEach(function(a) {
       html += '<th>' + escSvg(a.name) + '</th>';
     });
     html += '<th style="text-align:right;">Share (%)</th>';
+    if (priceAttr) html += '<th style="text-align:right;">Revenue Index</th>';
     html += '</tr></thead><tbody>';
 
     products.forEach(function(prod, i) {
@@ -117,10 +129,16 @@ var SimCharts = (function() {
       });
       var sh = shares && shares[i] !== undefined ? shares[i].toFixed(1) : "";
       html += '<td style="text-align:right;font-weight:600;">' + sh + '</td>';
+      if (priceAttr) {
+        var priceVal = prod.config ? prod.config[priceAttr] : "";
+        var priceNum = parseFloat(String(priceVal || "0").replace(/[^0-9.\-]/g, ""));
+        var rev = (!isNaN(priceNum) && shares && shares[i] !== undefined) ? ((shares[i] / 100) * priceNum).toFixed(2) : "";
+        html += '<td style="text-align:right;font-weight:600;">' + rev + '</td>';
+      }
       html += '</tr>';
     });
 
-    html += '</tbody></table>';
+    html += '</tbody></table></div>';
     return html;
   }
 
@@ -132,7 +150,7 @@ var SimCharts = (function() {
     if (!container || !sweepResults || sweepResults.length === 0) return;
 
     var n = sweepResults.length;
-    var w = 500, h = 280, ml = 60, mr = 30, mt = 30, mb = 70;
+    var w = 960, h = 540, ml = 70, mr = 40, mt = 36, mb = 80;
     var pw = w - ml - mr, ph = h - mt - mb;
     var maxS = Math.max.apply(null, sweepResults.map(function(r) { return r.share; }).concat([50]));
     var minS = Math.min.apply(null, sweepResults.map(function(r) { return r.share; }).concat([0]));
@@ -184,7 +202,7 @@ var SimCharts = (function() {
     if (!container || !sovResults || sovResults.length === 0) return;
 
     var n = sovResults.length;
-    var w = 540, barH = 24, gap = 8, ml = 160, mr = 100;
+    var w = 960, barH = 28, gap = 10, ml = 200, mr = 120;
     var h = n * (barH + gap) * 2 + 60;
     var pw = w - ml - mr;
 
@@ -256,7 +274,7 @@ var SimCharts = (function() {
     var optimalPrice = options.optimalPrice || null;
 
     var n = curveData.length;
-    var w = 500, h = 300, ml = 65, mr = 30, mt = 36, mb = 60;
+    var w = 960, h = 540, ml = 75, mr = 40, mt = 40, mb = 70;
     var pw = w - ml - mr, ph = h - mt - mb;
     var maxS = Math.max.apply(null, curveData.map(function(d) { return d.share; })) * 1.15;
     var minS = 0;

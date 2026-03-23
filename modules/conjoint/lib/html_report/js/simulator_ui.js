@@ -251,9 +251,8 @@ var SimUI = (function() {
     html += '</span></span>';
     html += '</div>';
 
-    // Chart + revenue containers (updated separately)
+    // Chart container (updated separately; revenue index merged into product grid table)
     html += '<div id="cj-sim-share-chart"></div>';
-    html += '<div id="cj-sim-revenue"></div>';
 
     // Scale factor in collapsible Advanced section
     var sf = SimEngine.getScaleFactor();
@@ -303,9 +302,8 @@ var SimUI = (function() {
       shares = SimEngine.predictShares(configs, method);
     }
 
-    // Only update the chart and revenue — controls stay intact
+    // Only update the chart — controls stay intact; revenue index is in the product grid table
     SimCharts.renderShareBars("cj-sim-share-chart", displayProducts, shares);
-    renderRevenueSummary(displayProducts, shares);
   }
 
   function detectPriceAttribute() {

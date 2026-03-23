@@ -10,8 +10,14 @@
     {
       "name": "tabs-report",
       "runtimeExecutable": "/usr/local/bin/node",
-      "runtimeArgs": ["-e", "const h=require('http'),f=require('fs'),p=require('path');const root='/Users/duncan/Documents/Turas';h.createServer((q,r)=>{const u=decodeURIComponent(q.url);const fp=p.join(root,u);f.stat(fp,(e,s)=>{if(e){r.writeHead(404);r.end('Not found: '+u);return}f.readFile(fp,(e2,d)=>{if(e2){r.writeHead(500);r.end('Error');return}const ext=p.extname(fp);const ct={'.html':'text/html','.css':'text/css','.js':'application/javascript','.json':'application/json','.woff2':'font/woff2','.woff':'font/woff','.ttf':'font/ttf','.svg':'image/svg+xml','.png':'image/png'}[ext]||'application/octet-stream';r.writeHead(200,{'Content-Type':ct});r.end(d)})})}).listen(8766,()=>console.log('Serving on 8766'))"],
+      "runtimeArgs": ["-e", "const h=require('http'),f=require('fs'),p=require('path');const root='/Users/duncan/Documents/Turas';h.createServer((q,r)=>{const u=decodeURIComponent(q.url.split('?')[0]);const fp=p.join(root,u);f.stat(fp,(e,s)=>{if(e){r.writeHead(404);r.end('Not found: '+u);return}f.readFile(fp,(e2,d)=>{if(e2){r.writeHead(500);r.end('Error');return}const ext=p.extname(fp);const ct={'.html':'text/html','.css':'text/css','.js':'application/javascript','.json':'application/json','.woff2':'font/woff2','.woff':'font/woff','.ttf':'font/ttf','.svg':'image/svg+xml','.png':'image/png'}[ext]||'application/octet-stream';r.writeHead(200,{'Content-Type':ct});r.end(d)})})}).listen(8766,()=>console.log('Serving on 8766'))"],
       "port": 8766
+    },
+    {
+      "name": "conjoint-report",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8767", "--directory", "/Users/duncan/Documents/Turas"],
+      "port": 8767
     }
   ]
 }

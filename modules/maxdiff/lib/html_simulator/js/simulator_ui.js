@@ -469,6 +469,25 @@
       });
     });
 
+    // Copy-to-clipboard buttons
+    document.querySelectorAll(".sim-copy-btn").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        var tabId = this.getAttribute("data-copy-tab");
+        if (typeof SimExport !== "undefined") {
+          SimExport.copyToClipboard(tabId);
+          // Flash feedback
+          var origText = this.innerHTML;
+          var self = this;
+          self.innerHTML = self.innerHTML.replace("Copy", "Copied!");
+          self.classList.add("sim-btn-success");
+          setTimeout(function() {
+            self.innerHTML = origText;
+            self.classList.remove("sim-btn-success");
+          }, 1500);
+        }
+      });
+    });
+
     // Make updatePinBadge available globally for SimPins to call
     window.SimUI = {
       updatePinBadge: updatePinBadge,

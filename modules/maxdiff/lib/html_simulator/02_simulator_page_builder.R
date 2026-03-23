@@ -71,15 +71,16 @@ build_simulator_page <- function(sim_data, ...) {
   # Build toolbar helper
   toolbar <- function(tab_id) {
     sprintf('<div class="sim-toolbar">
-      <button class="sim-pin-btn sim-btn sim-btn-icon" data-pin-tab="%s" title="Pin to Views">%s Pin to Views</button>
-      <button class="sim-export-png-btn sim-btn sim-btn-icon" data-export-tab="%s" title="Export PNG">%s Export PNG</button>
-      <button class="sim-export-excel-btn sim-btn sim-btn-icon" data-export-tab="%s" title="Export Excel">%s Export Excel</button>
-    </div>', tab_id, pin_icon(), tab_id, download_icon(), tab_id, table_icon())
+      <button class="sim-pin-btn sim-btn sim-btn-icon" data-pin-tab="%s" title="Pin to Views">%s Pin</button>
+      <button class="sim-copy-btn sim-btn sim-btn-icon" data-copy-tab="%s" title="Copy to Clipboard">%s Copy</button>
+      <button class="sim-export-png-btn sim-btn sim-btn-icon" data-export-tab="%s" title="Export PNG">%s PNG</button>
+      <button class="sim-export-excel-btn sim-btn sim-btn-icon" data-export-tab="%s" title="Export Excel">%s Excel</button>
+    </div>', tab_id, pin_icon(), tab_id, clipboard_icon(), tab_id, download_icon(), tab_id, table_icon())
   }
 
   pin_toolbar <- function(tab_id) {
     sprintf('<div class="sim-toolbar">
-      <button class="sim-pin-btn sim-btn sim-btn-icon" data-pin-tab="%s" title="Pin to Views">%s Pin to Views</button>
+      <button class="sim-pin-btn sim-btn sim-btn-icon" data-pin-tab="%s" title="Pin to Views">%s Pin</button>
     </div>', tab_id, pin_icon())
   }
 
@@ -328,6 +329,10 @@ table_icon <- function() {
   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>'
 }
 
+clipboard_icon <- function() {
+  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'
+}
+
 
 #' Build About tab HTML content from sim_data
 #'
@@ -424,6 +429,7 @@ body { font-size: 14px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoot
 .sim-btn-small { padding: 4px 10px; font-size: 12px; }
 .sim-btn-icon { padding: 5px 12px; font-size: 12px; }
 .sim-btn-icon svg { vertical-align: -2px; }
+.sim-btn-success { background: #059669 !important; color: white !important; }
 
 /* Toolbar */
 .sim-toolbar { display: flex; gap: 6px; flex-shrink: 0; }
