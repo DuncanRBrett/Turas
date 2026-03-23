@@ -58,7 +58,8 @@ classify_appeal <- function(individual_utils, method = "ABOVE_MEAN", k = 3) {
   if (method == "ABOVE_MEAN") {
     row_means <- rowMeans(utils_mat, na.rm = TRUE)
     for (i in seq_len(n_resp)) {
-      appeal[i, ] <- utils_mat[i, ] > row_means[i]
+      cmp <- utils_mat[i, ] > row_means[i]
+      appeal[i, ] <- ifelse(is.na(cmp), FALSE, cmp)
     }
   } else if (method %in% c("TOP_3", "TOP_K")) {
     top_k <- if (method == "TOP_3") 3L else as.integer(k)
@@ -68,12 +69,14 @@ classify_appeal <- function(individual_utils, method = "ABOVE_MEAN", k = 3) {
       appeal[i, ] <- !is.na(ranks) & ranks <= top_k
     }
   } else if (method == "ABOVE_ZERO") {
-    appeal <- utils_mat > 0
+    cmp <- utils_mat > 0
+    appeal <- ifelse(is.na(cmp), FALSE, cmp)
   } else {
     # Default to ABOVE_MEAN
     row_means <- rowMeans(utils_mat, na.rm = TRUE)
     for (i in seq_len(n_resp)) {
-      appeal[i, ] <- utils_mat[i, ] > row_means[i]
+      cmp <- utils_mat[i, ] > row_means[i]
+      appeal[i, ] <- ifelse(is.na(cmp), FALSE, cmp)
     }
   }
 

@@ -111,17 +111,17 @@ read_simulator_js <- function(filename) {
 #' Build Simulator CSS
 #' @keywords internal
 build_simulator_css <- function(brand, accent) {
-  css <- '
-:root { --sim-brand: BRAND; --sim-accent: ACCENT; }
-body { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; background: #f8f7f5; color: #334155; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-.sim-header { background: linear-gradient(135deg, #1a2744 0%, #2a3f5f 100%); color: white; padding: 28px 40px; border-bottom: 3px solid ACCENT; }
+  # Note: turas_base_css() provides --cj-brand, --cj-accent, reset, body, Inter font
+  '
+/* === STANDALONE SIMULATOR STYLES === */
+.sim-header { background: linear-gradient(135deg, #1a2744 0%, #2a3f5f 100%); color: white; padding: 28px 40px; border-bottom: 3px solid var(--cj-accent); }
 .sim-header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.3px; }
 .sim-subtitle { font-size: 12px; opacity: 0.7; margin-top: 4px; }
 .sim-nav { display: flex; gap: 0; background: white; border-bottom: 2px solid #e2e8f0; padding: 0 40px; position: sticky; top: 0; z-index: 10; }
 .sim-tab { padding: 12px 20px; font-size: 13px; font-weight: 500; color: #64748b; cursor: pointer; border: none; border-bottom: 3px solid transparent; background: none; transition: color 0.15s, border-color 0.15s; }
-.sim-tab:hover { color: BRAND; }
-.sim-tab:focus-visible { outline: 2px solid BRAND; outline-offset: -2px; }
-.sim-tab.active { color: BRAND; border-bottom-color: BRAND; font-weight: 600; }
+.sim-tab:hover { color: var(--cj-brand); }
+.sim-tab:focus-visible { outline: 2px solid var(--cj-brand); outline-offset: -2px; }
+.sim-tab.active { color: var(--cj-brand); border-bottom-color: var(--cj-brand); font-weight: 600; }
 .sim-container { padding: 24px 40px 60px; max-width: 1200px; margin: 0 auto; }
 .sim-panel { display: none; }
 .sim-panel.active { display: block; }
@@ -133,10 +133,10 @@ body { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; b
 .sim-controls { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
 .sim-controls label { font-size: 12px; color: #64748b; font-weight: 500; }
 .sim-controls select { padding: 7px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; font-family: inherit; background: white; transition: border-color 0.15s; }
-.sim-controls select:focus { border-color: BRAND; outline: none; box-shadow: 0 0 0 2px rgba(50,51,103,0.08); }
-.sim-add-btn { padding: 8px 16px; background: BRAND; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit; transition: opacity 0.15s, box-shadow 0.15s; }
+.sim-controls select:focus { border-color: var(--cj-brand); outline: none; box-shadow: 0 0 0 2px rgba(50,51,103,0.08); }
+.sim-add-btn { padding: 8px 16px; background: var(--cj-brand); color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit; transition: opacity 0.15s, box-shadow 0.15s; }
 .sim-add-btn:hover { opacity: 0.9; }
-.sim-add-btn:focus-visible { outline: 2px solid BRAND; outline-offset: 2px; }
+.sim-add-btn:focus-visible { outline: 2px solid var(--cj-brand); outline-offset: 2px; }
 .sim-product-card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 18px; margin-bottom: 12px; transition: border-color 0.15s; }
 .sim-product-card:hover { border-color: #cbd5e1; }
 .sim-product-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 13px; font-weight: 600; color: #1e293b; }
@@ -146,13 +146,10 @@ body { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; b
 .sim-attr-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; }
 .sim-attr-row label { font-size: 12px; color: #64748b; flex: 1; }
 .sim-attr-row select { flex: 1; max-width: 200px; padding: 5px 10px; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 12px; font-family: inherit; transition: border-color 0.15s; }
-.sim-attr-row select:focus { border-color: BRAND; outline: none; box-shadow: 0 0 0 2px rgba(50,51,103,0.08); }
+.sim-attr-row select:focus { border-color: var(--cj-brand); outline: none; box-shadow: 0 0 0 2px rgba(50,51,103,0.08); }
 .sim-share-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
-.sim-share-value { font-weight: 600; color: BRAND; font-variant-numeric: tabular-nums; }
+.sim-share-value { font-weight: 600; color: var(--cj-brand); font-variant-numeric: tabular-nums; }
 .sim-footer { text-align: center; padding: 20px; color: #94a3b8; font-size: 11px; border-top: 1px solid #e2e8f0; }
 @media (max-width: 768px) { .sim-layout { flex-direction: column; } .sim-header, .sim-nav, .sim-container { padding-left: 16px; padding-right: 16px; } }
 '
-  css <- gsub("BRAND", brand, css, fixed = TRUE)
-  css <- gsub("ACCENT", accent, css, fixed = TRUE)
-  css
 }

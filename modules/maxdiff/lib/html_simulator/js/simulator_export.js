@@ -94,10 +94,10 @@ var SimExport = (function() {
     var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + WIDTH + '" height="600">' +
       '<rect width="100%" height="100%" fill="white"/>' +
       '<rect x="0" y="0" width="100%" height="56" fill="' + brand + '"/>' +
-      '<text x="32" y="36" font-family="system-ui, sans-serif" font-size="20" font-weight="600" fill="white">' + escSvg(title) + '</text>' +
-      '<text x="' + (WIDTH - 32) + '" y="36" font-family="system-ui, sans-serif" font-size="12" fill="rgba(255,255,255,0.7)" text-anchor="end">TURAS MaxDiff Simulator</text>' +
+      '<text x="32" y="36" font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="20" font-weight="600" fill="white">' + escSvg(title) + '</text>' +
+      '<text x="' + (WIDTH - 32) + '" y="36" font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="12" fill="rgba(255,255,255,0.7)" text-anchor="end">TURAS MaxDiff Simulator</text>' +
       '<foreignObject x="24" y="72" width="' + (WIDTH - 48) + '" height="500">' +
-        '<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:system-ui,sans-serif;font-size:14px;color:#1e293b;line-height:1.5">' +
+        '<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;font-size:14px;color:#1e293b;line-height:1.5">' +
           bodyHtml +
         '</div>' +
       '</foreignObject>' +
@@ -180,9 +180,9 @@ var SimExport = (function() {
       var s = shares[i];
       var w = Math.max(4, (s.share / maxVal) * barMaxWidth);
 
-      svg += '<text x="' + (labelWidth) + '" y="' + (y + barHeight / 2 + 4) + '" font-family="system-ui,sans-serif" font-size="12" font-weight="500" fill="#334155" text-anchor="end">' + escSvg(s.label) + '</text>';
+      svg += '<text x="' + (labelWidth) + '" y="' + (y + barHeight / 2 + 4) + '" font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="12" font-weight="500" fill="#334155" text-anchor="end">' + escSvg(s.label) + '</text>';
       svg += '<rect x="' + barStart + '" y="' + y + '" width="' + w + '" height="' + barHeight + '" rx="4" fill="' + brand + '"/>';
-      svg += '<text x="' + (barStart + w + 8) + '" y="' + (y + barHeight / 2 + 4) + '" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#334155">' + s.share.toFixed(1) + '%</text>';
+      svg += '<text x="' + (barStart + w + 8) + '" y="' + (y + barHeight / 2 + 4) + '" font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="12" font-weight="600" fill="#334155">' + s.share.toFixed(1) + '%</text>';
 
       y += barHeight + gap;
     }
@@ -204,17 +204,17 @@ var SimExport = (function() {
       var r = results[i];
       var wA = (r.probA / 100) * barWidth;
 
-      svg += '<text x="60" y="' + y + '" font-family="system-ui,sans-serif" font-size="12" font-weight="500" fill="#475569">' + escSvg(r.itemA) + ' vs ' + escSvg(r.itemB) + '</text>';
+      svg += '<text x="60" y="' + y + '" font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="12" font-weight="500" fill="#475569">' + escSvg(r.itemA) + ' vs ' + escSvg(r.itemB) + '</text>';
       y += 8;
 
       svg += '<rect x="60" y="' + y + '" width="' + wA + '" height="36" rx="4" fill="' + brand + '"/>';
       svg += '<rect x="' + (60 + wA) + '" y="' + y + '" width="' + (barWidth - wA) + '" height="36" rx="4" fill="#e74c3c"/>';
-      svg += '<text x="' + (60 + wA / 2) + '" y="' + (y + 22) + '" font-family="system-ui,sans-serif" font-size="14" font-weight="700" fill="white" text-anchor="middle">' + r.probA + '%</text>';
-      svg += '<text x="' + (60 + wA + (barWidth - wA) / 2) + '" y="' + (y + 22) + '" font-family="system-ui,sans-serif" font-size="14" font-weight="700" fill="white" text-anchor="middle">' + r.probB + '%</text>';
+      svg += '<text x="' + (60 + wA / 2) + '" y="' + (y + 22) + '" font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="14" font-weight="700" fill="white" text-anchor="middle">' + r.probA + '%</text>';
+      svg += '<text x="' + (60 + wA + (barWidth - wA) / 2) + '" y="' + (y + 22) + '" font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="14" font-weight="700" fill="white" text-anchor="middle">' + r.probB + '%</text>';
 
       y += 36;
-      svg += '<text x="60" y="' + (y + 14) + '" font-family="system-ui,sans-serif" font-size="11" fill="#64748b">' + escSvg(r.itemA) + '</text>';
-      svg += '<text x="' + (60 + barWidth) + '" y="' + (y + 14) + '" font-family="system-ui,sans-serif" font-size="11" fill="#64748b" text-anchor="end">' + escSvg(r.itemB) + '</text>';
+      svg += '<text x="60" y="' + (y + 14) + '" font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="11" fill="#64748b">' + escSvg(r.itemA) + '</text>';
+      svg += '<text x="' + (60 + barWidth) + '" y="' + (y + 14) + '" font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="11" fill="#64748b" text-anchor="end">' + escSvg(r.itemB) + '</text>';
       y += 30;
     }
 
@@ -229,19 +229,19 @@ var SimExport = (function() {
     var svg = headerSVG(title, subtitle, brand);
 
     // Reach number
-    svg += '<text x="' + (WIDTH / 2) + '" y="' + (y + 40) + '" font-family="system-ui,sans-serif" font-size="48" font-weight="700" fill="' + brand + '" text-anchor="middle">' + reach.reach + '%</text>';
-    svg += '<text x="' + (WIDTH / 2) + '" y="' + (y + 60) + '" font-family="system-ui,sans-serif" font-size="14" fill="#64748b" text-anchor="middle">reach (' + reach.nReached + ' / ' + reach.nTotal + ' respondents)</text>';
-    svg += '<text x="' + (WIDTH / 2) + '" y="' + (y + 80) + '" font-family="system-ui,sans-serif" font-size="13" fill="#94a3b8" text-anchor="middle">Avg frequency: ' + reach.frequency + ' items</text>';
+    svg += '<text x="' + (WIDTH / 2) + '" y="' + (y + 40) + '" font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="48" font-weight="700" fill="' + brand + '" text-anchor="middle">' + reach.reach + '%</text>';
+    svg += '<text x="' + (WIDTH / 2) + '" y="' + (y + 60) + '" font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="14" fill="#64748b" text-anchor="middle">reach (' + reach.nReached + ' / ' + reach.nTotal + ' respondents)</text>';
+    svg += '<text x="' + (WIDTH / 2) + '" y="' + (y + 80) + '" font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="13" fill="#94a3b8" text-anchor="middle">Avg frequency: ' + reach.frequency + ' items</text>';
     y += 110;
 
     // Portfolio list
     if (labels.length > 0) {
-      svg += '<text x="60" y="' + y + '" font-family="system-ui,sans-serif" font-size="13" font-weight="600" fill="#334155">Portfolio (' + labels.length + ' items):</text>';
+      svg += '<text x="60" y="' + y + '" font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="13" font-weight="600" fill="#334155">Portfolio (' + labels.length + ' items):</text>';
       y += 8;
       for (var i = 0; i < labels.length; i++) {
         y += 22;
         svg += '<circle cx="72" cy="' + (y - 4) + '" r="3" fill="' + brand + '"/>';
-        svg += '<text x="84" y="' + y + '" font-family="system-ui,sans-serif" font-size="12" fill="#475569">' + escSvg(labels[i]) + '</text>';
+        svg += '<text x="84" y="' + y + '" font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="12" fill="#475569">' + escSvg(labels[i]) + '</text>';
       }
     }
 
@@ -252,14 +252,14 @@ var SimExport = (function() {
 
   function headerSVG(title, subtitle, brand) {
     return '<rect x="0" y="0" width="' + WIDTH + '" height="56" rx="0" fill="' + brand + '"/>' +
-      '<text x="32" y="28" font-family="system-ui,sans-serif" font-size="18" font-weight="600" fill="white" dominant-baseline="middle">' + escSvg(title) + '</text>' +
-      '<text x="32" y="48" font-family="system-ui,sans-serif" font-size="12" fill="rgba(255,255,255,0.8)">' + escSvg(subtitle) + '</text>' +
-      '<text x="' + (WIDTH - 32) + '" y="28" font-family="system-ui,sans-serif" font-size="11" fill="rgba(255,255,255,0.6)" text-anchor="end" dominant-baseline="middle">TURAS MaxDiff Simulator</text>';
+      '<text x="32" y="28" font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="18" font-weight="600" fill="white" dominant-baseline="middle">' + escSvg(title) + '</text>' +
+      '<text x="32" y="48" font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="12" fill="rgba(255,255,255,0.8)">' + escSvg(subtitle) + '</text>' +
+      '<text x="' + (WIDTH - 32) + '" y="28" font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="11" fill="rgba(255,255,255,0.6)" text-anchor="end" dominant-baseline="middle">TURAS MaxDiff Simulator</text>';
   }
 
   function footerSVG(y) {
     return '<line x1="32" y1="' + y + '" x2="' + (WIDTH - 32) + '" y2="' + y + '" stroke="#e2e8f0" stroke-width="1"/>' +
-      '<text x="' + (WIDTH / 2) + '" y="' + (y + 18) + '" font-family="system-ui,sans-serif" font-size="10" fill="#94a3b8" text-anchor="middle">Generated by TURAS MaxDiff Simulator v2.0</text>';
+      '<text x="' + (WIDTH / 2) + '" y="' + (y + 18) + '" font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="10" fill="#94a3b8" text-anchor="middle">Generated by TURAS MaxDiff Simulator v2.0</text>';
   }
 
   function wrapSVG(content, height) {

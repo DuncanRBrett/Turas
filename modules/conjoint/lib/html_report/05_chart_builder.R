@@ -45,7 +45,7 @@
 
 .svg_value_label <- function(x, y, label, anchor = "middle", size = 12) {
   sprintf(
-    '<text x="%.1f" y="%.1f" text-anchor="%s" fill="#334155" font-size="%d" font-weight="500">%s</text>',
+    '<text x="%.1f" y="%.1f" text-anchor="%s" fill="#1e293b" font-size="%d" font-weight="500">%s</text>',
     x, y, anchor, size, .svg_esc(label)
   )
 }
@@ -121,7 +121,7 @@ build_importance_chart <- function(importance, brand_colour = "#323367") {
 
     # Attribute label (font-weight 400 for softer axis labels)
     elements <- c(elements, sprintf(
-      '<text x="%d" y="%.1f" text-anchor="end" fill="#334155" font-size="13" font-weight="400" dominant-baseline="central">%s</text>',
+      '<text x="%d" y="%.1f" text-anchor="end" fill="#1e293b" font-size="13" font-weight="400" dominant-baseline="central">%s</text>',
       margin_left - 8, y + bar_height / 2, .svg_esc(imp_sorted$Attribute[i])
     ))
 
@@ -139,7 +139,7 @@ build_importance_chart <- function(importance, brand_colour = "#323367") {
       ))
     } else {
       elements <- c(elements, sprintf(
-        '<text x="%.1f" y="%.1f" text-anchor="start" fill="#334155" font-size="12" font-weight="500" dominant-baseline="central">%s</text>',
+        '<text x="%.1f" y="%.1f" text-anchor="start" fill="#1e293b" font-size="12" font-weight="500" dominant-baseline="central">%s</text>',
         margin_left + w + 6, y + bar_height / 2, val_label
       ))
     }
@@ -232,7 +232,7 @@ build_utility_chart <- function(attr_utilities, attr_name, brand_colour = "#3233
     # Value label (font-weight 600 for bolder contrast)
     label_y <- if (u >= 0) bar_y - 6 else bar_y + bar_h + 14
     elements <- c(elements, sprintf(
-      '<text x="%.1f" y="%.1f" text-anchor="middle" fill="#334155" font-size="12" font-weight="500">%s</text>',
+      '<text x="%.1f" y="%.1f" text-anchor="middle" fill="#1e293b" font-size="12" font-weight="500">%s</text>',
       x_center, label_y, sprintf("%.3f", u)
     ))
 
@@ -331,7 +331,7 @@ build_utility_dot_plot <- function(attr_utilities, attr_name, brand_colour = "#3
     label_x <- dot_x + if (u >= 0) 12 else -12
     label_anchor <- if (u >= 0) "start" else "end"
     elements <- c(elements, sprintf(
-      '<text x="%.1f" y="%.1f" text-anchor="%s" fill="#334155" font-size="11" font-weight="500">%s</text>',
+      '<text x="%.1f" y="%.1f" text-anchor="%s" fill="#1e293b" font-size="11" font-weight="500">%s</text>',
       label_x, y_center + 4, label_anchor, sprintf("%.3f", u)
     ))
 
@@ -449,8 +449,12 @@ build_wtp_chart <- function(wtp_data, brand_colour = "#323367") {
 
   cs <- wtp_data$currency_symbol %||% "$"
   wtp <- wtp_data$wtp_table
-  # Filter out baselines
-  if ("is_baseline" %in% names(wtp)) wtp <- wtp[!wtp$is_baseline, , drop = FALSE]
+  # Mark baselines for distinct rendering (greyed out, no bar)
+  if ("is_baseline" %in% names(wtp)) {
+    wtp$is_base <- wtp$is_baseline
+  } else {
+    wtp$is_base <- FALSE
+  }
   if (nrow(wtp) == 0) return("")
 
   n <- nrow(wtp)
@@ -507,8 +511,27 @@ build_wtp_chart <- function(wtp_data, brand_colour = "#323367") {
     }
     prev_attr <- curr_attr
 
+    is_base <- isTRUE(wtp$is_base[i])
     val <- wtp$WTP[i]
     bar_colour <- if (val >= 0) brand_colour else "#c0695c"
+
+    if (is_base) {
+      # Baseline row: greyed-out label with "(Reference)" tag, no bar
+      label <- sprintf("%s: %s (Reference)", curr_attr, wtp$Level[i])
+      if (nchar(label) > 40) label <- paste0(substr(label, 1, 39), "\u2026")
+      elements <- c(elements, sprintf(
+        '<text x="%d" y="%.1f" text-anchor="end" fill="#94a3b8" font-size="11" font-weight="400" font-style="italic" dominant-baseline="central">%s</text>',
+        margin_left - 8, y_pos + bar_height / 2, .svg_esc(label)
+      ))
+      # Dashed reference line at zero
+      elements <- c(elements, sprintf(
+        '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4,3"/>',
+        zero_x - 20, y_pos + bar_height / 2, zero_x + 20, y_pos + bar_height / 2
+      ))
+      y_pos <- y_pos + bar_height + bar_gap
+      next
+    }
+
     label <- sprintf("%s: %s", curr_attr, wtp$Level[i])
     if (nchar(label) > 34) label <- paste0(substr(label, 1, 33), "\u2026")
 
@@ -558,12 +581,20 @@ build_wtp_chart <- function(wtp_data, brand_colour = "#323367") {
       }
     }
 
-    # Value label (font-weight 600 for bolder contrast)
+    # Value label with white background to prevent strikethrough from CI whiskers
+    val_text <- sprintf("%s%.2f", cs, val)
     vx <- if (val >= 0) scale_x(val) + 4 else scale_x(val) - 4
     vanch <- if (val >= 0) "start" else "end"
+    # Approximate text width for background (7px per char at font-size 12)
+    val_text_w <- nchar(val_text) * 7
+    bg_x <- if (val >= 0) vx - 2 else vx - val_text_w - 2
     elements <- c(elements, sprintf(
-      '<text x="%.1f" y="%.1f" text-anchor="%s" fill="#334155" font-size="12" font-weight="500" dominant-baseline="central">%s</text>',
-      vx, y_pos + bar_height / 2, vanch, sprintf("%s%.2f", cs, val)
+      '<rect x="%.1f" y="%.1f" width="%.0f" height="16" rx="2" ry="2" fill="#fff" opacity="0.9"/>',
+      bg_x, y_pos + bar_height / 2 - 8, val_text_w + 4
+    ))
+    elements <- c(elements, sprintf(
+      '<text x="%.1f" y="%.1f" text-anchor="%s" fill="#1e293b" font-size="12" font-weight="500" dominant-baseline="central">%s</text>',
+      vx, y_pos + bar_height / 2, vanch, val_text
     ))
 
     y_pos <- y_pos + bar_height + bar_gap
@@ -831,7 +862,7 @@ build_class_size_chart <- function(class_sizes, brand_colour = "#323367") {
 
     # Label
     elements <- c(elements, sprintf(
-      '<text x="%d" y="%.1f" text-anchor="end" fill="#334155" font-size="13" font-weight="500" dominant-baseline="central">Class %d</text>',
+      '<text x="%d" y="%.1f" text-anchor="end" fill="#1e293b" font-size="13" font-weight="500" dominant-baseline="central">Class %d</text>',
       margin_left - 8, y + bar_height / 2, i
     ))
 

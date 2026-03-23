@@ -829,6 +829,13 @@ classify_item_discrimination <- function(individual_utils, items = NULL) {
     high_sd <- sds[j] > median_sd
     positive_mean <- means[j] > 0
 
+    # Guard against NA comparisons (e.g., all-NA utility columns)
+    if (is.na(high_mean) || is.na(high_sd)) {
+      classification[j] <- "MODERATE"
+      label[j] <- "Moderate"
+      next
+    }
+
     if (high_mean && !high_sd) {
       # Only label as "Universal Favorite" if utility is actually positive
       if (positive_mean) {

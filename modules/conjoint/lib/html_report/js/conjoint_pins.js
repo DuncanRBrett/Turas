@@ -1,6 +1,7 @@
 /**
  * Conjoint Report Pin System
- * Pin views, render pinned cards, persist to JSON store, batch export.
+ * Pin views with mode selection (chart, table, or both), render pinned cards,
+ * persist to JSON store, clipboard copy, download PNG, batch export.
  * Supports utility attributes (util-*), panel cards (pin-*), and custom entries.
  */
 
@@ -8,18 +9,102 @@
   "use strict";
 
   var pinnedViews = [];
+  var activePopover = null;
+
+  // === PIN POPOVER ===
+
+  window.showPinPopover = function(viewId, btnEl) {
+    // Close any open popover
+    dismissPopover();
+
+    var isSimulator = (viewId === "pin-simulator");
+    var isPinned = !isSimulator && pinnedViews.some(function(v) { return v.id === viewId; });
+
+    // Determine available pin modes based on what the source has
+    var modes = getPinModes(viewId);
+
+    var pop = document.createElement("div");
+    pop.className = "cj-pin-popover";
+
+    modes.forEach(function(mode) {
+      var item = document.createElement("button");
+      item.className = "cj-pin-popover-item";
+      item.textContent = mode.label;
+      item.addEventListener("click", function(e) {
+        e.stopPropagation();
+        dismissPopover();
+        togglePin(viewId, mode.key);
+      });
+      pop.appendChild(item);
+    });
+
+    // Unpin option if already pinned
+    if (isPinned) {
+      var unpin = document.createElement("button");
+      unpin.className = "cj-pin-popover-item unpin";
+      unpin.textContent = "Unpin";
+      unpin.addEventListener("click", function(e) {
+        e.stopPropagation();
+        dismissPopover();
+        unpinView(viewId);
+      });
+      pop.appendChild(unpin);
+    }
+
+    btnEl.style.position = "relative";
+    btnEl.appendChild(pop);
+    activePopover = { el: pop, btn: btnEl };
+
+    // Click outside to dismiss
+    setTimeout(function() {
+      document.addEventListener("click", onDocClick);
+    }, 0);
+  };
+
+  function onDocClick(e) {
+    if (activePopover && !activePopover.el.contains(e.target) && e.target !== activePopover.btn) {
+      dismissPopover();
+    }
+  }
+
+  function dismissPopover() {
+    if (activePopover) {
+      activePopover.el.remove();
+      activePopover = null;
+    }
+    document.removeEventListener("click", onDocClick);
+  }
+
+  function getPinModes(viewId) {
+    // Default modes available depend on what the source panel has
+    var source = findSource(viewId);
+    var hasChart = source && source.querySelector("svg");
+    var hasTable = source && (source.querySelector(".cj-table") || source.querySelector("table"));
+
+    var modes = [];
+    if (hasChart && hasTable) {
+      modes.push({ key: "both", label: "Chart + Table" });
+      modes.push({ key: "chart", label: "Chart only" });
+      modes.push({ key: "table", label: "Table only" });
+    } else if (hasChart) {
+      modes.push({ key: "chart", label: "Pin chart" });
+    } else if (hasTable) {
+      modes.push({ key: "table", label: "Pin table" });
+    } else {
+      modes.push({ key: "both", label: "Pin view" });
+    }
+    return modes;
+  }
+
 
   // === TOGGLE PIN ===
 
-  window.togglePin = function(viewId) {
-    // Simulator pins are snapshots — always add, never toggle off
-    // This allows multiple market share / revenue / sensitivity snapshots
+  function togglePin(viewId, mode) {
     var isSimulator = (viewId === "pin-simulator");
 
     if (isSimulator) {
-      var captured = captureView(viewId);
+      var captured = captureView(viewId, mode);
       if (captured) {
-        // Give each simulator snapshot a unique ID
         captured.id = "pin-sim-" + Date.now();
         pinnedViews.push(captured);
       }
@@ -31,40 +116,49 @@
       return;
     }
 
-    // Non-simulator pins: standard toggle behavior
+    // Non-simulator: check if already pinned
     var idx = pinnedViews.findIndex(function(v) { return v.id === viewId; });
-    var wasPinned = idx >= 0;
-
-    if (wasPinned) {
+    if (idx >= 0) {
+      // Re-pin with new mode (replace existing)
       pinnedViews.splice(idx, 1);
-    } else {
-      var captured = captureView(viewId);
-      if (captured) {
-        pinnedViews.push(captured);
-      }
+    }
+
+    var captured = captureView(viewId, mode);
+    if (captured) {
+      pinnedViews.push(captured);
     }
 
     updatePinButtons();
     renderPinnedCards();
     savePinnedData();
     updatePinnedBadge();
-
-    showPinToast(wasPinned ? "Removed from collection" : "Pinned to collection");
+    showPinToast("Pinned to collection");
     bounceButton(viewId);
-  };
+  }
 
-  function captureView(viewId) {
+  function unpinView(viewId) {
+    var idx = pinnedViews.findIndex(function(v) { return v.id === viewId; });
+    if (idx >= 0) {
+      pinnedViews.splice(idx, 1);
+      updatePinButtons();
+      renderPinnedCards();
+      savePinnedData();
+      updatePinnedBadge();
+      showPinToast("Removed from collection");
+    }
+  }
+
+
+  // === FIND SOURCE ELEMENT ===
+
+  function findSource(viewId) {
     var source = null;
 
-    // Utility attribute detail (util-Brand, util-Price, etc.)
     if (viewId.indexOf("util-") === 0) {
       source = document.querySelector('.cj-attr-detail.active');
-    }
-    // Panel-level pins (pin-overview, pin-diagnostics-fit, etc.)
-    else if (viewId.indexOf("pin-") === 0) {
+    } else if (viewId.indexOf("pin-") === 0) {
       var panelPart = viewId.replace(/^pin-/, "");
 
-      // Diagnostics sub-cards: pin-diagnostics-fit, pin-diagnostics-convergence, pin-diagnostics-quality
       if (panelPart.indexOf("diagnostics-") === 0) {
         var subPart = panelPart.replace("diagnostics-", "");
         var diagPanel = document.getElementById("panel-diagnostics");
@@ -75,9 +169,7 @@
             if (h2 && h2.textContent === targetH2[subPart]) source = card;
           });
         }
-      }
-      // LC sub-cards: pin-lc-bic, pin-lc-sizes, pin-lc-importance
-      else if (panelPart.indexOf("lc-") === 0) {
+      } else if (panelPart.indexOf("lc-") === 0) {
         var lcPart = panelPart.replace("lc-", "");
         var lcPanel = document.getElementById("panel-latentclass");
         if (lcPanel) {
@@ -87,9 +179,7 @@
             if (h2 && h2.textContent === lcTarget[lcPart]) source = card;
           });
         }
-      }
-      // WTP sub-cards: pin-wtp-main, pin-wtp-demand
-      else if (panelPart.indexOf("wtp-") === 0) {
+      } else if (panelPart.indexOf("wtp-") === 0) {
         var wtpPart = panelPart.replace("wtp-", "");
         var wtpPanel = document.getElementById("panel-wtp");
         if (wtpPanel) {
@@ -99,15 +189,10 @@
             if (h2 && h2.textContent === wtpTarget[wtpPart]) source = card;
           });
         }
-      }
-      // Overview: pin-overview
-      else if (panelPart === "overview") {
+      } else if (panelPart === "overview") {
         source = document.querySelector("#panel-overview .cj-card");
-      }
-      // Simulator: pin-simulator -> capture the results div with mode label
-      else if (panelPart === "simulator") {
+      } else if (panelPart === "simulator") {
         source = document.getElementById("cj-sim-results");
-        // Tag with current mode for descriptive snapshot title
         if (source) {
           var modeBtn = document.querySelector(".cj-sim-mode-btn.active");
           source._simMode = modeBtn ? modeBtn.textContent : "Simulator";
@@ -115,36 +200,49 @@
       }
     }
 
-    // Fallback: try panel-{id}
     if (!source) {
       var panelId = viewId.replace(/^util-/, "").replace(/^panel-/, "");
       source = document.getElementById("panel-" + panelId);
     }
 
+    return source;
+  }
+
+
+  // === CAPTURE VIEW ===
+
+  function captureView(viewId, mode) {
+    var source = findSource(viewId);
     if (!source) return null;
 
-    // Get title (simulator snapshots use mode label + timestamp)
+    mode = mode || "both";
+
+    // Get title
     var titleEl = source.querySelector("h2") || source.querySelector("h3");
     var title = titleEl ? titleEl.textContent : viewId;
     if (source._simMode) {
       var now = new Date();
       var timeStr = now.getHours().toString().padStart(2, "0") + ":" + now.getMinutes().toString().padStart(2, "0");
-      title = source._simMode + " — " + timeStr;
+      title = source._simMode + " \u2014 " + timeStr;
       delete source._simMode;
     }
 
-    // Get chart SVG
+    // Capture chart SVG (if mode allows)
     var chartSvg = "";
-    var svgEl = source.querySelector("svg");
-    if (svgEl) {
-      chartSvg = new XMLSerializer().serializeToString(svgEl);
+    if (mode === "both" || mode === "chart") {
+      var svgEl = source.querySelector("svg");
+      if (svgEl) {
+        chartSvg = new XMLSerializer().serializeToString(svgEl);
+      }
     }
 
-    // Get table HTML
+    // Capture table HTML (if mode allows)
     var tableHtml = "";
-    var tableEl = source.querySelector(".cj-table");
-    if (tableEl) {
-      tableHtml = tableEl.outerHTML;
+    if (mode === "both" || mode === "table") {
+      var tableEl = source.querySelector(".cj-table") || source.querySelector("table");
+      if (tableEl) {
+        tableHtml = tableEl.outerHTML;
+      }
     }
 
     return {
@@ -152,6 +250,7 @@
       title: title,
       chart: chartSvg,
       table: tableHtml,
+      mode: mode,
       note: "",
       timestamp: new Date().toISOString()
     };
@@ -163,12 +262,11 @@
   function updatePinButtons() {
     document.querySelectorAll(".cj-pin-btn").forEach(function(btn) {
       var onclick = btn.getAttribute("onclick") || "";
-      var match = onclick.match(/togglePin\('([^']+)'\)/);
+      var match = onclick.match(/showPinPopover\('([^']+)'/);
       if (match) {
         var id = match[1];
         var isPinned = pinnedViews.some(function(v) { return v.id === id; });
         btn.classList.toggle("pinned", isPinned);
-        // Keep emoji content unchanged — just toggle CSS class
       }
     });
   }
@@ -210,12 +308,20 @@
         return;
       }
 
-      html += '<div class="cj-pinned-card">';
+      html += '<div class="cj-pinned-card" id="cj-pinned-card-' + idx + '">';
+      html += '<div class="cj-pinned-card-header">';
       html += '<div class="cj-pinned-card-title">' + escHtml(view.title) + '</div>';
       html += '<div class="cj-pinned-card-actions">';
-      html += '<button class="cj-export-btn" onclick="exportPinnedSlide(' + idx + ')">Slide PNG</button>';
-      html += '<button class="cj-export-btn" onclick="removePinned(' + idx + ')">\u00d7</button>';
-      html += '</div>';
+      // Overflow menu
+      html += '<div class="cj-pinned-menu-wrap" style="position:relative;">';
+      html += '<button class="cj-export-btn" onclick="togglePinnedMenu(' + idx + ')" title="Actions">\u22ee</button>';
+      html += '<div class="cj-pinned-menu" id="cj-pinned-menu-' + idx + '" style="display:none;">';
+      html += '<button class="cj-pin-popover-item" onclick="copyPinnedToClipboard(' + idx + ')">Copy to clipboard</button>';
+      html += '<button class="cj-pin-popover-item" onclick="downloadPinnedPNG(' + idx + ')">Download PNG</button>';
+      html += '<button class="cj-pin-popover-item" onclick="exportPinnedSlide(' + idx + ')">Slide PNG</button>';
+      html += '<button class="cj-pin-popover-item unpin" onclick="removePinned(' + idx + ')">Remove</button>';
+      html += '</div></div>';
+      html += '</div></div>';
 
       if (view.chart) {
         html += '<div class="cj-chart-container">' + view.chart + '</div>';
@@ -234,6 +340,26 @@
 
     container.innerHTML = html;
   }
+
+  // Overflow menu toggle
+  window.togglePinnedMenu = function(idx) {
+    var menu = document.getElementById("cj-pinned-menu-" + idx);
+    if (!menu) return;
+    var isOpen = menu.style.display !== "none";
+    // Close all menus first
+    document.querySelectorAll(".cj-pinned-menu").forEach(function(m) { m.style.display = "none"; });
+    if (!isOpen) {
+      menu.style.display = "block";
+      setTimeout(function() {
+        document.addEventListener("click", function closer(e) {
+          if (!menu.contains(e.target)) {
+            menu.style.display = "none";
+            document.removeEventListener("click", closer);
+          }
+        });
+      }, 0);
+    }
+  };
 
   window.removePinned = function(idx) {
     pinnedViews.splice(idx, 1);
@@ -283,6 +409,99 @@
   };
 
 
+  // === CLIPBOARD COPY ===
+
+  window.copyPinnedToClipboard = function(idx) {
+    var card = document.getElementById("cj-pinned-card-" + idx);
+    if (!card) return;
+
+    renderCardToCanvas(card, 3, function(canvas) {
+      canvas.toBlob(function(blob) {
+        if (navigator.clipboard && typeof ClipboardItem !== "undefined") {
+          navigator.clipboard.write([
+            new ClipboardItem({ "image/png": blob })
+          ]).then(function() {
+            showPinToast("Copied to clipboard");
+          }).catch(function() {
+            // Fallback: download instead
+            downloadBlobAsFile(blob, "pinned_" + (idx + 1) + ".png");
+            showPinToast("Downloaded (clipboard not available)");
+          });
+        } else {
+          downloadBlobAsFile(blob, "pinned_" + (idx + 1) + ".png");
+          showPinToast("Downloaded (clipboard not available)");
+        }
+      }, "image/png");
+    });
+  };
+
+
+  // === DOWNLOAD PINNED PNG ===
+
+  window.downloadPinnedPNG = function(idx) {
+    var card = document.getElementById("cj-pinned-card-" + idx);
+    if (!card) return;
+
+    renderCardToCanvas(card, 3, function(canvas) {
+      canvas.toBlob(function(blob) {
+        downloadBlobAsFile(blob, "pinned_" + (idx + 1) + ".png");
+        showPinToast("PNG downloaded");
+      }, "image/png");
+    });
+  };
+
+  function downloadBlobAsFile(blob, filename) {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+
+  // === RENDER CARD TO CANVAS (for clipboard + PNG) ===
+
+  function renderCardToCanvas(cardEl, scale, callback) {
+    var rect = cardEl.getBoundingClientRect();
+    var w = rect.width;
+    var h = rect.height;
+
+    var canvas = document.createElement("canvas");
+    canvas.width = w * scale;
+    canvas.height = h * scale;
+    var ctx = canvas.getContext("2d");
+    ctx.scale(scale, scale);
+
+    // White background
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, w, h);
+
+    // Use SVG foreignObject to render HTML to canvas
+    var svgNS = "http://www.w3.org/2000/svg";
+    var svgStr = '<svg xmlns="' + svgNS + '" width="' + w + '" height="' + h + '">' +
+      '<foreignObject width="100%" height="100%">' +
+      '<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:system-ui,sans-serif;font-size:13px;color:#1e293b;">' +
+      cardEl.innerHTML +
+      '</div></foreignObject></svg>';
+
+    var svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+    var url = URL.createObjectURL(svgBlob);
+    var img = new Image();
+    img.onload = function() {
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      callback(canvas);
+    };
+    img.onerror = function() {
+      URL.revokeObjectURL(url);
+      // Fallback: just use background canvas
+      callback(canvas);
+    };
+    img.src = url;
+  }
+
+
   // === PERSISTENCE ===
 
   function savePinnedData() {
@@ -308,7 +527,7 @@
   };
 
 
-  // === EXPORT PINNED ===
+  // === EXPORT PINNED SLIDE ===
 
   window.exportPinnedSlide = function(idx) {
     var view = pinnedViews[idx];
@@ -326,13 +545,11 @@
     function drawBackground() {
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, slideW, slideH);
-      // Title bar
       ctx.fillStyle = brand;
       ctx.fillRect(0, 0, slideW, 50);
       ctx.fillStyle = "#ffffff";
       ctx.font = "bold 18px system-ui, sans-serif";
       ctx.fillText(view.title, 24, 34);
-      // Footer
       ctx.fillStyle = "#94a3b8";
       ctx.font = "10px system-ui, sans-serif";
       ctx.fillText("Generated by TURAS Analytics Platform", 24, slideH - 12);
@@ -340,24 +557,17 @@
 
     function downloadCanvas() {
       canvas.toBlob(function(blob) {
-        var a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = "pinned_" + (idx + 1) + ".png";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        downloadBlobAsFile(blob, "pinned_" + (idx + 1) + ".png");
       }, "image/png");
     }
 
     drawBackground();
 
-    // Draw SVG chart content if available
     if (view.chart) {
       var svgBlob = new Blob([view.chart], { type: "image/svg+xml;charset=utf-8" });
       var url = URL.createObjectURL(svgBlob);
       var img = new Image();
       img.onload = function() {
-        // Draw chart in content area (below title bar, above footer)
         var contentY = 60, contentH = slideH - 90;
         var aspectRatio = img.width / img.height;
         var drawW = Math.min(slideW - 48, contentH * aspectRatio);
@@ -370,11 +580,10 @@
       };
       img.onerror = function() {
         URL.revokeObjectURL(url);
-        downloadCanvas();  // Download without chart on error
+        downloadCanvas();
       };
       img.src = url;
     } else {
-      // No chart — draw note text if present
       if (view.note) {
         ctx.fillStyle = "#334155";
         ctx.font = "14px system-ui, sans-serif";
@@ -396,12 +605,10 @@
   };
 
   window.printPinnedViews = function() {
-    // Switch to pinned tab and add print override class
     switchReportTab("pinned");
     document.body.classList.add("cj-printing-pinned");
     setTimeout(function() {
       window.print();
-      // Remove the class after print dialog closes
       setTimeout(function() { document.body.classList.remove("cj-printing-pinned"); }, 500);
     }, 200);
   };
@@ -414,7 +621,6 @@
     toast.className = "cj-toast";
     toast.textContent = message;
     document.body.appendChild(toast);
-    // Force reflow before adding visible class
     toast.offsetHeight;
     toast.classList.add("visible");
     setTimeout(function() {

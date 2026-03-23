@@ -135,7 +135,7 @@ build_conjoint_meta <- function(summary, config = list()) {
 }
 
 
-# Source the shared design system (TURAS_ROOT-aware)
+# Source the shared design system and callout registry (TURAS_ROOT-aware)
 local({
   turas_root <- Sys.getenv("TURAS_ROOT", "")
   if (!nzchar(turas_root)) turas_root <- getwd()
@@ -145,6 +145,11 @@ local({
     source(file.path(ds_dir, "design_tokens.R"), local = FALSE)
     source(file.path(ds_dir, "font_embed.R"), local = FALSE)
     source(file.path(ds_dir, "base_css.R"), local = FALSE)
+  }
+  callout_dir <- file.path(turas_root, "modules", "shared", "lib", "callouts")
+  if (!dir.exists(callout_dir)) callout_dir <- file.path("modules", "shared", "lib", "callouts")
+  if (!exists("turas_callout", mode = "function") && dir.exists(callout_dir)) {
+    source(file.path(callout_dir, "callout_registry.R"), local = FALSE)
   }
 })
 
@@ -160,10 +165,8 @@ build_conjoint_css <- function(brand, accent) {
     turas_base_css(brand, accent, prefix = "cj"),
     error = function(e) ""
   )
-  css_root <- sprintf(':root { --cj-brand: %s; --cj-accent: %s; }', brand, accent)
+  css_root <- sprintf(':root { --cj-brand: %s; --cj-accent: %s; --cj-note-border: %s; --cj-note-text: #92700c; --cj-note-bg: #fffbeb; --cj-note-ring: #fbbf24; }', brand, accent, accent)
   css <- paste0(css_root, '
-* { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background:#f8f7f5; color:#1e293b; line-height:1.6; }
 
 /* === HEADER === */
 .cj-header {
@@ -213,6 +216,9 @@ body { font-family:"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Robot
 }
 .cj-report-tab:hover { color:var(--cj-brand); }
 .cj-report-tab.active { color:var(--cj-brand); border-bottom-color:var(--cj-brand); }
+.cj-nav-utils { margin-left:auto; display:flex; align-items:center; gap:6px; padding-right:4px; }
+.cj-nav-util-btn { padding:6px 14px; font-size:12px; font-weight:500; color:#64748b; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; cursor:pointer; font-family:inherit; transition:all 0.15s ease; }
+.cj-nav-util-btn:hover { color:var(--cj-brand); border-color:var(--cj-brand); background:#fff; }
 
 /* === MAIN CONTENT === */
 .cj-panels-wrap { max-width:1400px; margin:0 auto; padding:24px 40px 60px; }
@@ -265,9 +271,9 @@ body { font-family:"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Robot
 
 /* === TABLES === */
 .cj-table { width:100%; border-collapse:collapse; font-size:13px; }
-.cj-table th { text-align:left; padding:10px 14px; border-bottom:2px solid #e2e8f0; color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.4px; }
+.cj-table th { text-align:left; padding:12px 16px; border-bottom:2px solid #e2e8f0; color:#64748b; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.4px; }
 .cj-table th.cj-num-header { text-align:right; }
-.cj-table td { padding:8px 14px; border-bottom:1px solid #f1f5f9; }
+.cj-table td { padding:10px 16px; border-bottom:1px solid #f1f5f9; }
 .cj-label-col { font-weight:400; color:#334155; }
 .cj-num { font-variant-numeric:tabular-nums; text-align:right; }
 .cj-positive { color:#16a34a; font-weight:500; }
@@ -334,20 +340,37 @@ body { font-family:"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Robot
   content:attr(data-placeholder); color:#a3a3a3; font-style:italic;
 }
 
-/* === SIMULATOR ANNOTATION EDITOR === */
-.cj-sim-annotation-editor:focus { border-color:#d4a843; box-shadow:0 0 0 3px rgba(212,168,67,0.15); }
-.cj-sim-annotation-editor:empty::before {
-  content:attr(data-placeholder); color:#b8860b; font-style:italic; opacity:0.6;
-}
-
 /* === PIN BUTTON (emoji style, matches tabs) === */
 .cj-pin-btn {
   background:none; border:1px solid #e2e8f0; border-radius:4px;
   cursor:pointer; font-size:14px; padding:3px 8px;
-  color:#64748b; transition:all 0.15s ease;
+  color:#64748b; transition:all 0.15s ease; position:relative;
 }
 .cj-pin-btn:hover { border-color:var(--cj-brand); color:var(--cj-brand); }
 .cj-pin-btn.pinned { color:var(--cj-brand); border-color:var(--cj-brand); }
+
+/* === PIN POPOVER === */
+.cj-pin-popover {
+  position:absolute; top:calc(100% + 6px); right:0; z-index:200;
+  background:#fff; border:1px solid #e2e8f0; border-radius:8px;
+  box-shadow:0 4px 16px rgba(0,0,0,0.12); padding:6px 0; min-width:180px;
+  font-size:12px;
+}
+.cj-pin-popover-item {
+  display:block; width:100%; text-align:left; padding:8px 14px;
+  background:none; border:none; cursor:pointer; color:#334155;
+  font-size:12px; font-family:inherit; transition:background 0.1s;
+}
+.cj-pin-popover-item:hover { background:#f1f5f9; }
+.cj-pin-popover-item.unpin { color:#ef4444; border-top:1px solid #f1f5f9; }
+
+/* === PINNED CARD HEADER + OVERFLOW MENU === */
+.cj-pinned-card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+.cj-pinned-menu {
+  position:absolute; top:calc(100% + 4px); right:0; z-index:200;
+  background:#fff; border:1px solid #e2e8f0; border-radius:8px;
+  box-shadow:0 4px 16px rgba(0,0,0,0.12); padding:6px 0; min-width:170px;
+}
 
 /* === PIN BOUNCE ANIMATION === */
 @keyframes cj-pin-bounce {
@@ -377,19 +400,6 @@ body { font-family:"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Robot
   background:var(--cj-brand); color:#fff; font-size:10px; font-weight:700;
   margin-left:6px; vertical-align:middle;
 }
-
-/* === CALLOUT BOXES === */
-.cj-callout {
-  background:linear-gradient(135deg, color-mix(in srgb, var(--cj-brand) 6%, white), white);
-  border-left:4px solid var(--cj-brand); border-radius:0 6px 6px 0;
-  padding:14px 18px; margin-bottom:16px; font-size:12px; line-height:1.65; color:#475569;
-}
-.cj-callout-title {
-  font-size:12px; font-weight:600; color:#1e293b; margin-bottom:6px;
-  text-transform:uppercase; letter-spacing:0.03em;
-}
-.cj-callout p { margin-bottom:6px; }
-.cj-callout p:last-child { margin-bottom:0; }
 
 /* === SIMULATOR CALLOUTS (mode-switched) === */
 .cj-sim-callout { display:none; }
@@ -463,8 +473,8 @@ body { font-family:"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Robot
 }
 .cj-pinned-card-title { font-size:14px; font-weight:600; color:#1e293b; padding-bottom:8px; border-bottom:1px solid #f1f5f9; margin-bottom:10px; }
 .cj-pinned-card-actions { position:absolute; top:10px; right:10px; display:flex; gap:6px; }
-.cj-pinned-card .cj-table td { padding:6px 10px; font-size:12px; }
-.cj-pinned-card .cj-table th { padding:6px 10px; font-size:10px; }
+.cj-pinned-card .cj-table td { padding:6px 12px; font-size:12px; }
+.cj-pinned-card .cj-table th { padding:6px 12px; font-size:10px; }
 .cj-pinned-card .cj-chart-container { margin:6px 0; }
 .cj-pinned-card .cj-chart-wrap { margin:4px 0; }
 .cj-pinned-card .cj-insight-editor { min-height:40px; padding:8px; font-size:12px; }
@@ -479,21 +489,37 @@ body { font-family:"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Robot
 .cj-section-title:empty::before { content:"Section title..."; color:#64748b; font-style:italic; }
 
 /* === SIMULATOR === */
-.cj-sim-layout { display:flex; gap:24px; flex-wrap:wrap; }
-.cj-sim-config { flex:1; min-width:300px; }
-.cj-sim-results { flex:1; min-width:300px; }
-.cj-sim-product {
-  background:white; border-radius:8px; padding:16px; margin-bottom:12px;
-  box-shadow:0 1px 3px rgba(0,0,0,0.06); border-left:3px solid var(--cj-brand);
+.cj-sim-grid-container { margin-bottom:0; }
+.cj-sim-grid-scroll { overflow-x:auto; }
+.cj-sim-grid {
+  width:100%; border-collapse:collapse; font-size:12px;
 }
+.cj-sim-grid th, .cj-sim-grid td { padding:6px 10px; text-align:left; vertical-align:middle; }
+.cj-sim-grid thead th { border-bottom:2px solid #e2e8f0; }
+.cj-sim-grid tbody tr { border-bottom:1px solid #f1f5f9; }
+.cj-sim-grid tbody tr:last-child { border-bottom:none; }
+.cj-sim-grid-attr { min-width:40px; }
+.cj-sim-grid-attr-label { font-size:12px; color:#64748b; font-weight:500; white-space:nowrap; min-width:120px; }
+.cj-sim-grid-prod-header { min-width:150px; }
+.cj-sim-grid-cell { min-width:140px; }
+.cj-sim-grid-actions { display:flex; gap:2px; margin-top:2px; }
+.cj-sim-grid-action { background:none; border:none; color:#94a3b8; cursor:pointer; font-size:13px; padding:1px 4px; border-radius:3px; transition:color 0.15s; }
+.cj-sim-grid-action:hover { color:#ef4444; }
+.cj-sim-grid-add { width:40px; text-align:center; vertical-align:middle; }
+.cj-sim-add-col-btn {
+  width:32px; height:32px; border-radius:50%; border:2px dashed #cbd5e1;
+  background:none; color:#94a3b8; font-size:18px; cursor:pointer; transition:all 0.15s;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.cj-sim-add-col-btn:hover { border-color:var(--cj-brand); color:var(--cj-brand); }
 .cj-sim-product-name {
-  font-size:13px; font-weight:600; color:#1e293b; border:none; border-bottom:1.5px solid transparent;
-  background:transparent; outline:none; padding:2px 0; width:160px; transition:border-color 0.15s ease;
+  font-size:12px; font-weight:600; color:#1e293b; border:none; border-bottom:1.5px solid transparent;
+  background:transparent; outline:none; padding:2px 0; width:130px; transition:border-color 0.15s ease;
 }
 .cj-sim-product-name:focus { border-bottom-color:var(--cj-brand); }
 .cj-sim-select {
-  width:100%; padding:6px 10px; border:1px solid #e2e8f0; border-radius:4px;
-  font-size:12px; margin-bottom:6px; outline:none; transition:all 0.15s ease;
+  width:100%; padding:5px 8px; border:1px solid #e2e8f0; border-radius:4px;
+  font-size:12px; outline:none; transition:all 0.15s ease; font-family:inherit;
 }
 .cj-sim-select:focus { border-color:var(--cj-brand); }
 .cj-sim-add-btn {
@@ -502,6 +528,7 @@ body { font-family:"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Robot
   background:white; color:var(--cj-brand); cursor:pointer; transition:all 0.15s ease;
 }
 .cj-sim-add-btn:hover { background:var(--cj-brand); color:white; }
+.cj-sim-results { min-height:100px; }
 .cj-sim-share-bar { margin:8px 0; }
 .cj-sim-bar-bg { height:28px; background:#f1f5f9; border-radius:4px; overflow:hidden; position:relative; }
 .cj-sim-bar-fill { height:100%; border-radius:4px; transition:width 300ms; display:flex; align-items:center; justify-content:flex-end; padding-right:8px; color:white; font-size:11px; font-weight:600; }
@@ -555,7 +582,7 @@ body { font-family:"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Robot
   .cj-kpi-row { flex-direction:column; }
   .cj-util-layout { flex-direction:column; }
   .cj-util-sidebar { width:100%; position:static; max-height:none; }
-  .cj-sim-layout { flex-direction:column; }
+  .cj-sim-grid-scroll { -webkit-overflow-scrolling:touch; }
 }
 ')
   css <- paste0(shared_css, "\n\n/* === CONJOINT MODULE STYLES === */\n", css)
@@ -626,11 +653,8 @@ build_conjoint_header <- function(summary, brand, config = list()) {
     )
   }
 
-  # Help button + Save Report button
-  help_btn <- '<div style="display:flex;align-items:center;gap:8px;">
-<button class="cj-export-btn" onclick="saveReportHTML()" title="Save Report" style="font-size:12px;padding:4px 10px;border:1px solid rgba(255,255,255,0.3);background:transparent;color:#fff;border-radius:4px;cursor:pointer;">Save Report</button>
-<button class="cj-help-btn" onclick="toggleHelpOverlay()" title="Show help guide">?</button>
-</div>'
+  # Save/Help buttons moved to nav strip (cj-nav-utils)
+  help_btn <- ''
 
   # Prepared by line
   prepared_parts <- character()
@@ -692,8 +716,11 @@ build_report_tab_nav <- function(html_data, config = list()) {
   tabs <- list(
     list(id = "overview",    label = "Overview"),
     list(id = "utilities",   label = "Utilities"),
-    list(id = "diagnostics", label = "Diagnostics")
+    list(id = "simulator",   label = "Simulator")
   )
+
+  # Diagnostics always present
+  tabs <- c(tabs, list(list(id = "diagnostics", label = "Diagnostics")))
 
   if (!is.null(html_data$lc_data)) {
     tabs <- c(tabs, list(list(id = "latentclass", label = "Latent Classes")))
@@ -701,16 +728,15 @@ build_report_tab_nav <- function(html_data, config = list()) {
   if (!is.null(html_data$wtp_data)) {
     tabs <- c(tabs, list(list(id = "wtp", label = "WTP")))
   }
-  tabs <- c(tabs, list(list(id = "simulator", label = "Simulator")))
 
-  # About tab (conditional)
+  tabs <- c(tabs, list(list(id = "pinned", label = "Pinned <span class=\"cj-tab-badge\" id=\"cj-pinned-count\" style=\"display:none;\">0</span>")))
+  tabs <- c(tabs, list(list(id = "slides", label = "Added Slides")))
+
+  # About tab last (conditional)
   has_about <- !is.null(html_data$about) && isTRUE(html_data$about$has_content)
   if (has_about) {
     tabs <- c(tabs, list(list(id = "about", label = "About")))
   }
-
-  tabs <- c(tabs, list(list(id = "pinned", label = "Pinned <span class=\"cj-tab-badge\" id=\"cj-pinned-count\" style=\"display:none;\">0</span>")))
-  tabs <- c(tabs, list(list(id = "slides", label = "Added Slides")))
 
   buttons <- vapply(tabs, function(t) {
     active <- if (t$id == "overview") " active" else ""
@@ -721,7 +747,14 @@ build_report_tab_nav <- function(html_data, config = list()) {
     )
   }, character(1))
 
-  sprintf('<nav class="cj-report-tabs" role="tablist">%s</nav>', paste(buttons, collapse = "\n"))
+  # Right-aligned utility buttons (Save + Help)
+  nav_utils <- '<div class="cj-nav-utils">
+<button class="cj-nav-util-btn" onclick="saveReportHTML()" title="Save Report">Save</button>
+<button class="cj-nav-util-btn" onclick="toggleHelpOverlay()" title="Help">?</button>
+</div>'
+
+  sprintf('<nav class="cj-report-tabs" role="tablist">%s%s</nav>',
+          paste(buttons, collapse = "\n"), nav_utils)
 }
 
 
@@ -754,7 +787,7 @@ build_overview_panel <- function(html_data, tables, charts, config = list()) {
   )
 
   export_bar <- .build_export_bar("overview")
-  pin_btn <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-overview\')" title="Pin to Views"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
+  pin_btn <- '<button class="cj-pin-btn" onclick="showPinPopover(\'pin-overview\', this)" title="Pin to Views">\U0001F4CC</button>'
   insight <- build_insight_area("overview", html_data$insights)
 
   sprintf(
@@ -822,7 +855,7 @@ build_utilities_panel <- function(html_data, tables, charts, brand, config = lis
     attr_id <- gsub("[^a-zA-Z0-9]", "-", attr_name)
     export_bar <- .build_export_bar(paste0("util-", attr_id))
     pin_btn <- sprintf(
-      '<button class="cj-pin-btn" onclick="togglePin(\'util-%s\')" title="Pin to Views"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>',
+      '<button class="cj-pin-btn" onclick="showPinPopover(\'util-%s\', this)" title="Pin to Views">\U0001F4CC</button>',
       .html_esc(attr_name)
     )
 
@@ -871,10 +904,7 @@ build_utilities_panel <- function(html_data, tables, charts, brand, config = lis
     )
   }, character(1))
 
-  util_callout <- .build_callout(
-    "Reading Utility Values",
-    "<p>Utilities (also called part-worth utilities) measure <strong>how much people like or dislike</strong> each level of an attribute, relative to a baseline level.</p><p>Think of utilities as preference points. A positive value means people prefer that level over the baseline; a negative value means they prefer it less. The larger the number, the stronger the preference.</p><p>For example, if Brand A has a utility of +0.8 and Brand B has -0.3, people clearly prefer Brand A. The baseline brand (utility = 0) sits in between.</p><p>One level per attribute serves as the baseline (utility = 0), and all other levels are measured relative to it. Positive values are preferred over the baseline; negative values are less preferred.</p><p><strong>Statistical significance:</strong> Levels marked with stars (*, **, ***) are statistically significant, meaning we are confident the preference is real and not just random noise in the data.</p>"
-  )
+  util_callout <- turas_callout("conjoint", "reading_utilities")
 
   insight <- build_insight_area("utilities", html_data$insights)
 
@@ -908,7 +938,7 @@ build_diagnostics_panel <- function(html_data, tables, charts, brand) {
   sections <- c(sections, diag_callouts)
 
   export_bar <- .build_export_bar("diagnostics")
-  pin_fit <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-diagnostics-fit\')" title="Pin to Views"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
+  pin_fit <- '<button class="cj-pin-btn" onclick="showPinPopover(\'pin-diagnostics-fit\', this)" title="Pin to Views">\U0001F4CC</button>'
 
   # Model Fit
   sections <- c(sections, sprintf(
@@ -928,27 +958,13 @@ build_diagnostics_panel <- function(html_data, tables, charts, brand) {
     converged <- isTRUE(hb$convergence$converged)
     status_class <- if (converged) "cj-status-pass" else "cj-status-fail"
     status_text <- if (converged) "CONVERGED" else "NOT CONVERGED"
-    pin_conv <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-diagnostics-convergence\')" title="Pin to Views"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
+    pin_conv <- '<button class="cj-pin-btn" onclick="showPinPopover(\'pin-diagnostics-convergence\', this)" title="Pin to Views">\U0001F4CC</button>'
 
-    # Plain-language convergence explanation
+    # Plain-language convergence explanation (from callout registry)
     if (converged) {
-      conv_explain <- '<div class="cj-callout" style="margin-top:12px;"><p><strong>What this means:</strong> The MCMC algorithm has stabilised. The utility estimates are no longer drifting and can be trusted. The chain explored enough of the parameter space that further iterations would not materially change the results.</p></div>'
+      conv_explain <- paste0('<div style="margin-top:12px;">', turas_callout("conjoint", "convergence_pass"), '</div>')
     } else {
-      conv_explain <- '<div class="cj-callout" style="margin-top:12px;border-left-color:#e74c3c;">
-<p><strong>What does \u201cnot converged\u201d mean?</strong> Hierarchical Bayes estimation works by running a long chain of random samples (MCMC). The chain needs to \u201csettle down\u201d \u2014 early samples are unreliable and are discarded (burn-in). Convergence means the remaining samples have stabilised around the true values.</p>
-<p style="margin-top:8px;"><strong>Why it matters:</strong> If the chain hasn\u2019t converged, the utility estimates may still be drifting, meaning the results could change if you ran more iterations. The utilities are approximate rather than definitive.</p>
-<p style="margin-top:8px;"><strong>What to do about it:</strong></p>
-<ul style="margin:6px 0 0 16px;line-height:1.7;">
-<li><strong>Increase iterations</strong> \u2014 try 20,000\u201350,000 (current: %s) with burn-in set to half</li>
-<li><strong>Check the Geweke diagnostic</strong> \u2014 it compares the start and end of the chain. A failure means the chain was still drifting. More burn-in can help.</li>
-<li><strong>Check Effective Sample Size (ESS)</strong> \u2014 ESS below 100 means high autocorrelation between draws. Increase thinning (e.g., thin=5 keeps every 5th draw) or run more iterations.</li>
-<li><strong>Simplify the model</strong> \u2014 too many attribute levels relative to sample size can slow convergence. Consider whether all attributes are needed.</li>
-</ul>
-<p style="margin-top:8px;"><strong>Can you still use these results?</strong> Often, yes \u2014 directional findings (which attributes matter most, which levels are preferred) are usually stable well before formal convergence. But treat precise share predictions and small utility differences with caution.</p>
-</div>'
-      conv_explain <- sprintf(conv_explain,
-        format(hb$iterations %||% 0, big.mark = ",")
-      )
+      conv_explain <- paste0('<div style="margin-top:12px;">', turas_callout("conjoint", "convergence_fail"), '</div>')
     }
 
     sections <- c(sections, sprintf(
@@ -975,7 +991,7 @@ build_diagnostics_panel <- function(html_data, tables, charts, brand) {
 
     # Respondent quality
     if (!is.null(hb$quality)) {
-      pin_quality <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-diagnostics-quality\')" title="Pin to Views"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
+      pin_quality <- '<button class="cj-pin-btn" onclick="showPinPopover(\'pin-diagnostics-quality\', this)" title="Pin to Views">\U0001F4CC</button>'
 
       # Plain-language RLH explanation
       rlh_val <- hb$quality$mean_rlh %||% 0
@@ -993,7 +1009,7 @@ build_diagnostics_panel <- function(html_data, tables, charts, brand) {
       }
 
       rlh_explain <- sprintf(
-        '<div class="cj-callout" style="margin-top:12px;">
+        '<div class="t-callout" style="margin-top:12px;">
 <p><strong>What is RLH?</strong> Root Likelihood (RLH) measures how well the model predicts each respondent\u2019s actual choices. A value of %.3f means random guessing; higher is better. Mean RLH of <strong>%.3f</strong> is %s above chance.</p>
 <p style="margin-top:6px;"><strong>Verdict:</strong> %s</p>
 %s</div>',
@@ -1105,7 +1121,7 @@ build_diagnostics_panel <- function(html_data, tables, charts, brand) {
 </tbody>
 </table>
 
-<div class="cj-callout" style="margin-top:14px;">
+<div class="t-callout" style="margin-top:14px;">
 <p><strong>Rule of thumb:</strong> For the most accurate market simulations, use <strong>HB estimation</strong> with the <strong>R-side RFC simulator</strong> (which uses individual-level betas). In the interactive HTML report, <strong>Logit (MNL)</strong> is the recommended default. Use <strong>Latent Class</strong> when your primary goal is segment discovery rather than market simulation.</p>
 </div>
 
@@ -1147,7 +1163,7 @@ build_lc_panel <- function(html_data, tables, charts, brand) {
   ))
 
   # BIC chart + comparison table
-  pin_bic <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-lc-bic\')" title="Pin to Views"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
+  pin_bic <- '<button class="cj-pin-btn" onclick="showPinPopover(\'pin-lc-bic\', this)" title="Pin to Views">\U0001F4CC</button>'
   sections <- c(sections, sprintf(
     '<div class="cj-card">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -1163,7 +1179,7 @@ build_lc_panel <- function(html_data, tables, charts, brand) {
 
   # Class sizes
   if (!is.null(charts$class_sizes)) {
-    pin_sizes <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-lc-sizes\')" title="Pin to Views"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
+    pin_sizes <- '<button class="cj-pin-btn" onclick="showPinPopover(\'pin-lc-sizes\', this)" title="Pin to Views">\U0001F4CC</button>'
     sections <- c(sections, sprintf(
       '<div class="cj-card">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -1177,7 +1193,7 @@ build_lc_panel <- function(html_data, tables, charts, brand) {
 
   # Class importance comparison
   if (!is.null(charts$class_importance)) {
-    pin_imp <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-lc-importance\')" title="Pin to Views"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
+    pin_imp <- '<button class="cj-pin-btn" onclick="showPinPopover(\'pin-lc-importance\', this)" title="Pin to Views">\U0001F4CC</button>'
     sections <- c(sections, sprintf(
       '<div class="cj-card">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -1226,7 +1242,7 @@ build_wtp_panel <- function(html_data, tables, charts, brand) {
   } else ""
 
   # WTP chart + table
-  pin_wtp <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-wtp-main\')" title="Pin to Views"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
+  pin_wtp <- '<button class="cj-pin-btn" onclick="showPinPopover(\'pin-wtp-main\', this)" title="Pin to Views">\U0001F4CC</button>'
   sections <- c(sections, sprintf(
     '<div class="cj-card">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -1244,7 +1260,7 @@ build_wtp_panel <- function(html_data, tables, charts, brand) {
 
   # Demand curve
   if (!is.null(charts$demand_curve) || !is.null(tables$demand_curve)) {
-    pin_demand <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-wtp-demand\')" title="Pin to Views"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
+    pin_demand <- '<button class="cj-pin-btn" onclick="showPinPopover(\'pin-wtp-demand\', this)" title="Pin to Views">\U0001F4CC</button>'
     sections <- c(sections, sprintf(
       '<div class="cj-card">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -1334,7 +1350,7 @@ build_simulator_panel <- function(html_data, brand) {
 
   insight <- build_insight_area("simulator", html_data$insights)
 
-  pin_sim <- '<button class="cj-pin-btn" onclick="togglePin(\'pin-simulator\')" title="Pin to Views"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16 2L21 7L18.5 9.5L19 14L14 19L12 17L5 22L8 15L6 13L11 8L13.5 8.5L16 6" stroke="#8B2332" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="5.5" r="2" fill="#8B2332" opacity="0.3"/></svg></button>'
+  pin_sim <- '<button class="cj-pin-btn" onclick="showPinPopover(\'pin-simulator\', this)" title="Pin to Views">\U0001F4CC</button>'
 
   sprintf(
     '<div class="cj-panel" role="tabpanel" id="panel-simulator">
@@ -1345,30 +1361,20 @@ build_simulator_panel <- function(html_data, brand) {
 </div>
 %s
 <p style="font-size:12px;color:#64748b;margin-bottom:16px;">Configure product profiles and compare predicted market shares.</p>
+<div class="cj-sim-grid-container">
+<div class="cj-sim-grid-scroll" id="cj-sim-products"></div>
+</div>
+</div>
+<div class="cj-card" style="margin-top:0;">
 <div class="cj-sim-mode-btns">
 <button class="cj-sim-mode-btn active" onclick="switchSimMode(\'shares\')">Market Shares</button>
 <button class="cj-sim-mode-btn" onclick="switchSimMode(\'revenue\')">Revenue</button>
 <button class="cj-sim-mode-btn" onclick="switchSimMode(\'sensitivity\')">Sensitivity</button>
 <button class="cj-sim-mode-btn" onclick="switchSimMode(\'sov\')">Source of Volume</button>
 </div>
-<div class="cj-sim-layout">
-<div class="cj-sim-config" id="cj-sim-products">
-<button class="cj-sim-add-btn" onclick="SimUI.addProduct()">+ Add Product</button>
-</div>
 <div class="cj-sim-results" id="cj-sim-results">
 <div style="text-align:center;padding:40px;color:#94a3b8;">
-<div style="font-size:24px;">Add products to see predicted shares</div>
-</div>
-</div>
-<div class="cj-sim-annotation" id="cj-sim-annotation" style="margin-top:12px;border-left:3px solid #d4a843;padding-left:12px;">
-<div class="cj-sim-annotation-toggle" onclick="toggleSimAnnotation()" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#92700c;font-weight:600;padding:4px 0;transition:all 0.15s;">
-<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#92700c" stroke-width="2.2" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-<span id="cj-sim-annotation-label">Add note</span>
-</div>
-<div id="cj-sim-annotation-body" style="display:none;margin-top:6px;">
-<div contenteditable="true" class="cj-sim-annotation-editor" id="cj-sim-annotation-editor" data-placeholder="Add your analysis note for this scenario..." style="min-height:48px;padding:12px 14px;border:2px solid #fbbf24;border-radius:8px;font-size:13px;line-height:1.6;color:#1e293b;background:#fffbeb;outline:none;transition:all 0.2s ease;box-shadow:0 1px 3px rgba(251,191,36,0.15);" oninput="saveSimAnnotation()"></div>
-</div>
-</div>
+<div style="font-size:18px;">Add products to see predicted shares</div>
 </div>
 </div>
 </div>
@@ -1561,10 +1567,15 @@ build_insight_area <- function(tab_id, insights = list()) {
 #' Build an explanatory callout box
 #' @param title Callout title (plain text)
 #' @param body_html HTML body content (can contain <p> tags)
+#' @param collapsed Logical. Whether to start collapsed (default FALSE)
 #' @keywords internal
-.build_callout <- function(title, body_html) {
+.build_callout <- function(title, body_html, collapsed = FALSE) {
+  if (exists("turas_callout_html", mode = "function")) {
+    return(turas_callout_html(title = title, body = body_html, collapsed = collapsed))
+  }
+  # Fallback if shared design system not loaded
   sprintf(
-    '<div class="cj-callout"><div class="cj-callout-title">%s</div>%s</div>',
+    '<div class="t-callout"><div class="t-callout-body"><strong>%s</strong> %s</div></div>',
     .html_esc(title), body_html
   )
 }

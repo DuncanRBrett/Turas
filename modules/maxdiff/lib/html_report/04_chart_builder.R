@@ -11,7 +11,7 @@
 # UTILITY HELPERS
 # ==============================================================================
 
-svg_font <- "'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif"
+svg_font <- "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
 
 svg_wrap <- function(inner, width, height, aria_label) {
   sprintf(
@@ -77,6 +77,7 @@ build_preference_chart <- function(scores, brand_colour = "#1e3a5f", use_shares 
     val <- scores[[val_col]][i]
     w <- max(2, (val / max_val) * cw)
     label <- scores$Item_Label[i]
+    if (is.na(label)) label <- scores$Item_ID[i] %||% ""
     if (nchar(label) > 25) label <- paste0(substr(label, 1, 22), "...")
 
     val_label <- if (use_shares) sprintf("%.1f%%", val) else sprintf("%.0f", val)
@@ -159,6 +160,7 @@ build_anchor_threshold_chart <- function(anchor_data, brand_colour = "#1e3a5f", 
     is_must_have <- if ("Is_Must_Have" %in% names(anchor_data)) anchor_data$Is_Must_Have[i] else (rate >= threshold * 100)
     w <- max(2, (rate / max_val) * cw)
     label <- anchor_data$Item_Label[i] %||% anchor_data$Item_ID[i]
+    if (is.na(label)) label <- anchor_data$Item_ID[i] %||% ""
     if (nchar(label) > 25) label <- paste0(substr(label, 1, 22), "...")
 
     bar_colour <- if (is_must_have) "#27ae60" else brand_colour
@@ -228,6 +230,7 @@ build_diverging_chart <- function(count_data, brand_colour = "#1e3a5f") {
   bars <- paste(vapply(seq_len(n), function(i) {
     y <- mt + (i - 1) * (bar_height + gap)
     label <- count_data$Item_Label[i]
+    if (is.na(label)) label <- count_data$Item_ID[i] %||% ""
     if (nchar(label) > 22) label <- paste0(substr(label, 1, 19), "...")
     best <- count_data$Best_Pct[i]
     worst <- count_data$Worst_Pct[i]
@@ -427,6 +430,7 @@ build_segment_chart <- function(segment_data, brand_colour = "#1e3a5f") {
     bars <- paste(vapply(seq_len(n_items), function(i) {
       group_y <- content_top + (i - 1) * (group_height + group_gap)
       label <- df$Item_Label[i]
+      if (is.na(label)) label <- df$Item_ID[i] %||% ""
       if (nchar(label) > 25) label <- paste0(substr(label, 1, 22), "...")
 
       # Item label centred vertically on the group
@@ -576,6 +580,7 @@ build_strategy_quadrant <- function(hb_pop, brand_colour = "#1e3a5f") {
     x <- scale_x(means[i])
     y <- scale_y(sds[i])
     label <- labels[i]
+    if (is.na(label)) label <- ""
     if (nchar(label) > 18) label <- paste0(substr(label, 1, 15), "...")
     paste0(
       sprintf('<circle cx="%g" cy="%g" r="6" fill="%s" opacity="0.7" stroke="white" stroke-width="1.5"/>', x, y, brand_colour),
@@ -618,6 +623,12 @@ build_utility_distribution_chart <- function(dist_data, brand_colour = "#1e3a5f"
   df <- dist_data$summary
   densities <- dist_data$densities
 
+  # Remove rows with non-finite Min/Max (e.g., all-NA utility columns)
+  finite_rows <- is.finite(df$Min) & is.finite(df$Max)
+  df <- df[finite_rows, ]
+  densities <- densities[names(densities) %in% df$Item_ID]
+  if (nrow(df) < 2) return("")
+
   n <- nrow(df)
   row_height <- 44
   gap <- 4
@@ -633,7 +644,10 @@ build_utility_distribution_chart <- function(dist_data, brand_colour = "#1e3a5f"
   # X scale: covers all utility values
   x_min <- min(df$Min, na.rm = TRUE) - abs(diff(range(c(df$Min, df$Max)))) * 0.05
   x_max <- max(df$Max, na.rm = TRUE) + abs(diff(range(c(df$Min, df$Max)))) * 0.05
-  if (x_max - x_min < 0.01) { x_min <- x_min - 1; x_max <- x_max + 1 }
+  if (!is.finite(x_min) || !is.finite(x_max) || (x_max - x_min) < 0.01) {
+    x_min <- ifelse(is.finite(x_min), x_min - 1, -1)
+    x_max <- ifelse(is.finite(x_max), x_max + 1, 1)
+  }
 
   scale_x <- function(v) ml + (v - x_min) / (x_max - x_min) * cw
 
@@ -669,6 +683,7 @@ build_utility_distribution_chart <- function(dist_data, brand_colour = "#1e3a5f"
     y_center <- mt + (i - 1) * (row_height + gap) + row_height / 2
     item_id <- df$Item_ID[i]
     label <- df$Item_Label[i]
+    if (is.na(label)) label <- item_id
     if (nchar(label) > 25) label <- paste0(substr(label, 1, 22), "...")
 
     # Label

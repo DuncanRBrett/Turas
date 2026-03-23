@@ -24,6 +24,12 @@ local({
     source(file.path(ds_dir, "font_embed.R"), local = FALSE)
     source(file.path(ds_dir, "base_css.R"), local = FALSE)
   }
+  # Source callout registry
+  callout_dir <- file.path(turas_root, "modules", "shared", "lib", "callouts")
+  if (!dir.exists(callout_dir)) callout_dir <- file.path("modules", "shared", "lib", "callouts")
+  if (!exists("turas_callout", mode = "function") && dir.exists(callout_dir)) {
+    source(file.path(callout_dir, "callout_registry.R"), local = FALSE)
+  }
 })
 
 
@@ -546,20 +552,16 @@ build_md_about_panel <- function(meta, config, methodology = NULL) {
     meta$generated %||% format(Sys.Date(), "%Y-%m-%d"),
     meta$method %||% "N/A")
 
-  # How to read this report
-  how_to_read <- '
-<div class="md-card" style="margin-top:20px;">
-<h3>How to Read This Report</h3>
-<div style="font-size:13px;line-height:1.6;color:#334155;">
-<p><strong>MaxDiff (Maximum Difference Scaling)</strong> measures how strongly people prefer one thing over another.
-Respondents repeatedly chose the best and worst from small sets of items, forcing real trade-offs rather than allowing everything to be rated highly.</p>
-<p><strong>Preference Scores</strong> show each item on a 0&ndash;100 scale. Higher means more preferred. Preference shares show the probability of each item being chosen.</p>
-<p><strong>Item Analysis</strong> shows how often each item was picked as best vs worst. The BW Score captures the balance.</p>
-<p><strong>Head-to-Head</strong> shows win rates when pairs of items are compared directly.</p>
-<p><strong>Portfolio (TURF)</strong> identifies the smallest set of items that appeals to the widest audience.</p>
-<p><strong>Diagnostics</strong> confirms the statistical model ran correctly. Green badges = good.</p>
-</div>
-</div>'
+  # How to read this report — pull from registry for consistency
+  how_to_read <- tryCatch(
+    {
+      callout_html <- turas_callout("maxdiff", "how_to_read")
+      if (nzchar(callout_html)) {
+        sprintf('<div class="md-card" style="margin-top:20px;">%s</div>', callout_html)
+      } else ""
+    },
+    error = function(e) ""
+  )
 
   # Methodology section (folded into About)
   method_html <- ""
@@ -659,7 +661,7 @@ build_overview_panel <- function(html_data, tables, charts, insights = NULL) {
   icon_top <- '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>'
   icon_range <- '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>'
 
-  # Info callout at top
+  # Info callout at top — dynamic summary + registry "how to read"
   info_callout <- sprintf(
     '<div class="md-callout md-callout-method" style="margin-bottom:16px;">
 <strong>MaxDiff Analysis</strong> &mdash; %s items evaluated by %s respondents using %s estimation.
@@ -667,6 +669,12 @@ This report presents preference shares, item rankings, and comparative analysis.
     s$n_items %||% "0",
     format(as.integer(s$n_total %||% 0), big.mark = ","),
     htmlEscape(s$method_label %||% ""))
+  # Registry callout: How to Read (collapsible)
+  how_to_read_callout <- tryCatch(
+    turas_callout("maxdiff", "how_to_read", collapsed = TRUE),
+    error = function(e) ""
+  )
+  info_callout <- paste0(info_callout, "\n", how_to_read_callout)
 
   # Build 4 stat cards: Items, Respondents, Top Share, Share Range
   top_share_val <- if (!is.null(s$top_share) && !is.na(s$top_share)) paste0(s$top_share, "%") else "N/A"
@@ -1008,12 +1016,11 @@ build_items_panel <- function(html_data, tables, charts, insights = NULL, segmen
 
   images_html <- build_panel_images(html_data$images, "items")
 
-  count_callout <- '<div class="md-callout" style="margin-top:4px;margin-bottom:12px;font-size:13px;line-height:1.6;color:#334155;background:#f8fafc;border-left:3px solid var(--md-accent);padding:10px 14px;border-radius:4px;">
-<strong>Reading this table:</strong> Each item is scored by how often respondents chose it as best or worst.<br/>
-<span style="color:#16a34a;font-weight:600;">&#x25CF; Green values</span> = positive BW Scores &mdash; the item was chosen as <em>best</em> more often than worst.<br/>
-<span style="color:#dc2626;font-weight:600;">&#x25CF; Red values</span> = negative BW Scores &mdash; the item was chosen as <em>worst</em> more often than best.<br/>
-<strong>Best %</strong> = times chosen as best &divide; times shown. <strong>Worst %</strong> = times chosen as worst &divide; times shown.<br/>
-<strong>BW Score</strong> = Best% &minus; Worst%. Higher scores indicate stronger overall preference.</div>'
+  # Registry callout: Item Analysis (reading the table)
+  count_callout <- tryCatch(
+    turas_callout("maxdiff", "item_analysis"),
+    error = function(e) ""
+  )
 
   has_diverging <- nzchar(diverging_chart_html)
   has_quadrant <- nzchar(quadrant_chart_html)
@@ -1322,12 +1329,12 @@ build_md_css <- function(brand, accent) {
   --md-bg-muted: #f8f9fa;
   --md-border: #e2e8f0;
 }
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8f7f5; color: var(--md-text-primary); line-height: 1.6; font-size: 14px; -webkit-font-smoothing: antialiased; }
+/* Reset and body font provided by turas_base_css(); module overrides below */
+body { font-size: 14px; -webkit-font-smoothing: antialiased; }
 
 /* === HEADER === */
 .md-header {
-  background: linear-gradient(135deg, #1a2744 0%, #2a3f5f 100%);
+  background: linear-gradient(135deg, color-mix(in srgb, BRAND_TOKEN 80%, #000) 0%, color-mix(in srgb, BRAND_TOKEN 60%, #1a2744) 100%);
   color: white;
   padding: 24px 40px 20px;
   border-bottom: 3px solid BRAND_TOKEN;
@@ -1467,12 +1474,12 @@ body { font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Robo
 /* === TABLES === */
 .md-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 8px 0; }
 .md-table-compact { font-size: 12px; }
-.md-th { background: var(--md-bg-muted); padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--md-text-secondary); border-bottom: 2px solid var(--md-border); cursor: pointer; user-select: none; }
+.md-th { background: var(--md-bg-muted); padding: 12px 16px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--md-text-secondary); border-bottom: 2px solid var(--md-border); cursor: pointer; user-select: none; }
 .md-th:hover { background: #eef2f7; }
 .md-th .sort-arrow { font-size: 10px; margin-left: 4px; opacity: 0.5; }
 .md-th.md-num { text-align: right; }
 .md-th.md-label-col { text-align: left; }
-.md-td { padding: 8px 14px; border-bottom: 1px solid var(--md-border); vertical-align: middle; }
+.md-td { padding: 10px 16px; border-bottom: 1px solid var(--md-border); vertical-align: middle; }
 .md-td.md-num { text-align: right; font-variant-numeric: tabular-nums; }
 .md-td.md-label-col { font-weight: 500; }
 .md-tr-section td { background: var(--md-bg-muted); font-weight: 600; padding-top: 12px; border-bottom: 1px solid var(--md-border); }

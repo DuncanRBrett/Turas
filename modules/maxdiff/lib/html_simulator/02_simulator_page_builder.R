@@ -335,28 +335,29 @@ table_icon <- function() {
 #' analyst, email, phone, appendices, and editable notes.
 #' @keywords internal
 build_about_html <- function(sim_data) {
-  analyst <- htmlEscape(sim_data$analyst_name %||% "")
-  email <- htmlEscape(sim_data$analyst_email %||% "")
-  phone <- htmlEscape(sim_data$analyst_phone %||% "")
-  appendices <- htmlEscape(sim_data$appendices %||% "")
-  closing_notes <- sim_data$closing_notes %||% ""
+  safe_str <- function(x) { x <- x %||% ""; if (is.na(x)) "" else as.character(x) }
+  analyst <- htmlEscape(safe_str(sim_data$analyst_name))
+  email <- htmlEscape(safe_str(sim_data$analyst_email))
+  phone <- htmlEscape(safe_str(sim_data$analyst_phone))
+  appendices <- htmlEscape(safe_str(sim_data$appendices))
+  closing_notes <- safe_str(sim_data$closing_notes)
 
   # Contact section
   contact_html <- ""
   contact_items <- ""
-  if (nchar(analyst) > 0) contact_items <- paste0(contact_items,
+  if (nzchar(analyst)) contact_items <- paste0(contact_items,
     '<div class="sim-about-contact-item"><span class="sim-about-label">Analyst</span><span class="sim-about-value">', analyst, '</span></div>')
-  if (nchar(email) > 0) contact_items <- paste0(contact_items,
+  if (nzchar(email)) contact_items <- paste0(contact_items,
     '<div class="sim-about-contact-item"><span class="sim-about-label">Email</span><a class="sim-about-value sim-about-link" href="mailto:', email, '">', email, '</a></div>')
-  if (nchar(phone) > 0) contact_items <- paste0(contact_items,
+  if (nzchar(phone)) contact_items <- paste0(contact_items,
     '<div class="sim-about-contact-item"><span class="sim-about-label">Phone</span><span class="sim-about-value">', phone, '</span></div>')
-  if (nchar(contact_items) > 0) {
+  if (nzchar(contact_items)) {
     contact_html <- sprintf('<div class="sim-about-card"><div class="sim-about-contact-grid">%s</div></div>', contact_items)
   }
 
   # Appendices section
   appendices_html <- ""
-  if (nchar(appendices) > 0) {
+  if (nzchar(appendices)) {
     appendices_html <- sprintf(
       '<div class="sim-about-card"><div class="sim-about-detail"><span class="sim-about-label">Appendices</span><span class="sim-about-value">%s</span></div></div>',
       appendices
@@ -383,11 +384,12 @@ build_about_html <- function(sim_data) {
 
 
 build_simulator_css <- function(brand) {
-  css <- ':root { --sim-brand: BRAND_TOKEN; --sim-brand-light: BRAND_TOKEN12; }
-body { font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; background: #f8f7f5; color: #1e293b; line-height: 1.5; font-size: 14px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  css <- ':root { --sim-brand: BRAND_TOKEN; --sim-brand-light: BRAND_TOKEN12; --md-brand: BRAND_TOKEN; }
+/* Body font/reset provided by turas_base_css(); simulator overrides below */
+body { font-size: 14px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 
 /* Header */
-.sim-header { background: linear-gradient(135deg, #1a2744 0%, #2a3f5f 100%); color: white; padding: 28px 32px; border-bottom: 3px solid var(--sim-brand-light, #CC9900); }
+.sim-header { background: linear-gradient(135deg, color-mix(in srgb, var(--sim-brand) 80%, #000) 0%, color-mix(in srgb, var(--sim-brand) 60%, #1a2744) 100%); color: white; padding: 28px 32px; border-bottom: 3px solid var(--sim-brand-light, #CC9900); }
 .sim-header h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.3px; }
 .sim-meta { display: flex; gap: 16px; font-size: 12px; opacity: 0.85; margin-top: 4px; }
 

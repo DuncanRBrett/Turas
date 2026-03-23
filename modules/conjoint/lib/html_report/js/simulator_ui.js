@@ -112,41 +112,57 @@ var SimUI = (function() {
     var data = SimEngine.getData();
     if (!data) return;
 
-    var html = "";
+    // Table grid: rows = attributes, columns = products
+    var html = '<table class="cj-sim-grid">';
+
+    // Header row: attribute label + product names + add button
+    html += '<thead><tr>';
+    html += '<th class="cj-sim-grid-attr"></th>';
     products.forEach(function(prod, idx) {
-      html += '<div class="cj-sim-product">';
-      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">';
+      html += '<th class="cj-sim-grid-prod-header">';
       html += '<input type="text" class="cj-sim-product-name" value="' + escAttr(prod.name) + '" oninput="SimUI._debouncedRename(' + idx + ',this.value)" />';
-      html += '<div style="display:flex;gap:4px;">';
-      html += '<button style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:12px;" onclick="SimUI.copyProduct(' + idx + ')" title="Copy product">&#x2398;</button>';
+      html += '<div class="cj-sim-grid-actions">';
+      html += '<button class="cj-sim-grid-action" onclick="SimUI.copyProduct(' + idx + ')" title="Copy">\u2398</button>';
       if (products.length > 1) {
-        html += '<button style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px;" onclick="SimUI.removeProduct(' + idx + ')">\u00d7</button>';
+        html += '<button class="cj-sim-grid-action" onclick="SimUI.removeProduct(' + idx + ')" title="Remove">\u00d7</button>';
       }
       html += '</div>';
-      html += '</div>';
+      html += '</th>';
+    });
+    // Add product column
+    html += '<th class="cj-sim-grid-add">';
+    if (products.length < 12) {
+      html += '<button class="cj-sim-add-col-btn" onclick="SimUI.addProduct()" title="Add product">+</button>';
+    }
+    html += '</th>';
+    html += '</tr></thead>';
 
-      data.attributes.forEach(function(attr) {
-        html += '<div style="margin-bottom:4px;">';
-        html += '<label style="font-size:11px;color:#64748b;display:block;">' + escHtml(attr.name) + '</label>';
+    // Body rows: one per attribute
+    html += '<tbody>';
+    data.attributes.forEach(function(attr) {
+      html += '<tr>';
+      html += '<td class="cj-sim-grid-attr-label">' + escHtml(attr.name) + '</td>';
+      products.forEach(function(prod, idx) {
+        html += '<td class="cj-sim-grid-cell">';
         html += '<select class="cj-sim-select" onchange="SimUI.setLevel(' + idx + ',\'' + escAttr(attr.name) + '\',this.value)">';
         attr.levels.forEach(function(lev) {
           var selected = prod.config[attr.name] === lev.name ? " selected" : "";
           html += '<option value="' + escAttr(lev.name) + '"' + selected + '>' + escHtml(lev.name) + '</option>';
         });
-        html += '</select></div>';
+        html += '</select></td>';
       });
-
-      html += '</div>';
+      html += '<td></td>';  // empty cell under add column
+      html += '</tr>';
     });
+    html += '</tbody>';
 
-    html += '<div style="display:flex;gap:8px;align-items:center;">';
-    if (products.length >= 12) {
-      html += '<button class="cj-sim-add-btn" style="opacity:0.4;pointer-events:none;flex:1;">+ Add Product (Max 12)</button>';
-    } else {
-      html += '<button class="cj-sim-add-btn" onclick="SimUI.addProduct()" style="flex:1;">+ Add Product</button>';
-    }
+    html += '</table>';
+
+    // Controls row below grid
+    html += '<div style="display:flex;gap:8px;align-items:center;margin-top:10px;">';
     html += '<button class="cj-sim-add-btn" style="background:#f1f5f9;color:#64748b;flex:0 0 auto;" onclick="SimUI.resetAll()">Reset All</button>';
     html += '</div>';
+
     container.innerHTML = html;
   }
 
@@ -235,9 +251,15 @@ var SimUI = (function() {
     html += '</span></span>';
     html += '</div>';
 
-    // Scale factor (exponent) control
+    // Chart + revenue containers (updated separately)
+    html += '<div id="cj-sim-share-chart"></div>';
+    html += '<div id="cj-sim-revenue"></div>';
+
+    // Scale factor in collapsible Advanced section
     var sf = SimEngine.getScaleFactor();
-    html += '<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;">';
+    html += '<details style="margin-top:16px;border-top:1px solid #f1f5f9;padding-top:12px;">';
+    html += '<summary style="cursor:pointer;font-size:12px;font-weight:600;color:#64748b;user-select:none;">Advanced</summary>';
+    html += '<div style="margin-top:10px;display:flex;align-items:center;gap:8px;">';
     html += '<label style="font-size:11px;color:#64748b;white-space:nowrap;">Scale factor:</label>';
     html += '<input type="range" id="cj-sim-scale-slider" min="0.1" max="3.0" step="0.1" value="' + sf.toFixed(1) + '" ';
     html += 'style="width:120px;accent-color:#323367;" ';
@@ -249,10 +271,7 @@ var SimUI = (function() {
     html += 'Multiplies utilities before share computation. <strong>1.0</strong> = no adjustment. <strong>&gt;1</strong> = more differentiated shares. <strong>&lt;1</strong> = more equal shares.';
     html += '</span></span>';
     html += '</div>';
-
-    // Chart + revenue containers (updated separately)
-    html += '<div id="cj-sim-share-chart"></div>';
-    html += '<div id="cj-sim-revenue"></div>';
+    html += '</details>';
 
     container.innerHTML = html;
 
@@ -349,6 +368,12 @@ var SimUI = (function() {
 
   // === REVENUE SIMULATOR MODE ===
   var revenueCustomers = 1000;
+  var showShareBars = true;
+
+  function toggleShareBars(checked) {
+    showShareBars = checked;
+    updateResults();
+  }
 
   function setRevenueCustomers(val) {
     var n = parseInt(val, 10);
@@ -394,6 +419,12 @@ var SimUI = (function() {
     html += '<span style="font-size:11px;color:#94a3b8;">(Revenue = Price \u00d7 Share% \u00d7 Customers)</span>';
     html += '</div>';
 
+    // Toggle for market share bars
+    html += '<div style="margin-bottom:12px;">';
+    html += '<label style="font-size:12px;color:#64748b;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">';
+    html += '<input type="checkbox" ' + (showShareBars ? 'checked' : '') + ' onchange="SimUI.toggleShareBars(this.checked)" style="accent-color:#323367;" />';
+    html += 'Show market share bars</label></div>';
+
     // Stacked horizontal bars — Market Share row + Revenue row (OpinionX style)
     var barHeight = 36;
     var barGap = 8;
@@ -413,13 +444,15 @@ var SimUI = (function() {
       html += '<div style="margin-bottom:16px;">';
       html += '<div style="font-size:12px;font-weight:600;color:#1e293b;margin-bottom:4px;">' + escHtml(d.name) + '</div>';
 
-      // Market Share bar
-      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">';
-      html += '<span style="font-size:11px;color:#64748b;min-width:80px;text-align:right;">Market Share</span>';
-      html += '<div style="flex:1;background:#f1f5f9;border-radius:4px;height:' + barHeight + 'px;position:relative;overflow:hidden;">';
-      html += '<div style="width:' + shareW + '%;height:100%;background:' + colour + ';border-radius:4px;display:flex;align-items:center;justify-content:center;min-width:40px;transition:width 0.3s ease;">';
-      html += '<span style="font-size:12px;font-weight:600;color:#fff;">' + d.share.toFixed(1) + '%</span>';
-      html += '</div></div></div>';
+      // Market Share bar (togglable)
+      if (showShareBars) {
+        html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">';
+        html += '<span style="font-size:11px;color:#64748b;min-width:80px;text-align:right;">Market Share</span>';
+        html += '<div style="flex:1;background:#f1f5f9;border-radius:4px;height:' + barHeight + 'px;position:relative;overflow:hidden;">';
+        html += '<div style="width:' + shareW + '%;height:100%;background:' + colour + ';border-radius:4px;display:flex;align-items:center;justify-content:center;min-width:40px;transition:width 0.3s ease;">';
+        html += '<span style="font-size:12px;font-weight:600;color:#fff;">' + d.share.toFixed(1) + '%</span>';
+        html += '</div></div></div>';
+      }
 
       // Revenue bar
       html += '<div style="display:flex;align-items:center;gap:8px;">';
@@ -562,6 +595,7 @@ var SimUI = (function() {
     init: init,
     setScaleFactor: setScaleFactor,
     setRevenueCustomers: setRevenueCustomers,
+    toggleShareBars: toggleShareBars,
     addProduct: addProduct,
     removeProduct: removeProduct,
     copyProduct: copyProduct,

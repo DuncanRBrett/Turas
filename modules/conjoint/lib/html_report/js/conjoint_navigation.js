@@ -745,65 +745,6 @@
       SimUI.switchMode(mode);
     }
 
-    // Restore sticky annotation for this mode
-    if (typeof restoreSimAnnotation === "function") {
-      restoreSimAnnotation(mode);
-    }
-  };
-
-
-  // === SIMULATOR ANNOTATIONS (per-mode sticky notes) ===
-  // Each simulator mode (shares, revenue, sensitivity, sov) has its own persistent note
-
-  var simNotes = {};  // { "shares": "text", "revenue": "text", ... }
-
-  window.toggleSimAnnotation = function() {
-    var body = document.getElementById("cj-sim-annotation-body");
-    if (!body) return;
-    var visible = body.style.display !== "none";
-    body.style.display = visible ? "none" : "block";
-    if (!visible) {
-      var editor = document.getElementById("cj-sim-annotation-editor");
-      if (editor) setTimeout(function() { editor.focus(); }, 50);
-    }
-  };
-
-  window.saveSimAnnotation = function() {
-    var editor = document.getElementById("cj-sim-annotation-editor");
-    var label = document.getElementById("cj-sim-annotation-label");
-    if (!editor || !label) return;
-    var text = editor.innerText.trim();
-    var hasContent = text.length > 0;
-    label.textContent = hasContent ? "Edit note" : "Add note";
-
-    // Save to the current mode's storage
-    var activeBtn = document.querySelector(".cj-sim-mode-btn.active");
-    var mode = "shares";
-    if (activeBtn) {
-      var onclick = activeBtn.getAttribute("onclick") || "";
-      var match = onclick.match(/switchSimMode\('(\w+)'\)/);
-      if (match) mode = match[1];
-    }
-    simNotes[mode] = text;
-  };
-
-  // Restore note when switching modes
-  window.restoreSimAnnotation = function(mode) {
-    var editor = document.getElementById("cj-sim-annotation-editor");
-    var body = document.getElementById("cj-sim-annotation-body");
-    var label = document.getElementById("cj-sim-annotation-label");
-    if (!editor) return;
-
-    var text = simNotes[mode] || "";
-    editor.innerText = text;
-
-    if (text) {
-      if (body) body.style.display = "block";
-      if (label) label.textContent = "Edit note";
-    } else {
-      if (body) body.style.display = "none";
-      if (label) label.textContent = "Add note";
-    }
   };
 
 

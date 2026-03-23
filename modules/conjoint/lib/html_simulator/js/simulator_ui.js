@@ -171,7 +171,7 @@ document.addEventListener("DOMContentLoaded", function() {
   if (dataEl) {
     var simData = JSON.parse(dataEl.textContent);
     SimEngine.init(simData);
-    SimCharts.setBrand(document.documentElement.style.getPropertyValue("--sim-brand") || "#323367");
+    SimCharts.setBrand(getComputedStyle(document.documentElement).getPropertyValue("--cj-brand").trim() || "#323367");
     SimUI.init();
   }
 });
