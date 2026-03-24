@@ -16,8 +16,26 @@ pricing_root <- file.path(TURAS_ROOT, "modules", "pricing")
 shared_styles <- file.path(TURAS_ROOT, "modules", "shared", "template_styles.R")
 if (file.exists(shared_styles)) source(shared_styles)
 
-# Source the template generator
-source(file.path(pricing_root, "lib", "generate_config_templates.R"))
+# Source the template generator from project root so its internal path
+# resolution via .find_shared_template_styles() works (it uses getwd())
+old_wd_pricing <- getwd()
+setwd(TURAS_ROOT)
+
+# Source the generator with patched .find_shared_template_styles
+gen_code <- readLines(file.path(pricing_root, "lib", "generate_config_templates.R"))
+# Replace .find_shared_template_styles with a version that returns the known path
+gen_code <- sub(
+  '^\\.find_shared_template_styles <- function\\(\\) \\{',
+  sprintf('.find_shared_template_styles <- function() { return("%s")',
+          gsub("\\\\", "/", shared_styles)),
+  gen_code
+)
+tmp_gen <- tempfile(fileext = ".R")
+writeLines(gen_code, tmp_gen)
+source(tmp_gen, local = FALSE)
+unlink(tmp_gen)
+
+setwd(old_wd_pricing)
 
 
 # ==============================================================================

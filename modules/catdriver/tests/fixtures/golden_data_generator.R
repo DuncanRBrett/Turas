@@ -197,11 +197,14 @@ compute_expected_values <- function() {
   binary_anova <- car::Anova(binary_model, type = "II")
 
   # Importance ranking (by chi-square)
-  importance_order <- order(binary_anova$Chisq, decreasing = TRUE)
+  # car::Anova uses "LR Chisq" for logistic models
+  chisq_col <- if ("LR Chisq" %in% colnames(binary_anova)) "LR Chisq" else "Chisq"
+  chisq_values <- binary_anova[[chisq_col]]
+  importance_order <- order(chisq_values, decreasing = TRUE)
   binary_importance_ranking <- rownames(binary_anova)[importance_order]
 
   # Top driver chi-square
-  binary_top_chi_sq <- max(binary_anova$Chisq)
+  binary_top_chi_sq <- max(chisq_values)
 
   binary_expected <- list(
     n_observations = nrow(binary_data),

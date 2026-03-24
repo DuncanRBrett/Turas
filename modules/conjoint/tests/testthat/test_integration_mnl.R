@@ -47,6 +47,9 @@ if (is.null(turas_root)) {
   old_wd <- setwd(turas_root)
   on.exit(setwd(old_wd), add = TRUE)
 
+  # Fix random seed for reproducible MNL estimation
+  set.seed(42)
+
   # Source module (loads all functions into global env)
   source(file.path(turas_root, "modules", "conjoint", "R", "00_main.R"))
 

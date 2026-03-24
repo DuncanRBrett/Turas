@@ -17,17 +17,27 @@ if (file.exists(shared_styles)) source(shared_styles)
 
 # Source the template generator.
 # The generator tries sys.frame(1)$ofile to find shared/template_styles.R,
-# which may fail in test context. We source from project root as fallback,
-# and the functions from template_styles.R are already loaded above.
+# which fails in test context. We work around this by:
+# 1. Already having sourced template_styles.R above
+# 2. Sourcing from project root so the fallback path resolves
+# 3. Wrapping the source in tryCatch to handle the sys.frame error gracefully
 old_wd <- getwd()
 setwd(TURAS_ROOT)
-# Read the file, remove the sys.frame-based sourcing line that fails in tests,
-# then evaluate the rest
+
+# Create a temporary modified version that handles missing ofile
 gen_file <- file.path(MODULE_DIR, "lib", "generate_config_templates.R")
-gen_lines <- readLines(gen_file)
-# Comment out the problematic lines that resolve shared path via sys.frame
-gen_lines <- gsub("sys\\.frame\\(1\\)\\$ofile", "NULL", gen_lines)
-eval(parse(text = gen_lines), envir = globalenv())
+gen_code <- readLines(gen_file)
+# Replace sys.frame(1)$ofile with a safe alternative that returns "." when NULL
+gen_code <- gsub(
+  "sys\\.frame\\(1\\)\\$ofile",
+  '{x <- sys.frame(1)$ofile; if (is.null(x)) "." else x}',
+  gen_code
+)
+tmp_gen <- tempfile(fileext = ".R")
+writeLines(gen_code, tmp_gen)
+source(tmp_gen)
+unlink(tmp_gen)
+
 setwd(old_wd)
 
 

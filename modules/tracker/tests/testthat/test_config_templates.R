@@ -41,8 +41,22 @@ if (file.exists(trs_path)) source(trs_path)
 shared_styles <- file.path(turas_root, "modules", "shared", "template_styles.R")
 if (file.exists(shared_styles)) source(shared_styles)
 
-# Source the template generator
-source(file.path(tracker_root, "lib", "generate_config_templates.R"))
+# Source the template generator.
+# The generator tries sys.frame(1)$ofile to find shared/template_styles.R,
+# which returns NULL in test context. We patch the root path variable
+# and skip the internal source() call since template_styles.R is already loaded.
+gen_file <- file.path(tracker_root, "lib", "generate_config_templates.R")
+gen_code <- readLines(gen_file)
+# Replace the root detection and source line with a known-good path
+gen_code <- gsub(
+  "source\\(file\\.path\\(\\.tracker_gen_root,\\s*\"shared\",\\s*\"template_styles\\.R\"\\)\\)",
+  sprintf('source("%s")', gsub("\\\\", "/", shared_styles)),
+  gen_code
+)
+tmp_gen <- tempfile(fileext = ".R")
+writeLines(gen_code, tmp_gen)
+source(tmp_gen)
+unlink(tmp_gen)
 
 
 # ==============================================================================

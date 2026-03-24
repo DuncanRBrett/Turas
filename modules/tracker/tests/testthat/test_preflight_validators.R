@@ -61,8 +61,11 @@ new_error_log <- function() {
 }
 
 make_waves_df <- function(ids = c("W1", "W2"),
-                           starts = c("2025-01-01", "2025-07-01"),
-                           ends = c("2025-01-31", "2025-07-31")) {
+                           starts = NULL,
+                           ends = NULL) {
+  n <- length(ids)
+  if (is.null(starts)) starts <- paste0("2025-0", seq_len(n), "-01")
+  if (is.null(ends))   ends   <- paste0("2025-0", seq_len(n), "-28")
   data.frame(
     WaveID = ids,
     WaveLabel = paste("Wave", seq_along(ids)),
@@ -74,8 +77,11 @@ make_waves_df <- function(ids = c("W1", "W2"),
 }
 
 make_tracked_df <- function(codes = c("Q1", "Q2"),
-                             types = c("Rating", "Single"),
-                             specs = c("mean", "all")) {
+                             types = NULL,
+                             specs = NULL) {
+  n <- length(codes)
+  if (is.null(types)) types <- rep("Rating", n)
+  if (is.null(specs))  specs <- rep("mean", n)
   data.frame(
     QuestionCode = codes,
     QuestionType = types,

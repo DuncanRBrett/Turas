@@ -690,7 +690,7 @@ set_segmentation_seed <- function(config) {
   } else {
     # Generate seed from timestamp for reproducibility
     # Use date + time to ensure uniqueness across runs
-    seed_value <- as.integer(format(Sys.time(), "%Y%m%d%H%M%S")) %% .Machine$integer.max
+    seed_value <- as.integer(as.numeric(format(Sys.time(), "%Y%m%d%H%M%S")) %% .Machine$integer.max)
     seed_source <- "auto-generated"
   }
 

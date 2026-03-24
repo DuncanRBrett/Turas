@@ -48,6 +48,13 @@ new_error_log <- function() {
   .hub_create_error_log()
 }
 
+# Get detail text from error log (handles both hub and shared column names)
+get_details <- function(log) {
+  if ("Detail" %in% names(log)) return(log$Detail)
+  if ("Description" %in% names(log)) return(log$Description)
+  character(0)
+}
+
 make_reports_df <- function(keys = c("report1", "report2"),
                              labels = c("Report One", "Report Two"),
                              paths = NULL,
@@ -141,7 +148,7 @@ test_that("check_report_key_format detects invalid key characters", {
   result <- check_report_key_format(reports_df, new_error_log())
   errors <- result[result$Severity == "Error", ]
   expect_true(nrow(errors) > 0)
-  expect_true(any(grepl("bad key!", errors$Detail, fixed = TRUE)))
+  expect_true(any(grepl("bad key!", get_details(errors), fixed = TRUE)))
 })
 
 test_that("check_report_key_format detects key starting with number", {
@@ -153,7 +160,7 @@ test_that("check_report_key_format detects key starting with number", {
   result <- check_report_key_format(reports_df, new_error_log())
   errors <- result[result$Severity == "Error", ]
   expect_true(nrow(errors) > 0)
-  expect_true(any(grepl("123abc", errors$Detail)))
+  expect_true(any(grepl("123abc", get_details(errors))))
 })
 
 test_that("check_report_key_format warns about long keys", {
@@ -180,7 +187,7 @@ test_that("check_duplicate_report_keys detects duplicates", {
   result <- check_duplicate_report_keys(reports_df, new_error_log())
   errors <- result[result$Severity == "Error", ]
   expect_true(nrow(errors) > 0)
-  expect_true(any(grepl("report1", errors$Detail)))
+  expect_true(any(grepl("report1", get_details(errors))))
 })
 
 test_that("check_duplicate_report_keys passes with unique keys", {
@@ -232,7 +239,7 @@ test_that("check_colour_codes_valid detects invalid hex colour", {
   result <- check_colour_codes_valid(settings, new_error_log())
   errors <- result[result$Severity == "Error", ]
   expect_true(nrow(errors) > 0)
-  expect_true(any(grepl("not-a-hex", errors$Detail)))
+  expect_true(any(grepl("not-a-hex", get_details(errors))))
 })
 
 test_that("check_colour_codes_valid passes with valid hex colours", {

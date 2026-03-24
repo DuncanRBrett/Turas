@@ -218,46 +218,18 @@ test_that("set_segmentation_seed uses config seed when provided", {
 
 test_that("set_segmentation_seed auto-generates seed when not in config", {
   config <- list(seed = NULL)
-  # Auto-generated seed may overflow integer range in 2026+; accept either
-  # success or a known overflow error
-  result <- tryCatch({
-    output <- capture.output(seed <- set_segmentation_seed(config))
-    list(seed = seed, ok = TRUE)
-  }, error = function(e) {
-    if (grepl("not a valid integer", e$message)) {
-      list(seed = NA, ok = FALSE)
-    } else {
-      stop(e)
-    }
-  })
+  output <- capture.output(seed <- set_segmentation_seed(config))
 
-  if (result$ok) {
-    expect_type(result$seed, "integer")
-    expect_true(result$seed > 0)
-  } else {
-    skip("Auto-generated seed overflows integer range (known issue with timestamp-based seed)")
-  }
+  expect_type(seed, "integer")
+  expect_true(seed > 0)
 })
 
 test_that("set_segmentation_seed auto-generates seed for NA value", {
   config <- list(seed = NA)
-  result <- tryCatch({
-    output <- capture.output(seed <- set_segmentation_seed(config))
-    list(seed = seed, ok = TRUE)
-  }, error = function(e) {
-    if (grepl("not a valid integer", e$message)) {
-      list(seed = NA, ok = FALSE)
-    } else {
-      stop(e)
-    }
-  })
+  output <- capture.output(seed <- set_segmentation_seed(config))
 
-  if (result$ok) {
-    expect_type(result$seed, "integer")
-    expect_true(result$seed > 0)
-  } else {
-    skip("Auto-generated seed overflows integer range (known issue with timestamp-based seed)")
-  }
+  expect_type(seed, "integer")
+  expect_true(seed > 0)
 })
 
 
