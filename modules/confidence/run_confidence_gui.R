@@ -85,6 +85,8 @@ run_confidence_gui <- function() {
   }
 
   add_recent_project <- function(project_dir) {
+    # Normalize path to prevent tilde/symlink mismatches
+    project_dir <- normalizePath(path.expand(project_dir), winslash = "/", mustWork = FALSE)
     recent <- load_recent_projects()
     recent <- unique(c(project_dir, recent))
     recent <- recent[1:min(5, length(recent))]
@@ -253,6 +255,8 @@ run_confidence_gui <- function() {
     output$recent_ui <- renderUI({
       if (hide_recents) return(NULL)
       recent <- load_recent_projects()
+      # Filter out directories that no longer exist
+      recent <- recent[dir.exists(recent)]
       if (length(recent) == 0) return(NULL)
 
       div(class = "turas-recent-section",
@@ -261,7 +265,8 @@ run_confidence_gui <- function() {
         lapply(seq_along(recent), function(i) {
           tags$div(
             class = "turas-recent-item",
-            onclick = sprintf("Shiny.setInputValue('select_recent', '%s', {priority: 'event'})", recent[i]),
+            onclick = sprintf("Shiny.setInputValue('select_recent', '%s', {priority: 'event'})",
+                            gsub("'", "\\\\'", recent[i])),
             tags$strong(basename(recent[i])),
             tags$br(),
             tags$small(style = "color: #666;", recent[i])
@@ -417,6 +422,9 @@ run_confidence_gui <- function() {
 
         # Show completion or error message
         if (result$success) {
+          # Save to recent projects on successful run
+          add_recent_project(data$path)
+
           console_output(paste0(
             console_output(),
             sprintf("\n\n%s\n✓ ANALYSIS COMPLETE\n%s\n", strrep("=", 80), strrep("=", 80)),

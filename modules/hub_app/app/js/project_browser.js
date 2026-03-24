@@ -34,11 +34,25 @@ var ProjectBrowser = (function() {
   };
 
   /**
+   * Ensure a value is an array. Handles JSON auto_unbox converting
+   * single-element arrays to scalars or objects.
+   * @param {*} val
+   * @returns {Array}
+   */
+  function ensureArray(val) {
+    if (!val) return [];
+    if (Array.isArray(val)) return val;
+    // Single object (auto_unbox converted [{...}] to {...})
+    if (typeof val === "object") return [val];
+    return [];
+  }
+
+  /**
    * Render the project grid from an array of project objects.
    * @param {Array} projects - Array from scan_for_projects()
    */
   function render(projects) {
-    allProjects = projects || [];
+    allProjects = ensureArray(projects);
 
     var grid = HubApp.dom.projectGrid;
     var empty = HubApp.dom.projectEmpty;
@@ -78,14 +92,32 @@ var ProjectBrowser = (function() {
    * @returns {string} HTML string
    */
   function buildTile(project) {
-    var reportCount = project.report_count || 0;
-    var modules = groupByModule(project.reports || []);
+    var reports = ensureArray(project.reports);
+    var reportCount = project.report_count || reports.length || 0;
+    var modules = groupByModule(reports);
     var badgesHtml = buildModuleBadges(modules);
     var timeAgo = relativeTime(project.last_modified || "");
+    var displayPath = project.display_path || project.path || "";
+    var sizeLabel = project.total_size_label || "";
+
+    // Report list (show individual report titles, max 5)
+    var reportListHtml = buildReportList(null, reports);
 
     return '<div class="project-tile" data-path="' + escapeAttr(project.path) + '">' +
+      // Title row
       '<div class="tile-name">' + escapeHtml(project.name) + '</div>' +
+      // Path subtitle
+      '<div class="tile-path" title="' + escapeAttr(project.path) + '">' +
+        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+          '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>' +
+        '</svg>' +
+        escapeHtml(displayPath) +
+      '</div>' +
+      // Module badges
       (badgesHtml ? '<div class="tile-badges">' + badgesHtml + '</div>' : '') +
+      // Report list
+      reportListHtml +
+      // Meta row: count, size, time
       '<div class="tile-meta">' +
         '<span class="tile-meta-item">' +
           '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
@@ -94,6 +126,15 @@ var ProjectBrowser = (function() {
           '</svg>' +
           reportCount + ' report' + (reportCount !== 1 ? 's' : '') +
         '</span>' +
+        (sizeLabel
+          ? '<span class="tile-meta-item">' +
+              '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+                '<circle cx="12" cy="12" r="10"/>' +
+                '<path d="M12 8v4l3 3"/>' +
+              '</svg>' +
+              escapeHtml(sizeLabel) +
+            '</span>'
+          : '') +
         (timeAgo
           ? '<span class="tile-meta-item">' +
               '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
@@ -105,6 +146,42 @@ var ProjectBrowser = (function() {
           : '') +
       '</div>' +
     '</div>';
+  }
+
+  /**
+   * Build HTML list of individual report titles (max 5, then "... and N more").
+   * Uses the reports array (which has label + type per report) as the source
+   * of truth, since report_labels can be mangled by JSON auto_unbox.
+   *
+   * @param {Array|string} labels - Report label strings (may be scalar if 1 report)
+   * @param {Array} reports - Full report objects (label, type, filename)
+   * @returns {string} HTML string (empty if no reports)
+   */
+  function buildReportList(labels, reports) {
+    // Build the list from the reports array directly (reliable structure)
+    if (!reports || !Array.isArray(reports) || reports.length === 0) return "";
+
+    var MAX_SHOW = 5;
+    var html = '<div class="tile-report-list">';
+    var count = Math.min(reports.length, MAX_SHOW);
+
+    for (var i = 0; i < count; i++) {
+      var r = reports[i];
+      var label = (r && r.label) ? r.label : (r && r.filename ? r.filename : "");
+      var type = (r && r.type) ? r.type : "";
+      html += '<div class="tile-report-item">' +
+        '<span class="tile-report-dot tile-dot-' + escapeAttr(type) + '"></span>' +
+        escapeHtml(label) +
+      '</div>';
+    }
+
+    if (reports.length > MAX_SHOW) {
+      html += '<div class="tile-report-more">... and ' +
+        (reports.length - MAX_SHOW) + ' more</div>';
+    }
+
+    html += '</div>';
+    return html;
   }
 
   /**

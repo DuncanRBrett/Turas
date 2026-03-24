@@ -333,26 +333,37 @@ run_catdriver_gui <- function() {
       }
     })
 
-    # Recent projects dropdown
+    # Recent projects list
     output$recent_projects_ui <- renderUI({
       recent <- load_recent_projects()
-      if (length(recent) > 0) {
-        choices <- setNames(
-          sapply(recent, function(x) x$project_dir),
-          sapply(recent, function(x) basename(x$project_dir))
-        )
-        selectInput("recent_project", "Recent:",
-                   choices = c("Select recent..." = "", choices),
-                   width = "100%")
-      }
+      if (length(recent) == 0) return(NULL)
+      div(
+        tags$label("Recent:", style = "font-weight: 600; margin-bottom: 5px; display: block;"),
+        lapply(seq_along(recent), function(i) {
+          proj <- recent[[i]]
+          dir_path <- proj$project_dir
+          tags$div(
+            class = "turas-recent-item",
+            onclick = sprintf("Shiny.setInputValue('select_recent', '%s', {priority: 'event'})",
+                            gsub("'", "\\\\'", dir_path)),
+            tags$strong(basename(dir_path)),
+            tags$br(),
+            tags$small(style = "color: #666;", dir_path)
+          )
+        })
+      )
     })
 
     # Handle recent project selection
-    observeEvent(input$recent_project, {
-      if (!is.null(input$recent_project) && input$recent_project != "") {
-        if (dir.exists(input$recent_project)) {
-          files$project_dir <- input$recent_project
-          files$config_files <- character(0)
+    observeEvent(input$select_recent, {
+      req(input$select_recent)
+      dir_path <- normalizePath(path.expand(input$select_recent), winslash = "/", mustWork = FALSE)
+      if (dir.exists(dir_path)) {
+        files$project_dir <- dir_path
+        files$config_files <- character(0)
+        detected <- detect_config_files(dir_path)
+        if (length(detected) > 0) {
+          files$config_files <- file.path(dir_path, detected[1])
         }
       }
     })
@@ -519,6 +530,7 @@ run_catdriver_gui <- function() {
       req(files$project_dir, length(files$config_files) > 0)
 
       is_running(TRUE)
+      on.exit(is_running(FALSE), add = TRUE)
       console_text("")
 
       # Save to recent projects
@@ -529,10 +541,10 @@ run_catdriver_gui <- function() {
       n_configs <- length(files$config_files)
       is_multi <- n_configs >= 2
 
-      # Use withProgress for visual progress bar
-      withProgress(message = "Running Key Driver Analysis", value = 0, {
-
-        tryCatch({
+      # Use withProgress for visual progress bar - tryCatch wraps withProgress
+      # to ensure the progress overlay is always dismissed on error
+      tryCatch({
+        withProgress(message = "Running Key Driver Analysis", value = 0, {
           # Get Turas root
           turas_root <- Sys.getenv("TURAS_ROOT", getwd())
           if (basename(turas_root) != "Turas") {
@@ -809,14 +821,16 @@ run_catdriver_gui <- function() {
 
           setProgress(value = 1, detail = "Done!")
 
-        }, error = function(e) {
-          output_text <<- paste0(output_text, "\n\n\u2717 Error: ", e$message)
-        })
-
-      })  # End withProgress
+        })  # End withProgress
+      }, error = function(e) {
+        cat("\n=== TURAS ERROR ===\n")
+        cat("Message:", conditionMessage(e), "\n")
+        cat("==================\n\n")
+        output_text <<- paste0(output_text, "\n\n\u2717 Error: ", e$message)
+        showNotification(paste("Error:", conditionMessage(e)), type = "error", duration = 10)
+      })
 
       console_text(output_text)
-      is_running(FALSE)
     })
   }
 

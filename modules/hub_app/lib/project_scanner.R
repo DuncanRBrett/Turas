@@ -162,11 +162,26 @@ evaluate_project_dir <- function(dir_path) {
   last_modified <- max(all_mtimes, na.rm = TRUE)
   total_size <- sum(file.size(html_files), na.rm = TRUE)
 
+  # Smart project name: try to derive from report titles, fall back to folder name
+  folder_name <- basename(dir_path)
+  smart_name <- derive_project_name(turas_reports, folder_name)
+
+  # Abbreviated path for display (show parent context)
+  display_path <- abbreviate_path(dir_path)
+
+  # Report labels for display on card
+  report_labels <- vapply(turas_reports, function(r) {
+    r$label %||% tools::file_path_sans_ext(r$filename %||% "")
+  }, character(1))
+
   list(
     id = digest_path(dir_path),
-    name = basename(dir_path),
+    name = smart_name,
+    folder_name = folder_name,
     path = dir_path,
+    display_path = display_path,
     reports = turas_reports,
+    report_labels = report_labels,
     report_count = length(turas_reports),
     total_html_count = length(html_files),
     has_hub_config = has_hub_config,
@@ -315,3 +330,197 @@ get_project_reports <- function(project_path) {
     message = sprintf("Found %d Turas report(s)", length(reports))
   )
 }
+
+
+#' Derive a Meaningful Project Name from Report Titles
+#'
+#' Attempts to extract a common project name from report \code{<title>} tags.
+#' Falls back to the folder name if no pattern is found.
+#'
+#' Heuristic: report titles often follow the pattern
+#' "Type Report - ProjectName" or "ProjectName - Type".
+#' We look for the longest common substring across report titles,
+#' or use the title of the first report stripped of the type prefix.
+#'
+#' @param reports List of report objects (from sniff_report_type)
+#' @param folder_name Fallback name (basename of directory)
+#' @return Character string — the best project name
+#' @keywords internal
+derive_project_name <- function(reports, folder_name) {
+  if (length(reports) == 0) return(folder_name)
+
+  labels <- vapply(reports, function(r) r$label %||% "", character(1))
+  labels <- labels[nzchar(labels)]
+
+  if (length(labels) == 0) return(folder_name)
+
+  # If only one report, try to extract project name from its title
+  if (length(labels) == 1) {
+    name <- strip_report_type_from_title(labels[1])
+    if (nzchar(name) && name != labels[1]) return(name)
+    return(labels[1])
+  }
+
+  # Multiple reports: find common prefix/substring
+  # Try stripping type keywords and finding commonality
+  stripped <- vapply(labels, strip_report_type_from_title, character(1))
+  stripped <- stripped[nzchar(stripped)]
+
+  if (length(stripped) >= 2) {
+    # Find the longest common prefix among stripped titles
+    common <- longest_common_prefix(stripped)
+    common <- trimws(gsub("[_-]+$", "", common))  # Clean trailing separators
+    if (nchar(common) >= 3) return(common)
+  }
+
+  # Fallback: use folder name, but clean up date-like names
+  clean <- clean_folder_name(folder_name)
+  return(clean)
+}
+
+
+#' Strip Report Type Keywords from a Title
+#'
+#' Removes patterns like "Tracker Report - ", "Tabs - ", etc.
+#' Returns the remaining meaningful part.
+#'
+#' @param title Report title string
+#' @return Cleaned title
+#' @keywords internal
+strip_report_type_from_title <- function(title) {
+  if (is.null(title) || !nzchar(title)) return("")
+
+  # Common type phrases to remove (multi-word first, then single words)
+  type_phrases <- c(
+    "tabs report", "tracker report", "confidence report", "maxdiff report",
+    "conjoint report", "pricing report", "segment report", "segmentation report",
+    "catdriver report", "keydriver report", "weighting report",
+    "cat driver report", "key driver report", "categorical driver report",
+    "combined report", "hub report",
+    "report", "tracker", "tabs", "crosstabs", "confidence",
+    "maxdiff", "conjoint", "pricing", "segment", "segmentation",
+    "catdriver", "keydriver", "weighting", "combined", "hub",
+    "cat driver", "key driver", "categorical driver",
+    "exploration", "comparison", "unified", "simulator"
+  )
+
+  result <- title
+
+  # Remove "Phrase - " prefixes (e.g., "Tabs Report - BrandStudy")
+  for (tw in type_phrases) {
+    pattern <- sprintf("^\\s*%s\\s*[-—]\\s*", tw)
+    result <- gsub(pattern, "", result, ignore.case = TRUE, perl = TRUE)
+  }
+
+  # Remove " - Phrase" suffixes (e.g., "BrandStudy - Tabs Report")
+  for (tw in type_phrases) {
+    pattern <- sprintf("\\s*[-—]\\s*%s\\s*$", tw)
+    result <- gsub(pattern, "", result, ignore.case = TRUE, perl = TRUE)
+  }
+
+  # Remove standalone type phrases
+  for (tw in type_phrases) {
+    pattern <- sprintf("^\\s*%s\\s*$", tw)
+    if (grepl(pattern, result, ignore.case = TRUE)) {
+      return("")
+    }
+  }
+
+  trimws(result)
+}
+
+
+#' Find Longest Common Prefix of Strings
+#'
+#' @param strings Character vector
+#' @return The longest common prefix
+#' @keywords internal
+longest_common_prefix <- function(strings) {
+  if (length(strings) == 0) return("")
+  if (length(strings) == 1) return(strings[1])
+
+  # Compare character by character
+  ref <- strings[1]
+  prefix_len <- nchar(ref)
+
+  for (s in strings[-1]) {
+    max_check <- min(prefix_len, nchar(s))
+    match_len <- 0
+    for (i in seq_len(max_check)) {
+      if (substr(ref, i, i) == substr(s, i, i)) {
+        match_len <- i
+      } else {
+        break
+      }
+    }
+    prefix_len <- match_len
+    if (prefix_len == 0) return("")
+  }
+
+  substr(ref, 1, prefix_len)
+}
+
+
+#' Abbreviate a File Path for Display
+#'
+#' Shows the last 2-3 path components, with ~ for HOME.
+#' e.g., "/Users/duncan/Documents/Projects/BrandHealth" → "~/Documents/Projects/BrandHealth"
+#'
+#' @param path Full path
+#' @return Abbreviated path string
+#' @keywords internal
+abbreviate_path <- function(path) {
+  if (is.null(path) || !nzchar(path)) return("")
+
+  home <- Sys.getenv("HOME", path.expand("~"))
+  home <- normalizePath(home, winslash = "/", mustWork = FALSE)
+  norm_path <- normalizePath(path, winslash = "/", mustWork = FALSE)
+
+  # Replace HOME with ~
+  if (startsWith(norm_path, home)) {
+    display <- paste0("~", substring(norm_path, nchar(home) + 1))
+  } else {
+    display <- norm_path
+  }
+
+  # If still very long, show last 3 components
+  parts <- strsplit(display, "/")[[1]]
+  parts <- parts[nzchar(parts)]
+  if (length(parts) > 4) {
+    display <- paste0(".../", paste(tail(parts, 3), collapse = "/"))
+  }
+
+  display
+}
+
+
+#' Clean Up a Folder Name for Display
+#'
+#' Replaces underscores/hyphens with spaces, title-cases if it looks
+#' like a slug. Preserves date-like names but adds context.
+#'
+#' @param name Folder basename
+#' @return Cleaned display name
+#' @keywords internal
+clean_folder_name <- function(name) {
+  if (is.null(name) || !nzchar(name)) return("Untitled Project")
+
+  # If it's a pure date like "2026-03-24", keep it as is
+  # (the display_path will provide context)
+  if (grepl("^\\d{4}-\\d{2}-\\d{2}$", name)) return(name)
+
+  # Replace underscores and hyphens with spaces (but not in dates)
+  cleaned <- gsub("_", " ", name)
+
+  # Title case if all lowercase
+  if (cleaned == tolower(cleaned)) {
+    cleaned <- tools::toTitleCase(cleaned)
+  }
+
+  trimws(cleaned)
+}
+
+
+#' Null-coalescing operator (local)
+#' @keywords internal
+`%||%` <- function(a, b) if (is.null(a)) b else a

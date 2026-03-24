@@ -43,23 +43,22 @@ run_segment_gui <- function() {
   # Helper function to load recent projects
   load_recent_projects <- function() {
     if (file.exists(recent_file)) {
-      readRDS(recent_file)
+      recent <- tryCatch(readRDS(recent_file), error = function(e) character(0))
+      # Ensure character vector (not list)
+      if (is.list(recent)) recent <- as.character(unlist(recent))
+      recent[nzchar(recent) & file.exists(recent)]
     } else {
-      list()
+      character(0)
     }
   }
 
   # Helper function to save recent project
   save_recent_project <- function(config_path) {
+    config_path <- normalizePath(path.expand(config_path), winslash = "/", mustWork = FALSE)
     recent <- load_recent_projects()
-
-    # Add new project (avoid duplicates)
-    recent <- c(config_path, recent[recent != config_path])
-
-    # Keep only last 5
+    recent <- unique(c(config_path, recent[recent != config_path]))
     recent <- head(recent, 5)
-
-    saveRDS(recent, recent_file)
+    tryCatch(saveRDS(recent, recent_file), error = function(e) NULL)
   }
 
   # ===========================================================================
@@ -173,6 +172,7 @@ run_segment_gui <- function() {
                                                 winslash = "/", mustWork = FALSE)
         if (file.exists(selected_path_expanded)) {
           config_file(selected_path_expanded)
+          save_recent_project(selected_path_expanded)
           analysis_result(NULL)
         } else {
           showNotification("Config file no longer exists at this location",
@@ -204,13 +204,13 @@ run_segment_gui <- function() {
           p(strong("Recent Projects:"), style = "margin-top: 15px; margin-bottom: 10px;"),
           lapply(seq_along(recent_projects), function(i) {
             if (file.exists(recent_projects[[i]])) {
-              actionButton(
-                paste0("recent_project"),
-                label = basename(recent_projects[[i]]),
+              tags$div(
                 class = "turas-recent-item",
-                style = "width: 100%; text-align: left;",
                 onclick = paste0("Shiny.setInputValue('recent_project', ", i,
-                               ", {priority: 'event'})")
+                               ", {priority: 'event'})"),
+                tags$strong(basename(recent_projects[[i]])),
+                tags$br(),
+                tags$small(dirname(recent_projects[[i]]))
               )
             }
           })
@@ -395,6 +395,7 @@ run_segment_gui <- function() {
             sprintf("\n\n%s\n✓ ANALYSIS COMPLETE\n%s\n", strrep("=", 80), strrep("=", 80))
           ))
 
+          save_recent_project(config_file())
           progress$set(value = 1.0, detail = "Complete!")
           showNotification("Segmentation analysis completed successfully!",
                           type = "message", duration = 5)

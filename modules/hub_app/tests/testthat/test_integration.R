@@ -37,7 +37,7 @@ test_that("full flow: guard validates, scanner finds projects, reports listed", 
   expect_equal(scan_result$status, "PASS")
   expect_equal(length(scan_result$result$projects), 2)
 
-  project_names <- sapply(scan_result$result$projects, function(p) p$name)
+  project_names <- sapply(scan_result$result$projects, function(p) p$folder_name)
   expect_true("Alpha" %in% project_names)
   expect_true("Beta" %in% project_names)
 
@@ -90,7 +90,7 @@ test_that("full flow: export from scanned project data", {
   expect_equal(scan_result$status, "PASS")
 
   project <- scan_result$result$projects[[1]]
-  expect_equal(project$name, "ExportProject")
+  expect_equal(project$folder_name, "ExportProject")
 
   # Create mock export items (simulating what the frontend sends)
   items <- create_mock_export_items(n_pins = 3, n_sections = 1)

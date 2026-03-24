@@ -52,7 +52,7 @@ test_that("scan_for_projects finds a single Turas project", {
   result <- scan_for_projects(tmp)
   expect_equal(result$status, "PASS")
   expect_equal(length(result$result$projects), 1)
-  expect_equal(result$result$projects[[1]]$name, "BrandStudy2026")
+  expect_equal(result$result$projects[[1]]$folder_name, "BrandStudy2026")
   expect_equal(result$result$projects[[1]]$report_count, 1)
 })
 
@@ -68,8 +68,8 @@ test_that("scan_for_projects finds multiple projects", {
   expect_equal(result$status, "PASS")
   expect_equal(length(result$result$projects), 2)
 
-  # Check both projects found (order may vary)
-  names <- sapply(result$result$projects, function(p) p$name)
+  # Check both projects found (order may vary) — use folder_name for exact match
+  names <- sapply(result$result$projects, function(p) p$folder_name)
   expect_true("ProjectAlpha" %in% names)
   expect_true("ProjectBeta" %in% names)
 })
