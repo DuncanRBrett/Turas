@@ -15,7 +15,7 @@ This file provides context and guidelines for Claude Code when working with the 
 - **TRS v1.0 Compliance** - Structured refusal system instead of silent failures
 - **Configuration over hardcoding** - All parameters externalized
 
-**Current Status:** Production-ready (85/100 quality score)
+**Current Status:** Production-ready (89/100 quality score)
 
 ### Deployment Context
 
@@ -49,22 +49,23 @@ This ensures that when users run the Shiny app and encounter errors, they can se
 
 ## Architecture & Module Structure
 
-### Core Modules (11 Total)
+### Core Modules (12 Total)
 
 | Module | Purpose | Status | Quality Score |
 |--------|---------|--------|---------------|
 | **AlchemerParser** | Parse Alchemer exports, generate configs, detect routing | Production | 85/100 |
-| **catdriver** | Categorical driver analysis (SHAP, regression) | Production | 92/100 |
+| **catdriver** | Categorical driver analysis (SHAP, regression) | Production | 88/100 |
 | **confidence** | Confidence intervals (Wilson, bootstrap, weighted) | Production | 91/100 |
-| **conjoint** | Choice-based conjoint analysis (HB, utilities) | Production | 91/100 |
-| **keydriver** | Key driver correlation analysis | Production | 93/100 |
+| **conjoint** | Choice-based conjoint analysis (HB, utilities) | Production | 90/100 |
+| **keydriver** | Key driver correlation analysis | Production | 91/100 |
 | **maxdiff** | MaxDiff estimation (HB & aggregate) | Production | 91/100 |
 | **pricing** | Price sensitivity & optimization | Production | 90/100 |
-| **segment** | Clustering & segmentation | Production | 86/100 |
+| **report_hub** | Combine HTML reports into branded hub | Production | 82/100 |
+| **segment** | Clustering & segmentation | Production | 87/100 |
 | **tabs** | Cross-tabulation & significance testing | Production | 90/100 |
-| **tracker** | Longitudinal tracking & trend analysis | Production | 87/100 |
+| **tracker** | Longitudinal tracking & trend analysis | Production | 90/100 |
 | **weighting** | Sample weighting & rim weighting | Production | 86/100 |
-| **shared** | Common utilities (not counted in 11) | Utility | - |
+| **shared** | Common utilities (not counted in 12) | Utility | - |
 
 ### Standard Module Pattern
 
