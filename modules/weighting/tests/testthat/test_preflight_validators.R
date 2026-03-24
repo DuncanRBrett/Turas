@@ -311,3 +311,172 @@ test_that("validate_weighting_preflight detects issues in bad config", {
   expect_true(is.data.frame(result))
   expect_true(nrow(result) > 0)
 })
+
+
+# --- Check: Design targets vs data ---
+
+test_that("check_design_targets_vs_data detects missing stratum variable", {
+  skip_if(!exists("check_design_targets_vs_data", mode = "function"),
+          "check_design_targets_vs_data not available")
+
+  design_df <- data.frame(
+    weight_name = "w1",
+    stratum_variable = "NonExistent",
+    stratum_category = "A",
+    population_size = 1000,
+    stringsAsFactors = FALSE
+  )
+  data <- data.frame(Gender = c("M", "F"), stringsAsFactors = FALSE)
+  error_log <- NULL
+
+  result <- check_design_targets_vs_data(design_df, data, error_log)
+  expect_true(nrow(result) > 0)
+  expect_true(any(grepl("Not Found", result$Issue)))
+})
+
+test_that("check_design_targets_vs_data detects non-positive population_size", {
+  skip_if(!exists("check_design_targets_vs_data", mode = "function"),
+          "check_design_targets_vs_data not available")
+
+  design_df <- data.frame(
+    weight_name = "w1",
+    stratum_variable = "Gender",
+    stratum_category = "M",
+    population_size = -100,
+    stringsAsFactors = FALSE
+  )
+  data <- data.frame(Gender = c("M", "F"), stringsAsFactors = FALSE)
+  error_log <- NULL
+
+  result <- check_design_targets_vs_data(design_df, data, error_log)
+  errors <- result[result$Severity == "Error", ]
+  expect_true(nrow(errors) > 0)
+  expect_true(any(grepl("positive", errors$Detail, ignore.case = TRUE)))
+})
+
+
+# --- Check: Rim categories vs data ---
+
+test_that("check_rim_categories_vs_data detects missing rim variable", {
+  skip_if(!exists("check_rim_categories_vs_data", mode = "function"),
+          "check_rim_categories_vs_data not available")
+
+  rim_df <- data.frame(
+    weight_name = "w1",
+    variable = "MissingVar",
+    category = "A",
+    target_percent = 100,
+    stringsAsFactors = FALSE
+  )
+  data <- data.frame(Gender = c("M", "F"), stringsAsFactors = FALSE)
+  error_log <- NULL
+
+  result <- check_rim_categories_vs_data(rim_df, data, error_log)
+  errors <- result[result$Severity == "Error", ]
+  expect_true(nrow(errors) > 0)
+  expect_true(any(grepl("Not Found", errors$Issue)))
+})
+
+
+# --- Check: Weight variable quality ---
+
+test_that("check_weight_variable_quality detects NA values", {
+  skip_if(!exists("check_weight_variable_quality", mode = "function"),
+          "check_weight_variable_quality not available")
+
+  data <- data.frame(Gender = c("M", "F", NA, "M"), stringsAsFactors = FALSE)
+  error_log <- NULL
+
+  result <- check_weight_variable_quality(data, "Gender", error_log)
+  errors <- result[result$Severity == "Error", ]
+  expect_true(nrow(errors) > 0)
+  expect_true(any(grepl("Missing", errors$Issue, ignore.case = TRUE)))
+})
+
+
+# --- Check: Empty categories ---
+
+test_that("check_empty_categories detects all-NA variable", {
+  skip_if(!exists("check_empty_categories", mode = "function"),
+          "check_empty_categories not available")
+
+  data <- data.frame(AgeGroup = c(NA, NA, NA), stringsAsFactors = FALSE)
+  error_log <- NULL
+
+  result <- check_empty_categories(data, "AgeGroup", error_log)
+  errors <- result[result$Severity == "Error", ]
+  expect_true(nrow(errors) > 0)
+  expect_true(any(grepl("All-NA", errors$Issue, ignore.case = TRUE)))
+})
+
+
+# --- Check: Advanced settings vs specs ---
+
+test_that("check_advanced_settings_vs_specs detects orphan weight names", {
+  skip_if(!exists("check_advanced_settings_vs_specs", mode = "function"),
+          "check_advanced_settings_vs_specs not available")
+
+  advanced_df <- data.frame(
+    weight_name = c("w1", "w_orphan"),
+    max_iterations = c(100, 200),
+    stringsAsFactors = FALSE
+  )
+  specs_df <- data.frame(
+    weight_name = "w1",
+    method = "rim",
+    stringsAsFactors = FALSE
+  )
+  error_log <- NULL
+
+  result <- check_advanced_settings_vs_specs(advanced_df, specs_df, error_log)
+  warnings <- result[result$Severity == "Warning", ]
+  expect_true(nrow(warnings) > 0)
+  expect_true(any(grepl("w_orphan", warnings$Detail)))
+})
+
+
+# --- Check: Logo file exists ---
+
+test_that("check_logo_file_exists detects missing logo file", {
+  skip_if(!exists("check_logo_file_exists", mode = "function"),
+          "check_logo_file_exists not available")
+
+  config <- list(logo_file = "/nonexistent/path/logo.png")
+  error_log <- NULL
+
+  result <- check_logo_file_exists(config, error_log)
+  warnings <- result[result$Severity == "Warning", ]
+  expect_true(nrow(warnings) > 0)
+})
+
+test_that("check_logo_file_exists skips when no logo specified", {
+  skip_if(!exists("check_logo_file_exists", mode = "function"),
+          "check_logo_file_exists not available")
+
+  config <- list(logo_file = NULL)
+  error_log <- NULL
+
+  result <- check_logo_file_exists(config, error_log)
+  expect_true(is.null(result) || nrow(result) == 0)
+})
+
+
+# --- Check: Weight specs missing target sheet ---
+
+test_that("check_weight_specs_methods detects missing target sheet for design", {
+  skip_if(!exists("check_weight_specs_methods", mode = "function"),
+          "check_weight_specs_methods not available")
+
+  specs <- data.frame(
+    weight_name = "w1",
+    method = "design",
+    stringsAsFactors = FALSE
+  )
+  available_sheets <- c("General", "Weight_Specifications")
+  error_log <- NULL
+
+  result <- check_weight_specs_methods(specs, available_sheets, error_log)
+  errors <- result[result$Severity == "Error", ]
+  expect_true(nrow(errors) > 0)
+  expect_true(any(grepl("Design_Targets", errors$Detail)))
+})

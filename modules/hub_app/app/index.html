@@ -51,6 +51,17 @@
       </div>
     </div>
 
+    <!-- Folder filter bar -->
+    <div id="folder-filter-bar" class="folder-filter-bar" style="display:none;">
+      <span class="folder-filter-label">Folders:</span>
+      <button id="folder-filter-all" class="folder-chip folder-chip-active" onclick="ProjectBrowser.filterByFolder(null)">
+        All
+      </button>
+      <div id="folder-chips" class="folder-chips">
+        <!-- Populated by project_browser.js -->
+      </div>
+    </div>
+
     <div id="project-grid" class="project-grid">
       <!-- Populated by project_browser.js -->
     </div>

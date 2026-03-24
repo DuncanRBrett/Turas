@@ -766,7 +766,7 @@ build_catdriver_slides_examples <- function() {
     list(
       slide_order = 2,
       slide_title = "Methodology",
-      slide_content = "The analysis uses categorical key driver modelling with:\n\n- Ordinal logistic regression\n- SHAP-based importance decomposition\n- Bootstrap confidence intervals (n=500)",
+      slide_content = "The analysis uses categorical key driver modelling with:\n\n- Ordinal logistic regression\n- Type II Wald chi-square importance ranking\n- Bootstrap confidence intervals (n=500)",
       slide_image_path = "images/methodology_diagram.png"
     )
   )

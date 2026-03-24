@@ -14,7 +14,7 @@
 #' @param root_dirs Character vector of directories to scan
 #' @param max_depth Maximum subdirectory depth to search (default: 3)
 #' @return List with status and array of project objects
-scan_for_projects <- function(root_dirs, max_depth = 3) {
+scan_for_projects <- function(root_dirs, max_depth = 6) {
 
   if (length(root_dirs) == 0) {
     return(list(status = "PASS", result = list(projects = list())))
@@ -76,7 +76,7 @@ scan_for_projects <- function(root_dirs, max_depth = 3) {
 #' @param max_depth Maximum depth
 #' @return Character vector of directory paths
 #' @keywords internal
-find_project_dirs <- function(root, max_depth = 3) {
+find_project_dirs <- function(root, max_depth = 6) {
   candidates <- character(0)
 
   # Check root itself

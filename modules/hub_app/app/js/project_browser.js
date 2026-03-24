@@ -10,6 +10,8 @@ var ProjectBrowser = (function() {
   "use strict";
 
   var allProjects = [];
+  var scanDirs = [];          // Known scan directories (from R)
+  var activeFolder = null;    // null = "All", or a scan dir path to filter on
 
   // --- Module type mapping ---
   // Maps raw turas-report-type values to a display group.
@@ -70,14 +72,27 @@ var ProjectBrowser = (function() {
 
     grid.style.display = "";
     empty.style.display = "none";
-    if (count) count.textContent = allProjects.length + " project" +
-      (allProjects.length !== 1 ? "s" : "");
+
+    // Discover unique scan root folders from project paths
+    discoverScanDirs();
+    renderFolderChips();
+
+    // Apply active folder filter
+    var visibleProjects = getVisibleProjects();
+
+    if (count) count.textContent = visibleProjects.length + " project" +
+      (visibleProjects.length !== 1 ? "s" : "") +
+      (activeFolder ? " in folder" : "");
 
     var html = "";
-    for (var i = 0; i < allProjects.length; i++) {
-      html += buildTile(allProjects[i]);
+    for (var i = 0; i < visibleProjects.length; i++) {
+      html += buildTile(visibleProjects[i]);
     }
     grid.innerHTML = html;
+
+    if (visibleProjects.length === 0 && allProjects.length > 0) {
+      empty.style.display = "";
+    }
 
     // Bind click handlers
     var tiles = grid.querySelectorAll(".project-tile");
@@ -169,7 +184,10 @@ var ProjectBrowser = (function() {
       var r = reports[i];
       var label = (r && r.label) ? r.label : (r && r.filename ? r.filename : "");
       var type = (r && r.type) ? r.type : "";
-      html += '<div class="tile-report-item">' +
+      var filename = (r && r.filename) ? r.filename : "";
+      html += '<div class="tile-report-item tile-report-link" ' +
+        'data-report-filename="' + escapeAttr(filename) + '" ' +
+        'title="Open ' + escapeAttr(label) + '">' +
         '<span class="tile-report-dot tile-dot-' + escapeAttr(type) + '"></span>' +
         escapeHtml(label) +
       '</div>';
@@ -265,10 +283,37 @@ var ProjectBrowser = (function() {
 
   /**
    * Handle click on a project tile.
+   * If a specific report link was clicked, stores the target filename
+   * so ReportViewer can auto-activate that tab.
    */
-  function handleTileClick() {
+  function handleTileClick(e) {
     var path = this.getAttribute("data-path");
     if (!path) return;
+
+    // Check if a specific report was clicked
+    var reportLink = e.target.closest ? e.target.closest(".tile-report-link") : null;
+    if (!reportLink && e.target.classList && e.target.classList.contains("tile-report-link")) {
+      reportLink = e.target;
+    }
+    // Walk up for the dot child
+    if (!reportLink) {
+      var el = e.target;
+      while (el && el !== this) {
+        if (el.classList && el.classList.contains("tile-report-link")) {
+          reportLink = el;
+          break;
+        }
+        el = el.parentElement;
+      }
+    }
+
+    var targetReport = null;
+    if (reportLink) {
+      targetReport = reportLink.getAttribute("data-report-filename");
+    }
+
+    // Store the target report for ReportViewer to pick up
+    HubApp.state._pendingReportTarget = targetReport || null;
 
     var title = HubApp.dom.projectTitle;
     if (title) {
@@ -281,7 +326,9 @@ var ProjectBrowser = (function() {
     }
 
     HubApp.sendToShiny("hub_open_project", path);
-    HubApp.showToast("Opening project...");
+    HubApp.showToast(targetReport
+      ? "Opening report..."
+      : "Opening project...");
   }
 
   /**
@@ -335,8 +382,202 @@ var ProjectBrowser = (function() {
               .replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
+  // ===========================================================================
+  // Folder Discovery & Filtering
+  // ===========================================================================
+
+  /**
+   * Discover scan root directories from the projects' paths.
+   * Groups projects by their nearest scan root.
+   * Also accepts scan_dirs sent from R.
+   */
+  function discoverScanDirs() {
+    // Build unique parent-folder groups from project paths
+    var dirs = {};
+    for (var i = 0; i < allProjects.length; i++) {
+      var p = allProjects[i];
+      var path = p.path || "";
+      // Use display_path for grouping label, full path for matching
+      var parent = getParentPath(path);
+      if (parent && !dirs[parent]) {
+        dirs[parent] = {
+          path: parent,
+          label: abbreviatePath(parent),
+          count: 0
+        };
+      }
+      if (parent) dirs[parent].count++;
+    }
+    scanDirs = [];
+    for (var key in dirs) {
+      scanDirs.push(dirs[key]);
+    }
+    // Sort by count desc, then label
+    scanDirs.sort(function(a, b) {
+      return b.count - a.count || a.label.localeCompare(b.label);
+    });
+  }
+
+  /**
+   * Get the parent directory from a full path.
+   */
+  function getParentPath(path) {
+    if (!path) return "";
+    var parts = path.replace(/\\/g, "/").split("/");
+    parts.pop();
+    return parts.join("/");
+  }
+
+  /**
+   * Abbreviate a path for display.
+   * Shows the meaningful portion: strips common cloud storage prefixes,
+   * replaces HOME with ~, keeps enough context to distinguish folders.
+   */
+  function abbreviatePath(path) {
+    if (!path) return "";
+
+    var display = path.replace(/\\/g, "/");
+
+    // Try to derive from a project's display_path (R already does ~ substitution)
+    for (var i = 0; i < allProjects.length; i++) {
+      var dp = allProjects[i].display_path || "";
+      var projPath = (allProjects[i].path || "").replace(/\\/g, "/");
+      if (dp && projPath && projPath.indexOf(path) === 0) {
+        // display_path is for the project dir; we want its parent
+        var dpParts = dp.replace(/\\/g, "/").split("/");
+        dpParts.pop(); // remove project folder name
+        var parentDp = dpParts.join("/");
+        if (parentDp) return parentDp;
+      }
+    }
+
+    // Strip known cloud storage prefixes
+    var cloudPrefixes = [
+      /.*\/CloudStorage\/OneDrive[^/]*\//,
+      /.*\/CloudStorage\/Dropbox[^/]*\//,
+      /.*\/CloudStorage\/GoogleDrive[^/]*\//
+    ];
+    for (var c = 0; c < cloudPrefixes.length; c++) {
+      if (cloudPrefixes[c].test(display)) {
+        display = display.replace(cloudPrefixes[c], "OneDrive:/");
+        break;
+      }
+    }
+
+    // Replace HOME
+    // Detect home dir from any project's path vs display_path
+    for (var h = 0; h < allProjects.length; h++) {
+      var dp2 = (allProjects[h].display_path || "").replace(/\\/g, "/");
+      var fp2 = (allProjects[h].path || "").replace(/\\/g, "/");
+      if (dp2.indexOf("~/") === 0 && fp2.indexOf("/Users/") === 0) {
+        var homeDir = fp2.substring(0, fp2.length - dp2.length + 1);
+        if (homeDir && display.indexOf(homeDir) === 0) {
+          display = "~" + display.substring(homeDir.length - 1);
+          break;
+        }
+      }
+    }
+
+    return display;
+  }
+
+  /**
+   * Get projects visible after folder filter is applied.
+   */
+  function getVisibleProjects() {
+    if (!activeFolder) return allProjects;
+    return allProjects.filter(function(p) {
+      var parent = getParentPath(p.path || "");
+      return parent === activeFolder;
+    });
+  }
+
+  /**
+   * Render the folder filter chips.
+   */
+  function renderFolderChips() {
+    var bar = document.getElementById("folder-filter-bar");
+    var container = document.getElementById("folder-chips");
+    var allBtn = document.getElementById("folder-filter-all");
+
+    if (!bar || !container) return;
+
+    // Hide bar if only 1 folder
+    if (scanDirs.length <= 1) {
+      bar.style.display = "none";
+      return;
+    }
+    bar.style.display = "";
+
+    // "All" button active state
+    if (allBtn) {
+      allBtn.className = "folder-chip" + (activeFolder ? "" : " folder-chip-active");
+    }
+
+    var html = "";
+    for (var i = 0; i < scanDirs.length; i++) {
+      var dir = scanDirs[i];
+      var isActive = (activeFolder === dir.path);
+      html += '<div class="folder-chip-group">' +
+        '<button class="folder-chip' + (isActive ? ' folder-chip-active' : '') + '" ' +
+          'data-folder="' + escapeAttr(dir.path) + '" ' +
+          'onclick="ProjectBrowser.filterByFolder(\'' + escapeAttr(dir.path).replace(/'/g, "\\'") + '\')" ' +
+          'title="' + escapeAttr(dir.path) + '">' +
+          escapeHtml(dir.label) +
+          ' <span class="folder-chip-count">' + dir.count + '</span>' +
+        '</button>' +
+        '<button class="folder-chip-remove" ' +
+          'onclick="event.stopPropagation(); ProjectBrowser.removeFolder(\'' + escapeAttr(dir.path).replace(/'/g, "\\'") + '\')" ' +
+          'title="Remove this folder from scan">&times;</button>' +
+      '</div>';
+    }
+    container.innerHTML = html;
+  }
+
+  /**
+   * Filter projects by a specific folder path.
+   * @param {string|null} folderPath - Folder to filter to, or null for "All"
+   */
+  function filterByFolder(folderPath) {
+    activeFolder = folderPath || null;
+    render(allProjects);
+    // Also clear any text search
+    var searchInput = HubApp.dom.projectSearch;
+    if (searchInput) searchInput.value = "";
+  }
+
+  /**
+   * Remove a folder from the scan directories and rescan.
+   * @param {string} folderPath - Parent folder path to remove
+   */
+  function removeFolder(folderPath) {
+    if (!folderPath) return;
+    // Tell R to remove this directory and rescan
+    HubApp.sendToShiny("hub_remove_dir", folderPath);
+
+    // If we were filtering on this folder, reset to "All"
+    if (activeFolder === folderPath) {
+      activeFolder = null;
+    }
+  }
+
+  /**
+   * Update the known scan directories from R.
+   * Called when R sends the directory list.
+   */
+  function setScanDirs(dirs) {
+    if (Array.isArray(dirs)) {
+      scanDirs = dirs.map(function(d) {
+        return { path: d, label: d, count: 0 };
+      });
+    }
+  }
+
   return {
     render: render,
-    filter: filter
+    filter: filter,
+    filterByFolder: filterByFolder,
+    removeFolder: removeFolder,
+    setScanDirs: setScanDirs
   };
 })();

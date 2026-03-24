@@ -8,7 +8,7 @@ The Turas Categorical Key Driver (CatDriver) module performs categorical key dri
 -   **Ordinal** -- Ordered categories such as Low/Medium/High (clm from the ordinal package)
 -   **Multinomial** -- Unordered categories such as Brand A/B/C (multinom from nnet)
 
-Key capabilities include SHAP value computation, marginal effects analysis, driver importance ranking, subgroup comparison across grouping variables, and interactive HTML reports with comparison and unified tabbed views across multiple configurations. The module follows TRS v1.0 conventions throughout, with a split hard/soft guard system and structured refusal messages.
+Key capabilities include Type II Wald chi-square importance ranking, marginal effects analysis, odds ratio computation, subgroup comparison across grouping variables, and interactive HTML reports with comparison and unified tabbed views across multiple configurations. The module follows TRS v1.0 conventions throughout, with a split hard/soft guard system and structured refusal messages.
 
 ------------------------------------------------------------------------
 
@@ -47,7 +47,7 @@ Key capabilities include SHAP value computation, marginal effects analysis, driv
 | `04_analysis.R` | 378 | Dispatcher to ordinal/multinomial/binary model engines | 92/100 | Clean routing logic; delegates to 04a/04b or internal binary |
 | `04a_ordinal.R` | 537 | Ordinal logistic regression via clm (ordinal package) | 90/100 | Proportional odds model with diagnostics |
 | `04b_multinomial.R` | 247 | Multinomial logistic regression via multinom (nnet) | 90/100 | Compact; handles multi-category unordered outcomes |
-| `05_importance.R` | 681 | SHAP values, marginal effects, driver importance ranking | 88/100 | Core analytical output; ranks drivers by effect size |
+| `05_importance.R` | 681 | Type II Wald chi-square tests, driver importance ranking | 88/100 | Core analytical output; ranks drivers by effect size |
 | `06_output.R` | 577 | Main Excel workbook generation orchestrator | 87/100 | Coordinates sheet creation across 06a/06b/06c |
 | `06a_sheets_summary.R` | 413 | Executive summary and importance ranking sheets | 88/100 | Professional formatting with conditional styling |
 | `06b_sheets_detail.R` | 384 | Per-driver detail sheets and odds ratios | 85/100 | One sheet per driver with coefficient tables |
@@ -170,7 +170,7 @@ Key capabilities include SHAP value computation, marginal effects analysis, driv
                                     v
                          +---------------------+
                          |   05_importance.R   |
-                         |   SHAP / Marginal   |
+                         |  Chi-sq / Marginal  |
                          |   Effects (681L)    |
                          +----------+----------+
                                     |

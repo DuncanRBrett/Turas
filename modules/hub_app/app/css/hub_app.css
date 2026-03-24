@@ -167,6 +167,113 @@ body {
   align-content: start;
 }
 
+/* --- Folder Filter Bar --- */
+.folder-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 24px;
+  background: #fff;
+  border-bottom: 1px solid var(--ha-border);
+  flex-wrap: wrap;
+}
+
+.folder-filter-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ha-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.folder-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.folder-chip-group {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--ha-border);
+  background: #fff;
+  transition: border-color 0.15s;
+}
+
+.folder-chip-group:hover {
+  border-color: var(--ha-border-hover);
+}
+
+.folder-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ha-text-muted);
+  background: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.folder-chip:hover {
+  background: #f1f5f9;
+  color: var(--ha-text);
+}
+
+.folder-chip-active {
+  background: var(--ha-accent, #1a2744);
+  color: #fff !important;
+}
+
+.folder-chip-active:hover {
+  background: var(--ha-accent-light, #2a3f5f);
+}
+
+.folder-chip-count {
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(0, 0, 0, 0.1);
+  padding: 1px 5px;
+  border-radius: 8px;
+  min-width: 16px;
+  text-align: center;
+}
+
+.folder-chip-active .folder-chip-count {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.folder-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 100%;
+  border: none;
+  background: none;
+  color: var(--ha-text-faint);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+  border-left: 1px solid var(--ha-border);
+  transition: background 0.15s, color 0.15s;
+}
+
+.folder-chip-remove:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
 /* --- Project Tile --- */
 .project-tile {
   background: var(--ha-surface);
@@ -300,6 +407,19 @@ body {
 .tile-dot-keydriver  { background: #14b8a6; }
 .tile-dot-weighting  { background: #a855f7; }
 .tile-dot-hub        { background: var(--ha-text-faint); }
+
+.tile-report-link {
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 1px 4px;
+  margin: -1px -4px;
+  transition: background 0.1s, color 0.1s;
+}
+
+.tile-report-link:hover {
+  background: #eff6ff;
+  color: #2563eb;
+}
 
 .tile-report-more {
   font-size: 11px;

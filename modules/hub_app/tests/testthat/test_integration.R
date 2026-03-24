@@ -127,8 +127,8 @@ test_that("scanner handles deeply nested project structure", {
   deep_path <- file.path(root, "level1", "level2", "level3")
   create_mock_project(file.path(root, "level1", "level2"), "level3", "tabs")
 
-  # max_depth = 3 should find it
-  result <- scan_for_projects(root, max_depth = 3)
+  # max_depth = 6 (default) should find it
+  result <- scan_for_projects(root, max_depth = 6)
   expect_equal(result$status, "PASS")
   expect_equal(length(result$result$projects), 1)
 

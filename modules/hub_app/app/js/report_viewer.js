@@ -96,8 +96,21 @@ var ReportViewer = (function() {
       };
     }
 
-    // Activate the first report
-    activateReport(reportKey(reports[0]));
+    // Check if a specific report was requested (from clicking a report name on a card)
+    var targetKey = null;
+    if (HubApp.state._pendingReportTarget) {
+      var targetFilename = HubApp.state._pendingReportTarget;
+      HubApp.state._pendingReportTarget = null;
+      for (var t = 0; t < reports.length; t++) {
+        if (reports[t].filename === targetFilename) {
+          targetKey = reportKey(reports[t]);
+          break;
+        }
+      }
+    }
+
+    // Activate the target report, or the first one
+    activateReport(targetKey || reportKey(reports[0]));
   }
 
   /**

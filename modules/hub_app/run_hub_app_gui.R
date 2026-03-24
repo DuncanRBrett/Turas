@@ -225,7 +225,7 @@ run_hub_app_gui <- function(project_dirs = NULL) {
         paste("Scanning:", paste(rv$scan_dirs, collapse = ", ")))
 
       # Trigger rescan with new directories
-      result <- scan_for_projects(rv$scan_dirs, max_depth = 3)
+      result <- scan_for_projects(rv$scan_dirs, max_depth = 6)
 
       if (result$status %in% c("PASS", "PARTIAL")) {
         rv$projects <- result$result$projects
@@ -241,10 +241,67 @@ run_hub_app_gui <- function(project_dirs = NULL) {
       }
     })
 
+    # --- Handle remove directory ---
+    observeEvent(input$hub_remove_dir, {
+      dir_to_remove <- input$hub_remove_dir
+      if (is.null(dir_to_remove) || !nzchar(dir_to_remove)) return()
+
+      cat("[Hub App] Removing directory:", dir_to_remove, "\n")
+
+      # Find which scan_dir is the parent (or matches)
+      current <- rv$scan_dirs
+      # Remove any dir that matches or is a parent of the removed path
+      new_dirs <- current[!sapply(current, function(d) {
+        norm_d <- normalizePath(d, winslash = "/", mustWork = FALSE)
+        norm_r <- normalizePath(dir_to_remove, winslash = "/", mustWork = FALSE)
+        # Remove if the scan dir IS the folder, or the folder starts with scan dir
+        norm_d == norm_r || startsWith(norm_r, paste0(norm_d, "/"))
+      })]
+
+      if (length(new_dirs) == length(current)) {
+        # No scan dir matched — the removed folder is a subfolder.
+        # We can't easily exclude subfolders from a parent scan.
+        # Instead, just rescan (the folder may have been moved/deleted).
+        cat("[Hub App] Folder not in scan roots, rescanning...\n")
+      } else {
+        rv$scan_dirs <- new_dirs
+        cat("[Hub App] Scan directories now:", paste(new_dirs, collapse = ", "), "\n")
+      }
+
+      # Update display
+      if (length(rv$scan_dirs) > 0) {
+        shinyjs::html("hub-dir-display",
+          paste("Scanning:", paste(rv$scan_dirs, collapse = ", ")))
+      } else {
+        shinyjs::html("hub-dir-display",
+          "No directories configured. Click 'Add Folder' to choose.")
+      }
+
+      # Rescan
+      if (length(rv$scan_dirs) > 0) {
+        result <- scan_for_projects(rv$scan_dirs, max_depth = 6)
+        if (result$status %in% c("PASS", "PARTIAL")) {
+          rv$projects <- result$result$projects
+          project_json <- jsonlite::toJSON(
+            result$result$projects,
+            auto_unbox = TRUE,
+            pretty = FALSE
+          )
+          session$sendCustomMessage("hub_projects", project_json)
+          cat("[Hub App]", result$message, "\n")
+        } else {
+          session$sendCustomMessage("hub_projects", "[]")
+        }
+      } else {
+        rv$projects <- list()
+        session$sendCustomMessage("hub_projects", "[]")
+      }
+    })
+
     # --- Initial project scan ---
     observe({
       cat("[Hub App] Scanning for projects...\n")
-      result <- scan_for_projects(rv$scan_dirs, max_depth = 3)
+      result <- scan_for_projects(rv$scan_dirs, max_depth = 6)
 
       if (result$status %in% c("PASS", "PARTIAL")) {
         rv$projects <- result$result$projects
@@ -323,7 +380,7 @@ run_hub_app_gui <- function(project_dirs = NULL) {
     # --- Handle rescan request from frontend ---
     observeEvent(input$hub_rescan, {
       cat("[Hub App] Rescanning projects...\n")
-      result <- scan_for_projects(rv$scan_dirs, max_depth = 3)
+      result <- scan_for_projects(rv$scan_dirs, max_depth = 6)
 
       if (result$status %in% c("PASS", "PARTIAL")) {
         rv$projects <- result$result$projects
@@ -459,7 +516,7 @@ run_hub_app_gui <- function(project_dirs = NULL) {
               rv$scan_dirs <- valid_dirs
               shinyjs::html("hub-dir-display",
                 paste("Scanning:", paste(rv$scan_dirs, collapse = ", ")))
-              scan_result <- scan_for_projects(rv$scan_dirs, max_depth = 3)
+              scan_result <- scan_for_projects(rv$scan_dirs, max_depth = 6)
               if (scan_result$status %in% c("PASS", "PARTIAL")) {
                 rv$projects <- scan_result$result$projects
                 project_json <- jsonlite::toJSON(

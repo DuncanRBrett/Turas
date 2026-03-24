@@ -1217,8 +1217,6 @@ generate_catdriver_stats_pack <- function(config, survey_data, result,
     nominal     = "Multinomial logistic regression (nnet::multinom())",
     "Logistic/multinomial regression"
   )
-  shap_enabled <- isTRUE(config$shap_enabled)
-
   # TRS execution summary
   n_events   <- length(run_result$events %||% list())
   n_refusals <- sum(vapply(run_result$events %||% list(),
@@ -1240,7 +1238,7 @@ generate_catdriver_stats_pack <- function(config, survey_data, result,
     "Outcome Variable"   = config$outcome_label %||% config$outcome_var %||% "—",
     "Drivers tested"     = as.character(n_drivers),
     "Model Type"         = model_type_label,
-    "SHAP Values"        = if (shap_enabled) "shapr package" else "Not used",
+    "Importance Method"  = "Type II Wald chi-square (car::Anova)",
     "Subgroup Analysis"  = if (n_subgroups > 0) sprintf("%d subgroups", n_subgroups) else "None",
     "TRS Status"         = run_result$status %||% "PASS",
     "TRS Events"         = trs_summary
