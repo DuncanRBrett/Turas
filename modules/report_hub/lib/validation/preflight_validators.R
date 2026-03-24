@@ -1,12 +1,12 @@
 # ==============================================================================
 # REPORT HUB - PREFLIGHT VALIDATORS
 # ==============================================================================
-# Cross-referential validation between config and actual report files.
+# Content-level validation between config and actual report files.
 # Catches configuration mistakes before the combine_reports() pipeline runs.
 #
 # These validators go BEYOND the guard layer (00_guard.R) which checks
 # structural validity. Preflight checks verify the actual content of
-# report files and cross-reference mappings.
+# report files and runtime configuration.
 #
 # VERSION: 1.0
 # DATE: 2026-03-08
@@ -22,9 +22,6 @@
 # - check_duplicate_report_keys()     - No duplicate keys
 # - check_duplicate_report_paths()    - No duplicate file paths
 # - check_report_order_gaps()         - Order values are sequential
-# - check_crossref_codes_in_tracker() - CrossRef tracker codes exist in report
-# - check_crossref_codes_in_tabs()    - CrossRef tabs codes exist in report
-# - check_crossref_completeness()     - CrossRef covers key questions
 # - check_report_compatibility()      - Reports use compatible Turas versions
 # - check_logo_file_valid()           - Logo file is a valid image
 # - check_colour_codes_valid()        - Brand/accent colours are valid hex
@@ -147,7 +144,10 @@ check_report_type_detection <- function(reports_df, error_log) {
 
     # Skip if type is explicitly set in config
     if (!is.na(explicit_type) && nzchar(trimws(explicit_type))) {
-      valid_types <- c("tracker", "tabs")
+      valid_types <- c("tracker", "tabs", "crosstabs", "maxdiff", "conjoint",
+                       "pricing", "segment", "segmentation", "catdriver",
+                       "categorical driver", "keydriver", "key driver",
+                       "confidence", "weighting")
       if (!tolower(trimws(explicit_type)) %in% valid_types) {
         error_log <- .hub_log_issue(
           error_log, "Preflight", "Invalid Report Type",
@@ -174,7 +174,7 @@ check_report_type_detection <- function(reports_df, error_log) {
     if (!has_meta && !has_tracker_marker && !has_tabs_marker) {
       error_log <- .hub_log_issue(
         error_log, "Preflight", "Cannot Auto-Detect Report Type",
-        sprintf("Report '%s' has no report_type set and no auto-detection markers found. Set report_type column to 'tracker' or 'tabs'.",
+        sprintf("Report '%s' has no report_type set and no auto-detection markers found. Set the report_type column in config.",
                 label),
         label, "Warning"
       )
@@ -348,206 +348,7 @@ check_report_order_gaps <- function(reports_df, error_log) {
 
 
 # ==============================================================================
-# CHECK 7: CrossRef tracker codes in report
-# ==============================================================================
-
-#' Check CrossRef Tracker Codes Exist in Report
-#'
-#' If CrossRef sheet is present, verifies tracker_code values appear as
-#' question codes in the tracker HTML report.
-#'
-#' @param crossref_df Data frame from CrossRef sheet (or NULL)
-#' @param reports_df Data frame from Reports sheet
-#' @param error_log Data frame, error log
-#' @return Updated error_log
-#' @keywords internal
-check_crossref_codes_in_tracker <- function(crossref_df, reports_df, error_log) {
-
-  if (is.null(crossref_df) || nrow(crossref_df) == 0) return(error_log)
-
-  # Find tracker report
-  tracker_idx <- which(
-    (!is.na(reports_df$report_type) & tolower(reports_df$report_type) == "tracker") |
-    (!is.na(reports_df$report_key) & tolower(reports_df$report_key) == "tracker")
-  )
-
-  if (length(tracker_idx) == 0) {
-    error_log <- .hub_log_issue(
-      error_log, "Preflight", "CrossRef Without Tracker",
-      "CrossRef sheet has entries but no tracker-type report found in Reports sheet.",
-      "", "Warning"
-    )
-    return(error_log)
-  }
-
-  tracker_path <- reports_df$resolved_path[tracker_idx[1]]
-  if (!file.exists(tracker_path)) return(error_log)
-
-  # Read tracker HTML and extract question codes
-  tracker_html <- tryCatch(
-    paste(readLines(tracker_path, warn = FALSE), collapse = "\n"),
-    error = function(e) ""
-  )
-
-  # Look for question codes in data attributes or panel IDs
-  tracker_codes <- character(0)
-  code_matches <- gregexpr('data-question-code="([^"]+)"', tracker_html, perl = TRUE)
-  if (code_matches[[1]][1] > 0) {
-    tracker_codes <- regmatches(tracker_html, code_matches)[[1]]
-    tracker_codes <- gsub('data-question-code="([^"]+)"', "\\1", tracker_codes, perl = TRUE)
-  }
-
-  # Also check panel IDs
-  panel_matches <- gregexpr('id="panel-([^"]+)"', tracker_html, perl = TRUE)
-  if (panel_matches[[1]][1] > 0) {
-    panel_ids <- regmatches(tracker_html, panel_matches)[[1]]
-    panel_ids <- gsub('id="panel-([^"]+)"', "\\1", panel_ids, perl = TRUE)
-    tracker_codes <- unique(c(tracker_codes, panel_ids))
-  }
-
-  if (length(tracker_codes) == 0) {
-    error_log <- .hub_log_issue(
-      error_log, "Preflight", "Cannot Extract Tracker Codes",
-      "Could not extract question codes from tracker report. CrossRef validation skipped.",
-      tracker_path, "Info"
-    )
-    return(error_log)
-  }
-
-  # Check each CrossRef tracker_code
-  missing <- setdiff(crossref_df$tracker_code, tracker_codes)
-  if (length(missing) > 0) {
-    error_log <- .hub_log_issue(
-      error_log, "Preflight", "CrossRef Tracker Code Not Found",
-      sprintf("%d CrossRef tracker_code(s) not found in tracker report: %s",
-              length(missing), paste(missing, collapse = ", ")),
-      paste(missing, collapse = ", "), "Warning"
-    )
-  }
-
-  error_log
-}
-
-
-# ==============================================================================
-# CHECK 8: CrossRef tabs codes in report
-# ==============================================================================
-
-#' Check CrossRef Tabs Codes Exist in Report
-#'
-#' @param crossref_df Data frame from CrossRef sheet (or NULL)
-#' @param reports_df Data frame from Reports sheet
-#' @param error_log Data frame, error log
-#' @return Updated error_log
-#' @keywords internal
-check_crossref_codes_in_tabs <- function(crossref_df, reports_df, error_log) {
-
-  if (is.null(crossref_df) || nrow(crossref_df) == 0) return(error_log)
-
-  # Find tabs report
-  tabs_idx <- which(
-    (!is.na(reports_df$report_type) & tolower(reports_df$report_type) == "tabs") |
-    (!is.na(reports_df$report_key) & tolower(reports_df$report_key) == "tabs")
-  )
-
-  if (length(tabs_idx) == 0) {
-    error_log <- .hub_log_issue(
-      error_log, "Preflight", "CrossRef Without Tabs Report",
-      "CrossRef sheet has entries but no tabs-type report found in Reports sheet.",
-      "", "Warning"
-    )
-    return(error_log)
-  }
-
-  tabs_path <- reports_df$resolved_path[tabs_idx[1]]
-  if (!file.exists(tabs_path)) return(error_log)
-
-  # Read tabs HTML and extract question codes
-  tabs_html <- tryCatch(
-    paste(readLines(tabs_path, warn = FALSE), collapse = "\n"),
-    error = function(e) ""
-  )
-
-  tabs_codes <- character(0)
-  code_matches <- gregexpr('data-question-code="([^"]+)"', tabs_html, perl = TRUE)
-  if (code_matches[[1]][1] > 0) {
-    tabs_codes <- regmatches(tabs_html, code_matches)[[1]]
-    tabs_codes <- gsub('data-question-code="([^"]+)"', "\\1", tabs_codes, perl = TRUE)
-  }
-
-  panel_matches <- gregexpr('id="panel-([^"]+)"', tabs_html, perl = TRUE)
-  if (panel_matches[[1]][1] > 0) {
-    panel_ids <- regmatches(tabs_html, panel_matches)[[1]]
-    panel_ids <- gsub('id="panel-([^"]+)"', "\\1", panel_ids, perl = TRUE)
-    tabs_codes <- unique(c(tabs_codes, panel_ids))
-  }
-
-  if (length(tabs_codes) == 0) {
-    error_log <- .hub_log_issue(
-      error_log, "Preflight", "Cannot Extract Tabs Codes",
-      "Could not extract question codes from tabs report. CrossRef validation skipped.",
-      tabs_path, "Info"
-    )
-    return(error_log)
-  }
-
-  missing <- setdiff(crossref_df$tabs_code, tabs_codes)
-  if (length(missing) > 0) {
-    error_log <- .hub_log_issue(
-      error_log, "Preflight", "CrossRef Tabs Code Not Found",
-      sprintf("%d CrossRef tabs_code(s) not found in tabs report: %s",
-              length(missing), paste(missing, collapse = ", ")),
-      paste(missing, collapse = ", "), "Warning"
-    )
-  }
-
-  error_log
-}
-
-
-# ==============================================================================
-# CHECK 9: CrossRef completeness
-# ==============================================================================
-
-#' Check CrossRef Mapping Completeness
-#'
-#' If both tracker and tabs reports exist and CrossRef sheet is provided,
-#' check whether there are unmapped questions that could benefit from
-#' cross-referencing.
-#'
-#' @param crossref_df Data frame from CrossRef sheet (or NULL)
-#' @param reports_df Data frame from Reports sheet
-#' @param error_log Data frame, error log
-#' @return Updated error_log
-#' @keywords internal
-check_crossref_completeness <- function(crossref_df, reports_df, error_log) {
-
-  # Only relevant when both tracker and tabs reports exist
-  has_tracker <- any(
-    (!is.na(reports_df$report_type) & tolower(reports_df$report_type) == "tracker") |
-    (!is.na(reports_df$report_key) & tolower(reports_df$report_key) == "tracker")
-  )
-  has_tabs <- any(
-    (!is.na(reports_df$report_type) & tolower(reports_df$report_type) == "tabs") |
-    (!is.na(reports_df$report_key) & tolower(reports_df$report_key) == "tabs")
-  )
-
-  if (!has_tracker || !has_tabs) return(error_log)
-
-  if (is.null(crossref_df) || nrow(crossref_df) == 0) {
-    error_log <- .hub_log_issue(
-      error_log, "Preflight", "No CrossRef Mappings",
-      "Both tracker and tabs reports are included but no CrossRef mappings defined. Consider adding cross-reference mappings to enable linked navigation between reports.",
-      "", "Info"
-    )
-  }
-
-  error_log
-}
-
-
-# ==============================================================================
-# CHECK 10: Report compatibility (Turas version)
+# CHECK 7: Report compatibility (Turas version)
 # ==============================================================================
 
 #' Check Report Compatibility
@@ -605,7 +406,7 @@ check_report_compatibility <- function(reports_df, error_log) {
 
 
 # ==============================================================================
-# CHECK 11: Logo file valid
+# CHECK 8: Logo file valid
 # ==============================================================================
 
 #' Check Logo File Is Valid Image
@@ -663,7 +464,7 @@ check_logo_file_valid <- function(settings, config_dir, error_log) {
 
 
 # ==============================================================================
-# CHECK 12: Colour codes valid
+# CHECK 9: Colour codes valid
 # ==============================================================================
 
 #' Check Brand and Accent Colour Codes
@@ -696,7 +497,7 @@ check_colour_codes_valid <- function(settings, error_log) {
 
 
 # ==============================================================================
-# CHECK 13: Output directory writable
+# CHECK 10: Output directory writable
 # ==============================================================================
 
 #' Check Output Directory Is Writable
@@ -756,7 +557,7 @@ check_output_dir_writable <- function(settings, config_dir, error_log) {
 
 
 # ==============================================================================
-# CHECK 14: Report file sizes
+# CHECK 11: Report file sizes
 # ==============================================================================
 
 #' Check Report File Sizes
@@ -849,65 +650,50 @@ validate_report_hub_preflight <- function(config, config_file, error_log = NULL)
     )
   }))
 
-  # Build crossref_df
-  crossref_df <- config$cross_refs
-
   cat("Running preflight checks...\n")
 
   # --- Check 1: Report files readable ---
-  cat("  [1/14] Checking report files are readable...\n")
+  cat("  [1/11] Checking report files are readable...\n")
   error_log <- check_report_files_readable(reports_df, error_log)
 
   # --- Check 2: Report type detection ---
-  cat("  [2/14] Checking report type detection...\n")
+  cat("  [2/11] Checking report type detection...\n")
   error_log <- check_report_type_detection(reports_df, error_log)
 
   # --- Check 3: Report key format ---
-  cat("  [3/14] Checking report key format...\n")
+  cat("  [3/11] Checking report key format...\n")
   error_log <- check_report_key_format(reports_df, error_log)
 
   # --- Check 4: Duplicate report keys ---
-  cat("  [4/14] Checking for duplicate report keys...\n")
+  cat("  [4/11] Checking for duplicate report keys...\n")
   error_log <- check_duplicate_report_keys(reports_df, error_log)
 
   # --- Check 5: Duplicate report paths ---
-  cat("  [5/14] Checking for duplicate report paths...\n")
+  cat("  [5/11] Checking for duplicate report paths...\n")
   error_log <- check_duplicate_report_paths(reports_df, error_log)
 
   # --- Check 6: Report order gaps ---
-  cat("  [6/14] Checking report order values...\n")
+  cat("  [6/11] Checking report order values...\n")
   error_log <- check_report_order_gaps(reports_df, error_log)
 
-  # --- Check 7: CrossRef tracker codes ---
-  cat("  [7/14] Checking CrossRef tracker codes...\n")
-  error_log <- check_crossref_codes_in_tracker(crossref_df, reports_df, error_log)
-
-  # --- Check 8: CrossRef tabs codes ---
-  cat("  [8/14] Checking CrossRef tabs codes...\n")
-  error_log <- check_crossref_codes_in_tabs(crossref_df, reports_df, error_log)
-
-  # --- Check 9: CrossRef completeness ---
-  cat("  [9/14] Checking CrossRef completeness...\n")
-  error_log <- check_crossref_completeness(crossref_df, reports_df, error_log)
-
-  # --- Check 10: Report compatibility ---
-  cat("  [10/14] Checking report compatibility...\n")
+  # --- Check 7: Report compatibility ---
+  cat("  [7/11] Checking report compatibility...\n")
   error_log <- check_report_compatibility(reports_df, error_log)
 
-  # --- Check 11: Logo file valid ---
-  cat("  [11/14] Checking logo file...\n")
+  # --- Check 8: Logo file valid ---
+  cat("  [8/11] Checking logo file...\n")
   error_log <- check_logo_file_valid(settings, config_dir, error_log)
 
-  # --- Check 12: Colour codes ---
-  cat("  [12/14] Checking colour codes...\n")
+  # --- Check 9: Colour codes ---
+  cat("  [9/11] Checking colour codes...\n")
   error_log <- check_colour_codes_valid(settings, error_log)
 
-  # --- Check 13: Output directory writable ---
-  cat("  [13/14] Checking output directory...\n")
+  # --- Check 10: Output directory writable ---
+  cat("  [10/11] Checking output directory...\n")
   error_log <- check_output_dir_writable(settings, config_dir, error_log)
 
-  # --- Check 14: Report file sizes ---
-  cat("  [14/14] Checking report file sizes...\n")
+  # --- Check 11: Report file sizes ---
+  cat("  [11/11] Checking report file sizes...\n")
   error_log <- check_report_file_sizes(reports_df, error_log)
 
   # --- Summary ---

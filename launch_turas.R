@@ -75,15 +75,14 @@ launch_turas <- function() {
          description = "Sample and rim weighting with iterative proportional fitting",
          category = "setup",
          script = "modules/weighting/run_weighting_gui.R",
-         recent_file = file.path(path.expand("~"), ".turas_weighting_recent_folders.rds"),
-         recent_key = NULL,
-         recent_absolute = TRUE),
+         recent_file = ".turas_weighting_recent_folders.rds",
+         recent_key = NULL),
 
     list(id = "tabs", name = "Tabs",
          description = "Cross-tabulation reports with banner breakouts and statistical tests",
          category = "tables",
          script = "modules/tabs/run_tabs_gui.R",
-         recent_file = ".recent_projects.rds",
+         recent_file = ".recent_tabs_projects.rds",
          recent_key = NULL),
 
     list(id = "tracker", name = "Tracker",

@@ -14,6 +14,7 @@ source(file.path(hub_dir, "03_front_page_builder.R"))
 source(file.path(hub_dir, "04_navigation_builder.R"))
 source(file.path(hub_dir, "07_page_assembler.R"))
 source(file.path(hub_dir, "08_html_writer.R"))
+source(file.path(hub_dir, "lib", "validation", "preflight_validators.R"))
 
 #' Combine Multiple Turas HTML Reports
 #'
@@ -25,7 +26,6 @@ source(file.path(hub_dir, "08_html_writer.R"))
 #'   containing Settings and Reports sheets.
 #' @param output_file Path for the combined HTML output.
 #'   If NULL, auto-generated from project title + date.
-#' @param auto_cross_ref Reserved for future use. Default FALSE.
 #'
 #' @return TRS-compliant list with:
 #'   \item{status}{"PASS", "PARTIAL", or "REFUSED"}
@@ -47,7 +47,7 @@ source(file.path(hub_dir, "08_html_writer.R"))
 HUB_MAX_SOURCE_SIZE_BYTES <- 50 * 1024 * 1024  # 50 MB — warn above this
 
 #' @export
-combine_reports <- function(config_file, output_file = NULL, auto_cross_ref = FALSE) {
+combine_reports <- function(config_file, output_file = NULL) {
 
   cat("\n=== Turas Report Hub ===\n")
   cat("Config:", config_file, "\n")
@@ -69,6 +69,41 @@ combine_reports <- function(config_file, output_file = NULL, auto_cross_ref = FA
   warnings <- guard_result$warnings %||% character(0)
 
   cat(sprintf("  Found %d reports to combine\n", length(config$reports)))
+
+  # --- Step 1b: Preflight validation (cross-referential checks) ---
+  cat("Step 1b: Running preflight checks...\n")
+  preflight_log <- validate_report_hub_preflight(config, config_file)
+
+  if (nrow(preflight_log) > 0) {
+    n_errors <- sum(preflight_log$Severity == "Error")
+    n_warnings <- sum(preflight_log$Severity == "Warning")
+
+    if (n_errors > 0) {
+      error_details <- preflight_log[preflight_log$Severity == "Error", ]
+      error_msg <- paste(
+        sprintf("[%s] %s", error_details$Issue, error_details$Detail),
+        collapse = "; "
+      )
+      cat("\n=== TURAS ERROR ===\n")
+      cat("Code: PREFLIGHT_FAILED\n")
+      cat("Message:", error_msg, "\n")
+      cat("Fix: Resolve the preflight errors listed above and re-run.\n")
+      cat("==================\n\n")
+      return(list(
+        status = "REFUSED",
+        code = "PREFLIGHT_FAILED",
+        message = sprintf("Preflight validation failed with %d error(s): %s", n_errors, error_msg),
+        how_to_fix = "Resolve the preflight errors listed in the console output and re-run."
+      ))
+    }
+
+    if (n_warnings > 0) {
+      warning_details <- preflight_log[preflight_log$Severity == "Warning", ]
+      for (i in seq_len(nrow(warning_details))) {
+        warnings <- c(warnings, sprintf("Preflight: %s", warning_details$Detail[i]))
+      }
+    }
+  }
 
   # --- Step 2: Generate output file path if not provided ---
   if (is.null(output_file)) {

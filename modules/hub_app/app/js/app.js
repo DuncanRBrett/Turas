@@ -41,9 +41,14 @@ var HubApp = (function() {
     dom.reportContainer = document.getElementById("report-container");
     dom.reportLoading = document.getElementById("report-loading");
     dom.btnBack = document.getElementById("btn-back");
+    dom.btnSearch = document.getElementById("btn-search");
+    dom.btnPreferences = document.getElementById("btn-preferences");
     dom.btnRescan = document.getElementById("btn-rescan");
     dom.btnTogglePins = document.getElementById("btn-toggle-pins");
     dom.btnAddSection = document.getElementById("btn-add-section");
+    dom.btnToggleAnnotations = document.getElementById("btn-toggle-annotations");
+    dom.btnGenerateHub = document.getElementById("btn-generate-hub");
+    dom.btnExportPdf = document.getElementById("btn-export-pdf");
     dom.btnExportPptx = document.getElementById("btn-export-pptx");
     dom.btnExportPngs = document.getElementById("btn-export-pngs");
     dom.pinBoardPanel = document.getElementById("pin-board-panel");
@@ -52,6 +57,12 @@ var HubApp = (function() {
 
     // Initialise persistence layer
     HubState.init();
+
+    // Initialise annotations
+    Annotations.init();
+
+    // Initialise search
+    Search.init();
 
     // Register state change listener — when sidecar data arrives, hydrate PinBoard
     HubState.onChange(function(eventType, items) {
@@ -88,6 +99,26 @@ var HubApp = (function() {
       if (projects) {
         state.projects = projects;
         ProjectBrowser.render(projects);
+
+        // Auto-open last project if we're on the projects view and haven't opened anything yet
+        if (state.activeView === "projects" && !state.activeProject && !state._autoOpenAttempted) {
+          state._autoOpenAttempted = true;
+          HubState.getLastProject(function(lastProject) {
+            if (!lastProject || !lastProject.path) return;
+            // Verify the last project is still in the scanned list
+            var found = false;
+            for (var i = 0; i < projects.length; i++) {
+              if (projects[i].path === lastProject.path) {
+                found = true;
+                break;
+              }
+            }
+            if (found && state.activeView === "projects") {
+              console.log("[Hub App] Auto-opening last project:", lastProject.name);
+              sendToShiny("hub_open_project", lastProject.path);
+            }
+          });
+        }
       }
     });
 
@@ -102,8 +133,14 @@ var HubApp = (function() {
         showView("reports");
         ReportViewer.render(data);
 
+        // Save as last-opened project
+        HubState.saveLastProject(data.project_path, data.project_name);
+
         // Load pins for this project from sidecar
         HubState.loadForProject(data.project_path);
+
+        // Load annotations for this project
+        sendToShiny("hub_load_annotations", data.project_path);
       }
     });
 
@@ -125,6 +162,11 @@ var HubApp = (function() {
       ExportManager.handlePngZipComplete(data);
     });
 
+    shiny.addCustomMessageHandler("hub_generate_complete", function(jsonStr) {
+      var data = parseJSON(jsonStr);
+      ExportManager.handleHubGenerateComplete(data);
+    });
+
     shiny.addCustomMessageHandler("hub_pins_loaded", function(jsonStr) {
       if (jsonStr && jsonStr !== "null") {
         var data = parseJSON(jsonStr);
@@ -133,6 +175,34 @@ var HubApp = (function() {
           HubState.handleSidecarLoaded(data);
         }
       }
+    });
+
+    shiny.addCustomMessageHandler("hub_annotations_loaded", function(jsonStr) {
+      if (jsonStr && jsonStr !== "null") {
+        var data = parseJSON(jsonStr);
+        if (data) {
+          console.log("[Hub App] Loaded annotations from sidecar");
+          Annotations.load(data);
+        }
+      } else {
+        Annotations.load(null);
+      }
+    });
+
+    shiny.addCustomMessageHandler("hub_save_annotations_confirm", function(msg) {
+      // Silent confirmation — no toast for auto-save
+    });
+
+    shiny.addCustomMessageHandler("hub_preferences_loaded", function(jsonStr) {
+      var data = parseJSON(jsonStr);
+      if (data) {
+        Preferences.load(data);
+      }
+    });
+
+    shiny.addCustomMessageHandler("hub_search_results", function(jsonStr) {
+      var data = parseJSON(jsonStr);
+      Search.handleResults(data);
     });
   }
 
@@ -187,6 +257,20 @@ var HubApp = (function() {
       });
     }
 
+    // Search button
+    if (dom.btnSearch) {
+      dom.btnSearch.addEventListener("click", function() {
+        Search.show();
+      });
+    }
+
+    // Preferences button
+    if (dom.btnPreferences) {
+      dom.btnPreferences.addEventListener("click", function() {
+        Preferences.show();
+      });
+    }
+
     // Rescan button
     if (dom.btnRescan) {
       dom.btnRescan.addEventListener("click", function() {
@@ -215,6 +299,28 @@ var HubApp = (function() {
     if (dom.btnAddSection) {
       dom.btnAddSection.addEventListener("click", function() {
         PinBoard.addSection();
+      });
+    }
+
+    // Annotations toggle
+    if (dom.btnToggleAnnotations) {
+      dom.btnToggleAnnotations.addEventListener("click", function() {
+        Annotations.toggle();
+        this.classList.toggle("active");
+      });
+    }
+
+    // Generate Hub
+    if (dom.btnGenerateHub) {
+      dom.btnGenerateHub.addEventListener("click", function() {
+        ExportManager.generateHub();
+      });
+    }
+
+    // Export PDF
+    if (dom.btnExportPdf) {
+      dom.btnExportPdf.addEventListener("click", function() {
+        ExportManager.exportPdf();
       });
     }
 
@@ -255,6 +361,8 @@ var HubApp = (function() {
       if (dom.reportsLayout) dom.reportsLayout.classList.remove("pin-board-open");
       if (dom.btnTogglePins) dom.btnTogglePins.classList.remove("active");
       if (dom.btnAddSection) dom.btnAddSection.style.display = "none";
+      if (dom.btnToggleAnnotations) dom.btnToggleAnnotations.classList.remove("active");
+      Annotations.clear();
       HubState.clearProject();
     }
   }

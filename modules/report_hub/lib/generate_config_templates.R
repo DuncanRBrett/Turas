@@ -25,7 +25,7 @@
 #' Creates a polished Excel config workbook with:
 #' - Settings sheet with key-value pairs, dropdowns, and help text
 #' - Reports sheet for listing HTML reports to combine
-#' - CrossRef sheet for tracker-to-tabs question mapping
+#' - Slides sheet for qualitative insight slides (optional)
 #'
 #' @param output_path Path for the output Excel file
 #' @return Invisible TRUE on success
@@ -237,65 +237,7 @@ generate_report_hub_config_template <- function(output_path) {
   cat("  Reports sheet created\n")
 
   # ============================================================================
-  # SHEET 3: CrossRef (table format, optional)
-  # ============================================================================
-
-  crossref_columns <- list(
-    list(
-      name = "tracker_code",
-      width = 30,
-      required = TRUE,
-      description = "Question code in the tracker report (must match tracker's QuestionCode)",
-      dropdown = NULL,
-      numeric_range = NULL,
-      integer_range = NULL
-    ),
-    list(
-      name = "tabs_code",
-      width = 30,
-      required = TRUE,
-      description = "Corresponding question code in the tabs/crosstabs report",
-      dropdown = NULL,
-      numeric_range = NULL,
-      integer_range = NULL
-    ),
-    list(
-      name = "notes",
-      width = 45,
-      required = FALSE,
-      description = "Optional notes about the mapping (for documentation only)",
-      dropdown = NULL,
-      numeric_range = NULL,
-      integer_range = NULL
-    )
-  )
-
-  crossref_examples <- list(
-    list(tracker_code = "Q1_Brand_Awareness",
-         tabs_code = "Q1",
-         notes = "Brand awareness - same question both waves"),
-    list(tracker_code = "Q3_Satisfaction",
-         tabs_code = "Q3",
-         notes = "Overall satisfaction rating"),
-    list(tracker_code = "NPS",
-         tabs_code = "Q_NPS",
-         notes = "Net Promoter Score")
-  )
-
-  write_table_sheet(
-    wb = wb,
-    sheet_name = "CrossRef",
-    columns_def = crossref_columns,
-    title = "Cross-Reference Mapping (Optional)",
-    subtitle = "Map question codes between tracker and tabs reports for cross-linking",
-    example_rows = crossref_examples,
-    num_blank_rows = 30
-  )
-
-  cat("  CrossRef sheet created\n")
-
-  # ============================================================================
-  # SHEET 4: Slides (table format, optional)
+  # SHEET 3: Slides (table format, optional)
   # ============================================================================
 
   slides_columns <- list(

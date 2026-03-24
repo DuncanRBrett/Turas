@@ -439,7 +439,6 @@ test_that("guard passes with valid config and returns correct structure", {
   expect_equal(result$result$reports[[1]]$key, "tracker")
   expect_equal(result$result$reports[[1]]$label, "Main Tracker")
   expect_equal(result$result$reports[[1]]$order, 1)
-  expect_null(result$result$cross_refs)
 })
 
 test_that("guard passes with template-format config (headers not in row 1)", {

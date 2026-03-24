@@ -29,14 +29,22 @@ run_hub_app_gui <- function(project_dirs = NULL) {
     !sapply(required_packages, requireNamespace, quietly = TRUE)
   ]
   if (length(missing_packages) > 0) {
-    cat("\n=== TURAS HUB APP ERROR ===\n")
-    cat("Code: PKG_MISSING_DEPENDENCY\n")
-    cat("Missing:", paste(missing_packages, collapse = ", "), "\n")
-    cat("Fix: install.packages(c(",
+    cat("\n┌─── TURAS HUB APP ERROR ───────────────────────────────┐\n")
+    cat("│ Code: PKG_MISSING_DEPENDENCY\n")
+    cat("│ Missing:", paste(missing_packages, collapse = ", "), "\n")
+    cat("│ Fix: install.packages(c(",
         paste(sprintf('"%s"', missing_packages), collapse = ", "), "))\n")
-    cat("============================\n\n")
-    stop(sprintf("Missing packages: %s", paste(missing_packages, collapse = ", ")),
-         call. = FALSE)
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+    return(list(
+      status = "REFUSED",
+      code = "PKG_MISSING_DEPENDENCY",
+      message = sprintf("Missing packages: %s", paste(missing_packages, collapse = ", ")),
+      how_to_fix = sprintf(
+        "Install with: install.packages(c(%s))",
+        paste(sprintf('"%s"', missing_packages), collapse = ", ")
+      ),
+      context = list(missing = missing_packages)
+    ))
   }
 
   suppressPackageStartupMessages({
@@ -381,6 +389,181 @@ run_hub_app_gui <- function(project_dirs = NULL) {
       }
     })
 
+    # --- Handle search ---
+    observeEvent(input$hub_search, {
+      query <- input$hub_search
+      if (is.null(query) || !nzchar(trimws(query))) return()
+
+      tryCatch({
+        source(file.path(TURAS_HOME, "modules", "hub_app", "lib",
+                          "search_index.R"), local = TRUE)
+
+        # Build index from current projects
+        index_result <- build_search_index(rv$projects)
+        if (index_result$status != "PASS") {
+          session$sendCustomMessage("hub_search_results",
+            jsonlite::toJSON(list(query = query, results = list()),
+                              auto_unbox = TRUE))
+          return()
+        }
+
+        # Search
+        results <- search_index(index_result$result$index, query)
+
+        response <- jsonlite::toJSON(
+          list(query = query, results = results),
+          auto_unbox = TRUE, pretty = FALSE
+        )
+        session$sendCustomMessage("hub_search_results", response)
+        cat("[Hub App] Search for '", query, "' returned ",
+            length(results), " results\n", sep = "")
+
+      }, error = function(e) {
+        cat("[Hub App] Search error:", e$message, "\n")
+        session$sendCustomMessage("hub_search_results",
+          jsonlite::toJSON(list(query = query, results = list()),
+                            auto_unbox = TRUE))
+      })
+    })
+
+    # --- Handle preferences ---
+
+    observeEvent(input$hub_load_preferences, {
+      tryCatch({
+        source(file.path(TURAS_HOME, "modules", "hub_app", "lib",
+                          "preferences.R"), local = TRUE)
+        prefs <- get_hub_preferences()
+        pref_json <- jsonlite::toJSON(prefs, auto_unbox = TRUE, pretty = FALSE)
+        session$sendCustomMessage("hub_preferences_loaded", pref_json)
+      }, error = function(e) {
+        cat("[Hub App] ERROR loading preferences:", e$message, "\n")
+      })
+    })
+
+    observeEvent(input$hub_save_preferences, {
+      tryCatch({
+        source(file.path(TURAS_HOME, "modules", "hub_app", "lib",
+                          "preferences.R"), local = TRUE)
+        prefs <- jsonlite::fromJSON(input$hub_save_preferences,
+                                     simplifyVector = FALSE)
+        result <- save_hub_preferences(prefs)
+
+        if (result$status == "PASS") {
+          # If scan directories changed, trigger rescan
+          new_dirs <- prefs$scan_directories
+          if (!is.null(new_dirs) && length(new_dirs) > 0) {
+            existing <- rv$scan_dirs
+            all_dirs <- unique(c(existing, unlist(new_dirs)))
+            valid_dirs <- all_dirs[dir.exists(all_dirs)]
+            if (length(valid_dirs) > length(existing)) {
+              rv$scan_dirs <- valid_dirs
+              shinyjs::html("hub-dir-display",
+                paste("Scanning:", paste(rv$scan_dirs, collapse = ", ")))
+              scan_result <- scan_for_projects(rv$scan_dirs, max_depth = 3)
+              if (scan_result$status %in% c("PASS", "PARTIAL")) {
+                rv$projects <- scan_result$result$projects
+                project_json <- jsonlite::toJSON(
+                  scan_result$result$projects,
+                  auto_unbox = TRUE, pretty = FALSE)
+                session$sendCustomMessage("hub_projects", project_json)
+              }
+            }
+          }
+        }
+      }, error = function(e) {
+        cat("[Hub App] ERROR saving preferences:", e$message, "\n")
+        session$sendCustomMessage("hub_error",
+          paste("Failed to save preferences:", e$message))
+      })
+    })
+
+    # --- Handle annotation operations ---
+
+    # Save annotations to sidecar JSON
+    observeEvent(input$hub_save_annotations, {
+      req(rv$active_project_path)
+      ann_data <- input$hub_save_annotations
+
+      sidecar_path <- file.path(rv$active_project_path, ".turas_annotations.json")
+
+      tryCatch({
+        writeLines(ann_data, sidecar_path, useBytes = TRUE)
+        cat("[Hub App] Annotations saved to:", sidecar_path, "\n")
+        session$sendCustomMessage("hub_save_annotations_confirm", "annotations")
+      }, error = function(e) {
+        cat("[Hub App] ERROR saving annotations:", e$message, "\n")
+        session$sendCustomMessage("hub_error",
+          paste("Failed to save annotations:", e$message))
+      })
+    })
+
+    # Load annotations from sidecar JSON (triggered when opening a project)
+    observeEvent(input$hub_load_annotations, {
+      req(rv$active_project_path)
+
+      sidecar_path <- file.path(rv$active_project_path, ".turas_annotations.json")
+
+      if (file.exists(sidecar_path)) {
+        tryCatch({
+          ann_json <- paste(readLines(sidecar_path, warn = FALSE),
+                             collapse = "\n")
+          session$sendCustomMessage("hub_annotations_loaded", ann_json)
+          cat("[Hub App] Annotations loaded from:", sidecar_path, "\n")
+        }, error = function(e) {
+          cat("[Hub App] ERROR loading annotations:", e$message, "\n")
+          session$sendCustomMessage("hub_annotations_loaded", "null")
+        })
+      } else {
+        session$sendCustomMessage("hub_annotations_loaded", "null")
+      }
+    })
+
+    # --- Handle hub generation ---
+    observeEvent(input$hub_generate_hub, {
+      req(rv$active_project_path)
+
+      tryCatch({
+        payload <- jsonlite::fromJSON(input$hub_generate_hub,
+                                       simplifyVector = FALSE)
+
+        cat("[Hub App] Hub generation requested for:",
+            payload$project_name %||% "Unknown", "\n")
+
+        # Source and call the hub generator
+        source(file.path(TURAS_HOME, "modules", "hub_app", "lib",
+                          "hub_generator.R"), local = TRUE)
+
+        result <- generate_hub_from_project(
+          project_path = rv$active_project_path,
+          project_name = payload$project_name %||% basename(rv$active_project_path)
+        )
+
+        if (result$status %in% c("PASS", "PARTIAL")) {
+          response <- jsonlite::toJSON(list(
+            success = TRUE,
+            path = result$result$output_path,
+            filename = basename(result$result$output_path),
+            n_reports = result$result$n_reports
+          ), auto_unbox = TRUE)
+        } else {
+          response <- jsonlite::toJSON(list(
+            success = FALSE,
+            error = result$message
+          ), auto_unbox = TRUE)
+        }
+
+        session$sendCustomMessage("hub_generate_complete", response)
+
+      }, error = function(e) {
+        cat("[Hub App] Hub generation error:", e$message, "\n")
+        response <- jsonlite::toJSON(list(
+          success = FALSE,
+          error = e$message
+        ), auto_unbox = TRUE)
+        session$sendCustomMessage("hub_generate_complete", response)
+      })
+    })
+
     # --- Handle export requests ---
 
     # PPTX export
@@ -460,7 +643,7 @@ run_hub_app_gui <- function(project_dirs = NULL) {
         }
 
         # Create ZIP
-        safe_name <- gsub("[^a-zA-Z0-9_\\- ]", "",
+        safe_name <- gsub("[^a-zA-Z0-9_ -]", "",
                            payload$project_name %||% "Turas")
         safe_name <- gsub("\\s+", "_", trimws(safe_name))
         if (nchar(safe_name) == 0) safe_name <- "Turas"

@@ -24,6 +24,21 @@
                class="search-input"
                placeholder="Filter projects..."
                autocomplete="off">
+        <button id="btn-search" class="btn btn-secondary" title="Search across all projects">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          Search
+        </button>
+        <button id="btn-preferences" class="btn btn-icon" title="Settings">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
         <button id="btn-rescan" class="btn btn-secondary" title="Rescan directories">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -75,6 +90,14 @@
         <span id="report-count" class="toolbar-badge"></span>
       </div>
       <div class="toolbar-right">
+        <button id="btn-toggle-annotations" class="btn btn-secondary" title="Project notes & summary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+          Notes
+        </button>
         <button id="btn-toggle-pins" class="btn btn-secondary" title="Toggle pin board">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -97,6 +120,14 @@
           Section
         </button>
         <span class="toolbar-divider"></span>
+        <button id="btn-generate-hub" class="btn btn-secondary" title="Generate single-file combined hub">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+          </svg>
+          Hub
+        </button>
         <button id="btn-export-pptx" class="btn btn-secondary" title="Export pins to PowerPoint">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -104,6 +135,17 @@
             <polyline points="13 2 13 9 20 9"></polyline>
           </svg>
           PPTX
+        </button>
+        <button id="btn-export-pdf" class="btn btn-secondary" title="Export pins as PDF (print)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          PDF
         </button>
         <button id="btn-export-pngs" class="btn btn-secondary" title="Export all pin charts as PNGs">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -158,6 +200,26 @@
       </div>
 
     </div>
+
+    <!-- Annotations panel (hidden by default) -->
+    <div id="annotations-panel" class="annotations-panel" style="display:none;">
+      <div class="ann-section">
+        <label class="ann-label" for="ann-executive-summary">Executive Summary</label>
+        <textarea id="ann-executive-summary" class="ann-textarea ann-textarea-lg"
+                  placeholder="Write a brief executive summary for this project (supports markdown: **bold**, *italic*, ## headings, - bullets)..."></textarea>
+        <div id="ann-summary-preview" class="ann-preview pb-md-content" style="display:none;"></div>
+      </div>
+      <div class="ann-section">
+        <label class="ann-label" for="ann-background">Background &amp; Methodology</label>
+        <textarea id="ann-background" class="ann-textarea"
+                  placeholder="Describe the project background, methodology, sample size, fieldwork dates..."></textarea>
+      </div>
+      <div class="ann-section">
+        <label class="ann-label" for="ann-notes">Project Notes</label>
+        <textarea id="ann-notes" class="ann-textarea"
+                  placeholder="Working notes, reminders, follow-up items..."></textarea>
+      </div>
+    </div>
   </div>
 
   <!-- ================================================================
@@ -179,12 +241,86 @@
        SCRIPTS
        Order matters: utilities first, then components, then app init
        ================================================================ -->
+  <!-- ================================================================
+       SEARCH OVERLAY
+       ================================================================ -->
+  <div id="search-overlay" class="modal-overlay" style="display:none;">
+    <div class="modal-card search-modal">
+      <div class="search-header">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="search-input" class="search-field"
+               placeholder="Search across all projects..." autocomplete="off">
+        <button class="btn btn-icon" onclick="Search.hide()" title="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <div id="search-results" class="search-results"></div>
+      <div id="search-hint" class="search-hint">
+        Search pin titles, insights, report names, and annotations across all projects.
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================
+       PREFERENCES MODAL
+       ================================================================ -->
+  <div id="preferences-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Settings</h3>
+        <button class="btn btn-icon" onclick="Preferences.hide()" title="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="pref-field">
+          <label class="pref-label" for="pref-scan-dirs">Scan Directories</label>
+          <textarea id="pref-scan-dirs" class="pref-textarea"
+                    placeholder="One directory per line, e.g.&#10;~/Documents&#10;~/OneDrive/Projects"></textarea>
+          <span class="pref-hint">Directories to scan for Turas projects (one per line)</span>
+        </div>
+        <div class="pref-row">
+          <div class="pref-field pref-field-half">
+            <label class="pref-label" for="pref-brand-colour">Brand Colour</label>
+            <input type="color" id="pref-brand-colour" class="pref-colour" value="#2563EB">
+          </div>
+          <div class="pref-field pref-field-half">
+            <label class="pref-label" for="pref-accent-colour">Accent Colour</label>
+            <input type="color" id="pref-accent-colour" class="pref-colour" value="#10B981">
+          </div>
+        </div>
+        <div class="pref-field">
+          <label class="pref-label" for="pref-logo-path">Logo Path</label>
+          <input type="text" id="pref-logo-path" class="pref-input"
+                 placeholder="~/logo.png (optional, for PPTX exports)">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="Preferences.hide()">Cancel</button>
+        <button class="btn btn-primary" onclick="Preferences.save()">Save</button>
+      </div>
+    </div>
+  </div>
+
   <script src="js/app.js"></script>
   <script src="js/state.js"></script>
   <script src="js/project_browser.js"></script>
   <script src="js/report_viewer.js"></script>
   <script src="js/pin_board.js"></script>
   <script src="js/export_manager.js"></script>
+  <script src="js/annotations.js"></script>
+  <script src="js/preferences.js"></script>
+  <script src="js/search.js"></script>
 
 </body>
 </html>

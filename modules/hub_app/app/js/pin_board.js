@@ -65,6 +65,11 @@ var PinBoard = (function() {
     var label = pinObj.sourceLabel || source || "Report";
     var title = pinObj.title || "View";
     HubApp.showToast("Pinned: " + title + " (" + label + ")");
+
+    // Capture table as PNG for full CSS fidelity (async)
+    if (pinObj.tableHtml && !pinObj.tablePng) {
+      captureTablePng(pinObj.id, pinObj.tableHtml, source);
+    }
   }
 
   /**
@@ -299,6 +304,7 @@ var PinBoard = (function() {
         '<span class="pb-source-badge ' + badgeClass + '">' + escapeHtml(badgeLabel) + '</span>' +
         '<span class="pb-pin-title">' + escapeHtml(title) + '</span>' +
         '<div class="pb-item-actions">' +
+          (pin.chartSvg ? '<button class="pb-action-btn" onclick="ExportManager.exportPinAsPng(\'' + pid + '\')" title="Export as PNG">' + svgDownload() + '</button>' : '') +
           (idx > 0 ? '<button class="pb-action-btn" onclick="PinBoard.moveItem(\'' + pid + '\',-1)" title="Move up">' + svgArrowUp() + '</button>' : '') +
           (idx < total - 1 ? '<button class="pb-action-btn" onclick="PinBoard.moveItem(\'' + pid + '\',1)" title="Move down">' + svgArrowDown() + '</button>' : '') +
           '<button class="pb-action-btn pb-remove-btn" onclick="PinBoard.removeItem(\'' + pid + '\')" title="Remove pin">' + svgClose() + '</button>' +
@@ -346,9 +352,16 @@ var PinBoard = (function() {
       html += '<div class="pb-pin-chart">' + sanitizeHtml(pin.chartSvg) + '</div>';
     }
 
-    // Table HTML
-    if (pin.tableHtml && showTable) {
-      html += '<div class="pb-pin-table">' + sanitizeHtml(pin.tableHtml) + '</div>';
+    // Table: prefer CSS-faithful PNG capture, fall back to raw HTML
+    if (showTable) {
+      if (pin.tablePng) {
+        html += '<div class="pb-pin-table pb-pin-table-png">' +
+          '<img src="' + escapeAttr(pin.tablePng) + '" alt="Table" ' +
+          'style="max-width:100%;height:auto;">' +
+          '</div>';
+      } else if (pin.tableHtml) {
+        html += '<div class="pb-pin-table">' + sanitizeHtml(pin.tableHtml) + '</div>';
+      }
     }
 
     html += '</div>';
@@ -408,6 +421,176 @@ var PinBoard = (function() {
       overs[i].classList.remove("pb-drag-over");
     }
     dragSrcIdx = null;
+  }
+
+  // ===========================================================================
+  // Table PNG Capture (F18 — Full CSS Fidelity)
+  // ===========================================================================
+
+  var TABLE_CAPTURE_SCALE = 3;   // Canvas resolution multiplier
+  var TABLE_CAPTURE_TIMEOUT = 5000; // Max ms to wait for iframe render
+
+  /**
+   * Capture a table's HTML as a high-resolution PNG by rendering it inside
+   * a hidden iframe that inherits the source report's CSS context.
+   *
+   * Flow:
+   *   1. Create a hidden iframe
+   *   2. Write the table HTML + source report CSS into it
+   *   3. Wait for rendering
+   *   4. Use html2canvas-style approach: render to foreignObject SVG → canvas → PNG
+   *   5. Store the data URL on the pin and re-render
+   *
+   * @param {string} pinId - ID of the pin to update
+   * @param {string} tableHtml - Raw HTML table markup
+   * @param {string} sourceKey - Report key (for finding the source iframe's CSS)
+   */
+  function captureTablePng(pinId, tableHtml, sourceKey) {
+    // Find the source report's iframe to extract its stylesheets
+    var sourceIframe = document.getElementById("report-iframe-" + sourceKey);
+    var cssText = "";
+
+    if (sourceIframe) {
+      try {
+        var sourceDoc = sourceIframe.contentDocument;
+        if (sourceDoc) {
+          // Extract all <style> blocks and linked stylesheets
+          var styles = sourceDoc.querySelectorAll("style");
+          for (var s = 0; s < styles.length; s++) {
+            cssText += styles[s].textContent + "\n";
+          }
+          // Also try to get computed styles from stylesheet rules
+          try {
+            var sheets = sourceDoc.styleSheets;
+            for (var sh = 0; sh < sheets.length; sh++) {
+              try {
+                var rules = sheets[sh].cssRules || sheets[sh].rules;
+                if (rules) {
+                  for (var r = 0; r < rules.length; r++) {
+                    cssText += rules[r].cssText + "\n";
+                  }
+                }
+              } catch (e) {
+                // CORS or access error on external sheets — skip
+              }
+            }
+          } catch (e) {
+            // stylesheet access error
+          }
+        }
+      } catch (e) {
+        console.warn("[Pin Board] Could not access source iframe CSS:", e.message);
+      }
+    }
+
+    // Create a hidden iframe for rendering
+    var captureFrame = document.createElement("iframe");
+    captureFrame.style.cssText = "position:fixed;left:-9999px;top:-9999px;" +
+      "width:800px;height:1px;border:none;visibility:hidden;";
+    document.body.appendChild(captureFrame);
+
+    var cleanup = function() {
+      if (captureFrame.parentNode) {
+        document.body.removeChild(captureFrame);
+      }
+    };
+
+    // Safety timeout
+    var timer = setTimeout(function() {
+      console.warn("[Pin Board] Table capture timed out for pin:", pinId);
+      cleanup();
+    }, TABLE_CAPTURE_TIMEOUT);
+
+    captureFrame.onload = function() {
+      try {
+        var doc = captureFrame.contentDocument;
+        // Write table HTML with extracted CSS
+        doc.open();
+        doc.write(
+          '<!DOCTYPE html><html><head><style>' +
+          'body { margin: 0; padding: 8px; background: #fff; font-family: ' +
+          '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; font-size: 12px; }' +
+          'table { border-collapse: collapse; width: auto; }' +
+          'th, td { padding: 4px 8px; border: 1px solid #e2e8f0; }' +
+          'th { background: #f1f5f9; font-weight: 600; }' +
+          cssText +
+          '</style></head><body>' +
+          tableHtml +
+          '</body></html>'
+        );
+        doc.close();
+
+        // Wait a frame for rendering
+        setTimeout(function() {
+          try {
+            var body = doc.body;
+            var tableEl = body.querySelector("table") || body;
+            var width = Math.min(tableEl.scrollWidth + 16, 1200);
+            var height = Math.min(tableEl.scrollHeight + 16, 2000);
+
+            // Resize iframe to fit table
+            captureFrame.style.width = width + "px";
+            captureFrame.style.height = height + "px";
+
+            // Use SVG foreignObject → canvas approach
+            var svgData = '<svg xmlns="http://www.w3.org/2000/svg" ' +
+              'width="' + width + '" height="' + height + '">' +
+              '<foreignObject width="100%" height="100%">' +
+              '<div xmlns="http://www.w3.org/1999/xhtml">' +
+              new XMLSerializer().serializeToString(doc.documentElement) +
+              '</div></foreignObject></svg>';
+
+            var img = new Image();
+            img.onload = function() {
+              var canvas = document.createElement("canvas");
+              canvas.width = width * TABLE_CAPTURE_SCALE;
+              canvas.height = height * TABLE_CAPTURE_SCALE;
+              var ctx = canvas.getContext("2d");
+              ctx.scale(TABLE_CAPTURE_SCALE, TABLE_CAPTURE_SCALE);
+              ctx.fillStyle = "#ffffff";
+              ctx.fillRect(0, 0, width, height);
+              ctx.drawImage(img, 0, 0, width, height);
+
+              var dataUrl = canvas.toDataURL("image/png");
+
+              clearTimeout(timer);
+              cleanup();
+
+              // Update the pin with the captured PNG
+              var idx = findIndex(pinId);
+              if (idx !== -1) {
+                items[idx].tablePng = dataUrl;
+                render();
+                persist();
+                console.log("[Pin Board] Table PNG captured for pin:", pinId);
+              }
+            };
+
+            img.onerror = function() {
+              clearTimeout(timer);
+              cleanup();
+              console.warn("[Pin Board] Table PNG image render failed for pin:", pinId);
+            };
+
+            var blob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+            img.src = URL.createObjectURL(blob);
+
+          } catch (e) {
+            clearTimeout(timer);
+            cleanup();
+            console.warn("[Pin Board] Table capture render error:", e.message);
+          }
+        }, 200);
+
+      } catch (e) {
+        clearTimeout(timer);
+        cleanup();
+        console.warn("[Pin Board] Table capture error:", e.message);
+      }
+    };
+
+    // Trigger the load
+    captureFrame.src = "about:blank";
   }
 
   // ===========================================================================
@@ -545,6 +728,10 @@ var PinBoard = (function() {
 
   function svgClose() {
     return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+  }
+
+  function svgDownload() {
+    return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>';
   }
 
   // --- Public API ---

@@ -1,6 +1,6 @@
-# Turas Report Hub — Technical Documentation
+# Turas Report Hub -- Technical Documentation
 
-**Version:** 1.0
+**Version:** 2.0 (iframe architecture)
 **Last Updated:** March 2026
 **Target Audience:** Developers, Maintainers
 
@@ -10,7 +10,7 @@
 
 1. [Architecture Overview](#1-architecture-overview)
 2. [Pipeline Steps](#2-pipeline-steps)
-3. [Namespace Isolation System](#3-namespace-isolation-system)
+3. [Iframe Isolation System](#3-iframe-isolation-system)
 4. [JavaScript Runtime](#4-javascript-runtime)
 5. [CSS Architecture](#5-css-architecture)
 6. [Configuration System](#6-configuration-system)
@@ -27,62 +27,57 @@
 
 ## 1. Architecture Overview
 
-The Report Hub combines multiple Turas HTML reports into a single unified interactive document. It follows a **7-step pipeline** orchestrated by `00_main.R::combine_reports()`.
+The Report Hub combines multiple Turas HTML reports into a single unified interactive document. It follows a **6-step pipeline** orchestrated by `00_main.R::combine_reports()`.
+
+Each source report is embedded as-is inside a base64-encoded iframe. This **iframe isolation** approach guarantees that reports behave identically to their standalone versions -- no CSS/JS/DOM conflicts are possible because each report runs in its own browsing context.
 
 ### Pipeline Flow
 
 ```
 Config File (Excel)
-    │
-    ▼
-┌──────────────────────┐
-│ 1. Guard Validation   │  00_guard.R
-│    (config, paths)    │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│ 2. Pre-flight Checks  │  lib/validation/preflight_validators.R
-│    (14 cross-checks)  │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│ 3. HTML Parsing       │  01_html_parser.R
-│    (per report)       │  Extracts CSS, JS, panels, metadata, pinned data
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│ 4. Namespace Rewrite  │  02_namespace_rewriter.R (MOST COMPLEX)
-│    (per report)       │  Prefixes IDs, rewrites CSS/JS, wraps in IIFEs
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│ 5. Navigation Build   │  04_navigation_builder.R
-│    (two-tier tabs)    │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│ 6. Front Page Build   │  03_front_page_builder.R
-│    (overview cards)   │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│ 7. Page Assembly      │  07_page_assembler.R
-│    + HTML Writing     │  08_html_writer.R
-└──────────┬───────────┘
-           │
-           ▼
+    |
+    v
++----------------------+
+| 1. Guard Validation   |  00_guard.R
+|    (config, paths)    |
++----------+-----------+
+           |
+           v
++----------------------+
+| 2. HTML Reading       |  01_html_parser.R
+|    (per report)       |  Reads file, extracts metadata
++----------+-----------+
+           |
+           v
++----------------------+
+| 3. Navigation Build   |  04_navigation_builder.R
+|    (L1 report tabs)   |
++----------+-----------+
+           |
+           v
++----------------------+
+| 4. Front Page Build   |  03_front_page_builder.R
+|    (overview cards)   |
++----------+-----------+
+           |
+           v
++----------------------+
+| 5. Page Assembly      |  07_page_assembler.R
+|    (iframe embedding) |  Base64-encodes each report into iframe srcdoc
++----------+-----------+
+           |
+           v
++----------------------+
+| 6. HTML Writing       |  08_html_writer.R
++----------+-----------+
+           |
+           v
      Combined HTML File
 ```
 
 ### Key Design Principle
 
-The output is a **single, self-contained HTML file** with all CSS, JS, images (Base64-encoded), and data embedded inline. No external dependencies. Works offline.
+The output is a **single, self-contained HTML file** with all CSS, JS, images (Base64-encoded), and report HTML embedded inline. No external dependencies. Works offline.
 
 ---
 
@@ -103,145 +98,80 @@ Validates before any processing:
 
 Returns TRS refusal with actionable `how_to_fix` on any failure.
 
-### Step 2: Pre-flight Checks (lib/validation/preflight_validators.R — 931 lines)
+### Step 2: HTML Reading (01_html_parser.R)
 
-14 cross-referential checks between config and actual files:
-1. Report HTML files exist and are readable
-2. Files are valid HTML (contain `<html` or `<!DOCTYPE`)
-3. Report type auto-detection succeeds
-4. CrossRef sheet mappings are valid (if provided)
-5. Tracker codes exist in tracker reports
-6. Tabs codes exist in tabs reports
-7. Colour values are valid hex
-8. Logo file exists (if specified)
-9. Output directory is writable
-10. No duplicate report keys
-11. Order values are numeric
-12. Report keys don't conflict with reserved names (overview, pinned)
-13. CrossRef has required columns
-14. All report paths resolve correctly
-
-### Step 3: HTML Parsing (01_html_parser.R — 557 lines)
-
-For each input report, extracts:
-- **CSS blocks** — All `<style>` tags and inline styles
-- **JS blocks** — All `<script>` tags (excluding external CDN links)
-- **Content panels** — The main body sections (report content)
-- **Metadata** — Report type, question counts, sample sizes from `<meta>` tags
-- **Pinned data** — JSON-encoded pinned views stored in the report
+For each input report:
+- Reads the complete HTML file into memory (`raw_html`)
+- Extracts **metadata** -- report type, question counts, sample sizes from `<meta>` tags
+- Extracts **pinned data** -- JSON-encoded pinned views stored in the report
 
 Report type is auto-detected from:
 1. `<meta name="turas-report-type" content="tracker|tabs">` tags
-2. DOM structure markers (`id="tab-metrics"` → tracker, `id="tab-crosstabs"` → tabs)
+2. DOM structure markers (`id="tab-metrics"` -> tracker, `id="tab-crosstabs"` -> tabs)
 
-### Step 4: Namespace Rewriting (02_namespace_rewriter.R — 775 lines)
+The full HTML content is preserved unchanged for iframe embedding in step 5.
 
-**This is the most complex component.** It prevents cross-report DOM/CSS/JS conflicts.
+### Step 3: Navigation Building (04_navigation_builder.R)
 
-For each report:
-
-1. **DOM ID Prefixing** — All `id="xxx"` attributes become `id="{key}--xxx"` (e.g., `id="tracker--tab-metrics"`)
-
-2. **CSS Selector Rewriting** — `#xxx` selectors become `#tracker--xxx`. Class selectors within report scope are also adjusted.
-
-3. **JS Reference Rewriting** — All JavaScript patterns that reference DOM IDs are rewritten:
-   - `getElementById("xxx")` → `getElementById("tracker--xxx")`
-   - `querySelector("#xxx")` → `querySelector("#tracker--xxx")`
-   - `document.querySelector('[data-id="xxx"]')` → rewritten with prefix
-   - Hash references (`#xxx`) in event handlers
-
-4. **IIFE Wrapping** — All JS is wrapped in Immediately Invoked Function Expressions to prevent global scope pollution:
-   ```js
-   (function() {
-     // original report JS with rewritten references
-   })();
-   ```
-
-5. **Hub-conflicting Function Removal** — Functions that would conflict with hub-level equivalents are stripped:
-   - Save/download handlers (hub has its own Save button)
-   - Print handlers
-   - Pin management functions (hub unifies pins)
-
-### Step 5: Navigation Building (04_navigation_builder.R — 106 lines)
-
-Generates two-tier navigation HTML:
-- **Level 1 tabs:** Overview | Report 1 | Report 2 | ... | Pinned Views
-- **Level 2 sub-tabs:** Per-report internal tabs (e.g., Metrics | Summary | Crosstabs)
+Generates Level 1 navigation HTML:
+- **L1 tabs:** Overview | Report 1 | Report 2 | ... | Pinned Views | About
 
 Tab order comes from the `order` column in the Reports sheet.
 
-### Step 6: Front Page Building (03_front_page_builder.R — 205 lines)
+Note: Each report's internal navigation (sub-tabs) is preserved inside its iframe -- no L2 nav is built by the hub.
+
+### Step 4: Front Page Building (03_front_page_builder.R)
 
 Builds the Overview tab with:
-- **Report index cards** — One card per report showing key statistics extracted from metadata (sample size, question count, metric count, date range)
-- **Summary area** — Aggregate statistics across all reports
+- **Report index cards** -- One card per report showing key statistics extracted from metadata (sample size, question count, metric count, date range)
+- **Qualitative slides** -- Optional markdown slides with image support
+- **About panel** -- Analyst contact details and notes (if configured)
 
-Cards are clickable — clicking navigates to that report's tab.
+Cards are clickable -- clicking navigates to that report's tab.
 
-### Step 7: Page Assembly (07_page_assembler.R — 325 lines)
+### Step 5: Page Assembly (07_page_assembler.R)
 
-Assembles the final HTML document:
-1. `<!DOCTYPE html>` and `<html>` wrapper
-2. `<head>` with merged CSS: hub styles first, then each report's CSS (scoped by namespace)
+Assembles the final HTML document with iframe isolation:
+1. `<!DOCTYPE html>` and `<html>` wrapper with `hub-version: iframe-b64` marker
+2. `<head>` with hub-only CSS (report styles live inside iframes)
 3. `<body>` containing:
    - Branded header (title, subtitle, company, logo)
    - Level 1 navigation
    - Overview panel
-   - Report panels (each containing Level 2 nav + content)
+   - Report panels (each containing an empty `<iframe>` element)
    - Pinned Views panel
-4. Merged JS: hub scripts first, then each report's namespaced JS
-5. CSS colour placeholder replacement (`BRAND_COLOUR` → actual hex value)
+   - About panel (if configured)
+4. `<script type="text/plain">` blocks containing each report's full HTML, base64-encoded
+5. Hub JavaScript (navigation, pinned views, iframe loading)
+6. Initialization script that decodes base64 and loads each report into its iframe via `srcdoc`
 
-### Step 8: HTML Writing (08_html_writer.R — 58 lines)
+### Step 6: HTML Writing (08_html_writer.R)
 
 Writes the assembled HTML to disk. Creates the output directory if needed. Reports file size for logging.
 
 ---
 
-## 3. Namespace Isolation System
+## 3. Iframe Isolation System
 
 ### The Problem
 
-Multiple Turas reports use identical DOM IDs (e.g., `tab-overview`, `tab-summary`, `panel-content`). Without isolation, clicking a tab in one report would affect all reports.
+Multiple Turas reports use identical DOM IDs (e.g., `tab-overview`, `tab-summary`, `panel-content`), identical CSS class names, and identical JS function names. Without isolation, these would conflict.
 
 ### The Solution
 
-Every DOM element, CSS selector, and JS reference is prefixed with the report's unique `report_key`:
+Each report's complete HTML is base64-encoded and stored in a `<script type="text/plain" data-encoding="base64">` element. At runtime, the hub JavaScript decodes the base64, creates a Blob URL or sets `srcdoc`, and loads the report into its dedicated `<iframe>`.
 
-| Original | Namespaced (key = "tracker") |
-|----------|------------------------------|
-| `id="tab-metrics"` | `id="tracker--tab-metrics"` |
-| `#tab-metrics` (CSS) | `#tracker--tab-metrics` |
-| `getElementById("tab-metrics")` (JS) | `getElementById("tracker--tab-metrics")` |
+This provides **complete isolation**:
+- Each iframe has its own DOM -- no ID conflicts possible
+- Each iframe has its own CSS scope -- no style leaking
+- Each iframe has its own JS scope -- no function/variable conflicts
+- Reports behave identically to their standalone versions
 
-### Implementation Details
+### Why Base64?
 
-The namespace rewriter uses **regex-based string replacement** on the parsed HTML, CSS, and JS strings. Key patterns:
+Base64 encoding uses only `A-Za-z0-9+/=` characters, which cannot interfere with HTML parsing (no `<`, `>`, or `/` that could form closing tags). This guarantees safe roundtrip through unlimited create/edit/save/reopen cycles.
 
-```r
-# DOM ID rewriting
-html <- gsub('id="([^"]+)"', paste0('id="', key, '--\\1"'), html)
-
-# CSS selector rewriting
-css <- gsub('#([a-zA-Z][a-zA-Z0-9_-]*)', paste0('#', key, '--\\1'), css)
-
-# JS getElementById rewriting
-js <- gsub('getElementById\\("([^"]+)"\\)',
-           paste0('getElementById("', key, '--\\1")'), js)
-```
-
-**Caution:** Pattern ordering matters. More specific patterns must be applied before general ones to prevent double-prefixing.
-
-### IIFE Wrapping
-
-All report JS is wrapped in IIFEs to prevent variable name collisions:
-
-```js
-(function() {
-  // Report's entire JS block with rewritten references
-  // Variables are local to this scope
-})();
-```
+The ~33% size overhead is the cost of guaranteed safety.
 
 ---
 
@@ -249,44 +179,48 @@ All report JS is wrapped in IIFEs to prevent variable name collisions:
 
 Three JS files provide client-side interactivity in the combined report:
 
-### hub_id_resolver.js (12 lines)
+### hub_id_resolver.js
 
 Creates the `ReportHub` global namespace object used by other hub JS modules. Must load first.
 
-### hub_navigation.js (179 lines)
+### hub_navigation.js
 
-- **Tab switching** — Level 1 (reports) and Level 2 (sub-tabs within reports)
-- **URL hash deep-linking** — `#tracker` navigates to the tracker tab; `#tracker/metrics` navigates to a specific sub-tab
-- **Keyboard navigation** — Arrow keys move between tabs
-- **Save/Print** — Hub-level Save and Print buttons that operate on the entire combined report
+- **Tab switching** -- Level 1 report tabs and special panels (Overview, Pinned Views, About)
+- **URL hash deep-linking** -- `#tracker` navigates to the tracker tab
+- **Keyboard navigation** -- Arrow keys move between tabs
+- **Save/Print** -- Hub-level Save and Print buttons
+- **Iframe loading** -- Decodes base64 report HTML and loads into iframes on first tab activation (lazy loading)
 
-### hub_pinned.js (854 lines)
+### hub_pinned.js
 
-- **Pin collection** — Gathers pinned views from all reports into one panel
-- **Section dividers** — Users can add section headers between pins for narrative structure
-- **Drag-to-reorder** — Pins and sections can be rearranged by dragging
-- **JSON persistence** — Pin state is serialized to JSON and stored within the HTML document's data attributes; restored on page load
-- **Export** — Individual pins or all pins can be exported as PNG images
+- **Pin collection** -- Gathers pinned views from all reports into one panel
+- **Section dividers** -- Users can add section headers between pins for narrative structure
+- **Drag-to-reorder** -- Pins and sections can be rearranged by dragging
+- **JSON persistence** -- Pin state is serialized to JSON and stored within the HTML document's data attributes; restored on page load
+- **Export** -- Individual pins or all pins can be exported as PNG images
+- **Slide image uploads** -- Client-side image compression (resize to max 1200px, JPEG 0.7 quality)
 
 ---
 
 ## 5. CSS Architecture
 
-### hub_styles.css (643 lines)
+### hub_styles.css
 
 Hub-specific styles covering:
-- **Header** — Branded banner with logo, title, subtitle
-- **Two-tier navigation** — Top-level tabs and per-report sub-tabs
-- **Report cards** — Front page overview cards with hover effects
-- **Content panels** — Container for each report's content
-- **Pinned views panel** — Layout for unified pins with section dividers
-- **Responsive design** — Adapts to different viewport sizes
+- **Header** -- Branded banner with logo, title, subtitle
+- **Navigation** -- Top-level tabs for reports and special panels
+- **Report cards** -- Front page overview cards with hover effects
+- **Content panels** -- Container for each report's iframe
+- **Pinned views panel** -- Layout for unified pins with section dividers
+- **Responsive design** -- Adapts to different viewport sizes
+
+Note: Report-specific CSS lives inside each report's iframe and does not interact with hub styles.
 
 ### Colour Variables
 
 CSS uses placeholder values replaced at assembly time:
-- `BRAND_COLOUR` → replaced with `brand_colour` from config (default: `#323367`)
-- `ACCENT_COLOUR` → replaced with `accent_colour` from config (default: `#CC9900`)
+- `BRAND_COLOUR` -> replaced with `brand_colour` from config (default: `#323367`)
+- `ACCENT_COLOUR` -> replaced with `accent_colour` from config (default: `#CC9900`)
 
 Replacement happens in `07_page_assembler.R` via simple string substitution.
 
@@ -301,11 +235,10 @@ Replacement happens in `07_page_assembler.R` via simple string substitution.
 | Settings | Key-value (Field/Value columns) OR single-row (column names = fields) | Yes |
 | Reports | Table with one row per report | Yes |
 | Slides | Table with one row per qualitative slide (title, content, image, order) | No |
-| CrossRef | Table mapping tracker ↔ tabs question codes | No |
 
 ### Config Reading
 
-The guard layer (`00_guard.R`) reads the config. Settings sheet supports both formats — key-value is auto-detected by checking if the first column header is "Field" or similar.
+The guard layer (`00_guard.R`) reads the config. Settings sheet supports both formats -- key-value is auto-detected by checking if the first column header is "Field" or similar.
 
 ### Slides Sheet Processing
 
@@ -313,30 +246,28 @@ The optional Slides sheet adds qualitative insight slides to the Overview front 
 
 1. **Validation:** Each slide requires `slide_title` + at least one of `content` or `image_path`. Slides missing both are silently skipped.
 2. **Content:** Markdown text stored as-is; rendered client-side. Empty content (`""`) is valid when an image is provided.
-3. **Image encoding:** Images go through `.encode_slide_image()` — a compression pipeline that:
+3. **Image encoding:** Images go through `.encode_slide_image()` -- a compression pipeline that:
    - Reads PNG/JPEG files via the `png` and `jpeg` R packages
-   - Downscales images wider than 800px (bilinear interpolation, aspect ratio preserved)
+   - Downscales images wider than 1200px (bilinear interpolation, aspect ratio preserved)
    - Re-encodes as JPEG at 0.85 quality
    - Base64-encodes the result as a `data:image/jpeg;base64,...` URI
    - SVG images are base64-encoded as-is (no rasterisation)
    - Falls back to raw base64 embedding if `png`/`jpeg` packages are unavailable
 4. **Path resolution:** `image_path` values are tried as absolute paths first, then relative to the config file directory.
 
-The encoded image data is stored in `slide$image_data` and rendered by `03_front_page_builder.R` as an `<img>` thumbnail above the content area, with a hidden `<textarea>` holding the base64 data for client-side serialisation.
-
 ### Template Generation
 
-`lib/generate_config_templates.R` (328 lines) creates professional Excel templates using the shared infrastructure from `modules/shared/template_styles.R`. Templates include dropdown validation, colour-coded sections, and help text.
+`lib/generate_config_templates.R` creates professional Excel templates using the shared infrastructure from `modules/shared/template_styles.R`. Templates include dropdown validation, colour-coded sections, and help text.
 
 ---
 
 ## 7. Report Type Detection
 
 Detection priority:
-1. **Meta tag:** `<meta name="turas-report-type" content="tracker">` — highest priority
-2. **DOM markers:** `id="tab-metrics"` → tracker; `id="tab-crosstabs"` → tabs
+1. **Meta tag:** `<meta name="turas-report-type" content="tracker">` -- highest priority
+2. **DOM markers:** `id="tab-metrics"` -> tracker; `id="tab-crosstabs"` -> tabs
 3. **Config override:** `report_type` column in Reports sheet
-4. **Fallback:** `"unknown"` — report is included but with limited metadata extraction
+4. **Fallback:** `"unknown"` -- report is included but with limited metadata extraction
 
 To add support for a new report type, update the detection logic in `01_html_parser.R` and add type-specific metadata extraction.
 
@@ -377,34 +308,35 @@ list(
 Console output is mandatory for Shiny visibility. All errors are boxed in the console:
 
 ```
-┌─── TURAS ERROR ────────────────────────┐
-│ Code: IO_FILE_NOT_FOUND                │
-│ Message: Report file not found         │
-│ Fix: Check report_path in Reports sheet│
-└────────────────────────────────────────┘
+=== TURAS ERROR ===
+Code: IO_FILE_NOT_FOUND
+Message: Report file not found
+Fix: Check report_path in Reports sheet
+==================
 ```
 
 ---
 
 ## 10. Testing
 
-### Test File
+### Test Files
 
-`tests/testthat/test_report_hub.R` — 1,900 lines covering:
+83 tests across 8 test files in `tests/testthat/`:
 
-- **Guard validation** — Missing config, missing sheets, invalid fields, duplicate keys
-- **HTML parsing** — CSS extraction, JS extraction, panel extraction, metadata extraction, type detection
-- **Namespace rewriting** — ID prefixing, CSS rewriting, JS rewriting, IIFE wrapping, conflict removal
-- **Front page building** — Card generation, metadata display
-- **Pinned data extraction** — JSON parsing, source tagging
-- **Page assembly** — Complete HTML generation, structure validation
+- `test_guard.R` -- Config validation, missing sheets, invalid fields, duplicate keys
+- `test_html_parser.R` -- Metadata extraction, type detection, file reading
+- `test_front_page.R` -- Card generation, metadata display, slides
+- `test_help_overlay.R` -- Help overlay extraction and rendering
+- `test_visual_features.R` -- Visual styling and layout features
+- `test_page_assembler.R` -- Complete HTML generation, iframe structure
+- `test_integration.R` -- End-to-end pipeline tests
 
-Tests use **synthetic HTML input** — small hand-crafted HTML strings that simulate real Turas reports. No external fixture files needed.
+Tests use **synthetic HTML input** -- small hand-crafted HTML strings that simulate real Turas reports. No external fixture files needed.
 
 ### Running Tests
 
 ```r
-testthat::test_file("modules/report_hub/tests/testthat/test_report_hub.R")
+testthat::test_dir("modules/report_hub/tests/testthat")
 ```
 
 ---
@@ -428,35 +360,34 @@ testthat::test_file("modules/report_hub/tests/testthat/test_report_hub.R")
 ### Adding New Config Fields
 
 1. **Add to guard validation** in `00_guard.R` (if required field)
-2. **Add to preflight checks** in `lib/validation/preflight_validators.R` (if cross-referential)
-3. **Read the field** in the appropriate pipeline step
-4. **Update template generator** in `lib/generate_config_templates.R`
-5. **Update user documentation** in `docs/USER_MANUAL.md`
+2. **Read the field** in the appropriate pipeline step
+3. **Update template generator** in `lib/generate_config_templates.R`
+4. **Update user documentation** in `docs/USER_MANUAL.md`
 
 ### Adding New JavaScript Features
 
 1. Create new JS file in `js/` directory
 2. Update `07_page_assembler.R` to include the new file in the assembled HTML
 3. Ensure the new JS uses the `ReportHub` namespace to avoid global pollution
-4. Add tests in `test_report_hub.R`
+4. Add tests
 
 ### Adding New Front Page Components
 
 Modify `03_front_page_builder.R`:
 - Add new card types or summary sections
-- Metadata comes from `01_html_parser.R` — ensure it extracts what you need
+- Metadata comes from `01_html_parser.R` -- ensure it extracts what you need
 
 ---
 
 ## 12. Common Maintenance Tasks
 
-### Namespace Conflicts Appearing
+### Iframe Not Loading
 
-**Symptom:** Clicking a tab in one report affects another report.
+**Symptom:** Report panel shows loading spinner but never loads content.
 
-**Diagnosis:** A DOM ID wasn't properly prefixed. Check `02_namespace_rewriter.R` regex patterns. The most common cause is a new HTML attribute or JS pattern that the rewriter doesn't handle.
+**Diagnosis:** Check browser console for errors. Common causes: base64 encoding/decoding failure, or the source HTML contains characters that break `srcdoc` attribute parsing.
 
-**Fix:** Add a new regex pattern to the rewriter for the unhandled case.
+**Fix:** Verify that `base64enc::base64encode()` and the JS-side `atob()` decode produce identical HTML. Check for any post-processing that might corrupt the base64 string.
 
 ### Pinned Views Not Working
 
@@ -466,11 +397,9 @@ Modify `03_front_page_builder.R`:
 
 ### CSS Styling Issues
 
-**Symptom:** Hub elements styled incorrectly, or report styles leaking.
+**Symptom:** Hub elements styled incorrectly.
 
-**Diagnosis:** Check `hub_styles.css` for specificity issues. Report CSS should be scoped by namespace prefix. Hub CSS should use hub-specific class names.
-
-**Fix:** Increase specificity of hub selectors or add namespace scoping to the offending report CSS.
+**Diagnosis:** Check `hub_styles.css` for specificity issues. Hub CSS only affects the hub shell (header, nav, panels). Report styles are fully isolated inside iframes.
 
 ### New Turas Module Integration
 
@@ -479,7 +408,7 @@ When a new analytical module is added to Turas:
 2. Update parser type detection
 3. Update metadata extraction for the new type
 4. Add front page card layout
-5. Test namespace isolation with the new report
+5. Test that the report loads correctly in an iframe
 
 ---
 
@@ -490,71 +419,66 @@ When a new analytical module is added to Turas:
 | `openxlsx` | Read config Excel file | Yes |
 | `htmltools` | HTML escaping and generation | Yes |
 | `jsonlite` | Pinned data JSON handling | Yes |
-| `base64enc` | Logo Base64 encoding | If logo used |
+| `base64enc` | Report HTML, logo, and image encoding | Yes |
+| `png` | PNG image reading (slide compression) | For slides with images |
+| `jpeg` | JPEG image reading/writing (slide compression) | For slides with images |
 | `shiny` | GUI interface | GUI only |
 | `shinyFiles` | GUI file browser | GUI only |
 
 ### Shared Module Dependencies
 
-- `modules/shared/lib/trs_refusal.R` — TRS refusal system
-- `modules/shared/lib/validation_utils.R` — Input validation helpers
-- `modules/shared/lib/logging_utils.R` — Console logging (optional fallback)
-- `modules/shared/template_styles.R` — Template generation styling
+- `modules/shared/lib/design_system/` -- Design tokens, fonts, base CSS
+- `modules/shared/template_styles.R` -- Template generation styling
 
 ---
 
 ## 14. Data Flow Diagram
 
 ```
-                    ┌─────────────────────┐
-                    │  Config File (.xlsx) │
-                    │  ┌─────────────┐    │
-                    │  │ Settings    │    │
-                    │  │ Reports     │    │
-                    │  │ CrossRef    │    │
-                    │  └─────────────┘    │
-                    └─────────┬───────────┘
-                              │
-                    ┌─────────▼───────────┐
-                    │   Guard + Preflight  │
-                    │   Validation         │
-                    └─────────┬───────────┘
-                              │
-              ┌───────────────┼───────────────┐
-              │               │               │
-     ┌────────▼──────┐ ┌─────▼──────┐ ┌──────▼────────┐
-     │ Report A.html │ │ Report B   │ │ Report C      │
-     │ (Parse)       │ │ (Parse)    │ │ (Parse)       │
-     └────────┬──────┘ └─────┬──────┘ └──────┬────────┘
-              │               │               │
-     ┌────────▼──────┐ ┌─────▼──────┐ ┌──────▼────────┐
-     │ Namespace     │ │ Namespace  │ │ Namespace     │
-     │ Rewrite (A)   │ │ Rewrite(B) │ │ Rewrite (C)   │
-     └────────┬──────┘ └─────┬──────┘ └──────┬────────┘
-              │               │               │
-              └───────────────┼───────────────┘
-                              │
-                    ┌─────────▼───────────┐
-                    │  Navigation Builder  │
-                    │  Front Page Builder  │
-                    └─────────┬───────────┘
-                              │
-                    ┌─────────▼───────────┐
-                    │   Page Assembler     │
-                    │                     │
-                    │  ┌──────────────┐   │
-                    │  │ hub_styles   │   │
-                    │  │ hub JS files │   │
-                    │  │ Report CSS   │   │
-                    │  │ Report JS    │   │
-                    │  │ Report HTML  │   │
-                    │  └──────────────┘   │
-                    └─────────┬───────────┘
-                              │
-                    ┌─────────▼───────────┐
-                    │   HTML Writer        │
-                    │                     │
-                    │  Combined_Report    │
-                    │  .html              │
-                    └─────────────────────┘
+                    +---------------------+
+                    |  Config File (.xlsx) |
+                    |  +-----------+      |
+                    |  | Settings  |      |
+                    |  | Reports   |      |
+                    |  | Slides    |      |
+                    |  +-----------+      |
+                    +---------+-----------+
+                              |
+                    +---------v-----------+
+                    |   Guard Validation   |
+                    |   (00_guard.R)       |
+                    +---------+-----------+
+                              |
+              +---------------+---------------+
+              |               |               |
+     +--------v------+ +-----v------+ +------v--------+
+     | Report A.html | | Report B   | | Report C      |
+     | (Read + Meta) | | (Read)     | | (Read)        |
+     +--------+------+ +-----+------+ +------+--------+
+              |               |               |
+              +---------------+---------------+
+                              |
+                    +---------v-----------+
+                    |  Navigation Builder  |
+                    |  Front Page Builder  |
+                    +---------+-----------+
+                              |
+                    +---------v-----------+
+                    |   Page Assembler     |
+                    |                     |
+                    |  +---------------+  |
+                    |  | hub_styles    |  |
+                    |  | hub JS files  |  |
+                    |  | Base64-encoded|  |
+                    |  | report HTML   |  |
+                    |  | (in iframes)  |  |
+                    |  +---------------+  |
+                    +---------+-----------+
+                              |
+                    +---------v-----------+
+                    |   HTML Writer        |
+                    |                     |
+                    |  Combined_Report    |
+                    |  .html              |
+                    +---------------------+
 ```

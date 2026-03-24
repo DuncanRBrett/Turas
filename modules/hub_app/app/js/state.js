@@ -311,6 +311,64 @@ var HubState = (function() {
     openDB(callback || function() {});
   }
 
+  // ===========================================================================
+  // Last-Opened Project Memory
+  // ===========================================================================
+
+  var LAST_PROJECT_KEY = "__hub_last_project__";
+
+  /**
+   * Save the last-opened project path to IndexedDB.
+   * @param {string} projectPath - Project directory path
+   * @param {string} projectName - Project display name
+   */
+  function saveLastProject(projectPath, projectName) {
+    if (!db) return;
+
+    try {
+      var tx = db.transaction(STORE_NAME, "readwrite");
+      var store = tx.objectStore(STORE_NAME);
+      store.put({
+        projectKey: LAST_PROJECT_KEY,
+        data: { path: projectPath, name: projectName },
+        savedAt: Date.now()
+      });
+    } catch (e) {
+      console.warn("[Hub State] Failed to save last project:", e.message);
+    }
+  }
+
+  /**
+   * Get the last-opened project from IndexedDB.
+   * @param {function} callback - Called with ({ path, name }) or null
+   */
+  function getLastProject(callback) {
+    if (!db) {
+      callback(null);
+      return;
+    }
+
+    try {
+      var tx = db.transaction(STORE_NAME, "readonly");
+      var store = tx.objectStore(STORE_NAME);
+      var request = store.get(LAST_PROJECT_KEY);
+
+      request.onsuccess = function() {
+        if (request.result && request.result.data) {
+          callback(request.result.data);
+        } else {
+          callback(null);
+        }
+      };
+
+      request.onerror = function() {
+        callback(null);
+      };
+    } catch (e) {
+      callback(null);
+    }
+  }
+
   // --- Public API ---
   return {
     init: init,
@@ -320,6 +378,8 @@ var HubState = (function() {
     onChange: onChange,
     clearProject: clearProject,
     buildSidecarData: buildSidecarData,
-    parseSidecarData: parseSidecarData
+    parseSidecarData: parseSidecarData,
+    saveLastProject: saveLastProject,
+    getLastProject: getLastProject
   };
 })();

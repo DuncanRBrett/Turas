@@ -70,6 +70,12 @@ run_report_hub_gui <- function() {
 
   TURAS_HOME <- Sys.getenv("TURAS_ROOT", getwd())
 
+  # Source guard layer for shared reader functions (.read_table_sheet, .read_settings_sheet)
+  guard_file <- file.path(TURAS_HOME, "modules", "report_hub", "00_guard.R")
+  if (file.exists(guard_file)) {
+    source(guard_file, local = TRUE)
+  }
+
   # Load shared GUI theme
   source(file.path(TURAS_HOME, "modules", "shared", "lib", "gui_theme.R"))
   theme <- turas_gui_theme("Report Hub", "Unified Report Portal")
@@ -516,106 +522,8 @@ run_report_hub_gui <- function() {
 
 
 # ==============================================================================
-# HELPERS: Auto-detect header row (same approach as tabs module)
+# HELPERS: Config preview using guard's sheet readers
 # ==============================================================================
-
-#' Read a table-format Excel sheet with auto-detection of header row
-#' @keywords internal
-.read_table_preview <- function(file_path, sheet_name, required_cols) {
-  df <- openxlsx::read.xlsx(file_path, sheet = sheet_name)
-
-  if (all(required_cols %in% names(df))) {
-    # Filter out help/description rows
-    if (nrow(df) > 0 && any(grepl("^\\[REQUIRED\\]|^\\[Optional\\]",
-                                   as.character(df[[1]]), ignore.case = TRUE))) {
-      df <- df[!grepl("^\\[REQUIRED\\]|^\\[Optional\\]",
-                       as.character(df[[1]]), ignore.case = TRUE), , drop = FALSE]
-    }
-    if (nrow(df) > 0) {
-      all_na <- apply(df, 1, function(row) all(is.na(row) | trimws(as.character(row)) == ""))
-      df <- df[!all_na, , drop = FALSE]
-    }
-    return(df)
-  }
-
-  # Auto-detect: scan first 10 rows for the header
-  raw <- openxlsx::read.xlsx(file_path, sheet = sheet_name,
-                              colNames = FALSE, rows = 1:10)
-  header_row <- NULL
-  for (r in seq_len(nrow(raw))) {
-    row_vals <- as.character(unlist(raw[r, ]))
-    if (all(required_cols %in% row_vals)) {
-      header_row <- r
-      break
-    }
-  }
-
-  if (!is.null(header_row)) {
-    df <- openxlsx::read.xlsx(file_path, sheet = sheet_name, startRow = header_row)
-    if (nrow(df) > 0 && any(grepl("^\\[REQUIRED\\]|^\\[Optional\\]",
-                                   as.character(df[[1]]), ignore.case = TRUE))) {
-      df <- df[!grepl("^\\[REQUIRED\\]|^\\[Optional\\]",
-                       as.character(df[[1]]), ignore.case = TRUE), , drop = FALSE]
-    }
-    if (nrow(df) > 0) {
-      all_na <- apply(df, 1, function(row) all(is.na(row) | trimws(as.character(row)) == ""))
-      df <- df[!all_na, , drop = FALSE]
-    }
-    return(df)
-  }
-
-  return(df)
-}
-
-
-#' Read a Settings-format Excel sheet with auto-detection of header row
-#' @keywords internal
-.read_settings_preview <- function(file_path, sheet_name) {
-  df <- openxlsx::read.xlsx(file_path, sheet = sheet_name)
-  col_lower <- tolower(names(df))
-
-  has_kv <- ("setting" %in% col_lower && "value" %in% col_lower) ||
-            ("field" %in% col_lower && "value" %in% col_lower)
-
-  if (has_kv) {
-    key_col <- if ("setting" %in% col_lower) which(col_lower == "setting")[1]
-               else which(col_lower == "field")[1]
-    value_col <- which(col_lower == "value")[1]
-    keys <- as.character(df[[key_col]])
-    values <- as.character(df[[value_col]])
-    valid <- !is.na(keys) & nzchar(trimws(keys)) &
-             !grepl("^\\[", keys) &
-             !grepl("^(PROJECT|BRANDING|OUTPUT|SECTION)$", keys, ignore.case = TRUE)
-    return(as.list(setNames(values[valid], tolower(trimws(keys[valid])))))
-  }
-
-  # Auto-detect: scan first 10 rows for Setting/Value or Field/Value header
-  raw <- openxlsx::read.xlsx(file_path, sheet = sheet_name,
-                              colNames = FALSE, rows = 1:10)
-  for (r in seq_len(nrow(raw))) {
-    row_vals <- tolower(as.character(unlist(raw[r, ])))
-    if (("setting" %in% row_vals && "value" %in% row_vals) ||
-        ("field" %in% row_vals && "value" %in% row_vals)) {
-      df <- openxlsx::read.xlsx(file_path, sheet = sheet_name, startRow = r)
-      col_lower <- tolower(names(df))
-      key_col <- if ("setting" %in% col_lower) which(col_lower == "setting")[1]
-                 else which(col_lower == "field")[1]
-      value_col <- which(col_lower == "value")[1]
-      keys <- as.character(df[[key_col]])
-      values <- as.character(df[[value_col]])
-      valid <- !is.na(keys) & nzchar(trimws(keys)) &
-               !grepl("^\\[", keys) &
-               !grepl("^(PROJECT|BRANDING|OUTPUT|SECTION)$", keys, ignore.case = TRUE)
-      return(as.list(setNames(values[valid], tolower(trimws(keys[valid])))))
-    }
-  }
-
-  # Fallback: single-row format
-  settings <- as.list(df[1, ])
-  names(settings) <- tolower(trimws(names(settings)))
-  return(settings)
-}
-
 
 #' Quick-Read Config for Preview
 #'
@@ -638,14 +546,14 @@ read_config_preview <- function(config_path) {
       ))
     }
 
-    # Read Settings (auto-detect header row)
-    settings <- .read_settings_preview(config_path, "Settings")
+    # Read Settings (auto-detect header row, skip OpenXML cleaning for preview)
+    settings <- .read_settings_sheet(config_path, "Settings", clean_escapes = FALSE)
     title <- settings[["project_title"]]
     if (is.null(title) || is.na(title)) title <- "(No title found)"
 
     # Read Reports (auto-detect header row)
-    reports_df <- .read_table_preview(config_path, "Reports",
-                                       c("report_path", "report_label"))
+    reports_df <- .read_table_sheet(config_path, "Reports",
+                                     c("report_path", "report_label"))
 
     if (!"report_path" %in% names(reports_df) ||
         !"report_label" %in% names(reports_df)) {

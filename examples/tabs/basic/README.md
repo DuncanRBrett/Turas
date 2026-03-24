@@ -96,7 +96,7 @@ print(output$all_results)
 ```r
 # From TURAS root directory
 library(testthat)
-test_file("tests/regression/test_regression_tabs.R")
+test_file("tests/regression/test_regression_tabs_mock.R")
 ```
 
 ---

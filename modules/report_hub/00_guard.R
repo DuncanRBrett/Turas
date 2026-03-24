@@ -140,9 +140,11 @@
 #'
 #' @param file_path Path to Excel file
 #' @param sheet_name Sheet name to read
+#' @param clean_escapes Logical. If TRUE (default), clean OpenXML escape
+#'   sequences from values. Set to FALSE for preview/display use.
 #' @return Named list of settings
 #' @keywords internal
-.read_settings_sheet <- function(file_path, sheet_name) {
+.read_settings_sheet <- function(file_path, sheet_name, clean_escapes = TRUE) {
   df <- openxlsx::read.xlsx(file_path, sheet = sheet_name)
   col_lower <- tolower(names(df))
 
@@ -160,8 +162,9 @@
     valid <- !is.na(keys) & nzchar(trimws(keys)) &
              !grepl("^\\[", keys) &           # skip [REQUIRED] description rows
              !grepl("^(PROJECT|BRANDING|OUTPUT|SECTION)$", keys, ignore.case = TRUE)  # skip section headers
+    cleaned_values <- if (clean_escapes) .clean_openxml_escapes(values[valid]) else values[valid]
     settings <- as.list(setNames(
-      .clean_openxml_escapes(values[valid]),
+      cleaned_values,
       tolower(trimws(keys[valid]))
     ))
     return(settings)
@@ -192,8 +195,9 @@
     valid <- !is.na(keys) & nzchar(trimws(keys)) &
              !grepl("^\\[", keys) &
              !grepl("^(PROJECT|BRANDING|OUTPUT|SECTION)$", keys, ignore.case = TRUE)
+    cleaned_values <- if (clean_escapes) .clean_openxml_escapes(values[valid]) else values[valid]
     settings <- as.list(setNames(
-      .clean_openxml_escapes(values[valid]),
+      cleaned_values,
       tolower(trimws(keys[valid]))
     ))
     return(settings)
@@ -601,37 +605,18 @@
 }
 
 
-#' Parse Optional Config Sheets (CrossRef, Slides)
+#' Parse Optional Config Sheets (Slides)
 #'
-#' Reads the optional CrossRef and Slides sheets from the config file.
+#' Reads the optional Slides sheet from the config file.
 #' Returns parsed data and any warnings for missing columns.
 #'
 #' @param config_file Path to the config file
 #' @param sheets Character vector of available sheet names
-#' @return List with \code{cross_refs}, \code{slides}, and \code{warnings}
+#' @return List with \code{slides} and \code{warnings}
 #' @keywords internal
 .parse_optional_sheets <- function(config_file, sheets) {
   warnings <- character(0)
-  cross_refs <- NULL
   slides <- NULL
-
-  # --- CrossRef sheet ---
-  if ("CrossRef" %in% sheets) {
-    xref_required <- c("tracker_code", "tabs_code")
-    xref_df <- .read_table_sheet(config_file, "CrossRef", xref_required)
-    if (nrow(xref_df) > 0) {
-      xref_missing <- setdiff(xref_required, names(xref_df))
-      if (length(xref_missing) > 0) {
-        warnings <- c(warnings, sprintf(
-          "CrossRef sheet missing columns: %s. Cross-references will be skipped.",
-          paste(xref_missing, collapse = ", ")
-        ))
-      } else {
-        cross_refs <- xref_df[!is.na(xref_df$tracker_code) & !is.na(xref_df$tabs_code), ]
-        if (nrow(cross_refs) == 0) cross_refs <- NULL
-      }
-    }
-  }
 
   # --- Slides sheet ---
   if ("Slides" %in% sheets) {
@@ -713,7 +698,7 @@
     }
   }
 
-  list(cross_refs = cross_refs, slides = slides, warnings = warnings)
+  list(slides = slides, warnings = warnings)
 }
 
 
@@ -796,11 +781,10 @@
 #'
 #' @param settings Named list of validated settings
 #' @param reports_df Data frame of validated report entries
-#' @param cross_refs Data frame of cross-references (or NULL)
 #' @param slides List of slide objects (or NULL)
 #' @return The assembled config list
 #' @keywords internal
-.build_validated_config <- function(settings, reports_df, cross_refs, slides) {
+.build_validated_config <- function(settings, reports_df, slides) {
   # Helper: return trimmed value if non-null and non-empty, else NULL
   .trim_or_null <- function(x) {
     if (!is.null(x) && nzchar(trimws(x))) trimws(x) else NULL
@@ -836,7 +820,6 @@
                    nzchar(trimws(row$report_type))) trimws(row$report_type) else NULL
       )
     }),
-    cross_refs = cross_refs,
     slides = slides
   )
 }
@@ -846,7 +829,7 @@
 #'
 #' Validates the Report Hub config Excel file: checks file existence,
 #' reads and validates Settings and Reports sheets, parses optional
-#' CrossRef and Slides sheets, resolves output paths, and assembles
+#' Slides sheet, resolves output paths, and assembles
 #' the validated config object.
 #'
 #' @param config_file Path to the Report Hub config Excel file
@@ -886,7 +869,7 @@ guard_validate_hub_config <- function(config_file) {
     cat(sprintf("  [WARNING] %d reports configured — hub may be slow to load. Recommended: 5-10.\n", n_reports))
   }
 
-  # --- Step 5: Parse optional sheets (CrossRef, Slides) ---
+  # --- Step 5: Parse optional sheets (Slides) ---
   optional <- .parse_optional_sheets(config_file, sheets)
   warnings <- optional$warnings
 
@@ -897,7 +880,7 @@ guard_validate_hub_config <- function(config_file) {
 
   # --- Step 7: Build validated config object ---
   config <- .build_validated_config(
-    settings, reports_df, optional$cross_refs, optional$slides
+    settings, reports_df, optional$slides
   )
 
   # --- Return ---
@@ -906,9 +889,7 @@ guard_validate_hub_config <- function(config_file) {
     status = status,
     result = config,
     warnings = warnings,
-    message = sprintf("Config validated: %d reports, %s cross-references",
-                      length(config$reports),
-                      if (is.null(optional$cross_refs)) "no" else nrow(optional$cross_refs))
+    message = sprintf("Config validated: %d reports", length(config$reports))
   ))
 }
 

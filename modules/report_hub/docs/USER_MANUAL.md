@@ -10,10 +10,10 @@
 
 The **Report Hub** combines multiple Turas HTML reports (Tracker, Crosstabs, etc.) into a single unified report with:
 
-- **Two-tier navigation** — Top-level tabs for each report, sub-tabs for sections within each report
+- **Two-tier navigation** — Top-level tabs for each report, sub-tabs preserved inside each report's iframe
 - **Unified front page** — Overview cards showing key statistics for every included report
 - **Consolidated pinned views** — All pinned items from all reports merged into one panel
-- **Namespace isolation** — Each report's CSS, JavaScript, and DOM IDs are scoped to prevent conflicts
+- **Iframe isolation** — Each report is embedded in its own iframe, behaving identically to its standalone version with zero CSS/JS conflicts
 - **Branded header** — Project title, company logo, and colour scheme
 - **Save & print** — Single "Save Report" button preserves the entire combined report
 
@@ -60,7 +60,7 @@ if (result$status == "PASS") {
 
 ## Config File Reference
 
-The config file is an Excel workbook (`.xlsx`) with three sheets:
+The config file is an Excel workbook (`.xlsx`) with two required sheets and one optional sheet:
 
 ### Settings Sheet (Required)
 
@@ -117,24 +117,6 @@ Lists each HTML report to include in the combined output.
 - Paths can be absolute or relative to the config file location
 - Only `.html` and `.htm` files are accepted
 
-### CrossRef Sheet (Optional)
-
-Maps questions between tracker and crosstabs reports for cross-referencing.
-
-| Column | Description |
-|--------|-------------|
-| `tracker_code` | Question code in the tracker report |
-| `tabs_code` | Corresponding question code in the crosstabs report |
-
-**Example:**
-
-| tracker_code | tabs_code |
-|-------------|-----------|
-| Q1_awareness | Q1 |
-| Q5_satisfaction | Q5 |
-
-Rows with empty `tracker_code` or `tabs_code` are automatically skipped.
-
 ### Slides Sheet (Optional)
 
 Adds qualitative insight slides to the Overview front page. Each row becomes an editable slide card.
@@ -166,7 +148,7 @@ Adds qualitative insight slides to the Overview front page. Each row becomes an 
 Images specified via `image_path` are automatically **compressed and base64-embedded** into the self-contained HTML output. No external image files are referenced.
 
 **Compression pipeline:**
-1. Images wider than **800px** are downscaled to 800px width (bilinear interpolation), preserving aspect ratio
+1. Images wider than **1200px** are downscaled to 1200px width (bilinear interpolation), preserving aspect ratio
 2. PNG and JPEG images are re-encoded as **JPEG at 0.85 quality**
 3. SVG images pass through as-is (already lightweight vector format)
 4. The compressed image is base64-encoded and embedded directly in the HTML
@@ -175,14 +157,14 @@ Images specified via `image_path` are automatically **compressed and base64-embe
 
 | Original | Dimensions | After compression |
 |----------|-----------|-------------------|
-| 5MB PNG, 3000x2000 | Resized to 800x533 | ~40-80KB |
-| 5MB PNG, 1200x800 | Resized to 800x533 | ~50-100KB |
-| 5MB JPEG, 4000x3000 | Resized to 800x600 | ~30-60KB |
+| 5MB PNG, 3000x2000 | Resized to 1200x800 | ~60-120KB |
+| 5MB PNG, 1200x800 | No resize needed | ~80-150KB |
+| 5MB JPEG, 4000x3000 | Resized to 1200x900 | ~50-100KB |
 | 5MB JPEG, 800x600 (no resize needed) | 800x600 | ~80-150KB |
 
-Base64 encoding adds ~33% to the byte size in the HTML file. A typical slide image contributes **65-200KB** to the output file.
+Base64 encoding adds ~33% to the byte size in the HTML file. A typical slide image contributes **80-250KB** to the output file.
 
-**Manual image uploads** via the image button in the report UI are also compressed client-side: resized to max 800px wide, JPEG 0.7 quality, with a 5MB file size guard.
+**Manual image uploads** via the image button in the report UI are also compressed client-side: resized to max 1200px on the longest side, JPEG 0.7 quality, with a 5MB file size guard.
 
 **Requirements:** The `png`, `jpeg`, and `base64enc` R packages must be installed for image compression. If unavailable, images are embedded at their original size (larger file but still functional).
 
@@ -196,14 +178,13 @@ Base64 encoding adds ~33% to the byte size in the HTML file. A typical slide ima
 
 ## Function Reference
 
-### `combine_reports(config_file, output_file = NULL, auto_cross_ref = FALSE)`
+### `combine_reports(config_file, output_file = NULL)`
 
 Main entry point. Combines multiple HTML reports into one.
 
 **Parameters:**
 - `config_file` — Path to the Excel config file (required)
 - `output_file` — Output file path (optional; auto-generated if NULL)
-- `auto_cross_ref` — Enable fuzzy question matching (default FALSE)
 
 **Returns:** TRS-compliant list:
 ```r
@@ -231,13 +212,12 @@ Launches the Shiny GUI for interactive report combining. No parameters needed.
 The Report Hub processes reports through these steps:
 
 ```
-1. Guard Validation    → Validates config file, report paths, settings
-2. HTML Parsing        → Extracts CSS, JS, panels, metadata from each report
-3. Namespace Rewriting → Prefixes all DOM IDs, CSS selectors, JS variables
-4. Front Page Building → Creates overview cards with report statistics
-5. Navigation Building → Creates two-tier tab navigation
-6. Page Assembly       → Combines everything into a single HTML document
-7. HTML Writing        → Writes the final file to disk
+1. Guard Validation    -> Validates config file, report paths, settings
+2. HTML Reading        -> Reads each report file and extracts metadata
+3. Navigation Building -> Creates Level 1 tab navigation
+4. Front Page Building -> Creates overview cards with report statistics
+5. Page Assembly       -> Base64-encodes each report and assembles iframe-based HTML
+6. HTML Writing        -> Writes the final file to disk
 ```
 
 Each step is fail-safe with TRS refusal handling. If any step encounters an unrecoverable error, you'll see a detailed error message in the R console.
@@ -375,24 +355,22 @@ The file can be:
 modules/report_hub/
 ├── 00_main.R                # Main entry point: combine_reports()
 ├── 00_guard.R               # Config validation (TRS v1.0)
-├── 01_html_parser.R         # Extracts CSS/JS/panels from each HTML report
-├── 02_namespace_rewriter.R  # Prefixes IDs to prevent cross-report conflicts
-├── 03_front_page_builder.R  # Generates overview cards and summary area
-├── 04_navigation_builder.R  # Builds two-tier tab navigation
-├── 07_page_assembler.R      # Assembles final HTML document
+├── 01_html_parser.R         # Reads HTML reports and extracts metadata
+├── 03_front_page_builder.R  # Generates overview cards, slides, and about panel
+├── 04_navigation_builder.R  # Builds Level 1 tab navigation
+├── 07_page_assembler.R      # Assembles final HTML with iframe isolation
 ├── 08_html_writer.R         # Writes output file
 ├── run_report_hub_gui.R     # Shiny GUI launcher
 ├── assets/
 │   └── hub_styles.css       # Hub-specific CSS
 ├── js/
-│   ├── hub_id_resolver.js   # Scoped DOM query helpers
-│   ├── hub_navigation.js    # Tab switching and report navigation
+│   ├── hub_id_resolver.js   # ReportHub namespace initializer
+│   ├── hub_navigation.js    # Tab switching, deep linking, iframe loading
 │   └── hub_pinned.js        # Consolidated pinned views management
 ├── tests/
-│   └── testthat/
-│       └── test_report_hub.R
+│   └── testthat/            # 83 tests across 8 files
 └── docs/
-    └── REPORT_HUB_USER_GUIDE.md  # This file
+    └── USER_MANUAL.md       # This file
 ```
 
 ---
@@ -404,7 +382,9 @@ modules/report_hub/
 | `openxlsx` | Read config Excel file | Yes |
 | `htmltools` | HTML escaping | Yes |
 | `jsonlite` | Pinned data JSON handling | Yes |
-| `base64enc` | Logo embedding | Yes (if logo used) |
+| `base64enc` | Report HTML, logo, and image encoding | Yes |
+| `png` | PNG image reading (slide compression) | For slides with images |
+| `jpeg` | JPEG image reading/writing (slide compression) | For slides with images |
 | `shiny` | GUI only | GUI only |
 | `shinyFiles` | GUI file browser | GUI only |
 
@@ -414,4 +394,5 @@ modules/report_hub/
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.0 | March 2026 | Initial release with tracker + tabs support, namespace isolation, consolidated pinned views, branded header, front page with report cards |
+| 1.0 | March 2026 | Initial release with tracker + tabs support, consolidated pinned views, branded header, front page with report cards |
+| 2.0 | March 2026 | Migrated to iframe isolation architecture; removed namespace rewriting; base64-encoded report embedding |

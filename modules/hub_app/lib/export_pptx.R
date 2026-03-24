@@ -75,10 +75,21 @@ export_pins_to_pptx <- function(items,
     cat("[Hub App Export] Building PPTX for:", project_name, "\n")
 
     # --- Create presentation ---
+    # Try: explicit template → default branded template → built-in Office theme
     if (!is.null(template_path) && file.exists(template_path)) {
       pptx <- officer::read_pptx(template_path)
+      cat("[Hub App Export] Using custom template:", template_path, "\n")
     } else {
-      pptx <- officer::read_pptx()
+      # Look for the bundled branded template
+      turas_root <- Sys.getenv("TURAS_ROOT", getwd())
+      branded_path <- file.path(turas_root, "modules", "hub_app", "assets",
+                                 "turas_template.pptx")
+      if (file.exists(branded_path)) {
+        pptx <- officer::read_pptx(branded_path)
+        cat("[Hub App Export] Using branded Turas template\n")
+      } else {
+        pptx <- officer::read_pptx()
+      }
     }
 
     # --- Title slide ---
@@ -120,7 +131,7 @@ export_pins_to_pptx <- function(items,
     }
 
     # --- Save ---
-    safe_name <- gsub("[^a-zA-Z0-9_\\- ]", "", project_name)
+    safe_name <- gsub("[^a-zA-Z0-9_ -]", "", project_name)
     safe_name <- gsub("\\s+", "_", trimws(safe_name))
     if (nchar(safe_name) == 0) safe_name <- "Turas_Export"
 
