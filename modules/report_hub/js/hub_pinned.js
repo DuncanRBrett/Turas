@@ -276,7 +276,7 @@
   function buildSectionDividerHTML(section, idx) {
     var total = ReportHub.pinnedItems.length;
     var sid = escapeHtml(section.id);
-    return '<div class="hub-section-divider" data-idx="' + idx + '" data-item-id="' + sid + '">' +
+    return '<div class="hub-section-divider" data-idx="' + idx + '" data-item-id="' + sid + '" draggable="true" data-pin-drag-idx="' + idx + '">' +
       '<div class="hub-section-title" contenteditable="true" ' +
         'onpaste="event.preventDefault();document.execCommand(\'insertText\',false,event.clipboardData.getData(\'text/plain\'))" ' +
         'onblur="ReportHub.updateSectionTitleById(\'' + sid + '\', this.textContent)">' +
@@ -358,7 +358,7 @@
     var subtitle = pin.subtitle || pin.questionText || "";
 
     var pid = escapeHtml(pin.id);
-    var html = '<div class="hub-pin-card" data-pin-id="' + pid + '" data-idx="' + idx + '">' +
+    var html = '<div class="hub-pin-card" data-pin-id="' + pid + '" data-idx="' + idx + '" draggable="true" data-pin-drag-idx="' + idx + '">' +
       '<div class="hub-pin-header">' +
         sourceBadge +
         '<span class="hub-pin-title">' + escapeHtml(title) + '</span>' +
@@ -1788,5 +1788,75 @@
               .replace(/>/g, "&gt;")
               .replace(/"/g, "&quot;");
   }
+
+  // ============================================================================
+  // DRAG AND DROP REORDERING
+  // Allows pin cards and section dividers to be reordered by dragging.
+  // Uses the same HTML5 Drag and Drop pattern as the tabs module.
+  // ============================================================================
+  (function() {
+    var dragFromIdx = null;
+
+    document.addEventListener("dragstart", function(e) {
+      var draggable = e.target.closest("[data-pin-drag-idx]");
+      if (!draggable) return;
+      // Don't start drag when editing text inputs
+      if (e.target.isContentEditable || e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") {
+        e.preventDefault();
+        return;
+      }
+      dragFromIdx = parseInt(draggable.getAttribute("data-pin-drag-idx"), 10);
+      draggable.classList.add("hub-pin-dragging");
+      e.dataTransfer.effectAllowed = "move";
+      // Custom drag ghost with pin/section title
+      try {
+        var title = draggable.querySelector(".hub-pin-title, .hub-section-title");
+        var label = title ? title.textContent.substring(0, 30) : "Moving...";
+        var ghost = document.createElement("div");
+        ghost.style.cssText = "position:absolute;top:-999px;left:-999px;padding:8px 16px;background:#e2e8f0;border-radius:6px;font-size:13px;font-weight:500;color:#374151;white-space:nowrap;";
+        ghost.textContent = label;
+        document.body.appendChild(ghost);
+        e.dataTransfer.setDragImage(ghost, 0, 0);
+        setTimeout(function() { document.body.removeChild(ghost); }, 0);
+      } catch (err) {}
+    });
+
+    document.addEventListener("dragover", function(e) {
+      var target = e.target.closest("[data-pin-drag-idx]");
+      if (!target || dragFromIdx === null) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      document.querySelectorAll(".hub-pin-drop-target").forEach(function(el) {
+        el.classList.remove("hub-pin-drop-target");
+      });
+      target.classList.add("hub-pin-drop-target");
+    });
+
+    document.addEventListener("dragleave", function(e) {
+      var target = e.target.closest("[data-pin-drag-idx]");
+      if (target) target.classList.remove("hub-pin-drop-target");
+    });
+
+    document.addEventListener("drop", function(e) {
+      e.preventDefault();
+      document.querySelectorAll(".hub-pin-drop-target, .hub-pin-dragging").forEach(function(el) {
+        el.classList.remove("hub-pin-drop-target", "hub-pin-dragging");
+      });
+      var target = e.target.closest("[data-pin-drag-idx]");
+      if (!target || dragFromIdx === null) return;
+      var toIdx = parseInt(target.getAttribute("data-pin-drag-idx"), 10);
+      if (dragFromIdx !== toIdx) {
+        ReportHub.moveItem(dragFromIdx, toIdx);
+      }
+      dragFromIdx = null;
+    });
+
+    document.addEventListener("dragend", function() {
+      dragFromIdx = null;
+      document.querySelectorAll(".hub-pin-drop-target, .hub-pin-dragging").forEach(function(el) {
+        el.classList.remove("hub-pin-drop-target", "hub-pin-dragging");
+      });
+    });
+  })();
 
 })();

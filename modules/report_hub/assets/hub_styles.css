@@ -631,6 +631,12 @@ body {
   gap: 4px;
 }
 
+/* --- Drag and Drop --- */
+.hub-pin-dragging { opacity: 0.4 !important; }
+.hub-pin-drop-target { outline: 2px dashed var(--hub-brand); outline-offset: 4px; }
+.hub-pin-card[draggable="true"], .hub-section-divider[draggable="true"] { cursor: grab; }
+.hub-pin-card[draggable="true"]:active, .hub-section-divider[draggable="true"]:active { cursor: grabbing; }
+
 /* --- Markdown Rendered Content --- */
 .hub-md-content h2 {
   font-size: 16px;
