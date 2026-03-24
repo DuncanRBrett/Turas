@@ -15,6 +15,7 @@ var SimUI = (function() {
   var _renameTimer = null;
 
   var _initialized = false;
+  var _currencySymbol = "$";
 
   function init() {
     if (_initialized) return;
@@ -22,6 +23,7 @@ var SimUI = (function() {
     if (!data || !data.attributes) return;
 
     _initialized = true;
+    _currencySymbol = (data.meta && data.meta.currency_symbol) || "$";
 
     // Check for pre-defined products from config
     if (data.defaultProducts && Array.isArray(data.defaultProducts) && data.defaultProducts.length > 0) {
@@ -457,7 +459,7 @@ var SimUI = (function() {
       html += '<span style="font-size:11px;color:#64748b;min-width:80px;text-align:right;">Revenue</span>';
       html += '<div style="flex:1;background:#fef3c7;border-radius:4px;height:' + barHeight + 'px;position:relative;overflow:hidden;">';
       html += '<div style="width:' + Math.max(revW, 2) + '%;height:100%;background:#d4a843;border-radius:4px;display:flex;align-items:center;padding:0 10px;min-width:60px;transition:width 0.3s ease;">';
-      html += '<span style="font-size:12px;font-weight:600;color:#fff;">$' + d.revenue.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0}) + '</span>';
+      html += '<span style="font-size:12px;font-weight:600;color:#fff;">' + _currencySymbol + d.revenue.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0}) + '</span>';
       html += '</div></div></div>';
 
       html += '</div>';
@@ -480,10 +482,10 @@ var SimUI = (function() {
       var custCount = Math.round(revenueCustomers * rd.share / 100);
       html += '<tr' + (t === revenueData.length - 1 ? ' style="border-top:1px solid #e2e8f0;font-weight:600;"' : '') + '>';
       html += '<td style="padding:6px 8px;font-size:12px;">' + escHtml(rd.name) + '</td>';
-      html += '<td style="padding:6px 8px;font-size:12px;text-align:right;">$' + rd.price.toFixed(0) + '</td>';
+      html += '<td style="padding:6px 8px;font-size:12px;text-align:right;">' + _currencySymbol + rd.price.toFixed(0) + '</td>';
       html += '<td style="padding:6px 8px;font-size:12px;text-align:right;">' + rd.share.toFixed(1) + '%</td>';
       html += '<td style="padding:6px 8px;font-size:12px;text-align:right;">' + custCount.toLocaleString() + '</td>';
-      html += '<td style="padding:6px 8px;font-size:12px;text-align:right;font-weight:600;">$' + rd.revenue.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0}) + '</td>';
+      html += '<td style="padding:6px 8px;font-size:12px;text-align:right;font-weight:600;">' + _currencySymbol + rd.revenue.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0}) + '</td>';
       html += '</tr>';
     }
     // Total row
@@ -492,7 +494,7 @@ var SimUI = (function() {
     html += '<td style="padding:6px 8px;"></td>';
     html += '<td style="padding:6px 8px;font-size:12px;text-align:right;">100%</td>';
     html += '<td style="padding:6px 8px;font-size:12px;text-align:right;">' + revenueCustomers.toLocaleString() + '</td>';
-    html += '<td style="padding:6px 8px;font-size:12px;text-align:right;">$' + totalRevenue.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0}) + '</td>';
+    html += '<td style="padding:6px 8px;font-size:12px;text-align:right;">' + _currencySymbol + totalRevenue.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0}) + '</td>';
     html += '</tr></tbody></table></div>';
 
     container.innerHTML = html;

@@ -488,6 +488,7 @@ run_pricing_gui <- function() {
     output$results_table <- renderTable({
       req(rv$results)
       method <- rv$results$method
+      cs <- rv$results$config$currency_symbol %||% "$"
 
       if (method == "van_westendorp") {
         pp <- rv$results$results$price_points
@@ -499,7 +500,7 @@ run_pricing_gui <- function() {
             "Indifference Price Point",
             "Point of Marginal Expensiveness"
           ),
-          Price = sprintf("$%.2f", c(pp$PMC, pp$OPP, pp$IDP, pp$PME)),
+          Price = sprintf("%s%.2f", cs, c(pp$PMC, pp$OPP, pp$IDP, pp$PME)),
           check.names = FALSE
         )
       } else if (method == "gabor_granger") {
@@ -507,7 +508,7 @@ run_pricing_gui <- function() {
         rows <- data.frame(
           Metric = c("Revenue-Maximizing Price", "Purchase Intent", "Revenue Index"),
           Value = c(
-            sprintf("$%.2f", opt$price),
+            sprintf("%s%.2f", cs, opt$price),
             sprintf("%.1f%%", opt$purchase_intent * 100),
             sprintf("%.2f", opt$revenue_index)
           ),
@@ -518,7 +519,7 @@ run_pricing_gui <- function() {
           rows <- rbind(rows, data.frame(
             Metric = c("Profit-Maximizing Price", "Profit Index"),
             Value = c(
-              sprintf("$%.2f", opt_profit$price),
+              sprintf("%s%.2f", cs, opt_profit$price),
               sprintf("%.2f", opt_profit$profit_index)
             ),
             stringsAsFactors = FALSE
@@ -531,7 +532,7 @@ run_pricing_gui <- function() {
           data.frame(
             Metric = c("Revenue-Maximizing Price", "Predicted Intent"),
             Value = c(
-              sprintf("$%.2f", opt$price),
+              sprintf("%s%.2f", cs, opt$price),
               sprintf("%.1f%%", opt$predicted_intent * 100)
             ),
             stringsAsFactors = FALSE
@@ -543,9 +544,9 @@ run_pricing_gui <- function() {
         data.frame(
           Metric = c("VW Acceptable Range", "VW Optimal Range", "GG Revenue-Max Price"),
           Value = c(
-            sprintf("$%.2f - $%.2f", vw$PMC, vw$PME),
-            sprintf("$%.2f - $%.2f", vw$OPP, vw$IDP),
-            sprintf("$%.2f", gg$price)
+            sprintf("%s%.2f - %s%.2f", cs, vw$PMC, cs, vw$PME),
+            sprintf("%s%.2f - %s%.2f", cs, vw$OPP, cs, vw$IDP),
+            sprintf("%s%.2f", cs, gg$price)
           ),
           stringsAsFactors = FALSE
         )

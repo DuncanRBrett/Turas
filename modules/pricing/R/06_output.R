@@ -62,7 +62,8 @@ write_pricing_output <- function(results, plots, validation, config, output_file
 
   number_style <- openxlsx::createStyle(numFmt = "0.00")
   percent_style <- openxlsx::createStyle(numFmt = "0.0%")
-  currency_style <- openxlsx::createStyle(numFmt = "$#,##0.00")
+  cs <- config$currency_symbol %||% "$"
+  currency_style <- openxlsx::createStyle(numFmt = paste0(cs, "#,##0.00"))
 
   method <- tolower(config$analysis_method)
 
@@ -770,11 +771,11 @@ write_pricing_output <- function(results, plots, validation, config, output_file
         Item = c("Anchor Price", "Anchor Source", "Anchor Tier",
                  "Floor Price", "Ceiling Price", "Rounding Applied"),
         Value = c(
-          sprintf("$%.2f", ladder_results$diagnostics$anchor_price),
+          sprintf("%s%.2f", cs, ladder_results$diagnostics$anchor_price),
           ladder_results$diagnostics$anchor_source,
           ladder_results$diagnostics$anchor_tier,
-          sprintf("$%.2f", ladder_results$diagnostics$floor_price),
-          sprintf("$%.2f", ladder_results$diagnostics$ceiling_price),
+          sprintf("%s%.2f", cs, ladder_results$diagnostics$floor_price),
+          sprintf("%s%.2f", cs, ladder_results$diagnostics$ceiling_price),
           ladder_results$diagnostics$rounding_applied
         ),
         stringsAsFactors = FALSE

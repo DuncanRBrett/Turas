@@ -184,6 +184,7 @@ transform_conjoint_for_html <- function(conjoint_results, config = list()) {
       n_respondents     = model_result$n_respondents %||% NA,
       default_customers = as.numeric(config$default_customers %||%
                                      report_config$default_customers %||% 1000),
+      currency_symbol   = config$currency_symbol %||% "$",
       generated         = format(Sys.time(), "%Y-%m-%d %H:%M:%S")
     ),
     attributes = attributes,
