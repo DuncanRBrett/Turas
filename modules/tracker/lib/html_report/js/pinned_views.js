@@ -7,9 +7,14 @@
 
 var pinnedViews = [];
 
+/** Strip control characters that are invalid in XML (and thus SVG). */
+function stripInvalidXmlChars(str) {
+  return str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+}
+
 /** Convert SVG string to an Image-loadable URL (data URI for iframe compatibility). */
 function svgToImageUrl(svgString) {
-  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgString);
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(stripInvalidXmlChars(svgString));
 }
 
 /**
