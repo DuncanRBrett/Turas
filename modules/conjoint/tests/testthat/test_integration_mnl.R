@@ -89,12 +89,9 @@ if (is.null(turas_root)) {
     )
 
     # Status must be PASS or PARTIAL (not REFUSED)
-    diag_info <- sprintf("Expected PASS/PARTIAL, got: %s | code: %s | msg: %s | wd: %s",
-                         result$status,
-                         result$code %||% "NA",
-                         result$message %||% "NA",
-                         getwd())
-    expect_true(result$status %in% c("PASS", "PARTIAL"), info = diag_info)
+    expect_true(result$status %in% c("PASS", "PARTIAL"),
+                info = sprintf("Expected PASS/PARTIAL, got: %s (code: %s, msg: %s)",
+                               result$status, result$code %||% "NA", result$message %||% "NA"))
 
     # Clean up
     unlink(output_file)

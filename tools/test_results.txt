@@ -1,7 +1,7 @@
 ================================================================================
 TURAS ANALYTICS PLATFORM - COMPREHENSIVE SYSTEM CHECK
 ================================================================================
-Date:       2026-03-24 12:06:10
+Date:       2026-03-24 12:35:33
 R Version:  4.5.1
 Root:       /Users/duncan/Documents/Turas
 ================================================================================
@@ -117,7 +117,7 @@ What to do:
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 
-[PASS] Shared Infrastructure — 619 passed, 0 failed, 0 skipped (7.8s)
+[PASS] Shared Infrastructure — 619 passed, 0 failed, 0 skipped (7.5s)
 
 --------------------------------------------------------------------------------
 MODULE: AlchemerParser (7 test files)
@@ -162,7 +162,7 @@ routing_detection: ........................................
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 
-[PASS] AlchemerParser — 299 passed, 0 failed, 0 skipped (4.2s)
+[PASS] AlchemerParser — 299 passed, 0 failed, 0 skipped (4.0s)
 
 --------------------------------------------------------------------------------
 MODULE: Confidence (16 test files)
@@ -182,15 +182,15 @@ CI Dispatcher: .............................
 🎉🎊🎉🎊🎉🎊🎉🎊🎉🎊🎉
 
 --- test_config_templates.R ---
-config_templates: [Confidence] Config template saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370932d5bc07.xlsx
+config_templates: [Confidence] Config template saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370951c399f4.xlsx
   Sheets: File_Paths, Study_Settings, Question_Analysis, Population_Margins
-...[Confidence] Config template saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37092a2adb2.xlsx
+...[Confidence] Config template saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709219bd9d3.xlsx
   Sheets: File_Paths, Study_Settings, Question_Analysis, Population_Margins
-....[Confidence] Config template saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709d63f05b.xlsx
+....[Confidence] Config template saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709311b4150.xlsx
   Sheets: File_Paths, Study_Settings, Question_Analysis, Population_Margins
-......[Confidence] Config template saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095d58749a.xlsx
+......[Confidence] Config template saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370979856cee.xlsx
   Sheets: File_Paths, Study_Settings, Question_Analysis, Population_Margins
-......[Confidence] Config template saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709435961b9.xlsx
+......[Confidence] Config template saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709235d0332.xlsx
   Sheets: File_Paths, Study_Settings, Question_Analysis, Population_Margins
 .=== TURAS Confidence Module: Generating Config Templates ===
 [Confidence] Config template saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/confidence_tpl_14089/Confidence_Config_Template.xlsx
@@ -279,7 +279,7 @@ HTML Report Generation: ........................................................
 
 --- test_load_config.R ---
 load_config: 
-Config Loading: Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/test_config_120647_4782.xlsx
+Config Loading: Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/test_config_123605_4782.xlsx
 
 -
 /
@@ -315,7 +315,7 @@ Config Loading: Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56
   - Study settings: 6 parameters
   - Question analysis: 2 questions (max 200)
   - Population margins: (optional sheet not provided)
-......Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/test_config_120648_5097.xlsx
+......Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/test_config_123605_5097.xlsx
 
 -
 /
@@ -351,7 +351,7 @@ Config Loading: Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56
   - Study settings: 6 parameters
   - Question analysis: 2 questions (max 200)
   - Population margins: (optional sheet not provided)
-...Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/test_config_120648_3509.xlsx
+...Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/test_config_123605_3509.xlsx
 
 -
 /
@@ -387,7 +387,7 @@ Config Loading: Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56
   - Study settings: 6 parameters
   - Question analysis: 2 questions (max 200)
   - Population margins: (optional sheet not provided)
-...Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/test_config_120648_5935.xlsx
+...Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/test_config_123605_5935.xlsx
 
 -
 /
@@ -423,7 +423,7 @@ Config Loading: Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56
   - Study settings: 6 parameters
   - Question analysis: 2 questions (max 200)
   - Population margins: (optional sheet not provided)
-.....Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/test_config_120648_6771.xlsx
+.....Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/test_config_123605_6771.xlsx
 
 -
 /
@@ -459,7 +459,7 @@ Config Loading: Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56
   - Study settings: 7 parameters
   - Question analysis: 2 questions (max 500)
   - Population margins: (optional sheet not provided)
-.Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/test_config_120649_5262.xlsx
+.Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/test_config_123606_5262.xlsx
 
 -
 /
@@ -572,32 +572,32 @@ Mean Confidence Intervals: .....................................................
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 --- test_output_integration.R ---
-output_integration:    Writing: file370961a84e25.xlsx
-[TRS INFO] CONF: Saved: file370961a84e25.xlsx (26,288 bytes)
-..   Writing: file370952dadcc3.xlsx
-[TRS INFO] CONF: Saved: file370952dadcc3.xlsx (26,079 bytes)
-.......   Writing: file37092a77d30c.xlsx
-[TRS INFO] CONF: Saved: file37092a77d30c.xlsx (23,885 bytes)
-.   Writing: file370947df5164.xlsx
-[TRS INFO] CONF: Saved: file370947df5164.xlsx (21,372 bytes)
-.   Writing: file370940adeb0b.xlsx
-[TRS INFO] CONF: Saved: file370940adeb0b.xlsx (18,855 bytes)
-..   Writing: file3709187c6fd5.xlsx
-[TRS INFO] CONF: Saved: file3709187c6fd5.xlsx (18,821 bytes)
-.   Writing: file3709538dde02.xlsx
-[TRS INFO] CONF: Saved: file3709538dde02.xlsx (18,322 bytes)
-.   Writing: file370960132b7a.xlsx
-[TRS INFO] CONF: Saved: file370960132b7a.xlsx (18,855 bytes)
-.   Writing: file370920e7380e.xlsx
-[TRS INFO] CONF: Saved: file370920e7380e.xlsx (18,821 bytes)
-.   Writing: file3709353e55c9.xlsx
-[TRS INFO] CONF: Saved: file3709353e55c9.xlsx (18,855 bytes)
-.   Writing: file37096bcf55be.xlsx
-[TRS INFO] CONF: Saved: file37096bcf55be.xlsx (21,362 bytes)
-..   Writing: file3709489773c1.xlsx
-[TRS INFO] CONF: Saved: file3709489773c1.xlsx (15,949 bytes)
-......   Writing: file37091b40ed50.xlsx
-[TRS INFO] CONF: Saved: file37091b40ed50.xlsx (15,949 bytes)
+output_integration:    Writing: file370960fb03f.xlsx
+[TRS INFO] CONF: Saved: file370960fb03f.xlsx (26,288 bytes)
+..   Writing: file37097161bfec.xlsx
+[TRS INFO] CONF: Saved: file37097161bfec.xlsx (26,078 bytes)
+.......   Writing: file370970496ad3.xlsx
+[TRS INFO] CONF: Saved: file370970496ad3.xlsx (23,884 bytes)
+.   Writing: file37093a92a83d.xlsx
+[TRS INFO] CONF: Saved: file37093a92a83d.xlsx (21,371 bytes)
+.   Writing: file370969c16982.xlsx
+[TRS INFO] CONF: Saved: file370969c16982.xlsx (18,855 bytes)
+..   Writing: file37093cf4178e.xlsx
+[TRS INFO] CONF: Saved: file37093cf4178e.xlsx (18,821 bytes)
+.   Writing: file37097e6a6e2b.xlsx
+[TRS INFO] CONF: Saved: file37097e6a6e2b.xlsx (18,322 bytes)
+.   Writing: file37097fc187f6.xlsx
+[TRS INFO] CONF: Saved: file37097fc187f6.xlsx (18,855 bytes)
+.   Writing: file370929952da4.xlsx
+[TRS INFO] CONF: Saved: file370929952da4.xlsx (18,821 bytes)
+.   Writing: file370988caf85.xlsx
+[TRS INFO] CONF: Saved: file370988caf85.xlsx (18,855 bytes)
+.   Writing: file37092388a540.xlsx
+[TRS INFO] CONF: Saved: file37092388a540.xlsx (21,361 bytes)
+..   Writing: file370956fd514f.xlsx
+[TRS INFO] CONF: Saved: file370956fd514f.xlsx (15,949 bytes)
+......   Writing: file3709648edb8f.xlsx
+[TRS INFO] CONF: Saved: file3709648edb8f.xlsx (15,949 bytes)
 .
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -651,7 +651,7 @@ utils: ....................................................................
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 
-[PASS] Confidence — 1022 passed, 0 failed, 0 skipped (59.7s)
+[PASS] Confidence — 1022 passed, 0 failed, 0 skipped (49.7s)
 
 --------------------------------------------------------------------------------
 MODULE: Conjoint (20 test files)
@@ -719,11 +719,11 @@ hb_estimation: SSSSSSS
 html_report: .....................................................................................................................
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370950a6678b.html (0.22 MB)
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709d7b16da.html (0.22 MB)
 ..................
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370935754326.html (0.23 MB)
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709500ab3b9.html (0.23 MB)
 ..
   [HTML REPORT] Generating conjoint analysis report...
 
@@ -735,31 +735,31 @@ html_report: ...................................................................
 .
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370922fd66c8.html (0.22 MB)
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37096bc33cb3.html (0.22 MB)
 ................
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709667ebc0a.html (0.22 MB)
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37093b5281f4.html (0.22 MB)
 ..........
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370918389f92.html (0.23 MB)
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37092f03db34.html (0.23 MB)
 .
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370926abe350.html (0.22 MB)
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37097fa7cbbc.html (0.22 MB)
 .......
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37092caf7492.html (0.23 MB)
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370940c241f9.html (0.23 MB)
 ........
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37097b072b8.html (0.22 MB)
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709507e0b5f.html (0.22 MB)
 ...
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709221ef70c.html (0.22 MB)
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370920ee0783.html (0.22 MB)
 .......................
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -768,88 +768,71 @@ html_report: ...................................................................
 html_simulator: 
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709111508d8.html (0.22 MB)
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709ed73b02.html (0.22 MB)
 ...
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095072b4ed.html (0.22 MB)
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37093fc48008.html (0.22 MB)
 .......
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 --- test_integration_mnl.R ---
-integration_mnl: 123456789abcdefghijSklmnopqr..
+integration_mnl:    Writing: file3709a943e67.xlsx
+[TRS INFO] CONJ: Saved: file3709a943e67.xlsx (30,019 bytes)
 
-══ Skipped ═══════════════════════════════════════════════════════════════════════════════════════════════════════
-1. MNL end-to-end: HTML report is created ('test_integration_mnl.R:254:3') - Reason: empty test
+  [HTML REPORT] Generating conjoint analysis report...
 
-══ Failed ════════════════════════════════════════════════════════════════════════════════════════════════════════
-── 1. Failure ('test_integration_mnl.R:97:5'): MNL end-to-end: run_conjoint_analysis returns PASS or PARTIAL ─────
-result$status %in% c("PASS", "PARTIAL") is not TRUE
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709a943e67_report.html (0.43 MB)
+.   Writing: file3709f3b90f9.xlsx
+[TRS INFO] CONJ: Saved: file3709f3b90f9.xlsx (30,018 bytes)
 
-`actual`:   FALSE
-`expected`: TRUE 
-Expected PASS/PARTIAL, got: REFUSED | code: CONJ_ANALYSIS_FAILED | msg: unused argument (name = "n_selections") | wd: /Users/duncan/Documents/Turas
+  [HTML REPORT] Generating conjoint analysis report...
 
-── 2. Failure ('test_integration_mnl.R:124:5'): MNL end-to-end: utilities have Attribute, Level, Utility, SE colum
-is.data.frame(utils_df) is not TRUE
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709f3b90f9_report.html (0.43 MB)
+.........   Writing: file3709865545b.xlsx
+[TRS INFO] CONJ: Saved: file3709865545b.xlsx (30,019 bytes)
 
-`actual`:   FALSE
-`expected`: TRUE 
+  [HTML REPORT] Generating conjoint analysis report...
 
-── 3. Failure ('test_integration_mnl.R:127:5'): MNL end-to-end: utilities have Attribute, Level, Utility, SE colum
-"Attribute" %in% names(utils_df) is not TRUE
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709865545b_report.html (0.43 MB)
+......   Writing: file370952ca40cd.xlsx
+[TRS INFO] CONJ: Saved: file370952ca40cd.xlsx (30,018 bytes)
 
-`actual`:   FALSE
-`expected`: TRUE 
+  [HTML REPORT] Generating conjoint analysis report...
 
-── 4. Failure ('test_integration_mnl.R:128:5'): MNL end-to-end: utilities have Attribute, Level, Utility, SE colum
-"Level" %in% names(utils_df) is not TRUE
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370952ca40cd_report.html (0.43 MB)
+.........   Writing: file37091a627b17.xlsx
+[TRS INFO] CONJ: Saved: file37091a627b17.xlsx (30,018 bytes)
 
-`actual`:   FALSE
-`expected`: TRUE 
+  [HTML REPORT] Generating conjoint analysis report...
 
-── 5. Failure ('test_integration_mnl.R:129:5'): MNL end-to-end: utilities have Attribute, Level, Utility, SE colum
-"Utility" %in% names(utils_df) is not TRUE
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37091a627b17_report.html (0.43 MB)
+...   Writing: file3709dce7212.xlsx
+[TRS INFO] CONJ: Saved: file3709dce7212.xlsx (30,019 bytes)
 
-`actual`:   FALSE
-`expected`: TRUE 
+  [HTML REPORT] Generating conjoint analysis report...
 
-── 6. Failure ('test_integration_mnl.R:130:5'): MNL end-to-end: utilities have Attribute, Level, Utility, SE colum
-"Std_Error" %in% names(utils_df) is not TRUE
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709dce7212_report.html (0.43 MB)
+..   Writing: file3709642bf14b.xlsx
+[TRS INFO] CONJ: Saved: file3709642bf14b.xlsx (30,019 bytes)
 
-`actual`:   FALSE
-`expected`: TRUE 
+  [HTML REPORT] Generating conjoint analysis report...
 
-── 7. Error ('test_integration_mnl.R:133:5'): MNL end-to-end: utilities have Attribute, Level, Utility, SE columns
-Error in `expect_compare(">", act, exp)`: Result of comparison must be a single logical value
-Backtrace:
-    ▆
- 1. └─testthat::expect_gt(nrow(utils_df), 0) at test_integration_mnl.R:133:5
- 2.   └─testthat:::expect_compare(">", act, exp)
- 3.     └─rlang::abort("Result of comparison must be a single logical value")
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709642bf14b_report.html (0.43 MB)
+........   Writing: file3709296056ca.xlsx
+[TRS INFO] CONJ: Saved: file3709296056ca.xlsx (30,019 bytes)
 
-── 8. Failure ('test_integration_mnl.R:165:5'): MNL end-to-end: importance sums to approximately 100 ─────────────
-is.data.frame(importance) is not TRUE
+  [HTML REPORT] Generating conjoint analysis report...
 
-`actual`:   FALSE
-`expected`: TRUE 
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709296056ca_report.html (0.43 MB)
+   Writing: file370973e1fcfe.xlsx
+[TRS INFO] CONJ: Saved: file370973e1fcfe.xlsx (30,018 bytes)
 
-── 9. Failure ('test_integration_mnl.R:166:5'): MNL end-to-end: importance sums to approximately 100 ─────────────
-"Attribute" %in% names(importance) is not TRUE
+  [HTML REPORT] Generating conjoint analysis report...
 
-`actual`:   FALSE
-`expected`: TRUE 
-
-── 10. Failure ('test_integration_mnl.R:167:5'): MNL end-to-end: importance sums to approximately 100 ────────────
-"Importance" %in% names(importance) is not TRUE
-
-`actual`:   FALSE
-`expected`: TRUE 
-  ... and 17 more
-
-
-Maximum number of 10 failures reached, some test results may be missing.
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370973e1fcfe_report.html (0.43 MB)
+..
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
@@ -870,28 +853,28 @@ optimizer: ..........
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 --- test_output_integration.R ---
-output_integration:    Writing: file37097796df05.xlsx
-[TRS INFO] CONJ: Saved: file37097796df05.xlsx (24,768 bytes)
-..   Writing: file37093069dbba.xlsx
-[TRS INFO] CONJ: Saved: file37093069dbba.xlsx (24,768 bytes)
-...........   Writing: file370974f553b2.xlsx
-[TRS INFO] CONJ: Saved: file370974f553b2.xlsx (24,768 bytes)
-.   Writing: file370924fa68e1.xlsx
-[TRS INFO] CONJ: Saved: file370924fa68e1.xlsx (24,768 bytes)
-.   Writing: file37097e836197.xlsx
-[TRS INFO] CONJ: Saved: file37097e836197.xlsx (24,768 bytes)
-..   Writing: file37094706f7bb.xlsx
-[TRS INFO] CONJ: Saved: file37094706f7bb.xlsx (24,768 bytes)
-.   Writing: file3709541e24fe.xlsx
-[TRS INFO] CONJ: Saved: file3709541e24fe.xlsx (24,768 bytes)
-.   Writing: file37092986675e.xlsx
-[TRS INFO] CONJ: Saved: file37092986675e.xlsx (24,768 bytes)
+output_integration:    Writing: file370937e9d4ca.xlsx
+[TRS INFO] CONJ: Saved: file370937e9d4ca.xlsx (24,769 bytes)
+..   Writing: file3709dfd1c65.xlsx
+[TRS INFO] CONJ: Saved: file3709dfd1c65.xlsx (24,768 bytes)
+...........   Writing: file3709ec46f0d.xlsx
+[TRS INFO] CONJ: Saved: file3709ec46f0d.xlsx (24,769 bytes)
+.   Writing: file37094d750b18.xlsx
+[TRS INFO] CONJ: Saved: file37094d750b18.xlsx (24,768 bytes)
+.   Writing: file3709289216b6.xlsx
+[TRS INFO] CONJ: Saved: file3709289216b6.xlsx (24,769 bytes)
+..   Writing: file370948cf7a65.xlsx
+[TRS INFO] CONJ: Saved: file370948cf7a65.xlsx (24,768 bytes)
+.   Writing: file370924efac52.xlsx
+[TRS INFO] CONJ: Saved: file370924efac52.xlsx (24,768 bytes)
+.   Writing: file37095d48facf.xlsx
+[TRS INFO] CONJ: Saved: file37095d48facf.xlsx (24,768 bytes)
 .   Writing: output.xlsx
 [TRS INFO] CONJ: Saved: output.xlsx (24,768 bytes)
-.   Writing: file3709382c2ef3.xlsx
-[TRS INFO] CONJ: Saved: file3709382c2ef3.xlsx (24,376 bytes)
-.   Writing: file37096b5e9a5.xlsx
-[TRS INFO] CONJ: Saved: file37096b5e9a5.xlsx (24,441 bytes)
+.   Writing: file3709578a1d67.xlsx
+[TRS INFO] CONJ: Saved: file3709578a1d67.xlsx (24,377 bytes)
+.   Writing: file370979f9375e.xlsx
+[TRS INFO] CONJ: Saved: file370979f9375e.xlsx (24,442 bytes)
 .
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -934,15 +917,7 @@ wtp: ..............
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 
-FAILURES IN THIS MODULE:
-  FAIL in test_integration_mnl.R / integration_mnl: 1 failure(s)
-  FAIL in test_integration_mnl.R / integration_mnl: 5 failure(s)
-  FAIL in test_integration_mnl.R / integration_mnl: 3 failure(s)
-  FAIL in test_integration_mnl.R / integration_mnl: 5 failure(s)
-  FAIL in test_integration_mnl.R / integration_mnl: 1 failure(s)
-  FAIL in test_integration_mnl.R / integration_mnl: 8 failure(s)
-
-[FAIL] Conjoint — 590 passed, 23 failed, 8 skipped (74.5s)
+[PASS] Conjoint — 628 passed, 0 failed, 7 skipped (86.1s)
 
 --------------------------------------------------------------------------------
 MODULE: Cat Driver (6 test files)
@@ -1001,12 +976,12 @@ Suite 5: Importance & Odds Ratios: ..........................   Could not map te
 Suite 6: Missing Data Handling: ....................
 Suite 7: Output Generation: ...   [ERROR] Odds Ratios sheet failed: attempt to set an attribute on NULL
    [ERROR] Diagnostics sheet failed: argument is of length zero
-   Writing: file37095f05eb4f.xlsx
-[TRS INFO] CATD: Saved: file37095f05eb4f.xlsx (21,094 bytes)
+   Writing: file370947867560.xlsx
+[TRS INFO] CATD: Saved: file370947867560.xlsx (21,094 bytes)
 .   [ERROR] Odds Ratios sheet failed: attempt to set an attribute on NULL
    [ERROR] Diagnostics sheet failed: argument is of length zero
-   Writing: file37094552417d.xlsx
-[TRS INFO] CATD: Saved: file37094552417d.xlsx (21,095 bytes)
+   Writing: file370920f72840.xlsx
+[TRS INFO] CATD: Saved: file370920f72840.xlsx (21,094 bytes)
 .......
 Suite 8: Guard Framework: ......................
 Suite 9: Integration: ....................
@@ -1067,7 +1042,7 @@ Subgroup Edge Cases: .....
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 
-[PASS] Cat Driver — 659 passed, 0 failed, 1 skipped (15.4s)
+[PASS] Cat Driver — 659 passed, 0 failed, 1 skipped (14.3s)
 
 --------------------------------------------------------------------------------
 MODULE: Key Driver (17 test files)
@@ -1293,7 +1268,7 @@ integration:
     [WARN] JS file not found: tools/js/kd_pinned_views.js
     [WARN] JS file not found: tools/js/kd_slide_export.js
   Step 6: Writing HTML file to integration_test_kd_full_report.html...
-  Done! 0.12 MB in 1.7 seconds
+  Done! 0.12 MB in 1.6 seconds
 ------------------------------------------------------------ 
 
 ...
@@ -1315,7 +1290,7 @@ integration:
     [WARN] JS file not found: tools/js/kd_pinned_views.js
     [WARN] JS file not found: tools/js/kd_slide_export.js
   Step 6: Writing HTML file to integration_v104_report.html...
-  Done! 0.13 MB in 0.4 seconds
+  Done! 0.13 MB in 0.3 seconds
 ------------------------------------------------------------ 
 
 ...S
@@ -1459,7 +1434,7 @@ v10.4 Analytical Features:    Running Elastic Net analysis...
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 
-[PASS] Key Driver — 900 passed, 0 failed, 14 skipped (27.0s)
+[PASS] Key Driver — 900 passed, 0 failed, 14 skipped (25.8s)
 
 --------------------------------------------------------------------------------
 MODULE: MaxDiff (16 test files)
@@ -1507,8 +1482,8 @@ hb: ............................................................................
 --- test_html_report.R ---
 html_report: .............................................................  HTML Layer 1: Transforming data...
   HTML Layer 4: Assembling page...
-  HTML Writing to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370926f79b57.html
-  HTML report generated: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370926f79b57.html (151.3 KB)
+  HTML Writing to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709738fb4a4.html
+  HTML report generated: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709738fb4a4.html (151.3 KB)
 ....
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -1562,7 +1537,7 @@ validation: ....................................................................
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 
-[PASS] MaxDiff — 755 passed, 0 failed, 4 skipped (25.0s)
+[PASS] MaxDiff — 755 passed, 0 failed, 4 skipped (24.5s)
 
 --------------------------------------------------------------------------------
 MODULE: Pricing (23 test files)
@@ -1656,7 +1631,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709360722ff.xlsx
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370952325a07.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 ..
@@ -1670,7 +1645,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37097a0b6abf.xlsx
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709482fd742.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 ....
@@ -1684,7 +1659,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709b31c83d.xlsx
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37091b8615d.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 .
@@ -1698,7 +1673,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37097f994bfe.xlsx
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37097b8d4b1.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 .
@@ -1712,7 +1687,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709229aa54b.xlsx
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709667040cb.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 .
@@ -1726,7 +1701,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37096ad475d7.xlsx
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37092c924c6.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 .
@@ -1740,7 +1715,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370962ca61f0.xlsx
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370940df933c.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 .
@@ -1754,7 +1729,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370920ff5bb7.xlsx
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370942b77d82.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 
@@ -1768,7 +1743,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370920ff5bb7.xlsx
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370942b77d82.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 ..
@@ -1933,7 +1908,7 @@ html_report: ...................................................................
 W   HTML Report: Preparing simulator data...
    HTML Report: Assembling page...
    HTML Report: Writing file...
-   HTML Report: Written to file370912310e39.html (128.9 KB)
+   HTML Report: Written to file3709520622d4.html (128.9 KB)
 .......
 
 ══ Warnings ══════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -2115,10 +2090,10 @@ Diagnostics:
    Generated 1 plot(s)
 
 8. Generating output file...
-   Writing: file370942b9a451.xlsx
-[TRS INFO] PRICE: Saved: file370942b9a451.xlsx (51,535 bytes)
+   Writing: file37094a19bfb.xlsx
+[TRS INFO] PRICE: Saved: file37094a19bfb.xlsx (51,534 bytes)
    Plots saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/plots
-   Results written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370942b9a451.xlsx
+   Results written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094a19bfb.xlsx
 ......1. Configuration loaded
    Analysis method: gabor_granger
    Project: Test GG Pipeline
@@ -2139,10 +2114,10 @@ Diagnostics:
    Generated 2 plot(s)
 
 8. Generating output file...
-   Writing: file37094eff1f9b.xlsx
-[TRS INFO] PRICE: Saved: file37094eff1f9b.xlsx (22,205 bytes)
+   Writing: file37091cc83416.xlsx
+[TRS INFO] PRICE: Saved: file37091cc83416.xlsx (22,203 bytes)
    Plots saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/plots
-   Results written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094eff1f9b.xlsx
+   Results written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37091cc83416.xlsx
 .....1. Configuration loaded
    Analysis method: van_westendorp
    Project: Test Pipeline
@@ -2231,10 +2206,10 @@ Diagnostics:
    Generated 1 plot(s)
 
 8. Generating output file...
-   Writing: file3709e6726a5.xlsx
-[TRS INFO] PRICE: Saved: file3709e6726a5.xlsx (51,536 bytes)
+   Writing: file3709535121c6.xlsx
+[TRS INFO] PRICE: Saved: file3709535121c6.xlsx (51,533 bytes)
    Plots saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/plots
-   Results written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709e6726a5.xlsx
+   Results written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709535121c6.xlsx
 .1. Configuration loaded
    Analysis method: van_westendorp
    Project: Test Pipeline
@@ -2308,10 +2283,10 @@ Diagnostics:
    Generated 1 plot(s)
 
 8. Generating output file...
-   Writing: file370974143857.xlsx
-[TRS INFO] PRICE: Saved: file370974143857.xlsx (51,534 bytes)
+   Writing: file3709775d10cc.xlsx
+[TRS INFO] PRICE: Saved: file3709775d10cc.xlsx (51,533 bytes)
    Plots saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/plots
-   Results written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370974143857.xlsx
+   Results written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709775d10cc.xlsx
 ..
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -2368,9 +2343,9 @@ output_files:    HTML Report: Starting generation...
 W   HTML Report: Preparing simulator data...
    HTML Report: Assembling page...
    HTML Report: Writing file...
-   HTML Report: Written to file37092082a182.html (145.6 KB)
+   HTML Report: Written to file370929214e1a.html (145.6 KB)
 ....................................   Simulator: Building interactive dashboard...
-   Simulator: Written to file37092867aa65.html (33.8 KB)
+   Simulator: Written to file370918fc8851.html (33.8 KB)
 .................   HTML Report: Starting generation...
    HTML Report: Transforming data...
    HTML Report: Building tables...
@@ -2378,7 +2353,7 @@ W   HTML Report: Preparing simulator data...
    HTML Report: Preparing simulator data...
    HTML Report: Assembling page...
    HTML Report: Writing file...
-   HTML Report: Written to file37092789e997.html (128.1 KB)
+   HTML Report: Written to file37097132dc28.html (128.1 KB)
 ....   HTML Report: Starting generation...
    HTML Report: Transforming data...
    HTML Report: Building tables...
@@ -2386,7 +2361,7 @@ W   HTML Report: Preparing simulator data...
    HTML Report: Preparing simulator data...
    HTML Report: Assembling page...
    HTML Report: Writing file...
-   HTML Report: Written to file37093a2ba2e1.html (135.0 KB)
+   HTML Report: Written to file37092d9832bd.html (135.0 KB)
 ........
 
 ══ Warnings ══════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -2662,9 +2637,9 @@ Recommendations:
 
 --- test_simulator.R ---
 simulator: .................................   Simulator: Building interactive dashboard...
-   Simulator: Written to file37093836a474.html (33.8 KB)
+   Simulator: Written to file3709a3b4d34.html (33.8 KB)
 ............   Simulator: Building interactive dashboard...
-   Simulator: Written to file37095e441277.html (33.8 KB)
+   Simulator: Written to file3709652b0fa3.html (33.8 KB)
 .......   Simulator: Building interactive dashboard...
    ! Simulator: No demand curve data available
 ..
@@ -3032,7 +3007,7 @@ wtp_distribution: ...............................................
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 
-[PASS] Pricing — 813 passed, 0 failed, 0 skipped (85.2s)
+[PASS] Pricing — 813 passed, 0 failed, 0 skipped (85.8s)
 
 --------------------------------------------------------------------------------
 MODULE: Segment (21 test files)
@@ -3294,9 +3269,9 @@ Profiling 3 additional variables...
     Built 7 charts
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file...
-    HTML report written: file37093bf7c721.html (0.18 MB)
+    HTML report written: file3709344ae440.html (0.18 MB)
 ------------------------------------------------------------ 
-  HTML report complete (PASS, 1.7s)
+  HTML report complete (PASS, 1.6s)
 ------------------------------------------------------------ 
 ....
   Clustering method: KMEANS
@@ -3326,7 +3301,7 @@ Profiling 3 additional variables...
     Built 7 charts
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file...
-    HTML report written: file3709727794f5.html (0.18 MB)
+    HTML report written: file37093bc72797.html (0.18 MB)
 ------------------------------------------------------------ 
   HTML report complete (PASS, 0.2s)
 ------------------------------------------------------------ 
@@ -3358,7 +3333,7 @@ Profiling 3 additional variables...
     Built 7 charts
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file...
-    HTML report written: file370969f5c87c.html (0.18 MB)
+    HTML report written: file37092c547646.html (0.18 MB)
 ------------------------------------------------------------ 
   HTML report complete (PASS, 0.1s)
 ------------------------------------------------------------ 
@@ -3393,7 +3368,7 @@ Profiling 3 additional variables...
     Built 7 charts
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file...
-    HTML report written: file37093f9af1c5.html (0.19 MB)
+    HTML report written: file370946c5c804.html (0.19 MB)
 ------------------------------------------------------------ 
   HTML report complete (PASS, 0.1s)
 ------------------------------------------------------------ 
@@ -3425,73 +3400,73 @@ Profiling 3 additional variables...
     Built 7 charts
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file...
-    HTML report written: file370976ae4a95.html (0.18 MB)
+    HTML report written: file37096f3b5374.html (0.18 MB)
+------------------------------------------------------------ 
+  HTML report complete (PASS, 0.1s)
+------------------------------------------------------------ 
+...
+  Clustering method: KMEANS
+
+================================================================================ 
+SEGMENT PROFILING
+================================================================================ 
+
+Segment sizes:
+  Segment 1:   36 ( 36.0%)
+  Segment 2:   33 ( 33.0%)
+  Segment 3:   31 ( 31.0%)
+
+Profiling clustering variables...
+Profiling 3 additional variables...
+
+✓ Profiling complete
+  Clustering variables significantly different: 5/5
+------------------------------------------------------------ 
+  SEGMENT HTML REPORT GENERATION
+------------------------------------------------------------ 
+  Step 1: Validating inputs...
+  Step 2: Transforming data...
+  Step 3: Building tables...
+    Built 3 tables
+  Step 4: Building charts...
+    Built 7 charts
+  Step 5: Assembling HTML page...
+  Step 6: Writing HTML file...
+    HTML report written: file37097b845320.html (0.18 MB)
+------------------------------------------------------------ 
+  HTML report complete (PASS, 0.1s)
+------------------------------------------------------------ 
+...
+  Clustering method: KMEANS
+
+================================================================================ 
+SEGMENT PROFILING
+================================================================================ 
+
+Segment sizes:
+  Segment 1:   36 ( 36.0%)
+  Segment 2:   33 ( 33.0%)
+  Segment 3:   31 ( 31.0%)
+
+Profiling clustering variables...
+Profiling 3 additional variables...
+
+✓ Profiling complete
+  Clustering variables significantly different: 5/5
+------------------------------------------------------------ 
+  SEGMENT HTML REPORT GENERATION
+------------------------------------------------------------ 
+  Step 1: Validating inputs...
+  Step 2: Transforming data...
+  Step 3: Building tables...
+    Built 3 tables
+  Step 4: Building charts...
+    Built 7 charts
+  Step 5: Assembling HTML page...
+  Step 6: Writing HTML file...
+    HTML report written: file37091a2c340b.html (0.18 MB)
 ------------------------------------------------------------ 
   HTML report complete (PASS, 0.2s)
------------------------------------------------------------- 
-...
-  Clustering method: KMEANS
-
-================================================================================ 
-SEGMENT PROFILING
-================================================================================ 
-
-Segment sizes:
-  Segment 1:   36 ( 36.0%)
-  Segment 2:   33 ( 33.0%)
-  Segment 3:   31 ( 31.0%)
-
-Profiling clustering variables...
-Profiling 3 additional variables...
-
-✓ Profiling complete
-  Clustering variables significantly different: 5/5
------------------------------------------------------------- 
-  SEGMENT HTML REPORT GENERATION
------------------------------------------------------------- 
-  Step 1: Validating inputs...
-  Step 2: Transforming data...
-  Step 3: Building tables...
-    Built 3 tables
-  Step 4: Building charts...
-    Built 7 charts
-  Step 5: Assembling HTML page...
-  Step 6: Writing HTML file...
-    HTML report written: file3709395c74cf.html (0.18 MB)
------------------------------------------------------------- 
-  HTML report complete (PASS, 0.1s)
------------------------------------------------------------- 
-...
-  Clustering method: KMEANS
-
-================================================================================ 
-SEGMENT PROFILING
-================================================================================ 
-
-Segment sizes:
-  Segment 1:   36 ( 36.0%)
-  Segment 2:   33 ( 33.0%)
-  Segment 3:   31 ( 31.0%)
-
-Profiling clustering variables...
-Profiling 3 additional variables...
-
-✓ Profiling complete
-  Clustering variables significantly different: 5/5
------------------------------------------------------------- 
-  SEGMENT HTML REPORT GENERATION
------------------------------------------------------------- 
-  Step 1: Validating inputs...
-  Step 2: Transforming data...
-  Step 3: Building tables...
-    Built 3 tables
-  Step 4: Building charts...
-    Built 7 charts
-  Step 5: Assembling HTML page...
-  Step 6: Writing HTML file...
-    HTML report written: file3709e18ac5c.html (0.18 MB)
------------------------------------------------------------- 
-  HTML report complete (PASS, 0.1s)
 ------------------------------------------------------------ 
 ..
   Clustering method: KMEANS
@@ -3521,9 +3496,9 @@ Profiling 3 additional variables...
     Built 7 charts
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file...
-    HTML report written: file37091ae23a66.html (0.18 MB)
+    HTML report written: file3709619c38a7.html (0.18 MB)
 ------------------------------------------------------------ 
-  HTML report complete (PASS, 0.2s)
+  HTML report complete (PASS, 0.1s)
 ------------------------------------------------------------ 
 ..
 
@@ -3548,11 +3523,11 @@ Profiling 3 additional variables...
   Clustering variables significantly different: 5/5
 ...  Exporting segment assignments: test_assignments.xlsx
    Writing: test_assignments.xlsx
-[TRS INFO] SEGMENT: Saved: test_assignments.xlsx (10,011 bytes)
+[TRS INFO] SEGMENT: Saved: test_assignments.xlsx (10,012 bytes)
   Exported 91 segment assignments (with Segment_Names sheet)
 ......................................  Exporting segment assignments: segment_assignments.xlsx
    Writing: segment_assignments.xlsx
-[TRS INFO] SEGMENT: Saved: segment_assignments.xlsx (10,163 bytes)
+[TRS INFO] SEGMENT: Saved: segment_assignments.xlsx (10,164 bytes)
   Exported 100 segment assignments (with Segment_Names sheet)
 .
 -
@@ -3653,8 +3628,8 @@ output:   Exporting segment assignments: test_assignments.xlsx
 -
                                                                                                                 
 ..Created output folder: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/test_output_idempotent
-...........................   Writing: file370931fe374e.xlsx
-[TRS INFO] SEGMENT: Saved: file370931fe374e.xlsx (6,365 bytes)
+...........................   Writing: file37092f9fc143.xlsx
+[TRS INFO] SEGMENT: Saved: file37092f9fc143.xlsx (6,365 bytes)
 ..
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -3779,7 +3754,7 @@ vulnerability: [INFO] Vulnerability analysis complete: 86.0% vulnerable (thresho
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 
-[PASS] Segment — 928 passed, 0 failed, 1 skipped (26.8s)
+[PASS] Segment — 928 passed, 0 failed, 1 skipped (26.7s)
 
 --------------------------------------------------------------------------------
 MODULE: Tabs (20 test files)
@@ -3913,21 +3888,21 @@ composite value accuracy: ...
 
 --- test_config_templates.R ---
 config_templates: 
-  [SUCCESS] Crosstab Config template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37098b00693.xlsx
+  [SUCCESS] Crosstab Config template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095e82cf62.xlsx
 ...
-  [SUCCESS] Crosstab Config template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37093cb67b45.xlsx
+  [SUCCESS] Crosstab Config template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094688b737.xlsx
 ....
-  [SUCCESS] Crosstab Config template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094bc23007.xlsx
+  [SUCCESS] Crosstab Config template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370963120dcc.xlsx
 .
-  [SUCCESS] Crosstab Config template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370920ced8b.xlsx
+  [SUCCESS] Crosstab Config template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709112343b6.xlsx
 ...
-  [SUCCESS] Survey Structure template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37091c5c1b20.xlsx
+  [SUCCESS] Survey Structure template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370935a2f495.xlsx
 ...
-  [SUCCESS] Survey Structure template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370967b9bced.xlsx
+  [SUCCESS] Survey Structure template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709506bc17d.xlsx
 ....
-  [SUCCESS] Survey Structure template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370962298d07.xlsx
+  [SUCCESS] Survey Structure template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709452a8277.xlsx
 ....
-  [SUCCESS] Survey Structure template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370952ac4545.xlsx
+  [SUCCESS] Survey Structure template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370955bb20d0.xlsx
 ...
   [SUCCESS] Survey Structure template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/tabs_templates_14089/Survey_Structure.xlsx
 
@@ -3945,9 +3920,9 @@ config_templates:
   3. Run your analysis!
 
 ..
-  [SUCCESS] Crosstab Config template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095f623bb8.xlsx
+  [SUCCESS] Crosstab Config template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094750ce21.xlsx
 
-  [SUCCESS] Crosstab Config template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095f623bb8.xlsx
+  [SUCCESS] Crosstab Config template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094750ce21.xlsx
 ..
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -4097,8 +4072,8 @@ load_survey_structure: Loading survey structure from: Demo_Survey_Structure.xlsx
 
 --- test_e2e_integration.R ---
 e2e_integration: [OK] Turas>Tabs cell_calculator module loaded
-E2E: Config loading: [2026-03-24 12:12:58] INFO: Project root: /Users/duncan/Documents/Turas/examples/tabs/demo_survey
-[2026-03-24 12:12:58] INFO: Loading configuration...
+E2E: Config loading: [2026-03-24 12:42:18] INFO: Project root: /Users/duncan/Documents/Turas/examples/tabs/demo_survey
+[2026-03-24 12:42:18] INFO: Loading configuration...
 
 -
 /
@@ -4109,14 +4084,14 @@ E2E: Config loading: [2026-03-24 12:12:58] INFO: Project root: /Users/duncan/Doc
 
 -
                                                                                                                 
-[2026-03-24 12:12:58] INFO: Configuration loaded
+[2026-03-24 12:42:18] INFO: Configuration loaded
 
   WARNING: Unrecognised settings in config (may be typos):
     - generate_stats_pack 
   These settings will be ignored. Check spelling against the template.
 
-.........[2026-03-24 12:12:59] INFO: Project root: /nonexistent/path
-[2026-03-24 12:12:59] INFO: Loading configuration...
+.........[2026-03-24 12:42:18] INFO: Project root: /nonexistent/path
+[2026-03-24 12:42:18] INFO: Loading configuration...
 
 ┌─── TURAS TABS ERROR ────────────────────────────────────┐
 │ Code:     IO_FILE_NOT_FOUND 
@@ -4126,8 +4101,8 @@ E2E: Config loading: [2026-03-24 12:12:58] INFO: Project root: /Users/duncan/Doc
 └───────────────────────────────────────────────────────┘
 
 .
-E2E: Data loading: [2026-03-24 12:12:59] INFO: Project root: /Users/duncan/Documents/Turas/examples/tabs/demo_survey
-[2026-03-24 12:12:59] INFO: Loading configuration...
+E2E: Data loading: [2026-03-24 12:42:18] INFO: Project root: /Users/duncan/Documents/Turas/examples/tabs/demo_survey
+[2026-03-24 12:42:18] INFO: Loading configuration...
 
 -
 /
@@ -4138,13 +4113,13 @@ E2E: Data loading: [2026-03-24 12:12:59] INFO: Project root: /Users/duncan/Docum
 
 -
                                                                                                                 
-[2026-03-24 12:12:59] INFO: Configuration loaded
+[2026-03-24 12:42:18] INFO: Configuration loaded
 
   WARNING: Unrecognised settings in config (may be typos):
     - generate_stats_pack 
   These settings will be ignored. Check spelling against the template.
 
-[2026-03-24 12:12:59] INFO: Loading survey structure...
+[2026-03-24 12:42:18] INFO: Loading survey structure...
 Loading survey structure from: Demo_Survey_Structure.xlsx 
 
 -
@@ -4177,7 +4152,7 @@ Loading survey structure from: Demo_Survey_Structure.xlsx
 -
                                                                                                                 
   Loaded: 29 questions, 188 options
-[2026-03-24 12:12:59] INFO: Survey structure loaded
+[2026-03-24 12:42:18] INFO: Survey structure loaded
 
 -
 /
@@ -4188,8 +4163,8 @@ Loading survey structure from: Demo_Survey_Structure.xlsx
 
 -
                                                                                                                 
-[2026-03-24 12:12:59] INFO: Loaded 2 composite metric(s)
-[2026-03-24 12:12:59] INFO: Loading survey data...
+[2026-03-24 12:42:19] INFO: Loaded 2 composite metric(s)
+[2026-03-24 12:42:19] INFO: Loading survey data...
 Loading survey data from: Demo_Survey_Data.xlsx 
 
 -
@@ -4202,7 +4177,7 @@ Loading survey data from: Demo_Survey_Data.xlsx
 -
                                                                                                                 
   Loaded: 1,000 rows, 31 columns
-[2026-03-24 12:12:59] INFO: Loaded 1000 responses
+[2026-03-24 12:42:19] INFO: Loaded 1000 responses
 
 Weight: Weight:
   N (total):         1,000 
@@ -4219,7 +4194,7 @@ Weight: Weight:
   Effective n:       937 
   Design effect:     1.07 
 
-[2026-03-24 12:12:59] INFO: Loading question selection...
+[2026-03-24 12:42:19] INFO: Loading question selection...
 
 -
 /
@@ -4230,10 +4205,10 @@ Weight: Weight:
 
 -
                                                                                                                 
-[2026-03-24 12:12:59] INFO: Found 25 questions to analyze
+[2026-03-24 12:42:19] INFO: Found 25 questions to analyze
 ........
-E2E: Full analysis pipeline: [2026-03-24 12:12:59] INFO: Project root: /Users/duncan/Documents/Turas/examples/tabs/demo_survey
-[2026-03-24 12:12:59] INFO: Loading configuration...
+E2E: Full analysis pipeline: [2026-03-24 12:42:19] INFO: Project root: /Users/duncan/Documents/Turas/examples/tabs/demo_survey
+[2026-03-24 12:42:19] INFO: Loading configuration...
 
 -
 /
@@ -4244,13 +4219,13 @@ E2E: Full analysis pipeline: [2026-03-24 12:12:59] INFO: Project root: /Users/du
 
 -
                                                                                                                 
-[2026-03-24 12:12:59] INFO: Configuration loaded
+[2026-03-24 12:42:19] INFO: Configuration loaded
 
   WARNING: Unrecognised settings in config (may be typos):
     - generate_stats_pack 
   These settings will be ignored. Check spelling against the template.
 
-[2026-03-24 12:12:59] INFO: Loading survey structure...
+[2026-03-24 12:42:19] INFO: Loading survey structure...
 Loading survey structure from: Demo_Survey_Structure.xlsx 
 
 -
@@ -4283,7 +4258,7 @@ Loading survey structure from: Demo_Survey_Structure.xlsx
 -
                                                                                                                 
   Loaded: 29 questions, 188 options
-[2026-03-24 12:12:59] INFO: Survey structure loaded
+[2026-03-24 12:42:19] INFO: Survey structure loaded
 
 -
 /
@@ -4294,8 +4269,8 @@ Loading survey structure from: Demo_Survey_Structure.xlsx
 
 -
                                                                                                                 
-[2026-03-24 12:12:59] INFO: Loaded 2 composite metric(s)
-[2026-03-24 12:12:59] INFO: Loading survey data...
+[2026-03-24 12:42:19] INFO: Loaded 2 composite metric(s)
+[2026-03-24 12:42:19] INFO: Loading survey data...
 Loading survey data from: Demo_Survey_Data.xlsx 
 
 -
@@ -4308,7 +4283,7 @@ Loading survey data from: Demo_Survey_Data.xlsx
 -
                                                                                                                 
   Loaded: 1,000 rows, 31 columns
-[2026-03-24 12:13:00] INFO: Loaded 1000 responses
+[2026-03-24 12:42:19] INFO: Loaded 1000 responses
 
 Weight: Weight:
   N (total):         1,000 
@@ -4325,7 +4300,7 @@ Weight: Weight:
   Effective n:       937 
   Design effect:     1.07 
 
-[2026-03-24 12:13:00] INFO: Loading question selection...
+[2026-03-24 12:42:19] INFO: Loading question selection...
 
 -
 /
@@ -4336,8 +4311,8 @@ Weight: Weight:
 
 -
                                                                                                                 
-[2026-03-24 12:13:00] INFO: Found 25 questions to analyze
-[2026-03-24 12:13:00] INFO: Running comprehensive validation...
+[2026-03-24 12:42:19] INFO: Found 25 questions to analyze
+[2026-03-24 12:42:19] INFO: Running comprehensive validation...
 
 ================================================================================
 VALIDATION CHECKS (V10.1)
@@ -4362,11 +4337,11 @@ VALIDATION SUMMARY
 
 ================================================================================
 
-[2026-03-24 12:13:00] WARNING: Found 1 validation issues
-[2026-03-24 12:13:00] INFO: Validating composite definitions...
-[2026-03-24 12:13:00] INFO: Composite definitions validated
-[2026-03-24 12:13:00] INFO: Creating banner structure...
-[2026-03-24 12:13:00] INFO: Banner: 16 columns
+[2026-03-24 12:42:20] WARNING: Found 1 validation issues
+[2026-03-24 12:42:20] INFO: Validating composite definitions...
+[2026-03-24 12:42:20] INFO: Composite definitions validated
+[2026-03-24 12:42:20] INFO: Creating banner structure...
+[2026-03-24 12:42:20] INFO: Banner: 16 columns
 
 ============================================================ 
 ANALYSIS CONFIGURATION
@@ -4382,43 +4357,43 @@ ANALYSIS CONFIGURATION
   Estimated time:          ~20 seconds
 ============================================================ 
 
-[2026-03-24 12:13:00] INFO: Processing 25 questions...
+[2026-03-24 12:42:20] INFO: Processing 25 questions...
 
 
 [  4%] 1/25 | ETA: 0.3 seconds Q001
-[ 12%] 3/25 | ETA: 10.1 seconds Q002
-[ 20%] 5/25 | ETA: 7.3 seconds Q003
-[ 28%] 7/25 | ETA: 5.6 seconds Q004
-[ 36%] 9/25 | ETA: 4.5 seconds Q005
-[ 44%] 11/25 | ETA: 3.7 seconds Q006
-[ 52%] 13/25 | ETA: 3.1 seconds Q007
-[ 60%] 15/25 | ETA: 2.4 seconds Q008
+[ 12%] 3/25 | ETA: 10.6 seconds Q002
+[ 20%] 5/25 | ETA: 7.6 seconds Q003
+[ 28%] 7/25 | ETA: 5.8 seconds Q004
+[ 36%] 9/25 | ETA: 4.7 seconds Q005
+[ 44%] 11/25 | ETA: 3.8 seconds Q006
+[ 52%] 13/25 | ETA: 3.2 seconds Q007
+[ 60%] 15/25 | ETA: 2.5 seconds Q008
 [ 68%] 17/25 | ETA: 1.9 seconds Q009
 [ 76%] 19/25 | ETA: 1.4 seconds Q010
 [ 84%] 21/25 | ETA: 0.9 seconds Q011
-[ 92%] 23/25 | ETA: 0.4 seconds Q012
+[ 92%] 23/25 | ETA: 0.5 seconds Q012
 [100%] 25/25 | ETA: 0.0 seconds Q013
 
 [108%] 27/25 | ETA: -0.4 seconds Q014
 [116%] 29/25 | ETA: -0.8 seconds Q015
 [124%] 31/25 | ETA: -1.2 seconds Q016
-[132%] 33/25 | ETA: -1.5 seconds Q017
+[132%] 33/25 | ETA: -1.6 seconds Q017
 [140%] 35/25 | ETA: -1.9 seconds Q018
-[148%] 37/25 | ETA: -2.1 seconds Q019
-[156%] 39/25 | ETA: -2.4 seconds Q020
-[164%] 41/25 | ETA: -2.9 seconds Q021
-[172%] 43/25 | ETA: -3.1 seconds Q022
-[180%] 45/25 | ETA: -3.3 seconds Q023
-[188%] 47/25 | ETA: -3.5 seconds Q024
-[196%] 49/25 | ETA: -3.7 seconds Q025
-[2026-03-24 12:13:08] INFO: Processed 25 questions
-[2026-03-24 12:13:08] INFO: Processing 2 composite metric(s)...
-[2026-03-24 12:13:08] INFO: Creating banner row indices for composites...
-[2026-03-24 12:13:08] INFO: Created indices for 16 banner columns
-[2026-03-24 12:13:09] INFO: Processed 2 composite(s)
-[2026-03-24 12:13:09] INFO: Added 2 composite(s) to results
-.........[2026-03-24 12:13:09] INFO: Project root: /Users/duncan/Documents/Turas/examples/tabs/demo_survey
-[2026-03-24 12:13:09] INFO: Loading configuration...
+[148%] 37/25 | ETA: -2.2 seconds Q019
+[156%] 39/25 | ETA: -2.5 seconds Q020
+[164%] 41/25 | ETA: -3.0 seconds Q021
+[172%] 43/25 | ETA: -3.2 seconds Q022
+[180%] 45/25 | ETA: -3.4 seconds Q023
+[188%] 47/25 | ETA: -3.6 seconds Q024
+[196%] 49/25 | ETA: -3.9 seconds Q025
+[2026-03-24 12:42:28] INFO: Processed 25 questions
+[2026-03-24 12:42:28] INFO: Processing 2 composite metric(s)...
+[2026-03-24 12:42:28] INFO: Creating banner row indices for composites...
+[2026-03-24 12:42:28] INFO: Created indices for 16 banner columns
+[2026-03-24 12:42:29] INFO: Processed 2 composite(s)
+[2026-03-24 12:42:29] INFO: Added 2 composite(s) to results
+.........[2026-03-24 12:42:29] INFO: Project root: /Users/duncan/Documents/Turas/examples/tabs/demo_survey
+[2026-03-24 12:42:29] INFO: Loading configuration...
 
 -
 /
@@ -4429,13 +4404,13 @@ ANALYSIS CONFIGURATION
 
 -
                                                                                                                 
-[2026-03-24 12:13:09] INFO: Configuration loaded
+[2026-03-24 12:42:29] INFO: Configuration loaded
 
   WARNING: Unrecognised settings in config (may be typos):
     - generate_stats_pack 
   These settings will be ignored. Check spelling against the template.
 
-[2026-03-24 12:13:09] INFO: Loading survey structure...
+[2026-03-24 12:42:29] INFO: Loading survey structure...
 Loading survey structure from: Demo_Survey_Structure.xlsx 
 
 -
@@ -4468,7 +4443,7 @@ Loading survey structure from: Demo_Survey_Structure.xlsx
 -
                                                                                                                 
   Loaded: 29 questions, 188 options
-[2026-03-24 12:13:09] INFO: Survey structure loaded
+[2026-03-24 12:42:29] INFO: Survey structure loaded
 
 -
 /
@@ -4479,8 +4454,8 @@ Loading survey structure from: Demo_Survey_Structure.xlsx
 
 -
                                                                                                                 
-[2026-03-24 12:13:09] INFO: Loaded 2 composite metric(s)
-[2026-03-24 12:13:09] INFO: Loading survey data...
+[2026-03-24 12:42:29] INFO: Loaded 2 composite metric(s)
+[2026-03-24 12:42:29] INFO: Loading survey data...
 Loading survey data from: Demo_Survey_Data.xlsx 
 
 -
@@ -4493,7 +4468,7 @@ Loading survey data from: Demo_Survey_Data.xlsx
 -
                                                                                                                 
   Loaded: 1,000 rows, 31 columns
-[2026-03-24 12:13:09] INFO: Loaded 1000 responses
+[2026-03-24 12:42:29] INFO: Loaded 1000 responses
 
 Weight: Weight:
   N (total):         1,000 
@@ -4510,7 +4485,7 @@ Weight: Weight:
   Effective n:       937 
   Design effect:     1.07 
 
-[2026-03-24 12:13:09] INFO: Loading question selection...
+[2026-03-24 12:42:29] INFO: Loading question selection...
 
 -
 /
@@ -4521,8 +4496,8 @@ Weight: Weight:
 
 -
                                                                                                                 
-[2026-03-24 12:13:09] INFO: Found 25 questions to analyze
-[2026-03-24 12:13:09] INFO: Running comprehensive validation...
+[2026-03-24 12:42:29] INFO: Found 25 questions to analyze
+[2026-03-24 12:42:29] INFO: Running comprehensive validation...
 
 ================================================================================
 VALIDATION CHECKS (V10.1)
@@ -4547,11 +4522,11 @@ VALIDATION SUMMARY
 
 ================================================================================
 
-[2026-03-24 12:13:09] WARNING: Found 1 validation issues
-[2026-03-24 12:13:09] INFO: Validating composite definitions...
-[2026-03-24 12:13:09] INFO: Composite definitions validated
-[2026-03-24 12:13:09] INFO: Creating banner structure...
-[2026-03-24 12:13:09] INFO: Banner: 16 columns
+[2026-03-24 12:42:29] WARNING: Found 1 validation issues
+[2026-03-24 12:42:29] INFO: Validating composite definitions...
+[2026-03-24 12:42:29] INFO: Composite definitions validated
+[2026-03-24 12:42:29] INFO: Creating banner structure...
+[2026-03-24 12:42:29] INFO: Banner: 16 columns
 
 ============================================================ 
 ANALYSIS CONFIGURATION
@@ -4567,7 +4542,7 @@ ANALYSIS CONFIGURATION
   Estimated time:          ~20 seconds
 ============================================================ 
 
-[2026-03-24 12:13:09] INFO: Processing 25 questions...
+[2026-03-24 12:42:29] INFO: Processing 25 questions...
 
 
 [  4%] 1/25 | ETA: 0.0 seconds Q001
@@ -4589,22 +4564,22 @@ ANALYSIS CONFIGURATION
 [124%] 31/25 | ETA: -1.0 seconds Q016
 [132%] 33/25 | ETA: -1.4 seconds Q017
 [140%] 35/25 | ETA: -1.7 seconds Q018
-[148%] 37/25 | ETA: -1.9 seconds Q019
+[148%] 37/25 | ETA: -2.0 seconds Q019
 [156%] 39/25 | ETA: -2.2 seconds Q020
 [164%] 41/25 | ETA: -2.6 seconds Q021
 [172%] 43/25 | ETA: -2.8 seconds Q022
 [180%] 45/25 | ETA: -3.0 seconds Q023
 [188%] 47/25 | ETA: -3.2 seconds Q024
 [196%] 49/25 | ETA: -3.4 seconds Q025
-[2026-03-24 12:13:16] INFO: Processed 25 questions
-[2026-03-24 12:13:16] INFO: Processing 2 composite metric(s)...
-[2026-03-24 12:13:16] INFO: Creating banner row indices for composites...
-[2026-03-24 12:13:16] INFO: Created indices for 16 banner columns
-[2026-03-24 12:13:16] INFO: Processed 2 composite(s)
-[2026-03-24 12:13:16] INFO: Added 2 composite(s) to results
+[2026-03-24 12:42:36] INFO: Processed 25 questions
+[2026-03-24 12:42:36] INFO: Processing 2 composite metric(s)...
+[2026-03-24 12:42:36] INFO: Creating banner row indices for composites...
+[2026-03-24 12:42:36] INFO: Created indices for 16 banner columns
+[2026-03-24 12:42:36] INFO: Processed 2 composite(s)
+[2026-03-24 12:42:36] INFO: Added 2 composite(s) to results
 .
-E2E: Excel output: [2026-03-24 12:13:16] INFO: Project root: /Users/duncan/Documents/Turas/examples/tabs/demo_survey
-[2026-03-24 12:13:16] INFO: Loading configuration...
+E2E: Excel output: [2026-03-24 12:42:36] INFO: Project root: /Users/duncan/Documents/Turas/examples/tabs/demo_survey
+[2026-03-24 12:42:36] INFO: Loading configuration...
 
 -
 /
@@ -4615,13 +4590,13 @@ E2E: Excel output: [2026-03-24 12:13:16] INFO: Project root: /Users/duncan/Docum
 
 -
                                                                                                                 
-[2026-03-24 12:13:16] INFO: Configuration loaded
+[2026-03-24 12:42:36] INFO: Configuration loaded
 
   WARNING: Unrecognised settings in config (may be typos):
     - generate_stats_pack 
   These settings will be ignored. Check spelling against the template.
 
-[2026-03-24 12:13:16] INFO: Loading survey structure...
+[2026-03-24 12:42:36] INFO: Loading survey structure...
 Loading survey structure from: Demo_Survey_Structure.xlsx 
 
 -
@@ -4654,7 +4629,7 @@ Loading survey structure from: Demo_Survey_Structure.xlsx
 -
                                                                                                                 
   Loaded: 29 questions, 188 options
-[2026-03-24 12:13:17] INFO: Survey structure loaded
+[2026-03-24 12:42:36] INFO: Survey structure loaded
 
 -
 /
@@ -4665,8 +4640,8 @@ Loading survey structure from: Demo_Survey_Structure.xlsx
 
 -
                                                                                                                 
-[2026-03-24 12:13:17] INFO: Loaded 2 composite metric(s)
-[2026-03-24 12:13:17] INFO: Loading survey data...
+[2026-03-24 12:42:36] INFO: Loaded 2 composite metric(s)
+[2026-03-24 12:42:36] INFO: Loading survey data...
 Loading survey data from: Demo_Survey_Data.xlsx 
 
 -
@@ -4679,7 +4654,7 @@ Loading survey data from: Demo_Survey_Data.xlsx
 -
                                                                                                                 
   Loaded: 1,000 rows, 31 columns
-[2026-03-24 12:13:17] INFO: Loaded 1000 responses
+[2026-03-24 12:42:37] INFO: Loaded 1000 responses
 
 Weight: Weight:
   N (total):         1,000 
@@ -4696,7 +4671,7 @@ Weight: Weight:
   Effective n:       937 
   Design effect:     1.07 
 
-[2026-03-24 12:13:17] INFO: Loading question selection...
+[2026-03-24 12:42:37] INFO: Loading question selection...
 
 -
 /
@@ -4707,8 +4682,8 @@ Weight: Weight:
 
 -
                                                                                                                 
-[2026-03-24 12:13:17] INFO: Found 25 questions to analyze
-[2026-03-24 12:13:17] INFO: Running comprehensive validation...
+[2026-03-24 12:42:37] INFO: Found 25 questions to analyze
+[2026-03-24 12:42:37] INFO: Running comprehensive validation...
 
 ================================================================================
 VALIDATION CHECKS (V10.1)
@@ -4733,11 +4708,11 @@ VALIDATION SUMMARY
 
 ================================================================================
 
-[2026-03-24 12:13:17] WARNING: Found 1 validation issues
-[2026-03-24 12:13:17] INFO: Validating composite definitions...
-[2026-03-24 12:13:17] INFO: Composite definitions validated
-[2026-03-24 12:13:17] INFO: Creating banner structure...
-[2026-03-24 12:13:17] INFO: Banner: 16 columns
+[2026-03-24 12:42:37] WARNING: Found 1 validation issues
+[2026-03-24 12:42:37] INFO: Validating composite definitions...
+[2026-03-24 12:42:37] INFO: Composite definitions validated
+[2026-03-24 12:42:37] INFO: Creating banner structure...
+[2026-03-24 12:42:37] INFO: Banner: 16 columns
 
 ============================================================ 
 ANALYSIS CONFIGURATION
@@ -4753,14 +4728,407 @@ ANALYSIS CONFIGURATION
   Estimated time:          ~20 seconds
 ============================================================ 
 
-[2026-03-24 12:13:17] INFO: Processing 25 questions...
+[2026-03-24 12:42:37] INFO: Processing 25 questions...
+
+
+[  4%] 1/25 | ETA: 0.0 seconds Q001
+[ 12%] 3/25 | ETA: 3.2 seconds Q002
+[ 20%] 5/25 | ETA: 3.2 seconds Q003
+[ 28%] 7/25 | ETA: 2.9 seconds Q004
+[ 36%] 9/25 | ETA: 2.7 seconds Q005
+[ 44%] 11/25 | ETA: 2.4 seconds Q006
+[ 52%] 13/25 | ETA: 2.1 seconds Q007
+[ 60%] 15/25 | ETA: 1.7 seconds Q008
+[ 68%] 17/25 | ETA: 1.4 seconds Q009
+[ 76%] 19/25 | ETA: 1.0 seconds Q010
+[ 84%] 21/25 | ETA: 0.7 seconds Q011
+[ 92%] 23/25 | ETA: 0.3 seconds Q012
+[100%] 25/25 | ETA: 0.0 seconds Q013
+
+[108%] 27/25 | ETA: -0.3 seconds Q014
+[116%] 29/25 | ETA: -0.6 seconds Q015
+[124%] 31/25 | ETA: -1.0 seconds Q016
+[132%] 33/25 | ETA: -1.3 seconds Q017
+[140%] 35/25 | ETA: -1.6 seconds Q018
+[148%] 37/25 | ETA: -1.8 seconds Q019
+[156%] 39/25 | ETA: -2.0 seconds Q020
+[164%] 41/25 | ETA: -2.4 seconds Q021
+[172%] 43/25 | ETA: -2.6 seconds Q022
+[180%] 45/25 | ETA: -2.8 seconds Q023
+[188%] 47/25 | ETA: -3.0 seconds Q024
+[196%] 49/25 | ETA: -3.2 seconds Q025
+[2026-03-24 12:42:43] INFO: Processed 25 questions
+[2026-03-24 12:42:43] INFO: Processing 2 composite metric(s)...
+[2026-03-24 12:42:43] INFO: Creating banner row indices for composites...
+[2026-03-24 12:42:43] INFO: Created indices for 16 banner columns
+[2026-03-24 12:42:43] INFO: Processed 2 composite(s)
+[2026-03-24 12:42:43] INFO: Added 2 composite(s) to results
+[2026-03-24 12:42:43] INFO: Creating Excel output...
+[2026-03-24 12:42:43] INFO: Creating Summary sheet...
+[2026-03-24 12:42:44] INFO: Summary sheet created
+[2026-03-24 12:42:44] INFO: Building index summary...
+[2026-03-24 12:42:44] INFO: Writing Index_Summary sheet with 23 metrics...
+[2026-03-24 12:42:46] INFO: Index_Summary sheet created
+[2026-03-24 12:42:46] INFO: Creating Run_Status sheet...
+[2026-03-24 12:42:46] INFO: Run_Status sheet created (status: PASS)
+   Writing: turas_e2e_370955290db9.xlsx
+[TRS INFO] TABS: Saved: turas_e2e_370955290db9.xlsx (77,950 bytes)
+[2026-03-24 12:43:01] INFO: Saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/turas_e2e_370955290db9.xlsx
+......[2026-03-24 12:43:01] INFO: Project root: /Users/duncan/Documents/Turas/examples/tabs/demo_survey
+[2026-03-24 12:43:01] INFO: Loading configuration...
+
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+[2026-03-24 12:43:01] INFO: Configuration loaded
+
+  WARNING: Unrecognised settings in config (may be typos):
+    - generate_stats_pack 
+  These settings will be ignored. Check spelling against the template.
+
+[2026-03-24 12:43:01] INFO: Loading survey structure...
+Loading survey structure from: Demo_Survey_Structure.xlsx 
+
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+  Loaded: 29 questions, 188 options
+[2026-03-24 12:43:01] INFO: Survey structure loaded
+
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+[2026-03-24 12:43:01] INFO: Loaded 2 composite metric(s)
+[2026-03-24 12:43:01] INFO: Loading survey data...
+Loading survey data from: Demo_Survey_Data.xlsx 
+
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+  Loaded: 1,000 rows, 31 columns
+[2026-03-24 12:43:01] INFO: Loaded 1000 responses
+
+Weight: Weight:
+  N (total):         1,000 
+  N (nonzero):       1,000 
+  Min:               0.549 
+  Q1:                0.772 
+  Median:            1.012 
+  Q3:                1.22 
+  Max:               1.463 
+  Mean:              1 
+  SD:                0.26 
+  CV:                0.26 
+  Sum:               1,000 
+  Effective n:       937 
+  Design effect:     1.07 
+
+[2026-03-24 12:43:01] INFO: Loading question selection...
+
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+[2026-03-24 12:43:01] INFO: Found 25 questions to analyze
+[2026-03-24 12:43:01] INFO: Running comprehensive validation...
+
+================================================================================
+VALIDATION CHECKS (V10.1)
+================================================================================
+
+Validating survey structure...
+✓ Survey structure validation complete
+Validating data structure...
+✓ Data structure validation complete
+Validating weighting configuration...
+✓ Weighting validation complete
+Validating crosstab configuration...
+  Note: output_format 'excel' will be treated as 'xlsx'
+✓ Configuration validation complete
+  Pre-flight cross-reference checks...
+  ⚠ Pre-flight found 1 issue(s)
+
+--------------------------------------------------------------------------------
+VALIDATION SUMMARY
+--------------------------------------------------------------------------------
+
+
+================================================================================
+
+[2026-03-24 12:43:01] WARNING: Found 1 validation issues
+[2026-03-24 12:43:01] INFO: Validating composite definitions...
+[2026-03-24 12:43:01] INFO: Composite definitions validated
+[2026-03-24 12:43:01] INFO: Creating banner structure...
+[2026-03-24 12:43:01] INFO: Banner: 16 columns
+
+============================================================ 
+ANALYSIS CONFIGURATION
+============================================================ 
+  Questions to process:    25
+  Respondents:             1000
+  Banner columns:          16
+  Weighting:               Weight
+  Significance testing:    Yes (alpha=0.050)
+  HTML report:             Yes
+  Charts:                  Yes
+  Dashboard:               Yes
+  Estimated time:          ~20 seconds
+============================================================ 
+
+[2026-03-24 12:43:01] INFO: Processing 25 questions...
+
+
+[  4%] 1/25 | ETA: 0.0 seconds Q001
+[ 12%] 3/25 | ETA: 2.9 seconds Q002
+[ 20%] 5/25 | ETA: 3.0 seconds Q003
+[ 28%] 7/25 | ETA: 2.9 seconds Q004
+[ 36%] 9/25 | ETA: 2.7 seconds Q005
+[ 44%] 11/25 | ETA: 2.4 seconds Q006
+[ 52%] 13/25 | ETA: 2.0 seconds Q007
+[ 60%] 15/25 | ETA: 1.7 seconds Q008
+[ 68%] 17/25 | ETA: 1.4 seconds Q009
+[ 76%] 19/25 | ETA: 1.1 seconds Q010
+[ 84%] 21/25 | ETA: 0.7 seconds Q011
+[ 92%] 23/25 | ETA: 0.3 seconds Q012
+[100%] 25/25 | ETA: 0.0 seconds Q013
+
+[108%] 27/25 | ETA: -0.3 seconds Q014
+[116%] 29/25 | ETA: -0.7 seconds Q015
+[124%] 31/25 | ETA: -1.0 seconds Q016
+[132%] 33/25 | ETA: -1.3 seconds Q017
+[140%] 35/25 | ETA: -1.6 seconds Q018
+[148%] 37/25 | ETA: -1.8 seconds Q019
+[156%] 39/25 | ETA: -2.1 seconds Q020
+[164%] 41/25 | ETA: -2.5 seconds Q021
+[172%] 43/25 | ETA: -2.7 seconds Q022
+[180%] 45/25 | ETA: -2.9 seconds Q023
+[188%] 47/25 | ETA: -3.0 seconds Q024
+[196%] 49/25 | ETA: -3.2 seconds Q025
+[2026-03-24 12:43:08] INFO: Processed 25 questions
+[2026-03-24 12:43:08] INFO: Processing 2 composite metric(s)...
+[2026-03-24 12:43:08] INFO: Creating banner row indices for composites...
+[2026-03-24 12:43:08] INFO: Created indices for 16 banner columns
+[2026-03-24 12:43:08] INFO: Processed 2 composite(s)
+[2026-03-24 12:43:08] INFO: Added 2 composite(s) to results
+[2026-03-24 12:43:08] INFO: Creating Excel output...
+[2026-03-24 12:43:08] INFO: Creating Summary sheet...
+[2026-03-24 12:43:08] INFO: Summary sheet created
+[2026-03-24 12:43:08] INFO: Building index summary...
+[2026-03-24 12:43:08] INFO: Writing Index_Summary sheet with 23 metrics...
+[2026-03-24 12:43:10] INFO: Index_Summary sheet created
+[2026-03-24 12:43:10] INFO: Creating Run_Status sheet...
+[2026-03-24 12:43:10] INFO: Run_Status sheet created (status: PASS)
+   Writing: turas_e2e_data_370916f9b666.xlsx
+[TRS INFO] TABS: Saved: turas_e2e_data_370916f9b666.xlsx (77,949 bytes)
+[2026-03-24 12:43:24] INFO: Saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/turas_e2e_data_370916f9b666.xlsx
+..
+E2E: HTML output: [2026-03-24 12:43:24] INFO: Project root: /Users/duncan/Documents/Turas/examples/tabs/demo_survey
+[2026-03-24 12:43:24] INFO: Loading configuration...
+
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+[2026-03-24 12:43:24] INFO: Configuration loaded
+
+  WARNING: Unrecognised settings in config (may be typos):
+    - generate_stats_pack 
+  These settings will be ignored. Check spelling against the template.
+
+[2026-03-24 12:43:24] INFO: Loading survey structure...
+Loading survey structure from: Demo_Survey_Structure.xlsx 
+
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+  Loaded: 29 questions, 188 options
+[2026-03-24 12:43:24] INFO: Survey structure loaded
+
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+[2026-03-24 12:43:24] INFO: Loaded 2 composite metric(s)
+[2026-03-24 12:43:24] INFO: Loading survey data...
+Loading survey data from: Demo_Survey_Data.xlsx 
+
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+  Loaded: 1,000 rows, 31 columns
+[2026-03-24 12:43:25] INFO: Loaded 1000 responses
+
+Weight: Weight:
+  N (total):         1,000 
+  N (nonzero):       1,000 
+  Min:               0.549 
+  Q1:                0.772 
+  Median:            1.012 
+  Q3:                1.22 
+  Max:               1.463 
+  Mean:              1 
+  SD:                0.26 
+  CV:                0.26 
+  Sum:               1,000 
+  Effective n:       937 
+  Design effect:     1.07 
+
+[2026-03-24 12:43:25] INFO: Loading question selection...
+
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+[2026-03-24 12:43:25] INFO: Found 25 questions to analyze
+[2026-03-24 12:43:25] INFO: Running comprehensive validation...
+
+================================================================================
+VALIDATION CHECKS (V10.1)
+================================================================================
+
+Validating survey structure...
+✓ Survey structure validation complete
+Validating data structure...
+✓ Data structure validation complete
+Validating weighting configuration...
+✓ Weighting validation complete
+Validating crosstab configuration...
+  Note: output_format 'excel' will be treated as 'xlsx'
+✓ Configuration validation complete
+  Pre-flight cross-reference checks...
+  ⚠ Pre-flight found 1 issue(s)
+
+--------------------------------------------------------------------------------
+VALIDATION SUMMARY
+--------------------------------------------------------------------------------
+
+
+================================================================================
+
+[2026-03-24 12:43:25] WARNING: Found 1 validation issues
+[2026-03-24 12:43:25] INFO: Validating composite definitions...
+[2026-03-24 12:43:25] INFO: Composite definitions validated
+[2026-03-24 12:43:25] INFO: Creating banner structure...
+[2026-03-24 12:43:25] INFO: Banner: 16 columns
+
+============================================================ 
+ANALYSIS CONFIGURATION
+============================================================ 
+  Questions to process:    25
+  Respondents:             1000
+  Banner columns:          16
+  Weighting:               Weight
+  Significance testing:    Yes (alpha=0.050)
+  HTML report:             Yes
+  Charts:                  Yes
+  Dashboard:               Yes
+  Estimated time:          ~20 seconds
+============================================================ 
+
+[2026-03-24 12:43:25] INFO: Processing 25 questions...
 
 
 [  4%] 1/25 | ETA: 0.0 seconds Q001
 [ 12%] 3/25 | ETA: 3.1 seconds Q002
-[ 20%] 5/25 | ETA: 3.0 seconds Q003
+[ 20%] 5/25 | ETA: 3.1 seconds Q003
 [ 28%] 7/25 | ETA: 2.9 seconds Q004
-[ 36%] 9/25 | ETA: 2.6 seconds Q005
+[ 36%] 9/25 | ETA: 2.7 seconds Q005
 [ 44%] 11/25 | ETA: 2.4 seconds Q006
 [ 52%] 13/25 | ETA: 2.1 seconds Q007
 [ 60%] 15/25 | ETA: 1.8 seconds Q008
@@ -4770,428 +5138,35 @@ ANALYSIS CONFIGURATION
 [ 92%] 23/25 | ETA: 0.4 seconds Q012
 [100%] 25/25 | ETA: 0.0 seconds Q013
 
-[108%] 27/25 | ETA: -0.4 seconds Q014
+[108%] 27/25 | ETA: -0.3 seconds Q014
 [116%] 29/25 | ETA: -0.7 seconds Q015
 [124%] 31/25 | ETA: -1.0 seconds Q016
-[132%] 33/25 | ETA: -1.4 seconds Q017
-[140%] 35/25 | ETA: -1.7 seconds Q018
-[148%] 37/25 | ETA: -2.0 seconds Q019
-[156%] 39/25 | ETA: -2.2 seconds Q020
-[164%] 41/25 | ETA: -2.7 seconds Q021
-[172%] 43/25 | ETA: -3.0 seconds Q022
-[180%] 45/25 | ETA: -3.2 seconds Q023
-[188%] 47/25 | ETA: -3.4 seconds Q024
-[196%] 49/25 | ETA: -3.6 seconds Q025
-[2026-03-24 12:13:24] INFO: Processed 25 questions
-[2026-03-24 12:13:24] INFO: Processing 2 composite metric(s)...
-[2026-03-24 12:13:24] INFO: Creating banner row indices for composites...
-[2026-03-24 12:13:24] INFO: Created indices for 16 banner columns
-[2026-03-24 12:13:24] INFO: Processed 2 composite(s)
-[2026-03-24 12:13:24] INFO: Added 2 composite(s) to results
-[2026-03-24 12:13:24] INFO: Creating Excel output...
-[2026-03-24 12:13:25] INFO: Creating Summary sheet...
-[2026-03-24 12:13:25] INFO: Summary sheet created
-[2026-03-24 12:13:25] INFO: Building index summary...
-[2026-03-24 12:13:25] INFO: Writing Index_Summary sheet with 23 metrics...
-[2026-03-24 12:13:28] INFO: Index_Summary sheet created
-[2026-03-24 12:13:28] INFO: Creating Run_Status sheet...
-[2026-03-24 12:13:28] INFO: Run_Status sheet created (status: PASS)
-   Writing: turas_e2e_3709d11d458.xlsx
-[TRS INFO] TABS: Saved: turas_e2e_3709d11d458.xlsx (77,950 bytes)
-[2026-03-24 12:13:44] INFO: Saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/turas_e2e_3709d11d458.xlsx
-......[2026-03-24 12:13:44] INFO: Project root: /Users/duncan/Documents/Turas/examples/tabs/demo_survey
-[2026-03-24 12:13:44] INFO: Loading configuration...
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-[2026-03-24 12:13:44] INFO: Configuration loaded
-
-  WARNING: Unrecognised settings in config (may be typos):
-    - generate_stats_pack 
-  These settings will be ignored. Check spelling against the template.
-
-[2026-03-24 12:13:44] INFO: Loading survey structure...
-Loading survey structure from: Demo_Survey_Structure.xlsx 
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-  Loaded: 29 questions, 188 options
-[2026-03-24 12:13:45] INFO: Survey structure loaded
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-[2026-03-24 12:13:45] INFO: Loaded 2 composite metric(s)
-[2026-03-24 12:13:45] INFO: Loading survey data...
-Loading survey data from: Demo_Survey_Data.xlsx 
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-  Loaded: 1,000 rows, 31 columns
-[2026-03-24 12:13:45] INFO: Loaded 1000 responses
-
-Weight: Weight:
-  N (total):         1,000 
-  N (nonzero):       1,000 
-  Min:               0.549 
-  Q1:                0.772 
-  Median:            1.012 
-  Q3:                1.22 
-  Max:               1.463 
-  Mean:              1 
-  SD:                0.26 
-  CV:                0.26 
-  Sum:               1,000 
-  Effective n:       937 
-  Design effect:     1.07 
-
-[2026-03-24 12:13:45] INFO: Loading question selection...
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-[2026-03-24 12:13:45] INFO: Found 25 questions to analyze
-[2026-03-24 12:13:45] INFO: Running comprehensive validation...
-
-================================================================================
-VALIDATION CHECKS (V10.1)
-================================================================================
-
-Validating survey structure...
-✓ Survey structure validation complete
-Validating data structure...
-✓ Data structure validation complete
-Validating weighting configuration...
-✓ Weighting validation complete
-Validating crosstab configuration...
-  Note: output_format 'excel' will be treated as 'xlsx'
-✓ Configuration validation complete
-  Pre-flight cross-reference checks...
-  ⚠ Pre-flight found 1 issue(s)
-
---------------------------------------------------------------------------------
-VALIDATION SUMMARY
---------------------------------------------------------------------------------
-
-
-================================================================================
-
-[2026-03-24 12:13:45] WARNING: Found 1 validation issues
-[2026-03-24 12:13:45] INFO: Validating composite definitions...
-[2026-03-24 12:13:45] INFO: Composite definitions validated
-[2026-03-24 12:13:45] INFO: Creating banner structure...
-[2026-03-24 12:13:45] INFO: Banner: 16 columns
-
-============================================================ 
-ANALYSIS CONFIGURATION
-============================================================ 
-  Questions to process:    25
-  Respondents:             1000
-  Banner columns:          16
-  Weighting:               Weight
-  Significance testing:    Yes (alpha=0.050)
-  HTML report:             Yes
-  Charts:                  Yes
-  Dashboard:               Yes
-  Estimated time:          ~20 seconds
-============================================================ 
-
-[2026-03-24 12:13:45] INFO: Processing 25 questions...
-
-
-[  4%] 1/25 | ETA: 0.0 seconds Q001
-[ 12%] 3/25 | ETA: 3.1 seconds Q002
-[ 20%] 5/25 | ETA: 3.3 seconds Q003
-[ 28%] 7/25 | ETA: 3.0 seconds Q004
-[ 36%] 9/25 | ETA: 2.7 seconds Q005
-[ 44%] 11/25 | ETA: 2.4 seconds Q006
-[ 52%] 13/25 | ETA: 2.1 seconds Q007
-[ 60%] 15/25 | ETA: 1.8 seconds Q008
-[ 68%] 17/25 | ETA: 1.5 seconds Q009
-[ 76%] 19/25 | ETA: 1.1 seconds Q010
-[ 84%] 21/25 | ETA: 0.7 seconds Q011
-[ 92%] 23/25 | ETA: 0.4 seconds Q012
-[100%] 25/25 | ETA: 0.0 seconds Q013
-
-[108%] 27/25 | ETA: -0.4 seconds Q014
-[116%] 29/25 | ETA: -0.7 seconds Q015
-[124%] 31/25 | ETA: -1.1 seconds Q016
-[132%] 33/25 | ETA: -1.4 seconds Q017
-[140%] 35/25 | ETA: -1.8 seconds Q018
-[148%] 37/25 | ETA: -2.0 seconds Q019
-[156%] 39/25 | ETA: -2.3 seconds Q020
-[164%] 41/25 | ETA: -2.8 seconds Q021
-[172%] 43/25 | ETA: -3.0 seconds Q022
-[180%] 45/25 | ETA: -3.2 seconds Q023
-[188%] 47/25 | ETA: -3.4 seconds Q024
-[196%] 49/25 | ETA: -3.6 seconds Q025
-[2026-03-24 12:13:52] INFO: Processed 25 questions
-[2026-03-24 12:13:52] INFO: Processing 2 composite metric(s)...
-[2026-03-24 12:13:52] INFO: Creating banner row indices for composites...
-[2026-03-24 12:13:52] INFO: Created indices for 16 banner columns
-[2026-03-24 12:13:52] INFO: Processed 2 composite(s)
-[2026-03-24 12:13:52] INFO: Added 2 composite(s) to results
-[2026-03-24 12:13:52] INFO: Creating Excel output...
-[2026-03-24 12:13:52] INFO: Creating Summary sheet...
-[2026-03-24 12:13:52] INFO: Summary sheet created
-[2026-03-24 12:13:52] INFO: Building index summary...
-[2026-03-24 12:13:53] INFO: Writing Index_Summary sheet with 23 metrics...
-[2026-03-24 12:13:55] INFO: Index_Summary sheet created
-[2026-03-24 12:13:55] INFO: Creating Run_Status sheet...
-[2026-03-24 12:13:55] INFO: Run_Status sheet created (status: PASS)
-   Writing: turas_e2e_data_37096bd33396.xlsx
-[TRS INFO] TABS: Saved: turas_e2e_data_37096bd33396.xlsx (77,947 bytes)
-[2026-03-24 12:14:10] INFO: Saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/turas_e2e_data_37096bd33396.xlsx
-..
-E2E: HTML output: [2026-03-24 12:14:10] INFO: Project root: /Users/duncan/Documents/Turas/examples/tabs/demo_survey
-[2026-03-24 12:14:10] INFO: Loading configuration...
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-[2026-03-24 12:14:10] INFO: Configuration loaded
-
-  WARNING: Unrecognised settings in config (may be typos):
-    - generate_stats_pack 
-  These settings will be ignored. Check spelling against the template.
-
-[2026-03-24 12:14:10] INFO: Loading survey structure...
-Loading survey structure from: Demo_Survey_Structure.xlsx 
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-  Loaded: 29 questions, 188 options
-[2026-03-24 12:14:11] INFO: Survey structure loaded
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-[2026-03-24 12:14:11] INFO: Loaded 2 composite metric(s)
-[2026-03-24 12:14:11] INFO: Loading survey data...
-Loading survey data from: Demo_Survey_Data.xlsx 
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-  Loaded: 1,000 rows, 31 columns
-[2026-03-24 12:14:11] INFO: Loaded 1000 responses
-
-Weight: Weight:
-  N (total):         1,000 
-  N (nonzero):       1,000 
-  Min:               0.549 
-  Q1:                0.772 
-  Median:            1.012 
-  Q3:                1.22 
-  Max:               1.463 
-  Mean:              1 
-  SD:                0.26 
-  CV:                0.26 
-  Sum:               1,000 
-  Effective n:       937 
-  Design effect:     1.07 
-
-[2026-03-24 12:14:11] INFO: Loading question selection...
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-[2026-03-24 12:14:11] INFO: Found 25 questions to analyze
-[2026-03-24 12:14:11] INFO: Running comprehensive validation...
-
-================================================================================
-VALIDATION CHECKS (V10.1)
-================================================================================
-
-Validating survey structure...
-✓ Survey structure validation complete
-Validating data structure...
-✓ Data structure validation complete
-Validating weighting configuration...
-✓ Weighting validation complete
-Validating crosstab configuration...
-  Note: output_format 'excel' will be treated as 'xlsx'
-✓ Configuration validation complete
-  Pre-flight cross-reference checks...
-  ⚠ Pre-flight found 1 issue(s)
-
---------------------------------------------------------------------------------
-VALIDATION SUMMARY
---------------------------------------------------------------------------------
-
-
-================================================================================
-
-[2026-03-24 12:14:11] WARNING: Found 1 validation issues
-[2026-03-24 12:14:11] INFO: Validating composite definitions...
-[2026-03-24 12:14:11] INFO: Composite definitions validated
-[2026-03-24 12:14:11] INFO: Creating banner structure...
-[2026-03-24 12:14:11] INFO: Banner: 16 columns
-
-============================================================ 
-ANALYSIS CONFIGURATION
-============================================================ 
-  Questions to process:    25
-  Respondents:             1000
-  Banner columns:          16
-  Weighting:               Weight
-  Significance testing:    Yes (alpha=0.050)
-  HTML report:             Yes
-  Charts:                  Yes
-  Dashboard:               Yes
-  Estimated time:          ~20 seconds
-============================================================ 
-
-[2026-03-24 12:14:11] INFO: Processing 25 questions...
-
-
-[  4%] 1/25 | ETA: 0.0 seconds Q001
-[ 12%] 3/25 | ETA: 3.1 seconds Q002
-[ 20%] 5/25 | ETA: 3.1 seconds Q003
-[ 28%] 7/25 | ETA: 2.9 seconds Q004
-[ 36%] 9/25 | ETA: 2.7 seconds Q005
-[ 44%] 11/25 | ETA: 2.5 seconds Q006
-[ 52%] 13/25 | ETA: 2.1 seconds Q007
-[ 60%] 15/25 | ETA: 1.8 seconds Q008
-[ 68%] 17/25 | ETA: 1.5 seconds Q009
-[ 76%] 19/25 | ETA: 1.2 seconds Q010
-[ 84%] 21/25 | ETA: 0.8 seconds Q011
-[ 92%] 23/25 | ETA: 0.4 seconds Q012
-[100%] 25/25 | ETA: 0.0 seconds Q013
-
-[108%] 27/25 | ETA: -0.4 seconds Q014
-[116%] 29/25 | ETA: -0.7 seconds Q015
-[124%] 31/25 | ETA: -1.1 seconds Q016
-[132%] 33/25 | ETA: -1.4 seconds Q017
-[140%] 35/25 | ETA: -1.7 seconds Q018
-[148%] 37/25 | ETA: -2.0 seconds Q019
-[156%] 39/25 | ETA: -2.2 seconds Q020
-[164%] 41/25 | ETA: -2.7 seconds Q021
-[172%] 43/25 | ETA: -2.9 seconds Q022
-[180%] 45/25 | ETA: -3.1 seconds Q023
-[188%] 47/25 | ETA: -3.3 seconds Q024
-[196%] 49/25 | ETA: -3.5 seconds Q025
-[2026-03-24 12:14:18] INFO: Processed 25 questions
-[2026-03-24 12:14:18] INFO: Processing 2 composite metric(s)...
-[2026-03-24 12:14:18] INFO: Creating banner row indices for composites...
-[2026-03-24 12:14:18] INFO: Created indices for 16 banner columns
-[2026-03-24 12:14:18] INFO: Processed 2 composite(s)
-[2026-03-24 12:14:18] INFO: Added 2 composite(s) to results
-[2026-03-24 12:14:18] INFO: Creating Excel output...
-[2026-03-24 12:14:18] INFO: Creating Summary sheet...
-[2026-03-24 12:14:18] INFO: Summary sheet created
-[2026-03-24 12:14:18] INFO: Building index summary...
-[2026-03-24 12:14:18] INFO: Writing Index_Summary sheet with 23 metrics...
-[2026-03-24 12:14:20] INFO: Index_Summary sheet created
-[2026-03-24 12:14:20] INFO: Creating Run_Status sheet...
-[2026-03-24 12:14:20] INFO: Run_Status sheet created (status: PASS)
-   Writing: turas_e2e_html_37092de0d6d4.xlsx
-[TRS INFO] TABS: Saved: turas_e2e_html_37092de0d6d4.xlsx (77,949 bytes)
-[2026-03-24 12:14:35] INFO: Saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/turas_e2e_html_37092de0d6d4.xlsx
+[132%] 33/25 | ETA: -1.3 seconds Q017
+[140%] 35/25 | ETA: -1.6 seconds Q018
+[148%] 37/25 | ETA: -1.9 seconds Q019
+[156%] 39/25 | ETA: -2.1 seconds Q020
+[164%] 41/25 | ETA: -2.5 seconds Q021
+[172%] 43/25 | ETA: -2.7 seconds Q022
+[180%] 45/25 | ETA: -2.9 seconds Q023
+[188%] 47/25 | ETA: -3.1 seconds Q024
+[196%] 49/25 | ETA: -3.3 seconds Q025
+[2026-03-24 12:43:31] INFO: Processed 25 questions
+[2026-03-24 12:43:31] INFO: Processing 2 composite metric(s)...
+[2026-03-24 12:43:31] INFO: Creating banner row indices for composites...
+[2026-03-24 12:43:31] INFO: Created indices for 16 banner columns
+[2026-03-24 12:43:32] INFO: Processed 2 composite(s)
+[2026-03-24 12:43:32] INFO: Added 2 composite(s) to results
+[2026-03-24 12:43:32] INFO: Creating Excel output...
+[2026-03-24 12:43:32] INFO: Creating Summary sheet...
+[2026-03-24 12:43:32] INFO: Summary sheet created
+[2026-03-24 12:43:32] INFO: Building index summary...
+[2026-03-24 12:43:32] INFO: Writing Index_Summary sheet with 23 metrics...
+[2026-03-24 12:43:33] INFO: Index_Summary sheet created
+[2026-03-24 12:43:33] INFO: Creating Run_Status sheet...
+[2026-03-24 12:43:34] INFO: Run_Status sheet created (status: PASS)
+   Writing: turas_e2e_html_3709590086a7.xlsx
+[TRS INFO] TABS: Saved: turas_e2e_html_3709590086a7.xlsx (77,950 bytes)
+[2026-03-24 12:43:48] INFO: Saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/turas_e2e_html_3709590086a7.xlsx
 
 ------------------------------------------------------------ 
   HTML REPORT GENERATION
@@ -5207,8 +5182,8 @@ ANALYSIS CONFIGURATION
   Step 3b: Building SVG charts...
     25 charts built successfully
   Step 4: Assembling HTML page...
-  Step 5: Writing HTML file to turas_e2e_html_37092de0d6d4.html...
-  Done! 1.7 MB in 6.2 seconds
+  Step 5: Writing HTML file to turas_e2e_html_3709590086a7.html...
+  Done! 1.7 MB in 5.8 seconds
 ------------------------------------------------------------ 
 
 ....
@@ -5246,8 +5221,8 @@ generate_html_report — end-to-end:
   Step 3: Building HTML tables...
     1 tables built successfully
   Step 4: Assembling HTML page...
-  Step 5: Writing HTML file to file370956c876b3.html...
-  Done! 0.3 MB in 0.7 seconds
+  Step 5: Writing HTML file to file370956ffb147.html...
+  Done! 0.3 MB in 0.8 seconds
 ------------------------------------------------------------ 
 
 .....
@@ -5261,7 +5236,7 @@ generate_html_report — end-to-end:
   Step 3: Building HTML tables...
     1 tables built successfully
   Step 4: Assembling HTML page...
-  Step 5: Writing HTML file to file3709d1e7e36.html...
+  Step 5: Writing HTML file to file370911f5833b.html...
   Done! 0.3 MB in 0.1 seconds
 ------------------------------------------------------------ 
 
@@ -5288,7 +5263,7 @@ Fix: Ensure analysis completed successfully and produced results
   Step 3: Building HTML tables...
     2 tables built successfully
   Step 4: Assembling HTML page...
-  Step 5: Writing HTML file to file3709421fb9e1.html...
+  Step 5: Writing HTML file to file37092b844530.html...
   Done! 0.3 MB in 0.1 seconds
 ------------------------------------------------------------ 
 
@@ -5321,8 +5296,8 @@ End-to-end HTML — UI controls in generated report:
   Step 3: Building HTML tables...
     1 tables built successfully
   Step 4: Assembling HTML page...
-  Step 5: Writing HTML file to file370919c5a506.html...
-  Done! 0.3 MB in 0.5 seconds
+  Step 5: Writing HTML file to file37092f587bcc.html...
+  Done! 0.3 MB in 0.4 seconds
 ------------------------------------------------------------ 
 
 ........
@@ -5830,44 +5805,44 @@ run_all_validations — orchestrator: ..
 workbook_builder: [OK] Turas>Tabs cell_calculator module loaded
 get_style_config: ...........
 build_project_info: .........
-save_workbook_safe: .[2026-03-24 12:14:58] INFO: Created output directory
+save_workbook_safe: .[2026-03-24 12:44:09] INFO: Created output directory
    Writing: output.xlsx
 [TRS INFO] TABS: Saved: output.xlsx (6,364 bytes)
-[2026-03-24 12:14:58] INFO: Saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/wb_test_121458/output.xlsx
-..   Writing: file3709497644e8.xlsx
-[TRS INFO] TABS: Saved: file3709497644e8.xlsx (6,430 bytes)
-[2026-03-24 12:14:58] INFO: Saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709497644e8.xlsx
+[2026-03-24 12:44:09] INFO: Saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/wb_test_124409/output.xlsx
+..   Writing: file37099a80447.xlsx
+[TRS INFO] TABS: Saved: file37099a80447.xlsx (6,430 bytes)
+[2026-03-24 12:44:09] INFO: Saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37099a80447.xlsx
 ....
-create_crosstabs_workbook: [2026-03-24 12:14:58] INFO: Creating Excel output...
-[2026-03-24 12:14:58] INFO: Creating Summary sheet...
-[2026-03-24 12:14:58] INFO: Summary sheet created
-[2026-03-24 12:14:58] INFO: Creating Run_Status sheet...
-[2026-03-24 12:14:58] INFO: Run_Status sheet created (status: PASS)
-   Writing: file370972f389c2.xlsx
-[TRS INFO] TABS: Saved: file370972f389c2.xlsx (15,782 bytes)
-[2026-03-24 12:14:59] INFO: Saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370972f389c2.xlsx
-.....[2026-03-24 12:14:59] INFO: Creating Excel output...
-[2026-03-24 12:14:59] INFO: Creating Summary sheet...
-[2026-03-24 12:14:59] INFO: Summary sheet created
-[2026-03-24 12:14:59] INFO: Creating Run_Status sheet...
-[2026-03-24 12:14:59] INFO: Run_Status sheet created (status: PASS)
-   Writing: file3709761a899.xlsx
-[TRS INFO] TABS: Saved: file3709761a899.xlsx (15,782 bytes)
-[2026-03-24 12:14:59] INFO: Saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709761a899.xlsx
-...[2026-03-24 12:14:59] INFO: Creating Excel output...
-[2026-03-24 12:14:59] INFO: Creating Summary sheet...
-[2026-03-24 12:15:00] INFO: Summary sheet created
-[2026-03-24 12:15:00] INFO: Creating Run_Status sheet...
-[2026-03-24 12:15:00] INFO: Run_Status sheet created (status: PASS)
-   Writing: file37094741050c.xlsx
-[TRS INFO] TABS: Saved: file37094741050c.xlsx (15,477 bytes)
-[2026-03-24 12:15:00] INFO: Saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094741050c.xlsx
+create_crosstabs_workbook: [2026-03-24 12:44:09] INFO: Creating Excel output...
+[2026-03-24 12:44:09] INFO: Creating Summary sheet...
+[2026-03-24 12:44:09] INFO: Summary sheet created
+[2026-03-24 12:44:09] INFO: Creating Run_Status sheet...
+[2026-03-24 12:44:09] INFO: Run_Status sheet created (status: PASS)
+   Writing: file37097b321118.xlsx
+[TRS INFO] TABS: Saved: file37097b321118.xlsx (15,782 bytes)
+[2026-03-24 12:44:10] INFO: Saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37097b321118.xlsx
+.....[2026-03-24 12:44:10] INFO: Creating Excel output...
+[2026-03-24 12:44:10] INFO: Creating Summary sheet...
+[2026-03-24 12:44:10] INFO: Summary sheet created
+[2026-03-24 12:44:10] INFO: Creating Run_Status sheet...
+[2026-03-24 12:44:10] INFO: Run_Status sheet created (status: PASS)
+   Writing: file370926089dfe.xlsx
+[TRS INFO] TABS: Saved: file370926089dfe.xlsx (15,780 bytes)
+[2026-03-24 12:44:10] INFO: Saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370926089dfe.xlsx
+...[2026-03-24 12:44:10] INFO: Creating Excel output...
+[2026-03-24 12:44:10] INFO: Creating Summary sheet...
+[2026-03-24 12:44:10] INFO: Summary sheet created
+[2026-03-24 12:44:10] INFO: Creating Run_Status sheet...
+[2026-03-24 12:44:10] INFO: Run_Status sheet created (status: PASS)
+   Writing: file37096aa8407f.xlsx
+[TRS INFO] TABS: Saved: file37096aa8407f.xlsx (15,476 bytes)
+[2026-03-24 12:44:11] INFO: Saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37096aa8407f.xlsx
 ....
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 
-[PASS] Tabs — 1482 passed, 0 failed, 0 skipped (202.8s)
+[PASS] Tabs — 1482 passed, 0 failed, 0 skipped (193.1s)
 
 --------------------------------------------------------------------------------
 MODULE: Tracker (20 test files)
@@ -5908,29 +5883,29 @@ Tracker Configuration Evolution: ......  [INFO] TrackingSpecs for 'Q_SAT' read f
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 --- test_config_templates.R ---
-config_templates:   Generating tracking config template: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370933beacd2.xlsx
-  Created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370933beacd2.xlsx
+config_templates:   Generating tracking config template: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370976028550.xlsx
+  Created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370976028550.xlsx
     Sheets: Settings, Waves, TrackedQuestions, Banner
-...  Generating tracking config template: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709471e342a.xlsx
-  Created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709471e342a.xlsx
+...  Generating tracking config template: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709143c79de.xlsx
+  Created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709143c79de.xlsx
     Sheets: Settings, Waves, TrackedQuestions, Banner
-....  Generating tracking config template: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094b77685c.xlsx
-  Created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094b77685c.xlsx
+....  Generating tracking config template: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37097bff9994.xlsx
+  Created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37097bff9994.xlsx
     Sheets: Settings, Waves, TrackedQuestions, Banner
-...  Generating tracking config template: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370976de079a.xlsx
-  Created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370976de079a.xlsx
+...  Generating tracking config template: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095ff4d363.xlsx
+  Created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095ff4d363.xlsx
     Sheets: Settings, Waves, TrackedQuestions, Banner
-...  Generating tracking config template: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370921d6792c.xlsx
-  Created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370921d6792c.xlsx
+...  Generating tracking config template: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370959a0c345.xlsx
+  Created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370959a0c345.xlsx
     Sheets: Settings, Waves, TrackedQuestions, Banner
-..  Generating question mapping template: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37093b37e2d1.xlsx
-  Created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37093b37e2d1.xlsx
+..  Generating question mapping template: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370977621e48.xlsx
+  Created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370977621e48.xlsx
     Sheets: QuestionMap
-...  Generating question mapping template: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37096ce1ca0d.xlsx
-  Created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37096ce1ca0d.xlsx
+...  Generating question mapping template: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37091ade18b.xlsx
+  Created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37091ade18b.xlsx
     Sheets: QuestionMap
-.  Generating question mapping template: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095dac761a.xlsx
-  Created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095dac761a.xlsx
+.  Generating question mapping template: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37093bee7faa.xlsx
+  Created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37093bee7faa.xlsx
     Sheets: QuestionMap
 ....  Generating tracking config template: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/tracker_tpl_14089/Tracking_Config.xlsx
   Created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/tracker_tpl_14089/Tracking_Config.xlsx
@@ -6007,7 +5982,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37093e5a88f9.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37092ff3dcd5.html (0.4 MB)
 ................
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6015,7 +5990,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370954b2874c.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370966946d26.html (0.4 MB)
 ..................
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6023,7 +5998,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709515871a8.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709746bdca6.html (0.4 MB)
 .......
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6031,7 +6006,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37097f18ee27.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095c64a0dd.html (0.4 MB)
 ......
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6039,7 +6014,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370977334b81.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37093c1f009f.html (0.4 MB)
 .............
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6047,7 +6022,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37093353d3de.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709515e1eb4.html (0.4 MB)
 .
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6055,7 +6030,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37091ddbc0f7.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709758bde66.html (0.4 MB)
 .....
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6063,7 +6038,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709404996de.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37096dc189d.html (0.4 MB)
 ....
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6071,7 +6046,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37096b00e8da.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37096e6b4ca5.html (0.4 MB)
 .
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6079,7 +6054,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37092fa62029.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709afc2e3.html (0.4 MB)
 ......
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6087,7 +6062,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095ec59264.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37096f7a639.html (0.4 MB)
 .
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6095,7 +6070,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709239b980e.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709a346d0b.html (0.4 MB)
 ....
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6103,7 +6078,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709538671b6.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37092dbb2573.html (0.4 MB)
 .............
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6111,7 +6086,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709475bf02a.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370929da9011.html (0.4 MB)
 ..
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6119,7 +6094,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370964f757eb.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370944a00c57.html (0.4 MB)
 .......
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6127,7 +6102,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37091c87a6d7.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709d0743b5.html (0.4 MB)
 ...
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6135,7 +6110,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709a987b6d.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370959fd9576.html (0.4 MB)
 ...
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6143,7 +6118,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709123ae4d8.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095bf220f1.html (0.4 MB)
 ....
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6151,7 +6126,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095465e3b5.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709744b92ee.html (0.4 MB)
 ....
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6159,7 +6134,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709729e92c3.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709472a0330.html (0.4 MB)
 ....
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6167,7 +6142,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095101dbdc.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709444109c7.html (0.4 MB)
 ..
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6175,7 +6150,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370958a12467.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709865a513.html (0.4 MB)
 ....
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6183,7 +6158,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370947221a72.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37092c37aff4.html (0.4 MB)
 .
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6191,7 +6166,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37097df0aaf9.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370958518817.html (0.4 MB)
 ...
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6199,7 +6174,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37096b486e6f.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709392669d9.html (0.4 MB)
 .
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6207,7 +6182,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37091a209392.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709277a11.html (0.4 MB)
 ........
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6215,7 +6190,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709439a55f0.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370979bd8fea.html (0.4 MB)
 .....
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6223,7 +6198,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370964421069.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37097ac19210.html (0.4 MB)
 .....
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6231,7 +6206,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37093cbcf78a.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370953f29023.html (0.4 MB)
 ....................................
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6239,7 +6214,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370933d86955.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094d5371fe.html (0.4 MB)
 ...........
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6247,7 +6222,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37093e6ac8b3.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370921fe856b.html (0.4 MB)
 ...
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6255,7 +6230,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37093f1ab876.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094dc42763.html (0.4 MB)
 ....
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6263,7 +6238,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095dbaf47f.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709172efc48.html (0.4 MB)
 ..
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6271,7 +6246,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709e409285.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37093e140248.html (0.4 MB)
 ...
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6279,7 +6254,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370961ba3a19.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709702b3348.html (0.4 MB)
 .
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6287,7 +6262,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370936f343f5.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094230728.html (0.4 MB)
 ......
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6295,7 +6270,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37097274948f.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370954cdc402.html (0.4 MB)
 ......
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6303,7 +6278,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370953e06efa.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37092523c45a.html (0.4 MB)
 .....
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6311,7 +6286,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709410f1dd7.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709aec5531.html (0.4 MB)
 ....
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6319,7 +6294,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37096b1ea53c.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370964e1359.html (0.4 MB)
 .
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6327,7 +6302,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709173baf8e.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095edf5f66.html (0.4 MB)
 ...
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -6335,7 +6310,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37098c97f79.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709526b7693.html (0.4 MB)
 ..
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -6739,12 +6714,12 @@ Tracker Excel Output Writers: W......................
 WRITING EXCEL OUTPUT
 ================================================================================
 
-Output file: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370966dd438d.xlsx
+Output file: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094f0a953d.xlsx
 
 Saving workbook...
-   Writing: file370966dd438d.xlsx
-[TRS INFO] TRACKER: Saved: file370966dd438d.xlsx (11,006 bytes)
-✓ Output written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370966dd438d.xlsx
+   Writing: file37094f0a953d.xlsx
+[TRS INFO] TRACKER: Saved: file37094f0a953d.xlsx (11,007 bytes)
+✓ Output written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094f0a953d.xlsx
 ================================================================================
 
 .......................................
@@ -6752,12 +6727,12 @@ Saving workbook...
 WRITING WAVE HISTORY EXCEL OUTPUT
 ================================================================================
 
-Output file: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094bcc717b.xlsx
+Output file: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709e86e7fb.xlsx
 
 Saving workbook...
-   Writing: file37094bcc717b.xlsx
-[TRS INFO] TRACKER: Saved: file37094bcc717b.xlsx (6,806 bytes)
-✓ Wave History output written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094bcc717b.xlsx
+   Writing: file3709e86e7fb.xlsx
+[TRS INFO] TRACKER: Saved: file3709e86e7fb.xlsx (6,807 bytes)
+✓ Wave History output written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709e86e7fb.xlsx
 ================================================================================
 
 ..
@@ -6766,12 +6741,12 @@ WRITING EXCEL OUTPUT
 ================================================================================
 
   Detected banner breakout results
-Output file: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370924e93ffd.xlsx
+Output file: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095193bb80.xlsx
 
 Saving workbook...
-   Writing: file370924e93ffd.xlsx
-[TRS INFO] TRACKER: Saved: file370924e93ffd.xlsx (12,735 bytes)
-✓ Output written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370924e93ffd.xlsx
+   Writing: file37095193bb80.xlsx
+[TRS INFO] TRACKER: Saved: file37095193bb80.xlsx (12,737 bytes)
+✓ Output written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095193bb80.xlsx
 ================================================================================
 
 .....
@@ -6827,28 +6802,28 @@ Tracking Crosstab Engine: ....................................................
 tracking_crosstab_excel: 
 Tracking Crosstab Excel Output: 
   Generating Tracking Crosstab Excel report...
-  Tracking Crosstab saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37093b8168e2.xlsx
+  Tracking Crosstab saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37096204e15f.xlsx
 ..
   Generating Tracking Crosstab Excel report...
-  Tracking Crosstab saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370958948110.xlsx
+  Tracking Crosstab saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709e98564c.xlsx
 ...
   Generating Tracking Crosstab Excel report...
-  Tracking Crosstab saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709951267a.xlsx
+  Tracking Crosstab saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370979332e2f.xlsx
 ........................................
   Generating Tracking Crosstab Excel report...
-  Tracking Crosstab saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37096b56293c.xlsx
+  Tracking Crosstab saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37093aec09d.xlsx
 ..............
   Generating Tracking Crosstab Excel report...
-  Tracking Crosstab saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095955e765.xlsx
+  Tracking Crosstab saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370961089946.xlsx
 ............
   Generating Tracking Crosstab Excel report...
-  Tracking Crosstab saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37097e165c3e.xlsx
+  Tracking Crosstab saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370976206e78.xlsx
 ..
   Generating Tracking Crosstab Excel report...
-  Tracking Crosstab saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709107c5757.xlsx
+  Tracking Crosstab saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094998fc87.xlsx
 ...
   Generating Tracking Crosstab Excel report...
-  Tracking Crosstab saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095ae85a3b.xlsx
+  Tracking Crosstab saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709533c99dd.xlsx
 ..
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -6946,7 +6921,7 @@ Backtrace:
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 
-[PASS] Tracker — 1848 passed, 0 failed, 0 skipped (85.0s)
+[PASS] Tracker — 1848 passed, 0 failed, 0 skipped (79.6s)
 
 --------------------------------------------------------------------------------
 MODULE: Weighting (14 test files)
@@ -7466,7 +7441,7 @@ config_loader:
 --- test_config_templates.R ---
 config_templates: 
 === TURAS Weighting Module: Generating Config Template ===
-  Output: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094041ab0b.xlsx
+  Output: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709702f992d.xlsx
   [1/7] Settings sheet...
   [2/7] Weight_Specifications sheet...
   [3/7] Design_Targets sheet...
@@ -7474,12 +7449,12 @@ config_templates:
   [5/7] Cell_Targets sheet...
   [6/7] Advanced_Settings sheet...
   [7/7] Notes sheet...
-  Template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094041ab0b.xlsx
+  Template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709702f992d.xlsx
 === Template generation complete ===
 
 ...
 === TURAS Weighting Module: Generating Config Template ===
-  Output: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709b2291e6.xlsx
+  Output: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095119b147.xlsx
   [1/7] Settings sheet...
   [2/7] Weight_Specifications sheet...
   [3/7] Design_Targets sheet...
@@ -7487,12 +7462,12 @@ config_templates:
   [5/7] Cell_Targets sheet...
   [6/7] Advanced_Settings sheet...
   [7/7] Notes sheet...
-  Template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709b2291e6.xlsx
+  Template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095119b147.xlsx
 === Template generation complete ===
 
 .......
 === TURAS Weighting Module: Generating Config Template ===
-  Output: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37092144ff51.xlsx
+  Output: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37092c92c57.xlsx
   [1/7] Settings sheet...
   [2/7] Weight_Specifications sheet...
   [3/7] Design_Targets sheet...
@@ -7500,12 +7475,12 @@ config_templates:
   [5/7] Cell_Targets sheet...
   [6/7] Advanced_Settings sheet...
   [7/7] Notes sheet...
-  Template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37092144ff51.xlsx
+  Template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37092c92c57.xlsx
 === Template generation complete ===
 
 ...
 === TURAS Weighting Module: Generating Config Template ===
-  Output: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095643a010.xlsx
+  Output: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37097cc68bf2.xlsx
   [1/7] Settings sheet...
   [2/7] Weight_Specifications sheet...
   [3/7] Design_Targets sheet...
@@ -7513,12 +7488,12 @@ config_templates:
   [5/7] Cell_Targets sheet...
   [6/7] Advanced_Settings sheet...
   [7/7] Notes sheet...
-  Template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095643a010.xlsx
+  Template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37097cc68bf2.xlsx
 === Template generation complete ===
 
 ....
 === TURAS Weighting Module: Generating Config Template ===
-  Output: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094b5c785f.xlsx
+  Output: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095767e3e1.xlsx
   [1/7] Settings sheet...
   [2/7] Weight_Specifications sheet...
   [3/7] Design_Targets sheet...
@@ -7526,7 +7501,7 @@ config_templates:
   [5/7] Cell_Targets sheet...
   [6/7] Advanced_Settings sheet...
   [7/7] Notes sheet...
-  Template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094b5c785f.xlsx
+  Template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095767e3e1.xlsx
 === Template generation complete ===
 
 ..........
@@ -7667,7 +7642,7 @@ html_report: ...............................
     1 charts built
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file to test_weighting_report.html...
-  Done! 48.8 KB in 0.3 seconds
+  Done! 48.8 KB in 0.2 seconds
 ------------------------------------------------------------ 
 
 ......
@@ -7713,7 +7688,7 @@ html_report: ...............................
     1 charts built
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file to test_rim_report.html...
-  Done! 49.4 KB in 0.1 seconds
+  Done! 49.4 KB in 0.0 seconds
 ------------------------------------------------------------ 
 
 ..
@@ -8164,7 +8139,7 @@ validation: ..............................
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 
-[PASS] Weighting — 415 passed, 0 failed, 0 skipped (45.6s)
+[PASS] Weighting — 415 passed, 0 failed, 0 skipped (39.1s)
 
 --------------------------------------------------------------------------------
 MODULE: Report Hub (9 test files)
@@ -8176,37 +8151,37 @@ config_templates: Generating Report Hub config template...
   Settings sheet created
   Reports sheet created
   Slides sheet created
-  Template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709665429e1.xlsx (13269 bytes)
+  Template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370956e842d3.xlsx (13269 bytes)
 Done!
 ...Generating Report Hub config template...
   Settings sheet created
   Reports sheet created
   Slides sheet created
-  Template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709c6abe15.xlsx (13269 bytes)
+  Template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709440b3663.xlsx (13269 bytes)
 Done!
 ...Generating Report Hub config template...
   Settings sheet created
   Reports sheet created
   Slides sheet created
-  Template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709269d203e.xlsx (13269 bytes)
+  Template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370939c415d9.xlsx (13269 bytes)
 Done!
 ....Generating Report Hub config template...
   Settings sheet created
   Reports sheet created
   Slides sheet created
-  Template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370914c940a6.xlsx (13270 bytes)
+  Template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095b572dee.xlsx (13269 bytes)
 Done!
 ...Generating Report Hub config template...
   Settings sheet created
   Reports sheet created
   Slides sheet created
-  Template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709392d5136.xlsx (13269 bytes)
+  Template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709d6fa337.xlsx (13269 bytes)
 Done!
 .Generating Report Hub config template...
   Settings sheet created
   Reports sheet created
   Slides sheet created
-  Template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37091e5867ce.xlsx (13270 bytes)
+  Template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37096a6f7cde.xlsx (13270 bytes)
 Done!
 .Generating Report Hub config template...
   Settings sheet created
@@ -8218,7 +8193,7 @@ Done!
   Settings sheet created
   Reports sheet created
   Slides sheet created
-  Template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/rh_new_dir_14089/Report_Hub_Config_Template.xlsx (13270 bytes)
+  Template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/rh_new_dir_14089/Report_Hub_Config_Template.xlsx (13269 bytes)
 Done!
 ..
 
@@ -8248,7 +8223,7 @@ html_parser: .................................................
 --- test_integration.R ---
 integration: ..............
 === Turas Report Hub ===
-Config: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094de8679.xlsx 
+Config: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370912303704.xlsx 
 Step 1: Validating configuration...
   Found 2 reports to combine
 Step 1b: Running preflight checks...
@@ -8278,9 +8253,9 @@ Step 5: Assembling combined report (iframe isolation)...
   [hub-version: iframe-b64] Assembling with base64 iframe encoding
     Base64-encoded tabs: 574 B -> 768 B
     Base64-encoded tracker: 579 B -> 772 B
-Step 6: Writing output: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37092d4e746e.html
+Step 6: Writing output: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37091b6bf0f0.html
 
-Done! Combined report: /private/var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T/RtmpGlzyx3/file37092d4e746e.html (31 KB)
+Done! Combined report: /private/var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T/RtmpGlzyx3/file37091b6bf0f0.html (31 KB)
 ========================
 
 ...............
@@ -8296,7 +8271,7 @@ Fix: Check the file path. The config file must be a valid .xlsx file.
 
 ..
 === Turas Report Hub ===
-Config: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094a4f8cf3.xlsx 
+Config: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370971374134.xlsx 
 Step 1: Validating configuration...
 
 === TURAS ERROR ===
@@ -8307,7 +8282,7 @@ Fix: Add a 'Settings' sheet with at least project_title and company_name fields.
 
 ..
 === Turas Report Hub ===
-Config: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370970b3ceec.xlsx 
+Config: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37095e7d3b18.xlsx 
 Step 1: Validating configuration...
 
 === TURAS ERROR ===
@@ -8376,7 +8351,7 @@ visual_features: ........................
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 
-[PASS] Report Hub — 351 passed, 0 failed, 0 skipped (17.7s)
+[PASS] Report Hub — 351 passed, 0 failed, 0 skipped (15.3s)
 
 
 ======================================================================
@@ -8386,38 +8361,28 @@ visual_features: ........................
 
   Module                  Status    Pass    Fail    Skip    Warn    Time
   ----------------------  ------  ------  ------  ------  ------  ------
-  Shared Infrastructure   [ PASS]    619       0       0       0    7.8s
-  AlchemerParser          [ PASS]    299       0       0       0    4.2s
-  Confidence              [ PASS]   1022       0       0       0   59.7s
-  Conjoint                [ FAIL]    590      23       8       2   74.5s
-  Cat Driver              [ PASS]    659       0       1       2   15.4s
-  Key Driver              [ PASS]    900       0      14       2   27.0s
-  MaxDiff                 [ PASS]    755       0       4       0   25.0s
-  Pricing                 [ PASS]    813       0       0      63   85.2s
-  Segment                 [ PASS]    928       0       1       1   26.8s
-  Tabs                    [ PASS]   1482       0       0       0  202.8s
-  Tracker                 [ PASS]   1848       0       0       1   85.0s
-  Weighting               [ PASS]    415       0       0       1   45.6s
-  Report Hub              [ PASS]    351       0       0       0   17.7s
+  Shared Infrastructure   [ PASS]    619       0       0       0    7.5s
+  AlchemerParser          [ PASS]    299       0       0       0    4.0s
+  Confidence              [ PASS]   1022       0       0       0   49.7s
+  Conjoint                [ PASS]    628       0       7       2   86.1s
+  Cat Driver              [ PASS]    659       0       1       2   14.3s
+  Key Driver              [ PASS]    900       0      14       2   25.8s
+  MaxDiff                 [ PASS]    755       0       4       0   24.5s
+  Pricing                 [ PASS]    813       0       0      63   85.8s
+  Segment                 [ PASS]    928       0       1       1   26.7s
+  Tabs                    [ PASS]   1482       0       0       0  193.1s
+  Tracker                 [ PASS]   1848       0       0       1   79.6s
+  Weighting               [ PASS]    415       0       0       1   39.1s
+  Report Hub              [ PASS]    351       0       0       0   15.3s
   ----------------------  ------  ------  ------  ------  ------  ------
-  TOTALS                          10681      23      28      72  677.9s
+  TOTALS                          10719       0      27      72  652.2s
 
 ======================================================================
 
-  PLATFORM STATUS:  23 TEST(S) FAILED across 1 module(s)
-  Pass Rate:        99.8% (10681/10704 tests)
+  PLATFORM STATUS:  ALL TESTS PASSED
+  Pass Rate:        100% (10719/10719 tests)
   Test Files:       200 across 13 modules
-  Total Duration:   677.9 seconds
+  Total Duration:   652.2 seconds
 ======================================================================
 
-
-  MODULES WITH FAILURES:
-
-    Conjoint (23 failures):
-        FAIL in test_integration_mnl.R / integration_mnl: 1 failure(s)
-        FAIL in test_integration_mnl.R / integration_mnl: 5 failure(s)
-        FAIL in test_integration_mnl.R / integration_mnl: 3 failure(s)
-        FAIL in test_integration_mnl.R / integration_mnl: 5 failure(s)
-        FAIL in test_integration_mnl.R / integration_mnl: 1 failure(s)
-        FAIL in test_integration_mnl.R / integration_mnl: 8 failure(s)
 

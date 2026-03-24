@@ -346,7 +346,7 @@ validate_conjoint_data <- function(data, config) {
   for (attr in config$attributes$AttributeName) {
     level_counts <- data %>%
       filter(!!sym(config$chosen_column) == 1) %>%
-      count(!!sym(attr), name = "n_selections")
+      dplyr::count(!!sym(attr), name = "n_selections")
 
     low_counts <- level_counts %>%
       filter(n_selections < min_responses)
@@ -380,7 +380,7 @@ validate_conjoint_data <- function(data, config) {
 
   # Warning 3: Unbalanced choice set sizes
   set_sizes <- data %>%
-    count(!!sym(config$choice_set_column), name = "n_alternatives")
+    dplyr::count(!!sym(config$choice_set_column), name = "n_alternatives")
 
   if (length(unique(set_sizes$n_alternatives)) > 1) {
     size_summary <- paste(unique(set_sizes$n_alternatives), collapse = ", ")
@@ -484,7 +484,7 @@ calculate_data_statistics <- function(data, config) {
 
   # Alternatives per choice set
   alts_per_set <- data %>%
-    count(!!sym(config$choice_set_column), name = "n_alts")
+    dplyr::count(!!sym(config$choice_set_column), name = "n_alts")
 
   # Selection rates by attribute level
   selection_rates <- list()
