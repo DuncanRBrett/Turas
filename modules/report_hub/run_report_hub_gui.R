@@ -104,6 +104,82 @@ run_report_hub_gui <- function() {
   }
 
   # ==============================================================================
+  # HELPERS: Config preview using guard's sheet readers
+  # ==============================================================================
+
+  #' Quick-Read Config for Preview
+  #'
+  #' Reads the config file just enough to display a preview
+  #' without running full validation. Auto-detects header rows to support
+  #' both legacy and template formats.
+  #'
+  #' @param config_path Path to the config Excel file
+  #' @return List with title, n_reports, reports, and optional error
+  read_config_preview <- function(config_path) {
+    tryCatch({
+      # Check sheets exist
+      sheets <- openxlsx::getSheetNames(config_path)
+      if (!"Settings" %in% sheets || !"Reports" %in% sheets) {
+        return(list(
+          title = "Invalid config",
+          n_reports = 0,
+          reports = list(),
+          error = "Config file must have 'Settings' and 'Reports' sheets."
+        ))
+      }
+
+      # Read Settings (auto-detect header row, skip OpenXML cleaning for preview)
+      settings <- .read_settings_sheet(config_path, "Settings", clean_escapes = FALSE)
+      title <- settings[["project_title"]]
+      if (is.null(title) || is.na(title)) title <- "(No title found)"
+
+      # Read Reports (auto-detect header row)
+      reports_df <- .read_table_sheet(config_path, "Reports",
+                                       c("report_path", "report_label"))
+
+      if (!"report_path" %in% names(reports_df) ||
+          !"report_label" %in% names(reports_df)) {
+        return(list(
+          title = title,
+          n_reports = 0,
+          reports = list(),
+          error = "Reports sheet missing required columns (report_path, report_label)."
+        ))
+      }
+
+      config_dir <- dirname(config_path)
+
+      report_list <- lapply(seq_len(nrow(reports_df)), function(i) {
+        rpath <- as.character(reports_df$report_path[i])
+        rlabel <- as.character(reports_df$report_label[i])
+        if (is.na(rpath)) rpath <- ""
+        if (is.na(rlabel)) rlabel <- paste("Report", i)
+
+        # Check if path exists (absolute or relative to config)
+        found <- file.exists(rpath) || file.exists(file.path(config_dir, rpath))
+        list(label = rlabel, path = rpath, exists = found)
+      })
+
+      # Extract output settings
+      output_file <- settings[["output_file"]]
+      if (!is.null(output_file) && (is.na(output_file) || !nzchar(trimws(output_file)))) output_file <- NULL
+      output_dir <- settings[["output_dir"]]
+      if (!is.null(output_dir) && (is.na(output_dir) || !nzchar(trimws(output_dir)))) output_dir <- NULL
+
+      list(title = title, n_reports = nrow(reports_df), reports = report_list,
+           output_file = output_file, output_dir = output_dir)
+
+    }, error = function(e) {
+      list(
+        title = "Error reading config",
+        n_reports = 0,
+        reports = list(),
+        error = e$message
+      )
+    })
+  }
+
+  # ==============================================================================
   # SHINY UI
   # ==============================================================================
 
@@ -521,78 +597,3 @@ run_report_hub_gui <- function() {
 }
 
 
-# ==============================================================================
-# HELPERS: Config preview using guard's sheet readers
-# ==============================================================================
-
-#' Quick-Read Config for Preview
-#'
-#' Reads the config file just enough to display a preview
-#' without running full validation. Auto-detects header rows to support
-#' both legacy and template formats.
-#'
-#' @param config_path Path to the config Excel file
-#' @return List with title, n_reports, reports, and optional error
-read_config_preview <- function(config_path) {
-  tryCatch({
-    # Check sheets exist
-    sheets <- openxlsx::getSheetNames(config_path)
-    if (!"Settings" %in% sheets || !"Reports" %in% sheets) {
-      return(list(
-        title = "Invalid config",
-        n_reports = 0,
-        reports = list(),
-        error = "Config file must have 'Settings' and 'Reports' sheets."
-      ))
-    }
-
-    # Read Settings (auto-detect header row, skip OpenXML cleaning for preview)
-    settings <- .read_settings_sheet(config_path, "Settings", clean_escapes = FALSE)
-    title <- settings[["project_title"]]
-    if (is.null(title) || is.na(title)) title <- "(No title found)"
-
-    # Read Reports (auto-detect header row)
-    reports_df <- .read_table_sheet(config_path, "Reports",
-                                     c("report_path", "report_label"))
-
-    if (!"report_path" %in% names(reports_df) ||
-        !"report_label" %in% names(reports_df)) {
-      return(list(
-        title = title,
-        n_reports = 0,
-        reports = list(),
-        error = "Reports sheet missing required columns (report_path, report_label)."
-      ))
-    }
-
-    config_dir <- dirname(config_path)
-
-    report_list <- lapply(seq_len(nrow(reports_df)), function(i) {
-      rpath <- as.character(reports_df$report_path[i])
-      rlabel <- as.character(reports_df$report_label[i])
-      if (is.na(rpath)) rpath <- ""
-      if (is.na(rlabel)) rlabel <- paste("Report", i)
-
-      # Check if path exists (absolute or relative to config)
-      found <- file.exists(rpath) || file.exists(file.path(config_dir, rpath))
-      list(label = rlabel, path = rpath, exists = found)
-    })
-
-    # Extract output settings
-    output_file <- settings[["output_file"]]
-    if (!is.null(output_file) && (is.na(output_file) || !nzchar(trimws(output_file)))) output_file <- NULL
-    output_dir <- settings[["output_dir"]]
-    if (!is.null(output_dir) && (is.na(output_dir) || !nzchar(trimws(output_dir)))) output_dir <- NULL
-
-    list(title = title, n_reports = nrow(reports_df), reports = report_list,
-         output_file = output_file, output_dir = output_dir)
-
-  }, error = function(e) {
-    list(
-      title = "Error reading config",
-      n_reports = 0,
-      reports = list(),
-      error = e$message
-    )
-  })
-}
