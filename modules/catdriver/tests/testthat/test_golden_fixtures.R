@@ -22,34 +22,9 @@ library(testthat)
 # SETUP - Load fixtures and module
 # ==============================================================================
 
-# Path resolution is handled by helper-paths.R (auto-sourced by testthat)
-# which provides: module_root, turas_root
+# module_root and turas_root are provided by helper-paths.R
 test_dir <- file.path(module_root, "tests")
 fixtures_dir <- file.path(test_dir, "fixtures")
-
-# Source shared utilities if not already loaded
-if (!exists("turas_refuse", mode = "function")) {
-  shared_lib <- file.path(turas_root, "modules", "shared", "lib")
-  if (dir.exists(shared_lib)) {
-    for (f in sort(list.files(shared_lib, pattern = "\\.R$", full.names = TRUE))) {
-      tryCatch(source(f), error = function(e) NULL)
-    }
-  }
-}
-
-# Source module files if not already loaded
-if (!exists("run_catdriver", mode = "function")) {
-  old_wd <- getwd()
-  setwd(module_root)
-  r_files <- list.files("R", pattern = "\\.R$", full.names = TRUE)
-  r_files <- r_files[order(basename(r_files))]
-  for (f in r_files) {
-    tryCatch(source(f), error = function(e) {
-      cat("Warning: Could not source", basename(f), ":", e$message, "\n")
-    })
-  }
-  setwd(old_wd)
-}
 
 # ==============================================================================
 # HELPER: Load golden fixture data

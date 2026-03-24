@@ -14,24 +14,7 @@
 
 library(testthat)
 
-# Path resolution is handled by helper-paths.R (auto-sourced by testthat)
-# which provides: module_root, turas_root
-
-# Source shared utilities
-shared_path <- file.path(turas_root, "modules", "shared", "lib")
-if (dir.exists(shared_path)) {
-  for (f in list.files(shared_path, pattern = "[.]R$", full.names = TRUE)) {
-    tryCatch(source(f), error = function(e) NULL)
-  }
-}
-
-# Source catdriver R files
-setwd(module_root)
-for (f in sort(list.files("R", pattern = "[.]R$", full.names = TRUE))) {
-  tryCatch(source(f), error = function(e) {
-    cat("Warning: Could not source", basename(f), ":", e$message, "\n")
-  })
-}
+# module_root and turas_root are provided by helper-paths.R
 
 cat("\n=== Running Comprehensive Test Suite ===\n\n")
 

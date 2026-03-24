@@ -42,3 +42,22 @@
 # These variables match the names used by all catdriver test files
 module_root <- .find_module_dir()
 turas_root <- normalizePath(file.path(module_root, "..", ".."), mustWork = FALSE)
+
+# Source shared utilities (required for TRS refusal functions)
+shared_lib_path <- file.path(turas_root, "modules", "shared", "lib")
+if (dir.exists(shared_lib_path)) {
+  for (f in sort(list.files(shared_lib_path, pattern = "\\.R$", full.names = TRUE))) {
+    tryCatch(source(f), error = function(e) NULL)
+  }
+}
+
+# Source catdriver R files (tests rely on these being loaded)
+# Use absolute paths via file.path — do NOT use setwd()
+.catdriver_r_dir <- file.path(module_root, "R")
+if (dir.exists(.catdriver_r_dir)) {
+  for (f in sort(list.files(.catdriver_r_dir, pattern = "\\.R$", full.names = TRUE))) {
+    tryCatch(source(f), error = function(e) {
+      cat("Warning: Could not source", basename(f), ":", e$message, "\n")
+    })
+  }
+}

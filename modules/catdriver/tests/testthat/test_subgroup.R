@@ -18,29 +18,7 @@
 
 library(testthat)
 
-# Path resolution is handled by helper-paths.R (auto-sourced by testthat)
-# which provides: module_root, turas_root
-setwd(module_root)
-
-# Source shared utilities (required for TRS refusal functions)
-shared_lib_path <- file.path(turas_root, "modules", "shared", "lib")
-if (dir.exists(shared_lib_path)) {
-  shared_files <- list.files(shared_lib_path, pattern = "\\.R$", full.names = TRUE)
-  for (f in shared_files) {
-    tryCatch(source(f), error = function(e) {
-      cat("Warning: Could not source shared", basename(f), ":", e$message, "\n")
-    })
-  }
-}
-
-# Source all R files in order
-r_files <- list.files("R", pattern = "\\.R$", full.names = TRUE)
-r_files <- r_files[order(basename(r_files))]
-for (f in r_files) {
-  tryCatch(source(f), error = function(e) {
-    cat("Warning: Could not source", basename(f), ":", e$message, "\n")
-  })
-}
+# module_root and turas_root are provided by helper-paths.R
 
 
 # ==============================================================================
