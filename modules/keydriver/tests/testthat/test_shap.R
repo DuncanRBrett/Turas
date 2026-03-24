@@ -17,9 +17,7 @@ if (!exists("%||%")) {
   `%||%` <- function(a, b) if (is.null(a)) b else a
 }
 
-test_dir <- normalizePath(file.path(dirname(sys.frame(1)$ofile %||% "."), ".."))
-module_dir <- dirname(test_dir)
-project_root <- normalizePath(file.path(module_dir, "..", ".."))
+# module_dir and project_root are provided by helper-paths.R
 
 # Load TRS refusal system
 tryCatch({

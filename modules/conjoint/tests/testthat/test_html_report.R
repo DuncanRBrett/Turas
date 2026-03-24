@@ -40,6 +40,33 @@ if (!is.null(conjoint_root)) {
                             "generate_conjoint_test_data.R")
   if (file.exists(fixture_path)) source(fixture_path, local = FALSE)
 
+  # Pre-load shared design system and callout registry (needed by page builder)
+  turas_root <- normalizePath(file.path(conjoint_root, "..", ".."), mustWork = FALSE)
+  shared_root <- file.path(turas_root, "modules", "shared")
+  if (dir.exists(shared_root)) {
+    ds_dir <- file.path(shared_root, "lib", "design_system")
+    if (!exists("turas_base_css", mode = "function") && dir.exists(ds_dir)) {
+      for (ds_f in c("design_tokens.R", "font_embed.R", "base_css.R")) {
+        ds_fpath <- file.path(ds_dir, ds_f)
+        if (file.exists(ds_fpath)) source(ds_fpath, local = FALSE)
+      }
+    }
+    callout_dir <- file.path(shared_root, "lib", "callouts")
+    if (!exists("turas_callout", mode = "function") && dir.exists(callout_dir)) {
+      cr_path <- file.path(callout_dir, "callout_registry.R")
+      if (file.exists(cr_path)) source(cr_path, local = FALSE)
+    }
+  }
+
+  # Set TURAS_ROOT so that callout registry can find callouts.json at runtime,
+  # and clear any stale cache from previous sourcing
+  if (nzchar(turas_root) && dir.exists(turas_root)) {
+    Sys.setenv(TURAS_ROOT = turas_root)
+    if (exists(".callout_cache", mode = "environment")) {
+      .callout_cache$data <- NULL
+    }
+  }
+
   # Pre-load HTML report submodules
   html_report_dir <- file.path(conjoint_root, "lib", "html_report")
   for (f in c("00_html_guard.R", "01_data_transformer.R", "02_table_builder.R",
@@ -846,8 +873,8 @@ test_that("callout helper produces correct HTML structure", {
   if (!exists(".build_callout", mode = "function")) skip(".build_callout not loaded")
 
   html <- .build_callout("Test Title", "<p>Test body text</p>")
-  expect_true(grepl("cj-callout", html, fixed = TRUE))
-  expect_true(grepl("cj-callout-title", html, fixed = TRUE))
+  expect_true(grepl("t-callout", html, fixed = TRUE))
+  expect_true(grepl("t-callout-title", html, fixed = TRUE))
   expect_true(grepl("Test Title", html, fixed = TRUE))
   expect_true(grepl("Test body text", html, fixed = TRUE))
 })
@@ -863,7 +890,7 @@ test_that("diagnostics callouts produce method-specific text", {
   )
   callouts <- .build_diagnostics_callouts(html_data_mnl)
   combined <- paste(callouts, collapse = "\n")
-  expect_true(grepl("cj-callout", combined, fixed = TRUE))
+  expect_true(grepl("t-callout", combined, fixed = TRUE))
   expect_true(grepl("Model Fit Quality", combined, fixed = TRUE))
   expect_true(grepl("Estimation Method", combined, fixed = TRUE))
   expect_true(grepl("Multinomial Logit", combined, fixed = TRUE))
@@ -933,7 +960,7 @@ test_that("generated HTML includes callout boxes on major panels", {
   html <- paste(readLines(tmp_path, warn = FALSE), collapse = "\n")
 
   # Callout CSS class
-  expect_true(grepl("cj-callout", html, fixed = TRUE))
+  expect_true(grepl("t-callout", html, fixed = TRUE))
 
   # Overview callout
   expect_true(grepl("What Is Attribute Importance", html, fixed = TRUE))
@@ -1192,11 +1219,12 @@ test_that("pins JS includes expanded captureView and _addPinnedEntry", {
 
   pins_js <- paste(readLines(pins_file, warn = FALSE), collapse = "\n")
 
-  # Expanded captureView handles new pin IDs
-  expect_true(grepl("pin-overview", pins_js, fixed = TRUE))
-  expect_true(grepl("pin-diagnostics", pins_js, fixed = TRUE))
-  expect_true(grepl("pin-wtp", pins_js, fixed = TRUE))
-  expect_true(grepl("pin-lc", pins_js, fixed = TRUE))
+
+  # findSource handles pin IDs via dynamic pattern matching (strips "pin-" prefix)
+  expect_true(grepl('"overview"', pins_js, fixed = TRUE))
+  expect_true(grepl('"diagnostics-"', pins_js, fixed = TRUE))
+  expect_true(grepl('"wtp-"', pins_js, fixed = TRUE))
+  expect_true(grepl('"lc-"', pins_js, fixed = TRUE))
   expect_true(grepl("pin-simulator", pins_js, fixed = TRUE))
 
   # Slides integration

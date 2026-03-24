@@ -17,16 +17,7 @@ context("Keydriver HTML Builders")
 # SETUP - Module path resolution & sourcing
 # ==============================================================================
 
-.find_module_dir <- function() {
-  ofile <- tryCatch(sys.frame(1)$ofile, error = function(e) NULL)
-  if (!is.null(ofile)) {
-    return(normalizePath(file.path(dirname(ofile), "..", ".."), mustWork = FALSE))
-  }
-  tp <- tryCatch(testthat::test_path(), error = function(e) ".")
-  normalizePath(file.path(tp, "..", ".."), mustWork = FALSE)
-}
-module_dir <- .find_module_dir()
-project_root <- normalizePath(file.path(module_dir, "..", ".."), mustWork = FALSE)
+# module_dir and project_root are provided by helper-paths.R
 
 # Null-coalescing operator
 if (!exists("%||%", mode = "function")) {

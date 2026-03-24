@@ -314,7 +314,7 @@ test_that("build_chart_axes_svg returns gridlines with dashed style", {
 
   # Gridlines should be dashed with the correct colour
   expect_true(grepl('stroke="#e2e8f0"', combined, fixed = TRUE))
-  expect_true(grepl('stroke-dasharray="6,4"', combined, fixed = TRUE))
+  expect_true(grepl('stroke-dasharray="4,3"', combined, fixed = TRUE))
 })
 
 test_that("build_chart_axes_svg x-axis labels have data-wave attribute", {

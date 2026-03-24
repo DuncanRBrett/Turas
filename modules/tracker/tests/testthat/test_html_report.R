@@ -971,8 +971,9 @@ test_that("Per-metric table uses chip-only segment control (no row exclude butto
   content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
 
   # Row exclude buttons were removed — segment hiding is chip-only
+  # Check that no HTML elements use the row-exclude-btn class (CSS rules may still exist in shared styles)
 
-  expect_false(grepl("row-exclude-btn", content))
+  expect_false(grepl('class="row-exclude-btn"', content, fixed = TRUE))
   expect_false(grepl("toggleRowExclusion", content))
 
   # Segment chips should be present for toggling

@@ -18,17 +18,7 @@
 #
 # ==============================================================================
 
-# Locate module root robustly (works with test_file and test_dir)
-.find_module_dir <- function() {
-  ofile <- tryCatch(sys.frame(1)$ofile, error = function(e) NULL)
-  if (!is.null(ofile)) {
-    return(normalizePath(file.path(dirname(ofile), "..", ".."), mustWork = FALSE))
-  }
-  tp <- tryCatch(testthat::test_path(), error = function(e) ".")
-  normalizePath(file.path(tp, "..", ".."), mustWork = FALSE)
-}
-module_dir <- .find_module_dir()
-project_root <- normalizePath(file.path(module_dir, "..", ".."), mustWork = FALSE)
+# module_dir and project_root are provided by helper-paths.R
 
 # Source test data generators
 source(file.path(module_dir, "tests", "fixtures", "generate_test_data.R"))

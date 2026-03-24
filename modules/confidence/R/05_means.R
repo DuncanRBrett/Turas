@@ -206,7 +206,7 @@ calculate_mean_ci <- function(values, weights = NULL, conf_level = 0.95) {
     n_actual = n_actual,
     n_effective = n_eff,
     is_weighted = is_weighted,
-    method = sprintf("t-distribution (df=%d)", df),
+    method = sprintf("t-distribution (df=%.1f)", df),
     warnings = warnings
   ))
 }

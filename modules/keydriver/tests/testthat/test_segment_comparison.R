@@ -19,27 +19,7 @@ if (!exists("%||%")) {
   `%||%` <- function(a, b) if (is.null(a)) b else a
 }
 
-# Locate module root robustly (works with test_file and test_dir)
-.find_module_dir <- function() {
-  # Try testthat::test_path() first (works inside test_dir and test_file)
-  tp <- tryCatch(testthat::test_path(), error = function(e) NULL)
-  if (!is.null(tp) && nzchar(tp) && tp != ".") {
-    return(normalizePath(file.path(tp, "..", ".."), mustWork = FALSE))
-  }
-  # Fall back to walking from working directory
-  wd <- getwd()
-  if (grepl("keydriver", wd)) {
-    # We're somewhere inside the module
-    return(normalizePath(sub("/tests.*$", "", wd), mustWork = FALSE))
-  }
-  # Last resort: try relative to project root
-  if (dir.exists(file.path(wd, "modules", "keydriver"))) {
-    return(normalizePath(file.path(wd, "modules", "keydriver"), mustWork = FALSE))
-  }
-  normalizePath(".", mustWork = FALSE)
-}
-module_dir <- .find_module_dir()
-project_root <- normalizePath(file.path(module_dir, "..", ".."), mustWork = FALSE)
+# module_dir and project_root are provided by helper-paths.R
 
 # Source test data generators
 fixtures_path <- file.path(module_dir, "tests", "fixtures", "generate_test_data.R")

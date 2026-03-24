@@ -117,10 +117,13 @@ test_that("build_pinned_tab contains pinned-empty-state", {
   expect_true(grepl("pinned-empty-state", html, fixed = TRUE))
 })
 
-test_that("build_pinned_tab has Save Report button", {
+test_that("build_pinned_tab has export toolbar buttons", {
   html <- as.character(build_pinned_tab())
-  expect_true(grepl("Save Report", html, fixed = TRUE))
-  expect_true(grepl("saveReportHTML", html, fixed = TRUE))
+  # Save Report moved to page-level tab-actions bar (03_page_builder.R);
+
+  # Pinned tab now has Add Section and Export All as PNG buttons
+  expect_true(grepl("addSection", html, fixed = TRUE))
+  expect_true(grepl("exportAllPinsPNG", html, fixed = TRUE))
 })
 
 # ==============================================================================

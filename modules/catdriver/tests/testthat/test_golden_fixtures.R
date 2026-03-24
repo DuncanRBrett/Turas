@@ -22,37 +22,13 @@ library(testthat)
 # SETUP - Load fixtures and module
 # ==============================================================================
 
-# Determine paths - walk up from cwd to find catdriver module
-find_catdriver_root <- function() {
-  current <- getwd()
-  # Check if we're in the catdriver directory
-  if (basename(current) == "catdriver" && dir.exists(file.path(current, "R"))) {
-    return(current)
-  }
-  # Check if catdriver is a subdirectory (e.g., running from Turas root)
-  candidate <- file.path(current, "modules", "catdriver")
-  if (dir.exists(file.path(candidate, "R"))) {
-    return(candidate)
-  }
-  # Walk up
-  parent <- dirname(current)
-  while (parent != current) {
-    candidate <- file.path(parent, "modules", "catdriver")
-    if (dir.exists(file.path(candidate, "R"))) return(candidate)
-    if (basename(parent) == "catdriver" && dir.exists(file.path(parent, "R"))) return(parent)
-    current <- parent
-    parent <- dirname(current)
-  }
-  stop("Cannot locate catdriver module root")
-}
-
-module_root <- find_catdriver_root()
+# Path resolution is handled by helper-paths.R (auto-sourced by testthat)
+# which provides: module_root, turas_root
 test_dir <- file.path(module_root, "tests")
 fixtures_dir <- file.path(test_dir, "fixtures")
 
 # Source shared utilities if not already loaded
 if (!exists("turas_refuse", mode = "function")) {
-  turas_root <- dirname(dirname(module_root))
   shared_lib <- file.path(turas_root, "modules", "shared", "lib")
   if (dir.exists(shared_lib)) {
     for (f in sort(list.files(shared_lib, pattern = "\\.R$", full.names = TRUE))) {

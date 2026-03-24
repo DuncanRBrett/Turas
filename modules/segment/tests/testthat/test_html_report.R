@@ -314,7 +314,13 @@ test_that("HTML report contains pin buttons with emoji", {
   # Pin buttons should use emoji, not SVG bookmark
   expect_true(grepl("seg-pin-btn", html_text, fixed = TRUE),
               info = "Report should have pin buttons")
-  expect_false(grepl('viewBox="0 0 24 24"', html_text, fixed = TRUE),
+  # Extract pin button markup and verify it uses emoji (pushpin), not SVG icons
+  pin_btn_matches <- regmatches(html_text,
+    gregexpr('class="seg-pin-btn"[^>]*>[^<]*<', html_text, perl = TRUE))[[1]]
+  expect_true(length(pin_btn_matches) > 0,
+              info = "Should find seg-pin-btn elements")
+  has_svg_in_pins <- any(grepl("viewBox", pin_btn_matches, fixed = TRUE))
+  expect_false(has_svg_in_pins,
                info = "Pin buttons should not use SVG bookmark icons")
 })
 

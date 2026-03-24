@@ -25,9 +25,11 @@
     "callouts.json"
   )
 
-  # Fallback paths
+  # Fallback paths (TURAS_ROOT-aware for Shiny / test environments)
   if (!file.exists(json_path)) {
+    tr <- Sys.getenv("TURAS_ROOT", "")
     candidates <- c(
+      if (nzchar(tr)) file.path(tr, "modules", "shared", "lib", "callouts", "callouts.json") else NULL,
       file.path("modules", "shared", "lib", "callouts", "callouts.json"),
       file.path("..", "modules", "shared", "lib", "callouts", "callouts.json")
     )

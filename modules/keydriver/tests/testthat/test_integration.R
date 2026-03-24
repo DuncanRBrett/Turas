@@ -20,19 +20,7 @@ if (!exists("%||%", mode = "function")) {
   `%||%` <- function(x, y) if (is.null(x)) y else x
 }
 
-# Locate module root via sys.frame (works outside test_that) or test_path (inside)
-.find_module_dir <- function() {
-  # Try sys.frame approach first
-  ofile <- tryCatch(sys.frame(1)$ofile, error = function(e) NULL)
-  if (!is.null(ofile)) {
-    return(normalizePath(file.path(dirname(ofile), "..", ".."), mustWork = FALSE))
-  }
-  # Fallback: use test_path
-  tp <- tryCatch(testthat::test_path(), error = function(e) ".")
-  normalizePath(file.path(tp, "..", ".."), mustWork = FALSE)
-}
-module_dir <- .find_module_dir()
-project_root <- normalizePath(file.path(module_dir, "..", ".."), mustWork = FALSE)
+# module_dir and project_root are provided by helper-paths.R
 
 # Source test data generators
 source(file.path(module_dir, "tests", "fixtures", "generate_test_data.R"))

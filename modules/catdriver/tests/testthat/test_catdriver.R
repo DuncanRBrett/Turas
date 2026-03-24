@@ -17,21 +17,11 @@
 
 library(testthat)
 
-# Set working directory to module root
-script_dir <- tryCatch({
-  if (!is.null(sys.frame(1)$ofile)) dirname(sys.frame(1)$ofile) else getwd()
-}, error = function(e) getwd())
-
-if (basename(script_dir) == "tests") {
-  module_root <- dirname(script_dir)
-} else {
-  module_root <- script_dir
-}
+# Path resolution is handled by helper-paths.R (auto-sourced by testthat)
+# which provides: module_root, turas_root
 setwd(module_root)
 
 # Source shared utilities first (required for TRS refusal functions)
-# modules/catdriver -> modules -> Turas -> modules/shared/lib
-turas_root <- dirname(dirname(module_root))
 shared_lib_path <- file.path(turas_root, "modules", "shared", "lib")
 if (dir.exists(shared_lib_path)) {
   shared_files <- list.files(shared_lib_path, pattern = "\\.R$", full.names = TRUE)

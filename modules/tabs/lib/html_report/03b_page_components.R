@@ -650,14 +650,6 @@ build_controls <- function(has_any_freq, has_any_pct, has_any_sig,
       )
     ))
   }
-  if (has_any_freq && has_any_pct) {
-    toggles <- c(toggles, list(
-      htmltools::tags$label(class = "toggle-label",
-        htmltools::tags$input(type = "checkbox", onchange = "toggleFrequency(this.checked)"),
-        "Show count"
-      )
-    ))
-  }
   if (has_any_pct) {
     toggles <- c(toggles, list(
       htmltools::tags$label(class = "toggle-label",
@@ -667,6 +659,14 @@ build_controls <- function(has_any_freq, has_any_pct, has_any_sig,
       htmltools::tags$label(class = "toggle-label",
         htmltools::tags$input(type = "checkbox", onchange = "toggleAllColumns(this.checked)"),
         "Hide columns"
+      )
+    ))
+  }
+  if (has_any_freq && has_any_pct) {
+    toggles <- c(toggles, list(
+      htmltools::tags$label(class = "toggle-label",
+        htmltools::tags$input(type = "checkbox", onchange = "toggleFrequency(this.checked)"),
+        "Show count"
       )
     ))
   }

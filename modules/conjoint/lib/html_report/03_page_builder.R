@@ -904,7 +904,17 @@ build_utilities_panel <- function(html_data, tables, charts, brand, config = lis
     )
   }, character(1))
 
-  util_callout <- turas_callout("conjoint", "reading_utilities")
+  util_callout <- if (exists("turas_callout", mode = "function")) {
+    turas_callout("conjoint", "reading_utilities")
+  } else {
+    ""
+  }
+  if (!nzchar(util_callout)) {
+    util_callout <- .build_callout(
+      "Reading Utility Values",
+      "<p>Utility scores measure how much each attribute level contributes to overall preference. Higher values mean stronger preference. Within each attribute, the level with the highest utility is most preferred. The baseline level (utility = 0) serves as the reference point.</p>"
+    )
+  }
 
   insight <- build_insight_area("utilities", html_data$insights)
 

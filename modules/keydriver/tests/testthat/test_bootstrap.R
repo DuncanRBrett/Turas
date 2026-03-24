@@ -18,10 +18,7 @@ if (!exists("%||%")) {
   `%||%` <- function(a, b) if (is.null(a)) b else a
 }
 
-# Locate module root
-test_dir <- normalizePath(file.path(dirname(sys.frame(1)$ofile %||% "."), ".."))
-module_dir <- dirname(test_dir)
-project_root <- normalizePath(file.path(module_dir, "..", ".."))
+# module_dir and project_root are provided by helper-paths.R
 
 # Source shared TRS infrastructure
 tryCatch({
@@ -46,7 +43,7 @@ tryCatch({
 
 # Source test data generators
 tryCatch({
-  source(file.path(test_dir, "fixtures", "generate_test_data.R"))
+  source(file.path(module_dir, "tests", "fixtures", "generate_test_data.R"))
 }, error = function(e) {
   skip(paste("Cannot load test data generators:", conditionMessage(e)))
 })
