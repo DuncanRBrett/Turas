@@ -19,18 +19,31 @@
 # --- Locate project root and source module ----------------------------------
 .find_turas_root <- function() {
 
-  # Walk up from test file location to find project root
-  candidates <- c(
-    getwd(),
-    Sys.getenv("TURAS_ROOT", unset = ""),
-    tryCatch(file.path(dirname(dirname(testthat::test_path())), "..", ".."),
-             error = function(e) "")
-  )
-  for (cand in candidates) {
-    if (nzchar(cand) && file.exists(file.path(cand, "modules", "conjoint", "R", "00_main.R"))) {
-      return(normalizePath(cand))
+  # Walk up from test file location to find project root.
+
+  # When testthat runs, getwd() is set to the testthat/ directory
+  # (e.g., modules/conjoint/tests/testthat), NOT the project root.
+  # We must walk up parent directories to find the root marker.
+
+  marker <- file.path("modules", "conjoint", "R", "00_main.R")
+
+  # Strategy 1: Walk up from getwd()
+  dir <- normalizePath(getwd(), winslash = "/")
+  for (i in 1:8) {
+    if (file.exists(file.path(dir, marker))) {
+      return(dir)
     }
+    parent <- dirname(dir)
+    if (parent == dir) break
+    dir <- parent
   }
+
+  # Strategy 2: TURAS_ROOT environment variable
+  env_root <- Sys.getenv("TURAS_ROOT", unset = "")
+  if (nzchar(env_root) && file.exists(file.path(env_root, marker))) {
+    return(normalizePath(env_root))
+  }
+
   NULL
 }
 
@@ -76,6 +89,15 @@ if (is.null(turas_root)) {
     )
 
     # Status must be PASS or PARTIAL (not REFUSED)
+    if (result$status == "REFUSED") {
+      cat("\n[DIAG] REFUSED code:", result$code, "\n")
+      cat("[DIAG] REFUSED message:", result$message, "\n")
+      cat("[DIAG] REFUSED how_to_fix:", result$how_to_fix %||% "N/A", "\n")
+      cat("[DIAG] getwd():", getwd(), "\n")
+      cat("[DIAG] turas_root:", turas_root, "\n")
+      cat("[DIAG] demo_config exists:", file.exists(demo_config), "\n")
+      cat("[DIAG] demo_data exists:", file.exists(demo_data), "\n")
+    }
     expect_true(result$status %in% c("PASS", "PARTIAL"),
                 info = sprintf("Expected PASS/PARTIAL, got: %s", result$status))
 

@@ -73,7 +73,7 @@ context("Golden Fixtures: Binary Model")
 
 test_that("binary model produces correct sample size", {
   data <- load_golden_binary()
-  expect_equal(nrow(data), 120)
+  expect_equal(nrow(data), 400)
 })
 
 test_that("binary model produces correct outcome distribution", {
@@ -99,7 +99,8 @@ test_that("binary model identifies satisfaction as top driver", {
   anova_result <- car::Anova(model, type = "II")
 
   # Get importance ranking
-  chi_sq <- anova_result$Chisq
+  # car::Anova uses "LR Chisq" for logistic models, not "Chisq"
+  chi_sq <- if ("LR Chisq" %in% colnames(anova_result)) anova_result[["LR Chisq"]] else anova_result$Chisq
   names(chi_sq) <- rownames(anova_result)
   top_driver <- names(which.max(chi_sq))
 
@@ -177,7 +178,7 @@ context("Golden Fixtures: Ordinal Model")
 
 test_that("ordinal model produces correct sample size", {
   data <- load_golden_ordinal()
-  expect_equal(nrow(data), 90)
+  expect_equal(nrow(data), 350)
 })
 
 test_that("ordinal model produces correct outcome distribution", {
@@ -324,7 +325,8 @@ test_that("full binary analysis pipeline produces consistent results", {
 
   # Run importance analysis
   anova_result <- car::Anova(model, type = "II")
-  chi_sq <- anova_result$Chisq
+  # car::Anova uses "LR Chisq" for logistic models, not "Chisq"
+  chi_sq <- if ("LR Chisq" %in% colnames(anova_result)) anova_result[["LR Chisq"]] else anova_result$Chisq
   names(chi_sq) <- rownames(anova_result)
 
   # Create importance ranking

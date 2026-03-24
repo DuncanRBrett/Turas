@@ -1,7 +1,7 @@
 ================================================================================
 TURAS ANALYTICS PLATFORM - COMPREHENSIVE SYSTEM CHECK
 ================================================================================
-Date:       2026-03-24 08:25:58
+Date:       2026-03-24 09:35:33
 R Version:  4.5.1
 Root:       /Users/duncan/Documents/Turas
 ================================================================================
@@ -14,25 +14,26 @@ Path:   /Users/duncan/Documents/Turas/tests/testthat
 --- test_html_guard.R ---
 html_guard: ...........................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_html_table_builder.R ---
 html_table_builder: .........................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
-You rock!
+== DONE ========================================================================
+Way to go!
 
 --- test_html_transformer.R ---
 html_transformer: .........................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
+Woot!
 
 --- test_launcher.R ---
 launcher: ...................................................................................................................................................................................................................................................................
 === Launcher Tests Complete ===
 
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_module_smoke.R ---
 module_smoke: .........................................
@@ -41,43 +42,40 @@ Turas root: /Users/duncan/Documents/Turas
 Modules found: 14
 
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_no_silent_trycatch.R ---
 no_silent_trycatch: ..
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_shared_config.R ---
 shared_config: .............................
 === Config Utilities Tests Complete ===
 
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
-😸
+== DONE ========================================================================
 
 --- test_shared_formatting.R ---
 shared_formatting: ...............................................
 === Formatting Utilities Tests Complete ===
 
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_shared_validation.R ---
 shared_validation: ...................................
 === Validation Utilities Tests Complete ===
 
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
-Nice code.
+== DONE ========================================================================
 
 --- test_shared_weights.R ---
 shared_weights: ..................................................
 === Weights Utilities Tests Complete ===
 
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
-HUZZAH - priceless code.
+== DONE ========================================================================
 
 --- test_trs_refusal.R ---
 trs_refusal: ..............................
@@ -114,10 +112,10 @@ What to do:
 ================================================================================
 ..............................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 
-[PASS] Shared Infrastructure — 619 passed, 0 failed, 0 skipped (8.7s)
+[PASS] Shared Infrastructure — 619 passed, 0 failed, 0 skipped (6.7s)
 
 --------------------------------------------------------------------------------
 MODULE: AlchemerParser (7 test files)
@@ -127,39 +125,41 @@ Path:   /Users/duncan/Documents/Turas/modules/AlchemerParser/tests/testthat
 --- test_classify_questions.R ---
 classify_questions: .................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
+Your tests are classy!
 
 --- test_error_handling.R ---
 error_handling: ..........................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_generate_codes.R ---
 generate_codes: .................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
+You are a coding rockstar!
 
 --- test_output.R ---
 output: .................................................................................................................
 === AlchemerParser Output Tests Complete ===
 
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_parse_data_map.R ---
 parse_data_map: ......................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_parse_translation.R ---
 parse_translation: ................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_routing_detection.R ---
 routing_detection: ........................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 
 [PASS] AlchemerParser — 299 passed, 0 failed, 0 skipped (4.4s)
@@ -172,40 +172,40 @@ Path:   /Users/duncan/Documents/Turas/modules/confidence/tests/testthat
 --- test_bugfixes_v10_3.R ---
 bugfixes_v10_3: ............................................................................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_ci_dispatcher.R ---
 ci_dispatcher: 
 CI Dispatcher: .............................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
-🎉🎊🎉🎊🎉🎊🎉🎊🎉🎊🎉
+== DONE ========================================================================
+Woot!
 
 --- test_config_templates.R ---
-config_templates: [Confidence] Config template saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37093b2d4398.xlsx
+config_templates: [Confidence] Config template saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c6ee60439.xlsx
   Sheets: File_Paths, Study_Settings, Question_Analysis, Population_Margins
-...[Confidence] Config template saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37092dbc6ffa.xlsx
+...[Confidence] Config template saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c3469ce60.xlsx
   Sheets: File_Paths, Study_Settings, Question_Analysis, Population_Margins
-....[Confidence] Config template saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37093b3281c3.xlsx
+....[Confidence] Config template saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c5b443282.xlsx
   Sheets: File_Paths, Study_Settings, Question_Analysis, Population_Margins
-......[Confidence] Config template saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37097db5ca79.xlsx
+......[Confidence] Config template saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c1906394a.xlsx
   Sheets: File_Paths, Study_Settings, Question_Analysis, Population_Margins
-......[Confidence] Config template saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37097c66d9fa.xlsx
+......[Confidence] Config template saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c128c2a49.xlsx
   Sheets: File_Paths, Study_Settings, Question_Analysis, Population_Margins
 .=== TURAS Confidence Module: Generating Config Templates ===
-[Confidence] Config template saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/confidence_tpl_14089/Confidence_Config_Template.xlsx
+[Confidence] Config template saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/confidence_tpl_19852/Confidence_Config_Template.xlsx
   Sheets: File_Paths, Study_Settings, Question_Analysis, Population_Margins
 
 === Template generation complete ===
-Output: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/confidence_tpl_14089/Confidence_Config_Template.xlsx
+Output: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/confidence_tpl_19852/Confidence_Config_Template.xlsx
 ....
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_guard.R ---
 guard: .........................................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_html_report.R ---
 html_report: 
@@ -222,7 +222,7 @@ HTML Report Generation: ........................................................
     5 charts built
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file to full_pipeline_test.html...
-  Done! 85.0 KB in 0.0 seconds
+  Done! 85.1 KB in 0.0 seconds
 ------------------------------------------------------------ 
 
 ..........
@@ -238,7 +238,7 @@ HTML Report Generation: ........................................................
     4 charts built
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file to prop_only_test.html...
-  Done! 75.3 KB in 0.0 seconds
+  Done! 75.4 KB in 0.0 seconds
 ------------------------------------------------------------ 
 
 ..
@@ -254,7 +254,7 @@ HTML Report Generation: ........................................................
     2 charts built
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file to mean_only_test.html...
-  Done! 63.5 KB in 0.0 seconds
+  Done! 63.6 KB in 0.0 seconds
 ------------------------------------------------------------ 
 
 ..
@@ -270,350 +270,109 @@ HTML Report Generation: ........................................................
     2 charts built
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file to nps_only_test.html...
-  Done! 59.8 KB in 0.0 seconds
+  Done! 59.9 KB in 0.0 seconds
 ------------------------------------------------------------ 
 
 ..
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_load_config.R ---
 load_config: 
-Config Loading: Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/test_config_082633_4782.xlsx
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
+Config Loading: Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/test_config_093604_4782.xlsx
 ✓ Configuration loaded successfully
   - File paths: 2 parameters
   - Study settings: 6 parameters
   - Question analysis: 2 questions (max 200)
   - Population margins: (optional sheet not provided)
-......Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/test_config_082633_5097.xlsx
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
+......Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/test_config_093605_5097.xlsx
 ✓ Configuration loaded successfully
   - File paths: 2 parameters
   - Study settings: 6 parameters
   - Question analysis: 2 questions (max 200)
   - Population margins: (optional sheet not provided)
-...Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/test_config_082633_3509.xlsx
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
+...Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/test_config_093605_3509.xlsx
 ✓ Configuration loaded successfully
   - File paths: 2 parameters
   - Study settings: 6 parameters
   - Question analysis: 2 questions (max 200)
   - Population margins: (optional sheet not provided)
-...Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/test_config_082634_5935.xlsx
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
+...Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/test_config_093605_5935.xlsx
 ✓ Configuration loaded successfully
   - File paths: 2 parameters
   - Study settings: 6 parameters
   - Question analysis: 2 questions (max 200)
   - Population margins: (optional sheet not provided)
-.....Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/test_config_082634_6771.xlsx
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
+.....Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/test_config_093605_6771.xlsx
 ✓ Configuration loaded successfully
   - File paths: 2 parameters
   - Study settings: 7 parameters
   - Question analysis: 2 questions (max 500)
   - Population margins: (optional sheet not provided)
-.Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/test_config_082634_5262.xlsx
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
+.Loading configuration from: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/test_config_093605_5262.xlsx
 ✓ Configuration loaded successfully
   - File paths: 2 parameters
   - Study settings: 7 parameters
   - Question analysis: 2 questions (max 1000)
   - Population margins: (optional sheet not provided)
-.
--
-/
-                                                                                                                
+............
 
-/
-                                                                                                                
-
--
-                                                                                                                
-.
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-.
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-.
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-...
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-.....
-
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_load_data.R ---
 load_data: 
-Data Loading: ....
--
-/
-                                                                                                                
+Data Loading: .....................
 
-/
-                                                                                                                
-
--
-                                                                                                                
-.................
-
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_mean_ci.R ---
 mean_ci: 
 Mean Confidence Intervals: ........................................................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
-
---- test_output_integration.R ---
-output_integration:    Writing: file3709df92005.xlsx
-[TRS INFO] CONF: Saved: file3709df92005.xlsx (26,288 bytes)
-..   Writing: file370915139ee.xlsx
-[TRS INFO] CONF: Saved: file370915139ee.xlsx (26,078 bytes)
-.......   Writing: file37092a466a94.xlsx
-[TRS INFO] CONF: Saved: file37092a466a94.xlsx (23,884 bytes)
-.   Writing: file370916b3e7bb.xlsx
-[TRS INFO] CONF: Saved: file370916b3e7bb.xlsx (21,371 bytes)
-.   Writing: file3709555fdde.xlsx
-[TRS INFO] CONF: Saved: file3709555fdde.xlsx (18,855 bytes)
-..   Writing: file37094c099c25.xlsx
-[TRS INFO] CONF: Saved: file37094c099c25.xlsx (18,822 bytes)
-.   Writing: file370916bdbdc0.xlsx
-[TRS INFO] CONF: Saved: file370916bdbdc0.xlsx (18,322 bytes)
-.   Writing: file370981e3139.xlsx
-[TRS INFO] CONF: Saved: file370981e3139.xlsx (18,855 bytes)
-.   Writing: file3709512fa746.xlsx
-[TRS INFO] CONF: Saved: file3709512fa746.xlsx (18,822 bytes)
-.   Writing: file370916e4b76f.xlsx
-[TRS INFO] CONF: Saved: file370916e4b76f.xlsx (18,856 bytes)
-.   Writing: file37093136895a.xlsx
-[TRS INFO] CONF: Saved: file37093136895a.xlsx (21,362 bytes)
-..   Writing: file370922599c8b.xlsx
-[TRS INFO] CONF: Saved: file370922599c8b.xlsx (15,949 bytes)
-......   Writing: file37096def6f3f.xlsx
-[TRS INFO] CONF: Saved: file37096def6f3f.xlsx (15,950 bytes)
-.
-
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
-🎯 Your tests hit the mark 🎯
+== DONE ========================================================================
 
 --- test_output.R ---
 output: 
-Output Generation: ...........................   Writing: test_full_output_88301.xlsx
-[TRS INFO] CONF: Saved: test_full_output_88301.xlsx (24,031 bytes)
-.......   Writing: test_prop_only_64729.xlsx
-[TRS INFO] CONF: Saved: test_prop_only_64729.xlsx (18,856 bytes)
-...   Writing: test_no_results_93104.xlsx
-[TRS INFO] CONF: Saved: test_no_results_93104.xlsx (15,950 bytes)
+Output Generation: ...........................   Writing: test_full_output_63729.xlsx
+[TRS INFO] CONF: Saved: test_full_output_63729.xlsx (24,031 bytes)
+.......   Writing: test_prop_only_46313.xlsx
+[TRS INFO] CONF: Saved: test_prop_only_46313.xlsx (18,855 bytes)
+...   Writing: test_no_results_90983.xlsx
+[TRS INFO] CONF: Saved: test_no_results_90983.xlsx (15,949 bytes)
 .........
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
+
+--- test_output_integration.R ---
+output_integration:    Writing: file4d8c846abaa.xlsx
+[TRS INFO] CONF: Saved: file4d8c846abaa.xlsx (26,288 bytes)
+..   Writing: file4d8c3800580c.xlsx
+[TRS INFO] CONF: Saved: file4d8c3800580c.xlsx (26,079 bytes)
+.......   Writing: file4d8c339e95e7.xlsx
+[TRS INFO] CONF: Saved: file4d8c339e95e7.xlsx (23,885 bytes)
+.   Writing: file4d8c1f4bc4a9.xlsx
+[TRS INFO] CONF: Saved: file4d8c1f4bc4a9.xlsx (21,372 bytes)
+.   Writing: file4d8c7d82f8ce.xlsx
+[TRS INFO] CONF: Saved: file4d8c7d82f8ce.xlsx (18,856 bytes)
+..   Writing: file4d8c6790a54c.xlsx
+[TRS INFO] CONF: Saved: file4d8c6790a54c.xlsx (18,821 bytes)
+.   Writing: file4d8c29e2d55.xlsx
+[TRS INFO] CONF: Saved: file4d8c29e2d55.xlsx (18,322 bytes)
+.   Writing: file4d8c4558ecfc.xlsx
+[TRS INFO] CONF: Saved: file4d8c4558ecfc.xlsx (18,855 bytes)
+.   Writing: file4d8c430fd3c3.xlsx
+[TRS INFO] CONF: Saved: file4d8c430fd3c3.xlsx (18,821 bytes)
+.   Writing: file4d8c351b984e.xlsx
+[TRS INFO] CONF: Saved: file4d8c351b984e.xlsx (18,856 bytes)
+.   Writing: file4d8c3f8f6d3c.xlsx
+[TRS INFO] CONF: Saved: file4d8c3f8f6d3c.xlsx (21,362 bytes)
+..   Writing: file4d8c7ab8b9d9.xlsx
+[TRS INFO] CONF: Saved: file4d8c7ab8b9d9.xlsx (15,949 bytes)
+......   Writing: file4d8c16674df0.xlsx
+[TRS INFO] CONF: Saved: file4d8c16674df0.xlsx (15,950 bytes)
+.
+
+== DONE ========================================================================
 
 --- test_preflight_validators.R ---
 preflight_validators: ...........................  Pre-flight cross-reference checks (Confidence)...
@@ -622,36 +381,36 @@ preflight_validators: ...........................  Pre-flight cross-reference ch
   Pre-flight found 6 error(s)
 ..
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_proportion_ci.R ---
 proportion_ci: .................................................................................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_question_processor.R ---
 question_processor: ................................................................................................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_sampling_labels.R ---
 sampling_labels: ............................................................................................................................................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_study_level.R ---
 study_level: 
 Study-Level Calculations: ..............................................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_utils.R ---
 utils: ....................................................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 
-[PASS] Confidence — 1022 passed, 0 failed, 0 skipped (52.1s)
+[PASS] Confidence — 1022 passed, 0 failed, 0 skipped (48.4s)
 
 --------------------------------------------------------------------------------
 MODULE: Conjoint (20 test files)
@@ -662,68 +421,104 @@ Path:   /Users/duncan/Documents/Turas/modules/conjoint/tests/testthat
 alchemer_import: 
 Conjoint Alchemer Import: .......................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_bws.R ---
 bws: ...................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
-
---- test_config_templates.R ---
-config_templates: ..............
-
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_config.R ---
 config: ...............
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
+
+--- test_config_templates.R ---
+config_templates: ..............
+
+== DONE ========================================================================
 Nice code.
 
 --- test_edge_cases.R ---
 edge_cases: ......................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_estimation.R ---
 estimation: ...........
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_guard_fixes.R ---
 guard_fixes: .............................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_hb_estimation.R ---
-hb_estimation: SSSSSSS
+hb_estimation: 12345.6
 
-══ Skipped ═══════════════════════════════════════════════════════════════════════════════════════════════════════
-1. HB: prepare_bayesm_data returns correct structure ('test_hb_estimation.R:57:5') - Reason: {bayesm} is not installed
+== Failed ======================================================================
+-- 1. Error ('test_hb_estimation.R:73:5'): HB: prepare_bayesm_data returns corre
+Error in `dimnames(x) <- dn`: length of 'dimnames' [2] not equal to array extent
+Backtrace:
+    x
+ 1. \-global prepare_bayesm_data(data_list, synth$config, verbose = FALSE) at test_hb_estimation.R:73:5
+ 2.   \-base::`colnames<-`(`*tmp*`, value = col_names)
 
-2. HB: estimate_choice_model with method='hb' returns individual_betas ('test_hb_estimation.R:104:5') - Reason: {bayesm} is not installed
+-- 2. Error ('test_hb_estimation.R:128:5'): HB: estimate_choice_model with metho
+Error in `dimnames(x) <- dn`: length of 'dimnames' [2] not equal to array extent
+Backtrace:
+    x
+ 1. \-global estimate_choice_model(data_list, config, verbose = FALSE) at test_hb_estimation.R:128:5
+ 2.   \-global estimate_hierarchical_bayes(data_list, config, verbose)
+ 3.     \-global prepare_bayesm_data(data_list, config, verbose)
+ 4.       \-base::`colnames<-`(`*tmp*`, value = col_names)
 
-3. HB: convergence diagnostics have expected fields ('test_hb_estimation.R:151:5') - Reason: {bayesm} is not installed
+-- 3. Error ('test_hb_estimation.R:173:5'): HB: convergence diagnostics have exp
+Error in `dimnames(x) <- dn`: length of 'dimnames' [2] not equal to array extent
+Backtrace:
+    x
+ 1. \-global estimate_choice_model(data_list, config, verbose = FALSE) at test_hb_estimation.R:173:5
+ 2.   \-global estimate_hierarchical_bayes(data_list, config, verbose)
+ 3.     \-global prepare_bayesm_data(data_list, config, verbose)
+ 4.       \-base::`colnames<-`(`*tmp*`, value = col_names)
 
-4. HB: respondent RLH is computed and above chance level ('test_hb_estimation.R:186:5') - Reason: {bayesm} is not installed
+-- 4. Error ('test_hb_estimation.R:208:5'): HB: respondent RLH is computed and a
+Error in `dimnames(x) <- dn`: length of 'dimnames' [2] not equal to array extent
+Backtrace:
+    x
+ 1. \-global estimate_choice_model(data_list, config, verbose = FALSE) at test_hb_estimation.R:208:5
+ 2.   \-global estimate_hierarchical_bayes(data_list, config, verbose)
+ 3.     \-global prepare_bayesm_data(data_list, config, verbose)
+ 4.       \-base::`colnames<-`(`*tmp*`, value = col_names)
 
-5. HB: hb_settings field records MCMC parameters ('test_hb_estimation.R:237:5') - Reason: {bayesm} is not installed
+-- 5. Error ('test_hb_estimation.R:259:5'): HB: hb_settings field records MCMC p
+Error in `dimnames(x) <- dn`: length of 'dimnames' [2] not equal to array extent
+Backtrace:
+    x
+ 1. \-global estimate_choice_model(data_list, config, verbose = FALSE) at test_hb_estimation.R:259:5
+ 2.   \-global estimate_hierarchical_bayes(data_list, config, verbose)
+ 3.     \-global prepare_bayesm_data(data_list, config, verbose)
+ 4.       \-base::`colnames<-`(`*tmp*`, value = col_names)
 
-6. HB: prepare_bayesm_data catches inconsistent choice set sizes ('test_hb_estimation.R:272:5') - Reason: {bayesm} is not installed
+-- 6. Error ('test_hb_estimation.R:320:5'): HB: attribute_map correctly maps col
+Error in `dimnames(x) <- dn`: length of 'dimnames' [2] not equal to array extent
+Backtrace:
+    x
+ 1. \-global prepare_bayesm_data(data_list, synth$config, verbose = FALSE) at test_hb_estimation.R:320:5
+ 2.   \-base::`colnames<-`(`*tmp*`, value = col_names)
 
-7. HB: attribute_map correctly maps columns to attribute-level pairs ('test_hb_estimation.R:305:5') - Reason: {bayesm} is not installed
-
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_html_report.R ---
 html_report: .....................................................................................................................
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37091fe4229f.html (0.22 MB)
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8ceddd3d7.html (0.22 MB)
 ..................
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370913470350.html (0.23 MB)
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c10d19fad.html (0.23 MB)
 ..
   [HTML REPORT] Generating conjoint analysis report...
 
@@ -735,166 +530,149 @@ html_report: ...................................................................
 .
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37093394e27.html (0.22 MB)
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8cdc57246.html (0.22 MB)
 ................
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370916b8e1ba.html (0.22 MB)
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c316a95c8.html (0.22 MB)
 ..........
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709315d5495.html (0.23 MB)
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c3d9ce0d4.html (0.23 MB)
 .
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370927ad3819.html (0.22 MB)
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c67c8fd7b.html (0.22 MB)
 .......
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370965b0f2fe.html (0.23 MB)
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c4d4c84f2.html (0.23 MB)
 ........
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37096baa4c5.html (0.22 MB)
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c55155252.html (0.22 MB)
 ...
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370920aa7a14.html (0.22 MB)
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c185392aa.html (0.22 MB)
 .......................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_html_simulator.R ---
 html_simulator: 
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37097671c648.html (0.22 MB)
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c87ad20.html (0.22 MB)
 ...
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094d669b43.html (0.22 MB)
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c651012eb.html (0.22 MB)
 .......
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_integration_mnl.R ---
-integration_mnl: 123456789abcdefghijSklmnopqr..
+integration_mnl:    Writing: file4d8c23023039.xlsx
+[TRS INFO] CONJ: Saved: file4d8c23023039.xlsx (30,019 bytes)
 
-══ Skipped ═══════════════════════════════════════════════════════════════════════════════════════════════════════
-1. MNL end-to-end: HTML report is created ('test_integration_mnl.R:237:3') - Reason: empty test
+  [HTML REPORT] Generating conjoint analysis report...
 
-══ Failed ════════════════════════════════════════════════════════════════════════════════════════════════════════
-── 1. Failure ('test_integration_mnl.R:79:5'): MNL end-to-end: run_conjoint_analysis returns PASS or PARTIAL ─────
-result$status %in% c("PASS", "PARTIAL") is not TRUE
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c23023039_report.html (0.43 MB)
+.   Writing: file4d8c42d27a69.xlsx
+[TRS INFO] CONJ: Saved: file4d8c42d27a69.xlsx (30,019 bytes)
 
-`actual`:   FALSE
-`expected`: TRUE 
-Expected PASS/PARTIAL, got: REFUSED
+  [HTML REPORT] Generating conjoint analysis report...
 
-── 2. Failure ('test_integration_mnl.R:107:5'): MNL end-to-end: utilities have Attribute, Level, Utility, SE colum
-is.data.frame(utils_df) is not TRUE
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c42d27a69_report.html (0.43 MB)
+.........   Writing: file4d8c1d97e4e5.xlsx
+[TRS INFO] CONJ: Saved: file4d8c1d97e4e5.xlsx (30,020 bytes)
 
-`actual`:   FALSE
-`expected`: TRUE 
+  [HTML REPORT] Generating conjoint analysis report...
 
-── 3. Failure ('test_integration_mnl.R:110:5'): MNL end-to-end: utilities have Attribute, Level, Utility, SE colum
-"Attribute" %in% names(utils_df) is not TRUE
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c1d97e4e5_report.html (0.43 MB)
+......   Writing: file4d8c59daaa4a.xlsx
+[TRS INFO] CONJ: Saved: file4d8c59daaa4a.xlsx (30,019 bytes)
 
-`actual`:   FALSE
-`expected`: TRUE 
+  [HTML REPORT] Generating conjoint analysis report...
 
-── 4. Failure ('test_integration_mnl.R:111:5'): MNL end-to-end: utilities have Attribute, Level, Utility, SE colum
-"Level" %in% names(utils_df) is not TRUE
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c59daaa4a_report.html (0.43 MB)
+.........   Writing: file4d8c2c46065a.xlsx
+[TRS INFO] CONJ: Saved: file4d8c2c46065a.xlsx (30,018 bytes)
 
-`actual`:   FALSE
-`expected`: TRUE 
+  [HTML REPORT] Generating conjoint analysis report...
 
-── 5. Failure ('test_integration_mnl.R:112:5'): MNL end-to-end: utilities have Attribute, Level, Utility, SE colum
-"Utility" %in% names(utils_df) is not TRUE
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c2c46065a_report.html (0.43 MB)
+...   Writing: file4d8c52fb6ef8.xlsx
+[TRS INFO] CONJ: Saved: file4d8c52fb6ef8.xlsx (30,018 bytes)
 
-`actual`:   FALSE
-`expected`: TRUE 
+  [HTML REPORT] Generating conjoint analysis report...
 
-── 6. Failure ('test_integration_mnl.R:113:5'): MNL end-to-end: utilities have Attribute, Level, Utility, SE colum
-"Std_Error" %in% names(utils_df) is not TRUE
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c52fb6ef8_report.html (0.43 MB)
+..   Writing: file4d8c56b82840.xlsx
+[TRS INFO] CONJ: Saved: file4d8c56b82840.xlsx (30,019 bytes)
 
-`actual`:   FALSE
-`expected`: TRUE 
+  [HTML REPORT] Generating conjoint analysis report...
 
-── 7. Error ('test_integration_mnl.R:116:5'): MNL end-to-end: utilities have Attribute, Level, Utility, SE columns
-Error in `expect_compare(">", act, exp)`: Result of comparison must be a single logical value
-Backtrace:
-    ▆
- 1. └─testthat::expect_gt(nrow(utils_df), 0) at test_integration_mnl.R:116:5
- 2.   └─testthat:::expect_compare(">", act, exp)
- 3.     └─rlang::abort("Result of comparison must be a single logical value")
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c56b82840_report.html (0.43 MB)
+........   Writing: file4d8c3879ec16.xlsx
+[TRS INFO] CONJ: Saved: file4d8c3879ec16.xlsx (30,019 bytes)
 
-── 8. Failure ('test_integration_mnl.R:148:5'): MNL end-to-end: importance sums to approximately 100 ─────────────
-is.data.frame(importance) is not TRUE
+  [HTML REPORT] Generating conjoint analysis report...
 
-`actual`:   FALSE
-`expected`: TRUE 
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c3879ec16_report.html (0.43 MB)
+   Writing: file4d8c4c7ab551.xlsx
+[TRS INFO] CONJ: Saved: file4d8c4c7ab551.xlsx (30,019 bytes)
 
-── 9. Failure ('test_integration_mnl.R:149:5'): MNL end-to-end: importance sums to approximately 100 ─────────────
-"Attribute" %in% names(importance) is not TRUE
+  [HTML REPORT] Generating conjoint analysis report...
 
-`actual`:   FALSE
-`expected`: TRUE 
+  [HTML REPORT] Written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c4c7ab551_report.html (0.43 MB)
+..
 
-── 10. Failure ('test_integration_mnl.R:150:5'): MNL end-to-end: importance sums to approximately 100 ────────────
-"Importance" %in% names(importance) is not TRUE
-
-`actual`:   FALSE
-`expected`: TRUE 
-  ... and 17 more
-
-
-Maximum number of 10 failures reached, some test results may be missing.
-
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_interactions.R ---
 interactions: ................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_none_handling.R ---
 none_handling: 
 Conjoint None Option Handling: ..........................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_optimizer.R ---
 optimizer: ..........
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_output_integration.R ---
-output_integration:    Writing: file3709228e6491.xlsx
-[TRS INFO] CONJ: Saved: file3709228e6491.xlsx (24,769 bytes)
-..   Writing: file370972d74399.xlsx
-[TRS INFO] CONJ: Saved: file370972d74399.xlsx (24,769 bytes)
-...........   Writing: file37092e7b1360.xlsx
-[TRS INFO] CONJ: Saved: file37092e7b1360.xlsx (24,769 bytes)
-.   Writing: file370926397616.xlsx
-[TRS INFO] CONJ: Saved: file370926397616.xlsx (24,769 bytes)
-.   Writing: file370911caf0f4.xlsx
-[TRS INFO] CONJ: Saved: file370911caf0f4.xlsx (24,769 bytes)
-..   Writing: file37095ebfc204.xlsx
-[TRS INFO] CONJ: Saved: file37095ebfc204.xlsx (24,769 bytes)
-.   Writing: file370965fb04c9.xlsx
-[TRS INFO] CONJ: Saved: file370965fb04c9.xlsx (24,769 bytes)
-.   Writing: file37091541f2b2.xlsx
-[TRS INFO] CONJ: Saved: file37091541f2b2.xlsx (24,769 bytes)
+output_integration:    Writing: file4d8ce50ac46.xlsx
+[TRS INFO] CONJ: Saved: file4d8ce50ac46.xlsx (24,769 bytes)
+..   Writing: file4d8c22e95681.xlsx
+[TRS INFO] CONJ: Saved: file4d8c22e95681.xlsx (24,769 bytes)
+...........   Writing: file4d8c2f22b849.xlsx
+[TRS INFO] CONJ: Saved: file4d8c2f22b849.xlsx (24,769 bytes)
+.   Writing: file4d8c7c3a150a.xlsx
+[TRS INFO] CONJ: Saved: file4d8c7c3a150a.xlsx (24,769 bytes)
+.   Writing: file4d8c4ea589ab.xlsx
+[TRS INFO] CONJ: Saved: file4d8c4ea589ab.xlsx (24,769 bytes)
+..   Writing: file4d8c35ffc129.xlsx
+[TRS INFO] CONJ: Saved: file4d8c35ffc129.xlsx (24,769 bytes)
+.   Writing: file4d8c45e18d3c.xlsx
+[TRS INFO] CONJ: Saved: file4d8c45e18d3c.xlsx (24,769 bytes)
+.   Writing: file4d8c71ddd367.xlsx
+[TRS INFO] CONJ: Saved: file4d8c71ddd367.xlsx (24,768 bytes)
 .   Writing: output.xlsx
 [TRS INFO] CONJ: Saved: output.xlsx (24,769 bytes)
-.   Writing: file37095aaaaae2.xlsx
-[TRS INFO] CONJ: Saved: file37095aaaaae2.xlsx (24,377 bytes)
-.   Writing: file370951777a8b.xlsx
-[TRS INFO] CONJ: Saved: file370951777a8b.xlsx (24,442 bytes)
+.   Writing: file4d8c1911834e.xlsx
+[TRS INFO] CONJ: Saved: file4d8c1911834e.xlsx (24,377 bytes)
+.   Writing: file4d8c434ff6a0.xlsx
+[TRS INFO] CONJ: Saved: file4d8c434ff6a0.xlsx (24,442 bytes)
 .
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_preflight.R ---
 preflight: .....................................
@@ -905,44 +683,36 @@ Fix: Set working directory to Turas root, or pass module_dir explicitly.
 
 .........
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_simulation.R ---
 simulation: ..............
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_simulator_ci.R ---
 simulator_ci: ...........................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_utilities.R ---
 utilities: 
 Conjoint Part-Worth Utilities: ...............W........W.......
 
-══ Warnings ══════════════════════════════════════════════════════════════════════════════════════════════════════
+== Warnings ====================================================================
 1. Utilities correctly extracted from model coefficients ('test_utilities.R:265:3') - Ran out of iterations and did not converge
 
 2. Handle perfect separation case ('test_utilities.R:398:3') - Ran out of iterations and did not converge
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_wtp.R ---
 wtp: ..............
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 
-FAILURES IN THIS MODULE:
-  FAIL in test_integration_mnl.R / integration_mnl: 1 failure(s)
-  FAIL in test_integration_mnl.R / integration_mnl: 5 failure(s)
-  FAIL in test_integration_mnl.R / integration_mnl: 3 failure(s)
-  FAIL in test_integration_mnl.R / integration_mnl: 5 failure(s)
-  FAIL in test_integration_mnl.R / integration_mnl: 1 failure(s)
-  FAIL in test_integration_mnl.R / integration_mnl: 8 failure(s)
-
-[FAIL] Conjoint — 590 passed, 23 failed, 8 skipped (69.6s)
+[PASS] Conjoint — 629 passed, 0 failed, 0 skipped (80.8s)
 
 --------------------------------------------------------------------------------
 MODULE: Cat Driver (6 test files)
@@ -957,7 +727,7 @@ bugfixes:
 === All Bug Fix Tests Complete ===
 
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_catdriver.R ---
 catdriver: 
@@ -976,13 +746,13 @@ Weighted Analysis: W.............
 Convergence and Defensive Checks: ....
 Output Validation: .S..................
 
-══ Skipped ═══════════════════════════════════════════════════════════════════════════════════════════════════════
+== Skipped =====================================================================
 1. write_catdriver_output creates valid Excel file ('test_catdriver.R:1131:5') - Reason: Output write skipped - mock structure incomplete: argument is of length zero
 
-══ Warnings ══════════════════════════════════════════════════════════════════════════════════════════════════════
+== Warnings ====================================================================
 1. weighted binary model produces valid results ('test_catdriver.R:948:3') - non-integer #successes in a binomial glm!
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_comprehensive.R ---
 comprehensive: 
@@ -1001,12 +771,12 @@ Suite 5: Importance & Odds Ratios: ..........................   Could not map te
 Suite 6: Missing Data Handling: ....................
 Suite 7: Output Generation: ...   [ERROR] Odds Ratios sheet failed: attempt to set an attribute on NULL
    [ERROR] Diagnostics sheet failed: argument is of length zero
-   Writing: file37095a8fb4d5.xlsx
-[TRS INFO] CATD: Saved: file37095a8fb4d5.xlsx (21,093 bytes)
+   Writing: file4d8c56738054.xlsx
+[TRS INFO] CATD: Saved: file4d8c56738054.xlsx (21,095 bytes)
 .   [ERROR] Odds Ratios sheet failed: attempt to set an attribute on NULL
    [ERROR] Diagnostics sheet failed: argument is of length zero
-   Writing: file370975f48200.xlsx
-[TRS INFO] CATD: Saved: file370975f48200.xlsx (21,093 bytes)
+   Writing: file4d8c13f092f4.xlsx
+[TRS INFO] CATD: Saved: file4d8c13f092f4.xlsx (21,093 bytes)
 .......
 Suite 8: Guard Framework: ......................
 Suite 9: Integration: ....................
@@ -1030,41 +800,24 @@ How to fix:
 === Comprehensive Test Suite Complete ===
 
 
-══ Warnings ══════════════════════════════════════════════════════════════════════════════════════════════════════
+== Warnings ====================================================================
 1. 4.6 binary model with weights produces valid results ('test_comprehensive.R:669:3') - non-integer #successes in a binomial glm!
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_golden_fixtures.R ---
 golden_fixtures: 
-Golden Fixtures: Binary Model: 1...2.......
-Golden Fixtures: Ordinal Model: 3........
-Golden Fixtures: Integration Tests: 4.............
+Golden Fixtures: Binary Model: ............
+Golden Fixtures: Ordinal Model: .........
+Golden Fixtures: Integration Tests: .................
 Golden Fixtures: Reproducibility: ................
 
-══ Failed ════════════════════════════════════════════════════════════════════════════════════════════════════════
-── 1. Failure ('test_golden_fixtures.R:76:3'): binary model produces correct sample size ─────────────────────────
-nrow(data) not equal to 120.
-1/1 mismatches
-[1] 400 - 120 == 280
-
-── 2. Error ('test_golden_fixtures.R:103:3'): binary model identifies satisfaction as top driver ─────────────────
-Error in `names(chi_sq) <- rownames(anova_result)`: attempt to set an attribute on NULL
-
-── 3. Failure ('test_golden_fixtures.R:180:3'): ordinal model produces correct sample size ───────────────────────
-nrow(data) not equal to 90.
-1/1 mismatches
-[1] 350 - 90 == 260
-
-── 4. Error ('test_golden_fixtures.R:328:3'): full binary analysis pipeline produces consistent results ──────────
-Error in `names(chi_sq) <- rownames(anova_result)`: attempt to set an attribute on NULL
-
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_html_report.R ---
 html_report: .................................................................................................................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_subgroup.R ---
 subgroup: 
@@ -1081,14 +834,10 @@ Subgroup Edge Cases: .....
 === SUBGROUP TEST SUITE COMPLETE ===
 
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 
-FAILURES IN THIS MODULE:
-  FAIL in test_golden_fixtures.R / Golden Fixtures: Binary Model: 1 failure(s)
-  FAIL in test_golden_fixtures.R / Golden Fixtures: Ordinal Model: 1 failure(s)
-
-[FAIL] Cat Driver — 652 passed, 2 failed, 1 skipped (16.2s)
+[PASS] Cat Driver — 659 passed, 0 failed, 1 skipped (13.6s)
 
 --------------------------------------------------------------------------------
 MODULE: Key Driver (17 test files)
@@ -1144,7 +893,7 @@ Bootstrap Confidence Intervals:
   - Bootstrap complete: 4 drivers analyzed
 ..
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_bug_fixes.R ---
 bug_fixes: 
@@ -1155,32 +904,32 @@ Bug Fix Regression Tests:
   - Bootstrap complete: 2 drivers analyzed
 .....S
 
-══ Skipped ═══════════════════════════════════════════════════════════════════════════════════════════════════════
+== Skipped =====================================================================
 1. BUG-8: Term mapping processes drivers longest-name-first ('test_bug_fixes.R:135:3') - Reason: build_term_map not found
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
-😸
+== DONE ========================================================================
+Keep up the good work.
 
 --- test_config.R ---
 config: ....W.........................................................
 
-══ Warnings ══════════════════════════════════════════════════════════════════════════════════════════════════════
+== Warnings ====================================================================
 1. load_keydriver_config refuses on non-xlsx file with IO_ code ('test_config.R:63:3') - error 1 in extracting from zip file
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_core_importance.R ---
 core_importance: ..............................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_edge_cases.R ---
 edge_cases: ........................W.........
 
-══ Warnings ══════════════════════════════════════════════════════════════════════════════════════════════════════
+== Warnings ====================================================================
 1. non-numeric outcome is detected at model fitting stage ('test_edge_cases.R:337:3') - NAs introduced by coercion
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 Nice code.
 
 --- test_effect_size.R ---
@@ -1188,106 +937,106 @@ effect_size:
 Effect Size Interpretation: ......................................[WARN] R-squared of full model is less than reduced model. Returning f2 = 0.
 ....................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
-🐝 Your tests are the bee's knees 🐝
+== DONE ========================================================================
+You are a coding rockstar!
 
 --- test_executive_summary.R ---
 executive_summary: 
 Executive Summary: ................................................................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_guard.R ---
 guard: .....................................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_html_builders.R ---
 html_builders: 
 Keydriver HTML Builders: 
-┌─── TURAS ERROR ────────────────────────────────────────┐
-│ Code: IO_KD_HTML_SUBMODULE_MISSING
-│ Missing files:
-│   - 00_html_guard.R 
-│   - 01_data_transformer.R 
-│   - 02_table_builder.R 
-│   - 03_page_builder.R 
-│   - 03a_page_styling.R 
-│   - 03b_page_components.R 
-│   - 03c_section_builders.R 
-│   - 04_html_writer.R 
-│   - 05_chart_builder.R 
-│   - 06_quadrant_section.R 
-│   - 07_v104_sections.R 
-│   - js/kd_navigation.js 
-│   - js/kd_utils.js 
-│   - js/kd_pinned_views.js 
-│   - js/kd_slide_export.js 
-│ Expected in: tools 
-│ Fix: Restore missing files or check lib/html_report/ directory
-└──────────────────────────────────────────────────────┘
+<U+250C><U+2500><U+2500><U+2500> TURAS ERROR <U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2510>
+<U+2502> Code: IO_KD_HTML_SUBMODULE_MISSING
+<U+2502> Missing files:
+<U+2502>   - 00_html_guard.R 
+<U+2502>   - 01_data_transformer.R 
+<U+2502>   - 02_table_builder.R 
+<U+2502>   - 03_page_builder.R 
+<U+2502>   - 03a_page_styling.R 
+<U+2502>   - 03b_page_components.R 
+<U+2502>   - 03c_section_builders.R 
+<U+2502>   - 04_html_writer.R 
+<U+2502>   - 05_chart_builder.R 
+<U+2502>   - 06_quadrant_section.R 
+<U+2502>   - 07_v104_sections.R 
+<U+2502>   - js/kd_navigation.js 
+<U+2502>   - js/kd_utils.js 
+<U+2502>   - js/kd_pinned_views.js 
+<U+2502>   - js/kd_slide_export.js 
+<U+2502> Expected in: . 
+<U+2502> Fix: Restore missing files or check lib/html_report/ directory
+<U+2514><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2518>
 
    [WARN] Keydriver HTML report submodule(s) missing: 00_html_guard.R, 01_data_transformer.R, 02_table_builder.R, 03_page_builder.R, 03a_page_styling.R, 03b_page_components.R, 03c_section_builders.R, 04_html_writer.R, 05_chart_builder.R, 06_quadrant_section.R, 07_v104_sections.R, js/kd_navigation.js, js/kd_utils.js, js/kd_pinned_views.js, js/kd_slide_export.js
 ....................................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 You are a coding rockstar!
 
 --- test_html_report.R ---
 html_report: 
-┌─── TURAS ERROR ────────────────────────────────────────┐
-│ Code: IO_KD_HTML_SUBMODULE_MISSING
-│ Missing files:
-│   - 00_html_guard.R 
-│   - 01_data_transformer.R 
-│   - 02_table_builder.R 
-│   - 03_page_builder.R 
-│   - 03a_page_styling.R 
-│   - 03b_page_components.R 
-│   - 03c_section_builders.R 
-│   - 04_html_writer.R 
-│   - 05_chart_builder.R 
-│   - 06_quadrant_section.R 
-│   - 07_v104_sections.R 
-│   - js/kd_navigation.js 
-│   - js/kd_utils.js 
-│   - js/kd_pinned_views.js 
-│   - js/kd_slide_export.js 
-│ Expected in: tools 
-│ Fix: Restore missing files or check lib/html_report/ directory
-└──────────────────────────────────────────────────────┘
+<U+250C><U+2500><U+2500><U+2500> TURAS ERROR <U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2510>
+<U+2502> Code: IO_KD_HTML_SUBMODULE_MISSING
+<U+2502> Missing files:
+<U+2502>   - 00_html_guard.R 
+<U+2502>   - 01_data_transformer.R 
+<U+2502>   - 02_table_builder.R 
+<U+2502>   - 03_page_builder.R 
+<U+2502>   - 03a_page_styling.R 
+<U+2502>   - 03b_page_components.R 
+<U+2502>   - 03c_section_builders.R 
+<U+2502>   - 04_html_writer.R 
+<U+2502>   - 05_chart_builder.R 
+<U+2502>   - 06_quadrant_section.R 
+<U+2502>   - 07_v104_sections.R 
+<U+2502>   - js/kd_navigation.js 
+<U+2502>   - js/kd_utils.js 
+<U+2502>   - js/kd_pinned_views.js 
+<U+2502>   - js/kd_slide_export.js 
+<U+2502> Expected in: . 
+<U+2502> Fix: Restore missing files or check lib/html_report/ directory
+<U+2514><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2518>
 
    [WARN] Keydriver HTML report submodule(s) missing: 00_html_guard.R, 01_data_transformer.R, 02_table_builder.R, 03_page_builder.R, 03a_page_styling.R, 03b_page_components.R, 03c_section_builders.R, 04_html_writer.R, 05_chart_builder.R, 06_quadrant_section.R, 07_v104_sections.R, js/kd_navigation.js, js/kd_utils.js, js/kd_pinned_views.js, js/kd_slide_export.js
 ..............S........................
 
-══ Skipped ═══════════════════════════════════════════════════════════════════════════════════════════════════════
+== Skipped =====================================================================
 1. validate_keydriver_html_inputs refuses when htmltools is missing ('test_html_report.R:132:3') - Reason: htmltools is installed; cannot test PKG_HTMLTOOLS_MISSING path
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_integration.R ---
 integration: 
-┌─── TURAS ERROR ────────────────────────────────────────┐
-│ Code: IO_KD_HTML_SUBMODULE_MISSING
-│ Missing files:
-│   - 00_html_guard.R 
-│   - 01_data_transformer.R 
-│   - 02_table_builder.R 
-│   - 03_page_builder.R 
-│   - 03a_page_styling.R 
-│   - 03b_page_components.R 
-│   - 03c_section_builders.R 
-│   - 04_html_writer.R 
-│   - 05_chart_builder.R 
-│   - 06_quadrant_section.R 
-│   - 07_v104_sections.R 
-│   - js/kd_navigation.js 
-│   - js/kd_utils.js 
-│   - js/kd_pinned_views.js 
-│   - js/kd_slide_export.js 
-│ Expected in: tools 
-│ Fix: Restore missing files or check lib/html_report/ directory
-└──────────────────────────────────────────────────────┘
+<U+250C><U+2500><U+2500><U+2500> TURAS ERROR <U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2510>
+<U+2502> Code: IO_KD_HTML_SUBMODULE_MISSING
+<U+2502> Missing files:
+<U+2502>   - 00_html_guard.R 
+<U+2502>   - 01_data_transformer.R 
+<U+2502>   - 02_table_builder.R 
+<U+2502>   - 03_page_builder.R 
+<U+2502>   - 03a_page_styling.R 
+<U+2502>   - 03b_page_components.R 
+<U+2502>   - 03c_section_builders.R 
+<U+2502>   - 04_html_writer.R 
+<U+2502>   - 05_chart_builder.R 
+<U+2502>   - 06_quadrant_section.R 
+<U+2502>   - 07_v104_sections.R 
+<U+2502>   - js/kd_navigation.js 
+<U+2502>   - js/kd_utils.js 
+<U+2502>   - js/kd_pinned_views.js 
+<U+2502>   - js/kd_slide_export.js 
+<U+2502> Expected in: . 
+<U+2502> Fix: Restore missing files or check lib/html_report/ directory
+<U+2514><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2518>
 
    [WARN] Keydriver HTML report submodule(s) missing: 00_html_guard.R, 01_data_transformer.R, 02_table_builder.R, 03_page_builder.R, 03a_page_styling.R, 03b_page_components.R, 03c_section_builders.R, 04_html_writer.R, 05_chart_builder.R, 06_quadrant_section.R, 07_v104_sections.R, js/kd_navigation.js, js/kd_utils.js, js/kd_pinned_views.js, js/kd_slide_export.js
 ...........................................
@@ -1308,13 +1057,13 @@ integration:
 [WARN] build_kd_quadrant_chart: missing columns: importance_normalized, performance_normalized
     5 charts built
   Step 5: Assembling HTML page...
-    [WARN] JS file not found: tools/js/kd_utils.js
-    [WARN] JS file not found: tools/js/kd_navigation.js
-    [WARN] JS file not found: tools/js/kd_table_export.js
-    [WARN] JS file not found: tools/js/kd_pinned_views.js
-    [WARN] JS file not found: tools/js/kd_slide_export.js
+    [WARN] JS file not found: ./js/kd_utils.js
+    [WARN] JS file not found: ./js/kd_navigation.js
+    [WARN] JS file not found: ./js/kd_table_export.js
+    [WARN] JS file not found: ./js/kd_pinned_views.js
+    [WARN] JS file not found: ./js/kd_slide_export.js
   Step 6: Writing HTML file to integration_test_kd_full_report.html...
-  Done! 0.12 MB in 1.7 seconds
+  Done! 0.12 MB in 1.2 seconds
 ------------------------------------------------------------ 
 
 ...
@@ -1330,38 +1079,38 @@ integration:
 [WARN] build_kd_quadrant_chart: missing columns: importance_normalized, performance_normalized
     5 charts built
   Step 5: Assembling HTML page...
-    [WARN] JS file not found: tools/js/kd_utils.js
-    [WARN] JS file not found: tools/js/kd_navigation.js
-    [WARN] JS file not found: tools/js/kd_table_export.js
-    [WARN] JS file not found: tools/js/kd_pinned_views.js
-    [WARN] JS file not found: tools/js/kd_slide_export.js
+    [WARN] JS file not found: ./js/kd_utils.js
+    [WARN] JS file not found: ./js/kd_navigation.js
+    [WARN] JS file not found: ./js/kd_table_export.js
+    [WARN] JS file not found: ./js/kd_pinned_views.js
+    [WARN] JS file not found: ./js/kd_slide_export.js
   Step 6: Writing HTML file to integration_v104_report.html...
-  Done! 0.13 MB in 0.4 seconds
+  Done! 0.13 MB in 0.3 seconds
 ------------------------------------------------------------ 
 
 ...S
 
-══ Skipped ═══════════════════════════════════════════════════════════════════════════════════════════════════════
+== Skipped =====================================================================
 1. mixed predictor data handles categorical drivers ('test_integration.R:499:3') - Reason: build_term_map not available
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_preflight_validators.R ---
 preflight_validators: 
 Preflight Validators: .......................................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_quadrant.R ---
 quadrant: ..........................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_segment_comparison.R ---
 segment_comparison: 
 Segment Comparison: ..........................................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_shap.R ---
 shap: 
@@ -1371,7 +1120,6 @@ SHAP Submodule: ..............................................   [WARN] Segment 
 ------------------------------------------------------------
 SHAP ANALYSIS
 ------------------------------------------------------------
-   [WARN] Optional packages not available: viridis. Some visualizations may be limited.
   1. Validating inputs...
   2. Preparing data for XGBoost...
      - 200 observations, 5 features
@@ -1389,12 +1137,12 @@ SHAP ANALYSIS
 
 ........
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_term_mapping.R ---
 term_mapping: ........................................................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_v104_features.R ---
 v104_features: 
@@ -1425,7 +1173,46 @@ v10.4 Analytical Features:    Running Elastic Net analysis...
    - Selected drivers (lambda.1se): 5 / 5
    - Selected drivers (lambda.min): 5 / 5
    - CV MSE at lambda.1se: 0.2844
-....SSSSSSSSSS   Running GAM nonlinear effects analysis...
+....   Running Necessary Condition Analysis...
+   - Analysing 5 numeric drivers
+   [WARN] NCA for 'x1' failed: argument "y" is missing, with no default
+   [WARN] NCA for 'x2' failed: argument "y" is missing, with no default
+   [WARN] NCA for 'x3' failed: argument "y" is missing, with no default
+   [WARN] NCA for 'x4' failed: argument "y" is missing, with no default
+   [WARN] NCA for 'x5' failed: argument "y" is missing, with no default
+   - Necessary conditions found: 0 of 5
+......   Running Necessary Condition Analysis...
+   - Analysing 5 numeric drivers
+   [WARN] NCA for 'x1' failed: argument "y" is missing, with no default
+   [WARN] NCA for 'x2' failed: argument "y" is missing, with no default
+   [WARN] NCA for 'x3' failed: argument "y" is missing, with no default
+   [WARN] NCA for 'x4' failed: argument "y" is missing, with no default
+   [WARN] NCA for 'x5' failed: argument "y" is missing, with no default
+   - Necessary conditions found: 0 of 5
+..   Running Necessary Condition Analysis...
+..   Running Necessary Condition Analysis...
+   - Analysing 5 numeric drivers
+   [WARN] NCA for 'x1' failed: argument "y" is missing, with no default
+   [WARN] NCA for 'x2' failed: argument "y" is missing, with no default
+   [WARN] NCA for 'x3' failed: argument "y" is missing, with no default
+   [WARN] NCA for 'x4' failed: argument "y" is missing, with no default
+   [WARN] NCA for 'x5' failed: argument "y" is missing, with no default
+   - Necessary conditions found: 0 of 5
+..   Running Dominance Analysis...
+   - Analysing 5 drivers (2^5 = 32 submodels)
+   [WARN] domir::domin failed: argument "fitstat" is missing, with no default
+123456   Running Dominance Analysis...
+   - Analysing 5 drivers (2^5 = 32 submodels)
+   [WARN] domir::domin failed: argument "fitstat" is missing, with no default
+78   Running Dominance Analysis...
+   - Analysing 5 drivers (2^5 = 32 submodels)
+   [WARN] domir::domin failed: argument "fitstat" is missing, with no default
+9a   Running Dominance Analysis...
+   - Analysing 5 drivers (2^5 = 32 submodels)
+   [WARN] domir::domin failed: argument "fitstat" is missing, with no default
+bc   Running Dominance Analysis...
+..   Running Dominance Analysis...
+..   Running GAM nonlinear effects analysis...
    - Basis dimension k = 5
    - Fitting GAM for 5 numeric drivers
    - Linear R²: 0.655 | GAM deviance explained: 0.659
@@ -1454,33 +1241,81 @@ v10.4 Analytical Features:    Running Elastic Net analysis...
    - Drivers with significant nonlinearity: 2 of 3
 ..........
 
-══ Skipped ═══════════════════════════════════════════════════════════════════════════════════════════════════════
-1. Elastic Net: returns PARTIAL when glmnet not installed ('test_v104_features.R:161:3') - Reason: glmnet is installed — cannot test missing-package path
+== Skipped =====================================================================
+1. Elastic Net: returns PARTIAL when glmnet not installed ('test_v104_features.R:161:3') - Reason: glmnet is installed <U+2014> cannot test missing-package path
 
-2. NCA: runs successfully on basic data ('test_v104_features.R:210:3') - Reason: {NCA} is not installed
+== Failed ======================================================================
+-- 1. Failure ('test_v104_features.R:308:3'): Dominance: runs successfully on ba
+result$status not equal to "PASS".
+1/1 mismatches
+x[1]: "PARTIAL"
+y[1]: "PASS"
 
-3. NCA: classification is binary Necessary/Not Necessary ('test_v104_features.R:235:3') - Reason: {NCA} is not installed
+-- 2. Failure ('test_v104_features.R:309:3'): Dominance: runs successfully on ba
+!is.null(result$result) is not TRUE
 
-4. NCA: returns PARTIAL when too few cases ('test_v104_features.R:255:3') - Reason: {NCA} is not installed
+`actual`:   FALSE
+`expected`: TRUE 
 
-5. NCA: effect sizes are non-negative ('test_v104_features.R:275:3') - Reason: {NCA} is not installed
+-- 3. Failure ('test_v104_features.R:310:3'): Dominance: runs successfully on ba
+is.data.frame(result$result$summary) is not TRUE
 
-6. Dominance: runs successfully on basic data ('test_v104_features.R:301:3') - Reason: {domir} is not installed
+`actual`:   FALSE
+`expected`: TRUE 
 
-7. Dominance: general dominance sums to total R-squared ('test_v104_features.R:326:3') - Reason: {domir} is not installed
+-- 4. Failure ('test_v104_features.R:311:3'): Dominance: runs successfully on ba
+all(...) is not TRUE
 
-8. Dominance: percentages sum to ~100 ('test_v104_features.R:347:3') - Reason: {domir} is not installed
+`actual`:   FALSE
+`expected`: TRUE 
 
-9. Dominance: supports weighted data ('test_v104_features.R:368:3') - Reason: {domir} is not installed
+-- 5. Failure ('test_v104_features.R:313:3'): Dominance: runs successfully on ba
+nrow(result$result$summary) not equal to 5.
+target is NULL, current is numeric
 
-10. Dominance: requires at least 2 numeric drivers ('test_v104_features.R:388:3') - Reason: {domir} is not installed
+-- 6. Failure ('test_v104_features.R:314:3'): Dominance: runs successfully on ba
+result$result$n_obs == 200 is not TRUE
 
-11. Dominance: returns PARTIAL when too few cases ('test_v104_features.R:408:3') - Reason: {domir} is not installed
+`actual`:       
+`expected`: TRUE
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+-- 7. Failure ('test_v104_features.R:332:3'): Dominance: general dominance sums 
+result$status not equal to "PASS".
+1/1 mismatches
+x[1]: "PARTIAL"
+y[1]: "PASS"
+
+-- 8. Failure ('test_v104_features.R:335:3'): Dominance: general dominance sums 
+`dom_sum` not equal to `total_r2`.
+Types not compatible: integer is not NULL
+
+-- 9. Failure ('test_v104_features.R:353:3'): Dominance: percentages sum to ~100
+result$status not equal to "PASS".
+1/1 mismatches
+x[1]: "PARTIAL"
+y[1]: "PASS"
+
+-- 10. Failure ('test_v104_features.R:355:3'): Dominance: percentages sum to ~10
+abs(total_pct - 100) < 1 is not TRUE
+
+`actual`:   FALSE
+`expected`: TRUE 
+General_Pct should sum to ~100, got 0.0
+  ... and 2 more
 
 
-[PASS] Key Driver — 900 passed, 0 failed, 14 skipped (28.5s)
+Maximum number of 10 failures reached, some test results may be missing.
+
+== DONE ========================================================================
+
+
+FAILURES IN THIS MODULE:
+  FAIL in test_v104_features.R / v10.4 Analytical Features: 6 failure(s)
+  FAIL in test_v104_features.R / v10.4 Analytical Features: 2 failure(s)
+  FAIL in test_v104_features.R / v10.4 Analytical Features: 2 failure(s)
+  FAIL in test_v104_features.R / v10.4 Analytical Features: 2 failure(s)
+
+[FAIL] Key Driver — 916 passed, 12 failed, 4 skipped (29.2s)
 
 --------------------------------------------------------------------------------
 MODULE: MaxDiff (16 test files)
@@ -1490,100 +1325,100 @@ Path:   /Users/duncan/Documents/Turas/modules/maxdiff/tests/testthat
 --- test_config.R ---
 config: ...........................................................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_counts.R ---
 counts: ..................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_data_reshape.R ---
 data_reshape: ..........................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_design.R ---
 design: S....
 
-══ Skipped ═══════════════════════════════════════════════════════════════════════════════════════════════════════
+== Skipped =====================================================================
 1. generate_random_design creates correct structure ('test_design.R:17:3') - Reason: generate_random_design call failed
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_edge_cases.R ---
 edge_cases: ....................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_guard.R ---
 guard: ................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_hb.R ---
 hb: ............................................................................................................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_html_report.R ---
 html_report: .............................................................  HTML Layer 1: Transforming data...
   HTML Layer 4: Assembling page...
-  HTML Writing to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709318a3c18.html
-  HTML report generated: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709318a3c18.html (151.3 KB)
+  HTML Writing to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c4bea14da.html
+  HTML report generated: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c4bea14da.html (151.3 KB)
 ....
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_html_simulator.R ---
 html_simulator: ......................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_logit.R ---
 logit: ...........................SS.....
 
-══ Skipped ═══════════════════════════════════════════════════════════════════════════════════════════════════════
+== Skipped =====================================================================
 1. fit_aggregate_logit uses last item as anchor when none specified ('test_logit.R:226:1') - Reason: empty test
 
 2. fit_aggregate_logit uses designated anchor item ('test_logit.R:274:1') - Reason: empty test
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_output.R ---
 output: ...........S................
 
-══ Skipped ═══════════════════════════════════════════════════════════════════════════════════════════════════════
+== Skipped =====================================================================
 1. generate_maxdiff_output creates output file on disk ('test_output.R:123:1') - Reason: empty test
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_preference_shares.R ---
 preference_shares: ..................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_segments.R ---
 segments: ............................................................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_turf.R ---
 turf: ..........................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_utils.R ---
 utils: ............................................................................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_validation.R ---
 validation: ..................................................................................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 
-[PASS] MaxDiff — 755 passed, 0 failed, 4 skipped (24.9s)
+[PASS] MaxDiff — 755 passed, 0 failed, 4 skipped (18.4s)
 
 --------------------------------------------------------------------------------
 MODULE: Pricing (23 test files)
@@ -1591,79 +1426,25 @@ Path:   /Users/duncan/Documents/Turas/modules/pricing/tests/testthat
 --------------------------------------------------------------------------------
 
 --- test_added_slides.R ---
-added_slides: .
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-  [INFO] Loaded 2 added slides from AddedSlides sheet
-......
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-  [INFO] Loaded 3 added slides from AddedSlides sheet
-....
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-  [INFO] Loaded 2 added slides from AddedSlides sheet
-...
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-  [INFO] AddedSlides sheet found but missing slide_title/content columns - skipped
-.
--
-/
-                                                                                                                
-
-/
-                                                                                                                
-
--
-                                                                                                                
-  [INFO] Loaded 1 added slides from Added_Slides sheet
+added_slides: .  [INFO] Loaded 2 added slides from AddedSlides sheet
+......  [INFO] Loaded 3 added slides from AddedSlides sheet
+....  [INFO] Loaded 2 added slides from AddedSlides sheet
+...  [INFO] AddedSlides sheet found but missing slide_title/content columns - skipped
+.  [INFO] Loaded 1 added slides from Added_Slides sheet
 ............
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
 
 --- test_competitive_scenarios.R ---
 competitive_scenarios: ..............................
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
+
+--- test_config.R ---
+config: .............
+
+== DONE ========================================================================
+You rock!
 
 --- test_config_templates.R ---
 config_templates: 
@@ -1677,7 +1458,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709476e41fe.xlsx
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c7ed810f5.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 ..
@@ -1691,7 +1472,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37091898b182.xlsx
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c1a62938a.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 ....
@@ -1705,7 +1486,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370942589b66.xlsx
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c65ed2f0.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 .
@@ -1719,7 +1500,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370964a90550.xlsx
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c7c82d5fd.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 .
@@ -1733,7 +1514,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370935c8c331.xlsx
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c612de997.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 .
@@ -1747,7 +1528,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370921668423.xlsx
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c78cfcf7d.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 .
@@ -1761,7 +1542,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094a57fa85.xlsx
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c17500fa6.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 .
@@ -1775,7 +1556,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709548a607b.xlsx
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c454dde45.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 
@@ -1789,136 +1570,2055 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709548a607b.xlsx
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c454dde45.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 ..
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
-🎯 Your tests hit the mark 🎯
+== DONE ========================================================================
 
---- test_config.R ---
-config: 
--
-/
-                                                                                                                
+--- test_edge_cases.R ---
+edge_cases: ................................................
 
-/
-                                                                                                                
+== DONE ========================================================================
 
--
-                                                                                                                
+--- test_gabor_granger.R ---
+gabor_granger:   [WARNING] Gabor-Granger Monotonicity: 151 respondents (75.5%) showed non-monotonic purchase intent
+......  [WARNING] Gabor-Granger Monotonicity: 151 respondents (75.5%) showed non-monotonic purchase intent
+....  [WARNING] Gabor-Granger Monotonicity: 151 respondents (75.5%) showed non-monotonic purchase intent
+....  [WARNING] Gabor-Granger Monotonicity: 151 respondents (75.5%) showed non-monotonic purchase intent
+.....  [WARNING] Gabor-Granger Monotonicity: 151 respondents (75.5%) showed non-monotonic purchase intent
+.  [WARNING] Gabor-Granger Monotonicity: 151 respondents (75.5%) showed non-monotonic purchase intent
+...........  [WARNING] Gabor-Granger Monotonicity: 25 respondents (83.3%) showed non-monotonic purchase intent
+.....  [WARNING] Gabor-Granger Monotonicity: 61 respondents (61.0%) showed non-monotonic purchase intent
+..  [WARNING] Gabor-Granger Monotonicity: 100 respondents (100.0%) showed non-monotonic purchase intent
+..
 
--
-/
-                                                                                                                
+== DONE ========================================================================
 
-/
-                                                                                                                
+--- test_guard.R ---
+guard: ........................
 
--
-                                                                                                                
+== DONE ========================================================================
 
--
-/
-                                                                                                                
+--- test_html_report.R ---
+html_report: .................................................................................................   HTML Report: Starting generation...
+   HTML Report: Transforming data...
+   HTML Report: Building tables...
+   HTML Report: Building charts...
+W   HTML Report: Preparing simulator data...
+   HTML Report: Assembling page...
+   HTML Report: Writing file...
+   HTML Report: Written to file4d8c169a3a0.html (135.6 KB)
+.......
 
-/
-                                                                                                                
+== Warnings ====================================================================
+1. generate_pricing_html_report writes valid file ('test_html_report.R:397:3') - NAs introduced by coercion
 
--
-                                                                                                                
+== DONE ========================================================================
+
+--- test_integration.R ---
+integration: 
+============================================================ 
+VAN WESTENDORP DATA VALIDATION
+============================================================ 
+
+Total respondents: 250
+Complete cases: 250 (100.0%)
+Logical responses: 225 (90.0%)
+Quality score: 80/100
+
+Validation checks:
+  [PASS] config complete
+  [PASS] columns present
+  [PASS] numeric valid
+  [PASS] sample size
+  [FAIL] logical order
+  [PASS] positive prices
+  [PASS] no extreme outliers
+  [PASS] no duplicates
+
+Issues found:
+  - High logical order violation rate: 10.0% (threshold: 10%)
+
+Recommendations:
+  Review question wording - respondents may be confused
+  Consider excluding respondents with illogical responses
+
+......  [WARNING] Gabor-Granger Monotonicity: 195 respondents (78.0%) showed non-monotonic purchase intent
+......   Valid observations: 300 / 300
+   Price cells: 6 (range: 15.00 to 65.00)
+   Model: logistic, pseudo-R2: 0.109, AIC: 335.1
+......
+============================================================ 
+VAN WESTENDORP DATA VALIDATION
+============================================================ 
+
+Total respondents: 250
+Complete cases: 250 (100.0%)
+Logical responses: 225 (90.0%)
+Quality score: 80/100
+
+Validation checks:
+  [PASS] config complete
+  [PASS] columns present
+  [PASS] numeric valid
+  [PASS] sample size
+  [FAIL] logical order
+  [PASS] positive prices
+  [PASS] no extreme outliers
+  [PASS] no duplicates
+
+Issues found:
+  - High logical order violation rate: 10.0% (threshold: 10%)
+
+Recommendations:
+  Review question wording - respondents may be confused
+  Consider excluding respondents with illogical responses
+
 ....
--
-/
-                                                                                                                
+============================================================ 
+VAN WESTENDORP DATA VALIDATION
+============================================================ 
 
-/
-                                                                                                                
+Total respondents: 250
+Complete cases: 250 (100.0%)
+Logical responses: 225 (90.0%)
+Quality score: 80/100
 
--
-                                                                                                                
+Validation checks:
+  [PASS] config complete
+  [PASS] columns present
+  [PASS] numeric valid
+  [PASS] sample size
+  [FAIL] logical order
+  [PASS] positive prices
+  [PASS] no extreme outliers
+  [PASS] no duplicates
 
--
-/
-                                                                                                                
+Issues found:
+  - High logical order violation rate: 10.0% (threshold: 10%)
 
-/
-                                                                                                                
+Recommendations:
+  Review question wording - respondents may be confused
+  Consider excluding respondents with illogical responses
 
--
-                                                                                                                
+  [WARNING] Gabor-Granger Monotonicity: 195 respondents (78.0%) showed non-monotonic purchase intent
+...   Valid observations: 300 / 300
+   Price cells: 6 (range: 25.00 to 75.00)
+   Model: logistic, pseudo-R2: 0.145, AIC: 355.2
+..   Valid observations: 200 / 200
+   Price cells: 6 (range: 25.00 to 75.00)
+   Model: logistic, pseudo-R2: 0.096, AIC: 237.1
+...   Valid observations: 200 / 200
+   Price cells: 6 (range: 25.00 to 75.00)
+   Model: logistic, pseudo-R2: 0.096, AIC: 237.1
+....
 
--
-/
-                                                                                                                
+== DONE ========================================================================
 
-/
-                                                                                                                
+--- test_main_pipeline.R ---
+main_pipeline: 1. Configuration loaded
+   Analysis method: van_westendorp
+   Project: Test Pipeline
 
--
-                                                                                                                
+2. Loading and validating data...
+   Loaded 100 respondents
+   Valid cases for analysis: 100
+
+3. Running Van Westendorp PSM analysis...
+
+============================================================ 
+VAN WESTENDORP DATA VALIDATION
+============================================================ 
+
+Total respondents: 100
+Complete cases: 100 (100.0%)
+Logical responses: 90 (90.0%)
+Quality score: 80/100
+
+Validation checks:
+  [PASS] config complete
+  [PASS] columns present
+  [PASS] numeric valid
+  [PASS] sample size
+  [FAIL] logical order
+  [PASS] positive prices
+  [PASS] no extreme outliers
+  [PASS] no duplicates
+
+Issues found:
+  - High logical order violation rate: 10.0% (threshold: 10%)
+
+Recommendations:
+  Review question wording - respondents may be confused
+  Consider excluding respondents with illogical responses
+
+   Price points calculated:
+     PMC (Point of Marginal Cheapness): $32.53
+     OPP (Optimal Price Point): $34.78
+     IDP (Indifference Price Point): $44.48
+     PME (Point of Marginal Expensiveness): $69.97
+
+5. Building price ladder...
+   ! Price ladder generation failed: 
+================================================================================
+  [REFUSE] CFG_TIER_NAMES_MISMATCH: Tier Names Count Mismatch
+================================================================================
+
+Problem:
+  1 tier names provided but n_tiers is 3
+
+Why it matters:
+  Each tier must have exactly one name
+
+How to fix:
+  1. Adjust tier_names in PriceLadder configuration to match n_tiers
+  2. Use semicolon-separated names (e.g., 'Value;Standard;Premium' for 3 tiers)
+
+Diagnostics:
+  Expected:  3 tier names
+  Observed:  1 tier names: Value
+
+================================================================================
+
+
+6. Synthesizing recommendation...
+   Recommended price: $39.99
+   Confidence: HIGH (76%)
+
+7. Generating visualizations...
+   Generated 1 plot(s)
+
+8. Generating output file...
+   Writing: file4d8c25c5e25d.xlsx
+[TRS INFO] PRICE: Saved: file4d8c25c5e25d.xlsx (51,536 bytes)
+   Plots saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/plots
+   Results written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c25c5e25d.xlsx
+......1. Configuration loaded
+   Analysis method: gabor_granger
+   Project: Test GG Pipeline
+
+2. Loading and validating data...
+   Loaded 100 respondents
+   Valid cases for analysis: 100
+
+3. Running Gabor-Granger analysis...
+   Demand curve calculated for 7 price points
+   Optimal price (revenue-max): $40.00 (77.0% purchase intent)
+
+6. Synthesizing recommendation...
+   Recommended price: $39.99
+   Confidence: MEDIUM (70%)
+
+7. Generating visualizations...
+   Generated 2 plot(s)
+
+8. Generating output file...
+   Writing: file4d8c2cfee684.xlsx
+[TRS INFO] PRICE: Saved: file4d8c2cfee684.xlsx (22,205 bytes)
+   Plots saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/plots
+   Results written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c2cfee684.xlsx
+.....1. Configuration loaded
+   Analysis method: van_westendorp
+   Project: Test Pipeline
+
+2. Loading and validating data...
+.1. Configuration loaded
+   Analysis method: bogus_method
+   Project: Test Pipeline
+
+2. Loading and validating data...
+   Loaded 100 respondents
+   Valid cases for analysis: 100
+.1. Configuration loaded
+   Analysis method: van_westendorp
+   Project: Test Pipeline
+.1. Configuration loaded
+   Analysis method: van_westendorp
+   Project: Test Pipeline
+
+2. Loading and validating data...
+   Loaded 100 respondents
+   Valid cases for analysis: 100
+
+3. Running Van Westendorp PSM analysis...
+
+============================================================ 
+VAN WESTENDORP DATA VALIDATION
+============================================================ 
+
+Total respondents: 100
+Complete cases: 100 (100.0%)
+Logical responses: 90 (90.0%)
+Quality score: 80/100
+
+Validation checks:
+  [PASS] config complete
+  [PASS] columns present
+  [PASS] numeric valid
+  [PASS] sample size
+  [FAIL] logical order
+  [PASS] positive prices
+  [PASS] no extreme outliers
+  [PASS] no duplicates
+
+Issues found:
+  - High logical order violation rate: 10.0% (threshold: 10%)
+
+Recommendations:
+  Review question wording - respondents may be confused
+  Consider excluding respondents with illogical responses
+
+   Price points calculated:
+     PMC (Point of Marginal Cheapness): $32.53
+     OPP (Optimal Price Point): $34.78
+     IDP (Indifference Price Point): $44.48
+     PME (Point of Marginal Expensiveness): $69.97
+
+5. Building price ladder...
+   ! Price ladder generation failed: 
+================================================================================
+  [REFUSE] CFG_TIER_NAMES_MISMATCH: Tier Names Count Mismatch
+================================================================================
+
+Problem:
+  1 tier names provided but n_tiers is 3
+
+Why it matters:
+  Each tier must have exactly one name
+
+How to fix:
+  1. Adjust tier_names in PriceLadder configuration to match n_tiers
+  2. Use semicolon-separated names (e.g., 'Value;Standard;Premium' for 3 tiers)
+
+Diagnostics:
+  Expected:  3 tier names
+  Observed:  1 tier names: Value
+
+================================================================================
+
+
+6. Synthesizing recommendation...
+   Recommended price: $39.99
+   Confidence: HIGH (76%)
+
+7. Generating visualizations...
+   Generated 1 plot(s)
+
+8. Generating output file...
+   Writing: file4d8c6a48d833.xlsx
+[TRS INFO] PRICE: Saved: file4d8c6a48d833.xlsx (51,535 bytes)
+   Plots saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/plots
+   Results written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c6a48d833.xlsx
+.1. Configuration loaded
+   Analysis method: van_westendorp
+   Project: Test Pipeline
+
+2. Loading and validating data...
+   Loaded 100 respondents
+   Valid cases for analysis: 100
+
+3. Running Van Westendorp PSM analysis...
+
+============================================================ 
+VAN WESTENDORP DATA VALIDATION
+============================================================ 
+
+Total respondents: 100
+Complete cases: 100 (100.0%)
+Logical responses: 90 (90.0%)
+Quality score: 80/100
+
+Validation checks:
+  [PASS] config complete
+  [PASS] columns present
+  [PASS] numeric valid
+  [PASS] sample size
+  [FAIL] logical order
+  [PASS] positive prices
+  [PASS] no extreme outliers
+  [PASS] no duplicates
+
+Issues found:
+  - High logical order violation rate: 10.0% (threshold: 10%)
+
+Recommendations:
+  Review question wording - respondents may be confused
+  Consider excluding respondents with illogical responses
+
+   Price points calculated:
+     PMC (Point of Marginal Cheapness): $32.53
+     OPP (Optimal Price Point): $34.78
+     IDP (Indifference Price Point): $44.48
+     PME (Point of Marginal Expensiveness): $69.97
+
+5. Building price ladder...
+   ! Price ladder generation failed: 
+================================================================================
+  [REFUSE] CFG_TIER_NAMES_MISMATCH: Tier Names Count Mismatch
+================================================================================
+
+Problem:
+  1 tier names provided but n_tiers is 3
+
+Why it matters:
+  Each tier must have exactly one name
+
+How to fix:
+  1. Adjust tier_names in PriceLadder configuration to match n_tiers
+  2. Use semicolon-separated names (e.g., 'Value;Standard;Premium' for 3 tiers)
+
+Diagnostics:
+  Expected:  3 tier names
+  Observed:  1 tier names: Value
+
+================================================================================
+
+
+6. Synthesizing recommendation...
+   Recommended price: $39.99
+   Confidence: HIGH (76%)
+
+7. Generating visualizations...
+   Generated 1 plot(s)
+
+8. Generating output file...
+   Writing: file4d8c53a66d7b.xlsx
+[TRS INFO] PRICE: Saved: file4d8c53a66d7b.xlsx (51,536 bytes)
+   Plots saved to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/plots
+   Results written to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c53a66d7b.xlsx
 ..
--
-/
-                                                                                                                
 
-/
-                                                                                                                
+== DONE ========================================================================
 
--
-                                                                                                                
+--- test_monadic.R ---
+monadic:    Valid observations: 300 / 300
+   Price cells: 6 (range: 25.00 to 75.00)
+   Model: logistic, pseudo-R2: 0.145, AIC: 355.2
+.........   Valid observations: 200 / 200
+   Price cells: 6 (range: 25.00 to 75.00)
+   Model: log_logistic, pseudo-R2: 0.083, AIC: 240.3
+..   Valid observations: 300 / 300
+   Price cells: 6 (range: 10.00 to 60.00)
+   Model: logistic, pseudo-R2: 0.040, AIC: 323.6
+...   Valid observations: 200 / 200
+   Price cells: 6 (range: 25.00 to 75.00)
+   Model: logistic, pseudo-R2: 0.096, AIC: 237.1
+......   Valid observations: 600 / 600
+   Price cells: 6 (range: 25.00 to 75.00)
+   Model: logistic, pseudo-R2: 0.169, AIC: 694.8
+   Calculating bootstrap confidence intervals...
+   Revenue-optimal price: $41.16 [38.75, 44.58] (95% CI)
+......   Valid observations: 200 / 200
+   Price cells: 6 (range: 25.00 to 75.00)
+   ! WARNING: Price effect not statistically significant (p > 0.05)
+     Price coefficient p-value: 0.5694
+   Model: logistic, pseudo-R2: 0.001, AIC: 280.9
+...   Valid observations: 200 / 200
+   Price cells: 6 (range: 25.00 to 75.00)
+   Model: logistic, pseudo-R2: 0.096, AIC: 237.1
+   Profit-maximizing price: $62.88
+.....
 
--
-/
-                                                                                                                
+== DONE ========================================================================
 
-/
-                                                                                                                
+--- test_optimization.R ---
+optimization: ....................W....W..............................W.........................
 
--
-                                                                                                                
+== Warnings ====================================================================
+1. find_constrained_optimal returns NA when no feasible solution ('test_optimization.R:163:3') - No price satisfies all constraints. Returning NA.
 
--
-/
-                                                                                                                
+2. find_price_for_volume returns closest when target unachievable ('test_optimization.R:192:3') - Target volume 100000 not achievable. Max volume: 9000 at price 20.00
 
-/
-                                                                                                                
+3. find_continuous_optimal returns NULL with insufficient data ('test_optimization.R:331:3') - Insufficient data points for continuous optimization
 
--
-                                                                                                                
+== DONE ========================================================================
+You rock!
+
+--- test_output_files.R ---
+output_files:    HTML Report: Starting generation...
+   HTML Report: Transforming data...
+   HTML Report: Building tables...
+   HTML Report: Building charts...
+W   HTML Report: Preparing simulator data...
+   HTML Report: Assembling page...
+   HTML Report: Writing file...
+   HTML Report: Written to file4d8c7c418da8.html (152.4 KB)
+....................................   Simulator: Building interactive dashboard...
+   Simulator: Written to file4d8c53de2de2.html (33.8 KB)
+.................   HTML Report: Starting generation...
+   HTML Report: Transforming data...
+   HTML Report: Building tables...
+   HTML Report: Building charts...
+   HTML Report: Preparing simulator data...
+   HTML Report: Assembling page...
+   HTML Report: Writing file...
+   HTML Report: Written to file4d8c3eff7bdf.html (134.9 KB)
+....   HTML Report: Starting generation...
+   HTML Report: Transforming data...
+   HTML Report: Building tables...
+   HTML Report: Building charts...
+   HTML Report: Preparing simulator data...
+   HTML Report: Assembling page...
+   HTML Report: Writing file...
+   HTML Report: Written to file4d8ce13b3df.html (141.8 KB)
+........
+
+== Warnings ====================================================================
+1. HTML report is a valid self-contained document ('test_output_files.R:57:3') - NAs introduced by coercion
+
+== DONE ========================================================================
+
+--- test_point_elasticity.R ---
+point_elasticity: .....................
+
+== DONE ========================================================================
+
+--- test_price_ladder.R ---
+price_ladder: .............
+
+== DONE ========================================================================
+
+--- test_segment_statistical.R ---
+segment_statistical: ......................................
+
+== DONE ========================================================================
+You rock!
+
+--- test_segmentation.R ---
+segmentation: 
+============================================================ 
+VAN WESTENDORP DATA VALIDATION
+============================================================ 
+
+Total respondents: 300
+Complete cases: 300 (100.0%)
+Logical responses: 270 (90.0%)
+Quality score: 80/100
+
+Validation checks:
+  [PASS] config complete
+  [PASS] columns present
+  [PASS] numeric valid
+  [PASS] sample size
+  [FAIL] logical order
+  [PASS] positive prices
+  [PASS] no extreme outliers
+  [PASS] no duplicates
+
+Issues found:
+  - High logical order violation rate: 10.0% (threshold: 10%)
+
+Recommendations:
+  Review question wording - respondents may be confused
+  Consider excluding respondents with illogical responses
+
+
+============================================================ 
+VAN WESTENDORP DATA VALIDATION
+============================================================ 
+
+Total respondents: 113
+Complete cases: 113 (100.0%)
+Logical responses: 103 (91.2%)
+Quality score: 100/100
+
+Validation checks:
+  [PASS] config complete
+  [PASS] columns present
+  [PASS] numeric valid
+  [PASS] sample size
+  [PASS] logical order
+  [PASS] positive prices
+  [PASS] no extreme outliers
+  [PASS] no duplicates
+
+
+============================================================ 
+VAN WESTENDORP DATA VALIDATION
+============================================================ 
+
+Total respondents: 80
+Complete cases: 80 (100.0%)
+Logical responses: 70 (87.5%)
+Quality score: 80/100
+
+Validation checks:
+  [PASS] config complete
+  [PASS] columns present
+  [PASS] numeric valid
+  [PASS] sample size
+  [FAIL] logical order
+  [PASS] positive prices
+  [PASS] no extreme outliers
+  [PASS] no duplicates
+
+Issues found:
+  - High logical order violation rate: 12.5% (threshold: 10%)
+
+Recommendations:
+  Review question wording - respondents may be confused
+  Consider excluding respondents with illogical responses
+
+
+============================================================ 
+VAN WESTENDORP DATA VALIDATION
+============================================================ 
+
+Total respondents: 107
+Complete cases: 107 (100.0%)
+Logical responses: 97 (90.7%)
+Quality score: 100/100
+
+Validation checks:
+  [PASS] config complete
+  [PASS] columns present
+  [PASS] numeric valid
+  [PASS] sample size
+  [PASS] logical order
+  [PASS] positive prices
+  [PASS] no extreme outliers
+  [PASS] no duplicates
+
+....
+============================================================ 
+VAN WESTENDORP DATA VALIDATION
+============================================================ 
+
+Total respondents: 300
+Complete cases: 300 (100.0%)
+Logical responses: 270 (90.0%)
+Quality score: 80/100
+
+Validation checks:
+  [PASS] config complete
+  [PASS] columns present
+  [PASS] numeric valid
+  [PASS] sample size
+  [FAIL] logical order
+  [PASS] positive prices
+  [PASS] no extreme outliers
+  [PASS] no duplicates
+
+Issues found:
+  - High logical order violation rate: 10.0% (threshold: 10%)
+
+Recommendations:
+  Review question wording - respondents may be confused
+  Consider excluding respondents with illogical responses
+
+
+============================================================ 
+VAN WESTENDORP DATA VALIDATION
+============================================================ 
+
+Total respondents: 113
+Complete cases: 113 (100.0%)
+Logical responses: 103 (91.2%)
+Quality score: 100/100
+
+Validation checks:
+  [PASS] config complete
+  [PASS] columns present
+  [PASS] numeric valid
+  [PASS] sample size
+  [PASS] logical order
+  [PASS] positive prices
+  [PASS] no extreme outliers
+  [PASS] no duplicates
+
+
+============================================================ 
+VAN WESTENDORP DATA VALIDATION
+============================================================ 
+
+Total respondents: 80
+Complete cases: 80 (100.0%)
+Logical responses: 70 (87.5%)
+Quality score: 80/100
+
+Validation checks:
+  [PASS] config complete
+  [PASS] columns present
+  [PASS] numeric valid
+  [PASS] sample size
+  [FAIL] logical order
+  [PASS] positive prices
+  [PASS] no extreme outliers
+  [PASS] no duplicates
+
+Issues found:
+  - High logical order violation rate: 12.5% (threshold: 10%)
+
+Recommendations:
+  Review question wording - respondents may be confused
+  Consider excluding respondents with illogical responses
+
+
+============================================================ 
+VAN WESTENDORP DATA VALIDATION
+============================================================ 
+
+Total respondents: 107
+Complete cases: 107 (100.0%)
+Logical responses: 97 (90.7%)
+Quality score: 100/100
+
+Validation checks:
+  [PASS] config complete
+  [PASS] columns present
+  [PASS] numeric valid
+  [PASS] sample size
+  [PASS] logical order
+  [PASS] positive prices
+  [PASS] no extreme outliers
+  [PASS] no duplicates
+
+...W
+============================================================ 
+VAN WESTENDORP DATA VALIDATION
+============================================================ 
+
+Total respondents: 100
+Complete cases: 100 (100.0%)
+Logical responses: 90 (90.0%)
+Quality score: 80/100
+
+Validation checks:
+  [PASS] config complete
+  [PASS] columns present
+  [PASS] numeric valid
+  [PASS] sample size
+  [FAIL] logical order
+  [PASS] positive prices
+  [PASS] no extreme outliers
+  [PASS] no duplicates
+
+Issues found:
+  - High logical order violation rate: 10.0% (threshold: 10%)
+
+Recommendations:
+  Review question wording - respondents may be confused
+  Consider excluding respondents with illogical responses
+
+
+============================================================ 
+VAN WESTENDORP DATA VALIDATION
+============================================================ 
+
+Total respondents: 90
+Complete cases: 90 (100.0%)
+Logical responses: 81 (90.0%)
+Quality score: 80/100
+
+Validation checks:
+  [PASS] config complete
+  [PASS] columns present
+  [PASS] numeric valid
+  [PASS] sample size
+  [FAIL] logical order
+  [PASS] positive prices
+  [PASS] no extreme outliers
+  [PASS] no duplicates
+
+Issues found:
+  - High logical order violation rate: 10.0% (threshold: 10%)
+
+Recommendations:
+  Review question wording - respondents may be confused
+  Consider excluding respondents with illogical responses
+
+....
+
+== Warnings ====================================================================
+1. run_segmented_analysis skips small segments ('test_segmentation.R:98:3') - Skipping segments with n < 30: Small
+
+== DONE ========================================================================
+
+--- test_simulator.R ---
+simulator: .................................   Simulator: Building interactive dashboard...
+   Simulator: Written to file4d8c419f4228.html (33.8 KB)
+............   Simulator: Building interactive dashboard...
+   Simulator: Written to file4d8c2b8987ac.html (33.8 KB)
+.......   Simulator: Building interactive dashboard...
+   ! Simulator: No demand curve data available
+..
+
+== DONE ========================================================================
+
+--- test_synthesis.R ---
+synthesis: ......................
+
+== DONE ========================================================================
+
+--- test_validation.R ---
+validation: ..................................
+
+== DONE ========================================================================
+
+--- test_van_westendorp.R ---
+van_westendorp: .....WWWW...
+============================================================ 
+VAN WESTENDORP DATA VALIDATION
+============================================================ 
+
+Total respondents: 200
+Complete cases: 200 (100.0%)
+Logical responses: 180 (90.0%)
+Quality score: 80/100
+
+Validation checks:
+  [PASS] config complete
+  [PASS] columns present
+  [PASS] numeric valid
+  [PASS] sample size
+  [FAIL] logical order
+  [PASS] positive prices
+  [PASS] no extreme outliers
+  [PASS] no duplicates
+
+Issues found:
+  - High logical order violation rate: 10.0% (threshold: 10%)
+
+Recommendations:
+  Review question wording - respondents may be confused
+  Consider excluding respondents with illogical responses
+
+.......
+============================================================ 
+VAN WESTENDORP DATA VALIDATION
+============================================================ 
+
+Total respondents: 200
+Complete cases: 200 (100.0%)
+Logical responses: 180 (90.0%)
+Quality score: 80/100
+
+Validation checks:
+  [PASS] config complete
+  [PASS] columns present
+  [PASS] numeric valid
+  [PASS] sample size
+  [FAIL] logical order
+  [PASS] positive prices
+  [PASS] no extreme outliers
+  [PASS] no duplicates
+
+Issues found:
+  - High logical order violation rate: 10.0% (threshold: 10%)
+
+Recommendations:
+  Review question wording - respondents may be confused
+  Consider excluding respondents with illogical responses
+
 ...
--
-/
-                                                                                                                
+============================================================ 
+VAN WESTENDORP DATA VALIDATION
+============================================================ 
 
-/
-                                                                                                                
+Total respondents: 200
+Complete cases: 200 (100.0%)
+Logical responses: 180 (90.0%)
+Quality score: 80/100
 
--
-                                                                                                                
+Validation checks:
+  [PASS] config complete
+  [PASS] columns present
+  [PASS] numeric valid
+  [PASS] sample size
+  [FAIL] logical order
+  [PASS] positive prices
+  [PASS] no extreme outliers
+  [PASS] no duplicates
 
--
-/
-                                                                                                                
+Issues found:
+  - High logical order violation rate: 10.0% (threshold: 10%)
 
-/
-                                                                                                                
+Recommendations:
+  Review question wording - respondents may be confused
+  Consider excluding respondents with illogical responses
 
--
-                                                                                                                
+....
+============================================================ 
+VAN WESTENDORP DATA VALIDATION
+============================================================ 
 
--
-/
-                                                                                                                
+Total respondents: 200
+Complete cases: 200 (100.0%)
+Logical responses: 180 (90.0%)
+Quality score: 80/100
 
-/
-                                                                                                                
+Validation checks:
+  [PASS] config complete
+  [PASS] columns present
+  [PASS] numeric valid
+  [PASS] sample size
+  [FAIL] logical order
+  [PASS] positive prices
+  [PASS] no extreme outliers
+  [PASS] no duplicates
 
--
-                                                                                                                
+Issues found:
+  - High logical order violation rate: 10.0% (threshold: 10%)
+
+Recommendations:
+  Review question wording - respondents may be confused
+  Consider excluding respondents with illogical responses
+
+...
+============================================================ 
+VAN WESTENDORP DATA VALIDATION
+============================================================ 
+
+Total respondents: 200
+Complete cases: 200 (100.0%)
+Logical responses: 180 (90.0%)
+Quality score: 80/100
+
+Validation checks:
+  [PASS] config complete
+  [PASS] columns present
+  [PASS] numeric valid
+  [PASS] sample size
+  [FAIL] logical order
+  [PASS] positive prices
+  [PASS] no extreme outliers
+  [PASS] no duplicates
+
+Issues found:
+  - High logical order violation rate: 10.0% (threshold: 10%)
+
+Recommendations:
+  Review question wording - respondents may be confused
+  Consider excluding respondents with illogical responses
+
+.WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW.
+============================================================ 
+VAN WESTENDORP DATA VALIDATION
+============================================================ 
+
+Total respondents: 30
+Complete cases: 30 (100.0%)
+Logical responses: 27 (90.0%)
+Quality score: 80/100
+
+Validation checks:
+  [PASS] config complete
+  [PASS] columns present
+  [PASS] numeric valid
+  [PASS] sample size
+  [FAIL] logical order
+  [PASS] positive prices
+  [PASS] no extreme outliers
+  [PASS] no duplicates
+
+Issues found:
+  - High logical order violation rate: 10.0% (threshold: 10%)
+
+Recommendations:
+  Review question wording - respondents may be confused
+  Consider excluding respondents with illogical responses
+
+.
+============================================================ 
+VAN WESTENDORP DATA VALIDATION
+============================================================ 
+
+Total respondents: 200
+Complete cases: 140 (70.0%)
+Logical responses: 128 (91.4%)
+Quality score: 100/100
+
+Validation checks:
+  [PASS] config complete
+  [PASS] columns present
+  [PASS] numeric valid
+  [PASS] sample size
+  [PASS] logical order
+  [PASS] positive prices
+  [PASS] no extreme outliers
+  [PASS] no duplicates
+
+..
+============================================================ 
+VAN WESTENDORP DATA VALIDATION
+============================================================ 
+
+Total respondents: 300
+Complete cases: 300 (100.0%)
+Logical responses: 270 (90.0%)
+Quality score: 80/100
+
+Validation checks:
+  [PASS] config complete
+  [PASS] columns present
+  [PASS] numeric valid
+  [PASS] sample size
+  [FAIL] logical order
+  [PASS] positive prices
+  [PASS] no extreme outliers
+  [PASS] no duplicates
+
+Issues found:
+  - High logical order violation rate: 10.0% (threshold: 10%)
+
+Recommendations:
+  Review question wording - respondents may be confused
+  Consider excluding respondents with illogical responses
+
+.....
+
+== Warnings ====================================================================
+1. validate_vw_data catches non-numeric columns ('test_van_westendorp.R:51:3') - NAs introduced by coercion
+
+2. validate_vw_data catches non-numeric columns ('test_van_westendorp.R:51:3') - NAs introduced by coercion
+
+3. validate_vw_data catches non-numeric columns ('test_van_westendorp.R:51:3') - NAs introduced by coercion
+
+4. validate_vw_data catches non-numeric columns ('test_van_westendorp.R:51:3') - NAs introduced by coercion
+
+5. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+6. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+7. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+8. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+9. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+10. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+11. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+12. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+13. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+14. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+15. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+16. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+17. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+18. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+19. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+20. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+21. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+22. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+23. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+24. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+25. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+26. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+27. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+28. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+29. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+30. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+31. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+32. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+33. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+34. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+35. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+36. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+37. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+38. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+39. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+40. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+41. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+42. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+43. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+44. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+45. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+46. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+47. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+48. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+49. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+50. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+51. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+52. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+53. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+54. bootstrap_vw_confidence returns CIs ('test_van_westendorp.R:170:3') - Some respondents have inconsistent price structures. Consider using 'validate = TRUE' to analyze only consistent cases.
+
+== DONE ========================================================================
+
+--- test_visualization.R ---
+visualization: .........WWW.
+
+== Warnings ====================================================================
+1. plot_revenue_vs_profit handles missing profit data ('test_visualization.R:192:3') - no non-missing arguments to max; returning -Inf
+
+2. plot_revenue_vs_profit handles missing profit data ('test_visualization.R:192:3') - no non-missing arguments to max; returning -Inf
+
+3. plot_revenue_vs_profit handles missing profit data ('test_visualization.R:192:3') - no non-missing arguments to max; returning -Inf
+
+== DONE ========================================================================
+
+--- test_wtp_distribution.R ---
+wtp_distribution: ...............................................
+
+== DONE ========================================================================
+
+
+[PASS] Pricing — 813 passed, 0 failed, 0 skipped (75.4s)
+
+--------------------------------------------------------------------------------
+MODULE: Segment (21 test files)
+Path:   /Users/duncan/Documents/Turas/modules/segment/tests/testthat
+--------------------------------------------------------------------------------
+
+--- test_cards.R ---
+[SEGMENT] HTML report pipeline loaded
+cards: 
+================================================================================
+GENERATING SEGMENT ACTION CARDS
+================================================================================
+
+✓ Generated 3 segment action cards
+
+....
+================================================================================
+GENERATING SEGMENT ACTION CARDS
+================================================================================
+
+✓ Generated 2 segment action cards
+
+..
+================================================================================
+GENERATING SEGMENT ACTION CARDS
+================================================================================
+
+✓ Generated 2 segment action cards
+
+.....
+================================================================================
+GENERATING SEGMENT ACTION CARDS
+================================================================================
+
+✓ Generated 2 segment action cards
+
+.
+
+== DONE ========================================================================
+Woot!
+
+--- test_clustering.R ---
+[SEGMENT] HTML report pipeline loaded
+clustering: 
+  Clustering method: KMEANS
+........
+  Clustering method: HCLUST
+    Linkage method: ward.D2
+    Computing distance matrix (100 x 100)...
+    Fitting hierarchical model...
+.......................
+  Exploration mode: testing k = 2 to 4 (KMEANS)
+    Testing k = 2 ... 
+  Clustering method: KMEANS
+OK (sizes: 131, 69)
+    Testing k = 3 ... 
+  Clustering method: KMEANS
+OK (sizes: 68, 66, 66)
+    Testing k = 4 ... 
+  Clustering method: KMEANS
+OK (sizes: 68, 66, 39, 27)
+...............
+  Exploration mode: testing k = 2 to 3 (HCLUST)
+    Testing k = 2 ... 
+  Clustering method: HCLUST
+    Linkage method: ward.D2
+    Computing distance matrix (100 x 100)...
+    Fitting hierarchical model...
+OK (sizes: 50, 50)
+    Testing k = 3 ... 
+  Clustering method: HCLUST
+    Linkage method: ward.D2
+    Computing distance matrix (100 x 100)...
+    Fitting hierarchical model...
+OK (sizes: 50, 25, 25)
+..
+
+== DONE ========================================================================
+
+--- test_config_template.R ---
+[SEGMENT] HTML report pipeline loaded
+config_template: Generating segmentation config template...
+   Writing: test_config_template.xlsx
+[TRS INFO] SEGMENT: Saved: test_config_template.xlsx (18,884 bytes)
+Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/test_config_template.xlsx
+  Parameters: 50
+  Sheets: Config, Labels, Insights, About, Slides
+  Includes: descriptions, default values, data validation dropdowns
+............Generating segmentation config template...
+   Writing: test_config_cats.xlsx
+[TRS INFO] SEGMENT: Saved: test_config_cats.xlsx (18,884 bytes)
+Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/test_config_cats.xlsx
+  Parameters: 50
+  Sheets: Config, Labels, Insights, About, Slides
+  Includes: descriptions, default values, data validation dropdowns
+....................   Writing: test_branded_output.xlsx
+[TRS INFO] SEGMENT: Saved: test_branded_output.xlsx (8,426 bytes)
+......
+
+== DONE ========================================================================
+
+--- test_edge_cases.R ---
+[SEGMENT] HTML report pipeline loaded
+edge_cases: 
+  Clustering method: KMEANS
+...
+  Clustering method: KMEANS
+..
+  Clustering method: KMEANS
+.............
+  Exploration mode: testing k = 3 to 3 (KMEANS)
+    Testing k = 3 ... 
+  Clustering method: KMEANS
+OK (sizes: 25, 22, 13)
 ....
 
-══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+== DONE ========================================================================
+
+--- test_ensemble.R ---
+[SEGMENT] HTML report pipeline loaded
+ensemble: ................................................................
+
+== DONE ========================================================================
+
+--- test_executive_summary.R ---
+[SEGMENT] HTML report pipeline loaded
+executive_summary: ................................................
+
+== DONE ========================================================================
+
+--- test_gmm.R ---
+[SEGMENT] HTML report pipeline loaded
+gmm:     Fitting GMM with k = 3...
+    Model type: EII
+    BIC: -982.0
+    Borderline cases (uncertainty > 30%): 0 (0.0%)
+......    Fitting GMM with k = 3...
+    Model type: EII
+    BIC: -982.0
+    Borderline cases (uncertainty > 30%): 0 (0.0%)
+.    Fitting GMM with k = 3...
+    Model type: EII
+    BIC: -982.0
+    Borderline cases (uncertainty > 30%): 0 (0.0%)
+...    Fitting GMM with k = 3...
+    Model type: EII
+    BIC: -982.0
+    Borderline cases (uncertainty > 30%): 0 (0.0%)
+.    Fitting GMM with k = 3...
+    Model type: EII
+    BIC: -982.0
+    Borderline cases (uncertainty > 30%): 0 (0.0%)
+....    Fitting GMM with k = 3...
+    Model type: EII
+    BIC: -982.0
+    Borderline cases (uncertainty > 30%): 0 (0.0%)
+..........    Fitting GMM with k = 3...
+    Model type: EII
+    BIC: -982.0
+    Borderline cases (uncertainty > 30%): 0 (0.0%)
+..    Fitting GMM with k = 3...
+    Model type: EII
+    BIC: -982.0
+    Borderline cases (uncertainty > 30%): 0 (0.0%)
+....    Fitting GMM with k = 3...
+    Model type: EII
+    BIC: -982.0
+    Borderline cases (uncertainty > 30%): 0 (0.0%)
+..    Fitting GMM with k = 3...
+    Model type: EII
+    BIC: -982.0
+    Borderline cases (uncertainty > 30%): 0 (0.0%)
+........    Fitting GMM with k = 3...
+    Model type: EII
+    BIC: -982.0
+    Borderline cases (uncertainty > 30%): 0 (0.0%)
+..
+
+== DONE ========================================================================
+
+--- test_guard.R ---
+[SEGMENT] HTML report pipeline loaded
+guard: .............................................................................
+
+== DONE ========================================================================
+
+--- test_guards_hard.R ---
+[SEGMENT] HTML report pipeline loaded
+guards_hard: ............................
+
+== DONE ========================================================================
+
+--- test_guards_soft.R ---
+[SEGMENT] HTML report pipeline loaded
+guards_soft: ........................................
+
+== DONE ========================================================================
+
+--- test_hclust.R ---
+[SEGMENT] HTML report pipeline loaded
+hclust:     Linkage method: ward.D2
+    Computing distance matrix (100 x 100)...
+    Fitting hierarchical model...
+......    Linkage method: ward.D2
+    Computing distance matrix (100 x 100)...
+    Fitting hierarchical model...
+.    Linkage method: ward.D2
+    Computing distance matrix (100 x 100)...
+    Fitting hierarchical model...
+.....    Linkage method: ward.D2
+    Computing distance matrix (100 x 100)...
+    Fitting hierarchical model...
+..    Linkage method: ward.D2
+    Computing distance matrix (100 x 100)...
+    Fitting hierarchical model...
+..................    Linkage method: complete
+    Computing distance matrix (100 x 100)...
+    Fitting hierarchical model...
+..    Linkage method: average
+    Computing distance matrix (100 x 100)...
+    Fitting hierarchical model...
+..    Linkage method: ward.D2
+    Computing distance matrix (100 x 100)...
+    Fitting hierarchical model...
+..    Linkage method: ward.D2
+    Computing distance matrix (100 x 100)...
+    Fitting hierarchical model...
+..
+
+== DONE ========================================================================
+
+--- test_html_report.R ---
+[SEGMENT] HTML report pipeline loaded
+html_report: 
+  Clustering method: KMEANS
+
+================================================================================ 
+SEGMENT PROFILING
+================================================================================ 
+
+Segment sizes:
+  Segment 1:   36 ( 36.0%)
+  Segment 2:   33 ( 33.0%)
+  Segment 3:   31 ( 31.0%)
+
+Profiling clustering variables...
+Profiling 3 additional variables...
+
+✓ Profiling complete
+  Clustering variables significantly different: 5/5
+------------------------------------------------------------ 
+  SEGMENT HTML REPORT GENERATION
+------------------------------------------------------------ 
+  Step 1: Validating inputs...
+  Step 2: Transforming data...
+  Step 3: Building tables...
+    Built 3 tables
+  Step 4: Building charts...
+    Built 7 charts
+  Step 5: Assembling HTML page...
+  Step 6: Writing HTML file...
+    HTML report written: file4d8c10230b06.html (0.18 MB)
+------------------------------------------------------------ 
+  HTML report complete (PASS, 1.5s)
+------------------------------------------------------------ 
+....
+  Clustering method: KMEANS
+
+================================================================================ 
+SEGMENT PROFILING
+================================================================================ 
+
+Segment sizes:
+  Segment 1:   36 ( 36.0%)
+  Segment 2:   33 ( 33.0%)
+  Segment 3:   31 ( 31.0%)
+
+Profiling clustering variables...
+Profiling 3 additional variables...
+
+✓ Profiling complete
+  Clustering variables significantly different: 5/5
+------------------------------------------------------------ 
+  SEGMENT HTML REPORT GENERATION
+------------------------------------------------------------ 
+  Step 1: Validating inputs...
+  Step 2: Transforming data...
+  Step 3: Building tables...
+    Built 3 tables
+  Step 4: Building charts...
+    Built 7 charts
+  Step 5: Assembling HTML page...
+  Step 6: Writing HTML file...
+    HTML report written: file4d8c2dda3076.html (0.18 MB)
+------------------------------------------------------------ 
+  HTML report complete (PASS, 0.2s)
+------------------------------------------------------------ 
+...
+  Clustering method: KMEANS
+
+================================================================================ 
+SEGMENT PROFILING
+================================================================================ 
+
+Segment sizes:
+  Segment 1:   36 ( 36.0%)
+  Segment 2:   33 ( 33.0%)
+  Segment 3:   31 ( 31.0%)
+
+Profiling clustering variables...
+Profiling 3 additional variables...
+
+✓ Profiling complete
+  Clustering variables significantly different: 5/5
+------------------------------------------------------------ 
+  SEGMENT HTML REPORT GENERATION
+------------------------------------------------------------ 
+  Step 1: Validating inputs...
+  Step 2: Transforming data...
+  Step 3: Building tables...
+    Built 3 tables
+  Step 4: Building charts...
+    Built 7 charts
+  Step 5: Assembling HTML page...
+  Step 6: Writing HTML file...
+    HTML report written: file4d8c52280e97.html (0.18 MB)
+------------------------------------------------------------ 
+  HTML report complete (PASS, 0.1s)
+------------------------------------------------------------ 
+......
+  Clustering method: HCLUST
+    Linkage method: ward.D2
+    Computing distance matrix (100 x 100)...
+    Fitting hierarchical model...
+
+================================================================================ 
+SEGMENT PROFILING
+================================================================================ 
+
+Segment sizes:
+  Segment 1:   32 ( 32.0%)
+  Segment 2:   36 ( 36.0%)
+  Segment 3:   32 ( 32.0%)
+
+Profiling clustering variables...
+Profiling 3 additional variables...
+
+✓ Profiling complete
+  Clustering variables significantly different: 5/5
+------------------------------------------------------------ 
+  SEGMENT HTML REPORT GENERATION
+------------------------------------------------------------ 
+  Step 1: Validating inputs...
+  Step 2: Transforming data...
+  Step 3: Building tables...
+    Built 3 tables
+  Step 4: Building charts...
+    Built 7 charts
+  Step 5: Assembling HTML page...
+  Step 6: Writing HTML file...
+    HTML report written: file4d8c560e81ab.html (0.19 MB)
+------------------------------------------------------------ 
+  HTML report complete (PASS, 0.1s)
+------------------------------------------------------------ 
+...
+  Clustering method: KMEANS
+
+================================================================================ 
+SEGMENT PROFILING
+================================================================================ 
+
+Segment sizes:
+  Segment 1:   36 ( 36.0%)
+  Segment 2:   33 ( 33.0%)
+  Segment 3:   31 ( 31.0%)
+
+Profiling clustering variables...
+Profiling 3 additional variables...
+
+✓ Profiling complete
+  Clustering variables significantly different: 5/5
+------------------------------------------------------------ 
+  SEGMENT HTML REPORT GENERATION
+------------------------------------------------------------ 
+  Step 1: Validating inputs...
+  Step 2: Transforming data...
+  Step 3: Building tables...
+    Built 3 tables
+  Step 4: Building charts...
+    Built 7 charts
+  Step 5: Assembling HTML page...
+  Step 6: Writing HTML file...
+    HTML report written: file4d8c368dacf6.html (0.18 MB)
+------------------------------------------------------------ 
+  HTML report complete (PASS, 0.2s)
+------------------------------------------------------------ 
+...
+  Clustering method: KMEANS
+
+================================================================================ 
+SEGMENT PROFILING
+================================================================================ 
+
+Segment sizes:
+  Segment 1:   36 ( 36.0%)
+  Segment 2:   33 ( 33.0%)
+  Segment 3:   31 ( 31.0%)
+
+Profiling clustering variables...
+Profiling 3 additional variables...
+
+✓ Profiling complete
+  Clustering variables significantly different: 5/5
+------------------------------------------------------------ 
+  SEGMENT HTML REPORT GENERATION
+------------------------------------------------------------ 
+  Step 1: Validating inputs...
+  Step 2: Transforming data...
+  Step 3: Building tables...
+    Built 3 tables
+  Step 4: Building charts...
+    Built 7 charts
+  Step 5: Assembling HTML page...
+  Step 6: Writing HTML file...
+    HTML report written: file4d8c406643b2.html (0.18 MB)
+------------------------------------------------------------ 
+  HTML report complete (PASS, 0.1s)
+------------------------------------------------------------ 
+...
+  Clustering method: KMEANS
+
+================================================================================ 
+SEGMENT PROFILING
+================================================================================ 
+
+Segment sizes:
+  Segment 1:   36 ( 36.0%)
+  Segment 2:   33 ( 33.0%)
+  Segment 3:   31 ( 31.0%)
+
+Profiling clustering variables...
+Profiling 3 additional variables...
+
+✓ Profiling complete
+  Clustering variables significantly different: 5/5
+------------------------------------------------------------ 
+  SEGMENT HTML REPORT GENERATION
+------------------------------------------------------------ 
+  Step 1: Validating inputs...
+  Step 2: Transforming data...
+  Step 3: Building tables...
+    Built 3 tables
+  Step 4: Building charts...
+    Built 7 charts
+  Step 5: Assembling HTML page...
+  Step 6: Writing HTML file...
+    HTML report written: file4d8c5ae674fd.html (0.18 MB)
+------------------------------------------------------------ 
+  HTML report complete (PASS, 0.1s)
+------------------------------------------------------------ 
+..
+  Clustering method: KMEANS
+
+================================================================================ 
+SEGMENT PROFILING
+================================================================================ 
+
+Segment sizes:
+  Segment 1:   36 ( 36.0%)
+  Segment 2:   33 ( 33.0%)
+  Segment 3:   31 ( 31.0%)
+
+Profiling clustering variables...
+Profiling 3 additional variables...
+
+✓ Profiling complete
+  Clustering variables significantly different: 5/5
+------------------------------------------------------------ 
+  SEGMENT HTML REPORT GENERATION
+------------------------------------------------------------ 
+  Step 1: Validating inputs...
+  Step 2: Transforming data...
+  Step 3: Building tables...
+    Built 3 tables
+  Step 4: Building charts...
+    Built 7 charts
+  Step 5: Assembling HTML page...
+  Step 6: Writing HTML file...
+    HTML report written: file4d8c428ecb65.html (0.18 MB)
+------------------------------------------------------------ 
+  HTML report complete (PASS, 0.1s)
+------------------------------------------------------------ 
+..
+
+== DONE ========================================================================
+
+--- test_integration.R ---
+[SEGMENT] HTML report pipeline loaded
+integration: ..
+================================================================================ 
+SEGMENT PROFILING
+================================================================================ 
+
+Segment sizes:
+  Segment 1:   28 ( 30.8%)
+  Segment 2:   32 ( 35.2%)
+  Segment 3:   31 ( 34.1%)
+
+Profiling clustering variables...
+Profiling 3 additional variables...
+
+✓ Profiling complete
+  Clustering variables significantly different: 5/5
+...  Exporting segment assignments: test_assignments.xlsx
+   Writing: test_assignments.xlsx
+[TRS INFO] SEGMENT: Saved: test_assignments.xlsx (10,011 bytes)
+  Exported 91 segment assignments (with Segment_Names sheet)
+......................................  Exporting segment assignments: segment_assignments.xlsx
+   Writing: segment_assignments.xlsx
+[TRS INFO] SEGMENT: Saved: segment_assignments.xlsx (10,163 bytes)
+  Exported 100 segment assignments (with Segment_Names sheet)
+...........
+================================================================================ 
+SEGMENT PROFILING
+================================================================================ 
+
+Segment sizes:
+  Segment 1:   50 ( 50.0%)
+  Segment 2:   50 ( 50.0%)
+
+Profiling clustering variables...
+
+✓ Profiling complete
+  Clustering variables significantly different: 5/5
+...
+
+== DONE ========================================================================
+Your tests are astounding!
+
+--- test_lca.R ---
+[SEGMENT] HTML report pipeline loaded
+lca: .........................................
+
+== DONE ========================================================================
+
+--- test_output.R ---
+[SEGMENT] HTML report pipeline loaded
+output:   Exporting segment assignments: test_assignments.xlsx
+   Writing: test_assignments.xlsx
+[TRS INFO] SEGMENT: Saved: test_assignments.xlsx (9,378 bytes)
+  Exported 50 segment assignments (with Segment_Names sheet)
+.  Exporting segment assignments: test_assignments_cols.xlsx
+   Writing: test_assignments_cols.xlsx
+[TRS INFO] SEGMENT: Saved: test_assignments_cols.xlsx (9,378 bytes)
+  Exported 50 segment assignments (with Segment_Names sheet)
+...  Exporting segment assignments: test_assignments_rows.xlsx
+   Writing: test_assignments_rows.xlsx
+[TRS INFO] SEGMENT: Saved: test_assignments_rows.xlsx (9,378 bytes)
+  Exported 50 segment assignments (with Segment_Names sheet)
+.  Exporting segment assignments: test_assignments_probs.xlsx
+   Writing: test_assignments_probs.xlsx
+[TRS INFO] SEGMENT: Saved: test_assignments_probs.xlsx (12,386 bytes)
+  Exported 50 segment assignments (with Segment_Names sheet)
+....Created output folder: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/test_output_folder_creation
+..Created output folder: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/test_output_dated_folder/2026-03-24
+...  Exporting segment assignments: test_assignments_outliers.xlsx
+   Writing: test_assignments_outliers.xlsx
+[TRS INFO] SEGMENT: Saved: test_assignments_outliers.xlsx (9,548 bytes)
+  Exported 50 segment assignments (with Segment_Names sheet)
+..Created output folder: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/test_output_idempotent
+...........................   Writing: file4d8c1bde8558.xlsx
+[TRS INFO] SEGMENT: Saved: file4d8c1bde8558.xlsx (6,366 bytes)
+..
+
+== DONE ========================================================================
+
+--- test_preflight.R ---
+[SEGMENT] HTML report pipeline loaded
+preflight: .....................................................................  Running preflight validation...
+  Preflight: PASS (all checks clear)
+..  Running preflight validation...
+  Preflight: 7 ERROR(s), 0 warning(s)
+
+  ┌─── PREFLIGHT ERRORS ──────────────────────────────────┐
+  │ [Missing Data File] No 'data_file' parameter found in configuration. A data file is required.
+  │ [Invalid K Fixed] Final mode requires k_fixed >= 2, got: 1
+  │ [No Output Directory] No 'output_folder' specified in configuration.
+  │ [Missing Clustering Variables] 1 clustering variable(s) not found in data: q_missing
+  │ [Non-Numeric Clustering Variables] 1 clustering variable(s) are not numeric: q_text. K-means and distance-based clustering require numeric variables.
+  │ [Duplicate IDs] 1 duplicate value(s) in ID variable 'resp_id'. Each respondent must have a unique ID.
+  │ [Insufficient Sample Size] Dataset has 20 rows but 1-cluster solution with 3 variables requires at least 100. Consider reducing k or variables.
+  └────────────────────────────────────────────────────────┘
+
+.  Running preflight validation...
+  Preflight: PASS (all checks clear)
+..  Running preflight validation...
+  Preflight: PASS (all checks clear)
+.
+
+== DONE ========================================================================
+
+--- test_profiling.R ---
+[SEGMENT] HTML report pipeline loaded
+profiling: ..........
+================================================================================ 
+SEGMENT PROFILING
+================================================================================ 
+
+Segment sizes:
+  Segment 1:   50 ( 50.0%)
+  Segment 2:   50 ( 50.0%)
+
+Profiling clustering variables...
+
+✓ Profiling complete
+  Clustering variables significantly different: 4/4
+........
+================================================================================
+AUTO-GENERATING SEGMENT NAMES
+================================================================================
+
+Generated segment names:
+  Segment 1: Satisfied (50%)
+  Segment 2: Dissatisfied (50%)
+
+..
+================================================================================
+DEMOGRAPHIC PROFILING
+================================================================================
+
+Profiling 2 categorical and 0 numeric demographics...
+
+Analyzing: gender
+    Not significant (p = 0.086)
+Analyzing: age
+  ✓ Significant difference (p < 0.05)
+
+================================================================================
+DEMOGRAPHIC PROFILE SUMMARY
+================================================================================
+
+Categorical variables with significant segment differences: 1/2
+  Significant: age
+
+...
+
+== DONE ========================================================================
+
+--- test_scoring.R ---
+[SEGMENT] HTML report pipeline loaded
+scoring: ................................................
+
+== DONE ========================================================================
+
+--- test_utilities.R ---
+[SEGMENT] HTML report pipeline loaded
+utilities: ........................................WS................................................
+
+== Skipped =====================================================================
+1. validate_input_data detects non-numeric variables ('test_utilities.R:173:5') - Reason: validate_input_data errors on non-numeric variance check - source code issue
+
+== Warnings ====================================================================
+1. validate_input_data detects non-numeric variables ('test_utilities.R:157:5') - NAs introduced by coercion
+
+== DONE ========================================================================
+
+--- test_validation.R ---
+[SEGMENT] HTML report pipeline loaded
+validation: ................................  [SEGMENT WARNING] No k values meet minimum segment size requirement
+..
+================================================================================
+SEGMENT SEPARATION METRICS
+================================================================================
+
+Calinski-Harabasz Index: 1282.61
+  Higher is better. Typical range: 10-1000+
+
+Davies-Bouldin Index: 0.30
+  Lower is better. Good segmentation: < 1.0
+
+........
+
+== DONE ========================================================================
+
+--- test_vulnerability.R ---
+[SEGMENT] HTML report pipeline loaded
+vulnerability: [INFO] Vulnerability analysis complete: 86.0% vulnerable (threshold=0.30), avg confidence=0.139
+.......[INFO] Vulnerability analysis complete: 97.0% vulnerable (threshold=0.30), avg confidence=0.073
+...........[INFO] Vulnerability analysis: 1 rows with NA removed (4 remain).
+[INFO] Vulnerability analysis complete: 0.0% vulnerable (threshold=0.30), avg confidence=0.658
+..[INFO] Vulnerability analysis complete: 0.0% vulnerable (threshold=0.30), avg confidence=0.700
+...
+
+== DONE ========================================================================
+
+
+[PASS] Segment — 928 passed, 0 failed, 1 skipped (20.5s)
+
+--------------------------------------------------------------------------------
+MODULE: Tabs (20 test files)
+Path:   /Users/duncan/Documents/Turas/modules/tabs/tests/testthat
+--------------------------------------------------------------------------------
+
+--- test_banner.R ---
+banner: 
+generate_excel_letters: .........
+get_banner_label: ....
+create_banner_structure: ......
+process_standard_banner: ......
+validate_banner_structure: .
+<U+250C><U+2500><U+2500><U+2500> TURAS TABS ERROR <U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2510>
+<U+2502> Code:     DATA_LENGTH_MISMATCH 
+<U+2502> Title:    Banner Structure Length Mismatch 
+<U+2502> Problem:  Banner structure: internal_keys length doesn't match columns length. 
+<U+2502> Fix:      This is an internal error - check banner creation logic 
+<U+2514><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2518>
+
+.
+create_banner_row_indices: ...
+calculate_banner_bases: ..........
+get_column_weights: ..
+create_total_only_banner: ....
+
+== DONE ========================================================================
+
+--- test_bugfixes_v10_8.R ---
+bugfixes_v10_8: 
+Bug Fix #1: weighted_z_test <U+2014> floating-point tolerance: ....  [WARNING] Count exceeds base (count1=55.0, base1=50.0, count2=30.0, base2=100.0); skipping z-test.
+  This may indicate duplicated rows or upstream data errors.
+....  [WARNING] Negative count or base values detected; skipping z-test.
+...
+Bug Fix #2-3: Bessel-corrected weighted variance: .....
+Bug Fix #4: ranking_crosstabs <U+2014> tryCatch return value pattern: ..........
+<U+250C><U+2500><U+2500><U+2500> TURAS TABS ERROR <U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2510>
+<U+2502> Code:     CFG_ARG_INVALID_TYPE 
+<U+2502> Title:    Invalid Argument Type: ranking_matrix 
+<U+2502> Problem:  The ranking_matrix argument must be a matrix or data.frame. 
+<U+2502> Fix:      Provide a matrix or data.frame object for ranking_matrix 
+<U+2514><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2518>
+
+.
+<U+250C><U+2500><U+2500><U+2500> TURAS TABS ERROR <U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2510>
+<U+2502> Code:     CFG_ARG_INVALID_TYPE 
+<U+2502> Title:    Invalid Argument Type: item_name 
+<U+2502> Problem:  The item_name argument must be a single character string, got: numeric 
+<U+2502> Fix:      Provide a single character string for item_name matching a column in ranking_matrix 
+<U+2514><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2518>
+
+.
+Bug Fix #5: composite sig_letters <U+2014> key_to_letter lookup: ....
+Bug Fix #6: ranking tie-breaking <U+2014> equal means return NA: .....
+Bug Fix #7: BannerLabel takes priority over QuestionText: .....
+weighted_z_test_proportions <U+2014> parameter validation: 
+<U+250C><U+2500><U+2500><U+2500> TURAS TABS ERROR <U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2510>
+<U+2502> Code:     CFG_ARG_INVALID_VALUE 
+<U+2502> Title:    Invalid Alpha Parameter 
+<U+2502> Problem:  alpha must be a single numeric value between 0 and 1. 
+<U+2502> Fix:      Set alpha to a value between 0 and 1 (typically 0.05 or 0.01) 
+<U+2514><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2518>
+
+.
+<U+250C><U+2500><U+2500><U+2500> TURAS TABS ERROR <U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2510>
+<U+2502> Code:     CFG_ARG_INVALID_VALUE 
+<U+2502> Title:    Invalid Alpha Parameter 
+<U+2502> Problem:  alpha must be a single numeric value between 0 and 1. 
+<U+2502> Fix:      Set alpha to a value between 0 and 1 (typically 0.05 or 0.01) 
+<U+2514><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2518>
+
+.
+<U+250C><U+2500><U+2500><U+2500> TURAS TABS ERROR <U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2510>
+<U+2502> Code:     CFG_ARG_INVALID_VALUE 
+<U+2502> Title:    Invalid Alpha Parameter 
+<U+2502> Problem:  alpha must be a single numeric value between 0 and 1. 
+<U+2502> Fix:      Set alpha to a value between 0 and 1 (typically 0.05 or 0.01) 
+<U+2514><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2518>
+
+.
+<U+250C><U+2500><U+2500><U+2500> TURAS TABS ERROR <U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2510>
+<U+2502> Code:     CFG_ARG_INVALID_VALUE 
+<U+2502> Title:    Invalid min_base Parameter 
+<U+2502> Problem:  min_base must be a single numeric value >= 1. 
+<U+2502> Fix:      Set min_base to a positive integer (typically 30 or more) 
+<U+2514><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2518>
+
+.
+<U+250C><U+2500><U+2500><U+2500> TURAS TABS ERROR <U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2510>
+<U+2502> Code:     CFG_ARG_INVALID_VALUE 
+<U+2502> Title:    Invalid min_base Parameter 
+<U+2502> Problem:  min_base must be a single numeric value >= 1. 
+<U+2502> Fix:      Set min_base to a positive integer (typically 30 or more) 
+<U+2514><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2518>
+
+.  [WARNING] Weighted data requires effective-n for valid significance testing. Test skipped.
+.........
+
+== DONE ========================================================================
+
+--- test_calculations.R ---
+calculations: [OK] Turas>Tabs cell_calculator module loaded
+calculate_rating_mean: .....................
+Cell count and percentage calculations: ............
+Significance testing (z-test): ...........  [WARNING] Count exceeds base (count1=110.0, base1=100.0, count2=50.0, base2=100.0); skipping z-test.
+  This may indicate duplicated rows or upstream data errors.
+............
+
+== DONE ========================================================================
+
+--- test_chart_builder.R ---
+chart_builder: .............................................................................
+
+== DONE ========================================================================
+Keep up the good work.
+
+--- test_chart_series_colours.R ---
+chart_series_colours: ................................................................................................................................................................................................................................................
+
+== DONE ========================================================================
+
+--- test_composite_processor.R ---
+composite_processor: [OK] Turas>Tabs cell_calculator module loaded
+validate_composite_definitions: ..............
+calculate_composite_values: ........
+process_composite_question: ..........
+process_all_composites: .......
+composite value accuracy: ...
+
+== DONE ========================================================================
+
+--- test_config_templates.R ---
+config_templates: 
+  [SUCCESS] Crosstab Config template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c10d9e221.xlsx
+...
+  [SUCCESS] Crosstab Config template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c304fa56d.xlsx
+....
+  [SUCCESS] Crosstab Config template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c487bdc96.xlsx
+.
+  [SUCCESS] Crosstab Config template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c2d090e4a.xlsx
+...
+  [SUCCESS] Survey Structure template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c2a9777f0.xlsx
+...
+  [SUCCESS] Survey Structure template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8ca6823ad.xlsx
+....
+  [SUCCESS] Survey Structure template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c7cc9896.xlsx
+....
+  [SUCCESS] Survey Structure template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c20b40d37.xlsx
+...
+  [SUCCESS] Survey Structure template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/tabs_templates_19852/Survey_Structure.xlsx
+
+  [SUCCESS] Crosstab Config template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/tabs_templates_19852/Crosstab_Config.xlsx
+
+  ========================================
+  All templates generated successfully!
+  ========================================
+  Config:    /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/tabs_templates_19852/Crosstab_Config.xlsx
+  Structure: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/tabs_templates_19852/Survey_Structure.xlsx
+
+  Next steps:
+  1. Open Survey_Structure.xlsx and fill in your project details & questions
+  2. Open Crosstab_Config.xlsx and adjust analysis settings
+  3. Run your analysis!
+
+..
+  [SUCCESS] Crosstab Config template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c2b7acffb.xlsx
+
+  [SUCCESS] Crosstab Config template created: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//Rtmp1ZSJSu/file4d8c2b7acffb.xlsx
+..
+
+== DONE ========================================================================
+
+--- test_dashboard_builder.R ---
+dashboard_builder: .........................................................
+
+== DONE ========================================================================
+You are a coding rockstar!
+
+--- test_data_loading.R ---
+data_loading: 
+resolve_path <U+2014> absolute paths: .....
+resolve_path <U+2014> whitespace trimming: .......
+resolve_path <U+2014> ./ prefix: ..
+resolve_path <U+2014> invalid inputs: 
+<U+250C><U+2500><U+2500><U+2500> TURAS TABS ERROR <U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2510>
+<U+2502> Code:     CFG_ARG_EMPTY_PATH 
+<U+2502> Title:    Empty Base Path 
+<U+2502> Problem:  base_path cannot be empty 
+<U+2502> Fix:      Provide a valid directory path as the base_path parameter. 
+<U+2514><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2518>
+
+.
+<U+250C><U+2500><U+2500><U+2500> TURAS TABS ERROR <U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2510>
+<U+2502> Code:     CFG_ARG_EMPTY_PATH 
+<U+2502> Title:    Empty Base Path 
+<U+2502> Problem:  base_path cannot be empty 
+<U+2502> Fix:      Provide a valid directory path as the base_path parameter. 
+<U+2514><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2518>
+
+.
+get_project_root: ..
+<U+250C><U+2500><U+2500><U+2500> TURAS TABS ERROR <U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2510>
+<U+2502> Code:     CFG_ARG_EMPTY_STRING 
+<U+2502> Title:    Empty String Not Allowed 
+<U+2502> Problem:  config_file_path cannot be empty 
+<U+2502> Fix:      Provide a non-empty value for config_file_path. 
+<U+2514><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2518>
+
+.
+load_config_sheet <U+2014> header auto-detect: .....
+<U+250C><U+2500><U+2500><U+2500> TURAS TABS ERROR <U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2510>
+<U+2502> Code:     CFG_DUPLICATE_SETTINGS 
+<U+2502> Title:    Duplicate Configuration Settings 
+<U+2502> Problem:  Config sheet 'Settings' contains duplicate Setting names: alpha 
+<U+2502> Fix:      Remove duplicate Setting names from the config file to ensure each setting has a unique name. 
+<U+2514><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2500><U+2518>
+
+.
+load_survey_structure: Loading survey structure from: Demo_Survey_Structure.xlsx 
+  Loaded: 29 questions, 188 options
+.......
+.read_table_sheet: ...
+
+== DONE ========================================================================
+Keep up the good work.
 
