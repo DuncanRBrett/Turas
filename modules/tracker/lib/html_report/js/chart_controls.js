@@ -8,6 +8,11 @@
 (function() {
   "use strict";
 
+  /** Convert SVG string to an Image-loadable URL (data URI for iframe compatibility). */
+  function svgToImageUrl(svgString) {
+    return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgString);
+  }
+
   // ---- Additive Chart Selection ----
   var chartSelection = {};  // { metricId: true }
 
@@ -359,8 +364,7 @@
     if (!svg) return;
 
     var svgData = new XMLSerializer().serializeToString(svg);
-    var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
-    var svgUrl = URL.createObjectURL(svgBlob);
+    var svgUrl = svgToImageUrl(svgData);
 
     var canvas = document.createElement("canvas");
     var ctx = canvas.getContext("2d");
@@ -385,7 +389,6 @@
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        URL.revokeObjectURL(svgUrl);
       }, "image/png");
     };
 

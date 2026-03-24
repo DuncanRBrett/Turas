@@ -7,6 +7,11 @@
 (function() {
   "use strict";
 
+  /** Convert SVG string to an Image-loadable URL (data URI for iframe compatibility). */
+  function svgToImageUrl(svgString) {
+    return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgString);
+  }
+
   // ---- Slide Export ----
   window.exportSlidePNG = function(metricId, mode) {
     // mode: "chart", "table", or "chart_table"
@@ -76,8 +81,7 @@
       var svg = container ? container.querySelector(".tk-line-chart") : null;
       if (svg) {
         var svgData = new XMLSerializer().serializeToString(svg);
-        var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
-        var svgUrl = URL.createObjectURL(svgBlob);
+        var svgUrl = svgToImageUrl(svgData);
         var img = new Image();
 
         img.onload = function() {
@@ -93,7 +97,6 @@
           }
 
           downloadCanvas(canvas, "slide_" + metricId + ".png");
-          URL.revokeObjectURL(svgUrl);
         };
         img.src = svgUrl;
       }
@@ -549,13 +552,11 @@
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, vbParts[2], vbParts[3]);
 
-    var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
-    var svgUrl = URL.createObjectURL(svgBlob);
+    var svgUrl = svgToImageUrl(svgData);
     var img = new Image();
 
     img.onload = function() {
       ctx.drawImage(img, 0, 0, vbParts[2], vbParts[3]);
-      URL.revokeObjectURL(svgUrl);
 
       canvas.toBlob(function(blob) {
         if (!blob) return;

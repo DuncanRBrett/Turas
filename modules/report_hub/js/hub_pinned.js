@@ -8,6 +8,19 @@
 (function() {
   "use strict";
 
+  /** Strip control characters that are invalid in XML 1.0. */
+  function stripInvalidXmlChars(str) {
+    return str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+  }
+
+  /** Convert SVG string to an Image-loadable URL.
+   *  Uses a data URI instead of URL.createObjectURL so that SVG-to-canvas
+   *  rendering works reliably on file:// protocol.
+   *  Strips invalid XML control characters as a safety net. */
+  function svgToImageUrl(svgString) {
+    return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(stripInvalidXmlChars(svgString));
+  }
+
   // ---- Configuration constants ----
   var EXPORT_WIDTH         = 1280;   // Export SVG canvas width (px)
   var EXPORT_RENDER_SCALE  = 3;      // Canvas resolution multiplier for crisp PNGs
@@ -1115,8 +1128,12 @@
       headerRow.querySelectorAll("th").forEach(function(th) {
         if (th.style.display === "none") return;
         // Tabs uses .ct-header-text; tracker uses plain text
+        // Include column letter (A, B, C...) when present so significance markers are interpretable
         var text = th.querySelector(".ct-header-text");
-        headerCells.push(text ? text.textContent.trim() : th.textContent.trim().split("\n")[0].trim());
+        var label = text ? text.textContent.trim() : th.textContent.trim().split("\n")[0].trim();
+        var letterEl = th.querySelector(".ct-letter");
+        if (letterEl) label += " " + letterEl.textContent.trim();
+        headerCells.push(label);
         headerStyles.push(getCellStyle(th));
       });
       if (headerCells.length > 0) {
@@ -1661,12 +1678,10 @@
     // ---- Render SVG to PNG at 3x resolution ----
     var renderScale = EXPORT_RENDER_SCALE;
     var svgData = new XMLSerializer().serializeToString(svg);
-    var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
-    var url = URL.createObjectURL(svgBlob);
+    var url = svgToImageUrl(svgData);
 
     var img = new Image();
     img.onerror = function() {
-      URL.revokeObjectURL(url);
       console.error("[Hub Pin PNG] SVG render failed for pin: " + pin.id);
       alert("PNG export failed. Please try using Chrome or Edge browser.");
       if (onComplete) onComplete();
@@ -1684,7 +1699,6 @@
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
 
       // Composite pin image directly on canvas (avoids SVG <image> taint)
       var _finishExport = function() {

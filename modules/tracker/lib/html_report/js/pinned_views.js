@@ -7,6 +7,11 @@
 
 var pinnedViews = [];
 
+/** Convert SVG string to an Image-loadable URL (data URI for iframe compatibility). */
+function svgToImageUrl(svgString) {
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgString);
+}
+
 /**
  * Toggle pin on a metric (add or remove)
  * @param {string} metricId - The metric ID
@@ -971,12 +976,10 @@ function exportPinnedCardPNG(pinId) {
   // ---- Render SVG to PNG at 3x resolution ----
   var renderScale = 3;
   var svgData = new XMLSerializer().serializeToString(svg);
-  var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
-  var url = URL.createObjectURL(svgBlob);
+  var url = svgToImageUrl(svgData);
 
   var img = new Image();
   img.onerror = function() {
-    URL.revokeObjectURL(url);
     console.error("[Pin PNG] SVG render failed for pin: " + pinId);
     alert("PNG export failed. Please try using Chrome or Edge browser.");
   };
@@ -988,7 +991,6 @@ function exportPinnedCardPNG(pinId) {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    URL.revokeObjectURL(url);
     canvas.toBlob(function(blob) {
       if (!blob) return;
       var fnTitle = pin.metricTitle || pin.qTitle || "view";
@@ -1209,11 +1211,9 @@ function copyPinnedCardToClipboard(pinId) {
   // Render to canvas and copy to clipboard
   var renderScale = 3;
   var svgData = new XMLSerializer().serializeToString(svg);
-  var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
-  var url = URL.createObjectURL(svgBlob);
+  var url = svgToImageUrl(svgData);
   var sImg = new Image();
   sImg.onerror = function() {
-    URL.revokeObjectURL(url);
     alert("Copy failed. Try Chrome or Edge.");
   };
   sImg.onload = function() {
@@ -1224,7 +1224,6 @@ function copyPinnedCardToClipboard(pinId) {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(sImg, 0, 0, canvas.width, canvas.height);
-    URL.revokeObjectURL(url);
     canvas.toBlob(function(blob) {
       if (!blob) { alert("Copy failed."); return; }
       navigator.clipboard.write([
@@ -1678,8 +1677,7 @@ function exportSummarySlide(sectionType) {
   svgStr += htmlContent;
   svgStr += '</div></foreignObject></svg>';
 
-  var svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
-  var svgUrl = URL.createObjectURL(svgBlob);
+  var svgUrl = svgToImageUrl(svgStr);
   var canvas = document.createElement("canvas");
   canvas.width = w * scale;
   canvas.height = h * scale;
@@ -1698,10 +1696,8 @@ function exportSummarySlide(sectionType) {
       document.body.removeChild(a);
       URL.revokeObjectURL(a.href);
     }, "image/png");
-    URL.revokeObjectURL(svgUrl);
   };
   img.onerror = function() {
-    URL.revokeObjectURL(svgUrl);
   };
   img.src = svgUrl;
 }

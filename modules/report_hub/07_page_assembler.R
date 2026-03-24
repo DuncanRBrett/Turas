@@ -88,7 +88,7 @@ assemble_hub_html <- function(config, parsed_reports, overview_html, navigation_
     key <- parsed$report_key
     parts <- c(parts, sprintf(
       '<div class="hub-panel" data-hub-panel="%s">
-  <iframe id="hub-iframe-%s" class="hub-report-iframe"></iframe>
+  <iframe id="hub-iframe-%s" class="hub-report-iframe" allow="clipboard-write *"></iframe>
   <div class="hub-iframe-loading" id="hub-loading-%s">
     <div class="hub-loading-spinner"></div>
     <div class="hub-loading-text">Loading report...</div>

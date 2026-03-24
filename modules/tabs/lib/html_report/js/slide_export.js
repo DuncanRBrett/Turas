@@ -65,10 +65,14 @@ function extractSlideTableData(container) {
   var rows = [];
   var headerRow = [];
   // Header: get visible columns (use style.display only — offsetParent is null in detached DOM)
+  // Include column letter (A, B, C...) when present so significance markers are interpretable
   table.querySelectorAll("thead th").forEach(function(th) {
     if (th.style.display === "none") return;
     var text = th.querySelector(".ct-header-text");
-    headerRow.push(text ? text.textContent.trim() : th.textContent.trim().split("\n")[0].trim());
+    var label = text ? text.textContent.trim() : th.textContent.trim().split("\n")[0].trim();
+    var letterEl = th.querySelector(".ct-letter");
+    if (letterEl) label += " " + letterEl.textContent.trim();
+    headerRow.push(label);
   });
   rows.push({ cells: headerRow, type: "header" });
 
