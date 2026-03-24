@@ -89,17 +89,12 @@ if (is.null(turas_root)) {
     )
 
     # Status must be PASS or PARTIAL (not REFUSED)
-    if (result$status == "REFUSED") {
-      cat("\n[DIAG] REFUSED code:", result$code, "\n")
-      cat("[DIAG] REFUSED message:", result$message, "\n")
-      cat("[DIAG] REFUSED how_to_fix:", result$how_to_fix %||% "N/A", "\n")
-      cat("[DIAG] getwd():", getwd(), "\n")
-      cat("[DIAG] turas_root:", turas_root, "\n")
-      cat("[DIAG] demo_config exists:", file.exists(demo_config), "\n")
-      cat("[DIAG] demo_data exists:", file.exists(demo_data), "\n")
-    }
-    expect_true(result$status %in% c("PASS", "PARTIAL"),
-                info = sprintf("Expected PASS/PARTIAL, got: %s", result$status))
+    diag_info <- sprintf("Expected PASS/PARTIAL, got: %s | code: %s | msg: %s | wd: %s",
+                         result$status,
+                         result$code %||% "NA",
+                         result$message %||% "NA",
+                         getwd())
+    expect_true(result$status %in% c("PASS", "PARTIAL"), info = diag_info)
 
     # Clean up
     unlink(output_file)

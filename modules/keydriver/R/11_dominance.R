@@ -94,24 +94,29 @@ run_dominance_analysis <- function(data, config) {
   formula_str <- paste(outcome_var, "~", paste(numeric_drivers, collapse = " + "))
 
   # --- Run domir ---
+  # domir v1.2.0+ requires separate reg and fitstat arguments.
+  # For weighted analysis, we pre-weight the data since lm(weights=)
+  # cannot resolve the weight column inside domir's internal evaluation.
   dom_result <- tryCatch({
     if (!is.null(weight_var) && weight_var %in% names(d)) {
-      # Weighted: capture weight_var in local scope for closure safety
-      local_weight_var <- weight_var
+      # Pre-weight data: multiply all analysis columns by sqrt(weight)
+      # This is algebraically equivalent to weighted least squares
+      w_sqrt <- sqrt(d[[weight_var]])
+      d_wt <- d
+      for (v in c(outcome_var, numeric_drivers)) {
+        d_wt[[v]] <- d[[v]] * w_sqrt
+      }
       domir::domin(
         as.formula(formula_str),
-        function(formula, data, ...) {
-          m <- stats::lm(formula, data = data, weights = data[[local_weight_var]])
-          summary(m)$r.squared
-        },
-        data = d
+        reg = stats::lm,
+        fitstat = list(summary, "r.squared"),
+        data = d_wt
       )
     } else {
       domir::domin(
         as.formula(formula_str),
-        function(formula, data, ...) {
-          summary(stats::lm(formula, data = data))$r.squared
-        },
+        reg = stats::lm,
+        fitstat = list(summary, "r.squared"),
         data = d
       )
     }
