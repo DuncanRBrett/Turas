@@ -1346,3 +1346,579 @@ integration:
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
+--- test_preflight_validators.R ---
+preflight_validators: 
+Preflight Validators: .......................................................
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+--- test_quadrant.R ---
+quadrant: ..........................................
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+--- test_segment_comparison.R ---
+segment_comparison: 
+Segment Comparison: ..........................................................
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+--- test_shap.R ---
+shap: 
+SHAP Submodule: ..............................................   [WARN] Segment variable 'nonexistent_var' not found in data - skipping segment 'GroupA'
+..................   [WARN] Small sample size for SHAP analysis: 50 observations. Recommended: >= 200.
+..........
+------------------------------------------------------------
+SHAP ANALYSIS
+------------------------------------------------------------
+   [WARN] Optional packages not available: viridis. Some visualizations may be limited.
+  1. Validating inputs...
+  2. Preparing data for XGBoost...
+     - 200 observations, 5 features
+  3. Fitting XGBoost model...
+     - Best iteration: 30 trees
+  4. Calculating SHAP values...
+     - SHAP values calculated
+     - Top driver: Q1 (36.2%)
+  5. Generating visualizations...
+     - Generated 6 plot types
+
+  SHAP analysis complete.
+  - Model R²: 0.939
+  - RMSE: 0.207
+
+........
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+--- test_term_mapping.R ---
+term_mapping: ........................................................................
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+--- test_v104_features.R ---
+v104_features: 
+v10.4 Analytical Features:    Running Elastic Net analysis...
+   - Alpha: 0.50 (0=ridge, 0.5=elastic net, 1=lasso)
+   - Cross-validation folds: 5
+   - Selected drivers (lambda.1se): 5 / 5
+   - Selected drivers (lambda.min): 5 / 5
+   - CV MSE at lambda.1se: 0.2844
+.......   Running Elastic Net analysis...
+   - Alpha: 0.50 (0=ridge, 0.5=elastic net, 1=lasso)
+   - Cross-validation folds: 5
+   - Selected drivers (lambda.1se): 5 / 5
+   - Selected drivers (lambda.min): 5 / 5
+   - CV MSE at lambda.1se: 0.2844
+..   Running Elastic Net analysis...
+   - Alpha: 0.50 (0=ridge, 0.5=elastic net, 1=lasso)
+   - Cross-validation folds: 5
+   - Selected drivers (lambda.1se): 4 / 5
+   - Selected drivers (lambda.min): 5 / 5
+   - CV MSE at lambda.1se: 0.2939
+..   Running Elastic Net analysis...
+   - Alpha: 0.50 (0=ridge, 0.5=elastic net, 1=lasso)
+   - Cross-validation folds: 5
+..S   Running Elastic Net analysis...
+   - Alpha: 0.50 (0=ridge, 0.5=elastic net, 1=lasso)
+   - Cross-validation folds: 5
+   - Selected drivers (lambda.1se): 5 / 5
+   - Selected drivers (lambda.min): 5 / 5
+   - CV MSE at lambda.1se: 0.2844
+....SSSSSSSSSS   Running GAM nonlinear effects analysis...
+   - Basis dimension k = 5
+   - Fitting GAM for 5 numeric drivers
+   - Linear R²: 0.655 | GAM deviance explained: 0.659
+   - Drivers with significant nonlinearity: 1 of 5
+......   Running GAM nonlinear effects analysis...
+   - Basis dimension k = 5
+   - Fitting GAM for 5 numeric drivers
+   - Linear R²: 0.655 | GAM deviance explained: 0.659
+   - Drivers with significant nonlinearity: 1 of 5
+..   Running GAM nonlinear effects analysis...
+   - Basis dimension k = 5
+   - Fitting GAM for 5 numeric drivers
+   - Linear R²: 0.655 | GAM deviance explained: 0.659
+   - Drivers with significant nonlinearity: 1 of 5
+..   Running GAM nonlinear effects analysis...
+   - Basis dimension k = 5
+   - Fitting GAM for 5 numeric drivers
+   - Linear R²: 0.654 | GAM deviance explained: 0.654
+   - Drivers with significant nonlinearity: 0 of 5
+..   Running GAM nonlinear effects analysis...
+   - Basis dimension k = 5
+..   Running GAM nonlinear effects analysis...
+   - Basis dimension k = 5
+   - Fitting GAM for 3 numeric drivers
+   - Linear R²: 0.126 | GAM deviance explained: 0.989
+   - Drivers with significant nonlinearity: 2 of 3
+..........
+
+══ Skipped ═══════════════════════════════════════════════════════════════════════════════════════════════════════
+1. Elastic Net: returns PARTIAL when glmnet not installed ('test_v104_features.R:161:3') - Reason: glmnet is installed — cannot test missing-package path
+
+2. NCA: runs successfully on basic data ('test_v104_features.R:210:3') - Reason: {NCA} is not installed
+
+3. NCA: classification is binary Necessary/Not Necessary ('test_v104_features.R:235:3') - Reason: {NCA} is not installed
+
+4. NCA: returns PARTIAL when too few cases ('test_v104_features.R:255:3') - Reason: {NCA} is not installed
+
+5. NCA: effect sizes are non-negative ('test_v104_features.R:275:3') - Reason: {NCA} is not installed
+
+6. Dominance: runs successfully on basic data ('test_v104_features.R:301:3') - Reason: {domir} is not installed
+
+7. Dominance: general dominance sums to total R-squared ('test_v104_features.R:326:3') - Reason: {domir} is not installed
+
+8. Dominance: percentages sum to ~100 ('test_v104_features.R:347:3') - Reason: {domir} is not installed
+
+9. Dominance: supports weighted data ('test_v104_features.R:368:3') - Reason: {domir} is not installed
+
+10. Dominance: requires at least 2 numeric drivers ('test_v104_features.R:388:3') - Reason: {domir} is not installed
+
+11. Dominance: returns PARTIAL when too few cases ('test_v104_features.R:408:3') - Reason: {domir} is not installed
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+
+[PASS] Key Driver — 900 passed, 0 failed, 14 skipped (28.5s)
+
+--------------------------------------------------------------------------------
+MODULE: MaxDiff (16 test files)
+Path:   /Users/duncan/Documents/Turas/modules/maxdiff/tests/testthat
+--------------------------------------------------------------------------------
+
+--- test_config.R ---
+config: ...........................................................................
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+--- test_counts.R ---
+counts: ..................
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+--- test_data_reshape.R ---
+data_reshape: ..........................
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+--- test_design.R ---
+design: S....
+
+══ Skipped ═══════════════════════════════════════════════════════════════════════════════════════════════════════
+1. generate_random_design creates correct structure ('test_design.R:17:3') - Reason: generate_random_design call failed
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+--- test_edge_cases.R ---
+edge_cases: ....................
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+--- test_guard.R ---
+guard: ................................
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+--- test_hb.R ---
+hb: ............................................................................................................................
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+--- test_html_report.R ---
+html_report: .............................................................  HTML Layer 1: Transforming data...
+  HTML Layer 4: Assembling page...
+  HTML Writing to: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709318a3c18.html
+  HTML report generated: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709318a3c18.html (151.3 KB)
+....
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+--- test_html_simulator.R ---
+html_simulator: ......................
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+--- test_logit.R ---
+logit: ...........................SS.....
+
+══ Skipped ═══════════════════════════════════════════════════════════════════════════════════════════════════════
+1. fit_aggregate_logit uses last item as anchor when none specified ('test_logit.R:226:1') - Reason: empty test
+
+2. fit_aggregate_logit uses designated anchor item ('test_logit.R:274:1') - Reason: empty test
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+--- test_output.R ---
+output: ...........S................
+
+══ Skipped ═══════════════════════════════════════════════════════════════════════════════════════════════════════
+1. generate_maxdiff_output creates output file on disk ('test_output.R:123:1') - Reason: empty test
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+--- test_preference_shares.R ---
+preference_shares: ..................
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+--- test_segments.R ---
+segments: ............................................................................
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+--- test_turf.R ---
+turf: ..........................................
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+--- test_utils.R ---
+utils: ............................................................................................
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+--- test_validation.R ---
+validation: ..................................................................................
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+
+[PASS] MaxDiff — 755 passed, 0 failed, 4 skipped (24.9s)
+
+--------------------------------------------------------------------------------
+MODULE: Pricing (23 test files)
+Path:   /Users/duncan/Documents/Turas/modules/pricing/tests/testthat
+--------------------------------------------------------------------------------
+
+--- test_added_slides.R ---
+added_slides: .
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+  [INFO] Loaded 2 added slides from AddedSlides sheet
+......
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+  [INFO] Loaded 3 added slides from AddedSlides sheet
+....
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+  [INFO] Loaded 2 added slides from AddedSlides sheet
+...
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+  [INFO] AddedSlides sheet found but missing slide_title/content columns - skipped
+.
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+  [INFO] Loaded 1 added slides from Added_Slides sheet
+............
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+--- test_competitive_scenarios.R ---
+competitive_scenarios: ..............................
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+--- test_config_templates.R ---
+config_templates: 
+=== TURAS Pricing Module: Generating Config Template ===
+  Loaded shared template infrastructure
+  [1/7] Settings sheet...
+  [2/7] VanWestendorp sheet...
+  [3/7] GaborGranger sheet...
+  [4/7] Monadic sheet...
+  [5/7] Simulator sheet...
+  [6/7] Validation sheet...
+  [7/7] Reference sheet...
+
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709476e41fe.xlsx
+  Open in Excel and fill in the Value column for each sheet.
+
+..
+=== TURAS Pricing Module: Generating Config Template ===
+  Loaded shared template infrastructure
+  [1/7] Settings sheet...
+  [2/7] VanWestendorp sheet...
+  [3/7] GaborGranger sheet...
+  [4/7] Monadic sheet...
+  [5/7] Simulator sheet...
+  [6/7] Validation sheet...
+  [7/7] Reference sheet...
+
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37091898b182.xlsx
+  Open in Excel and fill in the Value column for each sheet.
+
+....
+=== TURAS Pricing Module: Generating Config Template ===
+  Loaded shared template infrastructure
+  [1/7] Settings sheet...
+  [2/7] VanWestendorp sheet...
+  [3/7] GaborGranger sheet...
+  [4/7] Monadic sheet...
+  [5/7] Simulator sheet...
+  [6/7] Validation sheet...
+  [7/7] Reference sheet...
+
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370942589b66.xlsx
+  Open in Excel and fill in the Value column for each sheet.
+
+.
+=== TURAS Pricing Module: Generating Config Template ===
+  Loaded shared template infrastructure
+  [1/7] Settings sheet...
+  [2/7] VanWestendorp sheet...
+  [3/7] GaborGranger sheet...
+  [4/7] Monadic sheet... SKIPPED
+  [5/7] Simulator sheet...
+  [6/7] Validation sheet...
+  [7/7] Reference sheet...
+
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370964a90550.xlsx
+  Open in Excel and fill in the Value column for each sheet.
+
+.
+=== TURAS Pricing Module: Generating Config Template ===
+  Loaded shared template infrastructure
+  [1/7] Settings sheet...
+  [2/7] VanWestendorp sheet...
+  [3/7] GaborGranger sheet...
+  [4/7] Monadic sheet...
+  [5/7] Simulator sheet...
+  [6/7] Validation sheet...
+  [7/7] Reference sheet...
+
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370935c8c331.xlsx
+  Open in Excel and fill in the Value column for each sheet.
+
+.
+=== TURAS Pricing Module: Generating Config Template ===
+  Loaded shared template infrastructure
+  [1/7] Settings sheet...
+  [2/7] VanWestendorp sheet...
+  [3/7] GaborGranger sheet...
+  [4/7] Monadic sheet...
+  [5/7] Simulator sheet... SKIPPED
+  [6/7] Validation sheet...
+  [7/7] Reference sheet...
+
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file370921668423.xlsx
+  Open in Excel and fill in the Value column for each sheet.
+
+.
+=== TURAS Pricing Module: Generating Config Template ===
+  Loaded shared template infrastructure
+  [1/7] Settings sheet...
+  [2/7] VanWestendorp sheet...
+  [3/7] GaborGranger sheet...
+  [4/7] Monadic sheet...
+  [5/7] Simulator sheet...
+  [6/7] Validation sheet...
+  [7/7] Reference sheet...
+
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file37094a57fa85.xlsx
+  Open in Excel and fill in the Value column for each sheet.
+
+.
+=== TURAS Pricing Module: Generating Config Template ===
+  Loaded shared template infrastructure
+  [1/7] Settings sheet...
+  [2/7] VanWestendorp sheet...
+  [3/7] GaborGranger sheet...
+  [4/7] Monadic sheet...
+  [5/7] Simulator sheet...
+  [6/7] Validation sheet...
+  [7/7] Reference sheet...
+
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709548a607b.xlsx
+  Open in Excel and fill in the Value column for each sheet.
+
+
+=== TURAS Pricing Module: Generating Config Template ===
+  Loaded shared template infrastructure
+  [1/7] Settings sheet...
+  [2/7] VanWestendorp sheet...
+  [3/7] GaborGranger sheet...
+  [4/7] Monadic sheet...
+  [5/7] Simulator sheet...
+  [6/7] Validation sheet...
+  [7/7] Reference sheet...
+
+  Config template saved: /var/folders/lv/v0smg88j75b3258m7p56jg8c0000gn/T//RtmpGlzyx3/file3709548a607b.xlsx
+  Open in Excel and fill in the Value column for each sheet.
+
+..
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+🎯 Your tests hit the mark 🎯
+
+--- test_config.R ---
+config: 
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+....
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+..
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+...
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+
+-
+/
+                                                                                                                
+
+/
+                                                                                                                
+
+-
+                                                                                                                
+....
+
+══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+
