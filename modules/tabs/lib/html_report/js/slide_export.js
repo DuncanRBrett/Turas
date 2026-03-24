@@ -6,19 +6,33 @@
 function wrapTextLines(text, maxWidth, charWidth) {
   if (!text) return [];
   var maxChars = Math.floor(maxWidth / charWidth);
-  if (text.length <= maxChars) return [text];
-  var words = text.split(" ");
-  var lines = [], current = "";
-  for (var i = 0; i < words.length; i++) {
-    var test = current ? current + " " + words[i] : words[i];
-    if (test.length > maxChars && current) {
-      lines.push(current);
-      current = words[i];
-    } else {
-      current = test;
+  // Split on newlines first to preserve paragraph breaks
+  var paragraphs = text.split("\n");
+  var lines = [];
+  for (var p = 0; p < paragraphs.length; p++) {
+    var para = paragraphs[p].trim();
+    if (!para) {
+      // Empty line = paragraph break (add blank line)
+      if (lines.length > 0) lines.push("");
+      continue;
     }
+    if (para.length <= maxChars) {
+      lines.push(para);
+      continue;
+    }
+    var words = para.split(" ");
+    var current = "";
+    for (var i = 0; i < words.length; i++) {
+      var test = current ? current + " " + words[i] : words[i];
+      if (test.length > maxChars && current) {
+        lines.push(current);
+        current = words[i];
+      } else {
+        current = test;
+      }
+    }
+    if (current) lines.push(current);
   }
-  if (current) lines.push(current);
   return lines;
 }
 
