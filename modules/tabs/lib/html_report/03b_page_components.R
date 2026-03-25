@@ -591,6 +591,16 @@ build_sidebar <- function(questions, has_sig = FALSE, brand_colour = "#323367") 
         )
       )
     ))
+
+    # Significance testing callout (from shared registry, collapsed by default)
+    if (exists("turas_callout", mode = "function")) {
+      sig_callout <- turas_callout("tabs", "significance_testing", collapsed = TRUE)
+      if (!is.null(sig_callout) && nzchar(sig_callout)) {
+        sidebar_content <- c(sidebar_content, list(
+          htmltools::HTML(sig_callout)
+        ))
+      }
+    }
   }
 
   htmltools::tags$div(
@@ -671,18 +681,12 @@ build_controls <- function(has_any_freq, has_any_pct, has_any_sig,
     ))
   }
 
-  # Significance testing callout (from shared registry, collapsed by default)
-  sig_callout <- if (has_any_sig && exists("turas_callout", mode = "function")) {
-    htmltools::HTML(turas_callout("tabs", "significance_testing", collapsed = TRUE))
-  }
-
   htmltools::tagList(
     htmltools::tags$div(
       class = "controls-bar",
       htmltools::tags$div(style = "flex:1"),
       toggles
-    ),
-    sig_callout
+    )
   )
 }
 

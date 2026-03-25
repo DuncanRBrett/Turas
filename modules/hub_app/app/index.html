@@ -51,13 +51,41 @@
       </div>
     </div>
 
-    <!-- Folder filter bar -->
-    <div id="folder-filter-bar" class="folder-filter-bar" style="display:none;">
-      <span class="folder-filter-label">Folders:</span>
-      <button id="folder-filter-all" class="folder-chip folder-chip-active" onclick="ProjectBrowser.filterByFolder(null)">
-        All
-      </button>
-      <div id="folder-chips" class="folder-chips">
+    <!-- Folder & Sort controls (inline with grid) -->
+    <div id="folder-sort-bar" class="folder-sort-bar" style="display:none;">
+      <div class="folder-dropdown-wrapper">
+        <button id="folder-dropdown-btn" class="btn btn-sm" title="Filter by folder">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+          </svg>
+          <span id="folder-dropdown-label">All folders</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div id="folder-dropdown-menu" class="folder-dropdown-menu" style="display:none;">
+          <!-- Populated by project_browser.js -->
+        </div>
+      </div>
+      <div class="sort-dropdown-wrapper">
+        <button id="sort-dropdown-btn" class="btn btn-sm" title="Sort projects">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="16" y2="12"/><line x1="4" y1="18" x2="12" y2="18"/>
+          </svg>
+          <span id="sort-dropdown-label">Recent</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div id="sort-dropdown-menu" class="sort-dropdown-menu" style="display:none;">
+          <button class="sort-option sort-option-active" data-sort="recent">Most recent</button>
+          <button class="sort-option" data-sort="name">Name (A-Z)</button>
+          <button class="sort-option" data-sort="name-desc">Name (Z-A)</button>
+          <button class="sort-option" data-sort="files">Most files</button>
+          <button class="sort-option" data-sort="modules">Most modules</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Expanded project overlay -->
+    <div id="project-overlay" class="project-overlay" style="display:none;">
+      <div class="project-overlay-content">
         <!-- Populated by project_browser.js -->
       </div>
     </div>
@@ -73,9 +101,10 @@
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
         </svg>
       </div>
-      <p class="empty-text">No Turas projects found</p>
-      <p class="empty-hint">Projects are folders containing Turas HTML reports.
-         Check your configured directories.</p>
+      <p class="empty-text">Welcome to Turas Hub</p>
+      <p class="empty-hint">To get started, click the <strong>gear icon</strong> (Preferences) to add folders to scan,
+         or use <strong>Add Folder</strong> above. The hub will find all Turas projects
+         in your chosen directories.</p>
     </div>
 
     <div id="project-loading" class="loading-state">

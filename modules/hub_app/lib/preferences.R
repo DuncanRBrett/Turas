@@ -107,6 +107,49 @@ default_preferences <- function() {
     accent_colour = "#10B981",
     logo_path = "",
     auto_save_interval = 500,
-    theme = "light"
+    theme = "light",
+    scan_max_depth = 6
   )
+}
+
+
+#' Detect Cloud Storage Directories
+#'
+#' Finds OneDrive, Google Drive, and Dropbox directories on the system.
+#' Used by the preferences UI to suggest additional scan directories.
+#'
+#' @return Character vector of detected cloud storage paths
+#' @export
+detect_cloud_storage <- function() {
+  cloud_dirs <- character(0)
+  home <- Sys.getenv("HOME", path.expand("~"))
+
+  # macOS: ~/Library/CloudStorage/ contains OneDrive, Google Drive, Dropbox
+
+  cloud_parent <- file.path(home, "Library", "CloudStorage")
+  if (dir.exists(cloud_parent)) {
+    subdirs <- list.dirs(cloud_parent, recursive = FALSE, full.names = TRUE)
+    cloud_dirs <- c(cloud_dirs, subdirs)
+  }
+
+  # Windows: OneDrive environment variable
+  onedrive <- Sys.getenv("OneDrive", "")
+  if (nzchar(onedrive) && dir.exists(onedrive)) {
+    cloud_dirs <- c(cloud_dirs, onedrive)
+  }
+
+  # Windows: common OneDrive paths
+  if (.Platform$OS.type == "windows") {
+    userprofile <- Sys.getenv("USERPROFILE", "")
+    if (nzchar(userprofile)) {
+      od_personal <- file.path(userprofile, "OneDrive")
+      od_business <- file.path(userprofile, "OneDrive - *")
+      if (dir.exists(od_personal)) cloud_dirs <- c(cloud_dirs, od_personal)
+      # Glob for business OneDrive
+      od_matches <- Sys.glob(file.path(userprofile, "OneDrive - *"))
+      cloud_dirs <- c(cloud_dirs, od_matches[dir.exists(od_matches)])
+    }
+  }
+
+  unique(cloud_dirs)
 }

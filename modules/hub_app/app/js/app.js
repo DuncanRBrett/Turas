@@ -204,6 +204,26 @@ var HubApp = (function() {
       var data = parseJSON(jsonStr);
       Search.handleResults(data);
     });
+
+    // --- New handlers for project management features ---
+
+    shiny.addCustomMessageHandler("hub_file_opened", function(jsonStr) {
+      var data = parseJSON(jsonStr);
+      if (data && data.success) {
+        showToast("Opened " + (data.filename || "file"));
+      }
+    });
+
+    shiny.addCustomMessageHandler("hub_note_saved", function(jsonStr) {
+      // Silent confirmation — note saves are auto-saved
+    });
+
+    shiny.addCustomMessageHandler("hub_module_launched", function(jsonStr) {
+      var data = parseJSON(jsonStr);
+      if (data && data.success) {
+        showToast((data.label || data.module || "Module") + " launched");
+      }
+    });
   }
 
   /**

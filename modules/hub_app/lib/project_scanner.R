@@ -1,18 +1,338 @@
 # ==============================================================================
 # TURAS > HUB APP — PROJECT SCANNER
 # ==============================================================================
-# Scans directories for Turas project folders containing HTML reports.
-# A "project" is any folder with at least one HTML file containing a
-# <meta name="turas-report-type"> tag, OR containing a Hub config Excel file.
+# Scans directories for Turas project folders. A "project" is any folder
+# containing at least one Turas config file (.xlsx matching module naming
+# patterns) OR at least one Turas HTML report (with <meta name="turas-report-type">).
+#
+# Detection tiers:
+#   Tier 1 — Filename pattern matching (fast, no file I/O beyond list.files)
+#   Tier 2 — Sheet-name inspection for ambiguous *_Config.xlsx files
+#   Tier 3 — HTML meta tag sniffing (backward compat)
+#
+# File categorization within a project:
+#   1. Config files  — .xlsx matching module patterns
+#   2. HTML reports   — .html with turas-report-type meta tag
+#   3. Data files     — .csv; .xlsx with data/responses/raw/survey/design in name
+#   4. Diagnostics    — .xlsx with stats_pack/diagnostic/validation/shap in name
+#   5. Excel reports  — all remaining .xlsx
+# ==============================================================================
+
+
+#' Null-coalescing operator (local)
+#' @keywords internal
+`%||%` <- function(a, b) if (is.null(a)) b else a
+
+
+# ==============================================================================
+# CONFIG FILE PATTERNS — Module Detection
+# ==============================================================================
+
+#' Module Config File Patterns
+#'
+#' Returns a named list of module IDs to regex patterns for detecting
+#' Turas config files by filename (case-insensitive).
+#'
+#' @return Named list: module_id -> regex pattern
+#' @keywords internal
+get_config_patterns <- function() {
+  list(
+    tabs       = "(?:crosstab_config|tabs_config|survey_structure)\\.xlsx$",
+    tracker    = "(?:tracking_config|tracker_config).*\\.xlsx$",
+    maxdiff    = "(?:maxdiff|max_diff).*config.*\\.xlsx$",
+    conjoint   = "(?:conjoint|cbc).*config.*\\.xlsx$",
+    segment    = "segment.*config.*\\.xlsx$",
+    pricing    = "(?:pricing|monadic).*config.*\\.xlsx$",
+    keydriver  = "(?:keydriver|key_driver).*config.*\\.xlsx$",
+    catdriver  = "(?:catdriver|categorical).*config.*\\.xlsx$",
+    confidence = "confidence.*config.*\\.xlsx$",
+    weighting  = "weighting.*config.*\\.xlsx$",
+    report_hub = "report_hub_config.*\\.xlsx$"
+  )
+}
+
+
+#' Module Script Paths (for launching GUIs)
+#'
+#' Returns a named list mapping module IDs to their GUI script paths
+#' (relative to TURAS_ROOT).
+#'
+#' @return Named list: module_id -> script path
+#' @keywords internal
+get_module_scripts <- function() {
+  list(
+    tabs       = "modules/tabs/run_tabs_gui.R",
+    tracker    = "modules/tracker/run_tracker_gui.R",
+    maxdiff    = "modules/maxdiff/run_maxdiff_gui.R",
+    conjoint   = "modules/conjoint/run_conjoint_gui.R",
+    segment    = "modules/segment/run_segment_gui.R",
+    pricing    = "modules/pricing/run_pricing_gui.R",
+    keydriver  = "modules/keydriver/run_keydriver_gui.R",
+    catdriver  = "modules/catdriver/run_catdriver_gui.R",
+    confidence = "modules/confidence/run_confidence_gui.R",
+    weighting  = "modules/weighting/run_weighting_gui.R",
+    report_hub = "modules/report_hub/run_report_hub_gui.R"
+  )
+}
+
+
+#' Module Display Labels
+#'
+#' @return Named list: module_id -> display label
+#' @keywords internal
+get_module_labels <- function() {
+  list(
+    tabs       = "Tabs",
+    tracker    = "Tracker",
+    maxdiff    = "MaxDiff",
+    conjoint   = "Conjoint",
+    segment    = "Segment",
+    pricing    = "Pricing",
+    keydriver  = "Key Driver",
+    catdriver  = "Cat Driver",
+    confidence = "Confidence",
+    weighting  = "Weighting",
+    report_hub = "Report Hub"
+  )
+}
+
+
+# ==============================================================================
+# TIER 2 — Sheet-Name Inspection for Ambiguous Configs
+# ==============================================================================
+
+#' Sheet-Name Rules for Ambiguous Config Detection
+#'
+#' Maps sheet-name combinations to module IDs. Used when a file matches
+#' *Config*.xlsx but not a specific module pattern.
+#'
+#' @return List of rules: each with `sheets` (required sheets) and `module`
+#' @keywords internal
+get_sheet_rules <- function() {
+  list(
+    list(sheets = c("Settings", "Questions", "Banners"), module = "tabs"),
+    list(sheets = c("Settings", "Questions", "Waves"),   module = "tracker"),
+    list(sheets = c("Settings", "Items"),                module = "maxdiff"),
+    list(sheets = c("Settings", "Attributes"),           module = "conjoint"),
+    list(sheets = c("Settings", "Reports"),              module = "report_hub"),
+    list(sheets = c("Config"),                           module = "segment")
+  )
+}
+
+
+#' Identify Module from Sheet Names (Tier 2)
+#'
+#' Opens an xlsx file and checks sheet names against known combinations.
+#'
+#' @param file_path Path to .xlsx file
+#' @return Module ID string, or NULL if no match
+#' @keywords internal
+identify_module_by_sheets <- function(file_path) {
+  tryCatch({
+    sheets <- openxlsx::getSheetNames(file_path)
+    rules <- get_sheet_rules()
+
+    for (rule in rules) {
+      if (all(rule$sheets %in% sheets)) {
+        return(rule$module)
+      }
+    }
+    NULL
+  }, error = function(e) {
+    NULL
+  })
+}
+
+
+# ==============================================================================
+# FILE CATEGORIZATION
+# ==============================================================================
+
+#' Config File Name Patterns (broad catch-all)
+#'
+#' Any xlsx with "config" or "survey_structure" in its name is a config file.
+#' This catches variants not matched by the specific Tier 1 module patterns
+#' (e.g. Crosstab_Config_Merch.xlsx, Crosstab_Config_Short.xlsx).
+#' @keywords internal
+is_config_file <- function(filename) {
+  grepl("(?:config|survey_structure)", filename, ignore.case = TRUE) &&
+    grepl("\\.xlsx$", filename, ignore.case = TRUE)
+}
+
+#' Data File Name Patterns
+#' @keywords internal
+is_data_file <- function(filename) {
+  grepl("(?:data|responses|raw|design)", filename, ignore.case = TRUE)
+}
+
+#' Diagnostic File Name Patterns
+#' @keywords internal
+is_diagnostic_file <- function(filename) {
+  grepl("(?:stats_pack|diagnostic|validation|shap)", filename, ignore.case = TRUE)
+}
+
+
+#' Categorize All Files in a Project Directory
+#'
+#' Scans the project directory (and 1-2 levels of subdirectories) and
+#' categorizes every relevant file. Files are assigned to exactly one
+#' category based on priority order.
+#'
+#' @param dir_path Project root directory
+#' @param config_files Character vector of already-identified config file paths
+#' @param subdirs_to_skip Character vector of subdirectory paths to skip
+#'   (e.g., subdirectories that are themselves separate projects)
+#' @return List with categorized file lists: configs, html_reports,
+#'   data_files, diagnostics, excel_reports
+#' @keywords internal
+categorize_project_files <- function(dir_path, config_files = character(0),
+                                     subdirs_to_skip = character(0)) {
+  # Normalize skip paths for comparison
+  skip_norm <- normalizePath(subdirs_to_skip, winslash = "/", mustWork = FALSE)
+
+  # Collect all files from project root + up to 2 levels of subdirectories
+  all_files <- list.files(dir_path, full.names = TRUE, recursive = FALSE)
+
+  # Also scan subdirectories (1-2 levels deep)
+  subdirs <- list.dirs(dir_path, recursive = FALSE, full.names = TRUE)
+  skip_dir_patterns <- c("^\\.", "node_modules", "renv", "__pycache__",
+                          "\\.git$", "tests$", "testthat$")
+
+  for (subdir in subdirs) {
+    sub_norm <- normalizePath(subdir, winslash = "/", mustWork = FALSE)
+    base <- basename(subdir)
+
+    # Skip hidden/system dirs
+    if (any(sapply(skip_dir_patterns, function(p) grepl(p, base)))) next
+    # Skip subdirectories that are themselves projects
+    if (sub_norm %in% skip_norm) next
+
+    sub_files <- list.files(subdir, full.names = TRUE, recursive = FALSE)
+    all_files <- c(all_files, sub_files)
+
+    # Go one more level deep
+    sub_subdirs <- tryCatch(
+      list.dirs(subdir, recursive = FALSE, full.names = TRUE),
+      error = function(e) character(0)
+    )
+    for (ss in sub_subdirs) {
+      ss_base <- basename(ss)
+      if (any(sapply(skip_dir_patterns, function(p) grepl(p, ss_base)))) next
+      ss_norm <- normalizePath(ss, winslash = "/", mustWork = FALSE)
+      if (ss_norm %in% skip_norm) next
+
+      ss_files <- list.files(ss, full.names = TRUE, recursive = FALSE)
+      all_files <- c(all_files, ss_files)
+    }
+  }
+
+  # Remove directories from file list
+  all_files <- all_files[!file.info(all_files)$isdir]
+
+  # Normalize config file paths for comparison
+  config_norm <- normalizePath(config_files, winslash = "/", mustWork = FALSE)
+
+  # Initialize category lists
+  configs <- list()
+  html_reports <- list()
+  data_files <- list()
+  diagnostics <- list()
+  excel_reports <- list()
+
+  # Track assigned files to avoid duplicates
+  assigned <- character(0)
+
+  # --- Priority 1: Config files (already detected) ---
+  for (cf in config_files) {
+    if (!file.exists(cf)) next
+    configs[[length(configs) + 1]] <- build_file_info(cf)
+    assigned <- c(assigned, normalizePath(cf, winslash = "/", mustWork = FALSE))
+  }
+
+  # --- Priority 2: HTML reports (sniff for turas meta tag) ---
+  html_files <- all_files[grepl("\\.html$", all_files, ignore.case = TRUE)]
+  for (hf in html_files) {
+    hf_norm <- normalizePath(hf, winslash = "/", mustWork = FALSE)
+    if (hf_norm %in% assigned) next
+
+    report_info <- sniff_report_type(hf)
+    if (!is.null(report_info)) {
+      html_reports[[length(html_reports) + 1]] <- report_info
+      assigned <- c(assigned, hf_norm)
+    }
+  }
+
+  # --- Remaining xlsx and csv files ---
+  remaining <- all_files[grepl("\\.(xlsx|csv)$", all_files, ignore.case = TRUE)]
+  remaining_norm <- normalizePath(remaining, winslash = "/", mustWork = FALSE)
+  remaining <- remaining[!(remaining_norm %in% assigned)]
+
+  for (f in remaining) {
+    fname <- basename(f)
+    f_norm <- normalizePath(f, winslash = "/", mustWork = FALSE)
+    if (f_norm %in% assigned) next
+
+    if (grepl("\\.csv$", fname, ignore.case = TRUE)) {
+      # --- Priority 3: CSV files are always data ---
+      data_files[[length(data_files) + 1]] <- build_file_info(f)
+      assigned <- c(assigned, f_norm)
+    } else if (is_config_file(fname)) {
+      # --- Priority 2b: Any xlsx with "config" or "survey_structure" in name ---
+      configs[[length(configs) + 1]] <- build_file_info(f)
+      assigned <- c(assigned, f_norm)
+    } else if (is_data_file(fname)) {
+      # --- Priority 3: xlsx data files ---
+      data_files[[length(data_files) + 1]] <- build_file_info(f)
+      assigned <- c(assigned, f_norm)
+    } else if (is_diagnostic_file(fname)) {
+      # --- Priority 4: Diagnostic files ---
+      diagnostics[[length(diagnostics) + 1]] <- build_file_info(f)
+      assigned <- c(assigned, f_norm)
+    } else {
+      # --- Priority 5: Everything else is an Excel report ---
+      excel_reports[[length(excel_reports) + 1]] <- build_file_info(f)
+      assigned <- c(assigned, f_norm)
+    }
+  }
+
+  list(
+    configs       = configs,
+    html_reports  = html_reports,
+    data_files    = data_files,
+    diagnostics   = diagnostics,
+    excel_reports = excel_reports
+  )
+}
+
+
+#' Build File Info Object
+#'
+#' @param file_path Full path to file
+#' @return List with path, filename, size, size_label, last_modified
+#' @keywords internal
+build_file_info <- function(file_path) {
+  finfo <- file.info(file_path)
+  list(
+    path          = file_path,
+    filename      = basename(file_path),
+    size          = finfo$size,
+    size_label    = format_file_size(finfo$size),
+    last_modified = format(finfo$mtime, "%Y-%m-%d %H:%M")
+  )
+}
+
+
+# ==============================================================================
+# PROJECT SCANNING — Main Entry Point
 # ==============================================================================
 
 #' Scan Directories for Turas Projects
 #'
-#' Searches configured root directories for folders containing Turas HTML
-#' reports. Returns structured project metadata for the frontend.
+#' Searches configured root directories for folders containing Turas config
+#' files or HTML reports. Returns structured project metadata for the frontend.
 #'
 #' @param root_dirs Character vector of directories to scan
-#' @param max_depth Maximum subdirectory depth to search (default: 3)
+#' @param max_depth Maximum subdirectory depth to search (default: 6)
 #' @return List with status and array of project objects
 scan_for_projects <- function(root_dirs, max_depth = 6) {
 
@@ -20,19 +340,39 @@ scan_for_projects <- function(root_dirs, max_depth = 6) {
     return(list(status = "PASS", result = list(projects = list())))
   }
 
-  projects <- list()
-
+  # Phase 1: Find all candidate directories
+  candidate_dirs <- character(0)
   for (root in root_dirs) {
     if (!dir.exists(root)) next
+    candidate_dirs <- c(candidate_dirs, find_candidate_dirs(root, max_depth))
+  }
+  candidate_dirs <- unique(candidate_dirs)
 
-    # Find subdirectories containing HTML files (up to max_depth)
-    candidate_dirs <- find_project_dirs(root, max_depth)
+  # Phase 2: Evaluate each candidate — identify projects
+  # We need to identify project roots first, then avoid treating their
+  # subdirectories as separate projects (unless they have their own configs)
+  projects <- list()
+  project_paths <- character(0)
 
-    for (dir_path in candidate_dirs) {
-      project <- evaluate_project_dir(dir_path)
-      if (!is.null(project)) {
-        projects[[length(projects) + 1]] <- project
+  for (dir_path in candidate_dirs) {
+    # Skip if this directory is a subdirectory of an already-found project
+    # (unless it has its own config files — handled inside evaluate)
+    is_subdir_of_project <- any(sapply(project_paths, function(pp) {
+      startsWith(
+        normalizePath(dir_path, winslash = "/", mustWork = FALSE),
+        paste0(normalizePath(pp, winslash = "/", mustWork = FALSE), "/")
+      )
+    }))
+
+    project <- evaluate_project_dir(dir_path)
+    if (!is.null(project)) {
+      # If this is a subdirectory of an existing project, only keep it
+      # if it has its own config files (i.e., it's a wave or sub-project)
+      if (is_subdir_of_project && length(project$files$configs) == 0) {
+        next
       }
+      projects[[length(projects) + 1]] <- project
+      project_paths <- c(project_paths, dir_path)
     }
   }
 
@@ -69,19 +409,24 @@ scan_for_projects <- function(root_dirs, max_depth = 6) {
 
 #' Find Candidate Project Directories
 #'
-#' Lists directories (up to max_depth) that contain at least one .html file.
-#' Also includes the root itself if it contains HTML files.
+#' Lists directories (up to max_depth) that contain .xlsx or .html files.
+#' These are candidates for evaluation as Turas projects.
 #'
 #' @param root Root directory to search
 #' @param max_depth Maximum depth
 #' @return Character vector of directory paths
 #' @keywords internal
-find_project_dirs <- function(root, max_depth = 6) {
+find_candidate_dirs <- function(root, max_depth = 6) {
   candidates <- character(0)
 
+  # Skip patterns for directories we should never enter
+  skip_patterns <- c("^\\.", "node_modules", "renv", "__pycache__",
+                      "\\.git$", "tests$", "testthat$",
+                      "^Library$", "^Applications$", "^\\.Trash$")
+
   # Check root itself
-  root_html <- list.files(root, pattern = "\\.html$", ignore.case = TRUE)
-  if (length(root_html) > 0) {
+  root_files <- list.files(root, pattern = "\\.(html|xlsx)$", ignore.case = TRUE)
+  if (length(root_files) > 0) {
     candidates <- c(candidates, root)
   }
 
@@ -92,22 +437,20 @@ find_project_dirs <- function(root, max_depth = 6) {
       error = function(e) character(0)
     )
 
-    # Skip hidden directories and common non-project folders
-    skip_patterns <- c("^\\.", "node_modules", "renv", "__pycache__",
-                        "\\.git$", "tests$", "testthat$")
     for (subdir in subdirs) {
       base <- basename(subdir)
       if (any(sapply(skip_patterns, function(p) grepl(p, base)))) next
 
-      # Check for HTML files in this subdirectory
-      sub_html <- list.files(subdir, pattern = "\\.html$", ignore.case = TRUE)
-      if (length(sub_html) > 0) {
+      # Check for relevant files in this subdirectory
+      sub_files <- list.files(subdir, pattern = "\\.(html|xlsx)$",
+                               ignore.case = TRUE)
+      if (length(sub_files) > 0) {
         candidates <- c(candidates, subdir)
       }
 
-      # Recurse one level deeper if needed
+      # Recurse deeper
       if (max_depth > 1) {
-        deeper <- find_project_dirs(subdir, max_depth - 1)
+        deeper <- find_candidate_dirs(subdir, max_depth - 1)
         candidates <- c(candidates, deeper)
       }
     }
@@ -117,35 +460,57 @@ find_project_dirs <- function(root, max_depth = 6) {
 }
 
 
+# ==============================================================================
+# PROJECT EVALUATION — Core Detection Logic
+# ==============================================================================
+
 #' Evaluate Whether a Directory Is a Turas Project
 #'
-#' Checks if a directory contains Turas HTML reports by looking for
-#' the turas-report-type meta tag or a Hub config file.
+#' Uses a tiered detection approach:
+#'   Tier 1: Config filename patterns (fast)
+#'   Tier 2: Sheet-name inspection for ambiguous configs
+#'   Tier 3: HTML meta tag sniffing
 #'
 #' @param dir_path Directory to evaluate
 #' @return Project object (list) if it's a Turas project, NULL otherwise
 #' @keywords internal
 evaluate_project_dir <- function(dir_path) {
 
-  html_files <- list.files(
-    dir_path,
-    pattern = "\\.html$",
-    full.names = TRUE,
-    ignore.case = TRUE
-  )
+  # --- Tier 1: Detect config files by filename pattern ---
+  config_patterns <- get_config_patterns()
+  xlsx_files <- list.files(dir_path, pattern = "\\.xlsx$",
+                            full.names = TRUE, ignore.case = TRUE)
+  config_files <- character(0)
+  config_modules <- character(0)
 
-  if (length(html_files) == 0) return(NULL)
+  for (xlsx_path in xlsx_files) {
+    fname <- basename(xlsx_path)
+    matched <- FALSE
 
-  # Check for Hub config file (strong indicator)
-  config_files <- list.files(
-    dir_path,
-    pattern = "Report_Hub_Config.*\\.xlsx$",
-    full.names = TRUE,
-    ignore.case = TRUE
-  )
-  has_hub_config <- length(config_files) > 0
+    for (module_id in names(config_patterns)) {
+      if (grepl(config_patterns[[module_id]], fname, ignore.case = TRUE)) {
+        config_files <- c(config_files, xlsx_path)
+        config_modules <- c(config_modules, module_id)
+        matched <- TRUE
+        break
+      }
+    }
 
-  # Check HTML files for turas-report-type meta tag
+    # --- Tier 2: Ambiguous config — try sheet inspection ---
+    if (!matched && grepl("config", fname, ignore.case = TRUE)) {
+      module_id <- identify_module_by_sheets(xlsx_path)
+      if (!is.null(module_id)) {
+        config_files <- c(config_files, xlsx_path)
+        config_modules <- c(config_modules, module_id)
+      }
+    }
+  }
+
+  has_configs <- length(config_files) > 0
+
+  # --- Tier 3: Check HTML files for turas-report-type meta tag ---
+  html_files <- list.files(dir_path, pattern = "\\.html$",
+                            full.names = TRUE, ignore.case = TRUE)
   turas_reports <- list()
   for (html_path in html_files) {
     report_info <- sniff_report_type(html_path)
@@ -154,44 +519,116 @@ evaluate_project_dir <- function(dir_path) {
     }
   }
 
-  # Skip if no Turas reports and no hub config
- if (length(turas_reports) == 0 && !has_hub_config) return(NULL)
+  has_reports <- length(turas_reports) > 0
 
-  # Build project metadata
-  all_mtimes <- file.mtime(html_files)
-  last_modified <- max(all_mtimes, na.rm = TRUE)
-  total_size <- sum(file.size(html_files), na.rm = TRUE)
+  # Must have at least one config or one report to qualify
+ if (!has_configs && !has_reports) return(NULL)
 
-  # Smart project name: try to derive from report titles, fall back to folder name
+  # --- Categorize all files in the project ---
+  # Find subdirectories that are themselves projects (to skip during file scan)
+  subdirs <- tryCatch(
+    list.dirs(dir_path, recursive = FALSE, full.names = TRUE),
+    error = function(e) character(0)
+  )
+  child_project_dirs <- character(0)
+  for (sd in subdirs) {
+    sd_xlsx <- list.files(sd, pattern = "\\.xlsx$", ignore.case = TRUE)
+    for (f in sd_xlsx) {
+      for (pattern in config_patterns) {
+        if (grepl(pattern, f, ignore.case = TRUE)) {
+          child_project_dirs <- c(child_project_dirs, sd)
+          break
+        }
+      }
+      if (sd %in% child_project_dirs) break
+    }
+  }
+
+  files <- categorize_project_files(dir_path, config_files, child_project_dirs)
+
+  # Add module info to config file entries
+  if (length(files$configs) > 0) {
+    for (i in seq_along(files$configs)) {
+      cfg_path <- files$configs[[i]]$path
+      idx <- match(
+        normalizePath(cfg_path, winslash = "/", mustWork = FALSE),
+        normalizePath(config_files, winslash = "/", mustWork = FALSE)
+      )
+      if (!is.na(idx)) {
+        files$configs[[i]]$module <- config_modules[idx]
+        labels <- get_module_labels()
+        files$configs[[i]]$module_label <- labels[[config_modules[idx]]] %||%
+          config_modules[idx]
+        scripts <- get_module_scripts()
+        files$configs[[i]]$script <- scripts[[config_modules[idx]]] %||% NULL
+      }
+    }
+  }
+
+  # --- Derive project metadata ---
   folder_name <- basename(dir_path)
-  smart_name <- derive_project_name(turas_reports, folder_name)
 
-  # Abbreviated path for display (show parent context)
-  display_path <- abbreviate_path(dir_path)
+  # Modules detected (from configs + reports)
+  modules <- unique(c(
+    config_modules,
+    vapply(turas_reports, function(r) {
+      # Map report types to module IDs
+      rtype <- tolower(r$type %||% "")
+      # Strip sub-types (e.g., "segment-exploration" -> "segment")
+      sub("-.*$", "", rtype)
+    }, character(1))
+  ))
+  modules <- modules[nzchar(modules)]
 
-  # Report labels for display on card
-  report_labels <- vapply(turas_reports, function(r) {
-    r$label %||% tools::file_path_sans_ext(r$filename %||% "")
-  }, character(1))
+  # Project name: try from report titles, then config filenames, then folder
+  smart_name <- derive_project_name(turas_reports, config_files, folder_name)
+
+  # Full display path (with ~ for HOME, NOT truncated)
+  display_path <- full_display_path(dir_path)
+
+  # Read project note if .turas_project.json exists
+  note <- read_project_note(dir_path)
+
+  # Compute counts
+  counts <- list(
+    configs       = length(files$configs),
+    html_reports  = length(files$html_reports),
+    excel_reports = length(files$excel_reports),
+    data_files    = length(files$data_files),
+    diagnostics   = length(files$diagnostics)
+  )
+
+  # Last modified across all files
+  all_file_paths <- c(
+    vapply(files$configs, function(f) f$path, character(1)),
+    vapply(files$html_reports, function(f) f$path, character(1)),
+    vapply(files$excel_reports, function(f) f$path, character(1)),
+    vapply(files$data_files, function(f) f$path, character(1)),
+    vapply(files$diagnostics, function(f) f$path, character(1))
+  )
+  if (length(all_file_paths) == 0) all_file_paths <- dir_path
+  all_mtimes <- file.mtime(all_file_paths)
+  last_modified <- max(all_mtimes, na.rm = TRUE)
 
   list(
-    id = digest_path(dir_path),
-    name = smart_name,
-    folder_name = folder_name,
-    path = dir_path,
-    display_path = display_path,
-    reports = turas_reports,
-    report_labels = report_labels,
-    report_count = length(turas_reports),
-    total_html_count = length(html_files),
-    has_hub_config = has_hub_config,
-    total_size = total_size,
-    total_size_label = format_file_size(total_size),
+    id            = digest_path(dir_path),
+    name          = smart_name,
+    folder_name   = folder_name,
+    path          = dir_path,
+    display_path  = display_path,
+    note          = note,
+    modules       = modules,
+    files         = files,
+    counts        = counts,
     last_modified = format(last_modified, "%Y-%m-%d %H:%M"),
     last_modified_ts = as.numeric(last_modified)
   )
 }
 
+
+# ==============================================================================
+# HTML REPORT SNIFFING
+# ==============================================================================
 
 #' Sniff Report Type from HTML File
 #'
@@ -199,7 +636,8 @@ evaluate_project_dir <- function(dir_path) {
 #' turas-report-type meta tag. Avoids reading the entire file.
 #'
 #' @param html_path Path to HTML file
-#' @return List with path, label, type, size, last_modified; or NULL
+#' @return List with path, filename, label, type, size, size_label,
+#'   last_modified; or NULL if not a Turas report
 #' @keywords internal
 sniff_report_type <- function(html_path) {
   tryCatch({
@@ -241,12 +679,12 @@ sniff_report_type <- function(html_path) {
     finfo <- file.info(html_path)
 
     list(
-      path = html_path,
-      filename = basename(html_path),
-      label = report_title,
-      type = report_type,
-      size = finfo$size,
-      size_label = format_file_size(finfo$size),
+      path          = html_path,
+      filename      = basename(html_path),
+      label         = report_title,
+      type          = report_type,
+      size          = finfo$size,
+      size_label    = format_file_size(finfo$size),
       last_modified = format(finfo$mtime, "%Y-%m-%d %H:%M")
     )
   }, error = function(e) {
@@ -255,41 +693,14 @@ sniff_report_type <- function(html_path) {
 }
 
 
-#' Generate a Stable ID from a File Path
-#'
-#' Creates a short, URL-safe identifier from a path.
-#'
-#' @param path File or directory path
-#' @return Character string (8-char hex digest)
-#' @keywords internal
-digest_path <- function(path) {
-  # Simple hash: sum of character codes, formatted as hex
-  chars <- utf8ToInt(path)
-  hash_val <- sum(chars * seq_along(chars)) %% .Machine$integer.max
-  sprintf("%08x", hash_val)
-}
-
-
-#' Format File Size for Display
-#'
-#' Converts bytes to human-readable string (KB, MB, GB).
-#'
-#' @param bytes Numeric file size in bytes
-#' @return Character string (e.g., "2.4 MB")
-#' @keywords internal
-format_file_size <- function(bytes) {
-  if (is.na(bytes) || bytes < 0) return("0 B")
-  if (bytes < 1024) return(paste(bytes, "B"))
-  if (bytes < 1024^2) return(sprintf("%.1f KB", bytes / 1024))
-  if (bytes < 1024^3) return(sprintf("%.1f MB", bytes / 1024^2))
-  sprintf("%.1f GB", bytes / 1024^3)
-}
-
+# ==============================================================================
+# PROJECT REPORTS — Detailed View
+# ==============================================================================
 
 #' Get Detailed Report List for a Single Project
 #'
-#' Returns full metadata for all Turas reports in a project directory.
-#' Used when a user opens a specific project.
+#' Returns full metadata for all Turas reports in a project directory
+#' (including subdirectories). Used when a user opens a specific project.
 #'
 #' @param project_path Path to the project directory
 #' @return List with status and report array
@@ -304,11 +715,13 @@ get_project_reports <- function(project_path) {
     ))
   }
 
+  # Look in root + subdirectories (up to 2 levels)
   html_files <- list.files(
     project_path,
     pattern = "\\.html$",
     full.names = TRUE,
-    ignore.case = TRUE
+    ignore.case = TRUE,
+    recursive = TRUE
   )
 
   reports <- list()
@@ -332,57 +745,136 @@ get_project_reports <- function(project_path) {
 }
 
 
-#' Derive a Meaningful Project Name from Report Titles
+# ==============================================================================
+# PROJECT NOTES — .turas_project.json Sidecar
+# ==============================================================================
+
+#' Read Project Note
 #'
-#' Attempts to extract a common project name from report \code{<title>} tags.
-#' Falls back to the folder name if no pattern is found.
+#' Reads the note field from .turas_project.json if it exists.
 #'
-#' Heuristic: report titles often follow the pattern
-#' "Type Report - ProjectName" or "ProjectName - Type".
-#' We look for the longest common substring across report titles,
-#' or use the title of the first report stripped of the type prefix.
+#' @param project_path Project directory path
+#' @return Character string (note text) or empty string
+#' @keywords internal
+read_project_note <- function(project_path) {
+  note_file <- file.path(project_path, ".turas_project.json")
+  if (!file.exists(note_file)) return("")
+
+  tryCatch({
+    data <- jsonlite::fromJSON(note_file, simplifyVector = FALSE)
+    data$note %||% ""
+  }, error = function(e) {
+    ""
+  })
+}
+
+
+#' Save Project Note
+#'
+#' Writes or updates .turas_project.json with the given note.
+#'
+#' @param project_path Project directory path
+#' @param note Character string — the note text
+#' @return List with status
+save_project_note <- function(project_path, note) {
+  note_file <- file.path(project_path, ".turas_project.json")
+
+  tryCatch({
+    # Read existing data if file exists (preserve other fields)
+    existing <- list()
+    if (file.exists(note_file)) {
+      existing <- tryCatch(
+        jsonlite::fromJSON(note_file, simplifyVector = FALSE),
+        error = function(e) list()
+      )
+    }
+
+    existing$note <- note
+    existing$updated <- format(Sys.time(), "%Y-%m-%dT%H:%M:%S")
+
+    json_out <- jsonlite::toJSON(existing, auto_unbox = TRUE, pretty = TRUE)
+    writeLines(json_out, note_file)
+
+    list(status = "PASS", message = "Note saved")
+  }, error = function(e) {
+    cat("[Hub App] ERROR saving project note:", e$message, "\n")
+    list(
+      status = "REFUSED",
+      code = "IO_WRITE_FAILED",
+      message = paste("Failed to save project note:", e$message)
+    )
+  })
+}
+
+
+# ==============================================================================
+# NAME DERIVATION
+# ==============================================================================
+
+#' Derive a Meaningful Project Name
+#'
+#' Attempts to extract a common project name from report titles or config
+#' file names. Falls back to the folder name.
 #'
 #' @param reports List of report objects (from sniff_report_type)
+#' @param config_files Character vector of config file paths
 #' @param folder_name Fallback name (basename of directory)
 #' @return Character string — the best project name
 #' @keywords internal
-derive_project_name <- function(reports, folder_name) {
-  if (length(reports) == 0) return(folder_name)
+derive_project_name <- function(reports, config_files = character(0),
+                                 folder_name = "Untitled") {
+  # Try report titles first
+  if (length(reports) > 0) {
+    labels <- vapply(reports, function(r) r$label %||% "", character(1))
+    labels <- labels[nzchar(labels)]
 
-  labels <- vapply(reports, function(r) r$label %||% "", character(1))
-  labels <- labels[nzchar(labels)]
+    if (length(labels) == 1) {
+      name <- strip_report_type_from_title(labels[1])
+      if (nzchar(name) && name != labels[1]) return(name)
+      return(labels[1])
+    }
 
-  if (length(labels) == 0) return(folder_name)
+    if (length(labels) >= 2) {
+      stripped <- vapply(labels, strip_report_type_from_title, character(1))
+      stripped <- stripped[nzchar(stripped)]
 
-  # If only one report, try to extract project name from its title
-  if (length(labels) == 1) {
-    name <- strip_report_type_from_title(labels[1])
-    if (nzchar(name) && name != labels[1]) return(name)
-    return(labels[1])
+      if (length(stripped) >= 2) {
+        common <- longest_common_prefix(stripped)
+        common <- trimws(gsub("[_-]+$", "", common))
+        if (nchar(common) >= 3) return(common)
+      }
+    }
   }
 
-  # Multiple reports: find common prefix/substring
-  # Try stripping type keywords and finding commonality
-  stripped <- vapply(labels, strip_report_type_from_title, character(1))
-  stripped <- stripped[nzchar(stripped)]
+  # Try config file names
+  if (length(config_files) > 0) {
+    cfg_names <- tools::file_path_sans_ext(basename(config_files))
+    # Strip module-type keywords
+    cleaned <- vapply(cfg_names, function(n) {
+      n <- gsub("(?:Crosstab|Tabs|Tracker|Tracking|MaxDiff|Max_Diff|Conjoint|CBC|Segment|Pricing|KeyDriver|Key_Driver|CatDriver|Categorical|Confidence|Weighting|Report_Hub|Survey_Structure)[_-]?",
+                "", n, ignore.case = TRUE)
+      n <- gsub("[_-]?(?:Config|Configuration)$", "", n, ignore.case = TRUE)
+      trimws(gsub("[_-]+", " ", n))
+    }, character(1))
+    cleaned <- cleaned[nzchar(cleaned)]
 
-  if (length(stripped) >= 2) {
-    # Find the longest common prefix among stripped titles
-    common <- longest_common_prefix(stripped)
-    common <- trimws(gsub("[_-]+$", "", common))  # Clean trailing separators
-    if (nchar(common) >= 3) return(common)
+    if (length(cleaned) == 1) return(cleaned)
+
+    if (length(cleaned) >= 2) {
+      common <- longest_common_prefix(cleaned)
+      common <- trimws(gsub("[_-]+$", "", common))
+      if (nchar(common) >= 3) return(common)
+    }
   }
 
-  # Fallback: use folder name, but clean up date-like names
-  clean <- clean_folder_name(folder_name)
-  return(clean)
+  # Fallback: folder name
+  clean_folder_name(folder_name)
 }
 
 
 #' Strip Report Type Keywords from a Title
 #'
 #' Removes patterns like "Tracker Report - ", "Tabs - ", etc.
-#' Returns the remaining meaningful part.
 #'
 #' @param title Report title string
 #' @return Cleaned title
@@ -390,7 +882,6 @@ derive_project_name <- function(reports, folder_name) {
 strip_report_type_from_title <- function(title) {
   if (is.null(title) || !nzchar(title)) return("")
 
-  # Common type phrases to remove (multi-word first, then single words)
   type_phrases <- c(
     "tabs report", "tracker report", "confidence report", "maxdiff report",
     "conjoint report", "pricing report", "segment report", "segmentation report",
@@ -406,19 +897,16 @@ strip_report_type_from_title <- function(title) {
 
   result <- title
 
-  # Remove "Phrase - " prefixes (e.g., "Tabs Report - BrandStudy")
   for (tw in type_phrases) {
-    pattern <- sprintf("^\\s*%s\\s*[-—]\\s*", tw)
+    pattern <- sprintf("^\\s*%s\\s*[-\u2014]\\s*", tw)
     result <- gsub(pattern, "", result, ignore.case = TRUE, perl = TRUE)
   }
 
-  # Remove " - Phrase" suffixes (e.g., "BrandStudy - Tabs Report")
   for (tw in type_phrases) {
-    pattern <- sprintf("\\s*[-—]\\s*%s\\s*$", tw)
+    pattern <- sprintf("\\s*[-\u2014]\\s*%s\\s*$", tw)
     result <- gsub(pattern, "", result, ignore.case = TRUE, perl = TRUE)
   }
 
-  # Remove standalone type phrases
   for (tw in type_phrases) {
     pattern <- sprintf("^\\s*%s\\s*$", tw)
     if (grepl(pattern, result, ignore.case = TRUE)) {
@@ -430,6 +918,10 @@ strip_report_type_from_title <- function(title) {
 }
 
 
+# ==============================================================================
+# UTILITY FUNCTIONS
+# ==============================================================================
+
 #' Find Longest Common Prefix of Strings
 #'
 #' @param strings Character vector
@@ -439,7 +931,6 @@ longest_common_prefix <- function(strings) {
   if (length(strings) == 0) return("")
   if (length(strings) == 1) return(strings[1])
 
-  # Compare character by character
   ref <- strings[1]
   prefix_len <- nchar(ref)
 
@@ -461,43 +952,62 @@ longest_common_prefix <- function(strings) {
 }
 
 
-#' Abbreviate a File Path for Display
+#' Full Display Path (NOT Truncated)
 #'
-#' Shows the last 2-3 path components, with ~ for HOME.
-#' e.g., "/Users/duncan/Documents/Projects/BrandHealth" → "~/Documents/Projects/BrandHealth"
+#' Replaces HOME with ~ but does NOT truncate. The full path is always shown.
 #'
 #' @param path Full path
-#' @return Abbreviated path string
+#' @return Display path string
 #' @keywords internal
-abbreviate_path <- function(path) {
+full_display_path <- function(path) {
   if (is.null(path) || !nzchar(path)) return("")
 
   home <- Sys.getenv("HOME", path.expand("~"))
   home <- normalizePath(home, winslash = "/", mustWork = FALSE)
   norm_path <- normalizePath(path, winslash = "/", mustWork = FALSE)
 
-  # Replace HOME with ~
   if (startsWith(norm_path, home)) {
-    display <- paste0("~", substring(norm_path, nchar(home) + 1))
+    paste0("~", substring(norm_path, nchar(home) + 1))
   } else {
-    display <- norm_path
+    norm_path
   }
+}
 
-  # If still very long, show last 3 components
-  parts <- strsplit(display, "/")[[1]]
-  parts <- parts[nzchar(parts)]
-  if (length(parts) > 4) {
-    display <- paste0(".../", paste(tail(parts, 3), collapse = "/"))
-  }
 
-  display
+#' Generate a Stable ID from a File Path
+#'
+#' Creates a short, URL-safe identifier from a path.
+#'
+#' @param path File or directory path
+#' @return Character string (8-char hex digest)
+#' @keywords internal
+digest_path <- function(path) {
+  chars <- utf8ToInt(path)
+  hash_val <- sum(chars * seq_along(chars)) %% .Machine$integer.max
+  sprintf("%08x", hash_val)
+}
+
+
+#' Format File Size for Display
+#'
+#' Converts bytes to human-readable string (KB, MB, GB).
+#'
+#' @param bytes Numeric file size in bytes
+#' @return Character string (e.g., "2.4 MB")
+#' @keywords internal
+format_file_size <- function(bytes) {
+  if (is.na(bytes) || bytes < 0) return("0 B")
+  if (bytes < 1024) return(paste(bytes, "B"))
+  if (bytes < 1024^2) return(sprintf("%.1f KB", bytes / 1024))
+  if (bytes < 1024^3) return(sprintf("%.1f MB", bytes / 1024^2))
+  sprintf("%.1f GB", bytes / 1024^3)
 }
 
 
 #' Clean Up a Folder Name for Display
 #'
 #' Replaces underscores/hyphens with spaces, title-cases if it looks
-#' like a slug. Preserves date-like names but adds context.
+#' like a slug.
 #'
 #' @param name Folder basename
 #' @return Cleaned display name
@@ -505,22 +1015,13 @@ abbreviate_path <- function(path) {
 clean_folder_name <- function(name) {
   if (is.null(name) || !nzchar(name)) return("Untitled Project")
 
-  # If it's a pure date like "2026-03-24", keep it as is
-  # (the display_path will provide context)
   if (grepl("^\\d{4}-\\d{2}-\\d{2}$", name)) return(name)
 
-  # Replace underscores and hyphens with spaces (but not in dates)
   cleaned <- gsub("_", " ", name)
 
-  # Title case if all lowercase
   if (cleaned == tolower(cleaned)) {
     cleaned <- tools::toTitleCase(cleaned)
   }
 
   trimws(cleaned)
 }
-
-
-#' Null-coalescing operator (local)
-#' @keywords internal
-`%||%` <- function(a, b) if (is.null(a)) b else a

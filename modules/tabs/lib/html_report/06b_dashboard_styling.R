@@ -32,6 +32,7 @@ build_dashboard_css <- function(brand_colour) {
       display: flex; align-items: center; gap: 0; max-width: 1400px; margin: 0 auto;
       padding: 0 32px; background: #fff;
       border-bottom: 1px solid #e2e8f0;
+      position: sticky; top: 0; z-index: 60;
     }
     .report-tab {
       padding: 12px 20px 10px; font-size: 14px; font-weight: 500;

@@ -198,6 +198,9 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       border: 1px solid #e2e8f0;
       overflow: hidden;
       margin-bottom: 12px;
+      position: sticky;
+      top: 43px;
+      z-index: 55;
     }
     .banner-tab {
       padding: 8px 16px;

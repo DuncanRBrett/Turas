@@ -12,15 +12,27 @@ run_hub_app_gui <- function(project_dirs = NULL) {
   # Null-coalescing operator
   `%||%` <- function(a, b) if (is.null(a)) b else a
 
-  # --- Default directories if none provided ---
+  # --- Load scan directories from saved preferences (or use provided dirs) ---
   if (is.null(project_dirs) || length(project_dirs) == 0) {
-    home <- Sys.getenv("HOME", path.expand("~"))
-    project_dirs <- c(
-      file.path(home, "Documents"),
-      file.path(home, "Desktop")
-    )
-    # Keep only existing directories
-    project_dirs <- project_dirs[dir.exists(project_dirs)]
+    # Load preferences to get saved scan directories
+    source(file.path(
+      Sys.getenv("TURAS_ROOT", getwd()),
+      "modules", "hub_app", "lib", "preferences.R"
+    ), local = TRUE)
+    saved_prefs <- get_hub_preferences()
+    saved_dirs <- unlist(saved_prefs$scan_directories)
+
+    if (!is.null(saved_dirs) && length(saved_dirs) > 0) {
+      # Use saved scan directories (keep only existing ones)
+      project_dirs <- saved_dirs[dir.exists(saved_dirs)]
+      cat("[Hub App] Loaded", length(project_dirs),
+          "scan directories from preferences\n")
+    } else {
+      # First launch — no saved directories, start empty
+      project_dirs <- character(0)
+      cat("[Hub App] No scan directories configured.",
+          "Use Preferences to add folders.\n")
+    }
   }
 
   # --- Package check (TRS v1.0: no auto-install) ---
@@ -61,6 +73,19 @@ run_hub_app_gui <- function(project_dirs = NULL) {
          local = TRUE)
   source(file.path(TURAS_HOME, "modules", "hub_app", "lib", "export_pptx.R"),
          local = TRUE)
+  source(file.path(TURAS_HOME, "modules", "hub_app", "lib", "preferences.R"),
+         local = TRUE)
+
+  # Helper: persist scan directories to preferences file
+  save_scan_dirs_to_prefs <- function(dirs, turas_home) {
+    tryCatch({
+      prefs <- get_hub_preferences()
+      prefs$scan_directories <- as.list(dirs)
+      save_hub_preferences(prefs)
+    }, error = function(e) {
+      cat("[Hub App] WARNING: Could not persist scan dirs:", e$message, "\n")
+    })
+  }
 
   # Load shared GUI theme
   source(file.path(TURAS_HOME, "modules", "shared", "lib", "gui_theme.R"),
@@ -220,6 +245,9 @@ run_hub_app_gui <- function(project_dirs = NULL) {
         rv$scan_dirs <- c(current, selected)
       }
 
+      # Persist scan dirs to preferences
+      save_scan_dirs_to_prefs(rv$scan_dirs, TURAS_HOME)
+
       # Update display
       shinyjs::html("hub-dir-display",
         paste("Scanning:", paste(rv$scan_dirs, collapse = ", ")))
@@ -259,12 +287,11 @@ run_hub_app_gui <- function(project_dirs = NULL) {
       })]
 
       if (length(new_dirs) == length(current)) {
-        # No scan dir matched — the removed folder is a subfolder.
-        # We can't easily exclude subfolders from a parent scan.
-        # Instead, just rescan (the folder may have been moved/deleted).
         cat("[Hub App] Folder not in scan roots, rescanning...\n")
       } else {
         rv$scan_dirs <- new_dirs
+        # Persist to preferences
+        save_scan_dirs_to_prefs(rv$scan_dirs, TURAS_HOME)
         cat("[Hub App] Scan directories now:", paste(new_dirs, collapse = ", "), "\n")
       }
 
@@ -300,23 +327,27 @@ run_hub_app_gui <- function(project_dirs = NULL) {
 
     # --- Initial project scan ---
     observe({
-      cat("[Hub App] Scanning for projects...\n")
-      result <- scan_for_projects(rv$scan_dirs, max_depth = 6)
-
-      if (result$status %in% c("PASS", "PARTIAL")) {
-        rv$projects <- result$result$projects
-        cat("[Hub App]", result$message, "\n")
-
-        # Send project list to frontend
-        project_json <- jsonlite::toJSON(
-          result$result$projects,
-          auto_unbox = TRUE,
-          pretty = FALSE
-        )
-        session$sendCustomMessage("hub_projects", project_json)
-      } else {
-        cat("[Hub App] WARNING: Project scan returned no results\n")
+      if (length(rv$scan_dirs) == 0) {
+        cat("[Hub App] No scan directories configured — skipping initial scan\n")
         session$sendCustomMessage("hub_projects", "[]")
+      } else {
+        cat("[Hub App] Scanning for projects...\n")
+        result <- scan_for_projects(rv$scan_dirs, max_depth = 6)
+
+        if (result$status %in% c("PASS", "PARTIAL")) {
+          rv$projects <- result$result$projects
+          cat("[Hub App]", result$message, "\n")
+
+          project_json <- jsonlite::toJSON(
+            result$result$projects,
+            auto_unbox = TRUE,
+            pretty = FALSE
+          )
+          session$sendCustomMessage("hub_projects", project_json)
+        } else {
+          cat("[Hub App] WARNING: Project scan returned no results\n")
+          session$sendCustomMessage("hub_projects", "[]")
+        }
       }
     }) |> bindEvent(TRUE, once = TRUE)
 
@@ -487,8 +518,6 @@ run_hub_app_gui <- function(project_dirs = NULL) {
 
     observeEvent(input$hub_load_preferences, {
       tryCatch({
-        source(file.path(TURAS_HOME, "modules", "hub_app", "lib",
-                          "preferences.R"), local = TRUE)
         prefs <- get_hub_preferences()
         pref_json <- jsonlite::toJSON(prefs, auto_unbox = TRUE, pretty = FALSE)
         session$sendCustomMessage("hub_preferences_loaded", pref_json)
@@ -499,21 +528,20 @@ run_hub_app_gui <- function(project_dirs = NULL) {
 
     observeEvent(input$hub_save_preferences, {
       tryCatch({
-        source(file.path(TURAS_HOME, "modules", "hub_app", "lib",
-                          "preferences.R"), local = TRUE)
         prefs <- jsonlite::fromJSON(input$hub_save_preferences,
                                      simplifyVector = FALSE)
         result <- save_hub_preferences(prefs)
 
         if (result$status == "PASS") {
-          # If scan directories changed, trigger rescan
-          new_dirs <- prefs$scan_directories
+          # Replace scan directories with saved preferences
+          new_dirs <- unlist(prefs$scan_directories)
           if (!is.null(new_dirs) && length(new_dirs) > 0) {
-            existing <- rv$scan_dirs
-            all_dirs <- unique(c(existing, unlist(new_dirs)))
-            valid_dirs <- all_dirs[dir.exists(all_dirs)]
-            if (length(valid_dirs) > length(existing)) {
-              rv$scan_dirs <- valid_dirs
+            valid_dirs <- new_dirs[dir.exists(new_dirs)]
+            rv$scan_dirs <- valid_dirs
+            cat("[Hub App] Scan directories updated:",
+                paste(valid_dirs, collapse = ", "), "\n")
+
+            if (length(valid_dirs) > 0) {
               shinyjs::html("hub-dir-display",
                 paste("Scanning:", paste(rv$scan_dirs, collapse = ", ")))
               scan_result <- scan_for_projects(rv$scan_dirs, max_depth = 6)
@@ -523,8 +551,19 @@ run_hub_app_gui <- function(project_dirs = NULL) {
                   scan_result$result$projects,
                   auto_unbox = TRUE, pretty = FALSE)
                 session$sendCustomMessage("hub_projects", project_json)
+              } else {
+                session$sendCustomMessage("hub_projects", "[]")
               }
+            } else {
+              shinyjs::html("hub-dir-display",
+                "No valid directories. Click 'Add Folder' to choose.")
+              session$sendCustomMessage("hub_projects", "[]")
             }
+          } else {
+            rv$scan_dirs <- character(0)
+            shinyjs::html("hub-dir-display",
+              "No directories configured. Click 'Add Folder' or use Preferences.")
+            session$sendCustomMessage("hub_projects", "[]")
           }
         }
       }, error = function(e) {
@@ -732,6 +771,207 @@ run_hub_app_gui <- function(project_dirs = NULL) {
           error = e$message
         ), auto_unbox = TRUE)
         session$sendCustomMessage("hub_export_pngs_complete", response)
+      })
+    })
+
+    # --- Handle file open requests from frontend ---
+    observeEvent(input$hub_open_file, {
+      file_path <- input$hub_open_file
+      if (is.null(file_path) || !nzchar(file_path)) return()
+
+      if (!file.exists(file_path)) {
+        cat("[Hub App] ERROR: File not found:", file_path, "\n")
+        session$sendCustomMessage("hub_error",
+          paste("File not found:", file_path))
+        return()
+      }
+
+      cat("[Hub App] Opening file:", file_path, "\n")
+
+      tryCatch({
+        os_type <- .Platform$OS.type
+        if (Sys.info()["sysname"] == "Darwin") {
+          system2("open", shQuote(file_path), wait = FALSE)
+        } else if (os_type == "windows") {
+          shell.exec(file_path)
+        } else {
+          system2("xdg-open", shQuote(file_path), wait = FALSE)
+        }
+        session$sendCustomMessage("hub_file_opened",
+          jsonlite::toJSON(list(
+            success = TRUE,
+            filename = basename(file_path)
+          ), auto_unbox = TRUE))
+      }, error = function(e) {
+        cat("[Hub App] ERROR opening file:", e$message, "\n")
+        session$sendCustomMessage("hub_error",
+          paste("Failed to open file:", e$message))
+      })
+    })
+
+    # --- Handle folder open requests ---
+    observeEvent(input$hub_open_folder, {
+      folder_path <- input$hub_open_folder
+      if (is.null(folder_path) || !nzchar(folder_path)) return()
+
+      if (!dir.exists(folder_path)) {
+        cat("[Hub App] ERROR: Folder not found:", folder_path, "\n")
+        session$sendCustomMessage("hub_error",
+          paste("Folder not found:", folder_path))
+        return()
+      }
+
+      cat("[Hub App] Opening folder:", folder_path, "\n")
+
+      tryCatch({
+        if (Sys.info()["sysname"] == "Darwin") {
+          system2("open", shQuote(folder_path), wait = FALSE)
+        } else if (.Platform$OS.type == "windows") {
+          shell.exec(folder_path)
+        } else {
+          system2("xdg-open", shQuote(folder_path), wait = FALSE)
+        }
+      }, error = function(e) {
+        cat("[Hub App] ERROR opening folder:", e$message, "\n")
+        session$sendCustomMessage("hub_error",
+          paste("Failed to open folder:", e$message))
+      })
+    })
+
+    # --- Handle project note save ---
+    observeEvent(input$hub_save_project_note, {
+      payload <- tryCatch(
+        jsonlite::fromJSON(input$hub_save_project_note, simplifyVector = FALSE),
+        error = function(e) NULL
+      )
+      if (is.null(payload)) return()
+
+      project_path <- payload$path
+      note <- payload$note %||% ""
+
+      if (is.null(project_path) || !dir.exists(project_path)) {
+        cat("[Hub App] ERROR: Cannot save note, project not found:",
+            project_path, "\n")
+        return()
+      }
+
+      result <- save_project_note(project_path, note)
+      if (result$status == "PASS") {
+        cat("[Hub App] Project note saved for:", basename(project_path), "\n")
+        session$sendCustomMessage("hub_note_saved",
+          jsonlite::toJSON(list(
+            success = TRUE,
+            path = project_path
+          ), auto_unbox = TRUE))
+      } else {
+        session$sendCustomMessage("hub_error", result$message)
+      }
+    })
+
+    # --- Handle module launch requests ---
+    observeEvent(input$hub_launch_module, {
+      payload <- tryCatch(
+        jsonlite::fromJSON(input$hub_launch_module, simplifyVector = FALSE),
+        error = function(e) NULL
+      )
+      if (is.null(payload)) return()
+
+      module_id <- payload$module
+      config_path <- payload$config_path
+      script <- payload$script
+
+      if (is.null(module_id) || is.null(script)) {
+        cat("[Hub App] ERROR: Missing module or script in launch request\n")
+        session$sendCustomMessage("hub_error",
+          "Missing module or script in launch request")
+        return()
+      }
+
+      turas_root <- Sys.getenv("TURAS_ROOT", getwd())
+      script_path <- file.path(turas_root, script)
+
+      if (!file.exists(script_path)) {
+        cat("[Hub App] ERROR: Module script not found:", script_path, "\n")
+        session$sendCustomMessage("hub_error",
+          paste("Module script not found:", script))
+        return()
+      }
+
+      cat("[Hub App] Launching module:", module_id,
+          "with config:", config_path %||% "(none)", "\n")
+
+      tryCatch({
+        # Build launch script (same pattern as launch_turas.R)
+        config_lines <- ""
+        if (!is.null(config_path) && nzchar(config_path)) {
+          config_lines <- sprintf(
+            'Sys.setenv(TURAS_MODULE_CONFIG = "%s")\n', config_path)
+          if (module_id == "report_hub") {
+            config_lines <- paste0(config_lines, sprintf(
+              'Sys.setenv(TURAS_HUB_CONFIG = "%s")\n', config_path))
+          }
+        }
+
+        launch_script <- sprintf('
+Sys.setenv(TURAS_ROOT = "%s")
+Sys.setenv(TURAS_LAUNCHED_FROM_HUB = "1")
+%ssetwd("%s")
+TURAS_LAUNCHER_ACTIVE <- TRUE
+source("%s")
+app <- run_%s_gui()
+shiny::runApp(app, launch.browser = TRUE)
+',
+          turas_root,
+          config_lines,
+          turas_root,
+          script_path,
+          module_id)
+
+        temp_script <- tempfile(fileext = ".R")
+        log_file <- tempfile(fileext = ".log")
+
+        launch_wrapped <- paste0(
+          'tryCatch({\n',
+          launch_script,
+          '}, error = function(e) {\n',
+          '  cat("ERROR:", conditionMessage(e), "\\n",',
+          ' file = "', log_file, '")\n',
+          '})\n'
+        )
+
+        writeLines(launch_wrapped, temp_script)
+
+        old_env <- Sys.getenv("TURAS_SKIP_RENV")
+        Sys.setenv(TURAS_SKIP_RENV = "1")
+
+        system2("Rscript",
+                args = c(temp_script),
+                wait = FALSE,
+                stdout = log_file,
+                stderr = log_file)
+
+        if (old_env == "") {
+          Sys.unsetenv("TURAS_SKIP_RENV")
+        } else {
+          Sys.setenv(TURAS_SKIP_RENV = old_env)
+        }
+
+        labels <- get_module_labels()
+        module_label <- labels[[module_id]] %||% module_id
+
+        session$sendCustomMessage("hub_module_launched",
+          jsonlite::toJSON(list(
+            success = TRUE,
+            module = module_id,
+            label = module_label
+          ), auto_unbox = TRUE))
+
+        cat("[Hub App] Module", module_label, "launched in background\n")
+
+      }, error = function(e) {
+        cat("[Hub App] ERROR launching module:", e$message, "\n")
+        session$sendCustomMessage("hub_error",
+          paste("Failed to launch module:", e$message))
       })
     })
 

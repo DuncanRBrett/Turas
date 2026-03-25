@@ -80,13 +80,18 @@ var ReportHub = ReportHub || {};
         ".header, .tk-header, .ci-header, .wt-header, .md-header, " +
         ".cj-header, .seg-header, .pr-header, .cd-header, .kd-header " +
         "{ display:none !important; } " +
-        // Make all report nav strips sticky so they stay visible on scroll
-        ".report-tabs, .banner-tabs, " +
-        ".cj-report-tabs, .cj-slide-tabs, " +
-        ".md-tab-nav, .md-subtab-nav, " +
-        ".pr-tab-nav, " +
+        // Make report nav strips sticky — stacked so banners don't cover the menu strip
+        ".report-tabs, " +
+        ".cj-report-tabs, " +
         ".kd-report-tabs, .cd-factor-tabs, .seg-report-tabs " +
-        "{ position:sticky !important; top:0 !important; z-index:50 !important; " +
+        "{ position:sticky !important; top:0 !important; z-index:60 !important; " +
+        "background:#fff !important; } " +
+        // Secondary nav strips sit below the main report tabs
+        ".banner-tabs, " +
+        ".cj-slide-tabs, " +
+        ".md-tab-nav, .md-subtab-nav, " +
+        ".pr-tab-nav " +
+        "{ position:sticky !important; top:43px !important; z-index:55 !important; " +
         "background:#fff !important; } " +
         ".hub-pin-float { position:fixed; bottom:20px; right:20px; z-index:9999; " +
         "background:var(--hub-bridge-brand, #323367); color:#fff; border:none; border-radius:8px; " +
