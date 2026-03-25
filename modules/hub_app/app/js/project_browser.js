@@ -51,7 +51,8 @@ var ProjectBrowser = (function() {
     diagnostic: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
     play: '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
     close: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
-    externalLink: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>'
+    externalLink: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>',
+    misc: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>'
   };
 
   function ensureArray(val) {
@@ -127,6 +128,7 @@ var ProjectBrowser = (function() {
     if (counts.data_files) summaryParts.push(counts.data_files + " data file" + (counts.data_files !== 1 ? "s" : ""));
     if (counts.excel_reports) summaryParts.push(counts.excel_reports + " excel output" + (counts.excel_reports !== 1 ? "s" : ""));
     if (counts.diagnostics) summaryParts.push(counts.diagnostics + " diagnostic" + (counts.diagnostics !== 1 ? "s" : ""));
+    if (counts.misc) summaryParts.push(counts.misc + " misc");
     var summaryText = summaryParts.join(" \u00b7 ") || "No files detected";
 
     return '<div class="project-tile" ' +
@@ -233,11 +235,12 @@ var ProjectBrowser = (function() {
         '<div class="overlay-section-header">' + ICONS.html + ' HTML Reports</div>';
       for (var h = 0; h < htmlReports.length; h++) {
         var r = htmlReports[h];
+        var displayName = escapeHtml(r.filename || r.label || "");
         html += '<div class="overlay-file-item overlay-file-html" ' +
           'data-project-path="' + escapeAttr(project.path) + '" ' +
           'data-report-filename="' + escapeAttr(r.filename || "") + '" ' +
           'title="Open in report viewer">' +
-          '<span class="overlay-file-name">' + escapeHtml(r.label || r.filename || "") + '</span>' +
+          '<span class="overlay-file-name">' + displayName + '</span>' +
           '<span class="overlay-file-date">' + escapeHtml(r.last_modified || "") + '</span>' +
           '<span class="overlay-file-size">' + escapeHtml(r.size_label || "") + '</span>' +
         '</div>';
@@ -288,6 +291,12 @@ var ProjectBrowser = (function() {
     var diagnostics = ensureArray(files.diagnostics);
     if (diagnostics.length > 0) {
       html += buildOverlayFileSection("Diagnostics", ICONS.diagnostic, diagnostics);
+    }
+
+    // Misc (templates, parsed files, etc.)
+    var misc = ensureArray(files.misc);
+    if (misc.length > 0) {
+      html += buildOverlayFileSection("Misc", ICONS.misc, misc);
     }
 
     html += '</div>';
@@ -599,7 +608,7 @@ var ProjectBrowser = (function() {
         sorted.sort(function(a, b) {
           var ac = a.counts || {}, bc = b.counts || {};
           var totalA = (ac.html_reports || 0) + (ac.configs || 0) + (ac.data_files || 0) +
-                       (ac.excel_reports || 0) + (ac.diagnostics || 0);
+                       (ac.excel_reports || 0) + (ac.diagnostics || 0) + (ac.misc || 0);
           var totalB = (bc.html_reports || 0) + (bc.configs || 0) + (bc.data_files || 0) +
                        (bc.excel_reports || 0) + (bc.diagnostics || 0);
           return totalB - totalA;

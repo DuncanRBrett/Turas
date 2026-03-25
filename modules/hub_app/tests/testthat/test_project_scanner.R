@@ -3,7 +3,17 @@
 # ==============================================================================
 
 # Source the scanner
-turas_root <- Sys.getenv("TURAS_ROOT", getwd())
+turas_root <- Sys.getenv("TURAS_ROOT", "")
+if (!nzchar(turas_root)) {
+  # Walk up from testthat dir to find project root
+  test_dir <- getwd()
+  candidate <- normalizePath(file.path(test_dir, "..", "..", "..", ".."), mustWork = FALSE)
+  if (file.exists(file.path(candidate, "launch_turas.R"))) {
+    turas_root <- candidate
+  } else {
+    turas_root <- normalizePath(file.path(test_dir, "..", "..", "..", "..", ".."), mustWork = FALSE)
+  }
+}
 source(file.path(turas_root, "modules", "hub_app", "lib", "project_scanner.R"))
 
 # ==============================================================================

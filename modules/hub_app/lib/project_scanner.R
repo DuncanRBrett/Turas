@@ -11,11 +11,12 @@
 #   Tier 3 — HTML meta tag sniffing (backward compat)
 #
 # File categorization within a project:
-#   1. Config files  — .xlsx matching module patterns
-#   2. HTML reports   — .html with turas-report-type meta tag
-#   3. Data files     — .csv; .xlsx with data/responses/raw/survey/design in name
-#   4. Diagnostics    — .xlsx with stats_pack/diagnostic/validation/shap in name
-#   5. Excel reports  — all remaining .xlsx
+#   1. Config files  — .xlsx matching module patterns (excl. templates/parsed)
+#   2. HTML reports   — all .html files (turas-tagged get rich metadata)
+#   3. Misc           — templates, parsed outputs, copies
+#   4. Data files     — .csv; .xlsx with data/responses/raw/survey/design in name
+#   5. Diagnostics    — .xlsx with stats_pack/diagnostic/validation/shap in name
+#   6. Excel reports  — all remaining .xlsx
 # ==============================================================================
 
 
@@ -37,7 +38,7 @@
 #' @keywords internal
 get_config_patterns <- function() {
   list(
-    tabs       = "(?:crosstab_config|tabs_config|survey_structure)\\.xlsx$",
+    tabs       = "(?:crosstab_config|tabs_config|survey_structure).*\\.xlsx$",
     tracker    = "(?:tracking_config|tracker_config).*\\.xlsx$",
     maxdiff    = "(?:maxdiff|max_diff).*config.*\\.xlsx$",
     conjoint   = "(?:conjoint|cbc).*config.*\\.xlsx$",
@@ -156,7 +157,17 @@ identify_module_by_sheets <- function(file_path) {
 #' @keywords internal
 is_config_file <- function(filename) {
   grepl("(?:config|survey_structure)", filename, ignore.case = TRUE) &&
-    grepl("\\.xlsx$", filename, ignore.case = TRUE)
+    grepl("\\.xlsx$", filename, ignore.case = TRUE) &&
+    !is_misc_file(filename)
+}
+
+#' Misc File Name Patterns
+#'
+#' Templates, parsed outputs, and other non-actionable files.
+#' These are not configs you'd run, nor data/reports/diagnostics.
+#' @keywords internal
+is_misc_file <- function(filename) {
+  grepl("(?:template|parsed|_copy\\b)", filename, ignore.case = TRUE)
 }
 
 #' Detect Module from Config Filename
@@ -282,6 +293,7 @@ categorize_project_files <- function(dir_path, config_files = character(0),
   data_files <- list()
   diagnostics <- list()
   excel_reports <- list()
+  misc <- list()
 
   # Track assigned files to avoid duplicates
   assigned <- character(0)
@@ -293,7 +305,8 @@ categorize_project_files <- function(dir_path, config_files = character(0),
     assigned <- c(assigned, normalizePath(cf, winslash = "/", mustWork = FALSE))
   }
 
-  # --- Priority 2: HTML reports (sniff for turas meta tag) ---
+  # --- Priority 2: HTML reports ---
+  # Include ALL .html files; turas-tagged ones get rich metadata, others get basic info
   html_files <- all_files[grepl("\\.html$", all_files, ignore.case = TRUE)]
   for (hf in html_files) {
     hf_norm <- normalizePath(hf, winslash = "/", mustWork = FALSE)
@@ -301,9 +314,22 @@ categorize_project_files <- function(dir_path, config_files = character(0),
 
     report_info <- sniff_report_type(hf)
     if (!is.null(report_info)) {
+      # Turas report — has type + label from meta/title tags
       html_reports[[length(html_reports) + 1]] <- report_info
-      assigned <- c(assigned, hf_norm)
+    } else {
+      # Non-turas HTML file — still include with basic file info
+      finfo <- file.info(hf)
+      html_reports[[length(html_reports) + 1]] <- list(
+        path          = hf,
+        filename      = basename(hf),
+        label         = tools::file_path_sans_ext(basename(hf)),
+        type          = "html",
+        size          = finfo$size,
+        size_label    = format_file_size(finfo$size),
+        last_modified = format(finfo$mtime, "%Y-%m-%d %H:%M")
+      )
     }
+    assigned <- c(assigned, hf_norm)
   }
 
   # --- Remaining xlsx and csv files ---
@@ -319,6 +345,10 @@ categorize_project_files <- function(dir_path, config_files = character(0),
     if (grepl("\\.csv$", fname, ignore.case = TRUE)) {
       # --- Priority 3: CSV files are always data ---
       data_files[[length(data_files) + 1]] <- build_file_info(f)
+      assigned <- c(assigned, f_norm)
+    } else if (is_misc_file(fname)) {
+      # --- Priority 2a: Misc files (templates, parsed) ---
+      misc[[length(misc) + 1]] <- build_file_info(f)
       assigned <- c(assigned, f_norm)
     } else if (is_config_file(fname)) {
       # --- Priority 2b: Any xlsx with "config" or "survey_structure" in name ---
@@ -344,7 +374,8 @@ categorize_project_files <- function(dir_path, config_files = character(0),
     html_reports  = html_reports,
     data_files    = data_files,
     diagnostics   = diagnostics,
-    excel_reports = excel_reports
+    excel_reports = excel_reports,
+    misc          = misc
   )
 }
 
@@ -531,6 +562,9 @@ evaluate_project_dir <- function(dir_path) {
     fname <- basename(xlsx_path)
     matched <- FALSE
 
+    # Skip templates and parsed files — these are not runnable configs
+    if (is_misc_file(fname)) next
+
     for (module_id in names(config_patterns)) {
       if (grepl(config_patterns[[module_id]], fname, ignore.case = TRUE)) {
         config_files <- c(config_files, xlsx_path)
@@ -609,9 +643,15 @@ evaluate_project_dir <- function(dir_path) {
         files$configs[[i]]$module_label <- labels[[mod_id]] %||% mod_id
         files$configs[[i]]$script <- scripts[[mod_id]] %||% NULL
       } else {
-        # Broad config catch-all — try to match module by pattern
+        # Broad config catch-all — try to match module by pattern first
         fname <- basename(cfg_path)
         mod_id <- detect_module_from_filename(fname, config_patterns)
+
+        # If filename doesn't reveal the module, try Tier 2 sheet inspection
+        if (is.null(mod_id) && grepl("\\.xlsx$", fname, ignore.case = TRUE)) {
+          mod_id <- identify_module_by_sheets(cfg_path)
+        }
+
         if (!is.null(mod_id)) {
           files$configs[[i]]$module <- mod_id
           files$configs[[i]]$module_label <- labels[[mod_id]] %||% mod_id
@@ -624,16 +664,29 @@ evaluate_project_dir <- function(dir_path) {
   # --- Derive project metadata ---
   folder_name <- basename(dir_path)
 
-  # Modules detected (from configs + reports)
-  modules <- unique(c(
-    config_modules,
-    vapply(turas_reports, function(r) {
-      # Map report types to module IDs
+  # Modules detected (from configs + reports + broad-catch configs)
+  # Start with Tier 1/2 config modules
+  all_modules <- config_modules
+
+  # Add modules from HTML report types
+  if (length(turas_reports) > 0) {
+    report_mods <- vapply(turas_reports, function(r) {
       rtype <- tolower(r$type %||% "")
-      # Strip sub-types (e.g., "segment-exploration" -> "segment")
       sub("-.*$", "", rtype)
     }, character(1))
-  ))
+    all_modules <- c(all_modules, report_mods)
+  }
+
+  # Add modules from broad-catch configs (detected by is_config_file in categorize)
+  if (length(files$configs) > 0) {
+    for (cfg in files$configs) {
+      if (!is.null(cfg$module) && nzchar(cfg$module)) {
+        all_modules <- c(all_modules, cfg$module)
+      }
+    }
+  }
+
+  modules <- unique(all_modules)
   modules <- modules[nzchar(modules)]
 
   # Project name: try from report titles, then config filenames, then folder
@@ -651,7 +704,8 @@ evaluate_project_dir <- function(dir_path) {
     html_reports  = length(files$html_reports),
     excel_reports = length(files$excel_reports),
     data_files    = length(files$data_files),
-    diagnostics   = length(files$diagnostics)
+    diagnostics   = length(files$diagnostics),
+    misc          = length(files$misc)
   )
 
   # Last modified across all files
@@ -660,7 +714,8 @@ evaluate_project_dir <- function(dir_path) {
     vapply(files$html_reports, function(f) f$path, character(1)),
     vapply(files$excel_reports, function(f) f$path, character(1)),
     vapply(files$data_files, function(f) f$path, character(1)),
-    vapply(files$diagnostics, function(f) f$path, character(1))
+    vapply(files$diagnostics, function(f) f$path, character(1)),
+    vapply(files$misc, function(f) f$path, character(1))
   )
   if (length(all_file_paths) == 0) all_file_paths <- dir_path
   all_mtimes <- file.mtime(all_file_paths)
