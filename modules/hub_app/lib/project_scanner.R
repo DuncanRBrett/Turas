@@ -159,6 +159,50 @@ is_config_file <- function(filename) {
     grepl("\\.xlsx$", filename, ignore.case = TRUE)
 }
 
+#' Detect Module from Config Filename
+#'
+#' Tries to match a config filename against module patterns. If no specific
+#' pattern matches, falls back to keyword detection in the filename.
+#'
+#' @param filename The config filename (basename only)
+#' @param patterns Named list of module patterns from get_config_patterns()
+#' @return Module ID string, or NULL if no match
+#' @keywords internal
+detect_module_from_filename <- function(filename, patterns) {
+  # Try specific Tier 1 patterns first
+  for (mod_id in names(patterns)) {
+    if (grepl(patterns[[mod_id]], filename, ignore.case = TRUE)) {
+      return(mod_id)
+    }
+  }
+
+  # Keyword fallback for common config names
+  fname_lower <- tolower(filename)
+  keyword_map <- list(
+    tabs       = c("crosstab", "cross_tab", "survey_structure"),
+    tracker    = c("tracking", "tracker"),
+    maxdiff    = c("maxdiff", "max_diff"),
+    conjoint   = c("conjoint", "cbc"),
+    segment    = c("segment"),
+    pricing    = c("pricing", "monadic"),
+    keydriver  = c("keydriver", "key_driver"),
+    catdriver  = c("catdriver", "categorical"),
+    confidence = c("confidence"),
+    weighting  = c("weighting"),
+    report_hub = c("report_hub")
+  )
+
+  for (mod_id in names(keyword_map)) {
+    for (kw in keyword_map[[mod_id]]) {
+      if (grepl(kw, fname_lower, fixed = TRUE)) {
+        return(mod_id)
+      }
+    }
+  }
+
+  NULL
+}
+
 #' Data File Name Patterns
 #' @keywords internal
 is_data_file <- function(filename) {
@@ -547,20 +591,32 @@ evaluate_project_dir <- function(dir_path) {
   files <- categorize_project_files(dir_path, config_files, child_project_dirs)
 
   # Add module info to config file entries
+  labels <- get_module_labels()
+  scripts <- get_module_scripts()
+
   if (length(files$configs) > 0) {
     for (i in seq_along(files$configs)) {
       cfg_path <- files$configs[[i]]$path
-      idx <- match(
-        normalizePath(cfg_path, winslash = "/", mustWork = FALSE),
+      cfg_norm <- normalizePath(cfg_path, winslash = "/", mustWork = FALSE)
+
+      # First check if this was a Tier 1 match
+      idx <- match(cfg_norm,
         normalizePath(config_files, winslash = "/", mustWork = FALSE)
       )
       if (!is.na(idx)) {
-        files$configs[[i]]$module <- config_modules[idx]
-        labels <- get_module_labels()
-        files$configs[[i]]$module_label <- labels[[config_modules[idx]]] %||%
-          config_modules[idx]
-        scripts <- get_module_scripts()
-        files$configs[[i]]$script <- scripts[[config_modules[idx]]] %||% NULL
+        mod_id <- config_modules[idx]
+        files$configs[[i]]$module <- mod_id
+        files$configs[[i]]$module_label <- labels[[mod_id]] %||% mod_id
+        files$configs[[i]]$script <- scripts[[mod_id]] %||% NULL
+      } else {
+        # Broad config catch-all — try to match module by pattern
+        fname <- basename(cfg_path)
+        mod_id <- detect_module_from_filename(fname, config_patterns)
+        if (!is.null(mod_id)) {
+          files$configs[[i]]$module <- mod_id
+          files$configs[[i]]$module_label <- labels[[mod_id]] %||% mod_id
+          files$configs[[i]]$script <- scripts[[mod_id]] %||% NULL
+        }
       }
     }
   }
