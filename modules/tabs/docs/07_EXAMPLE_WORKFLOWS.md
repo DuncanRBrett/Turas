@@ -339,11 +339,11 @@ purchase, and service quality only among those who contacted support.
 
 **Selection Sheet:**
 
-| QuestionCode     | Include | BaseFilter                   |
-|------------------|---------|------------------------------|
-| Q01_Satisfaction | Y       | Q_Purchased == "Yes"         |
-| Q02_Service      | Y       | Q_Contacted_Support == "Yes" |
-| Q03_General      | Y       |                              |
+| QuestionCode     | Include | BaseFilter                   | FilterLabel              |
+|------------------|---------|------------------------------|--------------------------|
+| Q01_Satisfaction | Y       | Q_Purchased == "Yes"         | Purchasers only          |
+| Q02_Service      | Y       | Q_Contacted_Support == "Yes" | Contacted support        |
+| Q03_General      | Y       |                              |                          |
 
 ### Expected Output
 
