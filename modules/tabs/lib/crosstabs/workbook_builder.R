@@ -385,12 +385,14 @@ write_single_question <- function(wb, sheet, question_results, q_code,
     current_row <- current_row + 1
 
     # Write filter if present
-    if (!is.null(question_results$base_filter) &&
+    has_base_filter <- !is.null(question_results$base_filter) &&
         !is.na(question_results$base_filter) &&
-        nchar(trimws(question_results$base_filter)) > 0) {
-      filter_text <- if (!is.null(question_results$filter_label) &&
-                        !is.na(question_results$filter_label) &&
-                        nchar(trimws(question_results$filter_label)) > 0) {
+        nchar(trimws(question_results$base_filter)) > 0
+    has_filter_label <- !is.null(question_results$filter_label) &&
+        !is.na(question_results$filter_label) &&
+        nchar(trimws(question_results$filter_label)) > 0
+    if (has_base_filter || has_filter_label) {
+      filter_text <- if (has_filter_label) {
         question_results$filter_label
       } else {
         question_results$base_filter

@@ -905,17 +905,20 @@ build_question_containers <- function(questions, tables, banner_groups,
           htmltools::HTML(sprintf("Banner: <strong class=\"banner-name-label\">%s</strong> &middot; Showing %s",
                                   htmltools::htmlEscape(first_group_name), htmltools::htmlEscape(stat_label %||% "")))
         ),
-        if (!is.na(q$base_filter) && nchar(q$base_filter %||% "") > 0) {
-          filter_display <- if (!is.na(q$filter_label %||% NA) &&
-                                nchar(q$filter_label %||% "") > 0) {
-            q$filter_label
-          } else {
-            q$base_filter
+        {
+          has_base_filter <- !is.na(q$base_filter) && nchar(q$base_filter %||% "") > 0
+          has_filter_label <- !is.na(q$filter_label %||% NA) && nchar(q$filter_label %||% "") > 0
+          if (has_base_filter || has_filter_label) {
+            filter_display <- if (has_filter_label) {
+              q$filter_label
+            } else {
+              q$base_filter
+            }
+            htmltools::tags$div(
+              style = "margin-top:4px;font-size:11px;color:#e8614d;font-weight:600",
+              sprintf("Filter: %s", filter_display)
+            )
           }
-          htmltools::tags$div(
-            style = "margin-top:4px;font-size:11px;color:#e8614d;font-weight:600",
-            sprintf("Filter: %s", filter_display)
-          )
         }
       ),
       htmltools::tags$div(class = "table-wrapper",
