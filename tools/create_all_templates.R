@@ -271,6 +271,7 @@ create_tabs_config_template <- function() {
   stub_data <- data.frame(
     StubQuestion = c("Q01", "Q02", "Q03", "Q04", "Q05"),
     BaseFilter = c(NA, NA, NA, "Gender == 'Male'", NA),
+    FilterLabel = c(NA, NA, NA, "Males only", NA),
     stringsAsFactors = FALSE
   )
 

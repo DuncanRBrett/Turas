@@ -492,11 +492,21 @@ process_single_question <- function(question_code, prepared_data,
     NA_character_
   }
 
+  # Extract human-readable filter label (optional, overrides raw filter expression in display)
+  q_filter_label <- if (!is.null(question_row$FilterLabel) &&
+                        !is.na(question_row$FilterLabel) &&
+                        nzchar(trimws(question_row$FilterLabel))) {
+    trimws(question_row$FilterLabel)
+  } else {
+    NA_character_
+  }
+
   return(list(
     question_code = question_code,
     question_text = question_info$QuestionText,
     question_type = question_info$Variable_Type,
     base_filter = base_filter,
+    filter_label = q_filter_label,
     bases = banner_bases,
     table = question_table,
     category = q_category,

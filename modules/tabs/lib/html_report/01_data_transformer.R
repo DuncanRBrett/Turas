@@ -227,7 +227,8 @@ classify_row_labels <- function(question_table, question_type = "Single_Choice")
 #'   \item{q_code}{Question code}
 #'   \item{question_text}{Full question text}
 #'   \item{question_type}{Question type}
-#'   \item{base_filter}{Filter text or NA}
+#'   \item{base_filter}{Filter expression or NA}
+#'   \item{filter_label}{Human-readable filter label or NA}
 #'   \item{stats}{Available statistics (from detect_available_stats)}
 #'   \item{table_data}{Data.frame for HTML table builder}
 #' @export
@@ -467,6 +468,7 @@ transform_single_question <- function(q_result, banner_info, config_obj) {
     question_text = q_result$question_text %||% "",
     question_type = q_type,
     base_filter = q_result$base_filter,
+    filter_label = q_result$filter_label %||% NA_character_,
     category = q_result$category %||% NA_character_,
     category_order = q_result$category_order %||% NA_character_,
     stats = stats,

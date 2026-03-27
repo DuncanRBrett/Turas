@@ -906,9 +906,15 @@ build_question_containers <- function(questions, tables, banner_groups,
                                   htmltools::htmlEscape(first_group_name), htmltools::htmlEscape(stat_label %||% "")))
         ),
         if (!is.na(q$base_filter) && nchar(q$base_filter %||% "") > 0) {
+          filter_display <- if (!is.na(q$filter_label %||% NA) &&
+                                nchar(q$filter_label %||% "") > 0) {
+            q$filter_label
+          } else {
+            q$base_filter
+          }
           htmltools::tags$div(
             style = "margin-top:4px;font-size:11px;color:#e8614d;font-weight:600",
-            sprintf("Filter: %s", q$base_filter)
+            sprintf("Filter: %s", filter_display)
           )
         }
       ),

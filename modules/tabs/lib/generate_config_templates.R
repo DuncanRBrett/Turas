@@ -897,6 +897,8 @@ generate_crosstab_config_template <- function(output_path,
          dropdown = c("Y", "N")),
     list(name = "BaseFilter", width = 35, required = FALSE,
          description = "R expression to filter respondents (e.g. Q1 == \"Male\" or !is.na(Q20)). Leave blank for no filter."),
+    list(name = "FilterLabel", width = 30, required = FALSE,
+         description = "Human-readable label shown in reports instead of the filter expression. Leave blank to show the raw filter."),
     list(name = "QuestionText", width = 40, required = FALSE,
          description = "Reference only - question wording for your convenience. Not used in processing.")
   )
@@ -906,14 +908,17 @@ generate_crosstab_config_template <- function(output_path,
     list(QuestionCode = "Total", Include = "N", UseBanner = "Y",
          BannerBoxCategory = "N", BannerLabel = "Total",
          DisplayOrder = 1, CreateIndex = "N", BaseFilter = "",
+         FilterLabel = "",
          QuestionText = "Total sample (always include as first banner)"),
     list(QuestionCode = "Q_Gender", Include = "N", UseBanner = "Y",
          BannerBoxCategory = "N", BannerLabel = "Gender",
          DisplayOrder = 2, CreateIndex = "N", BaseFilter = "",
+         FilterLabel = "",
          QuestionText = "Example: demographic banner question"),
     list(QuestionCode = "Q_Satisfaction", Include = "Y", UseBanner = "N",
          BannerBoxCategory = "", BannerLabel = "",
          DisplayOrder = "", CreateIndex = "Y", BaseFilter = "",
+         FilterLabel = "",
          QuestionText = "Example: stub question with index score")
   )
 

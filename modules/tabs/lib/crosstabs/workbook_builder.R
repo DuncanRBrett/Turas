@@ -388,7 +388,14 @@ write_single_question <- function(wb, sheet, question_results, q_code,
     if (!is.null(question_results$base_filter) &&
         !is.na(question_results$base_filter) &&
         nchar(trimws(question_results$base_filter)) > 0) {
-      filter_display <- paste("  Filter:", question_results$base_filter)
+      filter_text <- if (!is.null(question_results$filter_label) &&
+                        !is.na(question_results$filter_label) &&
+                        nchar(trimws(question_results$filter_label)) > 0) {
+        question_results$filter_label
+      } else {
+        question_results$base_filter
+      }
+      filter_display <- paste("  Filter:", filter_text)
       openxlsx::writeData(wb, sheet, filter_display,
                           startRow = current_row, startCol = 1, colNames = FALSE)
       openxlsx::addStyle(wb, sheet, styles$filter, rows = current_row, cols = 1)

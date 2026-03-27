@@ -446,6 +446,7 @@ add_composites_to_results <- function(all_results, composite_results, banner_inf
       question_text = comp_label,
       question_type = "Composite",
       base_filter = NA,
+      filter_label = NA_character_,
       table = comp_result$question_table,
       bases = comp_bases
     )

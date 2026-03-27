@@ -159,6 +159,7 @@ generate_crosstab_config <- function(questions) {
     DisplayOrder = NA,
     CreateIndex = "N",
     BaseFilter = NA,
+    FilterLabel = NA,
     QuestionText = "Response ID",
     stringsAsFactors = FALSE
   )
@@ -213,6 +214,7 @@ generate_crosstab_config <- function(questions) {
       DisplayOrder = integer(0),
       CreateIndex = character(0),
       BaseFilter = character(0),
+      FilterLabel = character(0),
       QuestionText = character(0),
       stringsAsFactors = FALSE
     ))
@@ -243,6 +245,7 @@ create_crosstab_row <- function(q_code, q_text, var_type) {
     DisplayOrder = NA,
     CreateIndex = create_index,
     BaseFilter = NA,
+    FilterLabel = NA,
     QuestionText = q_text,
     stringsAsFactors = FALSE
   )
