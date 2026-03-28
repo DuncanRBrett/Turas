@@ -116,6 +116,9 @@ modules <- list(
   list(name = "Weighting", id = "weighting",
        test_dir = "modules/weighting/tests/testthat",
        description = "Design/cell/rim weighting, diagnostics, trimming"),
+  list(name = "Hub App", id = "hub_app",
+       test_dir = "modules/hub_app/tests/testthat",
+       description = "Project hub app, scanner, search index, PPTX export"),
   list(name = "Report Hub", id = "report_hub",
        test_dir = "modules/report_hub/tests/testthat",
        description = "Report combination, HTML parsing, page assembly")
@@ -127,7 +130,7 @@ if (!is.null(selected_module)) {
   if (length(modules) == 0) {
     cat(sprintf("\n[ERROR] Module '%s' not found.\n", selected_module))
     cat("Available: shared, AlchemerParser, confidence, conjoint, catdriver,\n")
-    cat("  keydriver, maxdiff, pricing, segment, tabs, tracker, weighting, report_hub\n\n")
+    cat("  hub_app, keydriver, maxdiff, pricing, segment, tabs, tracker, weighting, report_hub\n\n")
     stop("Module not found")
   }
 }

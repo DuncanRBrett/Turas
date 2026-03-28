@@ -37,6 +37,12 @@ Output/
 output/
 Outputs/
 outputs/
+test_output/
+
+# Generated HTML reports (keep hub_app/app/index.html and test fixtures)
+*.html
+!modules/hub_app/app/index.html
+!**/tests/**/fixtures/**/*.html
 
 # Temporary files
 *.tmp
@@ -63,6 +69,11 @@ Thumbs.db
 # Recent projects tracking
 .recent_projects.rds
 .recent_tracker_projects.rds
+.recent_hub_configs.rds
+.recent_tabs_projects.rds
+
+# Marketing materials (moved to Google Drive)
+docs/marketing/
 
 # User project directories (not part of core Turas)
 my_*

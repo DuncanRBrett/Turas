@@ -135,7 +135,7 @@ module_stats <- function(mod_dir, test_dirs = NULL) {
 # ---------------------------------------------------------------------------
 
 module_names <- c("AlchemerParser", "catdriver", "confidence", "conjoint",
-                  "keydriver", "maxdiff", "pricing", "report_hub",
+                  "hub_app", "keydriver", "maxdiff", "pricing", "report_hub",
                   "segment", "shared", "tabs", "tracker", "weighting")
 
 rows <- list()
