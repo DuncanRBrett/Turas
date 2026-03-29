@@ -286,6 +286,7 @@ Value            |   ○   |   ○   |   ○   |   ○   |   ○   |
 - `DisplayOrder` - Control output sequence
 - `CreateIndex` - Create composite indices (Y/N)
 - `BaseFilter` - Subgroup filters
+- `FilterLabel` - Human-readable label shown in reports instead of the filter expression
 - `QuestionText` - Full question text for reference
 
 **Example rows:**

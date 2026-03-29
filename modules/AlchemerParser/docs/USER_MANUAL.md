@@ -428,6 +428,7 @@ for (proj in projects) {
 | DisplayOrder | Sort order | Blank (user fills in) |
 | CreateIndex | Auto-create index | Y for NPS/Likert/Rating, N otherwise |
 | BaseFilter | Filter condition | Blank (user fills in) |
+| FilterLabel | Human-readable filter label for reports | Blank (user fills in) |
 | QuestionText | Full question text | From parsing |
 
 **Special Rows:** - `ResponseID` with Include=N (system variable) -

@@ -230,7 +230,7 @@ load_question_selection <- function(config_file) {
   validate_data_frame(selection_df, c("QuestionCode"), 1)
 
   # Ensure optional columns exist and are character type
-  for (col in c("Include", "UseBanner", "BannerBoxCategory", "CreateIndex", "BaseFilter", "Category", "CategoryOrder")) {
+  for (col in c("Include", "UseBanner", "BannerBoxCategory", "CreateIndex", "BaseFilter", "FilterLabel", "Category", "CategoryOrder")) {
     if (!col %in% names(selection_df)) {
       selection_df[[col]] <- NA_character_
     } else {

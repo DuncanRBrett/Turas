@@ -194,6 +194,7 @@ as banner columns.
 | DisplayOrder | Order for banner columns (1, 2, 3...)           |
 | CreateIndex  | Y to calculate mean/index for this question     |
 | BaseFilter   | Optional filter expression                      |
+| FilterLabel  | Human-readable label shown in reports instead of the filter expression |
 
 **Example Selection sheet:**
 
@@ -533,6 +534,7 @@ To analyze only a subset of respondents for a specific question:
 
 1.  In the Selection sheet, find the question row
 2.  In the BaseFilter column, enter a filter expression
+3.  Optionally, in the FilterLabel column, enter a human-readable description (e.g., "Purchasers only"). This label is shown in reports instead of the raw filter expression
 
 Example: To analyze Q01 only among purchasers:
 

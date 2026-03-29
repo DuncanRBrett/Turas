@@ -250,6 +250,7 @@ are used. Each row represents one question from your survey structure.
 | `DisplayOrder` | No | *(auto)* | Numeric value controlling the display order. Lower numbers appear first. Banner questions are ordered by this value. |
 | `CreateIndex` | No | `N` | Set to `Y` to calculate an index score for this question. Requires scale-type response options with defined weights in the structure file. |
 | `BaseFilter` | No | *(none)* | Advanced: An R expression to filter the base for this question (e.g., filtering to only respondents who answered a previous question). |
+| `FilterLabel` | No | *(none)* | Human-readable label shown in reports instead of the raw BaseFilter expression. If blank, the BaseFilter expression is displayed as-is. |
 
 **Understanding Banners vs Stubs:**
 

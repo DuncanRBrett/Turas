@@ -451,10 +451,18 @@ write_question_table <- function(wb, sheet, result, banner_info, styles,
   current_row <- current_row + 1
   
   # Write base filter if present
-  if (!is.null(result$base_filter) && result$base_filter != "") {
+  has_base_filter_ef <- !is.null(result$base_filter) && !is.na(result$base_filter) &&
+    nchar(trimws(result$base_filter %||% "")) > 0
+  has_filter_label_ef <- !is.null(result$filter_label) && !is.na(result$filter_label) &&
+    nchar(trimws(result$filter_label)) > 0
+  if (has_base_filter_ef || has_filter_label_ef) {
     openxlsx::writeData(
       wb, sheet,
-      paste("Base:", result$base_filter),
+      paste("Base:", if (has_filter_label_ef) {
+        result$filter_label
+      } else {
+        result$base_filter
+      }),
       startRow = current_row,
       startCol = 1
     )
@@ -833,11 +841,20 @@ add_question_list <- function(wb, all_results, config, styles, start_row,
       eff_base <- 0
     }
 
-    filter_text <- if (!is.null(q_result$base_filter) &&
-                      length(q_result$base_filter) > 0 &&
-                      !is.na(q_result$base_filter) &&
-                      nchar(trimws(q_result$base_filter)) > 0) {
-      paste0(" [Filter: ", q_result$base_filter, "]")
+    has_bf_toc <- !is.null(q_result$base_filter) &&
+                    length(q_result$base_filter) > 0 &&
+                    !is.na(q_result$base_filter) &&
+                    nchar(trimws(q_result$base_filter)) > 0
+    has_fl_toc <- !is.null(q_result$filter_label) &&
+                    !is.na(q_result$filter_label) &&
+                    nchar(trimws(q_result$filter_label)) > 0
+    filter_text <- if (has_bf_toc || has_fl_toc) {
+      filter_display_text <- if (has_fl_toc) {
+        q_result$filter_label
+      } else {
+        q_result$base_filter
+      }
+      paste0(" [Filter: ", filter_display_text, "]")
     } else {
       ""
     }

@@ -724,6 +724,7 @@ selection_df <- data.frame(
     rep("N", 8)   # Single choice - no index
   ),
   BaseFilter = rep("", 29),
+  FilterLabel = rep("", 29),
   Category = c(
     "Demographics", "Demographics", "Demographics", "Demographics",
     "Awareness", "Awareness", "Awareness",
@@ -739,6 +740,7 @@ selection_df <- data.frame(
 
 # Q023 has a base filter (only asked if Q022 == "Yes")
 selection_df$BaseFilter[selection_df$QuestionCode == "Q023"] <- 'Q022 == "Yes"'
+selection_df$FilterLabel[selection_df$QuestionCode == "Q023"] <- "Answered Yes to Q022"
 
 # Write Config
 config_path <- file.path(output_dir, "Demo_Crosstab_Config.xlsx")

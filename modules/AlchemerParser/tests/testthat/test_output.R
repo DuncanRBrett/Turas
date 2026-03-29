@@ -203,7 +203,7 @@ test_that("create_crosstab_row returns correct structure", {
   expect_equal(names(row), c("QuestionCode", "Include", "UseBanner",
                               "BannerBoxCategory", "BannerLabel",
                               "DisplayOrder", "CreateIndex",
-                              "BaseFilter", "QuestionText"))
+                              "BaseFilter", "FilterLabel", "QuestionText"))
   expect_equal(nrow(row), 1)
 })
 
@@ -410,7 +410,7 @@ test_that("generate_crosstab_config has correct columns", {
   result <- generate_crosstab_config(questions)
   expected_cols <- c("QuestionCode", "Include", "UseBanner", "BannerBoxCategory",
                      "BannerLabel", "DisplayOrder", "CreateIndex", "BaseFilter",
-                     "QuestionText")
+                     "FilterLabel", "QuestionText")
   expect_equal(names(result), expected_cols)
 })
 

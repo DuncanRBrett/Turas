@@ -934,6 +934,24 @@ meaningful.
 `Q1 == "Female" & Q2 %in% c("18-34", "35-44")` (females aged 18-44) -
 `!is.na(Q20)` (only respondents who answered Q20)
 
+### Column: FilterLabel
+
+**What it does:** Provides a human-readable label that is displayed in
+reports instead of the raw BaseFilter expression.
+
+**Required:** No
+
+**What to enter:** A plain-language description of the filter, or leave
+blank to show the raw filter expression.
+
+**Examples:** - `Purchasers only` - `Employed respondents` -
+`Answered Yes to Q22` - `Complete responses, 1 year cohort`
+
+**When to use:** When the BaseFilter expression would be cryptic or
+confusing in the report (e.g., `Status == "Complete" & Q37 == "1"`), or
+when the filter was applied to the data before it reached Turas and you
+want to note that.
+
 ### Column: QuestionText
 
 **What it does:** Reference information only - has no effect on
