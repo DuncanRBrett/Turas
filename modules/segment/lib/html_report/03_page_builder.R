@@ -37,6 +37,14 @@ local({
       }, error = function(e) NULL)
     }
   }
+  # Source shared TurasPins JS loader
+  pins_path <- file.path(turas_root, "modules", "shared", "lib", "turas_pins_js.R")
+  if (!file.exists(pins_path)) {
+    pins_path <- file.path("modules", "shared", "lib", "turas_pins_js.R")
+  }
+  if (!exists("turas_pins_js", mode = "function") && file.exists(pins_path)) {
+    source(pins_path, local = FALSE)
+  }
 })
 
 
@@ -199,9 +207,15 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
     "[]"
   )
 
-  # Read JS files
+  # Load shared TurasPins library (required by seg_pins.js)
+  shared_js_tag <- if (exists("turas_pins_js", mode = "function")) {
+    shared_js <- turas_pins_js()
+    if (nzchar(shared_js)) htmltools::tags$script(htmltools::HTML(shared_js))
+  }
+
+  # Read module JS files
   js_files <- c("seg_utils.js", "seg_navigation.js",
-                "seg_pinned_views.js", "seg_slide_export.js")
+                "seg_pins.js", "seg_pins_extras.js")
   js_tags <- lapply(js_files, function(fname) {
     js_path <- file.path(.seg_html_report_dir, "js", fname)
     js_content <- if (file.exists(js_path)) {
@@ -211,6 +225,9 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
     }
     htmltools::tags$script(htmltools::HTML(js_content))
   })
+
+  # Prepend shared library before module JS
+  if (!is.null(shared_js_tag)) js_tags <- c(list(shared_js_tag), js_tags)
 
   # Report Hub metadata
   source_filename <- basename(config$output_file %||%
@@ -239,8 +256,7 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
       "Pinned Views",
       htmltools::tags$span(
         id = "seg-pin-count-badge",
-        class = "seg-pin-count-badge",
-        style = "display:none;"
+        class = "seg-pin-count-badge"
       )
     ),
     htmltools::tags$button(

@@ -532,13 +532,21 @@ build_seg_exploration_page <- function(html_data, tables, charts, config) {
     file.path(turas_root, "modules/segment/lib/html_report/js")
   })
 
-  js_files <- c("seg_utils.js", "seg_navigation.js", "seg_slide_export.js")
+  # Load shared TurasPins library
+  shared_js_tag <- if (exists("turas_pins_js", mode = "function")) {
+    shared_js <- turas_pins_js()
+    if (nzchar(shared_js)) htmltools::tags$script(htmltools::HTML(shared_js))
+  }
+
+  js_files <- c("seg_utils.js", "seg_navigation.js",
+                "seg_pins.js", "seg_pins_extras.js")
   js_tags <- lapply(js_files, function(jf) {
     jpath <- file.path(js_dir, jf)
     if (file.exists(jpath)) {
       htmltools::tags$script(htmltools::HTML(readLines(jpath, warn = FALSE) |> paste(collapse = "\n")))
     }
   })
+  if (!is.null(shared_js_tag)) js_tags <- c(list(shared_js_tag), js_tags)
 
   # Assemble final page
   page <- htmltools::browsable(
