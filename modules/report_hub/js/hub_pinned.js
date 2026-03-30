@@ -281,6 +281,24 @@
     }
 
     container.innerHTML = html;
+
+    // Force dark header theme on all pinned tables — inlineTableStyles may
+    // capture a wrong background (e.g. print media value) or miss it entirely
+    container.querySelectorAll(".hub-pin-table th").forEach(function(th) {
+      th.style.backgroundColor = "#1a2744";
+      th.style.color = "#e2e8f0";
+      th.style.fontWeight = "600";
+      th.style.fontSize = "11px";
+      th.style.padding = "12px 16px";
+      th.style.textAlign = "center";
+      th.style.letterSpacing = "0.5px";
+      th.style.verticalAlign = "bottom";
+    });
+    // First header cell (label column) left-aligned
+    container.querySelectorAll(".hub-pin-table thead tr").forEach(function(tr) {
+      var firstTh = tr.querySelector("th");
+      if (firstTh) firstTh.style.textAlign = "left";
+    });
   };
 
   /**
@@ -1245,7 +1263,7 @@
       "#9370DB", "#D2691E", "#20B2AA", "#8B4513", "#6A5ACD"
     ];
 
-    var baseRowH = 22, headerH = 26, fontSize = 10, padX = 6;
+    var baseRowH = 28, headerH = 34, fontSize = 11, padX = 10;
     // Adaptive first column width: measure longest label across all rows
     var maxLabelLen = 0;
     for (var mi = 0; mi < tableData.length; mi++) {
@@ -1270,6 +1288,39 @@
       if (bg === "rgb(255, 255, 255)" || bg === "#ffffff" || bg === "#fff" || bg === "white") return false;
       return true;
     }
+
+    // Calculate total table height for the rounded border
+    var totalTableH = 0;
+    for (var th = 0; th < tableData.length; th++) {
+      totalTableH += tableData[th].type === "header" ? headerH : baseRowH;
+    }
+
+    // Rounded clip path so header corners and last row corners are rounded
+    var clipId = "table-clip-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5);
+    var defs = svgParent.querySelector("defs") || document.createElementNS(ns, "defs");
+    if (!defs.parentNode) svgParent.insertBefore(defs, svgParent.firstChild);
+    var clipPath = document.createElementNS(ns, "clipPath");
+    clipPath.setAttribute("id", clipId);
+    var clipRect = document.createElementNS(ns, "rect");
+    clipRect.setAttribute("x", x); clipRect.setAttribute("y", y);
+    clipRect.setAttribute("width", maxWidth); clipRect.setAttribute("height", totalTableH);
+    clipRect.setAttribute("rx", "6"); clipRect.setAttribute("ry", "6");
+    clipPath.appendChild(clipRect);
+    defs.appendChild(clipPath);
+
+    // Group for clipped table content
+    var tableGroup = document.createElementNS(ns, "g");
+    tableGroup.setAttribute("clip-path", "url(#" + clipId + ")");
+    svgParent.appendChild(tableGroup);
+
+    // Subtle border around table
+    var borderRect = document.createElementNS(ns, "rect");
+    borderRect.setAttribute("x", x); borderRect.setAttribute("y", y);
+    borderRect.setAttribute("width", maxWidth); borderRect.setAttribute("height", totalTableH);
+    borderRect.setAttribute("rx", "6"); borderRect.setAttribute("ry", "6");
+    borderRect.setAttribute("fill", "none");
+    borderRect.setAttribute("stroke", "#e5e7eb"); borderRect.setAttribute("stroke-width", "1");
+    svgParent.appendChild(borderRect);
 
     tableData.forEach(function(row, ri) {
       var isHeader = row.type === "header";
@@ -1298,11 +1349,12 @@
       } else {
         bgRect.setAttribute("fill", "#f9fafb");
       }
-      svgParent.appendChild(bgRect);
+      tableGroup.appendChild(bgRect);
 
       // Per-cell background overlays: preserves significance highlighting,
-      // conditional formatting, and other cell-level background colours
-      if (hasCellStyles) {
+      // conditional formatting, and other cell-level background colours.
+      // Skip for header rows — they always use the dark #1a2744 background.
+      if (hasCellStyles && !isHeader) {
         row.cells.forEach(function(cellText, ci) {
           var cs = row.cellStyles[ci];
           if (cs && isSignificantBg(cs.bg)) {
@@ -1314,7 +1366,7 @@
             cellBg.setAttribute("width", cellW);
             cellBg.setAttribute("height", rH);
             cellBg.setAttribute("fill", cs.bg);
-            svgParent.appendChild(cellBg);
+            tableGroup.appendChild(cellBg);
           }
         });
       }
@@ -1328,7 +1380,7 @@
           dot.setAttribute("cy", curY + rH / 2);
           dot.setAttribute("r", "3.5");
           dot.setAttribute("fill", dotColour);
-          svgParent.appendChild(dot);
+          tableGroup.appendChild(dot);
           colourIdx++;
         }
       }
@@ -1404,14 +1456,14 @@
         }
 
         textEl.textContent = cellText;
-        svgParent.appendChild(textEl);
+        tableGroup.appendChild(textEl);
       });
 
       var borderLine = document.createElementNS(ns, "line");
       borderLine.setAttribute("x1", x); borderLine.setAttribute("x2", x + maxWidth);
       borderLine.setAttribute("y1", curY + rH); borderLine.setAttribute("y2", curY + rH);
       borderLine.setAttribute("stroke", "#e2e8f0"); borderLine.setAttribute("stroke-width", "0.5");
-      svgParent.appendChild(borderLine);
+      tableGroup.appendChild(borderLine);
 
       curY += rH;
     });
@@ -1596,7 +1648,7 @@
     if (pin.tableHtml && exportShowTable) {
       tableData = hubExtractPinTableData(pin.tableHtml);
       if (tableData && tableData.length > 0) {
-        estimatedTableH = 26 + (tableData.length - 1) * 22 + 4;
+        estimatedTableH = 34 + (tableData.length - 1) * 28 + 4;
       }
     }
 

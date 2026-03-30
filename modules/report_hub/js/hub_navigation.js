@@ -342,6 +342,10 @@ var ReportHub = ReportHub || {};
           if (prop === "font-size" && val === "16px") continue;
           // Skip auto widths
           if ((prop === "width" || prop === "min-width" || prop === "max-width") && val === "auto") continue;
+          // Don't bake max-width on cells — let columns stretch to fill card
+          if (prop === "max-width" && (el.tagName === "TH" || el.tagName === "TD")) continue;
+          // Don't bake min-width on cells — let layout be fluid
+          if (prop === "min-width" && (el.tagName === "TH" || el.tagName === "TD")) continue;
 
           inlined.push(prop + ":" + val);
         }
@@ -354,6 +358,16 @@ var ReportHub = ReportHub || {};
 
         // Remove class attributes — they mean nothing outside the report CSS
         el.removeAttribute("class");
+      }
+
+      // Force table to fill container width
+      var tbl = temp.querySelector("table");
+      if (tbl) {
+        var tblStyle = tbl.getAttribute("style") || "";
+        // Replace any baked width with 100%
+        tblStyle = tblStyle.replace(/width:\s*[^;]+;?/g, "");
+        tblStyle = "width:100%;table-layout:auto;" + tblStyle;
+        tbl.setAttribute("style", tblStyle);
       }
 
       var result = temp.innerHTML;

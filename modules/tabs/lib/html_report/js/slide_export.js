@@ -77,9 +77,23 @@ function extractSlideTableData(container) {
   var table = container.querySelector("table.ct-table");
   if (!table) return null;
   var rows = [];
+
+  // Helper: extract cell background from inline style or data-heatmap attribute
+  function getCellStyle(el) {
+    if (!el) return { bg: "", color: "", fontWeight: "" };
+    var bg = el.style.backgroundColor || "";
+    // Fall back to data-heatmap attribute (used by heatmap toggle)
+    if (!bg && el.getAttribute("data-heatmap")) bg = el.getAttribute("data-heatmap");
+    return {
+      bg: bg,
+      color: el.style.color || "",
+      fontWeight: el.style.fontWeight || ""
+    };
+  }
+
   var headerRow = [];
-  // Header: get visible columns (use style.display only — offsetParent is null in detached DOM)
-  // Include column letter (A, B, C...) when present so significance markers are interpretable
+  var headerStyles = [];
+  // Header: get visible columns
   table.querySelectorAll("thead th").forEach(function(th) {
     if (th.style.display === "none") return;
     var text = th.querySelector(".ct-header-text");
@@ -87,18 +101,21 @@ function extractSlideTableData(container) {
     var letterEl = th.querySelector(".ct-letter");
     if (letterEl) label += " " + letterEl.textContent.trim();
     headerRow.push(label);
+    headerStyles.push(getCellStyle(th));
   });
-  rows.push({ cells: headerRow, type: "header" });
+  rows.push({ cells: headerRow, type: "header", cellStyles: headerStyles });
 
   // Body rows: skip excluded rows, get visible columns
   table.querySelectorAll("tbody tr").forEach(function(tr) {
     if (tr.classList.contains("ct-row-excluded")) return;
     var cells = [];
+    var cellStyles = [];
     var isBase = tr.classList.contains("ct-row-base");
     var isMean = tr.classList.contains("ct-row-mean");
     var isNet = tr.classList.contains("ct-row-net");
     tr.querySelectorAll("td").forEach(function(td) {
       if (td.style.display === "none") return;
+      cellStyles.push(getCellStyle(td));
       var clone = td.cloneNode(true);
       // Remove frequency annotations and exclude buttons, but preserve significance markers
       clone.querySelectorAll(".ct-freq, .row-exclude-btn").forEach(function(el) { el.remove(); });
@@ -113,7 +130,7 @@ function extractSlideTableData(container) {
       cells.push(cellVal);
     });
     if (cells.length > 0) {
-      rows.push({ cells: cells, type: isBase ? "base" : (isMean ? "mean" : (isNet ? "net" : "data")) });
+      rows.push({ cells: cells, type: isBase ? "base" : (isMean ? "mean" : (isNet ? "net" : "data")), cellStyles: cellStyles });
     }
   });
   return rows;
@@ -125,10 +142,19 @@ function renderTableSVG(ns, svgParent, tableData, x, y, maxWidth) {
   var nCols = tableData[0].cells.length;
   if (nCols === 0) return 0;
 
-  var baseRowH = 18, headerH = 22, fontSize = 9, padX = 6;
-  var lineH = fontSize + 3; // line height for wrapped text
-  // Calculate column widths: first col gets more space
-  var firstColW = Math.min(Math.max(maxWidth * 0.3, 120), 200);
+  var baseRowH = 28, headerH = 34, fontSize = 11, padX = 10;
+  var lineH = fontSize + 4; // line height for wrapped text
+
+  // Adaptive first column width: measure longest label across all rows
+  var maxLabelLen = 0;
+  for (var mi = 0; mi < tableData.length; mi++) {
+    if (tableData[mi].cells.length > 0) {
+      var len = tableData[mi].cells[0].length;
+      if (len > maxLabelLen) maxLabelLen = len;
+    }
+  }
+  var estimatedLabelW = maxLabelLen * (fontSize * 0.6) + padX * 2 + 20;
+  var firstColW = Math.min(Math.max(estimatedLabelW, 160), maxWidth * 0.4);
   var dataColW = nCols > 1 ? (maxWidth - firstColW) / (nCols - 1) : maxWidth;
 
   // Pre-compute per-row heights based on text wrapping needs
@@ -148,6 +174,36 @@ function renderTableSVG(ns, svgParent, tableData, x, y, maxWidth) {
     return maxLines > 1 ? baseH + (maxLines - 1) * lineH : baseH;
   });
 
+  // Total table height for rounded border
+  var totalTableH = 0;
+  for (var th = 0; th < rowHeights.length; th++) totalTableH += rowHeights[th];
+
+  // Rounded clip path for clean corners
+  var clipId = "tbl-clip-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5);
+  var defs = svgParent.querySelector("defs") || document.createElementNS(ns, "defs");
+  if (!defs.parentNode) svgParent.insertBefore(defs, svgParent.firstChild);
+  var clipPath = document.createElementNS(ns, "clipPath");
+  clipPath.setAttribute("id", clipId);
+  var clipRect = document.createElementNS(ns, "rect");
+  clipRect.setAttribute("x", x); clipRect.setAttribute("y", y);
+  clipRect.setAttribute("width", maxWidth); clipRect.setAttribute("height", totalTableH);
+  clipRect.setAttribute("rx", "6"); clipRect.setAttribute("ry", "6");
+  clipPath.appendChild(clipRect);
+  defs.appendChild(clipPath);
+
+  var tableGroup = document.createElementNS(ns, "g");
+  tableGroup.setAttribute("clip-path", "url(#" + clipId + ")");
+  svgParent.appendChild(tableGroup);
+
+  // Subtle border around table
+  var borderRect = document.createElementNS(ns, "rect");
+  borderRect.setAttribute("x", x); borderRect.setAttribute("y", y);
+  borderRect.setAttribute("width", maxWidth); borderRect.setAttribute("height", totalTableH);
+  borderRect.setAttribute("rx", "6"); borderRect.setAttribute("ry", "6");
+  borderRect.setAttribute("fill", "none");
+  borderRect.setAttribute("stroke", "#e5e7eb"); borderRect.setAttribute("stroke-width", "1");
+  svgParent.appendChild(borderRect);
+
   var curY = y;
   tableData.forEach(function(row, ri) {
     var isHeader = row.type === "header";
@@ -160,29 +216,87 @@ function renderTableSVG(ns, svgParent, tableData, x, y, maxWidth) {
     if (isHeader) {
       bgRect.setAttribute("fill", "#1a2744");
     } else if (row.type === "base") {
-      bgRect.setAttribute("fill", "#fafbfc");
+      bgRect.setAttribute("fill", "#f8f9fa");
     } else if (row.type === "mean") {
-      bgRect.setAttribute("fill", "#fef9e7");
+      bgRect.setAttribute("fill", "#faf8f4");
     } else if (row.type === "net") {
-      bgRect.setAttribute("fill", "#f5f0e8");
+      bgRect.setAttribute("fill", "#faf8f5");
     } else if (ri % 2 === 0) {
       bgRect.setAttribute("fill", "#ffffff");
     } else {
       bgRect.setAttribute("fill", "#f9fafb");
     }
-    svgParent.appendChild(bgRect);
+    tableGroup.appendChild(bgRect);
+
+    // Per-cell background overlays (heatmap colours, significance highlighting)
+    // Skip for header rows — they always use the dark background
+    var hasCellStyles = row.cellStyles && row.cellStyles.length > 0;
+    if (hasCellStyles && !isHeader) {
+      row.cells.forEach(function(cellText, ci) {
+        var cs = row.cellStyles[ci];
+        if (cs && cs.bg && cs.bg !== "transparent" && cs.bg !== "rgba(0, 0, 0, 0)" &&
+            cs.bg !== "rgb(255, 255, 255)" && cs.bg !== "#ffffff" && cs.bg !== "#fff") {
+          var cellW = ci === 0 ? firstColW : dataColW;
+          var cellBgX = ci === 0 ? x : x + firstColW + (ci - 1) * dataColW;
+          var cellBg = document.createElementNS(ns, "rect");
+          cellBg.setAttribute("x", cellBgX);
+          cellBg.setAttribute("y", curY);
+          cellBg.setAttribute("width", cellW);
+          cellBg.setAttribute("height", rH);
+          cellBg.setAttribute("fill", cs.bg);
+          tableGroup.appendChild(cellBg);
+        }
+      });
+    }
 
     // Cell text
     row.cells.forEach(function(cellText, ci) {
+      var cs = hasCellStyles ? row.cellStyles[ci] : null;
       var cellW = ci === 0 ? firstColW : dataColW;
-      var cellX = ci === 0 ? x + padX : x + firstColW + (ci - 1) * dataColW + padX;
+      var cellX = ci === 0 ? x + padX : x + firstColW + (ci - 1) * dataColW;
       var maxChars = Math.floor((cellW - padX * 2) / (fontSize * 0.55));
       var textEl = document.createElementNS(ns, "text");
-      textEl.setAttribute("x", cellX);
       textEl.setAttribute("font-size", fontSize);
-      textEl.setAttribute("fill", isHeader ? "#ffffff" : (ci === 0 ? "#374151" : "#1e293b"));
-      if (isHeader || row.type === "net" || ci === 0) textEl.setAttribute("font-weight", "600");
-      if (row.type === "mean") textEl.setAttribute("font-style", "italic");
+
+      // Use inline cell styles when available, fall back to row-type defaults
+      var appliedInline = false;
+      if (!isHeader && cs && cs.color) {
+        textEl.setAttribute("fill", cs.color);
+        if (cs.fontWeight && (cs.fontWeight === "bold" || parseInt(cs.fontWeight) >= 600)) {
+          textEl.setAttribute("font-weight", "600");
+        }
+        appliedInline = true;
+      }
+
+      if (!appliedInline) {
+        if (isHeader) {
+          textEl.setAttribute("fill", "#ffffff");
+          textEl.setAttribute("font-weight", "600");
+        } else if (row.type === "net") {
+          textEl.setAttribute("fill", ci === 0 ? "#1a2744" : "#1e293b");
+          textEl.setAttribute("font-weight", "600");
+        } else if (row.type === "base") {
+          textEl.setAttribute("fill", "#64748b");
+          textEl.setAttribute("font-weight", "600");
+          textEl.setAttribute("font-size", fontSize - 1);
+        } else if (row.type === "mean") {
+          textEl.setAttribute("fill", "#475569");
+          textEl.setAttribute("font-style", "italic");
+          textEl.setAttribute("font-weight", "500");
+        } else {
+          textEl.setAttribute("fill", ci === 0 ? "#374151" : "#334155");
+          if (ci === 0) textEl.setAttribute("font-weight", "500");
+        }
+      }
+
+      // Text positioning: label column left-aligned, data columns centred
+      if (ci === 0) {
+        textEl.setAttribute("x", cellX);
+        textEl.setAttribute("text-anchor", "start");
+      } else {
+        textEl.setAttribute("x", cellX + cellW / 2);
+        textEl.setAttribute("text-anchor", "middle");
+      }
 
       // Wrap text if it exceeds column width
       if (maxChars > 0 && cellText.length > maxChars) {
@@ -192,9 +306,8 @@ function renderTableSVG(ns, svgParent, tableData, x, y, maxWidth) {
         var startY = curY + (rH - blockH) / 2 + fontSize;
         for (var li = 0; li < nLines; li++) {
           var tspan = document.createElementNS(ns, "tspan");
-          tspan.setAttribute("x", cellX);
+          tspan.setAttribute("x", ci === 0 ? cellX : cellX + cellW / 2);
           tspan.setAttribute("y", startY + li * lineH);
-          // Truncate last line if there are more lines remaining
           if (li === nLines - 1 && lines.length > nLines) {
             tspan.textContent = lines[li].substring(0, Math.max(maxChars - 1, 5)) + "\u2026";
           } else {
@@ -207,15 +320,17 @@ function renderTableSVG(ns, svgParent, tableData, x, y, maxWidth) {
         textEl.setAttribute("dominant-baseline", "central");
         textEl.textContent = cellText;
       }
-      svgParent.appendChild(textEl);
+      tableGroup.appendChild(textEl);
     });
 
     // Row border
-    var borderLine = document.createElementNS(ns, "line");
-    borderLine.setAttribute("x1", x); borderLine.setAttribute("x2", x + maxWidth);
-    borderLine.setAttribute("y1", curY + rH); borderLine.setAttribute("y2", curY + rH);
-    borderLine.setAttribute("stroke", "#e2e8f0"); borderLine.setAttribute("stroke-width", "0.5");
-    svgParent.appendChild(borderLine);
+    if (ri < tableData.length - 1) {
+      var borderLine = document.createElementNS(ns, "line");
+      borderLine.setAttribute("x1", x); borderLine.setAttribute("x2", x + maxWidth);
+      borderLine.setAttribute("y1", curY + rH); borderLine.setAttribute("y2", curY + rH);
+      borderLine.setAttribute("stroke", "#e2e8f0"); borderLine.setAttribute("stroke-width", "0.5");
+      tableGroup.appendChild(borderLine);
+    }
 
     curY += rH;
   });

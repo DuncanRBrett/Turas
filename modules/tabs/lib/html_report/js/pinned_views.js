@@ -217,6 +217,18 @@ function captureCurrentView(qCode) {
   };
 }
 
+// Inject pinned-card table CSS once (ensures tables fill card width)
+(function() {
+  if (document.getElementById("pinned-table-fix")) return;
+  var s = document.createElement("style");
+  s.id = "pinned-table-fix";
+  s.textContent =
+    ".pinned-card .ct-table { width: 100% !important; table-layout: auto !important; }" +
+    ".pinned-card .ct-table .ct-th { max-width: none; }" +
+    ".pinned-card .ct-table .ct-td { max-width: none; }";
+  document.head.appendChild(s);
+})();
+
 function renderPinnedCards() {
   var container = document.getElementById("pinned-cards-container");
   if (!container) return;
@@ -407,7 +419,7 @@ function renderPinnedCards() {
     }
 
     // Table (detailed reference) — respect pin mode
-    // Let the existing ct-table CSS rules handle all styling (same as tabs view)
+    // CSS .pinned-card .ct-table rules handle full-width layout
     if (pin.tableHtml && showTable) {
       var tableDiv = document.createElement("div");
       tableDiv.className = "table-wrapper";
@@ -416,7 +428,7 @@ function renderPinnedCards() {
       var tbl = tableDiv.querySelector("table");
       if (tbl) {
         if (!tbl.classList.contains("ct-table")) tbl.classList.add("ct-table");
-        // Clear any inline styles that might override the ct-table CSS
+        tbl.classList.remove("ct-cols-hidden");
         tbl.style.cssText = "";
       }
       card.appendChild(tableDiv);
@@ -655,7 +667,7 @@ function exportPinnedCardPNG(pinId) {
   var tableH = 0;
   if (pngShowTable && pin.tableHtml) {
     var countRows = (pin.tableHtml.match(/<tr/g) || []).length;
-    tableH = 22 + Math.max(0, countRows - 1) * 20 + 8;
+    tableH = 34 + Math.max(0, countRows - 1) * 28 + 8;
   }
 
   // Initial estimate — will be tightened after rendering
@@ -1059,7 +1071,7 @@ function copyPinnedCardToClipboard(pinId) {
   var tableH = 0;
   if (clipShowTable && pin.tableHtml) {
     var countRows = (pin.tableHtml.match(/<tr/g) || []).length;
-    tableH = 22 + Math.max(0, countRows - 1) * 20 + 8;
+    tableH = 34 + Math.max(0, countRows - 1) * 28 + 8;
   }
 
   // Initial estimate — will be tightened after rendering
@@ -1459,7 +1471,7 @@ function exportAllPinnedSlides() {
     var tableH = 0;
     if (slideShowTable && pin.tableHtml) {
       var countRows = (pin.tableHtml.match(/<tr/g) || []).length;
-      tableH = 22 + Math.max(0, countRows - 1) * 20 + 8;
+      tableH = 34 + Math.max(0, countRows - 1) * 28 + 8;
     }
 
     // Initial estimate — tightened after table render

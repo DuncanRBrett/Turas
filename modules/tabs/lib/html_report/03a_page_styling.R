@@ -351,6 +351,10 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     .pinned-card-chart { margin-bottom: 12px; }
     .pinned-card-chart svg { width: 100%; height: auto; }
     .pinned-card-table { overflow-x: auto; }
+    /* Pinned card tables: always fill card width, remove column caps */
+    .pinned-card .ct-table { width: 100% !important; }
+    .pinned-card .ct-table .ct-th { max-width: none; }
+    .pinned-card .ct-table .ct-td { max-width: none; }
     .footer {
       margin-top: 16px;
       padding: 12px 16px;

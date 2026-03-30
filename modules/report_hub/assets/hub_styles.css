@@ -1022,17 +1022,133 @@ body {
 .hub-pin-table {
   margin: 2px 0 0;
   overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
+  background: #ffffff;
 }
 
 .hub-pin-table table {
+  width: 100%;
+  border-collapse: collapse;
   font-size: 13px;
   color: #1e293b;
+  table-layout: auto;
+  line-height: 1.5;
 }
 
-.hub-pin-table td,
-.hub-pin-table th {
-  color: #1e293b;
+/* Header: dark, authoritative — match tabs view */
+.hub-pin-table .ct-th {
+  padding: 12px 16px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  border-bottom: none;
+  background: #1a2744;
+  color: #e2e8f0;
+  white-space: normal;
+  vertical-align: bottom;
 }
+.hub-pin-table .ct-th.ct-label-col {
+  text-align: left;
+  min-width: 180px;
+  white-space: normal;
+  word-wrap: break-word;
+}
+.hub-pin-table .ct-header-text {
+  font-size: 11px;
+  line-height: 1.3;
+  color: #e2e8f0;
+}
+.hub-pin-table .ct-letter {
+  display: inline-block;
+  font-size: 9px;
+  color: rgba(255,255,255,0.6);
+  margin-top: 2px;
+}
+.hub-pin-table .ct-th.bg-total .ct-header-text {
+  color: #e8c56d;
+}
+
+/* Data cells */
+.hub-pin-table .ct-td {
+  padding: 10px 16px;
+  text-align: center;
+  border-bottom: 1px solid #f0f1f3;
+  white-space: nowrap;
+  color: #334155;
+  font-size: 13px;
+}
+.hub-pin-table .ct-td.ct-label-col {
+  text-align: left;
+  font-weight: 500;
+  color: #1e293b;
+  white-space: normal;
+  word-wrap: break-word;
+  max-width: 320px;
+  background: #ffffff;
+}
+
+/* Zebra striping */
+.hub-pin-table tr.ct-row-category:nth-child(even) > .ct-td { background: #f9fafb; }
+
+/* Data values */
+.hub-pin-table .ct-val { font-variant-numeric: tabular-nums; color: #334155; }
+
+/* Significance markers */
+.hub-pin-table .ct-sig {
+  font-size: 9px;
+  font-weight: 700;
+  margin-left: 3px;
+  vertical-align: super;
+}
+
+/* Base row */
+.hub-pin-table .ct-row-base { background: #f8f9fa; }
+.hub-pin-table .ct-row-base .ct-td {
+  font-weight: 600;
+  font-size: 12px;
+  color: #64748b;
+  border-bottom: 2px solid #e2e8f0;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+/* NET rows */
+.hub-pin-table .ct-row-net { background: #faf8f5; }
+.hub-pin-table .ct-row-net .ct-td { font-weight: 600; color: #1e293b; }
+.hub-pin-table .ct-row-net .ct-label-col {
+  font-weight: 700;
+  color: #1e293b;
+  background: #faf8f5;
+}
+
+/* Mean / index rows */
+.hub-pin-table .ct-row-mean { background: #faf8f4; }
+.hub-pin-table .ct-row-mean .ct-td { font-style: italic; color: #475569; font-weight: 500; }
+.hub-pin-table .ct-row-mean .ct-label-col {
+  background: #faf8f4;
+  font-style: italic;
+  border-left: 3px solid #c9a96e;
+}
+
+/* Section separators */
+.hub-pin-table .ct-row-category + .ct-row-net > .ct-td { border-top: 2px solid #e2e8f0; }
+.hub-pin-table .ct-row-net + .ct-row-mean > .ct-td { border-top: 1px solid #e2e8f0; }
+.hub-pin-table .ct-row-category + .ct-row-mean > .ct-td { border-top: 2px solid #e2e8f0; }
+
+/* Row hover */
+.hub-pin-table tr.ct-row-category:hover > td { background: #eef2f7; }
+
+/* Last row */
+.hub-pin-table table tbody tr:last-child td {
+  border-bottom: none;
+  padding-bottom: 10px;
+}
+
+/* Low-base warning */
+.hub-pin-table .ct-low-base { color: #e8614d; font-weight: 600; }
 
 /* --- iframe Report Panels --- */
 /* Each report lives inside an iframe — full isolation, zero conflicts. */
