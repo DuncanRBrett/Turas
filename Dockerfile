@@ -46,6 +46,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglpk-dev \
     libgmp3-dev \
     libmpfr-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Set the application directory
@@ -60,11 +61,26 @@ COPY renv/activate.R renv/activate.R
 
 # Install renv and restore packages from lock file
 # This is the slow step — cached unless renv.lock changes
+# Two-pass restore: first pass installs most packages, second pass catches
+# any that failed due to dependency ordering issues in parallel builds
+# Disable renv's symlink cache — packages must be COPIED into the project
+# library, not symlinked to /root/.cache (which the shiny user cannot read).
+ENV RENV_CONFIG_CACHE_SYMLINKS=FALSE
+
 RUN R -e "install.packages('renv', repos = 'https://cloud.r-project.org')" && \
+    R -e "renv::consent(provided = TRUE); tryCatch(renv::restore(), error = function(e) message('First pass done, retrying failures...'))" && \
     R -e "renv::consent(provided = TRUE); renv::restore()"
 
 # Copy the full application
 COPY . .
+
+# Fix permissions: renv installs as root, but Shiny Server runs as 'shiny'
+RUN chmod -R a+rX /srv/shiny-server/turas/renv/library
+
+# Overwrite Renviron.site to:
+# 1. Include renv library FIRST in R_LIBS (before system libraries)
+# 2. Skip renv bootstrap at runtime
+RUN printf 'R_LIBS=/srv/shiny-server/turas/renv/library/linux-ubuntu-noble/R-4.5/x86_64-pc-linux-gnu:/usr/local/lib/R/site-library:/usr/local/lib/R/library\nTURAS_SKIP_RENV=1\n' > /usr/local/lib/R/etc/Renviron.site
 
 # Create data mount point
 RUN mkdir -p /data
@@ -80,7 +96,7 @@ server {\n\
     site_dir /srv/shiny-server/turas;\n\
     log_dir /var/log/shiny-server;\n\
     directory_index on;\n\
-    app_init_timeout 120;\n\
+    app_init_timeout 300;\n\
     app_idle_timeout 1800;\n\
   }\n\
 }\n' > /etc/shiny-server/shiny-server.conf
@@ -88,6 +104,9 @@ server {\n\
 # Create a simple app.R wrapper that launches Turas
 RUN echo '\
 # Turas Shiny App Entry Point (Docker)\n\
+# Add renv library to search path (renv itself is skipped via .Renviron)\n\
+renv_lib <- "/srv/shiny-server/turas/renv/library/linux-ubuntu-noble/R-4.5/x86_64-pc-linux-gnu"\n\
+if (dir.exists(renv_lib)) .libPaths(c(renv_lib, .libPaths()))\n\
 Sys.setenv(TURAS_ROOT = "/srv/shiny-server/turas")\n\
 Sys.setenv(TURAS_DOCKER = "1")\n\
 setwd(Sys.getenv("TURAS_ROOT"))\n\

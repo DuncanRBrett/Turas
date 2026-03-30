@@ -818,8 +818,10 @@ if ("%s" != "alchemerparser") {
   }
 
   # Run the launcher
+  # Don't try to open a browser inside Docker — there isn't one
+  open_browser <- !nzchar(Sys.getenv("TURAS_DOCKER"))
   runApp(list(ui = ui, server = server),
-         launch.browser = TRUE,
+         launch.browser = open_browser,
          quiet = TRUE)
 }
 
