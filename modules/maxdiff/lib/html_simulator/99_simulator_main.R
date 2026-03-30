@@ -114,10 +114,21 @@ generate_maxdiff_html_simulator <- function(maxdiff_results, config, output_path
     if (file.exists(fpath)) paste(readLines(fpath, warn = FALSE), collapse = "\n") else ""
   }
 
+  # Load shared pin library
+  turas_root <- Sys.getenv("TURAS_ROOT", "")
+  if (!nzchar(turas_root)) turas_root <- getwd()
+  pins_path <- file.path(turas_root, "modules", "shared", "lib", "turas_pins_js.R")
+  if (!file.exists(pins_path)) pins_path <- file.path("modules", "shared", "lib", "turas_pins_js.R")
+  if (!exists("turas_pins_js", mode = "function") && file.exists(pins_path)) {
+    source(pins_path, local = FALSE)
+  }
+  shared_js <- if (exists("turas_pins_js", mode = "function")) turas_pins_js() else ""
+
   js_files <- list(
+    shared = shared_js,
     engine = read_js("simulator_engine.js"),
     charts = read_js("simulator_charts.js"),
-    pins   = read_js("simulator_pins.js"),
+    pins   = read_js("sim_pins.js"),
     export = read_js("simulator_export.js"),
     ui     = read_js("simulator_ui.js")
   )
@@ -190,10 +201,13 @@ build_simulator_html_string <- function(maxdiff_results, config) {
     if (file.exists(fpath)) paste(readLines(fpath, warn = FALSE), collapse = "\n") else ""
   }
 
+  shared_js <- if (exists("turas_pins_js", mode = "function")) turas_pins_js() else ""
+
   js_files <- list(
+    shared = shared_js,
     engine = read_js("simulator_engine.js"),
     charts = read_js("simulator_charts.js"),
-    pins   = read_js("simulator_pins.js"),
+    pins   = read_js("sim_pins.js"),
     export = read_js("simulator_export.js"),
     ui     = read_js("simulator_ui.js")
   )

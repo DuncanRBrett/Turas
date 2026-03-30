@@ -608,18 +608,18 @@ build_pinned_views_panel <- function() {
 <div class="pinned-views-container">
 <div class="pinned-header">
 <h2>Pinned Views</h2>
-<div class="pinned-header-actions">
+<div id="md-pinned-toolbar" class="pinned-header-actions">
 <button class="md-export-btn" onclick="window._mdExportAllPinned()"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 14h12M8 2v9M4 7l4 4 4-4"/></svg> Export All as PNG</button>
 <button class="md-btn-secondary" onclick="window._mdSaveReport()">Save Report</button>
 </div>
 </div>
-<div id="pinned-cards-container"></div>
-<div id="pinned-empty-state" style="text-align:center;padding:60px 20px;color:#94a3b8;">
+<div id="md-pinned-cards-container"></div>
+<div id="md-pinned-empty" style="text-align:center;padding:60px 20px;color:#94a3b8;">
 <div style="font-size:36px;margin-bottom:12px;">&#128204;</div>
 <div style="font-size:14px;">No pinned views yet.</div>
 <div style="font-size:12px;margin-top:6px;">Use the pin button on any tab to capture a view</div>
 </div>
-<script type="application/json" id="pinned-views-data">[]</script>
+<script type="application/json" id="md-pinned-views-data">[]</script>
 </div>
 </div>'
 }

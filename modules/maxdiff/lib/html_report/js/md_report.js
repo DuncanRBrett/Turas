@@ -12,7 +12,6 @@
   // --------------------------------------------------------------------------
   // GLOBALS
   // --------------------------------------------------------------------------
-  var pinnedViews = [];
   var currentTab = "overview";
 
   // --------------------------------------------------------------------------
@@ -304,170 +303,15 @@
   }
 
   // --------------------------------------------------------------------------
-  // PINNED VIEWS
+  // PINNED VIEWS — Delegated to TurasPins shared library via md_pins.js
   // --------------------------------------------------------------------------
-  function loadPinnedData() {
-    var store = $("#pinned-views-data");
-    if (!store) return;
-    try { pinnedViews = JSON.parse(store.textContent) || []; } catch(e) { pinnedViews = []; }
-  }
-
-  function savePinnedData() {
-    var store = $("#pinned-views-data");
-    if (store) store.textContent = JSON.stringify(pinnedViews);
-  }
-
-  function updatePinBadge() {
-    var badge = $("#pin-count-badge");
-    if (!badge) return;
-    var count = pinnedViews.length;
-    badge.textContent = count;
-    badge.style.display = count > 0 ? "inline-block" : "none";
-  }
-
-  function captureCurrentView(panelId) {
-    var panel = $("#panel-" + panelId);
-    if (!panel) return null;
-
-    var title = "";
-    var h2 = panel.querySelector("h2");
-    if (h2) title = h2.textContent;
-
-    // Capture chart SVG
-    var chartSvg = "";
-    var svgEl = panel.querySelector(".md-chart-container svg");
-    if (svgEl) chartSvg = svgEl.outerHTML;
-
-    // Capture table HTML
-    var tableHtml = "";
-    var tableEl = panel.querySelector(".md-table");
-    if (tableEl) {
-      var clone = tableEl.cloneNode(true);
-      // Remove sort arrows from clone
-      clone.querySelectorAll(".sort-arrow").forEach(function(a) { a.remove(); });
-      tableHtml = clone.outerHTML;
-    }
-
-    // Capture insight text
-    var insightText = "";
-    var area = panel.querySelector(".insight-area");
-    if (area) {
-      var editor = area.querySelector(".insight-md-editor");
-      if (editor) insightText = editor.value;
-    }
-
-    return {
-      id: generateId(),
-      panelId: panelId,
-      title: title,
-      chartSvg: chartSvg,
-      tableHtml: tableHtml,
-      insightText: insightText,
-      timestamp: Date.now(),
-      order: pinnedViews.length,
-      pinMode: "all"
-    };
-  }
-
-  function executePinWithMode(panelId, mode) {
-    // Close popover
-    $$(".pin-mode-popover").forEach(function(p) { p.style.display = "none"; });
-
-    var view = captureCurrentView(panelId);
-    if (!view) return;
-    view.pinMode = mode;
-    pinnedViews.push(view);
-    savePinnedData();
-    updatePinBadge();
-    renderPinnedCards();
-
-    // Flash pin button to confirm
-    var btn = $(".pin-btn[data-panel='" + panelId + "']");
-    if (btn) {
-      btn.classList.add("pin-flash");
-      setTimeout(function() { btn.classList.remove("pin-flash"); }, 600);
-    }
-  }
-
-  function togglePin(panelId) {
-    var btn = $(".pin-btn[data-panel='" + panelId + "']");
-    if (!btn) return;
-    var popover = btn.parentElement.querySelector(".pin-mode-popover");
-    if (!popover) return;
-    var isOpen = popover.style.display === "block";
-    $$(".pin-mode-popover").forEach(function(p) { p.style.display = "none"; });
-    popover.style.display = isOpen ? "none" : "block";
-  }
-
-  function removePinned(pinId) {
-    pinnedViews = pinnedViews.filter(function(p) { return p.id !== pinId; });
-    savePinnedData();
-    updatePinBadge();
-    renderPinnedCards();
-  }
-
-  function movePinned(fromIdx, toIdx) {
-    if (toIdx < 0 || toIdx >= pinnedViews.length) return;
-    var item = pinnedViews.splice(fromIdx, 1)[0];
-    pinnedViews.splice(toIdx, 0, item);
-    savePinnedData();
-    renderPinnedCards();
-  }
-
-  function renderPinnedCards() {
-    var container = $("#pinned-cards-container");
-    var empty = $("#pinned-empty-state");
-    if (!container) return;
-
-    if (pinnedViews.length === 0) {
-      container.innerHTML = "";
-      if (empty) empty.style.display = "block";
-      return;
-    }
-    if (empty) empty.style.display = "none";
-
-    var html = "";
-    for (var i = 0; i < pinnedViews.length; i++) {
-      var pin = pinnedViews[i];
-      var showChart = pin.pinMode === "all" || pin.pinMode === "chart_insight";
-      var showTable = pin.pinMode === "all" || pin.pinMode === "table_insight";
-
-      var chartBlock = "";
-      if (showChart && pin.chartSvg) {
-        chartBlock = '<div class="pinned-chart">' + pin.chartSvg + '</div>';
-      }
-
-      var tableBlock = "";
-      if (showTable && pin.tableHtml) {
-        tableBlock = '<div class="pinned-table">' + pin.tableHtml + '</div>';
-      }
-
-      var insightBlock = "";
-      if (pin.insightText) {
-        insightBlock = '<div class="pinned-insight">' + renderMarkdown(pin.insightText) + '</div>';
-      }
-
-      html += '<div class="pinned-card" data-pin-id="' + escapeHtml(pin.id) + '">' +
-        '<div class="pinned-card-header">' +
-          '<div class="pinned-card-title">' + escapeHtml(pin.title) + '</div>' +
-          '<div class="pinned-card-actions">' +
-            (i > 0 ? '<button class="pinned-action" onclick="window._mdMovePinned(' + i + ',' + (i-1) + ')" title="Move up">\u25B2</button>' : '') +
-            (i < pinnedViews.length - 1 ? '<button class="pinned-action" onclick="window._mdMovePinned(' + i + ',' + (i+1) + ')" title="Move down">\u25BC</button>' : '') +
-            '<button class="pinned-action pinned-remove" onclick="window._mdRemovePinned(\'' + pin.id + '\')" title="Remove">\u00D7</button>' +
-          '</div>' +
-        '</div>' +
-        insightBlock + chartBlock + tableBlock +
-      '</div>';
-    }
-    container.innerHTML = html;
-  }
 
   // --------------------------------------------------------------------------
   // SAVE REPORT
   // --------------------------------------------------------------------------
   function saveReportHTML() {
     syncAllInsights();
-    savePinnedData();
+    if (typeof TurasPins !== "undefined") TurasPins.save();
 
     // Update header date badge
     var dateBadge = $("#md-header-date");
@@ -653,30 +497,7 @@
     }
   }
 
-  function pinSlide(slideId) {
-    var card = $('[data-slide-id="' + slideId + '"]');
-    if (!card) return;
-    var title = card.querySelector(".md-slide-title");
-    var editor = card.querySelector(".md-slide-md-editor");
-    var imgStore = card.querySelector(".md-slide-img-store");
-    var view = {
-      id: generateId(),
-      panelId: "added-slides",
-      title: title ? title.textContent : "Slide",
-      chartSvg: "",
-      tableHtml: "",
-      insightText: editor ? editor.value : "",
-      imageData: imgStore ? imgStore.value : "",
-      timestamp: Date.now(),
-      order: pinnedViews.length,
-      pinMode: "all"
-    };
-    pinnedViews.push(view);
-    savePinnedData();
-    updatePinBadge();
-    renderPinnedCards();
-    showToast("Slide pinned");
-  }
+  // pinSlide — delegated to md_pins.js
 
   function updateSlideEmptyState() {
     var container = $("#md-slides-container");
@@ -685,31 +506,7 @@
     empty.style.display = container.children.length === 0 ? "block" : "none";
   }
 
-  // --------------------------------------------------------------------------
-  // PIN INDIVIDUAL CHART
-  // --------------------------------------------------------------------------
-  function pinChart(btnEl, chartTitle) {
-    var wrapper = btnEl.closest(".md-chart-wrapper");
-    if (!wrapper) return;
-    var svg = wrapper.querySelector("svg");
-    if (!svg) { showToast("No chart found to pin"); return; }
-
-    var view = {
-      id: generateId(),
-      title: chartTitle || "Chart",
-      panelId: "chart",
-      pinMode: "chart_insight",
-      chartSvg: svg.outerHTML,
-      tableHtml: "",
-      insightText: "",
-      timestamp: new Date().toISOString()
-    };
-    pinnedViews.push(view);
-    savePinnedData();
-    updatePinBadge();
-    renderPinnedCards();
-    showToast("Chart pinned");
-  }
+  // pinChart — delegated to md_pins.js
 
   // --------------------------------------------------------------------------
   // PANEL EXCEL EXPORT
@@ -779,35 +576,7 @@
     showToast("Exported to Excel");
   }
 
-  // --------------------------------------------------------------------------
-  // PIN EXPORT (PNG slide)
-  // --------------------------------------------------------------------------
-  function exportPinnedAsPng(pinId) {
-    var pin = pinnedViews.find(function(p) { return p.id === pinId; });
-    if (!pin) return;
-    // Build simple SVG slide for export
-    var width = 1280, height = 720;
-    var title = escapeHtml(pin.title || "Pinned View");
-    var insight = pin.insightText ? escapeHtml(pin.insightText).substring(0, 500) : "";
-
-    var svgContent = '<rect width="' + width + '" height="' + height + '" fill="white"/>' +
-      '<text x="40" y="60" font-size="28" font-weight="bold" fill="#1e293b">' + title + '</text>' +
-      '<text x="40" y="100" font-size="14" fill="#64748b">' + insight + '</text>';
-
-    if (pin.chartSvg) {
-      svgContent += '<g transform="translate(40,120) scale(0.8)">' + pin.chartSvg.replace(/<svg[^>]*>/, '').replace(/<\/svg>/, '') + '</g>';
-    }
-
-    var svgStr = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '">' + svgContent + '</svg>';
-    var blob = new Blob([svgStr], { type: "image/svg+xml" });
-    downloadBlob(blob, (pin.title || "pin") + "_slide.svg");
-    showToast("Exported as SVG");
-  }
-
-  function exportAllPinnedAsPng() {
-    if (pinnedViews.length === 0) { showToast("No pinned views to export"); return; }
-    pinnedViews.forEach(function(pin) { exportPinnedAsPng(pin.id); });
-  }
+  // PIN EXPORT — delegated to md_pins.js via TurasPins
 
   // --------------------------------------------------------------------------
   // COLLAPSIBLE SECTIONS
@@ -834,17 +603,8 @@
     initTableSort();
     initUtilityToggle();
     initCollapsibles();
-    loadPinnedData();
-    updatePinBadge();
-    renderPinnedCards();
     hydrateInsights();
-
-    // Close popovers on outside click
-    document.addEventListener("click", function(e) {
-      if (!e.target.closest(".pin-btn-wrapper")) {
-        $$(".pin-mode-popover").forEach(function(p) { p.style.display = "none"; });
-      }
-    });
+    // Pin init handled by md_pins.js via TurasPins
   }
 
   // Expose to global scope for onclick handlers
@@ -852,10 +612,7 @@
   window._mdToggleInsight = toggleInsight;
   window._mdToggleInsightEdit = toggleInsightEdit;
   window._mdDismissInsight = dismissInsight;
-  window._mdTogglePin = togglePin;
-  window._mdExecutePin = executePinWithMode;
-  window._mdRemovePinned = removePinned;
-  window._mdMovePinned = movePinned;
+  // _mdTogglePin, _mdExecutePin, _mdRemovePinned, _mdMovePinned — set by md_pins.js
   window._mdSaveReport = saveReportHTML;
   window._mdToggleHelp = toggleHelpOverlay;
   window._mdFilterSegment = filterSegment;
@@ -866,11 +623,8 @@
   window._mdRemoveSlideImage = removeSlideImage;
   window._mdRemoveSlide = removeSlide;
   window._mdMoveSlide = moveSlide;
-  window._mdPinSlide = pinSlide;
-  window._mdPinChart = pinChart;
+  // _mdPinSlide, _mdPinChart, _mdExportPinnedSvg, _mdExportAllPinned — set by md_pins.js
   window._mdExportPanel = exportPanelToExcel;
-  window._mdExportPinnedSvg = exportPinnedAsPng;
-  window._mdExportAllPinned = exportAllPinnedAsPng;
 
   // Run on DOMContentLoaded or immediately if already loaded
   if (document.readyState === "loading") {

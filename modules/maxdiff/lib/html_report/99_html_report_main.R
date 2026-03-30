@@ -114,6 +114,37 @@ MAXDIFF_HTML_REPORT_VERSION <- "11.2"
 }
 
 
+#' Load pin wrapper JS module
+#'
+#' @return Character string of JS code, or empty string
+#' @keywords internal
+.md_load_pins_module <- function() {
+  js_paths <- c(
+    file.path(getwd(), "modules", "maxdiff", "lib", "html_report", "js", "md_pins.js"),
+    file.path(getwd(), "lib", "html_report", "js", "md_pins.js")
+  )
+
+  if (exists("script_dir_override", envir = globalenv())) {
+    sd <- get("script_dir_override", envir = globalenv())
+    js_paths <- c(
+      file.path(sd, "..", "lib", "html_report", "js", "md_pins.js"),
+      file.path(dirname(sd), "lib", "html_report", "js", "md_pins.js"),
+      js_paths
+    )
+  }
+
+  for (jp in js_paths) {
+    jp <- normalizePath(jp, mustWork = FALSE)
+    if (file.exists(jp)) {
+      return(paste(readLines(jp, warn = FALSE), collapse = "\n"))
+    }
+  }
+
+  message("[TRS INFO] MAXD_HTML_PINS_NOT_FOUND: md_pins.js not found, pinning will be limited")
+  ""
+}
+
+
 # ==============================================================================
 # MAIN ENTRY POINT
 # ==============================================================================
@@ -154,8 +185,20 @@ generate_maxdiff_html_report <- function(maxdiff_results, output_path, config,
     dir.create(output_dir, recursive = TRUE)
   }
 
-  # Load JS module
-  js_code <- .md_load_js_module()
+  # Load shared pin library
+  turas_root <- Sys.getenv("TURAS_ROOT", "")
+  if (!nzchar(turas_root)) turas_root <- getwd()
+  pins_path <- file.path(turas_root, "modules", "shared", "lib", "turas_pins_js.R")
+  if (!file.exists(pins_path)) pins_path <- file.path("modules", "shared", "lib", "turas_pins_js.R")
+  if (!exists("turas_pins_js", mode = "function") && file.exists(pins_path)) {
+    source(pins_path, local = FALSE)
+  }
+
+  # Load JS modules (shared lib + report JS + pin wrapper)
+  shared_js <- if (exists("turas_pins_js", mode = "function")) turas_pins_js() else ""
+  report_js <- .md_load_js_module()
+  pins_js <- .md_load_pins_module()
+  js_code <- paste(c(shared_js, report_js, pins_js), collapse = "\n\n")
 
   # --- Layer 1: Transform ---
   cat("  HTML Layer 1: Transforming data...\n")

@@ -214,8 +214,10 @@ build_simulator_page <- function(sim_data, ...) {
       <div class="sim-panel" id="panel-pins">
         <h2>Pinned Views</h2>
         <div id="pins-callout"></div>
-        <div id="pins-container">
-          <div class="sim-pins-empty">No pinned views yet. Pin views from other tabs to save them here.</div>
+        <div id="pins-container"></div>
+        <div id="sim-pins-empty" style="text-align:center;padding:40px 20px;color:#94a3b8;">
+          <div style="font-size:28px;margin-bottom:8px;">&#128204;</div>
+          <div style="font-size:13px;">No pinned views yet. Pin views from other tabs to save them here.</div>
         </div>
         <div class="sim-pins-actions">
           <button id="pins-add-slide" class="sim-btn sim-btn-outline">+ Custom Slide</button>
@@ -233,6 +235,7 @@ build_simulator_page <- function(sim_data, ...) {
   </div>
   <div class="sim-footer">TURAS MaxDiff Simulator v2.0 &middot; %s</div>
   <script type="application/json" id="sim-data">%s</script>
+  <script type="application/json" id="pinned-views-data">[]</script>
   %s
 </body>
 </html>',
@@ -297,8 +300,8 @@ build_segment_filter_html <- function(id, segments) {
 #' Build script tags for all JS files
 #' @keywords internal
 build_js_tags <- function(js_files) {
-  # Order matters: engine, charts, pins, export, ui (ui last since it wires everything)
-  order <- c("engine", "charts", "pins", "export", "ui")
+  # Order matters: shared first (TurasPins lib), then engine, charts, pins, export, ui (ui last)
+  order <- c("shared", "engine", "charts", "pins", "export", "ui")
   tags <- character(0)
   for (name in order) {
     if (!is.null(js_files[[name]]) && nchar(js_files[[name]]) > 0) {
