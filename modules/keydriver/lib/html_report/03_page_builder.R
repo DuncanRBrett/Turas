@@ -25,6 +25,12 @@ local({
   if (!exists("turas_callout", mode = "function") && dir.exists(callout_dir)) {
     source(file.path(callout_dir, "callout_registry.R"), local = FALSE)
   }
+  # Source shared pin library loader
+  pins_path <- file.path(turas_root, "modules", "shared", "lib", "turas_pins_js.R")
+  if (!file.exists(pins_path)) pins_path <- file.path("modules", "shared", "lib", "turas_pins_js.R")
+  if (!exists("turas_pins_js", mode = "function") && file.exists(pins_path)) {
+    source(pins_path, local = FALSE)
+  }
 })
 
 # Null-coalescing operator (existence guard)

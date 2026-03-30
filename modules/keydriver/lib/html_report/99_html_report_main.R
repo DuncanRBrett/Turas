@@ -43,7 +43,7 @@ for (.kd_file in .kd_required_files) {
 
 # Check JS files
 .kd_required_js <- c("kd_navigation.js", "kd_utils.js",
-                      "kd_pinned_views.js", "kd_slide_export.js")
+                      "kd_table_export.js", "kd_pins.js", "kd_pins_extras.js")
 for (.kd_js in .kd_required_js) {
   if (!file.exists(file.path(.kd_html_report_dir, "js", .kd_js))) {
     .kd_missing <- c(.kd_missing, paste0("js/", .kd_js))

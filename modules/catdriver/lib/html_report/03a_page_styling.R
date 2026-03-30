@@ -776,6 +776,26 @@ td.cd-td {
   border-color: var(--cd-brand);
 }
 
+/* PIN COUNT BADGE — small count in nav link                         */
+/* ================================================================ */
+
+.cd-pin-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  color: white;
+  background: var(--cd-brand, #323367);
+  border-radius: 9px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
 /* ================================================================ */
 /* CHART/TABLE WRAPPERS — containers with component pin buttons      */
 /* ================================================================ */
@@ -850,10 +870,24 @@ td.cd-td {
 }
 
 /* Drag-and-drop reordering for pinned cards */
-.cd-pin-dragging { opacity: 0.4; }
-.cd-pin-drop-target {
+.cd-pin-dragging,
+.turas-pin-dragging { opacity: 0.4; }
+.cd-pin-drop-target,
+.turas-pin-drop-target {
   outline: 2px dashed var(--cd-brand);
   outline-offset: -2px;
+}
+
+/* Drag cursor for pinned cards and section dividers */
+.cd-pinned-card[draggable="true"],
+.cd-pinned-card[data-pin-drag-idx],
+.cd-section-divider[draggable="true"] {
+  cursor: grab;
+}
+.cd-pinned-card[draggable="true"]:active,
+.cd-pinned-card[data-pin-drag-idx]:active,
+.cd-section-divider[draggable="true"]:active {
+  cursor: grabbing;
 }
 
 /* ================================================================ */
@@ -1043,18 +1077,55 @@ td.cd-td {
   margin-top: 10px;
   overflow-x: auto;
   overflow-y: visible;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
 }
 
 .cd-pinned-card-table table {
   width: 100%;
   font-size: 12px;
-  table-layout: fixed;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
 }
 
-.cd-pinned-card-table th,
+.cd-pinned-card-table th {
+  padding: 10px 14px;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  text-align: center;
+  color: #e2e8f0;
+  background: #1a2744;
+  border-bottom: 2px solid #0f1b30;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.cd-pinned-card-table th:first-child {
+  text-align: left;
+}
+
 .cd-pinned-card-table td {
+  padding: 8px 14px;
+  text-align: center;
+  color: #334155;
+  border-bottom: 1px solid #f0f1f3;
   word-wrap: break-word;
   overflow-wrap: break-word;
+}
+
+.cd-pinned-card-table td:first-child {
+  text-align: left;
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.cd-pinned-card-table tbody tr:nth-child(even) td {
+  background: #f9fafb;
+}
+
+.cd-pinned-card-table tbody tr:hover td {
+  background: #f1f5f9;
 }
 
 /* ================================================================ */
@@ -1181,11 +1252,13 @@ td.cd-td {
 }
 .cd-qual-slide-title:focus { border-bottom: 2px solid BRAND_COLOUR; }
 .cd-qual-slide-actions { display: flex; gap: 4px; }
-.cd-qual-slide-actions .export-btn {
+.cd-qual-slide-actions .export-btn,
+.cd-qual-btn {
   background: none; border: 1px solid #e2e8f0; border-radius: 4px;
   padding: 3px 7px; font-size: 13px; cursor: pointer; color: #475569;
 }
-.cd-qual-slide-actions .export-btn:hover { background: #f1f5f9; }
+.cd-qual-slide-actions .export-btn:hover,
+.cd-qual-btn:hover { background: #f1f5f9; }
 .cd-qual-md-editor {
   display: none; width: 100%; min-height: 120px; padding: 12px 16px;
   border: none; outline: none; font-family: monospace; font-size: 13px;

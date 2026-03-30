@@ -38,7 +38,11 @@ build_cd_section_nav <- function(brand_colour = "#323367", id_prefix = "",
     htmltools::tags$a(`data-cd-page` = "qualitative",
                       onclick = "cdSwitchPage('qualitative')", "Added Slides"),
     htmltools::tags$a(`data-cd-page` = "pinned-views",
-                      onclick = "cdSwitchPage('pinned-views')", "Pinned Views")
+                      onclick = "cdSwitchPage('pinned-views')",
+                      htmltools::HTML(paste0(
+                        "Pinned Views ",
+                        '<span id="cd-pin-count-badge" class="cd-pin-count-badge">0</span>'
+                      )))
   ))
 
   help_btn <- htmltools::tags$button(

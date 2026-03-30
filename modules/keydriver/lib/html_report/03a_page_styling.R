@@ -138,6 +138,11 @@ build_kd_css <- function(config) {
   display: block;
 }
 
+/* Pinned section always visible within its tab panel */
+#kd-tab-pinned .kd-section {
+  display: block;
+}
+
 /* ================================================================ */
 /* MAIN CONTENT                                                      */
 /* ================================================================ */
@@ -384,18 +389,26 @@ build_kd_css <- function(config) {
   opacity: 0.4;
 }
 
-.kd-pin-drop-target {
+.kd-pin-drop-target,
+.turas-pin-drop-target {
   outline: 2px dashed var(--kd-brand);
   outline-offset: -2px;
 }
 
+.kd-pin-dragging,
+.turas-pin-dragging {
+  opacity: 0.4;
+}
+
 .kd-pinned-card[draggable="true"],
-.kd-section-divider[draggable="true"] {
+.kd-section-divider[draggable="true"],
+.kd-pinned-card[data-pin-drag-idx] {
   cursor: grab;
 }
 
 .kd-pinned-card[draggable="true"]:active,
-.kd-section-divider[draggable="true"]:active {
+.kd-section-divider[draggable="true"]:active,
+.kd-pinned-card[data-pin-drag-idx]:active {
   cursor: grabbing;
 }
 
@@ -1200,18 +1213,55 @@ td.kd-td {
   margin-top: 6px;
   overflow-x: auto;
   overflow-y: visible;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
 }
 
 .kd-pinned-card-table table {
   width: 100%;
   font-size: 12px;
-  table-layout: fixed;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
 }
 
-.kd-pinned-card-table th,
+.kd-pinned-card-table th {
+  padding: 10px 14px;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  text-align: center;
+  color: #e2e8f0;
+  background: #1a2744;
+  border-bottom: 2px solid #0f1b30;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.kd-pinned-card-table th:first-child {
+  text-align: left;
+}
+
 .kd-pinned-card-table td {
+  padding: 8px 14px;
+  text-align: center;
+  color: #334155;
+  border-bottom: 1px solid #f0f1f3;
   word-wrap: break-word;
   overflow-wrap: break-word;
+}
+
+.kd-pinned-card-table td:first-child {
+  text-align: left;
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.kd-pinned-card-table tbody tr:nth-child(even) td {
+  background: #f9fafb;
+}
+
+.kd-pinned-card-table tbody tr:hover td {
+  background: #f1f5f9;
 }
 
 /* ================================================================ */

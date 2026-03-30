@@ -332,9 +332,14 @@ build_kd_action_bar <- function(report_title = "Keydriver Report") {
 #' @return htmltools tagList of script tags
 #' @keywords internal
 build_kd_js <- function(html_report_dir) {
+  # Load shared TurasPins library first (required by kd_pins.js)
+  shared_js_tag <- if (exists("turas_pins_js", mode = "function")) {
+    shared_js <- turas_pins_js()
+    if (nzchar(shared_js)) htmltools::tags$script(htmltools::HTML(shared_js))
+  }
+
   js_files <- c("kd_utils.js", "kd_navigation.js",
-                 "kd_table_export.js", "kd_pinned_views.js",
-                 "kd_slide_export.js")
+                 "kd_table_export.js", "kd_pins.js", "kd_pins_extras.js")
 
   js_tags <- lapply(js_files, function(fname) {
     js_path <- file.path(html_report_dir, "js", fname)
@@ -346,6 +351,9 @@ build_kd_js <- function(html_report_dir) {
     }
     htmltools::tags$script(htmltools::HTML(js_content))
   })
+
+  # Prepend shared library before module JS
+  if (!is.null(shared_js_tag)) js_tags <- c(list(shared_js_tag), js_tags)
 
   htmltools::tagList(js_tags)
 }

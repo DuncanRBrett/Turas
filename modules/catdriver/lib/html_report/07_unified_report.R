@@ -261,7 +261,7 @@ generate_catdriver_unified_report <- function(analyses,
       onclick = "cdSwitchAnalysisTab('pinned')",
       htmltools::HTML(paste0(
         "\U0001F4CC Pinned ",
-        '<span id="cd-pin-count-badge" class="cd-pin-count-badge" style="display:none;">0</span>'
+        '<span id="cd-pin-count-badge" class="cd-pin-count-badge">0</span>'
       ))
     )
   ))
@@ -384,13 +384,20 @@ generate_catdriver_unified_report <- function(analyses,
   footer <- build_comparison_footer(company_name = company_name,
                                      client_name = client_name)
 
-  # Read JS files — all 6
+  # Load shared TurasPins library first
+  shared_js_tag <- if (exists("turas_pins_js", mode = "function")) {
+    shared_js <- turas_pins_js()
+    if (nzchar(shared_js)) htmltools::tags$script(htmltools::HTML(shared_js))
+  }
+
+  # Read JS files
   js_files <- c("cd_utils.js", "cd_navigation.js", "cd_unified_tabs.js",
-                 "cd_insights.js", "cd_pinned_views.js", "cd_slide_export.js")
+                 "cd_insights.js", "cd_pins.js")
   js_tags <- lapply(js_files, function(fname) {
     js_content <- read_js_file(fname)
     htmltools::tags$script(htmltools::HTML(js_content))
   })
+  if (!is.null(shared_js_tag)) js_tags <- c(list(shared_js_tag), js_tags)
 
   # Report Hub metadata
   source_filename <- gsub("[.]html$", "", basename(output_path), ignore.case = TRUE)

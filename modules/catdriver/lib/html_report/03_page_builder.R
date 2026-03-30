@@ -26,6 +26,12 @@ local({
   if (!exists("turas_callout", mode = "function") && dir.exists(callout_dir)) {
     source(file.path(callout_dir, "callout_registry.R"), local = FALSE)
   }
+  # Source shared pin library loader
+  pins_path <- file.path(turas_root, "modules", "shared", "lib", "turas_pins_js.R")
+  if (!file.exists(pins_path)) pins_path <- file.path("modules", "shared", "lib", "turas_pins_js.R")
+  if (!exists("turas_pins_js", mode = "function") && file.exists(pins_path)) {
+    source(pins_path, local = FALSE)
+  }
 })
 
 #' Build Complete Catdriver HTML Page
@@ -114,10 +120,15 @@ function cdToggleHelp() {
     "[]"
   )
 
-  # Read JS files
+  # Load shared TurasPins library first (required by cd_pins.js)
+  shared_js_tag <- if (exists("turas_pins_js", mode = "function")) {
+    shared_js <- turas_pins_js()
+    if (nzchar(shared_js)) htmltools::tags$script(htmltools::HTML(shared_js))
+  }
+
+  # Read module JS files
   js_files <- c("cd_utils.js", "cd_navigation.js", "cd_insights.js",
-                 "cd_pinned_views.js", "cd_slide_export.js", "cd_qualitative.js",
-                 "cd_table_export.js")
+                 "cd_pins.js", "cd_qualitative.js", "cd_table_export.js")
   js_tags <- lapply(js_files, function(fname) {
     js_path <- file.path(.cd_html_report_dir, "js", fname)
     js_content <- if (file.exists(js_path)) {
@@ -127,6 +138,8 @@ function cdToggleHelp() {
     }
     htmltools::tags$script(htmltools::HTML(js_content))
   })
+  # Prepend shared library before module JS
+  if (!is.null(shared_js_tag)) js_tags <- c(list(shared_js_tag), js_tags)
 
   # Report Hub metadata
   source_filename <- basename(config$output_file %||%
