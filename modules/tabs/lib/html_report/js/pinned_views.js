@@ -416,7 +416,7 @@ function renderPinnedCards() {
       if (tbl) {
         // Preserve ct-table class for CSS matching; only set layout properties
         if (!tbl.classList.contains("ct-table")) tbl.classList.add("ct-table");
-        tbl.style.cssText = "font-size:10px;width:100%;table-layout:fixed;word-wrap:break-word;overflow-wrap:break-word;";
+        tbl.style.cssText = "font-size:10px;width:100%;table-layout:auto;word-wrap:break-word;overflow-wrap:break-word;";
       }
       // Ensure header cells don't have stale inline color overrides
       var ths = tableDiv.querySelectorAll(".ct-th");
