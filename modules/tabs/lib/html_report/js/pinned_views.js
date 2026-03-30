@@ -407,23 +407,17 @@ function renderPinnedCards() {
     }
 
     // Table (detailed reference) — respect pin mode
+    // Let the existing ct-table CSS rules handle all styling (same as tabs view)
     if (pin.tableHtml && showTable) {
       var tableDiv = document.createElement("div");
       tableDiv.className = "table-wrapper";
-      tableDiv.style.cssText = "overflow-x:auto;font-size:11px;margin-top:8px;";
+      tableDiv.style.marginTop = "8px";
       tableDiv.innerHTML = pin.tableHtml;
       var tbl = tableDiv.querySelector("table");
       if (tbl) {
-        // Preserve ct-table class for CSS matching; only set layout properties
         if (!tbl.classList.contains("ct-table")) tbl.classList.add("ct-table");
-        tbl.style.cssText = "font-size:10px;width:100%;table-layout:auto;word-wrap:break-word;overflow-wrap:break-word;";
-      }
-      // Ensure header cells don't have stale inline color overrides
-      var ths = tableDiv.querySelectorAll(".ct-th");
-      for (var ti = 0; ti < ths.length; ti++) {
-        ths[ti].style.removeProperty("color");
-        ths[ti].style.removeProperty("background");
-        ths[ti].style.removeProperty("background-color");
+        // Clear any inline styles that might override the ct-table CSS
+        tbl.style.cssText = "";
       }
       card.appendChild(tableDiv);
     }
