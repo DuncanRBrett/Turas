@@ -205,8 +205,8 @@ var PricingSimulator = (function() {
 
     if (!prices || !intents) return;
 
-    var w = 640, h = 280;
-    var ml = 50, mr = 60, mt = 20, mb = 35;
+    var w = 700, h = 280;
+    var ml = 50, mr = 120, mt = 20, mb = 35;
     var cw = w - ml - mr, ch = h - mt - mb;
 
     var xMin = prices[0], xMax = prices[prices.length - 1];
@@ -259,9 +259,9 @@ var PricingSimulator = (function() {
 
     // Legend
     svg.push('<line x1="'+(w-mr+10)+'" y1="'+mt+'" x2="'+(w-mr+30)+'" y2="'+mt+'" stroke="'+config.brand_colour+'" stroke-width="2.5"/>');
-    svg.push('<text x="'+(w-mr+34)+'" y="'+(mt+4)+'" fill="#64748b" font-size="10">Intent</text>');
+    svg.push('<text x="'+(w-mr+34)+'" y="'+(mt+4)+'" fill="#64748b" font-size="10">Purchase Intent</text>');
     svg.push('<line x1="'+(w-mr+10)+'" y1="'+(mt+16)+'" x2="'+(w-mr+30)+'" y2="'+(mt+16)+'" stroke="#f39c12" stroke-width="1.5" stroke-dasharray="5,3"/>');
-    svg.push('<text x="'+(w-mr+34)+'" y="'+(mt+20)+'" fill="#64748b" font-size="10">Revenue</text>');
+    svg.push('<text x="'+(w-mr+34)+'" y="'+(mt+20)+'" fill="#64748b" font-size="10">Revenue Index</text>');
 
     container.innerHTML = '<svg viewBox="0 0 '+w+' '+h+'" style="width:100%;height:auto;font-family:-apple-system,BlinkMacSystemFont,sans-serif;">' + svg.join("") + '</svg>';
   }
@@ -468,6 +468,15 @@ var PricingSimulator = (function() {
         '" onchange="PricingSimulator._onPriceChange(' + r + ',this.value)"></td>';
     }
     rows += "</tr>";
+
+    // Unit Cost (show when set)
+    if (hasProfit) {
+      rows += "<tr><td>Unit Cost (" + escHTML(config.currency) + ")</td>";
+      for (var uc = 0; uc < scenarios.length; uc++) {
+        rows += "<td>" + formatNum(config.unit_cost) + "</td>";
+      }
+      rows += "</tr>";
+    }
 
     // Purchase Intent
     rows += "<tr><td>Purchase Intent</td>";

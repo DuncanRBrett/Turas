@@ -25,6 +25,12 @@ local({
   if (!exists("turas_callout", mode = "function") && dir.exists(callout_dir)) {
     source(file.path(callout_dir, "callout_registry.R"), local = FALSE)
   }
+  # Source shared pin library loader
+  pins_path <- file.path(turas_root, "modules", "shared", "lib", "turas_pins_js.R")
+  if (!file.exists(pins_path)) pins_path <- file.path("modules", "shared", "lib", "turas_pins_js.R")
+  if (!exists("turas_pins_js", mode = "function") && file.exists(pins_path)) {
+    source(pins_path, local = FALSE)
+  }
 })
 
 `%||%` <- function(x, y) if (is.null(x) || length(x) == 0 || (length(x) == 1 && is.na(x))) y else x
@@ -900,35 +906,45 @@ td.pr-td {
   background: var(--sim-surface); border: 1px solid var(--sim-brand); color: var(--sim-brand);
 }
 #panel-simulator .sim-btn-outline:hover { background: var(--sim-bg); }
-#panel-simulator .sim-compare-table-wrap { overflow-x: auto; }
+#panel-simulator .sim-compare-table-wrap {
+  overflow-x: auto; border: 1px solid #e5e7eb; border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
+  -webkit-overflow-scrolling: touch;
+}
 #panel-simulator .sim-compare-table {
   width: 100%; border-collapse: collapse; font-size: 13px;
 }
 #panel-simulator .sim-compare-table th {
-  padding: 10px 14px; text-align: right; font-weight: 600; font-size: 11px;
-  text-transform: uppercase; letter-spacing: 0.3px; color: #64748b;
-  background: var(--sim-bg); border-bottom: 2px solid var(--sim-border);
-  white-space: nowrap;
+  padding: 12px 16px; text-align: right; font-weight: 600; font-size: 11px;
+  letter-spacing: 0.5px; color: #e2e8f0;
+  background: #1a2744; border-bottom: none;
+  white-space: nowrap; vertical-align: bottom;
 }
 #panel-simulator .sim-compare-table th:first-child { text-align: left; }
 #panel-simulator .sim-compare-table th .sim-remove-scenario {
-  cursor: pointer; color: #94a3b8; font-size: 14px; margin-left: 6px;
+  cursor: pointer; color: rgba(255,255,255,0.5); font-size: 14px; margin-left: 6px;
   border: none; background: none; padding: 0 2px; vertical-align: middle;
 }
-#panel-simulator .sim-compare-table th .sim-remove-scenario:hover { color: #ef4444; }
+#panel-simulator .sim-compare-table th .sim-remove-scenario:hover { color: #fca5a5; }
 #panel-simulator .sim-compare-table td {
-  padding: 10px 14px; text-align: right; border-bottom: 1px solid #f1f5f9;
-  font-variant-numeric: tabular-nums;
+  padding: 10px 16px; text-align: right; border-bottom: 1px solid #f0f1f3;
+  font-variant-numeric: tabular-nums; color: #334155;
+  transition: background-color 0.15s ease;
 }
 #panel-simulator .sim-compare-table td:first-child {
-  text-align: left; font-weight: 500; color: var(--sim-text); white-space: nowrap;
+  text-align: left; font-weight: 500; color: #1e293b; white-space: nowrap;
+  position: sticky; left: 0; z-index: 1; background: inherit;
+  min-width: 140px; border-right: 1px solid #e5e7eb;
 }
+#panel-simulator .sim-compare-table th + th { border-left: 1px solid rgba(255,255,255,0.15); }
+#panel-simulator .sim-compare-table td + td { border-left: 1px solid #e5e7eb; }
+#panel-simulator .sim-compare-table tbody tr:nth-child(even) { background: #f9fafb; }
+#panel-simulator .sim-compare-table tbody tr:hover { background: #eef2f7; }
 #panel-simulator .sim-compare-table .sim-best { color: #059669; font-weight: 600; }
 #panel-simulator .sim-compare-table .sim-worst { color: #dc2626; }
 #panel-simulator .sim-compare-table .sim-at-opt { color: #059669; font-size: 10px; }
-#panel-simulator .sim-compare-table tbody tr:hover { background: #fafbfc; }
 #panel-simulator .sim-compare-table input[type="number"] {
-  width: 80px; padding: 4px 6px; border: 1px solid var(--sim-border);
+  width: 80px; padding: 4px 6px; border: 1px solid #e2e8f0;
   border-radius: 4px; font-size: 13px; text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -1019,11 +1035,11 @@ td.pr-td {
 }
 .pr-export-btn:hover { border-color: BRAND_TOKEN; color: BRAND_TOKEN; }
 .pr-pin-btn {
-  background: #f1f5f9; border: 1px solid #e2e8f0; color: #64748b; padding: 4px 12px;
-  border-radius: 4px; cursor: pointer; font-size: 12px; transition: all 0.2s;
+  background: none; border: 1px solid #e2e8f0; color: #94a3b8; padding: 3px 8px;
+  border-radius: 4px; cursor: pointer; font-size: 14px; transition: all 0.15s;
+  line-height: 1;
 }
 .pr-pin-btn:hover { border-color: BRAND_TOKEN; color: BRAND_TOKEN; }
-.pr-pin-btn.pinned { background: BRAND_TOKEN; color: white; border-color: BRAND_TOKEN; }
 
 /* ── Pin Badge ── */
 .pr-pin-badge {
@@ -1568,15 +1584,21 @@ build_slide_card <- function(slide_id, title, content_md, image_data = NULL) {
 build_pinned_views_panel <- function() {
   '<div class="pr-panel" id="panel-pinned">
      <div class="pr-section">
-       <h2>Pinned Views</h2>
+       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;">
+         <div>
+           <h2 style="font-size:18px;font-weight:700;color:#1e293b;margin-bottom:4px;">Pinned Views</h2>
+           <p style="font-size:12px;color:#64748b;margin:0;">Pin sections from the report to create a curated set of key findings.</p>
+         </div>
+         <div style="display:flex;gap:8px;" id="pinned-bulk-actions">
+           <button class="pr-export-btn" onclick="TurasPins.addSection()">&#x2795; Add Section</button>
+           <button class="pr-export-btn" onclick="exportAllPinned()">&#x1F4E4; Export All as PNG</button>
+         </div>
+       </div>
+       <div id="pinned-cards-container"></div>
        <div id="pinned-empty-state" class="pr-pinned-empty">
          <div class="pr-pinned-empty-icon">&#128204;</div>
          <div class="pr-pinned-empty-text">No pinned views yet.</div>
-         <div class="pr-pinned-empty-hint">Click the Pin button on any section to capture it here for curation and export.</div>
-       </div>
-       <div id="pinned-cards-container"></div>
-       <div class="pr-pinned-actions" style="display:none" id="pinned-bulk-actions">
-         <button class="pr-btn-secondary" onclick="exportAllPinned()">Export All as PNG</button>
+         <div class="pr-pinned-empty-hint">Click the pin icon on any section to capture it here for curation and export. Use Add Section to organise pins into groups.</div>
        </div>
      </div>
      <script id="pinned-views-data" type="application/json">[]</script>
@@ -1594,9 +1616,9 @@ build_export_toolbar <- function(section_id) {
        <button class="pr-export-btn" onclick="exportChartPNG(\'%s\')" title="Export chart as PNG">Export PNG</button>
        <button class="pr-export-btn" onclick="exportTableExcel(\'%s\')" title="Export table as Excel">Export Excel</button>
        <button class="pr-export-btn" onclick="exportSlidePNG(\'%s\')" title="Export as slide">Export Slide</button>
-       <button class="pr-pin-btn" data-section="%s" onclick="togglePin(\'%s\')" title="Pin to Views">\U0001F4CC Pin to Views</button>
+       <button class="pr-pin-btn" onclick="pinSection(\'%s\')" title="Pin to Views">\U0001F4CC</button>
      </div>',
-    section_id, section_id, section_id, section_id, section_id
+    section_id, section_id, section_id, section_id
   )
 }
 
@@ -1772,6 +1794,7 @@ build_simulator_panel <- function(unit_cost, simulator_data) {
 
          <div class="sim-actions">
            <button class="sim-btn sim-btn-primary" onclick="PricingSimulator.exportPNG()">Export PNG</button>
+           <button class="pr-pin-btn" onclick="pinSection(\'simulator\')" title="Pin simulator view">\U0001F4CC</button>
          </div>
 
          %s
@@ -1840,12 +1863,22 @@ build_simulator_panel <- function(unit_cost, simulator_data) {
            </div>
          </div>
 
+         <div id="sim-insight-area" class="pr-insight-area" data-section="simulator">
+           <button class="pr-insight-toggle" onclick="toggleInsight(\'simulator\')">+ Add Insight</button>
+           <div class="pr-insight-container">
+             <div class="pr-insight-editor" contenteditable="true" data-section="simulator" data-placeholder="Add your insight or commentary here..."></div>
+             <button class="pr-insight-dismiss" onclick="dismissInsight(\'simulator\')" title="Clear insight">&times;</button>
+           </div>
+           <textarea class="pr-insight-store" data-section="simulator" style="display:none"></textarea>
+         </div>
+
          <!-- Scenario Comparison Section -->
          <div class="sim-compare" id="sim-compare-section">
            <div class="sim-compare-header">
              <h3>Scenario Comparison</h3>
              <div class="sim-compare-actions">
                <button class="sim-btn sim-btn-outline" id="sim-compare-add">+ Add Scenario</button>
+               <button class="pr-pin-btn" onclick="pinSection(\'comparison\')" title="Pin scenario comparison">\U0001F4CC</button>
              </div>
            </div>
            <div class="sim-compare-note">
@@ -1856,6 +1889,14 @@ build_simulator_panel <- function(unit_cost, simulator_data) {
                <thead><tr id="sim-compare-thead"></tr></thead>
                <tbody id="sim-compare-tbody"></tbody>
              </table>
+           </div>
+           <div id="compare-insight-area" class="pr-insight-area" data-section="comparison">
+             <button class="pr-insight-toggle" onclick="toggleInsight(\'comparison\')">+ Add Insight</button>
+             <div class="pr-insight-container">
+               <div class="pr-insight-editor" contenteditable="true" data-section="comparison" data-placeholder="Add your insight or commentary here..."></div>
+               <button class="pr-insight-dismiss" onclick="dismissInsight(\'comparison\')" title="Clear insight">&times;</button>
+             </div>
+             <textarea class="pr-insight-store" data-section="comparison" style="display:none"></textarea>
            </div>
          </div>
 
@@ -1904,6 +1945,14 @@ build_pricing_closing <- function(config) {
 build_pricing_js <- function(js_dir = NULL) {
   # Read JS from external files when available, fall back to inline
   js_parts <- character(0)
+
+  # Load shared TurasPins library first (required by pricing_pins.js)
+  if (exists("turas_pins_js", mode = "function")) {
+    shared_js <- turas_pins_js()
+    if (nzchar(shared_js)) {
+      js_parts <- c(js_parts, shared_js)
+    }
+  }
 
   if (!is.null(js_dir) && dir.exists(js_dir)) {
     js_files <- c("pricing_simulator.js", "pricing_insights.js", "pricing_pins.js", "pricing_slides.js", "pricing_exports.js", "pricing_navigation.js")
