@@ -25,6 +25,17 @@ local({
   }
 })
 
+# Source the shared TurasPins library (TURAS_ROOT-aware)
+local({
+  turas_root <- Sys.getenv("TURAS_ROOT", "")
+  if (!nzchar(turas_root)) turas_root <- getwd()
+  pins_path <- file.path(turas_root, "modules", "shared", "lib", "turas_pins_js.R")
+  if (!file.exists(pins_path)) pins_path <- file.path("modules", "shared", "lib", "turas_pins_js.R")
+  if (!exists("turas_pins_js", mode = "function") && file.exists(pins_path)) {
+    source(pins_path, local = FALSE)
+  }
+})
+
 # Null-coalescing operator (canonical definition in utils.R)
 if (!exists("%||%", mode = "function")) {
   `%||%` <- function(a, b) if (is.null(a)) b else a
@@ -58,6 +69,7 @@ build_confidence_page <- function(html_data, tables, charts, config,
   summary_panel <- build_ci_summary_panel(html_data, tables, charts, labels = labels)
   details_panel <- build_ci_details_panel(html_data, tables, charts, brand, labels = labels)
   notes_panel <- build_ci_notes_panel(html_data, config)
+  pinned_panel <- build_ci_pinned_panel()
   footer <- build_ci_footer()
   js <- build_ci_js()
 
@@ -69,6 +81,7 @@ build_confidence_page <- function(html_data, tables, charts, config,
     sprintf('<title>%s</title>\n', htmlEscape(labels$report_title)),
     '<style>\n', css, '\n</style>\n',
     '</head>\n<body>\n',
+    '<script type="application/json" id="ci-pinned-views-data">[]</script>\n',
     header, '\n',
     nav, '\n',
     help_overlay, '\n',
@@ -76,6 +89,7 @@ build_confidence_page <- function(html_data, tables, charts, config,
     summary_panel, '\n',
     details_panel, '\n',
     notes_panel, '\n',
+    pinned_panel, '\n',
     '</div>\n',
     footer, '\n',
     '<script>\n', js, '\n</script>\n',
@@ -539,10 +553,118 @@ body {
 }
 .ci-method-doc p:last-child { margin-bottom: 0; }
 
+/* Pin Button */
+.ci-pin-btn {
+  float: right;
+  background: transparent;
+  border: 1px solid var(--ci-border);
+  border-radius: var(--ci-radius-sm);
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--ci-text-secondary);
+  transition: all var(--ci-transition);
+  font-family: inherit;
+  line-height: 1;
+}
+.ci-pin-btn:hover {
+  border-color: BRAND;
+  color: BRAND;
+  background: #f0f7ff;
+}
+
+/* Pin Mode Popover */
+.ci-pin-popover {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 100;
+  background: #fff;
+  border: 1px solid var(--ci-border);
+  border-radius: var(--ci-radius-sm);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  padding: 4px;
+  min-width: 160px;
+}
+.ci-pin-popover-item {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ci-text-primary);
+  cursor: pointer;
+  text-align: left;
+  border-radius: 4px;
+  font-family: inherit;
+}
+.ci-pin-popover-item:hover {
+  background: #f0f7ff;
+  color: BRAND;
+}
+
+/* Pin Badge */
+.pin-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: BRAND;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* Pinned Views Panel */
+.ci-pinned-container { padding: 0; }
+.ci-pinned-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.ci-pinned-toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ci-pinned-toolbar button {
+  padding: 7px 16px;
+  border: 1px solid var(--ci-border);
+  border-radius: var(--ci-radius-sm);
+  background: var(--ci-bg-surface);
+  color: var(--ci-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--ci-transition);
+  font-family: inherit;
+}
+.ci-pinned-toolbar button:hover {
+  border-color: BRAND;
+  color: BRAND;
+  background: #f0f7ff;
+}
+.ci-pinned-empty {
+  text-align: center;
+  padding: 60px 24px;
+  color: var(--ci-text-tertiary);
+}
+.ci-pinned-empty-icon { font-size: 32px; margin-bottom: 12px; }
+
 /* Print */
 @media print {
   body { background: #fff; }
-  .report-tabs, .ci-save-tab, .ci-nav, .ci-comments-box, .ci-help-overlay, .ci-help-btn { display: none !important; }
+  .report-tabs, .ci-save-tab, .ci-nav, .ci-comments-box, .ci-help-overlay, .ci-help-btn, .ci-pin-btn, .ci-pinned-toolbar { display: none !important; }
   .tab-panel { display: block !important; page-break-inside: avoid; }
   .ci-detail-panel { display: block !important; }
   .ci-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -681,6 +803,7 @@ build_ci_tab_nav <- function() {
     <button class="report-tab active" data-tab="summary" onclick="switchReportTab(\'summary\')">Summary</button>
     <button class="report-tab" data-tab="details" onclick="switchReportTab(\'details\')">Question Details</button>
     <button class="report-tab" data-tab="notes" onclick="switchReportTab(\'notes\')">Method Notes</button>
+    <button class="report-tab" data-tab="pinned" onclick="switchReportTab(\'pinned\')">Pinned <span id="ci-pinned-count" class="pin-badge" style="display:none;"></span></button>
     <button class="report-tab ci-save-tab" onclick="saveReportHTML()">', save_icon, 'Save Report</button>
     <button class="ci-help-btn" onclick="toggleHelpOverlay()" title="Show help guide">?</button>
   </div>'
@@ -816,7 +939,7 @@ build_ci_summary_panel <- function(html_data, tables, charts, labels = NULL) {
     deff_summary <- paste0(deff_summary, "</div>")
 
     parts <- c(parts, sprintf(
-      '<div class="ci-card"><h3>Study-Level Statistics</h3>%s\n%s\n%s</div>',
+      '<div class="ci-card" data-pin-id="pin-study-level"><h3>Study-Level Statistics <button class="ci-pin-btn" onclick="ciPinSection(\'pin-study-level\', this)" title="Pin this view">&#128204; Pin</button></h3>%s\n%s\n%s</div>',
       deff_summary, study_callout, tables$study_level
     ))
   }
@@ -827,7 +950,7 @@ build_ci_summary_panel <- function(html_data, tables, charts, labels = NULL) {
     overview_callout <- turas_callout("confidence", "results_overview")
     method_callout <- turas_callout("confidence", "method_selection", collapsed = TRUE)
     parts <- c(parts, sprintf(
-      '<div class="ci-card"><h3>Results Overview</h3>%s\n%s\n%s\n%s</div>',
+      '<div class="ci-card" data-pin-id="pin-results-overview"><h3>Results Overview <button class="ci-pin-btn" onclick="ciPinSection(\'pin-results-overview\', this)" title="Pin this view">&#128204; Pin</button></h3>%s\n%s\n%s\n%s</div>',
       quality_callout, overview_callout, method_callout, tables$summary
     ))
   }
@@ -837,7 +960,7 @@ build_ci_summary_panel <- function(html_data, tables, charts, labels = NULL) {
     forest_callout <- turas_callout("confidence", "forest_plot_guide", collapsed = TRUE)
     viz_callout <- turas_callout("confidence", "visualization_guide", collapsed = TRUE)
     parts <- c(parts, sprintf(
-      '<div class="ci-card"><h3>%s</h3>%s\n%s\n%s</div>',
+      '<div class="ci-card" data-pin-id="pin-forest-plot"><h3>%s <button class="ci-pin-btn" onclick="ciPinSection(\'pin-forest-plot\', this)" title="Pin this view">&#128204; Pin</button></h3>%s\n%s\n%s</div>',
       labels$overview_title, charts$forest_plot, forest_callout, viz_callout
     ))
   }
@@ -846,7 +969,7 @@ build_ci_summary_panel <- function(html_data, tables, charts, labels = NULL) {
   if (nzchar(tables$representativeness %||% "")) {
     repr_callout <- turas_callout("confidence", "representativeness")
     parts <- c(parts, sprintf(
-      '<div class="ci-card"><h3>Sample Representativeness</h3>%s\n%s</div>',
+      '<div class="ci-card" data-pin-id="pin-representativeness"><h3>Sample Representativeness <button class="ci-pin-btn" onclick="ciPinSection(\'pin-representativeness\', this)" title="Pin this view">&#128204; Pin</button></h3>%s\n%s</div>',
       repr_callout, tables$representativeness
     ))
   }
@@ -946,9 +1069,10 @@ build_ci_details_panel <- function(html_data, tables, charts, brand, labels = NU
 
     q_heading <- if (!is.null(q$question_label) && q$question_label != q_ids[i])
       paste0(q_ids[i], " \u2014 ", q$question_label) else q_ids[i]
+    pin_view_id <- paste0("pin-detail-", q_ids[i])
     panels <- c(panels, sprintf(
-      '<div id="ci-detail-%s" class="ci-detail-panel%s"><div class="ci-card"><h3>%s</h3>%s</div></div>',
-      q_ids[i], active, htmlEscape(q_heading),
+      '<div id="ci-detail-%s" class="ci-detail-panel%s"><div class="ci-card"><h3>%s <button class="ci-pin-btn" onclick="ciPinSection(\'%s\', this)" title="Pin this view">&#128204; Pin</button></h3>%s</div></div>',
+      q_ids[i], active, htmlEscape(q_heading), pin_view_id,
       paste(panel_parts, collapse = "\n")
     ))
   }
@@ -1103,6 +1227,37 @@ build_ci_notes_panel <- function(html_data, config) {
 
 
 # ==============================================================================
+# PINNED VIEWS PANEL
+# ==============================================================================
+
+build_ci_pinned_panel <- function() {
+  '
+<div id="tab-pinned" class="tab-panel">
+<div class="ci-pinned-container">
+<div class="ci-pinned-header">
+<div>
+<h2 style="font-size:18px;font-weight:700;color:#1e293b;margin-bottom:4px;">Pinned Views</h2>
+<p style="font-size:12px;color:#64748b;">Pin charts and tables from other tabs to collect key findings.</p>
+</div>
+<div class="ci-pinned-toolbar" id="ci-pinned-toolbar" style="display:none;">
+<button onclick="addSection()">+ Add Section</button>
+<button onclick="exportAllPinnedSlides()">Export All as PNG</button>
+<button onclick="printPinnedViews()">Print / PDF</button>
+<button onclick="saveReportHTML()">Save Report</button>
+</div>
+</div>
+<div id="ci-pinned-cards-container"></div>
+<div class="ci-pinned-empty" id="ci-pinned-empty">
+<div class="ci-pinned-empty-icon">&#128204;</div>
+<div style="font-size:14px;font-weight:600;">No pinned views yet.</div>
+<div style="font-size:12px;color:#94a3b8;margin-top:6px;">Click the Pin button on any card to save it here.</div>
+</div>
+</div>
+</div>'
+}
+
+
+# ==============================================================================
 # FOOTER
 # ==============================================================================
 
@@ -1121,10 +1276,25 @@ build_ci_footer <- function() {
 build_ci_js <- function() {
   js_dir <- get0(".confidence_html_report_dir", envir = globalenv())
 
+  js_parts <- character()
+
+  # Prepend shared TurasPins library
+  shared_js <- if (exists("turas_pins_js", mode = "function")) turas_pins_js() else ""
+  if (nzchar(shared_js)) js_parts <- c(js_parts, shared_js)
+
   if (!is.null(js_dir)) {
-    js_path <- file.path(js_dir, "js", "confidence_navigation.js")
-    if (file.exists(js_path)) {
-      return(paste(readLines(js_path, warn = FALSE), collapse = "\n"))
+    # Load navigation JS
+    nav_path <- file.path(js_dir, "js", "confidence_navigation.js")
+    if (file.exists(nav_path)) {
+      js_parts <- c(js_parts, paste(readLines(nav_path, warn = FALSE), collapse = "\n"))
+    }
+    # Load pins wrapper JS
+    pins_path <- file.path(js_dir, "js", "ci_pins.js")
+    if (file.exists(pins_path)) {
+      js_parts <- c(js_parts, paste(readLines(pins_path, warn = FALSE), collapse = "\n"))
+    }
+    if (length(js_parts) > 0) {
+      return(paste(js_parts, collapse = "\n\n"))
     }
   }
 

@@ -29,6 +29,17 @@ local({
   }
 })
 
+# Source the shared TurasPins library (TURAS_ROOT-aware)
+local({
+  turas_root <- Sys.getenv("TURAS_ROOT", "")
+  if (!nzchar(turas_root)) turas_root <- getwd()
+  pins_path <- file.path(turas_root, "modules", "shared", "lib", "turas_pins_js.R")
+  if (!file.exists(pins_path)) pins_path <- file.path("modules", "shared", "lib", "turas_pins_js.R")
+  if (!exists("turas_pins_js", mode = "function") && file.exists(pins_path)) {
+    source(pins_path, local = FALSE)
+  }
+})
+
 #' Build Complete HTML Page
 #'
 #' Assembles all components into a browsable htmltools tag list.
@@ -63,6 +74,9 @@ build_weighting_page <- function(html_data, tables, charts, config,
   details_panel <- build_details_panel(html_data, tables, charts)
   notes_panel <- build_notes_panel(html_data)
 
+  # Build pinned views panel
+  pinned_panel <- build_wt_pinned_panel()
+
   # Build footer
   footer_html <- build_weighting_footer(html_data$summary)
 
@@ -77,12 +91,14 @@ build_weighting_page <- function(html_data, tables, charts, config,
                                  html_data$summary$project_name)),
     meta_tags,
     css_tag,
+    htmltools::tags$script(type = "application/json", id = "wt-pinned-views-data", htmltools::HTML("[]")),
     htmltools::HTML(header_html),
     htmltools::HTML(tab_nav),
     htmltools::tags$div(class = "wt-content",
       htmltools::HTML(summary_panel),
       htmltools::HTML(details_panel),
-      htmltools::HTML(notes_panel)
+      htmltools::HTML(notes_panel),
+      htmltools::HTML(pinned_panel)
     ),
     htmltools::HTML(footer_html),
     js_tag
@@ -540,8 +556,116 @@ body {
   color: BRAND;
 }
 
+/* Pin Button */
+.wt-pin-btn {
+  float: right;
+  background: transparent;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  color: #64748b;
+  transition: all 0.15s;
+  font-family: inherit;
+  line-height: 1;
+}
+.wt-pin-btn:hover {
+  border-color: BRAND;
+  color: BRAND;
+  background: #f0f7ff;
+}
+
+/* Pin Mode Popover */
+.wt-pin-popover {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 100;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  padding: 4px;
+  min-width: 160px;
+}
+.wt-pin-popover-item {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1e293b;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 4px;
+  font-family: inherit;
+}
+.wt-pin-popover-item:hover {
+  background: #f0f7ff;
+  color: BRAND;
+}
+
+/* Pin Badge */
+.pin-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: BRAND;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* Pinned Views Panel */
+.wt-pinned-container { padding: 0; }
+.wt-pinned-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.wt-pinned-toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.wt-pinned-toolbar button {
+  padding: 7px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #fff;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.wt-pinned-toolbar button:hover {
+  border-color: BRAND;
+  color: BRAND;
+  background: #f0f7ff;
+}
+.wt-pinned-empty {
+  text-align: center;
+  padding: 60px 24px;
+  color: #94a3b8;
+}
+.wt-pinned-empty-icon { font-size: 32px; margin-bottom: 12px; }
+
 @media print {
-  .report-tabs, .wt-nav, .wt-save-tab { display: none !important; }
+  .report-tabs, .wt-nav, .wt-save-tab, .wt-pin-btn, .wt-pinned-toolbar { display: none !important; }
   .tab-panel, .wt-detail-panel { display: block !important; }
   .wt-header { break-after: avoid; }
   .wt-card { break-inside: avoid; page-break-inside: avoid; }
@@ -662,6 +786,7 @@ build_report_tab_nav <- function(brand_colour) {
     <button class="report-tab active" data-tab="summary" onclick="switchReportTab(\'summary\')">Summary</button>
     <button class="report-tab" data-tab="details" onclick="switchReportTab(\'details\')">Weight Details</button>
     <button class="report-tab" data-tab="notes" onclick="switchReportTab(\'notes\')">Method Notes</button>
+    <button class="report-tab" data-tab="pinned" onclick="switchReportTab(\'pinned\')">Pinned <span id="wt-pinned-count" class="pin-badge" style="display:none;"></span></button>
     <button class="report-tab wt-save-tab" onclick="saveReportHTML()">Save Report</button>
   </div>'
 }
@@ -712,8 +837,8 @@ build_summary_panel <- function(html_data, summary_table) {
   sprintf(
     '<div id="tab-summary" class="tab-panel active">
       %s
-      <div class="wt-card">
-        <h3>All Weights Overview</h3>
+      <div class="wt-card" data-pin-id="pin-summary">
+        <h3>All Weights Overview <button class="wt-pin-btn" onclick="wtPinSection(\'pin-summary\', this)" title="Pin this view">&#128204; Pin</button></h3>
         %s
         %s
       </div>
@@ -767,36 +892,39 @@ build_details_panel <- function(html_data, tables, charts) {
 
     # Chart (histogram)
     chart_key <- detail$weight_name
+    dist_pin_id <- paste0("pin-wt-", wid, "-dist")
     if (!is.null(charts[[chart_key]]) && nzchar(charts[[chart_key]])) {
       panel_content <- paste0(panel_content, sprintf(
-        '<div class="wt-card"><h3>Distribution</h3>
+        '<div class="wt-card" data-pin-id="%s"><h3>Distribution <button class="wt-pin-btn" onclick="wtPinSection(\'%s\', this)" title="Pin this view">&#128204; Pin</button></h3>
           <div class="wt-callout">This histogram shows the distribution of weights across all respondents.
           A narrow distribution centred near 1.0 indicates the sample already closely matched the population targets, requiring only minor adjustments.
           A wide spread or heavy tail means some respondents are being up-weighted or down-weighted substantially, which inflates variance and reduces the effective sample size.
           Weights outside the range 0.3&ndash;3.0 are often worth investigating, as extreme weights can allow a small number of respondents to dominate weighted estimates.</div>
           %s</div>',
-        charts[[chart_key]]
+        dist_pin_id, dist_pin_id, charts[[chart_key]]
       ))
     }
 
     # Diagnostics table
     diag_key <- paste0("diagnostics_", detail$weight_name)
+    diag_pin_id <- paste0("pin-wt-", wid, "-diag")
     if (!is.null(tables[[diag_key]]) && nzchar(tables[[diag_key]])) {
       panel_content <- paste0(panel_content, sprintf(
-        '<div class="wt-card"><h3>Diagnostics</h3>%s</div>',
-        tables[[diag_key]]
+        '<div class="wt-card" data-pin-id="%s"><h3>Diagnostics <button class="wt-pin-btn" onclick="wtPinSection(\'%s\', this)" title="Pin this view">&#128204; Pin</button></h3>%s</div>',
+        diag_pin_id, diag_pin_id, tables[[diag_key]]
       ))
     }
 
     # Margins table (rim weights) with registry callout
     margins_key <- paste0("margins_", detail$weight_name)
+    margins_pin_id <- paste0("pin-wt-", wid, "-margins")
     if (!is.null(tables[[margins_key]]) && nzchar(tables[[margins_key]])) {
       rim_callout <- if (exists("turas_callout", mode = "function")) {
         turas_callout("weighting", "rim_targets", collapsed = TRUE)
       } else ""
       panel_content <- paste0(panel_content, sprintf(
-        '<div class="wt-card">%s%s</div>',
-        rim_callout, tables[[margins_key]]
+        '<div class="wt-card" data-pin-id="%s"><h3>Rim Margins <button class="wt-pin-btn" onclick="wtPinSection(\'%s\', this)" title="Pin this view">&#128204; Pin</button></h3>%s%s</div>',
+        margins_pin_id, margins_pin_id, rim_callout, tables[[margins_key]]
       ))
     }
 
@@ -1002,6 +1130,38 @@ build_method_documentation <- function(weight_details) {
 
 
 # ==============================================================================
+# PINNED VIEWS PANEL
+# ==============================================================================
+
+#' @keywords internal
+build_wt_pinned_panel <- function() {
+  '
+<div id="tab-pinned" class="tab-panel">
+<div class="wt-pinned-container">
+<div class="wt-pinned-header">
+<div>
+<h2 style="font-size:18px;font-weight:700;color:#1e293b;margin-bottom:4px;">Pinned Views</h2>
+<p style="font-size:12px;color:#64748b;">Pin charts and tables from other tabs to collect key findings.</p>
+</div>
+<div class="wt-pinned-toolbar" id="wt-pinned-toolbar" style="display:none;">
+<button onclick="addSection()">+ Add Section</button>
+<button onclick="exportAllPinnedSlides()">Export All as PNG</button>
+<button onclick="printPinnedViews()">Print / PDF</button>
+<button onclick="saveReportHTML()">Save Report</button>
+</div>
+</div>
+<div id="wt-pinned-cards-container"></div>
+<div class="wt-pinned-empty" id="wt-pinned-empty">
+<div class="wt-pinned-empty-icon">&#128204;</div>
+<div style="font-size:14px;font-weight:600;">No pinned views yet.</div>
+<div style="font-size:12px;color:#94a3b8;margin-top:6px;">Click the Pin button on any card to save it here.</div>
+</div>
+</div>
+</div>'
+}
+
+
+# ==============================================================================
 # FOOTER
 # ==============================================================================
 
@@ -1037,6 +1197,9 @@ build_weighting_js <- function() {
       js_dir <- file.path(dirname(ofile), "js")
     }
   }
+
+  # Prepend shared TurasPins library
+  shared_js <- if (exists("turas_pins_js", mode = "function")) turas_pins_js() else ""
 
   js_content <- ""
   if (!is.null(js_dir) && dir.exists(js_dir)) {
@@ -1084,7 +1247,9 @@ document.addEventListener("DOMContentLoaded", function() { switchReportTab("summ
 '
   }
 
-  htmltools::tags$script(htmltools::HTML(js_content))
+  # Combine shared pins library + module JS
+  all_js <- if (nzchar(shared_js)) paste0(shared_js, "\n\n", js_content) else js_content
+  htmltools::tags$script(htmltools::HTML(all_js))
 }
 
 
