@@ -101,8 +101,16 @@
 
     // If pin has HTML-only content (no SVG chart, no table), render it
     // to an image first, then composite into the export
+    console.log("[TurasPins _build] Pin:", pin.title,
+      "| hasHtmlContent:", L.hasHtmlContent,
+      "| chartClone:", !!L.chart.clone,
+      "| tData:", !!L.tData,
+      "| tableHtml length:", (pin.tableHtml || "").length,
+      "| chartSvg length:", (pin.chartSvg || "").length);
     if (L.hasHtmlContent && !L.chart.clone && !L.tData) {
+      console.log("[TurasPins _build] Taking HTML content path for:", pin.title);
       _renderHtmlToImage(pin.tableHtml, L.usableW, function(result) {
+        console.log("[TurasPins _build] HTML render result:", result ? "got image " + result.width + "x" + result.height : "NULL");
         if (result) {
           // Recalculate layout with the rendered image dimensions
           var htmlImgH = Math.round(result.height * (L.usableW / result.width));
@@ -337,9 +345,16 @@
     var svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
     var url = URL.createObjectURL(svgBlob);
 
+    // Diagnostic: log SVG size and first/last chars to console
+    console.log("[TurasPins HTML export] SVG size:", svgStr.length,
+      "| width:", width, "| height:", height,
+      "| xhtml length:", xhtml.length,
+      "| starts with:", svgStr.substring(0, 80));
+
     var img = new Image();
     img.onload = function() {
       URL.revokeObjectURL(url);
+      console.log("[TurasPins HTML export] Image loaded OK:", img.naturalWidth, "x", img.naturalHeight);
       var preset = TurasPins.QUALITY_PRESETS[TurasPins.EXPORT_QUALITY] ||
                    TurasPins.QUALITY_PRESETS.standard;
       var scale = preset.scale;
@@ -350,11 +365,15 @@
       ctx.fillStyle = "#fff";
       ctx.fillRect(0, 0, c.width, c.height);
       ctx.drawImage(img, 0, 0, c.width, c.height);
+      // Diagnostic: check if canvas has any non-white pixels
+      var sample = ctx.getImageData(Math.floor(c.width/2), Math.floor(c.height/2), 1, 1).data;
+      console.log("[TurasPins HTML export] Canvas centre pixel RGBA:", sample[0], sample[1], sample[2], sample[3]);
       callback({ dataUrl: c.toDataURL("image/png"), width: width, height: height });
     };
-    img.onerror = function() {
+    img.onerror = function(e) {
       URL.revokeObjectURL(url);
-      console.error("[TurasPins] HTML-to-image render failed");
+      console.error("[TurasPins HTML export] Image FAILED to load. Error:", e);
+      console.error("[TurasPins HTML export] SVG first 500 chars:", svgStr.substring(0, 500));
       callback(null);
     };
     img.src = url;
