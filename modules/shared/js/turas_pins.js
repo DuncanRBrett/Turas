@@ -39,7 +39,7 @@
       }
     };
     _hubMode = !!(window.pinToHub);
-    _load();
+    if (!_hubMode) _load();
     TurasPins.updateBadge();
     TurasPins.updateButtons();
     if (_hubMode) {
