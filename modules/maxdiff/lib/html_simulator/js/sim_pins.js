@@ -226,10 +226,9 @@ var SimPins = (function() {
   function addCustomSlide() {
     TurasPins.add({
       title: "Custom Slide",
-      type: "pin",
-      tableHtml: '<div class="sim-custom-slide-body" contenteditable="true" style="min-height:60px;padding:12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;">Click to edit...</div>',
-      insightText: "",
+      insightText: "Click to edit...",
       chartSvg: "",
+      tableHtml: "",
       pinMode: "all"
     });
   }

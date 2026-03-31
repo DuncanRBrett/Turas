@@ -84,20 +84,66 @@
 
   function mdClosePopovers() {
     $$(".pin-mode-popover").forEach(function(p) { p.style.display = "none"; });
+    var dyn = document.getElementById("md-pin-popover");
+    if (dyn) dyn.remove();
+    document.removeEventListener("click", mdClosePopoverOnOutside);
+  }
+
+  function mdClosePopoverOnOutside(e) {
+    var dyn = document.getElementById("md-pin-popover");
+    if (dyn && !dyn.contains(e.target)) mdClosePopovers();
   }
 
   /**
-   * Toggle pin mode popover for a panel.
+   * Smart pin — detects available content and shows only valid options.
+   * If only one content type exists, pins directly without popover.
    * @param {string} panelId - Panel identifier
    */
   function mdTogglePin(panelId) {
-    var btn = $(".pin-btn[data-panel='" + panelId + "']");
-    if (!btn) return;
-    var popover = btn.parentElement.querySelector(".pin-mode-popover");
-    if (!popover) return;
-    var isOpen = popover.style.display === "block";
     mdClosePopovers();
-    popover.style.display = isOpen ? "none" : "block";
+
+    var content = mdCaptureContent(panelId);
+    if (!content) return;
+    var hasChart = !!(content.chartSvg);
+    var hasTable = !!(content.tableHtml);
+
+    // Smart skip: only one content type → pin directly
+    if (hasChart && !hasTable) { mdExecutePin(panelId, "chart_insight"); return; }
+    if (!hasChart && hasTable) { mdExecutePin(panelId, "table_insight"); return; }
+    if (!hasChart && !hasTable) { mdExecutePin(panelId, "all"); return; }
+
+    // Both chart and table exist — show dynamic popover
+    var btn = $(".pin-btn[data-panel='" + panelId + "']");
+    if (!btn) { mdExecutePin(panelId, "all"); return; }
+
+    var popover = document.createElement("div");
+    popover.className = "pin-mode-popover";
+    popover.id = "md-pin-popover";
+    popover.style.display = "block";
+
+    var options = [
+      { label: "Table + Chart", mode: "all" },
+      { label: "Chart only", mode: "chart_insight" },
+      { label: "Table only", mode: "table_insight" }
+    ];
+
+    options.forEach(function(opt) {
+      var item = document.createElement("button");
+      item.className = "pin-mode-option";
+      item.textContent = opt.label;
+      item.onclick = function(e) {
+        e.stopPropagation();
+        mdExecutePin(panelId, opt.mode);
+        mdClosePopovers();
+      };
+      popover.appendChild(item);
+    });
+
+    btn.parentElement.style.position = "relative";
+    btn.parentElement.appendChild(popover);
+    setTimeout(function() {
+      document.addEventListener("click", mdClosePopoverOnOutside);
+    }, 10);
   }
 
   /**

@@ -91,21 +91,36 @@
 
     mode = mode || "all";
 
-    // Title
+    // Title — context-aware labelling
     var titleEl = source.querySelector("h2") || source.querySelector("h3");
     var title = titleEl ? titleEl.textContent : viewId;
+
+    // Utility views: prefix with "Utility —" so it's clear what was pinned
+    if (viewId.indexOf("util-") === 0) {
+      title = "Utility \u2014 " + title;
+    }
+
+    // Simulator views: prefix with "Simulator —" and add mode + timestamp
     if (source._simMode) {
       var now = new Date();
       var timeStr = String(now.getHours()).padStart(2, "0") + ":" +
                     String(now.getMinutes()).padStart(2, "0");
-      title = source._simMode + " \u2014 " + timeStr;
+      title = "Simulator \u2014 " + source._simMode + " (" + timeStr + ")";
       delete source._simMode;
     }
 
-    // Chart SVG
+    // Chart SVG — find visible SVG (skip display:none containers)
     var chartSvg = "";
     if (mode === "all" || mode === "chart_insight") {
-      var svgEl = source.querySelector("svg");
+      var svgEls = source.querySelectorAll("svg");
+      var svgEl = null;
+      for (var si = 0; si < svgEls.length; si++) {
+        var parent = svgEls[si].closest(".cj-chart-container, .cj-sim-chart-wrap, div");
+        if (parent && parent.style.display !== "none" && svgEls[si].getBoundingClientRect().height > 0) {
+          svgEl = svgEls[si];
+          break;
+        }
+      }
       if (svgEl) {
         var clone = svgEl.cloneNode(true);
         // Bug #7 pattern: explicit viewBox + dimensions
@@ -121,11 +136,14 @@
       }
     }
 
-    // Table HTML
+    // Table HTML — find visible table
     var tableHtml = "";
     if (mode === "all" || mode === "table_insight") {
       var tableEl = source.querySelector(".cj-table") || source.querySelector("table");
-      if (tableEl) tableHtml = tableEl.outerHTML;
+      if (tableEl) {
+        var tableClone = tableEl.cloneNode(true);
+        tableHtml = tableClone.outerHTML;
+      }
     }
 
     return {
@@ -317,6 +335,11 @@
   };
 
   // ── Global Function Delegates ──────────────────────────────────────────────
+
+  // Added slides pin delegate — conjoint_navigation.js calls this
+  window._addPinnedEntry = function(entry) {
+    TurasPins.add(entry);
+  };
 
   window.cjGetPinnedViews = function() { return TurasPins._getPinsRef(); };
   window.addSection = function(title) { TurasPins.addSection(title); };

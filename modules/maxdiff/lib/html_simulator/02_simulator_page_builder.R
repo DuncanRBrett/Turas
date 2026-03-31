@@ -518,25 +518,75 @@ body { font-size: 14px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoot
 .sim-seg-best { color: #059669; font-weight: 600; }
 .sim-seg-worst { color: #dc2626; }
 
-/* Pinned views */
+/* Pinned views — tabs-quality styling */
 .sim-pin-badge { display: inline-flex; align-items: center; justify-content: center; background: #ef4444; color: white; font-size: 10px; font-weight: 700; width: 18px; height: 18px; border-radius: 50%; margin-left: 4px; vertical-align: 1px; }
 .sim-pins-empty { text-align: center; padding: 48px 20px; color: #94a3b8; font-size: 14px; }
 .sim-pins-actions { display: flex; gap: 8px; margin-top: 16px; }
-.sim-pin-card { border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 14px; overflow: hidden; }
-.sim-pin-card-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
-.sim-pin-card-title { font-size: 13px; font-weight: 600; color: #334155; }
-.sim-pin-card-actions { display: flex; gap: 4px; }
-.sim-pin-card-body { padding: 14px; }
-.sim-pin-card-insight { margin-top: 10px; }
-.sim-pin-insight-editor { border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 12px; min-height: 60px; font-size: 13px; line-height: 1.6; outline: none; }
-.sim-pin-insight-editor:focus { border-color: var(--sim-brand); box-shadow: 0 0 0 2px rgba(30,58,95,0.1); }
-.sim-pin-insight-editor:empty::before { content: "Add insight or commentary..."; color: #94a3b8; }
-.sim-pin-section { padding: 14px; border-bottom: 2px solid var(--sim-brand); margin-bottom: 14px; }
-.sim-pin-section-title { font-size: 16px; font-weight: 700; color: var(--sim-brand); border: none; background: transparent; outline: none; width: 100%; }
-.sim-custom-slide { border: 1px dashed #cbd5e1; border-radius: 8px; padding: 16px; margin-bottom: 14px; }
-.sim-custom-slide-title { font-size: 15px; font-weight: 600; color: #334155; border: none; background: transparent; outline: none; width: 100%; margin-bottom: 8px; }
-.sim-custom-slide-body { border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 12px; min-height: 80px; font-size: 13px; line-height: 1.6; outline: none; }
-.sim-custom-slide-body:focus { border-color: var(--sim-brand); box-shadow: 0 0 0 2px rgba(30,58,95,0.1); }
+
+/* Pin cards — matches tabs module quality */
+.sim-pin-card {
+  background: #ffffff; border: 1px solid #e8e5e0; border-radius: 8px;
+  padding: 20px 24px; margin-bottom: 16px; page-break-inside: avoid;
+}
+.sim-pin-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+.sim-pin-card-title { font-size: 18px; font-weight: 600; color: #1e293b; margin-bottom: 2px; }
+.sim-pin-card-subtitle { font-size: 13px; font-weight: 400; color: #94a3b8; }
+.sim-pin-card-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+/* Insight area — brand-accented left border */
+.sim-pin-card-insight {
+  margin-bottom: 12px; padding: 14px 20px;
+  border-left: 3px solid var(--sim-brand, #1e3a5f); background: #f8fafa;
+  border-radius: 0 6px 6px 0; font-size: 14px; line-height: 1.6; color: #1e293b;
+}
+.sim-pin-card-insight:empty { display: none; }
+.sim-pin-card-insight[data-placeholder]:empty::before { content: attr(data-placeholder); color: #94a3b8; font-style: italic; }
+
+/* Chart area */
+.sim-pin-card-chart { margin-bottom: 12px; }
+.sim-pin-card-chart svg { width: 100%; height: auto; }
+
+/* Table area — full width, polished */
+.sim-pin-card-table { overflow-x: auto; margin-bottom: 8px; }
+.sim-pin-card-table table { width: 100% !important; border-collapse: collapse; font-size: 13px; }
+.sim-pin-card-table th {
+  padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.3px; color: #64748b;
+  background: #f8fafc; border-bottom: 2px solid #e2e8f0; max-width: none;
+}
+.sim-pin-card-table td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #334155; max-width: none; }
+.sim-pin-card-table tr:last-child td { border-bottom: none; }
+.sim-pin-card-table tr:hover td { background: #f8fafc; }
+
+/* Section dividers */
+.sim-pin-section-divider {
+  display: flex; align-items: center; gap: 12px; padding: 12px 0;
+  margin: 8px 0; border-bottom: 2px solid var(--sim-brand, #1e3a5f);
+}
+.sim-pin-section-title {
+  font-size: 16px; font-weight: 600; color: var(--sim-brand, #1e3a5f);
+  flex: 1; outline: none; min-width: 100px; border: none; background: transparent;
+}
+.sim-pin-section-title:focus { border-bottom: 1px dashed #e2e8f0; }
+.sim-pin-section-actions { display: flex; gap: 4px; }
+.sim-pin-remove-btn {
+  background: none; border: 1px solid #e2e8f0; border-radius: 4px;
+  cursor: pointer; font-size: 16px; line-height: 1; padding: 2px 6px; color: #94a3b8;
+}
+.sim-pin-remove-btn:hover { background: #fee2e2; color: #dc2626; border-color: #fecaca; }
+.sim-pin-action-btn {
+  background: none; border: 1px solid #e2e8f0; border-radius: 4px;
+  cursor: pointer; font-size: 11px; padding: 2px 6px; color: #64748b;
+}
+.sim-pin-action-btn:hover { background: #f1f5f9; }
+
+/* Drag & drop */
+.sim-pin-card[draggable="true"]:active { cursor: grabbing; }
+.pin-dragging { opacity: 0.4 !important; }
+.pin-drop-target { outline: 2px dashed var(--sim-brand); outline-offset: 4px; }
+
+/* Overflow menu */
+.pin-overflow-item:hover { background: #f1f5f9; }
 .sim-custom-slide-body:empty::before { content: "Write your content here... (supports **bold**, *italic*, - bullets)"; color: #94a3b8; }
 
 /* Insight blocks */
