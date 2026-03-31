@@ -142,6 +142,10 @@ var SimPins = (function() {
    * @param {string} tabId - "overview", "shares", "h2h", "portfolio", "diagnostics"
    */
   function captureView(tabId) {
+    if (typeof TurasPins === "undefined" || !TurasPins.getConfig()) {
+      console.error("[SimPins] TurasPins not initialised. Cannot capture view.");
+      return;
+    }
     var data = SimEngine.getData();
     if (!data) return;
 
@@ -251,6 +255,11 @@ var SimPins = (function() {
   // ── Initialisation ─────────────────────────────────────────────────────────
 
   function init() {
+    if (typeof TurasPins === "undefined" || typeof TurasPins.init !== "function") {
+      console.error("[SimPins] TurasPins shared library not loaded. Pin functionality unavailable.");
+      return;
+    }
+
     TurasPins.init({
       storeId: "pinned-views-data",
       cssPrefix: "sim-pin",

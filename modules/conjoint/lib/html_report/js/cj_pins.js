@@ -109,14 +109,30 @@
       delete source._simMode;
     }
 
+    // ── Simulator special case ──
+    // The simulator renders a mix of SVG charts, styled div bars, and tables
+    // depending on the active mode (shares, revenue, sensitivity, sov).
+    // Capture the full results innerHTML as tableHtml to preserve everything.
+    if (viewId === "pin-simulator") {
+      var resultsClone = source.cloneNode(true);
+      // Strip interactive elements from the snapshot
+      resultsClone.querySelectorAll("input, select, button, label").forEach(function(el) { el.remove(); });
+      return {
+        title: title,
+        chartSvg: "",
+        tableHtml: '<div class="cj-sim-snapshot">' + resultsClone.innerHTML + '</div>'
+      };
+    }
+
+    // ── Standard chart + table capture ──
+
     // Chart SVG — find visible SVG (skip display:none containers)
     var chartSvg = "";
     if (mode === "all" || mode === "chart_insight") {
       var svgEls = source.querySelectorAll("svg");
       var svgEl = null;
       for (var si = 0; si < svgEls.length; si++) {
-        var parent = svgEls[si].closest(".cj-chart-container, .cj-sim-chart-wrap, div");
-        if (parent && parent.style.display !== "none" && svgEls[si].getBoundingClientRect().height > 0) {
+        if (svgEls[si].getBoundingClientRect().height > 0) {
           svgEl = svgEls[si];
           break;
         }
@@ -173,6 +189,9 @@
    */
   window.cjPinSection = function(viewId, btnEl) {
     if (!btnEl) { cjExecutePin(viewId, "all"); return; }
+
+    // Simulator: always pin full snapshot directly (no mode choice)
+    if (viewId === "pin-simulator") { cjExecutePin(viewId, "all"); return; }
 
     cjClosePopover();
     var content = cjCaptureContent(viewId, "all");
@@ -252,26 +271,19 @@
 
     var printStyle = document.createElement("style");
     printStyle.id = "cj-pinned-print-style";
-    printStyle.textContent =
-      "@page { size: A4 landscape; margin: 10mm 12mm; } " +
-      "@media print { " +
-      "body > *:not(#cj-pinned-print-overlay) { display: none !important; } " +
-      "#cj-pinned-print-overlay { position: static !important; overflow: visible !important; } " +
-      ".cj-print-page { page-break-after: always; padding: 12px 0; } " +
-      ".cj-print-page:last-child { page-break-after: auto; } " +
-      ".cj-print-insight { margin-bottom: 12px; padding: 16px 24px; border-left: 4px solid #323367; " +
-      "  background: #f0f5f5; border-radius: 0 6px 6px 0; font-size: 15px; font-weight: 600; " +
-      "  color: #1a2744; line-height: 1.5; -webkit-print-color-adjust: exact; print-color-adjust: exact; } " +
-      ".cj-print-chart svg { width: 100%; height: auto; } " +
-      ".cj-print-table table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; } " +
-      ".cj-print-table th, .cj-print-table td { padding: 4px 8px; border: 1px solid #ddd; } " +
-      ".cj-print-table th { background: #f1f5f9; font-weight: 600; -webkit-print-color-adjust: exact; print-color-adjust: exact; } " +
-      ".cj-print-section-strip { padding: 16px 0 8px; border-bottom: 2px solid #323367; font-size: 16px; font-weight: 600; color: #323367; } " +
-      "} " +
-      "#cj-pinned-print-overlay { padding: 32px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; } " +
-      ".cj-print-page { border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; margin-bottom: 16px; } " +
-      ".cj-print-close-btn { position: fixed; top: 16px; right: 16px; z-index: 100000; padding: 8px 20px; " +
-      "  background: #323367; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }";
+    printStyle.textContent = [
+      "@page{size:A4 landscape;margin:10mm 12mm}",
+      "@media print{body>*:not(#cj-pinned-print-overlay){display:none!important}",
+      "#cj-pinned-print-overlay{position:static!important;overflow:visible!important}",
+      ".cj-print-page{page-break-after:always;padding:12px 0}.cj-print-page:last-child{page-break-after:auto}",
+      ".cj-print-insight{margin-bottom:12px;padding:16px 24px;border-left:4px solid #323367;background:#f0f5f5;border-radius:0 6px 6px 0;font-size:15px;font-weight:600;color:#1a2744;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact}",
+      ".cj-print-chart svg{width:100%;height:auto}.cj-print-table table{width:100%;border-collapse:collapse;font-size:13px}",
+      ".cj-print-table th,.cj-print-table td{padding:4px 8px;border:1px solid #ddd}.cj-print-table th{background:#f1f5f9;font-weight:600;-webkit-print-color-adjust:exact;print-color-adjust:exact}",
+      ".cj-print-section-strip{padding:16px 0 8px;border-bottom:2px solid #323367;font-size:16px;font-weight:600;color:#323367}}",
+      "#cj-pinned-print-overlay{padding:32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}",
+      ".cj-print-page{border:1px solid #e2e8f0;border-radius:8px;padding:24px;margin-bottom:16px}",
+      ".cj-print-close-btn{position:fixed;top:16px;right:16px;z-index:100000;padding:8px 20px;background:#323367;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600}"
+    ].join(" ");
     document.head.appendChild(printStyle);
 
     var closeBtn = document.createElement("button");
