@@ -74,15 +74,14 @@
     var tableTopY = chartInfo.bottomY + (chartInfo.h > 0 ? 4 : 0);
     var mode = pin.pinMode || "all";
     var tData = null, estTH = 0;
-    var htmlFallback = null;
+    var hasHtmlContent = false;
     if (pin.tableHtml && (mode === "all" || mode === "table_insight")) {
       tData = TurasPins._extractTableData(pin.tableHtml);
       if (tData && tData.length > 0) {
         estTH = 34 + (tData.length - 1) * 28 + 4;
       } else if (pin.tableHtml.trim().length > 0) {
-        // HTML content that isn't a table — measure and flag for foreignObject render
-        htmlFallback = _measureHtmlContent(pin.tableHtml, usableW);
-        if (htmlFallback) estTH = htmlFallback.height + 8;
+        // HTML content (gauges, sig cards, simulators) — needs image capture
+        hasHtmlContent = true;
       }
     }
 
@@ -92,13 +91,37 @@
       insightY: contentTop, insightH: insightH, insightEl: insightEl,
       imgTopY: imgTopY, imgDispW: imgDispW, imgDispH: imgDispH,
       chartTopY: chartTopY, chart: chartInfo,
-      tableTopY: tableTopY, tData: tData, htmlFallback: htmlFallback,
+      tableTopY: tableTopY, tData: tData, hasHtmlContent: hasHtmlContent,
       totalH: Math.max(tableTopY + estTH + pad, 160)
     };
   }
   function _build(pin, imgW, imgH, onComplete) {
     var L = _layout(pin, imgW, imgH);
     var W = TurasPins.EXPORT_WIDTH;
+
+    // If pin has HTML-only content (no SVG chart, no table), render it
+    // to an image first, then composite into the export
+    if (L.hasHtmlContent && !L.chart.clone && !L.tData) {
+      _renderHtmlToImage(pin.tableHtml, L.usableW, function(result) {
+        if (result) {
+          // Recalculate layout with the rendered image dimensions
+          var htmlImgH = Math.round(result.height * (L.usableW / result.width));
+          L.totalH = L.tableTopY + htmlImgH + L.pad;
+          var svg = _assembleSVG(pin, L, W);
+          // Composite HTML image onto canvas after SVG render
+          _toPNG(svg, pin, L.totalH, W,
+            { data: result.dataUrl, x: L.pad, y: L.tableTopY,
+              w: L.usableW, h: htmlImgH },
+            L.titleText, onComplete);
+        } else {
+          // Fallback: render without HTML content
+          var svg = _assembleSVG(pin, L, W);
+          _toPNG(svg, pin, L.totalH, W, null, L.titleText, onComplete);
+        }
+      });
+      return;
+    }
+
     var svg = _assembleSVG(pin, L, W);
     _toPNG(svg, pin, L.totalH, W,
       L.imgDispW > 0 ? { data: pin.imageData, x: L.pad, y: L.imgTopY,
@@ -255,84 +278,105 @@
   };
 
   /**
-   * Measure HTML content that isn't a table by rendering it off-screen.
-   * Collects computed styles so the foreignObject render looks correct.
+   * Render HTML content to a canvas image for pixel-perfect export.
+   * Renders off-screen with original stylesheets, captures ALL computed
+   * styles on every element, then renders via foreignObject SVG.
+   * This produces an exact replica of the rendered content.
+   *
+   * @param {string} html - Raw HTML content
+   * @param {number} maxWidth - Container width in pixels
+   * @param {function} callback - Called with {dataUrl, width, height} or null
    */
-  function _measureHtmlContent(html, maxWidth) {
+  function _renderHtmlToImage(html, maxWidth, callback) {
+    // 1. Render off-screen with full stylesheet context
     var container = document.createElement("div");
     container.style.cssText =
       "position:absolute;left:-9999px;top:-9999px;width:" + maxWidth + "px;" +
-      "font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;" +
-      "font-size:13px;color:#1e293b;line-height:1.5;";
+      "background:#fff;";
     container.innerHTML = TurasPins._sanitizeHtml(html);
     document.body.appendChild(container);
 
-    // Collect computed styles from rendered elements for inline embedding
-    var styledHtml = _inlineComputedStyles(container);
+    var width = container.offsetWidth;
     var height = container.offsetHeight;
+    if (height <= 0) {
+      document.body.removeChild(container);
+      callback(null);
+      return;
+    }
+    height = Math.min(height, 1200);
+
+    // 2. Deep-clone with ALL computed styles inlined on every element
+    var styledClone = _deepCloneWithStyles(container);
 
     document.body.removeChild(container);
 
-    if (height <= 0) return null;
-    return { html: styledHtml, height: Math.min(height, 800), width: maxWidth };
+    // 3. Build SVG with foreignObject containing the styled clone
+    var svgHtml =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '">' +
+      '<foreignObject width="100%" height="100%">' +
+      '<div xmlns="http://www.w3.org/1999/xhtml" style="width:' + width + 'px;height:' + height + 'px;overflow:hidden;">' +
+      styledClone.innerHTML +
+      '</div></foreignObject></svg>';
+
+    // 4. Render SVG to canvas via Image
+    var url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgHtml);
+    var img = new Image();
+    img.onload = function() {
+      var scale = TurasPins.QUALITY_PRESETS[TurasPins.EXPORT_QUALITY]
+        ? TurasPins.QUALITY_PRESETS[TurasPins.EXPORT_QUALITY].scale : 2;
+      var c = document.createElement("canvas");
+      c.width = width * scale;
+      c.height = height * scale;
+      var ctx = c.getContext("2d");
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      callback({ dataUrl: c.toDataURL("image/png"), width: width, height: height });
+    };
+    img.onerror = function() {
+      console.error("[TurasPins] HTML-to-image render failed");
+      callback(null);
+    };
+    img.src = url;
   }
 
   /**
-   * Walk DOM tree and inline critical computed styles so foreignObject
-   * renders correctly when the SVG is serialized to a data URI.
+   * Deep-clone a DOM tree with ALL computed styles inlined on every element.
+   * This ensures foreignObject renders identically to the original when
+   * the SVG is serialized to a data URI (no stylesheet access).
    */
-  function _inlineComputedStyles(root) {
-    var copy = root.cloneNode(true);
-    var origEls = root.querySelectorAll("*");
-    var copyEls = copy.querySelectorAll("*");
+  function _deepCloneWithStyles(original) {
+    var clone = original.cloneNode(true);
+    var origEls = original.querySelectorAll("*");
+    var cloneEls = clone.querySelectorAll("*");
 
+    // Inline styles on the root container
+    _inlineAllStyles(original, clone);
+
+    // Inline styles on every descendant
     for (var i = 0; i < origEls.length; i++) {
-      var cs = window.getComputedStyle(origEls[i]);
-      var inline = "";
-      // Capture the visual properties that matter
-      var props = [
-        "display", "flex-direction", "flex-wrap", "justify-content", "align-items",
-        "gap", "padding", "margin", "width", "max-width", "min-width",
-        "height", "max-height", "font-size", "font-weight", "font-family",
-        "color", "background-color", "background", "border", "border-radius",
-        "text-align", "line-height", "box-sizing", "overflow",
-        "grid-template-columns", "grid-gap"
-      ];
-      for (var j = 0; j < props.length; j++) {
-        var val = cs.getPropertyValue(props[j]);
-        if (val && val !== "normal" && val !== "none" && val !== "0px" &&
-            val !== "auto" && val !== "rgba(0, 0, 0, 0)" && val !== "transparent") {
-          inline += props[j] + ":" + val + ";";
-        }
-      }
-      if (inline) {
-        var existing = copyEls[i].getAttribute("style") || "";
-        copyEls[i].setAttribute("style", existing + inline);
-      }
+      _inlineAllStyles(origEls[i], cloneEls[i]);
     }
-    return copy.innerHTML;
+    return clone;
   }
 
   /**
-   * Add HTML content to SVG via foreignObject.
-   * This renders arbitrary HTML (gauges, sig cards, simulator results)
-   * that doesn't fit the table or chart extraction pathways.
+   * Copy all computed styles from a source element to a target element
+   * as inline styles. Skips default/empty values for efficiency.
    */
-  function _addHtmlFallback(svg, htmlFallback, x, y, w, h) {
-    var fo = document.createElementNS(NS, "foreignObject");
-    fo.setAttribute("x", x);
-    fo.setAttribute("y", y);
-    fo.setAttribute("width", w);
-    fo.setAttribute("height", h);
-
-    var body = document.createElementNS("http://www.w3.org/1999/xhtml", "div");
-    body.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
-    body.setAttribute("style",
-      "font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;" +
-      "font-size:13px;color:#1e293b;line-height:1.5;overflow:hidden;width:" + w + "px;");
-    body.innerHTML = htmlFallback.html;
-    fo.appendChild(body);
-    svg.appendChild(fo);
+  function _inlineAllStyles(source, target) {
+    var cs = window.getComputedStyle(source);
+    var cssText = "";
+    for (var i = 0; i < cs.length; i++) {
+      var prop = cs[i];
+      var val = cs.getPropertyValue(prop);
+      // Skip properties that are empty, have no effect, or add bloat
+      if (!val || val === "initial" || val === "unset") continue;
+      // Skip animation/transition properties (not needed for static render)
+      if (prop.indexOf("animation") === 0 || prop.indexOf("transition") === 0) continue;
+      cssText += prop + ":" + val + ";";
+    }
+    target.setAttribute("style", cssText);
   }
 
   /** Assemble export SVG from layout */
@@ -358,14 +402,6 @@
       var actH = TurasPins._renderTableSVG(svg, L.tData, L.pad, L.tableTopY, L.usableW);
       if (L.tableTopY + actH + L.pad > L.totalH) {
         L.totalH = L.tableTopY + actH + L.pad;
-        bg.setAttribute("height", L.totalH);
-        svg.setAttribute("viewBox", "0 0 " + W + " " + L.totalH);
-      }
-    } else if (L.htmlFallback) {
-      _addHtmlFallback(svg, L.htmlFallback, L.pad, L.tableTopY, L.usableW, L.htmlFallback.height);
-      var newH = L.tableTopY + L.htmlFallback.height + L.pad;
-      if (newH > L.totalH) {
-        L.totalH = newH;
         bg.setAttribute("height", L.totalH);
         svg.setAttribute("viewBox", "0 0 " + W + " " + L.totalH);
       }
