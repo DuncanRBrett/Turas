@@ -207,8 +207,8 @@ test_that("build_hub_js loads all three JS files", {
   expect_true(grepl("ReportHub\\.reportKeys", js))
   # Content from hub_navigation.js
   expect_true(grepl("loadIframe|switchReport", js))
-  # Content from hub_pinned.js
-  expect_true(grepl("exportPinCard|hubRenderPinTableSVG|pinnedItems", js))
+  # Content from hub pin JS files (hub_pins.js, hub_pins_render.js, etc.)
+  expect_true(grepl("exportPinCard|pinnedItems|renderPinnedCards", js))
 })
 
 test_that("build_hub_css returns styled CSS with token replacement", {

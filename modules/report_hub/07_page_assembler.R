@@ -18,6 +18,19 @@ local({
   }
 })
 
+# Source TurasPins shared library loader
+local({
+  turas_root <- Sys.getenv("TURAS_ROOT", "")
+  if (!nzchar(turas_root)) turas_root <- getwd()
+  pins_loader <- file.path(turas_root, "modules", "shared", "lib", "turas_pins_js.R")
+  if (!file.exists(pins_loader)) {
+    pins_loader <- file.path("modules", "shared", "lib", "turas_pins_js.R")
+  }
+  if (!exists("turas_pins_js", mode = "function") && file.exists(pins_loader)) {
+    source(pins_loader, local = FALSE)
+  }
+})
+
 #' Assemble the Combined Report HTML
 #'
 #' @param config Validated config from guard
@@ -284,8 +297,19 @@ build_hub_js <- function(config = NULL) {
     js_dir <- file.path("modules", "report_hub", "js")
   }
 
-  js_files <- c("hub_id_resolver.js", "hub_navigation.js", "hub_pinned.js")
+  # Shared TurasPins library must load before hub pin files
+  shared_js <- if (exists("turas_pins_js", mode = "function")) turas_pins_js() else ""
+
+  js_files <- c(
+    "hub_id_resolver.js",
+    "hub_navigation.js",
+    "hub_pins.js",
+    "hub_pins_render.js",
+    "hub_pins_overview.js",
+    "hub_pins_export.js"
+  )
   js_parts <- character(0)
+  if (nzchar(shared_js)) js_parts <- c(js_parts, shared_js)
 
   for (f in js_files) {
     fpath <- file.path(js_dir, f)
