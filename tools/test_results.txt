@@ -1,7 +1,7 @@
 ================================================================================
 TURAS ANALYTICS PLATFORM - COMPREHENSIVE SYSTEM CHECK
 ================================================================================
-Date:       2026-03-28 17:23:06
+Date:       2026-03-31 21:41:39
 R Version:  4.5.3
 Root:       /Users/duncan/Dev/Turas
 ================================================================================
@@ -20,7 +20,6 @@ html_guard: ...........................
 html_table_builder: .........................
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
-You rock!
 
 --- test_html_transformer.R ---
 html_transformer: .........................
@@ -54,7 +53,6 @@ shared_config: .............................
 
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
-😸
 
 --- test_shared_formatting.R ---
 shared_formatting: ...............................................
@@ -69,7 +67,6 @@ shared_validation: ...................................
 
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
-Nice code.
 
 --- test_shared_weights.R ---
 shared_weights: ..................................................
@@ -77,7 +74,6 @@ shared_weights: ..................................................
 
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
-HUZZAH - priceless code.
 
 --- test_trs_refusal.R ---
 trs_refusal: ..............................
@@ -117,7 +113,7 @@ What to do:
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 
-[PASS] Shared Infrastructure — 619 passed, 0 failed, 0 skipped (1.6s)
+[PASS] Shared Infrastructure — 619 passed, 0 failed, 0 skipped (2.3s)
 
 --------------------------------------------------------------------------------
 MODULE: AlchemerParser (7 test files)
@@ -162,7 +158,7 @@ routing_detection: ........................................
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 
-[PASS] AlchemerParser — 299 passed, 0 failed, 0 skipped (0.9s)
+[PASS] AlchemerParser — 299 passed, 0 failed, 0 skipped (1.6s)
 
 --------------------------------------------------------------------------------
 MODULE: Confidence (16 test files)
@@ -182,22 +178,22 @@ CI Dispatcher: .............................
 🎉🎊🎉🎊🎉🎊🎉🎊🎉🎊🎉
 
 --- test_config_templates.R ---
-config_templates: [Confidence] Config template saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906733c70303.xlsx
+config_templates: [Confidence] Config template saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d78bfc5a6.xlsx
   Sheets: File_Paths, Study_Settings, Question_Analysis, Population_Margins
-...[Confidence] Config template saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906717a86bbd.xlsx
+...[Confidence] Config template saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d765fdac89.xlsx
   Sheets: File_Paths, Study_Settings, Question_Analysis, Population_Margins
-....[Confidence] Config template saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90675f672df6.xlsx
+....[Confidence] Config template saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d77dde2e93.xlsx
   Sheets: File_Paths, Study_Settings, Question_Analysis, Population_Margins
-......[Confidence] Config template saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067476986f7.xlsx
+......[Confidence] Config template saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d71f40782a.xlsx
   Sheets: File_Paths, Study_Settings, Question_Analysis, Population_Margins
-......[Confidence] Config template saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906758e239ff.xlsx
+......[Confidence] Config template saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d74ce2334b.xlsx
   Sheets: File_Paths, Study_Settings, Question_Analysis, Population_Margins
 .=== TURAS Confidence Module: Generating Config Templates ===
-[Confidence] Config template saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/confidence_tpl_36967/Confidence_Config_Template.xlsx
+[Confidence] Config template saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/confidence_tpl_5591/Confidence_Config_Template.xlsx
   Sheets: File_Paths, Study_Settings, Question_Analysis, Population_Margins
 
 === Template generation complete ===
-Output: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/confidence_tpl_36967/Confidence_Config_Template.xlsx
+Output: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/confidence_tpl_5591/Confidence_Config_Template.xlsx
 ....
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -222,7 +218,7 @@ HTML Report Generation: ........................................................
     5 charts built
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file to full_pipeline_test.html...
-  Done! 85.0 KB in 0.0 seconds
+  Done! 154.0 KB in 0.0 seconds
 ------------------------------------------------------------ 
 
 ..........
@@ -238,7 +234,7 @@ HTML Report Generation: ........................................................
     4 charts built
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file to prop_only_test.html...
-  Done! 75.3 KB in 0.0 seconds
+  Done! 144.2 KB in 0.0 seconds
 ------------------------------------------------------------ 
 
 ..
@@ -254,7 +250,7 @@ HTML Report Generation: ........................................................
     2 charts built
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file to mean_only_test.html...
-  Done! 63.5 KB in 0.0 seconds
+  Done! 132.1 KB in 0.0 seconds
 ------------------------------------------------------------ 
 
 ..
@@ -270,7 +266,7 @@ HTML Report Generation: ........................................................
     2 charts built
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file to nps_only_test.html...
-  Done! 59.8 KB in 0.0 seconds
+  Done! 128.4 KB in 0.0 seconds
 ------------------------------------------------------------ 
 
 ..
@@ -279,7 +275,7 @@ HTML Report Generation: ........................................................
 
 --- test_load_config.R ---
 load_config: 
-Config Loading: Loading configuration from: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/test_config_172314_4782.xlsx
+Config Loading: Loading configuration from: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/test_config_214148_4782.xlsx
 
 -
 /
@@ -315,7 +311,7 @@ Config Loading: Loading configuration from: /var/folders/_k/w70jftv55x14x85f22dv
   - Study settings: 6 parameters
   - Question analysis: 2 questions (max 200)
   - Population margins: (optional sheet not provided)
-......Loading configuration from: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/test_config_172314_5097.xlsx
+......Loading configuration from: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/test_config_214149_5097.xlsx
 
 -
 /
@@ -351,7 +347,7 @@ Config Loading: Loading configuration from: /var/folders/_k/w70jftv55x14x85f22dv
   - Study settings: 6 parameters
   - Question analysis: 2 questions (max 200)
   - Population margins: (optional sheet not provided)
-...Loading configuration from: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/test_config_172314_3509.xlsx
+...Loading configuration from: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/test_config_214149_3509.xlsx
 
 -
 /
@@ -387,7 +383,7 @@ Config Loading: Loading configuration from: /var/folders/_k/w70jftv55x14x85f22dv
   - Study settings: 6 parameters
   - Question analysis: 2 questions (max 200)
   - Population margins: (optional sheet not provided)
-...Loading configuration from: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/test_config_172314_5935.xlsx
+...Loading configuration from: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/test_config_214149_5935.xlsx
 
 -
 /
@@ -423,7 +419,7 @@ Config Loading: Loading configuration from: /var/folders/_k/w70jftv55x14x85f22dv
   - Study settings: 6 parameters
   - Question analysis: 2 questions (max 200)
   - Population margins: (optional sheet not provided)
-.....Loading configuration from: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/test_config_172314_6771.xlsx
+.....Loading configuration from: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/test_config_214149_6771.xlsx
 
 -
 /
@@ -459,7 +455,7 @@ Config Loading: Loading configuration from: /var/folders/_k/w70jftv55x14x85f22dv
   - Study settings: 7 parameters
   - Question analysis: 2 questions (max 500)
   - Population margins: (optional sheet not provided)
-.Loading configuration from: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/test_config_172314_5262.xlsx
+.Loading configuration from: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/test_config_214149_5262.xlsx
 
 -
 /
@@ -572,32 +568,32 @@ Mean Confidence Intervals: .....................................................
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 --- test_output_integration.R ---
-output_integration:    Writing: file90673b05a522.xlsx
-[TRS INFO] CONF: Saved: file90673b05a522.xlsx (26,288 bytes)
-..   Writing: file90674f29635b.xlsx
-[TRS INFO] CONF: Saved: file90674f29635b.xlsx (26,078 bytes)
-.......   Writing: file906740ae2255.xlsx
-[TRS INFO] CONF: Saved: file906740ae2255.xlsx (23,884 bytes)
-.   Writing: file90673becc8fd.xlsx
-[TRS INFO] CONF: Saved: file90673becc8fd.xlsx (21,371 bytes)
-.   Writing: file906738ffa15d.xlsx
-[TRS INFO] CONF: Saved: file906738ffa15d.xlsx (18,855 bytes)
-..   Writing: file90677343ae6e.xlsx
-[TRS INFO] CONF: Saved: file90677343ae6e.xlsx (18,821 bytes)
-.   Writing: file90678eea86c.xlsx
-[TRS INFO] CONF: Saved: file90678eea86c.xlsx (18,322 bytes)
-.   Writing: file906737633bfc.xlsx
-[TRS INFO] CONF: Saved: file906737633bfc.xlsx (18,855 bytes)
-.   Writing: file906767972831.xlsx
-[TRS INFO] CONF: Saved: file906767972831.xlsx (18,821 bytes)
-.   Writing: file9067488b8523.xlsx
-[TRS INFO] CONF: Saved: file9067488b8523.xlsx (18,855 bytes)
-.   Writing: file90676daae073.xlsx
-[TRS INFO] CONF: Saved: file90676daae073.xlsx (21,361 bytes)
-..   Writing: file9067c9604cb.xlsx
-[TRS INFO] CONF: Saved: file9067c9604cb.xlsx (15,949 bytes)
-......   Writing: file9067799dd8dd.xlsx
-[TRS INFO] CONF: Saved: file9067799dd8dd.xlsx (15,949 bytes)
+output_integration:    Writing: file15d753ebb3a.xlsx
+[TRS INFO] CONF: Saved: file15d753ebb3a.xlsx (26,288 bytes)
+..   Writing: file15d71b68c300.xlsx
+[TRS INFO] CONF: Saved: file15d71b68c300.xlsx (26,077 bytes)
+.......   Writing: file15d79d0001c.xlsx
+[TRS INFO] CONF: Saved: file15d79d0001c.xlsx (23,883 bytes)
+.   Writing: file15d7141666bf.xlsx
+[TRS INFO] CONF: Saved: file15d7141666bf.xlsx (21,371 bytes)
+.   Writing: file15d75854a72f.xlsx
+[TRS INFO] CONF: Saved: file15d75854a72f.xlsx (18,855 bytes)
+..   Writing: file15d729bee7ff.xlsx
+[TRS INFO] CONF: Saved: file15d729bee7ff.xlsx (18,821 bytes)
+.   Writing: file15d76f041cae.xlsx
+[TRS INFO] CONF: Saved: file15d76f041cae.xlsx (18,323 bytes)
+.   Writing: file15d73219fbef.xlsx
+[TRS INFO] CONF: Saved: file15d73219fbef.xlsx (18,855 bytes)
+.   Writing: file15d7687179cc.xlsx
+[TRS INFO] CONF: Saved: file15d7687179cc.xlsx (18,821 bytes)
+.   Writing: file15d760422568.xlsx
+[TRS INFO] CONF: Saved: file15d760422568.xlsx (18,855 bytes)
+.   Writing: file15d77c52742c.xlsx
+[TRS INFO] CONF: Saved: file15d77c52742c.xlsx (21,360 bytes)
+..   Writing: file15d7f201402.xlsx
+[TRS INFO] CONF: Saved: file15d7f201402.xlsx (15,949 bytes)
+......   Writing: file15d74e3c04b8.xlsx
+[TRS INFO] CONF: Saved: file15d74e3c04b8.xlsx (15,949 bytes)
 .
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -651,7 +647,7 @@ utils: ....................................................................
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 
-[PASS] Confidence — 1022 passed, 0 failed, 0 skipped (13.7s)
+[PASS] Confidence — 1022 passed, 0 failed, 0 skipped (15.1s)
 
 --------------------------------------------------------------------------------
 MODULE: Conjoint (20 test files)
@@ -755,11 +751,11 @@ Backtrace:
 html_report: ....................................................................................................S..........
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906765de0a55.html (0.22 MB)
+  [HTML REPORT] Written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d764dd6576.html (0.29 MB)
 ..................
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067449040e.html (0.23 MB)
+  [HTML REPORT] Written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d72d51f379.html (0.29 MB)
 ..
   [HTML REPORT] Generating conjoint analysis report...
 
@@ -771,47 +767,55 @@ html_report: ...................................................................
 .
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906729053d94.html (0.22 MB)
+  [HTML REPORT] Written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d768dffaca.html (0.29 MB)
 ................
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90677abce0dd.html (0.22 MB)
+  [HTML REPORT] Written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d756ac16fe.html (0.29 MB)
 ..........
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90674e02c53c.html (0.23 MB)
+  [HTML REPORT] Written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d71f091401.html (0.29 MB)
 .
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90677271d226.html (0.22 MB)
-.......
+  [HTML REPORT] Written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d768a2c01a.html (0.29 MB)
+...1...
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90672fa5b7c7.html (0.23 MB)
+  [HTML REPORT] Written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7684fea6d.html (0.29 MB)
 ........
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90673466dfd3.html (0.22 MB)
+  [HTML REPORT] Written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d74f0822a4.html (0.29 MB)
 ...
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906714e5fe41.html (0.22 MB)
+  [HTML REPORT] Written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d75cd8cad2.html (0.29 MB)
 .......................
 
 ══ Skipped ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 1. all 7 JS files have valid syntax ('test_html_report.R:644:3') - Reason: node not found at /usr/local/bin/node
 
+══ Failed ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+── 1. Failure ('test_html_report.R:1048:3'): pin buttons use emoji character on all panels ───────────────────────────────────
+grepl("togglePin", html, fixed = TRUE) is not TRUE
+
+`actual`:   FALSE
+`expected`: TRUE 
+
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+Keep trying!
 
 --- test_html_simulator.R ---
 html_simulator: 
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90674826901a.html (0.22 MB)
+  [HTML REPORT] Written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d749aa2bb4.html (0.29 MB)
 ...
   [HTML REPORT] Generating conjoint analysis report...
 
-  [HTML REPORT] Written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067580245f5.html (0.22 MB)
+  [HTML REPORT] Written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7625ae160.html (0.29 MB)
 ....S
 
 ══ Skipped ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -858,28 +862,28 @@ optimizer: ..........
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 --- test_output_integration.R ---
-output_integration:    Writing: file9067303b50fa.xlsx
-[TRS INFO] CONJ: Saved: file9067303b50fa.xlsx (24,768 bytes)
-..   Writing: file90677d759440.xlsx
-[TRS INFO] CONJ: Saved: file90677d759440.xlsx (24,768 bytes)
-...........   Writing: file906736ff78c3.xlsx
-[TRS INFO] CONJ: Saved: file906736ff78c3.xlsx (24,768 bytes)
-.   Writing: file90673a7dbaf6.xlsx
-[TRS INFO] CONJ: Saved: file90673a7dbaf6.xlsx (24,768 bytes)
-.   Writing: file90677e154932.xlsx
-[TRS INFO] CONJ: Saved: file90677e154932.xlsx (24,768 bytes)
-..   Writing: file9067596d2599.xlsx
-[TRS INFO] CONJ: Saved: file9067596d2599.xlsx (24,768 bytes)
-.   Writing: file906755300851.xlsx
-[TRS INFO] CONJ: Saved: file906755300851.xlsx (24,768 bytes)
-.   Writing: file9067163ccd8a.xlsx
-[TRS INFO] CONJ: Saved: file9067163ccd8a.xlsx (24,768 bytes)
+output_integration:    Writing: file15d72620ece5.xlsx
+[TRS INFO] CONJ: Saved: file15d72620ece5.xlsx (24,768 bytes)
+..   Writing: file15d76b619aae.xlsx
+[TRS INFO] CONJ: Saved: file15d76b619aae.xlsx (24,768 bytes)
+...........   Writing: file15d77755fca8.xlsx
+[TRS INFO] CONJ: Saved: file15d77755fca8.xlsx (24,768 bytes)
+.   Writing: file15d7307de598.xlsx
+[TRS INFO] CONJ: Saved: file15d7307de598.xlsx (24,768 bytes)
+.   Writing: file15d71bdf8018.xlsx
+[TRS INFO] CONJ: Saved: file15d71bdf8018.xlsx (24,768 bytes)
+..   Writing: file15d731a7679a.xlsx
+[TRS INFO] CONJ: Saved: file15d731a7679a.xlsx (24,768 bytes)
+.   Writing: file15d7313487c7.xlsx
+[TRS INFO] CONJ: Saved: file15d7313487c7.xlsx (24,768 bytes)
+.   Writing: file15d71b4f0d7e.xlsx
+[TRS INFO] CONJ: Saved: file15d71b4f0d7e.xlsx (24,768 bytes)
 .   Writing: output.xlsx
 [TRS INFO] CONJ: Saved: output.xlsx (24,768 bytes)
-.   Writing: file906747f51c1.xlsx
-[TRS INFO] CONJ: Saved: file906747f51c1.xlsx (24,376 bytes)
-.   Writing: file90679c132ab.xlsx
-[TRS INFO] CONJ: Saved: file90679c132ab.xlsx (24,441 bytes)
+.   Writing: file15d7666e6544.xlsx
+[TRS INFO] CONJ: Saved: file15d7666e6544.xlsx (24,376 bytes)
+.   Writing: file15d74076c8be.xlsx
+[TRS INFO] CONJ: Saved: file15d74076c8be.xlsx (24,441 bytes)
 .
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -922,7 +926,10 @@ wtp: ..............
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 
-[PASS] Conjoint — 579 passed, 0 failed, 10 skipped (18.2s)
+FAILURES IN THIS MODULE:
+  FAIL in test_html_report.R / html_report: 1 failure(s)
+
+[FAIL] Conjoint — 578 passed, 1 failed, 10 skipped (22.1s)
 
 --------------------------------------------------------------------------------
 MODULE: Cat Driver (6 test files)
@@ -981,12 +988,12 @@ Suite 5: Importance & Odds Ratios: ..........................   Could not map te
 Suite 6: Missing Data Handling: ....................
 Suite 7: Output Generation: ...   [ERROR] Odds Ratios sheet failed: attempt to set an attribute on NULL
    [ERROR] Diagnostics sheet failed: argument is of length zero
-   Writing: file906733674f32.xlsx
-[TRS INFO] CATD: Saved: file906733674f32.xlsx (21,094 bytes)
+   Writing: file15d728591fe5.xlsx
+[TRS INFO] CATD: Saved: file15d728591fe5.xlsx (21,094 bytes)
 .   [ERROR] Odds Ratios sheet failed: attempt to set an attribute on NULL
    [ERROR] Diagnostics sheet failed: argument is of length zero
-   Writing: file906768e8b9a8.xlsx
-[TRS INFO] CATD: Saved: file906768e8b9a8.xlsx (21,094 bytes)
+   Writing: file15d73bc9c63d.xlsx
+[TRS INFO] CATD: Saved: file15d73bc9c63d.xlsx (21,094 bytes)
 .......
 Suite 8: Guard Framework: ......................
 Suite 9: Integration: ....................
@@ -1080,7 +1087,7 @@ Subgroup Edge Cases: .....
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 
-[PASS] Cat Driver — 605 passed, 0 failed, 17 skipped (4.0s)
+[PASS] Cat Driver — 605 passed, 0 failed, 17 skipped (4.8s)
 
 --------------------------------------------------------------------------------
 MODULE: Key Driver (17 test files)
@@ -1213,13 +1220,14 @@ Keydriver HTML Builders:
 │   - 07_v104_sections.R 
 │   - js/kd_navigation.js 
 │   - js/kd_utils.js 
-│   - js/kd_pinned_views.js 
-│   - js/kd_slide_export.js 
+│   - js/kd_table_export.js 
+│   - js/kd_pins.js 
+│   - js/kd_pins_extras.js 
 │ Expected in: tools 
 │ Fix: Restore missing files or check lib/html_report/ directory
 └──────────────────────────────────────────────────────┘
 
-   [WARN] Keydriver HTML report submodule(s) missing: 00_html_guard.R, 01_data_transformer.R, 02_table_builder.R, 03_page_builder.R, 03a_page_styling.R, 03b_page_components.R, 03c_section_builders.R, 04_html_writer.R, 05_chart_builder.R, 06_quadrant_section.R, 07_v104_sections.R, js/kd_navigation.js, js/kd_utils.js, js/kd_pinned_views.js, js/kd_slide_export.js
+   [WARN] Keydriver HTML report submodule(s) missing: 00_html_guard.R, 01_data_transformer.R, 02_table_builder.R, 03_page_builder.R, 03a_page_styling.R, 03b_page_components.R, 03c_section_builders.R, 04_html_writer.R, 05_chart_builder.R, 06_quadrant_section.R, 07_v104_sections.R, js/kd_navigation.js, js/kd_utils.js, js/kd_table_export.js, js/kd_pins.js, js/kd_pins_extras.js
 ....................................................
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -1243,13 +1251,14 @@ html_report:
 │   - 07_v104_sections.R 
 │   - js/kd_navigation.js 
 │   - js/kd_utils.js 
-│   - js/kd_pinned_views.js 
-│   - js/kd_slide_export.js 
+│   - js/kd_table_export.js 
+│   - js/kd_pins.js 
+│   - js/kd_pins_extras.js 
 │ Expected in: tools 
 │ Fix: Restore missing files or check lib/html_report/ directory
 └──────────────────────────────────────────────────────┘
 
-   [WARN] Keydriver HTML report submodule(s) missing: 00_html_guard.R, 01_data_transformer.R, 02_table_builder.R, 03_page_builder.R, 03a_page_styling.R, 03b_page_components.R, 03c_section_builders.R, 04_html_writer.R, 05_chart_builder.R, 06_quadrant_section.R, 07_v104_sections.R, js/kd_navigation.js, js/kd_utils.js, js/kd_pinned_views.js, js/kd_slide_export.js
+   [WARN] Keydriver HTML report submodule(s) missing: 00_html_guard.R, 01_data_transformer.R, 02_table_builder.R, 03_page_builder.R, 03a_page_styling.R, 03b_page_components.R, 03c_section_builders.R, 04_html_writer.R, 05_chart_builder.R, 06_quadrant_section.R, 07_v104_sections.R, js/kd_navigation.js, js/kd_utils.js, js/kd_table_export.js, js/kd_pins.js, js/kd_pins_extras.js
 ..............S........................
 
 ══ Skipped ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -1275,13 +1284,14 @@ integration:
 │   - 07_v104_sections.R 
 │   - js/kd_navigation.js 
 │   - js/kd_utils.js 
-│   - js/kd_pinned_views.js 
-│   - js/kd_slide_export.js 
+│   - js/kd_table_export.js 
+│   - js/kd_pins.js 
+│   - js/kd_pins_extras.js 
 │ Expected in: tools 
 │ Fix: Restore missing files or check lib/html_report/ directory
 └──────────────────────────────────────────────────────┘
 
-   [WARN] Keydriver HTML report submodule(s) missing: 00_html_guard.R, 01_data_transformer.R, 02_table_builder.R, 03_page_builder.R, 03a_page_styling.R, 03b_page_components.R, 03c_section_builders.R, 04_html_writer.R, 05_chart_builder.R, 06_quadrant_section.R, 07_v104_sections.R, js/kd_navigation.js, js/kd_utils.js, js/kd_pinned_views.js, js/kd_slide_export.js
+   [WARN] Keydriver HTML report submodule(s) missing: 00_html_guard.R, 01_data_transformer.R, 02_table_builder.R, 03_page_builder.R, 03a_page_styling.R, 03b_page_components.R, 03c_section_builders.R, 04_html_writer.R, 05_chart_builder.R, 06_quadrant_section.R, 07_v104_sections.R, js/kd_navigation.js, js/kd_utils.js, js/kd_table_export.js, js/kd_pins.js, js/kd_pins_extras.js
 ...........................................
   Bootstrap CI Analysis
   - Running 100 bootstrap iterations...
@@ -1303,10 +1313,10 @@ integration:
     [WARN] JS file not found: tools/js/kd_utils.js
     [WARN] JS file not found: tools/js/kd_navigation.js
     [WARN] JS file not found: tools/js/kd_table_export.js
-    [WARN] JS file not found: tools/js/kd_pinned_views.js
-    [WARN] JS file not found: tools/js/kd_slide_export.js
+    [WARN] JS file not found: tools/js/kd_pins.js
+    [WARN] JS file not found: tools/js/kd_pins_extras.js
   Step 6: Writing HTML file to integration_test_kd_full_report.html...
-  Done! 0.12 MB in 0.5 seconds
+  Done! 0.19 MB in 0.6 seconds
 ------------------------------------------------------------ 
 
 ...
@@ -1325,10 +1335,10 @@ integration:
     [WARN] JS file not found: tools/js/kd_utils.js
     [WARN] JS file not found: tools/js/kd_navigation.js
     [WARN] JS file not found: tools/js/kd_table_export.js
-    [WARN] JS file not found: tools/js/kd_pinned_views.js
-    [WARN] JS file not found: tools/js/kd_slide_export.js
+    [WARN] JS file not found: tools/js/kd_pins.js
+    [WARN] JS file not found: tools/js/kd_pins_extras.js
   Step 6: Writing HTML file to integration_v104_report.html...
-  Done! 0.13 MB in 0.1 seconds
+  Done! 0.20 MB in 0.1 seconds
 ------------------------------------------------------------ 
 
 ...S
@@ -1492,7 +1502,7 @@ v10.4 Analytical Features:    Running Elastic Net analysis...
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 
-[PASS] Key Driver — 928 passed, 0 failed, 4 skipped (7.8s)
+[PASS] Key Driver — 928 passed, 0 failed, 4 skipped (9.9s)
 
 --------------------------------------------------------------------------------
 MODULE: MaxDiff (16 test files)
@@ -1540,14 +1550,14 @@ hb: ............................................................................
 --- test_html_report.R ---
 html_report: .............................................................  HTML Layer 1: Transforming data...
   HTML Layer 4: Assembling page...
-  HTML Writing to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906723d0a347.html
-  HTML report generated: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906723d0a347.html (151.3 KB)
+  HTML Writing to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7142ad41a.html
+  HTML report generated: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7142ad41a.html (224.3 KB)
 ....
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 --- test_html_simulator.R ---
-html_simulator: ......................
+html_simulator: .......................
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
@@ -1595,7 +1605,7 @@ validation: ....................................................................
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 
-[PASS] MaxDiff — 755 passed, 0 failed, 4 skipped (7.0s)
+[PASS] MaxDiff — 756 passed, 0 failed, 4 skipped (7.4s)
 
 --------------------------------------------------------------------------------
 MODULE: Pricing (23 test files)
@@ -1689,7 +1699,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067131b8a42.xlsx
+  Config template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d72320b304.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 ..
@@ -1703,7 +1713,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90674381b81.xlsx
+  Config template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7f154b5f.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 ....
@@ -1717,7 +1727,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906757a0fa54.xlsx
+  Config template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d750e04d19.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 .
@@ -1731,7 +1741,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90677b26485f.xlsx
+  Config template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d73586cb35.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 .
@@ -1745,7 +1755,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906731c39fd.xlsx
+  Config template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d711a1d373.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 .
@@ -1759,7 +1769,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90677378f5b9.xlsx
+  Config template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d72d61e10.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 .
@@ -1773,7 +1783,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906715883312.xlsx
+  Config template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d71dbd535d.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 .
@@ -1787,7 +1797,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906770a65785.xlsx
+  Config template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7e286652.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 
@@ -1801,7 +1811,7 @@ config_templates:
   [6/7] Validation sheet...
   [7/7] Reference sheet...
 
-  Config template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906770a65785.xlsx
+  Config template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7e286652.xlsx
   Open in Excel and fill in the Value column for each sheet.
 
 ..
@@ -1959,18 +1969,55 @@ guard: ........................
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 --- test_html_report.R ---
-html_report: .................................................................................................   HTML Report: Starting generation...
+html_report: ....................................................................12...................3456....   HTML Report: Starting generation...
    HTML Report: Transforming data...
    HTML Report: Building tables...
    HTML Report: Building charts...
 W   HTML Report: Preparing simulator data...
    HTML Report: Assembling page...
    HTML Report: Writing file...
-   HTML Report: Written to file906756e10ad3.html (128.9 KB)
+   HTML Report: Written to file15d72c6fe769.html (199.8 KB)
 .......
 
 ══ Warnings ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 1. generate_pricing_html_report writes valid file ('test_html_report.R:397:3') - NAs introduced by coercion
+
+══ Failed ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+── 1. Failure ('test_html_report.R:309:3'): build_pricing_page produces complete HTML document ───────────────────────────────
+grepl("ArrowLeft", page) is not TRUE
+
+`actual`:   FALSE
+`expected`: TRUE 
+
+── 2. Failure ('test_html_report.R:310:3'): build_pricing_page produces complete HTML document ───────────────────────────────
+grepl("ArrowRight", page) is not TRUE
+
+`actual`:   FALSE
+`expected`: TRUE 
+
+── 3. Failure ('test_html_report.R:362:3'): build_pricing_js includes keyboard navigation ────────────────────────────────────
+grepl("keydown", js) is not TRUE
+
+`actual`:   FALSE
+`expected`: TRUE 
+
+── 4. Failure ('test_html_report.R:363:3'): build_pricing_js includes keyboard navigation ────────────────────────────────────
+grepl("ArrowLeft", js) is not TRUE
+
+`actual`:   FALSE
+`expected`: TRUE 
+
+── 5. Failure ('test_html_report.R:364:3'): build_pricing_js includes keyboard navigation ────────────────────────────────────
+grepl("ArrowRight", js) is not TRUE
+
+`actual`:   FALSE
+`expected`: TRUE 
+
+── 6. Failure ('test_html_report.R:365:3'): build_pricing_js includes keyboard navigation ────────────────────────────────────
+grepl("switchTab", js) is not TRUE
+
+`actual`:   FALSE
+`expected`: TRUE 
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
@@ -2148,10 +2195,10 @@ Diagnostics:
    Generated 1 plot(s)
 
 8. Generating output file...
-   Writing: file90676c96d051.xlsx
-[TRS INFO] PRICE: Saved: file90676c96d051.xlsx (51,519 bytes)
-   Plots saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/plots
-   Results written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90676c96d051.xlsx
+   Writing: file15d72c382300.xlsx
+[TRS INFO] PRICE: Saved: file15d72c382300.xlsx (51,517 bytes)
+   Plots saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/plots
+   Results written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d72c382300.xlsx
 ......1. Configuration loaded
    Analysis method: gabor_granger
    Project: Test GG Pipeline
@@ -2172,10 +2219,10 @@ Diagnostics:
    Generated 2 plot(s)
 
 8. Generating output file...
-   Writing: file906741f736f0.xlsx
-[TRS INFO] PRICE: Saved: file906741f736f0.xlsx (22,205 bytes)
-   Plots saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/plots
-   Results written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906741f736f0.xlsx
+   Writing: file15d77182fc52.xlsx
+[TRS INFO] PRICE: Saved: file15d77182fc52.xlsx (22,203 bytes)
+   Plots saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/plots
+   Results written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d77182fc52.xlsx
 .....1. Configuration loaded
    Analysis method: van_westendorp
    Project: Test Pipeline
@@ -2264,10 +2311,10 @@ Diagnostics:
    Generated 1 plot(s)
 
 8. Generating output file...
-   Writing: file9067b1d8fae.xlsx
-[TRS INFO] PRICE: Saved: file9067b1d8fae.xlsx (51,520 bytes)
-   Plots saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/plots
-   Results written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067b1d8fae.xlsx
+   Writing: file15d761382a83.xlsx
+[TRS INFO] PRICE: Saved: file15d761382a83.xlsx (51,519 bytes)
+   Plots saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/plots
+   Results written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d761382a83.xlsx
 .1. Configuration loaded
    Analysis method: van_westendorp
    Project: Test Pipeline
@@ -2341,10 +2388,10 @@ Diagnostics:
    Generated 1 plot(s)
 
 8. Generating output file...
-   Writing: file906713936cee.xlsx
-[TRS INFO] PRICE: Saved: file906713936cee.xlsx (51,520 bytes)
-   Plots saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/plots
-   Results written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906713936cee.xlsx
+   Writing: file15d73a677b9d.xlsx
+[TRS INFO] PRICE: Saved: file15d73a677b9d.xlsx (51,518 bytes)
+   Plots saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/plots
+   Results written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d73a677b9d.xlsx
 ..
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -2401,9 +2448,9 @@ output_files:    HTML Report: Starting generation...
 W   HTML Report: Preparing simulator data...
    HTML Report: Assembling page...
    HTML Report: Writing file...
-   HTML Report: Written to file90674adfb4d6.html (145.6 KB)
+   HTML Report: Written to file15d726f36e16.html (216.5 KB)
 ....................................   Simulator: Building interactive dashboard...
-   Simulator: Written to file90675c8c1f5a.html (33.8 KB)
+   Simulator: Written to file15d719fdaa2d.html (33.8 KB)
 .................   HTML Report: Starting generation...
    HTML Report: Transforming data...
    HTML Report: Building tables...
@@ -2411,7 +2458,7 @@ W   HTML Report: Preparing simulator data...
    HTML Report: Preparing simulator data...
    HTML Report: Assembling page...
    HTML Report: Writing file...
-   HTML Report: Written to file90673f3f040b.html (128.1 KB)
+   HTML Report: Written to file15d7701d9f99.html (199.1 KB)
 ....   HTML Report: Starting generation...
    HTML Report: Transforming data...
    HTML Report: Building tables...
@@ -2419,7 +2466,7 @@ W   HTML Report: Preparing simulator data...
    HTML Report: Preparing simulator data...
    HTML Report: Assembling page...
    HTML Report: Writing file...
-   HTML Report: Written to file906752a39394.html (135.0 KB)
+   HTML Report: Written to file15d77871c4e8.html (206.0 KB)
 ........
 
 ══ Warnings ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -2695,9 +2742,9 @@ Recommendations:
 
 --- test_simulator.R ---
 simulator: .................................   Simulator: Building interactive dashboard...
-   Simulator: Written to file90671e04590.html (33.8 KB)
+   Simulator: Written to file15d7617320a9.html (33.8 KB)
 ............   Simulator: Building interactive dashboard...
-   Simulator: Written to file90672bb46d59.html (33.8 KB)
+   Simulator: Written to file15d72e90ab09.html (33.8 KB)
 .......   Simulator: Building interactive dashboard...
    ! Simulator: No demand curve data available
 ..
@@ -3065,7 +3112,11 @@ wtp_distribution: ...............................................
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 
-[PASS] Pricing — 813 passed, 0 failed, 0 skipped (25.3s)
+FAILURES IN THIS MODULE:
+  FAIL in test_html_report.R / html_report: 2 failure(s)
+  FAIL in test_html_report.R / html_report: 4 failure(s)
+
+[FAIL] Pricing — 807 passed, 6 failed, 0 skipped (26.8s)
 
 --------------------------------------------------------------------------------
 MODULE: Segment (21 test files)
@@ -3149,20 +3200,20 @@ OK (sizes: 50, 25, 25)
 [SEGMENT] HTML report pipeline loaded
 config_template: Generating segmentation config template...
    Writing: test_config_template.xlsx
-[TRS INFO] SEGMENT: Saved: test_config_template.xlsx (18,885 bytes)
-Config template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/test_config_template.xlsx
+[TRS INFO] SEGMENT: Saved: test_config_template.xlsx (18,884 bytes)
+Config template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/test_config_template.xlsx
   Parameters: 50
   Sheets: Config, Labels, Insights, About, Slides
   Includes: descriptions, default values, data validation dropdowns
 ............Generating segmentation config template...
    Writing: test_config_cats.xlsx
-[TRS INFO] SEGMENT: Saved: test_config_cats.xlsx (18,885 bytes)
-Config template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/test_config_cats.xlsx
+[TRS INFO] SEGMENT: Saved: test_config_cats.xlsx (18,884 bytes)
+Config template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/test_config_cats.xlsx
   Parameters: 50
   Sheets: Config, Labels, Insights, About, Slides
   Includes: descriptions, default values, data validation dropdowns
 ....................   Writing: test_branded_output.xlsx
-[TRS INFO] SEGMENT: Saved: test_branded_output.xlsx (8,427 bytes)
+[TRS INFO] SEGMENT: Saved: test_branded_output.xlsx (8,426 bytes)
 ......
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -3324,12 +3375,12 @@ Profiling 3 additional variables...
   Step 3: Building tables...
     Built 3 tables
   Step 4: Building charts...
-    Built 7 charts
+    Built 6 charts
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file...
-    HTML report written: file9067242f7d35.html (0.18 MB)
+    HTML report written: file15d75a389df.html (0.21 MB)
 ------------------------------------------------------------ 
-  HTML report complete (PASS, 0.6s)
+  HTML report complete (PASS, 0.5s)
 ------------------------------------------------------------ 
 ....
   Clustering method: KMEANS
@@ -3356,12 +3407,12 @@ Profiling 3 additional variables...
   Step 3: Building tables...
     Built 3 tables
   Step 4: Building charts...
-    Built 7 charts
+    Built 6 charts
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file...
-    HTML report written: file9067704e2782.html (0.18 MB)
+    HTML report written: file15d74c9e9d8b.html (0.21 MB)
 ------------------------------------------------------------ 
-  HTML report complete (PASS, 0.1s)
+  HTML report complete (PASS, 0.0s)
 ------------------------------------------------------------ 
 ...
   Clustering method: KMEANS
@@ -3388,10 +3439,10 @@ Profiling 3 additional variables...
   Step 3: Building tables...
     Built 3 tables
   Step 4: Building charts...
-    Built 7 charts
+    Built 6 charts
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file...
-    HTML report written: file906736651568.html (0.18 MB)
+    HTML report written: file15d71d6ce3a4.html (0.21 MB)
 ------------------------------------------------------------ 
   HTML report complete (PASS, 0.0s)
 ------------------------------------------------------------ 
@@ -3423,10 +3474,10 @@ Profiling 3 additional variables...
   Step 3: Building tables...
     Built 3 tables
   Step 4: Building charts...
-    Built 7 charts
+    Built 6 charts
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file...
-    HTML report written: file90675ec447ed.html (0.19 MB)
+    HTML report written: file15d772959794.html (0.22 MB)
 ------------------------------------------------------------ 
   HTML report complete (PASS, 0.0s)
 ------------------------------------------------------------ 
@@ -3455,10 +3506,10 @@ Profiling 3 additional variables...
   Step 3: Building tables...
     Built 3 tables
   Step 4: Building charts...
-    Built 7 charts
+    Built 6 charts
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file...
-    HTML report written: file90674f9876c3.html (0.18 MB)
+    HTML report written: file15d71b93f9b2.html (0.21 MB)
 ------------------------------------------------------------ 
   HTML report complete (PASS, 0.0s)
 ------------------------------------------------------------ 
@@ -3487,10 +3538,10 @@ Profiling 3 additional variables...
   Step 3: Building tables...
     Built 3 tables
   Step 4: Building charts...
-    Built 7 charts
+    Built 6 charts
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file...
-    HTML report written: file906745df8aa9.html (0.18 MB)
+    HTML report written: file15d74543d874.html (0.21 MB)
 ------------------------------------------------------------ 
   HTML report complete (PASS, 0.0s)
 ------------------------------------------------------------ 
@@ -3519,48 +3570,57 @@ Profiling 3 additional variables...
   Step 3: Building tables...
     Built 3 tables
   Step 4: Building charts...
-    Built 7 charts
+    Built 6 charts
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file...
-    HTML report written: file906767d84292.html (0.18 MB)
+    HTML report written: file15d732a8202a.html (0.21 MB)
+------------------------------------------------------------ 
+  HTML report complete (PASS, 0.0s)
+------------------------------------------------------------ 
+1.
+  Clustering method: KMEANS
+
+================================================================================ 
+SEGMENT PROFILING
+================================================================================ 
+
+Segment sizes:
+  Segment 1:   36 ( 36.0%)
+  Segment 2:   33 ( 33.0%)
+  Segment 3:   31 ( 31.0%)
+
+Profiling clustering variables...
+Profiling 3 additional variables...
+
+✓ Profiling complete
+  Clustering variables significantly different: 5/5
+------------------------------------------------------------ 
+  SEGMENT HTML REPORT GENERATION
+------------------------------------------------------------ 
+  Step 1: Validating inputs...
+  Step 2: Transforming data...
+  Step 3: Building tables...
+    Built 3 tables
+  Step 4: Building charts...
+    Built 6 charts
+  Step 5: Assembling HTML page...
+  Step 6: Writing HTML file...
+    HTML report written: file15d71ee6840b.html (0.21 MB)
 ------------------------------------------------------------ 
   HTML report complete (PASS, 0.0s)
 ------------------------------------------------------------ 
 ..
-  Clustering method: KMEANS
 
-================================================================================ 
-SEGMENT PROFILING
-================================================================================ 
+══ Failed ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+── 1. Failure ('test_html_report.R:356:3'): HTML report overlap chart uses similarity percentages ────────────────────────────
+grepl("seg-overlap-heatmap", html_text, fixed = TRUE) is not TRUE
 
-Segment sizes:
-  Segment 1:   36 ( 36.0%)
-  Segment 2:   33 ( 33.0%)
-  Segment 3:   31 ( 31.0%)
-
-Profiling clustering variables...
-Profiling 3 additional variables...
-
-✓ Profiling complete
-  Clustering variables significantly different: 5/5
------------------------------------------------------------- 
-  SEGMENT HTML REPORT GENERATION
------------------------------------------------------------- 
-  Step 1: Validating inputs...
-  Step 2: Transforming data...
-  Step 3: Building tables...
-    Built 3 tables
-  Step 4: Building charts...
-    Built 7 charts
-  Step 5: Assembling HTML page...
-  Step 6: Writing HTML file...
-    HTML report written: file90675121cca4.html (0.18 MB)
------------------------------------------------------------- 
-  HTML report complete (PASS, 0.0s)
------------------------------------------------------------- 
-..
+`actual`:   FALSE
+`expected`: TRUE 
+Report should have overlap heatmap
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+Don't worry, you'll get it.
 
 --- test_integration.R ---
 [SEGMENT] HTML report pipeline loaded
@@ -3581,11 +3641,11 @@ Profiling 3 additional variables...
   Clustering variables significantly different: 5/5
 ...  Exporting segment assignments: test_assignments.xlsx
    Writing: test_assignments.xlsx
-[TRS INFO] SEGMENT: Saved: test_assignments.xlsx (10,012 bytes)
+[TRS INFO] SEGMENT: Saved: test_assignments.xlsx (10,011 bytes)
   Exported 91 segment assignments (with Segment_Names sheet)
 ......................................  Exporting segment assignments: segment_assignments.xlsx
    Writing: segment_assignments.xlsx
-[TRS INFO] SEGMENT: Saved: segment_assignments.xlsx (10,164 bytes)
+[TRS INFO] SEGMENT: Saved: segment_assignments.xlsx (10,163 bytes)
   Exported 100 segment assignments (with Segment_Names sheet)
 .
 -
@@ -3625,11 +3685,11 @@ lca: .........................................
 [SEGMENT] HTML report pipeline loaded
 output:   Exporting segment assignments: test_assignments.xlsx
    Writing: test_assignments.xlsx
-[TRS INFO] SEGMENT: Saved: test_assignments.xlsx (9,378 bytes)
+[TRS INFO] SEGMENT: Saved: test_assignments.xlsx (9,379 bytes)
   Exported 50 segment assignments (with Segment_Names sheet)
 .  Exporting segment assignments: test_assignments_cols.xlsx
    Writing: test_assignments_cols.xlsx
-[TRS INFO] SEGMENT: Saved: test_assignments_cols.xlsx (9,378 bytes)
+[TRS INFO] SEGMENT: Saved: test_assignments_cols.xlsx (9,379 bytes)
   Exported 50 segment assignments (with Segment_Names sheet)
 
 -
@@ -3643,7 +3703,7 @@ output:   Exporting segment assignments: test_assignments.xlsx
                                                                                                                             
 ...  Exporting segment assignments: test_assignments_rows.xlsx
    Writing: test_assignments_rows.xlsx
-[TRS INFO] SEGMENT: Saved: test_assignments_rows.xlsx (9,378 bytes)
+[TRS INFO] SEGMENT: Saved: test_assignments_rows.xlsx (9,379 bytes)
   Exported 50 segment assignments (with Segment_Names sheet)
 
 -
@@ -3657,7 +3717,7 @@ output:   Exporting segment assignments: test_assignments.xlsx
                                                                                                                             
 .  Exporting segment assignments: test_assignments_probs.xlsx
    Writing: test_assignments_probs.xlsx
-[TRS INFO] SEGMENT: Saved: test_assignments_probs.xlsx (12,383 bytes)
+[TRS INFO] SEGMENT: Saved: test_assignments_probs.xlsx (12,384 bytes)
   Exported 50 segment assignments (with Segment_Names sheet)
 
 -
@@ -3669,8 +3729,8 @@ output:   Exporting segment assignments: test_assignments.xlsx
 
 -
                                                                                                                             
-....Created output folder: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/test_output_folder_creation
-..Created output folder: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/test_output_dated_folder/2026-03-28
+....Created output folder: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/test_output_folder_creation
+..Created output folder: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/test_output_dated_folder/2026-03-31
 ...  Exporting segment assignments: test_assignments_outliers.xlsx
    Writing: test_assignments_outliers.xlsx
 [TRS INFO] SEGMENT: Saved: test_assignments_outliers.xlsx (9,547 bytes)
@@ -3685,9 +3745,9 @@ output:   Exporting segment assignments: test_assignments.xlsx
 
 -
                                                                                                                             
-..Created output folder: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/test_output_idempotent
-...........................   Writing: file9067600f0e17.xlsx
-[TRS INFO] SEGMENT: Saved: file9067600f0e17.xlsx (6,365 bytes)
+..Created output folder: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/test_output_idempotent
+...........................   Writing: file15d72fd217c9.xlsx
+[TRS INFO] SEGMENT: Saved: file15d72fd217c9.xlsx (6,365 bytes)
 ..
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -3812,7 +3872,10 @@ vulnerability: [INFO] Vulnerability analysis complete: 86.0% vulnerable (thresho
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 
-[PASS] Segment — 928 passed, 0 failed, 1 skipped (7.5s)
+FAILURES IN THIS MODULE:
+  FAIL in test_html_report.R / html_report: 1 failure(s)
+
+[FAIL] Segment — 927 passed, 1 failed, 1 skipped (9.6s)
 
 --------------------------------------------------------------------------------
 MODULE: Tabs (20 test files)
@@ -3946,31 +4009,31 @@ composite value accuracy: ...
 
 --- test_config_templates.R ---
 config_templates: 
-  [SUCCESS] Crosstab Config template created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906713dd43b5.xlsx
+  [SUCCESS] Crosstab Config template created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d73d220cac.xlsx
 ...
-  [SUCCESS] Crosstab Config template created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906772a45a40.xlsx
+  [SUCCESS] Crosstab Config template created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d73907eabe.xlsx
 ....
-  [SUCCESS] Crosstab Config template created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906765430eed.xlsx
+  [SUCCESS] Crosstab Config template created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d720ee85b8.xlsx
 .
-  [SUCCESS] Crosstab Config template created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906710ce640e.xlsx
+  [SUCCESS] Crosstab Config template created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7134f53b5.xlsx
 ...
-  [SUCCESS] Survey Structure template created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067f7d3c1a.xlsx
+  [SUCCESS] Survey Structure template created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d740a8dc35.xlsx
 ...
-  [SUCCESS] Survey Structure template created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90675f0312a7.xlsx
+  [SUCCESS] Survey Structure template created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d76cdaa944.xlsx
 ....
-  [SUCCESS] Survey Structure template created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90677f683ad1.xlsx
+  [SUCCESS] Survey Structure template created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7244a02cf.xlsx
 ....
-  [SUCCESS] Survey Structure template created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90673ce85427.xlsx
+  [SUCCESS] Survey Structure template created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d74652bc9d.xlsx
 ...
-  [SUCCESS] Survey Structure template created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/tabs_templates_36967/Survey_Structure.xlsx
+  [SUCCESS] Survey Structure template created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/tabs_templates_5591/Survey_Structure.xlsx
 
-  [SUCCESS] Crosstab Config template created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/tabs_templates_36967/Crosstab_Config.xlsx
+  [SUCCESS] Crosstab Config template created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/tabs_templates_5591/Crosstab_Config.xlsx
 
   ========================================
   All templates generated successfully!
   ========================================
-  Config:    /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/tabs_templates_36967/Crosstab_Config.xlsx
-  Structure: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/tabs_templates_36967/Survey_Structure.xlsx
+  Config:    /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/tabs_templates_5591/Crosstab_Config.xlsx
+  Structure: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/tabs_templates_5591/Survey_Structure.xlsx
 
   Next steps:
   1. Open Survey_Structure.xlsx and fill in your project details & questions
@@ -3978,9 +4041,9 @@ config_templates:
   3. Run your analysis!
 
 ..
-  [SUCCESS] Crosstab Config template created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90673fbc8660.xlsx
+  [SUCCESS] Crosstab Config template created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7ac0af3f.xlsx
 
-  [SUCCESS] Crosstab Config template created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90673fbc8660.xlsx
+  [SUCCESS] Crosstab Config template created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7ac0af3f.xlsx
 ..
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -4157,7 +4220,7 @@ generate_html_report — end-to-end:
   Step 3: Building HTML tables...
     1 tables built successfully
   Step 4: Assembling HTML page...
-  Step 5: Writing HTML file to file90674cfaf682.html...
+  Step 5: Writing HTML file to file15d7f516dc9.html...
   Done! 0.3 MB in 0.3 seconds
 ------------------------------------------------------------ 
 
@@ -4172,7 +4235,7 @@ generate_html_report — end-to-end:
   Step 3: Building HTML tables...
     1 tables built successfully
   Step 4: Assembling HTML page...
-  Step 5: Writing HTML file to file906716a14082.html...
+  Step 5: Writing HTML file to file15d73baa729c.html...
   Done! 0.3 MB in 0.0 seconds
 ------------------------------------------------------------ 
 
@@ -4199,7 +4262,7 @@ Fix: Ensure analysis completed successfully and produced results
   Step 3: Building HTML tables...
     2 tables built successfully
   Step 4: Assembling HTML page...
-  Step 5: Writing HTML file to file90672c2a71b6.html...
+  Step 5: Writing HTML file to file15d74864b39c.html...
   Done! 0.3 MB in 0.0 seconds
 ------------------------------------------------------------ 
 
@@ -4232,8 +4295,8 @@ End-to-end HTML — UI controls in generated report:
   Step 3: Building HTML tables...
     1 tables built successfully
   Step 4: Assembling HTML page...
-  Step 5: Writing HTML file to file906759afcc91.html...
-  Done! 0.3 MB in 0.2 seconds
+  Step 5: Writing HTML file to file15d77c3b7322.html...
+  Done! 0.3 MB in 0.1 seconds
 ------------------------------------------------------------ 
 
 ........
@@ -4741,44 +4804,44 @@ run_all_validations — orchestrator: ..
 workbook_builder: [OK] Turas>Tabs cell_calculator module loaded
 get_style_config: ...........
 build_project_info: .........
-save_workbook_safe: .[2026-03-28 17:25:01] INFO: Created output directory
+save_workbook_safe: .[2026-03-31 21:43:46] INFO: Created output directory
    Writing: output.xlsx
-[TRS INFO] TABS: Saved: output.xlsx (6,363 bytes)
-[2026-03-28 17:25:01] INFO: Saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/wb_test_172501/output.xlsx
-..   Writing: file90676d349f94.xlsx
-[TRS INFO] TABS: Saved: file90676d349f94.xlsx (6,429 bytes)
-[2026-03-28 17:25:01] INFO: Saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90676d349f94.xlsx
+[TRS INFO] TABS: Saved: output.xlsx (6,364 bytes)
+[2026-03-31 21:43:46] INFO: Saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/wb_test_214346/output.xlsx
+..   Writing: file15d75053f36.xlsx
+[TRS INFO] TABS: Saved: file15d75053f36.xlsx (6,430 bytes)
+[2026-03-31 21:43:46] INFO: Saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d75053f36.xlsx
 ....
-create_crosstabs_workbook: [2026-03-28 17:25:01] INFO: Creating Excel output...
-[2026-03-28 17:25:01] INFO: Creating Summary sheet...
-[2026-03-28 17:25:01] INFO: Summary sheet created
-[2026-03-28 17:25:01] INFO: Creating Run_Status sheet...
-[2026-03-28 17:25:01] INFO: Run_Status sheet created (status: PASS)
-   Writing: file90674448cce0.xlsx
-[TRS INFO] TABS: Saved: file90674448cce0.xlsx (15,783 bytes)
-[2026-03-28 17:25:01] INFO: Saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90674448cce0.xlsx
-.....[2026-03-28 17:25:01] INFO: Creating Excel output...
-[2026-03-28 17:25:01] INFO: Creating Summary sheet...
-[2026-03-28 17:25:01] INFO: Summary sheet created
-[2026-03-28 17:25:01] INFO: Creating Run_Status sheet...
-[2026-03-28 17:25:01] INFO: Run_Status sheet created (status: PASS)
-   Writing: file906767c08772.xlsx
-[TRS INFO] TABS: Saved: file906767c08772.xlsx (15,783 bytes)
-[2026-03-28 17:25:01] INFO: Saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906767c08772.xlsx
-...[2026-03-28 17:25:01] INFO: Creating Excel output...
-[2026-03-28 17:25:01] INFO: Creating Summary sheet...
-[2026-03-28 17:25:01] INFO: Summary sheet created
-[2026-03-28 17:25:01] INFO: Creating Run_Status sheet...
-[2026-03-28 17:25:01] INFO: Run_Status sheet created (status: PASS)
-   Writing: file90672baf0bd7.xlsx
-[TRS INFO] TABS: Saved: file90672baf0bd7.xlsx (15,480 bytes)
-[2026-03-28 17:25:01] INFO: Saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90672baf0bd7.xlsx
+create_crosstabs_workbook: [2026-03-31 21:43:46] INFO: Creating Excel output...
+[2026-03-31 21:43:46] INFO: Creating Summary sheet...
+[2026-03-31 21:43:46] INFO: Summary sheet created
+[2026-03-31 21:43:46] INFO: Creating Run_Status sheet...
+[2026-03-31 21:43:46] INFO: Run_Status sheet created (status: PASS)
+   Writing: file15d7725238f8.xlsx
+[TRS INFO] TABS: Saved: file15d7725238f8.xlsx (15,783 bytes)
+[2026-03-31 21:43:46] INFO: Saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7725238f8.xlsx
+.....[2026-03-31 21:43:46] INFO: Creating Excel output...
+[2026-03-31 21:43:46] INFO: Creating Summary sheet...
+[2026-03-31 21:43:46] INFO: Summary sheet created
+[2026-03-31 21:43:46] INFO: Creating Run_Status sheet...
+[2026-03-31 21:43:46] INFO: Run_Status sheet created (status: PASS)
+   Writing: file15d7223167a8.xlsx
+[TRS INFO] TABS: Saved: file15d7223167a8.xlsx (15,783 bytes)
+[2026-03-31 21:43:46] INFO: Saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7223167a8.xlsx
+...[2026-03-31 21:43:46] INFO: Creating Excel output...
+[2026-03-31 21:43:47] INFO: Creating Summary sheet...
+[2026-03-31 21:43:47] INFO: Summary sheet created
+[2026-03-31 21:43:47] INFO: Creating Run_Status sheet...
+[2026-03-31 21:43:47] INFO: Run_Status sheet created (status: PASS)
+   Writing: file15d7391272b2.xlsx
+[TRS INFO] TABS: Saved: file15d7391272b2.xlsx (15,480 bytes)
+[2026-03-31 21:43:47] INFO: Saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7391272b2.xlsx
 ....
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 
-[PASS] Tabs — 1435 passed, 0 failed, 9 skipped (28.8s)
+[PASS] Tabs — 1435 passed, 0 failed, 9 skipped (28.3s)
 
 --------------------------------------------------------------------------------
 MODULE: Tracker (20 test files)
@@ -4819,42 +4882,42 @@ Tracker Configuration Evolution: ......  [INFO] TrackingSpecs for 'Q_SAT' read f
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 --- test_config_templates.R ---
-config_templates:   Generating tracking config template: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90676079ae76.xlsx
-  Created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90676079ae76.xlsx
+config_templates:   Generating tracking config template: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d77bf6ee63.xlsx
+  Created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d77bf6ee63.xlsx
     Sheets: Settings, Waves, TrackedQuestions, Banner
-...  Generating tracking config template: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067166b5eba.xlsx
-  Created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067166b5eba.xlsx
+...  Generating tracking config template: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d72592fda2.xlsx
+  Created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d72592fda2.xlsx
     Sheets: Settings, Waves, TrackedQuestions, Banner
-....  Generating tracking config template: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90674112a45.xlsx
-  Created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90674112a45.xlsx
+....  Generating tracking config template: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d774620b82.xlsx
+  Created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d774620b82.xlsx
     Sheets: Settings, Waves, TrackedQuestions, Banner
-...  Generating tracking config template: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906725240140.xlsx
-  Created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906725240140.xlsx
+...  Generating tracking config template: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d772abcdef.xlsx
+  Created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d772abcdef.xlsx
     Sheets: Settings, Waves, TrackedQuestions, Banner
-...  Generating tracking config template: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067738a0747.xlsx
-  Created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067738a0747.xlsx
+...  Generating tracking config template: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d770a34706.xlsx
+  Created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d770a34706.xlsx
     Sheets: Settings, Waves, TrackedQuestions, Banner
-..  Generating question mapping template: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90677f1babda.xlsx
-  Created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90677f1babda.xlsx
+..  Generating question mapping template: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7215895d2.xlsx
+  Created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7215895d2.xlsx
     Sheets: QuestionMap
-...  Generating question mapping template: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067b1114fc.xlsx
-  Created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067b1114fc.xlsx
+...  Generating question mapping template: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d756ada31b.xlsx
+  Created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d756ada31b.xlsx
     Sheets: QuestionMap
-.  Generating question mapping template: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906799ef58e.xlsx
-  Created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906799ef58e.xlsx
+.  Generating question mapping template: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d74f028aca.xlsx
+  Created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d74f028aca.xlsx
     Sheets: QuestionMap
-....  Generating tracking config template: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/tracker_tpl_36967/Tracking_Config.xlsx
-  Created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/tracker_tpl_36967/Tracking_Config.xlsx
+....  Generating tracking config template: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/tracker_tpl_5591/Tracking_Config.xlsx
+  Created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/tracker_tpl_5591/Tracking_Config.xlsx
     Sheets: Settings, Waves, TrackedQuestions, Banner
-  Generating question mapping template: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/tracker_tpl_36967/Question_Mapping.xlsx
-  Created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/tracker_tpl_36967/Question_Mapping.xlsx
+  Generating question mapping template: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/tracker_tpl_5591/Question_Mapping.xlsx
+  Created: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/tracker_tpl_5591/Question_Mapping.xlsx
     Sheets: QuestionMap
 
   ========================================
   All tracker templates generated successfully!
   ========================================
-  Config:  /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/tracker_tpl_36967/Tracking_Config.xlsx
-  Mapping: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/tracker_tpl_36967/Question_Mapping.xlsx
+  Config:  /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/tracker_tpl_5591/Tracking_Config.xlsx
+  Mapping: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/tracker_tpl_5591/Question_Mapping.xlsx
 
   Next steps:
   1. Open Tracking_Config.xlsx and fill in project settings, waves, and tracked questions
@@ -4918,7 +4981,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906752e2b9c5.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d745a12828.html (0.4 MB)
 ................
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -4926,15 +4989,15 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067605fb56e.html (0.4 MB)
-..................
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d718b3e74a.html (0.4 MB)
+....................
   Generating Tracker HTML report...
     [1/5] Validating inputs...
     [2/5] Transforming data for HTML...
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906718f6c3fa.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d75e71b046.html (0.4 MB)
 .......
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -4942,7 +5005,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90675d1f6dff.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d79494388.html (0.4 MB)
 ......
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -4950,7 +5013,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906743493fe.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d711ddefc0.html (0.4 MB)
 .............
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -4958,7 +5021,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067caf6545.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7175015b0.html (0.4 MB)
 .
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -4966,7 +5029,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067f6cdb2b.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d79476cfa.html (0.4 MB)
 .....
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -4974,7 +5037,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906710613e57.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d73b411234.html (0.4 MB)
 ....
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -4982,7 +5045,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90677f82c9c2.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d76ca30daa.html (0.4 MB)
 .
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -4990,7 +5053,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906728b52493.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d738fc47c1.html (0.4 MB)
 ......
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -4998,7 +5061,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906724947068.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7ff4e9c2.html (0.4 MB)
 .
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5006,7 +5069,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906767207dcb.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d77c1ab154.html (0.4 MB)
 ....
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5014,7 +5077,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906757f9dd36.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d79f34a4c.html (0.4 MB)
 .............
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5022,7 +5085,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906763e26c83.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7df7f15e.html (0.4 MB)
 ..
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5030,7 +5093,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067147e2bee.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d73c9405e6.html (0.4 MB)
 .......
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5038,7 +5101,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067528ee761.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d745b4f0e4.html (0.4 MB)
 ...
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5046,7 +5109,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906747093a9f.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7665ae8c3.html (0.4 MB)
 ...
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5054,7 +5117,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906785bb1c0.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7332742cd.html (0.4 MB)
 ....
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5062,7 +5125,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906771b01dc4.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d73d357105.html (0.4 MB)
 ....
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5070,7 +5133,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906750af8992.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d755bd5663.html (0.4 MB)
 ....
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5078,7 +5141,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067565cfb6.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d75419b09b.html (0.4 MB)
 ..
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5086,7 +5149,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906759ed374c.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d74e9ed7ea.html (0.4 MB)
 ....
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5094,7 +5157,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90672cb2a445.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d774c5d29e.html (0.4 MB)
 .
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5102,7 +5165,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067432a01c6.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d73c785944.html (0.4 MB)
 ...
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5110,7 +5173,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90672ae3a48f.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d728829793.html (0.4 MB)
 .
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5118,7 +5181,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067147461ac.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d711632a3e.html (0.4 MB)
 ........
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5126,7 +5189,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90677f1bb80b.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d76352f445.html (0.4 MB)
 .....
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5134,7 +5197,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90672ed36c18.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d76e8c4e14.html (0.4 MB)
 .....
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5142,7 +5205,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906754d9ef09.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d75358ad8e.html (0.4 MB)
 ....................................
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5150,7 +5213,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906735faf5b7.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d721dad7c0.html (0.4 MB)
 ...........
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5158,7 +5221,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067470847e3.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d71ce244a9.html (0.4 MB)
 ...
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5166,7 +5229,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90674b1701a8.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d71fdce595.html (0.4 MB)
 ....
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5174,7 +5237,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906727e0cbdb.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d75f7ef84e.html (0.4 MB)
 ..
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5182,15 +5245,15 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906775e6bf9e.html (0.4 MB)
-...
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d732e0defb.html (0.4 MB)
+123
   Generating Tracker HTML report...
     [1/5] Validating inputs...
     [2/5] Transforming data for HTML...
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90677fa330b0.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7369b3032.html (0.4 MB)
 .
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5198,7 +5261,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90674e5cceb3.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d748ebdeb0.html (0.4 MB)
 ......
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5206,7 +5269,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906770e1b3ed.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d749b1d630.html (0.4 MB)
 ......
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5214,7 +5277,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906754ef3097.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7698f3180.html (0.4 MB)
 .....
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5222,7 +5285,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906737a806e9.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d71f016854.html (0.4 MB)
 ....
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5230,7 +5293,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067163c9838.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d755e3d504.html (0.4 MB)
 .
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5238,7 +5301,7 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90672a262861.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d77e7e6d8c.html (0.4 MB)
 ...
   Generating Tracker HTML report...
     [1/5] Validating inputs...
@@ -5246,8 +5309,27 @@ Tracker HTML Report: ...........................................................
     [3/5] Building tables and charts...
     [4/5] Assembling page...
     [5/5] Writing HTML file...
-  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906748219ddb.html (0.4 MB)
+  Tracker HTML report saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d712a6e597.html (0.4 MB)
 ..
+
+══ Failed ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+── 1. Failure ('test_html_report.R:1594:3'): JS has exportSummaryExcel, pinSummaryTable, exportSummaryTableSlide functions ───
+grepl("function exportSummaryExcel", content, fixed = TRUE) is not TRUE
+
+`actual`:   FALSE
+`expected`: TRUE 
+
+── 2. Failure ('test_html_report.R:1595:3'): JS has exportSummaryExcel, pinSummaryTable, exportSummaryTableSlide functions ───
+grepl("function pinSummaryTable", content, fixed = TRUE) is not TRUE
+
+`actual`:   FALSE
+`expected`: TRUE 
+
+── 3. Failure ('test_html_report.R:1596:3'): JS has exportSummaryExcel, pinSummaryTable, exportSummaryTableSlide functions ───
+grepl("function exportSummaryTableSlide", content, fixed = TRUE) is not TRUE
+
+`actual`:   FALSE
+`expected`: TRUE 
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
@@ -5650,12 +5732,12 @@ Tracker Excel Output Writers: W......................
 WRITING EXCEL OUTPUT
 ================================================================================
 
-Output file: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067c85be44.xlsx
+Output file: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d77ed61efb.xlsx
 
 Saving workbook...
-   Writing: file9067c85be44.xlsx
-[TRS INFO] TRACKER: Saved: file9067c85be44.xlsx (11,008 bytes)
-✓ Output written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067c85be44.xlsx
+   Writing: file15d77ed61efb.xlsx
+[TRS INFO] TRACKER: Saved: file15d77ed61efb.xlsx (11,008 bytes)
+✓ Output written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d77ed61efb.xlsx
 ================================================================================
 
 .......................................
@@ -5663,12 +5745,12 @@ Saving workbook...
 WRITING WAVE HISTORY EXCEL OUTPUT
 ================================================================================
 
-Output file: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906730ed8e21.xlsx
+Output file: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d748299340.xlsx
 
 Saving workbook...
-   Writing: file906730ed8e21.xlsx
-[TRS INFO] TRACKER: Saved: file906730ed8e21.xlsx (6,807 bytes)
-✓ Wave History output written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906730ed8e21.xlsx
+   Writing: file15d748299340.xlsx
+[TRS INFO] TRACKER: Saved: file15d748299340.xlsx (6,807 bytes)
+✓ Wave History output written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d748299340.xlsx
 ================================================================================
 
 ..
@@ -5677,12 +5759,12 @@ WRITING EXCEL OUTPUT
 ================================================================================
 
   Detected banner breakout results
-Output file: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90677f8bd012.xlsx
+Output file: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7334168d7.xlsx
 
 Saving workbook...
-   Writing: file90677f8bd012.xlsx
-[TRS INFO] TRACKER: Saved: file90677f8bd012.xlsx (12,737 bytes)
-✓ Output written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90677f8bd012.xlsx
+   Writing: file15d7334168d7.xlsx
+[TRS INFO] TRACKER: Saved: file15d7334168d7.xlsx (12,737 bytes)
+✓ Output written to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7334168d7.xlsx
 ================================================================================
 
 .....
@@ -5738,28 +5820,28 @@ Tracking Crosstab Engine: ....................................................
 tracking_crosstab_excel: 
 Tracking Crosstab Excel Output: 
   Generating Tracking Crosstab Excel report...
-  Tracking Crosstab saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906750c68bfc.xlsx
+  Tracking Crosstab saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d73b98a329.xlsx
 ..
   Generating Tracking Crosstab Excel report...
-  Tracking Crosstab saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906770e4b515.xlsx
+  Tracking Crosstab saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d71be526b6.xlsx
 ...
   Generating Tracking Crosstab Excel report...
-  Tracking Crosstab saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906771308c1d.xlsx
+  Tracking Crosstab saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d732cdbd87.xlsx
 ........................................
   Generating Tracking Crosstab Excel report...
-  Tracking Crosstab saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067722ffb4f.xlsx
+  Tracking Crosstab saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d75d9cbec3.xlsx
 ..............
   Generating Tracking Crosstab Excel report...
-  Tracking Crosstab saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90673258381d.xlsx
+  Tracking Crosstab saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d77df8636c.xlsx
 ............
   Generating Tracking Crosstab Excel report...
-  Tracking Crosstab saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90677c68871d.xlsx
+  Tracking Crosstab saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d72ed4b914.xlsx
 ..
   Generating Tracking Crosstab Excel report...
-  Tracking Crosstab saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067bdbeb46.xlsx
+  Tracking Crosstab saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d758400e6c.xlsx
 ...
   Generating Tracking Crosstab Excel report...
-  Tracking Crosstab saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90674ec082f4.xlsx
+  Tracking Crosstab saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d74f2aa8ee.xlsx
 ..
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -5857,7 +5939,10 @@ Backtrace:
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 
-[PASS] Tracker — 1848 passed, 0 failed, 0 skipped (21.4s)
+FAILURES IN THIS MODULE:
+  FAIL in test_html_report.R / Tracker HTML Report: 3 failure(s)
+
+[FAIL] Tracker — 1847 passed, 3 failed, 0 skipped (27.4s)
 
 --------------------------------------------------------------------------------
 MODULE: Weighting (14 test files)
@@ -6377,7 +6462,7 @@ config_loader:
 --- test_config_templates.R ---
 config_templates: 
 === TURAS Weighting Module: Generating Config Template ===
-  Output: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067a7e17bc.xlsx
+  Output: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d75eab749f.xlsx
   [1/7] Settings sheet...
   [2/7] Weight_Specifications sheet...
   [3/7] Design_Targets sheet...
@@ -6385,12 +6470,12 @@ config_templates:
   [5/7] Cell_Targets sheet...
   [6/7] Advanced_Settings sheet...
   [7/7] Notes sheet...
-  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067a7e17bc.xlsx
+  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d75eab749f.xlsx
 === Template generation complete ===
 
 ...
 === TURAS Weighting Module: Generating Config Template ===
-  Output: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90672323d6e4.xlsx
+  Output: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d71c03ff61.xlsx
   [1/7] Settings sheet...
   [2/7] Weight_Specifications sheet...
   [3/7] Design_Targets sheet...
@@ -6398,12 +6483,12 @@ config_templates:
   [5/7] Cell_Targets sheet...
   [6/7] Advanced_Settings sheet...
   [7/7] Notes sheet...
-  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90672323d6e4.xlsx
+  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d71c03ff61.xlsx
 === Template generation complete ===
 
 .......
 === TURAS Weighting Module: Generating Config Template ===
-  Output: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906714dad422.xlsx
+  Output: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d76cfd946.xlsx
   [1/7] Settings sheet...
   [2/7] Weight_Specifications sheet...
   [3/7] Design_Targets sheet...
@@ -6411,12 +6496,12 @@ config_templates:
   [5/7] Cell_Targets sheet...
   [6/7] Advanced_Settings sheet...
   [7/7] Notes sheet...
-  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906714dad422.xlsx
+  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d76cfd946.xlsx
 === Template generation complete ===
 
 ...
 === TURAS Weighting Module: Generating Config Template ===
-  Output: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906745ad7a7d.xlsx
+  Output: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7476154d6.xlsx
   [1/7] Settings sheet...
   [2/7] Weight_Specifications sheet...
   [3/7] Design_Targets sheet...
@@ -6424,12 +6509,12 @@ config_templates:
   [5/7] Cell_Targets sheet...
   [6/7] Advanced_Settings sheet...
   [7/7] Notes sheet...
-  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906745ad7a7d.xlsx
+  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7476154d6.xlsx
 === Template generation complete ===
 
 ....
 === TURAS Weighting Module: Generating Config Template ===
-  Output: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067e13bf3f.xlsx
+  Output: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d76c3fb650.xlsx
   [1/7] Settings sheet...
   [2/7] Weight_Specifications sheet...
   [3/7] Design_Targets sheet...
@@ -6437,12 +6522,12 @@ config_templates:
   [5/7] Cell_Targets sheet...
   [6/7] Advanced_Settings sheet...
   [7/7] Notes sheet...
-  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067e13bf3f.xlsx
+  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d76c3fb650.xlsx
 === Template generation complete ===
 
 ..........
 === TURAS Weighting Module: Generating Config Template ===
-  Output: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/weighting_tpl_36967/Weight_Config.xlsx
+  Output: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/weighting_tpl_5591/Weight_Config.xlsx
   [1/7] Settings sheet...
   [2/7] Weight_Specifications sheet...
   [3/7] Design_Targets sheet...
@@ -6450,7 +6535,7 @@ config_templates:
   [5/7] Cell_Targets sheet...
   [6/7] Advanced_Settings sheet...
   [7/7] Notes sheet...
-  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/weighting_tpl_36967/Weight_Config.xlsx
+  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/weighting_tpl_5591/Weight_Config.xlsx
 === Template generation complete ===
 
 .....
@@ -6578,7 +6663,7 @@ html_report: ...............................
     1 charts built
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file to test_weighting_report.html...
-  Done! 48.8 KB in 0.1 seconds
+  Done! 133.3 KB in 0.1 seconds
 ------------------------------------------------------------ 
 
 ......
@@ -6624,7 +6709,7 @@ html_report: ...............................
     1 charts built
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file to test_rim_report.html...
-  Done! 49.4 KB in 0.0 seconds
+  Done! 134.0 KB in 0.0 seconds
 ------------------------------------------------------------ 
 
 ..
@@ -6691,7 +6776,7 @@ Code: DATA_HTML_VALIDATION_FAILED
     1 charts built
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file to test_notes_report.html...
-  Done! 49.4 KB in 0.0 seconds
+  Done! 133.8 KB in 0.0 seconds
 ------------------------------------------------------------ 
 
 ........................
@@ -6797,7 +6882,7 @@ Code: DATA_HTML_VALIDATION_FAILED
     1 charts built
   Step 5: Assembling HTML page...
   Step 6: Writing HTML file to test_features_report.html...
-  Done! 48.9 KB in 0.0 seconds
+  Done! 133.3 KB in 0.0 seconds
 ------------------------------------------------------------ 
 
 ........
@@ -6811,7 +6896,7 @@ Code: DATA_HTML_VALIDATION_FAILED
 │   - 04_html_writer.R 
 │   - 05_chart_builder.R 
 │   - js/weighting_navigation.js 
-│ Expected in: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/nonexistent_html_report 
+│ Expected in: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/nonexistent_html_report 
 │ Fix: Restore missing files or check html_report/ directory
 └───────────────────────────────────────────────────────┘
 
@@ -7006,7 +7091,7 @@ Diagnostics:
 
 --- test_output.R ---
 output: ...   Writing: test_weighted.xlsx
-[TRS INFO] WEIGHTING: Saved: test_weighted.xlsx (7,668 bytes)
+[TRS INFO] WEIGHTING: Saved: test_weighted.xlsx (7,669 bytes)
 .......   Writing: test_report.xlsx
 [TRS INFO] WEIGHTING: Saved: test_report.xlsx (11,448 bytes)
 .......
@@ -7075,7 +7160,7 @@ validation: ..............................
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 
-[PASS] Weighting — 415 passed, 0 failed, 0 skipped (11.3s)
+[PASS] Weighting — 415 passed, 0 failed, 0 skipped (13.0s)
 
 --------------------------------------------------------------------------------
 MODULE: Hub App (7 test files)
@@ -7085,23 +7170,23 @@ Path:   /Users/duncan/Dev/Turas/modules/hub_app/tests/testthat
 --- test_export_pptx.R ---
 export_pptx: .....[Hub App Export] Building PPTX for: Test Project 
 [Hub App Export] Using branded Turas template
-[Hub App Export] PPTX saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/pptx_test_output/Test_Project_20260328_172534.pptx 
+[Hub App Export] PPTX saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/pptx_test_output/Test_Project_20260331_214428.pptx 
 [Hub App Export] 2 pin slides, 1 section slides
 .....[Hub App Export] Building PPTX for: No Charts 
 [Hub App Export] Using branded Turas template
-[Hub App Export] PPTX saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/pptx_nochart_test/No_Charts_20260328_172534.pptx 
+[Hub App Export] PPTX saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/pptx_nochart_test/No_Charts_20260331_214428.pptx 
 [Hub App Export] 2 pin slides, 0 section slides
 ...[Hub App Export] Building PPTX for: Sections Only 
 [Hub App Export] Using branded Turas template
-[Hub App Export] PPTX saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/pptx_sections_test/Sections_Only_20260328_172534.pptx 
+[Hub App Export] PPTX saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/pptx_sections_test/Sections_Only_20260331_214428.pptx 
 [Hub App Export] 0 pin slides, 2 section slides
 ...[Hub App Export] Building PPTX for: Mkdir Test 
 [Hub App Export] Using branded Turas template
-[Hub App Export] PPTX saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/pptx_mkdir_test/nested/dir/Mkdir_Test_20260328_172534.pptx 
+[Hub App Export] PPTX saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/pptx_mkdir_test/nested/dir/Mkdir_Test_20260331_214428.pptx 
 [Hub App Export] 1 pin slides, 0 section slides
 ..[Hub App Export] Building PPTX for: Project: With <Special> Chars! 
 [Hub App Export] Using branded Turas template
-[Hub App Export] PPTX saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/pptx_sanitize_test/Project_With_Special_Chars_20260328_172534.pptx 
+[Hub App Export] PPTX saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/pptx_sanitize_test/Project_With_Special_Chars_20260331_214428.pptx 
 [Hub App Export] 1 pin slides, 0 section slides
 ................
 
@@ -7146,7 +7231,7 @@ hub_generator:
 
 .....[Hub App] Generating combined hub for: Test Hub 
 [Hub App] Found 3 report(s)
-[Hub App] Config written: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/hubgen_discovery/DiscoveryTest/Test Hub_Auto_Hub_Config.xlsx 
+[Hub App] Config written: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/hubgen_discovery/DiscoveryTest/Test Hub_Auto_Hub_Config.xlsx 
 [Hub App] Running combine_reports()...
 W
 ┌─── TURAS HUB APP ERROR ───────────────────────────────┐
@@ -7166,7 +7251,7 @@ You rock!
 --- test_integration.R ---
 integration: .................[Hub App Export] Building PPTX for: ExportProject 
 [Hub App Export] Using branded Turas template
-[Hub App Export] PPTX saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/integration_export_flow/ExportProject/ExportProject_20260328_172535.pptx 
+[Hub App Export] PPTX saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/integration_export_flow/ExportProject/ExportProject_20260331_214429.pptx 
 [Hub App Export] 3 pin slides, 1 section slides
 ..........12..3[Hub App] WARNING: Directory not found (skipping): /nonexistent/abc123 
 ......456789
@@ -7221,9 +7306,9 @@ target is NULL, current is numeric
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 --- test_preferences.R ---
-preferences: ..............[Hub App] Preferences saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/prefs_test_roundtrip/.turas/hub_app_config.json 
-.......[Hub App] Preferences saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/prefs_test_merge/.turas/hub_app_config.json 
-....[Hub App] Preferences saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/prefs_test_unknown/.turas/hub_app_config.json 
+preferences: ..............[Hub App] Preferences saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/prefs_test_roundtrip/.turas/hub_app_config.json 
+.......[Hub App] Preferences saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/prefs_test_merge/.turas/hub_app_config.json 
+....[Hub App] Preferences saved to: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/prefs_test_unknown/.turas/hub_app_config.json 
 ...
 
 ══ DONE ══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -7261,7 +7346,7 @@ FAILURES IN THIS MODULE:
   FAIL in test_search_index.R / search_index: 2 failure(s)
   FAIL in test_search_index.R / search_index: 1 failure(s)
 
-[FAIL] Hub App — 251 passed, 12 failed, 0 skipped (1.9s)
+[FAIL] Hub App — 251 passed, 12 failed, 0 skipped (3.2s)
 
 --------------------------------------------------------------------------------
 MODULE: Report Hub (9 test files)
@@ -7273,49 +7358,49 @@ config_templates: Generating Report Hub config template...
   Settings sheet created
   Reports sheet created
   Slides sheet created
-  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906777ffe7c0.xlsx (13269 bytes)
+  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d71f21c337.xlsx (13269 bytes)
 Done!
 ...Generating Report Hub config template...
   Settings sheet created
   Reports sheet created
   Slides sheet created
-  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067a10bfc2.xlsx (13269 bytes)
+  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d7619efc4d.xlsx (13269 bytes)
 Done!
 ...Generating Report Hub config template...
   Settings sheet created
   Reports sheet created
   Slides sheet created
-  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90672fb38b42.xlsx (13270 bytes)
+  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d76eec8bb0.xlsx (13269 bytes)
 Done!
 ....Generating Report Hub config template...
   Settings sheet created
   Reports sheet created
   Slides sheet created
-  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90677e20940c.xlsx (13270 bytes)
+  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d77a689bdf.xlsx (13269 bytes)
 Done!
 ...Generating Report Hub config template...
   Settings sheet created
   Reports sheet created
   Slides sheet created
-  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906712d72f55.xlsx (13270 bytes)
+  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d766dcc473.xlsx (13269 bytes)
 Done!
 .Generating Report Hub config template...
   Settings sheet created
   Reports sheet created
   Slides sheet created
-  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90676289710c.xlsx (13270 bytes)
+  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d720fb34fb.xlsx (13269 bytes)
 Done!
 .Generating Report Hub config template...
   Settings sheet created
   Reports sheet created
   Slides sheet created
-  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/report_hub_tpl_36967/Report_Hub_Config_Template.xlsx (13269 bytes)
+  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/report_hub_tpl_5591/Report_Hub_Config_Template.xlsx (13269 bytes)
 Done!
 ..Generating Report Hub config template...
   Settings sheet created
   Reports sheet created
   Slides sheet created
-  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/rh_new_dir_36967/Report_Hub_Config_Template.xlsx (13269 bytes)
+  Template saved: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/rh_new_dir_5591/Report_Hub_Config_Template.xlsx (13269 bytes)
 Done!
 ..
 
@@ -7345,7 +7430,7 @@ html_parser: .................................................
 --- test_integration.R ---
 integration: ..............
 === Turas Report Hub ===
-Config: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90675bc882f0.xlsx 
+Config: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d731f69693.xlsx 
 Step 1: Validating configuration...
   Found 2 reports to combine
 Step 1b: Running preflight checks...
@@ -7375,9 +7460,9 @@ Step 5: Assembling combined report (iframe isolation)...
   [hub-version: iframe-b64] Assembling with base64 iframe encoding
     Base64-encoded tabs: 574 B -> 768 B
     Base64-encoded tracker: 579 B -> 772 B
-Step 6: Writing output: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file9067490c89a3.html
+Step 6: Writing output: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d73417a685.html
 
-Done! Combined report: /private/var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T/Rtmpk8Jo9n/file9067490c89a3.html (31 KB)
+Done! Combined report: /private/var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T/RtmpWaCosh/file15d73417a685.html (96 KB)
 ========================
 
 ...............
@@ -7393,7 +7478,7 @@ Fix: Check the file path. The config file must be a valid .xlsx file.
 
 ..
 === Turas Report Hub ===
-Config: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file906730aad2aa.xlsx 
+Config: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d728767992.xlsx 
 Step 1: Validating configuration...
 
 === TURAS ERROR ===
@@ -7404,7 +7489,7 @@ Fix: Add a 'Settings' sheet with at least project_title and company_name fields.
 
 ..
 === Turas Report Hub ===
-Config: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//Rtmpk8Jo9n/file90677a00d99f.xlsx 
+Config: /var/folders/_k/w70jftv55x14x85f22dvngv40000gn/T//RtmpWaCosh/file15d736e4c1a8.xlsx 
 Step 1: Validating configuration...
 
 === TURAS ERROR ===
@@ -7474,7 +7559,7 @@ visual_features: ........................
 😸
 
 
-[PASS] Report Hub — 351 passed, 0 failed, 0 skipped (4.1s)
+[PASS] Report Hub — 351 passed, 0 failed, 0 skipped (5.0s)
 
 
 ======================================================================
@@ -7484,33 +7569,46 @@ visual_features: ........................
 
   Module                  Status    Pass    Fail    Skip    Warn    Time
   ----------------------  ------  ------  ------  ------  ------  ------
-  Shared Infrastructure   [ PASS]    619       0       0       0    1.6s
-  AlchemerParser          [ PASS]    299       0       0       0    0.9s
-  Confidence              [ PASS]   1022       0       0       0   13.7s
-  Conjoint                [ PASS]    579       0      10       2   18.2s
-  Cat Driver              [ PASS]    605       0      17       2    4.0s
-  Key Driver              [ PASS]    928       0       4       2    7.8s
-  MaxDiff                 [ PASS]    755       0       4       0    7.0s
-  Pricing                 [ PASS]    813       0       0      63   25.3s
-  Segment                 [ PASS]    928       0       1       1    7.5s
-  Tabs                    [ PASS]   1435       0       9       0   28.8s
-  Tracker                 [ PASS]   1848       0       0       1   21.4s
-  Weighting               [ PASS]    415       0       0       1   11.3s
-  Hub App                 [ FAIL]    251      12       0       1    1.9s
-  Report Hub              [ PASS]    351       0       0       0    4.1s
+  Shared Infrastructure   [ PASS]    619       0       0       0    2.3s
+  AlchemerParser          [ PASS]    299       0       0       0    1.6s
+  Confidence              [ PASS]   1022       0       0       0   15.1s
+  Conjoint                [ FAIL]    578       1      10       2   22.1s
+  Cat Driver              [ PASS]    605       0      17       2    4.8s
+  Key Driver              [ PASS]    928       0       4       2    9.9s
+  MaxDiff                 [ PASS]    756       0       4       0    7.4s
+  Pricing                 [ FAIL]    807       6       0      63   26.8s
+  Segment                 [ FAIL]    927       1       1       1    9.6s
+  Tabs                    [ PASS]   1435       0       9       0   28.3s
+  Tracker                 [ FAIL]   1847       3       0       1   27.4s
+  Weighting               [ PASS]    415       0       0       1   13.0s
+  Hub App                 [ FAIL]    251      12       0       1    3.2s
+  Report Hub              [ PASS]    351       0       0       0    5.0s
   ----------------------  ------  ------  ------  ------  ------  ------
-  TOTALS                          10848      12      45      73  153.5s
+  TOTALS                          10840      23      45      73  176.6s
 
 ======================================================================
 
-  PLATFORM STATUS:  12 TEST(S) FAILED across 1 module(s)
-  Pass Rate:        99.9% (10848/10860 tests)
+  PLATFORM STATUS:  23 TEST(S) FAILED across 5 module(s)
+  Pass Rate:        99.8% (10840/10863 tests)
   Test Files:       207 across 14 modules
-  Total Duration:   153.5 seconds
+  Total Duration:   176.6 seconds
 ======================================================================
 
 
   MODULES WITH FAILURES:
+
+    Conjoint (1 failures):
+        FAIL in test_html_report.R / html_report: 1 failure(s)
+
+    Pricing (6 failures):
+        FAIL in test_html_report.R / html_report: 2 failure(s)
+        FAIL in test_html_report.R / html_report: 4 failure(s)
+
+    Segment (1 failures):
+        FAIL in test_html_report.R / html_report: 1 failure(s)
+
+    Tracker (3 failures):
+        FAIL in test_html_report.R / Tracker HTML Report: 3 failure(s)
 
     Hub App (12 failures):
         FAIL in test_integration.R / integration: 2 failure(s)

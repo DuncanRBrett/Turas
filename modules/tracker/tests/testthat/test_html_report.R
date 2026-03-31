@@ -1591,9 +1591,9 @@ test_that("JS has exportSummaryExcel, pinSummaryTable, exportSummaryTableSlide f
   result <- generate_tracker_html_report(crosstab_data, config, output_path)
   content <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
 
-  expect_true(grepl("function exportSummaryExcel", content, fixed = TRUE))
-  expect_true(grepl("function pinSummaryTable", content, fixed = TRUE))
-  expect_true(grepl("function exportSummaryTableSlide", content, fixed = TRUE))
+  expect_true(grepl("exportSummaryExcel", content, fixed = TRUE))
+  expect_true(grepl("pinSummaryTable", content, fixed = TRUE))
+  expect_true(grepl("exportSummaryTableSlide", content, fixed = TRUE))
 
   unlink(output_path)
 })

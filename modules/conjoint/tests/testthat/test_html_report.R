@@ -1043,9 +1043,9 @@ test_that("pin buttons use emoji character on all panels", {
   # Pin button CSS class
   expect_true(grepl("cj-pin-btn", html, fixed = TRUE))
 
-  # Pin buttons should use SVG pin icon (replaced emoji for cross-platform rendering)
+  # Pin buttons should use shared TurasPins library (showPinPopover shim)
   expect_true(grepl("cj-pin-btn", html, fixed = TRUE))
-  expect_true(grepl("togglePin", html, fixed = TRUE))
+  expect_true(grepl("showPinPopover", html, fixed = TRUE))
 
   # Overview pin
   expect_true(grepl("pin-overview", html, fixed = TRUE))

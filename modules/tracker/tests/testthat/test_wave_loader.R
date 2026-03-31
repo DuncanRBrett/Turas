@@ -273,8 +273,8 @@ test_that("apply_wave_weights falls back to 1 when weight column missing", {
 
 test_that("apply_wave_weights warns on missing weight values (NA)", {
   df <- data.frame(
-    ResponseID = 1:5,
-    weight = c(1.0, NA, 0.8, NA, 1.0),
+    ResponseID = 1:12,
+    weight = c(1.0, NA, 0.8, 1.1, 1.0, 0.9, 1.2, 0.7, 1.0, 1.0, 0.8, 1.1),
     stringsAsFactors = FALSE
   )
 
@@ -288,8 +288,8 @@ test_that("apply_wave_weights warns on missing weight values (NA)", {
 
 test_that("apply_wave_weights warns on zero or negative weights", {
   df <- data.frame(
-    ResponseID = 1:5,
-    weight = c(1.0, 0, -0.5, 1.2, 1.0),
+    ResponseID = 1:12,
+    weight = c(1.0, 0, -0.5, 1.2, 1.0, 0.9, 1.1, 0.8, 1.0, 1.0, 0.7, 1.2),
     stringsAsFactors = FALSE
   )
 

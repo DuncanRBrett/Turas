@@ -1984,21 +1984,23 @@ build_pricing_js <- function(js_dir = NULL) {
 
   if (!is.null(js_dir) && dir.exists(js_dir)) {
     js_files <- c("pricing_simulator.js", "pricing_insights.js", "pricing_pins.js", "pricing_slides.js", "pricing_exports.js", "pricing_navigation.js")
+    loaded_files <- FALSE
     for (jf in js_files) {
       jpath <- file.path(js_dir, jf)
       if (file.exists(jpath)) {
         js_parts <- c(js_parts, paste(readLines(jpath, warn = FALSE), collapse = "\n"))
+        loaded_files <- TRUE
       }
+    }
+    # If we loaded pricing JS files from directory, return combined (shared + files)
+    if (loaded_files) {
+      return(paste(js_parts, collapse = "\n\n"))
     }
   }
 
-  # If we loaded at least the navigation JS from files, return combined
-  if (length(js_parts) > 0) {
-    return(paste(js_parts, collapse = "\n\n"))
-  }
-
   # Fallback: inline JS (navigation + chart export only, no simulator)
-  '
+  # Combine with any shared JS already loaded (e.g. turas_pins_js)
+  inline_js <- '
   (function() {
     "use strict";
     var tabs = document.querySelectorAll(".pr-tab-btn");
@@ -2043,4 +2045,6 @@ build_pricing_js <- function(js_dir = NULL) {
     }
   };
   '
+  js_parts <- c(js_parts, inline_js)
+  paste(js_parts, collapse = "\n\n")
 }

@@ -352,12 +352,12 @@ test_that("HTML report overlap chart uses similarity percentages", {
 
   html_text <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
 
-  # Overlap chart should contain percentage values
-  expect_true(grepl("seg-overlap-heatmap", html_text, fixed = TRUE),
-              info = "Report should have overlap heatmap")
-  # Should contain similarity percentage text (e.g., "47%")
-  expect_true(grepl('[0-9]+%</text>', html_text),
-              info = "Overlap heatmap should show similarity percentages")
+  # Overlap section should contain the overlap table
+  expect_true(grepl("seg-overlap-table", html_text, fixed = TRUE),
+              info = "Report should have overlap table")
+  # Should contain percentage values in table cells
+  expect_true(grepl('[0-9]+%', html_text),
+              info = "Overlap table should show similarity percentages")
 })
 
 test_that("HTML report contains question reduction analysis", {

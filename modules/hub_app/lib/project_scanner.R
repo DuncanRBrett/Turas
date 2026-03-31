@@ -721,17 +721,24 @@ evaluate_project_dir <- function(dir_path) {
   all_mtimes <- file.mtime(all_file_paths)
   last_modified <- max(all_mtimes, na.rm = TRUE)
 
+  # Derived convenience fields for reports
+  has_hub_config <- "report_hub" %in% modules
+
   list(
-    id            = digest_path(dir_path),
-    name          = smart_name,
-    folder_name   = folder_name,
-    path          = dir_path,
-    display_path  = display_path,
-    note          = note,
-    modules       = modules,
-    files         = files,
-    counts        = counts,
-    last_modified = format(last_modified, "%Y-%m-%d %H:%M"),
+    id              = digest_path(dir_path),
+    name            = smart_name,
+    folder_name     = folder_name,
+    path            = dir_path,
+    display_path    = display_path,
+    note            = note,
+    modules         = modules,
+    files           = files,
+    counts          = counts,
+    reports         = turas_reports,
+    report_count    = length(turas_reports),
+    total_html_count = length(html_files),
+    has_hub_config  = has_hub_config,
+    last_modified   = format(last_modified, "%Y-%m-%d %H:%M"),
     last_modified_ts = as.numeric(last_modified)
   )
 }
