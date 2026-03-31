@@ -29,7 +29,7 @@
     var container = document.getElementById(config.containerId);
     if (!container) return;
     var emptyState = document.getElementById(config.emptyStateId);
-    var toolbar = config.toolbarId ? document.getElementById(config.toolbarId) : null;
+    var toolbar = config.toolbarId ? document.getElementById(config.toolbarId) : _findToolbar();
     var pins = TurasPins.getAll();
     var pinCount = TurasPins.getPinCount();
 
@@ -40,7 +40,10 @@
       return;
     }
     if (emptyState) emptyState.style.display = "none";
-    if (toolbar) toolbar.style.display = "";
+    if (toolbar) {
+      toolbar.style.display = "";
+      _injectPptxToolbar(toolbar);
+    }
 
     var html = "";
     var total = pins.length;
@@ -105,6 +108,9 @@
     // Export PNG
     html += '<button style="' + ITEM_CSS + '" ' + ITEM_HOVER +
       ' onclick="TurasPins.exportCard(\'' + pid + '\')">&#128247; Export as PNG</button>';
+    // Export single PPTX
+    html += '<button style="' + ITEM_CSS + '" ' + ITEM_HOVER +
+      ' onclick="TurasPins.exportSinglePptx(\'' + pid + '\')">&#128202; Export as PowerPoint</button>';
     // Move up
     if (idx > 0) {
       html += '<button style="' + ITEM_CSS + '" ' + ITEM_HOVER +
@@ -162,6 +168,72 @@
       '<div class="' + pfx + '-section-actions">' + moveHtml +
         '<button class="' + pfx + '-remove-btn" onclick="TurasPins.remove(\'' +
         sid + '\')" title="Remove">&times;</button></div></div>';
+  }
+
+  // ── Toolbar Discovery ──────────────────────────────────────────────────────
+
+  /** Find the export toolbar when no toolbarId is configured.
+   *  Looks for the parent container of "Export All" or "Add Section" buttons. */
+  function _findToolbar() {
+    var btns = document.querySelectorAll("button");
+    for (var i = 0; i < btns.length; i++) {
+      var txt = btns[i].textContent;
+      if (txt.indexOf("Export All") > -1 || txt.indexOf("Add Section") > -1) {
+        return btns[i].parentElement;
+      }
+    }
+    return null;
+  }
+
+  // ── PPTX Toolbar Injection ─────────────────────────────────────────────────
+
+  /** Inject PPTX export button and quality toggle into the toolbar (once per toolbar) */
+  function _injectPptxToolbar(toolbar) {
+    if (toolbar.getAttribute("data-pptx-injected")) return;
+    if (typeof PptxGenJS === "undefined") return;
+    toolbar.setAttribute("data-pptx-injected", "true");
+
+    // Quality toggle
+    var toggle = document.createElement("select");
+    toggle.id = "turas-pptx-quality";
+    toggle.title = "Export quality for PNG and PowerPoint";
+    toggle.style.cssText =
+      "padding:4px 8px;font-size:11px;border:1px solid #e2e8f0;border-radius:6px;" +
+      "background:#fff;color:#374151;cursor:pointer;font-family:inherit;";
+    var optStd = document.createElement("option");
+    optStd.value = "standard"; optStd.textContent = "Standard quality";
+    var optHigh = document.createElement("option");
+    optHigh.value = "high"; optHigh.textContent = "High quality";
+    toggle.appendChild(optStd);
+    toggle.appendChild(optHigh);
+    toggle.value = TurasPins.EXPORT_QUALITY;
+    toggle.addEventListener("change", function() {
+      TurasPins.EXPORT_QUALITY = toggle.value;
+    });
+
+    // PPTX export button — match existing button style
+    var btn = document.createElement("button");
+    btn.textContent = "\uD83D\uDCCA Export as PowerPoint";
+    btn.title = "Export all pins as a PowerPoint presentation";
+    btn.addEventListener("click", function() { TurasPins.exportPptx(); });
+
+    // Copy style from first existing button in toolbar
+    var existingBtn = toolbar.querySelector("button");
+    if (existingBtn) {
+      var cs = window.getComputedStyle(existingBtn);
+      btn.style.cssText =
+        "padding:" + cs.padding + ";font-size:" + cs.fontSize + ";" +
+        "border:" + cs.border + ";border-radius:" + cs.borderRadius + ";" +
+        "background:" + cs.background + ";color:" + cs.color + ";" +
+        "cursor:pointer;font-family:" + cs.fontFamily + ";";
+    } else {
+      btn.style.cssText =
+        "padding:6px 14px;font-size:12px;border:1px solid #e2e8f0;border-radius:6px;" +
+        "background:#fff;color:#374151;cursor:pointer;font-family:inherit;";
+    }
+
+    toolbar.appendChild(toggle);
+    toolbar.appendChild(btn);
   }
 
   // ── Overflow Menu Toggle ───────────────────────────────────────────────────

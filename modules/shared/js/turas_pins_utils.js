@@ -28,6 +28,14 @@ TurasPins.MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 /** Maximum image dimension after resize (px) */
 TurasPins.MAX_IMAGE_DIM = 1200;
 
+/** Current export quality preset key */
+TurasPins.EXPORT_QUALITY = "standard";
+/** Quality presets for PNG/PPTX export */
+TurasPins.QUALITY_PRESETS = {
+  standard: { format: "image/jpeg", quality: 0.85, scale: 2 },
+  high:     { format: "image/png",  quality: null,  scale: 3 }
+};
+
 // ── SVG Utilities ────────────────────────────────────────────────────────────
 
 /**

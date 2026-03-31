@@ -202,20 +202,26 @@
   function _toPNG(svg, pin, totalH, W, imgOvl, titleText, onComplete) {
     _toCanvas(svg, totalH, W, imgOvl, pin.id, function(canvas) {
       if (!canvas) { if (onComplete) onComplete(); return; }
+      var preset = TurasPins.QUALITY_PRESETS[TurasPins.EXPORT_QUALITY] ||
+                   TurasPins.QUALITY_PRESETS.standard;
+      var ext = preset.format === "image/jpeg" ? ".jpg" : ".png";
+      var args = preset.quality !== null ? [preset.format, preset.quality] : [preset.format];
       canvas.toBlob(function(blob) {
         if (!blob) { if (onComplete) onComplete(); return; }
         var slug = titleText.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 40);
         var a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "pinned_" + slug + ".png";
+        a.download = "pinned_" + slug + ext;
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         URL.revokeObjectURL(a.href);
         if (onComplete) onComplete();
-      }, "image/png");
+      }, args[0], args[1]);
     });
   }
 
-  /** Export pin to PNG blob (for clipboard) */
+  /** Export pin to image blob (for clipboard or PPTX).
+   *  Respects TurasPins.EXPORT_QUALITY preset for format and resolution.
+   */
   TurasPins._exportToBlob = function(pin, callback) {
     if (!pin) { callback(null); return; }
     var doExport = function(iw, ih) {
@@ -227,7 +233,10 @@
           w: L.imgDispW, h: L.imgDispH } : null,
         pin.id, function(canvas) {
           if (!canvas) { callback(null); return; }
-          canvas.toBlob(function(blob) { callback(blob); }, "image/png");
+          var preset = TurasPins.QUALITY_PRESETS[TurasPins.EXPORT_QUALITY] ||
+                       TurasPins.QUALITY_PRESETS.standard;
+          var args = preset.quality !== null ? [preset.format, preset.quality] : [preset.format];
+          canvas.toBlob(function(blob) { callback(blob); }, args[0], args[1]);
         });
     };
     if (pin.imageData) {
@@ -270,7 +279,9 @@
 
   /** SVG to canvas with optional image overlay */
   function _toCanvas(svg, totalH, W, imgOvl, pinId, callback) {
-    var scale = TurasPins.EXPORT_RENDER_SCALE;
+    var preset = TurasPins.QUALITY_PRESETS[TurasPins.EXPORT_QUALITY] ||
+                 TurasPins.QUALITY_PRESETS.standard;
+    var scale = preset.scale;
     var url = TurasPins._svgToImageUrl(new XMLSerializer().serializeToString(svg));
     var img = new Image();
     img.onerror = function() {
