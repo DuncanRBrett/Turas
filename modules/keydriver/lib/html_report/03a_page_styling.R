@@ -1024,6 +1024,16 @@ td.kd-td {
 /* QUALITATIVE SLIDES                                                */
 /* ================================================================ */
 
+/* Slides tab header */
+.kd-slides-panel { padding: 0; }
+.kd-slides-header {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; margin-bottom: 20px;
+  flex-wrap: wrap; gap: 12px;
+}
+.kd-slides-header h2 { font-size: 18px; font-weight: 700; color: var(--kd-brand); margin: 0 0 4px; }
+.kd-slides-toolbar { display: flex; gap: 8px; }
+
 .kd-qual-slides-container { margin-bottom: 16px; }
 
 .kd-qual-slide-card {

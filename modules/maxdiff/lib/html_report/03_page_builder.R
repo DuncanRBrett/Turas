@@ -315,7 +315,7 @@ build_maxdiff_page <- function(html_data, tables, charts, config,
   simulator_panel <- ""
   if (has_simulator) {
     # Inject CSS+JS into simulator to hide unwanted tabs and default to H2H
-    # Keep pins tab visible so users can see their pinned views
+    # Pins tab removed from simulator HTML — pins forward to main report via postMessage
     sim_hide_injection <- paste0(
       '<style>',
       '[data-tab="overview"],[data-tab="shares"],[data-tab="diagnostics"],[data-tab="about"]{display:none!important}',
@@ -1678,31 +1678,37 @@ body { font-size: 14px; -webkit-font-smoothing: antialiased; }
 .md-toast-show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 /* === H2H HEATMAP TABLE (segment-profile style) === */
+.md-h2h-legend {
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+  margin-bottom: 10px; padding: 8px 12px;
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;
+  font-size: 12px; color: #475569;
+}
+.md-h2h-legend-title { font-weight: 600; color: #1e293b; margin-right: 4px; }
+.md-h2h-legend-item { display: inline-flex; align-items: center; gap: 4px; }
+.md-h2h-legend-swatch {
+  display: inline-block; width: 16px; height: 16px;
+  border-radius: 3px; border: 1px solid #e2e8f0;
+}
 .md-h2h-wrapper { overflow-x: auto; margin: 8px 0; }
-.md-h2h-table { border-collapse: collapse; width: 100%; }
+.md-h2h-table { border-collapse: collapse; width: 100%; table-layout: fixed; font-size: 13px; font-family: inherit; }
 .md-h2h-table th, .md-h2h-table td { border: 1px solid #e2e8f0; }
 .md-h2h-label-col {
   text-align: left; font-weight: 600; font-size: 12px;
-  padding: 10px 14px; min-width: 100px; white-space: nowrap;
+  padding: 10px 14px; width: 160px; white-space: nowrap;
   background: #f8fafc; color: #1e293b;
 }
 .md-h2h-col-header {
-  padding: 0; vertical-align: bottom; background: #f8fafc;
-  min-width: 52px; position: relative; height: 120px;
-}
-.md-h2h-col-header-text {
-  writing-mode: vertical-rl; text-orientation: mixed;
-  transform: rotate(180deg);
+  text-align: center; vertical-align: bottom; background: #f8fafc;
   font-size: 11px; font-weight: 600; color: #1e293b;
-  padding: 8px 4px; white-space: nowrap;
-  position: absolute; bottom: 6px; left: 50%;
-  transform-origin: center center;
-  transform: rotate(180deg) translateX(50%);
+  padding: 8px 6px; white-space: normal; word-wrap: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.3;
 }
 .md-h2h-row-label {
   text-align: left; font-weight: 500; font-size: 12px;
-  padding: 8px 14px; white-space: nowrap; color: #1e293b;
-  background: #fafbfc;
+  padding: 8px 14px; white-space: normal; word-wrap: break-word;
+  color: #1e293b; background: #fafbfc;
 }
 .md-h2h-cell {
   text-align: center; font-size: 12px; font-variant-numeric: tabular-nums;

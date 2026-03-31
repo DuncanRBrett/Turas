@@ -516,11 +516,16 @@
             .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
+  /**
+   * Export tables from a panel to Excel XML.
+   * For panels with segment variants, exports each segment as a labelled
+   * section within the worksheet. Only exports visible tables unless
+   * segment containers are present (in which case all segments are exported).
+   * @param {string} panelId - Panel identifier (e.g., "h2h", "preferences")
+   */
   function exportPanelToExcel(panelId) {
     var panel = $("#panel-" + panelId);
     if (!panel) return;
-    var tables = panel.querySelectorAll(".md-table");
-    if (tables.length === 0) { showToast("No table data to export"); return; }
 
     var meta = $('meta[name="turas-source-filename"]');
     var base = meta ? meta.getAttribute("content").replace(/\.[^.]+$/, "") : "MaxDiff";
@@ -535,6 +540,7 @@
     xml.push('<Style ss:ID="header"><Font ss:Bold="1" ss:Size="11"/>');
     xml.push('<Interior ss:Color="#F8F9FA" ss:Pattern="Solid"/></Style>');
     xml.push('<Style ss:ID="title"><Font ss:Bold="1" ss:Size="12"/></Style>');
+    xml.push('<Style ss:ID="segment"><Font ss:Bold="1" ss:Size="11" ss:Color="#1e3a5f"/></Style>');
     xml.push('<Style ss:ID="normal"><Font ss:Size="11"/></Style>');
     xml.push('</Styles>');
     xml.push('<Worksheet ss:Name="' + escapeXml(sheetName) + '">');
@@ -548,8 +554,8 @@
       xml.push('<Row></Row>');
     }
 
-    tables.forEach(function(table, tIdx) {
-      if (tIdx > 0) xml.push('<Row></Row>');
+    // Helper: export a single table's rows to XML
+    function exportTableRows(table) {
       var rows = table.querySelectorAll("tr");
       rows.forEach(function(row, rowIdx) {
         xml.push('<Row>');
@@ -567,7 +573,48 @@
         });
         xml.push('</Row>');
       });
-    });
+    }
+
+    // Check for segment-variant containers (data-segment divs)
+    var segContainer = panel.querySelector(".md-segment-tables");
+    if (segContainer) {
+      // Export each segment separately with a label header
+      var segDivs = segContainer.querySelectorAll("[data-segment]");
+      segDivs.forEach(function(segDiv, sIdx) {
+        var segKey = segDiv.getAttribute("data-segment");
+        // Resolve segment label from the dropdown if available
+        var segLabel = segKey === "all" ? "All Respondents" : segKey;
+        var dropdown = panel.querySelector("select");
+        if (dropdown && segKey !== "all") {
+          for (var oi = 0; oi < dropdown.options.length; oi++) {
+            if (dropdown.options[oi].value === segKey) {
+              segLabel = dropdown.options[oi].text;
+              break;
+            }
+          }
+        }
+        // n= label
+        var nLabel = segDiv.querySelector(".md-segment-n-label");
+        var nText = nLabel ? " " + nLabel.textContent.trim() : "";
+
+        if (sIdx > 0) xml.push('<Row></Row>');
+        xml.push('<Row><Cell ss:StyleID="segment"><Data ss:Type="String">' +
+                  escapeXml(segLabel + nText) + '</Data></Cell></Row>');
+
+        var tables = segDiv.querySelectorAll(".md-table, .md-h2h-table, table");
+        tables.forEach(function(table) { exportTableRows(table); });
+      });
+    } else {
+      // No segment variants — export visible tables only
+      var tables = panel.querySelectorAll(".md-table, .md-h2h-table");
+      if (tables.length === 0) { showToast("No table data to export"); return; }
+      tables.forEach(function(table, tIdx) {
+        // Skip hidden tables
+        if (table.closest("[style*='display:none']") || table.closest("[style*='display: none']")) return;
+        if (tIdx > 0) xml.push('<Row></Row>');
+        exportTableRows(table);
+      });
+    }
 
     xml.push('</Table></Worksheet></Workbook>');
 

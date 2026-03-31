@@ -105,7 +105,6 @@ build_simulator_page <- function(sim_data, ...) {
       <button class="sim-tab-btn" data-tab="h2h">Head-to-Head</button>
       <button class="sim-tab-btn" data-tab="portfolio">Portfolio (TURF)</button>
       <button class="sim-tab-btn" data-tab="diagnostics">Diagnostics</button>
-      <button class="sim-tab-btn" data-tab="pins">Pinned Views <span id="pin-badge" class="sim-pin-badge" style="display:none">0</span></button>
       <button class="sim-tab-btn" data-tab="about">About</button>
     </div>
     <div class="sim-content">
@@ -210,21 +209,6 @@ build_simulator_page <- function(sim_data, ...) {
         </div>
       </div>
 
-      <!-- PINNED VIEWS TAB -->
-      <div class="sim-panel" id="panel-pins">
-        <h2>Pinned Views</h2>
-        <div id="pins-callout"></div>
-        <div id="pins-container"></div>
-        <div id="sim-pins-empty" style="text-align:center;padding:40px 20px;color:#94a3b8;">
-          <div style="font-size:28px;margin-bottom:8px;">&#128204;</div>
-          <div style="font-size:13px;">No pinned views yet. Pin views from other tabs to save them here.</div>
-        </div>
-        <div class="sim-pins-actions">
-          <button id="pins-add-slide" class="sim-btn sim-btn-outline">+ Custom Slide</button>
-          <button id="pins-add-section" class="sim-btn sim-btn-outline">+ Section Divider</button>
-        </div>
-      </div>
-
       <!-- ABOUT TAB -->
       <div class="sim-panel" id="panel-about">
         <h2>About</h2>
@@ -235,6 +219,7 @@ build_simulator_page <- function(sim_data, ...) {
   </div>
   <div class="sim-footer">TURAS MaxDiff Simulator v2.0 &middot; %s</div>
   <script type="application/json" id="sim-data">%s</script>
+  <!-- Pin data store kept for backward compatibility with standalone mode -->
   <script type="application/json" id="pinned-views-data">[]</script>
   %s
 </body>
@@ -519,9 +504,8 @@ body { font-size: 14px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoot
 .sim-seg-worst { color: #dc2626; }
 
 /* Pinned views — tabs-quality styling */
+/* Pin badge retained for standalone mode only */
 .sim-pin-badge { display: inline-flex; align-items: center; justify-content: center; background: #ef4444; color: white; font-size: 10px; font-weight: 700; width: 18px; height: 18px; border-radius: 50%; margin-left: 4px; vertical-align: 1px; }
-.sim-pins-empty { text-align: center; padding: 48px 20px; color: #94a3b8; font-size: 14px; }
-.sim-pins-actions { display: flex; gap: 8px; margin-top: 16px; }
 
 /* Pin cards — matches tabs module quality */
 .sim-pin-card {

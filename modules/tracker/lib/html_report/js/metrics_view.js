@@ -471,8 +471,17 @@ function applyChartSegmentState(panel) {
     chartArea.querySelectorAll(".tk-chart-label[data-segment=\"" + seg + "\"]").forEach(function(el) {
       el.style.display = isVisible ? "" : "none";
     });
+    // Legend items always remain visible as a key — only dim slightly when segment hidden
     chartArea.querySelectorAll(".tk-chart-legend-item[data-segment=\"" + seg + "\"]").forEach(function(el) {
-      el.style.opacity = isVisible ? "1" : "0.35";
+      el.style.opacity = isVisible ? "1" : "0.5";
+      // Update pill style to show active/inactive state
+      var rect = el.querySelector("rect");
+      if (rect) {
+        rect.setAttribute("fill", isVisible ? "#f0fafa" : "#f5f5f5");
+        rect.setAttribute("stroke", isVisible ? "#e2e8f0" : "#ddd");
+      }
+      var text = el.querySelector("text");
+      if (text) text.setAttribute("fill", isVisible ? "#1e293b" : "#94a3b8");
     });
   }
 

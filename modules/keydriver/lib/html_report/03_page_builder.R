@@ -159,7 +159,7 @@ build_kd_html_page <- function(html_data, tables, charts, config) {
     htmltools::tags$meta(name = "turas-source-filename", content = source_filename)
   )
 
-  # Report-level tab bar (Analysis | Pinned Views)
+  # Report-level tab bar (Analysis | Added Slides | Pinned Views)
   report_tab_bar <- htmltools::tags$div(
     class = "kd-report-tabs",
     htmltools::tags$button(
@@ -167,6 +167,12 @@ build_kd_html_page <- function(html_data, tables, charts, config) {
       `data-kd-tab` = "content",
       onclick = "kdSwitchReportTab('content')",
       "Analysis"
+    ),
+    htmltools::tags$button(
+      class = "kd-report-tab",
+      `data-kd-tab` = "slides",
+      onclick = "kdSwitchReportTab('slides')",
+      "\U0001F4DD Added Slides"
     ),
     htmltools::tags$button(
       class = "kd-report-tab",
@@ -232,7 +238,44 @@ build_kd_html_page <- function(html_data, tables, charts, config) {
             footer_section
           )
         ),
-        # Tab panel 2: Pinned Views
+        # Tab panel 2: Added Slides
+        htmltools::tags$div(
+          id = "kd-tab-slides",
+          class = "kd-tab-panel",
+          htmltools::tags$div(
+            class = "kd-content",
+            htmltools::tags$div(
+              class = "kd-slides-panel",
+              htmltools::tags$div(
+                class = "kd-slides-header",
+                htmltools::tags$h2("Added Slides"),
+                htmltools::tags$p(style = "font-size:12px;color:#64748b;margin:4px 0 0;",
+                  "Create custom commentary slides with text and images. Pin slides to Pinned Views for export."),
+                htmltools::tags$div(
+                  class = "kd-slides-toolbar",
+                  htmltools::tags$button(
+                    class = "kd-pinned-panel-btn",
+                    onclick = "kdAddQualSlide()",
+                    "\U0001F4DD + New Slide"
+                  ),
+                  htmltools::tags$button(
+                    class = "kd-pinned-panel-btn",
+                    onclick = "kdPinAllQualSlides()",
+                    "\U0001F4CC Pin All to Views"
+                  )
+                )
+              ),
+              htmltools::tags$div(id = "kd-qual-slides-container",
+                class = "kd-qual-slides-container"),
+              htmltools::tags$div(id = "kd-qual-slides-empty",
+                class = "kd-pinned-empty",
+                htmltools::tags$div(class = "kd-pinned-empty-icon", "\U0001F4DD"),
+                htmltools::tags$div("No slides yet. Click '+ New Slide' to add one.")
+              )
+            )
+          )
+        ),
+        # Tab panel 3: Pinned Views
         htmltools::tags$div(
           id = "kd-tab-pinned",
           class = "kd-tab-panel",

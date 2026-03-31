@@ -165,7 +165,8 @@ function pinQualSlide(slideId) {
   if (!card) return;
   var numberEl = card.querySelector(".qual-slide-number");
   var editor = card.querySelector(".qual-slide-editor");
-  var content = editor ? editor.innerHTML : "";
+  // Use innerHTML but clean up &nbsp; entities that contenteditable inserts
+  var content = editor ? editor.innerHTML.replace(/&nbsp;/g, " ").replace(/\u00A0/g, " ") : "";
 
   var imgStore = card.querySelector(".qual-img-store");
   var imageData = (imgStore && imgStore.value) ? imgStore.value : null;

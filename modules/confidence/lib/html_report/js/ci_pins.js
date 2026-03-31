@@ -294,6 +294,7 @@
       containerId: "ci-pinned-cards-container",
       emptyStateId: "ci-pinned-empty",
       badgeId: "ci-pinned-count",
+      toolbarId: "ci-pinned-toolbar",
       features: {
         insightEdit: true,
         sections: true,

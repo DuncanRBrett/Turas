@@ -259,6 +259,14 @@
         mdClosePopovers();
       }
     });
+
+    // Listen for simulator iframe pin messages
+    window.addEventListener("message", function(e) {
+      if (!e.data || e.data.type !== "turas-sim-pin") return;
+      var pin = e.data.pin;
+      if (!pin) return;
+      TurasPins.add(pin);
+    });
   }
 
   if (document.readyState === "loading") {

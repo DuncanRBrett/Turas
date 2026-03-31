@@ -45,6 +45,7 @@
     container.appendChild(card);
     var editorEl = card.querySelector(".kd-qual-md-editor");
     if (editorEl) editorEl.focus();
+    kdUpdateSlidesEmptyState();
   };
 
   /** Trigger file picker for qualitative slide image. */
@@ -159,7 +160,29 @@
   window.kdRemoveQualSlide = function(slideId) {
     var card = document.querySelector('.kd-qual-slide-card[data-slide-id="' + slideId + '"]');
     if (card) card.remove();
+    kdUpdateSlidesEmptyState();
   };
+
+  /** Pin all qualitative slides to pinned views. */
+  window.kdPinAllQualSlides = function() {
+    var container = document.getElementById("kd-qual-slides-container");
+    if (!container) return;
+    var cards = container.querySelectorAll(".kd-qual-slide-card");
+    if (cards.length === 0) return;
+    cards.forEach(function(card) {
+      var id = card.getAttribute("data-slide-id");
+      if (id) window.kdPinQualSlide(id);
+    });
+  };
+
+  /** Update empty state for slides tab. */
+  function kdUpdateSlidesEmptyState() {
+    var container = document.getElementById("kd-qual-slides-container");
+    var empty = document.getElementById("kd-qual-slides-empty");
+    if (!container || !empty) return;
+    var hasCards = container.querySelectorAll(".kd-qual-slide-card").length > 0;
+    empty.style.display = hasCards ? "none" : "";
+  }
 
   // ── Print / PDF ────────────────────────────────────────────────────────────
 

@@ -1182,11 +1182,6 @@ build_kd_pinned_panel <- function(config = list()) {
         ),
         htmltools::tags$button(
           class = "kd-pinned-panel-btn",
-          onclick = "kdAddQualSlide()",
-          "\U0001F4DD Add Slide"
-        ),
-        htmltools::tags$button(
-          class = "kd-pinned-panel-btn",
           onclick = "kdExportAllPinnedPNG()",
           "\U0001F4E5 Export All as PNG"
         ),
@@ -1206,10 +1201,6 @@ build_kd_pinned_panel <- function(config = list()) {
       id = "kd-pinned-empty", class = "kd-pinned-empty",
       htmltools::tags$div(class = "kd-pinned-empty-icon", "\U0001F4CC"),
       htmltools::tags$div("No pinned views yet.")
-    ),
-    htmltools::tags$div(
-      id = "kd-qual-slides-container", class = "kd-qual-slides-container",
-      config_slides
     ),
     htmltools::tags$div(id = "kd-pinned-cards-container")
   )

@@ -1295,7 +1295,7 @@ build_ci_pinned_panel <- function() {
 <h2 style="font-size:18px;font-weight:700;color:#1e293b;margin-bottom:4px;">Pinned Views</h2>
 <p style="font-size:12px;color:#64748b;">Pin charts and tables from other tabs to collect key findings.</p>
 </div>
-<div class="ci-pinned-toolbar" id="ci-pinned-toolbar" style="display:none;">
+<div class="ci-pinned-toolbar" id="ci-pinned-toolbar">
 <button onclick="addSection()">+ Add Section</button>
 <button onclick="exportAllPinnedSlides()">Export All as PNG</button>
 <button onclick="printPinnedViews()">Print / PDF</button>

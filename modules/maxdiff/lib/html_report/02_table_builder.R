@@ -390,28 +390,28 @@ build_h2h_table <- function(h2h_data, label_map = NULL) {
   if (is.null(items)) items <- paste0("Item_", seq_len(nrow(h2h_data)))
   n <- length(items)
 
-  # Map to labels — allow wider text for readability
+  # Map to labels — show full text, headers will wrap
   get_label <- function(id) {
     lbl <- if (!is.null(label_map) && id %in% names(label_map)) label_map[[id]] else id
-    if (nchar(lbl) > 25) lbl <- paste0(substr(lbl, 1, 22), "...")
     htmlEscape(lbl)
   }
 
-  # Header row — rotated text with proper sizing
-  header_cells <- '<th class="md-th md-h2h-label-col">vs</th>'
+  # Header row — H2H-specific classes only (no md-th base class which adds
+  # uppercase transform, large padding, and sort cursor that conflict)
+  header_cells <- '<th class="md-h2h-label-col">vs</th>'
   for (j in seq_len(n)) {
     header_cells <- paste0(header_cells, sprintf(
-      '<th class="md-th md-h2h-col-header"><div class="md-h2h-col-header-text">%s</div></th>',
+      '<th class="md-h2h-col-header">%s</th>',
       get_label(items[j])))
   }
 
   # Data rows with heatmap coloring (segment-profile style)
   rows <- vapply(seq_len(n), function(i) {
-    cells <- sprintf('<td class="md-td md-h2h-row-label">%s</td>', get_label(items[i]))
+    cells <- sprintf('<td class="md-h2h-row-label">%s</td>', get_label(items[i]))
     for (j in seq_len(n)) {
       val <- h2h_data[i, j]
       if (i == j || is.na(val)) {
-        cells <- paste0(cells, '<td class="md-td md-h2h-cell md-h2h-self">&mdash;</td>')
+        cells <- paste0(cells, '<td class="md-h2h-cell md-h2h-self">&mdash;</td>')
       } else {
         # Heatmap: strong win (green), mild win (blue tint), neutral, mild lose (amber), strong lose (red)
         css_class <- if (val >= 65) {
@@ -426,15 +426,26 @@ build_h2h_table <- function(h2h_data, label_map = NULL) {
           "md-h2h-neutral"
         }
         cells <- paste0(cells, sprintf(
-          '<td class="md-td md-h2h-cell %s">%.0f%%</td>', css_class, val))
+          '<td class="md-h2h-cell %s">%.0f%%</td>', css_class, val))
       }
     }
     sprintf('<tr>%s</tr>', cells)
   }, character(1))
 
+  # Colour code legend
+  legend_html <- paste0(
+    '<div class="md-h2h-legend">',
+    '<span class="md-h2h-legend-title">Colour key:</span>',
+    '<span class="md-h2h-legend-item"><span class="md-h2h-legend-swatch md-h2h-win-strong"></span> Strong win (&ge;65%)</span>',
+    '<span class="md-h2h-legend-item"><span class="md-h2h-legend-swatch md-h2h-win"></span> Win (&gt;55%)</span>',
+    '<span class="md-h2h-legend-item"><span class="md-h2h-legend-swatch md-h2h-neutral"></span> Neutral (45&ndash;55%)</span>',
+    '<span class="md-h2h-legend-item"><span class="md-h2h-legend-swatch md-h2h-lose"></span> Loss (&lt;45%)</span>',
+    '<span class="md-h2h-legend-item"><span class="md-h2h-legend-swatch md-h2h-lose-strong"></span> Strong loss (&le;35%)</span>',
+    '</div>')
+
   sprintf(
-    '<div class="md-h2h-wrapper"><table class="md-table md-h2h-table"><thead><tr>%s</tr></thead><tbody>%s</tbody></table></div>',
-    header_cells, paste(rows, collapse = "\n"))
+    '%s<div class="md-h2h-wrapper"><table class="md-h2h-table"><thead><tr>%s</tr></thead><tbody>%s</tbody></table></div>',
+    legend_html, header_cells, paste(rows, collapse = "\n"))
 }
 
 

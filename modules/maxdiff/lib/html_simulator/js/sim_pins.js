@@ -24,271 +24,184 @@ var SimPins = (function() {
     return div.innerHTML;
   }
 
-  // ── Snapshot Builders ──────────────────────────────────────────────────────
+  // ── DOM-based Content Capture ────────────────────────────────────────────
 
-  function buildSharesSnapshot(shares) {
-    var max = shares.length > 0 ? shares[0].share : 1;
-    if (max <= 0) max = 1;
+  /**
+   * Clone visible content from a simulator panel, stripping controls.
+   * Returns the innerHTML of the cloned panel with interactive elements removed.
+   */
+  function clonePanelContent(panelId) {
+    var panel = document.getElementById(panelId);
+    if (!panel) return "";
+    var clone = panel.cloneNode(true);
+    // Remove interactive controls, toolbars, buttons, selects, inputs, callout boxes
+    clone.querySelectorAll(".sim-toolbar, .sim-panel-header, .sim-insight-block, " +
+      ".sim-callout, .sim-h2h-remove-btn, .sim-h2h-controls, " +
+      ".sim-portfolio-controls, .sim-portfolio-grid, " +
+      ".sim-filter, " +
+      "select, button, input, .sim-seg-filter, " +
+      "[id$='-callout']").forEach(function(el) { el.remove(); });
+    // Remove any hidden elements
+    clone.querySelectorAll("[style*='display: none'], [style*='display:none']").forEach(function(el) { el.remove(); });
+    // Constrain SVGs to their natural size (don't let pin card blow them up)
+    clone.querySelectorAll("svg").forEach(function(svg) {
+      var w = svg.getAttribute("width");
+      if (w) svg.style.maxWidth = w + "px";
+      svg.style.height = "auto";
+    });
+    return clone.innerHTML;
+  }
+
+  /**
+   * Inline key CSS styles from the simulator stylesheet into cloned HTML
+   * so the pin renders correctly in the parent report context.
+   */
+  function inlineSimStyles(html) {
     var brand = (SimCharts && SimCharts.getBrandColour) ? SimCharts.getBrandColour() : "#1e3a5f";
-    var html = '<div class="sim-share-bars">';
-    for (var i = 0; i < shares.length; i++) {
-      var s = shares[i];
-      var w = Math.max(2, (s.share / max) * 100);
-      html += '<div class="sim-bar-row">' +
-        '<div class="sim-bar-label">' + esc(s.label) + '</div>' +
-        '<div class="sim-bar-track"><div class="sim-bar-fill" style="width:' + w + '%;background:' + brand + '"></div></div>' +
-        '<div class="sim-bar-value">' + s.share.toFixed(1) + '%</div>' +
-      '</div>';
-    }
-    html += '</div>';
-    return html;
+    // Wrap in a container that carries the essential simulator styles inline
+    return '<div style="font-family:Inter,system-ui,-apple-system,sans-serif;">' +
+      '<style>' +
+      '.sim-h2h{margin:8px 0 16px}' +
+      '.sim-h2h-bar{display:flex;height:44px;border-radius:6px;overflow:hidden}' +
+      '.sim-h2h-a,.sim-h2h-b{display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;min-width:40px}' +
+      '.sim-h2h-labels{display:flex;justify-content:space-between;margin-top:6px;font-size:12px;font-weight:500;color:#475569}' +
+      '.sim-h2h-slot-controls{border-bottom:1px solid #f1f5f9;padding-bottom:14px;margin-bottom:14px}' +
+      '.sim-h2h-slot-controls:last-of-type{border-bottom:none}' +
+      '.sim-h2h-slot-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}' +
+      '.sim-h2h-slot-num{font-size:12px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em}' +
+      '.sim-bar-row{display:flex;align-items:center;margin-bottom:5px}' +
+      '.sim-bar-label{width:170px;font-size:12px;font-weight:500;text-align:right;padding-right:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#334155}' +
+      '.sim-bar-track{flex:1;height:28px;background:#f1f5f9;border-radius:4px;overflow:hidden}' +
+      '.sim-bar-fill{height:100%;border-radius:4px}' +
+      '.sim-bar-value{width:58px;font-size:12px;font-weight:600;text-align:right;padding-left:8px;color:#334155}' +
+      '.sim-turf-gauge{display:flex;align-items:center;gap:24px;margin:16px 0}.sim-turf-gauge svg{max-width:120px!important;width:120px!important;height:120px!important}' +
+      '.sim-turf-stats{font-size:13px;color:#64748b}.sim-turf-stats div{margin-bottom:4px}' +
+      '.sim-turf-opt-list{margin-top:14px;font-size:13px}.sim-turf-opt-list ol{padding-left:22px}.sim-turf-opt-list li{margin-bottom:4px}' +
+      '.sim-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}' +
+      '.sim-stat-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px}' +
+      '.sim-stat-value{font-size:22px;font-weight:700;color:' + brand + '}' +
+      '.sim-stat-label{font-size:11px;font-weight:500;color:#64748b;text-transform:uppercase;letter-spacing:.05em}' +
+      '.sim-stat-sub{font-size:11px;color:#94a3b8;margin-top:2px}' +
+      '.sim-seg-table{width:100%;border-collapse:collapse}.sim-seg-table th{background:#f8fafc;font-weight:600;font-size:11px;padding:8px 12px;border-bottom:2px solid #e2e8f0;text-align:left}' +
+      '.sim-seg-table td{padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:12px}.sim-seg-item{font-weight:500}' +
+      '</style>' + html + '</div>';
   }
 
-  function buildH2HSnapshot(results) {
-    var brand = (SimCharts && SimCharts.getBrandColour) ? SimCharts.getBrandColour() : "#1e3a5f";
-    var html = '';
-    for (var i = 0; i < results.length; i++) {
-      var r = results[i];
-      html += '<div class="sim-h2h" style="margin-bottom:12px">' +
-        '<div class="sim-h2h-bar">' +
-          '<div class="sim-h2h-a" style="width:' + r.probA + '%;background:' + brand + '"><span>' + r.probA + '%</span></div>' +
-          '<div class="sim-h2h-b" style="width:' + r.probB + '%;background:#e74c3c"><span>' + r.probB + '%</span></div>' +
-        '</div>' +
-        '<div class="sim-h2h-labels">' +
-          '<span>' + esc(r.itemA) + '</span><span>' + esc(r.itemB) + '</span>' +
-        '</div>' +
-      '</div>';
-    }
-    return html;
+  /**
+   * Get the segment label for a given tab's segment filter.
+   */
+  function getSegLabel(tabId) {
+    var filterIdMap = {
+      shares: "seg-filter-shares",
+      h2h: "seg-filter-h2h",
+      portfolio: "seg-filter-turf"
+    };
+    var filterId = filterIdMap[tabId];
+    return filterId && window.SimUI ? window.SimUI.getSegLabel(filterId) : null;
   }
 
-  function buildTurfSnapshot(reach, selectedLabels, segLabel, topK, optHtml) {
-    var brand = (SimCharts && SimCharts.getBrandColour) ? SimCharts.getBrandColour() : "#1e3a5f";
-    var angle = (reach.reach / 100) * 360;
-    var rad = (angle - 90) * Math.PI / 180;
-    var large = angle > 180 ? 1 : 0;
-    var cx = 60, cy = 60, radius = 50;
-    var x = cx + radius * Math.cos(rad);
-    var y = cy + radius * Math.sin(rad);
-
-    var pathD = reach.reach >= 99.9
-      ? 'M ' + cx + ' ' + (cy - radius) + ' A ' + radius + ' ' + radius + ' 0 1 1 ' + (cx - 0.01) + ' ' + (cy - radius)
-      : 'M ' + cx + ' ' + (cy - radius) + ' A ' + radius + ' ' + radius + ' 0 ' + large + ' 1 ' + x.toFixed(1) + ' ' + y.toFixed(1);
-
-    var svg = '<svg viewBox="0 0 120 120" width="120" height="120">' +
-      '<circle cx="' + cx + '" cy="' + cy + '" r="' + radius + '" fill="none" stroke="#e2e8f0" stroke-width="8"/>' +
-      '<path d="' + pathD + '" fill="none" stroke="' + brand + '" stroke-width="8" stroke-linecap="round"/>' +
-      '<text x="' + cx + '" y="' + (cy + 2) + '" text-anchor="middle" font-size="18" font-weight="700" fill="' + brand + '">' + reach.reach + '%</text>' +
-      '<text x="' + cx + '" y="' + (cy + 16) + '" text-anchor="middle" font-size="10" fill="#64748b">reach</text>' +
-    '</svg>';
-
-    var html = '<div class="sim-turf-gauge">' + svg +
-      '<div class="sim-turf-stats">' +
-        '<div>' + reach.nReached + ' / ' + reach.nTotal + ' respondents reached</div>' +
-        '<div>Avg frequency: ' + reach.frequency + ' items</div>' +
-        (segLabel ? '<div class="sim-turf-seg-label">Segment: ' + esc(segLabel) + '</div>' : '') +
-        (topK ? '<div>Top-K threshold: ' + topK + '</div>' : '') +
-      '</div>' +
-    '</div>';
-
-    if (selectedLabels && selectedLabels.length > 0) {
-      html += '<div style="margin-top:12px;font-size:13px"><strong>Portfolio (' + selectedLabels.length + ' items):</strong></div>';
-      html += '<ul style="margin:4px 0 0 20px;font-size:12px;color:#475569">';
-      for (var i = 0; i < selectedLabels.length; i++) {
-        html += '<li style="margin-bottom:2px">' + esc(selectedLabels[i]) + '</li>';
-      }
-      html += '</ul>';
-    }
-
-    if (optHtml) {
-      html += '<div style="margin-top:12px">' + optHtml + '</div>';
-    }
-    return html;
-  }
-
-  function buildOverviewSnapshot(stats) {
-    if (!stats) return '<div>No overview data available.</div>';
-    var html = '<div style="font-size:13px"><div class="sim-stat-grid">';
-    html += '<div class="sim-stat-card"><div class="sim-stat-body"><div class="sim-stat-value">' + stats.nItems + '</div><div class="sim-stat-label">Items</div></div></div>';
-    html += '<div class="sim-stat-card"><div class="sim-stat-body"><div class="sim-stat-value">' + stats.nRespondents.toLocaleString() + '</div><div class="sim-stat-label">Respondents</div></div></div>';
-    html += '<div class="sim-stat-card"><div class="sim-stat-body"><div class="sim-stat-value">' + stats.topShare + '%</div><div class="sim-stat-label">Top Share</div><div class="sim-stat-sub">' + esc(stats.topItem) + '</div></div></div>';
-    html += '<div class="sim-stat-card"><div class="sim-stat-body"><div class="sim-stat-value">' + stats.shareRange + 'pp</div><div class="sim-stat-label">Share Range</div></div></div>';
-    html += '</div><div style="margin-top:8px;color:#64748b">Method: ' + esc(stats.method) + '</div></div>';
-    return html;
-  }
-
-  function buildDiagnosticsSnapshot(diag) {
-    if (!diag) return '<div>No diagnostic data available.</div>';
-    var html = '<div style="font-size:13px">';
-    html += '<table class="sim-seg-table" style="font-size:12px"><thead><tr><th style="text-align:left">Metric</th><th>Value</th></tr></thead><tbody>';
-    html += '<tr><td class="sim-seg-item">Method</td><td style="text-align:right">' + esc(diag.method) + '</td></tr>';
-    html += '<tr><td class="sim-seg-item">Utility Range</td><td style="text-align:right">' + diag.utilityRange + '</td></tr>';
-    html += '<tr><td class="sim-seg-item">Utility SD</td><td style="text-align:right">' + diag.utilitySD + '</td></tr>';
-    html += '<tr><td class="sim-seg-item">Discrimination Index</td><td style="text-align:right">' + diag.discriminationIndex + '</td></tr>';
-    if (diag.hasIndividual) {
-      html += '<tr><td class="sim-seg-item">Mean Max Share</td><td style="text-align:right">' + diag.meanMaxShare + '%</td></tr>';
-      html += '<tr><td class="sim-seg-item">Sharpness Ratio</td><td style="text-align:right">' + diag.sharpnessRatio + 'x</td></tr>';
-      html += '<tr><td class="sim-seg-item">Entropy Ratio</td><td style="text-align:right">' + diag.entropyRatio + '</td></tr>';
-      html += '<tr><td class="sim-seg-item">Heterogeneity</td><td style="text-align:right">' + diag.heterogeneity + '</td></tr>';
-    }
-    html += '</tbody></table></div>';
-    return html;
+  /**
+   * Get display title for a simulator tab.
+   */
+  function getTabTitle(tabId) {
+    var titles = {
+      overview: "Overview",
+      shares: "Preference Shares",
+      h2h: "Head-to-Head",
+      portfolio: "Portfolio (TURF)",
+      diagnostics: "Diagnostics"
+    };
+    var title = titles[tabId] || tabId;
+    var segLabel = getSegLabel(tabId);
+    if (segLabel) title += " \u2014 " + segLabel;
+    return title;
   }
 
   // ── Content Capture ────────────────────────────────────────────────────────
 
   /**
-   * Capture the current view from a simulator tab.
+   * Capture the current view from a simulator tab by cloning the DOM.
    * @param {string} tabId - "overview", "shares", "h2h", "portfolio", "diagnostics"
    */
   function captureView(tabId) {
-    if (typeof TurasPins === "undefined" || !TurasPins.getConfig()) {
-      console.error("[SimPins] TurasPins not initialised. Cannot capture view.");
-      return;
-    }
-    var data = SimEngine.getData();
-    if (!data) return;
+    var panelIdMap = {
+      overview: "panel-overview",
+      shares: "panel-shares",
+      h2h: "panel-h2h",
+      portfolio: "panel-portfolio",
+      diagnostics: "panel-diagnostics"
+    };
+    var panelId = panelIdMap[tabId];
+    if (!panelId) return;
 
-    var title = "";
-    var chartHtml = "";
+    var titles = {
+      overview: "Simulator: Overview",
+      shares: "Simulator: Preference Shares",
+      h2h: "Simulator: Head-to-Head",
+      portfolio: "Simulator: Portfolio (TURF)",
+      diagnostics: "Simulator: Diagnostics"
+    };
+    var title = titles[tabId] || "Simulator: " + tabId;
+    var segLabel = getSegLabel(tabId);
 
-    if (tabId === "overview") {
-      title = "Overview";
-      chartHtml = buildOverviewSnapshot(SimEngine.getOverviewStats());
+    var contentHtml = clonePanelContent(panelId);
 
-    } else if (tabId === "diagnostics") {
-      title = "Diagnostics";
-      chartHtml = buildDiagnosticsSnapshot(SimEngine.getDiagnostics());
+    // Capture insight text if present
+    var insightEditor = document.getElementById("insight-" + tabId);
+    var insightText = insightEditor ? insightEditor.innerHTML.replace(/&nbsp;/g, " ").trim() : "";
 
-    } else if (tabId === "shares") {
-      title = "Preference Shares";
-      var segFilter = window.SimUI ? window.SimUI.getSegFilter("seg-filter-shares") : null;
-      var segLabel = window.SimUI ? window.SimUI.getSegLabel("seg-filter-shares") : null;
-      if (segLabel) title += " \u2014 " + segLabel;
+    // Wrap with inlined styles so pin renders properly in parent report
+    var styledHtml = inlineSimStyles(contentHtml);
 
-      var shares = SimEngine.computeShares(segFilter);
-      var hiddenItems = window.SimUI ? window.SimUI.getHiddenItems() : {};
-      if (Object.keys(hiddenItems).length > 0) {
-        var visible = shares.filter(function(s) { return !hiddenItems[s.itemId]; });
-        var total = visible.reduce(function(sum, s) { return sum + s.share; }, 0);
-        if (total > 0) visible.forEach(function(s) { s.share = (s.share / total) * 100; });
-        shares = visible;
-      }
-      shares.sort(function(a, b) { return b.share - a.share; });
-      chartHtml = buildSharesSnapshot(shares);
-
-    } else if (tabId === "h2h") {
-      title = "Head-to-Head";
-      var segFilter = window.SimUI ? window.SimUI.getSegFilter("seg-filter-h2h") : null;
-      var segLabel = window.SimUI ? window.SimUI.getSegLabel("seg-filter-h2h") : null;
-      if (segLabel) title += " \u2014 " + segLabel;
-
-      var slots = window.SimUI ? window.SimUI.getH2HSlots() : [];
-      var results = [];
-      for (var i = 0; i < slots.length; i++) {
-        if (slots[i].idA && slots[i].idB && slots[i].idA !== slots[i].idB) {
-          results.push(SimEngine.headToHead(slots[i].idA, slots[i].idB, segFilter));
-        }
-      }
-      chartHtml = buildH2HSnapshot(results);
-
-    } else if (tabId === "portfolio") {
-      title = "Portfolio (TURF)";
-      var segFilter = window.SimUI ? window.SimUI.getSegFilter("seg-filter-turf") : null;
-      var segLabel = window.SimUI ? window.SimUI.getSegLabel("seg-filter-turf") : null;
-      if (segLabel) title += " \u2014 " + segLabel;
-
-      var checks = document.querySelectorAll(".sim-portfolio-check");
-      var selected = [];
-      checks.forEach(function(cb) { if (cb.checked) selected.push(cb.value); });
-      var topK = window.SimUI ? window.SimUI.getTopK() : 3;
-      var reach = SimEngine.turfReach(selected, topK, segFilter);
-
-      var itemLabels = {};
-      data.items.forEach(function(it) { itemLabels[it.id] = it.label; });
-      var selectedLabels = selected.map(function(id) { return itemLabels[id] || id; });
-
-      var optEl = document.getElementById("turf-opt-result");
-      var optHtml = (optEl && optEl.innerHTML) ? optEl.innerHTML : "";
-
-      chartHtml = buildTurfSnapshot(reach, selectedLabels, segLabel, topK, optHtml);
+    // Build subtitle with segment context — always show which segment was viewed
+    var subtitleText = "";
+    if (tabId === "h2h" || tabId === "portfolio" || tabId === "shares") {
+      subtitleText = segLabel ? "Segment: " + segLabel : "Segment: All respondents";
     }
 
-    // Delegate to TurasPins — chartHtml maps to tableHtml via normalise()
-    TurasPins.add({
+    var pinData = {
       title: title,
+      subtitle: subtitleText,
       tabId: tabId,
-      chartHtml: chartHtml,
-      insight: "",
+      chartHtml: styledHtml,
+      insight: insightText,
       pinMode: "all"
-    });
-  }
+    };
 
-  /**
-   * Add a custom slide via TurasPins.
-   */
-  function addCustomSlide() {
-    TurasPins.add({
-      title: "Custom Slide",
-      insightText: "Click to edit...",
-      chartSvg: "",
-      tableHtml: "",
-      pinMode: "all"
-    });
-  }
-
-  /**
-   * Add a section divider via TurasPins.
-   */
-  function addSection(title) {
-    TurasPins.addSection(title || "New Section");
-  }
-
-  function getCount() {
-    return TurasPins.getPinCount();
-  }
-
-  function getPins() {
-    return TurasPins.getAll();
+    // If embedded in iframe, forward pin to parent report's pinned views
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({
+        type: "turas-sim-pin",
+        pin: pinData
+      }, "*");
+      TurasPins._showToast("Pinned to report views");
+    } else {
+      // Standalone mode — pin locally
+      if (typeof TurasPins !== "undefined" && TurasPins.getConfig()) {
+        TurasPins.add(pinData);
+      }
+    }
   }
 
   // ── Initialisation ─────────────────────────────────────────────────────────
 
   var _initRetries = 0;
   function init() {
-    if (typeof TurasPins === "undefined" || typeof TurasPins.init !== "function") {
-      if (_initRetries < 5) {
-        _initRetries++;
-        setTimeout(init, 200);
-        return;
-      }
-      console.error("[SimPins] TurasPins shared library not loaded after retries. Pin functionality unavailable.");
+    // TurasPins still needed for standalone mode and toast notifications
+    if (typeof TurasPins !== "undefined" && typeof TurasPins.init === "function") {
+      TurasPins.init({
+        storeId: "pinned-views-data",
+        cssPrefix: "sim-pin",
+        moduleLabel: "MaxDiff Simulator",
+        containerId: "pins-container",
+        emptyStateId: "sim-pins-empty",
+        badgeId: "pin-badge",
+        features: { insightEdit: true, sections: false, dragDrop: false }
+      });
+    } else if (_initRetries < 5) {
+      _initRetries++;
+      setTimeout(init, 200);
       return;
-    }
-
-    TurasPins.init({
-      storeId: "pinned-views-data",
-      cssPrefix: "sim-pin",
-      moduleLabel: "MaxDiff Simulator",
-      containerId: "pins-container",
-      emptyStateId: "sim-pins-empty",
-      badgeId: "pin-badge",
-      features: {
-        insightEdit: true,
-        sections: true,
-        dragDrop: true
-      }
-    });
-    if (TurasPins._initDragDrop) TurasPins._initDragDrop();
-
-    // Wire add buttons
-    var addSlideBtn = document.getElementById("pins-add-slide");
-    if (addSlideBtn) {
-      addSlideBtn.addEventListener("click", function() { addCustomSlide(); });
-    }
-    var addSectionBtn = document.getElementById("pins-add-section");
-    if (addSectionBtn) {
-      addSectionBtn.addEventListener("click", function() { addSection("New Section"); });
     }
   }
 
@@ -298,11 +211,5 @@ var SimPins = (function() {
     init();
   }
 
-  return {
-    captureView: captureView,
-    addCustomSlide: addCustomSlide,
-    addSection: addSection,
-    getCount: getCount,
-    getPins: getPins
-  };
+  return { captureView: captureView };
 })();
