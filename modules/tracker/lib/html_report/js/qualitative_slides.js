@@ -172,28 +172,18 @@ function pinQualSlide(slideId) {
   var imageWidth = imgStore ? parseInt(imgStore.getAttribute("data-img-w")) || 0 : 0;
   var imageHeight = imgStore ? parseInt(imgStore.getAttribute("data-img-h")) || 0 : 0;
 
-  if (typeof pinnedViews === "undefined") return;
+  if (typeof TurasPins === "undefined") return;
 
-  var pin = {
-    id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
-    pinType: "text_box",
-    qCode: null,
-    qTitle: numberEl ? numberEl.textContent.trim() : "Added Slide",
-    bannerGroup: null, bannerLabel: null,
-    selectedColumns: null, excludedRows: null,
+  TurasPins.add({
+    title: numberEl ? numberEl.textContent.trim() : "Added Slide",
     insightText: content,
     imageData: imageData,
     imageWidth: imageWidth,
     imageHeight: imageHeight,
-    sortState: null,
-    tableHtml: null, chartSvg: null, baseText: null,
-    timestamp: Date.now(),
-    order: pinnedViews.length
-  };
-  pinnedViews.push(pin);
-  if (typeof savePinnedData === "function") savePinnedData();
-  if (typeof renderPinnedCards === "function") renderPinnedCards();
-  if (typeof updatePinBadge === "function") updatePinBadge();
+    tableHtml: "",
+    chartSvg: "",
+    pinMode: "all"
+  });
 }
 
 /** Pin all slides to Views. */

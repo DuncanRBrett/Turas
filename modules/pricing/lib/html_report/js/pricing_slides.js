@@ -222,24 +222,19 @@ function pinPrSlide(slideId) {
     }
   }
 
-  // Use the pricing module's pinned views system if available
-  if (typeof pinnedViews !== "undefined" && typeof savePinnedData === "function") {
-    var pin = {
-      id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
-      pinType: "text_box",
+  // Delegate to TurasPins shared library
+  if (typeof TurasPins !== "undefined") {
+    TurasPins.add({
       sectionId: "slides",
       title: titleEl ? titleEl.textContent.trim() : "Added Slide",
       insightText: rendered ? rendered.innerHTML : "",
       imageData: imageData,
       imageWidth: imageWidth,
       imageHeight: imageHeight,
-      timestamp: Date.now(),
-      order: pinnedViews.length
-    };
-    pinnedViews.push(pin);
-    savePinnedData();
-    if (typeof renderPinnedCards === "function") renderPinnedCards();
-    if (typeof updatePinBadge === "function") updatePinBadge();
+      tableHtml: "",
+      chartSvg: "",
+      pinMode: "all"
+    });
   }
 }
 

@@ -1404,27 +1404,20 @@
       }
     }
 
-    // Build pin object matching pinnedViews structure
-    if (typeof pinnedViews === "undefined") { console.warn("Pinned views not available"); return; }
+    // Build pin object and delegate to TurasPins
+    if (typeof TurasPins === "undefined") { console.warn("TurasPins not available"); return; }
 
-    var pinObj = {
-      id: "pin-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+    TurasPins.add({
       metricId: "visualise-" + (visState.mode === "metrics" ? visState.contextSegment : visState.contextMetric),
+      title: titleText,
       metricTitle: titleText,
       visibleSegments: [],
       tableHtml: tableHtml,
       chartSvg: chartSvg,
       chartVisible: mode === "all" || mode === "chart",
-      pinMode: mode,
-      insightText: insightText,
-      timestamp: Date.now(),
-      order: pinnedViews.length
-    };
-
-    pinnedViews.push(pinObj);
-    if (typeof renderPinnedCards === "function") renderPinnedCards();
-    if (typeof updatePinBadge === "function") updatePinBadge();
-    if (typeof savePinnedData === "function") savePinnedData();
+      pinMode: mode === "chart" ? "chart_insight" : mode === "table" ? "table_insight" : "all",
+      insightText: insightText
+    });
   };
 
   // ---- Export ----

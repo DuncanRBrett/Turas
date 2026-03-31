@@ -664,6 +664,62 @@ body {
 }
 .wt-pinned-empty-icon { font-size: 32px; margin-bottom: 12px; }
 
+/* Pinned Cards */
+.wt-pinned-card {
+  background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px;
+  padding: 20px 24px; margin-bottom: 16px;
+  page-break-inside: avoid; cursor: grab;
+}
+.wt-pinned-card[draggable="true"]:active { cursor: grabbing; }
+.wt-pinned-card-header {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; margin-bottom: 10px;
+}
+.wt-pinned-card-title { font-size: 18px; font-weight: 600; color: #1e293b; margin-bottom: 2px; flex: 1; min-width: 0; }
+.wt-pinned-card-subtitle { font-size: 13px; font-weight: 400; color: #94a3b8; }
+.wt-pinned-card-actions { display: flex; gap: 4px; flex-shrink: 0; align-items: center; margin-left: 12px; }
+.wt-pinned-remove-btn, .wt-pinned-action-btn {
+  background: none; border: 1px solid #e2e8f0; border-radius: 4px;
+  padding: 3px 8px; font-size: 11px; cursor: pointer; color: #64748b;
+  transition: all 0.15s;
+}
+.wt-pinned-remove-btn:hover { color: #e8614d; border-color: #e8614d; background: rgba(232,97,77,0.06); }
+.wt-pinned-action-btn:hover { border-color: #94a3b8; color: #374151; background: #f8f9fa; }
+.wt-pinned-card-insight {
+  margin-bottom: 12px; padding: 14px 20px;
+  border-left: 3px solid BRAND; background: #f8fafa;
+  border-radius: 0 6px 6px 0;
+  font-size: 14px; line-height: 1.6; color: #334155;
+}
+.wt-pinned-insight-rendered { min-height: 1em; cursor: text; }
+.wt-pinned-insight-rendered:empty::before {
+  content: attr(data-placeholder); color: #94a3b8; font-style: italic;
+}
+.wt-pinned-insight-editor {
+  width: 100%; border: 1px solid #cbd5e1; border-radius: 4px;
+  padding: 8px 12px; font-size: 13px; font-family: inherit;
+  line-height: 1.5; resize: vertical; min-height: 60px;
+}
+.wt-pinned-card-chart { margin-bottom: 12px; }
+.wt-pinned-card-chart svg { width: 100%; height: auto; }
+.wt-pinned-card-table { overflow-x: auto; }
+.wt-pinned-card-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.wt-pinned-card-table th { background: #f1f5f9; font-weight: 600; padding: 6px 10px; border: 1px solid #e2e8f0; text-align: left; }
+.wt-pinned-card-table td { padding: 6px 10px; border: 1px solid #e2e8f0; }
+
+/* Section Dividers */
+.wt-pinned-section-divider {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 0; margin: 8px 0;
+  border-bottom: 2px solid BRAND;
+}
+.wt-pinned-section-title {
+  font-size: 16px; font-weight: 600; color: BRAND;
+  flex: 1; outline: none; min-width: 100px;
+}
+.wt-pinned-section-title:focus { border-bottom: 1px dashed #e2e8f0; }
+.wt-pinned-section-actions { display: flex; gap: 4px; }
+
 @media print {
   .report-tabs, .wt-nav, .wt-save-tab, .wt-pin-btn, .wt-pinned-toolbar { display: none !important; }
   .tab-panel, .wt-detail-panel { display: block !important; }
@@ -1145,6 +1201,7 @@ build_wt_pinned_panel <- function() {
 </div>
 <div class="wt-pinned-toolbar" id="wt-pinned-toolbar" style="display:none;">
 <button onclick="addSection()">+ Add Section</button>
+<button onclick="wtPinAnalystNote()">+ Analyst Note</button>
 <button onclick="exportAllPinnedSlides()">Export All as PNG</button>
 <button onclick="printPinnedViews()">Print / PDF</button>
 <button onclick="saveReportHTML()">Save Report</button>

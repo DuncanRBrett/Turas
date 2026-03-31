@@ -262,6 +262,20 @@
 
   // ── Global Function Delegates ──────────────────────────────────────────────
 
+  /**
+   * Pin an analyst note — text-only pin for commentary and observations.
+   */
+  window.wtPinAnalystNote = function() {
+    TurasPins.add({
+      sectionKey: "analyst-note-" + Date.now(),
+      title: "Analyst Note",
+      insightText: "Double-click to add your note...",
+      chartSvg: "",
+      tableHtml: "",
+      pinMode: "all"
+    });
+  };
+
   window.wtGetPinnedViews = function() { return TurasPins._getPinsRef(); };
   window.addSection = function(title) { TurasPins.addSection(title); };
   window.removePinned = function(pinId) { TurasPins.remove(pinId); };

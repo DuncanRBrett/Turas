@@ -609,6 +609,7 @@ build_pinned_views_panel <- function() {
 <div class="pinned-header">
 <h2>Pinned Views</h2>
 <div id="md-pinned-toolbar" class="pinned-header-actions">
+<button class="md-btn-secondary" onclick="TurasPins.addSection()">&#x2795; Add Section</button>
 <button class="md-export-btn" onclick="window._mdExportAllPinned()"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 14h12M8 2v9M4 7l4 4 4-4"/></svg> Export All as PNG</button>
 <button class="md-btn-secondary" onclick="window._mdSaveReport()">Save Report</button>
 </div>
@@ -1643,6 +1644,16 @@ body { font-size: 14px; -webkit-font-smoothing: antialiased; }
   cursor: pointer; font-size: 11px; padding: 2px 6px; color: #64748b;
 }
 .md-pinned-action-btn:hover { background: #f1f5f9; }
+/* Insight editing */
+.md-pinned-insight-rendered { min-height: 1em; cursor: text; }
+.md-pinned-insight-rendered:empty::before {
+  content: attr(data-placeholder); color: #94a3b8; font-style: italic;
+}
+.md-pinned-insight-editor {
+  width: 100%; border: 1px solid #cbd5e1; border-radius: 4px;
+  padding: 8px 12px; font-size: 13px; font-family: inherit;
+  line-height: 1.5; resize: vertical; min-height: 60px;
+}
 
 /* Overflow menu */
 .pin-overflow-item:hover { background: #f1f5f9; }
@@ -1666,18 +1677,44 @@ body { font-size: 14px; -webkit-font-smoothing: antialiased; }
 }
 .md-toast-show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-/* === H2H HEATMAP TABLE === */
-.md-h2h-cell { text-align: center; font-size: 12px; font-variant-numeric: tabular-nums; }
-th.md-h2h-cell {
-  writing-mode: vertical-rl; text-orientation: mixed;
-  max-width: 40px; min-width: 32px; font-size: 10px;
-  padding: 8px 4px; vertical-align: bottom; white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis; height: 100px;
+/* === H2H HEATMAP TABLE (segment-profile style) === */
+.md-h2h-wrapper { overflow-x: auto; margin: 8px 0; }
+.md-h2h-table { border-collapse: collapse; width: 100%; }
+.md-h2h-table th, .md-h2h-table td { border: 1px solid #e2e8f0; }
+.md-h2h-label-col {
+  text-align: left; font-weight: 600; font-size: 12px;
+  padding: 10px 14px; min-width: 100px; white-space: nowrap;
+  background: #f8fafc; color: #1e293b;
 }
-.md-h2h-win { background: #dcfce7; color: #166534; }
-.md-h2h-lose { background: #fee2e2; color: #991b1b; }
-.md-h2h-neutral { background: #f1f5f9; color: #64748b; }
-.md-h2h-self { background: #e2e8f0; color: #94a3b8; }
+.md-h2h-col-header {
+  padding: 0; vertical-align: bottom; background: #f8fafc;
+  min-width: 52px; position: relative; height: 120px;
+}
+.md-h2h-col-header-text {
+  writing-mode: vertical-rl; text-orientation: mixed;
+  transform: rotate(180deg);
+  font-size: 11px; font-weight: 600; color: #1e293b;
+  padding: 8px 4px; white-space: nowrap;
+  position: absolute; bottom: 6px; left: 50%;
+  transform-origin: center center;
+  transform: rotate(180deg) translateX(50%);
+}
+.md-h2h-row-label {
+  text-align: left; font-weight: 500; font-size: 12px;
+  padding: 8px 14px; white-space: nowrap; color: #1e293b;
+  background: #fafbfc;
+}
+.md-h2h-cell {
+  text-align: center; font-size: 12px; font-variant-numeric: tabular-nums;
+  padding: 8px 6px; font-weight: 500;
+}
+/* Heatmap tinting — matches segment profile pattern */
+.md-h2h-win-strong { background: #dcfce7; color: #166534; }
+.md-h2h-win { background: #eff6ff; color: #1e40af; }
+.md-h2h-lose { background: #fef3c7; color: #92400e; }
+.md-h2h-lose-strong { background: #fee2e2; color: #991b1b; }
+.md-h2h-neutral { background: #ffffff; color: #64748b; }
+.md-h2h-self { background: #f1f5f9; color: #94a3b8; font-style: italic; }
 
 /* === ABOUT PAGE === */
 .md-about-section { max-width: 700px; }

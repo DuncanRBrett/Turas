@@ -1062,6 +1062,16 @@ td.cd-td {
   margin-bottom: 10px;
 }
 
+.cd-pinned-insight-rendered { min-height: 1em; cursor: text; }
+.cd-pinned-insight-rendered:empty::before {
+  content: attr(data-placeholder); color: #94a3b8; font-style: italic;
+}
+.cd-pinned-insight-editor {
+  width: 100%; border: 1px solid #cbd5e1; border-radius: 4px;
+  padding: 8px 12px; font-size: 13px; font-family: inherit;
+  line-height: 1.5; resize: vertical; min-height: 60px;
+}
+
 .cd-pinned-card-chart {
   margin-top: 10px;
   overflow: visible;
@@ -1132,7 +1142,7 @@ td.cd-td {
 /* SECTION DIVIDERS — editable headers between pinned cards          */
 /* ================================================================ */
 
-.cd-section-divider {
+.cd-section-divider, .cd-pinned-section-divider {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1141,7 +1151,7 @@ td.cd-td {
   border-bottom: 2px solid var(--cd-brand);
 }
 
-.cd-section-divider-title {
+.cd-section-divider-title, .cd-pinned-section-title {
   font-size: 16px;
   font-weight: 600;
   color: var(--cd-brand);
@@ -1150,11 +1160,11 @@ td.cd-td {
   min-width: 100px;
 }
 
-.cd-section-divider-title:focus {
+.cd-section-divider-title:focus, .cd-pinned-section-title:focus {
   border-bottom: 1px dashed var(--cd-border);
 }
 
-.cd-section-divider-actions {
+.cd-section-divider-actions, .cd-pinned-section-actions {
   display: flex;
   gap: 4px;
 }

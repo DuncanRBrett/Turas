@@ -1078,6 +1078,34 @@ td.pr-td {
   padding: 10px 14px; background: #f8fafc; border-top: 1px solid #e2e8f0;
   font-size: 13px; color: #475569; font-style: italic;
 }
+/* Section Dividers */
+.pinned-section-divider {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 0; margin: 8px 0;
+  border-bottom: 2px solid BRAND_TOKEN;
+}
+.pinned-section-title {
+  font-size: 16px; font-weight: 600; color: BRAND_TOKEN;
+  flex: 1; outline: none; min-width: 100px;
+}
+.pinned-section-title:focus { border-bottom: 1px dashed #e2e8f0; }
+.pinned-section-actions { display: flex; gap: 4px; }
+.pinned-action-btn {
+  background: none; border: 1px solid #e2e8f0; border-radius: 4px;
+  padding: 3px 8px; font-size: 11px; cursor: pointer; color: #64748b;
+  transition: all 0.15s;
+}
+.pinned-action-btn:hover { border-color: #94a3b8; color: #374151; background: #f8f9fa; }
+/* Insight editing */
+.pinned-insight-rendered { min-height: 1em; cursor: text; }
+.pinned-insight-rendered:empty::before {
+  content: attr(data-placeholder); color: #94a3b8; font-style: italic;
+}
+.pinned-insight-editor {
+  width: 100%; border: 1px solid #cbd5e1; border-radius: 4px;
+  padding: 8px 12px; font-size: 13px; font-family: inherit;
+  line-height: 1.5; resize: vertical; min-height: 60px;
+}
 .pr-pinned-actions { margin-top: 16px; }
 .pr-btn-secondary {
   background: white; border: 1px solid #e2e8f0; color: #475569; padding: 8px 16px;

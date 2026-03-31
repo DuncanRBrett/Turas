@@ -390,30 +390,41 @@ build_h2h_table <- function(h2h_data, label_map = NULL) {
   if (is.null(items)) items <- paste0("Item_", seq_len(nrow(h2h_data)))
   n <- length(items)
 
-  # Map to labels
+  # Map to labels — allow wider text for readability
   get_label <- function(id) {
     lbl <- if (!is.null(label_map) && id %in% names(label_map)) label_map[[id]] else id
-    if (nchar(lbl) > 20) lbl <- paste0(substr(lbl, 1, 17), "...")
+    if (nchar(lbl) > 25) lbl <- paste0(substr(lbl, 1, 22), "...")
     htmlEscape(lbl)
   }
 
-  # Header row
-  header_cells <- '<th class="md-th md-label-col" style="min-width:120px;">vs</th>'
+  # Header row — rotated text with proper sizing
+  header_cells <- '<th class="md-th md-h2h-label-col">vs</th>'
   for (j in seq_len(n)) {
     header_cells <- paste0(header_cells, sprintf(
-      '<th class="md-th md-h2h-cell" style="writing-mode:vertical-rl;max-width:40px;font-size:10px;">%s</th>',
+      '<th class="md-th md-h2h-col-header"><div class="md-h2h-col-header-text">%s</div></th>',
       get_label(items[j])))
   }
 
-  # Data rows
+  # Data rows with heatmap coloring (segment-profile style)
   rows <- vapply(seq_len(n), function(i) {
-    cells <- sprintf('<td class="md-td md-label-col" style="font-weight:500;font-size:12px;">%s</td>', get_label(items[i]))
+    cells <- sprintf('<td class="md-td md-h2h-row-label">%s</td>', get_label(items[i]))
     for (j in seq_len(n)) {
       val <- h2h_data[i, j]
       if (i == j || is.na(val)) {
         cells <- paste0(cells, '<td class="md-td md-h2h-cell md-h2h-self">&mdash;</td>')
       } else {
-        css_class <- if (val > 55) "md-h2h-win" else if (val < 45) "md-h2h-lose" else "md-h2h-neutral"
+        # Heatmap: strong win (green), mild win (blue tint), neutral, mild lose (amber), strong lose (red)
+        css_class <- if (val >= 65) {
+          "md-h2h-win-strong"
+        } else if (val > 55) {
+          "md-h2h-win"
+        } else if (val < 35) {
+          "md-h2h-lose-strong"
+        } else if (val < 45) {
+          "md-h2h-lose"
+        } else {
+          "md-h2h-neutral"
+        }
         cells <- paste0(cells, sprintf(
           '<td class="md-td md-h2h-cell %s">%.0f%%</td>', css_class, val))
       }
@@ -422,7 +433,7 @@ build_h2h_table <- function(h2h_data, label_map = NULL) {
   }, character(1))
 
   sprintf(
-    '<div style="overflow-x:auto;"><table class="md-table md-table-compact" style="table-layout:fixed;"><thead><tr>%s</tr></thead><tbody>%s</tbody></table></div>',
+    '<div class="md-h2h-wrapper"><table class="md-table md-h2h-table"><thead><tr>%s</tr></thead><tbody>%s</tbody></table></div>',
     header_cells, paste(rows, collapse = "\n"))
 }
 

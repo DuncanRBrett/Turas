@@ -402,12 +402,14 @@ build_kd_css <- function(config) {
 
 .kd-pinned-card[draggable="true"],
 .kd-section-divider[draggable="true"],
+.kd-pinned-section-divider[draggable="true"],
 .kd-pinned-card[data-pin-drag-idx] {
   cursor: grab;
 }
 
 .kd-pinned-card[draggable="true"]:active,
 .kd-section-divider[draggable="true"]:active,
+.kd-pinned-section-divider[draggable="true"]:active,
 .kd-pinned-card[data-pin-drag-idx]:active {
   cursor: grabbing;
 }
@@ -1198,6 +1200,16 @@ td.kd-td {
   margin-bottom: 6px;
 }
 
+.kd-pinned-insight-rendered { min-height: 1em; cursor: text; }
+.kd-pinned-insight-rendered:empty::before {
+  content: attr(data-placeholder); color: #94a3b8; font-style: italic;
+}
+.kd-pinned-insight-editor {
+  width: 100%; border: 1px solid #cbd5e1; border-radius: 4px;
+  padding: 8px 12px; font-size: 13px; font-family: inherit;
+  line-height: 1.5; resize: vertical; min-height: 60px;
+}
+
 .kd-pinned-card-chart {
   margin-top: 6px;
   overflow: visible;
@@ -1313,7 +1325,7 @@ td.kd-td {
 /* SECTION DIVIDERS                                                  */
 /* ================================================================ */
 
-.kd-section-divider {
+.kd-section-divider, .kd-pinned-section-divider {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1322,7 +1334,7 @@ td.kd-td {
   border-bottom: 2px solid var(--kd-brand);
 }
 
-.kd-section-divider-title {
+.kd-section-divider-title, .kd-pinned-section-title {
   font-size: 16px;
   font-weight: 600;
   color: var(--kd-brand);
@@ -1331,11 +1343,11 @@ td.kd-td {
   min-width: 100px;
 }
 
-.kd-section-divider-title:focus {
+.kd-section-divider-title:focus, .kd-pinned-section-title:focus {
   border-bottom: 1px dashed var(--kd-border);
 }
 
-.kd-section-divider-actions {
+.kd-section-divider-actions, .kd-pinned-section-actions {
   display: flex;
   gap: 4px;
 }

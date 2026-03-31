@@ -254,9 +254,15 @@ var SimPins = (function() {
 
   // ── Initialisation ─────────────────────────────────────────────────────────
 
+  var _initRetries = 0;
   function init() {
     if (typeof TurasPins === "undefined" || typeof TurasPins.init !== "function") {
-      console.error("[SimPins] TurasPins shared library not loaded. Pin functionality unavailable.");
+      if (_initRetries < 5) {
+        _initRetries++;
+        setTimeout(init, 200);
+        return;
+      }
+      console.error("[SimPins] TurasPins shared library not loaded after retries. Pin functionality unavailable.");
       return;
     }
 

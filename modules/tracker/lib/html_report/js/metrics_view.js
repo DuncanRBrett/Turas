@@ -472,7 +472,7 @@ function applyChartSegmentState(panel) {
       el.style.display = isVisible ? "" : "none";
     });
     chartArea.querySelectorAll(".tk-chart-legend-item[data-segment=\"" + seg + "\"]").forEach(function(el) {
-      el.style.display = isVisible ? "" : "none";
+      el.style.opacity = isVisible ? "1" : "0.35";
     });
   }
 
