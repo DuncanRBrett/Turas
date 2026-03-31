@@ -68,7 +68,8 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Robo
 .summary-editor { min-height: 80px; }
 .summary-section-controls { float: right; display: flex; gap: 6px; opacity: 0; transition: opacity 0.2s; }
 .summary-insight-box:hover .summary-section-controls,
-.summary-insight-box.has-content .summary-section-controls { opacity: 1; }
+.summary-insight-box.has-content .summary-section-controls,
+.dash-section:hover .summary-section-controls { opacity: 1; }
 /* Hover hints for editable content */
 .summary-editor { cursor: text; position: relative; }
 .summary-editor:hover::after {
@@ -462,11 +463,11 @@ body.hide-sparklines .tk-sparkline-wrap { display: none; }
 .insight-md-rendered p { margin: 0 0 6px; }
 .insight-dismiss:hover { color: #c0392b; }
 
-/* ---- SECTION DIVIDERS (Pinned Views) ---- */
-.section-divider { display: flex; align-items: center; gap: 12px; padding: 12px 0; margin: 8px 0; border-bottom: 2px solid var(--brand); }
-.section-divider-title { font-size: 16px; font-weight: 600; color: var(--brand); flex: 1; outline: none; min-width: 100px; }
-.section-divider-title:focus { border-bottom: 1px dashed var(--border); }
-.section-divider-actions { display: flex; gap: 4px; }
+/* ---- SECTION DIVIDERS (Pinned Views) — shared renderer uses pinned-section-* ---- */
+.section-divider, .pinned-section-divider { display: flex; align-items: center; gap: 12px; padding: 12px 0; margin: 8px 0; border-bottom: 2px solid var(--brand); }
+.section-divider-title, .pinned-section-title { font-size: 16px; font-weight: 600; color: var(--brand); flex: 1; outline: none; min-width: 100px; }
+.section-divider-title:focus, .pinned-section-title:focus { border-bottom: 1px dashed var(--border); }
+.section-divider-actions, .pinned-section-actions { display: flex; gap: 4px; }
 
 /* ---- PINNED VIEWS ---- */
 .pinned-tab-content { padding: 24px; max-width: 1400px; margin: 0 auto; }
@@ -485,8 +486,12 @@ body.hide-sparklines .tk-sparkline-wrap { display: none; }
 /* Export menu items (Visualise tab unified export dropdown) */
 .export-menu-item { display: block; width: 100%; text-align: left; padding: 8px 14px; border: none; background: none; cursor: pointer; font-size: 12px; font-family: inherit; color: #374151; transition: background 0.1s; }
 .export-menu-item:hover { background: #f1f5f9; }
+/* Shared renderer button styles */
+.pinned-remove-btn, .pinned-action-btn { background: none; border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer; color: var(--text-muted); transition: all 0.15s; }
+.pinned-remove-btn:hover { color: #e8614d; border-color: #e8614d; background: rgba(232,97,77,0.06); }
+.pinned-action-btn:hover { border-color: var(--text-muted); color: var(--text); background: #f8f9fa; }
 /* Drag and drop */
-.pinned-card[draggable="true"], .section-divider[draggable="true"] { cursor: grab; }
+.pinned-card[draggable="true"], .section-divider[draggable="true"], .pinned-section-divider[draggable="true"] { cursor: grab; }
 .pinned-card[draggable="true"]:active, .section-divider[draggable="true"]:active { cursor: grabbing; }
 .pin-dragging { opacity: 0.4; }
 .pin-drop-target { outline: 2px dashed var(--brand); outline-offset: 4px; }

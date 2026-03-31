@@ -102,6 +102,11 @@ build_overview_heatmap <- function(html_data, config) {
   banner_html <- c(banner_html, '</select>')
   banner_html <- c(banner_html, '</div>')
 
+  # Export button for Mode A heatmap
+  banner_html <- c(banner_html, '<div class="hm-control-group">')
+  banner_html <- c(banner_html, '<button class="export-btn" onclick="exportSummaryExcel()">&#x2B73; Export Excel</button>')
+  banner_html <- c(banner_html, '</div>')
+
   banner_html <- c(banner_html, '</div>')
 
   # ---- Wave chip bar ----

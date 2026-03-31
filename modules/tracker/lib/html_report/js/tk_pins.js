@@ -211,6 +211,10 @@
       }
     });
     if (TurasPins._initDragDrop) TurasPins._initDragDrop();
+    // Backward compat: expose pinnedViews as direct reference to internal array.
+    // External files (qualitative_slides.js, explorer_view.js, chart_controls.js,
+    // core_navigation.js) push directly to this array.
+    window.pinnedViews = TurasPins._getPinsRef();
   }
 
   if (document.readyState === "loading") {

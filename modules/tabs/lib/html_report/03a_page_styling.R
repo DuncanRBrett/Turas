@@ -328,25 +328,50 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     [draggable="true"]:active { cursor: grabbing; }
     /* Pin overflow menu */
     .pin-overflow-item:hover { background: #f1f5f9; }
-    /* Section dividers (pinned views) */
-    .section-divider { display: flex; align-items: center; gap: 12px; padding: 12px 0; margin: 8px 0; border-bottom: 2px solid BRAND; }
-    .section-divider-title { font-size: 16px; font-weight: 600; color: BRAND; flex: 1; outline: none; min-width: 100px; }
-    .section-divider-title:focus { border-bottom: 1px dashed #e2e8f0; }
-    .section-divider-actions { display: flex; gap: 4px; }
+    /* Section dividers — shared renderer uses pinned-section-divider */
+    .section-divider, .pinned-section-divider {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 0; margin: 8px 0;
+      border-bottom: 2px solid BRAND;
+    }
+    .section-divider-title, .pinned-section-title {
+      font-size: 16px; font-weight: 600; color: BRAND;
+      flex: 1; outline: none; min-width: 100px;
+    }
+    .section-divider-title:focus, .pinned-section-title:focus { border-bottom: 1px dashed #e2e8f0; }
+    .section-divider-actions, .pinned-section-actions { display: flex; gap: 4px; }
     /* Pinned view cards */
     .pinned-card {
       background: #ffffff; border: 1px solid #e8e5e0; border-radius: 8px;
       padding: 20px 24px; margin-bottom: 16px;
-      page-break-inside: avoid;
+      page-break-inside: avoid; cursor: grab;
+    }
+    .pinned-card-header {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; margin-bottom: 10px;
     }
     .pinned-card-title { font-size: 18px; font-weight: 600; color: #1e293b; margin-bottom: 2px; }
     .pinned-card-subtitle { font-size: 13px; font-weight: 400; color: #94a3b8; }
     .pinned-card-code { font-size: 11px; font-weight: 500; color: #94a3b8; margin-bottom: 4px; }
+    .pinned-card-actions { display: flex; gap: 4px; flex-shrink: 0; align-items: center; }
+    .pinned-remove-btn, .pinned-action-btn {
+      background: none; border: 1px solid #e2e8f0; border-radius: 4px;
+      padding: 3px 8px; font-size: 11px; cursor: pointer; color: #64748b;
+      transition: all 0.15s;
+    }
+    .pinned-remove-btn:hover { color: #e8614d; border-color: #e8614d; background: rgba(232,97,77,0.06); }
+    .pinned-action-btn:hover { border-color: #94a3b8; color: #374151; background: #f8f9fa; }
     .pinned-card-insight {
       margin-bottom: 12px; padding: 14px 20px;
       border-left: 3px solid BRAND; background: #f8fafa;
       border-radius: 0 6px 6px 0;
       font-size: 14px; line-height: 1.6; color: #1e293b;
+    }
+    .pinned-insight-rendered { cursor: text; min-height: 20px; }
+    .pinned-insight-editor {
+      width: 100%; border: 1px solid #e2e8f0; border-radius: 4px;
+      padding: 8px 12px; font-size: 13px; font-family: inherit;
+      line-height: 1.5; resize: vertical; min-height: 60px;
     }
     .pinned-card-chart { margin-bottom: 12px; }
     .pinned-card-chart svg { width: 100%; height: auto; }

@@ -1047,7 +1047,8 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
 /* SECTION DIVIDERS                                                  */
 /* ================================================================ */
 
-.seg-section-divider {
+/* Section dividers — shared TurasPins renderer uses seg-pinned-section-divider */
+.seg-section-divider, .seg-pinned-section-divider {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1056,20 +1057,20 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
   border-bottom: 2px solid var(--seg-brand);
 }
 
-.seg-section-divider-title {
+.seg-section-divider-title, .seg-pinned-section-title {
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--seg-brand);
   flex: 1;
   outline: none;
   min-width: 100px;
 }
 
-.seg-section-divider-title:focus {
+.seg-section-divider-title:focus, .seg-pinned-section-title:focus {
   border-bottom: 1px dashed var(--seg-border);
 }
 
-.seg-section-divider-actions {
+.seg-section-divider-actions, .seg-pinned-section-actions {
   display: flex;
   gap: 4px;
 }

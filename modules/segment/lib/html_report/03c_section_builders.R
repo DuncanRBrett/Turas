@@ -945,15 +945,6 @@ build_seg_overlap_section <- function(charts, html_data) {
     )
   )
 
-  # Include the SVG overlap heatmap chart if available
-  overlap_chart <- NULL
-  if (!is.null(charts) && !is.null(charts$overlap)) {
-    overlap_chart <- htmltools::tags$div(
-      class = "seg-chart-wrapper",
-      charts$overlap
-    )
-  }
-
   htmltools::tags$div(
     class = "seg-section",
     id = "seg-overlap",
@@ -963,13 +954,12 @@ build_seg_overlap_section <- function(charts, html_data) {
     htmltools::tags$p(
       class = "seg-section-intro",
       htmltools::HTML(paste0(
-        "Euclidean distances between segment centres in standardised space. ",
-        "Larger values indicate more distinct segments. Very low distances suggest ",
-        "two segments may be too similar to justify keeping them separate."
+        "Euclidean distances between segment centres (standardised). ",
+        "Higher values = more distinct segments. Low values suggest ",
+        "segments may be too similar to justify keeping separate."
       ))
     ),
     colour_key,
-    overlap_chart,
     overlap_table,
     pair_insights
   )

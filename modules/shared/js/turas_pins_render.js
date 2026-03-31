@@ -75,11 +75,17 @@
     return html;
   }
 
-  /** Card header: title + remove button + overflow menu (⋮) */
+  /** Card header: title + move arrows + remove button + overflow menu (⋮) */
   function _cardHeader(pid, title, idx, total, pfx) {
+    var moveHtml = "";
+    if (idx > 0) moveHtml += '<button class="' + pfx + '-action-btn" ' +
+      'onclick="TurasPins.move(\'' + pid + '\',-1)" title="Move up">\u25B2</button>';
+    if (idx < total - 1) moveHtml += '<button class="' + pfx + '-action-btn" ' +
+      'onclick="TurasPins.move(\'' + pid + '\',1)" title="Move down">\u25BC</button>';
     return '<div class="' + pfx + '-card-header">' +
       '<span class="' + pfx + '-card-title">' + TurasPins._escapeHtml(title) + '</span>' +
       '<div class="' + pfx + '-card-actions">' +
+        moveHtml +
         '<button class="' + pfx + '-remove-btn" onclick="TurasPins.remove(\'' +
           pid + '\')" title="Remove">&times;</button>' +
         _overflowMenu(pid, idx, total) +

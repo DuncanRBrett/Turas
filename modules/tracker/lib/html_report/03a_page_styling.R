@@ -32,6 +32,14 @@ local({
     source(file.path(ds_dir, "font_embed.R"), local = FALSE)
     source(file.path(ds_dir, "base_css.R"), local = FALSE)
   }
+  # Source shared TurasPins JS loader (needed by build_tracker_javascript)
+  pins_path <- file.path(turas_root, "modules", "shared", "lib", "turas_pins_js.R")
+  if (!file.exists(pins_path)) {
+    pins_path <- file.path("modules", "shared", "lib", "turas_pins_js.R")
+  }
+  if (!exists("turas_pins_js", mode = "function") && file.exists(pins_path)) {
+    source(pins_path, local = FALSE)
+  }
 })
 
 
