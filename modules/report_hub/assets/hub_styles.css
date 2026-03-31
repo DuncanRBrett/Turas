@@ -1003,6 +1003,13 @@ body {
 }
 
 /* --- Pin Content Areas --- */
+
+/* Neutral container for simulator content (grids, cards, styled divs).
+   No overflow, no table-specific rules — content's own styles control layout. */
+.hub-pin-content {
+  margin: 4px 0 2px;
+}
+
 .hub-pin-chart {
   margin: 4px 0 2px;
 }

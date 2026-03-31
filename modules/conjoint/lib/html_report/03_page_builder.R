@@ -1750,6 +1750,7 @@ build_conjoint_js <- function() {
     "simulator_charts.js",
     "conjoint_export.js",
     "cj_pins.js",
+    "cj_pins_print.js",
     "conjoint_charts.js"
   )
 

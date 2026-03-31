@@ -151,7 +151,11 @@
       html += '<div class="hub-pin-chart">' + TurasPins._sanitizeHtml(pin.chartSvg) + '</div>';
     }
     if (pin.tableHtml && showTable) {
-      html += '<div class="hub-pin-table">' + TurasPins._sanitizeHtml(pin.tableHtml) + '</div>';
+      // Use table-specific container for actual tables, neutral container for
+      // simulator content (grids, cards, styled divs) to avoid CSS conflicts
+      var isTable = /^\s*<table[\s>]/i.test(pin.tableHtml);
+      var cls = isTable ? "hub-pin-table" : "hub-pin-content";
+      html += '<div class="' + cls + '">' + TurasPins._sanitizeHtml(pin.tableHtml) + '</div>';
     }
 
     html += '</div>';
