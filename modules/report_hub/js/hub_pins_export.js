@@ -392,6 +392,50 @@
     img.src = url;
   }
 
+  // ── Clipboard Copy ────────────────────────────────────────────────────────
+
+  /**
+   * Copy a hub pin card to clipboard as PNG (for pasting into PowerPoint).
+   * Falls back to PNG download if clipboard API unavailable.
+   * @param {string} pinId - Pin ID
+   */
+  ReportHub.copyPinToClipboard = function(pinId) {
+    var pin = null;
+    for (var i = 0; i < ReportHub.pinnedItems.length; i++) {
+      if (ReportHub.pinnedItems[i].id === pinId) { pin = ReportHub.pinnedItems[i]; break; }
+    }
+    if (!pin) return;
+
+    TurasPins._exportToBlob(pin, function(blob) {
+      if (!blob) {
+        TurasPins._showToast("Could not render pin");
+        return;
+      }
+      if (navigator.clipboard && navigator.clipboard.write) {
+        navigator.clipboard.write([
+          new ClipboardItem({ "image/png": blob })
+        ]).then(function() {
+          TurasPins._showToast("Copied to clipboard");
+        }).catch(function() {
+          _downloadFallback(blob, pin);
+        });
+      } else {
+        _downloadFallback(blob, pin);
+      }
+    });
+  };
+
+  function _downloadFallback(blob, pin) {
+    var title = pin.title || pin.qTitle || "pinned";
+    var slug = title.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 40);
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "pinned_" + slug + ".png";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+    TurasPins._showToast("Downloaded (clipboard unavailable)");
+  }
+
   // ── PowerPoint Export (delegates to shared TurasPins PPTX engine) ──────────
 
   /**
