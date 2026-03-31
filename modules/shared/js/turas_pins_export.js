@@ -280,17 +280,21 @@
   /**
    * Render HTML content to a canvas image for pixel-perfect export.
    *
-   * Uses Blob URL (not data URI) for the SVG, which avoids encoding
-   * issues that cause data URI foreignObject to fail silently.
-   * Renders the HTML off-screen with full stylesheet context first,
-   * then captures via foreignObject SVG → Blob URL → Image → canvas.
+   * Two-phase approach:
+   * Phase 1: Render HTML off-screen with page's stylesheets applied,
+   *          then deep-clone with ALL computed styles inlined on every
+   *          element (since the SVG Blob has no stylesheet access).
+   * Phase 2: Serialize the styled clone via XMLSerializer (produces
+   *          well-formed XHTML), embed in SVG foreignObject, load via
+   *          Blob URL (not data URI — avoids encoding issues), render
+   *          to canvas.
    *
    * @param {string} html - Raw HTML content
    * @param {number} maxWidth - Container width in pixels
    * @param {function} callback - Called with {dataUrl, width, height} or null
    */
   function _renderHtmlToImage(html, maxWidth, callback) {
-    // 1. Render off-screen with full stylesheet context
+    // Phase 1: Render off-screen to capture computed styles
     var container = document.createElement("div");
     container.style.cssText =
       "position:absolute;left:-9999px;top:-9999px;width:" + maxWidth + "px;" +
@@ -308,19 +312,24 @@
     }
     height = Math.min(height, 1200);
 
-    // 2. Build SVG foreignObject using the live DOM innerHTML.
-    //    The key is using Blob URL (not data URI) — this avoids the
-    //    encoding/XHTML issues that break data URI foreignObject rendering.
-    var svgStr = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '">' +
-      '<foreignObject width="100%" height="100%">' +
-      '<div xmlns="http://www.w3.org/1999/xhtml" style="' +
-        'font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;' +
-        'font-size:13px;color:#1e293b;line-height:1.5;background:#fff;' +
-        'width:' + width + 'px;height:' + height + 'px;overflow:hidden;">' +
-      container.innerHTML +
-      '</div></foreignObject></svg>';
+    // Deep-clone with ALL computed styles inlined on every element.
+    // The SVG Blob is an independent document with no stylesheet access,
+    // so every style must be inline for the render to match.
+    var styledClone = _deepCloneWithStyles(container);
 
     document.body.removeChild(container);
+
+    // Phase 2: Serialize to XHTML and render via Blob URL
+    // XMLSerializer produces well-formed XML (self-closing tags)
+    // that foreignObject requires. innerHTML would produce HTML5
+    // with void elements that break SVG parsing.
+    styledClone.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
+    var xhtml = new XMLSerializer().serializeToString(styledClone);
+
+    var svgStr = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '">' +
+      '<foreignObject width="100%" height="100%">' +
+      xhtml +
+      '</foreignObject></svg>';
 
     // 3. Use Blob URL — critically different from data URI.
     //    Blob URLs handle encoding transparently, avoiding the malformed
@@ -349,6 +358,39 @@
       callback(null);
     };
     img.src = url;
+  }
+
+  /**
+   * Deep-clone a DOM tree with ALL computed styles inlined on every element.
+   * Required because the SVG Blob is loaded as an independent document
+   * with no access to the page's stylesheets.
+   */
+  function _deepCloneWithStyles(original) {
+    var clone = original.cloneNode(true);
+    var origEls = original.querySelectorAll("*");
+    var cloneEls = clone.querySelectorAll("*");
+    _inlineAllStyles(original, clone);
+    for (var i = 0; i < origEls.length; i++) {
+      _inlineAllStyles(origEls[i], cloneEls[i]);
+    }
+    return clone;
+  }
+
+  /**
+   * Copy ALL computed styles from source to target as inline styles.
+   */
+  function _inlineAllStyles(source, target) {
+    if (source.nodeType !== 1) return;
+    var cs;
+    try { cs = window.getComputedStyle(source); } catch (e) { return; }
+    var cssText = "";
+    for (var i = 0; i < cs.length; i++) {
+      var prop = cs[i];
+      var val = cs.getPropertyValue(prop);
+      if (!val) continue;
+      cssText += prop + ":" + val + ";";
+    }
+    target.setAttribute("style", cssText);
   }
 
   /** Assemble export SVG from layout */
