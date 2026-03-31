@@ -74,9 +74,16 @@
     var tableTopY = chartInfo.bottomY + (chartInfo.h > 0 ? 4 : 0);
     var mode = pin.pinMode || "all";
     var tData = null, estTH = 0;
+    var htmlFallback = null;
     if (pin.tableHtml && (mode === "all" || mode === "table_insight")) {
       tData = TurasPins._extractTableData(pin.tableHtml);
-      if (tData && tData.length > 0) estTH = 34 + (tData.length - 1) * 28 + 4;
+      if (tData && tData.length > 0) {
+        estTH = 34 + (tData.length - 1) * 28 + 4;
+      } else if (pin.tableHtml.trim().length > 0) {
+        // HTML content that isn't a table — measure and flag for foreignObject render
+        htmlFallback = _measureHtmlContent(pin.tableHtml, usableW);
+        if (htmlFallback) estTH = htmlFallback.height + 8;
+      }
     }
 
     return {
@@ -85,7 +92,7 @@
       insightY: contentTop, insightH: insightH, insightEl: insightEl,
       imgTopY: imgTopY, imgDispW: imgDispW, imgDispH: imgDispH,
       chartTopY: chartTopY, chart: chartInfo,
-      tableTopY: tableTopY, tData: tData,
+      tableTopY: tableTopY, tData: tData, htmlFallback: htmlFallback,
       totalH: Math.max(tableTopY + estTH + pad, 160)
     };
   }
@@ -247,6 +254,87 @@
     } else { doExport(0, 0); }
   };
 
+  /**
+   * Measure HTML content that isn't a table by rendering it off-screen.
+   * Collects computed styles so the foreignObject render looks correct.
+   */
+  function _measureHtmlContent(html, maxWidth) {
+    var container = document.createElement("div");
+    container.style.cssText =
+      "position:absolute;left:-9999px;top:-9999px;width:" + maxWidth + "px;" +
+      "font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;" +
+      "font-size:13px;color:#1e293b;line-height:1.5;";
+    container.innerHTML = TurasPins._sanitizeHtml(html);
+    document.body.appendChild(container);
+
+    // Collect computed styles from rendered elements for inline embedding
+    var styledHtml = _inlineComputedStyles(container);
+    var height = container.offsetHeight;
+
+    document.body.removeChild(container);
+
+    if (height <= 0) return null;
+    return { html: styledHtml, height: Math.min(height, 800), width: maxWidth };
+  }
+
+  /**
+   * Walk DOM tree and inline critical computed styles so foreignObject
+   * renders correctly when the SVG is serialized to a data URI.
+   */
+  function _inlineComputedStyles(root) {
+    var copy = root.cloneNode(true);
+    var origEls = root.querySelectorAll("*");
+    var copyEls = copy.querySelectorAll("*");
+
+    for (var i = 0; i < origEls.length; i++) {
+      var cs = window.getComputedStyle(origEls[i]);
+      var inline = "";
+      // Capture the visual properties that matter
+      var props = [
+        "display", "flex-direction", "flex-wrap", "justify-content", "align-items",
+        "gap", "padding", "margin", "width", "max-width", "min-width",
+        "height", "max-height", "font-size", "font-weight", "font-family",
+        "color", "background-color", "background", "border", "border-radius",
+        "text-align", "line-height", "box-sizing", "overflow",
+        "grid-template-columns", "grid-gap"
+      ];
+      for (var j = 0; j < props.length; j++) {
+        var val = cs.getPropertyValue(props[j]);
+        if (val && val !== "normal" && val !== "none" && val !== "0px" &&
+            val !== "auto" && val !== "rgba(0, 0, 0, 0)" && val !== "transparent") {
+          inline += props[j] + ":" + val + ";";
+        }
+      }
+      if (inline) {
+        var existing = copyEls[i].getAttribute("style") || "";
+        copyEls[i].setAttribute("style", existing + inline);
+      }
+    }
+    return copy.innerHTML;
+  }
+
+  /**
+   * Add HTML content to SVG via foreignObject.
+   * This renders arbitrary HTML (gauges, sig cards, simulator results)
+   * that doesn't fit the table or chart extraction pathways.
+   */
+  function _addHtmlFallback(svg, htmlFallback, x, y, w, h) {
+    var fo = document.createElementNS(NS, "foreignObject");
+    fo.setAttribute("x", x);
+    fo.setAttribute("y", y);
+    fo.setAttribute("width", w);
+    fo.setAttribute("height", h);
+
+    var body = document.createElementNS("http://www.w3.org/1999/xhtml", "div");
+    body.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
+    body.setAttribute("style",
+      "font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;" +
+      "font-size:13px;color:#1e293b;line-height:1.5;overflow:hidden;width:" + w + "px;");
+    body.innerHTML = htmlFallback.html;
+    fo.appendChild(body);
+    svg.appendChild(fo);
+  }
+
   /** Assemble export SVG from layout */
   function _assembleSVG(pin, L, W) {
     var font = "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
@@ -270,6 +358,14 @@
       var actH = TurasPins._renderTableSVG(svg, L.tData, L.pad, L.tableTopY, L.usableW);
       if (L.tableTopY + actH + L.pad > L.totalH) {
         L.totalH = L.tableTopY + actH + L.pad;
+        bg.setAttribute("height", L.totalH);
+        svg.setAttribute("viewBox", "0 0 " + W + " " + L.totalH);
+      }
+    } else if (L.htmlFallback) {
+      _addHtmlFallback(svg, L.htmlFallback, L.pad, L.tableTopY, L.usableW, L.htmlFallback.height);
+      var newH = L.tableTopY + L.htmlFallback.height + L.pad;
+      if (newH > L.totalH) {
+        L.totalH = newH;
         bg.setAttribute("height", L.totalH);
         svg.setAttribute("viewBox", "0 0 " + W + " " + L.totalH);
       }
