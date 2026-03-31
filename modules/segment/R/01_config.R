@@ -105,6 +105,16 @@ read_segment_config <- function(config_file) {
 
   config <- load_config_sheet(config_file, sheet_name = "Config")
 
+  # Resolve relative data_file paths against the config file's directory
+  if (!is.null(config$data_file) && nzchar(config$data_file) &&
+      !file.exists(config$data_file)) {
+    config_dir <- dirname(normalizePath(config_file, winslash = "/", mustWork = FALSE))
+    candidate <- file.path(config_dir, config$data_file)
+    if (file.exists(candidate)) {
+      config$data_file <- normalizePath(candidate, winslash = "/", mustWork = FALSE)
+    }
+  }
+
   if (length(config) == 0) {
     segment_refuse(
       code = "CFG_EMPTY_CONFIG",

@@ -18,6 +18,19 @@ local({
   }
 })
 
+# Source shared TurasPins JS loader (TURAS_ROOT-aware)
+local({
+  turas_root <- Sys.getenv("TURAS_ROOT", "")
+  if (!nzchar(turas_root)) turas_root <- getwd()
+  pins_path <- file.path(turas_root, "modules", "shared", "lib", "turas_pins_js.R")
+  if (!file.exists(pins_path)) {
+    pins_path <- file.path("modules", "shared", "lib", "turas_pins_js.R")
+  }
+  if (!exists("turas_pins_js", mode = "function") && file.exists(pins_path)) {
+    source(pins_path, local = FALSE)
+  }
+})
+
 # File-level helper: escape strings for safe insertion into JS single-quoted literals
 js_esc <- function(s) gsub("'", "\\\\'", gsub("\\\\", "\\\\\\\\", as.character(s)))
 
@@ -220,12 +233,19 @@ build_javascript <- function(html_data, brand_colour = "#323367") {
   # Global brand colour variable — all JS files reference this instead of hardcoded hex
   brand_colour_js <- sprintf('var BRAND_COLOUR = "%s";\n', brand_colour)
 
+  # Load shared TurasPins library (required by tabs_pins.js)
+  shared_pins_js <- if (exists("turas_pins_js", mode = "function")) turas_pins_js() else ""
+
   js_full <- paste0(
     brand_colour_js,
+    shared_pins_js,
     build_js_core_navigation(),
     build_js_chart_picker(),
     build_js_slide_export(),
-    build_js_pinned_views(),
+    read_js_file("tabs_pins.js"),
+    read_js_file("tabs_pins_dashboard.js"),
+    read_js_file("tabs_qual_slides.js"),
+    read_js_file("tabs_pins_print.js"),
     build_js_table_export_and_init()
   )
 
@@ -315,15 +335,15 @@ build_js_slide_export <- function() {
 }
 
 
-#' Build Pinned Views JavaScript
+#' Build Pinned Views JavaScript (Legacy — now handled by TurasPins shared library)
 #'
-#' Pin/unpin questions, render pinned view cards, reorder, persist to JSON,
-#' export all pinned views as individual slide PNGs.
+#' Pin functionality is now provided by tabs_pins.js, tabs_pins_dashboard.js,
+#' and tabs_pins_print.js, loaded directly in build_javascript().
 #'
-#' @return Character string of JavaScript code
+#' @return Empty string (retained for backward compatibility)
 #' @keywords internal
 build_js_pinned_views <- function() {
-  read_js_file("pinned_views.js")
+  ""
 }
 
 

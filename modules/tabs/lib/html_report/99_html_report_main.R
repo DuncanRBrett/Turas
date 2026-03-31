@@ -42,7 +42,9 @@
 
 # Also check for required JS files
 .hr_required_js <- c("core_navigation.js", "chart_picker.js", "slide_export.js",
-                      "pinned_views.js", "table_export_init.js")
+                      "tabs_pins.js", "tabs_pins_dashboard.js",
+                      "tabs_qual_slides.js", "tabs_pins_print.js",
+                      "table_export_init.js")
 
 .hr_missing <- character(0)
 for (.hr_file in .hr_required_files) {

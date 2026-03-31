@@ -21,6 +21,19 @@ local({
   }
 })
 
+# Source shared TurasPins JS loader (TURAS_ROOT-aware)
+local({
+  turas_root <- Sys.getenv("TURAS_ROOT", "")
+  if (!nzchar(turas_root)) turas_root <- getwd()
+  pins_path <- file.path(turas_root, "modules", "shared", "lib", "turas_pins_js.R")
+  if (!file.exists(pins_path)) {
+    pins_path <- file.path("modules", "shared", "lib", "turas_pins_js.R")
+  }
+  if (!exists("turas_pins_js", mode = "function") && file.exists(pins_path)) {
+    source(pins_path, local = FALSE)
+  }
+})
+
 
 #' Build Tracker HTML Page
 #'

@@ -171,9 +171,17 @@ build_tracker_javascript <- function(html_data, config = NULL) {
   brand_colour <- if (!is.null(config)) (get_setting(config, "brand_colour", default = "#323367") %||% "#323367") else "#323367"
   js_parts <- c(js_parts, sprintf('var BRAND_COLOUR_HEX = "%s";', brand_colour))
 
+  # Load shared TurasPins library (required by tk_pins.js)
+  shared_pins_js <- if (exists("turas_pins_js", mode = "function")) turas_pins_js() else ""
+  if (nzchar(shared_pins_js)) {
+    js_parts <- c(js_parts, sprintf("\n/* === TurasPins Shared Library === */\n%s", shared_pins_js))
+  }
+
   # Metric nav filter functions loaded from external JS file (first in list)
   js_files <- c("metric_nav_filter.js",
-                 "tab_navigation.js", "metrics_view.js", "pinned_views.js",
+                 "tab_navigation.js", "metrics_view.js",
+                 "tk_pins.js", "tk_pins_extras.js",
+                 "tk_summary_export.js",
                  "core_navigation.js", "chart_controls.js",
                  "chart_tooltip.js", "qualitative_slides.js",
                  "annotations.js", "heatmap_view.js",
