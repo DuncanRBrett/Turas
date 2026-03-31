@@ -280,15 +280,10 @@
   /**
    * Render HTML content to a canvas image for pixel-perfect export.
    *
-   * Pipeline:
-   * 1. Render HTML off-screen with the page's full stylesheet context
-   * 2. Deep-clone every DOM element with ALL computed styles inlined
-   * 3. Serialize to well-formed XHTML via XMLSerializer (not innerHTML)
-   * 4. Embed in SVG foreignObject and render via Image → canvas
-   *
-   * The XMLSerializer step is critical: innerHTML produces HTML5 which
-   * contains void elements (br, img, hr) that break SVG parsing.
-   * XMLSerializer produces well-formed XML that foreignObject requires.
+   * Uses Blob URL (not data URI) for the SVG, which avoids encoding
+   * issues that cause data URI foreignObject to fail silently.
+   * Renders the HTML off-screen with full stylesheet context first,
+   * then captures via foreignObject SVG → Blob URL → Image → canvas.
    *
    * @param {string} html - Raw HTML content
    * @param {number} maxWidth - Container width in pixels
@@ -299,7 +294,8 @@
     var container = document.createElement("div");
     container.style.cssText =
       "position:absolute;left:-9999px;top:-9999px;width:" + maxWidth + "px;" +
-      "background:#fff;";
+      "background:#fff;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;" +
+      "font-size:13px;color:#1e293b;line-height:1.5;";
     container.innerHTML = TurasPins._sanitizeHtml(html);
     document.body.appendChild(container);
 
@@ -312,29 +308,32 @@
     }
     height = Math.min(height, 1200);
 
-    // 2. Deep-clone with ALL computed styles inlined on every element
-    var styledClone = _deepCloneWithStyles(container);
+    // 2. Build SVG foreignObject using the live DOM innerHTML.
+    //    The key is using Blob URL (not data URI) — this avoids the
+    //    encoding/XHTML issues that break data URI foreignObject rendering.
+    var svgStr = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '">' +
+      '<foreignObject width="100%" height="100%">' +
+      '<div xmlns="http://www.w3.org/1999/xhtml" style="' +
+        'font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;' +
+        'font-size:13px;color:#1e293b;line-height:1.5;background:#fff;' +
+        'width:' + width + 'px;height:' + height + 'px;overflow:hidden;">' +
+      container.innerHTML +
+      '</div></foreignObject></svg>';
 
     document.body.removeChild(container);
 
-    // 3. Serialize to well-formed XHTML using XMLSerializer
-    //    innerHTML produces HTML5 (void tags like <br> break SVG parsing)
-    //    XMLSerializer produces valid XML (<br/>, <img/>) that foreignObject needs
-    var xhtmlBody = _serializeToXhtml(styledClone);
+    // 3. Use Blob URL — critically different from data URI.
+    //    Blob URLs handle encoding transparently, avoiding the malformed
+    //    XHTML issues that break data:image/svg+xml foreignObject rendering.
+    var svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+    var url = URL.createObjectURL(svgBlob);
 
-    // 4. Build SVG with foreignObject
-    var svgStr =
-      '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '">' +
-      '<foreignObject width="100%" height="100%">' +
-      xhtmlBody +
-      '</foreignObject></svg>';
-
-    // 5. Render SVG to canvas via Image
-    var url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgStr);
     var img = new Image();
     img.onload = function() {
-      var scale = TurasPins.QUALITY_PRESETS[TurasPins.EXPORT_QUALITY]
-        ? TurasPins.QUALITY_PRESETS[TurasPins.EXPORT_QUALITY].scale : 2;
+      URL.revokeObjectURL(url);
+      var preset = TurasPins.QUALITY_PRESETS[TurasPins.EXPORT_QUALITY] ||
+                   TurasPins.QUALITY_PRESETS.standard;
+      var scale = preset.scale;
       var c = document.createElement("canvas");
       c.width = width * scale;
       c.height = height * scale;
@@ -345,108 +344,11 @@
       callback({ dataUrl: c.toDataURL("image/png"), width: width, height: height });
     };
     img.onerror = function() {
-      console.error("[TurasPins] HTML-to-image render failed for foreignObject SVG");
+      URL.revokeObjectURL(url);
+      console.error("[TurasPins] HTML-to-image render failed");
       callback(null);
     };
     img.src = url;
-  }
-
-  /**
-   * Serialize a DOM element to well-formed XHTML string.
-   * Uses XMLSerializer which produces valid XML (self-closing tags,
-   * proper namespace declarations) required by SVG foreignObject.
-   *
-   * @param {Element} el - DOM element to serialize
-   * @returns {string} Well-formed XHTML string
-   */
-  function _serializeToXhtml(el) {
-    // Set XHTML namespace on the root so XMLSerializer produces valid output
-    el.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
-    var serializer = new XMLSerializer();
-    var xhtml = serializer.serializeToString(el);
-
-    // Fix any remaining issues:
-    // - Remove duplicate xmlns declarations that XMLSerializer may add to children
-    // - Ensure no broken namespace prefixes
-    xhtml = xhtml.replace(/ xmlns="http:\/\/www\.w3\.org\/1999\/xhtml"/g, "");
-    // Re-add xmlns only on the root element
-    xhtml = xhtml.replace(/^<div/, '<div xmlns="http://www.w3.org/1999/xhtml"');
-
-    return xhtml;
-  }
-
-  /**
-   * Deep-clone a DOM tree with ALL computed styles inlined on every element.
-   * This ensures foreignObject renders identically to the original when
-   * the SVG is serialized to a data URI (no stylesheet access).
-   */
-  function _deepCloneWithStyles(original) {
-    var clone = original.cloneNode(true);
-    var origEls = original.querySelectorAll("*");
-    var cloneEls = clone.querySelectorAll("*");
-
-    // Inline styles on the root container
-    _inlineAllStyles(original, clone);
-
-    // Inline styles on every descendant
-    for (var i = 0; i < origEls.length; i++) {
-      _inlineAllStyles(origEls[i], cloneEls[i]);
-    }
-
-    // Remove any SVG elements nested inside the HTML content —
-    // nested SVGs inside foreignObject can cause rendering issues.
-    // Convert them to inline images instead.
-    _convertNestedSvgsToImages(clone);
-
-    return clone;
-  }
-
-  /**
-   * Copy all computed styles from a source element to a target element
-   * as inline styles. Skips default/empty values for efficiency.
-   */
-  function _inlineAllStyles(source, target) {
-    if (source.nodeType !== 1) return; // Element nodes only
-    var cs;
-    try { cs = window.getComputedStyle(source); } catch (e) { return; }
-    var cssText = "";
-    for (var i = 0; i < cs.length; i++) {
-      var prop = cs[i];
-      var val = cs.getPropertyValue(prop);
-      if (!val || val === "initial" || val === "unset") continue;
-      // Skip animation/transition (not needed for static render)
-      if (prop.indexOf("animation") === 0 || prop.indexOf("transition") === 0) continue;
-      // Skip webkit-specific properties that add bloat
-      if (prop.indexOf("-webkit-text") === 0 || prop.indexOf("-webkit-tap") === 0) continue;
-      cssText += prop + ":" + val + ";";
-    }
-    target.setAttribute("style", cssText);
-  }
-
-  /**
-   * Convert nested SVG elements to inline PNG images.
-   * SVGs inside foreignObject can cause namespace conflicts and rendering
-   * failures. Converting them to raster images avoids this.
-   */
-  function _convertNestedSvgsToImages(root) {
-    var svgs = root.querySelectorAll("svg");
-    for (var i = svgs.length - 1; i >= 0; i--) {
-      var svgEl = svgs[i];
-      try {
-        var serializer = new XMLSerializer();
-        var svgStr = serializer.serializeToString(svgEl);
-        var dataUrl = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgStr);
-        var img = document.createElement("img");
-        img.setAttribute("src", dataUrl);
-        img.setAttribute("style", svgEl.getAttribute("style") || "");
-        img.setAttribute("width", svgEl.getAttribute("width") || "");
-        img.setAttribute("height", svgEl.getAttribute("height") || "");
-        if (svgEl.parentNode) svgEl.parentNode.replaceChild(img, svgEl);
-      } catch (e) {
-        // If serialization fails, just remove the SVG
-        if (svgEl.parentNode) svgEl.parentNode.removeChild(svgEl);
-      }
-    }
   }
 
   /** Assemble export SVG from layout */
