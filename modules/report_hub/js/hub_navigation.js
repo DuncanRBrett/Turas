@@ -74,6 +74,13 @@ var ReportHub = ReportHub || {};
         }
       };
 
+      // Switch TurasPins to hub mode — clears local pins, shows delegation message.
+      // Must happen AFTER pinToHub is set because TurasPins.init() already ran
+      // during the iframe's DOMContentLoaded (before the bridge was injected).
+      if (win.TurasPins && win.TurasPins._setHubMode) {
+        win.TurasPins._setHubMode();
+      }
+
       // Hide report headers and make nav strips sticky (hub provides its own header)
       var style = doc.createElement("style");
       style.textContent =

@@ -63,9 +63,37 @@
     TurasPins.add({
       metricId: "summary-kpi-cards",
       title: "Key Metrics at a Glance", metricTitle: "Key Metrics at a Glance",
-      tableHtml: container.outerHTML,
+      tableHtml: _wrapKpiStyles(container.outerHTML),
       chartSvg: "", chartVisible: false, insightText: ""
     });
+  }
+
+  /** Wrap KPI card HTML with embedded CSS for rendering outside tracker context. */
+  function _wrapKpiStyles(html) {
+    var brand = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() || "#323367";
+    var css = ".tk-hero-strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}" +
+      ".tk-hero-card{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:16px 20px;border-left:4px solid #94a3b8}" +
+      ".tk-hero-label{font-size:12px;font-weight:600;color:#64748b;margin-bottom:6px;line-height:1.3}" +
+      ".tk-hero-value-row{display:flex;align-items:baseline;gap:12px}" +
+      ".tk-hero-value{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}" +
+      ".tk-hero-delta{font-size:13px;font-weight:600}" +
+      ".tk-hero-sparkline{margin-top:8px}" +
+      ".tk-hero-sparkline svg{display:block;width:100%;height:auto}" +
+      ".tk-hero-primary .tk-hero-value{font-size:32px}" +
+      ".tk-hero-primary .tk-hero-card{padding:20px 24px}" +
+      ".tk-hero-secondary .tk-hero-card{padding:12px 16px}" +
+      ".tk-hero-secondary .tk-hero-value{font-size:22px}" +
+      ".tk-hero-secondary .tk-hero-label{font-size:11px}";
+    return '<div style="font-family:Inter,system-ui,-apple-system,sans-serif;"><style>' + css + '</style>' + html + '</div>';
+  }
+
+  /** Wrap sig change card HTML with embedded CSS for rendering outside tracker context. */
+  function _wrapSigStyles(html) {
+    var css = ".dash-sig-card{background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:12px 16px;border-left:3px solid #059669;margin-bottom:8px}" +
+      ".dash-sig-metric-badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:rgba(26,39,68,0.06);color:#1a2744;letter-spacing:0.5px}" +
+      ".dash-sig-text{font-size:12px;color:#1e293b;line-height:1.4}" +
+      ".dash-sig-grid{display:grid;gap:8px}";
+    return '<div style="font-family:Inter,system-ui,-apple-system,sans-serif;"><style>' + css + '</style>' + html + '</div>';
   }
 
   // ── Significant Changes ───────────────────────────────────────────────────
@@ -96,7 +124,7 @@
     TurasPins.add({
       metricId: "summary-sig-change-" + sigId,
       title: "Sig Change: " + title, metricTitle: "Sig Change: " + title,
-      tableHtml: clone.outerHTML,
+      tableHtml: _wrapSigStyles(clone.outerHTML),
       chartSvg: "", chartVisible: false, insightText: ""
     });
   };
@@ -120,7 +148,7 @@
     TurasPins.add({
       metricId: "summary-sig-changes",
       title: "Significant Changes", metricTitle: "Significant Changes",
-      tableHtml: wrapper.outerHTML,
+      tableHtml: _wrapSigStyles(wrapper.outerHTML),
       chartSvg: "", chartVisible: false, insightText: ""
     });
   };

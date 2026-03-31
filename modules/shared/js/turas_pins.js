@@ -262,6 +262,18 @@
       'the combined report pin reel.</div></div>';
   };
 
+  /**
+   * Switch to hub mode after bridge injection.
+   * Called by hub_navigation.js injectBridge() — handles the timing issue where
+   * TurasPins.init() runs before window.pinToHub is set on the iframe.
+   */
+  TurasPins._setHubMode = function() {
+    if (_hubMode) return;
+    _hubMode = true;
+    _pins = [];
+    TurasPins._renderHubDelegation();
+  };
+
   /** Direct access to internal pins array (for hub backward compat). */
   TurasPins._getPinsRef = function(newPins) {
     if (newPins !== undefined) _pins = newPins;
