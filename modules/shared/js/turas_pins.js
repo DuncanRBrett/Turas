@@ -258,8 +258,8 @@
       '<div style="font-size:32px;margin-bottom:12px;">\uD83D\uDCCC</div>' +
       '<div style="font-size:15px;font-weight:600;color:#334155;margin-bottom:8px;">' +
       'Pinned views are in the combined report</div>' +
-      '<div style="font-size:13px;">Pin items from this report and view them in ' +
-      "the Report Hub's Pinned Views tab.</div></div>";
+      '<div style="font-size:13px;">In combined reports, pins can be found in ' +
+      'the combined report pin reel.</div></div>';
   };
 
   /** Direct access to internal pins array (for hub backward compat). */

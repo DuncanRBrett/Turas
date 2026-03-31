@@ -62,6 +62,12 @@
     }
     container.innerHTML = html;
 
+    // Force SVGs to fill container — matches shared library pattern
+    container.querySelectorAll(".hub-pin-chart svg").forEach(function(s) {
+      s.style.width = "100%";
+      s.style.height = "auto";
+    });
+
     // Force dark header theme on all pinned tables
     container.querySelectorAll(".hub-pin-table th").forEach(function(th) {
       th.style.backgroundColor = "#1a2744";

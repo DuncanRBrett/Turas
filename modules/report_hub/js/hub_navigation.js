@@ -274,7 +274,9 @@ var ReportHub = ReportHub || {};
                     hubPin.sourceLabel = label;
                     if (!hubPin.title) hubPin.title = hubPin.sectionTitle || hubPin.panelLabel || "Pinned View";
                     if (!hubPin.timestamp) hubPin.timestamp = Date.now();
-                    if (hubPin.tableHtml) {
+                    // Inline table styles for standard tables only — simulator
+                    // pins embed their own <style> block and are self-contained
+                    if (hubPin.tableHtml && !/<style[\s>]/i.test(hubPin.tableHtml)) {
                       hubPin.tableHtml = inlineTableStyles(doc, hubPin.tableHtml);
                     }
                     win.pinToHub(hubPin);
@@ -356,8 +358,9 @@ var ReportHub = ReportHub || {};
           el.setAttribute("style", existing + (existing ? ";" : "") + inlined.join(";"));
         }
 
-        // Remove class attributes — they mean nothing outside the report CSS
-        el.removeAttribute("class");
+        // Keep class attributes — hub CSS has rules targeting .ct-th, .ct-td,
+        // .ct-label-col, .ct-row-base, etc. that style tables in the pin reel.
+        // Inlined styles serve as fallback for properties hub CSS does not cover.
       }
 
       // Force table to fill container width
@@ -411,8 +414,9 @@ var ReportHub = ReportHub || {};
             if (!hubPin.timestamp) hubPin.timestamp = Date.now();
 
             // Inline computed styles on table HTML so it renders correctly
-            // outside the report's CSS context (the hub has no report CSS).
-            if (hubPin.tableHtml) {
+            // outside the report's CSS context. Skip for simulator pins that
+            // embed their own <style> block — they are self-contained.
+            if (hubPin.tableHtml && !/<style[\s>]/i.test(hubPin.tableHtml)) {
               hubPin.tableHtml = inlineTableStyles(store.ownerDocument, hubPin.tableHtml);
             }
 
