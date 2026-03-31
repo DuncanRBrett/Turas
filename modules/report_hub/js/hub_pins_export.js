@@ -392,4 +392,40 @@
     img.src = url;
   }
 
+  // ── PowerPoint Export (delegates to shared TurasPins PPTX engine) ──────────
+
+  /**
+   * Export all hub pinned items as a PowerPoint presentation.
+   * Temporarily proxies ReportHub.pinnedItems through TurasPins so the
+   * shared PPTX engine can access them via TurasPins.getAll().
+   */
+  ReportHub.exportPptx = function() {
+    if (typeof PptxGenJS === "undefined" || typeof TurasPins === "undefined" ||
+        typeof TurasPins.exportPptx !== "function") {
+      if (typeof TurasPins !== "undefined" && TurasPins._showToast) {
+        TurasPins._showToast("PowerPoint export not available");
+      }
+      return;
+    }
+
+    var items = ReportHub.pinnedItems;
+    if (!items || items.length === 0) {
+      TurasPins._showToast("No pins to export");
+      return;
+    }
+
+    // Proxy: temporarily override TurasPins.getAll() to return hub pins
+    var originalGetAll = TurasPins.getAll;
+    TurasPins.getAll = function() { return items; };
+
+    var reportTitle = document.title || "Combined Report";
+    TurasPins.exportPptx({
+      filename: reportTitle.replace(/[^a-zA-Z0-9 _-]/g, "").replace(/\s+/g, "_").substring(0, 60) + "_pins",
+      onComplete: function() {
+        // Restore original getAll
+        TurasPins.getAll = originalGetAll;
+      }
+    });
+  };
+
 })();

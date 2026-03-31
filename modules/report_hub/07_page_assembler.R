@@ -280,6 +280,11 @@ build_pinned_panel <- function() {
     <div class="hub-pinned-toolbar" id="hub-pinned-toolbar" style="display:none;">
       <button class="hub-toolbar-btn" onclick="ReportHub.addSection()">+ Add Section</button>
       <button class="hub-toolbar-btn" onclick="ReportHub.exportAllPins()">Export All as PNGs</button>
+      <select class="hub-toolbar-btn" id="hub-pptx-quality" title="Export quality" onchange="if(typeof TurasPins!==\'undefined\')TurasPins.EXPORT_QUALITY=this.value" style="cursor:pointer;">
+        <option value="standard">Standard quality</option>
+        <option value="high">High quality</option>
+      </select>
+      <button class="hub-toolbar-btn" onclick="ReportHub.exportPptx()">&#128202; Export as PowerPoint</button>
       <button class="hub-toolbar-btn" onclick="window.print()">Print / PDF</button>
     </div>
     <div id="hub-pinned-cards"></div>
