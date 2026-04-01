@@ -435,12 +435,14 @@
       ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
       ctx.drawImage(img, 0, 0, c.width, c.height);
       if (imgOvl) {
+        console.log("[DIAG overlay] loading image, dataUrl length:", imgOvl.data ? imgOvl.data.length : 0);
         var pi = new Image();
         pi.onload = function() {
+          console.log("[DIAG overlay] loaded OK:", pi.naturalWidth, "x", pi.naturalHeight, "drawing at:", imgOvl.x * scale, imgOvl.y * scale, imgOvl.w * scale, imgOvl.h * scale);
           ctx.drawImage(pi, imgOvl.x * scale, imgOvl.y * scale, imgOvl.w * scale, imgOvl.h * scale);
           callback(c);
         };
-        pi.onerror = function() { callback(c); };
+        pi.onerror = function(e) { console.error("[DIAG overlay] FAILED to load:", e); callback(c); };
         pi.src = imgOvl.data;
       } else { callback(c); }
     };
