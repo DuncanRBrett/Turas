@@ -341,12 +341,14 @@
       return;
     }
 
-    // Render off-screen but VISIBLE — html2canvas skips visibility:hidden.
-    // Position off-screen with overflow:hidden on body to prevent scrollbars.
+    // Render off-screen but fully visible — html2canvas needs opacity:1 to
+    // capture content correctly (it faithfully renders opacity, so 0.001
+    // produces a near-transparent image). Position below the viewport fold
+    // so the user doesn't see the temporary element.
     var container = document.createElement("div");
     container.style.cssText =
-      "position:absolute;left:0;top:0;width:" + maxWidth + "px;" +
-      "z-index:-1;pointer-events:none;opacity:0.001;" +
+      "position:fixed;left:0;top:100vh;width:" + maxWidth + "px;" +
+      "z-index:-1;pointer-events:none;" +
       "background:#fff;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;" +
       "font-size:13px;color:#1e293b;line-height:1.5;";
     container.innerHTML = TurasPins._sanitizeHtml(html);
