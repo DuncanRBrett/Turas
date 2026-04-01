@@ -85,28 +85,29 @@
       chartSvg = new XMLSerializer().serializeToString(svgClone);
     }
 
-    // Table HTML
+    // Table HTML (with portable styles for hub)
     var tableHtml = "";
     var tableEl = section.querySelector("table.kd-table, table.kd-comp-table, table.kd-quadrant-action-table");
     if (tableEl) {
       var tableClone = tableEl.cloneNode(true);
-      var hidden = tableClone.querySelectorAll(
-        'tr[style*="display: none"], tr[style*="display:none"]'
-      );
-      hidden.forEach(function(row) { row.remove(); });
-      tableHtml = tableClone.outerHTML;
+      var portableHtml = TurasPins.capturePortableHtml(tableEl, tableClone);
+      var tableTemp = document.createElement("div");
+      tableTemp.innerHTML = portableHtml;
+      tableTemp.querySelectorAll('tr[style*="display: none"], tr[style*="display:none"]')
+        .forEach(function(row) { row.remove(); });
+      tableHtml = tableTemp.innerHTML;
     }
 
     // Overview card grids and insight elements
     if (sectionKey === "summary-cards" && !tableHtml && !chartSvg) {
       var cardGrid = section.querySelector(".kd-comp-cards");
-      if (cardGrid) tableHtml = '<div class="kd-pinned-exec-content">' + cardGrid.outerHTML + "</div>";
+      if (cardGrid) tableHtml = '<div class="kd-pinned-exec-content">' + TurasPins.capturePortableHtml(cardGrid) + "</div>";
     }
     if (sectionKey === "key-insights" && !tableHtml && !chartSvg) {
       var insightEls = section.querySelectorAll(".kd-comp-insight");
       if (insightEls.length > 0) {
         var insHtml = "";
-        insightEls.forEach(function(el) { insHtml += el.outerHTML; });
+        insightEls.forEach(function(el) { insHtml += TurasPins.capturePortableHtml(el); });
         tableHtml = '<div class="kd-pinned-exec-content">' + insHtml + "</div>";
       }
     }
@@ -115,16 +116,16 @@
     if (sectionKey === "exec-summary") {
       var execContent = "";
       var insightsList = section.querySelector(".kd-key-insights-heading");
-      if (insightsList && insightsList.parentElement) execContent += insightsList.parentElement.outerHTML;
+      if (insightsList && insightsList.parentElement) execContent += TurasPins.capturePortableHtml(insightsList.parentElement);
       var findingBox = section.querySelector(".kd-finding-box");
-      if (findingBox) execContent += findingBox.outerHTML;
+      if (findingBox) execContent += TurasPins.capturePortableHtml(findingBox);
       if (execContent) tableHtml = '<div class="kd-pinned-exec-content">' + execContent + "</div>";
     }
 
     // Diagnostics table
     if (sectionKey === "diagnostics" && !chartSvg) {
       var diagTable = section.querySelector("table.kd-diagnostics-table");
-      if (diagTable) tableHtml = diagTable.outerHTML;
+      if (diagTable) tableHtml = TurasPins.capturePortableHtml(diagTable);
     }
 
     // Metadata from panel stats or header badges

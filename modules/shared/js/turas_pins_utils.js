@@ -28,6 +28,14 @@ TurasPins.MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 /** Maximum image dimension after resize (px) */
 TurasPins.MAX_IMAGE_DIM = 1200;
 
+/** Current export quality preset key */
+TurasPins.EXPORT_QUALITY = "standard";
+/** Quality presets for PNG/PPTX export */
+TurasPins.QUALITY_PRESETS = {
+  standard: { format: "image/jpeg", quality: 0.85, scale: 2 },
+  high:     { format: "image/png",  quality: null,  scale: 3 }
+};
+
 // ── SVG Utilities ────────────────────────────────────────────────────────────
 
 /**
@@ -151,6 +159,73 @@ TurasPins._renderMarkdown = function(md) {
     return "<p>" + trimmed + "</p>";
   }).join("\n");
   return html;
+};
+
+// ── Portable HTML Capture ────────────────────────────────────────────────
+
+/**
+ * Create a portable HTML snapshot with all computed styles inlined.
+ * Use this at pin capture time to make HTML content render correctly
+ * in any context (e.g., hub combined report where the original CSS
+ * classes are not available).
+ *
+ * IMPORTANT: The liveElement must be attached to the DOM so that
+ * getComputedStyle returns actual computed values. If a clone is
+ * provided, styles are read from liveElement and written to clone.
+ *
+ * @param {Element} liveElement - Live DOM element (attached, with CSS applied)
+ * @param {Element} [clone] - Optional pre-built clone. If not provided, one is created.
+ * @returns {string} HTML string with all styles inlined
+ */
+TurasPins.capturePortableHtml = function(liveElement, clone) {
+  if (!liveElement) return "";
+  if (!clone) clone = liveElement.cloneNode(true);
+  var origEls = liveElement.querySelectorAll("*");
+  var cloneEls = clone.querySelectorAll("*");
+
+  // Read styles from LIVE element, write to clone
+  TurasPins._inlineCaptureStyles(liveElement, clone);
+  for (var i = 0; i < origEls.length; i++) {
+    TurasPins._inlineCaptureStyles(origEls[i], cloneEls[i]);
+  }
+  return clone.outerHTML;
+};
+
+/**
+ * Copy key visual computed styles from source to target as inline styles.
+ * Captures layout, typography, colour, borders — enough to render
+ * independently of any stylesheet.
+ * @param {Element} source - Live element with computed styles
+ * @param {Element} target - Clone element to receive inline styles
+ */
+TurasPins._inlineCaptureStyles = function(source, target) {
+  if (source.nodeType !== 1) return;
+  var cs;
+  try { cs = window.getComputedStyle(source); } catch (e) { return; }
+
+  var props = [
+    "display", "flex-direction", "flex-wrap", "justify-content", "align-items",
+    "gap", "padding", "margin", "width", "min-width", "max-width",
+    "height", "min-height", "font-size", "font-weight", "font-family",
+    "color", "background-color", "background", "border", "border-radius",
+    "border-collapse", "border-spacing", "text-align", "vertical-align",
+    "line-height", "letter-spacing", "text-transform", "white-space",
+    "overflow", "position", "top", "right", "bottom", "left",
+    "box-sizing", "opacity", "flex", "flex-shrink", "flex-grow"
+  ];
+
+  var cssText = "";
+  for (var i = 0; i < props.length; i++) {
+    var val = cs.getPropertyValue(props[i]);
+    if (val && val !== "normal" && val !== "none" && val !== "auto" &&
+        val !== "0px" && val !== "rgba(0, 0, 0, 0)" && val !== "transparent" &&
+        val !== "static" && val !== "visible" && val !== "content-box") {
+      cssText += props[i] + ":" + val + ";";
+    }
+  }
+  if (cssText) {
+    target.setAttribute("style", cssText);
+  }
 };
 
 // ── Toast Notification ───────────────────────────────────────────────────────

@@ -126,10 +126,17 @@ assemble_hub_html <- function(config, parsed_reports, overview_html, navigation_
   # The ~33% size overhead is the cost of guaranteed roundtrip safety
   # through unlimited create → edit → save → reopen cycles.
   for (parsed in parsed_reports) {
-    b64_html <- base64enc::base64encode(charToRaw(enc2utf8(parsed$raw_html)))
+    # Strip vendor JS (PptxGenJS) from embedded reports — loaded once at hub level
+    report_html <- parsed$raw_html
+    report_html <- gsub(
+      "/[*] TURAS_VENDOR_START [*]/.*?/[*] TURAS_VENDOR_END [*]/",
+      "/* vendor JS loaded at hub level */",
+      report_html
+    )
+    b64_html <- base64enc::base64encode(charToRaw(enc2utf8(report_html)))
     cat(sprintf("    Base64-encoded %s: %s -> %s\n",
                 parsed$report_key,
-                format_file_size(nchar(parsed$raw_html)),
+                format_file_size(nchar(report_html)),
                 format_file_size(nchar(b64_html))))
 
     parts <- c(parts, paste0(
@@ -273,6 +280,11 @@ build_pinned_panel <- function() {
     <div class="hub-pinned-toolbar" id="hub-pinned-toolbar" style="display:none;">
       <button class="hub-toolbar-btn" onclick="ReportHub.addSection()">+ Add Section</button>
       <button class="hub-toolbar-btn" onclick="ReportHub.exportAllPins()">Export All as PNGs</button>
+      <select class="hub-toolbar-btn" id="hub-pptx-quality" title="Export quality" onchange="if(typeof TurasPins!==\'undefined\')TurasPins.EXPORT_QUALITY=this.value" style="cursor:pointer;">
+        <option value="standard">Standard quality</option>
+        <option value="high">High quality</option>
+      </select>
+      <button class="hub-toolbar-btn" onclick="ReportHub.exportPptx()">&#128202; Export as PowerPoint</button>
       <button class="hub-toolbar-btn" onclick="window.print()">Print / PDF</button>
     </div>
     <div id="hub-pinned-cards"></div>

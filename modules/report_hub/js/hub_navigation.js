@@ -106,7 +106,22 @@ var ReportHub = ReportHub || {};
         "box-shadow:0 2px 12px rgba(0,0,0,0.2); transition:all 0.2s; " +
         "font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif; } " +
         ".hub-pin-float:hover { background:var(--hub-bridge-accent, #CC9900); " +
-        "transform:translateY(-1px); box-shadow:0 4px 16px rgba(0,0,0,0.25); }";
+        "transform:translateY(-1px); box-shadow:0 4px 16px rgba(0,0,0,0.25); } " +
+        // Hide inner report tabs that duplicate hub-level tabs (About, Pinned Views, Slides)
+        ".report-tab[data-tab='about'], " +
+        ".report-tab[data-tab='pinned'], " +
+        ".report-tab[data-tab='qualitative'], " +
+        ".report-tab[data-tab='slides'], " +
+        ".report-tab[data-tab='notes'], " +
+        ".cj-report-tab[data-tab='pinned'], " +
+        ".cj-report-tab[data-tab='slides'], " +
+        ".kd-report-tab[data-kd-tab='pinned'], " +
+        ".kd-report-tab[data-kd-tab='slides'], " +
+        ".cd-analysis-tab[data-tab='pinned'], " +
+        ".pin-count-badge " +
+        "{ display:none !important; } " +
+        "#tab-pinned, #tab-about, #tab-qualitative, #tab-slides, #tab-notes " +
+        "{ display:none !important; }";
       doc.head.appendChild(style);
 
       // Intercept the report's pin system via two mechanisms:

@@ -77,6 +77,28 @@
     }
     if (!pin) { if (onComplete) onComplete(); return; }
 
+    // Use shared _exportToBlob (html2canvas) for all pins.
+    // inlineTableStyles (run at pin-forwarding time inside the iframe)
+    // has already inlined all computed styles including significance
+    // markers, heatmap colours, and all CSS formatting. This makes
+    // the HTML self-contained and renderable at the hub level.
+    if (typeof TurasPins._exportToBlob === "function") {
+      TurasPins._exportToBlob(pin, function(blob) {
+        if (blob) {
+          var title = pin.title || pin.qTitle || "pinned";
+          var slug = title.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 40);
+          var a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = "pinned_" + slug + ".png";
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          URL.revokeObjectURL(a.href);
+        }
+        if (onComplete) onComplete();
+      });
+      return;
+    }
+
+    // Fallback: hub's own SVG renderer (no html2canvas available)
     if (pin.imageData) {
       var preImg = new Image();
       preImg.onload = function() {
@@ -391,5 +413,114 @@
     };
     img.src = url;
   }
+
+  // ── Hub Blob Export (for PPTX and clipboard) ───────────────────────────────
+
+  /**
+   * Export a hub pin to a PNG blob using the hub's own rendering pipeline.
+   * This uses buildExportSVG (same as PNG download) which has the table
+   * styles inlined at pin-forwarding time. The shared _exportToBlob would
+   * render at the hub level where module CSS classes don't exist.
+   *
+   * @param {string} pinId - Pin ID
+   * @param {function} callback - Called with Blob or null
+   */
+  function hubExportToBlob(pinId, callback) {
+    var pin = null;
+    for (var i = 0; i < ReportHub.pinnedItems.length; i++) {
+      if (ReportHub.pinnedItems[i].id === pinId) { pin = ReportHub.pinnedItems[i]; break; }
+    }
+    if (!pin) { callback(null); return; }
+
+    // Use the shared _exportToBlob which routes tableHtml through
+    // html2canvas. This preserves significance markers, heatmap colours,
+    // and all table formatting. The hub's inlineTableStyles (run at
+    // pin-forwarding time inside the iframe) has already inlined all
+    // computed styles, making the HTML self-contained and renderable
+    // at the hub level without module CSS classes.
+    if (typeof TurasPins._exportToBlob === "function") {
+      TurasPins._exportToBlob(pin, callback);
+      return;
+    }
+    callback(null);
+  }
+
+  // ── Clipboard Copy ────────────────────────────────────────────────────────
+
+  /**
+   * Copy a hub pin card to clipboard as PNG (for pasting into PowerPoint).
+   * Falls back to PNG download if clipboard API unavailable.
+   * @param {string} pinId - Pin ID
+   */
+  ReportHub.copyPinToClipboard = function(pinId) {
+    var pin = null;
+    for (var i = 0; i < ReportHub.pinnedItems.length; i++) {
+      if (ReportHub.pinnedItems[i].id === pinId) { pin = ReportHub.pinnedItems[i]; break; }
+    }
+    if (!pin) return;
+
+    hubExportToBlob(pinId, function(blob) {
+      if (!blob) {
+        TurasPins._showToast("Could not render pin");
+        return;
+      }
+      if (navigator.clipboard && navigator.clipboard.write) {
+        navigator.clipboard.write([
+          new ClipboardItem({ "image/png": blob })
+        ]).then(function() {
+          TurasPins._showToast("Copied to clipboard");
+        }).catch(function() {
+          _downloadFallback(blob, pin);
+        });
+      } else {
+        _downloadFallback(blob, pin);
+      }
+    });
+  };
+
+  function _downloadFallback(blob, pin) {
+    var title = pin.title || pin.qTitle || "pinned";
+    var slug = title.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 40);
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "pinned_" + slug + ".png";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+    TurasPins._showToast("Downloaded (clipboard unavailable)");
+  }
+
+  // ── PowerPoint Export (delegates to shared TurasPins PPTX engine) ──────────
+
+  /**
+   * Export all hub pinned items as a PowerPoint presentation.
+   * Temporarily proxies ReportHub.pinnedItems through TurasPins so the
+   * shared PPTX engine can access them via TurasPins.getAll().
+   */
+  ReportHub.exportPptx = function() {
+    if (typeof PptxGenJS === "undefined") {
+      TurasPins._showToast("PowerPoint export not available");
+      return;
+    }
+
+    var items = ReportHub.pinnedItems;
+    if (!items || items.length === 0) {
+      TurasPins._showToast("No pins to export");
+      return;
+    }
+
+    // Proxy TurasPins.getAll to return hub pins. The shared _exportToBlob
+    // (html2canvas) works correctly because inlineTableStyles has already
+    // inlined all CSS at pin-forwarding time inside the iframe.
+    var originalGetAll = TurasPins.getAll;
+    TurasPins.getAll = function() { return items; };
+
+    var reportTitle = document.title || "Combined Report";
+    TurasPins.exportPptx({
+      filename: reportTitle.replace(/[^a-zA-Z0-9 _-]/g, "").replace(/\s+/g, "_").substring(0, 60) + "_pins",
+      onComplete: function() {
+        TurasPins.getAll = originalGetAll;
+      }
+    });
+  };
 
 })();

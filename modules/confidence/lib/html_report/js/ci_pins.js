@@ -79,7 +79,7 @@
     var tableHtml = "";
     if (mode === "all" || mode === "table_insight") {
       var tableEl = source.querySelector(".ci-table") || source.querySelector("table");
-      if (tableEl) tableHtml = tableEl.outerHTML;
+      if (tableEl) tableHtml = TurasPins.capturePortableHtml(tableEl);
     }
 
     return {
