@@ -124,6 +124,7 @@
         '<span class="hub-source-badge ' + badgeClass + '">' + TurasPins._escapeHtml(badgeLabel) + '</span>' +
         '<span class="hub-pin-title">' + TurasPins._escapeHtml(title) + '</span>' +
         '<div class="hub-pin-actions">' +
+          '<button class="hub-action-btn" onclick="ReportHub.copyPinToClipboard(\'' + pid + '\')" title="Copy to clipboard">\uD83D\uDCCB</button>' +
           '<button class="hub-action-btn" onclick="ReportHub.exportPinCard(\'' + pid + '\')" title="Export as PNG">\uD83D\uDCF8</button>' +
           (idx > 0 ? '<button class="hub-action-btn" onclick="ReportHub.moveItemById(\'' + pid + '\',-1)" title="Move up">\u25B2</button>' : '') +
           (idx < total - 1 ? '<button class="hub-action-btn" onclick="ReportHub.moveItemById(\'' + pid + '\',1)" title="Move down">\u25BC</button>' : '') +

@@ -18,6 +18,18 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "8767", "--directory", "/Users/duncan/Documents/Turas"],
       "port": 8767
+    },
+    {
+      "name": "pptx-tests",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8768", "--directory", "/Users/duncan/Dev/Turas/modules/shared"],
+      "port": 8768
+    },
+    {
+      "name": "tabs-demo",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8769", "--directory", "/tmp/turas-test"],
+      "port": 8769
     }
   ]
 }

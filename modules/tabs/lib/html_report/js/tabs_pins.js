@@ -81,14 +81,24 @@
       };
     }
 
-    // Clone table, remove hidden elements
+    // Capture table with inline styles, then clean up the clone.
+    // capturePortableHtml must run BEFORE removing elements from the
+    // clone, because it reads from the live element and the element
+    // counts must match between live and clone.
     var tableClone = table ? table.cloneNode(true) : null;
-    if (tableClone) {
-      tableClone.querySelectorAll('[style*="display: none"], [style*="display:none"]')
+    var tablePortableHtml = "";
+    if (table && tableClone) {
+      // Inline styles first (live element → clone, matched by index)
+      tablePortableHtml = TurasPins.capturePortableHtml(table, tableClone);
+      // Now re-parse and remove unwanted elements from the styled HTML
+      var tableTemp = document.createElement("div");
+      tableTemp.innerHTML = tablePortableHtml;
+      tableTemp.querySelectorAll('[style*="display: none"], [style*="display:none"]')
         .forEach(function(el) { el.remove(); });
-      tableClone.querySelectorAll(".ct-row-excluded").forEach(function(el) { el.remove(); });
-      tableClone.querySelectorAll(".ct-sort-indicator, .row-exclude-btn, .ct-freq")
+      tableTemp.querySelectorAll(".ct-row-excluded").forEach(function(el) { el.remove(); });
+      tableTemp.querySelectorAll(".ct-sort-indicator, .row-exclude-btn, .ct-freq")
         .forEach(function(el) { el.remove(); });
+      tablePortableHtml = tableTemp.innerHTML;
     }
 
     // Chart SVG with viewBox fix
@@ -134,7 +144,7 @@
       excludedRows: excludedRows,
       insightText: insightText,
       sortState: tableSortState,
-      tableHtml: tableClone ? tableClone.outerHTML : "",
+      tableHtml: tablePortableHtml,
       chartSvg: chartSvgStr,
       baseText: baseText
     };

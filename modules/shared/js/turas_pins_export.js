@@ -74,9 +74,15 @@
     var tableTopY = chartInfo.bottomY + (chartInfo.h > 0 ? 4 : 0);
     var mode = pin.pinMode || "all";
     var tData = null, estTH = 0;
+    var hasHtmlContent = false;
     if (pin.tableHtml && (mode === "all" || mode === "table_insight")) {
-      tData = TurasPins._extractTableData(pin.tableHtml);
-      if (tData && tData.length > 0) estTH = 34 + (tData.length - 1) * 28 + 4;
+      if (pin.tableHtml.trim().length > 0) {
+        // Route ALL tableHtml through html2canvas for pixel-perfect export.
+        // The SVG table renderer (_extractTableData → _renderTableSVG) strips
+        // CSS formatting — header colours, significance markers, backgrounds.
+        // html2canvas preserves the full visual styling.
+        hasHtmlContent = true;
+      }
     }
 
     return {
@@ -85,13 +91,38 @@
       insightY: contentTop, insightH: insightH, insightEl: insightEl,
       imgTopY: imgTopY, imgDispW: imgDispW, imgDispH: imgDispH,
       chartTopY: chartTopY, chart: chartInfo,
-      tableTopY: tableTopY, tData: tData,
+      tableTopY: tableTopY, tData: tData, hasHtmlContent: hasHtmlContent,
       totalH: Math.max(tableTopY + estTH + pad, 160)
     };
   }
   function _build(pin, imgW, imgH, onComplete) {
     var L = _layout(pin, imgW, imgH);
     var W = TurasPins.EXPORT_WIDTH;
+
+    // If pin has HTML-only content (no SVG chart, no table), render it
+    // to an image first, then composite into the export
+    if (L.hasHtmlContent) {
+      _renderHtmlToImage(pin.tableHtml, L.usableW, function(result) {
+        if (result) {
+          var htmlImgW = Math.min(result.width, L.usableW);
+          var htmlImgH = Math.round(result.height * (htmlImgW / result.width));
+          L.totalH = L.tableTopY + htmlImgH + L.pad;
+          var svg = _assembleSVG(pin, L, W);
+          _toPNG(svg, pin, L.totalH, W,
+            { data: result.dataUrl, x: L.pad, y: L.tableTopY,
+              w: htmlImgW, h: htmlImgH },
+            L.titleText, onComplete);
+        } else {
+          var svg = _assembleSVG(pin, L, W);
+          _toPNG(svg, pin, L.totalH, W,
+            L.imgDispW > 0 ? { data: pin.imageData, x: L.pad, y: L.imgTopY,
+              w: L.imgDispW, h: L.imgDispH } : null,
+            L.titleText, onComplete);
+        }
+      });
+      return;
+    }
+
     var svg = _assembleSVG(pin, L, W);
     _toPNG(svg, pin, L.totalH, W,
       L.imgDispW > 0 ? { data: pin.imageData, x: L.pad, y: L.imgTopY,
@@ -202,24 +233,59 @@
   function _toPNG(svg, pin, totalH, W, imgOvl, titleText, onComplete) {
     _toCanvas(svg, totalH, W, imgOvl, pin.id, function(canvas) {
       if (!canvas) { if (onComplete) onComplete(); return; }
+      var preset = TurasPins.QUALITY_PRESETS[TurasPins.EXPORT_QUALITY] ||
+                   TurasPins.QUALITY_PRESETS.standard;
+      var ext = preset.format === "image/jpeg" ? ".jpg" : ".png";
+      var args = preset.quality !== null ? [preset.format, preset.quality] : [preset.format];
       canvas.toBlob(function(blob) {
         if (!blob) { if (onComplete) onComplete(); return; }
         var slug = titleText.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 40);
         var a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "pinned_" + slug + ".png";
+        a.download = "pinned_" + slug + ext;
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         URL.revokeObjectURL(a.href);
         if (onComplete) onComplete();
-      }, "image/png");
+      }, args[0], args[1]);
     });
   }
 
-  /** Export pin to PNG blob (for clipboard) */
+  /** Export pin to image blob (for clipboard or PPTX).
+   *  Respects TurasPins.EXPORT_QUALITY preset for format and resolution.
+   *  Delegates to _build for the rendering pipeline (including html2canvas
+   *  for HTML-only pins), then captures the result as a blob.
+   */
   TurasPins._exportToBlob = function(pin, callback) {
     if (!pin) { callback(null); return; }
     var doExport = function(iw, ih) {
       var L = _layout(pin, iw, ih);
+
+      // Pins with HTML content: render via html2canvas for pixel-perfect output
+      if (L.hasHtmlContent) {
+        _renderHtmlToImage(pin.tableHtml, L.usableW, function(result) {
+          if (result) {
+            var htmlImgW = Math.min(result.width, L.usableW);
+            var htmlImgH = Math.round(result.height * (htmlImgW / result.width));
+            L.totalH = L.tableTopY + htmlImgH + L.pad;
+            var W = TurasPins.EXPORT_WIDTH;
+            var svg = _assembleSVG(pin, L, W);
+            _toCanvas(svg, L.totalH, W,
+              { data: result.dataUrl, x: L.pad, y: L.tableTopY,
+                w: htmlImgW, h: htmlImgH },
+              pin.id, function(canvas) {
+                if (!canvas) { callback(null); return; }
+                var preset = TurasPins.QUALITY_PRESETS[TurasPins.EXPORT_QUALITY] ||
+                             TurasPins.QUALITY_PRESETS.standard;
+                var args = preset.quality !== null ? [preset.format, preset.quality] : [preset.format];
+                canvas.toBlob(function(blob) { callback(blob); }, args[0], args[1]);
+              });
+          } else {
+            callback(null);
+          }
+        });
+        return;
+      }
+
       var W = TurasPins.EXPORT_WIDTH;
       var svg = _assembleSVG(pin, L, W);
       _toCanvas(svg, L.totalH, W,
@@ -227,7 +293,10 @@
           w: L.imgDispW, h: L.imgDispH } : null,
         pin.id, function(canvas) {
           if (!canvas) { callback(null); return; }
-          canvas.toBlob(function(blob) { callback(blob); }, "image/png");
+          var preset = TurasPins.QUALITY_PRESETS[TurasPins.EXPORT_QUALITY] ||
+                       TurasPins.QUALITY_PRESETS.standard;
+          var args = preset.quality !== null ? [preset.format, preset.quality] : [preset.format];
+          canvas.toBlob(function(blob) { callback(blob); }, args[0], args[1]);
         });
     };
     if (pin.imageData) {
@@ -237,6 +306,69 @@
       pre.src = pin.imageData;
     } else { doExport(0, 0); }
   };
+
+  /**
+   * Render HTML content to a canvas image using html2canvas.
+   *
+   * foreignObject SVG approaches fail because the canvas gets tainted
+   * by cross-origin security restrictions (SecurityError on toDataURL).
+   * html2canvas avoids this entirely — it walks the DOM and draws to
+   * canvas using native 2D context commands (fillRect, fillText, etc.).
+   * No SVG, no Image loading, no cross-origin taint.
+   *
+   * @param {string} html - Raw HTML content
+   * @param {number} maxWidth - Container width in pixels
+   * @param {function} callback - Called with {dataUrl, width, height} or null
+   */
+  function _renderHtmlToImage(html, maxWidth, callback) {
+    if (typeof html2canvas === "undefined") {
+      console.warn("[TurasPins] html2canvas not available — HTML content cannot be exported");
+      callback(null);
+      return;
+    }
+
+    // Render off-screen but fully visible — html2canvas needs opacity:1 to
+    // capture content correctly (it faithfully renders opacity, so 0.001
+    // produces a near-transparent image). Position below the viewport fold
+    // so the user doesn't see the temporary element.
+    var container = document.createElement("div");
+    container.style.cssText =
+      "position:fixed;left:0;top:100vh;width:" + maxWidth + "px;" +
+      "z-index:-1;pointer-events:none;" +
+      "background:#fff;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;" +
+      "font-size:13px;color:#1e293b;line-height:1.5;";
+    container.innerHTML = TurasPins._sanitizeHtml(html);
+    document.body.appendChild(container);
+
+    var width = container.offsetWidth;
+    var height = container.offsetHeight;
+    if (height <= 0) {
+      document.body.removeChild(container);
+      callback(null);
+      return;
+    }
+    height = Math.min(height, 1200);
+
+    var preset = TurasPins.QUALITY_PRESETS[TurasPins.EXPORT_QUALITY] ||
+                 TurasPins.QUALITY_PRESETS.standard;
+
+    html2canvas(container, {
+      scale: preset.scale,
+      backgroundColor: "#ffffff",
+      width: width,
+      height: height,
+      logging: false,
+      useCORS: true
+    }).then(function(canvas) {
+      document.body.removeChild(container);
+      callback({ dataUrl: canvas.toDataURL("image/png"), width: width, height: height });
+    }).catch(function(err) {
+      console.error("[TurasPins] html2canvas render failed:", err);
+      document.body.removeChild(container);
+      console.error("[TurasPins] html2canvas failed:", err);
+      callback(null);
+    });
+  }
 
   /** Assemble export SVG from layout */
   function _assembleSVG(pin, L, W) {
@@ -270,7 +402,9 @@
 
   /** SVG to canvas with optional image overlay */
   function _toCanvas(svg, totalH, W, imgOvl, pinId, callback) {
-    var scale = TurasPins.EXPORT_RENDER_SCALE;
+    var preset = TurasPins.QUALITY_PRESETS[TurasPins.EXPORT_QUALITY] ||
+                 TurasPins.QUALITY_PRESETS.standard;
+    var scale = preset.scale;
     var url = TurasPins._svgToImageUrl(new XMLSerializer().serializeToString(svg));
     var img = new Image();
     img.onerror = function() {
