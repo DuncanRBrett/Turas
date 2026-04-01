@@ -129,9 +129,10 @@ assemble_hub_html <- function(config, parsed_reports, overview_html, navigation_
     # Strip vendor JS (PptxGenJS) from embedded reports — loaded once at hub level
     report_html <- parsed$raw_html
     report_html <- gsub(
-      "/[*] TURAS_VENDOR_START [*]/.*?/[*] TURAS_VENDOR_END [*]/",
+      "/\\* TURAS_VENDOR_START \\*/[\\s\\S]*?/\\* TURAS_VENDOR_END \\*/",
       "/* vendor JS loaded at hub level */",
-      report_html
+      report_html,
+      perl = TRUE
     )
     b64_html <- base64enc::base64encode(charToRaw(enc2utf8(report_html)))
     cat(sprintf("    Base64-encoded %s: %s -> %s\n",
