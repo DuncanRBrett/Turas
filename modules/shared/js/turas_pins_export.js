@@ -76,23 +76,11 @@
     var tData = null, estTH = 0;
     var hasHtmlContent = false;
     if (pin.tableHtml && (mode === "all" || mode === "table_insight")) {
-      // Check if the content is a pure table or mixed HTML.
-      // Mixed content (e.g. conjoint simulator: tables + share bars + charts)
-      // must go through html2canvas to preserve the full layout.
-      var tmp = document.createElement("div");
-      tmp.innerHTML = pin.tableHtml;
-      var hasTableEl = !!tmp.querySelector("table");
-      var hasDivContent = !!tmp.querySelector("div");
-      var hasStyleEl = !!tmp.querySelector("style");
-
-      if (hasTableEl && !hasDivContent && !hasStyleEl) {
-        // Pure table content — use the efficient SVG table renderer
-        tData = TurasPins._extractTableData(pin.tableHtml);
-        if (tData && tData.length > 0) estTH = 34 + (tData.length - 1) * 28 + 4;
-      }
-
-      if (!tData && pin.tableHtml.trim().length > 0) {
-        // Non-table or mixed HTML content — needs html2canvas image capture
+      if (pin.tableHtml.trim().length > 0) {
+        // Route ALL tableHtml through html2canvas for pixel-perfect export.
+        // The SVG table renderer (_extractTableData → _renderTableSVG) strips
+        // CSS formatting — header colours, significance markers, backgrounds.
+        // html2canvas preserves the full visual styling.
         hasHtmlContent = true;
       }
     }
@@ -113,22 +101,23 @@
 
     // If pin has HTML-only content (no SVG chart, no table), render it
     // to an image first, then composite into the export
-    if (L.hasHtmlContent && !L.chart.clone && !L.tData) {
+    if (L.hasHtmlContent) {
       _renderHtmlToImage(pin.tableHtml, L.usableW, function(result) {
         if (result) {
-          // Recalculate layout with the rendered image dimensions
-          var htmlImgH = Math.round(result.height * (L.usableW / result.width));
+          var htmlImgW = Math.min(result.width, L.usableW);
+          var htmlImgH = Math.round(result.height * (htmlImgW / result.width));
           L.totalH = L.tableTopY + htmlImgH + L.pad;
           var svg = _assembleSVG(pin, L, W);
-          // Composite HTML image onto canvas after SVG render
           _toPNG(svg, pin, L.totalH, W,
             { data: result.dataUrl, x: L.pad, y: L.tableTopY,
-              w: L.usableW, h: htmlImgH },
+              w: htmlImgW, h: htmlImgH },
             L.titleText, onComplete);
         } else {
-          // Fallback: render without HTML content
           var svg = _assembleSVG(pin, L, W);
-          _toPNG(svg, pin, L.totalH, W, null, L.titleText, onComplete);
+          _toPNG(svg, pin, L.totalH, W,
+            L.imgDispW > 0 ? { data: pin.imageData, x: L.pad, y: L.imgTopY,
+              w: L.imgDispW, h: L.imgDispH } : null,
+            L.titleText, onComplete);
         }
       });
       return;
@@ -271,18 +260,18 @@
     var doExport = function(iw, ih) {
       var L = _layout(pin, iw, ih);
 
-      // HTML-only pins: use _build which has the html2canvas path,
-      // then intercept the download by temporarily capturing the blob
-      if (L.hasHtmlContent && !L.chart.clone && !L.tData) {
+      // Pins with HTML content: render via html2canvas for pixel-perfect output
+      if (L.hasHtmlContent) {
         _renderHtmlToImage(pin.tableHtml, L.usableW, function(result) {
           if (result) {
-            var htmlImgH = Math.round(result.height * (L.usableW / result.width));
+            var htmlImgW = Math.min(result.width, L.usableW);
+            var htmlImgH = Math.round(result.height * (htmlImgW / result.width));
             L.totalH = L.tableTopY + htmlImgH + L.pad;
             var W = TurasPins.EXPORT_WIDTH;
             var svg = _assembleSVG(pin, L, W);
             _toCanvas(svg, L.totalH, W,
               { data: result.dataUrl, x: L.pad, y: L.tableTopY,
-                w: L.usableW, h: htmlImgH },
+                w: htmlImgW, h: htmlImgH },
               pin.id, function(canvas) {
                 if (!canvas) { callback(null); return; }
                 var preset = TurasPins.QUALITY_PRESETS[TurasPins.EXPORT_QUALITY] ||
@@ -351,11 +340,22 @@
     container.innerHTML = TurasPins._sanitizeHtml(html);
     document.body.appendChild(container);
 
-    // Use scrollWidth for actual content width — avoids excess white space
-    // when flex/grid content is narrower than the container (e.g. 2 gauge
-    // cards in a 1252px container).
-    var width = Math.min(container.scrollWidth, maxWidth);
+    // Measure actual content bounds — the container is maxWidth but flex/grid
+    // content may be narrower (e.g. 2 gauge cards in a 1252px container).
+    // Find the rightmost edge of child elements to crop white space.
+    var width = maxWidth;
     var height = container.offsetHeight;
+    var children = container.querySelectorAll("*");
+    var maxRight = 0;
+    for (var ci = 0; ci < children.length; ci++) {
+      var rect = children[ci].getBoundingClientRect();
+      var containerLeft = container.getBoundingClientRect().left;
+      var right = rect.right - containerLeft;
+      if (right > maxRight) maxRight = right;
+    }
+    if (maxRight > 0 && maxRight < width) {
+      width = Math.ceil(maxRight) + 16; // 16px padding
+    }
     if (height <= 0) {
       document.body.removeChild(container);
       callback(null);
