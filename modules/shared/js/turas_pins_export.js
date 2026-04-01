@@ -251,11 +251,40 @@
 
   /** Export pin to image blob (for clipboard or PPTX).
    *  Respects TurasPins.EXPORT_QUALITY preset for format and resolution.
+   *  Delegates to _build for the rendering pipeline (including html2canvas
+   *  for HTML-only pins), then captures the result as a blob.
    */
   TurasPins._exportToBlob = function(pin, callback) {
     if (!pin) { callback(null); return; }
     var doExport = function(iw, ih) {
       var L = _layout(pin, iw, ih);
+
+      // HTML-only pins: use _build which has the html2canvas path,
+      // then intercept the download by temporarily capturing the blob
+      if (L.hasHtmlContent && !L.chart.clone && !L.tData) {
+        _renderHtmlToImage(pin.tableHtml, L.usableW, function(result) {
+          if (result) {
+            var htmlImgH = Math.round(result.height * (L.usableW / result.width));
+            L.totalH = L.tableTopY + htmlImgH + L.pad;
+            var W = TurasPins.EXPORT_WIDTH;
+            var svg = _assembleSVG(pin, L, W);
+            _toCanvas(svg, L.totalH, W,
+              { data: result.dataUrl, x: L.pad, y: L.tableTopY,
+                w: L.usableW, h: htmlImgH },
+              pin.id, function(canvas) {
+                if (!canvas) { callback(null); return; }
+                var preset = TurasPins.QUALITY_PRESETS[TurasPins.EXPORT_QUALITY] ||
+                             TurasPins.QUALITY_PRESETS.standard;
+                var args = preset.quality !== null ? [preset.format, preset.quality] : [preset.format];
+                canvas.toBlob(function(blob) { callback(blob); }, args[0], args[1]);
+              });
+          } else {
+            callback(null);
+          }
+        });
+        return;
+      }
+
       var W = TurasPins.EXPORT_WIDTH;
       var svg = _assembleSVG(pin, L, W);
       _toCanvas(svg, L.totalH, W,
