@@ -29,10 +29,11 @@
     reader.onloadend = function() {
       var dataUrl = reader.result;
       if (!dataUrl) { callback(null, 0, 0); return; }
-      // Load as image to get natural dimensions
+      // Load as image to get natural dimensions (5s timeout guards against hang)
       var img = new Image();
-      img.onload = function() { callback(dataUrl, img.naturalWidth, img.naturalHeight); };
-      img.onerror = function() { callback(dataUrl, 0, 0); };
+      var timeout = setTimeout(function() { callback(dataUrl, 0, 0); }, 5000);
+      img.onload = function() { clearTimeout(timeout); callback(dataUrl, img.naturalWidth, img.naturalHeight); };
+      img.onerror = function() { clearTimeout(timeout); callback(dataUrl, 0, 0); };
       img.src = dataUrl;
     };
     reader.onerror = function() { callback(null, 0, 0); };
@@ -196,8 +197,8 @@
           })
           .catch(function(err) {
             _hideProgress();
-            console.error("[TurasPins] PPTX write failed:", err);
-            TurasPins._showToast("PowerPoint export failed");
+            console.error("[TurasPins] PPTX write failed:", err && err.message ? err.message : err);
+            TurasPins._showToast("PowerPoint export failed \u2014 try fewer slides or lower quality");
             if (options.onComplete) options.onComplete(false);
           });
         return;
@@ -229,7 +230,26 @@
       // Pin card → content slide with image
       _updateProgress("Rendering slide " + slideNum + " of " + total + "...", (slideNum / total) * 90);
 
+      // 10s per-pin timeout prevents the chain from stalling on a hung export
+      var pinDone = false;
+      var pinTimer = setTimeout(function() {
+        if (pinDone) return; pinDone = true;
+        console.warn("[TurasPins] Pin export timed out: " + (item.title || item.id));
+        var toSlide = pres.addSlide();
+        toSlide.addText(item.title || "Pinned View", {
+          x: MARGIN, y: MARGIN, w: IMG_MAX_W, h: 0.6,
+          fontSize: 18, fontFace: "Segoe UI", color: "1a2744", bold: true
+        });
+        toSlide.addText("(Slide rendering timed out)", {
+          x: MARGIN, y: 2, w: IMG_MAX_W, h: 0.4,
+          fontSize: 12, color: "94a3b8", align: "center"
+        });
+        idx++;
+        setTimeout(processNext, TurasPins.EXPORT_ALL_DELAY_MS);
+      }, 10000);
+
       TurasPins._exportToBlob(item, function(blob) {
+        if (pinDone) return; pinDone = true; clearTimeout(pinTimer);
         if (!blob) {
           // Still add slide with title even if image fails
           var errSlide = pres.addSlide();
@@ -366,8 +386,8 @@
             TurasPins._showToast("PowerPoint exported");
           })
           .catch(function(err) {
-            console.error("[TurasPins] PPTX write failed:", err);
-            TurasPins._showToast("PowerPoint export failed");
+            console.error("[TurasPins] PPTX write failed:", err && err.message ? err.message : err);
+            TurasPins._showToast("PowerPoint export failed \u2014 try lower quality setting");
           });
       });
     });

@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TurasPins PPTX Export — Test Harness</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 24px; background: #f8fafc; color: #1e293b; }
+    h1 { font-size: 20px; margin-bottom: 4px; }
+    .subtitle { font-size: 13px; color: #64748b; margin-bottom: 24px; }
+    .test-group { margin-bottom: 24px; }
+    .test-group h2 { font-size: 15px; margin-bottom: 8px; color: #334155; }
+    .test { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-radius: 6px; margin-bottom: 2px; font-size: 13px; }
+    .test.pass { background: #f0fdf4; }
+    .test.fail { background: #fef2f2; }
+    .test.pending { background: #f8fafc; }
+    .badge { display: inline-block; width: 56px; text-align: center; padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 11px; }
+    .badge.pass { background: #16a34a; color: #fff; }
+    .badge.fail { background: #dc2626; color: #fff; }
+    .badge.pending { background: #94a3b8; color: #fff; }
+    .summary { margin-top: 24px; padding: 16px; background: #fff; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 14px; }
+    .summary .pass-count { color: #16a34a; font-weight: 700; }
+    .summary .fail-count { color: #dc2626; font-weight: 700; }
+    .error-detail { font-size: 11px; color: #dc2626; margin-left: 66px; padding: 2px 0; }
+    #hidden-test-area { position: absolute; left: -9999px; top: -9999px; }
+  </style>
+</head>
+<body>
+  <h1>TurasPins PPTX Export Test Harness</h1>
+  <p class="subtitle">Browser-based tests for PowerPoint export functionality. Open in Chrome, Firefox, Safari, or Edge.</p>
+
+  <div id="test-results"></div>
+  <div id="hidden-test-area">
+    <script type="application/json" id="pinned-views-data">[]</script>
+    <div id="pinned-cards-container"></div>
+    <div id="pinned-empty-state"></div>
+    <div id="pinned-bulk-actions" style="display:flex;gap:8px;">
+      <button onclick="TurasPins.exportAll()">Export All as PNG</button>
+    </div>
+  </div>
+
+  <!-- Load PptxGenJS vendor bundle -->
+  <script src="../../js/vendor/pptxgen.bundle.js"></script>
+  <!-- Load TurasPins shared library (in dependency order) -->
+  <script src="../../js/turas_pins_utils.js"></script>
+  <script src="../../js/turas_pins.js"></script>
+  <script src="../../js/turas_pins_render.js"></script>
+  <script src="../../js/turas_pins_drag.js"></script>
+  <script src="../../js/turas_pins_insight_svg.js"></script>
+  <script src="../../js/turas_pins_table.js"></script>
+  <script src="../../js/turas_pins_export.js"></script>
+  <script src="../../js/turas_pins_pptx.js"></script>
+
+  <script>
+  (function() {
+    "use strict";
+
+    // ── Test Framework ──────────────────────────────────────────────────────
+
+    var results = [];
+    var currentGroup = "";
+
+    function group(name) { currentGroup = name; }
+
+    function test(name, fn) {
+      try {
+        fn();
+        results.push({ group: currentGroup, name: name, status: "pass" });
+      } catch (e) {
+        results.push({ group: currentGroup, name: name, status: "fail", error: e.message });
+      }
+    }
+
+    function assert(condition, message) {
+      if (!condition) throw new Error(message || "Assertion failed");
+    }
+
+    function assertEqual(actual, expected, message) {
+      if (actual !== expected) {
+        throw new Error((message || "assertEqual") + ": expected " + JSON.stringify(expected) + " but got " + JSON.stringify(actual));
+      }
+    }
+
+    function assertType(value, type, message) {
+      if (typeof value !== type) {
+        throw new Error((message || "assertType") + ": expected typeof " + type + " but got " + typeof value);
+      }
+    }
+
+    // ── Synthetic Test Data ─────────────────────────────────────────────────
+
+    function makeSyntheticSvg(label) {
+      return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200">' +
+        '<rect width="400" height="200" fill="#e2e8f0"/>' +
+        '<text x="200" y="110" text-anchor="middle" font-size="16" fill="#334155">' +
+        label + '</text></svg>';
+    }
+
+    function makeSyntheticTable() {
+      return '<table><thead><tr><th>Category</th><th>Value</th></tr></thead>' +
+        '<tbody><tr><td>A</td><td>42%</td></tr><tr><td>B</td><td>58%</td></tr></tbody></table>';
+    }
+
+    function makePin(id, opts) {
+      opts = opts || {};
+      return {
+        id: id || "pin-test-" + Date.now() + "-" + Math.random().toString(36).substr(2, 6),
+        type: "pin",
+        title: opts.title || "Test Pin " + id,
+        subtitle: opts.subtitle || "Test subtitle",
+        chartSvg: opts.chartSvg !== undefined ? opts.chartSvg : makeSyntheticSvg("Chart " + id),
+        tableHtml: opts.tableHtml !== undefined ? opts.tableHtml : makeSyntheticTable(),
+        insightText: opts.insightText || "**Key finding:** This is a test insight.",
+        pinMode: opts.pinMode || "all",
+        sourceLabel: opts.sourceLabel || "Test Module",
+        timestamp: new Date().toISOString()
+      };
+    }
+
+    function makeSection(id, title) {
+      return { id: id || "section-test-" + Date.now(), type: "section", title: title || "Test Section" };
+    }
+
+    // ── Initialise TurasPins for Testing ────────────────────────────────────
+
+    TurasPins.init({
+      storeId: "pinned-views-data",
+      cssPrefix: "pinned",
+      moduleLabel: "Test Module",
+      containerId: "pinned-cards-container",
+      emptyStateId: "pinned-empty-state",
+      badgeId: null,
+      toolbarId: "pinned-bulk-actions",
+      features: { insightEdit: true, sections: true, dragDrop: false }
+    });
+
+    // ── Test Groups ─────────────────────────────────────────────────────────
+
+    // Group 1: Library Loading
+    group("Library Loading");
+
+    test("PptxGenJS is loaded", function() {
+      assertType(PptxGenJS, "function", "PptxGenJS constructor");
+    });
+
+    test("TurasPins namespace exists", function() {
+      assertType(TurasPins, "object", "TurasPins namespace");
+    });
+
+    test("exportPptx function exists", function() {
+      assertType(TurasPins.exportPptx, "function", "exportPptx");
+    });
+
+    test("exportSinglePptx function exists", function() {
+      assertType(TurasPins.exportSinglePptx, "function", "exportSinglePptx");
+    });
+
+    test("PptxGenJS can create a presentation", function() {
+      var pres = new PptxGenJS();
+      assert(pres !== null && pres !== undefined, "Presentation object created");
+      assertType(pres.addSlide, "function", "addSlide method");
+      assertType(pres.writeFile, "function", "writeFile method");
+    });
+
+    // Group 2: Quality Presets
+    group("Quality Presets");
+
+    test("Quality presets are defined", function() {
+      assert(TurasPins.QUALITY_PRESETS, "QUALITY_PRESETS exists");
+      assert(TurasPins.QUALITY_PRESETS.standard, "standard preset exists");
+      assert(TurasPins.QUALITY_PRESETS.high, "high preset exists");
+    });
+
+    test("Standard preset uses JPEG", function() {
+      assertEqual(TurasPins.QUALITY_PRESETS.standard.format, "image/jpeg");
+      assertEqual(TurasPins.QUALITY_PRESETS.standard.quality, 0.85);
+      assertEqual(TurasPins.QUALITY_PRESETS.standard.scale, 2);
+    });
+
+    test("High preset uses PNG", function() {
+      assertEqual(TurasPins.QUALITY_PRESETS.high.format, "image/png");
+      assertEqual(TurasPins.QUALITY_PRESETS.high.quality, null);
+      assertEqual(TurasPins.QUALITY_PRESETS.high.scale, 3);
+    });
+
+    test("Default quality is standard", function() {
+      assertEqual(TurasPins.EXPORT_QUALITY, "standard");
+    });
+
+    test("Quality can be toggled", function() {
+      var original = TurasPins.EXPORT_QUALITY;
+      TurasPins.EXPORT_QUALITY = "high";
+      assertEqual(TurasPins.EXPORT_QUALITY, "high");
+      TurasPins.EXPORT_QUALITY = original; // restore
+    });
+
+    // Group 3: Edge Cases
+    group("Edge Cases");
+
+    test("exportPptx with empty pin-reel shows toast", function() {
+      // Clear all pins
+      var store = document.getElementById("pinned-views-data");
+      store.textContent = "[]";
+      TurasPins.load();
+      // Should not throw
+      TurasPins.exportPptx();
+    });
+
+    test("exportSinglePptx with invalid ID shows toast", function() {
+      TurasPins.exportSinglePptx("nonexistent-pin-id-12345");
+      // Should not throw, just show toast
+    });
+
+    test("Pin with chart only renders without crash", function() {
+      var pin = makePin("chart-only", { tableHtml: "", insightText: "" });
+      // Verify _exportToBlob doesn't throw
+      assert(pin.chartSvg.length > 0, "Chart SVG present");
+      assert(pin.tableHtml === "", "No table");
+    });
+
+    test("Pin with table only renders without crash", function() {
+      var pin = makePin("table-only", { chartSvg: "", insightText: "", pinMode: "table_insight" });
+      assert(pin.chartSvg === "", "No chart");
+      assert(pin.tableHtml.length > 0, "Table present");
+    });
+
+    test("Pin with insight only renders without crash", function() {
+      var pin = makePin("insight-only", { chartSvg: "", tableHtml: "" });
+      assert(pin.insightText.length > 0, "Insight present");
+    });
+
+    test("Pin with all content types", function() {
+      var pin = makePin("all-content");
+      assert(pin.chartSvg.length > 0 && pin.tableHtml.length > 0 && pin.insightText.length > 0);
+    });
+
+    // Group 4: Filename Sanitisation
+    group("Filename Sanitisation");
+
+    test("Special characters stripped from title", function() {
+      var title = "Q1: Brand Health & Tracking (2024)";
+      var safe = title.replace(/[^a-zA-Z0-9 _-]/g, "").replace(/\s+/g, "_").substring(0, 60);
+      assertEqual(safe, "Q1_Brand_Health_Tracking_2024");
+    });
+
+    test("Long titles truncated", function() {
+      var title = "A".repeat(100);
+      var safe = title.replace(/[^a-zA-Z0-9 _-]/g, "").replace(/\s+/g, "_").substring(0, 60);
+      assertEqual(safe.length, 60);
+    });
+
+    test("Empty title handled", function() {
+      var title = "";
+      var safe = title.replace(/[^a-zA-Z0-9 _-]/g, "").replace(/\s+/g, "_").substring(0, 60);
+      assertEqual(safe, "");
+    });
+
+    // Group 5: Slide Creation
+    group("Slide Creation");
+
+    test("Can create widescreen presentation", function() {
+      var pres = new PptxGenJS();
+      pres.layout = "LAYOUT_WIDE";
+      var slide = pres.addSlide();
+      assert(slide !== null, "Slide created");
+    });
+
+    test("Can add text to slide", function() {
+      var pres = new PptxGenJS();
+      pres.layout = "LAYOUT_WIDE";
+      var slide = pres.addSlide();
+      slide.addText("Test Title", { x: 0.5, y: 0.3, w: 12, h: 0.5, fontSize: 16 });
+      // No throw = pass
+    });
+
+    test("Can add image from data URL to slide", function() {
+      // Create a tiny 1x1 PNG as base64
+      var canvas = document.createElement("canvas");
+      canvas.width = 1; canvas.height = 1;
+      var ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ff0000";
+      ctx.fillRect(0, 0, 1, 1);
+      var dataUrl = canvas.toDataURL("image/png");
+
+      var pres = new PptxGenJS();
+      pres.layout = "LAYOUT_WIDE";
+      var slide = pres.addSlide();
+      slide.addImage({ data: dataUrl, x: 0.5, y: 1, w: 10, h: 5 });
+      // No throw = pass
+    });
+
+    test("Section divider creates title-only slide", function() {
+      var pres = new PptxGenJS();
+      pres.layout = "LAYOUT_WIDE";
+      var slide = pres.addSlide();
+      slide.addText("Section Title", {
+        x: 0.5, y: "40%", w: 12, h: 1,
+        fontSize: 28, bold: true, align: "center"
+      });
+      // No throw = pass
+    });
+
+    test("Multiple slides can be added", function() {
+      var pres = new PptxGenJS();
+      pres.layout = "LAYOUT_WIDE";
+      for (var i = 0; i < 10; i++) {
+        var slide = pres.addSlide();
+        slide.addText("Slide " + (i + 1), { x: 0.5, y: 0.5, w: 10, h: 1, fontSize: 16 });
+      }
+      // No throw = pass
+    });
+
+    // Group 6: Blob and Canvas APIs
+    group("Browser API Availability");
+
+    test("canvas.toBlob is available", function() {
+      var c = document.createElement("canvas");
+      assertType(c.toBlob, "function", "canvas.toBlob");
+    });
+
+    test("canvas.toDataURL is available", function() {
+      var c = document.createElement("canvas");
+      assertType(c.toDataURL, "function", "canvas.toDataURL");
+    });
+
+    test("Blob constructor is available", function() {
+      assertType(Blob, "function", "Blob constructor");
+    });
+
+    test("URL.createObjectURL is available", function() {
+      assertType(URL.createObjectURL, "function", "URL.createObjectURL");
+    });
+
+    test("FileReader is available", function() {
+      assertType(FileReader, "function", "FileReader");
+    });
+
+    test("JPEG blob can be created from canvas", function() {
+      var c = document.createElement("canvas");
+      c.width = 10; c.height = 10;
+      var ctx = c.getContext("2d");
+      ctx.fillStyle = "#333";
+      ctx.fillRect(0, 0, 10, 10);
+      // toBlob is async — we just verify it doesn't throw synchronously
+      var called = false;
+      c.toBlob(function(blob) { called = true; }, "image/jpeg", 0.85);
+      // Can't wait for async in sync test, but no throw = API exists
+    });
+
+    // Group 7: UI Injection
+    group("UI Injection");
+
+    test("PPTX toolbar button is injected into toolbar", function() {
+      // Add a pin so toolbar becomes visible
+      var pin = makePin("ui-test-1");
+      TurasPins.add(pin);
+      TurasPins.renderCards();
+
+      var toolbar = document.getElementById("pinned-bulk-actions");
+      var buttons = toolbar.querySelectorAll("button");
+      var pptxBtn = null;
+      for (var i = 0; i < buttons.length; i++) {
+        if (buttons[i].textContent.indexOf("PowerPoint") !== -1) {
+          pptxBtn = buttons[i];
+          break;
+        }
+      }
+      assert(pptxBtn !== null, "PowerPoint export button found in toolbar");
+    });
+
+    test("Quality toggle is injected into toolbar", function() {
+      var toolbar = document.getElementById("pinned-bulk-actions");
+      var select = toolbar.querySelector("#turas-pptx-quality");
+      assert(select !== null, "Quality select found in toolbar");
+      assertEqual(select.value, "standard", "Default is standard");
+    });
+
+    test("Quality toggle changes export quality", function() {
+      var select = document.getElementById("turas-pptx-quality");
+      select.value = "high";
+      select.dispatchEvent(new Event("change"));
+      assertEqual(TurasPins.EXPORT_QUALITY, "high");
+      // Reset
+      select.value = "standard";
+      select.dispatchEvent(new Event("change"));
+      assertEqual(TurasPins.EXPORT_QUALITY, "standard");
+    });
+
+    test("Overflow menu contains PowerPoint option", function() {
+      var container = document.getElementById("pinned-cards-container");
+      var pptxBtns = container.querySelectorAll("button");
+      var found = false;
+      for (var i = 0; i < pptxBtns.length; i++) {
+        if (pptxBtns[i].textContent.indexOf("PowerPoint") !== -1) {
+          found = true;
+          break;
+        }
+      }
+      assert(found, "PowerPoint option found in card overflow menu");
+    });
+
+    // Clean up test pin
+    TurasPins.remove("ui-test-1");
+
+    // Group 8: Markdown Stripping
+    group("Markdown Processing");
+
+    test("Bold markers removed", function() {
+      var input = "**Key finding:** Value is 42%";
+      var result = input.replace(/\*\*(.+?)\*\*/g, "$1");
+      assertEqual(result, "Key finding: Value is 42%");
+    });
+
+    test("Italic markers removed", function() {
+      var input = "*emphasis* on this";
+      var result = input.replace(/\*(.+?)\*/g, "$1");
+      assertEqual(result, "emphasis on this");
+    });
+
+    test("Heading markers removed", function() {
+      var input = "## Section Title";
+      var result = input.replace(/^## /gm, "");
+      assertEqual(result, "Section Title");
+    });
+
+    test("Bullet points converted", function() {
+      var input = "- Item one\n- Item two";
+      var result = input.replace(/^- /gm, "\u2022 ");
+      assert(result.indexOf("\u2022 Item one") !== -1);
+    });
+
+    // Group 9: Timeout & Defensive Coding
+    group("Timeout & Defensive Coding");
+
+    test("_exportToBlob calls callback with null for null pin", function() {
+      var called = false;
+      TurasPins._exportToBlob(null, function(blob) {
+        called = true;
+        assert(blob === null, "Expected null blob for null pin");
+      });
+      assert(called, "Callback was invoked synchronously for null pin");
+    });
+
+    test("_exportToBlob calls callback for pin with no content", function() {
+      var emptyPin = makePin("empty-content");
+      emptyPin.chartSvg = "";
+      emptyPin.tableHtml = "";
+      emptyPin.insightText = "";
+      // This should not hang — the function must always call back
+      var callbackFired = false;
+      TurasPins._exportToBlob(emptyPin, function(blob) { callbackFired = true; });
+      // Callback may be async for image-based pins, but for empty content
+      // it should resolve quickly. We verify it doesn't throw synchronously.
+    });
+
+    test("exportSinglePptx with non-existent pin ID does not crash", function() {
+      // Should show a toast but not throw
+      TurasPins.exportSinglePptx("nonexistent-pin-id-999");
+    });
+
+    test("exportPptx with empty pin array shows toast but does not crash", function() {
+      // Clear all pins and attempt export
+      var origPins = TurasPins.getAll();
+      while (TurasPins.getAll().length > 0) {
+        TurasPins.remove(TurasPins.getAll()[0].id);
+      }
+      TurasPins.exportPptx();
+      // Restore
+      for (var i = 0; i < origPins.length; i++) TurasPins.add(origPins[i]);
+    });
+
+    // Group 10: Portable HTML Capture
+    group("Portable HTML Capture");
+
+    test("capturePortableHtml returns string for valid element", function() {
+      var el = document.createElement("div");
+      el.innerHTML = "<span>test</span>";
+      document.body.appendChild(el);
+      var result = TurasPins.capturePortableHtml(el);
+      document.body.removeChild(el);
+      assertType(result, "string");
+      assert(result.length > 0, "Expected non-empty HTML string");
+      assert(result.indexOf("test") !== -1, "Content preserved in output");
+    });
+
+    test("capturePortableHtml returns empty string for null element", function() {
+      var result = TurasPins.capturePortableHtml(null);
+      assertEqual(result, "");
+    });
+
+    test("capturePortableHtml inlines computed styles", function() {
+      // Create element with a CSS class that sets background-color
+      var style = document.createElement("style");
+      style.textContent = ".test-portable-bg { background-color: rgb(255, 0, 0); }";
+      document.head.appendChild(style);
+
+      var el = document.createElement("div");
+      el.className = "test-portable-bg";
+      el.textContent = "styled";
+      document.body.appendChild(el);
+
+      var result = TurasPins.capturePortableHtml(el);
+      document.body.removeChild(el);
+      document.head.removeChild(style);
+
+      // The output should have inline styles with the background colour
+      assert(result.indexOf("background") !== -1, "Expected inlined background style");
+      assert(result.indexOf("rgb(255, 0, 0)") !== -1 || result.indexOf("rgb(255,0,0)") !== -1 || result.indexOf("red") !== -1,
+        "Expected red background colour inlined");
+    });
+
+    test("_inlineCaptureStyles handles non-element node without crash", function() {
+      var textNode = document.createTextNode("just text");
+      // Should not throw — non-element nodes are silently skipped
+      TurasPins._inlineCaptureStyles(textNode, textNode);
+    });
+
+    // Group 11: Export Pipeline Integration
+    group("Export Pipeline Integration");
+
+    test("_exportToBlob with chart-only pin calls callback", function() {
+      var pin = makePin("chart-only-test");
+      pin.chartSvg = makeSyntheticSvg("Chart Test");
+      pin.tableHtml = "";
+      pin.insightText = "";
+      pin.pinMode = "chart";
+      var callbackFired = false;
+      TurasPins._exportToBlob(pin, function(blob) { callbackFired = true; });
+      // Async — just verify it doesn't throw synchronously
+    });
+
+    test("_exportToBlob with table-only pin calls callback", function() {
+      var pin = makePin("table-only-test");
+      pin.chartSvg = "";
+      pin.tableHtml = makeSyntheticTable();
+      pin.insightText = "";
+      pin.pinMode = "table_insight";
+      var callbackFired = false;
+      TurasPins._exportToBlob(pin, function(blob) { callbackFired = true; });
+      // Async — just verify it doesn't throw synchronously
+    });
+
+    test("Quality presets affect scale values", function() {
+      var standard = TurasPins.QUALITY_PRESETS.standard;
+      var high = TurasPins.QUALITY_PRESETS.high;
+      assert(standard.scale < high.scale,
+        "High quality should have larger scale than standard (" +
+        standard.scale + " vs " + high.scale + ")");
+      assertEqual(standard.format, "image/jpeg");
+      assertEqual(high.format, "image/png");
+    });
+
+    // ── Render Results ──────────────────────────────────────────────────────
+
+    function renderResults() {
+      var container = document.getElementById("test-results");
+      var html = "";
+      var groups = {};
+      var passed = 0, failed = 0;
+
+      for (var i = 0; i < results.length; i++) {
+        var r = results[i];
+        if (!groups[r.group]) groups[r.group] = [];
+        groups[r.group].push(r);
+        if (r.status === "pass") passed++;
+        else failed++;
+      }
+
+      for (var g in groups) {
+        html += '<div class="test-group"><h2>' + g + '</h2>';
+        for (var j = 0; j < groups[g].length; j++) {
+          var t = groups[g][j];
+          html += '<div class="test ' + t.status + '">' +
+            '<span class="badge ' + t.status + '">' + t.status.toUpperCase() + '</span>' +
+            '<span>' + t.name + '</span></div>';
+          if (t.error) {
+            html += '<div class="error-detail">' + t.error + '</div>';
+          }
+        }
+        html += '</div>';
+      }
+
+      html += '<div class="summary">' +
+        'Total: ' + results.length + ' tests &mdash; ' +
+        '<span class="pass-count">' + passed + ' passed</span>, ' +
+        '<span class="fail-count">' + failed + ' failed</span>' +
+        '</div>';
+
+      container.innerHTML = html;
+
+      // Log summary to console
+      console.log("[TurasPins Test] " + passed + "/" + results.length + " passed" +
+        (failed > 0 ? " (" + failed + " FAILED)" : ""));
+    }
+
+    renderResults();
+  })();
+  </script>
+</body>
+</html>

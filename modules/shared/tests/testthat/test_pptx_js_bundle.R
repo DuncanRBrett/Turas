@@ -148,3 +148,30 @@ test_that("All expected JS files exist", {
     )
   }
 })
+
+test_that("Bundle includes capturePortableHtml function", {
+  skip_if_not()
+  js <- load_js_bundle()
+  expect_true(
+    grepl("capturePortableHtml", js, fixed = TRUE),
+    info = "capturePortableHtml not found in bundle"
+  )
+})
+
+test_that("Bundle includes _renderHtmlToImage function", {
+  skip_if_not()
+  js <- load_js_bundle()
+  expect_true(
+    grepl("_renderHtmlToImage", js, fixed = TRUE),
+    info = "_renderHtmlToImage not found in bundle"
+  )
+})
+
+test_that("Bundle includes _exportToBlob function", {
+  skip_if_not()
+  js <- load_js_bundle()
+  expect_true(
+    grepl("_exportToBlob", js, fixed = TRUE),
+    info = "_exportToBlob not found in bundle"
+  )
+})

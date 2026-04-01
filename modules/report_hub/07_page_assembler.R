@@ -134,6 +134,9 @@ assemble_hub_html <- function(config, parsed_reports, overview_html, navigation_
       report_html,
       perl = TRUE
     )
+    if (grepl("TURAS_VENDOR_START", report_html, fixed = TRUE)) {
+      cat(sprintf("  WARNING: Vendor JS markers not fully stripped from %s\n", parsed$report_key))
+    }
     b64_html <- base64enc::base64encode(charToRaw(enc2utf8(report_html)))
     cat(sprintf("    Base64-encoded %s: %s -> %s\n",
                 parsed$report_key,

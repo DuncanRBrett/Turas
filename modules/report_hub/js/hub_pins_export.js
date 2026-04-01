@@ -368,7 +368,7 @@
     var img = new Image();
     img.onerror = function() {
       console.error("[Hub Pin PNG] SVG render failed");
-      alert("PNG export failed. Please try using Chrome or Edge browser.");
+      TurasPins._showToast("PNG export failed \u2014 try Chrome or Edge");
       if (onComplete) onComplete();
     };
     img.onload = function() {
@@ -430,7 +430,11 @@
     for (var i = 0; i < ReportHub.pinnedItems.length; i++) {
       if (ReportHub.pinnedItems[i].id === pinId) { pin = ReportHub.pinnedItems[i]; break; }
     }
-    if (!pin) { callback(null); return; }
+    if (!pin) {
+      console.warn("[Hub Export] Pin not found:", pinId);
+      callback(null);
+      return;
+    }
 
     // Use the shared _exportToBlob which routes tableHtml through
     // html2canvas. This preserves significance markers, heatmap colours,
@@ -442,6 +446,7 @@
       TurasPins._exportToBlob(pin, callback);
       return;
     }
+    console.warn("[Hub Export] TurasPins._exportToBlob not available");
     callback(null);
   }
 
@@ -465,13 +470,18 @@
         return;
       }
       if (navigator.clipboard && navigator.clipboard.write) {
-        navigator.clipboard.write([
-          new ClipboardItem({ "image/png": blob })
-        ]).then(function() {
-          TurasPins._showToast("Copied to clipboard");
-        }).catch(function() {
+        try {
+          navigator.clipboard.write([
+            new ClipboardItem({ "image/png": blob })
+          ]).then(function() {
+            TurasPins._showToast("Copied to clipboard");
+          }).catch(function() {
+            _downloadFallback(blob, pin);
+          });
+        } catch (e) {
+          // ClipboardItem constructor can throw in some browsers
           _downloadFallback(blob, pin);
-        });
+        }
       } else {
         _downloadFallback(blob, pin);
       }

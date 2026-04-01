@@ -259,6 +259,7 @@
     if (!pin) { callback(null); return; }
     var doExport = function(iw, ih) {
       var L = _layout(pin, iw, ih);
+      if (!L) { callback(null); return; }
 
       // Pins with HTML content: render via html2canvas for pixel-perfect output
       if (L.hasHtmlContent) {
@@ -347,10 +348,22 @@
       callback(null);
       return;
     }
+    if (height > 1200) {
+      console.warn("[TurasPins] Content height " + height + "px exceeds 1200px limit — truncating for export");
+    }
     height = Math.min(height, 1200);
 
     var preset = TurasPins.QUALITY_PRESETS[TurasPins.EXPORT_QUALITY] ||
                  TurasPins.QUALITY_PRESETS.standard;
+
+    // 10s timeout guards against html2canvas hanging; done flag prevents double-callback
+    var done = false;
+    var timer = setTimeout(function() {
+      if (done) return; done = true;
+      console.warn("[TurasPins] html2canvas timed out after 10s");
+      if (container.parentNode) document.body.removeChild(container);
+      callback(null);
+    }, 10000);
 
     html2canvas(container, {
       scale: preset.scale,
@@ -360,12 +373,13 @@
       logging: false,
       useCORS: true
     }).then(function(canvas) {
-      document.body.removeChild(container);
+      if (done) return; done = true; clearTimeout(timer);
+      if (container.parentNode) document.body.removeChild(container);
       callback({ dataUrl: canvas.toDataURL("image/png"), width: width, height: height });
     }).catch(function(err) {
+      if (done) return; done = true; clearTimeout(timer);
       console.error("[TurasPins] html2canvas render failed:", err);
-      document.body.removeChild(container);
-      console.error("[TurasPins] html2canvas failed:", err);
+      if (container.parentNode) document.body.removeChild(container);
       callback(null);
     });
   }
@@ -420,11 +434,13 @@
       ctx.drawImage(img, 0, 0, c.width, c.height);
       if (imgOvl) {
         var pi = new Image();
+        var ovlTimer = setTimeout(function() { callback(c); }, 5000);
         pi.onload = function() {
+          clearTimeout(ovlTimer);
           ctx.drawImage(pi, imgOvl.x * scale, imgOvl.y * scale, imgOvl.w * scale, imgOvl.h * scale);
           callback(c);
         };
-        pi.onerror = function() { callback(c); };
+        pi.onerror = function() { clearTimeout(ovlTimer); callback(c); };
         pi.src = imgOvl.data;
       } else { callback(c); }
     };
