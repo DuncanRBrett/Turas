@@ -169,18 +169,22 @@ TurasPins._renderMarkdown = function(md) {
  * in any context (e.g., hub combined report where the original CSS
  * classes are not available).
  *
- * @param {Element} element - Live DOM element to capture
+ * IMPORTANT: The liveElement must be attached to the DOM so that
+ * getComputedStyle returns actual computed values. If a clone is
+ * provided, styles are read from liveElement and written to clone.
+ *
+ * @param {Element} liveElement - Live DOM element (attached, with CSS applied)
+ * @param {Element} [clone] - Optional pre-built clone. If not provided, one is created.
  * @returns {string} HTML string with all styles inlined
  */
-TurasPins.capturePortableHtml = function(element) {
-  if (!element) return "";
-  var clone = element.cloneNode(true);
-  var origEls = element.querySelectorAll("*");
+TurasPins.capturePortableHtml = function(liveElement, clone) {
+  if (!liveElement) return "";
+  if (!clone) clone = liveElement.cloneNode(true);
+  var origEls = liveElement.querySelectorAll("*");
   var cloneEls = clone.querySelectorAll("*");
 
-  // Inline styles on root
-  TurasPins._inlineCaptureStyles(element, clone);
-  // Inline styles on all descendants
+  // Read styles from LIVE element, write to clone
+  TurasPins._inlineCaptureStyles(liveElement, clone);
   for (var i = 0; i < origEls.length; i++) {
     TurasPins._inlineCaptureStyles(origEls[i], cloneEls[i]);
   }
