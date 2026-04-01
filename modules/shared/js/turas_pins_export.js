@@ -113,11 +113,8 @@
 
     // If pin has HTML-only content (no SVG chart, no table), render it
     // to an image first, then composite into the export
-    console.log("[DIAG _build]", pin.title, "html:", L.hasHtmlContent, "chart:", !!L.chart.clone, "tData:", !!L.tData);
     if (L.hasHtmlContent && !L.chart.clone && !L.tData) {
-      console.log("[DIAG _build] HTML path for:", pin.title, "tableHtml length:", pin.tableHtml.length);
       _renderHtmlToImage(pin.tableHtml, L.usableW, function(result) {
-        console.log("[DIAG _build] result:", result ? result.width + "x" + result.height : "NULL");
         if (result) {
           // Recalculate layout with the rendered image dimensions
           var htmlImgH = Math.round(result.height * (L.usableW / result.width));
@@ -356,9 +353,7 @@
 
     var width = container.offsetWidth;
     var height = container.offsetHeight;
-    console.log("[DIAG html2canvas] container size:", width, "x", height, "children:", container.childElementCount);
     if (height <= 0) {
-      console.log("[DIAG html2canvas] ZERO HEIGHT — aborting");
       document.body.removeChild(container);
       callback(null);
       return;
@@ -368,7 +363,6 @@
     var preset = TurasPins.QUALITY_PRESETS[TurasPins.EXPORT_QUALITY] ||
                  TurasPins.QUALITY_PRESETS.standard;
 
-    console.log("[DIAG html2canvas] calling html2canvas...");
     html2canvas(container, {
       scale: preset.scale,
       backgroundColor: "#ffffff",
@@ -377,11 +371,10 @@
       logging: false,
       useCORS: true
     }).then(function(canvas) {
-      console.log("[DIAG html2canvas] SUCCESS canvas:", canvas.width, "x", canvas.height);
       document.body.removeChild(container);
       callback({ dataUrl: canvas.toDataURL("image/png"), width: width, height: height });
     }).catch(function(err) {
-      console.error("[DIAG html2canvas] FAILED:", err);
+      console.error("[TurasPins] html2canvas render failed:", err);
       document.body.removeChild(container);
       console.error("[TurasPins] html2canvas failed:", err);
       callback(null);
@@ -437,14 +430,12 @@
       ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
       ctx.drawImage(img, 0, 0, c.width, c.height);
       if (imgOvl) {
-        console.log("[DIAG overlay] loading image, dataUrl length:", imgOvl.data ? imgOvl.data.length : 0);
         var pi = new Image();
         pi.onload = function() {
-          console.log("[DIAG overlay] loaded OK:", pi.naturalWidth, "x", pi.naturalHeight, "drawing at:", imgOvl.x * scale, imgOvl.y * scale, imgOvl.w * scale, imgOvl.h * scale);
           ctx.drawImage(pi, imgOvl.x * scale, imgOvl.y * scale, imgOvl.w * scale, imgOvl.h * scale);
           callback(c);
         };
-        pi.onerror = function(e) { console.error("[DIAG overlay] FAILED to load:", e); callback(c); };
+        pi.onerror = function() { callback(c); };
         pi.src = imgOvl.data;
       } else { callback(c); }
     };
