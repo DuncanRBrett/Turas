@@ -76,11 +76,23 @@
     var tData = null, estTH = 0;
     var hasHtmlContent = false;
     if (pin.tableHtml && (mode === "all" || mode === "table_insight")) {
-      tData = TurasPins._extractTableData(pin.tableHtml);
-      if (tData && tData.length > 0) {
-        estTH = 34 + (tData.length - 1) * 28 + 4;
-      } else if (pin.tableHtml.trim().length > 0) {
-        // HTML content (gauges, sig cards, simulators) — needs image capture
+      // Check if the content is a pure table or mixed HTML.
+      // Mixed content (e.g. conjoint simulator: tables + share bars + charts)
+      // must go through html2canvas to preserve the full layout.
+      var tmp = document.createElement("div");
+      tmp.innerHTML = pin.tableHtml;
+      var hasTableEl = !!tmp.querySelector("table");
+      var hasDivContent = !!tmp.querySelector("div");
+      var hasStyleEl = !!tmp.querySelector("style");
+
+      if (hasTableEl && !hasDivContent && !hasStyleEl) {
+        // Pure table content — use the efficient SVG table renderer
+        tData = TurasPins._extractTableData(pin.tableHtml);
+        if (tData && tData.length > 0) estTH = 34 + (tData.length - 1) * 28 + 4;
+      }
+
+      if (!tData && pin.tableHtml.trim().length > 0) {
+        // Non-table or mixed HTML content — needs html2canvas image capture
         hasHtmlContent = true;
       }
     }
@@ -326,13 +338,12 @@
       return;
     }
 
-    // Render off-screen with full stylesheet context.
-    // Use visibility:hidden (not left:-9999px) — html2canvas needs the
-    // element in normal layout flow for accurate flex/grid rendering.
+    // Render off-screen but VISIBLE — html2canvas skips visibility:hidden.
+    // Position off-screen with overflow:hidden on body to prevent scrollbars.
     var container = document.createElement("div");
     container.style.cssText =
-      "position:fixed;left:0;top:0;width:" + maxWidth + "px;" +
-      "visibility:hidden;z-index:-1;pointer-events:none;" +
+      "position:absolute;left:0;top:0;width:" + maxWidth + "px;" +
+      "z-index:-1;pointer-events:none;opacity:0.001;" +
       "background:#fff;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;" +
       "font-size:13px;color:#1e293b;line-height:1.5;";
     container.innerHTML = TurasPins._sanitizeHtml(html);
