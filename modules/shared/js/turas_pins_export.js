@@ -326,10 +326,13 @@
       return;
     }
 
-    // Render off-screen with full stylesheet context
+    // Render off-screen with full stylesheet context.
+    // Use visibility:hidden (not left:-9999px) — html2canvas needs the
+    // element in normal layout flow for accurate flex/grid rendering.
     var container = document.createElement("div");
     container.style.cssText =
-      "position:absolute;left:-9999px;top:-9999px;width:" + maxWidth + "px;" +
+      "position:fixed;left:0;top:0;width:" + maxWidth + "px;" +
+      "visibility:hidden;z-index:-1;pointer-events:none;" +
       "background:#fff;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;" +
       "font-size:13px;color:#1e293b;line-height:1.5;";
     container.innerHTML = TurasPins._sanitizeHtml(html);

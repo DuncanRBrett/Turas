@@ -245,6 +245,16 @@
       }
     }
 
+    // Fallback: if no SVG chart and no table found, capture the full
+    // source HTML so it can be rendered via html2canvas in the export
+    // pipeline. This handles simulator share bars and other div content.
+    if (!chartSvg && !tableHtml) {
+      var clone = source.cloneNode(true);
+      // Remove buttons and interactive elements
+      clone.querySelectorAll("button, input, select, .cj-sim-controls").forEach(function(el) { el.remove(); });
+      tableHtml = clone.innerHTML;
+    }
+
     return {
       id: viewId,
       title: title,
