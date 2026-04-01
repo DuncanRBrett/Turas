@@ -103,8 +103,8 @@ conjoint_preflight <- function(verbose = TRUE, module_dir = NULL) {
   # --------------------------------------------------------------------------
   js_dir <- file.path(base_dir, "lib", "html_report", "js")
   expected_js_files <- c(
-    "conjoint_charts.js", "conjoint_export.js", "conjoint_navigation.js",
-    "conjoint_pins.js", "simulator_charts.js", "simulator_engine.js",
+    "cj_pins.js", "conjoint_charts.js", "conjoint_export.js",
+    "conjoint_navigation.js", "simulator_charts.js", "simulator_engine.js",
     "simulator_ui.js"
   )
 

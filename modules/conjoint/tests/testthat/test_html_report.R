@@ -676,11 +676,11 @@ test_that("JS files contain expected module patterns", {
     expect_true(grepl("exportChartPNG", export_js, fixed = TRUE))
   }
 
-  # Pins JS should have togglePin
-  pins_file <- file.path(js_dir, "conjoint_pins.js")
+  # Pins JS should delegate to TurasPins shared library
+  pins_file <- file.path(js_dir, "cj_pins.js")
   if (file.exists(pins_file)) {
     pins_js <- paste(readLines(pins_file, warn = FALSE), collapse = "\n")
-    expect_true(grepl("togglePin", pins_js, fixed = TRUE))
+    expect_true(grepl("TurasPins", pins_js, fixed = TRUE))
     expect_true(grepl("hydratePinnedViews", pins_js, fixed = TRUE))
   }
 
@@ -1214,8 +1214,8 @@ test_that("pins JS includes expanded captureView and _addPinnedEntry", {
   js_dir <- if (!is.null(conjoint_root)) file.path(conjoint_root, "lib", "html_report", "js") else NULL
   if (is.null(js_dir) || !dir.exists(js_dir)) skip("JS directory not found")
 
-  pins_file <- file.path(js_dir, "conjoint_pins.js")
-  if (!file.exists(pins_file)) skip("conjoint_pins.js not found")
+  pins_file <- file.path(js_dir, "cj_pins.js")
+  if (!file.exists(pins_file)) skip("cj_pins.js not found")
 
   pins_js <- paste(readLines(pins_file, warn = FALSE), collapse = "\n")
 
