@@ -54,6 +54,7 @@ turas_pins_js <- function(include_vendor = TRUE) {
   # Vendor libraries (loaded first, before TurasPins code)
   vendor_dir <- file.path(js_dir, "vendor")
   vendor_files <- c(
+    "html2canvas.min.js",
     "pptxgen.bundle.js"
   )
 

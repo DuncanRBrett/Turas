@@ -101,16 +101,8 @@
 
     // If pin has HTML-only content (no SVG chart, no table), render it
     // to an image first, then composite into the export
-    console.log("[TurasPins _build] Pin:", pin.title,
-      "| hasHtmlContent:", L.hasHtmlContent,
-      "| chartClone:", !!L.chart.clone,
-      "| tData:", !!L.tData,
-      "| tableHtml length:", (pin.tableHtml || "").length,
-      "| chartSvg length:", (pin.chartSvg || "").length);
     if (L.hasHtmlContent && !L.chart.clone && !L.tData) {
-      console.log("[TurasPins _build] Taking HTML content path for:", pin.title);
       _renderHtmlToImage(pin.tableHtml, L.usableW, function(result) {
-        console.log("[TurasPins _build] HTML render result:", result ? "got image " + result.width + "x" + result.height : "NULL");
         if (result) {
           // Recalculate layout with the rendered image dimensions
           var htmlImgH = Math.round(result.height * (L.usableW / result.width));
@@ -286,23 +278,26 @@
   };
 
   /**
-   * Render HTML content to a canvas image for pixel-perfect export.
+   * Render HTML content to a canvas image using html2canvas.
    *
-   * Two-phase approach:
-   * Phase 1: Render HTML off-screen with page's stylesheets applied,
-   *          then deep-clone with ALL computed styles inlined on every
-   *          element (since the SVG Blob has no stylesheet access).
-   * Phase 2: Serialize the styled clone via XMLSerializer (produces
-   *          well-formed XHTML), embed in SVG foreignObject, load via
-   *          Blob URL (not data URI — avoids encoding issues), render
-   *          to canvas.
+   * foreignObject SVG approaches fail because the canvas gets tainted
+   * by cross-origin security restrictions (SecurityError on toDataURL).
+   * html2canvas avoids this entirely — it walks the DOM and draws to
+   * canvas using native 2D context commands (fillRect, fillText, etc.).
+   * No SVG, no Image loading, no cross-origin taint.
    *
    * @param {string} html - Raw HTML content
    * @param {number} maxWidth - Container width in pixels
    * @param {function} callback - Called with {dataUrl, width, height} or null
    */
   function _renderHtmlToImage(html, maxWidth, callback) {
-    // Phase 1: Render off-screen to capture computed styles
+    if (typeof html2canvas === "undefined") {
+      console.warn("[TurasPins] html2canvas not available — HTML content cannot be exported");
+      callback(null);
+      return;
+    }
+
+    // Render off-screen with full stylesheet context
     var container = document.createElement("div");
     container.style.cssText =
       "position:absolute;left:-9999px;top:-9999px;width:" + maxWidth + "px;" +
@@ -320,96 +315,24 @@
     }
     height = Math.min(height, 1200);
 
-    // Deep-clone with ALL computed styles inlined on every element.
-    // The SVG Blob is an independent document with no stylesheet access,
-    // so every style must be inline for the render to match.
-    var styledClone = _deepCloneWithStyles(container);
+    var preset = TurasPins.QUALITY_PRESETS[TurasPins.EXPORT_QUALITY] ||
+                 TurasPins.QUALITY_PRESETS.standard;
 
-    document.body.removeChild(container);
-
-    // Phase 2: Serialize to XHTML and render via Blob URL
-    // XMLSerializer produces well-formed XML (self-closing tags)
-    // that foreignObject requires. innerHTML would produce HTML5
-    // with void elements that break SVG parsing.
-    styledClone.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
-    var xhtml = new XMLSerializer().serializeToString(styledClone);
-
-    var svgStr = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '">' +
-      '<foreignObject width="100%" height="100%">' +
-      xhtml +
-      '</foreignObject></svg>';
-
-    // 3. Use Blob URL — critically different from data URI.
-    //    Blob URLs handle encoding transparently, avoiding the malformed
-    //    XHTML issues that break data:image/svg+xml foreignObject rendering.
-    var svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
-    var url = URL.createObjectURL(svgBlob);
-
-    // Diagnostic: log SVG size and first/last chars to console
-    console.log("[TurasPins HTML export] SVG size:", svgStr.length,
-      "| width:", width, "| height:", height,
-      "| xhtml length:", xhtml.length,
-      "| starts with:", svgStr.substring(0, 80));
-
-    var img = new Image();
-    img.onload = function() {
-      URL.revokeObjectURL(url);
-      console.log("[TurasPins HTML export] Image loaded OK:", img.naturalWidth, "x", img.naturalHeight);
-      var preset = TurasPins.QUALITY_PRESETS[TurasPins.EXPORT_QUALITY] ||
-                   TurasPins.QUALITY_PRESETS.standard;
-      var scale = preset.scale;
-      var c = document.createElement("canvas");
-      c.width = width * scale;
-      c.height = height * scale;
-      var ctx = c.getContext("2d");
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(0, 0, c.width, c.height);
-      ctx.drawImage(img, 0, 0, c.width, c.height);
-      // Diagnostic: check if canvas has any non-white pixels
-      var sample = ctx.getImageData(Math.floor(c.width/2), Math.floor(c.height/2), 1, 1).data;
-      console.log("[TurasPins HTML export] Canvas centre pixel RGBA:", sample[0], sample[1], sample[2], sample[3]);
-      callback({ dataUrl: c.toDataURL("image/png"), width: width, height: height });
-    };
-    img.onerror = function(e) {
-      URL.revokeObjectURL(url);
-      console.error("[TurasPins HTML export] Image FAILED to load. Error:", e);
-      console.error("[TurasPins HTML export] SVG first 500 chars:", svgStr.substring(0, 500));
+    html2canvas(container, {
+      scale: preset.scale,
+      backgroundColor: "#ffffff",
+      width: width,
+      height: height,
+      logging: false,
+      useCORS: true
+    }).then(function(canvas) {
+      document.body.removeChild(container);
+      callback({ dataUrl: canvas.toDataURL("image/png"), width: width, height: height });
+    }).catch(function(err) {
+      document.body.removeChild(container);
+      console.error("[TurasPins] html2canvas failed:", err);
       callback(null);
-    };
-    img.src = url;
-  }
-
-  /**
-   * Deep-clone a DOM tree with ALL computed styles inlined on every element.
-   * Required because the SVG Blob is loaded as an independent document
-   * with no access to the page's stylesheets.
-   */
-  function _deepCloneWithStyles(original) {
-    var clone = original.cloneNode(true);
-    var origEls = original.querySelectorAll("*");
-    var cloneEls = clone.querySelectorAll("*");
-    _inlineAllStyles(original, clone);
-    for (var i = 0; i < origEls.length; i++) {
-      _inlineAllStyles(origEls[i], cloneEls[i]);
-    }
-    return clone;
-  }
-
-  /**
-   * Copy ALL computed styles from source to target as inline styles.
-   */
-  function _inlineAllStyles(source, target) {
-    if (source.nodeType !== 1) return;
-    var cs;
-    try { cs = window.getComputedStyle(source); } catch (e) { return; }
-    var cssText = "";
-    for (var i = 0; i < cs.length; i++) {
-      var prop = cs[i];
-      var val = cs.getPropertyValue(prop);
-      if (!val) continue;
-      cssText += prop + ":" + val + ";";
-    }
-    target.setAttribute("style", cssText);
+    });
   }
 
   /** Assemble export SVG from layout */

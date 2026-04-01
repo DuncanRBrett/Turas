@@ -85,14 +85,14 @@ test_that("Bundle size is within expected range", {
 
   size_kb <- nchar(js) / 1024
 
-  # PptxGenJS bundle is ~466KB, plus TurasPins files ~80KB = ~546KB minimum
-  # Allow up to 700KB for growth
+  # html2canvas ~199KB + PptxGenJS ~466KB + TurasPins ~80KB = ~745KB minimum
+  # Allow up to 900KB for growth
   expect_true(
-    size_kb > 500,
-    info = paste0("Bundle too small (", round(size_kb), "KB) — PptxGenJS may not be included")
+    size_kb > 700,
+    info = paste0("Bundle too small (", round(size_kb), "KB) — vendor libs may not be included")
   )
   expect_true(
-    size_kb < 700,
+    size_kb < 900,
     info = paste0("Bundle too large (", round(size_kb), "KB) — check for accidental duplication")
   )
 })
