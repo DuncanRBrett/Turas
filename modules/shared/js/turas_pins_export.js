@@ -351,7 +351,10 @@
     container.innerHTML = TurasPins._sanitizeHtml(html);
     document.body.appendChild(container);
 
-    var width = container.offsetWidth;
+    // Use scrollWidth for actual content width — avoids excess white space
+    // when flex/grid content is narrower than the container (e.g. 2 gauge
+    // cards in a 1252px container).
+    var width = Math.min(container.scrollWidth, maxWidth);
     var height = container.offsetHeight;
     if (height <= 0) {
       document.body.removeChild(container);
