@@ -348,13 +348,19 @@
       callback(null);
       return;
     }
-    if (height > 1200) {
-      console.warn("[TurasPins] Content height " + height + "px exceeds 1200px limit — truncating for export");
-    }
-    height = Math.min(height, 1200);
-
     var preset = TurasPins.QUALITY_PRESETS[TurasPins.EXPORT_QUALITY] ||
                  TurasPins.QUALITY_PRESETS.standard;
+
+    // Canvas pixel budget: cap at ~8 megapixels to prevent browser memory
+    // crashes on tall tables. Instead of truncating content, reduce the
+    // html2canvas scale so the full table renders at lower resolution.
+    var MAX_CANVAS_PIXELS = 8000000;
+    var renderScale = preset.scale;
+    var canvasPixels = (width * renderScale) * (height * renderScale);
+    if (canvasPixels > MAX_CANVAS_PIXELS) {
+      renderScale = Math.sqrt(MAX_CANVAS_PIXELS / (width * height));
+      renderScale = Math.max(renderScale, 1); // never below 1x
+    }
 
     // 10s timeout guards against html2canvas hanging; done flag prevents double-callback
     var done = false;
@@ -366,7 +372,7 @@
     }, 10000);
 
     html2canvas(container, {
-      scale: preset.scale,
+      scale: renderScale,
       backgroundColor: "#ffffff",
       width: width,
       height: height,
