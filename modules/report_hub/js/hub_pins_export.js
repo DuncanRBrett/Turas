@@ -77,12 +77,12 @@
     }
     if (!pin) { if (onComplete) onComplete(); return; }
 
-    // HTML-only pins (gauges, sig cards, simulators): delegate to shared
-    // pipeline which has the html2canvas path for rendering div content
-    var hasTable = pin.tableHtml && TurasPins._extractTableData &&
-                   TurasPins._extractTableData(pin.tableHtml);
-    var isHtmlOnly = pin.tableHtml && !pin.chartSvg && !hasTable;
-    if (isHtmlOnly && typeof TurasPins._exportToBlob === "function") {
+    // Use shared _exportToBlob (html2canvas) for all pins.
+    // inlineTableStyles (run at pin-forwarding time inside the iframe)
+    // has already inlined all computed styles including significance
+    // markers, heatmap colours, and all CSS formatting. This makes
+    // the HTML self-contained and renderable at the hub level.
+    if (typeof TurasPins._exportToBlob === "function") {
       TurasPins._exportToBlob(pin, function(blob) {
         if (blob) {
           var title = pin.title || pin.qTitle || "pinned";
@@ -98,6 +98,7 @@
       return;
     }
 
+    // Fallback: hub's own SVG renderer (no html2canvas available)
     if (pin.imageData) {
       var preImg = new Image();
       preImg.onload = function() {
@@ -438,28 +439,17 @@
     }
     if (!pin) { callback(null); return; }
 
-    // HTML-only pins (gauges, simulators): use shared html2canvas path
-    var hasTable = pin.tableHtml && TurasPins._extractTableData &&
-                   TurasPins._extractTableData(pin.tableHtml);
-    var isHtmlOnly = pin.tableHtml && !pin.chartSvg && !hasTable;
-    if (isHtmlOnly && typeof TurasPins._exportToBlob === "function") {
+    // Use the shared _exportToBlob which routes tableHtml through
+    // html2canvas. This preserves significance markers, heatmap colours,
+    // and all table formatting. The hub's inlineTableStyles (run at
+    // pin-forwarding time inside the iframe) has already inlined all
+    // computed styles, making the HTML self-contained and renderable
+    // at the hub level without module CSS classes.
+    if (typeof TurasPins._exportToBlob === "function") {
       TurasPins._exportToBlob(pin, callback);
       return;
     }
-
-    // Regular pins: use hub's own buildExportSVG with blob callback
-    if (pin.imageData) {
-      var pre = new Image();
-      pre.onload = function() {
-        buildExportSVG(pin, pre.naturalWidth, pre.naturalHeight, null, callback);
-      };
-      pre.onerror = function() {
-        buildExportSVG(pin, 0, 0, null, callback);
-      };
-      pre.src = pin.imageData;
-    } else {
-      buildExportSVG(pin, 0, 0, null, callback);
-    }
+    callback(null);
   }
 
   // ── Clipboard Copy ────────────────────────────────────────────────────────
@@ -525,24 +515,17 @@
       return;
     }
 
-    // Proxy TurasPins.getAll AND _exportToBlob to use hub's own rendering.
-    // The shared _exportToBlob renders at hub level where module CSS
-    // classes don't exist. hubExportToBlob uses the hub's buildExportSVG
-    // which has the styles inlined at pin-forwarding time.
+    // Proxy TurasPins.getAll to return hub pins. The shared _exportToBlob
+    // (html2canvas) works correctly because inlineTableStyles has already
+    // inlined all CSS at pin-forwarding time inside the iframe.
     var originalGetAll = TurasPins.getAll;
-    var originalExportToBlob = TurasPins._exportToBlob;
-
     TurasPins.getAll = function() { return items; };
-    TurasPins._exportToBlob = function(pin, callback) {
-      hubExportToBlob(pin.id, callback);
-    };
 
     var reportTitle = document.title || "Combined Report";
     TurasPins.exportPptx({
       filename: reportTitle.replace(/[^a-zA-Z0-9 _-]/g, "").replace(/\s+/g, "_").substring(0, 60) + "_pins",
       onComplete: function() {
         TurasPins.getAll = originalGetAll;
-        TurasPins._exportToBlob = originalExportToBlob;
       }
     });
   };
