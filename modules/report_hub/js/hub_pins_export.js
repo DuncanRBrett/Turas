@@ -142,7 +142,7 @@
    * Build SVG export slide and render to PNG.
    * Layout: brand bar -> title -> meta -> insight -> image -> chart -> table
    */
-  function buildExportSVG(pin, pinImageW, pinImageH, onComplete) {
+  function buildExportSVG(pin, pinImageW, pinImageH, onComplete, blobCallback) {
     var W = EXPORT_WIDTH;
     var pad = 14;
     var usableW = W - pad * 2;
@@ -296,7 +296,7 @@
     }
 
     // ---- Render to PNG ----
-    renderToPNG(svg, totalH, titleText, imgData, imgX, imgY, imageDisplayW, imageDisplayH, onComplete);
+    renderToPNG(svg, totalH, titleText, imgData, imgX, imgY, imageDisplayW, imageDisplayH, onComplete, blobCallback);
   }
 
   // ── Internal Helpers ───────────────────────────────────────────────────────
@@ -357,8 +357,10 @@
     return { clone: clone, scale: scale, height: chartVB[3] * scale };
   }
 
-  /** Render SVG to PNG at high resolution, compositing pin image on canvas. */
-  function renderToPNG(svg, totalH, titleText, imgData, imgX, imgY, imgW, imgH, onComplete) {
+  /** Render SVG to PNG at high resolution, compositing pin image on canvas.
+   *  If blobCallback is provided, returns blob via callback instead of downloading.
+   */
+  function renderToPNG(svg, totalH, titleText, imgData, imgX, imgY, imgW, imgH, onComplete, blobCallback) {
     var W = EXPORT_WIDTH;
     var scale = EXPORT_RENDER_SCALE;
     var svgData = new XMLSerializer().serializeToString(svg);
@@ -383,6 +385,11 @@
       var finishExport = function() {
         canvas.toBlob(function(blob) {
           if (!blob) { if (onComplete) onComplete(); return; }
+          if (blobCallback) {
+            blobCallback(blob);
+            if (onComplete) onComplete();
+            return;
+          }
           var slug = titleText.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 40);
           var a = document.createElement("a");
           a.href = URL.createObjectURL(blob);
@@ -413,6 +420,48 @@
     img.src = url;
   }
 
+  // ── Hub Blob Export (for PPTX and clipboard) ───────────────────────────────
+
+  /**
+   * Export a hub pin to a PNG blob using the hub's own rendering pipeline.
+   * This uses buildExportSVG (same as PNG download) which has the table
+   * styles inlined at pin-forwarding time. The shared _exportToBlob would
+   * render at the hub level where module CSS classes don't exist.
+   *
+   * @param {string} pinId - Pin ID
+   * @param {function} callback - Called with Blob or null
+   */
+  function hubExportToBlob(pinId, callback) {
+    var pin = null;
+    for (var i = 0; i < ReportHub.pinnedItems.length; i++) {
+      if (ReportHub.pinnedItems[i].id === pinId) { pin = ReportHub.pinnedItems[i]; break; }
+    }
+    if (!pin) { callback(null); return; }
+
+    // HTML-only pins (gauges, simulators): use shared html2canvas path
+    var hasTable = pin.tableHtml && TurasPins._extractTableData &&
+                   TurasPins._extractTableData(pin.tableHtml);
+    var isHtmlOnly = pin.tableHtml && !pin.chartSvg && !hasTable;
+    if (isHtmlOnly && typeof TurasPins._exportToBlob === "function") {
+      TurasPins._exportToBlob(pin, callback);
+      return;
+    }
+
+    // Regular pins: use hub's own buildExportSVG with blob callback
+    if (pin.imageData) {
+      var pre = new Image();
+      pre.onload = function() {
+        buildExportSVG(pin, pre.naturalWidth, pre.naturalHeight, null, callback);
+      };
+      pre.onerror = function() {
+        buildExportSVG(pin, 0, 0, null, callback);
+      };
+      pre.src = pin.imageData;
+    } else {
+      buildExportSVG(pin, 0, 0, null, callback);
+    }
+  }
+
   // ── Clipboard Copy ────────────────────────────────────────────────────────
 
   /**
@@ -427,7 +476,7 @@
     }
     if (!pin) return;
 
-    TurasPins._exportToBlob(pin, function(blob) {
+    hubExportToBlob(pinId, function(blob) {
       if (!blob) {
         TurasPins._showToast("Could not render pin");
         return;
@@ -465,11 +514,8 @@
    * shared PPTX engine can access them via TurasPins.getAll().
    */
   ReportHub.exportPptx = function() {
-    if (typeof PptxGenJS === "undefined" || typeof TurasPins === "undefined" ||
-        typeof TurasPins.exportPptx !== "function") {
-      if (typeof TurasPins !== "undefined" && TurasPins._showToast) {
-        TurasPins._showToast("PowerPoint export not available");
-      }
+    if (typeof PptxGenJS === "undefined") {
+      TurasPins._showToast("PowerPoint export not available");
       return;
     }
 
@@ -479,16 +525,24 @@
       return;
     }
 
-    // Proxy: temporarily override TurasPins.getAll() to return hub pins
+    // Proxy TurasPins.getAll AND _exportToBlob to use hub's own rendering.
+    // The shared _exportToBlob renders at hub level where module CSS
+    // classes don't exist. hubExportToBlob uses the hub's buildExportSVG
+    // which has the styles inlined at pin-forwarding time.
     var originalGetAll = TurasPins.getAll;
+    var originalExportToBlob = TurasPins._exportToBlob;
+
     TurasPins.getAll = function() { return items; };
+    TurasPins._exportToBlob = function(pin, callback) {
+      hubExportToBlob(pin.id, callback);
+    };
 
     var reportTitle = document.title || "Combined Report";
     TurasPins.exportPptx({
       filename: reportTitle.replace(/[^a-zA-Z0-9 _-]/g, "").replace(/\s+/g, "_").substring(0, 60) + "_pins",
       onComplete: function() {
-        // Restore original getAll
         TurasPins.getAll = originalGetAll;
+        TurasPins._exportToBlob = originalExportToBlob;
       }
     });
   };
