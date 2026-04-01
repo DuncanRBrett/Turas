@@ -276,27 +276,9 @@
 
           var slide = pres.addSlide();
 
-          // Title at top
-          var title = item.title || item.metricTitle || item.qTitle || item.qCode || "Pinned View";
-          slide.addText(title, {
-            x: MARGIN, y: 0.3, w: IMG_MAX_W, h: 0.5,
-            fontSize: 16, fontFace: "Segoe UI",
-            color: "1a2744", bold: true
-          });
-
-          // Subtitle or source info
-          var subtitle = item.subtitle || item.questionText || "";
-          var source = item.sourceLabel || "";
-          var metaText = [source, subtitle].filter(Boolean).join(" \u2014 ");
-          if (metaText) {
-            slide.addText(metaText, {
-              x: MARGIN, y: 0.75, w: IMG_MAX_W, h: 0.3,
-              fontSize: 10, fontFace: "Segoe UI", color: "94a3b8"
-            });
-          }
-
-          // Pin image — maintain original aspect ratio
-          var imgTop = 1.2;
+          // Pin image already contains title and metadata from the SVG
+          // render, so we place it near the top without duplicating text.
+          var imgTop = MARGIN;
           var availH = SLIDE_H - imgTop - MARGIN;
           var dims = _fitImage(imgW, imgH, IMG_MAX_W, Math.min(availH, IMG_MAX_H));
           var imgX = MARGIN + (IMG_MAX_W - dims.w) / 2; // centre horizontally
@@ -354,23 +336,8 @@
         var slide = pres.addSlide();
         var title = pin.title || pin.metricTitle || pin.qTitle || pin.qCode || "Pinned View";
 
-        slide.addText(title, {
-          x: MARGIN, y: 0.3, w: IMG_MAX_W, h: 0.5,
-          fontSize: 16, fontFace: "Segoe UI",
-          color: "1a2744", bold: true
-        });
-
-        var subtitle = pin.subtitle || pin.questionText || "";
-        var source = pin.sourceLabel || "";
-        var metaText = [source, subtitle].filter(Boolean).join(" \u2014 ");
-        if (metaText) {
-          slide.addText(metaText, {
-            x: MARGIN, y: 0.75, w: IMG_MAX_W, h: 0.3,
-            fontSize: 10, fontFace: "Segoe UI", color: "94a3b8"
-          });
-        }
-
-        var imgTop = 1.2;
+        // Pin image already contains title and metadata from the SVG render
+        var imgTop = MARGIN;
         var availH = SLIDE_H - imgTop - MARGIN;
         var dims = _fitImage(imgW, imgH, IMG_MAX_W, Math.min(availH, IMG_MAX_H));
         var imgX = MARGIN + (IMG_MAX_W - dims.w) / 2;

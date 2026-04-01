@@ -217,7 +217,14 @@ TurasPins._inlineCaptureStyles = function(source, target) {
   var cssText = "";
   for (var i = 0; i < props.length; i++) {
     var val = cs.getPropertyValue(props[i]);
-    if (val && val !== "normal" && val !== "none" && val !== "auto" &&
+    if (!val) continue;
+    // "display:none" must be preserved — downstream cleanup uses it to
+    // remove hidden banner columns. Skip "none" only for other properties.
+    if (props[i] === "display") {
+      cssText += "display:" + val + ";";
+      continue;
+    }
+    if (val !== "normal" && val !== "none" && val !== "auto" &&
         val !== "0px" && val !== "rgba(0, 0, 0, 0)" && val !== "transparent" &&
         val !== "static" && val !== "visible" && val !== "content-box") {
       cssText += props[i] + ":" + val + ";";
