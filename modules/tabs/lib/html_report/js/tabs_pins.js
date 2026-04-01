@@ -134,7 +134,7 @@
       excludedRows: excludedRows,
       insightText: insightText,
       sortState: tableSortState,
-      tableHtml: tableClone ? tableClone.outerHTML : "",
+      tableHtml: tableClone ? TurasPins.capturePortableHtml(tableClone) : "",
       chartSvg: chartSvgStr,
       baseText: baseText
     };

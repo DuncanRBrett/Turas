@@ -161,6 +161,69 @@ TurasPins._renderMarkdown = function(md) {
   return html;
 };
 
+// ── Portable HTML Capture ────────────────────────────────────────────────
+
+/**
+ * Create a portable HTML snapshot with all computed styles inlined.
+ * Use this at pin capture time to make HTML content render correctly
+ * in any context (e.g., hub combined report where the original CSS
+ * classes are not available).
+ *
+ * @param {Element} element - Live DOM element to capture
+ * @returns {string} HTML string with all styles inlined
+ */
+TurasPins.capturePortableHtml = function(element) {
+  if (!element) return "";
+  var clone = element.cloneNode(true);
+  var origEls = element.querySelectorAll("*");
+  var cloneEls = clone.querySelectorAll("*");
+
+  // Inline styles on root
+  TurasPins._inlineCaptureStyles(element, clone);
+  // Inline styles on all descendants
+  for (var i = 0; i < origEls.length; i++) {
+    TurasPins._inlineCaptureStyles(origEls[i], cloneEls[i]);
+  }
+  return clone.outerHTML;
+};
+
+/**
+ * Copy key visual computed styles from source to target as inline styles.
+ * Captures layout, typography, colour, borders — enough to render
+ * independently of any stylesheet.
+ * @param {Element} source - Live element with computed styles
+ * @param {Element} target - Clone element to receive inline styles
+ */
+TurasPins._inlineCaptureStyles = function(source, target) {
+  if (source.nodeType !== 1) return;
+  var cs;
+  try { cs = window.getComputedStyle(source); } catch (e) { return; }
+
+  var props = [
+    "display", "flex-direction", "flex-wrap", "justify-content", "align-items",
+    "gap", "padding", "margin", "width", "min-width", "max-width",
+    "height", "min-height", "font-size", "font-weight", "font-family",
+    "color", "background-color", "background", "border", "border-radius",
+    "border-collapse", "border-spacing", "text-align", "vertical-align",
+    "line-height", "letter-spacing", "text-transform", "white-space",
+    "overflow", "position", "top", "right", "bottom", "left",
+    "box-sizing", "opacity", "flex", "flex-shrink", "flex-grow"
+  ];
+
+  var cssText = "";
+  for (var i = 0; i < props.length; i++) {
+    var val = cs.getPropertyValue(props[i]);
+    if (val && val !== "normal" && val !== "none" && val !== "auto" &&
+        val !== "0px" && val !== "rgba(0, 0, 0, 0)" && val !== "transparent" &&
+        val !== "static" && val !== "visible" && val !== "content-box") {
+      cssText += props[i] + ":" + val + ";";
+    }
+  }
+  if (cssText) {
+    target.setAttribute("style", cssText);
+  }
+};
+
 // ── Toast Notification ───────────────────────────────────────────────────────
 
 /**

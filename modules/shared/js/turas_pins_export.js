@@ -340,22 +340,8 @@
     container.innerHTML = TurasPins._sanitizeHtml(html);
     document.body.appendChild(container);
 
-    // Measure actual content bounds — the container is maxWidth but flex/grid
-    // content may be narrower (e.g. 2 gauge cards in a 1252px container).
-    // Find the rightmost edge of child elements to crop white space.
-    var width = maxWidth;
+    var width = container.offsetWidth;
     var height = container.offsetHeight;
-    var children = container.querySelectorAll("*");
-    var maxRight = 0;
-    for (var ci = 0; ci < children.length; ci++) {
-      var rect = children[ci].getBoundingClientRect();
-      var containerLeft = container.getBoundingClientRect().left;
-      var right = rect.right - containerLeft;
-      if (right > maxRight) maxRight = right;
-    }
-    if (maxRight > 0 && maxRight < width) {
-      width = Math.ceil(maxRight) + 16; // 16px padding
-    }
     if (height <= 0) {
       document.body.removeChild(container);
       callback(null);
