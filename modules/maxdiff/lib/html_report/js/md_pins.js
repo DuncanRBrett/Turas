@@ -53,14 +53,17 @@
       chartSvg = new XMLSerializer().serializeToString(clone);
     }
 
-    // Table HTML
+    // Table HTML (with portable styles for hub)
     var tableHtml = "";
     var tableEl = panel.querySelector(".md-table");
     if (tableEl) {
       var tableClone = tableEl.cloneNode(true);
-      // Remove sort arrows from clone
-      tableClone.querySelectorAll(".sort-arrow").forEach(function(a) { a.remove(); });
-      tableHtml = tableClone.outerHTML;
+      var portableHtml = TurasPins.capturePortableHtml(tableEl, tableClone);
+      // Re-parse and remove sort arrows from styled clone
+      var tableTemp = document.createElement("div");
+      tableTemp.innerHTML = portableHtml;
+      tableTemp.querySelectorAll(".sort-arrow").forEach(function(a) { a.remove(); });
+      tableHtml = tableTemp.innerHTML;
     }
 
     // Insight text

@@ -190,8 +190,7 @@
     if (mode === "all" || mode === "table_insight") {
       var tableEl = source.querySelector(".cj-table") || source.querySelector("table");
       if (tableEl) {
-        var tableClone = tableEl.cloneNode(true);
-        tableHtml = tableClone.outerHTML;
+        tableHtml = TurasPins.capturePortableHtml(tableEl);
       }
     }
 

@@ -40,19 +40,20 @@
     return new XMLSerializer().serializeToString(svgClone);
   }
 
-  /** Capture table HTML, cloning and removing hidden rows. */
+  /** Capture table HTML with portable styles, cloning and removing hidden rows. */
   function captureTableHtml(section) {
     var tableEl = section.querySelector("table.seg-table, table");
     if (!tableEl) return "";
     var tableClone = tableEl.cloneNode(true);
-    var hidden = tableClone.querySelectorAll(
-      'tr[style*="display: none"], tr[style*="display:none"]'
-    );
-    hidden.forEach(function(row) { row.remove(); });
-    return tableClone.outerHTML;
+    var portableHtml = TurasPins.capturePortableHtml(tableEl, tableClone);
+    var tableTemp = document.createElement("div");
+    tableTemp.innerHTML = portableHtml;
+    tableTemp.querySelectorAll('tr[style*="display: none"], tr[style*="display:none"]')
+      .forEach(function(row) { row.remove(); });
+    return tableTemp.innerHTML;
   }
 
-  /** Capture fallback content for special sections (exec-summary, cards). */
+  /** Capture fallback content for special sections with portable styles. */
   function captureSpecialContent(section, sectionKey) {
     if (sectionKey === "exec-summary") {
       var execContent = "";
@@ -60,12 +61,12 @@
         ".seg-quality-banner, .seg-exec-block, .seg-finding-box, " +
         ".seg-key-insights-heading, .seg-callout"
       );
-      blocks.forEach(function(el) { execContent += el.outerHTML; });
+      blocks.forEach(function(el) { execContent += TurasPins.capturePortableHtml(el); });
       if (execContent) return '<div class="seg-pinned-exec-content">' + execContent + "</div>";
     }
     if (sectionKey === "cards") {
       var cardGrid = section.querySelector(".seg-cards-grid, .seg-profile-cards");
-      if (cardGrid) return '<div class="seg-pinned-exec-content">' + cardGrid.outerHTML + "</div>";
+      if (cardGrid) return '<div class="seg-pinned-exec-content">' + TurasPins.capturePortableHtml(cardGrid) + "</div>";
     }
     return "";
   }

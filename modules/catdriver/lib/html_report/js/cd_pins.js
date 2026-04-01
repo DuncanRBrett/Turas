@@ -60,28 +60,29 @@
     var svgEl = section.querySelector("svg.cd-chart, svg.cd-forest-plot");
     if (svgEl) chartSvg = new XMLSerializer().serializeToString(svgEl);
 
-    // Table HTML — capture visible rows (respects chip filtering)
+    // Table HTML — capture visible rows with portable styles (respects chip filtering)
     var tableHtml = "";
     var tableEl = section.querySelector("table.cd-table, table.cd-comp-table");
     if (tableEl) {
       var tableClone = tableEl.cloneNode(true);
-      var hidden = tableClone.querySelectorAll(
-        'tr[style*="display: none"], tr[style*="display:none"]'
-      );
-      hidden.forEach(function(row) { row.remove(); });
-      tableHtml = tableClone.outerHTML;
+      var portableHtml = TurasPins.capturePortableHtml(tableEl, tableClone);
+      var tableTemp = document.createElement("div");
+      tableTemp.innerHTML = portableHtml;
+      tableTemp.querySelectorAll('tr[style*="display: none"], tr[style*="display:none"]')
+        .forEach(function(row) { row.remove(); });
+      tableHtml = tableTemp.innerHTML;
     }
 
     // Overview card grids and insight elements
     if (sectionKey === "summary-cards" && !tableHtml && !chartSvg) {
       var cardGrid = section.querySelector(".cd-comp-cards");
-      if (cardGrid) tableHtml = '<div class="cd-pinned-exec-content">' + cardGrid.outerHTML + "</div>";
+      if (cardGrid) tableHtml = '<div class="cd-pinned-exec-content">' + TurasPins.capturePortableHtml(cardGrid) + "</div>";
     }
     if (sectionKey === "key-insights" && !tableHtml && !chartSvg) {
       var insightEls = section.querySelectorAll(".cd-comp-insight");
       if (insightEls.length > 0) {
         var insHtml = "";
-        insightEls.forEach(function(el) { insHtml += el.outerHTML; });
+        insightEls.forEach(function(el) { insHtml += TurasPins.capturePortableHtml(el); });
         tableHtml = '<div class="cd-pinned-exec-content">' + insHtml + "</div>";
       }
     }
@@ -90,20 +91,20 @@
     if (sectionKey === "exec-summary") {
       var execContent = "";
       var confidence = section.querySelector(".cd-model-confidence");
-      if (confidence) execContent += confidence.outerHTML;
+      if (confidence) execContent += TurasPins.capturePortableHtml(confidence);
       var callouts = section.querySelectorAll(".cd-callout");
-      callouts.forEach(function(c) { execContent += c.outerHTML; });
+      callouts.forEach(function(c) { execContent += TurasPins.capturePortableHtml(c); });
       var insightsList = section.querySelector(".cd-key-insights-heading");
-      if (insightsList && insightsList.parentElement) execContent += insightsList.parentElement.outerHTML;
+      if (insightsList && insightsList.parentElement) execContent += TurasPins.capturePortableHtml(insightsList.parentElement);
       var findingBox = section.querySelector(".cd-finding-box");
-      if (findingBox) execContent += findingBox.outerHTML;
+      if (findingBox) execContent += TurasPins.capturePortableHtml(findingBox);
       if (execContent) tableHtml = '<div class="cd-pinned-exec-content">' + execContent + "</div>";
     }
 
     // Diagnostics table
     if (sectionKey === "diagnostics" && !chartSvg) {
       var diagTable = section.querySelector("table.cd-diagnostics-table");
-      if (diagTable) tableHtml = diagTable.outerHTML;
+      if (diagTable) tableHtml = TurasPins.capturePortableHtml(diagTable);
     }
 
     // Model metadata from panel stats or header badges

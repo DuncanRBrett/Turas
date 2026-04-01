@@ -44,35 +44,41 @@
       visibleSegments.push(chip.getAttribute("data-segment"));
     });
 
-    // ── Table HTML (filtered) ──
+    // ── Table HTML (filtered, with portable styles for hub) ──
     var cleanTableHtml = "";
     if (tableArea && mode !== "chart") {
+      // Capture portable HTML first (reads computed styles from live DOM)
       var tableClone = tableArea.cloneNode(true);
-      tableClone.querySelectorAll("tr.segment-hidden").forEach(function(row) { row.remove(); });
-      tableClone.querySelectorAll(".wave-hidden").forEach(function(el) { el.remove(); });
+      var portableHtml = TurasPins.capturePortableHtml(tableArea, tableClone);
+
+      // Re-parse and filter the styled clone
+      var tableTemp = document.createElement("div");
+      tableTemp.innerHTML = portableHtml;
+      tableTemp.querySelectorAll("tr.segment-hidden").forEach(function(row) { row.remove(); });
+      tableTemp.querySelectorAll(".wave-hidden").forEach(function(el) { el.remove(); });
 
       var showFreq = panel.classList.contains("show-freq");
       var vsPrevVisible = panel.querySelectorAll(".tk-change-row.tk-vs-prev.visible").length > 0;
       var vsBaseVisible = panel.querySelectorAll(".tk-change-row.tk-vs-base.visible").length > 0;
 
       if (showFreq) {
-        tableClone.querySelectorAll(".tk-freq").forEach(function(el) { el.style.display = "block"; });
+        tableTemp.querySelectorAll(".tk-freq").forEach(function(el) { el.style.display = "block"; });
       }
       if (vsPrevVisible) {
-        tableClone.querySelectorAll(".tk-change-row.tk-vs-prev").forEach(function(row) {
+        tableTemp.querySelectorAll(".tk-change-row.tk-vs-prev").forEach(function(row) {
           row.style.display = "table-row";
         });
       } else {
-        tableClone.querySelectorAll(".tk-change-row.tk-vs-prev").forEach(function(row) { row.remove(); });
+        tableTemp.querySelectorAll(".tk-change-row.tk-vs-prev").forEach(function(row) { row.remove(); });
       }
       if (vsBaseVisible) {
-        tableClone.querySelectorAll(".tk-change-row.tk-vs-base").forEach(function(row) {
+        tableTemp.querySelectorAll(".tk-change-row.tk-vs-base").forEach(function(row) {
           row.style.display = "table-row";
         });
       } else {
-        tableClone.querySelectorAll(".tk-change-row.tk-vs-base").forEach(function(row) { row.remove(); });
+        tableTemp.querySelectorAll(".tk-change-row.tk-vs-base").forEach(function(row) { row.remove(); });
       }
-      cleanTableHtml = tableClone.innerHTML;
+      cleanTableHtml = tableTemp.innerHTML;
     }
 
     // ── Chart SVG with viewBox fix (Bug #1) ──
