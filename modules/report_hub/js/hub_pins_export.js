@@ -77,6 +77,27 @@
     }
     if (!pin) { if (onComplete) onComplete(); return; }
 
+    // HTML-only pins (gauges, sig cards, simulators): delegate to shared
+    // pipeline which has the html2canvas path for rendering div content
+    var hasTable = pin.tableHtml && TurasPins._extractTableData &&
+                   TurasPins._extractTableData(pin.tableHtml);
+    var isHtmlOnly = pin.tableHtml && !pin.chartSvg && !hasTable;
+    if (isHtmlOnly && typeof TurasPins._exportToBlob === "function") {
+      TurasPins._exportToBlob(pin, function(blob) {
+        if (blob) {
+          var title = pin.title || pin.qTitle || "pinned";
+          var slug = title.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 40);
+          var a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = "pinned_" + slug + ".png";
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          URL.revokeObjectURL(a.href);
+        }
+        if (onComplete) onComplete();
+      });
+      return;
+    }
+
     if (pin.imageData) {
       var preImg = new Image();
       preImg.onload = function() {
