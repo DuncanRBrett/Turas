@@ -1395,6 +1395,162 @@ JSON.parse(wrapper.getAttribute('data-chart-data'));
 
 ---
 
+## 14. AI Insights System (V10.9.0)
+
+### Architecture
+
+AI insights are a purely additive, feature-flagged layer. When `enable_ai_insights = TRUE` in the Settings sheet, the system:
+
+1. Auto-creates a JSON sidecar (`{config}_ai_insights.json`) if absent
+2. Sources AI modules from `modules/shared/lib/ai/` (shared) and `modules/tabs/lib/ai/` (tabs-specific)
+3. Generates per-question callouts via LLM with verification and selectivity passes
+4. Generates a two-stage executive summary
+5. Renders callout panels in the HTML report with gold styling
+6. Saves all output to the JSON sidecar for caching
+
+When disabled (default), no AI code is loaded, no files are checked, report is identical to pre-feature.
+
+### File Structure
+
+```
+modules/shared/lib/ai/           # Shared across all modules
+  ai_provider.R                   # Provider abstraction (Anthropic, OpenAI, Google, Ollama)
+  ai_schemas.R                    # Verification and selectivity schemas
+  ai_utils.R                      # JSON sidecar persistence, content-hash caching
+  ai_verify.R                     # Verification and selectivity passes
+
+modules/tabs/lib/ai/              # Tabs-specific
+  ai_extraction.R                 # Extract data from all_results for LLM context
+  ai_prompts.R                    # All prompt templates (text constants)
+  ai_schemas_tabs.R               # Callout and exec summary schemas
+  ai_insights.R                   # Main orchestrator (generate_all_insights)
+  ai_rendering.R                  # HTML rendering (callouts, exec summary, methodology note, CSS)
+  ai_easystats.R                  # APA-style statistical narration (rule-based, no LLM)
+
+modules/tabs/lib/html_report/js/
+  ai_insights.js                  # Toggle, dismiss JS handlers
+```
+
+### Pipeline Position in generate_html_report()
+
+```
+Step 1:  Validate inputs
+Step 2:  Transform data for HTML
+Step 2b: Build summary dashboard
+Step 3:  Build HTML tables
+Step 3b: Build SVG charts
+Step 3c: Process logos
+Step 3d: GENERATE AI INSIGHTS  ← new, between logos and page assembly
+Step 4:  Assemble HTML page (ai_insights passed to build_html_page)
+Step 5:  Write HTML file
+```
+
+### Choosing and Switching AI Models
+
+The AI model is configured in the JSON sidecar file. The default is Claude Sonnet 4 (Anthropic).
+
+#### Supported Providers
+
+| Provider | Sidecar `provider` | Sidecar `model` | API Key Env Var | Notes |
+|----------|-------------------|-----------------|-----------------|-------|
+| **Anthropic** | `"anthropic"` | `"claude-sonnet-4-20250514"` | `ANTHROPIC_API_KEY` | Default. Best quality for research insight. |
+| **OpenAI** | `"openai"` | `"gpt-4.1"` | `OPENAI_API_KEY` | Good alternative. |
+| **Google** | `"google"` | `"gemini-2.5-pro"` | `GOOGLE_API_KEY` | Google Gemini models. |
+| **Ollama** | `"ollama"` | `"gemma4:31b"` | (none needed) | Local models. No data leaves your machine. |
+
+#### How to Switch Models
+
+Edit the `config` section of the JSON sidecar file:
+
+```json
+{
+  "config": {
+    "provider": "openai",
+    "model": "gpt-4.1",
+    "api_key_env": "OPENAI_API_KEY"
+  }
+}
+```
+
+Then delete the `questions` entries and `executive_summary` to force regeneration with the new model:
+
+```json
+{
+  "config": { ... },
+  "questions": {},
+  "executive_summary": null
+}
+```
+
+#### Choosing a Model
+
+| Consideration | Recommendation |
+|---------------|----------------|
+| **Best quality** | Claude Sonnet 4 or GPT-4.1 — best at structured output and following analytical guardrails |
+| **Lowest cost** | Ollama with local model — free, but lower quality on complex analysis |
+| **Data privacy** | Ollama — no data leaves your machine. Important for sensitive client data |
+| **Speed** | Claude Haiku or GPT-4.1-mini — faster but less nuanced observations |
+| **White-label** | Match the model to the client's preferences or compliance requirements |
+
+The model name is automatically displayed in the methodology note in the About tab, so clients see exactly which model was used.
+
+#### Model-Specific Notes
+
+- **Anthropic:** Uses prompt caching (5-minute default). Second and subsequent questions in the same run are cheaper.
+- **OpenAI:** Structured output is well-supported. May need slight prompt adjustments.
+- **Ollama:** Install and run locally (`ollama serve`). Quality varies by model size. The `gemma4:31b` model is a good balance of quality and speed for local use.
+- **Google Gemini:** Structured output support varies. Test before production use.
+
+### Content-Hash Caching
+
+Each callout stores an MD5 hash of the data payload. On re-run:
+- Hash matches → cached callout preserved (zero API calls)
+- Hash differs → new callout generated
+- Researcher edits to narrative text → preserved (hash still matches)
+- Manual suppression (`has_insight: false`) → preserved
+
+### Pin System Integration
+
+AI callouts integrate with the TurasPins shared library:
+- `aiInsightHtml` field on pin data model
+- `pinFlags.aiInsight` for granular control
+- `TurasPins.shouldShow(pin, "aiInsight")` for consistent rendering
+- Captured via `capturePortableHtml()` with inline styles
+- Rendered in pinned cards, PNG export, and PPTX export
+- Gold SVG block in exports (not html2canvas — more reliable)
+
+### Adding AI Insights to Another Module
+
+1. Create `modules/{module}/lib/ai/` directory
+2. Implement module-specific files:
+   - `ai_extraction.R` — extract from that module's analytical output
+   - `ai_prompts.R` — module-specific prompt templates
+   - `ai_schemas_{module}.R` — module-specific schemas
+3. Reuse shared infrastructure without modification:
+   - `ai_provider.R`, `ai_schemas.R`, `ai_utils.R`, `ai_verify.R`
+4. Add `enable_ai_insights` to that module's config
+5. Add AI callout capture to that module's pin JS file
+
+### Testing
+
+7 test files, 135 test blocks:
+- `test_ai_provider.R` — provider abstraction, error handling
+- `test_ai_utils.R` — sidecar read/write, caching, token estimation
+- `test_ai_verify.R` — verification and selectivity logic
+- `test_ai_extraction.R` — data extraction from all_results
+- `test_ai_rendering.R` — HTML output, CSS structure, exec summary variants
+- `test_ai_insights_integration.R` — end-to-end pipeline with mocked LLM
+- `test_ai_easystats.R` — APA narration
+
+Run all AI tests: `Rscript tools/run_all_tests.R --module=tabs`
+
+### Related Documentation
+
+- [AI Insights User Guide](AI_INSIGHTS_USER_GUIDE.md) — setup, configuration, workflow
+- [AI Prompt Tuning Guide](AI_PROMPT_TUNING_GUIDE.md) — systematic prompt improvement
+
+---
+
 ## Appendix: Version History
 
 | Version | Changes |
@@ -1406,7 +1562,8 @@ JSON.parse(wrapper.getAttribute('data-chart-data'));
 | 10.4.3 | Sig findings with resolved letter codes, full question text, descriptors |
 | 10.5.0 | Advanced chart rendering with multi-column support, chart column picker |
 | 10.6.0 | Pinned views, slide export, insight system, comments sheet, save/hydrate |
-| 10.8.0 | Chart palette presets (warm/cool/research), segment rendering thresholds, clipboard copy for charts and pinned cards, qualitative slide image upload with canvas resize, legend percentages, BRAND_COLOUR global injection |
+| 10.8.0 | Chart palette presets, segment rendering, clipboard copy, qualitative slides, BRAND_COLOUR injection |
+| 10.9.0 | AI-generated insight callouts, executive summary, pin system checkbox picker, provider abstraction, JSON sidecar caching, easystats APA narration |
 
 ---
 

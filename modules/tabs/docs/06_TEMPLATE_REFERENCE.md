@@ -816,6 +816,18 @@ These settings control the interactive HTML report generated alongside the Excel
 | `dashboard_sort_gauges` | Sort dashboard gauges by value | Y / N | N |
 | `priority_metric` | Default metric for dashboard display | net / mean / index | net |
 
+### AI Insights
+
+| Setting | Description | Values | Default |
+|---------|-------------|--------|---------|
+| `enable_ai_insights` | Enable AI-generated insight callouts in the HTML report | TRUE / FALSE | FALSE |
+
+When enabled, Turas generates AI-assisted observational callouts for each question using a large language model (default: Claude Sonnet 4 via Anthropic API). A JSON sidecar file is auto-created alongside your config Excel with default settings. Callouts are cached — re-runs with unchanged data make no API calls.
+
+**Requirements:** An API key must be set in the R environment (`ANTHROPIC_API_KEY` by default). The `ellmer` package must be installed.
+
+**AI settings** (provider, model, temperature, verification, selectivity) are configured in the auto-generated JSON sidecar file (`{config_name}_ai_insights.json`). See the AI Insights User Guide for details.
+
 ------------------------------------------------------------------------
 
 ## Selection Sheet
