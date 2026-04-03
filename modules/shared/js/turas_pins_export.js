@@ -56,13 +56,31 @@
     var metaY = titleY + titleLines.length * 20 + 2;
     var contentTop = metaY + 10;
 
+    // Researcher insight (rendered as SVG text)
     var insightEl = null, insightH = 0;
     if (insightBlocks.length > 0) {
       insightEl = TurasPins._renderInsightSVG(insightBlocks, pad + 14, contentTop + 14, usableW - 16, 7.5);
       insightH = insightEl.height + 18;
     }
 
-    var imgTopY = contentTop + insightH + (insightH > 0 ? 4 : 0);
+    // AI callout (rendered as SVG text with gold accent — reliable across all exports)
+    var aiInsightEl = null, aiInsightH = 0;
+    var showAi = pin.aiInsightHtml && (
+      (pin.pinFlags && pin.pinFlags.aiInsight) ||
+      (!pin.pinFlags && pin.aiInsightHtml)
+    );
+    if (showAi) {
+      var aiText = _extractTextFromHtml(pin.aiInsightHtml);
+      if (aiText) {
+        var aiY = contentTop + insightH + (insightH > 0 ? 4 : 0);
+        var aiBlocks = [{ type: "para", runs: [{ text: aiText, bold: false, italic: false }] }];
+        aiInsightEl = TurasPins._renderInsightSVG(aiBlocks, pad + 14, aiY + 28, usableW - 16, 7.5);
+        aiInsightH = aiInsightEl.height + 36;
+      }
+    }
+
+    var imgTopY = contentTop + insightH + aiInsightH +
+      (insightH > 0 || aiInsightH > 0 ? 4 : 0);
     var imgDispW = 0, imgDispH = 0;
     if (pin.imageData && imgW > 0 && imgH > 0) {
       imgDispW = Math.min(usableW, imgW);
@@ -72,28 +90,13 @@
     var chartTopY = imgTopY + imgDispH + (imgDispH > 0 ? 4 : 0);
     var chartInfo = _chart(pin, usableW, chartTopY);
     var tableTopY = chartInfo.bottomY + (chartInfo.h > 0 ? 4 : 0);
-    var mode = pin.pinMode || "all";
     var tData = null, estTH = 0;
     var hasHtmlContent = false;
-    // Combine AI callout + table into a single HTML block for html2canvas
     var combinedHtml = "";
-    // AI insight callout (rendered via html2canvas to preserve styling)
-    var showAi = pin.aiInsightHtml && (
-      (pin.pinFlags && pin.pinFlags.aiInsight) ||
-      (!pin.pinFlags && pin.aiInsightHtml)
-    );
-    if (showAi) {
-      combinedHtml += pin.aiInsightHtml;
-      hasHtmlContent = true;
-    }
-    // Table HTML
+    // Table HTML only (AI callout rendered as SVG above)
     var showTable = pin.tableHtml && TurasPins.shouldShow(pin, "table");
     if (showTable && pin.tableHtml.trim().length > 0) {
-      // Route ALL tableHtml through html2canvas for pixel-perfect export.
-      // The SVG table renderer (_extractTableData → _renderTableSVG) strips
-      // CSS formatting — header colours, significance markers, backgrounds.
-      // html2canvas preserves the full visual styling.
-      combinedHtml += pin.tableHtml;
+      combinedHtml = pin.tableHtml;
       hasHtmlContent = true;
     }
 
@@ -101,6 +104,8 @@
       pad: pad, usableW: usableW, titleText: titleText,
       titleLines: titleLines, titleY: titleY, metaY: metaY,
       insightY: contentTop, insightH: insightH, insightEl: insightEl,
+      aiInsightY: contentTop + insightH + (insightH > 0 ? 4 : 0),
+      aiInsightH: aiInsightH, aiInsightEl: aiInsightEl,
       imgTopY: imgTopY, imgDispW: imgDispW, imgDispH: imgDispH,
       chartTopY: chartTopY, chart: chartInfo,
       tableTopY: tableTopY, tData: tData, hasHtmlContent: hasHtmlContent,
@@ -169,6 +174,40 @@
     bar.setAttribute("width", "4"); bar.setAttribute("height", aH);
     bar.setAttribute("fill", brand); bar.setAttribute("rx", "2");
     svg.appendChild(bar); svg.appendChild(insightEl.element);
+  }
+
+  /** Render AI callout block with gold accent in SVG export */
+  function _addAiInsight(svg, aiInsightEl, y, pad, usableW) {
+    var aH = Math.max(36, aiInsightEl.height + 22);
+    // Gold background
+    _rect(svg, pad, y + 2, usableW, aH, "#fdf8ed", "4");
+    // Gold left accent bar
+    var bar = document.createElementNS(NS, "rect");
+    bar.setAttribute("x", pad); bar.setAttribute("y", y + 2);
+    bar.setAttribute("width", "4"); bar.setAttribute("height", aH);
+    bar.setAttribute("fill", "#c9a84c"); bar.setAttribute("rx", "2");
+    svg.appendChild(bar);
+    // "AI-ASSISTED INSIGHT" label
+    var label = document.createElementNS(NS, "text");
+    label.setAttribute("x", pad + 22); label.setAttribute("y", y + 16);
+    label.setAttribute("fill", "#c9a84c"); label.setAttribute("font-size", "9");
+    label.setAttribute("font-weight", "600"); label.setAttribute("letter-spacing", "1");
+    label.textContent = "\u2726 AI-ASSISTED INSIGHT";
+    svg.appendChild(label);
+    // Narrative text
+    svg.appendChild(aiInsightEl.element);
+  }
+
+  /** Extract plain text from AI callout HTML */
+  function _extractTextFromHtml(html) {
+    if (!html) return "";
+    var tmp = document.createElement("div");
+    tmp.innerHTML = html;
+    // Get the callout body text (skip header/label)
+    var body = tmp.querySelector(".ai-callout-body");
+    if (body) return body.textContent.trim();
+    // Fallback: strip all tags
+    return tmp.textContent.trim();
   }
 
   function _wrapLines(text, maxW, cw) {
@@ -416,6 +455,7 @@
     _addTitle(svg, L.titleLines, L.pad, L.titleY);
     _addMeta(svg, _meta(pin), L.pad, L.metaY);
     if (L.insightEl && L.insightH > 0) _addInsight(svg, L.insightEl, L.insightY, L.pad, L.usableW, brand);
+    if (L.aiInsightEl && L.aiInsightH > 0) _addAiInsight(svg, L.aiInsightEl, L.aiInsightY, L.pad, L.usableW);
     if (L.chart.clone && L.chart.h > 0) {
       var cg = document.createElementNS(NS, "g");
       cg.setAttribute("transform", "translate(" + L.pad + "," + L.chartTopY + ") scale(" + L.chart.scale + ")");
