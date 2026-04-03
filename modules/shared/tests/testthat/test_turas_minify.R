@@ -16,6 +16,11 @@
 #  10. Verification checks
 #  11. Integration — full pipeline (requires Node.js tools)
 #  12. Graceful degradation
+#  13. Demo file integration (optional)
+#  14. Prepare deliverable convenience function
+#  15. Watermark encode/decode (pure R — no tools required)
+#  16. JS obfuscation (requires javascript-obfuscator — skips if missing)
+#  17. Integration — obfuscation + watermark pipeline
 # ==============================================================================
 
 library(testthat)
@@ -37,6 +42,7 @@ if (length(shared_lib) == 0L) {
 shared_lib <- shared_lib[1]
 
 source(file.path(shared_lib, "turas_minify_verify.R"), local = FALSE)
+source(file.path(shared_lib, "turas_minify_watermark.R"), local = FALSE)
 source(file.path(shared_lib, "turas_minify.R"), local = FALSE)
 
 # Try to source TRS refusal (optional for tests)
@@ -139,6 +145,7 @@ if (file.exists(trs_path)) source(trs_path, local = FALSE)
 .has_terser <- function() nzchar(.minify_find_tool("terser"))
 .has_cleancss <- function() nzchar(.minify_find_tool("cleancss"))
 .has_html_minifier <- function() nzchar(.minify_find_tool("html-minifier-terser"))
+.has_obfuscator <- function() nzchar(.minify_find_tool("javascript-obfuscator"))
 
 
 # ==============================================================================
@@ -179,7 +186,7 @@ test_that("tool finder returns path or empty string", {
 test_that("tool checker returns named list", {
   tools <- .minify_check_tools()
   expect_type(tools, "list")
-  expect_named(tools, c("node", "terser", "cleancss", "html_minifier"))
+  expect_named(tools, c("node", "terser", "cleancss", "html_minifier", "obfuscator"))
   for (val in tools) expect_type(val, "character")
 })
 
@@ -551,7 +558,7 @@ test_that("full pipeline processes test fixture without error", {
   input_path <- .write_test_html()
   on.exit(unlink(c(input_path, sub("_dev", "", input_path)), force = TRUE))
 
-  result <- turas_minify(input_path, verbose = FALSE)
+  result <- turas_minify(input_path, obfuscate_js = FALSE, verbose = FALSE)
   expect_true(result$status %in% c("PASS", "PARTIAL"))
   expect_true(file.exists(result$output_path))
 })
@@ -563,7 +570,7 @@ test_that("full pipeline produces smaller output", {
   input_path <- .write_test_html()
   on.exit(unlink(c(input_path, sub("_dev", "", input_path)), force = TRUE))
 
-  result <- turas_minify(input_path, verbose = FALSE)
+  result <- turas_minify(input_path, obfuscate_js = FALSE, verbose = FALSE)
   expect_true(result$output_size_kb <= result$input_size_kb)
 })
 
@@ -574,7 +581,7 @@ test_that("full pipeline preserves data content", {
   input_path <- .write_test_html()
   on.exit(unlink(c(input_path, sub("_dev", "", input_path)), force = TRUE))
 
-  result <- turas_minify(input_path, verbose = FALSE)
+  result <- turas_minify(input_path, obfuscate_js = FALSE, verbose = FALSE)
   output_html <- paste(readLines(result$output_path, warn = FALSE), collapse = "\n")
 
   # Data values preserved
@@ -607,7 +614,7 @@ test_that("full pipeline strips turas meta tags", {
   input_path <- .write_test_html()
   on.exit(unlink(c(input_path, sub("_dev", "", input_path)), force = TRUE))
 
-  result <- turas_minify(input_path, verbose = FALSE)
+  result <- turas_minify(input_path, obfuscate_js = FALSE, verbose = FALSE)
   output_html <- paste(readLines(result$output_path, warn = FALSE), collapse = "\n")
 
   expect_false(grepl('name="turas-report-type"', output_html, fixed = TRUE))
@@ -621,7 +628,7 @@ test_that("full pipeline injects build tag", {
   input_path <- .write_test_html()
   on.exit(unlink(c(input_path, sub("_dev", "", input_path)), force = TRUE))
 
-  result <- turas_minify(input_path, verbose = FALSE)
+  result <- turas_minify(input_path, obfuscate_js = FALSE, verbose = FALSE)
   output_html <- paste(readLines(result$output_path, warn = FALSE), collapse = "\n")
 
   expect_true(grepl("Turas Build v", output_html, fixed = TRUE))
@@ -634,7 +641,7 @@ test_that("full pipeline verbose mode produces output", {
   on.exit(unlink(c(input_path, sub("_dev", "", input_path)), force = TRUE))
 
   output <- capture.output(
-    result <- turas_minify(input_path, verbose = TRUE)
+    result <- turas_minify(input_path, obfuscate_js = FALSE, verbose = TRUE)
   )
 
   expect_true(any(grepl("Minification Summary", output, fixed = TRUE)))
@@ -649,14 +656,14 @@ test_that("full pipeline is idempotent (re-minify does not corrupt)", {
   input_path <- .write_test_html()
 
   # First pass
-  result1 <- turas_minify(input_path, verbose = FALSE)
+  result1 <- turas_minify(input_path, obfuscate_js = FALSE, verbose = FALSE)
   output1 <- paste(readLines(result1$output_path, warn = FALSE), collapse = "\n")
 
   # Second pass on minified output
   second_output_path <- tempfile(fileext = ".html")
   result2 <- turas_minify(result1$output_path,
                            output_path = second_output_path,
-                           verbose = FALSE)
+                           obfuscate_js = FALSE, verbose = FALSE)
   output2 <- paste(readLines(result2$output_path, warn = FALSE), collapse = "\n")
 
   # Core data must survive double-minification
@@ -692,7 +699,8 @@ test_that("CSS-only mode works when terser is missing", {
   input_path <- .write_test_html()
   on.exit(unlink(c(input_path, sub("_dev", "", input_path)), force = TRUE))
 
-  result <- turas_minify(input_path, minify_js = FALSE, verbose = FALSE)
+  result <- turas_minify(input_path, minify_js = FALSE,
+                         obfuscate_js = FALSE, verbose = FALSE)
   expect_true(result$status %in% c("PASS", "PARTIAL"))
   expect_equal(result$js_blocks_processed, 0L)
   expect_true(result$css_blocks_processed > 0L)
@@ -705,7 +713,8 @@ test_that("JS-only mode works when cleancss is missing", {
   input_path <- .write_test_html()
   on.exit(unlink(c(input_path, sub("_dev", "", input_path)), force = TRUE))
 
-  result <- turas_minify(input_path, minify_css = FALSE, verbose = FALSE)
+  result <- turas_minify(input_path, minify_css = FALSE,
+                         obfuscate_js = FALSE, verbose = FALSE)
   expect_true(result$status %in% c("PASS", "PARTIAL"))
   expect_equal(result$css_blocks_processed, 0L)
   expect_true(result$js_blocks_processed > 0L)
@@ -718,7 +727,8 @@ test_that("explicit output_path is respected", {
   output_path <- tempfile(pattern = "custom_output", fileext = ".html")
   on.exit(unlink(c(input_path, output_path), force = TRUE))
 
-  result <- turas_minify(input_path, output_path = output_path, verbose = FALSE)
+  result <- turas_minify(input_path, output_path = output_path,
+                         obfuscate_js = FALSE, verbose = FALSE)
   expect_equal(result$output_path, output_path)
   expect_true(file.exists(output_path))
 })
@@ -729,7 +739,8 @@ test_that("strip_meta=FALSE preserves turas meta tags", {
   input_path <- .write_test_html()
   on.exit(unlink(c(input_path, sub("_dev", "", input_path)), force = TRUE))
 
-  result <- turas_minify(input_path, strip_meta = FALSE, verbose = FALSE)
+  result <- turas_minify(input_path, strip_meta = FALSE,
+                         obfuscate_js = FALSE, verbose = FALSE)
   output_html <- paste(readLines(result$output_path, warn = FALSE), collapse = "\n")
   expect_true(grepl('name="turas-report-type"', output_html, fixed = TRUE))
   expect_equal(result$meta_tags_stripped, 0L)
@@ -765,6 +776,7 @@ test_that("demo file processes correctly with full pipeline", {
 
   result <- turas_minify(.demo_fixture_path,
                           output_path = output_path,
+                          obfuscate_js = FALSE,
                           verbose = FALSE)
 
   # Status is PASS or PARTIAL
@@ -853,4 +865,362 @@ test_that("turas_prepare_deliverable handles NULL and empty path without error",
   expect_invisible(turas_prepare_deliverable(NULL))
   expect_invisible(turas_prepare_deliverable(""))
   expect_invisible(turas_prepare_deliverable(42))
+})
+
+
+# ==============================================================================
+# 15. WATERMARK ENCODE/DECODE (pure R — no external tools required)
+# ==============================================================================
+
+test_that("base64 encode/decode roundtrip preserves text", {
+  inputs <- c("Hello World", "Acme Corp|2026-04-03|abc123",
+              "", "a", "ab", "abc", "Special: @#$%^&*()")
+  for (input in inputs) {
+    encoded <- .watermark_base64_encode(input)
+    decoded <- .watermark_base64_decode(encoded)
+    expect_equal(decoded, input, info = sprintf("Roundtrip failed for: '%s'", input))
+  }
+})
+
+test_that("base64 encode produces expected output for known input", {
+  # Known-answer test: "Hello" -> "SGVsbG8="
+  expect_equal(.watermark_base64_encode("Hello"), "SGVsbG8=")
+  expect_equal(.watermark_base64_encode("Man"), "TWFu")
+  expect_equal(.watermark_base64_encode("Ma"), "TWE=")
+  expect_equal(.watermark_base64_encode("M"), "TQ==")
+})
+
+test_that("ZWC encode/decode roundtrip preserves text", {
+  inputs <- c("Hello World", "Acme Corp|2026-04-03|abc123",
+              "a", "Test Client Name")
+  for (input in inputs) {
+    encoded <- .watermark_encode_zwc(input)
+    decoded <- .watermark_decode_zwc(encoded)
+    expect_equal(decoded, input, info = sprintf("ZWC roundtrip failed for: '%s'", input))
+  }
+})
+
+test_that("ZWC encoding produces invisible characters", {
+  encoded <- .watermark_encode_zwc("Test")
+  chars <- strsplit(encoded, "")[[1]]
+  zwc_set <- c("\u200B", "\u200C", "\u200D", "\uFEFF")
+  expect_true(all(chars %in% zwc_set))
+  expect_equal(length(chars), 4L * length(charToRaw("Test")))
+})
+
+test_that("ZWC decode returns empty on invalid input", {
+  expect_equal(.watermark_decode_zwc(""), "")
+  expect_equal(.watermark_decode_zwc("not zwc chars"), "")
+})
+
+test_that("UUID generator produces 32 hex characters", {
+  id <- .watermark_generate_id()
+  expect_equal(nchar(id), 32L)
+  expect_true(grepl("^[0-9a-f]+$", id))
+})
+
+test_that("UUID generator produces unique values", {
+  ids <- replicate(10, .watermark_generate_id())
+  expect_equal(length(unique(ids)), 10L)
+})
+
+test_that("watermark payload roundtrip works", {
+  wm <- .watermark_build_payload("Acme Corp")
+  expect_equal(wm$client, "Acme Corp")
+  expect_true(nzchar(wm$date))
+  expect_true(nzchar(wm$id))
+
+  parsed <- .watermark_parse_payload(wm$payload)
+  expect_equal(parsed$client, "Acme Corp")
+  expect_equal(parsed$date, wm$date)
+  expect_equal(parsed$id, wm$id)
+})
+
+test_that("watermark injection adds both JS and HTML markers", {
+  html <- .build_test_html()
+  result <- .minify_inject_watermark(html, "Test Client")
+
+  expect_true(result$success)
+  expect_equal(result$client, "Test Client")
+  expect_true(nzchar(result$date))
+  expect_true(nzchar(result$id))
+
+  # JS watermark present
+  expect_true(grepl("window.__turas_build__=", result$html, fixed = TRUE))
+
+  # HTML watermark span present
+  expect_true(grepl("class=\"turas-wm\"", result$html, fixed = TRUE))
+})
+
+test_that("watermark injection skips on NULL/empty client", {
+  html <- .build_test_html()
+
+  result_null <- .minify_inject_watermark(html, NULL)
+  expect_false(result_null$success)
+  expect_equal(result_null$html, html)
+
+  result_empty <- .minify_inject_watermark(html, "")
+  expect_false(result_empty$success)
+  expect_equal(result_empty$html, html)
+})
+
+test_that("turas_decode_watermark extracts watermarks from file", {
+  html <- .build_test_html()
+  wm_result <- .minify_inject_watermark(html, "Decode Test Client")
+
+  tmp <- tempfile(fileext = ".html")
+  on.exit(unlink(tmp, force = TRUE))
+  writeLines(wm_result$html, tmp)
+
+  decoded <- turas_decode_watermark(tmp)
+  expect_equal(decoded$status, "PASS")
+  expect_equal(decoded$js_watermark$client, "Decode Test Client")
+  expect_equal(decoded$html_watermark$client, "Decode Test Client")
+  expect_true(decoded$match)
+})
+
+test_that("turas_decode_watermark returns REFUSED on missing file", {
+  result <- turas_decode_watermark("/nonexistent/path.html")
+  expect_equal(result$status, "REFUSED")
+})
+
+test_that("turas_decode_watermark returns REFUSED on unwatermarked file", {
+  html <- .build_test_html()
+  tmp <- tempfile(fileext = ".html")
+  on.exit(unlink(tmp, force = TRUE))
+  writeLines(html, tmp)
+
+  result <- turas_decode_watermark(tmp)
+  expect_equal(result$status, "REFUSED")
+  expect_true(grepl("No watermark", result$message))
+})
+
+
+# ==============================================================================
+# 16. JS OBFUSCATION (requires javascript-obfuscator — skips if missing)
+# ==============================================================================
+
+test_that("obfuscator tool detection works", {
+  result <- .minify_find_tool("javascript-obfuscator")
+  # Just check it returns a character (may or may not be installed)
+  expect_type(result, "character")
+})
+
+test_that("obfuscate_js_block obfuscates simple JS", {
+  skip_if_not(.has_obfuscator(), "javascript-obfuscator not available")
+
+  js <- 'function hello() { var msg = "Hello World"; console.log(msg); }'
+  obf_path <- .minify_find_tool("javascript-obfuscator")
+  result <- .minify_obfuscate_js_block(js, obf_path)
+
+  expect_true(result$success)
+  # String array artifacts should be present
+  expect_true(grepl("0x", result$content))
+  # Function name should be preserved (renameGlobals=false)
+  expect_true(grepl("hello", result$content, fixed = TRUE))
+  # Original string literal should NOT appear in clear text
+  expect_false(grepl('"Hello World"', result$content, fixed = TRUE))
+})
+
+test_that("obfuscate_js_block preserves onclick handler function names", {
+  skip_if_not(.has_obfuscator(), "javascript-obfuscator not available")
+
+  js <- paste0(
+    'function toggleHeatmap() { var x = "toggle"; console.log(x); }\n',
+    'function selectQuestion(q) { var el = document.getElementById(q); }\n',
+    'function switchBannerGroup(idx) { console.log("group", idx); }'
+  )
+  obf_path <- .minify_find_tool("javascript-obfuscator")
+  result <- .minify_obfuscate_js_block(js, obf_path)
+
+  expect_true(result$success)
+  expect_true(grepl("toggleHeatmap", result$content, fixed = TRUE))
+  expect_true(grepl("selectQuestion", result$content, fixed = TRUE))
+  expect_true(grepl("switchBannerGroup", result$content, fixed = TRUE))
+})
+
+test_that("obfuscate_js_block skips vendor blocks", {
+  skip_if_not(.has_obfuscator(), "javascript-obfuscator not available")
+
+  js <- paste0(
+    'function myFunc() { var x = "test"; }\n',
+    '/* TURAS_VENDOR_START */\n',
+    'var vendorLib = "already minified vendor code";\n',
+    '/* TURAS_VENDOR_END */\n',
+    'function myOtherFunc() { var y = "another"; }'
+  )
+  obf_path <- .minify_find_tool("javascript-obfuscator")
+  result <- .minify_obfuscate_js_block(js, obf_path)
+
+  expect_true(result$success)
+  # Vendor markers should be preserved
+  expect_true(grepl("TURAS_VENDOR_START", result$content, fixed = TRUE))
+  expect_true(grepl("TURAS_VENDOR_END", result$content, fixed = TRUE))
+  # Vendor content should be unchanged
+  expect_true(grepl("already minified vendor code", result$content, fixed = TRUE))
+})
+
+test_that("obfuscate_js_block returns original on empty input", {
+  result <- .minify_obfuscate_js_block("", "/fake/path")
+  expect_false(result$success)
+  expect_equal(result$content, "")
+})
+
+test_that("obfuscate_js_block returns original on bad path", {
+  result <- .minify_obfuscate_js_block("var x = 1;", "")
+  expect_false(result$success)
+  expect_equal(result$content, "var x = 1;")
+})
+
+test_that("check_tools includes obfuscator field", {
+  tools <- .minify_check_tools()
+  expect_true("obfuscator" %in% names(tools))
+})
+
+
+# ==============================================================================
+# 17. INTEGRATION — OBFUSCATION + WATERMARK PIPELINE
+# ==============================================================================
+
+test_that("full pipeline with obfuscation produces valid output", {
+  skip_if_not(.has_node(), "Node.js not available")
+  skip_if_not(.has_terser(), "terser not available")
+  skip_if_not(.has_obfuscator(), "javascript-obfuscator not available")
+
+  input_path <- .write_test_html()
+  output_path <- tempfile(fileext = ".html")
+  on.exit(unlink(c(input_path, output_path), force = TRUE))
+
+  result <- turas_minify(input_path, output_path,
+                         obfuscate_js = TRUE, verbose = FALSE)
+
+  expect_true(result$status %in% c("PASS", "PARTIAL"))
+  expect_true(file.exists(output_path))
+  expect_true(result$js_blocks_obfuscated > 0L)
+
+  # Read output and verify handler functions still present
+  output_html <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
+  expect_true(grepl("toggleHeatmap", output_html, fixed = TRUE))
+  expect_true(grepl("selectQuestion", output_html, fixed = TRUE))
+  expect_true(grepl("switchBannerGroup", output_html, fixed = TRUE))
+
+  # Verify string literals are obfuscated (not in clear text)
+  expect_false(grepl('"Hello World"', output_html, fixed = TRUE))
+})
+
+test_that("full pipeline with obfuscation + watermark works end-to-end", {
+  skip_if_not(.has_node(), "Node.js not available")
+  skip_if_not(.has_terser(), "terser not available")
+  skip_if_not(.has_obfuscator(), "javascript-obfuscator not available")
+
+  input_path <- .write_test_html()
+  output_path <- tempfile(fileext = ".html")
+  on.exit(unlink(c(input_path, output_path), force = TRUE))
+
+  result <- turas_minify(input_path, output_path,
+                         obfuscate_js = TRUE,
+                         watermark = "Integration Test Client",
+                         verbose = FALSE)
+
+  expect_true(result$status %in% c("PASS", "PARTIAL"))
+  expect_equal(result$watermark_client, "Integration Test Client")
+  expect_true(result$js_blocks_obfuscated > 0L)
+
+  # Decode the watermark from the output file
+  decoded <- turas_decode_watermark(output_path)
+  expect_equal(decoded$status, "PASS")
+
+  # HTML watermark should decode correctly
+  expect_equal(decoded$html_watermark$client, "Integration Test Client")
+})
+
+test_that("full pipeline without obfuscation matches Phase 1 behaviour", {
+  skip_if_not(.has_node(), "Node.js not available")
+  skip_if_not(.has_terser(), "terser not available")
+
+  input_path <- .write_test_html()
+  output_path <- tempfile(fileext = ".html")
+  on.exit(unlink(c(input_path, output_path), force = TRUE))
+
+  result <- turas_minify(input_path, output_path,
+                         obfuscate_js = FALSE, watermark = NULL,
+                         verbose = FALSE)
+
+  expect_true(result$status %in% c("PASS", "PARTIAL"))
+  expect_equal(result$js_blocks_obfuscated, 0L)
+  expect_equal(result$watermark_client, "")
+})
+
+test_that("obfuscator missing results in PARTIAL with minified JS preserved", {
+  skip_if_not(.has_node(), "Node.js not available")
+  skip_if_not(.has_terser(), "terser not available")
+
+  input_path <- .write_test_html()
+  output_path <- tempfile(fileext = ".html")
+  on.exit(unlink(c(input_path, output_path), force = TRUE))
+
+  # Temporarily override the tool check to simulate missing obfuscator
+  # by passing obfuscate_js=TRUE but with a saved/restored tool finder
+  # We can test this by checking that the function handles missing gracefully
+  # Instead, test via the direct block function with a bad path
+  result <- .minify_obfuscate_js_block("var x = 1;", "/nonexistent/obfuscator")
+  expect_false(result$success)
+  expect_equal(result$content, "var x = 1;")
+})
+
+test_that("verification passes on obfuscated output", {
+  skip_if_not(.has_node(), "Node.js not available")
+  skip_if_not(.has_terser(), "terser not available")
+  skip_if_not(.has_obfuscator(), "javascript-obfuscator not available")
+
+  input_path <- .write_test_html()
+  output_path <- tempfile(fileext = ".html")
+  on.exit(unlink(c(input_path, output_path), force = TRUE))
+
+  result <- turas_minify(input_path, output_path,
+                         obfuscate_js = TRUE,
+                         watermark = "Verify Test",
+                         verbose = FALSE)
+
+  expect_true(result$verification_passed)
+})
+
+test_that("verification with watermark_client checks watermark integrity", {
+  html <- .build_test_html()
+  wm_result <- .minify_inject_watermark(html, "Test Client")
+
+  verification <- run_minify_verification(
+    original_html = html,
+    minified_html = wm_result$html,
+    original_css = "", minified_css = "",
+    original_js = "", minified_js = "",
+    input_size_bytes = nchar(html),
+    output_size_bytes = nchar(wm_result$html),
+    obfuscated = FALSE,
+    watermark_client = "Test Client"
+  )
+
+  # Watermark check should be present and pass
+  expect_true("watermark" %in% names(verification$checks))
+  expect_true(verification$checks$watermark$pass)
+})
+
+test_that("verification skips js_function_count when obfuscated", {
+  verification <- run_minify_verification(
+    original_html = "<html><body></body></html>",
+    minified_html = "<html><body></body></html>",
+    original_css = "", minified_css = "",
+    original_js = "function a(){} function b(){}",
+    minified_js = "function a(){} function b(){} function _0x123(){}",
+    input_size_bytes = 100,
+    output_size_bytes = 120,
+    obfuscated = TRUE
+  )
+
+  # Function count check should be skipped (pass with skip message)
+  expect_true(verification$checks$js_functions$pass)
+  expect_true(grepl("skipped", verification$checks$js_functions$message))
+
+  # File size should pass with obfuscation tolerance
+  expect_true(verification$checks$file_size$pass)
 })

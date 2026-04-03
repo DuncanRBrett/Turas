@@ -392,9 +392,14 @@ run_confidence_gui <- function() {
         assign("TURAS_PREPARE_DELIVERABLE",
                isTRUE(input$prepare_deliverable), envir = .GlobalEnv)
         if (isTRUE(input$prepare_deliverable)) {
+          .client <- if (!is.null(input$client_name) && nzchar(input$client_name)) {
+            input$client_name
+          } else NULL
+          assign("TURAS_CLIENT_NAME", .client, envir = .GlobalEnv)
           .minify_dir <- file.path(TURAS_HOME, "modules", "shared", "lib")
           if (!exists("turas_prepare_deliverable", mode = "function")) {
             source(file.path(.minify_dir, "turas_minify_verify.R"), local = FALSE)
+            source(file.path(.minify_dir, "turas_minify_watermark.R"), local = FALSE)
             source(file.path(.minify_dir, "turas_minify.R"), local = FALSE)
           }
         }

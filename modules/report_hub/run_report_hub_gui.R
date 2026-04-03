@@ -530,10 +530,15 @@ run_report_hub_gui <- function() {
           # Minify for client delivery (if requested)
           if (isTRUE(input$prepare_deliverable) &&
               !is.null(result$result$output_path)) {
+            .client <- if (!is.null(input$client_name) && nzchar(input$client_name)) {
+              input$client_name
+            } else NULL
+            assign("TURAS_CLIENT_NAME", .client, envir = .GlobalEnv)
             # Load minification functions if not already available
             if (!exists("turas_minify", mode = "function")) {
               .minify_dir <- file.path(TURAS_HOME, "modules", "shared", "lib")
               source(file.path(.minify_dir, "turas_minify_verify.R"), local = FALSE)
+              source(file.path(.minify_dir, "turas_minify_watermark.R"), local = FALSE)
               source(file.path(.minify_dir, "turas_minify.R"), local = FALSE)
             }
           }

@@ -24,7 +24,7 @@
 
 # -- Constants ----------------------------------------------------------------
 
-.MINIFY_VERSION <- "1.0"
+.MINIFY_VERSION <- "2.0"
 
 .MINIFY_COPYRIGHT_TEMPLATE <- "/*! @preserve Turas (c) TRL %s. All rights reserved. */"
 
@@ -45,6 +45,26 @@
 )
 
 .MINIFY_TOOL_TIMEOUT_SECS <- 60L
+
+# javascript-obfuscator config — written to a temp JSON file per invocation.
+# renameGlobals=false: 676+ inline onclick handlers reference top-level functions.
+# renameProperties=false: window.TurasPins.move() in dynamic onclick strings.
+# stringArray + base64: primary IP protection — extracts all string literals
+# into an encoded array, making casual reading impossible.
+.MINIFY_OBFUSCATOR_CONFIG_JSON <- '{
+  "compact": true,
+  "stringArray": true,
+  "stringArrayThreshold": 0.8,
+  "stringArrayEncoding": ["base64"],
+  "stringArrayShuffle": true,
+  "controlFlowFlattening": false,
+  "renameGlobals": false,
+  "renameProperties": false,
+  "selfDefending": false,
+  "deadCodeInjection": false,
+  "disableConsoleOutput": false,
+  "log": false
+}'
 
 .MINIFY_NODE_SEARCH_PATHS <- c(
   "/opt/homebrew/bin",       # macOS Homebrew (Apple Silicon)
@@ -115,7 +135,8 @@
     node          = .minify_find_tool("node"),
     terser        = .minify_find_tool("terser"),
     cleancss      = .minify_find_tool("cleancss"),
-    html_minifier = .minify_find_tool("html-minifier-terser")
+    html_minifier = .minify_find_tool("html-minifier-terser"),
+    obfuscator    = .minify_find_tool("javascript-obfuscator")
   )
 }
 
@@ -372,7 +393,7 @@
     v_end <- v_end_pos + nchar(vendor_end_marker) - 1L
     vendor_idx <- vendor_idx + 1L
     v_text <- substr(js_to_minify, v_start, v_end)
-    placeholder <- sprintf("/* __TURAS_VENDOR_%d__ */", vendor_idx)
+    placeholder <- sprintf("function __TURAS_VENDOR_%d__(){}", vendor_idx)
     vendor_chunks[[placeholder]] <- v_text
     js_to_minify <- paste0(
       substr(js_to_minify, 1L, v_start - 1L),
@@ -419,6 +440,89 @@
   }
 
   list(content = minified, success = TRUE)
+}
+
+
+# -- JS obfuscation ----------------------------------------------------------
+
+#' Obfuscate a Single JS Block via javascript-obfuscator
+#'
+#' Writes JS to a temp file, runs javascript-obfuscator with a static config
+#' file, reads back the result. Vendor blocks (TURAS_VENDOR_START/END) are
+#' extracted and skipped, same as in minification.
+#'
+#' @param js_content Character, JavaScript content to obfuscate.
+#' @param obfuscator_path Character, path to javascript-obfuscator binary.
+#' @return Named list with content (obfuscated or original) and success (logical).
+#' @keywords internal
+.minify_obfuscate_js_block <- function(js_content, obfuscator_path) {
+  if (!nzchar(js_content) || !nzchar(obfuscator_path)) {
+    return(list(content = js_content, success = FALSE))
+  }
+
+  # Extract vendor sections — same pattern as .minify_js_block()
+  vendor_chunks <- list()
+  js_to_obfuscate <- js_content
+  vendor_start_marker <- "/* TURAS_VENDOR_START */"
+  vendor_end_marker <- "/* TURAS_VENDOR_END */"
+  vendor_idx <- 0L
+
+  repeat {
+    v_start <- regexpr(vendor_start_marker, js_to_obfuscate, fixed = TRUE)
+    if (v_start == -1L) break
+
+    v_end_pos <- regexpr(vendor_end_marker, js_to_obfuscate, fixed = TRUE)
+    if (v_end_pos == -1L) break
+
+    v_end <- v_end_pos + nchar(vendor_end_marker) - 1L
+    vendor_idx <- vendor_idx + 1L
+    v_text <- substr(js_to_obfuscate, v_start, v_end)
+    placeholder <- sprintf("function __TURAS_VENDOR_%d__(){}", vendor_idx)
+    vendor_chunks[[placeholder]] <- v_text
+    js_to_obfuscate <- paste0(
+      substr(js_to_obfuscate, 1L, v_start - 1L),
+      placeholder,
+      substr(js_to_obfuscate, v_end + 1L, nchar(js_to_obfuscate))
+    )
+  }
+
+  tmp_in <- tempfile(fileext = ".js")
+  tmp_out <- tempfile(fileext = ".js")
+  tmp_config <- tempfile(fileext = ".json")
+  on.exit(unlink(c(tmp_in, tmp_out, tmp_config), force = TRUE), add = TRUE)
+
+  writeLines(js_to_obfuscate, tmp_in, useBytes = TRUE)
+  writeLines(.MINIFY_OBFUSCATOR_CONFIG_JSON, tmp_config)
+
+  args <- c(tmp_in, "--output", tmp_out, "--config", tmp_config)
+  result <- tryCatch(
+    system2(obfuscator_path, args = args,
+            stdout = TRUE, stderr = TRUE,
+            timeout = .MINIFY_TOOL_TIMEOUT_SECS),
+    error = function(e) e
+  )
+
+  exit_status <- attr(result, "status")
+  if (inherits(result, "error") || (!is.null(exit_status) && exit_status != 0L)) {
+    return(list(content = js_content, success = FALSE))
+  }
+
+  if (!file.exists(tmp_out)) {
+    return(list(content = js_content, success = FALSE))
+  }
+
+  obfuscated <- paste(readLines(tmp_out, warn = FALSE), collapse = "\n")
+  if (!nzchar(obfuscated)) {
+    return(list(content = js_content, success = FALSE))
+  }
+
+  # Re-insert vendor chunks
+  for (placeholder in names(vendor_chunks)) {
+    obfuscated <- sub(placeholder, vendor_chunks[[placeholder]], obfuscated,
+                      fixed = TRUE)
+  }
+
+  list(content = obfuscated, success = TRUE)
 }
 
 
@@ -542,10 +646,14 @@
   cat(sprintf("Output:    %s KB  (%s)\n", output_kb, basename(result$output_path)))
   cat(sprintf("Reduction: %.1f%%\n", result$reduction_pct))
   cat(strrep("\u2500", 50), "\n")
-  cat(sprintf("JS blocks:     %d processed\n", result$js_blocks_processed))
+  cat(sprintf("JS blocks:     %d minified\n", result$js_blocks_processed))
+  cat(sprintf("JS blocks:     %d obfuscated\n", result$js_blocks_obfuscated))
   cat(sprintf("CSS blocks:    %d processed\n", result$css_blocks_processed))
   cat(sprintf("Meta tags:     %d stripped\n", result$meta_tags_stripped))
   cat(sprintf("HTML comments: %d removed\n", result$html_comments_removed))
+  if (nzchar(result$watermark_client %||% "")) {
+    cat(sprintf("Watermark:     %s\n", result$watermark_client))
+  }
   cat(sprintf("Warnings:      %d\n", length(result$warnings)))
   cat(strrep("\u2500", 50), "\n")
 
@@ -568,9 +676,11 @@
 
 #' Minify a Turas HTML Report
 #'
-#' Post-processes a finished Turas HTML report to produce a minified
-#' deliverable. Reduces file size via CSS/JS minification and HTML whitespace
-#' collapse, and strips internal metadata for IP protection.
+#' Post-processes a finished Turas HTML report to produce a minified and
+#' optionally obfuscated deliverable. Reduces file size via CSS/JS minification
+#' and HTML whitespace collapse, obfuscates JS via string array encoding, and
+#' strips internal metadata for IP protection. Optionally embeds invisible
+#' client watermarks for delivery traceability.
 #'
 #' The pipeline is resilient: failure of any individual step produces a warning
 #' and falls back to the original content. A minification failure never
@@ -585,6 +695,10 @@
 #' @param minify_js Logical. Whether to minify JavaScript blocks.
 #' @param minify_css Logical. Whether to minify CSS blocks.
 #' @param minify_html Logical. Whether to reduce HTML whitespace.
+#' @param obfuscate_js Logical. Whether to obfuscate JS with string array
+#'   encoding after minification. Requires javascript-obfuscator.
+#' @param watermark Character or NULL. Client name to embed as an invisible
+#'   watermark. NULL or empty string skips watermarking.
 #' @param verbose Logical. If TRUE, print progress and size comparison.
 #'
 #' @return A named list with:
@@ -593,11 +707,13 @@
 #'   \item{output_path}{Path to the minified output.}
 #'   \item{input_size_kb}{Original file size in KB.}
 #'   \item{output_size_kb}{Minified file size in KB.}
-#'   \item{reduction_pct}{Percentage size reduction.}
+#'   \item{reduction_pct}{Percentage size reduction (negative = size increase).}
 #'   \item{js_blocks_processed}{Number of JS blocks minified.}
+#'   \item{js_blocks_obfuscated}{Number of JS blocks obfuscated.}
 #'   \item{css_blocks_processed}{Number of CSS blocks minified.}
 #'   \item{meta_tags_stripped}{Number of meta tags removed.}
 #'   \item{html_comments_removed}{Number of HTML comments removed.}
+#'   \item{watermark_client}{Client name embedded, or empty string.}
 #'   \item{verification_passed}{Logical, TRUE if all checks passed.}
 #'   \item{verification_summary}{Character vector of check results.}
 #'   \item{warnings}{Character vector of warning messages.}
@@ -607,15 +723,12 @@
 #'   # Basic usage — derives output path from input
 #'   result <- turas_minify("reports/Project_dev.html")
 #'
-#'   # Verbose output with custom output path
-#'   result <- turas_minify(
-#'     "reports/Project_dev.html",
-#'     output_path = "delivery/Project.html",
-#'     verbose = TRUE
-#'   )
+#'   # With client watermark
+#'   result <- turas_minify("reports/Project_dev.html",
+#'                          watermark = "Acme Corp", verbose = TRUE)
 #'
-#'   # Skip JS minification (CSS and HTML only)
-#'   result <- turas_minify("reports/Project_dev.html", minify_js = FALSE)
+#'   # Skip obfuscation (minify only)
+#'   result <- turas_minify("reports/Project_dev.html", obfuscate_js = FALSE)
 #' }
 #'
 #' @export
@@ -626,6 +739,8 @@ turas_minify <- function(input_path,
                          minify_js = TRUE,
                          minify_css = TRUE,
                          minify_html = TRUE,
+                         obfuscate_js = TRUE,
+                         watermark = NULL,
                          verbose = FALSE) {
 
   warnings_acc <- character(0)
@@ -685,8 +800,10 @@ turas_minify <- function(input_path,
       status = "PARTIAL",
       input_path = input_path, output_path = output_path,
       input_size_kb = input_size / 1024, output_size_kb = output_size / 1024,
-      reduction_pct = 0, js_blocks_processed = 0L, css_blocks_processed = 0L,
+      reduction_pct = 0, js_blocks_processed = 0L, js_blocks_obfuscated = 0L,
+      css_blocks_processed = 0L,
       meta_tags_stripped = 0L, html_comments_removed = 0L,
+      watermark_client = "",
       verification_passed = TRUE, verification_summary = character(0),
       warnings = warnings_acc
     ))
@@ -705,6 +822,11 @@ turas_minify <- function(input_path,
   if (minify_html && !nzchar(tools$html_minifier)) {
     add_warning("html-minifier-terser not found. HTML whitespace reduction skipped. Install: npm install -g html-minifier-terser")
     minify_html <- FALSE
+  }
+
+  if (obfuscate_js && !nzchar(tools$obfuscator)) {
+    add_warning("javascript-obfuscator not found. JS obfuscation skipped. Install: npm install -g javascript-obfuscator")
+    obfuscate_js <- FALSE
   }
 
   # -- Step 2: Read file ------------------------------------------------------
@@ -804,6 +926,66 @@ turas_minify <- function(input_path,
     }
   }
 
+  # -- Step 6b: JS obfuscation ------------------------------------------------
+  js_obfuscated <- 0L
+  obfuscation_applied <- FALSE
+
+  if (obfuscate_js && nzchar(tools$obfuscator)) {
+    # Re-extract JS blocks (positions shifted after step 6 replacement)
+    obf_js_blocks <- .minify_extract_blocks(html, "script")
+    obf_contents <- vector("list", length(obf_js_blocks))
+
+    for (i in seq_along(obf_js_blocks)) {
+      block <- obf_js_blocks[[i]]
+
+      # Skip non-JS blocks
+      if (block$type %in% c("application/json", "text/plain")) {
+        obf_contents[[i]] <- NULL
+        next
+      }
+      if (!nzchar(block$content)) {
+        obf_contents[[i]] <- NULL
+        next
+      }
+
+      result <- .minify_obfuscate_js_block(block$content, tools$obfuscator)
+      if (result$success) {
+        obf_contents[[i]] <- result$content
+        js_obfuscated <- js_obfuscated + 1L
+      } else {
+        obf_contents[[i]] <- NULL
+        add_warning(sprintf("JS block %d failed to obfuscate, kept minified version", i))
+      }
+    }
+
+    if (js_obfuscated > 0L) {
+      html <- .minify_replace_blocks(html, obf_js_blocks, obf_contents)
+      obfuscation_applied <- TRUE
+    }
+    if (verbose) cat(sprintf("  Obfuscated %d/%d JS blocks\n",
+                             js_obfuscated, length(obf_js_blocks)))
+  }
+
+  # -- Step 6c: Watermark injection --------------------------------------------
+  watermark_client <- ""
+  if (is.character(watermark) && length(watermark) == 1L && nzchar(watermark)) {
+    if (exists(".minify_inject_watermark", mode = "function")) {
+      wm_result <- .minify_inject_watermark(html, watermark)
+      if (wm_result$success) {
+        html <- wm_result$html
+        watermark_client <- wm_result$client
+        if (verbose) {
+          cat(sprintf("  Watermark: %s (ID: %s)\n",
+                      wm_result$client, substr(wm_result$id, 1L, 8L)))
+        }
+      } else {
+        add_warning("Watermark injection failed")
+      }
+    } else {
+      add_warning("Watermark functions not loaded. Source turas_minify_watermark.R first.")
+    }
+  }
+
   # -- Step 7: HTML whitespace reduction --------------------------------------
   html_reduced <- FALSE
   if (minify_html) {
@@ -861,7 +1043,9 @@ turas_minify <- function(input_path,
     original_js = original_js_combined,
     minified_js = minified_js_combined,
     input_size_bytes = input_size,
-    output_size_bytes = output_size
+    output_size_bytes = output_size,
+    obfuscated = obfuscation_applied,
+    watermark_client = if (nzchar(watermark_client)) watermark_client else NULL
   )
 
   if (!verification$all_passed) {
@@ -888,9 +1072,11 @@ turas_minify <- function(input_path,
     output_size_kb = output_size / 1024,
     reduction_pct = reduction_pct,
     js_blocks_processed = js_processed,
+    js_blocks_obfuscated = js_obfuscated,
     css_blocks_processed = css_processed,
     meta_tags_stripped = meta_result$count,
     html_comments_removed = comment_result$count,
+    watermark_client = watermark_client,
     verification_passed = verification$all_passed,
     verification_summary = verification$summary,
     warnings = warnings_acc
@@ -943,7 +1129,13 @@ turas_prepare_deliverable <- function(html_path) {
     return(invisible(NULL))
   }
 
-  minify_result <- turas_minify(dev_path, verbose = TRUE)
+  # Pick up client name from global env (set by GUI)
+  client_name <- get0("TURAS_CLIENT_NAME", envir = .GlobalEnv)
+  if (!is.character(client_name) || length(client_name) != 1L || !nzchar(client_name)) {
+    client_name <- NULL
+  }
+
+  minify_result <- turas_minify(dev_path, verbose = TRUE, watermark = client_name)
 
   if (minify_result$status %in% c("PASS", "PARTIAL")) {
     cat(sprintf("  Client deliverable: %s (%.1f%% smaller)\n",

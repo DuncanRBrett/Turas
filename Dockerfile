@@ -49,10 +49,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Node.js — required by the minification pipeline (terser, clean-css, html-minifier-terser)
+# Node.js — required by the minification pipeline (terser, clean-css, html-minifier-terser, javascript-obfuscator)
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
-    npm install -g terser clean-css-cli html-minifier-terser && \
+    npm install -g terser clean-css-cli html-minifier-terser javascript-obfuscator && \
     rm -rf /var/lib/apt/lists/*
 
 # Set the application directory

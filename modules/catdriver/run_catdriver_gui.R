@@ -567,6 +567,12 @@ run_catdriver_gui <- function() {
           # Pass deliverable flag (minify functions loaded via import_all.R below)
           assign("TURAS_PREPARE_DELIVERABLE",
                  isTRUE(input$prepare_deliverable), envir = .GlobalEnv)
+          if (isTRUE(input$prepare_deliverable)) {
+            .client <- if (!is.null(input$client_name) && nzchar(input$client_name)) {
+              input$client_name
+            } else NULL
+            assign("TURAS_CLIENT_NAME", .client, envir = .GlobalEnv)
+          }
 
           # 1. Source shared TRS infrastructure first (required by guard files)
           # Also loads turas_minify.R and turas_minify_verify.R

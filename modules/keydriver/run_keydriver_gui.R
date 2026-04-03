@@ -397,6 +397,12 @@ run_keydriver_gui <- function() {
           # Pass deliverable flag
           assign("TURAS_PREPARE_DELIVERABLE",
                  isTRUE(input$prepare_deliverable), envir = .GlobalEnv)
+          if (isTRUE(input$prepare_deliverable)) {
+            .client <- if (!is.null(input$client_name) && nzchar(input$client_name)) {
+              input$client_name
+            } else NULL
+            assign("TURAS_CLIENT_NAME", .client, envir = .GlobalEnv)
+          }
 
           # Source module files with error handling
           incProgress(0.05, detail = "Loading module files...")

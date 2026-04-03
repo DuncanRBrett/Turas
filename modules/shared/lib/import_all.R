@@ -102,7 +102,10 @@ source(file.path(.shared_lib_path, "turas_excel_escape.R"), local = FALSE)
 # 15. Minification verification helpers (independent)
 source(file.path(.shared_lib_path, "turas_minify_verify.R"), local = FALSE)
 
-# 16. Report minification pipeline (depends on trs_refusal)
+# 16. Watermark encode/decode helpers (independent)
+source(file.path(.shared_lib_path, "turas_minify_watermark.R"), local = FALSE)
+
+# 17. Report minification pipeline (depends on trs_refusal, watermark, verify)
 source(file.path(.shared_lib_path, "turas_minify.R"), local = FALSE)
 
 # Clean up

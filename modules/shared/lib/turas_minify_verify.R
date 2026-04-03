@@ -284,13 +284,15 @@
 #' @return Named list with pass (logical) and message (character).
 #' @keywords internal
 .verify_data_attributes <- function(original_html, minified_html) {
-  # Fast attribute count using fixed string matching. Handles both
-  # 'attr=' and 'attr =' forms. Much faster than perl regex on
-  # multi-megabyte minified HTML.
+  # Fast attribute count using fixed string matching. Strips script blocks
+  # first to avoid counting attributes in JS string literals (which get
+  # encoded during obfuscation). Same approach as .verify_html_elements().
+  strip_scripts <- .strip_scripts_fast
   count_attr <- function(html, attr_name) {
     needle <- paste0(attr_name, "=")
+    h <- strip_scripts(html)
     as.integer(
-      (nchar(html) - nchar(gsub(needle, "", html, fixed = TRUE))) / nchar(needle)
+      (nchar(h) - nchar(gsub(needle, "", h, fixed = TRUE))) / nchar(needle)
     )
   }
 
@@ -342,6 +344,50 @@
 
 # -- Orchestrator -------------------------------------------------------------
 
+#' Verify Watermark Integrity
+#'
+#' Decodes both JS and HTML watermarks and verifies they match the expected
+#' client name. Requires turas_minify_watermark.R to be loaded.
+#'
+#' @param minified_html Full minified HTML string.
+#' @param expected_client Character, the client name that was embedded.
+#' @return Named list with pass (logical) and message (character).
+#' @keywords internal
+.verify_watermark <- function(minified_html, expected_client) {
+  if (!exists(".watermark_extract_js", mode = "function") ||
+      !exists(".watermark_extract_html", mode = "function")) {
+    return(list(pass = TRUE,
+                message = "Watermark check skipped (decoder not loaded)"))
+  }
+
+  js_wm <- .watermark_extract_js(minified_html)
+  html_wm <- .watermark_extract_html(minified_html)
+
+  if (is.null(js_wm) && is.null(html_wm)) {
+    return(list(pass = FALSE,
+                message = "Watermark not found in output"))
+  }
+
+  # Check that at least one watermark matches the expected client
+  js_match <- !is.null(js_wm) && js_wm$client == expected_client
+  html_match <- !is.null(html_wm) && html_wm$client == expected_client
+
+  if (js_match && html_match) {
+    list(pass = TRUE,
+         message = sprintf("Watermark verified: %s (JS + HTML match)", expected_client))
+  } else if (js_match || html_match) {
+    source_type <- if (js_match) "JS only" else "HTML only"
+    list(pass = TRUE,
+         message = sprintf("Watermark verified: %s (%s)", expected_client, source_type))
+  } else {
+    found_client <- if (!is.null(js_wm)) js_wm$client else html_wm$client
+    list(pass = FALSE,
+         message = sprintf("Watermark client mismatch: expected '%s', found '%s'",
+                           expected_client, found_client))
+  }
+}
+
+
 #' Run All Minification Verification Checks
 #'
 #' Orchestrates all verification checks after minification. Returns a
@@ -355,6 +401,11 @@
 #' @param minified_js Combined minified JS from all script blocks.
 #' @param input_size_bytes Original file size in bytes.
 #' @param output_size_bytes Minified file size in bytes.
+#' @param obfuscated Logical. If TRUE, adjusts checks for obfuscated output:
+#'   skips JS function count (obfuscator adds string array decoders) and
+#'   relaxes file size check (obfuscation can increase size).
+#' @param watermark_client Character or NULL. If non-NULL, verifies watermark
+#'   integrity by decoding and matching against this client name.
 #'
 #' @return Named list:
 #'   \item{all_passed}{Logical, TRUE if every check passed.}
@@ -365,16 +416,62 @@
 run_minify_verification <- function(original_html, minified_html,
                                     original_css, minified_css,
                                     original_js, minified_js,
-                                    input_size_bytes, output_size_bytes) {
-  checks <- list(
-    file_size      = .verify_file_size(input_size_bytes, output_size_bytes),
-    js_functions   = .verify_js_function_count(original_js, minified_js),
-    js_handlers    = .verify_js_handler_functions(minified_html, minified_js),
-    css_props      = .verify_css_custom_props(original_css, minified_css),
-    css_rules      = .verify_css_rule_count(original_css, minified_css),
-    html_elements  = .verify_html_elements(original_html, minified_html),
-    data_attrs     = .verify_data_attributes(original_html, minified_html)
-  )
+                                    input_size_bytes, output_size_bytes,
+                                    obfuscated = FALSE,
+                                    watermark_client = NULL) {
+  checks <- list()
+
+  # File size check — relaxed when obfuscated (string arrays can increase size)
+  if (obfuscated) {
+    # Allow output up to 300% of input with obfuscation. On small files (~2KB),
+    # the string array decoder alone is ~2KB, easily doubling the size. On
+    # production files (1MB+), the decoder is negligible.
+    if (output_size_bytes <= input_size_bytes * 3.0) {
+      change_pct <- (1 - output_size_bytes / input_size_bytes) * 100
+      checks$file_size <- list(
+        pass = TRUE,
+        message = sprintf("File size change: %.1f%% (obfuscation tolerance applied)",
+                          change_pct)
+      )
+    } else {
+      checks$file_size <- list(
+        pass = FALSE,
+        message = sprintf(
+          "File size increased >200%% with obfuscation: %s -> %s bytes",
+          format(input_size_bytes, big.mark = ","),
+          format(output_size_bytes, big.mark = ",")
+        )
+      )
+    }
+  } else {
+    checks$file_size <- .verify_file_size(input_size_bytes, output_size_bytes)
+  }
+
+  # JS function count — skipped when obfuscated (decoder functions added)
+  if (obfuscated) {
+    checks$js_functions <- list(
+      pass = TRUE,
+      message = "JS function count check skipped (obfuscation adds decoder functions)"
+    )
+  } else {
+    checks$js_functions <- .verify_js_function_count(original_js, minified_js)
+  }
+
+  # Handler function check — ALWAYS runs (critical safety net)
+  checks$js_handlers <- .verify_js_handler_functions(minified_html, minified_js)
+
+  # CSS checks — unaffected by obfuscation
+  checks$css_props <- .verify_css_custom_props(original_css, minified_css)
+  checks$css_rules <- .verify_css_rule_count(original_css, minified_css)
+
+  # HTML element checks — unaffected by obfuscation
+  checks$html_elements <- .verify_html_elements(original_html, minified_html)
+  checks$data_attrs <- .verify_data_attributes(original_html, minified_html)
+
+  # Watermark check — only when a client watermark was embedded
+  if (!is.null(watermark_client) && nzchar(watermark_client)) {
+    checks$watermark <- .verify_watermark(minified_html, watermark_client)
+  }
 
   all_passed <- all(vapply(checks, function(ch) ch$pass, logical(1)))
   summary_msgs <- vapply(checks, function(ch) {
