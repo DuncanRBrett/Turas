@@ -238,7 +238,10 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     analyst_email = get_config_value(config, "analyst_email", NULL),
     analyst_phone = get_config_value(config, "analyst_phone", NULL),
     verbatim_filename = get_config_value(config, "verbatim_filename", NULL),
-    closing_notes = get_config_value(config, "closing_notes", NULL)
+    closing_notes = get_config_value(config, "closing_notes", NULL),
+
+    # V10.9.0 AI Insights (optional, default FALSE)
+    enable_ai_insights = safe_logical(get_config_value(config, "enable_ai_insights", FALSE))
   )
 }
 
@@ -523,6 +526,8 @@ load_crosstabs_config <- function(config_file) {
     # Ranking
     "ranking_completeness_threshold_pct", "ranking_gap_threshold_pct", "ranking_tie_threshold_pct",
     "ranking_min_base",
+    # AI Insights
+    "enable_ai_insights",
     # File path settings (loaded separately but may appear in Settings sheet)
     "data_file", "structure_file", "output_file", "output_filename",
     "output_format", "output_folder", "output_subfolder"

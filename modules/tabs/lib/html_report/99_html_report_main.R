@@ -367,56 +367,60 @@ generate_html_report <- function(all_results, banner_info, config_obj, output_pa
   config_obj$client_logo_uri <- embed_logo(config_obj$client_logo_path, "Client logo")
 
   # ============================================================================
-  # STEP 3d: GENERATE AI INSIGHTS (if enabled)
+  # STEP 3d: GENERATE AI INSIGHTS (if enabled in Settings sheet)
   # ============================================================================
-  ai_insights <- NULL
 
-  # Check for AI sidecar file alongside the config workbook
-  ai_sidecar_path <- NULL
-  if (!is.null(config_obj$config_file_path) && nzchar(config_obj$config_file_path %||% "")) {
-    candidate_path <- paste0(tools::file_path_sans_ext(config_obj$config_file_path),
-                             "_ai_insights.json")
-    if (file.exists(candidate_path)) {
-      ai_sidecar_path <- candidate_path
-    }
-  }
-
-  if (!is.null(ai_sidecar_path)) {
+  if (isTRUE(config_obj$enable_ai_insights)) {
     cat("  Step 3d: Processing AI insights...\n")
 
-    # Source AI modules (conditional — only when sidecar exists)
-    ai_sourced <- tryCatch({
-      turas_root_dir <- Sys.getenv("TURAS_ROOT", "")
-      if (!nzchar(turas_root_dir)) turas_root_dir <- getwd()
-
-      # Shared AI infrastructure
-      source(file.path(turas_root_dir, "modules/shared/lib/ai/ai_provider.R"), local = FALSE)
-      source(file.path(turas_root_dir, "modules/shared/lib/ai/ai_schemas.R"), local = FALSE)
-      source(file.path(turas_root_dir, "modules/shared/lib/ai/ai_utils.R"), local = FALSE)
-      source(file.path(turas_root_dir, "modules/shared/lib/ai/ai_verify.R"), local = FALSE)
-
-      # Tabs-specific AI code
-      source(file.path(turas_root_dir, "modules/tabs/lib/ai/ai_extraction.R"), local = FALSE)
-      source(file.path(turas_root_dir, "modules/tabs/lib/ai/ai_prompts.R"), local = FALSE)
-      source(file.path(turas_root_dir, "modules/tabs/lib/ai/ai_schemas_tabs.R"), local = FALSE)
-      source(file.path(turas_root_dir, "modules/tabs/lib/ai/ai_insights.R"), local = FALSE)
-      source(file.path(turas_root_dir, "modules/tabs/lib/ai/ai_rendering.R"), local = FALSE)
-      TRUE
-    }, error = function(e) {
-      cat(sprintf("    [WARNING] Failed to load AI modules: %s\n", e$message))
-      cat("    Continuing without AI insights.\n")
-      FALSE
-    })
-
-    if (ai_sourced) {
-      ai_insights <- tryCatch({
-        generate_all_insights(all_results, banner_info, config_obj, ai_sidecar_path)
-      }, error = function(e) {
-        cat(sprintf("    [WARNING] AI insights generation failed: %s\n", e$message))
-        cat("    Continuing without AI insights.\n")
-        NULL
-      })
+    # Derive sidecar path from config file
+    ai_sidecar_path <- NULL
+    if (!is.null(config_obj$config_file_path) && nzchar(config_obj$config_file_path %||% "")) {
+      ai_sidecar_path <- paste0(tools::file_path_sans_ext(config_obj$config_file_path),
+                                "_ai_insights.json")
     }
+
+    if (!is.null(ai_sidecar_path)) {
+      # Source AI modules
+      ai_sourced <- tryCatch({
+        turas_root_dir <- Sys.getenv("TURAS_ROOT", "")
+        if (!nzchar(turas_root_dir)) turas_root_dir <- getwd()
+
+        source(file.path(turas_root_dir, "modules/shared/lib/ai/ai_provider.R"), local = FALSE)
+        source(file.path(turas_root_dir, "modules/shared/lib/ai/ai_schemas.R"), local = FALSE)
+        source(file.path(turas_root_dir, "modules/shared/lib/ai/ai_utils.R"), local = FALSE)
+        source(file.path(turas_root_dir, "modules/shared/lib/ai/ai_verify.R"), local = FALSE)
+        source(file.path(turas_root_dir, "modules/tabs/lib/ai/ai_extraction.R"), local = FALSE)
+        source(file.path(turas_root_dir, "modules/tabs/lib/ai/ai_prompts.R"), local = FALSE)
+        source(file.path(turas_root_dir, "modules/tabs/lib/ai/ai_schemas_tabs.R"), local = FALSE)
+        source(file.path(turas_root_dir, "modules/tabs/lib/ai/ai_insights.R"), local = FALSE)
+        source(file.path(turas_root_dir, "modules/tabs/lib/ai/ai_rendering.R"), local = FALSE)
+        TRUE
+      }, error = function(e) {
+        cat(sprintf("    [WARNING] Failed to load AI modules: %s\n", e$message))
+        cat("    Continuing without AI insights.\n")
+        FALSE
+      })
+
+      if (ai_sourced) {
+        # Auto-create sidecar with defaults if it doesn't exist
+        if (!file.exists(ai_sidecar_path)) {
+          cat("    Creating AI insights sidecar with default settings...\n")
+          default_sidecar <- create_default_sidecar()
+          write_ai_sidecar_to_path(default_sidecar, ai_sidecar_path)
+        }
+
+        ai_insights <- tryCatch({
+          generate_all_insights(all_results, banner_info, config_obj, ai_sidecar_path)
+        }, error = function(e) {
+          cat(sprintf("    [WARNING] AI insights generation failed: %s\n", e$message))
+          cat("    Continuing without AI insights.\n")
+          NULL
+        })
+      }
+    }
+  } else {
+    cat("  Step 3d: AI insights disabled (enable_ai_insights = FALSE)\n")
   }
 
   # ============================================================================
