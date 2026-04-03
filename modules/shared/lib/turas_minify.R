@@ -352,9 +352,38 @@
     return(list(content = js_content, success = FALSE))
   }
 
-  # Prepend copyright notice so terser preserves it via --comments '/^!/'
+  # Extract vendor sections (already minified — skip them to avoid slow
+  # re-parsing of 200KB+ compressed libraries like html2canvas, PptxGenJS).
+  # Vendor sections are marked with /* TURAS_VENDOR_START */ ... /* TURAS_VENDOR_END */
+  # Uses fixed string search (not regex) to avoid backtracking on large blocks.
+  vendor_chunks <- list()
+  js_to_minify <- js_content
+  vendor_start_marker <- "/* TURAS_VENDOR_START */"
+  vendor_end_marker <- "/* TURAS_VENDOR_END */"
+  vendor_idx <- 0L
+
+  repeat {
+    v_start <- regexpr(vendor_start_marker, js_to_minify, fixed = TRUE)
+    if (v_start == -1L) break
+
+    v_end_pos <- regexpr(vendor_end_marker, js_to_minify, fixed = TRUE)
+    if (v_end_pos == -1L) break
+
+    v_end <- v_end_pos + nchar(vendor_end_marker) - 1L
+    vendor_idx <- vendor_idx + 1L
+    v_text <- substr(js_to_minify, v_start, v_end)
+    placeholder <- sprintf("/* __TURAS_VENDOR_%d__ */", vendor_idx)
+    vendor_chunks[[placeholder]] <- v_text
+    js_to_minify <- paste0(
+      substr(js_to_minify, 1L, v_start - 1L),
+      placeholder,
+      substr(js_to_minify, v_end + 1L, nchar(js_to_minify))
+    )
+  }
+
+  # Prepend copyright notice so terser preserves it via --comments some
   copyright <- sprintf(.MINIFY_COPYRIGHT_TEMPLATE, format(Sys.Date(), "%Y"))
-  js_with_copyright <- paste0(copyright, "\n", js_content)
+  js_with_copyright <- paste0(copyright, "\n", js_to_minify)
 
   tmp_in <- tempfile(fileext = ".js")
   tmp_out <- tempfile(fileext = ".js")
@@ -382,6 +411,11 @@
   minified <- paste(readLines(tmp_out, warn = FALSE), collapse = "\n")
   if (!nzchar(minified)) {
     return(list(content = js_content, success = FALSE))
+  }
+
+  # Re-insert vendor chunks
+  for (placeholder in names(vendor_chunks)) {
+    minified <- sub(placeholder, vendor_chunks[[placeholder]], minified, fixed = TRUE)
   }
 
   list(content = minified, success = TRUE)

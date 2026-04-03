@@ -781,9 +781,25 @@ test_that("demo file processes correctly with full pipeline", {
   output_html <- paste(readLines(output_path, warn = FALSE), collapse = "\n")
   input_html <- paste(readLines(.demo_fixture_path, warn = FALSE), collapse = "\n")
 
+  # Use the same strip_scripts + count approach as the verification code
+  # to avoid counting <table> inside JS string literals
+  strip_js <- function(h) {
+    parts <- strsplit(h, "<script", fixed = TRUE)[[1]]
+    if (length(parts) <= 1L) return(h)
+    result <- parts[1]
+    for (i in 2:length(parts)) {
+      cp <- regexpr("</script>", parts[i], fixed = TRUE)
+      if (cp > 0) result <- paste0(result, substr(parts[i], cp + 9L, nchar(parts[i])))
+    }
+    result
+  }
   count_tag <- function(html, tag) {
-    m <- gregexpr(paste0("<", tag, "[\\s>]"), html, perl = TRUE)[[1]]
-    if (m[1] == -1L) 0L else length(m)
+    h <- strip_js(html)
+    n1 <- (nchar(h) - nchar(gsub(paste0("<", tag, " "), "", h, fixed = TRUE))) /
+          nchar(paste0("<", tag, " "))
+    n2 <- (nchar(h) - nchar(gsub(paste0("<", tag, ">"), "", h, fixed = TRUE))) /
+          nchar(paste0("<", tag, ">"))
+    as.integer(n1 + n2)
   }
 
   expect_equal(count_tag(output_html, "table"), count_tag(input_html, "table"))

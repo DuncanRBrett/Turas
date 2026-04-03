@@ -14,6 +14,30 @@
 # ==============================================================================
 
 
+# -- Shared helpers -----------------------------------------------------------
+
+#' Strip Script Blocks from HTML (Fast)
+#'
+#' Removes all <script>...</script> blocks using strsplit (no regex).
+#' Safe for multi-megabyte minified HTML where regex causes backtracking.
+#'
+#' @param html Character string.
+#' @return Character string with script blocks removed.
+#' @keywords internal
+.strip_scripts_fast <- function(html) {
+  parts <- strsplit(html, "<script", fixed = TRUE)[[1]]
+  if (length(parts) <= 1L) return(html)
+  result <- parts[1]
+  for (i in 2:length(parts)) {
+    close_pos <- regexpr("</script>", parts[i], fixed = TRUE)
+    if (close_pos > 0) {
+      result <- paste0(result, substr(parts[i], close_pos + 9L, nchar(parts[i])))
+    }
+  }
+  result
+}
+
+
 # -- Constants ----------------------------------------------------------------
 
 .VERIFY_HANDLER_ATTRS <- c("onclick", "onchange", "onload", "oninput",
@@ -75,16 +99,22 @@
 #' @return Named list with pass (logical) and message (character).
 #' @keywords internal
 .verify_js_handler_functions <- function(html_content, minified_js) {
-  handler_pattern <- paste0(
-    "(?:",
-    paste(.VERIFY_HANDLER_ATTRS, collapse = "|"),
-    ")\\s*=\\s*[\"']([^\"']+)[\"']"
-  )
-
-  handler_values <- regmatches(
-    html_content,
-    gregexpr(handler_pattern, html_content, perl = TRUE, ignore.case = TRUE)
-  )[[1]]
+  # Extract handler values using strsplit for speed on large files.
+  # Split HTML on each handler attribute pattern and extract the value
+  # from the start of each fragment after the split point.
+  handler_values <- character(0)
+  for (attr in c("onclick", "onchange")) {
+    needle <- paste0(attr, '="')
+    fragments <- strsplit(html_content, needle, fixed = TRUE)[[1]]
+    if (length(fragments) <= 1L) next
+    # Each fragment after the first starts with the handler value
+    for (fi in 2:length(fragments)) {
+      quote_end <- regexpr('"', fragments[fi], fixed = TRUE)
+      if (quote_end > 0 && quote_end <= 200L) {
+        handler_values <- c(handler_values, substr(fragments[fi], 1L, quote_end - 1L))
+      }
+    }
+  }
 
   if (length(handler_values) == 0L) {
     return(list(pass = TRUE, message = "No inline handlers found to check"))
@@ -207,16 +237,17 @@
 #' @return Named list with pass (logical) and message (character).
 #' @keywords internal
 .verify_html_elements <- function(original_html, minified_html) {
-  # Strip all script blocks before counting HTML tags, so we don't count
-  # tag-like strings inside JavaScript (e.g., "<table" in JSZip/PptxGen)
-  strip_scripts <- function(html) {
-    gsub("(<script(?=[\\s>])[^>]*>)([\\s\\S]*?)(</script>)", "", html, perl = TRUE)
-  }
+  strip_scripts <- .strip_scripts_fast
 
+  # Fast tag count using fixed string matching. Counts both "<tag " and "<tag>"
+  # forms to handle attributes vs no-attributes. Much faster than gregexpr with
+  # perl regex on multi-megabyte single-line minified HTML.
   count_tag <- function(html, tag) {
-    pattern <- paste0("<", tag, "[\\s>]")
-    matches <- gregexpr(pattern, html, perl = TRUE, ignore.case = TRUE)[[1]]
-    if (matches[1] == -1L) 0L else length(matches)
+    open_space <- paste0("<", tag, " ")
+    open_close <- paste0("<", tag, ">")
+    n1 <- (nchar(html) - nchar(gsub(open_space, "", html, fixed = TRUE))) / nchar(open_space)
+    n2 <- (nchar(html) - nchar(gsub(open_close, "", html, fixed = TRUE))) / nchar(open_close)
+    as.integer(n1 + n2)
   }
 
   orig_body <- strip_scripts(original_html)
@@ -253,10 +284,14 @@
 #' @return Named list with pass (logical) and message (character).
 #' @keywords internal
 .verify_data_attributes <- function(original_html, minified_html) {
+  # Fast attribute count using fixed string matching. Handles both
+  # 'attr=' and 'attr =' forms. Much faster than perl regex on
+  # multi-megabyte minified HTML.
   count_attr <- function(html, attr_name) {
-    pattern <- paste0(attr_name, "\\s*=")
-    matches <- gregexpr(pattern, html, perl = TRUE)[[1]]
-    if (matches[1] == -1L) 0L else length(matches)
+    needle <- paste0(attr_name, "=")
+    as.integer(
+      (nchar(html) - nchar(gsub(needle, "", html, fixed = TRUE))) / nchar(needle)
+    )
   }
 
   attrs <- c("data-q-code", "data-col-key")
