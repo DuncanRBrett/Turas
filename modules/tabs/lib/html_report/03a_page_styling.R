@@ -257,6 +257,8 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       flex-shrink: 0; line-height: 1;
     }
     .q-collapse-btn:hover { color: #64748b; }
+    .pin-btn:hover { background: #f1f5f9 !important; color: #64748b !important; border-color: #cbd5e1 !important; }
+    .pin-btn:active { background: #e2e8f0 !important; }
     .question-container.q-collapsed .q-collapse-btn { transform: rotate(-90deg); }
     .question-container.q-collapsed .table-wrapper,
     .question-container.q-collapsed .chart-wrapper,
