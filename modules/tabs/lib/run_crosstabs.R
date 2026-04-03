@@ -549,6 +549,9 @@ workbook_result <- create_crosstabs_workbook(
 if (isTRUE(config_result$config_obj$html_report)) {
   html_output_path <- sub("\\.xlsx$", ".html", config_result$output_path)
 
+  # Attach config file path for AI insights sidecar detection
+  config_result$config_obj$config_file_path <- config_result$config_file
+
   html_result <- tryCatch({
     generate_html_report(
       all_results = analysis_result$all_results,
