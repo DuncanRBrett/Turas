@@ -49,6 +49,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Node.js — required by the minification pipeline (terser, clean-css, html-minifier-terser)
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    npm install -g terser clean-css-cli html-minifier-terser && \
+    rm -rf /var/lib/apt/lists/*
+
 # Set the application directory
 ENV TURAS_ROOT=/srv/shiny-server/turas
 ENV TURAS_DOCKER=1

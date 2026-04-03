@@ -99,5 +99,11 @@ source(file.path(.shared_lib_path, "turas_save_workbook_atomic.R"), local = FALS
 # 14. TRS Excel Formula-Injection Protection (TRS v1.0)
 source(file.path(.shared_lib_path, "turas_excel_escape.R"), local = FALSE)
 
+# 15. Minification verification helpers (independent)
+source(file.path(.shared_lib_path, "turas_minify_verify.R"), local = FALSE)
+
+# 16. Report minification pipeline (depends on trs_refusal)
+source(file.path(.shared_lib_path, "turas_minify.R"), local = FALSE)
+
 # Clean up
 rm(.shared_lib_path)
