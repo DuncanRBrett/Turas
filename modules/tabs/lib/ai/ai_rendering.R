@@ -108,14 +108,6 @@ build_ai_exec_summary <- function(exec_summary, ai_config) {
   # Convert double newlines to paragraph breaks
   body_html <- narrative_to_paragraphs(escape_html(narrative))
 
-  # Both reviewed and unreviewed use gold AI styling
-  # Reviewed adds "Reviewed by research team" meta line
-  meta_html <- if (isTRUE(ai_config$exec_summary_reviewed)) {
-    '<div class="ai-callout-meta">Reviewed by research team</div>'
-  } else {
-    ""
-  }
-
   sprintf(
     '<div class="turas-ai-callout turas-ai-exec" id="ai-exec-summary">
   <div class="ai-callout-header">
@@ -123,9 +115,9 @@ build_ai_exec_summary <- function(exec_summary, ai_config) {
     <span class="ai-callout-label">AI-assisted key findings</span>
     <button class="ai-callout-dismiss" onclick="dismissAiCallout(this)" title="Dismiss this summary">&times;</button>
   </div>
-  <div class="ai-callout-body">%s</div>%s
+  <div class="ai-callout-body">%s</div>
 </div>',
-    body_html, meta_html
+    body_html
   )
 }
 

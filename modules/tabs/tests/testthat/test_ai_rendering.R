@@ -194,7 +194,7 @@ test_that("does not contain AI labelling", {
 
 context("build_ai_exec_summary")
 
-test_that("renders reviewed variant with gold AI styling and review note", {
+test_that("renders reviewed variant with gold AI styling, no review note", {
   exec <- make_test_exec_summary()
   config <- list(exec_summary_reviewed = TRUE)
 
@@ -202,7 +202,7 @@ test_that("renders reviewed variant with gold AI styling and review note", {
 
   expect_true(grepl('class="turas-ai-callout turas-ai-exec"', html, fixed = TRUE))
   expect_true(grepl("AI-assisted key findings", html, fixed = TRUE))
-  expect_true(grepl("Reviewed by research team", html, fixed = TRUE))
+  expect_false(grepl("Reviewed by research team", html, fixed = TRUE))
 })
 
 test_that("renders unreviewed variant with gold AI styling, no review note", {
