@@ -118,16 +118,21 @@ create_ai_chat <- function(ai_config) {
   }
 
   # Build the chat object
+  # max_tokens and temperature are set via params() at creation time
   chat <- tryCatch({
     model <- ai_config$model
+    p <- ellmer::params(
+      max_tokens  = as.integer(ai_config$max_tokens %||% 1500L),
+      temperature = ai_config$temperature %||% NULL
+    )
     switch(provider,
-      "anthropic" = ellmer::chat_anthropic(model = model),
-      "openai"    = ellmer::chat_openai(model = model),
-      "google"    = ellmer::chat_google_gemini(model = model),
+      "anthropic" = ellmer::chat_anthropic(model = model, params = p),
+      "openai"    = ellmer::chat_openai(model = model, params = p),
+      "google"    = ellmer::chat_google_gemini(model = model, params = p),
       "ollama"    = {
         ollama_model <- ai_config$ollama_model %||% model
         ollama_url   <- ai_config$ollama_url %||% "http://localhost:11434"
-        ellmer::chat_ollama(model = ollama_model, base_url = ollama_url)
+        ellmer::chat_ollama(model = ollama_model, base_url = ollama_url, params = p)
       }
     )
   }, error = function(e) {
@@ -167,6 +172,7 @@ call_insight_model <- function(prompt, schema, ai_config) {
 
     # If create_ai_chat returned a TRS refusal, log and return NULL
     if (is.list(chat) && identical(chat$status, "REFUSED")) {
+      cat(sprintf("    [AI ERROR] Provider setup: [%s] %s\n", chat$code, chat$message))
       warning(sprintf("AI provider setup failed: [%s] %s", chat$code, chat$message))
       return(NULL)
     }
@@ -177,13 +183,13 @@ call_insight_model <- function(prompt, schema, ai_config) {
     # Execute structured chat
     result <- chat$chat_structured(
       prompt$user,
-      type        = schema,
-      max_tokens  = as.integer(ai_config$max_tokens %||% 1500L)
+      type = schema
     )
 
     result
 
   }, error = function(e) {
+    cat(sprintf("    [AI ERROR] %s\n", e$message))
     warning(sprintf("AI insight generation failed: %s", e$message))
     NULL
   })
