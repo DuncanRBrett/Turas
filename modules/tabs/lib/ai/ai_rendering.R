@@ -151,12 +151,12 @@ build_ai_methodology_note <- function(ai_config, model_display_name) {
 
   if (isTRUE(ai_config$exec_summary_reviewed)) {
     note_text <- sprintf(
-      "AI-assisted insight callouts in this report are generated using %s and reviewed by the research team. They are clearly labelled in the report. Strategic commentary and the executive summary are written by the research team.",
+      "AI-assisted insight callouts in this report are generated using %s and reviewed by the research team. They are clearly labelled in the report. AI callouts analyse data across all banner groups simultaneously and may reference subgroups not visible in the currently selected banner view. Strategic commentary and the executive summary are written by the research team.",
       model_name
     )
   } else {
     note_text <- sprintf(
-      "AI-assisted insights in this report &mdash; including the key findings summary and per-question callouts &mdash; are generated using %s. They are clearly labelled in the report.",
+      "AI-assisted insights in this report &mdash; including the key findings summary and per-question callouts &mdash; are generated using %s. They are clearly labelled in the report. AI callouts analyse data across all banner groups simultaneously and may reference subgroups not visible in the currently selected banner view.",
       model_name
     )
   }
@@ -234,13 +234,13 @@ build_ai_callout_css <- function() {
   border-top: 1px solid var(--ct-border, #e2e4e8);
 }
 
-/* === AI callout (distinct visual treatment) === */
+/* === AI callout (distinct visual treatment — pale gold) === */
 .turas-ai-callout {
-  background: #f0f4f7;
-  border-left: 3px solid #8ba4b8;
+  background: #fdf8ed;
+  border-left: 3px solid #c9a84c;
   border-radius: var(--ct-radius-md, 6px);
-  padding: 14px 18px;
-  margin: 8px 0 20px 0;
+  padding: 16px 20px;
+  margin: 12px 0 16px 0;
   font-size: 13px;
   line-height: 1.65;
   color: var(--ct-text-primary, #1a1a2e);
@@ -259,14 +259,14 @@ build_ai_callout_css <- function() {
 }
 .turas-ai-callout .ai-callout-icon {
   font-size: 12px;
-  color: #8ba4b8;
+  color: #c9a84c;
 }
 .turas-ai-callout .ai-callout-label {
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 1px;
   text-transform: uppercase;
-  color: #8ba4b8;
+  color: #c9a84c;
   flex: 1;
 }
 .turas-ai-callout .ai-callout-pin {
@@ -308,10 +308,12 @@ build_ai_callout_css <- function() {
   margin-top: 6px;
 }
 .turas-ai-callout[data-confidence="medium"] {
-  border-left-color: var(--ct-warning, #e6a817);
+  border-left-color: #d4a017;
+  background: #fdf6e3;
 }
 .turas-ai-callout[data-confidence="low"] {
   border-left-color: var(--ct-text-tertiary, #8a8a9a);
+  background: #f5f3ee;
   opacity: 0.85;
 }
 

@@ -280,6 +280,8 @@
   // ── Insight Area ───────────────────────────────────────────────────────────
 
   function _buildInsightArea(pin, pid, pfx, config) {
+    // Skip if pinFlags says insight is off, or no insight text and no edit mode
+    if (pin.pinFlags && !pin.pinFlags.insight) return "";
     if (!config.features.insightEdit) {
       if (pin.insightText) {
         var r = TurasPins._containsHtml(pin.insightText) ?
