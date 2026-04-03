@@ -183,7 +183,12 @@
    * @param {string} qCode - Question code
    */
   window.togglePin = function(qCode) {
-    closePopover();
+    // If popover already open for this question, close it
+    var existing = document.querySelector(".pin-mode-popover");
+    if (existing) {
+      closePopover();
+      return;
+    }
 
     var btn = document.querySelector('.pin-btn[data-q-code="' + qCode + '"]');
     if (!btn) return;
@@ -198,10 +203,12 @@
 
     var popover = document.createElement("div");
     popover.className = "pin-mode-popover";
+    // Stop all clicks inside popover from bubbling to the pin button
+    popover.onclick = function(e) { e.stopPropagation(); };
 
     var title = document.createElement("div");
     title.className = "pin-mode-title";
-    title.textContent = "Pin to Views";
+    title.textContent = "PIN TO VIEWS";
     popover.appendChild(title);
 
     var checkboxes = [
@@ -238,7 +245,6 @@
     pinBtn.textContent = "Pin";
     pinBtn.onclick = function(e) {
       e.stopPropagation();
-      // Need at least one item checked
       var anyChecked = Object.keys(state).some(function(k) { return state[k]; });
       if (!anyChecked) return;
       closePopover();
@@ -246,9 +252,12 @@
     };
     popover.appendChild(pinBtn);
 
-    btn.style.position = "relative";
-    popover.style.cssText = "position:absolute;top:100%;right:0;z-index:1000;";
-    btn.appendChild(popover);
+    // Append to the question title card (not the button) to avoid re-triggering togglePin
+    var titleCard = btn.closest(".question-title-card") || btn.parentElement;
+    popover.style.cssText = "position:absolute;top:" +
+      (btn.offsetTop + btn.offsetHeight + 4) + "px;right:16px;z-index:1000;";
+    titleCard.style.position = "relative";
+    titleCard.appendChild(popover);
 
     setTimeout(function() {
       document.addEventListener("click", closePopoverOnOutside, true);
