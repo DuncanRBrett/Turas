@@ -74,8 +74,8 @@
       if (aiText) {
         var aiY = contentTop + insightH + (insightH > 0 ? 4 : 0);
         var aiBlocks = [{ type: "para", runs: [{ text: aiText, bold: false, italic: false }] }];
-        aiInsightEl = TurasPins._renderInsightSVG(aiBlocks, pad + 14, aiY + 28, usableW - 16, 7.5);
-        aiInsightH = aiInsightEl.height + 36;
+        aiInsightEl = TurasPins._renderInsightSVG(aiBlocks, pad + 18, aiY + 34, usableW - 24, 7.5);
+        aiInsightH = aiInsightEl.height + 48;
       }
     }
 
@@ -178,9 +178,9 @@
 
   /** Render AI callout block with gold accent in SVG export */
   function _addAiInsight(svg, aiInsightEl, y, pad, usableW) {
-    var aH = Math.max(44, aiInsightEl.height + 30);
-    // Gold background
-    _rect(svg, pad, y + 2, usableW, aH, "#fdf8ed", "4");
+    var aH = Math.max(52, aiInsightEl.height + 42);
+    // Gold background with generous padding
+    _rect(svg, pad, y + 2, usableW, aH, "#fdf8ed", "6");
     // Gold left accent bar
     var bar = document.createElementNS(NS, "rect");
     bar.setAttribute("x", pad); bar.setAttribute("y", y + 2);
@@ -189,12 +189,12 @@
     svg.appendChild(bar);
     // "AI-ASSISTED INSIGHT" label
     var label = document.createElementNS(NS, "text");
-    label.setAttribute("x", pad + 22); label.setAttribute("y", y + 18);
+    label.setAttribute("x", pad + 18); label.setAttribute("y", y + 20);
     label.setAttribute("fill", "#c9a84c"); label.setAttribute("font-size", "9");
-    label.setAttribute("font-weight", "600"); label.setAttribute("letter-spacing", "1");
+    label.setAttribute("font-weight", "700"); label.setAttribute("letter-spacing", "1.2");
     label.textContent = "\u2726 AI-ASSISTED INSIGHT";
     svg.appendChild(label);
-    // Narrative text
+    // Narrative text (positioned below label with breathing room)
     svg.appendChild(aiInsightEl.element);
   }
 

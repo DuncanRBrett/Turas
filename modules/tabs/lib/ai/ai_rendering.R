@@ -106,32 +106,25 @@ build_ai_exec_summary <- function(exec_summary, ai_config) {
   # Convert double newlines to paragraph breaks
   body_html <- narrative_to_paragraphs(escape_html(narrative))
 
-  dismiss_btn <- '<button class="ai-callout-dismiss" onclick="dismissAiCallout(this)" title="Dismiss this summary" style="float:right;margin-top:-2px;">&times;</button>'
-
-  if (isTRUE(ai_config$exec_summary_reviewed)) {
-    # Reviewed: standard report styling with dismiss
-    sprintf(
-      '<div class="turas-insight-exec" id="ai-exec-summary">
-  <div class="insight-label">Key findings %s</div>
-  <div class="insight-body">%s</div>
-  <div class="insight-meta">Insight commentary &middot; Reviewed by research team</div>
-</div>',
-      dismiss_btn, body_html
-    )
+  # Both reviewed and unreviewed use gold AI styling
+  # Reviewed adds "Reviewed by research team" meta line
+  meta_html <- if (isTRUE(ai_config$exec_summary_reviewed)) {
+    '<div class="ai-callout-meta">Reviewed by research team</div>'
   } else {
-    # Unreviewed: AI callout styling with dismiss
-    sprintf(
-      '<div class="turas-ai-callout turas-ai-exec" id="ai-exec-summary">
+    ""
+  }
+
+  sprintf(
+    '<div class="turas-ai-callout turas-ai-exec" id="ai-exec-summary">
   <div class="ai-callout-header">
-    <span class="ai-callout-icon" title="AI-assisted insight">&#10022;</span>
+    <span class="ai-callout-icon" title="AI-assisted key findings">&#10022;</span>
     <span class="ai-callout-label">AI-assisted key findings</span>
     <button class="ai-callout-dismiss" onclick="dismissAiCallout(this)" title="Dismiss this summary">&times;</button>
   </div>
-  <div class="ai-callout-body">%s</div>
+  <div class="ai-callout-body">%s</div>%s
 </div>',
-      body_html
-    )
-  }
+    body_html, meta_html
+  )
 }
 
 
@@ -243,6 +236,13 @@ build_ai_callout_css <- function() {
   font-size: 13.5px;
   line-height: 1.7;
   color: var(--ct-text-primary, #1a1a2e);
+  box-sizing: border-box;
+  width: 100%;
+}
+/* Match researcher commentary width */
+.turas-commentary {
+  box-sizing: border-box;
+  width: 100%;
 }
 .turas-ai-callout.turas-ai-exec {
   padding: 20px 24px;
@@ -282,8 +282,15 @@ build_ai_callout_css <- function() {
 }
 .turas-ai-callout .ai-callout-dismiss:hover { opacity: 0.8; color: #e74c3c; }
 .turas-ai-callout .ai-callout-body {
-  font-size: 13px;
-  line-height: 1.65;
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+.turas-ai-callout .ai-callout-meta {
+  font-size: 11px;
+  color: #a08840;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid #e8dfc0;
 }
 .turas-ai-callout .ai-callout-caveat {
   font-size: 12px;
