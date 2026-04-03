@@ -1308,13 +1308,25 @@ build_export_actions <- function() {
 #' @param config_obj Configuration object
 #' @return htmltools::tags$div (tab-panel)
 #' @keywords internal
-build_about_panel <- function(config_obj) {
+build_about_panel <- function(config_obj, ai_insights = NULL) {
   closing <- build_closing_section(config_obj)
   export  <- build_export_actions()
+
+  # AI methodology note (if AI insights were generated)
+  ai_note <- NULL
+  if (!is.null(ai_insights) &&
+      exists("build_ai_methodology_note", mode = "function")) {
+    ai_note <- htmltools::HTML(build_ai_methodology_note(
+      ai_insights$ai_config,
+      ai_insights$model_display_name
+    ))
+  }
+
   htmltools::tags$div(
     id = "tab-about",
     class = "tab-panel",
     closing,
+    ai_note,
     export
   )
 }

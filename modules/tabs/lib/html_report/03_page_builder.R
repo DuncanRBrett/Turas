@@ -175,10 +175,10 @@ build_html_page <- function(html_data, tables, config_obj,
       dashboard_html,
       crosstab_panel,
       build_qualitative_panel(qualitative_slides, brand_colour),
-      build_about_panel(config_obj),
+      build_about_panel(config_obj, ai_insights = ai_insights),
       pinned_panel,
       build_help_overlay(),
-      build_javascript(html_data, brand_colour),
+      build_javascript(html_data, brand_colour, ai_insights = ai_insights),
       build_tab_javascript()
     )
   } else {
@@ -220,7 +220,7 @@ build_html_page <- function(html_data, tables, config_obj,
       build_closing_section(config_obj),
       build_export_actions(),
       build_help_overlay(),
-      build_javascript(html_data, brand_colour)
+      build_javascript(html_data, brand_colour, ai_insights = ai_insights)
     )
   }
 
@@ -235,7 +235,8 @@ build_html_page <- function(html_data, tables, config_obj,
 #'
 #' @param html_data The transformed data
 #' @return htmltools::tags$script
-build_javascript <- function(html_data, brand_colour = "#323367") {
+build_javascript <- function(html_data, brand_colour = "#323367",
+                             ai_insights = NULL) {
   group_codes <- sapply(html_data$banner_groups, function(g) g$banner_code)
 
   # Global brand colour variable — all JS files reference this instead of hardcoded hex
@@ -246,7 +247,16 @@ build_javascript <- function(html_data, brand_colour = "#323367") {
 
   # AI insights JS (conditional — only if rendering functions exist)
   ai_js <- if (exists("build_ai_insights_js", mode = "function")) {
-    build_ai_insights_js()
+    # Generate exec summary HTML for dashboard injection
+    exec_html <- NULL
+    if (!is.null(ai_insights) && !is.null(ai_insights$executive_summary) &&
+        exists("build_ai_exec_summary", mode = "function")) {
+      exec_html <- build_ai_exec_summary(
+        ai_insights$executive_summary,
+        ai_insights$ai_config
+      )
+    }
+    build_ai_insights_js(exec_summary_html = exec_html)
   } else {
     ""
   }

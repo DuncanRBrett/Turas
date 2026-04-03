@@ -106,23 +106,26 @@ build_ai_exec_summary <- function(exec_summary, ai_config) {
   # Convert double newlines to paragraph breaks
   body_html <- narrative_to_paragraphs(escape_html(narrative))
 
+  dismiss_btn <- '<button class="ai-callout-dismiss" onclick="dismissAiCallout(this)" title="Dismiss this summary" style="float:right;margin-top:-2px;">&times;</button>'
+
   if (isTRUE(ai_config$exec_summary_reviewed)) {
-    # Reviewed: standard report styling
+    # Reviewed: standard report styling with dismiss
     sprintf(
       '<div class="turas-insight-exec" id="ai-exec-summary">
-  <div class="insight-label">Key findings</div>
+  <div class="insight-label">Key findings %s</div>
   <div class="insight-body">%s</div>
   <div class="insight-meta">Insight commentary &middot; Reviewed by research team</div>
 </div>',
-      body_html
+      dismiss_btn, body_html
     )
   } else {
-    # Unreviewed: AI callout styling
+    # Unreviewed: AI callout styling with dismiss
     sprintf(
       '<div class="turas-ai-callout turas-ai-exec" id="ai-exec-summary">
   <div class="ai-callout-header">
     <span class="ai-callout-icon" title="AI-assisted insight">&#10022;</span>
     <span class="ai-callout-label">AI-assisted key findings</span>
+    <button class="ai-callout-dismiss" onclick="dismissAiCallout(this)" title="Dismiss this summary">&times;</button>
   </div>
   <div class="ai-callout-body">%s</div>
 </div>',
@@ -348,11 +351,36 @@ build_ai_callout_css <- function() {
 
 #' Build JavaScript for AI insight interactivity
 #'
-#' Returns JS for toggle all callouts and pin-to-slide functionality.
+#' Returns JS for toggle, dismiss, and dashboard exec summary injection.
+#'
+#' @param exec_summary_html Character or NULL. Pre-rendered exec summary HTML
+#'   to inject into the dashboard after text boxes.
 #'
 #' @return Character. JavaScript string (without <script> tags).
-build_ai_insights_js <- function() {
-  '
+build_ai_insights_js <- function(exec_summary_html = NULL) {
+  # Inject AI exec summary into dashboard on page load
+  exec_inject_js <- ""
+  if (!is.null(exec_summary_html) && nzchar(exec_summary_html)) {
+    # Escape for JS string embedding
+    escaped <- gsub("\\\\", "\\\\\\\\", exec_summary_html)
+    escaped <- gsub("'", "\\\\'", escaped)
+    escaped <- gsub("\n", "\\\\n", escaped)
+    exec_inject_js <- sprintf('
+/* === Inject AI Executive Summary into Dashboard === */
+(function() {
+  var html = \'%s\';
+  var boxes = document.querySelectorAll(".dash-text-box");
+  var target = boxes.length > 0 ? boxes[boxes.length - 1] : null;
+  if (target) {
+    var wrapper = document.createElement("div");
+    wrapper.innerHTML = html;
+    target.parentNode.insertBefore(wrapper.firstElementChild || wrapper, target.nextSibling);
+  }
+})();
+', escaped)
+  }
+
+  paste0(exec_inject_js, '
 /* === AI Insights Toggle === */
 function toggleAllCallouts(show) {
   document.querySelectorAll(".turas-ai-callout:not(.turas-ai-exec)")
@@ -369,11 +397,11 @@ function toggleCalloutPin(btn) {
 
 /* === AI Callout Dismiss === */
 function dismissAiCallout(btn) {
-  var callout = btn.closest(".turas-ai-callout");
+  var callout = btn.closest(".turas-ai-callout, .turas-insight-exec");
   if (!callout) return;
   callout.style.display = "none";
 }
-'
+')
 }
 
 

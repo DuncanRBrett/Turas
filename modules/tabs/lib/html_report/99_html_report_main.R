@@ -181,6 +181,7 @@ generate_html_report <- function(all_results, banner_info, config_obj, output_pa
   # ============================================================================
   # STEP 2b: BUILD SUMMARY DASHBOARD (if enabled)
   # ============================================================================
+  ai_insights <- NULL  # Initialise early — populated in Step 3d if sidecar exists
   dashboard_html <- NULL
 
   if (isTRUE(config_obj$include_summary %||% TRUE)) {
