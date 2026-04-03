@@ -359,9 +359,16 @@ run_conjoint_gui <- function() {
           output_text <- paste0(output_text, "Loading Conjoint module...\n\n")
           console_text(output_text)
 
-          # Pass deliverable flag
+          # Pass deliverable flag and load minification functions if needed
           assign("TURAS_PREPARE_DELIVERABLE",
                  isTRUE(input$prepare_deliverable), envir = .GlobalEnv)
+          if (isTRUE(input$prepare_deliverable)) {
+            .minify_dir <- file.path(turas_root, "modules", "shared", "lib")
+            if (!exists("turas_prepare_deliverable", mode = "function")) {
+              source(file.path(.minify_dir, "turas_minify_verify.R"), local = FALSE)
+              source(file.path(.minify_dir, "turas_minify.R"), local = FALSE)
+            }
+          }
 
           # Set working directory to Turas root for module loading
           old_wd <- getwd()

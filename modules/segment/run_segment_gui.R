@@ -343,9 +343,16 @@ run_segment_gui <- function() {
       progress$set(message = "Running segmentation analysis", value = 0)
       on.exit(progress$close())
 
-      # Pass deliverable flag to run script
+      # Pass deliverable flag and load minification functions if needed
       assign("TURAS_PREPARE_DELIVERABLE",
              isTRUE(input$prepare_deliverable), envir = .GlobalEnv)
+      if (isTRUE(input$prepare_deliverable)) {
+        .minify_dir <- file.path(turas_root, "modules", "shared", "lib")
+        if (!exists("turas_prepare_deliverable", mode = "function")) {
+          source(file.path(.minify_dir, "turas_minify_verify.R"), local = FALSE)
+          source(file.path(.minify_dir, "turas_minify.R"), local = FALSE)
+        }
+      }
 
       # Change working directory to Turas root
       old_wd <- getwd()

@@ -407,9 +407,16 @@ run_tabs_gui <- function() {
         # Set config_file as global variable (script expects this)
         assign("config_file", file.path(data$path, current_config), envir = .GlobalEnv)
 
-        # Pass deliverable flag to run script
+        # Pass deliverable flag and load minification functions if needed
         assign("TURAS_PREPARE_DELIVERABLE",
                isTRUE(input$prepare_deliverable), envir = .GlobalEnv)
+        if (isTRUE(input$prepare_deliverable)) {
+          minify_dir <- file.path(TURAS_HOME, "modules", "shared", "lib")
+          if (!exists("turas_prepare_deliverable", mode = "function")) {
+            source(file.path(minify_dir, "turas_minify_verify.R"), local = FALSE)
+            source(file.path(minify_dir, "turas_minify.R"), local = FALSE)
+          }
+        }
 
         # Create Shiny progress bar updater (replaces log_progress)
         # This function will be called by process_all_questions()

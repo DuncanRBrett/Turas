@@ -651,9 +651,16 @@ run_tracker_gui <- function() {
         # Change to tracker directory
         setwd(tracker_dir)
 
-        # Pass deliverable flag to run script
+        # Pass deliverable flag and load minification functions if needed
         assign("TURAS_PREPARE_DELIVERABLE",
                isTRUE(input$prepare_deliverable), envir = .GlobalEnv)
+        if (isTRUE(input$prepare_deliverable)) {
+          .minify_dir <- file.path(TURAS_HOME, "modules", "shared", "lib")
+          if (!exists("turas_prepare_deliverable", mode = "function")) {
+            source(file.path(.minify_dir, "turas_minify_verify.R"), local = FALSE)
+            source(file.path(.minify_dir, "turas_minify.R"), local = FALSE)
+          }
+        }
 
         # Source run_tracker.R
         progress$set(value = 0.2, detail = "Loading tracker modules...")

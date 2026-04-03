@@ -388,9 +388,16 @@ run_confidence_gui <- function() {
           sprintf("\n%s\n\n", strrep("=", 80))
         ))
 
-        # Pass deliverable flag
+        # Pass deliverable flag and load minification functions if needed
         assign("TURAS_PREPARE_DELIVERABLE",
                isTRUE(input$prepare_deliverable), envir = .GlobalEnv)
+        if (isTRUE(input$prepare_deliverable)) {
+          .minify_dir <- file.path(TURAS_HOME, "modules", "shared", "lib")
+          if (!exists("turas_prepare_deliverable", mode = "function")) {
+            source(file.path(.minify_dir, "turas_minify_verify.R"), local = FALSE)
+            source(file.path(.minify_dir, "turas_minify.R"), local = FALSE)
+          }
+        }
 
         # Set script directory override so module can find its files
         assign("script_dir_override", file.path(confidence_dir, "R"), envir = .GlobalEnv)

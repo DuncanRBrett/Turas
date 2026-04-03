@@ -564,11 +564,12 @@ run_catdriver_gui <- function() {
           console_text(output_text)
           setProgress(value = 0.02, detail = "Loading modules...")
 
-          # Pass deliverable flag
+          # Pass deliverable flag (minify functions loaded via import_all.R below)
           assign("TURAS_PREPARE_DELIVERABLE",
                  isTRUE(input$prepare_deliverable), envir = .GlobalEnv)
 
           # 1. Source shared TRS infrastructure first (required by guard files)
+          # Also loads turas_minify.R and turas_minify_verify.R
           source(file.path(turas_root, "modules/shared/lib/import_all.R"))
 
           # 2. Source CatDriver modules in dependency order
