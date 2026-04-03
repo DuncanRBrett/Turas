@@ -1,6 +1,8 @@
 # ==============================================================================
 # AI RENDERING — HTML Rendering for AI Insights
 # ==============================================================================
+# SIZE-EXCEPTION: CSS string constants inflate line count beyond 300.
+#   Actual logic functions are individually under 50 lines.
 #
 # All HTML generation for AI-related content in tabs reports:
 #   - Per-question AI callout panels (distinct from researcher commentary)
