@@ -47,7 +47,8 @@ js_esc <- function(s) gsub("'", "\\\\'", gsub("\\\\", "\\\\\\\\", as.character(s
 build_html_page <- function(html_data, tables, config_obj,
                             dashboard_html = NULL, charts = list(),
                             source_filename = NULL,
-                            qualitative_slides = NULL) {
+                            qualitative_slides = NULL,
+                            ai_insights = NULL) {
 
   if (!requireNamespace("jsonlite", quietly = TRUE)) {
     return(list(
@@ -77,7 +78,8 @@ build_html_page <- function(html_data, tables, config_obj,
       build_controls(has_any_freq, has_any_pct, has_any_sig, brand_colour,
                      has_charts = length(charts) > 0),
       build_question_containers(html_data$questions, tables, html_data$banner_groups,
-                                config_obj, charts = charts),
+                                config_obj, charts = charts,
+                                ai_insights = ai_insights),
       build_footer(config_obj, min_base)
     )
   )
@@ -158,7 +160,10 @@ build_html_page <- function(html_data, tables, config_obj,
         htmltools::tags$title(project_title),
         build_css(brand_colour, accent_colour),
         build_dashboard_css(brand_colour),
-        build_print_css()
+        build_print_css(),
+        if (exists("build_ai_callout_css", mode = "function") && !is.null(ai_insights)) {
+          htmltools::tags$style(htmltools::HTML(build_ai_callout_css()))
+        }
       ),
       build_header(project_title, brand_colour, html_data$total_n, html_data$n_questions,
                          company_name = config_obj$company_name %||% "The Research Lamppost",
@@ -201,7 +206,10 @@ build_html_page <- function(html_data, tables, config_obj,
         hub_meta,
         htmltools::tags$title(project_title),
         build_css(brand_colour, accent_colour),
-        build_print_css()
+        build_print_css(),
+        if (exists("build_ai_callout_css", mode = "function") && !is.null(ai_insights)) {
+          htmltools::tags$style(htmltools::HTML(build_ai_callout_css()))
+        }
       ),
       build_header(project_title, brand_colour, html_data$total_n, html_data$n_questions,
                          company_name = config_obj$company_name %||% "The Research Lamppost",
@@ -236,6 +244,13 @@ build_javascript <- function(html_data, brand_colour = "#323367") {
   # Load shared TurasPins library (required by tabs_pins.js)
   shared_pins_js <- if (exists("turas_pins_js", mode = "function")) turas_pins_js() else ""
 
+  # AI insights JS (conditional — only if rendering functions exist)
+  ai_js <- if (exists("build_ai_insights_js", mode = "function")) {
+    build_ai_insights_js()
+  } else {
+    ""
+  }
+
   js_full <- paste0(
     brand_colour_js,
     shared_pins_js,
@@ -246,7 +261,8 @@ build_javascript <- function(html_data, brand_colour = "#323367") {
     read_js_file("tabs_pins_dashboard.js"),
     read_js_file("tabs_qual_slides.js"),
     read_js_file("tabs_pins_print.js"),
-    build_js_table_export_and_init()
+    build_js_table_export_and_init(),
+    ai_js
   )
 
   js_full <- gsub("BANNER_GROUPS_JSON",

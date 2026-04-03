@@ -366,6 +366,59 @@ generate_html_report <- function(all_results, banner_info, config_obj, output_pa
   config_obj$client_logo_uri <- embed_logo(config_obj$client_logo_path, "Client logo")
 
   # ============================================================================
+  # STEP 3d: GENERATE AI INSIGHTS (if enabled)
+  # ============================================================================
+  ai_insights <- NULL
+
+  # Check for AI sidecar file alongside the config workbook
+  ai_sidecar_path <- NULL
+  if (!is.null(config_obj$config_file_path) && nzchar(config_obj$config_file_path %||% "")) {
+    candidate_path <- paste0(tools::file_path_sans_ext(config_obj$config_file_path),
+                             "_ai_insights.json")
+    if (file.exists(candidate_path)) {
+      ai_sidecar_path <- candidate_path
+    }
+  }
+
+  if (!is.null(ai_sidecar_path)) {
+    cat("  Step 3d: Processing AI insights...\n")
+
+    # Source AI modules (conditional — only when sidecar exists)
+    ai_sourced <- tryCatch({
+      turas_root_dir <- Sys.getenv("TURAS_ROOT", "")
+      if (!nzchar(turas_root_dir)) turas_root_dir <- getwd()
+
+      # Shared AI infrastructure
+      source(file.path(turas_root_dir, "modules/shared/lib/ai/ai_provider.R"), local = FALSE)
+      source(file.path(turas_root_dir, "modules/shared/lib/ai/ai_schemas.R"), local = FALSE)
+      source(file.path(turas_root_dir, "modules/shared/lib/ai/ai_utils.R"), local = FALSE)
+      source(file.path(turas_root_dir, "modules/shared/lib/ai/ai_verify.R"), local = FALSE)
+
+      # Tabs-specific AI code
+      source(file.path(turas_root_dir, "modules/tabs/lib/ai/ai_extraction.R"), local = FALSE)
+      source(file.path(turas_root_dir, "modules/tabs/lib/ai/ai_prompts.R"), local = FALSE)
+      source(file.path(turas_root_dir, "modules/tabs/lib/ai/ai_schemas_tabs.R"), local = FALSE)
+      source(file.path(turas_root_dir, "modules/tabs/lib/ai/ai_insights.R"), local = FALSE)
+      source(file.path(turas_root_dir, "modules/tabs/lib/ai/ai_rendering.R"), local = FALSE)
+      TRUE
+    }, error = function(e) {
+      cat(sprintf("    [WARNING] Failed to load AI modules: %s\n", e$message))
+      cat("    Continuing without AI insights.\n")
+      FALSE
+    })
+
+    if (ai_sourced) {
+      ai_insights <- tryCatch({
+        generate_all_insights(all_results, banner_info, config_obj, ai_sidecar_path)
+      }, error = function(e) {
+        cat(sprintf("    [WARNING] AI insights generation failed: %s\n", e$message))
+        cat("    Continuing without AI insights.\n")
+        NULL
+      })
+    }
+  }
+
+  # ============================================================================
   # STEP 4: ASSEMBLE HTML PAGE
   # ============================================================================
   cat("  Step 4: Assembling HTML page...\n")
@@ -377,7 +430,8 @@ generate_html_report <- function(all_results, banner_info, config_obj, output_pa
     build_html_page(html_data, tables, config_obj,
                     dashboard_html = dashboard_html, charts = charts,
                     source_filename = source_filename,
-                    qualitative_slides = config_obj$qualitative_slides)
+                    qualitative_slides = config_obj$qualitative_slides,
+                    ai_insights = ai_insights)
   }, error = function(e) {
     cat("\n=== TURAS ERROR ===\n")
     cat("Code: CALC_PAGE_BUILD_FAILED\n")

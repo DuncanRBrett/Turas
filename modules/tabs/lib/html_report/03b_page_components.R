@@ -835,7 +835,8 @@ build_insight_area <- function(q_code, comment_entries = NULL,
 #' @param config_obj Configuration
 #' @return htmltools::tagList
 build_question_containers <- function(questions, tables, banner_groups,
-                                      config_obj, charts = list()) {
+                                      config_obj, charts = list(),
+                                      ai_insights = NULL) {
 
   first_group_name <- if (length(banner_groups) > 0) names(banner_groups)[1] else ""
 
@@ -925,6 +926,34 @@ build_question_containers <- function(questions, tables, banner_groups,
         tables[[q_code]]
       ),
       chart_div,
+      # AI insights: researcher commentary + AI callout (if ai_insights present)
+      if (!is.null(ai_insights) &&
+          exists("build_researcher_commentary_panel", mode = "function") &&
+          exists("build_ai_callout_panel", mode = "function")) {
+        ai_q <- ai_insights$callouts[[q_code]]
+        ai_commentary <- NULL
+        ai_callout <- NULL
+
+        # Researcher commentary from Comments sheet
+        rc_entries <- if (!is.null(comments)) comments[[q_code]] else NULL
+        if (!is.null(rc_entries) && length(rc_entries) > 0) {
+          # Use the first non-banner-specific comment as commentary
+          for (entry in rc_entries) {
+            if (is.na(entry$banner) || is.null(entry$banner)) {
+              ai_commentary <- entry$text
+              break
+            }
+          }
+        }
+
+        htmltools::tagList(
+          htmltools::HTML(build_researcher_commentary_panel(
+            ai_commentary, q_code)),
+          htmltools::HTML(build_ai_callout_panel(
+            if (!is.null(ai_q)) ai_q$ai_callout else NULL,
+            q_code))
+        )
+      },
       insight_div,
       htmltools::tags$div(class = "table-actions",
         htmltools::tags$div(
