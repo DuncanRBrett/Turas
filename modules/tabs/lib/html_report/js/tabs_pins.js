@@ -76,11 +76,15 @@
     if (!aiCallout) aiCallout = qContainer.querySelector(".turas-ai-callout");
     if (aiCallout && aiCallout.style.display !== "none" &&
         aiCallout.getAttribute("data-pinned") !== "hidden") {
+      // Capture portable HTML first (clone must match live element structure)
       var aiClone = aiCallout.cloneNode(true);
-      // Remove interactive buttons from the captured content
-      var btns = aiClone.querySelectorAll(".ai-callout-pin, .ai-callout-dismiss");
-      btns.forEach(function(b) { b.remove(); });
       aiInsightHtml = TurasPins.capturePortableHtml(aiCallout, aiClone);
+      // Then strip interactive buttons from the captured HTML
+      var aiTemp = document.createElement("div");
+      aiTemp.innerHTML = aiInsightHtml;
+      aiTemp.querySelectorAll(".ai-callout-pin, .ai-callout-dismiss")
+        .forEach(function(b) { b.remove(); });
+      aiInsightHtml = aiTemp.innerHTML;
     }
 
     // Table sort state
