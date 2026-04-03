@@ -741,6 +741,11 @@ generate_html_report_step <- function(config, study_stats, proportion_results,
     if (result$status == "PASS" && verbose) {
       cat(sprintf("  + HTML report written: %s (%.1f KB)\n",
                   basename(html_path), result$file_size_bytes / 1024))
+
+      # Minify for client delivery (if requested via Shiny checkbox)
+      if (exists("turas_prepare_deliverable", mode = "function")) {
+        turas_prepare_deliverable(html_path)
+      }
     } else if (result$status == "REFUSED" && verbose) {
       cat(sprintf("  ! HTML report failed: %s\n", result$message))
     }

@@ -289,7 +289,12 @@ run_maxdiff_gui <- function() {
                       "RUN MAXDIFF ANALYSIS",
                       class = "turas-btn-run",
                       icon = icon("play-circle"),
-                      disabled = !can_run || is_running())
+                      disabled = !can_run || is_running()),
+          div(style = "margin-top: 12px;",
+            checkboxInput("prepare_deliverable",
+                         "Prepare client deliverable (minify for delivery)",
+                         value = FALSE)
+          )
         )
       )
     })
@@ -354,6 +359,10 @@ run_maxdiff_gui <- function() {
             how_to_fix = "Verify the file path is correct and the file exists"
           )
         }
+
+        # Pass deliverable flag
+        assign("TURAS_PREPARE_DELIVERABLE",
+               isTRUE(input$prepare_deliverable), envir = .GlobalEnv)
 
         progress$set(value = 0.2, detail = "Loading MaxDiff module...")
         setwd(MODULE_DIR)

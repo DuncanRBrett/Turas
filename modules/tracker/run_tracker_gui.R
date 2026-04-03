@@ -524,7 +524,12 @@ run_tracker_gui <- function() {
                       "RUN TRACKING ANALYSIS",
                       class = "turas-btn-run",
                       icon = icon("play-circle"),
-                      disabled = !can_run || is_running())
+                      disabled = !can_run || is_running()),
+          div(style = "margin-top: 12px;",
+            checkboxInput("prepare_deliverable",
+                         "Prepare client deliverable (minify for delivery)",
+                         value = FALSE)
+          )
         )
       )
     })
@@ -645,6 +650,10 @@ run_tracker_gui <- function() {
 
         # Change to tracker directory
         setwd(tracker_dir)
+
+        # Pass deliverable flag to run script
+        assign("TURAS_PREPARE_DELIVERABLE",
+               isTRUE(input$prepare_deliverable), envir = .GlobalEnv)
 
         # Source run_tracker.R
         progress$set(value = 0.2, detail = "Loading tracker modules...")

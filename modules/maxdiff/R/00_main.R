@@ -1198,6 +1198,11 @@ run_maxdiff_generate_outputs <- function(design, long_data, raw_data,
         if (html_result$status == "PASS") {
           results$html_report_path <- html_result$output_file
           cat(sprintf("  HTML report saved: %s\n", html_result$output_file))
+
+          # Minify for client delivery (if requested via Shiny checkbox)
+          if (exists("turas_prepare_deliverable", mode = "function")) {
+            turas_prepare_deliverable(html_report_path)
+          }
         } else {
           cat(sprintf("  HTML report failed: %s\n", html_result$message %||% "unknown"))
         }

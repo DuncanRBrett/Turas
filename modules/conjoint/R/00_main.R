@@ -651,6 +651,11 @@ conjoint_generate_outputs <- function(utilities, importance, diagnostics,
       tryCatch({
         generate_conjoint_html_report(html_results, html_output_path, html_config)
         if (verbose) cat(sprintf("   \u2713 HTML report: %s\n", basename(html_output_path)))
+
+        # Minify for client delivery (if requested via Shiny checkbox)
+        if (exists("turas_prepare_deliverable", mode = "function")) {
+          turas_prepare_deliverable(html_output_path)
+        }
       }, error = function(e) {
         message(sprintf("[TRS INFO] CONJ_HTML_REPORT_FAILED: %s", conditionMessage(e)))
       })

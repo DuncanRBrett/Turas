@@ -538,6 +538,11 @@ run_pricing_analysis_from_config <- function(config) {
         if (html_result$status == "PASS") {
           html_report_path <- html_result$output_file
           cat(sprintf("   HTML report: %s\n", basename(html_report_path)))
+
+          # Minify for client delivery (if requested via Shiny checkbox)
+          if (exists("turas_prepare_deliverable", mode = "function")) {
+            turas_prepare_deliverable(html_path)
+          }
         }
       }, error = function(e) {
         message(sprintf("[TRS PARTIAL] PRICE_HTML_FAILED: HTML report generation failed: %s", e$message))

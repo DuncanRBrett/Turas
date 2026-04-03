@@ -303,7 +303,13 @@ run_segment_gui <- function() {
 
         actionButton("run_analysis_btn", "Run Segmentation Analysis",
                     class = "turas-btn-run",
-                    icon = icon("play-circle"))
+                    icon = icon("play-circle")),
+
+        div(style = "margin-top: 12px;",
+          checkboxInput("prepare_deliverable",
+                       "Prepare client deliverable (minify for delivery)",
+                       value = FALSE)
+        )
       )
     })
 
@@ -336,6 +342,10 @@ run_segment_gui <- function() {
       progress <- Progress$new(session)
       progress$set(message = "Running segmentation analysis", value = 0)
       on.exit(progress$close())
+
+      # Pass deliverable flag to run script
+      assign("TURAS_PREPARE_DELIVERABLE",
+             isTRUE(input$prepare_deliverable), envir = .GlobalEnv)
 
       # Change working directory to Turas root
       old_wd <- getwd()

@@ -1096,6 +1096,11 @@ run_catdriver_step_11_output <- function(model_result, importance, odds_ratios,
 
       if (html_result$status != "REFUSED") {
         log_message(paste("HTML report saved to:", basename(html_result$output_file)), "success")
+
+        # Minify for client delivery (if requested via Shiny checkbox)
+        if (exists("turas_prepare_deliverable", mode = "function")) {
+          turas_prepare_deliverable(html_path)
+        }
       } else {
         log_message(paste("HTML report skipped:", html_result$message), "warning")
       }

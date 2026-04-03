@@ -866,3 +866,59 @@ turas_minify <- function(input_path,
 
   result
 }
+
+
+#' Prepare Client Deliverable from HTML Report
+#'
+#' Convenience wrapper for Shiny GUI integration. Checks the
+#' TURAS_PREPARE_DELIVERABLE global flag, renames the original to _dev,
+#' minifies to the clean name, and falls back safely on failure.
+#'
+#' Call this after a successful HTML report write. Does nothing if the
+#' flag is not set or turas_minify is not available.
+#'
+#' @param html_path Character. Path to the HTML report just written.
+#' @return Invisible NULL (side effects: renames file, creates minified copy,
+#'   prints progress to console).
+#'
+#' @examples
+#' \dontrun{
+#'   # In a module run script, after HTML write succeeds:
+#'   turas_prepare_deliverable(html_output_path)
+#' }
+#'
+#' @export
+turas_prepare_deliverable <- function(html_path) {
+  if (!isTRUE(get0("TURAS_PREPARE_DELIVERABLE", envir = .GlobalEnv))) {
+    return(invisible(NULL))
+  }
+
+  if (!is.character(html_path) || length(html_path) != 1L || !nzchar(html_path)) {
+    return(invisible(NULL))
+  }
+
+  if (!file.exists(html_path)) {
+    return(invisible(NULL))
+  }
+
+  cat("\n  Preparing client deliverable...\n")
+  dev_path <- sub("\\.html$", "_dev.html", html_path)
+
+  if (!file.rename(html_path, dev_path)) {
+    cat("  [WARNING] Could not rename file for minification. Report preserved.\n")
+    return(invisible(NULL))
+  }
+
+  minify_result <- turas_minify(dev_path, verbose = TRUE)
+
+  if (minify_result$status %in% c("PASS", "PARTIAL")) {
+    cat(sprintf("  Client deliverable: %s (%.1f%% smaller)\n",
+        basename(minify_result$output_path), minify_result$reduction_pct))
+    cat(sprintf("  Dev copy kept: %s\n", basename(dev_path)))
+  } else {
+    file.rename(dev_path, html_path)
+    cat("  [WARNING] Minification failed. Original report preserved.\n")
+  }
+
+  invisible(NULL)
+}

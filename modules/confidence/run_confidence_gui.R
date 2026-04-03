@@ -306,7 +306,12 @@ run_confidence_gui <- function() {
                       "RUN ANALYSIS",
                       class = "turas-btn-run",
                       icon = icon("play-circle"),
-                      disabled = is_running())
+                      disabled = is_running()),
+          div(style = "margin-top: 12px;",
+            checkboxInput("prepare_deliverable",
+                         "Prepare client deliverable (minify for delivery)",
+                         value = FALSE)
+          )
         )
       )
     })
@@ -382,6 +387,10 @@ run_confidence_gui <- function() {
           sprintf("Config: %s\n", data$selected_config),
           sprintf("\n%s\n\n", strrep("=", 80))
         ))
+
+        # Pass deliverable flag
+        assign("TURAS_PREPARE_DELIVERABLE",
+               isTRUE(input$prepare_deliverable), envir = .GlobalEnv)
 
         # Set script directory override so module can find its files
         assign("script_dir_override", file.path(confidence_dir, "R"), envir = .GlobalEnv)

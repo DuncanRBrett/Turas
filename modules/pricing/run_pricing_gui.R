@@ -188,7 +188,12 @@ run_pricing_gui <- function() {
                         value = FALSE),
           actionButton("run_analysis", "Run Pricing Analysis",
                        class = "btn turas-btn-run",
-                       icon = icon("play"))
+                       icon = icon("play")),
+          div(style = "margin-top: 12px;",
+            checkboxInput("prepare_deliverable",
+                         "Prepare client deliverable (minify for delivery)",
+                         value = FALSE)
+          )
         )
       ),
 
@@ -440,6 +445,10 @@ run_pricing_gui <- function() {
           incProgress(0.05, detail = "Loading module files...")
           output_text <- paste0(output_text, "Loading Pricing module...\n\n")
           console_text(output_text)
+
+          # Pass deliverable flag
+          assign("TURAS_PREPARE_DELIVERABLE",
+                 isTRUE(input$prepare_deliverable), envir = .GlobalEnv)
 
           # Set script_dir_override so 00_main.R can find 00_guard.R
           assign("script_dir_override", r_dir, envir = globalenv())

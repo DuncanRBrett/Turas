@@ -326,7 +326,12 @@ run_tabs_gui <- function() {
                       btn_label,
                       class = "turas-btn-run",
                       icon = icon("play-circle"),
-                      disabled = is_running())
+                      disabled = is_running()),
+          div(style = "margin-top: 12px;",
+            checkboxInput("prepare_deliverable",
+                         "Prepare client deliverable (minify for delivery)",
+                         value = FALSE)
+          )
         )
       )
     })
@@ -401,6 +406,10 @@ run_tabs_gui <- function() {
 
         # Set config_file as global variable (script expects this)
         assign("config_file", file.path(data$path, current_config), envir = .GlobalEnv)
+
+        # Pass deliverable flag to run script
+        assign("TURAS_PREPARE_DELIVERABLE",
+               isTRUE(input$prepare_deliverable), envir = .GlobalEnv)
 
         # Create Shiny progress bar updater (replaces log_progress)
         # This function will be called by process_all_questions()
@@ -513,9 +522,12 @@ run_tabs_gui <- function() {
           )
         }
 
-        # Clean up global config_file between runs
+        # Clean up global variables between runs
         if (exists("config_file", envir = .GlobalEnv)) {
           rm("config_file", envir = .GlobalEnv)
+        }
+        if (exists("TURAS_PREPARE_DELIVERABLE", envir = .GlobalEnv)) {
+          rm("TURAS_PREPARE_DELIVERABLE", envir = .GlobalEnv)
         }
 
         # Restore working directory between runs

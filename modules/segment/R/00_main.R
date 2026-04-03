@@ -568,6 +568,11 @@ turas_segment_impl <- function(config_file, verbose = TRUE) {
     if (!is.null(html_result)) {
       cat(sprintf("  HTML report: %s (%.1f MB)\n", basename(html_path),
                   html_result$file_size_mb %||% 0))
+
+      # Minify for client delivery (if requested via Shiny checkbox)
+      if (exists("turas_prepare_deliverable", mode = "function")) {
+        turas_prepare_deliverable(html_path)
+      }
     }
   } else if (config$html_report && !.seg_html_available) {
     cat("  [WARNING] HTML report requested but pipeline not available\n")
@@ -711,6 +716,10 @@ run_exploration_pipeline <- function(data_list, config, guard, trs_state, start_
       cat(sprintf("  [WARNING] HTML exploration report failed: %s\n", e$message))
       NULL
     })
+
+    if (!is.null(html_result) && exists("turas_prepare_deliverable", mode = "function")) {
+      turas_prepare_deliverable(html_path)
+    }
   }
 
   elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
@@ -1000,6 +1009,11 @@ run_multi_method_pipeline <- function(data_list, config, guard, trs_state, start
     if (!is.null(html_result)) {
       cat(sprintf("  Combined HTML report: %s (%.1f MB)\n", basename(html_path),
                   html_result$file_size_mb %||% 0))
+
+      # Minify for client delivery (if requested via Shiny checkbox)
+      if (exists("turas_prepare_deliverable", mode = "function")) {
+        turas_prepare_deliverable(html_path)
+      }
     }
   }
 

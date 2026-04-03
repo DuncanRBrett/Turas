@@ -571,6 +571,11 @@ if (isTRUE(config_result$config_obj$html_report)) {
   if (!is.null(html_result) && html_result$status == "PASS") {
     cat(sprintf("  HTML Report: %s (%.1f MB)\n",
         html_result$output_file, html_result$file_size_mb))
+
+    # Minify for client delivery (if requested via Shiny checkbox)
+    if (exists("turas_prepare_deliverable", mode = "function")) {
+      turas_prepare_deliverable(html_output_path)
+    }
   }
 }
 

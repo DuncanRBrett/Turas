@@ -788,3 +788,53 @@ test_that("demo file processes correctly with full pipeline", {
 
   expect_equal(count_tag(output_html, "table"), count_tag(input_html, "table"))
 })
+
+
+# ==============================================================================
+# 14. PREPARE DELIVERABLE CONVENIENCE FUNCTION
+# ==============================================================================
+
+test_that("turas_prepare_deliverable does nothing when flag not set", {
+  skip_if_not(.has_node(), "Node.js not available")
+
+  input_path <- .write_test_html()
+  on.exit(unlink(input_path, force = TRUE))
+
+  # Ensure flag is not set
+  if (exists("TURAS_PREPARE_DELIVERABLE", envir = .GlobalEnv)) {
+    rm("TURAS_PREPARE_DELIVERABLE", envir = .GlobalEnv)
+  }
+
+  turas_prepare_deliverable(input_path)
+
+  # File should be unchanged (not renamed)
+  expect_true(file.exists(input_path))
+})
+
+test_that("turas_prepare_deliverable creates _dev and minified files when flag set", {
+  skip_if_not(.has_node(), "Node.js not available")
+  skip_if_not(.has_terser(), "terser not available")
+
+  input_path <- .write_test_html()
+  expected_dev <- sub("\\.html$", "_dev.html", input_path)
+  on.exit(unlink(c(input_path, expected_dev), force = TRUE))
+
+  # Set the flag
+  assign("TURAS_PREPARE_DELIVERABLE", TRUE, envir = .GlobalEnv)
+  on.exit(rm("TURAS_PREPARE_DELIVERABLE", envir = .GlobalEnv), add = TRUE)
+
+  turas_prepare_deliverable(input_path)
+
+  # Original should be renamed to _dev
+  expect_true(file.exists(expected_dev))
+  # Minified version should exist at the original path (turas_minify derives
+  # output from _dev → clean name)
+  clean_path <- sub("_dev\\.html$", ".html", expected_dev)
+  expect_true(file.exists(clean_path))
+})
+
+test_that("turas_prepare_deliverable handles NULL and empty path without error", {
+  expect_invisible(turas_prepare_deliverable(NULL))
+  expect_invisible(turas_prepare_deliverable(""))
+  expect_invisible(turas_prepare_deliverable(42))
+})

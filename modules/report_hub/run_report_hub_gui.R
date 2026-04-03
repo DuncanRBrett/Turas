@@ -447,7 +447,10 @@ run_report_hub_gui <- function() {
                       disabled = is_running()),
           div(style = "margin-top: 12px;",
             checkboxInput("auto_open", "Open result in browser when done",
-                         value = TRUE)
+                         value = TRUE),
+            checkboxInput("prepare_deliverable",
+                         "Prepare client deliverable (minify for delivery)",
+                         value = FALSE)
           )
         )
       )
@@ -524,6 +527,36 @@ run_report_hub_gui <- function() {
         result_info(result)
 
         if (result$status %in% c("PASS", "PARTIAL")) {
+          # Minify for client delivery (if requested)
+          if (isTRUE(input$prepare_deliverable) &&
+              exists("turas_minify", mode = "function") &&
+              !is.null(result$result$output_path)) {
+            hub_path <- result$result$output_path
+            dev_path <- sub("\\.html$", "_dev.html", hub_path)
+
+            if (file.rename(hub_path, dev_path)) {
+              minify_result <- turas_minify(dev_path, verbose = TRUE)
+
+              if (minify_result$status %in% c("PASS", "PARTIAL")) {
+                console_text(paste0(
+                  console_text(),
+                  sprintf("\nClient deliverable: %s (%.1f%% smaller)\n",
+                          basename(minify_result$output_path),
+                          minify_result$reduction_pct),
+                  sprintf("Dev copy kept: %s\n", basename(dev_path))
+                ))
+                # Update output path to the minified version for auto_open
+                result$result$output_path <- minify_result$output_path
+              } else {
+                file.rename(dev_path, hub_path)
+                console_text(paste0(
+                  console_text(),
+                  "\n[WARNING] Minification failed. Original report preserved.\n"
+                ))
+              }
+            }
+          }
+
           showNotification("Reports combined successfully!",
                           type = "message", duration = 5)
           if (isTRUE(input$auto_open)) {

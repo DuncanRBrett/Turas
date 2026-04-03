@@ -667,6 +667,11 @@ run_tracker <- function(tracking_config_path,
     )
     if (html_result$status == "PASS") {
       output_files$tracking_html <- html_result$output_file
+
+      # Minify for client delivery (if requested via Shiny checkbox)
+      if (exists("turas_prepare_deliverable", mode = "function")) {
+        turas_prepare_deliverable(html_path)
+      }
     } else {
       cat("\n  WARNING: HTML report generation failed\n")
       cat("  Code: ", html_result$code, "\n")

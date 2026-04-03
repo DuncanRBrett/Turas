@@ -828,6 +828,11 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
       if (!is.null(html_result) && !is.null(html_result$status) && html_result$status != "REFUSED") {
         results$html_report <- html_result
         cat(sprintf("   [OK] HTML report: %s\n", html_output_path))
+
+        # Minify for client delivery (if requested via Shiny checkbox)
+        if (exists("turas_prepare_deliverable", mode = "function")) {
+          turas_prepare_deliverable(html_output_path)
+        }
       }
     } else {
       cat("   [SKIP] HTML report library not found\n")

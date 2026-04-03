@@ -484,9 +484,16 @@ run_catdriver_gui <- function() {
       } else {
         sprintf("Run %d Analyses + Generate Unified Report", n)
       }
-      actionButton("run_analysis", label,
-                    class = "btn turas-btn-run",
-                    icon = icon("play"))
+      tagList(
+        actionButton("run_analysis", label,
+                      class = "btn turas-btn-run",
+                      icon = icon("play")),
+        div(style = "margin-top: 12px;",
+          checkboxInput("prepare_deliverable",
+                       "Prepare client deliverable (minify for delivery)",
+                       value = FALSE)
+        )
+      )
     })
 
     # =========================================================================
@@ -556,6 +563,10 @@ run_catdriver_gui <- function() {
           output_text <- paste0(output_text, "Loading Categorical Key Driver module...\n\n")
           console_text(output_text)
           setProgress(value = 0.02, detail = "Loading modules...")
+
+          # Pass deliverable flag
+          assign("TURAS_PREPARE_DELIVERABLE",
+                 isTRUE(input$prepare_deliverable), envir = .GlobalEnv)
 
           # 1. Source shared TRS infrastructure first (required by guard files)
           source(file.path(turas_root, "modules/shared/lib/import_all.R"))

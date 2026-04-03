@@ -191,7 +191,12 @@ run_keydriver_gui <- function() {
                         value = FALSE),
           actionButton("run_analysis", "Run Key Driver Analysis",
                       class = "btn turas-btn-run",
-                      icon = icon("play"))
+                      icon = icon("play")),
+          div(style = "margin-top: 12px;",
+            checkboxInput("prepare_deliverable",
+                         "Prepare client deliverable (minify for delivery)",
+                         value = FALSE)
+          )
         )
       ),
 
@@ -388,6 +393,10 @@ run_keydriver_gui <- function() {
           if (basename(turas_root) != "Turas") {
             turas_root <- dirname(turas_root)
           }
+
+          # Pass deliverable flag
+          assign("TURAS_PREPARE_DELIVERABLE",
+                 isTRUE(input$prepare_deliverable), envir = .GlobalEnv)
 
           # Source module files with error handling
           incProgress(0.05, detail = "Loading module files...")

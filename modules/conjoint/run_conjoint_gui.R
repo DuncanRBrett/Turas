@@ -155,7 +155,12 @@ run_conjoint_gui <- function() {
                         value = FALSE),
           actionButton("run_analysis", "Run Conjoint Analysis",
                       class = "btn turas-btn-run",
-                      icon = icon("play"))
+                      icon = icon("play")),
+          div(style = "margin-top: 12px;",
+            checkboxInput("prepare_deliverable",
+                         "Prepare client deliverable (minify for delivery)",
+                         value = FALSE)
+          )
         )
       ),
 
@@ -353,6 +358,10 @@ run_conjoint_gui <- function() {
           incProgress(0.05, detail = "Loading module files...")
           output_text <- paste0(output_text, "Loading Conjoint module...\n\n")
           console_text(output_text)
+
+          # Pass deliverable flag
+          assign("TURAS_PREPARE_DELIVERABLE",
+                 isTRUE(input$prepare_deliverable), envir = .GlobalEnv)
 
           # Set working directory to Turas root for module loading
           old_wd <- getwd()
