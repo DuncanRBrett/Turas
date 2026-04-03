@@ -73,6 +73,7 @@
     if (subtitle) html += '<div class="' + pfx + '-card-subtitle">' +
       TurasPins._escapeHtml(subtitle) + '</div>';
     html += _buildInsightArea(pin, pid, pfx, config);
+    html += _buildAiInsightArea(pin, pfx);
     html += _cardContent(pin, pfx);
     html += '</div>';
     return html;
@@ -125,7 +126,7 @@
     return html;
   }
 
-  /** Build card content: image, chart, table respecting pinMode */
+  /** Build card content: image, chart, table respecting pinMode/pinFlags */
   function _cardContent(pin, pfx) {
     var html = "";
     if (pin.imageData) {
@@ -133,13 +134,12 @@
         '<img src="' + pin.imageData + '" style="max-width:100%;' +
         'max-height:500px;border-radius:6px;border:1px solid #e2e8f0;" /></div>';
     }
-    var mode = pin.pinMode || "all";
     if (pin.chartSvg && pin.chartVisible !== false &&
-        (mode === "all" || mode === "chart_insight")) {
+        TurasPins.shouldShow(pin, "chart")) {
       html += '<div class="' + pfx + '-card-chart">' +
         TurasPins._sanitizeHtml(pin.chartSvg) + '</div>';
     }
-    if (pin.tableHtml && (mode === "all" || mode === "table_insight")) {
+    if (pin.tableHtml && TurasPins.shouldShow(pin, "table")) {
       html += '<div class="' + pfx + '-card-table">' +
         TurasPins._sanitizeHtml(pin.tableHtml) + '</div>';
     }
@@ -327,6 +327,17 @@
     r.style.display = ""; e.style.display = "none";
     TurasPins.updateInsight(pinId, md);
   };
+
+  // ── AI Insight Area (read-only, styled HTML) ─────────────────────────────
+
+  /** Build AI insight callout panel in pinned card (read-only, preserves styling) */
+  function _buildAiInsightArea(pin, pfx) {
+    if (!pin.aiInsightHtml) return "";
+    // Respect pinFlags if present
+    if (pin.pinFlags && !pin.pinFlags.aiInsight) return "";
+    return '<div class="' + pfx + '-card-ai-insight">' +
+      TurasPins._sanitizeHtml(pin.aiInsightHtml) + '</div>';
+  }
 
   // ── Clipboard Export (internal) ────────────────────────────────────────────
 

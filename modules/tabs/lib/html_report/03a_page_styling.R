@@ -912,6 +912,45 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     .pin-mode-option:last-child { border-radius: 0 0 8px 8px; }
     .pin-mode-disabled { color: #cbd5e1; cursor: default; }
     .pin-mode-disabled:hover { background: none; color: #cbd5e1; }
+    /* Checkbox-based pin picker */
+    .pin-mode-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 14px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #1e293b;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .pin-mode-checkbox:hover { background: #f0f4f8; }
+    .pin-mode-checkbox.pin-mode-disabled { color: #cbd5e1; cursor: default; }
+    .pin-mode-checkbox.pin-mode-disabled:hover { background: none; }
+    .pin-mode-checkbox input[type="checkbox"] {
+      accent-color: BRAND;
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      cursor: pointer;
+    }
+    .pin-mode-checkbox.pin-mode-disabled input[type="checkbox"] { cursor: default; }
+    .pin-mode-action {
+      display: block;
+      width: calc(100% - 20px);
+      margin: 6px 10px 8px;
+      padding: 7px 0;
+      border: none;
+      border-radius: 5px;
+      background: BRAND;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: opacity 0.15s;
+    }
+    .pin-mode-action:hover { opacity: 0.85; }
   '
 
   css_qualitative <- '

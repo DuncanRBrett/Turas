@@ -56,6 +56,9 @@ build_ai_callout_panel <- function(callout, q_code) {
     <button class="ai-callout-pin" onclick="toggleCalloutPin(this)" title="Pin to slide export">
       <span class="pin-icon">&#128204;</span>
     </button>
+    <button class="ai-callout-dismiss" onclick="dismissAiCallout(this)" title="Dismiss this insight">
+      &times;
+    </button>
   </div>
   <div class="ai-callout-body">%s</div>%s
 </div>',
@@ -277,6 +280,19 @@ build_ai_callout_css <- function() {
   transition: opacity 0.15s ease;
 }
 .turas-ai-callout .ai-callout-pin:hover { opacity: 0.7; }
+.turas-ai-callout .ai-callout-dismiss {
+  background: none;
+  border: 1px solid var(--ct-border, #e2e4e8);
+  border-radius: var(--ct-radius-sm, 4px);
+  padding: 2px 8px;
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0.3;
+  color: var(--ct-text-tertiary, #8a8a9a);
+  transition: opacity 0.15s ease;
+  line-height: 1;
+}
+.turas-ai-callout .ai-callout-dismiss:hover { opacity: 0.8; color: #e74c3c; }
 .turas-ai-callout[data-pinned="true"] .ai-callout-pin {
   opacity: 1;
   border-color: var(--ct-brand, #323367);
@@ -366,6 +382,13 @@ function toggleCalloutPin(btn) {
   if (!callout) return;
   var pinned = callout.getAttribute("data-pinned") === "true";
   callout.setAttribute("data-pinned", pinned ? "false" : "true");
+}
+
+/* === AI Callout Dismiss === */
+function dismissAiCallout(btn) {
+  var callout = btn.closest(".turas-ai-callout");
+  if (!callout) return;
+  callout.style.display = "none";
 }
 '
 }

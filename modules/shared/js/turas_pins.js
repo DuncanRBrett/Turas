@@ -73,10 +73,16 @@
       var modeMap = { both: "all", chart: "chart_insight", table: "table_insight" };
       pin.pinMode = modeMap[pin.mode] || pin.mode;
     }
+    // pinFlags takes precedence over pinMode for granular control
+    // pinFlags: { chart: bool, table: bool, insight: bool, aiInsight: bool }
+    if (pin.pinFlags && !pin.pinMode) {
+      pin.pinMode = "custom";
+    }
     // Defaults
     pin.chartSvg = pin.chartSvg || "";
     pin.tableHtml = pin.tableHtml || "";
     pin.insightText = pin.insightText || "";
+    pin.aiInsightHtml = pin.aiInsightHtml || "";
     pin.pinMode = pin.pinMode || "all";
     pin.timestamp = pin.timestamp || new Date().toISOString();
     pin.type = pin.type || "pin";
@@ -87,6 +93,29 @@
     delete pin.chart; delete pin.table; delete pin.note;
     delete pin.insight; delete pin.chartHtml; delete pin.mode;
     return pin;
+  };
+
+  /**
+   * Check whether a content type should be shown for a pin.
+   * Respects pinFlags (granular) if present, otherwise falls back to pinMode.
+   * @param {object} pin - Normalised pin
+   * @param {string} contentType - "chart", "table", "insight", or "aiInsight"
+   * @returns {boolean}
+   */
+  TurasPins.shouldShow = function(pin, contentType) {
+    // pinFlags takes precedence when present
+    if (pin.pinFlags && typeof pin.pinFlags === "object") {
+      return !!pin.pinFlags[contentType];
+    }
+    // Legacy pinMode fallback
+    var mode = pin.pinMode || "all";
+    switch (contentType) {
+      case "chart":     return mode === "all" || mode === "chart_insight" || mode === "chart_table";
+      case "table":     return mode === "all" || mode === "table_insight" || mode === "chart_table";
+      case "insight":   return mode === "all" || mode === "chart_insight" || mode === "table_insight";
+      case "aiInsight": return pin.pinFlags ? !!pin.pinFlags.aiInsight : false;
+      default:          return false;
+    }
   };
 
   /**

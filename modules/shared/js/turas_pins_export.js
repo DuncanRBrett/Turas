@@ -75,14 +75,26 @@
     var mode = pin.pinMode || "all";
     var tData = null, estTH = 0;
     var hasHtmlContent = false;
-    if (pin.tableHtml && (mode === "all" || mode === "table_insight")) {
-      if (pin.tableHtml.trim().length > 0) {
-        // Route ALL tableHtml through html2canvas for pixel-perfect export.
-        // The SVG table renderer (_extractTableData → _renderTableSVG) strips
-        // CSS formatting — header colours, significance markers, backgrounds.
-        // html2canvas preserves the full visual styling.
-        hasHtmlContent = true;
-      }
+    // Combine AI callout + table into a single HTML block for html2canvas
+    var combinedHtml = "";
+    // AI insight callout (rendered via html2canvas to preserve styling)
+    var showAi = pin.aiInsightHtml && (
+      (pin.pinFlags && pin.pinFlags.aiInsight) ||
+      (!pin.pinFlags && pin.aiInsightHtml)
+    );
+    if (showAi) {
+      combinedHtml += pin.aiInsightHtml;
+      hasHtmlContent = true;
+    }
+    // Table HTML
+    var showTable = pin.tableHtml && TurasPins.shouldShow(pin, "table");
+    if (showTable && pin.tableHtml.trim().length > 0) {
+      // Route ALL tableHtml through html2canvas for pixel-perfect export.
+      // The SVG table renderer (_extractTableData → _renderTableSVG) strips
+      // CSS formatting — header colours, significance markers, backgrounds.
+      // html2canvas preserves the full visual styling.
+      combinedHtml += pin.tableHtml;
+      hasHtmlContent = true;
     }
 
     return {
@@ -92,6 +104,7 @@
       imgTopY: imgTopY, imgDispW: imgDispW, imgDispH: imgDispH,
       chartTopY: chartTopY, chart: chartInfo,
       tableTopY: tableTopY, tData: tData, hasHtmlContent: hasHtmlContent,
+      combinedHtml: combinedHtml,
       totalH: Math.max(tableTopY + estTH + pad, 160)
     };
   }
@@ -99,10 +112,10 @@
     var L = _layout(pin, imgW, imgH);
     var W = TurasPins.EXPORT_WIDTH;
 
-    // If pin has HTML-only content (no SVG chart, no table), render it
-    // to an image first, then composite into the export
+    // If pin has HTML content (AI callout + table), render via html2canvas
+    // then composite into the export
     if (L.hasHtmlContent) {
-      _renderHtmlToImage(pin.tableHtml, L.usableW, function(result) {
+      _renderHtmlToImage(L.combinedHtml, L.usableW, function(result) {
         if (result) {
           var htmlImgW = Math.min(result.width, L.usableW);
           var htmlImgH = Math.round(result.height * (htmlImgW / result.width));
@@ -200,7 +213,7 @@
   function _chart(pin, usableW, topY) {
     var res = { clone: null, h: 0, scale: 1, bottomY: topY };
     var mode = pin.pinMode || "all";
-    if (!pin.chartSvg || pin.chartVisible === false || (mode !== "all" && mode !== "chart_insight")) return res;
+    if (!pin.chartSvg || pin.chartVisible === false || !TurasPins.shouldShow(pin, "chart")) return res;
     var tmp = document.createElement("div"); tmp.innerHTML = pin.chartSvg;
     var el = tmp.querySelector("svg");
     if (!el) return res;

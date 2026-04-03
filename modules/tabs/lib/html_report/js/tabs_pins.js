@@ -70,6 +70,19 @@
     var editor = qContainer.querySelector(".insight-md-editor");
     if (editor) insightText = editor.value.trim();
 
+    // AI callout (portable HTML with inline styles)
+    var aiInsightHtml = "";
+    var aiCallout = qContainer.querySelector('.turas-ai-callout[data-q-code="' + qCode + '"]');
+    if (!aiCallout) aiCallout = qContainer.querySelector(".turas-ai-callout");
+    if (aiCallout && aiCallout.style.display !== "none" &&
+        aiCallout.getAttribute("data-pinned") !== "hidden") {
+      var aiClone = aiCallout.cloneNode(true);
+      // Remove interactive buttons from the captured content
+      var btns = aiClone.querySelectorAll(".ai-callout-pin, .ai-callout-dismiss");
+      btns.forEach(function(b) { b.remove(); });
+      aiInsightHtml = TurasPins.capturePortableHtml(aiCallout, aiClone);
+    }
+
     // Table sort state
     var table = qContainer.querySelector("table.ct-table");
     var tableSortState = null;
@@ -143,6 +156,7 @@
       selectedColumns: selectedCols,
       excludedRows: excludedRows,
       insightText: insightText,
+      aiInsightHtml: aiInsightHtml,
       sortState: tableSortState,
       tableHtml: tablePortableHtml,
       chartSvg: chartSvgStr,
@@ -164,7 +178,8 @@
   }
 
   /**
-   * Show mode popover for crosstab pin.
+   * Show checkbox-based pin popover for crosstab pin.
+   * User can independently toggle: Chart, Table, Insight, AI Insight.
    * @param {string} qCode - Question code
    */
   window.togglePin = function(qCode) {
@@ -175,7 +190,11 @@
 
     var qContainer = document.querySelector("#q-container-" + getQuestionIndexByCode(qCode));
     if (!qContainer) qContainer = btn.closest(".question-container");
-    var hasChart = qContainer && qContainer.querySelector(".chart-wrapper svg");
+    var hasChart = !!(qContainer && qContainer.querySelector(".chart-wrapper svg"));
+    var hasAiCallout = !!(qContainer && qContainer.querySelector(".turas-ai-callout"));
+    var hasInsight = false;
+    var insightEditor = qContainer ? qContainer.querySelector(".insight-md-editor") : null;
+    if (insightEditor && insightEditor.value.trim()) hasInsight = true;
 
     var popover = document.createElement("div");
     popover.className = "pin-mode-popover";
@@ -185,28 +204,47 @@
     title.textContent = "Pin to Views";
     popover.appendChild(title);
 
-    var options = [
-      { label: "Table + Chart + Insight", mode: "all" },
-      { label: "Chart + Insight", mode: "chart_insight", needsChart: true },
-      { label: "Table + Insight", mode: "table_insight" }
+    var checkboxes = [
+      { key: "table",     label: "Table",      available: true,        checked: true },
+      { key: "chart",     label: "Chart",      available: hasChart,    checked: hasChart },
+      { key: "insight",   label: "Insight",    available: true,        checked: hasInsight },
+      { key: "aiInsight", label: "AI Insight",  available: hasAiCallout, checked: hasAiCallout }
     ];
 
-    options.forEach(function(opt) {
-      var row = document.createElement("button");
-      row.className = "pin-mode-option";
-      if (opt.needsChart && !hasChart) {
-        row.className += " pin-mode-disabled";
-        row.title = "No chart available";
-      }
-      row.textContent = opt.label;
-      row.onclick = function(e) {
-        e.stopPropagation();
-        if (opt.needsChart && !hasChart) return;
-        closePopover();
-        executePinWithMode(qCode, opt.mode);
-      };
+    var state = {};
+    checkboxes.forEach(function(opt) {
+      state[opt.key] = opt.available && opt.checked;
+
+      var row = document.createElement("label");
+      row.className = "pin-mode-checkbox" + (opt.available ? "" : " pin-mode-disabled");
+
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = opt.available && opt.checked;
+      cb.disabled = !opt.available;
+      cb.onchange = function() { state[opt.key] = this.checked; };
+
+      var span = document.createElement("span");
+      span.textContent = opt.label;
+      if (!opt.available) span.title = "Not available for this question";
+
+      row.appendChild(cb);
+      row.appendChild(span);
       popover.appendChild(row);
     });
+
+    var pinBtn = document.createElement("button");
+    pinBtn.className = "pin-mode-action";
+    pinBtn.textContent = "Pin";
+    pinBtn.onclick = function(e) {
+      e.stopPropagation();
+      // Need at least one item checked
+      var anyChecked = Object.keys(state).some(function(k) { return state[k]; });
+      if (!anyChecked) return;
+      closePopover();
+      executePinWithFlags(qCode, state);
+    };
+    popover.appendChild(pinBtn);
 
     btn.style.position = "relative";
     popover.style.cssText = "position:absolute;top:100%;right:0;z-index:1000;";
@@ -223,6 +261,25 @@
     var content = captureCurrentView(qCode);
     if (!content) return;
     content.pinMode = mode;
+    TurasPins.add(content);
+    tabsUpdatePinButton(qCode, true);
+  }
+
+  function executePinWithFlags(qCode, flags) {
+    var content = captureCurrentView(qCode);
+    if (!content) return;
+    content.pinFlags = {
+      chart:     !!flags.chart,
+      table:     !!flags.table,
+      insight:   !!flags.insight,
+      aiInsight: !!flags.aiInsight
+    };
+    content.pinMode = "custom";
+    // Clear content the user opted out of so it doesn't bloat storage
+    if (!flags.chart) content.chartSvg = "";
+    if (!flags.table) content.tableHtml = "";
+    if (!flags.insight) content.insightText = "";
+    if (!flags.aiInsight) content.aiInsightHtml = "";
     TurasPins.add(content);
     tabsUpdatePinButton(qCode, true);
   }
