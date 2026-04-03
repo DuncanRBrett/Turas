@@ -36,7 +36,6 @@ build_ai_callout_panel <- function(callout, q_code) {
   if (is.null(callout$narrative) || !nzchar(callout$narrative)) return("")
 
   confidence  <- callout$confidence %||% "high"
-  pinned_str  <- if (isTRUE(callout$pinned)) "true" else "false"
   narrative   <- escape_html(callout$narrative)
   limitations <- callout$data_limitations %||% ""
 
@@ -49,20 +48,17 @@ build_ai_callout_panel <- function(callout, q_code) {
   }
 
   sprintf(
-    '<div class="turas-ai-callout" data-q-code="%s" data-confidence="%s" data-pinned="%s">
+    '<div class="turas-ai-callout" data-q-code="%s" data-confidence="%s">
   <div class="ai-callout-header">
     <span class="ai-callout-icon" title="AI-assisted insight">&#10022;</span>
     <span class="ai-callout-label">AI-assisted insight</span>
-    <button class="ai-callout-pin" onclick="toggleCalloutPin(this)" title="Pin to slide export">
-      <span class="pin-icon">&#128204;</span>
-    </button>
     <button class="ai-callout-dismiss" onclick="dismissAiCallout(this)" title="Dismiss this insight">
       &times;
     </button>
   </div>
   <div class="ai-callout-body">%s</div>%s
 </div>',
-    escape_html(q_code), confidence, pinned_str,
+    escape_html(q_code), confidence,
     narrative, caveat_html
   )
 }
@@ -241,8 +237,8 @@ build_ai_callout_css <- function() {
   border-radius: var(--ct-radius-md, 6px);
   padding: 16px 20px;
   margin: 12px 0 16px 0;
-  font-size: 13px;
-  line-height: 1.65;
+  font-size: 13.5px;
+  line-height: 1.7;
   color: var(--ct-text-primary, #1a1a2e);
 }
 .turas-ai-callout.turas-ai-exec {
@@ -269,17 +265,6 @@ build_ai_callout_css <- function() {
   color: #c9a84c;
   flex: 1;
 }
-.turas-ai-callout .ai-callout-pin {
-  background: none;
-  border: 1px solid var(--ct-border, #e2e4e8);
-  border-radius: var(--ct-radius-sm, 4px);
-  padding: 2px 8px;
-  font-size: 12px;
-  cursor: pointer;
-  opacity: 0.4;
-  transition: opacity 0.15s ease;
-}
-.turas-ai-callout .ai-callout-pin:hover { opacity: 0.7; }
 .turas-ai-callout .ai-callout-dismiss {
   background: none;
   border: 1px solid var(--ct-border, #e2e4e8);
@@ -293,10 +278,6 @@ build_ai_callout_css <- function() {
   line-height: 1;
 }
 .turas-ai-callout .ai-callout-dismiss:hover { opacity: 0.8; color: #e74c3c; }
-.turas-ai-callout[data-pinned="true"] .ai-callout-pin {
-  opacity: 1;
-  border-color: var(--ct-brand, #323367);
-}
 .turas-ai-callout .ai-callout-body {
   font-size: 13px;
   line-height: 1.65;

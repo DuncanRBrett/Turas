@@ -167,7 +167,7 @@
   }
 
   function _addInsight(svg, insightEl, y, pad, usableW, brand) {
-    var aH = Math.max(24, insightEl.height + 8);
+    var aH = Math.max(32, insightEl.height + 16);
     _rect(svg, pad, y + 2, usableW, aH, "#f0f4ff", "4");
     var bar = document.createElementNS(NS, "rect");
     bar.setAttribute("x", pad); bar.setAttribute("y", y + 2);
@@ -178,7 +178,7 @@
 
   /** Render AI callout block with gold accent in SVG export */
   function _addAiInsight(svg, aiInsightEl, y, pad, usableW) {
-    var aH = Math.max(36, aiInsightEl.height + 22);
+    var aH = Math.max(44, aiInsightEl.height + 30);
     // Gold background
     _rect(svg, pad, y + 2, usableW, aH, "#fdf8ed", "4");
     // Gold left accent bar
@@ -189,7 +189,7 @@
     svg.appendChild(bar);
     // "AI-ASSISTED INSIGHT" label
     var label = document.createElementNS(NS, "text");
-    label.setAttribute("x", pad + 22); label.setAttribute("y", y + 16);
+    label.setAttribute("x", pad + 22); label.setAttribute("y", y + 18);
     label.setAttribute("fill", "#c9a84c"); label.setAttribute("font-size", "9");
     label.setAttribute("font-weight", "600"); label.setAttribute("letter-spacing", "1");
     label.textContent = "\u2726 AI-ASSISTED INSIGHT";

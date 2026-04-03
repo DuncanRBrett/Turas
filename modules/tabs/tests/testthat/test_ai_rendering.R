@@ -89,16 +89,16 @@ test_that("renders callout with correct structure", {
   expect_true(grepl('class="turas-ai-callout"', html, fixed = TRUE))
   expect_true(grepl('data-q-code="Q001"', html, fixed = TRUE))
   expect_true(grepl('data-confidence="high"', html, fixed = TRUE))
-  expect_true(grepl('data-pinned="false"', html, fixed = TRUE))
   expect_true(grepl("AI-assisted insight", html, fixed = TRUE))
   expect_true(grepl("NPS of +7", html, fixed = TRUE))
 })
 
-test_that("renders pinned state correctly", {
-  callout <- make_test_callout(pinned = TRUE)
+test_that("renders without pin button (pinning via question-level popover)", {
+  callout <- make_test_callout()
   html <- build_ai_callout_panel(callout, "Q001")
 
-  expect_true(grepl('data-pinned="true"', html, fixed = TRUE))
+  expect_false(grepl('data-pinned', html, fixed = TRUE))
+  expect_false(grepl('ai-callout-pin', html, fixed = TRUE))
 })
 
 test_that("renders medium confidence with caveat", {
@@ -148,12 +148,14 @@ test_that("escapes HTML in narrative", {
   expect_false(grepl("<50%", html, fixed = TRUE))
 })
 
-test_that("includes pin button with onclick handler", {
+test_that("includes dismiss button with onclick handler", {
   callout <- make_test_callout()
   html <- build_ai_callout_panel(callout, "Q001")
 
-  expect_true(grepl("toggleCalloutPin", html, fixed = TRUE))
-  expect_true(grepl('class="ai-callout-pin"', html, fixed = TRUE))
+  expect_true(grepl("dismissAiCallout", html, fixed = TRUE))
+  expect_true(grepl('class="ai-callout-dismiss"', html, fixed = TRUE))
+  # Pin button removed — pinning handled by question-level pin popover
+  expect_false(grepl('class="ai-callout-pin"', html, fixed = TRUE))
 })
 
 # ==============================================================================
