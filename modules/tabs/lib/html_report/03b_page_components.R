@@ -898,8 +898,7 @@ build_question_containers <- function(questions, tables, banner_groups,
             style = paste0(
               "background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;",
               "font-size:16px;padding:6px 10px;margin-left:8px;color:#94a3b8;",
-              "transition:all 0.15s;min-width:36px;min-height:36px;",
-              "display:inline-flex;align-items:center;justify-content:center;"
+              "transition:background 0.15s,color 0.15s,border-color 0.15s;"
             ),
             "\U0001F4CC"
           )

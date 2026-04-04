@@ -258,9 +258,11 @@
 
     // Append to the question title card (not the button) to avoid re-triggering togglePin
     var titleCard = btn.closest(".question-title-card") || btn.parentElement;
+    // Set position:relative BEFORE reading offsetTop — otherwise offsetTop is
+    // measured relative to the body (huge value) and the popover lands off-screen
+    titleCard.style.position = "relative";
     popover.style.cssText = "position:absolute;top:" +
       (btn.offsetTop + btn.offsetHeight + 4) + "px;right:16px;z-index:1000;";
-    titleCard.style.position = "relative";
     titleCard.appendChild(popover);
 
     setTimeout(function() {
