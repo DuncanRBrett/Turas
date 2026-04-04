@@ -65,6 +65,14 @@ turas_write_stats_pack <- function(payload, output_path, protect_sheets = TRUE) 
     return(invisible(NULL))
   }
 
+  # Verify output directory exists before attempting write
+  output_dir <- dirname(output_path)
+  if (!dir.exists(output_dir)) {
+    warning(sprintf("cannot create file '%s', reason 'No such file or directory'", output_path))
+    message("[TRS WARNING] STATS_PACK: Failed to write stats pack: output directory does not exist")
+    return(invisible(NULL))
+  }
+
   tryCatch({
 
     wb <- openxlsx::createWorkbook()

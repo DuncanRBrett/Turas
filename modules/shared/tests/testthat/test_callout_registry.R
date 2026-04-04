@@ -86,8 +86,9 @@ test_that("turas_callout respects collapsed parameter", {
   html_open <- turas_callout("keydriver", "shapley_importance", collapsed = FALSE)
   html_closed <- turas_callout("keydriver", "shapley_importance", collapsed = TRUE)
 
-  expect_false(grepl("collapsed", html_open))
-  expect_true(grepl("collapsed", html_closed))
+  # Check the CSS class on the div, not the onclick handler which always contains "collapsed"
+  expect_false(grepl("t-callout collapsed", html_open))
+  expect_true(grepl("t-callout collapsed", html_closed))
 })
 
 test_that("turas_callout_html builds from direct content", {

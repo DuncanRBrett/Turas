@@ -241,7 +241,8 @@ test_that("Data_Used sheet contains per-item stats when provided", {
 
   turas_write_stats_pack(make_minimal_payload(), tmp, protect_sheets = FALSE)
 
-  df <- openxlsx::read.xlsx(tmp, sheet = "Data_Used", colNames = TRUE)
+  # Row 1 is the section header "Response Counts by Question"; data starts at row 2
+  df <- openxlsx::read.xlsx(tmp, sheet = "Data_Used", startRow = 2, colNames = TRUE)
   expect_true("Question_ID" %in% names(df))
   expect_equal(nrow(df), 3L)
   expect_true("Q1" %in% df$Question_ID)

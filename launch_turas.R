@@ -751,26 +751,26 @@ launch_turas <- function() {
     launch_module <- function(module_name, script_path, config_path = NULL) {
       config_lines <- ""
       if (!is.null(config_path) && nzchar(config_path)) {
-        config_lines <- sprintf('Sys.setenv(TURAS_MODULE_CONFIG = "%s")\n', config_path)
+        config_lines <- sprintf('Sys.setenv(TURAS_MODULE_CONFIG = %s)\n', deparse(config_path))
         if (module_name == "report_hub") {
-          config_lines <- paste0(config_lines, sprintf('Sys.setenv(TURAS_HUB_CONFIG = "%s")\n', config_path))
+          config_lines <- paste0(config_lines, sprintf('Sys.setenv(TURAS_HUB_CONFIG = %s)\n', deparse(config_path)))
         }
       }
       launch_script <- sprintf('
-Sys.setenv(TURAS_ROOT = "%s")
+Sys.setenv(TURAS_ROOT = %s)
 Sys.setenv(TURAS_LAUNCHED_FROM_HUB = "1")
-%ssetwd("%s")
+%ssetwd(%s)
 TURAS_LAUNCHER_ACTIVE <- TRUE
-source("%s")
+source(%s)
 if ("%s" != "alchemerparser") {
   app <- %s()
   shiny::runApp(app, launch.browser = TRUE)
 }
 ',
-      turas_root,
+      deparse(turas_root),
       config_lines,
-      turas_root,
-      script_path,
+      deparse(turas_root),
+      deparse(script_path),
       module_name,
       paste0("run_", module_name, "_gui"))
 

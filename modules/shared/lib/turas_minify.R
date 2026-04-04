@@ -751,34 +751,28 @@ turas_minify <- function(input_path,
 
   # -- Step 0: Validate input -------------------------------------------------
   if (!is.character(input_path) || length(input_path) != 1L || !nzchar(input_path)) {
-    if (exists("turas_refuse", mode = "function")) {
-      turas_refuse(
-        code = "IO_INVALID_PATH",
-        title = "Invalid Input Path",
-        problem = "input_path must be a single non-empty character string",
-        why_it_matters = "Cannot locate the HTML report to minify",
-        how_to_fix = c("Provide a valid file path as a character string",
-                       "Example: turas_minify('reports/Project_dev.html')"),
-        module = "MINIFY"
-      )
-    }
-    stop("turas_minify: input_path must be a single non-empty character string")
+    turas_refuse(
+      code = "IO_INVALID_PATH",
+      title = "Invalid Input Path",
+      problem = "input_path must be a single non-empty character string",
+      why_it_matters = "Cannot locate the HTML report to minify",
+      how_to_fix = c("Provide a valid file path as a character string",
+                     "Example: turas_minify('reports/Project_dev.html')"),
+      module = "MINIFY"
+    )
   }
 
   if (!file.exists(input_path)) {
-    if (exists("turas_refuse", mode = "function")) {
-      turas_refuse(
-        code = "IO_FILE_NOT_FOUND",
-        title = "Input File Not Found",
-        problem = sprintf("File does not exist: %s", input_path),
-        why_it_matters = "Cannot minify a file that does not exist",
-        how_to_fix = c("Check the file path is correct",
-                       "Ensure the report has been generated before minifying",
-                       sprintf("Looked for: %s", input_path)),
-        module = "MINIFY"
-      )
-    }
-    stop(sprintf("turas_minify: file not found: %s", input_path))
+    turas_refuse(
+      code = "IO_FILE_NOT_FOUND",
+      title = "Input File Not Found",
+      problem = sprintf("File does not exist: %s", input_path),
+      why_it_matters = "Cannot minify a file that does not exist",
+      how_to_fix = c("Check the file path is correct",
+                     "Ensure the report has been generated before minifying",
+                     sprintf("Looked for: %s", input_path)),
+      module = "MINIFY"
+    )
   }
 
   if (is.null(output_path)) {

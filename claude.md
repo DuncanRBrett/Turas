@@ -305,7 +305,7 @@ test_that("confidence intervals handle weighted data correctly", {
 })
 ```
 
-**See:** `TESTING_GUIDE.md` for comprehensive testing documentation
+**See:** the Testing Requirements section above for comprehensive testing documentation
 
 ---
 
@@ -606,11 +606,9 @@ microbenchmark::microbenchmark(
 ### Key Documents
 
 - `README.md` - Project overview and getting started
-- `TURAS_COMPREHENSIVE_ANALYSIS.md` - Detailed module analysis
-- `TESTING_GUIDE.md` - Testing framework and best practices
-- `STATISTICAL_VALIDATION_AND_PACKAGE_REFERENCE.md` - Statistical methods
-- `DEPENDENCY_RESOLUTION_GUIDE.md` - Package management
-- `QUICK_LAUNCH.md` - Quick start guide
+- `OPERATOR_GUIDE.md` - Running modules, config format, stats packs
+- `CONTRIBUTING.md` - Development workflow and code conventions
+- `CHANGELOG.md` - Release history
 
 ### Module Documentation
 
@@ -774,8 +772,8 @@ source("modules/tabs/00_main.R")
 **For questions about:**
 - Architecture decisions → Ask in context
 - Statistical methods → Check module documentation first
-- Testing approach → See TESTING_GUIDE.md
-- Dependencies → See DEPENDENCY_RESOLUTION_GUIDE.md
+- Testing approach → See Testing Requirements section in this file
+- Dependencies → See Dependencies & Package Management section in this file
 
 ---
 

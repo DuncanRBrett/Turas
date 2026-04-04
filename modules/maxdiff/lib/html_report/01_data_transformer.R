@@ -1033,13 +1033,9 @@ enrich_segment_scores <- function(segment_scores, individual_utils, raw_data,
 
     # Determine segment membership
     if (!is.null(seg_def) && !is.na(seg_def) && nzchar(trimws(seg_def))) {
-      seg_membership <- tryCatch({
-        if (exists("safe_eval_expression", mode = "function")) {
-          safe_eval_expression(seg_def, resp_map, context = sprintf("enrich segment '%s'", seg_id))
-        } else {
-          eval(parse(text = seg_def), envir = resp_map)
-        }
-      }, error = function(e) NULL)
+      seg_membership <- tryCatch(
+        safe_eval_expression(seg_def, resp_map, context = sprintf("enrich segment '%s'", seg_id)),
+        error = function(e) NULL)
     } else {
       seg_membership <- resp_map[[seg_var]]
     }
@@ -1188,13 +1184,9 @@ compute_segment_h2h <- function(individual_utils, raw_data, segment_settings,
 
     # Determine membership
     if (!is.null(seg_def) && !is.na(seg_def) && nzchar(trimws(seg_def))) {
-      seg_membership <- tryCatch({
-        if (exists("safe_eval_expression", mode = "function")) {
-          safe_eval_expression(seg_def, resp_map, context = sprintf("h2h segment '%s'", seg_id))
-        } else {
-          eval(parse(text = seg_def), envir = resp_map)
-        }
-      }, error = function(e) NULL)
+      seg_membership <- tryCatch(
+        safe_eval_expression(seg_def, resp_map, context = sprintf("h2h segment '%s'", seg_id)),
+        error = function(e) NULL)
     } else {
       seg_membership <- resp_map[[seg_var]]
     }

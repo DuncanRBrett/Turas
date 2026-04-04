@@ -264,14 +264,10 @@ generate_maxdiff_html_report <- function(maxdiff_results, output_path, config,
 
           # Determine segment membership using Segment_Def expression
           if (!is.null(seg_def_expr) && !is.na(seg_def_expr) && nzchar(trimws(seg_def_expr))) {
-            seg_membership <- tryCatch({
-              if (exists("safe_eval_expression", mode = "function")) {
-                safe_eval_expression(seg_def_expr, raw_data_for_anchor,
-                                     context = sprintf("anchor seg '%s'", seg_id))
-              } else {
-                eval(parse(text = seg_def_expr), envir = raw_data_for_anchor)
-              }
-            }, error = function(e) NULL)
+            seg_membership <- tryCatch(
+              safe_eval_expression(seg_def_expr, raw_data_for_anchor,
+                                   context = sprintf("anchor seg '%s'", seg_id)),
+              error = function(e) NULL)
           } else if (seg_var %in% names(raw_data_for_anchor)) {
             seg_membership <- raw_data_for_anchor[[seg_var]]
           } else {
@@ -576,14 +572,10 @@ generate_maxdiff_html_report <- function(maxdiff_results, output_path, config,
       # Determine segment membership using Segment_Def expression
       if (!is.null(raw_data_local)) {
         if (!is.null(seg_def_expr) && !is.na(seg_def_expr) && nzchar(trimws(seg_def_expr))) {
-          seg_membership <- tryCatch({
-            if (exists("safe_eval_expression", mode = "function")) {
-              safe_eval_expression(seg_def_expr, raw_data_local,
-                                   context = sprintf("chart seg '%s'", seg_id))
-            } else {
-              eval(parse(text = seg_def_expr), envir = raw_data_local)
-            }
-          }, error = function(e) NULL)
+          seg_membership <- tryCatch(
+            safe_eval_expression(seg_def_expr, raw_data_local,
+                                 context = sprintf("chart seg '%s'", seg_id)),
+            error = function(e) NULL)
         } else if (seg_var %in% names(raw_data_local)) {
           seg_membership <- raw_data_local[[seg_var]]
         } else {

@@ -250,6 +250,13 @@ build_insight_prompt <- function(data, study_context, prompt_type) {
     },
 
     # Unknown prompt type
-    stop(sprintf("Unknown prompt_type: '%s'", prompt_type))
+    turas_refuse(
+      code = "CFG_INVALID_PROMPT_TYPE",
+      title = "Unknown AI Prompt Type",
+      problem = sprintf("prompt_type '%s' is not recognised", prompt_type),
+      why_it_matters = "Cannot build AI prompt for an unknown prompt type",
+      how_to_fix = sprintf("Use one of: ai_callout, verification, selectivity, exec_patterns, exec_narrative. Got: '%s'", prompt_type),
+      module = "TABS"
+    )
   )
 }
