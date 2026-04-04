@@ -1005,11 +1005,40 @@ Where:
 - **Default value:** Set via `default_customers` in the Settings sheet (default is 1,000).
 - **In the HTML report:** Edit the customer count field directly. The revenue figures update instantly.
 
+### Profit Analysis (Optional)
+
+The Revenue tab includes an optional **profit analysis** feature. Enable it by ticking the "Show profit analysis" checkbox.
+
+When enabled:
+
+- A **unit cost input** appears for each product. Enter the per-unit cost to see projected profit.
+- **Profit bars** appear below revenue bars -- green for positive profit, red for negative (loss).
+- The **summary table** gains "Unit Cost" and "Profit" columns.
+- Cost inputs accept up to 2 decimal places.
+
+**How Profit Is Calculated:**
+
+```
+Profit = (Price - Unit Cost) x Customers
+```
+
+Where Customers = round(Hypothetical Customers x Share%).
+
+**Important notes:**
+
+- Projected figures are for **scenario comparison, not forecasting**. Conjoint shares are relative preferences, not real-world market share predictions.
+- Ensure unit costs are entered in the **same currency** as price levels.
+- If you do not enter a cost for a product (e.g., a competitor whose costs you do not know), the profit bar and table cells for that product are suppressed -- shown as an em-dash.
+- Negative profit (cost exceeds price) is displayed as a red bar with a minus sign, useful for identifying loss-leader scenarios.
+- Cost values are preserved when switching between simulator modes and reset when you click "Reset All".
+- When you copy a product, its cost is also copied. When you remove a product, costs re-index automatically.
+
 ### Practical Uses
 
 - **Compare product line revenue:** See which product configuration generates the most total revenue, not just the highest share.
 - **Price optimisation:** A higher price reduces share but may increase revenue. The Revenue tab lets you see the net effect.
 - **Portfolio planning:** Configure all products in a planned portfolio and see total market revenue.
+- **Profitability analysis:** Enter your known unit costs to see which product configurations maximise profit, not just revenue.
 
 ### Example
 
@@ -1022,6 +1051,16 @@ Suppose you have three products:
 | Premium | $699 | 20% | 10,000 | $1,398,000 |
 
 Even though Economy has the highest share, Standard generates the most revenue due to its higher price. This kind of insight is the purpose of the Revenue Simulator.
+
+With profit analysis enabled and unit costs entered:
+
+| Product | Price | Share | Customers | Revenue | Unit Cost | Profit |
+|---------|-------|-------|-----------|---------|-----------|--------|
+| Economy | $299 | 45% | 4,500 | $1,345,500 | $180.00 | $535,500 |
+| Standard | $499 | 35% | 3,500 | $1,746,500 | $250.00 | $871,500 |
+| Premium | $699 | 20% | 2,000 | $1,398,000 | $400.00 | $598,000 |
+
+Standard remains the most profitable product, with the highest margin per unit and strong share.
 
 ---
 

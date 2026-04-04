@@ -133,3 +133,64 @@ test_that("simulator JS files have valid syntax", {
     )
   }
 })
+
+
+test_that("simulator_ui.js contains profit analysis functions", {
+  js_dir <- if (!is.null(conjoint_root)) file.path(conjoint_root, "lib", "html_report", "js") else NULL
+  if (is.null(js_dir) || !dir.exists(js_dir)) skip("JS directory not found")
+
+  ui_path <- file.path(js_dir, "simulator_ui.js")
+  if (!file.exists(ui_path)) skip("simulator_ui.js not found")
+
+  js_code <- paste(readLines(ui_path, warn = FALSE), collapse = "\n")
+
+  # State variables
+
+  expect_true(grepl("showProfitAnalysis", js_code, fixed = TRUE),
+    info = "Missing showProfitAnalysis state variable")
+  expect_true(grepl("productCosts", js_code, fixed = TRUE),
+    info = "Missing productCosts state variable")
+
+  # Public API functions
+  expect_true(grepl("toggleProfitAnalysis", js_code, fixed = TRUE),
+    info = "Missing toggleProfitAnalysis function")
+  expect_true(grepl("setProductCost", js_code, fixed = TRUE),
+    info = "Missing setProductCost function")
+
+  # Callout note text
+  expect_true(grepl("scenario comparison", js_code, fixed = TRUE),
+    info = "Missing callout note about scenario comparison")
+  expect_true(grepl("same currency", js_code, fixed = TRUE),
+    info = "Missing callout note about currency consistency")
+
+  # Profit bar colours (green for positive, red for negative)
+  expect_true(grepl("#16a34a", js_code, fixed = TRUE),
+    info = "Missing green profit bar colour")
+  expect_true(grepl("#dc2626", js_code, fixed = TRUE),
+    info = "Missing red profit bar colour")
+
+  # Cost input renders with onchange for blur/enter update
+  expect_true(grepl('setProductCost', js_code, fixed = TRUE),
+    info = "Missing setProductCost handler on cost input")
+})
+
+
+test_that("profit analysis public API is exposed in SimUI return object", {
+  js_dir <- if (!is.null(conjoint_root)) file.path(conjoint_root, "lib", "html_report", "js") else NULL
+  if (is.null(js_dir) || !dir.exists(js_dir)) skip("JS directory not found")
+
+  ui_path <- file.path(js_dir, "simulator_ui.js")
+  if (!file.exists(ui_path)) skip("simulator_ui.js not found")
+
+  js_code <- paste(readLines(ui_path, warn = FALSE), collapse = "\n")
+
+  # Extract the return object block (between "return {" and "};")
+  return_match <- regmatches(js_code, regexpr("return \\{[^}]+\\}", js_code))
+  expect_true(length(return_match) > 0, info = "Could not find return object in SimUI")
+
+  return_block <- return_match[1]
+  expect_true(grepl("toggleProfitAnalysis", return_block, fixed = TRUE),
+    info = "toggleProfitAnalysis not exposed in public API")
+  expect_true(grepl("setProductCost", return_block, fixed = TRUE),
+    info = "setProductCost not exposed in public API")
+})

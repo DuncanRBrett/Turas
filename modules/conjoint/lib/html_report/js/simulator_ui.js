@@ -75,6 +75,14 @@ var SimUI = (function() {
   function removeProduct(idx) {
     if (products.length <= 1) return;
     products.splice(idx, 1);
+    // Re-index productCosts: remove deleted key, shift keys above idx down by 1
+    var newCosts = {};
+    for (var k in productCosts) {
+      var ki = parseInt(k, 10);
+      if (ki < idx) newCosts[ki] = productCosts[ki];
+      else if (ki > idx) newCosts[ki - 1] = productCosts[ki];
+    }
+    productCosts = newCosts;
     renderProductPanels();
     updateResults();
   }
@@ -90,6 +98,17 @@ var SimUI = (function() {
     var configCopy = {};
     for (var k in source.config) configCopy[k] = source.config[k];
     products.splice(idx + 1, 0, { name: source.name + " (copy)", config: configCopy });
+    // Re-index productCosts: shift keys above idx up by 1, copy source cost if exists
+    var newCosts = {};
+    for (var ck in productCosts) {
+      var ci = parseInt(ck, 10);
+      if (ci <= idx) newCosts[ci] = productCosts[ci];
+      else newCosts[ci + 1] = productCosts[ci];
+    }
+    if (productCosts.hasOwnProperty(idx)) {
+      newCosts[idx + 1] = productCosts[idx];
+    }
+    productCosts = newCosts;
     renderProductPanels();
     updateResults();
   }
@@ -99,6 +118,8 @@ var SimUI = (function() {
     if (!data) return;
     products = [];
     productCounter = 0;
+    productCosts = {};
+    showProfitAnalysis = false;
     addProduct();
     addProduct();
   }
@@ -369,9 +390,39 @@ var SimUI = (function() {
   // === REVENUE SIMULATOR MODE ===
   var revenueCustomers = 1000;
   var showShareBars = true;
+  var showProfitAnalysis = false;
+  var productCosts = {};
 
   function toggleShareBars(checked) {
     showShareBars = checked;
+    updateResults();
+  }
+
+  /**
+   * Toggle profit analysis visibility.
+   * When enabled, shows per-product cost inputs, profit bars, and profit columns.
+   * @param {boolean} checked - Whether profit analysis is enabled
+   */
+  function toggleProfitAnalysis(checked) {
+    showProfitAnalysis = checked;
+    updateResults();
+  }
+
+  /**
+   * Set unit cost for a product. Triggers re-render on change (blur/enter).
+   * @param {number} idx - Product index
+   * @param {string} val - Cost value (empty string clears the cost)
+   */
+  function setProductCost(idx, val) {
+    var trimmed = String(val).trim();
+    if (trimmed === "") {
+      delete productCosts[idx];
+    } else {
+      var cost = parseFloat(trimmed);
+      if (!isNaN(cost)) {
+        productCosts[idx] = Math.round(cost * 100) / 100;
+      }
+    }
     updateResults();
   }
 
@@ -396,14 +447,18 @@ var SimUI = (function() {
     var shares = SimEngine.predictShares(configs, method);
     var n_products = products.length;
 
-    // Compute revenue per product
+    // Compute revenue and profit per product
     var revenueData = [];
     var maxRevenue = 0;
     for (var i = 0; i < n_products; i++) {
       var price = extractPrice(products[i], priceAttr);
       var share = shares[i];
       var revenue = price * (share / 100) * revenueCustomers;
-      revenueData.push({ name: products[i].name, share: share, price: price, revenue: revenue });
+      var custCount = Math.round(revenueCustomers * share / 100);
+      var hasCost = productCosts.hasOwnProperty(i);
+      var cost = hasCost ? productCosts[i] : null;
+      var profit = hasCost ? (price - cost) * custCount : null;
+      revenueData.push({ name: products[i].name, share: share, price: price, revenue: revenue, cost: cost, profit: profit, hasCost: hasCost, customers: custCount });
       if (revenue > maxRevenue) maxRevenue = revenue;
     }
     var totalRevenue = revenueData.reduce(function(s, d) { return s + d.revenue; }, 0);
@@ -420,16 +475,27 @@ var SimUI = (function() {
     html += '</div>';
 
     // Toggle for market share bars
-    html += '<div style="margin-bottom:12px;">';
+    html += '<div style="margin-bottom:8px;">';
     html += '<label style="font-size:12px;color:#64748b;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">';
     html += '<input type="checkbox" ' + (showShareBars ? 'checked' : '') + ' onchange="SimUI.toggleShareBars(this.checked)" style="accent-color:#323367;" />';
     html += 'Show market share bars</label></div>';
 
-    // Stacked horizontal bars — Market Share row + Revenue row (OpinionX style)
+    // Toggle for profit analysis
+    html += '<div style="margin-bottom:12px;">';
+    html += '<label style="font-size:12px;color:#64748b;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">';
+    html += '<input type="checkbox" ' + (showProfitAnalysis ? 'checked' : '') + ' onchange="SimUI.toggleProfitAnalysis(this.checked)" style="accent-color:#323367;" />';
+    html += 'Show profit analysis</label></div>';
+
+    // Callout note when profit analysis is enabled
+    if (showProfitAnalysis) {
+      html += '<div style="margin-bottom:16px;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;font-size:11px;color:#64748b;line-height:1.5;">';
+      html += 'Projected figures are for scenario comparison, not forecasting. Ensure unit costs are in the same currency as price levels.';
+      html += ' Profit = (Price \u2212 Unit Cost) \u00d7 Customers.';
+      html += '</div>';
+    }
+
+    // Stacked horizontal bars
     var barHeight = 36;
-    var barGap = 8;
-    var chartW = 600;
-    var rowHeight = barHeight * 2 + barGap + 24;
 
     html += '<div style="overflow-x:auto;">';
 
@@ -439,10 +505,21 @@ var SimUI = (function() {
       var revW = maxRevenue > 0 ? (d.revenue / totalRevenue) * 100 : 0;
       var colours = ["#323367", "#c0695c", "#5b8c5a", "#d4a843", "#7c6fb0", "#4a90a4"];
       var colour = colours[p % colours.length];
-      var lightColour = colour + "22";
 
       html += '<div style="margin-bottom:16px;">';
       html += '<div style="font-size:12px;font-weight:600;color:#1e293b;margin-bottom:4px;">' + escHtml(d.name) + '</div>';
+
+      // Per-product cost input (when profit analysis enabled)
+      if (showProfitAnalysis) {
+        var costVal = d.hasCost ? d.cost.toFixed(2) : "";
+        html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">';
+        html += '<span style="font-size:11px;color:#64748b;min-width:80px;text-align:right;">Unit Cost</span>';
+        html += '<input type="number" min="0" placeholder="Enter cost" ';
+        html += 'value="' + costVal + '" ';
+        html += 'style="width:120px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:right;" ';
+        html += 'onchange="SimUI.setProductCost(' + p + ',this.value)" />';
+        html += '</div>';
+      }
 
       // Market Share bar (togglable)
       if (showShareBars) {
@@ -455,12 +532,28 @@ var SimUI = (function() {
       }
 
       // Revenue bar
-      html += '<div style="display:flex;align-items:center;gap:8px;">';
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">';
       html += '<span style="font-size:11px;color:#64748b;min-width:80px;text-align:right;">Revenue</span>';
       html += '<div style="flex:1;background:#fef3c7;border-radius:4px;height:' + barHeight + 'px;position:relative;overflow:hidden;">';
       html += '<div style="width:' + Math.max(revW, 2) + '%;height:100%;background:#d4a843;border-radius:4px;display:flex;align-items:center;padding:0 10px;min-width:60px;transition:width 0.3s ease;">';
       html += '<span style="font-size:12px;font-weight:600;color:#fff;">' + _currencySymbol + d.revenue.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0}) + '</span>';
       html += '</div></div></div>';
+
+      // Profit bar (only when profit analysis enabled AND cost entered for this product)
+      if (showProfitAnalysis && d.hasCost) {
+        var profitIsNeg = d.profit < 0;
+        var profitBarColour = profitIsNeg ? "#dc2626" : "#16a34a";
+        var profitBarBg = profitIsNeg ? "#fef2f2" : "#dcfce7";
+        var profitW = totalRevenue > 0 ? (Math.abs(d.profit) / totalRevenue) * 100 : 0;
+        var profitLabel = (profitIsNeg ? "-" : "") + _currencySymbol + Math.abs(d.profit).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0});
+
+        html += '<div style="display:flex;align-items:center;gap:8px;">';
+        html += '<span style="font-size:11px;color:#64748b;min-width:80px;text-align:right;">Profit</span>';
+        html += '<div style="flex:1;background:' + profitBarBg + ';border-radius:4px;height:' + barHeight + 'px;position:relative;overflow:hidden;">';
+        html += '<div style="width:' + Math.max(profitW, 2) + '%;height:100%;background:' + profitBarColour + ';border-radius:4px;display:flex;align-items:center;padding:0 10px;min-width:60px;transition:width 0.3s ease;">';
+        html += '<span style="font-size:12px;font-weight:600;color:#fff;">' + profitLabel + '</span>';
+        html += '</div></div></div>';
+      }
 
       html += '</div>';
     }
@@ -476,18 +569,39 @@ var SimUI = (function() {
     html += '<th style="padding:6px 8px;font-size:11px;color:#64748b;text-align:right;font-weight:500;">Share</th>';
     html += '<th style="padding:6px 8px;font-size:11px;color:#64748b;text-align:right;font-weight:500;">Customers</th>';
     html += '<th style="padding:6px 8px;font-size:11px;color:#64748b;text-align:right;font-weight:600;">Revenue</th>';
+    if (showProfitAnalysis) {
+      html += '<th style="padding:6px 8px;font-size:11px;color:#64748b;text-align:right;font-weight:500;">Unit Cost</th>';
+      html += '<th style="padding:6px 8px;font-size:11px;color:#64748b;text-align:right;font-weight:600;">Profit</th>';
+    }
     html += '</tr></thead><tbody>';
+
+    var totalProfit = 0;
+    var hasTotalProfit = false;
+
     for (var t = 0; t < revenueData.length; t++) {
       var rd = revenueData[t];
-      var custCount = Math.round(revenueCustomers * rd.share / 100);
       html += '<tr' + (t === revenueData.length - 1 ? ' style="border-top:1px solid #e2e8f0;font-weight:600;"' : '') + '>';
       html += '<td style="padding:6px 8px;font-size:12px;">' + escHtml(rd.name) + '</td>';
       html += '<td style="padding:6px 8px;font-size:12px;text-align:right;">' + _currencySymbol + rd.price.toFixed(0) + '</td>';
       html += '<td style="padding:6px 8px;font-size:12px;text-align:right;">' + rd.share.toFixed(1) + '%</td>';
-      html += '<td style="padding:6px 8px;font-size:12px;text-align:right;">' + custCount.toLocaleString() + '</td>';
+      html += '<td style="padding:6px 8px;font-size:12px;text-align:right;">' + rd.customers.toLocaleString() + '</td>';
       html += '<td style="padding:6px 8px;font-size:12px;text-align:right;font-weight:600;">' + _currencySymbol + rd.revenue.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0}) + '</td>';
+      if (showProfitAnalysis) {
+        if (rd.hasCost) {
+          var profitColour = rd.profit < 0 ? "#dc2626" : "#16a34a";
+          var profitPrefix = rd.profit < 0 ? "-" : "";
+          totalProfit += rd.profit;
+          hasTotalProfit = true;
+          html += '<td style="padding:6px 8px;font-size:12px;text-align:right;">' + _currencySymbol + rd.cost.toFixed(2) + '</td>';
+          html += '<td style="padding:6px 8px;font-size:12px;text-align:right;font-weight:600;color:' + profitColour + ';">' + profitPrefix + _currencySymbol + Math.abs(rd.profit).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0}) + '</td>';
+        } else {
+          html += '<td style="padding:6px 8px;font-size:12px;text-align:right;color:#94a3b8;">\u2014</td>';
+          html += '<td style="padding:6px 8px;font-size:12px;text-align:right;color:#94a3b8;">\u2014</td>';
+        }
+      }
       html += '</tr>';
     }
+
     // Total row
     html += '<tr style="border-top:2px solid #1e293b;font-weight:600;">';
     html += '<td style="padding:6px 8px;font-size:12px;">Total</td>';
@@ -495,6 +609,16 @@ var SimUI = (function() {
     html += '<td style="padding:6px 8px;font-size:12px;text-align:right;">100%</td>';
     html += '<td style="padding:6px 8px;font-size:12px;text-align:right;">' + revenueCustomers.toLocaleString() + '</td>';
     html += '<td style="padding:6px 8px;font-size:12px;text-align:right;">' + _currencySymbol + totalRevenue.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0}) + '</td>';
+    if (showProfitAnalysis) {
+      html += '<td style="padding:6px 8px;"></td>';
+      if (hasTotalProfit) {
+        var totalProfitColour = totalProfit < 0 ? "#dc2626" : "#16a34a";
+        var totalProfitPrefix = totalProfit < 0 ? "-" : "";
+        html += '<td style="padding:6px 8px;font-size:12px;text-align:right;color:' + totalProfitColour + ';">' + totalProfitPrefix + _currencySymbol + Math.abs(totalProfit).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0}) + '</td>';
+      } else {
+        html += '<td style="padding:6px 8px;"></td>';
+      }
+    }
     html += '</tr></tbody></table></div>';
 
     container.innerHTML = html;
@@ -596,6 +720,8 @@ var SimUI = (function() {
     setScaleFactor: setScaleFactor,
     setRevenueCustomers: setRevenueCustomers,
     toggleShareBars: toggleShareBars,
+    toggleProfitAnalysis: toggleProfitAnalysis,
+    setProductCost: setProductCost,
     addProduct: addProduct,
     removeProduct: removeProduct,
     copyProduct: copyProduct,
