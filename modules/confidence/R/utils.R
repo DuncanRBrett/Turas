@@ -556,20 +556,17 @@ get_confidence_module_version <- function() {
 `%||%` <- function(a, b) if (is.null(a)) b else a
 
 
-#' Source a file if it exists
-#'
-#' Safely sources an R file, checking the given path first,
-#' then a fallback in the R/ subdirectory.
-#'
-#' @param file_path Path to the R file
-#' @keywords internal
-source_if_exists <- function(file_path) {
-  if (file.exists(file_path)) {
-    source(file_path)
-  } else if (file.exists(file.path("R", file_path))) {
-    source(file.path("R", file_path))
-  } else if (file.exists(file.path("..", "R", file_path))) {
-    source(file.path("..", "R", file_path))
+# source_if_exists: canonical definition in modules/shared/lib/source_utils.R
+# Minimal inline fallback for when import_all.R hasn't loaded the shared version
+if (!exists("source_if_exists", mode = "function")) {
+  source_if_exists <- function(file_path, envir = parent.frame()) {
+    candidates <- c(file_path, file.path("R", file_path), file.path("..", "R", file_path))
+    resolved <- candidates[file.exists(candidates)]
+    if (length(resolved) == 0L) return(invisible(NULL))
+    tryCatch(source(resolved[1L], local = envir), error = function(e) {
+      cat(sprintf("  [WARNING] Failed to source %s: %s\n", resolved[1L], conditionMessage(e)))
+    })
+    invisible(NULL)
   }
 }
 

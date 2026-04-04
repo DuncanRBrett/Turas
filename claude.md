@@ -67,6 +67,18 @@ This ensures that when users run the Shiny app and encounter errors, they can se
 | **weighting** | Sample weighting & rim weighting | Production | 91/100 |
 | **shared** | Common utilities (not counted in 12) | Utility | - |
 
+### Module File Layout Convention
+
+Modules use one of three file layout patterns. This is a known historical inconsistency, not a bug — all patterns work correctly.
+
+| Pattern | Modules | Source files live in |
+|---------|---------|---------------------|
+| **R/** subdirectory | AlchemerParser, confidence, conjoint, keydriver, catdriver, maxdiff, pricing, segment | `modules/{module}/R/` |
+| **lib/** subdirectory | tabs, tracker, weighting | `modules/{module}/lib/` |
+| **Root-level files** | hub_app, report_hub | `modules/{module}/` (no subdirectory) |
+
+When adding code to an existing module, follow whichever convention that module already uses.
+
 ### Standard Module Pattern
 
 Every analytical module follows this structure:

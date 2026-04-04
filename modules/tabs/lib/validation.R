@@ -49,21 +49,17 @@ MAX_DECIMAL_PLACES <- 6
 # DEPENDENCIES (V9.9.2)
 # ==============================================================================
 
-source_if_exists <- function(file_path) {
-  if (file.exists(file_path)) {
-    tryCatch({
-      # V9.9.2: Use sys.source with local environment to avoid global pollution
-      # while still making functions available in caller's environment
-      sys.source(file_path, envir = environment())
-      invisible(NULL)
-    }, error = function(e) {
-      cat(sprintf(
-        "  [WARNING] Failed to source %s: %s\n  Some functions may not be available.\n",
-        file_path,
-        conditionMessage(e)
-      ))
-      invisible(NULL)
+# source_if_exists: canonical definition in modules/shared/lib/source_utils.R
+# Minimal inline fallback for when import_all.R hasn't loaded the shared version
+if (!exists("source_if_exists", mode = "function")) {
+  source_if_exists <- function(file_path, envir = parent.frame()) {
+    candidates <- c(file_path, file.path("R", file_path), file.path("..", "R", file_path))
+    resolved <- candidates[file.exists(candidates)]
+    if (length(resolved) == 0L) return(invisible(NULL))
+    tryCatch(source(resolved[1L], local = envir), error = function(e) {
+      cat(sprintf("  [WARNING] Failed to source %s: %s\n", resolved[1L], conditionMessage(e)))
     })
+    invisible(NULL)
   }
 }
 

@@ -55,22 +55,17 @@ SCRIPT_VERSION <- "10.1"
 # DEPENDENCIES
 # ==============================================================================
 
-# Use shared_functions.R version if available, otherwise define minimal fallback
-if (!exists("source_if_exists")) {
+# source_if_exists: canonical definition in modules/shared/lib/source_utils.R
+# Minimal inline fallback for when import_all.R hasn't loaded the shared version
+if (!exists("source_if_exists", mode = "function")) {
   source_if_exists <- function(file_path, envir = parent.frame()) {
-    if (file.exists(file_path)) {
-      tryCatch({
-        sys.source(file_path, envir = envir)
-        invisible(NULL)
-      }, error = function(e) {
-        cat(sprintf(
-          "  [WARNING] Failed to source %s: %s\n  Some functions may not be available.\n",
-          file_path,
-          conditionMessage(e)
-        ))
-        invisible(NULL)
-      })
-    }
+    candidates <- c(file_path, file.path("R", file_path), file.path("..", "R", file_path))
+    resolved <- candidates[file.exists(candidates)]
+    if (length(resolved) == 0L) return(invisible(NULL))
+    tryCatch(source(resolved[1L], local = envir), error = function(e) {
+      cat(sprintf("  [WARNING] Failed to source %s: %s\n", resolved[1L], conditionMessage(e)))
+    })
+    invisible(NULL)
   }
 }
 

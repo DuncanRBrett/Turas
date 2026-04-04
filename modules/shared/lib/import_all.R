@@ -60,52 +60,55 @@
 # 1. TRS Refusal infrastructure (TRS v1.0 - no dependencies, needed by all modules)
 source(file.path(.shared_lib_path, "trs_refusal.R"), local = FALSE)
 
-# 2. Console capture for Shiny GUIs (TRS v1.0 - ensures no silent failures in GUI)
+# 2. Source utilities (source_if_exists - no dependencies, used by all modules)
+source(file.path(.shared_lib_path, "source_utils.R"), local = FALSE)
+
+# 3. Console capture for Shiny GUIs (TRS v1.0 - ensures no silent failures in GUI)
 source(file.path(.shared_lib_path, "console_capture.R"), local = FALSE)
 
-# 3. Validation (no dependencies)
+# 4. Validation (no dependencies)
 source(file.path(.shared_lib_path, "validation_utils.R"), local = FALSE)
 
-# 4. Data utils (uses validation)
+# 5. Data utils (uses validation)
 source(file.path(.shared_lib_path, "data_utils.R"), local = FALSE)
 
-# 5. Config utils (uses validation, includes find_turas_root)
+# 6. Config utils (uses validation, includes find_turas_root)
 source(file.path(.shared_lib_path, "config_utils.R"), local = FALSE)
 
-# 6. Logging (independent)
+# 7. Logging (independent)
 source(file.path(.shared_lib_path, "logging_utils.R"), local = FALSE)
 
-# 7. Formatting (independent)
+# 8. Formatting (independent)
 source(file.path(.shared_lib_path, "formatting_utils.R"), local = FALSE)
 
-# 8. Weights (independent)
+# 9. Weights (independent)
 source(file.path(.shared_lib_path, "weights_utils.R"), local = FALSE)
 
-# 9. TRS Unified Logging (TRS v1.0)
+# 10. TRS Unified Logging (TRS v1.0)
 source(file.path(.shared_lib_path, "turas_log.R"), local = FALSE)
 
-# 10. TRS Run State Management (TRS v1.0)
+# 11. TRS Run State Management (TRS v1.0)
 source(file.path(.shared_lib_path, "trs_run_state.R"), local = FALSE)
 
-# 11. TRS Run Status Excel Writer (TRS v1.0)
+# 12. TRS Run Status Excel Writer (TRS v1.0)
 source(file.path(.shared_lib_path, "trs_run_status_writer.R"), local = FALSE)
 
-# 12. TRS Banner (TRS v1.0)
+# 13. TRS Banner (TRS v1.0)
 source(file.path(.shared_lib_path, "trs_banner.R"), local = FALSE)
 
-# 13. TRS Atomic Workbook Save (TRS v1.0)
+# 14. TRS Atomic Workbook Save (TRS v1.0)
 source(file.path(.shared_lib_path, "turas_save_workbook_atomic.R"), local = FALSE)
 
-# 14. TRS Excel Formula-Injection Protection (TRS v1.0)
+# 15. TRS Excel Formula-Injection Protection (TRS v1.0)
 source(file.path(.shared_lib_path, "turas_excel_escape.R"), local = FALSE)
 
-# 15. Minification verification helpers (independent)
+# 16. Minification verification helpers (independent)
 source(file.path(.shared_lib_path, "turas_minify_verify.R"), local = FALSE)
 
-# 16. Watermark encode/decode helpers (independent)
+# 17. Watermark encode/decode helpers (independent)
 source(file.path(.shared_lib_path, "turas_minify_watermark.R"), local = FALSE)
 
-# 17. Report minification pipeline (depends on trs_refusal, watermark, verify)
+# 18. Report minification pipeline (depends on trs_refusal, watermark, verify)
 source(file.path(.shared_lib_path, "turas_minify.R"), local = FALSE)
 
 # Clean up

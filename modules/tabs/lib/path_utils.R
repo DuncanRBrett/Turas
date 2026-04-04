@@ -209,24 +209,8 @@ is_package_available <- function(package_name) {
 
 #' Safely source file if it exists (V9.9.1: Environment control added)
 #'
-#' SECURITY: Sources into specified environment to prevent namespace pollution
-#' DEFAULT: Sources into caller's environment (parent.frame())
-#'
-#' @param file_path Character, path to R script
-#' @param envir Environment, where to source (default: parent.frame())
-#' @return Invisible NULL
-#' @export
-source_if_exists <- function(file_path, envir = parent.frame()) {
-  if (file.exists(file_path)) {
-    tryCatch({
-      source(file_path, local = envir)
-      invisible(NULL)
-    }, error = function(e) {
-      cat(sprintf("  [WARNING] Failed to source %s: %s\n", file_path, conditionMessage(e)))
-      invisible(NULL)
-    })
-  }
-}
+# source_if_exists: canonical definition is in modules/shared/lib/source_utils.R
+# Loaded via import_all.R; no local copy needed
 
 
 # ==============================================================================
