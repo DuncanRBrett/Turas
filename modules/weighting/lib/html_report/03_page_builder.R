@@ -576,37 +576,7 @@ body {
   background: #f0f7ff;
 }
 
-/* Pin Mode Popover */
-.wt-pin-popover {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  z-index: 100;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-  padding: 4px;
-  min-width: 160px;
-}
-.wt-pin-popover-item {
-  display: block;
-  width: 100%;
-  padding: 8px 14px;
-  border: none;
-  background: transparent;
-  font-size: 13px;
-  font-weight: 500;
-  color: #1e293b;
-  cursor: pointer;
-  text-align: left;
-  border-radius: 4px;
-  font-family: inherit;
-}
-.wt-pin-popover-item:hover {
-  background: #f0f7ff;
-  color: BRAND;
-}
+/* Pin Mode Popover — now injected by shared turas_pins_popover.js */
 
 /* Pin Badge */
 .pin-badge {

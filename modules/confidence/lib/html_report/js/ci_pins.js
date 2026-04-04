@@ -91,70 +91,53 @@
 
   // ── Mode Popover ───────────────────────────────────────────────────────────
 
-  function ciClosePopover() {
-    var p = document.getElementById("ci-pin-popover");
-    if (p) p.remove();
-    document.removeEventListener("click", ciClosePopoverOnOutside);
-  }
-
-  function ciClosePopoverOnOutside(e) {
-    var p = document.getElementById("ci-pin-popover");
-    if (p && !p.contains(e.target)) ciClosePopover();
-  }
-
   /**
-   * Pin a view — always additive. Shows mode popover first.
+   * Pin a view — always additive. Shows checkbox popover first.
    * @param {string} viewId - View identifier
    * @param {HTMLElement} btnEl - Button that triggered
    */
   window.ciPinSection = function(viewId, btnEl) {
-    if (!btnEl) { ciExecutePin(viewId, "all"); return; }
-
-    ciClosePopover();
     var content = ciCaptureContent(viewId, "all");
-    var hasChart = content && content.chartSvg;
-    var hasTable = content && content.tableHtml;
+    if (!content) return;
+    var hasChart = !!content.chartSvg;
+    var hasTable = !!content.tableHtml;
 
-    // Smart skip: only one content type → pin directly
-    if (hasChart && !hasTable) { ciExecutePin(viewId, "chart_insight"); return; }
-    if (!hasChart && hasTable) { ciExecutePin(viewId, "table_insight"); return; }
-    if (!hasChart && !hasTable) { ciExecutePin(viewId, "all"); return; }
+    // No button or only one content type → pin directly
+    if (!btnEl || (!hasChart && !hasTable) ||
+        (hasChart && !hasTable) || (!hasChart && hasTable)) {
+      ciExecutePinWithFlags(viewId, {
+        table: hasTable,
+        chart: hasChart
+      });
+      return;
+    }
 
-    var popover = document.createElement("div");
-    popover.className = "ci-pin-popover";
-    popover.id = "ci-pin-popover";
-
-    var options = [
-      { label: "Table + Chart", mode: "all" },
-      { label: "Chart only", mode: "chart_insight" },
-      { label: "Table only", mode: "table_insight" }
+    var checkboxes = [
+      { key: "table", label: "Table", available: hasTable, checked: hasTable },
+      { key: "chart", label: "Chart", available: hasChart, checked: hasChart }
     ];
 
-    options.forEach(function(opt) {
-      var item = document.createElement("button");
-      item.className = "ci-pin-popover-item";
-      item.textContent = opt.label;
-      item.onclick = function(e) {
-        e.stopPropagation();
-        ciExecutePin(viewId, opt.mode);
-        ciClosePopover();
-      };
-      popover.appendChild(item);
+    TurasPins.showCheckboxPopover(btnEl, checkboxes, function(flags) {
+      ciExecutePinWithFlags(viewId, flags);
     });
-
-    btnEl.parentElement.style.position = "relative";
-    btnEl.parentElement.appendChild(popover);
-    setTimeout(function() {
-      document.addEventListener("click", ciClosePopoverOnOutside);
-    }, 10);
   };
 
   /**
-   * Execute pin with selected mode — captures content and delegates to TurasPins.
+   * Execute pin with flags — captures content and delegates to TurasPins.
    */
-  function ciExecutePin(viewId, mode) {
-    var content = ciCaptureContent(viewId, mode);
+  function ciExecutePinWithFlags(viewId, flags) {
+    var content = ciCaptureContent(viewId, "all");
     if (!content) return;
+
+    content.pinFlags = {
+      chart:     !!flags.chart,
+      table:     !!flags.table,
+      insight:   !!flags.insight,
+      aiInsight: !!flags.aiInsight
+    };
+    content.pinMode = "custom";
+    if (!flags.chart) content.chartSvg = "";
+    if (!flags.table) content.tableHtml = "";
 
     TurasPins.add({
       sectionKey: viewId,
@@ -162,7 +145,8 @@
       insightText: "",
       chartSvg: content.chartSvg,
       tableHtml: content.tableHtml,
-      pinMode: mode
+      pinFlags: content.pinFlags,
+      pinMode: "custom"
     });
   }
 

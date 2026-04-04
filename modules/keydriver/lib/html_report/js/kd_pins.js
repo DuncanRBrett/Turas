@@ -147,77 +147,50 @@
 
   // ── Mode Popover ───────────────────────────────────────────────────────────
 
-  function kdClosePopover() {
-    var p = document.getElementById("kd-pin-popover");
-    if (p) p.remove();
-    document.removeEventListener("click", kdClosePopoverOnOutside);
-  }
-
-  function kdClosePopoverOnOutside(e) {
-    var p = document.getElementById("kd-pin-popover");
-    if (p && !p.contains(e.target)) kdClosePopover();
-  }
-
   /**
    * Pin a section — always additive (each click captures a new snapshot).
-   * Shows mode popover to select chart/table/both.
+   * Shows checkbox popover to select content types.
    */
   window.kdPinSection = function(sectionKey, prefix) {
     prefix = prefix || "";
 
     var btn = document.querySelector('.kd-pin-btn[data-kd-pin-section="' + sectionKey + '"]');
-    if (!btn) { kdExecutePin(sectionKey, prefix, "all"); return; }
-
-    kdClosePopover();
     var content = kdCaptureSectionContent(sectionKey, prefix);
-    var hasChart = content && content.chartSvg;
-    var hasTable = content && content.tableHtml;
+    if (!content) return;
+    var hasChart = !!content.chartSvg;
+    var hasTable = !!content.tableHtml;
+    var hasInsight = !!content.insightText;
 
-    var popover = document.createElement("div");
-    popover.className = "kd-pin-popover";
-    popover.id = "kd-pin-popover";
+    if (!btn) {
+      kdExecutePinWithFlags(sectionKey, prefix, { table: hasTable, chart: hasChart, insight: hasInsight });
+      return;
+    }
 
-    var options = [
-      { label: "Table + Chart", mode: "all", enabled: hasChart && hasTable },
-      { label: "Chart only", mode: "chart_insight", enabled: !!hasChart },
-      { label: "Table only", mode: "table_insight", enabled: !!hasTable }
+    var checkboxes = [
+      { key: "table",   label: "Table",   available: hasTable,   checked: hasTable },
+      { key: "chart",   label: "Chart",   available: hasChart,   checked: hasChart },
+      { key: "insight", label: "Insight", available: true,       checked: hasInsight }
     ];
 
-    options.forEach(function(opt) {
-      var item = document.createElement("button");
-      item.className = "kd-pin-popover-item";
-      item.textContent = opt.label;
-      if (!opt.enabled) {
-        item.disabled = true;
-        item.style.opacity = "0.4";
-        item.style.cursor = "default";
-      } else {
-        item.onclick = function(e) {
-          e.stopPropagation();
-          kdExecutePin(sectionKey, prefix, opt.mode);
-          kdClosePopover();
-        };
-      }
-      popover.appendChild(item);
+    TurasPins.showCheckboxPopover(btn, checkboxes, function(flags) {
+      kdExecutePinWithFlags(sectionKey, prefix, flags);
     });
-
-    btn.parentElement.style.position = "relative";
-    btn.parentElement.appendChild(popover);
-    setTimeout(function() {
-      document.addEventListener("click", kdClosePopoverOnOutside);
-    }, 10);
   };
 
   /**
-   * Execute pin with selected mode — captures content and delegates to TurasPins.
+   * Execute pin with flags — captures content and delegates to TurasPins.
    */
-  function kdExecutePin(sectionKey, prefix, mode) {
+  function kdExecutePinWithFlags(sectionKey, prefix, flags) {
     var content = kdCaptureSectionContent(sectionKey, prefix);
     if (!content) return;
 
     var title = content.panelLabel
       ? content.panelLabel + " \u2014 " + content.sectionTitle
       : content.sectionTitle;
+
+    if (!flags.chart) content.chartSvg = "";
+    if (!flags.table) content.tableHtml = "";
+    if (!flags.insight) content.insightText = "";
 
     TurasPins.add({
       sectionKey: sectionKey,
@@ -226,9 +199,15 @@
       panelLabel: content.panelLabel,
       sectionTitle: content.sectionTitle,
       insightText: content.insightText,
-      chartSvg: (mode === "all" || mode === "chart_insight") ? content.chartSvg : "",
-      tableHtml: (mode === "all" || mode === "table_insight") ? content.tableHtml : "",
-      pinMode: mode,
+      chartSvg: content.chartSvg,
+      tableHtml: content.tableHtml,
+      pinFlags: {
+        chart:     !!flags.chart,
+        table:     !!flags.table,
+        insight:   !!flags.insight,
+        aiInsight: !!flags.aiInsight
+      },
+      pinMode: "custom",
       methodText: content.methodText,
       sampleN: content.sampleN
     });

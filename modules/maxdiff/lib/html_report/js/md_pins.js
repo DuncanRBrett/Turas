@@ -85,87 +85,66 @@
 
   // ── Mode Popover ───────────────────────────────────────────────────────────
 
-  function mdClosePopovers() {
-    $$(".pin-mode-popover").forEach(function(p) { p.style.display = "none"; });
-    var dyn = document.getElementById("md-pin-popover");
-    if (dyn) dyn.remove();
-    document.removeEventListener("click", mdClosePopoverOnOutside);
-  }
-
-  function mdClosePopoverOnOutside(e) {
-    var dyn = document.getElementById("md-pin-popover");
-    if (dyn && !dyn.contains(e.target)) mdClosePopovers();
-  }
-
   /**
-   * Smart pin — detects available content and shows only valid options.
+   * Smart pin — detects available content and shows checkbox popover.
    * If only one content type exists, pins directly without popover.
    * @param {string} panelId - Panel identifier
    */
   function mdTogglePin(panelId) {
-    mdClosePopovers();
+    TurasPins.closePopover();
 
     var content = mdCaptureContent(panelId);
     if (!content) return;
-    var hasChart = !!(content.chartSvg);
-    var hasTable = !!(content.tableHtml);
+    var hasChart = !!content.chartSvg;
+    var hasTable = !!content.tableHtml;
+    var hasInsight = !!content.insightText;
 
     // Smart skip: only one content type → pin directly
-    if (hasChart && !hasTable) { mdExecutePin(panelId, "chart_insight"); return; }
-    if (!hasChart && hasTable) { mdExecutePin(panelId, "table_insight"); return; }
-    if (!hasChart && !hasTable) { mdExecutePin(panelId, "all"); return; }
+    if (hasChart && !hasTable) { mdExecutePinWithFlags(panelId, { chart: true, insight: hasInsight }); return; }
+    if (!hasChart && hasTable) { mdExecutePinWithFlags(panelId, { table: true, insight: hasInsight }); return; }
+    if (!hasChart && !hasTable) { mdExecutePinWithFlags(panelId, { insight: hasInsight }); return; }
 
-    // Both chart and table exist — show dynamic popover
+    // Both chart and table exist — show checkbox popover
     var btn = $(".pin-btn[data-panel='" + panelId + "']");
-    if (!btn) { mdExecutePin(panelId, "all"); return; }
+    if (!btn) { mdExecutePinWithFlags(panelId, { table: true, chart: true, insight: hasInsight }); return; }
 
-    var popover = document.createElement("div");
-    popover.className = "pin-mode-popover";
-    popover.id = "md-pin-popover";
-    popover.style.display = "block";
-
-    var options = [
-      { label: "Table + Chart", mode: "all" },
-      { label: "Chart only", mode: "chart_insight" },
-      { label: "Table only", mode: "table_insight" }
+    var checkboxes = [
+      { key: "table",   label: "Table",   available: hasTable,   checked: hasTable },
+      { key: "chart",   label: "Chart",   available: hasChart,   checked: hasChart },
+      { key: "insight", label: "Insight", available: true,       checked: hasInsight }
     ];
 
-    options.forEach(function(opt) {
-      var item = document.createElement("button");
-      item.className = "pin-mode-option";
-      item.textContent = opt.label;
-      item.onclick = function(e) {
-        e.stopPropagation();
-        mdExecutePin(panelId, opt.mode);
-        mdClosePopovers();
-      };
-      popover.appendChild(item);
+    TurasPins.showCheckboxPopover(btn, checkboxes, function(flags) {
+      mdExecutePinWithFlags(panelId, flags);
     });
-
-    btn.parentElement.style.position = "relative";
-    btn.parentElement.appendChild(popover);
-    setTimeout(function() {
-      document.addEventListener("click", mdClosePopoverOnOutside);
-    }, 10);
   }
 
   /**
-   * Execute pin with selected mode.
+   * Execute pin with flags.
    * @param {string} panelId - Panel identifier
-   * @param {string} mode - "all", "chart_insight", or "table_insight"
+   * @param {object} flags - { table, chart, insight }
    */
-  function mdExecutePin(panelId, mode) {
-    mdClosePopovers();
+  function mdExecutePinWithFlags(panelId, flags) {
     var content = mdCaptureContent(panelId);
     if (!content) return;
+
+    if (!flags.chart) content.chartSvg = "";
+    if (!flags.table) content.tableHtml = "";
+    if (!flags.insight) content.insightText = "";
 
     TurasPins.add({
       sectionKey: panelId,
       title: content.title,
       insightText: content.insightText,
-      chartSvg: (mode === "all" || mode === "chart_insight") ? content.chartSvg : "",
-      tableHtml: (mode === "all" || mode === "table_insight") ? content.tableHtml : "",
-      pinMode: mode
+      chartSvg: content.chartSvg,
+      tableHtml: content.tableHtml,
+      pinFlags: {
+        chart:     !!flags.chart,
+        table:     !!flags.table,
+        insight:   !!flags.insight,
+        aiInsight: !!flags.aiInsight
+      },
+      pinMode: "custom"
     });
 
     // Flash pin button

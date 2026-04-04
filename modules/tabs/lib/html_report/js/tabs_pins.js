@@ -170,30 +170,13 @@
 
   // ── Mode Popover ──────────────────────────────────────────────────────────
 
-  function closePopover() {
-    var existing = document.querySelector(".pin-mode-popover");
-    if (existing) existing.remove();
-    document.removeEventListener("click", closePopoverOnOutside, true);
-  }
-
-  function closePopoverOnOutside(e) {
-    var p = document.querySelector(".pin-mode-popover");
-    if (p && !p.contains(e.target) && !e.target.closest(".pin-btn")) closePopover();
-  }
-
   /**
    * Show checkbox-based pin popover for crosstab pin.
    * User can independently toggle: Chart, Table, Insight, AI Insight.
+   * Delegates to TurasPins.showCheckboxPopover() shared helper.
    * @param {string} qCode - Question code
    */
   window.togglePin = function(qCode) {
-    // If popover already open for this question, close it
-    var existing = document.querySelector(".pin-mode-popover");
-    if (existing) {
-      closePopover();
-      return;
-    }
-
     var btn = document.querySelector('.pin-btn[data-q-code="' + qCode + '"]');
     if (!btn) return;
 
@@ -204,16 +187,6 @@
     var hasInsight = false;
     var insightEditor = qContainer ? qContainer.querySelector(".insight-md-editor") : null;
     if (insightEditor && insightEditor.value.trim()) hasInsight = true;
-
-    var popover = document.createElement("div");
-    popover.className = "pin-mode-popover";
-    // Stop all clicks inside popover from bubbling to the pin button
-    popover.onclick = function(e) { e.stopPropagation(); };
-
-    var title = document.createElement("div");
-    title.className = "pin-mode-title";
-    title.textContent = "PIN TO VIEWS";
-    popover.appendChild(title);
 
     // Only show AI Insight option when AI insights are enabled for this report
     var aiInsightsEnabled = !!document.querySelector(".turas-ai-callout");
@@ -226,63 +199,13 @@
       checkboxes.push({ key: "aiInsight", label: "AI Insight", available: hasAiCallout, checked: hasAiCallout });
     }
 
-    var state = {};
-    checkboxes.forEach(function(opt) {
-      state[opt.key] = opt.available && opt.checked;
-
-      var row = document.createElement("label");
-      row.className = "pin-mode-checkbox" + (opt.available ? "" : " pin-mode-disabled");
-
-      var cb = document.createElement("input");
-      cb.type = "checkbox";
-      cb.checked = opt.available && opt.checked;
-      cb.disabled = !opt.available;
-      cb.onchange = function() { state[opt.key] = this.checked; };
-
-      var span = document.createElement("span");
-      span.textContent = opt.label;
-      if (!opt.available) span.title = "Not available for this question";
-
-      row.appendChild(cb);
-      row.appendChild(span);
-      popover.appendChild(row);
-    });
-
-    var pinBtn = document.createElement("button");
-    pinBtn.className = "pin-mode-action";
-    pinBtn.textContent = "Pin";
-    pinBtn.onclick = function(e) {
-      e.stopPropagation();
-      var anyChecked = Object.keys(state).some(function(k) { return state[k]; });
-      if (!anyChecked) return;
-      closePopover();
-      executePinWithFlags(qCode, state);
-    };
-    popover.appendChild(pinBtn);
-
-    // Append to the question title card (not the button) to avoid re-triggering togglePin
     var titleCard = btn.closest(".question-title-card") || btn.parentElement;
-    // Set position:relative BEFORE reading offsetTop — otherwise offsetTop is
-    // measured relative to the body (huge value) and the popover lands off-screen
-    titleCard.style.position = "relative";
-    popover.style.cssText = "position:absolute;top:" +
-      (btn.offsetTop + btn.offsetHeight + 4) + "px;right:16px;z-index:1000;";
-    titleCard.appendChild(popover);
-
-    setTimeout(function() {
-      document.addEventListener("click", closePopoverOnOutside, true);
-    }, 0);
+    TurasPins.showCheckboxPopover(btn, checkboxes, function(flags) {
+      executePinWithFlags(qCode, flags);
+    }, titleCard);
   };
 
   // ── Execute Pin ───────────────────────────────────────────────────────────
-
-  function executePinWithMode(qCode, mode) {
-    var content = captureCurrentView(qCode);
-    if (!content) return;
-    content.pinMode = mode;
-    TurasPins.add(content);
-    tabsUpdatePinButton(qCode, true);
-  }
 
   function executePinWithFlags(qCode, flags) {
     var content = captureCurrentView(qCode);

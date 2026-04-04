@@ -253,12 +253,51 @@
   }
 
   /**
-   * Pin a section — always adds a new snapshot.
+   * Pin a section — shows checkbox popover when multiple content types exist.
    * @param {string} sectionId - Section to pin
+   * @param {HTMLElement} [btnEl] - Pin button for popover positioning
    */
-  window.pinSection = function(sectionId) {
+  window.pinSection = function(sectionId, btnEl) {
     var captured = captureView(sectionId);
-    if (captured) TurasPins.add(captured);
+    if (!captured) return;
+
+    var hasChart = !!captured.chartSvg;
+    var hasTable = !!captured.tableHtml;
+    var hasInsight = !!captured.insightText;
+
+    // Only one content type or no button → pin directly
+    if (!btnEl || (!hasChart && !hasTable) ||
+        (hasChart && !hasTable) || (!hasChart && hasTable)) {
+      captured.pinFlags = {
+        chart: hasChart, table: hasTable,
+        insight: hasInsight, aiInsight: false
+      };
+      captured.pinMode = "custom";
+      TurasPins.add(captured);
+      return;
+    }
+
+    var checkboxes = [
+      { key: "table",   label: "Table",   available: hasTable,   checked: hasTable },
+      { key: "chart",   label: "Chart",   available: hasChart,   checked: hasChart },
+      { key: "insight", label: "Insight", available: true,       checked: hasInsight }
+    ];
+
+    TurasPins.showCheckboxPopover(btnEl, checkboxes, function(flags) {
+      var content = captureView(sectionId);
+      if (!content) return;
+      if (!flags.chart) content.chartSvg = "";
+      if (!flags.table) content.tableHtml = "";
+      if (!flags.insight) content.insightText = "";
+      content.pinFlags = {
+        chart:     !!flags.chart,
+        table:     !!flags.table,
+        insight:   !!flags.insight,
+        aiInsight: !!flags.aiInsight
+      };
+      content.pinMode = "custom";
+      TurasPins.add(content);
+    });
   };
 
   window.removePinned = function(pinId) { TurasPins.remove(pinId); };

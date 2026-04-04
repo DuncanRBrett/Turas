@@ -62,6 +62,7 @@ turas_pins_js <- function(include_vendor = TRUE) {
   js_files <- c(
     "turas_pins_utils.js",
     "turas_pins.js",
+    "turas_pins_popover.js",
     "turas_pins_render.js",
     "turas_pins_drag.js",
     "turas_pins_insight_svg.js",

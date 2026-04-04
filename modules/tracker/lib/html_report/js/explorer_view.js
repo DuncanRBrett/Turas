@@ -505,13 +505,9 @@
     h.push('<button class="vis-axis-reset" onclick="visResetYAxis()" title="Reset to auto">&#x21BA;</button>');
     h.push('</div>');
     h.push('<div class="mv-control-group mv-action-buttons" style="border-right:none;margin-left:auto">');
-    h.push('<div class="tk-pin-dropdown" style="display:inline-block;position:relative">');
-    h.push('<button class="export-btn" onclick="visTogglePinMenu()">&#x1F4CC; Pin &#x25BE;</button>');
-    h.push('<div class="tk-pin-menu" id="vis-pin-menu" style="display:none">');
-    h.push('<button class="tk-pin-option" onclick="visPinView(\'all\')">Insight + Chart + Table</button>');
-    h.push('<button class="tk-pin-option" onclick="visPinView(\'chart\')">Insight + Chart</button>');
-    h.push('<button class="tk-pin-option" onclick="visPinView(\'table\')">Insight + Table</button>');
-    h.push('</div></div>');
+    h.push('<div style="display:inline-block;position:relative" data-pin-btn>');
+    h.push('<button class="export-btn" id="vis-pin-btn" onclick="visShowPinPopover(this)">&#x1F4CC; Pin</button>');
+    h.push('</div>');
     h.push('<div style="display:inline-block;position:relative">');
     h.push('<button class="export-btn" onclick="visToggleExportMenu()">&#x2B73; Export &#x25BE;</button>');
     h.push('<div class="vis-export-menu" id="vis-export-menu" style="display:none;position:absolute;bottom:100%;right:0;background:#fff;border:1px solid #e2e8f0;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:100;min-width:160px;padding:4px 0;margin-bottom:4px;">');
@@ -1352,27 +1348,46 @@
   };
 
   // ---- Pin ----
-  window.visTogglePinMenu = function() {
-    var menu = document.getElementById("vis-pin-menu");
-    if (menu) menu.style.display = menu.style.display === "none" ? "" : "none";
+  window.visShowPinPopover = function(btnEl) {
     // Close export menu if open
     var expMenu = document.getElementById("vis-export-menu");
     if (expMenu) expMenu.style.display = "none";
+
+    var main = document.getElementById("vis-main-panel");
+    if (!main) return;
+
+    var hasChart = !!document.getElementById("vis-chart");
+    var hasTable = !!document.getElementById("vis-table");
+    var insightEditor = document.getElementById("vis-insight-editor");
+    var insightRendered = document.getElementById("vis-insight-rendered");
+    var hasInsight = !!(insightRendered ? insightRendered.innerHTML.trim() : (insightEditor ? insightEditor.value.trim() : ""));
+
+    var checkboxes = [
+      { key: "table",   label: "Table",   available: hasTable,   checked: hasTable },
+      { key: "chart",   label: "Chart",   available: hasChart,   checked: hasChart },
+      { key: "insight", label: "Insight", available: true,       checked: hasInsight }
+    ];
+
+    TurasPins.showCheckboxPopover(btnEl, checkboxes, function(flags) {
+      visPinViewWithFlags(flags);
+    });
+  };
+
+  // Backward compat
+  window.visTogglePinMenu = function() {
+    var btn = document.getElementById("vis-pin-btn");
+    if (btn) window.visShowPinPopover(btn);
   };
 
   // ---- Unified Export dropdown ----
   window.visToggleExportMenu = function() {
     var menu = document.getElementById("vis-export-menu");
     if (menu) menu.style.display = menu.style.display === "none" ? "" : "none";
-    // Close pin menu if open
-    var pinMenu = document.getElementById("vis-pin-menu");
-    if (pinMenu) pinMenu.style.display = "none";
+    // Close pin popover if open
+    if (typeof TurasPins !== "undefined") TurasPins.closePopover();
   };
 
-  window.visPinView = function(mode) {
-    var menu = document.getElementById("vis-pin-menu");
-    if (menu) menu.style.display = "none";
-
+  function visPinViewWithFlags(flags) {
     var main = document.getElementById("vis-main-panel");
     if (!main) return;
 
@@ -1383,18 +1398,20 @@
     // Capture insight (rendered markdown HTML)
     var insightEditor = document.getElementById("vis-insight-editor");
     var insightRendered = document.getElementById("vis-insight-rendered");
-    var insightText = insightRendered ? insightRendered.innerHTML.trim() : (insightEditor ? insightEditor.value.trim() : "");
+    var insightText = flags.insight
+      ? (insightRendered ? insightRendered.innerHTML.trim() : (insightEditor ? insightEditor.value.trim() : ""))
+      : "";
 
     // Capture chart SVG
     var chartSvg = "";
-    if (mode === "all" || mode === "chart") {
+    if (flags.chart) {
       var chartEl = document.getElementById("vis-chart");
       if (chartEl) chartSvg = chartEl.innerHTML;
     }
 
     // Capture table HTML (clean: remove hidden rows)
     var tableHtml = "";
-    if (mode === "all" || mode === "table") {
+    if (flags.table) {
       var tableEl = document.getElementById("vis-table");
       if (tableEl) {
         var clone = tableEl.cloneNode(true);
@@ -1414,10 +1431,26 @@
       visibleSegments: [],
       tableHtml: tableHtml,
       chartSvg: chartSvg,
-      chartVisible: mode === "all" || mode === "chart",
-      pinMode: mode === "chart" ? "chart_insight" : mode === "table" ? "table_insight" : "all",
+      chartVisible: !!flags.chart,
+      pinFlags: {
+        chart:     !!flags.chart,
+        table:     !!flags.table,
+        insight:   !!flags.insight,
+        aiInsight: !!flags.aiInsight
+      },
+      pinMode: "custom",
       insightText: insightText
     });
+  }
+
+  // Backward compat for old static menu calls
+  window.visPinView = function(mode) {
+    var flags = {
+      chart:   mode === "all" || mode === "chart",
+      table:   mode === "all" || mode === "table",
+      insight: true
+    };
+    visPinViewWithFlags(flags);
   };
 
   // ---- Export ----

@@ -120,22 +120,11 @@
     };
   }
 
-  // ── Mode Popover (Bug #5 fix) ─────────────────────────────────────────────
-
-  function segClosePopover() {
-    var p = document.getElementById("seg-pin-popover");
-    if (p) p.remove();
-    document.removeEventListener("click", segClosePopoverOnOutside);
-  }
-
-  function segClosePopoverOnOutside(e) {
-    var p = document.getElementById("seg-pin-popover");
-    if (p && !p.contains(e.target)) segClosePopover();
-  }
+  // ── Mode Popover ────────────────────────────────────────────────────────────
 
   /**
    * Pin a section — always additive (each click captures a new snapshot).
-   * Shows mode popover to select chart/table/both.
+   * Shows checkbox popover to select content types.
    * @param {string} sectionKey - Section key
    * @param {string} prefix - ID prefix
    */
@@ -145,45 +134,30 @@
     var btn = document.querySelector(
       '.seg-pin-btn[data-seg-pin-section="' + sectionKey + '"]'
     );
-    if (!btn) { segExecutePin(sectionKey, prefix, "all"); return; }
-
-    segClosePopover();
     var content = segCaptureSectionContent(sectionKey, prefix);
-    var hasChart = content && content.chartSvg;
-    var hasTable = content && content.tableHtml;
+    if (!content) return;
+    var hasChart = !!content.chartSvg;
+    var hasTable = !!content.tableHtml;
+    var hasInsight = !!content.insightText;
 
-    // If only one content type exists, skip popover
-    if (hasChart && !hasTable) { segExecutePin(sectionKey, prefix, "chart_insight"); return; }
-    if (!hasChart && hasTable) { segExecutePin(sectionKey, prefix, "table_insight"); return; }
-    if (!hasChart && !hasTable) { segExecutePin(sectionKey, prefix, "all"); return; }
+    // No button or only one content type → pin directly
+    if (!btn || (!hasChart && !hasTable) ||
+        (hasChart && !hasTable) || (!hasChart && hasTable)) {
+      segExecutePinWithFlags(sectionKey, prefix, {
+        table: hasTable, chart: hasChart, insight: hasInsight
+      });
+      return;
+    }
 
-    var popover = document.createElement("div");
-    popover.className = "seg-pin-popover";
-    popover.id = "seg-pin-popover";
-
-    var options = [
-      { label: "Table + Chart", mode: "all" },
-      { label: "Chart only", mode: "chart_insight" },
-      { label: "Table only", mode: "table_insight" }
+    var checkboxes = [
+      { key: "table",   label: "Table",   available: hasTable,   checked: hasTable },
+      { key: "chart",   label: "Chart",   available: hasChart,   checked: hasChart },
+      { key: "insight", label: "Insight", available: true,       checked: hasInsight }
     ];
 
-    options.forEach(function(opt) {
-      var item = document.createElement("button");
-      item.className = "seg-pin-popover-item";
-      item.textContent = opt.label;
-      item.onclick = function(e) {
-        e.stopPropagation();
-        segExecutePin(sectionKey, prefix, opt.mode);
-        segClosePopover();
-      };
-      popover.appendChild(item);
+    TurasPins.showCheckboxPopover(btn, checkboxes, function(flags) {
+      segExecutePinWithFlags(sectionKey, prefix, flags);
     });
-
-    btn.parentElement.style.position = "relative";
-    btn.parentElement.appendChild(popover);
-    setTimeout(function() {
-      document.addEventListener("click", segClosePopoverOnOutside);
-    }, 10);
   };
 
   /**
@@ -219,9 +193,9 @@
   // ── Execute Pin ────────────────────────────────────────────────────────────
 
   /**
-   * Execute pin with selected mode — captures content and delegates to TurasPins.
+   * Execute pin with flags — captures content and delegates to TurasPins.
    */
-  function segExecutePin(sectionKey, prefix, mode) {
+  function segExecutePinWithFlags(sectionKey, prefix, flags) {
     var content = segCaptureSectionContent(sectionKey, prefix);
     if (!content) return;
 
@@ -229,14 +203,24 @@
       ? content.panelLabel + " \u2014 " + content.sectionTitle
       : content.sectionTitle;
 
+    if (!flags.chart) content.chartSvg = "";
+    if (!flags.table) content.tableHtml = "";
+    if (!flags.insight) content.insightText = "";
+
     TurasPins.add({
       sectionKey: sectionKey, prefix: prefix,
       title: title, panelLabel: content.panelLabel,
       sectionTitle: content.sectionTitle,
       insightText: content.insightText,
-      chartSvg: (mode === "all" || mode === "chart_insight") ? content.chartSvg : "",
-      tableHtml: (mode === "all" || mode === "table_insight") ? content.tableHtml : "",
-      pinMode: mode,
+      chartSvg: content.chartSvg,
+      tableHtml: content.tableHtml,
+      pinFlags: {
+        chart:     !!flags.chart,
+        table:     !!flags.table,
+        insight:   !!flags.insight,
+        aiInsight: !!flags.aiInsight
+      },
+      pinMode: "custom",
       methodText: content.methodText, sampleN: content.sampleN
     });
     segUpdatePinButtons();

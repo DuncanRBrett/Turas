@@ -133,13 +133,83 @@
 
   /**
    * Pin a metric view — always additive (each click captures new snapshot).
+   * When mode is provided, pins directly (backward compat).
+   * When mode is omitted or "popover", shows checkbox popover.
    * @param {string} metricId - The metric ID
-   * @param {string} mode - "all", "chart", or "table"
+   * @param {string} [mode] - "all", "chart", "table", or omit for popover
+   * @param {HTMLElement} [btnEl] - Pin button for popover positioning
    */
-  window.togglePin = function(metricId, mode) {
-    var content = captureMetricView(metricId, mode || "all");
-    if (content) TurasPins.add(content);
+  window.togglePin = function(metricId, mode, btnEl) {
+    // Legacy direct-mode calls: pin immediately
+    if (mode && mode !== "popover") {
+      var content = captureMetricView(metricId, mode);
+      if (content) TurasPins.add(content);
+      return;
+    }
+
+    // Detect available content
+    var panel = document.getElementById("mv-" + metricId);
+    if (!panel) return;
+    var hasChart = !!(panel.querySelector(".mv-chart-area") &&
+      panel.querySelector(".mv-chart-area").style.display !== "none" &&
+      panel.querySelector(".mv-chart-area svg"));
+    var hasTable = !!panel.querySelector(".mv-table-area");
+    var insightEditor = panel.querySelector(".insight-editor");
+    var hasInsight = !!(insightEditor && insightEditor.innerHTML.trim());
+
+    // Only one content type → pin directly
+    if (!hasChart && !hasTable) {
+      var c = captureMetricView(metricId, "all");
+      if (c) TurasPins.add(c);
+      return;
+    }
+    if (hasChart && !hasTable) {
+      togglePinWithFlags(metricId, { chart: true, insight: hasInsight });
+      return;
+    }
+    if (!hasChart && hasTable) {
+      togglePinWithFlags(metricId, { table: true, insight: hasInsight });
+      return;
+    }
+
+    // Both exist — show checkbox popover
+    if (!btnEl) btnEl = panel.querySelector(".mv-pin-btn, .export-btn");
+    if (!btnEl) {
+      togglePinWithFlags(metricId, { table: true, chart: true, insight: hasInsight });
+      return;
+    }
+
+    var checkboxes = [
+      { key: "table",   label: "Table",   available: hasTable,   checked: hasTable },
+      { key: "chart",   label: "Chart",   available: hasChart,   checked: hasChart },
+      { key: "insight", label: "Insight", available: true,       checked: hasInsight }
+    ];
+
+    TurasPins.showCheckboxPopover(btnEl, checkboxes, function(flags) {
+      togglePinWithFlags(metricId, flags);
+    });
   };
+
+  /**
+   * Execute pin with flags — captures content and strips unchecked types.
+   */
+  function togglePinWithFlags(metricId, flags) {
+    var content = captureMetricView(metricId, "all");
+    if (!content) return;
+
+    if (!flags.chart) content.chartSvg = "";
+    if (!flags.table) content.tableHtml = "";
+    if (!flags.insight) content.insightText = "";
+
+    content.pinFlags = {
+      chart:     !!flags.chart,
+      table:     !!flags.table,
+      insight:   !!flags.insight,
+      aiInsight: !!flags.aiInsight
+    };
+    content.pinMode = "custom";
+    TurasPins.add(content);
+  }
 
   // ── Insight Editing ───────────────────────────────────────────────────────
 

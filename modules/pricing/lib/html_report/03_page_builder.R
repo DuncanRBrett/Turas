@@ -1644,7 +1644,7 @@ build_export_toolbar <- function(section_id) {
        <button class="pr-export-btn" onclick="exportChartPNG(\'%s\')" title="Export chart as PNG">Export PNG</button>
        <button class="pr-export-btn" onclick="exportTableExcel(\'%s\')" title="Export table as Excel">Export Excel</button>
        <button class="pr-export-btn" onclick="exportSlidePNG(\'%s\')" title="Export as slide">Export Slide</button>
-       <button class="pr-pin-btn" onclick="pinSection(\'%s\')" title="Pin to Views">\U0001F4CC</button>
+       <button class="pr-pin-btn" onclick="pinSection(\'%s\', this)" title="Pin to Views">\U0001F4CC</button>
      </div>',
     section_id, section_id, section_id, section_id
   )

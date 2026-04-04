@@ -203,65 +203,41 @@
 
   // ── Mode Popover ───────────────────────────────────────────────────────────
 
-  function cjClosePopover() {
-    var p = document.getElementById("cj-pin-popover");
-    if (p) p.remove();
-    document.removeEventListener("click", cjClosePopoverOnOutside);
-  }
-
-  function cjClosePopoverOnOutside(e) {
-    var p = document.getElementById("cj-pin-popover");
-    if (p && !p.contains(e.target)) cjClosePopover();
-  }
-
   /**
-   * Pin a view — always additive. Shows mode popover first.
+   * Pin a view — always additive. Shows checkbox popover first.
    * @param {string} viewId - View identifier
    * @param {HTMLElement} btnEl - Button that triggered
    */
   window.cjPinSection = function(viewId, btnEl) {
-    if (!btnEl) { cjExecutePin(viewId, "all"); return; }
-
     // Simulator: always pin full snapshot directly (no mode choice)
-    if (viewId === "pin-simulator") { cjExecutePin(viewId, "all"); return; }
+    if (viewId === "pin-simulator") {
+      cjExecutePinWithFlags(viewId, { table: true, chart: true });
+      return;
+    }
 
-    cjClosePopover();
     var content = cjCaptureContent(viewId, "all");
-    var hasChart = content && content.chartSvg;
-    var hasTable = content && content.tableHtml;
+    if (!content) return;
+    var hasChart = !!content.chartSvg;
+    var hasTable = !!content.tableHtml;
 
-    // Smart skip: only one content type → pin directly
-    if (hasChart && !hasTable) { cjExecutePin(viewId, "chart_insight"); return; }
-    if (!hasChart && hasTable) { cjExecutePin(viewId, "table_insight"); return; }
-    if (!hasChart && !hasTable) { cjExecutePin(viewId, "all"); return; }
+    // No button or only one content type → pin directly
+    if (!btnEl || (!hasChart && !hasTable) ||
+        (hasChart && !hasTable) || (!hasChart && hasTable)) {
+      cjExecutePinWithFlags(viewId, {
+        table: hasTable,
+        chart: hasChart
+      });
+      return;
+    }
 
-    var popover = document.createElement("div");
-    popover.className = "cj-pin-popover";
-    popover.id = "cj-pin-popover";
-
-    var options = [
-      { label: "Table + Chart", mode: "all" },
-      { label: "Chart only", mode: "chart_insight" },
-      { label: "Table only", mode: "table_insight" }
+    var checkboxes = [
+      { key: "table", label: "Table", available: hasTable, checked: hasTable },
+      { key: "chart", label: "Chart", available: hasChart, checked: hasChart }
     ];
 
-    options.forEach(function(opt) {
-      var item = document.createElement("button");
-      item.className = "cj-pin-popover-item";
-      item.textContent = opt.label;
-      item.onclick = function(e) {
-        e.stopPropagation();
-        cjExecutePin(viewId, opt.mode);
-        cjClosePopover();
-      };
-      popover.appendChild(item);
+    TurasPins.showCheckboxPopover(btnEl, checkboxes, function(flags) {
+      cjExecutePinWithFlags(viewId, flags);
     });
-
-    btnEl.parentElement.style.position = "relative";
-    btnEl.parentElement.appendChild(popover);
-    setTimeout(function() {
-      document.addEventListener("click", cjClosePopoverOnOutside);
-    }, 10);
   };
 
   // Backward compat: old pin buttons call showPinPopover
@@ -270,11 +246,14 @@
   };
 
   /**
-   * Execute pin with selected mode — captures content and delegates to TurasPins.
+   * Execute pin with flags — captures content and delegates to TurasPins.
    */
-  function cjExecutePin(viewId, mode) {
-    var content = cjCaptureContent(viewId, mode);
+  function cjExecutePinWithFlags(viewId, flags) {
+    var content = cjCaptureContent(viewId, "all");
     if (!content) return;
+
+    if (!flags.chart) content.chartSvg = "";
+    if (!flags.table) content.tableHtml = "";
 
     TurasPins.add({
       sectionKey: viewId,
@@ -282,7 +261,13 @@
       insightText: "",
       chartSvg: content.chartSvg,
       tableHtml: content.tableHtml,
-      pinMode: mode
+      pinFlags: {
+        chart:     !!flags.chart,
+        table:     !!flags.table,
+        insight:   !!flags.insight,
+        aiInsight: !!flags.aiInsight
+      },
+      pinMode: "custom"
     });
   }
 

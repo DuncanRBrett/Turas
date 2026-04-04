@@ -86,70 +86,46 @@
 
   // ── Mode Popover ───────────────────────────────────────────────────────────
 
-  function wtClosePopover() {
-    var p = document.getElementById("wt-pin-popover");
-    if (p) p.remove();
-    document.removeEventListener("click", wtClosePopoverOnOutside);
-  }
-
-  function wtClosePopoverOnOutside(e) {
-    var p = document.getElementById("wt-pin-popover");
-    if (p && !p.contains(e.target)) wtClosePopover();
-  }
-
   /**
-   * Pin a view — always additive. Shows mode popover first.
+   * Pin a view — always additive. Shows checkbox popover first.
    * @param {string} viewId - View identifier
    * @param {HTMLElement} btnEl - Button that triggered
    */
   window.wtPinSection = function(viewId, btnEl) {
-    if (!btnEl) { wtExecutePin(viewId, "all"); return; }
-
-    wtClosePopover();
     var content = wtCaptureContent(viewId, "all");
-    var hasChart = content && content.chartSvg;
-    var hasTable = content && content.tableHtml;
+    if (!content) return;
+    var hasChart = !!content.chartSvg;
+    var hasTable = !!content.tableHtml;
 
-    // Smart skip: only one content type → pin directly
-    if (hasChart && !hasTable) { wtExecutePin(viewId, "chart_insight"); return; }
-    if (!hasChart && hasTable) { wtExecutePin(viewId, "table_insight"); return; }
-    if (!hasChart && !hasTable) { wtExecutePin(viewId, "all"); return; }
+    // No button or only one content type → pin directly
+    if (!btnEl || (!hasChart && !hasTable) ||
+        (hasChart && !hasTable) || (!hasChart && hasTable)) {
+      wtExecutePinWithFlags(viewId, {
+        table: hasTable,
+        chart: hasChart
+      });
+      return;
+    }
 
-    var popover = document.createElement("div");
-    popover.className = "wt-pin-popover";
-    popover.id = "wt-pin-popover";
-
-    var options = [
-      { label: "Table + Chart", mode: "all" },
-      { label: "Chart only", mode: "chart_insight" },
-      { label: "Table only", mode: "table_insight" }
+    var checkboxes = [
+      { key: "table", label: "Table", available: hasTable, checked: hasTable },
+      { key: "chart", label: "Chart", available: hasChart, checked: hasChart }
     ];
 
-    options.forEach(function(opt) {
-      var item = document.createElement("button");
-      item.className = "wt-pin-popover-item";
-      item.textContent = opt.label;
-      item.onclick = function(e) {
-        e.stopPropagation();
-        wtExecutePin(viewId, opt.mode);
-        wtClosePopover();
-      };
-      popover.appendChild(item);
+    TurasPins.showCheckboxPopover(btnEl, checkboxes, function(flags) {
+      wtExecutePinWithFlags(viewId, flags);
     });
-
-    btnEl.parentElement.style.position = "relative";
-    btnEl.parentElement.appendChild(popover);
-    setTimeout(function() {
-      document.addEventListener("click", wtClosePopoverOnOutside);
-    }, 10);
   };
 
   /**
-   * Execute pin with selected mode — captures content and delegates to TurasPins.
+   * Execute pin with flags — captures content and delegates to TurasPins.
    */
-  function wtExecutePin(viewId, mode) {
-    var content = wtCaptureContent(viewId, mode);
+  function wtExecutePinWithFlags(viewId, flags) {
+    var content = wtCaptureContent(viewId, "all");
     if (!content) return;
+
+    if (!flags.chart) content.chartSvg = "";
+    if (!flags.table) content.tableHtml = "";
 
     TurasPins.add({
       sectionKey: viewId,
@@ -157,7 +133,13 @@
       insightText: "",
       chartSvg: content.chartSvg,
       tableHtml: content.tableHtml,
-      pinMode: mode
+      pinFlags: {
+        chart:     !!flags.chart,
+        table:     !!flags.table,
+        insight:   !!flags.insight,
+        aiInsight: !!flags.aiInsight
+      },
+      pinMode: "custom"
     });
   }
 

@@ -838,36 +838,7 @@ td.cd-td {
   background: rgba(255,255,255,0.98);
 }
 
-/* Pin popover — table / chart / both selector */
-.cd-pin-popover {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  z-index: 1000;
-  background: #fff;
-  border: 1px solid var(--cd-border);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.10);
-  min-width: 150px;
-  padding: 4px 0;
-  margin-top: 4px;
-}
-.cd-pin-popover-item {
-  display: block;
-  width: 100%;
-  padding: 8px 14px;
-  border: none;
-  background: none;
-  text-align: left;
-  font-size: 12px;
-  font-family: inherit;
-  color: var(--cd-text);
-  cursor: pointer;
-}
-.cd-pin-popover-item:hover {
-  background: var(--cd-bg-muted);
-  color: var(--cd-brand);
-}
+/* Pin popover — now injected by shared turas_pins_popover.js */
 
 /* Drag-and-drop reordering for pinned cards */
 .cd-pin-dragging,

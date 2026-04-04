@@ -127,80 +127,52 @@
 
   // ── Mode Popover ───────────────────────────────────────────────────────────
 
-  function cdClosePopover() {
-    var p = document.getElementById("cd-pin-popover");
-    if (p) p.remove();
-    document.removeEventListener("click", cdClosePopoverOnOutside);
-  }
-
-  function cdClosePopoverOnOutside(e) {
-    var p = document.getElementById("cd-pin-popover");
-    if (p && !p.contains(e.target)) cdClosePopover();
-  }
-
   /**
    * Pin a section — always additive (each click captures a new snapshot).
-   * Shows mode popover to select chart/table/both.
+   * Shows checkbox popover to select content types.
    * @param {string} sectionKey - Section key
    * @param {string} prefix - ID prefix for multi-analysis
    */
   window.cdPinSection = function(sectionKey, prefix) {
     prefix = prefix || "";
 
-    // Show mode popover
     var btn = document.querySelector('.cd-pin-btn[data-cd-pin-section="' + sectionKey + '"]');
-    if (!btn) { cdExecutePin(sectionKey, prefix, "all"); return; }
-
-    cdClosePopover();
     var content = cdCaptureSectionContent(sectionKey, prefix);
-    var hasChart = content && content.chartSvg;
-    var hasTable = content && content.tableHtml;
+    if (!content) return;
+    var hasChart = !!content.chartSvg;
+    var hasTable = !!content.tableHtml;
+    var hasInsight = !!content.insightText;
 
-    var popover = document.createElement("div");
-    popover.className = "cd-pin-popover";
-    popover.id = "cd-pin-popover";
+    if (!btn) {
+      cdExecutePinWithFlags(sectionKey, prefix, { table: hasTable, chart: hasChart, insight: hasInsight });
+      return;
+    }
 
-    var options = [
-      { label: "Table + Chart", mode: "all", enabled: hasChart && hasTable },
-      { label: "Chart only", mode: "chart_insight", enabled: !!hasChart },
-      { label: "Table only", mode: "table_insight", enabled: !!hasTable }
+    var checkboxes = [
+      { key: "table",   label: "Table",   available: hasTable,   checked: hasTable },
+      { key: "chart",   label: "Chart",   available: hasChart,   checked: hasChart },
+      { key: "insight", label: "Insight", available: true,       checked: hasInsight }
     ];
 
-    options.forEach(function(opt) {
-      var item = document.createElement("button");
-      item.className = "cd-pin-popover-item";
-      item.textContent = opt.label;
-      if (!opt.enabled) {
-        item.disabled = true;
-        item.style.opacity = "0.4";
-        item.style.cursor = "default";
-      } else {
-        item.onclick = function(e) {
-          e.stopPropagation();
-          cdExecutePin(sectionKey, prefix, opt.mode);
-          cdClosePopover();
-        };
-      }
-      popover.appendChild(item);
+    TurasPins.showCheckboxPopover(btn, checkboxes, function(flags) {
+      cdExecutePinWithFlags(sectionKey, prefix, flags);
     });
-
-    btn.parentElement.style.position = "relative";
-    btn.parentElement.appendChild(popover);
-    setTimeout(function() {
-      document.addEventListener("click", cdClosePopoverOnOutside);
-    }, 10);
   };
 
   /**
-   * Execute pin with selected mode — captures content and delegates to TurasPins.
+   * Execute pin with flags — captures content and delegates to TurasPins.
    */
-  function cdExecutePin(sectionKey, prefix, mode) {
+  function cdExecutePinWithFlags(sectionKey, prefix, flags) {
     var content = cdCaptureSectionContent(sectionKey, prefix);
     if (!content) return;
 
     var title = content.panelLabel
       ? content.panelLabel + " \u2014 " + content.sectionTitle
       : content.sectionTitle;
+
+    if (!flags.chart) content.chartSvg = "";
+    if (!flags.table) content.tableHtml = "";
+    if (!flags.insight) content.insightText = "";
 
     TurasPins.add({
       sectionKey: sectionKey,
@@ -209,9 +181,15 @@
       panelLabel: content.panelLabel,
       sectionTitle: content.sectionTitle,
       insightText: content.insightText,
-      chartSvg: (mode === "all" || mode === "chart_insight") ? content.chartSvg : "",
-      tableHtml: (mode === "all" || mode === "table_insight") ? content.tableHtml : "",
-      pinMode: mode,
+      chartSvg: content.chartSvg,
+      tableHtml: content.tableHtml,
+      pinFlags: {
+        chart:     !!flags.chart,
+        table:     !!flags.table,
+        insight:   !!flags.insight,
+        aiInsight: !!flags.aiInsight
+      },
+      pinMode: "custom",
       modelType: content.modelType,
       sampleN: content.sampleN,
       r2Text: content.r2Text

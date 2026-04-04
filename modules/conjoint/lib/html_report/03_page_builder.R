@@ -360,20 +360,7 @@ build_conjoint_css <- function(brand, accent) {
 .cj-pin-btn:hover { border-color:var(--cj-brand); color:var(--cj-brand); }
 .cj-pin-btn.pinned { color:var(--cj-brand); border-color:var(--cj-brand); }
 
-/* === PIN POPOVER === */
-.cj-pin-popover {
-  position:absolute; top:calc(100% + 6px); right:0; z-index:200;
-  background:#fff; border:1px solid #e2e8f0; border-radius:8px;
-  box-shadow:0 4px 16px rgba(0,0,0,0.12); padding:6px 0; min-width:180px;
-  font-size:12px;
-}
-.cj-pin-popover-item {
-  display:block; width:100%; text-align:left; padding:8px 14px;
-  background:none; border:none; cursor:pointer; color:#334155;
-  font-size:12px; font-family:inherit; transition:background 0.1s;
-}
-.cj-pin-popover-item:hover { background:#f1f5f9; }
-.cj-pin-popover-item.unpin { color:#ef4444; border-top:1px solid #f1f5f9; }
+/* PIN POPOVER — now injected by shared turas_pins_popover.js */
 
 /* === PINNED CARD HEADER + OVERFLOW MENU === */
 .cj-pinned-card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }

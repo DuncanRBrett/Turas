@@ -1529,16 +1529,7 @@ body { font-size: 14px; -webkit-font-smoothing: antialiased; }
 .pin-btn:hover { background: var(--md-bg-muted); border-color: #cbd5e1; }
 .pin-btn.pin-flash { background: #dcfce7; border-color: #86efac; }
 
-.pin-mode-popover {
-  position: absolute; top: 100%; left: 0; z-index: 200; margin-top: 4px;
-  background: white; border: 1px solid var(--md-border); border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; min-width: 200px;
-}
-.pin-mode-option {
-  display: block; width: 100%; padding: 8px 14px; border: none; background: transparent;
-  text-align: left; font-size: 12px; color: var(--md-text-primary); cursor: pointer;
-}
-.pin-mode-option:hover { background: var(--md-bg-muted); }
+/* Pin Mode Popover — now injected by shared turas_pins_popover.js */
 
 /* === INSIGHT AREA === */
 .insight-area { margin-bottom: 12px; }

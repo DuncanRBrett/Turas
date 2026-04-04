@@ -349,40 +349,7 @@ build_kd_css <- function(config) {
   margin-bottom: 8px;
 }
 
-/* Pin mode popover */
-.kd-pin-popover {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  z-index: 1000;
-  background: white;
-  border: 1px solid var(--kd-border);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-  padding: 4px 0;
-  min-width: 140px;
-  margin-top: 4px;
-}
-
-.kd-pin-popover-item {
-  display: block;
-  width: 100%;
-  padding: 8px 14px;
-  border: none;
-  background: none;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--kd-text-primary);
-  cursor: pointer;
-  text-align: left;
-  font-family: inherit;
-  transition: background 0.1s;
-}
-
-.kd-pin-popover-item:hover:not(:disabled) {
-  background: #f1f5f9;
-  color: var(--kd-brand);
-}
+/* Pin mode popover — now injected by shared turas_pins_popover.js */
 
 /* Drag-and-drop states */
 .kd-pin-dragging {

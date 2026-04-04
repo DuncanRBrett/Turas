@@ -708,7 +708,7 @@ function dismissMetricInsight(metricId) {
  * @param {string} [mode="all"] - Pin mode: "all" (insight+chart+table), "chart" (insight+chart), "table" (insight+table)
  */
 function pinMetricView(metricId, mode) {
-  // Close pin menu if open
+  // Close any old-style pin menu if open
   var menu = document.getElementById("pin-menu-" + metricId);
   if (menu) menu.style.display = "none";
 
@@ -718,19 +718,24 @@ function pinMetricView(metricId, mode) {
 }
 
 /**
- * Toggle the pin dropdown menu visibility
+ * Toggle the pin checkbox popover for a metric.
+ * Delegates to togglePin() which shows the shared checkbox popover.
  * @param {string} metricId - The metric ID
  */
 function togglePinMenu(metricId) {
-  var menu = document.getElementById("pin-menu-" + metricId);
-  if (!menu) return;
-  var isVisible = menu.style.display !== "none";
-  // Close all other pin menus first
+  // Close any old-style static menus
   document.querySelectorAll(".tk-pin-menu").forEach(function(m) { m.style.display = "none"; });
-  menu.style.display = isVisible ? "none" : "block";
+
+  // Find the pin button to anchor the popover
+  var panel = document.getElementById("mv-" + metricId);
+  var btn = panel ? panel.querySelector(".mv-pin-btn, .export-btn, .tk-pin-dropdown button") : null;
+
+  if (typeof togglePin === "function") {
+    togglePin(metricId, "popover", btn);
+  }
 }
 
-// Close pin menus on click outside
+// Close pin menus on click outside (backward compat for any remaining static menus)
 document.addEventListener("click", function(e) {
   if (!e.target.closest(".tk-pin-dropdown")) {
     document.querySelectorAll(".tk-pin-menu").forEach(function(m) { m.style.display = "none"; });

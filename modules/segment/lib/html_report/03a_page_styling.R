@@ -842,36 +842,7 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
   border-color: var(--seg-brand);
 }
 
-/* Pin mode popover — table / chart / both selector */
-.seg-pin-popover {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  z-index: 1000;
-  background: #fff;
-  border: 1px solid var(--seg-border);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.10);
-  min-width: 150px;
-  padding: 4px 0;
-  margin-top: 4px;
-}
-.seg-pin-popover-item {
-  display: block;
-  width: 100%;
-  padding: 8px 14px;
-  border: none;
-  background: none;
-  text-align: left;
-  font-size: 12px;
-  font-family: inherit;
-  color: var(--seg-text);
-  cursor: pointer;
-}
-.seg-pin-popover-item:hover {
-  background: var(--seg-bg-muted);
-  color: var(--seg-brand);
-}
+/* Pin mode popover — now injected by shared turas_pins_popover.js */
 
 /* Drag-and-drop reordering for pinned cards */
 .seg-pin-dragging,
