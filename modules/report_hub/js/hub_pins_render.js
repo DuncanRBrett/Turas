@@ -138,6 +138,12 @@
 
     html += buildInsightAreaHTML(pin, pid);
 
+    // AI Insight callout (read-only, preserves original styling)
+    if (pin.aiInsightHtml && TurasPins.shouldShow(pin, "aiInsight")) {
+      html += '<div class="hub-pin-ai-insight">' +
+        TurasPins._sanitizeHtml(pin.aiInsightHtml) + '</div>';
+    }
+
     if (pin.imageData) {
       html += '<div style="margin-bottom:4px;text-align:center;">' +
         '<img src="' + pin.imageData + '" style="max-width:100%;max-height:500px;border-radius:6px;border:1px solid #e2e8f0;" />' +

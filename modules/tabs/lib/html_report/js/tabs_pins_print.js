@@ -123,6 +123,14 @@
       page.appendChild(insDiv);
     }
 
+    // AI Insight callout (read-only, preserves original styling)
+    if (pin.aiInsightHtml && TurasPins.shouldShow(pin, "aiInsight")) {
+      var aiDiv = document.createElement("div");
+      aiDiv.className = "pinned-print-ai-insight";
+      aiDiv.innerHTML = pin.aiInsightHtml;
+      page.appendChild(aiDiv);
+    }
+
     // Image
     if (pin.imageData) {
       var imgDiv = document.createElement("div");
