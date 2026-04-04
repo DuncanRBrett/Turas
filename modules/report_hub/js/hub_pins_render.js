@@ -144,9 +144,8 @@
       '</div>';
     }
 
-    var mode = pin.pinMode || "all";
-    var showChart = (mode === "all" || mode === "chart_insight");
-    var showTable = (mode === "all" || mode === "table_insight");
+    var showChart = TurasPins.shouldShow(pin, "chart");
+    var showTable = TurasPins.shouldShow(pin, "table");
 
     if (pin.chartSvg && pin.chartVisible !== false && showChart) {
       html += '<div class="hub-pin-chart">' + TurasPins._sanitizeHtml(pin.chartSvg) + '</div>';

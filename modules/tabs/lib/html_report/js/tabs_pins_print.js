@@ -108,9 +108,8 @@
     }
     page.appendChild(hdr);
 
-    var mode = pin.pinMode || "all";
-    var showTable = (mode === "all" || mode === "table_insight");
-    var showChart = (mode === "all" || mode === "chart_insight");
+    var showTable = TurasPins.shouldShow(pin, "table");
+    var showChart = TurasPins.shouldShow(pin, "chart");
 
     // Insight
     if (pin.insightText) {

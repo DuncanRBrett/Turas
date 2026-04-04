@@ -197,9 +197,8 @@
     }
 
     // ---- 4. Chart dimensions ----
-    var exportMode = pin.pinMode || "all";
-    var showChart = (exportMode === "all" || exportMode === "chart_insight");
-    var showTable = (exportMode === "all" || exportMode === "table_insight");
+    var showChart = TurasPins.shouldShow(pin, "chart");
+    var showTable = TurasPins.shouldShow(pin, "table");
 
     var chartTopY = imageTopY + imageDisplayH + (imageDisplayH > 0 ? 4 : 0);
     var chartDisplayH = 0, chartClone = null, chartScale = 1;

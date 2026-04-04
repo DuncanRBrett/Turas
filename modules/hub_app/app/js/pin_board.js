@@ -343,10 +343,16 @@ var PinBoard = (function() {
       '</textarea>' +
     '</div>';
 
-    // Chart SVG
-    var mode = pin.pinMode || "all";
-    var showChart = (mode === "all" || mode === "chart_insight");
-    var showTable = (mode === "all" || mode === "table_insight");
+    // Chart SVG — pinFlags takes precedence over legacy pinMode
+    var showChart, showTable;
+    if (pin.pinFlags && typeof pin.pinFlags === "object") {
+      showChart = !!pin.pinFlags.chart;
+      showTable = !!pin.pinFlags.table;
+    } else {
+      var mode = pin.pinMode || "all";
+      showChart = (mode === "all" || mode === "chart_insight");
+      showTable = (mode === "all" || mode === "table_insight");
+    }
 
     if (pin.chartSvg && pin.chartVisible !== false && showChart) {
       html += '<div class="pb-pin-chart">' + sanitizeHtml(pin.chartSvg) + '</div>';
