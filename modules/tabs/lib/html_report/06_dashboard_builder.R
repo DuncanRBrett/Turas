@@ -898,13 +898,12 @@ build_heatmap_grid <- function(metrics, banner_info, config_obj, thresholds,
       } else {
         disp <- format_gauge_value(val, metric$metric_type)
 
-        bg_style <- get_heatmap_bg_style(val, metric$metric_type, thresholds)
         tier <- get_heatmap_tier(val, metric$metric_type, thresholds)
         total_class <- if (is_total) " dash-hm-total" else ""
 
         html <- paste0(html, sprintf(
-          '<td class="dash-hm-td%s" style="%s" data-tier="%s">%s</td>',
-          total_class, bg_style, tier, htmltools::htmlEscape(disp)
+          '<td class="dash-hm-td%s" data-tier="%s">%s</td>',
+          total_class, tier, htmltools::htmlEscape(disp)
         ))
       }
     }

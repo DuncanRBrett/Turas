@@ -38,6 +38,8 @@ build_heatmap_export_js <- function() {
       xml.push("<Interior ss:Color=\\"#F8F9FA\\" ss:Pattern=\\"Solid\\"/></Style>");
       xml.push("<Style ss:ID=\\"title\\"><Font ss:Bold=\\"1\\" ss:Size=\\"12\\"/></Style>");
       xml.push("<Style ss:ID=\\"normal\\"><Font ss:Size=\\"11\\"/></Style>");
+      xml.push("<Style ss:ID=\\"green-strong\\"><Font ss:Size=\\"11\\" ss:Bold=\\"1\\" ss:Color=\\"#4a7c6f\\"/>");
+      xml.push("<Interior ss:Color=\\"#cde3da\\" ss:Pattern=\\"Solid\\"/></Style>");
       xml.push("<Style ss:ID=\\"green\\"><Font ss:Size=\\"11\\" ss:Color=\\"#4a7c6f\\"/>");
       xml.push("<Interior ss:Color=\\"#e0ede8\\" ss:Pattern=\\"Solid\\"/></Style>");
       xml.push("<Style ss:ID=\\"amber\\"><Font ss:Size=\\"11\\" ss:Color=\\"#96783a\\"/>");
@@ -63,7 +65,7 @@ build_heatmap_export_js <- function() {
           // normalised to rgb(r, g, b) by browsers, making string matching unreliable)
           if (!isHeader) {
             var tier = cell.getAttribute("data-tier");
-            if (tier === "green" || tier === "amber" || tier === "red") {
+            if (tier === "green-strong" || tier === "green" || tier === "amber" || tier === "red") {
               styleId = tier;
             }
           }

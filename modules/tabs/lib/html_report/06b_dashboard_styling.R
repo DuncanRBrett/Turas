@@ -317,6 +317,23 @@ build_dashboard_css <- function(brand_colour) {
     }
     .dash-hm-na { color: #cbd5e1; }
 
+    /* === HEATMAP TIER COLOURS (driven by data-tier attribute) === */
+    /* Specificity 0,3,0 matches .dash-hm-row:hover .dash-hm-td so that
+       tier colours are preserved on row hover (same as when inline styles
+       were used, since inline specificity always won). */
+    .dash-hm-row .dash-hm-td[data-tier="green-strong"] {
+      background-color: rgba(74,124,111,0.18); color: #4a7c6f; font-weight: 700;
+    }
+    .dash-hm-row .dash-hm-td[data-tier="green"] {
+      background-color: rgba(74,124,111,0.10); color: #4a7c6f;
+    }
+    .dash-hm-row .dash-hm-td[data-tier="amber"] {
+      background-color: rgba(201,169,110,0.15); color: #96783a;
+    }
+    .dash-hm-row .dash-hm-td[data-tier="red"] {
+      background-color: rgba(184,84,80,0.12); color: #b85450;
+    }
+
     /* === SEGMENT FILTER === */
     .sig-segment-filter {
       display: flex; align-items: center; gap: 10px;
@@ -507,18 +524,33 @@ get_heatmap_bg_style <- function(value, metric_type, thresholds) {
 
 #' Get Heatmap Colour Tier for a Cell
 #'
-#' Returns "green", "amber", or "red" — used as a data-tier attribute so the
-#' client-side Excel export can read tier without parsing normalised rgb() strings.
+#' Returns "green-strong", "green", "amber", or "red" — used as a data-tier
+#' attribute for CSS styling and client-side Excel export. The 4-tier system
+#' matches the visual heatmap gradient exactly:
+#'   - green-strong: value well above green threshold (bold, higher opacity)
+#'   - green: at or just above green threshold
+#'   - amber: between amber and green thresholds
+#'   - red: below amber threshold
 #'
 #' @param value Numeric
 #' @param metric_type Character
 #' @param thresholds List from build_colour_thresholds()
-#' @return Character: "green", "amber", or "red"
+#' @return Character: "green-strong", "green", "amber", or "red"
 #' @keywords internal
 get_heatmap_tier <- function(value, metric_type, thresholds) {
   if (is.na(value)) return("")
   t <- get_thresholds_for_type(metric_type, thresholds)
-  if (value >= t$green) return("green")
+
+  if (value >= t$green) {
+    # Strong-green cutoff uses same logic as get_heatmap_bg_style()
+    if (metric_type %in% c("net_positive", "nps_score")) {
+      strong_green <- t$green + (100 - t$green) * 0.4
+    } else {
+      strong_green <- t$green + (t$scale - t$green) * 0.33
+    }
+    if (value >= strong_green) return("green-strong")
+    return("green")
+  }
   if (value >= t$amber) return("amber")
   return("red")
 }
