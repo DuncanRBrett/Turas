@@ -215,12 +215,16 @@
     title.textContent = "PIN TO VIEWS";
     popover.appendChild(title);
 
+    // Only show AI Insight option when AI insights are enabled for this report
+    var aiInsightsEnabled = !!document.querySelector(".turas-ai-callout");
     var checkboxes = [
       { key: "table",     label: "Table",      available: true,        checked: true },
       { key: "chart",     label: "Chart",      available: hasChart,    checked: hasChart },
-      { key: "insight",   label: "Insight",    available: true,        checked: hasInsight },
-      { key: "aiInsight", label: "AI Insight",  available: hasAiCallout, checked: hasAiCallout }
+      { key: "insight",   label: "Insight",    available: true,        checked: hasInsight }
     ];
+    if (aiInsightsEnabled) {
+      checkboxes.push({ key: "aiInsight", label: "AI Insight", available: hasAiCallout, checked: hasAiCallout });
+    }
 
     var state = {};
     checkboxes.forEach(function(opt) {
