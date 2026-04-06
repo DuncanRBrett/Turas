@@ -434,19 +434,19 @@ tooling.
 
 ## Progress Tracker
 
-| Phase | Scope                                 | Status                          |
-|-------|---------------------------------------|---------------------------------|
-| 0     | Shared infrastructure                 | Complete — passed re-review         |
-| 1     | Tabs + Tracker                        | Fixes applied — awaiting re-review  |
-| 2     | Weighting + Confidence                | Fixes applied — awaiting re-review  |
-| 3     | KeyDriver + CatDriver                 | Fixes applied — awaiting re-review  |
-| 4     | Segment                               | Not started |
-| 5     | Pricing                               | Not started |
-| 6     | Conjoint + MaxDiff                    | Not started |
-| 7     | AlchemerParser + Report Hub + hub_app | Not started |
-| 8     | Callout Editor                        | Not started |
-| 9     | AI Insights Rollout                   | Not started |
-| 10    | Horizontal Pass + Cleanup             | Not started |
+| Phase | Scope | Status |
+|----|----|----|
+| 0 | Shared infrastructure | Complete — passed re-review |
+| 1 | Tabs + Tracker | Fixes applied — awaiting re-review |
+| 2 | Weighting + Confidence | Fixes applied — awaiting re-review |
+| 3 | KeyDriver + CatDriver | Fixes applied — awaiting re-review |
+| 4 | Segment | Not started |
+| 5 | Pricing | Not started |
+| 6 | Conjoint + MaxDiff | Not started |
+| 7 | AlchemerParser + Report Hub + hub_app | Not started |
+| 8 | Callout Editor | Not started |
+| 9 | AI Insights Rollout | Not started |
+| 10 | Horizontal Pass + Cleanup | Not started |
 
 ------------------------------------------------------------------------
 

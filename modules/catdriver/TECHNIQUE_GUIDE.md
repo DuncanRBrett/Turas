@@ -1,10 +1,8 @@
 # Categorical Key Driver Analysis: Technique Guide
 
-**Module:** Turas CatDriver
-**Audience:** Researchers, analysts, and clients commissioning categorical driver analysis
-**Last updated:** April 2026
+**Module:** Turas CatDriver **Audience:** Researchers, analysts, and clients commissioning categorical driver analysis **Last updated:** April 2026
 
----
+------------------------------------------------------------------------
 
 ## What categorical driver analysis does
 
@@ -12,29 +10,29 @@ Categorical driver analysis answers: "Which factors best predict membership in a
 
 The output is a ranking of driver importance (which factors matter most), plus odds ratios and probability lifts that show *how* each factor's categories relate to the outcome.
 
----
+------------------------------------------------------------------------
 
 ## When to use it
 
 CatDriver is appropriate when:
 
-- The **outcome is categorical**: binary (yes/no, churn/retain), ordinal (low/medium/high), or nominal (brand A/B/C)
-- The **predictors are categorical** (demographic segments, satisfaction tiers, usage categories)
-- You want to know which factors best **discriminate** between outcome groups
-- You need **odds ratios** or **probability lifts** for stakeholder communication
-- Sample size is at least 30, with at least 10 events per predictor (see watchouts)
+-   The **outcome is categorical**: binary (yes/no, churn/retain), ordinal (low/medium/high), or nominal (brand A/B/C)
+-   The **predictors are categorical** (demographic segments, satisfaction tiers, usage categories)
+-   You want to know which factors best **discriminate** between outcome groups
+-   You need **odds ratios** or **probability lifts** for stakeholder communication
+-   Sample size is at least 30, with at least 10 events per predictor (see watchouts)
 
 CatDriver is **not** appropriate when:
 
-- The outcome is continuous (use KeyDriver instead)
-- Predictors are continuous scales (use KeyDriver; CatDriver treats everything as categorical)
-- You need time-series or longitudinal analysis (use Tracker)
-- You have fewer than 2 predictor variables
+-   The outcome is continuous (use KeyDriver instead)
+-   Predictors are continuous scales (use KeyDriver; CatDriver treats everything as categorical)
+-   You need time-series or longitudinal analysis (use Tracker)
+-   You have fewer than 2 predictor variables
 
 ### CatDriver vs KeyDriver: decision framework
 
 | Question | Use KeyDriver | Use CatDriver |
-|----------|--------------|---------------|
+|----|----|----|
 | "What drives overall satisfaction (1-10)?" | Yes | No |
 | "What predicts whether someone churns?" | No | Yes (binary) |
 | "What drives satisfaction tier (Low/Med/High)?" | No | Yes (ordinal) |
@@ -42,7 +40,7 @@ CatDriver is **not** appropriate when:
 | "Which attributes have the biggest impact on NPS (0-10)?" | Yes | No |
 | "What predicts whether someone would recommend (Yes/No)?" | No | Yes (binary) |
 
----
+------------------------------------------------------------------------
 
 ## Questionnaire design for categorical outcomes
 
@@ -52,26 +50,26 @@ The outcome must be a categorical variable with well-defined, mutually exclusive
 
 **Binary outcomes** (most common): The simplest and most powerful case. Examples:
 
-- Churned vs Retained
-- Purchased vs Did not purchase
-- Promoter vs Non-promoter (collapsing NPS into two groups)
-- Satisfied vs Dissatisfied (collapsing a satisfaction scale)
+-   Churned vs Retained
+-   Purchased vs Did not purchase
+-   Promoter vs Non-promoter (collapsing NPS into two groups)
+-   Satisfied vs Dissatisfied (collapsing a satisfaction scale)
 
 When collapsing a scale into binary, choose a meaningful cut point and document it. "Top-2 box on a 5-point scale" is standard. Avoid arbitrary splits that create near-50/50 groups just for balance — the split should reflect a real business distinction.
 
 **Ordinal outcomes** (ordered categories): The categories have a natural order. Examples:
 
-- Low / Medium / High satisfaction
-- Disengaged / Neutral / Engaged
-- Never / Sometimes / Often / Always
+-   Low / Medium / High satisfaction
+-   Disengaged / Neutral / Engaged
+-   Never / Sometimes / Often / Always
 
 Ordinal analysis uses proportional odds logistic regression, which assumes each predictor has the same effect across all threshold transitions. This is usually a reasonable assumption in market research but can be violated when the drivers of moving from "low to medium" differ from those driving "medium to high."
 
 **Multinomial outcomes** (unordered categories): No natural ordering. Examples:
 
-- Brand preference (A/B/C/D)
-- Channel preference (Online/In-store/Phone)
-- Segment membership (if pre-defined)
+-   Brand preference (A/B/C/D)
+-   Channel preference (Online/In-store/Phone)
+-   Segment membership (if pre-defined)
 
 Multinomial analysis is the most complex and requires larger samples. Each comparison (A vs B, A vs C, etc.) estimates a separate set of coefficients.
 
@@ -92,15 +90,15 @@ All predictors in CatDriver are treated as categorical. Design guidance:
 The single most important sample size consideration for logistic regression is the **events per predictor (EPP)** ratio. "Events" means the count of the less common outcome category (for binary) or the smallest outcome group (for ordinal/multinomial).
 
 | EPP | Guidance |
-|-----|----------|
-| < 5 | Don't run. Results will be unreliable. Reduce drivers or combine categories. |
+|----|----|
+| \< 5 | Don't run. Results will be unreliable. Reduce drivers or combine categories. |
 | 5-10 | Proceed with caution. Consider Firth correction (CatDriver enables this automatically). |
 | 10-20 | Acceptable for most purposes. |
-| > 20 | Comfortable. |
+| \> 20 | Comfortable. |
 
 Example: 200 respondents, 30 churned (15%), 10 drivers with 3 categories each = 20 parameters. EPP = 30/20 = 1.5. **Don't run.** Reduce to 5 drivers (10 parameters, EPP = 3) or combine driver categories.
 
----
+------------------------------------------------------------------------
 
 ## How the statistical methods work
 
@@ -126,8 +124,8 @@ For unordered outcomes with 3+ categories. Fits K-1 binary comparisons simultane
 
 CatDriver uses `nnet::multinom()`. Two modes are available:
 
-- **One-vs-rest:** Each category compared against all others combined
-- **One-vs-one:** Pairwise comparisons between specific categories
+-   **One-vs-rest:** Each category compared against all others combined
+-   **One-vs-one:** Pairwise comparisons between specific categories
 
 ### Variable importance
 
@@ -135,7 +133,7 @@ CatDriver ranks drivers using Type II Wald chi-square tests from `car::Anova()`.
 
 This is the categorical equivalent of the R-squared decomposition used in KeyDriver.
 
----
+------------------------------------------------------------------------
 
 ## Interpreting the output
 
@@ -143,14 +141,14 @@ This is the categorical equivalent of the R-squared decomposition used in KeyDri
 
 The primary output for stakeholder communication. An odds ratio (OR) compares the odds of the outcome for one category against the reference category.
 
-| Odds Ratio | Meaning |
-|------------|---------|
-| OR = 1.0 | No difference from reference |
-| OR = 2.0 | 2x the odds of the outcome vs reference |
-| OR = 0.5 | Half the odds of the outcome vs reference |
-| OR = 5.0 | 5x the odds — strong effect |
+| Odds Ratio | Meaning                                   |
+|------------|-------------------------------------------|
+| OR = 1.0   | No difference from reference              |
+| OR = 2.0   | 2x the odds of the outcome vs reference   |
+| OR = 0.5   | Half the odds of the outcome vs reference |
+| OR = 5.0   | 5x the odds — strong effect               |
 
-**Odds ratios are not probabilities.** OR = 2.0 does NOT mean "twice as likely." It means twice the odds. When the outcome is rare (< 20% prevalence), odds ratios approximate risk ratios. When the outcome is common, odds ratios exaggerate the effect size.
+**Odds ratios are not probabilities.** OR = 2.0 does NOT mean "twice as likely." It means twice the odds. When the outcome is rare (\< 20% prevalence), odds ratios approximate risk ratios. When the outcome is common, odds ratios exaggerate the effect size.
 
 ### Probability lifts
 
@@ -162,23 +160,23 @@ Probability lifts are model-adjusted (they account for all other drivers) and ar
 
 ### Importance rankings
 
-| Importance % | Interpretation |
-|--------------|----------------|
-| > 30% | Dominant driver — drives most of the outcome variation |
-| 15-30% | Major driver — should be a focus area |
-| 5-15% | Moderate driver — worth monitoring |
-| < 5% | Minor driver — limited explanatory power |
+| Importance % | Interpretation                                         |
+|--------------|--------------------------------------------------------|
+| \> 30%       | Dominant driver — drives most of the outcome variation |
+| 15-30%       | Major driver — should be a focus area                  |
+| 5-15%        | Moderate driver — worth monitoring                     |
+| \< 5%        | Minor driver — limited explanatory power               |
 
 ### Model fit (McFadden pseudo R-squared)
 
 Unlike linear regression R-squared, McFadden R-squared values are typically much lower:
 
 | McFadden R-squared | Interpretation |
-|--------------------|----------------|
-| > 0.40 | Excellent fit |
+|----|----|
+| \> 0.40 | Excellent fit |
 | 0.20-0.40 | Good fit |
 | 0.10-0.20 | Moderate fit — drivers explain some but not all variation |
-| < 0.10 | Limited — the model has weak explanatory power |
+| \< 0.10 | Limited — the model has weak explanatory power |
 
 A McFadden R-squared of 0.20 corresponds roughly to a linear R-squared of 0.50-0.60, so the numbers are not directly comparable with KeyDriver output.
 
@@ -188,13 +186,13 @@ The 95% CI for an odds ratio tells you the range of plausible values. If the CI 
 
 Bootstrap CIs (when enabled) are more robust than model-based CIs for non-probability samples.
 
----
+------------------------------------------------------------------------
 
 ## Common watchouts
 
 ### 1. Rare events
 
-When the outcome is rare (< 10% prevalence), logistic regression can be unstable. Symptoms: very large odds ratios, wide confidence intervals, separation warnings. The Firth correction helps but is not a cure for genuinely insufficient data. If you have fewer than 20 events, reconsider the analysis.
+When the outcome is rare (\< 10% prevalence), logistic regression can be unstable. Symptoms: very large odds ratios, wide confidence intervals, separation warnings. The Firth correction helps but is not a cure for genuinely insufficient data. If you have fewer than 20 events, reconsider the analysis.
 
 ### 2. Separation (complete or quasi-complete)
 
@@ -220,7 +218,7 @@ For ordinal outcomes, the order of categories matters. If "High" is coded as 1 a
 
 All odds ratios and probability lifts are relative to the reference category. If the reference is unusual (e.g., a very small group), the comparisons may be misleading. Choose a reference that is common and represents a meaningful baseline.
 
----
+------------------------------------------------------------------------
 
 ## Subgroup comparison
 
@@ -228,35 +226,35 @@ CatDriver can split the analysis by a grouping variable (e.g., age group, region
 
 The output classifies each driver as:
 
-- **Universal:** Important across all subgroups
-- **Segment-specific:** Important in some subgroups but not others
-- **Mixed:** Moderate importance that varies by subgroup
+-   **Universal:** Important across all subgroups
+-   **Segment-specific:** Important in some subgroups but not others
+-   **Mixed:** Moderate importance that varies by subgroup
 
 This is powerful for targeted strategy — e.g., "price matters most for younger customers, while service quality drives satisfaction for older customers."
 
 **Sample size warning:** Each subgroup must have sufficient EPP independently. A total sample of 300 split into 4 subgroups of 75 may not support stable within-group logistic regression.
 
----
+------------------------------------------------------------------------
 
 ## Where this module could go
 
 The current implementation covers binary, ordinal, and multinomial logistic regression with comprehensive diagnostics. Potential extensions:
 
-- **Multinomial outcome expansion:** Full support for unordered multi-category outcomes with relative risk ratios and IIA diagnostics
-- **Interaction detection:** Identifying pairs of drivers whose combined effect on the outcome is greater (or less) than expected from their individual effects
-- **Marginal effects:** Beyond probability lifts, compute average marginal effects (AME) for direct probability-scale interpretation at different covariate profiles
-- **Penalised logistic regression:** LASSO or elastic net regularisation for automatic variable selection with categorical predictors
-- **Mixed effects:** Multilevel logistic regression for hierarchically structured data (respondents within regions within countries)
-- **SHAP for categorical outcomes:** TreeSHAP via XGBoost classification for nonlinear categorical driver importance
+-   **Multinomial outcome expansion:** Full support for unordered multi-category outcomes with relative risk ratios and IIA diagnostics
+-   **Interaction detection:** Identifying pairs of drivers whose combined effect on the outcome is greater (or less) than expected from their individual effects
+-   **Marginal effects:** Beyond probability lifts, compute average marginal effects (AME) for direct probability-scale interpretation at different covariate profiles
+-   **Penalised logistic regression:** LASSO or elastic net regularisation for automatic variable selection with categorical predictors
+-   **Mixed effects:** Multilevel logistic regression for hierarchically structured data (respondents within regions within countries)
+-   **SHAP for categorical outcomes:** TreeSHAP via XGBoost classification for nonlinear categorical driver importance
 
----
+------------------------------------------------------------------------
 
 ## References
 
-- Agresti, A. (2013). *Categorical Data Analysis*. 3rd ed. Wiley.
-- Hosmer, D. W., Lemeshow, S., & Sturdivant, R. X. (2013). *Applied Logistic Regression*. 3rd ed. Wiley.
-- Firth, D. (1993). Bias reduction of maximum likelihood estimates. *Biometrika*, 80(1), 27-38.
-- Kosmidis, I., & Firth, D. (2009). Bias reduction in exponential family nonlinear models. *Biometrika*, 96(4), 793-804.
-- McCullagh, P. (1980). Regression models for ordinal data. *Journal of the Royal Statistical Society: Series B*, 42(2), 109-142.
-- McFadden, D. (1974). Conditional logit analysis of qualitative choice behavior. In *Frontiers in Econometrics*, pp. 105-142.
-- Peduzzi, P., Concato, J., Kemper, E., Holford, T. R., & Feinstein, A. R. (1996). A simulation study of the number of events per variable in logistic regression analysis. *Journal of Clinical Epidemiology*, 49(12), 1373-1379.
+-   Agresti, A. (2013). *Categorical Data Analysis*. 3rd ed. Wiley.
+-   Hosmer, D. W., Lemeshow, S., & Sturdivant, R. X. (2013). *Applied Logistic Regression*. 3rd ed. Wiley.
+-   Firth, D. (1993). Bias reduction of maximum likelihood estimates. *Biometrika*, 80(1), 27-38.
+-   Kosmidis, I., & Firth, D. (2009). Bias reduction in exponential family nonlinear models. *Biometrika*, 96(4), 793-804.
+-   McCullagh, P. (1980). Regression models for ordinal data. *Journal of the Royal Statistical Society: Series B*, 42(2), 109-142.
+-   McFadden, D. (1974). Conditional logit analysis of qualitative choice behavior. In *Frontiers in Econometrics*, pp. 105-142.
+-   Peduzzi, P., Concato, J., Kemper, E., Holford, T. R., & Feinstein, A. R. (1996). A simulation study of the number of events per variable in logistic regression analysis. *Journal of Clinical Epidemiology*, 49(12), 1373-1379.
