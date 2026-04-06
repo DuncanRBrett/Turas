@@ -224,6 +224,18 @@ validate_pricing_config <- function(config) {
     )
   }
 
+  # Validate unit_cost is non-negative when specified
+  uc <- config$unit_cost
+  if (!is.null(uc) && !is.na(uc) && is.finite(uc) && uc < 0) {
+    pricing_refuse(
+      code = "CFG_NEGATIVE_UNIT_COST",
+      title = "Negative Unit Cost",
+      problem = sprintf("unit_cost is %.2f — must be zero or positive", uc),
+      why_it_matters = "Negative unit cost produces inflated profit indices that will mislead pricing decisions",
+      how_to_fix = "Set unit_cost to a non-negative value in your configuration, or leave blank to skip profit analysis"
+    )
+  }
+
   invisible(TRUE)
 }
 

@@ -742,6 +742,8 @@ bootstrap_vw_confidence <- function(too_cheap, cheap, expensive, too_expensive,
   # Use weighted resampling when weights are provided
   resample_prob <- if (!is.null(weights_c)) weights_c / sum(weights_c) else NULL
 
+  successful <- 0L
+
   for (i in seq_len(iterations)) {
     # Resample respondents with replacement (weighted if applicable)
     idx <- sample(n_c, n_c, replace = TRUE, prob = resample_prob)
@@ -768,9 +770,26 @@ bootstrap_vw_confidence <- function(too_cheap, cheap, expensive, too_expensive,
         psm_boot$idp,
         psm_boot$pricerange_upper
       )
+      successful <- successful + 1L
     }, error = function(e) {
       # Skip failed iterations
     })
+  }
+
+  # Check success rate (matching monadic bootstrap pattern)
+  if (successful < iterations * 0.5) {
+    pricing_console_warning(
+      sprintf("VW bootstrap: only %d/%d iterations succeeded — CIs may be unreliable", successful, iterations),
+      context = "VW Bootstrap CI"
+    )
+  }
+
+  if (successful < 10L) {
+    pricing_console_warning(
+      sprintf("VW bootstrap: only %d successful iterations — returning NULL CIs", successful),
+      context = "VW Bootstrap CI"
+    )
+    return(NULL)
   }
 
   # Calculate percentile confidence intervals

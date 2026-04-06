@@ -91,15 +91,36 @@ build_price_ladder <- function(vw_results = NULL, gg_results = NULL, config = NU
   reference_prices <- list()
 
   if (!is.null(vw_results)) {
-    reference_prices$PMC <- vw_results$price_points$PMC
-    reference_prices$OPP <- vw_results$price_points$OPP
-    reference_prices$IDP <- vw_results$price_points$IDP
-    reference_prices$PME <- vw_results$price_points$PME
-    reference_prices$vw_optimal <- (vw_results$price_points$OPP +
-                                    vw_results$price_points$IDP) / 2
+    # Extract VW price points with NA guard
+    vw_pp <- vw_results$price_points
+    pmc_val <- if (!is.null(vw_pp$PMC) && !is.na(vw_pp$PMC)) vw_pp$PMC else NULL
+    opp_val <- if (!is.null(vw_pp$OPP) && !is.na(vw_pp$OPP)) vw_pp$OPP else NULL
+    idp_val <- if (!is.null(vw_pp$IDP) && !is.na(vw_pp$IDP)) vw_pp$IDP else NULL
+    pme_val <- if (!is.null(vw_pp$PME) && !is.na(vw_pp$PME)) vw_pp$PME else NULL
 
-    # Use NMS revenue optimal if available
-    if (!is.null(vw_results$nms_results)) {
+    reference_prices$PMC <- pmc_val
+    reference_prices$OPP <- opp_val
+    reference_prices$IDP <- idp_val
+    reference_prices$PME <- pme_val
+
+    if (!is.null(opp_val) && !is.null(idp_val)) {
+      reference_prices$vw_optimal <- (opp_val + idp_val) / 2
+    }
+
+    # Guard against inverted range (PMC > PME indicates noisy data)
+    if (!is.null(pmc_val) && !is.null(pme_val) && pmc_val > pme_val) {
+      pricing_console_warning(
+        sprintf("VW range inverted (PMC=%.2f > PME=%.2f) — using +/-40%% fallback for ladder bounds", pmc_val, pme_val),
+        context = "Price Ladder"
+      )
+      reference_prices$PMC <- NULL
+      reference_prices$PME <- NULL
+    }
+
+    # Use NMS revenue optimal if available and valid
+    if (!is.null(vw_results$nms_results) &&
+        !is.null(vw_results$nms_results$revenue_optimal) &&
+        !is.na(vw_results$nms_results$revenue_optimal)) {
       reference_prices$nms_optimal <- vw_results$nms_results$revenue_optimal
     }
   }
@@ -322,7 +343,7 @@ analyze_gaps <- function(prices, tier_names, min_gap, max_gap) {
   flags <- character(0)
 
   for (i in 1:(n - 1)) {
-    gaps[i] <- (prices[i + 1] - prices[i]) / prices[i]
+    gaps[i] <- if (abs(prices[i]) < 1e-10) NA_real_ else (prices[i + 1] - prices[i]) / prices[i]
 
     if (gaps[i] < min_gap) {
       flag_msg <- sprintf("%s to %s gap (%.0f%%) below minimum (%.0f%%) - cannibalization risk",

@@ -575,11 +575,11 @@ write_pricing_output <- function(results, plots, validation, config, output_file
       openxlsx::addWorksheet(wb, "WTP_Summary")
 
       wtp_summary_df <- data.frame(
-        Metric = c("Sample Size", "Effective N", "Mean WTP", "Median WTP",
+        Metric = c("Sample Size", "Weighted N", "Mean WTP", "Median WTP",
                    "Standard Deviation", "Min WTP", "Max WTP"),
         Value = c(
           wtp$summary$n,
-          wtp$summary$effective_n,
+          wtp$summary$weighted_n,
           wtp$summary$mean,
           wtp$summary$median,
           wtp$summary$sd,

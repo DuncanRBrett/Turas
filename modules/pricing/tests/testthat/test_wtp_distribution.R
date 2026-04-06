@@ -271,7 +271,7 @@ test_that("compute_wtp_summary returns all expected statistics", {
 
   expect_s3_class(summary, "data.frame")
   expect_equal(nrow(summary), 1)
-  expect_true(all(c("n", "effective_n", "mean", "median", "sd", "min", "max") %in% names(summary)))
+  expect_true(all(c("n", "weighted_n", "mean", "median", "sd", "min", "max") %in% names(summary)))
   expect_equal(summary$n, 200)
   expect_true(summary$sd > 0)
   expect_true(summary$min < summary$max)
@@ -287,7 +287,7 @@ test_that("compute_wtp_summary handles weighted data", {
 
   # Weighted mean should be pulled toward 10
   expect_true(summary$mean < 30)
-  expect_equal(summary$effective_n, 9)
+  expect_equal(summary$weighted_n, 9)
 })
 
 test_that("compute_wtp_summary handles empty input", {

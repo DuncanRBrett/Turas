@@ -81,7 +81,18 @@ simulate_choice <- function(wtp_df, prices, allow_no_purchase = TRUE, market_siz
   # Aggregate to brand shares
   shares <- aggregate(weight ~ brand, data = chosen, sum)
   names(shares) <- c("brand", "total_weight")
-  shares$share <- shares$total_weight / sum(shares$total_weight)
+
+  # Guard against zero total weight (all no-purchase or all NA)
+  total_w <- sum(shares$total_weight)
+  if (total_w < 1e-10) {
+    pricing_console_warning(
+      "All respondent weight is zero or no-purchase — shares set to 0",
+      context = "Competitive Scenarios"
+    )
+    shares$share <- 0
+  } else {
+    shares$share <- shares$total_weight / total_w
+  }
 
   # Add volume if market size specified
   if (!is.null(market_size) && is.finite(market_size)) {

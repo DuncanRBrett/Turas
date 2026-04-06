@@ -518,16 +518,21 @@ test_segment_differences <- function(data,
     )
   }
 
-  # --- Weighted mean helper ---
+  # --- Weighted mean helper (N8: zero-weight guard) ---
   wmean <- function(x, w) {
     valid <- !is.na(x) & !is.na(w)
-    sum(x[valid] * w[valid]) / sum(w[valid])
+    sw <- sum(w[valid])
+    if (sw < 1e-10) return(NA_real_)
+    sum(x[valid] * w[valid]) / sw
   }
 
   # --- Overall test: Kruskal-Wallis ---
   kw_result <- tryCatch({
     kruskal.test(df$.metric, factor(df$.segment))
-  }, error = function(e) NULL)
+  }, error = function(e) {
+    message(sprintf("[PRICING] Kruskal-Wallis test failed: %s", e$message))
+    NULL
+  })
 
   overall_p <- if (!is.null(kw_result)) kw_result$p.value else NA_real_
 

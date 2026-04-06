@@ -233,7 +233,7 @@ compute_wtp_summary <- function(wtp_df) {
   if (n_obs == 0) {
     return(data.frame(
       n = 0L,
-      effective_n = 0,
+      weighted_n = 0,
       mean = NA_real_,
       median = NA_real_,
       sd = NA_real_,
@@ -248,7 +248,7 @@ compute_wtp_summary <- function(wtp_df) {
 
   data.frame(
     n = n_obs,
-    effective_n = sum(w),
+    weighted_n = sum(w),
     mean = mean_wtp,
     median = median_wtp,
     sd = sd_wtp,
