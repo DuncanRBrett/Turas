@@ -58,16 +58,20 @@ if (is.null(wb)) {
 
   # Ensure directory exists
   if (!dir.exists(dir_path)) {
-    tryCatch({
+    dir_ok <- tryCatch({
       dir.create(dir_path, recursive = TRUE, showWarnings = FALSE)
+      dir.exists(dir_path)
     }, error = function(e) {
+      FALSE
+    })
+    if (!dir_ok) {
       if (exists("turas_log_refuse", mode = "function")) {
         turas_log_refuse(module, paste("Cannot create directory:", dir_path),
                          code = paste0(module, "_DIR_FAIL"))
       }
       return(list(success = FALSE, file_path = file_path,
-                  error = paste("Cannot create directory:", e$message)))
-    })
+                  error = paste("Cannot create directory:", dir_path)))
+    }
   }
 
   # Check if file exists and we can't overwrite
@@ -243,12 +247,16 @@ turas_save_writexl_atomic <- function(sheets,
 
   # Ensure directory exists
   if (!dir.exists(dir_path)) {
-    tryCatch({
+    dir_ok <- tryCatch({
       dir.create(dir_path, recursive = TRUE, showWarnings = FALSE)
+      dir.exists(dir_path)
     }, error = function(e) {
-      return(list(success = FALSE, file_path = file_path,
-                  error = paste("Cannot create directory:", e$message)))
+      FALSE
     })
+    if (!dir_ok) {
+      return(list(success = FALSE, file_path = file_path,
+                  error = paste("Cannot create directory:", dir_path)))
+    }
   }
 
   # Create temp file path

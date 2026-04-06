@@ -80,6 +80,8 @@ check_hb_convergence <- function(mcmc_draws, parameters = NULL, verbose = TRUE) 
 
   # Check if we have MCMC draws
   if (is.null(mcmc_draws)) {
+    message("[TRS WARNING] HB_DIAGNOSTICS: No MCMC draws available for convergence diagnostics. ",
+            "Run HB estimation with save_draws=TRUE to enable diagnostics.")
     diagnostics$summary <- "No MCMC draws available for diagnostics"
     diagnostics$recommendations <- "Run HB estimation with save_draws=TRUE"
     return(diagnostics)
@@ -118,25 +120,41 @@ check_hb_convergence <- function(mcmc_draws, parameters = NULL, verbose = TRUE) 
   }
 
   # Check effective sample size
+  # Any parameter with ESS < 100 indicates insufficient sampling for reliable
+
+  # inference. Even one poorly-sampled parameter can invalidate results that
+  # depend on it. Flag non-convergence on any failure, not a percentage threshold.
   if (!is.null(diagnostics$effective_n)) {
     low_ess <- diagnostics$effective_n$ess < 100
     if (any(low_ess, na.rm = TRUE)) {
       n_low <- sum(low_ess, na.rm = TRUE)
-      if (n_low > length(low_ess) * 0.5) {
-        all_converged <- FALSE
-      }
+      all_converged <- FALSE
       recommendations <- c(recommendations,
-        sprintf("Increase iterations or reduce thinning: %d parameters have ESS < 100", n_low))
+        sprintf("Increase iterations or reduce thinning: %d of %d parameters have ESS < 100",
+                n_low, length(low_ess)))
     }
   }
 
-  # Check autocorrelation
+  # Check autocorrelation — high lag-1 AC means the chain is mixing slowly and
+  # ESS may be overestimated. Flag as non-converged to be safe.
   if (!is.null(diagnostics$autocorrelation)) {
     high_ac <- diagnostics$autocorrelation$lag1_ac > 0.9
     if (any(high_ac, na.rm = TRUE)) {
       n_high <- sum(high_ac, na.rm = TRUE)
+      all_converged <- FALSE
       recommendations <- c(recommendations,
-        sprintf("High autocorrelation detected: %d parameters have lag-1 AC > 0.9", n_high))
+        sprintf("High autocorrelation detected: %d parameters have lag-1 AC > 0.9 (increase thinning)", n_high))
+    }
+  }
+
+  # Check Geweke diagnostic — significant z-scores indicate non-stationarity
+  if (!is.null(diagnostics$geweke)) {
+    bad_geweke <- abs(diagnostics$geweke$z_score) > 1.96
+    if (any(bad_geweke, na.rm = TRUE)) {
+      n_bad_g <- sum(bad_geweke, na.rm = TRUE)
+      all_converged <- FALSE
+      recommendations <- c(recommendations,
+        sprintf("Geweke test failed: %d parameters show non-stationarity (|z| > 1.96)", n_bad_g))
     }
   }
 
@@ -458,6 +476,17 @@ calculate_basic_ess <- function(x) {
 calculate_split_rhat <- function(draws_matrix) {
   n_samples <- nrow(draws_matrix)
   n_params <- ncol(draws_matrix)
+
+  # Warn about single-chain limitation. Split-chain R-hat on a single MCMC chain
+
+  # is a weak diagnostic: both halves come from the same chain, so high
+  # autocorrelation makes them look similar even if the chain hasn't converged.
+  # Multi-chain runs are needed for reliable Gelman-Rubin diagnostics.
+  if (n_samples > 0) {
+    message("[TRS WARNING] HB_DIAGNOSTICS: Split-chain R-hat computed from a single chain. ",
+            "This is an approximate diagnostic only. For reliable convergence assessment, ",
+            "run multiple independent chains.")
+  }
 
   # Split chain in half
   mid <- floor(n_samples / 2)

@@ -42,77 +42,57 @@
 #' @export
 capture_console_all <- function(expr) {
 
+  # Use an explicit environment for handler state — avoids <<- and makes
+  # the scope of mutations unambiguous.
+  state <- new.env(parent = emptyenv())
+  state$warnings <- character(0)
+  state$messages <- character(0)
+  state$error <- NULL
+  state$result <- NULL
 
-  # Storage for warnings and messages
-  warnings_list <- character(0)
-  messages_list <- character(0)
-  error_condition <- NULL
-  result <- NULL
-
-# Capture stdout
+  # Capture stdout
   output <- capture.output({
-
-    # Set up warning handler to collect warnings
-    result <<- withCallingHandlers(
+    state$result <- withCallingHandlers(
       tryCatch(
         expr,
         error = function(e) {
-          error_condition <<- e
+          state$error <- e
           NULL
         }
       ),
       warning = function(w) {
-        warnings_list <<- c(warnings_list, conditionMessage(w))
+        state$warnings <- c(state$warnings, conditionMessage(w))
         invokeRestart("muffleWarning")
       },
       message = function(m) {
-        messages_list <<- c(messages_list, conditionMessage(m))
+        state$messages <- c(state$messages, conditionMessage(m))
         invokeRestart("muffleMessage")
       }
     )
-
   }, type = "output")
 
-  # Build combined output that shows everything
-  combined_output <- character(0)
-
-  # Add messages first (informational)
-  if (length(messages_list) > 0) {
-    for (msg in messages_list) {
-      combined_output <- c(combined_output, msg)
-    }
+  # Build combined output — collect parts then concatenate once (avoids O(n^2) growth)
+  parts <- list()
+  if (length(state$messages) > 0)  parts <- c(parts, list(state$messages))
+  if (length(output) > 0)          parts <- c(parts, list(output))
+  if (length(state$warnings) > 0) {
+    parts <- c(parts, list(c("", "--- WARNINGS ---", paste0("Warning: ", state$warnings))))
   }
-
-  # Add stdout output
-  if (length(output) > 0) {
-    combined_output <- c(combined_output, output)
+  if (!is.null(state$error)) {
+    parts <- c(parts, list(c("", "--- ERROR ---", conditionMessage(state$error))))
   }
-
-  # Add warnings prominently
-  if (length(warnings_list) > 0) {
-    combined_output <- c(combined_output, "")
-    combined_output <- c(combined_output, "--- WARNINGS ---")
-    for (w in warnings_list) {
-      combined_output <- c(combined_output, paste0("Warning: ", w))
-    }
-  }
-
-  # Add error if one occurred
-  if (!is.null(error_condition)) {
-    combined_output <- c(combined_output, "")
-    combined_output <- c(combined_output, "--- ERROR ---")
-    combined_output <- c(combined_output, conditionMessage(error_condition))
-  }
+  combined_output <- unlist(parts, use.names = FALSE)
+  if (is.null(combined_output)) combined_output <- character(0)
 
   list(
-    result = result,
+    result = state$result,
     output = output,
     combined_output = combined_output,
-    warnings = warnings_list,
-    messages = messages_list,
-    error = error_condition,
-    has_warnings = length(warnings_list) > 0,
-    has_error = !is.null(error_condition)
+    warnings = state$warnings,
+    messages = state$messages,
+    error = state$error,
+    has_warnings = length(state$warnings) > 0,
+    has_error = !is.null(state$error)
   )
 }
 

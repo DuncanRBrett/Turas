@@ -71,7 +71,7 @@ load_survey_data <- function(data_file_path, project_root = NULL,
           cat("  Using data.table::fread() for faster loading...\n")
           data.table::fread(data_file_path, data.table = FALSE)
         } else {
-          read.csv(data_file_path, stringsAsFactors = FALSE)
+          read.csv(data_file_path, stringsAsFactors = FALSE, encoding = "UTF-8")
         }
       },
       "sav"  = {

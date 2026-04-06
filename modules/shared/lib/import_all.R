@@ -10,14 +10,25 @@
 #   shared_path <- dirname(sys.frame(1)$ofile)  # Get this file's directory
 #   source(file.path(shared_path, "import_all.R"))
 #
-# LOADS:
-#   - trs_refusal.R (TRS v1.0 - must be first - no dependencies)
-#   - validation_utils.R (no dependencies)
-#   - data_utils.R (depends on validation)
-#   - config_utils.R (depends on validation, data)
-#   - logging_utils.R (no dependencies)
-#   - formatting_utils.R (no dependencies)
-#   - weights_utils.R (no dependencies)
+# LOADS 18 utilities in dependency order:
+#   1.  trs_refusal.R          (TRS v1.0 - must be first - no dependencies)
+#   2.  source_utils.R         (source_if_exists - no dependencies)
+#   3.  console_capture.R      (TRS v1.0 - Shiny GUI capture)
+#   4.  validation_utils.R     (no dependencies)
+#   5.  data_utils.R           (depends on validation)
+#   6.  config_utils.R         (depends on validation, data)
+#   7.  logging_utils.R        (no dependencies)
+#   8.  formatting_utils.R     (no dependencies)
+#   9.  weights_utils.R        (no dependencies)
+#   10. turas_log.R            (TRS v1.0 - unified logging)
+#   11. trs_run_state.R        (TRS v1.0 - run state management)
+#   12. trs_run_status_writer.R (TRS v1.0 - run status Excel writer)
+#   13. trs_banner.R           (TRS v1.0 - banner display)
+#   14. turas_save_workbook_atomic.R (TRS v1.0 - atomic workbook save)
+#   15. turas_excel_escape.R   (TRS v1.0 - formula-injection protection)
+#   16. turas_minify_verify.R  (minification verification)
+#   17. turas_minify_watermark.R (watermark encode/decode)
+#   18. turas_minify.R         (report minification pipeline)
 # ==============================================================================
 
 # Determine this file's directory for relative sourcing

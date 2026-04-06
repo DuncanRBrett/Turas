@@ -39,6 +39,33 @@
 
 
 # ==============================================================================
+# INTERNAL HELPERS
+# ==============================================================================
+
+# Escape Excel formula injection characters in user-supplied values.
+# Prefixes leading =, +, -, @ with a single quote to prevent execution.
+# Uses turas_excel_escape if available, otherwise applies minimal protection.
+sp_escape_value <- function(x) {
+  if (!is.character(x)) return(x)
+  if (exists("turas_excel_escape", mode = "function")) {
+    return(turas_excel_escape(x))
+  }
+  # Minimal fallback: prefix dangerous leading characters
+  gsub("^([=+@-])", "'\\1", x)
+}
+
+# Escape all character columns in a data.frame for safe Excel output
+sp_escape_df <- function(df) {
+  if (!is.data.frame(df) || nrow(df) == 0) return(df)
+  char_cols <- vapply(df, is.character, logical(1))
+  for (col in names(df)[char_cols]) {
+    df[[col]] <- vapply(df[[col]], sp_escape_value, character(1), USE.NAMES = FALSE)
+  }
+  df
+}
+
+
+# ==============================================================================
 # MAIN ENTRY POINT
 # ==============================================================================
 
@@ -102,7 +129,18 @@ turas_write_stats_pack <- function(payload, output_path, protect_sheets = TRUE) 
       }
     }
 
-    openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+    # Use atomic save if available (prevents corrupt files on failure)
+    if (exists("turas_save_workbook_atomic", mode = "function")) {
+      save_result <- turas_save_workbook_atomic(wb, output_path,
+                                                 module = "STATS_PACK",
+                                                 verbose = FALSE)
+      if (!save_result$success) {
+        message(sprintf("[TRS WARNING] STATS_PACK: Atomic save failed: %s", save_result$error))
+        return(invisible(NULL))
+      }
+    } else {
+      openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+    }
 
     message(sprintf("[TRS INFO] STATS_PACK: Written to %s", basename(output_path)))
     invisible(output_path)
@@ -175,7 +213,11 @@ sp_write_declaration_sheet <- function(wb, payload) {
   write_kv <- function(key, value, row, label_col = 2, value_col = 4) {
     openxlsx::writeData(wb, sheet, key, startRow = row, startCol = label_col)
     openxlsx::addStyle(wb, sheet, label_style, rows = row, cols = label_col)
-    openxlsx::writeData(wb, sheet, as.character(value %||% "—"), startRow = row, startCol = value_col)
+    # Resolve NULL to dash, then NA to dash, then escape formula injection chars
+    display_val <- value %||% "\u2014"
+    if (is.na(display_val)) display_val <- "\u2014"
+    display_val <- sp_escape_value(as.character(display_val))
+    openxlsx::writeData(wb, sheet, display_val, startRow = row, startCol = value_col)
     openxlsx::addStyle(wb, sheet, value_style, rows = row, cols = value_col)
     row + 1
   }
@@ -321,7 +363,7 @@ sp_write_data_used_sheet <- function(wb, payload) {
   if (!is.null(du$per_item_stats) && is.data.frame(du$per_item_stats) &&
       nrow(du$per_item_stats) > 0) {
 
-    openxlsx::writeData(wb, sheet, du$per_item_stats,
+    openxlsx::writeData(wb, sheet, sp_escape_df(du$per_item_stats),
                         startRow = row, startCol = 1,
                         withFilter = TRUE,
                         headerStyle = table_header_style)
@@ -356,7 +398,7 @@ sp_write_data_used_sheet <- function(wb, payload) {
     openxlsx::addStyle(wb, sheet, header_style, rows = row, cols = 1)
     row <- row + 1
 
-    openxlsx::writeData(wb, sheet, du$exclusions_detail,
+    openxlsx::writeData(wb, sheet, sp_escape_df(du$exclusions_detail),
                         startRow = row, startCol = 1,
                         withFilter = TRUE,
                         headerStyle = table_header_style)
@@ -383,7 +425,7 @@ sp_write_data_used_sheet <- function(wb, payload) {
     openxlsx::addStyle(wb, sheet, header_style, rows = row, cols = 1)
     row <- row + 1
 
-    openxlsx::writeData(wb, sheet, skipped_df,
+    openxlsx::writeData(wb, sheet, sp_escape_df(skipped_df),
                         startRow = row, startCol = 1,
                         headerStyle = table_header_style)
   }
@@ -427,7 +469,7 @@ sp_write_assumptions_sheet <- function(wb, payload) {
     stringsAsFactors = FALSE
   )
 
-  openxlsx::writeData(wb, sheet, params_df,
+  openxlsx::writeData(wb, sheet, sp_escape_df(params_df),
                       startRow = 1, startCol = 1,
                       withFilter = FALSE,
                       headerStyle = header_style)
@@ -476,7 +518,7 @@ sp_write_warnings_sheet <- function(wb, payload) {
     )
   }))
 
-  openxlsx::writeData(wb, sheet, events_df,
+  openxlsx::writeData(wb, sheet, sp_escape_df(events_df),
                       startRow = 1, startCol = 1,
                       withFilter = TRUE,
                       headerStyle = header_style)
@@ -541,7 +583,7 @@ sp_write_reproducibility_sheet <- function(wb, payload) {
     stringsAsFactors = FALSE
   )
 
-  openxlsx::writeData(wb, sheet, env_df, startRow = row, startCol = 1,
+  openxlsx::writeData(wb, sheet, sp_escape_df(env_df), startRow = row, startCol = 1,
                       headerStyle = table_header_style)
   row <- row + nrow(env_df) + 2
 
@@ -558,7 +600,7 @@ sp_write_reproducibility_sheet <- function(wb, payload) {
       stringsAsFactors = FALSE
     )
 
-    openxlsx::writeData(wb, sheet, seeds_df, startRow = row, startCol = 1,
+    openxlsx::writeData(wb, sheet, sp_escape_df(seeds_df), startRow = row, startCol = 1,
                         headerStyle = table_header_style)
     row <- row + nrow(seeds_df) + 2
   }
@@ -581,7 +623,7 @@ sp_write_reproducibility_sheet <- function(wb, payload) {
       stringsAsFactors = FALSE
     )
 
-    openxlsx::writeData(wb, sheet, pkg_df, startRow = row, startCol = 1,
+    openxlsx::writeData(wb, sheet, sp_escape_df(pkg_df), startRow = row, startCol = 1,
                         headerStyle = table_header_style)
   }
 
@@ -631,8 +673,7 @@ sp_write_config_echo_sheet <- function(wb, payload) {
     row <- row + 1
 
     if (is.data.frame(section)) {
-      # Write as-is
-      openxlsx::writeData(wb, sheet, section,
+      openxlsx::writeData(wb, sheet, sp_escape_df(section),
                           startRow = row, startCol = 1,
                           headerStyle = table_header_style)
       row <- row + nrow(section) + 2
@@ -642,18 +683,18 @@ sp_write_config_echo_sheet <- function(wb, payload) {
       kv_df <- data.frame(
         Setting = names(section),
         Value   = vapply(section, function(x) {
-          if (is.null(x) || (length(x) == 1 && is.na(x))) "—"
+          if (is.null(x) || (length(x) == 1 && is.na(x))) "\u2014"
           else paste(as.character(x), collapse = "; ")
         }, character(1)),
         stringsAsFactors = FALSE
       )
-      openxlsx::writeData(wb, sheet, kv_df,
+      openxlsx::writeData(wb, sheet, sp_escape_df(kv_df),
                           startRow = row, startCol = 1,
                           headerStyle = table_header_style)
       row <- row + nrow(kv_df) + 2
 
     } else {
-      openxlsx::writeData(wb, sheet, as.character(section),
+      openxlsx::writeData(wb, sheet, sp_escape_value(as.character(section)),
                           startRow = row, startCol = 1)
       row <- row + 2
     }

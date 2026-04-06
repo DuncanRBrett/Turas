@@ -47,6 +47,10 @@ hsl_to_hex <- function(h, s, l) {
 #' @keywords internal
 hex_to_rgb <- function(hex) {
   hex_clean <- sub("^#", "", hex)
+  if (!grepl("^[0-9A-Fa-f]{6}$", hex_clean)) {
+    warning(sprintf("Invalid hex colour: '%s'. Expected 6-character hex (e.g. '#FF0000' or 'FF0000').", hex), call. = FALSE)
+    return(rep(NA_real_, 3))
+  }
   c(
     strtoi(substr(hex_clean, 1, 2), 16L),
     strtoi(substr(hex_clean, 3, 4), 16L),
@@ -62,6 +66,7 @@ hex_to_rgb <- function(hex) {
 #' @keywords internal
 hex_to_hsl <- function(hex) {
   rgb <- hex_to_rgb(hex) / 255
+  if (any(is.na(rgb))) return(list(h = NA_real_, s = NA_real_, l = NA_real_))
   r <- rgb[1]; g <- rgb[2]; b <- rgb[3]
 
   cmax <- max(r, g, b)
