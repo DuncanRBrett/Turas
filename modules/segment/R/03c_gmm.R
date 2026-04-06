@@ -94,14 +94,15 @@ run_gmm_clustering <- function(data_list, config, guard) {
   probabilities <- gmm_fit$z
   uncertainty <- gmm_fit$uncertainty
 
-  # Check for degenerate components (very small membership or high uncertainty)
+  # Check for degenerate components (very small membership)
   component_sizes <- table(clusters)
   small_components <- names(component_sizes)[component_sizes < 5]
+  degenerate_warning <- NULL
   if (length(small_components) > 0) {
-    cat(sprintf(
-      "[SEGMENT WARNING] GMM: %d component(s) have fewer than 5 members. Solution may be unstable.\n",
-      length(small_components)
-    ))
+    degenerate_warning <- sprintf(
+      "%d component(s) have fewer than 5 members", length(small_components))
+    cat(sprintf("[SEGMENT WARNING] GMM: %s. Solution may be unstable.\n",
+                degenerate_warning))
   }
 
   # Calculate centers from model parameters
@@ -156,6 +157,7 @@ run_gmm_clustering <- function(data_list, config, guard) {
     centers = centers,
     method = "gmm",
     model = gmm_fit,
+    degenerate_components = degenerate_warning,
     method_info = list(
       model_type = gmm_fit$modelName,
       bic = bic_value,

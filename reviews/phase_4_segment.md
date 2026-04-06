@@ -365,7 +365,7 @@ All critical, important, and applicable minor findings addressed in this session
 | C5: Davies-Bouldin Inf with identical centers | FIXED | Added `between_dist < 1e-10` guard that skips pair and emits console warning about near-identical centers |
 | I1: Multiple comparison note | FIXED | Added documentation note in `test_segment_differences()` docstring about no family-wise correction and expected false positive rate. Added "Multiple comparisons" assumption to stats pack |
 | I2: GUI launcher cat() before stop() | FIXED | Added `cat()` output with formatted error box before `stop()` for Shiny console visibility |
-| I3: Config templates polish | DEFERRED | Requires manual Excel editing; deferred to Phase 10 horizontal pass |
+| I3: Config templates polish | FIXED | Generator rewritten with 5-column format (Setting, Value, Required?, Description, Valid Values), section headers, 16 missing fields added, all boolean dropdowns. Both templates regenerated. |
 | I4: Golden fixtures generation | FIXED | Ran `generate_golden_files.R`; committed 3 golden RDS files to `tests/fixtures/golden/` |
 | I5: Chi-square expected frequency | FIXED | Added `low_expected` flag to chi-square results; console message when significant result has expected frequency < 5 |
 | I6: K-means convergence flag | FIXED | Added `convergence_warning` field to k-means result. Soft guard now records convergence issues in `guard$warnings` and `guard$stability_flags` |

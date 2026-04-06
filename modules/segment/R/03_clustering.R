@@ -169,12 +169,23 @@ run_kmeans_dispatch <- function(data_list, config, guard) {
     )
   }
 
+  # Check convergence (ifault: 0=success, 1=max iterations, 2=empty cluster)
+  conv_warn <- NULL
+  if (!is.null(model$ifault) && model$ifault != 0) {
+    conv_warn <- sprintf("ifault=%d", model$ifault)
+    cat(sprintf(
+      "[SEGMENT WARNING] K-means convergence issue for k=%d: %s. Results may be suboptimal. Consider increasing nstart.\n",
+      k, conv_warn
+    ))
+  }
+
   list(
     clusters = as.integer(model$cluster),
     k = k,
     centers = model$centers,
     method = "kmeans",
     model = model,
+    convergence_warning = conv_warn,
     method_info = list(
       algorithm = if (use_minibatch) "mini-batch" else "Hartigan-Wong",
       nstart = config$nstart %||% 50,

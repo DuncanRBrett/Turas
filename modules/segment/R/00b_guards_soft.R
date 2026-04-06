@@ -330,5 +330,12 @@ segment_guard_post_clustering <- function(guard, cluster_result, validation_metr
     guard$stability_flags <- c(guard$stability_flags, "kmeans_convergence")
   }
 
+  # Flag degenerate GMM components
+  if (!is.null(cluster_result$degenerate_components)) {
+    guard$warnings <- c(guard$warnings,
+      sprintf("GMM degenerate components: %s", cluster_result$degenerate_components))
+    guard$stability_flags <- c(guard$stability_flags, "gmm_degenerate")
+  }
+
   guard
 }

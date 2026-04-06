@@ -381,9 +381,11 @@ calculate_separation_metrics <- function(data, clusters, clustering_vars) {
   }
   if (has_degenerate) {
     cat("  [WARNING] Davies-Bouldin: two or more clusters have near-identical centers.\n")
-    cat("            DB index may be unreliable. Consider reducing k.\n")
+    cat("            DB index set to NA (unreliable). Consider reducing k.\n")
+    db_index <- NA_real_
+  } else {
+    db_index <- mean(db_scores)
   }
-  db_index <- mean(db_scores)
 
   cat(sprintf("Calinski-Harabasz Index: %.2f\n", ch_index))
   cat("  Higher is better. Typical range: 10-1000+\n")
