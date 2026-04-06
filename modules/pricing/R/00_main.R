@@ -165,6 +165,9 @@ run_pricing_analysis <- function(config_file, data_file = NULL, output_file = NU
 #' @export
 run_pricing_analysis_from_config <- function(config) {
 
+  # Capture start time for stats pack duration (must be first)
+  start_time <- Sys.time()
+
   # ==========================================================================
   # TRS RUN STATE INITIALIZATION (TRS v1.0)
   # ==========================================================================
@@ -573,7 +576,7 @@ run_pricing_analysis_from_config <- function(config) {
       segment_results = segment_results,
       run_result      = run_result,
       output_file     = output_file,
-      start_time      = Sys.time()
+      start_time      = start_time
     )
   }
 
@@ -688,23 +691,120 @@ generate_pricing_stats_pack <- function(config, data_result, validation,
     paste(parts, collapse = ", ")
   }
 
+  # --- Method-specific results for stats pack ---
+  method_results <- list()
+
+  if (!is.null(vw_results)) {
+    method_results[["VW — PMC"]]  <- sprintf("%.2f", vw_results$price_points$PMC)
+    method_results[["VW — OPP"]]  <- sprintf("%.2f", vw_results$price_points$OPP)
+    method_results[["VW — IDP"]]  <- sprintf("%.2f", vw_results$price_points$IDP)
+    method_results[["VW — PME"]]  <- sprintf("%.2f", vw_results$price_points$PME)
+    method_results[["VW — n_valid"]] <- as.character(vw_results$diagnostics$n_valid)
+    method_results[["VW — violation_rate"]] <- sprintf("%.1f%%", vw_results$diagnostics$violation_rate * 100)
+    if (!is.null(vw_results$nms_results)) {
+      method_results[["VW — NMS_revenue_optimal"]] <- sprintf("%.2f", vw_results$nms_results$revenue_optimal)
+    }
+    if (!is.null(vw_results$confidence_intervals)) {
+      method_results[["VW — bootstrap_iterations"]] <- as.character(config$van_westendorp$bootstrap_iterations %||% 1000)
+      method_results[["VW — confidence_level"]] <- as.character(config$van_westendorp$confidence_level %||% 0.95)
+    }
+  }
+
+  if (!is.null(gg_results)) {
+    method_results[["GG — optimal_price"]] <- sprintf("%.2f", gg_results$optimal_price$price)
+    method_results[["GG — purchase_intent"]] <- sprintf("%.1f%%", gg_results$optimal_price$purchase_intent * 100)
+    method_results[["GG — revenue_index"]] <- sprintf("%.4f", gg_results$optimal_price$revenue_index)
+    method_results[["GG — n_respondents"]] <- as.character(gg_results$diagnostics$n_respondents)
+    method_results[["GG — n_price_points"]] <- as.character(gg_results$diagnostics$n_price_points)
+    if (!is.null(gg_results$optimal_price_profit)) {
+      method_results[["GG — profit_optimal_price"]] <- sprintf("%.2f", gg_results$optimal_price_profit$price)
+    }
+  }
+
+  if (!is.null(monadic_results)) {
+    method_results[["Mon — optimal_price"]] <- sprintf("%.2f", monadic_results$optimal_price$price)
+    method_results[["Mon — predicted_intent"]] <- sprintf("%.1f%%", monadic_results$optimal_price$predicted_intent * 100)
+    method_results[["Mon — model_type"]] <- monadic_results$model_summary$model_type
+    method_results[["Mon — pseudo_R2"]] <- sprintf("%.4f", monadic_results$model_summary$pseudo_r2)
+    method_results[["Mon — AIC"]] <- sprintf("%.1f", monadic_results$model_summary$aic)
+    method_results[["Mon — price_coef_p"]] <- sprintf("%.6f", monadic_results$model_summary$price_coefficient_p)
+    method_results[["Mon — n_valid"]] <- as.character(monadic_results$diagnostics$n_valid)
+    method_results[["Mon — n_cells"]] <- as.character(monadic_results$diagnostics$n_cells)
+    method_results[["Mon — min_cell_n"]] <- as.character(monadic_results$diagnostics$min_cell_n)
+    if (!is.null(monadic_results$confidence_intervals)) {
+      method_results[["Mon — bootstrap_iterations"]] <- as.character(config$monadic$bootstrap_iterations %||% 1000)
+      method_results[["Mon — bootstrap_success_rate"]] <- sprintf("%.0f%%",
+        monadic_results$confidence_intervals$n_successful / monadic_results$confidence_intervals$n_attempted * 100)
+    }
+  }
+
+  # --- Weight diagnostics ---
+  weight_info <- list()
+  if (!is.null(validation$weight_summary)) {
+    ws <- validation$weight_summary
+    weight_info[["Weighting applied"]] <- "Yes"
+    weight_info[["Effective N"]] <- sprintf("%.1f", ws$n_valid)
+    weight_info[["Weight range"]] <- sprintf("%.2f – %.2f", ws$min, ws$max)
+    weight_info[["Weight mean (SD)"]] <- sprintf("%.2f (%.2f)", ws$mean, ws$sd)
+  } else {
+    weight_info[["Weighting applied"]] <- "No"
+  }
+
   assumptions <- list(
-    "Method"            = analysis_method,
-    "Van Westendorp"    = if (!is.null(vw_results))
-                            "Cumulative frequency intersections (base R)"
-                          else "Not used",
-    "Gabor-Granger"     = if (!is.null(gg_results))
-                            "Demand curve regression (base R lm())"
-                          else "Not used",
-    "Price Points tested" = if (n_price_points > 0L) as.character(n_price_points) else "—",
-    "Segmentation"      = if (seg_enabled) {
-                            sprintf("Enabled — %d segment(s)", n_segments)
-                          } else "Disabled",
-    "TRS Status"        = run_result$status %||% "PASS",
-    "TRS Events"        = trs_summary
+    "Method"                = analysis_method,
+    "Van Westendorp"        = if (!is.null(vw_results))
+                                "Cumulative frequency intersections (pricesensitivitymeter)"
+                              else "Not used",
+    "Gabor-Granger"         = if (!is.null(gg_results))
+                                "Demand curve + revenue optimisation (base R)"
+                              else "Not used",
+    "Monadic"               = if (!is.null(monadic_results))
+                                sprintf("Logistic regression (%s, base R glm())", monadic_results$model_summary$model_type)
+                              else "Not used",
+    "Price Points tested"   = if (n_price_points > 0L) as.character(n_price_points) else "\u2014",
+    "Segmentation"          = if (seg_enabled) {
+                                sprintf("Enabled \u2014 %d segment(s)", n_segments)
+                              } else "Disabled",
+    "Multiple comparisons"  = "No family-wise correction applied across segment comparisons",
+    "TRS Status"            = run_result$status %||% "PASS",
+    "TRS Events"            = trs_summary
   )
 
+  # Merge method results and weight info into assumptions
+  assumptions <- c(assumptions, method_results, weight_info)
+
   duration_secs <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+
+  # --- Expanded config echo ---
+  config_echo_fields <- c("analysis_method", "currency_symbol", "project_name",
+                           "data_file", "output_file", "weight_var", "unit_cost")
+  config_echo_settings <- config[intersect(names(config), config_echo_fields)]
+
+  # Add method-specific config
+  if (!is.null(config$van_westendorp)) {
+    vw_cfg <- config$van_westendorp
+    config_echo_settings[["vw_col_too_cheap"]] <- vw_cfg$col_too_cheap %||% NA
+    config_echo_settings[["vw_col_cheap"]] <- vw_cfg$col_cheap %||% NA
+    config_echo_settings[["vw_col_expensive"]] <- vw_cfg$col_expensive %||% NA
+    config_echo_settings[["vw_col_too_expensive"]] <- vw_cfg$col_too_expensive %||% NA
+    config_echo_settings[["vw_calculate_confidence"]] <- vw_cfg$calculate_confidence %||% FALSE
+  }
+  if (!is.null(config$gabor_granger)) {
+    gg_cfg <- config$gabor_granger
+    config_echo_settings[["gg_data_format"]] <- gg_cfg$data_format %||% NA
+    config_echo_settings[["gg_n_price_points"]] <- length(gg_cfg$price_sequence %||% list())
+    config_echo_settings[["gg_revenue_optimization"]] <- gg_cfg$revenue_optimization %||% TRUE
+    config_echo_settings[["gg_calculate_elasticity"]] <- gg_cfg$calculate_elasticity %||% FALSE
+  }
+  if (!is.null(config$monadic)) {
+    mon_cfg <- config$monadic
+    config_echo_settings[["mon_model_type"]] <- mon_cfg$model_type %||% "logistic"
+    config_echo_settings[["mon_intent_type"]] <- mon_cfg$intent_type %||% "binary"
+    config_echo_settings[["mon_confidence_intervals"]] <- mon_cfg$confidence_intervals %||% FALSE
+  }
+  if (!is.null(config$segmentation$segment_column)) {
+    config_echo_settings[["segment_column"]] <- config$segmentation$segment_column
+  }
 
   payload <- list(
     module           = "PRICING",
@@ -725,10 +825,8 @@ generate_pricing_stats_pack <- function(config, data_result, validation,
     ),
     assumptions      = assumptions,
     run_result       = run_result,
-    packages         = c("openxlsx", "data.table"),
-    config_echo      = list(settings = config[c("analysis_method", "currency_symbol",
-                                                 "project_name", "data_file",
-                                                 "output_file")])
+    packages         = c("openxlsx", "data.table", "pricesensitivitymeter"),
+    config_echo      = list(settings = config_echo_settings)
   )
 
   result <- turas_write_stats_pack(payload, output_path)

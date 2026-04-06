@@ -328,7 +328,7 @@ calculate_demand_curve <- function(gg_data) {
   demand <- data.frame(
     price = prices,
     n_respondents = integer(length(prices)),
-    effective_n = numeric(length(prices)),
+    weighted_n = numeric(length(prices)),
     n_purchase = numeric(length(prices)),
     purchase_intent = numeric(length(prices)),
     stringsAsFactors = FALSE
@@ -343,13 +343,13 @@ calculate_demand_curve <- function(gg_data) {
       responses <- subset_data$response
 
       demand$n_respondents[i] <- nrow(subset_data)
-      demand$effective_n[i] <- sum(weights)
+      demand$weighted_n[i] <- sum(weights)
       demand$n_purchase[i] <- sum(weights * responses)
       # Weighted purchase intent
       demand$purchase_intent[i] <- sum(weights * responses) / sum(weights)
     } else {
       demand$n_respondents[i] <- 0
-      demand$effective_n[i] <- 0
+      demand$weighted_n[i] <- 0
       demand$n_purchase[i] <- 0
       demand$purchase_intent[i] <- NA_real_
     }

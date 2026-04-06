@@ -21,7 +21,9 @@
     np <- tryCatch(normalizePath(p, mustWork = TRUE), error = function(e) NULL)
     if (!is.null(np)) return(np)
   }
-  stop("Cannot locate modules/shared/template_styles.R")
+  msg <- "[PRICING] Cannot locate modules/shared/template_styles.R — template generation requires shared infrastructure"
+  cat("\n", msg, "\n")
+  stop(msg, call. = FALSE)
 }
 
 `%||%` <- function(x, y) if (is.null(x) || length(x) == 0 || (length(x) == 1 && is.na(x))) y else x

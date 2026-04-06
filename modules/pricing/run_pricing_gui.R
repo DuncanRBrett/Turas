@@ -38,6 +38,7 @@ run_pricing_gui <- function() {
       msg <- paste0(msg, "  ", step, "\n")
     }
     msg <- paste0(msg, "\n================================================================================\n")
+    cat(msg)
     stop(msg, call. = FALSE)
   }
 

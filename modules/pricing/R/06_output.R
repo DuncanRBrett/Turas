@@ -47,6 +47,41 @@ write_pricing_output <- function(results, plots, validation, config, output_file
 
   wb <- openxlsx::createWorkbook()
 
+  # ---------------------------------------------------------------------------
+  # Formula injection protection (OWASP CSV Injection)
+  # Inline fallback using vapply+substr (not regex, per Phase 3 re-review R3)
+  # ---------------------------------------------------------------------------
+  pricing_escape_cell <- if (exists("turas_excel_escape", mode = "function")) {
+    turas_excel_escape
+  } else {
+    function(x) {
+      if (!is.character(x)) return(x)
+      vapply(x, function(val) {
+        if (is.na(val) || nchar(val) == 0L) return(val)
+        first_char <- substr(val, 1, 1)
+        if (first_char %in% c("=", "+", "-", "@", "\t", "\r", "\n")) {
+          paste0("'", val)
+        } else {
+          val
+        }
+      }, character(1), USE.NAMES = FALSE)
+    }
+  }
+
+  pricing_escape_df <- function(df) {
+    if (!is.data.frame(df)) return(df)
+    # Escape column names
+    nm <- names(df)
+    names(df) <- pricing_escape_cell(nm)
+    # Escape character columns
+    for (col in seq_along(df)) {
+      if (is.character(df[[col]])) {
+        df[[col]] <- pricing_escape_cell(df[[col]])
+      }
+    }
+    df
+  }
+
   # Define styles
   header_style <- openxlsx::createStyle(
     fontColour = "#FFFFFF",
@@ -118,7 +153,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
     stringsAsFactors = FALSE
   )
 
-  openxlsx::writeData(wb, "Summary", summary_data, headerStyle = header_style)
+  openxlsx::writeData(wb, "Summary", pricing_escape_df(summary_data), headerStyle = header_style)
   openxlsx::addStyle(wb, "Summary", subheader_style, rows = which(summary_items == "WEIGHTING") + 1, cols = 1:2)
   openxlsx::setColWidths(wb, "Summary", cols = 1:2, widths = c(25, 40))
 
@@ -149,7 +184,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
       stringsAsFactors = FALSE
     )
 
-    openxlsx::writeData(wb, "VW_Price_Points", price_points_df, headerStyle = header_style)
+    openxlsx::writeData(wb, "VW_Price_Points", pricing_escape_df(price_points_df), headerStyle = header_style)
     openxlsx::addStyle(wb, "VW_Price_Points", currency_style,
                        rows = 2:5, cols = 3, gridExpand = TRUE)
     openxlsx::setColWidths(wb, "VW_Price_Points", cols = 1:3, widths = c(10, 35, 15))
@@ -164,7 +199,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
       stringsAsFactors = FALSE
     )
 
-    openxlsx::writeData(wb, "VW_Price_Points", range_data,
+    openxlsx::writeData(wb, "VW_Price_Points", pricing_escape_df(range_data),
                         startRow = range_start_row, headerStyle = header_style)
     openxlsx::addStyle(wb, "VW_Price_Points", currency_style,
                        rows = (range_start_row + 1):(range_start_row + 2),
@@ -174,7 +209,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
     if (!is.null(vw_results$confidence_intervals)) {
       openxlsx::addWorksheet(wb, "VW_Confidence_Intervals")
       openxlsx::writeData(wb, "VW_Confidence_Intervals",
-                          vw_results$confidence_intervals, headerStyle = header_style)
+                          pricing_escape_df(vw_results$confidence_intervals), headerStyle = header_style)
       openxlsx::addStyle(wb, "VW_Confidence_Intervals", currency_style,
                          rows = 2:5, cols = 2:5, gridExpand = TRUE)
       openxlsx::setColWidths(wb, "VW_Confidence_Intervals", cols = 1:5, widths = "auto")
@@ -183,12 +218,12 @@ write_pricing_output <- function(results, plots, validation, config, output_file
     # Descriptives
     openxlsx::addWorksheet(wb, "VW_Descriptives")
     openxlsx::writeData(wb, "VW_Descriptives",
-                        vw_results$descriptives, headerStyle = header_style)
+                        pricing_escape_df(vw_results$descriptives), headerStyle = header_style)
     openxlsx::setColWidths(wb, "VW_Descriptives", cols = 1:7, widths = "auto")
 
     # Curves data (for custom charting)
     openxlsx::addWorksheet(wb, "VW_Curves")
-    openxlsx::writeData(wb, "VW_Curves", vw_results$curves, headerStyle = header_style)
+    openxlsx::writeData(wb, "VW_Curves", pricing_escape_df(vw_results$curves), headerStyle = header_style)
     openxlsx::setColWidths(wb, "VW_Curves", cols = 1:7, widths = "auto")
   }
 
@@ -202,7 +237,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
     # Demand Curve sheet
     openxlsx::addWorksheet(wb, "GG_Demand_Curve")
     openxlsx::writeData(wb, "GG_Demand_Curve",
-                        gg_results$demand_curve, headerStyle = header_style)
+                        pricing_escape_df(gg_results$demand_curve), headerStyle = header_style)
     openxlsx::addStyle(wb, "GG_Demand_Curve", currency_style,
                        rows = 2:(nrow(gg_results$demand_curve) + 1),
                        cols = 1, gridExpand = TRUE)
@@ -214,7 +249,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
     # Revenue Curve sheet
     openxlsx::addWorksheet(wb, "GG_Revenue_Curve")
     openxlsx::writeData(wb, "GG_Revenue_Curve",
-                        gg_results$revenue_curve, headerStyle = header_style)
+                        pricing_escape_df(gg_results$revenue_curve), headerStyle = header_style)
     openxlsx::setColWidths(wb, "GG_Revenue_Curve", cols = 1:6, widths = "auto")
 
     # Optimal Price - Revenue
@@ -231,7 +266,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
         stringsAsFactors = FALSE
       )
 
-      openxlsx::writeData(wb, "GG_Optimal_Revenue", optimal_df, headerStyle = header_style)
+      openxlsx::writeData(wb, "GG_Optimal_Revenue", pricing_escape_df(optimal_df), headerStyle = header_style)
       openxlsx::addStyle(wb, "GG_Optimal_Revenue", currency_style, rows = 2, cols = 2)
       openxlsx::addStyle(wb, "GG_Optimal_Revenue", percent_style, rows = 3, cols = 2)
       openxlsx::setColWidths(wb, "GG_Optimal_Revenue", cols = 1:2, widths = c(25, 20))
@@ -256,7 +291,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
         stringsAsFactors = FALSE
       )
 
-      openxlsx::writeData(wb, "GG_Optimal_Profit", profit_df, headerStyle = header_style)
+      openxlsx::writeData(wb, "GG_Optimal_Profit", pricing_escape_df(profit_df), headerStyle = header_style)
       openxlsx::addStyle(wb, "GG_Optimal_Profit", currency_style, rows = c(2, 5), cols = 2)
       openxlsx::addStyle(wb, "GG_Optimal_Profit", percent_style, rows = 3, cols = 2)
       openxlsx::setColWidths(wb, "GG_Optimal_Profit", cols = 1:2, widths = c(25, 20))
@@ -277,7 +312,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
         stringsAsFactors = FALSE
       )
 
-      openxlsx::writeData(wb, "GG_Optimal_Profit", comp_df,
+      openxlsx::writeData(wb, "GG_Optimal_Profit", pricing_escape_df(comp_df),
                           startRow = comparison_start + 2, headerStyle = header_style)
       openxlsx::addStyle(wb, "GG_Optimal_Profit", currency_style,
                          rows = (comparison_start + 3):(comparison_start + 4), cols = 2)
@@ -289,7 +324,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
     if (!is.null(gg_results$elasticity)) {
       openxlsx::addWorksheet(wb, "GG_Elasticity")
       openxlsx::writeData(wb, "GG_Elasticity",
-                          gg_results$elasticity, headerStyle = header_style)
+                          pricing_escape_df(gg_results$elasticity), headerStyle = header_style)
       openxlsx::setColWidths(wb, "GG_Elasticity", cols = 1:7, widths = "auto")
     }
 
@@ -297,7 +332,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
     if (!is.null(gg_results$confidence_intervals)) {
       openxlsx::addWorksheet(wb, "GG_Confidence_Intervals")
       openxlsx::writeData(wb, "GG_Confidence_Intervals",
-                          gg_results$confidence_intervals, headerStyle = header_style)
+                          pricing_escape_df(gg_results$confidence_intervals), headerStyle = header_style)
       openxlsx::setColWidths(wb, "GG_Confidence_Intervals", cols = 1:5, widths = "auto")
     }
   }
@@ -310,7 +345,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
     # Demand Curve
     openxlsx::addWorksheet(wb, "Mon_Demand_Curve")
     openxlsx::writeData(wb, "Mon_Demand_Curve",
-                        results$demand_curve, headerStyle = header_style)
+                        pricing_escape_df(results$demand_curve), headerStyle = header_style)
     openxlsx::addStyle(wb, "Mon_Demand_Curve", currency_style,
                        rows = 2:(nrow(results$demand_curve) + 1),
                        cols = 1, gridExpand = TRUE)
@@ -320,7 +355,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
     # Observed Data
     openxlsx::addWorksheet(wb, "Mon_Observed_Data")
     openxlsx::writeData(wb, "Mon_Observed_Data",
-                        results$observed_data, headerStyle = header_style)
+                        pricing_escape_df(results$observed_data), headerStyle = header_style)
     openxlsx::setColWidths(wb, "Mon_Observed_Data",
                            cols = 1:ncol(results$observed_data), widths = "auto")
 
@@ -335,7 +370,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
       ),
       stringsAsFactors = FALSE
     )
-    openxlsx::writeData(wb, "Mon_Optimal_Price", opt_df, headerStyle = header_style)
+    openxlsx::writeData(wb, "Mon_Optimal_Price", pricing_escape_df(opt_df), headerStyle = header_style)
     openxlsx::addStyle(wb, "Mon_Optimal_Price", currency_style, rows = 2, cols = 2)
     openxlsx::addStyle(wb, "Mon_Optimal_Price", percent_style, rows = 3, cols = 2)
     openxlsx::setColWidths(wb, "Mon_Optimal_Price", cols = 1:2, widths = c(25, 20))
@@ -357,7 +392,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
         ),
         stringsAsFactors = FALSE
       )
-      openxlsx::writeData(wb, "Mon_Optimal_Price", profit_df,
+      openxlsx::writeData(wb, "Mon_Optimal_Price", pricing_escape_df(profit_df),
                           startRow = current_row + 2, headerStyle = header_style)
       openxlsx::addStyle(wb, "Mon_Optimal_Price", currency_style,
                          rows = current_row + 3, cols = 2)
@@ -384,14 +419,14 @@ write_pricing_output <- function(results, plots, validation, config, output_file
       ),
       stringsAsFactors = FALSE
     )
-    openxlsx::writeData(wb, "Mon_Model_Summary", model_df, headerStyle = header_style)
+    openxlsx::writeData(wb, "Mon_Model_Summary", pricing_escape_df(model_df), headerStyle = header_style)
     openxlsx::setColWidths(wb, "Mon_Model_Summary", cols = 1:2, widths = c(25, 20))
 
     # Elasticity
     if (!is.null(results$elasticity) && nrow(results$elasticity) > 0) {
       openxlsx::addWorksheet(wb, "Mon_Elasticity")
       openxlsx::writeData(wb, "Mon_Elasticity",
-                          results$elasticity, headerStyle = header_style)
+                          pricing_escape_df(results$elasticity), headerStyle = header_style)
       openxlsx::setColWidths(wb, "Mon_Elasticity",
                              cols = 1:ncol(results$elasticity), widths = "auto")
     }
@@ -421,7 +456,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
 
       if (length(ci_rows) > 0) {
         ci_df <- do.call(rbind, ci_rows)
-        openxlsx::writeData(wb, "Mon_Confidence_Intervals", ci_df,
+        openxlsx::writeData(wb, "Mon_Confidence_Intervals", pricing_escape_df(ci_df),
                             headerStyle = header_style)
         openxlsx::addStyle(wb, "Mon_Confidence_Intervals", currency_style,
                            rows = 2:(nrow(ci_df) + 1), cols = 2:3,
@@ -437,7 +472,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
                             startRow = ci_start)
         openxlsx::addStyle(wb, "Mon_Confidence_Intervals", subheader_style,
                            rows = ci_start, cols = 1:3)
-        openxlsx::writeData(wb, "Mon_Confidence_Intervals", ci$demand_curve_ci,
+        openxlsx::writeData(wb, "Mon_Confidence_Intervals", pricing_escape_df(ci$demand_curve_ci),
                             startRow = ci_start + 2, headerStyle = header_style)
       }
     }
@@ -460,7 +495,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
       stringsAsFactors = FALSE
     )
 
-    openxlsx::writeData(wb, "Validation", val_summary, headerStyle = header_style)
+    openxlsx::writeData(wb, "Validation", pricing_escape_df(val_summary), headerStyle = header_style)
     current_row <- nrow(val_summary) + 2
 
     # Add exclusion breakdown if available
@@ -481,7 +516,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
           stringsAsFactors = FALSE
         )
 
-        openxlsx::writeData(wb, "Validation", reason_df,
+        openxlsx::writeData(wb, "Validation", pricing_escape_df(reason_df),
                             startRow = current_row, headerStyle = header_style)
         current_row <- current_row + nrow(reason_df) + 3
       }
@@ -506,7 +541,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
         stringsAsFactors = FALSE
       )
 
-      openxlsx::writeData(wb, "Validation", mono_summary, startRow = current_row)
+      openxlsx::writeData(wb, "Validation", pricing_escape_df(mono_summary), startRow = current_row)
       current_row <- current_row + nrow(mono_summary) + 2
     }
 
@@ -520,7 +555,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
 
       for (i in seq_along(validation$warnings)) {
         openxlsx::writeData(wb, "Validation",
-                            paste0(i, ". ", validation$warnings[[i]]),
+                            pricing_escape_cell(paste0(i, ". ", validation$warnings[[i]])),
                             startRow = current_row)
         current_row <- current_row + 1
       }
@@ -554,7 +589,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
         stringsAsFactors = FALSE
       )
 
-      openxlsx::writeData(wb, "WTP_Summary", wtp_summary_df, headerStyle = header_style)
+      openxlsx::writeData(wb, "WTP_Summary", pricing_escape_df(wtp_summary_df), headerStyle = header_style)
       openxlsx::addStyle(wb, "WTP_Summary", currency_style,
                          rows = 4:8, cols = 2, gridExpand = TRUE)
       openxlsx::setColWidths(wb, "WTP_Summary", cols = 1:2, widths = c(25, 20))
@@ -570,7 +605,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
         stringsAsFactors = FALSE
       )
 
-      openxlsx::writeData(wb, "WTP_Percentiles", pct_df, headerStyle = header_style)
+      openxlsx::writeData(wb, "WTP_Percentiles", pricing_escape_df(pct_df), headerStyle = header_style)
       openxlsx::addStyle(wb, "WTP_Percentiles", currency_style,
                          rows = 2:(nrow(pct_df) + 1), cols = 2)
       openxlsx::setColWidths(wb, "WTP_Percentiles", cols = 1:2, widths = c(15, 20))
@@ -579,7 +614,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
     # WTP Distribution Data
     if (!is.null(wtp$distribution)) {
       openxlsx::addWorksheet(wb, "WTP_Distribution")
-      openxlsx::writeData(wb, "WTP_Distribution", wtp$distribution, headerStyle = header_style)
+      openxlsx::writeData(wb, "WTP_Distribution", pricing_escape_df(wtp$distribution), headerStyle = header_style)
       openxlsx::setColWidths(wb, "WTP_Distribution", cols = 1:ncol(wtp$distribution), widths = "auto")
     }
   }
@@ -591,7 +626,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
     scenarios <- results$competitive_scenarios
 
     openxlsx::addWorksheet(wb, "Competitive_Scenarios")
-    openxlsx::writeData(wb, "Competitive_Scenarios", scenarios, headerStyle = header_style)
+    openxlsx::writeData(wb, "Competitive_Scenarios", pricing_escape_df(scenarios), headerStyle = header_style)
 
     # Format share column as percentage
     share_col <- which(names(scenarios) == "share")
@@ -635,7 +670,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
       stringsAsFactors = FALSE
     )
 
-    openxlsx::writeData(wb, "Constrained_Optimization", opt_df, headerStyle = header_style)
+    openxlsx::writeData(wb, "Constrained_Optimization", pricing_escape_df(opt_df), headerStyle = header_style)
     openxlsx::addStyle(wb, "Constrained_Optimization", currency_style, rows = 2, cols = 2)
     openxlsx::addStyle(wb, "Constrained_Optimization", percent_style, rows = 3, cols = 2)
     openxlsx::setColWidths(wb, "Constrained_Optimization", cols = 1:2, widths = c(25, 20))
@@ -654,7 +689,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
         stringsAsFactors = FALSE
       )
 
-      openxlsx::writeData(wb, "Constrained_Optimization", const_df,
+      openxlsx::writeData(wb, "Constrained_Optimization", pricing_escape_df(const_df),
                           startRow = constraint_start + 2, headerStyle = header_style)
     }
   }
@@ -681,7 +716,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
         stringsAsFactors = FALSE
       )
 
-      openxlsx::writeData(wb, "VW_NMS_Results", nms_df, headerStyle = header_style)
+      openxlsx::writeData(wb, "VW_NMS_Results", pricing_escape_df(nms_df), headerStyle = header_style)
       openxlsx::addStyle(wb, "VW_NMS_Results", currency_style,
                          rows = 2:3, cols = 2, gridExpand = TRUE)
       openxlsx::setColWidths(wb, "VW_NMS_Results", cols = 1:3, widths = c(25, 15, 35))
@@ -693,7 +728,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
                             startRow = nms_data_start)
         openxlsx::addStyle(wb, "VW_NMS_Results", subheader_style,
                            rows = nms_data_start, cols = 1)
-        openxlsx::writeData(wb, "VW_NMS_Results", vw_results$nms_results$data,
+        openxlsx::writeData(wb, "VW_NMS_Results", pricing_escape_df(vw_results$nms_results$data),
                             startRow = nms_data_start + 2, headerStyle = header_style)
       }
     }
@@ -706,7 +741,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
     openxlsx::addWorksheet(wb, "Segment_Comparison")
 
     # Write comparison table
-    openxlsx::writeData(wb, "Segment_Comparison", segment_results$comparison_table,
+    openxlsx::writeData(wb, "Segment_Comparison", pricing_escape_df(segment_results$comparison_table),
                         headerStyle = header_style)
     openxlsx::setColWidths(wb, "Segment_Comparison",
                            cols = 1:ncol(segment_results$comparison_table),
@@ -722,7 +757,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
 
       for (i in seq_along(segment_results$insights)) {
         openxlsx::writeData(wb, "Segment_Comparison",
-                            paste0(i, ". ", segment_results$insights[i]),
+                            pricing_escape_cell(paste0(i, ". ", segment_results$insights[i])),
                             startRow = insight_start + 1 + i)
       }
     }
@@ -735,7 +770,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
     openxlsx::addWorksheet(wb, "Price_Ladder")
 
     # Write tier table
-    openxlsx::writeData(wb, "Price_Ladder", ladder_results$tier_table,
+    openxlsx::writeData(wb, "Price_Ladder", pricing_escape_df(ladder_results$tier_table),
                         headerStyle = header_style)
     openxlsx::addStyle(wb, "Price_Ladder", currency_style,
                        rows = 2:(nrow(ladder_results$tier_table) + 1),
@@ -754,7 +789,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
 
       for (i in seq_along(ladder_results$notes)) {
         openxlsx::writeData(wb, "Price_Ladder",
-                            paste0("* ", ladder_results$notes[i]),
+                            pricing_escape_cell(paste0("* ", ladder_results$notes[i])),
                             startRow = notes_start + 1 + i)
       }
     }
@@ -780,7 +815,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
         ),
         stringsAsFactors = FALSE
       )
-      openxlsx::writeData(wb, "Price_Ladder", diag_df,
+      openxlsx::writeData(wb, "Price_Ladder", pricing_escape_df(diag_df),
                           startRow = diag_start + 2, headerStyle = header_style)
     }
   }
@@ -806,7 +841,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
     openxlsx::writeData(wb, "Recommendation", "PRIMARY RECOMMENDATION",
                         startRow = 1)
     openxlsx::addStyle(wb, "Recommendation", subheader_style, rows = 1, cols = 1:2)
-    openxlsx::writeData(wb, "Recommendation", rec_df,
+    openxlsx::writeData(wb, "Recommendation", pricing_escape_df(rec_df),
                         startRow = 3, headerStyle = header_style)
     openxlsx::setColWidths(wb, "Recommendation", cols = 1:2, widths = c(25, 40))
 
@@ -829,7 +864,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
         Note = c(synthesis$acceptable_range$lower_desc, synthesis$acceptable_range$upper_desc),
         stringsAsFactors = FALSE
       )
-      openxlsx::writeData(wb, "Recommendation", range_df,
+      openxlsx::writeData(wb, "Recommendation", pricing_escape_df(range_df),
                           startRow = current_row + 1, headerStyle = header_style)
       current_row <- current_row + nrow(range_df) + 3
     }
@@ -840,7 +875,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
                           startRow = current_row)
       openxlsx::addStyle(wb, "Recommendation", subheader_style,
                          rows = current_row, cols = 1:4)
-      openxlsx::writeData(wb, "Recommendation", synthesis$evidence_table,
+      openxlsx::writeData(wb, "Recommendation", pricing_escape_df(synthesis$evidence_table),
                           startRow = current_row + 2, headerStyle = header_style)
       current_row <- current_row + nrow(synthesis$evidence_table) + 4
     }
@@ -872,7 +907,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
                            rows = current_row, cols = 1)
         for (i in seq_along(synthesis$risks$downside)) {
           openxlsx::writeData(wb, "Recommendation",
-                              paste0("* ", synthesis$risks$downside[i]),
+                              pricing_escape_cell(paste0("* ", synthesis$risks$downside[i])),
                               startRow = current_row + i)
         }
         current_row <- current_row + length(synthesis$risks$downside) + 3
@@ -883,7 +918,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
     openxlsx::addWorksheet(wb, "Executive_Summary")
     summary_lines <- strsplit(synthesis$executive_summary, "\n")[[1]]
     for (i in seq_along(summary_lines)) {
-      openxlsx::writeData(wb, "Executive_Summary", summary_lines[i], startRow = i)
+      openxlsx::writeData(wb, "Executive_Summary", pricing_escape_cell(summary_lines[i]), startRow = i)
     }
     openxlsx::setColWidths(wb, "Executive_Summary", cols = 1, widths = 80)
   }
@@ -906,7 +941,7 @@ write_pricing_output <- function(results, plots, validation, config, output_file
     stringsAsFactors = FALSE
   )
 
-  openxlsx::writeData(wb, "Configuration", config_df, headerStyle = header_style)
+  openxlsx::writeData(wb, "Configuration", pricing_escape_df(config_df), headerStyle = header_style)
   openxlsx::setColWidths(wb, "Configuration", cols = 1:2, widths = c(25, 50))
 
   # --------------------------------------------------------------------------
@@ -986,12 +1021,12 @@ export_pricing_csv <- function(results, output_dir, config) {
       price = c(vw$price_points$PMC, vw$price_points$OPP,
                 vw$price_points$IDP, vw$price_points$PME)
     )
-    write.csv(pp_df, pp_file, row.names = FALSE)
+    write.csv(pp_df, pp_file, row.names = FALSE, fileEncoding = "UTF-8")
     saved_files <- c(saved_files, pp_file)
 
     # Curves
     curves_file <- file.path(output_dir, "vw_curves.csv")
-    write.csv(vw$curves, curves_file, row.names = FALSE)
+    write.csv(vw$curves, curves_file, row.names = FALSE, fileEncoding = "UTF-8")
     saved_files <- c(saved_files, curves_file)
   }
 
@@ -1000,12 +1035,12 @@ export_pricing_csv <- function(results, output_dir, config) {
 
     # Demand curve
     demand_file <- file.path(output_dir, "gg_demand_curve.csv")
-    write.csv(gg$demand_curve, demand_file, row.names = FALSE)
+    write.csv(gg$demand_curve, demand_file, row.names = FALSE, fileEncoding = "UTF-8")
     saved_files <- c(saved_files, demand_file)
 
     # Revenue curve
     revenue_file <- file.path(output_dir, "gg_revenue_curve.csv")
-    write.csv(gg$revenue_curve, revenue_file, row.names = FALSE)
+    write.csv(gg$revenue_curve, revenue_file, row.names = FALSE, fileEncoding = "UTF-8")
     saved_files <- c(saved_files, revenue_file)
   }
 
