@@ -31,6 +31,7 @@ run_confidence_gui <- function() {
     }
 
     msg <- paste0(msg, "\n", strrep("=", 80), "\n")
+    cat(msg)  # Ensure console visibility in Shiny
     stop(msg, call. = FALSE)
   }
 

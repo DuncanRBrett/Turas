@@ -22,8 +22,22 @@
 # ==============================================================================
 
 if (!requireNamespace("openxlsx", quietly = TRUE)) {
-  stop("Package 'openxlsx' is required for config template generation. Install with: install.packages('openxlsx')",
-       call. = FALSE)
+  if (exists("weighting_refuse", mode = "function")) {
+    weighting_refuse(
+      code = "PKG_OPENXLSX_MISSING",
+      title = "Required Package Not Installed",
+      problem = "Package 'openxlsx' is required for config template generation but is not installed.",
+      why_it_matters = "Cannot generate Excel config templates without the openxlsx package.",
+      how_to_fix = "Install with: install.packages('openxlsx')"
+    )
+  } else {
+    cat("\n┌─── TURAS ERROR ───────────────────────────────────────┐\n")
+    cat("│ Code: PKG_OPENXLSX_MISSING\n")
+    cat("│ Package 'openxlsx' is required for config templates.\n")
+    cat("│ Fix: install.packages('openxlsx')\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+    stop("Package 'openxlsx' is required for config template generation.", call. = FALSE)
+  }
 }
 
 # Source the shared template infrastructure

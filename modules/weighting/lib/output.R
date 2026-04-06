@@ -95,7 +95,7 @@ write_weighted_data <- function(data, output_file, id_column = "ResponseID",
 
   tryCatch({
     if (file_ext == "csv") {
-      write.csv(output_data, output_file, row.names = FALSE)
+      write.csv(output_data, output_file, row.names = FALSE, fileEncoding = "UTF-8")
     } else if (file_ext %in% c("xlsx", "xls")) {
       if (!requireNamespace("openxlsx", quietly = TRUE)) {
         weighting_refuse(
@@ -298,7 +298,7 @@ generate_weighting_report <- function(weighting_results, output_file,
 
       report_lines <- c(report_lines,
         "EFFECTIVE SAMPLE SIZE:",
-        sprintf("  Effective N: %d", diag$effective_sample$effective_n),
+        sprintf("  Effective N: %s", format(round(diag$effective_sample$effective_n), big.mark = ",")),
         sprintf("  Design effect: %.2f", diag$effective_sample$design_effect),
         sprintf("  Efficiency: %.1f%%", diag$effective_sample$efficiency),
         ""
@@ -425,7 +425,12 @@ generate_weighting_report <- function(weighting_results, output_file,
       escape_text <- if (exists("turas_excel_escape", mode = "function")) {
         turas_excel_escape
       } else {
-        function(x) x
+        # Minimal inline fallback: prefix dangerous characters with single quote
+        # Covers OWASP CSV injection vectors: =, +, -, @, tab, carriage return
+        function(x) {
+          if (!is.character(x)) return(x)
+          gsub("^([=+\\-@\t\r])", "'\\1", x)
+        }
       }
 
       # ---- Summary sheet ----
@@ -550,7 +555,7 @@ generate_weighting_report <- function(weighting_results, output_file,
           eff_df <- data.frame(
             Metric = c("Effective N", "Design Effect (DEFF)", "Weighting Efficiency"),
             Value = c(
-              diag$effective_sample$effective_n,
+              round(diag$effective_sample$effective_n),
               round(diag$effective_sample$design_effect, 2),
               paste0(round(diag$effective_sample$efficiency, 1), "%")
             )
@@ -883,7 +888,7 @@ create_weight_summary_df <- function(weighting_results) {
         max = diag$distribution$max,
         mean = diag$distribution$mean,
         cv = diag$distribution$cv,
-        effective_n = diag$effective_sample$effective_n,
+        effective_n = round(diag$effective_sample$effective_n),
         design_effect = diag$effective_sample$design_effect,
         efficiency = diag$effective_sample$efficiency,
         quality_status = diag$quality$status,

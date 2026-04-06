@@ -58,8 +58,13 @@ get_module_dir <- function() {
     }
   }
 
-  stop("Cannot locate weighting module directory. Run from the Turas root or weighting module directory.",
-       call. = FALSE)
+  # TRS infrastructure not yet loaded — use formatted console error
+  cat("\n┌─── TURAS ERROR ───────────────────────────────────────┐\n")
+  cat("│ Code: IO_MODULE_DIR_NOT_FOUND\n")
+  cat("│ Cannot locate weighting module directory.\n")
+  cat("│ Fix: Run from the Turas root or weighting module directory.\n")
+  cat("└───────────────────────────────────────────────────────┘\n\n")
+  stop("Cannot locate weighting module directory.", call. = FALSE)
 }
 
 #' Source Module Libraries
@@ -70,9 +75,12 @@ source_module_libs <- function(module_dir) {
   lib_dir <- file.path(module_dir, "lib")
 
   if (!dir.exists(lib_dir)) {
-    stop(paste0("Module library directory not found: ", lib_dir,
-                "\nEnsure the Turas installation is complete and the lib/ directory exists."),
-         call. = FALSE)
+    cat("\n┌─── TURAS ERROR ───────────────────────────────────────┐\n")
+    cat("│ Code: IO_MODULE_LIB_NOT_FOUND\n")
+    cat(sprintf("│ Module library directory not found: %s\n", lib_dir))
+    cat("│ Fix: Ensure the Turas installation is complete.\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+    stop(paste0("Module library directory not found: ", lib_dir), call. = FALSE)
   }
 
   # Source in dependency order
@@ -114,15 +122,22 @@ load_shared_infrastructure <- function(module_dir) {
   }
 
   if (is.null(turas_root)) {
-    stop("Cannot find Turas shared infrastructure (modules/shared/).\n",
-         "Run from the Turas root directory or set TURAS_HOME environment variable.",
-         call. = FALSE)
+    cat("\n┌─── TURAS ERROR ───────────────────────────────────────┐\n")
+    cat("│ Code: IO_SHARED_NOT_FOUND\n")
+    cat("│ Cannot find Turas shared infrastructure (modules/shared/).\n")
+    cat("│ Fix: Run from the Turas root directory or set TURAS_HOME.\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+    stop("Cannot find Turas shared infrastructure.", call. = FALSE)
   }
 
   shared_import <- file.path(turas_root, "modules", "shared", "lib", "import_all.R")
   if (!file.exists(shared_import)) {
-    stop(paste0("Shared infrastructure file not found: ", shared_import),
-         call. = FALSE)
+    cat("\n┌─── TURAS ERROR ───────────────────────────────────────┐\n")
+    cat("│ Code: IO_IMPORT_ALL_NOT_FOUND\n")
+    cat(sprintf("│ Shared infrastructure file not found: %s\n", shared_import))
+    cat("│ Fix: Verify modules/shared/lib/import_all.R exists.\n")
+    cat("└───────────────────────────────────────────────────────┘\n\n")
+    stop(paste0("Shared infrastructure file not found: ", shared_import), call. = FALSE)
   }
 
   source(shared_import, local = FALSE)
@@ -291,7 +306,7 @@ run_weighting <- function(config_file,
     if (file_ext %in% c("xlsx", "xls")) {
       readxl::read_excel(data_path)
     } else if (file_ext == "csv") {
-      read.csv(data_path, stringsAsFactors = FALSE)
+      read.csv(data_path, stringsAsFactors = FALSE, fileEncoding = "UTF-8")
     } else if (file_ext == "sav") {
       if (!requireNamespace("haven", quietly = TRUE)) {
         weighting_refuse(
@@ -702,13 +717,13 @@ generate_weighting_stats_pack <- function(config, data, weight_names,
     n_cols    = ncol(data)
   )
 
-  # Count excluded (zero or NA weight respondents across all weights)
+  # Count unique respondents excluded (NA or zero weight in ANY weight column)
   n_excluded <- if (length(weight_names) > 0) {
-    n_bad <- sum(sapply(weight_names, function(wn) {
+    excluded_mask <- Reduce(`|`, lapply(weight_names, function(wn) {
       w <- data[[wn]]
-      sum(is.na(w) | w == 0)
+      is.na(w) | w == 0
     }))
-    max(0L, n_bad)
+    sum(excluded_mask)
   } else 0L
 
   data_used <- list(
@@ -732,29 +747,59 @@ generate_weighting_stats_pack <- function(config, data, weight_names,
                              sprintf("%s (%s)", wn, method))
   }
 
-  # Effective N and DEFF (from first weight result's diagnostics, if available)
-  first_wr <- weight_results[[weight_names[1]]]
-  eff_n_val <- tryCatch({
-    first_wr$diagnostics$effective_n %||% NA
-  }, error = function(e) NA)
-  deff_val <- tryCatch({
-    first_wr$diagnostics$deff %||% NA
-  }, error = function(e) NA)
+  # Per-weight diagnostics for stats pack (report ALL weights, not just first)
+  per_weight_details <- list()
+  for (wn in weight_names) {
+    wr <- weight_results[[wn]]
+    if (is.null(wr) || is.null(wr$diagnostics)) next
+    diag <- wr$diagnostics
+    per_weight_details[[wn]] <- list(
+      effective_n = diag$effective_sample$effective_n %||% NA,
+      deff = diag$effective_sample$design_effect %||% NA,
+      efficiency = diag$effective_sample$efficiency %||% NA,
+      quality = diag$quality$status %||% "—"
+    )
+  }
 
-  # Convergence info (from rim result if present)
-  first_rim <- tryCatch(first_wr$rim_result, error = function(e) NULL)
-  conv_tol   <- tryCatch(first_rim$convergence_tolerance %||% NA, error = function(e) NA)
-  conv_iters <- tryCatch(first_rim$iterations %||% NA, error = function(e) NA)
+  # Summary effective N and DEFF (from first weight with valid diagnostics)
+  eff_n_val <- NA
+  deff_val <- NA
+  for (wn in weight_names) {
+    wr <- weight_results[[wn]]
+    if (!is.null(wr) && !is.null(wr$diagnostics)) {
+      eff_n_val <- wr$diagnostics$effective_sample$effective_n %||% NA
+      deff_val <- wr$diagnostics$effective_sample$design_effect %||% NA
+      break
+    }
+  }
 
-  # Trimming info
-  first_trim <- tryCatch(first_wr$trimming_result, error = function(e) NULL)
-  trim_str <- if (!is.null(first_trim) && isTRUE(first_trim$trimming_applied)) {
-    lower <- tryCatch(first_trim$lower_bound %||% NA, error = function(e) NA)
-    upper <- tryCatch(first_trim$upper_bound %||% NA, error = function(e) NA)
-    sprintf("Applied — lower: %s, upper: %s",
-            if (!is.na(lower)) as.character(lower) else "—",
-            if (!is.na(upper)) as.character(upper) else "—")
-  } else "None"
+  # Convergence info (from first rim result if present)
+  conv_tol <- NA
+  conv_iters <- NA
+  for (wn in weight_names) {
+    wr <- weight_results[[wn]]
+    rim <- tryCatch(wr$rim_result, error = function(e) NULL)
+    if (!is.null(rim)) {
+      conv_tol <- rim$convergence_tolerance %||% NA
+      conv_iters <- rim$iterations %||% NA
+      break
+    }
+  }
+
+  # Trimming info (from first trimmed weight)
+  trim_str <- "None"
+  for (wn in weight_names) {
+    wr <- weight_results[[wn]]
+    trim <- tryCatch(wr$trimming_result, error = function(e) NULL)
+    if (!is.null(trim) && isTRUE(trim$trimming_applied)) {
+      lower <- tryCatch(trim$lower_bound %||% NA, error = function(e) NA)
+      upper <- tryCatch(trim$upper_bound %||% NA, error = function(e) NA)
+      trim_str <- sprintf("Applied — lower: %s, upper: %s",
+              if (!is.na(lower)) as.character(lower) else "—",
+              if (!is.na(upper)) as.character(upper) else "—")
+      break
+    }
+  }
 
   # TRS summary
   run_result <- if (!is.null(run_state) && exists("turas_run_state_result", mode = "function")) {
@@ -794,6 +839,14 @@ generate_weighting_stats_pack <- function(config, data, weight_names,
     "Trimming"                    = trim_str,
     "Effective N after weighting" = if (!is.na(eff_n_val)) format(round(eff_n_val), big.mark = ",") else "—",
     "DEFF"                        = if (!is.na(deff_val)) sprintf("%.3f", deff_val) else "—",
+    "Per-weight diagnostics"      = paste(vapply(names(per_weight_details), function(wn) {
+      d <- per_weight_details[[wn]]
+      sprintf("%s: eff_n=%s, DEFF=%s, quality=%s",
+              wn,
+              if (!is.na(d$effective_n)) format(round(d$effective_n), big.mark = ",") else "—",
+              if (!is.na(d$deff)) sprintf("%.3f", d$deff) else "—",
+              d$quality)
+    }, character(1)), collapse = " | "),
     "TRS Status"                  = run_result$status %||% "PASS",
     "TRS Events"                  = trs_summary
   )

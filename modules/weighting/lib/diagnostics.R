@@ -28,7 +28,7 @@ diagnose_weights <- function(weights,
                              rim_result = NULL,
                              trimming_result = NULL,
                              save_to_file = NULL,
-                             verbose = TRUE) {
+                             verbose = FALSE) {
 
   # Initialize results
   results <- list(
@@ -107,7 +107,8 @@ diagnose_weights <- function(weights,
   efficiency <- 100 * effective_n / n_valid
 
   results$effective_sample <- list(
-    effective_n = round(effective_n),
+    effective_n = effective_n,         # Numeric (not rounded) for downstream precision
+    effective_n_display = round(effective_n),  # Rounded for display/output only
     design_effect = design_effect,
     efficiency = efficiency
   )
@@ -283,9 +284,13 @@ print_diagnostics_console <- function(diag) {
   if (!is.null(diag$rim_weighting)) {
     cat("\nMETHOD: Rim Weighting\n")
     if (diag$rim_weighting$converged) {
-      cat("CONVERGENCE: Converged in ", diag$rim_weighting$iterations, " iterations\n")
+      if (!is.na(diag$rim_weighting$iterations)) {
+        cat("CONVERGENCE: Converged in ", diag$rim_weighting$iterations, " iterations\n")
+      } else {
+        cat("CONVERGENCE: Converged (survey::calibrate)\n")
+      }
     } else {
-      cat("CONVERGENCE: NOT CONVERGED after ", diag$rim_weighting$iterations, " iterations\n")
+      cat("CONVERGENCE: NOT CONVERGED\n")
     }
   }
 
@@ -317,7 +322,7 @@ print_diagnostics_console <- function(diag) {
   # Effective sample size section
   cat("\nEFFECTIVE SAMPLE SIZE:\n")
   cat(sprintf("  Effective N:              %s\n",
-              format(diag$effective_sample$effective_n, big.mark = ",")))
+              format(diag$effective_sample$effective_n_display %||% round(diag$effective_sample$effective_n), big.mark = ",")))
   cat(sprintf("  Design effect:            %.2f\n", diag$effective_sample$design_effect))
   cat(sprintf("  Efficiency:               %.1f%%",
               diag$effective_sample$efficiency))
@@ -451,7 +456,7 @@ compare_weights <- function(weight_list, verbose = TRUE) {
         n_valid = diag$sample_size$n_valid,
         mean = round(diag$distribution$mean, 3),
         cv = round(diag$distribution$cv, 3),
-        effective_n = diag$effective_sample$effective_n,
+        effective_n = round(diag$effective_sample$effective_n),
         design_effect = round(diag$effective_sample$design_effect, 2),
         efficiency = round(diag$effective_sample$efficiency, 1),
         max = round(diag$distribution$max, 2),
