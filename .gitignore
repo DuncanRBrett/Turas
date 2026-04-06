@@ -32,6 +32,9 @@ renv/.gitignore
 !**/templates/**/*.xlsx
 !**/templates/**/*.xls
 
+# EXCEPTION: Allow golden test fixture files
+!**/fixtures/golden/*.rds
+
 # Output files
 Output/
 output/

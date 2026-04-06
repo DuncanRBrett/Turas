@@ -1,25 +1,31 @@
+---
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
 # Turas Categorical Key Driver Module - Template Reference
 
-**Version:** 12.0
-**Last Updated:** 3 March 2026
-**Target Audience:** Analysts, Project Managers, Template Configurers
+**Version:** 12.0 **Last Updated:** 3 March 2026 **Target Audience:**
+Analysts, Project Managers, Template Configurers
 
-This document provides complete field-by-field reference for the CatDriver configuration template.
+This document provides complete field-by-field reference for the
+CatDriver configuration template.
 
----
+------------------------------------------------------------------------
 
 ## Table of Contents
 
-1. [Overview](#overview)
-2. [Settings Sheet](#settings-sheet)
-3. [Variables Sheet](#variables-sheet)
-4. [Driver_Settings Sheet](#driver_settings-sheet)
-5. [Complete Examples](#complete-examples)
-6. [Validation Rules](#validation-rules)
+1.  [Overview](#overview)
+2.  [Settings Sheet](#settings-sheet)
+3.  [Variables Sheet](#variables-sheet)
+4.  [Driver_Settings Sheet](#driver_settings-sheet)
+5.  [Complete Examples](#complete-examples)
+6.  [Validation Rules](#validation-rules)
 
----
+------------------------------------------------------------------------
 
-## Overview
+## Overview {#overview}
 
 ### Template Location
 
@@ -27,230 +33,236 @@ This document provides complete field-by-field reference for the CatDriver confi
 
 ### Sheet Structure
 
-| Sheet | Purpose | Required |
-|-------|---------|----------|
-| Instructions | Usage documentation | No |
-| Settings | Analysis parameters | Yes |
-| Variables | Variable definitions | Yes |
+| Sheet           | Purpose                  | Required    |
+|-----------------|--------------------------|-------------|
+| Instructions    | Usage documentation      | No          |
+| Settings        | Analysis parameters      | Yes         |
+| Variables       | Variable definitions     | Yes         |
 | Driver_Settings | Per-driver configuration | Recommended |
 
----
+------------------------------------------------------------------------
 
-## Settings Sheet
+## Settings Sheet {#settings-sheet}
 
 ### Core Settings
 
 #### analysis_name
 
-- **Purpose:** Title for reports and output
-- **Required:** No
-- **Data Type:** Text
-- **Default:** `Key Driver Analysis`
-- **Example:** `Customer Churn Drivers Q4 2025`
+-   **Purpose:** Title for reports and output
+-   **Required:** No
+-   **Data Type:** Text
+-   **Default:** `Key Driver Analysis`
+-   **Example:** `Customer Churn Drivers Q4 2025`
 
 #### data_file
 
-- **Purpose:** Path to survey data file
-- **Required:** Yes
-- **Data Type:** Text (file path)
-- **Valid Formats:** .csv, .xlsx, .xls, .sav, .dta
-- **Example:** `data/survey_responses.csv`
-- **Notes:** Relative to config file location or absolute path
+-   **Purpose:** Path to survey data file
+-   **Required:** Yes
+-   **Data Type:** Text (file path)
+-   **Valid Formats:** .csv, .xlsx, .xls, .sav, .dta
+-   **Example:** `data/survey_responses.csv`
+-   **Notes:** Relative to config file location or absolute path
 
 #### output_file
 
-- **Purpose:** Path for Excel output file
-- **Required:** Yes
-- **Data Type:** Text (file path)
-- **Example:** `output/churn_drivers.xlsx`
-- **Notes:** Directory must exist
+-   **Purpose:** Path for Excel output file
+-   **Required:** Yes
+-   **Data Type:** Text (file path)
+-   **Example:** `output/churn_drivers.xlsx`
+-   **Notes:** Directory must exist
 
----
+------------------------------------------------------------------------
 
 ### Model Settings
 
 #### outcome_type
 
-- **Purpose:** Declare the outcome variable type
-- **Required:** **Yes** (analysis will refuse without it)
-- **Valid Values:**
-  - `binary` - Binary logistic regression (exactly 2 outcome categories)
-  - `ordinal` - Ordinal logistic regression (3+ ordered categories)
-  - `multinomial` - Multinomial logistic regression (3+ unordered categories)
-- **Note:** `auto` is no longer accepted. You must explicitly declare the correct model type.
+-   **Purpose:** Declare the outcome variable type
+-   **Required:** **Yes** (analysis will refuse without it)
+-   **Valid Values:**
+    -   `binary` - Binary logistic regression (exactly 2 outcome
+        categories)
+    -   `ordinal` - Ordinal logistic regression (3+ ordered categories)
+    -   `multinomial` - Multinomial logistic regression (3+ unordered
+        categories)
+-   **Note:** `auto` is no longer accepted. You must explicitly declare
+    the correct model type.
 
 #### reference_category
 
-- **Purpose:** Baseline category for comparisons
-- **Required:** No
-- **Default:** First category alphabetically
-- **Example:** `Grade D` or `Churned`
-- **Notes:** Must exist in outcome variable
+-   **Purpose:** Baseline category for comparisons
+-   **Required:** No
+-   **Default:** First category alphabetically
+-   **Example:** `Grade D` or `Churned`
+-   **Notes:** Must exist in outcome variable
 
----
+------------------------------------------------------------------------
 
 ### Statistical Settings
 
 #### min_sample_size
 
-- **Purpose:** Minimum complete cases required
-- **Required:** No
-- **Data Type:** Integer
-- **Default:** `30`
-- **Valid Values:** 1 or greater
-- **Notes:** Analysis refuses if below threshold
+-   **Purpose:** Minimum complete cases required
+-   **Required:** No
+-   **Data Type:** Integer
+-   **Default:** `30`
+-   **Valid Values:** 1 or greater
+-   **Notes:** Analysis refuses if below threshold
 
 #### confidence_level
 
-- **Purpose:** Confidence level for intervals
-- **Required:** No
-- **Data Type:** Decimal
-- **Default:** `0.95`
-- **Valid Values:** 0.80 to 0.99
-- **Example:** `0.95` for 95% confidence intervals
+-   **Purpose:** Confidence level for intervals
+-   **Required:** No
+-   **Data Type:** Decimal
+-   **Default:** `0.95`
+-   **Valid Values:** 0.80 to 0.99
+-   **Example:** `0.95` for 95% confidence intervals
 
 #### missing_threshold
 
-- **Purpose:** Warning threshold for missing data
-- **Required:** No
-- **Data Type:** Integer (percentage)
-- **Default:** `50`
-- **Valid Values:** 0 to 100
-- **Notes:** Warns if any variable exceeds this %
+-   **Purpose:** Warning threshold for missing data
+-   **Required:** No
+-   **Data Type:** Integer (percentage)
+-   **Default:** `50`
+-   **Valid Values:** 0 to 100
+-   **Notes:** Warns if any variable exceeds this %
 
----
+------------------------------------------------------------------------
 
 ### Output Settings
 
 #### detailed_output
 
-- **Purpose:** Include all 6 sheets or just 4
-- **Required:** No
-- **Data Type:** TRUE/FALSE
-- **Default:** `TRUE`
-- **When FALSE:** Omits Odds Ratios and Diagnostics sheets
-- **When TRUE:** Full 6-sheet output
+-   **Purpose:** Include all 6 sheets or just 4
+-   **Required:** No
+-   **Data Type:** TRUE/FALSE
+-   **Default:** `TRUE`
+-   **When FALSE:** Omits Odds Ratios and Diagnostics sheets
+-   **When TRUE:** Full 6-sheet output
 
----
+------------------------------------------------------------------------
 
 ### Subgroup Comparison Settings (Optional)
 
 | Setting | Required | Default | Description |
-|---------|----------|---------|-------------|
+|-----------------|-----------------|-----------------|----------------------|
 | subgroup_var | No | (disabled) | Column name from data file to split analysis by subgroup (e.g., `age_group`, `region`). Must NOT be the outcome or a driver variable. Leave blank for standard analysis. |
 | subgroup_min_n | No | 30 | Minimum observations per subgroup to run analysis. Groups below this threshold produce a warning but analysis still proceeds. |
 | subgroup_include_total | No | TRUE | Include a full-dataset "Total" analysis alongside per-subgroup results. Provides a comparison baseline. |
 
-**Rules:**
-- `subgroup_var` must exist as a column in the data file
-- `subgroup_var` must NOT be the outcome variable
-- `subgroup_var` must NOT be listed as a driver in the Variables sheet
-- Must have at least 2 distinct non-NA values in the subgroup column
+**Rules:** - `subgroup_var` must exist as a column in the data file -
+`subgroup_var` must NOT be the outcome variable - `subgroup_var` must
+NOT be listed as a driver in the Variables sheet - Must have at least 2
+distinct non-NA values in the subgroup column
 
 **Additional Output (when subgroup_var is set):**
 
-Three extra Excel sheets are generated:
-- **Subgroup Summary** — side-by-side importance rankings with driver classification (Universal / Segment-Specific / Mixed)
-- **Subgroup OR Compare** — odds ratio values per group, flagging notable differences (ratio > 2.0x)
-- **Subgroup Model Fit** — per-group sample size, R², AIC, and convergence status
+Three extra Excel sheets are generated: - **Subgroup Summary** —
+side-by-side importance rankings with driver classification (Universal /
+Segment-Specific / Mixed) - **Subgroup OR Compare** — odds ratio values
+per group, flagging notable differences (ratio \> 2.0x) - **Subgroup
+Model Fit** — per-group sample size, R², AIC, and convergence status
 
-The HTML report also includes a dedicated Subgroups section with grouped bar charts, classification tables, and auto-generated management insights.
+The HTML report also includes a dedicated Subgroups section with grouped
+bar charts, classification tables, and auto-generated management
+insights.
 
----
+------------------------------------------------------------------------
 
-## Variables Sheet
+## Variables Sheet {#variables-sheet}
 
 ### Column Definitions
 
 #### VariableName
 
-- **Purpose:** Column name in data file
-- **Required:** Yes
-- **Data Type:** Text
-- **Validation:** Must exactly match column name (case-sensitive)
-- **Example:** `employment_satisfaction`
+-   **Purpose:** Column name in data file
+-   **Required:** Yes
+-   **Data Type:** Text
+-   **Validation:** Must exactly match column name (case-sensitive)
+-   **Example:** `employment_satisfaction`
 
 #### Type
 
-- **Purpose:** Variable role in analysis
-- **Required:** Yes
-- **Valid Values:**
-  - `Outcome` - Dependent variable (exactly 1)
-  - `Driver` - Predictor variable (1 or more)
-  - `Weight` - Survey weight (0 or 1)
+-   **Purpose:** Variable role in analysis
+-   **Required:** Yes
+-   **Valid Values:**
+    -   `Outcome` - Dependent variable (exactly 1)
+    -   `Driver` - Predictor variable (1 or more)
+    -   `Weight` - Survey weight (0 or 1)
 
 #### Label
 
-- **Purpose:** Display name for reports
-- **Required:** Yes
-- **Data Type:** Text
-- **Example:** `Employment Satisfaction`
+-   **Purpose:** Display name for reports
+-   **Required:** Yes
+-   **Data Type:** Text
+-   **Example:** `Employment Satisfaction`
 
 #### Order
 
-- **Purpose:** Category ordering for ordinal variables
-- **Required:** No (but recommended for ordinal outcomes)
-- **Format:** Semicolon-separated, low to high
-- **Examples:**
-  - `Low;Medium;High`
-  - `Strongly Disagree;Disagree;Neutral;Agree;Strongly Agree`
-  - `1;2;3;4;5`
-  - `Grade D;Grade C;Grade B;Grade A`
+-   **Purpose:** Category ordering for ordinal variables
+-   **Required:** No (but recommended for ordinal outcomes)
+-   **Format:** Semicolon-separated, low to high
+-   **Examples:**
+    -   `Low;Medium;High`
+    -   `Strongly Disagree;Disagree;Neutral;Agree;Strongly Agree`
+    -   `1;2;3;4;5`
+    -   `Grade D;Grade C;Grade B;Grade A`
 
----
+------------------------------------------------------------------------
 
-## Driver_Settings Sheet
+## Driver_Settings Sheet {#driver_settings-sheet}
 
 ### When to Use
 
-- Specify exact variable types
-- Set specific reference levels
-- Configure missing data handling
+-   Specify exact variable types
+-   Set specific reference levels
+-   Configure missing data handling
 
 ### Column Definitions
 
 #### driver
 
-- **Purpose:** Variable name to configure
-- **Required:** Yes
-- **Validation:** Must match a Driver in Variables sheet
-- **Example:** `academic_grade`
+-   **Purpose:** Variable name to configure
+-   **Required:** Yes
+-   **Validation:** Must match a Driver in Variables sheet
+-   **Example:** `academic_grade`
 
 #### type
 
-- **Purpose:** How to treat the variable
-- **Required:** Yes
-- **Valid Values:**
-  - `categorical` / `nominal` - Unordered factor
-  - `ordinal` - Ordered factor (treatment contrasts)
-  - `binary` - Two-level factor
+-   **Purpose:** How to treat the variable
+-   **Required:** Yes
+-   **Valid Values:**
+    -   `categorical` / `nominal` - Unordered factor
+    -   `ordinal` - Ordered factor (treatment contrasts)
+    -   `binary` - Two-level factor
 
 #### reference_level
 
-- **Purpose:** Baseline for comparisons
-- **Required:** No
-- **Default:** First level alphabetically
-- **Example:** `Grade D` or `No`
-- **Notes:** Must exist in data
+-   **Purpose:** Baseline for comparisons
+-   **Required:** No
+-   **Default:** First level alphabetically
+-   **Example:** `Grade D` or `No`
+-   **Notes:** Must exist in data
 
 #### missing_strategy
 
-- **Purpose:** How to handle missing values
-- **Required:** No
-- **Default:** `drop_row`
-- **Valid Values:**
-  - `drop_row` - Remove rows with missing
-  - `missing_as_level` - Create "Missing" category
-  - `error_if_missing` - Refuse if any missing
+-   **Purpose:** How to handle missing values
+-   **Required:** No
+-   **Default:** `drop_row`
+-   **Valid Values:**
+    -   `drop_row` - Remove rows with missing
+    -   `missing_as_level` - Create "Missing" category
+    -   `error_if_missing` - Refuse if any missing
 
----
+------------------------------------------------------------------------
 
-## Complete Examples
+## Complete Examples {#complete-examples}
 
 ### Example 1: Binary Outcome (Customer Churn)
 
 **Settings Sheet:**
-```
+
+```         
 Setting              | Value
 ---------------------|---------------------------
 analysis_name        | Customer Churn Drivers
@@ -264,7 +276,8 @@ detailed_output      | TRUE
 ```
 
 **Variables Sheet:**
-```
+
+```         
 VariableName         | Type    | Label              | Order
 ---------------------|---------|--------------------|---------
 churn_status         | Outcome | Churn Status       |
@@ -277,7 +290,8 @@ support_contacts     | Driver  | Support Contacts   |
 ### Example 2: Ordinal Outcome (Employee Satisfaction)
 
 **Settings Sheet:**
-```
+
+```         
 Setting              | Value
 ---------------------|---------------------------
 analysis_name        | Employee Satisfaction Drivers
@@ -290,7 +304,8 @@ detailed_output      | TRUE
 ```
 
 **Variables Sheet:**
-```
+
+```         
 VariableName         | Type    | Label              | Order
 ---------------------|---------|--------------------|---------
 satisfaction_level   | Outcome | Job Satisfaction   | Low;Neutral;High
@@ -301,7 +316,8 @@ compensation         | Driver  | Compensation       |
 ```
 
 **Driver_Settings Sheet:**
-```
+
+```         
 driver              | type        | reference_level | missing_strategy
 --------------------|-------------|-----------------|------------------
 manager_support     | ordinal     | Low             | drop_row
@@ -313,7 +329,8 @@ compensation        | categorical |                 | drop_row
 ### Example 3: Nominal Outcome (Brand Preference)
 
 **Settings Sheet:**
-```
+
+```         
 Setting              | Value
 ---------------------|---------------------------
 analysis_name        | Brand Preference Drivers
@@ -327,7 +344,8 @@ detailed_output      | TRUE
 ```
 
 **Variables Sheet:**
-```
+
+```         
 VariableName         | Type    | Label              | Order
 ---------------------|---------|--------------------|---------
 preferred_brand      | Outcome | Brand Preference   |
@@ -337,38 +355,38 @@ brand_awareness      | Driver  | Brand Awareness    |
 recommendation       | Driver  | Recommendation     |
 ```
 
----
+------------------------------------------------------------------------
 
-## Validation Rules
+## Validation Rules {#validation-rules}
 
 ### Settings Validation
 
-| Setting | Rule |
-|---------|------|
-| data_file | File must exist |
-| output_file | Directory must exist |
-| outcome_type | Must be: binary, ordinal, multinomial (required) |
-| reference_category | Must exist in outcome variable |
-| min_sample_size | Integer ≥ 1 |
-| confidence_level | 0 < value < 1 |
-| missing_threshold | 0 to 100 |
-| detailed_output | TRUE or FALSE |
+| Setting            | Rule                                             |
+|--------------------|--------------------------------------------------|
+| data_file          | File must exist                                  |
+| output_file        | Directory must exist                             |
+| outcome_type       | Must be: binary, ordinal, multinomial (required) |
+| reference_category | Must exist in outcome variable                   |
+| min_sample_size    | Integer ≥ 1                                      |
+| confidence_level   | 0 \< value \< 1                                  |
+| missing_threshold  | 0 to 100                                         |
+| detailed_output    | TRUE or FALSE                                    |
 
 ### Variables Validation
 
-| Rule | Error Message |
-|------|---------------|
-| Exactly 1 Outcome | "Must have exactly one Outcome variable" |
-| At least 1 Driver | "Must have at least one Driver variable" |
-| At most 1 Weight | "Can have at most one Weight variable" |
-| VariableName in data | "Variable 'X' not found in data" |
-| Type valid | "Invalid Type 'X', must be Outcome/Driver/Weight" |
-| Label non-empty | "Label required for variable 'X'" |
+| Rule                 | Error Message                                     |
+|----------------------|---------------------------------------------------|
+| Exactly 1 Outcome    | "Must have exactly one Outcome variable"          |
+| At least 1 Driver    | "Must have at least one Driver variable"          |
+| At most 1 Weight     | "Can have at most one Weight variable"            |
+| VariableName in data | "Variable 'X' not found in data"                  |
+| Type valid           | "Invalid Type 'X', must be Outcome/Driver/Weight" |
+| Label non-empty      | "Label required for variable 'X'"                 |
 
 ### Driver_Settings Validation
 
 | Rule | Error Message |
-|------|---------------|
+|----|----|
 | driver matches Variables | "Driver 'X' not found in Variables sheet" |
 | type valid | "Invalid type 'X', must be categorical/ordinal/binary" |
 | reference_level in data | "Reference level 'X' not found in data" |
@@ -376,47 +394,48 @@ recommendation       | Driver  | Recommendation     |
 
 ### Data Validation
 
-| Rule | Action |
-|------|--------|
-| Complete cases < min_sample_size | Refuse |
-| Missing > missing_threshold | Warning |
-| Outcome has < 2 categories | Refuse |
-| Outcome has > 10 categories | Warning |
-| Driver has > 20 categories | Warning |
-| Cell count < 5 | Warning |
+| Rule                              | Action  |
+|-----------------------------------|---------|
+| Complete cases \< min_sample_size | Refuse  |
+| Missing \> missing_threshold      | Warning |
+| Outcome has \< 2 categories       | Refuse  |
+| Outcome has \> 10 categories      | Warning |
+| Driver has \> 20 categories       | Warning |
+| Cell count \< 5                   | Warning |
 
----
+------------------------------------------------------------------------
 
 ## Output Structure
 
 ### Standard Output (detailed_output = TRUE)
 
-| Sheet | Content |
-|-------|---------|
-| Executive Summary | Plain-English findings |
-| Importance Summary | Driver rankings |
-| Factor Patterns | Category breakdowns |
-| Model Summary | Fit statistics |
-| Odds Ratios | Detailed comparisons |
-| Diagnostics | Data quality checks |
+| Sheet              | Content                |
+|--------------------|------------------------|
+| Executive Summary  | Plain-English findings |
+| Importance Summary | Driver rankings        |
+| Factor Patterns    | Category breakdowns    |
+| Model Summary      | Fit statistics         |
+| Odds Ratios        | Detailed comparisons   |
+| Diagnostics        | Data quality checks    |
 
 ### Minimal Output (detailed_output = FALSE)
 
-| Sheet | Content |
-|-------|---------|
-| Executive Summary | Plain-English findings |
-| Importance Summary | Driver rankings |
-| Factor Patterns | Category breakdowns |
-| Model Summary | Fit statistics |
+| Sheet              | Content                |
+|--------------------|------------------------|
+| Executive Summary  | Plain-English findings |
+| Importance Summary | Driver rankings        |
+| Factor Patterns    | Category breakdowns    |
+| Model Summary      | Fit statistics         |
 
----
+------------------------------------------------------------------------
 
 ## Template File Location
 
-Template located at: `modules/catdriver/docs/templates/CatDriver_Config_Template.xlsx`
+Template located at:
+`modules/catdriver/docs/templates/CatDriver_Config_Template.xlsx`
 
 Copy and rename for your project.
 
----
+------------------------------------------------------------------------
 
 **Part of the Turas Analytics Platform**

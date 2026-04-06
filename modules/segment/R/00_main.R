@@ -1105,15 +1105,59 @@ generate_segment_stats_pack <- function(config, data_list, cluster_result,
     paste(parts, collapse = ", ")
   }
 
+  # Method-specific implementation label
+  method_used <- tolower(config$method %||% "kmeans")
+  impl_label <- switch(method_used,
+    "kmeans" = "base R stats::kmeans()",
+    "hclust" = paste0("stats::hclust() — linkage: ", config$linkage_method %||% "ward.D2"),
+    "gmm"    = paste0("mclust::Mclust() — model: ", config$gmm_model_type %||% "VVV"),
+    paste0("base R — method: ", method_used)
+  )
+
+  # Per-cluster sample sizes
+  cluster_sizes <- if (!is.null(cluster_result$clusters)) {
+    tbl <- table(cluster_result$clusters)
+    paste(vapply(seq_along(tbl), function(i) {
+      sprintf("Segment %s: n=%d (%.1f%%)", names(tbl)[i], tbl[i],
+              100 * tbl[i] / sum(tbl))
+    }, character(1)), collapse = "; ")
+  } else {
+    "Not available"
+  }
+
+  # Validation metrics summary
+  val_summary <- if (!is.null(validation_metrics)) {
+    parts <- character(0)
+    if (!is.null(validation_metrics$silhouette))
+      parts <- c(parts, sprintf("Silhouette=%.3f", validation_metrics$silhouette))
+    if (!is.null(validation_metrics$calinski_harabasz))
+      parts <- c(parts, sprintf("CH=%.1f", validation_metrics$calinski_harabasz))
+    if (!is.null(validation_metrics$davies_bouldin) && is.finite(validation_metrics$davies_bouldin))
+      parts <- c(parts, sprintf("DB=%.3f", validation_metrics$davies_bouldin))
+    if (length(parts) > 0) paste(parts, collapse = "; ") else "Not computed"
+  } else {
+    "Not computed"
+  }
+
   assumptions <- list(
     "Clustering Method"       = config$method %||% "kmeans",
     "k (segments)"            = as.character(cluster_result$k),
+    "Segment sizes"           = cluster_sizes,
     "nstart"                  = as.character(config$nstart %||% 25),
     "Seed"                    = as.character(seed_used %||% "random"),
     "Variables used"          = as.character(n_vars),
     "Standardization"         = if (isTRUE(config$standardize)) "Yes" else "No",
     "Missing data handling"   = config$missing_method %||% config$imputation_method %||% "listwise",
-    "Implementation"          = "base R kmeans() / hclust()",
+    "Outlier detection"       = if (isTRUE(config$outlier_detection))
+                                  paste0("Yes — method: ", config$outlier_method %||% "mahalanobis")
+                                else "No",
+    "Variable selection"      = if (isTRUE(config$variable_selection))
+                                  paste0("Yes — method: ", config$variable_selection_method %||% "variance")
+                                else "No",
+    "Implementation"          = impl_label,
+    "Validation metrics"      = val_summary,
+    "Multiple comparisons"    = "No family-wise correction applied to profiling tests",
+    "Weighting"               = "Not supported — unweighted analysis",
     "TRS Status"              = run_result$status %||% "PASS",
     "TRS Events"              = trs_summary
   )
@@ -1146,10 +1190,15 @@ generate_segment_stats_pack <- function(config, data_list, cluster_result,
     seeds            = list("k-means / clustering" = as.character(seed_used %||% "random")),
     run_result       = run_result,
     packages         = c("openxlsx", "data.table"),
-    config_echo      = list(settings = config[c("method", "k", "k_min", "k_max",
-                                                  "nstart", "standardize",
-                                                  "missing_method", "output_folder",
-                                                  "project_name", "data_file")])
+    config_echo      = list(settings = config[intersect(names(config), c(
+                                                  "method", "k", "k_min", "k_max", "k_fixed",
+                                                  "nstart", "standardize", "seed",
+                                                  "missing_method", "missing_threshold",
+                                                  "outlier_detection", "outlier_method", "outlier_threshold",
+                                                  "variable_selection", "variable_selection_method",
+                                                  "linkage_method", "gmm_model_type",
+                                                  "min_segment_size_pct",
+                                                  "output_folder", "project_name", "data_file"))])
   )
 
   result <- turas_write_stats_pack(payload, output_path)

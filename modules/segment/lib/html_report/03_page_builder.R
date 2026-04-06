@@ -26,7 +26,10 @@ local({
   callout_dir <- file.path(turas_root, "modules", "shared", "lib", "callouts")
   if (!dir.exists(callout_dir)) callout_dir <- file.path("modules", "shared", "lib", "callouts")
   if (!exists("turas_callout", mode = "function") && dir.exists(callout_dir)) {
-    source(file.path(callout_dir, "callout_registry.R"), local = FALSE)
+    tryCatch(
+      source(file.path(callout_dir, "callout_registry.R"), local = FALSE),
+      error = function(e) message("[SEGMENT] Callout registry failed to load: ", e$message)
+    )
     # Prime callout cache with TURAS_ROOT-resolved path (avoids getwd() issues)
     json_path <- file.path(callout_dir, "callouts.json")
     if (file.exists(json_path) && is.null(.callout_cache$data)) {
@@ -36,6 +39,10 @@ local({
         .callout_cache$data <- cdata
       }, error = function(e) NULL)
     }
+  }
+  # Fallback: provide a no-op turas_callout if shared library was not found
+  if (!exists("turas_callout", mode = "function")) {
+    turas_callout <<- function(module, key, ...) ""
   }
   # Source shared TurasPins JS loader
   pins_path <- file.path(turas_root, "modules", "shared", "lib", "turas_pins_js.R")

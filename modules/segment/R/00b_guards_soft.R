@@ -323,5 +323,19 @@ segment_guard_post_clustering <- function(guard, cluster_result, validation_metr
   guard <- guard_record_cluster_stability(guard, cluster_result$k,
     validation_metrics$avg_silhouette, validation_metrics$tot_withinss)
 
+  # Flag convergence warnings from clustering algorithms
+  if (!is.null(cluster_result$convergence_warning)) {
+    guard$warnings <- c(guard$warnings,
+      sprintf("Clustering convergence issue: %s", cluster_result$convergence_warning))
+    guard$stability_flags <- c(guard$stability_flags, "kmeans_convergence")
+  }
+
+  # Flag degenerate GMM components
+  if (!is.null(cluster_result$degenerate_components)) {
+    guard$warnings <- c(guard$warnings,
+      sprintf("GMM degenerate components: %s", cluster_result$degenerate_components))
+    guard$stability_flags <- c(guard$stability_flags, "gmm_degenerate")
+  }
+
   guard
 }
