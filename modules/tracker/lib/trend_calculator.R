@@ -1171,6 +1171,12 @@ calculate_multi_mention_trend_categories <- function(q_code, question_map, wave_
       mention_proportions[[category]] <- proportion
     }
 
+    # Calculate effective N from weights (Kish formula)
+    w_cat <- wave_df$weight_var[valid_rows]
+    sum_w_cat <- sum(w_cat, na.rm = TRUE)
+    sum_w2_cat <- sum(w_cat^2, na.rm = TRUE)
+    cat_eff_n <- if (sum_w2_cat > 0) (sum_w_cat^2) / sum_w2_cat else 0
+
     # Store results
     wave_results[[wave_id]] <- list(
       available = TRUE,
@@ -1179,7 +1185,8 @@ calculate_multi_mention_trend_categories <- function(q_code, question_map, wave_
       tracked_columns = mm_columns,
       tracked_categories = categories_to_track,
       n_unweighted = length(valid_rows),
-      n_weighted = sum(wave_df$weight_var[valid_rows], na.rm = TRUE)
+      n_weighted = sum_w_cat,
+      eff_n = cat_eff_n
     )
   }
 
