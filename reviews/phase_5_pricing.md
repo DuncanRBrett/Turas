@@ -310,7 +310,7 @@ All critical and important findings addressed in this session. Tests passing (Pr
 
 | Finding | Status | What was done |
 |---------|--------|---------------|
-| C1: Formula injection in Excel output | FIXED | Added `pricing_escape_cell()`/`pricing_escape_df()` inline fallback using vapply+substr (not regex). Applied to all 34 data frame and scalar string writeData paths in `06_output.R` |
+| C1: Formula injection in Excel output | FIXED | Added `pricing_escape_cell()`/`pricing_escape_df()` inline fallback using vapply+substr (not regex). Applied to all 44 writeData paths in `06_output.R` (29 data frames + 5 scalar strings + 10 additional sub-sheet writes) |
 | C2: HTML callout tryCatch + fallback | FIXED | Added `tryCatch()` around `source(callout_registry.R)` with `message()` on error. Added no-op fallbacks for both `turas_callout` and `turas_callout_text` |
 | C3: Stats pack duration always ~0 | FIXED | Captured `start_time <- Sys.time()` at beginning of `run_pricing_analysis_from_config()` (line 168). Stats pack now receives the real start time |
 | I1: GUI launcher cat() before stop() | FIXED | Added `cat(msg)` before `stop(msg, call. = FALSE)` in `early_refuse()` for Shiny console visibility |
