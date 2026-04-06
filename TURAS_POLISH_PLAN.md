@@ -440,7 +440,7 @@ tooling.
 | 1 | Tabs + Tracker | Fixes applied — awaiting re-review |
 | 2 | Weighting + Confidence | Fixes applied — awaiting re-review |
 | 3 | KeyDriver + CatDriver | Fixes applied — awaiting re-review |
-| 4 | Segment | Complete — passed re-review         |
+| 4 | Segment | Complete — passed re-review |
 | 5 | Pricing | Not started |
 | 6 | Conjoint + MaxDiff | Not started |
 | 7 | AlchemerParser + Report Hub + hub_app | Not started |
