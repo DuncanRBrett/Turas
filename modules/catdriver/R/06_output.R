@@ -75,10 +75,15 @@ write_catdriver_output <- function(results, config, output_file) {
     turas_excel_escape
   } else {
     # Minimal inline fallback: prefix dangerous characters with single quote
-    # Covers OWASP CSV injection vectors: =, +, -, @, tab, carriage return
+    # Covers OWASP CSV injection vectors: =, +, -, @, tab, CR, LF
+    # Must match .EXCEL_FORMULA_PREFIXES in shared/lib/turas_excel_escape.R
     function(x) {
       if (!is.character(x)) return(x)
-      gsub("^([\t\r=+\\-@])", "'\\1", x)
+      dangerous <- c("=", "+", "-", "@", "\t", "\r", "\n")
+      vapply(x, function(v) {
+        if (is.na(v) || nchar(v) == 0) return(v)
+        if (substr(v, 1, 1) %in% dangerous) paste0("'", v) else v
+      }, character(1), USE.NAMES = FALSE)
     }
   }
 

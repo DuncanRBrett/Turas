@@ -25,7 +25,7 @@ local({
   if (!exists("turas_callout", mode = "function") && dir.exists(callout_dir)) {
     tryCatch(
       source(file.path(callout_dir, "callout_registry.R"), local = FALSE),
-      error = function(e) NULL
+      error = function(e) message("[KD HTML] Callout registry load failed: ", e$message)
     )
   }
   # No-op fallback: if callout registry is unavailable (CLI, standalone, test),
