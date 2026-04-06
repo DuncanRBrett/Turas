@@ -232,7 +232,7 @@ framework suggests overlapping groups.
 ### Decision framework
 
 | Situation | Recommended method |
-|---------------------------|---------------------------------------------|
+|----|----|
 | Standard market research segmentation, n \> 200 | K-means |
 | Exploratory analysis, uncertain about k | Hierarchical (then k-means) |
 | Need probabilistic segment membership | GMM |
@@ -254,7 +254,7 @@ the segments become uninterpretable or too small to act on.
 Turas computes several metrics to guide k selection:
 
 | Metric | What it measures | How to read it |
-|-----------------|----------------------------|---------------------------|
+|----|----|----|
 | **Silhouette coefficient** | How well each respondent fits its assigned cluster vs the next-best cluster | Range: -1 to +1. Above 0.5 is strong, 0.25-0.5 is reasonable, below 0.25 is weak |
 | **Calinski-Harabasz index** | Ratio of between-cluster to within-cluster variance | Higher is better. Look for local maxima across k values |
 | **Davies-Bouldin index** | Average similarity of each cluster to its most similar cluster | Lower is better. Below 1.0 indicates good separation |
