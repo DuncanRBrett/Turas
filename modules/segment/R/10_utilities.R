@@ -1611,145 +1611,143 @@ generate_segment_config_template <- function(output_path = "Segment_Config_Templ
   wb <- openxlsx::createWorkbook()
   openxlsx::addWorksheet(wb, "Config")
 
-  # Build config parameter table
-  params <- data.frame(
-    Setting = c(
-      # --- DATA SOURCE ---
-      "data_file", "data_sheet", "id_variable", "clustering_vars",
-      "profile_vars", "demographic_vars",
-      # --- CLUSTERING METHOD ---
-      "method", "linkage_method", "gmm_model_type",
-      # --- K PARAMETERS ---
-      "k_fixed", "k_min", "k_max", "nstart", "seed",
-      # --- DATA HANDLING ---
-      "missing_data", "missing_threshold", "standardize",
-      "min_segment_size_pct",
-      # --- OUTLIER DETECTION ---
-      "outlier_detection", "outlier_method", "outlier_threshold",
-      "outlier_handling", "outlier_min_vars",
-      # --- VARIABLE SELECTION ---
-      "variable_selection", "variable_selection_method",
-      "max_clustering_vars",
-      # --- OUTPUT ---
-      "output_folder", "output_prefix", "create_dated_folder",
-      "save_model", "generate_stats_pack", "segment_names", "auto_name_style", "scale_max",
-      # --- HTML REPORT ---
-      "html_report", "brand_colour", "accent_colour", "report_title",
-      # --- ENHANCED FEATURES ---
-      "generate_rules", "rules_max_depth",
-      "generate_action_cards",
-      "run_stability_check", "stability_n_runs",
-      "golden_questions_n",
-      # --- METADATA ---
-      "project_name", "analyst_name", "description",
-      "question_labels_file", "segment_names_file",
-      # --- STUDY IDENTIFICATION ---
-      "research_house"
-    ),
-    Value = c(
-      # DATA SOURCE
-      if (include_sample_values) "data/survey_data.xlsx" else "",
-      "Data",
-      if (include_sample_values) "respondent_id" else "",
-      if (include_sample_values) "q1,q2,q3,q4,q5" else "",
-      "", "",
-      # METHOD
-      "kmeans", "ward.D2", "",
-      # K
-      "", "3", "6", "50", "123",
-      # DATA HANDLING
-      "listwise_deletion", "15", "TRUE", "10",
-      # OUTLIERS
-      "FALSE", "zscore", "3.0", "flag", "1",
-      # VARIABLE SELECTION
-      "FALSE", "variance_correlation", "10",
-      # OUTPUT
-      "output/", "seg_", "TRUE", "TRUE", "N",
-      "auto", "descriptive", "10",
-      # HTML
-      "TRUE", "#323367", "#CC9900", "Segmentation Report",
-      # ENHANCED
-      "TRUE", "3", "TRUE", "FALSE", "5", "3",
-      # METADATA
-      if (include_sample_values) "My Segmentation Project" else "",
-      if (include_sample_values) "Analyst Name" else "",
-      "", "", "",
-      # STUDY IDENTIFICATION
-      ""
-    ),
-    Description = c(
-      # DATA SOURCE
-      "Path to survey data file (.xlsx, .csv, or .sav)",
-      "Sheet name in Excel file (default: Data)",
-      "Column name for respondent unique identifier",
-      "Comma-separated list of numeric variables for clustering",
-      "Comma-separated profile variables (optional, auto-detected if blank)",
-      "Comma-separated demographic variables for profiling (optional)",
-      # METHOD
-      "Clustering method: kmeans, hclust, gmm, or comma-separated for multi-method",
-      "Linkage method for hclust: ward.D2, complete, average, single",
-      "GMM covariance model type (blank = auto-select best BIC)",
-      # K
-      "Fixed number of segments (leave blank for exploration mode)",
-      "Minimum k to test in exploration mode",
-      "Maximum k to test in exploration mode",
-      "Number of random starts for k-means (higher = more stable, slower)",
-      "Random seed for reproducibility",
-      # DATA HANDLING
-      "How to handle missing data: listwise_deletion, mean_imputation, median_imputation, refuse",
-      "Maximum % missing data before warning (0-100)",
-      "Standardize variables before clustering? TRUE/FALSE",
-      "Minimum segment size as % of total (warns if below)",
-      # OUTLIERS
-      "Enable outlier detection? TRUE/FALSE",
-      "Outlier detection method: zscore or mahalanobis",
-      "Z-score threshold for outlier detection (typically 2.5-3.5)",
-      "How to handle outliers: none, flag, or remove",
-      "Minimum variables exceeding threshold to flag as outlier",
-      # VARIABLE SELECTION
-      "Enable automatic variable selection? TRUE/FALSE",
-      "Selection method: variance_correlation, factor_analysis, or both",
-      "Maximum number of clustering variables after selection",
-      # OUTPUT
-      "Output folder path (relative to config file)",
-      "Prefix for output file names",
-      "Create date-stamped subfolder? TRUE/FALSE",
-      "Save model object (.rds) for scoring? TRUE/FALSE",
-      "Generate a diagnostic stats pack workbook alongside main output. Provides a full audit trail of data received, methods used, assumptions, and reproducibility — designed for advanced partners and research statisticians. The random seed (set via 'seed' parameter) is captured in the Reproducibility sheet. Output file is named {output}_stats_pack.xlsx. Y or N.",
-      "Segment names: 'auto' or comma-separated custom names",
-      "Auto-naming style: descriptive, persona, or simple",
-      "Maximum value on rating scale (for interpreting high/low scores)",
-      # HTML
-      "Generate interactive HTML report? TRUE/FALSE",
-      "Brand colour for report header (hex code)",
-      "Accent colour for highlights (hex code)",
-      "Report title displayed in header",
-      # ENHANCED
-      "Generate classification rules (decision tree)? TRUE/FALSE",
-      "Maximum depth for classification tree (1-5)",
-      "Generate executive action cards? TRUE/FALSE",
-      "Run stability bootstrap check? TRUE/FALSE",
-      "Number of bootstrap runs for stability (3-20)",
-      "Number of golden questions to identify (1-10)",
-      # METADATA
-      "Project name for report headers",
-      "Analyst name for report attribution",
-      "Project description (optional)",
-      "Path to Excel file with question labels (optional)",
-      "Path to Excel file with edited segment names (optional, Step 3 workflow)",
-      # STUDY IDENTIFICATION
-      "Research organisation name — appears in the stats pack Declaration sheet. Use your company or white-label partner name."
-    ),
-    stringsAsFactors = FALSE
+  # ---------------------------------------------------------------------------
+  # Build 5-column config table (Tabs standard): Setting | Value | Required | Description | Valid Values
+  # Section header rows have Setting = section name, other cols blank
+  # ---------------------------------------------------------------------------
+  add_section <- function(name) list(Setting = name, Value = "", Required = "", Description = "", Valid_Values = "")
+  add_field <- function(s, v, r, d, vv = "") list(Setting = s, Value = v, Required = r, Description = d, Valid_Values = vv)
+  sv <- function(val) if (include_sample_values) val else ""
+
+  rows <- list(
+    # --- DATA SOURCE ---
+    add_section("DATA SOURCE"),
+    add_field("data_file",        sv("data/survey_data.xlsx"), "REQUIRED", "Path to survey data file (.xlsx, .csv, or .sav)", ".xlsx, .csv, .sav"),
+    add_field("data_sheet",       "Data",      "Optional", "Sheet name in Excel file", "Any valid sheet name"),
+    add_field("id_variable",      sv("respondent_id"), "REQUIRED", "Column name for respondent unique identifier", "Column name in data"),
+    add_field("clustering_vars",  sv("q1,q2,q3,q4,q5"), "REQUIRED", "Comma-separated list of numeric variables for clustering. Aim for 8-20 variables.", "Comma-separated column names"),
+    add_field("profile_vars",     "",          "Optional", "Comma-separated variables for profiling (auto-detected from data if blank)", "Comma-separated column names"),
+    add_field("demographic_vars", "",          "Optional", "Comma-separated categorical variables for demographic profiling", "Comma-separated column names"),
+    # --- CLUSTERING METHOD ---
+    add_section("CLUSTERING METHOD"),
+    add_field("method",           "kmeans",    "REQUIRED", "Clustering algorithm. Use 'all' or comma-separated for multi-method comparison.", "kmeans, hclust, gmm, all"),
+    add_field("linkage_method",   "ward.D2",   "Optional", "Linkage for hierarchical clustering. Only used when method=hclust.", "ward.D2, complete, average, single, mcquitty, median, centroid"),
+    add_field("gmm_model_type",   "",          "Optional", "GMM covariance structure. Only used when method=gmm. Blank = auto-select by BIC.", "EII, VII, EEI, VEI, EVI, VVI, EEE, VEE, EVE, VVE, EEV, VEV, EVV, VVV"),
+    # --- K PARAMETERS ---
+    add_section("K PARAMETERS"),
+    add_field("k_fixed",          "",          "Optional", "Fixed number of segments. Leave blank for exploration mode (tests k_min to k_max).", "Integer >= 2"),
+    add_field("k_min",            "3",         "Optional", "Minimum k to test in exploration mode", "2-10"),
+    add_field("k_max",            "6",         "Optional", "Maximum k to test in exploration mode. Must be > k_min.", "2-15"),
+    add_field("k_selection_metrics", "silhouette,elbow", "Optional", "Metrics for choosing optimal k in exploration mode", "silhouette, elbow, calinski_harabasz, davies_bouldin, gap_statistic"),
+    add_field("nstart",           "50",        "Optional", "Number of random starts for k-means (higher = more stable, slower)", "1-200"),
+    add_field("seed",             "123",       "Optional", "Random seed for reproducibility. Set to any integer.", "Any positive integer"),
+    # --- DATA HANDLING ---
+    add_section("DATA HANDLING"),
+    add_field("missing_data",     "listwise_deletion", "Optional", "Strategy for missing values in clustering variables", "listwise_deletion, mean_imputation, median_imputation, refuse"),
+    add_field("missing_threshold", "15",       "Optional", "Maximum % missing data per variable before warning", "0-100"),
+    add_field("standardize",      "TRUE",      "Optional", "Standardize (z-score) variables before clustering? Recommended unless all on same scale.", "TRUE, FALSE"),
+    add_field("min_segment_size_pct", "10",    "Optional", "Minimum segment size as % of total. Warns if any segment is smaller.", "0-50"),
+    # --- OUTLIER DETECTION ---
+    add_section("OUTLIER DETECTION"),
+    add_field("outlier_detection", "FALSE",    "Optional", "Enable multivariate outlier detection before clustering?", "TRUE, FALSE"),
+    add_field("outlier_method",   "zscore",    "Optional", "Detection method. Only used when outlier_detection=TRUE.", "zscore, mahalanobis"),
+    add_field("outlier_threshold", "3.0",      "Optional", "Threshold for flagging outliers (z-score or chi-sq alpha)", "1.0-5.0"),
+    add_field("outlier_handling", "flag",      "Optional", "How to handle detected outliers", "none, flag, remove"),
+    add_field("outlier_min_vars", "1",         "Optional", "Minimum variables exceeding threshold to flag a respondent", "1 to number of clustering vars"),
+    add_field("outlier_alpha",    "0.001",     "Optional", "Statistical alpha for Mahalanobis outlier detection", "0.0001-0.1"),
+    # --- VARIABLE SELECTION ---
+    add_section("VARIABLE SELECTION"),
+    add_field("variable_selection", "FALSE",   "Optional", "Enable automatic variable selection to reduce redundancy?", "TRUE, FALSE"),
+    add_field("variable_selection_method", "variance_correlation", "Optional", "Selection algorithm. Only used when variable_selection=TRUE.", "variance_correlation, factor_analysis, both"),
+    add_field("max_clustering_vars", "10",     "Optional", "Maximum variables to retain after selection", "2-20"),
+    add_field("varsel_min_variance", "0.1",    "Optional", "Minimum variance threshold — variables below this are dropped", "0.01-1.0"),
+    add_field("varsel_max_correlation", "0.8", "Optional", "Maximum pairwise correlation — one of a correlated pair is dropped", "0.5-0.95"),
+    # --- OUTPUT ---
+    add_section("OUTPUT"),
+    add_field("output_folder",    "output/",   "Optional", "Output folder path (relative to config file location)", "Any valid path"),
+    add_field("output_prefix",    "seg_",      "Optional", "Prefix for all output file names", "Text"),
+    add_field("create_dated_folder", "TRUE",   "Optional", "Create a date-stamped subfolder for each run?", "TRUE, FALSE"),
+    add_field("save_model",       "TRUE",      "Optional", "Save clustering model (.rds) for scoring new respondents?", "TRUE, FALSE"),
+    add_field("generate_stats_pack", "Y",      "Optional", "Generate diagnostics stats pack. Contractual deliverable — provides audit trail.", "Y, N"),
+    add_field("segment_names",    "auto",      "Optional", "Segment labels: 'auto' generates names, or provide comma-separated custom names matching k.", "'auto' or comma-separated names"),
+    add_field("auto_name_style",  "descriptive", "Optional", "Style for auto-generated names", "descriptive, persona, simple"),
+    add_field("scale_max",        "10",        "Optional", "Maximum value on rating scale (for interpreting high/low scores in naming)", "1-100"),
+    # --- HTML REPORT ---
+    add_section("HTML REPORT"),
+    add_field("html_report",      "TRUE",      "Optional", "Generate interactive HTML report with charts and profiles?", "TRUE, FALSE"),
+    add_field("brand_colour",     "#323367",   "Optional", "Brand colour for report header (hex code)", "#000000 to #FFFFFF"),
+    add_field("accent_colour",    "#CC9900",   "Optional", "Accent colour for highlights (hex code)", "#000000 to #FFFFFF"),
+    add_field("report_title",     "Segmentation Report", "Optional", "Title displayed in report header", "Text"),
+    add_field("html_show_exec_summary", "TRUE", "Optional", "Show executive summary section in HTML report", "TRUE, FALSE"),
+    add_field("html_show_overview",     "TRUE", "Optional", "Show overview section", "TRUE, FALSE"),
+    add_field("html_show_validation",   "TRUE", "Optional", "Show validation metrics section", "TRUE, FALSE"),
+    add_field("html_show_importance",   "TRUE", "Optional", "Show variable importance section", "TRUE, FALSE"),
+    add_field("html_show_profiles",     "TRUE", "Optional", "Show segment profiles section", "TRUE, FALSE"),
+    add_field("html_show_demographics", "TRUE", "Optional", "Show demographic profiles section", "TRUE, FALSE"),
+    add_field("html_show_rules",        "TRUE", "Optional", "Show classification rules section", "TRUE, FALSE"),
+    add_field("html_show_cards",        "TRUE", "Optional", "Show action cards section", "TRUE, FALSE"),
+    add_field("html_show_stability",    "TRUE", "Optional", "Show stability analysis section", "TRUE, FALSE"),
+    add_field("html_show_membership",   "TRUE", "Optional", "Show membership probabilities section", "TRUE, FALSE"),
+    add_field("html_show_guide",        "TRUE", "Optional", "Show interpretation guide section", "TRUE, FALSE"),
+    # --- ENHANCED FEATURES ---
+    add_section("ENHANCED FEATURES"),
+    add_field("generate_rules",   "TRUE",      "Optional", "Generate classification rules (decision tree) for typing new respondents?", "TRUE, FALSE"),
+    add_field("rules_max_depth",  "3",         "Optional", "Maximum tree depth for classification rules", "1-5"),
+    add_field("generate_action_cards", "TRUE",  "Optional", "Generate executive action cards per segment?", "TRUE, FALSE"),
+    add_field("run_stability_check", "FALSE",  "Optional", "Run bootstrap stability check? Computationally expensive.", "TRUE, FALSE"),
+    add_field("stability_n_runs", "5",         "Optional", "Number of bootstrap runs for stability analysis", "3-20"),
+    add_field("golden_questions_n", "3",       "Optional", "Number of golden questions to identify for typing tool", "1-100"),
+    add_field("use_lca",          "FALSE",     "Optional", "Enable latent class analysis (experimental). Requires poLCA package.", "TRUE, FALSE"),
+    # --- METADATA ---
+    add_section("METADATA"),
+    add_field("project_name",     sv("My Segmentation Project"), "Optional", "Project name for report headers and stats pack", "Text"),
+    add_field("analyst_name",     sv("Analyst Name"), "Optional", "Analyst name for report attribution", "Text"),
+    add_field("description",      "",          "Optional", "Project description (appears in report and stats pack)", "Text"),
+    add_field("question_labels_file", "",      "Optional", "Path to Excel file with question labels (variable | label)", ".xlsx file path"),
+    add_field("segment_names_file",   "",      "Optional", "Path to Excel file with edited segment names (Step 3 workflow)", ".xlsx file path"),
+    # --- STUDY IDENTIFICATION ---
+    add_section("STUDY IDENTIFICATION"),
+    add_field("research_house",   "",          "Optional", "Research organisation name for stats pack Declaration sheet", "Text")
   )
+
+  params <- do.call(rbind, lapply(rows, as.data.frame, stringsAsFactors = FALSE))
+  names(params) <- c("Setting", "Value", "Required?", "Description", "Valid Values / Notes")
+
+  # Identify section header rows (empty Value column = section)
+  section_rows <- which(params$`Required?` == "" & params$Value == "" &
+                        params$Description == "" & nzchar(params$Setting))
 
   # Write data with branded formatting
   seg_write_branded_sheet(wb, "Config", params)
 
-  # Widen columns for readability
-  openxlsx::setColWidths(wb, "Config", cols = 1, widths = 28)
-  openxlsx::setColWidths(wb, "Config", cols = 2, widths = 35)
-  openxlsx::setColWidths(wb, "Config", cols = 3, widths = 65)
+  # Widen columns to Tabs standard
+  openxlsx::setColWidths(wb, "Config", cols = 1, widths = 30)
+  openxlsx::setColWidths(wb, "Config", cols = 2, widths = 30)
+  openxlsx::setColWidths(wb, "Config", cols = 3, widths = 12)
+  openxlsx::setColWidths(wb, "Config", cols = 4, widths = 60)
+  openxlsx::setColWidths(wb, "Config", cols = 5, widths = 35)
+
+  # Style section header rows (lavender background, bold, merged across cols 2-5)
+  section_style <- openxlsx::createStyle(
+    fontName = SEG_FONT_NAME, fontSize = 11, fontColour = SEG_BRAND_COLOUR,
+    fgFill = "#E8EAF6", textDecoration = "bold",
+    border = "bottom", borderColour = SEG_BRAND_COLOUR
+  )
+  for (sr in section_rows) {
+    openxlsx::addStyle(wb, "Config", style = section_style,
+                       rows = sr + 1, cols = 1:5, gridExpand = TRUE, stack = TRUE)
+  }
+
+  # Style Required column: orange for REQUIRED, green for Optional
+  req_style <- openxlsx::createStyle(fontColour = "#D32F2F", textDecoration = "bold", fontSize = 9)
+  opt_style <- openxlsx::createStyle(fontColour = "#388E3C", fontSize = 9)
+  for (i in seq_len(nrow(params))) {
+    if (params$`Required?`[i] == "REQUIRED") {
+      openxlsx::addStyle(wb, "Config", style = req_style, rows = i + 1, cols = 3, stack = TRUE)
+    } else if (params$`Required?`[i] == "Optional") {
+      openxlsx::addStyle(wb, "Config", style = opt_style, rows = i + 1, cols = 3, stack = TRUE)
+    }
+  }
 
   # Add data validation dropdowns
   method_vals <- "kmeans,hclust,gmm,all"
@@ -1760,47 +1758,50 @@ generate_segment_config_template <- function(output_path = "Segment_Config_Templ
   name_style_vals <- "descriptive,persona,simple"
   linkage_vals <- "ward.D2,complete,average,single,mcquitty,median,centroid"
   varsel_vals <- "variance_correlation,factor_analysis,both"
+  kmetrics_vals <- "silhouette,elbow,calinski_harabasz,davies_bouldin,gap_statistic"
 
-  # Find row indices for each parameter that needs validation
-  method_row <- which(params$Setting == "method") + 1
-  missing_row <- which(params$Setting == "missing_data") + 1
-  outlier_m_row <- which(params$Setting == "outlier_method") + 1
-  outlier_h_row <- which(params$Setting == "outlier_handling") + 1
-  linkage_row <- which(params$Setting == "linkage_method") + 1
-  varsel_row <- which(params$Setting == "variable_selection_method") + 1
-  name_row <- which(params$Setting == "auto_name_style") + 1
+  # Find row indices (+1 for header row)
+  find_row <- function(setting) {
+    idx <- which(params$Setting == setting)
+    if (length(idx) == 1) idx + 1 else NULL
+  }
 
   # Apply data validation
   tryCatch({
-    openxlsx::dataValidation(wb, "Config", col = 2, rows = method_row,
-      type = "list", value = paste0('"', method_vals, '"'))
-    openxlsx::dataValidation(wb, "Config", col = 2, rows = missing_row,
-      type = "list", value = paste0('"', missing_vals, '"'))
-    openxlsx::dataValidation(wb, "Config", col = 2, rows = outlier_m_row,
-      type = "list", value = paste0('"', outlier_method_vals, '"'))
-    openxlsx::dataValidation(wb, "Config", col = 2, rows = outlier_h_row,
-      type = "list", value = paste0('"', outlier_handling_vals, '"'))
-    openxlsx::dataValidation(wb, "Config", col = 2, rows = linkage_row,
-      type = "list", value = paste0('"', linkage_vals, '"'))
-    openxlsx::dataValidation(wb, "Config", col = 2, rows = varsel_row,
-      type = "list", value = paste0('"', varsel_vals, '"'))
-    openxlsx::dataValidation(wb, "Config", col = 2, rows = name_row,
-      type = "list", value = paste0('"', name_style_vals, '"'))
+    # Dropdown validations
+    dropdown_map <- list(
+      method = method_vals, missing_data = missing_vals,
+      outlier_method = outlier_method_vals, outlier_handling = outlier_handling_vals,
+      linkage_method = linkage_vals, variable_selection_method = varsel_vals,
+      auto_name_style = name_style_vals
+    )
+    for (setting in names(dropdown_map)) {
+      row <- find_row(setting)
+      if (!is.null(row)) {
+        openxlsx::dataValidation(wb, "Config", col = 2, rows = row,
+          type = "list", value = paste0('"', dropdown_map[[setting]], '"'))
+      }
+    }
 
     # Y/N validation for stats pack
-    stats_pack_row <- which(params$Setting == "generate_stats_pack") + 1
-    if (length(stats_pack_row) == 1) {
+    stats_pack_row <- find_row("generate_stats_pack")
+    if (!is.null(stats_pack_row)) {
       openxlsx::dataValidation(wb, "Config", col = 2, rows = stats_pack_row,
         type = "list", value = '"Y,N"')
     }
 
-    # Boolean validations
+    # Boolean validations (TRUE/FALSE dropdowns)
     bool_settings <- c("standardize", "outlier_detection", "variable_selection",
                        "create_dated_folder", "save_model", "html_report",
-                       "generate_rules", "generate_action_cards", "run_stability_check")
+                       "generate_rules", "generate_action_cards", "run_stability_check",
+                       "use_lca",
+                       "html_show_exec_summary", "html_show_overview", "html_show_validation",
+                       "html_show_importance", "html_show_profiles", "html_show_demographics",
+                       "html_show_rules", "html_show_cards", "html_show_stability",
+                       "html_show_membership", "html_show_guide")
     for (setting in bool_settings) {
-      row <- which(params$Setting == setting) + 1
-      if (length(row) == 1) {
+      row <- find_row(setting)
+      if (!is.null(row)) {
         openxlsx::dataValidation(wb, "Config", col = 2, rows = row,
           type = "list", value = paste0('"', bool_vals, '"'))
       }
