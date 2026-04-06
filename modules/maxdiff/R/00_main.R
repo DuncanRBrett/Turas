@@ -413,7 +413,7 @@ run_maxdiff_impl <- function(config_path, project_root = NULL, verbose = TRUE) {
 
   if (config$mode == "ANALYSIS") {
     generate_stats_pack_flag <- isTRUE(
-      toupper(config$project_settings$Generate_Stats_Pack %||% "N") == "Y"
+      toupper(config$project_settings$Generate_Stats_Pack %||% "Y") == "Y"
     ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
 
     if (generate_stats_pack_flag) {

@@ -498,8 +498,8 @@ generate_crosstab_config_template <- function(output_path,
         list(name = "closing_notes", default = "", required = FALSE,
              description = "Custom text for the closing section of the HTML report.",
              valid_values_text = "Any text (supports markdown)"),
-        list(name = "Generate_Stats_Pack", default = "N", required = FALSE,
-             description = "Generate a diagnostic stats pack workbook. NOTE: For tabs module, enable via R option: options(turas.generate_stats_pack = TRUE). Output file is named {output}_stats_pack.xlsx.",
+        list(name = "Generate_Stats_Pack", default = "Y", required = FALSE,
+             description = "Generate a diagnostic stats pack workbook alongside main output. Stats packs are contractual deliverables. Output file is named {output}_stats_pack.xlsx.",
              valid_values_text = "Y or N (see description)",
              dropdown = c("Y", "N"))
       )

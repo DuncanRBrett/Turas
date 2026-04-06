@@ -628,7 +628,7 @@ run_weighting <- function(config_file,
   # ============================================================================
   stats_pack_file <- NULL
   generate_stats_pack_flag <- isTRUE(
-    toupper(config$general$generate_stats_pack %||% "N") == "Y"
+    toupper(config$general$generate_stats_pack %||% "Y") == "Y"
   ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
 
   if (generate_stats_pack_flag) {
