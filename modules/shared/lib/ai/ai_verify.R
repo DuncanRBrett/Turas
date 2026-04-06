@@ -77,6 +77,17 @@ verify_callout <- function(callout, question_data, ai_config, build_prompt_fn) {
     return(callout)
   }
 
+  # Deterministic pre-check: extract numbers from narrative and confirm each
+
+  # appears in the source data. Catches fabricated statistics before the LLM
+  # verification pass, which is not guaranteed to detect them.
+  deterministic_result <- deterministic_number_check(callout$narrative, question_data)
+  if (!isTRUE(deterministic_result$pass)) {
+    callout$verified <- FALSE
+    callout$verification_issues <- deterministic_result$issues
+    return(callout)
+  }
+
   # Call the verification model
   result <- call_insight_model(prompt, verification_schema, ai_config)
 
@@ -94,6 +105,73 @@ verify_callout <- function(callout, question_data, ai_config, build_prompt_fn) {
   }
 
   callout
+}
+
+
+#' Deterministic check that numbers cited in a narrative appear in source data
+#'
+#' Extracts all numeric values from the narrative text and checks each against
+#' a flattened set of numbers from the source data. Numbers that do not appear
+#' in the source data are flagged. This catches fabricated statistics that an
+#' LLM verifier might miss.
+#'
+#' @param narrative Character. The AI-generated narrative text.
+#' @param question_data List. The extracted question data payload.
+#' @return List with `pass` (logical) and `issues` (character or NULL).
+#' @keywords internal
+deterministic_number_check <- function(narrative, question_data) {
+  if (is.null(narrative) || !nzchar(narrative)) return(list(pass = TRUE, issues = NULL))
+
+  # Extract all numbers from the narrative (integers and decimals)
+  numbers_in_text <- regmatches(narrative, gregexpr("-?\\d+\\.?\\d*", narrative))[[1]]
+  if (length(numbers_in_text) == 0) return(list(pass = TRUE, issues = NULL))
+
+  numbers_in_text <- unique(as.numeric(numbers_in_text))
+  numbers_in_text <- numbers_in_text[!is.na(numbers_in_text)]
+  if (length(numbers_in_text) == 0) return(list(pass = TRUE, issues = NULL))
+
+  # Flatten all numeric values from the source data
+  source_numbers <- extract_all_numbers(question_data)
+
+  # Check each narrative number against source (with tolerance for rounding)
+  unmatched <- c()
+  for (n in numbers_in_text) {
+    # Skip very common numbers that aren't statistical claims (0, 1, 2, etc.)
+    if (n %in% 0:10) next
+    # Skip percentages of 100 (common phrasing, not a data point)
+    if (n == 100) next
+
+    # Check if the number matches any source value within rounding tolerance
+    matched <- any(abs(source_numbers - n) < 0.6)
+    if (!matched) {
+      unmatched <- c(unmatched, n)
+    }
+  }
+
+  if (length(unmatched) > 0) {
+    return(list(
+      pass = FALSE,
+      issues = sprintf(
+        "Deterministic check: narrative cites numbers not in source data: %s",
+        paste(unmatched, collapse = ", ")
+      )
+    ))
+  }
+
+  list(pass = TRUE, issues = NULL)
+}
+
+
+#' Recursively extract all numeric values from a nested list
+#' @keywords internal
+extract_all_numbers <- function(x) {
+  if (is.numeric(x)) return(x)
+  if (is.character(x)) {
+    vals <- suppressWarnings(as.numeric(x))
+    return(vals[!is.na(vals)])
+  }
+  if (is.list(x)) return(unlist(lapply(x, extract_all_numbers)))
+  numeric(0)
 }
 
 

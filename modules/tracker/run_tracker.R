@@ -799,11 +799,53 @@ generate_tracker_stats_pack <- function(config, wave_data, trend_results,
     n_cols    = if (!is.null(first_wave_data)) ncol(first_wave_data) else 0L
   )
 
+  # Per-wave sample sizes and weight diagnostics (contractual deliverable)
+  wave_diagnostics <- lapply(wave_names, function(wn) {
+    wd <- wave_data[[wn]]
+    if (is.null(wd) || !is.data.frame(wd)) {
+      return(list(wave = wn, n_unweighted = 0L, n_weighted = NA, eff_n = NA,
+                  weight_min = NA, weight_max = NA, weight_cv = NA))
+    }
+    n_uw <- nrow(wd)
+    w <- wd$weight_var
+    if (!is.null(w) && is.numeric(w)) {
+      w_valid <- w[!is.na(w) & w > 0]
+      sum_w <- sum(w_valid)
+      sum_w2 <- sum(w_valid^2)
+      eff <- if (sum_w2 > 0) (sum_w^2) / sum_w2 else n_uw
+      list(wave = wn, n_unweighted = n_uw, n_weighted = round(sum_w, 1),
+           eff_n = round(eff, 1),
+           weight_min = round(min(w_valid), 4), weight_max = round(max(w_valid), 4),
+           weight_cv = round(sd(w_valid) / mean(w_valid), 4))
+    } else {
+      list(wave = wn, n_unweighted = n_uw, n_weighted = n_uw, eff_n = n_uw,
+           weight_min = 1, weight_max = 1, weight_cv = 0)
+    }
+  })
+
+  # Build per-wave stats table for inclusion in data_used
+  wave_stats_df <- do.call(rbind, lapply(wave_diagnostics, function(wd) {
+    data.frame(
+      Wave = wd$wave, Unweighted_N = wd$n_unweighted, Weighted_N = wd$n_weighted,
+      Effective_N = wd$eff_n, Weight_Min = wd$weight_min, Weight_Max = wd$weight_max,
+      Weight_CV = wd$weight_cv, stringsAsFactors = FALSE
+    )
+  }))
+
   data_used <- list(
-    n_respondents     = total_respondents,
-    n_excluded        = 0L,
+    n_respondents      = total_respondents,
+    n_excluded         = 0L,
     questions_analysed = length(trend_results),
-    questions_skipped  = length(skipped_questions %||% list())
+    questions_skipped  = length(skipped_questions %||% list()),
+    per_item_stats     = wave_stats_df,
+    exclusions_detail  = if (length(skipped_questions %||% list()) > 0) {
+      data.frame(
+        Question = names(skipped_questions),
+        Reason = vapply(skipped_questions, function(sq) sq$reason %||% "Unknown",
+                        character(1)),
+        stringsAsFactors = FALSE
+      )
+    } else NULL
   )
 
   # Significance testing settings
@@ -841,15 +883,29 @@ generate_tracker_stats_pack <- function(config, wave_data, trend_results,
     paste(parts, collapse = ", ")
   }
 
+  # Alpha level
+  alpha_val <- get_setting(config, "alpha", default = 0.05)
+  min_base_val <- get_setting(config, "minimum_base", default = 30)
+
+  # Effective N range across waves
+  eff_ns <- vapply(wave_diagnostics, function(wd) wd$eff_n %||% NA_real_, numeric(1))
+  eff_ns <- eff_ns[!is.na(eff_ns)]
+  eff_n_range <- if (length(eff_ns) > 0) {
+    sprintf("%.0f - %.0f", min(eff_ns), max(eff_ns))
+  } else "N/A"
+
   assumptions <- list(
-    "Number of waves"      = as.character(n_waves),
-    "Wave labels"          = paste(wave_names, collapse = ", "),
-    "Significance testing" = sig_label,
-    "Implementation"       = "base R prop.test() / chisq.test()",
-    "Trend analysis"       = if (trend_enabled) "Enabled" else "Disabled",
-    "Comparison baseline"  = if (!is.null(baseline_wave)) as.character(baseline_wave) else "First wave",
-    "TRS Status"           = run_result$status %||% "PASS",
-    "TRS Events"           = trs_summary
+    "Number of waves"              = as.character(n_waves),
+    "Wave labels"                  = paste(wave_names, collapse = ", "),
+    "Significance testing"         = sig_label,
+    "Significance level (alpha)"   = as.character(alpha_val),
+    "Minimum base size"            = as.character(min_base_val),
+    "Effective N range"            = eff_n_range,
+    "Multiple comparison correction" = "None (standard market research practice)",
+    "Trend analysis"               = if (trend_enabled) "Enabled" else "Disabled",
+    "Comparison baseline"          = if (!is.null(baseline_wave)) as.character(baseline_wave) else "First wave",
+    "TRS Status"                   = run_result$status %||% "PASS",
+    "TRS Events"                   = trs_summary
   )
 
   config_echo <- tryCatch({

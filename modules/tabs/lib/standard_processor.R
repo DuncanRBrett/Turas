@@ -879,8 +879,9 @@ identify_top_bottom_categories <- function(ordered_cats) {
   # Bottom box is first (lowest DisplayOrder = lowest satisfaction scores)
   bottom_category <- ordered_cats[1]
 
-  # Exclude DK/NA from top box selection
-  non_dk_cats <- ordered_cats[!grepl("DK|NA|Don't Know|Not Applicable",
+  # Exclude DK/NA from top box selection (word boundaries prevent matching
+  # substrings like "National" or "Alternative")
+  non_dk_cats <- ordered_cats[!grepl("\\bDK\\b|\\bNA\\b|\\bDon't Know\\b|\\bNot Applicable\\b",
                                      ordered_cats, ignore.case = TRUE)]
 
   if (length(non_dk_cats) < 2) {

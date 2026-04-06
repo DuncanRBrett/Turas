@@ -876,14 +876,23 @@ weighted_z_test_proportions <- function(count1, base1, count2, base2,
   # Calculate proportions
   p1 <- count1 / base1
   p2 <- count2 / base2
-  
+
   # Pooled proportion (uses design-weighted counts)
   p_pooled <- (count1 + count2) / (base1 + base2)
-  
+
   # Edge cases: degenerate proportions
   if (p_pooled == 0 || p_pooled == 1) {
     # Both groups have 0% or 100% - no difference to test
     return(list(significant = FALSE, p_value = 1, higher = (p1 > p2)))
+  }
+
+  # Normal approximation precondition check using pooled proportion:
+  # n*p_pooled and n*(1-p_pooled) must both be >= 5 for both groups.
+  # Without this, the z-test is invalid for extreme proportions.
+  np1 <- n1 * p_pooled; nq1 <- n1 * (1 - p_pooled)
+  np2 <- n2 * p_pooled; nq2 <- n2 * (1 - p_pooled)
+  if (min(np1, nq1, np2, nq2) < 5) {
+    return(list(significant = FALSE, p_value = NA_real_, higher = (p1 > p2)))
   }
   
   # Standard error (uses effective sample sizes)
@@ -1185,7 +1194,7 @@ create_chi_square_failure <- function(warning_msg, chi_sq = NA_real_, df = NA_in
 #' Chi-square test for independence
 #'
 #' Tests independence between row variable and column variable.
-#' Uses Pearson's chi-square test with continuity correction for 2x2 tables.
+#' Uses Pearson's chi-square test (no continuity correction applied).
 #'
 #' STATISTICAL METHODOLOGY:
 #' - Pearson's chi-square test: χ² = Σ(O - E)² / E

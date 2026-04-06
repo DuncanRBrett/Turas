@@ -133,7 +133,7 @@ build_ai_exec_summary <- function(exec_summary, ai_config) {
 #' @return Character. HTML string.
 build_ai_methodology_note <- function(ai_config, model_display_name) {
 
-  model_name <- model_display_name %||% "AI model"
+  model_name <- escape_html(model_display_name %||% "AI model")
 
   if (isTRUE(ai_config$exec_summary_reviewed)) {
     note_text <- sprintf(

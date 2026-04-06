@@ -24,6 +24,8 @@
 #' @export
 calculate_changes <- function(wave_results, wave_ids, metric_name, sub_metric = NULL) {
 
+  if (length(wave_ids) < 2) return(list())
+
   changes <- list()
 
   for (i in 2:length(wave_ids)) {
@@ -100,6 +102,8 @@ calculate_changes <- function(wave_results, wave_ids, metric_name, sub_metric = 
 #' @keywords internal
 calculate_changes_for_metric <- function(wave_results, wave_ids, metric_name) {
 
+  if (length(wave_ids) < 2) return(list())
+
   changes <- list()
 
   for (i in 2:length(wave_ids)) {
@@ -148,7 +152,7 @@ calculate_changes_for_metric <- function(wave_results, wave_ids, metric_name) {
         to_value = current_val,
         absolute_change = NA,
         percentage_change = NA,
-        direction = NA
+        direction = "unavailable"
       )
     }
   }
@@ -168,6 +172,8 @@ calculate_changes_for_metric <- function(wave_results, wave_ids, metric_name) {
 #' @return List of change objects indexed by "prev_wave_to_current_wave"
 #' @keywords internal
 calculate_changes_for_multi_mention_option <- function(wave_results, wave_ids, column_name) {
+
+  if (length(wave_ids) < 2) return(list())
 
   changes <- list()
 
@@ -217,7 +223,7 @@ calculate_changes_for_multi_mention_option <- function(wave_results, wave_ids, c
         to_value = current_val,
         absolute_change = NA,
         percentage_change = NA,
-        direction = NA
+        direction = "unavailable"
       )
     }
   }
@@ -237,6 +243,8 @@ calculate_changes_for_multi_mention_option <- function(wave_results, wave_ids, c
 #' @return List of change objects indexed by "prev_wave_to_current_wave"
 #' @keywords internal
 calculate_changes_for_multi_mention_metric <- function(wave_results, wave_ids, metric_name) {
+
+  if (length(wave_ids) < 2) return(list())
 
   changes <- list()
 
@@ -284,7 +292,7 @@ calculate_changes_for_multi_mention_metric <- function(wave_results, wave_ids, m
         to_value = current_val,
         absolute_change = NA,
         percentage_change = NA,
-        direction = NA
+        direction = "unavailable"
       )
     }
   }

@@ -16,6 +16,14 @@
 # statistical_core.R provides: t_test_for_means, z_test_for_proportions, DEFAULT_ALPHA
 # constants.R provides: DEFAULT_MINIMUM_BASE
 # tracker_config_loader.R provides: get_setting
+#
+# KNOWN LIMITATION: No multiple comparison correction (Bonferroni, Holm, FDR)
+# is applied. Each wave-pair comparison is tested independently at the configured
+# alpha level. For a single-choice question with k response categories, the
+# family-wise error rate is approximately 1 - (1 - alpha)^k. This is standard
+# practice in market research tracking reports, where each test is reported
+# individually. If formal multiplicity correction is needed, apply it
+# downstream in the output layer.
 
 #' Perform Significance Tests for Means
 #'
@@ -37,6 +45,8 @@
 #' @return List of significance test results indexed by "prev_wave_vs_current_wave"
 #' @keywords internal
 perform_significance_tests_means <- function(wave_results, wave_ids, config) {
+
+  if (length(wave_ids) < 2) return(list())
 
   alpha <- get_setting(config, "alpha", default = DEFAULT_ALPHA)
   min_base <- get_setting(config, "minimum_base", default = DEFAULT_MINIMUM_BASE)
@@ -106,6 +116,8 @@ perform_significance_tests_means <- function(wave_results, wave_ids, config) {
 #' @return List of significance test results indexed by "prev_wave_vs_current_wave"
 #' @keywords internal
 perform_significance_tests_proportions <- function(wave_results, wave_ids, config, response_code) {
+
+  if (length(wave_ids) < 2) return(list())
 
   alpha <- get_setting(config, "alpha", default = DEFAULT_ALPHA)
   min_base <- get_setting(config, "minimum_base", default = DEFAULT_MINIMUM_BASE)
@@ -182,6 +194,8 @@ perform_significance_tests_proportions <- function(wave_results, wave_ids, confi
 #' @keywords internal
 perform_significance_tests_nps <- function(wave_results, wave_ids, config) {
 
+  if (length(wave_ids) < 2) return(list())
+
   # NPS is a difference of proportions, so we test the NPS score directly
   # This is a simplified approach for MVT
   # Could be enhanced with proper proportion difference testing
@@ -254,6 +268,8 @@ perform_significance_tests_nps <- function(wave_results, wave_ids, config) {
 perform_significance_tests_for_metric <- function(wave_results, wave_ids, metric_name,
                                                    config, test_type = "proportion") {
 
+  if (length(wave_ids) < 2) return(list())
+
   alpha <- get_setting(config, "alpha", default = DEFAULT_ALPHA)
   sig_tests <- list()
 
@@ -266,7 +282,7 @@ perform_significance_tests_for_metric <- function(wave_results, wave_ids, metric
 
     # Check availability
     if (!isTRUE(current$available) || !isTRUE(previous$available)) {
-      sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
+      sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- NA
       next
     }
 
@@ -275,7 +291,7 @@ perform_significance_tests_for_metric <- function(wave_results, wave_ids, metric
     previous_val <- previous$metrics[[metric_name]]
 
     if (is.na(current_val) || is.na(previous_val)) {
-      sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
+      sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- NA
       next
     }
 
@@ -295,7 +311,7 @@ perform_significance_tests_for_metric <- function(wave_results, wave_ids, metric
       test_result <- NA
     }
 
-    sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- test_result
+    sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- test_result
   }
 
   return(sig_tests)
@@ -315,6 +331,8 @@ perform_significance_tests_for_metric <- function(wave_results, wave_ids, metric
 #' @keywords internal
 perform_significance_tests_multi_mention <- function(wave_results, wave_ids, column_name, config) {
 
+  if (length(wave_ids) < 2) return(list())
+
   alpha <- get_setting(config, "alpha", default = DEFAULT_ALPHA)
   sig_tests <- list()
 
@@ -326,7 +344,7 @@ perform_significance_tests_multi_mention <- function(wave_results, wave_ids, col
     previous <- safe_wave_result(wave_results, prev_wave_id)
 
     if (!isTRUE(current$available) || !isTRUE(previous$available)) {
-      sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
+      sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- NA
       next
     }
 
@@ -334,7 +352,7 @@ perform_significance_tests_multi_mention <- function(wave_results, wave_ids, col
     previous_val <- previous$mention_proportions[[column_name]]
 
     if (is.na(current_val) || is.na(previous_val)) {
-      sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
+      sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- NA
       next
     }
 
@@ -347,7 +365,7 @@ perform_significance_tests_multi_mention <- function(wave_results, wave_ids, col
     p2 <- current_val / 100
 
     test_result <- z_test_for_proportions(p1, previous_eff_n, p2, current_eff_n, alpha)
-    sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- test_result
+    sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- test_result
   }
 
   return(sig_tests)
@@ -367,6 +385,8 @@ perform_significance_tests_multi_mention <- function(wave_results, wave_ids, col
 #' @keywords internal
 perform_significance_tests_multi_mention_metric <- function(wave_results, wave_ids, metric_name, config) {
 
+  if (length(wave_ids) < 2) return(list())
+
   alpha <- get_setting(config, "alpha", default = DEFAULT_ALPHA)
   sig_tests <- list()
 
@@ -378,7 +398,7 @@ perform_significance_tests_multi_mention_metric <- function(wave_results, wave_i
     previous <- safe_wave_result(wave_results, prev_wave_id)
 
     if (!isTRUE(current$available) || !isTRUE(previous$available)) {
-      sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
+      sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- NA
       next
     }
 
@@ -386,7 +406,7 @@ perform_significance_tests_multi_mention_metric <- function(wave_results, wave_i
     previous_val <- previous$additional_metrics[[metric_name]]
 
     if (is.na(current_val) || is.na(previous_val)) {
-      sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
+      sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- NA
       next
     }
 
@@ -401,11 +421,11 @@ perform_significance_tests_multi_mention_metric <- function(wave_results, wave_i
       p2 <- current_val / 100
 
       test_result <- z_test_for_proportions(p1, previous_eff_n, p2, current_eff_n, alpha)
-      sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- test_result
+      sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- test_result
     } else {
       # For count_mean, we'd need the raw count values for t-test
       # Skip significance testing for now
-      sig_tests[[paste0(prev_wave_id, "_to_", wave_id)]] <- NA
+      sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- NA
     }
   }
 

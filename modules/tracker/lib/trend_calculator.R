@@ -538,6 +538,7 @@ calculate_metrics_from_specs <- function(values, weights, specs_list,
       result <- calculate_weighted_mean(values, weights)
       metrics$mean <- result$mean
       metrics$sd <- result$sd
+      metrics$eff_n <- result$eff_n
 
     } else if (spec_lower == "top_box") {
       result <- calculate_top_box(values, weights, n_boxes = 1)
@@ -708,6 +709,7 @@ calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, con
       metrics = metrics,
       n_unweighted = length(valid_idx),
       n_weighted = sum(wave_df$weight_var[valid_idx]),
+      eff_n = metrics$eff_n,
       values = q_data,
       weights = wave_df$weight_var
     )
@@ -885,6 +887,7 @@ calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, 
       metrics = metrics,
       n_unweighted = length(valid_idx),
       n_weighted = sum(wave_df$weight_var[valid_idx]),
+      eff_n = metrics$eff_n,
       values = composite_values,
       weights = wave_df$weight_var,
       source_questions = source_questions
@@ -1444,6 +1447,12 @@ calculate_multi_mention_trend <- function(q_code, question_map, wave_data, confi
       specs, option_columns, wave_df, valid_rows
     )
 
+    # Calculate effective N from weights (Kish formula)
+    w <- wave_df$weight_var[valid_rows]
+    sum_w <- sum(w, na.rm = TRUE)
+    sum_w2 <- sum(w^2, na.rm = TRUE)
+    mm_eff_n <- if (sum_w2 > 0) (sum_w^2) / sum_w2 else 0
+
     # Store results
     wave_results[[wave_id]] <- list(
       available = TRUE,
@@ -1451,7 +1460,8 @@ calculate_multi_mention_trend <- function(q_code, question_map, wave_data, confi
       additional_metrics = additional_metrics,
       tracked_columns = option_columns,
       n_unweighted = length(valid_rows),
-      n_weighted = sum(wave_df$weight_var[valid_rows], na.rm = TRUE)
+      n_weighted = sum_w,
+      eff_n = mm_eff_n
     )
   }
 

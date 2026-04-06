@@ -129,20 +129,9 @@ calculate_multi_mention_count <- function(data, option_text, column_names, weigh
 # PERCENTAGE CALCULATIONS
 # ==============================================================================
 
-#' Calculate Weighted Percentage
-#' 
-#' Safely calculates percentage with zero-division handling
-#' 
-#' @param weighted_count Weighted count (numerator)
-#' @param weighted_base Weighted base (denominator)
-#' @return Numeric percentage or NA
-#' @export
-calculate_weighted_percentage <- function(weighted_count, weighted_base) {
-  if (is.na(weighted_base) || weighted_base == 0) {
-    return(NA_real_)
-  }
-  return((weighted_count / weighted_base) * 100)
-}
+# calculate_weighted_percentage() is defined in weighting.R (canonical version).
+# Do not duplicate here — callers use the weighting.R definition which also
+# supports an optional decimal_places parameter.
 
 #' Create Column Percentage Row
 #' 
@@ -430,7 +419,8 @@ calculate_likert_index <- function(data, question_col, options_info, weights) {
   all_weights <- numeric(0)
   
   for (i in seq_len(nrow(index_options))) {
-    matching <- safe_equal(data[[question_col]], index_options$OptionText[i])
+    matching <- safe_equal(data[[question_col]], index_options$OptionText[i]) &
+                !is.na(data[[question_col]])
     option_weight <- sum(weights[matching], na.rm = TRUE)
     
     weighted_sum <- weighted_sum + (option_weight * index_options$Index_Weight[i])

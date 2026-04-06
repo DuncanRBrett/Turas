@@ -193,16 +193,34 @@ generate_all_insights <- function(all_results, banner_info, config_obj,
   # === Executive summary ===
   exec_summary <- sidecar$executive_summary
   if (isTRUE(ai_config$generate_exec_summary)) {
-    # Only generate if not already present
-    if (is.null(exec_summary) || !nzchar(exec_summary$narrative %||% "")) {
-      cat("    Generating executive summary...\n")
-      all_q_data <- lapply(all_results, function(q) {
-        extract_question_data(q, banner_info)
-      })
-      all_q_data <- Filter(Negate(is.null), all_q_data)
+    # Build question data for hash check and potential generation
+    all_q_data <- lapply(all_results, function(q) {
+      extract_question_data(q, banner_info)
+    })
+    all_q_data <- Filter(Negate(is.null), all_q_data)
 
+    # Cache invalidation: regenerate if data has changed since last summary
+    exec_data_hash <- compute_data_hash(all_q_data)
+    cached_valid <- !is.null(exec_summary) &&
+                    nzchar(exec_summary$narrative %||% "") &&
+                    identical(exec_summary$data_hash %||% "", exec_data_hash)
+
+    if (!cached_valid) {
+      cat("    Generating executive summary...\n")
       exec_summary <- generate_executive_summary(all_q_data, study_context, ai_config)
       if (!is.null(exec_summary)) {
+        exec_summary$data_hash <- exec_data_hash
+
+        # Deterministic verification: check cited numbers against source data
+        det_check <- deterministic_number_check(exec_summary$narrative, all_q_data)
+        if (!isTRUE(det_check$pass)) {
+          cat(sprintf("    [WARNING] Exec summary failed numeric check: %s\n",
+                      det_check$issues))
+          exec_summary$verified <- FALSE
+          exec_summary$verification_issues <- det_check$issues
+        } else {
+          exec_summary$verified <- TRUE
+        }
         cat("    Executive summary generated.\n")
       } else {
         cat("    [WARNING] Executive summary generation failed.\n")
