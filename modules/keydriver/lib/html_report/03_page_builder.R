@@ -19,11 +19,19 @@ local({
     source(file.path(ds_dir, "font_embed.R"), local = FALSE)
     source(file.path(ds_dir, "base_css.R"), local = FALSE)
   }
-  # Source callout registry
+  # Source callout registry (with fallback if shared library unavailable)
   callout_dir <- file.path(turas_root, "modules", "shared", "lib", "callouts")
   if (!dir.exists(callout_dir)) callout_dir <- file.path("modules", "shared", "lib", "callouts")
   if (!exists("turas_callout", mode = "function") && dir.exists(callout_dir)) {
-    source(file.path(callout_dir, "callout_registry.R"), local = FALSE)
+    tryCatch(
+      source(file.path(callout_dir, "callout_registry.R"), local = FALSE),
+      error = function(e) NULL
+    )
+  }
+  # No-op fallback: if callout registry is unavailable (CLI, standalone, test),
+  # define a stub that returns empty string so section builders don't fail
+  if (!exists("turas_callout", mode = "function")) {
+    turas_callout <<- function(...) ""
   }
   # Source shared pin library loader
   pins_path <- file.path(turas_root, "modules", "shared", "lib", "turas_pins_js.R")

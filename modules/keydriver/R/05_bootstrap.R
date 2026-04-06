@@ -31,6 +31,12 @@
 #'   \item \strong{Relative_Weight}: Johnson's relative weight decomposition of R-squared
 #' }
 #'
+#' \strong{Weighting approach:} When weights are provided, they are applied at
+#' the resampling stage (probability-proportional-to-size bootstrap), not inside
+#' the per-iteration regression model. This single-application approach avoids
+#' double-weighting. If the resampling strategy is changed to uniform, weights
+#' must be passed to \code{lm()} inside each iteration instead.
+#'
 #' Config fields (all optional, with defaults):
 #' \itemize{
 #'   \item \code{enable_bootstrap} - logical, default FALSE

@@ -58,6 +58,28 @@ write_keydriver_output <- function(importance, model, correlations, config, outp
 
   wb <- openxlsx::createWorkbook()
 
+  # Excel formula injection protection (Phase 3 C3)
+  # User-sourced text (driver names, labels, config values) must be escaped
+  escape_text <- if (exists("turas_excel_escape", mode = "function")) {
+    turas_excel_escape
+  } else {
+    # Minimal inline fallback: prefix dangerous characters with single quote
+    # Covers OWASP CSV injection vectors: =, +, -, @, tab, carriage return
+    function(x) {
+      if (!is.character(x)) return(x)
+      gsub("^([\t\r=+\\-@])", "'\\1", x)
+    }
+  }
+
+  # Escape user-sourced columns in importance data
+  if (!is.null(importance) && is.data.frame(importance)) {
+    for (col in c("Driver", "Label", "DriverType", "AggMethod", "Method_Note")) {
+      if (col %in% names(importance)) {
+        importance[[col]] <- escape_text(importance[[col]])
+      }
+    }
+  }
+
   # Header style
   header_style <- openxlsx::createStyle(
     fontSize = 11,

@@ -20,7 +20,7 @@ run_catdriver_gui <- function() {
   # Check for missing packages and refuse with clear instructions if any are missing
   missing_packages <- required_packages[!sapply(required_packages, requireNamespace, quietly = TRUE)]
   if (length(missing_packages) > 0) {
-    stop(
+    msg <- paste0(
       "\n================================================================================\n",
       "  [REFUSE] PKG_MISSING_DEPENDENCY: Missing Required Packages\n",
       "================================================================================\n\n",
@@ -31,9 +31,10 @@ run_catdriver_gui <- function() {
       "How to fix:\n",
       "  Run the following command in R:\n",
       "    install.packages(c(", paste(sprintf('"%s"', missing_packages), collapse = ", "), "))\n\n",
-      "================================================================================\n",
-      call. = FALSE
+      "================================================================================\n"
     )
+    cat(msg)  # Ensure visible in Shiny console (Phase 3 I3)
+    stop(msg, call. = FALSE)
   }
 
   # Load packages

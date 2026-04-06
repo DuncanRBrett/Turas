@@ -1,23 +1,22 @@
 # ==============================================================================
-# CATEGORICAL KEY DRIVER - TURASGUARD LAYER
+# CATEGORICAL KEY DRIVER - TRS REFUSAL WRAPPERS
 # ==============================================================================
 #
-# Core validation and error enforcement framework.
-# Implements "no silent failures" philosophy per TRS v1.0.
+# PURPOSE: CatDriver-specific TRS refusal functions (catdriver_refuse,
+#   is_refusal, with_refusal_handler). These are thin wrappers around the
+#   shared TRS infrastructure, maintaining module-specific naming.
 #
-# This module uses the shared TRS infrastructure from:
-#   modules/shared/lib/trs_refusal.R
+# NOT TO BE CONFUSED WITH:
+#   - 00_guard.R: Validation gates (validate_catdriver_config, validate_catdriver_data, etc.)
+#   - 08a_guards_hard.R: Hard error guards (require_* functions)
+#   - 08b_guards_soft.R: Soft warning guards (check_* functions)
 #
-# Functions here are thin wrappers that delegate to the shared TRS
-# implementation while maintaining CatDriver-specific naming for
-# backwards compatibility.
+# This file provides the MECHANISM for refusals (how to refuse).
+# 00_guard.R provides the LOGIC for refusals (when to refuse).
 #
-# Related modules:
-#   - 08a_guards_hard.R: Hard error guards (require functions)
-#   - 08b_guards_soft.R: Soft warning guards (check functions)
+# Shared TRS infrastructure from: modules/shared/lib/trs_refusal.R
 #
 # Version: 1.1 (TRS Hardening)
-# Compliance: TURAS_Categorical_Key_Driver_Hardening_v1.1.md
 # Date: December 2024
 #
 # ==============================================================================

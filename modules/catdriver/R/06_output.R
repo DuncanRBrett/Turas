@@ -69,6 +69,28 @@ write_catdriver_output <- function(results, config, output_file) {
   # Create workbook
   wb <- openxlsx::createWorkbook()
 
+  # Excel formula injection protection (Phase 3 C3)
+  # User-sourced text (driver names, labels, category values) must be escaped
+  escape_text <- if (exists("turas_excel_escape", mode = "function")) {
+    turas_excel_escape
+  } else {
+    # Minimal inline fallback: prefix dangerous characters with single quote
+    # Covers OWASP CSV injection vectors: =, +, -, @, tab, carriage return
+    function(x) {
+      if (!is.character(x)) return(x)
+      gsub("^([\t\r=+\\-@])", "'\\1", x)
+    }
+  }
+
+  # Escape user-sourced text in results
+  if (!is.null(results$importance) && is.data.frame(results$importance)) {
+    for (col in c("variable", "label")) {
+      if (col %in% names(results$importance)) {
+        results$importance[[col]] <- escape_text(results$importance[[col]])
+      }
+    }
+  }
+
   # Define styles
   styles <- create_output_styles(wb)
 

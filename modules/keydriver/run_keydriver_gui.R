@@ -27,6 +27,7 @@ run_keydriver_gui <- function() {
       msg <- paste0(msg, "  ", step, "\n")
     }
     msg <- paste0(msg, "\n================================================================================\n")
+    cat(msg)  # Ensure visible in Shiny console (Phase 3 I2)
     stop(msg, call. = FALSE)
   }
 

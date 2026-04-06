@@ -945,7 +945,44 @@ generate_keydriver_stats_pack <- function(config, survey_data, result,
   importance   <- result$importance
   n_drivers    <- if (!is.null(importance) && is.data.frame(importance)) nrow(importance) else length(config$driver_vars)
   r_squared    <- tryCatch(summary(result$model)$r.squared, error = function(e) NA_real_)
+  n_model      <- tryCatch(nobs(result$model), error = function(e) nrow(survey_data))
   shap_enabled <- !is.null(result$shap)
+
+  # Calculate n_excluded: original rows minus complete cases used in model
+  n_original   <- nrow(survey_data)
+  n_excluded   <- n_original - n_model
+
+  # Weight diagnostics (Phase 3 C4: must include when weights present)
+  weight_info <- list()
+  is_weighted  <- !is.null(config$weight_var) && nzchar(config$weight_var %||% "")
+  if (is_weighted) {
+    w <- survey_data[[config$weight_var]]
+    if (!is.null(w) && is.numeric(w)) {
+      w_valid <- w[!is.na(w) & w > 0]
+      if (length(w_valid) > 0) {
+        sum_w  <- sum(w_valid)
+        sum_w2 <- sum(w_valid^2)
+        eff_n  <- (sum_w^2) / sum_w2
+        weight_info <- list(
+          effective_n   = round(eff_n, 1),
+          design_effect = round(length(w_valid) / eff_n, 3),
+          weight_cv     = round(sd(w_valid) / mean(w_valid), 3),
+          min_weight    = round(min(w_valid), 4),
+          max_weight    = round(max(w_valid), 4)
+        )
+      }
+    }
+  }
+
+  # Bootstrap summary (if run)
+  bootstrap_info <- list()
+  if (!is.null(result$bootstrap_ci)) {
+    bootstrap_info <- list(
+      iterations = config$settings$bootstrap_iterations %||% 1000,
+      ci_level   = config$settings$bootstrap_ci_level %||% 0.95,
+      methods    = "Correlation, Beta_Weight, Relative_Weight"
+    )
+  }
 
   # TRS execution summary
   n_events   <- length(run_result$events %||% list())
@@ -970,24 +1007,51 @@ generate_keydriver_stats_pack <- function(config, survey_data, result,
     "Method"            = "Pearson/Spearman correlation (base R cor())",
     "Regression"        = "OLS linear regression (base R lm())",
     "Model R-squared"   = if (!is.na(r_squared)) sprintf("%.4f", r_squared) else "—",
+    "Sample (model)"    = as.character(n_model),
+    "Excluded (listwise)" = as.character(n_excluded),
     "SHAP Values"       = if (shap_enabled) "shapr package" else "Not used",
     "Quadrant Analysis" = if (!is.null(result$quadrant)) "Enabled" else "Disabled",
     "TRS Status"        = run_result$status %||% "PASS",
     "TRS Events"        = trs_summary
   )
 
+  # Append weight diagnostics to assumptions
+  if (length(weight_info) > 0) {
+    assumptions[["Weight Variable"]]  <- config$weight_var
+    assumptions[["Effective N"]]      <- as.character(weight_info$effective_n)
+    assumptions[["Design Effect"]]    <- as.character(weight_info$design_effect)
+    assumptions[["Weight CV"]]        <- as.character(weight_info$weight_cv)
+    assumptions[["Min Weight"]]       <- as.character(weight_info$min_weight)
+    assumptions[["Max Weight"]]       <- as.character(weight_info$max_weight)
+  }
+
+  # Append bootstrap info
+  if (length(bootstrap_info) > 0) {
+    assumptions[["Bootstrap Iterations"]] <- as.character(bootstrap_info$iterations)
+    assumptions[["Bootstrap CI Level"]]   <- as.character(bootstrap_info$ci_level)
+    assumptions[["Bootstrap Methods"]]    <- bootstrap_info$methods
+  }
+
+  # Append VIF flags from guard
+  if (!is.null(result$guard_summary) && !is.null(result$guard_summary$stability_flags)) {
+    n_flags <- length(result$guard_summary$stability_flags)
+    if (n_flags > 0) {
+      assumptions[["Model Warnings"]] <- paste(result$guard_summary$stability_flags, collapse = "; ")
+    }
+  }
+
   data_receipt <- list(
     file_name           = basename(config$data_file %||% "unknown"),
-    n_rows              = nrow(survey_data),
+    n_rows              = n_original,
     n_cols              = ncol(survey_data),
     questions_in_config = length(config$driver_vars)
   )
 
   data_used <- list(
-    n_respondents      = nrow(survey_data),
-    n_excluded         = 0L,
+    n_respondents      = n_model,
+    n_excluded         = n_excluded,
     weight_variable    = config$weight_var %||% "",
-    weighted           = !is.null(config$weight_var) && nzchar(config$weight_var %||% ""),
+    weighted           = is_weighted,
     questions_analysed = n_drivers,
     questions_skipped  = 0L
   )
