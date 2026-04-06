@@ -685,7 +685,7 @@ run_tracker <- function(tracking_config_path,
   # ============================================================================
   stats_pack_file <- NULL
   generate_stats_pack_flag <- isTRUE(
-    toupper(get_setting(config, "generate_stats_pack", default = "N") %||% "N") == "Y"
+    toupper(get_setting(config, "generate_stats_pack", default = "Y") %||% "Y") == "Y"
   ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
 
   if (generate_stats_pack_flag) {

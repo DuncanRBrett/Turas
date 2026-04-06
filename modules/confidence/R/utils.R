@@ -571,6 +571,33 @@ if (!exists("source_if_exists", mode = "function")) {
 }
 
 
+# ==============================================================================
+# WEIGHTED VARIANCE HELPER
+# ==============================================================================
+
+#' Calculate Bessel-corrected weighted variance
+#'
+#' Uses V1/V2 correction factor for unbiased estimate with reliability weights.
+#' Reference: https://en.wikipedia.org/wiki/Weighted_arithmetic_mean#Reliability_weights
+#'
+#' @param values Numeric vector. Data values (no NAs)
+#' @param weights Numeric vector. Survey weights (no NAs, same length as values)
+#' @return Numeric. Weighted variance (unbiased estimate)
+#' @keywords internal
+calculate_weighted_variance <- function(values, weights) {
+  sum_w <- sum(weights)
+  mean_val <- sum(values * weights) / sum_w
+  sum_w2 <- sum(weights^2)
+  bessel_denom <- sum_w - (sum_w2 / sum_w)
+  if (bessel_denom > 0) {
+    sum(weights * (values - mean_val)^2) / bessel_denom
+  } else {
+    # Fallback to population estimator when correction is not possible
+    sum(weights * (values - mean_val)^2) / sum_w
+  }
+}
+
+
 #' Print module information
 #'
 #' Prints module information to console

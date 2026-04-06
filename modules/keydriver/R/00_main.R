@@ -841,7 +841,7 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
 
   # --- Generate Stats Pack (optional) ---
   generate_stats_pack_flag <- isTRUE(
-    toupper(config$settings$Generate_Stats_Pack %||% "N") == "Y"
+    toupper(config$settings$Generate_Stats_Pack %||% "Y") == "Y"
   ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
 
   if (generate_stats_pack_flag) {

@@ -557,7 +557,7 @@ run_pricing_analysis_from_config <- function(config) {
   # STEP 10: Generate Stats Pack (Optional)
   # --------------------------------------------------------------------------
   generate_stats_pack_flag <- isTRUE(
-    toupper(config$settings$Generate_Stats_Pack %||% "N") == "Y"
+    toupper(config$settings$Generate_Stats_Pack %||% "Y") == "Y"
   ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
 
   if (generate_stats_pack_flag) {

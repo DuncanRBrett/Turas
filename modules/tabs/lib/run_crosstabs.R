@@ -50,7 +50,8 @@ source(file.path(script_dir, "00_guard.R"))
     file.path(getwd(), "..", "shared", "lib")
   )
 
-  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R")
+  trs_files <- c("trs_run_state.R", "trs_banner.R", "trs_run_status_writer.R",
+                  "stats_pack_writer.R")
 
   for (shared_lib in possible_paths) {
     if (dir.exists(shared_lib)) {
@@ -580,6 +581,34 @@ if (isTRUE(config_result$config_obj$html_report)) {
 }
 
 # ==============================================================================
+# STEP 4c: GENERATE STATS PACK
+# ==============================================================================
+
+stats_pack_file <- NULL
+generate_stats_pack_flag <- isTRUE(
+  toupper(config_result$config_obj$generate_stats_pack %||% "Y") == "Y"
+) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
+
+if (generate_stats_pack_flag && exists("turas_write_stats_pack", mode = "function")) {
+  stats_pack_file <- tryCatch({
+    generate_tabs_stats_pack(
+      config_result  = config_result,
+      data_result    = data_result,
+      analysis_result = analysis_result,
+      workbook_result = workbook_result,
+      start_time     = start_time,
+      script_version = SCRIPT_VERSION
+    )
+  }, error = function(e) {
+    cat(sprintf("\n[WARNING] Stats pack generation failed: %s\n", conditionMessage(e)))
+    NULL
+  })
+  if (!is.null(stats_pack_file)) {
+    cat(sprintf("  Stats Pack: %s\n", basename(stats_pack_file)))
+  }
+}
+
+# ==============================================================================
 # STEP 5: COMPLETION SUMMARY
 # ==============================================================================
 
@@ -635,6 +664,134 @@ cat("\n")
 cat("TURAS Tabs V10.8.1\n")
 cat("\n")
 cat(paste(rep("=", 80), collapse=""), "\n")
+
+# ==============================================================================
+# STATS PACK HELPER
+# ==============================================================================
+
+#' Generate Tabs Stats Pack
+#'
+#' Builds the diagnostic payload from crosstab results and writes the stats
+#' pack Excel workbook alongside the main output.
+#'
+#' @keywords internal
+generate_tabs_stats_pack <- function(config_result, data_result,
+                                     analysis_result, workbook_result,
+                                     start_time, script_version) {
+
+  if (!exists("turas_write_stats_pack", mode = "function")) return(NULL)
+
+  # Output path: derive from main output
+  main_out <- config_result$output_path %||% "tabs_output.xlsx"
+  output_path <- sub("(\\.xlsx)$", "_stats_pack.xlsx", main_out, ignore.case = TRUE)
+  if (identical(output_path, main_out)) {
+    output_path <- paste0(tools::file_path_sans_ext(main_out), "_stats_pack.xlsx")
+  }
+
+  config_obj <- config_result$config_obj
+
+  # Data receipt
+  data_receipt <- list(
+    file_name = basename(config_obj$data_file %||% "unknown"),
+    n_rows    = nrow(data_result$survey_data),
+    n_cols    = ncol(data_result$survey_data)
+  )
+
+  # Data used
+  n_questions <- length(analysis_result$all_results)
+  n_skipped <- length(analysis_result$skipped_questions)
+  n_partial <- length(analysis_result$partial_questions)
+
+  data_used <- list(
+    n_respondents      = nrow(data_result$survey_data),
+    n_excluded         = 0L,
+    questions_total    = n_questions + n_skipped,
+    questions_analysed = n_questions,
+    questions_skipped  = n_skipped,
+    questions_partial  = n_partial
+  )
+
+  # Weight diagnostics
+  is_weighted <- isTRUE(config_obj$apply_weighting)
+  weight_var <- if (is_weighted) config_obj$weight_variable else NULL
+  eff_n_val <- data_result$effective_n %||% NA
+
+  # Significance testing parameters
+  sig_enabled <- isTRUE(config_obj$enable_significance_testing)
+  alpha_val <- config_obj$alpha %||% 0.05
+  min_base_val <- config_obj$min_base %||% 30
+
+  # TRS summary
+  run_result <- workbook_result$run_result
+  n_events <- length(run_result$events %||% list())
+  n_refusals <- sum(vapply(run_result$events %||% list(),
+                           function(e) identical(e$level, "REFUSE"), logical(1)))
+  n_partials <- sum(vapply(run_result$events %||% list(),
+                           function(e) identical(e$level, "PARTIAL"), logical(1)))
+  trs_summary <- if (n_events == 0) {
+    "No events — ran cleanly"
+  } else {
+    parts <- character(0)
+    if (n_refusals > 0) parts <- c(parts, sprintf("%d refusal(s)", n_refusals))
+    if (n_partials > 0) parts <- c(parts, sprintf("%d partial(s)", n_partials))
+    remainder <- n_events - n_refusals - n_partials
+    if (remainder > 0) parts <- c(parts, sprintf("%d info event(s)", remainder))
+    paste(parts, collapse = ", ")
+  }
+
+  duration_secs <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+
+  assumptions <- list(
+    "Analysis Type"              = "Cross-tabulation",
+    "Questions Processed"        = as.character(n_questions),
+    "Questions Skipped"          = as.character(n_skipped),
+    "Weighting"                  = if (is_weighted) sprintf("Yes — %s", weight_var) else "No",
+    "Effective N"                = if (!is.na(eff_n_val)) format(round(eff_n_val), big.mark = ",") else "—",
+    "Significance Testing"       = if (sig_enabled) "Enabled" else "Disabled",
+    "Alpha (p-value threshold)"  = if (sig_enabled) sprintf("%.3f", alpha_val) else "—",
+    "Minimum Base Size"          = as.character(min_base_val),
+    "Bonferroni Correction"      = if (sig_enabled && isTRUE(config_obj$bonferroni_correction)) "Applied" else "Not applied",
+    "HTML Report"                = if (isTRUE(config_obj$html_report)) "Generated" else "Not requested",
+    "AI Insights"                = if (isTRUE(config_obj$ai_insights)) "Enabled" else "Disabled",
+    "TRS Status"                 = run_result$status %||% "PASS",
+    "TRS Events"                 = trs_summary
+  )
+
+  config_echo <- list(
+    data_file      = config_obj$data_file,
+    structure_file = config_obj$structure_file,
+    output_file    = config_result$output_path,
+    apply_weighting = config_obj$apply_weighting,
+    weight_variable = config_obj$weight_variable,
+    enable_significance_testing = config_obj$enable_significance_testing
+  )
+
+  payload <- list(
+    module           = "TABS",
+    project_name     = workbook_result$project_name   %||% NULL,
+    analyst_name     = config_obj$analyst_name         %||% NULL,
+    research_house   = config_obj$research_house       %||% NULL,
+    run_timestamp    = start_time,
+    turas_version    = script_version,
+    r_version        = R.version$version.string,
+    status           = run_result$status %||% "PASS",
+    duration_seconds = if (duration_secs > 0 && duration_secs < 86400) duration_secs else NA,
+    data_receipt     = data_receipt,
+    data_used        = data_used,
+    assumptions      = assumptions,
+    run_result       = run_result,
+    packages         = c("openxlsx", "readxl"),
+    config_echo      = config_echo
+  )
+
+  result <- turas_write_stats_pack(payload, output_path)
+
+  if (!is.null(result)) {
+    message(sprintf("[TRS INFO] TABS: Stats pack written: %s", basename(output_path)))
+  }
+
+  output_path
+}
 
 # ==============================================================================
 # END OF SCRIPT

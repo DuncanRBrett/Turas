@@ -256,7 +256,7 @@
   add("ALCHEMER IMPORT", "alchemer_score_column", "Score", "Alchemer score column", FALSE, "", "Column name")
 
   # --- STATS PACK ---
-  add("STATS PACK", "generate_stats_pack", "N", "Generate a diagnostic stats pack workbook alongside main output. The stats pack provides a full audit trail of data received, methods used, assumptions, and reproducibility — designed for advanced partners and research statisticians. Output file is named {output}_stats_pack.xlsx.", FALSE, "Y,N", "Y or N")
+  add("STATS PACK", "generate_stats_pack", "Y", "Generate a diagnostic stats pack workbook alongside main output. The stats pack provides a full audit trail of data received, methods used, assumptions, and reproducibility. This is a contractual deliverable. Output file is named {output}_stats_pack.xlsx.", FALSE, "Y,N", "Y or N")
 
   # --- STUDY IDENTIFICATION ---
   add("STUDY IDENTIFICATION", "Project_Name", "", "Project name — appears in the stats pack Declaration sheet for identification and sign-off purposes. Leave blank if not using stats pack.", FALSE, "", "Free text")

@@ -327,7 +327,7 @@ run_confidence_analysis_impl <- function(config_path,
   # ==========================================================================
   stats_pack_result <- NULL
   generate_stats_pack_flag <- isTRUE(
-    toupper(config$study_settings$Generate_Stats_Pack %||% "N") == "Y"
+    toupper(config$study_settings$Generate_Stats_Pack %||% "Y") == "Y"
   ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
 
   if (generate_stats_pack_flag) {

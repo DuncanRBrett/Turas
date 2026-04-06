@@ -163,7 +163,7 @@ build_keydriver_settings_def <- function() {
         list(
           name = "Generate_Stats_Pack",
           required = FALSE,
-          default = "N",
+          default = "Y",
           description = "Generate a diagnostic stats pack workbook alongside main output. The stats pack provides a full audit trail of data received, methods used, assumptions, and reproducibility — designed for advanced partners and research statisticians. Output file is named {output}_stats_pack.xlsx.",
           valid_values_text = "Y or N",
           dropdown = c("Y", "N"),

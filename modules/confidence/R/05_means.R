@@ -151,22 +151,10 @@ calculate_mean_ci <- function(values, weights = NULL, conf_level = 0.95) {
       )
     }
 
-    # Weighted mean
+    # Weighted mean and SD using shared helper
     sum_w <- sum(weights)
     mean_val <- sum(values * weights) / sum_w
-
-    # Weighted SD with Bessel correction (reliability weights)
-    # Uses V1 = sum(w), V2 = sum(w^2) correction factor for unbiased estimate
-    # Reference: https://en.wikipedia.org/wiki/Weighted_arithmetic_mean#Reliability_weights
-    sum_w2 <- sum(weights^2)
-    bessel_denom <- sum_w - (sum_w2 / sum_w)
-    if (bessel_denom > 0) {
-      weighted_var <- sum(weights * (values - mean_val)^2) / bessel_denom
-    } else {
-      # Fallback to population estimator when correction is not possible
-      weighted_var <- sum(weights * (values - mean_val)^2) / sum_w
-    }
-    sd_val <- sqrt(weighted_var)
+    sd_val <- sqrt(calculate_weighted_variance(values, weights))
 
     # Effective sample size for degrees of freedom
     n_eff <- calculate_effective_n(weights)
@@ -541,15 +529,7 @@ credible_interval_mean <- function(values, weights = NULL, conf_level = 0.95,
   if (is_weighted) {
     sum_w <- sum(weights)
     mean_data <- sum(values * weights) / sum_w
-    # Bessel-corrected weighted variance (reliability weights)
-    sum_w2 <- sum(weights^2)
-    bessel_denom <- sum_w - (sum_w2 / sum_w)
-    if (bessel_denom > 0) {
-      weighted_var <- sum(weights * (values - mean_data)^2) / bessel_denom
-    } else {
-      weighted_var <- sum(weights * (values - mean_data)^2) / sum_w
-    }
-    sd_data <- sqrt(weighted_var)
+    sd_data <- sqrt(calculate_weighted_variance(values, weights))
     n_eff <- calculate_effective_n(weights)
   } else {
     mean_data <- mean(values)
@@ -707,15 +687,7 @@ analyze_mean <- function(values, weights = NULL, conf_level = 0.95,
   if (is_weighted) {
     sum_w <- sum(weights)
     mean_val <- sum(values * weights) / sum_w
-    # Bessel-corrected weighted variance (reliability weights)
-    sum_w2 <- sum(weights^2)
-    bessel_denom <- sum_w - (sum_w2 / sum_w)
-    if (bessel_denom > 0) {
-      weighted_var <- sum(weights * (values - mean_val)^2) / bessel_denom
-    } else {
-      weighted_var <- sum(weights * (values - mean_val)^2) / sum_w
-    }
-    sd_val <- sqrt(weighted_var)
+    sd_val <- sqrt(calculate_weighted_variance(values, weights))
     n_actual <- length(values)
     n_eff <- calculate_effective_n(weights)
   } else {

@@ -182,6 +182,9 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     exclude_outliers_from_stats = safe_logical(get_config_value(config, "exclude_outliers_from_stats", FALSE)),
     outlier_method = get_config_value(config, "outlier_method", "IQR"),
 
+    # Stats pack (contractual deliverable — defaults to Y)
+    generate_stats_pack = get_config_value(config, "generate_stats_pack", "Y"),
+
     # V10.3 HTML Report settings
     html_report = safe_logical(get_config_value(config, "html_report", FALSE)),
     brand_colour = get_config_value(config, "brand_colour", "#323367"),
@@ -502,6 +505,8 @@ load_crosstabs_config <- function(config_file) {
     "create_sample_composition", "create_index_summary",
     "index_summary_show_sections", "index_summary_show_base_sizes",
     "index_summary_show_composites", "index_summary_decimal_places",
+    # Stats pack
+    "generate_stats_pack",
     # HTML report
     "html_report", "brand_colour", "accent_colour", "project_title", "project_name",
     "company_name", "client_name",
