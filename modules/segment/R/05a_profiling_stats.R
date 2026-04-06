@@ -13,7 +13,12 @@
 #' IMPORTANT NOTE: P-values are DESCRIPTIVE, not inferential. Since segments
 #' are defined using these variables (or correlates), statistical tests are
 #' used for exploration and ranking, not hypothesis testing. Focus on effect
-#' sizes (Cohen's d, eta-squared) and practical significance.
+#' sizes (Cohen's d, epsilon-squared) and practical significance.
+#'
+#' No family-wise error correction (e.g. Bonferroni, Holm) is applied.
+#' When testing 30+ variables at alpha=0.05, expect ~1-2 false positives
+#' by chance. This is standard market research practice but should be
+#' documented in deliverables.
 #'
 #' @param data Data frame with all variables
 #' @param clusters Integer vector of segment assignments
@@ -57,18 +62,19 @@ test_segment_differences <- function(data, clusters, variables, alpha = 0.05) {
       }, error = function(e) NULL)
       
       if (!is.null(test_result)) {
-        # Calculate eta-squared as effect size
+        # Calculate epsilon-squared (Tomczak & Tomczak 2014) as effect size
+        # for Kruskal-Wallis. Formula: H / (n - 1), range [0, 1].
+        # NOT eta-squared — Kruskal-Wallis H is chi-squared, not F.
         n <- length(var_complete)
-        k <- length(unique(clusters_complete))
-        eta_sq <- (test_result$statistic - k + 1) / (n - k)
-        
+        epsilon_sq <- test_result$statistic / (n - 1)
+
         results <- rbind(results, data.frame(
           Variable = var,
           Test = "Kruskal-Wallis",
           Statistic = round(test_result$statistic, 3),
           P_Value = round(test_result$p.value, 4),
           Significant = test_result$p.value < alpha,
-          Effect_Size = round(max(0, eta_sq), 3),
+          Effect_Size = round(max(0, min(1, epsilon_sq)), 3),
           stringsAsFactors = FALSE
         ))
       }

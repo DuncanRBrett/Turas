@@ -362,16 +362,26 @@ calculate_separation_metrics <- function(data, clusters, clustering_vars) {
   }
 
   db_scores <- numeric(k)
+  has_degenerate <- FALSE
   for (i in 1:k) {
     max_ratio <- 0
     for (j in 1:k) {
       if (i != j) {
         between_dist <- sqrt(sum((centers[i, ] - centers[j, ])^2))
+        if (between_dist < 1e-10) {
+          # Degenerate: two clusters have identical/near-identical centers
+          has_degenerate <- TRUE
+          next
+        }
         ratio <- (avg_within[i] + avg_within[j]) / between_dist
         max_ratio <- max(max_ratio, ratio)
       }
     }
     db_scores[i] <- max_ratio
+  }
+  if (has_degenerate) {
+    cat("  [WARNING] Davies-Bouldin: two or more clusters have near-identical centers.\n")
+    cat("            DB index may be unreliable. Consider reducing k.\n")
   }
   db_index <- mean(db_scores)
 

@@ -554,18 +554,22 @@ profile_demographics <- function(data, clusters, demo_vars,
 
     # Chi-squared test
     tryCatch({
-      chi_result <- chisq.test(cross_tab)
+      chi_result <- suppressWarnings(chisq.test(cross_tab))
+      # Check expected frequency assumption (cells < 5 invalidate chi-sq approximation)
+      low_expected <- any(chi_result$expected < 5)
       chi_sq_tests[[var]] <- data.frame(
         Variable = var,
         Chi_Sq = round(chi_result$statistic, 2),
         DF = chi_result$parameter,
         P_Value = format(chi_result$p.value, scientific = TRUE, digits = 3),
         Significant = chi_result$p.value < 0.05,
+        Low_Expected = low_expected,
         stringsAsFactors = FALSE
       )
 
       if (chi_result$p.value < 0.05) {
-        cat(sprintf("  ✓ Significant difference (p < 0.05)\n"))
+        sig_note <- if (low_expected) " (caution: low expected frequencies)" else ""
+        cat(sprintf("  ✓ Significant difference (p < 0.05)%s\n", sig_note))
       } else {
         cat(sprintf("    Not significant (p = %.3f)\n", chi_result$p.value))
       }

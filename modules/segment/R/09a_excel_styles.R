@@ -28,6 +28,46 @@ SEG_GREEN_BG        <- "#E8F5E9"
 SEG_AMBER_BG        <- "#FFF8E1"
 SEG_RED_BG          <- "#FFEBEE"
 SEG_FONT_NAME       <- "Aptos"
+
+
+# ==============================================================================
+# FORMULA INJECTION PROTECTION
+# ==============================================================================
+# Inline fallback for when shared turas_excel_escape() is not available.
+# Uses vapply+substr (NOT regex — R's regex treats \n inside [] as literal).
+# Matches OWASP CSV injection vector list: =, +, -, @, \t, \r, \n
+
+seg_escape_cell <- if (exists("turas_excel_escape", mode = "function")) {
+  turas_excel_escape
+} else {
+  function(x) {
+    if (!is.character(x)) return(x)
+    vapply(x, function(val) {
+      if (is.na(val) || !nzchar(val)) return(val)
+      first_char <- substr(val, 1, 1)
+      if (first_char %in% c("=", "+", "-", "@", "\t", "\r", "\n")) {
+        paste0("'", val)
+      } else {
+        val
+      }
+    }, character(1), USE.NAMES = FALSE)
+  }
+}
+
+#' Escape all character columns in a data frame for Excel formula injection
+#' @param df Data frame to escape
+#' @return Data frame with character columns escaped
+#' @keywords internal
+seg_escape_df <- function(df) {
+  if (!is.data.frame(df) || nrow(df) == 0) return(df)
+  char_cols <- vapply(df, is.character, logical(1))
+  for (col in names(df)[char_cols]) {
+    df[[col]] <- seg_escape_cell(df[[col]])
+  }
+  # Also escape column names
+  names(df) <- seg_escape_cell(names(df))
+  df
+}
 SEG_FONT_SIZE       <- 11
 SEG_FONT_SIZE_TITLE <- 14
 
@@ -196,6 +236,9 @@ seg_write_branded_sheet <- function(wb, sheet, data, start_row = 1,
 
   if (is.null(data) || nrow(data) == 0) return(invisible(NULL))
 
+  # Formula injection protection: escape all character columns
+  data <- seg_escape_df(data)
+
   n_cols <- ncol(data)
   n_rows <- nrow(data)
 
@@ -238,7 +281,7 @@ seg_write_branded_sheet <- function(wb, sheet, data, start_row = 1,
 #' @return Invisible NULL
 #' @keywords internal
 seg_write_title <- function(wb, sheet, title, row = 1, col_span = 5) {
-  openxlsx::writeData(wb, sheet, title, startRow = row, startCol = 1)
+  openxlsx::writeData(wb, sheet, seg_escape_cell(title), startRow = row, startCol = 1)
   openxlsx::addStyle(wb, sheet, style = seg_style_title(),
                       rows = row, cols = 1)
   if (col_span > 1) {
@@ -265,9 +308,11 @@ seg_write_metrics <- function(wb, sheet, metrics, start_row = 1,
 
   for (i in seq_along(metrics)) {
     row <- start_row + i - 1
-    openxlsx::writeData(wb, sheet, names(metrics)[i],
+    openxlsx::writeData(wb, sheet, seg_escape_cell(names(metrics)[i]),
                          startRow = row, startCol = label_col)
-    openxlsx::writeData(wb, sheet, metrics[[i]],
+    metric_val <- metrics[[i]]
+    if (is.character(metric_val)) metric_val <- seg_escape_cell(metric_val)
+    openxlsx::writeData(wb, sheet, metric_val,
                          startRow = row, startCol = value_col)
     openxlsx::addStyle(wb, sheet, style = seg_style_metric_label(),
                         rows = row, cols = label_col)

@@ -1555,10 +1555,10 @@ merge_segment_to_data <- function(data_path,
       } else if (out_ext %in% c("xlsx", "xls")) {
         wb <- openxlsx::createWorkbook()
         openxlsx::addWorksheet(wb, "Data")
-        openxlsx::writeData(wb, "Data", merged)
+        openxlsx::writeData(wb, "Data", seg_escape_df(merged))
         openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
       } else {
-        write.csv(merged, output_path, row.names = FALSE)
+        write.csv(merged, output_path, row.names = FALSE, fileEncoding = "UTF-8")
       }
       cat(sprintf("  Written to: %s\n", output_path))
     }, error = function(e) {

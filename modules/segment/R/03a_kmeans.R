@@ -341,9 +341,10 @@ run_kmeans_single <- function(data,
       # Check convergence (ifault: 0=success, 1=max iterations, 2=empty cluster)
       if (!is.null(result$ifault) && result$ifault != 0) {
         cat(sprintf(
-          "[SEGMENT] K-means convergence note for k=%d: ifault=%d. Results may be suboptimal. Consider increasing nstart.\n",
+          "[SEGMENT WARNING] K-means convergence issue for k=%d: ifault=%d. Results may be suboptimal. Consider increasing nstart.\n",
           k, result$ifault
         ))
+        result$convergence_warning <- sprintf("ifault=%d", result$ifault)
       }
 
       result$method <- "standard"

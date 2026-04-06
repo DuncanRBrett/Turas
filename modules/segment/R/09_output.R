@@ -887,6 +887,8 @@ add_segment_run_status_sheet <- function(wb, run_status = "PASS", degraded = FAL
     }
   }
 
+  # Formula injection protection
+  rows <- seg_escape_df(rows)
   openxlsx::writeData(wb, "Run_Status", rows, colNames = FALSE)
   invisible(NULL)
 }
