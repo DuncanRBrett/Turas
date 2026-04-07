@@ -58,12 +58,20 @@
       var clone = visibleCards[i].cloneNode(true);
       var hideBtn = clone.querySelector(".kpi-card-hide-btn");
       if (hideBtn) hideBtn.remove();
-      // Inline computed styles so colors survive outside tracker stylesheet context
-      TurasPins._inlineCaptureStyles(visibleCards[i], clone);
-      var origEls = visibleCards[i].querySelectorAll("*");
-      var cloneEls = clone.querySelectorAll("*");
-      for (var j = 0; j < origEls.length && j < cloneEls.length; j++) {
-        TurasPins._inlineCaptureStyles(origEls[j], cloneEls[j]);
+      // Read directional color from live computed styles and write as inline
+      // on the specific value/delta elements only — NOT full style capture
+      // which breaks layout by freezing heights/widths/positions
+      var liveVal = visibleCards[i].querySelector(".tk-hero-value");
+      var cloneVal = clone.querySelector(".tk-hero-value");
+      if (liveVal && cloneVal) {
+        var valColor = window.getComputedStyle(liveVal).color;
+        if (valColor) cloneVal.style.color = valColor;
+      }
+      var liveDelta = visibleCards[i].querySelector(".tk-hero-delta");
+      var cloneDelta = clone.querySelector(".tk-hero-delta");
+      if (liveDelta && cloneDelta) {
+        var deltaColor = window.getComputedStyle(liveDelta).color;
+        if (deltaColor) cloneDelta.style.color = deltaColor;
       }
       container.appendChild(clone);
     }
