@@ -260,7 +260,6 @@
   function _meta(pin) {
     var p = [];
     // sourceLabel now rendered as a colored badge — don't duplicate in meta text
-    if (pin.timestamp) p.push(new Date(pin.timestamp).toLocaleDateString());
     if (pin.visibleSegments && pin.visibleSegments.length > 0)
       p.push("Segments: " + pin.visibleSegments.join(", "));
     if (pin.bannerLabel) p.push("Banner: " + pin.bannerLabel);
