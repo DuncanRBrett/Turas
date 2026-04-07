@@ -806,7 +806,8 @@ create_hb_diagnostics_sheet <- function(wb, model_result, header_style) {
     Geweke_z = conv$geweke_z,
     Geweke_Status = ifelse(abs(conv$geweke_z) < 1.96, "OK", "FAIL"),
     ESS = conv$effective_sample_size,
-    ESS_Status = ifelse(conv$effective_sample_size > 100, "OK", "LOW"),
+    ESS_Status = ifelse(conv$effective_sample_size > 400, "OK",
+                 ifelse(conv$effective_sample_size > 100, "WARNING", "LOW")),
     stringsAsFactors = FALSE,
     row.names = NULL
   )
@@ -834,6 +835,10 @@ create_hb_diagnostics_sheet <- function(wb, model_result, header_style) {
     }
     if (param_df$ESS_Status[r] == "LOW") {
       openxlsx::addStyle(wb, "HB Diagnostics", fail_style, rows = data_row, cols = 5)
+    } else if (param_df$ESS_Status[r] == "WARNING") {
+      openxlsx::addStyle(wb, "HB Diagnostics",
+                        openxlsx::createStyle(fontColour = "#B7950B", textDecoration = "bold"),
+                        rows = data_row, cols = 5)
     } else {
       openxlsx::addStyle(wb, "HB Diagnostics", ok_style, rows = data_row, cols = 5)
     }
@@ -851,7 +856,7 @@ create_hb_diagnostics_sheet <- function(wb, model_result, header_style) {
     Metric = c("Geweke z-score", "Effective Sample Size (ESS)"),
     Interpretation = c(
       "|z| < 1.96 indicates convergence (first 10% vs last 50% of chain are from same distribution)",
-      "ESS > 100 indicates sufficient independent draws. Low ESS suggests high autocorrelation; increase iterations or thinning."
+      "ESS > 400 indicates sufficient independent draws. ESS 100-400 is acceptable with caution. ESS < 100 is critical — increase iterations or thinning."
     ),
     stringsAsFactors = FALSE
   )

@@ -848,12 +848,41 @@ save_config_to_excel <- function(config, output_file) {
     Value = unlist(config$settings),
     stringsAsFactors = FALSE
   )
-  openxlsx::writeData(wb, "Settings", settings_df)
+  # Escape user-sourced text (formula injection protection)
+  alc_escape_cell <- if (exists("turas_excel_escape", mode = "function")) {
+    turas_excel_escape
+  } else if (exists("conjoint_escape_cell", mode = "function")) {
+    conjoint_escape_cell
+  } else {
+    function(x) {
+      if (!is.character(x)) return(x)
+      vapply(x, function(val) {
+        if (is.na(val) || nchar(val) == 0L) return(val)
+        first_char <- substr(val, 1, 1)
+        if (first_char %in% c("=", "+", "-", "@", "\t", "\r", "\n")) {
+          paste0("'", val)
+        } else {
+          val
+        }
+      }, character(1), USE.NAMES = FALSE)
+    }
+  }
+  alc_escape_df <- function(df) {
+    if (!is.data.frame(df)) return(df)
+    nm <- names(df)
+    names(df) <- alc_escape_cell(nm)
+    for (col in seq_along(df)) {
+      if (is.character(df[[col]])) df[[col]] <- alc_escape_cell(df[[col]])
+    }
+    df
+  }
+
+  openxlsx::writeData(wb, "Settings", alc_escape_df(settings_df))
 
   # Attributes sheet
   openxlsx::addWorksheet(wb, "Attributes")
   attrs_df <- config$attributes[, c("AttributeName", "NumLevels", "LevelNames")]
-  openxlsx::writeData(wb, "Attributes", attrs_df)
+  openxlsx::writeData(wb, "Attributes", alc_escape_df(attrs_df))
 
   # Apply formatting
   header_style <- create_header_style()

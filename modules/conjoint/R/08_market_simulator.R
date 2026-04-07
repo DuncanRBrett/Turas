@@ -13,6 +13,40 @@
 # Version: 3.0.0
 # ==============================================================================
 
+# ---------------------------------------------------------------------------
+# Formula injection protection (OWASP CSV Injection)
+# Inline fallback using vapply+substr (not regex, per Phase 3 re-review R3)
+# Must be module-level so both sheet-builder functions can access it.
+# ---------------------------------------------------------------------------
+cj_sim_escape_cell <- if (exists("turas_excel_escape", mode = "function")) {
+  turas_excel_escape
+} else {
+  function(x) {
+    if (!is.character(x)) return(x)
+    vapply(x, function(val) {
+      if (is.na(val) || nchar(val) == 0L) return(val)
+      first_char <- substr(val, 1, 1)
+      if (first_char %in% c("=", "+", "-", "@", "\t", "\r", "\n")) {
+        paste0("'", val)
+      } else {
+        val
+      }
+    }, character(1), USE.NAMES = FALSE)
+  }
+}
+
+cj_sim_escape_df <- function(df) {
+  if (!is.data.frame(df)) return(df)
+  nm <- names(df)
+  names(df) <- cj_sim_escape_cell(nm)
+  for (col in seq_along(df)) {
+    if (is.character(df[[col]])) {
+      df[[col]] <- cj_sim_escape_cell(df[[col]])
+    }
+  }
+  df
+}
+
 # ==============================================================================
 # 1. MAIN SIMULATOR SHEET CREATOR
 # ==============================================================================
@@ -151,8 +185,8 @@ write_product_configuration <- function(wb, sheet_name, config, utilities,
   attributes <- config$attributes$AttributeName
 
   for (attr in attributes) {
-    # Write attribute name
-    writeData(wb, sheet_name, attr, startCol = 1, startRow = current_row)
+    # Write attribute name (escaped — user-sourced from config)
+    writeData(wb, sheet_name, cj_sim_escape_cell(attr), startCol = 1, startRow = current_row)
 
     # Get levels for this attribute
     attr_levels <- utilities$Level[utilities$Attribute == attr]
@@ -163,8 +197,8 @@ write_product_configuration <- function(wb, sheet_name, config, utilities,
     for (prod in 1:n_products) {
       col <- 1 + prod
 
-      # Set default value (first level)
-      writeData(wb, sheet_name, attr_levels[1], startCol = col, startRow = current_row)
+      # Set default value (first level, escaped — user-sourced)
+      writeData(wb, sheet_name, cj_sim_escape_cell(attr_levels[1]), startCol = col, startRow = current_row)
 
       # Add cell style to indicate it's editable
       editable_style <- createStyle(fgFill = "#FFF2CC", border = "TopBottomLeftRight")
@@ -346,7 +380,7 @@ write_utilities_breakdown <- function(wb, sheet_name, config, n_products,
 
   for (i in seq_along(attributes)) {
     attr <- attributes[i]
-    writeData(wb, sheet_name, attr, startCol = 1, startRow = current_row)
+    writeData(wb, sheet_name, cj_sim_escape_cell(attr), startCol = 1, startRow = current_row)
 
     # For each product, VLOOKUP the utility
     for (prod in 1:n_products) {
@@ -453,7 +487,7 @@ write_sensitivity_analysis <- function(wb, sheet_name, config, start_row,
 
   for (i in seq_along(attributes)) {
     attr <- attributes[i]
-    writeData(wb, sheet_name, attr, startCol = 1, startRow = current_row)
+    writeData(wb, sheet_name, cj_sim_escape_cell(attr), startCol = 1, startRow = current_row)
 
     # Current level (reference to config)
     config_row_ref <- config_start_row + 1 + i
@@ -510,6 +544,9 @@ create_simulator_data_sheet <- function(wb, utilities, importance, header_style)
   lookup_data$Key <- paste0(lookup_data$Attribute, "|", lookup_data$Level)
   lookup_data <- lookup_data[, c("Key", "Attribute", "Level", "Utility")]
 
+  # Escape user-sourced text (formula injection protection)
+  lookup_data <- cj_sim_escape_df(lookup_data)
+
   # Write as formatted table
   writeDataTable(wb, sheet_name,
                  x = lookup_data,
@@ -524,7 +561,7 @@ create_simulator_data_sheet <- function(wb, utilities, importance, header_style)
   importance_data <- importance[, c("Attribute", "Importance")]
   importance_data <- importance_data[order(-importance_data$Importance), ]
 
-  writeData(wb, sheet_name, importance_data, startRow = 1, startCol = 6,
+  writeData(wb, sheet_name, cj_sim_escape_df(importance_data), startRow = 1, startCol = 6,
             colNames = TRUE, headerStyle = header_style)
 
   # Format columns

@@ -1147,7 +1147,7 @@ write_run_status_sheet <- function(wb, run_result, styles) {
   openxlsx::writeData(wb, "Run_Status", "RUN STATUS", startRow = 1, startCol = 1)
   openxlsx::addStyle(wb, "Run_Status", styles$header,
                     rows = 1, cols = 1:2, gridExpand = TRUE)
-  openxlsx::writeData(wb, "Run_Status", status_data, startRow = 2, startCol = 1,
+  openxlsx::writeData(wb, "Run_Status", maxdiff_escape_df(status_data), startRow = 2, startCol = 1,
                      colNames = TRUE, headerStyle = styles$subheader)
 
   # Conditional formatting: colour the status value
@@ -1179,7 +1179,7 @@ write_run_status_sheet <- function(wb, run_result, styles) {
                       rows = current_row, cols = 1:2, gridExpand = TRUE)
 
     if (is.data.frame(warnings_list)) {
-      openxlsx::writeData(wb, "Run_Status", warnings_list,
+      openxlsx::writeData(wb, "Run_Status", maxdiff_escape_df(warnings_list),
                          startRow = current_row + 1, startCol = 1,
                          colNames = TRUE, headerStyle = styles$subheader)
     } else {
@@ -1189,7 +1189,7 @@ write_run_status_sheet <- function(wb, run_result, styles) {
         Message = as.character(warnings_list),
         stringsAsFactors = FALSE
       )
-      openxlsx::writeData(wb, "Run_Status", events_df,
+      openxlsx::writeData(wb, "Run_Status", maxdiff_escape_df(events_df),
                          startRow = current_row + 1, startCol = 1,
                          colNames = TRUE, headerStyle = styles$subheader)
     }
@@ -1215,7 +1215,7 @@ write_design_sheets <- function(wb, results, config, styles) {
 
   # DESIGN sheet
   openxlsx::addWorksheet(wb, "DESIGN")
-  openxlsx::writeData(wb, "DESIGN", design_result$design, startRow = 1, startCol = 1,
+  openxlsx::writeData(wb, "DESIGN", maxdiff_escape_df(design_result$design), startRow = 1, startCol = 1,
                      colNames = TRUE, headerStyle = styles$header)
   openxlsx::setColWidths(wb, "DESIGN", cols = 1:ncol(design_result$design),
                         widths = "auto")
@@ -1230,13 +1230,13 @@ write_design_sheets <- function(wb, results, config, styles) {
                      startRow = 1, startCol = 1)
   openxlsx::addStyle(wb, "DESIGN_SUMMARY", styles$header,
                     rows = 1, cols = 1:2, gridExpand = TRUE)
-  openxlsx::writeData(wb, "DESIGN_SUMMARY", design_summary$summary,
+  openxlsx::writeData(wb, "DESIGN_SUMMARY", maxdiff_escape_df(design_summary$summary),
                      startRow = 2, startCol = 1,
                      colNames = TRUE, headerStyle = styles$subheader)
 
   openxlsx::writeData(wb, "DESIGN_SUMMARY", "Item Frequencies",
                      startRow = nrow(design_summary$summary) + 5, startCol = 1)
-  openxlsx::writeData(wb, "DESIGN_SUMMARY", design_summary$item_frequencies,
+  openxlsx::writeData(wb, "DESIGN_SUMMARY", maxdiff_escape_df(design_summary$item_frequencies),
                      startRow = nrow(design_summary$summary) + 6, startCol = 1,
                      colNames = TRUE, headerStyle = styles$subheader)
 
@@ -1292,7 +1292,7 @@ generate_design_output <- function(design_result, config, verbose = TRUE) {
 
   # DESIGN sheet
   openxlsx::addWorksheet(wb, "DESIGN")
-  openxlsx::writeData(wb, "DESIGN", design_result$design, startRow = 1, startCol = 1,
+  openxlsx::writeData(wb, "DESIGN", maxdiff_escape_df(design_result$design), startRow = 1, startCol = 1,
                      colNames = TRUE, headerStyle = styles$header)
   openxlsx::setColWidths(wb, "DESIGN", cols = 1:ncol(design_result$design),
                         widths = "auto")
@@ -1302,13 +1302,13 @@ generate_design_output <- function(design_result, config, verbose = TRUE) {
   openxlsx::addWorksheet(wb, "DESIGN_SUMMARY")
   design_summary <- summarize_design(design_result)
 
-  openxlsx::writeData(wb, "DESIGN_SUMMARY", design_summary$summary,
+  openxlsx::writeData(wb, "DESIGN_SUMMARY", maxdiff_escape_df(design_summary$summary),
                      startRow = 1, startCol = 1,
                      colNames = TRUE, headerStyle = styles$header)
 
   openxlsx::writeData(wb, "DESIGN_SUMMARY", "Item Frequencies",
                      startRow = nrow(design_summary$summary) + 3, startCol = 1)
-  openxlsx::writeData(wb, "DESIGN_SUMMARY", design_summary$item_frequencies,
+  openxlsx::writeData(wb, "DESIGN_SUMMARY", maxdiff_escape_df(design_summary$item_frequencies),
                      startRow = nrow(design_summary$summary) + 4, startCol = 1,
                      colNames = TRUE, headerStyle = styles$subheader)
 
