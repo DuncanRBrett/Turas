@@ -126,6 +126,10 @@
     pin = TurasPins.normalise(pin);
     if (pin.chartSvg) pin.chartSvg = TurasPins._compressSvg(pin.chartSvg);
     delete pin.pngDataUrl;
+    // Stamp source label from module config so it persists in exports
+    if (!pin.sourceLabel && _config && _config.moduleLabel) {
+      pin.sourceLabel = _config.moduleLabel;
+    }
     if (_hubMode) {
       window.pinToHub(pin);
       TurasPins._showToast("Pinned to combined report");
