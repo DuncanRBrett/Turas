@@ -24,6 +24,40 @@
 #
 # ==============================================================================
 
+# ---------------------------------------------------------------------------
+# Formula injection protection (OWASP CSV Injection)
+# Inline fallback using vapply+substr (not regex, per Phase 3 re-review R3)
+# ---------------------------------------------------------------------------
+conjoint_escape_cell <- if (exists("turas_excel_escape", mode = "function")) {
+  turas_excel_escape
+} else {
+  function(x) {
+    if (!is.character(x)) return(x)
+    vapply(x, function(val) {
+      if (is.na(val) || nchar(val) == 0L) return(val)
+      first_char <- substr(val, 1, 1)
+      if (first_char %in% c("=", "+", "-", "@", "\t", "\r", "\n")) {
+        paste0("'", val)
+      } else {
+        val
+      }
+    }, character(1), USE.NAMES = FALSE)
+  }
+}
+
+conjoint_escape_df <- function(df) {
+  if (!is.data.frame(df)) return(df)
+  nm <- names(df)
+  names(df) <- conjoint_escape_cell(nm)
+  for (col in seq_along(df)) {
+    if (is.character(df[[col]])) {
+      df[[col]] <- conjoint_escape_cell(df[[col]])
+    }
+  }
+  df
+}
+
+
 #' Write Conjoint Results to Excel
 #'
 #' Creates formatted Excel workbook with 8-sheet structure per specification
@@ -195,7 +229,7 @@ create_utility_chart_data_sheet <- function(wb, utilities, importance, header_st
     Importance = imp_sorted$Importance,
     stringsAsFactors = FALSE
   )
-  openxlsx::writeData(wb, "Utility Chart Data", imp_chart, startRow = row, startCol = 1,
+  openxlsx::writeData(wb, "Utility Chart Data", conjoint_escape_df(imp_chart), startRow = row, startCol = 1,
                      headerStyle = header_style)
   row <- row + nrow(imp_chart) + 3
 
@@ -210,13 +244,13 @@ create_utility_chart_data_sheet <- function(wb, utilities, importance, header_st
     attr_utils <- utilities[utilities$Attribute == attr, c("Level", "Utility")]
     attr_utils <- attr_utils[order(-attr_utils$Utility), ]
 
-    openxlsx::writeData(wb, "Utility Chart Data", attr, startRow = row, startCol = 1)
+    openxlsx::writeData(wb, "Utility Chart Data", conjoint_escape_cell(attr), startRow = row, startCol = 1)
     openxlsx::addStyle(wb, "Utility Chart Data",
                       openxlsx::createStyle(textDecoration = "bold"),
                       rows = row, cols = 1)
     row <- row + 1
 
-    openxlsx::writeData(wb, "Utility Chart Data", attr_utils, startRow = row, startCol = 1,
+    openxlsx::writeData(wb, "Utility Chart Data", conjoint_escape_df(attr_utils), startRow = row, startCol = 1,
                        headerStyle = header_style)
     row <- row + nrow(attr_utils) + 2
   }
@@ -228,7 +262,7 @@ create_utility_chart_data_sheet <- function(wb, utilities, importance, header_st
   row <- row + 1
 
   chart_data <- utilities[, c("Attribute", "Level", "Utility")]
-  openxlsx::writeData(wb, "Utility Chart Data", chart_data, startRow = row, startCol = 1,
+  openxlsx::writeData(wb, "Utility Chart Data", conjoint_escape_df(chart_data), startRow = row, startCol = 1,
                      headerStyle = header_style)
 
   # Apply number formatting
@@ -281,7 +315,7 @@ create_model_fit_sheet <- function(wb, diagnostics, model_result, header_style) 
       stringsAsFactors = FALSE
     )
 
-    openxlsx::writeData(wb, "Model Fit", fit_stats, startRow = row, startCol = 1,
+    openxlsx::writeData(wb, "Model Fit", conjoint_escape_df(fit_stats), startRow = row, startCol = 1,
                        headerStyle = header_style)
     row <- row + nrow(fit_stats) + 2
   }
@@ -303,7 +337,7 @@ create_model_fit_sheet <- function(wb, diagnostics, model_result, header_style) 
     stringsAsFactors = FALSE
   )
 
-  openxlsx::writeData(wb, "Model Fit", sample_info, startRow = row, startCol = 1,
+  openxlsx::writeData(wb, "Model Fit", conjoint_escape_df(sample_info), startRow = row, startCol = 1,
                      headerStyle = header_style)
   row <- row + nrow(sample_info) + 2
 
@@ -321,7 +355,7 @@ create_model_fit_sheet <- function(wb, diagnostics, model_result, header_style) 
       stringsAsFactors = FALSE
     )
 
-    openxlsx::writeData(wb, "Model Fit", quality_df, startRow = row, startCol = 1,
+    openxlsx::writeData(wb, "Model Fit", conjoint_escape_df(quality_df), startRow = row, startCol = 1,
                        headerStyle = header_style)
   }
 
@@ -371,7 +405,7 @@ create_raw_coefficients_sheet <- function(wb, model_result, header_style) {
     )
 
     # Write data
-    openxlsx::writeData(wb, "Raw Coefficients", coef_df, startRow = row, startCol = 1,
+    openxlsx::writeData(wb, "Raw Coefficients", conjoint_escape_df(coef_df), startRow = row, startCol = 1,
                        headerStyle = header_style)
 
     # Apply number formatting
@@ -423,7 +457,7 @@ create_importance_sheet <- function(wb, importance, header_style, positive_style
   openxlsx::addWorksheet(wb, "Attribute Importance")
 
   # Write data
-  openxlsx::writeData(wb, "Attribute Importance", importance, startRow = 1)
+  openxlsx::writeData(wb, "Attribute Importance", conjoint_escape_df(importance), startRow = 1)
 
   # Apply styles
   openxlsx::addStyle(wb, "Attribute Importance", header_style, rows = 1,
@@ -446,7 +480,7 @@ create_utilities_sheet <- function(wb, utilities, header_style,
   openxlsx::addWorksheet(wb, "Part-Worth Utilities")
 
   # Write data
-  openxlsx::writeData(wb, "Part-Worth Utilities", utilities, startRow = 1)
+  openxlsx::writeData(wb, "Part-Worth Utilities", conjoint_escape_df(utilities), startRow = 1)
 
   # Apply header style
   openxlsx::addStyle(wb, "Part-Worth Utilities", header_style, rows = 1,
@@ -504,7 +538,7 @@ create_data_summary_sheet <- function(wb, data_info, config, header_style) {
     stringsAsFactors = FALSE
   )
 
-  openxlsx::writeData(wb, "Data Summary", sample_stats,
+  openxlsx::writeData(wb, "Data Summary", conjoint_escape_df(sample_stats),
                      startRow = row, startCol = 1)
   row <- row + nrow(sample_stats) + 2
 
@@ -525,7 +559,7 @@ create_data_summary_sheet <- function(wb, data_info, config, header_style) {
       stringsAsFactors = FALSE
     )
 
-    openxlsx::writeData(wb, "Data Summary", val_summary,
+    openxlsx::writeData(wb, "Data Summary", conjoint_escape_df(val_summary),
                        startRow = row, startCol = 1)
   }
 
@@ -547,7 +581,7 @@ create_configuration_sheet <- function(wb, config, header_style) {
     stringsAsFactors = FALSE
   )
 
-  openxlsx::writeData(wb, "Configuration", config_summary, startRow = 1)
+  openxlsx::writeData(wb, "Configuration", conjoint_escape_df(config_summary), startRow = 1)
   openxlsx::addStyle(wb, "Configuration", header_style, rows = 1,
                     cols = 1:ncol(config_summary), gridExpand = TRUE)
 
@@ -641,7 +675,7 @@ create_individual_utilities_sheet <- function(wb, model_result, config, header_s
   }
 
   # Write data
-  openxlsx::writeData(wb, "Individual Utilities", indiv_df,
+  openxlsx::writeData(wb, "Individual Utilities", conjoint_escape_df(indiv_df),
                      startRow = row, startCol = 1, headerStyle = header_style)
 
   # Number formatting for utility columns
@@ -725,7 +759,7 @@ create_hb_diagnostics_sheet <- function(wb, model_result, header_style) {
     ),
     stringsAsFactors = FALSE
   )
-  openxlsx::writeData(wb, "HB Diagnostics", settings_df,
+  openxlsx::writeData(wb, "HB Diagnostics", conjoint_escape_df(settings_df),
                      startRow = row, startCol = 1, headerStyle = header_style)
   row <- row + nrow(settings_df) + 2
 
@@ -749,7 +783,7 @@ create_hb_diagnostics_sheet <- function(wb, model_result, header_style) {
     ),
     stringsAsFactors = FALSE
   )
-  openxlsx::writeData(wb, "HB Diagnostics", assess_df,
+  openxlsx::writeData(wb, "HB Diagnostics", conjoint_escape_df(assess_df),
                      startRow = row, startCol = 1, headerStyle = header_style)
 
   # Colour the status cell
@@ -777,7 +811,7 @@ create_hb_diagnostics_sheet <- function(wb, model_result, header_style) {
     row.names = NULL
   )
 
-  openxlsx::writeData(wb, "HB Diagnostics", param_df,
+  openxlsx::writeData(wb, "HB Diagnostics", conjoint_escape_df(param_df),
                      startRow = row, startCol = 1, headerStyle = header_style)
 
   # Format numbers
@@ -889,7 +923,7 @@ create_respondent_quality_sheet <- function(wb, model_result, header_style) {
     ),
     stringsAsFactors = FALSE
   )
-  openxlsx::writeData(wb, "Respondent Quality", summary_df,
+  openxlsx::writeData(wb, "Respondent Quality", conjoint_escape_df(summary_df),
                      startRow = row, startCol = 1, headerStyle = header_style)
   row <- row + nrow(summary_df) + 2
 
@@ -908,7 +942,7 @@ create_respondent_quality_sheet <- function(wb, model_result, header_style) {
   )
   resp_df <- resp_df[order(resp_df$RLH), ]
 
-  openxlsx::writeData(wb, "Respondent Quality", resp_df,
+  openxlsx::writeData(wb, "Respondent Quality", conjoint_escape_df(resp_df),
                      startRow = row, startCol = 1, headerStyle = header_style)
 
   # Number formatting for RLH
@@ -952,7 +986,7 @@ create_respondent_quality_sheet <- function(wb, model_result, header_style) {
     ),
     stringsAsFactors = FALSE
   )
-  openxlsx::writeData(wb, "Respondent Quality", guide_df,
+  openxlsx::writeData(wb, "Respondent Quality", conjoint_escape_df(guide_df),
                      startRow = row, startCol = 1, headerStyle = header_style)
 
   # Set column widths
@@ -1006,7 +1040,7 @@ create_class_comparison_sheet <- function(wb, model_result, header_style) {
   display_cols <- c("K", "LogLik", "n_params", "AIC", "BIC", "Entropy_R2", "Converged")
   display_df <- comp[, display_cols[display_cols %in% names(comp)]]
 
-  openxlsx::writeData(wb, "Class Comparison", display_df,
+  openxlsx::writeData(wb, "Class Comparison", conjoint_escape_df(display_df),
                      startRow = row, startCol = 1, headerStyle = header_style)
 
   # Number formatting
@@ -1102,7 +1136,7 @@ create_class_profiles_sheet <- function(wb, model_result, config, header_style) 
     Percentage = sprintf("%.1f%%", lc$class_proportions * 100),
     stringsAsFactors = FALSE
   )
-  openxlsx::writeData(wb, "Class Profiles", size_df,
+  openxlsx::writeData(wb, "Class Profiles", conjoint_escape_df(size_df),
                      startRow = row, startCol = 1, headerStyle = header_style)
   row <- row + nrow(size_df) + 2
 
@@ -1126,7 +1160,7 @@ create_class_profiles_sheet <- function(wb, model_result, config, header_style) 
                         rows = row, cols = 1)
       row <- row + 1
 
-      openxlsx::writeData(wb, "Class Profiles", imp[, c("Attribute", "Importance")],
+      openxlsx::writeData(wb, "Class Profiles", conjoint_escape_df(imp[, c("Attribute", "Importance")]),
                          startRow = row, startCol = 1, headerStyle = header_style)
 
       # Number formatting
@@ -1164,7 +1198,7 @@ create_class_profiles_sheet <- function(wb, model_result, config, header_style) 
 
   if (length(wide_rows) > 0) {
     utils_wide <- do.call(rbind, wide_rows)
-    openxlsx::writeData(wb, "Class Profiles", utils_wide,
+    openxlsx::writeData(wb, "Class Profiles", conjoint_escape_df(utils_wide),
                        startRow = row, startCol = 1, headerStyle = header_style)
 
     # Number format for class columns
@@ -1214,7 +1248,7 @@ create_class_membership_sheet <- function(wb, model_result, header_style) {
 
   # Membership table
   membership <- lc$membership
-  openxlsx::writeData(wb, "Class Membership", membership,
+  openxlsx::writeData(wb, "Class Membership", conjoint_escape_df(membership),
                      startRow = row, startCol = 1, headerStyle = header_style)
 
   # Number formatting for probability columns

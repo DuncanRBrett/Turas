@@ -168,6 +168,12 @@ predict_shares_logit <- function(utilities, availability) {
   exp_utilities <- exp(utilities - max_utility) * availability
   sum_exp_utilities <- sum(exp_utilities)
 
+  # Guard against division by zero (e.g., all availability weights are 0)
+  if (sum_exp_utilities < 1e-10) {
+    message("[TRS INFO] CONJ_SIMULATOR_ZERO_SHARES: All products unavailable — returning equal shares")
+    return(rep(1 / length(utilities), length(utilities)))
+  }
+
   shares <- exp_utilities / sum_exp_utilities
 
   shares

@@ -524,11 +524,14 @@ run_hb_convergence_diagnostics <- function(hb_output, bayesm_data, verbose = TRU
 
   # Determine convergence status
   geweke_pass <- all(abs(geweke_z) < 1.96)
-  ess_pass <- all(ess > 100)
+  ess_pass <- all(ess > 400)
   converged <- geweke_pass && ess_pass
 
   names(geweke_z) <- bayesm_data$col_names
   names(ess) <- bayesm_data$col_names
+
+  # Determine if there's a critical ESS issue (< 100) vs warning (100-400)
+  ess_critical <- any(ess < 100)
 
   convergence <- list(
     converged = converged,
@@ -538,7 +541,13 @@ run_hb_convergence_diagnostics <- function(hb_output, bayesm_data, verbose = TRU
     } else {
       problems <- character()
       if (!geweke_pass) problems <- c(problems, "Geweke test failed for some parameters")
-      if (!ess_pass) problems <- c(problems, "Low effective sample size for some parameters")
+      if (ess_critical) {
+        problems <- c(problems, sprintf("Critical: ESS < 100 for %d parameter(s) — insufficient sampling",
+                                        sum(ess < 100)))
+      } else if (!ess_pass) {
+        problems <- c(problems, sprintf("Warning: ESS < 400 for %d parameter(s) — may affect posterior accuracy",
+                                        sum(ess <= 400)))
+      }
       paste("Convergence issues:", paste(problems, collapse = "; "))
     },
     geweke_z = geweke_z,

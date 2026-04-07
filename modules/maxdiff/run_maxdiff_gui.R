@@ -70,6 +70,7 @@ run_maxdiff_gui <- function() {
       msg <- paste0(msg, "\nDetails:\n  ", details, "\n")
     }
     msg <- paste0(msg, "\n", strrep("=", 80), "\n")
+    cat(msg)
     stop(msg, call. = FALSE)
   }
 

@@ -28,7 +28,14 @@ local({
   callout_dir <- file.path(turas_root, "modules", "shared", "lib", "callouts")
   if (!dir.exists(callout_dir)) callout_dir <- file.path("modules", "shared", "lib", "callouts")
   if (!exists("turas_callout", mode = "function") && dir.exists(callout_dir)) {
-    source(file.path(callout_dir, "callout_registry.R"), local = FALSE)
+    tryCatch(
+      source(file.path(callout_dir, "callout_registry.R"), local = FALSE),
+      error = function(e) message(sprintf("[MAXDIFF] Callout registry load failed: %s", e$message))
+    )
+  }
+  # No-op fallback if callout registry is unavailable
+  if (!exists("turas_callout", mode = "function")) {
+    turas_callout <<- function(module, key, ...) ""
   }
 })
 

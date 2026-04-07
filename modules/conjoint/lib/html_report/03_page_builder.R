@@ -160,7 +160,17 @@ local({
   callout_dir <- file.path(turas_root, "modules", "shared", "lib", "callouts")
   if (!dir.exists(callout_dir)) callout_dir <- file.path("modules", "shared", "lib", "callouts")
   if (!exists("turas_callout", mode = "function") && dir.exists(callout_dir)) {
-    source(file.path(callout_dir, "callout_registry.R"), local = FALSE)
+    tryCatch(
+      source(file.path(callout_dir, "callout_registry.R"), local = FALSE),
+      error = function(e) message(sprintf("[CONJOINT] Callout registry load failed: %s", e$message))
+    )
+  }
+  # No-op fallbacks if callout registry is unavailable
+  if (!exists("turas_callout", mode = "function")) {
+    turas_callout <<- function(module, key, ...) ""
+  }
+  if (!exists("turas_callout_html", mode = "function")) {
+    turas_callout_html <<- function(title, body, ...) ""
   }
 })
 
@@ -1017,9 +1027,15 @@ build_diagnostics_panel <- function(html_data, tables, charts, brand) {
 
     # Plain-language convergence explanation (from callout registry)
     if (converged) {
-      conv_explain <- paste0('<div style="margin-top:12px;">', turas_callout("conjoint", "convergence_pass"), '</div>')
+      conv_explain <- tryCatch(
+        paste0('<div style="margin-top:12px;">', turas_callout("conjoint", "convergence_pass"), '</div>'),
+        error = function(e) ""
+      )
     } else {
-      conv_explain <- paste0('<div style="margin-top:12px;">', turas_callout("conjoint", "convergence_fail"), '</div>')
+      conv_explain <- tryCatch(
+        paste0('<div style="margin-top:12px;">', turas_callout("conjoint", "convergence_fail"), '</div>'),
+        error = function(e) ""
+      )
     }
 
     sections <- c(sections, sprintf(

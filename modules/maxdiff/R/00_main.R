@@ -800,6 +800,20 @@ generate_maxdiff_stats_pack <- function(config, results, run_result,
     paste(parts, collapse = ", ")
   }
 
+  # HB convergence diagnostics (when available)
+  hb_diag <- if (has_hb) results$hb_results$diagnostics else NULL
+  hb_convergence_items <- if (!is.null(hb_diag)) {
+    list(
+      "Convergence Status" = if (isTRUE(hb_diag$converged)) "CONVERGED" else "NOT CONVERGED",
+      "R-hat Max" = if (!is.na(hb_diag$rhat_max %||% NA)) sprintf("%.4f", hb_diag$rhat_max) else "N/A",
+      "ESS Min" = if (!is.na(hb_diag$ess_min %||% NA)) sprintf("%.0f", hb_diag$ess_min) else "N/A",
+      "Divergences" = as.character(hb_diag$n_divergences %||% 0),
+      "Quality Score" = if (!is.null(hb_diag$quality_score)) sprintf("%d/100", hb_diag$quality_score) else "N/A"
+    )
+  } else {
+    list()
+  }
+
   assumptions <- list(
     "Items"                = as.character(n_items),
     "Tasks per respondent" = if (!is.na(tasks_per_resp)) as.character(tasks_per_resp) else "—",
@@ -810,6 +824,10 @@ generate_maxdiff_stats_pack <- function(config, results, run_result,
     "TRS Status"           = run_result$status %||% "PASS",
     "TRS Events"           = trs_summary
   )
+
+  if (length(hb_convergence_items) > 0) {
+    assumptions <- c(assumptions, hb_convergence_items)
+  }
 
   data_receipt <- list(
     file_name           = basename(config$project_settings$Raw_Data_File %||% "unknown"),

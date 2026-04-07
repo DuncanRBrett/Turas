@@ -24,6 +24,7 @@ run_conjoint_gui <- function() {
       "How to fix:\n  ", paste(how_to_fix, collapse = "\n  "), "\n\n",
       strrep("=", 80), "\n"
     )
+    cat(msg)
     stop(msg, call. = FALSE)
   }
 

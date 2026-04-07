@@ -24,6 +24,39 @@
 # - utils.R
 # ==============================================================================
 
+# ---------------------------------------------------------------------------
+# Formula injection protection (OWASP CSV Injection)
+# Inline fallback using vapply+substr (not regex, per Phase 3 re-review R3)
+# ---------------------------------------------------------------------------
+maxdiff_escape_cell <- if (exists("turas_excel_escape", mode = "function")) {
+  turas_excel_escape
+} else {
+  function(x) {
+    if (!is.character(x)) return(x)
+    vapply(x, function(val) {
+      if (is.na(val) || nchar(val) == 0L) return(val)
+      first_char <- substr(val, 1, 1)
+      if (first_char %in% c("=", "+", "-", "@", "\t", "\r", "\n")) {
+        paste0("'", val)
+      } else {
+        val
+      }
+    }, character(1), USE.NAMES = FALSE)
+  }
+}
+
+maxdiff_escape_df <- function(df) {
+  if (!is.data.frame(df)) return(df)
+  nm <- names(df)
+  names(df) <- maxdiff_escape_cell(nm)
+  for (col in seq_along(df)) {
+    if (is.character(df[[col]])) {
+      df[[col]] <- maxdiff_escape_cell(df[[col]])
+    }
+  }
+  df
+}
+
 OUTPUT_VERSION <- "11.2"
 
 # ==============================================================================
@@ -372,6 +405,10 @@ write_summary_sheet <- function(wb, results, config, styles) {
     )
   }
 
+  # Escape user-sourced text (formula injection protection)
+  project_info <- maxdiff_escape_df(project_info)
+  sample_info  <- maxdiff_escape_df(sample_info)
+
   # Write project info
   openxlsx::writeData(wb, "SUMMARY", "PROJECT INFORMATION", startRow = 1, startCol = 1)
   openxlsx::addStyle(wb, "SUMMARY", styles$header, rows = 1, cols = 1:2, gridExpand = TRUE)
@@ -471,6 +508,9 @@ write_item_scores_sheet <- function(wb, results, config, styles) {
   output_cols <- output_cols[output_cols %in% names(item_scores)]
 
   output_df <- item_scores[, output_cols]
+
+  # Escape user-sourced text (formula injection protection)
+  output_df <- maxdiff_escape_df(output_df)
 
   # Write data
   openxlsx::writeData(wb, "ITEM_SCORES", output_df, startRow = 1, startCol = 1,
@@ -597,6 +637,9 @@ write_segment_scores_sheet <- function(wb, results, config, styles) {
 
   output_df <- segment_scores[, output_cols]
 
+  # Escape user-sourced text (formula injection protection)
+  output_df <- maxdiff_escape_df(output_df)
+
   # Write data
   openxlsx::writeData(wb, "SEGMENT_SCORES", output_df, startRow = 1, startCol = 1,
                      colNames = TRUE, headerStyle = styles$header)
@@ -671,6 +714,9 @@ write_individual_utils_sheet <- function(wb, results, config, styles) {
                        startRow = 1, startCol = 1)
     return()
   }
+
+  # Escape user-sourced text (formula injection protection)
+  ind_utils <- maxdiff_escape_df(ind_utils)
 
   # Write data
   openxlsx::writeData(wb, "INDIVIDUAL_UTILS", ind_utils, startRow = 1, startCol = 1,
@@ -759,7 +805,11 @@ write_diagnostics_sheet <- function(wb, results, config, styles) {
   for (section_name in names(diagnostics_data)) {
     section_data <- diagnostics_data[[section_name]]
 
-    openxlsx::writeData(wb, "MODEL_DIAGNOSTICS", section_name,
+    # Escape user-sourced text (formula injection protection)
+    section_name_safe <- maxdiff_escape_cell(section_name)
+    section_data <- maxdiff_escape_df(section_data)
+
+    openxlsx::writeData(wb, "MODEL_DIAGNOSTICS", section_name_safe,
                        startRow = current_row, startCol = 1)
     openxlsx::addStyle(wb, "MODEL_DIAGNOSTICS", styles$header,
                       rows = current_row, cols = 1:2, gridExpand = TRUE)
@@ -823,6 +873,9 @@ write_turf_results_sheet <- function(wb, results, config, styles) {
                     "Incremental_Pct", "Frequency")
   output_cols <- desired_cols[desired_cols %in% names(inc_table)]
   output_df <- inc_table[, output_cols, drop = FALSE]
+
+  # Escape user-sourced text (formula injection protection)
+  output_df <- maxdiff_escape_df(output_df)
 
   # Write data
   openxlsx::writeData(wb, "TURF_RESULTS", output_df, startRow = 1, startCol = 1,
@@ -913,6 +966,9 @@ write_anchor_analysis_sheet <- function(wb, results, config, styles) {
   output_cols <- desired_cols[desired_cols %in% names(anchor)]
   output_df <- anchor[, output_cols, drop = FALSE]
 
+  # Escape user-sourced text (formula injection protection)
+  output_df <- maxdiff_escape_df(output_df)
+
   # Write data
   openxlsx::writeData(wb, "ANCHOR_ANALYSIS", output_df, startRow = 1, startCol = 1,
                      colNames = TRUE, headerStyle = styles$header)
@@ -983,6 +1039,9 @@ write_item_discrimination_sheet <- function(wb, results, config, styles) {
                        startRow = 1, startCol = 1)
     return()
   }
+
+  # Escape user-sourced text (formula injection protection)
+  disc <- maxdiff_escape_df(disc)
 
   # Write all columns (include all classification columns)
   openxlsx::writeData(wb, "ITEM_DISCRIMINATION", disc, startRow = 1, startCol = 1,

@@ -789,6 +789,35 @@ generate_conjoint_stats_pack <- function(config, data_list, model_result,
     paste(parts, collapse = ", ")
   }
 
+  # HB convergence diagnostics (when available)
+  convergence_info <- model_result$convergence %||% NULL
+  if (!is.null(convergence_info)) {
+    hb_convergence_items <- list(
+      "Convergence Status" = if (isTRUE(convergence_info$converged)) "CONVERGED" else "NOT CONVERGED",
+      "ESS Range" = if (!is.null(convergence_info$effective_sample_size)) {
+        sprintf("%.0f - %.0f", min(convergence_info$effective_sample_size),
+                max(convergence_info$effective_sample_size))
+      } else "N/A",
+      "Geweke Test" = if (!is.null(convergence_info$geweke_pass)) {
+        if (convergence_info$geweke_pass) "PASSED" else sprintf("FAILED (max |z| = %.2f)", max(abs(convergence_info$geweke_z)))
+      } else "N/A"
+    )
+  } else {
+    hb_convergence_items <- list()
+  }
+
+  # Model fit statistics (when available)
+  fit_stats <- model_result$diagnostics$fit_statistics %||% NULL
+  model_fit_items <- if (!is.null(fit_stats)) {
+    list(
+      "McFadden R-squared" = sprintf("%.4f", fit_stats$mcfadden_r2 %||% NA),
+      "Hit Rate" = sprintf("%.1f%%", (fit_stats$hit_rate %||% 0) * 100),
+      "Log-Likelihood" = sprintf("%.2f", fit_stats$log_likelihood %||% NA)
+    )
+  } else {
+    list()
+  }
+
   assumptions <- list(
     "Model Type"            = model_type,
     "Attributes"            = as.character(n_attr),
@@ -802,6 +831,13 @@ generate_conjoint_stats_pack <- function(config, data_list, model_result,
     "TRS Status"            = run_result$status %||% "PASS",
     "TRS Events"            = trs_summary
   )
+
+  if (length(hb_convergence_items) > 0) {
+    assumptions <- c(assumptions, hb_convergence_items)
+  }
+  if (length(model_fit_items) > 0) {
+    assumptions <- c(assumptions, model_fit_items)
+  }
 
   duration_secs <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
 
