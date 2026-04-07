@@ -339,13 +339,15 @@ validate_catdriver_config <- function(config) {
 #' Validate CatDriver Data
 #'
 #' Hard validation gate for data. Refuses if critical issues found.
+#' Note: named guard_validate_data_hard to avoid collision with the soft
+#' diagnostics version in 02_validation.R (validate_catdriver_data).
 #'
 #' @param data Data frame
 #' @param config Configuration list
 #' @param guard Guard state for tracking warnings
 #' @return Updated guard state
 #' @keywords internal
-validate_catdriver_data <- function(data, config, guard) {
+guard_validate_data_hard <- function(data, config, guard) {
 
   outcome_var <- config$outcome_var
   driver_vars <- config$driver_vars

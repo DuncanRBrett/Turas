@@ -789,18 +789,19 @@ if ("%s" != "alchemerparser") {
 
       old_env <- Sys.getenv("TURAS_SKIP_RENV")
       Sys.setenv(TURAS_SKIP_RENV = "1")
+      on.exit({
+        if (old_env == "") {
+          Sys.unsetenv("TURAS_SKIP_RENV")
+        } else {
+          Sys.setenv(TURAS_SKIP_RENV = old_env)
+        }
+      }, add = TRUE)
 
       system2("Rscript",
               args = c(temp_script),
               wait = FALSE,
               stdout = log_file,
               stderr = log_file)
-
-      if (old_env == "") {
-        Sys.unsetenv("TURAS_SKIP_RENV")
-      } else {
-        Sys.setenv(TURAS_SKIP_RENV = old_env)
-      }
 
       later::later(function() {
         tryCatch({

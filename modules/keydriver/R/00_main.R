@@ -839,23 +839,6 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
     }
   }
 
-  # --- Generate Stats Pack (optional) ---
-  generate_stats_pack_flag <- isTRUE(
-    toupper(config$settings$Generate_Stats_Pack %||% "Y") == "Y"
-  ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
-
-  if (generate_stats_pack_flag) {
-    cat("\nGenerating stats pack...\n")
-    generate_keydriver_stats_pack(
-      config      = config,
-      survey_data = data$data,
-      result      = results,
-      run_result  = run_result,
-      start_time  = start_time,
-      verbose     = TRUE
-    )
-  }
-
   # --- Completion ---
   end_time <- Sys.time()
   elapsed <- round(as.numeric(difftime(end_time, start_time, units = "secs")), 1)
@@ -872,6 +855,23 @@ run_keydriver_analysis_impl <- function(config_file, data_file = NULL, output_fi
     turas_run_state_result(trs_state)
   } else { NULL }
   results$run_result <- run_result
+
+  # --- Generate Stats Pack (optional) ---
+  generate_stats_pack_flag <- isTRUE(
+    toupper(config$settings$Generate_Stats_Pack %||% "Y") == "Y"
+  ) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
+
+  if (generate_stats_pack_flag) {
+    cat("\nGenerating stats pack...\n")
+    generate_keydriver_stats_pack(
+      config      = config,
+      survey_data = data$data,
+      result      = results,
+      run_result  = run_result,
+      start_time  = start_time,
+      verbose     = TRUE
+    )
+  }
 
   if (!is.null(run_result) && exists("turas_print_final_banner", mode = "function")) {
     turas_print_final_banner(run_result)

@@ -7,7 +7,7 @@
 #   shared TRS infrastructure, maintaining module-specific naming.
 #
 # NOT TO BE CONFUSED WITH:
-#   - 00_guard.R: Validation gates (validate_catdriver_config, validate_catdriver_data, etc.)
+#   - 00_guard.R: Validation gates (validate_catdriver_config, guard_validate_data_hard, etc.)
 #   - 08a_guards_hard.R: Hard error guards (require_* functions)
 #   - 08b_guards_soft.R: Soft warning guards (check_* functions)
 #
