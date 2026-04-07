@@ -159,11 +159,45 @@
     svg.appendChild(el);
   }
 
-  function _addMeta(svg, text, pad, metaY) {
-    var el = document.createElementNS(NS, "text");
-    el.setAttribute("x", pad); el.setAttribute("y", metaY);
-    el.setAttribute("fill", "#94a3b8"); el.setAttribute("font-size", "12");
-    el.textContent = text; svg.appendChild(el);
+  // Badge colors matching hub_styles.css
+  var BADGE_COLORS = {
+    Tracker:        { bg: "#dbeafe", fg: "#1e40af" },
+    Crosstabs:      { bg: "#fef3c7", fg: "#92400e" },
+    Confidence:     { bg: "#ede9fe", fg: "#5b21b6" },
+    Conjoint:       { bg: "#fce7f3", fg: "#9d174d" },
+    MaxDiff:        { bg: "#ccfbf1", fg: "#065f46" },
+    Pricing:        { bg: "#fef9c3", fg: "#854d0e" },
+    Segmentation:   { bg: "#f0fdf4", fg: "#166534" },
+    "Cat Driver":   { bg: "#fff7ed", fg: "#9a3412" },
+    "Key Driver":   { bg: "#f0f9ff", fg: "#075985" },
+    Weighting:      { bg: "#f5f3ff", fg: "#6d28d9" },
+    Overview:       { bg: "#e0e7ff", fg: "#3730a3" }
+  };
+
+  function _addMeta(svg, text, pad, metaY, sourceLabel) {
+    // Render source badge as a colored tag if sourceLabel is present
+    var metaX = pad;
+    if (sourceLabel) {
+      var colors = BADGE_COLORS[sourceLabel] || { bg: "#f1f5f9", fg: "#475569" };
+      var badgeText = sourceLabel.toUpperCase();
+      var badgeW = badgeText.length * 6.5 + 16;
+      var badgeH = 18;
+      var badgeY = metaY - 13;
+      _rect(svg, pad, badgeY, badgeW, badgeH, colors.bg, "3");
+      var bt = document.createElementNS(NS, "text");
+      bt.setAttribute("x", pad + 8); bt.setAttribute("y", metaY - 1);
+      bt.setAttribute("fill", colors.fg); bt.setAttribute("font-size", "10");
+      bt.setAttribute("font-weight", "600"); bt.setAttribute("letter-spacing", "0.5");
+      bt.textContent = badgeText;
+      svg.appendChild(bt);
+      metaX = pad + badgeW + 8;
+    }
+    if (text) {
+      var el = document.createElementNS(NS, "text");
+      el.setAttribute("x", metaX); el.setAttribute("y", metaY);
+      el.setAttribute("fill", "#94a3b8"); el.setAttribute("font-size", "12");
+      el.textContent = text; svg.appendChild(el);
+    }
   }
 
   function _addInsight(svg, insightEl, y, pad, usableW, brand) {
@@ -225,7 +259,7 @@
 
   function _meta(pin) {
     var p = [];
-    if (pin.sourceLabel) p.push(pin.sourceLabel);
+    // sourceLabel now rendered as a colored badge — don't duplicate in meta text
     if (pin.timestamp) p.push(new Date(pin.timestamp).toLocaleDateString());
     if (pin.visibleSegments && pin.visibleSegments.length > 0)
       p.push("Segments: " + pin.visibleSegments.join(", "));
@@ -453,7 +487,7 @@
     var brand = _brandColour();
     _rect(svg, 0, 0, W, 4, brand);
     _addTitle(svg, L.titleLines, L.pad, L.titleY);
-    _addMeta(svg, _meta(pin), L.pad, L.metaY);
+    _addMeta(svg, _meta(pin), L.pad, L.metaY, pin.sourceLabel);
     if (L.insightEl && L.insightH > 0) _addInsight(svg, L.insightEl, L.insightY, L.pad, L.usableW, brand);
     if (L.aiInsightEl && L.aiInsightH > 0) _addAiInsight(svg, L.aiInsightEl, L.aiInsightY, L.pad, L.usableW);
     if (L.chart.clone && L.chart.h > 0) {
