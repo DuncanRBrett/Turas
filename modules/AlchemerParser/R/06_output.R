@@ -36,6 +36,36 @@ generate_output_files <- function(questions, project_name, output_dir,
     )
   }
 
+  # ---------------------------------------------------------------------------
+  # Formula injection protection (inline fallback if shared escape unavailable)
+  # Uses vapply+substr per Phase 3 re-review R3 — NOT regex
+  # ---------------------------------------------------------------------------
+  alchemer_escape_cell <- if (exists("turas_excel_escape", mode = "function")) {
+    turas_excel_escape
+  } else {
+    function(x) {
+      if (is.null(x) || length(x) == 0) return(x)
+      vapply(x, function(val) {
+        if (is.na(val) || !nzchar(val)) return(val)
+        first_char <- substr(val, 1, 1)
+        if (first_char %in% c("=", "+", "-", "@", "\t", "\r", "\n")) {
+          paste0("'", val)
+        } else {
+          val
+        }
+      }, character(1), USE.NAMES = FALSE)
+    }
+  }
+
+  alchemer_escape_df <- function(df) {
+    if (is.null(df) || nrow(df) == 0) return(df)
+    char_cols <- which(vapply(df, is.character, logical(1)))
+    for (col in char_cols) {
+      df[[col]] <- alchemer_escape_cell(df[[col]])
+    }
+    df
+  }
+
   # Generate file paths with "_parsed" suffix to distinguish from templates
   crosstab_file <- file.path(output_dir,
                              paste0(project_name, "_Crosstab_Config_parsed.xlsx"))
@@ -52,6 +82,8 @@ generate_output_files <- function(questions, project_name, output_dir,
   }
 
   crosstab_data <- generate_crosstab_config(questions)
+
+  crosstab_data <- alchemer_escape_df(crosstab_data)
 
   wb_crosstab <- openxlsx::createWorkbook()
   openxlsx::addWorksheet(wb_crosstab, "Selection")
@@ -77,6 +109,7 @@ generate_output_files <- function(questions, project_name, output_dir,
   wb_survey <- openxlsx::createWorkbook()
 
   # Questions sheet
+  survey_data$questions <- alchemer_escape_df(survey_data$questions)
   openxlsx::addWorksheet(wb_survey, "Questions")
   openxlsx::writeData(wb_survey, "Questions", survey_data$questions,
                      startRow = 1, startCol = 1, colNames = TRUE)
@@ -86,6 +119,7 @@ generate_output_files <- function(questions, project_name, output_dir,
                     gridExpand = TRUE)
 
   # Options sheet
+  survey_data$options <- alchemer_escape_df(survey_data$options)
   openxlsx::addWorksheet(wb_survey, "Options")
   openxlsx::writeData(wb_survey, "Options", survey_data$options,
                      startRow = 1, startCol = 1, colNames = TRUE)
@@ -97,6 +131,7 @@ generate_output_files <- function(questions, project_name, output_dir,
   # Routing sheet (if routing was detected)
   routing_summary <- build_routing_summary(questions)
   if (nrow(routing_summary) > 0) {
+    routing_summary <- alchemer_escape_df(routing_summary)
     openxlsx::addWorksheet(wb_survey, "Routing")
     openxlsx::writeData(wb_survey, "Routing", routing_summary,
                        startRow = 1, startCol = 1, colNames = TRUE)
@@ -119,6 +154,7 @@ generate_output_files <- function(questions, project_name, output_dir,
   }
 
   headers_data <- generate_data_headers(questions)
+  headers_data <- alchemer_escape_df(headers_data)
 
   wb_headers <- openxlsx::createWorkbook()
   openxlsx::addWorksheet(wb_headers, "Headers")

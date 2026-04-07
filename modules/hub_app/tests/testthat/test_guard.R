@@ -3,7 +3,21 @@
 # ==============================================================================
 
 # Source the guard file
-turas_root <- Sys.getenv("TURAS_ROOT", getwd())
+turas_root <- Sys.getenv("TURAS_ROOT", "")
+if (!nzchar(turas_root)) {
+  test_dir <- getwd()
+  candidate <- normalizePath(file.path(test_dir, "..", "..", "..", ".."), mustWork = FALSE)
+  if (file.exists(file.path(candidate, "launch_turas.R"))) {
+    turas_root <- candidate
+  } else {
+    candidate <- normalizePath(file.path(test_dir, "..", "..", "..", "..", ".."), mustWork = FALSE)
+    if (file.exists(file.path(candidate, "launch_turas.R"))) {
+      turas_root <- candidate
+    } else {
+      turas_root <- getwd()
+    }
+  }
+}
 source(file.path(turas_root, "modules", "hub_app", "00_guard.R"))
 
 # ==============================================================================

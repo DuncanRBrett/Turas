@@ -106,7 +106,8 @@ export_pins_to_pptx <- function(items,
     # --- Process each item ---
     pin_count <- 0
     section_count <- 0
-    temp_files <- character(0)
+    temp_env <- new.env(parent = emptyenv())
+    temp_env$files <- character(0)
 
     for (item in items) {
       item_type <- item$type %||% "unknown"
@@ -125,7 +126,7 @@ export_pins_to_pptx <- function(items,
 
       } else if (item_type == "pin") {
         # Content slide for pin
-        pptx <- add_pin_slide(pptx, item, temp_files)
+        pptx <- add_pin_slide(pptx, item, temp_env)
         pin_count <- pin_count + 1
       }
     }
@@ -143,7 +144,7 @@ export_pins_to_pptx <- function(items,
     print(pptx, target = output_path)
 
     # Clean up temp files
-    for (tf in temp_files) {
+    for (tf in temp_env$files) {
       if (file.exists(tf)) unlink(tf)
     }
 
@@ -185,11 +186,11 @@ export_pins_to_pptx <- function(items,
 #'
 #' @param pptx officer pptx object
 #' @param pin Pin list object
-#' @param temp_files Character vector of temp file paths (modified by reference via env)
+#' @param temp_env Environment with `$files` vector for tracking temp file paths
 #'
 #' @return Modified pptx object
 #' @keywords internal
-add_pin_slide <- function(pptx, pin, temp_files) {
+add_pin_slide <- function(pptx, pin, temp_env) {
 
   # Determine layout based on content
   has_chart <- !is.null(pin$chartPng) && nzchar(pin$chartPng %||% "")
@@ -237,7 +238,7 @@ add_pin_slide <- function(pptx, pin, temp_files) {
   if (has_chart) {
     img_path <- decode_data_url_to_file(pin$chartPng)
     if (!is.null(img_path) && file.exists(img_path)) {
-      temp_files <- c(temp_files, img_path)
+      temp_env$files <- c(temp_env$files, img_path)
 
       # Place chart image — positioned in lower portion of slide
       pptx <- officer::ph_with(pptx,

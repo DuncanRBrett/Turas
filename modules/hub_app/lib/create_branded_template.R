@@ -29,8 +29,17 @@ create_turas_pptx_template <- function(
     accent_colour = "#10B981") {
 
   if (!requireNamespace("officer", quietly = TRUE)) {
-    cat("[Hub App] ERROR: officer package required. Install with install.packages('officer')\n")
-    return(NULL)
+    cat("\n=== TURAS HUB APP ERROR ===\n")
+    cat("Code: PKG_MISSING_DEPENDENCY\n")
+    cat("Missing: officer\n")
+    cat("Fix: install.packages('officer')\n")
+    cat("============================\n\n")
+    return(list(
+      status = "REFUSED",
+      code = "PKG_MISSING_DEPENDENCY",
+      message = "The 'officer' package is required for PPTX template creation",
+      how_to_fix = "Install with: install.packages('officer')"
+    ))
   }
 
   turas_root <- Sys.getenv("TURAS_ROOT", getwd())

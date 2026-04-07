@@ -56,7 +56,23 @@ parse_translation_export <- function(file_path, verbose = FALSE) {
 
   # Read translation export
   # Expected columns: Key, Default Text
-  translation_data <- readxl::read_excel(file_path)
+  translation_data <- tryCatch(
+    readxl::read_excel(file_path),
+    error = function(e) {
+      alchemerparser_refuse(
+        code = "IO_FILE_CORRUPT",
+        title = "Cannot Read Translation Export File",
+        problem = sprintf("Failed to read translation export: %s", e$message),
+        why_it_matters = "The translation export file may be corrupt, password-protected, or not a valid Excel file.",
+        how_to_fix = c(
+          "Check that the file is a valid .xlsx file (not .xls)",
+          "Ensure the file is not password-protected",
+          "Try re-exporting the translation file from Alchemer",
+          "Open the file in Excel to verify it is not corrupted"
+        )
+      )
+    }
+  )
 
   # Verify required columns exist
   required_cols <- c("Key", "Default Text")
