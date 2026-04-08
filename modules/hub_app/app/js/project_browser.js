@@ -17,7 +17,11 @@ var ProjectBrowser = (function() {
   var allProjects = [];
   var scanDirs = [];
   var activeFolder = null;
-  var currentSort = "recent";  // "recent" | "name" | "name-desc" | "files" | "modules"
+  var currentSort = "recent";  // "recent" | "oldest" | "name" | "name-desc" | "files" | "modules"
+  var activeTypeFilters = [];   // module type strings e.g. ["tabs", "tracker"]
+  var pathSearchQuery = "";     // partial folder name match
+  var dateFrom = null;          // Date object or null
+  var dateTo = null;            // Date object or null
 
   // --- Module type mapping ---
   var TYPE_MAP = {
@@ -80,7 +84,7 @@ var ProjectBrowser = (function() {
       grid.style.display = "none";
       empty.style.display = "";
       if (count) count.textContent = "";
-      hideFolderSortBar();
+      hideFilterBar();
       return;
     }
 
@@ -88,7 +92,7 @@ var ProjectBrowser = (function() {
     empty.style.display = "none";
 
     discoverScanDirs();
-    renderFolderSortBar();
+    renderFilterBar();
 
     var visibleProjects = sortProjects(getVisibleProjects());
 
@@ -228,7 +232,7 @@ var ProjectBrowser = (function() {
     // File sections in columns
     html += '<div class="overlay-files">';
 
-    // HTML Reports
+    // HTML Reports — open in system browser
     var htmlReports = ensureArray(files.html_reports);
     if (htmlReports.length > 0) {
       html += '<div class="overlay-section">' +
@@ -237,10 +241,12 @@ var ProjectBrowser = (function() {
         var r = htmlReports[h];
         var displayName = escapeHtml(r.filename || r.label || "");
         html += '<div class="overlay-file-item overlay-file-html" ' +
+          'data-file-path="' + escapeAttr(r.path || "") + '" ' +
           'data-project-path="' + escapeAttr(project.path) + '" ' +
           'data-report-filename="' + escapeAttr(r.filename || "") + '" ' +
-          'title="Open in report viewer">' +
+          'title="Open in browser">' +
           '<span class="overlay-file-name">' + displayName + '</span>' +
+          ICONS.externalLink +
           '<span class="overlay-file-date">' + escapeHtml(r.last_modified || "") + '</span>' +
           '<span class="overlay-file-size">' + escapeHtml(r.size_label || "") + '</span>' +
         '</div>';
@@ -357,19 +363,14 @@ var ProjectBrowser = (function() {
       });
     }
 
-    // HTML report clicks
+    // HTML report clicks — open in system browser
     var htmlItems = overlay.querySelectorAll(".overlay-file-html");
     for (var h = 0; h < htmlItems.length; h++) {
       htmlItems[h].addEventListener("click", function() {
-        var projectPath = this.getAttribute("data-project-path");
-        var reportFilename = this.getAttribute("data-report-filename");
-        if (!projectPath) return;
-        HubApp.state._pendingReportTarget = reportFilename || null;
-        var title = HubApp.dom.projectTitle;
-        if (title) title.textContent = project.name;
-        HubApp.sendToShiny("hub_open_project", projectPath);
-        closeOverlay();
-        HubApp.showToast(reportFilename ? "Opening report..." : "Opening project...");
+        var filePath = this.getAttribute("data-file-path");
+        if (!filePath) return;
+        HubApp.sendToShiny("hub_open_html_in_browser", filePath);
+        HubApp.showToast("Opening in browser...");
       });
     }
 
@@ -619,6 +620,11 @@ var ProjectBrowser = (function() {
           return (ensureArray(b.modules).length) - (ensureArray(a.modules).length);
         });
         break;
+      case "oldest":
+        sorted.sort(function(a, b) {
+          return (a.last_modified_ts || 0) - (b.last_modified_ts || 0);
+        });
+        break;
       case "recent":
       default:
         sorted.sort(function(a, b) {
@@ -797,29 +803,73 @@ var ProjectBrowser = (function() {
   }
 
   function getVisibleProjects() {
-    if (!activeFolder) return allProjects;
     return allProjects.filter(function(p) {
-      var parent = getParentPath(p.path || "");
-      return parent === activeFolder;
+      // Folder filter
+      if (activeFolder) {
+        var parent = getParentPath(p.path || "");
+        if (parent !== activeFolder) return false;
+      }
+
+      // Type filter (OR logic: project has ANY of selected types)
+      if (activeTypeFilters.length > 0) {
+        var projectModules = ensureArray(p.modules).map(function(m) {
+          return (m || "").toLowerCase();
+        });
+        // Map to badge keys for matching
+        var projectBadges = {};
+        for (var t = 0; t < projectModules.length; t++) {
+          var mapped = TYPE_MAP[projectModules[t]];
+          if (mapped) projectBadges[mapped.badge] = true;
+        }
+        var hasMatch = false;
+        for (var f = 0; f < activeTypeFilters.length; f++) {
+          if (projectBadges[activeTypeFilters[f]]) { hasMatch = true; break; }
+        }
+        if (!hasMatch) return false;
+      }
+
+      // Path search (partial match)
+      if (pathSearchQuery) {
+        var matchPath = (p.display_path || p.path || "").toLowerCase();
+        var matchName = (p.name || "").toLowerCase();
+        if (matchPath.indexOf(pathSearchQuery) === -1 &&
+            matchName.indexOf(pathSearchQuery) === -1) return false;
+      }
+
+      // Date range
+      if (dateFrom || dateTo) {
+        var projTs = (p.last_modified_ts || 0) * 1000;
+        if (dateFrom && projTs < dateFrom.getTime()) return false;
+        if (dateTo) {
+          var endOfDay = new Date(dateTo);
+          endOfDay.setHours(23, 59, 59, 999);
+          if (projTs > endOfDay.getTime()) return false;
+        }
+      }
+
+      return true;
     });
   }
 
   // =========================================================================
-  // Folder & Sort Dropdowns
+  // Filter Bar
   // =========================================================================
 
-  function hideFolderSortBar() {
-    var bar = document.getElementById("folder-sort-bar");
+  function hideFilterBar() {
+    var bar = document.getElementById("filter-bar");
     if (bar) bar.style.display = "none";
   }
 
-  function renderFolderSortBar() {
-    var bar = document.getElementById("folder-sort-bar");
+  function renderFilterBar() {
+    var bar = document.getElementById("filter-bar");
     if (!bar) return;
 
-    bar.style.display = "flex";
+    bar.style.display = "";
 
-    // Update folder dropdown label
+    // --- Type filter dropdown ---
+    renderTypeFilterMenu();
+
+    // --- Folder dropdown ---
     var folderLabel = document.getElementById("folder-dropdown-label");
     if (folderLabel) {
       if (activeFolder) {
@@ -836,7 +886,6 @@ var ProjectBrowser = (function() {
       }
     }
 
-    // Build folder dropdown menu
     var menu = document.getElementById("folder-dropdown-menu");
     if (menu) {
       var html = '<button class="folder-menu-item' + (!activeFolder ? ' folder-menu-item-active' : '') +
@@ -853,45 +902,22 @@ var ProjectBrowser = (function() {
       }
       menu.innerHTML = html;
 
-      // Bind folder menu clicks
       var items = menu.querySelectorAll(".folder-menu-item");
       for (var mi = 0; mi < items.length; mi++) {
         items[mi].addEventListener("click", function() {
-          var folder = this.getAttribute("data-folder") || null;
-          activeFolder = folder;
+          activeFolder = this.getAttribute("data-folder") || null;
           menu.style.display = "none";
           render(allProjects);
         });
       }
     }
 
-    // Bind folder dropdown toggle
-    var folderBtn = document.getElementById("folder-dropdown-btn");
-    if (folderBtn && !folderBtn._bound) {
-      folderBtn._bound = true;
-      folderBtn.addEventListener("click", function(e) {
-        e.stopPropagation();
-        var m = document.getElementById("folder-dropdown-menu");
-        var sm = document.getElementById("sort-dropdown-menu");
-        if (sm) sm.style.display = "none";
-        if (m) m.style.display = (m.style.display === "none") ? "block" : "none";
-      });
-    }
+    // --- Bind dropdowns (once) ---
+    bindDropdownToggle("folder-dropdown-btn", "folder-dropdown-menu");
+    bindDropdownToggle("sort-dropdown-btn", "sort-dropdown-menu");
+    bindDropdownToggle("type-filter-btn", "type-filter-menu");
 
-    // Bind sort dropdown toggle
-    var sortBtn = document.getElementById("sort-dropdown-btn");
-    if (sortBtn && !sortBtn._bound) {
-      sortBtn._bound = true;
-      sortBtn.addEventListener("click", function(e) {
-        e.stopPropagation();
-        var sm = document.getElementById("sort-dropdown-menu");
-        var m = document.getElementById("folder-dropdown-menu");
-        if (m) m.style.display = "none";
-        if (sm) sm.style.display = (sm.style.display === "none") ? "block" : "none";
-      });
-    }
-
-    // Bind sort options
+    // --- Bind sort options ---
     var sortMenu = document.getElementById("sort-dropdown-menu");
     if (sortMenu) {
       var sortOpts = sortMenu.querySelectorAll(".sort-option");
@@ -904,7 +930,6 @@ var ProjectBrowser = (function() {
           sortOpts[s].addEventListener("click", function() {
             currentSort = this.getAttribute("data-sort") || "recent";
             sortMenu.style.display = "none";
-            // Update sort label
             var sortLabel = document.getElementById("sort-dropdown-label");
             if (sortLabel) sortLabel.textContent = this.textContent;
             render(allProjects);
@@ -913,16 +938,217 @@ var ProjectBrowser = (function() {
       }
     }
 
-    // Close dropdowns on outside click
-    if (!document._folderSortClickBound) {
-      document._folderSortClickBound = true;
-      document.addEventListener("click", function() {
-        var m = document.getElementById("folder-dropdown-menu");
-        var sm = document.getElementById("sort-dropdown-menu");
-        if (m) m.style.display = "none";
-        if (sm) sm.style.display = "none";
+    // --- Bind path search ---
+    var pathInput = document.getElementById("filter-path-search");
+    if (pathInput && !pathInput._bound) {
+      pathInput._bound = true;
+      pathInput.value = pathSearchQuery;
+      pathInput.addEventListener("input", function() {
+        pathSearchQuery = this.value.trim().toLowerCase();
+        render(allProjects);
       });
     }
+
+    // --- Bind date range ---
+    var dateFromEl = document.getElementById("filter-date-from");
+    var dateToEl = document.getElementById("filter-date-to");
+    if (dateFromEl && !dateFromEl._bound) {
+      dateFromEl._bound = true;
+      dateFromEl.addEventListener("change", function() {
+        dateFrom = this.value ? new Date(this.value) : null;
+        render(allProjects);
+      });
+    }
+    if (dateToEl && !dateToEl._bound) {
+      dateToEl._bound = true;
+      dateToEl.addEventListener("change", function() {
+        dateTo = this.value ? new Date(this.value) : null;
+        render(allProjects);
+      });
+    }
+
+    // --- Bind clear button ---
+    var clearBtn = document.getElementById("btn-clear-filters");
+    if (clearBtn && !clearBtn._bound) {
+      clearBtn._bound = true;
+      clearBtn.addEventListener("click", clearAllFilters);
+    }
+
+    // --- Close dropdowns on outside click ---
+    if (!document._filterClickBound) {
+      document._filterClickBound = true;
+      document.addEventListener("click", function() {
+        var menus = document.querySelectorAll(".filter-dropdown-menu, .folder-dropdown-menu, .sort-dropdown-menu");
+        for (var x = 0; x < menus.length; x++) menus[x].style.display = "none";
+      });
+    }
+
+    // --- Render filter chips ---
+    renderFilterChips();
+  }
+
+  function bindDropdownToggle(btnId, menuId) {
+    var btn = document.getElementById(btnId);
+    if (btn && !btn._bound) {
+      btn._bound = true;
+      btn.addEventListener("click", function(e) {
+        e.stopPropagation();
+        // Close all other dropdown menus
+        var allMenus = document.querySelectorAll(".filter-dropdown-menu, .folder-dropdown-menu, .sort-dropdown-menu");
+        for (var x = 0; x < allMenus.length; x++) {
+          if (allMenus[x].id !== menuId) allMenus[x].style.display = "none";
+        }
+        var m = document.getElementById(menuId);
+        if (m) m.style.display = (m.style.display === "none") ? "block" : "none";
+      });
+    }
+  }
+
+  function renderTypeFilterMenu() {
+    var menu = document.getElementById("type-filter-menu");
+    if (!menu) return;
+
+    // Discover all unique module types across projects
+    var allTypes = {};
+    for (var i = 0; i < allProjects.length; i++) {
+      var mods = ensureArray(allProjects[i].modules);
+      for (var m = 0; m < mods.length; m++) {
+        var mod = (mods[m] || "").toLowerCase();
+        var mapped = TYPE_MAP[mod];
+        if (mapped && !allTypes[mapped.badge]) {
+          allTypes[mapped.badge] = { label: mapped.label, count: 0 };
+        }
+        if (mapped) allTypes[mapped.badge].count++;
+      }
+    }
+
+    var html = '';
+    for (var key in allTypes) {
+      var checked = activeTypeFilters.indexOf(key) !== -1;
+      html += '<label class="filter-checkbox-item">' +
+        '<input type="checkbox" value="' + escapeAttr(key) + '"' +
+        (checked ? ' checked' : '') + '>' +
+        '<span class="tile-badge tile-badge-' + key + '">' +
+        escapeHtml(allTypes[key].label) + '</span>' +
+        '<span class="filter-count">' + allTypes[key].count + '</span>' +
+      '</label>';
+    }
+    menu.innerHTML = html;
+
+    // Bind checkbox changes
+    var checkboxes = menu.querySelectorAll('input[type="checkbox"]');
+    for (var c = 0; c < checkboxes.length; c++) {
+      checkboxes[c].addEventListener("change", function(e) {
+        e.stopPropagation();
+        activeTypeFilters = [];
+        var allCbs = menu.querySelectorAll('input[type="checkbox"]:checked');
+        for (var x = 0; x < allCbs.length; x++) {
+          activeTypeFilters.push(allCbs[x].value);
+        }
+        // Update label
+        var typeLabel = document.getElementById("type-filter-label");
+        if (typeLabel) {
+          typeLabel.textContent = activeTypeFilters.length === 0
+            ? "All types"
+            : activeTypeFilters.length + " type" + (activeTypeFilters.length !== 1 ? "s" : "");
+        }
+        render(allProjects);
+      });
+    }
+  }
+
+  function renderFilterChips() {
+    var container = document.getElementById("filter-chips");
+    var clearBtn = document.getElementById("btn-clear-filters");
+    if (!container) return;
+
+    var chips = [];
+    var hasFilters = false;
+
+    for (var i = 0; i < activeTypeFilters.length; i++) {
+      hasFilters = true;
+      var mapped = TYPE_MAP[activeTypeFilters[i]] || { label: activeTypeFilters[i] };
+      chips.push('<span class="filter-chip">' + escapeHtml(mapped.label) +
+        '<button class="filter-chip-remove" data-chip-type="type" ' +
+        'data-chip-value="' + escapeAttr(activeTypeFilters[i]) + '">&times;</button></span>');
+    }
+
+    if (activeFolder) {
+      hasFilters = true;
+      var dirLabel = abbreviatePath(activeFolder);
+      chips.push('<span class="filter-chip">' + escapeHtml(dirLabel) +
+        '<button class="filter-chip-remove" data-chip-type="folder">&times;</button></span>');
+    }
+
+    if (pathSearchQuery) {
+      hasFilters = true;
+      chips.push('<span class="filter-chip">Path: "' + escapeHtml(pathSearchQuery) +
+        '"<button class="filter-chip-remove" data-chip-type="path">&times;</button></span>');
+    }
+
+    if (dateFrom || dateTo) {
+      hasFilters = true;
+      var dateLabel = (dateFrom ? formatDate(dateFrom) : "...") +
+        " \u2013 " + (dateTo ? formatDate(dateTo) : "...");
+      chips.push('<span class="filter-chip">' + escapeHtml(dateLabel) +
+        '<button class="filter-chip-remove" data-chip-type="date">&times;</button></span>');
+    }
+
+    container.innerHTML = chips.join("");
+    container.style.display = hasFilters ? "flex" : "none";
+    if (clearBtn) clearBtn.style.display = hasFilters ? "" : "none";
+
+    // Bind chip remove clicks
+    var removeBtns = container.querySelectorAll(".filter-chip-remove");
+    for (var r = 0; r < removeBtns.length; r++) {
+      removeBtns[r].addEventListener("click", function(e) {
+        e.stopPropagation();
+        var chipType = this.getAttribute("data-chip-type");
+        var chipValue = this.getAttribute("data-chip-value");
+        if (chipType === "type" && chipValue) {
+          activeTypeFilters = activeTypeFilters.filter(function(t) { return t !== chipValue; });
+        } else if (chipType === "folder") {
+          activeFolder = null;
+        } else if (chipType === "path") {
+          pathSearchQuery = "";
+          var pathInput = document.getElementById("filter-path-search");
+          if (pathInput) pathInput.value = "";
+        } else if (chipType === "date") {
+          dateFrom = null;
+          dateTo = null;
+          var df = document.getElementById("filter-date-from");
+          var dt = document.getElementById("filter-date-to");
+          if (df) df.value = "";
+          if (dt) dt.value = "";
+        }
+        render(allProjects);
+      });
+    }
+  }
+
+  function clearAllFilters() {
+    activeFolder = null;
+    activeTypeFilters = [];
+    pathSearchQuery = "";
+    dateFrom = null;
+    dateTo = null;
+
+    var pathInput = document.getElementById("filter-path-search");
+    if (pathInput) pathInput.value = "";
+    var df = document.getElementById("filter-date-from");
+    var dt = document.getElementById("filter-date-to");
+    if (df) df.value = "";
+    if (dt) dt.value = "";
+
+    render(allProjects);
+  }
+
+  function formatDate(d) {
+    if (!d) return "";
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, "0");
+    var day = String(d.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + day;
   }
 
   function filterByFolder(folderPath) {

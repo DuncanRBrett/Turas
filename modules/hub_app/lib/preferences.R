@@ -103,6 +103,8 @@ get_preferences_path <- function() {
 default_preferences <- function() {
   list(
     scan_directories = list(),
+    exclude_directories = list(),
+    recent_views = list(),         # up to 5: {label, include_dirs, exclude_dirs, timestamp}
     brand_colour = "#2563EB",
     accent_colour = "#10B981",
     logo_path = "",

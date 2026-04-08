@@ -398,6 +398,107 @@ build_file_info <- function(file_path) {
 
 
 # ==============================================================================
+# PROJECT MERGING — Child-into-Parent Consolidation
+# ==============================================================================
+
+#' Merge Child Projects into Parents
+#'
+#' When a parent directory qualifies as a project and one or more of its
+#' subdirectories also qualify, consolidate the children's files, modules,
+#' and metadata into the parent card. Produces one card per top-level project.
+#'
+#' @param projects List of project objects from evaluate_project_dir
+#' @return List of merged project objects (children removed)
+#' @keywords internal
+merge_child_projects <- function(projects) {
+  if (length(projects) <= 1) return(projects)
+
+  # Sort by path length — parents (shorter paths) come first
+  path_lengths <- nchar(vapply(projects, function(p) p$path, character(1)))
+  projects <- projects[order(path_lengths)]
+
+  kept <- list()
+
+  for (proj in projects) {
+    proj_path <- normalizePath(proj$path, winslash = "/", mustWork = FALSE)
+    merged <- FALSE
+
+    for (k in seq_along(kept)) {
+      parent_path <- normalizePath(kept[[k]]$path, winslash = "/",
+                                    mustWork = FALSE)
+      if (startsWith(proj_path, paste0(parent_path, "/"))) {
+        kept[[k]] <- merge_project_into_parent(kept[[k]], proj)
+        merged <- TRUE
+        break
+      }
+    }
+
+    if (!merged) {
+      kept[[length(kept) + 1]] <- proj
+    }
+  }
+
+  kept
+}
+
+
+#' Merge a Child Project's Files into a Parent
+#'
+#' @param parent Parent project object
+#' @param child Child project object
+#' @return Updated parent with child's files merged in
+#' @keywords internal
+merge_project_into_parent <- function(parent, child) {
+  # Merge file lists (avoid duplicates by path)
+  parent_paths <- function(cat) {
+    vapply(parent$files[[cat]], function(f) f$path, character(1))
+  }
+
+  for (cat in c("configs", "html_reports", "excel_reports",
+                 "data_files", "diagnostics", "misc")) {
+    existing <- parent_paths(cat)
+    for (f in child$files[[cat]]) {
+      if (!(f$path %in% existing)) {
+        parent$files[[cat]][[length(parent$files[[cat]]) + 1]] <- f
+      }
+    }
+  }
+
+  # Recompute counts from merged file lists
+  for (cat in names(parent$counts)) {
+    parent$counts[[cat]] <- length(parent$files[[cat]])
+  }
+
+  # Merge modules
+  parent$modules <- unique(c(parent$modules, child$modules))
+
+  # Merge reports (avoid duplicates by path)
+  existing_report_paths <- vapply(parent$reports, function(r) r$path %||% "",
+                                   character(1))
+  for (r in child$reports) {
+    rpath <- r$path %||% ""
+    if (!nzchar(rpath) || !(rpath %in% existing_report_paths)) {
+      parent$reports[[length(parent$reports) + 1]] <- r
+    }
+  }
+  parent$report_count <- length(parent$reports)
+  parent$total_html_count <- parent$counts$html_reports
+
+  # Update last_modified to most recent
+  if (!is.null(child$last_modified_ts) &&
+      child$last_modified_ts > parent$last_modified_ts) {
+    parent$last_modified <- child$last_modified
+    parent$last_modified_ts <- child$last_modified_ts
+  }
+
+  parent$has_hub_config <- parent$has_hub_config ||
+    ("report_hub" %in% child$modules)
+
+  parent
+}
+
+
+# ==============================================================================
 # PROJECT SCANNING — Main Entry Point
 # ==============================================================================
 
@@ -424,42 +525,20 @@ scan_for_projects <- function(root_dirs, max_depth = 6) {
   candidate_dirs <- unique(candidate_dirs)
 
   # Phase 2: Evaluate each candidate — identify projects
-  # We need to identify project roots first, then avoid treating their
-  # subdirectories as separate projects (unless they have their own configs)
   projects <- list()
-  project_paths <- character(0)
+  seen_paths <- character(0)
 
   for (dir_path in candidate_dirs) {
-    # Skip if this directory is a subdirectory of an already-found project
-    # (unless it has its own config files — handled inside evaluate)
-    is_subdir_of_project <- any(sapply(project_paths, function(pp) {
-      startsWith(
-        normalizePath(dir_path, winslash = "/", mustWork = FALSE),
-        paste0(normalizePath(pp, winslash = "/", mustWork = FALSE), "/")
-      )
-    }))
-
+    if (dir_path %in% seen_paths) next
     project <- evaluate_project_dir(dir_path)
     if (!is.null(project)) {
-      # If this is a subdirectory of an existing project, only keep it
-      # if it has its own config files (i.e., it's a wave or sub-project)
-      if (is_subdir_of_project && length(project$files$configs) == 0) {
-        next
-      }
       projects[[length(projects) + 1]] <- project
-      project_paths <- c(project_paths, dir_path)
+      seen_paths <- c(seen_paths, dir_path)
     }
   }
 
-  # Deduplicate by path
-  seen_paths <- character(0)
-  unique_projects <- list()
-  for (p in projects) {
-    if (!p$path %in% seen_paths) {
-      seen_paths <- c(seen_paths, p$path)
-      unique_projects[[length(unique_projects) + 1]] <- p
-    }
-  }
+  # Phase 3: Merge child projects into parents — one card per top-level folder
+  unique_projects <- merge_child_projects(projects)
 
   # Sort by last modified (most recent first)
   if (length(unique_projects) > 0) {
@@ -587,8 +666,21 @@ evaluate_project_dir <- function(dir_path) {
   has_configs <- length(config_files) > 0
 
   # --- Tier 3: Check HTML files for turas-report-type meta tag ---
+  # Check root directory AND immediate subdirectories for HTML reports
   html_files <- list.files(dir_path, pattern = "\\.html$",
                             full.names = TRUE, ignore.case = TRUE)
+
+  # Also scan immediate subdirectories (reports may live in subfolders)
+  imm_subdirs <- tryCatch(
+    list.dirs(dir_path, recursive = FALSE, full.names = TRUE),
+    error = function(e) character(0)
+  )
+  for (sd in imm_subdirs) {
+    sd_html <- list.files(sd, pattern = "\\.html$",
+                           full.names = TRUE, ignore.case = TRUE)
+    html_files <- c(html_files, sd_html)
+  }
+
   turas_reports <- list()
   for (html_path in html_files) {
     report_info <- sniff_report_type(html_path)
@@ -600,29 +692,12 @@ evaluate_project_dir <- function(dir_path) {
   has_reports <- length(turas_reports) > 0
 
   # Must have at least one config or one report to qualify
- if (!has_configs && !has_reports) return(NULL)
+  if (!has_configs && !has_reports) return(NULL)
 
   # --- Categorize all files in the project ---
-  # Find subdirectories that are themselves projects (to skip during file scan)
-  subdirs <- tryCatch(
-    list.dirs(dir_path, recursive = FALSE, full.names = TRUE),
-    error = function(e) character(0)
-  )
-  child_project_dirs <- character(0)
-  for (sd in subdirs) {
-    sd_xlsx <- list.files(sd, pattern = "\\.xlsx$", ignore.case = TRUE)
-    for (f in sd_xlsx) {
-      for (pattern in config_patterns) {
-        if (grepl(pattern, f, ignore.case = TRUE)) {
-          child_project_dirs <- c(child_project_dirs, sd)
-          break
-        }
-      }
-      if (sd %in% child_project_dirs) break
-    }
-  }
-
-  files <- categorize_project_files(dir_path, config_files, child_project_dirs)
+  # Include files from all subdirectories (child projects will be merged
+  # into parents by merge_child_projects() in scan_for_projects)
+  files <- categorize_project_files(dir_path, config_files, character(0))
 
   # Add module info to config file entries
   labels <- get_module_labels()
@@ -689,8 +764,8 @@ evaluate_project_dir <- function(dir_path) {
   modules <- unique(all_modules)
   modules <- modules[nzchar(modules)]
 
-  # Project name: try from report titles, then config filenames, then folder
-  smart_name <- derive_project_name(turas_reports, config_files, folder_name)
+  # Project name: always use cleaned folder name for consistency
+  smart_name <- clean_folder_name(folder_name)
 
   # Full display path (with ~ for HOME, NOT truncated)
   display_path <- full_display_path(dir_path)

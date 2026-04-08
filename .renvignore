@@ -1,0 +1,40 @@
+# Directories without meaningful R dependency information
+archive/
+test_output/
+reviews/
+docs/
+structure/
+data/
+tools/
+.Rproj.user/
+
+# Test fixtures (data files, not R source)
+*/fixtures/
+
+# HTML report assets (JS/CSS/images)
+*/html_report/js/
+*/html_report/css/
+*/html_report/img/
+*/html_report/assets/
+
+# Hub app web assets
+modules/hub_app/app/
+
+# Non-R files renv shouldn't scan
+*.csv
+*.xlsx
+*.xls
+*.json
+*.png
+*.jpg
+*.gif
+*.svg
+*.pptx
+*.pdf
+*.docx
+*.html
+*.css
+*.js
+*.map
+*.min.js
+*.min.css

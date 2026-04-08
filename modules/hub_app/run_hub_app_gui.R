@@ -76,6 +76,17 @@ run_hub_app_gui <- function(project_dirs = NULL) {
   source(file.path(TURAS_HOME, "modules", "hub_app", "lib", "preferences.R"),
          local = TRUE)
 
+  # Helper: safely parse JSON from Shiny input values.
+  # jsonlite::fromJSON() auto-detects files vs JSON strings. When a Shiny
+  # input value doesn't look like inline JSON, fromJSON tries to open it
+  # as a file, which fails. parse_json() always treats input as a string.
+  safe_from_json <- function(input_val) {
+    if (is.null(input_val)) return(NULL)
+    val <- as.character(input_val)
+    if (!nzchar(val)) return(NULL)
+    jsonlite::parse_json(val, simplifyVector = FALSE)
+  }
+
   # Helper: persist scan directories to preferences file
   save_scan_dirs_to_prefs <- function(dirs, turas_home) {
     tryCatch({
@@ -84,6 +95,59 @@ run_hub_app_gui <- function(project_dirs = NULL) {
       save_hub_preferences(prefs)
     }, error = function(e) {
       cat("[Hub App] WARNING: Could not persist scan dirs:", e$message, "\n")
+    })
+  }
+
+  # Helper: scan with exclusion filtering
+  scan_with_exclusions <- function(include_dirs, exclude_dirs, max_depth = 6) {
+    result <- scan_for_projects(include_dirs, max_depth = max_depth)
+    if (result$status %in% c("PASS", "PARTIAL") && length(exclude_dirs) > 0) {
+      norm_exclude <- normalizePath(unlist(exclude_dirs),
+                                     winslash = "/", mustWork = FALSE)
+      result$result$projects <- Filter(function(p) {
+        norm_path <- normalizePath(p$path, winslash = "/", mustWork = FALSE)
+        !any(vapply(norm_exclude, function(ex) {
+          startsWith(norm_path, paste0(ex, "/")) || norm_path == ex
+        }, logical(1)))
+      }, result$result$projects)
+      result$message <- sprintf("Found %d project(s) after exclusions",
+                                 length(result$result$projects))
+    }
+    result
+  }
+
+  # Helper: save a recent view to preferences (FIFO, max 5)
+  save_recent_view <- function(include_dirs, exclude_dirs) {
+    tryCatch({
+      prefs <- get_hub_preferences()
+      # Build label from folder names
+      label <- paste(basename(include_dirs), collapse = ", ")
+      if (nchar(label) > 60) label <- paste0(substr(label, 1, 57), "...")
+
+      view <- list(
+        label = label,
+        include_dirs = as.list(include_dirs),
+        exclude_dirs = as.list(exclude_dirs),
+        timestamp = as.numeric(Sys.time())
+      )
+
+      # Remove duplicate views (same include+exclude dirs)
+      views <- prefs$recent_views %||% list()
+      views <- Filter(function(v) {
+        !identical(sort(unlist(v$include_dirs)), sort(include_dirs)) ||
+        !identical(sort(unlist(v$exclude_dirs)), sort(exclude_dirs))
+      }, views)
+
+      # Prepend new view, keep max 5
+      views <- c(list(view), views)
+      if (length(views) > 5) views <- views[1:5]
+
+      prefs$recent_views <- views
+      prefs$scan_directories <- as.list(include_dirs)
+      prefs$exclude_directories <- as.list(exclude_dirs)
+      save_hub_preferences(prefs)
+    }, error = function(e) {
+      cat("[Hub App] WARNING: Could not save recent view:", e$message, "\n")
     })
   }
 
@@ -166,13 +230,13 @@ run_hub_app_gui <- function(project_dirs = NULL) {
     # Directory chooser bar
     div(class = "hub-dir-bar",
       shinyDirButton("hub_dir_choose", "Add Folder",
-                     "Choose a folder containing Turas projects",
+                     "Choose a folder to scan for projects",
+                     class = "btn"),
+      shinyDirButton("hub_exclude_dir_choose", "Exclude Folder",
+                     "Choose a folder to exclude from scanning",
                      class = "btn"),
       span(class = "hub-dir-path", id = "hub-dir-display",
-           if (length(project_dirs) > 0)
-             paste("Scanning:", paste(project_dirs, collapse = ", "))
-           else
-             "No directories configured. Click 'Add Folder' to choose."
+           "Choose folders to scan, then click Scan for Projects."
       )
     ),
 
@@ -221,13 +285,17 @@ run_hub_app_gui <- function(project_dirs = NULL) {
     rv <- reactiveValues(
       projects = list(),
       scan_dirs = project_dirs,
+      exclude_dirs = character(0),
+      setup_mode = TRUE,
       active_project_path = NULL,
       active_project_reports = list()
     )
 
-    # --- Directory chooser ---
+    # --- Directory choosers ---
     volumes <- turas_gui_volumes()
     shinyDirChoose(input, "hub_dir_choose", roots = volumes, session = session)
+    shinyDirChoose(input, "hub_exclude_dir_choose", roots = volumes,
+                   session = session)
 
     observeEvent(input$hub_dir_choose, {
       if (is.integer(input$hub_dir_choose)) return()  # User cancelled
@@ -245,28 +313,52 @@ run_hub_app_gui <- function(project_dirs = NULL) {
         rv$scan_dirs <- c(current, selected)
       }
 
-      # Persist scan dirs to preferences
-      save_scan_dirs_to_prefs(rv$scan_dirs, TURAS_HOME)
-
-      # Update display
-      shinyjs::html("hub-dir-display",
-        paste("Scanning:", paste(rv$scan_dirs, collapse = ", ")))
-
-      # Trigger rescan with new directories
-      result <- scan_for_projects(rv$scan_dirs, max_depth = 6)
-
-      if (result$status %in% c("PASS", "PARTIAL")) {
-        rv$projects <- result$result$projects
-        project_json <- jsonlite::toJSON(
-          result$result$projects,
-          auto_unbox = TRUE,
-          pretty = FALSE
-        )
-        session$sendCustomMessage("hub_projects", project_json)
-        cat("[Hub App]", result$message, "\n")
+      if (rv$setup_mode) {
+        # In setup mode: notify frontend, don't auto-scan
+        session$sendCustomMessage("hub_dir_picked",
+          jsonlite::toJSON(list(type = "include", path = selected),
+                            auto_unbox = TRUE))
       } else {
-        session$sendCustomMessage("hub_projects", "[]")
+        # Normal mode: persist and rescan
+        save_scan_dirs_to_prefs(rv$scan_dirs, TURAS_HOME)
+        shinyjs::html("hub-dir-display",
+          paste("Scanning:", paste(rv$scan_dirs, collapse = ", ")))
+
+        result <- scan_with_exclusions(rv$scan_dirs, rv$exclude_dirs,
+                                        max_depth = 6)
+        if (result$status %in% c("PASS", "PARTIAL")) {
+          rv$projects <- result$result$projects
+          project_json <- jsonlite::toJSON(
+            result$result$projects, auto_unbox = TRUE, pretty = FALSE)
+          session$sendCustomMessage("hub_projects", project_json)
+          cat("[Hub App]", result$message, "\n")
+        } else {
+          session$sendCustomMessage("hub_projects", "[]")
+        }
       }
+    })
+
+    # --- Exclude directory chooser ---
+    observeEvent(input$hub_exclude_dir_choose, {
+      if (is.integer(input$hub_exclude_dir_choose)) return()
+
+      selected <- parseDirPath(volumes, input$hub_exclude_dir_choose)
+      if (length(selected) == 0 || !nzchar(selected)) return()
+
+      selected <- normalizePath(as.character(selected),
+                                 winslash = "/", mustWork = FALSE)
+      cat("[Hub App] Exclude directory added:", selected, "\n")
+
+      # Add to exclude list (avoid duplicates)
+      current <- rv$exclude_dirs
+      if (!(selected %in% current)) {
+        rv$exclude_dirs <- c(current, selected)
+      }
+
+      # Notify frontend
+      session$sendCustomMessage("hub_dir_picked",
+        jsonlite::toJSON(list(type = "exclude", path = selected),
+                          auto_unbox = TRUE))
     })
 
     # --- Handle remove directory ---
@@ -306,14 +398,12 @@ run_hub_app_gui <- function(project_dirs = NULL) {
 
       # Rescan
       if (length(rv$scan_dirs) > 0) {
-        result <- scan_for_projects(rv$scan_dirs, max_depth = 6)
+        result <- scan_with_exclusions(rv$scan_dirs, rv$exclude_dirs,
+                                        max_depth = 6)
         if (result$status %in% c("PASS", "PARTIAL")) {
           rv$projects <- result$result$projects
           project_json <- jsonlite::toJSON(
-            result$result$projects,
-            auto_unbox = TRUE,
-            pretty = FALSE
-          )
+            result$result$projects, auto_unbox = TRUE, pretty = FALSE)
           session$sendCustomMessage("hub_projects", project_json)
           cat("[Hub App]", result$message, "\n")
         } else {
@@ -325,31 +415,99 @@ run_hub_app_gui <- function(project_dirs = NULL) {
       }
     })
 
-    # --- Initial project scan ---
-    observe({
-      if (length(rv$scan_dirs) == 0) {
-        cat("[Hub App] No scan directories configured — skipping initial scan\n")
-        session$sendCustomMessage("hub_projects", "[]")
-      } else {
-        cat("[Hub App] Scanning for projects...\n")
-        result <- scan_for_projects(rv$scan_dirs, max_depth = 6)
+    # --- Session init: wait for frontend ready, then send preferences ---
+    observeEvent(input$hub_frontend_ready, {
+      cat("[Hub App] Frontend ready — sending preferences for session setup\n")
+      prefs <- get_hub_preferences()
+      pref_json <- jsonlite::toJSON(prefs, auto_unbox = TRUE, pretty = FALSE)
+      session$sendCustomMessage("hub_session_init", pref_json)
+    }, once = TRUE)
 
+    # --- Handle session start from frontend setup screen ---
+    observeEvent(input$hub_start_session, {
+      # Write diagnostic log to file (visible even without console)
+      debug_log <- file.path(TURAS_HOME, ".hub_debug.log")
+      tryCatch({
+        raw_input <- input$hub_start_session
+        cat(format(Sys.time()), "hub_start_session received\n",
+            "  class:", paste(class(raw_input), collapse=","), "\n",
+            "  typeof:", typeof(raw_input), "\n",
+            "  length:", length(raw_input), "\n",
+            "  value:", substr(paste(capture.output(str(raw_input)), collapse=" "), 1, 300), "\n",
+            file = debug_log, append = TRUE)
+
+        payload <- raw_input
+        if (is.null(payload)) {
+          session$sendCustomMessage("hub_error",
+            "Invalid session data received. Please try again.")
+          return()
+        }
+
+        # Handle both: list (native Shiny) or string (JSON.stringify)
+        if (is.character(payload)) {
+          payload <- jsonlite::fromJSON(payload, simplifyVector = FALSE)
+        }
+
+        include_dirs <- unlist(payload$include_dirs)
+        exclude_dirs <- unlist(payload$exclude_dirs)
+        if (is.null(include_dirs)) include_dirs <- character(0)
+        if (is.null(exclude_dirs)) exclude_dirs <- character(0)
+
+        if (length(include_dirs) == 0) {
+          session$sendCustomMessage("hub_error",
+            "No scan directories selected. Add at least one folder.")
+          return()
+        }
+
+        # Validate directories exist
+        valid_include <- include_dirs[dir.exists(include_dirs)]
+        valid_exclude <- if (length(exclude_dirs) > 0) {
+          exclude_dirs[dir.exists(exclude_dirs)]
+        } else character(0)
+
+        if (length(valid_include) == 0) {
+          session$sendCustomMessage("hub_error",
+            "None of the selected directories exist.")
+          return()
+        }
+
+        cat("[Hub App] Starting session with", length(valid_include),
+            "include dir(s) and", length(valid_exclude), "exclude dir(s)\n")
+
+        rv$scan_dirs <- valid_include
+        rv$exclude_dirs <- valid_exclude
+        rv$setup_mode <- FALSE
+
+        # Update dir-bar display
+        shinyjs::html("hub-dir-display",
+          paste("Scanning:", paste(valid_include, collapse = ", ")))
+
+        # Scan
+        result <- scan_with_exclusions(valid_include, valid_exclude,
+                                        max_depth = 6)
         if (result$status %in% c("PASS", "PARTIAL")) {
           rv$projects <- result$result$projects
-          cat("[Hub App]", result$message, "\n")
-
           project_json <- jsonlite::toJSON(
-            result$result$projects,
-            auto_unbox = TRUE,
-            pretty = FALSE
-          )
+            result$result$projects, auto_unbox = TRUE, pretty = FALSE)
           session$sendCustomMessage("hub_projects", project_json)
+          cat("[Hub App]", result$message, "\n")
         } else {
-          cat("[Hub App] WARNING: Project scan returned no results\n")
           session$sendCustomMessage("hub_projects", "[]")
         }
-      }
-    }) |> bindEvent(TRUE, once = TRUE)
+
+        # Save this as a recent view
+        save_recent_view(valid_include, valid_exclude)
+
+      }, error = function(e) {
+        # Write error details to debug log
+        cat(format(Sys.time()), "ERROR in hub_start_session:", e$message, "\n",
+            "  call:", paste(deparse(e$call), collapse=" "), "\n",
+            file = debug_log, append = TRUE)
+        cat("[Hub App] Session start error:", e$message, "\n")
+        session$sendCustomMessage("hub_error",
+          paste("Failed to start session:", e$message))
+      })
+    })
 
     # --- Handle project selection from frontend ---
     observeEvent(input$hub_open_project, {
@@ -411,15 +569,13 @@ run_hub_app_gui <- function(project_dirs = NULL) {
     # --- Handle rescan request from frontend ---
     observeEvent(input$hub_rescan, {
       cat("[Hub App] Rescanning projects...\n")
-      result <- scan_for_projects(rv$scan_dirs, max_depth = 6)
+      result <- scan_with_exclusions(rv$scan_dirs, rv$exclude_dirs,
+                                      max_depth = 6)
 
       if (result$status %in% c("PASS", "PARTIAL")) {
         rv$projects <- result$result$projects
         project_json <- jsonlite::toJSON(
-          result$result$projects,
-          auto_unbox = TRUE,
-          pretty = FALSE
-        )
+          result$result$projects, auto_unbox = TRUE, pretty = FALSE)
         session$sendCustomMessage("hub_projects", project_json)
         cat("[Hub App]", result$message, "\n")
       }
@@ -528,23 +684,30 @@ run_hub_app_gui <- function(project_dirs = NULL) {
 
     observeEvent(input$hub_save_preferences, {
       tryCatch({
-        prefs <- jsonlite::fromJSON(input$hub_save_preferences,
-                                     simplifyVector = FALSE)
+        prefs <- safe_from_json(input$hub_save_preferences)
         result <- save_hub_preferences(prefs)
 
         if (result$status == "PASS") {
-          # Replace scan directories with saved preferences
+          # Replace scan and exclude directories from saved preferences
           new_dirs <- unlist(prefs$scan_directories)
+          new_exclude <- unlist(prefs$exclude_directories)
+
           if (!is.null(new_dirs) && length(new_dirs) > 0) {
             valid_dirs <- new_dirs[dir.exists(new_dirs)]
+            valid_exclude <- if (length(new_exclude) > 0) {
+              new_exclude[dir.exists(new_exclude)]
+            } else character(0)
+
             rv$scan_dirs <- valid_dirs
+            rv$exclude_dirs <- valid_exclude
             cat("[Hub App] Scan directories updated:",
                 paste(valid_dirs, collapse = ", "), "\n")
 
             if (length(valid_dirs) > 0) {
               shinyjs::html("hub-dir-display",
                 paste("Scanning:", paste(rv$scan_dirs, collapse = ", ")))
-              scan_result <- scan_for_projects(rv$scan_dirs, max_depth = 6)
+              scan_result <- scan_with_exclusions(rv$scan_dirs, rv$exclude_dirs,
+                                                   max_depth = 6)
               if (scan_result$status %in% c("PASS", "PARTIAL")) {
                 rv$projects <- scan_result$result$projects
                 project_json <- jsonlite::toJSON(
@@ -561,6 +724,7 @@ run_hub_app_gui <- function(project_dirs = NULL) {
             }
           } else {
             rv$scan_dirs <- character(0)
+            rv$exclude_dirs <- character(0)
             shinyjs::html("hub-dir-display",
               "No directories configured. Click 'Add Folder' or use Preferences.")
             session$sendCustomMessage("hub_projects", "[]")
@@ -619,8 +783,7 @@ run_hub_app_gui <- function(project_dirs = NULL) {
       req(rv$active_project_path)
 
       tryCatch({
-        payload <- jsonlite::fromJSON(input$hub_generate_hub,
-                                       simplifyVector = FALSE)
+        payload <- safe_from_json(input$hub_generate_hub)
 
         cat("[Hub App] Hub generation requested for:",
             payload$project_name %||% "Unknown", "\n")
@@ -667,8 +830,7 @@ run_hub_app_gui <- function(project_dirs = NULL) {
       req(rv$active_project_path)
 
       tryCatch({
-        payload <- jsonlite::fromJSON(input$hub_export_pptx,
-                                       simplifyVector = FALSE)
+        payload <- safe_from_json(input$hub_export_pptx)
 
         cat("[Hub App] PPTX export requested for:",
             payload$project_name %||% "Unknown", "\n")
@@ -710,8 +872,7 @@ run_hub_app_gui <- function(project_dirs = NULL) {
       req(rv$active_project_path)
 
       tryCatch({
-        payload <- jsonlite::fromJSON(input$hub_export_pngs_zip,
-                                       simplifyVector = FALSE)
+        payload <- safe_from_json(input$hub_export_pngs_zip)
 
         cat("[Hub App] PNG ZIP export requested\n")
 
@@ -771,6 +932,32 @@ run_hub_app_gui <- function(project_dirs = NULL) {
           error = e$message
         ), auto_unbox = TRUE)
         session$sendCustomMessage("hub_export_pngs_complete", response)
+      })
+    })
+
+    # --- Handle HTML report open in system browser ---
+    observeEvent(input$hub_open_html_in_browser, {
+      file_path <- input$hub_open_html_in_browser
+      if (is.null(file_path) || !nzchar(file_path)) return()
+
+      if (!file.exists(file_path)) {
+        cat("[Hub App] ERROR: HTML file not found:", file_path, "\n")
+        session$sendCustomMessage("hub_error",
+          paste("File not found:", file_path))
+        return()
+      }
+
+      cat("[Hub App] Opening HTML in browser:", file_path, "\n")
+      tryCatch({
+        browseURL(paste0("file://",
+          normalizePath(file_path, winslash = "/")))
+        session$sendCustomMessage("hub_file_opened",
+          jsonlite::toJSON(list(success = TRUE,
+            filename = basename(file_path)), auto_unbox = TRUE))
+      }, error = function(e) {
+        cat("[Hub App] ERROR opening HTML:", e$message, "\n")
+        session$sendCustomMessage("hub_error",
+          paste("Failed to open:", e$message))
       })
     })
 
@@ -841,7 +1028,7 @@ run_hub_app_gui <- function(project_dirs = NULL) {
     # --- Handle project note save ---
     observeEvent(input$hub_save_project_note, {
       payload <- tryCatch(
-        jsonlite::fromJSON(input$hub_save_project_note, simplifyVector = FALSE),
+        safe_from_json(input$hub_save_project_note),
         error = function(e) NULL
       )
       if (is.null(payload)) return()
@@ -871,7 +1058,7 @@ run_hub_app_gui <- function(project_dirs = NULL) {
     # --- Handle module launch requests ---
     observeEvent(input$hub_launch_module, {
       payload <- tryCatch(
-        jsonlite::fromJSON(input$hub_launch_module, simplifyVector = FALSE),
+        safe_from_json(input$hub_launch_module),
         error = function(e) NULL
       )
       if (is.null(payload)) return()

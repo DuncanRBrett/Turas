@@ -12,7 +12,7 @@ var HubApp = (function() {
   // ---- State ----
   var state = {
     projects: [],
-    activeView: "projects",    // "projects" | "reports"
+    activeView: "setup",       // "setup" | "projects" | "reports"
     activeProject: null,       // project object
     activeReports: [],         // report objects with URLs
     pinBoardVisible: false     // pin board side panel toggle
@@ -28,6 +28,7 @@ var HubApp = (function() {
    */
   function init() {
     // Cache DOM references
+    dom.viewSetup = document.getElementById("view-setup");
     dom.viewProjects = document.getElementById("view-projects");
     dom.viewReports = document.getElementById("view-reports");
     dom.projectGrid = document.getElementById("project-grid");
@@ -57,6 +58,9 @@ var HubApp = (function() {
 
     // Initialise persistence layer
     HubState.init();
+
+    // Initialise session setup
+    SessionSetup.init();
 
     // Initialise annotations
     Annotations.init();
@@ -94,6 +98,22 @@ var HubApp = (function() {
       return;
     }
 
+    // --- Session setup handlers ---
+    shiny.addCustomMessageHandler("hub_session_init", function(jsonStr) {
+      var prefs = parseJSON(jsonStr);
+      if (prefs) {
+        SessionSetup.show(prefs);
+      }
+    });
+
+    shiny.addCustomMessageHandler("hub_dir_picked", function(jsonStr) {
+      var data = parseJSON(jsonStr);
+      if (data && data.type && data.path) {
+        SessionSetup.addDir(data.type, data.path);
+      }
+    });
+
+    // --- Project data handlers ---
     shiny.addCustomMessageHandler("hub_projects", function(jsonStr) {
       var projects = parseJSON(jsonStr);
       if (projects) {
@@ -224,6 +244,9 @@ var HubApp = (function() {
         showToast((data.label || data.module || "Module") + " launched");
       }
     });
+
+    // Signal to R that frontend handlers are registered and ready
+    sendToShiny("hub_frontend_ready", Date.now());
   }
 
   /**
@@ -366,6 +389,7 @@ var HubApp = (function() {
   function showView(viewName) {
     state.activeView = viewName;
 
+    if (dom.viewSetup) dom.viewSetup.classList.toggle("active", viewName === "setup");
     dom.viewProjects.classList.toggle("active", viewName === "projects");
     dom.viewReports.classList.toggle("active", viewName === "reports");
 

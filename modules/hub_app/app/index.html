@@ -4,15 +4,56 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Turas Hub App</title>
-  <link rel="stylesheet" href="css/hub_app.css">
+  <link rel="stylesheet" href="css/hub_app.css?v=2">
 </head>
 <body>
+
+  <!-- ================================================================
+       SESSION SETUP VIEW
+       First screen: pick folders to scan, quick-launch recent views
+       ================================================================ -->
+  <div id="view-setup" class="view active">
+    <div class="setup-container">
+      <div class="setup-header">
+        <h2 class="setup-title">Turas Hub</h2>
+        <p class="setup-subtitle">Choose folders to scan for projects</p>
+      </div>
+
+      <div class="setup-columns">
+        <div class="setup-section">
+          <h3 class="setup-section-title">Include Folders</h3>
+          <p class="setup-hint">Use the <strong>Add Folder</strong> button above to add directories. Subfolders are included automatically.</p>
+          <div id="setup-include-list" class="setup-dir-list">
+            <div class="setup-dir-empty">No folders added yet</div>
+          </div>
+        </div>
+
+        <div class="setup-section">
+          <h3 class="setup-section-title">Exclude Folders</h3>
+          <p class="setup-hint">Optionally use <strong>Exclude Folder</strong> above to exclude specific subfolders.</p>
+          <div id="setup-exclude-list" class="setup-dir-list">
+            <div class="setup-dir-empty">No exclusions</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="setup-actions">
+        <button id="btn-start-scan" class="btn btn-primary btn-lg" disabled>Add folders to scan</button>
+      </div>
+
+      <div id="setup-recent-views" class="setup-recent" style="display:none;">
+        <h3 class="setup-section-title">Recent Views</h3>
+        <div id="setup-recent-list" class="setup-recent-list">
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ================================================================
        PROJECT BROWSER VIEW
        Shows cards for each discovered Turas project
        ================================================================ -->
-  <div id="view-projects" class="view active">
+  <div id="view-projects" class="view">
     <div class="toolbar">
       <div class="toolbar-left">
         <h2 class="toolbar-title">Projects</h2>
@@ -51,35 +92,75 @@
       </div>
     </div>
 
-    <!-- Folder & Sort controls (inline with grid) -->
-    <div id="folder-sort-bar" class="folder-sort-bar" style="display:none;">
-      <div class="folder-dropdown-wrapper">
-        <button id="folder-dropdown-btn" class="btn btn-sm" title="Filter by folder">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-          </svg>
-          <span id="folder-dropdown-label">All folders</span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-        </button>
-        <div id="folder-dropdown-menu" class="folder-dropdown-menu" style="display:none;">
-          <!-- Populated by project_browser.js -->
+    <!-- Filter & Sort controls -->
+    <div id="filter-bar" class="filter-bar" style="display:none;">
+      <div class="filter-row">
+        <!-- Path search -->
+        <input type="text" id="filter-path-search" class="filter-input"
+               placeholder="Filter by folder path..." autocomplete="off">
+
+        <!-- Report type multi-select -->
+        <div class="filter-dropdown-wrapper">
+          <button id="type-filter-btn" class="btn btn-sm" title="Filter by report type">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+            </svg>
+            <span id="type-filter-label">All types</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div id="type-filter-menu" class="filter-dropdown-menu" style="display:none;">
+            <!-- Populated by project_browser.js with checkboxes -->
+          </div>
         </div>
+
+        <!-- Folder filter -->
+        <div class="filter-dropdown-wrapper">
+          <button id="folder-dropdown-btn" class="btn btn-sm" title="Filter by folder">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+            <span id="folder-dropdown-label">All folders</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div id="folder-dropdown-menu" class="folder-dropdown-menu" style="display:none;">
+            <!-- Populated by project_browser.js -->
+          </div>
+        </div>
+
+        <!-- Date range -->
+        <div class="filter-date-range">
+          <input type="date" id="filter-date-from" class="filter-date-input" title="From date">
+          <span class="filter-date-sep">&ndash;</span>
+          <input type="date" id="filter-date-to" class="filter-date-input" title="To date">
+        </div>
+
+        <!-- Sort -->
+        <div class="sort-dropdown-wrapper">
+          <button id="sort-dropdown-btn" class="btn btn-sm" title="Sort projects">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="16" y2="12"/><line x1="4" y1="18" x2="12" y2="18"/>
+            </svg>
+            <span id="sort-dropdown-label">Recent</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div id="sort-dropdown-menu" class="sort-dropdown-menu" style="display:none;">
+            <button class="sort-option sort-option-active" data-sort="recent">Most recent</button>
+            <button class="sort-option" data-sort="oldest">Oldest first</button>
+            <button class="sort-option" data-sort="name">Name (A-Z)</button>
+            <button class="sort-option" data-sort="name-desc">Name (Z-A)</button>
+            <button class="sort-option" data-sort="files">Most files</button>
+            <button class="sort-option" data-sort="modules">Most modules</button>
+          </div>
+        </div>
+
+        <!-- Clear all -->
+        <button id="btn-clear-filters" class="btn btn-sm" title="Clear all filters" style="display:none;">
+          Clear
+        </button>
       </div>
-      <div class="sort-dropdown-wrapper">
-        <button id="sort-dropdown-btn" class="btn btn-sm" title="Sort projects">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="16" y2="12"/><line x1="4" y1="18" x2="12" y2="18"/>
-          </svg>
-          <span id="sort-dropdown-label">Recent</span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-        </button>
-        <div id="sort-dropdown-menu" class="sort-dropdown-menu" style="display:none;">
-          <button class="sort-option sort-option-active" data-sort="recent">Most recent</button>
-          <button class="sort-option" data-sort="name">Name (A-Z)</button>
-          <button class="sort-option" data-sort="name-desc">Name (Z-A)</button>
-          <button class="sort-option" data-sort="files">Most files</button>
-          <button class="sort-option" data-sort="modules">Most modules</button>
-        </div>
+
+      <!-- Active filter chips -->
+      <div id="filter-chips" class="filter-chips" style="display:none;">
       </div>
     </div>
 
@@ -324,10 +405,18 @@
       </div>
       <div class="modal-body">
         <div class="pref-field">
-          <label class="pref-label" for="pref-scan-dirs">Scan Directories</label>
-          <textarea id="pref-scan-dirs" class="pref-textarea"
-                    placeholder="One directory per line, e.g.&#10;~/Documents&#10;~/OneDrive/Projects"></textarea>
-          <span class="pref-hint">Directories to scan for Turas projects (one per line)</span>
+          <label class="pref-label">Scan Directories</label>
+          <div id="pref-scan-dirs-list" class="pref-dir-list">
+            <!-- Populated by preferences.js -->
+          </div>
+          <span class="pref-hint">Use the "Add Folder" button above to add directories</span>
+        </div>
+        <div class="pref-field">
+          <label class="pref-label">Excluded Directories</label>
+          <div id="pref-exclude-dirs-list" class="pref-dir-list">
+            <!-- Populated by preferences.js -->
+          </div>
+          <span class="pref-hint">Use the "Exclude Folder" button above to exclude directories</span>
         </div>
         <div class="pref-row">
           <div class="pref-field pref-field-half">
@@ -352,15 +441,16 @@
     </div>
   </div>
 
-  <script src="js/app.js"></script>
-  <script src="js/state.js"></script>
-  <script src="js/project_browser.js"></script>
-  <script src="js/report_viewer.js"></script>
-  <script src="js/pin_board.js"></script>
-  <script src="js/export_manager.js"></script>
-  <script src="js/annotations.js"></script>
-  <script src="js/preferences.js"></script>
-  <script src="js/search.js"></script>
+  <script src="js/app.js?v=2"></script>
+  <script src="js/state.js?v=2"></script>
+  <script src="js/session_setup.js?v=2"></script>
+  <script src="js/project_browser.js?v=2"></script>
+  <script src="js/report_viewer.js?v=2"></script>
+  <script src="js/pin_board.js?v=2"></script>
+  <script src="js/export_manager.js?v=2"></script>
+  <script src="js/annotations.js?v=2"></script>
+  <script src="js/preferences.js?v=2"></script>
+  <script src="js/search.js?v=2"></script>
 
 </body>
 </html>
