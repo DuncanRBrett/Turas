@@ -88,8 +88,8 @@ RUN printf 'R_LIBS=/srv/shiny-server/turas/renv/library/linux-ubuntu-noble/R-4.5
 # Create data mount point
 RUN mkdir -p /data
 
-# Expose port
-EXPOSE 3838
+# Expose ports: 3838 = launcher, 3839-3848 = module sessions
+EXPOSE 3838 3839-3848
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \

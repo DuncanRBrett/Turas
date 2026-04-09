@@ -562,8 +562,18 @@ launch_turas <- function() {
 
     rv <- reactiveValues(
       selected_module = NULL,
-      status = ""
+      status = "",
+      docker_ports = list()   # module_id -> port (tracks running Docker modules)
     )
+
+    # Docker: allocate next available port from 3839-3848
+    next_docker_port <- function() {
+      used <- unlist(rv$docker_ports)
+      for (port in 3839:3848) {
+        if (!(port %in% used)) return(port)
+      }
+      3839L  # fallback: reuse first port
+    }
 
     # Status bar text
     output$status_text <- renderText({ rv$status })
@@ -670,7 +680,23 @@ launch_turas <- function() {
               mod$id
             ),
             "Launch New Session"
-          )
+          ),
+
+          # Docker: show clickable link to running module
+          if (nzchar(Sys.getenv("TURAS_DOCKER")) && !is.null(rv$docker_ports[[mod$id]])) {
+            port <- rv$docker_ports[[mod$id]]
+            div(style = "margin-top: 16px; padding: 16px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; text-align: center;",
+              tags$a(
+                href = sprintf("http://localhost:%d", port),
+                target = "_blank",
+                style = "font-size: 18px; font-weight: 600; color: #1a2744;",
+                sprintf("Open %s (port %d)", mod$name, port)
+              ),
+              tags$p(style = "margin-top: 8px; color: #64748b; font-size: 13px;",
+                "Click above to open in a new tab."
+              )
+            )
+          }
         )
       )
     })
@@ -695,7 +721,14 @@ launch_turas <- function() {
       show_status(paste0("Launching ", mod$name, "..."))
 
       tryCatch({
-        launch_module(mod$id, script_file)
+        # Docker: allocate port and track it
+        if (nzchar(Sys.getenv("TURAS_DOCKER"))) {
+          port <- next_docker_port()
+          launch_module(mod$id, script_file, docker_port = port)
+          rv$docker_ports[[mod$id]] <- port
+        } else {
+          launch_module(mod$id, script_file)
+        }
 
         later::later(function() {
           tryCatch(show_status(paste0(mod$name, " launched")), error = function(e) NULL)
@@ -729,10 +762,19 @@ launch_turas <- function() {
       show_status(paste0("Launching ", mod$name, " with ", basename(config_path), "..."))
 
       tryCatch({
-        # Pass config path directly into the launched script (no env var race condition)
-        launch_module(mod$id,
-                     file.path(turas_root, mod$script),
-                     config_path = config_path)
+        # Docker: allocate port and track it
+        if (nzchar(Sys.getenv("TURAS_DOCKER"))) {
+          port <- next_docker_port()
+          launch_module(mod$id,
+                       file.path(turas_root, mod$script),
+                       config_path = config_path,
+                       docker_port = port)
+          rv$docker_ports[[mod$id]] <- port
+        } else {
+          launch_module(mod$id,
+                       file.path(turas_root, mod$script),
+                       config_path = config_path)
+        }
 
         later::later(function() {
           tryCatch(show_status(paste0(mod$name, " launched")), error = function(e) NULL)
@@ -748,7 +790,25 @@ launch_turas <- function() {
     # ------------------------------------------------------------------
     # launch_module() — background Rscript launcher
     # ------------------------------------------------------------------
-    launch_module <- function(module_name, script_path, config_path = NULL) {
+    launch_module <- function(module_name, script_path, config_path = NULL,
+                              docker_port = 3839L) {
+      is_docker <- nzchar(Sys.getenv("TURAS_DOCKER"))
+
+      # Docker: kill any previous instance of this module
+      if (is_docker) {
+        pid_file <- file.path(turas_root, sprintf(".module_pid_%s", module_name))
+        if (file.exists(pid_file)) {
+          old_pid <- tryCatch(
+            as.integer(readLines(pid_file, n = 1, warn = FALSE)),
+            error = function(e) NA_integer_
+          )
+          if (!is.na(old_pid)) {
+            tryCatch(tools::pskill(old_pid), error = function(e) NULL)
+            Sys.sleep(0.5)
+          }
+        }
+      }
+
       config_lines <- ""
       if (!is.null(config_path) && nzchar(config_path)) {
         config_lines <- sprintf('Sys.setenv(TURAS_MODULE_CONFIG = %s)\n', deparse(config_path))
@@ -756,23 +816,34 @@ launch_turas <- function() {
           config_lines <- paste0(config_lines, sprintf('Sys.setenv(TURAS_HUB_CONFIG = %s)\n', deparse(config_path)))
         }
       }
+      # Docker: bind module to 0.0.0.0:{port}, write PID, don't open browser
+      docker_opts <- if (is_docker) sprintf("options(shiny.host = '0.0.0.0', shiny.port = %dL)\n", docker_port) else ""
+      pid_line <- if (is_docker) {
+        sprintf("writeLines(as.character(Sys.getpid()), %s)\n",
+                deparse(file.path(turas_root, sprintf(".module_pid_%s", module_name))))
+      } else ""
+      browser_val <- if (is_docker) "FALSE" else "TRUE"
+
       launch_script <- sprintf('
-Sys.setenv(TURAS_ROOT = %s)
+%s%sSys.setenv(TURAS_ROOT = %s)
 Sys.setenv(TURAS_LAUNCHED_FROM_HUB = "1")
 %ssetwd(%s)
 TURAS_LAUNCHER_ACTIVE <- TRUE
 source(%s)
 if ("%s" != "alchemerparser") {
   app <- %s()
-  shiny::runApp(app, launch.browser = TRUE)
+  shiny::runApp(app, launch.browser = %s)
 }
 ',
+      docker_opts,
+      pid_line,
       deparse(turas_root),
       config_lines,
       deparse(turas_root),
       deparse(script_path),
       module_name,
-      paste0("run_", module_name, "_gui"))
+      paste0("run_", module_name, "_gui"),
+      browser_val)
 
       temp_script <- tempfile(fileext = ".R")
       log_file <- tempfile(fileext = ".log")
