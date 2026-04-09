@@ -1,14 +1,14 @@
 # ==============================================================================
 # TURAS Analytics Platform - Docker Image
 # ==============================================================================
-# Builds a self-contained Shiny Server image with all R dependencies pre-installed
-# via renv. Data is mounted at /data at runtime.
+# Builds a self-contained image with all R dependencies pre-installed via renv.
+# Runs R directly (no Shiny Server). Data is mounted at /data at runtime.
 #
 # BUILD:   docker build -t turas .
 # RUN:     docker-compose up
 # ==============================================================================
 
-FROM rocker/shiny:4.5.1
+FROM rocker/shiny:4.5.3
 
 LABEL maintainer="Duncan Brett <duncan@researchlamppost.co.za>"
 LABEL description="TURAS Analytics Platform - Market Research Toolkit"
@@ -80,9 +80,6 @@ RUN R -e "install.packages('renv', repos = 'https://cloud.r-project.org')" && \
 # Copy the full application
 COPY . .
 
-# Fix permissions: renv installs as root, but Shiny Server runs as 'shiny'
-RUN chmod -R a+rX /srv/shiny-server/turas/renv/library
-
 # Overwrite Renviron.site to:
 # 1. Include renv library FIRST in R_LIBS (before system libraries)
 # 2. Skip renv bootstrap at runtime
@@ -91,40 +88,13 @@ RUN printf 'R_LIBS=/srv/shiny-server/turas/renv/library/linux-ubuntu-noble/R-4.5
 # Create data mount point
 RUN mkdir -p /data
 
-# Configure Shiny Server to serve Turas
-RUN echo '\
-run_as shiny;\n\
-\n\
-server {\n\
-  listen 3838;\n\
-\n\
-  location / {\n\
-    site_dir /srv/shiny-server/turas;\n\
-    log_dir /var/log/shiny-server;\n\
-    directory_index on;\n\
-    app_init_timeout 300;\n\
-    app_idle_timeout 1800;\n\
-  }\n\
-}\n' > /etc/shiny-server/shiny-server.conf
-
-# Create a simple app.R wrapper that launches Turas
-RUN echo '\
-# Turas Shiny App Entry Point (Docker)\n\
-# Add renv library to search path (renv itself is skipped via .Renviron)\n\
-renv_lib <- "/srv/shiny-server/turas/renv/library/linux-ubuntu-noble/R-4.5/x86_64-pc-linux-gnu"\n\
-if (dir.exists(renv_lib)) .libPaths(c(renv_lib, .libPaths()))\n\
-Sys.setenv(TURAS_ROOT = "/srv/shiny-server/turas")\n\
-Sys.setenv(TURAS_DOCKER = "1")\n\
-setwd(Sys.getenv("TURAS_ROOT"))\n\
-source("launch_turas.R")\n\
-launch_turas()\n' > /srv/shiny-server/turas/app.R
-
-# Expose Shiny Server port
+# Expose port
 EXPOSE 3838
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:3838/ || exit 1
 
-# Run Shiny Server
-CMD ["/usr/bin/shiny-server"]
+# Run R directly — launch_turas() calls runApp() internally.
+# Shiny options set host to 0.0.0.0 (container-accessible) and port 3838.
+CMD ["R", "-e", "options(shiny.host='0.0.0.0', shiny.port=3838L); source('launch_turas.R')"]
