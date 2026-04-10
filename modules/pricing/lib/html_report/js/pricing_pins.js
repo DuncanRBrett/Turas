@@ -314,7 +314,6 @@
       badgeId: "pin-badge",
       toolbarId: "pinned-bulk-actions",
       features: {
-        insightEdit: true,
         sections: true,
         dragDrop: true
       }

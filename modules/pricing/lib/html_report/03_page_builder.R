@@ -1106,16 +1106,7 @@ td.pr-td {
   transition: all 0.15s;
 }
 .pinned-action-btn:hover { border-color: #94a3b8; color: #374151; background: #f8f9fa; }
-/* Insight editing */
-.pinned-insight-rendered { min-height: 1em; cursor: text; }
-.pinned-insight-rendered:empty::before {
-  content: attr(data-placeholder); color: #94a3b8; font-style: italic;
-}
-.pinned-insight-editor {
-  width: 100%; border: 1px solid #cbd5e1; border-radius: 4px;
-  padding: 8px 12px; font-size: 13px; font-family: inherit;
-  line-height: 1.5; resize: vertical; min-height: 60px;
-}
+.pinned-insight-rendered { min-height: 1em; }
 .pr-pinned-actions { margin-top: 16px; }
 .pr-btn-secondary {
   background: white; border: 1px solid #e2e8f0; color: #475569; padding: 8px 16px;

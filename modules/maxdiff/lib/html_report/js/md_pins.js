@@ -228,7 +228,6 @@
       emptyStateId: "md-pinned-empty",
       badgeId: "pin-count-badge",
       features: {
-        insightEdit: true,
         sections: true,
         dragDrop: true
       }

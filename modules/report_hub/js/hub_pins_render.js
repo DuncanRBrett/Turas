@@ -136,7 +136,7 @@
       html += '<div class="hub-pin-subtitle">' + TurasPins._escapeHtml(subtitle) + '</div>';
     }
 
-    html += buildInsightAreaHTML(pin, pid);
+    html += buildInsightAreaHTML(pin);
 
     // AI Insight callout (read-only, preserves original styling)
     if (pin.aiInsightHtml && TurasPins.shouldShow(pin, "aiInsight")) {
@@ -168,32 +168,17 @@
     return html;
   }
 
-  /** Build insight area HTML with dual-mode rendered view + editor. */
-  function buildInsightAreaHTML(pin, pid) {
+  // Insights are always read-only in pin cards — add insights on the source
+  // page before pinning. Accepts both insight and insightText field names for
+  // compatibility with pins created by older sub-report versions.
+  function buildInsightAreaHTML(pin) {
     var insightRaw = pin.insight || pin.insightText || "";
-    var renderedHtml = "";
-    var editorText = "";
-    if (insightRaw) {
-      if (TurasPins._containsHtml(insightRaw)) {
-        renderedHtml = TurasPins._sanitizeHtml(insightRaw);
-        var tmp = document.createElement("div");
-        tmp.innerHTML = renderedHtml;
-        editorText = tmp.textContent.trim();
-      } else {
-        editorText = insightRaw;
-        renderedHtml = TurasPins._renderMarkdown(insightRaw);
-      }
-    }
-    return '<div class="hub-pin-insight" data-pin-id="' + pid + '">' +
-      '<div class="hub-insight-rendered hub-md-content" ' +
-        'ondblclick="ReportHub.toggleInsightEdit(\'' + pid + '\')" ' +
-        'data-placeholder="Double-click to add insight...">' +
-        (renderedHtml || '') +
-      '</div>' +
-      '<textarea class="hub-insight-editor" style="display:none" ' +
-        'onblur="ReportHub.finishInsightEdit(\'' + pid + '\')">' +
-        TurasPins._escapeHtml(editorText) +
-      '</textarea>' +
+    if (!insightRaw) return "";
+    var renderedHtml = TurasPins._containsHtml(insightRaw) ?
+      TurasPins._sanitizeHtml(insightRaw) :
+      TurasPins._renderMarkdown(insightRaw);
+    return '<div class="hub-pin-insight">' +
+      '<div class="hub-insight-rendered hub-md-content">' + renderedHtml + '</div>' +
     '</div>';
   }
 

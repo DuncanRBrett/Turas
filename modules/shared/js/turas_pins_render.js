@@ -72,7 +72,7 @@
     html += _cardHeader(pid, title, idx, total, pfx);
     if (subtitle) html += '<div class="' + pfx + '-card-subtitle">' +
       TurasPins._escapeHtml(subtitle) + '</div>';
-    html += _buildInsightArea(pin, pid, pfx, config);
+    html += _buildInsightArea(pin, pid, pfx);
     html += _buildAiInsightArea(pin, pfx);
     html += _cardContent(pin, pfx);
     html += '</div>';
@@ -279,56 +279,17 @@
 
   // ── Insight Area ───────────────────────────────────────────────────────────
 
-  function _buildInsightArea(pin, pid, pfx, config) {
-    // Skip if pinFlags says insight is off, or no insight text and no edit mode
+  // Insights are always read-only in pin cards — add insights on the source
+  // page before pinning. This ensures the insight is always captured with the
+  // pin and exports correctly in all contexts (standalone and hub-embedded).
+  function _buildInsightArea(pin, pid, pfx) {
     if (pin.pinFlags && !pin.pinFlags.insight) return "";
-    if (!config.features.insightEdit) {
-      if (pin.insightText) {
-        var r = TurasPins._containsHtml(pin.insightText) ?
-          TurasPins._sanitizeHtml(pin.insightText) :
-          TurasPins._renderMarkdown(pin.insightText);
-        return '<div class="' + pfx + '-card-insight">' + r + '</div>';
-      }
-      return "";
-    }
-    var raw = pin.insightText || "", rHtml = "", eTxt = "";
-    if (raw) {
-      if (TurasPins._containsHtml(raw)) {
-        rHtml = TurasPins._sanitizeHtml(raw);
-        var tmp = document.createElement("div"); tmp.innerHTML = rHtml;
-        eTxt = tmp.textContent.trim();
-      } else { eTxt = raw; rHtml = TurasPins._renderMarkdown(raw); }
-    }
-    return '<div class="' + pfx + '-card-insight" data-pin-id="' + pid + '">' +
-      '<div class="' + pfx + '-insight-rendered" ' +
-        'ondblclick="TurasPins.toggleInsightEdit(\'' + pid + '\')" ' +
-        'data-placeholder="Double-click to add insight...">' + (rHtml || "") + '</div>' +
-      '<textarea class="' + pfx + '-insight-editor" style="display:none" ' +
-        'onblur="TurasPins.finishInsightEdit(\'' + pid + '\')">' +
-        TurasPins._escapeHtml(eTxt) + '</textarea></div>';
+    if (!pin.insightText) return "";
+    var r = TurasPins._containsHtml(pin.insightText) ?
+      TurasPins._sanitizeHtml(pin.insightText) :
+      TurasPins._renderMarkdown(pin.insightText);
+    return '<div class="' + pfx + '-card-insight">' + r + '</div>';
   }
-
-  TurasPins.toggleInsightEdit = function(pinId) {
-    var c = TurasPins.getConfig(); if (!c) return;
-    var el = document.querySelector('.' + c.cssPrefix + '-card-insight[data-pin-id="' + pinId + '"]');
-    if (!el) return;
-    var r = el.querySelector("." + c.cssPrefix + "-insight-rendered");
-    var e = el.querySelector("." + c.cssPrefix + "-insight-editor");
-    if (r && e) { r.style.display = "none"; e.style.display = ""; e.focus(); }
-  };
-
-  TurasPins.finishInsightEdit = function(pinId) {
-    var c = TurasPins.getConfig(); if (!c) return;
-    var el = document.querySelector('.' + c.cssPrefix + '-card-insight[data-pin-id="' + pinId + '"]');
-    if (!el) return;
-    var r = el.querySelector("." + c.cssPrefix + "-insight-rendered");
-    var e = el.querySelector("." + c.cssPrefix + "-insight-editor");
-    if (!r || !e) return;
-    var md = e.value.trim();
-    r.innerHTML = md ? TurasPins._renderMarkdown(md) : "";
-    r.style.display = ""; e.style.display = "none";
-    TurasPins.updateInsight(pinId, md);
-  };
 
   // ── AI Insight Area (read-only, styled HTML) ─────────────────────────────
 

@@ -661,15 +661,7 @@ body {
   border-radius: 0 6px 6px 0;
   font-size: 14px; line-height: 1.6; color: #334155;
 }
-.wt-pinned-insight-rendered { min-height: 1em; cursor: text; }
-.wt-pinned-insight-rendered:empty::before {
-  content: attr(data-placeholder); color: #94a3b8; font-style: italic;
-}
-.wt-pinned-insight-editor {
-  width: 100%; border: 1px solid #cbd5e1; border-radius: 4px;
-  padding: 8px 12px; font-size: 13px; font-family: inherit;
-  line-height: 1.5; resize: vertical; min-height: 60px;
-}
+.wt-pinned-insight-rendered { min-height: 1em; }
 .wt-pinned-card-chart { margin-bottom: 12px; }
 .wt-pinned-card-chart svg { width: 100%; height: auto; }
 .wt-pinned-card-table { overflow-x: auto; }

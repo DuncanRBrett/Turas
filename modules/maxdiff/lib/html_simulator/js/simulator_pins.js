@@ -193,9 +193,7 @@ var SimPins = (function() {
           '</div>' +
           '<div class="sim-pin-card-body">' +
             p.chartHtml +
-            '<div class="sim-pin-card-insight">' +
-              '<div class="sim-pin-insight-editor" contenteditable="true" data-pin-id="' + p.id + '">' + renderMarkdown(p.insight || '') + '</div>' +
-            '</div>' +
+            (p.insight ? '<div class="sim-pin-card-insight"><div class="sim-pin-insight-rendered">' + renderMarkdown(p.insight) + '</div></div>' : '') +
           '</div>' +
         '</div>';
       }
@@ -233,15 +231,6 @@ var SimPins = (function() {
         var id = this.getAttribute("data-pin-id");
         var idx = findIndex(id);
         if (idx < pins.length - 1) { swap(idx, idx + 1); renderPins(); }
-      });
-    });
-
-    // Insight editors
-    container.querySelectorAll(".sim-pin-insight-editor").forEach(function(el) {
-      el.addEventListener("blur", function() {
-        var id = this.getAttribute("data-pin-id");
-        var pin = findPin(id);
-        if (pin) pin.insight = this.innerHTML;
       });
     });
 

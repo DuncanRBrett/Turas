@@ -287,7 +287,6 @@
       badgeId: "wt-pinned-count",
       toolbarId: "wt-pinned-toolbar",
       features: {
-        insightEdit: true,
         sections: true,
         dragDrop: true
       }
