@@ -365,7 +365,6 @@
       emptyStateId: "cd-pinned-empty",
       badgeId: "cd-pin-count-badge",
       features: {
-        insightEdit: true,
         sections: true,
         dragDrop: true
       }

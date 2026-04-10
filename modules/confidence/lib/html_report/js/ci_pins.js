@@ -280,7 +280,6 @@
       badgeId: "ci-pinned-count",
       toolbarId: "ci-pinned-toolbar",
       features: {
-        insightEdit: true,
         sections: true,
         dragDrop: true
       }

@@ -291,7 +291,6 @@
       emptyStateId: "pinned-empty-state",
       badgeId: "pin-count-badge",
       features: {
-        insightEdit: true,
         sections: true,
         dragDrop: true
       }

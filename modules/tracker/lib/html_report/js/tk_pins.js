@@ -281,7 +281,6 @@
       badgeId: "pin-count-badge",
       toolbarId: "pinned-toolbar",
       features: {
-        insightEdit: true,
         sections: true,
         dragDrop: true
       }

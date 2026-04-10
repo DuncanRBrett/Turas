@@ -306,7 +306,6 @@
       emptyStateId: "cj-pinned-empty",
       badgeId: "cj-pinned-count",
       features: {
-        insightEdit: true,
         sections: true,
         dragDrop: true
       }

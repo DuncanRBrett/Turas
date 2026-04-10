@@ -181,51 +181,6 @@
     }
   };
 
-  // ── Insight Editing ────────────────────────────────────────────────────────
-
-  /** Toggle insight into edit mode (double-click on rendered view). */
-  ReportHub.toggleInsightEdit = function(pinId) {
-    var container = document.querySelector('.hub-pin-insight[data-pin-id="' + pinId + '"]');
-    if (!container) return;
-    var rendered = container.querySelector(".hub-insight-rendered");
-    var editor = container.querySelector(".hub-insight-editor");
-    if (!rendered || !editor) return;
-    rendered.style.display = "none";
-    editor.style.display = "";
-    editor.focus();
-  };
-
-  /** Finish insight editing: re-render markdown and save. */
-  ReportHub.finishInsightEdit = function(pinId) {
-    var container = document.querySelector('.hub-pin-insight[data-pin-id="' + pinId + '"]');
-    if (!container) return;
-    var rendered = container.querySelector(".hub-insight-rendered");
-    var editor = container.querySelector(".hub-insight-editor");
-    if (!rendered || !editor) return;
-    var md = editor.value.trim();
-    rendered.innerHTML = md ? TurasPins._renderMarkdown(md) : "";
-    rendered.style.display = "";
-    editor.style.display = "none";
-    for (var i = 0; i < ReportHub.pinnedItems.length; i++) {
-      if (ReportHub.pinnedItems[i].id === pinId) {
-        ReportHub.pinnedItems[i].insight = md;
-        break;
-      }
-    }
-    ReportHub.savePinnedData();
-  };
-
-  /** Sync a pin's insight text after editing (legacy compat). */
-  ReportHub.syncPinInsight = function(pinId, text) {
-    for (var i = 0; i < ReportHub.pinnedItems.length; i++) {
-      if (ReportHub.pinnedItems[i].id === pinId) {
-        ReportHub.pinnedItems[i].insight = text.trim();
-        ReportHub.savePinnedData();
-        break;
-      }
-    }
-  };
-
   /** Expose markdown renderer for hub slides. */
   ReportHub.renderMarkdown = TurasPins._renderMarkdown;
 

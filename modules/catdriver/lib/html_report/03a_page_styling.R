@@ -1033,15 +1033,7 @@ td.cd-td {
   margin-bottom: 10px;
 }
 
-.cd-pinned-insight-rendered { min-height: 1em; cursor: text; }
-.cd-pinned-insight-rendered:empty::before {
-  content: attr(data-placeholder); color: #94a3b8; font-style: italic;
-}
-.cd-pinned-insight-editor {
-  width: 100%; border: 1px solid #cbd5e1; border-radius: 4px;
-  padding: 8px 12px; font-size: 13px; font-family: inherit;
-  line-height: 1.5; resize: vertical; min-height: 60px;
-}
+.cd-pinned-insight-rendered { min-height: 1em; }
 
 .cd-pinned-card-chart {
   margin-top: 10px;

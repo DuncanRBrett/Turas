@@ -369,12 +369,7 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       border-radius: 0 6px 6px 0;
       font-size: 14px; line-height: 1.6; color: #1e293b;
     }
-    .pinned-insight-rendered { cursor: text; min-height: 20px; }
-    .pinned-insight-editor {
-      width: 100%; border: 1px solid #e2e8f0; border-radius: 4px;
-      padding: 8px 12px; font-size: 13px; font-family: inherit;
-      line-height: 1.5; resize: vertical; min-height: 60px;
-    }
+    .pinned-insight-rendered { min-height: 20px; }
     .pinned-card-chart { margin-bottom: 12px; }
     .pinned-card-chart svg { width: 100%; height: auto; }
     .pinned-card-table { overflow-x: auto; }

@@ -132,47 +132,6 @@ var PinBoard = (function() {
     persist();
   }
 
-  /**
-   * Toggle insight into edit mode.
-   * @param {string} pinId
-   */
-  function toggleInsightEdit(pinId) {
-    var container = document.querySelector('.pb-insight[data-pin-id="' + pinId + '"]');
-    if (!container) return;
-
-    var rendered = container.querySelector(".pb-insight-rendered");
-    var editor = container.querySelector(".pb-insight-editor");
-    if (!rendered || !editor) return;
-
-    rendered.style.display = "none";
-    editor.style.display = "";
-    editor.focus();
-  }
-
-  /**
-   * Finish insight editing: re-render markdown, save.
-   * @param {string} pinId
-   */
-  function finishInsightEdit(pinId) {
-    var container = document.querySelector('.pb-insight[data-pin-id="' + pinId + '"]');
-    if (!container) return;
-
-    var rendered = container.querySelector(".pb-insight-rendered");
-    var editor = container.querySelector(".pb-insight-editor");
-    if (!rendered || !editor) return;
-
-    var md = editor.value.trim();
-    rendered.innerHTML = md ? renderMarkdown(md) : "";
-    rendered.style.display = "";
-    editor.style.display = "none";
-
-    // Save markdown source
-    var idx = findIndex(pinId);
-    if (idx !== -1) {
-      items[idx].insight = md;
-      persist();
-    }
-  }
 
   // ===========================================================================
   // Hydration
@@ -315,33 +274,16 @@ var PinBoard = (function() {
       html += '<div class="pb-pin-subtitle">' + escapeHtml(subtitle) + '</div>';
     }
 
-    // Insight (markdown editable)
+    // Insight — read-only; add insights on the source report page before pinning
     var insightRaw = pin.insight || pin.insightText || "";
-    var renderedHtml = "";
-    var editorText = "";
     if (insightRaw) {
-      if (containsHtml(insightRaw)) {
-        renderedHtml = sanitizeHtml(insightRaw);
-        var tmp = document.createElement("div");
-        tmp.innerHTML = renderedHtml;
-        editorText = tmp.textContent.trim();
-      } else {
-        editorText = insightRaw;
-        renderedHtml = renderMarkdown(insightRaw);
-      }
+      var renderedHtml = containsHtml(insightRaw) ?
+        sanitizeHtml(insightRaw) :
+        renderMarkdown(insightRaw);
+      html += '<div class="pb-insight">' +
+        '<div class="pb-insight-rendered pb-md-content">' + renderedHtml + '</div>' +
+      '</div>';
     }
-
-    html += '<div class="pb-insight" data-pin-id="' + pid + '">' +
-      '<div class="pb-insight-rendered pb-md-content" ' +
-        'ondblclick="PinBoard.toggleInsightEdit(\'' + pid + '\')" ' +
-        'data-placeholder="Double-click to add insight...">' +
-        (renderedHtml || '') +
-      '</div>' +
-      '<textarea class="pb-insight-editor" style="display:none" ' +
-        'onblur="PinBoard.finishInsightEdit(\'' + pid + '\')">' +
-        escapeHtml(editorText) +
-      '</textarea>' +
-    '</div>';
 
     // Chart SVG — pinFlags takes precedence over legacy pinMode
     var showChart, showTable;
@@ -747,8 +689,6 @@ var PinBoard = (function() {
     removeItem: removeItem,
     moveItem: moveItem,
     updateSectionTitle: updateSectionTitle,
-    toggleInsightEdit: toggleInsightEdit,
-    finishInsightEdit: finishInsightEdit,
     hydrate: hydrate,
     render: render,
     getItems: getItems,

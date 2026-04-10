@@ -694,36 +694,6 @@ body {
   color: #1a2744;
   min-height: 20px;
   padding: 10px 16px;
-  cursor: text;
-}
-
-.hub-insight-rendered:empty::before {
-  content: attr(data-placeholder);
-  color: #94a3b8;
-  font-style: italic;
-  font-weight: 400;
-}
-
-.hub-insight-editor {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  font-family: var(--hub-font);
-  font-size: 14px;
-  line-height: 1.5;
-  color: #1a2744;
-  min-height: 80px;
-  outline: none;
-  padding: 16px 24px;
-  border: 1px dashed var(--hub-border);
-  border-radius: 0 8px 8px 0;
-  background: rgba(255, 255, 255, 0.5);
-  resize: vertical;
-}
-
-.hub-insight-editor:focus {
-  border-color: var(--hub-brand);
-  background: rgba(255, 255, 255, 0.8);
 }
 
 /* --- Hub Text Sections (Executive Summary, Background) --- */

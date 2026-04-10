@@ -308,7 +308,6 @@
       emptyStateId: "seg-pinned-empty",
       badgeId: "seg-pin-count-badge",
       features: {
-        insightEdit: true,
         sections: true,
         dragDrop: true
       }

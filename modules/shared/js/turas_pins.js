@@ -35,7 +35,7 @@
       features: {
         sections: !!f.sections, dragDrop: !!f.dragDrop,
         modePopover: !!f.modePopover, imageUpload: !!f.imageUpload,
-        insightEdit: f.insightEdit !== false, qualSlides: !!f.qualSlides
+        qualSlides: !!f.qualSlides
       }
     };
     _hubMode = !!(window.pinToHub);

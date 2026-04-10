@@ -1642,16 +1642,7 @@ body { font-size: 14px; -webkit-font-smoothing: antialiased; }
   cursor: pointer; font-size: 11px; padding: 2px 6px; color: #64748b;
 }
 .md-pinned-action-btn:hover { background: #f1f5f9; }
-/* Insight editing */
-.md-pinned-insight-rendered { min-height: 1em; cursor: text; }
-.md-pinned-insight-rendered:empty::before {
-  content: attr(data-placeholder); color: #94a3b8; font-style: italic;
-}
-.md-pinned-insight-editor {
-  width: 100%; border: 1px solid #cbd5e1; border-radius: 4px;
-  padding: 8px 12px; font-size: 13px; font-family: inherit;
-  line-height: 1.5; resize: vertical; min-height: 60px;
-}
+.md-pinned-insight-rendered { min-height: 1em; }
 
 /* Overflow menu */
 .pin-overflow-item:hover { background: #f1f5f9; }

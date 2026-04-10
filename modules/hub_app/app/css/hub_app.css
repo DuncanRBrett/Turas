@@ -1090,36 +1090,6 @@ body {
   min-height: 24px;
   padding: 4px 6px;
   border-radius: 4px;
-  cursor: text;
-}
-
-.pb-insight-rendered:empty::before {
-  content: attr(data-placeholder);
-  color: var(--ha-text-faint);
-  font-style: italic;
-}
-
-.pb-insight-rendered:hover {
-  background: #f8fafc;
-}
-
-.pb-insight-editor {
-  width: 100%;
-  min-height: 80px;
-  padding: 8px;
-  font-size: 12px;
-  font-family: var(--ha-font);
-  line-height: 1.6;
-  border: 1px solid var(--ha-brand);
-  border-radius: 4px;
-  resize: vertical;
-  color: var(--ha-text);
-  background: #fff;
-}
-
-.pb-insight-editor:focus {
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(50, 51, 103, 0.15);
 }
 
 /* --- Markdown content styles --- */

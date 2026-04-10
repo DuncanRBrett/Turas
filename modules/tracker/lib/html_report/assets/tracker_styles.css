@@ -502,8 +502,6 @@ body.hide-sparklines .tk-sparkline-wrap { display: none; }
 .pinned-card-png { max-width: 100%; height: auto; border-radius: 4px; }
 .pinned-card-insight { padding: 16px 24px; border-bottom: 1px solid var(--border); background: linear-gradient(135deg, #f0f5f5 0%, #f8fafa 100%); border-left: 4px solid var(--brand); font-size: 15px; font-weight: 600; color: #1a2744; line-height: 1.5; }
 .pinned-card-insight-area { padding: 0; border-bottom: 1px solid var(--border); background: linear-gradient(135deg, #f0f5f5 0%, #f8fafa 100%); border-left: 4px solid var(--brand); }
-.pinned-card-insight-editor { background: transparent; padding: 16px 24px; font-size: 15px; font-weight: 600; line-height: 1.5; border-radius: 0; border-left: none; min-height: 36px; outline: none; color: #1a2744; }
-.pinned-card-insight-editor:empty::before { content: attr(data-placeholder); color: #aab; font-style: italic; }
 .pinned-insight-toggle { padding: 4px 10px; border: 1px dashed #cbd5e1; border-radius: 4px; background: transparent; color: #94a3b8; font-size: 11px; cursor: pointer; width: 100%; text-align: left; font-family: inherit; }
 .pinned-insight-toggle:hover { border-color: var(--brand); color: var(--brand); }
 .pinned-card-meta { padding: 8px 20px; font-size: 11px; color: var(--text-muted); border-top: 1px solid #f0f0f0; }

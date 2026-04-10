@@ -277,7 +277,6 @@
       emptyStateId: "kd-pinned-empty",
       badgeId: "kd-pin-count-badge",
       features: {
-        insightEdit: true,
         sections: true,
         dragDrop: true
       }

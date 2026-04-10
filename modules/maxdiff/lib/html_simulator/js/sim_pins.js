@@ -196,7 +196,7 @@ var SimPins = (function() {
         containerId: "pins-container",
         emptyStateId: "sim-pins-empty",
         badgeId: "pin-badge",
-        features: { insightEdit: true, sections: false, dragDrop: false }
+        features: { sections: false, dragDrop: false }
       });
     } else if (_initRetries < 5) {
       _initRetries++;
