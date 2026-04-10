@@ -723,6 +723,11 @@ body.hide-sparklines .tk-sparkline-wrap { display: none; }
 .summary-collapse-header.collapsed .section-chevron { transform: rotate(-90deg); }
 .summary-collapse-body { transition: max-height 0.2s ease; }
 .summary-collapse-body.collapsed { display: none; }
+/* Collapse hint: visible only when the section is collapsed */
+.summary-collapse-hint { display: none; font-size: 11px; color: #94a3b8; font-style: italic; }
+.summary-collapse-header.collapsed .summary-collapse-hint { display: inline; }
+/* Significance matrix controls bar: description left, export button right */
+.tk-sig-matrix-controls { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 8px 0 12px; flex-wrap: wrap; }
 .sig-cards-collapsed .dash-sig-card:nth-child(n+7) { display: none; }
 .sig-show-more { display: inline-flex; align-items: center; gap: 4px; padding: 6px 14px; border: 1px dashed #cbd5e1; border-radius: 6px; background: transparent; color: #94a3b8; font-size: 12px; cursor: pointer; margin-top: 8px; font-family: inherit; }
 .sig-show-more:hover { border-color: var(--brand); color: var(--brand); }

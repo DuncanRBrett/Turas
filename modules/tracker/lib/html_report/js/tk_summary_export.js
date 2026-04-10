@@ -204,6 +204,86 @@
     downloadBlob(xml, filename, "application/vnd.ms-excel");
   };
 
+  // ── Significance Matrix Excel Export ─────────────────────────────────────
+
+  /**
+   * Export the Significance Matrix heatmap table as Excel XML.
+   * Reads tk-heatmap-table inside summary-section-heatmap.
+   * Colour-codes cells: green (up), red (down), grey (stable), blank (n/a).
+   */
+  window.exportSigMatrixExcel = function() {
+    var container = document.getElementById("summary-section-heatmap");
+    if (!container) return;
+    var table = container.querySelector(".tk-heatmap-table");
+    if (!table) return;
+
+    var xml = '<?xml version="1.0"?>\n<?mso-application progid="Excel.Sheet"?>\n';
+    xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"\n';
+    xml += ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">\n';
+    xml += '<Styles>\n';
+    xml += '<Style ss:ID="Default"><Font ss:FontName="Calibri" ss:Size="11"/></Style>\n';
+    xml += '<Style ss:ID="Title"><Font ss:FontName="Calibri" ss:Size="14" ss:Bold="1"/></Style>\n';
+    xml += '<Style ss:ID="Header"><Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1"/>' +
+      '<Interior ss:Color="#D9E2F3" ss:Pattern="Solid"/></Style>\n';
+    xml += '<Style ss:ID="TypeHdr"><Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1"' +
+      ' ss:Color="#475569"/><Interior ss:Color="#F8FAFC" ss:Pattern="Solid"/></Style>\n';
+    xml += '<Style ss:ID="Up"><Font ss:FontName="Calibri" ss:Size="11"/>' +
+      '<Interior ss:Color="#D4EDDA" ss:Pattern="Solid"/></Style>\n';
+    xml += '<Style ss:ID="Down"><Font ss:FontName="Calibri" ss:Size="11"/>' +
+      '<Interior ss:Color="#F8D7DA" ss:Pattern="Solid"/></Style>\n';
+    xml += '<Style ss:ID="Stable"><Font ss:FontName="Calibri" ss:Size="11" ss:Color="#888888"/>' +
+      '<Interior ss:Color="#F1F5F9" ss:Pattern="Solid"/></Style>\n';
+    xml += '</Styles>\n';
+
+    xml += '<Worksheet ss:Name="Significance Matrix">\n<Table>\n';
+    xml += '<Row><Cell ss:StyleID="Title"><Data ss:Type="String">' +
+      'Significance Matrix</Data></Cell></Row>\n';
+    xml += '<Row><Cell><Data ss:Type="String">Change direction vs previous wave. ' +
+      'Green = significant increase, Red = significant decrease, ' +
+      'Grey = no significant change.</Data></Cell></Row>\n';
+    xml += '<Row></Row>\n';
+
+    // Header row
+    var headerRow = table.querySelector("thead tr");
+    if (headerRow) {
+      xml += '<Row>\n';
+      headerRow.querySelectorAll("th").forEach(function(th) {
+        xml += '<Cell ss:StyleID="Header"><Data ss:Type="String">' +
+          xmlEscape(th.textContent.trim()) + '</Data></Cell>\n';
+      });
+      xml += '</Row>\n';
+    }
+
+    // Body rows
+    table.querySelectorAll("tbody tr").forEach(function(tr) {
+      // Type group header row
+      if (tr.classList.contains("tk-heatmap-type-header")) {
+        var label = tr.querySelector("td") ? tr.querySelector("td").textContent.trim() : "";
+        var nCols = headerRow ? headerRow.querySelectorAll("th").length : 2;
+        xml += '<Row><Cell ss:StyleID="TypeHdr" ss:MergeAcross="' + (nCols - 1) + '">' +
+          '<Data ss:Type="String">' + xmlEscape(label) + '</Data></Cell></Row>\n';
+        return;
+      }
+      // Metric data row
+      if (!tr.classList.contains("tk-heatmap-row")) return;
+      xml += '<Row>\n';
+      tr.querySelectorAll("td").forEach(function(td) {
+        var text = td.textContent.trim();
+        var style = "Default";
+        if (td.classList.contains("tk-heatmap-up"))     { style = "Up"; }
+        else if (td.classList.contains("tk-heatmap-down"))   { style = "Down"; }
+        else if (td.classList.contains("tk-heatmap-stable")) { style = "Stable"; }
+        else if (td.classList.contains("tk-heatmap-na"))     { text = ""; }
+        xml += '<Cell ss:StyleID="' + style + '"><Data ss:Type="String">' +
+          xmlEscape(text) + '</Data></Cell>\n';
+      });
+      xml += '</Row>\n';
+    });
+
+    xml += '</Table>\n</Worksheet>\n</Workbook>';
+    downloadBlob(xml, "significance_matrix.xls", "application/vnd.ms-excel");
+  };
+
   // ── Summary Table Slide Export ────────────────────────────────────────────
 
   /** Export summary metrics table as a slide PNG. */
