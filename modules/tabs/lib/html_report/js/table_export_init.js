@@ -1,28 +1,50 @@
 // Depends on: getLabelText() from core_navigation.js, sortChartBars() from table_export_init.js (self)
-// Extract table data as 2D array (shared by CSV and Excel export)
+// Extract table data as 2D array (shared by CSV and Excel export).
+// When counts are currently shown (show-freq toggle on), each data row that
+// has ct-freq annotations is followed immediately by a separate count row so
+// that % and n= values appear on different rows in the exported file.
 function extractTableData(qCode) {
   var activeContainer = document.querySelector(".question-container.active");
   if (!activeContainer) return null;
   var table = activeContainer.querySelector("table.ct-table");
   if (!table) return null;
 
+  // Respect the user's current show-freq toggle state.
+  var mainEl = document.getElementById("main-content");
+  var showCounts = !!(mainEl && mainEl.classList.contains("show-freq"));
+
   var data = [];
   var rows = table.querySelectorAll("tr");
   rows.forEach(function(row) {
     var cells = row.querySelectorAll("th, td");
     var rowData = [];
+    var countData = [];
+    var hasCount = false;
+
     cells.forEach(function(cell) {
       if (cell.style.display === "none") return;
       var clone = cell.cloneNode(true);
-      var freqs = clone.querySelectorAll(".ct-freq");
-      freqs.forEach(function(f) { f.remove(); });
-      var sigs = clone.querySelectorAll(".ct-sig");
-      sigs.forEach(function(s) { s.remove(); });
-      var btns = clone.querySelectorAll(".row-exclude-btn");
-      btns.forEach(function(b) { b.remove(); });
+
+      // Extract count annotation before stripping it.
+      var freqEl = clone.querySelector(".ct-freq");
+      if (freqEl && showCounts) {
+        countData.push(freqEl.textContent.trim());
+        hasCount = true;
+      } else {
+        countData.push("");
+      }
+      if (freqEl) freqEl.remove();
+
+      clone.querySelectorAll(".ct-sig").forEach(function(s) { s.remove(); });
+      clone.querySelectorAll(".row-exclude-btn").forEach(function(b) { b.remove(); });
       rowData.push(clone.textContent.trim());
     });
-    if (rowData.length > 0) data.push(rowData);
+
+    if (rowData.length > 0) {
+      data.push(rowData);
+      // Append count row immediately after its parent row when counts are visible.
+      if (hasCount) data.push(countData);
+    }
   });
   return data;
 }

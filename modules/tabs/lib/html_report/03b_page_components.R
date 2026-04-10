@@ -978,44 +978,7 @@ build_question_containers <- function(questions, tables, banner_groups,
               class = "export-menu-item",
               onclick = sprintf("exportCSV('%s')", js_esc(q_code)),
               "\u2B73 Export CSV"
-            ),
-            if (has_chart) {
-              htmltools::tags$button(
-                class = "export-menu-item export-chart-menu-item",
-                onclick = sprintf("exportChartPNG('%s')", js_esc(q_code)),
-                "\U0001F4CA Export Chart PNG"
-              )
-            },
-            if (has_chart) {
-              htmltools::tags$div(class = "export-menu-sep")
-            },
-            if (has_chart) {
-              htmltools::tags$div(
-                class = "export-menu-label",
-                "Slide Export"
-              )
-            },
-            if (has_chart) {
-              htmltools::tags$button(
-                class = "export-menu-item export-slide-menu-item",
-                onclick = sprintf("exportSlidePNG('%s','chart_table')", js_esc(q_code)),
-                "\U0001F4C4 Chart + Table"
-              )
-            },
-            if (has_chart) {
-              htmltools::tags$button(
-                class = "export-menu-item export-slide-menu-item",
-                onclick = sprintf("exportSlidePNG('%s','chart')", js_esc(q_code)),
-                "\U0001F4C4 Chart Only"
-              )
-            },
-            if (has_chart) {
-              htmltools::tags$button(
-                class = "export-menu-item export-slide-menu-item",
-                onclick = sprintf("exportSlidePNG('%s','table')", js_esc(q_code)),
-                "\U0001F4C4 Table Only"
-              )
-            }
+            )
           )
         )
       )

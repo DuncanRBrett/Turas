@@ -113,7 +113,10 @@
       tableTemp.querySelectorAll('[style*="display: none"], [style*="display:none"]')
         .forEach(function(el) { el.remove(); });
       tableTemp.querySelectorAll(".ct-row-excluded").forEach(function(el) { el.remove(); });
-      tableTemp.querySelectorAll(".ct-sort-indicator, .row-exclude-btn, .ct-freq")
+      // .ct-freq elements are NOT removed here: capturePortableHtml inlines computed
+      // display values, so hidden counts (show-freq toggle off) arrive with
+      // display:none and are removed by the filter above; visible counts are preserved.
+      tableTemp.querySelectorAll(".ct-sort-indicator, .row-exclude-btn")
         .forEach(function(el) { el.remove(); });
       tablePortableHtml = tableTemp.innerHTML;
     }
