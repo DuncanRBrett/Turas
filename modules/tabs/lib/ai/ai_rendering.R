@@ -113,6 +113,7 @@ build_ai_exec_summary <- function(exec_summary, ai_config) {
   <div class="ai-callout-header">
     <span class="ai-callout-icon" title="AI-assisted key findings">&#10022;</span>
     <span class="ai-callout-label">AI-assisted key findings</span>
+    <button class="ai-callout-pin" onclick="pinAiExecSummary()" title="Pin to Views">&#x1F4CC; Pin to Views</button>
     <button class="ai-callout-dismiss" onclick="dismissAiCallout(this)" title="Dismiss this summary">&times;</button>
   </div>
   <div class="ai-callout-body">%s</div>
@@ -262,6 +263,18 @@ build_ai_callout_css <- function() {
   color: #c9a84c;
   flex: 1;
 }
+.turas-ai-callout .ai-callout-pin {
+  background: none;
+  border: 1px solid var(--ct-border, #e2e4e8);
+  border-radius: var(--ct-radius-sm, 4px);
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--ct-text-tertiary, #8a8a9a);
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+.turas-ai-callout .ai-callout-pin:hover { border-color: #c9a84c; color: #c9a84c; }
 .turas-ai-callout .ai-callout-dismiss {
   background: none;
   border: 1px solid var(--ct-border, #e2e4e8);

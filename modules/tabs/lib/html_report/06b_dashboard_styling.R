@@ -223,18 +223,17 @@ build_dashboard_css <- function(brand_colour) {
       min-height: 40px; cursor: pointer;
     }
     .dash-md-rendered:empty::after {
-      content: "+";
-      display: flex;
+      content: "+ Add text";
+      display: inline-flex;
       align-items: center;
-      justify-content: center;
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
+      padding: 4px 12px;
+      border-radius: 20px;
       border: 1.5px dashed #cbd5e1;
-      color: #cbd5e1;
-      font-size: 14px;
+      color: #94a3b8;
+      font-size: 12px;
       font-weight: 400;
       font-style: normal;
+      cursor: pointer;
     }
     .dash-md-rendered h2 { font-size: 15px; font-weight: 600; margin: 10px 0 5px; color: #1e293b; }
     .dash-md-rendered p { margin: 5px 0; }
@@ -257,8 +256,16 @@ build_dashboard_css <- function(brand_colour) {
     }
     .dash-collapse-chevron { font-size: 12px; color: #94a3b8; margin-right: 4px; transition: transform 0.2s; }
     .dash-collapsed .dash-heatmap,
-    .dash-collapsed .dash-section-sub { display: none; }
+    .dash-collapsed .dash-section-sub,
+    .dash-collapsed .dash-heatmap-controls { display: none; }
     .dash-collapsed .dash-heatmap-header { margin-bottom: 0; }
+    .dash-collapse-hint { display: none; font-size: 12px; color: #94a3b8; margin-left: 6px; font-style: italic; }
+    .dash-collapsed .dash-collapse-hint { display: inline; }
+    .dash-heatmap-controls {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 8px; flex-wrap: wrap; gap: 8px;
+    }
+    .dash-heatmap-controls .dash-legend { margin-bottom: 0; flex: 1; }
     .dash-export-btn {
       display: inline-flex; align-items: center; gap: 6px;
       padding: 6px 14px; font-size: 12px; font-weight: 600;

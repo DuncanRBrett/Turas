@@ -49,9 +49,19 @@
       ".dash-callout-best{background:rgba(74,124,111,0.12);color:#4a7c6f;border:1px solid rgba(74,124,111,0.25)}" +
       ".dash-callout-worst{background:rgba(184,84,80,0.10);color:#b85450;border:1px solid rgba(184,84,80,0.25)}" +
       ".dash-section-title{font-size:14px;font-weight:600;color:#1e293b;margin-bottom:12px}" +
-      ".dash-sig-card{background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:12px 16px;margin-bottom:8px}" +
-      ".dash-sig-text{font-size:13px;color:#334155;line-height:1.5}" +
-      ".dash-sig-grid{display:flex;flex-wrap:wrap;gap:8px}";
+      ".dash-sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}" +
+      ".dash-sig-card{background:#fff;border-radius:8px;border:1px solid #e2e8f0;" +
+        "padding:12px 16px;border-left:3px solid #4a7c6f;position:relative}" +
+      ".dash-sig-badges{display:flex;gap:6px;margin-bottom:4px;flex-wrap:wrap}" +
+      ".dash-sig-metric-badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;" +
+        "background:rgba(26,39,68,0.06);color:#1a2744;letter-spacing:0.5px}" +
+      ".dash-sig-group-badge{font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;" +
+        "background:rgba(50,51,103,0.08);color:" + brand + "}" +
+      ".dash-sig-type-badge{font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;" +
+        "background:rgba(201,169,110,0.10);color:#96783a}" +
+      ".dash-sig-question{font-size:11px;color:#64748b;line-height:1.3;margin-bottom:4px;" +
+        "white-space:normal;word-wrap:break-word;overflow-wrap:break-word}" +
+      ".dash-sig-text{font-size:12px;color:#1e293b;line-height:1.4}";
     return '<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;"><style>' + css + '</style>' + html + '</div>';
   }
 
@@ -211,6 +221,35 @@
     }
     var emptyMsg = document.getElementById("sig-filter-empty");
     if (emptyMsg) emptyMsg.style.display = visibleCount === 0 ? "" : "none";
+  };
+
+  // ── AI Exec Summary Pin ──────────────────────────────────────────────────
+
+  /**
+   * Pin the AI-assisted key findings executive summary.
+   * Uses capturePortableHtml to inline computed styles for hub compatibility.
+   */
+  window.pinAiExecSummary = function() {
+    var callout = document.getElementById("ai-exec-summary");
+    if (!callout) return;
+
+    var clone = callout.cloneNode(true);
+    var html = TurasPins.capturePortableHtml(callout, clone);
+
+    // Strip interactive buttons from the captured HTML
+    var temp = document.createElement("div");
+    temp.innerHTML = html;
+    temp.querySelectorAll(".ai-callout-pin, .ai-callout-dismiss")
+      .forEach(function(b) { b.remove(); });
+
+    TurasPins.add({
+      pinType: "ai_exec_summary",
+      qCode: null,
+      qTitle: "AI-assisted key findings",
+      title: "AI-assisted key findings",
+      tableHtml: '<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;">' + temp.innerHTML + '</div>',
+      insightText: null, chartSvg: null, baseText: null
+    });
   };
 
   // ── Markdown Renderer ─────────────────────────────────────────────────────

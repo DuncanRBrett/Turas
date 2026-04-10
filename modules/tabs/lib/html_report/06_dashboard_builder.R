@@ -116,10 +116,8 @@ build_dashboard_panel <- function(dashboard_data, config_obj) {
   # Build components
   meta_strip <- build_metadata_strip(dashboard_data$metadata, brand_colour)
 
-  # Colour legend (uses actual thresholds + custom label from config)
-  colour_legend <- build_colour_legend(thresholds, config_obj)
-
   # Build per-section content: each metric type gets gauges + heatmap
+  # (colour legend is rendered inside each heatmap's controls row)
   section_blocks <- list()
 
   if (length(metric_sections) > 0) {
@@ -192,7 +190,6 @@ build_dashboard_panel <- function(dashboard_data, config_obj) {
     htmltools::tags$div(
       class = "dash-container",
       meta_strip,
-      colour_legend,
       dashboard_callout,
       build_dashboard_text_boxes(brand_colour, config_obj),
       section_blocks,
@@ -614,12 +611,6 @@ build_gauge_section <- function(metrics, brand_colour, section_label, thresholds
         htmltools::HTML("&#x1F4CC; Pin to Views")
       ),
       htmltools::tags$button(
-        class = "dash-export-btn dash-slide-export-btn",
-        style = "margin-left:6px;",
-        onclick = sprintf("exportDashboardSlide('%s')", section_id),
-        htmltools::HTML("&#x1F4F7; Export Slide")
-      ),
-      htmltools::tags$button(
         class = "dash-export-btn dash-sort-btn",
         style = "margin-left:6px;",
         onclick = sprintf("cycleSortGauges('%s')", section_id),
@@ -815,19 +806,19 @@ build_heatmap_grid <- function(metrics, banner_info, config_obj, thresholds,
   safe_id <- gsub("[^a-zA-Z0-9_-]", "-", section_id)
 
   # Build table HTML as string
+  # Header: chevron + title + collapse hint (hint shown only when collapsed via CSS)
   html <- sprintf(
-    '<div class="dash-section dash-collapsible"><div class="dash-heatmap-header" onclick="toggleDashSection(this)" style="cursor:pointer"><span class="dash-collapse-chevron">&#x25BC;</span> <div class="dash-section-title" style="display:inline">%s</div>',
+    '<div class="dash-section dash-collapsible"><div class="dash-heatmap-header" onclick="toggleDashSection(this)" style="cursor:pointer"><span class="dash-collapse-chevron">&#x25BC;</span> <div class="dash-section-title" style="display:inline">%s</div><span class="dash-collapse-hint"> &middot; click to view heatmap</span></div>',
     htmltools::htmlEscape(section_label)
   )
-  html <- paste0(html, sprintf(
-    '<button class="dash-export-btn" onclick="exportHeatmapExcel(\'%s\', \'%s\')">',
-    js_esc(safe_id), js_esc(section_label)
-  ))
-  html <- paste0(html, '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">')
-  html <- paste0(html, '<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/>')
-  html <- paste0(html, '<line x1="12" y1="15" x2="12" y2="3"/></svg> Export Excel</button>')
-  html <- paste0(html, '</div>')
   html <- paste0(html, '<div class="dash-section-sub">All metrics across all banner groups &middot; Colour indicates strength</div>')
+  # Controls above heatmap: colour legend + export button (collapses with section)
+  legend_html <- as.character(build_colour_legend(thresholds, config_obj))
+  export_btn_html <- sprintf(
+    '<button class="dash-export-btn" onclick="exportHeatmapExcel(\'%s\', \'%s\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Export Excel</button>',
+    js_esc(safe_id), js_esc(section_label)
+  )
+  html <- paste0(html, '<div class="dash-heatmap-controls">', legend_html, export_btn_html, '</div>')
   html <- paste0(html, sprintf('<div class="dash-heatmap"><table class="dash-hm-table" id="%s">', safe_id))
 
   # --- Header Row 1: group names ---
