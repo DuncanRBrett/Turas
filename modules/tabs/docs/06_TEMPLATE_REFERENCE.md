@@ -787,10 +787,11 @@ Net positive = percentage positive minus percentage negative.
 
 ### HTML Report Settings
 
-These settings control the interactive HTML report generated alongside the Excel output.
+These settings control the interactive HTML report generated alongside
+the Excel output.
 
 | Setting | Description | Values | Default |
-|---------|-------------|--------|---------|
+|----|----|----|----|
 | `html_report` | Generate an HTML report | Y / N | Y |
 | `brand_colour` | Primary brand colour (hex) | Any hex colour | #323367 |
 | `accent_colour` | Secondary accent colour (hex) | Any hex colour | #0d8a8a |
@@ -806,7 +807,7 @@ These settings control the interactive HTML report generated alongside the Excel
 ### Dashboard Settings
 
 | Setting | Description | Values | Default |
-|---------|-------------|--------|---------|
+|----|----|----|----|
 | `dashboard_green_net` | Green threshold for Net Positive gauges | Number (0-100) | 50 |
 | `dashboard_amber_net` | Amber threshold for Net Positive gauges | Number (0-100) | 30 |
 | `dashboard_green_mean` | Green threshold for Rating Mean gauges | Number | 4.0 |
@@ -819,14 +820,23 @@ These settings control the interactive HTML report generated alongside the Excel
 ### AI Insights
 
 | Setting | Description | Values | Default |
-|---------|-------------|--------|---------|
+|----|----|----|----|
 | `enable_ai_insights` | Enable AI-generated insight callouts in the HTML report | TRUE / FALSE | FALSE |
 
-When enabled, Turas generates AI-assisted observational callouts for each question using a large language model (default: Claude Sonnet 4 via Anthropic API). A JSON sidecar file is auto-created alongside your config Excel with default settings. Callouts are cached — re-runs with unchanged data make no API calls.
+When enabled, Turas generates AI-assisted observational callouts for
+each question using a large language model (default: Claude Sonnet 4 via
+Anthropic API). A JSON sidecar file is auto-created alongside your
+config Excel with default settings. Callouts are cached — re-runs with
+unchanged data make no API calls.
 
-**Requirements:** An API key must be set in the R environment (`ANTHROPIC_API_KEY` by default). The `ellmer` package must be installed.
+**Requirements:** An API key must be set in the R environment
+(`ANTHROPIC_API_KEY` by default). The `ellmer` package must be
+installed.
 
-**AI settings** (provider, model, temperature, verification, selectivity) are configured in the auto-generated JSON sidecar file (`{config_name}_ai_insights.json`). See the AI Insights User Guide for details.
+**AI settings** (provider, model, temperature, verification,
+selectivity) are configured in the auto-generated JSON sidecar file
+(`{config_name}_ai_insights.json`). See the AI Insights User Guide for
+details.
 
 ------------------------------------------------------------------------
 
@@ -1680,30 +1690,32 @@ If one bin ends at 34, the next should start at 35.
 
 ## AddedSlides Sheet
 
-The AddedSlides sheet allows you to pre-seed editorial slides that appear in the Added Slides tab of the HTML report.
+The AddedSlides sheet allows you to pre-seed editorial slides that
+appear in the Added Slides tab of the HTML report.
 
-| Column | Description | Required |
-|--------|-------------|----------|
-| `slide_id` | Unique identifier for the slide | Yes |
-| `title` | Slide heading displayed in the report | Yes |
-| `content` | Slide body text (supports Markdown formatting) | Yes |
-| `image_path` | Path to an image file to embed in the slide | No |
+| Column       | Description                                    | Required |
+|--------------|------------------------------------------------|----------|
+| `slide_id`   | Unique identifier for the slide                | Yes      |
+| `title`      | Slide heading displayed in the report          | Yes      |
+| `content`    | Slide body text (supports Markdown formatting) | Yes      |
+| `image_path` | Path to an image file to embed in the slide    | No       |
 
-**Notes:**
-- Image paths can be relative (to the config file location) or absolute
-- Supported image formats: PNG, JPG, GIF, SVG
-- Large images are automatically scaled to fit the slide area
-- Slides appear in the order listed in the sheet
+**Notes:** - Image paths can be relative (to the config file location)
+or absolute - Supported image formats: PNG, JPG, GIF, SVG - Large images
+are automatically scaled to fit the slide area - Slides appear in the
+order listed in the sheet
 
 ------------------------------------------------------------------------
 
 ## Comments Sheet
 
-The Comments sheet allows you to attach analyst commentary to specific questions in the HTML report.
+The Comments sheet allows you to attach analyst commentary to specific
+questions in the HTML report.
 
-| Column | Description | Required |
-|--------|-------------|----------|
-| `QuestionCode` | The question code to attach the comment to | Yes |
-| `Comment` | The commentary text (supports basic formatting) | Yes |
+| Column         | Description                                     | Required |
+|----------------|-------------------------------------------------|----------|
+| `QuestionCode` | The question code to attach the comment to      | Yes      |
+| `Comment`      | The commentary text (supports basic formatting) | Yes      |
 
-Comments appear as highlighted notes below the question table in the HTML report.
+Comments appear as highlighted notes below the question table in the
+HTML report.

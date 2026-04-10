@@ -115,7 +115,7 @@ field.
 #### File Paths & Output
 
 | Setting | Required | Default | Description |
-|-----------------|-----------------|-----------------|----------------------|
+|----|----|----|----|
 | `structure_file` | Yes | *(none)* | Path to your survey structure Excel file. Can be absolute or relative to the config file location. |
 | `output_subfolder` | No | `Crosstabs` | Folder name for output files. Created automatically if it does not exist. Relative to the config file directory. |
 | `output_filename` | No | `Crosstabs.xlsx` | Name of the Excel output file. The HTML report uses the same name with `.html` extension. |
@@ -124,7 +124,7 @@ field.
 #### Weighting
 
 | Setting | Required | Default | Description |
-|-----------------|-----------------|-----------------|----------------------|
+|----|----|----|----|
 | `apply_weighting` | No | `FALSE` | Set to `TRUE` or `Y` to apply survey weights. Weights adjust for sample bias so results better represent the population. |
 | `weight_variable` | When weighting | *(none)* | Column name in your data file containing the weight values (e.g., `Weight`). |
 | `show_unweighted_n` | No | `TRUE` | Show the actual (unweighted) number of respondents alongside weighted counts. Useful for transparency. |
@@ -134,7 +134,7 @@ field.
 #### Display & Formatting
 
 | Setting | Required | Default | Description |
-|-----------------|-----------------|-----------------|----------------------|
+|----|----|----|----|
 | `show_frequency` | No | `TRUE` | Show raw count (frequency) rows in tables. |
 | `show_percent_column` | No | `TRUE` | Show column percentage rows (percentage of each column's base). This is the most common display format for crosstabs. |
 | `show_percent_row` | No | `FALSE` | Show row percentage rows (percentage of each row's total across columns). |
@@ -148,7 +148,7 @@ Box categories combine multiple response options into summary rows
 (e.g., "Top 2 Box" combining "Agree" and "Strongly Agree").
 
 | Setting | Required | Default | Description |
-|-----------------|-----------------|-----------------|----------------------|
+|----|----|----|----|
 | `boxcategory_frequency` | No | `FALSE` | Show frequency counts for box category rows. |
 | `boxcategory_percent_column` | No | `TRUE` | Show column percentages for box category rows. |
 
@@ -158,7 +158,7 @@ Significance testing tells you whether differences between groups (e.g.,
 Male vs Female) are statistically meaningful or could be due to chance.
 
 | Setting | Required | Default | Description |
-|-----------------|-----------------|-----------------|----------------------|
+|----|----|----|----|
 | `enable_significance_testing` | No | `TRUE` | Enable pairwise significance testing between banner columns. Results appear as letter codes in cells. |
 | `alpha` | No | `0.05` | The p-value threshold. Lower values (e.g., `0.01`) require stronger evidence to declare significance. Common values: `0.01`, `0.05`, `0.10`. |
 | `significance_min_base` | No | `30` | Minimum sample size required in a column before significance testing is performed. Columns below this threshold are dimmed and show a warning. |
@@ -167,7 +167,7 @@ Male vs Female) are statistically meaningful or could be due to chance.
 #### Summary Statistics
 
 | Setting | Required | Default | Description |
-|-----------------|-----------------|-----------------|----------------------|
+|----|----|----|----|
 | `show_standard_deviation` | No | `FALSE` | Show standard deviation for numeric and scale questions. |
 | `show_net_positive` | No | `TRUE` | Show NET POSITIVE row for scale questions (percentage of positive responses minus negative). |
 | `create_index_summary` | No | `Y` | Create a summary sheet in Excel with index scores for all questions that have indices. |
@@ -175,7 +175,7 @@ Male vs Female) are statistically meaningful or could be due to chance.
 #### HTML Report Settings
 
 | Setting | Required | Default | Description |
-|-----------------|-----------------|-----------------|----------------------|
+|----|----|----|----|
 | `html_report` | No | `FALSE` | Set to `TRUE` to generate an interactive HTML report alongside the Excel output. |
 | `project_title` | No | `Crosstab Report` | Title displayed in the report header and browser tab. Use your project name (e.g., "Customer Experience Survey 2025"). |
 | `company_name` | No | `The Research Lamppost` | Your company name, displayed in the report footer. |
@@ -196,7 +196,7 @@ The dashboard is a summary page showing headline metrics with
 traffic-light colour coding.
 
 | Setting | Required | Default | Description |
-|-----------------|-----------------|-----------------|----------------------|
+|----|----|----|----|
 | `include_summary` | No | `TRUE` | Include the dashboard summary tab in the report. |
 | `dashboard_metrics` | No | `NET POSITIVE` | Comma-separated list of metrics to display. Options: `NET POSITIVE`, `NPS Score`, `Mean`, or any custom label matching a row label in your data (e.g., `Good or excellent`). |
 
@@ -207,7 +207,7 @@ These settings control when metrics appear green (good), amber
 appropriate to your industry and study context.
 
 | Setting | Default | Description |
-|---------------------|---------------------|------------------------------|
+|----|----|----|
 | `dashboard_scale_mean` | `10` | Maximum value on the mean scale (e.g., `10` for a 1-10 scale, `5` for a 1-5 scale). |
 | `dashboard_scale_index` | `5` | Maximum value on the index scale. |
 | `dashboard_green_net` | `60` | NET percentage at or above this value appears green. |
@@ -225,7 +225,7 @@ Descriptors add explanatory text beneath summary statistic rows, helping
 readers understand what the scales mean.
 
 | Setting | Default | Description |
-|---------------------|---------------------|------------------------------|
+|----|----|----|
 | `index_descriptor` | *(none)* | Text displayed below index rows, e.g., "Strongly disagree(1) = 1 to Strongly agree(5) = 5". |
 | `mean_descriptor` | *(none)* | Text displayed below mean rows, e.g., "1 = Very dissatisfied to 10 = Very satisfied". |
 | `nps_descriptor` | *(none)* | Text displayed below NPS rows, e.g., "0 = Not at all likely to 10 = Extremely likely". |
@@ -233,7 +233,7 @@ readers understand what the scales mean.
 #### Advanced Settings
 
 | Setting | Default | Description |
-|---------------------|---------------------|------------------------------|
+|----|----|----|
 | `priority_metric` | *(none)* | Comma-separated list of metric types to highlight in charts (e.g., "Mean, NPS, Index"). When set, charts display the metric value as a styled badge. |
 
 ### 3.2 Selection Sheet
@@ -242,7 +242,7 @@ The Selection sheet controls which questions are analysed and how they
 are used. Each row represents one question from your survey structure.
 
 | Column | Required | Default | Description |
-|-----------------|-----------------|-----------------|----------------------|
+|----|----|----|----|
 | `QuestionCode` | Yes | *(none)* | The unique question identifier, matching a code in your survey structure file. |
 | `Include` | No | `N` | Set to `Y` to include this question as a **stub** (row question) in the crosstab analysis. |
 | `UseBanner` | No | `N` | Set to `Y` to use this question as a **banner** (column break). Banner questions create the column groupings that stub questions are cross-tabulated against. |
@@ -278,7 +278,7 @@ The Comments sheet (optional) lets you pre-populate analyst comments
 that appear in the HTML report alongside each question.
 
 | Column | Required | Description |
-|-------------------|-----------------------|------------------------------|
+|----|----|----|
 | `QuestionCode` | Yes | The question code this comment applies to. |
 | `Banner` | No | If specified, the comment only appears when this banner group is active. Leave blank for a comment that appears for all banners. |
 | `Comment` | Yes | The comment text. Plain text only. |
@@ -369,7 +369,7 @@ least one column must remain visible
 Each table displays your crosstab results with the following row types:
 
 | Row Type | Appearance | What It Shows |
-|--------------------|------------------------|-----------------------------|
+|----|----|----|
 | **Base (n=)** | Light grey background, bold | Sample size for each column. This is how many respondents are in each group. |
 | **Category rows** | White background | Individual response options with their percentages (and optional frequencies). |
 | **NET rows** | Warm tan background, bold | Aggregated categories (e.g., "Top 2 Box" combining Agree + Strongly Agree). |
@@ -438,7 +438,7 @@ visualisation above or beside its table.
 **Chart types** are selected automatically based on the question type:
 
 | Question Type | Chart Style | Description |
-|------------------------|------------------------|------------------------|
+|----|----|----|
 | Likert, Rating, NPS | Stacked horizontal bar | Colour-coded segments showing the proportion in each response category. Colours are determined by the active palette preset (see below). |
 | Single response | Horizontal bar chart | Individual bars for each response option showing their percentages. |
 
@@ -463,7 +463,8 @@ NPS) use one of five palette presets, configured via
     teal
 -   **research**: muted purple, lavender, neutral grey, sage, forest
 -   **teal**: monochromatic teal gradient, light to dark
--   **red**: Coca-Cola-inspired muted red gradient, pale blush to deep burgundy
+-   **red**: Coca-Cola-inspired muted red gradient, pale blush to deep
+    burgundy
 -   **brand**: monochromatic gradient generated from your `brand_colour`
 
 DK/NA/Refused categories always use warm grey (`#d1cdc7`) regardless of
@@ -528,14 +529,14 @@ card to change the order - **Remove:** Click the remove button to unpin
 a question - **The pin icon** in the main view reflects the current pin
 state
 
-**Clipboard copy:** - Each pinned card has a clipboard copy button
-(the clipboard icon) that copies the card as a PNG image directly to
-your clipboard - You can then paste straight into PowerPoint, Google
-Slides, or any other application that accepts image paste - **Note:**
-Clipboard copy requires serving the report via HTTPS or localhost. When
-opening a saved HTML file directly (`file://` protocol), clipboard
-buttons are hidden automatically, and the Export PNG buttons remain
-available as a fallback.
+**Clipboard copy:** - Each pinned card has a clipboard copy button (the
+clipboard icon) that copies the card as a PNG image directly to your
+clipboard - You can then paste straight into PowerPoint, Google Slides,
+or any other application that accepts image paste - **Note:** Clipboard
+copy requires serving the report via HTTPS or localhost. When opening a
+saved HTML file directly (`file://` protocol), clipboard buttons are
+hidden automatically, and the Export PNG buttons remain available as a
+fallback.
 
 **Added Slides with images** that have been pinned export correctly to
 PNG, including any uploaded images embedded in the slide.
@@ -551,7 +552,7 @@ separate page. Select "Save as PDF" in the print dialog for a PDF file.
 The report offers several export options:
 
 | Export | Format | What It Contains | How to Access |
-|---------------|---------------|-----------------------|-------------------|
+|----|----|----|----|
 | **CSV** | `.csv` | Current question's table data (visible columns only) | "Export CSV" button on each question |
 | **Excel** | `.xls` | Current question's table with formatting | "Export Excel" button on each question |
 | **Chart PNG** | `.png` | Current chart as a high-resolution image | Chart export dropdown |
@@ -591,8 +592,8 @@ to a single crosstab question.
 
 **Creating a slide:** 1. Switch to the "Added Slides" tab 2. Click the
 "Add Slide" button 3. A new slide card appears with an editable title
-and content area 4. Double-click the content area to edit; click away
-to save
+and content area 4. Double-click the content area to edit; click away to
+save
 
 **Markdown support:** Slide content supports Markdown formatting:
 
@@ -617,10 +618,10 @@ Views deck - Pinned slides with images export correctly to PNG
 including an `AddedSlides` sheet in your configuration workbook. The
 sheet should have these columns:
 
-| Column | Description |
-|-----------------|------------------------------------------------------|
-| `slide_title` | Title displayed at the top of the slide card |
-| `content` | Slide body text (Markdown supported) |
+| Column          | Description                                         |
+|-----------------|-----------------------------------------------------|
+| `slide_title`   | Title displayed at the top of the slide card        |
+| `content`       | Slide body text (Markdown supported)                |
 | `display_order` | Numeric value controlling the order (lower = first) |
 
 **Persistence:** - Images uploaded in the browser are included when you
@@ -635,7 +636,7 @@ when reopened
 ### Supported Browsers
 
 | Browser | Support Level | Notes |
-|---------------------|----------------------------------|------------------|
+|----|----|----|
 | **Google Chrome** (v90+) | Full support | Recommended. Best performance for exports and printing. |
 | **Microsoft Edge** (v90+) | Full support | Chromium-based Edge works identically to Chrome. |
 | **Mozilla Firefox** (v90+) | Full support | Minor differences in print layout. SVG export may differ slightly. |
@@ -646,7 +647,7 @@ when reopened
 ### Operating System Notes
 
 | OS | Notes |
-|------------------------------------|------------------------------------|
+|----|----|
 | **Windows 10/11** | Full support across Chrome, Edge, and Firefox. Print to PDF works via Microsoft Print to PDF. |
 | **macOS** | Full support across Chrome, Safari, and Firefox. Print to PDF is built into the system print dialog. |
 | **Linux** | Supported via Chrome and Firefox. Print to PDF available in most distributions. |
