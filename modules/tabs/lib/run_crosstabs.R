@@ -122,6 +122,7 @@ check_dependencies()
 
 TOTAL_COLUMN <- "Total"
 SIG_ROW_TYPE <- "Sig."
+SIG2_ROW_TYPE <- "Sig.2"   # Secondary significance level row (dual-alpha feature, V10.10)
 BASE_ROW_LABEL <- "Base (n=)"
 UNWEIGHTED_BASE_LABEL <- "Base (unweighted)"
 WEIGHTED_BASE_LABEL <- "Base (weighted)"
@@ -280,63 +281,77 @@ run_significance_tests_for_row <- function(row_data, row_type, banner_structure,
 
 #' Add significance row
 #'
+#' Computes pairwise significance letters for a data row and returns one or
+#' two sig rows (data frames). When \code{alpha_secondary} is non-NULL a
+#' second row with \code{RowType = "Sig.2"} is appended for the dual-alpha
+#' HTML toggle feature (V10.10).
+#'
 #' @param test_data List, test data by column
 #' @param banner_info List, banner structure
 #' @param row_type Character, test type
 #' @param internal_columns Character vector
-#' @param alpha Numeric, p-value threshold
+#' @param alpha Numeric, primary p-value threshold
 #' @param bonferroni_correction Logical
 #' @param min_base Integer
 #' @param is_weighted Logical
-#' @return Data frame with sig row or NULL
+#' @param alpha_secondary Numeric or NULL. When non-NULL, a secondary sig row
+#'   is calculated and appended. Default NULL (feature disabled).
+#' @return Data frame with one sig row (primary only) or two rows (primary +
+#'   secondary), or NULL if fewer than two columns in test_data.
 #' @export
 add_significance_row <- function(test_data, banner_info, row_type, internal_columns,
                                  alpha = DEFAULT_ALPHA,
                                  bonferroni_correction = TRUE,
                                  min_base = DEFAULT_MIN_BASE,
-                                 is_weighted = FALSE) {
+                                 is_weighted = FALSE,
+                                 alpha_secondary = NULL) {
   if (is.null(test_data) || length(test_data) < 2) return(NULL)
 
-  sig_values <- setNames(rep("", length(internal_columns)), internal_columns)
+  # Build a single sig row using the given alpha value
+  build_sig_row_for_alpha <- function(alpha_val, row_type_label, row_label_val) {
+    sig_values <- setNames(rep("", length(internal_columns)), internal_columns)
 
-  total_key <- paste0("TOTAL::", TOTAL_COLUMN)
-  if (total_key %in% names(sig_values)) {
-    sig_values[total_key] <- "-"
-  }
+    total_key <- paste0("TOTAL::", TOTAL_COLUMN)
+    if (total_key %in% names(sig_values)) sig_values[total_key] <- "-"
 
-  for (banner_code in names(banner_info$banner_info)) {
-    banner_cols <- banner_info$banner_info[[banner_code]]$internal_keys
-    banner_test_data <- test_data[names(test_data) %in% banner_cols]
+    for (banner_code in names(banner_info$banner_info)) {
+      banner_cols <- banner_info$banner_info[[banner_code]]$internal_keys
+      banner_test_data <- test_data[names(test_data) %in% banner_cols]
 
-    if (length(banner_test_data) > 1) {
-      banner_structure <- list(
-        column_names = names(banner_test_data),
-        letters = banner_info$banner_info[[banner_code]]$letters
-      )
-
-      sig_results <- run_significance_tests_for_row(
-        banner_test_data, row_type, banner_structure,
-        alpha, bonferroni_correction, min_base,
-        is_weighted = is_weighted
-      )
-
-      for (col_key in names(sig_results)) {
-        sig_values[col_key] <- sig_results[[col_key]]
+      if (length(banner_test_data) > 1) {
+        banner_structure <- list(
+          column_names = names(banner_test_data),
+          letters = banner_info$banner_info[[banner_code]]$letters
+        )
+        sig_results <- run_significance_tests_for_row(
+          banner_test_data, row_type, banner_structure,
+          alpha_val, bonferroni_correction, min_base,
+          is_weighted = is_weighted
+        )
+        for (col_key in names(sig_results)) sig_values[col_key] <- sig_results[[col_key]]
       }
     }
+
+    row <- data.frame(RowLabel = row_label_val, RowType = row_type_label,
+                      stringsAsFactors = FALSE)
+    for (col_key in internal_columns) row[[col_key]] <- sig_values[col_key]
+    row
   }
 
-  sig_row <- data.frame(
-    RowLabel = "",
-    RowType = SIG_ROW_TYPE,
-    stringsAsFactors = FALSE
-  )
+  # When dual-alpha is active, label rows with the confidence level so Excel
+  # output is self-documenting. When single-alpha, blank label preserves the
+  # existing format exactly (backward compatible).
+  dual_mode <- !is.null(alpha_secondary)
 
-  for (col_key in internal_columns) {
-    sig_row[[col_key]] <- sig_values[col_key]
-  }
+  primary_label <- if (dual_mode) alpha_to_confidence_label(alpha) else ""
+  primary_row <- build_sig_row_for_alpha(alpha, SIG_ROW_TYPE, primary_label)
 
-  return(sig_row)
+  if (!dual_mode) return(primary_row)
+
+  secondary_label <- alpha_to_confidence_label(alpha_secondary)
+  secondary_row <- build_sig_row_for_alpha(alpha_secondary, SIG2_ROW_TYPE, secondary_label)
+
+  rbind(primary_row, secondary_row)
 }
 
 

@@ -213,7 +213,8 @@ process_standard_question <- function(data, question_info, question_options,
         alpha = config$alpha,
         config$bonferroni_correction,
         config$significance_min_base,
-        is_weighted = is_weighted
+        is_weighted = is_weighted,
+        alpha_secondary = config$alpha_secondary
       )
       
       if (!is.null(sig_row)) {
@@ -300,7 +301,8 @@ create_boxcategory_column_percent <- function(category, row_counts, banner_bases
       alpha = config$alpha,
       config$bonferroni_correction,
       config$significance_min_base,
-      is_weighted = is_weighted
+      is_weighted = is_weighted,
+      alpha_secondary = config$alpha_secondary
     )
 
     if (!is.null(sig_row)) {
@@ -554,7 +556,8 @@ add_summary_significance_row <- function(stat_value_sets, stat_weight_sets,
     alpha = config$alpha,
     config$bonferroni_correction,
     config$significance_min_base,
-    is_weighted = is_weighted
+    is_weighted = is_weighted,
+    alpha_secondary = config$alpha_secondary
   )
 
   return(sig_row)

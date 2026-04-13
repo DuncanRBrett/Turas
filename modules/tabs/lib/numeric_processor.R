@@ -315,7 +315,8 @@ process_numeric_question <- function(data, question_info, question_options,
       alpha = config$alpha,
       config$bonferroni_correction,
       config$significance_min_base,
-      is_weighted = is_weighted
+      is_weighted = is_weighted,
+      alpha_secondary = config$alpha_secondary
     )
     
     if (!is.null(sig_row)) {
