@@ -140,6 +140,16 @@ resolve_path <- function(base_path, relative_path) {
   # Trim whitespace (Excel cells can have invisible leading/trailing spaces)
   relative_path <- trimws(relative_path)
 
+  # Normalize Windows backslashes to forward slashes (cross-platform: config
+  # files edited on Windows use \ but Docker/Linux requires /)
+  # A leading \ is Windows root-relative (e.g. \Data\file.xlsx) — strip it so
+  # the path is treated as relative to the project root, not to the Linux root.
+  windows_root_relative <- grepl("^\\\\", relative_path)
+  relative_path <- gsub("\\\\", "/", relative_path)
+  if (windows_root_relative) {
+    relative_path <- sub("^/", "", relative_path)
+  }
+
   # Remove leading ./
   relative_path <- gsub("^\\./", "", relative_path)
 
