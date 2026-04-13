@@ -585,6 +585,7 @@ var originalRowOrder = {}; // {tableId: [row elements]}
 | `switchBannerGroup(groupCode, btn)` | Switch active banner: saves insights, shows/hides columns, rebuilds charts |
 | `toggleHeatmap()` | Toggle `data-heatmap` background colours on all cells |
 | `toggleFrequencies()` | Toggle `.show-freq` class on main container |
+| `toggleSigLevel(level, btn)` | Switch significance badges: adds/removes `.show-sig-secondary` on `#main-content`; syncs `aria-pressed` and `.sig-btn-active` on the segmented button |
 | `toggleInsight(qCode)` | Show/hide insight editor for a question |
 | `getInsightStore(area)` | Parse JSON from hidden textarea for insight area |
 | `setInsightStore(area, obj)` | Serialise object to hidden textarea |
@@ -964,7 +965,11 @@ ct-row-excluded   → row excluded from chart
 ct-td             → data cell
 ct-label-col      → label column (sticky left)
 ct-data-col       → data column header
-ct-sig            → significance badge
+ct-sig                → primary significance badge (always present when sig testing enabled)
+ct-sig ct-sig-secondary → secondary significance badge (hidden by default; shown when #main-content has .show-sig-secondary)
+sig-level-switcher    → segmented toggle container (dual-alpha feature; absent when alpha_secondary not configured)
+sig-btn               → individual level button within the switcher
+sig-btn-active        → active/selected state for a sig-btn
 ct-low-base-dim   → dimmed low-base cell
 ct-heatmap-cell   → cell with heatmap background
 ct-sort-indicator → sort direction arrow

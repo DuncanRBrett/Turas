@@ -391,6 +391,15 @@ is assigned a letter (A, B, C, etc.) shown in the column header -
 Example: If the "Male" column shows "B" on a row, it means Males are
 significantly higher than Females (column B) on that measure
 
+**Dual significance level toggle:** - When `alpha_secondary` is configured,
+a segmented button (e.g., "95% | 90%") appears in the controls bar -
+Click either button to switch which significance level's badges are shown -
+The active level is highlighted; the inactive level's badges are hidden -
+This lets you compare findings at two pre-configured confidence levels
+without re-running the analysis - The report opens at whichever level is
+set by `alpha_default` in the config (default: primary) - When printing,
+the primary level is always used and the toggle button is hidden
+
 **Low base warnings:** - Columns with fewer respondents than the minimum
 base threshold appear dimmed - A warning icon appears in the base row -
 Results for these columns should be interpreted with caution

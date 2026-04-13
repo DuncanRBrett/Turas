@@ -247,6 +247,33 @@ significance threshold to account for multiple comparisons.
 If enabled, Tabs divides the alpha level by the number of comparisons
 being made. This is more conservative but reduces false positives.
 
+### Dual Significance Levels (V10.10)
+
+When subgroup bases are small, findings that fall short of 95% confidence
+may still be analytically meaningful at 90%. The optional dual significance
+level feature lets you specify a second alpha value so that both levels are
+calculated in a single run.
+
+**Config settings:**
+
+| Setting | Required | Default | Description |
+|---|---|---|---|
+| `alpha_secondary` | No | *(blank — feature off)* | Second significance level (e.g. `0.10` for 90% confidence). Must differ from `alpha`. Leave blank to disable. |
+| `alpha_default` | No | `primary` | Which level the HTML report opens on: `primary` or `secondary`. |
+
+**Outputs when enabled:**
+
+-   **Excel:** Two sig rows appear — e.g. "Sig. (95%)" and "Sig. (90%)" — so
+    both levels are visible simultaneously in the crosstab workbook.
+-   **HTML report:** A segmented button ("95% | 90%") appears in the controls
+    bar. Clicking switches which significance badges are shown. When
+    printing, only the primary level is shown.
+
+**When to use:** When you have a pre-agreed secondary threshold for
+subgroup analysis — typically when presenting to clients who want to see
+"directional" differences alongside confirmed differences. The level
+should be set before analysis, not chosen after seeing the data.
+
 ------------------------------------------------------------------------
 
 ## Weighting Concepts

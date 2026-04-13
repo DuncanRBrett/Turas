@@ -745,7 +745,7 @@ Phase 4 refactoring extracted orchestration into focused submodules:
    - Structure validators: questions, options, duplicates
    - Data validators: columns, types, multi-mention
    - Weight validators: column, values, DEFF
-   - Config validators: alpha, min_base, paths
+   - Config validators: alpha, alpha_secondary, alpha_default, min_base, paths
    - Pre-flight validators: cross-reference config ↔ structure ↔ data
 
 3. DATA LOADING

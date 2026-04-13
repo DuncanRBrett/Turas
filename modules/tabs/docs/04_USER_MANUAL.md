@@ -176,6 +176,8 @@ Essential settings to configure:
 | show_percent_column | TRUE to show percentages |
 | enable_significance_testing | TRUE to test significance |
 | alpha | Significance level (typically 0.05 for 95% confidence) |
+| alpha_secondary | Optional second significance level for HTML report toggle (e.g. 0.10 for 90%). Leave blank to disable. |
+| alpha_default | Which level the HTML report opens on: `primary` (default) or `secondary`. Only used when alpha_secondary is set. |
 
 See the [Template Reference](06_TEMPLATE_REFERENCE.md) for all available
 settings.
@@ -412,6 +414,40 @@ significantly higher than the value in column C (Female).
 If a cell has no letter, it's not significantly different from any other
 column.
 
+### Dual Significance Levels (HTML Report Toggle)
+
+When working with smaller subgroups, a finding that doesn't reach 95%
+confidence may still be worth flagging at 90%. The optional dual
+significance level feature lets you set a second alpha value in your
+config. The HTML report then shows a segmented button ("95% / 90%") in
+the controls bar, allowing you to switch between the two levels without
+re-running the analysis.
+
+**To enable:**
+
+Set `alpha_secondary` and optionally `alpha_default` in your Settings sheet:
+
+```
+alpha            = 0.05    # primary level (required — existing setting)
+alpha_secondary  = 0.10    # second level (optional — leave blank to disable)
+alpha_default    = primary # which level the report opens on (primary or secondary)
+```
+
+**How it works:**
+
+-   The Excel output gains a second sig row labelled "Sig. (95%)" and
+    "Sig. (90%)" (or whatever confidence levels you configured).
+-   The HTML report shows both sets of badges embedded in each cell. The
+    controls bar gains a segmented button to switch which set is visible.
+-   When printing, the primary level is always used. The toggle button
+    is hidden in print view.
+
+**Note:** This feature is designed for situations where subgroup bases are
+small and 90% confidence is a meaningful analytical threshold. It is not
+intended for exploring which level happens to produce significant results.
+The significance level should be decided before analysis, not after seeing
+the data.
+
 ------------------------------------------------------------------------
 
 ## Working with the HTML Report
@@ -612,7 +648,7 @@ includes:
 
 -   **Summary dashboard** with gauge charts and heatmap grids
 -   **Interactive crosstab tables** with heatmap colouring and
-    significance badges
+    significance badges, with an optional dual significance level toggle
 -   **Inline SVG charts** (stacked bars for ordinal, horizontal bars for
     nominal)
 -   **Pinned views** for saving and annotating key findings
