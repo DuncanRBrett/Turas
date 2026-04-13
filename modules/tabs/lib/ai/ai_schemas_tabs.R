@@ -59,24 +59,24 @@ exec_patterns_schema <- ellmer::type_object(
   "Structured identification of key patterns across all questions",
 
   strongest_measures = ellmer::type_array(
-    "The 3-4 measures with the highest positive scores",
-    items = ellmer::type_object(
-      "A single strong measure",
-      q_code      = ellmer::type_string("Question code"),
-      measure     = ellmer::type_string("Measure name"),
-      score       = ellmer::type_string("Score value"),
-      why_notable = ellmer::type_string("Why this is notable")
+    "The 3-4 measures with the highest positive scores. Each entry must
+     be a self-contained string in the format:
+     '{q_code}: {measure} — {score} ({why notable})'
+     Example: 'Q3: Brand Trust — 72% (highest score across all measures,
+     significantly above Q7 Satisfaction at 54%)'",
+    items = ellmer::type_string(
+      "One strong measure: '{q_code}: {measure} — {score} ({why notable})'"
     )
   ),
 
   weakest_measures = ellmer::type_array(
-    "The 3-4 measures with the lowest or most concerning scores",
-    items = ellmer::type_object(
-      "A single weak measure",
-      q_code      = ellmer::type_string("Question code"),
-      measure     = ellmer::type_string("Measure name"),
-      score       = ellmer::type_string("Score value"),
-      why_notable = ellmer::type_string("Why this is concerning")
+    "The 3-4 measures with the lowest or most concerning scores. Each
+     entry must be a self-contained string in the format:
+     '{q_code}: {measure} — {score} ({why concerning})'
+     Example: 'Q9: Delivery Speed — 31% good/excellent (lowest score,
+     significantly below category average)'",
+    items = ellmer::type_string(
+      "One weak measure: '{q_code}: {measure} — {score} ({why concerning})'"
     )
   ),
 

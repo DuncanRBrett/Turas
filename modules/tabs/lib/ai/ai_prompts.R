@@ -148,8 +148,13 @@ AI_SELECTIVITY_USER_PROMPT_TEMPLATE <- paste0(
 
 
 AI_EXEC_PATTERNS_USER_PROMPT_TEMPLATE <- paste0(
-  "For each field in your response, cite specific question codes ",
-  "and numbers from the data.\n\n",
+  "Identify the key patterns across all questions.\n\n",
+
+  "For strongest_measures and weakest_measures, write each entry as a ",
+  "single descriptive string including the question code, measure name, ",
+  "score, and why it is notable or concerning. ",
+  "Example: 'Q3: Brand Trust -- 72% (significantly above Q7 Satisfaction ",
+  "at 54%; strongest result across the study)'.\n\n",
 
   "STUDY CONTEXT:\n{study_context_json}\n\n",
   "ALL QUESTION DATA:\n{all_questions_json}"
