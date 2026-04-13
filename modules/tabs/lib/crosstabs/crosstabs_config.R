@@ -99,6 +99,7 @@ load_crosstabs_settings <- function(config_file, project_root) {
 
   # Get structure file path
   structure_file <- get_config_value(config, "structure_file", required = TRUE)
+  structure_file <- normalize_path_separators(structure_file)
   structure_file_path <- resolve_path(project_root, structure_file)
 
   # Validate structure file exists

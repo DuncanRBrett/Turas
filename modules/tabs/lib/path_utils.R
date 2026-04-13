@@ -96,6 +96,24 @@ tabs_source <- function(..., local = FALSE) {
 # PROJECT PATH HANDLING
 # ==============================================================================
 
+#' Normalize path separators for cross-platform compatibility
+#'
+#' Converts Windows backslashes to forward slashes and strips a leading
+#' backslash (Windows root-relative paths like \Data\file.xlsx) so paths
+#' entered on Windows work correctly on Linux/Docker.
+#'
+#' @param path Character, file path (may contain backslashes)
+#' @return Character, path with forward slashes only
+#' @export
+normalize_path_separators <- function(path) {
+  if (is.null(path) || is.na(path) || path == "") return(path)
+  # If path starts with \ it is Windows root-relative — treat as relative
+  leading_backslash <- grepl("^\\\\", path)
+  path <- gsub("\\\\", "/", path)
+  if (leading_backslash) path <- sub("^/", "", path)
+  path
+}
+
 #' Resolve relative path from base path
 #'
 #' USAGE: Convert relative paths to absolute for file operations

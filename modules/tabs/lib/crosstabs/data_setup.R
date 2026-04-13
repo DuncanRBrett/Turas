@@ -131,6 +131,7 @@ load_and_validate_data <- function(survey_structure, project_root) {
 
   # Get data file path from project sheet
   data_file <- get_config_value(survey_structure$project, "data_file", required = TRUE)
+  data_file <- normalize_path_separators(data_file)
   data_file_path <- resolve_path(project_root, data_file)
 
   # Validate file exists
