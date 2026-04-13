@@ -191,6 +191,32 @@ function toggleHeatmap(enabled) {
   });
 }
 
+// Significance level toggle (dual-alpha feature, V10.10)
+// Switches #main-content between primary and secondary sig badge display.
+// Called by the segmented button in the controls bar.
+function toggleSigLevel(level, clickedBtn) {
+  var main = document.getElementById("main-content");
+  if (!main) return;
+
+  if (level === "secondary") {
+    main.classList.add("show-sig-secondary");
+  } else {
+    main.classList.remove("show-sig-secondary");
+  }
+
+  // Update aria-pressed and active class on both buttons in the same group
+  if (clickedBtn) {
+    var group = clickedBtn.closest(".sig-level-switcher");
+    if (group) {
+      group.querySelectorAll(".sig-btn").forEach(function(btn) {
+        var isActive = btn === clickedBtn;
+        btn.setAttribute("aria-pressed", isActive ? "true" : "false");
+        btn.classList.toggle("sig-btn-active", isActive);
+      });
+    }
+  }
+}
+
 // Frequency toggle
 function toggleFrequency(enabled) {
   var main = document.getElementById("main-content");
@@ -865,5 +891,27 @@ function toggleDashEdit(boxId) {
       if (content) content.classList.add("edited");
     }
   }, true);
+})();
+
+// ---- Dual significance level: apply configured default on page load (V10.10) ----
+// Reads data-sig-default from #main-content. If "secondary", activates the
+// secondary level immediately so the report opens at the configured default.
+(function() {
+  var main = document.getElementById("main-content");
+  if (!main) return;
+  var sigDefault = main.getAttribute("data-sig-default");
+  if (sigDefault === "secondary") {
+    main.classList.add("show-sig-secondary");
+    // Sync button states to match the loaded default
+    var group = document.querySelector(".sig-level-switcher");
+    if (group) {
+      group.querySelectorAll(".sig-btn").forEach(function(btn) {
+        var isSecondary = btn.getAttribute("onclick") &&
+                          btn.getAttribute("onclick").indexOf("'secondary'") !== -1;
+        btn.setAttribute("aria-pressed", isSecondary ? "true" : "false");
+        btn.classList.toggle("sig-btn-active", isSecondary);
+      });
+    }
+  }
 })();
 

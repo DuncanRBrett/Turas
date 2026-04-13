@@ -605,6 +605,53 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       letter-spacing: 0.3px;
     }
 
+    /* --- Secondary significance badges (dual-alpha feature, V10.10) --- */
+    /* Hidden by default; shown when #main-content has .show-sig-secondary class */
+    .ct-sig-secondary { display: none; }
+
+    /* When secondary level is active: hide primary badges, show secondary */
+    #main-content.show-sig-secondary .ct-sig:not(.ct-sig-secondary) { display: none; }
+    #main-content.show-sig-secondary .ct-sig-secondary { display: inline-block; }
+
+    /* --- Significance level segmented toggle button (V10.10) --- */
+    .sig-level-switcher {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-left: 8px;
+    }
+    .sig-level-label {
+      font-size: 11px;
+      color: #64748b;
+      white-space: nowrap;
+    }
+    .sig-btn {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 9px;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+      color: #475569;
+      cursor: pointer;
+      border-radius: 0;
+      line-height: 1.4;
+      transition: background 0.1s, color 0.1s;
+    }
+    .sig-btn:first-of-type { border-radius: 4px 0 0 4px; }
+    .sig-btn:last-of-type  { border-radius: 0 4px 4px 0; border-left: none; }
+    .sig-btn-active {
+      background: #323367;
+      color: #fff;
+      border-color: #323367;
+    }
+    .sig-btn:hover:not(.sig-btn-active) { background: #e2e8f0; }
+    .sig-btn:focus-visible {
+      outline: 2px solid #323367;
+      outline-offset: 2px;
+      z-index: 1;
+      position: relative;
+    }
+
     /* --- Frequency annotations --- */
     .ct-freq {
       display: none;
@@ -1087,6 +1134,11 @@ build_print_css <- function() {
       .print-cols-dense .ct-freq { font-size: 9px !important; }
 
       /* === SIG BADGES (simplified for print) === */
+      /* In print, always show primary badges; hide toggle UI */
+      .ct-sig-secondary { display: none !important; }
+      #main-content.show-sig-secondary .ct-sig:not(.ct-sig-secondary) { display: inline-block !important; }
+      .sig-level-switcher { display: none !important; }
+
       .ct-sig {
         font-size: 9px !important;
         background: none !important;

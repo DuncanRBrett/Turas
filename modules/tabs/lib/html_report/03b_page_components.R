@@ -638,9 +638,22 @@ build_banner_tabs <- function(banner_groups, brand_colour = "#323367") {
 #' @param has_any_pct Logical
 #' @param has_any_sig Logical
 #' @param brand_colour Character
-#' @return htmltools::div
+#' @param has_charts Logical
+#' @param has_any_sig2 Logical. TRUE when a secondary significance level is
+#'   configured and at least one question has secondary sig data. Default FALSE.
+#' @param sig_primary_label Character or NULL. Label for the primary level button
+#'   (e.g. "95%"). Only used when has_any_sig2 is TRUE.
+#' @param sig_secondary_label Character or NULL. Label for the secondary level
+#'   button (e.g. "90%"). Only used when has_any_sig2 is TRUE.
+#' @param sig_default_level Character. "primary" or "secondary". Controls which
+#'   button is active on load. Default "primary".
+#' @return htmltools::tagList
 build_controls <- function(has_any_freq, has_any_pct, has_any_sig,
-                           brand_colour = "#323367", has_charts = FALSE) {
+                           brand_colour = "#323367", has_charts = FALSE,
+                           has_any_sig2 = FALSE,
+                           sig_primary_label = NULL,
+                           sig_secondary_label = NULL,
+                           sig_default_level = "primary") {
 
   # All controls as inline pill toggles
   toggles <- list()
@@ -681,11 +694,61 @@ build_controls <- function(has_any_freq, has_any_pct, has_any_sig,
     ))
   }
 
+  # Dual significance level segmented button (V10.10)
+  # Only rendered when a secondary alpha level is configured.
+  if (isTRUE(has_any_sig2) && !is.null(sig_primary_label) && !is.null(sig_secondary_label)) {
+    toggles <- c(toggles, list(build_sig_level_toggle(
+      sig_primary_label, sig_secondary_label, sig_default_level
+    )))
+  }
+
   htmltools::tagList(
     htmltools::tags$div(
       class = "controls-bar",
       htmltools::tags$div(style = "flex:1"),
       toggles
+    )
+  )
+}
+
+
+#' Build Significance Level Segmented Toggle
+#'
+#' Creates a two-button segmented control for switching between primary and
+#' secondary significance levels in the HTML report. Only rendered when dual
+#' significance levels are configured.
+#'
+#' Accessibility: uses role="group" with aria-label, and aria-pressed on each
+#' button to communicate the active state to screen readers.
+#'
+#' @param primary_label Character. Display label for the primary alpha level (e.g. "95%").
+#' @param secondary_label Character. Display label for the secondary alpha level (e.g. "90%").
+#' @param default_level Character. "primary" or "secondary". Sets the initially active button.
+#' @return htmltools::tags$div containing the segmented control
+#' @keywords internal
+build_sig_level_toggle <- function(primary_label, secondary_label,
+                                   default_level = "primary") {
+  primary_active <- isTRUE(tolower(trimws(default_level)) == "primary")
+
+  htmltools::tags$div(
+    class = "sig-level-switcher",
+    role = "group",
+    `aria-label` = "Significance level",
+    htmltools::tags$span(
+      class = "sig-level-label",
+      "Sig. level:"
+    ),
+    htmltools::tags$button(
+      class = if (primary_active) "sig-btn sig-btn-active" else "sig-btn",
+      `aria-pressed` = if (primary_active) "true" else "false",
+      onclick = "toggleSigLevel('primary', this)",
+      htmltools::htmlEscape(primary_label)
+    ),
+    htmltools::tags$button(
+      class = if (!primary_active) "sig-btn sig-btn-active" else "sig-btn",
+      `aria-pressed` = if (!primary_active) "true" else "false",
+      onclick = "toggleSigLevel('secondary', this)",
+      htmltools::htmlEscape(secondary_label)
     )
   )
 }

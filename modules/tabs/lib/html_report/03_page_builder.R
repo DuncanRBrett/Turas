@@ -67,16 +67,42 @@ build_html_page <- function(html_data, tables, config_obj,
   has_any_freq <- any(sapply(html_data$questions, function(q) q$stats$has_freq))
   has_any_pct <- any(sapply(html_data$questions, function(q) q$stats$has_col_pct || q$stats$has_row_pct))
 
+  # Dual significance level toggle (V10.10): derive labels from configured alphas
+  has_any_sig2 <- any(sapply(html_data$questions, function(q) isTRUE(q$stats$has_sig2)))
+  sig_primary_label <- if (has_any_sig2) {
+    alpha_to_confidence_label(config_obj$alpha %||% 0.05)
+  } else {
+    NULL
+  }
+  sig_secondary_label <- if (has_any_sig2) {
+    alpha_to_confidence_label(config_obj$alpha_secondary)
+  } else {
+    NULL
+  }
+  sig_default_level <- if (has_any_sig2) {
+    tolower(trimws(config_obj$alpha_default %||% "primary"))
+  } else {
+    "primary"
+  }
+
   # Build crosstab content (always needed)
+  # data-sig-default tells JS which alpha level to activate on page load
+  sig_default_attr <- if (has_any_sig2) sig_default_level else NULL
+
   crosstab_content <- htmltools::tags$div(
     class = "main-layout",
     id = "main-content",
+    `data-sig-default` = sig_default_attr,
     build_sidebar(html_data$questions, has_any_sig, brand_colour),
     htmltools::tags$div(
       class = "content-area",
       build_banner_tabs(html_data$banner_groups, brand_colour),
       build_controls(has_any_freq, has_any_pct, has_any_sig, brand_colour,
-                     has_charts = length(charts) > 0),
+                     has_charts = length(charts) > 0,
+                     has_any_sig2 = has_any_sig2,
+                     sig_primary_label = sig_primary_label,
+                     sig_secondary_label = sig_secondary_label,
+                     sig_default_level = sig_default_level),
       build_question_containers(html_data$questions, tables, html_data$banner_groups,
                                 config_obj, charts = charts,
                                 ai_insights = ai_insights),
