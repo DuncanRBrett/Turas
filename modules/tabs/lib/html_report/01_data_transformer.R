@@ -97,6 +97,7 @@ detect_available_stats <- function(question_table) {
     has_col_pct = "Column %" %in% row_types,
     has_row_pct = "Row %" %in% row_types,
     has_sig = "Sig." %in% row_types,
+    has_sig2 = "Sig.2" %in% row_types,   # Secondary sig level (dual-alpha feature, V10.10)
     has_mean = "Average" %in% row_types,
     has_index = "Index" %in% row_types,
     has_score = "Score" %in% row_types,
@@ -385,6 +386,21 @@ transform_single_question <- function(q_result, banner_info, config_obj) {
         sig_col <- paste0(".sig_", key)
         row[[sig_col]] <- if (nrow(sig_rows) > 0) {
           val <- sig_rows[1, key]
+          if (is.na(val) || val == "" || val == "-") "" else as.character(val)
+        } else {
+          ""
+        }
+      }
+    }
+
+    # Get secondary significance values (dual-alpha feature, V10.10)
+    if (stats$has_sig2) {
+      sig2_rows <- table[!is.na(table$RowLabel) & !is.na(table$RowType) &
+                         table$RowLabel == lbl & table$RowType == "Sig.2", , drop = FALSE]
+      for (key in available_keys) {
+        sig2_col <- paste0(".sig2_", key)
+        row[[sig2_col]] <- if (nrow(sig2_rows) > 0) {
+          val <- sig2_rows[1, key]
           if (is.na(val) || val == "" || val == "-") "" else as.character(val)
         } else {
           ""
