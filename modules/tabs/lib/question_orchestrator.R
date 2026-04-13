@@ -556,6 +556,7 @@ process_all_questions <- function(questions_to_process, survey_data,
 
   all_results <- list()
   processed_questions <- processed_so_far
+  n_initial_processed <- length(processed_so_far)   # Captured once; does not grow with the loop
   skipped_questions <- list()  # TRS v1.0: Track skipped questions for PARTIAL status
   partial_questions <- list()  # TRS v1.0: Track questions with missing sections
   processing_start <- Sys.time()
@@ -571,8 +572,9 @@ process_all_questions <- function(questions_to_process, survey_data,
   for (q_idx in seq_len(nrow(questions_to_process))) {
     current_question_code <- questions_to_process$QuestionCode[q_idx]
 
-    # Progress logging
-    total_processed <- length(processed_questions) + q_idx
+    # Progress logging — use the initial count (not the growing processed_questions
+    # vector) so that (processed/total) shows correctly rather than ~doubling.
+    total_processed <- n_initial_processed + q_idx
     if (!is.null(progress_callback)) {
       progress_callback(total_processed, total_question_count,
                        current_question_code, processing_start)

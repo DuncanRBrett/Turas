@@ -388,8 +388,9 @@ write_question_table_fast <- function(wb, sheet, data_table, banner_info,
     if (internal_key %in% names(data_table)) {
       col_data <- data_table[[internal_key]]
 
-      if (any(type_col == SIG_ROW_TYPE)) {
-        sig_indices <- which(type_col == SIG_ROW_TYPE)
+      sig_row_types <- c(SIG_ROW_TYPE, SIG2_ROW_TYPE)
+      if (any(type_col %in% sig_row_types)) {
+        sig_indices <- which(type_col %in% sig_row_types)
         for (sig_idx in sig_indices) {
           sig_val <- col_data[sig_idx]
 

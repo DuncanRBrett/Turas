@@ -246,14 +246,22 @@ transform_single_question <- function(q_result, banner_info, config_obj) {
   # Forward-fill RowLabel: the source data only sets RowLabel on the first
   # RowType for each item (typically Frequency), leaving Column %, Sig., etc.
   # with empty labels. Propagate each non-empty label downward.
+  #
+  # Sig rows (RowType "Sig." / "Sig.2") are excluded from setting last_label
+  # because in dual-alpha mode they carry a confidence label ("Sig. (95%)")
+  # rather than the option label. They must inherit the option label like any
+  # other sub-row, so the matcher can pair them with their parent option.
+  sig_row_types_ff <- c("Sig.", "Sig.2")
   last_label <- ""
   for (i in seq_len(nrow(table))) {
-    if (!is.na(table$RowLabel[i]) && nzchar(table$RowLabel[i])) {
+    if (!is.na(table$RowLabel[i]) && nzchar(table$RowLabel[i]) &&
+        !table$RowType[i] %in% sig_row_types_ff) {
       last_label <- table$RowLabel[i]
     } else {
       table$RowLabel[i] <- last_label
     }
   }
+  rm(sig_row_types_ff)
 
   # Forward-fill RowSource: same logic as RowLabel — sub-rows (Column %, Sig.)
 
