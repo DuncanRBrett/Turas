@@ -1322,56 +1322,70 @@ run_net_difference_tests <- function(test_data, banner_info, internal_keys,
                                     alpha = 0.05,
                                     bonferroni_correction = TRUE,
                                     min_base = 30,
-                                    is_weighted = FALSE) {
+                                    is_weighted = FALSE,
+                                    alpha2 = NULL) {
   # Validation
   if (is.null(test_data) || length(test_data) < 2) return(NULL)
   if (is.null(banner_info) || is.null(internal_keys)) return(NULL)
-  
+
   # Calculate number of comparisons for Bonferroni
   num_comparisons <- choose(length(test_data), 2)
   if (num_comparisons == 0) return(NULL)
-  
+
   alpha_adj <- alpha
   if (bonferroni_correction && num_comparisons > 0) {
     alpha_adj <- alpha / num_comparisons
   }
-  
-  # Initialize results for both nets
-  net1_sig <- setNames(rep("", length(internal_keys)), internal_keys)
-  net2_sig <- setNames(rep("", length(internal_keys)), internal_keys)
-  
+
+  # Dual-alpha: secondary threshold, same Bonferroni divisor (V10.10).
+  dual <- !is.null(alpha2)
+  alpha2_adj <- if (dual) {
+    if (bonferroni_correction && num_comparisons > 0) alpha2 / num_comparisons else alpha2
+  } else NULL
+
+  # Initialize results for both nets (primary; secondary only when dual)
+  net1_sig  <- setNames(rep("", length(internal_keys)), internal_keys)
+  net2_sig  <- setNames(rep("", length(internal_keys)), internal_keys)
+  net1_sig2 <- if (dual) setNames(rep("", length(internal_keys)), internal_keys) else NULL
+  net2_sig2 <- if (dual) setNames(rep("", length(internal_keys)), internal_keys) else NULL
+
   # Total column gets "-"
   total_key <- paste0("TOTAL::", "Total")
   if (total_key %in% names(net1_sig)) {
-    net1_sig[total_key] <- "-"
-    net2_sig[total_key] <- "-"
+    net1_sig[total_key]  <- "-"
+    net2_sig[total_key]  <- "-"
+    if (dual) { net1_sig2[total_key] <- "-"; net2_sig2[total_key] <- "-" }
   }
-  
+
   # Test each banner question separately
   for (banner_code in names(banner_info$banner_info)) {
-    banner_cols <- banner_info$banner_info[[banner_code]]$internal_keys
+    banner_cols   <- banner_info$banner_info[[banner_code]]$internal_keys
     banner_letters <- banner_info$banner_info[[banner_code]]$letters
-    
+
     # Test each column against others in same banner
     for (i in seq_along(banner_cols)) {
-      col_i <- banner_cols[i]
+      col_i  <- banner_cols[i]
       data_i <- test_data[[col_i]]
-      
+
       if (is.null(data_i)) next
-      
-      higher_than_letters <- character(0)
-      higher_than_letters_net2 <- character(0)
-      
+
+      higher1 <- character(0); higher2 <- character(0)
+      higher1_2 <- if (dual) character(0) else NULL
+      higher2_2 <- if (dual) character(0) else NULL
+
       for (j in seq_along(banner_cols)) {
         if (i == j) next
-        
-        col_j <- banner_cols[j]
+
+        col_j  <- banner_cols[j]
         data_j <- test_data[[col_j]]
-        
+
         if (is.null(data_j)) next
-        
-        # Test net1: col_i vs col_j
-        test_result_net1 <- weighted_z_test_proportions(
+
+        letter <- banner_letters[j]
+        has_letter <- length(letter) > 0 && letter != "-"
+
+        # Test net1: col_i vs col_j — p_value computed once, used for both thresholds
+        r1 <- weighted_z_test_proportions(
           data_i$count1, data_i$base,
           data_j$count1, data_j$base,
           data_i$eff_n, data_j$eff_n,
@@ -1379,16 +1393,13 @@ run_net_difference_tests <- function(test_data, banner_info, internal_keys,
           min_base = min_base,
           alpha = alpha_adj
         )
-        
-        if (test_result_net1$significant && test_result_net1$higher) {
-          letter <- banner_letters[j]
-          if (length(letter) > 0 && letter != "-") {
-            higher_than_letters <- c(higher_than_letters, letter)
-          }
-        }
-        
+        if (r1$significant && r1$higher && has_letter)
+          higher1 <- c(higher1, letter)
+        if (dual && r1$higher && has_letter && !is.na(r1$p_value) && r1$p_value < alpha2_adj)
+          higher1_2 <- c(higher1_2, letter)
+
         # Test net2: col_i vs col_j
-        test_result_net2 <- weighted_z_test_proportions(
+        r2 <- weighted_z_test_proportions(
           data_i$count2, data_i$base,
           data_j$count2, data_j$base,
           data_i$eff_n, data_j$eff_n,
@@ -1396,25 +1407,27 @@ run_net_difference_tests <- function(test_data, banner_info, internal_keys,
           min_base = min_base,
           alpha = alpha_adj
         )
-        
-        if (test_result_net2$significant && test_result_net2$higher) {
-          letter <- banner_letters[j]
-          if (length(letter) > 0 && letter != "-") {
-            higher_than_letters_net2 <- c(higher_than_letters_net2, letter)
-          }
-        }
+        if (r2$significant && r2$higher && has_letter)
+          higher2 <- c(higher2, letter)
+        if (dual && r2$higher && has_letter && !is.na(r2$p_value) && r2$p_value < alpha2_adj)
+          higher2_2 <- c(higher2_2, letter)
       }
-      
+
       # Store results
-      net1_sig[col_i] <- paste(higher_than_letters, collapse = "")
-      net2_sig[col_i] <- paste(higher_than_letters_net2, collapse = "")
+      net1_sig[col_i] <- paste(higher1, collapse = "")
+      net2_sig[col_i] <- paste(higher2, collapse = "")
+      if (dual) {
+        net1_sig2[col_i] <- paste(higher1_2, collapse = "")
+        net2_sig2[col_i] <- paste(higher2_2, collapse = "")
+      }
     }
   }
-  
-  return(list(
-    net1 = net1_sig,
-    net2 = net2_sig
-  ))
+
+  if (dual) {
+    return(list(net1 = net1_sig, net2 = net2_sig,
+                net1_2 = net1_sig2, net2_2 = net2_sig2))
+  }
+  return(list(net1 = net1_sig, net2 = net2_sig))
 }
 
 # ==============================================================================

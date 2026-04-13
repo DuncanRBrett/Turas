@@ -204,7 +204,8 @@ run_significance_tests_for_row <- function(row_data, row_type, banner_structure,
                                            alpha = DEFAULT_ALPHA,
                                            bonferroni_correction = TRUE,
                                            min_base = DEFAULT_MIN_BASE,
-                                           is_weighted = FALSE) {
+                                           is_weighted = FALSE,
+                                           alpha2 = NULL) {
   if (is.null(row_data) || length(row_data) == 0) return(list())
   if (is.null(banner_structure) || is.null(banner_structure$letters)) return(list())
 
@@ -233,11 +234,22 @@ run_significance_tests_for_row <- function(row_data, row_type, banner_structure,
     alpha_adj <- alpha / num_comparisons
   }
 
-  sig_results <- list()
+  # Dual-alpha: pre-compute secondary threshold once (V10.10).
+  # When alpha2 is provided we re-use the p_value from the single test call
+  # rather than running every test twice. This keeps dual-alpha performance
+  # identical to single-alpha performance.
+  dual <- !is.null(alpha2)
+  alpha2_adj <- if (dual) {
+    if (bonferroni_correction && num_comparisons > 0) alpha2 / num_comparisons else alpha2
+  } else NULL
+
+  sig_results  <- list()
+  sig_results2 <- if (dual) list() else NULL
   column_names <- names(row_data)
 
   for (i in seq_along(row_data)) {
-    higher_than <- character(0)
+    higher_than  <- character(0)
+    higher_than2 <- if (dual) character(0) else NULL
 
     for (j in seq_along(row_data)) {
       if (i == j) next
@@ -262,6 +274,7 @@ run_significance_tests_for_row <- function(row_data, row_type, banner_structure,
         list(significant = FALSE, p_value = NA_real_, higher = FALSE)
       }
 
+      # Primary significance decision (uses pre-compared $significant from test)
       if (test_result$significant && test_result$higher) {
         col_letter <- banner_structure$letters[
           banner_structure$column_names == column_names[j]
@@ -270,11 +283,25 @@ run_significance_tests_for_row <- function(row_data, row_type, banner_structure,
           higher_than <- c(higher_than, col_letter)
         }
       }
+
+      # Secondary significance: re-use p_value, compare against alpha2_adj.
+      # No second test call needed — the expensive computation is already done.
+      if (dual && test_result$higher && !is.na(test_result$p_value) &&
+          test_result$p_value < alpha2_adj) {
+        col_letter <- banner_structure$letters[
+          banner_structure$column_names == column_names[j]
+        ]
+        if (length(col_letter) > 0) {
+          higher_than2 <- c(higher_than2, col_letter)
+        }
+      }
     }
 
     sig_results[[column_names[i]]] <- paste(higher_than, collapse = "")
+    if (dual) sig_results2[[column_names[i]]] <- paste(higher_than2, collapse = "")
   }
 
+  if (dual) return(list(primary = sig_results, secondary = sig_results2))
   return(sig_results)
 }
 
@@ -307,49 +334,65 @@ add_significance_row <- function(test_data, banner_info, row_type, internal_colu
                                  alpha_secondary = NULL) {
   if (is.null(test_data) || length(test_data) < 2) return(NULL)
 
-  # Build a single sig row using the given alpha value
-  build_sig_row_for_alpha <- function(alpha_val, row_type_label, row_label_val) {
-    sig_values <- setNames(rep("", length(internal_columns)), internal_columns)
-
-    total_key <- paste0("TOTAL::", TOTAL_COLUMN)
-    if (total_key %in% names(sig_values)) sig_values[total_key] <- "-"
-
-    for (banner_code in names(banner_info$banner_info)) {
-      banner_cols <- banner_info$banner_info[[banner_code]]$internal_keys
-      banner_test_data <- test_data[names(test_data) %in% banner_cols]
-
-      if (length(banner_test_data) > 1) {
-        banner_structure <- list(
-          column_names = names(banner_test_data),
-          letters = banner_info$banner_info[[banner_code]]$letters
-        )
-        sig_results <- run_significance_tests_for_row(
-          banner_test_data, row_type, banner_structure,
-          alpha_val, bonferroni_correction, min_base,
-          is_weighted = is_weighted
-        )
-        for (col_key in names(sig_results)) sig_values[col_key] <- sig_results[[col_key]]
-      }
-    }
-
-    row <- data.frame(RowLabel = row_label_val, RowType = row_type_label,
-                      stringsAsFactors = FALSE)
-    for (col_key in internal_columns) row[[col_key]] <- sig_values[col_key]
-    row
-  }
-
   # When dual-alpha is active, label rows with the confidence level so Excel
   # output is self-documenting. When single-alpha, blank label preserves the
   # existing format exactly (backward compatible).
   dual_mode <- !is.null(alpha_secondary)
 
-  primary_label <- if (dual_mode) alpha_to_confidence_label(alpha) else ""
-  primary_row <- build_sig_row_for_alpha(alpha, SIG_ROW_TYPE, primary_label)
+  primary_label   <- if (dual_mode) alpha_to_confidence_label(alpha) else ""
+  secondary_label <- if (dual_mode) alpha_to_confidence_label(alpha_secondary) else NULL
+
+  # Initialise sig value vectors for primary (and optionally secondary).
+  total_key  <- paste0("TOTAL::", TOTAL_COLUMN)
+  sig_values  <- setNames(rep("", length(internal_columns)), internal_columns)
+  sig_values2 <- if (dual_mode) setNames(rep("", length(internal_columns)), internal_columns) else NULL
+
+  if (total_key %in% names(sig_values)) {
+    sig_values[total_key]  <- "-"
+    if (dual_mode) sig_values2[total_key] <- "-"
+  }
+
+  for (banner_code in names(banner_info$banner_info)) {
+    banner_cols      <- banner_info$banner_info[[banner_code]]$internal_keys
+    banner_test_data <- test_data[names(test_data) %in% banner_cols]
+
+    if (length(banner_test_data) > 1) {
+      banner_structure <- list(
+        column_names = names(banner_test_data),
+        letters      = banner_info$banner_info[[banner_code]]$letters
+      )
+      # Single call: p-values computed once; both alpha thresholds applied
+      # inside run_significance_tests_for_row when alpha2 is provided.
+      sig_results <- run_significance_tests_for_row(
+        banner_test_data, row_type, banner_structure,
+        alpha, bonferroni_correction, min_base,
+        is_weighted = is_weighted,
+        alpha2 = alpha_secondary
+      )
+
+      if (dual_mode) {
+        # dual path: sig_results is list(primary=..., secondary=...)
+        for (col_key in names(sig_results$primary))
+          sig_values[col_key]  <- sig_results$primary[[col_key]]
+        for (col_key in names(sig_results$secondary))
+          sig_values2[col_key] <- sig_results$secondary[[col_key]]
+      } else {
+        for (col_key in names(sig_results)) sig_values[col_key] <- sig_results[[col_key]]
+      }
+    }
+  }
+
+  # Assemble primary row
+  primary_row <- data.frame(RowLabel = primary_label, RowType = SIG_ROW_TYPE,
+                             stringsAsFactors = FALSE)
+  for (col_key in internal_columns) primary_row[[col_key]] <- sig_values[col_key]
 
   if (!dual_mode) return(primary_row)
 
-  secondary_label <- alpha_to_confidence_label(alpha_secondary)
-  secondary_row <- build_sig_row_for_alpha(alpha_secondary, SIG2_ROW_TYPE, secondary_label)
+  # Assemble secondary row and combine
+  secondary_row <- data.frame(RowLabel = secondary_label, RowType = SIG2_ROW_TYPE,
+                               stringsAsFactors = FALSE)
+  for (col_key in internal_columns) secondary_row[[col_key]] <- sig_values2[col_key]
 
   rbind(primary_row, secondary_row)
 }

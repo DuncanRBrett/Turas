@@ -809,57 +809,47 @@ add_net_significance_rows <- function(existing_table, data, question_info,
     banner_bases, internal_keys
   )
 
-  # Run primary significance tests
+  dual_mode     <- !is.null(config$alpha_secondary)
+  primary_label <- if (dual_mode) alpha_to_confidence_label(config$alpha) else ""
+
+  # Single call: p-values computed once; secondary threshold applied inside
+  # run_net_difference_tests when alpha2 is provided (V10.10 performance fix).
   net_sig_results <- run_net_difference_tests(
     net_test_data, banner_info, internal_keys,
     alpha = config$alpha,
     config$bonferroni_correction,
     config$significance_min_base,
-    is_weighted = is_weighted
+    is_weighted = is_weighted,
+    alpha2 = config$alpha_secondary
   )
 
   if (is.null(net_sig_results)) {
     return(existing_table)
   }
 
-  dual_mode <- !is.null(config$alpha_secondary)
-
-  primary_label <- if (dual_mode) alpha_to_confidence_label(config$alpha) else ""
-
-  # Build sig rows for net1 and net2 (primary; possibly rbind'd with secondary)
-  make_net_sig_rows <- function(net_results_primary, net_results_secondary) {
-    r1 <- build_net_sig_row(net_results_primary, internal_keys,
+  # Build the 1- or 2-row sig block for a given net slot
+  make_net_sig_rows <- function(primary_results, secondary_results) {
+    r1 <- build_net_sig_row(primary_results, internal_keys,
                             row_type = "Sig.", row_label = primary_label)
-    if (!dual_mode || is.null(net_results_secondary)) return(r1)
-    r2 <- build_net_sig_row(net_results_secondary, internal_keys,
+    if (!dual_mode || is.null(secondary_results)) return(r1)
+    r2 <- build_net_sig_row(secondary_results, internal_keys,
                             row_type = "Sig.2",
                             row_label = alpha_to_confidence_label(config$alpha_secondary))
     rbind(r1, r2)
   }
 
-  # Secondary tests (dual-alpha feature, V10.10)
-  net_sig_results2 <- if (dual_mode) {
-    run_net_difference_tests(
-      net_test_data, banner_info, internal_keys,
-      alpha = config$alpha_secondary,
-      config$bonferroni_correction,
-      config$significance_min_base,
-      is_weighted = is_weighted
-    )
-  } else NULL
-
   # Insert sig rows (one or two rows) after each net's "Column %" row
   existing_table <- insert_net_sig_row(
     existing_table, box_categories[1],
     make_net_sig_rows(net_sig_results$net1,
-                      if (!is.null(net_sig_results2)) net_sig_results2$net1 else NULL),
+                      if (dual_mode) net_sig_results$net1_2 else NULL),
     internal_keys
   )
 
   existing_table <- insert_net_sig_row(
     existing_table, box_categories[2],
     make_net_sig_rows(net_sig_results$net2,
-                      if (!is.null(net_sig_results2)) net_sig_results2$net2 else NULL),
+                      if (dual_mode) net_sig_results$net2_2 else NULL),
     internal_keys
   )
 
@@ -1004,50 +994,37 @@ add_net_positive_significance <- function(row_counts_top, row_counts_bottom,
     }
   }
 
-  # Run net difference tests
+  dual_mode <- !is.null(config$alpha_secondary)
+
+  # Single call: p-values computed once; secondary threshold applied inside
+  # run_net_difference_tests when alpha2 is provided (V10.10 performance fix).
   net_sig_results <- run_net_difference_tests(
     test_data, banner_info, internal_keys,
     alpha = config$alpha,
     config$bonferroni_correction,
     config$significance_min_base,
-    is_weighted = is_weighted
+    is_weighted = is_weighted,
+    alpha2 = config$alpha_secondary
   )
 
   if (is.null(net_sig_results)) return(NULL)
-
-  dual_mode <- !is.null(config$alpha_secondary)
 
   sig_row <- data.frame(
     RowLabel = if (dual_mode) alpha_to_confidence_label(config$alpha) else "",
     RowType = "Sig.",
     stringsAsFactors = FALSE
   )
-  for (key in internal_keys) {
-    sig_row[[key]] <- net_sig_results$net1[[key]]
-  }
+  for (key in internal_keys) sig_row[[key]] <- net_sig_results$net1[[key]]
   sig_row$RowSource <- "net_positive"
 
   if (!dual_mode) return(sig_row)
-
-  # Secondary significance row (dual-alpha feature, V10.10)
-  net_sig_results2 <- run_net_difference_tests(
-    test_data, banner_info, internal_keys,
-    alpha = config$alpha_secondary,
-    config$bonferroni_correction,
-    config$significance_min_base,
-    is_weighted = is_weighted
-  )
-
-  if (is.null(net_sig_results2)) return(sig_row)
 
   sig_row2 <- data.frame(
     RowLabel = alpha_to_confidence_label(config$alpha_secondary),
     RowType = "Sig.2",
     stringsAsFactors = FALSE
   )
-  for (key in internal_keys) {
-    sig_row2[[key]] <- net_sig_results2$net1[[key]]
-  }
+  for (key in internal_keys) sig_row2[[key]] <- net_sig_results$net1_2[[key]]
   sig_row2$RowSource <- "net_positive"
 
   rbind(sig_row, sig_row2)
