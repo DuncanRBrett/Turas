@@ -42,6 +42,7 @@ build_question_table <- function(question_data, banner_groups, config_obj,
   min_base <- config_obj$significance_min_base %||% 30
   brand_colour <- config_obj$brand_colour %||% "#323367"
   has_sig <- stats$has_sig
+  has_sig2 <- isTRUE(stats$has_sig2)   # Secondary sig level (dual-alpha feature, V10.10)
   has_freq <- stats$has_freq && isTRUE(config_obj$embed_frequencies)
 
   # Parse brand colour to RGB for heatmap (with validation)
@@ -252,7 +253,7 @@ build_question_table <- function(question_data, banner_groups, config_obj,
         cell_content <- sprintf('<span class="%s">%s%s</span>',
                                 val_class, display_val, suffix)
 
-        # Significance badge
+        # Primary significance badge
         if (has_sig) {
           sig_col <- paste0(".sig_", key)
           if (sig_col %in% names(table_data)) {
@@ -261,6 +262,20 @@ build_question_table <- function(question_data, banner_groups, config_obj,
               cell_content <- paste0(cell_content, sprintf(
                 '<span class="ct-sig">\u25B2%s</span>',
                 htmltools::htmlEscape(sig_val)))
+            }
+          }
+        }
+
+        # Secondary significance badge (dual-alpha feature, V10.10)
+        # Hidden by default; shown when user toggles to secondary level.
+        if (has_sig2) {
+          sig2_col <- paste0(".sig2_", key)
+          if (sig2_col %in% names(table_data)) {
+            sig2_val <- as.character(table_data[[sig2_col]][row_idx])
+            if (!is.na(sig2_val) && nzchar(sig2_val) && sig2_val != "-") {
+              cell_content <- paste0(cell_content, sprintf(
+                '<span class="ct-sig ct-sig-secondary">\u25B2%s</span>',
+                htmltools::htmlEscape(sig2_val)))
             }
           }
         }
