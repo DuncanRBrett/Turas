@@ -155,7 +155,7 @@ build_dashboard_panel <- function(dashboard_data, config_obj) {
   # Significant findings (across all metrics)
   if (length(dashboard_data$sig_findings) > 0) {
     sig_section <- build_sig_findings_section(
-      dashboard_data$sig_findings, brand_colour
+      dashboard_data$sig_findings, brand_colour, config_obj
     )
   } else {
     sig_section <- htmltools::tags$div(class = "dash-section",
@@ -921,11 +921,25 @@ build_heatmap_grid <- function(metrics, banner_info, config_obj, thresholds,
 #'
 #' @param sig_findings List from extract_sig_findings
 #' @param brand_colour Character hex colour
+#' @param config_obj Configuration object (used to derive significance level label)
 #' @return htmltools::tags$div
 #' @keywords internal
-build_sig_findings_section <- function(sig_findings, brand_colour) {
+build_sig_findings_section <- function(sig_findings, brand_colour,
+                                       config_obj = NULL) {
 
   if (length(sig_findings) == 0) return(NULL)
+
+  # Derive significance level label(s) for the subtitle
+  alpha_primary   <- if (!is.null(config_obj)) config_obj$alpha %||% 0.05 else 0.05
+  alpha_secondary <- if (!is.null(config_obj)) config_obj$alpha_secondary else NULL
+  primary_pct     <- round((1 - alpha_primary) * 100)
+  dual_mode       <- !is.null(alpha_secondary)
+  sig_level_note  <- if (dual_mode) {
+    secondary_pct <- round((1 - alpha_secondary) * 100)
+    sprintf("at %d%% confidence (primary threshold)", primary_pct)
+  } else {
+    sprintf("at %d%% confidence", primary_pct)
+  }
 
   cards <- lapply(seq_along(sig_findings), function(i) {
     f <- sig_findings[[i]]
@@ -1015,6 +1029,10 @@ build_sig_findings_section <- function(sig_findings, brand_colour) {
     id = "dash-sec-sig-findings",
     htmltools::tags$div(class = "dash-section-title",
       "Significant Findings",
+      htmltools::tags$span(
+        class = "dash-sig-level-badge",
+        sig_level_note
+      ),
       htmltools::tags$button(
         class = "dash-export-btn",
         style = "margin-left:12px;",
@@ -1029,7 +1047,18 @@ build_sig_findings_section <- function(sig_findings, brand_colour) {
       )
     ),
     htmltools::tags$div(class = "dash-section-sub",
-      "Columns significantly higher than others on headline metrics. Click the eye to hide, pin to save individual findings."
+      if (dual_mode) {
+        sprintf(
+          "Columns significantly higher than others on headline metrics (%d%% confidence). A secondary threshold (%d%% confidence) is also applied in the Crosstabs tab. Click the eye to hide, pin to save individual findings.",
+          primary_pct,
+          round((1 - alpha_secondary) * 100)
+        )
+      } else {
+        sprintf(
+          "Columns significantly higher than others on headline metrics (%d%% confidence). Click the eye to hide, pin to save individual findings.",
+          primary_pct
+        )
+      }
     ),
     # Segment filter dropdown
     if (length(all_segments) > 1) {

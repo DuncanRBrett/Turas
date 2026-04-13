@@ -384,6 +384,12 @@ build_dashboard_css <- function(brand_colour) {
       padding: 2px 6px; font-size: 11px; cursor: pointer; color: #64748b;
     }
     .sig-card-actions button:hover { border-color: #94a3b8; color: #1e293b; }
+    .dash-sig-level-badge {
+      display: inline-block; font-size: 10px; font-weight: 600;
+      padding: 2px 8px; border-radius: 10px; margin-left: 8px;
+      background: rgba(26,39,68,0.06); color: #64748b;
+      letter-spacing: 0.3px; vertical-align: middle;
+    }
     .dash-sig-badges { display: flex; gap: 6px; margin-bottom: 4px; }
     .dash-sig-metric-badge {
       font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 3px;
