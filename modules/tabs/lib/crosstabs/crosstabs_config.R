@@ -24,9 +24,32 @@
 .DEFAULT_ALPHA <- 0.05
 .DEFAULT_MIN_BASE <- 30
 
+# Valid values for alpha_default setting
+.VALID_ALPHA_DEFAULTS <- c("primary", "secondary")
+
 # ==============================================================================
 # VALIDATION
 # ==============================================================================
+
+#' Convert Alpha to Confidence Level Label
+#'
+#' Converts a significance level (alpha) to a human-readable row label
+#' for use in Excel output and HTML report display when dual significance
+#' levels are configured.
+#'
+#' @param alpha Numeric, significance level (e.g. 0.05)
+#' @return Character, label such as "Sig. (95%)"
+#'
+#' @examples
+#' alpha_to_confidence_label(0.05)  # "Sig. (95%)"
+#' alpha_to_confidence_label(0.10)  # "Sig. (90%)"
+#'
+#' @keywords internal
+alpha_to_confidence_label <- function(alpha) {
+  pct <- round((1 - alpha) * 100)
+  sprintf("Sig. (%d%%)", pct)
+}
+
 
 #' Validate Config File Exists
 #'
@@ -162,6 +185,15 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     alpha = safe_numeric(get_config_value(config, "alpha", default_alpha)),
     significance_min_base = safe_numeric(get_config_value(config, "significance_min_base", default_min_base)),
     bonferroni_correction = safe_logical(get_config_value(config, "bonferroni_correction", TRUE)),
+
+    # Dual significance level toggle (optional — V10.10)
+    # Set alpha_secondary to enable a second significance level in HTML reports.
+    # Leave blank/absent to disable the feature (zero impact on existing reports).
+    alpha_secondary = {
+      raw <- get_config_value(config, "alpha_secondary", NULL)
+      if (is.null(raw) || is.na(suppressWarnings(as.numeric(raw)))) NULL else safe_numeric(raw)
+    },
+    alpha_default = get_config_value(config, "alpha_default", "primary"),
 
     # Checkpointing
     enable_checkpointing = safe_logical(get_config_value(config, "enable_checkpointing", TRUE)),
@@ -482,6 +514,9 @@ load_crosstabs_config <- function(config_file) {
   # Build config object
   config_obj <- build_config_object(settings$config)
 
+  # Validate dual significance level config (if alpha_secondary is set)
+  validate_dual_significance_config(config_obj)
+
   # Check for unrecognised settings — typos are silently ignored otherwise
   .KNOWN_SETTINGS <- c(
     # Weighting
@@ -500,6 +535,7 @@ load_crosstabs_config <- function(config_file) {
     # Significance testing
     "enable_significance_testing", "alpha", "significance_level",
     "significance_min_base", "bonferroni_correction", "enable_chi_square",
+    "alpha_secondary", "alpha_default",
     # Checkpointing
     "enable_checkpointing",
     # Sample composition & index summary

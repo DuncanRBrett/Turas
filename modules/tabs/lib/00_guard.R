@@ -522,6 +522,99 @@ validate_tabs_banner <- function(banner_info, selection_df) {
 }
 
 
+#' Validate Dual Significance Level Configuration
+#'
+#' Cross-field validation for alpha_secondary and alpha_default settings.
+#' Called after build_config_object() when alpha_secondary is non-NULL.
+#' No-op when alpha_secondary is NULL (feature is disabled).
+#'
+#' @param config_obj Configuration object from build_config_object()
+#' @return Invisible TRUE if valid; calls tabs_refuse() on any violation
+#' @keywords internal
+validate_dual_significance_config <- function(config_obj) {
+  if (is.null(config_obj$alpha_secondary)) return(invisible(TRUE))
+
+  # alpha_secondary must be numeric
+  if (!is.numeric(config_obj$alpha_secondary) || is.na(config_obj$alpha_secondary)) {
+    tabs_refuse(
+      code = "CFG_ALPHA_SECONDARY_INVALID",
+      title = "Invalid Secondary Significance Level",
+      problem = sprintf(
+        "alpha_secondary must be a number but received: '%s'",
+        config_obj$alpha_secondary
+      ),
+      why_it_matters = "A non-numeric alpha cannot be used as a significance threshold.",
+      how_to_fix = c(
+        "Open your config file (Settings sheet)",
+        "Set alpha_secondary to a decimal such as 0.10 (for 90% confidence)",
+        "Leave alpha_secondary blank to disable the dual significance feature"
+      )
+    )
+  }
+
+  # alpha_secondary must be in a valid statistical range
+  if (config_obj$alpha_secondary <= 0 || config_obj$alpha_secondary >= 1) {
+    tabs_refuse(
+      code = "CFG_ALPHA_SECONDARY_RANGE",
+      title = "Secondary Significance Level Out of Range",
+      problem = sprintf(
+        "alpha_secondary must be between 0 and 1 (exclusive). Received: %s",
+        config_obj$alpha_secondary
+      ),
+      why_it_matters = "Significance levels outside the 0-1 range are statistically invalid.",
+      how_to_fix = c(
+        "Set alpha_secondary to a value between 0.001 and 0.50",
+        "Typical values: 0.10 (90% confidence), 0.15, 0.20"
+      ),
+      details = sprintf("Valid range: 0.001 to 0.50. Received: %s", config_obj$alpha_secondary)
+    )
+  }
+
+  # alpha_secondary must differ from primary alpha (identical levels produce identical results)
+  if (isTRUE(all.equal(config_obj$alpha_secondary, config_obj$alpha))) {
+    tabs_refuse(
+      code = "CFG_ALPHA_SECONDARY_DUPLICATE",
+      title = "Secondary Significance Level Duplicates Primary",
+      problem = sprintf(
+        "alpha_secondary (%s) must differ from alpha (%s).",
+        config_obj$alpha_secondary, config_obj$alpha
+      ),
+      why_it_matters = "Identical significance levels would produce identical results. The toggle would do nothing.",
+      how_to_fix = c(
+        "Set alpha_secondary to a value different from alpha",
+        sprintf(
+          "Current alpha: %s — try alpha_secondary: 0.10 for a 90%% confidence secondary level",
+          config_obj$alpha
+        )
+      )
+    )
+  }
+
+  # alpha_default must be "primary" or "secondary"
+  valid_defaults <- c("primary", "secondary")
+  if (!isTRUE(tolower(trimws(config_obj$alpha_default)) %in% valid_defaults)) {
+    tabs_refuse(
+      code = "CFG_ALPHA_DEFAULT_INVALID",
+      title = "Invalid alpha_default Value",
+      problem = sprintf(
+        "alpha_default must be 'primary' or 'secondary'. Received: '%s'",
+        config_obj$alpha_default
+      ),
+      why_it_matters = "An invalid alpha_default prevents the HTML report from loading at the correct significance level.",
+      how_to_fix = c(
+        "Set alpha_default to 'primary' (default) or 'secondary' in the Settings sheet",
+        "'primary' opens the report at the main alpha level",
+        "'secondary' opens the report at the secondary alpha level"
+      ),
+      expected = valid_defaults,
+      observed = config_obj$alpha_default
+    )
+  }
+
+  invisible(TRUE)
+}
+
+
 #' Validate Question Column Exists in Data
 #'
 #' Soft validation for question column. Returns FALSE if not found.
