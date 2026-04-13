@@ -242,7 +242,21 @@ generate_crosstab_config_template <- function(output_path,
         list(name = "test_net_differences", default = "FALSE", required = FALSE,
              description = "Test significance of NET POSITIVE differences across banner groups.",
              valid_values_text = "TRUE or FALSE",
-             dropdown = c("TRUE", "FALSE"))
+             dropdown = c("TRUE", "FALSE")),
+        list(name = "alpha_secondary", default = "", required = FALSE,
+             description = paste0(
+               "Second significance level for HTML report toggle. ",
+               "Leave blank to disable. Must differ from alpha. ",
+               "E.g. set to 0.10 to add a 90% confidence toggle alongside the primary level."
+             ),
+             valid_values_text = "0.001 to 0.50, or leave blank to disable"),
+        list(name = "alpha_default", default = "primary", required = FALSE,
+             description = paste0(
+               "Which significance level the HTML report opens on when alpha_secondary is set. ",
+               "'primary' shows the main alpha level first; 'secondary' shows the secondary level first."
+             ),
+             valid_values_text = "primary or secondary",
+             dropdown = c("primary", "secondary"))
       )
     ),
 
