@@ -717,9 +717,12 @@ build_net_test_data <- function(row_counts_net1, row_counts_net2,
   return(net_test_data)
 }
 
-#' Insert significance row after a BoxCategory percentage row
+#' Insert one or two significance rows after a BoxCategory percentage row
+#'
+#' In dual-alpha mode pass a 2-row data frame as \code{sig_rows} (primary and
+#' secondary already rbind'd) so both are inserted together in one operation.
 #' @keywords internal
-insert_net_sig_row <- function(existing_table, net_name, net_results, internal_keys) {
+insert_net_sig_row <- function(existing_table, net_name, sig_rows, internal_keys) {
   # Find net percentage row position
   net_pct_row <- which(
     existing_table$RowLabel == net_name &
@@ -730,32 +733,29 @@ insert_net_sig_row <- function(existing_table, net_name, net_results, internal_k
     return(existing_table)
   }
 
-  # Create significance row
-  net_sig_row <- data.frame(
-    RowLabel = "",
-    RowType = "Sig.",
-    stringsAsFactors = FALSE
-  )
-
-  for (key in internal_keys) {
-    net_sig_row[[key]] <- net_results[[key]]
-  }
-
-  # Tag as boxcategory for downstream classification (inherits from parent net)
-  net_sig_row$RowSource <- "boxcategory"
-
   # Insert after net percentage row
   if (net_pct_row[1] < nrow(existing_table)) {
     existing_table <- rbind(
       existing_table[1:net_pct_row[1], ],
-      net_sig_row,
+      sig_rows,
       existing_table[(net_pct_row[1] + 1):nrow(existing_table), ]
     )
   } else {
-    existing_table <- rbind(existing_table, net_sig_row)
+    existing_table <- rbind(existing_table, sig_rows)
   }
 
   return(existing_table)
+}
+
+#' Build one significance row for a box-category net
+#' @keywords internal
+build_net_sig_row <- function(net_results, internal_keys,
+                              row_type = "Sig.", row_label = "") {
+  sig_row <- data.frame(RowLabel = row_label, RowType = row_type,
+                        stringsAsFactors = FALSE)
+  for (key in internal_keys) sig_row[[key]] <- net_results[[key]]
+  sig_row$RowSource <- "boxcategory"
+  sig_row
 }
 
 #' Add Net Difference Significance Rows
@@ -809,7 +809,7 @@ add_net_significance_rows <- function(existing_table, data, question_info,
     banner_bases, internal_keys
   )
 
-  # Run net difference tests
+  # Run primary significance tests
   net_sig_results <- run_net_difference_tests(
     net_test_data, banner_info, internal_keys,
     alpha = config$alpha,
@@ -822,13 +822,45 @@ add_net_significance_rows <- function(existing_table, data, question_info,
     return(existing_table)
   }
 
-  # Insert sig rows into existing table (delegated to helper)
+  dual_mode <- !is.null(config$alpha_secondary)
+
+  primary_label <- if (dual_mode) alpha_to_confidence_label(config$alpha) else ""
+
+  # Build sig rows for net1 and net2 (primary; possibly rbind'd with secondary)
+  make_net_sig_rows <- function(net_results_primary, net_results_secondary) {
+    r1 <- build_net_sig_row(net_results_primary, internal_keys,
+                            row_type = "Sig.", row_label = primary_label)
+    if (!dual_mode || is.null(net_results_secondary)) return(r1)
+    r2 <- build_net_sig_row(net_results_secondary, internal_keys,
+                            row_type = "Sig.2",
+                            row_label = alpha_to_confidence_label(config$alpha_secondary))
+    rbind(r1, r2)
+  }
+
+  # Secondary tests (dual-alpha feature, V10.10)
+  net_sig_results2 <- if (dual_mode) {
+    run_net_difference_tests(
+      net_test_data, banner_info, internal_keys,
+      alpha = config$alpha_secondary,
+      config$bonferroni_correction,
+      config$significance_min_base,
+      is_weighted = is_weighted
+    )
+  } else NULL
+
+  # Insert sig rows (one or two rows) after each net's "Column %" row
   existing_table <- insert_net_sig_row(
-    existing_table, box_categories[1], net_sig_results$net1, internal_keys
+    existing_table, box_categories[1],
+    make_net_sig_rows(net_sig_results$net1,
+                      if (!is.null(net_sig_results2)) net_sig_results2$net1 else NULL),
+    internal_keys
   )
 
   existing_table <- insert_net_sig_row(
-    existing_table, box_categories[2], net_sig_results$net2, internal_keys
+    existing_table, box_categories[2],
+    make_net_sig_rows(net_sig_results$net2,
+                      if (!is.null(net_sig_results2)) net_sig_results2$net2 else NULL),
+    internal_keys
   )
 
   return(existing_table)
@@ -981,21 +1013,44 @@ add_net_positive_significance <- function(row_counts_top, row_counts_bottom,
     is_weighted = is_weighted
   )
 
-  if (!is.null(net_sig_results)) {
-    sig_row <- data.frame(
-      RowLabel = "",
-      RowType = "Sig.",
-      stringsAsFactors = FALSE
-    )
-    for (key in internal_keys) {
-      sig_row[[key]] <- net_sig_results$net1[[key]]
-    }
-    # Tag as net_positive for downstream classification
-    sig_row$RowSource <- "net_positive"
-    return(sig_row)
-  }
+  if (is.null(net_sig_results)) return(NULL)
 
-  return(NULL)
+  dual_mode <- !is.null(config$alpha_secondary)
+
+  sig_row <- data.frame(
+    RowLabel = if (dual_mode) alpha_to_confidence_label(config$alpha) else "",
+    RowType = "Sig.",
+    stringsAsFactors = FALSE
+  )
+  for (key in internal_keys) {
+    sig_row[[key]] <- net_sig_results$net1[[key]]
+  }
+  sig_row$RowSource <- "net_positive"
+
+  if (!dual_mode) return(sig_row)
+
+  # Secondary significance row (dual-alpha feature, V10.10)
+  net_sig_results2 <- run_net_difference_tests(
+    test_data, banner_info, internal_keys,
+    alpha = config$alpha_secondary,
+    config$bonferroni_correction,
+    config$significance_min_base,
+    is_weighted = is_weighted
+  )
+
+  if (is.null(net_sig_results2)) return(sig_row)
+
+  sig_row2 <- data.frame(
+    RowLabel = alpha_to_confidence_label(config$alpha_secondary),
+    RowType = "Sig.2",
+    stringsAsFactors = FALSE
+  )
+  for (key in internal_keys) {
+    sig_row2[[key]] <- net_sig_results2$net1[[key]]
+  }
+  sig_row2$RowSource <- "net_positive"
+
+  rbind(sig_row, sig_row2)
 }
 
 #' Add Net Positive Row
