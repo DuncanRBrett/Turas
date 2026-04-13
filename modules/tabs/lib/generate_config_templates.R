@@ -519,6 +519,21 @@ generate_crosstab_config_template <- function(output_path,
       )
     ),
 
+    # ---- AI INSIGHTS ----
+    list(
+      section_name = "AI INSIGHTS",
+      fields = list(
+        list(name = "enable_ai_insights", default = "FALSE", required = FALSE,
+             description = paste0(
+               "Generate AI-powered callout insights alongside crosstab tables in the HTML report. ",
+               "Requires an Anthropic API key set in the ANTHROPIC_API_KEY environment variable. ",
+               "Leave FALSE if you do not have an API key or do not need AI commentary."
+             ),
+             valid_values_text = "TRUE or FALSE",
+             dropdown = c("FALSE", "TRUE"))
+      )
+    ),
+
     # ---- STUDY IDENTIFICATION ----
     list(
       section_name = "STUDY IDENTIFICATION",
