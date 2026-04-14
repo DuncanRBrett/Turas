@@ -893,9 +893,40 @@ load_wave_structure <- function(file_path, wave_id) {
     )
   }
 
-  # Read Options sheet
+  # Read Options sheet — auto-detect header row for template-format files
+  # (templates have instruction/description rows before the actual column headers)
   options_df <- tryCatch({
-    openxlsx::read.xlsx(file_path, sheet = "Options")
+    required_cols <- c("QuestionCode", "OptionText")
+    df <- openxlsx::read.xlsx(file_path, sheet = "Options")
+
+    if (!all(required_cols %in% names(df))) {
+      # Scan first 10 rows for the real header row
+      raw <- suppressWarnings(
+        openxlsx::read.xlsx(file_path, sheet = "Options",
+                            colNames = FALSE, rows = 1:10)
+      )
+      header_row <- NULL
+      for (r in seq_len(nrow(raw))) {
+        row_vals <- as.character(unlist(raw[r, ]))
+        if (all(required_cols %in% row_vals)) {
+          header_row <- r
+          break
+        }
+      }
+      if (!is.null(header_row)) {
+        df <- openxlsx::read.xlsx(file_path, sheet = "Options",
+                                  startRow = header_row)
+      }
+    }
+
+    # Filter out template help rows (e.g. "[REQUIRED]..." descriptions)
+    if (nrow(df) > 0 && "QuestionCode" %in% names(df)) {
+      df <- df[!grepl("^\\[REQUIRED\\]|^\\[Optional\\]",
+                      as.character(df[["QuestionCode"]]), ignore.case = TRUE), ,
+               drop = FALSE]
+    }
+
+    df
   }, error = function(e) {
     tracker_refuse(
       code = "IO_STRUCTURE_READ_FAILED",
@@ -911,8 +942,7 @@ load_wave_structure <- function(file_path, wave_id) {
   })
 
   # Validate required columns
-  required_cols <- c("QuestionCode", "OptionText")
-  missing_cols <- setdiff(required_cols, names(options_df))
+  missing_cols <- setdiff(c("QuestionCode", "OptionText"), names(options_df))
   if (length(missing_cols) > 0) {
     tracker_refuse(
       code = "CFG_INVALID_STRUCTURE_FORMAT",

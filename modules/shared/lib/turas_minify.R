@@ -522,6 +522,15 @@
                       fixed = TRUE)
   }
 
+  # Escape </script> inside the JS so the HTML parser doesn't prematurely end
+  # the <script> block. The obfuscator adds '<script>document.F=Object</script>'
+  # as a plaintext string in its anti-debugging code — a literal </script> inside
+  # a <script> block causes the browser HTML parser to close the block early,
+  # leaving switchReportTab and all subsequent code outside the script block.
+  # <\/script> is valid JavaScript (backslash before / is a no-op escape) and
+  # is invisible to the HTML parser.
+  obfuscated <- gsub("</script>", "<\\/script>", obfuscated, fixed = TRUE)
+
   list(content = obfuscated, success = TRUE)
 }
 
