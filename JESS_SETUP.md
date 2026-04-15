@@ -139,9 +139,15 @@ launcher — click it to open the module in a new tab.
 ### Recent Projects
 
 Recent projects are now saved in your `TurasProjects\.turas\` folder.
-This means: - They survive Docker restarts - Up to 10 recent projects
-are remembered per module - The same recent projects appear in the
-launcher and in each module
+This means:
+- They survive Docker restarts and updates
+- Up to 10 recent projects are remembered per module
+- The same recent projects appear in the launcher and in each module
+
+**After this first-time setup**, your recent projects list will be empty —
+this is normal. Simply open each of your active projects once and they
+will be remembered from then on. You won't lose them again when Docker
+updates.
 
 ------------------------------------------------------------------------
 
