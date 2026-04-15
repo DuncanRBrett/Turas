@@ -108,11 +108,13 @@ Create a file called `turas.bat` in the Turas folder with this content:
 REM =====================================================
 REM  turas.bat — Launch Turas
 REM  Double-click this file whenever you want to use Turas
+REM
+REM  Requires docker-compose.yml and .env in the same folder.
+REM  Edit .env to set TURAS_PROJECTS_ROOT to your projects folder.
 REM =====================================================
 
-SET IMAGE=duncanrbrett/turas:latest
-SET PORT=3838
-SET URL=http://localhost:%PORT%
+REM Change to the folder where this .bat file lives
+cd /d "%~dp0"
 
 echo.
 echo ============================================
@@ -121,20 +123,19 @@ echo ============================================
 echo.
 
 echo Checking for updates...
-docker pull %IMAGE%
+docker-compose pull
 
 echo Stopping any previous session...
-docker stop turas-app >nul 2>&1
-docker rm turas-app >nul 2>&1
+docker-compose down >nul 2>&1
 
 echo Launching Turas...
-docker run -d --name turas-app -p %PORT%:3838 -p 3839-3848:3839-3848 -v "C:\Users\USERNAME\OneDrive\Projects:/data/Projects" %IMAGE%
+docker-compose up -d
 
 echo Waiting for Turas to start...
 timeout /t 30 /nobreak >nul
 
 echo Opening Turas in your browser...
-start %URL%
+start http://localhost:3838
 
 echo.
 echo ============================================
@@ -150,18 +151,14 @@ echo.
 
 SET /P ACTION=Type STOP and press Enter when you are done:
 
-docker stop turas-app >nul 2>&1
-docker rm turas-app >nul 2>&1
+docker-compose down
 
 echo.
 echo Turas has been stopped. You can close this window.
 pause
 ```
 
-**IMPORTANT:** Replace `USERNAME` in the `-v` volume mount with the user's actual Windows username and adjust the path to point to their project data folder. To find the correct path:
-
-1. Open File Explorer and navigate to their projects folder
-2. Right-click the folder, select Properties
+**Note:** The `.bat` file uses `docker-compose`, which reads the `.env` file in the same folder for machine-specific settings (particularly `TURAS_PROJECTS_ROOT`). No paths are hardcoded in the `.bat` file itself — all configuration lives in `.env`.
 3. The "Location" field shows the full path (e.g., `C:\Users\jess\OneDrive\Projects`)
 
 ### Step 4: Test it
