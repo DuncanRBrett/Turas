@@ -99,9 +99,6 @@ check_dependencies <- function() {
 
 check_dependencies()
 
-# Recent projects file
-recent_projects_file <- file.path(script_dir, ".recent_alchemerparser_projects.rds")
-
 #' Run AlchemerParser GUI
 #'
 #' @description
@@ -120,6 +117,10 @@ run_alchemerparser_gui <- function() {
   source(file.path(turas_root, "modules", "shared", "lib", "gui_theme.R"))
   theme <- turas_gui_theme("AlchemerParser", "Parse Alchemer Surveys & Generate Configs")
   hide_recents <- turas_hide_recents()
+
+  # Recent projects file — persistent storage in TURAS_PROJECTS_ROOT/.turas/
+  # Defined here (after gui_theme.R is sourced) so turas_recent_file() is available.
+  recent_projects_file <- turas_recent_file("alchemerparser")
 
   ui <- fluidPage(
     theme$head,
@@ -383,7 +384,7 @@ run_alchemerparser_gui <- function() {
         # Add current project (will overwrite if name exists)
         new_entry <- setNames(input$project_dir, proj_name)
         recent <- c(new_entry, recent[names(recent) != proj_name])
-        recent <- head(recent, 5)  # Keep only 5 most recent
+        recent <- head(recent, TURAS_MAX_RECENTS)
 
         saveRDS(recent, recent_projects_file)
       }, error = function(e) {

@@ -70,29 +70,12 @@ run_tabs_gui <- function() {
   theme <- turas_gui_theme("Tabs", "Cross-tabulation & Statistical Testing")
   hide_recents <- turas_hide_recents()
   
-  # Recent projects file
-  RECENT_PROJECTS_FILE <- file.path(TURAS_HOME, ".recent_tabs_projects.rds")
-  
   # === HELPER FUNCTIONS ===
-  
-  load_recent_projects <- function() {
-    if (file.exists(RECENT_PROJECTS_FILE)) {
-      tryCatch(readRDS(RECENT_PROJECTS_FILE), error = function(e) character(0))
-    } else {
-      character(0)
-    }
-  }
-  
-  save_recent_projects <- function(projects) {
-    tryCatch(saveRDS(projects, RECENT_PROJECTS_FILE), error = function(e) NULL)
-  }
-  
-  add_recent_project <- function(project_dir) {
-    recent <- load_recent_projects()
-    recent <- unique(c(project_dir, recent))
-    recent <- recent[1:min(5, length(recent))]
-    save_recent_projects(recent)
-  }
+
+  # Recent projects — persistent storage via shared utilities (max TURAS_MAX_RECENTS)
+  load_recent_projects <- function() turas_load_recents("tabs")
+  save_recent_projects <- function(r) turas_save_recents("tabs", r)
+  add_recent_project   <- function(p) turas_add_recent("tabs", p)
   
   detect_config_files <- function(project_dir) {
     if (!dir.exists(project_dir)) return(character(0))

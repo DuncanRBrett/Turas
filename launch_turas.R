@@ -195,14 +195,38 @@ launch_turas <- function() {
   # ============================================================================
 
   #' Read recent projects for a module, normalizing different storage formats
+  #'
+  #' Checks the persistent location (TURAS_PROJECTS_ROOT/.turas/) first so
+  #' that Docker-hosted recents survive container restarts. Falls back to the
+  #' legacy turas_root-relative path for backwards compatibility.
   read_module_recents <- function(mod) {
     tryCatch({
       if (is.null(mod$recent_file)) return(character(0))
-      rds_path <- if (isTRUE(mod$recent_absolute)) {
+
+      # Derive the standardised key from the legacy filename.
+      # e.g. ".recent_tabs_projects.rds" => "tabs", ".recent_maxdiff.rds" => "maxdiff"
+      raw_key <- sub("^\\.recent_(.+?)(?:_projects|_folders)?\\.rds$", "\\1",
+                     basename(mod$recent_file), perl = TRUE)
+      new_path <- file.path(
+        {
+          root <- Sys.getenv("TURAS_PROJECTS_ROOT", "")
+          if (nzchar(root) && dir.exists(root)) {
+            file.path(root, ".turas")
+          } else {
+            turas_root
+          }
+        },
+        paste0(".recent_", raw_key, ".rds")
+      )
+
+      legacy_path <- if (isTRUE(mod$recent_absolute)) {
         mod$recent_file
       } else {
         file.path(turas_root, mod$recent_file)
       }
+
+      # Prefer new persistent location; fall back to legacy for existing installs
+      rds_path <- if (file.exists(new_path)) new_path else legacy_path
       if (!file.exists(rds_path)) return(character(0))
 
       data <- readRDS(rds_path)
@@ -222,7 +246,7 @@ launch_turas <- function() {
 
       paths <- paths[!is.na(paths)]
       paths <- paths[file.exists(paths) | dir.exists(paths)]
-      head(paths, 5)
+      head(paths, 10L)
     }, error = function(e) character(0))
   }
 
@@ -649,9 +673,20 @@ launch_turas <- function() {
             )
           ),
 
-          # Recent projects
+          # Launch fresh button — shown first so it is always immediately visible
+          tags$button(
+            class = "launch-new-btn",
+            onclick = sprintf(
+              "Shiny.setInputValue('launch_fresh', '%s', {priority: 'event'})",
+              mod$id
+            ),
+            "Launch New Session"
+          ),
+
+          # Recent projects — shown below the launch button
           if (length(recents) > 0) {
             tagList(
+              div(class = "launch-divider", "or open recent"),
               div(class = "recent-section-label", "Recent Projects"),
               lapply(seq_along(recents), function(i) {
                 config_path <- recents[i]
@@ -665,22 +700,9 @@ launch_turas <- function() {
                   div(class = "recent-name", basename(config_path)),
                   div(class = "recent-path", dirname(config_path))
                 )
-              }),
-              div(class = "launch-divider", "or")
+              })
             )
-          } else {
-            div(class = "no-recents", "No recent projects")
           },
-
-          # Launch fresh button
-          tags$button(
-            class = "launch-new-btn",
-            onclick = sprintf(
-              "Shiny.setInputValue('launch_fresh', '%s', {priority: 'event'})",
-              mod$id
-            ),
-            "Launch New Session"
-          ),
 
           # Docker: show clickable link to running module
           if (nzchar(Sys.getenv("TURAS_DOCKER")) && !is.null(rv$docker_ports[[mod$id]])) {

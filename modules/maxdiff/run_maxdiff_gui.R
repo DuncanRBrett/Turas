@@ -52,7 +52,8 @@ run_maxdiff_gui <- function() {
   hide_recents <- turas_hide_recents()
 
   MODULE_DIR <- file.path(TURAS_HOME, "modules", "maxdiff")
-  RECENT_FILE <- file.path(TURAS_HOME, ".recent_maxdiff.rds")
+  # Recent projects file — persistent storage in TURAS_PROJECTS_ROOT/.turas/
+  RECENT_FILE <- turas_recent_file("maxdiff")
 
   # === HELPER FUNCTIONS ===
 
@@ -86,7 +87,7 @@ run_maxdiff_gui <- function() {
     recent <- load_recent()
     recent <- c(list(list(path = path, mode = mode)), recent)
     recent <- recent[!duplicated(sapply(recent, `[[`, "path"))]
-    if (length(recent) > 5) recent <- recent[1:5]
+    if (length(recent) > TURAS_MAX_RECENTS) recent <- recent[seq_len(TURAS_MAX_RECENTS)]
     tryCatch(saveRDS(recent, RECENT_FILE), error = function(e) NULL)
   }
 

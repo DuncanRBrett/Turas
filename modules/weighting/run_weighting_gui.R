@@ -330,9 +330,8 @@ run_weighting_gui <- function(launch_browser = TRUE) {
       }
     }
 
-    # Recent folders file location (persistent across sessions)
-    # Use Turas root directory for consistency with other modules
-    recent_folders_file <- file.path(turas_root, ".turas_weighting_recent_folders.rds")
+    # Recent folders file — persistent storage in TURAS_PROJECTS_ROOT/.turas/
+    recent_folders_file <- turas_recent_file("weighting")
 
     # Load recent folders on startup
     observe({
@@ -391,10 +390,10 @@ run_weighting_gui <- function(launch_browser = TRUE) {
         # Remove if already exists (will re-add at top)
         rv$recent_folders <- setdiff(rv$recent_folders, folder_path)
 
-        # Add to front, limit to 5 most recent
+        # Add to front, limit to TURAS_MAX_RECENTS
         rv$recent_folders <- c(folder_path, rv$recent_folders)
-        if (length(rv$recent_folders) > 5) {
-          rv$recent_folders <- rv$recent_folders[1:5]
+        if (length(rv$recent_folders) > TURAS_MAX_RECENTS) {
+          rv$recent_folders <- rv$recent_folders[seq_len(TURAS_MAX_RECENTS)]
         }
 
         # Save to file

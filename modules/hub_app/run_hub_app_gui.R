@@ -138,9 +138,9 @@ run_hub_app_gui <- function(project_dirs = NULL) {
         !identical(sort(unlist(v$exclude_dirs)), sort(exclude_dirs))
       }, views)
 
-      # Prepend new view, keep max 5
+      # Prepend new view, keep max TURAS_MAX_RECENTS
       views <- c(list(view), views)
-      if (length(views) > 5) views <- views[1:5]
+      if (length(views) > TURAS_MAX_RECENTS) views <- views[seq_len(TURAS_MAX_RECENTS)]
 
       prefs$recent_views <- views
       prefs$scan_directories <- as.list(include_dirs)

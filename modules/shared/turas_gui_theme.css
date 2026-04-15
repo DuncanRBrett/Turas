@@ -368,6 +368,229 @@ body {
   border-bottom-color: var(--turas-accent);
 }
 
+/* ==========================================================================
+   shinyFiles File / Directory Browser — Turas visual override
+   Applies to every file and directory picker modal across all modules.
+   Class names sourced from shinyFiles package source (sF-* prefix).
+   ========================================================================== */
+
+/* --- Hide toolbar clutter --- */
+
+/* "Create new folder" — users should not create folders inside Turas */
+.sF-newDir { display: none !important; }
+
+/* Pencil / edit-path button — confusing next to the root label */
+.sF-textChoice { display: none !important; }
+
+/* "Sort content" — rarely needed; removed to reduce visual noise */
+.sF-sort { display: none !important; }
+
+/* --- Modal shell --- */
+
+.sF-modal .modal-content {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.20);
+  overflow: hidden;
+  font-family: var(--turas-font);
+}
+
+.sF-modal .modal-header {
+  background: linear-gradient(135deg, #1a2744 0%, #2a3f5f 100%) !important;
+  border-bottom: none !important;
+  padding: 14px 20px !important;
+}
+
+.sF-modal .modal-header .modal-title,
+.sF-modal .sF-title {
+  color: #fff !important;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  font-family: var(--turas-font);
+}
+
+.sF-modal .modal-header .close {
+  color: rgba(255, 255, 255, 0.65) !important;
+  opacity: 1 !important;
+  text-shadow: none !important;
+  font-size: 20px;
+  margin-top: 1px;
+}
+
+.sF-modal .modal-header .close:hover {
+  color: #fff !important;
+  opacity: 1 !important;
+}
+
+/* --- Navigation toolbar --- */
+
+.sF-navigation {
+  background: #f8f7f5;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--turas-border);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Back / Up / Forward navigation buttons */
+.sF-navigate .btn-default,
+.sF-refresh .btn-default {
+  background: #fff;
+  border: 1px solid var(--turas-border);
+  color: var(--turas-text-muted);
+  font-size: 12px;
+  font-family: var(--turas-font);
+  border-radius: 6px;
+  padding: 4px 10px;
+  line-height: 1.4;
+}
+
+.sF-navigate .btn-default:hover,
+.sF-refresh .btn-default:hover {
+  background: #f1f5f9;
+  border-color: var(--turas-border-hover);
+  color: var(--turas-text);
+}
+
+/* Root / volume breadcrumb selector — the "Projects / Home" dropdown */
+.sF-breadcrumps {
+  border: 1px solid var(--turas-border) !important;
+  border-radius: 6px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  font-family: var(--turas-font) !important;
+  color: var(--turas-text) !important;
+  background: #fff !important;
+  height: 30px !important;
+  padding: 4px 8px !important;
+}
+
+/* --- Modal body: remove default padding so panes fill flush --- */
+.sF-modal .modal-body {
+  padding: 0;
+}
+
+/* --- Pane column headings ("Directories" / "Content") --- */
+.sF-dirInfo h6 {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.7px !important;
+  color: var(--turas-text-muted) !important;
+  font-family: var(--turas-font) !important;
+  padding: 9px 14px 7px !important;
+  margin: 0 !important;
+  background: #fafafa;
+  border-bottom: 1px solid var(--turas-border);
+}
+
+/* Dividing line between the two panes */
+.sF-dirInfo.col-md-7 {
+  border-right: 1px solid var(--turas-border);
+}
+
+/* --- Directory tree items --- */
+
+.sF-directory {
+  font-size: 13px;
+  font-family: var(--turas-font);
+  color: var(--turas-text);
+  cursor: pointer;
+}
+
+/* Folder icons are PNG images — use filter to shift hue from yellow → slate blue.
+   hue-rotate(170deg) moves yellow (~45°) to blue-grey (~215°).
+   saturate(0.65) + brightness(1.1) gives a muted professional tone. */
+.sF-directory .sF-file-icon::after {
+  filter: hue-rotate(150deg) saturate(0.75) brightness(1.05) !important;
+  transition: filter 0.12s;
+}
+
+/* Selected folder: richer Turas accent blue */
+.sF-directory.selected .sF-file-icon::after {
+  filter: hue-rotate(175deg) saturate(1.1) brightness(0.95) !important;
+}
+
+/* Selected folder text colour */
+.sF-directory.selected > .sF-file-name div {
+  font-weight: 600;
+}
+
+/* Hover row highlight */
+.sF-directory:not(.selected):hover {
+  background: rgba(26, 39, 68, 0.04);
+  border-radius: 4px;
+}
+
+/* Selected row highlight */
+.sF-directory.selected {
+  background: rgba(26, 39, 68, 0.07);
+  border-radius: 4px;
+}
+
+/* --- File list (right pane) --- */
+
+.sF-file {
+  font-size: 13px;
+  font-family: var(--turas-font);
+  color: var(--turas-text);
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.sF-file:hover:not(.selected) {
+  background: #f1f5f9;
+}
+
+.sF-file.selected {
+  background: rgba(26, 39, 68, 0.08);
+}
+
+/* --- Footer buttons --- */
+
+.sF-responseButtons {
+  background: #f8f7f5;
+  border-top: 1px solid var(--turas-border);
+  padding: 10px 16px;
+}
+
+#sF-cancelButton {
+  background: #fff !important;
+  border: 1px solid var(--turas-border) !important;
+  color: var(--turas-text) !important;
+  font-size: 13px;
+  font-family: var(--turas-font);
+  font-weight: 500;
+  border-radius: 6px;
+  padding: 6px 18px;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+#sF-cancelButton:hover {
+  background: #f1f5f9 !important;
+  border-color: var(--turas-border-hover) !important;
+}
+
+#sF-selectButton {
+  background: var(--turas-accent) !important;
+  border: none !important;
+  color: #fff !important;
+  font-size: 13px;
+  font-family: var(--turas-font);
+  font-weight: 600;
+  border-radius: 6px;
+  padding: 6px 22px;
+  transition: background 0.12s;
+}
+
+#sF-selectButton:hover {
+  background: var(--turas-accent-light) !important;
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 768px) {
   .turas-header-inner {
