@@ -251,7 +251,9 @@ categorize_project_files <- function(dir_path, config_files = character(0),
   # Also scan subdirectories (1-2 levels deep)
   subdirs <- list.dirs(dir_path, recursive = FALSE, full.names = TRUE)
   skip_dir_patterns <- c("^\\.", "node_modules", "renv", "__pycache__",
-                          "\\.git$", "tests$", "testthat$")
+                          "\\.git$", "tests$", "testthat$",
+                          "^[0-9_]*[Aa]rchive$",   # never index archived copies
+                          "[Ww]orkings")             # temp/working folders (e.g. 07_Workings (Temp))
 
   for (subdir in subdirs) {
     sub_norm <- normalizePath(subdir, winslash = "/", mustWork = FALSE)
@@ -576,7 +578,9 @@ find_candidate_dirs <- function(root, max_depth = 6) {
   # Skip patterns for directories we should never enter
   skip_patterns <- c("^\\.", "node_modules", "renv", "__pycache__",
                       "\\.git$", "tests$", "testthat$",
-                      "^Library$", "^Applications$", "^\\.Trash$")
+                      "^Library$", "^Applications$", "^\\.Trash$",
+                      "^[0-9_]*[Aa]rchive$",  # never surface archived configs
+                      "[Ww]orkings")            # temp/working folders (e.g. 07_Workings (Temp))
 
   # Check root itself
   root_files <- list.files(root, pattern = "\\.(html|xlsx)$", ignore.case = TRUE)
