@@ -586,3 +586,144 @@ test_that("get_config_patterns covers all expected modules", {
                           "weighting", "report_hub")
   expect_true(all(expected_modules %in% names(patterns)))
 })
+
+
+# ==============================================================================
+# Directory exclusions — Archive and Workings folders
+# ==============================================================================
+# These tests verify that archive and working/temp folders are never surfaced
+# as project candidates and that files inside them are not indexed.
+# ==============================================================================
+
+# --- Helper: place a real config file in a directory ---
+place_config <- function(dir, filename = "Crosstab_Config.xlsx") {
+  dir.create(dir, recursive = TRUE, showWarnings = FALSE)
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "Settings")
+  openxlsx::writeData(wb, "Settings", data.frame(x = 1))
+  openxlsx::saveWorkbook(wb, file.path(dir, filename), overwrite = TRUE)
+  invisible(file.path(dir, filename))
+}
+
+
+# --- Archive folder variants are never surfaced as project candidates ---
+
+test_that("scan_for_projects ignores 04_Archive at wave level", {
+  tmp <- tempfile(); dir.create(tmp); on.exit(unlink(tmp, recursive = TRUE))
+
+  wave   <- file.path(tmp, "CCPB", "CCPB-CCS", "W16")
+  active <- file.path(wave, "W16_Crosstab_Config.xlsx")
+  dir.create(wave, recursive = TRUE, showWarnings = FALSE)
+  place_config(wave, "W16_Crosstab_Config.xlsx")
+  place_config(file.path(wave, "04_Archive"), "Old_Crosstab_Config.xlsx")
+
+  result <- scan_for_projects(tmp)
+  paths  <- sapply(result$result$projects, function(p) p$path)
+
+  expect_false(any(grepl("04_Archive", paths)))
+  expect_true(any(grepl("W16$", paths)))
+})
+
+test_that("scan_for_projects ignores plain 'Archive' folder", {
+  tmp <- tempfile(); dir.create(tmp); on.exit(unlink(tmp, recursive = TRUE))
+
+  place_config(file.path(tmp, "ActiveProject"), "Crosstab_Config.xlsx")
+  place_config(file.path(tmp, "Archive"),        "Old_Crosstab_Config.xlsx")
+
+  result <- scan_for_projects(tmp)
+  paths  <- sapply(result$result$projects, function(p) p$path)
+
+  expect_false(any(grepl("Archive$", paths)))
+  expect_true(any(grepl("ActiveProject$", paths)))
+})
+
+test_that("scan_for_projects ignores lower-case 'archive' folder", {
+  tmp <- tempfile(); dir.create(tmp); on.exit(unlink(tmp, recursive = TRUE))
+
+  place_config(file.path(tmp, "LiveProject"), "Crosstab_Config.xlsx")
+  place_config(file.path(tmp, "archive"),     "Old_Crosstab_Config.xlsx")
+
+  result <- scan_for_projects(tmp)
+  paths  <- sapply(result$result$projects, function(p) p$path)
+
+  expect_false(any(grepl("archive$", paths)))
+})
+
+
+# --- Archive config files are not indexed within a project's file list ---
+
+test_that("categorize_project_files excludes files inside 04_Archive subfolder", {
+  tmp <- tempfile(); dir.create(tmp); on.exit(unlink(tmp, recursive = TRUE))
+
+  # Active config at project root, old copy in archive
+  place_config(tmp, "Crosstab_Config.xlsx")
+  place_config(file.path(tmp, "04_Archive"), "Old_Crosstab_Config.xlsx")
+
+  result <- scan_for_projects(tmp)
+  expect_equal(length(result$result$projects), 1L)
+
+  proj   <- result$result$projects[[1]]
+  cfg_names <- sapply(proj$files$configs, function(f) basename(f$path))
+
+  expect_true("Crosstab_Config.xlsx"     %in% cfg_names)
+  expect_false("Old_Crosstab_Config.xlsx" %in% cfg_names)
+})
+
+
+# --- Workings/temp folder variants are never surfaced ---
+
+test_that("scan_for_projects ignores '07_Workings (Temp)' folder", {
+  tmp <- tempfile(); dir.create(tmp); on.exit(unlink(tmp, recursive = TRUE))
+
+  place_config(file.path(tmp, "W07"),                   "Crosstab_Config.xlsx")
+  place_config(file.path(tmp, "07_Workings (Temp)"),    "Working_Crosstab_Config.xlsx")
+
+  result <- scan_for_projects(tmp)
+  paths  <- sapply(result$result$projects, function(p) p$path)
+
+  expect_false(any(grepl("Workings", paths)))
+  expect_true(any(grepl("W07$", paths)))
+})
+
+test_that("scan_for_projects ignores plain 'Workings' folder", {
+  tmp <- tempfile(); dir.create(tmp); on.exit(unlink(tmp, recursive = TRUE))
+
+  place_config(file.path(tmp, "CurrentWave"), "Crosstab_Config.xlsx")
+  place_config(file.path(tmp, "Workings"),    "Draft_Config.xlsx")
+
+  result <- scan_for_projects(tmp)
+  paths  <- sapply(result$result$projects, function(p) p$path)
+
+  expect_false(any(grepl("Workings$", paths)))
+})
+
+test_that("scan_for_projects ignores 'Workings_Temp' folder", {
+  tmp <- tempfile(); dir.create(tmp); on.exit(unlink(tmp, recursive = TRUE))
+
+  place_config(file.path(tmp, "CurrentWave"),  "Crosstab_Config.xlsx")
+  place_config(file.path(tmp, "Workings_Temp"), "Draft_Config.xlsx")
+
+  result <- scan_for_projects(tmp)
+  paths  <- sapply(result$result$projects, function(p) p$path)
+
+  expect_false(any(grepl("Workings_Temp$", paths)))
+})
+
+
+# --- Workings config files are not indexed within a project's file list ---
+
+test_that("categorize_project_files excludes files inside Workings subfolder", {
+  tmp <- tempfile(); dir.create(tmp); on.exit(unlink(tmp, recursive = TRUE))
+
+  place_config(tmp, "Crosstab_Config.xlsx")
+  place_config(file.path(tmp, "07_Workings (Temp)"), "Draft_Crosstab_Config.xlsx")
+
+  result <- scan_for_projects(tmp)
+  expect_equal(length(result$result$projects), 1L)
+
+  proj      <- result$result$projects[[1]]
+  cfg_names <- sapply(proj$files$configs, function(f) basename(f$path))
+
+  expect_true("Crosstab_Config.xlsx"       %in% cfg_names)
+  expect_false("Draft_Crosstab_Config.xlsx" %in% cfg_names)
+})

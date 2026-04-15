@@ -16,13 +16,21 @@ services:
     platform: linux/amd64
     container_name: turas
     ports:
+      # Main launcher
       - "3838:3838"
+      # Module sub-ports (one per module, allocated dynamically by the launcher)
+      - "3839-3848:3839-3848"
     volumes:
-      # Mount project data directory — Jess puts config + data files here
-      - ./data:/data
+      # Mount the shared projects folder from the host into the container.
+      # On Jess's machine, TURAS_PROJECTS_ROOT in .env points at the Google
+      # Drive folder. Falls back to ./data if .env is not present.
+      - ${TURAS_PROJECTS_ROOT:-./data}:/data
     environment:
       - TURAS_ROOT=/srv/shiny-server/turas
       - TURAS_DOCKER=1
+      # Inside the container the projects root is always /data regardless
+      # of where it lives on the host. All modules resolve paths against this.
+      - TURAS_PROJECTS_ROOT=/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3838/"]

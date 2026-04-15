@@ -81,27 +81,10 @@ run_report_hub_gui <- function() {
   theme <- turas_gui_theme("Report Hub", "Unified Report Portal")
   hide_recents <- turas_hide_recents()
 
-  # Recent configs file (last 5 configs, same approach as tabs module)
-  RECENT_CONFIGS_FILE <- file.path(TURAS_HOME, ".recent_hub_configs.rds")
-
-  load_recent_configs <- function() {
-    if (file.exists(RECENT_CONFIGS_FILE)) {
-      tryCatch(readRDS(RECENT_CONFIGS_FILE), error = function(e) character(0))
-    } else {
-      character(0)
-    }
-  }
-
-  save_recent_configs <- function(configs) {
-    tryCatch(saveRDS(configs, RECENT_CONFIGS_FILE), error = function(e) NULL)
-  }
-
-  add_recent_config <- function(config_path) {
-    recent <- load_recent_configs()
-    recent <- unique(c(config_path, recent))
-    recent <- recent[1:min(5, length(recent))]
-    save_recent_configs(recent)
-  }
+  # Recent configs — persistent storage via shared utilities (max TURAS_MAX_RECENTS)
+  load_recent_configs <- function() turas_load_recents("hub")
+  save_recent_configs <- function(r) turas_save_recents("hub", r)
+  add_recent_config   <- function(p) turas_add_recent("hub", p)
 
   # ==============================================================================
   # HELPERS: Config preview using guard's sheet readers

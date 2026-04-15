@@ -85,7 +85,8 @@ run_pricing_gui <- function() {
   # ============================================================================
   # Recent Projects
   # ============================================================================
-  RECENT_PROJECTS_FILE <- file.path(turas_root, ".recent_pricing_projects.rds")
+  # Recent projects file — persistent storage in TURAS_PROJECTS_ROOT/.turas/
+  RECENT_PROJECTS_FILE <- turas_recent_file("pricing")
 
   load_recent_projects <- function() {
     if (file.exists(RECENT_PROJECTS_FILE)) {
@@ -103,7 +104,7 @@ run_pricing_gui <- function() {
     recent <- load_recent_projects()
     recent <- recent[!sapply(recent, function(x) x$project_dir == project_info$project_dir)]
     recent <- c(list(project_info), recent)
-    recent <- recent[1:min(5, length(recent))]
+    recent <- recent[seq_len(min(TURAS_MAX_RECENTS, length(recent)))]
     save_recent_projects(recent)
   }
 

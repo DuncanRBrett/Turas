@@ -102,8 +102,8 @@ run_tracker_gui <- function() {
   theme <- turas_gui_theme("Tracker", "Multi-Wave Trend Calculation & Testing")
   hide_recents <- turas_hide_recents()
 
-  # Recent projects file
-  RECENT_PROJECTS_FILE <- file.path(TURAS_HOME, ".recent_tracker_projects.rds")
+  # Recent projects file — persistent storage in TURAS_PROJECTS_ROOT/.turas/
+  RECENT_PROJECTS_FILE <- turas_recent_file("tracker")
 
   # === HELPER FUNCTIONS ===
 
@@ -124,7 +124,7 @@ run_tracker_gui <- function() {
     # Add to front, remove duplicates based on tracking_config path
     recent <- c(list(project_info), recent)
     recent <- recent[!duplicated(sapply(recent, function(x) x$tracking_config))]
-    recent <- recent[1:min(5, length(recent))]
+    recent <- recent[seq_len(min(TURAS_MAX_RECENTS, length(recent)))]
     save_recent_projects(recent)
   }
 

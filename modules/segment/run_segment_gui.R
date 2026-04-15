@@ -41,29 +41,10 @@ run_segment_gui <- function() {
   # Source the segmentation module
   source(file.path(segment_dir, "run_segment.R"))
 
-  # Recent projects file
-  recent_file <- file.path(turas_root, ".recent_segment_projects.rds")
-
-  # Helper function to load recent projects
-  load_recent_projects <- function() {
-    if (file.exists(recent_file)) {
-      recent <- tryCatch(readRDS(recent_file), error = function(e) character(0))
-      # Ensure character vector (not list)
-      if (is.list(recent)) recent <- as.character(unlist(recent))
-      recent[nzchar(recent) & file.exists(recent)]
-    } else {
-      character(0)
-    }
-  }
-
-  # Helper function to save recent project
-  save_recent_project <- function(config_path) {
-    config_path <- normalizePath(path.expand(config_path), winslash = "/", mustWork = FALSE)
-    recent <- load_recent_projects()
-    recent <- unique(c(config_path, recent[recent != config_path]))
-    recent <- head(recent, 5)
-    tryCatch(saveRDS(recent, recent_file), error = function(e) NULL)
-  }
+  # Recent projects — persistent storage via shared utilities (max TURAS_MAX_RECENTS)
+  # save_recent_project is the "add" function: normalises, deduplicates, trims
+  load_recent_projects <- function() turas_load_recents("segment")
+  save_recent_project  <- function(p) turas_add_recent("segment", p)
 
   # ===========================================================================
   # SHINY UI
