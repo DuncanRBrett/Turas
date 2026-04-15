@@ -12,7 +12,7 @@
 
 services:
   turas:
-    build: .
+    image: duncanrbrett/turas:latest
     platform: linux/amd64
     container_name: turas
     ports:
