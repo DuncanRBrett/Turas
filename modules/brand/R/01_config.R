@@ -161,11 +161,15 @@ load_brand_config <- function(config_path, project_root = NULL) {
 
   # Load Categories sheet (auto-detect format: template with title rows, or simple)
   categories <- tryCatch({
-    # Try template format first (title + subtitle + headers in rows 1-3)
-    cats <- openxlsx::read.xlsx(config_path, sheet = "Categories", startRow = 3)
-    if (is.null(cats) || nrow(cats) == 0 || !"Category" %in% names(cats)) {
-      # Fall back to simple format (headers in row 1)
-      cats <- openxlsx::read.xlsx(config_path, sheet = "Categories", startRow = 1)
+    # Try simple format first (headers in row 1) - most reliable
+    cats <- openxlsx::read.xlsx(config_path, sheet = "Categories", startRow = 1)
+    # If column names look like template title, try startRow=3
+    if (!is.null(cats) && ncol(cats) >= 1 &&
+        grepl("^Category Def|^TURAS", names(cats)[1], ignore.case = TRUE)) {
+      cats2 <- openxlsx::read.xlsx(config_path, sheet = "Categories", startRow = 3)
+      if (!is.null(cats2) && nrow(cats2) > 0 && "Category" %in% names(cats2)) {
+        cats <- cats2
+      }
     }
     cats
   }, error = function(e) {
@@ -250,13 +254,18 @@ load_brand_survey_structure <- function(structure_path) {
   # Auto-detects format: template (startRow=3) vs simple (startRow=1)
   .load_table <- function(sheet_name) {
     tryCatch({
-      # Try template format first (title + subtitle + headers in rows 1-3)
+      # Try simple format first (headers in row 1) - most reliable
       df <- openxlsx::read.xlsx(structure_path, sheet = sheet_name,
-                                startRow = 3)
-      if (is.null(df) || nrow(df) == 0 || ncol(df) == 0) {
-        # Fall back to simple format (headers in row 1)
-        df <- openxlsx::read.xlsx(structure_path, sheet = sheet_name,
-                                  startRow = 1)
+                                startRow = 1)
+      # If column names look like template title rows, try startRow=3
+      if (!is.null(df) && ncol(df) >= 1) {
+        first_col <- names(df)[1]
+        if (grepl("^TURAS|^Category Entry|^Brand |^Question |^Response |^DBA ",
+                  first_col, ignore.case = TRUE)) {
+          df2 <- openxlsx::read.xlsx(structure_path, sheet = sheet_name,
+                                     startRow = 3)
+          if (!is.null(df2) && nrow(df2) > 0) df <- df2
+        }
       }
       if (!is.null(df) && nrow(df) > 0 && ncol(df) > 0) {
         first_col <- df[[1]]
