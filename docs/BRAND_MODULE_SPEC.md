@@ -959,6 +959,8 @@ The Survey_Structure.xlsx is the single source of truth for data mapping. Multip
 
 Both files use the standard Turas config utilities (`load_config_sheet()`, `get_config_value()`, typed getters from `shared/lib/config_utils.R`) and support auto-detect header row for branded Excel templates.
 
+**Visual polish and inline documentation are mandatory.** The generated Excel templates must match the quality standard of existing Turas config templates (tabs, tracker): branded headers, colour-coded section dividers, help text rows with `[REQUIRED]` / `[Optional]` prefixes, inline explanations for every setting. An operator who has never used the module must be able to fill in the config from the Excel alone, without consulting external documentation. Comprehensive user manuals (operator guide) and technical documentation (architecture, function reference) are also required deliverables — see Project Plan Section 8.
+
 ### File 1: Brand_Config.xlsx
 
 #### Settings sheet (Setting/Value format)

@@ -320,11 +320,27 @@ All code governed by `duncan-coding-standards` skill. Non-negotiable.
 
 ### Config
 
--   [ ] Template generators produce valid, documented Excel files
+-   [ ] Template generators produce valid, documented Excel files with
+    the same visual polish as tabs/tracker templates (branded headers,
+    colour-coded sections, help text rows, section dividers)
+-   [ ] Every setting has an inline explanation row — an operator who
+    has never used the module can fill in the config without external
+    documentation
 -   [ ] Module runs with template defaults (no manual editing for basic
     run)
 -   [ ] All element toggles work independently
 -   [ ] Meaningful TRS error messages for incomplete/malformed config
+
+### Documentation
+
+-   [ ] Comprehensive user manual (operator guide): how to configure,
+    run, and interpret output — written for Jess/Duncan, not developers
+-   [ ] Technical documentation: module architecture, data flow,
+    function reference, config schema reference — for maintainers
+-   [ ] Module README.md per module (`brand/README.md`,
+    `portfolio/README.md`)
+-   [ ] Inline help in config templates matches the user manual (same
+    terminology, same explanations)
 
 ### Delivery
 
