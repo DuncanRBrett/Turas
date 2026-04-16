@@ -154,10 +154,38 @@ load_brand_config <- function(config_path, project_root = NULL) {
   config$respondent_id_col <- config$respondent_id_col %||% "Respondent_ID"
   config$report_title <- config$report_title %||% "Brand Health Report"
 
-  # Store project root
-
+  # Store project root and resolve all file paths
+  # All paths in config are relative to the config file's directory.
+  # This ensures configs work when synced via OneDrive/Dropbox across machines.
   config$project_root <- project_root
   config$config_path <- config_path
+
+  # Resolve data_file path
+  if (!is.null(config$data_file) && nchar(trimws(config$data_file)) > 0) {
+    if (exists("resolve_path", mode = "function")) {
+      config$data_file_resolved <- resolve_path(project_root, config$data_file)
+    } else {
+      config$data_file_resolved <- file.path(project_root, config$data_file)
+    }
+  }
+
+  # Resolve structure_file path
+  if (!is.null(config$structure_file) && nchar(trimws(config$structure_file)) > 0) {
+    if (exists("resolve_path", mode = "function")) {
+      config$structure_file_resolved <- resolve_path(project_root, config$structure_file)
+    } else {
+      config$structure_file_resolved <- file.path(project_root, config$structure_file)
+    }
+  }
+
+  # Resolve output_dir path
+  if (!is.null(config$output_dir) && nchar(trimws(config$output_dir)) > 0) {
+    if (exists("resolve_path", mode = "function")) {
+      config$output_dir_resolved <- resolve_path(project_root, config$output_dir)
+    } else {
+      config$output_dir_resolved <- file.path(project_root, config$output_dir)
+    }
+  }
 
   # Load Categories sheet (auto-detect format: template with title rows, or simple)
   categories <- tryCatch({

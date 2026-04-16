@@ -147,10 +147,8 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
   # --- STEP 2: Load survey structure ---
   if (verbose) cat("STEP 2: Loading survey structure...\n")
 
-  structure_path <- config$structure_file
-  if (!is.null(config$project_root) && !startsWith(structure_path, "/")) {
-    structure_path <- file.path(config$project_root, structure_path)
-  }
+  # Use resolved path (relative paths already resolved against config dir)
+  structure_path <- config$structure_file_resolved %||% config$structure_file
 
   structure <- tryCatch(
     load_brand_survey_structure(structure_path),
@@ -183,10 +181,8 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
   # --- STEP 3: Load data ---
   if (verbose) cat("STEP 3: Loading survey data...\n")
 
-  data_path <- config$data_file
-  if (!is.null(config$project_root) && !startsWith(data_path, "/")) {
-    data_path <- file.path(config$project_root, data_path)
-  }
+  # Use resolved path (relative paths already resolved against config dir)
+  data_path <- config$data_file_resolved %||% config$data_file
 
   data <- tryCatch({
     if (grepl("\\.csv$", data_path, ignore.case = TRUE)) {

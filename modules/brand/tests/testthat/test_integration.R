@@ -118,9 +118,9 @@ for (f in brand_files) {
                 "output_dir", "structure_file",
                 "alpha", "min_base_size", "low_base_warning"),
     Value = c("Integration Test", "Test Client", "cross-sectional", "1",
-              data_path, "IPK", "balanced",
+              "survey_data.csv", "IPK", "balanced",
               "Y", "Y", "Y", "Y", "N", "N", "N", "Y",
-              file.path(tmp_dir, "output"), structure_path,
+              "output", "Survey_Structure.xlsx",
               "0.05", "30", "75"),
     stringsAsFactors = FALSE
   )

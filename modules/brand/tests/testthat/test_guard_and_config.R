@@ -65,7 +65,7 @@ source(file.path(TURAS_ROOT, "modules", "brand", "R", "generate_config_templates
               "0.05", "30", "75",
               "#1A5276", "#2E86C1", "#B0B0B0", "#808080",
               "output/test", "Y", "Y", "Y", "Y",
-              "Brand Health Report", structure_path,
+              "Brand Health Report", "Survey_Structure.xlsx",
               "Y", "0.5", "0.5"),
     stringsAsFactors = FALSE
   )
@@ -517,4 +517,70 @@ test_that(".parse_yn handles all valid inputs", {
   expect_false(.parse_yn(NULL, default = FALSE))
   expect_true(.parse_yn(NULL, default = TRUE))
   expect_false(.parse_yn(NA, default = FALSE))
+})
+
+
+# ==============================================================================
+# PATH RESOLUTION TESTS (OneDrive portability)
+# ==============================================================================
+
+test_that("load_brand_config resolves relative paths against config dir", {
+  tmp_dir <- file.path(tempdir(), "brand_path_test")
+  dir.create(tmp_dir, showWarnings = FALSE, recursive = TRUE)
+  on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
+
+  files <- .create_test_config_files(tmp_dir)
+  config <- load_brand_config(files$config_path)
+
+  # project_root should be the config file's directory
+  expect_equal(normalizePath(config$project_root, mustWork = FALSE),
+               normalizePath(tmp_dir, mustWork = FALSE))
+
+  # Resolved paths should be absolute (regardless of what's in config)
+  expect_true(!is.null(config$structure_file_resolved))
+  expect_true(grepl("^/", config$structure_file_resolved) ||
+              grepl("^[A-Z]:", config$structure_file_resolved))
+
+  # Resolved structure file should point to the right place
+  expect_true(file.exists(config$structure_file_resolved))
+})
+
+test_that("relative data_file path resolves correctly", {
+  tmp_dir <- file.path(tempdir(), "brand_rel_data_test")
+  sub_dir <- file.path(tmp_dir, "data")
+  dir.create(sub_dir, showWarnings = FALSE, recursive = TRUE)
+  on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
+
+  # Create data in a subdirectory
+  data_path <- file.path(sub_dir, "survey.csv")
+  write.csv(data.frame(x = 1:5), data_path, row.names = FALSE)
+
+  # Create config with relative data_file path
+  config_path <- file.path(tmp_dir, "cfg.xlsx")
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "Settings")
+  openxlsx::writeData(wb, "Settings", data.frame(
+    Setting = c("project_name", "client_name", "data_file", "focal_brand",
+                "output_dir", "structure_file"),
+    Value = c("Test", "Client", "data/survey.csv", "IPK",
+              "output", "Survey_Structure.xlsx"),
+    stringsAsFactors = FALSE
+  ))
+  openxlsx::addWorksheet(wb, "Categories")
+  openxlsx::writeData(wb, "Categories", data.frame(
+    Category = "FV", Type = "transaction", Timeframe_Target = "3m",
+    stringsAsFactors = FALSE
+  ))
+  openxlsx::addWorksheet(wb, "DBA_Assets")
+  openxlsx::saveWorkbook(wb, config_path, overwrite = TRUE)
+
+  config <- load_brand_config(config_path)
+
+  # data_file should be the original relative value
+  expect_equal(config$data_file, "data/survey.csv")
+
+  # data_file_resolved should be absolute and point to the correct file
+  expect_true(file.exists(config$data_file_resolved))
+  expect_equal(normalizePath(config$data_file_resolved),
+               normalizePath(data_path))
 })
