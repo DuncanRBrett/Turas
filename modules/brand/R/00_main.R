@@ -256,10 +256,20 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
     if (isTRUE(config$element_mental_avail) && nrow(cat_ceps) > 0) {
       if (verbose) cat("  Running Mental Availability...\n")
 
-      # Build CEP linkage (try pre-shaped matrix approach)
+      # Build CEP linkage from data
+      # Column names in data follow: QuestionCode_BrandCode pattern
+      # QuestionCode comes from Questions sheet (e.g., CEP01_DSS)
+      # We need to map CEP codes to their question codes for column matching
+      cep_questions <- get_questions_for_battery(structure, "cep_matrix", cat_name)
+      cep_col_codes <- if (nrow(cep_questions) > 0) {
+        cep_questions$QuestionCode
+      } else {
+        cat_ceps$CEPCode  # fallback to raw CEP codes
+      }
+
       linkage <- tryCatch(
         build_cep_linkage_from_matrix(
-          data, cat_ceps$CEPCode, cat_brands$BrandCode
+          data, cep_col_codes, cat_brands$BrandCode
         ),
         error = function(e) {
           warnings_list <<- c(warnings_list,
@@ -269,13 +279,25 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       )
 
       if (!is.null(linkage)) {
+        # Map question codes to CEP labels for display
+        cep_labels_mapped <- data.frame(
+          CEPCode = cep_col_codes,
+          CEPText = if (nrow(cep_questions) > 0 && nrow(cat_ceps) > 0) {
+            # Match question codes to CEP texts via position
+            cep_questions$QuestionText[seq_along(cep_col_codes)]
+          } else {
+            cep_col_codes
+          },
+          stringsAsFactors = FALSE
+        )
+
         cat_result$mental_availability <- run_mental_availability(
           linkage = linkage,
-          cep_labels = cat_ceps,
+          cep_labels = cep_labels_mapped,
           focal_brand = config$focal_brand,
           weights = weights,
           run_cep_turf = isTRUE(config$element_cep_turf),
-          turf_max_items = min(10, nrow(cat_ceps))
+          turf_max_items = min(10, length(cep_col_codes))
         )
       }
     }
@@ -371,7 +393,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
             cep_brand_matrix = ma_result$cep_brand_matrix,
             penetration_vector = focal_pen,
             focal_brand = config$focal_brand,
-            cep_labels = cat_ceps,
+            cep_labels = if (exists("cep_labels_mapped")) cep_labels_mapped else cat_ceps,
             weights = weights
           ),
           error = function(e) {
