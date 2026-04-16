@@ -1,187 +1,89 @@
 # ==============================================================================
-# MAXDIFF MODULE - TURF ANALYSIS - TURAS V11.0
+# MAXDIFF MODULE - TURF ANALYSIS (WRAPPER)
 # ==============================================================================
-# Total Unduplicated Reach & Frequency analysis for portfolio optimization
-# Part of Turas MaxDiff Module
+# MaxDiff-specific wrapper around the shared TURF engine.
+# The core TURF logic lives in modules/shared/lib/turf_engine.R for reuse
+# across maxdiff (portfolio TURF), brand (CEP TURF), and portfolio
+# (category TURF) modules.
 #
 # VERSION HISTORY:
 # Turas v11.0 - Initial release (2026-03)
+# Turas v11.2 - Extracted core to shared/lib/turf_engine.R (2026-04)
 #
-# WHAT IS TURF?
-# Given individual-level utilities, TURF finds the combination of K items
-# that maximizes "reach" -- the % of respondents for whom at least one
-# item in the portfolio is appealing.
+# This file provides backward-compatible wrappers that delegate to the
+# shared engine while preserving the maxdiff-specific refusal handling.
 #
 # DEPENDENCIES:
-# - utils.R (rescale_utilities, is_missing_value)
+# - modules/shared/lib/turf_engine.R (shared TURF engine)
 # ==============================================================================
 
-TURF_VERSION <- "11.1"
+TURF_VERSION <- "11.2"
 
-# ==============================================================================
-# APPEAL CLASSIFICATION
-# ==============================================================================
-
-#' Classify items as appealing per respondent
-#'
-#' For each respondent, determines which items they find appealing based
-#' on the chosen threshold method.
-#'
-#' @param individual_utils Matrix or data frame. Rows = respondents, cols = items.
-#'   Column names should be Item_IDs.
-#' @param method Character. Threshold method:
-#'   "ABOVE_MEAN" - item utility > respondent's mean utility
-#'   "TOP_3" - respondent's top 3 items
-#'   "TOP_K" - respondent's top K items (requires k parameter)
-#'   "ABOVE_ZERO" - item utility > 0
-#' @param k Integer. Number of top items for TOP_K method (default: 3)
-#'
-#' @return Logical matrix. Same dimensions as individual_utils.
-#'   TRUE = respondent finds item appealing.
-#'
-#' @keywords internal
-classify_appeal <- function(individual_utils, method = "ABOVE_MEAN", k = 3) {
-
-  if (is.null(individual_utils) || nrow(individual_utils) == 0) {
-    return(matrix(logical(0), nrow = 0, ncol = 0))
+# --- Source shared TURF engine ---
+.source_turf_engine <- function() {
+  # Already loaded?
+  if (exists("TURF_ENGINE_VERSION", envir = globalenv(), inherits = FALSE)) {
+    return(invisible(NULL))
   }
 
-  utils_mat <- as.matrix(individual_utils)
-  n_resp <- nrow(utils_mat)
-  n_items <- ncol(utils_mat)
+  # Try multiple paths to find the shared engine
+  candidates <- character(0)
 
-  method <- toupper(trimws(method))
+  # Path 1: via script_dir_override (set during testing)
+  if (exists("script_dir_override", envir = globalenv())) {
+    sdir <- get("script_dir_override", envir = globalenv())
+    candidates <- c(candidates, file.path(dirname(sdir), "..", "shared", "lib", "turf_engine.R"))
+  }
 
-  appeal <- matrix(FALSE, nrow = n_resp, ncol = n_items)
-  colnames(appeal) <- colnames(utils_mat)
+  # Path 2: via find_turas_root() if available
+  if (exists("find_turas_root", mode = "function")) {
+    candidates <- c(candidates,
+      file.path(find_turas_root(), "modules", "shared", "lib", "turf_engine.R"))
+  }
 
-  if (method == "ABOVE_MEAN") {
-    row_means <- rowMeans(utils_mat, na.rm = TRUE)
-    for (i in seq_len(n_resp)) {
-      cmp <- utils_mat[i, ] > row_means[i]
-      appeal[i, ] <- ifelse(is.na(cmp), FALSE, cmp)
-    }
-  } else if (method %in% c("TOP_3", "TOP_K")) {
-    top_k <- if (method == "TOP_3") 3L else as.integer(k)
-    top_k <- min(top_k, n_items)
-    for (i in seq_len(n_resp)) {
-      ranks <- rank(-utils_mat[i, ], ties.method = "first", na.last = "keep")
-      appeal[i, ] <- !is.na(ranks) & ranks <= top_k
-    }
-  } else if (method == "ABOVE_ZERO") {
-    cmp <- utils_mat > 0
-    appeal <- ifelse(is.na(cmp), FALSE, cmp)
-  } else {
-    # Default to ABOVE_MEAN
-    row_means <- rowMeans(utils_mat, na.rm = TRUE)
-    for (i in seq_len(n_resp)) {
-      cmp <- utils_mat[i, ] > row_means[i]
-      appeal[i, ] <- ifelse(is.na(cmp), FALSE, cmp)
+  # Path 3: relative to this file (when sourced normally)
+  if (exists("sys.frame") && !is.null(tryCatch(sys.frame(1)$ofile, error = function(e) NULL))) {
+    this_dir <- dirname(sys.frame(1)$ofile)
+    candidates <- c(candidates,
+      file.path(this_dir, "..", "..", "shared", "lib", "turf_engine.R"))
+  }
+
+  # Path 4: from working directory
+  candidates <- c(candidates, "modules/shared/lib/turf_engine.R")
+
+  for (path in candidates) {
+    path <- normalizePath(path, mustWork = FALSE)
+    if (file.exists(path)) {
+      source(path, local = FALSE)
+      return(invisible(NULL))
     }
   }
 
-  return(appeal)
+  warning("Could not find shared TURF engine (turf_engine.R). Using maxdiff-local fallback.")
 }
 
+.source_turf_engine()
+
 
 # ==============================================================================
-# REACH CALCULATION
+# BACKWARD-COMPATIBLE MAXDIFF WRAPPERS
 # ==============================================================================
+# The shared engine uses 'individual_scores' as the parameter name.
+# MaxDiff callers use 'individual_utils'. These wrappers maintain the
+# existing maxdiff API so no caller code needs to change.
 
-#' Calculate reach for a portfolio of items
-#'
-#' Computes the % of respondents for whom at least one item in the
-#' portfolio is appealing.
-#'
-#' @param appeal_matrix Logical matrix from classify_appeal()
-#' @param item_indices Integer vector. Column indices of items in portfolio
-#' @param weights Numeric vector. Respondent weights (optional)
-#'
-#' @return Numeric. Reach proportion (0-1)
-#'
-#' @keywords internal
-calculate_reach <- function(appeal_matrix, item_indices, weights = NULL) {
-
-  if (length(item_indices) == 0) return(0)
-
-  n_resp <- nrow(appeal_matrix)
-  if (n_resp == 0) return(0)
-
-  # Check if any item in portfolio appeals to each respondent
-  if (length(item_indices) == 1) {
-    reached <- appeal_matrix[, item_indices]
-  } else {
-    reached <- rowSums(appeal_matrix[, item_indices, drop = FALSE]) > 0
-  }
-
-  if (is.null(weights)) {
-    return(mean(reached, na.rm = TRUE))
-  } else {
-    weights <- weights[!is.na(reached)]
-    reached <- reached[!is.na(reached)]
-    return(sum(weights * reached) / sum(weights))
-  }
+if (!exists("classify_appeal", mode = "function")) {
+  # Fallback: if shared engine failed to load, the original functions
+  # are needed. This should not happen in production.
+  stop("TURF engine not loaded. Check that modules/shared/lib/turf_engine.R exists.")
 }
 
+# Override run_turf_analysis to add maxdiff-specific refusal handling
+.shared_run_turf <- run_turf_analysis
 
-#' Calculate frequency for a portfolio of items
-#'
-#' Computes the average number of appealing items per respondent
-#' within the portfolio.
-#'
-#' @param appeal_matrix Logical matrix from classify_appeal()
-#' @param item_indices Integer vector. Column indices of items in portfolio
-#' @param weights Numeric vector. Respondent weights (optional)
-#'
-#' @return Numeric. Average frequency
-#'
-#' @keywords internal
-calculate_frequency <- function(appeal_matrix, item_indices, weights = NULL) {
-
-  if (length(item_indices) == 0) return(0)
-
-  n_resp <- nrow(appeal_matrix)
-  if (n_resp == 0) return(0)
-
-  freq_per_resp <- rowSums(appeal_matrix[, item_indices, drop = FALSE])
-
-  if (is.null(weights)) {
-    return(mean(freq_per_resp, na.rm = TRUE))
-  } else {
-    return(sum(weights * freq_per_resp) / sum(weights))
-  }
-}
-
-
-# ==============================================================================
-# GREEDY TURF OPTIMIZATION
-# ==============================================================================
-
-#' Run TURF analysis with greedy optimization
-#'
-#' Finds the optimal portfolio of items that maximizes reach using
-#' a greedy forward-selection algorithm.
-#'
-#' @param individual_utils Matrix or data frame. Rows = respondents, cols = items.
-#'   Column names should be Item_IDs.
-#' @param items Data frame. Item definitions with Item_ID and Item_Label columns.
-#' @param max_items Integer. Maximum portfolio size to evaluate (default: 10)
-#' @param threshold_method Character. Appeal threshold method
-#'   (default: "ABOVE_MEAN"). See classify_appeal() for options.
-#' @param threshold_k Integer. K for TOP_K method (default: 3)
-#' @param weights Numeric vector. Respondent weights (optional)
-#' @param verbose Logical. Print progress (default: TRUE)
-#'
-#' @return List with:
-#'   \item{incremental_table}{Data frame with columns: Step, Item_ID, Item_Label,
-#'     Reach_Pct, Incremental_Pct, Frequency}
-#'   \item{reach_curve}{Data frame with portfolio_size and reach for plotting}
-#'   \item{appeal_matrix}{The computed appeal matrix}
-#'   \item{threshold_method}{Method used}
-#'   \item{n_respondents}{Number of respondents}
-#'   \item{n_items}{Number of items evaluated}
-#'
-#' @export
+#' @rdname run_turf_analysis
+#' @description MaxDiff wrapper around shared TURF engine. Adds maxdiff-specific
+#'   TRS refusal handling for missing individual utilities.
 run_turf_analysis <- function(individual_utils, items,
                               max_items = 10,
                               threshold_method = "ABOVE_MEAN",
@@ -189,7 +91,7 @@ run_turf_analysis <- function(individual_utils, items,
                               weights = NULL,
                               verbose = TRUE) {
 
-  # --- Validate inputs ---
+  # MaxDiff-specific refusal for missing utilities
   if (is.null(individual_utils) || nrow(individual_utils) == 0) {
     if (exists("maxdiff_refuse", mode = "function")) {
       maxdiff_refuse(
@@ -203,228 +105,18 @@ run_turf_analysis <- function(individual_utils, items,
     return(list(status = "REFUSED", message = "No individual utilities available"))
   }
 
-  # Drop non-numeric columns (e.g., resp_id) before matrix conversion
-  if (is.data.frame(individual_utils)) {
-    numeric_cols <- sapply(individual_utils, is.numeric)
-    utils_mat <- as.matrix(individual_utils[, numeric_cols, drop = FALSE])
-  } else {
-    utils_mat <- as.matrix(individual_utils)
-  }
-  n_resp <- nrow(utils_mat)
-  n_items <- ncol(utils_mat)
-  item_names <- colnames(utils_mat)
-
-  max_items <- min(max_items, n_items)
-
-  if (verbose) {
-    cat(sprintf("  TURF Analysis: %d respondents, %d items, max portfolio = %d\n",
-                n_resp, n_items, max_items))
-    cat(sprintf("  Threshold method: %s\n", threshold_method))
-  }
-
-  # --- Classify appeal ---
-  appeal <- classify_appeal(utils_mat, method = threshold_method, k = threshold_k)
-
-  # --- Greedy forward selection ---
-  selected <- integer(0)
-  available <- seq_len(n_items)
-
-  results <- data.frame(
-    Step = integer(0),
-    Item_ID = character(0),
-    Item_Label = character(0),
-    Reach_Pct = numeric(0),
-    Incremental_Pct = numeric(0),
-    Frequency = numeric(0),
-    stringsAsFactors = FALSE
-  )
-
-  prev_reach <- 0
-
-  for (step in seq_len(max_items)) {
-    best_item <- NA_integer_
-    best_reach <- -1
-
-    # Find item that adds most incremental reach
-    for (candidate in available) {
-      trial_portfolio <- c(selected, candidate)
-      trial_reach <- calculate_reach(appeal, trial_portfolio, weights)
-
-      if (trial_reach > best_reach) {
-        best_reach <- trial_reach
-        best_item <- candidate
-      }
-    }
-
-    if (is.na(best_item)) break
-
-    selected <- c(selected, best_item)
-    available <- setdiff(available, best_item)
-
-    incremental <- best_reach - prev_reach
-    freq <- calculate_frequency(appeal, selected, weights)
-
-    # Look up label
-    item_id <- item_names[best_item]
-    item_label <- item_id
-    if (!is.null(items) && "Item_ID" %in% names(items) && "Item_Label" %in% names(items)) {
-      match_idx <- match(item_id, items$Item_ID)
-      if (!is.na(match_idx)) {
-        item_label <- items$Item_Label[match_idx]
-      }
-    }
-
-    results <- rbind(results, data.frame(
-      Step = step,
-      Item_ID = item_id,
-      Item_Label = item_label,
-      Reach_Pct = round(best_reach * 100, 1),
-      Incremental_Pct = round(incremental * 100, 1),
-      Frequency = round(freq, 2),
-      stringsAsFactors = FALSE
-    ))
-
-    prev_reach <- best_reach
-
-    if (verbose) {
-      cat(sprintf("  Step %d: +%s (Reach: %.1f%%, +%.1f%%)\n",
-                  step, item_label, best_reach * 100, incremental * 100))
-    }
-
-    # Stop if 100% reach
-    if (best_reach >= 0.999) break
-  }
-
-  # Build reach curve for plotting
-  reach_curve <- data.frame(
-    Portfolio_Size = c(0, results$Step),
-    Reach_Pct = c(0, results$Reach_Pct)
-  )
-
-  list(
-    status = "PASS",
-    incremental_table = results,
-    reach_curve = reach_curve,
-    appeal_matrix = appeal,
+  # Delegate to shared engine
+  .shared_run_turf(
+    individual_scores = individual_utils,
+    items = items,
+    max_items = max_items,
     threshold_method = threshold_method,
-    n_respondents = n_resp,
-    n_items = n_items,
-    max_items_evaluated = max_items
+    threshold_k = threshold_k,
+    weights = weights,
+    verbose = verbose,
+    id_col = "Item_ID",
+    label_col = "Item_Label"
   )
-}
-
-
-# ==============================================================================
-# CUSTOM PORTFOLIO REACH
-# ==============================================================================
-
-#' Calculate reach for a specific portfolio
-#'
-#' Given a pre-computed appeal matrix, calculates reach and frequency
-#' for a user-specified set of items.
-#'
-#' @param appeal_matrix Logical matrix from classify_appeal() or run_turf_analysis()
-#' @param item_ids Character vector. Item IDs in the portfolio
-#' @param all_item_ids Character vector. All item IDs (column names of appeal_matrix)
-#' @param weights Numeric vector. Respondent weights (optional)
-#'
-#' @return List with reach_pct and frequency
-#'
-#' @export
-calculate_portfolio_reach <- function(appeal_matrix, item_ids, all_item_ids = NULL,
-                                      weights = NULL) {
-
-  if (is.null(all_item_ids)) {
-    all_item_ids <- colnames(appeal_matrix)
-  }
-
-  indices <- match(item_ids, all_item_ids)
-  indices <- indices[!is.na(indices)]
-
-  if (length(indices) == 0) {
-    return(list(reach_pct = 0, frequency = 0, n_items = 0))
-  }
-
-  reach <- calculate_reach(appeal_matrix, indices, weights)
-  freq <- calculate_frequency(appeal_matrix, indices, weights)
-
-  list(
-    reach_pct = round(reach * 100, 1),
-    frequency = round(freq, 2),
-    n_items = length(indices)
-  )
-}
-
-
-# ==============================================================================
-# REACH SENSITIVITY ANALYSIS
-# ==============================================================================
-
-#' Compare TURF reach across different threshold methods
-#'
-#' Runs the TURF greedy selection for multiple threshold methods and
-#' returns a comparison table showing how reach varies by method.
-#'
-#' @param individual_utils Matrix or data frame. Rows = respondents, cols = items.
-#' @param items Data frame. Item definitions with Item_ID and Item_Label.
-#' @param portfolio_sizes Integer vector. Portfolio sizes to compare (default: 1:5).
-#' @param methods Character vector. Threshold methods to compare.
-#' @param weights Numeric vector. Respondent weights (optional).
-#' @param verbose Logical. Print progress (default: FALSE).
-#'
-#' @return Data frame with columns: Portfolio_Size, Method, Reach_Pct
-#'
-#' @export
-compute_reach_sensitivity <- function(individual_utils, items,
-                                       portfolio_sizes = 1:5,
-                                       methods = c("ABOVE_MEAN", "TOP_3", "ABOVE_ZERO"),
-                                       weights = NULL,
-                                       verbose = FALSE) {
-
-  if (is.null(individual_utils) || nrow(individual_utils) == 0) {
-    return(data.frame(Portfolio_Size = integer(), Method = character(),
-                      Reach_Pct = numeric(), stringsAsFactors = FALSE))
-  }
-
-  results <- list()
-
-  for (method in methods) {
-    turf <- tryCatch(
-      run_turf_analysis(
-        individual_utils = individual_utils,
-        items = items,
-        max_items = max(portfolio_sizes),
-        threshold_method = method,
-        weights = weights,
-        verbose = verbose
-      ),
-      error = function(e) NULL
-    )
-
-    if (is.null(turf) || is.null(turf$reach_curve)) next
-
-    for (ps in portfolio_sizes) {
-      reach <- if (ps <= nrow(turf$incremental_table)) {
-        turf$incremental_table$Reach_Pct[ps]
-      } else {
-        max(turf$incremental_table$Reach_Pct)
-      }
-
-      results[[length(results) + 1]] <- data.frame(
-        Portfolio_Size = ps,
-        Method = method,
-        Reach_Pct = reach,
-        stringsAsFactors = FALSE
-      )
-    }
-  }
-
-  if (length(results) == 0) {
-    return(data.frame(Portfolio_Size = integer(), Method = character(),
-                      Reach_Pct = numeric(), stringsAsFactors = FALSE))
-  }
-
-  do.call(rbind, results)
 }
 
 
@@ -432,4 +124,6 @@ compute_reach_sensitivity <- function(individual_utils, items,
 # MODULE INITIALIZATION
 # ==============================================================================
 
-message(sprintf("TURAS>MaxDiff TURF module loaded (v%s)", TURF_VERSION))
+message(sprintf("TURAS>MaxDiff TURF wrapper loaded (v%s, engine v%s)",
+                TURF_VERSION,
+                if (exists("TURF_ENGINE_VERSION")) TURF_ENGINE_VERSION else "?"))
