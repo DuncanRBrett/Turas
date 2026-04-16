@@ -21,6 +21,14 @@ launch_turas <- function() {
     turas_root <- getwd()
   }
 
+  # Load .env for local development (Docker reads .env via docker-compose.
+  # For local R sessions this sets TURAS_PROJECTS_ROOT etc. on every call
+  # so no R restart is needed after editing .env.)
+  env_file <- file.path(turas_root, ".env")
+  if (file.exists(env_file)) {
+    readRenviron(env_file)
+  }
+
   # Validate: must contain launch_turas.R (the marker file for Turas root)
   if (!file.exists(file.path(turas_root, "launch_turas.R"))) {
     # Try parent directory

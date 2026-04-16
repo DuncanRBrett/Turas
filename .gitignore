@@ -78,6 +78,9 @@ Thumbs.db
 # Marketing materials (moved to Google Drive)
 docs/marketing/
 
+# Environment / machine-specific config (never commit)
+.env
+
 # User project directories (not part of core Turas)
 my_*
 projects/
