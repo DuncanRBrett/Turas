@@ -210,7 +210,7 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
   font-size: 11px;
 }
 
-/* In-cell ▲/▼ sig badge — superscript-ish, doesn't push the number */
+/* In-cell up/down sig badge — superscript-style, compact */
 .fn-td .fn-sig {
   display: inline-block; margin-left: 4px;
   font-size: 10px; font-weight: 700;
@@ -236,8 +236,8 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 .fn-help-btn:hover, .fn-sort-btn:hover {
   background: #e2e8f0; color: #1e293b;
 }
-.fn-sort-btn[data-fn-sort-dir="asc"]::after  { content: "\2191"; font-size: 10px; margin-left: 1px; color: var(--fn-brand); }
-.fn-sort-btn[data-fn-sort-dir="desc"]::after { content: "\2193"; font-size: 10px; margin-left: 1px; color: var(--fn-brand); }
+.fn-sort-btn[data-fn-sort-dir="asc"]::after  { content: "\u2191"; font-size: 10px; margin-left: 1px; color: var(--fn-brand); }
+.fn-sort-btn[data-fn-sort-dir="desc"]::after { content: "\u2193"; font-size: 10px; margin-left: 1px; color: var(--fn-brand); }
 .fn-sort-btn[data-fn-sort-dir="asc"],
 .fn-sort-btn[data-fn-sort-dir="desc"] {
   background: rgba(26,82,118,0.08); color: var(--fn-brand);
