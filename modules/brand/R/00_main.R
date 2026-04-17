@@ -60,6 +60,7 @@ BRAND_VERSION <- "1.0"
     "03a_funnel_derive.R",
     "03b_funnel_metrics.R",
     "03_funnel.R",
+    "03c_funnel_panel_data.R",
     "04_repertoire.R",
     "05_wom.R",
     "06_drivers_barriers.R",

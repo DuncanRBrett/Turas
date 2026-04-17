@@ -117,24 +117,40 @@ build_ma_tables <- function(ma, focal_brand) {
 }
 
 
-#' Build all tables for Funnel
+#' Build all tables for Funnel (role-registry architecture)
+#'
+#' Consumes the new long-format \code{funnel$stages} directly. Falls back
+#' to the legacy wide adapter to keep the table's column schema stable
+#' while the HTML renderers are being migrated to the new data contract.
+#'
 #' @keywords internal
 build_funnel_tables <- function(funnel, focal_brand) {
   if (is.null(funnel) || identical(funnel$status, "REFUSED")) return("")
+  if (is.null(funnel$stages) || nrow(funnel$stages) == 0) return("")
+
+  brand_codes <- unique(as.character(funnel$stages$brand_code))
+  brand_list <- data.frame(BrandCode = brand_codes, stringsAsFactors = FALSE)
+
+  legacy_wide <- build_funnel_legacy_wide(funnel, brand_list)
+  legacy_conv <- build_funnel_legacy_conversions(funnel, brand_list)
 
   parts <- character(0)
   parts <- c(parts, build_br_table(
-    funnel$stage_metrics, "BrandCode", focal_brand,
+    legacy_wide, "BrandCode", focal_brand,
     pct_cols = c("Aware_Pct", "Positive_Pct", "Love_Pct", "Prefer_Pct",
                  "Ambivalent_Pct", "Reject_Pct", "NoOpinion_Pct",
                  "Bought_Pct", "Primary_Pct"),
     title = "Funnel Stage Metrics",
-    caption = sprintf("Base: n = %d", funnel$n_respondents %||% 0)))
+    caption = sprintf("Base: n = %d unweighted",
+                      funnel$meta$n_unweighted %||% 0)))
 
-  parts <- c(parts, build_br_table(
-    funnel$conversion_metrics, "BrandCode", focal_brand,
-    pct_cols = c("Aware_to_Positive", "Positive_to_Bought", "Bought_to_Primary"),
-    title = "Stage-to-Stage Conversion (%)"))
+  if (nrow(legacy_conv) > 0) {
+    parts <- c(parts, build_br_table(
+      legacy_conv, "BrandCode", focal_brand,
+      pct_cols = c("Aware_to_Positive", "Positive_to_Bought",
+                   "Bought_to_Primary"),
+      title = "Stage-to-Stage Conversion (%)"))
+  }
 
   paste(parts, collapse = "\n")
 }

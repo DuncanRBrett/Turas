@@ -184,8 +184,9 @@ build_br_summary_panel <- function(results, config) {
       mpen_val <- if (!is.null(ma) && !is.null(ma$metrics_summary$focal_mpen)) {
         sprintf("%.0f%%", ma$metrics_summary$focal_mpen * 100)
       } else "\u2014"
-      aware_val <- if (!is.null(funnel) && !is.null(funnel$metrics_summary$focal_aware)) {
-        sprintf("%.0f%%", funnel$metrics_summary$focal_aware)
+      aware_val <- if (!is.null(funnel) &&
+                        !is.null(funnel$metrics_summary$focal_by_stage$aware)) {
+        sprintf("%.0f%%", 100 * funnel$metrics_summary$focal_by_stage$aware)
       } else "\u2014"
 
       parts <- c(parts, sprintf('

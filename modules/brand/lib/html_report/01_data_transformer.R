@@ -92,34 +92,41 @@ transform_brand_charts <- function(results, config) {
         charts[[paste0("ma_", cat_id)]] <- ma_charts
       }
 
-      # Funnel charts
+      # Funnel charts — consumes new role-registry funnel shape and
+      # adapts to the legacy wide data frame expected by the existing
+      # SVG builders (build_funnel_chart, build_dot_plot). This adapter
+      # stays until the HTML panel migrates to build_funnel_panel_data().
       funnel <- cr$funnel
-      if (!is.null(funnel) && !identical(funnel$status, "REFUSED")) {
+      if (!is.null(funnel) && !identical(funnel$status, "REFUSED") &&
+          !is.null(funnel$stages) && nrow(funnel$stages) > 0) {
         funnel_charts <- list()
+        brand_list_local <- data.frame(
+          BrandCode = unique(as.character(funnel$stages$brand_code)),
+          stringsAsFactors = FALSE)
+        legacy_wide <- build_funnel_legacy_wide(funnel, brand_list_local)
+        legacy_conv <- build_funnel_legacy_conversions(funnel, brand_list_local)
 
-        # 5. Funnel bar with attitude decomposition
-        if (!is.null(funnel$stage_metrics)) {
+        if (nrow(legacy_wide) > 0) {
           funnel_charts[[length(funnel_charts) + 1]] <- list(
-            svg = build_funnel_chart(funnel$stage_metrics, focal, brand_colour,
+            svg = build_funnel_chart(legacy_wide, focal, brand_colour,
                                      title = sprintf("Brand Funnel \u2014 %s", cat_name)),
             title = "Brand Funnel"
           )
         }
-
-        # 6. Conversion leak dot plot
-        if (!is.null(funnel$conversion_metrics)) {
+        if (nrow(legacy_conv) > 0 && !all(is.na(legacy_conv$Aware_to_Positive))) {
           conv_df <- data.frame(
-            Label = paste(funnel$conversion_metrics$BrandCode, "\u2014 Aware\u2192Positive"),
-            Value = funnel$conversion_metrics$Aware_to_Positive,
+            Label = paste(legacy_conv$BrandCode, "\u2014 Aware\u2192Consideration"),
+            Value = legacy_conv$Aware_to_Positive,
             stringsAsFactors = FALSE
           )
           funnel_charts[[length(funnel_charts) + 1]] <- list(
-            svg = build_dot_plot(conv_df, focal_label = paste(focal, "\u2014 Aware\u2192Positive"),
+            svg = build_dot_plot(conv_df,
+                                focal_label = paste(focal, "\u2014 Aware\u2192Consideration"),
                                 brand_colour = brand_colour,
                                 comp_colour = comp_colour,
-                                title = sprintf("Conversion: Aware \u2192 Positive \u2014 %s", cat_name),
+                                title = sprintf("Conversion: Aware \u2192 Consideration \u2014 %s", cat_name),
                                 value_suffix = "%",
-                                ref_line = median(conv_df$Value),
+                                ref_line = median(conv_df$Value, na.rm = TRUE),
                                 ref_label = "Median"),
             title = "Conversion Rates"
           )
