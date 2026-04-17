@@ -38,17 +38,16 @@ Supports three category types: transactional (FMCG), durable, service. Stage sha
 
 ## 3. Stage derivation
 
-### 3.1 Transactional (up to 5 stages)
+### 3.1 Transactional (up to 4 stages)
 
 | \# | Stage | Default label | Derivation |
 |----|----|----|----|
 | 1 | Aware | Aware | `funnel.awareness = 1` |
-| 2 | Consideration | Consideration | `aware = 1` AND `attitude ∈ {love, prefer, ambivalent}` |
-| 3 | Bought | Bought | prev stage AND `bought_long = 1` — omitted if role absent |
-| 4 | Frequent | Frequent | prev stage AND `bought_target = 1` — omitted if role absent |
-| 5 | Preferred | Preferred | prev stage AND `frequency` = argmax across all brands for that respondent (ties counted — all tied brands flagged as Preferred) |
+| 2 | Consideration | Consider | `aware = 1` AND `attitude ∈ {love, prefer, ambivalent}` |
+| 3 | Long Period | Long Period | prev stage AND `bought_long = 1` — omitted if role absent |
+| 4 | Target Period | Target Period | prev stage AND `bought_target = 1` — omitted if role absent |
 
-Stages 3–5 collapse individually when their roles are absent. Minimum funnel = stages 1–2.
+Stages 3–4 collapse individually when their roles are absent. Minimum funnel = stages 1–2. Heavy-buyer / frequency analysis is **not** a funnel stage — it lives in the Repertoire / Frequency element, where the full buying-rate distribution can be shown instead of a single threshold cut (v2.1 decision).
 
 ### 3.2 Durable (up to 4 stages)
 
@@ -76,11 +75,15 @@ For every brand B and every stage S \> 1: `count(B, S) ≤ count(B, S-1)`.
 
 Nested by construction: each stage's derivation ANDs the previous stage's boolean matrix. Guard test enforces on every run. On violation, refuse with `CALC_NESTING_VIOLATED` and a diagnostic showing the offending (brand, stage, count) tuple.
 
-### 3.5 "Preferred" ties
+### 3.5 Why no Heavy Buyer / Preferred stage
 
-A respondent whose max frequency is tied across multiple brands is counted as Preferred for **all** tied brands. Brand-level Preferred percentages can therefore sum to \>100% across the category. This is documented in the About drawer:
+Earlier drafts placed a fifth "Preferred" stage (frequency argmax with ties) at the apex of the transactional funnel. That was dropped in v2.1 for three reasons:
 
-> *Preferred includes ties. Respondents whose purchase frequency is equal-highest across multiple brands are counted for each of those brands. Preferred percentages can sum above 100% across the category as a result.*
+1.  A funnel is a binary leakage story. Every other stage answers "did this person do X or not" without a threshold choice; a heavy-buyer cut requires one (personal mean / absolute / top quartile) and the debate is a symptom of the stage being the wrong shape.
+2.  Frequency is a distribution, not a milestone. Showing the full distribution in a dedicated Frequency view preserves information a single cut throws away.
+3.  Heavy-buyer-of-N-brands breaks the 1-respondent → 1-place mental model that funnel-shape reads ("we convert X% of aware into heavy") implicitly assume.
+
+Heavy buyers, Share of Requirements, and frequency bands therefore live in the Repertoire / Frequency element, not the funnel. The brand-level frequency role (`funnel.transactional.frequency`) is still loaded because the About drawer references it — the funnel just doesn't consume it as a stage.
 
 ------------------------------------------------------------------------
 
@@ -253,7 +256,7 @@ list(
     methodology_note,        # nested-funnel callout (canonical text, §9.3)
     base_note,               # weighted vs unweighted explanation
     significance_note,       # panel-sampling disclosure (canonical text, §8.3)
-    ties_note,               # Preferred ties explanation (canonical text, §3.5)
+    heavy_buyer_note,        # points readers to Repertoire/Frequency panel (§3.5)
     prior_brand_note         # service only, when role present
   )
 )
@@ -321,7 +324,7 @@ About drawer carries verbatim:
 
 ### 9.2 Per-stage application
 
-Applied to each stage's base independently, not to total sample size. A brand with total n=200 but Preferred n=15 gets the Preferred metric flagged while earlier stages pass.
+Applied to each stage's base independently, not to total sample size. A brand with total n=200 but Target Period n=15 gets the Target Period metric flagged while earlier stages pass.
 
 ### 9.3 Nested-funnel methodology — canonical text
 
@@ -339,7 +342,7 @@ QuestionText values substituted from QuestionMap.
 
 Three synthetic 10-respondent fixtures, each hand-calculated in `funnel_known_answers.xlsx`:
 
--   **Transactional fixture** — 10 respondents × 3 brands, covering all 5 stages, including one Preferred tie case. Expected values pre-computed by hand.
+-   **Transactional fixture** — 10 respondents × 3 brands, covering all 4 stages (Aware → Consider → Long Period → Target Period). Expected values pre-computed by hand.
 -   **Durable fixture** — 10 respondents × 3 brands with `current_owner` + `tenure` covering threshold edge cases (= threshold, \< threshold, missing tenure).
 -   **Service fixture** — 10 respondents × 3 brands with `current_customer` + `prior_brand`. Validates prior-brand is About-only, not a stage.
 
@@ -354,7 +357,7 @@ Tests assert **exact** values from the hand calculations.
 -   Missing required role → guard refuses loud at config-load, not run time.
 -   OptionMap omits Ambivalent → Consideration = Love + Prefer only; About explains.
 -   Inverted attitude scale (1 = no_opinion, 5 = love) → correctly remapped; same results.
--   Preferred ties → all tied brands counted; brand-level sum \> 100% documented.
+-   Frequency role absent → funnel still runs at 4 stages; About drawer notes heavy-buyer analysis lives in Repertoire/Frequency.
 -   All brand codes contain non-ASCII → no encoding failures.
 -   Weights all equal 1 → weighted results match unweighted exactly.
 -   Weights sum to zero → guard refuses loud.
@@ -380,9 +383,9 @@ The existing `03_funnel.R` and its 62 tests are replaced wholesale.
 | Old | New |
 |----|----|
 | `run_funnel(data, brands, awareness_prefix, attitude_prefix, penetration_prefix, ...)` | `run_funnel(data, role_map, brand_list, config, weights, sig_tester)` |
-| 4-stage only (Aware / Positive / Bought / Primary) | 3–5 stages by category type |
+| 4-stage only (Aware / Positive / Bought / Primary) | 2–4 stages by category type (transactional terminates at Target Period) |
 | Single penetration prefix | Three category-type-specific role sets |
-| Primary = attitude code 1 | Preferred = frequency argmax with ties |
+| Primary = attitude code 1 | Heavy-buyer analysis moved to Repertoire/Frequency (v2.1) |
 | No nesting | Strict nesting (validated) |
 | No CIs no sig testing wired | Sig testing wired, CIs explicitly out |
 

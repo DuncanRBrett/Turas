@@ -23,14 +23,11 @@
 #   Consideration IPK=7 (70%) ROB=6 (60%) CART=5 (50%)
 #   Bought_Long   IPK=6 (60%) ROB=6 (60%) CART=5 (50%)
 #   Bought_Target IPK=5 (50%) ROB=4 (40%) CART=4 (40%)
-#   Preferred     IPK=4 (40%) ROB=3 (30%) CART=2 (20%)
 #
-# Preferred tie mechanics (FUNNEL_SPEC §3.5): tied max frequencies flag every
-# tied brand. R2 (I=4, R=4) and R10 (I=4, R=4) each contribute to both IPK
-# and ROB's Preferred count — so the column sum can exceed the Bought_Target
-# column when the respondent is in Bought_Target for both tied brands.
-# In this fixture neither tie row reduces counts (both brands are in
-# Bought_Target at those rows), so: IPK Preferred = 4, ROB = 3, CART = 2.
+# Transactional funnel has 4 stages (FUNNEL_SPEC_v2 §3.1). Heavy-buyer /
+# frequency analysis lives in the Repertoire / Frequency element, not the
+# funnel — so the Frequency column in the fixture is retained for integration
+# tests of that element but is not consumed here.
 # ==============================================================================
 
 .find_turas_root_for_test <- function() {
@@ -139,16 +136,14 @@ source(file.path(TURAS_ROOT, "modules", "brand", "R", "03_funnel.R"))
   aware         = c(IPK = 0.9, ROB = 0.8, CART = 0.7),
   consideration = c(IPK = 0.7, ROB = 0.6, CART = 0.5),
   bought_long   = c(IPK = 0.6, ROB = 0.6, CART = 0.5),
-  bought_target = c(IPK = 0.5, ROB = 0.4, CART = 0.4),
-  preferred     = c(IPK = 0.4, ROB = 0.3, CART = 0.2)
+  bought_target = c(IPK = 0.5, ROB = 0.4, CART = 0.4)
 )
 
 .expected_base_unweighted <- list(
   aware         = c(IPK = 9, ROB = 8, CART = 7),
   consideration = c(IPK = 7, ROB = 6, CART = 5),
   bought_long   = c(IPK = 6, ROB = 6, CART = 5),
-  bought_target = c(IPK = 5, ROB = 4, CART = 4),
-  preferred     = c(IPK = 4, ROB = 3, CART = 2)
+  bought_target = c(IPK = 5, ROB = 4, CART = 4)
 )
 
 
@@ -232,32 +227,13 @@ test_that("Bought_Target stage matches hand calculation", {
 })
 
 
-test_that("Preferred stage matches hand calculation (including tied max)", {
+test_that("Preferred-era stages are not materialised (funnel terminates at Target Period)", {
   data <- .fixture_transactional()
   rm <- load_role_map(.structure_transactional())
   res <- run_funnel(data, rm, .brand_list_ircc(), .config_transactional())
 
-  for (b in names(.expected_pct$preferred)) {
-    expect_equal(.pct_for(res$stages, "preferred", b),
-                 .expected_pct$preferred[[b]], tolerance = 1e-9,
-                 info = sprintf("Preferred pct for %s", b))
-  }
-})
-
-
-test_that("Preferred ties mean respondents can contribute to multiple brands", {
-  # R2 and R10 are tied between IPK and ROB at frequency 4. Both brands'
-  # Bought_Target is 1 for those respondents, so both get flagged Preferred.
-  # Sanity: brand-level Preferred sum exceeds the number of respondents
-  # contributing only if ties are counted.
-  data <- .fixture_transactional()
-  rm <- load_role_map(.structure_transactional())
-  res <- run_funnel(data, rm, .brand_list_ircc(), .config_transactional())
-
-  total_pref <- sum(res$stages$base_unweighted[
-    res$stages$stage_key == "preferred"])
-  # R1(I), R2(I,R tie), R3(C), R4(R), R8(I), R9(C), R10(I,R tie) = 9 flags
-  expect_equal(total_pref, 9)
+  expect_false("preferred" %in% res$stages$stage_key)
+  expect_false("heavy_buyer" %in% res$stages$stage_key)
 })
 
 
@@ -283,11 +259,6 @@ test_that("IPK conversion ratios match hand-calculated drops", {
     ipk$value[ipk$from_stage == "bought_long" &
               ipk$to_stage == "bought_target"],
     0.5 / 0.6, tolerance = 1e-6)
-  # Bought_Target -> Preferred = 0.4 / 0.5
-  expect_equal(
-    ipk$value[ipk$from_stage == "bought_target" &
-              ipk$to_stage == "preferred"],
-    0.4 / 0.5, tolerance = 1e-6)
 })
 
 
@@ -340,9 +311,9 @@ test_that("metrics_summary carries focal_by_stage with every stage", {
 
   ms <- res$metrics_summary
   expect_equal(ms$focal_brand, "IPK")
-  expect_equal(length(ms$focal_by_stage), 5)
+  expect_equal(length(ms$focal_by_stage), 4)
   expect_equal(ms$focal_by_stage$aware, 0.9, tolerance = 1e-9)
-  expect_equal(ms$focal_by_stage$preferred, 0.4, tolerance = 1e-9)
+  expect_equal(ms$focal_by_stage$bought_target, 0.5, tolerance = 1e-9)
 })
 
 
@@ -354,11 +325,9 @@ test_that("biggest_drop identifies IPK's weakest stage-to-stage", {
   ms <- res$metrics_summary
   expect_true(!is.null(ms$biggest_drop))
   # IPK ratios:
-  #   aware->consideration  0.778
+  #   aware->consideration  0.778  <- weakest
   #   consideration->BL     0.857
   #   BL->BT                0.833
-  #   BT->preferred         0.800
-  # Weakest ratio = aware -> consideration
   expect_equal(ms$biggest_drop$from_stage, "aware")
   expect_equal(ms$biggest_drop$to_stage, "consideration")
 })
@@ -374,7 +343,7 @@ test_that("meta records category type, focal, and stage keys", {
   expect_equal(res$meta$category_type, "transactional")
   expect_equal(res$meta$focal_brand, "IPK")
   expect_equal(res$meta$n_unweighted, 10)
-  expect_equal(res$meta$stage_count, 5)
+  expect_equal(res$meta$stage_count, 4)
   expect_setequal(res$meta$stage_keys,
-    c("aware", "consideration", "bought_long", "bought_target", "preferred"))
+    c("aware", "consideration", "bought_long", "bought_target"))
 })

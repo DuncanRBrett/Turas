@@ -185,13 +185,13 @@ test_that("run_brand produces the hand-calculated stage percentages", {
                                      stages$stage_key == "aware"]
   expect_equal(ipk_aware, 0.9, tolerance = 1e-9)
 
-  ipk_pref <- stages$pct_weighted[stages$brand_code == "IPK" &
-                                    stages$stage_key == "preferred"]
-  expect_equal(ipk_pref, 0.4, tolerance = 1e-9)
+  ipk_target <- stages$pct_weighted[stages$brand_code == "IPK" &
+                                      stages$stage_key == "bought_target"]
+  expect_equal(ipk_target, 0.5, tolerance = 1e-9)
 
-  cart_pref <- stages$pct_weighted[stages$brand_code == "CART" &
-                                     stages$stage_key == "preferred"]
-  expect_equal(cart_pref, 0.2, tolerance = 1e-9)
+  cart_target <- stages$pct_weighted[stages$brand_code == "CART" &
+                                       stages$stage_key == "bought_target"]
+  expect_equal(cart_target, 0.4, tolerance = 1e-9)
 })
 
 

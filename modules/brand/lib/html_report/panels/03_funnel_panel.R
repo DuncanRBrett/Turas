@@ -262,7 +262,7 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
   if (is.null(a)) return("")
   parts <- character(0)
   for (key in c("methodology_note", "base_note", "significance_note",
-                "ties_note", "prior_brand_note")) {
+                "heavy_buyer_note", "prior_brand_note")) {
     val <- a[[key]]
     if (!is.null(val) && is.character(val) && nzchar(trimws(val))) {
       parts <- c(parts, sprintf('<p class="fn-about-item"><strong>%s:</strong> %s</p>',
@@ -284,7 +284,7 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
     methodology_note   = "Methodology",
     base_note          = "Bases",
     significance_note  = "Significance",
-    ties_note          = "Preferred ties",
+    heavy_buyer_note   = "Heavy buyers & frequency",
     prior_brand_note   = "Prior brand",
     key)
 }

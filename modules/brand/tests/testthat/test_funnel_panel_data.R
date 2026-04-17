@@ -110,19 +110,19 @@ test_that("meta captures focal brand, category type, stage count, and N", {
   expect_equal(panel$meta$focal_brand_code, "IPK")
   expect_equal(panel$meta$focal_brand_name, "IPK")
   expect_equal(panel$meta$category_type, "transactional")
-  expect_equal(panel$meta$stage_count, 5)
+  expect_equal(panel$meta$stage_count, 4)
   expect_equal(panel$meta$n_unweighted, 10)
   expect_setequal(panel$meta$stage_keys,
-    c("aware","consideration","bought_long","bought_target","preferred"))
+    c("aware","consideration","bought_long","bought_target"))
   expect_equal(panel$meta$stage_labels[["aware"]], "Aware")
-  expect_equal(panel$meta$stage_labels[["preferred"]], "Preferred")
+  expect_equal(panel$meta$stage_labels[["bought_target"]], "Target Period")
 })
 
 
 test_that("funnel cards carry focal pct, category-avg pct, and warning flag per stage", {
   result <- .run_fixture()
   panel <- build_funnel_panel_data(result, .brand_list(), list())
-  expect_equal(length(panel$cards$funnel), 5)
+  expect_equal(length(panel$cards$funnel), 4)
 
   aware_card <- panel$cards$funnel[[1]]
   expect_equal(aware_card$stage_key, "aware")
@@ -151,10 +151,10 @@ test_that("table cells cover every (stage, brand) pair with absolute and nested 
   result <- .run_fixture()
   panel <- build_funnel_panel_data(result, .brand_list(), list())
 
-  expect_equal(length(panel$table$stage_keys), 5)
+  expect_equal(length(panel$table$stage_keys), 4)
   expect_equal(length(panel$table$brand_codes), 3)
-  # 5 stages x 3 brands = 15 cells
-  expect_equal(length(panel$table$cells), 15)
+  # 4 stages x 3 brands = 12 cells
+  expect_equal(length(panel$table$cells), 12)
 
   # IPK aware cell: absolute = 0.9; nested = same for stage 1 (no prev)
   ipk_aware <- Filter(function(c)
@@ -176,7 +176,7 @@ test_that("table includes an Average-of-all-brands row with both pct modes", {
   result <- .run_fixture()
   panel <- build_funnel_panel_data(result, .brand_list(), list())
 
-  expect_equal(length(panel$table$avg_all_brands), 5)
+  expect_equal(length(panel$table$avg_all_brands), 4)
   aware_avg <- panel$table$avg_all_brands[[1]]
   expect_equal(aware_avg$stage_key, "aware")
   # mean(0.9, 0.8, 0.7) = 0.8
@@ -195,7 +195,7 @@ test_that("shape_chart envelope carries per-stage min and max", {
   panel <- build_funnel_panel_data(result, .brand_list(), list())
 
   env <- panel$shape_chart$envelope
-  expect_equal(length(env$stage_keys), 5)
+  expect_equal(length(env$stage_keys), 4)
   # Aware: min(0.7 CART), max(0.9 IPK)
   expect_equal(env$min_values[1], 0.7, tolerance = 1e-9)
   expect_equal(env$max_values[1], 0.9, tolerance = 1e-9)
@@ -206,7 +206,7 @@ test_that("shape_chart series have one pct per stage per brand", {
   result <- .run_fixture()
   panel <- build_funnel_panel_data(result, .brand_list(), list())
 
-  expect_equal(length(panel$shape_chart$focal_series$pct_values), 5)
+  expect_equal(length(panel$shape_chart$focal_series$pct_values), 4)
   expect_equal(length(panel$shape_chart$competitor_series), 2)
   expect_equal(panel$shape_chart$focal_series$brand_code, "IPK")
   # Focal Aware = 0.9 (matches test_funnel_transactional.R)
@@ -244,7 +244,7 @@ test_that("config block carries chip picker defaults, conversion metric, show_co
 })
 
 
-test_that("about carries canonical methodology, ties, and panel-disclosure notes", {
+test_that("about carries canonical methodology, heavy-buyer pointer, and panel-disclosure notes", {
   result <- .run_fixture()
   panel <- build_funnel_panel_data(result, .brand_list(), list())
 
@@ -252,7 +252,8 @@ test_that("about carries canonical methodology, ties, and panel-disclosure notes
   expect_true(grepl("nested", panel$about$methodology_note, ignore.case = TRUE))
   expect_true(grepl("non-probability|panel sampling",
                     panel$about$significance_note, ignore.case = TRUE))
-  expect_true(grepl("ties", panel$about$ties_note, ignore.case = TRUE))
+  expect_true(grepl("Repertoire|Frequency|heavy",
+                    panel$about$heavy_buyer_note, ignore.case = TRUE))
   expect_true(grepl("IPK", panel$about$base_note))
 })
 

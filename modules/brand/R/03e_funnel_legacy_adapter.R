@@ -45,7 +45,7 @@ build_funnel_legacy_wide <- function(result, brand_list) {
                                  stage_pcts$current_owner_d %||%
                                  stage_pcts$current_customer_s %||%
                                  NA_real_)
-  out$Primary_Pct     <- 100 * (stage_pcts$preferred %||%
+  out$Primary_Pct     <- 100 * (stage_pcts$bought_target %||%
                                  stage_pcts$long_tenured_d %||%
                                  stage_pcts$long_tenured_s %||%
                                  NA_real_)
@@ -126,8 +126,8 @@ build_funnel_legacy_conversions <- function(result, brand_list) {
       to_keys = c("bought_long", "current_owner_d", "current_customer_s")),
     Bought_to_Primary = vapply(brand_codes,
       .get_ratio, numeric(1),
-      from_key = "bought_target",
-      to_keys = c("preferred", "long_tenured_d", "long_tenured_s")),
+      from_key = "bought_long",
+      to_keys = c("bought_target", "long_tenured_d", "long_tenured_s")),
     stringsAsFactors = FALSE
   )
 }

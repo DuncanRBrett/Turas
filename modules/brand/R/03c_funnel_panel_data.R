@@ -57,6 +57,8 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
 .panel_meta <- function(result, brand_list, config, stage_keys) {
   focal <- result$meta$focal_brand
   focal_label <- .brand_label(brand_list, focal)
+  def_overrides <- config$`funnel.stage_definitions` %||%
+                   config$funnel.stage_definitions
   list(
     category_type = result$meta$category_type,
     focal_brand_code = focal,
@@ -67,8 +69,17 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
     n_unweighted = result$meta$n_unweighted,
     stage_count = length(stage_keys),
     stage_keys = stage_keys,
-    stage_labels = .stage_labels_for(stage_keys)
+    stage_labels = .stage_labels_for(stage_keys),
+    stage_definitions = .stage_definitions_for(stage_keys, def_overrides)
   )
+}
+
+
+#' Build stage_key -> definition map for the ? popovers.
+#' @keywords internal
+.stage_definitions_for <- function(stage_keys, overrides = NULL) {
+  vapply(stage_keys, .stage_definition, character(1), overrides = overrides,
+         USE.NAMES = TRUE)
 }
 
 
@@ -336,11 +347,10 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
     significance_note = paste(
       "Significance tests use a two-proportion z-test. Panel sampling is",
       "non-probability; margin of error is not reported."),
-    ties_note = paste(
-      "Preferred counts include ties. Respondents with equal-highest",
-      "purchase frequency across multiple brands are counted for each",
-      "tied brand; brand-level Preferred percentages can therefore sum",
-      "above 100%."),
+    heavy_buyer_note = paste(
+      "Heavy-buyer and frequency analysis — how often respondents buy each",
+      "brand — lives in the Repertoire / Frequency view, not the funnel.",
+      "Funnel stages are behavioural milestones (aware → buy), not loyalty cuts."),
     prior_brand_note = if ("funnel.service.prior_brand" %in% names(
       result$role_map_used %||% list())) {
       "Prior-brand data available in Repertoire switching analysis."
@@ -373,16 +383,34 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
 .stage_label <- function(key) {
   labels <- c(
     aware              = "Aware",
-    consideration      = "Consideration",
-    bought_long        = "Bought",
-    bought_target      = "Frequent",
-    preferred          = "Preferred",
+    consideration      = "Consider",
+    bought_long        = "Long Period",
+    bought_target      = "Target Period",
     current_owner_d    = "Current owner",
     long_tenured_d     = "Long-tenured owner",
     current_customer_s = "Current customer",
     long_tenured_s     = "Long-tenured customer"
   )
   unname(labels[key]) %||% key
+}
+
+
+#' Default per-stage definition shown in the HTML ? popover.
+#'
+#' Sourced from \code{.FUNNEL_DEFAULT_DEFINITIONS} in 03a_funnel_derive.R
+#' (kept alongside the derivation so the explanation travels with the
+#' computation). Operator can override per project via
+#' \code{config$funnel.stage_definitions}.
+#' @keywords internal
+.stage_definition <- function(key, overrides = NULL) {
+  if (!is.null(overrides) && !is.null(overrides[[key]])) {
+    return(as.character(overrides[[key]]))
+  }
+  defs <- tryCatch(get(".FUNNEL_DEFAULT_DEFINITIONS", envir = globalenv(),
+                        inherits = TRUE),
+                   error = function(e) NULL)
+  if (is.null(defs) || is.null(defs[[key]])) return("")
+  as.character(defs[[key]])
 }
 
 

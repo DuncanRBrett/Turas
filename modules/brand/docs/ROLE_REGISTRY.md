@@ -115,7 +115,7 @@ OptionMap allows inverting codes, omitting positions (e.g., no Ambivalent → Co
 |----|----|----|----|----|
 | `funnel.transactional.bought_long` | per_brand | Multi_Mention | Optional | BRANDPENTRANS1 — longer timeframe. |
 | `funnel.transactional.bought_target` | per_brand | Multi_Mention | Optional | BRANDPENTRANS2 — target timeframe. |
-| `funnel.transactional.frequency` | per_brand | Numeric | Optional | BRANDPENTRANS3. Required for Preferred stage. |
+| `funnel.transactional.frequency` | per_brand | Numeric | Optional | BRANDPENTRANS3. Consumed by Repertoire / Frequency element (heavy-buyer, SoR). Not a funnel stage in v2.1. |
 
 At least one of the three required to render any buying stage.
 
