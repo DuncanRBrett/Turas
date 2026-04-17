@@ -48,8 +48,15 @@ TURF_VERSION <- "11.2"
       file.path(this_dir, "..", "..", "shared", "lib", "turf_engine.R"))
   }
 
-  # Path 4: from working directory
+  # Path 4: from working directory (launched from Turas root)
   candidates <- c(candidates, "modules/shared/lib/turf_engine.R")
+
+  # Path 5: working directory sits inside modules/maxdiff (GUI launcher
+  # does setwd(MODULE_DIR) before sourcing R/00_main.R, per
+  # run_maxdiff_gui.R — this is the common case and must work).
+  candidates <- c(candidates,
+    file.path("..", "shared", "lib", "turf_engine.R"),
+    file.path(getwd(), "..", "shared", "lib", "turf_engine.R"))
 
   for (path in candidates) {
     path <- normalizePath(path, mustWork = FALSE)
