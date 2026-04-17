@@ -81,11 +81,18 @@
   // Heatmap ON/OFF — reads data-heatmap on every .ct-heatmap-cell and writes
   // it as inline background-color. When OFF, a .fn-heatmap-off class on the
   // panel root blanks the background via CSS.
+  // Focal and avg rows/columns skip the per-cell heatmap — they keep their
+  // persistent CSS tints regardless of toggle state.
   // ---------------------------------------------------------------------------
   function applyHeatmap(panel, on) {
     panel.classList.toggle("fn-heatmap-off", !on);
     if (!on) return;
     panel.querySelectorAll(".ct-heatmap-cell").forEach(function(td){
+      var row = td.closest("tr");
+      if (row && (row.classList.contains("fn-row-focal") ||
+                  row.classList.contains("fn-row-avg-all"))) return;
+      if (td.classList.contains("fn-rel-td-focal") ||
+          td.classList.contains("fn-rel-td-avg")) return;
       var colour = td.getAttribute("data-heatmap");
       if (colour) td.style.backgroundColor = colour;
     });
@@ -202,6 +209,20 @@
       if (label && !label.querySelector(".fn-focal-badge")) {
         label.insertAdjacentHTML("beforeend",
           ' <span class="fn-focal-badge">FOCAL</span>');
+      }
+    }
+    // Move new focal row to top of tbody (just after Base row),
+    // then re-anchor Category average immediately after focal.
+    var tbody = panel.querySelector("table.fn-table tbody");
+    if (tbody) {
+      var baseRow  = tbody.querySelector(".fn-row-base");
+      var focalRow = tbody.querySelector("tr.fn-row-focal");
+      var avgRow   = tbody.querySelector("tr.fn-row-avg-all");
+      if (baseRow && focalRow && baseRow.nextSibling !== focalRow) {
+        tbody.insertBefore(focalRow, baseRow.nextSibling);
+      }
+      if (focalRow && avgRow && focalRow.nextSibling !== avgRow) {
+        tbody.insertBefore(avgRow, focalRow.nextSibling);
       }
     }
     // Rebuild cards against the new focal, update the title sub-line, repaint chart
@@ -481,7 +502,7 @@
     var active = panel.querySelector(activeSel);
     if (active) active.setAttribute("data-fn-sort-dir", dir);
 
-    var tbody = panel.querySelector(".fn-table tbody");
+    var tbody = panel.querySelector("table.fn-table tbody");
     if (!tbody) return;
     var competitors = Array.prototype.slice.call(
       tbody.querySelectorAll('tr.fn-row-competitor'));

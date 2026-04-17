@@ -131,8 +131,7 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
   paste0(
     '<thead><tr>',
     '<th class="ct-th ct-label-col">Attitude</th>',
-    sprintf('<th class="ct-th ct-data-col fn-rel-th-focal" style="color:%s;">%s</th>',
-            focal_colour, focal_name),
+    sprintf('<th class="ct-th ct-data-col fn-rel-th-focal">%s</th>', focal_name),
     '<th class="ct-th ct-data-col fn-rel-th-avg"><em>Category avg</em></th>',
     comp_ths,
     '</tr></thead>'

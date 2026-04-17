@@ -85,9 +85,9 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 /* -------------------------------------------------------------------------- */
 .fn-focus-bar {
   display: flex; align-items: center; gap: 10px;
-  padding: 10px 14px; background: #f8fafc;
+  padding: 8px 14px; background: #f8fafc;
   border: 1px solid #e2e8f0; border-radius: 8px;
-  margin-bottom: 14px;
+  margin-bottom: 8px;
 }
 .fn-ctl-label {
   font-size: 11px; font-weight: 600; color: #64748b;
@@ -222,33 +222,37 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 .fn-panel .ct-base-n { font-variant-numeric: tabular-nums; }
 .fn-panel .ct-na { color: #d1d5db; font-size: 12px; }
 
-/* Focal row — left-border accent + tinted label */
+/* Focal row — left-border accent on label, persistent tint across ALL data cells */
 .fn-panel .fn-row-focal .ct-td.ct-label-col {
-  color: var(--fn-brand); background: rgba(26,82,118,0.04);
+  color: var(--fn-brand); background: rgba(26,82,118,0.06) !important;
   border-left: 3px solid var(--fn-brand); font-weight: 700;
 }
+.fn-panel .fn-row-focal .ct-td.ct-data-col { background: rgba(26,82,118,0.06) !important; }
 .fn-focal-badge {
   display: inline-block; font-size: 9px; font-weight: 700;
   background: var(--fn-brand); color: #fff; padding: 1px 5px;
   border-radius: 3px; margin-left: 4px; letter-spacing: 0.5px;
 }
 
-/* Category average row — italic, muted band */
-.fn-panel .fn-row-avg-all { background: #fafbfc; }
+/* Category average row — italic, muted band across ALL data cells */
 .fn-panel .fn-row-avg-all .ct-td.ct-label-col {
-  font-style: italic; color: #475569; background: #f1f3f6;
+  font-style: italic; color: #475569; background: #eff1f5 !important;
 }
+.fn-panel .fn-row-avg-all .ct-td.ct-data-col { background: #eff1f5 !important; }
 
-/* Heatmap — applied via inline background-color from data-heatmap (JS).
-   Toggle OFF clears the style via panel class. */
+/* Heatmap — JS applies inline background on competitor cells only (focal/avg skipped).
+   Toggle OFF clears competitor cells via panel class; focal/avg keep their !important tints. */
 .fn-panel .ct-heatmap-cell { transition: background-color 0.15s ease; }
 .fn-panel.fn-heatmap-off .ct-heatmap-cell { background-color: transparent !important; }
+/* Restore focal/avg tints when heatmap is toggled off (higher specificity wins) */
+.fn-panel.fn-heatmap-off .fn-row-focal .ct-td.ct-data-col { background: rgba(26,82,118,0.06) !important; }
+.fn-panel.fn-heatmap-off .fn-row-avg-all .ct-td.ct-data-col { background: #eff1f5 !important; }
 
 /* Low-base dim — cell pct muted to signal small base */
 .fn-panel .ct-low-base-dim .ct-val { opacity: 0.5; color: #c0392b; }
 
-/* Primary value + count annotation (tabs .ct-val + .ct-freq pattern) */
-.fn-panel .ct-val { font-weight: 600; font-size: 13px; color: #1e293b; }
+/* Primary value — uniform dark, never overridden by heatmap background */
+.fn-panel .ct-val { font-weight: 600; font-size: 13px; color: #1e293b !important; }
 .fn-panel .ct-freq {
   display: none; font-size: 10px; color: #94a3b8; margin-top: 2px;
 }
@@ -321,20 +325,33 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 /* -------------------------------------------------------------------------- */
 /* RELATIONSHIP TABLE — focal column + category-avg column                    */
 /* -------------------------------------------------------------------------- */
-/* Focal column header: accent underline so it reads as "primary" column */
+/* Focal column header: bold + accent underline; text stays white */
 .fn-panel .fn-rel-th-focal {
   border-bottom: 3px solid var(--fn-brand);
+  font-weight: 900;
 }
-/* Focal column cells: same light tint as the focal row in the funnel table */
-.fn-panel .fn-rel-td-focal {
-  background: rgba(26, 82, 118, 0.04) !important;
-}
-/* Category avg column: italic, muted — mirrors fn-row-avg-all row in funnel */
+/* Focal column cells: persistent tint, never cleared by heatmap-off */
+.fn-panel .fn-rel-td-focal { background: rgba(26,82,118,0.06) !important; }
+.fn-panel.fn-heatmap-off .fn-rel-td-focal { background: rgba(26,82,118,0.06) !important; }
+
+/* Category avg column: italic header text, muted cell tint */
 .fn-panel .fn-rel-th-avg em { font-style: italic; opacity: 0.85; }
 .fn-panel .fn-rel-td-avg {
-  background: #fafbfc !important;
-  color: #475569;
+  background: #eff1f5 !important;
   font-style: italic;
+}
+.fn-panel.fn-heatmap-off .fn-rel-td-avg { background: #eff1f5 !important; }
+
+/* -------------------------------------------------------------------------- */
+/* STAGE DEFINITIONS IN ABOUT (replaces ? popover)                            */
+/* -------------------------------------------------------------------------- */
+.fn-stage-defs { margin: 6px 0 10px 0; padding: 0; }
+.fn-stage-def-term {
+  font-weight: 700; color: #1e293b; font-size: 12px;
+  margin-top: 6px;
+}
+.fn-stage-def-body {
+  margin: 0 0 2px 12px; color: #475569; font-size: 12px;
 }
 
 /* -------------------------------------------------------------------------- */

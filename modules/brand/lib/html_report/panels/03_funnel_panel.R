@@ -58,14 +58,17 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
     sprintf('<script type="application/json" class="fn-panel-data">%s</script>',
             json_payload),
     .fn_title_card(panel_data),
+    .fn_focus_bar(panel_data),
     .fn_sub_tabs(),
     '<div class="fn-subtab" data-fn-subtab="summary">',
-      .fn_focus_bar(panel_data),
       .fn_cards_section(panel_data, focal_colour),
     '</div>',
     '<div class="fn-subtab" data-fn-subtab="funnel" hidden>',
       .fn_table_controls(panel_data),
       .fn_table_section(panel_data, focal_colour),
+      '<div class="fn-chart-wrap-outer">',
+        .fn_chart_section(panel_data, focal_colour),
+      '</div>',
     '</div>',
     '<div class="fn-subtab" data-fn-subtab="relationship" hidden>',
       .fn_relationship_section(panel_data, focal_colour),
@@ -170,9 +173,10 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
     '<div class="fn-ctl-group"><span class="fn-ctl-label">Show brands</span>',
     sprintf('<div class="fn-chip-row col-chip-bar">%s</div></div>', chips_html),
 
-    # Heatmap checked by default, Show count off — matches tabs
+    # Heatmap checked by default, Show count off, Show chart on
     '<label class="toggle-label"><input type="checkbox" checked data-fn-action="heatmap"> Heatmap</label>',
     '<label class="toggle-label"><input type="checkbox" data-fn-action="showcounts"> Show count</label>',
+    '<label class="toggle-label"><input type="checkbox" checked data-fn-action="showchart"> Show chart</label>',
 
     # Base (% of total / previous) — segmented toggle, same shape as tabs' sig-level-switcher
     '<div class="sig-level-switcher fn-base-switcher" role="group" aria-label="Percentage base">',
@@ -290,16 +294,38 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
 
 .fn_about_section <- function(pd) {
   a <- pd$about
-  if (is.null(a)) return("")
   parts <- character(0)
-  for (key in c("methodology_note", "base_note", "significance_note",
-                "heavy_buyer_note", "prior_brand_note")) {
-    val <- a[[key]]
-    if (!is.null(val) && is.character(val) && nzchar(trimws(val))) {
-      parts <- c(parts, sprintf('<p class="fn-about-item"><strong>%s:</strong> %s</p>',
-                                .fn_about_heading(key), .fn_esc(val)))
+
+  # Stage definitions (replaces the ? popovers on column headers)
+  stage_keys  <- pd$meta$stage_keys  %||% character(0)
+  stage_lbls  <- pd$meta$stage_labels %||% list()
+  stage_defs  <- pd$meta$stage_definitions %||% list()
+  def_items <- vapply(stage_keys, function(k) {
+    lbl <- stage_lbls[[k]] %||% k
+    def <- stage_defs[[k]] %||% ""
+    if (!nzchar(trimws(def))) return("")
+    sprintf('<dt class="fn-stage-def-term">%s</dt><dd class="fn-stage-def-body">%s</dd>',
+            .fn_esc(lbl), .fn_esc(def))
+  }, character(1))
+  def_items <- def_items[nzchar(def_items)]
+  if (length(def_items) > 0) {
+    parts <- c(parts, paste0(
+      '<p class="fn-about-item"><strong>Stage definitions:</strong></p>',
+      '<dl class="fn-stage-defs">', paste(def_items, collapse = ""), '</dl>'))
+  }
+
+  # Methodology notes
+  if (!is.null(a)) {
+    for (key in c("methodology_note", "base_note", "significance_note",
+                  "heavy_buyer_note", "prior_brand_note")) {
+      val <- a[[key]]
+      if (!is.null(val) && is.character(val) && nzchar(trimws(val))) {
+        parts <- c(parts, sprintf('<p class="fn-about-item"><strong>%s:</strong> %s</p>',
+                                  .fn_about_heading(key), .fn_esc(val)))
+      }
     }
   }
+
   if (length(parts) == 0) return("")
   paste0(
     '<details class="fn-about"><summary class="fn-about-summary">About this funnel</summary>',

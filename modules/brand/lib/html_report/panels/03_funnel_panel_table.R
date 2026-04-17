@@ -42,7 +42,7 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
   paste0(
     '<section class="fn-section fn-table-section">',
     '<div class="fn-table-wrap">',
-    '<table class="ct-table fn-ct-table" data-fn-table="1">',
+    '<table class="ct-table fn-ct-table fn-table" data-fn-table="1">',
     .fn_table_header(stage_labels, stage_keys),
     '<tbody>',
     .fn_row_base(stage_keys, table$cells, brand_codes),
@@ -52,7 +52,6 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
     .fn_rows_competitors(stage_keys, brand_codes, brand_names, focal,
                          table$cells, col_max),
     '</tbody></table></div>',
-    .fn_popover_templates(stage_keys, stage_labels, stage_defs),
     .fn_add_insight_strip(),
     '</section>'
   )
@@ -74,22 +73,19 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
               data-fn-sort-dir="asc">\u21C5</button>',
     '</th>')
 
-  # Stage column headers — each gets a help "?" popover trigger + sort button
+  # Stage column headers — sort button only (? definitions moved to About section)
   stage_ths <- paste(vapply(seq_along(stage_keys), function(i) {
     key <- .fn_esc(stage_keys[i])
     label <- .fn_esc(stage_labels[i])
     sprintf(
       '<th class="ct-th ct-data-col fn-ct-th-stage" data-fn-stage="%s" data-sort-col="%s">
          <div class="ct-header-text">%s</div>
-         <button type="button" class="fn-help-btn"
-                 aria-label="What is %s?"
-                 data-fn-action="help" data-fn-stage="%s">?</button>
          <button type="button" class="ct-sort-indicator fn-sort-btn"
                  aria-label="Sort by %s"
                  data-fn-action="sort-stage" data-fn-stage="%s"
                  data-fn-sort-dir="none">\u21C5</button>
        </th>',
-      key, key, label, label, key, label, key)
+      key, key, label, label, key)
   }, character(1)), collapse = "")
 
   paste0('<thead><tr>', brand_th, stage_ths, '</tr></thead>')
