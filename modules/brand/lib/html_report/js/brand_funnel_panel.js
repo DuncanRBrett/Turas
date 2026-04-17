@@ -1,0 +1,283 @@
+// =============================================================================
+// BRAND FUNNEL PANEL — INTERACTIVE BEHAVIOUR (FUNNEL_SPEC_v2 §6)
+// =============================================================================
+// Each .fn-panel carries a <script type="application/json" class="fn-panel-data">
+// with the full panel payload. Controls operate on the panel in-place:
+//
+//   • Focus dropdown: reassigns focal brand across cards/table/chart.
+//   • Table chips: show/hide brand columns (independent of chart chips).
+//   • Chart chips: show/hide brand lines on slope chart.
+//   • % mode: nested (default) ⇄ absolute.
+//   • Show counts: appends n=X under every percentage cell.
+//   • Chart view: slope ⇄ small-multiples.
+//   • Segment emphasis: highlights one attitude position + auto-sorts
+//     brand rows by that segment.
+//   • Export: downloads the pre-written funnel_<cat>.xlsx file
+//     (filename discovered via data-fn-excel-filename on panel root).
+// =============================================================================
+
+(function(){
+  if (window.__BRAND_FUNNEL_PANEL_INIT__) return;
+  window.__BRAND_FUNNEL_PANEL_INIT__ = true;
+
+  document.addEventListener("DOMContentLoaded", function(){
+    var panels = document.querySelectorAll(".fn-panel");
+    for (var i = 0; i < panels.length; i++) initPanel(panels[i]);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Panel init
+  // ---------------------------------------------------------------------------
+  function initPanel(panel) {
+    var payload = readPayload(panel);
+    if (!payload) return;
+    panel.__fnData = payload;
+    panel.__fnState = {
+      focal: (payload.meta && payload.meta.focal_brand_code) || null,
+      pctMode: "nested",
+      showCounts: false,
+      chartView: "slope",
+      emphasis: "all",
+      tableBrands: {},
+      chartBrands: {}
+    };
+    // Default chip state: table all on, chart only focal on
+    var allBrands = (payload.table && payload.table.brand_codes) || [];
+    for (var i = 0; i < allBrands.length; i++) {
+      panel.__fnState.tableBrands[allBrands[i]] = true;
+      panel.__fnState.chartBrands[allBrands[i]] =
+        (allBrands[i] === panel.__fnState.focal);
+    }
+    bindControls(panel);
+    applyTableVisibility(panel);
+    applyChartVisibility(panel);
+    applyPctMode(panel);
+  }
+
+  function readPayload(panel) {
+    var el = panel.querySelector("script.fn-panel-data");
+    if (!el) return null;
+    try { return JSON.parse(el.textContent || "{}"); }
+    catch(e) { console.warn("Funnel panel JSON parse failed", e); return null; }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bind every control inside the panel
+  // ---------------------------------------------------------------------------
+  function bindControls(panel) {
+    var focusSel = panel.querySelector('[data-fn-action="focus"]');
+    if (focusSel) focusSel.addEventListener("change", function(){
+      setFocal(panel, this.value);
+    });
+
+    panel.querySelectorAll('button[data-fn-scope][data-fn-brand]').forEach(function(btn){
+      btn.addEventListener("click", function(){
+        toggleBrandChip(panel, btn.getAttribute("data-fn-scope"),
+                        btn.getAttribute("data-fn-brand"), btn);
+      });
+    });
+
+    panel.querySelectorAll('[data-fn-action="pctmode"]').forEach(function(r){
+      r.addEventListener("change", function(){
+        panel.__fnState.pctMode = r.value;
+        applyPctMode(panel);
+      });
+    });
+
+    var counts = panel.querySelector('[data-fn-action="showcounts"]');
+    if (counts) counts.addEventListener("change", function(){
+      panel.__fnState.showCounts = counts.checked;
+      panel.classList.toggle("fn-show-counts", counts.checked);
+    });
+
+    panel.querySelectorAll('[data-fn-action="chartview"]').forEach(function(r){
+      r.addEventListener("change", function(){
+        panel.__fnState.chartView = r.value;
+        applyChartView(panel);
+      });
+    });
+
+    panel.querySelectorAll('.fn-seg-chip[data-fn-emphasis]').forEach(function(c){
+      c.addEventListener("click", function(){
+        setEmphasis(panel, c.getAttribute("data-fn-emphasis"));
+      });
+    });
+
+    var exp = panel.querySelector('[data-fn-action="export"]');
+    if (exp) exp.addEventListener("click", function(){ exportToExcel(panel); });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Focus dropdown
+  // ---------------------------------------------------------------------------
+  function setFocal(panel, code) {
+    if (!code) return;
+    panel.__fnState.focal = code;
+    panel.setAttribute("data-fn-focal", code);
+    // Mark the focal row in the table
+    panel.querySelectorAll("tr[data-fn-brand]").forEach(function(row){
+      row.classList.toggle("fn-row-focal", row.getAttribute("data-fn-brand") === code);
+      row.classList.toggle("fn-row-competitor", row.getAttribute("data-fn-brand") !== code);
+    });
+    // Repaint chart lines with new focal styling
+    rebuildChart(panel);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Chip toggles — scope = "table" or "chart"
+  // ---------------------------------------------------------------------------
+  function toggleBrandChip(panel, scope, code, btn) {
+    var bucket = scope === "table" ? "tableBrands" : "chartBrands";
+    panel.__fnState[bucket][code] = !panel.__fnState[bucket][code];
+    btn.classList.toggle("col-chip-off", !panel.__fnState[bucket][code]);
+    if (scope === "table") applyTableVisibility(panel);
+    else applyChartVisibility(panel);
+  }
+
+  function applyTableVisibility(panel) {
+    var state = panel.__fnState.tableBrands || {};
+    var codes = Object.keys(state);
+    // Hide/show brand rows; header stays put
+    panel.querySelectorAll("tr[data-fn-brand]").forEach(function(row){
+      var c = row.getAttribute("data-fn-brand");
+      row.style.display = state[c] === false ? "none" : "";
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // % mode — rewrite visible cell text via data-fn-pct-abs / data-fn-pct-nes
+  // ---------------------------------------------------------------------------
+  function applyPctMode(panel) {
+    var mode = panel.__fnState.pctMode;
+    var attr = (mode === "absolute") ? "data-fn-pct-abs" : "data-fn-pct-nes";
+    panel.querySelectorAll(".fn-td").forEach(function(td){
+      var v = parseFloat(td.getAttribute(attr));
+      var primary = td.querySelector(".fn-pct-primary");
+      if (primary && !isNaN(v)) primary.textContent = Math.round(v * 100) + "%";
+    });
+    // Cards always show absolute — don't rewrite; they read direct from payload
+  }
+
+  // ---------------------------------------------------------------------------
+  // Chart visibility — JS redraws competitor lines when chips toggle
+  // ---------------------------------------------------------------------------
+  function applyChartVisibility(panel) {
+    rebuildChart(panel);
+  }
+
+  function applyChartView(panel) {
+    var wrap = panel.querySelector(".fn-chart-wrap");
+    if (!wrap) return;
+    wrap.setAttribute("data-fn-chart", panel.__fnState.chartView);
+    rebuildChart(panel);
+  }
+
+  function rebuildChart(panel) {
+    var svg = panel.querySelector(".fn-slope-svg");
+    if (!svg) return;
+    var pd = panel.__fnData;
+    if (!pd || !pd.shape_chart) return;
+    // Remove previously injected competitor series
+    svg.querySelectorAll('[data-fn-series-comp="1"]').forEach(function(n){ n.remove(); });
+
+    var comp = pd.shape_chart.competitor_series || [];
+    var enabled = panel.__fnState.chartBrands || {};
+    var focal = panel.__fnState.focal;
+    for (var i = 0; i < comp.length; i++) {
+      var series = comp[i];
+      if (!enabled[series.brand_code]) continue;
+      if (series.brand_code === focal) continue;
+      var line = buildCompLine(series, pd.shape_chart.stage_positions || series.stage_keys);
+      if (line) svg.insertAdjacentHTML("beforeend", line);
+    }
+  }
+
+  function buildCompLine(series, stage_positions) {
+    var pcts = series.pct_values || [];
+    var n = pcts.length;
+    if (n < 2) return "";
+    // Re-derive the same x/y mapping as the R-side SVG builder
+    var w = 760, h = 360, ml = 60, mr = 30, mt = 40, mb = 60;
+    var pw = w - ml - mr, ph = h - mt - mb;
+    var pts = [];
+    for (var i = 0; i < n; i++) {
+      var v = pcts[i];
+      if (v == null || isNaN(v)) continue;
+      var x = ml + pw * (i / (n - 1));
+      var y = mt + ph * (1 - Math.max(0, Math.min(1, v)));
+      pts.push(x.toFixed(2) + "," + y.toFixed(2));
+    }
+    if (pts.length < 2) return "";
+    return '<polyline points="' + pts.join(" ") + '" ' +
+           'fill="none" stroke="#94a3b8" stroke-width="1.5" ' +
+           'opacity="0.8" data-fn-series-comp="1" ' +
+           'data-fn-brand="' + escapeAttr(series.brand_code) + '"/>';
+  }
+
+  // ---------------------------------------------------------------------------
+  // Segment emphasis + auto-sort
+  // ---------------------------------------------------------------------------
+  function setEmphasis(panel, role) {
+    panel.__fnState.emphasis = role;
+    panel.querySelectorAll(".fn-seg-chip").forEach(function(c){
+      c.classList.toggle("active", c.getAttribute("data-fn-emphasis") === role);
+    });
+    var container = panel.querySelector(".fn-relationship-bars");
+    if (!container) return;
+    container.setAttribute("data-fn-emphasis", role);
+    if (role === "all") {
+      panel.removeAttribute("data-fn-emphasis-active");
+    } else {
+      panel.setAttribute("data-fn-emphasis-active", "1");
+      container.querySelectorAll(".fn-seg").forEach(function(s){
+        s.classList.toggle("fn-seg-active",
+          s.getAttribute("data-fn-role") === role);
+      });
+      sortBarsByEmphasis(container, role);
+    }
+  }
+
+  function sortBarsByEmphasis(container, role) {
+    var rows = Array.prototype.slice.call(
+      container.querySelectorAll(".fn-bar-row"));
+    rows.sort(function(a, b){
+      var av = segPctOf(a, role);
+      var bv = segPctOf(b, role);
+      return bv - av;
+    });
+    rows.forEach(function(r){ container.appendChild(r); });
+  }
+
+  function segPctOf(row, role) {
+    var seg = row.querySelector('.fn-seg[data-fn-role="' + role + '"]');
+    if (!seg) return 0;
+    var v = parseFloat(seg.getAttribute("data-fn-pct"));
+    return isNaN(v) ? 0 : v;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Export to Excel — the file is already written alongside the HTML by
+  // write_funnel_excel(). The panel carries the filename via data-attribute;
+  // we just trigger a download link. If the filename isn't set we alert.
+  // ---------------------------------------------------------------------------
+  function exportToExcel(panel) {
+    var fn = panel.getAttribute("data-fn-excel-filename");
+    if (!fn) {
+      alert("Excel file not available. Run the report with output_excel = Y.");
+      return;
+    }
+    var a = document.createElement("a");
+    a.href = fn;
+    a.download = fn;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Utilities
+  // ---------------------------------------------------------------------------
+  function escapeAttr(s) {
+    return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+  }
+})();

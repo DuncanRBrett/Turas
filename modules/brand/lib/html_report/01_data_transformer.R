@@ -282,3 +282,58 @@ transform_brand_tables <- function(results, config) {
 
   tables
 }
+
+
+#' Transform brand results into dedicated role-registry panel HTML
+#'
+#' Currently returns one entry per category for the funnel element
+#' (key \code{funnel_<cat_id>}); other elements fall through to the
+#' legacy charts + tables path in build_br_category_panel.
+#'
+#' @param results List. Output from run_brand().
+#' @param config List. Brand config.
+#' @return Named list of panel HTML strings keyed by \code{element_catid}.
+#' @keywords internal
+transform_brand_panels <- function(results, config) {
+  panels <- list()
+  focal_colour <- config$colour_focal %||% "#1A5276"
+
+  if (is.null(results$results$categories)) return(panels)
+
+  brand_list_all <- if (!is.null(results$structure) &&
+                         !is.null(results$structure$brands)) {
+    results$structure$brands
+  } else NULL
+
+  for (cat_name in names(results$results$categories)) {
+    cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
+    cr <- results$results$categories[[cat_name]]
+    funnel <- cr$funnel
+    if (is.null(funnel) || identical(funnel$status, "REFUSED")) next
+    if (is.null(funnel$stages) || nrow(funnel$stages) == 0) next
+
+    cat_brands <- if (!is.null(brand_list_all) &&
+                       "Category" %in% names(brand_list_all)) {
+      brand_list_all[brand_list_all$Category == cat_name, , drop = FALSE]
+    } else if (!is.null(brand_list_all)) {
+      brand_list_all
+    } else {
+      data.frame(
+        BrandCode = unique(as.character(funnel$stages$brand_code)),
+        stringsAsFactors = FALSE)
+    }
+    if (!("BrandLabel" %in% names(cat_brands))) {
+      cat_brands$BrandLabel <- cat_brands$BrandCode
+    }
+
+    panel_data <- build_funnel_panel_data(funnel, cat_brands,
+      config = list(category_label = cat_name,
+                    wave_label = as.character(config$wave %||% ""),
+                    show_counts = FALSE))
+    panel_html <- build_funnel_panel_html(panel_data,
+                                          category_code = cat_id,
+                                          focal_colour = focal_colour)
+    panels[[paste0("funnel_", cat_id)]] <- panel_html
+  }
+  panels
+}

@@ -62,6 +62,15 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
     if (file.exists(fp)) source(fp, local = FALSE)
   }
 
+  # --- Source dedicated panel renderers (role-registry architecture) ---
+  panels_dir <- file.path(report_dir, "panels")
+  if (dir.exists(panels_dir)) {
+    for (f in sort(list.files(panels_dir, pattern = "\\.R$",
+                              full.names = TRUE))) {
+      tryCatch(source(f, local = FALSE), error = function(e) NULL)
+    }
+  }
+
   # --- Load JS modules ---
   js_dir <- file.path(report_dir, "js")
   brand_js <- ""
@@ -96,9 +105,42 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
     }
   )
 
+  # --- Layer 2b: Dedicated role-registry panels (funnel in v1) ---
+  panels <- tryCatch(
+    transform_brand_panels(results, config),
+    error = function(e) {
+      message(sprintf("[BRAND HTML] Panel transform failed: %s", e$message))
+      list()
+    }
+  )
+
+  # Load panel styles + JS (funnel panel only for now)
+  panel_styles <- if (exists("build_funnel_panel_styles", mode = "function")) {
+    tryCatch(build_funnel_panel_styles(config$colour_focal %||% "#1A5276"),
+             error = function(e) "")
+  } else ""
+  panel_js <- ""
+  fn_js_path <- file.path(dirname(sys.frame(1)$ofile %||% ""),
+                          "js", "brand_funnel_panel.js")
+  if (!is.null(fn_js_path) && is.character(fn_js_path) &&
+      file.exists(fn_js_path)) {
+    panel_js <- paste(readLines(fn_js_path, warn = FALSE), collapse = "\n")
+  } else {
+    # Fallback: source via find_turas_root() when available
+    root_js <- tryCatch(file.path(find_turas_root(), "modules", "brand",
+                                   "lib", "html_report", "js",
+                                   "brand_funnel_panel.js"),
+                        error = function(e) NULL)
+    if (!is.null(root_js) && file.exists(root_js)) {
+      panel_js <- paste(readLines(root_js, warn = FALSE), collapse = "\n")
+    }
+  }
+
   # --- Layers 3+4: Assemble page ---
   html <- tryCatch(
-    build_brand_page(results, charts, tables, config, brand_js, pins_js),
+    build_brand_page(results, charts, tables, config, brand_js, pins_js,
+                     panels = panels, panel_styles = panel_styles,
+                     panel_js = panel_js),
     error = function(e) {
       message(sprintf("[BRAND HTML] Page assembly failed: %s", e$message))
       # Fallback: minimal page

@@ -223,7 +223,7 @@ build_br_summary_panel <- function(results, config) {
 #' Build a category panel with sub-tabs for each element
 #' @keywords internal
 build_br_category_panel <- function(cat_name, cat_results, charts, tables,
-                                     config) {
+                                     config, panels = list()) {
   cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
   panel_id <- paste0("cat-", cat_id)
   focal <- config$focal_brand %||% ""
@@ -271,15 +271,21 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
                                 section_id, section_id))
     parts <- c(parts, build_br_section_toolbar(section_id))
 
-    # Charts + tables for this element
+    # If a dedicated panel HTML was emitted (funnel — role-registry
+    # architecture), render that instead of the generic charts+tables
+    # block. Falls back to the legacy chart/table rendering otherwise.
     chart_key <- paste0(el, "_", cat_id)
-    if (!is.null(charts[[chart_key]])) {
-      for (ch in charts[[chart_key]]) {
-        parts <- c(parts, build_br_chart_wrapper(ch$svg, ch$title %||% ""))
+    if (!is.null(panels[[chart_key]])) {
+      parts <- c(parts, panels[[chart_key]])
+    } else {
+      if (!is.null(charts[[chart_key]])) {
+        for (ch in charts[[chart_key]]) {
+          parts <- c(parts, build_br_chart_wrapper(ch$svg, ch$title %||% ""))
+        }
       }
-    }
-    if (!is.null(tables[[chart_key]])) {
-      parts <- c(parts, tables[[chart_key]])
+      if (!is.null(tables[[chart_key]])) {
+        parts <- c(parts, tables[[chart_key]])
+      }
     }
 
     parts <- c(parts, '</div></div>')
@@ -400,7 +406,9 @@ build_br_help_overlay <- function() {
 #' @return Character. Complete HTML document.
 #' @keywords internal
 build_brand_page <- function(results, charts, tables, config,
-                              brand_js = "", pins_js = "") {
+                              brand_js = "", pins_js = "",
+                              panels = list(), panel_styles = "",
+                              panel_js = "") {
 
   brand_colour <- config$colour_focal %||% "#1A5276"
   accent_colour <- config$colour_focal_accent %||% "#2E86C1"
@@ -496,47 +504,50 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
     if (has_content) deep_cats <- c(deep_cats, cn)
   }
 
-  panels <- character(0)
-  panels <- c(panels, build_br_summary_panel(results, config))
+  # panel_parts = accumulator of per-panel HTML fragments
+  # (disambiguated from the `panels` parameter which is a lookup keyed by
+  # element_categoryid for dedicated role-registry panel HTML).
+  panel_parts <- character(0)
+  panel_parts <- c(panel_parts, build_br_summary_panel(results, config))
 
   for (cat_name in deep_cats) {
-    panels <- c(panels, build_br_category_panel(
+    panel_parts <- c(panel_parts, build_br_category_panel(
       cat_name, results$results$categories[[cat_name]],
-      charts, tables, config
+      charts, tables, config, panels = panels
     ))
   }
 
   # Brand-level panels
   if (isTRUE(config$element_dba) && !is.null(results$results$dba)) {
     dba_id <- "dba"
-    panels <- c(panels, sprintf(
+    panel_parts <- c(panel_parts, sprintf(
       '<div class="br-panel" id="panel-dba"><div class="br-element-section" id="section-%s" data-section="%s">%s',
       dba_id, dba_id, build_br_section_toolbar(dba_id)))
     if (!is.null(charts[["dba"]])) {
       for (ch in charts[["dba"]]) {
-        panels <- c(panels, build_br_chart_wrapper(ch$svg, ch$title %||% ""))
+        panel_parts <- c(panel_parts, build_br_chart_wrapper(ch$svg, ch$title %||% ""))
       }
     }
-    if (!is.null(tables[["dba"]])) panels <- c(panels, tables[["dba"]])
-    panels <- c(panels, '</div></div>')
+    if (!is.null(tables[["dba"]])) panel_parts <- c(panel_parts, tables[["dba"]])
+    panel_parts <- c(panel_parts, '</div></div>')
   }
 
   if (isTRUE(config$element_wom) && !is.null(results$results$wom)) {
     wom_id <- "wom"
-    panels <- c(panels, sprintf(
+    panel_parts <- c(panel_parts, sprintf(
       '<div class="br-panel" id="panel-wom"><div class="br-element-section" id="section-%s" data-section="%s">%s',
       wom_id, wom_id, build_br_section_toolbar(wom_id)))
     if (!is.null(charts[["wom"]])) {
       for (ch in charts[["wom"]]) {
-        panels <- c(panels, build_br_chart_wrapper(ch$svg, ch$title %||% ""))
+        panel_parts <- c(panel_parts, build_br_chart_wrapper(ch$svg, ch$title %||% ""))
       }
     }
-    if (!is.null(tables[["wom"]])) panels <- c(panels, tables[["wom"]])
-    panels <- c(panels, '</div></div>')
+    if (!is.null(tables[["wom"]])) panel_parts <- c(panel_parts, tables[["wom"]])
+    panel_parts <- c(panel_parts, '</div></div>')
   }
 
-  panels <- c(panels, build_br_pinned_panel())
-  panels <- c(panels, build_br_about_panel(config))
+  panel_parts <- c(panel_parts, build_br_pinned_panel())
+  panel_parts <- c(panel_parts, build_br_about_panel(config))
 
   # --- Assemble page ---
   sprintf('<!DOCTYPE html>
@@ -548,6 +559,7 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
   <meta name="turas-source-filename" content="%s">
   <title>%s</title>
   <style>%s\n%s</style>
+  %s
 </head>
 <body>
   %s
@@ -557,17 +569,20 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
   %s
   <script>%s</script>
   <script>%s</script>
+  <script>%s</script>
 </body>
 </html>',
     .br_esc(config$report_title %||% "brand_report"),
     .br_esc(config$report_title %||% "Brand Health Report"),
     base_css, module_css,
+    panel_styles,
     build_br_header(config),
     build_br_tab_nav(deep_cats, config),
-    paste(panels, collapse = "\n"),
+    paste(panel_parts, collapse = "\n"),
     build_br_help_overlay(),
     "",
     pins_js,
-    brand_js
+    brand_js,
+    panel_js
   )
 }
