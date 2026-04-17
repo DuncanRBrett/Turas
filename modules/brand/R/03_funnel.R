@@ -110,7 +110,10 @@ run_funnel <- function(data, role_map, brand_list, config,
     sig_results = sig_df,
     metrics_summary = summary_list,
     warnings = derived$warnings,
-    meta = .funnel_meta(config, focal_brand, data, weights, derived)
+    meta = .funnel_meta(config, focal_brand, data, weights, derived),
+    # Role map retained so downstream writers (Excel + CSV) can carry
+    # ClientCode + QuestionText onto every row without re-resolving.
+    role_map = role_map
   )
 }
 

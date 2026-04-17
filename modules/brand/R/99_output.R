@@ -264,7 +264,7 @@ generate_brand_csv <- function(results, output_dir, config = NULL) {
         # Canonical 4-sheet funnel workbook + long CSV per FUNNEL_SPEC §7
         cat_code <- gsub("[^A-Za-z0-9]+", "_", cat_name)
         write_funnel_excel(
-          result = funnel, brand_list = bl, role_map = NULL,
+          result = funnel, brand_list = bl, role_map = funnel$role_map,
           output_path = file.path(output_dir,
             sprintf("funnel_%s.xlsx", cat_code)),
           config = list(
@@ -272,7 +272,7 @@ generate_brand_csv <- function(results, output_dir, config = NULL) {
             `funnel.warn_base` = config$low_base_warning,
             `funnel.suppress_base` = config$min_base_size))
         write_funnel_csv(
-          result = funnel, brand_list = bl, role_map = NULL,
+          result = funnel, brand_list = bl, role_map = funnel$role_map,
           output_path = file.path(output_dir,
             sprintf("funnel_%s_long.csv", cat_code)),
           config = list(category_code = cat_code,
