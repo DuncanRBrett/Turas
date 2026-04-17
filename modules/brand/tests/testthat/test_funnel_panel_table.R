@@ -118,9 +118,10 @@ test_that("table renders with non-empty HTML", {
 
 test_that("Base row is present with n= values per stage", {
   html <- .render_table()
-  expect_true(grepl('fn-row-base', html))
+  # Uses tabs' ct-row-base pattern; n < 30 gets tabs' ct-low-base red/bold span
+  expect_true(grepl('ct-row-base', html))
   expect_true(grepl('Base \\(n=\\)', html))
-  expect_true(grepl('fn-base-n', html))
+  expect_true(grepl('ct-low-base|ct-base-n', html))
 })
 
 
@@ -162,33 +163,28 @@ test_that("Help buttons + popover templates cover every stage", {
 
 test_that("Per-column heatmap: two cells at the same value get the same shade", {
   html <- .flatten_html(.render_table())
-  # In the IPK/ROB/CART fixture at Bought_Long both IPK and ROB are 60%.
-  # Per-column max = 0.6; both should therefore have the same background rgba.
-  # <td> attrs emit in order: style, then data-fn-stage, then data-fn-brand.
-  rgx <- 'style="background:rgba\\(37,99,171,([0-9.]+)\\);"[^>]*data-fn-stage="bought_long" data-fn-brand="(IPK|ROB)"'
+  # IPK/ROB both 60% at bought_long → same column max → same rgba in data-heatmap
+  rgx <- 'data-heatmap="rgba\\(37,99,171,([0-9.]+)\\)"[^>]*data-fn-stage="bought_long" data-fn-brand="(IPK|ROB)"'
   hits <- regmatches(html, gregexpr(rgx, html))[[1]]
   expect_gte(length(hits), 2)
   opacities <- regmatches(hits, regexpr('rgba\\(37,99,171,[0-9.]+\\)', hits))
-  # Two cells, same value, per-column-normalised → identical rgba
   expect_true(length(unique(opacities)) == 1)
 })
 
 
 test_that("Per-column heatmap: max-of-column always hits the top alpha", {
   html <- .flatten_html(.render_table())
-  # IPK at Aware (0.9) is the column max; IPK at Bought_Long (0.6) is also
-  # a column max (tied with ROB). Both should therefore hit the top alpha
-  # (0.06 + 1.0 * 0.34 = 0.40) under per-column normalisation.
+  # Tabs-parity alpha range is 0.08..0.65. Column max -> 0.08 + 0.57 = 0.65.
   extract_alpha_for <- function(stage, brand) {
     pat <- sprintf(
-      'style="background:rgba\\(37,99,171,([0-9.]+)\\);"[^>]*data-fn-stage="%s" data-fn-brand="%s"',
+      'data-heatmap="rgba\\(37,99,171,([0-9.]+)\\)"[^>]*data-fn-stage="%s" data-fn-brand="%s"',
       stage, brand)
     m <- regmatches(html, regexpr(pat, html))
     if (length(m) == 0 || !nzchar(m)) return(NA_real_)
     as.numeric(sub('.*rgba\\(37,99,171,([0-9.]+)\\).*', '\\1', m))
   }
-  expect_equal(extract_alpha_for("aware", "IPK"), 0.40, tolerance = 0.01)
-  expect_equal(extract_alpha_for("bought_long", "IPK"), 0.40, tolerance = 0.01)
+  expect_equal(extract_alpha_for("aware", "IPK"), 0.65, tolerance = 0.01)
+  expect_equal(extract_alpha_for("bought_long", "IPK"), 0.65, tolerance = 0.01)
 })
 
 
@@ -196,9 +192,9 @@ test_that("Per-column heatmap: max-of-column always hits the top alpha", {
 
 test_that("Every competitor row carries data-fn-sort-<stage> + data-fn-sort-brand", {
   html <- .render_table()
-  # Find each competitor row line (the opening <tr ...> tag)
+  # Class list is now "ct-row fn-row-competitor"
   row_matches <- regmatches(html, gregexpr(
-    '<tr[^>]*class="fn-row fn-row-competitor"[^>]*>', html))[[1]]
+    '<tr[^>]*class="ct-row fn-row-competitor"[^>]*>', html))[[1]]
   expect_true(length(row_matches) >= 2)
   for (row in row_matches) {
     expect_true(grepl('data-fn-sort-brand="', row), info = row)
@@ -287,6 +283,9 @@ test_that("Small base (n < 30) triggers ⚠ warning on cell + base row", {
     )
   )
   html <- build_funnel_table_section(fake_panel)
-  expect_true(grepl("fn-td-warn", html))
-  expect_true(grepl('<span class="fn-warn"', html))
+  # Cell-level: ct-low-base-dim applied to data cells when base is below the
+  # 30-threshold; base row itself uses ct-low-base with the ⚠ glyph appended.
+  expect_true(grepl("ct-low-base-dim", html))
+  expect_true(grepl("ct-low-base", html))
+  expect_true(grepl("\u26A0", html))
 })

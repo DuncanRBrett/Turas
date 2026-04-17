@@ -330,9 +330,13 @@ transform_brand_panels <- function(results, config) {
       config = list(category_label = cat_name,
                     wave_label = as.character(config$wave %||% ""),
                     show_counts = FALSE))
+    # Link the Export button to the pre-written funnel Excel workbook that
+    # write_funnel_excel() drops next to the HTML report.
+    xlsx_name <- sprintf("funnel_%s.xlsx", cat_id)
     panel_html <- build_funnel_panel_html(panel_data,
                                           category_code = cat_id,
-                                          focal_colour = focal_colour)
+                                          focal_colour = focal_colour,
+                                          excel_filename = xlsx_name)
     panels[[paste0("funnel_", cat_id)]] <- panel_html
   }
   panels

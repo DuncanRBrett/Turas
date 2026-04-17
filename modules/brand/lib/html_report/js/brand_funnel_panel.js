@@ -54,6 +54,41 @@
     applyTableVisibility(panel);
     applyChartVisibility(panel);
     applyPctMode(panel);
+    applyHeatmap(panel, true);  // On by default
+    bindSubTabs(panel);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sub-tab nav (Summary | Funnel | Relationship)
+  // ---------------------------------------------------------------------------
+  function bindSubTabs(panel) {
+    panel.querySelectorAll('.fn-subtab-btn[data-fn-subtab-target]').forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var target = btn.getAttribute("data-fn-subtab-target");
+        panel.querySelectorAll('.fn-subtab-btn').forEach(function(b){
+          var active = b === btn;
+          b.classList.toggle("active", active);
+          b.setAttribute("aria-selected", active ? "true" : "false");
+        });
+        panel.querySelectorAll('.fn-subtab[data-fn-subtab]').forEach(function(s){
+          s.hidden = (s.getAttribute("data-fn-subtab") !== target);
+        });
+      });
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Heatmap ON/OFF — reads data-heatmap on every .ct-heatmap-cell and writes
+  // it as inline background-color. When OFF, a .fn-heatmap-off class on the
+  // panel root blanks the background via CSS.
+  // ---------------------------------------------------------------------------
+  function applyHeatmap(panel, on) {
+    panel.classList.toggle("fn-heatmap-off", !on);
+    if (!on) return;
+    panel.querySelectorAll(".ct-heatmap-cell").forEach(function(td){
+      var colour = td.getAttribute("data-heatmap");
+      if (colour) td.style.backgroundColor = colour;
+    });
   }
 
   function readPayload(panel) {
@@ -79,16 +114,31 @@
       });
     });
 
-    panel.querySelectorAll('[data-fn-action="pctmode"]').forEach(function(r){
-      r.addEventListener("change", function(){
-        panel.__fnState.pctMode = r.value;
+    // Base (% of total / previous) — tabs segmented-button style
+    panel.querySelectorAll('button[data-fn-action="pctmode"]').forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var mode = btn.getAttribute("data-fn-pctmode");
+        panel.__fnState.pctMode = mode;
+        panel.querySelectorAll('button[data-fn-action="pctmode"]').forEach(function(b){
+          var active = b === btn;
+          b.classList.toggle("sig-btn-active", active);
+          b.setAttribute("aria-pressed", active ? "true" : "false");
+        });
         applyPctMode(panel);
       });
     });
 
+    // Heatmap toggle (checked by default)
+    var heat = panel.querySelector('[data-fn-action="heatmap"]');
+    if (heat) heat.addEventListener("change", function(){
+      applyHeatmap(panel, heat.checked);
+    });
+
+    // Show count — tabs uses .show-freq parent class to reveal .ct-freq
     var counts = panel.querySelector('[data-fn-action="showcounts"]');
     if (counts) counts.addEventListener("change", function(){
       panel.__fnState.showCounts = counts.checked;
+      panel.classList.toggle("show-freq", counts.checked);
       panel.classList.toggle("fn-show-counts", counts.checked);
     });
 
@@ -139,13 +189,110 @@
     if (!code) return;
     panel.__fnState.focal = code;
     panel.setAttribute("data-fn-focal", code);
-    // Mark the focal row in the table
+    // Move the FOCAL row class + badge
     panel.querySelectorAll("tr[data-fn-brand]").forEach(function(row){
-      row.classList.toggle("fn-row-focal", row.getAttribute("data-fn-brand") === code);
-      row.classList.toggle("fn-row-competitor", row.getAttribute("data-fn-brand") !== code);
+      var isFocal = row.getAttribute("data-fn-brand") === code;
+      row.classList.toggle("fn-row-focal", isFocal);
+      row.classList.toggle("fn-row-competitor", !isFocal);
     });
-    // Repaint chart lines with new focal styling
+    panel.querySelectorAll(".fn-focal-badge").forEach(function(b){ b.remove(); });
+    var focalRow = panel.querySelector("tr.fn-row-focal");
+    if (focalRow) {
+      var label = focalRow.querySelector(".ct-label-col");
+      if (label && !label.querySelector(".fn-focal-badge")) {
+        label.insertAdjacentHTML("beforeend",
+          ' <span class="fn-focal-badge">FOCAL</span>');
+      }
+    }
+    // Rebuild cards against the new focal, update the title sub-line, repaint chart
+    rebuildFunnelCards(panel, code);
+    rebuildRelationshipCards(panel, code);
+    updateTitleSub(panel, code);
     rebuildChart(panel);
+  }
+
+  function rebuildFunnelCards(panel, focal) {
+    var pd = panel.__fnData;
+    if (!pd || !pd.table) return;
+    var cells = pd.table.cells || [];
+    panel.querySelectorAll(".fn-card-funnel").forEach(function(card){
+      var stageKey = card.getAttribute("data-fn-stage");
+      var focalPct = null, otherPcts = [];
+      var focalBaseU = null;
+      for (var i = 0; i < cells.length; i++) {
+        var c = cells[i];
+        if (c.stage_key !== stageKey) continue;
+        if (c.brand_code === focal) {
+          focalPct = c.pct_absolute;
+          focalBaseU = c.base_unweighted;
+        } else if (c.pct_absolute != null) {
+          otherPcts.push(c.pct_absolute);
+        }
+      }
+      var cavg = otherPcts.length
+        ? otherPcts.reduce(function(a,b){return a+b;}, 0) / otherPcts.length
+        : null;
+      var pctEl = card.querySelector(".tk-hero-value");
+      if (pctEl) pctEl.textContent = focalPct == null ? "—"
+                   : Math.round(focalPct * 100) + "%";
+      var cmpEl = card.querySelector(".fn-card-compare strong");
+      if (cmpEl) cmpEl.textContent = cavg == null ? "—"
+                   : Math.round(cavg * 100) + "%";
+      var baseEl = card.querySelector(".fn-card-base");
+      if (baseEl) baseEl.textContent = focalBaseU == null ? ""
+                    : "Focal n = " + Math.round(focalBaseU);
+    });
+  }
+
+  function rebuildRelationshipCards(panel, focal) {
+    var pd = panel.__fnData;
+    if (!pd || !pd.consideration_detail) return;
+    var brands = pd.consideration_detail.brands || [];
+    var focalEntry = null, others = [];
+    for (var i = 0; i < brands.length; i++) {
+      if (brands[i].brand_code === focal) focalEntry = brands[i];
+      else others.push(brands[i]);
+    }
+    if (!focalEntry) return;
+    var roleMap = {
+      "LOVE": "attitude.love",
+      "PREFER": "attitude.prefer",
+      "AMBIVALENT": "attitude.ambivalent",
+      "REJECT": "attitude.reject",
+      "NO OPINION": "attitude.no_opinion"
+    };
+    panel.querySelectorAll(".fn-card-relationship").forEach(function(card){
+      var labelEl = card.querySelector(".tk-hero-label");
+      var name = labelEl ? labelEl.textContent.trim().toUpperCase() : "";
+      var role = roleMap[name];
+      if (!role) return;
+      var focalPct = (focalEntry.segments || {})[role];
+      var otherPcts = [];
+      for (var j = 0; j < others.length; j++) {
+        var seg = (others[j].segments || {})[role];
+        if (seg != null) otherPcts.push(seg);
+      }
+      var cavg = otherPcts.length
+        ? otherPcts.reduce(function(a,b){return a+b;}, 0) / otherPcts.length
+        : null;
+      var pctEl = card.querySelector(".tk-hero-value");
+      if (pctEl) pctEl.textContent = focalPct == null ? "—"
+                   : Math.round(focalPct * 100) + "%";
+      var cmpEl = card.querySelector(".fn-card-compare strong");
+      if (cmpEl) cmpEl.textContent = cavg == null ? "—"
+                   : Math.round(cavg * 100) + "%";
+    });
+  }
+
+  function updateTitleSub(panel, focal) {
+    var pd = panel.__fnData;
+    if (!pd || !pd.table) return;
+    var codes = pd.table.brand_codes || [];
+    var names = pd.table.brand_names || [];
+    var idx = codes.indexOf(focal);
+    var name = idx >= 0 ? names[idx] : focal;
+    var strong = panel.querySelector(".fn-title-sub strong");
+    if (strong) strong.textContent = name;
   }
 
   // ---------------------------------------------------------------------------
@@ -179,11 +326,13 @@
     var mode = panel.__fnState.pctMode;
     var useAbs = (mode === "total" || mode === "absolute");
     var attr = useAbs ? "data-fn-pct-abs" : "data-fn-pct-nes";
-    panel.querySelectorAll(".fn-td").forEach(function(td){
-      var v = parseFloat(td.getAttribute(attr));
-      var primary = td.querySelector(".fn-pct-primary");
-      if (primary && !isNaN(v)) primary.textContent = Math.round(v * 100) + "%";
-    });
+    // New table uses ct-td (tabs parity); older .fn-td selector kept for safety.
+    panel.querySelectorAll(".ct-td[data-fn-pct-abs], .fn-td[data-fn-pct-abs]")
+      .forEach(function(td){
+        var v = parseFloat(td.getAttribute(attr));
+        var primary = td.querySelector(".fn-pct-primary");
+        if (primary && !isNaN(v)) primary.textContent = Math.round(v * 100) + "%";
+      });
     // Cards always show absolute — don't rewrite; they read direct from payload
   }
 

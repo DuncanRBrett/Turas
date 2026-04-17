@@ -1,25 +1,25 @@
 # ==============================================================================
-# BRAND MODULE - FUNNEL PANEL TABLE (POLISHED, FUNNEL_SPEC_v2 §6)
+# BRAND MODULE - FUNNEL PANEL TABLE (tabs-parity polish)
 # ==============================================================================
-# Renders the stage-by-brand table inside a tabs/tracker-style card.
+# Uses the tabs module's ct-* CSS classes verbatim so the funnel table
+# looks identical to a tabs crosstab card (dark navy header, red-bold
+# small-base warning, column letters, sort indicators in header).
 #
 # Row order (locked — sort only shuffles competitor rows):
-#   1. Base (n= per stage, with small-base warning triangle when n < 30)
-#   2. Focal brand                  (left-border accent, FOCAL badge)
+#   1. Base (n=) per stage, with ct-low-base red/bold when < 30
+#   2. Focal brand                  (left-border accent)
 #   3. Category average             (italic, muted band)
-#   4+ Competitors                  (sortable A-Z / Z-A / by any stage column)
+#   4+ Competitors                  (sortable A-Z / Z-A / by any stage)
 #
-# Cells carry both pct_of_total and pct_of_previous as data attributes; the
-# panel JS toggles which one renders primary based on the Percentage Base
-# control. Heatmap shading is PER COLUMN (relative within each stage), which
-# reads honestly for a funnel where rightmost stages always decline.
-# Sig ▲/▼ vs category average is rendered inline where present.
-# Stage definitions are emitted as a hidden template consumed by the JS
-# popover handler on the header ? buttons.
+# Per-column heatmap shading scales 0.08..0.65 (wider than the earlier
+# 0.06..0.40 range so the gradient is clearly visible). Controlled by
+# the panel-level .fn-heatmap-off class which blanks cell backgrounds.
+# Sig ▲/▼ vs category average renders inline where present.
 # ==============================================================================
 
 
-#' Build the funnel table section (header + controls + table + popover templates)
+#' Build the funnel table section (table + popover templates).
+#' The Heatmap toggle lives on the controls bar above, not here.
 #'
 #' @param pd Panel data from build_funnel_panel_data().
 #' @param focal_colour Character. Hex colour for focal highlighting.
@@ -41,9 +41,8 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
 
   paste0(
     '<section class="fn-section fn-table-section">',
-    '<h3 class="fn-section-title">Funnel table <span class="fn-insight-marker" title="AI insight available">&#9679;</span></h3>',
     '<div class="fn-table-wrap">',
-    '<table class="fn-table ct-table" data-fn-table="1">',
+    '<table class="ct-table fn-ct-table" data-fn-table="1">',
     .fn_table_header(stage_labels, stage_keys),
     '<tbody>',
     .fn_row_base(stage_keys, table$cells, brand_codes),
@@ -54,44 +53,46 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
                          table$cells, col_max),
     '</tbody></table></div>',
     .fn_popover_templates(stage_keys, stage_labels, stage_defs),
+    .fn_add_insight_strip(),
     '</section>'
   )
 }
 
 
 # ==============================================================================
-# INTERNAL: HEADER
+# INTERNAL: HEADER (matches tabs' ct-th pattern)
 # ==============================================================================
 
 .fn_table_header <- function(stage_labels, stage_keys) {
-  cols <- vapply(seq_along(stage_keys), function(i) {
+  # Brand column header (sortable A-Z / Z-A)
+  brand_th <- paste0(
+    '<th class="ct-th ct-label-col" data-sort-col="brand">',
+      '<div class="ct-header-text">Brand</div>',
+      '<button type="button" class="ct-sort-indicator fn-sort-btn"
+              aria-label="Sort brands alphabetically"
+              data-fn-action="sort-brand"
+              data-fn-sort-dir="asc">\u21C5</button>',
+    '</th>')
+
+  # Stage column headers — each gets a help "?" popover trigger + sort button
+  stage_ths <- paste(vapply(seq_along(stage_keys), function(i) {
     key <- .fn_esc(stage_keys[i])
     label <- .fn_esc(stage_labels[i])
     sprintf(
-      '<th class="fn-th-stage" data-fn-stage="%s" data-sort-col="%s">
-         <span class="fn-th-label">%s</span>
+      '<th class="ct-th ct-data-col fn-ct-th-stage" data-fn-stage="%s" data-sort-col="%s">
+         <div class="ct-header-text">%s</div>
          <button type="button" class="fn-help-btn"
                  aria-label="What is %s?"
                  data-fn-action="help" data-fn-stage="%s">?</button>
-         <button type="button" class="fn-sort-btn"
+         <button type="button" class="ct-sort-indicator fn-sort-btn"
                  aria-label="Sort by %s"
                  data-fn-action="sort-stage" data-fn-stage="%s"
-                 data-fn-sort-dir="none">&#x25B4;&#x25BE;</button>
+                 data-fn-sort-dir="none">\u21C5</button>
        </th>',
       key, key, label, label, key, label, key)
-  }, character(1))
-  paste0(
-    '<thead><tr>',
-    '<th class="fn-th-brand" data-sort-col="brand">
-       <span class="fn-th-label">Brand</span>
-       <button type="button" class="fn-sort-btn"
-               aria-label="Sort brands alphabetically"
-               data-fn-action="sort-brand"
-               data-fn-sort-dir="asc">&#x25B4;&#x25BE;</button>
-     </th>',
-    paste(cols, collapse = ""),
-    '</tr></thead>'
-  )
+  }, character(1)), collapse = "")
+
+  paste0('<thead><tr>', brand_th, stage_ths, '</tr></thead>')
 }
 
 
@@ -100,11 +101,9 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
 # ==============================================================================
 
 .fn_row_base <- function(stage_keys, cells, brand_codes) {
-  # Base row aggregates the category base at each stage (sum of brand bases
-  # / respondents per stage). We use category-average base as a proxy — the
-  # brand-specific base is shown in the Show Counts mode.
+  # Show the largest base across the visible brands (all brands are shown
+  # by default; per-brand small-base warnings appear on the cells below).
   base_by_stage <- vapply(stage_keys, function(k) {
-    ks <- vapply(cells, function(c) identical(c$stage_key, k), logical(1))
     bs <- vapply(cells, function(c) {
       if (!identical(c$stage_key, k) || !(c$brand_code %in% brand_codes)) {
         return(NA_real_)
@@ -118,18 +117,18 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
   cells_html <- vapply(seq_along(stage_keys), function(i) {
     v <- base_by_stage[i]
     if (!is.finite(v)) {
-      return('<td class="fn-td fn-td-base fn-td-empty">&mdash;</td>')
+      return('<td class="ct-td ct-data-col ct-na">&mdash;</td>')
     }
     warn <- v < .FN_SMALL_BASE
-    sprintf('<td class="fn-td fn-td-base%s"><span class="fn-base-n">n=%d%s</span></td>',
-            if (warn) " fn-td-base-warn" else "",
+    sprintf('<td class="ct-td ct-data-col"><span class="%s">n=%d%s</span></td>',
+            if (warn) "ct-low-base" else "ct-base-n",
             as.integer(round(v)),
-            if (warn) ' <span class="fn-warn" aria-label="small base">\u26A0</span>' else "")
+            if (warn) " \u26A0" else "")
   }, character(1))
 
   paste0(
-    '<tr class="fn-row fn-row-base" data-locked="1">',
-    '<th class="fn-th-rowlabel fn-th-rowlabel-base">Base (n=)</th>',
+    '<tr class="ct-row ct-row-base fn-row-base" data-locked="1">',
+    '<td class="ct-td ct-label-col">Base (n=)</td>',
     paste(cells_html, collapse = ""),
     '</tr>'
   )
@@ -144,8 +143,8 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
   row_attrs <- sprintf('data-fn-brand="%s" data-locked="1" style="--fn-row-accent:%s;"',
                        .fn_esc(focal), focal_colour)
   paste0(
-    sprintf('<tr class="fn-row fn-row-focal" %s>', row_attrs),
-    sprintf('<th class="fn-th-rowlabel fn-row-focal-label">%s <span class="fn-focal-badge">focal</span></th>',
+    sprintf('<tr class="ct-row fn-row-focal" %s>', row_attrs),
+    sprintf('<td class="ct-td ct-label-col fn-row-focal-label">%s <span class="fn-focal-badge">FOCAL</span></td>',
             .fn_esc(display)),
     .fn_cells_html(stage_keys, cells_for, col_max),
     '</tr>'
@@ -159,7 +158,7 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
     vapply(avg_rows, function(r) r$stage_key, character(1)))
   cells <- vapply(stage_keys, function(k) {
     r <- by_key[[k]]
-    if (is.null(r)) return('<td class="fn-td fn-td-empty">&mdash;</td>')
+    if (is.null(r)) return('<td class="ct-td ct-data-col ct-na">&mdash;</td>')
     pct_abs <- r$pct_absolute %||% NA_real_
     pct_nes <- r$pct_nested %||% NA_real_
     .fn_cell_html(pct_abs, pct_nes, base_w = NA_real_, base_u = NA_real_,
@@ -168,8 +167,8 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
                   row_class = "fn-td-avg")
   }, character(1))
   paste0(
-    '<tr class="fn-row fn-row-avg-all" data-locked="1">',
-    '<th class="fn-th-rowlabel">Category average</th>',
+    '<tr class="ct-row fn-row-avg-all" data-locked="1">',
+    '<td class="ct-td ct-label-col"><em>Category average</em></td>',
     paste(cells, collapse = ""),
     '</tr>'
   )
@@ -180,16 +179,15 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
                                  focal, cells, col_max) {
   non_focal_idx <- which(brand_codes != focal)
   if (length(non_focal_idx) == 0) return("")
-  # Default order: alphabetical by brand name (matches the default sort)
   order_idx <- non_focal_idx[order(tolower(brand_names[non_focal_idx]))]
   rows <- vapply(order_idx, function(i) {
     b <- brand_codes[i]; nm <- brand_names[i]
     cells_for <- .fn_cells_for_brand(cells, b)
     sort_attrs <- .fn_brand_sort_attrs(cells_for, stage_keys, nm)
     paste0(
-      sprintf('<tr class="fn-row fn-row-competitor" data-fn-brand="%s"%s>',
+      sprintf('<tr class="ct-row fn-row-competitor" data-fn-brand="%s"%s>',
               .fn_esc(b), sort_attrs),
-      sprintf('<th class="fn-th-rowlabel">%s</th>', .fn_esc(nm)),
+      sprintf('<td class="ct-td ct-label-col">%s</td>', .fn_esc(nm)),
       .fn_cells_html(stage_keys, cells_for, col_max),
       '</tr>'
     )
@@ -198,9 +196,6 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
 }
 
 
-#' Emit a data-fn-sort-<stage>="0.NNN" attribute for every stage + a
-#' data-fn-sort-brand for the alphabetical sort.
-#' @keywords internal
 .fn_brand_sort_attrs <- function(cells_for, stage_keys, brand_name) {
   parts <- vapply(stage_keys, function(k) {
     v <- cells_for[[k]]$pct_absolute %||% NA_real_
@@ -236,8 +231,6 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
 }
 
 
-#' Column max of pct_absolute — used to normalise heatmap shade per stage.
-#' @keywords internal
 .fn_per_column_max <- function(cells_by_stage, stage_keys) {
   out <- stats::setNames(vector("list", length(stage_keys)), stage_keys)
   for (k in stage_keys) {
@@ -255,7 +248,7 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
 .fn_cells_html <- function(stage_keys, cells_by_stage_for_brand, col_max) {
   vals <- vapply(stage_keys, function(k) {
     c <- cells_by_stage_for_brand[[k]]
-    if (is.null(c)) return('<td class="fn-td fn-td-empty">&mdash;</td>')
+    if (is.null(c)) return('<td class="ct-td ct-data-col ct-na">&mdash;</td>')
     .fn_cell_html(c$pct_absolute, c$pct_nested,
                   c$base_weighted, c$base_unweighted,
                   k, c$brand_code,
@@ -271,34 +264,31 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
                           stage_key, brand_code, col_max, sig_vs_avg,
                           row_class = "") {
   if (is.null(pct_absolute) || is.na(pct_absolute)) {
-    return(sprintf('<td class="fn-td fn-td-empty %s">&mdash;</td>', row_class))
+    return(sprintf('<td class="ct-td ct-data-col ct-na %s">&mdash;</td>', row_class))
   }
-  bg_style <- .fn_per_column_heatmap_bg(pct_absolute, col_max)
+  heatmap_data <- .fn_per_column_heatmap_data(pct_absolute, col_max)
   abs_display    <- sprintf("%.0f%%", 100 * pct_absolute)
   nested_display <- if (is.null(pct_nested) || is.na(pct_nested)) abs_display
                     else sprintf("%.0f%%", 100 * pct_nested)
   base_display <- if (is.finite(base_u %||% NA_real_))
                     sprintf("n=%d", as.integer(base_u))
-                  else if (is.finite(base_w %||% NA_real_))
-                    sprintf("n=%.0f", base_w)
                   else ""
 
-  # Small-base warning on unweighted base < threshold
   is_warn <- is.finite(base_u %||% NA_real_) &&
              !is.na(base_u) && as.numeric(base_u) < .FN_SMALL_BASE
-  warn_cls <- if (is_warn) " fn-td-warn" else ""
+  dim_cls <- if (is_warn) " ct-low-base-dim" else ""
   sig_badge <- .fn_sig_badge(sig_vs_avg)
 
   sprintf(
-    '<td class="fn-td%s %s" style="%s"
+    '<td class="ct-td ct-data-col ct-heatmap-cell%s %s" data-heatmap="%s"
          data-fn-stage="%s" data-fn-brand="%s"
          data-fn-pct-abs="%.6f" data-fn-pct-nes="%.6f"
          data-fn-base="%s"
          data-sort-val="%.6f">
-       <span class="fn-pct fn-pct-primary">%s</span>%s
-       <span class="fn-pct-count">%s</span>
+       <span class="ct-val fn-pct-primary">%s</span>%s
+       <span class="ct-freq fn-pct-count">%s</span>
      </td>',
-    warn_cls, row_class, bg_style,
+    dim_cls, row_class, heatmap_data,
     .fn_esc(stage_key), .fn_esc(brand_code),
     pct_absolute, if (is.null(pct_nested) || is.na(pct_nested))
                     pct_absolute else pct_nested,
@@ -309,39 +299,35 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
 }
 
 
-#' In-cell ▲/▼ badge rendered whenever the brand is sig higher / lower than
-#' the category average at that stage. Rendered hidden by default; JS
-#' enables via a panel class so the user can opt in/out (future work) —
-#' for now always visible.
+#' In-cell ▲/▼ badge — brand sig higher / lower than category average.
 #' @keywords internal
 .fn_sig_badge <- function(direction) {
   switch(direction,
-    higher = '<span class="fn-sig fn-sig-up" title="Higher than category average (p<0.05)">\u25B2</span>',
-    lower  = '<span class="fn-sig fn-sig-down" title="Lower than category average (p<0.05)">\u25BC</span>',
+    higher = '<span class="ct-sig fn-sig-up" title="Higher than category average (p<0.05)">\u25B2</span>',
+    lower  = '<span class="ct-sig fn-sig-down" title="Lower than category average (p<0.05)">\u25BC</span>',
     "")
 }
 
 
-#' Per-column heatmap shading (honest for funnels because stage 5 never
-#' looks 'pale' relative to stage 1 — shade is relative within the column).
+#' Per-column heatmap rgba — wider alpha range (0.08 .. 0.65) so the
+#' gradient reads clearly at desktop size. The JS applies this
+#' data-heatmap value as inline background-color on report load; the
+#' Heatmap toggle blanks it via a parent .fn-heatmap-off class.
 #' @keywords internal
-.fn_per_column_heatmap_bg <- function(val, col_max) {
+.fn_per_column_heatmap_data <- function(val, col_max) {
   if (is.na(val) || val <= 0) return("")
   denom <- if (is.null(col_max) || !is.finite(col_max) || col_max <= 0) 1
            else col_max
   frac <- min(1, max(0, val / denom))
-  opacity <- 0.06 + frac * 0.34
-  sprintf("background:rgba(37,99,171,%.2f);", opacity)
+  opacity <- 0.08 + frac * 0.57
+  sprintf("rgba(37,99,171,%.3f)", opacity)
 }
 
 
 # ==============================================================================
-# INTERNAL: POPOVER TEMPLATES
+# INTERNAL: POPOVER TEMPLATES + ADD INSIGHT STRIP
 # ==============================================================================
 
-#' Hidden <template> blocks per stage. JS reads these when the header ?
-#' button is clicked and floats the content next to the trigger.
-#' @keywords internal
 .fn_popover_templates <- function(stage_keys, stage_labels, stage_defs) {
   parts <- vapply(seq_along(stage_keys), function(i) {
     k <- stage_keys[i]
@@ -359,11 +345,20 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
 }
 
 
+.fn_add_insight_strip <- function() {
+  '<div class="fn-add-insight-strip">
+     <button type="button" class="fn-add-insight-btn" data-fn-action="add-insight">
+       + Add Insight
+     </button>
+   </div>'
+}
+
+
 # ==============================================================================
 # CONSTANTS + SHARED HELPERS
 # ==============================================================================
 
-.FN_SMALL_BASE <- 30  # n< this triggers the ⚠ flag (per Duncan, matches tabs)
+.FN_SMALL_BASE <- 30
 
 
 if (!exists("%||%")) {
