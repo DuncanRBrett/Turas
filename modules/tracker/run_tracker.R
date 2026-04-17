@@ -446,7 +446,14 @@ run_tracker <- function(tracking_config_path,
     dirname(output_path)
   } else {
     if (!is.null(output_dir_setting) && nzchar(trimws(output_dir_setting))) {
-      trimws(output_dir_setting)
+      dir_val <- trimws(output_dir_setting)
+      # Resolve relative paths against the config file's directory so that
+      # settings like "02_Report" always land next to the config, regardless
+      # of the current working directory when the GUI runs.
+      if (!grepl("^(/|[A-Za-z]:)", dir_val)) {
+        dir_val <- file.path(dirname(config$config_path), dir_val)
+      }
+      dir_val
     } else {
       dirname(config$config_path)
     }

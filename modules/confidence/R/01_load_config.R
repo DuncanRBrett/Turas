@@ -158,6 +158,23 @@ load_confidence_config <- function(config_path) {
   }
   study_settings_list <- as.list(setNames(study_settings$Value, study_settings$Setting))
 
+  # Resolve relative file paths against the config file's directory.
+  # Paths in the config (e.g. "01_Data/data.xlsx") are written relative to the
+  # config file location, not the R working directory. Resolving them here
+  # means every downstream consumer gets a fully-qualified absolute path.
+  config_dir <- dirname(config_path)
+  path_settings <- c("Data_File", "Output_File", "HTML_Output_File")
+  for (ps in path_settings) {
+    val <- file_paths_list[[ps]]
+    if (!is.null(val) && !is.na(val) && nzchar(trimws(val))) {
+      val <- trimws(val)
+      # Only resolve if not already absolute
+      if (!grepl("^(/|[A-Za-z]:)", val)) {
+        file_paths_list[[ps]] <- file.path(config_dir, val)
+      }
+    }
+  }
+
   # Return structured config object
   config <- list(
     file_paths = file_paths_list,

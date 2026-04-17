@@ -103,9 +103,16 @@ test_that("load_confidence_config returns file_paths as named list", {
 
   config <- load_confidence_config(config_path)
 
+  # Relative Data_File / Output_File entries in the config are resolved
+  # against the config file's directory by load_confidence_config(). The
+  # returned values are absolute paths ending in the original basenames.
   expect_type(config$file_paths, "list")
-  expect_equal(config$file_paths$Data_File, "data.csv")
-  expect_equal(config$file_paths$Output_File, "output.xlsx")
+  expect_equal(basename(config$file_paths$Data_File), "data.csv")
+  expect_equal(basename(config$file_paths$Output_File), "output.xlsx")
+  expect_true(startsWith(config$file_paths$Data_File,
+                         normalizePath(dirname(config_path),
+                                       winslash = "/", mustWork = FALSE)) ||
+              startsWith(config$file_paths$Data_File, dirname(config_path)))
 })
 
 test_that("load_confidence_config returns study_settings as named list", {

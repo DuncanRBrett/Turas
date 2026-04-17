@@ -12,12 +12,12 @@
     },
     "method_comparison": {
       "title": "Understanding the Methods",
-      "text": "<ul><li><strong>Correlation:<\/strong> Simple bivariate association (Pearson r) — does not control for other drivers.<\/li><li><strong>Beta Weight:<\/strong> Standardised regression coefficient — shows unique contribution controlling for all other drivers simultaneously.<\/li><li><strong>Relative Weight:<\/strong> Decomposes R² by orthogonalising the predictor space — handles multicollinearity better than raw betas.<\/li><li><strong>Shapley Value:<\/strong> Game-theory based fair division of R² — the most robust single measure when drivers overlap.<\/li><\/ul><p style='font-size:11px;color:#94a3b8;margin-top:6px;font-style:italic;'>When drivers rank consistently across methods, confidence in their importance is high. Large rank discrepancies may indicate multicollinearity or non-linear effects.<\/p>",
+      "text": "<ul><li><strong>Correlation:</strong> Simple bivariate association (Pearson r) — does not control for other drivers.</li><li><strong>Beta Weight:</strong> Standardised regression coefficient — shows unique contribution controlling for all other drivers simultaneously.</li><li><strong>Relative Weight:</strong> Decomposes R² by orthogonalising the predictor space — handles multicollinearity better than raw betas.</li><li><strong>Shapley Value:</strong> Game-theory based fair division of R² — the most robust single measure when drivers overlap.</li></ul><p style='font-size:11px;color:#94a3b8;margin-top:6px;font-style:italic;'>When drivers rank consistently across methods, confidence in their importance is high. Large rank discrepancies may indicate multicollinearity or non-linear effects.</p>",
       "context": "Method comparison section"
     },
     "effect_sizes": {
       "title": "Cohen's f² Benchmarks",
-      "text": "Effect sizes show how much each driver contributes to the model beyond all others. Cohen's f² benchmarks: <strong>Large ≥ 0.35<\/strong> (substantial practical impact), <strong>Medium ≥ 0.15<\/strong> (meaningful contribution), <strong>Small ≥ 0.02<\/strong> (detectable but modest). Drivers below 0.02 have negligible unique contribution after controlling for other predictors.",
+      "text": "Effect sizes show how much each driver contributes to the model beyond all others. Cohen's f² benchmarks: <strong>Large ≥ 0.35</strong> (substantial practical impact), <strong>Medium ≥ 0.15</strong> (meaningful contribution), <strong>Small ≥ 0.02</strong> (detectable but modest). Drivers below 0.02 have negligible unique contribution after controlling for other predictors.",
       "context": "Effect sizes section"
     },
     "correlation_matrix": {
@@ -54,7 +54,7 @@
     },
     "diagnostics": {
       "title": "Model Diagnostics",
-      "text": "Diagnostics assess whether the model is reliable. <strong>Convergence<\/strong> (green = converged) confirms the model found a stable solution. <strong>Multicollinearity<\/strong> flags drivers that overlap too much (VIF > 5 is concerning). <strong>Small cells<\/strong> warns when too few responses fall in a category, which can produce unstable estimates.",
+      "text": "Diagnostics assess whether the model is reliable. <strong>Convergence</strong> (green = converged) confirms the model found a stable solution. <strong>Multicollinearity</strong> flags drivers that overlap too much (VIF > 5 is concerning). <strong>Small cells</strong> warns when too few responses fall in a category, which can produce unstable estimates.",
       "context": "Model diagnostics section"
     }
   },
@@ -73,31 +73,31 @@
     },
     "representativeness": {
       "title": "Reading Representativeness",
-      "text": "The representativeness assessment compares your sample to known population benchmarks. <strong>Green<\/strong> cells indicate the sample closely matches the population (&lt;2pp difference). <strong>Amber<\/strong> indicates moderate deviation (2-5pp). <strong>Red<\/strong> indicates substantial deviation (&gt;5pp) that may bias results if related to the survey topic.",
+      "text": "The representativeness assessment compares your sample to known population benchmarks. <strong>Green</strong> cells indicate the sample closely matches the population (&lt;2pp difference). <strong>Amber</strong> indicates moderate deviation (2-5pp). <strong>Red</strong> indicates substantial deviation (&gt;5pp) that may bias results if related to the survey topic.",
       "context": "Representativeness card",
       "page": "Summary"
     },
     "results_overview": {
       "title": "Understanding This Table",
-      "text": "This table summarises all questions analysed, showing the point estimate, interval bounds, interval width, and a quality assessment. The <strong>Method<\/strong> column shows which statistical method produced the displayed values (see Method Selection below). A <strong>+1<\/strong> or <strong>+2<\/strong> next to the method name means additional methods are available in the Question Details tab. <strong>Green<\/strong> quality means the estimate is precise enough for confident decisions. (note: there may be other forms of error) <strong>Amber<\/strong> suggests the margin of error is notable — interpret with care. <strong>Red<\/strong> indicates wide intervals where estimates should be treated as directional only.",
+      "text": "This table summarises all questions analysed, showing the point estimate, interval bounds, interval width, and a quality assessment. The <strong>Method</strong> column shows which statistical method produced the displayed values (see Method Selection below). A <strong>+1</strong> or <strong>+2</strong> next to the method name means additional methods are available in the Question Details tab. <strong>Green</strong> quality means the estimate is precise enough for confident decisions. (note: there may be other forms of error) <strong>Amber</strong> suggests the margin of error is notable — interpret with care. <strong>Red</strong> indicates wide intervals where estimates should be treated as directional only.",
       "context": "Results overview card",
       "page": "Summary"
     },
     "method_selection": {
       "title": "How the Primary Method is Chosen",
-      "text": "The summary table displays results from a single <strong>primary method<\/strong> per question, chosen by a fixed priority order based on statistical best practice:<ul><li><strong>Proportions:<\/strong> Wilson score (preferred) → Normal approximation → Bootstrap → Bayesian. Wilson is preferred because it maintains reliable coverage even at extreme proportions (below 5% or above 95%) and small samples, unlike the Normal approximation which can produce impossible intervals.<\/li><li><strong>Means:<\/strong> t-Distribution (preferred) → Bootstrap → Bayesian. The t-distribution is the standard method when the population standard deviation is unknown, which is nearly always.<\/li><li><strong>NPS:<\/strong> Normal approximation (preferred) → Bootstrap → Bayesian. The Normal method is standard for the difference-of-proportions that defines NPS.<\/li><\/ul>The first method available in the results is used. All methods are compared side-by-side in the <strong>Question Details<\/strong> tab — if the methods disagree substantially, this may indicate the data violates assumptions of the primary method.",
+      "text": "The summary table displays results from a single <strong>primary method</strong> per question, chosen by a fixed priority order based on statistical best practice:<ul><li><strong>Proportions:</strong> Wilson score (preferred) → Normal approximation → Bootstrap → Bayesian. Wilson is preferred because it maintains reliable coverage even at extreme proportions (below 5% or above 95%) and small samples, unlike the Normal approximation which can produce impossible intervals.</li><li><strong>Means:</strong> t-Distribution (preferred) → Bootstrap → Bayesian. The t-distribution is the standard method when the population standard deviation is unknown, which is nearly always.</li><li><strong>NPS:</strong> Normal approximation (preferred) → Bootstrap → Bayesian. The Normal method is standard for the difference-of-proportions that defines NPS.</li></ul>The first method available in the results is used. All methods are compared side-by-side in the <strong>Question Details</strong> tab — if the methods disagree substantially, this may indicate the data violates assumptions of the primary method.",
       "context": "Results overview card, below table",
       "page": "Summary"
     },
     "forest_plot_guide": {
       "title": "Reading the Forest Plot",
-      "text": "Each dot represents the point estimate (proportion, mean, or NPS score). The horizontal bar shows the confidence or stability interval — the range of plausible values for the true population parameter. <strong>Shorter bars = more precision.<\/strong> When two bars don't overlap, the difference between those questions is likely statistically meaningful. Very wide bars suggest the sample may be too small for that question.",
+      "text": "Each dot represents the point estimate (proportion, mean, or NPS score). The horizontal bar shows the confidence or stability interval — the range of plausible values for the true population parameter. <strong>Shorter bars = more precision.</strong> When two bars don't overlap, the difference between those questions is likely statistically meaningful. Very wide bars suggest the sample may be too small for that question.",
       "context": "Forest plot card",
       "page": "Summary"
     },
     "study_level_weighting": {
       "title": "Understanding Weighting Effects",
-      "text": "When survey responses carry unequal weights, some respondents contribute more to the estimate than others. The <strong>Design Effect (DEFF)<\/strong> measures precision loss due to weighting — a DEFF of 1.0 means no loss, while 2.0 means you'd need twice the sample for equivalent precision. <strong>Efficiency above 70%<\/strong> is generally acceptable; below 50% suggests the weighting scheme may need review. These calculations assume a probability-based sample — for non-probability designs, DEFF captures only the weighting effect, not the full extent of sampling bias.",
+      "text": "When survey responses carry unequal weights, some respondents contribute more to the estimate than others. The <strong>Design Effect (DEFF)</strong> measures precision loss due to weighting — a DEFF of 1.0 means no loss, while 2.0 means you'd need twice the sample for equivalent precision. <strong>Efficiency above 70%</strong> is generally acceptable; below 50% suggests the weighting scheme may need review. These calculations assume a probability-based sample — for non-probability designs, DEFF captures only the weighting effect, not the full extent of sampling bias.",
       "context": "Study-level statistics card (weighted only)",
       "page": "Summary"
     },
@@ -115,7 +115,7 @@
     },
     "non_sampling_error": {
       "title": "Sources of Error Not Captured",
-      "text": "Confidence intervals only capture random sampling error. They do not account for: <strong>Non-response bias<\/strong> (people who didn't respond may differ systematically), <strong>Measurement error<\/strong> (poorly worded questions), <strong>Coverage error<\/strong> (population groups not reachable by the survey method), or <strong>Processing errors<\/strong> (data cleaning and coding mistakes).",
+      "text": "Confidence intervals only capture random sampling error. They do not account for: <strong>Non-response bias</strong> (people who didn't respond may differ systematically), <strong>Measurement error</strong> (poorly worded questions), <strong>Coverage error</strong> (population groups not reachable by the survey method), or <strong>Processing errors</strong> (data cleaning and coding mistakes).",
       "context": "Understanding Limitations card",
       "page": "Method Notes"
     },
@@ -139,43 +139,43 @@
     },
     "convergence_fail": {
       "title": "Model Convergence Warning",
-      "text": "The MCMC chains have not fully converged, which means the individual-level estimates may not be fully stable. This can happen when: the model is complex relative to sample size, there are too many attribute levels, or insufficient iterations were run. <strong>Recommendations:<\/strong> Increase the number of iterations, check the Geweke diagnostics for specific parameters, review the effective sample size (ESS), or simplify the model by reducing attributes. The aggregate-level results are likely directionally correct but use individual-level utilities with caution.",
+      "text": "The MCMC chains have not fully converged, which means the individual-level estimates may not be fully stable. This can happen when: the model is complex relative to sample size, there are too many attribute levels, or insufficient iterations were run. <strong>Recommendations:</strong> Increase the number of iterations, check the Geweke diagnostics for specific parameters, review the effective sample size (ESS), or simplify the model by reducing attributes. The aggregate-level results are likely directionally correct but use individual-level utilities with caution.",
       "context": "Diagnostics panel (not converged)"
     }
   },
   "maxdiff": {
     "how_to_read": {
       "title": "How to Read This Report",
-      "text": "MaxDiff (Maximum Difference Scaling) measures relative preference by asking respondents to choose the best and worst from sets of items. <strong>Preference Scores (0–100)<\/strong> show each item's relative desirability — higher is more preferred. <strong>BW Scores<\/strong> show the raw best-minus-worst count. <strong>TURF<\/strong> (Total Unduplicated Reach and Frequency) identifies the optimal combination of items to maximise the number of people who find at least one attractive option.",
+      "text": "MaxDiff (Maximum Difference Scaling) measures relative preference by asking respondents to choose the best and worst from sets of items. <strong>Preference Scores (0–100)</strong> show each item's relative desirability — higher is more preferred. <strong>BW Scores</strong> show the raw best-minus-worst count. <strong>TURF</strong> (Total Unduplicated Reach and Frequency) identifies the optimal combination of items to maximise the number of people who find at least one attractive option.",
       "context": "Overview panel"
     },
     "item_analysis": {
       "title": "Reading this Table",
-      "text": "Items are ranked by preference score. <strong>Green shading<\/strong> indicates items that respondents consistently chose as 'best' — these are the most preferred. <strong>Red shading<\/strong> indicates items frequently chosen as 'worst'. The Best% and Worst% columns show how often each item was selected. The BW Score (Best% minus Worst%) provides a simple summary metric.",
+      "text": "Items are ranked by preference score. <strong>Green shading</strong> indicates items that respondents consistently chose as 'best' — these are the most preferred. <strong>Red shading</strong> indicates items frequently chosen as 'worst'. The Best% and Worst% columns show how often each item was selected. The BW Score (Best% minus Worst%) provides a simple summary metric.",
       "context": "Item analysis table"
     }
   },
   "segment": {
     "interpretation_guide": {
       "title": "How to Interpret These Results",
-      "text": "<strong>DO:<\/strong><ul><li>Validate segments against external criteria (behaviour, demographics)<\/li><li>Consider practical segment size — segments too small to target are not actionable<\/li><li>Look at the profile differences, not just statistical metrics<\/li><li>Test stability by running with different random seeds<\/li><li>Use multiple metrics (silhouette, gap statistic) to assess quality<\/li><\/ul><strong>DON'T:<\/strong><ul><li>Treat segments as rigid categories — boundaries are inherently fuzzy<\/li><li>Over-interpret small differences between adjacent segments<\/li><li>Assume the 'best' statistical solution is the most useful business solution<\/li><li>Ignore segments that don't fit your expectations — they may reveal something new<\/li><li>Use silhouette scores alone to choose the number of segments<\/li><\/ul>",
+      "text": "<strong>DO:</strong><ul><li>Validate segments against external criteria (behaviour, demographics)</li><li>Consider practical segment size — segments too small to target are not actionable</li><li>Look at the profile differences, not just statistical metrics</li><li>Test stability by running with different random seeds</li><li>Use multiple metrics (silhouette, gap statistic) to assess quality</li></ul><strong>DON'T:</strong><ul><li>Treat segments as rigid categories — boundaries are inherently fuzzy</li><li>Over-interpret small differences between adjacent segments</li><li>Assume the 'best' statistical solution is the most useful business solution</li><li>Ignore segments that don't fit your expectations — they may reveal something new</li><li>Use silhouette scores alone to choose the number of segments</li></ul>",
       "context": "Results interpretation section"
     },
     "how_it_works": {
       "title": "How Segmentation Works",
-      "text": "<strong>K-Means:<\/strong> Assigns each respondent to the nearest of k cluster centres, then recalculates centres, repeating until stable. Fast and effective for well-separated, spherical clusters.<br><br><strong>Hierarchical Clustering:<\/strong> Builds a tree (dendrogram) of nested clusters by progressively merging the most similar groups. Useful for exploring natural groupings at different levels.<br><br><strong>GMM (Gaussian Mixture Models):<\/strong> Models each segment as a statistical distribution, allowing 'soft' membership where respondents can partially belong to multiple segments. Best when segments overlap.<br><br><strong>Choosing k:<\/strong> There is no single 'correct' number of segments. The silhouette score measures how well-separated the segments are: <strong>&gt;0.50<\/strong> = strong structure, <strong>0.35–0.50<\/strong> = reasonable, <strong>0.25–0.35<\/strong> = weak, <strong>&lt;0.25<\/strong> = little meaningful structure.",
+      "text": "<strong>K-Means:</strong> Assigns each respondent to the nearest of k cluster centres, then recalculates centres, repeating until stable. Fast and effective for well-separated, spherical clusters.<br><br><strong>Hierarchical Clustering:</strong> Builds a tree (dendrogram) of nested clusters by progressively merging the most similar groups. Useful for exploring natural groupings at different levels.<br><br><strong>GMM (Gaussian Mixture Models):</strong> Models each segment as a statistical distribution, allowing 'soft' membership where respondents can partially belong to multiple segments. Best when segments overlap.<br><br><strong>Choosing k:</strong> There is no single 'correct' number of segments. The silhouette score measures how well-separated the segments are: <strong>&gt;0.50</strong> = strong structure, <strong>0.35–0.50</strong> = reasonable, <strong>0.25–0.35</strong> = weak, <strong>&lt;0.25</strong> = little meaningful structure.",
       "context": "Methodology explanation section"
     }
   },
   "weighting": {
     "weight_metrics": {
       "title": "Reading Weight Metrics",
-      "text": "<strong>Min/Max:<\/strong> The smallest and largest individual weights — extreme values (e.g., max &gt;5) suggest some respondents are being given disproportionate influence.<br><strong>CV (Coefficient of Variation):<\/strong> Measures weight variability relative to the mean. CV &lt;0.20 is good, 0.20–0.50 is acceptable, &gt;0.50 is problematic.<br><strong>DEFF (Design Effect):<\/strong> How much the weighting inflates variance compared to an unweighted sample (1 + CV²). DEFF of 1.5 means you need 50% more sample for equivalent precision.<br><strong>Efficiency:<\/strong> The inverse of DEFF as a percentage. &gt;70% is good, &lt;50% is concerning — the weighting is costing too much precision.",
+      "text": "<strong>Min/Max:</strong> The smallest and largest individual weights — extreme values (e.g., max &gt;5) suggest some respondents are being given disproportionate influence.<br><strong>CV (Coefficient of Variation):</strong> Measures weight variability relative to the mean. CV &lt;0.20 is good, 0.20–0.50 is acceptable, &gt;0.50 is problematic.<br><strong>DEFF (Design Effect):</strong> How much the weighting inflates variance compared to an unweighted sample (1 + CV²). DEFF of 1.5 means you need 50% more sample for equivalent precision.<br><strong>Efficiency:</strong> The inverse of DEFF as a percentage. &gt;70% is good, &lt;50% is concerning — the weighting is costing too much precision.",
       "context": "Weight diagnostics table"
     },
     "rim_targets": {
       "title": "Rim Target Achievement",
-      "text": "Shows how well the weighted sample matches population targets. <strong>Green<\/strong> cells achieved the target within 0.5 percentage points. <strong>Amber<\/strong> cells are within 2pp — acceptable for most purposes. <strong>Red<\/strong> cells deviate by more than 2pp, which may indicate insufficient sample in that category or conflicting rim targets.",
+      "text": "Shows how well the weighted sample matches population targets. <strong>Green</strong> cells achieved the target within 0.5 percentage points. <strong>Amber</strong> cells are within 2pp — acceptable for most purposes. <strong>Red</strong> cells deviate by more than 2pp, which may indicate insufficient sample in that category or conflicting rim targets.",
       "context": "Rim target comparison table"
     },
     "stratum_weights": {
@@ -231,6 +231,62 @@
       "text": "Composite scores combine multiple survey questions into a single index. The score shown is typically a weighted or unweighted average of the component questions, rescaled to a 0–100 range. Higher scores indicate more positive responses across the combined questions. Component breakdowns show how each contributing question performs individually.",
       "context": "Composite question containers",
       "page": "Crosstabs"
+    }
+  },
+  "brand": {
+    "how_to_read": {
+      "title": "How to read this report",
+      "text": "This report uses the <strong>Category Buyer Mindset (CBM)</strong> framework from Romaniuk and the Ehrenberg-Bass Institute. Every tab opens with a headline finding, then a visual, then a data table you can pin or export to Excel. The focal brand is always shown saturated; competitors are desaturated grey so the eye goes to the client's position first. Every chart carries its base size (n) and fieldwork date at the bottom. Double-click any insight box to edit; pin any view to build your presentation deck.",
+      "context": "About and Summary sections",
+      "page": "about"
+    },
+    "summary": {
+      "title": "What this summary shows",
+      "text": "Headline metrics and the three most important findings for the focal brand in this category. MMS is the single most important brand health metric — it captures the brand's share of all mental links to category buying situations. Penetration is the behavioural counterpart — what share of category buyers have actually bought the brand in the target timeframe. Average repertoire size tells you how many brands the typical buyer uses; small repertoires signal commodity categories, large repertoires signal switching.",
+      "context": "Category summary tab",
+      "page": "summary"
+    },
+    "mental_availability": {
+      "title": "What is Mental Availability?",
+      "text": "Mental availability is whether a brand comes to mind in category buying situations. It is the single strongest predictor of brand choice in the EBI evidence base — a brand that is mentally available to more buyers in more buying situations wins more often. We measure it via Category Entry Points (CEPs): the situations, needs, and occasions that trigger category buying. Three headline metrics: <strong>MPen</strong> (mental penetration — what share of buyers link the brand to any CEP), <strong>NS</strong> (network size — how many CEPs per brand, among those who link at least one), and <strong>MMS</strong> (mental market share — the brand's share of all brand-CEP links in the category). MMS is the headline but MPen is the growth lever: in EBI theory, broadening reach beats deepening associations.",
+      "context": "Mental Availability tab",
+      "page": "mental_availability"
+    },
+    "cep_heat_strip": {
+      "title": "How to read the CEP x Brand heat strip",
+      "text": "Each cell shows the percentage of category buyers who link the brand (column) to the CEP (row). CEPs are sorted by the focal brand's linkage strength, so the focal brand's strongest situations are at the top. Darker cells mean higher linkage. Non-significant differences from the category average are masked (lighter grey) so the eye focuses on real signal. Look for two patterns: CEPs where the focal brand is category-leading (dark focal column, defend these), and CEPs where the focal brand lags but the CEP is high-reach (lighter focal column with dark competitor columns nearby — these are growth targets).",
+      "context": "Mental Availability CEP heat strip",
+      "page": "mental_availability"
+    },
+    "funnel": {
+      "title": "How the funnel is derived",
+      "text": "Funnel stages are derived from the core CBM data (awareness + 5-level attitude + penetration), not from traditional sequential funnel questions. This is methodologically stronger because the attitude scale gives richer diagnostics than binary consideration and there is no pipe dependency between stages. Stages: <strong>Aware</strong> → <strong>Positive disposition</strong> (attitude codes 1-3: love, prefer, would-buy-if-no-other) → <strong>Bought in period</strong> → <strong>Primary brand</strong>. Active rejection (attitude code 4) is shown explicitly, not hidden inside 'doesn't consider'. Most conversion variation across brands is driven by brand size (Double Jeopardy) — the diagnostic signal is where your brand deviates from what its size would predict.",
+      "context": "Funnel tab",
+      "page": "funnel"
+    },
+    "repertoire": {
+      "title": "How to read repertoire",
+      "text": "Repertoire is the set of brands a category buyer actually uses in the target timeframe. Small repertoires (1-2 brands) signal loyalty or commodity; large repertoires (4+) signal switching. Three metrics matter: <strong>average repertoire size</strong> (category-level), <strong>sole loyalty</strong> (share of buyers who use only this brand), and <strong>share of requirements</strong> (among buyers of the focal brand, what share of their purchases does it get). SoR is the behavioural analogue of attitude preference — it separates 'part of my repertoire' from 'my main brand'.",
+      "context": "Repertoire tab",
+      "page": "repertoire"
+    },
+    "drivers_barriers": {
+      "title": "How drivers and barriers are identified",
+      "text": "Driver importance is <strong>derived</strong> from the relationship between each attribute's linkage and purchase behaviour — we do not ask respondents to rate importance directly, because self-reported importance is unreliable. Each attribute lands in one of four quadrants on the Importance x Performance map: <strong>Defend</strong> (high importance, high performance), <strong>Improve</strong> (high importance, low performance — the top priority), <strong>Maintain</strong> (low importance, high performance — do not over-invest), <strong>Monitor</strong> (low importance, low performance). Rejection themes are open-ended reasons given by respondents who chose attitude code 4 — a small volume, but each theme carries strategic weight because rejection is active, not passive.",
+      "context": "Drivers & Barriers tab",
+      "page": "drivers_barriers"
+    },
+    "dba": {
+      "title": "Distinctive Brand Assets (DBA)",
+      "text": "DBA measures whether the brand's visual and verbal assets (logo, colours, tagline, characters) are both <strong>Fame</strong> (widely recognised by category buyers) and <strong>Unique</strong> (correctly attributed to this brand, not to competitors). Each asset lands in one of four quadrants on the Fame x Uniqueness grid: <strong>Distinctive</strong> (high fame, high uniqueness — protect and amplify), <strong>Usable</strong> (low fame, high uniqueness — invest to build fame), <strong>Ambiguous</strong> (high fame, low uniqueness — competitors are stealing credit; disambiguate), <strong>Avoid</strong> (low fame, low uniqueness — retire or rework). Attribution in this study is open-ended unless closed-list is specified in config.",
+      "context": "DBA tab",
+      "page": "dba"
+    },
+    "wom": {
+      "title": "Word-of-Mouth (WOM)",
+      "text": "WOM tracks two behaviours: <strong>received</strong> (heard someone talk about the brand) and <strong>shared</strong> (talked about the brand yourself), each split by positive and negative. The <strong>net balance</strong> (positive minus negative) is the headline — brands with strong positive net balance have advocacy; strong negative balance signals active detraction. <strong>Amplification</strong> is the share of category buyers who shared positive WOM about the brand in the target timeframe — the practical measure of brand advocacy. Received positive WOM scales with brand size (Double Jeopardy); the interesting signal is in received negative WOM and in shared negative WOM, which are smaller but strategically loaded.",
+      "context": "WOM tab",
+      "page": "wom"
     }
   }
 }

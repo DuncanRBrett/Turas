@@ -586,6 +586,10 @@ load_wave_data <- function(file_path, wave_id, categorical_cols = character(0),
 #' Resolve Data File Path
 #'
 #' Resolves data file path, handling both absolute and relative paths.
+#' When the file is not found directly, walks up to the parent and grandparent
+#' of data_dir. This handles common project layouts where config files live in
+#' a subdirectory (e.g. Crosswave/) but DataFile paths are written relative to
+#' a higher-level project root (e.g. CCPB/).
 #'
 #' @param data_file Character. File path from configuration
 #' @param data_dir Character. Base directory for relative paths (optional)
@@ -599,11 +603,17 @@ resolve_data_file_path <- function(data_file, data_dir = NULL) {
     return(normalizePath(data_file))
   }
 
-  # If relative path and data_dir provided, combine
+  # If relative path and data_dir provided, try data_dir and its ancestors
   if (!is.null(data_dir)) {
-    combined_path <- file.path(data_dir, data_file)
-    if (file.exists(combined_path)) {
-      return(normalizePath(combined_path))
+    candidate <- data_dir
+    for (i in 1:3) {
+      combined_path <- file.path(candidate, data_file)
+      if (file.exists(combined_path)) {
+        return(normalizePath(combined_path))
+      }
+      parent <- dirname(candidate)
+      if (is.na(parent) || parent == candidate) break
+      candidate <- parent
     }
   }
 
@@ -1226,16 +1236,28 @@ resolve_support_file_path <- function(file_ref, data_dir = NULL, config_dir = NU
     return(normalizePath(file_ref))
   }
 
-  # Try relative to data_dir
+  # Try relative to data_dir and its ancestors
   if (!is.null(data_dir)) {
-    cand <- file.path(data_dir, file_ref)
-    if (file.exists(cand)) return(normalizePath(cand))
+    candidate <- data_dir
+    for (i in 1:3) {
+      cand <- file.path(candidate, file_ref)
+      if (file.exists(cand)) return(normalizePath(cand))
+      parent <- dirname(candidate)
+      if (is.na(parent) || parent == candidate) break
+      candidate <- parent
+    }
   }
 
-  # Try relative to config_dir
+  # Try relative to config_dir and its ancestors
   if (!is.null(config_dir)) {
-    cand <- file.path(config_dir, file_ref)
-    if (file.exists(cand)) return(normalizePath(cand))
+    candidate <- config_dir
+    for (i in 1:3) {
+      cand <- file.path(candidate, file_ref)
+      if (file.exists(cand)) return(normalizePath(cand))
+      parent <- dirname(candidate)
+      if (is.na(parent) || parent == candidate) break
+      candidate <- parent
+    }
   }
 
   # Try basename in data_dir
