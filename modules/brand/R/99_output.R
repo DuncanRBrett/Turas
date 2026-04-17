@@ -118,13 +118,23 @@ generate_brand_excel <- function(results, output_path, config = NULL) {
         }
       }
 
-      # Funnel
+      # Funnel (role-registry architecture; new long-format result).
+      # The combined workbook keeps per-category sheets via the legacy
+      # wide adapter for consistency with other elements; the dedicated
+      # funnel workbook with the richer 4-sheet layout is written via
+      # write_funnel_excel() in the CSV output branch below.
       funnel <- cat_res$funnel
-      if (!is.null(funnel) && !identical(funnel$status, "REFUSED")) {
-        .write_sheet(paste0(cat_prefix, "_Funnel"), funnel$stage_metrics,
+      if (!is.null(funnel) && !identical(funnel$status, "REFUSED") &&
+          !is.null(funnel$stages) && nrow(funnel$stages) > 0) {
+        bl <- data.frame(
+          BrandCode = unique(as.character(funnel$stages$brand_code)),
+          stringsAsFactors = FALSE)
+        bl$BrandLabel <- bl$BrandCode
+        legacy_wide <- build_funnel_legacy_wide(funnel, bl)
+        legacy_conv <- build_funnel_legacy_conversions(funnel, bl)
+        .write_sheet(paste0(cat_prefix, "_Funnel"), legacy_wide,
                      paste("Brand Funnel -", cat_name))
-        .write_sheet(paste0(cat_prefix, "_Conversion"),
-                     funnel$conversion_metrics,
+        .write_sheet(paste0(cat_prefix, "_Conversion"), legacy_conv,
                      paste("Conversion Ratios -", cat_name))
       }
 
@@ -245,9 +255,28 @@ generate_brand_csv <- function(results, output_dir, config = NULL) {
       }
 
       funnel <- cat_res$funnel
-      if (!is.null(funnel) && !identical(funnel$status, "REFUSED")) {
-        .write_csv(funnel$stage_metrics, paste0(prefix, "_funnel.csv"))
-        .write_csv(funnel$conversion_metrics, paste0(prefix, "_conversion.csv"))
+      if (!is.null(funnel) && !identical(funnel$status, "REFUSED") &&
+          !is.null(funnel$stages) && nrow(funnel$stages) > 0) {
+        bl <- data.frame(
+          BrandCode = unique(as.character(funnel$stages$brand_code)),
+          stringsAsFactors = FALSE)
+        bl$BrandLabel <- bl$BrandCode
+        # Canonical 4-sheet funnel workbook + long CSV per FUNNEL_SPEC §7
+        cat_code <- gsub("[^A-Za-z0-9]+", "_", cat_name)
+        write_funnel_excel(
+          result = funnel, brand_list = bl, role_map = NULL,
+          output_path = file.path(output_dir,
+            sprintf("funnel_%s.xlsx", cat_code)),
+          config = list(
+            `funnel.conversion_metric` = config$`funnel.conversion_metric`,
+            `funnel.warn_base` = config$low_base_warning,
+            `funnel.suppress_base` = config$min_base_size))
+        write_funnel_csv(
+          result = funnel, brand_list = bl, role_map = NULL,
+          output_path = file.path(output_dir,
+            sprintf("funnel_%s_long.csv", cat_code)),
+          config = list(category_code = cat_code,
+                        wave_label = as.character(config$wave %||% "")))
       }
 
       rep <- cat_res$repertoire

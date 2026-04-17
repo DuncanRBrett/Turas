@@ -19,6 +19,11 @@ if (dir.exists(shared_lib)) {
   }
 }
 source(file.path(TURAS_ROOT, "modules", "brand", "R", "00_guard.R"))
+# Funnel output + legacy adapters must be loaded before 99_output.R
+# because 99_output.R now calls write_funnel_excel / write_funnel_csv /
+# build_funnel_legacy_wide in its funnel branch.
+source(file.path(TURAS_ROOT, "modules", "brand", "R", "03c_funnel_panel_data.R"))
+source(file.path(TURAS_ROOT, "modules", "brand", "R", "03d_funnel_output.R"))
 source(file.path(TURAS_ROOT, "modules", "brand", "R", "99_output.R"))
 
 
@@ -68,23 +73,54 @@ source(file.path(TURAS_ROOT, "modules", "brand", "R", "99_output.R"))
           ),
           funnel = list(
             status = "PASS",
-            stage_metrics = data.frame(
-              BrandCode = c("IPK", "MC"),
-              Aware_Pct = c(85, 70), Positive_Pct = c(55, 40),
-              Love_Pct = c(20, 15), Prefer_Pct = c(25, 20),
-              Ambivalent_Pct = c(10, 5), Reject_Pct = c(5, 8),
-              NoOpinion_Pct = c(25, 27),
-              Bought_Pct = c(45, 30), Primary_Pct = c(20, 15),
-              Base_n = c(200, 200),
+            # New role-registry shape: long-format stages + conversions +
+            # attitude decomposition.
+            stages = data.frame(
+              brand_code = rep(c("IPK", "MC"), each = 5),
+              stage_key = rep(c("aware", "consideration",
+                                "bought_long", "bought_target",
+                                "preferred"), 2),
+              pct_weighted = c(0.85, 0.55, 0.45, 0.30, 0.20,
+                               0.70, 0.40, 0.30, 0.20, 0.15),
+              pct_unweighted = c(0.85, 0.55, 0.45, 0.30, 0.20,
+                                 0.70, 0.40, 0.30, 0.20, 0.15),
+              base_weighted = c(170, 110, 90, 60, 40,
+                                140, 80, 60, 40, 30),
+              base_unweighted = c(170, 110, 90, 60, 40,
+                                  140, 80, 60, 40, 30),
+              warning_flag = "none", stringsAsFactors = FALSE
+            ),
+            conversions = data.frame(
+              brand_code = rep(c("IPK", "MC"), each = 4),
+              from_stage = rep(c("aware", "consideration",
+                                 "bought_long", "bought_target"), 2),
+              to_stage = rep(c("consideration", "bought_long",
+                               "bought_target", "preferred"), 2),
+              value = c(0.647, 0.818, 0.667, 0.667,
+                        0.571, 0.750, 0.667, 0.750),
+              method = "ratio", stringsAsFactors = FALSE
+            ),
+            attitude_decomposition = data.frame(
+              brand_code = rep(c("IPK", "MC"), each = 5),
+              attitude_role = rep(c("attitude.love", "attitude.prefer",
+                                    "attitude.ambivalent",
+                                    "attitude.reject",
+                                    "attitude.no_opinion"), 2),
+              pct = c(0.20, 0.25, 0.10, 0.05, 0.40,
+                      0.15, 0.20, 0.05, 0.08, 0.52),
+              base = c(170, 170, 170, 170, 170,
+                       140, 140, 140, 140, 140),
               stringsAsFactors = FALSE
             ),
-            conversion_metrics = data.frame(
-              BrandCode = c("IPK", "MC"),
-              Aware_to_Positive = c(64.7, 57.1),
-              Positive_to_Bought = c(81.8, 75.0),
-              Bought_to_Primary = c(44.4, 50.0),
-              stringsAsFactors = FALSE
-            )
+            sig_results = data.frame(),
+            meta = list(category_type = "transactional",
+                        focal_brand = "IPK", wave = 1L,
+                        n_unweighted = 200, n_weighted = 200,
+                        stage_count = 5L,
+                        stage_keys = c("aware", "consideration",
+                                       "bought_long", "bought_target",
+                                       "preferred")),
+            warnings = character(0)
           ),
           repertoire = list(
             status = "PASS",
