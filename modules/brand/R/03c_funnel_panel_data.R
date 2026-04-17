@@ -74,12 +74,56 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
 
 .panel_cards <- function(result, focal, stage_keys) {
   stages <- result$stages
-  if (is.null(stages) || nrow(stages) == 0) return(list())
+  if (is.null(stages) || nrow(stages) == 0) {
+    return(list(funnel = list(), relationship = list()))
+  }
   sig_df <- result$sig_results
-  cards <- lapply(stage_keys, function(key) {
+
+  funnel_cards <- lapply(stage_keys, function(key) {
     .card_for_stage(stages, sig_df, key, focal)
   })
+  funnel_cards <- Filter(Negate(is.null), funnel_cards)
+
+  rel_cards <- .relationship_cards(result$attitude_decomposition, focal)
+
+  list(funnel = funnel_cards, relationship = rel_cards)
+}
+
+
+#' Five relationship / attitude-position summary cards (focal % vs avg %)
+#' @keywords internal
+.relationship_cards <- function(att_df, focal) {
+  if (is.null(att_df) || nrow(att_df) == 0) return(list())
+  positions <- c("attitude.love", "attitude.prefer",
+                 "attitude.ambivalent", "attitude.reject",
+                 "attitude.no_opinion")
+  cards <- lapply(positions, function(role) {
+    focal_row <- att_df[att_df$brand_code == focal &
+                          att_df$attitude_role == role, , drop = FALSE]
+    if (nrow(focal_row) == 0) return(NULL)
+    other <- att_df[att_df$brand_code != focal &
+                      att_df$attitude_role == role, , drop = FALSE]
+    cat_avg <- if (nrow(other) == 0) NA_real_
+               else mean(other$pct, na.rm = TRUE)
+    list(
+      attitude_role = role,
+      attitude_label = .attitude_label_short(role),
+      focal_pct = focal_row$pct[1],
+      focal_base = focal_row$base[1],
+      cat_avg_pct = cat_avg
+    )
+  })
   Filter(Negate(is.null), cards)
+}
+
+
+.attitude_label_short <- function(role) {
+  labels <- c(attitude.love = "Love",
+              attitude.prefer = "Prefer",
+              attitude.ambivalent = "Ambivalent",
+              attitude.reject = "Reject",
+              attitude.no_opinion = "No opinion")
+  unname(labels[role]) %||% role
 }
 
 
@@ -111,32 +155,76 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
 .panel_table <- function(result, brand_list, stage_keys) {
   stages <- result$stages
   if (is.null(stages) || nrow(stages) == 0) {
-    return(list(stage_labels = character(0), brand_codes = character(0),
-                brand_names = character(0), cells = list()))
+    return(list(stage_keys = character(0), stage_labels = character(0),
+                brand_codes = character(0), brand_names = character(0),
+                cells = list(), avg_all_brands = list()))
   }
   brand_codes <- as.character(brand_list$BrandCode)
   brand_names <- as.character(
     brand_list$BrandLabel %||% brand_list$BrandCode)
   stage_labels <- vapply(stage_keys, .stage_label, character(1))
 
+  # Nested pct = stage pct / previous stage pct (category-wide). Stage 1
+  # has no previous stage so nested = absolute. Precomputed per brand
+  # so the JS toggle can switch view without extra computation.
+  prev_pct <- list()
   cells <- list()
   for (key in stage_keys) {
     for (b in brand_codes) {
       row <- stages[stages$stage_key == key & stages$brand_code == b, ,
                     drop = FALSE]
+      abs_pct <- if (nrow(row) == 0) NA_real_ else row$pct_weighted
+      nested_pct <- if (is.null(prev_pct[[b]]) || !is.finite(prev_pct[[b]]) ||
+                        prev_pct[[b]] <= 0 || !is.finite(abs_pct)) {
+        abs_pct
+      } else {
+        abs_pct / prev_pct[[b]]
+      }
       cells[[length(cells) + 1]] <- list(
         stage_key = key, brand_code = b,
-        pct = if (nrow(row) == 0) NA_real_ else row$pct_weighted,
-        base_weighted = if (nrow(row) == 0) NA_real_ else row$base_weighted,
+        pct_absolute = abs_pct,
+        pct_nested   = nested_pct,
+        base_weighted   = if (nrow(row) == 0) NA_real_ else row$base_weighted,
         base_unweighted = if (nrow(row) == 0) NA_real_ else row$base_unweighted,
         sig_vs_focal = .sig_vs_focal_for(result$sig_results, key, b,
                                          result$meta$focal_brand),
         warning_flag = if (nrow(row) == 0) "na" else row$warning_flag
       )
+      prev_pct[[b]] <- abs_pct
     }
   }
+
+  avg_all <- .avg_all_brands_row(stages, stage_keys)
+
   list(stage_keys = stage_keys, stage_labels = stage_labels,
-       brand_codes = brand_codes, brand_names = brand_names, cells = cells)
+       brand_codes = brand_codes, brand_names = brand_names,
+       cells = cells, avg_all_brands = avg_all)
+}
+
+
+#' Category-average row: mean pct across every brand per stage (absolute +
+#' nested variants). Included as its own row in the rendered table.
+#' @keywords internal
+.avg_all_brands_row <- function(stages, stage_keys) {
+  prev_avg <- NA_real_
+  out <- list()
+  for (key in stage_keys) {
+    vals <- stages$pct_weighted[stages$stage_key == key]
+    abs_mean <- if (length(vals) == 0) NA_real_ else mean(vals, na.rm = TRUE)
+    nested_mean <- if (!is.finite(prev_avg) || prev_avg <= 0 ||
+                       !is.finite(abs_mean)) {
+      abs_mean
+    } else {
+      abs_mean / prev_avg
+    }
+    out[[length(out) + 1]] <- list(
+      stage_key = key,
+      pct_absolute = abs_mean,
+      pct_nested = nested_mean
+    )
+    prev_avg <- abs_mean
+  }
+  out
 }
 
 
@@ -153,15 +241,31 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
     s
   })
 
-  stage_all_pct <- vapply(stage_keys, function(k) {
+  stage_all_pct <- unname(vapply(stage_keys, function(k) {
     mean(stages$pct_weighted[stages$stage_key == k], na.rm = TRUE)
-  }, numeric(1))
+  }, numeric(1)))
+
+  # Envelope = min/max across all brands per stage. Used to render the
+  # light-grey shaded band behind the focal line (spec outline).
+  env_min <- unname(vapply(stage_keys, function(k) {
+    suppressWarnings(min(stages$pct_weighted[stages$stage_key == k],
+                         na.rm = TRUE))
+  }, numeric(1)))
+  env_max <- unname(vapply(stage_keys, function(k) {
+    suppressWarnings(max(stages$pct_weighted[stages$stage_key == k],
+                         na.rm = TRUE))
+  }, numeric(1)))
+  env_min[!is.finite(env_min)] <- NA_real_
+  env_max[!is.finite(env_max)] <- NA_real_
 
   list(
     focal_series = focal_series,
     competitor_series = competitor_series,
     category_avg_series = list(stage_keys = stage_keys,
                                pct_values = stage_all_pct),
+    envelope = list(stage_keys = stage_keys,
+                    min_values = env_min,
+                    max_values = env_max),
     stage_positions = seq_along(stage_keys),
     default_view = "slope"
   )
@@ -315,142 +419,6 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
   list()
 }
 
-
-# ==============================================================================
-# LEGACY WIDE-FORMAT ADAPTER (for existing HTML chart/table builders)
-# ==============================================================================
-# The existing HTML report (pre-rebuild) consumes a wide per-brand data
-# frame with columns Aware_Pct / Positive_Pct / Love_Pct / etc. This
-# adapter produces that shape from the new long-format result, so the
-# existing chart and table builders continue to work unchanged while we
-# incrementally migrate them to the new data contract.
-
-#' Convert a run_funnel() result to the legacy wide per-brand data frame
-#'
-#' @param result List returned by \code{run_funnel()}.
-#' @param brand_list Data frame with BrandCode column.
-#'
-#' @return Data frame, one row per brand, with the pre-rebuild column
-#'   schema (\code{BrandCode}, \code{Aware_Pct}, \code{Positive_Pct},
-#'   \code{Bought_Pct}, \code{Primary_Pct}, attitude-decomposition
-#'   percentages). Values are in percentage points (0-100), matching the
-#'   legacy convention.
-#'
-#' @keywords internal
-build_funnel_legacy_wide <- function(result, brand_list) {
-  if (is.null(result) || identical(result$status, "REFUSED") ||
-      is.null(result$stages) || nrow(result$stages) == 0) {
-    return(.empty_legacy_wide())
-  }
-  brand_codes <- as.character(brand_list$BrandCode)
-
-  stage_pcts <- .pivot_stages_to_wide(result$stages, brand_codes)
-  att_pcts   <- .pivot_attitude_to_wide(result$attitude_decomposition,
-                                        brand_codes)
-
-  out <- data.frame(BrandCode = brand_codes, stringsAsFactors = FALSE)
-  out$Aware_Pct       <- 100 * stage_pcts$aware
-  out$Positive_Pct    <- 100 * stage_pcts$consideration
-  out$Bought_Pct      <- 100 * (stage_pcts$bought_long %||% stage_pcts$current_owner_d %||% stage_pcts$current_customer_s %||% NA_real_)
-  out$Primary_Pct     <- 100 * (stage_pcts$preferred %||% stage_pcts$long_tenured_d %||% stage_pcts$long_tenured_s %||% NA_real_)
-  out$Love_Pct        <- 100 * att_pcts$attitude.love
-  out$Prefer_Pct      <- 100 * att_pcts$attitude.prefer
-  out$Ambivalent_Pct  <- 100 * att_pcts$attitude.ambivalent
-  out$Reject_Pct      <- 100 * att_pcts$attitude.reject
-  out$NoOpinion_Pct   <- 100 * att_pcts$attitude.no_opinion
-  out
-}
-
-
-.empty_legacy_wide <- function() {
-  data.frame(
-    BrandCode = character(0),
-    Aware_Pct = numeric(0), Positive_Pct = numeric(0),
-    Bought_Pct = numeric(0), Primary_Pct = numeric(0),
-    Love_Pct = numeric(0), Prefer_Pct = numeric(0),
-    Ambivalent_Pct = numeric(0), Reject_Pct = numeric(0),
-    NoOpinion_Pct = numeric(0),
-    stringsAsFactors = FALSE
-  )
-}
-
-
-.pivot_stages_to_wide <- function(stages, brand_codes) {
-  keys <- unique(as.character(stages$stage_key))
-  out <- list()
-  for (k in keys) {
-    vals <- vapply(brand_codes, function(b) {
-      row <- stages[stages$stage_key == k & stages$brand_code == b, ,
-                    drop = FALSE]
-      if (nrow(row) == 0) NA_real_ else row$pct_weighted
-    }, numeric(1))
-    out[[k]] <- unname(vals)
-  }
-  out
-}
-
-
-#' Legacy wide-format conversions for the old dot-plot renderer
-#'
-#' @param result run_funnel() result.
-#' @param brand_list Data frame with BrandCode.
-#'
-#' @return Data frame with columns BrandCode, Aware_to_Positive,
-#'   Positive_to_Bought, Bought_to_Primary, values in 0-100.
-#'
-#' @keywords internal
-build_funnel_legacy_conversions <- function(result, brand_list) {
-  if (is.null(result$conversions) || nrow(result$conversions) == 0) {
-    return(data.frame(BrandCode = character(0),
-                      Aware_to_Positive = numeric(0),
-                      Positive_to_Bought = numeric(0),
-                      Bought_to_Primary = numeric(0),
-                      stringsAsFactors = FALSE))
-  }
-  brand_codes <- as.character(brand_list$BrandCode)
-
-  .get_ratio <- function(b, from_key, to_keys) {
-    for (to_key in to_keys) {
-      row <- result$conversions[
-        result$conversions$brand_code == b &
-          result$conversions$from_stage == from_key &
-          result$conversions$to_stage == to_key, , drop = FALSE]
-      if (nrow(row) > 0) return(100 * row$value[1])
-    }
-    NA_real_
-  }
-
-  data.frame(
-    BrandCode = brand_codes,
-    Aware_to_Positive = vapply(brand_codes,
-      .get_ratio, numeric(1), from_key = "aware",
-      to_keys = c("consideration")),
-    Positive_to_Bought = vapply(brand_codes,
-      .get_ratio, numeric(1), from_key = "consideration",
-      to_keys = c("bought_long", "current_owner_d", "current_customer_s")),
-    Bought_to_Primary = vapply(brand_codes,
-      .get_ratio, numeric(1),
-      from_key = "bought_target",
-      to_keys = c("preferred", "long_tenured_d", "long_tenured_s")),
-    stringsAsFactors = FALSE
-  )
-}
-
-
-.pivot_attitude_to_wide <- function(att_df, brand_codes) {
-  positions <- c("attitude.love", "attitude.prefer", "attitude.ambivalent",
-                 "attitude.reject", "attitude.no_opinion")
-  out <- list()
-  for (p in positions) {
-    vals <- vapply(brand_codes, function(b) {
-      row <- att_df[att_df$brand_code == b & att_df$attitude_role == p, ,
-                    drop = FALSE]
-      if (nrow(row) == 0) NA_real_ else row$pct
-    }, numeric(1))
-    out[[p]] <- unname(vals)
-  }
-  out
-}
 
 
 # ==============================================================================

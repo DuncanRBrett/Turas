@@ -24,6 +24,7 @@ source(file.path(TURAS_ROOT, "modules", "brand", "R", "03a_funnel_derive.R"))
 source(file.path(TURAS_ROOT, "modules", "brand", "R", "03b_funnel_metrics.R"))
 source(file.path(TURAS_ROOT, "modules", "brand", "R", "03_funnel.R"))
 source(file.path(TURAS_ROOT, "modules", "brand", "R", "03c_funnel_panel_data.R"))
+source(file.path(TURAS_ROOT, "modules", "brand", "R", "03e_funnel_legacy_adapter.R"))
 source(file.path(TURAS_ROOT, "modules", "brand", "R", "03d_funnel_output.R"))
 
 

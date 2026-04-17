@@ -31,6 +31,7 @@ source(file.path(TURAS_ROOT, "modules", "brand", "R", "03a_funnel_derive.R"))
 source(file.path(TURAS_ROOT, "modules", "brand", "R", "03b_funnel_metrics.R"))
 source(file.path(TURAS_ROOT, "modules", "brand", "R", "03_funnel.R"))
 source(file.path(TURAS_ROOT, "modules", "brand", "R", "03c_funnel_panel_data.R"))
+source(file.path(TURAS_ROOT, "modules", "brand", "R", "03e_funnel_legacy_adapter.R"))
 
 
 # --- Shared fixture helpers (mirrors test_funnel_transactional.R) ------------
@@ -118,12 +119,12 @@ test_that("meta captures focal brand, category type, stage count, and N", {
 })
 
 
-test_that("cards carry focal pct, category-avg pct, and warning flag per stage", {
+test_that("funnel cards carry focal pct, category-avg pct, and warning flag per stage", {
   result <- .run_fixture()
   panel <- build_funnel_panel_data(result, .brand_list(), list())
-  expect_equal(length(panel$cards), 5)
+  expect_equal(length(panel$cards$funnel), 5)
 
-  aware_card <- panel$cards[[1]]
+  aware_card <- panel$cards$funnel[[1]]
   expect_equal(aware_card$stage_key, "aware")
   expect_equal(aware_card$focal_pct, 0.9, tolerance = 1e-9)
   # Category average (excluding focal) = mean(ROB 0.8, CART 0.7) = 0.75
@@ -132,7 +133,21 @@ test_that("cards carry focal pct, category-avg pct, and warning flag per stage",
 })
 
 
-test_that("table cells cover every (stage, brand) pair", {
+test_that("relationship cards — 5 attitude positions with focal vs avg", {
+  result <- .run_fixture()
+  panel <- build_funnel_panel_data(result, .brand_list(), list())
+  expect_equal(length(panel$cards$relationship), 5)
+
+  love_card <- Filter(function(c) c$attitude_role == "attitude.love",
+                      panel$cards$relationship)[[1]]
+  expect_equal(love_card$attitude_label, "Love")
+  # IPK love = 3/9 from fixture
+  expect_equal(love_card$focal_pct, 3/9, tolerance = 1e-9)
+  expect_true(is.numeric(love_card$cat_avg_pct))
+})
+
+
+test_that("table cells cover every (stage, brand) pair with absolute and nested pct", {
   result <- .run_fixture()
   panel <- build_funnel_panel_data(result, .brand_list(), list())
 
@@ -141,11 +156,49 @@ test_that("table cells cover every (stage, brand) pair", {
   # 5 stages x 3 brands = 15 cells
   expect_equal(length(panel$table$cells), 15)
 
-  # Spot-check: IPK aware cell pct = 0.9
+  # IPK aware cell: absolute = 0.9; nested = same for stage 1 (no prev)
   ipk_aware <- Filter(function(c)
     c$stage_key == "aware" && c$brand_code == "IPK", panel$table$cells)[[1]]
-  expect_equal(ipk_aware$pct, 0.9, tolerance = 1e-9)
+  expect_equal(ipk_aware$pct_absolute, 0.9, tolerance = 1e-9)
+  expect_equal(ipk_aware$pct_nested,   0.9, tolerance = 1e-9)
   expect_equal(ipk_aware$sig_vs_focal, "focal")
+
+  # IPK consideration: absolute = 0.7; nested = 0.7/0.9 = 0.7778
+  ipk_cons <- Filter(function(c)
+    c$stage_key == "consideration" && c$brand_code == "IPK",
+    panel$table$cells)[[1]]
+  expect_equal(ipk_cons$pct_absolute, 0.7, tolerance = 1e-9)
+  expect_equal(ipk_cons$pct_nested,   0.7 / 0.9, tolerance = 1e-9)
+})
+
+
+test_that("table includes an Average-of-all-brands row with both pct modes", {
+  result <- .run_fixture()
+  panel <- build_funnel_panel_data(result, .brand_list(), list())
+
+  expect_equal(length(panel$table$avg_all_brands), 5)
+  aware_avg <- panel$table$avg_all_brands[[1]]
+  expect_equal(aware_avg$stage_key, "aware")
+  # mean(0.9, 0.8, 0.7) = 0.8
+  expect_equal(aware_avg$pct_absolute, 0.8, tolerance = 1e-9)
+  expect_equal(aware_avg$pct_nested,   0.8, tolerance = 1e-9)  # stage 1
+
+  cons_avg <- panel$table$avg_all_brands[[2]]
+  # absolute mean = mean(0.7, 0.6, 0.5) = 0.6; nested = 0.6 / 0.8 = 0.75
+  expect_equal(cons_avg$pct_absolute, 0.6, tolerance = 1e-9)
+  expect_equal(cons_avg$pct_nested,   0.75, tolerance = 1e-9)
+})
+
+
+test_that("shape_chart envelope carries per-stage min and max", {
+  result <- .run_fixture()
+  panel <- build_funnel_panel_data(result, .brand_list(), list())
+
+  env <- panel$shape_chart$envelope
+  expect_equal(length(env$stage_keys), 5)
+  # Aware: min(0.7 CART), max(0.9 IPK)
+  expect_equal(env$min_values[1], 0.7, tolerance = 1e-9)
+  expect_equal(env$max_values[1], 0.9, tolerance = 1e-9)
 })
 
 

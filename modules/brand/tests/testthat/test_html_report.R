@@ -35,6 +35,7 @@ source(file.path(TURAS_ROOT, "modules", "brand", "R", "00_guard.R"))
 # Source before the HTML pipeline so legacy wide-format conversion is
 # available inside transform_brand_charts / transform_brand_tables.
 source(file.path(TURAS_ROOT, "modules", "brand", "R", "03c_funnel_panel_data.R"))
+source(file.path(TURAS_ROOT, "modules", "brand", "R", "03e_funnel_legacy_adapter.R"))
 source(file.path(TURAS_ROOT, "modules", "brand", "lib", "html_report",
                  "99_html_report_main.R"))
 

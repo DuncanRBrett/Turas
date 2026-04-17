@@ -23,6 +23,7 @@ source(file.path(TURAS_ROOT, "modules", "brand", "R", "00_guard.R"))
 # because 99_output.R now calls write_funnel_excel / write_funnel_csv /
 # build_funnel_legacy_wide in its funnel branch.
 source(file.path(TURAS_ROOT, "modules", "brand", "R", "03c_funnel_panel_data.R"))
+source(file.path(TURAS_ROOT, "modules", "brand", "R", "03e_funnel_legacy_adapter.R"))
 source(file.path(TURAS_ROOT, "modules", "brand", "R", "03d_funnel_output.R"))
 source(file.path(TURAS_ROOT, "modules", "brand", "R", "99_output.R"))
 
