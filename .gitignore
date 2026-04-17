@@ -35,6 +35,10 @@ renv/.gitignore
 # EXCEPTION: Allow golden test fixture files
 !**/fixtures/golden/*.rds
 
+# EXCEPTION: Allow synthetic test-fixture CSVs (hand-calculated, non-PII)
+!**/tests/fixtures/**/*.csv
+!**/tests/**/fixtures/**/*.csv
+
 # Output files
 Output/
 output/

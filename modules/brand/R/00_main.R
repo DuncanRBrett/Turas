@@ -23,6 +23,12 @@
 
 BRAND_VERSION <- "1.0"
 
+# SIZE-EXCEPTION: file-level. run_brand() is the sequential orchestration
+# entry point for every analytical element. Keeping the orchestrator in one
+# file mirrors the tabs/tracker pattern and keeps the data flow readable.
+# Per-element work is delegated to 02_mental_availability.R, 03_funnel.R +
+# helpers, 04_repertoire.R, 05_wom.R, 06_drivers_barriers.R, 07_dba.R.
+
 # --- Source module files ---
 .get_brand_script_dir <- function() {
   # Try sys.frame ofile first
@@ -51,6 +57,8 @@ BRAND_VERSION <- "1.0"
     "00_guard_role_map.R",
     "01_config.R",
     "02_mental_availability.R",
+    "03a_funnel_derive.R",
+    "03b_funnel_metrics.R",
     "03_funnel.R",
     "04_repertoire.R",
     "05_wom.R",
@@ -118,6 +126,12 @@ BRAND_VERSION <- "1.0"
 #' }
 #'
 #' @export
+# SIZE-EXCEPTION: sequential orchestration (load config, load structure, load
+# data, run per-category loop, run brand-level elements, assemble result).
+# Decomposing further fragments a linear pipeline without improving
+# readability. Funnel dispatch is extracted into .run_funnel_for_category;
+# other element dispatchers will follow as each element migrates to the
+# role-registry architecture.
 run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
 
   start_time <- proc.time()["elapsed"]
@@ -304,34 +318,15 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       }
     }
 
-    # Funnel
+    # Funnel (role-registry architecture; see FUNNEL_SPEC_v2.md)
     if (isTRUE(config$element_funnel)) {
       if (verbose) cat("  Running Funnel...\n")
 
-      # Find question prefixes for this category
-      aware_qs <- get_questions_for_battery(structure, "awareness", cat_name)
-      att_qs <- get_questions_for_battery(structure, "attitude", cat_name)
-      pen_qs <- get_questions_for_battery(structure, "penetration", cat_name)
-
-      aware_prefix <- if (nrow(aware_qs) > 0) aware_qs$QuestionCode[1] else ""
-      att_prefix <- if (nrow(att_qs) > 0) att_qs$QuestionCode[1] else ""
-      pen_prefix <- if (nrow(pen_qs) > 0) pen_qs$QuestionCode[1] else ""
-
-      cat_result$funnel <- tryCatch(
-        run_funnel(
-          data, cat_brands,
-          awareness_prefix = aware_prefix,
-          attitude_prefix = att_prefix,
-          penetration_prefix = pen_prefix,
-          focal_brand = config$focal_brand,
-          weights = weights,
-          min_base = config$min_base_size,
-          low_base_warning = config$low_base_warning
-        ),
-        error = function(e) {
-          warnings_list <<- c(warnings_list,
-            sprintf("Funnel failed for %s: %s", cat_name, e$message))
-          list(status = "REFUSED", message = e$message)
+      cat_result$funnel <- .run_funnel_for_category(
+        data = data, structure = structure, cat_brands = cat_brands,
+        cat_ceps = cat_ceps, config = config, weights = weights,
+        cat_name = cat_name, warnings_acc = function(msg) {
+          warnings_list <<- c(warnings_list, msg)
         }
       )
     }
@@ -537,6 +532,78 @@ if (!exists(".find_brand_col", mode = "function")) {
     match <- intersect(candidates, names(data))
     if (length(match) > 0) match[1] else NULL
   }
+}
+
+
+# ==============================================================================
+# FUNNEL DISPATCH (role-registry architecture)
+# ==============================================================================
+# Wraps the new run_funnel() signature. Returns a refusal list rather than
+# throwing, so a single-category refusal does not abort the whole brand
+# analysis. When the structure lacks a QuestionMap sheet the funnel is
+# skipped loudly — there is no legacy fallback; the operator must add the
+# QuestionMap per modules/brand/docs/ROLE_REGISTRY.md §11.
+
+.run_funnel_for_category <- function(data, structure, cat_brands, cat_ceps,
+                                     config, weights, cat_name,
+                                     warnings_acc) {
+  if (is.null(structure$questionmap) ||
+      is.null(nrow(structure$questionmap)) ||
+      nrow(structure$questionmap) == 0) {
+    msg <- sprintf(
+      "Funnel skipped for '%s': Survey_Structure.xlsx has no QuestionMap sheet (role-registry architecture required).",
+      cat_name)
+    warnings_acc(msg)
+    return(list(status = "REFUSED", code = "CFG_QUESTIONMAP_MISSING",
+                message = msg))
+  }
+
+  funnel_cfg <- .funnel_config_from_global(config, cat_name, cat_brands)
+
+  brand_with_refusal_handler({
+    role_map <- load_role_map(structure,
+                              brand_list = cat_brands,
+                              cep_list   = cat_ceps,
+                              asset_list = structure$dba_assets)
+    run_funnel(
+      data       = data,
+      role_map   = role_map,
+      brand_list = cat_brands,
+      config     = funnel_cfg,
+      weights    = weights,
+      sig_tester = NULL
+    )
+  })
+}
+
+
+#' Pull the funnel subset of settings out of the full brand config
+#'
+#' Translates the global Brand_Config settings (underscore-separated) into
+#' the funnel.* dot-separated keys expected by run_funnel(). Keeps the
+#' orchestration decoupled from funnel-specific parameter names.
+#'
+#' @keywords internal
+.funnel_config_from_global <- function(config, cat_name, cat_brands) {
+  cat_type <- config$category_type %||% config$`category.type` %||% "transactional"
+  conv <- config$funnel_conversion_metric %||%
+           config$`funnel.conversion_metric` %||% "ratio"
+  warn_b <- config$funnel_warn_base %||% config$low_base_warning %||% 75
+  supp_b <- config$funnel_suppress_base %||% config$min_base_size %||% 0
+  tenure <- config$funnel_tenure_threshold %||%
+             config$`funnel.tenure_threshold`
+  alpha <- config$alpha %||% 0.05
+
+  list(
+    `category.type`            = cat_type,
+    focal_brand                = config$focal_brand,
+    wave                       = config$wave,
+    `funnel.conversion_metric` = conv,
+    `funnel.warn_base`         = warn_b,
+    `funnel.suppress_base`     = supp_b,
+    `funnel.tenure_threshold`  = tenure,
+    `funnel.significance_level` = alpha
+  )
 }
 
 

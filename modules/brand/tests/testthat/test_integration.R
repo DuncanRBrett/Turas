@@ -208,6 +208,37 @@ for (f in brand_files) {
   ))
 
   openxlsx::addWorksheet(wb_ss, "DBA_Assets")
+
+  # QuestionMap (role-registry architecture; see ROLE_REGISTRY.md)
+  openxlsx::addWorksheet(wb_ss, "QuestionMap")
+  openxlsx::writeData(wb_ss, "QuestionMap", data.frame(
+    Role = c("funnel.awareness", "funnel.attitude",
+             "funnel.transactional.bought_target",
+             "system.respondent.id"),
+    ClientCode = c("AWARE_FV", "ATT_FV", "PEN_FV", "Respondent_ID"),
+    QuestionText = c("Which brands?", "Attitude?",
+                     "Bought in last month?", "Respondent identifier"),
+    QuestionTextShort = NA_character_,
+    Variable_Type = c("Multi_Mention", "Single_Response",
+                      "Multi_Mention", "Single_Response"),
+    ColumnPattern = c("{code}_{brand_code}", "{code}_{brand_code}",
+                      "{code}_{brand_code}", "{code}"),
+    OptionMapScale = c("", "attitude_scale", "", ""),
+    Notes = NA_character_,
+    stringsAsFactors = FALSE
+  ))
+
+  openxlsx::addWorksheet(wb_ss, "OptionMap")
+  openxlsx::writeData(wb_ss, "OptionMap", data.frame(
+    Scale = rep("attitude_scale", 5),
+    ClientCode = as.character(1:5),
+    Role = c("attitude.love", "attitude.prefer", "attitude.ambivalent",
+             "attitude.reject", "attitude.no_opinion"),
+    ClientLabel = c("Love", "Prefer", "Ambivalent", "Reject", "No opinion"),
+    OrderIndex = 1:5,
+    stringsAsFactors = FALSE
+  ))
+
   openxlsx::saveWorkbook(wb_ss, structure_path, overwrite = TRUE)
 
   list(config_path = config_path, structure_path = structure_path,
@@ -255,7 +286,7 @@ test_that("run_brand includes Mental Availability results", {
   expect_equal(sum(ma$mms$MMS), 1, tolerance = 0.01)
 })
 
-test_that("run_brand includes Funnel results", {
+test_that("run_brand includes Funnel results (role-registry architecture)", {
   tmp_dir <- file.path(tempdir(), "brand_integration_funnel")
   dir.create(tmp_dir, showWarnings = FALSE, recursive = TRUE)
   on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
@@ -267,8 +298,12 @@ test_that("run_brand includes Funnel results", {
   expect_true(!is.null(cat_results$funnel))
 
   funnel <- cat_results$funnel
-  expect_true(is.data.frame(funnel$stage_metrics))
-  expect_equal(nrow(funnel$stage_metrics), 3)  # 3 brands
+  # New funnel output: $stages is long-format (brand x stage), not wide.
+  # 3 brands and at least Aware + Consideration + Bought_Target stages.
+  expect_true(is.data.frame(funnel$stages))
+  expect_gte(nrow(funnel$stages), 3 * 2)
+  expect_true(all(c("brand_code", "stage_key", "pct_weighted")
+                  %in% names(funnel$stages)))
 })
 
 test_that("run_brand includes Repertoire results", {

@@ -36,12 +36,12 @@
 # All valid refusal code prefixes per TRS v1.0
 
 .trs_valid_prefixes <- c(
-
-"CFG_",      # Configuration errors
+  "CFG_",      # Configuration errors
   "DATA_",     # Data integrity errors
   "IO_",       # File or path errors
   "MODEL_",    # Model fitting errors
-"MAPPER_",   # Mapping / coverage errors
+  "MAPPER_",   # Mapping / coverage errors
+  "CALC_",     # Calculation / statistical failures (per CLAUDE.md)
   "PKG_",      # Missing dependency errors
   "FEATURE_",  # Optional feature failures
   "BUG_"       # Internal logic failures
