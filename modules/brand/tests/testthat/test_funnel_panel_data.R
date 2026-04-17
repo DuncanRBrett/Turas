@@ -119,6 +119,35 @@ test_that("meta captures focal brand, category type, stage count, and N", {
 })
 
 
+test_that("meta exposes stage definitions for every stage (popover copy)", {
+  result <- .run_fixture()
+  panel <- build_funnel_panel_data(result, .brand_list(), list())
+
+  expect_true(is.character(panel$meta$stage_definitions))
+  expect_setequal(names(panel$meta$stage_definitions),
+    c("aware","consideration","bought_long","bought_target"))
+  expect_true(all(nzchar(panel$meta$stage_definitions)))
+  # Spot-check a canonical definition
+  expect_true(grepl("aware", panel$meta$stage_definitions[["aware"]],
+                    ignore.case = TRUE))
+})
+
+
+test_that("config-level funnel.stage_definitions overrides baked defaults", {
+  result <- .run_fixture()
+  overrides <- list(aware = "Custom aware text")
+  panel <- build_funnel_panel_data(result, .brand_list(),
+    list(`funnel.stage_definitions` = overrides))
+
+  expect_equal(panel$meta$stage_definitions[["aware"]],
+               "Custom aware text")
+  # Non-overridden keys fall back to defaults
+  expect_true(nzchar(panel$meta$stage_definitions[["consideration"]]))
+  expect_false(panel$meta$stage_definitions[["consideration"]] ==
+               "Custom aware text")
+})
+
+
 test_that("funnel cards carry focal pct, category-avg pct, and warning flag per stage", {
   result <- .run_fixture()
   panel <- build_funnel_panel_data(result, .brand_list(), list())
@@ -169,6 +198,20 @@ test_that("table cells cover every (stage, brand) pair with absolute and nested 
     panel$table$cells)[[1]]
   expect_equal(ipk_cons$pct_absolute, 0.7, tolerance = 1e-9)
   expect_equal(ipk_cons$pct_nested,   0.7 / 0.9, tolerance = 1e-9)
+})
+
+
+test_that("every cell carries a sig_vs_avg field for the in-cell \u25B2/\u25BC flag", {
+  result <- .run_fixture()
+  panel <- build_funnel_panel_data(result, .brand_list(), list())
+
+  for (cell in panel$table$cells) {
+    expect_true(cell$sig_vs_avg %in%
+                c("higher", "lower", "not_sig", "na"),
+                info = sprintf("cell %s/%s sig_vs_avg = %s",
+                               cell$stage_key, cell$brand_code,
+                               cell$sig_vs_avg))
+  }
 })
 
 

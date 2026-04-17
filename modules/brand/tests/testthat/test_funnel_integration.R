@@ -264,7 +264,14 @@ test_that("Sig-tester closure wrapping tabs returns the expected structure", {
                     "direction", "p_value", "significant")
                   %in% names(res$sig_results)))
   expect_true(all(res$sig_results$comparison %in%
-                    c("focal_vs_competitor", "focal_vs_cat_avg")))
+                    c("focal_vs_competitor", "focal_vs_cat_avg",
+                      "brand_vs_cat_avg")))
+  # Per-cell sig_vs_avg is emitted for every brand, not only focal.
+  brand_vs_avg <- res$sig_results[res$sig_results$comparison ==
+                                    "brand_vs_cat_avg", , drop = FALSE]
+  expect_true(nrow(brand_vs_avg) > 0)
+  expect_setequal(unique(brand_vs_avg$brand_code),
+                  as.character(structure$brands$BrandCode))
 })
 
 

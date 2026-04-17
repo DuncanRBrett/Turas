@@ -199,6 +199,7 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
         base_unweighted = if (nrow(row) == 0) NA_real_ else row$base_unweighted,
         sig_vs_focal = .sig_vs_focal_for(result$sig_results, key, b,
                                          result$meta$focal_brand),
+        sig_vs_avg = .sig_vs_avg_for_brand(result$sig_results, key, b),
         warning_flag = if (nrow(row) == 0) "na" else row$warning_flag
       )
       prev_pct[[b]] <- abs_pct
@@ -435,6 +436,23 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
   if (is.null(sig_df) || nrow(sig_df) == 0) return("na")
   row <- sig_df[sig_df$stage_key == stage_key &
                   sig_df$comparison == "focal_vs_cat_avg", , drop = FALSE]
+  if (nrow(row) == 0) return("not_sig")
+  if (!isTRUE(row$significant)) return("not_sig")
+  row$direction[1]
+}
+
+
+#' Per-brand sig-vs-cat-avg lookup for in-cell \u25B2/\u25BC arrows.
+#'
+#' Reads the \code{brand_vs_cat_avg} comparison row emitted by
+#' \code{run_significance_tests()}. Returns "higher" / "lower" / "not_sig"
+#' / "na".
+#' @keywords internal
+.sig_vs_avg_for_brand <- function(sig_df, stage_key, brand_code) {
+  if (is.null(sig_df) || nrow(sig_df) == 0) return("na")
+  row <- sig_df[sig_df$stage_key == stage_key &
+                  sig_df$brand_code == brand_code &
+                  sig_df$comparison == "brand_vs_cat_avg", , drop = FALSE]
   if (nrow(row) == 0) return("not_sig")
   if (!isTRUE(row$significant)) return("not_sig")
   row$direction[1]
