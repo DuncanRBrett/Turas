@@ -316,6 +316,13 @@ load_brand_survey_structure <- function(structure_path) {
   structure$attributes <- .load_table("Attributes")
   structure$dba_assets <- .load_table("DBA_Assets")
 
+  # Role-registry sheets (new architecture; see ROLE_REGISTRY.md §11).
+  # Optional here: not every element has migrated yet, so projects with
+  # only legacy Questions/Options remain loadable. Elements that require a
+  # role map (funnel in v1) refuse loud via load_role_map() if missing.
+  structure$questionmap <- .load_table("QuestionMap")
+  structure$optionmap   <- .load_table("OptionMap")
+
   # Load project settings
   project_raw <- tryCatch(
     openxlsx::read.xlsx(structure_path, sheet = "Project", colNames = FALSE),

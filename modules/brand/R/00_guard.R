@@ -428,6 +428,14 @@ guard_validate_data <- function(data, structure, config) {
 
 
 # ==============================================================================
+# ROLE-REGISTRY GUARD LAYER (split into 00_guard_role_map.R)
+# ==============================================================================
+# The role-registry guard layer (guard_validate_role_map + helpers) lives in
+# modules/brand/R/00_guard_role_map.R. It is sourced alongside this file by
+# 00_main.R.
+# ==============================================================================
+
+# ==============================================================================
 # MODULE INITIALISATION
 # ==============================================================================
 

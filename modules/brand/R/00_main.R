@@ -47,6 +47,8 @@ BRAND_VERSION <- "1.0"
 
   module_files <- c(
     "00_guard.R",
+    "00_role_map.R",
+    "00_guard_role_map.R",
     "01_config.R",
     "02_mental_availability.R",
     "03_funnel.R",
