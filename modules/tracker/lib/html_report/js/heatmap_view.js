@@ -576,4 +576,6 @@
     buildSparklineSvg: buildSparklineSvg
   };
 
+  window.getHmWaveState = function() { return hmWaveState; };
+
 })();

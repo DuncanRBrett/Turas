@@ -517,10 +517,13 @@
     h.push('</div></div>');
 
     // Wave chip bar (toggle individual waves)
+    // Seed initial active state from Explorer heatmap wave selection if available
+    var hmState = (typeof getHmWaveState === "function") ? getHmWaveState() : null;
     h.push('<div class="hm-wave-chips vis-wave-chips" id="vis-wave-chips">');
     h.push('<label class="hm-control-label" style="margin-right:6px;">Waves:</label>');
     for (var wi = 0; wi < data.waves.length; wi++) {
-      h.push('<button class="hm-wave-chip active" data-wave="' + escapeHtml(data.waves[wi]) +
+      var waveActive = !hmState || hmState[data.waves[wi]] !== false;
+      h.push('<button class="hm-wave-chip' + (waveActive ? ' active' : '') + '" data-wave="' + escapeHtml(data.waves[wi]) +
         '" onclick="visToggleWaveChip(\'' + escapeHtml(data.waves[wi]) + '\',this)">' +
         escapeHtml(data.waveLabels[wi]) + '</button>');
     }
@@ -560,11 +563,13 @@
 
     content.innerHTML = h.join("\n");
 
-    // Init wave chip state (all waves visible by default in Visualise)
+    // Init wave chip state — inherit from Explorer heatmap selection if available
     visWaveState = {};
+    var hmState2 = (typeof getHmWaveState === "function") ? getHmWaveState() : null;
     for (var wi2 = 0; wi2 < data.waves.length; wi2++) {
-      visWaveState[data.waves[wi2]] = true;
+      visWaveState[data.waves[wi2]] = !hmState2 || hmState2[data.waves[wi2]] !== false;
     }
+    applyVisWaveVisibility();
 
     // Render chart after DOM insertion
     if (visState.chartVisible) renderVisCombinedChart(data);
@@ -1473,10 +1478,10 @@
       xml += '<Row>';
       tr.querySelectorAll("th, td").forEach(function(cell) {
         var sid = cell.tagName === "TH" ? "H" : "Default";
-        var txt = cell.textContent.trim();
+        var valSpan = cell.querySelector(".tk-val");
+        var txt = valSpan ? valSpan.textContent.trim() : cell.textContent.trim();
         var num = parseFloat(txt);
-        var type = (!isNaN(num) && txt.match(/^[\d.\-+]+%?$/)) ? "Number" : "String";
-        if (type === "Number") txt = String(num);
+        var type = (!isNaN(num) && /^[\d.\-+]+%?$/.test(txt)) ? "Number" : "String";
         xml += '<Cell ss:StyleID="' + sid + '"><Data ss:Type="' + type + '">' + xmlEscape(txt) + '</Data></Cell>';
       });
       xml += '</Row>\n';
@@ -1588,8 +1593,9 @@
         var text = td.textContent.trim();
         var type = "String";
         if (td.classList.contains("hm-value-cell")) {
-          var num = parseFloat(td.getAttribute("data-value"));
-          if (!isNaN(num)) { text = String(num); type = "Number"; }
+          text = td.textContent.trim();
+          var num = parseFloat(text);
+          if (!isNaN(num) && /^[\d.\-+]+%?$/.test(text)) { type = "Number"; }
         }
         xml += '<Cell><Data ss:Type="' + type + '">' + xmlEscape(text) + '</Data></Cell>\n';
       });

@@ -156,7 +156,8 @@ build_overview_heatmap <- function(html_data, config) {
   grid_html <- c(grid_html, '<th class="hm-th hm-label-col">Metric</th>')
   for (i in seq_len(n_waves)) {
     grid_html <- c(grid_html, sprintf(
-      '<th class="hm-th hm-wave-col">%s</th>',
+      '<th class="hm-th hm-wave-col" data-wave="%s">%s</th>',
+      htmltools::htmlEscape(waves[i]),
       htmltools::htmlEscape(wave_labels[i])
     ))
   }

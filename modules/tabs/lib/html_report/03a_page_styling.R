@@ -656,7 +656,8 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
     .ct-freq {
       display: none;
       font-size: 10px;
-      color: #94a3b8;
+      color: inherit;
+      opacity: 0.7;
       margin-top: 2px;
     }
     .show-freq .ct-freq { display: block; }

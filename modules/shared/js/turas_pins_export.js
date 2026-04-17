@@ -295,6 +295,39 @@
     if (!vb) return res;
     var parts = vb.split(/[\s,]+/).map(Number);
     if (parts.length < 4 || parts[2] <= 0 || parts[3] <= 0 || isNaN(parts[2]) || isNaN(parts[3])) return res;
+
+    // Append HTML legend items (vis-legend) as SVG elements so they survive export
+    var legendItems = tmp.querySelectorAll(".vis-legend-item");
+    if (legendItems.length > 0) {
+      var svgW = parts[2];
+      var legendRowH = 28;
+      var newH = parts[3] + legendRowH;
+      clone.setAttribute("viewBox", "0 0 " + svgW + " " + newH);
+      clone.setAttribute("height", newH);
+      var lx = 0;
+      var ly = parts[3] + 8;
+      legendItems.forEach(function(item) {
+        var swatch = item.querySelector(".vis-legend-swatch");
+        var colour = "#94a3b8";
+        if (swatch) {
+          var bg = swatch.style.background || swatch.style.backgroundColor || "";
+          if (bg) colour = bg;
+        }
+        var label = item.textContent.trim();
+        var circle = document.createElementNS(NS, "circle");
+        circle.setAttribute("cx", lx + 6); circle.setAttribute("cy", ly + 8);
+        circle.setAttribute("r", "5"); circle.setAttribute("fill", colour);
+        clone.appendChild(circle);
+        var text = document.createElementNS(NS, "text");
+        text.setAttribute("x", lx + 16); text.setAttribute("y", ly + 12);
+        text.setAttribute("font-size", "11"); text.setAttribute("fill", "#334155");
+        text.textContent = label;
+        clone.appendChild(text);
+        lx += label.length * 6.5 + 30;
+      });
+      parts[3] = newH;
+    }
+
     res.clone = clone; res.scale = usableW / parts[2]; res.h = parts[3] * res.scale;
     res.bottomY = topY + res.h;
     return res;

@@ -180,9 +180,9 @@
         if (labelEl) {
           text = labelEl.textContent.trim();
         } else if (td.classList.contains("hm-value-cell")) {
-          var numVal = parseFloat(td.getAttribute("data-value"));
-          if (!isNaN(numVal)) { text = String(numVal); dataType = "Number"; }
-          else text = td.textContent.trim();
+          text = td.textContent.trim();
+          var numVal = parseFloat(text);
+          if (!isNaN(numVal) && /^[\d.\-+]+%?$/.test(text)) { dataType = "Number"; }
           var bg = td.style.backgroundColor || "";
           if (bg.indexOf("39, 174, 96") >= 0 || bg.indexOf("46, 204, 113") >= 0) style = "Green";
           else if (bg.indexOf("243, 156, 18") >= 0 || bg.indexOf("241, 196, 15") >= 0) style = "Amber";

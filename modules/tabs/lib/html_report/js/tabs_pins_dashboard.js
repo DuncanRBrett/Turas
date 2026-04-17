@@ -37,8 +37,8 @@
         "white-space:normal;word-wrap:break-word}" +
       ".dash-gauge-qcode{font-size:10px;font-weight:700;color:" + brand + ";margin-right:4px}" +
       ".dash-gauge-value{font-size:24px;font-weight:700;color:#1e293b}" +
-      ".dash-type-badge{display:inline-block;font-size:9px;font-weight:700;" +
-        "padding:2px 8px;border-radius:3px;letter-spacing:0.5px;margin-bottom:6px}" +
+      ".dash-gauge-card:not(.dash-gauge-hero) svg{display:block;margin:0 auto}" +
+      ".dash-type-badge{display:none}" +
       ".dash-type-net_positive{background:rgba(74,124,111,0.1);color:#4a7c6f}" +
       ".dash-type-nps_score{background:rgba(50,51,103,0.1);color:" + brand + "}" +
       ".dash-type-average{background:rgba(201,169,110,0.1);color:#96783a}" +
