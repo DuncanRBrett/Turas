@@ -249,6 +249,16 @@ build_dashboard_css <- function(brand_colour) {
     .dash-text-content.editing .dash-md-rendered { display: none; }
     .dash-text-content:not(.editing) .dash-md-editor { display: none; }
 
+    /* === GAUGE SECTION COLLAPSE HEADER === */
+    .dash-gauge-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 6px 0; border-bottom: 2px solid #e2e8f0; margin-bottom: 12px;
+      font-size: 13px; font-weight: 700; color: #1a2744;
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .dash-gauge-header:hover { opacity: 0.85; }
+    .dash-collapsed .dash-gauges { display: none; }
+
     /* === HEATMAP GRID === */
     .dash-heatmap-header {
       display: flex; justify-content: space-between; align-items: center;

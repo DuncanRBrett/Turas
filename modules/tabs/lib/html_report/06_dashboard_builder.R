@@ -598,23 +598,31 @@ build_gauge_section <- function(metrics, brand_colour, section_label, thresholds
   )
 
   htmltools::tags$div(
-    class = "dash-section",
+    class = "dash-section dash-collapsible",
     `data-section-type` = section_label,
     id = paste0("dash-sec-", section_id),
-    htmltools::tags$div(class = "dash-section-title",
-      htmltools::HTML(htmltools::htmlEscape(section_label)),
-      tier_badges,
-      htmltools::tags$button(
-        class = "dash-export-btn",
-        style = "margin-left:12px;",
-        onclick = sprintf("pinGaugeSection('%s')", section_id),
-        htmltools::HTML("&#x1F4CC; Pin to Views")
+    htmltools::tags$div(
+      class = "dash-gauge-header",
+      onclick = "toggleDashSection(this)",
+      style = "cursor:pointer",
+      htmltools::tags$div(
+        style = "display:flex;align-items:center;gap:6px;",
+        htmltools::tags$span(class = "dash-collapse-chevron", htmltools::HTML("&#x25BC;")),
+        htmltools::HTML(htmltools::htmlEscape(section_label)),
+        tier_badges
       ),
-      htmltools::tags$button(
-        class = "dash-export-btn dash-sort-btn",
-        style = "margin-left:6px;",
-        onclick = sprintf("cycleSortGauges('%s')", section_id),
-        htmltools::HTML(sort_icon)
+      htmltools::tags$div(
+        style = "display:flex;gap:6px;align-items:center;",
+        htmltools::tags$button(
+          class = "dash-export-btn",
+          onclick = sprintf("event.stopPropagation();pinGaugeSection('%s')", section_id),
+          htmltools::HTML("&#x1F4CC; Pin to Views")
+        ),
+        htmltools::tags$button(
+          class = "dash-export-btn dash-sort-btn",
+          onclick = sprintf("event.stopPropagation();cycleSortGauges('%s')", section_id),
+          htmltools::HTML(sort_icon)
+        )
       )
     ),
     htmltools::tags$div(class = "dash-gauges",
