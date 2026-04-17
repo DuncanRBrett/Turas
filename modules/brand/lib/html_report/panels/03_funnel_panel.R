@@ -66,9 +66,6 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
     '<div class="fn-subtab" data-fn-subtab="funnel" hidden>',
       .fn_table_controls(panel_data),
       .fn_table_section(panel_data, focal_colour),
-      '<div class="fn-chart-wrap-outer">',
-        .fn_chart_section(panel_data, focal_colour),
-      '</div>',
     '</div>',
     '<div class="fn-subtab" data-fn-subtab="relationship" hidden>',
       .fn_relationship_section(panel_data, focal_colour),
@@ -173,10 +170,9 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
     '<div class="fn-ctl-group"><span class="fn-ctl-label">Show brands</span>',
     sprintf('<div class="fn-chip-row col-chip-bar">%s</div></div>', chips_html),
 
-    # Heatmap checked by default, Show count off, Show chart on — matches tabs
+    # Heatmap checked by default, Show count off — matches tabs
     '<label class="toggle-label"><input type="checkbox" checked data-fn-action="heatmap"> Heatmap</label>',
     '<label class="toggle-label"><input type="checkbox" data-fn-action="showcounts"> Show count</label>',
-    '<label class="toggle-label"><input type="checkbox" checked data-fn-action="showchart"> Show chart</label>',
 
     # Base (% of total / previous) — segmented toggle, same shape as tabs' sig-level-switcher
     '<div class="sig-level-switcher fn-base-switcher" role="group" aria-label="Percentage base">',

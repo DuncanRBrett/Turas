@@ -43,20 +43,176 @@ build_funnel_chart_section <- function(pd, focal_colour = "#1A5276") {
 }
 
 
-#' Build the relationship segment-emphasis section
+#' Build the relationship table section (ct-table, brands as columns,
+#' attitude positions as rows — same chrome as the funnel table).
+#'
+#' Columns: [Attitude label | Focal | Category avg | Competitor 1 | ...]
+#' Rows:    [Base (n=) | Love | Prefer | Ambivalent | Reject | No opinion]
+#'
+#' @param pd Panel data from build_funnel_panel_data().
+#' @param focal_colour Hex colour.
+#' @return Character HTML.
 #' @export
 build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
   cd <- pd$consideration_detail
   if (is.null(cd) || is.null(cd$brands) || length(cd$brands) == 0) return("")
 
+  focal  <- pd$meta$focal_brand_code %||% character(0)
+  brands <- cd$brands
+
+  focal_entries <- Filter(function(b) identical(b$brand_code, focal), brands)
+  comp_entries  <- Filter(function(b) !identical(b$brand_code, focal), brands)
+  if (length(comp_entries) > 0) {
+    nms <- tolower(vapply(comp_entries,
+      function(b) as.character(b$brand_name %||% b$brand_code), character(1)))
+    comp_entries <- comp_entries[order(nms)]
+  }
+  ordered <- c(focal_entries, comp_entries)
+  if (length(ordered) == 0) return("")
+
+  att_roles  <- c("attitude.love", "attitude.prefer", "attitude.ambivalent",
+                  "attitude.reject", "attitude.no_opinion")
+  att_labels <- c("Love", "Prefer", "Ambivalent", "Reject", "No opinion")
+
+  # Category average per attitude across all brands
+  cat_avg <- vapply(att_roles, function(role) {
+    vals <- vapply(brands, function(b)
+      as.numeric(b$segments[[role]] %||% NA_real_), numeric(1))
+    vals <- vals[is.finite(vals)]
+    if (length(vals) == 0) NA_real_ else mean(vals)
+  }, numeric(1))
+
+  # Per-brand column max for per-column heatmap scaling
+  brand_max <- vapply(ordered, function(b) {
+    vals <- vapply(att_roles, function(r)
+      as.numeric(b$segments[[r]] %||% NA_real_), numeric(1))
+    vals <- vals[is.finite(vals) & vals > 0]
+    if (length(vals) == 0) 1 else max(vals)
+  }, numeric(1))
+  names(brand_max) <- vapply(ordered, function(b) b$brand_code, character(1))
+  avg_max <- { v <- cat_avg[is.finite(cat_avg) & cat_avg > 0]
+               if (length(v) == 0) 1 else max(v) }
+
   paste0(
-    '<section class="fn-section fn-relationship-section">',
-    '<h3 class="fn-section-title">Relationship <span class="fn-insight-marker" title="AI insight available">&#9679;</span></h3>',
-    .fn_segment_picker(),
-    '<div class="fn-relationship-bars" data-fn-emphasis="all">',
-    paste(lapply(cd$brands, .fn_brand_seg_bar, focal_colour,
-                 pd$meta$focal_brand_code), collapse = ""),
-    '</div></section>'
+    '<section class="fn-section fn-table-section fn-rel-table-section">',
+    '<div class="fn-table-wrap">',
+    '<table class="ct-table fn-ct-table fn-rel-table">',
+    .fn_rel_header(ordered, focal, focal_colour),
+    '<tbody>',
+    .fn_rel_base_row(ordered, focal),
+    paste(vapply(seq_along(att_roles), function(i)
+      .fn_rel_att_row(att_roles[i], att_labels[i], ordered, focal,
+                      cat_avg[i], brand_max, avg_max),
+      character(1)), collapse = ""),
+    '</tbody></table></div>',
+    .fn_add_insight_strip(),
+    '</section>'
+  )
+}
+
+
+# ==============================================================================
+# INTERNAL: RELATIONSHIP TABLE HELPERS
+# ==============================================================================
+
+.fn_rel_header <- function(ordered, focal, focal_colour) {
+  focal_name <- {
+    e <- Filter(function(b) identical(b$brand_code, focal), ordered)
+    if (length(e) > 0) .fn_esc(as.character(e[[1]]$brand_name %||% e[[1]]$brand_code))
+    else "Focal"
+  }
+  comp_entries <- Filter(function(b) !identical(b$brand_code, focal), ordered)
+
+  comp_ths <- paste(vapply(comp_entries, function(b)
+    sprintf('<th class="ct-th ct-data-col">%s</th>',
+            .fn_esc(as.character(b$brand_name %||% b$brand_code))),
+    character(1)), collapse = "")
+
+  paste0(
+    '<thead><tr>',
+    '<th class="ct-th ct-label-col">Attitude</th>',
+    sprintf('<th class="ct-th ct-data-col fn-rel-th-focal" style="color:%s;">%s</th>',
+            focal_colour, focal_name),
+    '<th class="ct-th ct-data-col fn-rel-th-avg"><em>Category avg</em></th>',
+    comp_ths,
+    '</tr></thead>'
+  )
+}
+
+
+.fn_rel_base_row <- function(ordered, focal) {
+  all_n <- vapply(ordered, function(b)
+    as.numeric(b$aware_base %||% NA_real_), numeric(1))
+  finite_n <- all_n[is.finite(all_n)]
+  avg_n <- if (length(finite_n) == 0) NA_real_ else mean(finite_n)
+
+  small_base <- if (exists(".FN_SMALL_BASE")) .FN_SMALL_BASE else 30L
+  n_cell <- function(n, extra_cls = "") {
+    base_cls <- trimws(paste("ct-td ct-data-col", extra_cls))
+    if (!is.finite(n))
+      return(sprintf('<td class="%s ct-na">&mdash;</td>', base_cls))
+    ni <- as.integer(round(n))
+    warn <- ni < small_base
+    sprintf('<td class="%s"><span class="%s">n=%d%s</span></td>',
+            base_cls,
+            if (warn) "ct-low-base" else "ct-base-n", ni,
+            if (warn) " \u26A0" else "")
+  }
+
+  focal_cell <- n_cell(all_n[match(focal,
+    vapply(ordered, function(b) b$brand_code, character(1)))],
+    "fn-rel-td-focal")
+  comp_codes  <- vapply(Filter(function(b) !identical(b$brand_code, focal), ordered),
+                        function(b) b$brand_code, character(1))
+  comp_cells  <- paste(vapply(which(!vapply(ordered, function(b)
+    identical(b$brand_code, focal), logical(1))),
+    function(i) n_cell(all_n[i]), character(1)), collapse = "")
+
+  paste0(
+    '<tr class="ct-row ct-row-base fn-row-base">',
+    '<td class="ct-td ct-label-col">Base (n=)</td>',
+    focal_cell,
+    n_cell(avg_n, "fn-rel-td-avg"),
+    comp_cells,
+    '</tr>'
+  )
+}
+
+
+.fn_rel_att_row <- function(role, label, ordered, focal,
+                             cat_avg_pct, brand_max, avg_max) {
+  small_base <- if (exists(".FN_SMALL_BASE")) .FN_SMALL_BASE else 30L
+
+  pct_cell <- function(pct, col_max, extra_cls = "") {
+    base_cls <- trimws(paste("ct-td ct-data-col", extra_cls))
+    if (!is.finite(pct))
+      return(sprintf('<td class="%s ct-na">&mdash;</td>', base_cls))
+    denom  <- if (!is.finite(col_max) || col_max <= 0) 1 else col_max
+    frac   <- min(1, max(0, pct / denom))
+    hm     <- sprintf("rgba(37,99,171,%.3f)", 0.08 + frac * 0.57)
+    sprintf(
+      '<td class="%s ct-heatmap-cell" data-heatmap="%s" data-fn-pct-abs="%.6f"><span class="ct-val">%.0f%%</span></td>',
+      base_cls, hm, pct, 100 * pct)
+  }
+
+  focal_idx <- which(vapply(ordered, function(b)
+    identical(b$brand_code, focal), logical(1)))
+  focal_pct <- if (length(focal_idx) == 1)
+    as.numeric(ordered[[focal_idx]]$segments[[role]] %||% NA_real_) else NA_real_
+
+  comp_entries <- Filter(function(b) !identical(b$brand_code, focal), ordered)
+  comp_cells <- paste(vapply(comp_entries, function(b) {
+    pct <- as.numeric(b$segments[[role]] %||% NA_real_)
+    pct_cell(pct, brand_max[[b$brand_code]])
+  }, character(1)), collapse = "")
+
+  paste0(
+    sprintf('<tr class="ct-row fn-rel-row" data-fn-att="%s">', .fn_esc(role)),
+    sprintf('<td class="ct-td ct-label-col">%s</td>', .fn_esc(label)),
+    pct_cell(focal_pct, brand_max[[focal]], "fn-rel-td-focal"),
+    pct_cell(cat_avg_pct, avg_max, "fn-rel-td-avg"),
+    comp_cells,
+    '</tr>'
   )
 }
 

@@ -318,8 +318,24 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 }
 .fn-add-insight-btn:hover { color: var(--fn-brand); }
 
-/* Show-chart toggle controls chart section visibility */
-.fn-panel.fn-hide-chart .fn-chart-wrap-outer { display: none; }
+/* -------------------------------------------------------------------------- */
+/* RELATIONSHIP TABLE — focal column + category-avg column                    */
+/* -------------------------------------------------------------------------- */
+/* Focal column header: accent underline so it reads as "primary" column */
+.fn-panel .fn-rel-th-focal {
+  border-bottom: 3px solid var(--fn-brand);
+}
+/* Focal column cells: same light tint as the focal row in the funnel table */
+.fn-panel .fn-rel-td-focal {
+  background: rgba(26, 82, 118, 0.04) !important;
+}
+/* Category avg column: italic, muted — mirrors fn-row-avg-all row in funnel */
+.fn-panel .fn-rel-th-avg em { font-style: italic; opacity: 0.85; }
+.fn-panel .fn-rel-td-avg {
+  background: #fafbfc !important;
+  color: #475569;
+  font-style: italic;
+}
 
 /* -------------------------------------------------------------------------- */
 /* CARDS (unchanged from earlier)                                             */
