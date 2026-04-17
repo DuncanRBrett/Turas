@@ -141,14 +141,13 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
 .fn_toggles_bar <- function() {
   paste0(
     '<div class="fn-ctl-group fn-toggles">',
-    '<span class="fn-ctl-label">Display</span>',
-    '<label class="fn-toggle"><input type="radio" name="fn-pctmode" value="nested" checked data-fn-action="pctmode"> % of %</label>',
-    '<label class="fn-toggle"><input type="radio" name="fn-pctmode" value="absolute" data-fn-action="pctmode"> % of absolute</label>',
+    '<span class="fn-ctl-label">Percentage base</span>',
+    '<label class="fn-toggle"><input type="radio" name="fn-pctmode" value="total" checked data-fn-action="pctmode"> % of total sample</label>',
+    '<label class="fn-toggle"><input type="radio" name="fn-pctmode" value="previous" data-fn-action="pctmode"> % of previous stage</label>',
     '<span class="fn-sep"></span>',
     '<label class="fn-toggle"><input type="checkbox" data-fn-action="showcounts"> Show counts</label>',
     '<span class="fn-sep"></span>',
-    '<label class="fn-toggle"><input type="radio" name="fn-chartview" value="slope" checked data-fn-action="chartview"> Slope</label>',
-    '<label class="fn-toggle"><input type="radio" name="fn-chartview" value="small" data-fn-action="chartview"> Small multiples</label>',
+    '<label class="fn-toggle"><input type="checkbox" data-fn-action="showchart" checked> Show chart</label>',
     '<span class="fn-sep"></span>',
     '<button type="button" class="fn-export-btn" data-fn-action="export">Export to Excel</button>',
     '</div>'

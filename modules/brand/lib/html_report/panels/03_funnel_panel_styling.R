@@ -175,13 +175,93 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
   border-radius: 3px; margin-left: 4px; text-transform: uppercase;
   letter-spacing: 0.5px;
 }
-.fn-row-avg-all { background: #fafbfc; }
-.fn-row-avg-all .fn-th-rowlabel { font-style: italic; color: #475569; }
+.fn-row-avg-all {
+  background: #f5f6f8;
+}
+.fn-row-avg-all .fn-th-rowlabel {
+  font-style: italic; color: #475569;
+  background: #f1f3f6;
+}
+.fn-row-avg-all .fn-td {
+  background-image: linear-gradient(#f5f6f8 0%, #f5f6f8 100%) !important;
+  background-blend-mode: multiply;
+}
 .fn-td { font-variant-numeric: tabular-nums; position: relative; }
-.fn-pct-primary { font-weight: 600; display: block; }
-.fn-pct-count { font-size: 10px; color: #64748b; display: none; }
+.fn-pct-primary { font-weight: 600; display: block; line-height: 1.15; }
+.fn-pct-count { font-size: 10px; color: #64748b; display: none; margin-top: 2px; }
 .fn-panel.fn-show-counts .fn-pct-count { display: block; }
 .fn-td-empty { color: #cbd5e1; }
+
+/* Base row — shows n= per stage, inherits ct-table base row styling */
+.fn-row-base { background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+.fn-row-base .fn-th-rowlabel-base {
+  font-weight: 700; color: #475569; background: #f8fafc;
+}
+.fn-td-base .fn-base-n {
+  font-size: 11px; font-weight: 600; color: #475569;
+  font-variant-numeric: tabular-nums;
+}
+.fn-td-base-warn .fn-base-n,
+.fn-td-warn .fn-pct-primary {
+  color: #c0392b;
+}
+.fn-warn {
+  display: inline-block; margin-left: 3px; color: #c0392b;
+  font-size: 11px;
+}
+
+/* In-cell ▲/▼ sig badge — superscript-ish, doesn't push the number */
+.fn-td .fn-sig {
+  display: inline-block; margin-left: 4px;
+  font-size: 10px; font-weight: 700;
+  padding: 0; background: transparent;
+  vertical-align: top; line-height: 1;
+}
+
+/* Header chrome: label + help + sort, all inline */
+.fn-table thead th {
+  position: sticky; top: 0;
+}
+.fn-th-stage, .fn-th-brand {
+  white-space: nowrap;
+}
+.fn-th-label { margin-right: 4px; }
+.fn-help-btn, .fn-sort-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; padding: 0; margin-left: 2px;
+  border: 1px solid transparent; border-radius: 4px; background: transparent;
+  color: #94a3b8; font-size: 10px; font-weight: 700;
+  cursor: pointer; font-family: inherit;
+}
+.fn-help-btn:hover, .fn-sort-btn:hover {
+  background: #e2e8f0; color: #1e293b;
+}
+.fn-sort-btn[data-fn-sort-dir="asc"]::after  { content: "\2191"; font-size: 10px; margin-left: 1px; color: var(--fn-brand); }
+.fn-sort-btn[data-fn-sort-dir="desc"]::after { content: "\2193"; font-size: 10px; margin-left: 1px; color: var(--fn-brand); }
+.fn-sort-btn[data-fn-sort-dir="asc"],
+.fn-sort-btn[data-fn-sort-dir="desc"] {
+  background: rgba(26,82,118,0.08); color: var(--fn-brand);
+}
+
+/* Help popover */
+.fn-help-popover {
+  position: absolute; z-index: 30;
+  max-width: 320px; min-width: 220px;
+  padding: 10px 14px;
+  background: #ffffff; color: #1e293b;
+  border: 1px solid #e2e8f0; border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
+  font-size: 12px; line-height: 1.45;
+}
+.fn-help-popover-title {
+  font-size: 11px; font-weight: 700; color: var(--fn-brand);
+  text-transform: uppercase; letter-spacing: 0.6px;
+  margin-bottom: 6px;
+}
+.fn-help-popover-body { color: #334155; }
+
+/* Show-chart toggle controls chart section visibility */
+.fn-panel.fn-hide-chart .fn-chart-section { display: none; }
 
 /* Slope chart + relationship */
 .fn-chart-wrap { background: #fff; border: 1px solid #e2e8f0;

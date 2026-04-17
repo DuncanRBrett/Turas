@@ -34,12 +34,14 @@
     panel.__fnData = payload;
     panel.__fnState = {
       focal: (payload.meta && payload.meta.focal_brand_code) || null,
-      pctMode: "nested",
+      pctMode: "total",      // "total" (% of sample) | "previous" (% of prev stage)
       showCounts: false,
+      showChart: true,
       chartView: "slope",
       emphasis: "all",
       tableBrands: {},
-      chartBrands: {}
+      chartBrands: {},
+      sort: { col: "brand", dir: "asc" }
     };
     // Default chip state: table all on, chart only focal on
     var allBrands = (payload.table && payload.table.brand_codes) || [];
@@ -90,12 +92,35 @@
       panel.classList.toggle("fn-show-counts", counts.checked);
     });
 
+    var showChart = panel.querySelector('[data-fn-action="showchart"]');
+    if (showChart) showChart.addEventListener("change", function(){
+      panel.__fnState.showChart = showChart.checked;
+      panel.classList.toggle("fn-hide-chart", !showChart.checked);
+    });
+
     panel.querySelectorAll('[data-fn-action="chartview"]').forEach(function(r){
       r.addEventListener("change", function(){
         panel.__fnState.chartView = r.value;
         applyChartView(panel);
       });
     });
+
+    panel.querySelectorAll('[data-fn-action="sort-brand"]').forEach(function(b){
+      b.addEventListener("click", function(){ toggleBrandSort(panel, b); });
+    });
+    panel.querySelectorAll('[data-fn-action="sort-stage"]').forEach(function(b){
+      b.addEventListener("click", function(){
+        toggleStageSort(panel, b, b.getAttribute("data-fn-stage"));
+      });
+    });
+
+    panel.querySelectorAll('[data-fn-action="help"]').forEach(function(b){
+      b.addEventListener("click", function(e){
+        e.stopPropagation();
+        toggleHelpPopover(panel, b, b.getAttribute("data-fn-stage"));
+      });
+    });
+    document.addEventListener("click", function(){ closeAllHelpPopovers(panel); });
 
     panel.querySelectorAll('.fn-seg-chip[data-fn-emphasis]').forEach(function(c){
       c.addEventListener("click", function(){
@@ -148,8 +173,12 @@
   // % mode — rewrite visible cell text via data-fn-pct-abs / data-fn-pct-nes
   // ---------------------------------------------------------------------------
   function applyPctMode(panel) {
+    // "total" -> % of total sample (pct_absolute)
+    // "previous" -> % of previous stage (pct_nested)
+    // Legacy "absolute"/"nested" accepted for back-compat.
     var mode = panel.__fnState.pctMode;
-    var attr = (mode === "absolute") ? "data-fn-pct-abs" : "data-fn-pct-nes";
+    var useAbs = (mode === "total" || mode === "absolute");
+    var attr = useAbs ? "data-fn-pct-abs" : "data-fn-pct-nes";
     panel.querySelectorAll(".fn-td").forEach(function(td){
       var v = parseFloat(td.getAttribute(attr));
       var primary = td.querySelector(".fn-pct-primary");
@@ -272,6 +301,92 @@
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sort — Focal + Category Average rows are LOCKED to positions 2+3 (Base
+  // row stays at 1). Only competitor rows reorder. Sort state is tracked
+  // on panel.__fnState.sort = { col: "brand"|<stage_key>, dir: "asc"|"desc" }.
+  // ---------------------------------------------------------------------------
+  function toggleBrandSort(panel, btn) {
+    var s = panel.__fnState.sort;
+    var nextDir = (s.col === "brand" && s.dir === "asc") ? "desc" : "asc";
+    setSort(panel, "brand", nextDir);
+  }
+
+  function toggleStageSort(panel, btn, stageKey) {
+    var s = panel.__fnState.sort;
+    var nextDir = (s.col === stageKey && s.dir === "desc") ? "asc" : "desc";
+    setSort(panel, stageKey, nextDir);
+  }
+
+  function setSort(panel, col, dir) {
+    panel.__fnState.sort = { col: col, dir: dir };
+    // Mark header state so CSS/aria can render the indicator
+    panel.querySelectorAll("[data-fn-action^='sort-']").forEach(function(b){
+      b.setAttribute("data-fn-sort-dir", "none");
+    });
+    var activeSel = (col === "brand")
+      ? '[data-fn-action="sort-brand"]'
+      : '[data-fn-action="sort-stage"][data-fn-stage="' + col + '"]';
+    var active = panel.querySelector(activeSel);
+    if (active) active.setAttribute("data-fn-sort-dir", dir);
+
+    var tbody = panel.querySelector(".fn-table tbody");
+    if (!tbody) return;
+    var competitors = Array.prototype.slice.call(
+      tbody.querySelectorAll('tr.fn-row-competitor'));
+    competitors.sort(function(a, b){
+      var av, bv;
+      if (col === "brand") {
+        av = a.getAttribute("data-fn-sort-brand") || "";
+        bv = b.getAttribute("data-fn-sort-brand") || "";
+        return dir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+      }
+      av = parseFloat(a.getAttribute("data-fn-sort-" + col));
+      bv = parseFloat(b.getAttribute("data-fn-sort-" + col));
+      if (isNaN(av)) av = -Infinity;
+      if (isNaN(bv)) bv = -Infinity;
+      return dir === "asc" ? av - bv : bv - av;
+    });
+    competitors.forEach(function(r){ tbody.appendChild(r); });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Help popovers — floated next to the header ? trigger; click outside or
+  // on another ? dismisses. Content comes from the hidden <template> blocks
+  // emitted by the renderer (one per stage).
+  // ---------------------------------------------------------------------------
+  function toggleHelpPopover(panel, btn, stageKey) {
+    var existing = panel.querySelector('.fn-help-popover');
+    if (existing && existing.getAttribute("data-fn-stage") === stageKey) {
+      existing.remove();
+      return;
+    }
+    closeAllHelpPopovers(panel);
+    var tpl = panel.querySelector('template.fn-help-template[data-fn-stage="' + stageKey + '"]');
+    if (!tpl) return;
+    var label = tpl.getAttribute("data-fn-stage-label") || stageKey;
+    var body = tpl.content.cloneNode(true);
+    var pop = document.createElement("div");
+    pop.className = "fn-help-popover";
+    pop.setAttribute("data-fn-stage", stageKey);
+    pop.setAttribute("role", "dialog");
+    pop.innerHTML = '<div class="fn-help-popover-title">' +
+      escapeAttr(label) + '</div>';
+    pop.appendChild(body);
+    // Position it — place relative to the panel using the button rect
+    var bRect = btn.getBoundingClientRect();
+    var pRect = panel.getBoundingClientRect();
+    pop.style.left = (bRect.left - pRect.left) + "px";
+    pop.style.top = (bRect.bottom - pRect.top + 6) + "px";
+    panel.appendChild(pop);
+    // Stop clicks inside the popover from bubbling to the document listener
+    pop.addEventListener("click", function(e){ e.stopPropagation(); });
+  }
+
+  function closeAllHelpPopovers(panel) {
+    panel.querySelectorAll('.fn-help-popover').forEach(function(p){ p.remove(); });
   }
 
   // ---------------------------------------------------------------------------
