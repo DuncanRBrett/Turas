@@ -80,9 +80,28 @@ TURF_VERSION <- "11.2"
 # existing maxdiff API so no caller code needs to change.
 
 if (!exists("classify_appeal", mode = "function")) {
-  # Fallback: if shared engine failed to load, the original functions
-  # are needed. This should not happen in production.
-  stop("TURF engine not loaded. Check that modules/shared/lib/turf_engine.R exists.")
+  # Shared TURF engine failed to load — every path candidate in
+  # .source_turf_engine() missed. Refuse loudly with a TRS-compliant
+  # message instead of stop(), so the user sees what's actually wrong
+  # rather than a cryptic "could not find function maxdiff_refuse"
+  # when downstream code tries to call the refusal handler.
+  if (exists("maxdiff_refuse", mode = "function")) {
+    maxdiff_refuse(
+      code = "IO_FILE_NOT_FOUND",
+      title = "Shared TURF Engine Not Loaded",
+      problem = "modules/shared/lib/turf_engine.R could not be sourced from any of the fallback paths in .source_turf_engine().",
+      why_it_matters = paste(
+        "MaxDiff's TURF analysis delegates to the shared engine.",
+        "Without it, run_turf_analysis() cannot compute anything."),
+      how_to_fix = c(
+        "Verify modules/shared/lib/turf_engine.R exists.",
+        "If you launched from a non-standard directory, set script_dir_override = 'path/to/maxdiff/R' in globalenv() before sourcing 00_main.R.",
+        "If running via the GUI, launch from the Turas root and use run_maxdiff_gui()."
+      )
+    )
+  } else {
+    stop("TURF engine not loaded. Check that modules/shared/lib/turf_engine.R exists.")
+  }
 }
 
 # Override run_turf_analysis to add maxdiff-specific refusal handling
