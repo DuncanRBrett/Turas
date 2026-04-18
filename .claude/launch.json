@@ -36,6 +36,12 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "8770", "--directory", "/Users/duncan/Dev/Turas/tmp_sample_funnel_html"],
       "port": 8770
+    },
+    {
+      "name": "brand-rel-preview",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8771", "--directory", "/tmp"],
+      "port": 8771
     }
   ]
 }
