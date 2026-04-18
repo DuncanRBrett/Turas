@@ -115,30 +115,20 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
     brand_chips,
     avg_chip,
     '</div>',
-    # Meta row: base, shading, count, chart toggle, export
+    # Meta row: base, checkboxes, export
     '<div class="fn-rel-meta-row">',
     '<div class="sig-level-switcher" role="group" aria-label="Percentage base">',
     '<span class="sig-level-label">Base:</span>',
     '<button type="button" class="sig-btn sig-btn-active" data-fn-rel-base="aware" aria-pressed="true">% aware</button>',
     '<button type="button" class="sig-btn" data-fn-rel-base="total" aria-pressed="false">% total</button>',
     '</div>',
-    '<div class="sig-level-switcher" role="group" aria-label="Table shading">',
-    '<span class="sig-level-label">Shading:</span>',
-    '<button type="button" class="sig-btn sig-btn-active" data-fn-rel-shade="off" aria-pressed="true">Off</button>',
-    '<button type="button" class="sig-btn" data-fn-rel-shade="heatmap" aria-pressed="false">Heatmap</button>',
-    '</div>',
-    '<div class="sig-level-switcher" role="group" aria-label="Show counts">',
-    '<span class="sig-level-label">Counts:</span>',
-    '<button type="button" class="sig-btn sig-btn-active" data-fn-rel-count="off" aria-pressed="true">%</button>',
-    '<button type="button" class="sig-btn" data-fn-rel-count="on" aria-pressed="false">% &amp; n</button>',
-    '</div>',
-    '<div class="fn-rel-meta-actions">',
-    '<button type="button" class="fn-rel-chart-toggle-btn" data-fn-rel-chart-vis="on" aria-pressed="true">Hide chart</button>',
+    '<label class="toggle-label"><input type="checkbox" data-fn-rel-showci> CI bands</label>',
+    '<label class="toggle-label"><input type="checkbox" data-fn-rel-showcounts> Show count</label>',
+    '<label class="toggle-label"><input type="checkbox" checked data-fn-rel-showchart> Show chart</label>',
     '<button type="button" class="export-btn fn-rel-export-btn" data-fn-rel-action="export" title="Export table to CSV">',
     '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="flex-shrink:0;"><path d="M6 1v7M3 6l3 3 3-3M1 10h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     ' Export',
     '</button>',
-    '</div>',
     '</div>',
     '</div>'
   )
@@ -286,9 +276,13 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
     count_total    <- if (is.finite(pct_total) && is.finite(n_total))
       sprintf(' data-fn-rel-count-total="%d"', as.integer(round(pct_total * n_total))) else ""
 
+    cnt_aware_val <- if (is.finite(pct_aware) && is.finite(aware_n))
+      as.integer(round(pct_aware * aware_n)) else NA_integer_
+    freq_span <- if (!is.na(cnt_aware_val))
+      sprintf('<span class="ct-freq fn-pct-count">n=%d</span>', cnt_aware_val) else ""
     sprintf(
-      '<td class="ct-td ct-data-col ct-heatmap-cell%s" data-heatmap="%s" data-fn-att="%s" data-fn-rel-pct-aware="%.6f"%s%s%s><span class="ct-val">%.0f%%</span></td>',
-      focal_cls, hm, .fn_esc(role), pct_aware, total_attr, count_aware, count_total, 100 * pct_aware)
+      '<td class="ct-td ct-data-col ct-heatmap-cell%s" data-heatmap="%s" data-fn-att="%s" data-fn-rel-pct-aware="%.6f"%s%s%s><span class="ct-val">%.0f%%</span>%s</td>',
+      focal_cls, hm, .fn_esc(role), pct_aware, total_attr, count_aware, count_total, 100 * pct_aware, freq_span)
   }, character(1)), collapse = "")
 
   sprintf('<tr class="%s" data-fn-brand="%s">%s%s%s</tr>',

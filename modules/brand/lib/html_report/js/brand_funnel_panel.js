@@ -65,7 +65,7 @@
     applyTableVisibility(panel);
     applyChartVisibility(panel);
     applyPctMode(panel);
-    applyTableShading(panel, "heatmap");
+    applyTableShading(panel, "off");
     applyTableSigMarkers(panel);
     bindSubTabs(panel);
     bindPinDropdown(panel);
@@ -204,17 +204,10 @@
       });
     });
 
-    // Table shading segmented buttons (Off / Heatmap / CI bands)
-    panel.querySelectorAll('[data-fn-action="tableshading"]').forEach(function(btn){
-      btn.addEventListener("click", function(){
-        var mode = btn.getAttribute("data-fn-shade");
-        panel.querySelectorAll('[data-fn-action="tableshading"]').forEach(function(b){
-          var active = b === btn;
-          b.classList.toggle("sig-btn-active", active);
-          b.setAttribute("aria-pressed", active ? "true" : "false");
-        });
-        applyTableShading(panel, mode);
-      });
+    // CI bands checkbox (single toggle; off by default)
+    var showCI = panel.querySelector('[data-fn-action="showci"]');
+    if (showCI) showCI.addEventListener("change", function(){
+      applyTableShading(panel, showCI.checked ? "ci" : "off");
     });
 
     // Show count — tabs uses .show-freq parent class to reveal .ct-freq
@@ -1347,7 +1340,7 @@
 
       // Detect active subtab
       var activeSubtab = "funnel";
-      var activeBtn = panel.querySelector(".fn-subtab-btn.fn-subtab-active");
+      var activeBtn = panel.querySelector(".fn-subtab-btn.active");
       if (activeBtn) activeSubtab = activeBtn.getAttribute("data-fn-subtab-target") || "funnel";
 
       var items;
@@ -1545,61 +1538,36 @@
         });
         buildRelChart(panel);
         applyRelTableBase(panel);
+        applyRelTableSigMarkers(panel);
         sortRelTable(panel);
       });
     });
 
-    // Table shading toggle (Off / Heatmap)
-    panel.querySelectorAll("[data-fn-rel-shade]").forEach(function(btn) {
-      btn.addEventListener("click", function() {
-        var mode = btn.getAttribute("data-fn-rel-shade");
-        panel.__fnState.tableShading = mode;
-        panel.querySelectorAll("[data-fn-rel-shade]").forEach(function(b) {
-          var on = b === btn;
-          b.classList.toggle("sig-btn-active", on);
-          b.setAttribute("aria-pressed", on ? "true" : "false");
-        });
-        if (mode === "off") {
-          panel.classList.add("fn-heatmap-off");
-          panel.querySelectorAll("[data-fn-rel-table] td.ct-heatmap-cell").forEach(function(td) {
-            td.style.backgroundColor = "";
-          });
-        } else {
-          panel.classList.remove("fn-heatmap-off");
-          var pctAttr = (panel.__fnState.relBase === "total")
-            ? "data-fn-rel-pct-total" : "data-fn-rel-pct-aware";
-          applyRelTableHeatmap(panel, pctAttr);
-        }
+    // CI bands checkbox (relationship table)
+    var relShowCI = panel.querySelector('[data-fn-rel-showci]');
+    if (relShowCI) relShowCI.addEventListener("change", function() {
+      var pctAttr = (panel.__fnState.relBase === "total")
+        ? "data-fn-rel-pct-total" : "data-fn-rel-pct-aware";
+      panel.querySelectorAll("[data-fn-rel-table] td.ct-heatmap-cell").forEach(function(td) {
+        td.classList.remove("fn-ci-above", "fn-ci-within", "fn-ci-below");
       });
+      if (relShowCI.checked) applyRelTableCI(panel, pctAttr);
     });
 
-    // Show count toggle (% only / % & n)
-    panel.querySelectorAll("[data-fn-rel-count]").forEach(function(btn) {
-      btn.addEventListener("click", function() {
-        var on = btn.getAttribute("data-fn-rel-count") === "on";
-        panel.__fnState.relShowCount = on;
-        panel.querySelectorAll("[data-fn-rel-count]").forEach(function(b) {
-          var active = b === btn;
-          b.classList.toggle("sig-btn-active", active);
-          b.setAttribute("aria-pressed", active ? "true" : "false");
-        });
-        applyRelTableBase(panel);
-      });
+    // Show count checkbox — show-freq class reveals .ct-freq spans
+    var relShowCounts = panel.querySelector('[data-fn-rel-showcounts]');
+    if (relShowCounts) relShowCounts.addEventListener("change", function() {
+      panel.__fnState.relShowCount = relShowCounts.checked;
+      panel.classList.toggle("show-freq", relShowCounts.checked);
     });
 
-    // Show/hide chart toggle
-    var chartToggleBtn = panel.querySelector("[data-fn-rel-chart-vis]");
-    if (chartToggleBtn) {
-      chartToggleBtn.addEventListener("click", function() {
-        var area = panel.querySelector("[data-fn-rel-chart-area]");
-        if (!area) return;
-        var showing = panel.__fnState.relShowChart;
-        panel.__fnState.relShowChart = !showing;
-        area.style.display = showing ? "none" : "";
-        chartToggleBtn.textContent = showing ? "Show chart" : "Hide chart";
-        chartToggleBtn.setAttribute("aria-pressed", showing ? "false" : "true");
-      });
-    }
+    // Show/hide chart checkbox
+    var relShowChart = panel.querySelector('[data-fn-rel-showchart]');
+    if (relShowChart) relShowChart.addEventListener("change", function() {
+      panel.__fnState.relShowChart = relShowChart.checked;
+      var area = panel.querySelector("[data-fn-rel-chart-area]");
+      if (area) area.style.display = relShowChart.checked ? "" : "none";
+    });
 
     // Export button
     var exportBtn = panel.querySelector("[data-fn-rel-action='export']");
@@ -1612,6 +1580,7 @@
 
     buildRelChart(panel);
     applyRelTableBase(panel);
+    applyRelTableSigMarkers(panel);
     sortRelTable(panel);
     applyRelBrandVis(panel);
   }
@@ -1696,7 +1665,6 @@
         : "1";
 
       var segHtml  = "";
-      var tailItems = [];
 
       REL_SEG_ROLES.forEach(function(role) {
         var pct      = segs[role] || 0;
@@ -1705,12 +1673,8 @@
         var color    = isEmph ? REL_SEG_COLORS[role] : "rgba(148,163,184,0.18)";
         var insideLbl = "";
 
-        if (isEmph && pct > 0) {
-          if (widthPct >= 8) {
-            insideLbl = '<span class="fn-rel-seg-label-inside">' + Math.round(pct * 100) + '%</span>';
-          } else {
-            tailItems.push({ pct: pct, color: REL_SEG_COLORS[role] });
-          }
+        if (isEmph && pct > 0 && widthPct >= 5) {
+          insideLbl = '<span class="fn-rel-seg-label-inside">' + Math.round(pct * 100) + '%</span>';
         }
 
         segHtml += '<div class="fn-rel-seg" data-fn-role="' + escapeAttr(role) +
@@ -1718,21 +1682,11 @@
           insideLbl + '</div>';
       });
 
-      var tailHtml = "";
-      if (tailItems.length > 0) {
-        tailHtml = '<div class="fn-rel-tail-labels">';
-        tailItems.forEach(function(t) {
-          tailHtml += '<span class="fn-rel-pct-tail" style="color:' + t.color + ';">' +
-            Math.round(t.pct * 100) + '%</span>';
-        });
-        tailHtml += '</div>';
-      }
-
       return '<div class="' + rowCls + '" data-fn-brand="' + escapeAttr(brandCode) + '">' +
         '<div class="fn-rel-bar-label">' + labelHtml + '</div>' +
         '<div class="fn-rel-bar-area">' +
         '<div class="fn-rel-bar-track" style="flex:' + trackFlex + ' ' + trackFlex + ' 0%;">' +
-        segHtml + '</div>' + tailHtml +
+        segHtml + '</div>' +
         '</div></div>';
     }
 
@@ -1891,22 +1845,104 @@
   function applyRelTableBase(panel) {
     var table = panel.querySelector("[data-fn-rel-table]");
     if (!table) return;
-    var base       = (panel.__fnState && panel.__fnState.relBase) || "aware";
-    var showCount  = panel.__fnState && panel.__fnState.relShowCount;
-    var pctAttr    = base === "total" ? "data-fn-rel-pct-total"   : "data-fn-rel-pct-aware";
-    var cntAttr    = base === "total" ? "data-fn-rel-count-total"  : "data-fn-rel-count-aware";
+    var base    = (panel.__fnState && panel.__fnState.relBase) || "aware";
+    var pctAttr = base === "total" ? "data-fn-rel-pct-total"  : "data-fn-rel-pct-aware";
+    var cntAttr = base === "total" ? "data-fn-rel-count-total" : "data-fn-rel-count-aware";
     table.querySelectorAll("td.ct-heatmap-cell[data-fn-att]").forEach(function(td) {
-      var pct   = parseFloat(td.getAttribute(pctAttr));
-      var cnt   = parseInt(td.getAttribute(cntAttr), 10);
-      var valEl = td.querySelector(".ct-val");
-      if (valEl && !isNaN(pct)) {
-        var pctStr = Math.round(pct * 100) + "%";
-        valEl.textContent = (showCount && !isNaN(cnt)) ? pctStr + " (n=" + cnt + ")" : pctStr;
-      }
+      var pct = parseFloat(td.getAttribute(pctAttr));
+      var cnt = parseInt(td.getAttribute(cntAttr), 10);
+      var valEl  = td.querySelector(".ct-val");
+      var freqEl = td.querySelector(".ct-freq");
+      if (valEl && !isNaN(pct)) valEl.textContent = Math.round(pct * 100) + "%";
+      if (freqEl && !isNaN(cnt)) freqEl.textContent = "n=" + cnt;
     });
-    if (panel.__fnState && panel.__fnState.tableShading === "heatmap") {
-      applyRelTableHeatmap(panel, pctAttr);
+    // Re-apply CI bands if currently active
+    var relShowCI = panel.querySelector('[data-fn-rel-showci]');
+    if (relShowCI && relShowCI.checked) {
+      table.querySelectorAll("td.ct-heatmap-cell[data-fn-att]").forEach(function(td) {
+        td.classList.remove("fn-ci-above", "fn-ci-within", "fn-ci-below");
+      });
+      applyRelTableCI(panel, pctAttr);
     }
+  }
+
+  function applyRelTableCI(panel, pctAttr) {
+    var table = panel.querySelector("[data-fn-rel-table]");
+    if (!table) return;
+    pctAttr = pctAttr || "data-fn-rel-pct-aware";
+    // Compute mean + 95% CI per attitude column from non-avg brand rows
+    var vals = {};
+    table.querySelectorAll("td.ct-heatmap-cell[data-fn-att]").forEach(function(td) {
+      if (td.classList.contains("fn-rel-td-avg")) return;
+      var att = td.getAttribute("data-fn-att");
+      var v   = parseFloat(td.getAttribute(pctAttr));
+      if (!att || isNaN(v)) return;
+      if (!vals[att]) vals[att] = [];
+      vals[att].push(v);
+    });
+    var ciBounds = {};
+    Object.keys(vals).forEach(function(att) {
+      var vs = vals[att];
+      if (vs.length < 2) return;
+      var mean = vs.reduce(function(a, b) { return a + b; }, 0) / vs.length;
+      var sd   = Math.sqrt(vs.reduce(function(a, v) {
+        return a + (v - mean) * (v - mean);
+      }, 0) / (vs.length - 1));
+      var se = sd / Math.sqrt(vs.length);
+      ciBounds[att] = { lower: mean - 1.96 * se, upper: mean + 1.96 * se };
+    });
+    table.querySelectorAll("td.ct-heatmap-cell[data-fn-att]").forEach(function(td) {
+      if (td.classList.contains("fn-rel-td-avg")) return;
+      var att  = td.getAttribute("data-fn-att");
+      var bnds = att && ciBounds[att];
+      if (!bnds) return;
+      var v = parseFloat(td.getAttribute(pctAttr));
+      if (isNaN(v)) return;
+      var cls = v > bnds.upper ? "fn-ci-above" : v < bnds.lower ? "fn-ci-below" : "fn-ci-within";
+      td.classList.add(cls);
+    });
+  }
+
+  function applyRelTableSigMarkers(panel) {
+    var table = panel.querySelector("[data-fn-rel-table]");
+    if (!table) return;
+    var pctAttr = "data-fn-rel-pct-aware";
+    var cntAttr = "data-fn-rel-count-aware";
+    // Get cat avg pct per att from the avg row (uses fn-rel-td-avg, not ct-heatmap-cell)
+    var avgPcts = {};
+    var avgRow = table.querySelector("tr.fn-row-avg-all");
+    if (avgRow) {
+      avgRow.querySelectorAll("td[data-fn-att]").forEach(function(td) {
+        var att = td.getAttribute("data-fn-att");
+        var v   = parseFloat(td.getAttribute(pctAttr));
+        if (att && !isNaN(v)) avgPcts[att] = v;
+      });
+    }
+    if (Object.keys(avgPcts).length === 0) return;
+    table.querySelectorAll("tr:not(.fn-row-avg-all):not(.fn-row-base)").forEach(function(row) {
+      row.querySelectorAll("td.ct-heatmap-cell[data-fn-att]").forEach(function(td) {
+        var valEl = td.querySelector(".ct-val");
+        if (!valEl) return;
+        // Remove old arrows
+        valEl.querySelectorAll(".fn-sig-avg").forEach(function(a) { a.remove(); });
+        var att   = td.getAttribute("data-fn-att");
+        var v     = parseFloat(td.getAttribute(pctAttr));
+        var cnt   = parseInt(td.getAttribute(cntAttr), 10);
+        var avg   = avgPcts[att];
+        if (isNaN(v) || isNaN(cnt) || avg == null || cnt <= 0) return;
+        var n   = cnt / v;  // reverse-compute aware_n from count = pct * n
+        if (n <= 0 || !isFinite(n)) return;
+        var se  = Math.sqrt(avg * (1 - avg) / n);
+        var sig = se > 0 && Math.abs(v - avg) > 1.96 * se;
+        if (!sig) return;
+        var dir  = v > avg ? "fn-sig-avg-up" : "fn-sig-avg-dn";
+        var arrow = v > avg ? "\u2191" : "\u2193";
+        var span = document.createElement("span");
+        span.className = "fn-sig-avg " + dir;
+        span.textContent = arrow;
+        valEl.appendChild(span);
+      });
+    });
   }
 
   function applyRelTableHeatmap(panel, pctAttr) {

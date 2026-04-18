@@ -491,13 +491,6 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
   text-shadow: 0 1px 2px rgba(0,0,0,0.3);
   padding: 0 4px;
 }
-.fn-rel-tail-labels {
-  display: flex; gap: 3px; align-items: center; flex-shrink: 0;
-}
-.fn-rel-pct-tail {
-  font-size: 11px; font-weight: 700;
-  white-space: nowrap; flex-shrink: 0;
-}
 /* Category average bar row */
 .fn-rel-bar-row-avg .fn-rel-bar-label {
   color: #64748b; font-style: italic; font-weight: 500;

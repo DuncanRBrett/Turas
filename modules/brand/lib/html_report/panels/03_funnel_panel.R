@@ -179,13 +179,7 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
     '<div class="fn-ctl-group"><span class="fn-ctl-label">Show brands</span>',
     sprintf('<div class="fn-chip-row col-chip-bar">%s</div></div>', chips_html),
 
-    # Table shading: segmented Off / Heatmap (default) / CI bands
-    '<div class="sig-level-switcher fn-shade-switcher" role="group" aria-label="Cell shading">',
-    '<span class="sig-level-label">Shade:</span>',
-    '<button type="button" class="sig-btn" data-fn-action="tableshading" data-fn-shade="off" aria-pressed="false">Off</button>',
-    '<button type="button" class="sig-btn sig-btn-active" data-fn-action="tableshading" data-fn-shade="heatmap" aria-pressed="true">Heatmap</button>',
-    '<button type="button" class="sig-btn" data-fn-action="tableshading" data-fn-shade="ci" aria-pressed="false">CI bands</button>',
-    '</div>',
+    '<label class="toggle-label"><input type="checkbox" data-fn-action="showci"> CI bands</label>',
     '<label class="toggle-label"><input type="checkbox" data-fn-action="showcounts"> Show count</label>',
     '<label class="toggle-label"><input type="checkbox" checked data-fn-action="showchart"> Show chart</label>',
 
