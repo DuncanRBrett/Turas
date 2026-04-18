@@ -287,6 +287,57 @@ test_that("config block carries chip picker defaults, conversion metric, show_co
 })
 
 
+# --- Brand colours tests -------------------------------------------------------
+
+.brand_list_with_colours <- function() {
+  data.frame(
+    BrandCode  = c("IPK", "ROB", "CART"),
+    BrandLabel = c("IPK", "Robertsons", "Cartwright"),
+    Colour     = c("#1A5276", "#C0392B", ""),   # CART left blank intentionally
+    stringsAsFactors = FALSE
+  )
+}
+
+test_that("brand_colours map contains only brands with valid hex colours set", {
+  result <- .run_fixture()
+  panel  <- build_funnel_panel_data(result, .brand_list_with_colours(), list())
+
+  colours <- panel$config$brand_colours
+  # IPK and ROB have colours; CART's blank entry must be absent
+  expect_equal(colours[["IPK"]],  "#1A5276")
+  expect_equal(colours[["ROB"]],  "#C0392B")
+  expect_null(colours[["CART"]])
+})
+
+
+test_that("brand_colours map is empty when no Colour column is present", {
+  result <- .run_fixture()
+  panel  <- build_funnel_panel_data(result, .brand_list(), list())
+
+  expect_equal(length(panel$config$brand_colours), 0L)
+})
+
+
+test_that("invalid hex values in Colour column are silently dropped with a warning", {
+  result  <- .run_fixture()
+  bl_bad  <- data.frame(
+    BrandCode  = c("IPK", "ROB", "CART"),
+    BrandLabel = c("IPK", "Robertsons", "Cartwright"),
+    Colour     = c("#1A5276", "not-a-colour", "#ZZZ123"),
+    stringsAsFactors = FALSE
+  )
+
+  panel <- expect_warning(
+    build_funnel_panel_data(result, bl_bad, list()),
+    regexp = "not a valid hex"
+  )
+  colours <- panel$config$brand_colours
+  expect_equal(colours[["IPK"]], "#1A5276")
+  expect_null(colours[["ROB"]])
+  expect_null(colours[["CART"]])
+})
+
+
 test_that("about carries canonical methodology, heavy-buyer pointer, and panel-disclosure notes", {
   result <- .run_fixture()
   panel <- build_funnel_panel_data(result, .brand_list(), list())

@@ -642,22 +642,29 @@ BRAND_CONFIG_VERSION <- "1.0"
          integer_range = c(1, 100)),
     list(name = "IsFocal", width = 12, required = TRUE,
          description = "Is this the focal (client) brand? Exactly one per category should be Y",
-         dropdown = c("Y", "N"))
+         dropdown = c("Y", "N")),
+    list(name = "Colour", width = 14, required = FALSE,
+         description = "Optional hex colour (#RRGGBB) for this brand in all charts and chips. Leave blank to use defaults.")
   )
 }
 
 .build_brands_examples <- function() {
   list(
     list(Category = "Frozen Vegetables", BrandCode = "IPK",
-         BrandLabel = "IPK", DisplayOrder = 1, IsFocal = "Y"),
+         BrandLabel = "IPK", DisplayOrder = 1, IsFocal = "Y",
+         Colour = "#1A5276"),
     list(Category = "Frozen Vegetables", BrandCode = "MCCAIN",
-         BrandLabel = "McCain", DisplayOrder = 2, IsFocal = "N"),
+         BrandLabel = "McCain", DisplayOrder = 2, IsFocal = "N",
+         Colour = ""),
     list(Category = "Frozen Vegetables", BrandCode = "FINDUS",
-         BrandLabel = "Findus", DisplayOrder = 3, IsFocal = "N"),
+         BrandLabel = "Findus", DisplayOrder = 3, IsFocal = "N",
+         Colour = ""),
     list(Category = "Ready Meals", BrandCode = "IPK",
-         BrandLabel = "IPK", DisplayOrder = 1, IsFocal = "Y"),
+         BrandLabel = "IPK", DisplayOrder = 1, IsFocal = "Y",
+         Colour = "#1A5276"),
     list(Category = "Ready Meals", BrandCode = "COMPA",
-         BrandLabel = "Competitor A", DisplayOrder = 2, IsFocal = "N")
+         BrandLabel = "Competitor A", DisplayOrder = 2, IsFocal = "N",
+         Colour = "")
   )
 }
 

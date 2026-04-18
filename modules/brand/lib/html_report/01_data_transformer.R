@@ -296,7 +296,7 @@ transform_brand_tables <- function(results, config) {
 #' @keywords internal
 transform_brand_panels <- function(results, config) {
   panels <- list()
-  focal_colour <- config$colour_focal %||% "#1A5276"
+  config_focal_colour <- config$colour_focal %||% "#1A5276"
 
   if (is.null(results$results$categories)) return(panels)
 
@@ -326,6 +326,10 @@ transform_brand_panels <- function(results, config) {
       cat_brands$BrandLabel <- cat_brands$BrandCode
     }
 
+    # Focal colour: brand's own Colour entry takes precedence over config default.
+    focal_colour <- .resolve_focal_colour(cat_brands, funnel$meta$focal_brand,
+                                          config_focal_colour)
+
     panel_data <- build_funnel_panel_data(funnel, cat_brands,
       config = list(category_label = cat_name,
                     wave_label = as.character(config$wave %||% ""),
@@ -340,4 +344,34 @@ transform_brand_panels <- function(results, config) {
     panels[[paste0("funnel_", cat_id)]] <- panel_html
   }
   panels
+}
+
+
+#' Resolve the focal brand's display colour.
+#'
+#' Priority: (1) brand's own Colour column in the Brands sheet, (2) the
+#' project-level colour_focal setting in Brand_Config.xlsx, (3) hardcoded
+#' Turas navy default.
+#'
+#' @param cat_brands Data frame. Brands for this category.
+#' @param focal_code Character. BrandCode of the focal brand.
+#' @param config_colour Character. Project-level fallback colour.
+#'
+#' @return Character. A validated hex colour string.
+#' @keywords internal
+.resolve_focal_colour <- function(cat_brands, focal_code, config_colour) {
+  default_colour <- "#1A5276"
+  if (is.null(focal_code) || is.na(focal_code)) {
+    return(config_colour %||% default_colour)
+  }
+  if (!is.null(cat_brands) && "Colour" %in% names(cat_brands)) {
+    focal_row <- cat_brands[cat_brands$BrandCode == focal_code, , drop = FALSE]
+    if (nrow(focal_row) > 0) {
+      col <- trimws(as.character(focal_row$Colour[1]))
+      if (nzchar(col) && grepl("^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$", col)) {
+        return(col)
+      }
+    }
+  }
+  config_colour %||% default_colour
 }
