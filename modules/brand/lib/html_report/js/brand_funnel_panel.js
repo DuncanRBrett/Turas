@@ -1283,6 +1283,54 @@
   }
 
   // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // Export relationship table to CSV
+  // ---------------------------------------------------------------------------
+  function exportRelTableCSV(panel) {
+    var table = panel.querySelector("[data-fn-rel-table]");
+    if (!table) return;
+    var hidden  = panel.__fnState.relHiddenBrands || new Set();
+    var base    = (panel.__fnState && panel.__fnState.relBase) || "aware";
+    var pctAttr = base === "total" ? "data-fn-rel-pct-total" : "data-fn-rel-pct-aware";
+    var rows    = [];
+
+    // Headers — strip sort indicator text
+    var headers = Array.from(table.querySelectorAll("thead th")).map(function(th) {
+      var clone = th.cloneNode(true);
+      var ind = clone.querySelector(".ct-sort-indicator");
+      if (ind) clone.removeChild(ind);
+      return '"' + clone.textContent.trim().replace(/"/g, '""') + '"';
+    });
+    rows.push(headers.join(","));
+
+    // Data rows
+    table.querySelectorAll("tbody tr").forEach(function(tr) {
+      if (tr.style.display === "none") return;
+      var brand = tr.getAttribute("data-fn-brand");
+      if (brand && hidden.has(brand)) return;
+      var cells = Array.from(tr.querySelectorAll("td")).map(function(td) {
+        var attRole = td.getAttribute("data-fn-att");
+        if (attRole) {
+          var pct = parseFloat(td.getAttribute(pctAttr));
+          return isNaN(pct) ? '""' : '"' + Math.round(pct * 100) + '%"';
+        }
+        return '"' + td.textContent.trim().replace(/"/g, '""') + '"';
+      });
+      rows.push(cells.join(","));
+    });
+
+    var csv  = "\ufeff" + rows.join("\r\n"); // BOM for Excel UTF-8
+    var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement("a");
+    a.href = url; a.download = "brand_relationship.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // ---------------------------------------------------------------------------
   // Pin dropdown — lists individually pinnable sections; calls TurasPin if
   // available, otherwise toggles a .fn-pinned outline as visual feedback.
   // ---------------------------------------------------------------------------
@@ -1296,17 +1344,32 @@
 
       var pd = panel.__fnData;
       var hasAI = pd && pd.meta && pd.meta.has_ai_insights;
-      var items = [
-        { label: "Table",        sel: ".fn-table-wrap" },
-        { label: "Slope chart",  sel: "[data-fn-view='slope']" },
-        { label: "Mini funnels", sel: "[data-fn-view='minifunnels']" },
-        { label: "Insights",     sel: ".fn-insight-strip" }
-      ];
+
+      // Detect active subtab
+      var activeSubtab = "funnel";
+      var activeBtn = panel.querySelector(".fn-subtab-btn.fn-subtab-active");
+      if (activeBtn) activeSubtab = activeBtn.getAttribute("data-fn-subtab-target") || "funnel";
+
+      var items;
+      if (activeSubtab === "relationship") {
+        items = [
+          { label: "Relationship table", sel: ".fn-rel-table-wrap" },
+          { label: "Relationship chart", sel: "[data-fn-rel-chart-area]" },
+          { label: "Insights",           sel: ".fn-insight-strip" }
+        ];
+      } else {
+        items = [
+          { label: "Table",        sel: ".fn-table-wrap" },
+          { label: "Slope chart",  sel: "[data-fn-view='slope']" },
+          { label: "Mini funnels", sel: "[data-fn-view='minifunnels']" },
+          { label: "Insights",     sel: ".fn-insight-strip" }
+        ];
+      }
       if (hasAI) items.push({ label: "AI insights", sel: ".fn-ai-insights" });
 
       var html = '<div class="fn-pin-dropdown" role="dialog" aria-label="Pin sections">' +
         '<div class="fn-pin-header">Pin sections</div>';
-      items.forEach(function(item, idx) {
+      items.forEach(function(item) {
         html += '<label class="fn-pin-item">' +
           '<input type="checkbox" class="fn-pin-chk" data-fn-pin-sel="' +
           item.sel.replace(/"/g, "&quot;") + '"> ' + item.label + '</label>';
@@ -1331,11 +1394,13 @@
       drop.querySelector(".fn-pin-save-btn").addEventListener("click", function() {
         var pd       = panel.__fnData;
         var catLabel = (pd && pd.meta && pd.meta.category_label) ||
-                       (pd && pd.meta && pd.meta.category_code) || "Brand Funnel";
-        var pctMode  = panel.__fnState.pctMode;
-        var baseNote = pctMode === "previous"
-          ? "Base: % of previous stage"
-          : "Base: % of total respondents";
+                       (pd && pd.meta && pd.meta.category_code) || "Brand";
+        var isRel    = (activeSubtab === "relationship");
+        var baseNote = isRel
+          ? "Base: % of aware respondents"
+          : (panel.__fnState.pctMode === "previous"
+              ? "Base: % of previous stage"
+              : "Base: % of total respondents");
         var focalName = "";
         if (pd && pd.table) {
           var codes = pd.table.brand_codes || [];
@@ -1349,11 +1414,10 @@
           var sel = chk.getAttribute("data-fn-pin-sel");
           var el  = panel.querySelector(sel);
           if (!el) return;
-
-          // Stamp pin metadata on the element so TurasPin (or the hub) can label it
-          el.setAttribute("data-pin-title",    "Brand Funnel \u2013 " + catLabel + " \u2013 " + sectionLabel);
-          el.setAttribute("data-pin-footnote",  baseNote + (focalName ? "; Focal: " + focalName : ""));
-
+          el.setAttribute("data-pin-title",
+            "Brand " + (isRel ? "Relationship" : "Funnel") + " \u2013 " + catLabel + " \u2013 " + sectionLabel);
+          el.setAttribute("data-pin-footnote",
+            baseNote + (focalName ? "; Focal: " + focalName : ""));
           if (window.TurasPin && window.TurasPin.pin) {
             window.TurasPin.pin(el);
           } else {
@@ -1373,11 +1437,11 @@
     "attitude.reject","attitude.no_opinion"
   ];
   var REL_SEG_COLORS = {
-    "attitude.love":       "#1A5276",
-    "attitude.prefer":     "#2E86C1",
-    "attitude.ambivalent": "#85C1E9",
-    "attitude.reject":     "#C0392B",
-    "attitude.no_opinion": "#94a3b8"
+    "attitude.love":       "#2E7D32",
+    "attitude.prefer":     "#81C784",
+    "attitude.ambivalent": "#F9A825",
+    "attitude.reject":     "#C62828",
+    "attitude.no_opinion": "#90A4AE"
   };
   var REL_SEG_LABELS = {
     "attitude.love":       "Love",
@@ -1389,33 +1453,88 @@
 
   function initRelChart(panel) {
     if (!panel.querySelector("[data-fn-rel-chart]")) return;
-    panel.__fnState.relEmphasis = "all";
-    panel.__fnState.relSort     = "desc";
-    panel.__fnState.relBase     = "aware";
+    panel.__fnState.relEmphasisSet  = new Set();
+    panel.__fnState.relBase         = "aware";
+    panel.__fnState.relSortCol      = "brand";
+    panel.__fnState.relSortDir      = "asc";
+    panel.__fnState.relHiddenBrands = new Set();
+    panel.__fnState.relShowChart    = true;
+    panel.__fnState.relShowCount    = false;
+    panel.__fnState.tableShading    = "off";
 
+    var pd = panel.__fnData;
+
+    // Apply brand colours to brand chips from pd.config.brand_colours
+    panel.querySelectorAll("[data-fn-rel-brand]").forEach(function(chip) {
+      var code = chip.getAttribute("data-fn-rel-brand");
+      if (code === "__avg__") return;
+      var color = (pd && pd.config && pd.config.brand_colours && pd.config.brand_colours[code])
+                  || resolveBrandColor(pd, panel.__fnState, code);
+      if (color) chip.style.setProperty("--brand-chip-color", color);
+    });
+
+    // Apply sentiment colours to emphasis chips
+    panel.querySelectorAll("[data-fn-rel-emphasis]").forEach(function(btn) {
+      var role = btn.getAttribute("data-fn-rel-emphasis");
+      var col  = REL_SEG_COLORS[role];
+      if (col) btn.style.setProperty("--seg-chip-color", col);
+    });
+
+    // Emphasis chips — multi-select; "All" chip clears set
     panel.querySelectorAll("[data-fn-rel-emphasis]").forEach(function(btn) {
       btn.addEventListener("click", function() {
         var role = btn.getAttribute("data-fn-rel-emphasis");
-        panel.__fnState.relEmphasis = role;
+        var eset = panel.__fnState.relEmphasisSet;
+        if (role === "all") {
+          eset.clear();
+        } else {
+          if (eset.has(role)) { eset.delete(role); } else { eset.add(role); }
+        }
         panel.querySelectorAll("[data-fn-rel-emphasis]").forEach(function(b) {
-          b.classList.toggle("active", b === btn);
+          var bRole = b.getAttribute("data-fn-rel-emphasis");
+          b.classList.toggle("active", bRole === "all" ? eset.size === 0 : eset.has(bRole));
         });
+        buildRelChart(panel);
+        updateRelHeadline(panel);
+      });
+    });
+
+    // Brand chips — toggle visibility in chart and table
+    panel.querySelectorAll("[data-fn-rel-brand]").forEach(function(chip) {
+      chip.addEventListener("click", function() {
+        var code   = chip.getAttribute("data-fn-rel-brand");
+        var hidden = panel.__fnState.relHiddenBrands;
+        if (hidden.has(code)) {
+          hidden.delete(code);
+          chip.classList.add("active");
+          chip.classList.remove("col-chip-off");
+        } else {
+          hidden.add(code);
+          chip.classList.remove("active");
+          chip.classList.add("col-chip-off");
+        }
+        applyRelBrandVis(panel);
+        buildRelChart(panel);
+        updateRelHeadline(panel);
+      });
+    });
+
+    // Column header sort
+    panel.querySelectorAll("[data-fn-rel-sortable]").forEach(function(th) {
+      th.addEventListener("click", function() {
+        var col    = th.getAttribute("data-fn-rel-sortable");
+        var curCol = panel.__fnState.relSortCol;
+        var curDir = panel.__fnState.relSortDir;
+        panel.__fnState.relSortCol = col;
+        panel.__fnState.relSortDir = (col === curCol)
+          ? (curDir === "desc" ? "asc" : "desc")
+          : (col === "brand" ? "asc" : "desc");
+        sortRelTable(panel);
         buildRelChart(panel);
       });
     });
 
-    panel.querySelectorAll("[data-fn-rel-sort]").forEach(function(btn) {
-      btn.addEventListener("click", function() {
-        panel.__fnState.relSort = btn.getAttribute("data-fn-rel-sort");
-        panel.querySelectorAll("[data-fn-rel-sort]").forEach(function(b) {
-          var on = b === btn;
-          b.classList.toggle("sig-btn-active", on);
-          b.setAttribute("aria-pressed", on ? "true" : "false");
-        });
-        buildRelChart(panel);
-      });
-    });
-
+    // Base toggle
     panel.querySelectorAll("[data-fn-rel-base]").forEach(function(btn) {
       btn.addEventListener("click", function() {
         panel.__fnState.relBase = btn.getAttribute("data-fn-rel-base");
@@ -1426,11 +1545,75 @@
         });
         buildRelChart(panel);
         applyRelTableBase(panel);
+        sortRelTable(panel);
       });
     });
 
+    // Table shading toggle (Off / Heatmap)
+    panel.querySelectorAll("[data-fn-rel-shade]").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        var mode = btn.getAttribute("data-fn-rel-shade");
+        panel.__fnState.tableShading = mode;
+        panel.querySelectorAll("[data-fn-rel-shade]").forEach(function(b) {
+          var on = b === btn;
+          b.classList.toggle("sig-btn-active", on);
+          b.setAttribute("aria-pressed", on ? "true" : "false");
+        });
+        if (mode === "off") {
+          panel.classList.add("fn-heatmap-off");
+          panel.querySelectorAll("[data-fn-rel-table] td.ct-heatmap-cell").forEach(function(td) {
+            td.style.backgroundColor = "";
+          });
+        } else {
+          panel.classList.remove("fn-heatmap-off");
+          var pctAttr = (panel.__fnState.relBase === "total")
+            ? "data-fn-rel-pct-total" : "data-fn-rel-pct-aware";
+          applyRelTableHeatmap(panel, pctAttr);
+        }
+      });
+    });
+
+    // Show count toggle (% only / % & n)
+    panel.querySelectorAll("[data-fn-rel-count]").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        var on = btn.getAttribute("data-fn-rel-count") === "on";
+        panel.__fnState.relShowCount = on;
+        panel.querySelectorAll("[data-fn-rel-count]").forEach(function(b) {
+          var active = b === btn;
+          b.classList.toggle("sig-btn-active", active);
+          b.setAttribute("aria-pressed", active ? "true" : "false");
+        });
+        applyRelTableBase(panel);
+      });
+    });
+
+    // Show/hide chart toggle
+    var chartToggleBtn = panel.querySelector("[data-fn-rel-chart-vis]");
+    if (chartToggleBtn) {
+      chartToggleBtn.addEventListener("click", function() {
+        var area = panel.querySelector("[data-fn-rel-chart-area]");
+        if (!area) return;
+        var showing = panel.__fnState.relShowChart;
+        panel.__fnState.relShowChart = !showing;
+        area.style.display = showing ? "none" : "";
+        chartToggleBtn.textContent = showing ? "Show chart" : "Hide chart";
+        chartToggleBtn.setAttribute("aria-pressed", showing ? "false" : "true");
+      });
+    }
+
+    // Export button
+    var exportBtn = panel.querySelector("[data-fn-rel-action='export']");
+    if (exportBtn) {
+      exportBtn.addEventListener("click", function() { exportRelTableCSV(panel); });
+    }
+
+    // Heatmap off by default
+    panel.classList.add("fn-heatmap-off");
+
     buildRelChart(panel);
     applyRelTableBase(panel);
+    sortRelTable(panel);
+    applyRelBrandVis(panel);
   }
 
   function relPct(brand, role, base, nTotal) {
@@ -1448,13 +1631,18 @@
     var pd = panel.__fnData;
     if (!pd || !pd.consideration_detail) { container.innerHTML = ""; return; }
 
-    var brands      = pd.consideration_detail.brands || [];
-    var focal       = panel.__fnState.focal;
-    var emphasis    = panel.__fnState.relEmphasis || "all";
-    var sortMode    = panel.__fnState.relSort     || "desc";
-    var base        = panel.__fnState.relBase     || "aware";
-    var nTotal      = pd.meta && (pd.meta.n_weighted || pd.meta.n_unweighted);
-    var useTotal    = (base === "total" && nTotal);
+    var allBrands = pd.consideration_detail.brands || [];
+    var hidden    = panel.__fnState.relHiddenBrands || new Set();
+    var brands    = allBrands.filter(function(b) { return !hidden.has(b.brand_code); });
+    var focal     = panel.__fnState.focal;
+    var emphSet   = panel.__fnState.relEmphasisSet || new Set();
+    var isAll     = emphSet.size === 0;
+    var sortCol   = panel.__fnState.relSortCol  || "brand";
+    var sortDir   = panel.__fnState.relSortDir  || "asc";
+    var base      = panel.__fnState.relBase     || "aware";
+    var nTotal    = pd.meta && (pd.meta.n_weighted || pd.meta.n_unweighted);
+    var useTotal  = (base === "total" && nTotal);
+    var showAvg   = !hidden.has("__avg__");
 
     var focalBrand = null, compBrands = [];
     brands.forEach(function(b) {
@@ -1462,109 +1650,145 @@
     });
 
     var sortedComps = compBrands.slice();
-    if (sortMode === "alpha") {
+    if (sortCol === "brand") {
       sortedComps.sort(function(a, b) {
-        return (a.brand_name || a.brand_code).localeCompare(b.brand_name || b.brand_code);
-      });
-    } else if (emphasis !== "all") {
-      sortedComps.sort(function(a, b) {
-        var av = relPct(a, emphasis, base, nTotal);
-        var bv = relPct(b, emphasis, base, nTotal);
-        return sortMode === "desc" ? bv - av : av - bv;
+        var an = (a.brand_name || a.brand_code).toLowerCase();
+        var bn = (b.brand_name || b.brand_code).toLowerCase();
+        return sortDir === "asc" ? an.localeCompare(bn) : bn.localeCompare(an);
       });
     } else {
       sortedComps.sort(function(a, b) {
-        var at = REL_SEG_ROLES.reduce(function(s, r) { return s + relPct(a, r, base, nTotal); }, 0);
-        var bt = REL_SEG_ROLES.reduce(function(s, r) { return s + relPct(b, r, base, nTotal); }, 0);
-        return sortMode === "desc" ? bt - at : at - bt;
+        var av = relPct(a, sortCol, base, nTotal);
+        var bv = relPct(b, sortCol, base, nTotal);
+        return sortDir === "desc" ? bv - av : av - bv;
       });
     }
 
-    var ordered = focalBrand ? [focalBrand].concat(sortedComps) : sortedComps;
+    // Cat avg segments (computed across ALL brands for consistency)
+    var avgSegments = null;
+    if (showAvg && allBrands.length > 0) {
+      avgSegments = {};
+      REL_SEG_ROLES.forEach(function(role) {
+        var vals = allBrands.map(function(b) { return relPct(b, role, base, nTotal); });
+        avgSegments[role] = vals.reduce(function(s, v) { return s + v; }, 0) / vals.length;
+      });
+    }
 
+    // Max bar total for proportional track widths (total-base mode only)
     var maxBarTotal = 0;
     if (useTotal) {
-      ordered.forEach(function(b) {
+      var checkRows = (focalBrand ? [focalBrand] : []).concat(sortedComps);
+      checkRows.forEach(function(b) {
         var t = REL_SEG_ROLES.reduce(function(s, r) { return s + relPct(b, r, base, nTotal); }, 0);
         if (t > maxBarTotal) maxBarTotal = t;
       });
+      if (avgSegments) {
+        var at = REL_SEG_ROLES.reduce(function(s, r) { return s + (avgSegments[r] || 0); }, 0);
+        if (at > maxBarTotal) maxBarTotal = at;
+      }
     }
 
-    var html = '<div class="fn-rel-chart-inner">';
-
-    ordered.forEach(function(brand) {
-      var isFocal = brand.brand_code === focal;
-      var rowCls  = "fn-rel-bar-row" + (isFocal ? " fn-rel-bar-row-focal" : "");
-      var labelHtml = escapeAttr(brand.brand_name || brand.brand_code);
-      if (isFocal) labelHtml += ' <span class="fn-focal-badge">FOCAL</span>';
-
-      var totalPct = REL_SEG_ROLES.reduce(function(s, r) {
-        return s + relPct(brand, r, base, nTotal);
-      }, 0);
-
-      // "% aware" → bars always 100% wide (composition view)
-      // "% total" → bar width proportional to awareness rate (relative to max)
+    // Render one horizontal bar row
+    function renderRow(brandCode, segs, rowCls, labelHtml) {
+      var totalPct = REL_SEG_ROLES.reduce(function(s, r) { return s + (segs[r] || 0); }, 0);
       var trackFlex = useTotal
         ? (maxBarTotal > 0 ? (totalPct / maxBarTotal).toFixed(4) : "0")
         : "1";
 
-      html += '<div class="' + rowCls + '" data-fn-brand="' + escapeAttr(brand.brand_code) + '">';
-      html += '<div class="fn-rel-bar-label">' + labelHtml + '</div>';
-      html += '<div class="fn-rel-bar-area">';
-      html += '<div class="fn-rel-bar-track" style="flex:' + trackFlex + ' ' + trackFlex + ' 0%;">';
-
-      var emphPct = null;
+      var segHtml  = "";
+      var tailItems = [];
 
       REL_SEG_ROLES.forEach(function(role) {
-        var pct      = relPct(brand, role, base, nTotal);
+        var pct      = segs[role] || 0;
         var widthPct = totalPct > 0 ? (pct / totalPct) * 100 : 0;
-        var isEmph   = (emphasis === "all" || emphasis === role);
+        var isEmph   = isAll || emphSet.has(role);
         var color    = isEmph ? REL_SEG_COLORS[role] : "rgba(148,163,184,0.18)";
-        var showLbl  = emphasis !== "all" && emphasis === role;
-        if (showLbl) emphPct = { pct: pct, widthPct: widthPct };
+        var insideLbl = "";
 
-        var insideLbl = (showLbl && widthPct > 9)
-          ? '<span class="fn-rel-seg-label-inside">' + Math.round(pct * 100) + '%</span>'
-          : '';
-        html += '<div class="fn-rel-seg" data-fn-role="' + escapeAttr(role) +
+        if (isEmph && pct > 0) {
+          if (widthPct >= 8) {
+            insideLbl = '<span class="fn-rel-seg-label-inside">' + Math.round(pct * 100) + '%</span>';
+          } else {
+            tailItems.push({ pct: pct, color: REL_SEG_COLORS[role] });
+          }
+        }
+
+        segHtml += '<div class="fn-rel-seg" data-fn-role="' + escapeAttr(role) +
           '" style="width:' + widthPct.toFixed(2) + '%;background:' + color + ';">' +
           insideLbl + '</div>';
       });
 
-      html += '</div>'; // track
-
-      if (emphPct && emphPct.widthPct <= 9) {
-        html += '<div class="fn-rel-pct-tail">' + Math.round(emphPct.pct * 100) + '%</div>';
+      var tailHtml = "";
+      if (tailItems.length > 0) {
+        tailHtml = '<div class="fn-rel-tail-labels">';
+        tailItems.forEach(function(t) {
+          tailHtml += '<span class="fn-rel-pct-tail" style="color:' + t.color + ';">' +
+            Math.round(t.pct * 100) + '%</span>';
+        });
+        tailHtml += '</div>';
       }
 
-      html += '</div></div>'; // area + row
+      return '<div class="' + rowCls + '" data-fn-brand="' + escapeAttr(brandCode) + '">' +
+        '<div class="fn-rel-bar-label">' + labelHtml + '</div>' +
+        '<div class="fn-rel-bar-area">' +
+        '<div class="fn-rel-bar-track" style="flex:' + trackFlex + ' ' + trackFlex + ' 0%;">' +
+        segHtml + '</div>' + tailHtml +
+        '</div></div>';
+    }
+
+    var html = '<div class="fn-rel-chart-inner">';
+
+    // Focal brand first
+    if (focalBrand) {
+      var fSegs = {};
+      REL_SEG_ROLES.forEach(function(r) { fSegs[r] = relPct(focalBrand, r, base, nTotal); });
+      var fLbl = escapeAttr(focalBrand.brand_name || focalBrand.brand_code) + ' <span class="fn-focal-badge">FOCAL</span>';
+      html += renderRow(focalBrand.brand_code, fSegs, "fn-rel-bar-row fn-rel-bar-row-focal", fLbl);
+    }
+
+    // Cat avg (if visible)
+    if (avgSegments) {
+      html += renderRow("__avg__", avgSegments, "fn-rel-bar-row fn-rel-bar-row-avg", "<em>Cat avg</em>");
+    }
+
+    // Competitors
+    sortedComps.forEach(function(brand) {
+      var bSegs = {};
+      REL_SEG_ROLES.forEach(function(r) { bSegs[r] = relPct(brand, r, base, nTotal); });
+      html += renderRow(brand.brand_code, bSegs, "fn-rel-bar-row", escapeAttr(brand.brand_name || brand.brand_code));
     });
 
     // Legend
     html += '<div class="fn-rel-legend">';
     REL_SEG_ROLES.forEach(function(role) {
-      var isEmph = (emphasis === "all" || emphasis === role);
+      var isEmph = isAll || emphSet.has(role);
       var color  = isEmph ? REL_SEG_COLORS[role] : "rgba(148,163,184,0.30)";
       html += '<div class="fn-rel-legend-item">' +
         '<div class="fn-rel-legend-swatch" style="background:' + color + '"></div>' +
         '<span>' + escapeAttr(REL_SEG_LABELS[role]) + '</span></div>';
     });
-    html += '</div></div>'; // legend + chart-inner
+    html += '</div></div>';
 
     container.innerHTML = html;
-    updateRelHeadline(panel, emphasis, base, nTotal);
+    updateRelHeadline(panel);
   }
 
-  function updateRelHeadline(panel, emphasis, base, nTotal) {
+  function updateRelHeadline(panel) {
     var hdEl = panel.querySelector("[data-fn-rel-headline]");
     if (!hdEl) return;
-    if (emphasis === "all") { hdEl.style.display = "none"; return; }
+    var emphSet = panel.__fnState.relEmphasisSet || new Set();
+    // Only show headline when exactly one segment is emphasised
+    if (emphSet.size !== 1) { hdEl.style.display = "none"; return; }
+    var emphasis = emphSet.values().next().value;
 
     var pd = panel.__fnData;
     if (!pd || !pd.consideration_detail) return;
-    var brands = pd.consideration_detail.brands || [];
-    var focal  = panel.__fnState.focal;
-    if (!nTotal) nTotal = pd.meta && (pd.meta.n_weighted || pd.meta.n_unweighted);
+    var allBrands = pd.consideration_detail.brands || [];
+    var hidden    = panel.__fnState.relHiddenBrands || new Set();
+    var brands    = allBrands.filter(function(b) { return !hidden.has(b.brand_code); });
+    var focal     = panel.__fnState.focal;
+    var base      = panel.__fnState.relBase || "aware";
+    var nTotal    = pd.meta && (pd.meta.n_weighted || pd.meta.n_unweighted);
 
     var brandPcts = brands
       .map(function(b) { return { brand: b, pct: relPct(b, emphasis, base, nTotal) }; })
@@ -1576,45 +1800,112 @@
     var sorted = brandPcts.slice().sort(function(a, b) { return b.pct - a.pct; });
     var top    = sorted[0];
 
-    var topStr     = Math.round(top.pct * 100) + "%";
-    var avgStr     = Math.round(catAvg * 100) + "%";
-    var ratio      = catAvg > 0 ? top.pct / catAvg : null;
-    var roleName   = REL_SEG_LABELS[emphasis] || emphasis;
-    var brandName  = escapeAttr(top.brand.brand_name || top.brand.brand_code);
-    var isFocalTop = top.brand.brand_code === focal;
+    var topStr    = Math.round(top.pct * 100) + "%";
+    var avgStr    = Math.round(catAvg * 100) + "%";
+    var ratio     = catAvg > 0 ? top.pct / catAvg : null;
+    var roleName  = REL_SEG_LABELS[emphasis] || emphasis;
+    var brandName = escapeAttr(top.brand.brand_name || top.brand.brand_code);
 
     var prefix;
     if (emphasis === "attitude.reject") {
       prefix = "<strong>" + brandName + "</strong> has the highest active rejection";
-    } else if (isFocalTop) {
+    } else if (top.brand.brand_code === focal) {
       prefix = "<strong>" + brandName + "</strong> leads on <em>" + roleName + "</em>";
     } else {
       prefix = "<strong>" + brandName + "</strong> has the highest <em>" + roleName + "</em>";
     }
 
     var suffix = " at <strong>" + topStr + "</strong>";
-    if (ratio != null && ratio >= 1.5) {
-      suffix += " \u2014 " + ratio.toFixed(1) + "\u00D7 the category average (" + avgStr + ")";
-    } else {
-      suffix += " (category avg: " + avgStr + ")";
-    }
+    suffix += (ratio != null && ratio >= 1.5)
+      ? " \u2014 " + ratio.toFixed(1) + "\u00D7 the category average (" + avgStr + ")"
+      : " (category avg: " + avgStr + ")";
 
     hdEl.innerHTML = '<div class="fn-rel-headline-text">' + prefix + suffix + '</div>';
     hdEl.style.display = "";
   }
 
+  function sortRelTable(panel) {
+    var table = panel.querySelector("[data-fn-rel-table]");
+    if (!table) return;
+    var tbody = table.querySelector("tbody");
+    if (!tbody) return;
+
+    var col  = panel.__fnState.relSortCol || "brand";
+    var dir  = panel.__fnState.relSortDir || "asc";
+    var base = panel.__fnState.relBase    || "aware";
+    var attr = base === "total" ? "data-fn-rel-pct-total" : "data-fn-rel-pct-aware";
+
+    var focalRow = tbody.querySelector("tr.fn-row-focal");
+    var avgRow   = tbody.querySelector("tr.fn-row-avg-all");
+    var compRows = Array.from(tbody.querySelectorAll("tr.fn-row-competitor"));
+
+    compRows.sort(function(a, b) {
+      if (col === "brand") {
+        var aLbl = a.querySelector(".ct-label-col");
+        var bLbl = b.querySelector(".ct-label-col");
+        var an   = (aLbl ? aLbl.textContent.trim() : a.getAttribute("data-fn-brand") || "").toLowerCase();
+        var bn   = (bLbl ? bLbl.textContent.trim() : b.getAttribute("data-fn-brand") || "").toLowerCase();
+        return dir === "asc" ? an.localeCompare(bn) : bn.localeCompare(an);
+      } else {
+        var aCell = a.querySelector('td[data-fn-att="' + col + '"]');
+        var bCell = b.querySelector('td[data-fn-att="' + col + '"]');
+        var av    = aCell ? parseFloat(aCell.getAttribute(attr)) : -1;
+        var bv    = bCell ? parseFloat(bCell.getAttribute(attr)) : -1;
+        if (isNaN(av)) av = -1; if (isNaN(bv)) bv = -1;
+        return dir === "desc" ? bv - av : av - bv;
+      }
+    });
+
+    // Rebuild tbody: focal → avg → sorted competitors
+    var frag = document.createDocumentFragment();
+    if (focalRow) frag.appendChild(focalRow);
+    if (avgRow)   frag.appendChild(avgRow);
+    compRows.forEach(function(r) { frag.appendChild(r); });
+    tbody.appendChild(frag);
+
+    // Update sort indicator icons
+    panel.querySelectorAll("[data-fn-rel-sort-ind]").forEach(function(el) {
+      var c = el.getAttribute("data-fn-rel-sort-ind");
+      if (c === col) {
+        el.textContent = dir === "desc" ? "\u2193" : "\u2191";
+        el.setAttribute("data-fn-sort-dir", dir);
+      } else {
+        el.textContent = "\u2195";
+        el.setAttribute("data-fn-sort-dir", "");
+      }
+    });
+  }
+
+  function applyRelBrandVis(panel) {
+    var table = panel.querySelector("[data-fn-rel-table]");
+    if (!table) return;
+    var hidden = panel.__fnState.relHiddenBrands || new Set();
+    table.querySelectorAll("tr[data-fn-brand]").forEach(function(row) {
+      row.style.display = hidden.has(row.getAttribute("data-fn-brand")) ? "none" : "";
+    });
+    // Category avg row controlled by __avg__ chip
+    var avgRow = table.querySelector("tr.fn-row-avg-all");
+    if (avgRow) avgRow.style.display = hidden.has("__avg__") ? "none" : "";
+  }
+
   function applyRelTableBase(panel) {
     var table = panel.querySelector("[data-fn-rel-table]");
     if (!table) return;
-    var base  = (panel.__fnState && panel.__fnState.relBase) || "aware";
-    var attr  = base === "total" ? "data-fn-rel-pct-total" : "data-fn-rel-pct-aware";
+    var base       = (panel.__fnState && panel.__fnState.relBase) || "aware";
+    var showCount  = panel.__fnState && panel.__fnState.relShowCount;
+    var pctAttr    = base === "total" ? "data-fn-rel-pct-total"   : "data-fn-rel-pct-aware";
+    var cntAttr    = base === "total" ? "data-fn-rel-count-total"  : "data-fn-rel-count-aware";
     table.querySelectorAll("td.ct-heatmap-cell[data-fn-att]").forEach(function(td) {
-      var pct   = parseFloat(td.getAttribute(attr));
+      var pct   = parseFloat(td.getAttribute(pctAttr));
+      var cnt   = parseInt(td.getAttribute(cntAttr), 10);
       var valEl = td.querySelector(".ct-val");
-      if (valEl && !isNaN(pct)) valEl.textContent = Math.round(pct * 100) + "%";
+      if (valEl && !isNaN(pct)) {
+        var pctStr = Math.round(pct * 100) + "%";
+        valEl.textContent = (showCount && !isNaN(cnt)) ? pctStr + " (n=" + cnt + ")" : pctStr;
+      }
     });
-    if (panel.__fnState && panel.__fnState.tableShading !== "off") {
-      applyRelTableHeatmap(panel, attr);
+    if (panel.__fnState && panel.__fnState.tableShading === "heatmap") {
+      applyRelTableHeatmap(panel, pctAttr);
     }
   }
 

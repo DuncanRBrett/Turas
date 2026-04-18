@@ -73,10 +73,16 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
 
   paste0(
     '<section class="fn-section fn-rel-chart-section">',
-    .fn_rel_controls(),
+    .fn_rel_controls(ordered, focal),
     .fn_rel_table_v2(ordered, focal, focal_colour, n_total),
     '<div class="fn-rel-headline" data-fn-rel-headline style="display:none;margin-top:14px;"></div>',
+    '<div class="fn-rel-chart-area" data-fn-rel-chart-area>',
+    '<div class="fn-rel-chart-controls col-chip-bar">',
+    '<span class="sig-level-label" style="flex-shrink:0;">Emphasise:</span>',
+    .fn_rel_emphasis_chips(),
+    '</div>',
     '<div class="fn-rel-chart" data-fn-rel-chart></div>',
+    '</div>',
     .fn_add_insight_strip(),
     '</section>'
   )
@@ -87,38 +93,72 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
 # INTERNAL: RELATIONSHIP CONTROLS BAR
 # ==============================================================================
 
-.fn_rel_controls <- function() {
+.fn_rel_controls <- function(ordered, focal) {
+  brand_chips <- paste(vapply(ordered, function(b) {
+    code   <- as.character(b$brand_code)
+    name   <- b$brand_name %||% b$brand_code
+    is_foc <- identical(code, as.character(focal))
+    label  <- if (is_foc) paste0(.fn_esc(name), ' <span class="fn-focal-badge">FOCAL</span>')
+               else .fn_esc(name)
+    sprintf('<button type="button" class="col-chip fn-rel-brand-chip active" data-fn-rel-brand="%s">%s</button>',
+            .fn_esc(code), label)
+  }, character(1)), collapse = "")
+
+  # Category average chip
+  avg_chip <- '<button type="button" class="col-chip fn-rel-brand-chip fn-rel-avg-chip active" data-fn-rel-brand="__avg__">Cat avg</button>'
+
+  paste0(
+    '<div class="fn-rel-controls">',
+    # Brand chips row (including cat avg)
+    '<div class="fn-rel-brand-row col-chip-bar">',
+    '<span class="sig-level-label" style="flex-shrink:0;">Brands:</span>',
+    brand_chips,
+    avg_chip,
+    '</div>',
+    # Meta row: base, shading, count, chart toggle, export
+    '<div class="fn-rel-meta-row">',
+    '<div class="sig-level-switcher" role="group" aria-label="Percentage base">',
+    '<span class="sig-level-label">Base:</span>',
+    '<button type="button" class="sig-btn sig-btn-active" data-fn-rel-base="aware" aria-pressed="true">% aware</button>',
+    '<button type="button" class="sig-btn" data-fn-rel-base="total" aria-pressed="false">% total</button>',
+    '</div>',
+    '<div class="sig-level-switcher" role="group" aria-label="Table shading">',
+    '<span class="sig-level-label">Shading:</span>',
+    '<button type="button" class="sig-btn sig-btn-active" data-fn-rel-shade="off" aria-pressed="true">Off</button>',
+    '<button type="button" class="sig-btn" data-fn-rel-shade="heatmap" aria-pressed="false">Heatmap</button>',
+    '</div>',
+    '<div class="sig-level-switcher" role="group" aria-label="Show counts">',
+    '<span class="sig-level-label">Counts:</span>',
+    '<button type="button" class="sig-btn sig-btn-active" data-fn-rel-count="off" aria-pressed="true">%</button>',
+    '<button type="button" class="sig-btn" data-fn-rel-count="on" aria-pressed="false">% &amp; n</button>',
+    '</div>',
+    '<div class="fn-rel-meta-actions">',
+    '<button type="button" class="fn-rel-chart-toggle-btn" data-fn-rel-chart-vis="on" aria-pressed="true">Hide chart</button>',
+    '<button type="button" class="export-btn fn-rel-export-btn" data-fn-rel-action="export" title="Export table to CSV">',
+    '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="flex-shrink:0;"><path d="M6 1v7M3 6l3 3 3-3M1 10h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    ' Export',
+    '</button>',
+    '</div>',
+    '</div>',
+    '</div>'
+  )
+}
+
+
+# ==============================================================================
+# INTERNAL: EMPHASIS CHIPS (rendered in chart area)
+# ==============================================================================
+
+.fn_rel_emphasis_chips <- function() {
   seg_labels <- c(All = "all", Love = "attitude.love", Prefer = "attitude.prefer",
                   Ambivalent = "attitude.ambivalent", Reject = "attitude.reject",
                   `No opinion` = "attitude.no_opinion")
-  chips <- paste(vapply(seq_along(seg_labels), function(i) {
+  paste(vapply(seq_along(seg_labels), function(i) {
     nm     <- names(seg_labels)[i]
     active <- if (nm == "All") " active" else ""
     sprintf('<button type="button" class="col-chip fn-rel-seg-chip%s" data-fn-rel-emphasis="%s">%s</button>',
             active, seg_labels[[i]], .fn_esc(nm))
   }, character(1)), collapse = "")
-
-  paste0(
-    '<div class="fn-rel-controls">',
-    '<div class="fn-rel-emphasis-row col-chip-bar">',
-    '<span class="col-chip-label">Emphasise:</span>',
-    chips,
-    '</div>',
-    '<div class="fn-rel-meta-row">',
-    '<div class="sig-level-switcher fn-rel-sort-group" role="group" aria-label="Sort brands">',
-    '<span class="sig-level-label">Sort:</span>',
-    '<button type="button" class="sig-btn sig-btn-active" data-fn-rel-sort="desc" aria-pressed="true">\u2193 High first</button>',
-    '<button type="button" class="sig-btn" data-fn-rel-sort="asc" aria-pressed="false">\u2191 Low first</button>',
-    '<button type="button" class="sig-btn" data-fn-rel-sort="alpha" aria-pressed="false">A\u2013Z</button>',
-    '</div>',
-    '<div class="sig-level-switcher fn-rel-base-group" role="group" aria-label="Percentage base">',
-    '<span class="sig-level-label">Base:</span>',
-    '<button type="button" class="sig-btn sig-btn-active" data-fn-rel-base="aware" aria-pressed="true">% aware</button>',
-    '<button type="button" class="sig-btn" data-fn-rel-base="total" aria-pressed="false">% total</button>',
-    '</div>',
-    '</div>',
-    '</div>'
-  )
 }
 
 
@@ -152,13 +192,15 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
   names(att_max) <- att_roles
 
   att_ths <- paste(vapply(seq_along(att_labels), function(i)
-    sprintf('<th class="ct-th ct-data-col fn-rel-th-att" data-fn-att="%s">%s</th>',
-            .fn_esc(att_roles[i]), .fn_esc(att_labels[i])),
+    sprintf(
+      '<th class="ct-th ct-data-col fn-rel-th-att fn-rel-th-sortable" data-fn-rel-sortable="%s" data-fn-att="%s" style="cursor:pointer;">%s<button class="ct-sort-indicator" data-fn-rel-sort-ind="%s" aria-label="Sort by %s">\u2195</button></th>',
+      .fn_esc(att_roles[i]), .fn_esc(att_roles[i]), .fn_esc(att_labels[i]),
+      .fn_esc(att_roles[i]), .fn_esc(att_labels[i])),
     character(1)), collapse = "")
 
   header <- paste0(
     '<thead><tr>',
-    '<th class="ct-th ct-label-col" style="text-align:left;min-width:160px;">Brand</th>',
+    '<th class="ct-th ct-label-col fn-rel-th-sortable" data-fn-rel-sortable="brand" style="text-align:left;min-width:160px;cursor:pointer;">Brand<button class="ct-sort-indicator" data-fn-rel-sort-ind="brand" aria-label="Sort by brand">\u2195</button></th>',
     '<th class="ct-th ct-data-col" style="min-width:70px;">Base</th>',
     att_ths,
     '</tr></thead>'
@@ -180,8 +222,14 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
     '</tr>'
   )
 
-  brand_rows <- paste(vapply(ordered, function(b)
-    .fn_rel_brand_row_v2(b, att_roles, att_max, focal, n_total),
+  focal_rows <- paste(vapply(
+    Filter(function(b) identical(as.character(b$brand_code), as.character(focal)), ordered),
+    function(b) .fn_rel_brand_row_v2(b, att_roles, att_max, focal, n_total),
+    character(1)), collapse = "")
+
+  comp_rows <- paste(vapply(
+    Filter(function(b) !identical(as.character(b$brand_code), as.character(focal)), ordered),
+    function(b) .fn_rel_brand_row_v2(b, att_roles, att_max, focal, n_total),
     character(1)), collapse = "")
 
   paste0(
@@ -189,8 +237,9 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
     '<table class="ct-table fn-ct-table fn-rel-table-v2" data-fn-rel-table="1">',
     header,
     '<tbody>',
+    focal_rows,
     avg_row,
-    brand_rows,
+    comp_rows,
     '</tbody></table></div>'
   )
 }
@@ -230,12 +279,16 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
     frac  <- min(1, max(0, pct_aware / denom))
     hm    <- sprintf("rgba(37,99,171,%.3f)", 0.08 + frac * 0.57)
 
-    total_attr <- if (is.finite(pct_total))
+    total_attr     <- if (is.finite(pct_total))
       sprintf(' data-fn-rel-pct-total="%.6f"', pct_total) else ""
+    count_aware    <- if (is.finite(aware_n))
+      sprintf(' data-fn-rel-count-aware="%d"', as.integer(round(pct_aware * aware_n))) else ""
+    count_total    <- if (is.finite(pct_total) && is.finite(n_total))
+      sprintf(' data-fn-rel-count-total="%d"', as.integer(round(pct_total * n_total))) else ""
 
     sprintf(
-      '<td class="ct-td ct-data-col ct-heatmap-cell%s" data-heatmap="%s" data-fn-att="%s" data-fn-rel-pct-aware="%.6f"%s><span class="ct-val">%.0f%%</span></td>',
-      focal_cls, hm, .fn_esc(role), pct_aware, total_attr, 100 * pct_aware)
+      '<td class="ct-td ct-data-col ct-heatmap-cell%s" data-heatmap="%s" data-fn-att="%s" data-fn-rel-pct-aware="%.6f"%s%s%s><span class="ct-val">%.0f%%</span></td>',
+      focal_cls, hm, .fn_esc(role), pct_aware, total_attr, count_aware, count_total, 100 * pct_aware)
   }, character(1)), collapse = "")
 
   sprintf('<tr class="%s" data-fn-brand="%s">%s%s%s</tr>',

@@ -377,11 +377,64 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
   margin-bottom: 14px;
   display: flex; flex-direction: column; gap: 8px;
 }
-.fn-rel-emphasis-row.col-chip-bar {
+.fn-rel-brand-row.col-chip-bar {
   display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
 }
 .fn-rel-meta-row {
   display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+}
+.fn-rel-meta-actions {
+  display: flex; align-items: center; gap: 6px; margin-left: auto;
+}
+/* Chart toggle button — standalone rounded */
+.fn-rel-chart-toggle-btn {
+  font-size: 11px; font-weight: 500; padding: 5px 10px;
+  border: 1px solid #e2e8f0; border-radius: 4px;
+  background: #fff; color: #475569; cursor: pointer;
+  font-family: inherit; line-height: 1.4; transition: background 0.1s;
+  white-space: nowrap;
+}
+.fn-rel-chart-toggle-btn:hover { background: #e2e8f0; }
+/* Export button */
+.fn-rel-export-btn {
+  white-space: nowrap;
+}
+/* Brand chips — colour-coded via CSS custom property */
+.col-chip-bar .fn-rel-brand-chip {
+  border-color: var(--brand-chip-color, #e2e8f0) !important;
+}
+.col-chip-bar .fn-rel-brand-chip.active {
+  background: var(--brand-chip-color, #475569) !important;
+  border-color: var(--brand-chip-color, #475569) !important;
+  color: #fff !important; opacity: 1 !important;
+  text-decoration: none !important;
+}
+/* Cat avg chip */
+.col-chip-bar .fn-rel-avg-chip.active {
+  background: #64748b !important;
+  border-color: #64748b !important;
+  color: #fff !important;
+}
+/* Emphasis chips — sentiment colour via CSS custom property */
+.col-chip-bar .fn-rel-seg-chip {
+  border-color: var(--seg-chip-color, #e2e8f0) !important;
+}
+.col-chip-bar .fn-rel-seg-chip.active {
+  background: var(--seg-chip-color, #475569) !important;
+  border-color: var(--seg-chip-color, #475569) !important;
+  color: #fff !important; opacity: 1 !important;
+}
+/* "All" chip — neutral slate */
+.col-chip-bar .fn-rel-seg-chip[data-fn-rel-emphasis="all"].active {
+  background: #475569 !important;
+  border-color: #475569 !important;
+}
+/* Chart area wrapper (show/hide target) */
+.fn-rel-chart-area { margin-top: 14px; }
+/* Emphasis chips row inside chart area */
+.fn-rel-chart-controls {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin-bottom: 10px;
 }
 
 /* Headline */
@@ -438,9 +491,19 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
   text-shadow: 0 1px 2px rgba(0,0,0,0.3);
   padding: 0 4px;
 }
+.fn-rel-tail-labels {
+  display: flex; gap: 3px; align-items: center; flex-shrink: 0;
+}
 .fn-rel-pct-tail {
-  font-size: 12px; font-weight: 700; color: #334155;
-  white-space: nowrap; flex-shrink: 0; min-width: 34px;
+  font-size: 11px; font-weight: 700;
+  white-space: nowrap; flex-shrink: 0;
+}
+/* Category average bar row */
+.fn-rel-bar-row-avg .fn-rel-bar-label {
+  color: #64748b; font-style: italic; font-weight: 500;
+}
+.fn-rel-bar-row-avg .fn-rel-bar-track {
+  height: 20px; opacity: 0.82;
 }
 
 /* Legend */
