@@ -122,7 +122,7 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
     '<button type="button" class="sig-btn sig-btn-active" data-fn-rel-base="aware" aria-pressed="true">% aware</button>',
     '<button type="button" class="sig-btn" data-fn-rel-base="total" aria-pressed="false">% total</button>',
     '</div>',
-    '<label class="toggle-label"><input type="checkbox" data-fn-rel-showci> CI bands</label>',
+    '<label class="toggle-label"><input type="checkbox" data-fn-rel-showci> Show heatmap</label>',
     '<label class="toggle-label"><input type="checkbox" data-fn-rel-showcounts> Show count</label>',
     '<label class="toggle-label"><input type="checkbox" checked data-fn-rel-showchart> Show chart</label>',
     '<button type="button" class="export-btn fn-rel-export-btn" data-fn-rel-action="export" title="Export table to CSV">',

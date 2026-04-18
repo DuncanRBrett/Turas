@@ -168,10 +168,8 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
   focal <- pd$meta$focal_brand_code %||% brand_codes[1]
 
   chips_html <- paste(vapply(seq_along(brand_codes), function(i) {
-    active <- brand_codes[i] == focal || length(brand_codes) <= 6
-    cls <- if (active) "col-chip" else "col-chip col-chip-off"
-    sprintf('<button type="button" class="%s" data-fn-scope="table" data-fn-brand="%s">%s</button>',
-            cls, .fn_esc(brand_codes[i]), .fn_esc(brand_names[i]))
+    sprintf('<button type="button" class="col-chip" data-fn-scope="table" data-fn-brand="%s">%s</button>',
+            .fn_esc(brand_codes[i]), .fn_esc(brand_names[i]))
   }, character(1)), collapse = "")
 
   paste0(
@@ -179,7 +177,7 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
     '<div class="fn-ctl-group"><span class="fn-ctl-label">Show brands</span>',
     sprintf('<div class="fn-chip-row col-chip-bar">%s</div></div>', chips_html),
 
-    '<label class="toggle-label"><input type="checkbox" data-fn-action="showci"> CI bands</label>',
+    '<label class="toggle-label"><input type="checkbox" data-fn-action="showci"> Show heatmap</label>',
     '<label class="toggle-label"><input type="checkbox" data-fn-action="showcounts"> Show count</label>',
     '<label class="toggle-label"><input type="checkbox" checked data-fn-action="showchart"> Show chart</label>',
 

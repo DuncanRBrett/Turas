@@ -52,15 +52,21 @@
       chartBrands: {},
       sort: { col: "brand", dir: "asc" }
     };
-    // Default chip state: table all on, chart only focal on; cat avg off
+    // Default chip state: all brands on in table and chart; cat avg off
     var allBrands = (payload.table && payload.table.brand_codes) || [];
     for (var i = 0; i < allBrands.length; i++) {
       panel.__fnState.tableBrands[allBrands[i]] = true;
-      panel.__fnState.chartBrands[allBrands[i]] =
-        (allBrands[i] === panel.__fnState.focal);
+      panel.__fnState.chartBrands[allBrands[i]] = true;
     }
     panel.__fnState.chartBrands["__avg__"] = false; // cat avg chip off by default
     bindControls(panel);
+    // Apply brand colours to funnel table/chart chip buttons
+    panel.querySelectorAll('button[data-fn-scope][data-fn-brand]').forEach(function(btn) {
+      var code = btn.getAttribute('data-fn-brand');
+      if (code === '__avg__') return;
+      var color = resolveBrandColor(payload, panel.__fnState, code);
+      if (color) btn.style.setProperty('--brand-chip-color', color);
+    });
     applySortIndicators(panel);
     applyTableVisibility(panel);
     applyChartVisibility(panel);
@@ -334,6 +340,36 @@
       }
       if (focalRow && avgRow && focalRow.nextSibling !== avgRow) {
         tbody.insertBefore(avgRow, focalRow.nextSibling);
+      }
+    }
+
+    // Update relationship table: swap focal/competitor classes, badge, cell highlight, row order
+    var relTable = panel.querySelector("[data-fn-rel-table]");
+    if (relTable) {
+      var relTbody = relTable.querySelector("tbody") || relTable;
+      // Swap row classes and clear old FOCAL badges from rel table rows only
+      relTable.querySelectorAll("tr[data-fn-brand]").forEach(function(row) {
+        var isFocal = row.getAttribute("data-fn-brand") === code;
+        row.classList.toggle("fn-row-focal", isFocal);
+        row.classList.toggle("fn-row-competitor", !isFocal);
+        var lbl = row.querySelector(".ct-label-col");
+        if (lbl) {
+          lbl.querySelectorAll(".fn-focal-badge").forEach(function(b) { b.remove(); });
+          if (isFocal) lbl.insertAdjacentHTML("beforeend", ' <span class="fn-focal-badge">FOCAL</span>');
+        }
+        // Swap fn-rel-td-focal on data cells
+        row.querySelectorAll("td[data-fn-att]").forEach(function(td) {
+          td.classList.toggle("fn-rel-td-focal", isFocal);
+        });
+      });
+      // Move focal row to top (above avg row)
+      var relFocal = relTbody.querySelector("tr.fn-row-focal");
+      var relAvg   = relTbody.querySelector("tr.fn-row-avg-all");
+      if (relFocal && relTbody.firstChild !== relFocal) {
+        relTbody.insertBefore(relFocal, relTbody.firstChild);
+      }
+      if (relFocal && relAvg && relFocal.nextSibling !== relAvg) {
+        relTbody.insertBefore(relAvg, relFocal.nextSibling);
       }
     }
     // Ensure new focal is always on in chart/mini-funnels; update its chip UI
@@ -1673,7 +1709,7 @@
         var color    = isEmph ? REL_SEG_COLORS[role] : "rgba(148,163,184,0.18)";
         var insideLbl = "";
 
-        if (isEmph && pct > 0 && widthPct >= 5) {
+        if (isEmph && pct > 0 && widthPct >= 2) {
           insideLbl = '<span class="fn-rel-seg-label-inside">' + Math.round(pct * 100) + '%</span>';
         }
 
