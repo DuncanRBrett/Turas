@@ -52,7 +52,6 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
     .fn_rows_competitors(stage_keys, brand_codes, brand_names, focal,
                          table$cells, col_max),
     '</tbody></table></div>',
-    .fn_add_insight_strip(),
     '</section>'
   )
 }

@@ -66,8 +66,13 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
       .fn_table_controls(panel_data),
       .fn_table_section(panel_data, focal_colour),
       '<div class="fn-chart-wrap-outer">',
-        .fn_chart_section(panel_data, focal_colour),
+        .fn_chart_header(panel_data),
+        '<div class="fn-chart-view" data-fn-view="slope">',
+          .fn_chart_section(panel_data, focal_colour),
+        '</div>',
+        '<div class="fn-chart-view fn-mini-funnels-view" data-fn-view="minifunnels" hidden></div>',
       '</div>',
+      .fn_add_insight_strip(),
     '</div>',
     '<div class="fn-subtab" data-fn-subtab="relationship" hidden>',
       .fn_relationship_section(panel_data, focal_colour),
@@ -277,6 +282,33 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
 # ==============================================================================
 # INTERNAL: SECTION SLOTS (populated by table + chart helpers)
 # ==============================================================================
+
+.fn_chart_header <- function(pd) {
+  brand_codes <- pd$config$chip_picker$all_brands %||%
+    (pd$table$brand_codes %||% character(0))
+  brand_names <- pd$table$brand_names %||% brand_codes
+  focal <- pd$meta$focal_brand_code %||% brand_codes[1]
+
+  chips_html <- paste(vapply(seq_along(brand_codes), function(i) {
+    active <- brand_codes[i] == focal
+    cls <- if (active) "col-chip" else "col-chip col-chip-off"
+    sprintf('<button type="button" class="%s" data-fn-scope="chart" data-fn-brand="%s">%s</button>',
+            cls, .fn_esc(brand_codes[i]), .fn_esc(brand_names[i]))
+  }, character(1)), collapse = "")
+
+  paste0(
+    '<div class="fn-chart-header">',
+    '<div class="fn-chart-type-switcher sig-level-switcher" role="group" aria-label="Chart type">',
+    '<button type="button" class="sig-btn sig-btn-active" data-fn-action="chartview"',
+    ' data-fn-chartview="slope" aria-pressed="true">Slope</button>',
+    '<button type="button" class="sig-btn" data-fn-action="chartview"',
+    ' data-fn-chartview="minifunnels" aria-pressed="false">Mini Funnels</button>',
+    '</div>',
+    '<div class="fn-chart-brand-chips col-chip-bar">', chips_html, '</div>',
+    '</div>'
+  )
+}
+
 
 .fn_table_section <- function(pd, focal_colour) {
   build_funnel_table_section(pd, focal_colour)

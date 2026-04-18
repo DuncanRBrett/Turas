@@ -397,11 +397,62 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 .fn-sig-down { color: #c0392b; background: rgba(192,57,43,0.1); }
 
 /* -------------------------------------------------------------------------- */
+/* Show-chart toggle                                                          */
+/* -------------------------------------------------------------------------- */
+.fn-panel.fn-hide-chart .fn-chart-wrap-outer { display: none; }
+
+/* -------------------------------------------------------------------------- */
+/* Chart header — type switcher + chart brand chips                           */
+/* -------------------------------------------------------------------------- */
+.fn-chart-header {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 0 8px; border-bottom: 1px solid #f0f2f5; margin-bottom: 10px;
+}
+.fn-chart-type-switcher { flex-shrink: 0; }
+.fn-chart-brand-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* -------------------------------------------------------------------------- */
 /* Slope chart + relationship                                                 */
 /* -------------------------------------------------------------------------- */
 .fn-chart-wrap { background: #fff; border: 1px solid #e2e8f0;
   border-radius: 8px; padding: 14px; }
 .fn-slope-svg { display: block; max-width: 100%; height: auto; }
+
+/* -------------------------------------------------------------------------- */
+/* Mini funnels                                                                */
+/* -------------------------------------------------------------------------- */
+.fn-mini-funnels-view {
+  display: flex; flex-wrap: wrap; gap: 12px; padding: 8px 0;
+  align-items: flex-start;
+}
+.fn-mini-funnel {
+  flex: 0 0 auto; min-width: 140px; max-width: 200px;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+  padding: 12px 12px 10px;
+}
+.fn-mini-funnel.fn-mf-focal {
+  border: 2px solid var(--fn-brand);
+}
+.fn-mf-title {
+  font-size: 11px; font-weight: 700; color: #1e293b; text-align: center;
+  margin-bottom: 10px; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fn-mf-stages { display: flex; flex-direction: column; gap: 5px; }
+.fn-mf-stage { display: flex; flex-direction: column; align-items: center; }
+.fn-mf-bar-bg {
+  width: 100%; background: #f1f5f9; border-radius: 3px; height: 18px;
+  display: flex; justify-content: center; overflow: hidden;
+}
+.fn-mf-bar {
+  height: 100%; border-radius: 3px; display: flex; align-items: center;
+  justify-content: center; font-size: 9px; font-weight: 700; color: #fff;
+  transition: width 0.35s ease;
+}
+.fn-mf-label {
+  font-size: 9px; color: #94a3b8; text-align: center; margin-top: 2px;
+}
+.fn-mf-pct { font-weight: 600; color: #475569; }
 
 .fn-relationship-section .fn-seg-picker { margin-bottom: 12px; }
 .fn-relationship-bars { background: #fff; border: 1px solid #e2e8f0;

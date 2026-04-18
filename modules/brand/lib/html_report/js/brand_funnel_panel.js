@@ -155,9 +155,15 @@
       panel.classList.toggle("fn-hide-chart", !showChart.checked);
     });
 
-    panel.querySelectorAll('[data-fn-action="chartview"]').forEach(function(r){
-      r.addEventListener("change", function(){
-        panel.__fnState.chartView = r.value;
+    panel.querySelectorAll('[data-fn-action="chartview"]').forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var view = btn.getAttribute("data-fn-chartview");
+        panel.__fnState.chartView = view;
+        panel.querySelectorAll('[data-fn-action="chartview"]').forEach(function(b){
+          var active = b === btn;
+          b.classList.toggle("sig-btn-active", active);
+          b.setAttribute("aria-pressed", active ? "true" : "false");
+        });
         applyChartView(panel);
       });
     });
@@ -361,14 +367,77 @@
   // Chart visibility — JS redraws competitor lines when chips toggle
   // ---------------------------------------------------------------------------
   function applyChartVisibility(panel) {
-    rebuildChart(panel);
+    if (panel.__fnState.chartView === "minifunnels") buildMiniFunnels(panel);
+    else rebuildChart(panel);
   }
 
   function applyChartView(panel) {
-    var wrap = panel.querySelector(".fn-chart-wrap");
-    if (!wrap) return;
-    wrap.setAttribute("data-fn-chart", panel.__fnState.chartView);
-    rebuildChart(panel);
+    var view = panel.__fnState.chartView;
+    panel.querySelectorAll(".fn-chart-view").forEach(function(el){
+      el.hidden = el.getAttribute("data-fn-view") !== view;
+    });
+    if (view === "minifunnels") buildMiniFunnels(panel);
+    else rebuildChart(panel);
+  }
+
+  function buildMiniFunnels(panel) {
+    var view = panel.querySelector(".fn-mini-funnels-view");
+    if (!view) return;
+    var pd = panel.__fnData;
+    if (!pd || !pd.table) { view.innerHTML = ""; return; }
+
+    var stageKeys   = pd.table.stage_keys   || [];
+    var stageLabels = pd.table.stage_labels || stageKeys;
+    var brandCodes  = pd.table.brand_codes  || [];
+    var brandNames  = pd.table.brand_names  || brandCodes;
+    var cells       = pd.table.cells        || [];
+    var focal       = panel.__fnState.focal;
+    var chartBrands = panel.__fnState.chartBrands || {};
+    var focalColour = pd.focal_colour || "#1A5276";
+    var pctMode     = panel.__fnState.pctMode;
+
+    var cellMap = {};
+    for (var ci = 0; ci < cells.length; ci++) {
+      var c = cells[ci];
+      if (!cellMap[c.brand_code]) cellMap[c.brand_code] = {};
+      cellMap[c.brand_code][c.stage_key] = c;
+    }
+
+    var html = "";
+    for (var bi = 0; bi < brandCodes.length; bi++) {
+      var code = brandCodes[bi];
+      if (chartBrands[code] === false) continue;
+      var name    = brandNames[bi] || code;
+      var isFocal = code === focal;
+      var color   = isFocal ? focalColour : "#94a3b8";
+
+      html += '<div class="fn-mini-funnel' + (isFocal ? " fn-mf-focal" : "") + '">';
+      html += '<div class="fn-mf-title">' + escapeAttr(name);
+      if (isFocal) html += ' <span class="fn-focal-badge">FOCAL</span>';
+      html += "</div>";
+      html += '<div class="fn-mf-stages">';
+
+      for (var si = 0; si < stageKeys.length; si++) {
+        var k     = stageKeys[si];
+        var lbl   = stageLabels[si] || k;
+        var cell  = cellMap[code] && cellMap[code][k];
+        var pct   = cell ? (pctMode === "previous" && cell.pct_nested != null
+                            ? cell.pct_nested : cell.pct_absolute) : null;
+        var barW  = pct != null ? Math.max(6, Math.round(pct * 100)) : 0;
+        var pctStr = pct != null ? Math.round(pct * 100) + "%" : "\u2014";
+
+        html += '<div class="fn-mf-stage">';
+        html += '<div class="fn-mf-bar-bg">';
+        html += '<div class="fn-mf-bar" style="width:' + barW + '%;background:' + color + ';">';
+        if (barW > 22) html += pctStr;
+        html += "</div></div>";
+        html += '<div class="fn-mf-label">' + escapeAttr(lbl);
+        html += ' <span class="fn-mf-pct">' + pctStr + "</span></div>";
+        html += "</div>";
+      }
+      html += "</div></div>";
+    }
+    view.innerHTML = html;
   }
 
   function rebuildChart(panel) {
