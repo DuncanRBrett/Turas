@@ -57,9 +57,8 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
             panel_id, focal_colour, excel_attr),
     sprintf('<script type="application/json" class="fn-panel-data">%s</script>',
             json_payload),
-    .fn_title_card(panel_data),
-    .fn_focus_bar(panel_data),
     .fn_sub_tabs(),
+    .fn_focus_bar(panel_data),
     '<div class="fn-subtab" data-fn-subtab="summary">',
       .fn_cards_section(panel_data, focal_colour),
     '</div>',
@@ -143,6 +142,10 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
     '<div class="fn-focus-bar">
        <label class="fn-ctl-label">Focal brand</label>
        <select class="fn-focus-select" data-fn-action="focus">%s</select>
+       <div class="fn-focus-actions">
+         <button type="button" class="fn-pin-btn pin-btn" title="Pin this panel" aria-label="Pin">\U0001F4CC</button>
+         <button type="button" class="export-btn fn-export-btn" data-fn-action="export" title="Export to Excel">\u2B73 Export \u25BE</button>
+       </div>
      </div>',
     focus_options)
 }

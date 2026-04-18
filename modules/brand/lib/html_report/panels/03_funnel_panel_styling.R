@@ -65,7 +65,7 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 
 .fn-subnav {
   display: flex; gap: 0; border-bottom: 1px solid #e2e8f0;
-  margin-bottom: 14px;
+  margin-bottom: 0;
 }
 .fn-subtab-btn {
   padding: 8px 16px; background: transparent; border: none;
@@ -78,6 +78,7 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
   color: var(--fn-brand);
   border-bottom-color: var(--fn-brand);
 }
+.fn-subtab { padding-top: 14px; }
 .fn-subtab[hidden] { display: none; }
 
 /* -------------------------------------------------------------------------- */
@@ -85,10 +86,10 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 /* -------------------------------------------------------------------------- */
 .fn-focus-bar {
   display: flex; align-items: center; gap: 10px;
-  padding: 8px 14px; background: #f8fafc;
-  border: 1px solid #e2e8f0; border-radius: 8px;
-  margin-bottom: 8px;
+  padding: 10px 0; border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 0;
 }
+.fn-focus-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .fn-ctl-label {
   font-size: 11px; font-weight: 600; color: #64748b;
   text-transform: uppercase; letter-spacing: 0.6px;
@@ -252,7 +253,7 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 .fn-panel .ct-low-base-dim .ct-val { opacity: 0.5; color: #c0392b; }
 
 /* Primary value — uniform dark, never overridden by heatmap background */
-.fn-panel .ct-val { font-weight: 600; font-size: 13px; color: #1e293b !important; }
+.fn-panel .ct-val { font-weight: 600; font-size: 13px; color: #0f172a !important; }
 .fn-panel .ct-freq {
   display: none; font-size: 10px; color: #94a3b8; margin-top: 2px;
 }

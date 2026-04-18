@@ -49,7 +49,7 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
 build_br_header <- function(config) {
   brand <- config$colour_focal %||% "#1A5276"
   sprintf('
-<div class="br-header" style="background:linear-gradient(135deg,%s 0%%,%s 100%%);color:#fff;padding:20px 32px;border-radius:0 0 12px 12px;">
+<div class="br-header" style="background:%s;color:#fff;padding:20px 32px;border-radius:0 0 12px 12px;">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;">
     <div>
       <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.5px;opacity:0.7;margin-bottom:4px;">Turas Brand Health</div>
@@ -77,7 +77,7 @@ build_br_header <- function(config) {
     <span>%s</span>
   </div>
 </div>',
-    brand, adjustcolor(brand, offset = c(0.15, 0.15, 0.15, 0)),
+    brand,
     .br_esc(config$report_title %||% "Brand Health Report"),
     .br_esc(config$report_subtitle %||% ""),
     .br_esc(config$client_name %||% ""),
@@ -267,14 +267,16 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
     section_id <- paste0(el, "-", cat_id)
     parts <- c(parts, sprintf('<div class="br-subpanel%s" data-group="%s" data-subpanel="%s">',
                                 active, cat_id, el))
+    chart_key <- paste0(el, "_", cat_id)
     parts <- c(parts, sprintf('<div class="br-element-section" id="section-%s" data-section="%s">',
                                 section_id, section_id))
-    parts <- c(parts, build_br_section_toolbar(section_id))
+    if (is.null(panels[[chart_key]])) {
+      parts <- c(parts, build_br_section_toolbar(section_id))
+    }
 
     # If a dedicated panel HTML was emitted (funnel — role-registry
     # architecture), render that instead of the generic charts+tables
     # block. Falls back to the legacy chart/table rendering otherwise.
-    chart_key <- paste0(el, "_", cat_id)
     if (!is.null(panels[[chart_key]])) {
       parts <- c(parts, panels[[chart_key]])
     } else {
