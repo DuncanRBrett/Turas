@@ -424,12 +424,21 @@ calculate_cep_penetration <- function(respondent_cep_matrix, cep_codes,
 #'   \item{n_ceps}{Integer}
 #'   \item{n_brands}{Integer}
 #'
+#' @param attribute_linkage Optional list from
+#'   \code{build_cep_linkage_from_matrix()} treating attribute codes as
+#'   stimuli. When supplied, \code{run_mental_availability()} additionally
+#'   computes an attribute x brand matrix (see §Brand Attributes).
+#' @param attribute_labels Data frame with AttrCode + AttrText columns.
+#'   Used to look up display text for attribute rows.
+#'
 #' @export
 run_mental_availability <- function(linkage, cep_labels = NULL,
                                     focal_brand = NULL,
                                     weights = NULL,
                                     run_cep_turf = TRUE,
-                                    turf_max_items = 10) {
+                                    turf_max_items = 10,
+                                    attribute_linkage = NULL,
+                                    attribute_labels = NULL) {
 
   warnings <- character(0)
 
@@ -542,6 +551,47 @@ run_mental_availability <- function(linkage, cep_labels = NULL,
     } else NA_real_
   )
 
+  # --- Brand image attribute matrix (optional) ---
+  attr_matrix  <- NULL
+  attr_labels_out <- NULL
+  n_attrs <- 0L
+  if (!is.null(attribute_linkage) &&
+      length(attribute_linkage$linkage_tensor) > 0) {
+    attr_codes <- attribute_linkage$cep_codes  # (reused field name)
+    # Align tensor's brand order to the CEP brand order where possible so
+    # both matrices share the same column layout.
+    brand_order <- brand_codes
+    if (!setequal(names(attribute_linkage$linkage_tensor), brand_order)) {
+      warnings <- c(warnings,
+        "Attribute matrix brand set differs from CEP matrix; rendering on intersection")
+      brand_order <- intersect(brand_order,
+                                names(attribute_linkage$linkage_tensor))
+      attribute_linkage$linkage_tensor <-
+        attribute_linkage$linkage_tensor[brand_order]
+    } else {
+      attribute_linkage$linkage_tensor <-
+        attribute_linkage$linkage_tensor[brand_order]
+    }
+    attr_matrix <- calculate_cep_brand_matrix(
+      attribute_linkage$linkage_tensor, attr_codes, weights
+    )
+    # Rename the first column from CEPCode to AttrCode for clarity
+    names(attr_matrix)[1] <- "AttrCode"
+    attr_labels_out <- if (!is.null(attribute_labels) &&
+                           "AttrText" %in% names(attribute_labels)) {
+      data.frame(
+        AttrCode = attr_codes,
+        AttrText = attribute_labels$AttrText[
+          match(attr_codes, attribute_labels$AttrCode)],
+        stringsAsFactors = FALSE
+      )
+    } else {
+      data.frame(AttrCode = attr_codes, AttrText = attr_codes,
+                 stringsAsFactors = FALSE)
+    }
+    n_attrs <- length(attr_codes)
+  }
+
   status <- if (length(warnings) > 0) "PARTIAL" else "PASS"
 
   list(
@@ -552,10 +602,13 @@ run_mental_availability <- function(linkage, cep_labels = NULL,
     cep_brand_matrix = cep_matrix,
     cep_penetration = cep_pen,
     cep_turf = cep_turf,
+    attribute_brand_matrix = attr_matrix,
+    attribute_labels = attr_labels_out,
     metrics_summary = metrics_summary,
     warnings = warnings,
     n_respondents = n_resp,
     n_ceps = length(cep_codes),
+    n_attrs = n_attrs,
     n_brands = length(brand_codes)
   )
 }

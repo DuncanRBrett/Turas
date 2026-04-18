@@ -310,13 +310,34 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
           stringsAsFactors = FALSE
         )
 
+        # Brand image attributes (optional — same matrix shape as CEP)
+        attr_linkage <- NULL
+        if (!is.null(cat_attrs) && nrow(cat_attrs) > 0) {
+          attr_linkage <- tryCatch(
+            build_cep_linkage_from_matrix(
+              data, cat_attrs$AttrCode, cat_brands$BrandCode
+            ),
+            error = function(e) {
+              warnings_list <<- c(warnings_list,
+                sprintf("MA attribute matrix failed for %s: %s",
+                        cat_name, e$message))
+              NULL
+            }
+          )
+        }
+
         cat_result$mental_availability <- run_mental_availability(
           linkage = linkage,
           cep_labels = cep_labels_mapped,
           focal_brand = config$focal_brand,
           weights = weights,
           run_cep_turf = isTRUE(config$element_cep_turf),
-          turf_max_items = min(10, length(cep_col_codes))
+          turf_max_items = min(10, length(cep_col_codes)),
+          attribute_linkage = attr_linkage,
+          attribute_labels = if (!is.null(cat_attrs) && nrow(cat_attrs) > 0)
+            data.frame(AttrCode = cat_attrs$AttrCode,
+                       AttrText = cat_attrs$AttrText,
+                       stringsAsFactors = FALSE) else NULL
         )
       }
     }

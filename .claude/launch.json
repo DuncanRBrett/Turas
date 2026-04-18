@@ -42,6 +42,12 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "8771", "--directory", "/tmp"],
       "port": 8771
+    },
+    {
+      "name": "brand-ma-sample",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8772", "--directory", "/Users/duncan/Dev/Turas/tmp_sample_ma_html"],
+      "port": 8772
     }
   ]
 }

@@ -343,6 +343,79 @@ transform_brand_panels <- function(results, config) {
                                           excel_filename = xlsx_name)
     panels[[paste0("funnel_", cat_id)]] <- panel_html
   }
+
+  # --- Mental Availability panels (per category) ---
+  if (exists("build_ma_panel_data", mode = "function") &&
+      exists("build_ma_panel_html", mode = "function")) {
+    for (cat_name in names(results$results$categories)) {
+      cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
+      cr <- results$results$categories[[cat_name]]
+      ma <- cr$mental_availability
+      if (is.null(ma) || identical(ma$status, "REFUSED")) next
+      if (is.null(ma$cep_brand_matrix)) next
+
+      cat_brands <- if (!is.null(brand_list_all) &&
+                         "Category" %in% names(brand_list_all)) {
+        brand_list_all[brand_list_all$Category == cat_name, , drop = FALSE]
+      } else if (!is.null(brand_list_all)) brand_list_all else
+        data.frame(BrandCode = setdiff(names(ma$cep_brand_matrix), "CEPCode"),
+                   stringsAsFactors = FALSE)
+      if (!("BrandLabel" %in% names(cat_brands))) {
+        cat_brands$BrandLabel <- cat_brands$BrandCode
+      }
+
+      # Awareness per brand (for the "% aware" base toggle on CEPs)
+      awareness_by_brand <- NULL
+      if (!is.null(cr$funnel) && !is.null(cr$funnel$stages) &&
+          nrow(cr$funnel$stages) > 0) {
+        aw <- cr$funnel$stages[cr$funnel$stages$stage_key == "aware", , drop = FALSE]
+        pct_col <- if ("pct_weighted" %in% names(aw)) "pct_weighted" else
+                   if ("pct_absolute" %in% names(aw)) "pct_absolute" else NA_character_
+        if (nrow(aw) > 0 && !is.na(pct_col)) {
+          awareness_by_brand <- stats::setNames(
+            as.numeric(aw[[pct_col]]) * 100, as.character(aw$brand_code))
+        }
+      }
+
+      cep_list <- if (!is.null(results$structure) &&
+                      !is.null(results$structure$ceps)) {
+        ceps_all <- results$structure$ceps
+        if ("Category" %in% names(ceps_all))
+          ceps_all[ceps_all$Category == cat_name, , drop = FALSE]
+        else ceps_all
+      } else data.frame(CEPCode = character(), CEPText = character(),
+                        stringsAsFactors = FALSE)
+
+      attr_list <- if (!is.null(results$structure) &&
+                       !is.null(results$structure$attributes)) {
+        at_all <- results$structure$attributes
+        if (nrow(at_all) > 0 && "Category" %in% names(at_all))
+          at_all[at_all$Category == cat_name, , drop = FALSE]
+        else at_all
+      } else NULL
+
+      focal_colour <- .resolve_focal_colour(cat_brands, config$focal_brand,
+                                            config_focal_colour)
+
+      ma_pd <- build_ma_panel_data(
+        ma_result = ma,
+        brand_list = cat_brands,
+        cep_list = cep_list,
+        attribute_list = attr_list,
+        awareness_by_brand = awareness_by_brand,
+        config = list(
+          category_label = cat_name,
+          wave_label = as.character(config$wave %||% ""),
+          focal_brand_code = config$focal_brand,
+          focal_colour = focal_colour))
+
+      ma_html <- build_ma_panel_html(ma_pd,
+                                      category_code = cat_id,
+                                      focal_colour = focal_colour)
+      panels[[paste0("ma_", cat_id)]] <- ma_html
+    }
+  }
+
   panels
 }
 

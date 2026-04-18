@@ -1,0 +1,890 @@
+/* ==========================================================================
+   Brand Mental Availability Panel — interactivity
+   ==========================================================================
+   Features:
+   - Sub-tab switch (Attributes / CEPs / Metrics)
+   - Focal brand change, persisted across panels via a CustomEvent on window
+   - Brand chips (toggle visibility), chip colouring from brand palette
+   - Heatmap modes: CI bands (default) / diverging vs cat avg / off
+   - Base mode: % total / % aware (both stim tabs)
+   - Row grey-out toggle (checkbox on row label) — greyed rows dim in table
+     and drop out of the bar chart
+   - Show chart toggle + inline SVG bar chart (one bar per visible brand,
+     grouped per active attribute/CEP, bars coloured to match chips)
+   - Column sort
+   - Client-side .xls export
+   - Pin dropdown → window.TurasPin.pin()
+   - Full-width editable insight box (persists in sessionStorage)
+   ========================================================================== */
+
+(function () {
+  if (window.__BRAND_MA_PANEL_INIT__) return;
+  window.__BRAND_MA_PANEL_INIT__ = true;
+
+  var FOCAL_EVENT = 'turas:brand-focal-change';
+  var FOCAL_STORAGE_KEY = 'turas.brand.focal';
+
+  function onReady(fn) {
+    if (document.readyState !== 'loading') fn();
+    else document.addEventListener('DOMContentLoaded', fn);
+  }
+
+  // -------------------------------------------------------------- helpers
+  function escAttr(s) {
+    if (s == null) return '';
+    return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function escHtml(s) { return escAttr(s); }
+
+  function readPayload(panel) {
+    var el = panel.querySelector('script.ma-panel-data');
+    if (!el) return null;
+    try { return JSON.parse(el.textContent || '{}'); }
+    catch (e) { return null; }
+  }
+
+  function hexToRgba(hex, alpha) {
+    if (!hex) return 'rgba(100,116,139,' + alpha + ')';
+    if (hex[0] === '#') hex = hex.slice(1);
+    if (hex.length === 3) hex = hex.split('').map(function (c) { return c + c; }).join('');
+    if (hex.length < 6) return 'rgba(100,116,139,' + alpha + ')';
+    var r = parseInt(hex.slice(0, 2), 16);
+    var g = parseInt(hex.slice(2, 4), 16);
+    var b = parseInt(hex.slice(4, 6), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+  }
+
+  function getBrandColour(pd, code) {
+    if (!code) return '#94a3b8';
+    if (pd.config && pd.config.brand_colours && pd.config.brand_colours[code])
+      return pd.config.brand_colours[code];
+    if (code === (pd.meta && pd.meta.focal_brand_code))
+      return pd.config.focal_colour || pd.focal_colour || '#1A5276';
+    var palette = ['#4e79a7','#f28e2b','#e15759','#76b7b2','#59a14f',
+                   '#edc948','#b07aa1','#ff9da7','#9c755f','#bab0ac'];
+    var idx = (pd.config.brand_codes || []).indexOf(code);
+    if (idx < 0) idx = 0;
+    return palette[idx % palette.length];
+  }
+
+  function getBrandName(pd, code) {
+    var codes = (pd.config && pd.config.brand_codes) || [];
+    var names = (pd.config && pd.config.brand_names) || [];
+    var idx = codes.indexOf(code);
+    return idx < 0 ? code : (names[idx] || code);
+  }
+
+  // -------------------------------------------------------------- init
+  onReady(function () {
+    document.querySelectorAll('.ma-panel').forEach(function (panel) {
+      initPanel(panel);
+    });
+
+    // Cross-panel focal sync: listen for the custom event, update this
+    // panel's focal when a sibling (funnel/other MA) changes. Also
+    // updates any funnel panel in the same category.
+    window.addEventListener(FOCAL_EVENT, function (ev) {
+      var d = ev.detail || {};
+      if (!d.code) return;
+
+      // Update MA panels
+      document.querySelectorAll('.ma-panel').forEach(function (panel) {
+        var pd = panel.__maData;
+        if (!pd) return;
+        if (d.category != null && pd.meta && pd.meta.category_label &&
+            String(d.category) !== String(pd.meta.category_label)) return;
+        if (d.source === panel) return;
+        var sel = panel.querySelector('.ma-focus-select');
+        if (sel && sel.value !== d.code) sel.value = d.code;
+        setFocal(panel, d.code, { silent: true });
+      });
+
+      // Update funnel panels (dispatch a change on their select)
+      document.querySelectorAll('.fn-panel').forEach(function (fnPanel) {
+        if (d.source === fnPanel) return;
+        var fnPd = fnPanel.__fnData;
+        if (fnPd && fnPd.meta && fnPd.meta.category_label &&
+            d.category != null &&
+            String(d.category) !== String(fnPd.meta.category_label)) return;
+        var fnSel = fnPanel.querySelector('.fn-focus-select');
+        if (!fnSel) return;
+        // Only trigger if a matching option exists
+        var hasOpt = Array.from(fnSel.options || []).some(function (o) { return o.value === d.code; });
+        if (!hasOpt) return;
+        if (fnSel.value !== d.code) {
+          fnSel.value = d.code;
+          // Suppress re-emit by marking this change as coming from cross-panel
+          fnSel.__maSuppress = true;
+          fnSel.dispatchEvent(new Event('change'));
+          fnSel.__maSuppress = false;
+        }
+      });
+    });
+
+    // Also patch the funnel panel's focal selector (if present) to emit
+    // the same event, so MA picks it up when the user changes focal on
+    // the funnel side.
+    document.querySelectorAll('.fn-panel .fn-focus-select').forEach(function (sel) {
+      var fnPanel = sel.closest('.fn-panel');
+      sel.addEventListener('change', function () {
+        if (sel.__maSuppress) return;  // change came from MA, don't re-emit
+        var pd = fnPanel && fnPanel.__fnData;
+        var cat = pd && pd.meta && pd.meta.category_label;
+        window.dispatchEvent(new CustomEvent(FOCAL_EVENT, {
+          detail: { category: cat || null, code: sel.value, source: fnPanel }
+        }));
+      });
+    });
+
+    // Restore last focal from sessionStorage if any
+    try {
+      var stored = JSON.parse(sessionStorage.getItem(FOCAL_STORAGE_KEY) || '{}');
+      Object.keys(stored).forEach(function (cat) {
+        window.dispatchEvent(new CustomEvent(FOCAL_EVENT, {
+          detail: { category: cat, code: stored[cat], source: null }
+        }));
+      });
+    } catch (e) { /* ignore */ }
+  });
+
+  function initPanel(panel) {
+    var pd = readPayload(panel);
+    if (!pd) return;
+    panel.__maData = pd;
+
+    var brandCodes = (pd.config && pd.config.brand_codes) || [];
+
+    var makeVisMap = function () {
+      var m = {};
+      brandCodes.forEach(function (c) { m[c] = true; });
+      m.__avg__ = true;
+      return m;
+    };
+    var makeRowMap = function (codes) {
+      var m = {};
+      (codes || []).forEach(function (c) { m[c] = true; });
+      return m;
+    };
+    var attrCodes = (pd.attributes && pd.attributes.codes) || [];
+    var cepCodes  = (pd.ceps       && pd.ceps.codes)       || [];
+
+    panel.__maState = {
+      focal: (pd.meta && pd.meta.focal_brand_code) || brandCodes[0] || null,
+      basemode:   { attributes: 'total', ceps: 'total' },
+      heatmap:    { attributes: 'ci',    ceps: 'ci' },
+      counts:     { attributes: false,   ceps: false },
+      showchart:  { attributes: true,    ceps: true },
+      visible:    { attributes: makeVisMap(), ceps: makeVisMap() },
+      rowActive:  { attributes: makeRowMap(attrCodes), ceps: makeRowMap(cepCodes) },
+      sort:       { attributes: { col: null, dir: 'none' },
+                    ceps:       { col: null, dir: 'none' } }
+    };
+
+    colourChips(panel);
+
+    bindSubTabs(panel);
+    bindFocusSelect(panel);
+    bindChipPicker(panel);
+    bindToggles(panel);
+    bindBaseMode(panel);
+    bindHeatmapMode(panel);
+    bindSortButtons(panel);
+    bindExport(panel);
+    bindPinDropdown(panel);
+    bindAddInsight(panel);
+    bindRowActiveCheckboxes(panel);
+    bindInsightBoxPersistence(panel);
+
+    // Stamp rows with their original index for stable "reset" sort
+    panel.querySelectorAll('.ma-matrix-section tbody tr.ma-row').forEach(function (r, i) {
+      r.setAttribute('data-ma-orig-idx', i);
+    });
+
+    // Initial render
+    applyHeatmapMode(panel, 'attributes');
+    applyHeatmapMode(panel, 'ceps');
+    applyBaseMode(panel, 'attributes');
+    applyBaseMode(panel, 'ceps');
+    applyShowCounts(panel, 'attributes');
+    applyShowCounts(panel, 'ceps');
+    renderChart(panel, 'attributes');
+    renderChart(panel, 'ceps');
+
+    // Re-render when the MA panel (or its chart sections) become visible
+    // after starting in display:none (e.g. the parent tab wasn't active
+    // at init-time). Uses an IntersectionObserver for efficiency; falls
+    // back to a one-shot MutationObserver on the br-tab state.
+    if (typeof IntersectionObserver !== 'undefined') {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting && e.target.clientWidth > 0) {
+            var stim = e.target.getAttribute('data-ma-stim');
+            renderChart(panel, stim);
+          }
+        });
+      }, { root: null, threshold: 0.01 });
+      panel.querySelectorAll('.ma-chart-section').forEach(function (s) {
+        io.observe(s);
+      });
+    }
+
+    // Restore focal from sessionStorage if present for this category
+    try {
+      var stored = JSON.parse(sessionStorage.getItem(FOCAL_STORAGE_KEY) || '{}');
+      var cat = pd.meta && pd.meta.category_label;
+      if (cat && stored[cat] && stored[cat] !== panel.__maState.focal) {
+        var sel = panel.querySelector('.ma-focus-select');
+        if (sel) sel.value = stored[cat];
+        setFocal(panel, stored[cat], { silent: true });
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  function colourChips(panel) {
+    var pd = panel.__maData;
+    var focal = panel.__maState.focal;
+    panel.querySelectorAll('.col-chip[data-ma-brand]').forEach(function (chip) {
+      var code = chip.getAttribute('data-ma-brand');
+      var col  = getBrandColour(pd, code);
+      chip.style.backgroundColor = hexToRgba(col, code === focal ? 0.55 : 0.22);
+      chip.style.borderColor = hexToRgba(col, 0.7);
+      chip.style.color = code === focal ? '#fff' : '#1e293b';
+      chip.style.fontWeight = code === focal ? '700' : '500';
+    });
+  }
+
+  // -------------------------------------------------------------- sub-tabs
+  function bindSubTabs(panel) {
+    panel.querySelectorAll('.ma-subtab-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var target = btn.getAttribute('data-ma-subtab-target');
+        panel.querySelectorAll('.ma-subtab-btn').forEach(function (b) {
+          var active = b === btn;
+          b.classList.toggle('active', active);
+          b.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        panel.querySelectorAll('.ma-subtab').forEach(function (sp) {
+          var show = sp.getAttribute('data-ma-subtab') === target;
+          if (show) sp.removeAttribute('hidden');
+          else      sp.setAttribute('hidden', '');
+        });
+        // Re-render chart when tab becomes visible (in case it was
+        // built while hidden and has wrong dimensions)
+        if (target === 'attributes' || target === 'ceps') {
+          renderChart(panel, target);
+        }
+      });
+    });
+  }
+
+  // -------------------------------------------------------------- focal
+  function bindFocusSelect(panel) {
+    var sel = panel.querySelector('.ma-focus-select');
+    if (!sel) return;
+    sel.addEventListener('change', function () {
+      setFocal(panel, sel.value, { silent: false });
+    });
+  }
+
+  function setFocal(panel, code, opts) {
+    opts = opts || {};
+    if (!code) return;
+    panel.__maState.focal = code;
+    refreshFocalAccents(panel);
+    colourChips(panel);
+    renderChart(panel, 'attributes');
+    renderChart(panel, 'ceps');
+    // Persist + broadcast
+    try {
+      var stored = JSON.parse(sessionStorage.getItem(FOCAL_STORAGE_KEY) || '{}');
+      var cat = panel.__maData && panel.__maData.meta && panel.__maData.meta.category_label;
+      if (cat) {
+        stored[cat] = code;
+        sessionStorage.setItem(FOCAL_STORAGE_KEY, JSON.stringify(stored));
+      }
+    } catch (e) { /* ignore */ }
+    if (!opts.silent) {
+      var cat = panel.__maData && panel.__maData.meta && panel.__maData.meta.category_label;
+      window.dispatchEvent(new CustomEvent(FOCAL_EVENT, {
+        detail: { category: cat || null, code: code, source: panel }
+      }));
+    }
+  }
+
+  function refreshFocalAccents(panel) {
+    var focal = panel.__maState.focal;
+    panel.querySelectorAll('.ma-ct-th-brand').forEach(function (th) {
+      th.classList.toggle('ma-ct-th-focal',
+        th.getAttribute('data-ma-brand') === focal);
+      var existing = th.querySelector('.ma-focal-badge');
+      if (existing) existing.remove();
+      if (th.getAttribute('data-ma-brand') === focal) {
+        var hdr = th.querySelector('.ct-header-text');
+        if (hdr) {
+          var b = document.createElement('span');
+          b.className = 'ma-focal-badge';
+          b.textContent = 'FOCAL';
+          hdr.appendChild(b);
+        }
+      }
+    });
+    panel.querySelectorAll('.ma-ct-table td[data-ma-brand]').forEach(function (td) {
+      td.classList.toggle('ma-td-focal',
+        td.getAttribute('data-ma-brand') === focal);
+    });
+    panel.querySelectorAll('.ma-metrics-table tr').forEach(function (tr) {
+      var code = tr.getAttribute('data-ma-brand');
+      tr.classList.toggle('ma-row-focal', code && code === focal);
+    });
+  }
+
+  // -------------------------------------------------------------- chips
+  function bindChipPicker(panel) {
+    panel.querySelectorAll('.col-chip[data-ma-scope]').forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        var scope = chip.getAttribute('data-ma-scope');
+        var code  = chip.getAttribute('data-ma-brand');
+        var vis = panel.__maState.visible[scope];
+        if (!vis) return;
+        vis[code] = !vis[code];
+        chip.classList.toggle('col-chip-off', !vis[code]);
+        applyColumnVisibility(panel, scope);
+        renderChart(panel, scope);
+      });
+    });
+  }
+
+  function applyColumnVisibility(panel, scope) {
+    var vis = panel.__maState.visible[scope];
+    var sec = panel.querySelector('.ma-matrix-section[data-ma-stim="' + scope + '"]');
+    if (!sec) return;
+    sec.querySelectorAll('th[data-ma-brand], td[data-ma-brand]').forEach(function (cell) {
+      var code = cell.getAttribute('data-ma-brand');
+      cell.style.display = vis[code] === false ? 'none' : '';
+    });
+  }
+
+  // -------------------------------------------------------------- toggles
+  function bindToggles(panel) {
+    panel.querySelectorAll('input[data-ma-action="showcounts"]').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        var stim = cb.getAttribute('data-ma-stim');
+        panel.__maState.counts[stim] = cb.checked;
+        applyShowCounts(panel, stim);
+      });
+    });
+    panel.querySelectorAll('input[data-ma-action="showchart"]').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        var stim = cb.getAttribute('data-ma-stim');
+        panel.__maState.showchart[stim] = cb.checked;
+        var sec = panel.querySelector('.ma-chart-section[data-ma-stim="' + stim + '"]');
+        if (sec) {
+          if (cb.checked) { sec.removeAttribute('hidden'); renderChart(panel, stim); }
+          else sec.setAttribute('hidden', '');
+        }
+      });
+    });
+  }
+
+  function applyShowCounts(panel, stim) {
+    var sec = panel.querySelector('.ma-matrix-section[data-ma-stim="' + stim + '"]');
+    if (!sec) return;
+    sec.classList.toggle('ma-show-counts', !!panel.__maState.counts[stim]);
+  }
+
+  // -------------------------------------------------------------- heatmap mode
+  function bindHeatmapMode(panel) {
+    panel.querySelectorAll('.sig-btn[data-ma-action="heatmapmode"]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var stim = btn.getAttribute('data-ma-stim');
+        var mode = btn.getAttribute('data-ma-heatmap-mode');
+        panel.__maState.heatmap[stim] = mode;
+        var parent = btn.closest('.ma-heatmap-switcher');
+        if (parent) {
+          parent.querySelectorAll('.sig-btn').forEach(function (b) {
+            var active = b === btn;
+            b.classList.toggle('sig-btn-active', active);
+            b.setAttribute('aria-pressed', active ? 'true' : 'false');
+          });
+        }
+        applyHeatmapMode(panel, stim);
+      });
+    });
+  }
+
+  function applyHeatmapMode(panel, stim) {
+    var sec = panel.querySelector('.ma-matrix-section[data-ma-stim="' + stim + '"]');
+    if (!sec) return;
+    var mode = panel.__maState.heatmap[stim] || 'ci';
+    sec.setAttribute('data-ma-heatmap-mode', mode);
+    sec.classList.toggle('ma-heatmap-off', mode === 'off');
+    sec.querySelectorAll('.ma-heatmap-cell').forEach(function (td) {
+      if (mode === 'diff') {
+        var col = td.getAttribute('data-ma-heatmap') || '';
+        td.style.backgroundColor = col;
+      } else {
+        td.style.backgroundColor = '';
+      }
+    });
+  }
+
+  // -------------------------------------------------------------- base mode
+  function bindBaseMode(panel) {
+    panel.querySelectorAll('.sig-btn[data-ma-action="basemode"]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var stim = btn.getAttribute('data-ma-stim');
+        var mode = btn.getAttribute('data-ma-basemode');
+        panel.__maState.basemode[stim] = mode;
+        var parent = btn.closest('.ma-base-switcher');
+        if (parent) {
+          parent.querySelectorAll('.sig-btn').forEach(function (b) {
+            var active = b === btn;
+            b.classList.toggle('sig-btn-active', active);
+            b.setAttribute('aria-pressed', active ? 'true' : 'false');
+          });
+        }
+        applyBaseMode(panel, stim);
+        renderChart(panel, stim);
+      });
+    });
+  }
+
+  function applyBaseMode(panel, stim) {
+    var mode = panel.__maState.basemode[stim] || 'total';
+    var sec = panel.querySelector('.ma-matrix-section[data-ma-stim="' + stim + '"]');
+    if (!sec) return;
+    sec.querySelectorAll('.ma-heatmap-cell').forEach(function (td) {
+      var pctTotal = parseFloat(td.getAttribute('data-ma-pct'));
+      var pctAware = parseFloat(td.getAttribute('data-ma-pct-aware'));
+      var nTotal   = td.getAttribute('data-ma-n-total');
+      var nAware   = td.getAttribute('data-ma-n-aware');
+      var span = td.querySelector('.ma-pct-primary');
+      var nSpan = td.querySelector('.ma-n-primary');
+      if (!span) return;
+      var val = pctTotal;
+      var n = nTotal;
+      if (mode === 'aware' && !isNaN(pctAware)) { val = pctAware; n = nAware; }
+      if (isNaN(val)) { span.textContent = '—'; return; }
+      span.textContent = Math.round(val) + '%';
+      if (nSpan) nSpan.textContent = (n ? ('n=' + n) : '');
+      td.setAttribute('data-sort-val', val.toFixed(6));
+    });
+  }
+
+  // -------------------------------------------------------------- row active (grey-out)
+  function bindRowActiveCheckboxes(panel) {
+    panel.querySelectorAll('.ma-row-active-cb').forEach(function (cb) {
+      cb.addEventListener('change', function (ev) {
+        ev.stopPropagation();
+        var stim = cb.getAttribute('data-ma-stim');
+        var code = cb.getAttribute('data-ma-stim-code');
+        if (!stim || !code) return;
+        panel.__maState.rowActive[stim][code] = cb.checked;
+        var tr = cb.closest('tr');
+        if (tr) tr.classList.toggle('ma-row-inactive', !cb.checked);
+        renderChart(panel, stim);
+      });
+    });
+    // Also allow click on the label text to toggle
+    panel.querySelectorAll('.ma-row-label-text').forEach(function (t) {
+      t.addEventListener('click', function (ev) {
+        var cb = t.closest('.ma-row-toggle').querySelector('.ma-row-active-cb');
+        if (cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); }
+        ev.preventDefault();
+      });
+    });
+  }
+
+  // -------------------------------------------------------------- sort
+  function bindSortButtons(panel) {
+    panel.querySelectorAll('.ma-sort-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var stim = btn.getAttribute('data-ma-stim');
+        var action = btn.getAttribute('data-ma-action');
+        var brand  = btn.getAttribute('data-ma-brand') || null;
+        var state = panel.__maState.sort[stim];
+        if (!state) return;
+
+        var key = action === 'sort-brand' ? brand : '__stim__';
+        var next;
+        if (state.col !== key) next = 'desc';
+        else if (state.dir === 'desc') next = 'asc';
+        else if (state.dir === 'asc')  next = 'none';
+        else next = 'desc';
+
+        state.col = next === 'none' ? null : key;
+        state.dir = next;
+
+        panel.querySelectorAll('.ma-sort-btn[data-ma-stim="' + stim + '"]').forEach(function (b) {
+          b.setAttribute('data-ma-sort-dir', 'none');
+          b.textContent = '\u21C5';
+        });
+        btn.setAttribute('data-ma-sort-dir', next);
+        btn.textContent = next === 'desc' ? '\u2193'
+                        : next === 'asc'  ? '\u2191' : '\u21C5';
+
+        applySort(panel, stim);
+      });
+    });
+  }
+
+  function applySort(panel, stim) {
+    var state = panel.__maState.sort[stim];
+    var sec = panel.querySelector('.ma-matrix-section[data-ma-stim="' + stim + '"]');
+    if (!sec) return;
+    var tbody = sec.querySelector('tbody');
+    if (!tbody) return;
+    var rows = Array.from(tbody.querySelectorAll('tr.ma-row'));
+    if (state.dir === 'none' || !state.col) {
+      rows.sort(function (a, b) {
+        return parseInt(a.getAttribute('data-ma-orig-idx') || '0', 10) -
+               parseInt(b.getAttribute('data-ma-orig-idx') || '0', 10);
+      });
+    } else if (state.col === '__stim__') {
+      rows.sort(function (a, b) {
+        var av = a.getAttribute('data-ma-sort-stim') || '';
+        var bv = b.getAttribute('data-ma-sort-stim') || '';
+        return av.localeCompare(bv);
+      });
+      if (state.dir === 'desc') rows.reverse();
+    } else {
+      rows.sort(function (a, b) {
+        var av = parseFloat(a.getAttribute('data-ma-sort-' + state.col) || 'NaN');
+        var bv = parseFloat(b.getAttribute('data-ma-sort-' + state.col) || 'NaN');
+        if (isNaN(av)) return 1; if (isNaN(bv)) return -1;
+        return av - bv;
+      });
+      if (state.dir === 'desc') rows.reverse();
+    }
+    rows.forEach(function (r) { tbody.appendChild(r); });
+    var summary = tbody.querySelector('tr.ma-row-summary');
+    if (summary) tbody.appendChild(summary);
+  }
+
+  // -------------------------------------------------------------- bar chart
+  function renderChart(panel, stim) {
+    var sec = panel.querySelector('.ma-chart-section[data-ma-stim="' + stim + '"]');
+    if (!sec) return;
+    if (panel.__maState.showchart[stim] === false) { sec.setAttribute('hidden', ''); return; }
+    sec.removeAttribute('hidden');
+
+    var svg = sec.querySelector('.ma-bar-chart');
+    if (!svg) return;
+
+    var pd = panel.__maData;
+    var block = pd[stim];
+    if (!block) { svg.innerHTML = ''; return; }
+
+    var focal = panel.__maState.focal;
+    var baseMode = panel.__maState.basemode[stim] || 'total';
+    var visMap = panel.__maState.visible[stim] || {};
+    var rowActive = panel.__maState.rowActive[stim] || {};
+
+    var brandCodes = (pd.config && pd.config.brand_codes) || [];
+    // Column order: focal first, then others in brand-list order
+    var orderedBrands = [];
+    if (focal && brandCodes.indexOf(focal) >= 0) orderedBrands.push(focal);
+    brandCodes.forEach(function (c) { if (c !== focal) orderedBrands.push(c); });
+    var visibleBrands = orderedBrands.filter(function (c) { return visMap[c] !== false; });
+
+    var activeRows = (block.codes || []).map(function (code, i) {
+      return { code: code, label: block.labels[i], idx: i };
+    }).filter(function (r) { return rowActive[r.code] !== false; });
+
+    if (activeRows.length === 0 || visibleBrands.length === 0) {
+      svg.innerHTML = '';
+      return;
+    }
+
+    // Build cell lookup
+    var cellMap = {};
+    (block.cells || []).forEach(function (c) {
+      cellMap[c.stim_code + '|' + c.brand_code] = c;
+    });
+
+    var pctField = baseMode === 'aware' ? 'pct_aware' : 'pct_total';
+
+    // SVG dimensions — compact grouped bar chart
+    var marginLeft = 180;    // room for group label
+    var marginRight = 24;
+    var marginTop = 18;
+    var marginBottom = 26;
+    var barGroupGap = 10;
+    // Target: ~52px per attribute group when 10 brands visible
+    var barHeight = Math.max(8, Math.min(14, Math.floor(120 / visibleBrands.length)));
+    var groupHeight = visibleBrands.length * (barHeight + 1) + barGroupGap;
+    var chartHeight = marginTop + marginBottom + activeRows.length * groupHeight;
+    var width = svg.clientWidth || 800;
+    svg.setAttribute('viewBox', '0 0 ' + width + ' ' + chartHeight);
+    svg.setAttribute('height', chartHeight);
+    svg.setAttribute('preserveAspectRatio', 'xMinYMin meet');
+    svg.style.height = chartHeight + 'px';
+
+    var xZero = marginLeft;
+    var xEnd = width - marginRight;
+    var xScale = xEnd - xZero;
+
+    // Max value (for scale)
+    var maxVal = 0;
+    activeRows.forEach(function (r) {
+      visibleBrands.forEach(function (b) {
+        var c = cellMap[r.code + '|' + b];
+        if (!c) return;
+        var v = c[pctField];
+        if (v != null && !isNaN(v) && v > maxVal) maxVal = v;
+      });
+    });
+    maxVal = Math.max(10, Math.ceil(maxVal / 10) * 10);
+
+    var parts = [];
+
+    // X-axis gridlines
+    var gridSteps = 4;
+    for (var g = 0; g <= gridSteps; g++) {
+      var gv = maxVal * g / gridSteps;
+      var gx = xZero + xScale * g / gridSteps;
+      parts.push('<line class="ma-bar-gridline" x1="' + gx + '" y1="' + marginTop + '" x2="' + gx + '" y2="' + (chartHeight - marginBottom) + '"/>');
+      parts.push('<text class="ma-bar-label" x="' + gx + '" y="' + (chartHeight - marginBottom + 14) + '" text-anchor="middle">' + Math.round(gv) + '%</text>');
+    }
+
+    // Groups
+    activeRows.forEach(function (r, ri) {
+      var y0 = marginTop + ri * groupHeight;
+      // Group label
+      parts.push('<text class="ma-bar-group-label" x="' + (marginLeft - 10) + '" y="' + (y0 + 14) + '" text-anchor="end">' + escHtml(r.label) + '</text>');
+
+      // Cat-avg marker (dashed line)
+      var avg = block.stim_avg ? block.stim_avg[r.idx] : null;
+      if (avg != null && !isNaN(avg)) {
+        // When in aware mode we can't really show a cat-avg line because
+        // avg is still on total base — so only draw when total mode
+        if (baseMode === 'total') {
+          var ax = xZero + xScale * avg / maxVal;
+          parts.push('<line class="ma-bar-cat-avg" x1="' + ax + '" y1="' + y0 + '" x2="' + ax + '" y2="' + (y0 + visibleBrands.length * (barHeight + 1)) + '"><title>Cat avg: ' + avg.toFixed(0) + '%</title></line>');
+        }
+      }
+
+      visibleBrands.forEach(function (b, bi) {
+        var c = cellMap[r.code + '|' + b];
+        if (!c) return;
+        var v = c[pctField];
+        if (v == null || isNaN(v)) return;
+        var barY = y0 + bi * (barHeight + 1);
+        var barW = Math.max(1, xScale * v / maxVal);
+        var col = getBrandColour(pd, b);
+        var isFocal = b === focal;
+        parts.push('<rect class="ma-bar" x="' + xZero + '" y="' + barY + '" width="' + barW + '" height="' + barHeight + '" fill="' + col + '" fill-opacity="' + (isFocal ? '0.95' : '0.75') + '" stroke="' + col + '" stroke-width="' + (isFocal ? 1 : 0.5) + '"><title>' + escHtml(getBrandName(pd, b)) + ': ' + v.toFixed(0) + '%</title></rect>');
+        // Value label (only if bar wide enough)
+        if (barW > 30) {
+          parts.push('<text class="ma-bar-value" x="' + (xZero + barW - 4) + '" y="' + (barY + barHeight / 2 + 4) + '" text-anchor="end" fill="#fff">' + v.toFixed(0) + '%</text>');
+        } else {
+          parts.push('<text class="ma-bar-value" x="' + (xZero + barW + 4) + '" y="' + (barY + barHeight / 2 + 4) + '" text-anchor="start">' + v.toFixed(0) + '%</text>');
+        }
+      });
+    });
+
+    // Y-axis line
+    parts.push('<line class="ma-bar-axis" x1="' + xZero + '" y1="' + marginTop + '" x2="' + xZero + '" y2="' + (chartHeight - marginBottom) + '"/>');
+
+    svg.innerHTML = parts.join('');
+  }
+
+  // -------------------------------------------------------------- insight box
+  function insightKey(panel, stim) {
+    var pd = panel.__maData;
+    var cat = pd && pd.meta && pd.meta.category_label;
+    return 'turas.ma.insight:' + (cat || '') + ':' + stim;
+  }
+
+  function bindInsightBoxPersistence(panel) {
+    panel.querySelectorAll('.ma-insight-box-text').forEach(function (ta) {
+      var stim = ta.getAttribute('data-ma-stim');
+      var key = insightKey(panel, stim);
+      try {
+        var saved = sessionStorage.getItem(key);
+        if (saved) ta.value = saved;
+      } catch (e) { /* ignore */ }
+      ta.addEventListener('input', function () {
+        try { sessionStorage.setItem(key, ta.value); } catch (e) {}
+      });
+    });
+    panel.querySelectorAll('.ma-insight-box-clear').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var stim = btn.getAttribute('data-ma-stim');
+        var ta = panel.querySelector('.ma-insight-box-text[data-ma-stim="' + stim + '"]');
+        if (ta) {
+          ta.value = '';
+          try { sessionStorage.removeItem(insightKey(panel, stim)); } catch (e) {}
+        }
+      });
+    });
+  }
+
+  // -------------------------------------------------------------- export
+  function bindExport(panel) {
+    panel.querySelectorAll('.ma-export-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var stim = btn.getAttribute('data-ma-stim');
+        exportTable(panel, stim);
+      });
+    });
+  }
+
+  function exportTable(panel, stim) {
+    var sec = panel.querySelector('.ma-matrix-section[data-ma-stim="' + stim + '"]');
+    if (!sec) return;
+    var tbl = sec.querySelector('table');
+    if (!tbl) return;
+    var pd = panel.__maData || {};
+    var cat = (pd.meta && pd.meta.category_label) || 'category';
+    var focal = (pd.meta && pd.meta.focal_brand_code) || '';
+    var mode = (panel.__maState.basemode[stim] || 'total');
+    var title = (stim === 'attributes') ? 'Brand Attributes' : 'Category Entry Points';
+    var html = '<html><head><meta charset="utf-8"><title>' + escHtml(title) + '</title>'
+      + '<style>table{border-collapse:collapse;font-family:Arial,sans-serif;}'
+      + 'th,td{border:1px solid #ccc;padding:4px 8px;font-size:12px;text-align:center;}'
+      + 'th{background:#1e293b;color:#fff;}'
+      + '.focal{background:#EBF5FB;font-weight:600;}</style></head><body>'
+      + '<h3>' + escHtml(title) + ' — ' + escHtml(cat) + '</h3>'
+      + '<p style="font-size:11px;color:#555;">Base: ' + (mode === 'aware' ? '% of those aware of brand' : '% of total sample')
+      + (focal ? ' · Focal: ' + escHtml(focal) : '') + '</p>'
+      + tbl.outerHTML.replace(/<button[^>]*>[^<]*<\/button>/g, '').replace(/<input[^>]*>/g, '')
+      + '</body></html>';
+    var blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    var url  = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'ma_' + stim + '_' + (cat || 'category').toLowerCase().replace(/[^a-z0-9]+/g, '_') + '.xls';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 0);
+  }
+
+  // -------------------------------------------------------------- pin dropdown
+  function bindPinDropdown(panel) {
+    var btn = panel.querySelector('.ma-pin-dropdown-btn');
+    if (!btn) return;
+    btn.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      openPinDropdown(panel, btn);
+    });
+  }
+
+  function openPinDropdown(panel, btn) {
+    panel.querySelectorAll('.ma-pin-dropdown').forEach(function (el) { el.remove(); });
+
+    var activeTab = panel.querySelector('.ma-subtab-btn.active');
+    var activeKey = activeTab ? activeTab.getAttribute('data-ma-subtab-target') : 'attributes';
+    var opts = [];
+    if (activeKey === 'attributes' || activeKey === 'ceps') {
+      opts.push({ key: 'matrix', label: 'Matrix table' });
+      opts.push({ key: 'chart',  label: 'Bar chart' });
+      opts.push({ key: 'insight',label: 'Insight note' });
+    } else if (activeKey === 'metrics') {
+      opts.push({ key: 'hero',    label: 'Headline metric cards' });
+      opts.push({ key: 'brandtbl',label: 'Brand metric table' });
+      opts.push({ key: 'rank',    label: 'CEP penetration ranking' });
+    }
+
+    var dd = document.createElement('div');
+    dd.className = 'ma-pin-dropdown';
+    dd.style.cssText = 'position:absolute;z-index:400;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.08);padding:8px;min-width:220px;font-size:12px;';
+    dd.innerHTML = '<div style="font-weight:600;margin-bottom:6px;color:#334155;">Pin sections</div>'
+      + opts.map(function (o) {
+        return '<label style="display:block;padding:3px 0;"><input type="checkbox" data-ma-pin-opt="' + o.key + '" style="margin-right:6px;">' + escHtml(o.label) + '</label>';
+      }).join('')
+      + '<div style="text-align:right;margin-top:8px;"><button type="button" class="ma-pin-confirm" style="background:var(--ma-brand,#1A5276);color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;">Pin selected</button></div>';
+
+    var rect = btn.getBoundingClientRect();
+    var panelRect = panel.getBoundingClientRect();
+    dd.style.right = Math.max(0, panelRect.right - rect.right) + 'px';
+    dd.style.top = (rect.bottom - panelRect.top + 4) + 'px';
+    panel.appendChild(dd);
+
+    function closeOnce() {
+      dd.remove();
+      document.removeEventListener('click', closeOnce);
+    }
+    setTimeout(function () { document.addEventListener('click', closeOnce); }, 0);
+    dd.addEventListener('click', function (e) { e.stopPropagation(); });
+
+    dd.querySelector('.ma-pin-confirm').addEventListener('click', function () {
+      var selected = Array.from(dd.querySelectorAll('input:checked')).map(function (inp) {
+        return inp.getAttribute('data-ma-pin-opt');
+      });
+      if (!selected.length) { closeOnce(); return; }
+      pinSections(panel, activeKey, selected);
+      closeOnce();
+    });
+  }
+
+  function pinSections(panel, activeKey, optKeys) {
+    var pd = panel.__maData || {};
+    var cat = (pd.meta && pd.meta.category_label) || 'Category';
+    var focal = (pd.meta && pd.meta.focal_brand_name) || '';
+    var title = 'Mental Availability \u2014 ' + cat;
+    var footnote = focal ? ('Focal: ' + focal) : '';
+
+    optKeys.forEach(function (key) {
+      var el = null, subLabel = '';
+      if ((activeKey === 'attributes' || activeKey === 'ceps') && key === 'matrix') {
+        el = panel.querySelector('.ma-matrix-section[data-ma-stim="' + activeKey + '"]');
+        subLabel = activeKey === 'attributes' ? 'Brand attributes' : 'Category Entry Points';
+      } else if ((activeKey === 'attributes' || activeKey === 'ceps') && key === 'chart') {
+        el = panel.querySelector('.ma-chart-section[data-ma-stim="' + activeKey + '"]');
+        subLabel = 'Bar chart';
+      } else if ((activeKey === 'attributes' || activeKey === 'ceps') && key === 'insight') {
+        el = panel.querySelector('.ma-insight-box[data-ma-stim="' + activeKey + '"]');
+        subLabel = 'Insight';
+      } else if (activeKey === 'metrics' && key === 'hero') {
+        el = panel.querySelector('.ma-hero-strip'); subLabel = 'Headline metrics';
+      } else if (activeKey === 'metrics' && key === 'brandtbl') {
+        el = panel.querySelector('.ma-metrics-table');
+        if (el) el = el.closest('.ma-table-wrap') || el;
+        subLabel = 'Brand metrics table';
+      } else if (activeKey === 'metrics' && key === 'rank') {
+        el = panel.querySelector('.ma-rank-list'); subLabel = 'CEP penetration ranking';
+      }
+      if (!el) return;
+      el.setAttribute('data-pin-title', title + ' \u2014 ' + subLabel);
+      if (footnote) el.setAttribute('data-pin-footnote', footnote);
+      if (window.TurasPin && typeof window.TurasPin.pin === 'function') {
+        try { window.TurasPin.pin(el); } catch (e) { el.classList.add('ma-pinned'); }
+      } else { el.classList.add('ma-pinned'); }
+    });
+  }
+
+  // -------------------------------------------------------------- legacy add-insight (kept for pin compat)
+  function bindAddInsight(panel) { /* no-op now; full insight box covers the use case */ }
+
+  // Re-render charts on viewport resize (debounced)
+  var resizeTimer = null;
+  window.addEventListener('resize', function () {
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () {
+      document.querySelectorAll('.ma-panel').forEach(function (p) {
+        if (!p.__maData) return;
+        renderChart(p, 'attributes');
+        renderChart(p, 'ceps');
+      });
+    }, 120);
+  });
+
+  // Re-render charts when the containing br-tab becomes active.
+  document.addEventListener('click', function (ev) {
+    var tabBtn = ev.target && ev.target.closest && ev.target.closest('.br-tab-btn');
+    if (!tabBtn) return;
+    setTimeout(function () {
+      document.querySelectorAll('.ma-panel').forEach(function (p) {
+        if (!p.__maData) return;
+        // Only render the sections whose own clientWidth is now > 0
+        p.querySelectorAll('.ma-chart-section').forEach(function (s) {
+          if (s.clientWidth > 0) {
+            renderChart(p, s.getAttribute('data-ma-stim'));
+          }
+        });
+      });
+    }, 20);
+  });
+})();

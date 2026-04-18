@@ -120,26 +120,42 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
     }
   )
 
-  # Load panel styles + JS (funnel panel only for now)
-  panel_styles <- if (exists("build_funnel_panel_styles", mode = "function")) {
-    tryCatch(build_funnel_panel_styles(config$colour_focal %||% "#1A5276"),
-             error = function(e) "")
-  } else ""
-  panel_js <- ""
-  # Resolve JS path: prefer source-time anchor, fall back to working dir and TURAS_ROOT
-  .js_candidates <- c(
-    if (!is.null(.BRAND_HTML_REPORT_DIR))
-      file.path(.BRAND_HTML_REPORT_DIR, "js", "brand_funnel_panel.js"),
-    file.path(getwd(), "modules", "brand", "lib", "html_report",
-              "js", "brand_funnel_panel.js"),
-    tryCatch(file.path(find_turas_root(), "modules", "brand", "lib",
-                       "html_report", "js", "brand_funnel_panel.js"),
-             error = function(e) NULL)
-  )
-  .js_found <- Filter(function(p) !is.null(p) && file.exists(p), .js_candidates)
-  if (length(.js_found) > 0) {
-    panel_js <- paste(readLines(.js_found[[1]], warn = FALSE), collapse = "\n")
+  # Load panel styles + JS (funnel + mental availability)
+  brand_colour_cfg <- config$colour_focal %||% "#1A5276"
+  panel_styles <- ""
+  if (exists("build_funnel_panel_styles", mode = "function")) {
+    panel_styles <- paste(panel_styles,
+      tryCatch(build_funnel_panel_styles(brand_colour_cfg),
+               error = function(e) ""),
+      sep = "\n")
   }
+  if (exists("build_ma_panel_styles", mode = "function")) {
+    panel_styles <- paste(panel_styles,
+      tryCatch(build_ma_panel_styles(brand_colour_cfg),
+               error = function(e) ""),
+      sep = "\n")
+  }
+
+  # Resolve JS paths (funnel + MA) and concatenate into one panel_js blob
+  .resolve_js <- function(filename) {
+    candidates <- c(
+      if (!is.null(.BRAND_HTML_REPORT_DIR))
+        file.path(.BRAND_HTML_REPORT_DIR, "js", filename),
+      file.path(getwd(), "modules", "brand", "lib", "html_report",
+                "js", filename),
+      tryCatch(file.path(find_turas_root(), "modules", "brand", "lib",
+                         "html_report", "js", filename),
+               error = function(e) NULL)
+    )
+    found <- Filter(function(p) !is.null(p) && file.exists(p), candidates)
+    if (length(found) == 0) return("")
+    paste(readLines(found[[1]], warn = FALSE), collapse = "\n")
+  }
+  panel_js <- paste(
+    .resolve_js("brand_funnel_panel.js"),
+    .resolve_js("brand_ma_panel.js"),
+    sep = "\n"
+  )
 
   # --- Layers 3+4: Assemble page ---
   html <- tryCatch(
