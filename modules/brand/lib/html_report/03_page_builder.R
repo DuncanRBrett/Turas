@@ -49,12 +49,12 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
 build_br_header <- function(config) {
   brand <- config$colour_focal %||% "#1A5276"
   sprintf('
-<div class="br-header" style="background:%s;color:#fff;padding:20px 32px;border-radius:0 0 12px 12px;">
+<div class="br-header" style="background:#1a2744;color:#fff;padding:20px 32px;border-radius:0 0 12px 12px;">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;">
     <div>
       <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.5px;opacity:0.7;margin-bottom:4px;">Turas Brand Health</div>
-      <h1 style="margin:0;font-size:22px;font-weight:700;">%s</h1>
-      <div style="font-size:13px;opacity:0.8;margin-top:2px;">%s</div>
+      <h1 style="margin:0;font-size:22px;font-weight:700;color:#fff;">%s</h1>
+      <div style="font-size:13px;opacity:0.8;margin-top:2px;color:#fff;">%s</div>
     </div>
     <div style="display:flex;gap:8px;">
       <button class="br-save-btn" onclick="_brSaveReport()" title="Save Report"
@@ -77,7 +77,6 @@ build_br_header <- function(config) {
     <span>%s</span>
   </div>
 </div>',
-    brand,
     .br_esc(config$report_title %||% "Brand Health Report"),
     .br_esc(config$report_subtitle %||% ""),
     .br_esc(config$client_name %||% ""),
