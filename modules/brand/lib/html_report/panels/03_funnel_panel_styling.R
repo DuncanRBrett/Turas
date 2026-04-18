@@ -714,10 +714,10 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 /* -------------------------------------------------------------------------- */
 .fn-shading-switcher, .fn-shade-switcher { flex-shrink: 0; }
 
-/* CI band cell colours — applied as inline bg when "CI bands" mode active    */
-.fn-ci-above { background-color: rgba(5,150,105,0.18)  !important; }
-.fn-ci-within { background-color: rgba(245,158,11,0.15) !important; }
-.fn-ci-below  { background-color: rgba(192,57,43,0.13)  !important; }
+/* CI band cell colours — higher specificity so they override focal/avg tints */
+.fn-panel .fn-ci-above  { background-color: rgba(5,150,105,0.22)  !important; }
+.fn-panel .fn-ci-within { background-color: rgba(245,158,11,0.18) !important; }
+.fn-panel .fn-ci-below  { background-color: rgba(192,57,43,0.18)  !important; }
 
 @media print {
   .fn-controls, .fn-export-btn, .fn-subnav, .fn-pin-btn { display: none !important; }

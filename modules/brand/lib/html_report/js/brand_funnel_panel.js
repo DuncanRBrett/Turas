@@ -1586,8 +1586,12 @@
         ? "data-fn-rel-pct-total" : "data-fn-rel-pct-aware";
       panel.querySelectorAll("[data-fn-rel-table] td.ct-heatmap-cell").forEach(function(td) {
         td.classList.remove("fn-ci-above", "fn-ci-within", "fn-ci-below");
+        td.style.removeProperty("background-color");
       });
-      if (relShowCI.checked) applyRelTableCI(panel, pctAttr);
+      if (relShowCI.checked) {
+        panel.classList.remove("fn-heatmap-off");
+        applyRelTableCI(panel, pctAttr);
+      }
     });
 
     // Show count checkbox — show-freq class reveals .ct-freq spans
@@ -1610,9 +1614,6 @@
     if (exportBtn) {
       exportBtn.addEventListener("click", function() { exportRelTableCSV(panel); });
     }
-
-    // Heatmap off by default
-    panel.classList.add("fn-heatmap-off");
 
     buildRelChart(panel);
     applyRelTableBase(panel);
@@ -1906,27 +1907,35 @@
     var table = panel.querySelector("[data-fn-rel-table]");
     if (!table) return;
     pctAttr = pctAttr || "data-fn-rel-pct-aware";
-    // Compute mean + 95% CI per attitude column from non-avg brand rows
-    var vals = {};
-    table.querySelectorAll("td.ct-heatmap-cell[data-fn-att]").forEach(function(td) {
-      if (td.classList.contains("fn-rel-td-avg")) return;
-      var att = td.getAttribute("data-fn-att");
-      var v   = parseFloat(td.getAttribute(pctAttr));
-      if (!att || isNaN(v)) return;
-      if (!vals[att]) vals[att] = [];
-      vals[att].push(v);
-    });
+
+    // Get category average pct per column from the avg row
+    var avgPcts = {};
+    var avgRow = table.querySelector("tr.fn-row-avg-all");
+    if (avgRow) {
+      avgRow.querySelectorAll("td[data-fn-att]").forEach(function(td) {
+        var att = td.getAttribute("data-fn-att");
+        var v   = parseFloat(td.getAttribute(pctAttr));
+        if (att && !isNaN(v)) avgPcts[att] = v;
+      });
+    }
+    if (Object.keys(avgPcts).length === 0) return;
+
+    // Use average aware_base across brands as n for binomial CI
+    var brands = panel.__fnData && panel.__fnData.consideration_detail &&
+                 panel.__fnData.consideration_detail.brands || [];
+    var n = brands.length
+      ? brands.reduce(function(s, b) { return s + (b.aware_base || 0); }, 0) / brands.length
+      : 100;
+
+    // Compute 95% CI bounds per column: avg_p ± 1.96 * sqrt(p*(1-p)/n)
     var ciBounds = {};
-    Object.keys(vals).forEach(function(att) {
-      var vs = vals[att];
-      if (vs.length < 2) return;
-      var mean = vs.reduce(function(a, b) { return a + b; }, 0) / vs.length;
-      var sd   = Math.sqrt(vs.reduce(function(a, v) {
-        return a + (v - mean) * (v - mean);
-      }, 0) / (vs.length - 1));
-      var se = sd / Math.sqrt(vs.length);
-      ciBounds[att] = { lower: mean - 1.96 * se, upper: mean + 1.96 * se };
+    Object.keys(avgPcts).forEach(function(att) {
+      var p  = avgPcts[att];
+      var se = Math.sqrt(p * (1 - p) / Math.max(n, 1));
+      ciBounds[att] = { lower: p - 1.96 * se, upper: p + 1.96 * se };
     });
+
+    // Apply colour classes to brand cells (not avg row)
     table.querySelectorAll("td.ct-heatmap-cell[data-fn-att]").forEach(function(td) {
       if (td.classList.contains("fn-rel-td-avg")) return;
       var att  = td.getAttribute("data-fn-att");

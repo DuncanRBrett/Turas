@@ -191,12 +191,14 @@ load_brand_config <- function(config_path, project_root = NULL) {
   categories <- tryCatch({
     # Try simple format first (headers in row 1) - most reliable
     cats <- openxlsx::read.xlsx(config_path, sheet = "Categories", startRow = 1)
-    # If column names look like template title, try startRow=3
-    if (!is.null(cats) && ncol(cats) >= 1 &&
-        grepl("^Category Def|^TURAS", names(cats)[1], ignore.case = TRUE)) {
-      cats2 <- openxlsx::read.xlsx(config_path, sheet = "Categories", startRow = 3)
-      if (!is.null(cats2) && nrow(cats2) > 0 && "Category" %in% names(cats2)) {
-        cats <- cats2
+    # If "Category" column not found in row-1 read, the sheet has title/description
+    # rows — scan startRow 2, 3, 4 until we find the real headers
+    if (!is.null(cats) && !"Category" %in% names(cats)) {
+      for (.sr in 2:4) {
+        cats2 <- tryCatch(
+          openxlsx::read.xlsx(config_path, sheet = "Categories", startRow = .sr),
+          error = function(e) NULL)
+        if (!is.null(cats2) && "Category" %in% names(cats2)) { cats <- cats2; break }
       }
     }
     cats
@@ -285,14 +287,18 @@ load_brand_survey_structure <- function(structure_path) {
       # Try simple format first (headers in row 1) - most reliable
       df <- openxlsx::read.xlsx(structure_path, sheet = sheet_name,
                                 startRow = 1)
-      # If column names look like template title rows, try startRow=3
-      if (!is.null(df) && ncol(df) >= 1) {
-        first_col <- names(df)[1]
-        if (grepl("^TURAS|^Category Entry|^Brand |^Question |^Response |^DBA ",
-                  first_col, ignore.case = TRUE)) {
-          df2 <- openxlsx::read.xlsx(structure_path, sheet = sheet_name,
-                                     startRow = 3)
-          if (!is.null(df2) && nrow(df2) > 0) df <- df2
+      # If the first column name looks like a title/description row, scan for
+      # real headers at startRow 2, 3, 4
+      .looks_like_data_header <- function(d) {
+        any(c("BrandCode","Category","QuestionCode","CEPCode","AttrCode",
+              "AssetCode") %in% names(d))
+      }
+      if (!is.null(df) && !.looks_like_data_header(df)) {
+        for (.sr in 2:4) {
+          df2 <- tryCatch(
+            openxlsx::read.xlsx(structure_path, sheet = sheet_name, startRow = .sr),
+            error = function(e) NULL)
+          if (!is.null(df2) && .looks_like_data_header(df2)) { df <- df2; break }
         }
       }
       if (!is.null(df) && nrow(df) > 0 && ncol(df) > 0) {
