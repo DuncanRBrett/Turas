@@ -369,22 +369,102 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 .fn-add-insight-btn:hover { color: var(--fn-brand); }
 
 /* -------------------------------------------------------------------------- */
-/* RELATIONSHIP TABLE — focal column + category-avg column                    */
+/* RELATIONSHIP CHART SECTION                                                 */
 /* -------------------------------------------------------------------------- */
-/* Focal column header: bold + accent underline; text stays white */
-.fn-panel .fn-rel-th-focal {
-  border-bottom: 3px solid var(--fn-brand);
-  font-weight: 900;
+.fn-rel-controls {
+  padding: 10px 0 10px;
+  border-bottom: 1px solid #f0f2f5;
+  margin-bottom: 14px;
+  display: flex; flex-direction: column; gap: 8px;
 }
-/* Focal column cells: persistent tint, never cleared by heatmap-off */
+.fn-rel-emphasis-row.col-chip-bar {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+}
+.fn-rel-meta-row {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+}
+
+/* Headline */
+.fn-rel-headline {
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border-left: 3px solid var(--fn-brand);
+  border-radius: 0 6px 6px 0;
+  font-size: 13px; color: #1e293b; line-height: 1.5;
+}
+.fn-rel-headline em { font-style: normal; color: var(--fn-brand); font-weight: 600; }
+.fn-rel-headline strong { font-weight: 700; color: #0f172a; }
+
+/* Chart container */
+.fn-rel-chart {
+  background: #fff; border: 1px solid #e2e8f0;
+  border-radius: 8px; padding: 16px 20px 12px;
+  margin-bottom: 12px; min-height: 40px;
+}
+.fn-rel-chart-inner { display: flex; flex-direction: column; gap: 5px; }
+
+/* Brand rows */
+.fn-rel-bar-row {
+  display: flex; align-items: center; gap: 10px; min-height: 28px;
+}
+.fn-rel-bar-label {
+  width: 172px; flex-shrink: 0;
+  font-size: 12px; font-weight: 500; color: #1e293b;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.fn-rel-bar-row-focal .fn-rel-bar-label {
+  color: var(--fn-brand); font-weight: 700;
+}
+.fn-rel-bar-area {
+  flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0;
+}
+.fn-rel-bar-track {
+  flex: 1; display: flex; height: 24px; border-radius: 4px; overflow: hidden;
+  background: #f1f5f9;
+}
+.fn-rel-bar-row-focal .fn-rel-bar-track {
+  height: 28px;
+  box-shadow: 0 1px 4px rgba(26,82,118,0.14);
+}
+.fn-rel-seg {
+  height: 100%; display: flex; align-items: center; justify-content: center;
+  transition: background-color 0.18s, opacity 0.18s;
+  flex-shrink: 0; min-width: 0;
+}
+.fn-rel-seg-label-inside {
+  font-size: 11px; font-weight: 700; color: #fff;
+  white-space: nowrap; pointer-events: none;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  padding: 0 4px;
+}
+.fn-rel-pct-tail {
+  font-size: 12px; font-weight: 700; color: #334155;
+  white-space: nowrap; flex-shrink: 0; min-width: 34px;
+}
+
+/* Legend */
+.fn-rel-legend {
+  display: flex; flex-wrap: wrap; gap: 8px 16px;
+  padding: 10px 0 2px; border-top: 1px solid #f0f2f5; margin-top: 10px;
+}
+.fn-rel-legend-item {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; color: #475569;
+}
+.fn-rel-legend-swatch {
+  width: 13px; height: 13px; border-radius: 3px; flex-shrink: 0;
+  transition: background-color 0.18s;
+}
+
+/* Flipped table — brands as rows, attitudes as columns */
+.fn-rel-table-v2 .fn-rel-th-att { font-size: 10px; }
+/* Focal row cells — persistent accent tint */
 .fn-panel .fn-rel-td-focal { background: rgba(26,82,118,0.06) !important; }
 .fn-panel.fn-heatmap-off .fn-rel-td-focal { background: rgba(26,82,118,0.06) !important; }
-
-/* Category avg column: italic header text, muted cell tint */
-.fn-panel .fn-rel-th-avg em { font-style: italic; opacity: 0.85; }
+/* Category avg row cells — muted italic */
 .fn-panel .fn-rel-td-avg {
-  background: #eff1f5 !important;
-  font-style: italic;
+  background: #eff1f5 !important; font-style: italic;
 }
 .fn-panel.fn-heatmap-off .fn-rel-td-avg { background: #eff1f5 !important; }
 
