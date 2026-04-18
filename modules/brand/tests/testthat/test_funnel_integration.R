@@ -185,13 +185,13 @@ test_that("run_brand produces the hand-calculated stage percentages", {
                                      stages$stage_key == "aware"]
   expect_equal(ipk_aware, 0.9, tolerance = 1e-9)
 
-  ipk_pref <- stages$pct_weighted[stages$brand_code == "IPK" &
-                                    stages$stage_key == "preferred"]
-  expect_equal(ipk_pref, 0.4, tolerance = 1e-9)
+  ipk_target <- stages$pct_weighted[stages$brand_code == "IPK" &
+                                      stages$stage_key == "bought_target"]
+  expect_equal(ipk_target, 0.5, tolerance = 1e-9)
 
-  cart_pref <- stages$pct_weighted[stages$brand_code == "CART" &
-                                     stages$stage_key == "preferred"]
-  expect_equal(cart_pref, 0.2, tolerance = 1e-9)
+  cart_target <- stages$pct_weighted[stages$brand_code == "CART" &
+                                       stages$stage_key == "bought_target"]
+  expect_equal(cart_target, 0.4, tolerance = 1e-9)
 })
 
 
@@ -264,7 +264,14 @@ test_that("Sig-tester closure wrapping tabs returns the expected structure", {
                     "direction", "p_value", "significant")
                   %in% names(res$sig_results)))
   expect_true(all(res$sig_results$comparison %in%
-                    c("focal_vs_competitor", "focal_vs_cat_avg")))
+                    c("focal_vs_competitor", "focal_vs_cat_avg",
+                      "brand_vs_cat_avg")))
+  # Per-cell sig_vs_avg is emitted for every brand, not only focal.
+  brand_vs_avg <- res$sig_results[res$sig_results$comparison ==
+                                    "brand_vs_cat_avg", , drop = FALSE]
+  expect_true(nrow(brand_vs_avg) > 0)
+  expect_setequal(unique(brand_vs_avg$brand_code),
+                  as.character(structure$brands$BrandCode))
 })
 
 

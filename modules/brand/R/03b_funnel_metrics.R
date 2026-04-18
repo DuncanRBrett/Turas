@@ -147,7 +147,20 @@ calculate_attitude_decomposition <- function(attitude_entry, awareness_matrix,
 # run_significance_tests
 # ==============================================================================
 
-#' Focal-vs-competitor + focal-vs-cat-avg two-proportion z-tests per stage
+#' Two-proportion z-tests per stage — three comparison families
+#'
+#' Emits three comparison flavours per stage:
+#' \describe{
+#'   \item{\code{focal_vs_competitor}}{One row per competitor: focal's
+#'     proportion vs that competitor's proportion.}
+#'   \item{\code{brand_vs_cat_avg}}{One row per brand (including focal):
+#'     that brand's proportion vs the category average computed over
+#'     every OTHER brand at the same stage. Used for in-cell ▲/▼ flags
+#'     across the whole table, not just the focal row.}
+#'   \item{\code{focal_vs_cat_avg}}{Legacy alias — same as
+#'     \code{brand_vs_cat_avg} for the focal row. Kept so existing panel
+#'     code reading this comparison keeps working.}
+#' }
 #'
 #' @param stage_metrics Output of calculate_stage_metrics().
 #' @param focal_brand Character code of the focal brand.
@@ -171,22 +184,38 @@ run_significance_tests <- function(stage_metrics, focal_brand,
   for (stage_key in stages_in_order) {
     stage_rows <- stage_metrics[stage_metrics$stage_key == stage_key, ,
                                 drop = FALSE]
+
+    # (1) focal vs every competitor
     focal_row <- stage_rows[stage_rows$brand_code == focal_brand, ,
                             drop = FALSE]
-    if (nrow(focal_row) != 1) next
-    for (b in setdiff(brands, focal_brand)) {
-      comp_row <- stage_rows[stage_rows$brand_code == b, , drop = FALSE]
-      if (nrow(comp_row) == 1) {
-        rows[[length(rows) + 1]] <- .sig_row(focal_row, comp_row,
-          stage_key, focal_brand, b, "focal_vs_competitor",
-          sig_tester, alpha)
+    if (nrow(focal_row) == 1) {
+      for (b in setdiff(brands, focal_brand)) {
+        comp_row <- stage_rows[stage_rows$brand_code == b, , drop = FALSE]
+        if (nrow(comp_row) == 1) {
+          rows[[length(rows) + 1]] <- .sig_row(focal_row, comp_row,
+            stage_key, focal_brand, b, "focal_vs_competitor",
+            sig_tester, alpha)
+        }
       }
     }
-    cat_avg <- .category_average_excluding_focal(stage_rows, focal_brand)
-    if (!is.null(cat_avg)) {
+
+    # (2) every brand vs category average (excluding itself)
+    for (b in brands) {
+      brand_row <- stage_rows[stage_rows$brand_code == b, , drop = FALSE]
+      if (nrow(brand_row) != 1) next
+      cat_avg <- .category_average_excluding(stage_rows, b)
+      if (is.null(cat_avg)) next
+      # brand_code on the emitted row = the brand tested (not "category_avg")
       rows[[length(rows) + 1]] <- .sig_row_against_summary(
-        focal_row, cat_avg, stage_key, focal_brand,
-        "category_avg", "focal_vs_cat_avg", sig_tester, alpha)
+        brand_row, cat_avg, stage_key, b,
+        b, "brand_vs_cat_avg", sig_tester, alpha)
+      # Legacy alias kept on the focal row so downstream panel_data that
+      # still reads `focal_vs_cat_avg` continues to resolve.
+      if (identical(b, focal_brand)) {
+        rows[[length(rows) + 1]] <- .sig_row_against_summary(
+          brand_row, cat_avg, stage_key, focal_brand,
+          focal_brand, "focal_vs_cat_avg", sig_tester, alpha)
+      }
     }
   }
   if (length(rows) == 0) return(.empty_sig_df())
@@ -346,8 +375,11 @@ run_significance_tests <- function(stage_metrics, focal_brand,
 }
 
 
-.category_average_excluding_focal <- function(stage_rows, focal_brand) {
-  other <- stage_rows[stage_rows$brand_code != focal_brand, , drop = FALSE]
+#' Category average excluding one brand — used both for the focal's
+#' vs-average comparison and for every brand's own vs-average test.
+#' @keywords internal
+.category_average_excluding <- function(stage_rows, excluded_brand) {
+  other <- stage_rows[stage_rows$brand_code != excluded_brand, , drop = FALSE]
   if (nrow(other) == 0) return(NULL)
   tot_base <- sum(other$base_weighted, na.rm = TRUE)
   tot_n <- sum(
@@ -357,6 +389,11 @@ run_significance_tests <- function(stage_metrics, focal_brand,
   if (tot_n <= 0 || !is.finite(tot_n)) return(NULL)
   list(base = tot_base, total_n = tot_n,
        pct = tot_base / tot_n)
+}
+
+# Backwards-compat alias — older code paths may still reference this.
+.category_average_excluding_focal <- function(stage_rows, focal_brand) {
+  .category_average_excluding(stage_rows, focal_brand)
 }
 
 

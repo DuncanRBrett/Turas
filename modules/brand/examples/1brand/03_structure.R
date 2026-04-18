@@ -193,6 +193,14 @@
 # BRANDS, CEPs, ATTRIBUTES, DBA_ASSETS SHEETS
 # ==============================================================================
 
+# Brand-specific hex colours. Focal (IPK) and two key competitors have fixed
+# colours; others left blank so they pick up the automatic Tableau-10 palette.
+.BRAND_COLOURS_1BRAND <- list(
+  IPK   = "#1A5276",   # Turas navy — focal brand
+  ROB   = "#C0392B",   # Robertsons red
+  KNORR = "#E67E22"    # Knorr amber
+)
+
 .build_1brand_brands_rows <- function() {
   cat_name <- ipk_category()$name
   lapply(ipk_brands(), function(b) list(
@@ -200,7 +208,8 @@
     BrandCode    = b$code,
     BrandLabel   = b$label,
     DisplayOrder = b$display_order,
-    IsFocal      = if (isTRUE(b$is_focal)) "Y" else "N"
+    IsFocal      = if (isTRUE(b$is_focal)) "Y" else "N",
+    Colour       = .BRAND_COLOURS_1BRAND[[b$code]] %||% ""
   ))
 }
 

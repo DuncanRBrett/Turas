@@ -15,6 +15,12 @@ BRAND_HTML_VERSION <- "2.0"
 
 if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
 
+# Capture this file's directory at source time (reliable path anchor for JS/CSS assets)
+.BRAND_HTML_REPORT_DIR <- tryCatch({
+  f <- sys.frame(length(sys.frames()))$ofile
+  if (!is.null(f) && nchar(f) > 0) dirname(normalizePath(f)) else NULL
+}, error = function(e) NULL)
+
 
 #' Generate interactive brand HTML report
 #'
@@ -120,20 +126,19 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
              error = function(e) "")
   } else ""
   panel_js <- ""
-  fn_js_path <- file.path(dirname(sys.frame(1)$ofile %||% ""),
-                          "js", "brand_funnel_panel.js")
-  if (!is.null(fn_js_path) && is.character(fn_js_path) &&
-      file.exists(fn_js_path)) {
-    panel_js <- paste(readLines(fn_js_path, warn = FALSE), collapse = "\n")
-  } else {
-    # Fallback: source via find_turas_root() when available
-    root_js <- tryCatch(file.path(find_turas_root(), "modules", "brand",
-                                   "lib", "html_report", "js",
-                                   "brand_funnel_panel.js"),
-                        error = function(e) NULL)
-    if (!is.null(root_js) && file.exists(root_js)) {
-      panel_js <- paste(readLines(root_js, warn = FALSE), collapse = "\n")
-    }
+  # Resolve JS path: prefer source-time anchor, fall back to working dir and TURAS_ROOT
+  .js_candidates <- c(
+    if (!is.null(.BRAND_HTML_REPORT_DIR))
+      file.path(.BRAND_HTML_REPORT_DIR, "js", "brand_funnel_panel.js"),
+    file.path(getwd(), "modules", "brand", "lib", "html_report",
+              "js", "brand_funnel_panel.js"),
+    tryCatch(file.path(find_turas_root(), "modules", "brand", "lib",
+                       "html_report", "js", "brand_funnel_panel.js"),
+             error = function(e) NULL)
+  )
+  .js_found <- Filter(function(p) !is.null(p) && file.exists(p), .js_candidates)
+  if (length(.js_found) > 0) {
+    panel_js <- paste(readLines(.js_found[[1]], warn = FALSE), collapse = "\n")
   }
 
   # --- Layers 3+4: Assemble page ---

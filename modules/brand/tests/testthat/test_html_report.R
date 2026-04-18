@@ -92,29 +92,28 @@ source(file.path(TURAS_ROOT, "modules", "brand", "lib", "html_report",
             # New role-registry shape: long-format stages + conversions +
             # attitude decomposition. See FUNNEL_SPEC_v2.md §5.1.
             stages = data.frame(
-              brand_code = rep(c("IPK", "MC"), each = 5),
+              brand_code = rep(c("IPK", "MC"), each = 4),
               stage_key = rep(c("aware", "consideration",
-                                "bought_long", "bought_target",
-                                "preferred"), 2),
-              pct_weighted = c(0.85, 0.55, 0.45, 0.30, 0.20,
-                               0.70, 0.40, 0.30, 0.20, 0.15),
-              pct_unweighted = c(0.85, 0.55, 0.45, 0.30, 0.20,
-                                 0.70, 0.40, 0.30, 0.20, 0.15),
-              base_weighted = c(170, 110, 90, 60, 40,
-                                140, 80, 60, 40, 30),
-              base_unweighted = c(170, 110, 90, 60, 40,
-                                  140, 80, 60, 40, 30),
+                                "bought_long", "bought_target"), 2),
+              pct_weighted = c(0.85, 0.55, 0.45, 0.30,
+                               0.70, 0.40, 0.30, 0.20),
+              pct_unweighted = c(0.85, 0.55, 0.45, 0.30,
+                                 0.70, 0.40, 0.30, 0.20),
+              base_weighted = c(170, 110, 90, 60,
+                                140, 80, 60, 40),
+              base_unweighted = c(170, 110, 90, 60,
+                                  140, 80, 60, 40),
               warning_flag = "none",
               stringsAsFactors = FALSE
             ),
             conversions = data.frame(
-              brand_code = rep(c("IPK", "MC"), each = 4),
+              brand_code = rep(c("IPK", "MC"), each = 3),
               from_stage = rep(c("aware", "consideration",
-                                 "bought_long", "bought_target"), 2),
+                                 "bought_long"), 2),
               to_stage = rep(c("consideration", "bought_long",
-                               "bought_target", "preferred"), 2),
-              value = c(0.647, 0.818, 0.667, 0.667,
-                        0.571, 0.750, 0.667, 0.750),
+                               "bought_target"), 2),
+              value = c(0.647, 0.818, 0.667,
+                        0.571, 0.750, 0.667),
               method = "ratio",
               stringsAsFactors = FALSE
             ),
@@ -135,15 +134,14 @@ source(file.path(TURAS_ROOT, "modules", "brand", "lib", "html_report",
               focal_brand = "IPK",
               focal_by_stage = list(aware = 0.85, consideration = 0.55,
                                     bought_long = 0.45,
-                                    bought_target = 0.30,
-                                    preferred = 0.20)
+                                    bought_target = 0.30)
             ),
             meta = list(
               category_type = "transactional", focal_brand = "IPK",
               wave = 1L, n_unweighted = 200, n_weighted = 200,
-              stage_count = 5L,
+              stage_count = 4L,
               stage_keys = c("aware", "consideration", "bought_long",
-                             "bought_target", "preferred")
+                             "bought_target")
             ),
             warnings = character(0)
           ),

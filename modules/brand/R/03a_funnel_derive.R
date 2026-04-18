@@ -13,18 +13,20 @@
 # VERSION: 2.0
 # ==============================================================================
 
-BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
+BRAND_FUNNEL_DERIVE_VERSION <- "2.1"
 
 
 # ==============================================================================
 # CONSTANTS
 # ==============================================================================
 
-# Category type -> ordered stage list. Every stage shares a derivation key
-# which is looked up in .STAGE_DERIVATIONS below.
+# Category type -> ordered stage list. Transactional funnels are 4 stages
+# (Aware → Consider → Long Period → Target Period). Heavy-buyer / frequency
+# analysis lives in the Repertoire / Frequency element, not here — the
+# funnel is a leakage story with unambiguous binary stages (FUNNEL_SPEC_v2 §3).
 .FUNNEL_STAGE_PLAN <- list(
   transactional = c("aware", "consideration",
-                    "bought_long", "bought_target", "preferred"),
+                    "bought_long", "bought_target"),
   durable       = c("aware", "consideration",
                     "current_owner_d", "long_tenured_d"),
   service       = c("aware", "consideration",
@@ -35,14 +37,27 @@ BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
 # runtime via config$funnel.stage_labels_override.
 .FUNNEL_DEFAULT_LABELS <- list(
   aware              = "Aware",
-  consideration      = "Consideration",
-  bought_long        = "Bought",
-  bought_target      = "Frequent",
-  preferred          = "Preferred",
+  consideration      = "Consider",
+  bought_long        = "Long Period",
+  bought_target      = "Target Period",
   current_owner_d    = "Current owner",
   long_tenured_d     = "Long-tenured owner",
   current_customer_s = "Current customer",
   long_tenured_s     = "Long-tenured customer"
+)
+
+# Stage definitions — shown as clickable ? popovers in the HTML report
+# and exported to the About drawer / Excel metadata sheet. Operator can
+# override per project via config$funnel.stage_definitions.
+.FUNNEL_DEFAULT_DEFINITIONS <- list(
+  aware              = "Respondents who recognise the brand (stated aided awareness).",
+  consideration      = "Aware respondents holding a positive or non-rejecting attitude (Love, Prefer, or Ambivalent — not Reject or No opinion).",
+  bought_long        = "Considerers who have bought the brand in the longer timeframe asked on the survey.",
+  bought_target      = "Long-period buyers who also bought the brand in the target (shorter) timeframe.",
+  current_owner_d    = "Considerers who currently own this brand in the category.",
+  long_tenured_d     = "Current owners whose tenure meets or exceeds the configured tenure threshold.",
+  current_customer_s = "Considerers who are current customers of this brand.",
+  long_tenured_s     = "Current customers whose tenure meets or exceeds the configured tenure threshold."
 )
 
 # Positive attitude role set (Consideration membership).
@@ -95,7 +110,8 @@ derive_funnel_stages <- function(data, role_map, category_type,
 
   for (key in plan) {
     mat <- .derive_stage_matrix(
-      key, data, role_map, brands, n_resp, category_type, tenure_threshold)
+      key, data, role_map, brands, n_resp, category_type,
+      tenure_threshold)
     if (is.null(mat$matrix)) {
       warns <- c(warns, mat$warning)
       next
@@ -236,11 +252,10 @@ validate_nesting <- function(stages, weights = NULL) {
 
     bought_long = .optional_per_brand_stage(
       role_map, "funnel.transactional.bought_long",
-      data, brands, n_resp, "Bought (longer timeframe)"),
+      data, brands, n_resp, "Long Period"),
     bought_target = .optional_per_brand_stage(
       role_map, "funnel.transactional.bought_target",
-      data, brands, n_resp, "Frequent (target timeframe)"),
-    preferred = .preferred_stage(role_map, data, brands, n_resp),
+      data, brands, n_resp, "Target Period"),
 
     current_owner_d = .single_response_brand_match_stage(
       role_map, "funnel.durable.current_owner",
@@ -311,38 +326,6 @@ validate_nesting <- function(stages, weights = NULL) {
 }
 
 
-#' Preferred stage — frequency argmax with ties
-#' @keywords internal
-.preferred_stage <- function(role_map, data, brands, n_resp) {
-  entry <- role_map[["funnel.transactional.frequency"]]
-  if (is.null(entry)) {
-    return(list(matrix = NULL,
-                warning = "Stage 'Preferred' dropped: frequency role absent."))
-  }
-
-  freq_mat <- matrix(NA_real_, nrow = n_resp, ncol = length(brands),
-                     dimnames = list(NULL, brands))
-  for (b in brands) {
-    col <- .column_for_brand(entry, b)
-    if (!is.null(col) && col %in% names(data)) {
-      freq_mat[, b] <- suppressWarnings(as.numeric(data[[col]]))
-    }
-  }
-
-  row_max <- suppressWarnings(apply(freq_mat, 1, max, na.rm = TRUE))
-  row_max[!is.finite(row_max) | row_max <= 0] <- NA_real_
-
-  preferred <- matrix(FALSE, nrow = n_resp, ncol = length(brands),
-                      dimnames = list(NULL, brands))
-  for (i in seq_len(n_resp)) {
-    if (!is.na(row_max[i])) {
-      preferred[i, ] <- !is.na(freq_mat[i, ]) &
-                       freq_mat[i, ] == row_max[i] &
-                       freq_mat[i, ] > 0
-    }
-  }
-  list(matrix = preferred)
-}
 
 
 #' Single-response respondent-level role where value is a brand code

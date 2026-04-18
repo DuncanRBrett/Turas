@@ -10,7 +10,8 @@
 #   - Weights all equal 1 → weighted == unweighted
 #   - Weights sum to zero handled at guard layer (covered in guard tests)
 #   - suppress_base renders "suppress" flag on stages below threshold
-#   - Preferred ties allow brand-sums to exceed Bought_Target rows
+#   - Frequency role absent → funnel still renders at 4 stages (heavy-buyer
+#     analysis is not a funnel stage in v2.1, so frequency is never required).
 # ==============================================================================
 
 .find_turas_root_for_test <- function() {
@@ -125,7 +126,7 @@ test_that("Zero awareness for all brands yields 0% at every stage, NA conversion
 
   for (b in c("IPK","ROB","CART")) {
     expect_equal(.pct(res$stages, "aware", b), 0)
-    expect_equal(.pct(res$stages, "preferred", b), 0)
+    expect_equal(.pct(res$stages, "bought_target", b), 0)
   }
   # Conversions should be NA (not NaN / not division error)
   expect_true(all(is.na(res$conversions$value)))
@@ -158,7 +159,10 @@ test_that("All aware + none positive gives Consideration = 0 and later stages = 
 
 # --- Missing optional role --------------------------------------------------
 
-test_that("Dropping the frequency role removes Preferred but keeps earlier stages", {
+test_that("Dropping the frequency role leaves the funnel intact (4 stages, no warning)", {
+  # In v2.1 frequency is consumed by the Repertoire / Frequency element,
+  # not the funnel. Absent → funnel is unaffected; no preferred/heavy_buyer
+  # stage is produced in either case.
   qm <- .qm_transactional()
   qm <- qm[qm$Role != "funnel.transactional.frequency", , drop = FALSE]
   rm <- load_role_map(.structure(qm, .optionmap_attitude()))
@@ -166,11 +170,11 @@ test_that("Dropping the frequency role removes Preferred but keeps earlier stage
   data <- .fixture_transactional()
   res <- run_funnel(data, rm, .brand_list(), .config())
 
-  expect_equal(res$status, "PARTIAL")
+  expect_equal(res$status, "PASS")
   expect_false("preferred" %in% res$meta$stage_keys)
-  # Earlier stages unchanged
+  expect_false("heavy_buyer" %in% res$meta$stage_keys)
+  expect_equal(res$meta$stage_count, 4)
   expect_equal(.pct(res$stages, "aware", "IPK"), 0.9, tolerance = 1e-9)
-  expect_true(any(grepl("Preferred", res$warnings)))
 })
 
 
@@ -217,7 +221,7 @@ test_that("Inverted attitude scale (5=love..1=no_opinion) yields same stage coun
   res <- run_funnel(data, rm, .brand_list(), .config())
 
   expect_equal(.pct(res$stages, "consideration", "IPK"), 0.7, tolerance = 1e-9)
-  expect_equal(.pct(res$stages, "preferred", "IPK"), 0.4, tolerance = 1e-9)
+  expect_equal(.pct(res$stages, "bought_target", "IPK"), 0.5, tolerance = 1e-9)
 })
 
 
@@ -238,7 +242,8 @@ test_that("Weights all equal 1 produce weighted == unweighted", {
 # --- Suppress base flag ------------------------------------------------------
 
 test_that("suppress_base = 50 marks stages with base 30-49 as 'suppress'", {
-  # Tiny fixture where Preferred will fall below 50 but higher stages pass
+  # Tiny fixture where Target Period base randomly falls below 50 at the
+  # brand level while Aware base (60) sits in the warn band (50..<75).
   set.seed(7)
   n <- 60
   data <- data.frame(Respondent_ID = seq_len(n), Weight = 1)
@@ -246,20 +251,20 @@ test_that("suppress_base = 50 marks stages with base 30-49 as 'suppress'", {
     data[[paste0("BRANDAWARE_", b)]]  <- rep(1, n)
     data[[paste0("QBRANDATT1_", b)]]  <- as.character(sample(1:2, n, replace = TRUE))
     data[[paste0("BRANDPENTRANS1_", b)]] <- rep(1, n)
-    data[[paste0("BRANDPENTRANS2_", b)]] <- rep(1, n)
-    # Frequency: only random subset wins → narrower Preferred base
-    data[[paste0("BRANDPENTRANS3_", b)]] <- sample(0:1, n, replace = TRUE)
+    # Target period: only random subset → narrower base at stage 4
+    data[[paste0("BRANDPENTRANS2_", b)]] <- sample(0:1, n, replace = TRUE)
+    data[[paste0("BRANDPENTRANS3_", b)]] <- 1
   }
   rm <- load_role_map(.structure(.qm_transactional(), .optionmap_attitude()))
   cfg <- .config(`funnel.suppress_base` = 50, `funnel.warn_base` = 75)
   res <- run_funnel(data, rm, .brand_list(), cfg)
 
-  aware_flags <- res$stages$warning_flag[res$stages$stage_key == "aware"]
-  pref_flags  <- res$stages$warning_flag[res$stages$stage_key == "preferred"]
+  aware_flags  <- res$stages$warning_flag[res$stages$stage_key == "aware"]
+  target_flags <- res$stages$warning_flag[res$stages$stage_key == "bought_target"]
   # Aware for every brand is 60 → between 50 and 75 → warn
   expect_true(all(aware_flags == "warn"))
-  # Preferred bases (randomish) likely below 50 → suppress (or <30 → suppress)
-  expect_true(any(pref_flags == "suppress"))
+  # Target Period bases (randomish) likely below 50 → suppress
+  expect_true(any(target_flags == "suppress"))
 })
 
 

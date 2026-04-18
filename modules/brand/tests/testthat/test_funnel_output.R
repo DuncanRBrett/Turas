@@ -184,7 +184,7 @@ test_that("write_funnel_csv produces one row per brand x stage", {
   write_funnel_csv(bundle$result, .brand_list_ircc(), bundle$role_map,
                    tmp, list(category_code = "FMCG_TEST", wave_label = "W1"))
   df <- utils::read.csv(tmp, stringsAsFactors = FALSE)
-  expect_equal(nrow(df), 15)  # 5 stages x 3 brands
+  expect_equal(nrow(df), 12)  # 4 stages x 3 brands
   expect_setequal(unique(df$brand_code), c("IPK", "ROB", "CART"))
 })
 

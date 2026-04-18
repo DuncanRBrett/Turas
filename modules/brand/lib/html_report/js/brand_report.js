@@ -18,6 +18,24 @@
     });
     var target = document.getElementById("panel-" + tabName);
     if (target) target.classList.add("active");
+
+    var titleEl = document.getElementById("br-header-title");
+    if (titleEl) {
+      var header = document.querySelector(".br-header");
+      var reportTitle = header ? (header.getAttribute("data-report-title") || "") : "";
+      var nonCatTabs = ["summary", "pinned", "about", "dba", "wom", "portfolio"];
+      if (nonCatTabs.indexOf(tabName) !== -1) {
+        titleEl.textContent = reportTitle;
+      } else {
+        var activeBtn = document.querySelector('.br-tab-btn[data-tab="' + tabName + '"]');
+        if (activeBtn) {
+          var badge = activeBtn.querySelector(".br-pin-badge");
+          var label = activeBtn.textContent.trim();
+          if (badge) label = label.replace(badge.textContent.trim(), "").trim();
+          titleEl.textContent = label;
+        }
+      }
+    }
   };
 
   // --- Category sub-tab switching ---
