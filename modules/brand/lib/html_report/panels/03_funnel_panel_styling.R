@@ -63,6 +63,51 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 }
 .fn-pin-btn.pin-btn:hover { border-color: var(--fn-brand); }
 
+.fn-pin-dropdown-btn {
+  margin-left: auto; padding: 5px 10px; font-size: 11px; font-weight: 600;
+  background: #fff; color: #64748b;
+  border: 1px solid #e2e8f0; border-radius: 6px;
+  cursor: pointer; font-family: inherit;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.fn-pin-dropdown-btn:hover { border-color: var(--fn-brand); color: var(--fn-brand); }
+.fn-pin-dropdown {
+  position: absolute; z-index: 50;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  min-width: 180px;
+}
+.fn-pin-header {
+  font-size: 10px; font-weight: 700; color: #64748b;
+  text-transform: uppercase; letter-spacing: 0.6px;
+  padding: 8px 14px 4px;
+}
+.fn-pin-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 14px; font-size: 12px; font-weight: 500;
+  color: #1e293b; cursor: pointer;
+}
+.fn-pin-item:hover { background: #f8fafc; }
+.fn-pin-item input[type="checkbox"] { accent-color: var(--fn-brand); cursor: pointer; }
+.fn-pin-footer {
+  padding: 6px 14px 8px; border-top: 1px solid #f0f2f5; margin-top: 4px;
+}
+.fn-pin-save-btn {
+  width: 100%; padding: 6px; font-size: 11px; font-weight: 600;
+  background: var(--fn-brand); color: #fff; border: none; border-radius: 4px;
+  cursor: pointer; font-family: inherit;
+}
+.fn-pin-save-btn:hover { opacity: 0.88; }
+.fn-pinned { outline: 2px dashed var(--fn-brand); outline-offset: 4px; }
+
+/* Significance markers vs category average CI — always visible, shading-independent */
+.fn-sig-avg {
+  font-size: 9px; font-weight: 800; margin-left: 2px;
+  vertical-align: super; line-height: 1;
+}
+.fn-sig-avg-up { color: #059669; }
+.fn-sig-avg-dn { color: #c0392b; }
+
 .fn-subnav {
   display: flex; gap: 0; border-bottom: 1px solid #e2e8f0;
   margin-bottom: 0;
@@ -114,13 +159,13 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
   display: flex; flex-wrap: wrap; gap: 4px;
   padding: 0; border: none; margin: 0; background: transparent;
 }
-.fn-chip-row .col-chip {
+.fn-chip-row .col-chip, .col-chip-bar .col-chip {
   padding: 5px 12px; border: 1px solid #e2e8f0; border-radius: 16px;
   background: #f0fafa; color: #1e293b; font-size: 11px; font-weight: 500;
   cursor: pointer; font-family: inherit; transition: all 0.15s;
 }
-.fn-chip-row .col-chip:hover { border-color: var(--fn-brand); }
-.fn-chip-row .col-chip-off {
+.fn-chip-row .col-chip:hover, .col-chip-bar .col-chip:hover { border-color: var(--fn-brand); }
+.fn-chip-row .col-chip-off, .col-chip-bar .col-chip-off {
   background: #f8f9fa; color: #94a3b8;
   text-decoration: line-through; opacity: 0.55;
 }
@@ -276,14 +321,14 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
   font-size: 10px; color: #94a3b8; cursor: pointer; font-family: inherit;
   margin-left: 2px;
 }
-.fn-panel .ct-sort-indicator:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.fn-panel .ct-sort-indicator:hover { background: rgba(255,255,255,0.1); color: #e2e8f0; }
+/* Active direction: subtle, no highlight — icon text set by JS */
 .fn-panel .ct-sort-indicator[data-fn-sort-dir="asc"],
 .fn-panel .ct-sort-indicator[data-fn-sort-dir="desc"] {
-  color: var(--fn-brand); font-weight: 700;
-  background: #fff;
+  color: #cbd5e1; background: transparent;
 }
-.fn-panel .ct-sort-indicator[data-fn-sort-dir="asc"]::after  { content: "↑"; margin-left: 1px; font-size: 10px; }
-.fn-panel .ct-sort-indicator[data-fn-sort-dir="desc"]::after { content: "↓"; margin-left: 1px; font-size: 10px; }
+.fn-panel .ct-sort-indicator[data-fn-sort-dir="asc"]::after,
+.fn-panel .ct-sort-indicator[data-fn-sort-dir="desc"]::after { content: ""; }
 
 /* Help "?" button on stage headers */
 .fn-help-btn {
@@ -410,6 +455,27 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 }
 .fn-chart-type-switcher { flex-shrink: 0; }
 .fn-chart-brand-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.fn-panel.fn-view-minifunnels .fn-slope-ctl { display: none; }
+
+/* Y-axis min/max inputs */
+.fn-yaxis-range {
+  display: flex; align-items: center; gap: 4px;
+}
+.fn-yaxis-input {
+  width: 46px; padding: 4px 6px; border: 1px solid #e2e8f0; border-radius: 4px;
+  font-family: inherit; font-size: 11px; color: #1e293b; text-align: center;
+  -moz-appearance: textfield;
+}
+.fn-yaxis-input::-webkit-outer-spin-button,
+.fn-yaxis-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.fn-yaxis-input::placeholder { color: #94a3b8; }
+.fn-yaxis-sep { font-size: 11px; color: #94a3b8; }
+.fn-yaxis-reset {
+  padding: 3px 7px; border: 1px solid #e2e8f0; border-radius: 4px;
+  background: #fff; color: #94a3b8; cursor: pointer; font-size: 13px;
+  font-family: inherit; line-height: 1;
+}
+.fn-yaxis-reset:hover { border-color: var(--fn-brand); color: var(--fn-brand); }
 
 /* -------------------------------------------------------------------------- */
 /* Slope chart + relationship                                                 */
@@ -421,6 +487,11 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 /* -------------------------------------------------------------------------- */
 /* Mini funnels                                                                */
 /* -------------------------------------------------------------------------- */
+.fn-mf-section-heading {
+  font-size: 11px; font-weight: 700; color: #64748b;
+  text-transform: uppercase; letter-spacing: 0.8px;
+  padding: 12px 0 6px; border-top: 1px solid #f0f2f5; margin-top: 8px;
+}
 .fn-mini-funnels-view {
   display: flex; flex-wrap: wrap; gap: 12px; padding: 8px 0;
   align-items: flex-start;
@@ -428,11 +499,11 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 .fn-mini-funnel {
   flex: 0 0 auto; min-width: 140px; max-width: 200px;
   background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+  border-left: 4px solid #e2e8f0;
   padding: 12px 12px 10px;
 }
-.fn-mini-funnel.fn-mf-focal {
-  border: 2px solid var(--fn-brand);
-}
+.fn-mini-funnel.fn-mf-focal { border-left-color: var(--fn-brand); }
+.fn-mini-funnel.fn-mf-avg { border-left-color: #64748b; font-style: italic; }
 .fn-mf-title {
   font-size: 11px; font-weight: 700; color: #1e293b; text-align: center;
   margin-bottom: 10px; white-space: nowrap; overflow: hidden;
@@ -486,9 +557,35 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 .fn-panel-empty { padding: 24px; background: #f8fafc; color: #64748b;
   border-radius: 8px; text-align: center; }
 
+/* -------------------------------------------------------------------------- */
+/* Slope chart hover tooltip                                                  */
+/* -------------------------------------------------------------------------- */
+.fn-slope-tooltip {
+  position: absolute; z-index: 100; pointer-events: none; display: none;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12); padding: 0;
+  min-width: 130px; white-space: nowrap; overflow: hidden;
+}
+.fn-st-color-bar { height: 4px; border-radius: 8px 8px 0 0; }
+.fn-st-body { padding: 8px 12px; }
+.fn-st-brand { font-size: 12px; font-weight: 700; color: #1e293b; margin-bottom: 2px; }
+.fn-st-stage { font-size: 11px; color: #64748b; margin-bottom: 4px; }
+.fn-st-pct { font-size: 22px; font-weight: 800; color: #1e293b; letter-spacing: -0.5px; line-height: 1; }
+
+/* -------------------------------------------------------------------------- */
+/* Shading switchers — reuse .sig-level-switcher                              */
+/* -------------------------------------------------------------------------- */
+.fn-shading-switcher, .fn-shade-switcher { flex-shrink: 0; }
+
+/* CI band cell colours — applied as inline bg when "CI bands" mode active    */
+.fn-ci-above { background-color: rgba(5,150,105,0.18)  !important; }
+.fn-ci-within { background-color: rgba(245,158,11,0.15) !important; }
+.fn-ci-below  { background-color: rgba(192,57,43,0.13)  !important; }
+
 @media print {
   .fn-controls, .fn-export-btn, .fn-subnav, .fn-pin-btn { display: none !important; }
   .fn-subtab[hidden] { display: block !important; }
+  .fn-slope-tooltip { display: none !important; }
 }
 '
 }

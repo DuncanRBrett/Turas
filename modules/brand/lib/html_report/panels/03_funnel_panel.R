@@ -70,7 +70,8 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
         '<div class="fn-chart-view" data-fn-view="slope">',
           .fn_chart_section(panel_data, focal_colour),
         '</div>',
-        '<div class="fn-chart-view fn-mini-funnels-view" data-fn-view="minifunnels" hidden></div>',
+        '<div class="fn-mf-section-heading">Mini Funnels</div>',
+        '<div class="fn-mini-funnels-view" data-fn-view="minifunnels"></div>',
       '</div>',
       .fn_add_insight_strip(),
     '</div>',
@@ -147,10 +148,7 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
     '<div class="fn-focus-bar">
        <label class="fn-ctl-label">Focal brand</label>
        <select class="fn-focus-select" data-fn-action="focus">%s</select>
-       <div class="fn-focus-actions">
-         <button type="button" class="fn-pin-btn pin-btn" title="Pin this panel" aria-label="Pin">\U0001F4CC</button>
-         <button type="button" class="export-btn fn-export-btn" data-fn-action="export" title="Export to Excel">\u2B73 Export \u25BE</button>
-       </div>
+       <button type="button" class="fn-pin-dropdown-btn" data-fn-action="pindropdown" title="Pin a section" aria-haspopup="true">&#128204; Pin &#9662;</button>
      </div>',
     focus_options)
 }
@@ -181,8 +179,13 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
     '<div class="fn-ctl-group"><span class="fn-ctl-label">Show brands</span>',
     sprintf('<div class="fn-chip-row col-chip-bar">%s</div></div>', chips_html),
 
-    # Heatmap checked by default, Show count off, Show chart on
-    '<label class="toggle-label"><input type="checkbox" checked data-fn-action="heatmap"> Heatmap</label>',
+    # Table shading: segmented Off / Heatmap (default) / CI bands
+    '<div class="sig-level-switcher fn-shade-switcher" role="group" aria-label="Cell shading">',
+    '<span class="sig-level-label">Shade:</span>',
+    '<button type="button" class="sig-btn" data-fn-action="tableshading" data-fn-shade="off" aria-pressed="false">Off</button>',
+    '<button type="button" class="sig-btn sig-btn-active" data-fn-action="tableshading" data-fn-shade="heatmap" aria-pressed="true">Heatmap</button>',
+    '<button type="button" class="sig-btn" data-fn-action="tableshading" data-fn-shade="ci" aria-pressed="false">CI bands</button>',
+    '</div>',
     '<label class="toggle-label"><input type="checkbox" data-fn-action="showcounts"> Show count</label>',
     '<label class="toggle-label"><input type="checkbox" checked data-fn-action="showchart"> Show chart</label>',
 
@@ -193,7 +196,7 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
     '<button type="button" class="sig-btn" data-fn-action="pctmode" data-fn-pctmode="previous" aria-pressed="false">% of previous</button>',
     '</div>',
 
-    '<button type="button" class="export-btn fn-export-btn" data-fn-action="export" title="Export to Excel">\u2B73 Export \u25BE</button>',
+    '<button type="button" class="export-btn fn-export-btn" data-fn-action="exporttable" title="Export table to Excel">\u2B73 Export table \u25BE</button>',
     '</div>'
   )
 }
@@ -289,22 +292,40 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
   brand_names <- pd$table$brand_names %||% brand_codes
   focal <- pd$meta$focal_brand_code %||% brand_codes[1]
 
-  chips_html <- paste(vapply(seq_along(brand_codes), function(i) {
+  # Cat Avg chip — always first, off by default in slope (toggles the dashed line + mini funnel card)
+  cat_avg_chip <- '<button type="button" class="col-chip col-chip-off fn-chip-avg" data-fn-scope="chart" data-fn-brand="__avg__">Cat Avg</button>'
+
+  brand_chips_html <- paste(vapply(seq_along(brand_codes), function(i) {
     active <- brand_codes[i] == focal
     cls <- if (active) "col-chip" else "col-chip col-chip-off"
     sprintf('<button type="button" class="%s" data-fn-scope="chart" data-fn-brand="%s">%s</button>',
             cls, .fn_esc(brand_codes[i]), .fn_esc(brand_names[i]))
   }, character(1)), collapse = "")
 
+  chips_html <- paste0(cat_avg_chip, brand_chips_html)
+
   paste0(
     '<div class="fn-chart-header">',
-    '<div class="fn-chart-type-switcher sig-level-switcher" role="group" aria-label="Chart type">',
-    '<button type="button" class="sig-btn sig-btn-active" data-fn-action="chartview"',
-    ' data-fn-chartview="slope" aria-pressed="true">Slope</button>',
-    '<button type="button" class="sig-btn" data-fn-action="chartview"',
-    ' data-fn-chartview="minifunnels" aria-pressed="false">Mini Funnels</button>',
-    '</div>',
     '<div class="fn-chart-brand-chips col-chip-bar">', chips_html, '</div>',
+    '<div class="sig-level-switcher fn-slope-ctl" role="group" aria-label="Values">',
+    '<span class="sig-level-label">Values:</span>',
+    '<button type="button" class="sig-btn sig-btn-active" data-fn-action="showvalues" data-fn-showvalues="focal" aria-pressed="true">Focal</button>',
+    '<button type="button" class="sig-btn" data-fn-action="showvalues" data-fn-showvalues="all" aria-pressed="false">All</button>',
+    '<button type="button" class="sig-btn" data-fn-action="showvalues" data-fn-showvalues="none" aria-pressed="false">None</button>',
+    '</div>',
+    '<div class="sig-level-switcher fn-shading-switcher fn-slope-ctl" role="group" aria-label="Shading">',
+    '<span class="sig-level-label">Shading:</span>',
+    '<button type="button" class="sig-btn sig-btn-active" data-fn-action="shading" data-fn-shading="range" aria-pressed="true">Range</button>',
+    '<button type="button" class="sig-btn" data-fn-action="shading" data-fn-shading="ci" aria-pressed="false">CI</button>',
+    '<button type="button" class="sig-btn" data-fn-action="shading" data-fn-shading="none" aria-pressed="false">None</button>',
+    '</div>',
+    '<div class="fn-yaxis-range fn-slope-ctl">',
+    '<span class="sig-level-label">Y-axis:</span>',
+    '<input type="number" class="fn-yaxis-input" data-fn-yaxis="min" placeholder="0" min="0" max="100" step="5">',
+    '<span class="fn-yaxis-sep">\u2013</span>',
+    '<input type="number" class="fn-yaxis-input" data-fn-yaxis="max" placeholder="100" min="0" max="100" step="5">',
+    '<button type="button" class="fn-yaxis-reset" data-fn-action="yaxisreset" title="Reset y-axis">\u21BA</button>',
+    '</div>',
     '</div>'
   )
 }

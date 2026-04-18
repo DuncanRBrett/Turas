@@ -34,7 +34,6 @@ build_funnel_chart_section <- function(pd, focal_colour = "#1A5276") {
 
   paste0(
     '<section class="fn-section fn-chart-section">',
-    '<h3 class="fn-section-title">Shape view <span class="fn-insight-marker" title="AI insight available">&#9679;</span></h3>',
     '<div class="fn-chart-wrap" data-fn-chart="slope">',
     svg,
     '</div>',
