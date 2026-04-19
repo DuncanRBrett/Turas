@@ -90,19 +90,20 @@
   ))
 
   # ---- WOM battery (brand-level, Category = ALL) ----
+  # Follows CBM TRANS questions: QWOMBRAND1a/1b (received), 2a/2b (shared+count), 3a/3b (neg+count)
   wom_qs <- list(
-    list(QuestionCode = "WOM_POS_REC",   QuestionText = "Which brands have you heard someone speak POSITIVELY about?",
+    list(QuestionCode = "WOM_POS_REC",   QuestionText = "Has someone shared something POSITIVE about any of these brands in the last 3 months? (QWOMBRAND1a)",
          VariableType = "Multi_Mention", Battery = "wom", Category = "ALL"),
-    list(QuestionCode = "WOM_POS_FREQ",  QuestionText = "How often have you heard positive word-of-mouth?",
+    list(QuestionCode = "WOM_NEG_REC",   QuestionText = "Has someone shared something NEGATIVE about any of these brands in the last 3 months? (QWOMBRAND1b)",
+         VariableType = "Multi_Mention", Battery = "wom", Category = "ALL"),
+    list(QuestionCode = "WOM_POS_SHARE", QuestionText = "Have you shared something POSITIVE about any of these brands in the last 3 months? (QWOMBRAND2a)",
+         VariableType = "Multi_Mention", Battery = "wom", Category = "ALL"),
+    list(QuestionCode = "WOM_POS_COUNT", QuestionText = "On how many occasions have you shared something POSITIVE about each brand in the last 3 months? (QWOMBRAND2b)",
          VariableType = "Rating",        Battery = "wom", Category = "ALL"),
-    list(QuestionCode = "WOM_NEG_REC",   QuestionText = "Which brands have you heard someone speak NEGATIVELY about?",
+    list(QuestionCode = "WOM_NEG_SHARE", QuestionText = "Have you shared something NEGATIVE about any of these brands in the last 3 months? (QWOMBRAND3a)",
          VariableType = "Multi_Mention", Battery = "wom", Category = "ALL"),
-    list(QuestionCode = "WOM_NEG_FREQ",  QuestionText = "How often have you heard negative word-of-mouth?",
-         VariableType = "Rating",        Battery = "wom", Category = "ALL"),
-    list(QuestionCode = "WOM_POS_SHARE", QuestionText = "Which brands have you spoken POSITIVELY about to others?",
-         VariableType = "Multi_Mention", Battery = "wom", Category = "ALL"),
-    list(QuestionCode = "WOM_NEG_SHARE", QuestionText = "Which brands have you spoken NEGATIVELY about to others?",
-         VariableType = "Multi_Mention", Battery = "wom", Category = "ALL")
+    list(QuestionCode = "WOM_NEG_COUNT", QuestionText = "On how many occasions have you shared something NEGATIVE about each brand in the last 3 months? (QWOMBRAND3b)",
+         VariableType = "Rating",        Battery = "wom", Category = "ALL")
   )
 
   # ---- DBA battery (brand-level, one fame + one uniqueness question per asset) ----
@@ -159,15 +160,15 @@
     list(code = sprintf("BRANDPEN3_%s", cat_code), val = "5", text = "Rarely / first purchase", order = 5)
   )
 
-  # WOM frequency scales
-  wom_pos_freq <- list(
-    list(code = "WOM_POS_FREQ", val = "1", text = "Several times a week", order = 1),
-    list(code = "WOM_POS_FREQ", val = "2", text = "Weekly",               order = 2),
-    list(code = "WOM_POS_FREQ", val = "3", text = "A few times a month",  order = 3),
-    list(code = "WOM_POS_FREQ", val = "4", text = "Monthly or less",      order = 4),
-    list(code = "WOM_POS_FREQ", val = "5", text = "Never",                order = 5)
+  # WOM occasion count scales (QWOMBRAND2b / QWOMBRAND3b) — per brand, conditional on sharing
+  wom_count_options <- list(
+    list(code = "WOM_POS_COUNT", val = "1", text = "Once",          order = 1),
+    list(code = "WOM_POS_COUNT", val = "2", text = "Twice",         order = 2),
+    list(code = "WOM_POS_COUNT", val = "3", text = "3 times",       order = 3),
+    list(code = "WOM_POS_COUNT", val = "4", text = "4 times",       order = 4),
+    list(code = "WOM_POS_COUNT", val = "5", text = "5 or more times", order = 5)
   )
-  wom_neg_freq <- lapply(wom_pos_freq, function(r) { r$code <- "WOM_NEG_FREQ"; r })
+  wom_neg_count_options <- lapply(wom_count_options, function(r) { r$code <- "WOM_NEG_COUNT"; r })
 
   # DBA fame scale (binary recognition)
   dba_fame <- unlist(lapply(ipk_dba_assets(), function(a) list(
@@ -177,7 +178,7 @@
          text = "No, I have not seen this before", order = 2)
   )), recursive = FALSE)
 
-  all_options <- c(attitude, cat_buy, pen_freq, wom_pos_freq, wom_neg_freq, dba_fame)
+  all_options <- c(attitude, cat_buy, pen_freq, wom_count_options, wom_neg_count_options, dba_fame)
 
   lapply(all_options, function(o) list(
     QuestionCode = o$code,
@@ -241,6 +242,159 @@
     FameQuestionCode   = sprintf("DBA_FAME_%s",   a$code),
     UniqueQuestionCode = sprintf("DBA_UNIQUE_%s", a$code)
   ))
+}
+
+
+# ==============================================================================
+# QUESTIONMAP SHEET (role-registry architecture — required for funnel element)
+# ==============================================================================
+
+.build_questionmap_columns <- function() {
+  list(
+    list(name = "Role",               width = 36, required = TRUE,
+         description = "Registry role name (e.g. funnel.awareness). See ROLE_REGISTRY.md."),
+    list(name = "ClientCode",         width = 24, required = TRUE,
+         description = "Client question code used as column prefix in the data file"),
+    list(name = "QuestionText",       width = 52, required = TRUE,
+         description = "Full question wording — shown in chart/card labels and About drawer"),
+    list(name = "QuestionTextShort",  width = 26, required = FALSE,
+         description = "Optional shortened label for tight UI elements"),
+    list(name = "Variable_Type",      width = 20, required = TRUE,
+         description = "Data type; shared vocabulary with tabs module",
+         dropdown = c("Single_Response", "Multi_Mention", "Rating",
+                      "Likert", "NPS", "Ranking", "Numeric", "Open_End")),
+    list(name = "ColumnPattern",      width = 28, required = TRUE,
+         description = paste0("Column naming template. Tokens: {code}, {brandcode},",
+                              " {cepcode}, {assetcode}. e.g. {code}_{brandcode}")),
+    list(name = "OptionMapScale",     width = 20, required = FALSE,
+         description = "Scale name in OptionMap sheet. Leave blank for binary/free-text."),
+    list(name = "Notes",              width = 40, required = FALSE,
+         description = "Operator notes — not shown in report")
+  )
+}
+
+.build_1brand_questionmap_rows <- function() {
+  cat_def  <- ipk_category()
+  cat_code <- cat_def$code
+  cat_name <- cat_def$name
+  tfl      <- cat_def$timeframe_long
+  tft      <- cat_def$timeframe_target
+
+  list(
+    list(Role = "system.respondent.id",
+         ClientCode        = "Respondent_ID",
+         QuestionText      = "Respondent panel identifier",
+         QuestionTextShort = "Resp ID",
+         Variable_Type     = "Single_Response",
+         ColumnPattern     = "{code}",
+         OptionMapScale    = "",
+         Notes             = "Unique per row"),
+    list(Role = "system.respondent.weight",
+         ClientCode        = "Weight",
+         QuestionText      = "Post-stratification respondent weight",
+         QuestionTextShort = "Weight",
+         Variable_Type     = "Numeric",
+         ColumnPattern     = "{code}",
+         OptionMapScale    = "",
+         Notes             = ""),
+    list(Role = "funnel.awareness",
+         ClientCode        = sprintf("BRANDAWARE_%s", cat_code),
+         QuestionText      = sprintf("Which of these brands of %s have you heard of?",
+                                     tolower(cat_name)),
+         QuestionTextShort = "Brand awareness",
+         Variable_Type     = "Multi_Mention",
+         ColumnPattern     = "{code}_{brandcode}",
+         OptionMapScale    = "",
+         Notes             = "QBRANDAWARE equivalent"),
+    list(Role = "funnel.attitude",
+         ClientCode        = sprintf("BRANDATT1_%s", cat_code),
+         QuestionText      = paste("Which of these statements best describes",
+                                   "how you feel about this brand?"),
+         QuestionTextShort = "Brand attitude",
+         Variable_Type     = "Single_Response",
+         ColumnPattern     = "{code}_{brandcode}",
+         OptionMapScale    = "attitude_scale",
+         Notes             = "Romaniuk 5-position scale; codes mapped via OptionMap"),
+    list(Role = "funnel.rejection_oe",
+         ClientCode        = sprintf("BRANDATT2_%s", cat_code),
+         QuestionText      = "Why would you refuse to buy this brand? (open-ended)",
+         QuestionTextShort = "Rejection reason",
+         Variable_Type     = "Open_End",
+         ColumnPattern     = "{code}_{brandcode}",
+         OptionMapScale    = "",
+         Notes             = "Optional; populated only when attitude = reject"),
+    list(Role = "funnel.transactional.bought_long",
+         ClientCode        = sprintf("BRANDPEN1_%s", cat_code),
+         QuestionText      = sprintf("Which of these brands have you bought in the last %s?", tfl),
+         QuestionTextShort = sprintf("Bought last %s", tfl),
+         Variable_Type     = "Multi_Mention",
+         ColumnPattern     = "{code}_{brandcode}",
+         OptionMapScale    = "",
+         Notes             = "BRANDPENTRANS1 — longer timeframe"),
+    list(Role = "funnel.transactional.bought_target",
+         ClientCode        = sprintf("BRANDPEN2_%s", cat_code),
+         QuestionText      = sprintf("Which of these brands have you bought in the last %s?", tft),
+         QuestionTextShort = sprintf("Bought last %s", tft),
+         Variable_Type     = "Multi_Mention",
+         ColumnPattern     = "{code}_{brandcode}",
+         OptionMapScale    = "",
+         Notes             = "BRANDPENTRANS2 — target timeframe"),
+    list(Role = "funnel.transactional.frequency",
+         ClientCode        = sprintf("BRANDPEN3_%s", cat_code),
+         QuestionText      = paste("How frequently do you buy each brand",
+                                   "when purchasing in this category?"),
+         QuestionTextShort = "Purchase frequency",
+         Variable_Type     = "Numeric",
+         ColumnPattern     = "{code}_{brandcode}",
+         OptionMapScale    = "",
+         Notes             = "BRANDPENTRANS3 — frequency scale 1-5")
+  )
+}
+
+
+# ==============================================================================
+# OPTIONMAP SHEET (scale codes for Single_Response roles)
+# ==============================================================================
+
+.build_optionmap_columns <- function() {
+  list(
+    list(name = "Scale",       width = 20, required = TRUE,
+         description = "Scale name — must match OptionMapScale in QuestionMap"),
+    list(name = "ClientCode",  width = 14, required = TRUE,
+         description = "Integer or string code as it appears in the data"),
+    list(name = "Role",        width = 28, required = FALSE,
+         description = "Position role this code maps to (e.g. attitude.love). Blank = non-analytic."),
+    list(name = "ClientLabel", width = 52, required = TRUE,
+         description = "Client question wording for this response option — shown in report legend"),
+    list(name = "OrderIndex",  width = 14, required = TRUE,
+         description = "Display order (integer). Lower = first.",
+         integer_range = c(1, 100))
+  )
+}
+
+.build_1brand_optionmap_rows <- function() {
+  list(
+    list(Scale = "attitude_scale", ClientCode = "1",
+         Role        = "attitude.love",
+         ClientLabel = "I love it / it's my favourite",
+         OrderIndex  = 1),
+    list(Scale = "attitude_scale", ClientCode = "2",
+         Role        = "attitude.prefer",
+         ClientLabel = "It's among the ones I prefer",
+         OrderIndex  = 2),
+    list(Scale = "attitude_scale", ClientCode = "3",
+         Role        = "attitude.ambivalent",
+         ClientLabel = "I wouldn't usually consider it, but I would if no other option",
+         OrderIndex  = 3),
+    list(Scale = "attitude_scale", ClientCode = "4",
+         Role        = "attitude.reject",
+         ClientLabel = "I would refuse to buy this brand",
+         OrderIndex  = 4),
+    list(Scale = "attitude_scale", ClientCode = "5",
+         Role        = "attitude.no_opinion",
+         ClientLabel = "I have no opinion about this brand",
+         OrderIndex  = 5)
+  )
 }
 
 
@@ -323,6 +477,26 @@ generate_1brand_structure <- function(output_path, overwrite = TRUE) {
     title    = "DBA Asset Definitions (only if element_dba = Y in Brand_Config)",
     subtitle = "Asset codes linked to fame and uniqueness question codes.",
     example_rows   = .build_1brand_dba_structure_rows(),
+    num_blank_rows = 0
+  )
+
+  write_table_sheet(
+    wb, "QuestionMap",
+    .build_questionmap_columns(),
+    title    = "Question Role Map (required for role-registry elements)",
+    subtitle = paste("Maps semantic roles (funnel.awareness, funnel.attitude, etc.)",
+                     "to client question codes. See ROLE_REGISTRY.md."),
+    example_rows   = .build_1brand_questionmap_rows(),
+    num_blank_rows = 0
+  )
+
+  write_table_sheet(
+    wb, "OptionMap",
+    .build_optionmap_columns(),
+    title    = "Response Option Map (for Single_Response roles)",
+    subtitle = paste("Maps coded values to semantic position roles",
+                     "(e.g. attitude_scale code 1 = attitude.love)."),
+    example_rows   = .build_1brand_optionmap_rows(),
     num_blank_rows = 0
   )
 

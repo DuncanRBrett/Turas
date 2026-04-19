@@ -27,70 +27,9 @@ transform_brand_charts <- function(results, config) {
       cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
       cr <- results$results$categories[[cat_name]]
 
-      # Mental Availability charts
-      ma <- cr$mental_availability
-      if (!is.null(ma) && !identical(ma$status, "REFUSED")) {
-        ma_charts <- list()
-
-        # 1. MMS League dot plot
-        if (!is.null(ma$mms)) {
-          mms_df <- data.frame(
-            Label = ma$mms$BrandCode,
-            Value = ma$mms$MMS * 100,
-            stringsAsFactors = FALSE
-          )
-          ma_charts[[length(ma_charts) + 1]] <- list(
-            svg = build_dot_plot(mms_df, focal_label = focal,
-                                brand_colour = brand_colour,
-                                comp_colour = comp_colour,
-                                title = sprintf("Mental Market Share \u2014 %s", cat_name),
-                                value_suffix = "%",
-                                ref_line = mean(mms_df$Value),
-                                ref_label = "Category avg"),
-            title = "Mental Market Share"
-          )
-        }
-
-        # 2. MPen x NS scatter
-        if (!is.null(ma$mpen) && !is.null(ma$ns)) {
-          scatter_df <- merge(ma$mpen, ma$ns, by = "BrandCode")
-          scatter_df$MPen_Pct <- scatter_df$MPen * 100
-          ma_charts[[length(ma_charts) + 1]] <- list(
-            svg = build_scatter(scatter_df, "MPen_Pct", "NS", "BrandCode",
-                                focal_label = focal,
-                                brand_colour = brand_colour,
-                                comp_colour = comp_colour,
-                                title = sprintf("MPen \u00d7 NS Diagnostic \u2014 %s", cat_name),
-                                x_label = "Mental Penetration (%)",
-                                y_label = "Network Size (avg CEPs)",
-                                x_suffix = "%",
-                                ref_x = median(scatter_df$MPen_Pct),
-                                ref_y = median(scatter_df$NS)),
-            title = "MPen x NS Diagnostic"
-          )
-        }
-
-        # 3. CEP x brand heat strip
-        if (!is.null(ma$cep_brand_matrix)) {
-          ma_charts[[length(ma_charts) + 1]] <- list(
-            svg = build_heat_strip(ma$cep_brand_matrix, focal,
-                                   brand_colour, title = sprintf(
-                                     "CEP \u00d7 Brand Linkage (%%) \u2014 %s", cat_name)),
-            title = "CEP x Brand Linkage"
-          )
-        }
-
-        # 4. CEP TURF reach curve
-        if (!is.null(ma$cep_turf) && !is.null(ma$cep_turf$reach_curve)) {
-          ma_charts[[length(ma_charts) + 1]] <- list(
-            svg = build_reach_curve(ma$cep_turf$reach_curve, brand_colour,
-                                    title = sprintf("CEP TURF Reach Curve \u2014 %s", cat_name)),
-            title = "CEP TURF Reach Curve"
-          )
-        }
-
-        charts[[paste0("ma_", cat_id)]] <- ma_charts
-      }
+      # Mental Availability: now always rendered as the polished 3-tab panel
+      # (build_ma_panel_data + build_ma_panel_html in transform_brand_panels).
+      # Legacy SVG charts are no longer generated.
 
       # Funnel charts — consumes new role-registry funnel shape and
       # adapts to the legacy wide data frame expected by the existing
@@ -164,45 +103,6 @@ transform_brand_charts <- function(results, config) {
         charts[[paste0("repertoire_", cat_id)]] <- rep_charts
       }
 
-      # Drivers & Barriers charts
-      db <- cr$drivers_barriers
-      if (!is.null(db) && !identical(db$status, "REFUSED")) {
-        db_charts <- list()
-
-        # 9. I x P quadrant
-        if (!is.null(db$ixp_quadrants) && "Focal_Linkage_Pct" %in% names(db$ixp_quadrants)) {
-          ixp <- db$ixp_quadrants
-          ixp$display_label <- ixp$Label %||% ixp$Code
-          imp_med <- median(abs(ixp$Differential), na.rm = TRUE)
-          perf_med <- median(ixp$Focal_Linkage_Pct, na.rm = TRUE)
-
-          db_charts[[length(db_charts) + 1]] <- list(
-            svg = build_scatter(ixp, "Focal_Linkage_Pct", "Differential",
-                                "display_label", focal_label = NULL,
-                                brand_colour = brand_colour,
-                                title = sprintf("Importance \u00d7 Performance \u2014 %s", cat_name),
-                                x_label = sprintf("%s Linkage (%%)", focal),
-                                y_label = "Derived Importance (differential pp)",
-                                x_suffix = "%", y_suffix = "pp",
-                                quadrant_labels = c("Strengthen", "Maintain",
-                                                     "Deprioritise", "Monitor"),
-                                ref_x = perf_med, ref_y = imp_med),
-            title = "Importance x Performance"
-          )
-        }
-
-        # 10. Competitive dumbbell
-        if (!is.null(db$competitive_advantage) && nrow(db$competitive_advantage) > 0) {
-          db_charts[[length(db_charts) + 1]] <- list(
-            svg = build_dumbbell(db$competitive_advantage, focal, brand_colour,
-                                 comp_colour,
-                                 title = sprintf("Competitive Advantage \u2014 %s", cat_name)),
-            title = "Competitive Advantage"
-          )
-        }
-
-        charts[[paste0("db_", cat_id)]] <- db_charts
-      }
     }
   }
 
@@ -264,14 +164,12 @@ transform_brand_tables <- function(results, config) {
       cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
       cr <- results$results$categories[[cat_name]]
 
-      if (!is.null(cr$mental_availability))
-        tables[[paste0("ma_", cat_id)]] <- build_ma_tables(cr$mental_availability, focal)
+      # MA is now always rendered by the new panel (build_ma_panel_html).
+      # build_ma_tables() is removed; there is no old-format MA fallback.
       if (!is.null(cr$funnel))
         tables[[paste0("funnel_", cat_id)]] <- build_funnel_tables(cr$funnel, focal)
       if (!is.null(cr$repertoire))
         tables[[paste0("repertoire_", cat_id)]] <- build_repertoire_tables(cr$repertoire, focal)
-      if (!is.null(cr$drivers_barriers))
-        tables[[paste0("db_", cat_id)]] <- build_db_tables(cr$drivers_barriers, focal)
     }
   }
 

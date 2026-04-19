@@ -62,15 +62,30 @@ add_wom <- function(df) {
     reject_mask <- !is.na(att) & att == 4L
     share_neg[reject_mask] <- .rbern(sum(reject_mask), 0.62 * wom_engagement[reject_mask])
 
+    # Per-brand WOM occasion counts (QWOMBRAND2b, QWOMBRAND3b)
+    # Conditional on sharing: 1–5 occasions (5 = "5 or more times")
+    pos_count <- rep(NA_integer_, n)
+    shared_pos_mask <- share_pos == 1L
+    if (any(shared_pos_mask)) {
+      pos_count[shared_pos_mask] <- .rcat(sum(shared_pos_mask),
+        c(0.35, 0.28, 0.18, 0.11, 0.08))
+    }
+
+    neg_count <- rep(NA_integer_, n)
+    shared_neg_mask <- share_neg == 1L
+    if (any(shared_neg_mask)) {
+      neg_count[shared_neg_mask] <- .rcat(sum(shared_neg_mask),
+        c(0.42, 0.26, 0.16, 0.10, 0.06))
+    }
+
     df[[sprintf("WOM_POS_REC_%s",   b$code)]] <- rec_pos
     df[[sprintf("WOM_NEG_REC_%s",   b$code)]] <- rec_neg
     df[[sprintf("WOM_POS_SHARE_%s", b$code)]] <- share_pos
+    df[[sprintf("WOM_POS_COUNT_%s", b$code)]] <- pos_count
     df[[sprintf("WOM_NEG_SHARE_%s", b$code)]] <- share_neg
+    df[[sprintf("WOM_NEG_COUNT_%s", b$code)]] <- neg_count
   }
 
-  # Overall WOM frequency scales (1 = several times a week, 5 = never)
-  df$WOM_POS_FREQ <- .rcat(n, c(0.08, 0.18, 0.32, 0.28, 0.14))
-  df$WOM_NEG_FREQ <- .rcat(n, c(0.03, 0.08, 0.18, 0.38, 0.33))
   df
 }
 

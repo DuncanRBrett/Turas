@@ -23,8 +23,11 @@
 
 #' Generate the synthetic respondent-level CSV
 #'
-#' Produces a fully-reproducible dataset matching the CBM data shape defined
-#' by the Survey_Structure.xlsx written by generate_1brand_structure().
+#' Produces a fully-reproducible dataset matching the CBM TRANS data shape
+#' defined by the Survey_Structure.xlsx written by generate_1brand_structure().
+#' All TRANS question batteries are present: screener, awareness, attitude,
+#' penetration (BRANDPENTRANS1/2/3), CEP matrix, attribute matrix, WOM
+#' (QWOMBRAND1a/1b/2a/2b/3a/3b), and DBA.
 #'
 #' @param output_path Character. Destination path for the CSV.
 #' @param n Integer. Number of respondents (default 300).
@@ -84,7 +87,7 @@ generate_1brand_data <- function(output_path, n = 300, seed = 42) {
 #'   Penetration (3 questions x each brand)
 #'   CEP matrix (15 CEPs x 10 brands)
 #'   Attribute matrix (5 attrs x 10 brands)
-#'   WOM (4 per-brand + 2 overall)
+#'   WOM (6 per-brand columns: rec+/-, share+/count+, share-/count-) per CBM TRANS spec
 #'   DBA (fame + unique per asset)
 #'
 #' @keywords internal
@@ -125,13 +128,15 @@ generate_1brand_data <- function(output_path, n = 300, seed = 42) {
   group_attr <- as.vector(outer(attr_codes, brand_codes,
                                  FUN = function(a, b) paste0(a, "_", b)))
 
-  # Group 7: WOM
+  # Group 7: WOM — order mirrors CBM TRANS question sequence
+  # QWOMBRAND1a=POS_REC, 1b=NEG_REC, 2a=POS_SHARE, 2b=POS_COUNT, 3a=NEG_SHARE, 3b=NEG_COUNT
   group_wom <- c(
     sprintf("WOM_POS_REC_%s",   brand_codes),
     sprintf("WOM_NEG_REC_%s",   brand_codes),
     sprintf("WOM_POS_SHARE_%s", brand_codes),
+    sprintf("WOM_POS_COUNT_%s", brand_codes),
     sprintf("WOM_NEG_SHARE_%s", brand_codes),
-    "WOM_POS_FREQ", "WOM_NEG_FREQ"
+    sprintf("WOM_NEG_COUNT_%s", brand_codes)
   )
 
   # Group 8: DBA

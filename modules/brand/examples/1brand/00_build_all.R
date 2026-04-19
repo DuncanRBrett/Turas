@@ -20,10 +20,14 @@
 # ==============================================================================
 
 .default_1brand_output_dir <- function() {
-  path.expand(file.path(
+  # Prefer OneDrive if it exists (synced across machines), fall back to
+  # ~/TurasProjects/Examples/DrySpices so the example works without OneDrive.
+  onedrive <- path.expand(file.path(
     "~", "Library", "CloudStorage", "OneDrive-Personal",
-    "DB Files", "TurasProjects", "Examples", "1Brand"
+    "DB Files", "TurasProjects", "Examples", "DrySpices"
   ))
+  if (dir.exists(dirname(dirname(onedrive)))) return(onedrive)
+  path.expand(file.path("~", "TurasProjects", "Examples", "DrySpices"))
 }
 
 
@@ -113,7 +117,7 @@ build_1brand_synthetic_example <- function(output_dir = NULL, seed = 42) {
 
   .source_1brand_sources()
 
-  cat(sprintf("\n=== Building 1Brand synthetic study ===\n"))
+  cat(sprintf("\n=== Building Dry Spices synthetic study ===\n"))
   cat(sprintf("Output: %s\n\n", output_dir))
 
   meta <- ipk_study_meta()

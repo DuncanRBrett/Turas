@@ -57,6 +57,7 @@ BRAND_VERSION <- "1.0"
     "00_guard_role_map.R",
     "01_config.R",
     "02_mental_availability.R",
+    "02a_ma_panel_data.R",
     "03a_funnel_derive.R",
     "03b_funnel_metrics.R",
     "03_funnel.R",
@@ -65,7 +66,6 @@ BRAND_VERSION <- "1.0"
     "03e_funnel_legacy_adapter.R",
     "04_repertoire.R",
     "05_wom.R",
-    "06_drivers_barriers.R",
     "07_dba.R"
   )
 
@@ -387,43 +387,6 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
           list(status = "REFUSED", message = e$message)
         }
       )
-    }
-
-    # Drivers & Barriers
-    if (isTRUE(config$element_drivers_barriers) && nrow(cat_ceps) > 0) {
-      if (verbose) cat("  Running Drivers & Barriers...\n")
-
-      # Need: linkage (from MA), cep_brand_matrix (from MA), penetration
-      ma_result <- cat_result$mental_availability
-      if (!is.null(ma_result) && !is.null(ma_result$cep_brand_matrix)) {
-        # Build focal brand penetration vector
-        pen_qs <- get_questions_for_battery(structure, "penetration", cat_name)
-        focal_pen <- rep(0L, nrow(data))
-        if (nrow(pen_qs) > 0) {
-          pen_col <- .find_brand_col(data, pen_qs$QuestionCode[1],
-                                     config$focal_brand)
-          if (!is.null(pen_col)) {
-            vals <- data[[pen_col]]
-            focal_pen <- as.integer(!is.na(vals) & vals > 0)
-          }
-        }
-
-        cat_result$drivers_barriers <- tryCatch(
-          run_drivers_barriers(
-            linkage = linkage,
-            cep_brand_matrix = ma_result$cep_brand_matrix,
-            penetration_vector = focal_pen,
-            focal_brand = config$focal_brand,
-            cep_labels = if (exists("cep_labels_mapped")) cep_labels_mapped else cat_ceps,
-            weights = weights
-          ),
-          error = function(e) {
-            warnings_list <<- c(warnings_list,
-              sprintf("D&B failed for %s: %s", cat_name, e$message))
-            list(status = "REFUSED", message = e$message)
-          }
-        )
-      }
     }
 
     category_results[[cat_name]] <- cat_result

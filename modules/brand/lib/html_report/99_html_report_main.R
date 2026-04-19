@@ -68,6 +68,10 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
     if (file.exists(fp)) source(fp, local = FALSE)
   }
 
+  # --- Source MA panel data builder (analytics layer, needed by transformer) ---
+  ma_data_file <- file.path(turas_root, "modules", "brand", "R", "02a_ma_panel_data.R")
+  if (file.exists(ma_data_file)) source(ma_data_file, local = FALSE)
+
   # --- Source dedicated panel renderers (role-registry architecture) ---
   panels_dir <- file.path(report_dir, "panels")
   if (dir.exists(panels_dir)) {

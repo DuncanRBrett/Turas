@@ -121,6 +121,13 @@ launch_turas <- function() {
          recent_file = ".recent_pricing_projects.rds",
          recent_key = "project_dir"),
 
+    list(id = "brand", name = "Brand",
+         description = "Brand health analysis: funnel, mental availability, WOM, and repertoire",
+         category = "advanced",
+         script = "modules/brand/run_brand_gui.R",
+         recent_file = ".recent_brand_projects.rds",
+         recent_key = NULL),
+
     list(id = "segment", name = "Segment",
          description = "K-means clustering segmentation with automatic variable selection",
          category = "advanced",
@@ -184,6 +191,8 @@ launch_turas <- function() {
     maxdiff = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/><polyline points="18 20 12 14 6 20"/><line x1="3" y1="4" x2="21" y2="4"/></svg>',
 
     pricing = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
+
+    brand = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/></svg>',
 
     segment = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="16" r="3"/><circle cx="17" cy="7" r="2"/><circle cx="7" cy="17" r="2"/></svg>',
 

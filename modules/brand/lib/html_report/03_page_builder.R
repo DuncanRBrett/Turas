@@ -242,13 +242,10 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
   if (!is.null(cat_results$repertoire) &&
       !identical(cat_results$repertoire$status, "REFUSED"))
     elements <- c(elements, "repertoire")
-  if (!is.null(cat_results$drivers_barriers) &&
-      !identical(cat_results$drivers_barriers$status, "REFUSED"))
-    elements <- c(elements, "db")
 
   if (length(elements) > 1) {
     elem_labels <- c(ma = "Mental Availability", funnel = "Funnel",
-                     repertoire = "Repertoire", db = "Drivers & Barriers")
+                     repertoire = "Repertoire")
     subtab_btns <- vapply(seq_along(elements), function(i) {
       el <- elements[i]
       active <- if (i == 1) " active" else ""
@@ -269,16 +266,21 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
     chart_key <- paste0(el, "_", cat_id)
     parts <- c(parts, sprintf('<div class="br-element-section" id="section-%s" data-section="%s">',
                                 section_id, section_id))
-    if (is.null(panels[[chart_key]])) {
-      parts <- c(parts, build_br_section_toolbar(section_id))
-    }
 
-    # If a dedicated panel HTML was emitted (funnel — role-registry
-    # architecture), render that instead of the generic charts+tables
-    # block. Falls back to the legacy chart/table rendering otherwise.
     if (!is.null(panels[[chart_key]])) {
+      # New panel HTML (MA and Funnel always use this path)
       parts <- c(parts, panels[[chart_key]])
+    } else if (el == "ma") {
+      # MA has no old-format fallback — build_ma_panel_data must be loaded
+      parts <- c(parts,
+        '<div style="padding:32px;text-align:center;color:#94a3b8;font-size:14px;">',
+        'Mental Availability panel could not be rendered.',
+        ' Ensure <code>02a_ma_panel_data.R</code> is sourced before calling',
+        ' <code>generate_brand_html_report()</code>.',
+        '</div>')
     } else {
+      # Legacy charts + tables path (repertoire, drivers & barriers)
+      parts <- c(parts, build_br_section_toolbar(section_id))
       if (!is.null(charts[[chart_key]])) {
         for (ch in charts[[chart_key]]) {
           parts <- c(parts, build_br_chart_wrapper(ch$svg, ch$title %||% ""))
@@ -348,11 +350,6 @@ build_br_about_panel <- function(config) {
       The 5-level attitude scale provides richer diagnostics than traditional binary consideration.
       Rejection is captured explicitly (attitude code 4).</p>
 
-      <h3 style="font-size:15px;color:%s;margin:20px 0 8px;">Drivers &amp; Barriers</h3>
-      <p>Attribute importance is derived statistically from the relationship between CEP linkage
-      and buying behaviour. This is methodologically stronger than asking respondents to rate
-      importance directly.</p>
-
       <h3 style="font-size:15px;color:%s;margin:20px 0 8px;">References</h3>
       <ul style="padding-left:20px;">
         <li>Romaniuk, J. (2022). <em>Better Brand Health</em>. Oxford University Press.</li>
@@ -365,7 +362,6 @@ build_br_about_panel <- function(config) {
     </div>
   </div>
 </div>',
-    config$colour_focal %||% "#1A5276",
     config$colour_focal %||% "#1A5276",
     config$colour_focal %||% "#1A5276",
     config$colour_focal %||% "#1A5276",
