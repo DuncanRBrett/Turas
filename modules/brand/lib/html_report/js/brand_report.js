@@ -38,17 +38,45 @@
     }
   };
 
-  // --- Category sub-tab switching ---
+  // --- Category sub-tab switching (2-layer nav) ---
+  // Each button carries data-subpanel (which .br-subpanel to make active) and
+  // data-internal-tab (which internal panel tab to switch to). The internal
+  // panel nav bars (.fn-subnav / .ma-subnav) are hidden via CSS but remain in
+  // the DOM so dispatching a click on them triggers their own JS state updates.
   window.switchCategorySubtab = function(btn) {
-    var group = btn.getAttribute("data-group");
-    var subtab = btn.getAttribute("data-subtab");
+    var group       = btn.getAttribute("data-group");
+    var subtab      = btn.getAttribute("data-subtab");
+    var subpanel    = btn.getAttribute("data-subpanel");
+    var internalTab = btn.getAttribute("data-internal-tab") || "";
 
     document.querySelectorAll('.br-subtab-btn[data-group="' + group + '"]').forEach(function(b) {
       b.classList.toggle("active", b.getAttribute("data-subtab") === subtab);
     });
+
+    // Show the sub-panel that owns this tab
     document.querySelectorAll('.br-subpanel[data-group="' + group + '"]').forEach(function(p) {
-      p.classList.toggle("active", p.getAttribute("data-subpanel") === subtab);
+      p.classList.toggle("active", p.getAttribute("data-subpanel") === subpanel);
     });
+
+    // Route to the correct internal tab within the now-active sub-panel
+    if (internalTab) {
+      var activeSubPanel = document.querySelector(
+        '.br-subpanel[data-group="' + group + '"][data-subpanel="' + subpanel + '"]'
+      );
+      if (activeSubPanel) {
+        // MA panel: click the hidden .ma-subtab-btn
+        var maBtn = activeSubPanel.querySelector(
+          '.ma-subtab-btn[data-ma-subtab-target="' + internalTab + '"]'
+        );
+        if (maBtn) { maBtn.click(); return; }
+
+        // Funnel panel: click the hidden .fn-subtab-btn
+        var fnBtn = activeSubPanel.querySelector(
+          '.fn-subtab-btn[data-fn-subtab-target="' + internalTab + '"]'
+        );
+        if (fnBtn) { fnBtn.click(); }
+      }
+    }
   };
 
   // --- Insight editor ---

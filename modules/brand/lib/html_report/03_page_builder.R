@@ -220,58 +220,101 @@ build_br_summary_panel <- function(results, config) {
 }
 
 
-#' Build a category panel with sub-tabs for each element
+#' Build a category panel with 2-layer flat sub-tabs
+#'
+#' Each element's internal sections (Funnel/Relationship, Attributes/CEPs/Metrics)
+#' are promoted to category-level sub-tabs, removing the intermediate element
+#' grouping layer. The panel HTML for each element is kept intact but its
+#' internal nav bar is hidden via CSS.
+#'
+#' Sub-tab order: Brand Funnel → Brand Attitude → Brand Attributes →
+#' Category Entry Points → MA Metrics → Category Buying
+#'
 #' @keywords internal
 build_br_category_panel <- function(cat_name, cat_results, charts, tables,
                                      config, panels = list()) {
   cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
   panel_id <- paste0("cat-", cat_id)
-  focal <- config$focal_brand %||% ""
 
   parts <- character(0)
   parts <- c(parts, sprintf('<div class="br-panel" id="panel-%s">', panel_id))
 
-  # Sub-tab navigation
-  elements <- character(0)
-  if (!is.null(cat_results$mental_availability) &&
-      !identical(cat_results$mental_availability$status, "REFUSED"))
-    elements <- c(elements, "ma")
-  if (!is.null(cat_results$funnel) &&
-      !identical(cat_results$funnel$status, "REFUSED"))
-    elements <- c(elements, "funnel")
-  if (!is.null(cat_results$repertoire) &&
-      !identical(cat_results$repertoire$status, "REFUSED"))
-    elements <- c(elements, "repertoire")
+  # Detect which elements have renderable data
+  has_funnel <- !is.null(cat_results$funnel) &&
+    !identical(cat_results$funnel$status, "REFUSED")
+  has_ma <- !is.null(cat_results$mental_availability) &&
+    !identical(cat_results$mental_availability$status, "REFUSED")
+  has_repertoire <- !is.null(cat_results$repertoire) &&
+    !identical(cat_results$repertoire$status, "REFUSED")
 
-  if (length(elements) > 1) {
-    elem_labels <- c(ma = "Mental Availability", funnel = "Funnel",
-                     repertoire = "Repertoire")
-    subtab_btns <- vapply(seq_along(elements), function(i) {
-      el <- elements[i]
-      active <- if (i == 1) " active" else ""
-      sprintf('<button class="br-subtab-btn%s" data-group="%s" data-subtab="%s" onclick="switchCategorySubtab(this)">%s</button>',
-              active, cat_id, el, elem_labels[el])
-    }, character(1))
-    parts <- c(parts, sprintf('<div class="br-subtab-nav">%s</div>',
-                                paste(subtab_btns, collapse = "\n")))
+  # Build flat sub-tab list in the required display order.
+  # Each entry: key (unique), label, subpanel (which .br-subpanel to show),
+  # internal_tab (which internal panel tab to switch to, "" = n/a).
+  flat_tabs <- list()
+  if (has_funnel) {
+    flat_tabs <- c(flat_tabs,
+      list(list(key = "fn-funnel",       label = "Brand Funnel",
+                subpanel = "fn",  internal_tab = "funnel")),
+      list(list(key = "fn-relationship", label = "Brand Attitude",
+                subpanel = "fn",  internal_tab = "relationship"))
+    )
+  }
+  if (has_ma) {
+    flat_tabs <- c(flat_tabs,
+      list(list(key = "ma-attributes",   label = "Brand Attributes",
+                subpanel = "ma",  internal_tab = "attributes")),
+      list(list(key = "ma-ceps",         label = "Category Entry Points",
+                subpanel = "ma",  internal_tab = "ceps")),
+      list(list(key = "ma-metrics",      label = "MA Metrics",
+                subpanel = "ma",  internal_tab = "metrics"))
+    )
+  }
+  if (has_repertoire) {
+    flat_tabs <- c(flat_tabs,
+      list(list(key = "rep",             label = "Category Buying",
+                subpanel = "rep", internal_tab = ""))
+    )
   }
 
-  # Sub-panels
-  for (i in seq_along(elements)) {
-    el <- elements[i]
-    active <- if (i == 1) " active" else ""
+  # Sub-tab navigation bar
+  if (length(flat_tabs) > 0) {
+    subtab_btns <- vapply(seq_along(flat_tabs), function(i) {
+      tab <- flat_tabs[[i]]
+      active_cls <- if (i == 1) " active" else ""
+      sprintf(
+        '<button class="br-subtab-btn%s" data-group="%s" data-subtab="%s" data-subpanel="%s" data-internal-tab="%s" onclick="switchCategorySubtab(this)">%s</button>',
+        active_cls, cat_id, tab$key, tab$subpanel, tab$internal_tab, tab$label
+      )
+    }, character(1))
+    parts <- c(parts, sprintf('<div class="br-subtab-nav">%s</div>',
+                              paste(subtab_btns, collapse = "\n")))
+  }
+
+  # One sub-panel per element. Active sub-panel = the one containing the first tab.
+  first_subpanel <- if (length(flat_tabs) > 0) flat_tabs[[1]]$subpanel else ""
+
+  # Element map: subpanel key → element name used for chart/panel lookup keys
+  element_map <- list()
+  if (has_funnel)     element_map[["fn"]]  <- "funnel"
+  if (has_ma)         element_map[["ma"]]  <- "ma"
+  if (has_repertoire) element_map[["rep"]] <- "repertoire"
+
+  for (sp_key in names(element_map)) {
+    el        <- element_map[[sp_key]]
+    active    <- if (sp_key == first_subpanel) " active" else ""
     section_id <- paste0(el, "-", cat_id)
-    parts <- c(parts, sprintf('<div class="br-subpanel%s" data-group="%s" data-subpanel="%s">',
-                                active, cat_id, el))
-    chart_key <- paste0(el, "_", cat_id)
-    parts <- c(parts, sprintf('<div class="br-element-section" id="section-%s" data-section="%s">',
-                                section_id, section_id))
+    chart_key  <- paste0(el, "_", cat_id)
+
+    parts <- c(parts, sprintf(
+      '<div class="br-subpanel%s" data-group="%s" data-subpanel="%s">',
+      active, cat_id, sp_key))
+    parts <- c(parts, sprintf(
+      '<div class="br-element-section" id="section-%s" data-section="%s">',
+      section_id, section_id))
 
     if (!is.null(panels[[chart_key]])) {
-      # New panel HTML (MA and Funnel always use this path)
       parts <- c(parts, panels[[chart_key]])
     } else if (el == "ma") {
-      # MA has no old-format fallback — build_ma_panel_data must be loaded
       parts <- c(parts,
         '<div style="padding:32px;text-align:center;color:#94a3b8;font-size:14px;">',
         'Mental Availability panel could not be rendered.',
@@ -279,7 +322,7 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
         ' <code>generate_brand_html_report()</code>.',
         '</div>')
     } else {
-      # Legacy charts + tables path (repertoire, drivers & barriers)
+      # Legacy path: repertoire and any future elements without a dedicated panel
       parts <- c(parts, build_br_section_toolbar(section_id))
       if (!is.null(charts[[chart_key]])) {
         for (ch in charts[[chart_key]]) {
@@ -480,6 +523,10 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
   background: rgba(0,0,0,0.4); z-index: 1000;
 }
 .br-help-overlay.open { display: block; }
+/* 2-layer nav: internal panel sub-navbars are hidden — their tabs are
+   promoted to the category-level .br-subtab-nav. The internal nav HTML
+   is kept in the DOM so JS click-dispatch still works. */
+.fn-subnav, .ma-subnav { display: none !important; }
 @media print {
   .br-tab-nav, .br-section-toolbar, .br-insight-container,
   .br-chart-pin-btn, .br-save-btn, .br-help-btn { display: none !important; }
