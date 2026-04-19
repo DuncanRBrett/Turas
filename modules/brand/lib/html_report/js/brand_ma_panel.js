@@ -193,6 +193,10 @@
     bindBaseMode(panel);
     bindHeatmapMode(panel);
     bindSortButtons(panel);
+    bindMetricsSortButtons(panel);
+    bindMetricsChips(panel);
+    bindMetricsShowCounts(panel);
+    bindMetricsChartToggles(panel);
     bindExport(panel);
     bindPinDropdown(panel);
     bindAddInsight(panel);
@@ -213,6 +217,9 @@
     applyShowCounts(panel, 'ceps');
     renderChart(panel, 'attributes');
     renderChart(panel, 'ceps');
+    repositionMetricsPinnedRows(panel);
+    renderMAScatter(panel);
+    renderMABarChart(panel);
 
     // Re-render when the MA panel (or its chart sections) become visible
     // after starting in display:none (e.g. the parent tab wasn't active
@@ -221,15 +228,24 @@
     if (typeof IntersectionObserver !== 'undefined') {
       var io = new IntersectionObserver(function (entries) {
         entries.forEach(function (e) {
-          if (e.isIntersecting && e.target.clientWidth > 0) {
-            var stim = e.target.getAttribute('data-ma-stim');
-            renderChart(panel, stim);
+          if (!e.isIntersecting || e.target.clientWidth <= 0) return;
+          if (e.target.classList.contains('ma-scatter-wrap')) {
+            renderMAScatter(panel); return;
           }
+          if (e.target.classList.contains('ma-bars-wrap')) {
+            renderMABarChart(panel); return;
+          }
+          var stim = e.target.getAttribute('data-ma-stim');
+          if (stim) renderChart(panel, stim);
         });
       }, { root: null, threshold: 0.01 });
       panel.querySelectorAll('.ma-chart-section').forEach(function (s) {
         io.observe(s);
       });
+      var scatterWrap = panel.querySelector('.ma-scatter-wrap');
+      var barsWrap    = panel.querySelector('.ma-bars-wrap');
+      if (scatterWrap) io.observe(scatterWrap);
+      if (barsWrap)    io.observe(barsWrap);
     }
 
     // Restore focal from sessionStorage if present for this category
@@ -277,6 +293,9 @@
         // built while hidden and has wrong dimensions)
         if (target === 'attributes' || target === 'ceps') {
           renderChart(panel, target);
+        } else if (target === 'metrics') {
+          renderMAScatter(panel);
+          renderMABarChart(panel);
         }
       });
     });
@@ -313,9 +332,13 @@
     panel.__maState.focal = code;
     refreshFocalAccents(panel);
     reorderFocalColumn(panel, code);
+    refreshMetricsFocal(panel);
+    refreshMetricsHero(panel);
     colourChips(panel);
     renderChart(panel, 'attributes');
     renderChart(panel, 'ceps');
+    renderMAScatter(panel);
+    renderMABarChart(panel);
     // Persist + broadcast
     try {
       var stored = JSON.parse(sessionStorage.getItem(FOCAL_STORAGE_KEY) || '{}');
@@ -600,6 +623,521 @@
     rows.forEach(function (r) { tbody.appendChild(r); });
     var summary = tbody.querySelector('tr.ma-row-summary');
     if (summary) tbody.appendChild(summary);
+  }
+
+  // -------------------------------------------------------------- metrics table sort
+  function bindMetricsSortButtons(panel) {
+    panel.__maState.metricsSort = { col: null, dir: 'none' };
+
+    panel.querySelectorAll('.ma-metrics-table .ma-metric-sort-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var col   = btn.getAttribute('data-sort-col');
+        var state = panel.__maState.metricsSort;
+        var next;
+        if (state.col !== col) {
+          // Brand col: first click = A→Z; metric cols: first click = highest first
+          next = { col: col, dir: col === 'brand' ? 'asc' : 'desc' };
+        } else {
+          next = { col: col, dir: state.dir === 'desc' ? 'asc' : 'desc' };
+        }
+        state.col = next.col;
+        state.dir = next.dir;
+
+        panel.querySelectorAll('.ma-metrics-table .ma-metric-sort-btn').forEach(function (b) {
+          b.setAttribute('data-sort-dir', 'none');
+          b.textContent = '\u21C5';
+        });
+        btn.setAttribute('data-sort-dir', next.dir);
+        // For brand: asc=A→Z (↑), desc=Z→A (↓); for metrics: desc=highest (↓)
+        btn.textContent = next.dir === 'desc' ? '\u2193' : '\u2191';
+
+        applyMetricsSort(panel);
+      });
+    });
+  }
+
+  function applyMetricsSort(panel) {
+    var state = panel.__maState && panel.__maState.metricsSort;
+    if (!state) return;
+    var table = panel.querySelector('.ma-metrics-table');
+    if (!table) return;
+    var tbody = table.querySelector('tbody');
+    if (!tbody) return;
+
+    // Only sort non-focal brand rows; focal row stays pinned above cat avg
+    var focalCode = panel.__maState.focal;
+    var sortableRows = Array.from(tbody.querySelectorAll('tr.ma-row')).filter(function (r) {
+      return r.getAttribute('data-ma-brand') !== focalCode;
+    });
+
+    if (state.col === 'brand') {
+      sortableRows.sort(function (a, b) {
+        var av = (a.getAttribute('data-sort-brand') || '').trim();
+        var bv = (b.getAttribute('data-sort-brand') || '').trim();
+        return av.localeCompare(bv);
+      });
+      if (state.dir === 'desc') sortableRows.reverse();
+    } else {
+      sortableRows.sort(function (a, b) {
+        var av = parseFloat(a.getAttribute('data-sort-' + state.col) || 'NaN');
+        var bv = parseFloat(b.getAttribute('data-sort-' + state.col) || 'NaN');
+        if (isNaN(av)) return 1;
+        if (isNaN(bv)) return -1;
+        return state.dir === 'desc' ? bv - av : av - bv;
+      });
+    }
+
+    sortableRows.forEach(function (r) { tbody.appendChild(r); });
+    // Re-pin fixed rows: base > focal > cat-avg > (other brand rows already at bottom)
+    repositionMetricsPinnedRows(panel);
+  }
+
+  function repositionMetricsPinnedRows(panel) {
+    var table = panel.querySelector('.ma-metrics-table');
+    if (!table) return;
+    var tbody = table.querySelector('tbody');
+    if (!tbody) return;
+    var focal    = panel.__maState.focal;
+    var avgRow   = tbody.querySelector('tr.ma-metrics-cat-avg');
+    var baseRow  = tbody.querySelector('tr.ma-metrics-base');
+    var focalRow = focal ? tbody.querySelector('tr.ma-row[data-ma-brand="' + focal + '"]') : null;
+    // Order from bottom to top (each insertBefore pushes to front)
+    if (avgRow)   tbody.insertBefore(avgRow,   tbody.firstChild);
+    if (focalRow) tbody.insertBefore(focalRow, tbody.firstChild);
+    if (baseRow)  tbody.insertBefore(baseRow,  tbody.firstChild);
+  }
+
+  // -------------------------------------------------------------- metrics chips
+  function bindMetricsChips(panel) {
+    panel.querySelectorAll('.col-chip[data-ma-scope="metrics"]').forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        var code  = chip.getAttribute('data-ma-brand');
+        var focal = panel.__maState.focal;
+        if (code === focal) return; // focal brand cannot be hidden
+        var isOff = chip.classList.toggle('col-chip-off');
+        var table = panel.querySelector('.ma-metrics-table');
+        if (!table) return;
+        table.querySelectorAll('tbody tr.ma-row[data-ma-brand="' + code + '"]').forEach(function (r) {
+          r.style.display = isOff ? 'none' : '';
+        });
+        renderMAScatter(panel);
+        renderMABarChart(panel);
+      });
+    });
+  }
+
+  // -------------------------------------------------------------- metrics hero refresh
+  function refreshMetricsHero(panel) {
+    var pd = panel.__maData;
+    if (!pd || !pd.metrics) return;
+    var focal = panel.__maState && panel.__maState.focal;
+    if (!focal) return;
+
+    var rows = pd.metrics.table || [];
+    var focalRow = null;
+    rows.forEach(function (r) { if (r.brand_code === focal) focalRow = r; });
+    if (!focalRow) return;
+
+    var focalName   = focalRow.brand_name || getBrandName(pd, focal);
+    var focalColour = getBrandColour(pd, focal);
+    var catAvg      = pd.metrics.cat_avg || {};
+
+    // Update section heading
+    var titleEl = panel.querySelector('.ma-metrics-hero-title');
+    if (titleEl) titleEl.textContent = focalName + ' \u2014 Headline Metrics';
+
+    // Find overall leader for a metric key
+    function findLeader(key) {
+      var best = null, bestVal = -Infinity;
+      rows.forEach(function (r) {
+        var v = r[key];
+        if (v != null && !isNaN(v) && v > bestVal) { bestVal = v; best = r; }
+      });
+      return best;
+    }
+
+    function fmtVal(val, unit) {
+      if (val == null || isNaN(Number(val))) return '\u2014';
+      return unit === 'pct' ? Number(val).toFixed(1) + '%' : Number(val).toFixed(2);
+    }
+
+    var metricDefs = [
+      { key: 'mpen', unit: 'pct' },
+      { key: 'ns',   unit: 'num' },
+      { key: 'mms',  unit: 'pct' },
+      { key: 'som',  unit: 'pct' }
+    ];
+
+    metricDefs.forEach(function (def) {
+      var card = panel.querySelector('.ma-hero-card[data-ma-metric="' + def.key + '"]');
+      if (!card) return;
+
+      // Focal value
+      var valEl = card.querySelector('.tk-hero-value');
+      if (valEl) {
+        valEl.textContent = fmtVal(focalRow[def.key], def.unit);
+        valEl.style.color = focalColour;
+      }
+      card.style.borderLeftColor = focalColour;
+
+      // Category avg (static — doesn't change with focal)
+      var avgEl = card.querySelector('.ma-hero-compare strong');
+      if (avgEl) avgEl.textContent = fmtVal(catAvg[def.key], def.unit);
+
+      // Leader line
+      var leaderEl = card.querySelector('.ma-hero-leader');
+      if (leaderEl) {
+        var leader = findLeader(def.key);
+        if (!leader) {
+          leaderEl.innerHTML = '';
+        } else if (leader.brand_code === focal) {
+          leaderEl.className = 'ma-hero-leader ma-hero-leader-focal';
+          leaderEl.textContent = 'Category leader';
+        } else {
+          leaderEl.className = 'ma-hero-leader';
+          var lname = leader.brand_name || getBrandName(pd, leader.brand_code);
+          leaderEl.innerHTML = 'Leader: <strong>' + escHtml(lname) + '</strong> (' + fmtVal(leader[def.key], def.unit) + ')';
+        }
+      }
+    });
+  }
+
+  // -------------------------------------------------------------- metrics focal refresh
+  function refreshMetricsFocal(panel) {
+    var focal = panel.__maState.focal;
+    var table = panel.querySelector('.ma-metrics-table');
+    if (!table) return;
+    var tbody = table.querySelector('tbody');
+    if (!tbody) return;
+
+    // Update focal-row class and badge on all brand rows
+    tbody.querySelectorAll('tr.ma-row').forEach(function (r) {
+      var code     = r.getAttribute('data-ma-brand');
+      var isFocal  = code === focal;
+      r.classList.toggle('ma-metrics-focal-row', isFocal);
+      var lbl = r.querySelector('td.ct-label-col');
+      if (!lbl) return;
+      var existing = lbl.querySelector('.ma-focal-badge');
+      if (existing) existing.remove();
+      if (isFocal) {
+        var b = document.createElement('span');
+        b.className = 'ma-focal-badge';
+        b.textContent = 'FOCAL';
+        lbl.appendChild(b);
+      }
+    });
+
+    // Ensure focal chip is always on and row visible
+    panel.querySelectorAll('.col-chip[data-ma-scope="metrics"]').forEach(function (chip) {
+      if (chip.getAttribute('data-ma-brand') === focal) {
+        chip.classList.remove('col-chip-off');
+        var focalRow = tbody.querySelector('tr.ma-row[data-ma-brand="' + focal + '"]');
+        if (focalRow) focalRow.style.display = '';
+      }
+    });
+
+    repositionMetricsPinnedRows(panel);
+  }
+
+  // -------------------------------------------------------------- chart section toggles
+  function bindMetricsChartToggles(panel) {
+    panel.querySelectorAll('input[data-ma-action="togglechart"]').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        var target = cb.getAttribute('data-ma-chart-target');
+        var sec = panel.querySelector('[data-ma-chart-id="' + target + '"]');
+        if (!sec) return;
+        if (cb.checked) {
+          sec.removeAttribute('hidden');
+          if (target === 'scatter') renderMAScatter(panel);
+          else if (target === 'bars') renderMABarChart(panel);
+        } else {
+          sec.setAttribute('hidden', '');
+        }
+      });
+    });
+  }
+
+  // -------------------------------------------------------------- metrics show counts
+  function bindMetricsShowCounts(panel) {
+    var cb = panel.querySelector('input[data-ma-action="showcounts-metrics"]');
+    if (!cb) return;
+    cb.addEventListener('change', function () {
+      var sec = panel.querySelector('.ma-metrics-section');
+      if (sec) sec.classList.toggle('ma-show-counts-metrics', cb.checked);
+    });
+  }
+
+  // -------------------------------------------------------------- metrics scatter (MPen × NS)
+  function renderMAScatter(panel) {
+    var wrap = panel.querySelector('.ma-scatter-wrap');
+    if (!wrap) return;
+    var svg = wrap.querySelector('.ma-scatter-svg');
+    if (!svg) return;
+
+    var pd = panel.__maData;
+    if (!pd || !pd.metrics) { svg.innerHTML = ''; return; }
+
+    var focal = panel.__maState && panel.__maState.focal;
+
+    // Build vis map from metrics chips
+    var visMap = {};
+    panel.querySelectorAll('.col-chip[data-ma-scope="metrics"]').forEach(function (chip) {
+      visMap[chip.getAttribute('data-ma-brand')] = !chip.classList.contains('col-chip-off');
+    });
+
+    var points = (pd.metrics.table || []).filter(function (r) {
+      return visMap[r.brand_code] !== false && r.mpen != null && r.ns != null;
+    }).map(function (r) {
+      return { code: r.brand_code, name: r.brand_name,
+               mpen: r.mpen, ns: r.ns, mms: r.mms || 0, som: r.som || 0,
+               isFocal: r.brand_code === focal };
+    });
+
+    if (points.length === 0) { svg.innerHTML = ''; return; }
+
+    var catAvg = pd.metrics.cat_avg || {};
+    var mL = 50, mR = 20, mT = 22, mB = 46;
+    var width  = svg.clientWidth || 500;
+    var height = Math.max(260, Math.round(width * 0.62));
+
+    svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+    svg.setAttribute('height', height);
+    svg.style.height = height + 'px';
+
+    var xMax = Math.max(20, Math.ceil(Math.max.apply(null, points.map(function (p) { return p.mpen; })) / 10) * 10 + 10);
+    var yMax = Math.max(1, (Math.ceil(Math.max.apply(null, points.map(function (p) { return p.ns; })) * 4) / 4) + 0.5);
+    var mmsMax = Math.max(1, Math.max.apply(null, points.map(function (p) { return p.mms; })));
+
+    var pW = width - mL - mR;
+    var pH = height - mT - mB;
+
+    function toX(v) { return mL + pW * v / xMax; }
+    function toY(v) { return mT + pH * (1 - v / yMax); }
+    function bR(mms) { return Math.max(6, Math.min(22, 6 + 16 * mms / mmsMax)); }
+
+    var parts = [];
+
+    // Grid
+    for (var xi = 0; xi <= 5; xi++) {
+      var xv = xMax * xi / 5;
+      var gx = toX(xv);
+      parts.push('<line x1="' + gx + '" y1="' + mT + '" x2="' + gx + '" y2="' + (mT + pH) +
+                 '" stroke="#eef2f7" stroke-width="1"/>');
+      parts.push('<text x="' + gx + '" y="' + (mT + pH + 14) +
+                 '" text-anchor="middle" font-size="9" fill="#94a3b8">' + Math.round(xv) + '%</text>');
+    }
+    for (var yi = 0; yi <= 4; yi++) {
+      var yv = yMax * yi / 4;
+      var gy = toY(yv);
+      parts.push('<line x1="' + mL + '" y1="' + gy + '" x2="' + (width - mR) + '" y2="' + gy +
+                 '" stroke="#eef2f7" stroke-width="1"/>');
+      parts.push('<text x="' + (mL - 6) + '" y="' + gy +
+                 '" text-anchor="end" dominant-baseline="middle" font-size="9" fill="#94a3b8">' + yv.toFixed(1) + '</text>');
+    }
+
+    // Cat avg reference lines
+    if (catAvg.mpen != null) {
+      var ax = toX(catAvg.mpen);
+      parts.push('<line x1="' + ax + '" y1="' + mT + '" x2="' + ax + '" y2="' + (mT + pH) +
+                 '" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 3"/>');
+      parts.push('<text x="' + (ax + 3) + '" y="' + (mT + 10) +
+                 '" font-size="8" fill="#94a3b8">avg MPen</text>');
+    }
+    if (catAvg.ns != null) {
+      var ay = toY(catAvg.ns);
+      parts.push('<line x1="' + mL + '" y1="' + ay + '" x2="' + (width - mR) + '" y2="' + ay +
+                 '" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 3"/>');
+      parts.push('<text x="' + (mL + 4) + '" y="' + (ay - 4) +
+                 '" font-size="8" fill="#94a3b8">avg NS</text>');
+    }
+
+    // OLS double-jeopardy trend line
+    if (points.length >= 3) {
+      var n = points.length;
+      var sx = 0, sy = 0, sxy = 0, sx2 = 0;
+      points.forEach(function (p) { sx += p.mpen; sy += p.ns; sxy += p.mpen * p.ns; sx2 += p.mpen * p.mpen; });
+      var den = sx2 - sx * sx / n;
+      if (Math.abs(den) > 1e-8) {
+        var b = (sxy - sx * sy / n) / den;
+        var a = sy / n - b * sx / n;
+        var lx1 = 0, ly1 = a, lx2 = xMax, ly2 = a + b * xMax;
+        // clamp to [0, yMax]
+        if (ly1 < 0) { lx1 = -a / b; ly1 = 0; }
+        if (ly2 > yMax) { lx2 = (yMax - a) / b; ly2 = yMax; }
+        if (ly1 > yMax) { lx1 = (yMax - a) / b; ly1 = yMax; }
+        if (ly2 < 0) { lx2 = -a / b; ly2 = 0; }
+        parts.push('<line x1="' + toX(lx1) + '" y1="' + toY(ly1) + '" x2="' + toX(lx2) + '" y2="' + toY(ly2) +
+                   '" stroke="#64748b" stroke-width="1.5" stroke-dasharray="7 4" opacity="0.4">' +
+                   '<title>Double jeopardy trend</title></line>');
+      }
+    }
+
+    // Quadrant labels (very subtle)
+    var midX = catAvg.mpen != null ? toX(catAvg.mpen) : mL + pW / 2;
+    var midY = catAvg.ns   != null ? toY(catAvg.ns)   : mT + pH / 2;
+    var qs = 'font-size:8;fill:#d1d5db;font-weight:600;letter-spacing:0.6px;';
+    parts.push('<text style="' + qs + '" x="' + (width - mR - 4) + '" y="' + (mT + 12) + '" text-anchor="end">STRONG</text>');
+    parts.push('<text style="' + qs + '" x="' + (mL + 4) + '" y="' + (mT + 12) + '">NICHE</text>');
+    parts.push('<text style="' + qs + '" x="' + (width - mR - 4) + '" y="' + (mT + pH - 5) + '" text-anchor="end">BROAD REACH</text>');
+    parts.push('<text style="' + qs + '" x="' + (mL + 4) + '" y="' + (mT + pH - 5) + '">WEAK</text>');
+
+    // Axes
+    parts.push('<line x1="' + mL + '" y1="' + mT + '" x2="' + mL + '" y2="' + (mT + pH) + '" stroke="#cbd5e1" stroke-width="1"/>');
+    parts.push('<line x1="' + mL + '" y1="' + (mT + pH) + '" x2="' + (width - mR) + '" y2="' + (mT + pH) + '" stroke="#cbd5e1" stroke-width="1"/>');
+    parts.push('<text x="' + (mL + pW / 2) + '" y="' + (height - 6) + '" text-anchor="middle" font-size="10" fill="#475569" font-weight="600">Mental Penetration (%)</text>');
+    parts.push('<text transform="rotate(-90 ' + (mL - 36) + ' ' + (mT + pH / 2) + ')" x="' + (mL - 36) + '" y="' + (mT + pH / 2) + '" text-anchor="middle" font-size="10" fill="#475569" font-weight="600">Network Size</text>');
+
+    // Bubbles — focal on top
+    var nonFocal = points.filter(function (p) { return !p.isFocal; });
+    var focal2   = points.filter(function (p) { return p.isFocal; });
+    nonFocal.concat(focal2).forEach(function (p) {
+      var cx  = toX(p.mpen), cy = toY(p.ns), r2 = bR(p.mms);
+      var col = getBrandColour(pd, p.code);
+      parts.push('<circle cx="' + cx + '" cy="' + cy + '" r="' + r2 + '"' +
+                 ' fill="' + col + '" fill-opacity="' + (p.isFocal ? 0.85 : 0.65) + '"' +
+                 ' stroke="' + col + '" stroke-width="' + (p.isFocal ? 2 : 1) + '">' +
+                 '<title>' + escHtml(p.name) + '\nMPen: ' + p.mpen.toFixed(1) + '%' +
+                 '\nNS: ' + p.ns.toFixed(2) + '\nMMS: ' + p.mms.toFixed(1) + '%</title></circle>');
+      var lblLines2 = wrapSvgLabel(p.name, 14);
+      var lblFontSize = p.isFocal ? 10 : 9;
+      var lblLineH = lblFontSize + 2;
+      var lblStartY = cy - ((lblLines2.length - 1) * lblLineH) / 2 + 3;
+      var tspans2 = lblLines2.map(function (line, li) {
+        return '<tspan x="' + (cx + r2 + 3) + '" dy="' + (li === 0 ? 0 : lblLineH) + '">' + escHtml(line) + '</tspan>';
+      });
+      parts.push('<text x="' + (cx + r2 + 3) + '" y="' + lblStartY + '"' +
+                 ' font-size="' + lblFontSize + '" font-weight="' + (p.isFocal ? 700 : 400) + '"' +
+                 ' fill="' + col + '">' + tspans2.join('') + '</text>');
+    });
+
+    svg.innerHTML = parts.join('');
+  }
+
+  // -------------------------------------------------------------- metrics bar chart (MMS vs SOM)
+  function renderMABarChart(panel) {
+    var wrap = panel.querySelector('.ma-bars-wrap');
+    if (!wrap) return;
+    var svg = wrap.querySelector('.ma-bars-svg');
+    if (!svg) return;
+
+    var pd = panel.__maData;
+    if (!pd || !pd.metrics) { svg.innerHTML = ''; return; }
+
+    var focal = panel.__maState && panel.__maState.focal;
+
+    var visMap = {};
+    panel.querySelectorAll('.col-chip[data-ma-scope="metrics"]').forEach(function (chip) {
+      visMap[chip.getAttribute('data-ma-brand')] = !chip.classList.contains('col-chip-off');
+    });
+
+    // Focal first, then others by MMS desc
+    var all = (pd.metrics.table || []).filter(function (r) {
+      return visMap[r.brand_code] !== false;
+    });
+    var focalRows = all.filter(function (r) { return r.brand_code === focal; });
+    var others    = all.filter(function (r) { return r.brand_code !== focal; })
+                       .sort(function (a, b) { return (b.mms || 0) - (a.mms || 0); });
+    var rows = focalRows.concat(others);
+    if (rows.length === 0) { svg.innerHTML = ''; return; }
+
+    var catAvg = pd.metrics.cat_avg || {};
+    var lblW = 130, mR = 8, mT = 28, mB = 22;
+    var barH = 12, barGap = 3, rowH = barH * 2 + barGap + 14;
+
+    var width  = svg.clientWidth || 500;
+    var height = mT + mB + rows.length * rowH + 20;
+
+    svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+    svg.setAttribute('height', height);
+    svg.style.height = height + 'px';
+
+    var pW = width - lblW - mR;
+
+    var maxVal = Math.max(
+      Math.max.apply(null, rows.map(function (r) { return r.mms || 0; }).concat(catAvg.mms || 0)),
+      Math.max.apply(null, rows.map(function (r) { return r.som || 0; }).concat(catAvg.som || 0))
+    );
+    maxVal = Math.max(5, Math.ceil(maxVal / 5) * 5 + 5);
+
+    function toX(v) { return lblW + pW * v / maxVal; }
+
+    var parts = [];
+
+    // Legend
+    parts.push('<rect x="' + lblW + '" y="7" width="14" height="9" fill="#475569" fill-opacity="0.8" rx="2"/>');
+    parts.push('<text x="' + (lblW + 18) + '" y="15.5" font-size="10" fill="#334155" font-weight="500">MMS</text>');
+    parts.push('<rect x="' + (lblW + 54) + '" y="7" width="14" height="9" fill="#94a3b8" fill-opacity="0.6" rx="2"/>');
+    parts.push('<text x="' + (lblW + 72) + '" y="15.5" font-size="10" fill="#334155" font-weight="500">Share of Mind</text>');
+
+    // X grid + ticks
+    for (var ti = 0; ti <= 4; ti++) {
+      var tv = maxVal * ti / 4;
+      var tx = toX(tv);
+      parts.push('<line x1="' + tx + '" y1="' + mT + '" x2="' + tx + '" y2="' + (height - mB) +
+                 '" stroke="#f1f5f9" stroke-width="1"/>');
+      parts.push('<text x="' + tx + '" y="' + (height - mB + 12) +
+                 '" text-anchor="middle" font-size="9" fill="#94a3b8">' + Math.round(tv) + '%</text>');
+    }
+
+    // Cat avg reference lines
+    if (catAvg.mms != null) {
+      var cx = toX(catAvg.mms);
+      parts.push('<line x1="' + cx + '" y1="' + mT + '" x2="' + cx + '" y2="' + (height - mB) +
+                 '" stroke="#475569" stroke-width="1" stroke-dasharray="4 3" opacity="0.6">' +
+                 '<title>Cat avg MMS: ' + catAvg.mms.toFixed(1) + '%</title></line>');
+    }
+    if (catAvg.som != null) {
+      var sx = toX(catAvg.som);
+      parts.push('<line x1="' + sx + '" y1="' + mT + '" x2="' + sx + '" y2="' + (height - mB) +
+                 '" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 3" opacity="0.6">' +
+                 '<title>Cat avg SOM: ' + catAvg.som.toFixed(1) + '%</title></line>');
+    }
+
+    // Bars per brand
+    rows.forEach(function (r, i) {
+      var y0     = mT + i * rowH;
+      var col    = getBrandColour(pd, r.brand_code);
+      var isFocal = r.brand_code === focal;
+      var lblLines = wrapSvgLabel(r.brand_name || r.brand_code, 16);
+      var lineH    = 12;
+      var lblMidY  = y0 + rowH / 2;
+      var lblStartY = lblMidY - ((lblLines.length - 1) * lineH) / 2;
+      var tspans = lblLines.map(function (line, li) {
+        return '<tspan x="' + (lblW - 6) + '" dy="' + (li === 0 ? 0 : lineH) + '">' + escHtml(line) + '</tspan>';
+      });
+      parts.push('<text x="' + (lblW - 6) + '" y="' + lblStartY +
+                 '" text-anchor="end" dominant-baseline="middle" font-size="11"' +
+                 ' fill="' + (isFocal ? col : '#334155') + '"' +
+                 ' font-weight="' + (isFocal ? 700 : 400) + '">' + tspans.join('') + '</text>');
+
+      // MMS bar
+      var mmsW = Math.max(0, pW * (r.mms || 0) / maxVal);
+      parts.push('<rect x="' + lblW + '" y="' + y0 + '" width="' + mmsW + '" height="' + barH +
+                 '" fill="' + col + '" fill-opacity="' + (isFocal ? 0.9 : 0.7) + '" rx="2">' +
+                 '<title>' + escHtml(r.brand_name) + ' MMS: ' + (r.mms || 0).toFixed(1) + '%</title></rect>');
+      if (mmsW > 28)
+        parts.push('<text x="' + (lblW + mmsW - 4) + '" y="' + (y0 + barH - 3) +
+                   '" text-anchor="end" font-size="9" fill="#fff" font-weight="600">' + (r.mms || 0).toFixed(1) + '%</text>');
+
+      // SOM bar
+      var somY = y0 + barH + barGap;
+      var somW = Math.max(0, pW * (r.som || 0) / maxVal);
+      parts.push('<rect x="' + lblW + '" y="' + somY + '" width="' + somW + '" height="' + barH +
+                 '" fill="' + col + '" fill-opacity="' + (isFocal ? 0.38 : 0.25) + '" rx="2">' +
+                 '<title>' + escHtml(r.brand_name) + ' SOM: ' + (r.som || 0).toFixed(1) + '%</title></rect>');
+      if (somW > 28)
+        parts.push('<text x="' + (lblW + somW - 4) + '" y="' + (somY + barH - 3) +
+                   '" text-anchor="end" font-size="9" fill="' + col + '" font-weight="600">' + (r.som || 0).toFixed(1) + '%</text>');
+
+      if (i < rows.length - 1)
+        parts.push('<line x1="' + lblW + '" y1="' + (y0 + rowH - 2) + '" x2="' + (width - mR) + '" y2="' + (y0 + rowH - 2) +
+                   '" stroke="#f1f5f9" stroke-width="1"/>');
+    });
+
+    // Y axis
+    parts.push('<line x1="' + lblW + '" y1="' + mT + '" x2="' + lblW + '" y2="' + (height - mB) + '" stroke="#cbd5e1" stroke-width="1"/>');
+
+    svg.innerHTML = parts.join('');
   }
 
   // -------------------------------------------------------------- label wrap helper
@@ -947,7 +1485,9 @@
     } else if (activeKey === 'metrics') {
       opts.push({ key: 'hero',    label: 'Headline metric cards' });
       opts.push({ key: 'brandtbl',label: 'Brand metric table' });
-      opts.push({ key: 'rank',    label: 'CEP penetration ranking' });
+      opts.push({ key: 'scatter', label: 'Mental Space scatter' });
+      opts.push({ key: 'bars',    label: 'MMS vs SOM chart' });
+      opts.push({ key: 'ranking', label: 'CEP penetration ranking' });
     }
 
     var dd = document.createElement('div');
@@ -1006,8 +1546,12 @@
         el = panel.querySelector('.ma-metrics-table');
         if (el) el = el.closest('.ma-table-wrap') || el;
         subLabel = 'Brand metrics table';
-      } else if (activeKey === 'metrics' && key === 'rank') {
-        el = panel.querySelector('.ma-rank-list'); subLabel = 'CEP penetration ranking';
+      } else if (activeKey === 'metrics' && key === 'scatter') {
+        el = panel.querySelector('.ma-scatter-wrap'); subLabel = 'Mental Space scatter';
+      } else if (activeKey === 'metrics' && key === 'bars') {
+        el = panel.querySelector('.ma-bars-wrap'); subLabel = 'MMS vs SOM chart';
+      } else if (activeKey === 'metrics' && key === 'ranking') {
+        el = panel.querySelector('.ma-rank-section'); subLabel = 'CEP penetration ranking';
       }
       if (!el) return;
       el.setAttribute('data-pin-title', title + ' \u2014 ' + subLabel);
@@ -1030,6 +1574,8 @@
         if (!p.__maData) return;
         renderChart(p, 'attributes');
         renderChart(p, 'ceps');
+        renderMAScatter(p);
+        renderMABarChart(p);
       });
     }, 120);
   });

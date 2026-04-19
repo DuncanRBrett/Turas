@@ -274,6 +274,30 @@ build_ma_panel_data <- function(ma_result, brand_list, cep_list,
 }
 
 
+# CI band classification (above/within/below category average 95% CI)
+.calc_metric_ci_bounds <- function(vals) {
+  v <- vals[!is.na(vals) & is.finite(vals)]
+  if (length(v) < 2) return(list(lower = NA_real_, upper = NA_real_))
+  m  <- mean(v)
+  se <- stats::sd(v) / sqrt(length(v))
+  list(lower = round(m - 1.96 * se, 3), upper = round(m + 1.96 * se, 3))
+}
+
+.calc_metric_ci_bands <- function(vals) {
+  m <- mean(vals, na.rm = TRUE)
+  s <- stats::sd(vals, na.rm = TRUE)
+  n <- sum(!is.na(vals))
+  if (n < 2 || is.na(s) || s == 0)
+    return(rep("within", length(vals)))
+  se    <- s / sqrt(n)
+  upper <- m + 1.96 * se
+  lower <- m - 1.96 * se
+  ifelse(is.na(vals), "na",
+    ifelse(vals > upper, "above",
+      ifelse(vals < lower, "below", "within")))
+}
+
+
 .ma_build_metrics_block <- function(ma_result, brand_codes, brand_names,
                                     focal_code) {
   # Align metrics frames to brand_codes order
@@ -282,9 +306,24 @@ build_ma_panel_data <- function(ma_result, brand_list, cep_list,
     as.numeric(df[[col]][idx])
   }
 
+  n_ceps <- ma_result$n_ceps %||% 0L
+
   mpen <- 100 * align(ma_result$mpen, "MPen", "BrandCode")  # to percent
   ns   <- align(ma_result$ns, "NS", "BrandCode")
   mms  <- 100 * align(ma_result$mms, "MMS", "BrandCode")  # to percent
+  # Share of Mind (Romaniuk 2022): brand's CEP links as share of ALL links
+  # made by buyers with MPen for that brand.  Each brand uses a different
+  # respondent base → totals across brands exceed 100%.
+  # Derivation: SOM_b = MMS_b × 100 / MPen_b  (MPen factor cancels numerator
+  # and denominator when same n_MPen_b appears in both under the independence
+  # approximation for cross-brand links).
+  som <- round(ifelse(mpen > 0, mms * 100 / mpen, NA_real_), 1)
+
+  # CI band classification vs category average for each metric
+  mms_band  <- .calc_metric_ci_bands(mms)
+  mpen_band <- .calc_metric_ci_bands(mpen)
+  ns_band   <- .calc_metric_ci_bands(ns)
+  som_band  <- .calc_metric_ci_bands(som)
 
   # Per-brand metrics table (brands as rows)
   table_rows <- vector("list", length(brand_codes))
@@ -294,7 +333,12 @@ build_ma_panel_data <- function(ma_result, brand_list, cep_list,
       brand_name = brand_names[i],
       mpen       = round(mpen[i], 1),
       ns         = round(ns[i], 2),
-      mms        = round(mms[i], 1)
+      mms        = round(mms[i], 1),
+      som        = round(som[i], 1),
+      mms_band   = mms_band[i],
+      mpen_band  = mpen_band[i],
+      ns_band    = ns_band[i],
+      som_band   = som_band[i]
     )
   }
 
@@ -307,21 +351,37 @@ build_ma_panel_data <- function(ma_result, brand_list, cep_list,
   focal_hero <- list(
     mpen = if (!is.na(focal_idx)) round(mpen[focal_idx], 1) else NA_real_,
     ns   = if (!is.na(focal_idx)) round(ns[focal_idx], 2)   else NA_real_,
-    mms  = if (!is.na(focal_idx)) round(mms[focal_idx], 1)  else NA_real_
+    mms  = if (!is.na(focal_idx)) round(mms[focal_idx], 1)  else NA_real_,
+    som  = if (!is.na(focal_idx)) round(som[focal_idx], 1)  else NA_real_
   )
 
-  # Category average (mean across brands) for context
+  # Category average (mean across brands) for context + 95% CI bounds
+  mpen_bounds <- .calc_metric_ci_bounds(mpen)
+  ns_bounds   <- .calc_metric_ci_bounds(ns)
+  mms_bounds  <- .calc_metric_ci_bounds(mms)
+  som_bounds  <- .calc_metric_ci_bounds(som)
+
   cat_avg <- list(
-    mpen = round(mean(mpen, na.rm = TRUE), 1),
-    ns   = round(mean(ns,   na.rm = TRUE), 2),
-    mms  = round(mean(mms,  na.rm = TRUE), 1)
+    mpen       = round(mean(mpen, na.rm = TRUE), 1),
+    ns         = round(mean(ns,   na.rm = TRUE), 2),
+    mms        = round(mean(mms,  na.rm = TRUE), 1),
+    som        = round(mean(som,  na.rm = TRUE), 1),
+    mpen_ci_lo = mpen_bounds$lower,
+    mpen_ci_hi = mpen_bounds$upper,
+    ns_ci_lo   = ns_bounds$lower,
+    ns_ci_hi   = ns_bounds$upper,
+    mms_ci_lo  = mms_bounds$lower,
+    mms_ci_hi  = mms_bounds$upper,
+    som_ci_lo  = som_bounds$lower,
+    som_ci_hi  = som_bounds$upper
   )
 
   # Leader per metric
   leader <- list(
     mpen = brand_codes[which.max(mpen)],
     ns   = brand_codes[which.max(ns)],
-    mms  = brand_codes[which.max(mms)]
+    mms  = brand_codes[which.max(mms)],
+    som  = brand_codes[which.max(som)]
   )
 
   list(
@@ -329,7 +389,13 @@ build_ma_panel_data <- function(ma_result, brand_list, cep_list,
     focal_hero  = focal_hero,
     cat_avg     = cat_avg,
     leader      = leader,
-    cep_penetration = cep_rank
+    cep_penetration = cep_rank,
+    max_vals = list(
+      mpen = round(max(mpen, na.rm = TRUE), 1),
+      ns   = round(max(ns,   na.rm = TRUE), 2),
+      mms  = round(max(mms,  na.rm = TRUE), 1),
+      som  = round(max(som,  na.rm = TRUE), 1)
+    )
   )
 }
 
