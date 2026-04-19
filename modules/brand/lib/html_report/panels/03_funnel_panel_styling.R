@@ -160,14 +160,14 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
   padding: 0; border: none; margin: 0; background: transparent;
 }
 .fn-chip-row .col-chip, .col-chip-bar .col-chip {
-  padding: 5px 12px; border: 1px solid var(--brand-chip-color, #e2e8f0); border-radius: 16px;
-  background: color-mix(in srgb, var(--brand-chip-color, #64748b) 12%, #fff);
-  color: #1e293b; font-size: 11px; font-weight: 500;
+  padding: 5px 12px; border: 1px solid var(--brand-chip-color, #64748b); border-radius: 16px;
+  background: var(--brand-chip-color, #64748b);
+  color: #fff; font-size: 11px; font-weight: 500;
   cursor: pointer; font-family: inherit; transition: all 0.15s;
 }
-.fn-chip-row .col-chip:hover, .col-chip-bar .col-chip:hover { border-color: var(--brand-chip-color, var(--fn-brand)); }
+.fn-chip-row .col-chip:hover, .col-chip-bar .col-chip:hover { filter: brightness(0.88); }
 .fn-chip-row .col-chip-off, .col-chip-bar .col-chip-off {
-  background: #f8f9fa; color: #94a3b8; border-color: #e2e8f0 !important;
+  background: #f8f9fa !important; color: #94a3b8 !important; border-color: #e2e8f0 !important;
   text-decoration: line-through; opacity: 0.55;
 }
 

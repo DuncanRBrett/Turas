@@ -704,13 +704,18 @@
     panel.querySelectorAll(".fn-chart-brand-chips button").forEach(function(btn) {
       var code  = btn.getAttribute("data-fn-brand");
       var isOn  = state.chartBrands[code] !== false;
-      btn.style.borderColor = "";
-      btn.style.background  = "";
+      btn.classList.toggle("col-chip-off", !isOn);
+      btn.style.setProperty('--brand-chip-color', '');
+      btn.style.backgroundColor = '';
+      btn.style.borderColor = '';
+      btn.style.color = '';
       if (isOn) {
         var color = (code === "__avg__") ? "#64748b"
                   : resolveBrandColor(pd, state, code);
+        btn.style.setProperty('--brand-chip-color', color);
+        btn.style.backgroundColor = color;
         btn.style.borderColor = color;
-        btn.style.background  = hexToRgba(color, 0.1);
+        btn.style.color = '#fff';
       }
     });
   }

@@ -65,13 +65,13 @@ build_ma_panel_styles <- function(focal_colour = "#1A5276") {
 /* Chips (brand picker) */
 .ma-chip-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .col-chip { font-size: 11px; padding: 3px 9px; border-radius: 12px;
-            border: 1px solid #cbd5e1;
-            background: var(--brand-chip-color, #f1f5f9);
-            color: #334155; cursor: pointer; transition: all 0.12s;
+            border: 1px solid var(--brand-chip-color, #64748b);
+            background: var(--brand-chip-color, #64748b);
+            color: #fff; cursor: pointer; transition: all 0.12s;
             font-weight: 500; }
-.col-chip:hover { filter: brightness(0.97); }
-.col-chip.col-chip-off { background: #fff !important; color: #94a3b8;
-                         border-color: #e2e8f0; }
+.col-chip:hover { filter: brightness(0.88); }
+.col-chip.col-chip-off { background: #f1f5f9 !important; color: #94a3b8 !important;
+                         border-color: #e2e8f0 !important; }
 
 /* Base mode segmented */
 .sig-level-switcher.ma-base-switcher { display: inline-flex; align-items: center;

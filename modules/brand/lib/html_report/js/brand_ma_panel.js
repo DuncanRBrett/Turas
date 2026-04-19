@@ -250,9 +250,10 @@
     panel.querySelectorAll('.col-chip[data-ma-brand]').forEach(function (chip) {
       var code = chip.getAttribute('data-ma-brand');
       var col  = getBrandColour(pd, code);
-      chip.style.backgroundColor = hexToRgba(col, code === focal ? 0.55 : 0.22);
-      chip.style.borderColor = hexToRgba(col, 0.7);
-      chip.style.color = code === focal ? '#fff' : '#1e293b';
+      chip.style.setProperty('--brand-chip-color', col);
+      chip.style.backgroundColor = col;
+      chip.style.borderColor = col;
+      chip.style.color = '#fff';
       chip.style.fontWeight = code === focal ? '700' : '500';
     });
   }
@@ -599,6 +600,29 @@
     if (summary) tbody.appendChild(summary);
   }
 
+  // -------------------------------------------------------------- label wrap helper
+  function wrapSvgLabel(text, maxChars) {
+    var words = text.split(' ');
+    var line1 = '', line2 = '';
+    var onLine2 = false;
+    for (var i = 0; i < words.length; i++) {
+      var w = words[i];
+      if (!onLine2) {
+        var t1 = line1 ? line1 + ' ' + w : w;
+        if (t1.length <= maxChars) { line1 = t1; } else { onLine2 = true; line2 = w; }
+      } else {
+        var t2 = line2 ? line2 + ' ' + w : w;
+        if (t2.length <= maxChars) { line2 = t2; }
+        else { line2 = line2.slice(0, maxChars - 1) + '\u2026'; break; }
+      }
+    }
+    var lines = [];
+    if (line1) lines.push(line1);
+    if (line2) lines.push(line2);
+    if (!lines.length) lines.push(text.slice(0, maxChars));
+    return lines;
+  }
+
   // -------------------------------------------------------------- dot plot chart
   function renderChart(panel, stim) {
     var sec = panel.querySelector('.ma-chart-section[data-ma-stim="' + stim + '"]');
@@ -705,9 +729,13 @@
                    '" height="' + rowH + '" fill="#fafbfc" fill-opacity="0.55"/>');
       }
 
-      var lbl = r.label.length > 28 ? r.label.slice(0, 27) + '\u2026' : r.label;
-      parts.push('<text class="ma-bar-group-label" x="' + (xZero - 10) + '" y="' + dotCY +
-                 '" text-anchor="end" dominant-baseline="middle">' + escHtml(lbl) + '</text>');
+      var lblLines = wrapSvgLabel(r.label, 26);
+      var lineH = 14;
+      var startY = dotCY - Math.floor(lblLines.length * lineH / 2) + Math.floor(lineH / 2);
+      var tspans = lblLines.map(function(line, li) {
+        return '<tspan x="' + (xZero - 10) + '" y="' + (startY + li * lineH) + '">' + escHtml(line) + '</tspan>';
+      });
+      parts.push('<text class="ma-bar-group-label" text-anchor="end">' + tspans.join('') + '</text>');
 
       parts.push('<line x1="' + xZero + '" y1="' + dotCY + '" x2="' + xEnd + '" y2="' + dotCY +
                  '" stroke="#eef2f7" stroke-width="1"/>');
