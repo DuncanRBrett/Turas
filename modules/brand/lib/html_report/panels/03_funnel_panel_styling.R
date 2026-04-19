@@ -752,6 +752,12 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 .fn-stk-emph-chip:hover:not(.fn-stk-emph-active) {
   background: #e2e8f0; color: #1e293b;
 }
+
+/* The [hidden] attribute is overridden by display:flex on these rows.
+   Explicit rule with higher specificity restores correct behaviour. */
+.fn-stk-emph-row[hidden],
+.fn-stk-ctl[hidden],
+.fn-slope-ctl[hidden] { display: none !important; }
 '
 }
 

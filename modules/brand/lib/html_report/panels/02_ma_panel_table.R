@@ -100,7 +100,11 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
       brand_ths <- c(brand_ths, sprintf(
         '<th class="ct-th ct-data-col ma-ct-th-catavg" data-ma-brand="__avg__" data-sort-col="avg">
            <div class="ct-header-text">Cat avg</div>
-         </th>'))
+           <button type="button" class="ct-sort-indicator ma-sort-btn"
+                   aria-label="Sort by category average"
+                   data-ma-action="sort-avg" data-ma-stim="%s"
+                   data-ma-sort-dir="none">\u21C5</button>
+         </th>', stim))
     } else {
       brand_ths <- c(brand_ths, sprintf(
         '<th class="ct-th ct-data-col ma-ct-th-brand" data-ma-brand="%s" data-sort-col="%s">

@@ -249,7 +249,7 @@
     var focal = panel.__maState.focal;
     panel.querySelectorAll('.col-chip[data-ma-brand]').forEach(function (chip) {
       var code = chip.getAttribute('data-ma-brand');
-      var col  = getBrandColour(pd, code);
+      var col  = code === '__avg__' ? '#64748b' : getBrandColour(pd, code);
       chip.style.setProperty('--brand-chip-color', col);
       chip.style.backgroundColor = col;
       chip.style.borderColor = col;
@@ -544,7 +544,9 @@
         var state = panel.__maState.sort[stim];
         if (!state) return;
 
-        var key = action === 'sort-brand' ? brand : '__stim__';
+        var key = action === 'sort-brand' ? brand
+                : action === 'sort-avg'   ? 'avg'
+                : '__stim__';
         var next;
         if (state.col !== key) next = 'desc';
         else if (state.dir === 'desc') next = 'asc';
@@ -707,7 +709,11 @@
     if (legendCurRow.length > 0) legendRows.push(legendCurRow);
     var legendRowH  = 18;
     var legendPadT  = 10;
-    var legendH     = legendRows.length > 0 ? legendPadT + legendRows.length * legendRowH : 0;
+    var showCatAvgNote = baseMode === 'total' && block.stim_avg &&
+      block.stim_avg.some(function (v) { return v != null && !isNaN(v); });
+    var legendH     = (legendRows.length > 0 || showCatAvgNote)
+      ? legendPadT + legendRows.length * legendRowH + (showCatAvgNote ? legendRowH : 0)
+      : 0;
 
     var dataAreaH   = marginTop + marginBottom + activeRows.length * rowH;
     var chartHeight = dataAreaH + legendH;
@@ -811,7 +817,7 @@
                '" x2="' + xZero + '" y2="' + (dataAreaH - marginBottom) + '"/>');
 
     // SVG legend
-    if (legendRows.length > 0) {
+    if (legendRows.length > 0 || showCatAvgNote) {
       var legendStartY = chartHeight - legendH + legendPadT;
       var legendParts = ['<g class="ma-bar-legend" font-size="10" fill="#334155">'];
       for (var lri = 0; lri < legendRows.length; lri++) {
@@ -831,6 +837,15 @@
             escHtml(le.item.label) + '</text>'
           );
         }
+      }
+      if (showCatAvgNote) {
+        var catAvgNoteY = legendStartY + legendRows.length * legendRowH + Math.round(legendRowH / 2);
+        legendParts.push(
+          '<line x1="8" y1="' + catAvgNoteY + '" x2="28" y2="' + catAvgNoteY + '"' +
+          ' stroke="#64748b" stroke-width="1.5" stroke-dasharray="3 3"/>',
+          '<text x="32" y="' + catAvgNoteY + '" dominant-baseline="middle"' +
+          ' fill="#64748b">Category average</text>'
+        );
       }
       legendParts.push('</g>');
       parts.push(legendParts.join(''));

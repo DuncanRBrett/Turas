@@ -66,6 +66,10 @@
     }
     panel.__fnState.chartBrands["__avg__"] = false; // cat avg chip off by default
     bindControls(panel);
+    // Enforce initial control row visibility (chartView starts as "slope")
+    panel.querySelectorAll(".fn-stk-ctl").forEach(function(el) { el.hidden = true; });
+    var initBarWrap = panel.querySelector(".fn-bar-wrap");
+    if (initBarWrap) initBarWrap.hidden = true;
     // Apply brand colours to funnel table/chart chip buttons
     panel.querySelectorAll('button[data-fn-scope][data-fn-brand]').forEach(function(btn) {
       var code = btn.getAttribute('data-fn-brand');

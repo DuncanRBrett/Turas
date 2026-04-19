@@ -157,11 +157,15 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
   brand_names <- pd$config$brand_names %||% brand_codes
   focal <- pd$meta$focal_brand_code %||% brand_codes[1]
 
-  chips_html <- paste(vapply(seq_along(brand_codes), function(i) {
-    # Always default to all brands visible
-    sprintf('<button type="button" class="col-chip" data-ma-scope="%s" data-ma-brand="%s">%s</button>',
-            .ma_esc(stim), .ma_esc(brand_codes[i]), .ma_esc(brand_names[i]))
-  }, character(1)), collapse = "")
+  chips_html <- paste(c(
+    vapply(seq_along(brand_codes), function(i) {
+      # Always default to all brands visible
+      sprintf('<button type="button" class="col-chip" data-ma-scope="%s" data-ma-brand="%s">%s</button>',
+              .ma_esc(stim), .ma_esc(brand_codes[i]), .ma_esc(brand_names[i]))
+    }, character(1)),
+    sprintf('<button type="button" class="col-chip" data-ma-scope="%s" data-ma-brand="__avg__">Cat avg</button>',
+            .ma_esc(stim))
+  ), collapse = "")
 
   block <- if (stim == "attributes") pd$attributes else pd$ceps
   has_aware <- !is.null(block) && !is.null(block$awareness_by_brand)
