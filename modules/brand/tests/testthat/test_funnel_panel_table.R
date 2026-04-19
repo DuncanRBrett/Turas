@@ -145,16 +145,12 @@ test_that("Sort buttons exist on every stage header AND brand header", {
 })
 
 
-test_that("Help buttons + popover templates cover every stage", {
+test_that("Stage column headers render for every stage", {
   html <- .render_table()
-  help_count <- length(gregexpr('data-fn-action="help"', html)[[1]])
-  expect_equal(help_count, 4)
-  tpl_count <- length(gregexpr('class="fn-help-template"', html)[[1]])
-  expect_equal(tpl_count, 4)
-  # Every stage key appears in a template
+  # Stage headers use data-fn-stage attributes (help popovers moved to About section)
   for (k in c("aware", "consideration", "bought_long", "bought_target")) {
-    expect_true(grepl(sprintf('fn-help-template[^>]*data-fn-stage="%s"', k),
-                      html), info = sprintf("template for %s", k))
+    expect_true(grepl(sprintf('data-fn-stage="%s"', k), html),
+                info = sprintf("stage header for %s", k))
   }
 })
 

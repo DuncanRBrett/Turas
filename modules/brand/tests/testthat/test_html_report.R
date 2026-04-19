@@ -242,7 +242,7 @@ test_that("HTML contains Mental Availability section", {
   expect_true(grepl("Mental Market Share", html))
   expect_true(grepl("Mental Penetration", html))
   expect_true(grepl("Network Size", html))
-  expect_true(grepl("CEP.*Brand.*Linkage", html))
+  expect_true(grepl("Share of Mind", html))
 })
 
 test_that("HTML contains Funnel section", {
