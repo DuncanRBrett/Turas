@@ -269,7 +269,7 @@ build_ma_panel_data <- function(ma_result, brand_list, cep_list,
     cells         = cells,
     n_total       = if (is.na(n_total)) NULL else as.integer(n_total),
     awareness_by_brand = if (!is.null(awareness_by_brand))
-      as.list(round(as.numeric(awareness_by_brand), 1)) else NULL
+      as.list(round(awareness_by_brand, 1)) else NULL
   )
 }
 

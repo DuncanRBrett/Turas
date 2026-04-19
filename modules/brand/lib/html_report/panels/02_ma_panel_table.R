@@ -261,14 +261,14 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
 
 .ma_catavg_cell_html <- function(avg_pct, ci_lower, ci_upper, base_n) {
   if (is.null(avg_pct) || is.na(avg_pct)) {
-    return('<td class="ct-td ct-data-col ma-td-catavg ct-na">&mdash;</td>')
+    return('<td class="ct-td ct-data-col ma-td-catavg ct-na" data-ma-brand="__avg__">&mdash;</td>')
   }
   ci_text <- if (!is.na(ci_lower) && !is.na(ci_upper))
     sprintf("%.0f\u2013%.0f", ci_lower, ci_upper) else ""
   n_txt <- if (is.null(base_n) || length(base_n) == 0 || is.na(base_n)) ""
            else sprintf("n=%d", as.integer(base_n))
   sprintf(
-    '<td class="ct-td ct-data-col ma-td-catavg" data-ma-ci-lower="%s" data-ma-ci-upper="%s" data-sort-val="%.6f" title="95%% CI: %s">
+    '<td class="ct-td ct-data-col ma-td-catavg" data-ma-brand="__avg__" data-ma-ci-lower="%s" data-ma-ci-upper="%s" data-sort-val="%.6f" title="95%% CI: %s">
        <span class="ct-val">%.0f%%</span>
        <span class="ct-freq ma-ci-hint">CI %s</span>
      </td>',

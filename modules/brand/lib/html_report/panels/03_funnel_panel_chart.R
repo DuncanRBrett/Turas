@@ -37,6 +37,9 @@ build_funnel_chart_section <- function(pd, focal_colour = "#1A5276") {
     '<div class="fn-chart-wrap" data-fn-chart="slope">',
     svg,
     '</div>',
+    '<div class="fn-bar-wrap" hidden>',
+    '<svg class="fn-bar-svg" width="100%" height="400" role="img" aria-label="Funnel bar chart"></svg>',
+    '</div>',
     '</section>'
   )
 }

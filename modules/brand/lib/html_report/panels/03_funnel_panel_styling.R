@@ -724,6 +724,34 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
   .fn-subtab[hidden] { display: block !important; }
   .fn-slope-tooltip { display: none !important; }
 }
+
+/* -------------------------------------------------------------------------- */
+/* Bar chart view                                                              */
+/* -------------------------------------------------------------------------- */
+.fn-bar-wrap {
+  width: 100%; overflow-x: auto;
+}
+.fn-bar-svg {
+  display: block; font-family: inherit; overflow: visible;
+}
+
+/* Emphasis chips — stage selector row in stacked view */
+.fn-stk-emph-row {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 6px 0 2px;
+}
+.fn-stk-emph-chip {
+  padding: 3px 10px; border-radius: 14px; font-size: 11px; font-weight: 600;
+  cursor: pointer; border: 1px solid #cbd5e1; background: #f1f5f9;
+  color: #475569; font-family: inherit; transition: background 0.15s, color 0.15s;
+}
+.fn-stk-emph-chip.fn-stk-emph-active {
+  background: var(--fn-brand, #1A5276); color: #fff;
+  border-color: var(--fn-brand, #1A5276);
+}
+.fn-stk-emph-chip:hover:not(.fn-stk-emph-active) {
+  background: #e2e8f0; color: #1e293b;
+}
 '
 }
 

@@ -687,7 +687,30 @@
     var dotR         = 5;
 
     var width = svg.clientWidth || 800;
-    var chartHeight = marginTop + marginBottom + activeRows.length * rowH;
+
+    // Pre-calculate legend layout so we can include it in chartHeight
+    var legendItems = visibleBrands.map(function (b) {
+      var name  = getBrandName(pd, b);
+      var label = name.length > 18 ? name.slice(0, 17) + '\u2026' : name;
+      return { code: b, label: label, col: getBrandColour(pd, b),
+               isFocal: b === focal, w: 14 + label.length * 5.8 + 12 };
+    });
+    var legendRows = [], legendCurRow = [], legendX = 0;
+    for (var li = 0; li < legendItems.length; li++) {
+      var litem = legendItems[li];
+      if (legendX + litem.w > width - 8 && legendCurRow.length > 0) {
+        legendRows.push(legendCurRow); legendCurRow = []; legendX = 0;
+      }
+      legendCurRow.push({ item: litem, x: legendX });
+      legendX += litem.w;
+    }
+    if (legendCurRow.length > 0) legendRows.push(legendCurRow);
+    var legendRowH  = 18;
+    var legendPadT  = 10;
+    var legendH     = legendRows.length > 0 ? legendPadT + legendRows.length * legendRowH : 0;
+
+    var dataAreaH   = marginTop + marginBottom + activeRows.length * rowH;
+    var chartHeight = dataAreaH + legendH;
     svg.setAttribute('viewBox', '0 0 ' + width + ' ' + chartHeight);
     svg.setAttribute('height', chartHeight);
     svg.setAttribute('preserveAspectRatio', 'xMinYMin meet');
@@ -715,8 +738,8 @@
       var gv = maxVal * g / gridSteps;
       var gx = xZero + xScale * g / gridSteps;
       parts.push('<line class="ma-bar-gridline" x1="' + gx + '" y1="' + marginTop +
-                 '" x2="' + gx + '" y2="' + (chartHeight - marginBottom) + '"/>');
-      parts.push('<text class="ma-bar-label" x="' + gx + '" y="' + (chartHeight - marginBottom + 14) +
+                 '" x2="' + gx + '" y2="' + (dataAreaH - marginBottom) + '"/>');
+      parts.push('<text class="ma-bar-label" x="' + gx + '" y="' + (dataAreaH - marginBottom + 14) +
                  '" text-anchor="middle">' + Math.round(gv) + '%</text>');
     }
 
@@ -785,7 +808,33 @@
     });
 
     parts.push('<line class="ma-bar-axis" x1="' + xZero + '" y1="' + marginTop +
-               '" x2="' + xZero + '" y2="' + (chartHeight - marginBottom) + '"/>');
+               '" x2="' + xZero + '" y2="' + (dataAreaH - marginBottom) + '"/>');
+
+    // SVG legend
+    if (legendRows.length > 0) {
+      var legendStartY = chartHeight - legendH + legendPadT;
+      var legendParts = ['<g class="ma-bar-legend" font-size="10" fill="#334155">'];
+      for (var lri = 0; lri < legendRows.length; lri++) {
+        var lrow = legendRows[lri];
+        for (var lci = 0; lci < lrow.length; lci++) {
+          var le = lrow[lci];
+          var lcx = le.x + 5;
+          var lcy = legendStartY + lri * legendRowH;
+          var lr  = le.item.isFocal ? 5.5 : 4.5;
+          var lop = le.item.isFocal ? '1' : '0.75';
+          legendParts.push(
+            '<circle cx="' + lcx + '" cy="' + lcy + '" r="' + lr + '"' +
+            ' fill="' + le.item.col + '" fill-opacity="' + lop + '"/>',
+            '<text x="' + (lcx + 9) + '" y="' + lcy + '"' +
+            ' dominant-baseline="middle"' +
+            ' font-weight="' + (le.item.isFocal ? '700' : '400') + '">' +
+            escHtml(le.item.label) + '</text>'
+          );
+        }
+      }
+      legendParts.push('</g>');
+      parts.push(legendParts.join(''));
+    }
 
     svg.innerHTML = parts.join('');
   }

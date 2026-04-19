@@ -44,14 +44,20 @@
       showValues: "focal",  // "focal" | "all" | "none"
       yMinInput: null,
       yMaxInput: null,
-      shading: "range",      // slope chart band: "range" | "ci" | "none"
+      shading: "range",        // slope chart band: "range" | "ci" | "none"
       tableShading: "heatmap", // table cells: "off" | "heatmap" | "ci"
       callouts: {},
       emphasis: "all",
       tableBrands: {},
       chartBrands: {},
-      sort: { col: "brand", dir: "asc" }
+      sort: { col: "brand", dir: "asc" },
+      chartView: "slope",  // "slope" | "bar"
+      barStage: null       // active stage key in bar view (set in initPanel)
     };
+    // Default bar stage = first stage key
+    var stageKeys = (payload.table && payload.table.stage_keys) || [];
+    panel.__fnState.barStage = stageKeys[0] || null;
+
     // Default chip state: all brands on in table and chart; cat avg off
     var allBrands = (payload.table && payload.table.brand_codes) || [];
     for (var i = 0; i < allBrands.length; i++) {
@@ -302,6 +308,40 @@
       });
     });
 
+    // Chart view toggle (Slope | Bar)
+    panel.querySelectorAll('[data-fn-action="chartview"]').forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        var view = btn.getAttribute("data-fn-view");
+        panel.__fnState.chartView = view;
+        panel.querySelectorAll('[data-fn-action="chartview"]').forEach(function(b) {
+          var active = b === btn;
+          b.classList.toggle("sig-btn-active", active);
+          b.setAttribute("aria-pressed", active ? "true" : "false");
+        });
+        var isBar = view === "bar";
+        panel.querySelectorAll(".fn-slope-ctl").forEach(function(el) { el.hidden = isBar; });
+        panel.querySelectorAll(".fn-stk-ctl").forEach(function(el) { el.hidden = !isBar; });
+        var slopeWrap = panel.querySelector('[data-fn-chart="slope"]');
+        var barWrap   = panel.querySelector(".fn-bar-wrap");
+        if (slopeWrap) slopeWrap.hidden = isBar;
+        if (barWrap)   barWrap.hidden   = !isBar;
+        if (isBar) buildBarChart(panel);
+        else { drawSlopeSvg(panel); buildMiniFunnels(panel); }
+      });
+    });
+
+    // Bar stage selector chips
+    panel.querySelectorAll(".fn-stk-emph-chip").forEach(function(chip) {
+      chip.addEventListener("click", function() {
+        var stage = chip.getAttribute("data-fn-stk-emphasis");
+        panel.__fnState.barStage = stage;
+        panel.querySelectorAll(".fn-stk-emph-chip").forEach(function(c) {
+          c.classList.toggle("fn-stk-emph-active", c === chip);
+        });
+        buildBarChart(panel);
+      });
+    });
+
     var exp = panel.querySelector('[data-fn-action="exporttable"]');
     if (exp) exp.addEventListener("click", function(){ exportTable(panel); });
   }
@@ -513,11 +553,15 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Chart visibility — JS redraws competitor lines when chips toggle
+  // Chart visibility — routes to slope or stacked depending on state
   // ---------------------------------------------------------------------------
   function applyChartVisibility(panel) {
-    drawSlopeSvg(panel);
-    buildMiniFunnels(panel);
+    if (panel.__fnState.chartView === "bar") {
+      buildBarChart(panel);
+    } else {
+      drawSlopeSvg(panel);
+      buildMiniFunnels(panel);
+    }
   }
 
   function buildMiniFunnels(panel) {
@@ -2022,4 +2066,139 @@
   function escapeAttr(s) {
     return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
   }
+
+  function escSvg(s) {
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bar chart — one horizontal bar per brand for the selected funnel stage.
+  // Bars use brand colours; focal brand is thicker. Category avg shown as a
+  // dashed reference line. Brands sorted focal-first then descending by value.
+  // ---------------------------------------------------------------------------
+  function buildBarChart(panel) {
+    var wrap  = panel.querySelector(".fn-bar-wrap");
+    if (!wrap) return;
+    var svgEl = wrap.querySelector(".fn-bar-svg");
+    if (!svgEl) return;
+
+    var pd    = panel.__fnData;
+    var state = panel.__fnState;
+    if (!pd || !pd.table) { svgEl.innerHTML = ""; return; }
+
+    var stageKeys   = pd.table.stage_keys   || [];
+    var stageLabels = pd.table.stage_labels || {};
+    var brandCodes  = pd.table.brand_codes  || [];
+    var brandNames  = pd.table.brand_names  || brandCodes;
+    var cells       = pd.table.cells        || [];
+    var focal       = state.focal;
+    var barStage    = state.barStage || stageKeys[0];
+
+    if (!barStage) {
+      svgEl.innerHTML = '<text x="20" y="30" font-size="12" fill="#94a3b8">No stage data</text>';
+      return;
+    }
+
+    var stageLabel = stageLabels[barStage] || barStage;
+
+    // Value map: brandCode -> pct_absolute for selected stage
+    var valMap = {};
+    for (var ci = 0; ci < cells.length; ci++) {
+      var c = cells[ci];
+      if (c.stage_key === barStage && c.pct_absolute != null) {
+        valMap[c.brand_code] = c.pct_absolute;
+      }
+    }
+
+    // Visible brands (cat avg chip excluded)
+    var visBrands = brandCodes.filter(function(b) {
+      return b !== "__avg__" && state.chartBrands[b] !== false;
+    });
+
+    var brandData = visBrands.map(function(b) {
+      var bIdx = brandCodes.indexOf(b);
+      return {
+        code: b,
+        name: bIdx >= 0 ? brandNames[bIdx] : b,
+        val:  valMap[b] != null ? valMap[b] : null
+      };
+    });
+
+    // Sort: focal first, then descending by value
+    brandData.sort(function(a, b) {
+      if (a.code === focal) return -1;
+      if (b.code === focal) return 1;
+      return (b.val != null ? b.val : -1) - (a.val != null ? a.val : -1);
+    });
+
+    // Category average reference value
+    var catAvgVal = null;
+    if (pd.table.avg_all_brands) {
+      for (var ai = 0; ai < pd.table.avg_all_brands.length; ai++) {
+        if (pd.table.avg_all_brands[ai].stage_key === barStage) {
+          catAvgVal = pd.table.avg_all_brands[ai].pct_absolute; break;
+        }
+      }
+    }
+    if (catAvgVal == null) {
+      var vals = brandCodes.map(function(b) { return valMap[b]; }).filter(function(v) { return v != null; });
+      if (vals.length) catAvgVal = vals.reduce(function(a, b) { return a + b; }, 0) / vals.length;
+    }
+
+    // Layout
+    var W = 700, labelW = 160, rPad = 56, barAreaW = W - labelW - rPad;
+    var rowH = 32, focalBarH = 24, stdBarH = 18, mt = 28, mb = 16;
+    var H = mt + brandData.length * rowH + mb;
+
+    var parts = [];
+
+    // Stage title
+    parts.push('<text x="' + (labelW + barAreaW / 2) + '" y="16" text-anchor="middle" font-size="11" font-weight="600" fill="#64748b">' + escSvg(stageLabel) + ' \u2014 % of total respondents</text>');
+
+    // Category average dashed reference line
+    if (catAvgVal != null) {
+      var avgX = (labelW + catAvgVal * barAreaW).toFixed(1);
+      parts.push('<line x1="' + avgX + '" y1="' + mt + '" x2="' + avgX + '" y2="' + (H - mb) + '" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3"/>');
+      parts.push('<text x="' + avgX + '" y="' + (mt - 4) + '" text-anchor="middle" font-size="9" fill="#94a3b8">cat avg ' + Math.round(catAvgVal * 100) + '%</text>');
+    }
+
+    // Bars
+    for (var ri = 0; ri < brandData.length; ri++) {
+      var bd      = brandData[ri];
+      var y       = mt + ri * rowH;
+      var isFocal = bd.code === focal;
+      var bh      = isFocal ? focalBarH : stdBarH;
+      var barY    = y + (rowH - bh) / 2;
+      var color   = resolveBrandColor(pd, state, bd.code);
+
+      // Row separator
+      if (ri > 0) {
+        parts.push('<line x1="' + (labelW - 2) + '" y1="' + y + '" x2="' + (labelW + barAreaW + 4) + '" y2="' + y + '" stroke="#f1f5f9" stroke-width="1"/>');
+      }
+
+      // Brand name label
+      var dispName = bd.name.length > 22 ? bd.name.slice(0, 21) + "\u2026" : bd.name;
+      var fontW    = isFocal ? "700" : "400";
+      parts.push('<text x="' + (labelW - 6) + '" y="' + (y + rowH / 2 + 4).toFixed(1) + '" text-anchor="end" font-size="12" font-weight="' + fontW + '" fill="' + color + '">' + escSvg(dispName) + '</text>');
+
+      if (bd.val == null) {
+        parts.push('<rect x="' + labelW + '" y="' + barY.toFixed(1) + '" width="' + barAreaW + '" height="' + bh + '" fill="#f8fafc" rx="2"/>');
+        continue;
+      }
+
+      var barW = Math.max(2, bd.val * barAreaW);
+      // Track
+      parts.push('<rect x="' + labelW + '" y="' + barY.toFixed(1) + '" width="' + barAreaW + '" height="' + bh + '" fill="#f1f5f9" rx="2"/>');
+      // Bar
+      parts.push('<rect x="' + labelW + '" y="' + barY.toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + bh + '" fill="' + color + '" rx="2"/>');
+      // Value label to the right
+      var pctStr = Math.round(bd.val * 100) + "%";
+      parts.push('<text x="' + (labelW + barW + 5).toFixed(1) + '" y="' + (barY + bh / 2 + 4).toFixed(1) + '" font-size="11" font-weight="' + fontW + '" fill="' + color + '">' + pctStr + '</text>');
+    }
+
+    svgEl.setAttribute("viewBox", "0 0 " + W + " " + H);
+    svgEl.setAttribute("height", H);
+    svgEl.innerHTML = parts.join("");
+  }
+
 })();

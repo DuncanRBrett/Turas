@@ -284,6 +284,10 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
   brand_names <- pd$table$brand_names %||% brand_codes
   focal <- pd$meta$focal_brand_code %||% brand_codes[1]
 
+  # Stage info for stacked emphasis chips
+  stage_keys   <- pd$table$stage_keys   %||% character(0)
+  stage_labels <- pd$table$stage_labels %||% list()
+
   # Cat Avg chip — always first, off by default in slope (toggles the dashed line + mini funnel card)
   cat_avg_chip <- '<button type="button" class="col-chip col-chip-off fn-chip-avg" data-fn-scope="chart" data-fn-brand="__avg__">Cat Avg</button>'
 
@@ -296,9 +300,28 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
 
   chips_html <- paste0(cat_avg_chip, brand_chips_html)
 
+  # Stage selector chips for bar view — first stage active by default
+  stage_chips <- if (length(stage_keys) > 0)
+    paste(vapply(seq_along(stage_keys), function(j) {
+      k   <- stage_keys[j]
+      lbl <- stage_labels[[k]] %||% k
+      cls <- if (j == 1) "fn-stk-emph-chip fn-stk-emph-active" else "fn-stk-emph-chip"
+      sprintf('<button type="button" class="%s" data-fn-stk-emphasis="%s">%s</button>',
+              cls, .fn_esc(k), .fn_esc(lbl))
+    }, character(1)), collapse = "")
+  else ""
+
   paste0(
     '<div class="fn-chart-header">',
+    # View toggle — always visible
+    '<div class="sig-level-switcher fn-view-switcher" role="group" aria-label="View">',
+    '<span class="sig-level-label">View:</span>',
+    '<button type="button" class="sig-btn sig-btn-active" data-fn-action="chartview" data-fn-view="slope" aria-pressed="true">Slope</button>',
+    '<button type="button" class="sig-btn" data-fn-action="chartview" data-fn-view="bar" aria-pressed="false">Bar</button>',
+    '</div>',
+    # Brand chips — always visible
     '<div class="fn-chart-brand-chips col-chip-bar">', chips_html, '</div>',
+    # Slope-only controls
     '<div class="sig-level-switcher fn-slope-ctl" role="group" aria-label="Values">',
     '<span class="sig-level-label">Values:</span>',
     '<button type="button" class="sig-btn sig-btn-active" data-fn-action="showvalues" data-fn-showvalues="focal" aria-pressed="true">Focal</button>',
@@ -318,6 +341,13 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
     '<input type="number" class="fn-yaxis-input" data-fn-yaxis="max" placeholder="100" min="0" max="100" step="5">',
     '<button type="button" class="fn-yaxis-reset" data-fn-action="yaxisreset" title="Reset y-axis">\u21BA</button>',
     '</div>',
+    # Bar-only controls: stage selector
+    if (length(stage_keys) > 0) paste0(
+      '<div class="fn-stk-ctl fn-stk-emph-row" hidden>',
+      '<span class="sig-level-label">Stage:</span>',
+      stage_chips,
+      '</div>'
+    ) else '',
     '</div>'
   )
 }

@@ -181,9 +181,8 @@ build_ma_panel_styles <- function(focal_colour = "#1A5276") {
 
 /* Chart chip bar + legend */
 .ma-chart-chip-bar { margin-bottom: 6px; }
-/* Chart legend */
-.ma-chart-legend { display: flex; flex-wrap: wrap; gap: 4px 14px;
-                   margin: 0 0 8px; }
+/* Chart legend (HTML div hidden — legend now rendered inside SVG) */
+.ma-chart-legend { display: none; }
 .ma-legend-item { display: inline-flex; align-items: center; gap: 5px;
                   font-size: 11px; color: #334155; }
 .ma-legend-dot { display: inline-block; width: 9px; height: 9px;
@@ -253,6 +252,7 @@ build_ma_panel_styles <- function(focal_colour = "#1A5276") {
                                     font-weight: 600; }
 .ma-bar-chart .ma-bar-cat-avg { stroke: #64748b; stroke-width: 1.5;
                                 stroke-dasharray: 3 3; }
+.ma-bar-chart .ma-bar-legend { font-family: inherit; }
 
 /* Full-width insight box */
 .ma-insight-box { width: 100%; margin-top: 12px; padding: 10px 12px;
