@@ -172,14 +172,15 @@
 
     panel.__maState = {
       focal: (pd.meta && pd.meta.focal_brand_code) || brandCodes[0] || null,
-      basemode:   { attributes: 'total', ceps: 'total' },
-      heatmap:    { attributes: 'ci',    ceps: 'ci' },
-      counts:     { attributes: false,   ceps: false },
-      showchart:  { attributes: true,    ceps: true },
-      visible:    { attributes: makeVisMap(), ceps: makeVisMap() },
-      rowActive:  { attributes: makeRowMap(attrCodes), ceps: makeRowMap(cepCodes) },
-      sort:       { attributes: { col: null, dir: 'none' },
-                    ceps:       { col: null, dir: 'none' } }
+      basemode:     { attributes: 'total', ceps: 'total' },
+      heatmap:      { attributes: 'ci',    ceps: 'ci' },
+      counts:       { attributes: false,   ceps: false },
+      showchart:    { attributes: true,    ceps: true },
+      visible:      { attributes: makeVisMap(), ceps: makeVisMap() },
+      chartVisible: { attributes: makeVisMap(), ceps: makeVisMap() },
+      rowActive:    { attributes: makeRowMap(attrCodes), ceps: makeRowMap(cepCodes) },
+      sort:         { attributes: { col: null, dir: 'none' },
+                      ceps:       { col: null, dir: 'none' } }
     };
 
     colourChips(panel);
@@ -187,6 +188,7 @@
     bindSubTabs(panel);
     bindFocusSelect(panel);
     bindChipPicker(panel);
+    bindChartChips(panel);
     bindToggles(panel);
     bindBaseMode(panel);
     bindHeatmapMode(panel);
@@ -288,11 +290,28 @@
     });
   }
 
+  function reorderFocalColumn(panel, focal) {
+    panel.querySelectorAll('.ma-matrix-section').forEach(function (sec) {
+      sec.querySelectorAll('table').forEach(function (table) {
+        table.querySelectorAll('tr').forEach(function (row) {
+          var labelCell = row.children[0];
+          if (!labelCell) return;
+          var focalCell = row.querySelector('[data-ma-brand="' + focal + '"]');
+          var avgCell   = row.querySelector('[data-ma-brand="__avg__"]');
+          if (!focalCell) return;
+          row.insertBefore(focalCell, labelCell.nextSibling);
+          if (avgCell) row.insertBefore(avgCell, focalCell.nextSibling);
+        });
+      });
+    });
+  }
+
   function setFocal(panel, code, opts) {
     opts = opts || {};
     if (!code) return;
     panel.__maState.focal = code;
     refreshFocalAccents(panel);
+    reorderFocalColumn(panel, code);
     colourChips(panel);
     renderChart(panel, 'attributes');
     renderChart(panel, 'ceps');
@@ -326,7 +345,7 @@
           var b = document.createElement('span');
           b.className = 'ma-focal-badge';
           b.textContent = 'FOCAL';
-          hdr.appendChild(b);
+          hdr.insertBefore(b, hdr.firstChild);
         }
       }
     });
@@ -341,6 +360,20 @@
   }
 
   // -------------------------------------------------------------- chips
+  function bindChartChips(panel) {
+    panel.querySelectorAll('.chart-chip[data-ma-chart-scope]').forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        var scope = chip.getAttribute('data-ma-chart-scope');
+        var code  = chip.getAttribute('data-ma-brand');
+        var vis = panel.__maState.chartVisible[scope];
+        if (!vis) return;
+        vis[code] = !vis[code];
+        chip.classList.toggle('col-chip-off', !vis[code]);
+        renderChart(panel, scope);
+      });
+    });
+  }
+
   function bindChipPicker(panel) {
     panel.querySelectorAll('.col-chip[data-ma-scope]').forEach(function (chip) {
       chip.addEventListener('click', function () {
@@ -396,19 +429,10 @@
 
   // -------------------------------------------------------------- heatmap mode
   function bindHeatmapMode(panel) {
-    panel.querySelectorAll('.sig-btn[data-ma-action="heatmapmode"]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var stim = btn.getAttribute('data-ma-stim');
-        var mode = btn.getAttribute('data-ma-heatmap-mode');
-        panel.__maState.heatmap[stim] = mode;
-        var parent = btn.closest('.ma-heatmap-switcher');
-        if (parent) {
-          parent.querySelectorAll('.sig-btn').forEach(function (b) {
-            var active = b === btn;
-            b.classList.toggle('sig-btn-active', active);
-            b.setAttribute('aria-pressed', active ? 'true' : 'false');
-          });
-        }
+    panel.querySelectorAll('input[type="checkbox"][data-ma-action="heatmapmode"]').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        var stim = cb.getAttribute('data-ma-stim');
+        panel.__maState.heatmap[stim] = cb.checked ? 'ci' : 'off';
         applyHeatmapMode(panel, stim);
       });
     });
@@ -455,6 +479,18 @@
     var mode = panel.__maState.basemode[stim] || 'total';
     var sec = panel.querySelector('.ma-matrix-section[data-ma-stim="' + stim + '"]');
     if (!sec) return;
+    // Update base row cells
+    sec.querySelectorAll('tr.ma-row-base td.ma-base-n[data-ma-brand]').forEach(function (td) {
+      var span = td.querySelector('.ma-base-val');
+      if (!span) return;
+      if (mode === 'aware') {
+        var n = td.getAttribute('data-ma-n-aware');
+        span.textContent = n ? 'n=' + n + ' aware' : '\u2014';
+      } else {
+        var n = td.getAttribute('data-ma-n-total');
+        span.textContent = n ? 'n=' + n : '\u2014';
+      }
+    });
     sec.querySelectorAll('.ma-heatmap-cell').forEach(function (td) {
       var pctTotal = parseFloat(td.getAttribute('data-ma-pct'));
       var pctAware = parseFloat(td.getAttribute('data-ma-pct-aware'));
@@ -563,7 +599,7 @@
     if (summary) tbody.appendChild(summary);
   }
 
-  // -------------------------------------------------------------- bar chart
+  // -------------------------------------------------------------- dot plot chart
   function renderChart(panel, stim) {
     var sec = panel.querySelector('.ma-chart-section[data-ma-stim="' + stim + '"]');
     if (!sec) return;
@@ -577,13 +613,12 @@
     var block = pd[stim];
     if (!block) { svg.innerHTML = ''; return; }
 
-    var focal = panel.__maState.focal;
+    var focal    = panel.__maState.focal;
     var baseMode = panel.__maState.basemode[stim] || 'total';
-    var visMap = panel.__maState.visible[stim] || {};
+    var visMap   = panel.__maState.chartVisible[stim] || {};
     var rowActive = panel.__maState.rowActive[stim] || {};
 
     var brandCodes = (pd.config && pd.config.brand_codes) || [];
-    // Column order: focal first, then others in brand-list order
     var orderedBrands = [];
     if (focal && brandCodes.indexOf(focal) >= 0) orderedBrands.push(focal);
     brandCodes.forEach(function (c) { if (c !== focal) orderedBrands.push(c); });
@@ -593,12 +628,24 @@
       return { code: code, label: block.labels[i], idx: i };
     }).filter(function (r) { return rowActive[r.code] !== false; });
 
+    // Render legend
+    var legendEl = sec.querySelector('.ma-chart-legend');
+    if (legendEl) {
+      legendEl.innerHTML = visibleBrands.map(function (b) {
+        var col = getBrandColour(pd, b);
+        var isFocal = b === focal;
+        return '<span class="ma-legend-item">' +
+               '<span class="ma-legend-dot" style="background:' + col + ';opacity:' + (isFocal ? '1' : '0.8') + '"></span>' +
+               '<span class="ma-legend-name">' + escHtml(getBrandName(pd, b)) + '</span>' +
+               '</span>';
+      }).join('');
+    }
+
     if (activeRows.length === 0 || visibleBrands.length === 0) {
       svg.innerHTML = '';
       return;
     }
 
-    // Build cell lookup
     var cellMap = {};
     (block.cells || []).forEach(function (c) {
       cellMap[c.stim_code + '|' + c.brand_code] = c;
@@ -606,27 +653,26 @@
 
     var pctField = baseMode === 'aware' ? 'pct_aware' : 'pct_total';
 
-    // SVG dimensions — compact grouped bar chart
-    var marginLeft = 180;    // room for group label
-    var marginRight = 24;
-    var marginTop = 18;
-    var marginBottom = 26;
-    var barGroupGap = 10;
-    // Target: ~52px per attribute group when 10 brands visible
-    var barHeight = Math.max(8, Math.min(14, Math.floor(120 / visibleBrands.length)));
-    var groupHeight = visibleBrands.length * (barHeight + 1) + barGroupGap;
-    var chartHeight = marginTop + marginBottom + activeRows.length * groupHeight;
+    // Layout constants
+    var marginLeft   = 200;
+    var marginRight  = 30;
+    var marginTop    = 14;
+    var marginBottom = 28;
+    var rowH         = 44;
+    var dotCYOffset  = 28;
+    var dotR         = 5;
+
     var width = svg.clientWidth || 800;
+    var chartHeight = marginTop + marginBottom + activeRows.length * rowH;
     svg.setAttribute('viewBox', '0 0 ' + width + ' ' + chartHeight);
     svg.setAttribute('height', chartHeight);
     svg.setAttribute('preserveAspectRatio', 'xMinYMin meet');
     svg.style.height = chartHeight + 'px';
 
-    var xZero = marginLeft;
-    var xEnd = width - marginRight;
+    var xZero  = marginLeft;
+    var xEnd   = width - marginRight;
     var xScale = xEnd - xZero;
 
-    // Max value (for scale)
     var maxVal = 0;
     activeRows.forEach(function (r) {
       visibleBrands.forEach(function (b) {
@@ -640,53 +686,78 @@
 
     var parts = [];
 
-    // X-axis gridlines
     var gridSteps = 4;
     for (var g = 0; g <= gridSteps; g++) {
       var gv = maxVal * g / gridSteps;
       var gx = xZero + xScale * g / gridSteps;
-      parts.push('<line class="ma-bar-gridline" x1="' + gx + '" y1="' + marginTop + '" x2="' + gx + '" y2="' + (chartHeight - marginBottom) + '"/>');
-      parts.push('<text class="ma-bar-label" x="' + gx + '" y="' + (chartHeight - marginBottom + 14) + '" text-anchor="middle">' + Math.round(gv) + '%</text>');
+      parts.push('<line class="ma-bar-gridline" x1="' + gx + '" y1="' + marginTop +
+                 '" x2="' + gx + '" y2="' + (chartHeight - marginBottom) + '"/>');
+      parts.push('<text class="ma-bar-label" x="' + gx + '" y="' + (chartHeight - marginBottom + 14) +
+                 '" text-anchor="middle">' + Math.round(gv) + '%</text>');
     }
 
-    // Groups
     activeRows.forEach(function (r, ri) {
-      var y0 = marginTop + ri * groupHeight;
-      // Group label
-      parts.push('<text class="ma-bar-group-label" x="' + (marginLeft - 10) + '" y="' + (y0 + 14) + '" text-anchor="end">' + escHtml(r.label) + '</text>');
+      var rowTop = marginTop + ri * rowH;
+      var dotCY  = rowTop + dotCYOffset;
 
-      // Cat-avg marker (dashed line)
-      var avg = block.stim_avg ? block.stim_avg[r.idx] : null;
-      if (avg != null && !isNaN(avg)) {
-        // When in aware mode we can't really show a cat-avg line because
-        // avg is still on total base — so only draw when total mode
-        if (baseMode === 'total') {
-          var ax = xZero + xScale * avg / maxVal;
-          parts.push('<line class="ma-bar-cat-avg" x1="' + ax + '" y1="' + y0 + '" x2="' + ax + '" y2="' + (y0 + visibleBrands.length * (barHeight + 1)) + '"><title>Cat avg: ' + avg.toFixed(0) + '%</title></line>');
-        }
+      if (ri % 2 === 0) {
+        parts.push('<rect x="' + xZero + '" y="' + rowTop + '" width="' + xScale +
+                   '" height="' + rowH + '" fill="#fafbfc" fill-opacity="0.55"/>');
       }
 
-      visibleBrands.forEach(function (b, bi) {
-        var c = cellMap[r.code + '|' + b];
-        if (!c) return;
-        var v = c[pctField];
+      var lbl = r.label.length > 28 ? r.label.slice(0, 27) + '\u2026' : r.label;
+      parts.push('<text class="ma-bar-group-label" x="' + (xZero - 10) + '" y="' + dotCY +
+                 '" text-anchor="end" dominant-baseline="middle">' + escHtml(lbl) + '</text>');
+
+      parts.push('<line x1="' + xZero + '" y1="' + dotCY + '" x2="' + xEnd + '" y2="' + dotCY +
+                 '" stroke="#eef2f7" stroke-width="1"/>');
+
+      var avg = block.stim_avg ? block.stim_avg[r.idx] : null;
+      if (avg != null && !isNaN(avg) && baseMode === 'total') {
+        var ax = xZero + xScale * avg / maxVal;
+        parts.push('<line class="ma-bar-cat-avg" x1="' + ax + '" y1="' + (rowTop + 4) +
+                   '" x2="' + ax + '" y2="' + (rowTop + rowH - 4) + '">' +
+                   '<title>Cat avg: ' + avg.toFixed(0) + '%</title></line>');
+      }
+
+      visibleBrands.forEach(function (b) {
+        var cell = cellMap[r.code + '|' + b];
+        if (!cell) return;
+        var v = cell[pctField];
         if (v == null || isNaN(v)) return;
-        var barY = y0 + bi * (barHeight + 1);
-        var barW = Math.max(1, xScale * v / maxVal);
-        var col = getBrandColour(pd, b);
+
+        var cx      = xZero + Math.max(dotR, Math.min(xScale, xScale * v / maxVal));
+        var col     = getBrandColour(pd, b);
         var isFocal = b === focal;
-        parts.push('<rect class="ma-bar" x="' + xZero + '" y="' + barY + '" width="' + barW + '" height="' + barHeight + '" fill="' + col + '" fill-opacity="' + (isFocal ? '0.95' : '0.75') + '" stroke="' + col + '" stroke-width="' + (isFocal ? 1 : 0.5) + '"><title>' + escHtml(getBrandName(pd, b)) + ': ' + v.toFixed(0) + '%</title></rect>');
-        // Value label (only if bar wide enough)
-        if (barW > 30) {
-          parts.push('<text class="ma-bar-value" x="' + (xZero + barW - 4) + '" y="' + (barY + barHeight / 2 + 4) + '" text-anchor="end" fill="#fff">' + v.toFixed(0) + '%</text>');
-        } else {
-          parts.push('<text class="ma-bar-value" x="' + (xZero + barW + 4) + '" y="' + (barY + barHeight / 2 + 4) + '" text-anchor="start">' + v.toFixed(0) + '%</text>');
-        }
+        var r2      = isFocal ? dotR + 1 : dotR;
+        var opacity = isFocal ? 1 : 0.80;
+
+        parts.push(
+          '<text x="' + cx + '" y="' + (dotCY - r2 - 3) + '"' +
+          ' text-anchor="middle" dominant-baseline="text-after-edge"' +
+          ' font-size="9" fill="' + col + '"' +
+          ' font-weight="' + (isFocal ? '700' : '500') + '">' +
+          v.toFixed(0) + '%</text>'
+        );
+
+        parts.push(
+          '<circle class="ma-bar" cx="' + cx + '" cy="' + dotCY + '"' +
+          ' r="' + r2 + '" fill="' + col + '" fill-opacity="' + opacity + '"' +
+          ' stroke="' + col + '" stroke-width="' + (isFocal ? 1.5 : 0.5) + '">' +
+          '<title>' + escHtml(getBrandName(pd, b)) + ': ' + v.toFixed(0) + '%</title>' +
+          '</circle>'
+        );
       });
+
+      if (ri < activeRows.length - 1) {
+        parts.push('<line x1="' + xZero + '" y1="' + (rowTop + rowH) +
+                   '" x2="' + xEnd + '" y2="' + (rowTop + rowH) +
+                   '" stroke="#e8ecf0" stroke-width="1"/>');
+      }
     });
 
-    // Y-axis line
-    parts.push('<line class="ma-bar-axis" x1="' + xZero + '" y1="' + marginTop + '" x2="' + xZero + '" y2="' + (chartHeight - marginBottom) + '"/>');
+    parts.push('<line class="ma-bar-axis" x1="' + xZero + '" y1="' + marginTop +
+               '" x2="' + xZero + '" y2="' + (chartHeight - marginBottom) + '"/>');
 
     svg.innerHTML = parts.join('');
   }

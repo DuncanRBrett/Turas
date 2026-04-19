@@ -79,17 +79,15 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
                data-ma-sort-dir="none">\u21C5</button>
      </th>', stmt_label, stim)
 
-  base_th <- '<th class="ct-th ct-data-col ma-ct-th-base"><div class="ct-header-text">Base</div></th>'
-
   brand_ths <- character(0)
 
   for (i in seq_along(brand_codes)) {
     bc <- brand_codes[i]; bn <- brand_names[i]
     if (!is.null(focal) && bc == focal) {
-      # Focal column — leftmost data column, accent colour
+      # Focal column — leftmost data column, accent colour; FOCAL badge sits above brand name
       brand_ths <- c(brand_ths, sprintf(
         '<th class="ct-th ct-data-col ma-ct-th-brand ma-ct-th-focal" data-ma-brand="%s" data-sort-col="%s">
-           <div class="ct-header-text">%s <span class="ma-focal-badge">FOCAL</span></div>
+           <div class="ct-header-text"><span class="ma-focal-badge">FOCAL</span><span class="ma-brand-name">%s</span></div>
            <button type="button" class="ct-sort-indicator ma-sort-btn"
                    aria-label="Sort by %s"
                    data-ma-action="sort-brand" data-ma-brand="%s" data-ma-stim="%s"
@@ -117,7 +115,7 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
     }
   }
 
-  paste0('<thead><tr>', stmt_th, base_th,
+  paste0('<thead><tr>', stmt_th,
          paste(brand_ths, collapse = ""),
          '</tr></thead>')
 }
@@ -137,7 +135,6 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
   stim_avg <- block$stim_avg
   ci_lower <- block$stim_ci_lower
   ci_upper <- block$stim_ci_upper
-  base_n   <- block$n_total
 
   rows <- vapply(seq_along(codes), function(i) {
     code <- codes[i]
@@ -147,19 +144,19 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
                  avg_pct   = stim_avg[i],
                  ci_lower  = ci_lower[i],
                  ci_upper  = ci_upper[i],
-                 base_n    = base_n,
                  cells     = cells,
                  brand_codes = brand_codes,
                  focal       = focal,
                  stim        = stim)
   }, character(1))
 
-  paste(rows, collapse = "")
+  paste0(.ma_base_row(block, brand_codes, focal),
+         paste(rows, collapse = ""))
 }
 
 
 .ma_row_html <- function(code, label, avg_pct, ci_lower, ci_upper,
-                         base_n, cells, brand_codes, focal, stim) {
+                         cells, brand_codes, focal, stim, base_n = NULL) {
   cells_by_brand <- stats::setNames(
     vector("list", length(brand_codes)), brand_codes)
   for (c in cells) {
@@ -197,10 +194,6 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
     sprintf(' data-ma-sort-avg="%s"',
             if (is.na(avg_pct)) "" else sprintf("%.6f", avg_pct)))
 
-  # Base column — largest n available (category total)
-  base_display <- if (is.null(base_n) || length(base_n) == 0 || is.na(base_n))
-    "&mdash;" else sprintf("n=%d", as.integer(base_n))
-
   sprintf(
     '<tr class="ct-row ma-row" data-ma-stim="%s" data-ma-sort-stim="%s"%s>
        <td class="ct-td ct-label-col ma-row-label" title="%s">
@@ -208,7 +201,6 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
            <span class="ma-row-label-text">%s</span>
          </label>
        </td>
-       <td class="ct-td ct-data-col ma-td-base"><span class="ct-base-n">%s</span></td>
        %s
      </tr>',
     .ma_esc(code), .ma_esc(tolower(label)),
@@ -216,7 +208,6 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
     .ma_esc(label),
     stim, .ma_esc(code),
     .ma_esc(label),
-    base_display,
     paste(cells_html, collapse = ""))
 }
 
@@ -302,17 +293,16 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
     v <- brand_avg[[b]]
     if (is.na(v)) {
       row_cells <- c(row_cells,
-        sprintf('<td class="ct-td ct-data-col ct-na%s">&mdash;</td>',
-                focal_cls))
+        sprintf('<td class="ct-td ct-data-col ct-na%s" data-ma-brand="%s">&mdash;</td>',
+                focal_cls, .ma_esc(b)))
     } else {
       row_cells <- c(row_cells, sprintf(
-        '<td class="ct-td ct-data-col ma-td-brand-avg%s"><span class="ct-val">%.0f%%</span></td>',
-        focal_cls, v))
+        '<td class="ct-td ct-data-col ma-td-brand-avg%s" data-ma-brand="%s"><span class="ct-val">%.0f%%</span></td>',
+        focal_cls, .ma_esc(b), v))
     }
     if (is_focal) {
-      # Cat avg for brand avgs column — overall mean of means
       row_cells <- c(row_cells, sprintf(
-        '<td class="ct-td ct-data-col ma-td-catavg"><span class="ct-val">%.0f%%</span></td>',
+        '<td class="ct-td ct-data-col ma-td-catavg" data-ma-brand="__avg__"><span class="ct-val">%.0f%%</span></td>',
         mean(brand_avg, na.rm = TRUE)))
     }
   }
@@ -320,8 +310,51 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
   paste0(
     '<tr class="ct-row ma-row-summary" data-locked="1">',
     '<td class="ct-td ct-label-col"><em>Brand average</em></td>',
-    '<td class="ct-td ct-data-col">&mdash;</td>',
     paste(row_cells, collapse = ""),
+    '</tr>'
+  )
+}
+
+
+# ==============================================================================
+# INTERNAL: BASE ROW — shows base n per brand at top of tbody
+# ==============================================================================
+
+.ma_base_row <- function(block, brand_codes, focal) {
+  n_total <- block$n_total %||% NA
+  awareness_pcts  <- block$awareness_by_brand
+  block_codes     <- block$brand_codes %||% character(0)
+  n_aware_by_code <- if (!is.null(awareness_pcts) && length(block_codes) > 0) {
+    base <- if (is.null(n_total) || is.na(n_total)) 0 else n_total
+    ap_num <- unlist(awareness_pcts)  # convert named list → named numeric vector
+    round(ap_num * base / 100)
+  } else NULL
+
+  n_total_display <- if (is.null(n_total) || is.na(n_total)) "&mdash;"
+                     else sprintf("n=%d", as.integer(n_total))
+
+  cells <- character(0)
+  for (b in brand_codes) {
+    is_focal  <- !is.null(focal) && b == focal
+    focal_cls <- if (is_focal) " ma-td-focal" else ""
+    n_total_attr  <- if (is.null(n_total) || is.na(n_total)) "" else as.integer(n_total)
+    n_aware       <- if (!is.null(n_aware_by_code)) unname(n_aware_by_code[b]) else NA_real_
+    n_aware_attr  <- if (is.na(n_aware)) "" else as.integer(n_aware)
+
+    cells <- c(cells, sprintf(
+      '<td class="ct-td ct-data-col ma-base-n%s" data-ma-brand="%s" data-ma-n-total="%s" data-ma-n-aware="%s"><span class="ma-base-val">%s</span></td>',
+      focal_cls, .ma_esc(b), n_total_attr, n_aware_attr, n_total_display))
+
+    if (is_focal) {
+      cells <- c(cells,
+        '<td class="ct-td ct-data-col ma-td-catavg ma-base-n" data-ma-brand="__avg__">&mdash;</td>')
+    }
+  }
+
+  paste0(
+    '<tr class="ma-row-base" data-locked="1">',
+    '<td class="ct-td ct-label-col"><em>Base</em></td>',
+    paste(cells, collapse = ""),
     '</tr>'
   )
 }

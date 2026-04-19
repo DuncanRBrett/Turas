@@ -95,30 +95,31 @@ build_ma_panel_styles <- function(focal_colour = "#1A5276") {
 .ma-ct-table th.ct-th {
   background: #1e293b; color: #fff; font-weight: 600; font-size: 11px;
   letter-spacing: 0.3px; padding: 8px 10px; border-bottom: 2px solid #0f172a;
-  text-align: center; white-space: nowrap; position: sticky; top: 0; z-index: 2; }
+  text-align: center; white-space: normal; text-transform: none;
+  position: sticky; top: 0; z-index: 2; }
 .ma-ct-table th.ct-label-col { text-align: left; }
-.ma-ct-table th .ct-header-text { display: inline-flex; align-items: center;
-                                   gap: 4px; }
+.ma-ct-table th .ct-header-text { display: flex; flex-direction: column;
+                                   align-items: center; gap: 3px;
+                                   text-align: center; }
 .ma-ct-table .ct-sort-indicator {
-  background: rgba(255,255,255,0.14); border: none; color: #fff;
-  font-size: 11px; padding: 1px 4px; border-radius: 3px; cursor: pointer;
-  margin-left: 4px; }
-.ma-ct-table .ct-sort-indicator:hover { background: rgba(255,255,255,0.28); }
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; padding: 0;
+  background: transparent; border: 1px solid transparent; border-radius: 4px;
+  font-size: 10px; color: rgba(255,255,255,0.35); cursor: pointer;
+  margin-left: 2px; }
+.ma-ct-table .ct-sort-indicator:hover { background: rgba(255,255,255,0.1); color: #e2e8f0; }
 
 .ma-ct-th-focal { background: %FOCAL% !important; color: #fff; }
-.ma-ct-th-focal .ma-focal-badge { background: rgba(255,255,255,0.22);
-                                  color: #fff; font-size: 9px;
-                                  font-weight: 800; letter-spacing: 0.6px;
-                                  padding: 1px 4px; border-radius: 3px;
-                                  margin-left: 4px; vertical-align: middle; }
+.ma-focal-badge { display: inline-block; background: rgba(255,255,255,0.22);
+                  color: #fff; font-size: 9px; font-weight: 800;
+                  letter-spacing: 0.6px; padding: 1px 5px; border-radius: 3px; }
 .ma-ct-th-catavg { background: #334155 !important; font-style: italic; }
 
 .ma-ct-table td.ct-td { padding: 7px 10px; border-bottom: 1px solid #f0f0f0;
                          color: #334155; text-align: center;
                          vertical-align: middle; }
 .ma-ct-table td.ct-label-col { text-align: left; font-weight: 500;
-                                white-space: nowrap; max-width: 260px;
-                                overflow: hidden; text-overflow: ellipsis; }
+                                white-space: normal; max-width: 260px; }
 .ma-ct-table tr.ma-row:hover td { background: #f8f9fb; }
 .ma-ct-table tr.ma-row-summary td { background: #f8fafc !important;
                                      font-weight: 600; color: #334155;
@@ -152,17 +153,18 @@ build_ma_panel_styles <- function(focal_colour = "#1A5276") {
 .ma-td-catavg .ct-val { font-weight: 700; color: #1e293b; }
 .ma-ci-hint { display: block; font-size: 10px; color: #94a3b8; margin-top: 1px; }
 
-/* Base column */
-.ma-ct-th-base, .ma-td-base { background: #f8fafc; font-size: 11px; color: #64748b; }
+/* Base row (top of tbody, replaces base column) */
+.ma-row-base td.ct-td { background: #f0f4f8; font-size: 10px; color: #64748b;
+                        font-style: italic; border-bottom: 1px solid #dde3eb; }
+.ma-row-base td.ct-label-col { font-weight: 600; }
 
 /* Row label — clickable toggle to grey out */
 .ma-row-label { padding-left: 8px; max-width: 300px; }
-.ma-row-toggle { display: flex; align-items: center; gap: 6px;
+.ma-row-toggle { display: flex; align-items: flex-start; gap: 6px;
                  cursor: pointer; }
-.ma-row-toggle input { margin: 0; flex-shrink: 0; }
+.ma-row-toggle input { margin: 2px 0 0; flex-shrink: 0; }
 .ma-row-label-text { font-weight: 500; color: #334155;
-                     white-space: nowrap; overflow: hidden;
-                     text-overflow: ellipsis; }
+                     white-space: normal; line-height: 1.35; }
 .ma-row.ma-row-inactive { opacity: 0.45; }
 .ma-row.ma-row-inactive .ma-row-label-text { text-decoration: line-through; }
 .ma-row.ma-row-inactive td.ma-heatmap-cell { background: #f8fafc !important;
@@ -177,11 +179,16 @@ build_ma_panel_styles <- function(focal_colour = "#1A5276") {
 /* Low-base dim */
 .ma-ct-table .ma-low-base-dim .ct-val { color: #c0392b; opacity: 0.6; }
 
-/* Focal badge (header) */
-.ma-focal-badge { display: inline-block; background: rgba(255,255,255,0.22);
-                  color: #fff; font-size: 9px; font-weight: 800;
-                  letter-spacing: 0.6px; padding: 1px 5px; border-radius: 3px;
-                  margin-left: 4px; vertical-align: middle; }
+/* Chart chip bar + legend */
+.ma-chart-chip-bar { margin-bottom: 6px; }
+/* Chart legend */
+.ma-chart-legend { display: flex; flex-wrap: wrap; gap: 4px 14px;
+                   margin: 0 0 8px; }
+.ma-legend-item { display: inline-flex; align-items: center; gap: 5px;
+                  font-size: 11px; color: #334155; }
+.ma-legend-dot { display: inline-block; width: 9px; height: 9px;
+                 border-radius: 50%; flex-shrink: 0; }
+.ma-legend-name { white-space: nowrap; }
 
 /* Section titles */
 .ma-section { margin-bottom: 16px; }

@@ -72,7 +72,7 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
       .ma_controls_bar(panel_data, stim = "attributes"),
       .ma_matrix_section(panel_data, stim = "attributes",
                          focal_colour = focal_colour),
-      .ma_chart_placeholder(stim = "attributes"),
+      .ma_chart_placeholder(stim = "attributes", pd = panel_data),
       .ma_insight_box(stim = "attributes"),
       '</div>'
     ) else "",
@@ -83,7 +83,7 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
       .ma_controls_bar(panel_data, stim = "ceps"),
       .ma_matrix_section(panel_data, stim = "ceps",
                          focal_colour = focal_colour),
-      .ma_chart_placeholder(stim = "ceps"),
+      .ma_chart_placeholder(stim = "ceps", pd = panel_data),
       .ma_insight_box(stim = "ceps"),
       '</div>'
     ) else "",
@@ -176,14 +176,9 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
     )
   } else ""
 
-  # Heatmap segmented: CI band (default) vs diverging vs off
-  heatmap_switcher <- paste0(
-    '<div class="sig-level-switcher ma-heatmap-switcher" role="group" aria-label="Heatmap">',
-    '<span class="sig-level-label">Heatmap:</span>',
-    sprintf('<button type="button" class="sig-btn sig-btn-active" data-ma-action="heatmapmode" data-ma-stim="%s" data-ma-heatmap-mode="ci" aria-pressed="true">CI bands</button>', stim),
-    sprintf('<button type="button" class="sig-btn" data-ma-action="heatmapmode" data-ma-stim="%s" data-ma-heatmap-mode="diff" aria-pressed="false">vs cat avg</button>', stim),
-    sprintf('<button type="button" class="sig-btn" data-ma-action="heatmapmode" data-ma-stim="%s" data-ma-heatmap-mode="off" aria-pressed="false">Off</button>', stim),
-    '</div>'
+  heatmap_switcher <- sprintf(
+    '<label class="toggle-label"><input type="checkbox" checked data-ma-action="heatmapmode" data-ma-stim="%s"> Show heatmap</label>',
+    stim
   )
 
   paste0(
@@ -225,14 +220,25 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
 }
 
 
-#' Bar chart scaffold — populated client-side by brand_ma_panel.js.
+#' Dot chart scaffold with per-chart brand chips — populated by brand_ma_panel.js.
 #' @keywords internal
-.ma_chart_placeholder <- function(stim) {
+.ma_chart_placeholder <- function(stim, pd) {
+  brand_codes <- pd$config$brand_codes %||% character(0)
+  brand_names <- pd$config$brand_names %||% brand_codes
+
+  chips_html <- paste(vapply(seq_along(brand_codes), function(i) {
+    sprintf(
+      '<button type="button" class="col-chip chart-chip" data-ma-chart-scope="%s" data-ma-brand="%s">%s</button>',
+      stim, .ma_esc(brand_codes[i]), .ma_esc(brand_names[i]))
+  }, character(1)), collapse = "")
+
   sprintf(
     '<section class="ma-chart-section" data-ma-stim="%s">
+       <div class="ma-chart-chip-bar ma-chip-row" data-ma-chart-scope="%s">%s</div>
+       <div class="ma-chart-legend"></div>
        <svg class="ma-bar-chart" data-ma-stim="%s" xmlns="http://www.w3.org/2000/svg"></svg>
      </section>',
-    stim, stim)
+    stim, stim, chips_html, stim)
 }
 
 
