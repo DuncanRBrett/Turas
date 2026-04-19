@@ -308,24 +308,13 @@ build_ma_panel_styles <- function(focal_colour = "#1A5276") {
 .ma-metrics-table th.ct-th { min-width: 110px; }
 .ma-metrics-table th.ct-label-col { min-width: 160px; text-align: left; }
 
-/* Metrics formula callout */
-.ma-metric-formula-box {
-  margin: 0 0 10px; border: 1px solid #e2e8f0;
-  border-radius: 6px; overflow: hidden; font-size: 12px; }
-.ma-metric-formula-summary {
-  padding: 6px 12px; font-size: 12px; font-weight: 600;
-  color: #64748b; cursor: pointer; background: #f8fafc;
-  list-style: none; user-select: none; }
-.ma-metric-formula-summary::-webkit-details-marker { display: none; }
-.ma-metric-formula-summary::before { content: "\25B8  "; }
-.ma-metric-formula-box[open] .ma-metric-formula-summary::before { content: "\25BE  "; }
-.ma-metric-formula-body { padding: 10px 14px; background: #fff; }
-.ma-metric-formula-body dl { margin: 0; }
-.ma-metric-formula-body dt {
-  font-weight: 700; color: #1e293b; margin-top: 8px; }
-.ma-metric-formula-body dt:first-child { margin-top: 0; }
-.ma-metric-formula-body dd {
-  margin: 2px 0 0; color: #64748b; padding-left: 14px; }
+/* About drawer — formula dl */
+.ma-about-formulas { margin-top: 10px; }
+.ma-formula-dl { margin: 4px 0 0; display: grid;
+  grid-template-columns: max-content 1fr; gap: 2px 12px; }
+.ma-formula-dl dt { font-weight: 700; color: #1e293b; white-space: nowrap;
+                    padding: 2px 0; align-self: start; }
+.ma-formula-dl dd { margin: 0; color: #64748b; padding: 2px 0; }
 
 /* CI range bar inside cat-avg metric cells */
 .ma-metrics-cat-avg td.ct-td { padding-bottom: 5px; }
@@ -367,15 +356,12 @@ build_ma_panel_styles <- function(focal_colour = "#1A5276") {
 .ma-rank-section { margin-top: 18px; padding-top: 14px; border-top: 1px dashed #e2e8f0; }
 .ma-rank-section[hidden] { display: none !important; }
 
-/* Metrics charts area */
-.ma-metrics-charts {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
-  margin: 18px 0; }
-@media (max-width: 700px) {
-  .ma-metrics-charts { grid-template-columns: 1fr; } }
+/* Metrics charts area — stacked full-width */
+.ma-metrics-charts { display: flex; flex-direction: column; gap: 20px;
+                     margin: 18px 0; }
 .ma-scatter-wrap, .ma-bars-wrap {
-  background: #fafbfc; border: 1px solid #eef2f7;
-  border-radius: 8px; padding: 12px 14px; }
+  width: 100%; background: #fafbfc; border: 1px solid #eef2f7;
+  border-radius: 8px; padding: 12px 14px; box-sizing: border-box; }
 .ma-scatter-wrap[hidden], .ma-bars-wrap[hidden] { display: none !important; }
 .ma-scatter-svg, .ma-bars-svg {
   width: 100%; display: block; font-family: inherit; }

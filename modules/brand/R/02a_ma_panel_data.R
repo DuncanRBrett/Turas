@@ -132,11 +132,12 @@ build_ma_panel_data <- function(ma_result, brand_list, cep_list,
       "(n<30) are dimmed."))
 
   config_out <- list(
-    brand_codes   = brand_codes,
-    brand_names   = brand_names,
-    brand_colours = brand_colours,
-    focal_colour  = config$focal_colour %||%
-                     brand_colours[[focal_code]] %||% "#1A5276",
+    brand_codes    = brand_codes,
+    brand_names    = brand_names,
+    brand_colours  = brand_colours,
+    focal_colour   = config$focal_colour %||%
+                      brand_colours[[focal_code]] %||% "#1A5276",
+    decimal_places = as.integer(config$decimal_places %||% 0L),
     default_base_mode = if (is.null(awareness_by_brand)) "total" else "total"
   )
 
@@ -325,20 +326,26 @@ build_ma_panel_data <- function(ma_result, brand_list, cep_list,
   ns_band   <- .calc_metric_ci_bands(ns)
   som_band  <- .calc_metric_ci_bands(som)
 
+  n_resp_num <- as.numeric(ma_result$n_respondents %||% NA_real_)
+
   # Per-brand metrics table (brands as rows)
   table_rows <- vector("list", length(brand_codes))
   for (i in seq_along(brand_codes)) {
+    # total_links = all CEP links for this brand (shown as "count" for MMS)
+    total_links <- if (!is.na(mpen[i]) && !is.na(ns[i]) && is.finite(n_resp_num))
+      as.integer(round(mpen[i] / 100 * ns[i] * n_resp_num)) else NA_integer_
     table_rows[[i]] <- list(
-      brand_code = brand_codes[i],
-      brand_name = brand_names[i],
-      mpen       = round(mpen[i], 1),
-      ns         = round(ns[i], 2),
-      mms        = round(mms[i], 1),
-      som        = round(som[i], 1),
-      mms_band   = mms_band[i],
-      mpen_band  = mpen_band[i],
-      ns_band    = ns_band[i],
-      som_band   = som_band[i]
+      brand_code  = brand_codes[i],
+      brand_name  = brand_names[i],
+      mpen        = round(mpen[i], 1),
+      ns          = round(ns[i], 2),
+      mms         = round(mms[i], 1),
+      som         = round(som[i], 1),
+      mms_band    = mms_band[i],
+      mpen_band   = mpen_band[i],
+      ns_band     = ns_band[i],
+      som_band    = som_band[i],
+      total_links = total_links
     )
   }
 

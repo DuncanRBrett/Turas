@@ -231,8 +231,8 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 .fn-panel .ct-table .ct-th {
   padding: 12px 16px; text-align: center;
   background: #1a2744; color: #fff;
-  font-weight: 700; font-size: 10px;
-  text-transform: uppercase; letter-spacing: 0.6px;
+  font-weight: 600; font-size: 11px;
+  text-transform: none; letter-spacing: 0.2px;
   vertical-align: bottom; border-bottom: 2px solid #1a2744;
   white-space: nowrap;
 }
@@ -286,6 +286,9 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
   font-style: italic; color: #475569; background: #eff1f5 !important;
 }
 .fn-panel .fn-row-avg-all .ct-td.ct-data-col { background: #eff1f5 !important; }
+/* CI bar in funnel cat avg cells — reuses .ma-ci-bar-* classes */
+.fn-panel .fn-td-avg-ci { padding-bottom: 5px; vertical-align: top; }
+.fn-panel .fn-td-avg-ci .ct-val { display: block; font-weight: 700; color: #1e293b; }
 
 /* Heatmap — JS applies inline background on competitor cells only (focal/avg skipped).
    Toggle OFF clears competitor cells via panel class; focal/avg keep their !important tints. */

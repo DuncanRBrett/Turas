@@ -155,11 +155,28 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
     r <- by_key[[k]]
     if (is.null(r)) return('<td class="ct-td ct-data-col ct-na">&mdash;</td>')
     pct_abs <- r$pct_absolute %||% NA_real_
-    pct_nes <- r$pct_nested %||% NA_real_
-    .fn_cell_html(pct_abs, pct_nes, base_w = NA_real_, base_u = NA_real_,
-                  stage_key = k, brand_code = "__avg_all__",
-                  col_max = col_max[[k]], sig_vs_avg = "na",
-                  row_class = "fn-td-avg")
+    if (is.null(pct_abs) || is.na(pct_abs))
+      return('<td class="ct-td ct-data-col ct-na fn-td-avg">&mdash;</td>')
+    ci_lo   <- r$ci_lo %||% NA_real_
+    ci_hi   <- r$ci_hi %||% NA_real_
+    safe_max <- max(0.01, as.numeric(col_max[[k]] %||% 1), na.rm = TRUE)
+    disp    <- sprintf("%.0f%%", 100 * pct_abs)
+    lo_disp <- if (is.finite(ci_lo)) sprintf("%.0f%%", 100 * ci_lo) else ""
+    hi_disp <- if (is.finite(ci_hi)) sprintf("%.0f%%", 100 * ci_hi) else ""
+    fill_left <- if (nzchar(lo_disp)) max(0, min(94, 100 * ci_lo / safe_max)) else 0
+    fill_w    <- if (nzchar(lo_disp) && nzchar(hi_disp))
+                  max(4, min(100 - fill_left, 100 * (ci_hi - ci_lo) / safe_max)) else 0
+    mean_pct  <- max(1, min(99, 100 * pct_abs / safe_max))
+    ci_bar <- if (nzchar(lo_disp) && nzchar(hi_disp)) paste0(
+      sprintf('<div class="ma-ci-bar-wrap" title="95%% CI: %s \u2013 %s">', lo_disp, hi_disp),
+      sprintf('<div class="ma-ci-bar-range" style="left:%.1f%%;width:%.1f%%;"></div>', fill_left, fill_w),
+      sprintf('<div class="ma-ci-bar-tick" style="left:%.1f%%"></div>', mean_pct),
+      '</div>',
+      sprintf('<div class="ma-ci-limits"><span>%s</span><span>%s</span></div>', lo_disp, hi_disp)
+    ) else ""
+    sprintf(
+      '<td class="ct-td ct-data-col fn-td-avg fn-td-avg-ci" data-sort-val="%.6f"><span class="ct-val">%s</span>%s</td>',
+      pct_abs, disp, ci_bar)
   }, character(1))
   paste0(
     '<tr class="ct-row fn-row-avg-all" data-locked="1">',

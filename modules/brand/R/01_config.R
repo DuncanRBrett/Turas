@@ -147,6 +147,7 @@ load_brand_config <- function(config_path, project_root = NULL) {
   config$dba_attribution_type <- config$dba_attribution_type %||% "open"
   config$wom_timeframe <- config$wom_timeframe %||% "3 months"
   config$db_importance_method <- config$db_importance_method %||% "differential"
+  config$decimal_places <- as.integer(config$decimal_places %||% 0L)
   config$colour_focal <- config$colour_focal %||% "#1A5276"
   config$colour_focal_accent <- config$colour_focal_accent %||% "#2E86C1"
   config$colour_competitor <- config$colour_competitor %||% "#B0B0B0"

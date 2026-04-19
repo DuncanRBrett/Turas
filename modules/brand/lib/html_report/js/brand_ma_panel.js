@@ -756,9 +756,10 @@
       return best;
     }
 
+    var dp = (pd.config && pd.config.decimal_places != null) ? pd.config.decimal_places : 0;
     function fmtVal(val, unit) {
       if (val == null || isNaN(Number(val))) return '\u2014';
-      return unit === 'pct' ? Number(val).toFixed(1) + '%' : Number(val).toFixed(2);
+      return unit === 'pct' ? Number(val).toFixed(dp) + '%' : Number(val).toFixed(2);
     }
 
     var metricDefs = [
@@ -895,16 +896,17 @@
 
     if (points.length === 0) { svg.innerHTML = ''; return; }
 
+    var dp = (pd.config && pd.config.decimal_places != null) ? pd.config.decimal_places : 0;
     var catAvg = pd.metrics.cat_avg || {};
-    var mL = 50, mR = 20, mT = 22, mB = 46;
-    var width  = svg.clientWidth || 500;
-    var height = Math.max(260, Math.round(width * 0.62));
+    var mL = 56, mR = 24, mT = 28, mB = 48;
+    var width  = svg.clientWidth || 600;
+    var height = Math.max(300, Math.round(width * 0.5));
 
     svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
     svg.setAttribute('height', height);
     svg.style.height = height + 'px';
 
-    var xMax = Math.max(20, Math.ceil(Math.max.apply(null, points.map(function (p) { return p.mpen; })) / 10) * 10 + 10);
+    var xMax = 100; // always 0-100 for MPen
     var yMax = Math.max(1, (Math.ceil(Math.max.apply(null, points.map(function (p) { return p.ns; })) * 4) / 4) + 0.5);
     var mmsMax = Math.max(1, Math.max.apply(null, points.map(function (p) { return p.mms; })));
 
@@ -913,11 +915,17 @@
 
     function toX(v) { return mL + pW * v / xMax; }
     function toY(v) { return mT + pH * (1 - v / yMax); }
-    function bR(mms) { return Math.max(6, Math.min(22, 6 + 16 * mms / mmsMax)); }
+    function bR(mms) { return Math.max(7, Math.min(24, 7 + 17 * mms / mmsMax)); }
 
     var parts = [];
 
-    // Grid
+    // Subtle quadrant tint (based on cat avg)
+    var qMidX = catAvg.mpen != null ? toX(catAvg.mpen) : mL + pW / 2;
+    var qMidY = catAvg.ns   != null ? toY(catAvg.ns)   : mT + pH / 2;
+    parts.push('<rect x="' + qMidX + '" y="' + mT + '" width="' + (mL + pW - qMidX) + '" height="' + (qMidY - mT) + '" fill="rgba(5,150,105,0.04)"/>');
+    parts.push('<rect x="' + mL + '" y="' + qMidY + '" width="' + (qMidX - mL) + '" height="' + (mT + pH - qMidY) + '" fill="rgba(220,38,38,0.04)"/>');
+
+    // Grid lines
     for (var xi = 0; xi <= 5; xi++) {
       var xv = xMax * xi / 5;
       var gx = toX(xv);
@@ -939,16 +947,16 @@
     if (catAvg.mpen != null) {
       var ax = toX(catAvg.mpen);
       parts.push('<line x1="' + ax + '" y1="' + mT + '" x2="' + ax + '" y2="' + (mT + pH) +
-                 '" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 3"/>');
-      parts.push('<text x="' + (ax + 3) + '" y="' + (mT + 10) +
-                 '" font-size="8" fill="#94a3b8">avg MPen</text>');
+                 '" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5 3"/>');
+      parts.push('<text x="' + (ax + 4) + '" y="' + (mT + 11) +
+                 '" font-size="9" fill="#94a3b8" font-weight="600">avg MPen</text>');
     }
     if (catAvg.ns != null) {
       var ay = toY(catAvg.ns);
       parts.push('<line x1="' + mL + '" y1="' + ay + '" x2="' + (width - mR) + '" y2="' + ay +
-                 '" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 3"/>');
-      parts.push('<text x="' + (mL + 4) + '" y="' + (ay - 4) +
-                 '" font-size="8" fill="#94a3b8">avg NS</text>');
+                 '" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5 3"/>');
+      parts.push('<text x="' + (mL + 4) + '" y="' + (ay - 5) +
+                 '" font-size="9" fill="#94a3b8" font-weight="600">avg NS</text>');
     }
 
     // OLS double-jeopardy trend line
@@ -961,31 +969,28 @@
         var b = (sxy - sx * sy / n) / den;
         var a = sy / n - b * sx / n;
         var lx1 = 0, ly1 = a, lx2 = xMax, ly2 = a + b * xMax;
-        // clamp to [0, yMax]
         if (ly1 < 0) { lx1 = -a / b; ly1 = 0; }
         if (ly2 > yMax) { lx2 = (yMax - a) / b; ly2 = yMax; }
         if (ly1 > yMax) { lx1 = (yMax - a) / b; ly1 = yMax; }
         if (ly2 < 0) { lx2 = -a / b; ly2 = 0; }
         parts.push('<line x1="' + toX(lx1) + '" y1="' + toY(ly1) + '" x2="' + toX(lx2) + '" y2="' + toY(ly2) +
-                   '" stroke="#64748b" stroke-width="1.5" stroke-dasharray="7 4" opacity="0.4">' +
+                   '" stroke="#64748b" stroke-width="1.5" stroke-dasharray="8 5" opacity="0.35">' +
                    '<title>Double jeopardy trend</title></line>');
       }
     }
 
-    // Quadrant labels (very subtle)
-    var midX = catAvg.mpen != null ? toX(catAvg.mpen) : mL + pW / 2;
-    var midY = catAvg.ns   != null ? toY(catAvg.ns)   : mT + pH / 2;
-    var qs = 'font-size:8;fill:#d1d5db;font-weight:600;letter-spacing:0.6px;';
-    parts.push('<text style="' + qs + '" x="' + (width - mR - 4) + '" y="' + (mT + 12) + '" text-anchor="end">STRONG</text>');
-    parts.push('<text style="' + qs + '" x="' + (mL + 4) + '" y="' + (mT + 12) + '">NICHE</text>');
-    parts.push('<text style="' + qs + '" x="' + (width - mR - 4) + '" y="' + (mT + pH - 5) + '" text-anchor="end">BROAD REACH</text>');
-    parts.push('<text style="' + qs + '" x="' + (mL + 4) + '" y="' + (mT + pH - 5) + '">WEAK</text>');
+    // Quadrant labels
+    var qs = 'font-size:9;fill:#cbd5e1;font-weight:700;letter-spacing:0.5px;';
+    parts.push('<text style="' + qs + '" x="' + (width - mR - 6) + '" y="' + (mT + 14) + '" text-anchor="end">STRONG</text>');
+    parts.push('<text style="' + qs + '" x="' + (mL + 6) + '" y="' + (mT + 14) + '">NICHE</text>');
+    parts.push('<text style="' + qs + '" x="' + (width - mR - 6) + '" y="' + (mT + pH - 6) + '" text-anchor="end">BROAD REACH</text>');
+    parts.push('<text style="' + qs + '" x="' + (mL + 6) + '" y="' + (mT + pH - 6) + '">WEAK</text>');
 
     // Axes
-    parts.push('<line x1="' + mL + '" y1="' + mT + '" x2="' + mL + '" y2="' + (mT + pH) + '" stroke="#cbd5e1" stroke-width="1"/>');
-    parts.push('<line x1="' + mL + '" y1="' + (mT + pH) + '" x2="' + (width - mR) + '" y2="' + (mT + pH) + '" stroke="#cbd5e1" stroke-width="1"/>');
-    parts.push('<text x="' + (mL + pW / 2) + '" y="' + (height - 6) + '" text-anchor="middle" font-size="10" fill="#475569" font-weight="600">Mental Penetration (%)</text>');
-    parts.push('<text transform="rotate(-90 ' + (mL - 36) + ' ' + (mT + pH / 2) + ')" x="' + (mL - 36) + '" y="' + (mT + pH / 2) + '" text-anchor="middle" font-size="10" fill="#475569" font-weight="600">Network Size</text>');
+    parts.push('<line x1="' + mL + '" y1="' + mT + '" x2="' + mL + '" y2="' + (mT + pH) + '" stroke="#94a3b8" stroke-width="1.5"/>');
+    parts.push('<line x1="' + mL + '" y1="' + (mT + pH) + '" x2="' + (width - mR) + '" y2="' + (mT + pH) + '" stroke="#94a3b8" stroke-width="1.5"/>');
+    parts.push('<text x="' + (mL + pW / 2) + '" y="' + (height - 4) + '" text-anchor="middle" font-size="11" fill="#475569" font-weight="600">Mental Penetration (%)</text>');
+    parts.push('<text transform="rotate(-90 ' + (mL - 40) + ' ' + (mT + pH / 2) + ')" x="' + (mL - 40) + '" y="' + (mT + pH / 2) + '" text-anchor="middle" font-size="11" fill="#475569" font-weight="600">Network Size</text>');
 
     // Bubbles — focal on top
     var nonFocal = points.filter(function (p) { return !p.isFocal; });
@@ -993,19 +998,30 @@
     nonFocal.concat(focal2).forEach(function (p) {
       var cx  = toX(p.mpen), cy = toY(p.ns), r2 = bR(p.mms);
       var col = getBrandColour(pd, p.code);
+      // Drop shadow filter id per bubble
+      var filterId = 'f-' + p.code.replace(/[^a-z0-9]/gi, '');
+      parts.push('<defs><filter id="' + filterId + '" x="-30%" y="-30%" width="160%" height="160%">' +
+                 '<feDropShadow dx="1" dy="1" stdDeviation="2" flood-color="' + col + '" flood-opacity="0.25"/>' +
+                 '</filter></defs>');
       parts.push('<circle cx="' + cx + '" cy="' + cy + '" r="' + r2 + '"' +
-                 ' fill="' + col + '" fill-opacity="' + (p.isFocal ? 0.85 : 0.65) + '"' +
-                 ' stroke="' + col + '" stroke-width="' + (p.isFocal ? 2 : 1) + '">' +
-                 '<title>' + escHtml(p.name) + '\nMPen: ' + p.mpen.toFixed(1) + '%' +
-                 '\nNS: ' + p.ns.toFixed(2) + '\nMMS: ' + p.mms.toFixed(1) + '%</title></circle>');
+                 ' fill="' + col + '" fill-opacity="' + (p.isFocal ? 0.88 : 0.70) + '"' +
+                 ' stroke="' + col + '" stroke-width="' + (p.isFocal ? 2.5 : 1.5) + '"' +
+                 ' filter="url(#' + filterId + ')">' +
+                 '<title>' + escHtml(p.name) + '\nMPen: ' + p.mpen.toFixed(dp) + '%' +
+                 '\nNS: ' + p.ns.toFixed(2) + '\nMMS: ' + p.mms.toFixed(dp) + '%</title></circle>');
       var lblLines2 = wrapSvgLabel(p.name, 14);
       var lblFontSize = p.isFocal ? 10 : 9;
       var lblLineH = lblFontSize + 2;
       var lblStartY = cy - ((lblLines2.length - 1) * lblLineH) / 2 + 3;
+      // Try to offset label to avoid overlap at right edge
+      var lblX = cx + r2 + 4;
+      var anchorDir = 'start';
+      if (lblX + 60 > width - mR) { lblX = cx - r2 - 4; anchorDir = 'end'; }
       var tspans2 = lblLines2.map(function (line, li) {
-        return '<tspan x="' + (cx + r2 + 3) + '" dy="' + (li === 0 ? 0 : lblLineH) + '">' + escHtml(line) + '</tspan>';
+        return '<tspan x="' + lblX + '" dy="' + (li === 0 ? 0 : lblLineH) + '">' + escHtml(line) + '</tspan>';
       });
-      parts.push('<text x="' + (cx + r2 + 3) + '" y="' + lblStartY + '"' +
+      parts.push('<text x="' + lblX + '" y="' + lblStartY + '"' +
+                 ' text-anchor="' + anchorDir + '"' +
                  ' font-size="' + lblFontSize + '" font-weight="' + (p.isFocal ? 700 : 400) + '"' +
                  ' fill="' + col + '">' + tspans2.join('') + '</text>');
     });
@@ -1040,6 +1056,7 @@
     var rows = focalRows.concat(others);
     if (rows.length === 0) { svg.innerHTML = ''; return; }
 
+    var dp = (pd.config && pd.config.decimal_places != null) ? pd.config.decimal_places : 0;
     var catAvg = pd.metrics.cat_avg || {};
     var lblW = 130, mR = 8, mT = 28, mB = 22;
     var barH = 12, barGap = 3, rowH = barH * 2 + barGap + 14;
@@ -1076,7 +1093,7 @@
       parts.push('<line x1="' + tx + '" y1="' + mT + '" x2="' + tx + '" y2="' + (height - mB) +
                  '" stroke="#f1f5f9" stroke-width="1"/>');
       parts.push('<text x="' + tx + '" y="' + (height - mB + 12) +
-                 '" text-anchor="middle" font-size="9" fill="#94a3b8">' + Math.round(tv) + '%</text>');
+                 '" text-anchor="middle" font-size="9" fill="#94a3b8">' + tv.toFixed(dp) + '%</text>');
     }
 
     // Cat avg reference lines
@@ -1084,13 +1101,13 @@
       var cx = toX(catAvg.mms);
       parts.push('<line x1="' + cx + '" y1="' + mT + '" x2="' + cx + '" y2="' + (height - mB) +
                  '" stroke="#475569" stroke-width="1" stroke-dasharray="4 3" opacity="0.6">' +
-                 '<title>Cat avg MMS: ' + catAvg.mms.toFixed(1) + '%</title></line>');
+                 '<title>Cat avg MMS: ' + catAvg.mms.toFixed(dp) + '%</title></line>');
     }
     if (catAvg.som != null) {
       var sx = toX(catAvg.som);
       parts.push('<line x1="' + sx + '" y1="' + mT + '" x2="' + sx + '" y2="' + (height - mB) +
                  '" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 3" opacity="0.6">' +
-                 '<title>Cat avg SOM: ' + catAvg.som.toFixed(1) + '%</title></line>');
+                 '<title>Cat avg SOM: ' + catAvg.som.toFixed(dp) + '%</title></line>');
     }
 
     // Bars per brand
@@ -1114,20 +1131,20 @@
       var mmsW = Math.max(0, pW * (r.mms || 0) / maxVal);
       parts.push('<rect x="' + lblW + '" y="' + y0 + '" width="' + mmsW + '" height="' + barH +
                  '" fill="' + col + '" fill-opacity="' + (isFocal ? 0.9 : 0.7) + '" rx="2">' +
-                 '<title>' + escHtml(r.brand_name) + ' MMS: ' + (r.mms || 0).toFixed(1) + '%</title></rect>');
+                 '<title>' + escHtml(r.brand_name) + ' MMS: ' + (r.mms || 0).toFixed(dp) + '%</title></rect>');
       if (mmsW > 28)
         parts.push('<text x="' + (lblW + mmsW - 4) + '" y="' + (y0 + barH - 3) +
-                   '" text-anchor="end" font-size="9" fill="#fff" font-weight="600">' + (r.mms || 0).toFixed(1) + '%</text>');
+                   '" text-anchor="end" font-size="9" fill="#fff" font-weight="600">' + (r.mms || 0).toFixed(dp) + '%</text>');
 
       // SOM bar
       var somY = y0 + barH + barGap;
       var somW = Math.max(0, pW * (r.som || 0) / maxVal);
       parts.push('<rect x="' + lblW + '" y="' + somY + '" width="' + somW + '" height="' + barH +
                  '" fill="' + col + '" fill-opacity="' + (isFocal ? 0.38 : 0.25) + '" rx="2">' +
-                 '<title>' + escHtml(r.brand_name) + ' SOM: ' + (r.som || 0).toFixed(1) + '%</title></rect>');
+                 '<title>' + escHtml(r.brand_name) + ' SOM: ' + (r.som || 0).toFixed(dp) + '%</title></rect>');
       if (somW > 28)
         parts.push('<text x="' + (lblW + somW - 4) + '" y="' + (somY + barH - 3) +
-                   '" text-anchor="end" font-size="9" fill="' + col + '" font-weight="600">' + (r.som || 0).toFixed(1) + '%</text>');
+                   '" text-anchor="end" font-size="9" fill="' + col + '" font-weight="600">' + (r.som || 0).toFixed(dp) + '%</text>');
 
       if (i < rows.length - 1)
         parts.push('<line x1="' + lblW + '" y1="' + (y0 + rowH - 2) + '" x2="' + (width - mR) + '" y2="' + (y0 + rowH - 2) +

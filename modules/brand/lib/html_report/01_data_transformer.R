@@ -228,10 +228,25 @@ transform_brand_panels <- function(results, config) {
     focal_colour <- .resolve_focal_colour(cat_brands, funnel$meta$focal_brand,
                                           config_focal_colour)
 
+    # Per-category timeframe labels (Long Period / Target Period overrides)
+    cat_cfg_row <- if (!is.null(config$categories) &&
+                       "Category" %in% names(config$categories))
+      config$categories[config$categories$Category == cat_name, , drop = FALSE]
+    else NULL
+    timeframe_long   <- if (!is.null(cat_cfg_row) && nrow(cat_cfg_row) > 0 &&
+                             "Timeframe_Long"   %in% names(cat_cfg_row))
+      as.character(cat_cfg_row$Timeframe_Long[1]) else NULL
+    timeframe_target <- if (!is.null(cat_cfg_row) && nrow(cat_cfg_row) > 0 &&
+                             "Timeframe_Target" %in% names(cat_cfg_row))
+      as.character(cat_cfg_row$Timeframe_Target[1]) else NULL
+
     panel_data <- build_funnel_panel_data(funnel, cat_brands,
-      config = list(category_label = cat_name,
-                    wave_label = as.character(config$wave %||% ""),
-                    show_counts = FALSE))
+      config = list(category_label    = cat_name,
+                    wave_label        = as.character(config$wave %||% ""),
+                    show_counts       = FALSE,
+                    Timeframe_Long    = timeframe_long,
+                    Timeframe_Target  = timeframe_target,
+                    decimal_places    = config$decimal_places %||% 0L))
     # Link the Export button to the pre-written funnel Excel workbook that
     # write_funnel_excel() drops next to the HTML report.
     xlsx_name <- sprintf("funnel_%s.xlsx", cat_id)
@@ -305,7 +320,8 @@ transform_brand_panels <- function(results, config) {
           category_label = cat_name,
           wave_label = as.character(config$wave %||% ""),
           focal_brand_code = config$focal_brand,
-          focal_colour = focal_colour))
+          focal_colour = focal_colour,
+          decimal_places = config$decimal_places %||% 0L))
 
       ma_html <- build_ma_panel_html(ma_pd,
                                       category_code = cat_id,

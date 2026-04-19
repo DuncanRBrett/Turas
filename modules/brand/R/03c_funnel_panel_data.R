@@ -40,8 +40,8 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
 
   list(
     meta = .panel_meta(result, brand_list, config, stage_keys),
-    cards = .panel_cards(result, focal, stage_keys),
-    table = .panel_table(result, brand_list, stage_keys),
+    cards = .panel_cards(result, focal, stage_keys, config = config),
+    table = .panel_table(result, brand_list, stage_keys, config = config),
     shape_chart = .panel_shape_chart(result, brand_list, focal, stage_keys),
     consideration_detail = .panel_consideration_detail(result, brand_list),
     config = .panel_config(result, brand_list, focal, config),
@@ -59,6 +59,7 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
   focal_label <- .brand_label(brand_list, focal)
   def_overrides <- config$`funnel.stage_definitions` %||%
                    config$funnel.stage_definitions
+  lbl_overrides <- .stage_label_overrides(config)
   list(
     category_type = result$meta$category_type,
     focal_brand_code = focal,
@@ -69,7 +70,7 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
     n_unweighted = result$meta$n_unweighted,
     stage_count = length(stage_keys),
     stage_keys = stage_keys,
-    stage_labels = .stage_labels_for(stage_keys),
+    stage_labels = .stage_labels_for(stage_keys, overrides = lbl_overrides),
     stage_definitions = .stage_definitions_for(stage_keys, def_overrides)
   )
 }
@@ -83,15 +84,16 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
 }
 
 
-.panel_cards <- function(result, focal, stage_keys) {
+.panel_cards <- function(result, focal, stage_keys, config = list()) {
   stages <- result$stages
   if (is.null(stages) || nrow(stages) == 0) {
     return(list(funnel = list(), relationship = list()))
   }
   sig_df <- result$sig_results
+  lbl_overrides <- .stage_label_overrides(config)
 
   funnel_cards <- lapply(stage_keys, function(key) {
-    .card_for_stage(stages, sig_df, key, focal)
+    .card_for_stage(stages, sig_df, key, focal, overrides = lbl_overrides)
   })
   funnel_cards <- Filter(Negate(is.null), funnel_cards)
 
@@ -138,7 +140,7 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
 }
 
 
-.card_for_stage <- function(stages, sig_df, key, focal) {
+.card_for_stage <- function(stages, sig_df, key, focal, overrides = list()) {
   focal_row <- stages[stages$stage_key == key & stages$brand_code == focal, ,
                       drop = FALSE]
   if (nrow(focal_row) == 0) return(NULL)
@@ -151,7 +153,7 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
   list(
     stage_index = which(unique(stages$stage_key) == key),
     stage_key = key,
-    stage_label = .stage_label(key),
+    stage_label = .stage_label(key, overrides = overrides),
     focal_pct = focal_row$pct_weighted,
     focal_base_weighted = focal_row$base_weighted,
     focal_base_unweighted = focal_row$base_unweighted,
@@ -163,7 +165,7 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
 }
 
 
-.panel_table <- function(result, brand_list, stage_keys) {
+.panel_table <- function(result, brand_list, stage_keys, config = list()) {
   stages <- result$stages
   if (is.null(stages) || nrow(stages) == 0) {
     return(list(stage_keys = character(0), stage_labels = character(0),
@@ -173,7 +175,8 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
   brand_codes <- as.character(brand_list$BrandCode)
   brand_names <- as.character(
     brand_list$BrandLabel %||% brand_list$BrandCode)
-  stage_labels <- vapply(stage_keys, .stage_label, character(1))
+  lbl_overrides <- .stage_label_overrides(config)
+  stage_labels <- .stage_labels_for(stage_keys, overrides = lbl_overrides)
 
   # Nested pct = stage pct / previous stage pct (category-wide). Stage 1
   # has no previous stage so nested = absolute. Precomputed per brand
@@ -222,17 +225,27 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
   out <- list()
   for (key in stage_keys) {
     vals <- stages$pct_weighted[stages$stage_key == key]
-    abs_mean <- if (length(vals) == 0) NA_real_ else mean(vals, na.rm = TRUE)
+    v    <- vals[!is.na(vals)]
+    abs_mean <- if (length(v) == 0) NA_real_ else mean(v)
     nested_mean <- if (!is.finite(prev_avg) || prev_avg <= 0 ||
                        !is.finite(abs_mean)) {
       abs_mean
     } else {
       abs_mean / prev_avg
     }
+    # 95% CI around the mean based on brand-to-brand variability
+    ci_lo <- NA_real_; ci_hi <- NA_real_
+    if (length(v) >= 2) {
+      se    <- stats::sd(v) / sqrt(length(v))
+      ci_lo <- abs_mean - 1.96 * se
+      ci_hi <- abs_mean + 1.96 * se
+    }
     out[[length(out) + 1]] <- list(
-      stage_key = key,
+      stage_key    = key,
       pct_absolute = abs_mean,
-      pct_nested = nested_mean
+      pct_nested   = nested_mean,
+      ci_lo        = ci_lo,
+      ci_hi        = ci_hi
     )
     prev_avg <- abs_mean
   }
@@ -416,7 +429,8 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
 }
 
 
-.stage_label <- function(key) {
+.stage_label <- function(key, overrides = list()) {
+  if (!is.null(overrides[[key]])) return(as.character(overrides[[key]]))
   labels <- c(
     aware              = "Aware",
     consideration      = "Consider",
@@ -450,8 +464,17 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
 }
 
 
-.stage_labels_for <- function(stage_keys) {
-  vapply(stage_keys, .stage_label, character(1))
+.stage_labels_for <- function(stage_keys, overrides = list()) {
+  vapply(stage_keys, .stage_label, character(1), overrides = overrides)
+}
+
+.stage_label_overrides <- function(config) {
+  ov <- list()
+  if (!is.null(config$Timeframe_Long)  && nzchar(trimws(config$Timeframe_Long)))
+    ov$bought_long   <- paste("Past", trimws(config$Timeframe_Long))
+  if (!is.null(config$Timeframe_Target) && nzchar(trimws(config$Timeframe_Target)))
+    ov$bought_target <- paste("Past", trimws(config$Timeframe_Target))
+  ov
 }
 
 

@@ -278,6 +278,21 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
         .ma_about_heading(key), .ma_esc(val)))
     }
   }
+  # Metric formulas (always shown)
+  parts <- c(parts, paste0(
+    '<div class="ma-about-formulas">',
+    '<p class="ma-about-item"><strong>Metric formulas</strong></p>',
+    '<dl class="ma-formula-dl">',
+    '<dt>Mental Penetration (MPen)</dt>',
+    '<dd>Respondents linking brand to \u22651 CEP &divide; Total respondents &times; 100</dd>',
+    '<dt>Network Size (NS)</dt>',
+    '<dd>Total CEP links for brand &divide; Respondents linking \u22651 CEP (average depth)</dd>',
+    '<dt>Mental Market Share (MMS)</dt>',
+    '<dd>(MPen &times; NS) &divide; &Sigma;(MPen<sub>i</sub> &times; NS<sub>i</sub>) &times; 100 &mdash; brand\u2019s share of all category CEP associations</dd>',
+    '<dt>Share of Mind (SOM)</dt>',
+    '<dd>MMS &divide; MPen &times; 100 &mdash; CEP links as % of all links by buyers with MPen for that brand. Totals across brands exceed 100%.</dd>',
+    '</dl></div>'
+  ))
   if (length(parts) == 0) return("")
   paste0(
     '<details class="ma-about"><summary class="ma-about-summary">About Mental Availability</summary>',

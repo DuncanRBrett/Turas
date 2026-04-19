@@ -38,25 +38,8 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
     '<div class="ma-chip-row col-chip-bar" data-ma-scope="metrics">', chips_html, '</div>',
     '</div>',
     chart_toggles,
-    '<label class="toggle-label"><input type="checkbox" data-ma-action="showcounts-metrics"> Show n</label>',
+    '<label class="toggle-label"><input type="checkbox" data-ma-action="showcounts-metrics"> Show count</label>',
     '</div>'
-  )
-
-  formula_callout <- paste0(
-    '<details class="ma-metric-formula-box">',
-    '<summary class="ma-metric-formula-summary">\u0192 Metric formulas</summary>',
-    '<div class="ma-metric-formula-body"><dl>',
-    '<dt>Mental Penetration (MPen)</dt>',
-    '<dd>Respondents linking brand to \u22651 CEP &divide; Total respondents &times; 100</dd>',
-    '<dt>Network Size (NS)</dt>',
-    '<dd>Total CEP links for brand &divide; Respondents linking \u22651 CEP</dd>',
-    '<dt>Mental Market Share (MMS)</dt>',
-    '<dd>(MPen &times; NS) &divide; &Sigma;(MPen<sub>i</sub> &times; NS<sub>i</sub>) &times; 100 &mdash; ',
-    'brand\u2019s share of all category CEP associations</dd>',
-    '<dt>Share of Mind (SOM)</dt>',
-    '<dd>MMS &divide; MPen &times; 100 &mdash; ',
-    'brand\u2019s CEP links as a % of all links by buyers with MPen for that brand. Totals across brands exceed 100%.</dd>',
-    '</dl></div></details>'
   )
 
   paste0(
@@ -66,7 +49,6 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
     .ma_metrics_table(pd, focal_colour),
     .ma_metrics_charts(pd),
     .ma_cep_ranking(pd, focal_colour),
-    formula_callout,
     '</section>'
   )
 }
@@ -91,12 +73,14 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
     if (is.na(idx)) code else brand_names[idx]
   }
 
+  dp <- as.integer(pd$config$decimal_places %||% 0L)
+
   card <- function(label, focal_val, avg_val, leader_code, unit, metric_key) {
     focal_disp <- if (is.null(focal_val) || is.na(focal_val)) "\u2014"
-                  else if (unit == "pct") sprintf("%.1f%%", focal_val)
+                  else if (unit == "pct") sprintf(paste0("%.", dp, "f%%"), focal_val)
                   else sprintf("%.2f", focal_val)
     avg_disp <- if (is.null(avg_val) || is.na(avg_val)) "\u2014"
-                else if (unit == "pct") sprintf("%.1f%%", avg_val)
+                else if (unit == "pct") sprintf(paste0("%.", dp, "f%%"), avg_val)
                 else sprintf("%.2f", avg_val)
     lead_name <- leader_name(leader_code)
     is_leader <- identical(focal, leader_code)
@@ -140,6 +124,7 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
   focal   <- pd$meta$focal_brand_code
   cat_avg <- pd$metrics$cat_avg
   n_resp  <- pd$meta$n_respondents
+  dp      <- as.integer(pd$config$decimal_places %||% 0L)
 
   # Max values per metric (for CI bar scaling in cat avg row)
   mms_max  <- max(c(cat_avg$mms  %||% 0, vapply(rows, function(r) r$mms  %||% 0, numeric(1))), na.rm = TRUE)
@@ -168,11 +153,11 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
   fmt_cell <- function(val, band, fmt, n = NULL) {
     if (is.null(val) || is.na(val))
       return('<td class="ct-td ct-data-col ct-na">&mdash;</td>')
-    disp   <- if (fmt == "pct") sprintf("%.1f%%", val) else sprintf("%.2f", val)
+    disp   <- if (fmt == "pct") sprintf(paste0("%.", dp, "f%%"), val) else sprintf("%.2f", val)
     band_s <- as.character(band %||% "within")
     bg     <- ci_bg(band_s)
     n_html <- if (!is.null(n) && !is.na(n))
-      sprintf('<span class="ma-n-metrics">n=%s</span>',
+      sprintf('<span class="ma-n-metrics">%s</span>',
               format(as.integer(n), big.mark = ","))
       else ""
     sprintf(
@@ -184,11 +169,11 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
   fmt_avg_ci_cell <- function(avg_val, ci_lo, ci_hi, max_val, fmt) {
     if (is.null(avg_val) || is.na(avg_val))
       return('<td class="ct-td ct-data-col ma-metrics-cat-avg">&mdash;</td>')
-    disp    <- if (fmt == "pct") sprintf("%.1f%%", avg_val) else sprintf("%.2f", avg_val)
+    disp    <- if (fmt == "pct") sprintf(paste0("%.", dp, "f%%"), avg_val) else sprintf("%.2f", avg_val)
     lo_disp <- if (!is.null(ci_lo) && !is.na(ci_lo))
-      (if (fmt == "pct") sprintf("%.1f%%", ci_lo) else sprintf("%.2f", ci_lo)) else ""
+      (if (fmt == "pct") sprintf(paste0("%.", dp, "f%%"), ci_lo) else sprintf("%.2f", ci_lo)) else ""
     hi_disp <- if (!is.null(ci_hi) && !is.na(ci_hi))
-      (if (fmt == "pct") sprintf("%.1f%%", ci_hi) else sprintf("%.2f", ci_hi)) else ""
+      (if (fmt == "pct") sprintf(paste0("%.", dp, "f%%"), ci_hi) else sprintf("%.2f", ci_hi)) else ""
     safe_max   <- max(1, as.numeric(max_val %||% 1), na.rm = TRUE)
     fill_left  <- if (nzchar(lo_disp)) max(0, min(94, 100 * as.numeric(ci_lo) / safe_max)) else 0
     fill_w     <- if (nzchar(lo_disp) && nzchar(hi_disp))
@@ -225,7 +210,7 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
     paste0(
       sprintf('<tr class="%s" data-ma-brand="%s"%s>', cls, .ma_esc(r$brand_code), sort_attrs),
       sprintf('<td class="ct-td ct-label-col">%s%s</td>', .ma_esc(r$brand_name), focal_badge),
-      fmt_cell(r$mms,  r$mms_band,  "pct", n = n_resp),
+      fmt_cell(r$mms,  r$mms_band,  "pct", n = r$total_links),
       fmt_cell(r$mpen, r$mpen_band, "pct", n = n_resp),
       fmt_cell(r$ns,   r$ns_band,   "num", n = n_linkers),
       fmt_cell(r$som,  r$som_band,  "pct", n = n_resp),
