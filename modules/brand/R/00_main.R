@@ -67,7 +67,8 @@ BRAND_VERSION <- "1.0"
     "04_repertoire.R",
     "05_wom.R",
     "06_drivers_barriers.R",
-    "07_dba.R"
+    "07_dba.R",
+    "08_cat_buying.R"
   )
 
   for (f in module_files) {
@@ -317,7 +318,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
 
       linkage <- tryCatch(
         build_cep_linkage_from_matrix(
-          data, cep_col_codes, cat_brands$BrandCode
+          cat_data, cep_col_codes, cat_brands$BrandCode
         ),
         error = function(e) {
           warnings_list <<- c(warnings_list,
@@ -344,7 +345,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
         if (!is.null(cat_attrs) && nrow(cat_attrs) > 0) {
           attr_linkage <- tryCatch(
             build_cep_linkage_from_matrix(
-              data, cat_attrs$AttrCode, cat_brands$BrandCode
+              cat_data, cat_attrs$AttrCode, cat_brands$BrandCode
             ),
             error = function(e) {
               warnings_list <<- c(warnings_list,
@@ -359,7 +360,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
           linkage = linkage,
           cep_labels = cep_labels_mapped,
           focal_brand = config$focal_brand,
-          weights = weights,
+          weights = cat_weights,
           run_cep_turf = isTRUE(config$element_cep_turf),
           turf_max_items = min(10, length(cep_col_codes)),
           attribute_linkage = attr_linkage,
@@ -376,8 +377,8 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       if (verbose) cat("  Running Funnel...\n")
 
       cat_result$funnel <- .run_funnel_for_category(
-        data = data, structure = structure, cat_brands = cat_brands,
-        cat_ceps = cat_ceps, config = config, weights = weights,
+        data = cat_data, structure = structure, cat_brands = cat_brands,
+        cat_ceps = cat_ceps, config = config, weights = cat_weights,
         cat_name = cat_name, warnings_acc = function(msg) {
           warnings_list <<- c(warnings_list, msg)
         }
@@ -388,17 +389,17 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
     if (isTRUE(config$element_repertoire) && cat_depth == "full") {
       if (verbose) cat("  Running Repertoire...\n")
 
-      # Build penetration matrix from data
-      pen_mat <- matrix(0L, nrow = nrow(data), ncol = nrow(cat_brands))
+      # Build penetration matrix from cat_data (focal respondents only)
+      pen_mat <- matrix(0L, nrow = nrow(cat_data), ncol = nrow(cat_brands))
       colnames(pen_mat) <- cat_brands$BrandCode
 
       pen_qs <- get_questions_for_battery(structure, "penetration", cat_name)
       if (nrow(pen_qs) > 0) {
         pen_prefix <- pen_qs$QuestionCode[1]
         for (b in seq_len(nrow(cat_brands))) {
-          col <- .find_brand_col(data, pen_prefix, cat_brands$BrandCode[b])
+          col <- .find_brand_col(cat_data, pen_prefix, cat_brands$BrandCode[b])
           if (!is.null(col)) {
-            vals <- data[[col]]
+            vals <- cat_data[[col]]
             pen_mat[, b] <- as.integer(!is.na(vals) & vals > 0)
           }
         }
@@ -408,7 +409,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
         run_repertoire(
           pen_mat, cat_brands$BrandCode,
           focal_brand = config$focal_brand,
-          weights = weights
+          weights = cat_weights
         ),
         error = function(e) {
           warnings_list <<- c(warnings_list,
@@ -416,6 +417,40 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
           list(status = "REFUSED", message = e$message)
         }
       )
+    }
+
+    # Category Buying Frequency (full categories only)
+    # Reads the cat_buying.frequency.{cat_code} role from QuestionMap and maps
+    # coded responses through the cat_buy_scale OptionMap scale.
+    if (isTRUE(config$element_repertoire) && cat_depth == "full" &&
+        !is.null(cat_code) && !is.null(structure$questionmap) &&
+        nrow(structure$questionmap) > 0) {
+      freq_role <- paste0("cat_buying.frequency.", cat_code)
+      qmap_rows <- structure$questionmap
+      freq_row  <- qmap_rows[
+        !is.na(qmap_rows$Role) &
+          trimws(as.character(qmap_rows$Role)) == freq_role,
+        , drop = FALSE]
+      if (nrow(freq_row) > 0) {
+        freq_col_name <- trimws(as.character(freq_row$ClientCode[1]))
+        if (!is.na(freq_col_name) && nzchar(freq_col_name) &&
+            freq_col_name %in% names(cat_data)) {
+          if (verbose) cat("  Running Category Buying Frequency...\n")
+          cat_result$cat_buying_frequency <- tryCatch(
+            run_cat_buying_frequency(
+              cat_data[[freq_col_name]],
+              option_map = structure$optionmap,
+              weights    = cat_weights
+            ),
+            error = function(e) {
+              warnings_list <<- c(warnings_list,
+                sprintf("Cat buying frequency failed for %s: %s",
+                        cat_name, e$message))
+              list(status = "REFUSED", message = e$message)
+            }
+          )
+        }
+      }
     }
 
     # WOM (full categories only; filtered to focal respondents for this category)
@@ -460,9 +495,9 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       pen_qs <- get_questions_for_battery(structure, "penetration", cat_name)
       if (nrow(pen_qs) > 0) {
         pen_prefix    <- pen_qs$QuestionCode[1]
-        focal_pen_col <- .find_brand_col(data, pen_prefix, config$focal_brand)
+        focal_pen_col <- .find_brand_col(cat_data, pen_prefix, config$focal_brand)
         if (!is.null(focal_pen_col)) {
-          vals   <- data[[focal_pen_col]]
+          vals   <- cat_data[[focal_pen_col]]
           db_pen <- as.integer(!is.na(vals) & vals > 0)
         }
       }

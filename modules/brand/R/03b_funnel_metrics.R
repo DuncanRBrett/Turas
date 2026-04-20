@@ -297,22 +297,21 @@ run_significance_tests <- function(stage_metrics, focal_brand,
 
 .attitude_rows_for_brand <- function(brand_code, col_values, aware_vec,
                                      weights, role_to_codes) {
-  if (!any(aware_vec)) return(list())
-  aware_w <- sum(weights[aware_vec], na.rm = TRUE)
-  if (aware_w == 0) return(list())
+  total_w <- sum(weights, na.rm = TRUE)
+  if (total_w == 0) return(list())
 
   values_char <- as.character(col_values)
   rows <- list()
   for (role in .FUNNEL_ATTITUDE_POSITIONS) {
     codes <- role_to_codes[[role]]
     if (is.null(codes) || length(codes) == 0) next
-    hits <- aware_vec & !is.na(values_char) & values_char %in% codes
-    pct <- sum(weights[hits], na.rm = TRUE) / aware_w
+    hits <- !is.na(values_char) & values_char %in% codes
+    pct <- sum(weights[hits], na.rm = TRUE) / total_w
     rows[[length(rows) + 1]] <- data.frame(
       brand_code = brand_code,
       attitude_role = role,
       pct = pct,
-      base = aware_w,
+      base = total_w,
       stringsAsFactors = FALSE
     )
   }

@@ -349,19 +349,49 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
         parts <- c(parts, tables[[wom_key]])
       }
     } else if (el == "repertoire") {
-      # Category Buying: repertoire metrics with contextual header
+      # Category Buying panel: frequency + brand period comparison + repertoire + crossover grid
       parts <- c(parts, build_br_section_toolbar(section_id))
       parts <- c(parts, sprintf(
         '<h3 class="br-element-title">Category Buying \u2014 %s</h3>',
         .br_esc(cat_name)))
-      parts <- c(parts, '<p style="font-size:12px;color:#64748b;margin:0 0 12px;">',
-        'Brand repertoire size, sole loyalty, and brand overlap among category buyers. ',
-        'Buying frequency analysis will be added in a future update.</p>')
+
+      # KPI summary strip when frequency data is available
+      cbf <- cat_results$cat_buying_frequency
+      if (!is.null(cbf) && !identical(cbf$status, "REFUSED")) {
+        pct_b  <- if (!is.null(cbf$pct_buyers) && !is.na(cbf$pct_buyers))
+          sprintf("%.0f%%", cbf$pct_buyers) else "\u2014"
+        mfreq  <- if (!is.null(cbf$mean_freq) && !is.na(cbf$mean_freq))
+          sprintf("%.1f×/month", cbf$mean_freq) else "\u2014"
+        n_resp <- if (!is.null(cbf$n_respondents) && !is.na(cbf$n_respondents))
+          sprintf("n = %d all respondents", cbf$n_respondents) else ""
+
+        parts <- c(parts, sprintf(
+          '<div style="display:flex;gap:12px;margin:0 0 16px;flex-wrap:wrap;">
+  <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 18px;min-width:130px;">
+    <div style="font-size:22px;font-weight:700;color:#1A5276;">%s</div>
+    <div style="font-size:11px;color:#64748b;margin-top:2px;">Category buyers</div>
+  </div>
+  <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 18px;min-width:130px;">
+    <div style="font-size:22px;font-weight:700;color:#166534;">%s</div>
+    <div style="font-size:11px;color:#64748b;margin-top:2px;">Mean buy rate</div>
+  </div>
+  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 18px;min-width:130px;align-self:center;">
+    <div style="font-size:12px;color:#94a3b8;">%s</div>
+  </div>
+</div>', pct_b, mfreq, .br_esc(n_resp)))
+      } else {
+        parts <- c(parts,
+          '<p style="font-size:12px;color:#64748b;margin:0 0 12px;">',
+          'Brand repertoire size, sole loyalty, and duplication of purchase among category buyers.</p>')
+      }
+
+      # Charts
       if (!is.null(charts[[chart_key]])) {
         for (ch in charts[[chart_key]]) {
           parts <- c(parts, build_br_chart_wrapper(ch$svg, ch$title %||% ""))
         }
       }
+      # Tables (frequency distribution, 12m/3m, repertoire, crossover grid)
       if (!is.null(tables[[chart_key]])) {
         parts <- c(parts, tables[[chart_key]])
       }

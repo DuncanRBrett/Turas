@@ -159,6 +159,81 @@ run_repertoire <- function(penetration_matrix, brand_codes,
     }
   }
 
+  # --- Full crossover matrix (Duplication of Purchase) ---
+  # crossover_matrix[i, j] = % of brand_i buyers who also buy brand_j.
+  # This is the Ehrenberg / Sharp "duplication of purchase" table.
+  crossover_matrix <- NULL
+  if (n_brands >= 2) {
+    cross_mat <- matrix(NA_real_, nrow = n_brands, ncol = n_brands,
+                        dimnames = list(brand_codes, brand_codes))
+
+    for (i in seq_along(brand_codes)) {
+      bi_buyers <- pen_mat[, i] == 1
+      n_bi_wt   <- if (is.null(weights)) sum(bi_buyers, na.rm = TRUE)
+                   else sum(weights[bi_buyers], na.rm = TRUE)
+      if (n_bi_wt <= 0) next
+      for (j in seq_along(brand_codes)) {
+        if (i == j) { cross_mat[i, j] <- 100; next }
+        both <- bi_buyers & (pen_mat[, j] == 1)
+        cross_mat[i, j] <- if (is.null(weights)) {
+          round(sum(both, na.rm = TRUE) / n_bi_wt * 100, 1)
+        } else {
+          round(sum(weights[both], na.rm = TRUE) / n_bi_wt * 100, 1)
+        }
+      }
+    }
+
+    cmdf <- as.data.frame(cross_mat, stringsAsFactors = FALSE)
+    crossover_matrix <- cbind(
+      data.frame(BrandCode = rownames(cmdf), stringsAsFactors = FALSE),
+      cmdf,
+      stringsAsFactors = FALSE
+    )
+    rownames(crossover_matrix) <- NULL
+  }
+
+  # --- Per-brand loyalty profile ---
+  # For each brand, split its buyers into: Sole (1 brand), Dual (2 brands),
+  # Multi (3+ brands). Plus mean repertoire size among that brand's buyers.
+  # This reveals the buyer-typology profile sitting behind each brand's share.
+  brand_repertoire_profile <- data.frame(
+    BrandCode       = brand_codes,
+    Brand_Buyers_n  = integer(n_brands),
+    Sole_Pct        = numeric(n_brands),
+    Dual_Pct        = numeric(n_brands),
+    Multi_Pct       = numeric(n_brands),
+    Mean_Repertoire = numeric(n_brands),
+    stringsAsFactors = FALSE
+  )
+
+  for (b in seq_along(brand_codes)) {
+    bb     <- pen_mat[, b] == 1
+    n_bb   <- sum(bb, na.rm = TRUE)
+    brand_repertoire_profile$Brand_Buyers_n[b] <- n_bb
+
+    if (n_bb > 0) {
+      rep_per_buyer <- brands_per_resp[bb]
+
+      if (is.null(weights)) {
+        brand_repertoire_profile$Sole_Pct[b]  <- round(sum(rep_per_buyer == 1) / n_bb * 100, 1)
+        brand_repertoire_profile$Dual_Pct[b]  <- round(sum(rep_per_buyer == 2) / n_bb * 100, 1)
+        brand_repertoire_profile$Multi_Pct[b] <- round(sum(rep_per_buyer >= 3) / n_bb * 100, 1)
+        brand_repertoire_profile$Mean_Repertoire[b] <- round(mean(rep_per_buyer), 1)
+      } else {
+        bb_wts <- weights[bb]
+        wt_tot <- sum(bb_wts, na.rm = TRUE)
+        brand_repertoire_profile$Sole_Pct[b]  <- round(
+          sum(bb_wts[rep_per_buyer == 1], na.rm = TRUE) / wt_tot * 100, 1)
+        brand_repertoire_profile$Dual_Pct[b]  <- round(
+          sum(bb_wts[rep_per_buyer == 2], na.rm = TRUE) / wt_tot * 100, 1)
+        brand_repertoire_profile$Multi_Pct[b] <- round(
+          sum(bb_wts[rep_per_buyer >= 3], na.rm = TRUE) / wt_tot * 100, 1)
+        brand_repertoire_profile$Mean_Repertoire[b] <- round(
+          sum(bb_wts * rep_per_buyer, na.rm = TRUE) / wt_tot, 1)
+      }
+    }
+  }
+
   # --- Share of requirements (TRANS only, needs frequency data) ---
   share_of_req <- NULL
   if (!is.null(frequency_matrix)) {
@@ -224,6 +299,8 @@ run_repertoire <- function(penetration_matrix, brand_codes,
     mean_repertoire = round(mean_rep, 1),
     sole_loyalty = sole_loyalty,
     brand_overlap = brand_overlap,
+    crossover_matrix = crossover_matrix,
+    brand_repertoire_profile = brand_repertoire_profile,
     share_of_requirements = share_of_req,
     metrics_summary = metrics_summary,
     n_respondents = n_resp,

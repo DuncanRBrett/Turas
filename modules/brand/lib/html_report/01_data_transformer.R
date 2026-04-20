@@ -74,29 +74,52 @@ transform_brand_charts <- function(results, config) {
         charts[[paste0("funnel_", cat_id)]] <- funnel_charts
       }
 
-      # Repertoire charts
+      # Category Buying + Repertoire charts
       rep <- cr$repertoire
+      cbf <- cr$cat_buying_frequency
       if (!is.null(rep) && !identical(rep$status, "REFUSED")) {
         rep_charts <- list()
 
-        # 7. Repertoire size distribution
+        # Purchase frequency distribution (category-level, all respondents)
+        if (!is.null(cbf) && !identical(cbf$status, "REFUSED") &&
+            !is.null(cbf$distribution) && nrow(cbf$distribution) > 0) {
+          dist_ordered <- cbf$distribution
+          if ("Order" %in% names(dist_ordered)) {
+            dist_ordered <- dist_ordered[order(dist_ordered$Order), , drop = FALSE]
+          }
+          # Colour bars by frequency level: heavy = brand colour, never = muted
+          rep_charts[[length(rep_charts) + 1]] <- list(
+            svg = build_h_bar(
+              dist_ordered, "Label", "Pct", brand_colour,
+              title = sprintf("Category Purchase Frequency \u2014 %s (all respondents)",
+                              cat_name),
+              value_suffix = "%"),
+            title = "Category Purchase Frequency"
+          )
+        }
+
+        # Repertoire size distribution
         if (!is.null(rep$repertoire_size)) {
           rep_charts[[length(rep_charts) + 1]] <- list(
             svg = build_h_bar(rep$repertoire_size, "Brands_Bought", "Percentage",
-                              brand_colour, title = sprintf("Repertoire Size \u2014 %s", cat_name),
+                              brand_colour,
+                              title = sprintf("Repertoire Size \u2014 %s", cat_name),
                               value_suffix = "%"),
             title = "Repertoire Size"
           )
         }
 
-        # 8. Brand overlap
-        if (!is.null(rep$brand_overlap) && nrow(rep$brand_overlap) > 0) {
+        # Per-brand loyalty profile (stacked: Sole / Dual / Multi)
+        if (!is.null(rep$brand_repertoire_profile) &&
+            nrow(rep$brand_repertoire_profile) > 0 &&
+            exists("build_loyalty_profile_chart", mode = "function")) {
           rep_charts[[length(rep_charts) + 1]] <- list(
-            svg = build_h_bar(rep$brand_overlap, "BrandCode", "Overlap_Pct",
-                              brand_colour,
-                              title = sprintf("Brand Overlap with %s \u2014 %s", focal, cat_name),
-                              value_suffix = "%"),
-            title = "Brand Overlap"
+            svg = build_loyalty_profile_chart(
+              rep$brand_repertoire_profile,
+              focal_brand  = focal,
+              focal_colour = brand_colour,
+              title = sprintf("Buyer Loyalty Profile \u2014 %s", cat_name)),
+            title = "Buyer Loyalty Profile"
           )
         }
 
@@ -176,7 +199,8 @@ transform_brand_tables <- function(results, config) {
       if (!is.null(cr$funnel))
         tables[[paste0("funnel_", cat_id)]] <- build_funnel_tables(cr$funnel, focal)
       if (!is.null(cr$repertoire))
-        tables[[paste0("repertoire_", cat_id)]] <- build_repertoire_tables(cr$repertoire, focal)
+        tables[[paste0("repertoire_", cat_id)]] <- build_cat_buying_tables(
+          cr$repertoire, cr$cat_buying_frequency, focal)
       # WOM is per-category
       if (!is.null(cr$wom) && !identical(cr$wom$status, "REFUSED"))
         tables[[paste0("wom_", cat_id)]] <- build_wom_tables(cr$wom, focal)

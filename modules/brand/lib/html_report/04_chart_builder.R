@@ -676,6 +676,137 @@ build_dumbbell <- function(df, focal_brand = NULL,
 # ==============================================================================
 # CONVENIENCE: null coalescing
 # ==============================================================================
+# 9. STACKED LOYALTY PROFILE (per-brand sole / dual / multi)
+# ==============================================================================
+
+#' Build a stacked horizontal bar showing buyer loyalty profile per brand
+#'
+#' Each bar represents one brand. Segments show the % of that brand's buyers
+#' who are sole-loyal (Sole), dual-brand shoppers (Dual), or multi-brand
+#' shoppers (Multi). A dot at the right shows mean repertoire size.
+#'
+#' @param brand_repertoire_profile Data frame with BrandCode, Sole_Pct,
+#'   Dual_Pct, Multi_Pct, Mean_Repertoire, Brand_Buyers_n.
+#' @param focal_brand Character. Focal brand code (row highlighted).
+#' @param focal_colour Hex colour for sole-loyal segment.
+#' @param title Character.
+#'
+#' @return SVG string.
+#' @keywords internal
+build_loyalty_profile_chart <- function(brand_repertoire_profile,
+                                         focal_brand    = NULL,
+                                         focal_colour   = "#1A5276",
+                                         title          = "Buyer Loyalty Profile") {
+
+  df <- brand_repertoire_profile
+  if (is.null(df) || nrow(df) == 0) return("")
+
+  # Colours: Sole = focal (most committed), Dual = medium, Multi = muted
+  col_sole  <- focal_colour
+  col_dual  <- "#60a5fa"   # sky-blue
+  col_multi <- "#cbd5e1"   # slate-200
+
+  n     <- nrow(df)
+  row_h <- 28; gap <- 6
+  ml    <- 80; mr <- 90; mt <- 50; mb <- 30
+  cw    <- 720 - ml - mr
+  total_h <- mt + n * (row_h + gap) + mb
+
+  parts <- character(0)
+
+  # Title
+  parts <- c(parts, sprintf(
+    '<text x="%d" y="22" fill="#1e293b" font-size="14" font-weight="700">%s</text>',
+    ml, .br_escape(title)))
+
+  # Legend (top-right)
+  leg_x <- ml + cw - 10
+  parts <- c(parts,
+    sprintf('<rect x="%g" y="32" width="10" height="10" rx="2" fill="%s"/>',
+            leg_x - 200, col_sole),
+    sprintf('<text x="%g" y="41" fill="#64748b" font-size="10">Sole</text>',
+            leg_x - 187),
+    sprintf('<rect x="%g" y="32" width="10" height="10" rx="2" fill="%s"/>',
+            leg_x - 150, col_dual),
+    sprintf('<text x="%g" y="41" fill="#64748b" font-size="10">Dual</text>',
+            leg_x - 137),
+    sprintf('<rect x="%g" y="32" width="10" height="10" rx="2" fill="%s"/>',
+            leg_x - 100, col_multi),
+    sprintf('<text x="%g" y="41" fill="#64748b" font-size="10">Multi (3+)</text>',
+            leg_x - 87),
+    sprintf('<text x="%g" y="41" fill="#94a3b8" font-size="10">\u2022 Mean brands</text>',
+            leg_x - 28))
+
+  for (i in seq_len(n)) {
+    bc        <- df$BrandCode[i]
+    sole_pct  <- df$Sole_Pct[i]  %||% 0
+    dual_pct  <- df$Dual_Pct[i]  %||% 0
+    multi_pct <- df$Multi_Pct[i] %||% 0
+    mean_rep  <- df$Mean_Repertoire[i] %||% NA_real_
+    n_bb      <- df$Brand_Buyers_n[i]  %||% 0
+
+    y         <- mt + (i - 1) * (row_h + gap)
+    is_focal  <- !is.null(focal_brand) && bc == focal_brand
+    lbl_fw    <- if (is_focal) "700" else "400"
+    lbl_col   <- if (is_focal) "#1e293b" else "#64748b"
+
+    # Label
+    parts <- c(parts, sprintf(
+      '<text x="%g" y="%g" text-anchor="end" fill="%s" font-size="12" font-weight="%s" dominant-baseline="middle">%s</text>',
+      ml - 6, y + row_h / 2, lbl_col, lbl_fw, .br_escape(bc)))
+
+    # Stacked bar segments
+    x_cursor <- ml
+    segs <- list(
+      list(pct = sole_pct,  col = col_sole),
+      list(pct = dual_pct,  col = col_dual),
+      list(pct = multi_pct, col = col_multi)
+    )
+    for (seg in segs) {
+      w <- max(0, (seg$pct / 100) * cw)
+      if (w > 0) {
+        parts <- c(parts, sprintf(
+          '<rect x="%g" y="%g" width="%g" height="%d" fill="%s" opacity="0.85"/>',
+          x_cursor, y, w, row_h, seg$col))
+      }
+      x_cursor <- x_cursor + w
+    }
+
+    # Background track (unaccounted % due to rounding)
+    if (x_cursor < ml + cw) {
+      parts <- c(parts, sprintf(
+        '<rect x="%g" y="%g" width="%g" height="%d" fill="#f1f5f9"/>',
+        x_cursor, y, (ml + cw) - x_cursor, row_h))
+    }
+
+    # Mean repertoire dot + label
+    if (!is.na(mean_rep) && mean_rep > 0) {
+      max_rep <- max(df$Mean_Repertoire, na.rm = TRUE)
+      max_rep <- max(max_rep, 1)
+      dot_x   <- ml + cw + 8 + ((mean_rep - 1) / max(max_rep - 1, 0.1)) * 50
+      parts <- c(parts,
+        sprintf('<circle cx="%g" cy="%g" r="5" fill="%s" opacity="0.8"/>',
+                dot_x, y + row_h / 2, lbl_col),
+        sprintf('<text x="%g" y="%g" fill="%s" font-size="10" dominant-baseline="middle">%.1f</text>',
+                dot_x + 8, y + row_h / 2, lbl_col, mean_rep))
+    }
+  }
+
+  # Axis: 0 / 50% / 100% marks
+  for (tick in c(0, 50, 100)) {
+    tx <- ml + (tick / 100) * cw
+    parts <- c(parts,
+      sprintf('<line x1="%g" y1="%d" x2="%g" y2="%g" stroke="#e2e8f0" stroke-width="1"/>',
+              tx, mt, tx, mt + n * (row_h + gap)),
+      sprintf('<text x="%g" y="%d" text-anchor="middle" fill="#94a3b8" font-size="10">%d%%</text>',
+              tx, mt - 5, tick))
+  }
+
+  br_svg_wrap(paste(parts, collapse = "\n"), 720, total_h, title)
+}
+
+
+# ==============================================================================
 
 if (!exists("%||%")) {
   `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a

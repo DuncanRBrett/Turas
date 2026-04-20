@@ -285,19 +285,19 @@ test_that("IPK attitude decomposition sums to 100% and matches hand calc", {
 
   ipk <- res$attitude_decomposition[
     res$attitude_decomposition$brand_code == "IPK", ]
-  # Aware respondents for IPK: 9 (R1,R2,R3,R4,R6,R7,R8,R9,R10)
-  # Attitude codes: 1,2,3,4,1,3,2,5,1
-  # Love (1): R1,R6,R10 = 3/9
-  # Prefer (2): R2,R8 = 2/9
-  # Ambivalent (3): R3,R7 = 2/9
-  # Reject (4): R4 = 1/9
-  # No opinion (5): R9 = 1/9
+  # All 10 respondents answer attitude (R5 not aware → code 5 "no opinion").
+  # Attitude codes all 10: 1,2,3,4,5,1,3,2,5,1
+  # Love (1): R1,R6,R10 = 3/10
+  # Prefer (2): R2,R8 = 2/10
+  # Ambivalent (3): R3,R7 = 2/10
+  # Reject (4): R4 = 1/10
+  # No opinion (5): R5,R9 = 2/10
   expect_equal(ipk$pct[ipk$attitude_role == "attitude.love"],
-               3 / 9, tolerance = 1e-9)
+               3 / 10, tolerance = 1e-9)
   expect_equal(ipk$pct[ipk$attitude_role == "attitude.prefer"],
-               2 / 9, tolerance = 1e-9)
+               2 / 10, tolerance = 1e-9)
   expect_equal(ipk$pct[ipk$attitude_role == "attitude.reject"],
-               1 / 9, tolerance = 1e-9)
+               1 / 10, tolerance = 1e-9)
   expect_equal(sum(ipk$pct), 1.0, tolerance = 1e-9)
 })
 
