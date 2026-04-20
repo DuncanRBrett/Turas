@@ -450,6 +450,131 @@ cat9_dba_codes <- function() vapply(cat9_dba_assets(), function(a) a$code, chara
 
 
 # ==============================================================================
+# PURCHASE CHANNELS  (shared across all full categories)
+# ==============================================================================
+
+cat9_channels <- function() {
+  list(
+    list(code = "SUPMKT", label = "Supermarket (e.g. Pick n Pay, Checkers, Woolworths)"),
+    list(code = "SPECIA", label = "Speciality food store"),
+    list(code = "ONLINE", label = "Online / food delivery app"),
+    list(code = "CONVEN", label = "Convenience store / garage forecourt"),
+    list(code = "WHOLES", label = "Wholesale / bulk store (e.g. Makro, Costco)"),
+    list(code = "MARKET", label = "Farmers market / fresh market"),
+    list(code = "OTHER",  label = "Somewhere else")
+  )
+}
+
+cat9_channel_codes <- function() vapply(cat9_channels(), function(c) c$code, character(1))
+
+
+# ==============================================================================
+# MARKETING REACH ASSETS  (Q013–Q015: ad recognition, brand recall, media)
+# ==============================================================================
+# Category = "ALL" means the ad was shown to all respondents.
+# Category-specific codes restrict the asset to respondents in that focal category.
+
+cat9_reach_assets <- function() {
+  list(
+    list(code = "ADTV01",   label = "IPK TV spot — 'Taste the difference'",
+         category = "ALL", brand = "IPK",
+         image_path = "assets/reach/ipk_tv_ad_01.jpg"),
+    list(code = "ADDIG01",  label = "IPK digital banner — pasta range",
+         category = "PAS", brand = "IPK",
+         image_path = "assets/reach/ipk_digital_pas_01.jpg"),
+    list(code = "ADDIG02",  label = "IPK digital banner — seasoning range",
+         category = "DSS", brand = "IPK",
+         image_path = "assets/reach/ipk_digital_dss_01.jpg"),
+    list(code = "ADPR01",   label = "IPK print ad — Taste magazine",
+         category = "ALL", brand = "IPK",
+         image_path = "assets/reach/ipk_print_taste_01.jpg")
+  )
+}
+
+cat9_reach_asset_codes <- function() vapply(cat9_reach_assets(), function(a) a$code, character(1))
+
+# Media channels for Q015 (where seen)
+cat9_reach_media <- function() {
+  list(
+    list(code = "TV",      label = "Television"),
+    list(code = "SOCIAL",  label = "Social media (Facebook, Instagram, TikTok)"),
+    list(code = "ONLINE",  label = "Online advertising (website banner, YouTube)"),
+    list(code = "PRINT",   label = "Newspaper or magazine"),
+    list(code = "OUTDOOR", label = "Outdoor (billboard, bus shelter)"),
+    list(code = "RADIO",   label = "Radio"),
+    list(code = "INSTORE", label = "In-store (shelf display, packaging)"),
+    list(code = "OTHER",   label = "Somewhere else")
+  )
+}
+
+
+# ==============================================================================
+# STANDARD DEMOGRAPHICS  (South Africa; added to all respondents)
+# ==============================================================================
+
+cat9_demographics <- function() {
+  list(
+    list(code = "AGE",      label = "Age group",
+         variable_type = "Single_Mention",
+         options = list(
+           list(val = "1", text = "18–24"),
+           list(val = "2", text = "25–34"),
+           list(val = "3", text = "35–49"),
+           list(val = "4", text = "50–64"),
+           list(val = "5", text = "65+")
+         )),
+    list(code = "GENDER",   label = "Gender",
+         variable_type = "Single_Mention",
+         options = list(
+           list(val = "1", text = "Female"),
+           list(val = "2", text = "Male"),
+           list(val = "3", text = "Non-binary / prefer not to say")
+         )),
+    list(code = "PROVINCE", label = "Province",
+         variable_type = "Single_Mention",
+         options = list(
+           list(val = "1",  text = "Gauteng"),
+           list(val = "2",  text = "Western Cape"),
+           list(val = "3",  text = "KwaZulu-Natal"),
+           list(val = "4",  text = "Eastern Cape"),
+           list(val = "5",  text = "Limpopo"),
+           list(val = "6",  text = "Mpumalanga"),
+           list(val = "7",  text = "North West"),
+           list(val = "8",  text = "Free State"),
+           list(val = "9",  text = "Northern Cape")
+         )),
+    list(code = "LSM",      label = "Living Standards Measure (LSM)",
+         variable_type = "Single_Mention",
+         options = list(
+           list(val = "6",  text = "LSM 6"),
+           list(val = "7",  text = "LSM 7"),
+           list(val = "8",  text = "LSM 8"),
+           list(val = "9",  text = "LSM 9"),
+           list(val = "10", text = "LSM 10")
+         )),
+    list(code = "RACE",     label = "Population group",
+         variable_type = "Single_Mention",
+         options = list(
+           list(val = "1", text = "Black African"),
+           list(val = "2", text = "Coloured"),
+           list(val = "3", text = "Indian / Asian"),
+           list(val = "4", text = "White"),
+           list(val = "5", text = "Prefer not to say")
+         )),
+    list(code = "HH_INCOME", label = "Monthly household income (ZAR)",
+         variable_type = "Single_Mention",
+         options = list(
+           list(val = "1", text = "Under R5,000"),
+           list(val = "2", text = "R5,000–R9,999"),
+           list(val = "3", text = "R10,000–R19,999"),
+           list(val = "4", text = "R20,000–R39,999"),
+           list(val = "5", text = "R40,000 or more")
+         ))
+  )
+}
+
+
+# ==============================================================================
 # BRAND COLOURS
 # ==============================================================================
 

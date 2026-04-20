@@ -92,12 +92,30 @@
   full_cats  <- Filter(function(c) c$analysis_depth == "full",           cat9_categories())
   aware_cats <- Filter(function(c) c$analysis_depth == "awareness_only", cat9_categories())
 
-  # Full-category question battery: CATBUY + funnel + CEPs + attributes
+  # Screener questions (all 9 categories; one binary column per category in export)
+  # SQ1 = bought in long timeframe; SQ2 = bought in target timeframe.
+  # Column pattern: {code}_{catcode} e.g. SQ1_DSS, SQ2_POS
+  screener_qs <- list(
+    list(QuestionCode = "SQ1",
+         QuestionText = sprintf("Which of the following have you bought in the last %s?",
+                                cat9_category("DSS")$timeframe_long),
+         VariableType = "Multi_Mention", Battery = "screener", Category = "ALL"),
+    list(QuestionCode = "SQ2",
+         QuestionText = sprintf("Which of the following have you bought in the last %s?",
+                                cat9_category("DSS")$timeframe_target),
+         VariableType = "Multi_Mention", Battery = "screener", Category = "ALL")
+  )
+
+  # Full-category question battery: CATBUY + CATCOUNT + funnel + CEPs + attributes + channels
   full_qs <- unlist(lapply(full_cats, function(cat) {
     base <- list(
-      list(QuestionCode = sprintf("CATBUY_%s",     cat$code),
+      list(QuestionCode = sprintf("CATBUY_%s",   cat$code),
            QuestionText = sprintf("How often do you buy %s?", tolower(cat$name)),
            VariableType = "Single_Mention", Battery = "cat_buying",  Category = cat$name),
+      list(QuestionCode = sprintf("CATCOUNT_%s", cat$code),
+           QuestionText = sprintf("How many times have you bought %s in the last %s?",
+                                  tolower(cat$name), cat$timeframe_target),
+           VariableType = "Numeric", Battery = "cat_buying", Category = cat$name),
       list(QuestionCode = sprintf("BRANDAWARE_%s", cat$code),
            QuestionText = sprintf("Which of these brands of %s have you heard of before today?", tolower(cat$name)),
            VariableType = "Multi_Mention",  Battery = "awareness",   Category = cat$name),
@@ -131,7 +149,15 @@
       Battery      = "attribute",
       Category     = cat$name
     ))
-    c(base, cep_qs, attr_qs)
+    channel_q <- list(list(
+      QuestionCode = sprintf("CHANNEL_%s", cat$code),
+      QuestionText = sprintf("Where have you bought %s in the last %s?",
+                             tolower(cat$name), cat$timeframe_target),
+      VariableType = "Multi_Mention",
+      Battery      = "channels",
+      Category     = cat$name
+    ))
+    c(base, cep_qs, attr_qs, channel_q)
   }), recursive = FALSE)
 
   # Awareness-only category questions: BRANDAWARE only
@@ -165,6 +191,19 @@
          VariableType = "Rating", Battery = "wom", Category = "ALL")
   )
 
+  # Marketing reach battery (Q013–Q015 per asset; Category = asset$category)
+  reach_qs <- unlist(lapply(cat9_reach_assets(), function(a) list(
+    list(QuestionCode = sprintf("REACH_SEEN_%s",  a$code),
+         QuestionText = sprintf("Have you seen this image (or something similar) in advertising recently? (%s)", a$label),
+         VariableType = "Single_Mention", Battery = "reach", Category = a$category),
+    list(QuestionCode = sprintf("REACH_BRAND_%s", a$code),
+         QuestionText = sprintf("Which brand was this advertising for? (%s)", a$label),
+         VariableType = "Multi_Mention",  Battery = "reach", Category = a$category),
+    list(QuestionCode = sprintf("REACH_MEDIA_%s", a$code),
+         QuestionText = sprintf("Where did you see this advertising? (%s)", a$label),
+         VariableType = "Multi_Mention",  Battery = "reach", Category = a$category)
+  )), recursive = FALSE)
+
   # DBA battery (all respondents across all 9 categories; IPK assets only)
   dba_qs <- unlist(lapply(cat9_dba_assets(), function(a) list(
     list(QuestionCode = sprintf("DBA_FAME_%s",   a$code),
@@ -175,7 +214,7 @@
          VariableType = "Open_End",       Battery = "dba", Category = "ALL")
   )), recursive = FALSE)
 
-  c(full_qs, aware_qs, wom_qs, dba_qs)
+  c(screener_qs, full_qs, aware_qs, wom_qs, reach_qs, dba_qs)
 }
 
 
@@ -242,7 +281,29 @@
     )
   }), recursive = FALSE)
 
-  all_opts <- c(attitude, cat_buy, pen_freq, wom_pos_count, wom_neg_count, dba_fame)
+  # Marketing reach seen — binary scale per asset
+  reach_seen <- unlist(lapply(cat9_reach_assets(), function(a) {
+    code <- sprintf("REACH_SEEN_%s", a$code)
+    list(
+      list(code = code, val = "1", text = "Yes, I have seen this advertising", order = 1),
+      list(code = code, val = "2", text = "No, I have not seen this advertising", order = 2)
+    )
+  }), recursive = FALSE)
+
+  # Channel options — one set per full category (shared channel list)
+  channel_opts <- unlist(lapply(full_cats, function(cat) {
+    code <- sprintf("CHANNEL_%s", cat$code)
+    mapply(function(ch, i) list(code = code, val = ch$code, text = ch$label, order = i),
+           cat9_channels(), seq_along(cat9_channels()), SIMPLIFY = FALSE)
+  }), recursive = FALSE)
+
+  # Demographics options
+  dem_opts <- unlist(lapply(cat9_demographics(), function(d) {
+    lapply(d$options, function(o) list(code = d$code, val = o$val, text = o$text, order = as.integer(o$val)))
+  }), recursive = FALSE)
+
+  all_opts <- c(attitude, cat_buy, pen_freq, wom_pos_count, wom_neg_count, dba_fame,
+                reach_seen, channel_opts, dem_opts)
 
   lapply(all_opts, function(o) list(
     QuestionCode = o$code,
@@ -308,8 +369,41 @@
 
 
 # ==============================================================================
-# DBA_ASSETS SHEET  (Survey_Structure version: links to question codes)
+# CHANNELS SHEET  (purchase channel definitions, shared across full categories)
 # ==============================================================================
+
+.build_channels_columns <- function() {
+  list(
+    list(name = "ChannelCode",  width = 14, required = TRUE,
+         description = "Short code used in column names (e.g. SUPMKT)"),
+    list(name = "ChannelLabel", width = 48, required = TRUE,
+         description = "Full channel label as shown to respondents"),
+    list(name = "DisplayOrder", width = 14, required = TRUE,
+         description = "Order channels appear in questionnaire and output")
+  )
+}
+
+.build_9cat_channels_rows <- function() {
+  mapply(function(ch, i) list(
+    ChannelCode  = ch$code,
+    ChannelLabel = ch$label,
+    DisplayOrder = i
+  ), cat9_channels(), seq_along(cat9_channels()), SIMPLIFY = FALSE)
+}
+
+
+# ==============================================================================
+# DBA_ASSETS SHEET  (Survey_Structure version: links to question codes + image path)
+# Extends the shared .build_dba_structure_columns() with an ImagePath column.
+# ==============================================================================
+
+.build_9cat_dba_structure_columns <- function() {
+  c(.build_dba_structure_columns(), list(
+    list(name = "ImagePath", width = 44, required = FALSE,
+         description = paste0("Relative path to asset image file (PNG/JPG). ",
+                              "Required for asset_type = image; leave blank for text/audio."))
+  ))
+}
 
 .build_9cat_dba_structure_rows <- function() {
   lapply(cat9_dba_assets(), function(a) list(
@@ -317,8 +411,69 @@
     AssetLabel         = a$label,
     AssetType          = a$asset_type,
     FameQuestionCode   = sprintf("DBA_FAME_%s",   a$code),
-    UniqueQuestionCode = sprintf("DBA_UNIQUE_%s", a$code)
+    UniqueQuestionCode = sprintf("DBA_UNIQUE_%s", a$code),
+    ImagePath          = a$file_path
   ))
+}
+
+
+# ==============================================================================
+# MARKETING REACH SHEETS  (Q013–Q015: ad recognition, brand recall, media)
+# ==============================================================================
+
+.build_marketing_reach_columns <- function() {
+  list(
+    list(name = "AssetCode",          width = 14, required = TRUE,
+         description = "Unique code for this ad/stimulus. Used as suffix in column names"),
+    list(name = "AssetLabel",         width = 44, required = TRUE,
+         description = "Description of the ad or image shown to respondents"),
+    list(name = "ImagePath",          width = 44, required = FALSE,
+         description = "Relative path to image file shown in survey (PNG/JPG). Blank for text/audio stimuli"),
+    list(name = "Brand",              width = 14, required = TRUE,
+         description = "Brand code this ad belongs to (must match Brands sheet)"),
+    list(name = "Category",           width = 20, required = TRUE,
+         description = paste0("Category this ad is shown in. Use ALL for brand-level ads ",
+                              "shown to all respondents, or a category code (e.g. DSS) ",
+                              "for category-specific ads.")),
+    list(name = "SeenQuestionCode",   width = 24, required = TRUE,
+         description = "Column prefix for Q013 recognition. Pattern: REACH_SEEN_{code}"),
+    list(name = "BrandQuestionCode",  width = 24, required = TRUE,
+         description = "Column prefix for Q014 brand recall. Pattern: REACH_BRAND_{code}"),
+    list(name = "MediaQuestionCode",  width = 24, required = TRUE,
+         description = "Column prefix for Q015 media channel. Pattern: REACH_MEDIA_{code}")
+  )
+}
+
+.build_9cat_reach_rows <- function() {
+  lapply(cat9_reach_assets(), function(a) list(
+    AssetCode         = a$code,
+    AssetLabel        = a$label,
+    ImagePath         = a$image_path,
+    Brand             = a$brand,
+    Category          = a$category,
+    SeenQuestionCode  = sprintf("REACH_SEEN_%s",  a$code),
+    BrandQuestionCode = sprintf("REACH_BRAND_%s", a$code),
+    MediaQuestionCode = sprintf("REACH_MEDIA_%s", a$code)
+  ))
+}
+
+.build_reach_media_columns <- function() {
+  list(
+    list(name = "MediaCode",  width = 14, required = TRUE,
+         description = "Short code used in output tables"),
+    list(name = "MediaLabel", width = 44, required = TRUE,
+         description = "Full media channel label as shown to respondents"),
+    list(name = "DisplayOrder", width = 14, required = TRUE,
+         description = "Order media options appear in questionnaire")
+  )
+}
+
+.build_9cat_reach_media_rows <- function() {
+  mapply(function(m, i) list(
+    MediaCode    = m$code,
+    MediaLabel   = m$label,
+    DisplayOrder = i
+  ), cat9_reach_media(), seq_along(cat9_reach_media()), SIMPLIFY = FALSE)
 }
 
 
@@ -330,6 +485,33 @@
 
   full_cats  <- Filter(function(c) c$analysis_depth == "full",           cat9_categories())
   aware_cats <- Filter(function(c) c$analysis_depth == "awareness_only", cat9_categories())
+
+  # Screener rows — one pair per category (all 9: full + awareness-only)
+  # ClientCode includes the category suffix so ColumnPattern = "{code}" resolves
+  # directly to the data column (e.g. SQ1_DSS, SQ2_DSS, SQ1_SLD, etc.).
+  # Note: {catcode} is NOT a supported role-map token — embed cat in ClientCode.
+  screener_rows <- unlist(lapply(cat9_categories(), function(cat) {
+    list(
+      list(Role = sprintf("screener.long.%s",   cat$code),
+           ClientCode = sprintf("SQ1_%s", cat$code),
+           QuestionText = sprintf("Bought %s in the last %s (screener)",
+                                  tolower(cat$name), cat$timeframe_long),
+           QuestionTextShort = sprintf("Screener 12mo %s", cat$code),
+           Variable_Type = "Single_Response",
+           ColumnPattern = "{code}",
+           OptionMapScale = "",
+           Notes = sprintf("SQ1CATBUYTRANS — column SQ1_%s. 1=yes, 0=no", cat$code)),
+      list(Role = sprintf("screener.target.%s", cat$code),
+           ClientCode = sprintf("SQ2_%s", cat$code),
+           QuestionText = sprintf("Bought %s in the last %s (screener)",
+                                  tolower(cat$name), cat$timeframe_target),
+           QuestionTextShort = sprintf("Screener 3mo %s", cat$code),
+           Variable_Type = "Single_Response",
+           ColumnPattern = "{code}",
+           OptionMapScale = "",
+           Notes = sprintf("SQ2CATBUYTRANS — column SQ2_%s. 1=yes, 0=no", cat$code))
+    )
+  }), recursive = FALSE)
 
   # System rows (once)
   system_rows <- list(
@@ -468,6 +650,80 @@
          Notes = "QWOMBRAND3b — conditional on WOM_NEG_SHARE = 1")
   )
 
+  # Category buying rows (2 per full category: frequency ordinal + count numeric)
+  cat_buying_rows <- unlist(lapply(full_cats, function(cat) {
+    list(
+      list(Role = sprintf("cat_buying.frequency.%s", cat$code),
+           ClientCode = sprintf("CATBUY_%s", cat$code),
+           QuestionText = sprintf("How often do you buy %s?", tolower(cat$name)),
+           QuestionTextShort = sprintf("%s buy freq", cat$code),
+           Variable_Type = "Single_Response",
+           ColumnPattern = "{code}",
+           OptionMapScale = "cat_buy_scale",
+           Notes = "QCATEGORYBUYING ordinal scale 1=Several times a week … 5=Never"),
+      list(Role = sprintf("cat_buying.count.%s", cat$code),
+           ClientCode = sprintf("CATCOUNT_%s", cat$code),
+           QuestionText = sprintf("How many times have you bought %s in the last %s?",
+                                  tolower(cat$name), cat$timeframe_target),
+           QuestionTextShort = sprintf("%s buy count", cat$code),
+           Variable_Type = "Numeric",
+           ColumnPattern = "{code}",
+           OptionMapScale = "",
+           Notes = "QCATEGORYBUYINGTRANS Q016 — numeric count; no option scale")
+    )
+  }), recursive = FALSE)
+
+  # Channel rows (1 per full category; options in Channels sheet)
+  # ColumnPattern = "{code}" resolves to CHANNEL_{CAT} (a stub — actual data
+  # columns are CHANNEL_{CAT}_{CHANNELCODE}). {channelcode} is not a supported
+  # role-map token; use {code} to avoid validation errors. The analysis engine
+  # accesses channel columns directly via the Channels sheet, not via role_map.
+  channel_rows <- lapply(full_cats, function(cat) {
+    list(Role = sprintf("channel.purchase.%s", cat$code),
+         ClientCode = sprintf("CHANNEL_%s", cat$code),
+         QuestionText = sprintf("Where have you bought %s in the last %s?",
+                                tolower(cat$name), cat$timeframe_target),
+         QuestionTextShort = sprintf("%s channels", cat$code),
+         Variable_Type = "Multi_Mention",
+         ColumnPattern = "{code}",
+         OptionMapScale = "",
+         Notes = paste0("Q020 — actual data cols: CHANNEL_", cat$code,
+                        "_{CHANNELCODE} e.g. CHANNEL_", cat$code,
+                        "_SUPMKT. Channel codes in Channels sheet."))
+  })
+
+  # Marketing reach rows (3 per asset: seen, brand recall, media channel)
+  reach_rows <- unlist(lapply(cat9_reach_assets(), function(a) {
+    cat_note <- if (a$category == "ALL") "all respondents" else
+                sprintf("focal category %s respondents only", a$category)
+    list(
+      list(Role = sprintf("reach.seen.%s", a$code),
+           ClientCode = sprintf("REACH_SEEN_%s", a$code),
+           QuestionText = sprintf("Have you seen this image (or something similar) in advertising recently? (%s)", a$label),
+           QuestionTextShort = sprintf("Seen: %s", a$code),
+           Variable_Type = "Single_Response",
+           ColumnPattern = "{code}",
+           OptionMapScale = "reach_seen_scale",
+           Notes = sprintf("Q013 recognition — %s; 1=yes, 2=no", cat_note)),
+      list(Role = sprintf("reach.brand.%s", a$code),
+           ClientCode = sprintf("REACH_BRAND_%s", a$code),
+           QuestionText = sprintf("Which brand was this advertising for? (%s)", a$label),
+           QuestionTextShort = sprintf("Brand recall: %s", a$code),
+           Variable_Type = "Open_End",
+           ColumnPattern = "{code}",
+           OptionMapScale = "",
+           Notes = "Q014 — open-ended brand recall; coded for uniqueness scoring"),
+      list(Role = sprintf("reach.media.%s", a$code),
+           ClientCode = sprintf("REACH_MEDIA_%s", a$code),
+           QuestionText = sprintf("Where did you see this advertising? (%s)", a$label),
+           QuestionTextShort = sprintf("Media: %s", a$code),
+           Variable_Type = "Multi_Mention",
+           ColumnPattern = "{code}",
+           OptionMapScale = "",
+           Notes = "Q015 — comma-separated media codes; options in ReachMedia sheet")
+    )
+  }), recursive = FALSE)
+
   # DBA rows (one pair per asset — brand-level, IPK only)
   dba_rows <- unlist(lapply(cat9_dba_assets(), function(a) list(
     list(Role = sprintf("dba.fame.%s", a$code),
@@ -488,7 +744,8 @@
          Notes = "Open-ended attribution; text coded to brand for uniqueness scoring")
   )), recursive = FALSE)
 
-  c(system_rows, funnel_rows, cross_aware_rows, wom_rows, dba_rows)
+  c(screener_rows, system_rows, cat_buying_rows, funnel_rows, channel_rows,
+    cross_aware_rows, wom_rows, reach_rows, dba_rows)
 }
 
 
@@ -538,7 +795,77 @@
     list(Scale = "dba_fame_scale", ClientCode = "1",
          Role = "dba.recognised",     ClientLabel = "Yes, I have seen this before",    OrderIndex = 1),
     list(Scale = "dba_fame_scale", ClientCode = "2",
-         Role = "dba.not_recognised", ClientLabel = "No, I have not seen this before", OrderIndex = 2)
+         Role = "dba.not_recognised", ClientLabel = "No, I have not seen this before", OrderIndex = 2),
+
+    # Category buying frequency scale (CATBUY_{CAT} questions)
+    list(Scale = "cat_buy_scale", ClientCode = "1",
+         Role = "cat_buy.several_week", ClientLabel = "Several times a week",    OrderIndex = 1),
+    list(Scale = "cat_buy_scale", ClientCode = "2",
+         Role = "cat_buy.once_week",    ClientLabel = "About once a week",       OrderIndex = 2),
+    list(Scale = "cat_buy_scale", ClientCode = "3",
+         Role = "cat_buy.few_month",    ClientLabel = "A few times a month",     OrderIndex = 3),
+    list(Scale = "cat_buy_scale", ClientCode = "4",
+         Role = "cat_buy.monthly_less", ClientLabel = "Monthly or less",         OrderIndex = 4),
+    list(Scale = "cat_buy_scale", ClientCode = "5",
+         Role = "cat_buy.never",        ClientLabel = "Never buy this category", OrderIndex = 5),
+
+    # Marketing reach recognition scale (REACH_SEEN_{ADCODE} questions)
+    list(Scale = "reach_seen_scale", ClientCode = "1",
+         Role = "reach.recognised",     ClientLabel = "Yes, I have seen this advertising",    OrderIndex = 1),
+    list(Scale = "reach_seen_scale", ClientCode = "2",
+         Role = "reach.not_recognised", ClientLabel = "No, I have not seen this advertising", OrderIndex = 2)
+  )
+}
+
+
+# ==============================================================================
+# DEMOGRAPHICS SHEET
+# ==============================================================================
+
+.build_demographics_columns <- function() {
+  list(
+    list(name = "QuestionCode",  width = 16, required = TRUE,
+         description = "Unique question code matching column name in data file"),
+    list(name = "QuestionText",  width = 52, required = TRUE,
+         description = "Full question wording"),
+    list(name = "VariableType",  width = 20, required = TRUE,
+         description = "Data type",
+         dropdown = c("Single_Mention", "Multi_Mention", "Numeric", "Open_End")),
+    list(name = "OptionMapScale",width = 20, required = FALSE,
+         description = "Scale name in OptionMap (leave blank if options defined in Options sheet)"),
+    list(name = "Notes",         width = 40, required = FALSE,
+         description = "Operator notes")
+  )
+}
+
+.build_9cat_demographics_rows <- function() {
+  lapply(cat9_demographics(), function(d) list(
+    QuestionCode  = d$code,
+    QuestionText  = d$label,
+    VariableType  = d$variable_type,
+    OptionMapScale = "",
+    Notes         = ""
+  ))
+}
+
+
+# ==============================================================================
+# ADHOC SHEET  (blank template for client-specific questions)
+# ==============================================================================
+
+.build_adhoc_columns <- function() {
+  list(
+    list(name = "QuestionCode",     width = 20, required = TRUE,
+         description = "[REQUIRED] Unique question code matching column name in data file"),
+    list(name = "QuestionText",     width = 60, required = TRUE,
+         description = "[REQUIRED] Full question wording"),
+    list(name = "VariableType",     width = 20, required = TRUE,
+         description = "[REQUIRED] Data type",
+         dropdown = c("Single_Mention", "Multi_Mention", "Rating", "Numeric", "Open_End")),
+    list(name = "Category",         width = 24, required = FALSE,
+         description = "Category this question applies to (leave blank / ALL for all respondents)"),
+    list(name = "AnalysisNote",     width = 48, required = FALSE,
+         description = "How this question should be used in analysis — for analyst reference only")
   )
 }
 
@@ -638,16 +965,82 @@ generate_9cat_structure <- function(output_path, overwrite = TRUE) {
   )
 
   write_table_sheet(
+    wb, "Channels",
+    .build_channels_columns(),
+    title    = "Purchase Channel Definitions (Q020)",
+    subtitle = paste0(
+      "Channel options used in CHANNEL_{CAT} questions for all 4 full categories. ",
+      "Column pattern in data: CHANNEL_{CAT}_{CHANNELCODE} (e.g. CHANNEL_DSS_SUPMKT). ",
+      "Add or remove rows to reflect channels relevant to this category set."
+    ),
+    example_rows   = .build_9cat_channels_rows(),
+    num_blank_rows = 3
+  )
+
+  write_table_sheet(
     wb, "DBA_Assets",
-    .build_dba_structure_columns(),
+    .build_9cat_dba_structure_columns(),
     title    = "DBA Asset Definitions (only if element_dba = Y in Brand_Config)",
     subtitle = paste0(
       "5 distinctive brand assets for Ina Paarman's Kitchen. ",
       "DBA is brand-level: all 400 respondents across all 9 categories see these assets. ",
-      "FameQuestionCode and UniqueQuestionCode link to question column prefixes."
+      "ImagePath links to the image file shown to respondents in the survey."
     ),
     example_rows   = .build_9cat_dba_structure_rows(),
     num_blank_rows = 0
+  )
+
+  write_table_sheet(
+    wb, "MarketingReach",
+    .build_marketing_reach_columns(),
+    title    = "Marketing Reach Asset Definitions (Q013–Q015)",
+    subtitle = paste0(
+      "Ad stimuli shown to respondents for recognition, brand recall, and media channel questions. ",
+      "Category = ALL means the asset is shown to all respondents; ",
+      "a category code (e.g. DSS) restricts it to respondents in that focal category. ",
+      "ImagePath is the relative path to the image file shown in the survey."
+    ),
+    example_rows   = .build_9cat_reach_rows(),
+    num_blank_rows = 5
+  )
+
+  write_table_sheet(
+    wb, "ReachMedia",
+    .build_reach_media_columns(),
+    title    = "Marketing Reach Media Channel Definitions (Q015)",
+    subtitle = paste0(
+      "Media channel options for Q015 (Where did you see this advertising?). ",
+      "These options are shared across all reach assets."
+    ),
+    example_rows   = .build_9cat_reach_media_rows(),
+    num_blank_rows = 3
+  )
+
+  write_table_sheet(
+    wb, "Demographics",
+    .build_demographics_columns(),
+    title    = "Demographic Question Definitions",
+    subtitle = paste0(
+      "Standard South African demographic questions asked of all respondents. ",
+      "Response options are defined in the Options sheet. ",
+      "Add rows for any additional demographics included in the fieldwork."
+    ),
+    example_rows   = .build_9cat_demographics_rows(),
+    num_blank_rows = 5
+  )
+
+  write_table_sheet(
+    wb, "AdHoc",
+    .build_adhoc_columns(),
+    title    = "Ad Hoc Question Definitions",
+    subtitle = paste0(
+      "Client-specific questions not part of the standard CBM battery. ",
+      "Add one row per ad hoc question. The analysis engine ignores this sheet — ",
+      "ad hoc questions are processed separately by the analyst. ",
+      "Response options can be added to the Options sheet using the same QuestionCode."
+    ),
+    example_rows   = list(),
+    num_blank_rows = 10
   )
 
   write_table_sheet(
@@ -656,8 +1049,12 @@ generate_9cat_structure <- function(output_path, overwrite = TRUE) {
     title    = "Question Role Map (required for role-registry elements)",
     subtitle = paste0(
       "Maps semantic roles to client question codes. ",
-      "Funnel roles are category-qualified (e.g. funnel.awareness.DSS) for the 4 full categories. ",
+      "Screener roles (screener.long.* / screener.target.*) cover all 9 categories. ",
+      "Category buying roles (cat_buying.frequency.* / cat_buying.count.*) cover the 4 full categories. ",
+      "Funnel roles (funnel.awareness.* etc.) cover the 4 full categories only. ",
+      "Channel roles (channel.purchase.*) cover the 4 full categories. ",
       "Cross-category awareness roles (cross_cat.awareness.*) cover the 5 awareness-only categories. ",
+      "Marketing reach roles (reach.seen.* / reach.brand.* / reach.media.*) cover all reach assets. ",
       "See ROLE_REGISTRY.md for full role vocabulary."
     ),
     example_rows   = .build_9cat_questionmap_rows(),
@@ -670,7 +1067,12 @@ generate_9cat_structure <- function(output_path, overwrite = TRUE) {
     title    = "Response Option Map (for Single_Response roles)",
     subtitle = paste0(
       "Maps coded values to semantic position roles. ",
-      "attitude_scale is referenced by all 4 full-category attitude questions via QuestionMap."
+      "attitude_scale: Romaniuk 5-position scale referenced by all 4 full-category attitude questions. ",
+      "purchase_freq_scale: brand purchase frequency (BRANDPEN3). ",
+      "cat_buy_scale: category buying frequency ordinal (CATBUY_{CAT}). ",
+      "wom_count_scale: WOM occasion count (1–5+ occasions). ",
+      "dba_fame_scale: asset recognition binary (yes/no). ",
+      "reach_seen_scale: ad recognition binary (yes/no)."
     ),
     example_rows   = .build_9cat_optionmap_rows(),
     num_blank_rows = 0

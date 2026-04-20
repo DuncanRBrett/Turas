@@ -68,10 +68,15 @@
 
   df <- data.frame(row.names = seq_len(n), stringsAsFactors = FALSE)
 
-  # Category buying
-  catbuy_col <- sprintf("CATBUY_%s", cat_code)
-  cat_buy    <- .rcat9(n, c(0.13, 0.37, 0.34, 0.14, 0.02))
-  df[[catbuy_col]] <- cat_buy
+  # Category buying — ordinal frequency (CATBUY) + numeric count (CATCOUNT)
+  catbuy_col   <- sprintf("CATBUY_%s",   cat_code)
+  catcount_col <- sprintf("CATCOUNT_%s", cat_code)
+  cat_buy      <- .rcat9(n, c(0.13, 0.37, 0.34, 0.14, 0.02))
+  # Numeric count: rough mapping from ordinal (rounded, with noise)
+  count_means  <- c(10, 4, 2, 1, 0)
+  cat_count    <- pmax(0L, round(count_means[cat_buy] + rnorm(n, 0, 0.8)))
+  df[[catbuy_col]]   <- cat_buy
+  df[[catcount_col]] <- as.integer(cat_count)
 
   # Awareness
   aware_mat <- matrix(0L, n, length(brands))
@@ -174,6 +179,18 @@
     }
   }
 
+  # Purchase channels (conditional on buying in category)
+  # CHANNEL_{CAT}_{CHANNELCODE} — multi-mention, buyers only
+  bought <- df[[catbuy_col]] < 5L  # anyone who buys at all
+  channel_probs <- c(SUPMKT=0.88, SPECIA=0.18, ONLINE=0.22,
+                     CONVEN=0.12, WHOLES=0.15, MARKET=0.08, OTHER=0.04)
+  for (ch in cat9_channels()) {
+    col      <- sprintf("CHANNEL_%s_%s", cat_code, ch$code)
+    vals     <- .rbern(n, channel_probs[[ch$code]])
+    vals[!bought] <- 0L
+    df[[col]] <- vals
+  }
+
   df
 }
 
@@ -261,6 +278,68 @@
 
 
 # ==============================================================================
+# BUILD MARKETING REACH BLOCK  (Q013–Q015 per asset)
+# ==============================================================================
+
+.build_9cat_reach_block <- function(n_total, focal_cats) {
+
+  reach_df  <- data.frame(row.names = seq_len(n_total), stringsAsFactors = FALSE)
+  all_brands <- c("Ina Paarman's Kitchen", "Knorr", "Woolworths", "Dolmio",
+                  "Robertsons", "Pick n Pay", "Other brand", "Don't know / can't remember")
+  media_codes <- cat9_reach_media_codes <- vapply(cat9_reach_media(), function(m) m$code, character(1))
+
+  for (a in cat9_reach_assets()) {
+    # Determine which respondents were shown this asset
+    if (a$category == "ALL") {
+      eligible <- rep(TRUE, n_total)
+    } else {
+      eligible <- focal_cats == a$category
+    }
+
+    seen_col  <- sprintf("REACH_SEEN_%s",  a$code)
+    brand_col <- sprintf("REACH_BRAND_%s", a$code)   # open-ended brand recall
+    media_col <- sprintf("REACH_MEDIA_%s", a$code)   # multi-mention media
+
+    # REACH_SEEN: 1=yes, 2=no  (roughly 35–55% recognition for an average ad)
+    seen_vals        <- rep(NA_integer_, n_total)
+    seen_vals[eligible] <- ifelse(.rbern(sum(eligible), 0.42) == 1L, 1L, 2L)
+    reach_df[[seen_col]] <- seen_vals
+
+    # REACH_BRAND: open-ended brand name (only if seen)
+    brand_vals           <- rep(NA_character_, n_total)
+    recognised           <- !is.na(seen_vals) & seen_vals == 1L
+    nr                   <- sum(recognised)
+    if (nr > 0) {
+      correct  <- c("Ina Paarman's Kitchen", "Ina Paarman", "IPK")
+      noise    <- c("Knorr", "Woolworths", "Robertsons", "Don't know")
+      picks    <- character(nr)
+      for (i in seq_len(nr))
+        picks[i] <- if (runif(1) < 0.72) sample(correct, 1) else sample(noise, 1)
+      brand_vals[recognised] <- picks
+    }
+    reach_df[[brand_col]] <- brand_vals
+
+    # REACH_MEDIA: comma-separated media codes (only if seen; multi-mention)
+    media_probs <- c(TV=0.45, SOCIAL=0.38, ONLINE=0.32, PRINT=0.20,
+                     OUTDOOR=0.12, RADIO=0.08, INSTORE=0.18, OTHER=0.03)
+    media_vals  <- rep(NA_character_, n_total)
+    if (nr > 0) {
+      rows_seen <- which(recognised)
+      media_vals[rows_seen] <- vapply(rows_seen, function(i) {
+        selected <- media_codes[vapply(media_codes, function(m)
+          .rbern(1, media_probs[[m]]) == 1L, logical(1))]
+        if (length(selected) == 0) selected <- sample(media_codes, 1)
+        paste(selected, collapse = ",")
+      }, character(1))
+    }
+    reach_df[[media_col]] <- media_vals
+  }
+
+  reach_df
+}
+
+
+# ==============================================================================
 # BUILD DBA BLOCK  (all respondents, IPK assets only)
 # ==============================================================================
 
@@ -321,9 +400,41 @@ generate_9cat_data <- function(output_path, n = 400, seed = 42, overwrite = TRUE
   set.seed(seed)
 
   full_codes  <- c("DSS", "POS", "PAS", "BAK")
+  aware_codes <- c("SLD", "STO", "PES", "COO", "ANT")
+  all_codes   <- c(full_codes, aware_codes)
   n_per_cat   <- floor(n / 4)
   n_total     <- n_per_cat * 4
   focal_cats  <- rep(full_codes, each = n_per_cat)
+
+  # Screener columns: SQ1_{catcode} and SQ2_{catcode} for all 9 categories
+  # Focal category = always 1 for both screeners (respondent qualified).
+  # Other full categories = probabilistic multi-category buying.
+  # Awareness-only categories = probabilistic based on category prevalence.
+  sq1_df <- data.frame(row.names = seq_len(n_total), stringsAsFactors = FALSE)
+  sq2_df <- data.frame(row.names = seq_len(n_total), stringsAsFactors = FALSE)
+
+  cat_long_buy_prev  <- c(DSS=0.72, POS=0.60, PAS=0.65, BAK=0.55,
+                          SLD=0.58, STO=0.68, PES=0.38, COO=0.55, ANT=0.28)
+  cat_target_buy_prev <- c(DSS=0.52, POS=0.42, PAS=0.48, BAK=0.38,
+                           SLD=0.40, STO=0.50, PES=0.25, COO=0.40, ANT=0.18)
+
+  for (cc in all_codes) {
+    sq1_col <- sprintf("SQ1_%s", cc)
+    sq2_col <- sprintf("SQ2_%s", cc)
+    focal_mask <- focal_cats == cc
+
+    sq1_vals <- .rbern(n_total, cat_long_buy_prev[[cc]])
+    sq2_vals <- .rbern(n_total, cat_target_buy_prev[[cc]])
+
+    # Focal category respondents always pass both screeners
+    sq1_vals[focal_mask] <- 1L
+    sq2_vals[focal_mask] <- 1L
+    # SQ2 cannot be 1 if SQ1 is 0
+    sq2_vals[sq1_vals == 0L] <- 0L
+
+    sq1_df[[sq1_col]] <- sq1_vals
+    sq2_df[[sq2_col]] <- sq2_vals
+  }
 
   # System columns
   sys_df <- data.frame(
@@ -350,19 +461,26 @@ generate_9cat_data <- function(output_path, n = 400, seed = 42, overwrite = TRUE
   # WOM block (full-category brands, focal respondents only)
   wom_df <- .build_9cat_wom_block(n_total, focal_cats)
 
+  # Marketing reach block (per asset; ALL = all respondents, category = focal only)
+  reach_df <- .build_9cat_reach_block(n_total, focal_cats)
+
   # DBA block (all respondents)
   dba_df <- .build_9cat_dba_block(n_total)
 
-  # Demographics
+  # Demographics (coded values matching Options sheet)
   dem_df <- data.frame(
-    Age      = .rcat9(n_total, c(0.20, 0.38, 0.28, 0.14)),
-    Province = .rcat9(n_total, c(0.34, 0.22, 0.24, 0.10, 0.05, 0.03, 0.02)),
-    LSM      = .rcat9(n_total, c(0.12, 0.28, 0.35, 0.18, 0.07)),
+    AGE       = .rcat9(n_total, c(0.18, 0.32, 0.28, 0.16, 0.06)),
+    GENDER    = .rcat9(n_total, c(0.52, 0.46, 0.02)),
+    PROVINCE  = .rcat9(n_total, c(0.34, 0.22, 0.24, 0.10, 0.03, 0.03, 0.02, 0.01, 0.01)),
+    LSM       = .rcat9(n_total, c(0.12, 0.28, 0.35, 0.18, 0.07)),
+    RACE      = .rcat9(n_total, c(0.52, 0.20, 0.10, 0.16, 0.02)),
+    HH_INCOME = .rcat9(n_total, c(0.10, 0.22, 0.30, 0.24, 0.14)),
     stringsAsFactors = FALSE
   )
 
-  # Combine all blocks
-  all_blocks <- c(list(sys_df), cat_blocks, list(aware_only_df, wom_df, dba_df, dem_df))
+  # Combine all blocks (screeners first, then system, then category batteries)
+  all_blocks <- c(list(sq1_df, sq2_df, sys_df), cat_blocks,
+                  list(aware_only_df, wom_df, reach_df, dba_df, dem_df))
   full_df    <- do.call(cbind, all_blocks)
 
   # Write output

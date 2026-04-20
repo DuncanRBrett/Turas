@@ -263,16 +263,26 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
 
   for (i in seq_len(nrow(categories))) {
     cat_name <- categories$Category[i]
-    if (verbose) cat(sprintf("\n--- Category: %s ---\n", cat_name))
+
+    # Determine analysis depth from Categories sheet (if present).
+    # "full" receives the complete CBM battery; "awareness_only" contributes
+    # brand awareness only (used for cross-category portfolio analysis).
+    cat_depth <- if ("Analysis_Depth" %in% names(categories))
+                   trimws(as.character(categories$Analysis_Depth[i]))
+                 else "full"
+    if (is.na(cat_depth) || cat_depth == "") cat_depth <- "full"
+
+    if (verbose) cat(sprintf("\n--- Category: %s [%s] ---\n", cat_name, cat_depth))
 
     cat_brands <- get_brands_for_category(structure, cat_name)
-    cat_ceps <- get_ceps_for_category(structure, cat_name)
-    cat_attrs <- get_attributes_for_category(structure, cat_name)
+    cat_ceps   <- get_ceps_for_category(structure, cat_name)
+    cat_attrs  <- get_attributes_for_category(structure, cat_name)
 
-    cat_result <- list(category = cat_name)
+    cat_result <- list(category = cat_name, analysis_depth = cat_depth)
 
-    # Mental Availability
-    if (isTRUE(config$element_mental_avail) && nrow(cat_ceps) > 0) {
+    # Mental Availability (full categories only — awareness_only cats have no CEPs)
+    if (isTRUE(config$element_mental_avail) && nrow(cat_ceps) > 0 &&
+        cat_depth == "full") {
       if (verbose) cat("  Running Mental Availability...\n")
 
       # Build CEP linkage from data
@@ -342,8 +352,8 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       }
     }
 
-    # Funnel (role-registry architecture; see FUNNEL_SPEC_v2.md)
-    if (isTRUE(config$element_funnel)) {
+    # Funnel (role-registry architecture; full categories only)
+    if (isTRUE(config$element_funnel) && cat_depth == "full") {
       if (verbose) cat("  Running Funnel...\n")
 
       cat_result$funnel <- .run_funnel_for_category(
@@ -355,8 +365,8 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       )
     }
 
-    # Repertoire
-    if (isTRUE(config$element_repertoire)) {
+    # Repertoire (full categories only — awareness_only cats have no pen data)
+    if (isTRUE(config$element_repertoire) && cat_depth == "full") {
       if (verbose) cat("  Running Repertoire...\n")
 
       # Build penetration matrix from data
@@ -548,7 +558,17 @@ if (!exists(".find_brand_col", mode = "function")) {
   funnel_cfg <- .funnel_config_from_global(config, cat_name, cat_brands)
 
   brand_with_refusal_handler({
-    role_map <- load_role_map(structure,
+    # For multi-category studies, the QuestionMap contains category-suffixed
+    # role names (e.g. funnel.awareness.DSS). Normalise to bare names for this
+    # category before building the role map so run_funnel() can find its
+    # required roles (funnel.awareness, funnel.attitude, etc.).
+    cat_qmap <- .normalize_questionmap_for_category(
+      structure$questionmap, cat_brands, data
+    )
+    cat_structure        <- structure
+    cat_structure$questionmap <- cat_qmap
+
+    role_map <- load_role_map(cat_structure,
                               brand_list = cat_brands,
                               cep_list   = cat_ceps,
                               asset_list = structure$dba_assets)
@@ -561,6 +581,86 @@ if (!exists(".find_brand_col", mode = "function")) {
       sig_tester = NULL
     )
   })
+}
+
+
+#' Normalise a QuestionMap for a single-category funnel run
+#'
+#' Multi-category studies store funnel roles with a category suffix
+#' (e.g. \code{funnel.awareness.DSS}) so each category can point at its own
+#' data columns. The funnel element, however, expects bare role names
+#' (\code{funnel.awareness}). This helper:
+#' \enumerate{
+#'   \item Detects whether the map uses suffixed funnel roles (three-level
+#'     names like \code{funnel.awareness.DSS}).
+#'   \item If not, returns the QuestionMap unchanged (single-category study).
+#'   \item If yes, identifies the suffix for the current category by testing
+#'     which \code{funnel.awareness.*} row resolves columns that exist in data
+#'     for the brands supplied.
+#'   \item Filters to only that category's funnel rows plus all shared rows
+#'     (screener.*, system.*, wom.*, dba.*, reach.*, cross_cat.*, cat_buying.*,
+#'     channel.*).
+#'   \item Strips the suffix from funnel row role names so they match the bare
+#'     names the funnel element requires.
+#' }
+#'
+#' @param qmap Data frame. The raw QuestionMap sheet.
+#' @param cat_brands Data frame. Brands for this category; must have BrandCode.
+#' @param data Data frame. Survey data used for column resolution check.
+#' @return Data frame. Normalised QuestionMap for this category.
+#' @keywords internal
+.normalize_questionmap_for_category <- function(qmap, cat_brands, data) {
+  if (is.null(qmap) || nrow(qmap) == 0) return(qmap)
+
+  roles <- trimws(as.character(qmap$Role))
+
+  # Detect multi-category: funnel role with three dot-separated segments
+  # e.g. "funnel.awareness.DSS"
+  is_multi <- any(grepl("^funnel\\.[^.]+\\.[^.]+$", roles))
+  if (!is_multi) return(qmap)  # Single-category map — use as-is
+
+  # Identify the suffix for this category by finding which
+  # funnel.awareness.* row has a ClientCode that resolves to the majority of
+  # expected brand columns (e.g. BRANDAWARE_DSS_IPK … BRANDAWARE_DSS_CKRDSS).
+  # Requiring a majority prevents false matches via brands shared across
+  # categories (e.g. IPK appears in all 9 categories, so a single-column check
+  # would always resolve to the first funnel category encountered).
+  aw_idx <- which(grepl("^funnel\\.awareness\\.[^.]+$", roles))
+  cat_suffix <- NULL
+  threshold  <- max(1L, floor(nrow(cat_brands) * 0.5))
+  for (i in aw_idx) {
+    cc  <- trimws(as.character(qmap$ClientCode[i]))
+    if (is.na(cc) || cc == "") next
+    if (nrow(cat_brands) == 0) next
+    expected_cols <- paste0(cc, "_", cat_brands$BrandCode)
+    n_found <- sum(expected_cols %in% names(data))
+    if (n_found >= threshold) {
+      parts <- strsplit(roles[i], "\\.")[[1]]
+      cat_suffix <- parts[length(parts)]
+      break
+    }
+  }
+
+  if (is.null(cat_suffix)) {
+    # Cannot determine category suffix — return unchanged; funnel will refuse
+    # with a clear "role missing" message if required roles are absent.
+    return(qmap)
+  }
+
+  # Keep rows that either belong to this category's funnel group or are shared
+  suffix_rx <- paste0("\\.", cat_suffix, "$")
+  is_cat_funnel <- grepl(suffix_rx, roles)
+  # Shared: not a category-scoped funnel/attr/cep/channel/cat_buying row
+  is_cat_scoped <- grepl("^(funnel|cross_cat)\\..*\\.[A-Z]{2,}$", roles)
+  is_shared     <- !is_cat_scoped
+
+  keep   <- is_cat_funnel | is_shared
+  result <- qmap[keep, , drop = FALSE]
+
+  # Strip suffix from the funnel rows
+  result$Role[is_cat_funnel[keep]] <- sub(suffix_rx, "",
+                                          result$Role[is_cat_funnel[keep]])
+  result
 }
 
 
