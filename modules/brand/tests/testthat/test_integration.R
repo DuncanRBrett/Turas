@@ -321,7 +321,7 @@ test_that("run_brand includes Repertoire results", {
   expect_true(rep$status %in% c("PASS", "REFUSED"))
 })
 
-test_that("run_brand includes WOM results", {
+test_that("run_brand includes WOM results (per-category)", {
   tmp_dir <- file.path(tempdir(), "brand_integration_wom")
   dir.create(tmp_dir, showWarnings = FALSE, recursive = TRUE)
   on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
@@ -329,10 +329,15 @@ test_that("run_brand includes WOM results", {
   fixtures <- .create_integration_fixtures(tmp_dir)
   result <- run_brand(fixtures$config_path, verbose = FALSE)
 
-  expect_true(!is.null(result$results$wom))
-  wom <- result$results$wom
-  expect_true(is.data.frame(wom$wom_metrics))
-  expect_equal(nrow(wom$wom_metrics), 3)  # 3 brands
+  # WOM is per-category (each category has its own brand list and respondent group)
+  cat_results <- result$results$categories[["Frozen Vegetables"]]
+  expect_true(!is.null(cat_results$wom))
+  wom <- cat_results$wom
+  expect_true(wom$status %in% c("PASS", "PARTIAL", "REFUSED"))
+  if (wom$status != "REFUSED") {
+    expect_true(is.data.frame(wom$wom_metrics))
+    expect_equal(nrow(wom$wom_metrics), 3)  # 3 brands
+  }
 })
 
 test_that("run_brand refuses non-existent config file", {

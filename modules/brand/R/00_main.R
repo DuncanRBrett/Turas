@@ -66,6 +66,7 @@ BRAND_VERSION <- "1.0"
     "03e_funnel_legacy_adapter.R",
     "04_repertoire.R",
     "05_wom.R",
+    "06_drivers_barriers.R",
     "07_dba.R"
   )
 
@@ -279,6 +280,24 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
     cat_attrs  <- get_attributes_for_category(structure, cat_name)
 
     cat_result <- list(category = cat_name, analysis_depth = cat_depth)
+    linkage    <- NULL  # populated by MA block; used by D&B
+
+    # Detect short category code (e.g. "DSS") and filter data to focal
+    # respondents for this category. Focal filtering is used for WOM so each
+    # category's WOM metrics reflect its own respondent group and brand list.
+    focal_col  <- config$focal_category_col %||% "Focal_Category"
+    cat_code   <- if (cat_depth == "full" && !is.null(structure$questionmap))
+                    .detect_category_code(structure$questionmap, cat_brands, data)
+                  else NULL
+    cat_data   <- if (!is.null(cat_code) && focal_col %in% names(data)) {
+                    data[!is.na(data[[focal_col]]) &
+                         data[[focal_col]] == cat_code, ]
+                  } else data
+    cat_weights <- if (!is.null(weights) && !is.null(cat_code) &&
+                       focal_col %in% names(data)) {
+                     weights[!is.na(data[[focal_col]]) &
+                             data[[focal_col]] == cat_code]
+                   } else weights
 
     # Mental Availability (full categories only — awareness_only cats have no CEPs)
     if (isTRUE(config$element_mental_avail) && nrow(cat_ceps) > 0 &&
@@ -399,6 +418,78 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       )
     }
 
+    # WOM (full categories only; filtered to focal respondents for this category)
+    # WOM is category-specific because each category has a different brand list
+    # and only its focal respondents answered WOM questions for those brands.
+    if (isTRUE(config$element_wom) && cat_depth == "full") {
+      if (verbose) cat("  Running WOM...\n")
+      wom_qs <- get_questions_for_battery(structure, "wom")
+      if (!is.null(wom_qs) && nrow(wom_qs) > 0) {
+        pos_rec  <- .wom_prefix(wom_qs, "POS.*REC|REC.*POS",  "WOM_POS_REC")
+        neg_rec  <- .wom_prefix(wom_qs, "NEG.*REC|REC.*NEG",  "WOM_NEG_REC")
+        pos_shr  <- .wom_prefix(wom_qs, "POS.*SHARE|SHARE.*POS|POS_S", "WOM_POS_SHARE")
+        neg_shr  <- .wom_prefix(wom_qs, "NEG.*SHARE|SHARE.*NEG|NEG_S", "WOM_NEG_SHARE")
+        cat_result$wom <- tryCatch(
+          run_wom(
+            cat_data, cat_brands$BrandCode,
+            received_pos_prefix = pos_rec,
+            received_neg_prefix = neg_rec,
+            shared_pos_prefix   = pos_shr,
+            shared_neg_prefix   = neg_shr,
+            focal_brand = config$focal_brand,
+            weights     = cat_weights
+          ),
+          error = function(e) {
+            warnings_list <<- c(warnings_list,
+              sprintf("WOM failed for %s: %s", cat_name, e$message))
+            list(status = "REFUSED", message = e$message)
+          }
+        )
+      }
+    }
+
+    # Drivers & Barriers (full categories only; requires MA linkage)
+    if (isTRUE(config$element_drivers_barriers) && cat_depth == "full") {
+      if (verbose) cat("  Running Drivers & Barriers...\n")
+
+      db_cep_mat <- if (!is.null(cat_result$mental_availability))
+                      cat_result$mental_availability$cep_brand_matrix else NULL
+
+      # Focal brand penetration vector (reuses same question source as repertoire)
+      db_pen <- NULL
+      pen_qs <- get_questions_for_battery(structure, "penetration", cat_name)
+      if (nrow(pen_qs) > 0) {
+        pen_prefix    <- pen_qs$QuestionCode[1]
+        focal_pen_col <- .find_brand_col(data, pen_prefix, config$focal_brand)
+        if (!is.null(focal_pen_col)) {
+          vals   <- data[[focal_pen_col]]
+          db_pen <- as.integer(!is.na(vals) & vals > 0)
+        }
+      }
+
+      if (!is.null(linkage) && !is.null(db_cep_mat) && !is.null(db_pen)) {
+        cat_result$drivers_barriers <- tryCatch(
+          run_drivers_barriers(
+            linkage     = linkage,
+            cep_mat     = db_cep_mat,
+            pen         = db_pen,
+            focal_brand = config$focal_brand,
+            cep_labels  = if (!is.null(cat_ceps) && nrow(cat_ceps) > 0)
+              data.frame(CEPCode = cat_ceps$CEPCode,
+                         CEPText = cat_ceps$CEPText,
+                         stringsAsFactors = FALSE) else NULL
+          ),
+          error = function(e) {
+            warnings_list <<- c(warnings_list,
+              sprintf("Drivers & Barriers failed for %s: %s", cat_name, e$message))
+            list(status = "REFUSED", message = e$message)
+          }
+        )
+      } else {
+        if (verbose) cat("  Drivers & Barriers skipped: MA linkage or pen data unavailable.\n")
+      }
+    }
+
     category_results[[cat_name]] <- cat_result
   }
 
@@ -435,45 +526,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
     }
   }
 
-  # WOM
-  if (isTRUE(config$element_wom)) {
-    if (verbose) cat("\nRunning WOM (brand-level)...\n")
-
-    wom_qs <- get_questions_for_battery(structure, "wom")
-    if (!is.null(wom_qs) && nrow(wom_qs) > 0) {
-      # Get unique brand codes across all categories
-      all_brands <- unique(structure$brands$BrandCode)
-
-      # Find WOM column prefixes from question codes
-      pos_rec_qs <- wom_qs[grepl("POS.*REC|REC.*POS", wom_qs$QuestionCode,
-                                  ignore.case = TRUE), , drop = FALSE]
-      neg_rec_qs <- wom_qs[grepl("NEG.*REC|REC.*NEG", wom_qs$QuestionCode,
-                                  ignore.case = TRUE), , drop = FALSE]
-      pos_share_qs <- wom_qs[grepl("POS.*SHARE|SHARE.*POS|POS_S",
-                                    wom_qs$QuestionCode,
-                                    ignore.case = TRUE), , drop = FALSE]
-      neg_share_qs <- wom_qs[grepl("NEG.*SHARE|SHARE.*NEG|NEG_S",
-                                    wom_qs$QuestionCode,
-                                    ignore.case = TRUE), , drop = FALSE]
-
-      results$wom <- tryCatch(
-        run_wom(
-          data, all_brands,
-          received_pos_prefix = if (nrow(pos_rec_qs) > 0) pos_rec_qs$QuestionCode[1] else "WOM_POS_REC",
-          received_neg_prefix = if (nrow(neg_rec_qs) > 0) neg_rec_qs$QuestionCode[1] else "WOM_NEG_REC",
-          shared_pos_prefix = if (nrow(pos_share_qs) > 0) pos_share_qs$QuestionCode[1] else "WOM_POS_SHARE",
-          shared_neg_prefix = if (nrow(neg_share_qs) > 0) neg_share_qs$QuestionCode[1] else "WOM_NEG_SHARE",
-          focal_brand = config$focal_brand,
-          weights = weights
-        ),
-        error = function(e) {
-          warnings_list <<- c(warnings_list,
-            sprintf("WOM failed: %s", e$message))
-          list(status = "REFUSED", message = e$message)
-        }
-      )
-    }
-  }
+  # WOM is now per-category (see Step 4 above). No brand-level WOM.
 
   # --- STEP 6: Determine overall status ---
   elapsed <- proc.time()["elapsed"] - start_time
@@ -619,27 +672,7 @@ if (!exists(".find_brand_col", mode = "function")) {
   is_multi <- any(grepl("^funnel\\.[^.]+\\.[^.]+$", roles))
   if (!is_multi) return(qmap)  # Single-category map — use as-is
 
-  # Identify the suffix for this category by finding which
-  # funnel.awareness.* row has a ClientCode that resolves to the majority of
-  # expected brand columns (e.g. BRANDAWARE_DSS_IPK … BRANDAWARE_DSS_CKRDSS).
-  # Requiring a majority prevents false matches via brands shared across
-  # categories (e.g. IPK appears in all 9 categories, so a single-column check
-  # would always resolve to the first funnel category encountered).
-  aw_idx <- which(grepl("^funnel\\.awareness\\.[^.]+$", roles))
-  cat_suffix <- NULL
-  threshold  <- max(1L, floor(nrow(cat_brands) * 0.5))
-  for (i in aw_idx) {
-    cc  <- trimws(as.character(qmap$ClientCode[i]))
-    if (is.na(cc) || cc == "") next
-    if (nrow(cat_brands) == 0) next
-    expected_cols <- paste0(cc, "_", cat_brands$BrandCode)
-    n_found <- sum(expected_cols %in% names(data))
-    if (n_found >= threshold) {
-      parts <- strsplit(roles[i], "\\.")[[1]]
-      cat_suffix <- parts[length(parts)]
-      break
-    }
-  }
+  cat_suffix <- .detect_category_code(qmap, cat_brands, data)
 
   if (is.null(cat_suffix)) {
     # Cannot determine category suffix — return unchanged; funnel will refuse
@@ -647,6 +680,16 @@ if (!exists(".find_brand_col", mode = "function")) {
     return(qmap)
   }
 
+  .strip_cat_suffix_from_qmap(qmap, roles, cat_suffix)
+}
+
+
+#' Strip a category suffix from a QuestionMap and filter to that category
+#'
+#' Shared implementation for .normalize_questionmap_for_category() and callers
+#' that already know cat_suffix.
+#' @keywords internal
+.strip_cat_suffix_from_qmap <- function(qmap, roles, cat_suffix) {
   # Keep rows that either belong to this category's funnel group or are shared
   suffix_rx <- paste0("\\.", cat_suffix, "$")
   is_cat_funnel <- grepl(suffix_rx, roles)
@@ -661,6 +704,59 @@ if (!exists(".find_brand_col", mode = "function")) {
   result$Role[is_cat_funnel[keep]] <- sub(suffix_rx, "",
                                           result$Role[is_cat_funnel[keep]])
   result
+}
+
+
+#' Detect the short category code for a given brand list
+#'
+#' Inspects the QuestionMap's \code{funnel.awareness.*} rows and finds which
+#' suffix (e.g. "DSS") has the majority of its expected awareness columns
+#' (\code{{ClientCode}_{brand}}) present in the data. Returns NULL when no
+#' matching suffix is found (single-category studies, awareness-only cats).
+#'
+#' @param qmap Data frame. Raw QuestionMap from Survey_Structure.
+#' @param cat_brands Data frame. Brands for this category (BrandCode column).
+#' @param data Data frame. Survey data.
+#' @return Character scalar category code, or NULL.
+#' @keywords internal
+.detect_category_code <- function(qmap, cat_brands, data) {
+  if (is.null(qmap) || nrow(qmap) == 0) return(NULL)
+  if (is.null(cat_brands) || nrow(cat_brands) == 0) return(NULL)
+
+  roles     <- trimws(as.character(qmap$Role))
+  aw_idx    <- which(grepl("^funnel\\.awareness\\.[^.]+$", roles))
+  if (length(aw_idx) == 0) return(NULL)
+
+  threshold <- max(1L, floor(nrow(cat_brands) * 0.5))
+  for (i in aw_idx) {
+    cc <- trimws(as.character(qmap$ClientCode[i]))
+    if (is.na(cc) || cc == "") next
+    expected_cols <- paste0(cc, "_", cat_brands$BrandCode)
+    n_found <- sum(expected_cols %in% names(data))
+    if (n_found >= threshold) {
+      parts <- strsplit(roles[i], "\\.")[[1]]
+      return(parts[length(parts)])
+    }
+  }
+  NULL
+}
+
+
+#' Extract WOM question code prefix from a questions data frame
+#'
+#' Matches a WOM question by regex pattern and returns the QuestionCode (used
+#' as the column prefix e.g. "WOM_POS_REC"). Falls back to \code{default}
+#' if no match is found.
+#'
+#' @param wom_qs Data frame. Rows where Battery == "wom".
+#' @param pattern Character. Regex to match the QuestionCode.
+#' @param default Character. Fallback prefix.
+#' @return Character scalar.
+#' @keywords internal
+.wom_prefix <- function(wom_qs, pattern, default) {
+  rows <- wom_qs[grepl(pattern, wom_qs$QuestionCode, ignore.case = TRUE), ,
+                 drop = FALSE]
+  if (nrow(rows) > 0) rows$QuestionCode[1] else default
 }
 
 

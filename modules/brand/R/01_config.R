@@ -111,7 +111,7 @@ load_brand_config <- function(config_path, project_root = NULL) {
   # Parse element toggles to logical
   element_fields <- c("element_funnel", "element_mental_avail", "element_cep_turf",
                        "element_repertoire", "element_dba", "element_portfolio",
-                       "element_wom")
+                       "element_wom", "element_drivers_barriers")
   for (ef in element_fields) {
     config[[ef]] <- .parse_yn(config[[ef]], default = (ef != "element_dba"))
   }
