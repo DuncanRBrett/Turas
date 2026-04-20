@@ -530,6 +530,12 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
 
   results$categories <- category_results
 
+  # --- STEP 5a: Cross-category portfolio data (full 1200 respondents) ---
+  # Computes category usage and focal brand awareness from the FULL dataset,
+  # not from per-category filtered subsets.
+  results$portfolio <- .compute_portfolio_data(data, categories, structure,
+                                               config, weights)
+
   # --- STEP 5: Brand-level elements ---
 
   # DBA
@@ -821,6 +827,120 @@ if (!exists(".find_brand_col", mode = "function")) {
     `funnel.suppress_base`     = supp_b,
     `funnel.tenure_threshold`  = tenure,
     `funnel.significance_level` = alpha
+  )
+}
+
+
+# ==============================================================================
+# PORTFOLIO DATA (cross-category, full respondent base)
+# ==============================================================================
+
+#' Compute cross-category portfolio summary from full dataset
+#'
+#' Uses all respondents (not cat_data filtered) to compute:
+#' \itemize{
+#'   \item \code{cat_usage_pct} — proportion qualifying for each category
+#'     (SQ2_{cat_code} == 1, falling back to SQ1_{cat_code})
+#'   \item \code{brand_awareness} — named list of brand_code → awareness %
+#'     among qualifiers, for ALL brands in the category
+#' }
+#'
+#' @keywords internal
+.compute_portfolio_data <- function(data, categories, structure, config, weights) {
+  focal       <- config$focal_brand %||% ""
+  n_total     <- nrow(data)
+  total_w     <- if (!is.null(weights)) sum(weights, na.rm = TRUE) else n_total
+
+  # Helper: weighted proportion
+  .wprop <- function(vals, w, is_qual = NULL) {
+    if (!is.null(is_qual)) {
+      vals <- vals[is_qual]; w_use <- w[is_qual]
+    } else {
+      w_use <- w
+    }
+    denom <- sum(w_use, na.rm = TRUE)
+    if (denom <= 0) return(NA_real_)
+    sum(w_use * vals, na.rm = TRUE) / denom
+  }
+
+  rows <- lapply(seq_len(nrow(categories)), function(i) {
+    cat_name  <- categories$Category[i]
+    cat_depth <- trimws(as.character(
+      if ("Analysis_Depth" %in% names(categories)) categories$Analysis_Depth[i] else "full"
+    ))
+    if (is.na(cat_depth) || cat_depth == "") cat_depth <- "full"
+
+    # Detect short category code (e.g. "DSS") from QuestionMap
+    cat_brands <- tryCatch(
+      get_brands_for_category(structure, cat_name),
+      error = function(e) data.frame(BrandCode = character(0))
+    )
+    cat_code <- if (!is.null(structure$questionmap) && nrow(cat_brands) > 0)
+      .detect_category_code(structure$questionmap, cat_brands, data)
+    else NULL
+
+    # Category usage — % of all respondents who qualify (SQ2 then SQ1 fallback)
+    usage_pct <- NA_real_
+    is_qual   <- NULL
+    if (!is.null(cat_code)) {
+      for (sq_col in c(paste0("SQ2_", cat_code), paste0("SQ1_", cat_code))) {
+        if (sq_col %in% names(data)) {
+          sq_vals   <- as.integer(data[[sq_col]] == 1)
+          is_qual   <- sq_vals == 1
+          usage_pct <- if (!is.null(weights))
+            .wprop(sq_vals, weights)
+          else
+            mean(sq_vals, na.rm = TRUE)
+          break
+        }
+      }
+    }
+
+    # Brand awareness among qualifiers for ALL brands in this category
+    brand_awareness <- list()
+    if (!is.null(cat_code) && nrow(cat_brands) > 0) {
+      for (bi in seq_len(nrow(cat_brands))) {
+        bc     <- cat_brands$BrandCode[bi]
+        aw_col <- paste0("BRANDAWARE_", cat_code, "_", bc)
+        if (aw_col %in% names(data)) {
+          aw_vals <- as.integer(!is.na(data[[aw_col]]) & data[[aw_col]] == 1)
+          pct <- if (!is.null(weights)) {
+            if (!is.null(is_qual)) .wprop(aw_vals, weights, is_qual)
+            else .wprop(aw_vals, weights)
+          } else {
+            if (!is.null(is_qual)) mean(aw_vals[is_qual], na.rm = TRUE)
+            else mean(aw_vals, na.rm = TRUE)
+          }
+          brand_awareness[[bc]] <- pct
+        }
+      }
+    }
+
+    # All brand codes for this category (for the picker)
+    brand_codes <- if (nrow(cat_brands) > 0) as.character(cat_brands$BrandCode) else character(0)
+    brand_names <- if ("BrandName" %in% names(cat_brands))
+      as.character(cat_brands$BrandName) else brand_codes
+
+    list(
+      category           = cat_name,
+      analysis_depth     = cat_depth,
+      cat_code           = cat_code %||% "",
+      n_total            = n_total,
+      cat_usage_pct      = usage_pct,
+      brand_awareness    = brand_awareness,  # named list: BrandCode → pct
+      brand_codes        = brand_codes,
+      brand_names        = brand_names
+    )
+  })
+
+  # Collect all unique brand codes across all categories (for global picker)
+  all_brands <- unique(unlist(lapply(rows, `[[`, "brand_codes")))
+
+  list(
+    focal_brand  = focal,
+    n_total      = n_total,
+    categories   = rows,
+    all_brands   = all_brands
   )
 }
 

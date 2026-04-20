@@ -166,19 +166,39 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
                   "attitude.reject", "attitude.no_opinion")
   att_labels <- c("Love", "Prefer", "Ambivalent", "Reject", "No opinion")
 
-  # Category average per attitude (across all brands, % of aware base)
+  # After session-3 fix: brand$segments[[role]] = count / total_w = % of ALL respondents.
+  # "% total" base = segments[[role]] directly.
+  # "% aware" base = segments[[role]] * (n_total / aware_n) — scaled up to aware denominator.
   brands_all <- ordered
+
+  # Category avg: % of aware base (default display)
   cat_avg_aware <- vapply(att_roles, function(role) {
+    vals <- vapply(brands_all, function(b) {
+      pt <- as.numeric(b$segments[[role]] %||% NA_real_)
+      bn <- as.numeric(b$aware_base    %||% NA_real_)
+      if (!is.finite(pt) || !is.finite(bn) || !is.finite(n_total) || bn <= 0) NA_real_
+      else pt * (n_total / bn)
+    }, numeric(1))
+    vals <- vals[is.finite(vals)]
+    if (length(vals) == 0) NA_real_ else mean(vals)
+  }, numeric(1))
+
+  # Category avg: % of total base (for toggle)
+  cat_avg_total <- vapply(att_roles, function(role) {
     vals <- vapply(brands_all, function(b)
       as.numeric(b$segments[[role]] %||% NA_real_), numeric(1))
     vals <- vals[is.finite(vals)]
     if (length(vals) == 0) NA_real_ else mean(vals)
   }, numeric(1))
 
-  # Per-attitude column max for heatmap scaling (across all brands)
+  # Per-attitude column max calibrated to % aware (matches default display view)
   att_max <- vapply(att_roles, function(role) {
-    vals <- vapply(brands_all, function(b)
-      as.numeric(b$segments[[role]] %||% NA_real_), numeric(1))
+    vals <- vapply(brands_all, function(b) {
+      pt <- as.numeric(b$segments[[role]] %||% NA_real_)
+      bn <- as.numeric(b$aware_base    %||% NA_real_)
+      if (!is.finite(pt) || !is.finite(bn) || !is.finite(n_total) || bn <= 0) NA_real_
+      else pt * (n_total / bn)
+    }, numeric(1))
     vals <- vals[is.finite(vals) & vals > 0]
     if (length(vals) == 0) 1 else max(vals)
   }, numeric(1))
@@ -203,9 +223,13 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
     pct <- cat_avg_aware[[role]]
     if (!is.finite(pct))
       return('<td class="ct-td ct-data-col fn-rel-td-avg ct-na">&mdash;</td>')
+    total_attr <- {
+      pt <- cat_avg_total[[role]]
+      if (is.finite(pt)) sprintf(' data-fn-rel-pct-total="%.6f"', pt) else ""
+    }
     sprintf(
-      '<td class="ct-td ct-data-col fn-rel-td-avg" data-fn-att="%s" data-fn-rel-pct-aware="%.6f"><span class="ct-val">%.0f%%</span></td>',
-      .fn_esc(role), pct, 100 * pct)
+      '<td class="ct-td ct-data-col fn-rel-td-avg" data-fn-att="%s" data-fn-rel-pct-aware="%.6f"%s><span class="ct-val">%.0f%%</span></td>',
+      .fn_esc(role), pct, total_attr, 100 * pct)
   }, character(1)), collapse = "")
   avg_row <- paste0(
     '<tr class="ct-row fn-row-avg-all fn-rel-row">',
@@ -261,31 +285,36 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
   }
 
   att_cells <- paste(vapply(att_roles, function(role) {
-    pct_aware <- as.numeric(brand$segments[[role]] %||% NA_real_)
-    if (!is.finite(pct_aware))
+    # segments[[role]] = % of all category respondents (total base) after session-3 fix
+    pct_total <- as.numeric(brand$segments[[role]] %||% NA_real_)
+    if (!is.finite(pct_total))
       return(sprintf('<td class="ct-td ct-data-col%s ct-na">&mdash;</td>', focal_cls))
 
-    pct_total <- if (is.finite(aware_n) && is.finite(n_total) && n_total > 0)
-      pct_aware * (aware_n / n_total) else NA_real_
+    # Scale up to % of aware respondents
+    pct_aware <- if (is.finite(aware_n) && is.finite(n_total) && aware_n > 0)
+      pct_total * (n_total / aware_n) else NA_real_
 
+    # Heatmap colour calibrated to default display (% aware)
+    display_pct <- if (is.finite(pct_aware)) pct_aware else pct_total
     denom <- if (!is.finite(att_max[[role]]) || att_max[[role]] <= 0) 1 else att_max[[role]]
-    frac  <- min(1, max(0, pct_aware / denom))
+    frac  <- min(1, max(0, display_pct / denom))
     hm    <- sprintf("rgba(37,99,171,%.3f)", 0.08 + frac * 0.57)
 
-    total_attr     <- if (is.finite(pct_total))
-      sprintf(' data-fn-rel-pct-total="%.6f"', pct_total) else ""
-    count_aware    <- if (is.finite(aware_n))
-      sprintf(' data-fn-rel-count-aware="%d"', as.integer(round(pct_aware * aware_n))) else ""
-    count_total    <- if (is.finite(pct_total) && is.finite(n_total))
-      sprintf(' data-fn-rel-count-total="%d"', as.integer(round(pct_total * n_total))) else ""
+    aware_attr <- if (is.finite(pct_aware))
+      sprintf(' data-fn-rel-pct-aware="%.6f"', pct_aware) else ""
+    # Raw count: pct_total * n_total (same people, different denominator for %)
+    cnt_val <- if (is.finite(n_total))
+      as.integer(round(pct_total * n_total)) else NA_integer_
+    count_attrs <- if (!is.na(cnt_val))
+      sprintf(' data-fn-rel-count-total="%d" data-fn-rel-count-aware="%d"', cnt_val, cnt_val)
+    else ""
+    freq_span <- if (!is.na(cnt_val))
+      sprintf('<span class="ct-freq fn-pct-count">n=%d</span>', cnt_val) else ""
 
-    cnt_aware_val <- if (is.finite(pct_aware) && is.finite(aware_n))
-      as.integer(round(pct_aware * aware_n)) else NA_integer_
-    freq_span <- if (!is.na(cnt_aware_val))
-      sprintf('<span class="ct-freq fn-pct-count">n=%d</span>', cnt_aware_val) else ""
     sprintf(
-      '<td class="ct-td ct-data-col ct-heatmap-cell%s" data-heatmap="%s" data-fn-att="%s" data-fn-rel-pct-aware="%.6f"%s%s%s><span class="ct-val">%.0f%%</span>%s</td>',
-      focal_cls, hm, .fn_esc(role), pct_aware, total_attr, count_aware, count_total, 100 * pct_aware, freq_span)
+      '<td class="ct-td ct-data-col ct-heatmap-cell%s" data-heatmap="%s" data-fn-att="%s" data-fn-rel-pct-total="%.6f"%s%s><span class="ct-val">%.0f%%</span>%s</td>',
+      focal_cls, hm, .fn_esc(role), pct_total, aware_attr, count_attrs,
+      100 * display_pct, freq_span)
   }, character(1)), collapse = "")
 
   sprintf('<tr class="%s" data-fn-brand="%s">%s%s%s</tr>',

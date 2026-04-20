@@ -364,10 +364,15 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
 
 
 .fn_add_insight_strip <- function() {
-  '<div class="fn-add-insight-strip">
+  '<div class="fn-insight-strip fn-add-insight-strip">
      <button type="button" class="fn-add-insight-btn" data-fn-action="add-insight">
        + Add Insight
      </button>
+     <div class="fn-insight-box" style="display:none;margin-top:8px;">
+       <textarea class="fn-insight-textarea" rows="3"
+         placeholder="Enter your insight here\u2026"
+         style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-family:inherit;font-size:13px;color:#1e293b;resize:vertical;"></textarea>
+     </div>
    </div>'
 }
 

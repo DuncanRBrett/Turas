@@ -418,114 +418,185 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
 
 #' Build the portfolio optimisation panel
 #'
-#' Cross-category comparison table showing IPK's brand position across all
-#' categories in the study. Full categories show MA and funnel metrics;
-#' awareness-only categories show awareness only.
+#' Cross-category table using the FULL respondent base (all 1200), showing
+#' Category Usage (% qualifying) and Brand Awareness per category.
+#' A brand picker chip row lets the user select which brand's awareness to view.
+#' Per-category MA metrics (MMS/MPen/NS) are excluded.
 #'
 #' @keywords internal
 build_br_portfolio_panel <- function(results, config) {
-  focal <- config$focal_brand %||% ""
+  focal        <- config$focal_brand %||% ""
   brand_colour <- config$colour_focal %||% "#1A5276"
-  cats <- results$results$categories
-  if (is.null(cats) || length(cats) == 0)
-    return('<div class="br-panel" id="panel-portfolio"><div class="br-section"><p style="color:#94a3b8;padding:32px;text-align:center;">No category data available.</p></div></div>')
 
+  port_data <- results$results$portfolio
+  cats      <- results$results$categories
+
+  if ((is.null(port_data) || length(port_data$categories) == 0) &&
+      (is.null(cats) || length(cats) == 0)) {
+    return('<div class="br-panel" id="panel-portfolio"><div class="br-section"><p style="color:#94a3b8;padding:32px;text-align:center;">No category data available.</p></div></div>')
+  }
+
+  n_total    <- port_data$n_total %||% NA_integer_
   section_id <- "portfolio-overview"
+  port_rows  <- if (!is.null(port_data)) port_data$categories else list()
+
+  # Build global brand code -> name map from all category rows
+  brand_map <- list()
+  for (pr in port_rows) {
+    bcs <- pr$brand_codes %||% character(0)
+    bns <- pr$brand_names %||% bcs
+    for (bi in seq_along(bcs)) {
+      bc <- bcs[bi]
+      bn <- if (bi <= length(bns)) bns[bi] else bc
+      if (!bc %in% names(brand_map)) brand_map[[bc]] <- bn
+    }
+  }
+  all_bcs     <- names(brand_map)
+  others      <- sort(setdiff(all_bcs, focal))
+  ordered_bcs <- c(if (focal %in% all_bcs) focal else character(0), others)
+  active_bc   <- if (length(ordered_bcs) > 0L) ordered_bcs[1L] else ""
+  active_name <- if (nchar(active_bc) > 0L) (brand_map[[active_bc]] %||% active_bc) else "Brand"
+
+  # Encode brand_awareness named list as JSON for data attribute
+  .aw_json <- function(ba) {
+    if (is.null(ba) || length(ba) == 0L) return("{}")
+    pairs <- vapply(names(ba), function(bc) {
+      v <- ba[[bc]]
+      if (is.finite(v)) sprintf('"%s":%.6f', bc, v) else sprintf('"%s":null', bc)
+    }, character(1L))
+    paste0("{", paste(pairs, collapse = ","), "}")
+  }
+
   parts <- character(0)
   parts <- c(parts, '<div class="br-panel" id="panel-portfolio">')
   parts <- c(parts, '<div class="br-section">')
+  parts <- c(parts, '<h2 style="font-size:20px;color:#1e293b;margin:0 0 6px;">Portfolio Overview</h2>')
   parts <- c(parts, sprintf(
-    '<h2 style="font-size:20px;color:#1e293b;margin:0 0 6px;">Portfolio Overview</h2>'))
-  parts <- c(parts, sprintf(
-    '<p style="font-size:13px;color:#64748b;margin:0 0 20px;">Cross-category brand position for <strong>%s</strong>. Full categories show the complete CBM battery. Awareness-only categories contribute brand tracking data only.</p>',
-    .br_esc(focal)))
+    '<p style="font-size:13px;color:#64748b;margin:0 0 4px;">Cross-category reach. Based on all %s respondents.</p>',
+    if (!is.na(n_total)) format(n_total, big.mark = ",") else "all"))
+  parts <- c(parts, '<p style="font-size:11px;color:#94a3b8;margin:0 0 20px;">Category Usage = % of all respondents who qualify (screener SQ2). Brand Awareness = % of category qualifiers aware of the selected brand.</p>')
 
-  # --- Summary metrics table ---
-  parts <- c(parts, '<div class="br-element-section" id="section-portfolio-overview" data-section="portfolio-overview">')
+  parts <- c(parts, sprintf(
+    '<div class="br-element-section" id="section-%s" data-section="%s">',
+    section_id, section_id))
   parts <- c(parts, build_br_section_toolbar(section_id))
 
-  # Column headers
-  parts <- c(parts, '
+  # Brand picker chip row
+  if (length(ordered_bcs) > 0L) {
+    base_css   <- paste0("display:inline-block;padding:4px 12px;font-size:12px;font-weight:500;",
+                         "cursor:pointer;border:1px solid #e2e8f0;background:#f8fafc;color:#475569;",
+                         "border-radius:0;")
+    active_css <- paste0("display:inline-block;padding:4px 12px;font-size:12px;font-weight:500;",
+                         "cursor:pointer;border:1px solid ", brand_colour, ";background:", brand_colour,
+                         ";color:#fff;border-radius:0;")
+    n_chips <- length(ordered_bcs)
+    chips_html <- vapply(seq_len(n_chips), function(ci) {
+      bc   <- ordered_bcs[ci]
+      name <- .br_esc(brand_map[[bc]] %||% bc)
+      edge <- if (ci == 1L && n_chips == 1L) "border-radius:4px;" else
+              if (ci == 1L)     "border-radius:4px 0 0 4px;" else
+              if (ci == n_chips) "border-left:none;border-radius:0 4px 4px 0;" else
+              "border-left:none;"
+      css  <- if (bc == active_bc) paste0(active_css, edge) else paste0(base_css, edge)
+      sprintf('<button type="button" style="%s" data-br-port-brand="%s">%s</button>',
+              css, .br_esc(bc), name)
+    }, character(1L))
+
+    parts <- c(parts,
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap;">',
+      '<span style="font-size:12px;color:#64748b;white-space:nowrap;">Show awareness for:</span>',
+      sprintf('<div id="br-port-brand-picker" style="display:flex;flex-wrap:wrap;">%s</div>',
+              paste(chips_html, collapse = "")),
+      '</div>')
+  }
+
+  # Table
+  aware_hdr <- sprintf('%s Awareness', .br_esc(active_name))
+  parts <- c(parts, sprintf('
 <div style="overflow-x:auto;">
 <table class="br-table" data-sortable="true">
-<thead>
-<tr>
+<thead><tr>
   <th>Category</th>
   <th>Analysis</th>
-  <th>Awareness</th>
-  <th>MMS</th>
-  <th>MPen</th>
-  <th>NS</th>
-</tr>
-</thead>
-<tbody>')
+  <th style="text-align:right;">Category Usage</th>
+  <th id="br-port-aware-hdr" style="text-align:right;">%s</th>
+</tr></thead>
+<tbody>', aware_hdr))
 
-  for (cat_name in names(cats)) {
-    cr    <- cats[[cat_name]]
-    depth <- cr$analysis_depth %||% "full"
+  for (pr in port_rows) {
+    cat_name  <- pr$category       %||% ""
+    depth     <- pr$analysis_depth %||% "full"
+    usage_pct <- pr$cat_usage_pct
+    aw_map    <- pr$brand_awareness %||% list()
+    aw_json   <- .aw_json(aw_map)
 
-    awareness_str <- "\u2014"
-    mms_str       <- "\u2014"
-    mpen_str      <- "\u2014"
-    ns_str        <- "\u2014"
-
-    if (depth == "full") {
-      # Awareness from funnel metrics_summary
-      fn <- cr$funnel
-      if (!is.null(fn) && !identical(fn$status, "REFUSED") &&
-          !is.null(fn$metrics_summary$focal_by_stage$aware)) {
-        awareness_str <- sprintf("%.0f%%",
-          fn$metrics_summary$focal_by_stage$aware * 100)
-      }
-      # MA metrics
-      ma <- cr$mental_availability
-      if (!is.null(ma) && !identical(ma$status, "REFUSED")) {
-        ms <- ma$metrics_summary
-        if (!is.null(ms$focal_mms))  mms_str  <- sprintf("%.1f%%", ms$focal_mms * 100)
-        if (!is.null(ms$focal_mpen)) mpen_str <- sprintf("%.0f%%", ms$focal_mpen * 100)
-        if (!is.null(ms$focal_ns))   ns_str   <- sprintf("%.1f",   ms$focal_ns)
-      }
-    }
+    init_aw   <- aw_map[[active_bc]]
+    usage_str <- if (!is.null(usage_pct) && is.finite(usage_pct))
+      sprintf("%.0f%%", usage_pct * 100) else "\u2014"
+    aware_str <- if (!is.null(init_aw) && is.finite(init_aw))
+      sprintf("%.0f%%", init_aw * 100) else "\u2014"
 
     depth_badge <- if (depth == "full")
-      sprintf('<span style="background:#EBF5FB;color:%s;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:600;">Full</span>', brand_colour)
+      sprintf('<span style="background:#EBF5FB;color:%s;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:600;">Full</span>',
+              brand_colour)
     else
       '<span style="background:#f1f5f9;color:#94a3b8;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:500;">Awareness only</span>'
 
     row_style <- if (depth == "awareness_only") ' style="color:#94a3b8;"' else ""
+    fw        <- if (depth == "full") "600" else "400"
 
     parts <- c(parts, sprintf(
-      '<tr%s><td style="font-weight:%s;">%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>',
-      row_style,
-      if (depth == "full") "600" else "400",
-      .br_esc(cat_name),
-      depth_badge,
-      awareness_str, mms_str, mpen_str, ns_str))
+      "<tr%s data-br-port-awareness='%s'><td style=\"font-weight:%s;\">%s</td><td>%s</td><td style=\"text-align:right;\">%s</td><td class=\"br-port-aware-cell\" style=\"text-align:right;\">%s</td></tr>",
+      row_style, aw_json, fw, .br_esc(cat_name), depth_badge, usage_str, aware_str))
   }
 
   parts <- c(parts, '</tbody></table></div>')
 
-  # Metric legend
-  parts <- c(parts, '
-<div style="margin-top:12px;font-size:11px;color:#94a3b8;display:flex;gap:16px;flex-wrap:wrap;">
-  <span><strong>Awareness</strong> = % category buyers who have heard of the brand</span>
-  <span><strong>MMS</strong> = Mental Market Share (share of all brand-CEP links)</span>
-  <span><strong>MPen</strong> = Mental Penetration (% buyers linking \u22651 CEP)</span>
-  <span><strong>NS</strong> = Network Size (mean CEPs per linking buyer)</span>
-</div>')
+  # Inline JS for brand picker (only needed when there are multiple brands)
+  if (length(ordered_bcs) > 1L) {
+    parts <- c(parts, sprintf('
+<script>
+(function() {
+  var section = document.getElementById("section-%s");
+  if (!section) return;
+  var brandColour = "%s";
+  section.addEventListener("click", function(e) {
+    var chip = e.target;
+    if (!chip || !chip.hasAttribute("data-br-port-brand")) return;
+    var brand = chip.getAttribute("data-br-port-brand");
+    var brandName = chip.textContent.trim();
+    var picker = document.getElementById("br-port-brand-picker");
+    if (picker) {
+      picker.querySelectorAll("[data-br-port-brand]").forEach(function(c) {
+        var on = c === chip;
+        c.style.background  = on ? brandColour : "#f8fafc";
+        c.style.color       = on ? "#fff" : "#475569";
+        c.style.borderColor = on ? brandColour : "#e2e8f0";
+      });
+    }
+    var hdr = document.getElementById("br-port-aware-hdr");
+    if (hdr) hdr.textContent = brandName + " Awareness";
+    section.querySelectorAll("tr[data-br-port-awareness]").forEach(function(row) {
+      var map = {};
+      try { map = JSON.parse(row.getAttribute("data-br-port-awareness")); } catch(x) {}
+      var val = map[brand];
+      var cell = row.querySelector(".br-port-aware-cell");
+      if (cell) cell.textContent = (val != null && isFinite(val)) ? Math.round(val * 100) + "%%" : "\u2014";
+    });
+  });
+})();
+</script>', section_id, brand_colour))
+  }
 
   parts <- c(parts, '</div>')  # element-section
 
-  # --- Future sections placeholder ---
+  # Future sections placeholder
   parts <- c(parts, '
 <div class="br-element-section" style="margin-top:16px;">
   <h3 class="br-element-title">Portfolio Optimisation \u2014 Coming Soon</h3>
-  <p style="font-size:13px;color:#64748b;line-height:1.6;">
-    Future versions will add:
-  </p>
   <ul style="font-size:13px;color:#64748b;line-height:2;padding-left:20px;">
-    <li>Awareness-indexed MMS to compare mental availability efficiency across categories</li>
     <li>Category investment prioritisation matrix (market size \u00d7 brand strength)</li>
+    <li>Awareness-indexed MMS to compare mental availability efficiency across categories</li>
     <li>Cross-category CEP overlap analysis (which entry points span multiple categories)</li>
     <li>Portfolio growth opportunity scoring</li>
   </ul>

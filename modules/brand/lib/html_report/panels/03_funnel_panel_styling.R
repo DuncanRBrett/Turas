@@ -372,6 +372,14 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 }
 .fn-add-insight-btn:hover { color: var(--fn-brand); }
 
+/* Funnel inversion warning (% previous mode, nested > 100%) */
+.fn-inversion-warning {
+  background: rgba(220,38,38,0.08) !important;
+  outline: 1px solid rgba(220,38,38,0.40);
+  cursor: help;
+}
+.fn-inversion-warning .fn-pct-primary { color: #dc2626; font-weight: 700; }
+
 /* -------------------------------------------------------------------------- */
 /* RELATIONSHIP CHART SECTION                                                 */
 /* -------------------------------------------------------------------------- */

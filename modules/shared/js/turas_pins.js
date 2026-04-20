@@ -313,4 +313,55 @@
     return _pins;
   };
 
+  // ---------------------------------------------------------------------------
+  // TurasPin (singular) — lightweight adapter called by panel JS modules
+  // (brand_funnel_panel.js, brand_ma_panel.js) that pre-set data-pin-title /
+  // data-pin-footnote on the element before calling TurasPin.pin(el).
+  // ---------------------------------------------------------------------------
+  window.TurasPin = {
+    pin: function(el) {
+      if (typeof TurasPins === "undefined" || !TurasPins.add) return;
+      var title    = el.getAttribute("data-pin-title")    || el.id || "Pinned view";
+      var footnote = el.getAttribute("data-pin-footnote") || "";
+
+      var svg   = el.querySelector("svg");
+      var table = el.querySelector("table");
+
+      var chartSvg = "";
+      if (svg) {
+        var clone = svg.cloneNode(true);
+        var vb = svg.getAttribute("viewBox");
+        if (vb) {
+          var vbParts = vb.split(/\s+/);
+          if (vbParts.length >= 4) {
+            clone.setAttribute("width",  vbParts[2]);
+            clone.setAttribute("height", vbParts[3]);
+          }
+        }
+        chartSvg = clone.outerHTML;
+      }
+
+      var tableHtml = "";
+      if (table) {
+        tableHtml = (TurasPins.capturePortableHtml)
+          ? TurasPins.capturePortableHtml(table)
+          : table.outerHTML;
+      }
+
+      TurasPins.add({
+        sectionKey:  "pin-" + Date.now(),
+        title:       title,
+        chartSvg:    chartSvg,
+        tableHtml:   tableHtml,
+        insightText: footnote,
+        pinFlags: {
+          chart:   !!chartSvg,
+          table:   !!tableHtml,
+          insight: !!footnote
+        },
+        pinMode: "custom"
+      });
+    }
+  };
+
 })();
