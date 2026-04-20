@@ -58,9 +58,9 @@ for (f in brand_files) {
   structure_path <- file.path(tmp_dir, "Survey_Structure.xlsx")
   data_path <- file.path(tmp_dir, "survey_data.csv")
 
-  brands <- c("IPK", "MCCAIN", "FINDUS")
+  brands <- c("IPK", "ROB", "KNO")
   ceps <- paste0("CEP", sprintf("%02d", 1:5))
-  categories <- c("Frozen Vegetables")
+  categories <- c("Dry Seasonings & Spices")
 
   # --- Generate survey data ---
   data <- data.frame(
@@ -69,10 +69,10 @@ for (f in brand_files) {
   )
 
   for (brand in brands) {
-    size <- switch(brand, IPK = 0.7, MCCAIN = 0.5, FINDUS = 0.3)
+    size <- switch(brand, IPK = 0.7, ROB = 0.5, KNO = 0.3, 0.4)
 
     # Awareness
-    data[[paste0("AWARE_FV_", brand)]] <- rbinom(n_resp, 1, size)
+    data[[paste0("AWARE_DSS_", brand)]] <- rbinom(n_resp, 1, size)
 
     # CEP matrix (multi-mention: 1/0 per CEP per brand)
     for (cep in ceps) {
@@ -82,11 +82,11 @@ for (f in brand_files) {
 
     # Attitude (1-5 among aware)
     att <- rep(NA_integer_, n_resp)
-    aware <- data[[paste0("AWARE_FV_", brand)]]
+    aware <- data[[paste0("AWARE_DSS_", brand)]]
     for (r in which(aware == 1)) {
       att[r] <- sample(1:5, 1, prob = c(size * 0.3, 0.25, 0.2, 0.05, 0.2))
     }
-    data[[paste0("ATT_FV_", brand)]] <- att
+    data[[paste0("ATT_DSS_", brand)]] <- att
 
     # Penetration (among aware + positive)
     pen <- rep(0L, n_resp)
@@ -95,7 +95,7 @@ for (f in brand_files) {
         pen[r] <- rbinom(1, 1, size * 0.5)
       }
     }
-    data[[paste0("PEN_FV_", brand)]] <- pen
+    data[[paste0("PEN_DSS_", brand)]] <- pen
 
     # WOM
     data[[paste0("WOM_POS_REC_", brand)]] <- rbinom(n_resp, 1, 0.12)
@@ -128,7 +128,7 @@ for (f in brand_files) {
 
   openxlsx::addWorksheet(wb_cfg, "Categories")
   cats <- data.frame(
-    Category = "Frozen Vegetables",
+    Category = "Dry Seasonings & Spices",
     Type = "transaction",
     Timeframe_Long = "12 months",
     Timeframe_Target = "3 months",
@@ -151,8 +151,8 @@ for (f in brand_files) {
 
   openxlsx::addWorksheet(wb_ss, "Questions")
   questions <- data.frame(
-    QuestionCode = c("AWARE_FV", paste0("CEP0", 1:5),
-                     "ATT_FV", "PEN_FV",
+    QuestionCode = c("AWARE_DSS", paste0("CEP0", 1:5),
+                     "ATT_DSS", "PEN_DSS",
                      "WOM_POS_REC", "WOM_NEG_REC",
                      "WOM_POS_SHARE", "WOM_NEG_SHARE"),
     QuestionText = c("Brands heard of",
@@ -166,14 +166,14 @@ for (f in brand_files) {
     Battery = c("awareness", rep("cep_matrix", 5),
                 "attitude", "penetration",
                 rep("wom", 4)),
-    Category = c(rep("Frozen Vegetables", 8), rep("ALL", 4)),
+    Category = c(rep("Dry Seasonings & Spices", 8), rep("ALL", 4)),
     stringsAsFactors = FALSE
   )
   openxlsx::writeData(wb_ss, "Questions", questions)
 
   openxlsx::addWorksheet(wb_ss, "Options")
   openxlsx::writeData(wb_ss, "Options", data.frame(
-    QuestionCode = rep("ATT_FV", 5),
+    QuestionCode = rep("ATT_DSS", 5),
     OptionText = as.character(1:5),
     DisplayText = c("Love", "Prefer", "Ambivalent", "Reject", "No opinion"),
     DisplayOrder = 1:5, ShowInOutput = rep("Y", 5),
@@ -182,9 +182,9 @@ for (f in brand_files) {
 
   openxlsx::addWorksheet(wb_ss, "Brands")
   openxlsx::writeData(wb_ss, "Brands", data.frame(
-    Category = rep("Frozen Vegetables", 3),
-    BrandCode = c("IPK", "MCCAIN", "FINDUS"),
-    BrandLabel = c("IPK", "McCain", "Findus"),
+    Category = rep("Dry Seasonings & Spices", 3),
+    BrandCode = c("IPK", "ROB", "KNO"),
+    BrandLabel = c("IPK", "Robertsons", "Knorr"),
     DisplayOrder = 1:3,
     IsFocal = c("Y", "N", "N"),
     stringsAsFactors = FALSE
@@ -192,17 +192,18 @@ for (f in brand_files) {
 
   openxlsx::addWorksheet(wb_ss, "CEPs")
   openxlsx::writeData(wb_ss, "CEPs", data.frame(
-    Category = rep("Frozen Vegetables", 5),
+    Category = rep("Dry Seasonings & Spices", 5),
     CEPCode = ceps,
-    CEPText = paste("When I", c("want quick", "feed family",
-                                 "want healthy", "on budget", "entertain")),
+    CEPText = paste("When I", c("want great flavour", "cook for family",
+                                 "want healthy food", "cook on budget",
+                                 "entertain guests")),
     DisplayOrder = 1:5,
     stringsAsFactors = FALSE
   ))
 
   openxlsx::addWorksheet(wb_ss, "Attributes")
   openxlsx::writeData(wb_ss, "Attributes", data.frame(
-    Category = "Frozen Vegetables",
+    Category = "Dry Seasonings & Spices",
     AttrCode = "ATTR01", AttrText = "Good value",
     DisplayOrder = 1, stringsAsFactors = FALSE
   ))
@@ -215,7 +216,7 @@ for (f in brand_files) {
     Role = c("funnel.awareness", "funnel.attitude",
              "funnel.transactional.bought_target",
              "system.respondent.id"),
-    ClientCode = c("AWARE_FV", "ATT_FV", "PEN_FV", "Respondent_ID"),
+    ClientCode = c("AWARE_DSS", "ATT_DSS", "PEN_DSS", "Respondent_ID"),
     QuestionText = c("Which brands?", "Attitude?",
                      "Bought in last month?", "Respondent identifier"),
     QuestionTextShort = NA_character_,
@@ -273,7 +274,7 @@ test_that("run_brand includes Mental Availability results", {
   fixtures <- .create_integration_fixtures(tmp_dir)
   result <- run_brand(fixtures$config_path, verbose = FALSE)
 
-  cat_results <- result$results$categories[["Frozen Vegetables"]]
+  cat_results <- result$results$categories[["Dry Seasonings & Spices"]]
   expect_true(!is.null(cat_results$mental_availability))
 
   ma <- cat_results$mental_availability
@@ -294,7 +295,7 @@ test_that("run_brand includes Funnel results (role-registry architecture)", {
   fixtures <- .create_integration_fixtures(tmp_dir)
   result <- run_brand(fixtures$config_path, verbose = FALSE)
 
-  cat_results <- result$results$categories[["Frozen Vegetables"]]
+  cat_results <- result$results$categories[["Dry Seasonings & Spices"]]
   expect_true(!is.null(cat_results$funnel))
 
   funnel <- cat_results$funnel
@@ -314,7 +315,7 @@ test_that("run_brand includes Repertoire results", {
   fixtures <- .create_integration_fixtures(tmp_dir)
   result <- run_brand(fixtures$config_path, verbose = FALSE)
 
-  cat_results <- result$results$categories[["Frozen Vegetables"]]
+  cat_results <- result$results$categories[["Dry Seasonings & Spices"]]
   expect_true(!is.null(cat_results$repertoire))
 
   rep <- cat_results$repertoire
@@ -330,7 +331,7 @@ test_that("run_brand includes WOM results (per-category)", {
   result <- run_brand(fixtures$config_path, verbose = FALSE)
 
   # WOM is per-category (each category has its own brand list and respondent group)
-  cat_results <- result$results$categories[["Frozen Vegetables"]]
+  cat_results <- result$results$categories[["Dry Seasonings & Spices"]]
   expect_true(!is.null(cat_results$wom))
   wom <- cat_results$wom
   expect_true(wom$status %in% c("PASS", "PARTIAL", "REFUSED"))

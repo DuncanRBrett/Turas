@@ -407,8 +407,8 @@ guard_validate_data <- function(data, structure, config) {
   if (!is.null(structure$questions)) {
     question_codes <- structure$questions$QuestionCode
     for (qcode in question_codes) {
-      # Questions may map to multiple columns (e.g., BRANDAWARE_FV_IPK,
-      # BRANDAWARE_FV_MCCAIN). Check for prefix match.
+      # Questions may map to multiple columns (e.g., BRANDAWARE_DSS_IPK,
+      # BRANDAWARE_DSS_ROB). Check for prefix match.
       matching_cols <- grep(paste0("^", qcode), names(data), value = TRUE)
       if (length(matching_cols) == 0) {
         warnings <- c(warnings, sprintf(

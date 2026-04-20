@@ -102,8 +102,7 @@ build_br_tab_nav <- function(category_names, config) {
 
   if (isTRUE(config$element_dba))
     btns <- c(btns, '<button class="br-tab-btn" data-tab="dba" onclick="switchBrandTab(\'dba\')">Brand Assets</button>')
-  if (isTRUE(config$element_wom))
-    btns <- c(btns, '<button class="br-tab-btn" data-tab="wom" onclick="switchBrandTab(\'wom\')">Word-of-Mouth</button>')
+  # WOM is per-category (each category sub-tab). No top-level WOM tab.
   if (isTRUE(config$element_portfolio))
     btns <- c(btns, '<button class="br-tab-btn" data-tab="portfolio" onclick="switchBrandTab(\'portfolio\')">Portfolio</button>')
 
@@ -246,6 +245,9 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
     !identical(cat_results$mental_availability$status, "REFUSED")
   has_repertoire <- !is.null(cat_results$repertoire) &&
     !identical(cat_results$repertoire$status, "REFUSED")
+  has_wom <- !is.null(cat_results$wom) &&
+    !identical(cat_results$wom$status, "REFUSED") &&
+    !is.null(cat_results$wom$wom_metrics)
 
   # Build flat sub-tab list in the required display order.
   # Each entry: key (unique), label, subpanel (which .br-subpanel to show),
@@ -275,6 +277,12 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
                 subpanel = "rep", internal_tab = ""))
     )
   }
+  if (has_wom) {
+    flat_tabs <- c(flat_tabs,
+      list(list(key = "wom",             label = "Word of Mouth",
+                subpanel = "wom", internal_tab = ""))
+    )
+  }
 
   # Sub-tab navigation bar
   if (length(flat_tabs) > 0) {
@@ -298,6 +306,7 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
   if (has_funnel)     element_map[["fn"]]  <- "funnel"
   if (has_ma)         element_map[["ma"]]  <- "ma"
   if (has_repertoire) element_map[["rep"]] <- "repertoire"
+  if (has_wom)        element_map[["wom"]] <- "wom"
 
   for (sp_key in names(element_map)) {
     el        <- element_map[[sp_key]]
@@ -321,8 +330,43 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
         ' Ensure <code>02a_ma_panel_data.R</code> is sourced before calling',
         ' <code>generate_brand_html_report()</code>.',
         '</div>')
+    } else if (el == "wom") {
+      # WOM: per-category, rendered from charts + tables keyed as wom_{cat_id}
+      parts <- c(parts, build_br_section_toolbar(section_id))
+      wom_key <- paste0("wom_", cat_id)
+      parts <- c(parts, sprintf(
+        '<h3 class="br-element-title">Word of Mouth \u2014 %s</h3>',
+        .br_esc(cat_name)))
+      parts <- c(parts, '<p style="font-size:12px;color:#64748b;margin:0 0 12px;">',
+        'Percentage of category buyers who received or shared word-of-mouth about each brand ',
+        'in the study\'s recall timeframe.</p>')
+      if (!is.null(charts[[wom_key]])) {
+        for (ch in charts[[wom_key]]) {
+          parts <- c(parts, build_br_chart_wrapper(ch$svg, ch$title %||% ""))
+        }
+      }
+      if (!is.null(tables[[wom_key]])) {
+        parts <- c(parts, tables[[wom_key]])
+      }
+    } else if (el == "repertoire") {
+      # Category Buying: repertoire metrics with contextual header
+      parts <- c(parts, build_br_section_toolbar(section_id))
+      parts <- c(parts, sprintf(
+        '<h3 class="br-element-title">Category Buying \u2014 %s</h3>',
+        .br_esc(cat_name)))
+      parts <- c(parts, '<p style="font-size:12px;color:#64748b;margin:0 0 12px;">',
+        'Brand repertoire size, sole loyalty, and brand overlap among category buyers. ',
+        'Buying frequency analysis will be added in a future update.</p>')
+      if (!is.null(charts[[chart_key]])) {
+        for (ch in charts[[chart_key]]) {
+          parts <- c(parts, build_br_chart_wrapper(ch$svg, ch$title %||% ""))
+        }
+      }
+      if (!is.null(tables[[chart_key]])) {
+        parts <- c(parts, tables[[chart_key]])
+      }
     } else {
-      # Legacy path: repertoire and any future elements without a dedicated panel
+      # Legacy path: any future elements without a dedicated panel
       parts <- c(parts, build_br_section_toolbar(section_id))
       if (!is.null(charts[[chart_key]])) {
         for (ch in charts[[chart_key]]) {
@@ -338,6 +382,128 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
   }
 
   parts <- c(parts, '</div>')
+  paste(parts, collapse = "\n")
+}
+
+
+#' Build the portfolio optimisation panel
+#'
+#' Cross-category comparison table showing IPK's brand position across all
+#' categories in the study. Full categories show MA and funnel metrics;
+#' awareness-only categories show awareness only.
+#'
+#' @keywords internal
+build_br_portfolio_panel <- function(results, config) {
+  focal <- config$focal_brand %||% ""
+  brand_colour <- config$colour_focal %||% "#1A5276"
+  cats <- results$results$categories
+  if (is.null(cats) || length(cats) == 0)
+    return('<div class="br-panel" id="panel-portfolio"><div class="br-section"><p style="color:#94a3b8;padding:32px;text-align:center;">No category data available.</p></div></div>')
+
+  section_id <- "portfolio-overview"
+  parts <- character(0)
+  parts <- c(parts, '<div class="br-panel" id="panel-portfolio">')
+  parts <- c(parts, '<div class="br-section">')
+  parts <- c(parts, sprintf(
+    '<h2 style="font-size:20px;color:#1e293b;margin:0 0 6px;">Portfolio Overview</h2>'))
+  parts <- c(parts, sprintf(
+    '<p style="font-size:13px;color:#64748b;margin:0 0 20px;">Cross-category brand position for <strong>%s</strong>. Full categories show the complete CBM battery. Awareness-only categories contribute brand tracking data only.</p>',
+    .br_esc(focal)))
+
+  # --- Summary metrics table ---
+  parts <- c(parts, '<div class="br-element-section" id="section-portfolio-overview" data-section="portfolio-overview">')
+  parts <- c(parts, build_br_section_toolbar(section_id))
+
+  # Column headers
+  parts <- c(parts, '
+<div style="overflow-x:auto;">
+<table class="br-table" data-sortable="true">
+<thead>
+<tr>
+  <th>Category</th>
+  <th>Analysis</th>
+  <th>Awareness</th>
+  <th>MMS</th>
+  <th>MPen</th>
+  <th>NS</th>
+</tr>
+</thead>
+<tbody>')
+
+  for (cat_name in names(cats)) {
+    cr    <- cats[[cat_name]]
+    depth <- cr$analysis_depth %||% "full"
+
+    awareness_str <- "\u2014"
+    mms_str       <- "\u2014"
+    mpen_str      <- "\u2014"
+    ns_str        <- "\u2014"
+
+    if (depth == "full") {
+      # Awareness from funnel metrics_summary
+      fn <- cr$funnel
+      if (!is.null(fn) && !identical(fn$status, "REFUSED") &&
+          !is.null(fn$metrics_summary$focal_by_stage$aware)) {
+        awareness_str <- sprintf("%.0f%%",
+          fn$metrics_summary$focal_by_stage$aware * 100)
+      }
+      # MA metrics
+      ma <- cr$mental_availability
+      if (!is.null(ma) && !identical(ma$status, "REFUSED")) {
+        ms <- ma$metrics_summary
+        if (!is.null(ms$focal_mms))  mms_str  <- sprintf("%.1f%%", ms$focal_mms * 100)
+        if (!is.null(ms$focal_mpen)) mpen_str <- sprintf("%.0f%%", ms$focal_mpen * 100)
+        if (!is.null(ms$focal_ns))   ns_str   <- sprintf("%.1f",   ms$focal_ns)
+      }
+    }
+
+    depth_badge <- if (depth == "full")
+      sprintf('<span style="background:#EBF5FB;color:%s;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:600;">Full</span>', brand_colour)
+    else
+      '<span style="background:#f1f5f9;color:#94a3b8;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:500;">Awareness only</span>'
+
+    row_style <- if (depth == "awareness_only") ' style="color:#94a3b8;"' else ""
+
+    parts <- c(parts, sprintf(
+      '<tr%s><td style="font-weight:%s;">%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>',
+      row_style,
+      if (depth == "full") "600" else "400",
+      .br_esc(cat_name),
+      depth_badge,
+      awareness_str, mms_str, mpen_str, ns_str))
+  }
+
+  parts <- c(parts, '</tbody></table></div>')
+
+  # Metric legend
+  parts <- c(parts, '
+<div style="margin-top:12px;font-size:11px;color:#94a3b8;display:flex;gap:16px;flex-wrap:wrap;">
+  <span><strong>Awareness</strong> = % category buyers who have heard of the brand</span>
+  <span><strong>MMS</strong> = Mental Market Share (share of all brand-CEP links)</span>
+  <span><strong>MPen</strong> = Mental Penetration (% buyers linking \u22651 CEP)</span>
+  <span><strong>NS</strong> = Network Size (mean CEPs per linking buyer)</span>
+</div>')
+
+  parts <- c(parts, '</div>')  # element-section
+
+  # --- Future sections placeholder ---
+  parts <- c(parts, '
+<div class="br-element-section" style="margin-top:16px;">
+  <h3 class="br-element-title">Portfolio Optimisation \u2014 Coming Soon</h3>
+  <p style="font-size:13px;color:#64748b;line-height:1.6;">
+    Future versions will add:
+  </p>
+  <ul style="font-size:13px;color:#64748b;line-height:2;padding-left:20px;">
+    <li>Awareness-indexed MMS to compare mental availability efficiency across categories</li>
+    <li>Category investment prioritisation matrix (market size \u00d7 brand strength)</li>
+    <li>Cross-category CEP overlap analysis (which entry points span multiple categories)</li>
+    <li>Portfolio growth opportunity scoring</li>
+  </ul>
+</div>')
+
+  parts <- c(parts, '</div>')  # section
+  parts <- c(parts, '</div>')  # panel
+
   paste(parts, collapse = "\n")
 }
 
@@ -576,19 +742,11 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
     panel_parts <- c(panel_parts, '</div></div>')
   }
 
-  if (isTRUE(config$element_wom) && !is.null(results$results$wom)) {
-    wom_id <- "wom"
-    panel_parts <- c(panel_parts, sprintf(
-      '<div class="br-panel" id="panel-wom"><div class="br-element-section" id="section-%s" data-section="%s">%s',
-      wom_id, wom_id, build_br_section_toolbar(wom_id)))
-    if (!is.null(charts[["wom"]])) {
-      for (ch in charts[["wom"]]) {
-        panel_parts <- c(panel_parts, build_br_chart_wrapper(ch$svg, ch$title %||% ""))
-      }
-    }
-    if (!is.null(tables[["wom"]])) panel_parts <- c(panel_parts, tables[["wom"]])
-    panel_parts <- c(panel_parts, '</div></div>')
-  }
+  # WOM is now per-category (sub-tab inside each category panel).
+  # No brand-level WOM panel.
+
+  if (isTRUE(config$element_portfolio))
+    panel_parts <- c(panel_parts, build_br_portfolio_panel(results, config))
 
   panel_parts <- c(panel_parts, build_br_pinned_panel())
   panel_parts <- c(panel_parts, build_br_about_panel(config))

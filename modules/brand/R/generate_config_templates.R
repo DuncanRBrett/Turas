@@ -485,7 +485,7 @@ BRAND_CONFIG_VERSION <- "1.0"
 
 .build_categories_examples <- function() {
   list(
-    list(Category = "Frozen Vegetables", Type = "transaction",
+    list(Category = "Dry Seasonings & Spices", Type = "transaction",
          Timeframe_Long = "12 months", Timeframe_Target = "3 months",
          Focal_Weight = 0.25),
     list(Category = "Ready Meals", Type = "transaction",
@@ -569,22 +569,22 @@ BRAND_CONFIG_VERSION <- "1.0"
 
 .build_questions_examples <- function() {
   list(
-    list(QuestionCode = "BRANDAWARE_FV",
+    list(QuestionCode = "BRANDAWARE_DSS",
          QuestionText = "Which brands have you heard of?",
          VariableType = "Multi_Mention", Battery = "awareness",
-         Category = "Frozen Vegetables"),
-    list(QuestionCode = "BRANDATTR_FV_01",
-         QuestionText = "Good for a quick weeknight meal",
+         Category = "Dry Seasonings & Spices"),
+    list(QuestionCode = "BRANDATTR_DSS_01",
+         QuestionText = "Adds great flavour to food",
          VariableType = "Multi_Mention", Battery = "cep_matrix",
-         Category = "Frozen Vegetables"),
-    list(QuestionCode = "BRANDATTR_FV_16",
+         Category = "Dry Seasonings & Spices"),
+    list(QuestionCode = "BRANDATTR_DSS_16",
          QuestionText = "Good value for money",
          VariableType = "Multi_Mention", Battery = "attribute",
-         Category = "Frozen Vegetables"),
-    list(QuestionCode = "BRANDATT1_FV",
+         Category = "Dry Seasonings & Spices"),
+    list(QuestionCode = "BRANDATT1_DSS",
          QuestionText = "Brand attitude",
          VariableType = "Single_Mention", Battery = "attitude",
-         Category = "Frozen Vegetables"),
+         Category = "Dry Seasonings & Spices"),
     list(QuestionCode = "WOM_POS_REC",
          QuestionText = "Received positive WOM",
          VariableType = "Multi_Mention", Battery = "wom",
@@ -611,19 +611,19 @@ BRAND_CONFIG_VERSION <- "1.0"
 
 .build_options_examples <- function() {
   list(
-    list(QuestionCode = "BRANDATT1_FV", OptionText = "1",
+    list(QuestionCode = "BRANDATT1_DSS", OptionText = "1",
          DisplayText = "I love it / it's my favourite",
          DisplayOrder = 1, ShowInOutput = "Y"),
-    list(QuestionCode = "BRANDATT1_FV", OptionText = "2",
+    list(QuestionCode = "BRANDATT1_DSS", OptionText = "2",
          DisplayText = "It's among the ones I prefer",
          DisplayOrder = 2, ShowInOutput = "Y"),
-    list(QuestionCode = "BRANDATT1_FV", OptionText = "3",
+    list(QuestionCode = "BRANDATT1_DSS", OptionText = "3",
          DisplayText = "I wouldn't usually consider it, but I would if no other option",
          DisplayOrder = 3, ShowInOutput = "Y"),
-    list(QuestionCode = "BRANDATT1_FV", OptionText = "4",
+    list(QuestionCode = "BRANDATT1_DSS", OptionText = "4",
          DisplayText = "I would refuse to buy this brand",
          DisplayOrder = 4, ShowInOutput = "Y"),
-    list(QuestionCode = "BRANDATT1_FV", OptionText = "5",
+    list(QuestionCode = "BRANDATT1_DSS", OptionText = "5",
          DisplayText = "I have no opinion about this brand",
          DisplayOrder = 5, ShowInOutput = "Y")
   )
@@ -650,14 +650,14 @@ BRAND_CONFIG_VERSION <- "1.0"
 
 .build_brands_examples <- function() {
   list(
-    list(Category = "Frozen Vegetables", BrandCode = "IPK",
+    list(Category = "Dry Seasonings & Spices", BrandCode = "IPK",
          BrandLabel = "IPK", DisplayOrder = 1, IsFocal = "Y",
          Colour = "#1A5276"),
-    list(Category = "Frozen Vegetables", BrandCode = "MCCAIN",
-         BrandLabel = "McCain", DisplayOrder = 2, IsFocal = "N",
+    list(Category = "Dry Seasonings & Spices", BrandCode = "ROB",
+         BrandLabel = "Robertsons", DisplayOrder = 2, IsFocal = "N",
          Colour = ""),
-    list(Category = "Frozen Vegetables", BrandCode = "FINDUS",
-         BrandLabel = "Findus", DisplayOrder = 3, IsFocal = "N",
+    list(Category = "Dry Seasonings & Spices", BrandCode = "KNO",
+         BrandLabel = "Knorr", DisplayOrder = 3, IsFocal = "N",
          Colour = ""),
     list(Category = "Ready Meals", BrandCode = "IPK",
          BrandLabel = "IPK", DisplayOrder = 1, IsFocal = "Y",
@@ -684,11 +684,11 @@ BRAND_CONFIG_VERSION <- "1.0"
 
 .build_ceps_examples <- function() {
   list(
-    list(Category = "Frozen Vegetables", CEPCode = "CEP01",
+    list(Category = "Dry Seasonings & Spices", CEPCode = "CEP01",
          CEPText = "Good for a quick weeknight meal", DisplayOrder = 1),
-    list(Category = "Frozen Vegetables", CEPCode = "CEP02",
+    list(Category = "Dry Seasonings & Spices", CEPCode = "CEP02",
          CEPText = "Something the whole family enjoys", DisplayOrder = 2),
-    list(Category = "Frozen Vegetables", CEPCode = "CEP03",
+    list(Category = "Dry Seasonings & Spices", CEPCode = "CEP03",
          CEPText = "When I want a healthy option", DisplayOrder = 3)
   )
 }
@@ -709,9 +709,9 @@ BRAND_CONFIG_VERSION <- "1.0"
 
 .build_attributes_examples <- function() {
   list(
-    list(Category = "Frozen Vegetables", AttrCode = "ATTR01",
+    list(Category = "Dry Seasonings & Spices", AttrCode = "ATTR01",
          AttrText = "Good value for money", DisplayOrder = 1),
-    list(Category = "Frozen Vegetables", AttrCode = "ATTR02",
+    list(Category = "Dry Seasonings & Spices", AttrCode = "ATTR02",
          AttrText = "High quality ingredients", DisplayOrder = 2)
   )
 }

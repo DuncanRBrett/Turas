@@ -108,18 +108,25 @@ transform_brand_charts <- function(results, config) {
 
   # Brand-level charts
 
-  # 11. WOM diverging bar
-  wom <- results$results$wom
-  if (!is.null(wom) && !identical(wom$status, "REFUSED") && !is.null(wom$wom_metrics)) {
-    charts[["wom"]] <- list(
-      list(
-        svg = build_diverging_bar(wom$wom_metrics, "BrandCode",
-                                   "ReceivedPos_Pct", "ReceivedNeg_Pct",
-                                   focal, brand_colour,
-                                   title = "WOM Net Balance \u2014 Received"),
-        title = "WOM Net Balance"
-      )
-    )
+  # WOM is now per-category (each category has its own brand list and respondent group).
+  # Per-category WOM charts are keyed as wom_{cat_id} and rendered in the category panel.
+  if (!is.null(results$results$categories)) {
+    for (cat_name in names(results$results$categories)) {
+      cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
+      wom <- results$results$categories[[cat_name]]$wom
+      if (!is.null(wom) && !identical(wom$status, "REFUSED") &&
+          !is.null(wom$wom_metrics)) {
+        charts[[paste0("wom_", cat_id)]] <- list(
+          list(
+            svg = build_diverging_bar(wom$wom_metrics, "BrandCode",
+                                      "ReceivedPos_Pct", "ReceivedNeg_Pct",
+                                      focal, brand_colour,
+                                      title = sprintf("WOM Net Balance \u2014 %s", cat_name)),
+            title = "WOM Net Balance"
+          )
+        )
+      }
+    }
   }
 
   # 12. DBA Fame x Uniqueness grid
@@ -170,11 +177,15 @@ transform_brand_tables <- function(results, config) {
         tables[[paste0("funnel_", cat_id)]] <- build_funnel_tables(cr$funnel, focal)
       if (!is.null(cr$repertoire))
         tables[[paste0("repertoire_", cat_id)]] <- build_repertoire_tables(cr$repertoire, focal)
+      # WOM is per-category
+      if (!is.null(cr$wom) && !identical(cr$wom$status, "REFUSED"))
+        tables[[paste0("wom_", cat_id)]] <- build_wom_tables(cr$wom, focal)
+      # Drivers & Barriers is per-category
+      if (!is.null(cr$drivers_barriers) && !identical(cr$drivers_barriers$status, "REFUSED"))
+        tables[[paste0("db_", cat_id)]] <- build_db_tables(cr$drivers_barriers, focal)
     }
   }
 
-  if (!is.null(results$results$wom))
-    tables[["wom"]] <- build_wom_tables(results$results$wom, focal)
   if (!is.null(results$results$dba))
     tables[["dba"]] <- build_dba_tables(results$results$dba)
 
