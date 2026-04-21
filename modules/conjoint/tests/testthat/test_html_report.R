@@ -580,9 +580,11 @@ test_that("page builder export bar has all buttons", {
   if (!exists(".build_export_bar", mode = "function")) skip(".build_export_bar not loaded")
 
   bar <- .build_export_bar("overview")
-  expect_true(grepl("exportCSV", bar, fixed = TRUE))
+  expect_true(grepl("exportCSV",   bar, fixed = TRUE))
   expect_true(grepl("exportExcel", bar, fixed = TRUE))
-  expect_true(grepl("exportChartPNG", bar, fixed = TRUE))
+  # Combined PNG export replaces separate Chart PNG / Slide PNG buttons
+  expect_true(grepl("exportPNG",   bar, fixed = TRUE))
+  expect_true(grepl("Export PNG",  bar, fixed = TRUE))
 })
 
 

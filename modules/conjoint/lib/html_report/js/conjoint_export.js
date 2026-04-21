@@ -309,6 +309,25 @@
   };
 
 
+  // === COMBINED EXPORT PNG (Chart + Slide chooser) ===
+
+  /**
+   * Show checkbox popover so the user can choose Chart PNG, Slide PNG, or both.
+   * @param {string} panelId - Panel identifier passed to exportChartPNG/exportSlidePNG
+   * @param {HTMLElement} btnEl - The button that was clicked (anchors the popover)
+   */
+  window.exportPNG = function(panelId, btnEl) {
+    var checkboxes = [
+      { key: "chart", label: "Chart PNG", available: true, checked: true },
+      { key: "slide", label: "Slide PNG", available: true, checked: true }
+    ];
+    TurasPins.showCheckboxPopover(btnEl, checkboxes, function(flags) {
+      if (flags.chart) exportChartPNG(panelId);
+      if (flags.slide) exportSlidePNG(panelId);
+    }, null, { title: "EXPORT AS PNG", actionLabel: "Export" });
+  };
+
+
   // === SVG TO PNG UTILITY ===
 
   function svgToPNG(svgElement, scale, callback) {

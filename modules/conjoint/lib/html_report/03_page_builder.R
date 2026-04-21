@@ -1415,8 +1415,7 @@ build_simulator_panel <- function(html_data, brand) {
   sim_export <- '<div class="cj-export-bar">
 <button class="cj-export-btn" onclick="exportSimulatorCSV()">CSV</button>
 <button class="cj-export-btn" onclick="exportSimulatorExcel()">Excel</button>
-<button class="cj-export-btn" onclick="exportChartPNG(\'simulator\')">Chart PNG</button>
-<button class="cj-export-btn" onclick="exportSlidePNG(\'simulator\')">Slide PNG</button>
+<button class="cj-export-btn" onclick="exportPNG(\'simulator\', this)">Export PNG</button>
 </div>'
 
   insight <- build_insight_area("simulator", html_data$insights)
@@ -1731,10 +1730,9 @@ build_insight_area <- function(tab_id, insights = list()) {
     '<div class="cj-export-bar">
 <button class="cj-export-btn" onclick="exportCSV(\'%s\')">CSV</button>
 <button class="cj-export-btn" onclick="exportExcel(\'%s\')">Excel</button>
-<button class="cj-export-btn" onclick="exportChartPNG(\'%s\')">Chart PNG</button>
-<button class="cj-export-btn" onclick="exportSlidePNG(\'%s\')">Slide PNG</button>
+<button class="cj-export-btn" onclick="exportPNG(\'%s\', this)">Export PNG</button>
 </div>',
-    panel_id, panel_id, panel_id, panel_id
+    panel_id, panel_id, panel_id
   )
 }
 
