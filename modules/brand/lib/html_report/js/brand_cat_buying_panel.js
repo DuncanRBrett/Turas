@@ -109,6 +109,7 @@
     bindCbEmphasisChips(panel);
     bindCbBrandsFocusSelect(panel);
     bindCbBrandsChartCol(panel);
+    relocateCbToolbarIntoControls(panel);
 
     renderCbStackedBars(panel, 'loyalty');
     renderCbStackedBars(panel, 'dist');
@@ -124,6 +125,30 @@
       }, { root: null, threshold: 0.01 });
       panel.querySelectorAll('.fn-rel-chart-area').forEach(function (s) { io.observe(s); });
     }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Relocate section toolbar pin+export into the Brand Summary controls bar */
+  /* ---------------------------------------------------------------------- */
+
+  function relocateCbToolbarIntoControls(panel) {
+    var section = panel.closest('.br-element-section');
+    if (!section) return;
+    var toolbar = section.querySelector(':scope > .cb-toolbar-top');
+    if (!toolbar || toolbar.__cbRelocated) return;
+    var controls = panel.querySelector(
+      '.cb-controls-bar[data-cb-scope="brands"]');
+    if (!controls) return;
+    var pinBtn    = toolbar.querySelector('.br-pin-btn');
+    var exportBtn = toolbar.querySelector('.br-export-btn');
+    if (!pinBtn && !exportBtn) return;
+    var wrap = document.createElement('span');
+    wrap.className = 'cb-toolbar-relocated';
+    if (pinBtn)    wrap.appendChild(pinBtn);
+    if (exportBtn) wrap.appendChild(exportBtn);
+    controls.appendChild(wrap);
+    toolbar.style.display = 'none';
+    toolbar.__cbRelocated = true;
   }
 
   /* ---------------------------------------------------------------------- */
@@ -591,6 +616,16 @@
       : btn.getAttribute('data-brand');
     var focalColour = panel.dataset.focalColour || '#1A5276';
 
+    /* Capture the previous focal BEFORE any class mutations below
+       (section 3 strips focal-row from non-new-focal rows, which would
+        otherwise hide which row was the outgoing focal). */
+    var prevFocal = (panel.__cbData && panel.__cbData.focalBrand) || null;
+    if (!prevFocal) {
+      var prevFocalRow = panel.querySelector(
+        '.cb-brand-freq-table tbody tr.focal-row[data-brand]');
+      if (prevFocalRow) prevFocal = prevFocalRow.getAttribute('data-brand');
+    }
+
     /* 2. Re-colour SVG elements (legacy server-side charts) */
     var MUTED = '#94a3b8';
     panel.querySelectorAll('g[data-brand]').forEach(function (g) {
@@ -613,7 +648,9 @@
     });
 
     /* 3b. Brand Performance Summary: new focal to row 1, demoted focal to
-          sortable section (below cat-avg row), FOCAL badge swapped. */
+          sortable section (below cat-avg row), FOCAL badge swapped.
+          Uses prevFocal (captured above) — do NOT rely on the focal-row
+          class here because section 3 already stripped it. */
     panel.querySelectorAll('.cb-brand-freq-table').forEach(function (table) {
       var tbody  = table.querySelector('tbody');
       if (!tbody) return;
@@ -621,9 +658,8 @@
 
       /* First pass: update classes + badges */
       tbody.querySelectorAll('tr[data-brand]').forEach(function (tr) {
-        var bc       = tr.getAttribute('data-brand');
-        var isFocal  = bc === brandCode;
-        var wasFocal = tr.classList.contains('focal-row');
+        var bc      = tr.getAttribute('data-brand');
+        var isFocal = bc === brandCode;
         tr.classList.toggle('focal-row',     isFocal);
         tr.classList.toggle('cbp-brand-row', !isFocal);
 
@@ -639,27 +675,26 @@
         } else if (!isFocal && badge) {
           badge.parentNode.removeChild(badge);
         }
-        /* Tag demoted focal so we can place it after the cat-avg row below */
-        tr.__cbWasFocal = wasFocal && !isFocal;
       });
 
-      /* Second pass: position rows */
-      tbody.querySelectorAll('tr[data-brand]').forEach(function (tr) {
-        var bc      = tr.getAttribute('data-brand');
-        var isFocal = bc === brandCode;
-        if (isFocal) {
-          if (avgRow) tbody.insertBefore(tr, avgRow);
-          else        tbody.insertBefore(tr, tbody.firstChild);
-        } else if (tr.__cbWasFocal) {
-          /* Demoted focal — move directly below cat-avg row */
-          if (avgRow && avgRow.nextSibling) {
-            tbody.insertBefore(tr, avgRow.nextSibling);
-          } else {
-            tbody.appendChild(tr);
-          }
+      /* Second pass: position rows.
+         Demoted-focal identity comes from prevFocal, not from a class. */
+      var newFocalRow = tbody.querySelector('tr[data-brand="' + brandCode + '"]');
+      var demotedRow  = (prevFocal && prevFocal !== brandCode)
+        ? tbody.querySelector('tr[data-brand="' + prevFocal + '"]')
+        : null;
+
+      if (newFocalRow) {
+        if (avgRow) tbody.insertBefore(newFocalRow, avgRow);
+        else        tbody.insertBefore(newFocalRow, tbody.firstChild);
+      }
+      if (demotedRow) {
+        if (avgRow && avgRow.nextSibling) {
+          tbody.insertBefore(demotedRow, avgRow.nextSibling);
+        } else {
+          tbody.appendChild(demotedRow);
         }
-        tr.__cbWasFocal = false;
-      });
+      }
     });
 
     /* 4. Update KPI chips from embedded JSON */

@@ -334,9 +334,15 @@ paste0(
   color: #fff; cursor: pointer; transition: all 0.12s; font-weight: 500;
 }
 .col-chip:hover { filter: brightness(0.88); }
-.col-chip.col-chip-off {
-  background: #f1f5f9 !important; color: #94a3b8 !important;
+.col-chip.col-chip-off,
+.cb-panel .col-chip-bar .fn-rel-brand-chip.col-chip-off,
+.cb-panel .col-chip-bar .fn-rel-brand-chip.col-chip-off.active {
+  background: #f1f5f9 !important;
+  background-color: #f1f5f9 !important;
+  color: #94a3b8 !important;
   border-color: #e2e8f0 !important;
+  text-decoration: line-through !important;
+  opacity: 0.6 !important;
 }
 .ma-chip-row, .col-chip-bar {
   display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
@@ -354,6 +360,28 @@ paste0(
 .cb-emphasis-row {
   display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px;
   margin: 10px 0 8px; font-size: 11px; color: #64748b;
+}
+
+/* Info callout (column definitions) */
+.cb-panel details.cb-info-callout {
+  margin: 6px 0 12px; background: #f8fafc;
+  border: 1px solid #e2e8f0; border-radius: 8px;
+  padding: 6px 12px; font-size: 12px; color: #334155;
+}
+.cb-panel details.cb-info-callout > summary {
+  cursor: pointer; font-weight: 600; color: #1a2744;
+  list-style: none; padding: 4px 0;
+}
+.cb-panel details.cb-info-callout > summary::-webkit-details-marker { display: none; }
+.cb-panel details.cb-info-callout[open] > summary { margin-bottom: 4px; }
+.cb-panel details.cb-info-callout .cb-info-body ul {
+  margin: 4px 0 6px 18px; padding: 0; line-height: 1.55;
+}
+.cb-panel details.cb-info-callout .cb-info-body li { margin: 2px 0; }
+
+/* Toolbar-relocated pin/export buttons inside the brands controls bar */
+.cb-panel .cb-controls-bar .cb-toolbar-relocated {
+  margin-left: auto; display: inline-flex; gap: 6px; align-items: center;
 }
 
 /* Brand Attitude-style table used for Loyalty & Distribution tabs */

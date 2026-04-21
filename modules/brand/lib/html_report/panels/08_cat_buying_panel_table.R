@@ -470,22 +470,6 @@ cb_brand_freq_scr_table_html <- function(norms_table,
     body_rows <- c(body_rows, .row_html(row, "cbp-brand-row", .cb_esc(lbl)))
   }
 
-  vol_note <- if (!is.na(cat_mean_purch))
-    sprintf("Vol share = (Pen \u00d7 Avg purch.) \u00f7 %.1f (category mean). ",
-            cat_mean_purch)
-  else "Vol share requires category mean purchases. "
-
-  footer_html <- sprintf(paste0(
-    '<tfoot><tr><td colspan="6" class="cb-perf-foot">%s</td></tr></tfoot>'),
-    .cb_esc(paste0(
-      "Pen = % of respondents who bought the brand (BRANDPEN3, reconciled). ",
-      "Avg purch. = mean times bought per brand buyer. ",
-      "SCR obs = share of category requirement (loyalty). ",
-      vol_note,
-      "CI band on Category avg = \u00b11 SD across brands. ",
-      "Heatmap: green = above upper CI band, red = below lower CI band, amber = inside the band. ",
-      "Click a column header to sort brands.")))
-
   paste(c(
     '<div class="cb-brand-freq-wrap">',
     sprintf('<table class="cb-brand-freq-table" id="%s" data-cb-heatmap="off">', tbl_id),
@@ -493,7 +477,6 @@ cb_brand_freq_scr_table_html <- function(norms_table,
     '<tbody>',
     body_rows,
     '</tbody>',
-    footer_html,
     '</table></div>'
   ), collapse = "\n")
 }

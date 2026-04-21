@@ -98,12 +98,6 @@ render_cat_buying_panel <- function(panel_data) {
     '<div class="cb-panel cb-on-context" id="%s" data-focal-colour="%s" style="--cb-focal-colour:%s;">',
     panel_id, .cb_esc(fcol), .cb_esc(fcol)))
 
-  subtitle <- sprintf(
-    "Target timeframe: last %d months \u00b7 Longer timeframe: last %d months",
-    t_months, l_months)
-  parts <- c(parts, sprintf(
-    '<p class="cb-subtitle" style="margin-top:0;">%s</p>', .cb_esc(subtitle)))
-
   # JSON: per-brand KPI data for focal switcher
   parts <- c(parts, .cb_kpi_json_script(dn, bh, cat_code))
 
@@ -175,9 +169,6 @@ render_cat_buying_panel <- function(panel_data) {
   parts <- c(parts, '<div class="cb-subtab" data-cb-tab="dop" hidden>')
   parts <- c(parts, .cb_dop_tab(rep, focal, brand_labels))
   parts <- c(parts, '</div>')
-
-  # Limitations footer
-  parts <- c(parts, .cb_limitations_footer(t_months))
 
   parts <- c(parts, '</div>') # close .cb-panel
   paste(parts, collapse = "\n")
@@ -257,6 +248,29 @@ render_cat_buying_panel <- function(panel_data) {
   has_dn <- !is.null(dn) && !identical(dn$status, "REFUSED")
   has_bh <- !is.null(bh) && !identical(bh$status, "REFUSED")
 
+  # Info callout — column definitions & how to read the table
+  cat_mean_purch <- if (has_dn && !is.null(dn$category_metrics$mean_purchases))
+    dn$category_metrics$mean_purchases else NA_real_
+  vol_note <- if (!is.na(cat_mean_purch))
+    sprintf("<strong>Vol share</strong> = (Pen \u00d7 Avg purch.) \u00f7 %.1f (category mean).",
+            cat_mean_purch)
+  else "<strong>Vol share</strong> requires category mean purchases."
+  parts <- c(parts, paste0(
+    '<details class="cb-info-callout" data-cb-scope="brands">',
+    '<summary>&#9432; How to read this table</summary>',
+    '<div class="cb-info-body">',
+    '<ul>',
+    '<li><strong>Pen</strong> = % of respondents who bought the brand (BRANDPEN3, reconciled).</li>',
+    '<li><strong>Avg purch.</strong> = mean times bought per brand buyer.</li>',
+    '<li><strong>SCR obs</strong> = share of category requirement (loyalty).</li>',
+    '<li>', vol_note, '</li>',
+    '<li><strong>CI band</strong> on Category avg = \u00b11 SD across brands.</li>',
+    '<li><strong>Heatmap</strong>: green = above upper CI band, red = below lower CI band, amber = inside the band.</li>',
+    '<li>Click a column header to sort brands.</li>',
+    '</ul>',
+    '</div>',
+    '</details>'))
+
   # Controls bar: show chart + show heatmap (both off by default)
   parts <- c(parts,
     '<div class="cb-controls-bar" data-cb-scope="brands">',
@@ -268,8 +282,20 @@ render_cat_buying_panel <- function(panel_data) {
     '  </label>',
     '</div>')
 
-  # Chart placeholder (hidden until Show chart is checked).
-  # Column selector + single bar chart below.
+  if (has_dn && exists("cb_brand_freq_scr_table_html", mode = "function")) {
+    parts <- c(parts, cb_brand_freq_scr_table_html(
+      dn$norms_table,
+      focal_brand      = focal,
+      brand_labels     = brand_labels,
+      brand_heaviness  = if (has_bh) bh$brand_heaviness else NULL,
+      category_metrics = dn$category_metrics,
+      target_months    = t_months))
+  } else if (!has_dn) {
+    parts <- c(parts, .cb_refused_block(dn, "Brand performance summary"))
+  }
+
+  # Chart placeholder (hidden until Show chart is checked) — BELOW the table.
+  # Column selector + single bar chart.
   parts <- c(parts,
     '<div class="cb-brands-chart-area" data-cb-scope="brands" hidden>',
     '  <div class="cb-brands-chart-ctl">',
@@ -284,17 +310,6 @@ render_cat_buying_panel <- function(panel_data) {
     '  <div class="cb-brands-chart" data-cb-brands-chart="brands"></div>',
     '</div>')
 
-  if (has_dn && exists("cb_brand_freq_scr_table_html", mode = "function")) {
-    parts <- c(parts, cb_brand_freq_scr_table_html(
-      dn$norms_table,
-      focal_brand      = focal,
-      brand_labels     = brand_labels,
-      brand_heaviness  = if (has_bh) bh$brand_heaviness else NULL,
-      category_metrics = dn$category_metrics,
-      target_months    = t_months))
-  } else if (!has_dn) {
-    parts <- c(parts, .cb_refused_block(dn, "Brand performance summary"))
-  }
   paste(parts, collapse = "\n")
 }
 
@@ -868,15 +883,6 @@ render_cat_buying_panel <- function(panel_data) {
           .cb_esc(label),
           .cb_esc(elem$message %||% ""),
           .cb_esc(elem$code    %||% ""))
-}
-
-
-.cb_limitations_footer <- function(t_months) {
-  sprintf(
-    '<div style="margin:20px 0 8px;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;font-size:10px;color:#94a3b8;line-height:1.6;">
-<strong>Limitations &amp; notes:</strong> Dirichlet expected values assume a stationary category over the target timeframe (%dm). Growing or declining categories produce systematic deviations. BRANDPEN3 is stated recall, subject to telescoping and omission. Winsorisation at 99th percentile \u00d7 3 mitigates extreme outliers. For categories with &lt; 4 brands, estimates are flagged as PARTIAL. <strong>Penetration note:</strong> Penetration here may differ from the Brand Funnel by 1\u20133pp because purchase count reconciliation promotes respondents who reported any BRANDPEN3 purchases to buyer status.
-</div>',
-    t_months)
 }
 
 

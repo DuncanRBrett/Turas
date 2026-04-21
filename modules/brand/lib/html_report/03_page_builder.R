@@ -356,12 +356,42 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
       cb_panel_key <- paste0("cat_buying_", cat_id)
 
       if (!is.null(panels[[cb_panel_key]])) {
-        # New Dirichlet panel — self-contained HTML fragment
-        parts <- c(parts, build_br_section_toolbar(section_id))
-        parts <- c(parts, sprintf(
-          '<h3 class="br-element-title">Category Buying \u2014 %s</h3>',
-          .br_esc(cat_name)))
+        # New Dirichlet panel — self-contained HTML fragment.
+        # Layout overrides (per design request):
+        #   - Pin + Export emitted at top with class cb-toolbar-top so JS can
+        #     relocate them into the Brand Summary controls bar (right side).
+        #   - No redundant h3 title or timeframe subtitle.
+        #   - +Add Insight button moved BELOW the panel, full width.
+        parts <- c(parts, sprintf('
+<div class="br-section-toolbar cb-toolbar-top" data-section="%s" style="display:flex;gap:8px;margin-bottom:12px;">
+  <button class="br-pin-btn" data-section="%s" onclick="brTogglePin(\'%s\')" title="Pin to Views"
+    style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:15px;padding:5px 10px;color:#94a3b8;transition:all 0.15s;">
+    &#x1F4CC;
+  </button>
+  <button class="br-export-btn" onclick="_brExportPanel(\'%s\')" title="Export Excel"
+    style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;padding:5px 10px;color:#64748b;">
+    &#x1F4E5; Export
+  </button>
+</div>',
+          section_id, section_id, section_id, section_id))
         parts <- c(parts, panels[[cb_panel_key]])
+        parts <- c(parts, sprintf('
+<div class="cb-insight-footer" style="margin-top:20px;">
+  <button class="br-insight-toggle" onclick="_brToggleInsight(\'%s\')"
+    style="width:100%%;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:13px;padding:10px 14px;color:#334155;background:#f8fafc;font-weight:600;">
+    + Add Insight
+  </button>
+  <div class="br-insight-container" data-section="%s" style="display:none;margin-top:12px;position:relative;">
+    <textarea class="br-insight-editor" data-section="%s" placeholder="Type key insight here..."
+      style="width:100%%;min-height:60px;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-family:inherit;font-size:13px;resize:vertical;"></textarea>
+    <div class="br-insight-rendered" data-section="%s" ondblclick="_brToggleInsightEdit(\'%s\')"
+      style="display:none;padding:10px;border:1px solid #e2e8f0;border-radius:6px;min-height:40px;cursor:pointer;font-size:13px;line-height:1.5;"></div>
+    <button class="br-insight-dismiss" onclick="_brDismissInsight(\'%s\')"
+      style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px;position:absolute;top:4px;right:8px;">&times;</button>
+  </div>
+</div>',
+          section_id, section_id, section_id, section_id,
+          section_id, section_id))
       } else {
         # Legacy fallback: frequency KPI strip + SVG charts + legacy tables
         parts <- c(parts, build_br_section_toolbar(section_id))
