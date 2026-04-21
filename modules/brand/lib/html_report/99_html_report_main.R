@@ -138,16 +138,16 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
       sep = "\n")
   }
   if (exists("build_ma_panel_styles", mode = "function")) {
-    panel_styles <- paste(panel_styles,
-      tryCatch(build_ma_panel_styles(brand_colour_cfg),
-               error = function(e) ""),
-      sep = "\n")
+    css <- tryCatch(build_ma_panel_styles(brand_colour_cfg), error = function(e) "")
+    if (nzchar(trimws(css)))
+      panel_styles <- paste(panel_styles,
+        paste0('<style class="ma-panel-styles">', css, '</style>'), sep = "\n")
   }
   if (exists("build_portfolio_panel_styles", mode = "function")) {
-    panel_styles <- paste(panel_styles,
-      tryCatch(build_portfolio_panel_styles(brand_colour_cfg),
-               error = function(e) ""),
-      sep = "\n")
+    css <- tryCatch(build_portfolio_panel_styles(brand_colour_cfg), error = function(e) "")
+    if (nzchar(trimws(css)))
+      panel_styles <- paste(panel_styles,
+        paste0('<style class="pf-panel-styles">', css, '</style>'), sep = "\n")
   }
 
   # Resolve JS paths (funnel + MA) and concatenate into one panel_js blob

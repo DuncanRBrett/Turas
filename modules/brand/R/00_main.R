@@ -510,21 +510,26 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
           }
         )
 
-        if (verbose) cat("  Running buyer heaviness...\n")
-        cat_result$buyer_heaviness <- tryCatch(
-          run_buyer_heaviness(
-            pen_mat     = vol_result$pen_mat,
-            m_vec       = vol_result$m_vec,
-            brand_codes = cat_brands$BrandCode,
-            focal_brand = config$focal_brand,
-            weights     = cat_weights
-          ),
-          error = function(e) {
-            warnings_list <<- c(warnings_list,
-              sprintf("Buyer heaviness failed for %s: %s", cat_name, e$message))
-            list(status = "REFUSED", message = e$message)
-          }
-        )
+        # P1.2 fix: buyer heaviness requires a successful Dirichlet run —
+        # both analyses depend on the same Dirichlet parameterisation.
+        if (!identical(cat_result$dirichlet_norms$status, "REFUSED")) {
+          if (verbose) cat("  Running buyer heaviness...\n")
+          cat_result$buyer_heaviness <- tryCatch(
+            run_buyer_heaviness(
+              pen_mat     = vol_result$pen_mat,
+              m_vec       = vol_result$m_vec,
+              brand_codes = cat_brands$BrandCode,
+              focal_brand = config$focal_brand,
+              weights     = cat_weights,
+              x_mat       = vol_result$x_mat
+            ),
+            error = function(e) {
+              warnings_list <<- c(warnings_list,
+                sprintf("Buyer heaviness failed for %s: %s", cat_name, e$message))
+              list(status = "REFUSED", message = e$message)
+            }
+          )
+        }
 
         # Pass frequency_matrix into run_repertoire for share_of_requirements
         # (re-run repertoire with frequency data now that vol_result is available)

@@ -14,7 +14,8 @@
 
 BRAND_BUYER_HEAVINESS_VERSION <- "1.0"
 
-# Tie-breaking tolerance: tertile sizes must be within this fraction of 1/3
+# Tolerance: tertile sizes may deviate ±5pp from 1/3 to absorb heavy ties in
+# m_vec (e.g. when many buyers report exactly 1 purchase per the target window).
 .BH_TERTILE_TOL <- 0.05
 
 
@@ -44,7 +45,8 @@ run_buyer_heaviness <- function(pen_mat,
                                 m_vec,
                                 brand_codes,
                                 focal_brand = NULL,
-                                weights     = NULL) {
+                                weights     = NULL,
+                                x_mat       = NULL) {
 
   if (is.null(pen_mat) || nrow(pen_mat) == 0)
     return(.bh_refuse("DATA_NO_BUYERS", "pen_mat is empty"))
@@ -52,6 +54,12 @@ run_buyer_heaviness <- function(pen_mat,
   n_resp   <- nrow(pen_mat)
   n_brands <- length(brand_codes)
   w        <- .bh_weights(weights, n_resp)
+
+  # Validate x_mat dimensions; discard if mismatched
+  if (!is.null(x_mat) &&
+      !(is.matrix(x_mat) && nrow(x_mat) == n_resp && ncol(x_mat) == n_brands)) {
+    x_mat <- NULL
+  }
 
   # --- Buyers only ---
   buyers_mask <- m_vec > 0
@@ -63,6 +71,12 @@ run_buyer_heaviness <- function(pen_mat,
   m_buyers <- m_vec[buyers_mask]
   w_buyers <- w[buyers_mask]
 
+  # Loyalty segments and purchase frequency distribution (requires x_mat)
+  loy_segs  <- if (!is.null(x_mat))
+    .bh_loyalty_segments(pen_mat, x_mat, m_vec, brand_codes, w, buyers_mask) else NULL
+  freq_dist <- if (!is.null(x_mat))
+    .bh_freq_dist(pen_mat, x_mat, brand_codes, w, buyers_mask) else NULL
+
   # Check for all-same m_vec (tertiles undefined)
   if (length(unique(m_buyers)) == 1) {
     single_tier <- data.frame(
@@ -70,14 +84,16 @@ run_buyer_heaviness <- function(pen_mat,
       Pct  = 100, n = n_buyers,
       stringsAsFactors = FALSE)
     return(list(
-      status             = "PARTIAL",
-      warnings           = "All buyers have identical m_i; tertiles are undefined",
-      tertile_bounds     = list(light = c(0, Inf), medium = NULL, heavy = NULL),
-      category_buyer_mix = single_tier,
-      brand_heaviness    = .bh_empty_heaviness(brand_codes, n_brands),
-      metrics_summary    = list(focal_brand = focal_brand %||% NA_character_,
-                                focal_nmi = NA_real_, focal_wbar = NA_real_,
-                                focal_wbar_gap = NA_real_)
+      status                 = "PARTIAL",
+      warnings               = "All buyers have identical m_i; tertiles are undefined",
+      tertile_bounds         = list(light = c(0, Inf), medium = NULL, heavy = NULL),
+      category_buyer_mix     = single_tier,
+      brand_heaviness        = .bh_empty_heaviness(brand_codes, n_brands),
+      brand_loyalty_segments = loy_segs,
+      brand_freq_dist        = freq_dist,
+      metrics_summary        = list(focal_brand = focal_brand %||% NA_character_,
+                                    focal_nmi = NA_real_, focal_wbar = NA_real_,
+                                    focal_wbar_gap = NA_real_)
     ))
   }
 
@@ -161,12 +177,14 @@ run_buyer_heaviness <- function(pen_mat,
   }
 
   list(
-    status             = "PASS",
-    tertile_bounds     = list(light = c(0, q33), medium = c(q33, q67),
-                               heavy = c(q67, Inf)),
-    category_buyer_mix = cat_mix,
-    brand_heaviness    = brand_heaviness,
-    metrics_summary    = ms
+    status                 = "PASS",
+    tertile_bounds         = list(light = c(0, q33), medium = c(q33, q67),
+                                   heavy = c(q67, Inf)),
+    category_buyer_mix     = cat_mix,
+    brand_heaviness        = brand_heaviness,
+    brand_loyalty_segments = loy_segs,
+    brand_freq_dist        = freq_dist,
+    metrics_summary        = ms
   )
 }
 
@@ -241,6 +259,92 @@ run_buyer_heaviness <- function(pen_mat,
   w <- as.numeric(weights)
   w[is.na(w) | w < 0] <- 0
   if (sum(w) <= 0) rep(1.0, n) else w
+}
+
+
+#' Compute 4-segment loyalty profile per brand as % of all category buyers
+#'
+#' Segments: Sole (only this brand) | Primary (SCR > 50%, not sole) |
+#' Secondary (SCR ≤ 50%) | Not in repertoire.
+#'
+#' @param pen_mat Integer matrix n_resp × n_brands.
+#' @param x_mat Numeric matrix n_resp × n_brands. Purchase counts (col index = brand).
+#' @param m_vec Numeric vector. Per-respondent category volume.
+#' @param brand_codes Character vector.
+#' @param w Numeric vector. Weights.
+#' @param buyers_mask Logical vector. TRUE for category buyers (m_vec > 0).
+#'
+#' @return Data frame: BrandCode | Sole_Pct | Primary_Pct | Secondary_Pct | NoBuy_Pct.
+#' @keywords internal
+.bh_loyalty_segments <- function(pen_mat, x_mat, m_vec, brand_codes, w, buyers_mask) {
+  n_brands    <- length(brand_codes)
+  w_cat       <- w[buyers_mask]
+  total_cat_w <- sum(w_cat)
+  m_cat       <- m_vec[buyers_mask]
+
+  rows <- lapply(seq_len(n_brands), function(bi) {
+    x_j        <- x_mat[buyers_mask, bi]
+    x_j[is.na(x_j)] <- 0
+    scr_j      <- ifelse(m_cat > 0, x_j / m_cat, 0)
+    bought     <- x_j > 0
+    sole       <- bought & (x_j >= m_cat)
+    primary    <- bought & !sole & (scr_j > 0.5)
+    secondary  <- bought & !sole & !primary
+    no_buy     <- !bought
+
+    list(
+      BrandCode     = brand_codes[bi],
+      Sole_Pct      = sum(w_cat[sole])       / total_cat_w * 100,
+      Primary_Pct   = sum(w_cat[primary])    / total_cat_w * 100,
+      Secondary_Pct = sum(w_cat[secondary])  / total_cat_w * 100,
+      NoBuy_Pct     = sum(w_cat[no_buy])     / total_cat_w * 100
+    )
+  })
+
+  as.data.frame(
+    do.call(rbind, lapply(rows, as.data.frame, stringsAsFactors = FALSE)),
+    stringsAsFactors = FALSE)
+}
+
+
+#' Compute purchase frequency distribution per brand among brand buyers
+#'
+#' Buckets: 1×, 2×, 3–5×, 6+×. Values as % of weighted brand buyer count.
+#'
+#' @param pen_mat Integer matrix n_resp × n_brands.
+#' @param x_mat Numeric matrix n_resp × n_brands. Purchase counts.
+#' @param brand_codes Character vector.
+#' @param w Numeric vector. Weights.
+#' @param buyers_mask Logical vector. TRUE for category buyers.
+#'
+#' @return Data frame: BrandCode | Freq1_Pct | Freq2_Pct | Freq3to5_Pct | Freq6plus_Pct.
+#' @keywords internal
+.bh_freq_dist <- function(pen_mat, x_mat, brand_codes, w, buyers_mask) {
+  n_brands <- length(brand_codes)
+
+  rows <- lapply(seq_len(n_brands), function(bi) {
+    b_mask <- pen_mat[, bi] == 1L & buyers_mask
+    if (!any(b_mask)) {
+      return(list(BrandCode = brand_codes[bi], Freq1_Pct = NA_real_,
+                  Freq2_Pct = NA_real_, Freq3to5_Pct = NA_real_, Freq6plus_Pct = NA_real_))
+    }
+    x_j    <- as.integer(round(x_mat[b_mask, bi]))
+    x_j[is.na(x_j) | x_j < 1L] <- 1L
+    w_bb   <- w[b_mask]
+    tot_w  <- sum(w_bb)
+
+    list(
+      BrandCode     = brand_codes[bi],
+      Freq1_Pct     = sum(w_bb[x_j == 1L])              / tot_w * 100,
+      Freq2_Pct     = sum(w_bb[x_j == 2L])              / tot_w * 100,
+      Freq3to5_Pct  = sum(w_bb[x_j >= 3L & x_j <= 5L]) / tot_w * 100,
+      Freq6plus_Pct = sum(w_bb[x_j >= 6L])              / tot_w * 100
+    )
+  })
+
+  as.data.frame(
+    do.call(rbind, lapply(rows, as.data.frame, stringsAsFactors = FALSE)),
+    stringsAsFactors = FALSE)
 }
 
 

@@ -139,12 +139,11 @@ test_that("panel contains section id for category code", {
               grepl("TST", html, fixed = TRUE))
 })
 
-test_that("panel contains DJ scatter section element", {
+test_that("panel contains Purchase Distribution section", {
   skip_if_not(exists("render_cat_buying_panel", mode = "function"),
                "08_cat_buying_panel.R not loaded")
   html <- render_cat_buying_panel(make_panel_data())
-  expect_true(grepl("dj-scatter|cb-dj|double.jeopardy|Double Jeopardy",
-                    html, ignore.case = TRUE))
+  expect_true(grepl("Purchase Distribution|cb-dist-chart|cb-dist-row", html))
 })
 
 test_that("panel contains norms table section", {

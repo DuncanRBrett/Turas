@@ -376,9 +376,13 @@ transform_brand_panels <- function(results, config) {
       rep <- cr$repertoire
       cbf <- cr$cat_buying_frequency
 
-      # Only build the panel if at least one Dirichlet/heaviness element is present.
-      # If both are absent the legacy inline block renders instead (03_page_builder.R).
-      if (is.null(dn) && is.null(bh)) next
+      # P1.1 fix: only build the Dirichlet panel when at least one of the two
+      # paired elements (dirichlet_norms or buyer_heaviness) is present and not
+      # REFUSED.  If both are absent or both REFUSED the legacy inline block in
+      # 03_page_builder.R renders instead, giving the operator a clear fallback.
+      dn_ok <- !is.null(dn) && !identical(dn$status, "REFUSED")
+      bh_ok <- !is.null(bh) && !identical(bh$status, "REFUSED")
+      if (!dn_ok && !bh_ok) next
 
       cat_brands_local <- if (!is.null(brand_list_all) &&
                                "Category" %in% names(brand_list_all)) {
@@ -406,17 +410,18 @@ transform_brand_panels <- function(results, config) {
       }
 
       panel_data <- list(
-        cat_name         = cat_name,
-        category_code    = cat_id,
-        focal_brand      = config$focal_brand %||% NULL,
-        focal_colour     = focal_colour,
-        target_months    = config$target_timeframe_months %||% 3L,
-        longer_months    = config$longer_timeframe_months %||% 12L,
-        dirichlet_norms  = dn,
-        buyer_heaviness  = bh,
-        cat_buying_frequency = cbf,
-        repertoire       = rep,
-        brand_labels     = brand_labels
+        cat_name              = cat_name,
+        category_code         = cat_id,
+        focal_brand           = config$focal_brand %||% NULL,
+        focal_colour          = focal_colour,
+        target_months         = config$target_timeframe_months %||% 3L,
+        longer_months         = config$longer_timeframe_months %||% 12L,
+        dirichlet_norms       = dn,
+        buyer_heaviness       = bh,
+        cat_buying_frequency  = cbf,
+        repertoire            = rep,
+        brand_labels          = brand_labels,
+        cat_buying_dist_labels = config$cat_buying_dist_labels %||% NULL
       )
 
       cb_html <- tryCatch(
