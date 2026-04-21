@@ -349,24 +349,37 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
         parts <- c(parts, tables[[wom_key]])
       }
     } else if (el == "repertoire") {
-      # Category Buying panel: frequency + brand period comparison + repertoire + crossover grid
-      parts <- c(parts, build_br_section_toolbar(section_id))
-      parts <- c(parts, sprintf(
-        '<h3 class="br-element-title">Category Buying \u2014 %s</h3>',
-        .br_esc(cat_name)))
+      # Category Buying panel.
+      # v3: rendered by the new Dirichlet panel when available (panels key
+      # "cat_buying_<cat_id>"); falls back to the legacy inline block when the
+      # Dirichlet pipeline was not run or all upstream elements were REFUSED.
+      cb_panel_key <- paste0("cat_buying_", cat_id)
 
-      # KPI summary strip when frequency data is available
-      cbf <- cat_results$cat_buying_frequency
-      if (!is.null(cbf) && !identical(cbf$status, "REFUSED")) {
-        pct_b  <- if (!is.null(cbf$pct_buyers) && !is.na(cbf$pct_buyers))
-          sprintf("%.0f%%", cbf$pct_buyers) else "\u2014"
-        mfreq  <- if (!is.null(cbf$mean_freq) && !is.na(cbf$mean_freq))
-          sprintf("%.1f×/month", cbf$mean_freq) else "\u2014"
-        n_resp <- if (!is.null(cbf$n_respondents) && !is.na(cbf$n_respondents))
-          sprintf("n = %d all respondents", cbf$n_respondents) else ""
-
+      if (!is.null(panels[[cb_panel_key]])) {
+        # New Dirichlet panel — self-contained HTML fragment
+        parts <- c(parts, build_br_section_toolbar(section_id))
         parts <- c(parts, sprintf(
-          '<div style="display:flex;gap:12px;margin:0 0 16px;flex-wrap:wrap;">
+          '<h3 class="br-element-title">Category Buying \u2014 %s</h3>',
+          .br_esc(cat_name)))
+        parts <- c(parts, panels[[cb_panel_key]])
+      } else {
+        # Legacy fallback: frequency KPI strip + SVG charts + legacy tables
+        parts <- c(parts, build_br_section_toolbar(section_id))
+        parts <- c(parts, sprintf(
+          '<h3 class="br-element-title">Category Buying \u2014 %s</h3>',
+          .br_esc(cat_name)))
+
+        cbf <- cat_results$cat_buying_frequency
+        if (!is.null(cbf) && !identical(cbf$status, "REFUSED")) {
+          pct_b  <- if (!is.null(cbf$pct_buyers) && !is.na(cbf$pct_buyers))
+            sprintf("%.0f%%", cbf$pct_buyers) else "\u2014"
+          mfreq  <- if (!is.null(cbf$mean_freq) && !is.na(cbf$mean_freq))
+            sprintf("%.1f\u00d7/month", cbf$mean_freq) else "\u2014"
+          n_resp <- if (!is.null(cbf$n_respondents) && !is.na(cbf$n_respondents))
+            sprintf("n = %d all respondents", cbf$n_respondents) else ""
+
+          parts <- c(parts, sprintf(
+            '<div style="display:flex;gap:12px;margin:0 0 16px;flex-wrap:wrap;">
   <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 18px;min-width:130px;">
     <div style="font-size:22px;font-weight:700;color:#1A5276;">%s</div>
     <div style="font-size:11px;color:#64748b;margin-top:2px;">Category buyers</div>
@@ -379,21 +392,20 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
     <div style="font-size:12px;color:#94a3b8;">%s</div>
   </div>
 </div>', pct_b, mfreq, .br_esc(n_resp)))
-      } else {
-        parts <- c(parts,
-          '<p style="font-size:12px;color:#64748b;margin:0 0 12px;">',
-          'Brand repertoire size, sole loyalty, and duplication of purchase among category buyers.</p>')
-      }
-
-      # Charts
-      if (!is.null(charts[[chart_key]])) {
-        for (ch in charts[[chart_key]]) {
-          parts <- c(parts, build_br_chart_wrapper(ch$svg, ch$title %||% ""))
+        } else {
+          parts <- c(parts,
+            '<p style="font-size:12px;color:#64748b;margin:0 0 12px;">',
+            'Brand repertoire size, sole loyalty, and duplication of purchase among category buyers.</p>')
         }
-      }
-      # Tables (frequency distribution, 12m/3m, repertoire, crossover grid)
-      if (!is.null(tables[[chart_key]])) {
-        parts <- c(parts, tables[[chart_key]])
+
+        if (!is.null(charts[[chart_key]])) {
+          for (ch in charts[[chart_key]]) {
+            parts <- c(parts, build_br_chart_wrapper(ch$svg, ch$title %||% ""))
+          }
+        }
+        if (!is.null(tables[[chart_key]])) {
+          parts <- c(parts, tables[[chart_key]])
+        }
       }
     } else {
       # Legacy path: any future elements without a dedicated panel

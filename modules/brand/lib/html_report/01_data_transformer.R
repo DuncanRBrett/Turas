@@ -365,6 +365,74 @@ transform_brand_panels <- function(results, config) {
     }
   }
 
+  # --- Category Buying (Dirichlet) panels (per category) ---
+  if (exists("render_cat_buying_panel", mode = "function")) {
+    for (cat_name in names(results$results$categories)) {
+      cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
+      cr <- results$results$categories[[cat_name]]
+
+      dn  <- cr$dirichlet_norms
+      bh  <- cr$buyer_heaviness
+      rep <- cr$repertoire
+      cbf <- cr$cat_buying_frequency
+
+      # Only build the panel if at least one Dirichlet/heaviness element is present.
+      # If both are absent the legacy inline block renders instead (03_page_builder.R).
+      if (is.null(dn) && is.null(bh)) next
+
+      cat_brands_local <- if (!is.null(brand_list_all) &&
+                               "Category" %in% names(brand_list_all)) {
+        brand_list_all[brand_list_all$Category == cat_name, , drop = FALSE]
+      } else if (!is.null(brand_list_all)) brand_list_all else NULL
+
+      focal_colour <- .resolve_focal_colour(cat_brands_local, config$focal_brand,
+                                            config_focal_colour)
+
+      # Build brand_labels lookup: prefer BrandLabel column, fall back to
+      # title-case conversion of the brand code.
+      brand_labels <- NULL
+      if (!is.null(cat_brands_local) && nrow(cat_brands_local) > 0 &&
+          "BrandCode" %in% names(cat_brands_local)) {
+        lbl_col <- if ("BrandLabel" %in% names(cat_brands_local))
+          cat_brands_local$BrandLabel else NULL
+        brand_labels <- stats::setNames(
+          if (!is.null(lbl_col))
+            as.character(lbl_col)
+          else
+            vapply(as.character(cat_brands_local$BrandCode),
+                   function(x) tools::toTitleCase(tolower(x)),
+                   character(1L)),
+          as.character(cat_brands_local$BrandCode))
+      }
+
+      panel_data <- list(
+        cat_name         = cat_name,
+        category_code    = cat_id,
+        focal_brand      = config$focal_brand %||% NULL,
+        focal_colour     = focal_colour,
+        target_months    = config$target_timeframe_months %||% 3L,
+        longer_months    = config$longer_timeframe_months %||% 12L,
+        dirichlet_norms  = dn,
+        buyer_heaviness  = bh,
+        cat_buying_frequency = cbf,
+        repertoire       = rep,
+        brand_labels     = brand_labels
+      )
+
+      cb_html <- tryCatch(
+        render_cat_buying_panel(panel_data),
+        error = function(e) {
+          message(sprintf("[BRAND HTML] Cat buying panel failed for %s: %s",
+                          cat_name, e$message))
+          NULL
+        }
+      )
+      if (!is.null(cb_html)) {
+        panels[[paste0("cat_buying_", cat_id)]] <- cb_html
+      }
+    }
+  }
+
   panels
 }
 

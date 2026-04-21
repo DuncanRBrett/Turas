@@ -16,6 +16,21 @@ OUT_PATH <- "/Users/duncan/Library/CloudStorage/OneDrive-Personal/DB Files/Turas
 N <- 1200
 N_PER_CAT <- 300
 
+# Timeframe constants — must match config defaults in §1.3 of CAT_BUYING_SPEC_v3.
+# BRANDPEN3 = count of purchases in the last TARGET_TIMEFRAME_MONTHS months.
+# Change these constants here and all BRANDPEN3 distributions rescale automatically.
+TARGET_TIMEFRAME_MONTHS <- 3L   # BRANDPEN2 + BRANDPEN3 window
+LONGER_TIMEFRAME_MONTHS <- 12L  # BRANDPEN1 window
+
+# BRANDPEN3 generation parameters — tuned so category mean M ≈ 4–5 per buyer
+# over TARGET_TIMEFRAME_MONTHS = 3, producing a realistic DJ gradient:
+#   focal brand (IPK): negbin(mu=6, theta=2), clamped to [1, 10*TARGET_TIMEFRAME_MONTHS]
+#   competitors:       negbin(mu=3, theta=1.5), clamped to [1, 10*TARGET_TIMEFRAME_MONTHS]
+BRANDPEN3_IPK_MU    <- 6
+BRANDPEN3_IPK_THETA <- 2
+BRANDPEN3_COMP_MU   <- 3
+BRANDPEN3_COMP_THETA <- 1.5
+
 # ---- Brand lists per category ------------------------------------------------
 brands <- list(
   DSS = c("IPK","ROB","KNORR","CART","RAJAH","SFRI","SPMEC","WWTDSS","PNPDSS","CKRDSS"),
@@ -122,15 +137,25 @@ make_focal_block <- function(cat, id_start) {
   pen_long_probs <- c(0.65, rev(seq(0.18, 0.45, length.out = nb - 1)))
   pen_long  <- matrix(0L, n, nb)
   pen_tgt   <- matrix(0L, n, nb)
-  pen_freq  <- matrix(NA_integer_, n, nb)
+  pen_freq  <- matrix(NA_real_, n, nb)  # BRANDPEN3: count of purchases in TARGET window
+  max_count <- as.integer(10L * TARGET_TIMEFRAME_MONTHS)
   for (bi in seq_len(nb)) {
     aw <- aware[, bi]
     buyers_long <- aw * rbinom(n, 1, pen_long_probs[bi])
     pen_long[, bi] <- buyers_long
     buyers_tgt <- buyers_long * rbinom(n, 1, 0.70)
     pen_tgt[, bi] <- buyers_tgt
-    pen_freq[buyers_tgt == 1, bi] <- wsample(1:5, sum(buyers_tgt),
-                                             c(0.20, 0.30, 0.30, 0.15, 0.05))
+    n_tgt <- sum(buyers_tgt)
+    if (n_tgt > 0) {
+      is_ipk <- (b[bi] == "IPK")
+      mu    <- if (is_ipk) BRANDPEN3_IPK_MU    else BRANDPEN3_COMP_MU
+      theta <- if (is_ipk) BRANDPEN3_IPK_THETA  else BRANDPEN3_COMP_THETA
+      # rnegbin via MASS or base stats::rnbinom (size = theta, mu = mu)
+      raw_counts <- stats::rnbinom(n_tgt, size = theta, mu = mu)
+      # Clamp: floor at 1 (bought at least once), cap at 10×window
+      raw_counts <- pmax(1L, pmin(max_count, as.integer(raw_counts)))
+      pen_freq[buyers_tgt == 1, bi] <- raw_counts
+    }
   }
   colnames(pen_long) <- paste0("BRANDPEN1_", cat, "_", b)
   colnames(pen_tgt)  <- paste0("BRANDPEN2_", cat, "_", b)

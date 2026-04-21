@@ -68,7 +68,10 @@ BRAND_VERSION <- "1.0"
     "05_wom.R",
     "06_drivers_barriers.R",
     "07_dba.R",
-    "08_cat_buying.R"
+    "08_cat_buying.R",
+    "08b_brand_volume.R",
+    "08c_dirichlet_norms.R",
+    "08d_buyer_heaviness.R"
   )
 
   for (f in module_files) {
@@ -447,6 +450,91 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
                 sprintf("Cat buying frequency failed for %s: %s",
                         cat_name, e$message))
               list(status = "REFUSED", message = e$message)
+            }
+          )
+        }
+      }
+    }
+
+    # Brand Volume Matrix + Dirichlet Norms + Buyer Heaviness (full categories only)
+    # These three elements require BRANDPEN2 and BRANDPEN3 columns resolved via
+    # the cat_code detected above. They are skipped when cat_code is NULL.
+    if (isTRUE(config$element_repertoire) && cat_depth == "full" &&
+        !is.null(cat_code)) {
+
+      pen2_prefix  <- paste0("BRANDPEN2_", cat_code)
+      pen3_prefix  <- paste0("BRANDPEN3_", cat_code)
+
+      if (verbose) cat("  Building brand volume matrix...\n")
+      vol_result <- tryCatch(
+        build_brand_volume_matrix(
+          cat_data         = cat_data,
+          cat_brands       = cat_brands,
+          pen_target_prefix = pen2_prefix,
+          freq_prefix      = pen3_prefix,
+          verbose          = verbose
+        ),
+        error = function(e) {
+          warnings_list <<- c(warnings_list,
+            sprintf("Brand volume matrix failed for %s: %s", cat_name, e$message))
+          list(status = "REFUSED", message = e$message)
+        }
+      )
+      cat_result$brand_volume <- vol_result
+
+      if (!identical(vol_result$status, "REFUSED")) {
+        if (verbose) cat("  Running Dirichlet norms...\n")
+        cat_result$dirichlet_norms <- tryCatch(
+          run_dirichlet_norms(
+            pen_mat       = vol_result$pen_mat,
+            x_mat         = vol_result$x_mat,
+            m_vec         = vol_result$m_vec,
+            brand_codes   = cat_brands$BrandCode,
+            focal_brand   = config$focal_brand,
+            weights       = cat_weights,
+            target_months = config$target_timeframe_months %||% 3L,
+            longer_months = config$longer_timeframe_months %||% 12L
+          ),
+          error = function(e) {
+            warnings_list <<- c(warnings_list,
+              sprintf("Dirichlet norms failed for %s: %s", cat_name, e$message))
+            list(status = "REFUSED", message = e$message)
+          }
+        )
+
+        if (verbose) cat("  Running buyer heaviness...\n")
+        cat_result$buyer_heaviness <- tryCatch(
+          run_buyer_heaviness(
+            pen_mat     = vol_result$pen_mat,
+            m_vec       = vol_result$m_vec,
+            brand_codes = cat_brands$BrandCode,
+            focal_brand = config$focal_brand,
+            weights     = cat_weights
+          ),
+          error = function(e) {
+            warnings_list <<- c(warnings_list,
+              sprintf("Buyer heaviness failed for %s: %s", cat_name, e$message))
+            list(status = "REFUSED", message = e$message)
+          }
+        )
+
+        # Pass frequency_matrix into run_repertoire for share_of_requirements
+        # (re-run repertoire with frequency data now that vol_result is available)
+        if (!is.null(cat_result$repertoire) &&
+            !identical(cat_result$repertoire$status, "REFUSED")) {
+          cat_result$repertoire <- tryCatch(
+            run_repertoire(
+              vol_result$pen_mat,
+              cat_brands$BrandCode,
+              focal_brand      = config$focal_brand,
+              frequency_matrix = vol_result$x_mat,
+              weights          = cat_weights
+            ),
+            error = function(e) {
+              warnings_list <<- c(warnings_list,
+                sprintf("Repertoire (with frequency) failed for %s: %s",
+                        cat_name, e$message))
+              cat_result$repertoire
             }
           )
         }

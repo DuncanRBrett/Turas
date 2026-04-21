@@ -146,6 +146,10 @@ load_brand_config <- function(config_path, project_root = NULL) {
   config$dba_uniqueness_threshold <- config$dba_uniqueness_threshold %||% 0.50
   config$dba_attribution_type <- config$dba_attribution_type %||% "open"
   config$wom_timeframe <- config$wom_timeframe %||% "3 months"
+  config$target_timeframe_months <- as.integer(
+    config$target_timeframe_months %||% 3L)
+  config$longer_timeframe_months <- as.integer(
+    config$longer_timeframe_months %||% 12L)
   config$db_importance_method <- config$db_importance_method %||% "differential"
   config$decimal_places <- as.integer(config$decimal_places %||% 0L)
   config$colour_focal <- config$colour_focal %||% "#1A5276"

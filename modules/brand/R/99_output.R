@@ -155,6 +155,55 @@ generate_brand_excel <- function(results, output_path, config = NULL) {
         }
       }
 
+      # Dirichlet norms (§11)
+      dn <- cat_res$dirichlet_norms
+      if (!is.null(dn)) {
+        if (identical(dn$status, "REFUSED")) {
+          cat("\n┌─── TURAS ERROR ───────────────────────────────────────┐\n")
+          cat(sprintf("│ Context: 99_output — dirichlet for %s\n", cat_name))
+          cat(sprintf("│ Code:    %s\n", dn$code %||% "UNKNOWN"))
+          cat(sprintf("│ Message: %s\n", dn$message %||% ""))
+          cat("└───────────────────────────────────────────────────────┘\n\n")
+          refused_df <- data.frame(
+            code    = dn$code    %||% "REFUSED",
+            message = dn$message %||% "",
+            how_to_fix = "See console output for details",
+            stringsAsFactors = FALSE)
+          .write_sheet(paste0(substr(cat_prefix, 1, 12), "_dir_REFUSED"),
+                       refused_df, paste("Dirichlet REFUSED -", cat_name))
+        } else {
+          if (!is.null(dn$norms_table))
+            .write_sheet(paste0(cat_prefix, "_Dirichlet"), dn$norms_table,
+                         paste("Dirichlet Norms -", cat_name))
+          if (!is.null(dn$market_shares))
+            .write_sheet(paste0(cat_prefix, "_MktShare"), dn$market_shares,
+                         paste("Market Share -", cat_name))
+        }
+      }
+
+      # Buyer heaviness (§11)
+      bh <- cat_res$buyer_heaviness
+      if (!is.null(bh)) {
+        if (identical(bh$status, "REFUSED")) {
+          cat("\n┌─── TURAS ERROR ───────────────────────────────────────┐\n")
+          cat(sprintf("│ Context: 99_output — buyer heaviness for %s\n", cat_name))
+          cat(sprintf("│ Code:    %s\n", bh$code %||% "UNKNOWN"))
+          cat(sprintf("│ Message: %s\n", bh$message %||% ""))
+          cat("└───────────────────────────────────────────────────────┘\n\n")
+        } else if (!is.null(bh$brand_heaviness)) {
+          .write_sheet(paste0(cat_prefix, "_BuyHvy"), bh$brand_heaviness,
+                       paste("Buyer Heaviness -", cat_name))
+        }
+      }
+
+      # DoP deviation matrix (§11) — from repertoire element
+      rep2 <- cat_res$repertoire
+      if (!is.null(rep2) && !identical(rep2$status, "REFUSED")) {
+        if (!is.null(rep2$dop_deviation_matrix))
+          .write_sheet(paste0(cat_prefix, "_DoP_Dev"), rep2$dop_deviation_matrix,
+                       paste("DoP Deviation -", cat_name))
+      }
+
       # Drivers & Barriers
       db <- cat_res$drivers_barriers
       if (!is.null(db) && !identical(db$status, "REFUSED")) {

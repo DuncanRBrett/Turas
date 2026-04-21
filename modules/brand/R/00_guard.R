@@ -172,6 +172,43 @@ guard_validate_brand_config <- function(config) {
     )
   }
 
+  # Validate timeframe months
+  t_tgt  <- config$target_timeframe_months %||% 3L
+  t_long <- config$longer_timeframe_months %||% 12L
+  if (is.na(t_tgt) || !is.numeric(t_tgt) || t_tgt < 1L) {
+    brand_refuse(
+      code = "CFG_TIMEFRAME_INVALID",
+      title = "Invalid target_timeframe_months",
+      problem = sprintf("target_timeframe_months must be a positive integer; got: %s",
+                        as.character(t_tgt)),
+      why_it_matters = "Used to annualise Dirichlet KPIs",
+      how_to_fix = "Set target_timeframe_months to a positive integer (e.g. 3)"
+    )
+  }
+  if (is.na(t_long) || !is.numeric(t_long) || t_long < 1L) {
+    brand_refuse(
+      code = "CFG_TIMEFRAME_INVALID",
+      title = "Invalid longer_timeframe_months",
+      problem = sprintf("longer_timeframe_months must be a positive integer; got: %s",
+                        as.character(t_long)),
+      why_it_matters = "Used for funnel labelling",
+      how_to_fix = "Set longer_timeframe_months to a positive integer (e.g. 12)"
+    )
+  }
+  if (t_tgt >= t_long) {
+    brand_refuse(
+      code = "CFG_TIMEFRAME_INVALID",
+      title = "Timeframe Ordering Error",
+      problem = sprintf(
+        "target_timeframe_months (%d) must be less than longer_timeframe_months (%d)",
+        t_tgt, t_long),
+      why_it_matters = "BRANDPEN2/3 target window must be shorter than BRANDPEN1 window",
+      how_to_fix = "Ensure target_timeframe_months < longer_timeframe_months",
+      expected = "target < longer",
+      observed = sprintf("target=%d, longer=%d", t_tgt, t_long)
+    )
+  }
+
   list(status = "PASS")
 }
 

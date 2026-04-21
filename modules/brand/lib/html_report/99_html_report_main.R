@@ -162,6 +162,7 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
   panel_js <- paste(
     .resolve_js("brand_funnel_panel.js"),
     .resolve_js("brand_ma_panel.js"),
+    .resolve_js("brand_cat_buying_panel.js"),
     sep = "\n"
   )
 
