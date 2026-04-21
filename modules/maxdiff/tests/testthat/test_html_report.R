@@ -107,6 +107,20 @@ test_that("build_turf_chart generates SVG", {
   expect_true(grepl("<svg", svg))
 })
 
+test_that("build_panel_toolbar contains Pin, Export PNG and Export Excel buttons", {
+  skip_if(!exists("build_panel_toolbar", mode = "function"))
+
+  html <- build_panel_toolbar("preferences")
+
+  expect_true(grepl("md-panel-toolbar", html))
+  expect_true(grepl("pin-btn", html))
+  expect_true(grepl("mdExportPNG", html))
+  expect_true(grepl("Export PNG", html))
+  expect_true(grepl("_mdExportPanel", html))
+  expect_true(grepl("Export Excel", html))
+})
+
+
 test_that("build_maxdiff_page generates complete HTML document", {
   skip_if(!exists("build_maxdiff_page", mode = "function"))
 
