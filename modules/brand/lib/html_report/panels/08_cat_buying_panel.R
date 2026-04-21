@@ -104,10 +104,6 @@ render_cat_buying_panel <- function(panel_data) {
   parts <- c(parts, sprintf(
     '<p class="cb-subtitle" style="margin-top:0;">%s</p>', .cb_esc(subtitle)))
 
-  # Brand picker (focal switcher above all tabs)
-  parts <- c(parts, .cb_brand_picker(dn, bh, focal, fcol, cat_code,
-                                      brand_labels, brand_colours))
-
   # JSON: per-brand KPI data for focal switcher
   parts <- c(parts, .cb_kpi_json_script(dn, bh, cat_code))
 
@@ -117,6 +113,10 @@ render_cat_buying_panel <- function(panel_data) {
 
   # Sub-tab navigation
   parts <- c(parts, .cb_sub_tab_nav(cat_code))
+
+  # Brand picker (focal <select> + show/hide chips) — BELOW the sub-tab nav
+  parts <- c(parts, .cb_brand_picker(dn, bh, focal, fcol, cat_code,
+                                      brand_labels, brand_colours))
 
   # ----- Tab 1: Category Context (default) -----------------------------------
   parts <- c(parts, '<div class="cb-subtab" data-cb-tab="context">')
@@ -268,9 +268,19 @@ render_cat_buying_panel <- function(panel_data) {
     '  </label>',
     '</div>')
 
-  # Chart placeholder (hidden until toggled)
+  # Chart placeholder (hidden until Show chart is checked).
+  # Column selector + single bar chart below.
   parts <- c(parts,
     '<div class="cb-brands-chart-area" data-cb-scope="brands" hidden>',
+    '  <div class="cb-brands-chart-ctl">',
+    '    <label class="cb-brands-chart-ctl-label">Column</label>',
+    '    <select class="cb-brands-chart-col" data-cb-action="brandschart-col">',
+    '      <option value="pen" selected>Penetration</option>',
+    '      <option value="avg">Avg purchases</option>',
+    '      <option value="vol">Vol share</option>',
+    '      <option value="scr">SCR obs</option>',
+    '    </select>',
+    '  </div>',
     '  <div class="cb-brands-chart" data-cb-brands-chart="brands"></div>',
     '</div>')
 

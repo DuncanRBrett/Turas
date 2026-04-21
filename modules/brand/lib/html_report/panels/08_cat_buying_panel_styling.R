@@ -173,15 +173,27 @@ paste0(
 .cb-brand-freq-wrap { overflow-x: auto; margin: 8px 0 20px; }
 .cb-brand-freq-table { width: 100%; border-collapse: separate;
   border-spacing: 0; font-size: 12px; }
-.cb-brand-freq-table th {
-  background: #1e293b; color: #fff; padding: 8px 10px;
-  text-align: center; font-weight: 600; font-size: 11px;
-  letter-spacing: 0.3px; text-transform: none; white-space: normal;
-  border-bottom: 2px solid #0f172a;
+/* High-specificity + !important so report-hub / page-builder th rules
+   (which set uppercase + light background) cannot win. */
+.cb-panel .cb-brand-freq-table thead tr th,
+.cb-panel .cb-brand-freq-table th {
+  background: #1e293b !important; background-color: #1e293b !important;
+  color: #fff !important;
+  padding: 8px 10px !important;
+  text-align: center !important;
+  font-weight: 600 !important; font-size: 11px !important;
+  letter-spacing: 0.3px !important;
+  text-transform: none !important;
+  white-space: normal !important;
+  border-bottom: 2px solid #0f172a !important;
+  cursor: default;
 }
-.cb-brand-freq-table th:first-child { text-align: left; }
-.cb-brand-freq-table th.cb-sort-th { cursor: pointer; user-select: none; }
-.cb-brand-freq-table th.cb-sort-th:hover { background: #334155; }
+.cb-panel .cb-brand-freq-table thead tr th:first-child,
+.cb-panel .cb-brand-freq-table th:first-child { text-align: left !important; }
+.cb-panel .cb-brand-freq-table th.cb-sort-th { cursor: pointer; user-select: none; }
+.cb-panel .cb-brand-freq-table th.cb-sort-th:hover {
+  background: #334155 !important; background-color: #334155 !important;
+}
 .cb-brand-freq-table .cb-sort-arr {
   display: inline-block; min-width: 14px; margin-left: 4px;
   font-size: 10px; color: rgba(255,255,255,0.6);
@@ -230,11 +242,25 @@ paste0(
   background: rgba(220, 38, 38, 0.14) !important; color: #991b1b;
 }
 .cb-brand-freq-table[data-cb-heatmap="on"] td.cb-hm-near {
-  background: rgba(148, 163, 184, 0.08);
+  background: rgba(251, 191, 36, 0.18) !important; color: #92400e;
 }
 
 /* Brand Summary chart area (Show chart toggle) */
 .cb-brands-chart-area { margin: 4px 0 12px; }
+.cb-brands-chart-ctl {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 6px; padding: 6px 10px;
+  background: #f1f5f9; border: 1px solid #e2e8f0;
+  border-radius: 6px; font-size: 11px;
+}
+.cb-brands-chart-ctl-label {
+  font-size: 11px; font-weight: 600; color: #475569;
+  text-transform: uppercase; letter-spacing: 0.3px;
+}
+.cb-brands-chart-col {
+  font-size: 12px; padding: 3px 8px; border: 1px solid #cbd5e1;
+  border-radius: 4px; background: #fff; color: #1a2744; cursor: pointer;
+}
 .cb-brands-chart {
   display: flex; flex-direction: column; gap: 6px; padding: 10px 12px;
   background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
@@ -267,7 +293,8 @@ paste0(
   text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 2px;
 }
 
-/* === Sub-tab navigation === */
+',
+'/* === Sub-tab navigation === */
 .cb-subnav {
   display: flex; gap: 0; border-bottom: 2px solid #e2e8f0; margin: 16px 0;
 }

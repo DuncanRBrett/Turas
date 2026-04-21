@@ -90,6 +90,7 @@
     panel.__cbState = {
       showchart: { loyalty: true, dist: true, brands: false },
       heatmap:   { brands: false },
+      brandsChartCol: 'pen',
       visible: {
         loyalty: makeVisMap(pd.brandCodes),
         dist:    makeVisMap(pd.brandCodes),
@@ -107,6 +108,7 @@
     bindCbSort(panel);
     bindCbEmphasisChips(panel);
     bindCbBrandsFocusSelect(panel);
+    bindCbBrandsChartCol(panel);
 
     renderCbStackedBars(panel, 'loyalty');
     renderCbStackedBars(panel, 'dist');
@@ -354,8 +356,27 @@
   }
 
   /* ---------------------------------------------------------------------- */
-  /* Brand Summary chart renderer (bar chart of Pen / Avg purch / Vol / SCR) */
+  /* Brand Summary chart renderer — single column selected via dropdown       */
   /* ---------------------------------------------------------------------- */
+
+  /* Column key -> { col index in table row, label, suffix } */
+  var BRANDS_CHART_COLS = {
+    pen: { col: 2, label: 'Penetration',   suffix: '%' },
+    avg: { col: 3, label: 'Avg purchases', suffix: ''  },
+    vol: { col: 4, label: 'Vol share',     suffix: '%' },
+    scr: { col: 5, label: 'SCR obs',       suffix: '%' }
+  };
+
+  function bindCbBrandsChartCol(panel) {
+    var sel = panel.querySelector('select[data-cb-action="brandschart-col"]');
+    if (!sel) return;
+    sel.addEventListener('change', function () {
+      var key = sel.value;
+      if (!BRANDS_CHART_COLS[key]) return;
+      panel.__cbState.brandsChartCol = key;
+      if (panel.__cbState.showchart.brands) renderCbBrandsChart(panel);
+    });
+  }
 
   function renderCbBrandsChart(panel) {
     var host = panel.querySelector('.cb-brands-chart[data-cb-brands-chart="brands"]');
@@ -363,14 +384,8 @@
     var table = panel.querySelector('.cb-brand-freq-table');
     if (!table) { host.innerHTML = ''; return; }
 
-    /* Column indices must mirror the R-side header order: */
-    /* 0 Brand | 1 Base | 2 Pen | 3 Avg purch. | 4 Vol share | 5 SCR obs */
-    var metrics = [
-      { col: 2, label: 'Penetration',   suffix: '%' },
-      { col: 3, label: 'Avg purchases', suffix: ''  },
-      { col: 4, label: 'Vol share',     suffix: '%' },
-      { col: 5, label: 'SCR obs',       suffix: '%' }
-    ];
+    var key = (panel.__cbState && panel.__cbState.brandsChartCol) || 'pen';
+    var m   = BRANDS_CHART_COLS[key] || BRANDS_CHART_COLS.pen;
 
     var pd    = panel.__cbData || {};
     var focal = pd.focalBrand;
@@ -380,60 +395,69 @@
       table.querySelectorAll('tbody tr[data-brand]'));
     var avgRow = table.querySelector('tbody tr.cbp-avg-row');
 
-    var html = '';
-    metrics.forEach(function (m) {
-      /* collect (brand, value) pairs */
-      var entries = [];
-      var vals    = [];
-      rows.forEach(function (tr) {
-        var code = tr.getAttribute('data-brand');
-        if (vis[code] === false) return;
-        var cell = tr.children[m.col];
-        if (!cell) return;
-        var v = parseFloat(cell.getAttribute('data-v'));
-        if (isNaN(v)) return;
-        entries.push({ code: code, v: v, isFocal: code === focal });
-        vals.push(v);
-      });
-      if (entries.length === 0) return;
-
-      var max = Math.max.apply(null, vals);
-      if (!isFinite(max) || max <= 0) max = 1;
-
-      /* Category average from the avg row */
-      var avgV = NaN;
-      if (avgRow && avgRow.children[m.col]) {
-        avgV = parseFloat(avgRow.children[m.col].getAttribute('data-v'));
-      }
-      var avgPct = (!isNaN(avgV) && max > 0) ? Math.min(100, (avgV / max) * 100) : null;
-
-      html += '<div class="cb-brands-chart-group">';
-      html += '<div class="cb-brands-chart-title">' + escHtml(m.label) + '</div>';
-      entries.forEach(function (e) {
-        var pct  = Math.max(0, (e.v / max) * 100);
-        var col  = getBrandColour(pd, e.code);
-        var name = getBrandName(pd, e.code);
-        var txt  = (m.suffix === '%'
-          ? e.v.toFixed(0) + '%'
-          : e.v.toFixed(e.v < 10 ? 2 : 1));
-        html += '<div class="cb-brands-chart-row">'
-             +   '<div class="cb-brands-chart-label' + (e.isFocal ? ' focal' : '') + '">'
-             +     escHtml(name) + (e.isFocal ? ' \u2605' : '')
-             +   '</div>'
-             +   '<div class="cb-brands-chart-bar-track">'
-             +     '<div class="cb-brands-chart-bar" style="width:' + pct.toFixed(1)
-             +       '%;background:' + col + ';">' + txt + '</div>'
-             +     (avgPct !== null
-               ? '<div class="cb-brands-chart-avg-line" title="Category avg" '
-                 + 'style="left:' + avgPct.toFixed(1) + '%;"></div>'
-               : '')
-             +   '</div>'
-             + '</div>';
-      });
-      html += '</div>';
+    /* Collect (brand, value) pairs across all visible brands */
+    var entries = [];
+    var vals    = [];
+    rows.forEach(function (tr) {
+      var code = tr.getAttribute('data-brand');
+      if (vis[code] === false) return;
+      var cell = tr.children[m.col];
+      if (!cell) return;
+      var v = parseFloat(cell.getAttribute('data-v'));
+      if (isNaN(v)) return;
+      entries.push({ code: code, v: v, isFocal: code === focal });
+      vals.push(v);
     });
 
-    host.innerHTML = html || '<div style="font-size:11px;color:#94a3b8;">No visible brands.</div>';
+    if (entries.length === 0) {
+      host.innerHTML = '<div style="font-size:11px;color:#94a3b8;">No visible brands.</div>';
+      return;
+    }
+
+    /* Sort descending by value (focal stays wherever — value-sorted chart) */
+    entries.sort(function (a, b) { return b.v - a.v; });
+
+    var max = Math.max.apply(null, vals);
+    if (!isFinite(max) || max <= 0) max = 1;
+
+    /* Category average marker */
+    var avgV = NaN;
+    if (avgRow && avgRow.children[m.col]) {
+      avgV = parseFloat(avgRow.children[m.col].getAttribute('data-v'));
+    }
+    var avgPct = (!isNaN(avgV) && max > 0) ? Math.min(100, (avgV / max) * 100) : null;
+    var avgTxt = !isNaN(avgV)
+      ? (m.suffix === '%' ? avgV.toFixed(0) + '%' : avgV.toFixed(1))
+      : null;
+
+    var html = '';
+    html += '<div class="cb-brands-chart-title">' + escHtml(m.label)
+         +  (avgTxt ? ' <span style="font-weight:400;color:#64748b;">(cat avg ' + escHtml(avgTxt) + ')</span>' : '')
+         +  '</div>';
+
+    entries.forEach(function (e) {
+      var pct  = Math.max(0, (e.v / max) * 100);
+      var col  = getBrandColour(pd, e.code);
+      var name = getBrandName(pd, e.code);
+      var txt  = (m.suffix === '%'
+        ? e.v.toFixed(0) + '%'
+        : e.v.toFixed(e.v < 10 ? 2 : 1));
+      html += '<div class="cb-brands-chart-row">'
+           +   '<div class="cb-brands-chart-label' + (e.isFocal ? ' focal' : '') + '">'
+           +     escHtml(name) + (e.isFocal ? ' \u2605' : '')
+           +   '</div>'
+           +   '<div class="cb-brands-chart-bar-track">'
+           +     '<div class="cb-brands-chart-bar" style="width:' + pct.toFixed(1)
+           +       '%;background:' + col + ';">' + txt + '</div>'
+           +     (avgPct !== null
+             ? '<div class="cb-brands-chart-avg-line" title="Category avg" '
+               + 'style="left:' + avgPct.toFixed(1) + '%;"></div>'
+             : '')
+           +   '</div>'
+           + '</div>';
+    });
+
+    host.innerHTML = html;
   }
 
   /* ---------------------------------------------------------------------- */
@@ -588,16 +612,21 @@
       tr.classList.toggle('focal-row', tr.getAttribute('data-brand') === brandCode);
     });
 
-    /* 3b. Brand Performance Summary: focal row to top + FOCAL badge */
+    /* 3b. Brand Performance Summary: new focal to row 1, demoted focal to
+          sortable section (below cat-avg row), FOCAL badge swapped. */
     panel.querySelectorAll('.cb-brand-freq-table').forEach(function (table) {
       var tbody  = table.querySelector('tbody');
       if (!tbody) return;
       var avgRow = tbody.querySelector('.cbp-avg-row');
+
+      /* First pass: update classes + badges */
       tbody.querySelectorAll('tr[data-brand]').forEach(function (tr) {
-        var bc      = tr.getAttribute('data-brand');
-        var isFocal = bc === brandCode;
-        if (isFocal) { tr.classList.remove('cbp-brand-row'); tr.classList.add('focal-row'); }
-        else          { tr.classList.remove('focal-row');    tr.classList.add('cbp-brand-row'); }
+        var bc       = tr.getAttribute('data-brand');
+        var isFocal  = bc === brandCode;
+        var wasFocal = tr.classList.contains('focal-row');
+        tr.classList.toggle('focal-row',     isFocal);
+        tr.classList.toggle('cbp-brand-row', !isFocal);
+
         var badge = tr.querySelector('.cb-focal-badge');
         if (isFocal && !badge) {
           var nameCell = tr.querySelector('.ct-label-col, .brand-col');
@@ -610,10 +639,26 @@
         } else if (!isFocal && badge) {
           badge.parentNode.removeChild(badge);
         }
+        /* Tag demoted focal so we can place it after the cat-avg row below */
+        tr.__cbWasFocal = wasFocal && !isFocal;
+      });
+
+      /* Second pass: position rows */
+      tbody.querySelectorAll('tr[data-brand]').forEach(function (tr) {
+        var bc      = tr.getAttribute('data-brand');
+        var isFocal = bc === brandCode;
         if (isFocal) {
           if (avgRow) tbody.insertBefore(tr, avgRow);
           else        tbody.insertBefore(tr, tbody.firstChild);
+        } else if (tr.__cbWasFocal) {
+          /* Demoted focal — move directly below cat-avg row */
+          if (avgRow && avgRow.nextSibling) {
+            tbody.insertBefore(tr, avgRow.nextSibling);
+          } else {
+            tbody.appendChild(tr);
+          }
         }
+        tr.__cbWasFocal = false;
       });
     });
 

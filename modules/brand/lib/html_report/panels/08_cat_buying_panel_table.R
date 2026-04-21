@@ -337,17 +337,18 @@ cb_brand_freq_scr_table_html <- function(norms_table,
             sprintf(fmt, lo, hi))
   }
 
-  # Heatmap cell class (relative to cat avg): green when above avg by >10%,
-  # red when below by >10% (as % deviation from avg). Tunable threshold.
-  .hm_cls <- function(v, avg) {
-    if (is.na(v) || is.na(avg) || avg == 0) return("")
-    dev <- (v - avg) / abs(avg) * 100
-    if (dev >= 10)      " cb-hm-above"
-    else if (dev <= -10) " cb-hm-below"
-    else                 " cb-hm-near"
+  # Heatmap cell class (relative to cat avg \u00b11 SD "CI band"):
+  # green  = above upper band (v > avg + sd)
+  # red    = below lower band (v < avg - sd)
+  # amber  = within the band
+  .hm_cls <- function(v, avg, sd_v) {
+    if (is.na(v) || is.na(avg) || !is.finite(sd_v) || sd_v <= 0) return("")
+    if (v > avg + sd_v)       " cb-hm-above"
+    else if (v < avg - sd_v)  " cb-hm-below"
+    else                      " cb-hm-near"
   }
-  .hm_cell <- function(v, avg, text, d = 2) {
-    cls <- .hm_cls(v, avg)
+  .hm_cell <- function(v, avg, sd_v, text, d = 2) {
+    cls <- .hm_cls(v, avg, sd_v)
     sprintf('<td class="cb-hm-cell%s" data-v="%s">%s</td>',
             cls,
             if (is.na(v)) "" else formatC(v, format = "f", digits = d),
@@ -424,10 +425,10 @@ cb_brand_freq_scr_table_html <- function(norms_table,
       sprintf('<td class="ct-label-col">%s</td>', lbl_html),
       sprintf('<td class="cb-base-td" data-v="%s">%s</td>',
               if (is.na(n_v)) "0" else as.character(n_v), fmt_int(n_v)),
-      .hm_cell(pen_v,  avg_pen,  fmt_pct(pen_v)),
-      .hm_cell(br_v,   avg_br,   fmt_n(br_v), d = 3),
-      .hm_cell(vs_v,   avg_vs,   fmt_pct(vs_v)),
-      .hm_cell(scro_v, avg_scro, fmt_pct(scro_v)),
+      .hm_cell(pen_v,  avg_pen,  sd_pen,  fmt_pct(pen_v)),
+      .hm_cell(br_v,   avg_br,   sd_br,   fmt_n(br_v), d = 3),
+      .hm_cell(vs_v,   avg_vs,   sd_vs,   fmt_pct(vs_v)),
+      .hm_cell(scro_v, avg_scro, sd_scro, fmt_pct(scro_v)),
       '</tr>')
   }
 
@@ -482,7 +483,7 @@ cb_brand_freq_scr_table_html <- function(norms_table,
       "SCR obs = share of category requirement (loyalty). ",
       vol_note,
       "CI band on Category avg = \u00b11 SD across brands. ",
-      "Heatmap: green \u2265 +10%, red \u2264 \u221210% vs category avg. ",
+      "Heatmap: green = above upper CI band, red = below lower CI band, amber = inside the band. ",
       "Click a column header to sort brands.")))
 
   paste(c(
