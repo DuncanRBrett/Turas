@@ -409,6 +409,22 @@ transform_brand_panels <- function(results, config) {
           as.character(cat_brands_local$BrandCode))
       }
 
+      # Build brand_colours lookup from Colour column (hex codes)
+      brand_colours <- list()
+      if (!is.null(cat_brands_local) && nrow(cat_brands_local) > 0 &&
+          "BrandCode" %in% names(cat_brands_local) &&
+          "Colour" %in% names(cat_brands_local)) {
+        for (ii in seq_len(nrow(cat_brands_local))) {
+          bc_ii <- trimws(as.character(cat_brands_local$BrandCode[ii]))
+          col_ii <- cat_brands_local$Colour[ii]
+          if (is.null(col_ii) || is.na(col_ii)) next
+          col_ii <- trimws(as.character(col_ii))
+          if (!nzchar(col_ii)) next
+          if (!grepl("^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$", col_ii)) next
+          brand_colours[[bc_ii]] <- col_ii
+        }
+      }
+
       panel_data <- list(
         cat_name              = cat_name,
         category_code         = cat_id,
@@ -421,6 +437,7 @@ transform_brand_panels <- function(results, config) {
         cat_buying_frequency  = cbf,
         repertoire            = rep,
         brand_labels          = brand_labels,
+        brand_colours         = brand_colours,
         cat_buying_dist_labels = config$cat_buying_dist_labels %||% NULL
       )
 

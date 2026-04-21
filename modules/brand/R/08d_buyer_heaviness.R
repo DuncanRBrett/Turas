@@ -77,6 +77,10 @@ run_buyer_heaviness <- function(pen_mat,
   freq_dist <- if (!is.null(x_mat))
     .bh_freq_dist(pen_mat, x_mat, brand_codes, w, buyers_mask) else NULL
 
+  # Category-level frequency distribution: bucket m_vec (total category
+  # purchases per buyer) into the same 1/2/3-5/6+ breaks used by brand_freq_dist.
+  cat_freq_dist <- .bh_category_freq_dist(m_vec, w, buyers_mask)
+
   # Check for all-same m_vec (tertiles undefined)
   if (length(unique(m_buyers)) == 1) {
     single_tier <- data.frame(
@@ -91,6 +95,7 @@ run_buyer_heaviness <- function(pen_mat,
       brand_heaviness        = .bh_empty_heaviness(brand_codes, n_brands),
       brand_loyalty_segments = loy_segs,
       brand_freq_dist        = freq_dist,
+      category_freq_dist     = cat_freq_dist,
       metrics_summary        = list(focal_brand = focal_brand %||% NA_character_,
                                     focal_nmi = NA_real_, focal_wbar = NA_real_,
                                     focal_wbar_gap = NA_real_)
@@ -184,6 +189,7 @@ run_buyer_heaviness <- function(pen_mat,
     brand_heaviness        = brand_heaviness,
     brand_loyalty_segments = loy_segs,
     brand_freq_dist        = freq_dist,
+    category_freq_dist     = cat_freq_dist,
     metrics_summary        = ms
   )
 }
@@ -344,6 +350,46 @@ run_buyer_heaviness <- function(pen_mat,
 
   as.data.frame(
     do.call(rbind, lapply(rows, as.data.frame, stringsAsFactors = FALSE)),
+    stringsAsFactors = FALSE)
+}
+
+
+#' Compute category-level purchase frequency distribution (1/2/3-5/6+ buckets)
+#'
+#' Buckets each category buyer by total category purchase count (\code{m_vec}).
+#' Uses the same breaks as \code{.bh_freq_dist} so the Category Context and
+#' Purchase Distribution panels share a consistent frequency concept.
+#'
+#' @param m_vec Numeric vector. Per-respondent category purchase count.
+#' @param w Numeric vector. Weights.
+#' @param buyers_mask Logical vector. TRUE for category buyers (m_vec > 0).
+#'
+#' @return Data frame with columns: Bucket (1, 2, 3to5, 6plus), Label
+#'   (1x, 2x, 3-5x, 6+x), Pct (% of category buyers), n (unweighted count).
+#' @keywords internal
+.bh_category_freq_dist <- function(m_vec, w, buyers_mask) {
+  m_b <- as.integer(round(m_vec[buyers_mask]))
+  m_b[is.na(m_b) | m_b < 1L] <- 1L
+  w_b   <- w[buyers_mask]
+  tot_w <- sum(w_b)
+  if (!is.finite(tot_w) || tot_w <= 0) {
+    return(data.frame(
+      Bucket = c("1", "2", "3to5", "6plus"),
+      Label  = c("1\u00d7", "2\u00d7", "3\u20135\u00d7", "6+\u00d7"),
+      Pct    = rep(NA_real_, 4),
+      n      = rep(0L, 4),
+      stringsAsFactors = FALSE))
+  }
+  masks <- list(
+    m_b == 1L,
+    m_b == 2L,
+    m_b >= 3L & m_b <= 5L,
+    m_b >= 6L)
+  data.frame(
+    Bucket = c("1", "2", "3to5", "6plus"),
+    Label  = c("1\u00d7", "2\u00d7", "3\u20135\u00d7", "6+\u00d7"),
+    Pct    = vapply(masks, function(mk) sum(w_b[mk]) / tot_w * 100, numeric(1)),
+    n      = vapply(masks, function(mk) sum(mk), integer(1)),
     stringsAsFactors = FALSE)
 }
 

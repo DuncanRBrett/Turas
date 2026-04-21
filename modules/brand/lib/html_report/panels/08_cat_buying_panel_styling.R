@@ -15,6 +15,7 @@ BRAND_CB_STYLING_VERSION <- "2.0"
 #' @return Character. A \code{<style>} HTML tag containing panel CSS.
 #' @keywords internal
 cb_panel_css <- function() {
+paste0(
 '<style>
 /* === Category Buying Panel === */
 .cb-panel { font-family: system-ui, -apple-system, sans-serif; }
@@ -90,9 +91,35 @@ cb_panel_css <- function() {
   padding: 12px 16px; margin: 8px 0 16px; font-size: 12px; color: #991b1b;
 }
 
+/* Focal brand dropdown (MA-style focus bar) */
+.cb-focus-bar {
+  display: flex; align-items: center; gap: 10px;
+  margin: 6px 0 10px; padding: 8px 12px;
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+}
+.cb-focus-label {
+  font-size: 11px; font-weight: 700; color: #475569;
+  letter-spacing: 0.3px; white-space: nowrap;
+}
+.cb-focus-select {
+  font-size: 13px; font-weight: 600; color: #1a2744;
+  padding: 5px 10px; border: 1px solid #cbd5e1; border-radius: 6px;
+  background: #fff; cursor: pointer; min-width: 180px;
+}
+.cb-focus-select:focus { outline: 2px solid var(--cb-focal-colour, #1A5276); outline-offset: 1px; }
+.cb-panel.cb-on-context .cb-focus-bar { display: none; }
+
 /* Panel-level brand picker */
 .cb-brand-picker, .cb-ctl-row {
   display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 0 0 14px;
+}
+/* Hide the panel-level brand picker while the (category-level) Context tab
+   is active — it has no focal-brand interactions. */
+.cb-panel.cb-on-context .cb-brand-picker { display: none; }
+/* Title-case variant of the control label (for the brand picker) */
+.cb-ctl-label.cb-ctl-label-title {
+  text-transform: none; letter-spacing: 0.2px;
+  font-size: 12px; color: #475569;
 }
 /* Legacy focal chip (kept for backwards compat) */
 .cb-focal-chip {
@@ -141,17 +168,25 @@ cb_panel_css <- function() {
   padding: 4px 8px; border-bottom: 1px solid #f1f5f9; font-size: 12px;
 }
 
-/* Brand Performance Summary table */
+',
+'/* Brand Performance Summary table (header style matches Brand Attitude) */
 .cb-brand-freq-wrap { overflow-x: auto; margin: 8px 0 20px; }
-.cb-brand-freq-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.cb-brand-freq-table { width: 100%; border-collapse: separate;
+  border-spacing: 0; font-size: 12px; }
 .cb-brand-freq-table th {
-  background: #1a2744; color: #fff; padding: 6px 8px;
-  text-align: center; font-weight: 600; white-space: nowrap; font-size: 11px;
-  text-transform: none;
+  background: #1e293b; color: #fff; padding: 8px 10px;
+  text-align: center; font-weight: 600; font-size: 11px;
+  letter-spacing: 0.3px; text-transform: none; white-space: normal;
+  border-bottom: 2px solid #0f172a;
 }
 .cb-brand-freq-table th:first-child { text-align: left; }
 .cb-brand-freq-table th.cb-sort-th { cursor: pointer; user-select: none; }
-.cb-brand-freq-table th.cb-sort-th:hover { background: #2a3a5c; }
+.cb-brand-freq-table th.cb-sort-th:hover { background: #334155; }
+.cb-brand-freq-table .cb-sort-arr {
+  display: inline-block; min-width: 14px; margin-left: 4px;
+  font-size: 10px; color: rgba(255,255,255,0.6);
+}
+.cb-brand-freq-table th.cb-sort-th:hover .cb-sort-arr { color: #e2e8f0; }
 .cb-brand-freq-table td {
   padding: 5px 8px; border-bottom: 1px solid #f1f5f9;
   text-align: right; font-size: 12px;
@@ -165,6 +200,72 @@ cb_panel_css <- function() {
   font-style: italic; color: #475569; background: #f8fafc;
 }
 .cb-brand-freq-table tr.cbp-brand-row:hover { background: #f8fafc; }
+
+/* MA-style sort indicator button inside the header */
+.cb-brand-freq-table .ct-sort-indicator {
+  background: transparent; border: none; color: rgba(255, 255, 255, 0.6);
+  cursor: pointer; padding: 0 2px; margin-left: 4px; font-size: 11px;
+  line-height: 1; transition: color 0.15s;
+}
+.cb-brand-freq-table .ct-sort-indicator:hover,
+.cb-brand-freq-table .ct-sort-indicator[data-cb-sort-dir="asc"],
+.cb-brand-freq-table .ct-sort-indicator[data-cb-sort-dir="desc"] {
+  color: #e2e8f0;
+}
+.cb-brand-freq-table .ct-sort-indicator[data-cb-sort-dir="asc"]::after  { content: " \\25B2"; font-size: 9px; }
+.cb-brand-freq-table .ct-sort-indicator[data-cb-sort-dir="desc"]::after { content: " \\25BC"; font-size: 9px; }
+.cb-brand-freq-table .ct-header-text { display: inline-block; }
+
+/* CI band under the Category avg cells (\u00b11 SD spread across brands) */
+.cb-ci-band {
+  display: block; margin-top: 2px; font-size: 9px; color: #94a3b8;
+  font-style: italic; font-weight: 400; white-space: nowrap;
+}
+
+/* Heatmap cells (off by default; flip data-cb-heatmap="on" on the table) */
+.cb-brand-freq-table[data-cb-heatmap="on"] td.cb-hm-above {
+  background: rgba(5, 150, 105, 0.16) !important; color: #065f46;
+}
+.cb-brand-freq-table[data-cb-heatmap="on"] td.cb-hm-below {
+  background: rgba(220, 38, 38, 0.14) !important; color: #991b1b;
+}
+.cb-brand-freq-table[data-cb-heatmap="on"] td.cb-hm-near {
+  background: rgba(148, 163, 184, 0.08);
+}
+
+/* Brand Summary chart area (Show chart toggle) */
+.cb-brands-chart-area { margin: 4px 0 12px; }
+.cb-brands-chart {
+  display: flex; flex-direction: column; gap: 6px; padding: 10px 12px;
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+}
+.cb-brands-chart-row {
+  display: grid; grid-template-columns: 140px 1fr; gap: 8px;
+  align-items: center; font-size: 11px;
+}
+.cb-brands-chart-label {
+  font-size: 11px; color: #334155; text-align: right;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 6px;
+}
+.cb-brands-chart-label.focal { font-weight: 700; color: #1a2744; }
+.cb-brands-chart-bar-track {
+  flex: 1; height: 16px; background: #eef2f7; border-radius: 3px;
+  overflow: hidden; position: relative;
+}
+.cb-brands-chart-bar {
+  height: 100%; background: var(--cb-focal-colour, #1A5276);
+  display: flex; align-items: center; justify-content: flex-end;
+  padding-right: 6px; color: #fff; font-size: 10px; font-weight: 600;
+  min-width: 18px;
+}
+.cb-brands-chart-avg-line {
+  position: absolute; top: 0; bottom: 0; width: 1px;
+  background: #0f172a; opacity: 0.5;
+}
+.cb-brands-chart-title {
+  font-size: 11px; font-weight: 600; color: #475569;
+  text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 2px;
+}
 
 /* === Sub-tab navigation === */
 .cb-subnav {
@@ -318,4 +419,5 @@ cb_panel_css <- function() {
 .ma-bar-group-label { font-size: 11px; fill: #334155; font-weight: 500; }
 .ma-bar-cat-avg  { stroke: #94a3b8; stroke-width: 1.5; stroke-dasharray: 4 3; }
 </style>'
+)
 }

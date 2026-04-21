@@ -51,6 +51,7 @@
 
   function getBrandColour(pd, code) {
     if (!pd || !code) return '#94a3b8';
+    if (pd.brandColours && pd.brandColours[code]) return pd.brandColours[code];
     if (pd.focalBrand === code) return pd.focalColour || '#1A5276';
     var idx = (pd.brandCodes || []).indexOf(code);
     if (idx < 0) idx = 0;
@@ -87,10 +88,12 @@
     };
 
     panel.__cbState = {
-      showchart: { loyalty: true, dist: true },
+      showchart: { loyalty: true, dist: true, brands: false },
+      heatmap:   { brands: false },
       visible: {
         loyalty: makeVisMap(pd.brandCodes),
-        dist:    makeVisMap(pd.brandCodes)
+        dist:    makeVisMap(pd.brandCodes),
+        brands:  makeVisMap(pd.brandCodes)
       },
       emphasis: { loyalty: 'all', dist: 'all' }
     };
@@ -98,8 +101,12 @@
     colourCbChips(panel);
     bindCbSubTabs(panel);
     bindCbChips(panel);
+    bindCbPanelChips(panel);
     bindCbShowChart(panel);
+    bindCbHeatmapToggle(panel);
+    bindCbSort(panel);
     bindCbEmphasisChips(panel);
+    bindCbBrandsFocusSelect(panel);
 
     renderCbStackedBars(panel, 'loyalty');
     renderCbStackedBars(panel, 'dist');
@@ -124,9 +131,15 @@
   function colourCbChips(panel) {
     var pd    = panel.__cbData;
     var focal = pd && pd.focalBrand;
-    panel.querySelectorAll('.fn-rel-brand-chip[data-cb-brand]').forEach(function (chip) {
-      var code = chip.getAttribute('data-cb-brand');
+    /* Panel-level chips use data-brand; per-tab chips use data-cb-brand */
+    panel.querySelectorAll(
+      '.fn-rel-brand-chip[data-cb-brand], .fn-rel-brand-chip[data-brand]'
+    ).forEach(function (chip) {
+      var code = chip.getAttribute('data-cb-brand') ||
+                 chip.getAttribute('data-brand');
+      if (!code) return;
       var col  = getBrandColour(pd, code);
+      chip.style.setProperty('--brand-chip-color', col);
       chip.style.backgroundColor = col;
       chip.style.borderColor     = col;
       chip.style.color           = '#fff';
@@ -150,6 +163,7 @@
           if (show) sp.removeAttribute('hidden');
           else      sp.setAttribute('hidden', '');
         });
+        panel.classList.toggle('cb-on-context', target === 'context');
         if (target === 'loyalty' || target === 'dist') {
           renderCbStackedBars(panel, target);
         }
@@ -195,6 +209,14 @@
       cb.addEventListener('change', function () {
         var scope = cb.getAttribute('data-cb-scope');
         panel.__cbState.showchart[scope] = cb.checked;
+        if (scope === 'brands') {
+          var brandsArea = panel.querySelector('.cb-brands-chart-area[data-cb-scope="brands"]');
+          if (brandsArea) {
+            if (cb.checked) { brandsArea.removeAttribute('hidden'); renderCbBrandsChart(panel); }
+            else              brandsArea.setAttribute('hidden', '');
+          }
+          return;
+        }
         var chartArea = panel.querySelector('.fn-rel-chart-area[data-cb-scope="' + scope + '"]');
         if (chartArea) {
           if (cb.checked) { chartArea.removeAttribute('hidden'); renderCbStackedBars(panel, scope); }
@@ -202,6 +224,216 @@
         }
       });
     });
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Panel-level brand chips: show/hide rows in the Brand Summary table      */
+  /* (chips DO NOT change the focal brand; focal changes via <select>)       */
+  /* ---------------------------------------------------------------------- */
+
+  function bindCbPanelChips(panel) {
+    panel.querySelectorAll(
+      '.fn-rel-brand-chip[data-cb-action="toggle-row"]'
+    ).forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        var code = chip.getAttribute('data-brand');
+        if (!code) return;
+        var vis = panel.__cbState.visible.brands;
+        vis[code] = !vis[code];
+        chip.classList.toggle('col-chip-off', !vis[code]);
+        applyBrandsRowVisibility(panel);
+        if (panel.__cbState.showchart.brands) renderCbBrandsChart(panel);
+      });
+    });
+  }
+
+  function applyBrandsRowVisibility(panel) {
+    var vis = panel.__cbState.visible.brands || {};
+    panel.querySelectorAll('.cb-brand-freq-table tbody tr[data-brand]').forEach(function (tr) {
+      var code = tr.getAttribute('data-brand');
+      tr.style.display = vis[code] === false ? 'none' : '';
+    });
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Heatmap mode toggle (flips data-cb-heatmap attr on the table)          */
+  /* ---------------------------------------------------------------------- */
+
+  function bindCbHeatmapToggle(panel) {
+    panel.querySelectorAll('input[data-cb-action="heatmapmode"]').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        var scope = cb.getAttribute('data-cb-scope') || 'brands';
+        panel.__cbState.heatmap[scope] = cb.checked;
+        panel.querySelectorAll('.cb-brand-freq-table').forEach(function (table) {
+          table.setAttribute('data-cb-heatmap', cb.checked ? 'on' : 'off');
+        });
+      });
+    });
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Sort handler for Brand Summary table (MA-style header buttons)          */
+  /* ---------------------------------------------------------------------- */
+
+  function bindCbSort(panel) {
+    panel.querySelectorAll('[data-cb-action="sort"]').forEach(function (btn) {
+      btn.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        var tableId = btn.getAttribute('data-cb-sort-table');
+        var col     = parseInt(btn.getAttribute('data-cb-sort-col'), 10);
+        var table   = document.getElementById(tableId);
+        if (!table || isNaN(col)) return;
+        var tbody = table.querySelector('tbody');
+        if (!tbody) return;
+
+        /* Cycle this button: none -> desc -> asc -> none */
+        var curDir = btn.getAttribute('data-cb-sort-dir') || 'none';
+        var nextDir = curDir === 'none' ? 'desc'
+                   : curDir === 'desc' ? 'asc' : 'none';
+
+        /* Reset all sort indicators on this table */
+        table.querySelectorAll('[data-cb-action="sort"][data-cb-sort-table="' + tableId + '"]')
+          .forEach(function (b) { b.setAttribute('data-cb-sort-dir', 'none'); });
+        btn.setAttribute('data-cb-sort-dir', nextDir);
+
+        /* Only sortable rows (exclude focal row + cat avg row) */
+        var rows = Array.prototype.slice.call(
+          tbody.querySelectorAll('tr.cbp-brand-row'));
+        if (rows.length === 0) return;
+
+        var readVal = function (tr) {
+          var cells = tr.children;
+          if (col >= cells.length) return NaN;
+          var v = cells[col].getAttribute('data-v');
+          var n = parseFloat(v);
+          return isNaN(n) ? -Infinity : n;
+        };
+
+        if (nextDir === 'none') {
+          /* Restore default order: data-default-order attr, or leave alone */
+          rows.sort(function (a, b) {
+            return (parseInt(a.getAttribute('data-default-order') || '0', 10)
+                  - parseInt(b.getAttribute('data-default-order') || '0', 10));
+          });
+        } else {
+          var dir = nextDir === 'asc' ? 1 : -1;
+          rows.sort(function (a, b) {
+            var av = readVal(a), bv = readVal(b);
+            if (av === bv) return 0;
+            return av > bv ? dir : -dir;
+          });
+        }
+
+        /* Re-append sortable rows after the cat-avg row */
+        rows.forEach(function (r) { tbody.appendChild(r); });
+      });
+    });
+
+    /* Stamp default-order so the "none" state can restore the starting sequence */
+    panel.querySelectorAll('.cb-brand-freq-table').forEach(function (table) {
+      var tbody = table.querySelector('tbody');
+      if (!tbody) return;
+      var i = 0;
+      tbody.querySelectorAll('tr.cbp-brand-row').forEach(function (tr) {
+        tr.setAttribute('data-default-order', String(i++));
+      });
+    });
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Focal <select> dropdown (delegates to _cbSetFocal for table+KPI update) */
+  /* ---------------------------------------------------------------------- */
+
+  function bindCbBrandsFocusSelect(panel) {
+    /* Re-render the Brand Summary chart (if visible) after focal changes */
+    var sel = panel.querySelector('select.cb-focus-select[data-cb-action="focus"]');
+    if (!sel) return;
+    sel.addEventListener('change', function () {
+      if (panel.__cbState.showchart.brands) renderCbBrandsChart(panel);
+    });
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Brand Summary chart renderer (bar chart of Pen / Avg purch / Vol / SCR) */
+  /* ---------------------------------------------------------------------- */
+
+  function renderCbBrandsChart(panel) {
+    var host = panel.querySelector('.cb-brands-chart[data-cb-brands-chart="brands"]');
+    if (!host) return;
+    var table = panel.querySelector('.cb-brand-freq-table');
+    if (!table) { host.innerHTML = ''; return; }
+
+    /* Column indices must mirror the R-side header order: */
+    /* 0 Brand | 1 Base | 2 Pen | 3 Avg purch. | 4 Vol share | 5 SCR obs */
+    var metrics = [
+      { col: 2, label: 'Penetration',   suffix: '%' },
+      { col: 3, label: 'Avg purchases', suffix: ''  },
+      { col: 4, label: 'Vol share',     suffix: '%' },
+      { col: 5, label: 'SCR obs',       suffix: '%' }
+    ];
+
+    var pd    = panel.__cbData || {};
+    var focal = pd.focalBrand;
+    var vis   = (panel.__cbState.visible && panel.__cbState.visible.brands) || {};
+
+    var rows = Array.prototype.slice.call(
+      table.querySelectorAll('tbody tr[data-brand]'));
+    var avgRow = table.querySelector('tbody tr.cbp-avg-row');
+
+    var html = '';
+    metrics.forEach(function (m) {
+      /* collect (brand, value) pairs */
+      var entries = [];
+      var vals    = [];
+      rows.forEach(function (tr) {
+        var code = tr.getAttribute('data-brand');
+        if (vis[code] === false) return;
+        var cell = tr.children[m.col];
+        if (!cell) return;
+        var v = parseFloat(cell.getAttribute('data-v'));
+        if (isNaN(v)) return;
+        entries.push({ code: code, v: v, isFocal: code === focal });
+        vals.push(v);
+      });
+      if (entries.length === 0) return;
+
+      var max = Math.max.apply(null, vals);
+      if (!isFinite(max) || max <= 0) max = 1;
+
+      /* Category average from the avg row */
+      var avgV = NaN;
+      if (avgRow && avgRow.children[m.col]) {
+        avgV = parseFloat(avgRow.children[m.col].getAttribute('data-v'));
+      }
+      var avgPct = (!isNaN(avgV) && max > 0) ? Math.min(100, (avgV / max) * 100) : null;
+
+      html += '<div class="cb-brands-chart-group">';
+      html += '<div class="cb-brands-chart-title">' + escHtml(m.label) + '</div>';
+      entries.forEach(function (e) {
+        var pct  = Math.max(0, (e.v / max) * 100);
+        var col  = getBrandColour(pd, e.code);
+        var name = getBrandName(pd, e.code);
+        var txt  = (m.suffix === '%'
+          ? e.v.toFixed(0) + '%'
+          : e.v.toFixed(e.v < 10 ? 2 : 1));
+        html += '<div class="cb-brands-chart-row">'
+             +   '<div class="cb-brands-chart-label' + (e.isFocal ? ' focal' : '') + '">'
+             +     escHtml(name) + (e.isFocal ? ' \u2605' : '')
+             +   '</div>'
+             +   '<div class="cb-brands-chart-bar-track">'
+             +     '<div class="cb-brands-chart-bar" style="width:' + pct.toFixed(1)
+             +       '%;background:' + col + ';">' + txt + '</div>'
+             +     (avgPct !== null
+               ? '<div class="cb-brands-chart-avg-line" title="Category avg" '
+                 + 'style="left:' + avgPct.toFixed(1) + '%;"></div>'
+               : '')
+             +   '</div>'
+             + '</div>';
+      });
+      html += '</div>';
+    });
+
+    host.innerHTML = html || '<div style="font-size:11px;color:#94a3b8;">No visible brands.</div>';
   }
 
   /* ---------------------------------------------------------------------- */
@@ -368,7 +600,7 @@
         else          { tr.classList.remove('focal-row');    tr.classList.add('cbp-brand-row'); }
         var badge = tr.querySelector('.cb-focal-badge');
         if (isFocal && !badge) {
-          var nameCell = tr.querySelector('.brand-col');
+          var nameCell = tr.querySelector('.ct-label-col, .brand-col');
           if (nameCell) {
             badge = document.createElement('span');
             badge.className = 'cb-focal-badge';

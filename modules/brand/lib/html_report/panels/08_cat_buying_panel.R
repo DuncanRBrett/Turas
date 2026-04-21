@@ -83,6 +83,7 @@ render_cat_buying_panel <- function(panel_data) {
   cbf          <- panel_data$cat_buying_frequency
   rep          <- panel_data$repertoire
   brand_labels <- panel_data$brand_labels %||% NULL
+  brand_colours <- panel_data$brand_colours %||% list()
   dist_labels  <- panel_data$cat_buying_dist_labels %||% NULL
 
   has_dn <- !is.null(dn) && !identical(dn$status, "REFUSED")
@@ -94,7 +95,7 @@ render_cat_buying_panel <- function(panel_data) {
   if (exists("cb_panel_css", mode = "function")) parts <- c(parts, cb_panel_css())
 
   parts <- c(parts, sprintf(
-    '<div class="cb-panel" id="%s" data-focal-colour="%s" style="--cb-focal-colour:%s;">',
+    '<div class="cb-panel cb-on-context" id="%s" data-focal-colour="%s" style="--cb-focal-colour:%s;">',
     panel_id, .cb_esc(fcol), .cb_esc(fcol)))
 
   subtitle <- sprintf(
@@ -104,21 +105,22 @@ render_cat_buying_panel <- function(panel_data) {
     '<p class="cb-subtitle" style="margin-top:0;">%s</p>', .cb_esc(subtitle)))
 
   # Brand picker (focal switcher above all tabs)
-  parts <- c(parts, .cb_brand_picker(dn, bh, focal, fcol, cat_code, brand_labels))
+  parts <- c(parts, .cb_brand_picker(dn, bh, focal, fcol, cat_code,
+                                      brand_labels, brand_colours))
 
   # JSON: per-brand KPI data for focal switcher
   parts <- c(parts, .cb_kpi_json_script(dn, bh, cat_code))
 
   # JSON: chart data for JS stacked bar renderer
   parts <- c(parts, .cb_chart_data_json(
-    dn, bh, focal, fcol, brand_labels, dist_labels, cat_code))
+    dn, bh, focal, fcol, brand_labels, brand_colours, dist_labels, cat_code))
 
   # Sub-tab navigation
   parts <- c(parts, .cb_sub_tab_nav(cat_code))
 
   # ----- Tab 1: Category Context (default) -----------------------------------
   parts <- c(parts, '<div class="cb-subtab" data-cb-tab="context">')
-  parts <- c(parts, .cb_context_tab(cbf, rep, dn))
+  parts <- c(parts, .cb_context_tab(cbf, rep, dn, bh, dist_labels))
   parts <- c(parts, '</div>')
 
   # ----- Tab 2: Brand Performance Summary ------------------------------------
@@ -208,21 +210,40 @@ render_cat_buying_panel <- function(panel_data) {
 # TAB CONTENT BUILDERS
 # ==============================================================================
 
-.cb_context_tab <- function(cbf, rep, dn = NULL) {
+.cb_context_tab <- function(cbf, rep, dn = NULL, bh = NULL, dist_labels = NULL) {
   parts <- character(0)
   parts <- c(parts, '<div class="cb-section-title">Category Context</div>')
   parts <- c(parts, '<p style="font-size:12px;color:#64748b;margin:-4px 0 12px;">Category-level purchase frequency and brand repertoire distributions among category buyers.</p>')
 
+  # KPI strip: Avg purchases + Avg brands bought, side-by-side
+  kpi_chips <- character(0)
   if (!is.null(dn) && !identical(dn$status, "REFUSED") &&
       !is.null(dn$category_metrics$mean_purchases)) {
     mp <- sprintf("%.1f", dn$category_metrics$mean_purchases)
-    parts <- c(parts, sprintf(
-      '<div class="cb-kpi-strip" style="margin-bottom:16px;"><div class="cb-kpi-chip"><div class="cb-kpi-val">%s</div><div class="cb-kpi-label">Avg purchases / category buyer</div></div></div>',
+    kpi_chips <- c(kpi_chips, sprintf(
+      '<div class="cb-kpi-chip"><div class="cb-kpi-val">%s</div><div class="cb-kpi-label">Avg purchases / category buyer</div></div>',
       mp))
   }
+  if (!is.null(rep) && !identical(rep$status, "REFUSED") &&
+      !is.null(rep$mean_repertoire) && !is.na(rep$mean_repertoire)) {
+    mr <- sprintf("%.1f", rep$mean_repertoire)
+    kpi_chips <- c(kpi_chips, sprintf(
+      '<div class="cb-kpi-chip"><div class="cb-kpi-val">%s</div><div class="cb-kpi-label">Avg brands bought / category buyer</div></div>',
+      mr))
+  }
+  if (length(kpi_chips) > 0) {
+    parts <- c(parts, sprintf(
+      '<div class="cb-kpi-strip" style="margin-bottom:16px;">%s</div>',
+      paste(kpi_chips, collapse = "")))
+  }
+
+  # Category freq distribution from BRANDPEN3-derived m_vec (same buckets as
+  # the Purchase Distribution tab) — replaces the stated-scale cbf distribution.
+  cat_fd <- if (!is.null(bh) && !identical(bh$status, "REFUSED"))
+    bh$category_freq_dist else NULL
 
   if (exists("cb_freq_repertoire_tables_html", mode = "function")) {
-    parts <- c(parts, cb_freq_repertoire_tables_html(cbf, rep))
+    parts <- c(parts, cb_freq_repertoire_tables_html(cat_fd, rep, dist_labels))
   }
   paste(parts, collapse = "\n")
 }
@@ -232,9 +253,27 @@ render_cat_buying_panel <- function(panel_data) {
   parts <- character(0)
   parts <- c(parts, '<div class="cb-section-title">Brand Performance Summary</div>')
   parts <- c(parts,
-    '<p style="font-size:12px;color:#64748b;margin:-4px 0 8px;">Penetration and volume share are based on BRANDPEN3 purchase counts after reconciliation. SCR = share of category requirement (loyalty metric). \u0394\u2265\u00b120pp shaded.</p>')
+    '<p style="font-size:12px;color:#64748b;margin:-4px 0 8px;">Penetration and volume share are based on BRANDPEN3 purchase counts after reconciliation. SCR = share of category requirement (loyalty metric).</p>')
   has_dn <- !is.null(dn) && !identical(dn$status, "REFUSED")
   has_bh <- !is.null(bh) && !identical(bh$status, "REFUSED")
+
+  # Controls bar: show chart + show heatmap (both off by default)
+  parts <- c(parts,
+    '<div class="cb-controls-bar" data-cb-scope="brands">',
+    '  <label class="toggle-label">',
+    '    <input type="checkbox" data-cb-action="showchart" data-cb-scope="brands"> Show chart',
+    '  </label>',
+    '  <label class="toggle-label">',
+    '    <input type="checkbox" data-cb-action="heatmapmode" data-cb-scope="brands"> Show heatmap',
+    '  </label>',
+    '</div>')
+
+  # Chart placeholder (hidden until toggled)
+  parts <- c(parts,
+    '<div class="cb-brands-chart-area" data-cb-scope="brands" hidden>',
+    '  <div class="cb-brands-chart" data-cb-brands-chart="brands"></div>',
+    '</div>')
+
   if (has_dn && exists("cb_brand_freq_scr_table_html", mode = "function")) {
     parts <- c(parts, cb_brand_freq_scr_table_html(
       dn$norms_table,
@@ -540,6 +579,7 @@ render_cat_buying_panel <- function(panel_data) {
 # ==============================================================================
 
 .cb_chart_data_json <- function(dn, bh, focal, fcol, brand_labels,
+                                 brand_colours = list(),
                                  dist_labels, cat_code) {
   has_bh <- !is.null(bh) && !identical(bh$status, "REFUSED")
   lbl_fn <- if (exists(".cb_brand_lbl", mode = "function")) .cb_brand_lbl else
@@ -573,13 +613,24 @@ render_cat_buying_panel <- function(panel_data) {
   dist_block <- .cb_chart_block(
     bh, "brand_freq_dist", codes, dist_codes, dist_seg_labels, dist_cols, has_bh)
 
+  # Brand colours map (only for brands with an explicit hex)
+  colours_map <- list()
+  if (!is.null(brand_colours) && length(brand_colours) > 0) {
+    for (bc in codes) {
+      if (!is.null(brand_colours[[bc]]) && nzchar(brand_colours[[bc]])) {
+        colours_map[[bc]] <- as.character(brand_colours[[bc]])
+      }
+    }
+  }
+
   payload <- list(
-    brandCodes  = as.list(codes),
-    brandNames  = as.list(unname(names_vec)),
-    focalBrand  = focal %||% "",
-    focalColour = fcol %||% "#1A5276",
-    loyalty     = loy_block,
-    dist        = dist_block
+    brandCodes   = as.list(codes),
+    brandNames   = as.list(unname(names_vec)),
+    brandColours = colours_map,
+    focalBrand   = focal %||% "",
+    focalColour  = fcol %||% "#1A5276",
+    loyalty      = loy_block,
+    dist         = dist_block
   )
 
   json_str <- tryCatch(
@@ -686,7 +737,7 @@ render_cat_buying_panel <- function(panel_data) {
 
 
 .cb_brand_picker <- function(dn, bh, focal, fcol, cat_code,
-                              brand_labels = NULL) {
+                              brand_labels = NULL, brand_colours = list()) {
   codes <- character(0)
   if (!is.null(dn) && !identical(dn$status, "REFUSED") && !is.null(dn$norms_table))
     codes <- c(codes, as.character(dn$norms_table$BrandCode))
@@ -698,18 +749,53 @@ render_cat_buying_panel <- function(panel_data) {
   lbl_fn <- if (exists(".cb_brand_lbl", mode = "function")) .cb_brand_lbl else
     function(code, bl) tools::toTitleCase(tolower(as.character(code)))
 
-  chips <- paste(vapply(codes, function(bc) {
+  # Fallback palette — same as JS PALETTE for brands without Colour
+  palette <- c('#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f',
+               '#edc948', '#b07aa1', '#ff9da7', '#9c755f', '#bab0ac')
+  resolve_colour <- function(bc, idx) {
+    if (!is.null(brand_colours) && !is.null(brand_colours[[bc]]) &&
+        nzchar(brand_colours[[bc]])) {
+      return(as.character(brand_colours[[bc]]))
+    }
+    if (!is.null(focal) && bc == focal && !is.null(fcol) && nzchar(fcol)) {
+      return(as.character(fcol))
+    }
+    palette[((idx - 1) %% length(palette)) + 1]
+  }
+
+  # Focal-brand <select> dropdown (MA-style)
+  select_options <- paste(vapply(seq_along(codes), function(i) {
+    bc <- codes[i]
     lbl <- lbl_fn(bc, brand_labels)
+    sel <- if (!is.null(focal) && bc == focal) " selected" else ""
+    sprintf('<option value="%s"%s>%s</option>',
+            .cb_esc(bc), sel, .cb_esc(lbl))
+  }, character(1)), collapse = "")
+
+  focus_bar <- sprintf(
+    '<div class="cb-focus-bar">
+       <label class="cb-focus-label">Focal brand</label>
+       <select class="cb-focus-select" data-cb-action="focus" onchange="_cbSetFocal(this,\'%s\')">%s</select>
+     </div>',
+    .cb_esc(cat_code), select_options)
+
+  # Coloured brand chips — show/hide toggles (NOT focal selectors).
+  # Clicking a chip hides its row in the brand summary table via JS.
+  chips <- paste(vapply(seq_along(codes), function(i) {
+    bc <- codes[i]
+    lbl <- lbl_fn(bc, brand_labels)
+    col <- resolve_colour(bc, i)
     is_foc <- !is.null(focal) && bc == focal
     badge <- if (is_foc) ' <span class="fn-focal-badge">FOCAL</span>' else ""
     sprintf(
-      '<button type="button" class="col-chip fn-rel-brand-chip active" data-brand="%s" onclick="_cbSetFocal(this,\'%s\')">%s%s</button>',
-      .cb_esc(bc), .cb_esc(cat_code), .cb_esc(lbl), badge)
+      '<button type="button" class="col-chip fn-rel-brand-chip active" data-cb-action="toggle-row" data-brand="%s" style="--brand-chip-color:%s;background-color:%s;border-color:%s;color:#fff;">%s%s</button>',
+      .cb_esc(bc), .cb_esc(col), .cb_esc(col), .cb_esc(col),
+      .cb_esc(lbl), badge)
   }, character(1)), collapse = "")
 
   sprintf(
-    '<div class="cb-brand-picker"><span class="cb-ctl-label">BRANDS:</span><div class="col-chip-bar">%s</div></div>',
-    chips)
+    '%s<div class="cb-brand-picker"><span class="cb-ctl-label cb-ctl-label-title">Show brands</span><div class="col-chip-bar">%s</div></div>',
+    focus_bar, chips)
 }
 
 

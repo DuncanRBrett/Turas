@@ -163,65 +163,68 @@ cb_norms_table_html <- function(norms_table,
 
 #' Build compact Category Context tables: purchase frequency + repertoire size
 #'
-#' Returns two side-by-side tables in a CSS grid wrapper, followed by the mean
-#' repertoire stat. Both tables are always rendered; if data is unavailable an
-#' informative note is shown instead.
+#' Returns two side-by-side tables in a CSS grid wrapper. Both tables are
+#' always rendered; if data is unavailable an informative note is shown.
 #'
-#' @param cbf List or NULL. \code{cat_buying_frequency} result from run_brand().
-#'   Must contain \code{cbf$distribution} with columns \code{Label} and \code{Pct}.
+#' Purchase Frequency uses the category-level 1x / 2x / 3-5x / 6+x buckets
+#' derived from BRANDPEN3 purchase counts (\code{bh$category_freq_dist}),
+#' matching the column headers used on the Purchase Distribution sub-tab.
+#' Custom bucket labels may be supplied via \code{dist_labels}.
+#'
+#' @param cat_fd Data frame or NULL. From
+#'   \code{run_buyer_heaviness()$category_freq_dist}. Columns: Bucket, Label,
+#'   Pct, n. Pct is % of category buyers in each bucket.
 #' @param rep List or NULL. \code{repertoire} result from run_brand().
 #'   Must contain \code{rep$repertoire_size} with columns
 #'   \code{Brands_Bought} and \code{Percentage}.
-#'   \code{rep$mean_repertoire} displayed as a summary stat when present.
+#' @param dist_labels Character vector of length 4 or NULL. Overrides the
+#'   default bucket labels (1x / 2x / 3-5x / 6+x).
 #'
-#' @return Character. HTML string (two-column grid with compact tables + mean stat).
+#' @return Character. HTML string (two-column grid with compact tables).
 #' @keywords internal
-cb_freq_repertoire_tables_html <- function(cbf = NULL, rep = NULL) {
+cb_freq_repertoire_tables_html <- function(cat_fd = NULL, rep = NULL,
+                                            dist_labels = NULL) {
   lines <- character(0)
   lines <- c(lines, '<div class="cb-context-tables">')
 
-  # --- Purchase Frequency Distribution ---
+  # --- Category Purchase Frequency (BRANDPEN3 buckets) ---
   lines <- c(lines, '<div>')
   lines <- c(lines, '<div class="cb-ctx-subtitle">Category Purchase Frequency</div>')
 
-  freq_ok <- !is.null(cbf) && !identical(cbf$status, "REFUSED") &&
-             !is.null(cbf$distribution) && nrow(cbf$distribution) > 0
+  freq_ok <- !is.null(cat_fd) && is.data.frame(cat_fd) && nrow(cat_fd) > 0 &&
+             "Pct" %in% names(cat_fd)
 
   if (freq_ok) {
-    dist <- cbf$distribution
-    if ("Order" %in% names(dist)) dist <- dist[order(dist$Order), , drop = FALSE]
+    default_lbl <- c("1\u00d7", "2\u00d7", "3\u20135\u00d7", "6+\u00d7")
+    labels <- if (!is.null(dist_labels) && length(dist_labels) == 4L)
+      as.character(dist_labels)
+    else if ("Label" %in% names(cat_fd))
+      as.character(cat_fd$Label)
+    else default_lbl
+
     lines <- c(lines, '<table class="cb-ctx-table">')
-    lines <- c(lines, '<thead><tr><th>Frequency</th><th style="text-align:right;">%</th></tr></thead>')
+    lines <- c(lines, '<thead><tr><th>Purchases in window</th><th style="text-align:right;">%</th></tr></thead>')
     lines <- c(lines, '<tbody>')
-    for (i in seq_len(nrow(dist))) {
-      lbl_i <- if ("Label" %in% names(dist)) .cb_esc(dist$Label[i]) else as.character(i)
-      pct_i <- if ("Pct" %in% names(dist) && !is.na(dist$Pct[i]))
-        sprintf("%.1f%%", dist$Pct[i]) else "\u2014"
+    for (i in seq_len(nrow(cat_fd))) {
+      lbl_i <- .cb_esc(labels[i])
+      pct_i <- if (!is.na(cat_fd$Pct[i])) sprintf("%.1f%%", cat_fd$Pct[i])
+               else "\u2014"
       lines <- c(lines, sprintf('<tr><td>%s</td><td style="text-align:right;">%s</td></tr>',
                                  lbl_i, pct_i))
     }
     lines <- c(lines, '</tbody></table>')
+    lines <- c(lines, '<p style="font-size:10px;color:#94a3b8;margin:4px 0 0;font-style:italic;">% of category buyers by total category purchases in target window (BRANDPEN3).</p>')
   } else {
-    lines <- c(lines, '<p style="font-size:12px;color:#94a3b8;">Purchase frequency data not available.</p>')
+    lines <- c(lines, '<p style="font-size:12px;color:#94a3b8;">Category frequency data not available.</p>')
   }
   lines <- c(lines, '</div>')
 
-  # --- Repertoire Size Distribution + mean stat ---
+  # --- Repertoire Size Distribution ---
   lines <- c(lines, '<div>')
   lines <- c(lines, '<div class="cb-ctx-subtitle">Repertoire Size</div>')
 
   rep_ok <- !is.null(rep) && !identical(rep$status, "REFUSED") &&
             !is.null(rep$repertoire_size) && nrow(rep$repertoire_size) > 0
-
-  mean_rep <- if (!is.null(rep) && !identical(rep$status, "REFUSED") &&
-                  !is.null(rep$mean_repertoire) && !is.na(rep$mean_repertoire))
-    rep$mean_repertoire else NULL
-
-  if (!is.null(mean_rep)) {
-    lines <- c(lines, sprintf(
-      '<div class="cb-ctx-stat">Mean: <strong>%.1f brands</strong> per buyer</div>',
-      mean_rep))
-  }
 
   if (rep_ok) {
     rs <- rep$repertoire_size
@@ -288,13 +291,6 @@ cb_brand_freq_scr_table_html <- function(norms_table,
   fmt_int  <- function(x) if (is.na(x) || x == 0L) "\u2014" else
     formatC(as.integer(x), format = "d", big.mark = ",")
 
-  dev_cls <- function(v) {
-    if (is.na(v)) return("")
-    if (abs(v) >= 20) {
-      if (v > 0) " class=\"cb-dev-large-pos\"" else " class=\"cb-dev-large-neg\""
-    } else ""
-  }
-
   vol_share_fn <- function(pen, buy_rate) {
     if (is.na(pen) || is.na(buy_rate) || is.na(cat_mean_purch) ||
         cat_mean_purch == 0) return(NA_real_)
@@ -313,32 +309,49 @@ cb_brand_freq_scr_table_html <- function(norms_table,
     else NA_integer_
   }
 
-  # Column-wise stats across all brands (for category avg row + range display)
+  # Column-wise stats across all brands (for category avg row + heatmap/CI bands)
   all_pen  <- as.numeric(norms_table$Penetration_Obs_Pct)
   all_br   <- as.numeric(norms_table$BuyRate_Obs)
   all_scro <- as.numeric(norms_table$SCR_Obs_Pct)
-  all_scre <- as.numeric(norms_table$SCR_Exp_Pct)
-  all_scrd <- as.numeric(norms_table$SCR_Dev_Pct)
   all_vs   <- vapply(seq_len(nrow(norms_table)),
     function(i) vol_share_fn(all_pen[i], all_br[i]), numeric(1))
 
   avg_pen  <- mean(all_pen,  na.rm = TRUE)
   avg_br   <- mean(all_br,   na.rm = TRUE)
   avg_scro <- mean(all_scro, na.rm = TRUE)
-  avg_scre <- mean(all_scre, na.rm = TRUE)
-  avg_scrd <- mean(all_scrd, na.rm = TRUE)
   avg_vs   <- mean(all_vs,   na.rm = TRUE)
 
-  # Min–max range text for category avg row (mirrors the CI bars in brand attitude)
-  .rng <- function(vals) {
-    mn <- min(vals, na.rm = TRUE); mx <- max(vals, na.rm = TRUE)
-    if (!is.finite(mn) || !is.finite(mx)) return("")
-    sprintf('<div class="cb-perf-range">%.0f\u2013%.0f%%</div>', mn, mx)
+  sd_pen  <- stats::sd(all_pen,  na.rm = TRUE)
+  sd_br   <- stats::sd(all_br,   na.rm = TRUE)
+  sd_scro <- stats::sd(all_scro, na.rm = TRUE)
+  sd_vs   <- stats::sd(all_vs,   na.rm = TRUE)
+
+  # CI band = cross-brand 1-SD spread around the mean (a visual band, not a
+  # sampling-CI). Mirrors the "range" hint MA shows under cat-avg cells.
+  .ci_band <- function(mn, sd_v, digits = 0, pct = TRUE) {
+    if (!is.finite(mn) || !is.finite(sd_v) || sd_v == 0) return("")
+    lo <- mn - sd_v; hi <- mn + sd_v
+    fmt <- if (pct) sprintf("%%.%df%%%%\u2013%%.%df%%%%", digits, digits) else
+      sprintf("%%.%df\u2013%%.%df", digits, digits)
+    sprintf('<div class="cb-ci-band" title="\u00b11 SD across brands">%s</div>',
+            sprintf(fmt, lo, hi))
   }
-  .rng_n <- function(vals) {
-    mn <- min(vals, na.rm = TRUE); mx <- max(vals, na.rm = TRUE)
-    if (!is.finite(mn) || !is.finite(mx)) return("")
-    sprintf('<div class="cb-perf-range">%.1f\u2013%.1f</div>', mn, mx)
+
+  # Heatmap cell class (relative to cat avg): green when above avg by >10%,
+  # red when below by >10% (as % deviation from avg). Tunable threshold.
+  .hm_cls <- function(v, avg) {
+    if (is.na(v) || is.na(avg) || avg == 0) return("")
+    dev <- (v - avg) / abs(avg) * 100
+    if (dev >= 10)      " cb-hm-above"
+    else if (dev <= -10) " cb-hm-below"
+    else                 " cb-hm-near"
+  }
+  .hm_cell <- function(v, avg, text, d = 2) {
+    cls <- .hm_cls(v, avg)
+    sprintf('<td class="cb-hm-cell%s" data-v="%s">%s</td>',
+            cls,
+            if (is.na(v)) "" else formatC(v, format = "f", digits = d),
+            text)
   }
 
   # Sort order: focal first, then other brands by penetration descending
@@ -373,134 +386,115 @@ cb_brand_freq_scr_table_html <- function(norms_table,
     "This is a loyalty metric \u2014 it does NOT sum to 100%% across brands ",
     "because each brand\u2019s SCR is measured within its own buyer group.")
 
-  # --- Inline sort JS (emitted once per table) ---
-  sort_js <- sprintf(
-    '<script>(function(){window._cbpSort=window._cbpSort||function(th,id,ci){var asc=th.dataset.asc!=="1";th.dataset.asc=asc?"1":"0";var body=document.querySelector("#"+id+" tbody");var rows=Array.from(body.querySelectorAll("tr.cbp-brand-row"));rows.sort(function(a,b){var av=parseFloat(a.cells[ci].dataset.v)||0,bv=parseFloat(b.cells[ci].dataset.v)||0;return(asc?1:-1)*(av-bv);});rows.forEach(function(r){body.appendChild(r);});document.querySelectorAll("#"+id+" .cb-sort-arr").forEach(function(s){s.textContent="\u21c5";});th.querySelector(".cb-sort-arr").textContent=asc?"\u2191":"\u2193";};})();</script>',
-    character(0))
-
-  # --- Build HTML ---
-  lines <- character(0)
-  lines <- c(lines, sort_js)
-  lines <- c(lines, '<div class="cb-brand-freq-wrap">')
-  lines <- c(lines, sprintf('<table class="cb-brand-freq-table" id="%s">', tbl_id))
-
-  # Header row with sort buttons on numeric columns
+  # --- Header: sort buttons on numeric columns (MA-style indicator) ---
   .sort_th <- function(label, ci, tip = "") {
     tip_attr <- if (nzchar(tip)) sprintf(' title="%s"', .cb_esc(tip)) else ""
     sprintf(
-      '<th class="cb-sort-th"%s onclick="_cbpSort(this,\'%s\',%d)">%s<span class="cb-sort-arr">\u21c5</span></th>',
-      tip_attr, tbl_id, ci, label)
+      paste0('<th class="cb-sort-th" data-sort-col="%d"%s>',
+             '<div class="ct-header-text">%s</div>',
+             '<button type="button" class="ct-sort-indicator" aria-label="Sort by %s" ',
+             'data-cb-action="sort" data-cb-sort-col="%d" data-cb-sort-table="%s" ',
+             'data-cb-sort-dir="none">\u21C5</button>',
+             '</th>'),
+      ci, tip_attr, label, .cb_esc(label), ci, tbl_id)
   }
 
-  lines <- c(lines, '<thead><tr>',
-    '<th style="text-align:left;cursor:default;" onclick="_cbpSort(this,\'',
-    tbl_id, '\',0)">Brand <span class="cb-sort-arr">\u21c5</span></th>',
-    '<th title="Weighted respondent count who bought this brand (BRANDPEN3 reconciled)">Base<br/>(n=)</th>',
-    .sort_th("Pen", 2L, pen_tip),
+  header_html <- paste0(
+    '<thead><tr>',
+    '<th class="ct-label-col" style="text-align:left;">Brand</th>',
+    sprintf('<th title="%s" class="cb-base-th">Base<br/>(n=)</th>',
+            .cb_esc("Weighted respondent count who bought this brand (BRANDPEN3 reconciled).")),
+    .sort_th("Pen",        2L, pen_tip),
     .sort_th("Avg purch.", 3L, br_tip),
-    .sort_th("Vol share", 4L, vs_tip),
-    .sort_th("SCR obs", 5L, scr_tip),
-    .sort_th("SCR exp", 6L, "Dirichlet model-expected SCR for this brand."),
-    .sort_th("\u0394 SCR", 7L,
-             "SCR deviation from expected (percentage points). \u2265\u00b120pp shaded."),
-    '</tr></thead><tbody>')
+    .sort_th("Vol share",  4L, vs_tip),
+    .sort_th("SCR obs",    5L, scr_tip),
+    '</tr></thead>'
+  )
 
-  # --- Focal brand row (first) ---
-  if (length(focal_idx) == 1) {
-    frow   <- norms_table[focal_idx, ]
-    bc     <- as.character(frow$BrandCode)
-    lbl    <- .cb_brand_lbl(bc, brand_labels)
-    pen_v  <- .get(frow, "Penetration_Obs_Pct")
-    br_v   <- .get(frow, "BuyRate_Obs")
-    scro_v <- .get(frow, "SCR_Obs_Pct")
-    scre_v <- .get(frow, "SCR_Exp_Pct")
-    scrd_v <- .get(frow, "SCR_Dev_Pct")
-    vs_v   <- vol_share_fn(pen_v, br_v)
-    n_v    <- .bh_n(bc)
-    dev_str <- if (!is.na(scrd_v)) sprintf("%+.0f", scrd_v) else "\u2014"
-    # focal-row class is consistent with _cbSetFocal in brand_cat_buying_panel.js
-    lines <- c(lines,
-      sprintf('<tr class="focal-row" data-brand="%s">', .cb_esc(bc)),
-      sprintf('<td class="brand-col">%s<span class="cb-focal-badge">FOCAL</span></td>',
-              .cb_esc(lbl)),
-      sprintf('<td data-v="%s">%s</td>',
-              if (!is.na(n_v)) as.character(n_v) else "0", fmt_int(n_v)),
-      sprintf('<td data-v="%.2f">%s</td>', pen_v %||% 0, fmt_pct(pen_v)),
-      sprintf('<td data-v="%.3f">%s</td>', br_v  %||% 0, fmt_n(br_v)),
-      sprintf('<td data-v="%.2f">%s</td>', vs_v  %||% 0, fmt_pct(vs_v)),
-      sprintf('<td data-v="%.2f">%s</td>', scro_v %||% 0, fmt_pct(scro_v)),
-      sprintf('<td data-v="%.2f" style="color:#64748b;">%s</td>',
-              scre_v %||% 0, fmt_pct(scre_v)),
-      sprintf('<td data-v="%.2f"%s>%s</td>', scrd_v %||% 0, dev_cls(scrd_v), dev_str),
-      '</tr>')
-  }
-
-  # --- Category average row (second) with min-max range context ---
-  avg_dev_str <- if (!is.na(avg_scrd)) sprintf("%+.0f", avg_scrd) else "\u2014"
-  lines <- c(lines,
-    '<tr class="cbp-avg-row">',
-    '<td class="brand-col" style="font-style:italic;">Category avg</td>',
-    '<td>\u2014</td>',
-    sprintf('<td data-v="%.2f">%s%s</td>',
-            avg_pen, fmt_pct(avg_pen), .rng(all_pen)),
-    sprintf('<td data-v="%.3f">%s%s</td>',
-            avg_br, fmt_n(avg_br), .rng_n(all_br)),
-    sprintf('<td data-v="%.2f">%s%s</td>',
-            avg_vs, fmt_pct(avg_vs), .rng(all_vs)),
-    sprintf('<td data-v="%.2f">%s%s</td>',
-            avg_scro, fmt_pct(avg_scro), .rng(all_scro)),
-    sprintf('<td data-v="%.2f" style="color:#94a3b8;">%s</td>',
-            avg_scre, fmt_pct(avg_scre)),
-    sprintf('<td data-v="%.2f">%s</td>', avg_scrd, avg_dev_str),
-    '</tr>')
-
-  # --- Other brand rows (sortable; class cbp-brand-row for JS targeting) ---
-  for (i in seq_len(nrow(nt))) {
-    row <- nt[i, ]
-    bc  <- as.character(row$BrandCode)
-    if (!is.null(focal_brand) && bc == focal_brand) next  # rendered above
-    lbl    <- .cb_brand_lbl(bc, brand_labels)
+  # --- Build body rows ---
+  .row_html <- function(row, row_cls, lbl_html) {
+    bc     <- as.character(row$BrandCode)
     pen_v  <- .get(row, "Penetration_Obs_Pct")
     br_v   <- .get(row, "BuyRate_Obs")
     scro_v <- .get(row, "SCR_Obs_Pct")
-    scre_v <- .get(row, "SCR_Exp_Pct")
-    scrd_v <- .get(row, "SCR_Dev_Pct")
     vs_v   <- vol_share_fn(pen_v, br_v)
     n_v    <- .bh_n(bc)
-    dev_str <- if (!is.na(scrd_v)) sprintf("%+.0f", scrd_v) else "\u2014"
-
-    lines <- c(lines,
-      sprintf('<tr class="cbp-brand-row" data-brand="%s">', .cb_esc(bc)),
-      sprintf('<td class="brand-col" data-v="%s">%s</td>',
-              .cb_esc(lbl), .cb_esc(lbl)),
-      sprintf('<td data-v="%s">%s</td>',
-              if (!is.na(n_v)) as.character(n_v) else "0", fmt_int(n_v)),
-      sprintf('<td data-v="%.2f">%s</td>', pen_v  %||% 0, fmt_pct(pen_v)),
-      sprintf('<td data-v="%.3f">%s</td>', br_v   %||% 0, fmt_n(br_v)),
-      sprintf('<td data-v="%.2f">%s</td>', vs_v   %||% 0, fmt_pct(vs_v)),
-      sprintf('<td data-v="%.2f">%s</td>', scro_v %||% 0, fmt_pct(scro_v)),
-      sprintf('<td data-v="%.2f" style="color:#64748b;">%s</td>',
-              scre_v %||% 0, fmt_pct(scre_v)),
-      sprintf('<td data-v="%.2f"%s>%s</td>', scrd_v %||% 0, dev_cls(scrd_v), dev_str),
+    paste0(
+      sprintf('<tr class="%s" data-brand="%s">', row_cls, .cb_esc(bc)),
+      sprintf('<td class="ct-label-col">%s</td>', lbl_html),
+      sprintf('<td class="cb-base-td" data-v="%s">%s</td>',
+              if (is.na(n_v)) "0" else as.character(n_v), fmt_int(n_v)),
+      .hm_cell(pen_v,  avg_pen,  fmt_pct(pen_v)),
+      .hm_cell(br_v,   avg_br,   fmt_n(br_v), d = 3),
+      .hm_cell(vs_v,   avg_vs,   fmt_pct(vs_v)),
+      .hm_cell(scro_v, avg_scro, fmt_pct(scro_v)),
       '</tr>')
   }
 
-  lines <- c(lines, '</tbody>')
+  body_rows <- character(0)
+
+  # Row 1: focal
+  if (length(focal_idx) == 1) {
+    frow <- norms_table[focal_idx, ]
+    lbl  <- .cb_brand_lbl(frow$BrandCode, brand_labels)
+    lbl_html <- sprintf('%s<span class="cb-focal-badge">FOCAL</span>', .cb_esc(lbl))
+    body_rows <- c(body_rows, .row_html(frow, "focal-row", lbl_html))
+  }
+
+  # Row 2: category avg (with CI bands)
+  body_rows <- c(body_rows, paste0(
+    '<tr class="cbp-avg-row">',
+    '<td class="ct-label-col" style="font-style:italic;">Category avg</td>',
+    '<td class="cb-base-td">\u2014</td>',
+    sprintf('<td class="cb-avg-td" data-v="%s">%s%s</td>',
+            formatC(avg_pen, format = "f", digits = 2),
+            fmt_pct(avg_pen), .ci_band(avg_pen, sd_pen, 0, TRUE)),
+    sprintf('<td class="cb-avg-td" data-v="%s">%s%s</td>',
+            formatC(avg_br, format = "f", digits = 3),
+            fmt_n(avg_br), .ci_band(avg_br, sd_br, 1, FALSE)),
+    sprintf('<td class="cb-avg-td" data-v="%s">%s%s</td>',
+            formatC(avg_vs, format = "f", digits = 2),
+            fmt_pct(avg_vs), .ci_band(avg_vs, sd_vs, 0, TRUE)),
+    sprintf('<td class="cb-avg-td" data-v="%s">%s%s</td>',
+            formatC(avg_scro, format = "f", digits = 2),
+            fmt_pct(avg_scro), .ci_band(avg_scro, sd_scro, 0, TRUE)),
+    '</tr>'))
+
+  # Rows 3+: other brands (sortable)
+  for (i in seq_len(nrow(nt))) {
+    row <- nt[i, ]
+    bc  <- as.character(row$BrandCode)
+    if (!is.null(focal_brand) && bc == focal_brand) next
+    lbl <- .cb_brand_lbl(bc, brand_labels)
+    body_rows <- c(body_rows, .row_html(row, "cbp-brand-row", .cb_esc(lbl)))
+  }
 
   vol_note <- if (!is.na(cat_mean_purch))
-    sprintf("Vol share = (Pen \u00d7 Avg purch.) \u00f7 %.1f (category mean). ", cat_mean_purch)
+    sprintf("Vol share = (Pen \u00d7 Avg purch.) \u00f7 %.1f (category mean). ",
+            cat_mean_purch)
   else "Vol share requires category mean purchases. "
-  lines <- c(lines, sprintf(
-    '<tfoot><tr><td colspan="8" style="font-size:10px;color:#94a3b8;padding:5px 4px;font-style:italic;">%s</td></tr></tfoot>',
-    paste0(
-      "Pen = % of respondents who bought the brand (BRANDPEN3, reconciled; ",
-      "may differ from Brand Funnel by 1\u20133pp \u2014 see column tooltip). ",
+
+  footer_html <- sprintf(paste0(
+    '<tfoot><tr><td colspan="6" class="cb-perf-foot">%s</td></tr></tfoot>'),
+    .cb_esc(paste0(
+      "Pen = % of respondents who bought the brand (BRANDPEN3, reconciled). ",
       "Avg purch. = mean times bought per brand buyer. ",
-      "SCR obs = share of category requirement (loyalty \u2014 does not sum to 100%% across brands). ",
+      "SCR obs = share of category requirement (loyalty). ",
       vol_note,
-      "\u0394\u2265\u00b120pp shaded. Click column headers to sort brands.")))
-  lines <- c(lines, '</table></div>')
-  paste(lines, collapse = "\n")
+      "CI band on Category avg = \u00b11 SD across brands. ",
+      "Heatmap: green \u2265 +10%, red \u2264 \u221210% vs category avg. ",
+      "Click a column header to sort brands.")))
+
+  paste(c(
+    '<div class="cb-brand-freq-wrap">',
+    sprintf('<table class="cb-brand-freq-table" id="%s" data-cb-heatmap="off">', tbl_id),
+    header_html,
+    '<tbody>',
+    body_rows,
+    '</tbody>',
+    footer_html,
+    '</table></div>'
+  ), collapse = "\n")
 }
 
 
