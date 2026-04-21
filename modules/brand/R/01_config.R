@@ -159,6 +159,18 @@ load_brand_config <- function(config_path, project_root = NULL) {
   config$respondent_id_col <- config$respondent_id_col %||% "Respondent_ID"
   config$report_title <- config$report_title %||% "Brand Health Report"
 
+  # Portfolio config keys (§3.3 + Q2 of PORTFOLIO_SPEC_v1.md)
+  config$portfolio_min_base <- as.integer(
+    config$portfolio_min_base %||% 30L)
+  config$portfolio_cooccur_min_pairs <- as.integer(
+    config$portfolio_cooccur_min_pairs %||% 20L)
+  config$portfolio_timeframe <- trimws(
+    as.character(config$portfolio_timeframe %||% "3m"))
+  config$portfolio_extension_baseline <- trimws(
+    as.character(config$portfolio_extension_baseline %||% "all"))
+  config$focal_home_category <- trimws(
+    as.character(config$focal_home_category %||% ""))
+
   # Store project root and resolve all file paths
   # All paths in config are relative to the config file's directory.
   # This ensures configs work when synced via OneDrive/Dropbox across machines.

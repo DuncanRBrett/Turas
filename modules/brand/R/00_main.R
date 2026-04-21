@@ -71,7 +71,8 @@ BRAND_VERSION <- "1.0"
     "08_cat_buying.R",
     "08b_brand_volume.R",
     "08c_dirichlet_norms.R",
-    "08d_buyer_heaviness.R"
+    "08d_buyer_heaviness.R",
+    "09_portfolio.R"
   )
 
   for (f in module_files) {
