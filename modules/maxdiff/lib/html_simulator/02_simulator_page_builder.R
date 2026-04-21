@@ -74,8 +74,7 @@ build_simulator_page <- function(sim_data, ...) {
       <button class="sim-pin-btn sim-btn sim-btn-icon" data-pin-tab="%s" title="Pin to Views">%s Pin</button>
       <button class="sim-copy-btn sim-btn sim-btn-icon" data-copy-tab="%s" title="Copy to Clipboard">%s Copy</button>
       <button class="sim-export-png-btn sim-btn sim-btn-icon" data-export-tab="%s" title="Export PNG">%s PNG</button>
-      <button class="sim-export-excel-btn sim-btn sim-btn-icon" data-export-tab="%s" title="Export Excel">%s Excel</button>
-    </div>', tab_id, pin_icon(), tab_id, clipboard_icon(), tab_id, download_icon(), tab_id, table_icon())
+    </div>', tab_id, pin_icon(), tab_id, clipboard_icon(), tab_id, download_icon())
   }
 
   pin_toolbar <- function(tab_id) {
@@ -94,10 +93,6 @@ build_simulator_page <- function(sim_data, ...) {
   <style>%s</style>
 </head>
 <body>
-  <div class="sim-header">
-    <h1>%s</h1>
-    <div class="sim-meta"><span>Interactive MaxDiff Simulator</span><span>%d items &middot; %s respondents</span></div>
-  </div>
   <div class="sim-container">
     <div class="sim-tab-nav">
       <button class="sim-tab-btn active" data-tab="overview">Overview</button>
@@ -191,7 +186,7 @@ build_simulator_page <- function(sim_data, ...) {
         <div id="turf-opt-result"></div>
         <div class="sim-insight-block">
           <div class="sim-insight-label">Insight</div>
-          <div class="sim-insight-editor" contenteditable="true" id="insight-turf" data-placeholder="Add TURF insight or commentary..."></div>
+          <div class="sim-insight-editor" contenteditable="true" id="insight-portfolio" data-placeholder="Add TURF insight or commentary..."></div>
         </div>
       </div>
 
@@ -226,9 +221,6 @@ build_simulator_page <- function(sim_data, ...) {
 </html>',
     project_name,
     css,
-    project_name,
-    n_items,
-    format(n_resp, big.mark = ","),
     pin_toolbar("overview"),
     toolbar("shares"),
     seg_filter_shares,
@@ -240,7 +232,7 @@ build_simulator_page <- function(sim_data, ...) {
     portfolio_checks,
     pin_toolbar("diagnostics"),
     build_about_html(sim_data),
-    format(Sys.Date(), "%%B %%Y"),
+    format(Sys.Date(), "%B %Y"),
     json_data,
     build_js_tags(js_files)
   )

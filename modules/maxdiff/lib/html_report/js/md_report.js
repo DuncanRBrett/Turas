@@ -575,8 +575,22 @@
       });
     }
 
-    // Check for segment-variant containers (data-segment divs)
-    var segContainer = panel.querySelector(".md-segment-tables");
+    // Scope to the active sub-panel if one exists (panels with sub-tabs like Preferences).
+    // This ensures we export only what the user is currently viewing, and avoids
+    // picking up chart-only segment containers from inactive sub-panels.
+    var scope = panel.querySelector(".md-subpanel.active") || panel;
+
+    // Find the first segment-variant container that actually contains table data.
+    // Chart-only segment containers (.md-segment-tables wrapping SVG variants) are ignored.
+    var segContainer = null;
+    var candidates = scope.querySelectorAll(".md-segment-tables");
+    for (var ci = 0; ci < candidates.length; ci++) {
+      if (candidates[ci].querySelector("[data-segment] .md-table, [data-segment] .md-h2h-table")) {
+        segContainer = candidates[ci];
+        break;
+      }
+    }
+
     if (segContainer) {
       // Export each segment separately with a label header
       var segDivs = segContainer.querySelectorAll("[data-segment]");
@@ -601,15 +615,15 @@
         xml.push('<Row><Cell ss:StyleID="segment"><Data ss:Type="String">' +
                   escapeXml(segLabel + nText) + '</Data></Cell></Row>');
 
-        var tables = segDiv.querySelectorAll(".md-table, .md-h2h-table, table");
+        var tables = segDiv.querySelectorAll(".md-table, .md-h2h-table");
         tables.forEach(function(table) { exportTableRows(table); });
       });
     } else {
-      // No segment variants — export visible tables only
-      var tables = panel.querySelectorAll(".md-table, .md-h2h-table");
+      // No segment table variants — export visible tables from the scoped area
+      var tables = scope.querySelectorAll(".md-table, .md-h2h-table");
       if (tables.length === 0) { showToast("No table data to export"); return; }
       tables.forEach(function(table, tIdx) {
-        // Skip hidden tables
+        // Skip tables inside hidden containers (inactive sub-panels, hidden segments)
         if (table.closest("[style*='display:none']") || table.closest("[style*='display: none']")) return;
         if (tIdx > 0) xml.push('<Row></Row>');
         exportTableRows(table);

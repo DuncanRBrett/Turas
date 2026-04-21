@@ -52,12 +52,70 @@
    * @returns {string|null}
    */
   function _viewInsightTabId(viewId) {
-    if (viewId === "pin-overview")               return "overview";
-    if (viewId === "pin-simulator")              return "simulator";
-    if (viewId.indexOf("pin-diagnostics-") === 0) return "diagnostics";
-    if (viewId.indexOf("pin-wtp-")         === 0) return "wtp";
-    if (viewId.indexOf("util-")            === 0) return "utilities";
+    // Strip "pin-" prefix so both "pin-overview" (from pin button) and
+    // "overview" (from export bar) resolve to the same insight editor.
+    var bare = viewId.replace(/^pin-/, "");
+    if (bare === "overview")                    return "overview";
+    if (bare === "simulator")                   return "simulator";
+    if (bare.indexOf("diagnostics") === 0)      return "diagnostics";
+    if (bare.indexOf("wtp") === 0)              return "wtp";
+    if (viewId.indexOf("util-") === 0)          return "utilities";
     return null;
+  }
+
+  // ── Simulator Control Staticification ─────────────────────────────────────
+
+  /**
+   * Convert interactive form controls in a simulator clone to static readable
+   * equivalents so the pin/export captures meaningful content instead of blanks.
+   * Selects → label badge, checkboxes → checked indicator, range → value badge,
+   * pure control buttons → removed, hidden tooltips → removed.
+   */
+  function _staticifySimControls(clone) {
+    // Remove hidden tooltip text panels (display:none, not useful in snapshot)
+    clone.querySelectorAll(".cj-sim-tooltip").forEach(function(el) { el.remove(); });
+
+    // <select> → badge showing selected option text
+    clone.querySelectorAll("select").forEach(function(sel) {
+      var span = document.createElement("span");
+      span.style.cssText = "font-size:12px;font-weight:500;color:#1e293b;padding:2px 8px;" +
+        "background:#f1f5f9;border-radius:4px;display:inline-block;";
+      var opt = sel.options[sel.selectedIndex];
+      span.textContent = opt ? opt.text : sel.value;
+      sel.parentNode.replaceChild(span, sel);
+    });
+
+    // <input type="checkbox"> → small coloured box with tick if checked
+    clone.querySelectorAll("input[type='checkbox']").forEach(function(cb) {
+      var span = document.createElement("span");
+      var checked = cb.checked;
+      span.style.cssText = "display:inline-flex;align-items:center;justify-content:center;" +
+        "width:13px;height:13px;border:1.5px solid " + (checked ? "#323367" : "#94a3b8") + ";" +
+        "border-radius:2px;background:" + (checked ? "#323367" : "#fff") + ";" +
+        "vertical-align:middle;margin-right:3px;font-size:9px;color:#fff;line-height:1;";
+      span.textContent = checked ? "\u2713" : "";
+      cb.parentNode.replaceChild(span, cb);
+    });
+
+    // <input type="range"> → value badge
+    clone.querySelectorAll("input[type='range']").forEach(function(inp) {
+      var span = document.createElement("span");
+      span.style.cssText = "font-size:12px;font-weight:600;color:#1e293b;padding:2px 8px;" +
+        "background:#f1f5f9;border-radius:4px;display:inline-block;";
+      span.textContent = parseFloat(inp.value).toFixed(1);
+      inp.parentNode.replaceChild(span, inp);
+    });
+
+    // All remaining <input> → plain value text
+    clone.querySelectorAll("input").forEach(function(inp) {
+      var span = document.createElement("span");
+      span.style.cssText = "font-size:12px;color:#1e293b;";
+      span.textContent = inp.value || "";
+      inp.parentNode.replaceChild(span, inp);
+    });
+
+    // Pure control buttons → remove entirely
+    clone.querySelectorAll("button").forEach(function(btn) { btn.remove(); });
   }
 
   // ── Content Capture ────────────────────────────────────────────────────────
@@ -159,7 +217,7 @@
     // Capture the full results innerHTML as tableHtml to preserve everything.
     if (viewId === "pin-simulator") {
       var resultsClone = source.cloneNode(true);
-      resultsClone.querySelectorAll("input, select, button, label").forEach(function(el) { el.remove(); });
+      _staticifySimControls(resultsClone);
       // Constrain SVGs to their natural size
       resultsClone.querySelectorAll("svg").forEach(function(svg) {
         var w = svg.getAttribute("width");
@@ -167,10 +225,19 @@
         svg.style.width = "100%";
         svg.style.height = "auto";
       });
+      var simInsightTabId = _viewInsightTabId(viewId);
+      var simInsightText = "";
+      if (simInsightTabId) {
+        var simInsightEl = document.getElementById("insight-editor-" + simInsightTabId);
+        if (simInsightEl && simInsightEl.textContent.trim()) {
+          simInsightText = simInsightEl.textContent.trim();
+        }
+      }
       return {
         title: title,
         chartSvg: "",
-        tableHtml: _wrapSimulatorStyles(resultsClone.innerHTML)
+        tableHtml: _wrapSimulatorStyles(resultsClone.innerHTML),
+        insightText: simInsightText
       };
     }
 
@@ -239,7 +306,7 @@
   window.cjPinSection = function(viewId, btnEl) {
     // Simulator: always pin full snapshot directly (no mode choice)
     if (viewId === "pin-simulator") {
-      cjExecutePinWithFlags(viewId, { table: true, chart: true });
+      cjExecutePinWithFlags(viewId, { table: true, chart: true, insight: true });
       return;
     }
 
@@ -273,6 +340,72 @@
   // Backward compat: old pin buttons call showPinPopover
   window.showPinPopover = function(viewId, btnEl) {
     window.cjPinSection(viewId, btnEl);
+  };
+
+  // ── Export PNG ─────────────────────────────────────────────────────────────
+
+  /**
+   * Export current view as PNG — uses the identical checkbox popover and content
+   * capture as cjPinSection, but renders via TurasPins.exportContentAsPNG
+   * (same visual output as a pinned card) and downloads immediately.
+   * @param {string} viewId - View identifier
+   * @param {HTMLElement} btnEl - Button that triggered
+   */
+  window.cjExportPNG = function(viewId, btnEl) {
+    // Export bar passes "simulator"; pin button passes "pin-simulator".
+    // Normalise so the simulator innerHTML capture path fires correctly.
+    if (viewId === "simulator") viewId = "pin-simulator";
+
+    if (viewId === "pin-simulator") {
+      var simContent = cjCaptureContent(viewId, "all");
+      if (!simContent) return;
+      TurasPins.exportContentAsPNG({
+        title:       simContent.title,
+        sourceLabel: "Conjoint",
+        chartSvg:    simContent.chartSvg,
+        tableHtml:   simContent.tableHtml,
+        insightText: simContent.insightText,
+        pinFlags:    { chart: true, table: true, insight: true }
+      });
+      return;
+    }
+
+    var content = cjCaptureContent(viewId, "all");
+    if (!content) return;
+    var hasChart   = !!content.chartSvg;
+    var hasTable   = !!content.tableHtml;
+    var hasInsight = !!content.insightText;
+
+    if (!btnEl || (!hasChart && !hasTable)) {
+      TurasPins.exportContentAsPNG({
+        title:       content.title,
+        sourceLabel: "Conjoint",
+        chartSvg:    content.chartSvg,
+        tableHtml:   content.tableHtml,
+        insightText: content.insightText,
+        pinFlags:    { chart: hasChart, table: hasTable, insight: hasInsight }
+      });
+      return;
+    }
+
+    var checkboxes = [
+      { key: "table",   label: "Table",   available: hasTable,   checked: hasTable },
+      { key: "chart",   label: "Chart",   available: hasChart,   checked: hasChart },
+      { key: "insight", label: "Insight", available: true,       checked: hasInsight }
+    ];
+
+    TurasPins.showCheckboxPopover(btnEl, checkboxes, function(flags) {
+      var c = cjCaptureContent(viewId, "all");
+      if (!c) return;
+      TurasPins.exportContentAsPNG({
+        title:       c.title,
+        sourceLabel: "Conjoint",
+        chartSvg:    flags.chart   ? c.chartSvg    : "",
+        tableHtml:   flags.table   ? c.tableHtml   : "",
+        insightText: flags.insight ? c.insightText : "",
+        pinFlags:    { chart: !!flags.chart, table: !!flags.table, insight: !!flags.insight }
+      });
+    }, null, { title: "EXPORT AS PNG", actionLabel: "Export" });
   };
 
   /**

@@ -177,6 +177,11 @@
     title.textContent = popoverTitle;
     popover.appendChild(title);
 
+    // Optional header element (e.g. sub-tab radio group) inserted before checkboxes
+    if (opts.headerEl) {
+      popover.appendChild(opts.headerEl);
+    }
+
     // Checkboxes
     var state = {};
     checkboxes.forEach(function(opt) {
