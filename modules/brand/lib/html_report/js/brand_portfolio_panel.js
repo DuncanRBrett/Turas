@@ -59,6 +59,30 @@ function pfSwitchStrengthBrand(brandCode) {
 }
 
 /**
+ * Handle constellation node click — highlight selected node and pin centred_brand.
+ * Re-centres the view by visually emphasising the clicked node.
+ * Pin payload: { subtab: 'constellation', centred_brand: brandCode }.
+ * @param {Event|null} event - Click event (may be null when called from restore).
+ * @param {string} brandCode - Brand code of the activated node.
+ */
+function pfConstellationNodeClick(event, brandCode) {
+  var chart = document.getElementById('pf-constellation-chart');
+  if (chart) {
+    chart.querySelectorAll('circle[data-brand]').forEach(function(c) {
+      var selected = c.getAttribute('data-brand') === brandCode;
+      c.setAttribute('stroke', selected ? '#f59e0b' : '#fff');
+      c.setAttribute('stroke-width', selected ? '3.5' : '2');
+      c.setAttribute('opacity', selected ? '1' : '0.7');
+    });
+  }
+
+  if (typeof brSetPinState === 'function') {
+    brSetPinState('subtab', 'constellation');
+    brSetPinState('centred_brand', brandCode);
+  }
+}
+
+/**
  * Restore portfolio panel state from a pin payload.
  * Called by brand_pins.js when a portfolio pin is activated.
  * @param {Object} state - Pin state object.
@@ -67,7 +91,7 @@ function pfRestorePinState(state) {
   if (!state) return;
   if (state.subtab) pfSwitchSubtab(state.subtab);
   if (state.pf_strength_brand) pfSwitchStrengthBrand(state.pf_strength_brand);
-  // Phase 4: restore constellation centred_brand
+  if (state.centred_brand) pfConstellationNodeClick(null, state.centred_brand);
 }
 
 // ---------------------------------------------------------------------------

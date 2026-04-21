@@ -237,8 +237,14 @@ run_portfolio <- function(data, categories, structure, config, weights = NULL) {
     }
   )
 
-  # Phase 4: constellation (stub)
-  constellation_result <- NULL
+  # Phase 4: constellation
+  constellation_result <- tryCatch(
+    compute_constellation(data, categories, structure, config, weights),
+    error = function(e) {
+      message(sprintf("[PORTFOLIO] Constellation failed: %s", e$message))
+      NULL
+    }
+  )
 
   # Aggregate suppressed categories across analyses
   all_suppressed <- unique(c(
@@ -277,7 +283,9 @@ run_portfolio <- function(data, categories, structure, config, weights = NULL) {
       )
     ),
     footprint_matrix = if (!is.null(footprint_result)) footprint_result$matrix_df else NULL,
-    constellation    = constellation_result,
+    constellation    = if (!is.null(constellation_result) &&
+                           identical(constellation_result$status, "PASS"))
+                         constellation_result else NULL,
     clutter          = clutter_result,
     strength         = if (!is.null(strength_result) &&
                            identical(strength_result$status, "PASS"))

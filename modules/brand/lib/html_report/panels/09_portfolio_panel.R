@@ -61,6 +61,7 @@ build_br_portfolio_panel <- function(results, config) {
   )
 
   fp_html <- .pf_footprint_subtab(portfolio, panel_data, focal_brand, focal_colour)
+  cn_html <- .pf_constellation_subtab(portfolio, panel_data, focal_brand, focal_colour)
   cl_html <- .pf_clutter_subtab(portfolio, panel_data, focal_colour)
   ex_html <- .pf_extension_subtab(portfolio, panel_data, focal_brand, focal_colour)
 
@@ -89,9 +90,9 @@ build_br_portfolio_panel <- function(results, config) {
     fp_html,
     '</div>',
 
-    # Competitive Set subtab (Phase 4 stub)
+    # Competitive Set subtab
     '<div class="pf-subtab" id="pf-subtab-constellation">',
-    '<div class="pf-coming-soon">Competitive Constellation — available in Phase 4</div>',
+    cn_html,
     '</div>',
 
     # Category Context subtab
@@ -180,6 +181,53 @@ build_br_portfolio_panel <- function(results, config) {
     chart_svg,
     '</div>',
     if (nzchar(supp_note)) supp_note else "",
+    if (nzchar(about_text)) {
+      sprintf('<div class="pf-about-drawer"><strong>About this chart:</strong> %s</div>',
+              .pf_esc(about_text))
+    } else ""
+  )
+}
+
+
+# ==============================================================================
+# CONSTELLATION SUBTAB
+# ==============================================================================
+
+.pf_constellation_subtab <- function(portfolio, panel_data, focal_brand,
+                                      focal_colour) {
+  cn <- portfolio$constellation
+  section_id <- "pf-constellation"
+
+  if (is.null(cn) || is.null(cn$nodes) || nrow(cn$nodes) == 0) {
+    return('<p style="color:#94a3b8;padding:24px 0;">Competitive constellation data not available.</p>')
+  }
+
+  chart_svg <- tryCatch(
+    build_network(
+      nodes        = cn$nodes,
+      edges        = cn$edges,
+      layout       = cn$layout,
+      focal_colour = focal_colour,
+      title        = "Competitive Constellation (Co-awareness Jaccard)"
+    ),
+    error = function(e) ""
+  )
+
+  engine_note <- if (!is.null(cn$layout_engine)) {
+    sprintf('<p style="font-size:10px;color:#94a3b8;margin:4px 0;">Layout: %s</p>',
+            .pf_esc(cn$layout_engine))
+  } else ""
+
+  about_text <- if (!is.null(panel_data)) {
+    panel_data$about$constellation %||% ""
+  } else ""
+
+  paste0(
+    .pf_section_toolbar(section_id),
+    '<div id="', section_id, '-chart" style="margin:8px 0;">',
+    chart_svg,
+    '</div>',
+    engine_note,
     if (nzchar(about_text)) {
       sprintf('<div class="pf-about-drawer"><strong>About this chart:</strong> %s</div>',
               .pf_esc(about_text))

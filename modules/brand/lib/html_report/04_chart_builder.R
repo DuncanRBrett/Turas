@@ -874,6 +874,99 @@ build_loyalty_profile_chart <- function(brand_repertoire_profile,
 
 
 # ==============================================================================
+# 10. NETWORK / CONSTELLATION CHART (§4.2)
+# ==============================================================================
+
+#' Build competitive constellation network SVG
+#'
+#' Renders pre-computed node positions and edges as an inline SVG. Nodes are
+#' circles sized by total aware respondents. Focal brand is highlighted.
+#' Edges are drawn as lines with opacity proportional to Jaccard similarity.
+#'
+#' @param nodes Data frame: brand, n_aware_w, is_focal.
+#' @param edges Data frame: b1, b2, jaccard, cooccur_n.
+#' @param layout Data frame: brand, x, y (pre-computed positions).
+#' @param focal_colour Character. Hex colour for focal brand node.
+#' @param comp_colour Character. Hex colour for competitor nodes.
+#' @param title Character. Chart title.
+#'
+#' @return Character. Inline SVG string.
+#' @keywords internal
+build_network <- function(nodes, edges, layout,
+                          focal_colour = "#1A5276",
+                          comp_colour  = "#94a3b8",
+                          title        = "Competitive Constellation") {
+  if (is.null(nodes) || nrow(nodes) == 0 || is.null(layout)) return("")
+
+  w <- 720L; h <- 520L
+  pad <- 60L
+  pw  <- w - 2L * pad
+  ph  <- h - pad - 40L  # leave room for title
+
+  # Merge layout into nodes
+  nodes <- merge(nodes, layout, by = "brand", all.x = TRUE)
+  nodes <- nodes[!is.na(nodes$x), , drop = FALSE]
+  if (nrow(nodes) == 0) return("")
+
+  # Map layout coordinates to SVG
+  x_range <- range(nodes$x, na.rm = TRUE)
+  y_range <- range(nodes$y, na.rm = TRUE)
+  sx <- function(v) pad + (v - x_range[1]) / max(diff(x_range), 1e-6) * pw
+  sy <- function(v) 40L + ph - (v - y_range[1]) / max(diff(y_range), 1e-6) * ph
+
+  nodes$svgx <- sx(nodes$x)
+  nodes$svgy <- sy(nodes$y)
+
+  # Node radius: 8–22 px, scaled by n_aware_w
+  max_aw <- max(nodes$n_aware_w, 1)
+  nodes$r <- 8 + (nodes$n_aware_w / max_aw) * 14
+
+  parts <- character(0)
+
+  # Title
+  parts <- c(parts, sprintf(
+    '<text x="%d" y="22" fill="#1e293b" font-size="14" font-weight="700">%s</text>',
+    pad, .br_escape(title)))
+
+  # Edges (draw before nodes so nodes sit on top)
+  if (!is.null(edges) && nrow(edges) > 0) {
+    max_jac <- max(edges$jaccard, 1e-6)
+    for (k in seq_len(nrow(edges))) {
+      b1 <- edges$b1[k]; b2 <- edges$b2[k]
+      n1 <- nodes[nodes$brand == b1, , drop = FALSE]
+      n2 <- nodes[nodes$brand == b2, , drop = FALSE]
+      if (nrow(n1) == 0 || nrow(n2) == 0) next
+      jac     <- edges$jaccard[k]
+      opacity <- 0.15 + (jac / max_jac) * 0.55
+      lw      <- 1 + (jac / max_jac) * 3
+      parts <- c(parts, sprintf(
+        '<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="#94a3b8" stroke-width="%.1f" opacity="%.2f"/>',
+        n1$svgx, n1$svgy, n2$svgx, n2$svgy, lw, opacity
+      ))
+    }
+  }
+
+  # Nodes + labels
+  for (i in seq_len(nrow(nodes))) {
+    nd <- nodes[i, ]
+    col <- if (isTRUE(nd$is_focal)) focal_colour else comp_colour
+    parts <- c(parts,
+      sprintf('<circle cx="%g" cy="%g" r="%g" fill="%s" opacity="0.85" stroke="#fff" stroke-width="2" data-brand="%s" style="cursor:pointer;" onclick="pfConstellationNodeClick(event,\'%s\')"/>',
+              nd$svgx, nd$svgy, nd$r, col,
+              .br_escape(nd$brand), .br_escape(nd$brand)),
+      sprintf('<text x="%g" y="%g" fill="%s" font-size="10" font-weight="%s">%s</text>',
+              nd$svgx + nd$r + 3, nd$svgy - nd$r - 2,
+              if (isTRUE(nd$is_focal)) "#1e293b" else "#64748b",
+              if (isTRUE(nd$is_focal)) "700" else "400",
+              .br_escape(.br_trunc(nd$brand, 16)))
+    )
+  }
+
+  br_svg_wrap(paste(parts, collapse = "\n"), w, h, title)
+}
+
+
+# ==============================================================================
 
 if (!exists("%||%")) {
   `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a

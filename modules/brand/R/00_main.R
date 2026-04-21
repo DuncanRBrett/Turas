@@ -74,6 +74,7 @@ BRAND_VERSION <- "1.0"
     "08d_buyer_heaviness.R",
     "09_portfolio.R",
     "09a_portfolio_footprint.R",
+    "09b_portfolio_constellation.R",
     "09c_portfolio_clutter.R",
     "09d_portfolio_strength.R",
     "09e_portfolio_extension.R",
