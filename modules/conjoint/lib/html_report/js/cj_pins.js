@@ -43,6 +43,23 @@
     return '<div style="font-family:Inter,system-ui,-apple-system,sans-serif;"><style>' + css + '</style>' + html + '</div>';
   }
 
+  // ── Insight Tab Mapping ────────────────────────────────────────────────────
+
+  /**
+   * Map a viewId to the tab_id used for its insight editor element.
+   * Returns null for views that have no associated insight area.
+   * @param {string} viewId
+   * @returns {string|null}
+   */
+  function _viewInsightTabId(viewId) {
+    if (viewId === "pin-overview")               return "overview";
+    if (viewId === "pin-simulator")              return "simulator";
+    if (viewId.indexOf("pin-diagnostics-") === 0) return "diagnostics";
+    if (viewId.indexOf("pin-wtp-")         === 0) return "wtp";
+    if (viewId.indexOf("util-")            === 0) return "utilities";
+    return null;
+  }
+
   // ── Content Capture ────────────────────────────────────────────────────────
 
   /**
@@ -194,10 +211,21 @@
       }
     }
 
+    // Insight text — look up the editor by its tab-specific ID
+    var insightText = "";
+    var insightTabId = _viewInsightTabId(viewId);
+    if (insightTabId) {
+      var insightEl = document.getElementById("insight-editor-" + insightTabId);
+      if (insightEl && insightEl.textContent.trim()) {
+        insightText = insightEl.textContent.trim();
+      }
+    }
+
     return {
       title: title,
       chartSvg: chartSvg,
-      tableHtml: tableHtml
+      tableHtml: tableHtml,
+      insightText: insightText
     };
   }
 
@@ -219,20 +247,22 @@
     if (!content) return;
     var hasChart = !!content.chartSvg;
     var hasTable = !!content.tableHtml;
+    var hasInsight = !!content.insightText;
 
-    // No button or only one content type → pin directly
-    if (!btnEl || (!hasChart && !hasTable) ||
-        (hasChart && !hasTable) || (!hasChart && hasTable)) {
+    // No button or nothing to pin → pin directly with defaults
+    if (!btnEl || (!hasChart && !hasTable)) {
       cjExecutePinWithFlags(viewId, {
         table: hasTable,
-        chart: hasChart
+        chart: hasChart,
+        insight: hasInsight
       });
       return;
     }
 
     var checkboxes = [
-      { key: "table", label: "Table", available: hasTable, checked: hasTable },
-      { key: "chart", label: "Chart", available: hasChart, checked: hasChart }
+      { key: "table",   label: "Table",   available: hasTable,   checked: hasTable },
+      { key: "chart",   label: "Chart",   available: hasChart,   checked: hasChart },
+      { key: "insight", label: "Insight", available: true,       checked: hasInsight }
     ];
 
     TurasPins.showCheckboxPopover(btnEl, checkboxes, function(flags) {
@@ -252,13 +282,14 @@
     var content = cjCaptureContent(viewId, "all");
     if (!content) return;
 
-    if (!flags.chart) content.chartSvg = "";
-    if (!flags.table) content.tableHtml = "";
+    if (!flags.chart)   content.chartSvg   = "";
+    if (!flags.table)   content.tableHtml  = "";
+    if (!flags.insight) content.insightText = "";
 
     TurasPins.add({
       sectionKey: viewId,
       title: content.title,
-      insightText: "",
+      insightText: content.insightText,
       chartSvg: content.chartSvg,
       tableHtml: content.tableHtml,
       pinFlags: {
