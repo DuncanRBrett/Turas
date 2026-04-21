@@ -239,18 +239,13 @@ generate_brand_excel <- function(results, output_path, config = NULL) {
                  "Distinctive Brand Assets")
   }
 
-  # Portfolio
+  # Portfolio (six analytic sheets via 09g_portfolio_output.R)
   if (!is.null(results$results$portfolio) &&
       !identical(results$results$portfolio$status, "REFUSED")) {
-    port <- results$results$portfolio
-    .write_sheet("Portfolio_Map", port$portfolio_map, "Portfolio Map")
-    .write_sheet("Portfolio_Quadrants", port$priority_quadrants,
-                 "Priority Quadrants")
-    if (!is.null(port$category_turf) &&
-        !is.null(port$category_turf$incremental_table)) {
-      .write_sheet("Category_TURF", port$category_turf$incremental_table,
-                   "Category TURF")
-    }
+    tryCatch(
+      write_portfolio_sheets(results$results$portfolio, wb, header_style, config),
+      error = function(e) message(sprintf("[OUTPUT] Portfolio sheets failed: %s", e$message))
+    )
   }
 
   openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
@@ -350,6 +345,21 @@ generate_brand_csv <- function(results, output_dir, config = NULL) {
   dba <- results$results$dba
   if (!is.null(dba) && !identical(dba$status, "REFUSED")) {
     .write_csv(dba$dba_metrics, "dba_metrics.csv")
+  }
+
+  # Portfolio (six CSVs in output_dir/portfolio/)
+  if (!is.null(results$results$portfolio) &&
+      !identical(results$results$portfolio$status, "REFUSED")) {
+    pf_result <- tryCatch(
+      write_portfolio_csv(results$results$portfolio, output_dir, config),
+      error = function(e) {
+        message(sprintf("[OUTPUT] Portfolio CSV failed: %s", e$message))
+        NULL
+      }
+    )
+    if (!is.null(pf_result) && !is.null(pf_result$files_written)) {
+      files_written <- c(files_written, pf_result$files_written)
+    }
   }
 
   list(

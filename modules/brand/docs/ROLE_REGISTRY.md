@@ -271,4 +271,22 @@ Before building against this registry:
 
 ------------------------------------------------------------------------
 
+## 14. Portfolio awareness-set roles
+
+**Added in PORTFOLIO_SPEC_v1.** These roles underpin the five portfolio analyses (§4 of the spec). They do not appear in the per-category funnel namespace because they are collected cross-category before the focal deep-dive.
+
+| Role | Column pattern | Cardinality | Variable type | Notes |
+|----|----|----|----|-----|
+| `portfolio.screener.3m` | `SQ2_{cat_code}` | `per_category` | `Single_Response` | Category buyer in 3-month window (1/0). Denominator for `portfolio_timeframe = "3m"`. |
+| `portfolio.screener.13m` | `SQ1_{cat_code}` | `per_category` | `Single_Response` | Category buyer in 13-month window (1/0). Denominator for `portfolio_timeframe = "13m"`. |
+| `portfolio.cross_cat_awareness` | `BRANDAWARE_{cat_code}_{brand_code}` | `brand_matrix` | `Multi_Mention` | Cross-category brand awareness (1/0). Collected before focal deep-dive; gated on SQ1 qualifier. Non-qualifiers receive 0, not NA. |
+
+**Denominator rule (load-bearing):** every portfolio rate uses `build_portfolio_base()` in `R/09_portfolio.R` as the single source of truth for the SQ1/SQ2 qualifier filter. No other file should filter these columns directly. See `R/09_portfolio.R` comment block §3.1 for the full rationale.
+
+**Detection:** `R/00_main.R:.detect_category_code()` matches `funnel.awareness.{cat_code}` QuestionMap rows to identify the cat_code for each category. This same detection is reused by portfolio — no parallel detection code.
+
+**See also:** `modules/brand/docs/PORTFOLIO_SPEC_v1.md` for full specification.
+
+------------------------------------------------------------------------
+
 **End of registry v1.0 draft.**

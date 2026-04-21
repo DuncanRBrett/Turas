@@ -266,6 +266,19 @@ run_portfolio <- function(data, categories, structure, config, weights = NULL) {
                n_buyers_w = numeric(0), stringsAsFactors = FALSE)
   }
 
+  supporting_result <- .compute_supporting_metrics(
+    data             = data,
+    weights          = if (!is.null(weights)) weights else rep(1.0, n_total),
+    timeframe        = timeframe,
+    focal            = focal,
+    footprint_result = footprint_result,
+    clutter_result   = clutter_result,
+    extension_result = if (!is.null(extension_result) &&
+                           identical(extension_result$status, "PASS"))
+                         extension_result else NULL,
+    n_cats_total     = nrow(categories)
+  )
+
   list(
     status       = "PASS",
     focal_brand  = focal,
@@ -293,11 +306,101 @@ run_portfolio <- function(data, categories, structure, config, weights = NULL) {
     extension        = if (!is.null(extension_result) &&
                            identical(extension_result$status, "PASS"))
                          extension_result else NULL,
-    supporting       = NULL,
+    supporting       = supporting_result,
     suppressions     = list(
       low_base_cats  = all_suppressed,
       dropped_brands = character(0),
       dropped_edges  = 0L
     )
+  )
+}
+
+
+# ==============================================================================
+# SUPPORTING METRICS HELPER (§5)
+# ==============================================================================
+
+#' Compute hero-strip supporting metrics for the portfolio tab
+#'
+#' @param data Data frame. Full survey data.
+#' @param weights Numeric vector. Survey weights.
+#' @param timeframe Character. "3m" or "13m".
+#' @param focal Character. Focal brand code.
+#' @param footprint_result List or NULL. Output from compute_footprint_matrix().
+#' @param clutter_result List or NULL. Output from compute_clutter_data().
+#' @param extension_result List or NULL. Output from compute_extension_table() if PASS.
+#' @param n_cats_total Integer. Total number of categories in config.
+#'
+#' @return Named list: avg_awareness_set_size_focal_cat, focal_footprint_breadth,
+#'   focal_awareness_efficiency, mean_repertoire_depth, n_cats_total.
+#' @keywords internal
+.compute_supporting_metrics <- function(data, weights, timeframe, focal,
+                                        footprint_result, clutter_result,
+                                        extension_result, n_cats_total) {
+  w <- weights
+
+  # Focal footprint breadth: cats where A(focal, c) > 0
+  breadth <- 0L
+  if (!is.null(footprint_result) && !is.null(footprint_result$matrix_df)) {
+    fp <- footprint_result$matrix_df
+    if (nrow(fp) > 0 && "Brand" %in% names(fp)) {
+      focal_row <- fp[fp$Brand == focal, setdiff(names(fp), "Brand"), drop = FALSE]
+      if (nrow(focal_row) > 0) {
+        vals  <- unlist(focal_row[1L, ], use.names = FALSE)
+        breadth <- sum(!is.na(vals) & vals > 0)
+      }
+    }
+  }
+
+  # Home category: prefer extension-reported, else max focal_share in clutter
+  home_cat <- if (!is.null(extension_result)) extension_result$home_cat else NULL
+
+  # Avg awareness set size + focal efficiency from clutter (focal home cat row)
+  avg_set_size     <- NA_real_
+  focal_efficiency <- NA_real_
+  if (!is.null(clutter_result) && !is.null(clutter_result$clutter_df)) {
+    cl <- clutter_result$clutter_df
+    if (nrow(cl) > 0) {
+      home_row <- if (!is.null(home_cat) && home_cat %in% cl$cat) {
+        cl[cl$cat == home_cat, , drop = FALSE]
+      } else {
+        # fallback: row with max focal_share_of_aware
+        max_idx <- which.max(cl$focal_share_of_aware)
+        cl[max_idx, , drop = FALSE]
+      }
+      if (nrow(home_row) > 0) {
+        avg_set_size <- home_row$awareness_set_size_mean[1L]
+        sh  <- home_row$focal_share_of_aware[1L]
+        pen <- home_row$cat_penetration[1L]
+        if (!is.na(sh) && !is.na(pen) && pen > 0) {
+          focal_efficiency <- sh / pen
+        }
+      }
+    }
+  }
+
+  # Mean repertoire depth: mean(rowSums of SQ cols) weighted
+  sq_prefix <- if (identical(timeframe, "13m")) "SQ1_" else "SQ2_"
+  sq_cols   <- grep(paste0("^", sq_prefix), names(data), value = TRUE)
+  mean_repertoire_depth <- NA_real_
+  if (length(sq_cols) > 0) {
+    sq_mat <- do.call(cbind, lapply(sq_cols, function(cc) {
+      v <- data[[cc]]
+      as.integer(!is.na(v) & as.integer(v) == 1L)
+    }))
+    depths <- if (is.matrix(sq_mat)) rowSums(sq_mat) else sq_mat
+    w_sum  <- sum(w, na.rm = TRUE)
+    if (w_sum > 0) {
+      mean_repertoire_depth <- sum(w * depths, na.rm = TRUE) / w_sum
+    }
+  }
+
+  list(
+    avg_awareness_set_size_focal_cat = avg_set_size,
+    focal_footprint_breadth          = as.integer(breadth),
+    n_cats_total                     = as.integer(n_cats_total),
+    focal_awareness_efficiency       = focal_efficiency,
+    mean_repertoire_depth            = mean_repertoire_depth,
+    home_cat                         = home_cat %||% ""
   )
 }

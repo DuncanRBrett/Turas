@@ -74,15 +74,16 @@ build_br_portfolio_panel <- function(results, config) {
     '<div class="pf-panel">',
 
     # Panel header
+    '<h2 style="font-size:20px;color:#1e293b;margin:0 0 4px;">Portfolio Mapping</h2>',
     sprintf(
-      '<h2 style="font-size:20px;color:#1e293b;margin:0 0 4px;">Portfolio Mapping</h2>'),
-    sprintf(
-      '<p style="font-size:12px;color:#64748b;margin:0 0 16px;">',
-      'Cross-category brand presence. Timeframe: %s. Base: all %s respondents.</p>',
+      '<p style="font-size:12px;color:#64748b;margin:0 0 16px;">Cross-category brand presence. Timeframe: %s. Base: all %s respondents.</p>',
       timeframe_label, n_label
     ),
 
-    # 4-subtab nav (all tabs rendered; Competitive Set + Extension are stubs)
+    # Hero strip KPI cards (§5)
+    .pf_hero_strip(portfolio$supporting, focal_brand, focal_colour),
+
+    # 4-subtab nav
     .pf_sub_nav(),
 
     # Footprint subtab
@@ -108,6 +109,43 @@ build_br_portfolio_panel <- function(results, config) {
     '</div>',  # .pf-panel
     '</div>',  # .br-section
     '</div>'   # .br-panel
+  )
+}
+
+
+# ==============================================================================
+# HERO STRIP KPI CARDS (§5)
+# ==============================================================================
+
+.pf_hero_strip <- function(supporting, focal_brand, focal_colour) {
+  if (is.null(supporting)) return("")
+
+  .kpi <- function(value, label) {
+    sprintf(
+      '<div class="pf-kpi-card"><div class="pf-kpi-value">%s</div><div class="pf-kpi-label">%s</div></div>',
+      .pf_esc(value), .pf_esc(label)
+    )
+  }
+
+  fmt_n <- function(x) if (is.null(x) || is.na(x)) "\u2014" else
+    format(round(x, 1), nsmall = 1)
+  fmt_x <- function(x) if (is.null(x) || is.na(x)) "\u2014" else
+    sprintf("%.1f\u00d7", x)
+
+  n_cats <- supporting$n_cats_total %||% 0L
+  breadth <- supporting$focal_footprint_breadth %||% 0L
+
+  paste0(
+    '<div class="pf-hero-strip">',
+    .kpi(fmt_n(supporting$avg_awareness_set_size_focal_cat),
+         "Brands known per buyer in focal category"),
+    .kpi(sprintf("%d of %d", breadth, n_cats),
+         paste(focal_brand, "present across categories")),
+    .kpi(fmt_x(supporting$focal_awareness_efficiency),
+         "Awareness efficiency vs category penetration"),
+    .kpi(fmt_n(supporting$mean_repertoire_depth),
+         "Avg categories shopped per respondent"),
+    '</div>'
   )
 }
 

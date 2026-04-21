@@ -78,7 +78,8 @@ BRAND_VERSION <- "1.0"
     "09c_portfolio_clutter.R",
     "09d_portfolio_strength.R",
     "09e_portfolio_extension.R",
-    "09f_portfolio_panel_data.R"
+    "09f_portfolio_panel_data.R",
+    "09g_portfolio_output.R"
   )
 
   for (f in module_files) {
