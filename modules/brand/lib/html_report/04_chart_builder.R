@@ -316,15 +316,22 @@ build_heat_strip <- function(matrix_df, focal_brand = NULL,
     for (j in seq_along(brand_cols)) {
       x <- ml + (j - 1) * cell_w
       val <- matrix_df[[brand_cols[j]]][i]
-      if (is.na(val)) val <- 0
-      intensity <- min(1, val / max_val)
-      bg <- sprintf("rgba(26,82,118,%.2f)", 0.08 + intensity * 0.45)
-      txt_col <- if (intensity > 0.6) "#fff" else "#334155"
+      is_absent <- is.na(val)
+      if (is_absent) {
+        bg      <- "#f1f5f9"
+        txt_col <- "#94a3b8"
+        cell_label <- "\u2014"
+      } else {
+        intensity  <- min(1, val / max_val)
+        bg         <- sprintf("rgba(26,82,118,%.2f)", 0.08 + intensity * 0.45)
+        txt_col    <- if (intensity > 0.6) "#fff" else "#334155"
+        cell_label <- .br_fmt(val, 1)
+      }
 
       parts <- c(parts,
         sprintf('<rect x="%g" y="%g" width="%d" height="%d" fill="%s" stroke="#fff" stroke-width="1"/>', x, y, cell_w, cell_h, bg),
         sprintf('<text x="%g" y="%g" text-anchor="middle" fill="%s" font-size="10" dominant-baseline="middle">%s</text>',
-                x + cell_w / 2, y + cell_h / 2, txt_col, .br_fmt(val, 1)))
+                x + cell_w / 2, y + cell_h / 2, txt_col, cell_label))
     }
   }
 

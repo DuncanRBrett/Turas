@@ -202,12 +202,44 @@ run_portfolio <- function(data, categories, structure, config, weights = NULL) {
     as.numeric(n_total)
   }
 
-  # Analyses delegated to sub-modules (phases 2-5); stubs return NULL here
-  footprint_result  <- NULL   # 09a — phase 2
-  clutter_result    <- NULL   # 09c — phase 2
-  strength_result   <- NULL   # 09d — phase 3
-  extension_result  <- NULL   # 09e — phase 3
-  constellation_result <- NULL  # 09b — phase 4
+  # Phase 2: footprint matrix + clutter quadrant
+  footprint_result <- tryCatch(
+    compute_footprint_matrix(data, categories, structure, config, weights),
+    error = function(e) {
+      message(sprintf("[PORTFOLIO] Footprint failed: %s", e$message))
+      NULL
+    }
+  )
+
+  clutter_result <- tryCatch(
+    compute_clutter_data(data, categories, structure, config, weights),
+    error = function(e) {
+      message(sprintf("[PORTFOLIO] Clutter failed: %s", e$message))
+      NULL
+    }
+  )
+
+  # Phase 3: strength map + extension (stubs)
+  strength_result      <- NULL
+  extension_result     <- NULL
+  # Phase 4: constellation (stub)
+  constellation_result <- NULL
+
+  # Aggregate suppressed categories across analyses
+  all_suppressed <- unique(c(
+    if (!is.null(footprint_result)) footprint_result$suppressed_cats else character(0),
+    if (!is.null(clutter_result))   clutter_result$suppressed_cats   else character(0)
+  ))
+
+  # Build per-category bases from footprint
+  bases_per_cat <- if (!is.null(footprint_result) &&
+                        !is.null(footprint_result$bases_df) &&
+                        nrow(footprint_result$bases_df) > 0) {
+    footprint_result$bases_df
+  } else {
+    data.frame(cat = character(0), n_buyers_uw = integer(0),
+               n_buyers_w = numeric(0), stringsAsFactors = FALSE)
+  }
 
   list(
     status       = "PASS",
@@ -216,14 +248,7 @@ run_portfolio <- function(data, categories, structure, config, weights = NULL) {
     n_total      = n_total,
     n_weighted   = total_w,
     bases        = list(
-      per_category = data.frame(
-        cat             = character(0),
-        n_buyers_uw     = integer(0),
-        n_buyers_w      = numeric(0),
-        n_aware_total_uw = integer(0),
-        n_aware_total_w  = numeric(0),
-        stringsAsFactors = FALSE
-      ),
+      per_category = bases_per_cat,
       per_brand    = data.frame(
         brand                = character(0),
         n_aware_uw           = integer(0),
@@ -232,14 +257,14 @@ run_portfolio <- function(data, categories, structure, config, weights = NULL) {
         stringsAsFactors     = FALSE
       )
     ),
-    footprint_matrix = footprint_result,
+    footprint_matrix = if (!is.null(footprint_result)) footprint_result$matrix_df else NULL,
     constellation    = constellation_result,
     clutter          = clutter_result,
     strength         = strength_result,
     extension        = extension_result,
     supporting       = NULL,
     suppressions     = list(
-      low_base_cats  = character(0),
+      low_base_cats  = all_suppressed,
       dropped_brands = character(0),
       dropped_edges  = 0L
     )

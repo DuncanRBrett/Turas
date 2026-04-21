@@ -143,6 +143,12 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
                error = function(e) ""),
       sep = "\n")
   }
+  if (exists("build_portfolio_panel_styles", mode = "function")) {
+    panel_styles <- paste(panel_styles,
+      tryCatch(build_portfolio_panel_styles(brand_colour_cfg),
+               error = function(e) ""),
+      sep = "\n")
+  }
 
   # Resolve JS paths (funnel + MA) and concatenate into one panel_js blob
   .resolve_js <- function(filename) {
@@ -163,6 +169,7 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
     .resolve_js("brand_funnel_panel.js"),
     .resolve_js("brand_ma_panel.js"),
     .resolve_js("brand_cat_buying_panel.js"),
+    .resolve_js("brand_portfolio_panel.js"),
     sep = "\n"
   )
 
