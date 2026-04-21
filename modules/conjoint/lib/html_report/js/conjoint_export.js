@@ -73,10 +73,28 @@
   window.exportExcel = function(panelId) {
     var data = extractTableData(panelId);
     if (!data) return;
-    exportExcelFromData(data, "conjoint_" + panelId);
+
+    var title = "";
+    var filenameBase = "conjoint_" + panelId;
+
+    // For utility panels: read the attribute name from the active detail element
+    // so the file is named "conjoint_utility_Brand.xls" and includes a title row
+    if (panelId.indexOf("util-") === 0) {
+      var detailEl = document.querySelector(".cj-attr-detail.active");
+      if (detailEl) {
+        var attrName = detailEl.getAttribute("data-attr") ||
+          (detailEl.querySelector("h2") ? detailEl.querySelector("h2").textContent.trim() : "");
+        if (attrName) {
+          title = attrName;
+          filenameBase = "conjoint_utility_" + attrName.replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_|_$/g, "");
+        }
+      }
+    }
+
+    exportExcelFromData(data, filenameBase, title);
   };
 
-  function exportExcelFromData(data, filenameBase) {
+  function exportExcelFromData(data, filenameBase, title) {
     var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">';
     html += '<head><meta charset="UTF-8">';
     html += '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>';
@@ -86,6 +104,14 @@
     html += 'th{background:#f1f5f9;font-weight:bold;border-bottom:2px solid #ccc;}</style>';
     html += '</head><body>';
     html += '<table border="1" cellspacing="0" cellpadding="4">';
+
+    // Optional title row spanning all columns
+    if (title) {
+      var colspan = data.headers.length || 1;
+      html += '<tr><th colspan="' + colspan + '" style="background:#323367;color:#ffffff;' +
+        'font-size:12pt;text-align:left;border-bottom:2px solid #1e1e5c;">' +
+        htmlEscape(title) + '</th></tr>';
+    }
 
     // Headers
     html += '<tr>';
@@ -135,51 +161,33 @@
   // === BUILD SIMULATOR EXPORT DATA ===
 
   function buildSimulatorExportData() {
-    if (typeof SimEngine === "undefined") return null;
+    if (typeof SimEngine === "undefined" || typeof SimUI === "undefined") return null;
     var simData = SimEngine.getData();
     if (!simData || !simData.attributes) return null;
+
+    var products = SimUI.getProducts();
+    if (!products || products.length === 0) return null;
 
     // Build headers: Product Name, Attribute1, Attribute2, ..., Predicted Share (%)
     var headers = ["Product"];
     simData.attributes.forEach(function(a) { headers.push(a.name); });
     headers.push("Predicted Share (%)");
 
-    // Extract product configs from DOM
-    var prodEls = document.querySelectorAll(".cj-sim-product");
-    if (prodEls.length === 0) return null;
-
-    var configs = [];
-    prodEls.forEach(function(el) {
-      var config = {};
-      el.querySelectorAll("select").forEach(function(sel) {
-        var label = sel.previousElementSibling;
-        if (label) {
-          config[label.textContent.trim()] = sel.value;
-        }
-      });
-      configs.push(config);
-    });
-
-    // Calculate shares
+    // Calculate shares using product configs from SimUI state (not DOM)
+    var configs = products.map(function(p) { return p.config; });
     var shares = [];
-    if (configs.length > 0) {
-      try {
-        shares = SimEngine.predictShares(configs, "logit");
-      } catch (e) {
-        shares = configs.map(function() { return 0; });
-      }
+    try {
+      shares = SimEngine.predictShares(configs, "logit");
+    } catch (e) {
+      shares = configs.map(function() { return 0; });
     }
-
-    // Read product names from DOM
-    var nameEls = document.querySelectorAll(".cj-sim-product-name");
 
     // Build rows
     var rows = [];
-    configs.forEach(function(config, i) {
-      var pName = (nameEls[i] && nameEls[i].value) ? nameEls[i].value : "Product " + (i + 1);
-      var row = [pName];
+    products.forEach(function(prod, i) {
+      var row = [prod.name || ("Product " + (i + 1))];
       simData.attributes.forEach(function(a) {
-        row.push(config[a.name] || "");
+        row.push(prod.config[a.name] || "");
       });
       row.push(shares[i] !== undefined ? shares[i].toFixed(1) : "");
       rows.push(row);

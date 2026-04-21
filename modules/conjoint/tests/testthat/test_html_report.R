@@ -386,6 +386,10 @@ test_that("WTP table renders when data provided", {
   expect_true(is.character(html))
   expect_true(grepl("data-table-id", html))
   expect_true(grepl("Beta", html, fixed = TRUE))
+  # Baseline reference must appear in data-export-value so Excel export captures it
+  expect_true(grepl('data-export-value="Alpha \\(baseline\\)"', html))
+  # Non-baseline rows must not have "(baseline)" in their export value
+  expect_false(grepl('data-export-value="Beta \\(baseline\\)"', html))
 })
 
 
@@ -580,9 +584,17 @@ test_that("page builder export bar has all buttons", {
   if (!exists(".build_export_bar", mode = "function")) skip(".build_export_bar not loaded")
 
   bar <- .build_export_bar("overview")
-  expect_true(grepl("exportCSV", bar, fixed = TRUE))
+  # Export PNG button (calls cjExportPNG — renders via pin card pipeline)
+  expect_true(grepl("cjExportPNG", bar, fixed = TRUE))
+  expect_true(grepl("Export PNG",  bar, fixed = TRUE))
+  # Excel button present when has_table = TRUE (default)
   expect_true(grepl("exportExcel", bar, fixed = TRUE))
-  expect_true(grepl("exportChartPNG", bar, fixed = TRUE))
+  # CSV button removed
+  expect_false(grepl("exportCSV",  bar, fixed = TRUE))
+
+  # has_table = FALSE omits Excel button
+  bar_no_table <- .build_export_bar("overview", has_table = FALSE)
+  expect_false(grepl("exportExcel", bar_no_table, fixed = TRUE))
 })
 
 

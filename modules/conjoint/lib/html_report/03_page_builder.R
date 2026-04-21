@@ -1413,10 +1413,8 @@ build_simulator_panel <- function(html_data, brand) {
 
   # Simulator export bar
   sim_export <- '<div class="cj-export-bar">
-<button class="cj-export-btn" onclick="exportSimulatorCSV()">CSV</button>
 <button class="cj-export-btn" onclick="exportSimulatorExcel()">Excel</button>
-<button class="cj-export-btn" onclick="exportChartPNG(\'simulator\')">Chart PNG</button>
-<button class="cj-export-btn" onclick="exportSlidePNG(\'simulator\')">Slide PNG</button>
+<button class="cj-export-btn" onclick="cjExportPNG(\'simulator\', this)">Export PNG</button>
 </div>'
 
   insight <- build_insight_area("simulator", html_data$insights)
@@ -1726,15 +1724,15 @@ build_insight_area <- function(tab_id, insights = list()) {
 # ==============================================================================
 
 #' @keywords internal
-.build_export_bar <- function(panel_id) {
+.build_export_bar <- function(panel_id, has_table = TRUE) {
+  excel_btn <- if (has_table) {
+    sprintf('<button class="cj-export-btn" onclick="exportExcel(\'%s\')">Excel</button>', panel_id)
+  } else ""
   sprintf(
     '<div class="cj-export-bar">
-<button class="cj-export-btn" onclick="exportCSV(\'%s\')">CSV</button>
-<button class="cj-export-btn" onclick="exportExcel(\'%s\')">Excel</button>
-<button class="cj-export-btn" onclick="exportChartPNG(\'%s\')">Chart PNG</button>
-<button class="cj-export-btn" onclick="exportSlidePNG(\'%s\')">Slide PNG</button>
-</div>',
-    panel_id, panel_id, panel_id, panel_id
+<button class="cj-export-btn" onclick="cjExportPNG(\'%s\', this)">Export PNG</button>
+%s</div>',
+    panel_id, excel_btn
   )
 }
 

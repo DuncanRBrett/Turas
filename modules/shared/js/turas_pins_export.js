@@ -9,6 +9,38 @@
 
   var NS = "http://www.w3.org/2000/svg";
 
+  /**
+   * Export captured content immediately as PNG — uses the identical rendering
+   * pipeline as a saved pin card export but without saving to the pin list.
+   *
+   * @param {object} content - Same structure as the object passed to TurasPins.add():
+   *   { title, sourceLabel, chartSvg, tableHtml, insightText, pinFlags }
+   */
+  TurasPins.exportContentAsPNG = function(content) {
+    var pin = {
+      id:          "export-" + Date.now(),
+      type:        "pin",
+      title:       content.title       || "Export",
+      sourceLabel: content.sourceLabel || "",
+      chartSvg:    content.chartSvg    || "",
+      tableHtml:   content.tableHtml   || "",
+      insightText: content.insightText || "",
+      pinFlags:    content.pinFlags    || { chart: true, table: true, insight: true },
+      pinMode:     "custom"
+    };
+    TurasPins._exportToBlob(pin, function(blob) {
+      if (!blob) return;
+      var slug = pin.title.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 40);
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "export_" + slug + ".png";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    });
+  };
+
   /** Export a single pin card as PNG. */
   TurasPins.exportCard = function(pinId, onComplete) {
     var pins = TurasPins.getAll();
@@ -268,8 +300,21 @@
   }
 
   function _brandColour() {
-    try { return getComputedStyle(document.documentElement).getPropertyValue("--hub-brand").trim() || "#323367"; }
-    catch (e) { return "#323367"; }
+    try {
+      var rs = getComputedStyle(document.documentElement);
+      return rs.getPropertyValue("--hub-brand").trim()  ||
+             rs.getPropertyValue("--cj-brand").trim()   ||
+             rs.getPropertyValue("--md-brand").trim()   ||
+             rs.getPropertyValue("--kd-brand").trim()   ||
+             rs.getPropertyValue("--cd-brand").trim()   ||
+             rs.getPropertyValue("--pr-brand").trim()   ||
+             rs.getPropertyValue("--tk-brand").trim()   ||
+             rs.getPropertyValue("--seg-brand").trim()  ||
+             rs.getPropertyValue("--ci-brand").trim()   ||
+             rs.getPropertyValue("--wt-brand").trim()   ||
+             rs.getPropertyValue("--turas-brand").trim() ||
+             "#323367";
+    } catch (e) { return "#323367"; }
   }
 
   function _rect(parent, x, y, w, h, fill, rx) {

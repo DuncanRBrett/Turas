@@ -197,6 +197,24 @@
     chartImg.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
   };
 
+  // ── Combined Export PNG (Chart + Slide chooser) ──
+
+  /**
+   * Show checkbox popover so the user can choose Chart PNG, Slide PNG, or both.
+   * @param {string} sectionId - Section identifier
+   * @param {HTMLElement} btnEl - The button that was clicked (anchors the popover)
+   */
+  window.exportPNG = function(sectionId, btnEl) {
+    var checkboxes = [
+      { key: "chart", label: "Chart PNG", available: true, checked: true },
+      { key: "slide", label: "Slide PNG", available: true, checked: true }
+    ];
+    TurasPins.showCheckboxPopover(btnEl, checkboxes, function(flags) {
+      if (flags.chart) exportChartPNG(sectionId);
+      if (flags.slide) exportSlidePNG(sectionId);
+    }, null, { title: "EXPORT AS PNG", actionLabel: "Export" });
+  };
+
   // ── Save Report (serialize current state to downloadable HTML) ──
   window.saveReportHTML = function() {
     // Sync all insights before saving

@@ -138,26 +138,32 @@
   // ── Show ───────────────────────────────────────────────────────────────────
 
   /**
-   * Show a checkbox-based pin popover.
+   * Show a checkbox-based popover (pin or export).
    *
-   * @param {HTMLElement} btnEl - The pin button that was clicked
+   * @param {HTMLElement} btnEl - The button that was clicked
    * @param {Array<{key:string, label:string, available:boolean, checked:boolean}>} checkboxes
    *   Content type options to show. Each has:
-   *   - key: "table", "chart", "insight", or "aiInsight"
+   *   - key: string identifier
    *   - label: Display text
    *   - available: Whether content exists (disabled if false)
    *   - checked: Default checked state
-   * @param {function(Object)} onPin - Callback with flags object
-   *   { table: bool, chart: bool, insight: bool, aiInsight: bool }
+   * @param {function(Object)} onConfirm - Callback with flags object keyed by checkbox key
    * @param {HTMLElement} [anchorEl] - Optional parent for positioning (defaults to btn parent)
+   * @param {object} [opts] - Optional overrides: { title, actionLabel }
+   *   - title: Popover heading text (default "PIN TO VIEWS")
+   *   - actionLabel: Action button text (default "Pin")
    */
-  TurasPins.showCheckboxPopover = function(btnEl, checkboxes, onPin, anchorEl) {
+  TurasPins.showCheckboxPopover = function(btnEl, checkboxes, onConfirm, anchorEl, opts) {
     // Toggle: if popover already open, close it
     var existing = document.querySelector(".pin-mode-popover");
     if (existing) {
       TurasPins.closePopover();
       return;
     }
+
+    opts = opts || {};
+    var popoverTitle  = opts.title       || "PIN TO VIEWS";
+    var actionLabel   = opts.actionLabel || "Pin";
 
     _ensureCSS();
 
@@ -168,8 +174,13 @@
     // Title
     var title = document.createElement("div");
     title.className = "pin-mode-title";
-    title.textContent = "PIN TO VIEWS";
+    title.textContent = popoverTitle;
     popover.appendChild(title);
+
+    // Optional header element (e.g. sub-tab radio group) inserted before checkboxes
+    if (opts.headerEl) {
+      popover.appendChild(opts.headerEl);
+    }
 
     // Checkboxes
     var state = {};
@@ -194,16 +205,16 @@
       popover.appendChild(row);
     });
 
-    // Pin button
+    // Action button
     var pinBtn = document.createElement("button");
     pinBtn.className = "pin-mode-action";
-    pinBtn.textContent = "Pin";
+    pinBtn.textContent = actionLabel;
     pinBtn.onclick = function(e) {
       e.stopPropagation();
       var anyChecked = Object.keys(state).some(function(k) { return state[k]; });
       if (!anyChecked) return;
       TurasPins.closePopover();
-      onPin(state);
+      onConfirm(state);
     };
     popover.appendChild(pinBtn);
 

@@ -163,13 +163,8 @@ build_pin_button <- function(panel_id) {
   sprintf(
     '<div class="pin-btn-wrapper">
   <button class="pin-btn" data-panel="%s" onclick="window._mdTogglePin(\'%s\')" title="Pin to Views">%s</button>
-  <div class="pin-mode-popover" style="display:none;">
-    <button class="pin-mode-option" onclick="window._mdExecutePin(\'%s\',\'all\')">Table + Chart + Insight</button>
-    <button class="pin-mode-option" onclick="window._mdExecutePin(\'%s\',\'chart_insight\')">Chart + Insight</button>
-    <button class="pin-mode-option" onclick="window._mdExecutePin(\'%s\',\'table_insight\')">Table + Insight</button>
-  </div>
 </div>',
-    panel_id, panel_id, pin_icon, panel_id, panel_id, panel_id
+    panel_id, panel_id, pin_icon
   )
 }
 
@@ -179,13 +174,17 @@ build_pin_button <- function(panel_id) {
 # ==============================================================================
 
 build_panel_toolbar <- function(panel_id, insights_list = NULL) {
-  export_btn <- sprintf(
+  export_png_btn <- sprintf(
+    '<button class="md-export-btn" onclick="mdExportPNG(\'%s\', this)">Export PNG</button>',
+    panel_id)
+  export_excel_btn <- sprintf(
     '<button class="md-export-btn" onclick="window._mdExportPanel(\'%s\')" title="Export table data to Excel"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 14h12M8 2v9M4 7l4 4 4-4"/></svg> Export Excel</button>',
     panel_id)
   paste0(
     '<div class="md-panel-toolbar">',
     build_pin_button(panel_id),
-    export_btn,
+    export_png_btn,
+    export_excel_btn,
     '</div>',
     build_insight_area(panel_id, insights_list)
   )
@@ -1046,21 +1045,21 @@ build_items_panel <- function(html_data, tables, charts, insights = NULL, segmen
     '<button class="md-subtab-btn" data-group="items" data-subtab="detailed" onclick="window._mdSwitchSubtab(this)">Detailed Scores</button>')
   subtab_nav <- paste0(subtab_nav, '</div>')
 
-  # Sub-panels — charts in segment containers, plus segment table fallback
+  # Sub-panels — chart-only sub-tabs show no table; Detailed Scores owns the tables
   bw_panel <- sprintf(
-    '<div class="md-subpanel active" data-group="items" data-subpanel="bw">%s%s</div>',
-    diverging_chart_html, seg_counts_container)
+    '<div class="md-subpanel active" data-group="items" data-subpanel="bw">%s</div>',
+    diverging_chart_html)
 
   quadrant_panel <- ""
   if (has_quadrant) {
     quadrant_panel <- sprintf(
-      '<div class="md-subpanel" data-group="items" data-subpanel="quadrant">%s%s</div>',
-      quadrant_chart_html, seg_counts_container)
+      '<div class="md-subpanel" data-group="items" data-subpanel="quadrant">%s</div>',
+      quadrant_chart_html)
   }
 
   detailed_panel <- sprintf(
-    '<div class="md-subpanel" data-group="items" data-subpanel="detailed">%s%s</div>',
-    count_callout, count_table)
+    '<div class="md-subpanel" data-group="items" data-subpanel="detailed">%s%s%s</div>',
+    count_callout, count_table, seg_counts_container)
 
   sprintf(
     '<div class="md-panel" id="panel-items">
@@ -1283,6 +1282,10 @@ build_diagnostics_panel <- function(html_data, tables, charts, insights = NULL) 
       m$design_detail %||% "", m$assumptions %||% "")
   }
 
+  # Wrap all stat-card sections together so JS can capture them as "Cards" for pinning
+  hero_wrapper <- sprintf('<div class="md-diag-hero">%s%s%s%s</div>',
+    model_section, pop_section, quality_section, resp_section)
+
   images_html <- build_panel_images(html_data$images, "diagnostics")
 
   sprintf(
@@ -1295,12 +1298,9 @@ build_diagnostics_panel <- function(html_data, tables, charts, insights = NULL) 
     %s
     %s
     %s
-    %s
-    %s
-    %s
   </div>
 </div>',
-    toolbar, callout, model_section, pop_section, quality_section, resp_section, item_table_section, method_section, images_html)
+    toolbar, callout, hero_wrapper, item_table_section, method_section, images_html)
 }
 
 
@@ -1371,13 +1371,14 @@ body { font-size: 14px; -webkit-font-smoothing: antialiased; }
 
 /* Badge bar */
 .md-badge-bar {
-  display: inline-flex; align-items: center; margin-top: 12px;
+  display: flex; flex-wrap: wrap; align-items: center; margin-top: 12px;
   border: 1px solid rgba(255,255,255,0.15); border-radius: 6px;
   background: rgba(255,255,255,0.05);
 }
-.md-badge-item { display: inline-flex; align-items: center; padding: 4px 12px; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.85); }
+.md-badge-item { display: inline-flex; align-items: center; padding: 4px 12px; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.85); border-left: 1px solid rgba(255,255,255,0.20); }
+.md-badge-item:first-child { border-left: none; }
 .md-badge-item strong { color: #fff; font-weight: 700; }
-.md-badge-sep { width: 1px; height: 16px; background: rgba(255,255,255,0.20); flex-shrink: 0; }
+.md-badge-sep { display: none; }
 
 /* Help button */
 .md-help-btn {
@@ -1389,13 +1390,13 @@ body { font-size: 14px; -webkit-font-smoothing: antialiased; }
 
 /* === TAB NAVIGATION === */
 .md-tab-nav {
-  display: flex; gap: 0; background: white; border-bottom: 2px solid var(--md-border);
-  padding: 0 40px; position: sticky; top: 0; z-index: 100; overflow-x: auto;
+  display: flex; flex-wrap: wrap; gap: 0; background: white; border-bottom: 2px solid var(--md-border);
+  padding: 0 40px; position: sticky; top: 0; z-index: 100;
 }
 .md-tab-btn {
   background: transparent; border: none; padding: 12px 20px; font-size: 13px; font-weight: 500;
   color: var(--md-text-secondary); cursor: pointer; border-bottom: 3px solid transparent;
-  white-space: nowrap; transition: all 200ms;
+  transition: all 200ms;
 }
 .md-tab-btn:hover { color: var(--md-brand); }
 .md-tab-btn.active { color: var(--md-brand); border-bottom-color: var(--md-brand); }
@@ -1524,7 +1525,7 @@ body { font-size: 14px; -webkit-font-smoothing: antialiased; }
 .md-btn-secondary:hover { background: var(--md-bg-muted); color: var(--md-text-primary); border-color: #cbd5e1; }
 
 /* === PANEL TOOLBAR (pin + insight) === */
-.md-panel-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.md-panel-toolbar { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 8px; }
 
 /* === PIN BUTTON === */
 .pin-btn-wrapper { position: relative; }
@@ -1680,19 +1681,19 @@ body { font-size: 14px; -webkit-font-smoothing: antialiased; }
   border-radius: 3px; border: 1px solid #e2e8f0;
 }
 .md-h2h-wrapper { overflow-x: auto; margin: 8px 0; }
-.md-h2h-table { border-collapse: collapse; width: 100%; table-layout: fixed; font-size: 13px; font-family: inherit; }
+.md-h2h-table { border-collapse: collapse; min-width: 100%; table-layout: auto; font-size: 13px; font-family: inherit; }
 .md-h2h-table th, .md-h2h-table td { border: 1px solid #e2e8f0; }
 .md-h2h-label-col {
   text-align: left; font-weight: 600; font-size: 12px;
   padding: 10px 14px; width: 160px; white-space: nowrap;
   background: #f8fafc; color: #1e293b;
 }
-.md-h2h-col-header {
+.md-h2h-table thead th.md-h2h-col-header {
   text-align: center; vertical-align: bottom; background: #f8fafc;
-  font-size: 11px; font-weight: 600; color: #1e293b;
-  padding: 8px 6px; white-space: normal; word-wrap: break-word;
-  overflow-wrap: break-word;
-  line-height: 1.3;
+  font-size: 10px; font-weight: 600; color: #475569;
+  padding: 6px 4px; white-space: normal; word-break: break-word;
+  overflow-wrap: break-word; min-width: 64px;
+  text-transform: none; line-height: 1.3; letter-spacing: 0;
 }
 .md-h2h-row-label {
   text-align: left; font-weight: 500; font-size: 12px;
@@ -1890,8 +1891,7 @@ build_md_print_css <- function() {
   .md-header-title, .md-header-titles h1 { color: var(--md-brand) !important; }
   .md-header-prepared, .md-header-subtitle { color: #64748b !important; }
   .md-badge-bar { border-color: #e2e8f0 !important; }
-  .md-badge-item { color: #334155 !important; }
-  .md-badge-sep { background: #e2e8f0 !important; }
+  .md-badge-item { color: #334155 !important; border-left-color: #e2e8f0 !important; }
   body { background: white; }
   .md-container { max-width: 100%; padding: 0 20px; }
   #panel-pinned { display: none !important; }

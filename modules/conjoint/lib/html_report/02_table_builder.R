@@ -233,10 +233,15 @@ build_wtp_table <- function(wtp_data) {
       }
     } else ""
 
+    level_export <- if (is_bl) {
+      .html_escape(paste0(wtp$Level[i], " (baseline)"))
+    } else {
+      .html_escape(wtp$Level[i])
+    }
     sprintf(
       '<tr><td class="cj-label-col" data-col-key="attribute" data-export-value="%s">%s</td><td class="cj-label-col" data-col-key="level" data-export-value="%s">%s%s</td><td class="cj-num %s" data-col-key="wtp" data-export-value="%s">%s</td>%s</tr>',
       .html_escape(wtp$Attribute[i]), .html_escape(wtp$Attribute[i]),
-      .html_escape(wtp$Level[i]), .html_escape(wtp$Level[i]),
+      level_export, .html_escape(wtp$Level[i]),
       if (is_bl) ' <span class="cj-baseline">(baseline)</span>' else "",
       wtp_class,
       if (is_bl) "" else sprintf("%.2f", wtp_val),
