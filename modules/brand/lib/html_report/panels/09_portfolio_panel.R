@@ -62,6 +62,7 @@ build_br_portfolio_panel <- function(results, config) {
 
   fp_html <- .pf_footprint_subtab(portfolio, panel_data, focal_brand, focal_colour)
   cl_html <- .pf_clutter_subtab(portfolio, panel_data, focal_colour)
+  ex_html <- .pf_extension_subtab(portfolio, panel_data, focal_brand, focal_colour)
 
   timeframe_label <- if (identical(portfolio$timeframe, "3m")) "3-month" else "13-month"
   n_label         <- format(portfolio$n_total %||% 0L, big.mark = ",")
@@ -98,9 +99,9 @@ build_br_portfolio_panel <- function(results, config) {
     cl_html,
     '</div>',
 
-    # Extension subtab (Phase 3 stub)
+    # Extension subtab
     '<div class="pf-subtab" id="pf-subtab-extension">',
-    '<div class="pf-coming-soon">Portfolio Strength Map &amp; Permission-to-Extend — available in Phase 3</div>',
+    ex_html,
     '</div>',
 
     '</div>',  # .pf-panel
@@ -272,6 +273,133 @@ build_br_portfolio_panel <- function(results, config) {
     '</tr></thead><tbody>',
     rows_html,
     '</tbody></table></div>'
+  )
+}
+
+
+# ==============================================================================
+# EXTENSION SUBTAB
+# ==============================================================================
+
+.pf_extension_subtab <- function(portfolio, panel_data, focal_brand, focal_colour) {
+  strength  <- portfolio$strength
+  extension <- portfolio$extension
+  section_id <- "pf-extension"
+
+  # --- Strength map ---
+  strength_html <- if (!is.null(strength) &&
+                        !is.null(strength$per_brand) &&
+                        focal_brand %in% names(strength$per_brand)) {
+    fb_df <- strength$per_brand[[focal_brand]]
+    if (nrow(fb_df) >= 2) {
+      fb_df$cat_pen_pct    <- fb_df$cat_pen    * 100
+      fb_df$brand_aware_pct <- fb_df$brand_aware
+      chart_svg <- tryCatch(
+        build_bubble_scatter(
+          df          = fb_df,
+          x_col       = "cat_pen_pct",
+          y_col       = "brand_aware_pct",
+          label_col   = "cat",
+          size_col    = "aware_n_w",
+          brand_colour = focal_colour,
+          title       = sprintf("Portfolio Strength: %s (%%)", .pf_esc(focal_brand))
+        ),
+        error = function(e) ""
+      )
+      paste0(
+        '<h3 style="font-size:14px;font-weight:600;color:#1e293b;margin:0 0 12px;">',
+        'Portfolio Strength Map</h3>',
+        '<div style="margin:8px 0;">', chart_svg, '</div>',
+        '<p style="font-size:11px;color:#94a3b8;margin:4px 0 16px;">',
+        'Each bubble = one category. X = category penetration in sample; ',
+        'Y = brand awareness among category buyers. Diagonal = equal performance.</p>'
+      )
+    } else if (nrow(fb_df) == 1) {
+      sprintf(
+        '<div class="pf-coming-soon" style="min-height:100px;">%s is present in only one category — strength map requires two or more.</div>',
+        .pf_esc(focal_brand)
+      )
+    } else {
+      '<p style="color:#94a3b8;padding:16px 0;">Strength map data not available.</p>'
+    }
+  } else {
+    '<p style="color:#94a3b8;padding:16px 0;">Strength map data not available.</p>'
+  }
+
+  # --- Extension table ---
+  ext_html <- if (!is.null(extension) &&
+                   !is.null(extension$extension_df) &&
+                   nrow(extension$extension_df) > 0) {
+    home_note <- if (nzchar(extension$home_cat %||% "")) {
+      sprintf(
+        '<p style="font-size:11px;color:#64748b;margin:0 0 12px;">Home category: <strong>%s</strong> (%s). Non-home categories ranked by lift.</p>',
+        .pf_esc(extension$home_cat),
+        if (identical(extension$home_cat_source, "config")) "configured" else "auto-detected"
+      )
+    } else ""
+
+    paste0(
+      '<h3 style="font-size:14px;font-weight:600;color:#1e293b;margin:16px 0 8px;">',
+      'Permission-to-Extend</h3>',
+      home_note,
+      .pf_extension_table(extension$extension_df)
+    )
+  } else {
+    '<p style="color:#94a3b8;padding:16px 0;">Extension data not available.</p>'
+  }
+
+  about_text <- if (!is.null(panel_data)) panel_data$about$extension %||% "" else ""
+
+  paste0(
+    .pf_section_toolbar(section_id),
+    strength_html,
+    ext_html,
+    if (nzchar(about_text)) {
+      sprintf('<div class="pf-about-drawer"><strong>About this analysis:</strong> %s</div>',
+              .pf_esc(about_text))
+    } else ""
+  )
+}
+
+
+.pf_extension_table <- function(ext_df) {
+  if (nrow(ext_df) == 0) return("")
+
+  rows_html <- paste(vapply(seq_len(nrow(ext_df)), function(i) {
+    r          <- ext_df[i, ]
+    is_home    <- isTRUE(r$is_home)
+    low_base   <- isTRUE(r$low_base_flag)
+    lift_str   <- if (!is.na(r$lift) && !is_home) {
+      if (low_base) sprintf("%.2f&#x2020;", r$lift) else sprintf("%.2f", r$lift)
+    } else if (is_home) "(home)" else "—"
+    sig_str    <- if (!is.na(r$p_adj) && !is_home) {
+      if (r$p_adj < 0.05) "&#x2605;" else ""
+    } else ""
+    row_style <- if (is_home) ' style="background:#f8fafc;color:#94a3b8;"' else ""
+    sprintf(
+      '<tr%s><td>%s</td><td style="text-align:right;">%s</td><td style="text-align:right;">%.1f%%</td><td style="text-align:right;">%s%s</td></tr>',
+      row_style,
+      .pf_esc(r$cat),
+      format(r$n_buyers_uw, big.mark = ","),
+      r$focal_aware_pct %||% 0,
+      lift_str, sig_str
+    )
+  }, character(1)), collapse = "")
+
+  paste0(
+    '<div style="overflow-x:auto;">',
+    '<table style="width:100%;border-collapse:collapse;font-size:12px;">',
+    '<thead><tr style="background:#f8fafc;font-weight:600;color:#475569;">',
+    '<th style="padding:8px;text-align:left;border-bottom:1px solid #e2e8f0;">Category</th>',
+    '<th style="padding:8px;text-align:right;border-bottom:1px solid #e2e8f0;">Buyers (n)</th>',
+    '<th style="padding:8px;text-align:right;border-bottom:1px solid #e2e8f0;">Aware of focal</th>',
+    '<th style="padding:8px;text-align:right;border-bottom:1px solid #e2e8f0;">Lift &#x2605;=sig.</th>',
+    '</tr></thead><tbody>',
+    rows_html,
+    '</tbody></table>',
+    '<p style="font-size:10px;color:#94a3b8;margin:6px 0 0;">',
+    '&#x2605; p&lt;0.05 (BH-corrected). &#x2020; low base (n&lt;threshold).</p>',
+    '</div>'
   )
 }
 

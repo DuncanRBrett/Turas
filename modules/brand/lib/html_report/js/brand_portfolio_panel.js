@@ -33,6 +33,32 @@ function pfSwitchSubtab(subtab) {
 }
 
 /**
+ * Switch the active brand chip in the strength map picker.
+ * Pre-renders all brand charts; this function simply shows the selected one.
+ * @param {string} brandCode - Brand code to activate.
+ */
+function pfSwitchStrengthBrand(brandCode) {
+  const panel = document.getElementById('panel-portfolio');
+  if (!panel) return;
+
+  // Update chip buttons
+  panel.querySelectorAll('.pf-brand-chip').forEach(function(btn) {
+    const isActive = btn.dataset.pfBrand === brandCode;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-pressed', String(isActive));
+  });
+
+  // Show matching chart, hide others
+  panel.querySelectorAll('.pf-strength-chart').forEach(function(div) {
+    div.style.display = div.dataset.pfBrand === brandCode ? 'block' : 'none';
+  });
+
+  if (typeof brSetPinState === 'function') {
+    brSetPinState('pf_strength_brand', brandCode);
+  }
+}
+
+/**
  * Restore portfolio panel state from a pin payload.
  * Called by brand_pins.js when a portfolio pin is activated.
  * @param {Object} state - Pin state object.
@@ -40,7 +66,7 @@ function pfSwitchSubtab(subtab) {
 function pfRestorePinState(state) {
   if (!state) return;
   if (state.subtab) pfSwitchSubtab(state.subtab);
-  // Phase 3: restore brand chip selection
+  if (state.pf_strength_brand) pfSwitchStrengthBrand(state.pf_strength_brand);
   // Phase 4: restore constellation centred_brand
 }
 

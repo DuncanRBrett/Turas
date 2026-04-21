@@ -156,7 +156,8 @@ build_scatter <- function(df, x_col, y_col, label_col,
                           x_suffix = "", y_suffix = "",
                           quadrant_labels = NULL,
                           ref_x = NULL, ref_y = NULL,
-                          size_col = NULL) {
+                          size_col = NULL,
+                          diag_ref_line = FALSE) {
 
   if (is.null(df) || nrow(df) == 0) return("")
 
@@ -240,6 +241,18 @@ build_scatter <- function(df, x_col, y_col, label_col,
   parts <- c(parts, sprintf(
     '<rect x="%d" y="%d" width="%d" height="%d" fill="none" stroke="#e2e8f0" stroke-width="1"/>', ml, mt, pw, ph))
 
+  # Diagonal reference line y = x (strength map only)
+  if (isTRUE(diag_ref_line)) {
+    d_lo <- max(x_min, y_min)
+    d_hi <- min(x_max, y_max)
+    if (d_hi > d_lo) {
+      parts <- c(parts, sprintf(
+        '<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="6,4"/>',
+        sx(d_lo), sy(d_lo), sx(d_hi), sy(d_hi)
+      ))
+    }
+  }
+
   # Dots
   for (i in seq_len(nrow(df))) {
     xv <- x_vals[i]; yv <- y_vals[i]
@@ -262,6 +275,53 @@ build_scatter <- function(df, x_col, y_col, label_col,
   }
 
   br_svg_wrap(paste(parts, collapse = "\n"), w, h, title)
+}
+
+
+# ==============================================================================
+# 2b. BUBBLE SCATTER (portfolio strength map — §4.4)
+# ==============================================================================
+
+#' Build portfolio strength bubble scatter
+#'
+#' Thin wrapper over \code{build_scatter()} that enables variable-radius dots
+#' and adds a diagonal y = x reference line. Used for the §4.4 strength map
+#' where x = category penetration and y = brand awareness among buyers.
+#'
+#' @param df Data frame. Must contain x_col, y_col, label_col, size_col.
+#' @param x_col Character. Column name for x-axis values.
+#' @param y_col Character. Column name for y-axis values.
+#' @param label_col Character. Column name for dot labels.
+#' @param size_col Character or NULL. Column for variable radius.
+#' @param brand_colour Character. Hex colour for dots.
+#' @param title Character. Chart title.
+#' @param x_label Character. X-axis label.
+#' @param y_label Character. Y-axis label.
+#'
+#' @return Character. Inline SVG string.
+#' @keywords internal
+build_bubble_scatter <- function(df, x_col, y_col, label_col,
+                                 size_col = NULL,
+                                 brand_colour = "#1A5276",
+                                 title = "",
+                                 x_label = "Category Penetration (%)",
+                                 y_label = "Brand Awareness among Buyers (%)") {
+  build_scatter(
+    df           = df,
+    x_col        = x_col,
+    y_col        = y_col,
+    label_col    = label_col,
+    focal_label  = NULL,
+    brand_colour = brand_colour,
+    comp_colour  = brand_colour,
+    title        = title,
+    x_label      = x_label,
+    y_label      = y_label,
+    x_suffix     = "%",
+    y_suffix     = "%",
+    size_col     = size_col,
+    diag_ref_line = TRUE
+  )
 }
 
 

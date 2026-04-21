@@ -95,5 +95,29 @@ build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
   justify-content: center;
   min-height: 200px;
 }
-", focal_colour, focal_colour, focal_colour)
+.pf-brand-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.pf-brand-chip {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 12px;
+  transition: all 0.15s;
+}
+.pf-brand-chip:hover { background: #f1f5f9; color: #1e293b; }
+.pf-brand-chip.active {
+  background: %s;
+  border-color: %s;
+  color: #fff;
+  font-weight: 600;
+}
+", focal_colour, focal_colour, focal_colour, focal_colour, focal_colour)
 }

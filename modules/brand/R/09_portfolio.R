@@ -219,16 +219,35 @@ run_portfolio <- function(data, categories, structure, config, weights = NULL) {
     }
   )
 
-  # Phase 3: strength map + extension (stubs)
-  strength_result      <- NULL
-  extension_result     <- NULL
+  # Phase 3: strength map + extension
+  strength_result <- tryCatch(
+    compute_strength_map(data, categories, structure, config, weights),
+    error = function(e) {
+      message(sprintf("[PORTFOLIO] Strength failed: %s", e$message))
+      NULL
+    }
+  )
+
+  extension_result <- tryCatch(
+    compute_extension_table(data, categories, structure, config, weights,
+                            footprint_result = footprint_result),
+    error = function(e) {
+      message(sprintf("[PORTFOLIO] Extension failed: %s", e$message))
+      NULL
+    }
+  )
+
   # Phase 4: constellation (stub)
   constellation_result <- NULL
 
   # Aggregate suppressed categories across analyses
   all_suppressed <- unique(c(
-    if (!is.null(footprint_result)) footprint_result$suppressed_cats else character(0),
-    if (!is.null(clutter_result))   clutter_result$suppressed_cats   else character(0)
+    if (!is.null(footprint_result)) footprint_result$suppressed_cats   else character(0),
+    if (!is.null(clutter_result))   clutter_result$suppressed_cats     else character(0),
+    if (!is.null(strength_result))  strength_result$suppressed_cats    else character(0),
+    if (!is.null(extension_result) &&
+        identical(extension_result$status, "PASS"))
+      extension_result$suppressed_cats else character(0)
   ))
 
   # Build per-category bases from footprint
@@ -260,8 +279,12 @@ run_portfolio <- function(data, categories, structure, config, weights = NULL) {
     footprint_matrix = if (!is.null(footprint_result)) footprint_result$matrix_df else NULL,
     constellation    = constellation_result,
     clutter          = clutter_result,
-    strength         = strength_result,
-    extension        = extension_result,
+    strength         = if (!is.null(strength_result) &&
+                           identical(strength_result$status, "PASS"))
+                         strength_result else NULL,
+    extension        = if (!is.null(extension_result) &&
+                           identical(extension_result$status, "PASS"))
+                         extension_result else NULL,
     supporting       = NULL,
     suppressions     = list(
       low_base_cats  = all_suppressed,
