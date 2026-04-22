@@ -31,33 +31,28 @@ build_portfolio_overview_subtab_styles <- function(focal_colour = "#1A5276") {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-.pfo-picker-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.pfo-picker-chip {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 999px;
-  color: #475569;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  padding: 6px 14px;
-  transition: all 0.15s;
-}
-.pfo-picker-chip:hover {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
+.pfo-picker-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: #fff url(\"data:image/svg+xml;charset=UTF-8,%%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%%3E%%3Cpath fill='%%23475569' d='M6 8L0 0h12z'/%%3E%%3C/svg%%3E\") no-repeat right 12px center;
+  background-size: 10px 7px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
   color: #1e293b;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  min-width: 220px;
+  padding: 8px 36px 8px 14px;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.pfo-picker-chip.active {
-  font-weight: 600;
+.pfo-picker-select:hover {
+  border-color: #94a3b8;
 }
-.pfo-picker-chip:focus-visible {
-  outline: 2px solid %s;
-  outline-offset: 2px;
+.pfo-picker-select:focus-visible {
+  border-color: %s;
+  box-shadow: 0 0 0 3px rgba(26, 82, 118, 0.15);
+  outline: none;
 }
 
 .pfo-grid {

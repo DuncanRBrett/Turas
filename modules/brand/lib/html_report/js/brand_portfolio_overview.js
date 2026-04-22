@@ -258,19 +258,8 @@
     if (t) t.innerHTML = renderTable(payload, focalCode);
     if (d) d.innerHTML = renderDeepStrip(payload, focalCode);
 
-    document.querySelectorAll('.pfo-picker-chip').forEach(function (chip) {
-      var active = chip.getAttribute('data-pfo-brand') === focalCode;
-      chip.classList.toggle('active', active);
-      if (active) {
-        chip.style.background = colour;
-        chip.style.borderColor = colour;
-        chip.style.color = '#fff';
-      } else {
-        chip.style.background = '';
-        chip.style.borderColor = '';
-        chip.style.color = '';
-      }
-    });
+    var sel = document.getElementById('pfo-focal-select');
+    if (sel && sel.value !== focalCode) sel.value = focalCode;
 
     if (typeof brSetPinState === 'function') {
       brSetPinState('pf_overview_focal', focalCode);
@@ -278,12 +267,10 @@
   }
 
   ready(function () {
-    var picker = document.querySelector('.pfo-picker');
-    if (!picker) return;
-    picker.addEventListener('click', function (e) {
-      var chip = e.target.closest('.pfo-picker-chip');
-      if (!chip) return;
-      var code = chip.getAttribute('data-pfo-brand');
+    var sel = document.getElementById('pfo-focal-select');
+    if (!sel) return;
+    sel.addEventListener('change', function (e) {
+      var code = e.target.value;
       if (code) swap(code);
     });
   });

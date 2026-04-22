@@ -79,24 +79,21 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
 .pfo_picker <- function(brands, focal_brand, focal_colour) {
   if (is.null(brands) || nrow(brands) == 0) return("")
 
-  chips <- paste(vapply(seq_len(nrow(brands)), function(i) {
+  options_html <- paste(vapply(seq_len(nrow(brands)), function(i) {
     bc  <- brands$brand_code[i]
     lbl <- brands$brand_name[i]
-    is_active <- identical(bc, focal_brand)
-    style <- if (is_active) {
-      sprintf('style="background:%s;border-color:%s;color:#fff;"',
-              focal_colour, focal_colour)
-    } else ""
-    sprintf(
-      '<button type="button" class="pfo-picker-chip%s" data-pfo-brand="%s" %s>%s</button>',
-      if (is_active) " active" else "", .pf_esc(bc), style, .pf_esc(lbl)
-    )
+    sel <- if (identical(bc, focal_brand)) " selected" else ""
+    sprintf('<option value="%s"%s>%s</option>',
+            .pf_esc(bc), sel, .pf_esc(lbl))
   }, character(1)), collapse = "")
 
   paste0(
-    '<div class="pfo-picker" role="tablist" aria-label="Focal brand picker">',
-      '<span class="pfo-picker-label">Focal brand</span>',
-      '<div class="pfo-picker-chips">', chips, '</div>',
+    '<div class="pfo-picker">',
+      '<label for="pfo-focal-select" class="pfo-picker-label">Focal brand</label>',
+      '<select id="pfo-focal-select" class="pfo-picker-select" ',
+        'aria-label="Focal brand">',
+        options_html,
+      '</select>',
     '</div>'
   )
 }
