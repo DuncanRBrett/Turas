@@ -142,23 +142,11 @@
   /* ---------------------------------------------------------------------- */
 
   function relocateCbToolbarIntoControls(panel) {
-    var section = panel.closest('.br-element-section');
-    if (!section) return;
-    var toolbar = section.querySelector(':scope > .cb-toolbar-top');
-    if (!toolbar || toolbar.__cbRelocated) return;
-    var controls = panel.querySelector(
-      '.cb-controls-bar[data-cb-scope="brands"]');
-    if (!controls) return;
-    var pinBtn    = toolbar.querySelector('.br-pin-btn');
-    var exportBtn = toolbar.querySelector('.br-export-btn');
-    if (!pinBtn && !exportBtn) return;
-    var wrap = document.createElement('span');
-    wrap.className = 'cb-toolbar-relocated';
-    if (pinBtn)    wrap.appendChild(pinBtn);
-    if (exportBtn) wrap.appendChild(exportBtn);
-    controls.appendChild(wrap);
-    toolbar.style.display = 'none';
-    toolbar.__cbRelocated = true;
+    // No-op: the top-level cb-toolbar-top stays visible so pin/PNG/Excel are
+    // reachable from every internal cb-subtab (context, brands, loyalty, etc.)
+    // — relocating into the brands-scope controls hid the buttons while the
+    // default "context" sub-view was active.
+    return;
   }
 
   /* ---------------------------------------------------------------------- */

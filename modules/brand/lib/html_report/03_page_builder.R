@@ -114,7 +114,7 @@ build_br_tab_nav <- function(category_names, config) {
 }
 
 
-#' Build section toolbar (pin + export + insight)
+#' Build section toolbar (pin + PNG export + Excel export + insight)
 #' @keywords internal
 build_br_section_toolbar <- function(section_id) {
   sprintf('
@@ -123,9 +123,13 @@ build_br_section_toolbar <- function(section_id) {
     style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:15px;padding:5px 10px;color:#94a3b8;transition:all 0.15s;">
     &#x1F4CC;
   </button>
+  <button class="br-png-btn" onclick="brExportPng(\'%s\')" title="Export PNG"
+    style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;padding:5px 10px;color:#64748b;">
+    &#x1F5BC; PNG
+  </button>
   <button class="br-export-btn" onclick="_brExportPanel(\'%s\')" title="Export Excel"
     style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;padding:5px 10px;color:#64748b;">
-    &#x1F4E5; Export
+    &#x1F4E5; Excel
   </button>
   <button class="br-insight-toggle" onclick="_brToggleInsight(\'%s\')"
     style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;padding:5px 10px;color:#64748b;">
@@ -140,7 +144,7 @@ build_br_section_toolbar <- function(section_id) {
   <button class="br-insight-dismiss" onclick="_brDismissInsight(\'%s\')"
     style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px;position:absolute;top:4px;right:8px;">&times;</button>
 </div>',
-    section_id, section_id, section_id, section_id,
+    section_id, section_id, section_id, section_id, section_id,
     section_id, section_id, section_id, section_id, section_id)
 }
 
@@ -322,6 +326,15 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
       section_id, section_id))
 
     if (!is.null(panels[[chart_key]])) {
+      # WOM and repertoire/cat-buying panels don't embed their own pin/PNG/Excel
+      # toolbar, so attach the shared one before the panel content. Funnel and
+      # MA panels embed their own controls (pin dropdown + per-view exports).
+      if (el == "wom") {
+        parts <- c(parts, build_br_section_toolbar(section_id))
+        parts <- c(parts, sprintf(
+          '<h3 class="br-element-title">Word of Mouth \u2014 %s</h3>',
+          .br_esc(cat_name)))
+      }
       parts <- c(parts, panels[[chart_key]])
     } else if (el == "ma") {
       parts <- c(parts,
@@ -378,12 +391,16 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
     style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:15px;padding:5px 10px;color:#94a3b8;transition:all 0.15s;">
     &#x1F4CC;
   </button>
+  <button class="br-png-btn" onclick="brExportPng(\'%s\')" title="Export PNG"
+    style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;padding:5px 10px;color:#64748b;">
+    &#x1F5BC; PNG
+  </button>
   <button class="br-export-btn" onclick="_brExportPanel(\'%s\')" title="Export Excel"
     style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;padding:5px 10px;color:#64748b;">
-    &#x1F4E5; Export
+    &#x1F4E5; Excel
   </button>
 </div>',
-          section_id, section_id, section_id, section_id))
+          section_id, section_id, section_id, section_id, section_id))
         parts <- c(parts, panels[[cb_panel_key]])
         parts <- c(parts, sprintf('
 <div class="cb-insight-footer" style="margin-top:20px;">

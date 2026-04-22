@@ -190,7 +190,8 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
     '<button type="button" class="sig-btn" data-fn-action="pctmode" data-fn-pctmode="aware" aria-pressed="false" title="Awareness pinned to 100%. Shows conversion from awareness for each stage.">% of aware</button>',
     '</div>',
 
-    '<button type="button" class="export-btn fn-export-btn" data-fn-action="exporttable" title="Export table to Excel">\u2B73 Export table \u25BE</button>',
+    '<button type="button" class="export-btn fn-png-btn" onclick="brExportPngFromEl(this)" title="Export view to PNG">&#x1F5BC; PNG</button>',
+    '<button type="button" class="export-btn fn-export-btn" data-fn-action="exporttable" title="Export table to Excel">\u2B73 Excel \u25BE</button>',
     '</div>'
   )
 }

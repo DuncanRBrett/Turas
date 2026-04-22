@@ -199,10 +199,18 @@
   window._brExportPanel = function(panelId) {
     var panel = document.getElementById("section-" + panelId);
     if (!panel) panel = document.querySelector('[data-section="' + panelId + '"]');
+    if (!panel && /^pf-/.test(panelId)) {
+      var subId = panelId.replace(/^pf-/, "pf-subtab-");
+      panel = document.getElementById(subId);
+    }
     if (!panel) return;
 
     var tables = panel.querySelectorAll("table.br-table");
-    if (tables.length === 0) return;
+    if (tables.length === 0) tables = panel.querySelectorAll("table");
+    if (tables.length === 0) {
+      alert("No table available on this section to export.");
+      return;
+    }
 
     var xml = '<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?>';
     xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">';

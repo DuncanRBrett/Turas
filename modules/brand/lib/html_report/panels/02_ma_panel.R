@@ -194,7 +194,8 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
     heatmap_switcher,
     sprintf('<label class="toggle-label"><input type="checkbox" data-ma-action="showcounts" data-ma-stim="%s"> Show count</label>', stim),
     sprintf('<label class="toggle-label"><input type="checkbox" checked data-ma-action="showchart" data-ma-stim="%s"> Show chart</label>', stim),
-    sprintf('<button type="button" class="export-btn ma-export-btn" data-ma-action="exporttable" data-ma-stim="%s" title="Export table to Excel">\u2B73 Export \u25BE</button>',
+    '<button type="button" class="export-btn ma-png-btn" onclick="brExportPngFromEl(this)" title="Export view to PNG">&#x1F5BC; PNG</button>',
+    sprintf('<button type="button" class="export-btn ma-export-btn" data-ma-action="exporttable" data-ma-stim="%s" title="Export table to Excel">\u2B73 Excel \u25BE</button>',
             stim),
     '</div>'
   )

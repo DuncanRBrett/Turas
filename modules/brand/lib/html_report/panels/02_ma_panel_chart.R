@@ -39,6 +39,8 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
     '</div>',
     chart_toggles,
     '<label class="toggle-label"><input type="checkbox" data-ma-action="showcounts-metrics"> Show count</label>',
+    '<button type="button" class="export-btn ma-png-btn" onclick="brExportPngFromEl(this)" title="Export view to PNG">&#x1F5BC; PNG</button>',
+    '<button type="button" class="export-btn ma-export-btn" data-ma-action="exporttable" data-ma-stim="metrics" title="Export table to Excel">\u2B73 Excel \u25BE</button>',
     '</div>'
   )
 
