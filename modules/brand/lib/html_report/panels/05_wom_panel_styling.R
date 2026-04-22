@@ -40,12 +40,37 @@ build_wom_panel_styles <- function(focal_colour = "#1A5276") {
   border: 1px solid #cbd5e1; border-radius: 6px;
   background: #ffffff; color: #0f172a; min-width: 180px;
 }
+.wom-chart-controls {
+  display: inline-flex; align-items: center; gap: 12px;
+  margin-left: auto;
+}
 .wom-toggle-label {
   display: inline-flex; align-items: center; gap: 6px;
   font-size: 12px; font-weight: 500; color: #334155;
-  margin-left: auto; cursor: pointer; user-select: none;
+  cursor: pointer; user-select: none;
 }
 .wom-toggle-label input[type="checkbox"] { cursor: pointer; }
+
+/* Heard / Said segmented control */
+.wom-variant-seg {
+  display: inline-flex; border: 1px solid #cbd5e1; border-radius: 6px;
+  background: #ffffff; overflow: hidden;
+}
+.wom-variant-seg .wom-variant-btn {
+  font-size: 12px; font-weight: 600; color: #475569;
+  padding: 4px 10px; background: #ffffff; border: 0;
+  cursor: pointer; user-select: none;
+  border-right: 1px solid #e2e8f0;
+}
+.wom-variant-seg .wom-variant-btn:last-child { border-right: 0; }
+.wom-variant-seg .wom-variant-btn:hover { background: #f1f5f9; }
+.wom-variant-seg .wom-variant-btn.active {
+  background: #1a2744; color: #ffffff;
+}
+.wom-chart-controls[aria-disabled="true"] .wom-variant-seg,
+.wom-chart-controls[aria-disabled="true"] .wom-variant-seg .wom-variant-btn {
+  opacity: 0.5; pointer-events: none;
+}
 
 /* Brand picker: coloured show/hide chips */
 .wom-brand-picker {
@@ -158,8 +183,17 @@ build_wom_panel_styles <- function(focal_colour = "#1A5276") {
   box-shadow: inset 3px 0 0 var(--fn-row-accent, %s);
 }
 
-/* Chart placeholder — shown only when Show chart toggle is on */
-.wom-chart-section { margin-top: 14px; }
+/* Chart section — shown only when Show chart toggle is on */
+.wom-chart-section {
+  margin-top: 14px;
+  padding: 14px 14px 10px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0; border-radius: 8px;
+}
+.wom-chart-variant[hidden] { display: none !important; }
+.wom-chart-svg {
+  display: block; width: 100%%; height: auto;
+}
 .wom-chart-placeholder {
   padding: 36px 20px; text-align: center;
   color: #94a3b8; font-size: 12px;

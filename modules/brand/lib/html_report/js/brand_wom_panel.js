@@ -53,7 +53,7 @@
       });
     });
 
-    // --- Show chart toggle (placeholder section)
+    // --- Show chart toggle
     panel.querySelectorAll('[data-wom-action="showchart"]').forEach(function (cb) {
       cb.addEventListener("change", function () {
         var scope = cb.getAttribute("data-wom-scope");
@@ -62,8 +62,44 @@
         if (!sec) return;
         if (cb.checked) sec.removeAttribute("hidden");
         else             sec.setAttribute("hidden", "");
+        syncVariantControlDisabled(panel, cb.checked);
       });
     });
+
+    // --- Heard / Said variant selector
+    panel.querySelectorAll('[data-wom-action="variant"]').forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var variant = btn.getAttribute("data-wom-variant");
+        if (!variant) return;
+        switchChartVariant(panel, variant);
+      });
+    });
+
+    // Ensure variant control reflects initial Show chart state
+    var cb0 = panel.querySelector('[data-wom-action="showchart"]');
+    syncVariantControlDisabled(panel, cb0 ? cb0.checked : false);
+  }
+
+  function switchChartVariant(panel, variant) {
+    panel.querySelectorAll('[data-wom-action="variant"]').forEach(function (btn) {
+      var active = btn.getAttribute("data-wom-variant") === variant;
+      btn.classList.toggle("active", active);
+      btn.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    var sec = panel.querySelector(".wom-chart-section");
+    if (sec) sec.setAttribute("data-wom-variant", variant);
+    panel.querySelectorAll(".wom-chart-variant").forEach(function (wrap) {
+      var match = wrap.getAttribute("data-wom-variant") === variant;
+      if (match) wrap.removeAttribute("hidden");
+      else       wrap.setAttribute("hidden", "");
+    });
+  }
+
+  function syncVariantControlDisabled(panel, enabled) {
+    var host = panel.querySelector(".wom-chart-controls");
+    if (!host) return;
+    if (enabled) host.removeAttribute("aria-disabled");
+    else         host.setAttribute("aria-disabled", "true");
   }
 
   function repinFocal(panel, table, focalCode, accent) {

@@ -47,7 +47,7 @@ build_wom_panel_html <- function(panel_data,
             json_payload),
     .wom_controls_bar(panel_data, category_code, focal_colour),
     .wom_table_section(panel_data, focal_colour),
-    .wom_chart_placeholder(category_code),
+    .wom_chart_section(panel_data, category_code, focal_colour),
     .wom_insight_box(),
     '</div>'
   )
@@ -99,31 +99,51 @@ build_wom_panel_html <- function(panel_data,
     '<div class="wom-focus-bar">
        <label class="wom-ctl-label">Focal brand</label>
        <select class="wom-focus-select" data-wom-action="focus">%s</select>
-       <label class="wom-toggle-label">
-         <input type="checkbox" data-wom-action="showchart" data-wom-scope="%s">
-         Show chart
-       </label>
+       <div class="wom-chart-controls">
+         <label class="wom-toggle-label">
+           <input type="checkbox" data-wom-action="showchart" data-wom-scope="%s">
+           Show chart
+         </label>
+         <div class="wom-variant-seg" data-wom-scope="%s" role="tablist" aria-label="Chart variant">
+           <button type="button" class="wom-variant-btn active" data-wom-action="variant" data-wom-variant="heard" role="tab" aria-selected="true">Heard</button>
+           <button type="button" class="wom-variant-btn" data-wom-action="variant" data-wom-variant="said" role="tab" aria-selected="false">Said + occasions</button>
+         </div>
+       </div>
      </div>
      <div class="wom-brand-picker">
        <span class="wom-ctl-label wom-ctl-label-title">Show brands</span>
        <div class="col-chip-bar" data-wom-scope="%s">%s</div>
      </div>',
-    focus_options, .wom_esc(category_code), .wom_esc(category_code), chips_html)
+    focus_options,
+    .wom_esc(category_code), .wom_esc(category_code),
+    .wom_esc(category_code), chips_html)
 }
 
 
 # ==============================================================================
-# INTERNAL: CHART PLACEHOLDER (hidden until Show chart toggled on)
+# INTERNAL: CHART SECTION (hidden until Show chart toggled on)
 # ==============================================================================
+# Renders both the Heard and Said SVG charts. The JS controller toggles
+# section visibility (via the hidden attribute) based on the Show chart
+# checkbox and swaps the inner variant wrappers based on the Heard/Said
+# segmented control.
 
-.wom_chart_placeholder <- function(category_code) {
+.wom_chart_section <- function(pd, category_code, focal_colour) {
+  heard_svg <- tryCatch(
+    build_wom_heard_chart(pd, focal_colour),
+    error = function(e) '<div class="wom-chart-placeholder">Chart unavailable.</div>'
+  )
+  said_svg <- tryCatch(
+    build_wom_said_chart(pd, focal_colour),
+    error = function(e) '<div class="wom-chart-placeholder">Chart unavailable.</div>'
+  )
+
   sprintf(
-    '<section class="wom-chart-section" data-wom-scope="%s" hidden>
-       <div class="wom-chart-placeholder">
-         <span>Chart coming soon.</span>
-       </div>
+    '<section class="wom-chart-section" data-wom-scope="%s" data-wom-variant="heard" hidden>
+       <div class="wom-chart-variant" data-wom-variant="heard">%s</div>
+       <div class="wom-chart-variant" data-wom-variant="said" hidden>%s</div>
      </section>',
-    .wom_esc(category_code))
+    .wom_esc(category_code), heard_svg, said_svg)
 }
 
 
