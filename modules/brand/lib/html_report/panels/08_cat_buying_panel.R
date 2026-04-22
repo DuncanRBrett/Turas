@@ -187,7 +187,8 @@ render_cat_buying_panel <- function(panel_data) {
 
   # ----- Tab 5: Duplication of Purchase --------------------------------------
   parts <- c(parts, '<div class="cb-subtab" data-cb-tab="dop" hidden>')
-  parts <- c(parts, .cb_dop_tab(rep, focal, brand_labels))
+  parts <- c(parts, .cb_dop_tab(rep, focal, brand_labels,
+                                 brand_buyers_n = brand_buyers_n_map))
   parts <- c(parts, '</div>')
 
   parts <- c(parts, '</div>') # close .cb-panel
@@ -432,22 +433,37 @@ render_cat_buying_panel <- function(panel_data) {
 }
 
 
-.cb_dop_tab <- function(rep, focal, brand_labels) {
+.cb_dop_tab <- function(rep, focal, brand_labels, brand_buyers_n = NULL) {
   parts <- character(0)
+  parts <- c(parts, '<section class="cb-dop-section" data-cb-scope="dop">')
   parts <- c(parts, '<div class="cb-section-title">Duplication of Purchase</div>')
   parts <- c(parts, paste0(
     '<p style="font-size:12px;color:#64748b;margin:-4px 0 8px;">',
     'Read across a row: of this brand\'s buyers, what % also bought each column brand ',
     'in the target window. Category avg is shown first; cells shaded by column CI band ',
     '(green above +1 SD, amber inside \u00b11 SD, red below \u22121 SD).</p>'))
+
+  # Toolbar: Show heatmap (default ON) + Show counts (default OFF)
+  parts <- c(parts, paste0(
+    '<div class="cb-controls-bar" data-cb-scope="dop">',
+    '<label class="toggle-label">',
+    '<input type="checkbox" checked data-cb-action="heatmapmode" data-cb-scope="dop"> Show heatmap',
+    '</label>',
+    '<label class="toggle-label">',
+    '<input type="checkbox" data-cb-action="showcounts" data-cb-scope="dop"> Show counts',
+    '</label>',
+    '</div>'))
+
   obs_mat <- rep$crossover_matrix %||% NULL
   if (!is.null(obs_mat) && exists("cb_dop_heatmap_html", mode = "function")) {
     parts <- c(parts, cb_dop_heatmap_html(obs_mat, NULL, focal,
-                                           brand_labels = brand_labels,
-                                           observed     = TRUE))
+                                           brand_labels   = brand_labels,
+                                           observed       = TRUE,
+                                           brand_buyers_n = brand_buyers_n))
   } else {
     parts <- c(parts, '<p style="font-size:12px;color:#94a3b8;">Duplication of purchase requires BRANDPEN3 data.</p>')
   }
+  parts <- c(parts, '</section>')
   paste(parts, collapse = "\n")
 }
 
@@ -525,7 +541,7 @@ render_cat_buying_panel <- function(panel_data) {
   # Columns 1..(2+nSeg) are sortable (click header → sort by data-v).
   seg_ths <- paste(vapply(seq_along(seg_codes), function(si) {
     sprintf(paste0(
-      '<th class="ct-th ct-data-col cb-sortable" ',
+      '<th class="ct-th ct-data-col cb-sortable" title="Click to sort" ',
       'data-cb-seg="%s" data-cb-sort-col="%d" data-cb-sort-dir="none">',
       '<span class="cb-th-label">%s</span>',
       '<span class="cb-sort-ind"></span></th>'),
@@ -534,11 +550,11 @@ render_cat_buying_panel <- function(panel_data) {
 
   header_html <- sprintf(paste0(
     '<tr><th class="ct-th ct-label-col">Brand</th>',
-    '<th class="ct-th ct-data-col cb-col-buyers cb-sortable" ',
+    '<th class="ct-th ct-data-col cb-col-buyers cb-sortable" title="Click to sort" ',
     'data-cb-sort-col="1" data-cb-sort-dir="none">',
     '<span class="cb-th-label">%% Buyers</span>',
     '<span class="cb-sort-ind"></span></th>',
-    '<th class="ct-th ct-data-col cb-col-base cb-sortable" ',
+    '<th class="ct-th ct-data-col cb-col-base cb-sortable" title="Click to sort" ',
     'data-cb-sort-col="2" data-cb-sort-dir="none">',
     '<span class="cb-th-label">%s</span>',
     '<span class="cb-sort-ind"></span></th>',

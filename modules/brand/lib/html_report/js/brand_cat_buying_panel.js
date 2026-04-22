@@ -91,8 +91,8 @@
 
     panel.__cbState = {
       showchart:  { loyalty: true, dist: true, brands: false },
-      heatmap:    { brands: false, loyalty: false, dist: false },
-      showcounts: { loyalty: false, dist: false },
+      heatmap:    { brands: false, loyalty: false, dist: false, dop: true },
+      showcounts: { loyalty: false, dist: false, dop: false },
       brandsChartCol: 'pen',
       visible: {
         loyalty: makeVisMap(pd.brandCodes),
@@ -114,6 +114,7 @@
     bindCbShowCounts(panel);
     bindCbSort(panel);
     bindCbRelSort(panel);
+    bindCbDopSort(panel);
     bindCbEmphasisChips(panel);
     colourCbEmphasisChips(panel);
     bindCbBrandsFocusSelect(panel);
@@ -319,6 +320,14 @@
           panel.querySelectorAll('.cb-brand-freq-table').forEach(function (t) {
             t.setAttribute('data-cb-heatmap', flag);
           });
+        } else if (scope === 'dop') {
+          /* DoP: mark the .cb-dop-section scope table */
+          var dopSec = panel.querySelector('.cb-dop-section[data-cb-scope="dop"]');
+          if (dopSec) {
+            dopSec.querySelectorAll('.cb-dop-table').forEach(function (t) {
+              t.setAttribute('data-cb-heatmap', flag);
+            });
+          }
         } else {
           /* loyalty/dist: mark the .cb-rel-section scope table */
           var sec = panel.querySelector('.cb-rel-section[data-cb-scope="' + scope + '"]');
@@ -342,10 +351,14 @@
         var scope = cb.getAttribute('data-cb-scope');
         if (!scope) return;
         panel.__cbState.showcounts[scope] = cb.checked;
-        var sec = panel.querySelector('.cb-rel-section[data-cb-scope="' + scope + '"]');
+        /* Section lookup: DoP lives in .cb-dop-section, loyalty/dist in .cb-rel-section */
+        var sec = scope === 'dop'
+          ? panel.querySelector('.cb-dop-section[data-cb-scope="dop"]')
+          : panel.querySelector('.cb-rel-section[data-cb-scope="' + scope + '"]');
         if (!sec) return;
         /* % stays visible always; only toggle the n=X secondary label */
-        sec.querySelectorAll('.cb-seg-cell .cb-val-n').forEach(function (n) {
+        var sel = scope === 'dop' ? '.cb-dop-cell .cb-val-n' : '.cb-seg-cell .cb-val-n';
+        sec.querySelectorAll(sel).forEach(function (n) {
           if (cb.checked) n.removeAttribute('hidden');
           else            n.setAttribute('hidden', '');
         });
@@ -488,6 +501,92 @@
 
         /* Chart follows sort */
         renderCbStackedBars(panel, scope);
+      });
+    });
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Duplication of Purchase column sorting — click header to sort rows by   */
+  /* column value. Focal row stays pinned row 1; Cat avg row stays row 2.    */
+  /* ---------------------------------------------------------------------- */
+
+  function bindCbDopSort(panel) {
+    panel.querySelectorAll('.cb-dop-table thead th.cb-sortable').forEach(function (th) {
+      th.addEventListener('click', function () {
+        var table = th.closest('.cb-dop-table');
+        if (!table) return;
+        var tbody = table.querySelector('tbody');
+        if (!tbody) return;
+        var colIdx = parseInt(th.getAttribute('data-cb-sort-col'), 10);
+        if (isNaN(colIdx)) return;
+
+        var curDir  = th.getAttribute('data-cb-sort-dir') || 'none';
+        var nextDir = curDir === 'none' ? 'desc'
+                   : curDir === 'desc' ? 'asc' : 'none';
+
+        table.querySelectorAll('thead th.cb-sortable').forEach(function (h) {
+          h.setAttribute('data-cb-sort-dir', 'none');
+        });
+        th.setAttribute('data-cb-sort-dir', nextDir);
+
+        /* Stamp default order once (original HTML sequence) */
+        if (!tbody.__cbDopDefaultStamped) {
+          var i = 0;
+          tbody.querySelectorAll('tr[data-brand]').forEach(function (tr) {
+            tr.setAttribute('data-default-order', String(i++));
+          });
+          tbody.__cbDopDefaultStamped = true;
+        }
+
+        var focal = (panel.__cbData && panel.__cbData.focalBrand) || null;
+        var avgRow   = tbody.querySelector('.cb-dop-avg-row');
+        var focalRow = focal ? tbody.querySelector('tr[data-brand="' + focal + '"]') : null;
+
+        /* Sortable rows = all [data-brand] rows except the focal (pinned) */
+        var allRows = Array.prototype.slice.call(tbody.querySelectorAll('tr[data-brand]'));
+        var rows = allRows.filter(function (r) { return r !== focalRow; });
+
+        var isText = colIdx === 0;
+        var readText = function (tr) {
+          /* Prefer row-level data-name (set in R for safe lowercase compare);
+             fall back to the first cell's text. */
+          var n = tr.getAttribute('data-name');
+          if (n != null && n.length) return n;
+          var cell = tr.children && tr.children[0];
+          return cell ? (cell.textContent || '').trim().toLowerCase() : '';
+        };
+        var readVal = function (tr) {
+          var cells = tr.children;
+          if (colIdx >= cells.length) return -Infinity;
+          var v = cells[colIdx].getAttribute('data-v');
+          var n = parseFloat(v);
+          return isNaN(n) ? -Infinity : n;
+        };
+
+        if (nextDir === 'none') {
+          rows.sort(function (a, b) {
+            return (parseInt(a.getAttribute('data-default-order') || '0', 10)
+                  - parseInt(b.getAttribute('data-default-order') || '0', 10));
+          });
+        } else {
+          var dir = nextDir === 'asc' ? 1 : -1;
+          if (isText) {
+            rows.sort(function (a, b) {
+              return readText(a).localeCompare(readText(b)) * dir;
+            });
+          } else {
+            rows.sort(function (a, b) {
+              var av = readVal(a), bv = readVal(b);
+              if (av === bv) return 0;
+              return av > bv ? dir : -dir;
+            });
+          }
+        }
+
+        /* Re-attach in order: focal, avg, then sorted rows */
+        if (focalRow) tbody.appendChild(focalRow);
+        if (avgRow)   tbody.appendChild(avgRow);
+        rows.forEach(function (r) { tbody.appendChild(r); });
       });
     });
   }
@@ -745,12 +844,11 @@
       var isEmph = emphAll || (emph && emph[segCodes[i]] === true);
       var col    = isEmph ? colors[i] : 'rgba(148,163,184,0.18)';
       var txt    = v.toFixed(0) + '%';
-      /* Always show %. Small (<8%) segments float label outside so e.g. "4%"
-         stays readable; larger segments put it inside. */
-      var tiny  = pct < 8;
-      var inside = tiny
-        ? '<span class="fn-rel-seg-lbl fn-rel-seg-lbl-tiny" data-seg-col="' + col + '" title="' + txt + '">' + txt + '</span>'
-        : '<span class="fn-rel-seg-lbl">' + txt + '</span>';
+      /* Always show % inside the segment. Small (<8%) segments get a tighter
+         font & allow tiny overflow so e.g. "4%" remains readable. */
+      var tiny   = pct < 8;
+      var lblCls = 'fn-rel-seg-lbl' + (tiny ? ' fn-rel-seg-lbl-tiny' : '');
+      var inside = '<span class="' + lblCls + '" title="' + txt + '">' + txt + '</span>';
       segHtml += '<div class="fn-rel-seg' + (tiny ? ' fn-rel-seg-tiny' : '') +
                  '" style="width:' + pct.toFixed(1) + '%;background:' + col + ';">' +
                  inside + '</div>';
@@ -870,6 +968,25 @@
       }
     });
 
+    /* 3d. Duplication of Purchase table: new focal above the Cat avg row,
+           demoted focal drops below it. */
+    panel.querySelectorAll('.cb-dop-table').forEach(function (table) {
+      var tbody = table.querySelector('tbody');
+      if (!tbody) return;
+      var avgRow   = tbody.querySelector('.cb-dop-avg-row');
+      var newFocal = tbody.querySelector('tr[data-brand="' + brandCode + '"]');
+      var demoted  = (prevFocal && prevFocal !== brandCode)
+        ? tbody.querySelector('tr[data-brand="' + prevFocal + '"]')
+        : null;
+      if (newFocal && avgRow) {
+        tbody.insertBefore(newFocal, avgRow);
+      }
+      if (demoted && avgRow) {
+        if (avgRow.nextSibling) tbody.insertBefore(demoted, avgRow.nextSibling);
+        else                    tbody.appendChild(demoted);
+      }
+    });
+
     /* 3b. Brand Performance Summary: new focal to row 1, demoted focal to
           sortable section (below cat-avg row), FOCAL badge swapped.
           Uses prevFocal (captured above) — do NOT rely on the focal-row
@@ -954,6 +1071,29 @@
       renderCbStackedBars(panel, 'loyalty');
       renderCbStackedBars(panel, 'dist');
     }
+
+    /* 6. Panel-level brand chips: strip stale FOCAL badge from every chip,
+          add it to the newly selected focal chip. (The picker chips are
+          rendered server-side with the badge baked into the original focal;
+          without this pass the badge stays on the wrong brand.) */
+    panel.querySelectorAll(
+      '.fn-rel-brand-chip[data-brand], .fn-rel-brand-chip[data-cb-brand]'
+    ).forEach(function (chip) {
+      var code = chip.getAttribute('data-brand') ||
+                 chip.getAttribute('data-cb-brand');
+      var existing = chip.querySelector('.fn-focal-badge');
+      if (code === brandCode) {
+        if (!existing) {
+          var badge = document.createElement('span');
+          badge.className = 'fn-focal-badge';
+          badge.textContent = 'FOCAL';
+          chip.appendChild(document.createTextNode(' '));
+          chip.appendChild(badge);
+        }
+      } else if (existing) {
+        existing.parentNode.removeChild(existing);
+      }
+    });
   };
 
   /* ---------------------------------------------------------------------- */

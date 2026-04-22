@@ -117,6 +117,47 @@ paste0(
   border-left: 3px solid var(--cb-focal-colour, #1A5276);
   color: var(--cb-focal-colour, #1A5276); font-weight: 700;
 }
+/* DoP toolbar — reuse generic controls-bar look */
+.cb-dop-section .cb-controls-bar {
+  display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+  margin: 4px 0 8px;
+}
+/* Cell values: %, and hidden n=X that the Show counts toggle reveals */
+.cb-dop-table .cb-dop-cell .cb-val-pct {
+  display: block; font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.cb-dop-table .cb-dop-cell .cb-val-n {
+  display: block; font-size: 10px; color: inherit; opacity: 0.75;
+  font-weight: 400; margin-top: 1px; font-variant-numeric: tabular-nums;
+}
+.cb-dop-table .cb-dop-cell .cb-val-n[hidden] { display: none; }
+/* Heatmap OFF → strip traffic-light colouring, keep text centred/readable */
+.cb-dop-table[data-cb-heatmap="off"] td.cb-dop-cell {
+  background: #ffffff !important; color: #334155 !important; font-weight: 500 !important;
+}
+/* Category avg CI mini-bar (funnel-style formatting) */
+.cb-dop-table .cb-dop-avg-cell.cb-dop-avg-ci { padding-bottom: 6px; }
+.cb-dop-table .cb-dop-avg-ci .cb-val-pct {
+  display: block; font-weight: 700; color: #1e293b; font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.cb-dop-table .cb-dop-avg-ci .ma-ci-bar-wrap {
+  position: relative; height: 6px; background: #dde3eb;
+  border-radius: 3px; margin: 4px 0 2px; overflow: visible;
+}
+.cb-dop-table .cb-dop-avg-ci .ma-ci-bar-range {
+  position: absolute; height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, rgba(71,85,105,0.25), rgba(71,85,105,0.5));
+}
+.cb-dop-table .cb-dop-avg-ci .ma-ci-bar-tick {
+  position: absolute; width: 2px; height: 140%; top: -20%;
+  background: #475569; border-radius: 1px; transform: translateX(-50%);
+}
+.cb-dop-table .cb-dop-avg-ci .ma-ci-limits {
+  display: flex; justify-content: space-between; font-size: 9px;
+  color: #94a3b8; margin-top: 1px; font-variant-numeric: tabular-nums;
+}
+.cb-dop-table .cb-dop-avg-ci .ma-ci-limits span { line-height: 1; }
 
 /* Collapsible */
 .cb-details-toggle {
@@ -315,19 +356,31 @@ paste0(
   background: #1a2744; color: #fff;
 }
 
-/* Sortable headers (loyalty/dist tables) */
-.cb-panel .ct-table thead th.cb-sortable {
+/* Sortable headers (loyalty/dist + DoP tables) */
+.cb-panel .ct-table thead th.cb-sortable,
+.cb-panel .cb-dop-table thead th.cb-sortable {
   cursor: pointer; user-select: none; position: relative;
 }
-.cb-panel .ct-table thead th.cb-sortable:hover { background: #233255; }
-.cb-panel .ct-table thead th.cb-sortable .cb-sort-ind {
+.cb-panel .ct-table thead th.cb-sortable:hover,
+.cb-panel .cb-dop-table thead th.cb-sortable:hover { background: #233255; }
+.cb-panel .ct-table thead th.cb-sortable .cb-sort-ind,
+.cb-panel .cb-dop-table thead th.cb-sortable .cb-sort-ind {
   display: inline-block; width: 10px; margin-left: 4px;
-  font-size: 9px; color: #cbd5e1; opacity: 0.7;
+  font-size: 9px; color: #cbd5e1; opacity: 0.85;
 }
-.cb-panel .ct-table thead th.cb-sortable[data-cb-sort-dir="asc"]  .cb-sort-ind::after { content: "\\25B2"; }
-.cb-panel .ct-table thead th.cb-sortable[data-cb-sort-dir="desc"] .cb-sort-ind::after { content: "\\25BC"; }
+/* Neutral dual-arrow glyph at rest shows sortable affordance */
+.cb-panel .ct-table thead th.cb-sortable[data-cb-sort-dir="none"] .cb-sort-ind::after,
+.cb-panel .cb-dop-table thead th.cb-sortable[data-cb-sort-dir="none"] .cb-sort-ind::after {
+  content: "\\2B83"; font-size: 10px; opacity: 0.55;
+}
+.cb-panel .ct-table thead th.cb-sortable[data-cb-sort-dir="asc"]  .cb-sort-ind::after,
+.cb-panel .cb-dop-table thead th.cb-sortable[data-cb-sort-dir="asc"]  .cb-sort-ind::after { content: "\\25B2"; }
+.cb-panel .ct-table thead th.cb-sortable[data-cb-sort-dir="desc"] .cb-sort-ind::after,
+.cb-panel .cb-dop-table thead th.cb-sortable[data-cb-sort-dir="desc"] .cb-sort-ind::after { content: "\\25BC"; }
 .cb-panel .ct-table thead th.cb-sortable[data-cb-sort-dir="asc"]  .cb-sort-ind,
-.cb-panel .ct-table thead th.cb-sortable[data-cb-sort-dir="desc"] .cb-sort-ind { opacity: 1; color: #fff; }
+.cb-panel .ct-table thead th.cb-sortable[data-cb-sort-dir="desc"] .cb-sort-ind,
+.cb-panel .cb-dop-table thead th.cb-sortable[data-cb-sort-dir="asc"]  .cb-sort-ind,
+.cb-panel .cb-dop-table thead th.cb-sortable[data-cb-sort-dir="desc"] .cb-sort-ind { opacity: 1; color: #fff; }
 
 /* Brand Summary chart area (Show chart toggle) */
 .cb-brands-chart-area { margin: 4px 0 12px; }
@@ -524,21 +577,19 @@ paste0(
 }
 .fn-rel-seg-lbl {
   font-size: 11px; font-weight: 700; color: #fff;
-  padding: 0 4px; text-shadow: 0 0 2px rgba(0,0,0,0.35);
+  padding: 0 4px; text-shadow: 0 0 2px rgba(0,0,0,0.45);
+  white-space: nowrap;
 }
-/* Tiny segments: ensure the slice is wide enough to see and float the
-   % label above the bar so e.g. "4%" is still readable. */
-.fn-rel-seg-tiny { min-width: 4px; overflow: visible; }
+/* Tiny segments: keep the label INSIDE the segment. Tighten font and
+   let it overflow the coloured block horizontally so e.g. "4%" is still
+   legible without floating above the track. */
+.fn-rel-seg-tiny { min-width: 6px; overflow: visible; }
 .fn-rel-seg-lbl-tiny {
-  font-size: 10px; font-weight: 700; color: #1a2744;
-  background: #fff; border: 1px solid #cbd5e1; border-radius: 3px;
-  padding: 0 3px; position: absolute; top: -16px; left: 50%;
-  transform: translateX(-50%); white-space: nowrap; z-index: 2;
-  box-shadow: 0 1px 3px rgba(15,23,42,0.15);
+  font-size: 9px; font-weight: 700; color: #fff;
+  text-shadow: 0 0 3px rgba(0,0,0,0.7), 0 0 2px rgba(0,0,0,0.55);
+  padding: 0 1px; white-space: nowrap;
   pointer-events: none;
 }
-/* Extra vertical room for tiny-label to sit above the track */
-.fn-rel-bar-row { padding-top: 14px; }
 
 /* Emphasis chips — active state uses the segment colour (set via inline
    data-cb-seg-color → CSS custom prop applied in JS). */

@@ -374,9 +374,10 @@ cb_buyrate_bars_svg <- function(brand_heaviness,
 #' @return Character. HTML string.
 #' @keywords internal
 cb_dop_heatmap_html <- function(dev_matrix, obs_matrix = NULL,
-                                 focal_brand  = NULL,
-                                 brand_labels = NULL,
-                                 observed     = FALSE) {
+                                 focal_brand    = NULL,
+                                 brand_labels   = NULL,
+                                 observed       = FALSE,
+                                 brand_buyers_n = NULL) {
   if (is.null(dev_matrix)) return("")
 
   brands <- dev_matrix$BrandCode
@@ -392,6 +393,17 @@ cb_dop_heatmap_html <- function(dev_matrix, obs_matrix = NULL,
   })
   col_avgs <- vapply(col_vals, function(v) mean(v, na.rm = TRUE), numeric(1))
   col_sds  <- vapply(col_vals, function(v) sd(v,   na.rm = TRUE), numeric(1))
+  # Per-column display max for CI mini-bar scaling — make sure it covers both
+  # the largest observed value and the upper CI bound, with a small margin.
+  col_max  <- vapply(seq_along(brands), function(j) {
+    cv <- col_vals[[j]]
+    raw_max <- suppressWarnings(max(cv, na.rm = TRUE))
+    if (!is.finite(raw_max)) raw_max <- 0
+    hi <- if (is.finite(col_avgs[j]) && is.finite(col_sds[j]))
+      col_avgs[j] + col_sds[j] else raw_max
+    m <- max(raw_max, hi, na.rm = TRUE) * 1.1
+    if (!is.finite(m) || m <= 0) 1 else m
+  }, numeric(1))
 
   # Traffic-light CI-band classifier for observed mode (green above upper band,
   # red below lower band, amber inside). For deviation mode keep legacy scale.
@@ -400,6 +412,23 @@ cb_dop_heatmap_html <- function(dev_matrix, obs_matrix = NULL,
     if (val > avg + sd_v) "cb-dop-above"
     else if (val < avg - sd_v) "cb-dop-below"
     else "cb-dop-near"
+  }
+
+  # Lookup for row buyer base (used by Show counts toggle → renders n=X below %).
+  # `brand_buyers_n` may be a named int/num vector or a list; use single-bracket
+  # to get NA safely for unknown names.
+  buyers_lookup <- function(code) {
+    if (is.null(brand_buyers_n)) return(NA_real_)
+    nm <- as.character(code)
+    if (!nm %in% names(brand_buyers_n)) return(NA_real_)
+    v <- suppressWarnings(as.numeric(brand_buyers_n[nm]))
+    if (length(v) != 1 || !is.finite(v)) return(NA_real_)
+    v
+  }
+  fmt_n <- function(n) {
+    if (!is.finite(n)) return("\u2014")
+    if (n >= 1000) format(round(n), big.mark = ",", scientific = FALSE)
+    else sprintf("%d", as.integer(round(n)))
   }
 
   # Cell styling. `observed` → use CI-band traffic-light class; else legacy
@@ -429,7 +458,7 @@ cb_dop_heatmap_html <- function(dev_matrix, obs_matrix = NULL,
 
   lines <- character(0)
   lines <- c(lines, '<div class="cb-heatmap-wrap">')
-  lines <- c(lines, '<table class="cb-heatmap-table cb-dop-table">')
+  lines <- c(lines, '<table class="cb-heatmap-table cb-dop-table" data-cb-heatmap="on">')
 
   # Column-group header label above — "% of buyers who also bought brand"
   lines <- c(lines, '<thead>')
@@ -438,34 +467,37 @@ cb_dop_heatmap_html <- function(dev_matrix, obs_matrix = NULL,
     '<th class="cb-dop-group-lbl" colspan="%d">%% of buyers who also bought brand</th></tr>'),
     n))
 
-  # Column headers (brand labels)
-  lines <- c(lines, '<tr><th class="cb-dop-row-hdr">Brand</th>')
-  for (b in brands) {
-    lines <- c(lines, sprintf('<th class="cb-dop-col-hdr">%s</th>',
-                               .cb_esc(.cb_brand_lbl(b, brand_labels))))
+  # Header row — Brand column sortable A-Z/Z-A (col 0); columns sort numerically.
+  lines <- c(lines, paste0(
+    '<tr><th class="cb-dop-row-hdr cb-sortable" ',
+    'data-cb-sort-col="0" data-cb-sort-dir="none" title="Click to sort A-Z">',
+    '<span class="cb-th-label">Brand</span>',
+    '<span class="cb-sort-ind"></span></th>'))
+  for (bi in seq_along(brands)) {
+    lines <- c(lines, sprintf(paste0(
+      '<th class="cb-dop-col-hdr cb-sortable" ',
+      'data-cb-sort-col="%d" data-cb-sort-dir="none" ',
+      'title="Click to sort">',
+      '<span class="cb-th-label">%s</span>',
+      '<span class="cb-sort-ind"></span></th>'),
+      bi, .cb_esc(.cb_brand_lbl(brands[bi], brand_labels))))
   }
   lines <- c(lines, '</tr></thead><tbody>')
 
-  # Category average row (first)
-  avg_cells <- vapply(seq_along(brands), function(j) {
-    v <- col_avgs[j]
-    txt <- if (!is.na(v)) sprintf("%.0f%%", v) else "\u2014"
-    sprintf('<td class="cb-dop-avg-cell" style="text-align:center;">%s</td>', txt)
-  }, character(1))
-  lines <- c(lines, sprintf(
-    '<tr class="cb-dop-avg-row"><td class="cb-dop-row-lbl"><em>Category avg</em></td>%s</tr>',
-    paste(avg_cells, collapse = "")))
-
-  # Per-brand rows
-  for (i in seq_along(brands)) {
+  # Build a single brand row (used for focal-first + non-focal rows).
+  build_brand_row <- function(i) {
     is_focal <- !is.null(focal_brand) && brands[i] == focal_brand
     row_cls  <- if (is_focal) "focal-row" else ""
-    lines <- c(lines, sprintf('<tr data-brand="%s" class="%s"><td class="cb-dop-row-lbl"><b>%s</b></td>',
-                               .cb_esc(brands[i]), row_cls,
-                               .cb_esc(.cb_brand_lbl(brands[i], brand_labels))))
+    row_buyers <- buyers_lookup(brands[i])
+    nm <- .cb_brand_lbl(brands[i], brand_labels)
+    # Brand column text-sort key lives on the row as data-name (lowercased).
+    out <- sprintf(
+      '<tr data-brand="%s" class="%s" data-name="%s"><td class="cb-dop-row-lbl"><b>%s</b></td>',
+      .cb_esc(brands[i]), row_cls, .cb_esc(tolower(nm)), .cb_esc(nm))
+    cells <- character(0)
     for (j in seq_along(brands)) {
       if (i == j) {
-        lines <- c(lines, '<td class="cb-dop-diag" style="text-align:center;">\u2014</td>')
+        cells <- c(cells, '<td class="cb-dop-diag" style="text-align:center;">\u2014</td>')
         next
       }
       val <- tryCatch(as.numeric(dev_matrix[i, brands[j]]), error = function(e) NA)
@@ -473,12 +505,64 @@ cb_dop_heatmap_html <- function(dev_matrix, obs_matrix = NULL,
         tryCatch(as.numeric(obs_matrix[i, brands[j]]), error = function(e) NULL) else NULL
       val_txt <- if (is.na(val)) "\u2014" else if (observed) sprintf("%.0f%%", val) else sprintf("%+.1f", val)
       attrs <- cell_attrs(val, j, obs)
-      lines <- c(lines, sprintf(
-        '<td class="cb-dop-cell %s" style="%s" title="%s">%s</td>',
-        attrs$cls, attrs$style, .cb_esc(attrs$title), val_txt))
+      data_v_attr <- if (!is.na(val)) sprintf(' data-v="%.4f"', val) else ' data-v=""'
+      # Show-counts companion: n = pct * row_buyers / 100 (hidden by default).
+      n_val <- if (!is.na(val) && is.finite(row_buyers)) val * row_buyers / 100 else NA_real_
+      n_span <- if (!is.na(val))
+        sprintf('<span class="cb-val-n" hidden>n=%s</span>', fmt_n(n_val))
+      else ""
+      pct_span <- sprintf('<span class="cb-val-pct">%s</span>', val_txt)
+      cells <- c(cells, sprintf(
+        '<td class="cb-dop-cell %s"%s style="%s" title="%s">%s%s</td>',
+        attrs$cls, data_v_attr, attrs$style, .cb_esc(attrs$title),
+        pct_span, n_span))
     }
-    lines <- c(lines, '</tr>')
+    paste0(out, paste(cells, collapse = ""), '</tr>')
   }
+
+  # Category average row — value + CI mini-bar (avg \u00b1 1 SD), funnel format
+  avg_cells <- vapply(seq_along(brands), function(j) {
+    v    <- col_avgs[j]
+    sdv  <- col_sds[j]
+    if (!is.finite(v)) {
+      return('<td class="cb-dop-avg-cell" data-v="" style="text-align:center;">\u2014</td>')
+    }
+    txt  <- sprintf("%.0f%%", v)
+    data_v_attr <- sprintf(' data-v="%.4f"', v)
+    safe_max <- col_max[j]
+    ci_bar <- ""
+    if (is.finite(sdv) && sdv > 0) {
+      lo <- max(0, v - sdv); hi <- min(safe_max, v + sdv)
+      lo_disp <- sprintf("%.0f%%", lo)
+      hi_disp <- sprintf("%.0f%%", hi)
+      fill_left <- max(0, min(94, 100 * lo / safe_max))
+      fill_w    <- max(4, min(100 - fill_left, 100 * (hi - lo) / safe_max))
+      mean_pct  <- max(1, min(99, 100 * v / safe_max))
+      ci_bar <- paste0(
+        sprintf('<div class="ma-ci-bar-wrap" title="CI (\u00b11 SD): %s \u2013 %s">', lo_disp, hi_disp),
+        sprintf('<div class="ma-ci-bar-range" style="left:%.1f%%;width:%.1f%%;"></div>', fill_left, fill_w),
+        sprintf('<div class="ma-ci-bar-tick" style="left:%.1f%%"></div>', mean_pct),
+        '</div>',
+        sprintf('<div class="ma-ci-limits"><span>%s</span><span>%s</span></div>', lo_disp, hi_disp))
+    }
+    sprintf(
+      '<td class="cb-dop-avg-cell cb-dop-avg-ci"%s style="text-align:center;"><span class="cb-val-pct">%s</span>%s</td>',
+      data_v_attr, txt, ci_bar)
+  }, character(1))
+  avg_row_html <- sprintf(
+    '<tr class="cb-dop-avg-row"><td class="cb-dop-row-lbl"><em>Category average</em></td>%s</tr>',
+    paste(avg_cells, collapse = ""))
+
+  # Row order: focal FIRST (above Category avg), then avg, then remaining brands.
+  focal_idx  <- if (!is.null(focal_brand)) which(brands == focal_brand) else integer(0)
+  other_idx  <- setdiff(seq_along(brands), focal_idx)
+
+  if (length(focal_idx) == 1) {
+    lines <- c(lines, build_brand_row(focal_idx))
+  }
+  lines <- c(lines, avg_row_html)
+  for (i in other_idx) lines <- c(lines, build_brand_row(i))
+
   lines <- c(lines, '</tbody></table></div>')
   paste(lines, collapse = "\n")
 }
