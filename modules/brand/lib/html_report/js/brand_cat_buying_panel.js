@@ -421,6 +421,12 @@
 
         /* Re-append sortable rows after the cat-avg row */
         rows.forEach(function (r) { tbody.appendChild(r); });
+
+        /* Chart follows sort: re-render so bar order matches the table. */
+        if (panel.__cbState && panel.__cbState.showchart
+            && panel.__cbState.showchart.brands) {
+          renderCbBrandsChart(panel);
+        }
       });
     });
 
@@ -663,8 +669,8 @@
       return;
     }
 
-    /* Sort descending by value (focal stays wherever — value-sorted chart) */
-    entries.sort(function (a, b) { return b.v - a.v; });
+    /* Order follows the table: entries are collected in DOM order, so whatever
+       sort the user applied to the Brand Summary table is reflected here. */
 
     var max = Math.max.apply(null, vals);
     if (!isFinite(max) || max <= 0) max = 1;
