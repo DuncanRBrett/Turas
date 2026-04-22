@@ -60,6 +60,23 @@ build_br_portfolio_panel <- function(results, config) {
     }
   )
 
+  overview <- tryCatch(
+    if (exists("build_portfolio_overview", mode = "function"))
+      build_portfolio_overview(results, config) else NULL,
+    error = function(e) {
+      message(sprintf("[BRAND HTML] Portfolio overview failed: %s", e$message))
+      NULL
+    }
+  )
+
+  ov_html <- if (!is.null(overview) && identical(overview$status, "PASS") &&
+                  exists(".pf_overview_subtab", mode = "function")) {
+    .pf_overview_subtab(overview, focal_brand, focal_colour,
+                        about_text = panel_data$about$overview %||% "")
+  } else {
+    '<p style="color:#94a3b8;padding:24px 0;">Overview data not available.</p>'
+  }
+
   fp_html <- .pf_footprint_subtab(portfolio, panel_data, focal_brand, focal_colour)
   cn_html <- .pf_constellation_subtab(portfolio, panel_data, focal_brand, focal_colour)
   cl_html <- .pf_clutter_subtab(portfolio, panel_data, focal_colour)
@@ -83,11 +100,16 @@ build_br_portfolio_panel <- function(results, config) {
     # Hero strip KPI cards (§5)
     .pf_hero_strip(portfolio$supporting, focal_brand, focal_colour),
 
-    # 4-subtab nav
+    # 5-subtab nav
     .pf_sub_nav(),
 
+    # Overview subtab (default)
+    '<div class="pf-subtab active" id="pf-subtab-overview">',
+    ov_html,
+    '</div>',
+
     # Footprint subtab
-    '<div class="pf-subtab active" id="pf-subtab-footprint">',
+    '<div class="pf-subtab" id="pf-subtab-footprint">',
     fp_html,
     '</div>',
 
@@ -157,9 +179,12 @@ build_br_portfolio_panel <- function(results, config) {
 .pf_sub_nav <- function() {
   paste0(
     '<div class="pf-sub-nav" role="tablist">',
-    '<button class="pf-sub-btn active" data-pf-subtab="footprint"',
+    '<button class="pf-sub-btn active" data-pf-subtab="overview"',
+    '  onclick="pfSwitchSubtab(\'overview\')"',
+    '  role="tab" aria-selected="true">Overview</button>',
+    '<button class="pf-sub-btn" data-pf-subtab="footprint"',
     '  onclick="pfSwitchSubtab(\'footprint\')"',
-    '  role="tab" aria-selected="true">Footprint</button>',
+    '  role="tab" aria-selected="false">Footprint</button>',
     '<button class="pf-sub-btn" data-pf-subtab="constellation"',
     '  onclick="pfSwitchSubtab(\'constellation\')"',
     '  role="tab" aria-selected="false">Competitive Set</button>',

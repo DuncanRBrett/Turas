@@ -1,8 +1,10 @@
 # ==============================================================================
-# BRAND MODULE - PORTFOLIO PANEL CSS
+# BRAND MODULE - PORTFOLIO PANEL CSS (shell only)
 # ==============================================================================
 # Scoped to .pf-* prefix to avoid collisions with funnel (.fn-*) and MA (.ma-*).
-# Injected once per report by 99_html_report_main.R.
+# Overview-subtab-specific (.pfo-*) styles live in
+# 09_portfolio_overview_subtab_styling.R and are loaded alongside this bundle
+# by 99_html_report_main.R.
 # ==============================================================================
 
 #' Build portfolio panel CSS bundle
