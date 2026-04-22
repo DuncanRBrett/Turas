@@ -327,7 +327,8 @@ cb_brand_freq_scr_table_html <- function(norms_table,
   sd_vs   <- stats::sd(all_vs,   na.rm = TRUE)
 
   # CI band = cross-brand 1-SD spread around the mean (a visual band, not a
-  # sampling-CI). Mirrors the "range" hint MA shows under cat-avg cells.
+  # sampling-CI). Kept for legacy callers; cat avg now uses the funnel-style
+  # mini-bar via .ci_minibar().
   .ci_band <- function(mn, sd_v, digits = 0, pct = TRUE) {
     if (!is.finite(mn) || !is.finite(sd_v) || sd_v == 0) return("")
     lo <- mn - sd_v; hi <- mn + sd_v
@@ -335,6 +336,42 @@ cb_brand_freq_scr_table_html <- function(norms_table,
       sprintf("%%.%df\u2013%%.%df", digits, digits)
     sprintf('<div class="cb-ci-band" title="\u00b11 SD across brands">%s</div>',
             sprintf(fmt, lo, hi))
+  }
+
+  # Funnel-style CI mini-bar: value + shaded range (avg \u00b11 SD) + tick at
+  # mean + lo/hi labels below. `safe_max` is the per-column display scale.
+  # `digits`/`pct` control the lo/hi label format (matching .ci_band).
+  .ci_minibar <- function(mn, sd_v, safe_max, digits = 0, pct = TRUE) {
+    if (!is.finite(mn) || !is.finite(sd_v) || sd_v == 0 ||
+        !is.finite(safe_max) || safe_max <= 0) return("")
+    lo <- max(0, mn - sd_v); hi <- min(safe_max, mn + sd_v)
+    if (hi <= lo) return("")
+    fmt_one <- if (pct) sprintf("%%.%df%%%%", digits) else sprintf("%%.%df", digits)
+    lo_disp <- sprintf(fmt_one, lo)
+    hi_disp <- sprintf(fmt_one, hi)
+    fill_left <- max(0, min(94, 100 * lo / safe_max))
+    fill_w    <- max(4, min(100 - fill_left, 100 * (hi - lo) / safe_max))
+    mean_pct  <- max(1, min(99, 100 * mn / safe_max))
+    paste0(
+      sprintf('<div class="ma-ci-bar-wrap" title="\u00b11 SD across brands: %s \u2013 %s">',
+              lo_disp, hi_disp),
+      sprintf('<div class="ma-ci-bar-range" style="left:%.1f%%;width:%.1f%%;"></div>',
+              fill_left, fill_w),
+      sprintf('<div class="ma-ci-bar-tick" style="left:%.1f%%"></div>', mean_pct),
+      '</div>',
+      sprintf('<div class="ma-ci-limits"><span>%s</span><span>%s</span></div>',
+              lo_disp, hi_disp))
+  }
+
+  # Per-column display max for the mini-bar:
+  #   Pen / Vol share / SCR are 0-100% → cap at 100.
+  #   Avg purch. is a count → max observed * 1.15 (with a sensible floor).
+  max_pen  <- 100
+  max_vs   <- 100
+  max_scro <- 100
+  max_br   <- {
+    raw <- suppressWarnings(max(c(all_br, avg_br + sd_br), na.rm = TRUE))
+    if (!is.finite(raw) || raw <= 0) 1 else raw * 1.15
   }
 
   # Heatmap cell class (relative to cat avg \u00b11 SD "CI band"):
@@ -442,23 +479,27 @@ cb_brand_freq_scr_table_html <- function(norms_table,
     body_rows <- c(body_rows, .row_html(frow, "focal-row", lbl_html))
   }
 
-  # Row 2: category avg (with CI bands)
+  # Row 2: category avg — funnel-style CI mini-bar per numeric cell
   body_rows <- c(body_rows, paste0(
     '<tr class="cbp-avg-row">',
     '<td class="ct-label-col" style="font-style:italic;">Category avg</td>',
     '<td class="cb-base-td">\u2014</td>',
-    sprintf('<td class="cb-avg-td" data-v="%s">%s%s</td>',
+    sprintf('<td class="cb-avg-td cb-avg-td-ci" data-v="%s"><span class="cb-val-pct">%s</span>%s</td>',
             formatC(avg_pen, format = "f", digits = 2),
-            fmt_pct(avg_pen), .ci_band(avg_pen, sd_pen, 0, TRUE)),
-    sprintf('<td class="cb-avg-td" data-v="%s">%s%s</td>',
+            fmt_pct(avg_pen),
+            .ci_minibar(avg_pen,  sd_pen,  max_pen,  0, TRUE)),
+    sprintf('<td class="cb-avg-td cb-avg-td-ci" data-v="%s"><span class="cb-val-pct">%s</span>%s</td>',
             formatC(avg_br, format = "f", digits = 3),
-            fmt_n(avg_br), .ci_band(avg_br, sd_br, 1, FALSE)),
-    sprintf('<td class="cb-avg-td" data-v="%s">%s%s</td>',
+            fmt_n(avg_br),
+            .ci_minibar(avg_br,   sd_br,   max_br,   1, FALSE)),
+    sprintf('<td class="cb-avg-td cb-avg-td-ci" data-v="%s"><span class="cb-val-pct">%s</span>%s</td>',
             formatC(avg_vs, format = "f", digits = 2),
-            fmt_pct(avg_vs), .ci_band(avg_vs, sd_vs, 0, TRUE)),
-    sprintf('<td class="cb-avg-td" data-v="%s">%s%s</td>',
+            fmt_pct(avg_vs),
+            .ci_minibar(avg_vs,   sd_vs,   max_vs,   0, TRUE)),
+    sprintf('<td class="cb-avg-td cb-avg-td-ci" data-v="%s"><span class="cb-val-pct">%s</span>%s</td>',
             formatC(avg_scro, format = "f", digits = 2),
-            fmt_pct(avg_scro), .ci_band(avg_scro, sd_scro, 0, TRUE)),
+            fmt_pct(avg_scro),
+            .ci_minibar(avg_scro, sd_scro, max_scro, 0, TRUE)),
     '</tr>'))
 
   # Rows 3+: other brands (sortable)

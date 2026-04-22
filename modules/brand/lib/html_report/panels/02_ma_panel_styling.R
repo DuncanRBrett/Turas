@@ -152,6 +152,10 @@ build_ma_panel_styles <- function(focal_colour = "#1A5276") {
                 border-right: 2px solid #e2e8f0; }
 .ma-td-catavg .ct-val { font-weight: 700; color: #1e293b; }
 .ma-ci-hint { display: block; font-size: 10px; color: #94a3b8; margin-top: 1px; }
+/* Cat-avg CI mini-bar (funnel-style) on Brand Attitude table — same visual
+   contract as the Metrics tab. Keep cell compact but give the bar breathing room. */
+.ma-td-catavg.ma-td-catavg-ci { padding-bottom: 6px; vertical-align: top; }
+.ma-td-catavg.ma-td-catavg-ci .ct-val { display: block; }
 
 /* Base row (top of tbody, replaces base column) */
 .ma-row-base td.ct-td { background: #f0f4f8; font-size: 10px; color: #64748b;

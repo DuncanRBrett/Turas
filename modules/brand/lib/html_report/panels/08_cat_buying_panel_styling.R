@@ -315,7 +315,63 @@ paste0(
   display: block; margin-top: 2px; font-size: 9px; color: #94a3b8;
   font-style: italic; font-weight: 400; white-space: nowrap;
 }
+/* Funnel-style CI mini-bar on the Brand Summary Category avg row. Reuses the
+   same .ma-ci-bar-* classes as the Metrics tab, DoP, and Brand Attitude. */
+.cb-brand-freq-table td.cb-avg-td.cb-avg-td-ci {
+  padding-bottom: 6px; vertical-align: top; text-align: center;
+}
+.cb-brand-freq-table td.cb-avg-td.cb-avg-td-ci .cb-val-pct {
+  display: block; font-weight: 700; color: #1e293b; font-size: 13px;
+  font-variant-numeric: tabular-nums; font-style: normal;
+}
+.cb-brand-freq-table td.cb-avg-td.cb-avg-td-ci .ma-ci-bar-wrap {
+  position: relative; height: 6px; background: #dde3eb;
+  border-radius: 3px; margin: 4px 0 2px; overflow: visible;
+}
+.cb-brand-freq-table td.cb-avg-td.cb-avg-td-ci .ma-ci-bar-range {
+  position: absolute; height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, rgba(71,85,105,0.25), rgba(71,85,105,0.5));
+}
+.cb-brand-freq-table td.cb-avg-td.cb-avg-td-ci .ma-ci-bar-tick {
+  position: absolute; width: 2px; height: 140%; top: -20%;
+  background: #475569; border-radius: 1px; transform: translateX(-50%);
+}
+.cb-brand-freq-table td.cb-avg-td.cb-avg-td-ci .ma-ci-limits {
+  display: flex; justify-content: space-between; font-size: 9px;
+  color: #94a3b8; margin-top: 1px; font-variant-numeric: tabular-nums;
+  font-style: normal;
+}
+.cb-brand-freq-table td.cb-avg-td.cb-avg-td-ci .ma-ci-limits span { line-height: 1; }
 
+/* Funnel-style CI mini-bar on the Loyalty & Purchase Distribution Category avg
+   row (.cb-rel-table). Same visual contract as Brand Summary / DoP / MA. */
+.cb-panel .cb-rel-table td.cb-avg-seg-ci {
+  padding-bottom: 6px; vertical-align: top; text-align: center;
+}
+.cb-panel .cb-rel-table td.cb-avg-seg-ci .cb-val-pct {
+  display: block; font-weight: 700; color: #1e293b; font-size: 13px;
+  font-variant-numeric: tabular-nums; font-style: normal;
+}
+.cb-panel .cb-rel-table td.cb-avg-seg-ci .ma-ci-bar-wrap {
+  position: relative; height: 6px; background: #dde3eb;
+  border-radius: 3px; margin: 4px 0 2px; overflow: visible;
+}
+.cb-panel .cb-rel-table td.cb-avg-seg-ci .ma-ci-bar-range {
+  position: absolute; height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, rgba(71,85,105,0.25), rgba(71,85,105,0.5));
+}
+.cb-panel .cb-rel-table td.cb-avg-seg-ci .ma-ci-bar-tick {
+  position: absolute; width: 2px; height: 140%; top: -20%;
+  background: #475569; border-radius: 1px; transform: translateX(-50%);
+}
+.cb-panel .cb-rel-table td.cb-avg-seg-ci .ma-ci-limits {
+  display: flex; justify-content: space-between; font-size: 9px;
+  color: #94a3b8; margin-top: 1px; font-variant-numeric: tabular-nums;
+  font-style: normal;
+}
+.cb-panel .cb-rel-table td.cb-avg-seg-ci .ma-ci-limits span { line-height: 1; }
+',
+'
 /* Heatmap cells (off by default; flip data-cb-heatmap="on" on the table) */
 .cb-brand-freq-table[data-cb-heatmap="on"] td.cb-hm-above,
 .cb-panel .ct-table[data-cb-heatmap="on"] td.cb-hm-above {

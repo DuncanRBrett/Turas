@@ -291,6 +291,11 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
     '<dd>(MPen &times; NS) &divide; &Sigma;(MPen<sub>i</sub> &times; NS<sub>i</sub>) &times; 100 &mdash; brand\u2019s share of all category CEP associations</dd>',
     '<dt>Share of Mind (SOM)</dt>',
     '<dd>MMS &divide; MPen &times; 100 &mdash; CEP links as % of all links by buyers with MPen for that brand. Totals across brands exceed 100%.</dd>',
+    '<dt>Cat avg CI (mini bar)</dt>',
+    '<dd>For each stimulus row, take the brand values (v<sub>1</sub>\u2026v<sub>n</sub>), compute mean <em>m</em> and standard deviation <em>SD</em>, ',
+    'then <strong>SE = SD &divide; &radic;n</strong> and the <strong>95% CI = m &plusmn; 1.96 &times; SE</strong>. ',
+    'The shaded range on the mini bar spans lo\u2013hi; the tick marks the mean; labels below show the bounds. ',
+    'Interprets the brand values at a stimulus as a sample, so the CI narrows as more brands link to that CEP.</dd>',
     '</dl></div>'
   ))
   if (length(parts) == 0) return("")

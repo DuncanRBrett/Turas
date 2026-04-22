@@ -285,8 +285,13 @@ render_cat_buying_panel <- function(panel_data) {
     '<li><strong>Avg purch.</strong> = mean times bought per brand buyer.</li>',
     '<li><strong>SCR obs</strong> = share of category requirement (loyalty).</li>',
     '<li>', vol_note, '</li>',
-    '<li><strong>CI band</strong> on Category avg = \u00b11 SD across brands.</li>',
-    '<li><strong>Heatmap</strong>: green = above upper CI band, red = below lower CI band, amber = inside the band.</li>',
+    '<li><strong>CI band on Category avg</strong> \u2014 shown as the mini bar in the Cat avg row. ',
+    'For each column we take the values across the <em>B</em> brands, compute the mean (m) and standard deviation (SD), ',
+    'and draw the shaded range as <strong>m \u00b1 1 SD</strong>. The tick marks the mean; the labels below show the lo / hi bounds. ',
+    'If brand values are roughly normal, ~68% of brands fall inside this band.</li>',
+    '<li><em>Note:</em> this is a <strong>cross-brand dispersion band</strong> (spread of brands around the category average), ',
+    'not a sampling confidence interval on the estimate itself.</li>',
+    '<li><strong>Heatmap</strong>: green = above upper band (+1 SD), red = below lower band (\u22121 SD), amber = inside the band.</li>',
     '<li>Click a column header to sort brands.</li>',
     '</ul>',
     '</div>',
@@ -404,6 +409,14 @@ render_cat_buying_panel <- function(panel_data) {
 
 # Scope-specific info callout (loyalty vs dist)
 .cb_ma_info_callout <- function(scope) {
+  ci_explainer <- paste0(
+    '<li><strong>CI band on Category avg</strong> \u2014 shown as the mini bar in the Cat avg row. ',
+    'For each segment column we compute the mean (m) and standard deviation (SD) across the <em>B</em> brand rows, ',
+    'then shade the range <strong>m \u00b1 1 SD</strong>. The tick marks the mean; labels below show the lo / hi bounds. ',
+    'If brand values are roughly normal, ~68% of brands fall inside this band.</li>',
+    '<li><em>Note:</em> this is a <strong>cross-brand dispersion band</strong> (spread of brands around the category average), ',
+    'not a sampling confidence interval on the estimate itself.</li>',
+    '<li><strong>Heatmap</strong>: green = above upper band (+1 SD), red = below lower band (\u22121 SD), amber = inside the band.</li>')
   body <- if (identical(scope, "loyalty")) {
     paste0(
       '<ul>',
@@ -412,8 +425,8 @@ render_cat_buying_panel <- function(panel_data) {
       '<li><strong>Secondary (\u226450%)</strong> = bought this brand, but another brand takes the majority of their category spend.</li>',
       '<li><strong>Not bought</strong> = category buyer who did not buy this brand in the target window.</li>',
       '<li><strong>% Buyers</strong> = % of category buyers who bought the brand (Sole + Primary + Secondary).</li>',
-      '<li><strong>CI band</strong> on Category avg = \u00b11 SD across brands. Heatmap: green = above upper band, red = below lower band, amber = inside band.</li>',
-      '<li><strong>Show counts</strong> toggles segment % \u2194 raw weighted N (of category buyers). <strong>Show heatmap</strong> colours segment cells by CI band.</li>',
+      ci_explainer,
+      '<li><strong>Show counts</strong> toggles segment % \u2194 raw weighted N (of category buyers).</li>',
       '</ul>')
   } else {
     paste0(
@@ -421,8 +434,8 @@ render_cat_buying_panel <- function(panel_data) {
       '<li>Segments are buckets of purchase <em>frequency</em> among this brand\u2019s buyers over the target window.</li>',
       '<li><strong>% Buyers</strong> = % of category buyers who bought the brand (for context).</li>',
       '<li><strong>Base (n=)</strong> = weighted count of this brand\u2019s buyers.</li>',
-      '<li><strong>CI band</strong> on Category avg = \u00b11 SD across brands. Heatmap: green = above upper band, red = below lower band, amber = inside band.</li>',
-      '<li><strong>Show counts</strong> toggles segment % \u2194 raw weighted N (of brand buyers). <strong>Show heatmap</strong> colours segment cells by CI band.</li>',
+      ci_explainer,
+      '<li><strong>Show counts</strong> toggles segment % \u2194 raw weighted N (of brand buyers).</li>',
       '</ul>')
   }
   paste0(
@@ -438,10 +451,25 @@ render_cat_buying_panel <- function(panel_data) {
   parts <- c(parts, '<section class="cb-dop-section" data-cb-scope="dop">')
   parts <- c(parts, '<div class="cb-section-title">Duplication of Purchase</div>')
   parts <- c(parts, paste0(
-    '<p style="font-size:12px;color:#64748b;margin:-4px 0 8px;">',
-    'Read across a row: of this brand\'s buyers, what % also bought each column brand ',
-    'in the target window. Category avg is shown first; cells shaded by column CI band ',
-    '(green above +1 SD, amber inside \u00b11 SD, red below \u22121 SD).</p>'))
+    '<details class="cb-info-callout" data-cb-scope="dop">',
+    '<summary>&#9432; How to read this table</summary>',
+    '<div class="cb-info-body">',
+    '<ul>',
+    '<li><strong>Read across a row:</strong> of this brand\'s buyers, what % also bought each column brand in the target window.</li>',
+    '<li><strong>Diagonal</strong> cells (brand &times; itself) are shown as \u2014 (not meaningful).</li>',
+    '<li><strong>Category avg</strong> row (first data row) = unweighted mean duplication with the column brand across all other brand rows.</li>',
+    '<li><strong>CI band on Category avg</strong> \u2014 shown as the mini bar in the Cat avg row. ',
+    'For each column we compute the mean (m) and standard deviation (SD) of the duplication values across the brand rows, ',
+    'then shade the range <strong>m \u00b1 1 SD</strong>. The tick marks the mean; labels below show the lo / hi bounds. ',
+    'If brand values are roughly normal, ~68% of brands fall inside this band.</li>',
+    '<li><em>Note:</em> this is a <strong>cross-brand dispersion band</strong> (spread of brands around the category average), ',
+    'not a sampling confidence interval on the estimate itself.</li>',
+    '<li><strong>Heatmap</strong>: green = above upper band (+1 SD), red = below lower band (\u22121 SD), amber = inside the band.</li>',
+    '<li><strong>Show counts</strong> toggles cell % \u2194 raw weighted N (co-buyers of the row brand). <strong>Show heatmap</strong> colours cells by CI band.</li>',
+    '<li>Click a column header to sort brands (Brand column sorts A-Z / Z-A).</li>',
+    '</ul>',
+    '</div>',
+    '</details>'))
 
   # Toolbar: Show heatmap (default ON) + Show counts (default OFF)
   parts <- c(parts, paste0(
@@ -571,13 +599,34 @@ render_cat_buying_panel <- function(panel_data) {
     sd(as.numeric(data_df[[cn]]), na.rm = TRUE)
   }, numeric(1))
 
-  # Category avg row — CI band shown on seg cells (avg ± sd)
+  # Category avg row — funnel-style CI mini-bar per seg cell (avg \u00b11 SD).
+  # Seg values are percentages → scale capped at 100.
+  .rel_ci_minibar <- function(mn, sd_v, safe_max = 100) {
+    if (!is.finite(mn) || !is.finite(sd_v) || sd_v == 0 ||
+        !is.finite(safe_max) || safe_max <= 0) return("")
+    lo <- max(0, mn - sd_v); hi <- min(safe_max, mn + sd_v)
+    if (hi <= lo) return("")
+    lo_disp   <- sprintf("%.0f%%", lo)
+    hi_disp   <- sprintf("%.0f%%", hi)
+    fill_left <- max(0, min(94, 100 * lo / safe_max))
+    fill_w    <- max(4, min(100 - fill_left, 100 * (hi - lo) / safe_max))
+    mean_pct  <- max(1, min(99, 100 * mn / safe_max))
+    paste0(
+      sprintf('<div class="ma-ci-bar-wrap" title="\u00b11 SD across brands: %s \u2013 %s">',
+              lo_disp, hi_disp),
+      sprintf('<div class="ma-ci-bar-range" style="left:%.1f%%;width:%.1f%%;"></div>',
+              fill_left, fill_w),
+      sprintf('<div class="ma-ci-bar-tick" style="left:%.1f%%"></div>', mean_pct),
+      '</div>',
+      sprintf('<div class="ma-ci-limits"><span>%s</span><span>%s</span></div>',
+              lo_disp, hi_disp))
+  }
   avg_seg_cells <- paste(vapply(seq_along(col_names), function(si) {
     v  <- cat_avgs[si]
     sd <- cat_sds[si]
-    ci <- if (!is.na(v) && !is.na(sd)) sprintf(" <span class=\"cb-ci-band\">\u00b1%.0f</span>", sd) else ""
-    sprintf('<td class="ct-td ct-data-col"><span class="cb-val-pct">%s</span>%s</td>',
-            fmt_pct(v), ci)
+    bar <- .rel_ci_minibar(v, sd, 100)
+    sprintf('<td class="ct-td ct-data-col cb-avg-seg-ci"><span class="cb-val-pct">%s</span>%s</td>',
+            fmt_pct(v), bar)
   }, character(1)), collapse = "")
   avg_row <- sprintf(
     '<tr class="ct-row fn-row-avg-all cb-rel-row cb-avg-row"><td class="ct-td ct-label-col">Category avg</td><td class="ct-td ct-data-col cb-col-buyers">\u2014</td><td class="ct-td ct-data-col cb-col-base">\u2014</td>%s</tr>',
