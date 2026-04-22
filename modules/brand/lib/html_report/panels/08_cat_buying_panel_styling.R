@@ -77,6 +77,47 @@ paste0(
   text-align: center; text-transform: none;
 }
 
+/* DoP table: group header above column labels */
+.cb-dop-table .cb-dop-grouphdr th.cb-dop-group-lbl {
+  background: #1a2744; color: #fff; font-weight: 600;
+  font-size: 11px; letter-spacing: 0; text-transform: none;
+  padding: 6px 8px; border-bottom: 1px solid #334155;
+}
+.cb-dop-table th.cb-dop-row-hdr { background: #1a2744; }
+.cb-dop-table th.cb-dop-col-hdr {
+  background: #1a2744; color: #fff; text-transform: none;
+  font-weight: 600; font-size: 11px; letter-spacing: 0;
+}
+.cb-dop-table .cb-dop-row-lbl {
+  background: #f8fafc; color: #1a2744; font-weight: 500;
+  text-align: left; white-space: nowrap;
+}
+.cb-dop-table .cb-dop-diag {
+  background: #e2e8f0; color: #94a3b8;
+}
+/* Average row first — italic, subtle backdrop */
+.cb-dop-table tr.cb-dop-avg-row .cb-dop-avg-cell {
+  background: #eff1f5; color: #475569; font-style: italic; font-weight: 500;
+}
+.cb-dop-table tr.cb-dop-avg-row .cb-dop-row-lbl {
+  background: #eff1f5; color: #475569; font-style: italic;
+}
+/* Traffic-light heatmap — CI band (col avg ± 1 SD) */
+.cb-dop-table td.cb-dop-cell.cb-dop-above {
+  background: rgba(5, 150, 105, 0.22); color: #065f46; font-weight: 600;
+}
+.cb-dop-table td.cb-dop-cell.cb-dop-near {
+  background: rgba(251, 191, 36, 0.22); color: #92400e;
+}
+.cb-dop-table td.cb-dop-cell.cb-dop-below {
+  background: rgba(220, 38, 38, 0.20); color: #991b1b; font-weight: 600;
+}
+/* Focal row subtle emphasis */
+.cb-dop-table tr.focal-row .cb-dop-row-lbl {
+  border-left: 3px solid var(--cb-focal-colour, #1A5276);
+  color: var(--cb-focal-colour, #1A5276); font-weight: 700;
+}
+
 /* Collapsible */
 .cb-details-toggle {
   font-size: 12px; color: #64748b; cursor: pointer; text-decoration: underline;
@@ -235,15 +276,58 @@ paste0(
 }
 
 /* Heatmap cells (off by default; flip data-cb-heatmap="on" on the table) */
-.cb-brand-freq-table[data-cb-heatmap="on"] td.cb-hm-above {
+.cb-brand-freq-table[data-cb-heatmap="on"] td.cb-hm-above,
+.cb-panel .ct-table[data-cb-heatmap="on"] td.cb-hm-above {
   background: rgba(5, 150, 105, 0.16) !important; color: #065f46;
 }
-.cb-brand-freq-table[data-cb-heatmap="on"] td.cb-hm-below {
+.cb-brand-freq-table[data-cb-heatmap="on"] td.cb-hm-below,
+.cb-panel .ct-table[data-cb-heatmap="on"] td.cb-hm-below {
   background: rgba(220, 38, 38, 0.14) !important; color: #991b1b;
 }
-.cb-brand-freq-table[data-cb-heatmap="on"] td.cb-hm-near {
+.cb-brand-freq-table[data-cb-heatmap="on"] td.cb-hm-near,
+.cb-panel .ct-table[data-cb-heatmap="on"] td.cb-hm-near {
   background: rgba(251, 191, 36, 0.18) !important; color: #92400e;
 }
+
+/* Loyalty/Dist segment cells: % is primary, n=X shown below when show-counts on */
+.cb-panel .ct-table .cb-seg-cell { line-height: 1.25; }
+.cb-panel .ct-table .cb-seg-cell .cb-val-pct {
+  display: block; font-weight: 600;
+}
+.cb-panel .ct-table .cb-seg-cell .cb-val-n {
+  display: block; font-size: 10px; color: #94a3b8;
+  font-weight: 400; margin-top: 1px;
+}
+.cb-panel .ct-table .cb-seg-cell .cb-val-n[hidden] { display: none; }
+.cb-panel .ct-table .cb-avg-row .cb-ci-band {
+  display: inline-block; margin-left: 4px; font-size: 9px;
+  color: #94a3b8; font-style: italic; font-weight: 400;
+}
+.cb-panel .ct-table .cb-col-buyers,
+.cb-panel .ct-table .cb-col-base {
+  font-variant-numeric: tabular-nums;
+  color: #475569;
+  background: #fcfcfd;
+  border-right: 1px solid #eef2f7;
+}
+.cb-panel .ct-table th.cb-col-buyers,
+.cb-panel .ct-table th.cb-col-base {
+  background: #1a2744; color: #fff;
+}
+
+/* Sortable headers (loyalty/dist tables) */
+.cb-panel .ct-table thead th.cb-sortable {
+  cursor: pointer; user-select: none; position: relative;
+}
+.cb-panel .ct-table thead th.cb-sortable:hover { background: #233255; }
+.cb-panel .ct-table thead th.cb-sortable .cb-sort-ind {
+  display: inline-block; width: 10px; margin-left: 4px;
+  font-size: 9px; color: #cbd5e1; opacity: 0.7;
+}
+.cb-panel .ct-table thead th.cb-sortable[data-cb-sort-dir="asc"]  .cb-sort-ind::after { content: "\\25B2"; }
+.cb-panel .ct-table thead th.cb-sortable[data-cb-sort-dir="desc"] .cb-sort-ind::after { content: "\\25BC"; }
+.cb-panel .ct-table thead th.cb-sortable[data-cb-sort-dir="asc"]  .cb-sort-ind,
+.cb-panel .ct-table thead th.cb-sortable[data-cb-sort-dir="desc"] .cb-sort-ind { opacity: 1; color: #fff; }
 
 /* Brand Summary chart area (Show chart toggle) */
 .cb-brands-chart-area { margin: 4px 0 12px; }
@@ -436,7 +520,32 @@ paste0(
 .fn-rel-seg {
   height: 100%; transition: background-color 0.18s;
   display: flex; align-items: center; justify-content: center;
-  overflow: hidden; white-space: nowrap;
+  overflow: visible; white-space: nowrap; position: relative;
+}
+.fn-rel-seg-lbl {
+  font-size: 11px; font-weight: 700; color: #fff;
+  padding: 0 4px; text-shadow: 0 0 2px rgba(0,0,0,0.35);
+}
+/* Tiny segments: ensure the slice is wide enough to see and float the
+   % label above the bar so e.g. "4%" is still readable. */
+.fn-rel-seg-tiny { min-width: 4px; overflow: visible; }
+.fn-rel-seg-lbl-tiny {
+  font-size: 10px; font-weight: 700; color: #1a2744;
+  background: #fff; border: 1px solid #cbd5e1; border-radius: 3px;
+  padding: 0 3px; position: absolute; top: -16px; left: 50%;
+  transform: translateX(-50%); white-space: nowrap; z-index: 2;
+  box-shadow: 0 1px 3px rgba(15,23,42,0.15);
+  pointer-events: none;
+}
+/* Extra vertical room for tiny-label to sit above the track */
+.fn-rel-bar-row { padding-top: 14px; }
+
+/* Emphasis chips — active state uses the segment colour (set via inline
+   data-cb-seg-color → CSS custom prop applied in JS). */
+.col-chip.cb-rel-seg-chip[data-cb-seg-color].active {
+  background: var(--brand-chip-color) !important;
+  border-color: var(--brand-chip-color) !important;
+  color: #fff !important;
 }
 
 /* Row greyout (legacy matrix table) */

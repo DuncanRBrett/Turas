@@ -122,6 +122,20 @@ render_cat_buying_panel <- function(panel_data) {
   parts <- c(parts, .cb_brands_tab(dn, bh, focal, brand_labels, t_months))
   parts <- c(parts, '</div>')
 
+  # Base counts + "% buyers (of cat buyers)" derived from loyalty segments.
+  # Used as the Base and "% Buyers" columns on the Loyalty & Distribution tabs.
+  total_cat_buyers_n <- if (has_bh && !is.null(bh$category_buyer_mix$n))
+    sum(as.integer(bh$category_buyer_mix$n), na.rm = TRUE) else NA_integer_
+  loy_df0 <- if (has_bh) bh$brand_loyalty_segments else NULL
+  buyers_pct_map <- if (!is.null(loy_df0) && "NoBuy_Pct" %in% names(loy_df0)) {
+    setNames(100 - as.numeric(loy_df0$NoBuy_Pct), as.character(loy_df0$BrandCode))
+  } else setNames(numeric(0), character(0))
+  brand_buyers_n_map <- if (has_bh && !is.null(bh$brand_heaviness) &&
+                            "Brand_Buyers_n" %in% names(bh$brand_heaviness)) {
+    setNames(as.integer(bh$brand_heaviness$Brand_Buyers_n),
+             as.character(bh$brand_heaviness$BrandCode))
+  } else setNames(integer(0), character(0))
+
   # ----- Tab 3: Loyalty Segmentation -----------------------------------------
   loy_seg_codes  <- c("sole", "primary", "secondary", "nobuy")
   loy_seg_labels <- c("Sole buyer", "Primary (>50% SCR)", "Secondary (\u226450%)", "Not bought")
@@ -140,6 +154,9 @@ render_cat_buying_panel <- function(panel_data) {
     description  = paste0(
       "How category buyers relate to each brand: sole buyer | primary (>50% of their ",
       "purchases) | secondary (\u226450%) | not bought. As % of all category buyers."),
+    buyers_pct_map = buyers_pct_map,
+    base_n         = total_cat_buyers_n,
+    base_label     = "Cat buyers (n=)",
     refused_source = bh))
   parts <- c(parts, '</div>')
 
@@ -162,6 +179,9 @@ render_cat_buying_panel <- function(panel_data) {
     focal        = focal,
     brand_labels = brand_labels,
     description  = "% of brand buyers by purchase frequency in the target window. Category average shown.",
+    buyers_pct_map = buyers_pct_map,
+    base_n_map     = brand_buyers_n_map,
+    base_label     = "Brand buyers (n=)",
     refused_source = bh))
   parts <- c(parts, '</div>')
 
@@ -319,6 +339,10 @@ render_cat_buying_panel <- function(panel_data) {
 #' @keywords internal
 .cb_ma_style_tab <- function(scope, data_df, col_names, seg_codes, seg_labels,
                               focal, brand_labels, description,
+                              buyers_pct_map = NULL,
+                              base_n_map     = NULL,
+                              base_n         = NULL,
+                              base_label     = "Base (n=)",
                               refused_source = NULL) {
   parts <- character(0)
   parts <- c(parts, sprintf(
@@ -338,19 +362,33 @@ render_cat_buying_panel <- function(panel_data) {
     lbl_fn(bc, brand_labels)
   }, character(1))
 
-  # Brands: visibility chips (Brand Attitude style)
-  parts <- c(parts, .cb_rel_brand_chips(scope, brands, brand_names, focal))
+  # Info callout
+  parts <- c(parts, .cb_ma_info_callout(scope))
 
-  # Show chart toggle
-  parts <- c(parts, sprintf(
-    '<label class="toggle-label" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#334155;cursor:pointer;margin:0 0 10px;">
-  <input type="checkbox" checked data-cb-action="showchart" data-cb-scope="%s"> Show chart
-</label>', scope))
+  # Controls bar: show chart + show counts + show heatmap (pin/export relocated
+  # here by JS, right-aligned via .cb-toolbar-relocated).
+  parts <- c(parts, sprintf(paste0(
+    '<div class="cb-controls-bar" data-cb-scope="%s">',
+    '<label class="toggle-label">',
+    '<input type="checkbox" checked data-cb-action="showchart" data-cb-scope="%s"> Show chart',
+    '</label>',
+    '<label class="toggle-label">',
+    '<input type="checkbox" data-cb-action="showcounts" data-cb-scope="%s"> Show counts',
+    '</label>',
+    '<label class="toggle-label">',
+    '<input type="checkbox" data-cb-action="heatmapmode" data-cb-scope="%s"> Show heatmap',
+    '</label>',
+    '</div>'),
+    scope, scope, scope, scope))
 
   # Table: brands-as-rows, segments-as-columns (matches Brand Attitude orientation)
   parts <- c(parts, .cb_rel_table_html(
     scope, data_df, col_names, seg_codes, seg_labels,
-    brands, brand_names, focal))
+    brands, brand_names, focal,
+    buyers_pct_map = buyers_pct_map,
+    base_n_map     = base_n_map,
+    base_n         = base_n,
+    base_label     = base_label))
 
   # Emphasis chips + stacked bar chart area (JS renders into fn-rel-chart div)
   parts <- c(parts, .cb_rel_emphasis_chips(scope, seg_codes, seg_labels))
@@ -363,10 +401,45 @@ render_cat_buying_panel <- function(panel_data) {
 }
 
 
+# Scope-specific info callout (loyalty vs dist)
+.cb_ma_info_callout <- function(scope) {
+  body <- if (identical(scope, "loyalty")) {
+    paste0(
+      '<ul>',
+      '<li><strong>Sole buyer</strong> = bought this brand and no other brand in the category.</li>',
+      '<li><strong>Primary (&gt;50% SCR)</strong> = this brand is &gt;50% of the buyer\u2019s category purchases (but they also buy other brands).</li>',
+      '<li><strong>Secondary (\u226450%)</strong> = bought this brand, but another brand takes the majority of their category spend.</li>',
+      '<li><strong>Not bought</strong> = category buyer who did not buy this brand in the target window.</li>',
+      '<li><strong>% Buyers</strong> = % of category buyers who bought the brand (Sole + Primary + Secondary).</li>',
+      '<li><strong>CI band</strong> on Category avg = \u00b11 SD across brands. Heatmap: green = above upper band, red = below lower band, amber = inside band.</li>',
+      '<li><strong>Show counts</strong> toggles segment % \u2194 raw weighted N (of category buyers). <strong>Show heatmap</strong> colours segment cells by CI band.</li>',
+      '</ul>')
+  } else {
+    paste0(
+      '<ul>',
+      '<li>Segments are buckets of purchase <em>frequency</em> among this brand\u2019s buyers over the target window.</li>',
+      '<li><strong>% Buyers</strong> = % of category buyers who bought the brand (for context).</li>',
+      '<li><strong>Base (n=)</strong> = weighted count of this brand\u2019s buyers.</li>',
+      '<li><strong>CI band</strong> on Category avg = \u00b11 SD across brands. Heatmap: green = above upper band, red = below lower band, amber = inside band.</li>',
+      '<li><strong>Show counts</strong> toggles segment % \u2194 raw weighted N (of brand buyers). <strong>Show heatmap</strong> colours segment cells by CI band.</li>',
+      '</ul>')
+  }
+  paste0(
+    '<details class="cb-info-callout" data-cb-scope="', scope, '">',
+    '<summary>&#9432; How to read this tab</summary>',
+    '<div class="cb-info-body">', body, '</div>',
+    '</details>')
+}
+
+
 .cb_dop_tab <- function(rep, focal, brand_labels) {
   parts <- character(0)
   parts <- c(parts, '<div class="cb-section-title">Duplication of Purchase</div>')
-  parts <- c(parts, '<p style="font-size:12px;color:#64748b;margin:-4px 0 8px;">% of each brand\'s buyers who also bought each other brand in the target window.</p>')
+  parts <- c(parts, paste0(
+    '<p style="font-size:12px;color:#64748b;margin:-4px 0 8px;">',
+    'Read across a row: of this brand\'s buyers, what % also bought each column brand ',
+    'in the target window. Category avg is shown first; cells shaded by column CI band ',
+    '(green above +1 SD, amber inside \u00b11 SD, red below \u22121 SD).</p>'))
   obs_mat <- rep$crossover_matrix %||% NULL
   if (!is.null(obs_mat) && exists("cb_dop_heatmap_html", mode = "function")) {
     parts <- c(parts, cb_dop_heatmap_html(obs_mat, NULL, focal,
@@ -430,25 +503,69 @@ render_cat_buying_panel <- function(panel_data) {
 
 # Brands-as-rows, segments-as-columns table (Brand Attitude orientation)
 .cb_rel_table_html <- function(scope, data_df, col_names, seg_codes, seg_labels,
-                                brands, brand_names, focal) {
+                                brands, brand_names, focal,
+                                buyers_pct_map = NULL,
+                                base_n_map     = NULL,
+                                base_n         = NULL,
+                                base_label     = "Base (n=)") {
+  # Heatmap CI-band classifier — same logic as Brand Summary.
+  .hm_cls <- function(v, avg, sd_v) {
+    if (is.na(v) || is.na(avg) || is.na(sd_v) || sd_v == 0) return("cb-hm-near")
+    if (v > avg + sd_v) "cb-hm-above"
+    else if (v < avg - sd_v) "cb-hm-below"
+    else "cb-hm-near"
+  }
+  fmt_pct <- function(v) if (!is.na(v)) sprintf("%.0f%%", v) else "\u2014"
+  fmt_n   <- function(v) {
+    if (is.null(v) || is.na(v)) return("\u2014")
+    if (v >= 1000) format(round(v), big.mark = ",", scientific = FALSE) else sprintf("%d", as.integer(round(v)))
+  }
+
+  # Header: Brand | % Buyers | Base (n=) | seg1 | seg2 | ...
+  # Columns 1..(2+nSeg) are sortable (click header → sort by data-v).
   seg_ths <- paste(vapply(seq_along(seg_codes), function(si) {
-    sprintf('<th class="ct-th ct-data-col" data-cb-seg="%s">%s</th>',
-            .cb_esc(seg_codes[si]), .cb_esc(seg_labels[si]))
+    sprintf(paste0(
+      '<th class="ct-th ct-data-col cb-sortable" ',
+      'data-cb-seg="%s" data-cb-sort-col="%d" data-cb-sort-dir="none">',
+      '<span class="cb-th-label">%s</span>',
+      '<span class="cb-sort-ind"></span></th>'),
+      .cb_esc(seg_codes[si]), 2L + si, .cb_esc(seg_labels[si]))
   }, character(1)), collapse = "")
 
+  header_html <- sprintf(paste0(
+    '<tr><th class="ct-th ct-label-col">Brand</th>',
+    '<th class="ct-th ct-data-col cb-col-buyers cb-sortable" ',
+    'data-cb-sort-col="1" data-cb-sort-dir="none">',
+    '<span class="cb-th-label">%% Buyers</span>',
+    '<span class="cb-sort-ind"></span></th>',
+    '<th class="ct-th ct-data-col cb-col-base cb-sortable" ',
+    'data-cb-sort-col="2" data-cb-sort-dir="none">',
+    '<span class="cb-th-label">%s</span>',
+    '<span class="cb-sort-ind"></span></th>',
+    '%s</tr>'),
+    .cb_esc(base_label), seg_ths)
+
+  # Per-column category avg & SD across brands (for CI band & heatmap)
   cat_avgs <- vapply(col_names, function(cn) {
     if (!cn %in% names(data_df)) return(NA_real_)
     mean(as.numeric(data_df[[cn]]), na.rm = TRUE)
   }, numeric(1))
+  cat_sds <- vapply(col_names, function(cn) {
+    if (!cn %in% names(data_df)) return(NA_real_)
+    sd(as.numeric(data_df[[cn]]), na.rm = TRUE)
+  }, numeric(1))
 
-  avg_cells <- paste(vapply(seq_along(col_names), function(si) {
-    v <- cat_avgs[si]
-    sprintf('<td class="ct-td ct-data-col">%s</td>',
-            if (!is.na(v)) sprintf("%.0f%%", v) else "\u2014")
+  # Category avg row — CI band shown on seg cells (avg ± sd)
+  avg_seg_cells <- paste(vapply(seq_along(col_names), function(si) {
+    v  <- cat_avgs[si]
+    sd <- cat_sds[si]
+    ci <- if (!is.na(v) && !is.na(sd)) sprintf(" <span class=\"cb-ci-band\">\u00b1%.0f</span>", sd) else ""
+    sprintf('<td class="ct-td ct-data-col"><span class="cb-val-pct">%s</span>%s</td>',
+            fmt_pct(v), ci)
   }, character(1)), collapse = "")
   avg_row <- sprintf(
-    '<tr class="ct-row fn-row-avg-all cb-rel-row"><td class="ct-td ct-label-col">Category avg</td>%s</tr>',
-    avg_cells)
+    '<tr class="ct-row fn-row-avg-all cb-rel-row cb-avg-row"><td class="ct-td ct-label-col">Category avg</td><td class="ct-td ct-data-col cb-col-buyers">\u2014</td><td class="ct-td ct-data-col cb-col-base">\u2014</td>%s</tr>',
+    avg_seg_cells)
 
   order_idx <- if (!is.null(focal) && focal %in% brands) {
     c(which(brands == focal), which(brands != focal))
@@ -465,30 +582,59 @@ render_cat_buying_panel <- function(panel_data) {
     else
       "ct-row fn-rel-row cb-rel-row"
     badge <- if (is_foc) '<span class="fn-focal-badge">FOCAL</span>' else ""
+
+    # % Buyers (of cat buyers) and Base N
+    buyers_pct <- if (!is.null(buyers_pct_map) && bc %in% names(buyers_pct_map))
+      as.numeric(buyers_pct_map[[bc]]) else NA_real_
+    base_val <- if (!is.null(base_n_map) && bc %in% names(base_n_map))
+      as.numeric(base_n_map[[bc]])
+    else if (!is.null(base_n)) as.numeric(base_n)
+    else NA_real_
+
+    buyers_cell <- sprintf(
+      '<td class="ct-td ct-data-col cb-col-buyers" data-v="%s">%s</td>',
+      if (!is.na(buyers_pct)) sprintf("%.4f", buyers_pct) else "",
+      fmt_pct(buyers_pct))
+    base_cell <- sprintf(
+      '<td class="ct-td ct-data-col cb-col-base" data-v="%s">%s</td>',
+      if (!is.null(base_val) && !is.na(base_val)) sprintf("%.4f", base_val) else "",
+      fmt_n(base_val))
+
     data_cells <- paste(vapply(seq_along(col_names), function(si) {
       cn  <- col_names[si]
       ri  <- which(data_df$BrandCode == bc)
-      val <- if (length(ri) == 1 && cn %in% names(data_df) &&
-                 !is.na(data_df[[cn]][ri]))
-               sprintf("%.0f%%", data_df[[cn]][ri])
-             else "\u2014"
-      sprintf('<td class="ct-td ct-data-col">%s</td>', val)
+      v <- if (length(ri) == 1 && cn %in% names(data_df))
+        as.numeric(data_df[[cn]][ri]) else NA_real_
+      # Seg N = segment % × base N / 100 (approx weighted count)
+      n_cell <- if (!is.na(v) && !is.na(base_val)) v * base_val / 100 else NA_real_
+      hm <- .hm_cls(v, cat_avgs[si], cat_sds[si])
+      data_attrs <- sprintf(' data-v="%s" data-pct="%s" data-n="%s"',
+                            if (!is.na(v)) sprintf("%.4f", v) else "",
+                            fmt_pct(v),
+                            fmt_n(n_cell))
+      n_label <- if (!is.na(n_cell)) paste0("n=", fmt_n(n_cell)) else "n=\u2014"
+      sprintf(
+        paste0('<td class="ct-td ct-data-col cb-seg-cell %s"%s>',
+               '<span class="cb-val-pct">%s</span>',
+               '<span class="cb-val-n" hidden>%s</span></td>'),
+        hm, data_attrs, fmt_pct(v), n_label)
     }, character(1)), collapse = "")
     sprintf(
-      '<tr class="%s" data-cb-brand="%s"><td class="ct-td ct-label-col">%s %s</td>%s</tr>',
-      row_cls, .cb_esc(bc), .cb_esc(nm), badge, data_cells)
+      '<tr class="%s" data-cb-brand="%s"><td class="ct-td ct-label-col">%s %s</td>%s%s%s</tr>',
+      row_cls, .cb_esc(bc), .cb_esc(nm), badge,
+      buyers_cell, base_cell, data_cells)
   }, character(1)), collapse = "\n")
 
   sprintf(
     '<section class="cb-rel-section" data-cb-scope="%s">
   <div class="ma-table-wrap" style="overflow-x:auto;">
     <table class="ct-table cb-rel-table">
-      <thead><tr><th class="ct-th ct-label-col">Brand</th>%s</tr></thead>
+      <thead>%s</thead>
       <tbody>%s%s</tbody>
     </table>
   </div>
 </section>',
-    scope, seg_ths, avg_row, rows_html)
+    scope, header_html, avg_row, rows_html)
 }
 
 

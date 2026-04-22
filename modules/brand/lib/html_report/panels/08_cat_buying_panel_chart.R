@@ -382,55 +382,100 @@ cb_dop_heatmap_html <- function(dev_matrix, obs_matrix = NULL,
   brands <- dev_matrix$BrandCode
   n      <- length(brands)
 
-  # Colour scale: sequential blue for observed values; diverging for deviations
-  cell_style <- function(val, obs) {
-    if (is.na(val)) return('style="background:#f8fafc;color:#94a3b8;"')
+  # Column averages & SDs across the non-diagonal cells in each column.
+  col_vals <- lapply(brands, function(col_b) {
+    v <- tryCatch(as.numeric(dev_matrix[, col_b]), error = function(e) rep(NA_real_, n))
+    # exclude diagonal (i == j) — brand vs. itself
+    diag_idx <- which(brands == col_b)
+    if (length(diag_idx) == 1) v[diag_idx] <- NA_real_
+    v
+  })
+  col_avgs <- vapply(col_vals, function(v) mean(v, na.rm = TRUE), numeric(1))
+  col_sds  <- vapply(col_vals, function(v) sd(v,   na.rm = TRUE), numeric(1))
+
+  # Traffic-light CI-band classifier for observed mode (green above upper band,
+  # red below lower band, amber inside). For deviation mode keep legacy scale.
+  hm_cls <- function(val, avg, sd_v) {
+    if (is.na(val) || is.na(avg) || is.na(sd_v) || sd_v == 0) return("cb-dop-near")
+    if (val > avg + sd_v) "cb-dop-above"
+    else if (val < avg - sd_v) "cb-dop-below"
+    else "cb-dop-near"
+  }
+
+  # Cell styling. `observed` → use CI-band traffic-light class; else legacy
+  # green/red deviation alpha shading.
+  cell_attrs <- function(val, col_idx, obs) {
+    if (is.na(val)) return(list(cls = "", style = 'background:#f8fafc;color:#94a3b8;', title = ""))
     if (observed) {
-      alpha <- min(0.7, val / 100 * 0.8 + 0.05)
-      bg    <- sprintf("rgba(30,58,138,%.2f)", alpha)
-      col   <- if (val >= 45) "#ffffff" else "#1e293b"
-      return(sprintf('style="background:%s;color:%s;text-align:center;" title="%.0f%% duplication"',
-                     bg, col, val))
+      cls <- hm_cls(val, col_avgs[col_idx], col_sds[col_idx])
+      title <- sprintf("%.0f%% \u2014 col avg %.0f%%, \u00b11 SD %.1f",
+                       val, col_avgs[col_idx], col_sds[col_idx])
+      return(list(cls = cls, style = "text-align:center;", title = title))
     }
     abs_val <- abs(val)
     alpha   <- min(1, abs_val / 20)
     if (val > 0) {
-      bg  <- sprintf("rgba(22,101,52,%.2f)", alpha * 0.4)
-      col <- if (abs_val >= 10) "#166534" else "#475569"
+      bg <- sprintf("rgba(22,101,52,%.2f)", alpha * 0.4)
+      co <- if (abs_val >= 10) "#166534" else "#475569"
     } else {
-      bg  <- sprintf("rgba(153,27,27,%.2f)", alpha * 0.4)
-      col <- if (abs_val >= 10) "#991b1b" else "#475569"
+      bg <- sprintf("rgba(153,27,27,%.2f)", alpha * 0.4)
+      co <- if (abs_val >= 10) "#991b1b" else "#475569"
     }
-    obs_txt <- if (!is.null(obs) && !is.na(obs)) sprintf(" <small>(%.0f%%)</small>", obs) else ""
-    sprintf('style="background:%s;color:%s;text-align:center;" title="Dev: %+.1fpp%s"',
-            bg, col, val, obs_txt)
+    obs_txt <- if (!is.null(obs) && !is.na(obs)) sprintf(" (obs %.0f%%)", obs) else ""
+    list(cls = "",
+         style = sprintf("background:%s;color:%s;text-align:center;", bg, co),
+         title = sprintf("Dev: %+.1fpp%s", val, obs_txt))
   }
 
   lines <- character(0)
   lines <- c(lines, '<div class="cb-heatmap-wrap">')
-  lines <- c(lines, '<table class="cb-heatmap-table">')
-  lines <- c(lines, '<thead><tr><th></th>')
+  lines <- c(lines, '<table class="cb-heatmap-table cb-dop-table">')
+
+  # Column-group header label above — "% of buyers who also bought brand"
+  lines <- c(lines, '<thead>')
+  lines <- c(lines, sprintf(paste0(
+    '<tr class="cb-dop-grouphdr"><th class="cb-dop-row-hdr"></th>',
+    '<th class="cb-dop-group-lbl" colspan="%d">%% of buyers who also bought brand</th></tr>'),
+    n))
+
+  # Column headers (brand labels)
+  lines <- c(lines, '<tr><th class="cb-dop-row-hdr">Brand</th>')
   for (b in brands) {
-    lines <- c(lines, sprintf('<th>%s</th>', .cb_esc(.cb_brand_lbl(b, brand_labels))))
+    lines <- c(lines, sprintf('<th class="cb-dop-col-hdr">%s</th>',
+                               .cb_esc(.cb_brand_lbl(b, brand_labels))))
   }
   lines <- c(lines, '</tr></thead><tbody>')
 
+  # Category average row (first)
+  avg_cells <- vapply(seq_along(brands), function(j) {
+    v <- col_avgs[j]
+    txt <- if (!is.na(v)) sprintf("%.0f%%", v) else "\u2014"
+    sprintf('<td class="cb-dop-avg-cell" style="text-align:center;">%s</td>', txt)
+  }, character(1))
+  lines <- c(lines, sprintf(
+    '<tr class="cb-dop-avg-row"><td class="cb-dop-row-lbl"><em>Category avg</em></td>%s</tr>',
+    paste(avg_cells, collapse = "")))
+
+  # Per-brand rows
   for (i in seq_along(brands)) {
     is_focal <- !is.null(focal_brand) && brands[i] == focal_brand
-    row_cls  <- if (is_focal) ' class="focal-row"' else ""
-    lines <- c(lines, sprintf('<tr data-brand="%s"%s><td><b>%s</b></td>',
+    row_cls  <- if (is_focal) "focal-row" else ""
+    lines <- c(lines, sprintf('<tr data-brand="%s" class="%s"><td class="cb-dop-row-lbl"><b>%s</b></td>',
                                .cb_esc(brands[i]), row_cls,
                                .cb_esc(.cb_brand_lbl(brands[i], brand_labels))))
     for (j in seq_along(brands)) {
       if (i == j) {
-        lines <- c(lines, '<td style="background:#e2e8f0;color:#94a3b8;text-align:center;">—</td>')
+        lines <- c(lines, '<td class="cb-dop-diag" style="text-align:center;">\u2014</td>')
         next
       }
       val <- tryCatch(as.numeric(dev_matrix[i, brands[j]]), error = function(e) NA)
       obs <- if (!is.null(obs_matrix))
         tryCatch(as.numeric(obs_matrix[i, brands[j]]), error = function(e) NULL) else NULL
       val_txt <- if (is.na(val)) "\u2014" else if (observed) sprintf("%.0f%%", val) else sprintf("%+.1f", val)
-      lines <- c(lines, sprintf('<td %s>%s</td>', cell_style(val, obs), val_txt))
+      attrs <- cell_attrs(val, j, obs)
+      lines <- c(lines, sprintf(
+        '<td class="cb-dop-cell %s" style="%s" title="%s">%s</td>',
+        attrs$cls, attrs$style, .cb_esc(attrs$title), val_txt))
     }
     lines <- c(lines, '</tr>')
   }
