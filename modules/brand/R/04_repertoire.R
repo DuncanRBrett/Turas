@@ -159,6 +159,145 @@ run_repertoire <- function(penetration_matrix, brand_codes,
     }
   }
 
+  # --- Full crossover matrix (Duplication of Purchase) ---
+  # crossover_matrix[i, j] = % of brand_i buyers who also buy brand_j.
+  # This is the Ehrenberg / Sharp "duplication of purchase" table.
+  crossover_matrix <- NULL
+  if (n_brands >= 2) {
+    cross_mat <- matrix(NA_real_, nrow = n_brands, ncol = n_brands,
+                        dimnames = list(brand_codes, brand_codes))
+
+    for (i in seq_along(brand_codes)) {
+      bi_buyers <- pen_mat[, i] == 1
+      n_bi_wt   <- if (is.null(weights)) sum(bi_buyers, na.rm = TRUE)
+                   else sum(weights[bi_buyers], na.rm = TRUE)
+      if (n_bi_wt <= 0) next
+      for (j in seq_along(brand_codes)) {
+        if (i == j) { cross_mat[i, j] <- 100; next }
+        both <- bi_buyers & (pen_mat[, j] == 1)
+        cross_mat[i, j] <- if (is.null(weights)) {
+          round(sum(both, na.rm = TRUE) / n_bi_wt * 100, 1)
+        } else {
+          round(sum(weights[both], na.rm = TRUE) / n_bi_wt * 100, 1)
+        }
+      }
+    }
+
+    cmdf <- as.data.frame(cross_mat, stringsAsFactors = FALSE)
+    crossover_matrix <- cbind(
+      data.frame(BrandCode = rownames(cmdf), stringsAsFactors = FALSE),
+      cmdf,
+      stringsAsFactors = FALSE
+    )
+    rownames(crossover_matrix) <- NULL
+  }
+
+  # --- Per-brand loyalty profile ---
+  # For each brand, split its buyers into: Sole (1 brand), Dual (2 brands),
+  # Multi (3+ brands). Plus mean repertoire size among that brand's buyers.
+  # This reveals the buyer-typology profile sitting behind each brand's share.
+  brand_repertoire_profile <- data.frame(
+    BrandCode       = brand_codes,
+    Brand_Buyers_n  = integer(n_brands),
+    Sole_Pct        = numeric(n_brands),
+    Dual_Pct        = numeric(n_brands),
+    Multi_Pct       = numeric(n_brands),
+    Mean_Repertoire = numeric(n_brands),
+    stringsAsFactors = FALSE
+  )
+
+  for (b in seq_along(brand_codes)) {
+    bb     <- pen_mat[, b] == 1
+    n_bb   <- sum(bb, na.rm = TRUE)
+    brand_repertoire_profile$Brand_Buyers_n[b] <- n_bb
+
+    if (n_bb > 0) {
+      rep_per_buyer <- brands_per_resp[bb]
+
+      if (is.null(weights)) {
+        brand_repertoire_profile$Sole_Pct[b]  <- round(sum(rep_per_buyer == 1) / n_bb * 100, 1)
+        brand_repertoire_profile$Dual_Pct[b]  <- round(sum(rep_per_buyer == 2) / n_bb * 100, 1)
+        brand_repertoire_profile$Multi_Pct[b] <- round(sum(rep_per_buyer >= 3) / n_bb * 100, 1)
+        brand_repertoire_profile$Mean_Repertoire[b] <- round(mean(rep_per_buyer), 1)
+      } else {
+        bb_wts <- weights[bb]
+        wt_tot <- sum(bb_wts, na.rm = TRUE)
+        brand_repertoire_profile$Sole_Pct[b]  <- round(
+          sum(bb_wts[rep_per_buyer == 1], na.rm = TRUE) / wt_tot * 100, 1)
+        brand_repertoire_profile$Dual_Pct[b]  <- round(
+          sum(bb_wts[rep_per_buyer == 2], na.rm = TRUE) / wt_tot * 100, 1)
+        brand_repertoire_profile$Multi_Pct[b] <- round(
+          sum(bb_wts[rep_per_buyer >= 3], na.rm = TRUE) / wt_tot * 100, 1)
+        brand_repertoire_profile$Mean_Repertoire[b] <- round(
+          sum(bb_wts * rep_per_buyer, na.rm = TRUE) / wt_tot, 1)
+      }
+    }
+  }
+
+  # --- Duplication-of-Purchase expected values and deviations (§2.5 / §7.4) ---
+  # dop_D_coefficient: OLS fit of obs_D_{ij} ~ 0 + b_j over off-diagonal cells
+  # dop_expected_matrix: D × b_j broadcast across rows (same structure as crossover_matrix)
+  # dop_deviation_matrix: observed − expected in percentage points
+  dop_D_coefficient    <- NULL
+  dop_expected_matrix  <- NULL
+  dop_deviation_matrix <- NULL
+
+  if (!is.null(crossover_matrix) && n_brands >= 2) {
+    brand_pen_vec <- if (is.null(weights)) {
+      colSums(pen_mat, na.rm = TRUE) / n_resp * 100
+    } else {
+      vapply(seq_len(n_brands), function(j) {
+        sum(weights[pen_mat[, j] == 1], na.rm = TRUE) /
+          sum(weights, na.rm = TRUE) * 100
+      }, numeric(1))
+    }
+    names(brand_pen_vec) <- brand_codes
+
+    # Off-diagonal observed duplication values for OLS (y = obs, x = b_j)
+    obs_vals <- numeric(0)
+    pen_vals <- numeric(0)
+    for (i in seq_len(n_brands)) {
+      for (j in seq_len(n_brands)) {
+        if (i == j) next
+        obs_ij <- crossover_matrix[i, brand_codes[j]]
+        if (!is.numeric(obs_ij)) obs_ij <- as.numeric(obs_ij)
+        if (!is.na(obs_ij)) {
+          obs_vals <- c(obs_vals, obs_ij)
+          pen_vals <- c(pen_vals, brand_pen_vec[j])
+        }
+      }
+    }
+
+    if (length(obs_vals) >= 2) {
+      # No-intercept OLS: D = sum(obs × pen) / sum(pen^2)
+      D <- sum(obs_vals * pen_vals) / sum(pen_vals^2)
+      dop_D_coefficient <- D
+
+      exp_mat <- matrix(NA_real_, nrow = n_brands, ncol = n_brands,
+                        dimnames = list(brand_codes, brand_codes))
+      dev_mat <- matrix(NA_real_, nrow = n_brands, ncol = n_brands,
+                        dimnames = list(brand_codes, brand_codes))
+      for (i in seq_len(n_brands)) {
+        for (j in seq_len(n_brands)) {
+          if (i == j) next
+          exp_ij <- D * brand_pen_vec[j]
+          obs_ij <- crossover_matrix[i, brand_codes[j]]
+          if (!is.numeric(obs_ij)) obs_ij <- as.numeric(obs_ij)
+          exp_mat[i, j] <- exp_ij
+          dev_mat[i, j] <- if (!is.na(obs_ij)) obs_ij - exp_ij else NA_real_
+        }
+      }
+
+      to_df <- function(m) {
+        df <- as.data.frame(m, stringsAsFactors = FALSE)
+        cbind(data.frame(BrandCode = rownames(df), stringsAsFactors = FALSE),
+              df, stringsAsFactors = FALSE)
+      }
+      dop_expected_matrix  <- to_df(exp_mat)
+      dop_deviation_matrix <- to_df(dev_mat)
+    }
+  }
+
   # --- Share of requirements (TRANS only, needs frequency data) ---
   share_of_req <- NULL
   if (!is.null(frequency_matrix)) {
@@ -224,6 +363,11 @@ run_repertoire <- function(penetration_matrix, brand_codes,
     mean_repertoire = round(mean_rep, 1),
     sole_loyalty = sole_loyalty,
     brand_overlap = brand_overlap,
+    crossover_matrix = crossover_matrix,
+    dop_D_coefficient    = dop_D_coefficient,
+    dop_expected_matrix  = dop_expected_matrix,
+    dop_deviation_matrix = dop_deviation_matrix,
+    brand_repertoire_profile = brand_repertoire_profile,
     share_of_requirements = share_of_req,
     metrics_summary = metrics_summary,
     n_respondents = n_resp,

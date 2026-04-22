@@ -111,7 +111,7 @@ load_brand_config <- function(config_path, project_root = NULL) {
   # Parse element toggles to logical
   element_fields <- c("element_funnel", "element_mental_avail", "element_cep_turf",
                        "element_repertoire", "element_dba", "element_portfolio",
-                       "element_wom")
+                       "element_wom", "element_drivers_barriers")
   for (ef in element_fields) {
     config[[ef]] <- .parse_yn(config[[ef]], default = (ef != "element_dba"))
   }
@@ -146,6 +146,10 @@ load_brand_config <- function(config_path, project_root = NULL) {
   config$dba_uniqueness_threshold <- config$dba_uniqueness_threshold %||% 0.50
   config$dba_attribution_type <- config$dba_attribution_type %||% "open"
   config$wom_timeframe <- config$wom_timeframe %||% "3 months"
+  config$target_timeframe_months <- as.integer(
+    config$target_timeframe_months %||% 3L)
+  config$longer_timeframe_months <- as.integer(
+    config$longer_timeframe_months %||% 12L)
   config$db_importance_method <- config$db_importance_method %||% "differential"
   config$decimal_places <- as.integer(config$decimal_places %||% 0L)
   config$colour_focal <- config$colour_focal %||% "#1A5276"
@@ -154,6 +158,18 @@ load_brand_config <- function(config_path, project_root = NULL) {
   config$colour_category_avg <- config$colour_category_avg %||% "#808080"
   config$respondent_id_col <- config$respondent_id_col %||% "Respondent_ID"
   config$report_title <- config$report_title %||% "Brand Health Report"
+
+  # Portfolio config keys (§3.3 + Q2 of PORTFOLIO_SPEC_v1.md)
+  config$portfolio_min_base <- as.integer(
+    config$portfolio_min_base %||% 30L)
+  config$portfolio_cooccur_min_pairs <- as.integer(
+    config$portfolio_cooccur_min_pairs %||% 20L)
+  config$portfolio_timeframe <- trimws(
+    as.character(config$portfolio_timeframe %||% "3m"))
+  config$portfolio_extension_baseline <- trimws(
+    as.character(config$portfolio_extension_baseline %||% "all"))
+  config$focal_home_category <- trimws(
+    as.character(config$focal_home_category %||% ""))
 
   # Store project root and resolve all file paths
   # All paths in config are relative to the config file's directory.

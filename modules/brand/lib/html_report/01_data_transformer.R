@@ -74,29 +74,52 @@ transform_brand_charts <- function(results, config) {
         charts[[paste0("funnel_", cat_id)]] <- funnel_charts
       }
 
-      # Repertoire charts
+      # Category Buying + Repertoire charts
       rep <- cr$repertoire
+      cbf <- cr$cat_buying_frequency
       if (!is.null(rep) && !identical(rep$status, "REFUSED")) {
         rep_charts <- list()
 
-        # 7. Repertoire size distribution
+        # Purchase frequency distribution (category-level, all respondents)
+        if (!is.null(cbf) && !identical(cbf$status, "REFUSED") &&
+            !is.null(cbf$distribution) && nrow(cbf$distribution) > 0) {
+          dist_ordered <- cbf$distribution
+          if ("Order" %in% names(dist_ordered)) {
+            dist_ordered <- dist_ordered[order(dist_ordered$Order), , drop = FALSE]
+          }
+          # Colour bars by frequency level: heavy = brand colour, never = muted
+          rep_charts[[length(rep_charts) + 1]] <- list(
+            svg = build_h_bar(
+              dist_ordered, "Label", "Pct", brand_colour,
+              title = sprintf("Category Purchase Frequency \u2014 %s (all respondents)",
+                              cat_name),
+              value_suffix = "%"),
+            title = "Category Purchase Frequency"
+          )
+        }
+
+        # Repertoire size distribution
         if (!is.null(rep$repertoire_size)) {
           rep_charts[[length(rep_charts) + 1]] <- list(
             svg = build_h_bar(rep$repertoire_size, "Brands_Bought", "Percentage",
-                              brand_colour, title = sprintf("Repertoire Size \u2014 %s", cat_name),
+                              brand_colour,
+                              title = sprintf("Repertoire Size \u2014 %s", cat_name),
                               value_suffix = "%"),
             title = "Repertoire Size"
           )
         }
 
-        # 8. Brand overlap
-        if (!is.null(rep$brand_overlap) && nrow(rep$brand_overlap) > 0) {
+        # Per-brand loyalty profile (stacked: Sole / Dual / Multi)
+        if (!is.null(rep$brand_repertoire_profile) &&
+            nrow(rep$brand_repertoire_profile) > 0 &&
+            exists("build_loyalty_profile_chart", mode = "function")) {
           rep_charts[[length(rep_charts) + 1]] <- list(
-            svg = build_h_bar(rep$brand_overlap, "BrandCode", "Overlap_Pct",
-                              brand_colour,
-                              title = sprintf("Brand Overlap with %s \u2014 %s", focal, cat_name),
-                              value_suffix = "%"),
-            title = "Brand Overlap"
+            svg = build_loyalty_profile_chart(
+              rep$brand_repertoire_profile,
+              focal_brand  = focal,
+              focal_colour = brand_colour,
+              title = sprintf("Buyer Loyalty Profile \u2014 %s", cat_name)),
+            title = "Buyer Loyalty Profile"
           )
         }
 
@@ -108,18 +131,25 @@ transform_brand_charts <- function(results, config) {
 
   # Brand-level charts
 
-  # 11. WOM diverging bar
-  wom <- results$results$wom
-  if (!is.null(wom) && !identical(wom$status, "REFUSED") && !is.null(wom$wom_metrics)) {
-    charts[["wom"]] <- list(
-      list(
-        svg = build_diverging_bar(wom$wom_metrics, "BrandCode",
-                                   "ReceivedPos_Pct", "ReceivedNeg_Pct",
-                                   focal, brand_colour,
-                                   title = "WOM Net Balance \u2014 Received"),
-        title = "WOM Net Balance"
-      )
-    )
+  # WOM is now per-category (each category has its own brand list and respondent group).
+  # Per-category WOM charts are keyed as wom_{cat_id} and rendered in the category panel.
+  if (!is.null(results$results$categories)) {
+    for (cat_name in names(results$results$categories)) {
+      cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
+      wom <- results$results$categories[[cat_name]]$wom
+      if (!is.null(wom) && !identical(wom$status, "REFUSED") &&
+          !is.null(wom$wom_metrics)) {
+        charts[[paste0("wom_", cat_id)]] <- list(
+          list(
+            svg = build_diverging_bar(wom$wom_metrics, "BrandCode",
+                                      "ReceivedPos_Pct", "ReceivedNeg_Pct",
+                                      focal, brand_colour,
+                                      title = sprintf("WOM Net Balance \u2014 %s", cat_name)),
+            title = "WOM Net Balance"
+          )
+        )
+      }
+    }
   }
 
   # 12. DBA Fame x Uniqueness grid
@@ -169,12 +199,17 @@ transform_brand_tables <- function(results, config) {
       if (!is.null(cr$funnel))
         tables[[paste0("funnel_", cat_id)]] <- build_funnel_tables(cr$funnel, focal)
       if (!is.null(cr$repertoire))
-        tables[[paste0("repertoire_", cat_id)]] <- build_repertoire_tables(cr$repertoire, focal)
+        tables[[paste0("repertoire_", cat_id)]] <- build_cat_buying_tables(
+          cr$repertoire, cr$cat_buying_frequency, focal)
+      # WOM is per-category
+      if (!is.null(cr$wom) && !identical(cr$wom$status, "REFUSED"))
+        tables[[paste0("wom_", cat_id)]] <- build_wom_tables(cr$wom, focal)
+      # Drivers & Barriers is per-category
+      if (!is.null(cr$drivers_barriers) && !identical(cr$drivers_barriers$status, "REFUSED"))
+        tables[[paste0("db_", cat_id)]] <- build_db_tables(cr$drivers_barriers, focal)
     }
   }
 
-  if (!is.null(results$results$wom))
-    tables[["wom"]] <- build_wom_tables(results$results$wom, focal)
   if (!is.null(results$results$dba))
     tables[["dba"]] <- build_dba_tables(results$results$dba)
 
@@ -327,6 +362,96 @@ transform_brand_panels <- function(results, config) {
                                       category_code = cat_id,
                                       focal_colour = focal_colour)
       panels[[paste0("ma_", cat_id)]] <- ma_html
+    }
+  }
+
+  # --- Category Buying (Dirichlet) panels (per category) ---
+  if (exists("render_cat_buying_panel", mode = "function")) {
+    for (cat_name in names(results$results$categories)) {
+      cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
+      cr <- results$results$categories[[cat_name]]
+
+      dn  <- cr$dirichlet_norms
+      bh  <- cr$buyer_heaviness
+      rep <- cr$repertoire
+      cbf <- cr$cat_buying_frequency
+
+      # P1.1 fix: only build the Dirichlet panel when at least one of the two
+      # paired elements (dirichlet_norms or buyer_heaviness) is present and not
+      # REFUSED.  If both are absent or both REFUSED the legacy inline block in
+      # 03_page_builder.R renders instead, giving the operator a clear fallback.
+      dn_ok <- !is.null(dn) && !identical(dn$status, "REFUSED")
+      bh_ok <- !is.null(bh) && !identical(bh$status, "REFUSED")
+      if (!dn_ok && !bh_ok) next
+
+      cat_brands_local <- if (!is.null(brand_list_all) &&
+                               "Category" %in% names(brand_list_all)) {
+        brand_list_all[brand_list_all$Category == cat_name, , drop = FALSE]
+      } else if (!is.null(brand_list_all)) brand_list_all else NULL
+
+      focal_colour <- .resolve_focal_colour(cat_brands_local, config$focal_brand,
+                                            config_focal_colour)
+
+      # Build brand_labels lookup: prefer BrandLabel column, fall back to
+      # title-case conversion of the brand code.
+      brand_labels <- NULL
+      if (!is.null(cat_brands_local) && nrow(cat_brands_local) > 0 &&
+          "BrandCode" %in% names(cat_brands_local)) {
+        lbl_col <- if ("BrandLabel" %in% names(cat_brands_local))
+          cat_brands_local$BrandLabel else NULL
+        brand_labels <- stats::setNames(
+          if (!is.null(lbl_col))
+            as.character(lbl_col)
+          else
+            vapply(as.character(cat_brands_local$BrandCode),
+                   function(x) tools::toTitleCase(tolower(x)),
+                   character(1L)),
+          as.character(cat_brands_local$BrandCode))
+      }
+
+      # Build brand_colours lookup from Colour column (hex codes)
+      brand_colours <- list()
+      if (!is.null(cat_brands_local) && nrow(cat_brands_local) > 0 &&
+          "BrandCode" %in% names(cat_brands_local) &&
+          "Colour" %in% names(cat_brands_local)) {
+        for (ii in seq_len(nrow(cat_brands_local))) {
+          bc_ii <- trimws(as.character(cat_brands_local$BrandCode[ii]))
+          col_ii <- cat_brands_local$Colour[ii]
+          if (is.null(col_ii) || is.na(col_ii)) next
+          col_ii <- trimws(as.character(col_ii))
+          if (!nzchar(col_ii)) next
+          if (!grepl("^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$", col_ii)) next
+          brand_colours[[bc_ii]] <- col_ii
+        }
+      }
+
+      panel_data <- list(
+        cat_name              = cat_name,
+        category_code         = cat_id,
+        focal_brand           = config$focal_brand %||% NULL,
+        focal_colour          = focal_colour,
+        target_months         = config$target_timeframe_months %||% 3L,
+        longer_months         = config$longer_timeframe_months %||% 12L,
+        dirichlet_norms       = dn,
+        buyer_heaviness       = bh,
+        cat_buying_frequency  = cbf,
+        repertoire            = rep,
+        brand_labels          = brand_labels,
+        brand_colours         = brand_colours,
+        cat_buying_dist_labels = config$cat_buying_dist_labels %||% NULL
+      )
+
+      cb_html <- tryCatch(
+        render_cat_buying_panel(panel_data),
+        error = function(e) {
+          message(sprintf("[BRAND HTML] Cat buying panel failed for %s: %s",
+                          cat_name, e$message))
+          NULL
+        }
+      )
+      if (!is.null(cb_html)) {
+        panels[[paste0("cat_buying_", cat_id)]] <- cb_html
+      }
     }
   }
 

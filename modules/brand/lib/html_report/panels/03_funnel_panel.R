@@ -59,15 +59,16 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
             json_payload),
     .fn_sub_tabs(),
     .fn_focus_bar(panel_data),
-    '<div class="fn-subtab" data-fn-subtab="summary">',
+    '<div class="fn-subtab" data-fn-subtab="summary" hidden>',
       .fn_cards_section(panel_data, focal_colour),
     '</div>',
-    '<div class="fn-subtab" data-fn-subtab="funnel" hidden>',
+    '<div class="fn-subtab" data-fn-subtab="funnel">',
       .fn_table_controls(panel_data),
       .fn_table_section(panel_data, focal_colour),
       '<div class="fn-chart-wrap-outer">',
         .fn_chart_header(panel_data),
         '<div class="fn-chart-view" data-fn-view="slope">',
+          '<div class="fn-aware-note" style="display:none;font-size:11px;color:#64748b;padding:4px 8px 0;font-style:italic;">Awareness pinned to 100%. Chart shows conversion efficiency from awareness.</div>',
           .fn_chart_section(panel_data, focal_colour),
         '</div>',
         '<div class="fn-mf-section-heading">Mini Funnels</div>',
@@ -119,8 +120,8 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
 
 .fn_sub_tabs <- function() {
   '<nav class="fn-subnav" role="tablist" aria-label="Funnel sections">
-     <button type="button" class="fn-subtab-btn active" data-fn-subtab-target="summary" role="tab" aria-selected="true">Summary</button>
-     <button type="button" class="fn-subtab-btn" data-fn-subtab-target="funnel" role="tab" aria-selected="false">Funnel</button>
+     <button type="button" class="fn-subtab-btn" data-fn-subtab-target="summary" role="tab" aria-selected="false">Summary</button>
+     <button type="button" class="fn-subtab-btn active" data-fn-subtab-target="funnel" role="tab" aria-selected="true">Funnel</button>
      <button type="button" class="fn-subtab-btn" data-fn-subtab-target="relationship" role="tab" aria-selected="false">Relationship</button>
    </nav>'
 }
@@ -186,6 +187,7 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
     '<span class="sig-level-label">Base:</span>',
     '<button type="button" class="sig-btn sig-btn-active" data-fn-action="pctmode" data-fn-pctmode="total" aria-pressed="true">% of total</button>',
     '<button type="button" class="sig-btn" data-fn-action="pctmode" data-fn-pctmode="previous" aria-pressed="false">% of previous</button>',
+    '<button type="button" class="sig-btn" data-fn-action="pctmode" data-fn-pctmode="aware" aria-pressed="false" title="Awareness pinned to 100%. Shows conversion from awareness for each stage.">% of aware</button>',
     '</div>',
 
     '<button type="button" class="export-btn fn-export-btn" data-fn-action="exporttable" title="Export table to Excel">\u2B73 Export table \u25BE</button>',

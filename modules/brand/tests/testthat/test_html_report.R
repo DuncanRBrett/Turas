@@ -55,8 +55,8 @@ source(file.path(TURAS_ROOT, "modules", "brand", "lib", "html_report",
     ),
     results = list(
       categories = list(
-        "Frozen Veg" = list(
-          category = "Frozen Veg",
+        "Dry Seasonings & Spices" = list(
+          category = "Dry Seasonings & Spices",
           mental_availability = list(
             status = "PASS",
             mms = data.frame(BrandCode = c("IPK", "MC"),
@@ -161,22 +161,23 @@ source(file.path(TURAS_ROOT, "modules", "brand", "lib", "html_report",
               BrandCode = "MC", Overlap_Pct = 45, stringsAsFactors = FALSE
             ),
             n_respondents = 200, n_buyers = 140
+          ),
+          # WOM is per-category (each category has its own brand list)
+          wom = list(
+            status = "PASS",
+            wom_metrics = data.frame(
+              BrandCode = c("IPK", "MC"),
+              ReceivedPos_Pct = c(15, 12), ReceivedNeg_Pct = c(3, 5),
+              SharedPos_Pct = c(10, 8), SharedNeg_Pct = c(1, 2),
+              SharedPosFreq_Mean = c(2.5, 2.1), SharedNegFreq_Mean = c(1.5, 1.2),
+              stringsAsFactors = FALSE
+            ),
+            net_balance = data.frame(
+              BrandCode = c("IPK", "MC"),
+              Net_Received = c(12, 7), Net_Shared = c(9, 6),
+              stringsAsFactors = FALSE
+            )
           )
-        )
-      ),
-      wom = list(
-        status = "PASS",
-        wom_metrics = data.frame(
-          BrandCode = c("IPK", "MC"),
-          ReceivedPos_Pct = c(15, 12), ReceivedNeg_Pct = c(3, 5),
-          SharedPos_Pct = c(10, 8), SharedNeg_Pct = c(1, 2),
-          SharedPosFreq_Mean = c(2.5, 2.1), SharedNegFreq_Mean = c(1.5, 1.2),
-          stringsAsFactors = FALSE
-        ),
-        net_balance = data.frame(
-          BrandCode = c("IPK", "MC"),
-          Net_Received = c(12, 7), Net_Shared = c(9, 6),
-          stringsAsFactors = FALSE
         )
       )
     )
@@ -268,8 +269,8 @@ test_that("HTML contains WOM section", {
 
   html <- paste(readLines(tmp, warn = FALSE), collapse = "\n")
 
-  expect_true(grepl("Word-of-Mouth", html) || grepl("WOM", html))
-  expect_true(grepl("WOM", html))
+  # WOM is now per-category: appears as "Word of Mouth" sub-tab in each category panel
+  expect_true(grepl("Word of Mouth", html) || grepl("WOM", html))
 })
 
 test_that("HTML contains About section", {

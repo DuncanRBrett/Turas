@@ -74,7 +74,7 @@ source(file.path(TURAS_ROOT, "modules", "brand", "R", "generate_config_templates
   # Categories sheet
   openxlsx::addWorksheet(wb_cfg, "Categories")
   categories <- data.frame(
-    Category = c("Frozen Vegetables", "Ready Meals", "Sauces"),
+    Category = c("Dry Seasonings & Spices", "Ready Meals", "Sauces"),
     Type = c("transaction", "transaction", "transaction"),
     Timeframe_Long = c("12 months", "12 months", "12 months"),
     Timeframe_Target = c("3 months", "3 months", "3 months"),
@@ -109,15 +109,15 @@ source(file.path(TURAS_ROOT, "modules", "brand", "R", "generate_config_templates
   # Questions sheet
   openxlsx::addWorksheet(wb_ss, "Questions")
   questions <- data.frame(
-    QuestionCode = c("BRANDAWARE_FV", "BRANDATTR_FV_01", "BRANDATT1_FV",
+    QuestionCode = c("BRANDAWARE_DSS", "BRANDATTR_DSS_01", "BRANDATT1_DSS",
                      "WOM_POS_REC"),
-    QuestionText = c("Brands heard of", "Quick weeknight meal",
+    QuestionText = c("Brands heard of", "Adds great flavour to food",
                      "Brand attitude", "Received positive WOM"),
     VariableType = c("Multi_Mention", "Multi_Mention",
                      "Single_Mention", "Multi_Mention"),
     Battery = c("awareness", "cep_matrix", "attitude", "wom"),
-    Category = c("Frozen Vegetables", "Frozen Vegetables",
-                 "Frozen Vegetables", "ALL"),
+    Category = c("Dry Seasonings & Spices", "Dry Seasonings & Spices",
+                 "Dry Seasonings & Spices", "ALL"),
     stringsAsFactors = FALSE
   )
   openxlsx::writeData(wb_ss, "Questions", questions)
@@ -125,7 +125,7 @@ source(file.path(TURAS_ROOT, "modules", "brand", "R", "generate_config_templates
   # Options sheet
   openxlsx::addWorksheet(wb_ss, "Options")
   options <- data.frame(
-    QuestionCode = rep("BRANDATT1_FV", 5),
+    QuestionCode = rep("BRANDATT1_DSS", 5),
     OptionText = as.character(1:5),
     DisplayText = c("I love it", "I prefer it", "Would buy if no choice",
                     "Would refuse", "No opinion"),
@@ -138,9 +138,9 @@ source(file.path(TURAS_ROOT, "modules", "brand", "R", "generate_config_templates
   # Brands sheet
   openxlsx::addWorksheet(wb_ss, "Brands")
   brands <- data.frame(
-    Category = c("Frozen Vegetables", "Frozen Vegetables", "Ready Meals"),
-    BrandCode = c("IPK", "MCCAIN", "IPK"),
-    BrandLabel = c("IPK", "McCain", "IPK"),
+    Category = c("Dry Seasonings & Spices", "Dry Seasonings & Spices", "Ready Meals"),
+    BrandCode = c("IPK", "ROB", "IPK"),
+    BrandLabel = c("IPK", "Robertsons", "IPK"),
     DisplayOrder = c(1, 2, 1),
     IsFocal = c("Y", "N", "Y"),
     stringsAsFactors = FALSE
@@ -150,9 +150,9 @@ source(file.path(TURAS_ROOT, "modules", "brand", "R", "generate_config_templates
   # CEPs sheet
   openxlsx::addWorksheet(wb_ss, "CEPs")
   ceps <- data.frame(
-    Category = rep("Frozen Vegetables", 3),
+    Category = rep("Dry Seasonings & Spices", 3),
     CEPCode = c("CEP01", "CEP02", "CEP03"),
-    CEPText = c("Quick weeknight meal", "Family enjoys", "Healthy option"),
+    CEPText = c("Adds great flavour to food", "Family enjoys", "Healthy option"),
     DisplayOrder = 1:3,
     stringsAsFactors = FALSE
   )
@@ -161,7 +161,7 @@ source(file.path(TURAS_ROOT, "modules", "brand", "R", "generate_config_templates
   # Attributes sheet
   openxlsx::addWorksheet(wb_ss, "Attributes")
   attrs <- data.frame(
-    Category = rep("Frozen Vegetables", 2),
+    Category = rep("Dry Seasonings & Spices", 2),
     AttrCode = c("ATTR01", "ATTR02"),
     AttrText = c("Good value", "High quality"),
     DisplayOrder = 1:2,
@@ -241,7 +241,7 @@ test_that("guard_validate_brand_config refuses invalid focal_assignment", {
 
 test_that("guard_validate_categories passes with valid categories", {
   cats <- data.frame(
-    Category = c("Frozen Veg", "Ready Meals"),
+    Category = c("Dry Seasonings & Spices", "Ready Meals"),
     Type = c("transaction", "transaction"),
     Timeframe_Target = c("3 months", "3 months"),
     stringsAsFactors = FALSE

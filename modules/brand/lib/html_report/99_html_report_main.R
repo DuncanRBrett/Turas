@@ -91,8 +91,12 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
     }
   }
 
-  # Load shared TurasPins JS
+  # Load shared TurasPins JS — source the loader if not already available
   pins_js <- ""
+  if (!exists("turas_pins_js", mode = "function")) {
+    pins_loader <- file.path(turas_root, "modules", "shared", "lib", "turas_pins_js.R")
+    if (file.exists(pins_loader)) tryCatch(source(pins_loader, local = FALSE), error = function(e) NULL)
+  }
   if (exists("turas_pins_js", mode = "function")) {
     pins_js <- tryCatch(turas_pins_js(include_vendor = TRUE), error = function(e) "")
   }
@@ -134,10 +138,16 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
       sep = "\n")
   }
   if (exists("build_ma_panel_styles", mode = "function")) {
-    panel_styles <- paste(panel_styles,
-      tryCatch(build_ma_panel_styles(brand_colour_cfg),
-               error = function(e) ""),
-      sep = "\n")
+    css <- tryCatch(build_ma_panel_styles(brand_colour_cfg), error = function(e) "")
+    if (nzchar(trimws(css)))
+      panel_styles <- paste(panel_styles,
+        paste0('<style class="ma-panel-styles">', css, '</style>'), sep = "\n")
+  }
+  if (exists("build_portfolio_panel_styles", mode = "function")) {
+    css <- tryCatch(build_portfolio_panel_styles(brand_colour_cfg), error = function(e) "")
+    if (nzchar(trimws(css)))
+      panel_styles <- paste(panel_styles,
+        paste0('<style class="pf-panel-styles">', css, '</style>'), sep = "\n")
   }
 
   # Resolve JS paths (funnel + MA) and concatenate into one panel_js blob
@@ -158,6 +168,8 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
   panel_js <- paste(
     .resolve_js("brand_funnel_panel.js"),
     .resolve_js("brand_ma_panel.js"),
+    .resolve_js("brand_cat_buying_panel.js"),
+    .resolve_js("brand_portfolio_panel.js"),
     sep = "\n"
   )
 

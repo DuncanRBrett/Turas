@@ -66,7 +66,20 @@ BRAND_VERSION <- "1.0"
     "03e_funnel_legacy_adapter.R",
     "04_repertoire.R",
     "05_wom.R",
-    "07_dba.R"
+    "06_drivers_barriers.R",
+    "07_dba.R",
+    "08_cat_buying.R",
+    "08b_brand_volume.R",
+    "08c_dirichlet_norms.R",
+    "08d_buyer_heaviness.R",
+    "09_portfolio.R",
+    "09a_portfolio_footprint.R",
+    "09b_portfolio_constellation.R",
+    "09c_portfolio_clutter.R",
+    "09d_portfolio_strength.R",
+    "09e_portfolio_extension.R",
+    "09f_portfolio_panel_data.R",
+    "09g_portfolio_output.R"
   )
 
   for (f in module_files) {
@@ -263,16 +276,44 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
 
   for (i in seq_len(nrow(categories))) {
     cat_name <- categories$Category[i]
-    if (verbose) cat(sprintf("\n--- Category: %s ---\n", cat_name))
+
+    # Determine analysis depth from Categories sheet (if present).
+    # "full" receives the complete CBM battery; "awareness_only" contributes
+    # brand awareness only (used for cross-category portfolio analysis).
+    cat_depth <- if ("Analysis_Depth" %in% names(categories))
+                   trimws(as.character(categories$Analysis_Depth[i]))
+                 else "full"
+    if (is.na(cat_depth) || cat_depth == "") cat_depth <- "full"
+
+    if (verbose) cat(sprintf("\n--- Category: %s [%s] ---\n", cat_name, cat_depth))
 
     cat_brands <- get_brands_for_category(structure, cat_name)
-    cat_ceps <- get_ceps_for_category(structure, cat_name)
-    cat_attrs <- get_attributes_for_category(structure, cat_name)
+    cat_ceps   <- get_ceps_for_category(structure, cat_name)
+    cat_attrs  <- get_attributes_for_category(structure, cat_name)
 
-    cat_result <- list(category = cat_name)
+    cat_result <- list(category = cat_name, analysis_depth = cat_depth)
+    linkage    <- NULL  # populated by MA block; used by D&B
 
-    # Mental Availability
-    if (isTRUE(config$element_mental_avail) && nrow(cat_ceps) > 0) {
+    # Detect short category code (e.g. "DSS") and filter data to focal
+    # respondents for this category. Focal filtering is used for WOM so each
+    # category's WOM metrics reflect its own respondent group and brand list.
+    focal_col  <- config$focal_category_col %||% "Focal_Category"
+    cat_code   <- if (cat_depth == "full" && !is.null(structure$questionmap))
+                    .detect_category_code(structure$questionmap, cat_brands, data)
+                  else NULL
+    cat_data   <- if (!is.null(cat_code) && focal_col %in% names(data)) {
+                    data[!is.na(data[[focal_col]]) &
+                         data[[focal_col]] == cat_code, ]
+                  } else data
+    cat_weights <- if (!is.null(weights) && !is.null(cat_code) &&
+                       focal_col %in% names(data)) {
+                     weights[!is.na(data[[focal_col]]) &
+                             data[[focal_col]] == cat_code]
+                   } else weights
+
+    # Mental Availability (full categories only — awareness_only cats have no CEPs)
+    if (isTRUE(config$element_mental_avail) && nrow(cat_ceps) > 0 &&
+        cat_depth == "full") {
       if (verbose) cat("  Running Mental Availability...\n")
 
       # Build CEP linkage from data
@@ -288,7 +329,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
 
       linkage <- tryCatch(
         build_cep_linkage_from_matrix(
-          data, cep_col_codes, cat_brands$BrandCode
+          cat_data, cep_col_codes, cat_brands$BrandCode
         ),
         error = function(e) {
           warnings_list <<- c(warnings_list,
@@ -315,7 +356,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
         if (!is.null(cat_attrs) && nrow(cat_attrs) > 0) {
           attr_linkage <- tryCatch(
             build_cep_linkage_from_matrix(
-              data, cat_attrs$AttrCode, cat_brands$BrandCode
+              cat_data, cat_attrs$AttrCode, cat_brands$BrandCode
             ),
             error = function(e) {
               warnings_list <<- c(warnings_list,
@@ -330,7 +371,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
           linkage = linkage,
           cep_labels = cep_labels_mapped,
           focal_brand = config$focal_brand,
-          weights = weights,
+          weights = cat_weights,
           run_cep_turf = isTRUE(config$element_cep_turf),
           turf_max_items = min(10, length(cep_col_codes)),
           attribute_linkage = attr_linkage,
@@ -342,34 +383,34 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       }
     }
 
-    # Funnel (role-registry architecture; see FUNNEL_SPEC_v2.md)
-    if (isTRUE(config$element_funnel)) {
+    # Funnel (role-registry architecture; full categories only)
+    if (isTRUE(config$element_funnel) && cat_depth == "full") {
       if (verbose) cat("  Running Funnel...\n")
 
       cat_result$funnel <- .run_funnel_for_category(
-        data = data, structure = structure, cat_brands = cat_brands,
-        cat_ceps = cat_ceps, config = config, weights = weights,
+        data = cat_data, structure = structure, cat_brands = cat_brands,
+        cat_ceps = cat_ceps, config = config, weights = cat_weights,
         cat_name = cat_name, warnings_acc = function(msg) {
           warnings_list <<- c(warnings_list, msg)
         }
       )
     }
 
-    # Repertoire
-    if (isTRUE(config$element_repertoire)) {
+    # Repertoire (full categories only — awareness_only cats have no pen data)
+    if (isTRUE(config$element_repertoire) && cat_depth == "full") {
       if (verbose) cat("  Running Repertoire...\n")
 
-      # Build penetration matrix from data
-      pen_mat <- matrix(0L, nrow = nrow(data), ncol = nrow(cat_brands))
+      # Build penetration matrix from cat_data (focal respondents only)
+      pen_mat <- matrix(0L, nrow = nrow(cat_data), ncol = nrow(cat_brands))
       colnames(pen_mat) <- cat_brands$BrandCode
 
       pen_qs <- get_questions_for_battery(structure, "penetration", cat_name)
       if (nrow(pen_qs) > 0) {
         pen_prefix <- pen_qs$QuestionCode[1]
         for (b in seq_len(nrow(cat_brands))) {
-          col <- .find_brand_col(data, pen_prefix, cat_brands$BrandCode[b])
+          col <- .find_brand_col(cat_data, pen_prefix, cat_brands$BrandCode[b])
           if (!is.null(col)) {
-            vals <- data[[col]]
+            vals <- cat_data[[col]]
             pen_mat[, b] <- as.integer(!is.na(vals) & vals > 0)
           }
         }
@@ -379,7 +420,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
         run_repertoire(
           pen_mat, cat_brands$BrandCode,
           focal_brand = config$focal_brand,
-          weights = weights
+          weights = cat_weights
         ),
         error = function(e) {
           warnings_list <<- c(warnings_list,
@@ -389,10 +430,212 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       )
     }
 
+    # Category Buying Frequency (full categories only)
+    # Reads the cat_buying.frequency.{cat_code} role from QuestionMap and maps
+    # coded responses through the cat_buy_scale OptionMap scale.
+    if (isTRUE(config$element_repertoire) && cat_depth == "full" &&
+        !is.null(cat_code) && !is.null(structure$questionmap) &&
+        nrow(structure$questionmap) > 0) {
+      freq_role <- paste0("cat_buying.frequency.", cat_code)
+      qmap_rows <- structure$questionmap
+      freq_row  <- qmap_rows[
+        !is.na(qmap_rows$Role) &
+          trimws(as.character(qmap_rows$Role)) == freq_role,
+        , drop = FALSE]
+      if (nrow(freq_row) > 0) {
+        freq_col_name <- trimws(as.character(freq_row$ClientCode[1]))
+        if (!is.na(freq_col_name) && nzchar(freq_col_name) &&
+            freq_col_name %in% names(cat_data)) {
+          if (verbose) cat("  Running Category Buying Frequency...\n")
+          cat_result$cat_buying_frequency <- tryCatch(
+            run_cat_buying_frequency(
+              cat_data[[freq_col_name]],
+              option_map = structure$optionmap,
+              weights    = cat_weights
+            ),
+            error = function(e) {
+              warnings_list <<- c(warnings_list,
+                sprintf("Cat buying frequency failed for %s: %s",
+                        cat_name, e$message))
+              list(status = "REFUSED", message = e$message)
+            }
+          )
+        }
+      }
+    }
+
+    # Brand Volume Matrix + Dirichlet Norms + Buyer Heaviness (full categories only)
+    # These three elements require BRANDPEN2 and BRANDPEN3 columns resolved via
+    # the cat_code detected above. They are skipped when cat_code is NULL.
+    if (isTRUE(config$element_repertoire) && cat_depth == "full" &&
+        !is.null(cat_code)) {
+
+      pen2_prefix  <- paste0("BRANDPEN2_", cat_code)
+      pen3_prefix  <- paste0("BRANDPEN3_", cat_code)
+
+      if (verbose) cat("  Building brand volume matrix...\n")
+      vol_result <- tryCatch(
+        build_brand_volume_matrix(
+          cat_data         = cat_data,
+          cat_brands       = cat_brands,
+          pen_target_prefix = pen2_prefix,
+          freq_prefix      = pen3_prefix,
+          verbose          = verbose
+        ),
+        error = function(e) {
+          warnings_list <<- c(warnings_list,
+            sprintf("Brand volume matrix failed for %s: %s", cat_name, e$message))
+          list(status = "REFUSED", message = e$message)
+        }
+      )
+      cat_result$brand_volume <- vol_result
+
+      if (!identical(vol_result$status, "REFUSED")) {
+        if (verbose) cat("  Running Dirichlet norms...\n")
+        cat_result$dirichlet_norms <- tryCatch(
+          run_dirichlet_norms(
+            pen_mat       = vol_result$pen_mat,
+            x_mat         = vol_result$x_mat,
+            m_vec         = vol_result$m_vec,
+            brand_codes   = cat_brands$BrandCode,
+            focal_brand   = config$focal_brand,
+            weights       = cat_weights,
+            target_months = config$target_timeframe_months %||% 3L,
+            longer_months = config$longer_timeframe_months %||% 12L
+          ),
+          error = function(e) {
+            warnings_list <<- c(warnings_list,
+              sprintf("Dirichlet norms failed for %s: %s", cat_name, e$message))
+            list(status = "REFUSED", message = e$message)
+          }
+        )
+
+        # P1.2 fix: buyer heaviness requires a successful Dirichlet run —
+        # both analyses depend on the same Dirichlet parameterisation.
+        if (!identical(cat_result$dirichlet_norms$status, "REFUSED")) {
+          if (verbose) cat("  Running buyer heaviness...\n")
+          cat_result$buyer_heaviness <- tryCatch(
+            run_buyer_heaviness(
+              pen_mat     = vol_result$pen_mat,
+              m_vec       = vol_result$m_vec,
+              brand_codes = cat_brands$BrandCode,
+              focal_brand = config$focal_brand,
+              weights     = cat_weights,
+              x_mat       = vol_result$x_mat
+            ),
+            error = function(e) {
+              warnings_list <<- c(warnings_list,
+                sprintf("Buyer heaviness failed for %s: %s", cat_name, e$message))
+              list(status = "REFUSED", message = e$message)
+            }
+          )
+        }
+
+        # Pass frequency_matrix into run_repertoire for share_of_requirements
+        # (re-run repertoire with frequency data now that vol_result is available)
+        if (!is.null(cat_result$repertoire) &&
+            !identical(cat_result$repertoire$status, "REFUSED")) {
+          cat_result$repertoire <- tryCatch(
+            run_repertoire(
+              vol_result$pen_mat,
+              cat_brands$BrandCode,
+              focal_brand      = config$focal_brand,
+              frequency_matrix = vol_result$x_mat,
+              weights          = cat_weights
+            ),
+            error = function(e) {
+              warnings_list <<- c(warnings_list,
+                sprintf("Repertoire (with frequency) failed for %s: %s",
+                        cat_name, e$message))
+              cat_result$repertoire
+            }
+          )
+        }
+      }
+    }
+
+    # WOM (full categories only; filtered to focal respondents for this category)
+    # WOM is category-specific because each category has a different brand list
+    # and only its focal respondents answered WOM questions for those brands.
+    if (isTRUE(config$element_wom) && cat_depth == "full") {
+      if (verbose) cat("  Running WOM...\n")
+      wom_qs <- get_questions_for_battery(structure, "wom")
+      if (!is.null(wom_qs) && nrow(wom_qs) > 0) {
+        pos_rec  <- .wom_prefix(wom_qs, "POS.*REC|REC.*POS",  "WOM_POS_REC")
+        neg_rec  <- .wom_prefix(wom_qs, "NEG.*REC|REC.*NEG",  "WOM_NEG_REC")
+        pos_shr  <- .wom_prefix(wom_qs, "POS.*SHARE|SHARE.*POS|POS_S", "WOM_POS_SHARE")
+        neg_shr  <- .wom_prefix(wom_qs, "NEG.*SHARE|SHARE.*NEG|NEG_S", "WOM_NEG_SHARE")
+        cat_result$wom <- tryCatch(
+          run_wom(
+            cat_data, cat_brands$BrandCode,
+            received_pos_prefix = pos_rec,
+            received_neg_prefix = neg_rec,
+            shared_pos_prefix   = pos_shr,
+            shared_neg_prefix   = neg_shr,
+            focal_brand = config$focal_brand,
+            weights     = cat_weights
+          ),
+          error = function(e) {
+            warnings_list <<- c(warnings_list,
+              sprintf("WOM failed for %s: %s", cat_name, e$message))
+            list(status = "REFUSED", message = e$message)
+          }
+        )
+      }
+    }
+
+    # Drivers & Barriers (full categories only; requires MA linkage)
+    if (isTRUE(config$element_drivers_barriers) && cat_depth == "full") {
+      if (verbose) cat("  Running Drivers & Barriers...\n")
+
+      db_cep_mat <- if (!is.null(cat_result$mental_availability))
+                      cat_result$mental_availability$cep_brand_matrix else NULL
+
+      # Focal brand penetration vector (reuses same question source as repertoire)
+      db_pen <- NULL
+      pen_qs <- get_questions_for_battery(structure, "penetration", cat_name)
+      if (nrow(pen_qs) > 0) {
+        pen_prefix    <- pen_qs$QuestionCode[1]
+        focal_pen_col <- .find_brand_col(cat_data, pen_prefix, config$focal_brand)
+        if (!is.null(focal_pen_col)) {
+          vals   <- cat_data[[focal_pen_col]]
+          db_pen <- as.integer(!is.na(vals) & vals > 0)
+        }
+      }
+
+      if (!is.null(linkage) && !is.null(db_cep_mat) && !is.null(db_pen)) {
+        cat_result$drivers_barriers <- tryCatch(
+          run_drivers_barriers(
+            linkage     = linkage,
+            cep_mat     = db_cep_mat,
+            pen         = db_pen,
+            focal_brand = config$focal_brand,
+            cep_labels  = if (!is.null(cat_ceps) && nrow(cat_ceps) > 0)
+              data.frame(CEPCode = cat_ceps$CEPCode,
+                         CEPText = cat_ceps$CEPText,
+                         stringsAsFactors = FALSE) else NULL
+          ),
+          error = function(e) {
+            warnings_list <<- c(warnings_list,
+              sprintf("Drivers & Barriers failed for %s: %s", cat_name, e$message))
+            list(status = "REFUSED", message = e$message)
+          }
+        )
+      } else {
+        if (verbose) cat("  Drivers & Barriers skipped: MA linkage or pen data unavailable.\n")
+      }
+    }
+
     category_results[[cat_name]] <- cat_result
   }
 
   results$categories <- category_results
+
+  # --- STEP 5a: Cross-category portfolio data (full 1200 respondents) ---
+  # Computes category usage and focal brand awareness from the FULL dataset,
+  # not from per-category filtered subsets.
+  results$portfolio <- .compute_portfolio_data(data, categories, structure,
+                                               config, weights)
 
   # --- STEP 5: Brand-level elements ---
 
@@ -425,45 +668,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
     }
   }
 
-  # WOM
-  if (isTRUE(config$element_wom)) {
-    if (verbose) cat("\nRunning WOM (brand-level)...\n")
-
-    wom_qs <- get_questions_for_battery(structure, "wom")
-    if (!is.null(wom_qs) && nrow(wom_qs) > 0) {
-      # Get unique brand codes across all categories
-      all_brands <- unique(structure$brands$BrandCode)
-
-      # Find WOM column prefixes from question codes
-      pos_rec_qs <- wom_qs[grepl("POS.*REC|REC.*POS", wom_qs$QuestionCode,
-                                  ignore.case = TRUE), , drop = FALSE]
-      neg_rec_qs <- wom_qs[grepl("NEG.*REC|REC.*NEG", wom_qs$QuestionCode,
-                                  ignore.case = TRUE), , drop = FALSE]
-      pos_share_qs <- wom_qs[grepl("POS.*SHARE|SHARE.*POS|POS_S",
-                                    wom_qs$QuestionCode,
-                                    ignore.case = TRUE), , drop = FALSE]
-      neg_share_qs <- wom_qs[grepl("NEG.*SHARE|SHARE.*NEG|NEG_S",
-                                    wom_qs$QuestionCode,
-                                    ignore.case = TRUE), , drop = FALSE]
-
-      results$wom <- tryCatch(
-        run_wom(
-          data, all_brands,
-          received_pos_prefix = if (nrow(pos_rec_qs) > 0) pos_rec_qs$QuestionCode[1] else "WOM_POS_REC",
-          received_neg_prefix = if (nrow(neg_rec_qs) > 0) neg_rec_qs$QuestionCode[1] else "WOM_NEG_REC",
-          shared_pos_prefix = if (nrow(pos_share_qs) > 0) pos_share_qs$QuestionCode[1] else "WOM_POS_SHARE",
-          shared_neg_prefix = if (nrow(neg_share_qs) > 0) neg_share_qs$QuestionCode[1] else "WOM_NEG_SHARE",
-          focal_brand = config$focal_brand,
-          weights = weights
-        ),
-        error = function(e) {
-          warnings_list <<- c(warnings_list,
-            sprintf("WOM failed: %s", e$message))
-          list(status = "REFUSED", message = e$message)
-        }
-      )
-    }
-  }
+  # WOM is now per-category (see Step 4 above). No brand-level WOM.
 
   # --- STEP 6: Determine overall status ---
   elapsed <- proc.time()["elapsed"] - start_time
@@ -548,7 +753,17 @@ if (!exists(".find_brand_col", mode = "function")) {
   funnel_cfg <- .funnel_config_from_global(config, cat_name, cat_brands)
 
   brand_with_refusal_handler({
-    role_map <- load_role_map(structure,
+    # For multi-category studies, the QuestionMap contains category-suffixed
+    # role names (e.g. funnel.awareness.DSS). Normalise to bare names for this
+    # category before building the role map so run_funnel() can find its
+    # required roles (funnel.awareness, funnel.attitude, etc.).
+    cat_qmap <- .normalize_questionmap_for_category(
+      structure$questionmap, cat_brands, data
+    )
+    cat_structure        <- structure
+    cat_structure$questionmap <- cat_qmap
+
+    role_map <- load_role_map(cat_structure,
                               brand_list = cat_brands,
                               cep_list   = cat_ceps,
                               asset_list = structure$dba_assets)
@@ -561,6 +776,129 @@ if (!exists(".find_brand_col", mode = "function")) {
       sig_tester = NULL
     )
   })
+}
+
+
+#' Normalise a QuestionMap for a single-category funnel run
+#'
+#' Multi-category studies store funnel roles with a category suffix
+#' (e.g. \code{funnel.awareness.DSS}) so each category can point at its own
+#' data columns. The funnel element, however, expects bare role names
+#' (\code{funnel.awareness}). This helper:
+#' \enumerate{
+#'   \item Detects whether the map uses suffixed funnel roles (three-level
+#'     names like \code{funnel.awareness.DSS}).
+#'   \item If not, returns the QuestionMap unchanged (single-category study).
+#'   \item If yes, identifies the suffix for the current category by testing
+#'     which \code{funnel.awareness.*} row resolves columns that exist in data
+#'     for the brands supplied.
+#'   \item Filters to only that category's funnel rows plus all shared rows
+#'     (screener.*, system.*, wom.*, dba.*, reach.*, cross_cat.*, cat_buying.*,
+#'     channel.*).
+#'   \item Strips the suffix from funnel row role names so they match the bare
+#'     names the funnel element requires.
+#' }
+#'
+#' @param qmap Data frame. The raw QuestionMap sheet.
+#' @param cat_brands Data frame. Brands for this category; must have BrandCode.
+#' @param data Data frame. Survey data used for column resolution check.
+#' @return Data frame. Normalised QuestionMap for this category.
+#' @keywords internal
+.normalize_questionmap_for_category <- function(qmap, cat_brands, data) {
+  if (is.null(qmap) || nrow(qmap) == 0) return(qmap)
+
+  roles <- trimws(as.character(qmap$Role))
+
+  # Detect multi-category: funnel role with three dot-separated segments
+  # e.g. "funnel.awareness.DSS"
+  is_multi <- any(grepl("^funnel\\.[^.]+\\.[^.]+$", roles))
+  if (!is_multi) return(qmap)  # Single-category map — use as-is
+
+  cat_suffix <- .detect_category_code(qmap, cat_brands, data)
+
+  if (is.null(cat_suffix)) {
+    # Cannot determine category suffix — return unchanged; funnel will refuse
+    # with a clear "role missing" message if required roles are absent.
+    return(qmap)
+  }
+
+  .strip_cat_suffix_from_qmap(qmap, roles, cat_suffix)
+}
+
+
+#' Strip a category suffix from a QuestionMap and filter to that category
+#'
+#' Shared implementation for .normalize_questionmap_for_category() and callers
+#' that already know cat_suffix.
+#' @keywords internal
+.strip_cat_suffix_from_qmap <- function(qmap, roles, cat_suffix) {
+  # Keep rows that either belong to this category's funnel group or are shared
+  suffix_rx <- paste0("\\.", cat_suffix, "$")
+  is_cat_funnel <- grepl(suffix_rx, roles)
+  # Shared: not a category-scoped funnel/attr/cep/channel/cat_buying row
+  is_cat_scoped <- grepl("^(funnel|cross_cat)\\..*\\.[A-Z]{2,}$", roles)
+  is_shared     <- !is_cat_scoped
+
+  keep   <- is_cat_funnel | is_shared
+  result <- qmap[keep, , drop = FALSE]
+
+  # Strip suffix from the funnel rows
+  result$Role[is_cat_funnel[keep]] <- sub(suffix_rx, "",
+                                          result$Role[is_cat_funnel[keep]])
+  result
+}
+
+
+#' Detect the short category code for a given brand list
+#'
+#' Inspects the QuestionMap's \code{funnel.awareness.*} rows and finds which
+#' suffix (e.g. "DSS") has the majority of its expected awareness columns
+#' (\code{{ClientCode}_{brand}}) present in the data. Returns NULL when no
+#' matching suffix is found (single-category studies, awareness-only cats).
+#'
+#' @param qmap Data frame. Raw QuestionMap from Survey_Structure.
+#' @param cat_brands Data frame. Brands for this category (BrandCode column).
+#' @param data Data frame. Survey data.
+#' @return Character scalar category code, or NULL.
+#' @keywords internal
+.detect_category_code <- function(qmap, cat_brands, data) {
+  if (is.null(qmap) || nrow(qmap) == 0) return(NULL)
+  if (is.null(cat_brands) || nrow(cat_brands) == 0) return(NULL)
+
+  roles     <- trimws(as.character(qmap$Role))
+  aw_idx    <- which(grepl("^funnel\\.awareness\\.[^.]+$", roles))
+  if (length(aw_idx) == 0) return(NULL)
+
+  threshold <- max(1L, floor(nrow(cat_brands) * 0.5))
+  for (i in aw_idx) {
+    cc <- trimws(as.character(qmap$ClientCode[i]))
+    if (is.na(cc) || cc == "") next
+    expected_cols <- paste0(cc, "_", cat_brands$BrandCode)
+    n_found <- sum(expected_cols %in% names(data))
+    if (n_found >= threshold) {
+      parts <- strsplit(roles[i], "\\.")[[1]]
+      return(parts[length(parts)])
+    }
+  }
+  NULL
+}
+
+
+#' Extract WOM question code prefix from a questions data frame
+#'
+#' Matches a WOM question by regex pattern and returns the QuestionCode (used
+#' as the column prefix e.g. "WOM_POS_REC"). Falls back to \code{default}
+#' if no match is found.
+#'
+#' @param wom_qs Data frame. Rows where Battery == "wom".
+#' @param pattern Character. Regex to match the QuestionCode.
+#' @param default Character. Fallback prefix.
+#' @return Character scalar.
+#' @keywords internal
+.wom_prefix <- function(wom_qs, pattern, default) {
+  rows <- wom_qs[grepl(pattern, wom_qs$QuestionCode, ignore.case = TRUE), ,
+                 drop = FALSE]
+  if (nrow(rows) > 0) rows$QuestionCode[1] else default
 }
 
 
@@ -591,6 +929,22 @@ if (!exists(".find_brand_col", mode = "function")) {
     `funnel.tenure_threshold`  = tenure,
     `funnel.significance_level` = alpha
   )
+}
+
+
+# ==============================================================================
+# PORTFOLIO DATA (cross-category, full respondent base)
+# ==============================================================================
+
+#' Compute cross-category portfolio data (thin wrapper)
+#'
+#' Delegates to \code{run_portfolio()} for the full portfolio analysis.
+#' Preserves the \code{results$portfolio} output key for backwards
+#' compatibility with downstream code.
+#'
+#' @keywords internal
+.compute_portfolio_data <- function(data, categories, structure, config, weights) {
+  run_portfolio(data, categories, structure, config, weights)
 }
 
 

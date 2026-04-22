@@ -41,8 +41,8 @@ source(file.path(TURAS_ROOT, "modules", "brand", "R", "99_output.R"))
     ),
     results = list(
       categories = list(
-        "Frozen Veg" = list(
-          category = "Frozen Veg",
+        "Dry Seasonings & Spices" = list(
+          category = "Dry Seasonings & Spices",
           mental_availability = list(
             status = "PASS",
             mms = data.frame(BrandCode = c("IPK", "MC"),

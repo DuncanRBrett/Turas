@@ -153,9 +153,9 @@ test_that("Attitude_Decomposition sheet covers all 5 positions per brand", {
                     "No.Opinion", "Aware_Base_Unweighted")
                   %in% names(att)))
   expect_equal(nrow(att), 3)  # 3 brands
-  # IPK Love = 3/9 ≈ 33.33%
+  # IPK Love = 3/10 = 30% (total base: all 10 respondents answer attitude)
   ipk_row <- att[att$BrandCode == "IPK", ]
-  expect_equal(ipk_row$Love, 33.33, tolerance = 0.01)
+  expect_equal(ipk_row$Love, 30, tolerance = 0.01)
 })
 
 

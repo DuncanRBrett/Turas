@@ -270,6 +270,25 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
     mean(stages$pct_weighted[stages$stage_key == k], na.rm = TRUE)
   }, numeric(1)))
 
+  # Nested version of category average (each stage as % of previous)
+  stage_all_pct_nes <- stage_all_pct
+  for (.j in seq(2, length(stage_all_pct))) {
+    .prev <- stage_all_pct[.j - 1L]
+    stage_all_pct_nes[.j] <- if (!is.na(.prev) && .prev > 0)
+                               stage_all_pct[.j] / .prev else NA_real_
+  }
+  # Aware-indexed version of category average (each stage / average awareness)
+  stage_all_pct_aw <- stage_all_pct
+  .avg_aware <- if (length(stage_all_pct) > 0 && !is.na(stage_all_pct[1]) &&
+                    stage_all_pct[1] > 0) stage_all_pct[1] else NA_real_
+  if (!is.na(.avg_aware)) {
+    stage_all_pct_aw[1] <- 1.0
+    for (.j in seq(2, length(stage_all_pct))) {
+      stage_all_pct_aw[.j] <- if (!is.na(stage_all_pct[.j]))
+                                stage_all_pct[.j] / .avg_aware else NA_real_
+    }
+  }
+
   # Envelope = min/max across all brands per stage. Used to render the
   # light-grey shaded band behind the focal line (spec outline).
   env_min <- unname(vapply(stage_keys, function(k) {
@@ -287,7 +306,9 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
     focal_series = focal_series,
     competitor_series = competitor_series,
     category_avg_series = list(stage_keys = stage_keys,
-                               pct_values = stage_all_pct),
+                               pct_values = stage_all_pct,
+                               pct_values_nes = stage_all_pct_nes,
+                               pct_values_aw = stage_all_pct_aw),
     envelope = list(stage_keys = stage_keys,
                     min_values = env_min,
                     max_values = env_max),
@@ -308,8 +329,24 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
                   drop = FALSE]
     if (nrow(row) == 0) NA_real_ else row$base_weighted
   }, numeric(1)))
+  # Nested: each stage as proportion of the previous absolute stage
+  nes <- vals
+  for (j in seq(2, length(vals))) {
+    prev <- vals[j - 1L]
+    nes[j] <- if (!is.na(prev) && prev > 0) vals[j] / prev else NA_real_
+  }
+  # Aware-indexed: each stage as proportion of awareness (stage 0).
+  # Awareness is pinned to 1.0 so all brands start at the same point on the chart.
+  aw <- vals
+  aware_val <- if (length(vals) > 0 && !is.na(vals[1]) && vals[1] > 0) vals[1] else NA_real_
+  if (!is.na(aware_val)) {
+    aw[1] <- 1.0
+    for (j in seq(2, length(vals))) {
+      aw[j] <- if (!is.na(vals[j])) vals[j] / aware_val else NA_real_
+    }
+  }
   list(brand_code = brand_code, stage_keys = stage_keys,
-       pct_values = vals, base_values = base)
+       pct_values = vals, pct_values_nes = nes, pct_values_aw = aw, base_values = base)
 }
 
 

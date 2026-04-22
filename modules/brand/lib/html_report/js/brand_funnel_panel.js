@@ -205,6 +205,23 @@
       });
     });
 
+    // Add Insight toggle — shows/hides inline textarea in the insight strip
+    panel.querySelectorAll('button[data-fn-action="add-insight"]').forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        var strip = btn.closest(".fn-insight-strip");
+        if (!strip) return;
+        var box = strip.querySelector(".fn-insight-box");
+        if (!box) return;
+        var open = box.style.display !== "none";
+        box.style.display = open ? "none" : "block";
+        btn.textContent = open ? "+ Add Insight" : "\u2212 Hide Insight";
+        if (!open) {
+          var ta = box.querySelector(".fn-insight-textarea");
+          if (ta) ta.focus();
+        }
+      });
+    });
+
     // Base (% of total / previous) — tabs segmented-button style
     panel.querySelectorAll('button[data-fn-action="pctmode"]').forEach(function(btn){
       btn.addEventListener("click", function(){
@@ -217,6 +234,7 @@
         });
         applyPctMode(panel);
         buildMiniFunnels(panel);  // mini funnels must reflect the new % base
+        drawSlopeSvg(panel);      // slope chart re-renders with new base
       });
     });
 
@@ -544,7 +562,8 @@
     // "previous" -> % of previous stage (pct_nested)
     // Legacy "absolute"/"nested" accepted for back-compat.
     var mode = panel.__fnState.pctMode;
-    var useAbs = (mode === "total" || mode === "absolute");
+    // "aware" mode: table stays on absolute %; only the slope chart changes.
+    var useAbs = (mode === "total" || mode === "absolute" || mode === "aware");
     var attr = useAbs ? "data-fn-pct-abs" : "data-fn-pct-nes";
     // New table uses ct-td (tabs parity); older .fn-td selector kept for safety.
     panel.querySelectorAll(".ct-td[data-fn-pct-abs], .fn-td[data-fn-pct-abs]")
@@ -554,6 +573,23 @@
         if (primary && !isNaN(v)) primary.textContent = Math.round(v * 100) + "%";
       });
     // Cards always show absolute — don't rewrite; they read direct from payload
+
+    // In % previous mode, flag any cell where nested pct > 100% (funnel inversion —
+    // more buyers at a downstream stage than the upstream one, indicating data issue).
+    panel.querySelectorAll(".ct-td[data-fn-pct-nes]").forEach(function(td) {
+      td.classList.remove("fn-inversion-warning");
+      td.removeAttribute("title");
+    });
+    if (!useAbs) {
+      panel.querySelectorAll(".ct-td[data-fn-pct-nes]").forEach(function(td) {
+        var nes = parseFloat(td.getAttribute("data-fn-pct-nes"));
+        if (!isNaN(nes) && nes > 1.001) {
+          td.classList.add("fn-inversion-warning");
+          td.setAttribute("title", "Funnel inversion: this stage exceeds the previous stage (" +
+            Math.round(nes * 100) + "%). Check data quality.");
+        }
+      });
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -905,20 +941,32 @@
     var callouts     = state.callouts || {};
     var allComp      = sc.competitor_series || [];
 
+    // Pick the right values array based on current base mode:
+    //   "total"    — absolute % of all respondents
+    //   "previous" — each stage as % of the previous stage
+    //   "aware"    — each stage as % of awareness (awareness pinned to 100%)
+    var pctMode = state.pctMode || "total";
+    function pickPcts(series) {
+      if (!series) return null;
+      if (pctMode === "previous") return series.pct_values_nes || series.pct_values;
+      if (pctMode === "aware")    return series.pct_values_aw  || series.pct_values;
+      return series.pct_values;
+    }
+
     // Determine focal pct_values and competitor list for current focal selection
     var focalPcts, compSeries = [];
     if (!currentFocal || currentFocal === origFocal) {
-      focalPcts  = sc.focal_series && sc.focal_series.pct_values;
+      focalPcts  = pickPcts(sc.focal_series);
       compSeries = allComp.slice();
     } else {
       var newEntry = null;
       for (var i = 0; i < allComp.length; i++) {
         if (allComp[i].brand_code === currentFocal) { newEntry = allComp[i]; break; }
       }
-      focalPcts = newEntry ? newEntry.pct_values : (sc.focal_series && sc.focal_series.pct_values);
-      if (sc.focal_series && sc.focal_series.pct_values) {
+      focalPcts = pickPcts(newEntry || sc.focal_series);
+      if (sc.focal_series) {
         compSeries.push({ brand_code: origFocal,
-                          pct_values: sc.focal_series.pct_values,
+                          pct_values: pickPcts(sc.focal_series),
                           stage_keys: sc.focal_series.stage_keys });
       }
       for (var i = 0; i < allComp.length; i++) {
@@ -1021,8 +1069,8 @@
     } else if (shading === "ci") {
       // Collect all brand pct values to compute ±1.96 SE band around category avg
       var allPctsCI = [];
-      if (sc.focal_series && sc.focal_series.pct_values) allPctsCI.push(sc.focal_series.pct_values);
-      allComp.forEach(function(cs) { if (cs.pct_values) allPctsCI.push(cs.pct_values); });
+      if (sc.focal_series) allPctsCI.push(pickPcts(sc.focal_series));
+      allComp.forEach(function(cs) { var p = pickPcts(cs); if (p) allPctsCI.push(p); });
       if (allPctsCI.length >= 2) {
         var ciTopPts = [], ciBotPts = [];
         for (var i = 0; i < n; i++) {
@@ -1044,7 +1092,7 @@
     }
 
     // Category avg dashed line (respects chip state)
-    var avgPcts = sc.category_avg_series && sc.category_avg_series.pct_values;
+    var avgPcts = pickPcts(sc.category_avg_series);
     var showAvg = chartBrands["__avg__"] !== false;
     if (avgPcts && showAvg) {
       var avgCallouts = filterCallouts(callouts, "__avg__");
@@ -1086,7 +1134,7 @@
       var color = resolveBrandColor(pd, state, cs.brand_code);
       var cco = filterCallouts(callouts, cs.brand_code);
       var cName = getBrandName(pd, cs.brand_code);
-      parts.push(svgSeries(cs.pct_values || [], n, xFor, yFor, color, false, false,
+      parts.push(svgSeries(pickPcts(cs) || [], n, xFor, yFor, color, false, false,
                            showValues, cs.brand_code, cco, cName, stageLabels));
       visibleComps.push({ brand_code: cs.brand_code, color: color });
     });
@@ -1101,6 +1149,10 @@
 
     // Legend (two rows: static + visible competitors)
     parts.push(buildSvgLegend(focalColour, ml, h, visibleComps, pd, shading, showAvg));
+
+    // Show/hide "% of aware" annotation note
+    var awareNote = panel.querySelector(".fn-aware-note");
+    if (awareNote) awareNote.style.display = (pctMode === "aware") ? "" : "none";
 
     // Update viewBox to match new height and rebuild SVG content
     svg.setAttribute("viewBox", "0 0 " + w + " " + h);

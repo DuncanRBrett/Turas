@@ -170,8 +170,8 @@ test_that("relationship cards — 5 attitude positions with focal vs avg", {
   love_card <- Filter(function(c) c$attitude_role == "attitude.love",
                       panel$cards$relationship)[[1]]
   expect_equal(love_card$attitude_label, "Love")
-  # IPK love = 3/9 from fixture
-  expect_equal(love_card$focal_pct, 3/9, tolerance = 1e-9)
+  # IPK love = 3/10 from fixture (total base: all 10 respondents answer attitude)
+  expect_equal(love_card$focal_pct, 3/10, tolerance = 1e-9)
   expect_true(is.numeric(love_card$cat_avg_pct))
 })
 
@@ -269,8 +269,8 @@ test_that("consideration_detail has one entry per brand with 5 attitude segments
   expect_setequal(names(ipk_entry$segments),
     c("attitude.love","attitude.prefer","attitude.ambivalent",
       "attitude.reject","attitude.no_opinion"))
-  # IPK love = 3/9 from fixture (R1, R6, R10 are Love among 9 aware respondents)
-  expect_equal(ipk_entry$segments$attitude.love, 3/9, tolerance = 1e-9)
+  # IPK love = 3/10 from fixture (total base: all 10 respondents answer attitude)
+  expect_equal(ipk_entry$segments$attitude.love, 3/10, tolerance = 1e-9)
 })
 
 

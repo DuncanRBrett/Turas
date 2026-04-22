@@ -172,6 +172,43 @@ guard_validate_brand_config <- function(config) {
     )
   }
 
+  # Validate timeframe months
+  t_tgt  <- config$target_timeframe_months %||% 3L
+  t_long <- config$longer_timeframe_months %||% 12L
+  if (is.na(t_tgt) || !is.numeric(t_tgt) || t_tgt < 1L) {
+    brand_refuse(
+      code = "CFG_TIMEFRAME_INVALID",
+      title = "Invalid target_timeframe_months",
+      problem = sprintf("target_timeframe_months must be a positive integer; got: %s",
+                        as.character(t_tgt)),
+      why_it_matters = "Used to annualise Dirichlet KPIs",
+      how_to_fix = "Set target_timeframe_months to a positive integer (e.g. 3)"
+    )
+  }
+  if (is.na(t_long) || !is.numeric(t_long) || t_long < 1L) {
+    brand_refuse(
+      code = "CFG_TIMEFRAME_INVALID",
+      title = "Invalid longer_timeframe_months",
+      problem = sprintf("longer_timeframe_months must be a positive integer; got: %s",
+                        as.character(t_long)),
+      why_it_matters = "Used for funnel labelling",
+      how_to_fix = "Set longer_timeframe_months to a positive integer (e.g. 12)"
+    )
+  }
+  if (t_tgt >= t_long) {
+    brand_refuse(
+      code = "CFG_TIMEFRAME_INVALID",
+      title = "Timeframe Ordering Error",
+      problem = sprintf(
+        "target_timeframe_months (%d) must be less than longer_timeframe_months (%d)",
+        t_tgt, t_long),
+      why_it_matters = "BRANDPEN2/3 target window must be shorter than BRANDPEN1 window",
+      how_to_fix = "Ensure target_timeframe_months < longer_timeframe_months",
+      expected = "target < longer",
+      observed = sprintf("target=%d, longer=%d", t_tgt, t_long)
+    )
+  }
+
   list(status = "PASS")
 }
 
@@ -407,8 +444,8 @@ guard_validate_data <- function(data, structure, config) {
   if (!is.null(structure$questions)) {
     question_codes <- structure$questions$QuestionCode
     for (qcode in question_codes) {
-      # Questions may map to multiple columns (e.g., BRANDAWARE_FV_IPK,
-      # BRANDAWARE_FV_MCCAIN). Check for prefix match.
+      # Questions may map to multiple columns (e.g., BRANDAWARE_DSS_IPK,
+      # BRANDAWARE_DSS_ROB). Check for prefix match.
       matching_cols <- grep(paste0("^", qcode), names(data), value = TRUE)
       if (length(matching_cols) == 0) {
         warnings <- c(warnings, sprintf(
@@ -421,6 +458,131 @@ guard_validate_data <- function(data, structure, config) {
 
   if (length(warnings) > 0) {
     return(list(status = "PARTIAL", warnings = warnings))
+  }
+
+  list(status = "PASS")
+}
+
+
+# ==============================================================================
+# PORTFOLIO GUARD LAYER
+# ==============================================================================
+
+#' Validate portfolio element preconditions
+#'
+#' Checks that the data and config satisfy all requirements for running the
+#' portfolio mapping element. Returns PASS if all checks succeed; returns a
+#' TRS refusal on the first failure.
+#'
+#' Error codes (§9 of PORTFOLIO_SPEC_v1.md):
+#' \itemize{
+#'   \item \code{CFG_PORTFOLIO_AWARENESS_OFF} — element_portfolio=Y but
+#'     cross_category_awareness=N
+#'   \item \code{CFG_PORTFOLIO_NO_CATEGORIES} — no categories with detectable
+#'     cat_code columns
+#'   \item \code{DATA_PORTFOLIO_NO_AWARENESS_COLS} — zero BRANDAWARE_* columns
+#'     found in data despite config saying Y
+#'   \item \code{DATA_PORTFOLIO_TIMEFRAME_MISSING} — portfolio_timeframe requires
+#'     SQ2_* (or SQ1_*) columns that are absent from the data
+#' }
+#'
+#' @param data Data frame. Full survey data.
+#' @param categories Data frame. Categories sheet (from config$categories).
+#' @param structure List. Loaded survey structure.
+#' @param config List. Loaded brand config.
+#'
+#' @return List with status = "PASS" or a TRS refusal.
+#'
+#' @keywords internal
+guard_validate_portfolio <- function(data, categories, structure, config) {
+
+  # cross_category_awareness must be Y when portfolio is enabled
+  if (!isTRUE(config$cross_category_awareness)) {
+    brand_refuse(
+      code          = "CFG_PORTFOLIO_AWARENESS_OFF",
+      title         = "Cross-Category Awareness Disabled",
+      problem       = paste0(
+        "element_portfolio = Y but cross_category_awareness = N. ",
+        "Portfolio analyses require BRANDAWARE_* columns, which are only ",
+        "collected when cross_category_awareness is enabled."
+      ),
+      why_it_matters = paste0(
+        "Without cross-category awareness data, portfolio awareness rates ",
+        "cannot be computed."
+      ),
+      how_to_fix    = c(
+        "Set cross_category_awareness = Y in Brand_Config.xlsx > Settings",
+        "OR set element_portfolio = N to disable the portfolio element"
+      )
+    )
+  }
+
+  # At least one category must exist
+  if (is.null(categories) || nrow(categories) == 0) {
+    brand_refuse(
+      code          = "CFG_PORTFOLIO_NO_CATEGORIES",
+      title         = "No Categories for Portfolio Analysis",
+      problem       = "No categories are defined; portfolio analysis requires at least 2.",
+      why_it_matters = "Portfolio mapping maps across categories and needs 2+ to be meaningful.",
+      how_to_fix    = "Add category definitions to the Categories sheet in Brand_Config.xlsx"
+    )
+  }
+
+  # At least one BRANDAWARE_* column must be present in the data
+  aware_cols <- grep("^BRANDAWARE_", names(data), value = TRUE)
+  if (length(aware_cols) == 0) {
+    brand_refuse(
+      code          = "DATA_PORTFOLIO_NO_AWARENESS_COLS",
+      title         = "No Cross-Category Awareness Columns Found",
+      problem       = paste0(
+        "cross_category_awareness = Y and element_portfolio = Y, but no ",
+        "BRANDAWARE_* columns were found in the survey data."
+      ),
+      why_it_matters = paste0(
+        "Portfolio awareness rates require BRANDAWARE_{cat}_{brand} columns ",
+        "for all categories."
+      ),
+      how_to_fix    = c(
+        "Verify the data file contains BRANDAWARE_{cat}_{brand} columns",
+        "Check the Survey_Structure.xlsx QuestionMap has funnel.awareness.* roles",
+        "Re-export data from Alchemer with the awareness battery included"
+      ),
+      missing = "BRANDAWARE_*"
+    )
+  }
+
+  # Timeframe screener columns must be present for the configured timeframe
+  timeframe <- config$portfolio_timeframe %||% "3m"
+  sq_prefix <- if (identical(timeframe, "3m")) "SQ2_" else "SQ1_"
+  sq_cols   <- grep(paste0("^", sq_prefix), names(data), value = TRUE)
+  if (length(sq_cols) == 0) {
+    sq_alt_prefix <- if (identical(timeframe, "3m")) "SQ1_" else "SQ2_"
+    sq_alt_cols   <- grep(paste0("^", sq_alt_prefix), names(data), value = TRUE)
+    alt_msg <- if (length(sq_alt_cols) > 0) {
+      sprintf(
+        " However, %s* columns ARE present — consider setting portfolio_timeframe = '%s'.",
+        sq_alt_prefix, if (identical(timeframe, "3m")) "13m" else "3m"
+      )
+    } else ""
+
+    brand_refuse(
+      code          = "DATA_PORTFOLIO_TIMEFRAME_MISSING",
+      title         = sprintf("Timeframe Screener Columns Missing (%s*)", sq_prefix),
+      problem       = sprintf(
+        "portfolio_timeframe = '%s' requires %s* screener columns, but none were found in the data.%s",
+        timeframe, sq_prefix, alt_msg
+      ),
+      why_it_matters = paste0(
+        "The portfolio denominator (§3.1 of spec) uses screener columns to ",
+        "identify category buyers. Without them, all awareness rates are undefined."
+      ),
+      how_to_fix    = c(
+        sprintf("Ensure data contains %s{cat_code} columns for each category", sq_prefix),
+        sprintf("OR set portfolio_timeframe = '%s' in Brand_Config.xlsx",
+                if (identical(timeframe, "3m")) "13m" else "3m")
+      ),
+      missing = paste0(sq_prefix, "*")
+    )
   }
 
   list(status = "PASS")

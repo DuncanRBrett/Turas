@@ -267,19 +267,35 @@ build_ma_matrix_section <- function(pd, stim = c("attributes", "ceps"),
   if (is.null(avg_pct) || is.na(avg_pct)) {
     return('<td class="ct-td ct-data-col ma-td-catavg ct-na" data-ma-brand="__avg__">&mdash;</td>')
   }
-  ci_text <- if (!is.na(ci_lower) && !is.na(ci_upper))
-    sprintf("%.0f\u2013%.0f", ci_lower, ci_upper) else ""
-  n_txt <- if (is.null(base_n) || length(base_n) == 0 || is.na(base_n)) ""
-           else sprintf("n=%d", as.integer(base_n))
+  # Funnel-style CI mini-bar (matches .ma-ci-bar-wrap used on Metrics tab and
+  # the Category Buying DoP category-average row). Values are % on a 0-100 scale.
+  has_ci <- !is.na(ci_lower) && !is.na(ci_upper)
+  ci_text <- if (has_ci) sprintf("%.0f\u2013%.0f", ci_lower, ci_upper) else ""
+  ci_bar <- ""
+  if (has_ci) {
+    safe_max  <- 100
+    lo        <- max(0, min(safe_max, ci_lower))
+    hi        <- max(lo, min(safe_max, ci_upper))
+    fill_left <- max(0, min(94, 100 * lo / safe_max))
+    fill_w    <- max(4, min(100 - fill_left, 100 * (hi - lo) / safe_max))
+    mean_pct  <- max(1, min(99, 100 * avg_pct / safe_max))
+    lo_disp   <- sprintf("%.0f%%", lo)
+    hi_disp   <- sprintf("%.0f%%", hi)
+    ci_bar <- paste0(
+      sprintf('<div class="ma-ci-bar-wrap" title="95%% CI: %s \u2013 %s">', lo_disp, hi_disp),
+      sprintf('<div class="ma-ci-bar-range" style="left:%.1f%%;width:%.1f%%;"></div>', fill_left, fill_w),
+      sprintf('<div class="ma-ci-bar-tick" style="left:%.1f%%"></div>', mean_pct),
+      '</div>',
+      sprintf('<div class="ma-ci-limits"><span>%s</span><span>%s</span></div>', lo_disp, hi_disp))
+  }
   sprintf(
-    '<td class="ct-td ct-data-col ma-td-catavg" data-ma-brand="__avg__" data-ma-ci-lower="%s" data-ma-ci-upper="%s" data-sort-val="%.6f" title="95%% CI: %s">
-       <span class="ct-val">%.0f%%</span>
-       <span class="ct-freq ma-ci-hint">CI %s</span>
+    '<td class="ct-td ct-data-col ma-td-catavg ma-td-catavg-ci" data-ma-brand="__avg__" data-ma-ci-lower="%s" data-ma-ci-upper="%s" data-sort-val="%.6f" title="95%% CI: %s">
+       <span class="ct-val">%.0f%%</span>%s
      </td>',
     if (is.na(ci_lower)) "" else sprintf("%.3f", ci_lower),
     if (is.na(ci_upper)) "" else sprintf("%.3f", ci_upper),
     avg_pct, ci_text,
-    avg_pct, ci_text)
+    avg_pct, ci_bar)
 }
 
 

@@ -156,7 +156,8 @@ build_scatter <- function(df, x_col, y_col, label_col,
                           x_suffix = "", y_suffix = "",
                           quadrant_labels = NULL,
                           ref_x = NULL, ref_y = NULL,
-                          size_col = NULL) {
+                          size_col = NULL,
+                          diag_ref_line = FALSE) {
 
   if (is.null(df) || nrow(df) == 0) return("")
 
@@ -240,6 +241,18 @@ build_scatter <- function(df, x_col, y_col, label_col,
   parts <- c(parts, sprintf(
     '<rect x="%d" y="%d" width="%d" height="%d" fill="none" stroke="#e2e8f0" stroke-width="1"/>', ml, mt, pw, ph))
 
+  # Diagonal reference line y = x (strength map only)
+  if (isTRUE(diag_ref_line)) {
+    d_lo <- max(x_min, y_min)
+    d_hi <- min(x_max, y_max)
+    if (d_hi > d_lo) {
+      parts <- c(parts, sprintf(
+        '<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="6,4"/>',
+        sx(d_lo), sy(d_lo), sx(d_hi), sy(d_hi)
+      ))
+    }
+  }
+
   # Dots
   for (i in seq_len(nrow(df))) {
     xv <- x_vals[i]; yv <- y_vals[i]
@@ -262,6 +275,53 @@ build_scatter <- function(df, x_col, y_col, label_col,
   }
 
   br_svg_wrap(paste(parts, collapse = "\n"), w, h, title)
+}
+
+
+# ==============================================================================
+# 2b. BUBBLE SCATTER (portfolio strength map — §4.4)
+# ==============================================================================
+
+#' Build portfolio strength bubble scatter
+#'
+#' Thin wrapper over \code{build_scatter()} that enables variable-radius dots
+#' and adds a diagonal y = x reference line. Used for the §4.4 strength map
+#' where x = category penetration and y = brand awareness among buyers.
+#'
+#' @param df Data frame. Must contain x_col, y_col, label_col, size_col.
+#' @param x_col Character. Column name for x-axis values.
+#' @param y_col Character. Column name for y-axis values.
+#' @param label_col Character. Column name for dot labels.
+#' @param size_col Character or NULL. Column for variable radius.
+#' @param brand_colour Character. Hex colour for dots.
+#' @param title Character. Chart title.
+#' @param x_label Character. X-axis label.
+#' @param y_label Character. Y-axis label.
+#'
+#' @return Character. Inline SVG string.
+#' @keywords internal
+build_bubble_scatter <- function(df, x_col, y_col, label_col,
+                                 size_col = NULL,
+                                 brand_colour = "#1A5276",
+                                 title = "",
+                                 x_label = "Category Penetration (%)",
+                                 y_label = "Brand Awareness among Buyers (%)") {
+  build_scatter(
+    df           = df,
+    x_col        = x_col,
+    y_col        = y_col,
+    label_col    = label_col,
+    focal_label  = NULL,
+    brand_colour = brand_colour,
+    comp_colour  = brand_colour,
+    title        = title,
+    x_label      = x_label,
+    y_label      = y_label,
+    x_suffix     = "%",
+    y_suffix     = "%",
+    size_col     = size_col,
+    diag_ref_line = TRUE
+  )
 }
 
 
@@ -316,15 +376,22 @@ build_heat_strip <- function(matrix_df, focal_brand = NULL,
     for (j in seq_along(brand_cols)) {
       x <- ml + (j - 1) * cell_w
       val <- matrix_df[[brand_cols[j]]][i]
-      if (is.na(val)) val <- 0
-      intensity <- min(1, val / max_val)
-      bg <- sprintf("rgba(26,82,118,%.2f)", 0.08 + intensity * 0.45)
-      txt_col <- if (intensity > 0.6) "#fff" else "#334155"
+      is_absent <- is.na(val)
+      if (is_absent) {
+        bg      <- "#f1f5f9"
+        txt_col <- "#94a3b8"
+        cell_label <- "\u2014"
+      } else {
+        intensity  <- min(1, val / max_val)
+        bg         <- sprintf("rgba(26,82,118,%.2f)", 0.08 + intensity * 0.45)
+        txt_col    <- if (intensity > 0.6) "#fff" else "#334155"
+        cell_label <- .br_fmt(val, 1)
+      }
 
       parts <- c(parts,
         sprintf('<rect x="%g" y="%g" width="%d" height="%d" fill="%s" stroke="#fff" stroke-width="1"/>', x, y, cell_w, cell_h, bg),
         sprintf('<text x="%g" y="%g" text-anchor="middle" fill="%s" font-size="10" dominant-baseline="middle">%s</text>',
-                x + cell_w / 2, y + cell_h / 2, txt_col, .br_fmt(val, 1)))
+                x + cell_w / 2, y + cell_h / 2, txt_col, cell_label))
     }
   }
 
@@ -675,6 +742,230 @@ build_dumbbell <- function(df, focal_brand = NULL,
 
 # ==============================================================================
 # CONVENIENCE: null coalescing
+# ==============================================================================
+# 9. STACKED LOYALTY PROFILE (per-brand sole / dual / multi)
+# ==============================================================================
+
+#' Build a stacked horizontal bar showing buyer loyalty profile per brand
+#'
+#' Each bar represents one brand. Segments show the % of that brand's buyers
+#' who are sole-loyal (Sole), dual-brand shoppers (Dual), or multi-brand
+#' shoppers (Multi). A dot at the right shows mean repertoire size.
+#'
+#' @param brand_repertoire_profile Data frame with BrandCode, Sole_Pct,
+#'   Dual_Pct, Multi_Pct, Mean_Repertoire, Brand_Buyers_n.
+#' @param focal_brand Character. Focal brand code (row highlighted).
+#' @param focal_colour Hex colour for sole-loyal segment.
+#' @param title Character.
+#'
+#' @return SVG string.
+#' @keywords internal
+build_loyalty_profile_chart <- function(brand_repertoire_profile,
+                                         focal_brand    = NULL,
+                                         focal_colour   = "#1A5276",
+                                         title          = "Buyer Loyalty Profile") {
+
+  df <- brand_repertoire_profile
+  if (is.null(df) || nrow(df) == 0) return("")
+
+  # Colours: Sole = focal (most committed), Dual = medium, Multi = muted
+  col_sole  <- focal_colour
+  col_dual  <- "#60a5fa"   # sky-blue
+  col_multi <- "#cbd5e1"   # slate-200
+
+  n     <- nrow(df)
+  row_h <- 28; gap <- 6
+  ml    <- 80; mr <- 90; mt <- 50; mb <- 30
+  cw    <- 720 - ml - mr
+  total_h <- mt + n * (row_h + gap) + mb
+
+  parts <- character(0)
+
+  # Title
+  parts <- c(parts, sprintf(
+    '<text x="%d" y="22" fill="#1e293b" font-size="14" font-weight="700">%s</text>',
+    ml, .br_escape(title)))
+
+  # Legend (top-right)
+  leg_x <- ml + cw - 10
+  parts <- c(parts,
+    sprintf('<rect x="%g" y="32" width="10" height="10" rx="2" fill="%s"/>',
+            leg_x - 200, col_sole),
+    sprintf('<text x="%g" y="41" fill="#64748b" font-size="10">Sole</text>',
+            leg_x - 187),
+    sprintf('<rect x="%g" y="32" width="10" height="10" rx="2" fill="%s"/>',
+            leg_x - 150, col_dual),
+    sprintf('<text x="%g" y="41" fill="#64748b" font-size="10">Dual</text>',
+            leg_x - 137),
+    sprintf('<rect x="%g" y="32" width="10" height="10" rx="2" fill="%s"/>',
+            leg_x - 100, col_multi),
+    sprintf('<text x="%g" y="41" fill="#64748b" font-size="10">Multi (3+)</text>',
+            leg_x - 87),
+    sprintf('<text x="%g" y="41" fill="#94a3b8" font-size="10">\u2022 Mean brands</text>',
+            leg_x - 28))
+
+  for (i in seq_len(n)) {
+    bc        <- df$BrandCode[i]
+    sole_pct  <- df$Sole_Pct[i]  %||% 0
+    dual_pct  <- df$Dual_Pct[i]  %||% 0
+    multi_pct <- df$Multi_Pct[i] %||% 0
+    mean_rep  <- df$Mean_Repertoire[i] %||% NA_real_
+    n_bb      <- df$Brand_Buyers_n[i]  %||% 0
+
+    y         <- mt + (i - 1) * (row_h + gap)
+    is_focal  <- !is.null(focal_brand) && bc == focal_brand
+    lbl_fw    <- if (is_focal) "700" else "400"
+    lbl_col   <- if (is_focal) "#1e293b" else "#64748b"
+
+    # Label
+    parts <- c(parts, sprintf(
+      '<text x="%g" y="%g" text-anchor="end" fill="%s" font-size="12" font-weight="%s" dominant-baseline="middle">%s</text>',
+      ml - 6, y + row_h / 2, lbl_col, lbl_fw, .br_escape(bc)))
+
+    # Stacked bar segments
+    x_cursor <- ml
+    segs <- list(
+      list(pct = sole_pct,  col = col_sole),
+      list(pct = dual_pct,  col = col_dual),
+      list(pct = multi_pct, col = col_multi)
+    )
+    for (seg in segs) {
+      w <- max(0, (seg$pct / 100) * cw)
+      if (w > 0) {
+        parts <- c(parts, sprintf(
+          '<rect x="%g" y="%g" width="%g" height="%d" fill="%s" opacity="0.85"/>',
+          x_cursor, y, w, row_h, seg$col))
+      }
+      x_cursor <- x_cursor + w
+    }
+
+    # Background track (unaccounted % due to rounding)
+    if (x_cursor < ml + cw) {
+      parts <- c(parts, sprintf(
+        '<rect x="%g" y="%g" width="%g" height="%d" fill="#f1f5f9"/>',
+        x_cursor, y, (ml + cw) - x_cursor, row_h))
+    }
+
+    # Mean repertoire dot + label
+    if (!is.na(mean_rep) && mean_rep > 0) {
+      max_rep <- max(df$Mean_Repertoire, na.rm = TRUE)
+      max_rep <- max(max_rep, 1)
+      dot_x   <- ml + cw + 8 + ((mean_rep - 1) / max(max_rep - 1, 0.1)) * 50
+      parts <- c(parts,
+        sprintf('<circle cx="%g" cy="%g" r="5" fill="%s" opacity="0.8"/>',
+                dot_x, y + row_h / 2, lbl_col),
+        sprintf('<text x="%g" y="%g" fill="%s" font-size="10" dominant-baseline="middle">%.1f</text>',
+                dot_x + 8, y + row_h / 2, lbl_col, mean_rep))
+    }
+  }
+
+  # Axis: 0 / 50% / 100% marks
+  for (tick in c(0, 50, 100)) {
+    tx <- ml + (tick / 100) * cw
+    parts <- c(parts,
+      sprintf('<line x1="%g" y1="%d" x2="%g" y2="%g" stroke="#e2e8f0" stroke-width="1"/>',
+              tx, mt, tx, mt + n * (row_h + gap)),
+      sprintf('<text x="%g" y="%d" text-anchor="middle" fill="#94a3b8" font-size="10">%d%%</text>',
+              tx, mt - 5, tick))
+  }
+
+  br_svg_wrap(paste(parts, collapse = "\n"), 720, total_h, title)
+}
+
+
+# ==============================================================================
+# 10. NETWORK / CONSTELLATION CHART (§4.2)
+# ==============================================================================
+
+#' Build competitive constellation network SVG
+#'
+#' Renders pre-computed node positions and edges as an inline SVG. Nodes are
+#' circles sized by total aware respondents. Focal brand is highlighted.
+#' Edges are drawn as lines with opacity proportional to Jaccard similarity.
+#'
+#' @param nodes Data frame: brand, n_aware_w, is_focal.
+#' @param edges Data frame: b1, b2, jaccard, cooccur_n.
+#' @param layout Data frame: brand, x, y (pre-computed positions).
+#' @param focal_colour Character. Hex colour for focal brand node.
+#' @param comp_colour Character. Hex colour for competitor nodes.
+#' @param title Character. Chart title.
+#'
+#' @return Character. Inline SVG string.
+#' @keywords internal
+build_network <- function(nodes, edges, layout,
+                          focal_colour = "#1A5276",
+                          comp_colour  = "#94a3b8",
+                          title        = "Competitive Constellation") {
+  if (is.null(nodes) || nrow(nodes) == 0 || is.null(layout)) return("")
+
+  w <- 720L; h <- 520L
+  pad <- 60L
+  pw  <- w - 2L * pad
+  ph  <- h - pad - 40L  # leave room for title
+
+  # Merge layout into nodes
+  nodes <- merge(nodes, layout, by = "brand", all.x = TRUE)
+  nodes <- nodes[!is.na(nodes$x), , drop = FALSE]
+  if (nrow(nodes) == 0) return("")
+
+  # Map layout coordinates to SVG
+  x_range <- range(nodes$x, na.rm = TRUE)
+  y_range <- range(nodes$y, na.rm = TRUE)
+  sx <- function(v) pad + (v - x_range[1]) / max(diff(x_range), 1e-6) * pw
+  sy <- function(v) 40L + ph - (v - y_range[1]) / max(diff(y_range), 1e-6) * ph
+
+  nodes$svgx <- sx(nodes$x)
+  nodes$svgy <- sy(nodes$y)
+
+  # Node radius: 8–22 px, scaled by n_aware_w
+  max_aw <- max(nodes$n_aware_w, 1)
+  nodes$r <- 8 + (nodes$n_aware_w / max_aw) * 14
+
+  parts <- character(0)
+
+  # Title
+  parts <- c(parts, sprintf(
+    '<text x="%d" y="22" fill="#1e293b" font-size="14" font-weight="700">%s</text>',
+    pad, .br_escape(title)))
+
+  # Edges (draw before nodes so nodes sit on top)
+  if (!is.null(edges) && nrow(edges) > 0) {
+    max_jac <- max(edges$jaccard, 1e-6)
+    for (k in seq_len(nrow(edges))) {
+      b1 <- edges$b1[k]; b2 <- edges$b2[k]
+      n1 <- nodes[nodes$brand == b1, , drop = FALSE]
+      n2 <- nodes[nodes$brand == b2, , drop = FALSE]
+      if (nrow(n1) == 0 || nrow(n2) == 0) next
+      jac     <- edges$jaccard[k]
+      opacity <- 0.15 + (jac / max_jac) * 0.55
+      lw      <- 1 + (jac / max_jac) * 3
+      parts <- c(parts, sprintf(
+        '<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="#94a3b8" stroke-width="%.1f" opacity="%.2f"/>',
+        n1$svgx, n1$svgy, n2$svgx, n2$svgy, lw, opacity
+      ))
+    }
+  }
+
+  # Nodes + labels
+  for (i in seq_len(nrow(nodes))) {
+    nd <- nodes[i, ]
+    col <- if (isTRUE(nd$is_focal)) focal_colour else comp_colour
+    parts <- c(parts,
+      sprintf('<circle cx="%g" cy="%g" r="%g" fill="%s" opacity="0.85" stroke="#fff" stroke-width="2" data-brand="%s" style="cursor:pointer;" onclick="pfConstellationNodeClick(event,\'%s\')"/>',
+              nd$svgx, nd$svgy, nd$r, col,
+              .br_escape(nd$brand), .br_escape(nd$brand)),
+      sprintf('<text x="%g" y="%g" fill="%s" font-size="10" font-weight="%s">%s</text>',
+              nd$svgx + nd$r + 3, nd$svgy - nd$r - 2,
+              if (isTRUE(nd$is_focal)) "#1e293b" else "#64748b",
+              if (isTRUE(nd$is_focal)) "700" else "400",
+              .br_escape(.br_trunc(nd$brand, 16)))
+    )
+  }
+
+  br_svg_wrap(paste(parts, collapse = "\n"), w, h, title)
+}
+
+
 # ==============================================================================
 
 if (!exists("%||%")) {

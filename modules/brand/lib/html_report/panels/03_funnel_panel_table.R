@@ -45,7 +45,8 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
     '<table class="ct-table fn-ct-table fn-table" data-fn-table="1">',
     .fn_table_header(stage_labels, stage_keys),
     '<tbody>',
-    .fn_row_base(stage_keys, table$cells, brand_codes),
+    .fn_row_base(stage_keys, table$cells, brand_codes,
+                 n_total = pd$meta$n_unweighted),
     .fn_row_focal(stage_keys, focal, brand_names[match(focal, brand_codes)],
                   table$cells, focal_colour, col_max),
     .fn_row_avg_all(stage_keys, table$avg_all_brands, col_max),
@@ -95,19 +96,24 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
 # INTERNAL: ROWS
 # ==============================================================================
 
-.fn_row_base <- function(stage_keys, cells, brand_codes) {
-  # Show the largest base across the visible brands (all brands are shown
-  # by default; per-brand small-base warnings appear on the cells below).
-  base_by_stage <- vapply(stage_keys, function(k) {
-    bs <- vapply(cells, function(c) {
-      if (!identical(c$stage_key, k) || !(c$brand_code %in% brand_codes)) {
-        return(NA_real_)
-      }
-      as.numeric(c$base_unweighted %||% NA_real_)
+.fn_row_base <- function(stage_keys, cells, brand_codes, n_total = NULL) {
+  # Show the total respondent base for all stages (n_total = all focal
+  # respondents). This is the correct denominator for "% of total" display.
+  # Fall back to max per-brand base only when n_total is not available.
+  base_by_stage <- if (!is.null(n_total) && is.finite(n_total) && n_total > 0) {
+    stats::setNames(rep(as.numeric(n_total), length(stage_keys)), stage_keys)
+  } else {
+    vapply(stage_keys, function(k) {
+      bs <- vapply(cells, function(c) {
+        if (!identical(c$stage_key, k) || !(c$brand_code %in% brand_codes)) {
+          return(NA_real_)
+        }
+        as.numeric(c$base_unweighted %||% NA_real_)
+      }, numeric(1))
+      bs <- bs[!is.na(bs)]
+      if (length(bs) == 0) NA_real_ else max(bs, na.rm = TRUE)
     }, numeric(1))
-    bs <- bs[!is.na(bs)]
-    if (length(bs) == 0) NA_real_ else max(bs, na.rm = TRUE)
-  }, numeric(1))
+  }
 
   cells_html <- vapply(seq_along(stage_keys), function(i) {
     v <- base_by_stage[i]
@@ -358,10 +364,15 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
 
 
 .fn_add_insight_strip <- function() {
-  '<div class="fn-add-insight-strip">
+  '<div class="fn-insight-strip fn-add-insight-strip">
      <button type="button" class="fn-add-insight-btn" data-fn-action="add-insight">
        + Add Insight
      </button>
+     <div class="fn-insight-box" style="display:none;margin-top:8px;">
+       <textarea class="fn-insight-textarea" rows="3"
+         placeholder="Enter your insight here\u2026"
+         style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-family:inherit;font-size:13px;color:#1e293b;resize:vertical;"></textarea>
+     </div>
    </div>'
 }
 

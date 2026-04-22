@@ -93,7 +93,7 @@ test_that("Brand_Config Categories sheet has example rows", {
 
   # Should have example rows
   expect_true(nrow(categories) >= 3)
-  expect_true("Frozen Vegetables" %in% categories[, 1])
+  expect_true("Dry Seasonings & Spices" %in% categories[, 1])
 })
 
 test_that("Brand_Config refuses when file exists and overwrite = FALSE", {
