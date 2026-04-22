@@ -318,14 +318,27 @@
   // (brand_funnel_panel.js, brand_ma_panel.js) that pre-set data-pin-title /
   // data-pin-footnote on the element before calling TurasPin.pin(el).
   // ---------------------------------------------------------------------------
+  function _firstVisible(nodes) {
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (n.closest && n.closest("[hidden]")) continue;
+      if (n.offsetParent !== null) return n;
+      var r = n.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) return n;
+    }
+    return nodes[0] || null;
+  }
+
   window.TurasPin = {
     pin: function(el) {
       if (typeof TurasPins === "undefined" || !TurasPins.add) return;
       var title    = el.getAttribute("data-pin-title")    || el.id || "Pinned view";
       var footnote = el.getAttribute("data-pin-footnote") || "";
 
-      var svg   = el.querySelector("svg");
-      var table = el.querySelector("table");
+      var svgs   = el.querySelectorAll("svg");
+      var tables = el.querySelectorAll("table");
+      var svg    = _firstVisible(svgs);
+      var table  = _firstVisible(tables);
 
       var chartSvg = "";
       if (svg) {
@@ -346,6 +359,16 @@
         tableHtml = (TurasPins.capturePortableHtml)
           ? TurasPins.capturePortableHtml(table)
           : table.outerHTML;
+      }
+
+      // HTML fallback: panels built from divs (e.g. mini-funnels — no SVG,
+      // no table) pin as an inline HTML block so the user still sees them.
+      if (!chartSvg && !tableHtml) {
+        var captured = (TurasPins.capturePortableHtml)
+          ? TurasPins.capturePortableHtml(el)
+          : el.outerHTML;
+        // Render HTML block as the "table" slot so the pinned card shows it.
+        tableHtml = captured;
       }
 
       TurasPins.add({

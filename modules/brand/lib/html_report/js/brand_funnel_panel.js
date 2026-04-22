@@ -1492,10 +1492,13 @@
           { label: "Insights",           sel: ".fn-insight-strip" }
         ];
       } else {
+        // NOTE: ".fn-chart-view[data-fn-view='slope']" targets the div (not
+        // the Slope/Bar toggle BUTTON which also carries data-fn-view='slope')
+        // so we capture the currently-visible chart (whichever view is on).
         items = [
           { label: "Table",        sel: ".fn-table-wrap" },
-          { label: "Slope chart",  sel: "[data-fn-view='slope']" },
-          { label: "Mini funnels", sel: "[data-fn-view='minifunnels']" },
+          { label: "Chart",        sel: ".fn-chart-view[data-fn-view='slope']" },
+          { label: "Mini funnels", sel: ".fn-mini-funnels-view[data-fn-view='minifunnels']" },
           { label: "Insights",     sel: ".fn-insight-strip" }
         ];
       }
