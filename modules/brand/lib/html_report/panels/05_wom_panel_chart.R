@@ -172,11 +172,13 @@ build_wom_said_chart <- function(panel_data, focal_colour = "#1A5276") {
               xl, grid_top - 26, neg_colour, avg_neg))
   }
 
-  # Bars
+  # Bars — one <g class="wom-bar-row" data-wom-brand> per brand so JS can
+  # hide / reorder rows in sync with the table.
+  step <- bar_h + gap
   for (i in seq_along(order_idx)) {
     b <- brands[[order_idx[i]]]
     is_f <- isTRUE(b$is_focal)
-    y <- mt + (i - 1) * (bar_h + gap)
+    y <- mt + (i - 1) * step
 
     pos_v <- suppressWarnings(as.numeric(b$values[[pos_key]]))
     neg_v <- suppressWarnings(as.numeric(b$values[[neg_key]]))
@@ -196,56 +198,58 @@ build_wom_said_chart <- function(panel_data, focal_colour = "#1A5276") {
     pos_opacity <- if (is_f) "1" else "0.85"
     neg_opacity <- if (is_f) "1" else "0.85"
 
+    bar_parts <- character(0)
+
     # Focal-row band
     if (is_f) {
-      parts <- c(parts, sprintf(
-        '<rect x="%d" y="%g" width="%d" height="%d" fill="%s" opacity="0.07"/>',
+      bar_parts <- c(bar_parts, sprintf(
+        '<rect class="wom-bar-focal-band" x="%d" y="%g" width="%d" height="%d" fill="%s" opacity="0.07"/>',
         ml - 16, y - 3, inner_w + 24, bar_h + 6, focal_colour))
     }
 
     # Label (left gutter)
-    parts <- c(parts, sprintf(
-      '<text x="%d" y="%g" text-anchor="end" fill="%s" font-size="11" font-weight="%s" dominant-baseline="middle">%s%s</text>',
+    bar_parts <- c(bar_parts, sprintf(
+      '<text class="wom-bar-label" x="%d" y="%g" text-anchor="end" fill="%s" font-size="11" font-weight="%s" dominant-baseline="middle">%s%s</text>',
       ml - 10, y + bar_h / 2, lbl_col, lbl_weight,
       .wom_chart_esc(.wom_chart_trunc(label, 20)),
       if (is_f) " \u25C6" else ""))
 
     # Negative bar (grows leftwards from mid_x)
     if (neg_w > 0.4) {
-      parts <- c(parts, sprintf(
+      bar_parts <- c(bar_parts, sprintf(
         '<rect x="%g" y="%g" width="%g" height="%d" rx="2" fill="%s" opacity="%s"/>',
         mid_x - neg_w, y, neg_w, bar_h, neg_fill, neg_opacity))
       if (neg_w >= 22) {
-        parts <- c(parts, sprintf(
+        bar_parts <- c(bar_parts, sprintf(
           '<text x="%g" y="%g" text-anchor="middle" fill="#fff" font-size="10" font-weight="600" dominant-baseline="middle">%.0f%%</text>',
           mid_x - neg_w / 2, y + bar_h / 2, neg_v))
       } else {
-        parts <- c(parts, sprintf(
+        bar_parts <- c(bar_parts, sprintf(
           '<text x="%g" y="%g" text-anchor="end" fill="%s" font-size="10" font-weight="600" dominant-baseline="middle">%.0f%%</text>',
           mid_x - neg_w - 3, y + bar_h / 2, neg_colour, neg_v))
       }
     } else {
-      parts <- c(parts, sprintf(
+      bar_parts <- c(bar_parts, sprintf(
         '<text x="%g" y="%g" text-anchor="end" fill="#94a3b8" font-size="10" dominant-baseline="middle">%.0f%%</text>',
         mid_x - 3, y + bar_h / 2, neg_v))
     }
 
     # Positive bar (grows rightwards from mid_x)
     if (pos_w > 0.4) {
-      parts <- c(parts, sprintf(
+      bar_parts <- c(bar_parts, sprintf(
         '<rect x="%g" y="%g" width="%g" height="%d" rx="2" fill="%s" opacity="%s"/>',
         mid_x, y, pos_w, bar_h, pos_fill, pos_opacity))
       if (pos_w >= 22) {
-        parts <- c(parts, sprintf(
+        bar_parts <- c(bar_parts, sprintf(
           '<text x="%g" y="%g" text-anchor="middle" fill="#fff" font-size="10" font-weight="600" dominant-baseline="middle">%.0f%%</text>',
           mid_x + pos_w / 2, y + bar_h / 2, pos_v))
       } else {
-        parts <- c(parts, sprintf(
+        bar_parts <- c(bar_parts, sprintf(
           '<text x="%g" y="%g" text-anchor="start" fill="%s" font-size="10" font-weight="600" dominant-baseline="middle">%.0f%%</text>',
           mid_x + pos_w + 3, y + bar_h / 2, pos_colour, pos_v))
       }
     } else {
-      parts <- c(parts, sprintf(
+      bar_parts <- c(bar_parts, sprintf(
         '<text x="%g" y="%g" text-anchor="start" fill="#94a3b8" font-size="10" dominant-baseline="middle">%.0f%%</text>',
         mid_x + 3, y + bar_h / 2, pos_v))
     }
@@ -253,7 +257,7 @@ build_wom_said_chart <- function(panel_data, focal_colour = "#1A5276") {
     # Right-gutter annotations
     net_col <- if (net_v >= 0) pos_colour else neg_colour
     right_x <- ml + inner_w + 8
-    parts <- c(parts, sprintf(
+    bar_parts <- c(bar_parts, sprintf(
       '<text x="%g" y="%g" fill="%s" font-size="11" font-weight="700" dominant-baseline="middle">Net %+.0fpp</text>',
       right_x, y + bar_h / 2, net_col, net_v))
 
@@ -263,16 +267,23 @@ build_wom_said_chart <- function(panel_data, focal_colour = "#1A5276") {
       occ_txt <- sprintf("\u00D7%.1f pos | \u00D7%.1f neg",
                          if (is.finite(pos_occ)) pos_occ else 0,
                          if (is.finite(neg_occ)) neg_occ else 0)
-      parts <- c(parts, sprintf(
+      bar_parts <- c(bar_parts, sprintf(
         '<text x="%g" y="%g" fill="#64748b" font-size="10" dominant-baseline="middle">%s</text>',
         right_x + 70, y + bar_h / 2, .wom_chart_esc(occ_txt)))
     }
+
+    bar_row <- sprintf(
+      '<g class="wom-bar-row" data-wom-brand="%s" data-wom-original-idx="%d" data-wom-focal="%s">%s</g>',
+      .wom_chart_esc(b$brand_code), as.integer(i - 1L),
+      if (is_f) "1" else "0",
+      paste(bar_parts, collapse = "\n"))
+    parts <- c(parts, bar_row)
   }
 
   svg_body <- paste(parts, collapse = "\n")
   sprintf(
-    '<svg class="wom-chart-svg" viewBox="0 0 %d %g" width="100%%" preserveAspectRatio="xMinYMin meet" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="%s">%s</svg>',
-    W, total_h, .wom_chart_esc(title), svg_body)
+    '<svg class="wom-chart-svg" viewBox="0 0 %d %g" width="100%%" preserveAspectRatio="xMinYMin meet" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="%s" data-wom-step="%d" data-wom-mt="%d" data-wom-bar-h="%d">%s</svg>',
+    W, total_h, .wom_chart_esc(title), step, mt, bar_h, svg_body)
 }
 
 

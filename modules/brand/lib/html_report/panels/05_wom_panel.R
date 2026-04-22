@@ -182,10 +182,11 @@ build_wom_panel_html <- function(panel_data,
       freq = " wom-th-freq",
       "")
     sprintf(
-      '<th class="ct-th ct-data-col wom-th%s" data-wom-col="%s" data-wom-col-type="%s" title="%s">%s</th>',
+      '<th class="ct-th ct-data-col wom-th wom-sortable%s" data-wom-col="%s" data-wom-col-type="%s" data-wom-action="sort" data-wom-sort-col="%s" data-wom-sort-dir="none" title="%s \u2014 click to sort"><span>%s</span><span class="wom-sort-ind"></span></th>',
       group_cls,
       .wom_esc(col$key),
       .wom_esc(col$value_type),
+      .wom_esc(col$key),
       .wom_esc(col$long_label %||% col$label),
       .wom_esc(col$label))
   }, character(1)), collapse = "")

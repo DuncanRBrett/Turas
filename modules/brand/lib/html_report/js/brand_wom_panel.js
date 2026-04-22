@@ -2,10 +2,15 @@
  * WOM Panel controller
  *
  * Live controls:
- *   - Focal-brand dropdown    (.wom-focus-select)           → repins focal row
- *   - Coloured brand chips    ([data-wom-action="toggle-row"]) → show/hide rows
- *   - Brand column header     ([data-wom-action="sort"])    → A-Z / Z-A sort
+ *   - Focal-brand dropdown    (.wom-focus-select)             → repins focal row
+ *   - Coloured brand chips    ([data-wom-action="toggle-row"])→ show/hide row + chart bar
+ *   - Any column header       ([data-wom-action="sort"])      → asc/desc sort
  *   - Show chart checkbox     ([data-wom-action="showchart"]) → toggles chart
+ *   - Heard/Said variant seg  ([data-wom-action="variant"])   → swaps SVG variant
+ *
+ * Chart ↔ table coupling: any reorder or chip toggle calls reflowChart(),
+ * which hides/shows and repositions <g class="wom-bar-row"> groups so the
+ * chart mirrors the visible row order of the table.
  */
 (function () {
   "use strict";
@@ -40,16 +45,25 @@
         if (!row) return;
         var active = chip.classList.toggle("active");
         row.classList.toggle("wom-row-hidden", !active);
+        reflowChart(panel);
       });
     });
 
-    // --- Brand column sort
+    // --- Column sort (Brand = alpha, data cols = numeric on data-wom-val)
     panel.querySelectorAll('[data-wom-action="sort"]').forEach(function (th) {
       th.addEventListener("click", function () {
+        var col = th.getAttribute("data-wom-sort-col") || "brand";
         var dir = th.getAttribute("data-wom-sort-dir") || "none";
-        var next = dir === "asc" ? "desc" : "asc";
+        // Data-column default is DESC (most interesting first); Brand default is ASC.
+        var next;
+        if (dir === "none") next = (col === "brand") ? "asc" : "desc";
+        else                next = (dir === "asc") ? "desc" : "asc";
+        panel.querySelectorAll('[data-wom-action="sort"]').forEach(function (other) {
+          if (other !== th) other.setAttribute("data-wom-sort-dir", "none");
+        });
         th.setAttribute("data-wom-sort-dir", next);
-        sortByBrand(table, next);
+        sortTable(panel, table, col, next);
+        reflowChart(panel);
       });
     });
 
@@ -78,6 +92,11 @@
     // Ensure variant control reflects initial Show chart state
     var cb0 = panel.querySelector('[data-wom-action="showchart"]');
     syncVariantControlDisabled(panel, cb0 ? cb0.checked : false);
+
+    // Initial chart reflow so bar order matches the table's initial
+    // (alphabetical) competitor order — chart is built focal-first then
+    // net DESC, but the table ships alphabetical.
+    reflowChart(panel);
   }
 
   function switchChartVariant(panel, variant) {
@@ -176,29 +195,99 @@
     if (avgRow) tbody.appendChild(avgRow);
     compRows.forEach(function (tr) { tbody.appendChild(tr); });
 
-    // Reset any active sort indicator — repin implies alpha order
-    var sortTh = panel.querySelector('[data-wom-action="sort"]');
-    if (sortTh) sortTh.setAttribute("data-wom-sort-dir", "none");
+    // Reset all sort indicators — repin implies alpha order
+    panel.querySelectorAll('[data-wom-action="sort"]').forEach(function (th) {
+      th.setAttribute("data-wom-sort-dir", "none");
+    });
+
+    reflowChart(panel);
   }
 
-  function sortByBrand(table, dir) {
+  // Sort competitor rows by `col` in `dir`. Focal + cat-avg stay pinned.
+  //   col === "brand": alphabetical on data-wom-sort-key
+  //   else:            numeric on td[data-wom-col=col]'s data-wom-val
+  function sortTable(panel, table, col, dir) {
     var tbody = table.querySelector("tbody");
     if (!tbody) return;
     var rows = Array.prototype.slice.call(tbody.querySelectorAll("tr"));
     var focalRow = null, avgRow = null, compRows = [];
     rows.forEach(function (tr) {
-      if (tr.classList.contains("wom-row-avg"))   avgRow   = tr;
+      if (tr.classList.contains("wom-row-avg"))        avgRow = tr;
       else if (tr.classList.contains("wom-row-focal")) focalRow = tr;
-      else if (tr.classList.contains("wom-row"))  compRows.push(tr);
+      else if (tr.classList.contains("wom-row"))       compRows.push(tr);
     });
-    compRows.sort(function (a, b) {
-      var la = a.dataset.womSortKey || "";
-      var lb = b.dataset.womSortKey || "";
-      return dir === "desc" ? lb.localeCompare(la) : la.localeCompare(lb);
-    });
+
+    if (col === "brand") {
+      compRows.sort(function (a, b) {
+        var la = a.dataset.womSortKey || "";
+        var lb = b.dataset.womSortKey || "";
+        return dir === "desc" ? lb.localeCompare(la) : la.localeCompare(lb);
+      });
+    } else {
+      compRows.sort(function (a, b) {
+        var va = rowValueForCol(a, col);
+        var vb = rowValueForCol(b, col);
+        var aBad = !isFinite(va), bBad = !isFinite(vb);
+        if (aBad && bBad) return 0;
+        if (aBad) return 1;   // NaNs last regardless of dir
+        if (bBad) return -1;
+        return dir === "desc" ? vb - va : va - vb;
+      });
+    }
+
     if (focalRow) tbody.appendChild(focalRow);
     if (avgRow)   tbody.appendChild(avgRow);
     compRows.forEach(function (tr) { tbody.appendChild(tr); });
+  }
+
+  function rowValueForCol(tr, col) {
+    var td = tr.querySelector('td[data-wom-col="' + cssEscape(col) + '"]');
+    if (!td) return NaN;
+    var raw = td.getAttribute("data-wom-val");
+    if (raw === null || raw === "") return NaN;
+    var v = parseFloat(raw);
+    return isFinite(v) ? v : NaN;
+  }
+
+  // Reflow SVG bar groups so the chart mirrors the table's current visible
+  // row order. Hidden brands -> display:none; visible brands get a
+  // translate(0, dy) transform where dy = (newIdx - originalIdx) * step.
+  function reflowChart(panel) {
+    var table = panel.querySelector(".wom-table");
+    if (!table) return;
+
+    var focalCode = null;
+    var focalRow = table.querySelector("tr.wom-row-focal");
+    if (focalRow) focalCode = focalRow.getAttribute("data-wom-brand");
+
+    // Visible competitor order (table row order)
+    var visibleOrdered = [];
+    if (focalCode) visibleOrdered.push(focalCode);
+    table.querySelectorAll("tbody tr.wom-row").forEach(function (tr) {
+      if (tr.classList.contains("wom-row-focal")) return;
+      if (tr.classList.contains("wom-row-hidden")) return;
+      var bc = tr.getAttribute("data-wom-brand");
+      if (bc) visibleOrdered.push(bc);
+    });
+
+    panel.querySelectorAll(".wom-chart-svg").forEach(function (svg) {
+      var step = parseFloat(svg.getAttribute("data-wom-step")) || 30;
+      svg.querySelectorAll("g.wom-bar-row").forEach(function (g) {
+        var bc = g.getAttribute("data-wom-brand");
+        var origIdx = parseInt(g.getAttribute("data-wom-original-idx"), 10);
+        if (!isFinite(origIdx)) origIdx = 0;
+        var newIdx = visibleOrdered.indexOf(bc);
+        if (newIdx < 0) {
+          g.style.display = "none";
+          g.removeAttribute("transform");
+        } else {
+          g.style.display = "";
+          var deltaY = (newIdx - origIdx) * step;
+          if (Math.abs(deltaY) < 0.01) g.removeAttribute("transform");
+          else g.setAttribute("transform", "translate(0," + deltaY + ")");
+        }
+      });
+    });
   }
 
   function syncChipActivity(panel) {

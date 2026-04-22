@@ -114,8 +114,8 @@ build_wom_panel_styles <- function(focal_colour = "#1A5276") {
   text-align: left; min-width: 180px; background: #1a2744;
 }
 
-/* Sortable Brand header: indicator + hover */
-.wom-table th.wom-sortable { user-select: none; }
+/* Sortable headers: indicator + hover — applies to Brand and every data col */
+.wom-table th.wom-sortable { user-select: none; cursor: pointer; }
 .wom-table th.wom-sortable:hover { background: #243558; }
 .wom-table th.wom-sortable .wom-sort-ind {
   display: inline-block; width: 10px; margin-left: 6px;
