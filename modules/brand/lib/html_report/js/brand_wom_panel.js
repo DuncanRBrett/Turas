@@ -1,9 +1,11 @@
 /**
  * WOM Panel controller
  *
- * v1.0 scope: static WOM table with a live focal-brand dropdown that
- * reorders rows and toggles focal styling client-side. Chart layer will
- * be added in a follow-up commit.
+ * Live controls:
+ *   - Focal-brand dropdown    (.wom-focus-select)           → repins focal row
+ *   - Coloured brand chips    ([data-wom-action="toggle-row"]) → show/hide rows
+ *   - Brand column header     ([data-wom-action="sort"])    → A-Z / Z-A sort
+ *   - Show chart checkbox     ([data-wom-action="showchart"]) → toggles chart
  */
 (function () {
   "use strict";
@@ -12,20 +14,59 @@
     if (!panel || panel.dataset.womInit === "1") return;
     panel.dataset.womInit = "1";
 
-    var select = panel.querySelector(".wom-focus-select");
-    var table  = panel.querySelector(".wom-table");
-    if (!select || !table) return;
+    var table = panel.querySelector(".wom-table");
+    if (!table) return;
 
     var accent = panel.getAttribute("data-focal-colour") || "#1A5276";
 
-    select.addEventListener("change", function () {
-      var brand = select.value;
-      if (!brand) return;
-      repinFocal(table, brand, accent);
+    // --- Focal brand dropdown
+    var select = panel.querySelector(".wom-focus-select");
+    if (select) {
+      select.addEventListener("change", function () {
+        var brand = select.value;
+        if (!brand) return;
+        repinFocal(panel, table, brand, accent);
+        syncChipActivity(panel);
+      });
+    }
+
+    // --- Brand show/hide chips
+    panel.querySelectorAll('[data-wom-action="toggle-row"]').forEach(function (chip) {
+      chip.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        var bc = chip.getAttribute("data-wom-brand");
+        if (!bc) return;
+        var row = table.querySelector('tr[data-wom-brand="' + cssEscape(bc) + '"]');
+        if (!row) return;
+        var active = chip.classList.toggle("active");
+        row.classList.toggle("wom-row-hidden", !active);
+      });
+    });
+
+    // --- Brand column sort
+    panel.querySelectorAll('[data-wom-action="sort"]').forEach(function (th) {
+      th.addEventListener("click", function () {
+        var dir = th.getAttribute("data-wom-sort-dir") || "none";
+        var next = dir === "asc" ? "desc" : "asc";
+        th.setAttribute("data-wom-sort-dir", next);
+        sortByBrand(table, next);
+      });
+    });
+
+    // --- Show chart toggle (placeholder section)
+    panel.querySelectorAll('[data-wom-action="showchart"]').forEach(function (cb) {
+      cb.addEventListener("change", function () {
+        var scope = cb.getAttribute("data-wom-scope");
+        var sel   = '.wom-chart-section[data-wom-scope="' + cssEscape(scope) + '"]';
+        var sec   = panel.querySelector(sel);
+        if (!sec) return;
+        if (cb.checked) sec.removeAttribute("hidden");
+        else             sec.setAttribute("hidden", "");
+      });
     });
   }
 
-  function repinFocal(table, focalCode, accent) {
+  function repinFocal(panel, table, focalCode, accent) {
     var tbody = table.querySelector("tbody");
     if (!tbody) return;
 
@@ -33,10 +74,7 @@
       tbody.querySelectorAll("tr.wom-row, tr.wom-row-avg"));
     if (allRows.length === 0) return;
 
-    // Partition
-    var focalRow = null;
-    var avgRow   = null;
-    var compRows = [];
+    var focalRow = null, avgRow = null, compRows = [];
     allRows.forEach(function (tr) {
       if (tr.classList.contains("wom-row-avg")) {
         avgRow = tr;
@@ -55,13 +93,9 @@
       tr.classList.add("fn-row-competitor", "wom-row-competitor");
       tr.removeAttribute("style");
       tr.removeAttribute("data-locked");
-
-      // Remove focal cell highlight
       tr.querySelectorAll(".fn-rel-td-focal").forEach(function (td) {
         td.classList.remove("fn-rel-td-focal");
       });
-
-      // Strip any FOCAL badge from the label cell
       var lbl = tr.querySelector("td.ct-label-col");
       if (lbl) {
         var badge = lbl.querySelector(".fn-focal-badge");
@@ -69,7 +103,6 @@
       }
     });
 
-    // Apply focal styling to the newly-focal row
     focalRow.classList.remove("fn-row-competitor", "wom-row-competitor");
     focalRow.classList.add("fn-row-focal", "wom-row-focal");
     focalRow.setAttribute("style", "--fn-row-accent:" + accent + ";");
@@ -86,17 +119,59 @@
       focalLbl.appendChild(badge);
     }
 
-    // Sort competitors alphabetically by label text
-    compRows.sort(function (a, b) {
-      var la = (a.querySelector("td.ct-label-col") || {}).textContent || "";
-      var lb = (b.querySelector("td.ct-label-col") || {}).textContent || "";
-      return la.trim().toLowerCase().localeCompare(lb.trim().toLowerCase());
+    // Move focal to FOCAL chip, strip badge from the old chip
+    panel.querySelectorAll(".wom-brand-chip").forEach(function (chip) {
+      var b = chip.querySelector(".fn-focal-badge");
+      if (b) b.remove();
+      if (chip.getAttribute("data-wom-brand") === focalCode) {
+        chip.appendChild(document.createTextNode(" "));
+        var nb = document.createElement("span");
+        nb.className = "fn-focal-badge";
+        nb.textContent = "FOCAL";
+        chip.appendChild(nb);
+      }
     });
 
-    // Re-insert: focal, avg, then competitors
+    compRows.sort(function (a, b) {
+      return (a.dataset.womSortKey || "").localeCompare(b.dataset.womSortKey || "");
+    });
+
     tbody.appendChild(focalRow);
     if (avgRow) tbody.appendChild(avgRow);
     compRows.forEach(function (tr) { tbody.appendChild(tr); });
+
+    // Reset any active sort indicator — repin implies alpha order
+    var sortTh = panel.querySelector('[data-wom-action="sort"]');
+    if (sortTh) sortTh.setAttribute("data-wom-sort-dir", "none");
+  }
+
+  function sortByBrand(table, dir) {
+    var tbody = table.querySelector("tbody");
+    if (!tbody) return;
+    var rows = Array.prototype.slice.call(tbody.querySelectorAll("tr"));
+    var focalRow = null, avgRow = null, compRows = [];
+    rows.forEach(function (tr) {
+      if (tr.classList.contains("wom-row-avg"))   avgRow   = tr;
+      else if (tr.classList.contains("wom-row-focal")) focalRow = tr;
+      else if (tr.classList.contains("wom-row"))  compRows.push(tr);
+    });
+    compRows.sort(function (a, b) {
+      var la = a.dataset.womSortKey || "";
+      var lb = b.dataset.womSortKey || "";
+      return dir === "desc" ? lb.localeCompare(la) : la.localeCompare(lb);
+    });
+    if (focalRow) tbody.appendChild(focalRow);
+    if (avgRow)   tbody.appendChild(avgRow);
+    compRows.forEach(function (tr) { tbody.appendChild(tr); });
+  }
+
+  function syncChipActivity(panel) {
+    // No-op: chip "active" state is independent of focal selection.
+  }
+
+  function cssEscape(s) {
+    if (window.CSS && CSS.escape) return CSS.escape(s);
+    return String(s).replace(/([^a-zA-Z0-9_\-])/g, "\\$1");
   }
 
   function initAll() {
@@ -109,6 +184,5 @@
     initAll();
   }
 
-  // Expose for late-rendered panels (e.g. tab lazy-mount).
   window.__initWomPanels = initAll;
 })();

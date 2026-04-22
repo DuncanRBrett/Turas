@@ -125,11 +125,27 @@ build_wom_panel_styles <- function(focal_colour = "#1A5276") {
   border-left: 1px solid #e2e8f0;
 }
 
-/* Net columns get an italic, slightly muted tint so they read as derived */
+/* Net columns get an italic treatment so they read as derived */
 .wom-table .wom-th-net {
-  font-style: italic; color: #475569;
+  font-style: italic; color: #e2e8f0;
 }
 .wom-table .wom-td-net .ct-val { font-weight: 600; }
+
+/* Heatmap: green (above) / amber (near) / red (below) relative to cat avg ±1 SD.
+   Matches the cat_buying panel palette. */
+.wom-table td.wom-hm-above {
+  background: rgba(5, 150, 105, 0.16) !important; color: #065f46;
+}
+.wom-table td.wom-hm-below {
+  background: rgba(220, 38, 38, 0.14) !important; color: #991b1b;
+}
+.wom-table td.wom-hm-near {
+  background: rgba(251, 191, 36, 0.18) !important; color: #92400e;
+}
+/* Focal row keeps its tint but preserves heatmap colour of the value */
+.wom-table tr.wom-row-focal td.wom-hm-above { background: rgba(5, 150, 105, 0.22) !important; }
+.wom-table tr.wom-row-focal td.wom-hm-below { background: rgba(220, 38, 38, 0.20) !important; }
+.wom-table tr.wom-row-focal td.wom-hm-near  { background: rgba(251, 191, 36, 0.24) !important; }
 
 /* Cat-avg row CI bar — inherit ma-ci-bar-wrap sizing from MA panel CSS.
    Ensure the CI column reads as a secondary row (same as fn-row-avg-all). */
@@ -140,6 +156,15 @@ build_wom_panel_styles <- function(focal_colour = "#1A5276") {
 /* Focal row left-border rail (mirror fn-row-focal) */
 .wom-table .wom-row-focal td:first-child {
   box-shadow: inset 3px 0 0 var(--fn-row-accent, %s);
+}
+
+/* Chart placeholder — shown only when Show chart toggle is on */
+.wom-chart-section { margin-top: 14px; }
+.wom-chart-placeholder {
+  padding: 36px 20px; text-align: center;
+  color: #94a3b8; font-size: 12px;
+  border: 1px dashed #cbd5e1; border-radius: 8px;
+  background: #f8fafc;
 }
 
 /* Insight box — margin tidy-up when stacked below the table */

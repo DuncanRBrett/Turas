@@ -281,22 +281,30 @@ build_wom_panel_html <- function(panel_data,
     net  = " wom-td-net",
     freq = " wom-td-freq",
     "")
-  # Diverging heatmap for net columns (red = negative, blue = positive);
-  # sequential heatmap for pct and freq columns calibrated to column-wise
-  # maxima derived from cat_avg + brand spread.
-  heatmap_bg <- .wom_heatmap_bg(value, val_type, stats_block)
-  bg_attr <- if (nzchar(heatmap_bg))
-    sprintf(' data-wom-heatmap="%s" style="background-color:%s;"',
-            heatmap_bg, heatmap_bg)
-  else ""
+  # Green/amber/red vs category avg \u00b11 SD (matches cat_buying panel):
+  #   above avg + SD -> wom-hm-above (green)
+  #   below avg - SD -> wom-hm-below (red)
+  #   within the band -> wom-hm-near  (amber)
+  hm_cls <- .wom_hm_cls(value, stats_block)
 
   sprintf(
-    '<td class="ct-td ct-data-col%s%s" data-wom-col="%s" data-wom-val="%.3f"%s><span class="ct-val">%s</span></td>',
-    focal_cls, type_cls,
+    '<td class="ct-td ct-data-col%s%s%s" data-wom-col="%s" data-wom-val="%.3f"><span class="ct-val">%s</span></td>',
+    focal_cls, type_cls, hm_cls,
     .wom_esc(col$key),
     value,
-    bg_attr,
     display)
+}
+
+
+.wom_hm_cls <- function(value, stats_block) {
+  if (is.null(stats_block)) return("")
+  avg  <- stats_block$mean
+  sd_v <- stats_block$sd
+  if (!is.finite(value) || !is.finite(avg) ||
+      !is.finite(sd_v) || sd_v <= 0) return("")
+  if (value > avg + sd_v)      " wom-hm-above"
+  else if (value < avg - sd_v) " wom-hm-below"
+  else                         " wom-hm-near"
 }
 
 
@@ -379,27 +387,6 @@ build_wom_panel_html <- function(panel_data,
 }
 
 
-.wom_heatmap_bg <- function(value, val_type, stats_block) {
-  if (!is.finite(value)) return("")
-  if (identical(val_type, "net")) {
-    # Symmetric red/blue around zero; saturation scales with |value|
-    span <- max(10, abs(value),
-                if (!is.null(stats_block) && is.finite(stats_block$mean))
-                  abs(stats_block$mean) else 0)
-    frac <- min(1, abs(value) / span)
-    alpha <- 0.08 + frac * 0.55
-    if (value >= 0) sprintf("rgba(37,99,171,%.3f)", alpha)
-    else            sprintf("rgba(192,57,43,%.3f)", alpha)
-  } else {
-    # Sequential blue scaled to cat-avg * 3 as a soft ceiling, falling back
-    # to the value itself so a lone brand still picks up some shading.
-    ref_max <- if (!is.null(stats_block) && is.finite(stats_block$mean))
-      max(1, 3 * stats_block$mean) else max(1, value)
-    frac <- min(1, value / ref_max)
-    alpha <- 0.08 + frac * 0.45
-    sprintf("rgba(37,99,171,%.3f)", alpha)
-  }
-}
 
 
 # ==============================================================================

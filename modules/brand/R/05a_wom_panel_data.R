@@ -130,17 +130,21 @@ build_wom_panel_data <- function(wom_result,
     n <- length(finite_v)
     if (n == 0) {
       return(list(mean = NA_real_, ci_lower = NA_real_,
-                  ci_upper = NA_real_, n_brands = 0L))
+                  ci_upper = NA_real_, sd = NA_real_,
+                  n_brands = 0L))
     }
     m <- mean(finite_v)
     if (n < 2) {
       return(list(mean = round(m, 2), ci_lower = NA_real_,
-                  ci_upper = NA_real_, n_brands = as.integer(n)))
+                  ci_upper = NA_real_, sd = NA_real_,
+                  n_brands = as.integer(n)))
     }
-    se <- stats::sd(finite_v) / sqrt(n)
+    sd_v <- stats::sd(finite_v)
+    se   <- sd_v / sqrt(n)
     list(mean     = round(m, 2),
          ci_lower = round(m - 1.96 * se, 2),
          ci_upper = round(m + 1.96 * se, 2),
+         sd       = round(sd_v, 3),
          n_brands = as.integer(n))
   })
   names(cat_avg) <- names(col_values)
