@@ -455,6 +455,91 @@ transform_brand_panels <- function(results, config) {
     }
   }
 
+  # --- Word of Mouth panels (per category) ---
+  if (exists("build_wom_panel_data", mode = "function") &&
+      exists("build_wom_panel_html", mode = "function")) {
+    for (cat_name in names(results$results$categories)) {
+      cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
+      cr <- results$results$categories[[cat_name]]
+      wom <- cr$wom
+      if (is.null(wom) || identical(wom$status, "REFUSED")) next
+      if (is.null(wom$wom_metrics)) next
+
+      cat_brands_local <- if (!is.null(brand_list_all) &&
+                               "Category" %in% names(brand_list_all)) {
+        brand_list_all[brand_list_all$Category == cat_name, , drop = FALSE]
+      } else if (!is.null(brand_list_all)) brand_list_all else
+        data.frame(BrandCode = as.character(wom$wom_metrics$BrandCode),
+                   stringsAsFactors = FALSE)
+      if (!("BrandLabel" %in% names(cat_brands_local))) {
+        cat_brands_local$BrandLabel <- cat_brands_local$BrandCode
+      }
+
+      focal_colour <- .resolve_focal_colour(cat_brands_local,
+                                            config$focal_brand,
+                                            config_focal_colour)
+
+      # Timeframe label — prefer category Timeframe_Target, fall back to
+      # the original WOM question wording default.
+      cat_cfg_row <- if (!is.null(config$categories) &&
+                         "Category" %in% names(config$categories))
+        config$categories[config$categories$Category == cat_name, , drop = FALSE]
+      else NULL
+      tf_label <- if (!is.null(cat_cfg_row) && nrow(cat_cfg_row) > 0 &&
+                      "Timeframe_Target" %in% names(cat_cfg_row))
+        as.character(cat_cfg_row$Timeframe_Target[1]) else NULL
+      if (is.null(tf_label) || !nzchar(tf_label)) tf_label <- "last 3 months"
+
+      # Build brand_colours lookup from Colour column (hex codes)
+      wom_brand_colours <- list()
+      if (!is.null(cat_brands_local) && nrow(cat_brands_local) > 0 &&
+          "BrandCode" %in% names(cat_brands_local) &&
+          "Colour" %in% names(cat_brands_local)) {
+        for (ii in seq_len(nrow(cat_brands_local))) {
+          bc_ii <- trimws(as.character(cat_brands_local$BrandCode[ii]))
+          col_ii <- cat_brands_local$Colour[ii]
+          if (is.null(col_ii) || is.na(col_ii)) next
+          col_ii <- trimws(as.character(col_ii))
+          if (!nzchar(col_ii)) next
+          if (!grepl("^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$", col_ii)) next
+          wom_brand_colours[[bc_ii]] <- col_ii
+        }
+      }
+
+      wom_pd <- tryCatch(
+        build_wom_panel_data(
+          wom_result = wom,
+          brand_list = cat_brands_local,
+          config = list(
+            category_label   = cat_name,
+            wave_label       = as.character(config$wave %||% ""),
+            focal_brand_code = config$focal_brand,
+            focal_colour     = focal_colour,
+            brand_colours    = wom_brand_colours,
+            timeframe_label  = tf_label
+          )),
+        error = function(e) {
+          message(sprintf("[BRAND HTML] WOM panel data failed for %s: %s",
+                          cat_name, e$message))
+          NULL
+        })
+      if (is.null(wom_pd)) next
+
+      wom_html <- tryCatch(
+        build_wom_panel_html(wom_pd,
+                             category_code = cat_id,
+                             focal_colour = focal_colour),
+        error = function(e) {
+          message(sprintf("[BRAND HTML] WOM panel render failed for %s: %s",
+                          cat_name, e$message))
+          NULL
+        })
+      if (!is.null(wom_html)) {
+        panels[[paste0("wom_", cat_id)]] <- wom_html
+      }
+    }
+  }
+
   panels
 }
 

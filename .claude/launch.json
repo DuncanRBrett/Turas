@@ -48,6 +48,12 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "8772", "--directory", "/Users/duncan/Dev/Turas/tmp_sample_ma_html"],
       "port": 8772
+    },
+    {
+      "name": "brand-9cat-report",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8773", "--directory", "/tmp/wom_preview"],
+      "port": 8773
     }
   ]
 }

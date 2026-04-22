@@ -66,6 +66,7 @@ BRAND_VERSION <- "1.0"
     "03e_funnel_legacy_adapter.R",
     "04_repertoire.R",
     "05_wom.R",
+    "05a_wom_panel_data.R",
     "06_drivers_barriers.R",
     "07_dba.R",
     "08_cat_buying.R",
@@ -565,13 +566,19 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
         neg_rec  <- .wom_prefix(wom_qs, "NEG.*REC|REC.*NEG",  "WOM_NEG_REC")
         pos_shr  <- .wom_prefix(wom_qs, "POS.*SHARE|SHARE.*POS|POS_S", "WOM_POS_SHARE")
         neg_shr  <- .wom_prefix(wom_qs, "NEG.*SHARE|SHARE.*NEG|NEG_S", "WOM_NEG_SHARE")
+        pos_cnt  <- .wom_prefix(wom_qs, "POS.*COUNT|COUNT.*POS|POS.*FREQ|FREQ.*POS",
+                                "WOM_POS_COUNT")
+        neg_cnt  <- .wom_prefix(wom_qs, "NEG.*COUNT|COUNT.*NEG|NEG.*FREQ|FREQ.*NEG",
+                                "WOM_NEG_COUNT")
         cat_result$wom <- tryCatch(
           run_wom(
             cat_data, cat_brands$BrandCode,
-            received_pos_prefix = pos_rec,
-            received_neg_prefix = neg_rec,
-            shared_pos_prefix   = pos_shr,
-            shared_neg_prefix   = neg_shr,
+            received_pos_prefix    = pos_rec,
+            received_neg_prefix    = neg_rec,
+            shared_pos_prefix      = pos_shr,
+            shared_neg_prefix      = neg_shr,
+            shared_pos_freq_prefix = pos_cnt,
+            shared_neg_freq_prefix = neg_cnt,
             focal_brand = config$focal_brand,
             weights     = cat_weights
           ),

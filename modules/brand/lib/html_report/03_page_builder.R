@@ -331,22 +331,32 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
         ' <code>generate_brand_html_report()</code>.',
         '</div>')
     } else if (el == "wom") {
-      # WOM: per-category, rendered from charts + tables keyed as wom_{cat_id}
-      parts <- c(parts, build_br_section_toolbar(section_id))
+      # WOM: per-category. Renders the new brand-attitude-style panel when
+      # panels[[wom_<cat_id>]] is present; falls back to the legacy charts +
+      # tables otherwise.
       wom_key <- paste0("wom_", cat_id)
-      parts <- c(parts, sprintf(
-        '<h3 class="br-element-title">Word of Mouth \u2014 %s</h3>',
-        .br_esc(cat_name)))
-      parts <- c(parts, '<p style="font-size:12px;color:#64748b;margin:0 0 12px;">',
-        'Percentage of category buyers who received or shared word-of-mouth about each brand ',
-        'in the study\'s recall timeframe.</p>')
-      if (!is.null(charts[[wom_key]])) {
-        for (ch in charts[[wom_key]]) {
-          parts <- c(parts, build_br_chart_wrapper(ch$svg, ch$title %||% ""))
+      if (!is.null(panels[[wom_key]])) {
+        parts <- c(parts, build_br_section_toolbar(section_id))
+        parts <- c(parts, sprintf(
+          '<h3 class="br-element-title">Word of Mouth \u2014 %s</h3>',
+          .br_esc(cat_name)))
+        parts <- c(parts, panels[[wom_key]])
+      } else {
+        parts <- c(parts, build_br_section_toolbar(section_id))
+        parts <- c(parts, sprintf(
+          '<h3 class="br-element-title">Word of Mouth \u2014 %s</h3>',
+          .br_esc(cat_name)))
+        parts <- c(parts, '<p style="font-size:12px;color:#64748b;margin:0 0 12px;">',
+          'Percentage of category buyers who received or shared word-of-mouth about each brand ',
+          'in the study\'s recall timeframe.</p>')
+        if (!is.null(charts[[wom_key]])) {
+          for (ch in charts[[wom_key]]) {
+            parts <- c(parts, build_br_chart_wrapper(ch$svg, ch$title %||% ""))
+          }
         }
-      }
-      if (!is.null(tables[[wom_key]])) {
-        parts <- c(parts, tables[[wom_key]])
+        if (!is.null(tables[[wom_key]])) {
+          parts <- c(parts, tables[[wom_key]])
+        }
       }
     } else if (el == "repertoire") {
       # Category Buying panel.
