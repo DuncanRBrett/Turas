@@ -271,7 +271,13 @@
     });
 
     panel.querySelectorAll(".wom-chart-svg").forEach(function (svg) {
-      var step = parseFloat(svg.getAttribute("data-wom-step")) || 30;
+      var step  = parseFloat(svg.getAttribute("data-wom-step")) || 30;
+      var mt    = parseFloat(svg.getAttribute("data-wom-mt"))   || 58;
+      var mb    = parseFloat(svg.getAttribute("data-wom-mb"))   || 26;
+      var origN = parseInt(svg.getAttribute("data-wom-n"), 10)  || 0;
+      var W     = parseFloat(svg.getAttribute("data-wom-w"))    || 760;
+
+      // Reposition / hide bar groups
       svg.querySelectorAll("g.wom-bar-row").forEach(function (g) {
         var bc = g.getAttribute("data-wom-brand");
         var origIdx = parseInt(g.getAttribute("data-wom-original-idx"), 10);
@@ -287,6 +293,22 @@
           else g.setAttribute("transform", "translate(0," + deltaY + ")");
         }
       });
+
+      // Shrink grid + axis to match visible row count, then resize viewBox.
+      var nVis     = visibleOrdered.length || 1;
+      var gridBot  = mt + nVis * step;
+      var totalH   = gridBot + mb;
+
+      svg.querySelectorAll("line.wom-grid-line, line.wom-center-line").forEach(function (ln) {
+        ln.setAttribute("y2", String(gridBot));
+      });
+      svg.querySelectorAll("line.wom-avg-line").forEach(function (ln) {
+        ln.setAttribute("y2", String(gridBot - 2));
+      });
+      svg.querySelectorAll("text.wom-axis-tick-label").forEach(function (t) {
+        t.setAttribute("y", String(gridBot + 12));
+      });
+      svg.setAttribute("viewBox", "0 0 " + W + " " + totalH);
     });
   }
 

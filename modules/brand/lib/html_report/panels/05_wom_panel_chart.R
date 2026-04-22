@@ -138,18 +138,18 @@ build_wom_said_chart <- function(panel_data, focal_colour = "#1A5276") {
     xr <- mid_x + half_w * f
     v_lbl <- sprintf("%.0f%%", max_axis * f)
     parts <- c(parts,
-      sprintf('<line x1="%g" y1="%d" x2="%g" y2="%d" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="2,3"/>',
+      sprintf('<line class="wom-grid-line" x1="%g" y1="%d" x2="%g" y2="%d" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="2,3"/>',
               xl, grid_top, xl, grid_bot),
-      sprintf('<line x1="%g" y1="%d" x2="%g" y2="%d" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="2,3"/>',
+      sprintf('<line class="wom-grid-line" x1="%g" y1="%d" x2="%g" y2="%d" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="2,3"/>',
               xr, grid_top, xr, grid_bot),
-      sprintf('<text x="%g" y="%d" text-anchor="middle" fill="#94a3b8" font-size="9">%s</text>',
+      sprintf('<text class="wom-axis-tick-label" x="%g" y="%d" text-anchor="middle" fill="#94a3b8" font-size="9">%s</text>',
               xl, grid_bot + 12, v_lbl),
-      sprintf('<text x="%g" y="%d" text-anchor="middle" fill="#94a3b8" font-size="9">%s</text>',
+      sprintf('<text class="wom-axis-tick-label" x="%g" y="%d" text-anchor="middle" fill="#94a3b8" font-size="9">%s</text>',
               xr, grid_bot + 12, v_lbl))
   }
   # Centre line (0%)
   parts <- c(parts, sprintf(
-    '<line x1="%g" y1="%d" x2="%g" y2="%d" stroke="#475569" stroke-width="1"/>',
+    '<line class="wom-center-line" x1="%g" y1="%d" x2="%g" y2="%d" stroke="#475569" stroke-width="1"/>',
     mid_x, grid_top, mid_x, grid_bot))
 
   # Category-average reference markers (dashed notches)
@@ -158,7 +158,7 @@ build_wom_said_chart <- function(panel_data, focal_colour = "#1A5276") {
   if (is.finite(avg_pos)) {
     xr <- mid_x + half_w * (avg_pos / max_axis)
     parts <- c(parts, sprintf(
-      '<line x1="%g" y1="%d" x2="%g" y2="%d" stroke="%s" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.8"/>',
+      '<line class="wom-avg-line" x1="%g" y1="%d" x2="%g" y2="%d" stroke="%s" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.8"/>',
       xr, grid_top + 2, xr, grid_bot - 2, pos_colour),
       sprintf('<text x="%g" y="%d" text-anchor="middle" fill="%s" font-size="9" font-weight="600">cat avg %.0f%%</text>',
               xr, grid_top - 26, pos_colour, avg_pos))
@@ -166,7 +166,7 @@ build_wom_said_chart <- function(panel_data, focal_colour = "#1A5276") {
   if (is.finite(avg_neg)) {
     xl <- mid_x - half_w * (avg_neg / max_axis)
     parts <- c(parts, sprintf(
-      '<line x1="%g" y1="%d" x2="%g" y2="%d" stroke="%s" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.8"/>',
+      '<line class="wom-avg-line" x1="%g" y1="%d" x2="%g" y2="%d" stroke="%s" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.8"/>',
       xl, grid_top + 2, xl, grid_bot - 2, neg_colour),
       sprintf('<text x="%g" y="%d" text-anchor="middle" fill="%s" font-size="9" font-weight="600">cat avg %.0f%%</text>',
               xl, grid_top - 26, neg_colour, avg_neg))
@@ -282,8 +282,9 @@ build_wom_said_chart <- function(panel_data, focal_colour = "#1A5276") {
 
   svg_body <- paste(parts, collapse = "\n")
   sprintf(
-    '<svg class="wom-chart-svg" viewBox="0 0 %d %g" width="100%%" preserveAspectRatio="xMinYMin meet" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="%s" data-wom-step="%d" data-wom-mt="%d" data-wom-bar-h="%d">%s</svg>',
-    W, total_h, .wom_chart_esc(title), step, mt, bar_h, svg_body)
+    '<svg class="wom-chart-svg" viewBox="0 0 %d %g" width="100%%" preserveAspectRatio="xMinYMin meet" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="%s" data-wom-w="%d" data-wom-step="%d" data-wom-mt="%d" data-wom-mb="%d" data-wom-bar-h="%d" data-wom-n="%d">%s</svg>',
+    W, total_h, .wom_chart_esc(title),
+    W, step, mt, mb, bar_h, n, svg_body)
 }
 
 

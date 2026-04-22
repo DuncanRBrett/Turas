@@ -121,9 +121,9 @@ build_wom_panel_styles <- function(focal_colour = "#1A5276") {
   display: inline-block; width: 10px; margin-left: 6px;
   opacity: 0.55; font-size: 10px;
 }
-.wom-table th.wom-sortable[data-wom-sort-dir="asc"]  .wom-sort-ind::before { content: "\2191"; opacity: 1; }
-.wom-table th.wom-sortable[data-wom-sort-dir="desc"] .wom-sort-ind::before { content: "\2193"; opacity: 1; }
-.wom-table th.wom-sortable[data-wom-sort-dir="none"] .wom-sort-ind::before { content: "\2195"; }
+.wom-table th.wom-sortable[data-wom-sort-dir="asc"]  .wom-sort-ind::before { content: "\\2191"; opacity: 1; }
+.wom-table th.wom-sortable[data-wom-sort-dir="desc"] .wom-sort-ind::before { content: "\\2193"; opacity: 1; }
+.wom-table th.wom-sortable[data-wom-sort-dir="none"] .wom-sort-ind::before { content: "\\2195"; }
 
 /* Data cell + column-group table shaping */
 .wom-table th, .wom-table td { vertical-align: middle; }
