@@ -116,10 +116,15 @@
     var editor = section.querySelector(".br-insight-editor");
     if (editor && editor.value.trim()) hasInsight = true;
 
+    // Smart skip: if only one content type available, pin directly (no dialog)
+    if (hasChart && !hasTable)  { brExecutePin(sectionId, { chart: true,  table: false, insight: hasInsight }); return; }
+    if (!hasChart && hasTable)  { brExecutePin(sectionId, { chart: false, table: true,  insight: hasInsight }); return; }
+    if (!hasChart && !hasTable) { brExecutePin(sectionId, { chart: false, table: false, insight: hasInsight }); return; }
+
     var checkboxes = [
-      { key: "table",   label: "Table",   available: hasTable, checked: hasTable },
-      { key: "chart",   label: "Chart",   available: hasChart, checked: hasChart },
-      { key: "insight", label: "Insight", available: true,     checked: hasInsight }
+      { key: "chart",   label: "Chart",   available: true, checked: true },
+      { key: "table",   label: "Table",   available: true, checked: true },
+      { key: "insight", label: "Insight", available: true, checked: hasInsight }
     ];
 
     var anchor = btn.closest(".br-section-toolbar") || btn.parentElement;
@@ -197,21 +202,41 @@
   };
 
   // --- Export section content as PNG (no pin save) ---
-  window.brExportPng = function(sectionId) {
+  window.brExportPng = function(sectionId, btnEl) {
     if (typeof TurasPins === "undefined") return;
     var content = brCaptureContent(sectionId);
     if (!content) return;
     applyPortfolioTitleFallback(content, sectionId);
-    // Flag all available parts so export renders chart + table + insight if present
-    content.pinFlags = {
-      chart:   !!content.chartSvg,
-      table:   !!content.tableHtml,
-      insight: !!content.insightText
-    };
-    content.pinMode = "custom";
-    if (typeof TurasPins.exportContentAsPNG === "function") {
-      TurasPins.exportContentAsPNG(content);
+
+    var hasChart   = !!content.chartSvg;
+    var hasTable   = !!content.tableHtml;
+    var hasInsight = !!content.insightText;
+
+    function doExport(flags) {
+      TurasPins.exportContentAsPNG({
+        title:       content.title,
+        chartSvg:    flags.chart   ? content.chartSvg   : "",
+        tableHtml:   flags.table   ? content.tableHtml  : "",
+        insightText: flags.insight ? content.insightText : "",
+        pinFlags:    { chart: !!flags.chart, table: !!flags.table, insight: !!flags.insight },
+        pinMode:     "custom"
+      });
     }
+
+    // No button element or nothing to choose between → export directly
+    if (!btnEl || (!hasChart && !hasTable)) {
+      doExport({ chart: hasChart, table: hasTable, insight: hasInsight });
+      return;
+    }
+
+    var checkboxes = [];
+    if (hasChart) checkboxes.push({ key: "chart",   label: "Chart",   available: true, checked: true });
+    if (hasTable) checkboxes.push({ key: "table",   label: "Table",   available: true, checked: true });
+    checkboxes.push(              { key: "insight", label: "Insight", available: true, checked: hasInsight });
+
+    TurasPins.showCheckboxPopover(btnEl, checkboxes, function(flags) {
+      doExport(flags);
+    }, null, { title: "EXPORT AS PNG", actionLabel: "Export" });
   };
 
   // --- Export the enclosing sub-view (or element-section) as PNG ---
@@ -258,15 +283,34 @@
       }
     }
 
-    content.pinFlags = {
-      chart:   !!content.chartSvg,
-      table:   !!content.tableHtml,
-      insight: !!content.insightText
-    };
-    content.pinMode = "custom";
-    if (typeof TurasPins.exportContentAsPNG === "function") {
-      TurasPins.exportContentAsPNG(content);
+    var hasChart   = !!content.chartSvg;
+    var hasTable   = !!content.tableHtml;
+    var hasInsight = !!content.insightText;
+
+    function doExportFromEl(flags) {
+      TurasPins.exportContentAsPNG({
+        title:       content.title,
+        chartSvg:    flags.chart   ? content.chartSvg   : "",
+        tableHtml:   flags.table   ? content.tableHtml  : "",
+        insightText: flags.insight ? content.insightText : "",
+        pinFlags:    { chart: !!flags.chart, table: !!flags.table, insight: !!flags.insight },
+        pinMode:     "custom"
+      });
     }
+
+    if (!hasChart && !hasTable) {
+      doExportFromEl({ chart: false, table: false, insight: hasInsight });
+      return;
+    }
+
+    var checkboxes = [];
+    if (hasChart) checkboxes.push({ key: "chart",   label: "Chart",   available: true, checked: true });
+    if (hasTable) checkboxes.push({ key: "table",   label: "Table",   available: true, checked: true });
+    checkboxes.push(              { key: "insight", label: "Insight", available: true, checked: hasInsight });
+
+    TurasPins.showCheckboxPopover(btnEl, checkboxes, function(flags) {
+      doExportFromEl(flags);
+    }, null, { title: "EXPORT AS PNG", actionLabel: "Export" });
   };
 
   // --- Export all pinned as PNG ---
@@ -301,6 +345,17 @@
     });
 
     if (TurasPins._initDragDrop) TurasPins._initDragDrop();
+
+    // Close any open popover when clicking outside, but not when clicking
+    // the brand pin/PNG buttons themselves (they open their own popovers).
+    document.addEventListener("click", function(e) {
+      if (!e.target.closest(".br-pin-btn") &&
+          !e.target.closest(".br-png-btn") &&
+          !e.target.closest(".ma-png-btn") &&
+          !e.target.closest(".fn-png-btn")) {
+        TurasPins.closePopover();
+      }
+    });
   }
 
   if (document.readyState === "loading") {

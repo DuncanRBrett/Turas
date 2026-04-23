@@ -526,7 +526,7 @@ build_br_portfolio_panel <- function(results, config) {
     style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:15px;padding:5px 10px;color:#94a3b8;">
     &#x1F4CC;
   </button>
-  <button class="br-png-btn" onclick="brExportPng(\'%s\')" title="Export PNG"
+  <button class="br-png-btn" onclick="brExportPng(\'%s\',this)" title="Export PNG"
     style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;padding:5px 10px;color:#64748b;">
     &#x1F5BC; PNG
   </button>

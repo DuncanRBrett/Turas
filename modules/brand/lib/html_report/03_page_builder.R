@@ -123,7 +123,7 @@ build_br_section_toolbar <- function(section_id) {
     style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:15px;padding:5px 10px;color:#94a3b8;transition:all 0.15s;">
     &#x1F4CC;
   </button>
-  <button class="br-png-btn" onclick="brExportPng(\'%s\')" title="Export PNG"
+  <button class="br-png-btn" onclick="brExportPng(\'%s\',this)" title="Export PNG"
     style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;padding:5px 10px;color:#64748b;">
     &#x1F5BC; PNG
   </button>
@@ -391,7 +391,7 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
     style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:15px;padding:5px 10px;color:#94a3b8;transition:all 0.15s;">
     &#x1F4CC;
   </button>
-  <button class="br-png-btn" onclick="brExportPng(\'%s\')" title="Export PNG"
+  <button class="br-png-btn" onclick="brExportPng(\'%s\',this)" title="Export PNG"
     style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;padding:5px 10px;color:#64748b;">
     &#x1F5BC; PNG
   </button>
