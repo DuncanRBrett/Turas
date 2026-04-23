@@ -1492,10 +1492,14 @@
           { label: "Insights",           sel: ".fn-insight-strip" }
         ];
       } else {
+        // ".fn-chart-view[data-fn-view='slope']" is the outer chart wrapper div.
+        // It avoids matching the Slope/Bar toggle BUTTON (which also carries
+        // data-fn-view='slope'). The save handler resolves bar vs slope at
+        // capture time so the active view is always pinned.
         items = [
           { label: "Table",        sel: ".fn-table-wrap" },
-          { label: "Slope chart",  sel: "[data-fn-view='slope']" },
-          { label: "Mini funnels", sel: "[data-fn-view='minifunnels']" },
+          { label: "Chart",        sel: ".fn-chart-view[data-fn-view='slope']" },
+          { label: "Mini funnels", sel: ".fn-mini-funnels-view[data-fn-view='minifunnels']" },
           { label: "Insights",     sel: ".fn-insight-strip" }
         ];
       }
@@ -1526,15 +1530,12 @@
       }, 0);
 
       drop.querySelector(".fn-pin-save-btn").addEventListener("click", function() {
+        if (typeof TurasPins === "undefined") { drop.remove(); return; }
+
         var pd       = panel.__fnData;
         var catLabel = (pd && pd.meta && pd.meta.category_label) ||
                        (pd && pd.meta && pd.meta.category_code) || "Brand";
         var isRel    = (activeSubtab === "relationship");
-        var baseNote = isRel
-          ? "Base: % of aware respondents"
-          : (panel.__fnState.pctMode === "previous"
-              ? "Base: % of previous stage"
-              : "Base: % of total respondents");
         var focalName = "";
         if (pd && pd.table) {
           var codes = pd.table.brand_codes || [];
@@ -1543,20 +1544,69 @@
           if (fi >= 0) focalName = names[fi];
         }
 
+        var title = "Brand " + (isRel ? "Relationship" : "Funnel") + " \u2013 " + catLabel;
+        if (focalName) title += " \u2013 " + focalName;
+
+        var chartSvg    = "";
+        var tableHtml   = "";
+        var insightText = "";
+        var hasChart    = false;
+        var hasTable    = false;
+        var hasInsight  = false;
+
         drop.querySelectorAll(".fn-pin-chk:checked").forEach(function(chk) {
-          var sectionLabel = chk.parentNode.textContent.trim();
-          var sel = chk.getAttribute("data-fn-pin-sel");
-          var el  = panel.querySelector(sel);
+          var label = chk.parentNode.textContent.trim();
+          var sel   = chk.getAttribute("data-fn-pin-sel");
+          var el    = panel.querySelector(sel);
           if (!el) return;
-          el.setAttribute("data-pin-title",
-            "Brand " + (isRel ? "Relationship" : "Funnel") + " \u2013 " + catLabel + " \u2013 " + sectionLabel);
-          el.setAttribute("data-pin-footnote",
-            baseNote + (focalName ? "; Focal: " + focalName : ""));
-          if (window.TurasPin && window.TurasPin.pin) {
-            window.TurasPin.pin(el);
+
+          if (/insight/i.test(label)) {
+            // Read textarea value — do NOT capture the DOM element itself
+            var ta  = el.querySelector(".fn-insight-textarea");
+            var txt = ta ? ta.value.trim() : "";
+            if (txt) { insightText = txt; hasInsight = true; }
+          } else if (label === "Chart" && !chartSvg) {
+            // Use bar wrap when bar view is active; slope container otherwise.
+            var barWrap = panel.querySelector(".fn-bar-wrap");
+            var chartEl = (barWrap && !barWrap.hidden) ? barWrap : el;
+            var svgEl = chartEl.querySelector("svg");
+            if (svgEl) {
+              var svgClone = svgEl.cloneNode(true);
+              if (!svgClone.getAttribute("viewBox")) {
+                var rect = svgEl.getBoundingClientRect();
+                if (rect.width > 0) {
+                  svgClone.setAttribute("viewBox", "0 0 " + rect.width + " " + rect.height);
+                }
+              }
+              if (!svgClone.getAttribute("width"))  svgClone.setAttribute("width",  svgEl.getBoundingClientRect().width  || "");
+              if (!svgClone.getAttribute("height")) svgClone.setAttribute("height", svgEl.getBoundingClientRect().height || "");
+              chartSvg = svgClone.outerHTML;
+              hasChart = true;
+            }
           } else {
-            el.classList.toggle("fn-pinned");
+            // Table, Mini funnels, Relationship table/chart, AI insights
+            var tbl = el.querySelector("table");
+            if (tbl) {
+              tableHtml += TurasPins.capturePortableHtml
+                ? TurasPins.capturePortableHtml(tbl)
+                : tbl.outerHTML;
+            } else {
+              tableHtml += el.outerHTML;
+            }
+            hasTable = true;
           }
+        });
+
+        if (!hasChart && !hasTable && !hasInsight) { drop.remove(); return; }
+
+        TurasPins.add({
+          sectionKey:  "fn-" + Date.now(),
+          title:       title,
+          chartSvg:    chartSvg,
+          tableHtml:   tableHtml,
+          insightText: insightText,
+          pinFlags:    { chart: hasChart, table: hasTable, insight: hasInsight },
+          pinMode:     "custom"
         });
         drop.remove();
       });

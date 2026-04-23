@@ -114,7 +114,7 @@ build_br_tab_nav <- function(category_names, config) {
 }
 
 
-#' Build section toolbar (pin + export + insight)
+#' Build section toolbar (pin + PNG export + Excel export + insight)
 #' @keywords internal
 build_br_section_toolbar <- function(section_id) {
   sprintf('
@@ -123,9 +123,13 @@ build_br_section_toolbar <- function(section_id) {
     style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:15px;padding:5px 10px;color:#94a3b8;transition:all 0.15s;">
     &#x1F4CC;
   </button>
+  <button class="br-png-btn" onclick="brExportPng(\'%s\',this)" title="Export PNG"
+    style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;padding:5px 10px;color:#64748b;">
+    &#x1F5BC; PNG
+  </button>
   <button class="br-export-btn" onclick="_brExportPanel(\'%s\')" title="Export Excel"
     style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;padding:5px 10px;color:#64748b;">
-    &#x1F4E5; Export
+    &#x1F4E5; Excel
   </button>
   <button class="br-insight-toggle" onclick="_brToggleInsight(\'%s\')"
     style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;padding:5px 10px;color:#64748b;">
@@ -140,7 +144,7 @@ build_br_section_toolbar <- function(section_id) {
   <button class="br-insight-dismiss" onclick="_brDismissInsight(\'%s\')"
     style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px;position:absolute;top:4px;right:8px;">&times;</button>
 </div>',
-    section_id, section_id, section_id, section_id,
+    section_id, section_id, section_id, section_id, section_id,
     section_id, section_id, section_id, section_id, section_id)
 }
 
@@ -322,6 +326,15 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
       section_id, section_id))
 
     if (!is.null(panels[[chart_key]])) {
+      # WOM and repertoire/cat-buying panels don't embed their own pin/PNG/Excel
+      # toolbar, so attach the shared one before the panel content. Funnel and
+      # MA panels embed their own controls (pin dropdown + per-view exports).
+      if (el == "wom") {
+        parts <- c(parts, build_br_section_toolbar(section_id))
+        parts <- c(parts, sprintf(
+          '<h3 class="br-element-title">Word of Mouth \u2014 %s</h3>',
+          .br_esc(cat_name)))
+      }
       parts <- c(parts, panels[[chart_key]])
     } else if (el == "ma") {
       parts <- c(parts,
@@ -378,12 +391,16 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
     style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:15px;padding:5px 10px;color:#94a3b8;transition:all 0.15s;">
     &#x1F4CC;
   </button>
+  <button class="br-png-btn" onclick="brExportPng(\'%s\',this)" title="Export PNG"
+    style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;padding:5px 10px;color:#64748b;">
+    &#x1F5BC; PNG
+  </button>
   <button class="br-export-btn" onclick="_brExportPanel(\'%s\')" title="Export Excel"
     style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;padding:5px 10px;color:#64748b;">
-    &#x1F4E5; Export
+    &#x1F4E5; Excel
   </button>
 </div>',
-          section_id, section_id, section_id, section_id))
+          section_id, section_id, section_id, section_id, section_id))
         parts <- c(parts, panels[[cb_panel_key]])
         parts <- c(parts, sprintf('
 <div class="cb-insight-footer" style="margin-top:20px;">
@@ -846,14 +863,69 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
    promoted to the category-level .br-subtab-nav. The internal nav HTML
    is kept in the DOM so JS click-dispatch still works. */
 .fn-subnav, .ma-subnav { display: none !important; }
+
+/* === PINNED CARD (br-pinned-*) — matches conjoint/tabs visual standard === */
+.br-pinned-card {
+  background:#ffffff; border:1px solid #e8e5e0; border-radius:8px;
+  padding:20px 24px; margin-bottom:16px; page-break-inside:avoid;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+.br-pinned-card-header {
+  display:flex; justify-content:space-between; align-items:flex-start;
+  margin-bottom:12px; gap:12px;
+}
+.br-pinned-card-title {
+  font-size:16px; font-weight:600; color:#1e293b; line-height:1.3;
+  flex:1 1 auto; min-width:0;
+}
+.br-pinned-card-actions { display:flex; gap:4px; flex-shrink:0; align-items:center; }
+.br-pinned-action-btn, .br-pinned-remove-btn {
+  padding:4px 8px; font-size:14px; line-height:1;
+  background:none; border:1px solid #e2e8f0; border-radius:4px;
+  cursor:pointer; color:#64748b; transition:all 0.15s;
+}
+.br-pinned-action-btn:hover { background:#f1f5f9; color:#1e293b; }
+.br-pinned-remove-btn:hover { background:#fee2e2; color:#b91c1c; border-color:#fca5a5; }
+
+.br-pinned-card-insight {
+  margin-bottom:12px; padding:14px 20px;
+  border-left:3px solid %s; background:#f8fafa;
+  border-radius:0 6px 6px 0; font-size:14px; line-height:1.6; color:#1e293b;
+}
+.br-pinned-card-insight:empty { display:none; }
+.br-pinned-card-chart { margin-bottom:12px; }
+.br-pinned-card-chart svg { width:100%%; height:auto; max-width:100%%; }
+.br-pinned-card-table { overflow-x:auto; margin-bottom:8px; }
+.br-pinned-card-table table { width:100%% !important; border-collapse:collapse; font-size:13px; }
+.br-pinned-card-table th {
+  padding:8px 12px; text-align:left; font-size:11px; font-weight:600;
+  text-transform:uppercase; letter-spacing:0.3px; color:#64748b;
+  background:#f8fafc; border-bottom:2px solid #e2e8f0;
+}
+.br-pinned-card-table td {
+  padding:8px 12px; border-bottom:1px solid #f1f5f9; color:#334155;
+}
+.br-pinned-card-table tr:last-child td { border-bottom:none; }
+.br-pinned-card-table tr:hover td { background:#f8fafc; }
+
+.br-pinned-card[draggable="true"] { cursor:grab; }
+.br-pinned-card[draggable="true"]:active { cursor:grabbing; }
+.pin-dragging { opacity:0.4 !important; }
+.pin-drop-target { outline:2px dashed %s; outline-offset:4px; }
+
+.turas-pin-overflow { font-family:inherit; }
+.turas-pin-overflow button { font-family:inherit !important; }
+
 @media print {
   .br-tab-nav, .br-section-toolbar, .br-insight-container,
-  .br-chart-pin-btn, .br-save-btn, .br-help-btn { display: none !important; }
+  .br-chart-pin-btn, .br-save-btn, .br-help-btn,
+  .br-pinned-card-actions { display: none !important; }
   .br-panel { display: block !important; page-break-inside: avoid; }
   .br-subpanel { display: block !important; }
 }
   ', brand_colour, accent_colour, brand_colour,
      brand_colour, brand_colour, brand_colour,
+     brand_colour, brand_colour,
      brand_colour, brand_colour,
      brand_colour, brand_colour)
 

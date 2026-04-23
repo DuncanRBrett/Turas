@@ -224,12 +224,16 @@ run_dirichlet_norms <- function(pen_mat,
     # NBDdirichlet::dirichlet() signature:
     #   dirichlet(cat.pen, cat.buyrate, brand.share, brand.pen.obs)
     # brand.pen.obs is required — observed brand penetration as fractions
-    dir_obj <- NBDdirichlet::dirichlet(
+    # suppressWarnings: the package emits informational "nstar is too small"
+    # notices during maximum-likelihood estimation on small samples. These are
+    # not errors — the calculation still completes and our guard validates the
+    # output. Suppressing here keeps test and console output clean.
+    dir_obj <- suppressWarnings(NBDdirichlet::dirichlet(
       cat.pen       = cat_pen,
       cat.buyrate   = cat_mean_purch,
       brand.share   = brand_shares,
       brand.pen.obs = brand_pen_obs
-    )
+    ))
     dir_obj
   }, error = function(e) {
     list(.error = conditionMessage(e))

@@ -1451,15 +1451,21 @@
   }
 
   function exportTable(panel, stim) {
-    var sec = panel.querySelector('.ma-matrix-section[data-ma-stim="' + stim + '"]');
+    var sec = panel.querySelector('.ma-matrix-section[data-ma-stim="' + stim + '"]')
+           || panel.querySelector('.ma-metrics-section[data-ma-stim="' + stim + '"]')
+           || panel.querySelector('[data-ma-stim="' + stim + '"]');
     if (!sec) return;
     var tbl = sec.querySelector('table');
     if (!tbl) return;
     var pd = panel.__maData || {};
     var cat = (pd.meta && pd.meta.category_label) || 'category';
     var focal = (pd.meta && pd.meta.focal_brand_code) || '';
-    var mode = (panel.__maState.basemode[stim] || 'total');
-    var title = (stim === 'attributes') ? 'Brand Attributes' : 'Category Entry Points';
+    var basemode = (panel.__maState && panel.__maState.basemode) || {};
+    var mode = (basemode[stim] || 'total');
+    var title = (stim === 'attributes') ? 'Brand Attributes'
+              : (stim === 'ceps') ? 'Category Entry Points'
+              : (stim === 'metrics') ? 'Headline Metrics'
+              : stim;
     var html = '<html><head><meta charset="utf-8"><title>' + escHtml(title) + '</title>'
       + '<style>table{border-collapse:collapse;font-family:Arial,sans-serif;}'
       + 'th,td{border:1px solid #ccc;padding:4px 8px;font-size:12px;text-align:center;}'

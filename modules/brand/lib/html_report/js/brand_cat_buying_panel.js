@@ -142,23 +142,41 @@
   /* ---------------------------------------------------------------------- */
 
   function relocateCbToolbarIntoControls(panel) {
-    var section = panel.closest('.br-element-section');
-    if (!section) return;
-    var toolbar = section.querySelector(':scope > .cb-toolbar-top');
-    if (!toolbar || toolbar.__cbRelocated) return;
-    var controls = panel.querySelector(
-      '.cb-controls-bar[data-cb-scope="brands"]');
-    if (!controls) return;
-    var pinBtn    = toolbar.querySelector('.br-pin-btn');
-    var exportBtn = toolbar.querySelector('.br-export-btn');
-    if (!pinBtn && !exportBtn) return;
-    var wrap = document.createElement('span');
-    wrap.className = 'cb-toolbar-relocated';
-    if (pinBtn)    wrap.appendChild(pinBtn);
-    if (exportBtn) wrap.appendChild(exportBtn);
-    controls.appendChild(wrap);
-    toolbar.style.display = 'none';
-    toolbar.__cbRelocated = true;
+    // Move the pin/PNG/Excel buttons into the currently-active subtab's
+    // .cb-controls-bar (right-aligned via .cb-toolbar-relocated). On subtabs
+    // without a controls bar (Category Context), restore the toolbar to its
+    // original top-of-section position so the buttons remain reachable.
+    // NOTE: the toolbar is emitted as a SIBLING of .cb-panel inside
+    // .br-element-section, so look up via the section, not the panel.
+    var section = panel.closest('.br-element-section') || panel.parentNode;
+    // Use plain querySelector (no `:scope >`) because once relocated the
+    // toolbar is no longer a direct child of the section.
+    var toolbar = section ? section.querySelector('.cb-toolbar-top') : null;
+    if (!toolbar) return;
+
+    if (!panel.__cbToolbarHome) {
+      panel.__cbToolbarHome = {
+        parent:  toolbar.parentNode,
+        next:    toolbar.nextSibling,
+        display: toolbar.style.display
+      };
+    }
+
+    var activeTab = panel.querySelector('.cb-subtab:not([hidden])');
+    var controls  = activeTab ? activeTab.querySelector('.cb-controls-bar') : null;
+
+    if (controls) {
+      toolbar.classList.add('cb-toolbar-relocated');
+      toolbar.style.margin = '';
+      toolbar.style.display = '';
+      controls.appendChild(toolbar);
+    } else {
+      toolbar.classList.remove('cb-toolbar-relocated');
+      var home = panel.__cbToolbarHome;
+      if (home && home.parent && toolbar.parentNode !== home.parent) {
+        home.parent.insertBefore(toolbar, home.next || null);
+      }
+    }
   }
 
   /* ---------------------------------------------------------------------- */
@@ -204,6 +222,7 @@
         if (target === 'loyalty' || target === 'dist') {
           renderCbStackedBars(panel, target);
         }
+        relocateCbToolbarIntoControls(panel);
       });
     });
   }

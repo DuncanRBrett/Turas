@@ -411,7 +411,7 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
     col <- trimws(as.character(col))
     if (!nzchar(col)) next
     if (!grepl("^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$", col)) {
-      warning(sprintf("Brand '%s': Colour '%s' is not a valid hex code — skipped.", code, col))
+      message(sprintf("[BRAND] Brand '%s': Colour '%s' is not a valid hex code — skipped.", code, col))
       next
     }
     colours[[code]] <- col

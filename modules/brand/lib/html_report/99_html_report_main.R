@@ -149,6 +149,13 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
       panel_styles <- paste(panel_styles,
         paste0('<style class="pf-panel-styles">', css, '</style>'), sep = "\n")
   }
+  if (exists("build_portfolio_overview_subtab_styles", mode = "function")) {
+    css <- tryCatch(build_portfolio_overview_subtab_styles(brand_colour_cfg),
+                    error = function(e) "")
+    if (nzchar(trimws(css)))
+      panel_styles <- paste(panel_styles,
+        paste0('<style class="pfo-subtab-styles">', css, '</style>'), sep = "\n")
+  }
   if (exists("build_wom_panel_styles", mode = "function")) {
     css <- tryCatch(build_wom_panel_styles(brand_colour_cfg), error = function(e) "")
     if (nzchar(trimws(css)))
@@ -175,6 +182,7 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
     .resolve_js("brand_ma_panel.js"),
     .resolve_js("brand_cat_buying_panel.js"),
     .resolve_js("brand_portfolio_panel.js"),
+    .resolve_js("brand_portfolio_overview.js"),
     .resolve_js("brand_wom_panel.js"),
     sep = "\n"
   )

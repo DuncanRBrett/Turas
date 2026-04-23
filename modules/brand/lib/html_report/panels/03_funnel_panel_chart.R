@@ -128,9 +128,10 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
     '<label class="toggle-label"><input type="checkbox" data-fn-rel-showci> Show heatmap</label>',
     '<label class="toggle-label"><input type="checkbox" data-fn-rel-showcounts> Show count</label>',
     '<label class="toggle-label"><input type="checkbox" checked data-fn-rel-showchart> Show chart</label>',
-    '<button type="button" class="export-btn fn-rel-export-btn" data-fn-rel-action="export" title="Export table to CSV">',
+    '<button type="button" class="export-btn fn-png-btn" onclick="brExportPngFromEl(this)" title="Export view to PNG">&#x1F5BC; PNG</button>',
+    '<button type="button" class="export-btn fn-rel-export-btn" data-fn-rel-action="export" title="Export table to Excel">',
     '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="flex-shrink:0;"><path d="M6 1v7M3 6l3 3 3-3M1 10h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-    ' Export',
+    ' Excel',
     '</button>',
     '</div>',
     '</div>'

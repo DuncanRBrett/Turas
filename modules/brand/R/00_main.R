@@ -80,7 +80,8 @@ BRAND_VERSION <- "1.0"
     "09d_portfolio_strength.R",
     "09e_portfolio_extension.R",
     "09f_portfolio_panel_data.R",
-    "09g_portfolio_output.R"
+    "09g_portfolio_output.R",
+    "09h_portfolio_overview_data.R"
   )
 
   for (f in module_files) {
@@ -643,6 +644,22 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
   # not from per-category filtered subsets.
   results$portfolio <- .compute_portfolio_data(data, categories, structure,
                                                config, weights)
+
+  # --- STEP 5b: Portfolio Overview (focal-brand view across ALL categories) ---
+  # Deep-dive AND awareness-only categories together, enriched with pen/SCR/vol
+  # for deep-dive cats from category_results.
+  results$portfolio_overview <- tryCatch(
+    compute_portfolio_overview_data(
+      data, categories, structure, config,
+      weights          = weights,
+      category_results = category_results
+    ),
+    error = function(e) {
+      warnings_list <<- c(warnings_list,
+        sprintf("Portfolio overview failed: %s", e$message))
+      NULL
+    }
+  )
 
   # --- STEP 5: Brand-level elements ---
 
