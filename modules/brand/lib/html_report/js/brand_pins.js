@@ -111,7 +111,16 @@
     if (!section) return;
 
     var hasChart = !!section.querySelector("svg");
-    var hasTable = !!section.querySelector("table.br-table");
+    // Match captureFromRoot's selector list so smart-skip sees the same tables
+    // the actual capture will find (pfo-table, fn-table, ma-table, plain table).
+    var hasTable = !!(
+      section.querySelector("table.br-table")  ||
+      section.querySelector("table.pfo-table") ||
+      section.querySelector("table.fn-table")  ||
+      section.querySelector("table.ma-table")  ||
+      section.querySelector("table.ma-matrix") ||
+      section.querySelector("table")
+    );
     var hasInsight = false;
     var editor = section.querySelector(".br-insight-editor");
     if (editor && editor.value.trim()) hasInsight = true;
@@ -328,6 +337,20 @@
     if (typeof TurasPins !== "undefined" && TurasPins.addSection) {
       TurasPins.addSection(title);
     }
+  };
+
+  // --- Pin state store ---
+  // Lightweight key-value store so portfolio/overview JS can record UI state
+  // (active subtab, focal brand, centred brand) that future pin-restore hooks
+  // can read via brGetPinState().
+  var _brPinState = {};
+
+  window.brSetPinState = function(key, value) {
+    _brPinState[key] = value;
+  };
+
+  window.brGetPinState = function(key) {
+    return _brPinState[key];
   };
 
   // --- Init TurasPins ---

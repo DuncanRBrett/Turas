@@ -1492,9 +1492,10 @@
           { label: "Insights",           sel: ".fn-insight-strip" }
         ];
       } else {
-        // NOTE: ".fn-chart-view[data-fn-view='slope']" targets the div (not
-        // the Slope/Bar toggle BUTTON which also carries data-fn-view='slope')
-        // so we capture the currently-visible chart (whichever view is on).
+        // ".fn-chart-view[data-fn-view='slope']" is the outer chart wrapper div.
+        // It avoids matching the Slope/Bar toggle BUTTON (which also carries
+        // data-fn-view='slope'). The save handler resolves bar vs slope at
+        // capture time so the active view is always pinned.
         items = [
           { label: "Table",        sel: ".fn-table-wrap" },
           { label: "Chart",        sel: ".fn-chart-view[data-fn-view='slope']" },
@@ -1565,8 +1566,10 @@
             var txt = ta ? ta.value.trim() : "";
             if (txt) { insightText = txt; hasInsight = true; }
           } else if (label === "Chart" && !chartSvg) {
-            // Slope/bar chart SVG
-            var svgEl = el.querySelector("svg");
+            // Use bar wrap when bar view is active; slope container otherwise.
+            var barWrap = panel.querySelector(".fn-bar-wrap");
+            var chartEl = (barWrap && !barWrap.hidden) ? barWrap : el;
+            var svgEl = chartEl.querySelector("svg");
             if (svgEl) {
               var svgClone = svgEl.cloneNode(true);
               if (!svgClone.getAttribute("viewBox")) {

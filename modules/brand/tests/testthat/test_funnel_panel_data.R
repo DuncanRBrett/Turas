@@ -318,7 +318,7 @@ test_that("brand_colours map is empty when no Colour column is present", {
 })
 
 
-test_that("invalid hex values in Colour column are silently dropped with a warning", {
+test_that("invalid hex values in Colour column are silently dropped with a message", {
   result  <- .run_fixture()
   bl_bad  <- data.frame(
     BrandCode  = c("IPK", "ROB", "CART"),
@@ -327,7 +327,7 @@ test_that("invalid hex values in Colour column are silently dropped with a warni
     stringsAsFactors = FALSE
   )
 
-  panel <- expect_warning(
+  panel <- expect_message(
     build_funnel_panel_data(result, bl_bad, list()),
     regexp = "not a valid hex"
   )
