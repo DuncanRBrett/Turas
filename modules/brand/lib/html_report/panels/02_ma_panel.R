@@ -59,8 +59,8 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
   default_tab <- if (has_attrs) "attributes" else "ceps"
 
   paste0(
-    sprintf('<div class="ma-panel" id="%s" data-focal-colour="%s"%s>',
-            panel_id, focal_colour, excel_attr),
+    sprintf('<div class="ma-panel" id="%s" data-focal-colour="%s" style="--ma-brand:%s"%s>',
+            panel_id, focal_colour, focal_colour, excel_attr),
     sprintf('<script type="application/json" class="ma-panel-data">%s</script>',
             json_payload),
     .ma_sub_tabs(has_attrs, has_ceps, default_tab),
@@ -175,7 +175,7 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
 
   base_switcher <- if (has_aware) {
     paste0(
-      '<div class="sig-level-switcher ma-base-switcher" role="group" aria-label="Percentage base">',
+      '<div class="sig-level-switcher" role="group" aria-label="Percentage base">',
       '<span class="sig-level-label">Base:</span>',
       sprintf('<button type="button" class="sig-btn" data-ma-action="basemode" data-ma-stim="%s" data-ma-basemode="aware" aria-pressed="false">%% aware</button>', stim),
       sprintf('<button type="button" class="sig-btn sig-btn-active" data-ma-action="basemode" data-ma-stim="%s" data-ma-basemode="total" aria-pressed="true">%% total</button>', stim),
@@ -193,6 +193,7 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
     '<div class="ma-ctl-group"><span class="ma-ctl-label">Show brands</span>',
     sprintf('<div class="ma-chip-row col-chip-bar" data-ma-scope="%s">%s</div></div>',
             stim, chips_html),
+    '<div class="ma-meta-row">',
     base_switcher,
     heatmap_switcher,
     sprintf('<label class="toggle-label"><input type="checkbox" data-ma-action="showcounts" data-ma-stim="%s"> Show count</label>', stim),
@@ -201,6 +202,7 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
     '<button type="button" class="export-btn ma-png-btn" onclick="brExportPngFromEl(this)" title="Export view to PNG">&#x1F5BC; PNG</button>',
     sprintf('<button type="button" class="export-btn ma-export-btn" data-ma-action="exporttable" data-ma-stim="%s" title="Export table to Excel">\u2B73 Excel \u25BE</button>',
             stim),
+    '</div>',
     '</div>'
   )
 }

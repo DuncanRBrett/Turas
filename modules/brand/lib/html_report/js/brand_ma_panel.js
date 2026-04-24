@@ -196,7 +196,7 @@
     bindMetricsSortButtons(panel);
     bindMetricsChips(panel);
     bindMetricsShowCounts(panel);
-    bindMetricsChartToggles(panel);
+    bindChartSelectMenu(panel);
     bindExport(panel);
     bindPinDropdown(panel);
     bindAddInsight(panel);
@@ -485,7 +485,7 @@
         var stim = btn.getAttribute('data-ma-stim');
         var mode = btn.getAttribute('data-ma-basemode');
         panel.__maState.basemode[stim] = mode;
-        var parent = btn.closest('.ma-base-switcher');
+        var parent = btn.closest('.sig-level-switcher');
         if (parent) {
           parent.querySelectorAll('.sig-btn').forEach(function (b) {
             var active = b === btn;
@@ -503,16 +503,18 @@
     var mode = panel.__maState.basemode[stim] || 'total';
     var sec = panel.querySelector('.ma-matrix-section[data-ma-stim="' + stim + '"]');
     if (!sec) return;
-    // Update base row cells
+    // Update base row cells — always show n=aware (total)
     sec.querySelectorAll('tr.ma-row-base td.ma-base-n[data-ma-brand]').forEach(function (td) {
       var span = td.querySelector('.ma-base-val');
       if (!span) return;
-      if (mode === 'aware') {
-        var n = td.getAttribute('data-ma-n-aware');
-        span.textContent = n ? 'n=' + n + ' aware' : '\u2014';
+      var nTotal = td.getAttribute('data-ma-n-total');
+      var nAware = td.getAttribute('data-ma-n-aware');
+      if (nAware && nTotal) {
+        span.textContent = 'n=' + nAware + ' (' + nTotal + ')';
+      } else if (nTotal) {
+        span.textContent = 'n=' + nTotal;
       } else {
-        var n = td.getAttribute('data-ma-n-total');
-        span.textContent = n ? 'n=' + n : '\u2014';
+        span.textContent = '\u2014';
       }
     });
     sec.querySelectorAll('.ma-heatmap-cell').forEach(function (td) {
@@ -524,11 +526,18 @@
       var nSpan = td.querySelector('.ma-n-primary');
       if (!span) return;
       var val = pctTotal;
-      var n = nTotal;
-      if (mode === 'aware' && !isNaN(pctAware)) { val = pctAware; n = nAware; }
+      if (mode === 'aware' && !isNaN(pctAware)) { val = pctAware; }
       if (isNaN(val)) { span.textContent = '—'; return; }
       span.textContent = Math.round(val) + '%';
-      if (nSpan) nSpan.textContent = (n ? ('n=' + n) : '');
+      if (nSpan) {
+        if (nAware && nTotal) {
+          nSpan.textContent = 'n=' + nAware + ' (' + nTotal + ')';
+        } else if (nTotal) {
+          nSpan.textContent = 'n=' + nTotal;
+        } else {
+          nSpan.textContent = '';
+        }
+      }
       td.setAttribute('data-sort-val', val.toFixed(6));
     });
   }
@@ -841,10 +850,43 @@
   }
 
   // -------------------------------------------------------------- chart section toggles
-  function bindMetricsChartToggles(panel) {
-    panel.querySelectorAll('input[data-ma-action="togglechart"]').forEach(function (cb) {
+  var CHART_OPTS = [
+    { key: 'scatter', label: 'Mental Space' },
+    { key: 'bars',    label: 'MMS vs SOM' },
+    { key: 'ranking', label: 'CEP Ranking' }
+  ];
+
+  function bindChartSelectMenu(panel) {
+    panel.querySelectorAll('[data-ma-action="chartselectmenu"]').forEach(function (btn) {
+      btn.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        openChartSelectMenu(panel, btn);
+      });
+    });
+  }
+
+  function openChartSelectMenu(panel, btn) {
+    panel.querySelectorAll('.ma-chart-select-menu').forEach(function (el) { el.remove(); });
+
+    var dd = document.createElement('div');
+    dd.className = 'ma-chart-select-menu';
+    dd.style.cssText = 'position:absolute;z-index:400;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.08);padding:8px;min-width:180px;font-size:12px;';
+    dd.innerHTML = '<div style="font-weight:600;margin-bottom:6px;color:#334155;">Show charts</div>'
+      + CHART_OPTS.map(function (c) {
+        var sec = panel.querySelector('[data-ma-chart-id="' + c.key + '"]');
+        var checked = (!sec || !sec.hasAttribute('hidden')) ? ' checked' : '';
+        return '<label style="display:block;padding:3px 0;cursor:pointer;"><input type="checkbox"' + checked + ' data-ma-chart-key="' + c.key + '" style="margin-right:6px;">' + c.label + '</label>';
+      }).join('');
+
+    var rect = btn.getBoundingClientRect();
+    var panelRect = panel.getBoundingClientRect();
+    dd.style.left = (rect.left - panelRect.left) + 'px';
+    dd.style.top  = (rect.bottom - panelRect.top + 4) + 'px';
+    panel.appendChild(dd);
+
+    dd.querySelectorAll('input[data-ma-chart-key]').forEach(function (cb) {
       cb.addEventListener('change', function () {
-        var target = cb.getAttribute('data-ma-chart-target');
+        var target = cb.getAttribute('data-ma-chart-key');
         var sec = panel.querySelector('[data-ma-chart-id="' + target + '"]');
         if (!sec) return;
         if (cb.checked) {
@@ -854,8 +896,25 @@
         } else {
           sec.setAttribute('hidden', '');
         }
+        updateChartSelectBtn(panel, btn);
       });
     });
+
+    function closeOnce() {
+      dd.remove();
+      document.removeEventListener('click', closeOnce);
+    }
+    setTimeout(function () { document.addEventListener('click', closeOnce); }, 0);
+    dd.addEventListener('click', function (e) { e.stopPropagation(); });
+  }
+
+  function updateChartSelectBtn(panel, btn) {
+    var anyVisible = CHART_OPTS.some(function (c) {
+      var s = panel.querySelector('[data-ma-chart-id="' + c.key + '"]');
+      return s && !s.hasAttribute('hidden');
+    });
+    btn.setAttribute('aria-pressed', anyVisible ? 'true' : 'false');
+    btn.innerHTML = (anyVisible ? '&#10003; ' : '') + 'Show chart &#9662;';
   }
 
   // -------------------------------------------------------------- metrics show counts

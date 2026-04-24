@@ -32,22 +32,18 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
       .ma_esc(brand_codes[i]), .ma_esc(brand_names[i]))
   }, character(1)), collapse = "")
 
-  chart_toggles <- paste0(
-    '<label class="toggle-label"><input type="checkbox" checked data-ma-action="togglechart" data-ma-chart-target="scatter"> Mental Space</label>',
-    '<label class="toggle-label"><input type="checkbox" checked data-ma-action="togglechart" data-ma-chart-target="bars"> MMS vs SOM</label>',
-    '<label class="toggle-label"><input type="checkbox" checked data-ma-action="togglechart" data-ma-chart-target="ranking"> CEP Ranking</label>'
-  )
-
   controls_bar <- paste0(
     '<div class="ma-controls controls-bar">',
     '<div class="ma-ctl-group"><span class="ma-ctl-label">Show brands</span>',
     '<div class="ma-chip-row col-chip-bar" data-ma-scope="metrics">', chips_html, '</div>',
     '</div>',
-    chart_toggles,
+    '<div class="ma-meta-row">',
+    '<button type="button" class="export-btn ma-chart-select-btn" data-ma-action="chartselectmenu" aria-haspopup="true" aria-pressed="true" title="Select charts to show">&#10003; Show chart &#9662;</button>',
     '<label class="toggle-label"><input type="checkbox" data-ma-action="showcounts-metrics"> Show count</label>',
     '<button type="button" class="export-btn ma-pin-dropdown-btn" data-ma-action="pindropdown" title="Pin a section" aria-haspopup="true">&#128204; Pin &#9662;</button>',
     '<button type="button" class="export-btn ma-png-btn" onclick="brExportPngFromEl(this)" title="Export view to PNG">&#x1F5BC; PNG</button>',
     '<button type="button" class="export-btn ma-export-btn" data-ma-action="exporttable" data-ma-stim="metrics" title="Export table to Excel">\u2B73 Excel \u25BE</button>',
+    '</div>',
     '</div>'
   )
 
