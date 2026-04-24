@@ -179,9 +179,11 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
   stage_labels <- .stage_labels_for(stage_keys, overrides = lbl_overrides)
 
   # Nested pct = stage pct / previous stage pct (category-wide). Stage 1
-  # has no previous stage so nested = absolute. Precomputed per brand
+  # has no previous stage so nested = absolute. Aware pct = stage pct /
+  # brand's stage-1 (awareness) pct — stage 1 pins to 1.0. All precomputed
   # so the JS toggle can switch view without extra computation.
-  prev_pct <- list()
+  prev_pct  <- list()
+  aware_pct <- list()  # brand -> awareness pct (stage 1 absolute)
   cells <- list()
   for (key in stage_keys) {
     for (b in brand_codes) {
@@ -194,10 +196,21 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
       } else {
         abs_pct / prev_pct[[b]]
       }
+      # Stage 1 = brand's awareness baseline; pin to 1.0 for % of aware display.
+      if (is.null(aware_pct[[b]])) aware_pct[[b]] <- abs_pct
+      aware_val <- aware_pct[[b]]
+      pct_aw <- if (key == stage_keys[1]) {
+        1.0
+      } else if (is.finite(aware_val) && aware_val > 0 && is.finite(abs_pct)) {
+        abs_pct / aware_val
+      } else {
+        NA_real_
+      }
       cells[[length(cells) + 1]] <- list(
         stage_key = key, brand_code = b,
         pct_absolute = abs_pct,
         pct_nested   = nested_pct,
+        pct_aware    = pct_aw,
         base_weighted   = if (nrow(row) == 0) NA_real_ else row$base_weighted,
         base_unweighted = if (nrow(row) == 0) NA_real_ else row$base_unweighted,
         sig_vs_focal = .sig_vs_focal_for(result$sig_results, key, b,
@@ -221,7 +234,8 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
 #' nested variants). Included as its own row in the rendered table.
 #' @keywords internal
 .avg_all_brands_row <- function(stages, stage_keys) {
-  prev_avg <- NA_real_
+  prev_avg  <- NA_real_
+  aware_avg <- NA_real_
   out <- list()
   for (key in stage_keys) {
     vals <- stages$pct_weighted[stages$stage_key == key]
@@ -232,6 +246,14 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
       abs_mean
     } else {
       abs_mean / prev_avg
+    }
+    if (key == stage_keys[1]) aware_avg <- abs_mean
+    aware_mean <- if (key == stage_keys[1]) {
+      1.0
+    } else if (is.finite(aware_avg) && aware_avg > 0 && is.finite(abs_mean)) {
+      abs_mean / aware_avg
+    } else {
+      NA_real_
     }
     # 95% CI around the mean based on brand-to-brand variability
     ci_lo <- NA_real_; ci_hi <- NA_real_
@@ -244,6 +266,7 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
       stage_key    = key,
       pct_absolute = abs_mean,
       pct_nested   = nested_mean,
+      pct_aware    = aware_mean,
       ci_lo        = ci_lo,
       ci_hi        = ci_hi
     )

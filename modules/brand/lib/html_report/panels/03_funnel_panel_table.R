@@ -267,7 +267,7 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
   vals <- vapply(stage_keys, function(k) {
     c <- cells_by_stage_for_brand[[k]]
     if (is.null(c)) return('<td class="ct-td ct-data-col ct-na">&mdash;</td>')
-    .fn_cell_html(c$pct_absolute, c$pct_nested,
+    .fn_cell_html(c$pct_absolute, c$pct_nested, c$pct_aware,
                   c$base_weighted, c$base_unweighted,
                   k, c$brand_code,
                   col_max = col_max[[k]],
@@ -278,7 +278,7 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
 }
 
 
-.fn_cell_html <- function(pct_absolute, pct_nested, base_w, base_u,
+.fn_cell_html <- function(pct_absolute, pct_nested, pct_aware, base_w, base_u,
                           stage_key, brand_code, col_max, sig_vs_avg,
                           row_class = "") {
   if (is.null(pct_absolute) || is.na(pct_absolute)) {
@@ -296,11 +296,12 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
              !is.na(base_u) && as.numeric(base_u) < .FN_SMALL_BASE
   dim_cls <- if (is_warn) " ct-low-base-dim" else ""
   sig_badge <- .fn_sig_badge(sig_vs_avg)
+  pct_aw_val <- if (is.null(pct_aware) || is.na(pct_aware)) pct_absolute else pct_aware
 
   sprintf(
     '<td class="ct-td ct-data-col ct-heatmap-cell%s %s" data-heatmap="%s"
          data-fn-stage="%s" data-fn-brand="%s"
-         data-fn-pct-abs="%.6f" data-fn-pct-nes="%.6f"
+         data-fn-pct-abs="%.6f" data-fn-pct-nes="%.6f" data-fn-pct-aw="%.6f"
          data-fn-base="%s"
          data-sort-val="%.6f">
        <span class="ct-val fn-pct-primary">%s</span>%s
@@ -310,6 +311,7 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
     .fn_esc(stage_key), .fn_esc(brand_code),
     pct_absolute, if (is.null(pct_nested) || is.na(pct_nested))
                     pct_absolute else pct_nested,
+    pct_aw_val,
     if (is.finite(base_u %||% NA_real_)) as.integer(base_u) else "",
     pct_absolute,
     abs_display, sig_badge, base_display
