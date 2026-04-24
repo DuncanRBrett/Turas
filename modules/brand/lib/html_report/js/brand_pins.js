@@ -71,13 +71,27 @@
       tableHtml = table.outerHTML;
     }
 
-    var editor = root.querySelector(".br-insight-editor");
+    var editor = root.querySelector(".br-insight-editor")
+             || root.querySelector(".fn-insight-textarea");
     var insightText = editor ? editor.value.trim() : "";
+
+    // For sections whose chart is HTML (not SVG), capture the chart area HTML
+    // so it can be rendered alongside the table in PNG export.
+    var chartHtml = "";
+    if (!chartSvg) {
+      var htmlChartEl = root.querySelector("[data-fn-rel-chart-area]");
+      if (htmlChartEl && typeof TurasPins !== "undefined" && TurasPins.capturePortableHtml) {
+        chartHtml = TurasPins.capturePortableHtml(htmlChartEl);
+      } else if (htmlChartEl) {
+        chartHtml = htmlChartEl.outerHTML;
+      }
+    }
 
     return {
       sectionKey: sectionKey || (root.id || ""),
       title: titleText,
       chartSvg: chartSvg,
+      chartHtml: chartHtml,
       tableHtml: tableHtml,
       insightText: insightText
     };
@@ -297,15 +311,20 @@
       }
     }
 
-    var hasChart   = !!content.chartSvg;
+    var hasChart   = !!content.chartSvg || !!content.chartHtml;
     var hasTable   = !!content.tableHtml;
     var hasInsight = !!content.insightText;
 
     function doExportFromEl(flags) {
+      // When chart is HTML (not SVG), prepend it to tableHtml for html2canvas rendering
+      var exportTableHtml = flags.table ? content.tableHtml : "";
+      if (flags.chart && content.chartHtml && !content.chartSvg) {
+        exportTableHtml = content.chartHtml + (exportTableHtml ? exportTableHtml : "");
+      }
       TurasPins.exportContentAsPNG({
         title:       content.title,
-        chartSvg:    flags.chart   ? content.chartSvg   : "",
-        tableHtml:   flags.table   ? content.tableHtml  : "",
+        chartSvg:    (flags.chart && content.chartSvg) ? content.chartSvg : "",
+        tableHtml:   exportTableHtml,
         insightText: flags.insight ? content.insightText : "",
         pinFlags:    { chart: !!flags.chart, table: !!flags.table, insight: !!flags.insight },
         pinMode:     "custom"

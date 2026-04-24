@@ -1661,7 +1661,7 @@
         items = [
           { label: "Relationship table", sel: ".fn-rel-table-wrap" },
           { label: "Relationship chart", sel: "[data-fn-rel-chart-area]" },
-          { label: "Insights",           sel: ".fn-insight-strip" }
+          { label: "Insights",           sel: ".fn-rel-chart-section .fn-insight-strip" }
         ];
       } else {
         // ".fn-chart-view[data-fn-view='slope']" is the outer chart wrapper div.
@@ -1952,12 +1952,14 @@
   }
 
   function relPct(brand, role, base, nTotal) {
-    var aware = brand.segments && brand.segments[role] != null
+    // segments[role] = count/n_total (% of total respondents, session-3 fix)
+    var segVal = brand.segments && brand.segments[role] != null
       ? brand.segments[role] : 0;
-    if (base === "total" && nTotal && brand.aware_base) {
-      return aware * (brand.aware_base / nTotal);
+    // "% aware" = scale up to aware denominator; "% total" = use as-is
+    if (base === "aware" && nTotal && brand.aware_base && brand.aware_base > 0) {
+      return segVal * (nTotal / brand.aware_base);
     }
-    return aware;
+    return segVal;
   }
 
   function buildRelChart(panel) {
@@ -1975,8 +1977,10 @@
     var sortCol   = panel.__fnState.relSortCol  || "brand";
     var sortDir   = panel.__fnState.relSortDir  || "asc";
     var base      = panel.__fnState.relBase     || "aware";
-    var nTotal    = pd.meta && (pd.meta.n_weighted || pd.meta.n_unweighted);
-    var useTotal  = (base === "total" && nTotal);
+    var nTotalEl  = container.closest("[data-fn-rel-ntotal]");
+    var nTotal    = (pd.meta && (pd.meta.n_weighted || pd.meta.n_unweighted)) ||
+                    (nTotalEl ? parseFloat(nTotalEl.getAttribute("data-fn-rel-ntotal")) : 0);
+    var useTotal  = (base === "total");
     var showAvg   = !hidden.has("__avg__");
 
     var focalBrand = null, compBrands = [];
@@ -2214,13 +2218,17 @@
     var base    = (panel.__fnState && panel.__fnState.relBase) || "aware";
     var pctAttr = base === "total" ? "data-fn-rel-pct-total"  : "data-fn-rel-pct-aware";
     var cntAttr = base === "total" ? "data-fn-rel-count-total" : "data-fn-rel-count-aware";
+    var denomAttr = base === "total" ? "data-fn-rel-denom-total" : "data-fn-rel-denom-aware";
     table.querySelectorAll("td.ct-heatmap-cell[data-fn-att]").forEach(function(td) {
-      var pct = parseFloat(td.getAttribute(pctAttr));
-      var cnt = parseInt(td.getAttribute(cntAttr), 10);
+      var pct   = parseFloat(td.getAttribute(pctAttr));
+      var cnt   = parseInt(td.getAttribute(cntAttr), 10);
+      var denom = parseInt(td.getAttribute(denomAttr), 10);
       var valEl  = td.querySelector(".ct-val");
       var freqEl = td.querySelector(".ct-freq");
       if (valEl && !isNaN(pct)) valEl.textContent = Math.round(pct * 100) + "%";
-      if (freqEl && !isNaN(cnt)) freqEl.textContent = "n=" + cnt;
+      if (freqEl && !isNaN(cnt)) {
+        freqEl.textContent = "n=" + cnt + (!isNaN(denom) ? " (" + denom + ")" : "");
+      }
     });
     // Update avg row cells (fn-rel-td-avg, not ct-heatmap-cell)
     table.querySelectorAll("td.fn-rel-td-avg[data-fn-att]").forEach(function(td) {

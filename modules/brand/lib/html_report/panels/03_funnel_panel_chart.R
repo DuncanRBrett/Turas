@@ -64,6 +64,20 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
   brands  <- cd$brands
   n_total <- as.numeric(pd$meta$n_weighted %||% pd$meta$n_unweighted %||% NA_real_)
 
+  # Fallback: derive n_total from funnel stage-1 base when meta values are absent.
+  if (!is.finite(n_total) && !is.null(pd$table$cells) && length(pd$table$cells) > 0) {
+    first_key <- pd$meta$stage_keys[1]
+    if (!is.null(first_key)) {
+      bases <- vapply(pd$table$cells, function(cell) {
+        if (identical(as.character(cell$stage_key), as.character(first_key)))
+          as.numeric(cell$base_weighted %||% cell$base_unweighted %||% NA_real_)
+        else NA_real_
+      }, numeric(1))
+      fb <- bases[is.finite(bases)]
+      if (length(fb) > 0) n_total <- max(fb)
+    }
+  }
+
   focal_entries <- Filter(function(b) identical(b$brand_code, focal), brands)
   comp_entries  <- Filter(function(b) !identical(b$brand_code, focal), brands)
   if (length(comp_entries) > 0) {
@@ -75,7 +89,8 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
   if (length(ordered) == 0) return("")
 
   paste0(
-    '<section class="fn-section fn-rel-chart-section">',
+    sprintf('<section class="fn-section fn-rel-chart-section"%s>',
+            if (is.finite(n_total)) sprintf(' data-fn-rel-ntotal="%.0f"', n_total) else ""),
     .fn_rel_controls(ordered, focal),
     .fn_rel_table_v2(ordered, focal, focal_colour, n_total),
     '<div class="fn-rel-headline" data-fn-rel-headline style="display:none;margin-top:14px;"></div>',
@@ -326,11 +341,22 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
     # Raw count: pct_total * n_total (same people, different denominator for %)
     cnt_val <- if (is.finite(n_total))
       as.integer(round(pct_total * n_total)) else NA_integer_
-    count_attrs <- if (!is.na(cnt_val))
-      sprintf(' data-fn-rel-count-total="%d" data-fn-rel-count-aware="%d"', cnt_val, cnt_val)
+    count_attrs <- if (!is.na(cnt_val)) {
+      denom_aware_str <- if (is.finite(aware_n))
+        sprintf(' data-fn-rel-denom-aware="%d"', as.integer(round(aware_n))) else ""
+      denom_total_str <- if (is.finite(n_total))
+        sprintf(' data-fn-rel-denom-total="%d"', as.integer(round(n_total))) else ""
+      paste0(
+        sprintf(' data-fn-rel-count-total="%d" data-fn-rel-count-aware="%d"', cnt_val, cnt_val),
+        denom_aware_str, denom_total_str)
+    } else ""
+    # Initial display is % aware (default); show n=count (aware_n) format
+    freq_span <- if (!is.na(cnt_val) && is.finite(aware_n))
+      sprintf('<span class="ct-freq fn-pct-count">n=%d (%d)</span>',
+              cnt_val, as.integer(round(aware_n)))
+    else if (!is.na(cnt_val))
+      sprintf('<span class="ct-freq fn-pct-count">n=%d</span>', cnt_val)
     else ""
-    freq_span <- if (!is.na(cnt_val))
-      sprintf('<span class="ct-freq fn-pct-count">n=%d</span>', cnt_val) else ""
 
     sprintf(
       '<td class="ct-td ct-data-col ct-heatmap-cell%s" data-heatmap="%s" data-fn-att="%s" data-fn-rel-pct-total="%.6f"%s%s><span class="ct-val">%.0f%%</span>%s</td>',
