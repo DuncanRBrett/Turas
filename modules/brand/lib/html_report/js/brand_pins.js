@@ -23,6 +23,7 @@
 
     // Pick the first *visible* SVG in the subtree — skip SVGs inside <button>
     // elements (e.g. toolbar download icons) which are not chart content.
+    // Fallback: any non-button SVG even if not visible (e.g. inactive tab).
     var svg = null;
     var svgs = root.querySelectorAll("svg");
     for (var si = 0; si < svgs.length; si++) {
@@ -30,10 +31,9 @@
     }
     if (!svg) {
       for (var si2 = 0; si2 < svgs.length; si2++) {
-        if (isVisible(svgs[si2]) && !svgs[si2].closest("button")) { svg = svgs[si2]; break; }
+        if (!svgs[si2].closest("button")) { svg = svgs[si2]; break; }
       }
     }
-    if (!svg && svgs.length > 0) svg = svgs[0];
 
     var chartSvg = "";
     if (svg) {
