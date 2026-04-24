@@ -167,6 +167,11 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
   brand_names <- pd$table$brand_names %||% brand_codes
   focal <- pd$meta$focal_brand_code %||% brand_codes[1]
 
+  # Sort: focal first, then alphabetical by brand name
+  sorted_order <- order(brand_codes != focal, tolower(brand_names))
+  brand_codes  <- brand_codes[sorted_order]
+  brand_names  <- brand_names[sorted_order]
+
   chips_html <- paste(vapply(seq_along(brand_codes), function(i) {
     sprintf('<button type="button" class="col-chip" data-fn-scope="table" data-fn-brand="%s">%s</button>',
             .fn_esc(brand_codes[i]), .fn_esc(brand_names[i]))
@@ -176,23 +181,20 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
     '<div class="fn-controls controls-bar">',
     '<div class="fn-ctl-group"><span class="fn-ctl-label">Show brands</span>',
     sprintf('<div class="fn-chip-row col-chip-bar">%s</div></div>', chips_html),
-
+    '<div class="fn-meta-row">',
     '<label class="toggle-label"><input type="checkbox" data-fn-action="showci"> Show heatmap</label>',
     '<label class="toggle-label"><input type="checkbox" data-fn-action="showcounts"> Show count</label>',
     '<label class="toggle-label"><input type="checkbox" checked data-fn-action="showchart"> Show chart</label>',
-
-    # Base (% of total / previous) — segmented toggle, same shape as tabs' sig-level-switcher
     '<div class="sig-level-switcher fn-base-switcher" role="group" aria-label="Percentage base">',
     '<span class="sig-level-label">Base:</span>',
     '<button type="button" class="sig-btn sig-btn-active" data-fn-action="pctmode" data-fn-pctmode="total" aria-pressed="true">% of total</button>',
     '<button type="button" class="sig-btn" data-fn-action="pctmode" data-fn-pctmode="previous" aria-pressed="false">% of previous</button>',
     '<button type="button" class="sig-btn" data-fn-action="pctmode" data-fn-pctmode="aware" aria-pressed="false" title="Awareness pinned to 100%. Shows conversion from awareness for each stage.">% of aware</button>',
     '</div>',
-
-    # Pin + PNG + Excel grouped on the right (conjoint-style placement)
     '<button type="button" class="fn-pin-dropdown-btn export-btn" data-fn-action="pindropdown" title="Pin a section" aria-haspopup="true">&#128204; Pin &#9662;</button>',
     '<button type="button" class="export-btn fn-png-btn" onclick="brExportPngFromEl(this)" title="Export view to PNG">&#x1F5BC; PNG</button>',
     '<button type="button" class="export-btn fn-export-btn" data-fn-action="exporttable" title="Export table to Excel">\u2B73 Excel \u25BE</button>',
+    '</div>',
     '</div>'
   )
 }

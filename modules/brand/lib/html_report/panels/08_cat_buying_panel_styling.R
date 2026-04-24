@@ -504,7 +504,7 @@ paste0(
 
 /* Controls bar */
 .cb-controls-bar {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+  display: flex; flex-direction: column; gap: 8px;
   margin-bottom: 12px; padding: 8px 10px;
   background: #f8fafc; border: 1px solid #eef2f7; border-radius: 8px;
 }

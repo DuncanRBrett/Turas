@@ -147,10 +147,13 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 }
 
 .fn-controls.controls-bar {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+  display: flex; flex-direction: column; gap: 8px;
   padding: 10px 14px; background: #f8fafc;
   border: 1px solid #e2e8f0; border-radius: 8px;
   margin-bottom: 10px;
+}
+.fn-meta-row {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
 }
 .fn-controls .fn-ctl-group {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;

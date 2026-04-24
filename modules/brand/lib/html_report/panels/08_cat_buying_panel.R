@@ -501,6 +501,13 @@ render_cat_buying_panel <- function(panel_data) {
 # ==============================================================================
 
 .cb_controls_bar <- function(scope, brands, brand_names, focal) {
+  # Sort: focal first, then alphabetical by brand name
+  if (!is.null(focal) && focal %in% brands) {
+    sorted_order <- order(brands != focal, tolower(brand_names))
+    brands      <- brands[sorted_order]
+    brand_names <- brand_names[sorted_order]
+  }
+
   chips_html <- paste(vapply(seq_along(brands), function(i) {
     bc  <- brands[i]
     nm  <- brand_names[i]
@@ -515,10 +522,12 @@ render_cat_buying_panel <- function(panel_data) {
     <span class="cb-ctl-label">Show brands</span>
     <div class="ma-chip-row col-chip-bar" data-cb-scope="%s">%s</div>
   </div>
-  <label class="toggle-label">
-    <input type="checkbox" checked data-cb-action="showchart" data-cb-scope="%s">
-    Show chart
-  </label>
+  <div class="fn-meta-row">
+    <label class="toggle-label">
+      <input type="checkbox" checked data-cb-action="showchart" data-cb-scope="%s">
+      Show chart
+    </label>
+  </div>
 </div>',
     scope, chips_html, scope)
 }
@@ -985,6 +994,12 @@ render_cat_buying_panel <- function(panel_data) {
   lbl_fn <- if (exists(".cb_brand_lbl", mode = "function")) .cb_brand_lbl else
     function(code, bl) tools::toTitleCase(tolower(as.character(code)))
 
+  # Sort: focal first, then alphabetical by display name
+  names_vec <- vapply(codes, function(bc) lbl_fn(bc, brand_labels), character(1))
+  sorted_ord <- order(codes != focal, tolower(names_vec))
+  codes     <- codes[sorted_ord]
+  names_vec <- names_vec[sorted_ord]
+
   # Fallback palette — same as JS PALETTE for brands without Colour
   palette <- c('#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f',
                '#edc948', '#b07aa1', '#ff9da7', '#9c755f', '#bab0ac')
@@ -1002,7 +1017,7 @@ render_cat_buying_panel <- function(panel_data) {
   # Focal-brand <select> dropdown (MA-style)
   select_options <- paste(vapply(seq_along(codes), function(i) {
     bc <- codes[i]
-    lbl <- lbl_fn(bc, brand_labels)
+    lbl <- names_vec[i]
     sel <- if (!is.null(focal) && bc == focal) " selected" else ""
     sprintf('<option value="%s"%s>%s</option>',
             .cb_esc(bc), sel, .cb_esc(lbl))
@@ -1019,7 +1034,7 @@ render_cat_buying_panel <- function(panel_data) {
   # Clicking a chip hides its row in the brand summary table via JS.
   chips <- paste(vapply(seq_along(codes), function(i) {
     bc <- codes[i]
-    lbl <- lbl_fn(bc, brand_labels)
+    lbl <- names_vec[i]
     col <- resolve_colour(bc, i)
     is_foc <- !is.null(focal) && bc == focal
     badge <- if (is_foc) ' <span class="fn-focal-badge">FOCAL</span>' else ""
