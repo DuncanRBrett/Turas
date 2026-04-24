@@ -1641,9 +1641,9 @@
   // available, otherwise toggles a .fn-pinned outline as visual feedback.
   // ---------------------------------------------------------------------------
   function bindPinDropdown(panel) {
-    var btn = panel.querySelector('[data-fn-action="pindropdown"]');
-    if (!btn) return;
-    btn.addEventListener("click", function(e) {
+    var pinBtns = panel.querySelectorAll('[data-fn-action="pindropdown"]');
+    if (!pinBtns.length) return;
+    pinBtns.forEach(function(btn) { btn.addEventListener("click", function(e) {
       e.stopPropagation();
       var existing = panel.querySelector(".fn-pin-dropdown");
       if (existing) { existing.remove(); return; }
@@ -1782,7 +1782,7 @@
         });
         drop.remove();
       });
-    });
+    }); });
   }
 
   // ---------------------------------------------------------------------------
@@ -1901,6 +1901,8 @@
         });
         buildRelChart(panel);
         applyRelTableBase(panel);
+        var pctAttr2 = panel.__fnState.relBase === "total" ? "data-fn-rel-pct-total" : "data-fn-rel-pct-aware";
+        applyRelTableHeatmap(panel, pctAttr2);
         applyRelTableSigMarkers(panel);
         sortRelTable(panel);
       });

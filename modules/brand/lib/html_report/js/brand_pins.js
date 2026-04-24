@@ -21,12 +21,17 @@
     var title = root.querySelector(".br-element-title, h2, h3, .pfo-section-title");
     var titleText = title ? title.textContent.trim() : (sectionKey || "");
 
-    // Pick the first *visible* SVG in the subtree — handles panels that hold
-    // several sibling SVGs where only the active one is displayed.
+    // Pick the first *visible* SVG in the subtree — skip SVGs inside <button>
+    // elements (e.g. toolbar download icons) which are not chart content.
     var svg = null;
     var svgs = root.querySelectorAll("svg");
     for (var si = 0; si < svgs.length; si++) {
-      if (isVisible(svgs[si])) { svg = svgs[si]; break; }
+      if (isVisible(svgs[si]) && !svgs[si].closest("button")) { svg = svgs[si]; break; }
+    }
+    if (!svg) {
+      for (var si2 = 0; si2 < svgs.length; si2++) {
+        if (isVisible(svgs[si2])) { svg = svgs[si2]; break; }
+      }
     }
     if (!svg && svgs.length > 0) svg = svgs[0];
 
