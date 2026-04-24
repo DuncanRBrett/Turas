@@ -30,7 +30,7 @@
     }
     if (!svg) {
       for (var si2 = 0; si2 < svgs.length; si2++) {
-        if (isVisible(svgs[si2])) { svg = svgs[si2]; break; }
+        if (isVisible(svgs[si2]) && !svgs[si2].closest("button")) { svg = svgs[si2]; break; }
       }
     }
     if (!svg && svgs.length > 0) svg = svgs[0];

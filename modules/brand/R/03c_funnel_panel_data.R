@@ -383,7 +383,7 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
     list(
       brand_code = b,
       brand_name = .brand_label(brand_list, b),
-      aware_base = sub$base[1],
+      aware_base = if ("aware_base" %in% names(sub)) sub$aware_base[1] else sub$base[1],
       segments = stats::setNames(as.list(sub$pct), sub$attitude_role)
     )
   })

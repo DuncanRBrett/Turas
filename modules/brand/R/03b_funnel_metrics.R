@@ -300,6 +300,12 @@ run_significance_tests <- function(stage_metrics, focal_brand,
   total_w <- sum(weights, na.rm = TRUE)
   if (total_w == 0) return(list())
 
+  # aware_base = weighted count of respondents aware of this brand.
+  # Stored separately so .panel_consideration_detail can expose it as the
+  # denominator for "% aware" display without changing the pct contract
+  # (pct = count/total_w, the session-3 base).
+  aware_w <- sum(weights[as.logical(aware_vec)], na.rm = TRUE)
+
   values_char <- as.character(col_values)
   rows <- list()
   for (role in .FUNNEL_ATTITUDE_POSITIONS) {
@@ -308,10 +314,11 @@ run_significance_tests <- function(stage_metrics, focal_brand,
     hits <- !is.na(values_char) & values_char %in% codes
     pct <- sum(weights[hits], na.rm = TRUE) / total_w
     rows[[length(rows) + 1]] <- data.frame(
-      brand_code = brand_code,
+      brand_code  = brand_code,
       attitude_role = role,
-      pct = pct,
-      base = total_w,
+      pct         = pct,
+      base        = total_w,
+      aware_base  = aware_w,
       stringsAsFactors = FALSE
     )
   }

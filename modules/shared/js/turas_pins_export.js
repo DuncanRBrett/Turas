@@ -492,13 +492,13 @@
     }
 
     // Render off-screen but fully visible — html2canvas needs opacity:1 to
-    // capture content correctly (it faithfully renders opacity, so 0.001
-    // produces a near-transparent image). Position below the viewport fold
-    // so the user doesn't see the temporary element.
+    // capture content correctly. Fixed positioning at far-left keeps the element
+    // out of view while remaining in the viewport stacking context so html2canvas
+    // can measure and render it reliably (top:100vh + z-index:-1 caused hangs).
     var container = document.createElement("div");
     container.style.cssText =
-      "position:fixed;left:0;top:100vh;width:" + maxWidth + "px;" +
-      "z-index:-1;pointer-events:none;" +
+      "position:fixed;left:-9999px;top:0;width:" + maxWidth + "px;" +
+      "pointer-events:none;" +
       "background:#fff;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;" +
       "font-size:13px;color:#1e293b;line-height:1.5;";
     container.innerHTML = TurasPins._sanitizeHtml(html);

@@ -1902,7 +1902,8 @@
         buildRelChart(panel);
         applyRelTableBase(panel);
         var pctAttr2 = panel.__fnState.relBase === "total" ? "data-fn-rel-pct-total" : "data-fn-rel-pct-aware";
-        applyRelTableHeatmap(panel, pctAttr2);
+        var relShowCI2 = panel.querySelector('[data-fn-rel-showci]');
+        if (relShowCI2 && relShowCI2.checked) applyRelTableHeatmap(panel, pctAttr2);
         applyRelTableSigMarkers(panel);
         sortRelTable(panel);
       });
