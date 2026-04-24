@@ -56,17 +56,22 @@
     return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
   }
 
+  var BRAND_PALETTE = ['#4e79a7','#f28e2b','#e15759','#76b7b2','#59a14f',
+                       '#edc948','#b07aa1','#ff9da7','#9c755f','#bab0ac'];
+
+  function stableBrandIdx(code) {
+    var h = 5381;
+    for (var i = 0; i < code.length; i++) h = ((h << 5) + h + code.charCodeAt(i)) & 0x7fffffff;
+    return h % BRAND_PALETTE.length;
+  }
+
   function getBrandColour(pd, code) {
     if (!code) return '#94a3b8';
     if (pd.config && pd.config.brand_colours && pd.config.brand_colours[code])
       return pd.config.brand_colours[code];
     if (code === (pd.meta && pd.meta.focal_brand_code))
       return pd.config.focal_colour || pd.focal_colour || '#1A5276';
-    var palette = ['#4e79a7','#f28e2b','#e15759','#76b7b2','#59a14f',
-                   '#edc948','#b07aa1','#ff9da7','#9c755f','#bab0ac'];
-    var idx = (pd.config.brand_codes || []).indexOf(code);
-    if (idx < 0) idx = 0;
-    return palette[idx % palette.length];
+    return BRAND_PALETTE[stableBrandIdx(code)];
   }
 
   function getBrandName(pd, code) {
@@ -1690,44 +1695,82 @@
     });
   }
 
+  function captureSvg(el) {
+    if (!el) return '';
+    var svg = el.querySelector('svg:not(button svg)');
+    if (!svg) return '';
+    var clone = svg.cloneNode(true);
+    var vb = svg.getAttribute('viewBox');
+    if (vb) { var p = vb.split(/\s+/); clone.setAttribute('width', p[2]); clone.setAttribute('height', p[3]); }
+    return clone.outerHTML;
+  }
+
+  function captureTable(el) {
+    if (!el) return '';
+    var tbl = el.querySelector('table');
+    if (!tbl) return '';
+    return (typeof TurasPins !== 'undefined' && TurasPins.capturePortableHtml)
+      ? TurasPins.capturePortableHtml(tbl) : tbl.outerHTML;
+  }
+
   function pinSections(panel, activeKey, optKeys) {
+    if (typeof TurasPins === 'undefined') return;
     var pd = panel.__maData || {};
     var cat = (pd.meta && pd.meta.category_label) || 'Category';
     var focal = (pd.meta && pd.meta.focal_brand_name) || '';
-    var title = 'Mental Availability \u2014 ' + cat;
-    var footnote = focal ? ('Focal: ' + focal) : '';
+    var baseTitle = 'Mental Availability \u2014 ' + cat;
 
-    optKeys.forEach(function (key) {
-      var el = null, subLabel = '';
-      if ((activeKey === 'attributes' || activeKey === 'ceps') && key === 'matrix') {
-        el = panel.querySelector('.ma-matrix-section[data-ma-stim="' + activeKey + '"]');
-        subLabel = activeKey === 'attributes' ? 'Brand attributes' : 'Category Entry Points';
-      } else if ((activeKey === 'attributes' || activeKey === 'ceps') && key === 'chart') {
-        el = panel.querySelector('.ma-chart-section[data-ma-stim="' + activeKey + '"]');
-        subLabel = 'Bar chart';
-      } else if ((activeKey === 'attributes' || activeKey === 'ceps') && key === 'insight') {
-        el = panel.querySelector('.ma-insight-box[data-ma-stim="' + activeKey + '"]');
-        subLabel = 'Insight';
-      } else if (activeKey === 'metrics' && key === 'hero') {
-        el = panel.querySelector('.ma-hero-strip'); subLabel = 'Headline metrics';
-      } else if (activeKey === 'metrics' && key === 'brandtbl') {
-        el = panel.querySelector('.ma-metrics-table');
-        if (el) el = el.closest('.ma-table-wrap') || el;
-        subLabel = 'Brand metrics table';
-      } else if (activeKey === 'metrics' && key === 'scatter') {
-        el = panel.querySelector('.ma-scatter-wrap'); subLabel = 'Mental Space scatter';
-      } else if (activeKey === 'metrics' && key === 'bars') {
-        el = panel.querySelector('.ma-bars-wrap'); subLabel = 'MMS vs SOM chart';
-      } else if (activeKey === 'metrics' && key === 'ranking') {
-        el = panel.querySelector('.ma-rank-section'); subLabel = 'CEP penetration ranking';
+    if (activeKey === 'attributes' || activeKey === 'ceps') {
+      // Combine all selected sections into ONE pin card
+      var subLabel = activeKey === 'attributes' ? 'Brand Attributes' : 'Category Entry Points';
+      var chartSvg = '', tableHtml = '', insightText = '';
+      if (optKeys.indexOf('matrix') >= 0) {
+        var matSec = panel.querySelector('.ma-matrix-section[data-ma-stim="' + activeKey + '"]');
+        tableHtml = captureTable(matSec);
       }
-      if (!el) return;
-      el.setAttribute('data-pin-title', title + ' \u2014 ' + subLabel);
-      if (footnote) el.setAttribute('data-pin-footnote', footnote);
-      if (window.TurasPin && typeof window.TurasPin.pin === 'function') {
-        try { window.TurasPin.pin(el); } catch (e) { el.classList.add('ma-pinned'); }
-      } else { el.classList.add('ma-pinned'); }
-    });
+      if (optKeys.indexOf('chart') >= 0) {
+        var chartSec = panel.querySelector('.ma-chart-section[data-ma-stim="' + activeKey + '"]');
+        chartSvg = captureSvg(chartSec);
+      }
+      if (optKeys.indexOf('insight') >= 0) {
+        var ta = panel.querySelector('.ma-insight-box-text[data-ma-stim="' + activeKey + '"]');
+        if (ta) insightText = ta.value.trim();
+      }
+      TurasPins.add({
+        sectionKey: 'ma-' + activeKey + '-' + Date.now(),
+        title: baseTitle + ' \u2014 ' + subLabel,
+        chartSvg: chartSvg, chartHtml: '',
+        tableHtml: tableHtml, insightText: insightText,
+        pinMode: 'custom',
+        pinFlags: { chart: !!chartSvg, table: !!tableHtml, insight: !!insightText }
+      });
+
+    } else if (activeKey === 'metrics') {
+      // Metrics: each section is a distinct content type — pin separately
+      var metricsInsight = '';
+      var taM = panel.querySelector('.ma-insight-box-text[data-ma-stim="metrics"]');
+      if (taM) metricsInsight = taM.value.trim();
+      var metricDefs = {
+        hero:     { sel: '.ma-hero-strip',    label: 'Headline metrics' },
+        brandtbl: { sel: '.ma-table-wrap',    label: 'Brand metrics table' },
+        scatter:  { sel: '.ma-scatter-wrap',  label: 'Mental Space' },
+        bars:     { sel: '.ma-bars-wrap',     label: 'MMS vs SOM' },
+        ranking:  { sel: '.ma-rank-section',  label: 'CEP Ranking' }
+      };
+      optKeys.forEach(function (key) {
+        var def = metricDefs[key]; if (!def) return;
+        var el = panel.querySelector(def.sel); if (!el) return;
+        TurasPins.add({
+          sectionKey: 'ma-metrics-' + key + '-' + Date.now(),
+          title: baseTitle + ' \u2014 ' + def.label,
+          chartSvg: captureSvg(el), chartHtml: '',
+          tableHtml: captureTable(el),
+          insightText: key === 'ranking' ? metricsInsight : '',
+          pinMode: 'custom',
+          pinFlags: { chart: !!captureSvg(el), table: !!captureTable(el), insight: false }
+        });
+      });
+    }
   }
 
   // -------------------------------------------------------------- legacy add-insight (kept for pin compat)

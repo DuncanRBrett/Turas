@@ -90,7 +90,7 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
 
     '<div class="ma-subtab" data-ma-subtab="metrics" hidden>',
       .ma_metrics_section(panel_data, focal_colour = focal_colour),
-      .ma_add_insight_strip(),
+      .ma_insight_box(stim = "metrics"),
     '</div>',
 
     .ma_about_section(panel_data),

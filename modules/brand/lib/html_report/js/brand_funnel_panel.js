@@ -808,11 +808,10 @@
   }
 
   function getCompColor(pd, brandCode) {
-    var comp = (pd.shape_chart && pd.shape_chart.competitor_series) || [];
-    for (var i = 0; i < comp.length; i++) {
-      if (comp[i].brand_code === brandCode) return FN_COMP_COLORS[i % FN_COMP_COLORS.length];
-    }
-    return "#94a3b8";
+    if (!brandCode) return '#94a3b8';
+    var h = 5381;
+    for (var i = 0; i < brandCode.length; i++) h = ((h << 5) + h + brandCode.charCodeAt(i)) & 0x7fffffff;
+    return FN_COMP_COLORS[h % FN_COMP_COLORS.length];
   }
 
   function getBrandName(pd, brandCode) {
