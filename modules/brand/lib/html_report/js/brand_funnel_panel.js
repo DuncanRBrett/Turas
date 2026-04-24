@@ -1590,46 +1590,108 @@
 
   // ---------------------------------------------------------------------------
   // ---------------------------------------------------------------------------
-  // Export relationship table to CSV
+  // Export relationship table to Excel (.xls HTML format).
+  // Writes a % row + n= row per brand, respecting the active base toggle.
   // ---------------------------------------------------------------------------
-  function exportRelTableCSV(panel) {
+  function exportRelTableExcel(panel) {
     var table = panel.querySelector("[data-fn-rel-table]");
     if (!table) return;
-    var hidden  = panel.__fnState.relHiddenBrands || new Set();
-    var base    = (panel.__fnState && panel.__fnState.relBase) || "aware";
-    var pctAttr = base === "total" ? "data-fn-rel-pct-total" : "data-fn-rel-pct-aware";
-    var rows    = [];
+    var hidden    = panel.__fnState.relHiddenBrands || new Set();
+    var base      = (panel.__fnState && panel.__fnState.relBase) || "aware";
+    var pctAttr   = base === "total" ? "data-fn-rel-pct-total"  : "data-fn-rel-pct-aware";
+    var cntAttr   = base === "total" ? "data-fn-rel-count-total" : "data-fn-rel-count-aware";
+    var denomAttr = base === "total" ? "data-fn-rel-denom-total" : "data-fn-rel-denom-aware";
+    var baseLabel = base === "total" ? "% of total respondents"  : "% of aware respondents";
 
-    // Headers — strip sort indicator text
-    var headers = Array.from(table.querySelectorAll("thead th")).map(function(th) {
+    var tdStyle = "border:1px solid #ccc;padding:4px 8px;font-family:Calibri,sans-serif;font-size:12px;";
+    var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office"' +
+      ' xmlns:x="urn:schemas-microsoft-com:office:excel"' +
+      ' xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8">' +
+      "<style>td,th{" + tdStyle + "}" +
+      "th{background:#1a2744;color:#fff;font-weight:700;}" +
+      ".mode{background:#e8edf5;color:#1a2744;font-style:italic;font-size:11px;}" +
+      ".focal{font-weight:700;background:#eef4fb;}" +
+      ".count{color:#888;font-size:11px;}" +
+      ".avg{font-style:italic;background:#f5f6f8;}" +
+      "</style></head><body><table>";
+
+    // Column headers — strip sort-indicator button text
+    var ths = Array.from(table.querySelectorAll("thead th"));
+    var colCount = ths.length;
+    var headers = ths.map(function(th) {
       var clone = th.cloneNode(true);
       var ind = clone.querySelector(".ct-sort-indicator");
       if (ind) clone.removeChild(ind);
-      return '"' + clone.textContent.trim().replace(/"/g, '""') + '"';
+      return clone.textContent.trim();
     });
-    rows.push(headers.join(","));
 
-    // Data rows
+    html += '<tr><td class="mode" colspan="' + colCount + '">Base: ' + baseLabel + '</td></tr>';
+    html += "<tr>" + headers.map(function(h) { return "<th>" + h + "</th>"; }).join("") + "</tr>";
+
     table.querySelectorAll("tbody tr").forEach(function(tr) {
       if (tr.style.display === "none") return;
       var brand = tr.getAttribute("data-fn-brand");
       if (brand && hidden.has(brand)) return;
-      var cells = Array.from(tr.querySelectorAll("td")).map(function(td) {
-        var attRole = td.getAttribute("data-fn-att");
-        if (attRole) {
+
+      var isAvg   = tr.classList.contains("fn-row-avg-all");
+      var isFocal = tr.classList.contains("fn-row-focal");
+      var cls     = isFocal ? ' class="focal"' : (isAvg ? ' class="avg"' : "");
+
+      var tds = Array.from(tr.querySelectorAll("td"));
+
+      // % row
+      html += "<tr>";
+      tds.forEach(function(td) {
+        var role = td.getAttribute("data-fn-att");
+        if (role) {
           var pct = parseFloat(td.getAttribute(pctAttr));
-          return isNaN(pct) ? '""' : '"' + Math.round(pct * 100) + '%"';
+          html += "<td" + cls + ">" + (isNaN(pct) ? "" : Math.round(pct * 100) + "%") + "</td>";
+        } else {
+          // Label or Base column — strip FOCAL badge / CI bar markup
+          var clone = td.cloneNode(true);
+          var badge = clone.querySelector(".fn-focal-badge");
+          if (badge) clone.removeChild(badge);
+          var ciBar = clone.querySelector(".ma-ci-bar-wrap, .ma-ci-limits");
+          if (ciBar) clone.removeChild(ciBar);
+          html += "<td" + cls + ">" + clone.textContent.trim() + "</td>";
         }
-        return '"' + td.textContent.trim().replace(/"/g, '""') + '"';
       });
-      rows.push(cells.join(","));
+      html += "</tr>";
+
+      // n= row — skip for avg row (no per-brand counts there)
+      if (!isAvg) {
+        var labelTd = tds[0];
+        var labelClone = labelTd ? labelTd.cloneNode(true) : null;
+        if (labelClone) {
+          var badge2 = labelClone.querySelector(".fn-focal-badge");
+          if (badge2) labelClone.removeChild(badge2);
+        }
+        var brandLabel = labelClone ? labelClone.textContent.trim() : "";
+        html += "<tr>";
+        tds.forEach(function(td, i) {
+          var role = td.getAttribute("data-fn-att");
+          if (role) {
+            var cnt   = parseInt(td.getAttribute(cntAttr),   10);
+            var denom = parseInt(td.getAttribute(denomAttr), 10);
+            var str   = isNaN(cnt) ? "" : ("n=" + cnt + (!isNaN(denom) ? " (" + denom + ")" : ""));
+            html += '<td class="count">' + str + "</td>";
+          } else if (i === 0) {
+            html += '<td class="count">' + brandLabel + " (n=)</td>";
+          } else {
+            html += '<td class="count"></td>';
+          }
+        });
+        html += "</tr>";
+      }
     });
 
-    var csv  = "\ufeff" + rows.join("\r\n"); // BOM for Excel UTF-8
-    var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    html += "</table></body></html>";
+
+    var blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
     var url  = URL.createObjectURL(blob);
     var a    = document.createElement("a");
-    a.href = url; a.download = "brand_relationship.csv";
+    a.href = url;
+    a.download = "brand_relationship.xls";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -1942,7 +2004,7 @@
     // Export button
     var exportBtn = panel.querySelector("[data-fn-rel-action='export']");
     if (exportBtn) {
-      exportBtn.addEventListener("click", function() { exportRelTableCSV(panel); });
+      exportBtn.addEventListener("click", function() { exportRelTableExcel(panel); });
     }
 
     buildRelChart(panel);

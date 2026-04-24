@@ -19,6 +19,12 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
 
   brand_codes <- pd$config$brand_codes %||% character(0)
   brand_names <- pd$config$brand_names %||% brand_codes
+  focal       <- pd$meta$focal_brand_code %||% brand_codes[1]
+
+  # Sort: focal first, then alphabetical by brand name
+  sorted_order <- order(brand_codes != focal, tolower(brand_names))
+  brand_codes  <- brand_codes[sorted_order]
+  brand_names  <- brand_names[sorted_order]
 
   chips_html <- paste(vapply(seq_along(brand_codes), function(i) {
     sprintf(
@@ -39,6 +45,7 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
     '</div>',
     chart_toggles,
     '<label class="toggle-label"><input type="checkbox" data-ma-action="showcounts-metrics"> Show count</label>',
+    '<button type="button" class="export-btn ma-pin-dropdown-btn" data-ma-action="pindropdown" title="Pin a section" aria-haspopup="true">&#128204; Pin &#9662;</button>',
     '<button type="button" class="export-btn ma-png-btn" onclick="brExportPngFromEl(this)" title="Export view to PNG">&#x1F5BC; PNG</button>',
     '<button type="button" class="export-btn ma-export-btn" data-ma-action="exporttable" data-ma-stim="metrics" title="Export table to Excel">\u2B73 Excel \u25BE</button>',
     '</div>'

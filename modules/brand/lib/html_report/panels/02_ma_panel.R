@@ -141,7 +141,6 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
     '<div class="ma-focus-bar">
        <label class="ma-ctl-label">Focal brand</label>
        <select class="ma-focus-select" data-ma-action="focus">%s</select>
-       <button type="button" class="ma-pin-dropdown-btn" data-ma-action="pindropdown" title="Pin a section" aria-haspopup="true">&#128204; Pin &#9662;</button>
      </div>',
     focus_options)
 }
@@ -157,9 +156,13 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
   brand_names <- pd$config$brand_names %||% brand_codes
   focal <- pd$meta$focal_brand_code %||% brand_codes[1]
 
+  # Sort: focal first, then alphabetical by brand name
+  sorted_order <- order(brand_codes != focal, tolower(brand_names))
+  brand_codes  <- brand_codes[sorted_order]
+  brand_names  <- brand_names[sorted_order]
+
   chips_html <- paste(c(
     vapply(seq_along(brand_codes), function(i) {
-      # Always default to all brands visible
       sprintf('<button type="button" class="col-chip" data-ma-scope="%s" data-ma-brand="%s">%s</button>',
               .ma_esc(stim), .ma_esc(brand_codes[i]), .ma_esc(brand_names[i]))
     }, character(1)),
@@ -194,6 +197,7 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
     heatmap_switcher,
     sprintf('<label class="toggle-label"><input type="checkbox" data-ma-action="showcounts" data-ma-stim="%s"> Show count</label>', stim),
     sprintf('<label class="toggle-label"><input type="checkbox" checked data-ma-action="showchart" data-ma-stim="%s"> Show chart</label>', stim),
+    '<button type="button" class="export-btn ma-pin-dropdown-btn" data-ma-action="pindropdown" title="Pin a section" aria-haspopup="true">&#128204; Pin &#9662;</button>',
     '<button type="button" class="export-btn ma-png-btn" onclick="brExportPngFromEl(this)" title="Export view to PNG">&#x1F5BC; PNG</button>',
     sprintf('<button type="button" class="export-btn ma-export-btn" data-ma-action="exporttable" data-ma-stim="%s" title="Export table to Excel">\u2B73 Excel \u25BE</button>',
             stim),

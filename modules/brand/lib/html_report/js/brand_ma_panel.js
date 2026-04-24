@@ -1457,28 +1457,114 @@
     if (!sec) return;
     var tbl = sec.querySelector('table');
     if (!tbl) return;
-    var pd = panel.__maData || {};
-    var cat = (pd.meta && pd.meta.category_label) || 'category';
-    var focal = (pd.meta && pd.meta.focal_brand_code) || '';
-    var basemode = (panel.__maState && panel.__maState.basemode) || {};
-    var mode = (basemode[stim] || 'total');
+
+    var pd      = panel.__maData || {};
+    var cat     = (pd.meta && pd.meta.category_label) || 'category';
+    var focal   = (pd.meta && pd.meta.focal_brand_code) || '';
+    var maState = panel.__maState || {};
+    var mode    = ((maState.basemode && maState.basemode[stim]) || 'total');
+    var vis     = (maState.visible && maState.visible[stim]) || {};
+    var pctAttr = (mode === 'aware') ? 'data-ma-pct-aware' : 'data-ma-pct';
+    var nAttr   = (mode === 'aware') ? 'data-ma-n-aware'   : 'data-ma-n-total';
+    var baseLabel = (mode === 'aware') ? '% of those aware of brand' : '% of total sample';
+
     var title = (stim === 'attributes') ? 'Brand Attributes'
-              : (stim === 'ceps') ? 'Category Entry Points'
-              : (stim === 'metrics') ? 'Headline Metrics'
-              : stim;
-    var html = '<html><head><meta charset="utf-8"><title>' + escHtml(title) + '</title>'
-      + '<style>table{border-collapse:collapse;font-family:Arial,sans-serif;}'
-      + 'th,td{border:1px solid #ccc;padding:4px 8px;font-size:12px;text-align:center;}'
-      + 'th{background:#1e293b;color:#fff;}'
-      + '.focal{background:#EBF5FB;font-weight:600;}</style></head><body>'
-      + '<h3>' + escHtml(title) + ' — ' + escHtml(cat) + '</h3>'
-      + '<p style="font-size:11px;color:#555;">Base: ' + (mode === 'aware' ? '% of those aware of brand' : '% of total sample')
-      + (focal ? ' · Focal: ' + escHtml(focal) : '') + '</p>'
-      + tbl.outerHTML.replace(/<button[^>]*>[^<]*<\/button>/g, '').replace(/<input[^>]*>/g, '')
-      + '</body></html>';
+              : (stim === 'ceps')       ? 'Category Entry Points'
+              : 'Headline Metrics';
+
+    var tdStyle = 'border:1px solid #ccc;padding:4px 8px;font-family:Calibri,sans-serif;font-size:12px;';
+    var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office"'
+      + ' xmlns:x="urn:schemas-microsoft-com:office:excel"'
+      + ' xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8">'
+      + '<style>td,th{' + tdStyle + '}'
+      + 'th{background:#1a2744;color:#fff;font-weight:700;}'
+      + '.mode{background:#e8edf5;color:#1a2744;font-style:italic;font-size:11px;}'
+      + '.focal{font-weight:700;background:#eef4fb;}'
+      + '.count{color:#888;font-size:11px;}'
+      + '.base-row{background:#f0f4f8;font-style:italic;}'
+      + '</style></head><body><table>';
+
+    // Header row — strip sort buttons
+    var ths = Array.from(tbl.querySelectorAll('thead th'));
+    var colCount = ths.length;
+    var headers = ths.map(function (th) {
+      var clone = th.cloneNode(true);
+      clone.querySelectorAll('button, input').forEach(function (el) { el.remove(); });
+      return clone.textContent.trim();
+    });
+    html += '<tr><td class="mode" colspan="' + colCount + '">Base: ' + baseLabel + ' \u2014 ' + escHtml(cat) + '</td></tr>';
+    html += '<tr>' + headers.map(function (h) { return '<th>' + escHtml(h) + '</th>'; }).join('') + '</tr>';
+
+    // Body rows
+    tbl.querySelectorAll('tbody tr').forEach(function (tr) {
+      if (tr.style.display === 'none') return;
+      var tds = Array.from(tr.querySelectorAll('td'));
+
+      // Base row — show n= per brand
+      if (tr.classList.contains('ma-row-base')) {
+        html += '<tr>';
+        tds.forEach(function (td) {
+          var brand = td.getAttribute('data-ma-brand');
+          if (brand && brand !== '__avg__') {
+            var n = td.getAttribute(nAttr);
+            html += '<td class="base-row">' + (n ? 'n=' + n : '\u2014') + '</td>';
+          } else {
+            html += '<td class="base-row">' + td.textContent.trim() + '</td>';
+          }
+        });
+        html += '</tr>';
+        return;
+      }
+
+      // % row
+      html += '<tr>';
+      tds.forEach(function (td) {
+        var brand = td.getAttribute('data-ma-brand');
+        if (!brand) {
+          // label column
+          var clone = td.cloneNode(true);
+          clone.querySelectorAll('button, input, .ct-sort-indicator, .ma-ci-bar-wrap, .ma-ci-limits').forEach(function (el) { el.remove(); });
+          html += '<td>' + escHtml(clone.textContent.trim()) + '</td>';
+        } else if (brand === '__avg__') {
+          var pct = parseFloat(td.getAttribute('data-ma-pct'));
+          var ciLo = td.getAttribute('data-ma-ci-lower');
+          var ciHi = td.getAttribute('data-ma-ci-upper');
+          var ciStr = (ciLo && ciHi) ? ' (' + Math.round(parseFloat(ciLo)) + '\u2013' + Math.round(parseFloat(ciHi)) + '%)' : '';
+          html += '<td>' + (isNaN(pct) ? '\u2014' : Math.round(pct) + '%' + ciStr) + '</td>';
+        } else {
+          if (vis[brand] === false) { html += '<td>\u2014</td>'; return; }
+          var isFocal = (brand === focal);
+          var cls = isFocal ? ' class="focal"' : '';
+          var pct = parseFloat(td.getAttribute(pctAttr));
+          html += '<td' + cls + '>' + (isNaN(pct) ? '\u2014' : Math.round(pct) + '%') + '</td>';
+        }
+      });
+      html += '</tr>';
+
+      // n= row — skip for avg column
+      html += '<tr>';
+      tds.forEach(function (td) {
+        var brand = td.getAttribute('data-ma-brand');
+        if (!brand) {
+          var clone = td.cloneNode(true);
+          clone.querySelectorAll('button, input').forEach(function (el) { el.remove(); });
+          html += '<td class="count">' + escHtml(clone.textContent.trim()) + ' (n=)</td>';
+        } else if (brand === '__avg__') {
+          html += '<td class="count">\u2014</td>';
+        } else {
+          if (vis[brand] === false) { html += '<td class="count">\u2014</td>'; return; }
+          var n = td.getAttribute(nAttr);
+          html += '<td class="count">' + (n ? 'n=' + n : '\u2014') + '</td>';
+        }
+      });
+      html += '</tr>';
+    });
+
+    html += '</table></body></html>';
+
     var blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
     var url  = URL.createObjectURL(blob);
-    var a = document.createElement('a');
+    var a    = document.createElement('a');
     a.href = url;
     a.download = 'ma_' + stim + '_' + (cat || 'category').toLowerCase().replace(/[^a-z0-9]+/g, '_') + '.xls';
     document.body.appendChild(a); a.click();
@@ -1487,11 +1573,11 @@
 
   // -------------------------------------------------------------- pin dropdown
   function bindPinDropdown(panel) {
-    var btn = panel.querySelector('.ma-pin-dropdown-btn');
-    if (!btn) return;
-    btn.addEventListener('click', function (ev) {
-      ev.stopPropagation();
-      openPinDropdown(panel, btn);
+    panel.querySelectorAll('.ma-pin-dropdown-btn').forEach(function (btn) {
+      btn.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        openPinDropdown(panel, btn);
+      });
     });
   }
 
