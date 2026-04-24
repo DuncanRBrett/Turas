@@ -221,16 +221,35 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
   )
 
   avg_cells <- paste(vapply(att_roles, function(role) {
-    pct <- cat_avg_aware[[role]]
-    if (!is.finite(pct))
+    pct_aw <- cat_avg_aware[[role]]
+    if (!is.finite(pct_aw))
       return('<td class="ct-td ct-data-col fn-rel-td-avg ct-na">&mdash;</td>')
-    total_attr <- {
-      pt <- cat_avg_total[[role]]
-      if (is.finite(pt)) sprintf(' data-fn-rel-pct-total="%.6f"', pt) else ""
-    }
+    pt_total <- cat_avg_total[[role]]
+    n_eff <- max(1, n_total)
+    ci_aw_lo <- max(0, pct_aw - 1.96 * sqrt(max(0, pct_aw * (1 - pct_aw)) / n_eff))
+    ci_aw_hi <- min(1, pct_aw + 1.96 * sqrt(max(0, pct_aw * (1 - pct_aw)) / n_eff))
+    total_attrs <- if (is.finite(pt_total)) {
+      ci_to_lo <- max(0, pt_total - 1.96 * sqrt(max(0, pt_total * (1 - pt_total)) / n_eff))
+      ci_to_hi <- min(1, pt_total + 1.96 * sqrt(max(0, pt_total * (1 - pt_total)) / n_eff))
+      sprintf(
+        ' data-fn-rel-pct-total="%.6f" data-fn-rel-ci-lo-total="%.6f" data-fn-rel-ci-hi-total="%.6f"',
+        pt_total, ci_to_lo, ci_to_hi)
+    } else ""
+    lo_disp   <- sprintf("%.0f%%", 100 * ci_aw_lo)
+    hi_disp   <- sprintf("%.0f%%", 100 * ci_aw_hi)
+    fill_left <- max(0, min(94, 100 * ci_aw_lo))
+    fill_w    <- max(4, min(100 - fill_left, 100 * (ci_aw_hi - ci_aw_lo)))
+    mean_pct  <- max(1, min(99, 100 * pct_aw))
+    ci_bar <- paste0(
+      sprintf('<div class="ma-ci-bar-wrap" title="95%% CI: %s \u2013 %s">', lo_disp, hi_disp),
+      sprintf('<div class="ma-ci-bar-range" style="left:%.1f%%;width:%.1f%%;"></div>', fill_left, fill_w),
+      sprintf('<div class="ma-ci-bar-tick" style="left:%.1f%%"></div>', mean_pct),
+      '</div>',
+      sprintf('<div class="ma-ci-limits"><span>%s</span><span>%s</span></div>', lo_disp, hi_disp)
+    )
     sprintf(
-      '<td class="ct-td ct-data-col fn-rel-td-avg" data-fn-att="%s" data-fn-rel-pct-aware="%.6f"%s><span class="ct-val">%.0f%%</span></td>',
-      .fn_esc(role), pct, total_attr, 100 * pct)
+      '<td class="ct-td ct-data-col fn-rel-td-avg" data-fn-att="%s" data-fn-rel-pct-aware="%.6f" data-fn-rel-ci-lo-aware="%.6f" data-fn-rel-ci-hi-aware="%.6f"%s><span class="ct-val">%.0f%%</span>%s</td>',
+      .fn_esc(role), pct_aw, ci_aw_lo, ci_aw_hi, total_attrs, 100 * pct_aw, ci_bar)
   }, character(1)), collapse = "")
   avg_row <- paste0(
     '<tr class="ct-row fn-row-avg-all fn-rel-row">',

@@ -2220,6 +2220,34 @@
       if (valEl && !isNaN(pct)) valEl.textContent = Math.round(pct * 100) + "%";
       if (freqEl && !isNaN(cnt)) freqEl.textContent = "n=" + cnt;
     });
+    // Update avg row cells (fn-rel-td-avg, not ct-heatmap-cell)
+    table.querySelectorAll("td.fn-rel-td-avg[data-fn-att]").forEach(function(td) {
+      var pct = parseFloat(td.getAttribute(pctAttr));
+      var valEl = td.querySelector(".ct-val");
+      if (valEl && !isNaN(pct)) valEl.textContent = Math.round(pct * 100) + "%";
+      // Re-render CI bar with mode-specific bounds
+      var ciLo = parseFloat(td.getAttribute("data-fn-rel-ci-lo-" + base));
+      var ciHi = parseFloat(td.getAttribute("data-fn-rel-ci-hi-" + base));
+      var barWrap   = td.querySelector(".ma-ci-bar-wrap");
+      var barLimits = td.querySelector(".ma-ci-limits");
+      var barTick   = td.querySelector(".ma-ci-bar-tick");
+      var barRange  = td.querySelector(".ma-ci-bar-range");
+      if (barWrap && !isNaN(pct) && !isNaN(ciLo) && !isNaN(ciHi)) {
+        var loDisp   = Math.round(ciLo * 100) + "%";
+        var hiDisp   = Math.round(ciHi * 100) + "%";
+        var fillLeft = Math.max(0, Math.min(94, ciLo * 100));
+        var fillW    = Math.max(4, Math.min(100 - fillLeft, (ciHi - ciLo) * 100));
+        var meanPct  = Math.max(1, Math.min(99, pct * 100));
+        barWrap.title = "95% CI: " + loDisp + " \u2013 " + hiDisp;
+        if (barRange) { barRange.style.left = fillLeft.toFixed(1) + "%"; barRange.style.width = fillW.toFixed(1) + "%"; }
+        if (barTick)  barTick.style.left = meanPct.toFixed(1) + "%";
+        if (barLimits) {
+          var spans = barLimits.querySelectorAll("span");
+          if (spans[0]) spans[0].textContent = loDisp;
+          if (spans[1]) spans[1].textContent = hiDisp;
+        }
+      }
+    });
     // Re-apply CI bands if currently active
     var relShowCI = panel.querySelector('[data-fn-rel-showci]');
     if (relShowCI && relShowCI.checked) {
