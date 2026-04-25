@@ -200,12 +200,11 @@ build_wom_said_chart <- function(panel_data, focal_colour = "#1A5276") {
 
     bar_parts <- character(0)
 
-    # Focal-row band
-    if (is_f) {
-      bar_parts <- c(bar_parts, sprintf(
-        '<rect class="wom-bar-focal-band" x="%d" y="%g" width="%d" height="%d" fill="%s" opacity="0.07"/>',
-        ml - 16, y - 3, inner_w + 24, bar_h + 6, focal_colour))
-    }
+    # Focal-row band (emitted for all rows; non-focal hidden so JS can toggle)
+    bar_parts <- c(bar_parts, sprintf(
+      '<rect class="wom-bar-focal-band" x="%d" y="%g" width="%d" height="%d" fill="%s" opacity="0.07"%s/>',
+      ml - 16, y - 3, inner_w + 24, bar_h + 6, focal_colour,
+      if (is_f) "" else ' display="none"'))
 
     # Label (left gutter)
     bar_parts <- c(bar_parts, sprintf(

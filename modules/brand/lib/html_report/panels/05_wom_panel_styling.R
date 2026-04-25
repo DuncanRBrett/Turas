@@ -22,81 +22,67 @@ build_wom_panel_styles <- function(focal_colour = "#1A5276") {
   border: 1px dashed #e2e8f0; border-radius: 8px; background: #f8fafc;
 }
 
-/* Focus bar */
+/* Focus bar (focal brand selector above chips) */
 .wom-focus-bar {
   display: flex; align-items: center; gap: 10px;
-  padding: 8px 12px; margin: 0 0 8px;
+  padding: 8px 12px; margin: 0 0 6px;
   background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
 }
 .wom-ctl-label {
   font-size: 12px; font-weight: 600; color: #334155;
 }
 .wom-ctl-label-title {
-  text-transform: uppercase; letter-spacing: 0.3px; color: #64748b;
-  font-size: 11px;
+  text-transform: uppercase; letter-spacing: 0.4px; color: #64748b;
+  font-size: 11px; font-weight: 600; white-space: nowrap;
 }
 .wom-focus-select {
   font-size: 13px; padding: 4px 8px;
   border: 1px solid #cbd5e1; border-radius: 6px;
   background: #ffffff; color: #0f172a; min-width: 180px;
 }
-.wom-chart-controls {
-  display: inline-flex; align-items: center; gap: 12px;
-  margin-left: auto;
+
+/* Controls bar: two-row layout (chips / meta-row) */
+.wom-controls-bar {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-bottom: 12px; padding: 8px 10px;
+  background: #f8fafc; border: 1px solid #eef2f7; border-radius: 8px;
 }
-.wom-toggle-label {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: 12px; font-weight: 500; color: #334155;
-  cursor: pointer; user-select: none;
+.wom-ctl-group {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
 }
-.wom-toggle-label input[type="checkbox"] { cursor: pointer; }
+.wom-meta-row {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+}
 
 /* Heard / Said segmented control */
 .wom-variant-seg {
-  display: inline-flex; border: 1px solid #cbd5e1; border-radius: 6px;
+  display: inline-flex; border: 1px solid #e2e8f0; border-radius: 4px;
   background: #ffffff; overflow: hidden;
 }
 .wom-variant-seg .wom-variant-btn {
-  font-size: 12px; font-weight: 600; color: #475569;
-  padding: 4px 10px; background: #ffffff; border: 0;
+  font-size: 11px; font-weight: 500; color: #1e293b;
+  padding: 5px 10px; background: #ffffff; border: 0;
   cursor: pointer; user-select: none;
-  border-right: 1px solid #e2e8f0;
+  border-right: 1px solid #e2e8f0; line-height: 1.4;
 }
 .wom-variant-seg .wom-variant-btn:last-child { border-right: 0; }
-.wom-variant-seg .wom-variant-btn:hover { background: #f1f5f9; }
+.wom-variant-seg .wom-variant-btn:hover { background: #e2e8f0; }
 .wom-variant-seg .wom-variant-btn.active {
-  background: #1a2744; color: #ffffff;
+  background: #1a2744; color: #ffffff; font-weight: 600;
 }
-.wom-chart-controls[aria-disabled="true"] .wom-variant-seg,
-.wom-chart-controls[aria-disabled="true"] .wom-variant-seg .wom-variant-btn {
-  opacity: 0.5; pointer-events: none;
+.wom-variant-seg[aria-disabled="true"] {
+  opacity: 0.45; pointer-events: none;
 }
 
-/* Brand picker: coloured show/hide chips */
-.wom-brand-picker {
-  display: flex; align-items: flex-start; gap: 10px;
-  padding: 8px 12px; margin: 0 0 12px;
-  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
-  flex-wrap: wrap;
+/* WOM brand chips (off state) */
+.wom-brand-chip:not(.active) {
+  background: #f1f5f9 !important; color: #94a3b8 !important;
+  border-color: #e2e8f0 !important;
+  text-decoration: line-through; opacity: 0.6;
 }
-.wom-brand-picker .col-chip-bar {
-  display: flex; flex-wrap: wrap; gap: 6px;
-}
-.wom-brand-picker .wom-brand-chip {
-  font-size: 12px; font-weight: 600; padding: 4px 10px;
-  border-radius: 999px; cursor: pointer; border: 1px solid transparent;
-  opacity: 1; transition: opacity 0.15s ease, filter 0.15s ease;
-}
-.wom-brand-picker .wom-brand-chip:not(.active) {
-  background: #ffffff !important; color: #94a3b8 !important;
-  border-color: #cbd5e1 !important;
-  text-decoration: line-through; filter: none; opacity: 0.65;
-}
-.wom-brand-picker .wom-brand-chip .fn-focal-badge {
-  margin-left: 6px; font-size: 9px; padding: 1px 5px;
-  background: rgba(255,255,255,0.25); border-radius: 4px;
-  letter-spacing: 0.3px;
-}
+
+/* Hidden base column — shown via Show count checkbox */
+.wom-table .wom-col-base[hidden] { display: none !important; }
 
 /* Hidden brand rows */
 .wom-table tr.wom-row-hidden { display: none; }
@@ -203,6 +189,12 @@ build_wom_panel_styles <- function(focal_colour = "#1A5276") {
 
 /* Insight box — margin tidy-up when stacked below the table */
 .wom-insight-box { margin-top: 14px; }
+
+/* Relocated section toolbar: sits inline in meta-row — no extra margin */
+.wom-meta-row .wom-toolbar-relocated {
+  margin: 0; padding: 0; background: none; border: none;
+  display: flex; gap: 6px; align-items: center;
+}
 </style>',
     focal_colour)
 }

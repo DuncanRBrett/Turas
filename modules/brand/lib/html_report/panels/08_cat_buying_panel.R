@@ -1000,9 +1000,9 @@ render_cat_buying_panel <- function(panel_data) {
   codes     <- codes[sorted_ord]
   names_vec <- names_vec[sorted_ord]
 
-  # Fallback palette — same as JS PALETTE for brands without Colour
-  palette <- c('#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f',
-               '#edc948', '#b07aa1', '#ff9da7', '#9c755f', '#bab0ac')
+  # DJB2-hash palette — identical to JS BRAND_PALETTE for cross-panel consistency
+  palette <- c('#4e79a7','#f28e2b','#e15759','#76b7b2','#59a14f',
+               '#edc948','#b07aa1','#ff9da7','#9c755f','#bab0ac')
   resolve_colour <- function(bc, idx) {
     if (!is.null(brand_colours) && !is.null(brand_colours[[bc]]) &&
         nzchar(brand_colours[[bc]])) {
@@ -1011,7 +1011,9 @@ render_cat_buying_panel <- function(panel_data) {
     if (!is.null(focal) && bc == focal && !is.null(fcol) && nzchar(fcol)) {
       return(as.character(fcol))
     }
-    palette[((idx - 1) %% length(palette)) + 1]
+    h <- 5381.0
+    for (b in utf8ToInt(bc)) h <- (h * 33.0 + b) %% 2147483648.0
+    palette[[(as.integer(h) %% length(palette)) + 1L]]
   }
 
   # Focal-brand <select> dropdown (MA-style)

@@ -55,9 +55,9 @@
     if (!pd || !code) return '#94a3b8';
     if (pd.brandColours && pd.brandColours[code]) return pd.brandColours[code];
     if (pd.focalBrand === code) return pd.focalColour || '#1A5276';
-    var idx = (pd.brandCodes || []).indexOf(code);
-    if (idx < 0) idx = 0;
-    return PALETTE[idx % PALETTE.length];
+    var h = 5381;
+    for (var i = 0; i < code.length; i++) h = ((h << 5) + h + code.charCodeAt(i)) & 0x7fffffff;
+    return PALETTE[h % PALETTE.length];
   }
 
   function getBrandName(pd, code) {
@@ -219,12 +219,31 @@
           else      sp.setAttribute('hidden', '');
         });
         panel.classList.toggle('cb-on-context', target === 'context');
-        if (target === 'loyalty' || target === 'dist') {
+
+        /* Re-apply brand visibility from panel-level state to the newly-shown tab */
+        if (target === 'brands') {
+          applyBrandsRowVisibility(panel);
+          /* Sync per-tab chip off-states to match panel-level visible map */
+          syncSubTabChipStates(panel, 'brands');
+        } else if (target === 'loyalty' || target === 'dist') {
+          applyRowVisibility(panel, target);
+          syncSubTabChipStates(panel, target);
           renderCbStackedBars(panel, target);
         }
+
         relocateCbToolbarIntoControls(panel);
       });
     });
+  }
+
+  /* Mirror panel-level __cbState.visible into chip off-state CSS for a scope */
+  function syncSubTabChipStates(panel, scope) {
+    var vis = panel.__cbState.visible[scope] || {};
+    panel.querySelectorAll('.fn-rel-brand-chip[data-cb-scope="' + scope + '"]')
+      .forEach(function (chip) {
+        var code = chip.getAttribute('data-cb-brand');
+        chip.classList.toggle('col-chip-off', vis[code] === false);
+      });
   }
 
   /* ---------------------------------------------------------------------- */

@@ -64,16 +64,25 @@ build_wom_panel_html <- function(panel_data,
   brand_colours <- pd$config$brand_colours %||% list()
   focal         <- pd$meta$focal_brand_code %||% brand_codes[1]
 
-  # Fallback palette — mirrors cat_buying panel
-  palette <- c('#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f',
-               '#edc948', '#b07aa1', '#ff9da7', '#9c755f', '#bab0ac')
-  .resolve_col <- function(bc, idx) {
+  if (length(brand_codes) == 0) return("")
+
+  # DJB2 hash palette — identical to JS BRAND_PALETTE for cross-panel consistency
+  palette <- c('#4e79a7','#f28e2b','#e15759','#76b7b2','#59a14f',
+               '#edc948','#b07aa1','#ff9da7','#9c755f','#bab0ac')
+  .stable_col <- function(bc) {
     if (!is.null(brand_colours[[bc]]) && nzchar(brand_colours[[bc]]))
       return(as.character(brand_colours[[bc]]))
-    if (!is.null(focal) && bc == focal && !is.null(focal_colour) &&
-        nzchar(focal_colour)) return(as.character(focal_colour))
-    palette[((idx - 1) %% length(palette)) + 1]
+    if (!is.null(focal) && bc == focal && nzchar(focal_colour %||% ""))
+      return(as.character(focal_colour))
+    h <- 5381.0
+    for (b in utf8ToInt(bc)) h <- (h * 33.0 + b) %% 2147483648.0
+    palette[[(as.integer(h) %% length(palette)) + 1L]]
   }
+
+  # Sort: focal first, then alphabetical by display name
+  sorted_ord  <- order(brand_codes != focal, tolower(brand_names))
+  brand_codes <- brand_codes[sorted_ord]
+  brand_names <- brand_names[sorted_ord]
 
   # Focal-brand dropdown
   focus_options <- paste(vapply(seq_along(brand_codes), function(i) {
@@ -86,7 +95,7 @@ build_wom_panel_html <- function(panel_data,
   chips_html <- paste(vapply(seq_along(brand_codes), function(i) {
     bc  <- brand_codes[i]
     nm  <- brand_names[i]
-    col <- .resolve_col(bc, i)
+    col <- .stable_col(bc)
     is_foc <- !is.null(focal) && bc == focal
     badge  <- if (is_foc) ' <span class="fn-focal-badge">FOCAL</span>' else ""
     sprintf(
@@ -99,24 +108,31 @@ build_wom_panel_html <- function(panel_data,
     '<div class="wom-focus-bar">
        <label class="wom-ctl-label">Focal brand</label>
        <select class="wom-focus-select" data-wom-action="focus">%s</select>
-       <div class="wom-chart-controls">
-         <label class="wom-toggle-label">
+     </div>
+     <div class="wom-controls-bar">
+       <div class="wom-ctl-group">
+         <span class="wom-ctl-label wom-ctl-label-title">Show brands</span>
+         <div class="col-chip-bar" data-wom-scope="%s">%s</div>
+       </div>
+       <div class="wom-meta-row">
+         <label class="toggle-label">
            <input type="checkbox" data-wom-action="showchart" data-wom-scope="%s">
            Show chart
          </label>
-         <div class="wom-variant-seg" data-wom-scope="%s" role="tablist" aria-label="Chart variant">
+         <div class="wom-variant-seg" data-wom-scope="%s" role="tablist" aria-label="Chart variant" aria-disabled="true">
            <button type="button" class="wom-variant-btn active" data-wom-action="variant" data-wom-variant="heard" role="tab" aria-selected="true">Heard</button>
            <button type="button" class="wom-variant-btn" data-wom-action="variant" data-wom-variant="said" role="tab" aria-selected="false">Said + occasions</button>
          </div>
+         <label class="toggle-label">
+           <input type="checkbox" data-wom-action="showcounts">
+           Show count
+         </label>
        </div>
-     </div>
-     <div class="wom-brand-picker">
-       <span class="wom-ctl-label wom-ctl-label-title">Show brands</span>
-       <div class="col-chip-bar" data-wom-scope="%s">%s</div>
      </div>',
     focus_options,
-    .wom_esc(category_code), .wom_esc(category_code),
-    .wom_esc(category_code), chips_html)
+    .wom_esc(category_code), chips_html,
+    .wom_esc(category_code),
+    .wom_esc(category_code))
 }
 
 
@@ -173,7 +189,7 @@ build_wom_panel_html <- function(panel_data,
     'title="Click to sort A\u2013Z / Z\u2013A" ',
     'style="text-align:left;min-width:160px;cursor:pointer;">',
     '<span>Brand</span><span class="wom-sort-ind"></span></th>')
-  base_th <- '<th class="ct-th ct-data-col" style="min-width:70px;">Base</th>'
+  base_th <- '<th class="ct-th ct-data-col wom-col-base" style="min-width:70px;" hidden>Base</th>'
 
   col_ths <- paste(vapply(columns, function(col) {
     group_cls <- switch(col$value_type,
@@ -268,7 +284,7 @@ build_wom_panel_html <- function(panel_data,
   paste0(
     '<tr class="ct-row fn-row-avg-all wom-row-avg" data-locked="1">',
     '<td class="ct-td ct-label-col"><em>Category average</em></td>',
-    '<td class="ct-td ct-data-col"><span style="color:#94a3b8;font-size:11px;">\u2014</span></td>',
+    '<td class="ct-td ct-data-col wom-col-base" hidden><span style="color:#94a3b8;font-size:11px;">\u2014</span></td>',
     cells,
     '</tr>'
   )
@@ -283,7 +299,7 @@ build_wom_panel_html <- function(panel_data,
   }
   ni <- as.integer(n)
   warn <- ni < 30L
-  sprintf('<td class="ct-td ct-data-col%s"><span class="%s">n=%d%s</span></td>',
+  sprintf('<td class="ct-td ct-data-col wom-col-base%s" hidden><span class="%s">n=%d%s</span></td>',
           focal_cls,
           if (warn) "ct-low-base" else "ct-base-n",
           ni,

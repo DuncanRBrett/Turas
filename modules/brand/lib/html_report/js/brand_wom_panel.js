@@ -80,6 +80,16 @@
       });
     });
 
+    // --- Show count toggle (Base column visibility)
+    panel.querySelectorAll('[data-wom-action="showcounts"]').forEach(function (cb) {
+      cb.addEventListener("change", function () {
+        panel.querySelectorAll(".wom-col-base").forEach(function (el) {
+          if (cb.checked) el.removeAttribute("hidden");
+          else            el.setAttribute("hidden", "");
+        });
+      });
+    });
+
     // --- Heard / Said variant selector
     panel.querySelectorAll('[data-wom-action="variant"]').forEach(function (btn) {
       btn.addEventListener("click", function () {
@@ -92,6 +102,10 @@
     // Ensure variant control reflects initial Show chart state
     var cb0 = panel.querySelector('[data-wom-action="showchart"]');
     syncVariantControlDisabled(panel, cb0 ? cb0.checked : false);
+
+    // Move the section toolbar (pin/png/excel) into the meta-row;
+    // hide the insight toggle since WOM has its own inline insight box.
+    relocateWomToolbar(panel);
 
     // Initial chart reflow so bar order matches the table's initial
     // (alphabetical) competitor order — chart is built focal-first then
@@ -115,10 +129,36 @@
   }
 
   function syncVariantControlDisabled(panel, enabled) {
-    var host = panel.querySelector(".wom-chart-controls");
-    if (!host) return;
-    if (enabled) host.removeAttribute("aria-disabled");
-    else         host.setAttribute("aria-disabled", "true");
+    panel.querySelectorAll(".wom-variant-seg").forEach(function (seg) {
+      if (enabled) seg.removeAttribute("aria-disabled");
+      else         seg.setAttribute("aria-disabled", "true");
+    });
+  }
+
+  function pinWomView(panel) {
+    if (typeof TurasPins === "undefined") return;
+    var table = panel.querySelector(".wom-table");
+    var chartSection = panel.querySelector(".wom-chart-section:not([hidden])");
+    var insightEl = panel.querySelector(".ma-insight-box-text");
+
+    var tableHtml = table ? table.outerHTML : "";
+    var chartSvg  = chartSection ? (chartSection.querySelector("svg") || {}).outerHTML || "" : "";
+    var insight   = insightEl ? insightEl.value.trim() : "";
+
+    var catCode = panel.getAttribute("data-cat-code") || "";
+    TurasPins.add({
+      title:   "Word of Mouth" + (catCode ? " — " + catCode : ""),
+      html:    chartSvg + tableHtml,
+      insight: insight
+    });
+  }
+
+  function exportWomExcel(panel) {
+    if (typeof brExportTableToExcel !== "function") return;
+    var table = panel.querySelector(".wom-table");
+    if (!table) return;
+    var catCode = panel.getAttribute("data-cat-code") || "wom";
+    brExportTableToExcel(table, "WOM_" + catCode);
   }
 
   function repinFocal(panel, table, focalCode, accent) {
@@ -200,6 +240,7 @@
       th.setAttribute("data-wom-sort-dir", "none");
     });
 
+    updateChartFocalBrand(panel, focalCode, accent);
     reflowChart(panel);
   }
 
@@ -310,6 +351,50 @@
       });
       svg.setAttribute("viewBox", "0 0 " + W + " " + totalH);
     });
+  }
+
+  // Update SVG chart focal visual state when the focal brand changes.
+  // Toggles the background band, label weight/colour/diamond.
+  function updateChartFocalBrand(panel, focalCode, accent) {
+    panel.querySelectorAll(".wom-chart-svg g.wom-bar-row").forEach(function (g) {
+      var bc = g.getAttribute("data-wom-brand");
+      var isFocal = (bc === focalCode);
+      g.setAttribute("data-wom-focal", isFocal ? "1" : "0");
+
+      var band = g.querySelector(".wom-bar-focal-band");
+      if (band) band.style.display = isFocal ? "" : "none";
+
+      var lbl = g.querySelector(".wom-bar-label");
+      if (lbl) {
+        lbl.setAttribute("font-weight", isFocal ? "700" : "500");
+        lbl.setAttribute("fill", isFocal ? accent : "#1e293b");
+        var txt = (lbl.textContent || "").replace(/\s*\u25C6\s*$/, "").trim();
+        lbl.textContent = isFocal ? txt + " \u25C6" : txt;
+      }
+    });
+  }
+
+  // Move the section toolbar (pin/png/excel) into the WOM meta-row so it
+  // sits alongside the Show chart controls. Hides the +Add Insight toggle
+  // since the WOM panel has its own inline insight box below the table.
+  function relocateWomToolbar(panel) {
+    var section = panel.closest(".br-element-section") || panel.parentNode;
+    if (!section) return;
+    var toolbar = section.querySelector(".br-section-toolbar");
+    if (!toolbar) return;
+
+    var insightToggle = toolbar.querySelector(".br-insight-toggle");
+    if (insightToggle) insightToggle.style.display = "none";
+    var insightContainer = section.querySelector(".br-insight-container");
+    if (insightContainer) insightContainer.style.display = "none";
+
+    var metaRow = panel.querySelector(".wom-meta-row");
+    if (metaRow) {
+      toolbar.style.margin = "";
+      toolbar.style.marginBottom = "";
+      toolbar.classList.add("wom-toolbar-relocated");
+      metaRow.appendChild(toolbar);
+    }
   }
 
   function syncChipActivity(panel) {
