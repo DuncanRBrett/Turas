@@ -898,10 +898,16 @@ build_network <- function(nodes, edges, layout,
                           title        = "Competitive Constellation") {
   if (is.null(nodes) || nrow(nodes) == 0 || is.null(layout)) return("")
 
-  w <- 720L; h <- 520L
-  pad <- 60L
-  pw  <- w - 2L * pad
-  ph  <- h - pad - 40L  # leave room for title
+  # Bigger canvas + larger top/side margins so brand labels at the
+  # edges don't collide with the title or get truncated. Right-edge
+  # labels are flipped to the left of their node further down so wide
+  # labels like "Checkers House Brand" or "PnP No Name" fit.
+  w <- 820L; h <- 580L
+  pad_x   <- 90L
+  pad_top <- 80L      # leaves room for title (y=22) + first label
+  pad_bot <- 60L
+  pw  <- w - 2L * pad_x
+  ph  <- h - pad_top - pad_bot
 
   # Merge layout into nodes
   nodes <- merge(nodes, layout, by = "brand", all.x = TRUE)
@@ -911,8 +917,8 @@ build_network <- function(nodes, edges, layout,
   # Map layout coordinates to SVG
   x_range <- range(nodes$x, na.rm = TRUE)
   y_range <- range(nodes$y, na.rm = TRUE)
-  sx <- function(v) pad + (v - x_range[1]) / max(diff(x_range), 1e-6) * pw
-  sy <- function(v) 40L + ph - (v - y_range[1]) / max(diff(y_range), 1e-6) * ph
+  sx <- function(v) pad_x + (v - x_range[1]) / max(diff(x_range), 1e-6) * pw
+  sy <- function(v) pad_top + ph - (v - y_range[1]) / max(diff(y_range), 1e-6) * ph
 
   nodes$svgx <- sx(nodes$x)
   nodes$svgy <- sy(nodes$y)
@@ -925,8 +931,8 @@ build_network <- function(nodes, edges, layout,
 
   # Title
   parts <- c(parts, sprintf(
-    '<text x="%d" y="22" fill="#1e293b" font-size="14" font-weight="700">%s</text>',
-    pad, .br_escape(title)))
+    '<text x="%d" y="28" fill="#1e293b" font-size="14" font-weight="700">%s</text>',
+    pad_x, .br_escape(title)))
 
   # Edges (draw before nodes so nodes sit on top). Each line carries
   # data-pf-cn-b1 / data-pf-cn-b2 / data-pf-cn-jac so the JS-side focal
@@ -972,26 +978,38 @@ build_network <- function(nodes, edges, layout,
         '<circle class="pf-cn-halo" data-pf-cn-halo="%s" cx="%g" cy="%g" r="%g" fill="none" stroke="%s" stroke-width="2" stroke-dasharray="3 3" opacity="0.55"/>',
         bcode, nd$svgx, nd$svgy, radius + 6, focal_colour))
     }
-    # Native SVG tooltip: <title> must be the FIRST child of the
-    # element being hovered for browsers (Chrome, Safari, Firefox) to
-    # consistently surface it. Putting it inside <circle> directly is
-    # more reliable than wrapping in a <g> — JS rewrites the title text
-    # whenever the focal changes so hover always reflects the active
-    # focal-vs-rival Jaccard.
+    # Smart label placement: nodes in the right third of the chart get
+    # their label drawn LEFT of the node (right-anchored) so wide labels
+    # like "Checkers House Brand" don't run off the SVG edge. Top-edge
+    # nodes get the label drawn BELOW so they don't collide with the title.
+    on_right <- nd$svgx > (pad_x + pw * 0.65)
+    on_top   <- nd$svgy < (pad_top + 20)
+    if (on_right) {
+      label_x <- nd$svgx - radius - 4
+      anchor  <- "end"
+    } else {
+      label_x <- nd$svgx + radius + 4
+      anchor  <- "start"
+    }
+    label_y <- if (on_top) nd$svgy + radius + 14 else nd$svgy - radius - 2
+
+    # Hover tooltip is delivered by JS (instant, reliable) — the brand
+    # display label rides on the circle as a data attribute so the
+    # tooltip handler can read it without a DOM walk.
     parts <- c(parts,
-      sprintf('<circle class="pf-cn-node%s" data-pf-cn-node="%s" data-pf-cn-base-r="%g" cx="%g" cy="%g" r="%g" fill="%s" opacity="0.9" stroke="#fff" stroke-width="2" data-brand="%s" style="cursor:pointer;" onclick="pfConstellationNodeClick(event,\'%s\')"><title data-pf-cn-tip="%s">%s</title></circle>',
+      sprintf('<circle class="pf-cn-node%s" data-pf-cn-node="%s" data-pf-cn-base-r="%g" data-pf-cn-name="%s" cx="%g" cy="%g" r="%g" fill="%s" opacity="0.9" stroke="#fff" stroke-width="2" data-brand="%s" style="cursor:pointer;" onclick="pfConstellationNodeClick(event,\'%s\')"></circle>',
               if (is_focal) " pf-cn-node-focal" else "",
-              bcode, nd$r, nd$svgx, nd$svgy, radius, col,
-              bcode, bcode,
-              bcode, .br_escape(label)),
-      sprintf('<text class="pf-cn-label%s" data-pf-cn-label="%s" x="%g" y="%g" fill="%s" font-size="%s" font-weight="%s">%s</text>',
+              bcode, nd$r, .br_escape(label),
+              nd$svgx, nd$svgy, radius, col,
+              bcode, bcode),
+      sprintf('<text class="pf-cn-label%s" data-pf-cn-label="%s" x="%g" y="%g" text-anchor="%s" fill="%s" font-size="%s" font-weight="%s">%s</text>',
               if (is_focal) " pf-cn-label-focal" else "",
               bcode,
-              nd$svgx + radius + 4, nd$svgy - radius - 2,
+              label_x, label_y, anchor,
               if (is_focal) "#1e293b" else "#64748b",
               if (is_focal) "12" else "10",
               if (is_focal) "700" else "400",
-              .br_escape(.br_trunc(label, 22)))
+              .br_escape(.br_trunc(label, 24)))
     )
   }
 

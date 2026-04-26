@@ -515,9 +515,120 @@ function cssEscape(s) {
 // COMPETITIVE SET — per-category chart + focal picker + closest-competitors
 // ---------------------------------------------------------------------------
 
+// Lazy-build a single floating tooltip element. One per document is
+// enough — we move and rewrite it as the cursor moves between nodes.
+function pfCnGetTooltip() {
+  var t = document.getElementById('pf-cn-tooltip');
+  if (t) return t;
+  t = document.createElement('div');
+  t.id = 'pf-cn-tooltip';
+  t.className = 'pf-cn-tooltip';
+  t.setAttribute('role', 'tooltip');
+  t.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(t);
+  return t;
+}
+
+function pfCnFormatTooltip(node, focalCode) {
+  var brandLabel = node.getAttribute('data-pf-cn-name') ||
+                   pfCnReadNodeLabel(node);
+  var code = node.getAttribute('data-pf-cn-node');
+  if (!focalCode || code === focalCode) return brandLabel + ' — focal';
+
+  // Compute Jaccard with focal + rank from the SVG's edges.
+  var svg = node.ownerSVGElement;
+  var jacByCode = {};
+  if (svg) {
+    svg.querySelectorAll('.pf-cn-edge').forEach(function (e) {
+      var b1 = e.getAttribute('data-pf-cn-b1');
+      var b2 = e.getAttribute('data-pf-cn-b2');
+      var j  = parseFloat(e.getAttribute('data-pf-cn-jac')) || 0;
+      if (b1 === focalCode) jacByCode[b2] = j;
+      else if (b2 === focalCode) jacByCode[b1] = j;
+    });
+  }
+  var ranked = Object.keys(jacByCode)
+    .sort(function (a, b) { return jacByCode[b] - jacByCode[a]; });
+  var rank = ranked.indexOf(code) + 1;
+  var jac  = jacByCode[code];
+
+  // Look up the focal's brand label too so the tooltip reads naturally.
+  var focalLabel = focalCode;
+  if (svg) {
+    var fcss = (window.CSS && CSS.escape) ? CSS.escape(focalCode)
+      : focalCode.replace(/([^a-zA-Z0-9_\-])/g, '\\$1');
+    var fNode = svg.querySelector('.pf-cn-node[data-pf-cn-node="' + fcss + '"]');
+    if (fNode) {
+      focalLabel = fNode.getAttribute('data-pf-cn-name') ||
+                   pfCnReadNodeLabel(fNode);
+    }
+  }
+
+  if (jac == null) {
+    return brandLabel + ' — no co-awareness link with ' + focalLabel;
+  }
+  var pct = Math.round(jac * 100);
+  return brandLabel + ' — ' + pct + '% Jaccard with ' + focalLabel +
+         ' · #' + rank + ' closest';
+}
+
+function pfCnPositionTooltip(tip, ev) {
+  // Place tooltip just below+right of cursor; flip to left/up if it
+  // would overflow the viewport.
+  var pad = 12;
+  var x = ev.clientX + pad;
+  var y = ev.clientY + pad;
+  // Show first to measure
+  tip.style.visibility = 'hidden';
+  tip.style.opacity = '1';
+  tip.style.left = '0px';
+  tip.style.top  = '0px';
+  var r = tip.getBoundingClientRect();
+  if (x + r.width  > window.innerWidth)  x = ev.clientX - pad - r.width;
+  if (y + r.height > window.innerHeight) y = ev.clientY - pad - r.height;
+  tip.style.left = x + 'px';
+  tip.style.top  = y + 'px';
+  tip.style.visibility = 'visible';
+}
+
+function pfCnBindHoverTooltips(panel) {
+  // Delegate hover events on the constellation panel — works for any
+  // re-rendered SVG too (e.g. if we later swap in a new chart).
+  panel.addEventListener('mouseover', function (ev) {
+    var node = ev.target.closest && ev.target.closest('.pf-cn-node');
+    if (!node) return;
+    var tip = pfCnGetTooltip();
+    var container = document.getElementById('pf-constellation-chart');
+    var focal = container ? container.getAttribute('data-pf-cn-focal') : '';
+    tip.textContent = pfCnFormatTooltip(node, focal);
+    tip.setAttribute('aria-hidden', 'false');
+    pfCnPositionTooltip(tip, ev);
+  });
+  panel.addEventListener('mousemove', function (ev) {
+    var node = ev.target.closest && ev.target.closest('.pf-cn-node');
+    if (!node) return;
+    var tip = pfCnGetTooltip();
+    if (tip.getAttribute('aria-hidden') === 'true') return;
+    pfCnPositionTooltip(tip, ev);
+  });
+  panel.addEventListener('mouseout', function (ev) {
+    var node = ev.target.closest && ev.target.closest('.pf-cn-node');
+    if (!node) return;
+    // Only hide when leaving the node entirely (not when moving to a
+    // sibling element inside the same node).
+    var to = ev.relatedTarget;
+    if (to && node.contains(to)) return;
+    var tip = pfCnGetTooltip();
+    tip.style.opacity = '0';
+    tip.style.visibility = 'hidden';
+    tip.setAttribute('aria-hidden', 'true');
+  });
+}
+
 function pfInitConstellationChips() {
   var panel = document.getElementById('pf-subtab-constellation');
   if (!panel) return;
+  pfCnBindHoverTooltips(panel);
 
   panel.querySelectorAll('.pf-cn-cat-chip').forEach(function (chip) {
     chip.addEventListener('click', function () {
@@ -668,11 +779,8 @@ function pfCnRestyleSvgForFocal(svg, focalCode, focalColour) {
     e.classList.remove('pf-cn-edge-focal');
   });
 
-  // Reset all <title> tooltips to bare brand label.
-  svg.querySelectorAll('.pf-cn-node').forEach(function (n) {
-    var t = n.querySelector('title');
-    if (t) t.textContent = pfCnReadNodeLabel(n);
-  });
+  // (Tooltip text is now built on hover by pfCnFormatTooltip — no
+  // per-node text to reset on focal change.)
 
   if (!focalCode) return;
 
@@ -735,9 +843,8 @@ function pfCnRestyleSvgForFocal(svg, focalCode, focalColour) {
     e.classList.add('pf-cn-edge-focal');
   });
 
-  // Update node-group <title> tooltips so hovering shows
-  // "Brand X — 42% Jaccard with [Focal] (#2 closest)".
-  pfCnUpdateTooltips(svg, focalCode, label ? label.textContent : focalCode);
+  // Hover tooltip text is built on demand by pfCnFormatTooltip from
+  // the live edge data, so no pre-population is needed when focal changes.
 }
 
 // Brand display label for a node — read the matching <text> in the
@@ -752,44 +859,6 @@ function pfCnReadNodeLabel(node) {
   if (!svg) return code;
   var lbl = svg.querySelector('.pf-cn-label[data-pf-cn-label="' + fcss + '"]');
   return lbl ? (lbl.textContent || code) : code;
-}
-
-function pfCnUpdateTooltips(svg, focalCode, focalLabel) {
-  // Build code → Jaccard-with-focal map from focal-incident edges,
-  // and code → rank from sorted Jaccards (matches the side panel).
-  var jacByCode = {};
-  svg.querySelectorAll('.pf-cn-edge').forEach(function (e) {
-    var b1 = e.getAttribute('data-pf-cn-b1');
-    var b2 = e.getAttribute('data-pf-cn-b2');
-    var j  = parseFloat(e.getAttribute('data-pf-cn-jac')) || 0;
-    if (b1 === focalCode) jacByCode[b2] = j;
-    else if (b2 === focalCode) jacByCode[b1] = j;
-  });
-  var ranked = Object.keys(jacByCode)
-    .sort(function (a, b) { return jacByCode[b] - jacByCode[a]; });
-  var rankByCode = {};
-  ranked.forEach(function (code, i) { rankByCode[code] = i + 1; });
-
-  svg.querySelectorAll('.pf-cn-node').forEach(function (n) {
-    var code = n.getAttribute('data-pf-cn-node');
-    var title = n.querySelector('title');
-    if (!title) return;
-    var brandLabel = pfCnReadNodeLabel(n);
-    if (code === focalCode) {
-      title.textContent = brandLabel + ' — focal';
-      return;
-    }
-    var jac = jacByCode[code];
-    if (jac == null) {
-      title.textContent = brandLabel +
-        ' — no co-awareness link with ' + focalLabel;
-      return;
-    }
-    var pct  = Math.round(jac * 100);
-    var rank = rankByCode[code];
-    title.textContent = brandLabel + ' — ' + pct + '% Jaccard with ' +
-      focalLabel + ' · #' + rank + ' closest';
-  });
 }
 
 function pfCnRenderRivals(panel, catCode, focalCode) {

@@ -467,6 +467,21 @@ build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
 .pf-cn-reading em { color: #1e293b; font-style: italic; }
 .pf-cn-reading-line { margin: 0 0 8px; }
 .pf-cn-reading-line:last-child { margin-bottom: 0; }
+
+/* JS-driven hover tooltip for Competitive Set nodes. Floats fixed to
+   the viewport so the cursor never overlaps it; one element per
+   document, repositioned on each hover. */
+.pf-cn-tooltip {
+  position: fixed; pointer-events: none;
+  background: #1e293b; color: #fff;
+  font-size: 12px; line-height: 1.4;
+  padding: 6px 10px; border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(15,23,42,0.18);
+  max-width: 280px; z-index: 1000;
+  visibility: hidden; opacity: 0;
+  transition: opacity 0.08s ease;
+}
+.pf-cn-tooltip[aria-hidden='false'] { opacity: 1; visibility: visible; }
 "
   gsub("%FOCAL%", focal_colour, tmpl, fixed = TRUE)
 }
