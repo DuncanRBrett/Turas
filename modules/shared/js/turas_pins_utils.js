@@ -208,6 +208,17 @@ TurasPins._inlineCaptureStyles = function(source, target) {
     "gap", "padding", "margin", "width", "min-width", "max-width",
     "height", "min-height", "font-size", "font-weight", "font-family",
     "color", "background-color", "background", "border", "border-radius",
+    // Border longhands — `border` shorthand returns empty string in most
+    // browsers, so brand-coloured border rails (e.g. `border-left: 3px
+    // solid var(--ma-brand)`) only survive capture when the longhands
+    // are read explicitly. Without these, PPTX exports lose the brand
+    // colour rails because var(--ma-brand) is panel-scoped and resolves
+    // to the default once the captured HTML is moved to a body-level
+    // container by html2canvas.
+    "border-top-color", "border-right-color", "border-bottom-color", "border-left-color",
+    "border-top-width", "border-right-width", "border-bottom-width", "border-left-width",
+    "border-top-style", "border-right-style", "border-bottom-style", "border-left-style",
+    "outline-color", "box-shadow",
     "border-collapse", "border-spacing", "text-align", "vertical-align",
     "line-height", "letter-spacing", "text-transform", "white-space",
     "overflow", "position", "top", "right", "bottom", "left",

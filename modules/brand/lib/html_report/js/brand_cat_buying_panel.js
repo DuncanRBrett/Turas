@@ -1197,12 +1197,60 @@
     });
   }
 
+  /* Context tab is structurally different from the other CB sub-tabs:
+     it shows KPI cards plus two small reference tables (frequency +
+     repertoire), and no chart. Each visible element gets its own
+     checkbox so users can pin exactly what they see. */
+  function cbDetectContextCheckboxes(activeTab, hasInsight) {
+    var hasCards = !!activeTab.querySelector('.cb-kpi-strip');
+    var ctxTables = activeTab.querySelectorAll('.cb-context-tables .cb-ctx-table');
+    var checkboxes = [];
+    if (hasCards)         checkboxes.push({ key: 'cards',    label: 'KPI cards',         available: true, checked: true });
+    if (ctxTables.length > 0) checkboxes.push({ key: 'freq', label: 'Frequency table',   available: true, checked: true });
+    if (ctxTables.length > 1) checkboxes.push({ key: 'rep',  label: 'Repertoire table',  available: true, checked: true });
+    checkboxes.push(                            { key: 'insight', label: 'Insight',      available: true, checked: hasInsight });
+    return checkboxes;
+  }
+
+  function cbCaptureContextHtml(activeTab, flags) {
+    var portable = (typeof TurasPins !== 'undefined' && TurasPins.capturePortableHtml)
+      ? TurasPins.capturePortableHtml
+      : function (el) { return el.outerHTML; };
+    var strip = (typeof window.brStripInteractive === 'function')
+      ? window.brStripInteractive
+      : function (s) { return s; };
+    var pieces = [];
+    if (flags.cards) {
+      var kpi = activeTab.querySelector('.cb-kpi-strip');
+      if (kpi) pieces.push(strip(portable(kpi)));
+    }
+    var ctxTables = activeTab.querySelectorAll('.cb-context-tables .cb-ctx-table');
+    if (flags.freq && ctxTables[0]) pieces.push(strip(portable(ctxTables[0])));
+    if (flags.rep  && ctxTables[1]) pieces.push(strip(portable(ctxTables[1])));
+    return pieces.join('');
+  }
+
   function cbPinDialog(panel, pinBtn) {
     if (typeof TurasPins === 'undefined') return;
 
     var activeTab = panel.querySelector('.cb-subtab:not([hidden])');
     if (!activeTab) return;
     var tabKey = activeTab.getAttribute('data-cb-tab') || '';
+
+    /* Insight lives at section level */
+    var section = panel.closest('.br-element-section') || panel.parentNode;
+    var editor = section ? section.querySelector('.br-insight-editor') : null;
+    var hasInsight = !!(editor && editor.value.trim());
+
+    /* Context tab branch — different element set (cards + 2 tables) */
+    if (tabKey === 'context') {
+      var ctxBoxes = cbDetectContextCheckboxes(activeTab, hasInsight);
+      var anchorCtx = pinBtn.closest('.br-section-toolbar') || pinBtn.parentElement;
+      TurasPins.showCheckboxPopover(pinBtn, ctxBoxes, function (flags) {
+        cbExecuteContextPin(panel, activeTab, flags, editor);
+      }, anchorCtx);
+      return;
+    }
 
     /* Detect available content in the active sub-tab only */
     var hasChart = false;
@@ -1220,12 +1268,6 @@
       hasChart = false;
       hasTable = !!(activeTab.querySelector('.cb-dop-table'));
     }
-    /* context tab: hasChart=false, hasTable=false */
-
-    /* Insight lives at section level */
-    var section = panel.closest('.br-element-section') || panel.parentNode;
-    var editor = section ? section.querySelector('.br-insight-editor') : null;
-    var hasInsight = !!(editor && editor.value.trim());
 
     /* Build checkbox list. available:true required by showCheckboxPopover to
        enable the checkbox; without it all items render as disabled. */
@@ -1234,7 +1276,7 @@
     if (hasTable) checkboxes.push({ key: 'table',   label: 'Table',   available: true, checked: true });
     checkboxes.push(          { key: 'insight', label: 'Insight', available: true, checked: hasInsight });
 
-    /* No real content (e.g. context tab) — pin directly with no dialog */
+    /* No real content — pin insight directly with no dialog */
     if (!hasChart && !hasTable) {
       cbExecutePin(panel, activeTab, tabKey, { chart: false, table: false, insight: hasInsight }, editor);
       return;
@@ -1244,6 +1286,36 @@
     TurasPins.showCheckboxPopover(pinBtn, checkboxes, function (flags) {
       cbExecutePin(panel, activeTab, tabKey, flags, editor);
     }, anchor);
+  }
+
+  function cbExecuteContextPin(panel, activeTab, flags, editor) {
+    if (typeof TurasPins === 'undefined') return;
+
+    var section = panel.closest('.br-element-section') || panel.parentNode;
+    var titleEl = section ? section.querySelector('.br-element-title') : null;
+    var baseTitle = titleEl ? titleEl.textContent.trim() : '';
+    var title = baseTitle ? baseTitle + ' — Category Context' : 'Category Context';
+
+    var html = cbCaptureContextHtml(activeTab, flags);
+    var insightText = (flags.insight && editor) ? editor.value.trim() : '';
+
+    if (!html && !insightText) return;
+
+    TurasPins.add({
+      sectionKey:  'cb-context-' + Date.now(),
+      title:       title,
+      chartSvg:    '',
+      tableHtml:   html,
+      insightText: insightText,
+      pinFlags:    { chart: false, table: !!html, insight: !!insightText },
+      pinMode:     'custom'
+    });
+
+    var pinBtn = section ? section.querySelector('.cb-toolbar-top .br-pin-btn') : null;
+    if (pinBtn) {
+      pinBtn.classList.add('pin-flash');
+      setTimeout(function () { pinBtn.classList.remove('pin-flash'); }, 600);
+    }
   }
 
   function cbExecutePin(panel, activeTab, tabKey, flags, editor) {
@@ -1291,6 +1363,14 @@
           : tbl.outerHTML;
       }
     }
+
+    /* Strip interactive controls (sort buttons, info-callouts, toolbars)
+       so the pinned card is a static snapshot, not a live UI clone. */
+    var stripCb = (typeof window.brStripInteractive === 'function')
+      ? window.brStripInteractive
+      : function (s) { return s; };
+    capturedChartHtml = stripCb(capturedChartHtml);
+    capturedTableHtml = stripCb(capturedTableHtml);
 
     /* Chart HTML precedes table HTML so the pin card reads top-to-bottom */
     content.tableHtml = capturedChartHtml + capturedTableHtml;
@@ -1346,6 +1426,19 @@
     if (!activeTab) return;
     var tabKey = activeTab.getAttribute('data-cb-tab') || '';
 
+    var section = panel.closest('.br-element-section') || panel.parentNode;
+    var editor  = section ? section.querySelector('.br-insight-editor') : null;
+    var hasInsight = !!(editor && editor.value.trim());
+
+    /* Context tab branch — element set differs (cards + 2 tables) */
+    if (tabKey === 'context') {
+      var ctxBoxes = cbDetectContextCheckboxes(activeTab, hasInsight);
+      TurasPins.showCheckboxPopover(pngBtn, ctxBoxes, function (flags) {
+        cbExecuteContextPng(panel, activeTab, flags, editor);
+      }, null, { title: 'EXPORT AS PNG', actionLabel: 'Export' });
+      return;
+    }
+
     /* Detect available content — mirrors cbPinDialog detection */
     var hasChart = false;
     var hasTable = false;
@@ -1362,10 +1455,6 @@
       hasChart = false;
       hasTable = !!(activeTab.querySelector('.cb-dop-table'));
     }
-
-    var section = panel.closest('.br-element-section') || panel.parentNode;
-    var editor  = section ? section.querySelector('.br-insight-editor') : null;
-    var hasInsight = !!(editor && editor.value.trim());
 
     function doExport(flags) {
       cbExecutePng(panel, activeTab, tabKey, flags, editor);
@@ -1384,6 +1473,27 @@
     TurasPins.showCheckboxPopover(pngBtn, checkboxes, function (flags) {
       doExport(flags);
     }, null, { title: 'EXPORT AS PNG', actionLabel: 'Export' });
+  }
+
+  function cbExecuteContextPng(panel, activeTab, flags, editor) {
+    if (typeof TurasPins === 'undefined') return;
+
+    var section = panel.closest('.br-element-section') || panel.parentNode;
+    var titleEl = section ? section.querySelector('.br-element-title') : null;
+    var baseTitle = titleEl ? titleEl.textContent.trim() : '';
+    var title = baseTitle ? baseTitle + ' — Category Context' : 'Category Context';
+
+    var html = cbCaptureContextHtml(activeTab, flags);
+    var insightText = (flags.insight && editor) ? editor.value.trim() : '';
+
+    TurasPins.exportContentAsPNG({
+      title:       title,
+      chartSvg:    '',
+      tableHtml:   html,
+      insightText: insightText,
+      pinFlags:    { chart: false, table: !!html, insight: !!insightText },
+      pinMode:     'custom'
+    });
   }
 
   function cbExecutePng(panel, activeTab, tabKey, flags, editor) {
@@ -1426,6 +1536,13 @@
           : tbl.outerHTML;
       }
     }
+
+    /* Strip interactive controls so the PNG matches a static snapshot. */
+    var stripPng = (typeof window.brStripInteractive === 'function')
+      ? window.brStripInteractive
+      : function (s) { return s; };
+    capturedChartHtml = stripPng(capturedChartHtml);
+    capturedTableHtml = stripPng(capturedTableHtml);
 
     /* Chart HTML prepended to table HTML — both rendered by html2canvas in export.
        Same pinFlags.table fix as cbExecutePin: must be true whenever there is any

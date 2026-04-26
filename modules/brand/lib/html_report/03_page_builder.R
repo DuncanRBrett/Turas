@@ -172,10 +172,19 @@ build_br_summary_panel <- function(results, config) {
   parts <- c(parts, '<div class="br-panel active" id="panel-summary"><div class="br-section">')
   parts <- c(parts, '<h2 style="font-size:20px;color:#1e293b;margin:0 0 20px;">Executive Summary</h2>')
 
-  # Per-category headline cards
+  # Per-category headline cards. Wrapped in a .br-element-section so the
+  # standard pin/PNG toolbar (brTogglePin / brExportPng) can target it.
+  # The grid carries data-pin-as-table so captureFromRoot grabs the cards
+  # HTML (no <table> exists on this panel).
+  section_id <- "summary-cards"
+  parts <- c(parts, sprintf(
+    '<div class="br-element-section" id="section-%s" data-section="%s">',
+    section_id, section_id))
+  parts <- c(parts, build_br_section_toolbar(section_id))
+
   cats <- results$results$categories
   if (!is.null(cats)) {
-    parts <- c(parts, '<div class="br-summary-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;">')
+    parts <- c(parts, '<div class="br-summary-grid" data-pin-as-table style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;">')
     for (cat_name in names(cats)) {
       cr <- cats[[cat_name]]
       ma <- cr$mental_availability
@@ -218,7 +227,8 @@ build_br_summary_panel <- function(results, config) {
     parts <- c(parts, '</div>')
   }
 
-  parts <- c(parts, '</div></div>')
+  parts <- c(parts, '</div>')        # close .br-element-section
+  parts <- c(parts, '</div></div>')  # close .br-section + .br-panel
   paste(parts, collapse = "\n")
 }
 

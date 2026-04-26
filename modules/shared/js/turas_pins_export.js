@@ -21,6 +21,9 @@
       id:          "export-" + Date.now(),
       type:        "pin",
       title:       content.title       || "Export",
+      subtitle:    content.subtitle    || "",
+      baseText:    content.baseText    || "",
+      bannerLabel: content.bannerLabel || "",
       sourceLabel: content.sourceLabel || "",
       chartSvg:    content.chartSvg    || "",
       tableHtml:   content.tableHtml   || "",
@@ -503,6 +506,25 @@
       "font-size:13px;color:#1e293b;line-height:1.5;";
     container.innerHTML = TurasPins._sanitizeHtml(html);
     document.body.appendChild(container);
+
+    // html2canvas misrenders `box-shadow: inset ...` on table cells —
+    // instead of drawing the narrow inset rail, it floods the cell with
+    // the shadow colour, wiping out the cell's actual background. Brand's
+    // focal-column rail (`.ma-td-focal { box-shadow: inset 3px 0 0 0
+    // <focal>, inset -3px 0 0 0 <focal>; }`) is the canonical case: the
+    // green significance heatmap on the live table becomes a red column in
+    // the export. Neutralise inset shadows here so the cell's own
+    // background renders cleanly. Outer drop shadows are preserved.
+    container.querySelectorAll("*").forEach(function(el) {
+      var bs = "";
+      try {
+        bs = (el.style && el.style.boxShadow) ||
+             window.getComputedStyle(el).boxShadow || "";
+      } catch (e) { bs = ""; }
+      if (bs && bs.indexOf("inset") !== -1) {
+        el.style.boxShadow = "none";
+      }
+    });
 
     var width = container.offsetWidth;
     var height = container.offsetHeight;

@@ -1832,9 +1832,21 @@
 
         if (!hasChart && !hasTable && !hasInsight) { drop.remove(); return; }
 
+        // Strip interactive controls so the pinned card is a static snapshot.
+        if (typeof window.brStripInteractive === "function") {
+          tableHtml = window.brStripInteractive(tableHtml);
+        }
+
+        // Active "Base:" toggle — captured from the panel so the pin/PNG
+        // records which percentage base the user was looking at.
+        var baseLabel = (typeof window.brReadBaseLabel === "function")
+          ? window.brReadBaseLabel(panel) : "";
+
         TurasPins.add({
           sectionKey:  "fn-" + Date.now(),
           title:       title,
+          subtitle:    baseLabel ? "Base: " + baseLabel : "",
+          baseText:    baseLabel,
           chartSvg:    chartSvg,
           tableHtml:   tableHtml,
           insightText: insightText,

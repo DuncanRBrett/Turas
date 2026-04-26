@@ -14,6 +14,52 @@
     return !!el && el.offsetParent !== null;
   }
 
+  // --- Strip interactive controls from a captured HTML fragment ---
+  // Pinned cards must read like a snapshot, not a live UI: sort buttons,
+  // toolbars, info-callouts, hidden inputs, and stray onclick handlers
+  // all get removed. Class list is intentionally brand-specific so the
+  // generic shared TurasPins library stays unaware of brand DOM details.
+  var INTERACTIVE_SELECTORS = [
+    'button', 'input', 'select',
+    '.ct-sort-indicator', '.row-exclude-btn',
+    '.cb-info-callout', '.cb-controls-bar',
+    '.fn-controls', '.ma-controls', '.controls-bar',
+    '.fn-pin-dropdown-btn', '.fn-pin-dropdown',
+    '.br-pin-btn', '.br-png-btn', '.br-export-btn', '.br-insight-toggle',
+    '.fn-png-btn', '.ma-png-btn', '.fn-export-btn', '.ma-export-btn',
+    '.toggle-label', '.sig-level-switcher',
+    '[onclick]', '[ondblclick]'
+  ].join(',');
+
+  window.brStripInteractive = function(html) {
+    if (!html) return html;
+    var d = document.createElement('div');
+    d.innerHTML = html;
+    d.querySelectorAll(INTERACTIVE_SELECTORS).forEach(function(el) { el.remove(); });
+    return d.innerHTML;
+  };
+
+  // --- Read the active "Base:" toggle label inside a captured root ---
+  // Funnel, Brand Attitude, Brand Attributes and CEPs all expose a
+  // `.sig-level-switcher` with a "Base:" prefix label and one
+  // `.sig-btn-active` button. Returns the active button's text trimmed,
+  // or "" if no Base toggle is present in this root.
+  // Only considers VISIBLE switchers (offsetParent !== null) so hidden
+  // sub-tabs (e.g. funnel's relationship sub-tab when the user is on
+  // the main funnel sub-tab) don't leak the wrong base label.
+  window.brReadBaseLabel = function(root) {
+    if (!root) return "";
+    var switchers = root.querySelectorAll(".sig-level-switcher");
+    for (var i = 0; i < switchers.length; i++) {
+      if (!isVisible(switchers[i])) continue;
+      var lbl = switchers[i].querySelector(".sig-level-label");
+      if (!lbl || !/Base\s*:/i.test(lbl.textContent || "")) continue;
+      var active = switchers[i].querySelector(".sig-btn-active");
+      if (active) return (active.textContent || "").trim();
+    }
+    return "";
+  };
+
   // --- Extract capture payload from a given root element ---
   function captureFromRoot(root, sectionKey) {
     if (!root) return null;
@@ -71,8 +117,25 @@
       tableHtml = table.outerHTML;
     }
 
+    // Card-grid escape hatch: sections with no <table> can opt into pin
+    // capture by marking their card container with data-pin-as-table.
+    // Used by the Summary panel (KPI cards) and any future card-only views.
+    if (!tableHtml) {
+      var cardsEl = root.querySelector("[data-pin-as-table]");
+      if (cardsEl && typeof TurasPins !== "undefined" && TurasPins.capturePortableHtml) {
+        tableHtml = TurasPins.capturePortableHtml(cardsEl);
+      } else if (cardsEl) {
+        tableHtml = cardsEl.outerHTML;
+      }
+    }
+
+    // Insight textarea selectors:
+    // - .br-insight-editor      generic section toolbar (page_builder)
+    // - .fn-insight-textarea    funnel + cat-buying panels
+    // - .ma-insight-box-text    MA + WoM panels
     var editor = root.querySelector(".br-insight-editor")
-             || root.querySelector(".fn-insight-textarea");
+             || root.querySelector(".fn-insight-textarea")
+             || root.querySelector(".ma-insight-box-text");
     var insightText = editor ? editor.value.trim() : "";
 
     // For sections whose chart is HTML (not SVG), capture the chart area HTML
@@ -87,9 +150,23 @@
       }
     }
 
+    // Final pass: strip interactive controls from the captured fragments
+    // so pinned cards never carry sort buttons, toolbars, or live toggles.
+    tableHtml = window.brStripInteractive(tableHtml);
+    chartHtml = window.brStripInteractive(chartHtml);
+
+    // Active "Base:" toggle label — read from the LIVE root before
+    // controls are stripped from the captured HTML. Stored both as
+    // `subtitle` (rendered in the pin card) and `baseText` (rendered
+    // by the PNG/PPT exporter as the meta line under the title).
+    var baseLabel = window.brReadBaseLabel(root);
+    var subtitle  = baseLabel ? "Base: " + baseLabel : "";
+
     return {
       sectionKey: sectionKey || (root.id || ""),
       title: titleText,
+      subtitle: subtitle,
+      baseText: baseLabel,
       chartSvg: chartSvg,
       chartHtml: chartHtml,
       tableHtml: tableHtml,
@@ -139,14 +216,16 @@
 
     var hasChart = !!section.querySelector("svg");
     // Match captureFromRoot's selector list so smart-skip sees the same tables
-    // the actual capture will find (pfo-table, fn-table, ma-table, plain table).
+    // the actual capture will find (pfo-table, fn-table, ma-table, plain table,
+    // and any [data-pin-as-table] card-grid escape hatch used by Summary).
     var hasTable = !!(
       section.querySelector("table.br-table")  ||
       section.querySelector("table.pfo-table") ||
       section.querySelector("table.fn-table")  ||
       section.querySelector("table.ma-table")  ||
       section.querySelector("table.ma-matrix") ||
-      section.querySelector("table")
+      section.querySelector("table") ||
+      section.querySelector("[data-pin-as-table]")
     );
     var hasInsight = false;
     var editor = section.querySelector(".br-insight-editor");
@@ -251,6 +330,8 @@
     function doExport(flags) {
       TurasPins.exportContentAsPNG({
         title:       content.title,
+        subtitle:    content.subtitle || "",
+        baseText:    content.baseText || "",
         chartSvg:    flags.chart   ? content.chartSvg   : "",
         tableHtml:   flags.table   ? content.tableHtml  : "",
         insightText: flags.insight ? content.insightText : "",
@@ -331,6 +412,8 @@
       }
       TurasPins.exportContentAsPNG({
         title:       content.title,
+        subtitle:    content.subtitle || "",
+        baseText:    content.baseText || "",
         chartSvg:    (flags.chart && content.chartSvg) ? content.chartSvg : "",
         tableHtml:   exportTableHtml,
         insightText: flags.insight ? content.insightText : "",

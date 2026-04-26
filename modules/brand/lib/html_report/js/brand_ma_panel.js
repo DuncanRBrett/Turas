@@ -1661,6 +1661,7 @@
       opts.push({ key: 'scatter', label: 'Mental Space scatter' });
       opts.push({ key: 'bars',    label: 'MMS vs SOM chart' });
       opts.push({ key: 'ranking', label: 'CEP penetration ranking' });
+      opts.push({ key: 'insight', label: 'Insight note' });
     }
 
     var dd = document.createElement('div');
@@ -1705,19 +1706,27 @@
     return clone.outerHTML;
   }
 
+  function _maStrip(html) {
+    return (typeof window.brStripInteractive === 'function')
+      ? window.brStripInteractive(html)
+      : html;
+  }
+
   function captureTable(el) {
     if (!el) return '';
     var tbl = el.querySelector('table');
     if (!tbl) return '';
-    return (typeof TurasPins !== 'undefined' && TurasPins.capturePortableHtml)
+    var html = (typeof TurasPins !== 'undefined' && TurasPins.capturePortableHtml)
       ? TurasPins.capturePortableHtml(tbl) : tbl.outerHTML;
+    return _maStrip(html);
   }
 
   // Capture arbitrary HTML for div-based sections (no SVG/table).
   function captureHtml(el) {
     if (!el) return '';
-    return (typeof TurasPins !== 'undefined' && TurasPins.capturePortableHtml)
+    var html = (typeof TurasPins !== 'undefined' && TurasPins.capturePortableHtml)
       ? TurasPins.capturePortableHtml(el) : el.outerHTML;
+    return _maStrip(html);
   }
 
   function pinSections(panel, activeKey, optKeys) {
@@ -1743,9 +1752,17 @@
         var ta = panel.querySelector('.ma-insight-box-text[data-ma-stim="' + activeKey + '"]');
         if (ta) insightText = ta.value.trim();
       }
+      // Active "Base:" toggle for the current MA sub-tab. Scope to the
+      // sub-tab wrapper so we don't accidentally read another sub-tab's
+      // toggle (attributes vs ceps share the same panel).
+      var maSubtab = panel.querySelector('.ma-subtab[data-ma-subtab="' + activeKey + '"]') || panel;
+      var maBaseLabel = (typeof window.brReadBaseLabel === 'function')
+        ? window.brReadBaseLabel(maSubtab) : '';
       TurasPins.add({
         sectionKey: 'ma-' + activeKey + '-' + Date.now(),
         title: baseTitle + ' \u2014 ' + subLabel,
+        subtitle: maBaseLabel ? 'Base: ' + maBaseLabel : '',
+        baseText: maBaseLabel,
         chartSvg: chartSvg, chartHtml: '',
         tableHtml: tableHtml, insightText: insightText,
         pinMode: 'custom',
@@ -1754,9 +1771,13 @@
 
     } else if (activeKey === 'metrics') {
       // Metrics: each section is a distinct content type — pin separately
+      // Insight is captured only when its checkbox is ticked, so unticked
+      // metrics never get the insight surreptitiously attached to ranking.
       var metricsInsight = '';
-      var taM = panel.querySelector('.ma-insight-box-text[data-ma-stim="metrics"]');
-      if (taM) metricsInsight = taM.value.trim();
+      if (optKeys.indexOf('insight') >= 0) {
+        var taM = panel.querySelector('.ma-insight-box-text[data-ma-stim="metrics"]');
+        if (taM) metricsInsight = taM.value.trim();
+      }
       var metricDefs = {
         hero:     { sel: '.ma-hero-strip',    label: 'Headline metrics' },
         brandtbl: { sel: '.ma-table-wrap',    label: 'Brand metrics table' },
@@ -1764,8 +1785,14 @@
         bars:     { sel: '.ma-bars-wrap',     label: 'MMS vs SOM' },
         ranking:  { sel: '.ma-rank-section',  label: 'CEP Ranking' }
       };
-      optKeys.forEach(function (key) {
-        var def = metricDefs[key]; if (!def) return;
+      // Iterate in canonical screen order so insight (if ticked) attaches
+      // to the first pinned card rather than to whichever metric the user
+      // happened to tick first in the dropdown.
+      var orderedKeys = ['hero', 'brandtbl', 'scatter', 'bars', 'ranking'];
+      var pinIndex = 0;
+      orderedKeys.forEach(function (key) {
+        if (optKeys.indexOf(key) < 0) return;
+        var def = metricDefs[key];
         var el = panel.querySelector(def.sel); if (!el) return;
         var svg = captureSvg(el);
         var tbl = captureTable(el);
@@ -1776,11 +1803,25 @@
           title: baseTitle + ' \u2014 ' + def.label,
           chartSvg: svg, chartHtml: '',
           tableHtml: tbl || htm,
-          insightText: key === 'ranking' ? metricsInsight : '',
+          insightText: (pinIndex === 0) ? metricsInsight : '',
           pinMode: 'custom',
-          pinFlags: { chart: !!svg, table: !!(tbl || htm), insight: false }
+          pinFlags: { chart: !!svg, table: !!(tbl || htm),
+                      insight: (pinIndex === 0 && !!metricsInsight) }
         });
+        pinIndex++;
       });
+      // Insight ticked alone (no other element) — emit a standalone insight pin
+      if (pinIndex === 0 && metricsInsight) {
+        TurasPins.add({
+          sectionKey: 'ma-metrics-insight-' + Date.now(),
+          title: baseTitle + ' — Insight',
+          chartSvg: '', chartHtml: '',
+          tableHtml: '',
+          insightText: metricsInsight,
+          pinMode: 'custom',
+          pinFlags: { chart: false, table: false, insight: true }
+        });
+      }
     }
   }
 
