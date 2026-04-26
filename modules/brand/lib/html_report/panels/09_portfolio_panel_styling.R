@@ -13,9 +13,13 @@
 #' @return Character. CSS string.
 #' @keywords internal
 build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
-  sprintf("
+  # Use a `%FOCAL%` template + gsub instead of sprintf — sprintf has an
+  # 8192-char format-string limit that this bundle has now outgrown,
+  # plus single-character `%` literals (in CSS comments etc.) crash
+  # sprintf and silently drop the entire portfolio CSS.
+  tmpl <- "
 /* ---- Portfolio Panel ---- */
-.pf-panel { width:100%%; }
+.pf-panel { width:100%; }
 .pf-sub-nav {
   display: flex;
   gap: 4px;
@@ -37,8 +41,8 @@ build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
 }
 .pf-sub-btn:hover { background: #f1f5f9; color: #1e293b; }
 .pf-sub-btn.active {
-  background: %s;
-  border-color: %s;
+  background: %FOCAL%;
+  border-color: %FOCAL%;
   color: #fff;
   font-weight: 600;
 }
@@ -60,7 +64,7 @@ build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
   text-align: center;
 }
 .pf-kpi-value {
-  color: %s;
+  color: %FOCAL%;
   font-size: 28px;
   font-weight: 700;
   line-height: 1.1;
@@ -116,8 +120,8 @@ build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
 }
 .pf-brand-chip:hover { background: #f1f5f9; color: #1e293b; }
 .pf-brand-chip.active {
-  background: %s;
-  border-color: %s;
+  background: %FOCAL%;
+  border-color: %FOCAL%;
   color: #fff;
   font-weight: 600;
 }
@@ -138,22 +142,97 @@ build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
   border: 1px solid #e2e8f0; border-radius: 6px; background: #fff;
   font-size: 13px; padding: 6px 10px; color: #1e293b; min-width: 200px;
 }
-.pf-fp-focal-select:focus { outline: 2px solid %s; outline-offset: 1px; }
-.pf-fp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.pf-fp-chip {
+.pf-fp-focal-select:focus { outline: 2px solid %FOCAL%; outline-offset: 1px; }
+/* Brand row: focal pill + popover trigger. */
+.pf-fp-brands-row {
+  display: inline-flex; align-items: center; gap: 8px;
+  flex-wrap: wrap; position: relative;
+}
+.pf-fp-focal-chip {
   display: inline-flex; align-items: center; gap: 6px;
   background: #fff; border: 1px solid #e2e8f0; border-radius: 16px;
-  color: #334155; font-size: 12px; font-weight: 500;
-  padding: 4px 12px; cursor: pointer; transition: all 0.15s;
+  color: #1e293b; font-size: 12px; font-weight: 600;
+  padding: 4px 10px;
 }
-.pf-fp-chip:hover { background: #f8fafc; }
-.pf-fp-chip-on  { background: #fff; }
-.pf-fp-chip-off { background: #f1f5f9; color: #94a3b8; opacity: 0.55; }
-.pf-fp-chip-off .pf-fp-chip-dot { opacity: 0.4; }
-.pf-fp-chip-dot {
-  display: inline-block; width: 10px; height: 10px; border-radius: 50%%;
+.pf-fp-focal-chip-dot {
+  display: inline-block; width: 10px; height: 10px; border-radius: 50%;
   flex-shrink: 0;
 }
+.pf-fp-pop-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: #fff; border: 1px solid #cbd5e1; border-radius: 8px;
+  color: #1e293b; font-size: 12px; font-weight: 500;
+  padding: 6px 12px; cursor: pointer; transition: all 0.15s;
+}
+.pf-fp-pop-btn:hover { background: #f8fafc; border-color: #94a3b8; }
+.pf-fp-pop-btn[aria-expanded='true'] { border-color: %FOCAL%; box-shadow: 0 0 0 3px rgba(26,82,118,0.12); }
+.pf-fp-pop-btn-count {
+  font-size: 11px; color: #64748b; font-weight: 500;
+}
+
+/* Popover panel — sits below the trigger. The [hidden] override is
+   essential: `display:flex` here would otherwise win over the browser's
+   default [hidden] { display: none }, so toggling pop.hidden in JS would
+   leave the panel permanently visible. */
+.pf-fp-pop {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 30;
+  min-width: 280px; max-width: 360px; max-height: 360px;
+  background: #fff; border: 1px solid #cbd5e1; border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(15,23,42,0.18), 0 2px 6px rgba(15,23,42,0.08);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.pf-fp-pop[hidden] { display: none !important; }
+.pf-fp-pop-search {
+  padding: 8px 10px 6px; border-bottom: 1px solid #f1f5f9;
+}
+.pf-fp-pop-input {
+  width: 100%; box-sizing: border-box;
+  border: 1px solid #e2e8f0; border-radius: 6px;
+  padding: 6px 10px; font-size: 12px; color: #1e293b;
+  background: #f8fafc;
+}
+.pf-fp-pop-input:focus { outline: 2px solid %FOCAL%; outline-offset: 1px; background: #fff; }
+.pf-fp-pop-actions {
+  display: flex; gap: 6px; padding: 6px 10px;
+  border-bottom: 1px solid #f1f5f9; background: #f8fafc;
+}
+.pf-fp-pop-action {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+  font-size: 11px; font-weight: 500; color: #475569;
+  padding: 3px 10px; cursor: pointer;
+}
+.pf-fp-pop-action:hover { background: #f1f5f9; color: #1e293b; }
+.pf-fp-pop-list {
+  overflow-y: auto; flex: 1 1 auto; padding: 4px 0;
+}
+.pf-fp-pop-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; cursor: pointer; font-size: 12px; color: #1e293b;
+  transition: background 0.12s;
+}
+.pf-fp-pop-item:hover { background: #f8fafc; }
+.pf-fp-pop-item-focal {
+  background: #f8fafc; font-weight: 600;
+  border-bottom: 1px solid #e2e8f0;
+}
+.pf-fp-pop-cb { margin: 0; flex-shrink: 0; }
+.pf-fp-pop-dot {
+  display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+  flex-shrink: 0;
+}
+.pf-fp-pop-name { flex: 1 1 auto; }
+
+/* Category chip row. Smaller + tighter than brand chips. */
+.pf-fp-cat-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.pf-fp-cat-chip {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+  color: #475569; font-size: 11px; font-weight: 500;
+  padding: 3px 10px; cursor: pointer; transition: all 0.12s;
+  text-transform: lowercase;
+}
+.pf-fp-cat-chip:hover { background: #f8fafc; color: #1e293b; }
+.pf-fp-cat-chip-on  { background: #fff; color: #1e293b; }
+.pf-fp-cat-chip-off { background: #f1f5f9; color: #94a3b8; opacity: 0.55; }
 .pf-fp-toggles { display: flex; flex-direction: column; gap: 4px; }
 .pf-fp-toggles .toggle-label {
   display: inline-flex; align-items: center; gap: 6px;
@@ -162,12 +241,12 @@ build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
 
 /* ---- Header strip — solid navy, no per-cell breaks. ---- */
 .pf-fp-table-wrap {
-  width: 100%%; overflow-x: auto;
+  width: 100%; overflow-x: auto;
   border: 1px solid #e2e8f0; border-radius: 8px;
   background: #fff;
 }
 .pf-fp-table {
-  width: 100%%; border-collapse: collapse; border-spacing: 0;
+  width: 100%; border-collapse: collapse; border-spacing: 0;
   font-size: 12px; table-layout: auto;
 }
 /* The <th> itself is the click target (no inner <button>) so the
@@ -227,8 +306,8 @@ build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
   min-width: 220px;
 }
 .pf-fp-row-focal th.pf-fp-row-label {
-  font-weight: 700; color: %s;
-  border-left: 3px solid %s; background: #f8fafc;
+  font-weight: 700; color: %FOCAL%;
+  border-left: 3px solid %FOCAL%; background: #f8fafc;
 }
 .pf-fp-row-focal th.pf-fp-row-label .pf-fp-row-label-text { text-transform: lowercase; }
 .pf-fp-row-other:hover td,
@@ -241,16 +320,18 @@ build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
 }
 .pf-fp-td-na { color: #cbd5e1; background: #fafafa; }
 
-/* Categories-per-brand column — visually distinct from heatmap cells. */
+/* Categories-per-brand column — sits immediately right of the brand
+   label as a portfolio-summary column, visually divided from the
+   heatmap cells with a stronger right border. */
 .pf-fp-th-cats {
-  border-left: 1px solid #243353;
-  min-width: 88px;
+  min-width: 92px;
+  border-right: 2px solid #0f172a;
 }
 .pf-fp-td-cats {
-  border-left: 1px solid #e2e8f0;
   background: #f8fafc;
   font-weight: 600; color: #1e293b;
   font-variant-numeric: tabular-nums;
+  border-right: 2px solid #cbd5e1;
 }
 .pf-fp-cats-num { font-size: 13px; }
 .pf-fp-cats-of  { font-size: 10px; color: #94a3b8; margin-left: 1px; }
@@ -275,6 +356,6 @@ build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
 .pf-fp-suppressed-note {
   font-size: 11px; color: #94a3b8; margin: 8px 4px 0; font-style: italic;
 }
-", focal_colour, focal_colour, focal_colour, focal_colour, focal_colour,
-   focal_colour, focal_colour, focal_colour)
+"
+  gsub("%FOCAL%", focal_colour, tmpl, fixed = TRUE)
 }

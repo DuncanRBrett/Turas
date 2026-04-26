@@ -92,10 +92,16 @@ compute_footprint_matrix <- function(data, categories, structure,
       error = function(e) data.frame(BrandCode = character(0))
     )
 
+    # Use the broader detector (also matches cross_cat.awareness.<CC>) so
+    # awareness-only / non-key categories resolve a code instead of being
+    # silently dropped. Falls back to the funnel-only detector when the
+    # overview helper isn't in scope.
     cat_code <- if (!is.null(structure$questionmap) &&
-                    nrow(structure$questionmap) > 0)
-      .detect_category_code(structure$questionmap, cat_brands, data)
-    else NULL
+                    nrow(structure$questionmap) > 0) {
+      detector <- if (exists(".po_detect_cat_code", mode = "function"))
+                    .po_detect_cat_code else .detect_category_code
+      detector(structure$questionmap, cat_brands, data)
+    } else NULL
     if (is.null(cat_code)) next
 
     base <- build_portfolio_base(data, cat_code, timeframe, weights)

@@ -123,8 +123,8 @@ build_pf_footprint_html <- function(footprint, focal_brand, focal_colour,
   } else setNames(integer(0), character(0))
 
   paste0(
-    .pf_fp_controls_bar(brand_codes, brand_label, focal_brand,
-                         focal_colour, brand_colours),
+    .pf_fp_controls_bar(brand_codes, brand_label, cat_codes, cat_label,
+                         focal_brand, focal_colour, brand_colours),
     .pf_fp_table(fp, brand_codes, brand_label, cat_codes, cat_label,
                   base_n, n_total, suppressed, focal_brand, focal_colour)
   )
@@ -135,8 +135,9 @@ build_pf_footprint_html <- function(footprint, focal_brand, focal_colour,
 # CONTROLS BAR — focal <select> + colour-coded chips
 # ==============================================================================
 
-.pf_fp_controls_bar <- function(brand_codes, brand_label, focal_brand,
-                                 focal_colour, brand_colours) {
+.pf_fp_controls_bar <- function(brand_codes, brand_label,
+                                 cat_codes, cat_label,
+                                 focal_brand, focal_colour, brand_colours) {
   # Focal-brand <select>
   options <- vapply(seq_along(brand_codes), function(i) {
     bc  <- brand_codes[i]
@@ -146,19 +147,46 @@ build_pf_footprint_html <- function(footprint, focal_brand, focal_colour,
             .pf_esc(bc), sel, .pf_esc(nm))
   }, character(1))
 
-  # Coloured chips — same DJB2 palette as other tabs, focal gets the brand colour.
-  chips <- vapply(seq_along(brand_codes), function(i) {
+  # Brand-popover items (one row per brand, all visible by default).
+  brand_items <- vapply(seq_along(brand_codes), function(i) {
     bc  <- brand_codes[i]
     nm  <- brand_label[i]
     col <- .pf_brand_colour(bc, focal_brand, focal_colour, brand_colours)
     is_foc <- identical(bc, focal_brand)
     badge  <- if (is_foc) ' <span class="fn-focal-badge">FOCAL</span>' else ""
+    # Lowercase search-token attribute so the popover's filter matches
+    # case-insensitively without rebuilding the markup.
     sprintf(
-      '<button type="button" class="col-chip pf-fp-chip" data-pf-fp-brand="%s" style="--pf-chip-col:%s;"><span class="pf-fp-chip-dot" style="background:%s;"></span>%s%s</button>',
-      .pf_esc(bc), col, col, .pf_esc(nm), badge
+      '<label class="pf-fp-pop-item%s" data-pf-fp-brand="%s" data-pf-fp-search="%s"><input type="checkbox" class="pf-fp-pop-cb" data-pf-fp-brand-cb="%s" checked><span class="pf-fp-pop-dot" style="background:%s;"></span><span class="pf-fp-pop-name">%s</span>%s</label>',
+      if (is_foc) " pf-fp-pop-item-focal" else "",
+      .pf_esc(bc), .pf_esc(tolower(nm)), .pf_esc(bc), col, .pf_esc(nm), badge
     )
   }, character(1))
 
+  # Category chips — small set (~9), simple chip row matches MA / Funnel.
+  cat_chips <- vapply(seq_along(cat_codes), function(j) {
+    cc  <- cat_codes[j]
+    lbl <- tolower(cat_label[j])
+    sprintf(
+      '<button type="button" class="pf-fp-cat-chip pf-fp-cat-chip-on" data-pf-fp-cat="%s">%s</button>',
+      .pf_esc(cc), .pf_esc(lbl)
+    )
+  }, character(1))
+
+  # Focal-coloured chip pinned next to the brand popover button so the
+  # focal brand is always visible at a glance.
+  focal_col <- .pf_brand_colour(focal_brand, focal_brand, focal_colour, brand_colours)
+  focal_chip <- if (length(focal_brand) > 0 && nzchar(focal_brand %||% "")) sprintf(
+    '<span class="pf-fp-focal-chip" data-pf-fp-brand="%s"><span class="pf-fp-focal-chip-dot" style="background:%s;"></span><span class="pf-fp-focal-chip-name">%s</span><span class="fn-focal-badge">FOCAL</span></span>',
+    .pf_esc(focal_brand), focal_col,
+    .pf_esc(.nm_lookup(brand_label, brand_codes, focal_brand))
+  ) else ""
+
+  # Order: Focal brand · Categories · Display · Brands.
+  # Brands is LAST because its popover opens absolute-below the trigger;
+  # putting it at the end means the popover only ever covers empty space
+  # or the table (which is below) — not the Categories or Display
+  # controls that sit on the same row.
   paste0(
     '<div class="pf-fp-controls">',
     '<div class="pf-fp-ctl-group">',
@@ -166,10 +194,10 @@ build_pf_footprint_html <- function(footprint, focal_brand, focal_colour,
     sprintf('<select id="pf-fp-focal-select" class="pf-fp-focal-select" data-pf-fp-action="focal">%s</select>',
             paste(options, collapse = "")),
     '</div>',
-    '<div class="pf-fp-ctl-group pf-fp-chips-group">',
-    '<span class="pf-fp-ctl-label">Show brands</span>',
-    sprintf('<div class="pf-fp-chips col-chip-bar">%s</div>',
-            paste(chips, collapse = "")),
+    '<div class="pf-fp-ctl-group pf-fp-cats-group">',
+    '<span class="pf-fp-ctl-label">Categories</span>',
+    sprintf('<div class="pf-fp-cat-chips">%s</div>',
+            paste(cat_chips, collapse = "")),
     '</div>',
     '<div class="pf-fp-ctl-group pf-fp-toggles-group">',
     '<span class="pf-fp-ctl-label">Display</span>',
@@ -178,8 +206,38 @@ build_pf_footprint_html <- function(footprint, focal_brand, focal_colour,
     '<label class="toggle-label"><input type="checkbox" data-pf-fp-action="showcounts"> Show count</label>',
     '</div>',
     '</div>',
+    '<div class="pf-fp-ctl-group pf-fp-brands-group">',
+    '<span class="pf-fp-ctl-label">Brands</span>',
+    '<div class="pf-fp-brands-row">',
+    focal_chip,
+    sprintf(
+      '<button type="button" class="pf-fp-pop-btn" data-pf-fp-action="brandpop" aria-haspopup="true" aria-expanded="false"><span class="pf-fp-pop-btn-label">Manage brands</span><span class="pf-fp-pop-btn-count" data-pf-fp-brand-count>%d / %d visible</span><span aria-hidden="true">▾</span></button>',
+      length(brand_codes), length(brand_codes)
+    ),
+    sprintf(
+      '<div class="pf-fp-pop" data-pf-fp-pop="brand" hidden>
+         <div class="pf-fp-pop-search">
+           <input type="search" class="pf-fp-pop-input" placeholder="Search brands…" data-pf-fp-action="brandsearch" />
+         </div>
+         <div class="pf-fp-pop-actions">
+           <button type="button" class="pf-fp-pop-action" data-pf-fp-action="brand-all">Show all</button>
+           <button type="button" class="pf-fp-pop-action" data-pf-fp-action="brand-none">Hide all</button>
+           <button type="button" class="pf-fp-pop-action" data-pf-fp-action="brand-focal">Focal only</button>
+         </div>
+         <div class="pf-fp-pop-list">%s</div>
+       </div>',
+      paste(brand_items, collapse = "")
+    ),
+    '</div>',
+    '</div>',
     '</div>'
   )
+}
+
+# Helper: name lookup for a single code, used by the focal chip.
+.nm_lookup <- function(brand_label, brand_codes, code) {
+  i <- match(code, brand_codes)
+  if (is.na(i)) code else brand_label[i]
 }
 
 
@@ -263,10 +321,11 @@ build_pf_footprint_html <- function(footprint, focal_brand, focal_colour,
       '<td class="pf-fp-td pf-fp-td-cats" data-pf-fp-val="%d" data-pf-fp-col="__cats__"><span class="pf-fp-cats-num">%d</span><span class="pf-fp-cats-of">/%d</span></td>',
       as.integer(cats_n), as.integer(cats_n), as.integer(total_cats)
     )
+    # Column order matches the header: brand | cats-count | per-category cells.
     sprintf(
       '<tr class="%s" data-pf-fp-brand="%s" data-pf-fp-focal="%s"><th class="pf-fp-row-label" scope="row"><span class="pf-fp-row-label-text">%s</span>%s</th>%s%s</tr>',
       row_cls, .pf_esc(bc), if (is_focal) "1" else "0",
-      .pf_esc(label_lc), badge, paste(cells, collapse = ""), cats_cell
+      .pf_esc(label_lc), badge, cats_cell, paste(cells, collapse = "")
     )
   }, character(1))
 
@@ -274,10 +333,11 @@ build_pf_footprint_html <- function(footprint, focal_brand, focal_colour,
   brand_th <- '<th class="pf-fp-th pf-fp-th-brand pf-fp-th-sort" data-pf-fp-sort="__brand__" scope="col" tabindex="0" role="button"><span class="pf-fp-th-inner"><span class="pf-fp-th-label">brand</span><span class="pf-fp-sort-ind" aria-hidden="true">&#x2195;</span></span></th>'
 
   # Default state: heatmap on, counts off — matches MA matrix.
+  # Column order: brand label | categories-count | per-category cells.
   paste0(
     '<div class="pf-fp-table-wrap pf-fp-heatmap-on">',
     '<table class="pf-fp-table" data-pf-focal="', .pf_esc(focal_brand), '">',
-    '<thead><tr>', brand_th, paste(ths, collapse = ""), cats_th, '</tr></thead>',
+    '<thead><tr>', brand_th, cats_th, paste(ths, collapse = ""), '</tr></thead>',
     '<tbody>', paste(rows, collapse = ""), '</tbody>',
     '</table>',
     if (length(suppressed) > 0) sprintf(

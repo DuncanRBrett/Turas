@@ -98,7 +98,9 @@ build_br_portfolio_panel <- function(results, config) {
     ),
 
     # Hero strip KPI cards (§5)
-    .pf_hero_strip(portfolio$supporting, focal_brand, focal_colour),
+    .pf_hero_strip(portfolio$supporting, focal_brand, focal_colour,
+                    focal_brand_name = .pf_resolve_focal_name(panel_data, portfolio,
+                                                               focal_brand)),
 
     # 5-subtab nav
     .pf_sub_nav(),
@@ -139,7 +141,45 @@ build_br_portfolio_panel <- function(results, config) {
 # HERO STRIP KPI CARDS (§5)
 # ==============================================================================
 
-.pf_hero_strip <- function(supporting, focal_brand, focal_colour) {
+# Look up the focal brand's display NAME, preferring (in order):
+#   1. The brand_names map already computed by compute_footprint_matrix
+#      and threaded through panel_data$footprint.
+#   2. The portfolio_overview cats_list, where each category records its
+#      brand_codes + brand_names — Overview is computed independently and
+#      always available alongside the Portfolio panel.
+#   3. The focal brand code itself, as a last-resort fallback.
+.pf_resolve_focal_name <- function(panel_data, portfolio, focal_brand) {
+  if (is.null(focal_brand) || !nzchar(focal_brand)) return("")
+
+  # 1. Footprint brand_names map.
+  fp_names <- panel_data$footprint$brand_names
+  if (!is.null(fp_names) && length(fp_names) > 0 &&
+      focal_brand %in% names(fp_names)) {
+    v <- fp_names[[focal_brand]]
+    if (!is.null(v) && length(v) > 0 && !is.na(v) && nzchar(as.character(v)))
+      return(as.character(v))
+  }
+
+  # 2. Overview cats_list (used when overview was built via the
+  #    .po_build_category_record pipeline).
+  ov_cats <- portfolio$overview$categories
+  if (!is.null(ov_cats)) {
+    for (cat in ov_cats) {
+      codes <- cat$brand_codes %||% character(0)
+      names_v <- cat$brand_names %||% codes
+      idx <- match(focal_brand, codes)
+      if (!is.na(idx) && idx <= length(names_v) && nzchar(names_v[idx]))
+        return(as.character(names_v[idx]))
+    }
+  }
+
+  # 3. Fallback.
+  focal_brand
+}
+
+
+.pf_hero_strip <- function(supporting, focal_brand, focal_colour,
+                            focal_brand_name = NULL) {
   if (is.null(supporting)) return("")
 
   .kpi <- function(value, label) {
@@ -157,12 +197,19 @@ build_br_portfolio_panel <- function(results, config) {
   n_cats <- supporting$n_cats_total %||% 0L
   breadth <- supporting$focal_footprint_breadth %||% 0L
 
+  # Use the focal brand display name when available \u2014 e.g.
+  # "Ina Paarman's Kitchen present across categories" rather than
+  # "IPK present across categories". Falls back to the code if the
+  # name isn't supplied.
+  focal_label <- if (!is.null(focal_brand_name) && nzchar(focal_brand_name))
+                   focal_brand_name else focal_brand
+
   paste0(
     '<div class="pf-hero-strip">',
     .kpi(fmt_n(supporting$avg_awareness_set_size_focal_cat),
          "Brands known per buyer in focal category"),
     .kpi(sprintf("%d of %d", breadth, n_cats),
-         paste(focal_brand, "present across categories")),
+         paste(focal_label, "present across categories")),
     .kpi(fmt_x(supporting$focal_awareness_efficiency),
          "Awareness efficiency vs category penetration"),
     .kpi(fmt_n(supporting$mean_repertoire_depth),

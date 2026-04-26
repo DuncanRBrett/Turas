@@ -121,17 +121,11 @@ function pfInitFootprintTable() {
     });
   }
 
-  // --- Chip clicks (toggle row visibility) ----------------------------------
-  section.querySelectorAll('.pf-fp-chip').forEach(function (chip) {
-    chip.classList.add('pf-fp-chip-on');  // start visible
-    chip.addEventListener('click', function () {
-      var brand = chip.getAttribute('data-pf-fp-brand');
-      var on = chip.classList.toggle('pf-fp-chip-on');
-      chip.classList.toggle('pf-fp-chip-off', !on);
-      var row = table.querySelector('tr[data-pf-fp-brand="' + cssEscape(brand) + '"]');
-      if (row) row.style.display = on ? '' : 'none';
-    });
-  });
+  // --- Brand popover (searchable multi-select) ------------------------------
+  pfFpInitBrandPopover(section, table);
+
+  // --- Category chip toggles ------------------------------------------------
+  pfFpInitCategoryChips(section, table);
 
   // --- Column-header sort ---------------------------------------------------
   // Click target is the <th> itself (no inner <button>) — keeps the
@@ -174,6 +168,148 @@ function pfInitFootprintTable() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// FOOTPRINT — brand popover + category chips
+// ---------------------------------------------------------------------------
+
+/**
+ * Wire the searchable brand popover. Exposes:
+ *   - "Manage brands" toggle button (open/close)
+ *   - Search input (case-insensitive substring on data-pf-fp-search)
+ *   - All / None / Focal-only quick actions
+ *   - Per-brand checkboxes that show/hide the matching <tr> in the table
+ *   - Outside-click + Escape to dismiss
+ */
+function pfFpInitBrandPopover(section, table) {
+  var btn = section.querySelector('.pf-fp-pop-btn[data-pf-fp-action="brandpop"]');
+  var pop = section.querySelector('.pf-fp-pop[data-pf-fp-pop="brand"]');
+  if (!btn || !pop) return;
+
+  function open() {
+    pop.hidden = false;
+    btn.setAttribute('aria-expanded', 'true');
+    var input = pop.querySelector('.pf-fp-pop-input');
+    if (input) setTimeout(function () { input.focus(); }, 0);
+  }
+  function close() {
+    pop.hidden = true;
+    btn.setAttribute('aria-expanded', 'false');
+  }
+  function toggle() { (pop.hidden) ? open() : close(); }
+
+  btn.addEventListener('click', function (ev) { ev.preventDefault(); toggle(); });
+  // Outside-click close — uses closest() so clicks on nested spans inside
+  // the trigger button or the popover are correctly attributed. The
+  // mousedown phase fires before click, so the popover closes cleanly
+  // when the user clicks a category chip or anywhere else.
+  document.addEventListener('mousedown', function (ev) {
+    if (pop.hidden) return;
+    var t = ev.target;
+    if (t.closest('.pf-fp-pop[data-pf-fp-pop="brand"]')) return;
+    if (t.closest('.pf-fp-pop-btn[data-pf-fp-action="brandpop"]')) return;
+    close();
+  });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape' && !pop.hidden) close();
+  });
+
+  // --- Search filter ---
+  var input = pop.querySelector('.pf-fp-pop-input');
+  if (input) {
+    input.addEventListener('input', function () {
+      var q = (input.value || '').trim().toLowerCase();
+      pop.querySelectorAll('.pf-fp-pop-item').forEach(function (item) {
+        var hay = item.getAttribute('data-pf-fp-search') || '';
+        item.style.display = (q === '' || hay.indexOf(q) !== -1) ? '' : 'none';
+      });
+    });
+  }
+
+  // --- Per-brand checkbox → row visibility ---
+  function applyBrand(bc, on) {
+    var row = table.querySelector('tr[data-pf-fp-brand="' + cssEscape(bc) + '"]');
+    if (row) row.style.display = on ? '' : 'none';
+  }
+  function refreshCount() {
+    var total   = pop.querySelectorAll('.pf-fp-pop-cb').length;
+    var visible = pop.querySelectorAll('.pf-fp-pop-cb:checked').length;
+    var label   = btn.querySelector('[data-pf-fp-brand-count]');
+    if (label) label.textContent = visible + ' / ' + total + ' visible';
+    if (typeof brSetPinState === 'function') {
+      var hidden = [];
+      pop.querySelectorAll('.pf-fp-pop-cb').forEach(function (cb) {
+        if (!cb.checked) hidden.push(cb.getAttribute('data-pf-fp-brand-cb'));
+      });
+      brSetPinState('pf_fp_hidden_brands', hidden);
+    }
+  }
+
+  pop.querySelectorAll('.pf-fp-pop-cb').forEach(function (cb) {
+    cb.addEventListener('change', function () {
+      applyBrand(cb.getAttribute('data-pf-fp-brand-cb'), cb.checked);
+      refreshCount();
+    });
+  });
+
+  // --- Bulk actions ---
+  function setAll(state) {
+    pop.querySelectorAll('.pf-fp-pop-cb').forEach(function (cb) {
+      cb.checked = state;
+      applyBrand(cb.getAttribute('data-pf-fp-brand-cb'), state);
+    });
+    refreshCount();
+  }
+  var btnAll   = pop.querySelector('[data-pf-fp-action="brand-all"]');
+  var btnNone  = pop.querySelector('[data-pf-fp-action="brand-none"]');
+  var btnFocal = pop.querySelector('[data-pf-fp-action="brand-focal"]');
+  if (btnAll)  btnAll.addEventListener('click',  function () { setAll(true); });
+  if (btnNone) btnNone.addEventListener('click', function () { setAll(false); });
+  if (btnFocal) btnFocal.addEventListener('click', function () {
+    var focal = table.getAttribute('data-pf-focal') || '';
+    pop.querySelectorAll('.pf-fp-pop-cb').forEach(function (cb) {
+      var bc = cb.getAttribute('data-pf-fp-brand-cb');
+      var on = (bc === focal);
+      cb.checked = on;
+      applyBrand(bc, on);
+    });
+    refreshCount();
+  });
+}
+
+/**
+ * Wire the per-category chip row. Clicking a chip hides/shows that
+ * category's column (header + every <td data-pf-fp-col=cc>) in the
+ * table. Default state: all on.
+ */
+function pfFpInitCategoryChips(section, table) {
+  section.querySelectorAll('.pf-fp-cat-chip').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      var cc = chip.getAttribute('data-pf-fp-cat');
+      var on = chip.classList.toggle('pf-fp-cat-chip-on');
+      chip.classList.toggle('pf-fp-cat-chip-off', !on);
+      pfFpSetColVisible(table, cc, on);
+      if (typeof brSetPinState === 'function') {
+        var hidden = [];
+        section.querySelectorAll('.pf-fp-cat-chip-off').forEach(function (c) {
+          hidden.push(c.getAttribute('data-pf-fp-cat'));
+        });
+        brSetPinState('pf_fp_hidden_cats', hidden);
+      }
+    });
+  });
+}
+
+function pfFpSetColVisible(table, cc, visible) {
+  var disp = visible ? '' : 'none';
+  // Header cell
+  var th = table.querySelector('th.pf-fp-th-sort[data-pf-fp-sort="' + cssEscape(cc) + '"]');
+  if (th) th.style.display = disp;
+  // All matching body cells
+  table.querySelectorAll('td[data-pf-fp-col="' + cssEscape(cc) + '"]').forEach(function (td) {
+    td.style.display = disp;
+  });
+}
+
 function pfFpSetFocal(brand) {
   var table = document.querySelector('.pf-fp-table');
   if (!table) return;
@@ -211,7 +347,57 @@ function pfFpSetFocal(brand) {
   });
   if (focalRow && tbody.firstChild !== focalRow) tbody.insertBefore(focalRow, tbody.firstChild);
 
+  // Force the new focal brand's row visible (in case it had been hidden
+  // from the popover) and re-check its checkbox + popover row.
+  if (focalRow) focalRow.style.display = '';
+  var pop = section ? section.querySelector('.pf-fp-pop[data-pf-fp-pop="brand"]') : null;
+  if (pop) {
+    var cb = pop.querySelector('.pf-fp-pop-cb[data-pf-fp-brand-cb="' + cssEscape(brand) + '"]');
+    if (cb && !cb.checked) cb.checked = true;
+    // Move the focal row's <label> in the popover to the top so it's prominent.
+    var item = pop.querySelector('.pf-fp-pop-item[data-pf-fp-brand="' + cssEscape(brand) + '"]');
+    if (item) {
+      pop.querySelectorAll('.pf-fp-pop-item').forEach(function (el) {
+        el.classList.remove('pf-fp-pop-item-focal');
+      });
+      item.classList.add('pf-fp-pop-item-focal');
+      var list = pop.querySelector('.pf-fp-pop-list');
+      if (list && list.firstChild !== item) list.insertBefore(item, list.firstChild);
+    }
+    // Update the visible/total badge on the popover button.
+    var btn = section.querySelector('.pf-fp-pop-btn[data-pf-fp-action="brandpop"]');
+    if (btn) {
+      var total   = pop.querySelectorAll('.pf-fp-pop-cb').length;
+      var visible = pop.querySelectorAll('.pf-fp-pop-cb:checked').length;
+      var lbl = btn.querySelector('[data-pf-fp-brand-count]');
+      if (lbl) lbl.textContent = visible + ' / ' + total + ' visible';
+    }
+  }
+
+  // Update the focal pill next to the popover (dot colour + name).
+  pfFpUpdateFocalPill(section, brand);
+
   if (typeof brSetPinState === 'function') brSetPinState('pf_fp_focal', brand);
+}
+
+function pfFpUpdateFocalPill(section, brand) {
+  if (!section) return;
+  var pill = section.querySelector('.pf-fp-focal-chip');
+  if (!pill) return;
+  // Take the brand label + colour from the matching popover item, which
+  // already has the right dot colour and display name baked in.
+  var src = section.querySelector('.pf-fp-pop-item[data-pf-fp-brand="' + cssEscape(brand) + '"]');
+  if (!src) return;
+  pill.setAttribute('data-pf-fp-brand', brand);
+  var srcName = src.querySelector('.pf-fp-pop-name');
+  var nameEl  = pill.querySelector('.pf-fp-focal-chip-name');
+  if (srcName && nameEl) nameEl.textContent = srcName.textContent;
+  var srcDot = src.querySelector('.pf-fp-pop-dot');
+  var dotEl  = pill.querySelector('.pf-fp-focal-chip-dot');
+  if (srcDot && dotEl) {
+    var col = srcDot.style.background || srcDot.style.backgroundColor || '';
+    if (col) dotEl.style.background = col;
+  }
 }
 
 function pfFpSortBy(table, key) {
