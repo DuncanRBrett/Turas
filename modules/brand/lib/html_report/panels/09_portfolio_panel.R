@@ -205,34 +205,46 @@ build_br_portfolio_panel <- function(results, config) {
 
 .pf_footprint_subtab <- function(portfolio, panel_data, focal_brand,
                                   focal_colour) {
-  fp <- portfolio$footprint_matrix
-  bases <- if (!is.null(portfolio$bases) &&
-               !is.null(portfolio$bases$per_category))
-    portfolio$bases$per_category else NULL
-
-  if (is.null(fp) || !is.data.frame(fp) || nrow(fp) == 0) {
-    return('<p style="color:#94a3b8;padding:24px 0;">Footprint data not available.</p>')
-  }
-
   section_id <- "pf-footprint"
 
-  chart_svg <- tryCatch(
-    build_heat_strip(
-      matrix_df    = fp,
-      focal_brand  = focal_brand,
-      brand_colour = focal_colour,
-      title        = "Brand Awareness by Category (% of category buyers)"
-    ),
-    error = function(e) ""
-  )
+  # Footprint block (matrix_df, bases_df, cat_names, brand_names,
+  # suppressed_cats) is assembled by .portfolio_footprint_block().
+  footprint <- panel_data$footprint
+  if (is.null(footprint)) {
+    # Fallback to portfolio_result if panel_data didn't run.
+    fp_df <- portfolio$footprint_matrix
+    if (!is.null(fp_df) && nrow(fp_df) > 0) {
+      meta <- portfolio$footprint_meta %||% list()
+      footprint <- list(
+        matrix_df       = fp_df,
+        bases_df        = portfolio$bases$per_category,
+        cat_names       = meta$cat_names %||% character(0),
+        brand_names     = meta$brand_names %||% character(0),
+        n_total         = portfolio$n_total %||% NA_integer_,
+        suppressed_cats = portfolio$suppressions$low_base_cats %||% character(0)
+      )
+    }
+  }
 
-  suppressed <- portfolio$suppressions$low_base_cats %||% character(0)
-  supp_note  <- if (length(suppressed) > 0) {
-    sprintf(
-      '<div class="pf-suppression-note">Categories suppressed (base below threshold): %s</div>',
-      .pf_esc(paste(suppressed, collapse = ", "))
+  if (is.null(footprint) || is.null(footprint$matrix_df) ||
+      nrow(footprint$matrix_df) == 0) {
+    return(paste0(
+      .pf_section_toolbar(section_id),
+      '<p style="color:#94a3b8;padding:24px 0;">Footprint data not available.</p>'
+    ))
+  }
+
+  table_html <- if (exists("build_pf_footprint_html", mode = "function")) {
+    tryCatch(
+      build_pf_footprint_html(footprint, focal_brand, focal_colour),
+      error = function(e) sprintf(
+        '<p style="color:#b91c1c;padding:16px 0;">Footprint render failed: %s</p>',
+        .pf_esc(e$message)
+      )
     )
-  } else ""
+  } else {
+    '<p style="color:#94a3b8;padding:24px 0;">Footprint renderer not loaded.</p>'
+  }
 
   about_text <- if (!is.null(panel_data)) {
     panel_data$about$footprint %||% ""
@@ -241,9 +253,8 @@ build_br_portfolio_panel <- function(results, config) {
   paste0(
     .pf_section_toolbar(section_id),
     '<div id="', section_id, '-chart" style="margin:8px 0;">',
-    chart_svg,
+    table_html,
     '</div>',
-    if (nzchar(supp_note)) supp_note else "",
     if (nzchar(about_text)) {
       sprintf('<div class="pf-about-drawer"><strong>About this chart:</strong> %s</div>',
               .pf_esc(about_text))

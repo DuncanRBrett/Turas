@@ -68,10 +68,14 @@ build_portfolio_panel_data <- function(portfolio_result, config,
   if (is.null(fp) || !is.data.frame(fp) || nrow(fp) == 0) return(NULL)
 
   bases <- portfolio_result$bases$per_category
+  meta  <- portfolio_result$footprint_meta %||% list()
   list(
     matrix_df       = fp,
     bases_df        = if (!is.null(bases) && nrow(bases) > 0) bases
                       else data.frame(),
+    cat_names       = meta$cat_names   %||% character(0),
+    brand_names     = meta$brand_names %||% character(0),
+    n_total         = portfolio_result$n_total %||% NA_integer_,
     suppressed_cats = portfolio_result$suppressions$low_base_cats %||%
                       character(0)
   )

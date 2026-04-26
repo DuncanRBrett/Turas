@@ -188,12 +188,18 @@ test_that("bases_df: correct unweighted and weighted buyer counts", {
   expect_equal(result$bases_df$n_buyers_w, 3.0, tolerance = 1e-6)
 })
 
-test_that("categories below min_base are suppressed and matrix is empty", {
+test_that("categories below min_base are flagged but kept in the matrix", {
+  # Spec change (Apr 2026): the Footprint sub-tab now shows EVERY category
+  # the screener resolves, regardless of base. Low-base categories are
+  # recorded in `suppressed_cats` so the renderer can mark them, but their
+  # column (and any awareness values it carries) is still emitted — Duncan
+  # wants the full portfolio view, not a base-filtered subset.
   result <- compute_footprint_matrix(.fp_data(), .fp_categories(),
                                      .fp_structure(), .fp_config(min_base = 10L))
   expect_equal(result$status, "PASS")
-  expect_equal(nrow(result$matrix_df), 0L)
-  expect_equal(result$suppressed_cats, "TST")
+  expect_gt(nrow(result$matrix_df), 0L)
+  expect_true("TST" %in% result$suppressed_cats)
+  expect_true("TST" %in% setdiff(names(result$matrix_df), "Brand"))
 })
 
 test_that("empty categories input returns PASS with empty matrix", {

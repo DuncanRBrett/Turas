@@ -296,6 +296,10 @@ run_portfolio <- function(data, categories, structure, config, weights = NULL) {
       )
     ),
     footprint_matrix = if (!is.null(footprint_result)) footprint_result$matrix_df else NULL,
+    footprint_meta   = if (!is.null(footprint_result)) list(
+                          cat_names   = footprint_result$cat_names   %||% character(0),
+                          brand_names = footprint_result$brand_names %||% character(0)
+                        ) else NULL,
     constellation    = if (!is.null(constellation_result) &&
                            identical(constellation_result$status, "PASS"))
                          constellation_result else NULL,

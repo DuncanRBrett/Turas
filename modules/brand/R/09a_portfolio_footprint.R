@@ -58,8 +58,16 @@
 #'   \item{status}{"PASS"}
 #'   \item{matrix_df}{Data frame: Brand column + one column per category.
 #'     Values are awareness % (0–100). Rows sorted by total footprint
-#'     descending. Columns sorted by category buyer size descending.}
+#'     descending. Columns sorted by category buyer size descending.
+#'     All categories from the config are included — categories whose
+#'     unweighted base falls below \code{config$portfolio_min_base} are
+#'     also recorded in \code{suppressed_cats} so the renderer can flag
+#'     them, but their column is still emitted (with the awareness
+#'     values that were observed, even if at low base).}
 #'   \item{bases_df}{Data frame: cat, n_buyers_uw, n_buyers_w.}
+#'   \item{cat_names}{Named character vector: cat_code -> human display name.}
+#'   \item{brand_names}{Named character vector: brand_code -> display name,
+#'     unioned across all categories.}
 #'   \item{suppressed_cats}{Character. Category codes below min_base.}
 #'
 #' @export
@@ -72,6 +80,9 @@ compute_footprint_matrix <- function(data, categories, structure,
   cat_codes      <- character(0)
   cat_n_buyers   <- integer(0)
   bases_list     <- list()
+  # name maps are lists so `[[code]]` returns NULL (not error) for missing keys
+  cat_name_map   <- list()
+  brand_name_map <- list()
   suppressed     <- character(0)
 
   for (i in seq_len(nrow(categories))) {
@@ -80,7 +91,6 @@ compute_footprint_matrix <- function(data, categories, structure,
       get_brands_for_category(structure, cat_name),
       error = function(e) data.frame(BrandCode = character(0))
     )
-    if (nrow(cat_brands) == 0) next
 
     cat_code <- if (!is.null(structure$questionmap) &&
                     nrow(structure$questionmap) > 0)
@@ -91,22 +101,38 @@ compute_footprint_matrix <- function(data, categories, structure,
     base <- build_portfolio_base(data, cat_code, timeframe, weights)
     if (!is.null(base$status)) next
 
-    if (base$n_uw < min_base) {
-      suppressed <- c(suppressed, cat_code)
-      next
-    }
+    is_low_base <- base$n_uw < min_base
+    if (is_low_base) suppressed <- c(suppressed, cat_code)
 
+    # Include every category whose screener column resolved, regardless of
+    # min_base or whether brands are declared in the structure. Low-base
+    # cats are still flagged in `suppressed_cats` so the renderer can mark
+    # them; non-key cats with no brand list contribute an all-NA column,
+    # which is the right semantic ("not measured" — see panel about-text).
     cat_codes    <- c(cat_codes, cat_code)
     cat_n_buyers <- c(cat_n_buyers, base$n_uw)
     bases_list[[cat_code]] <- list(n_buyers_uw = base$n_uw, n_buyers_w = base$n_w)
+    cat_name_map[[cat_code]] <- as.character(cat_name)
 
-    brand_codes <- as.character(cat_brands$BrandCode)
-    awareness   <- .compute_category_awareness(data, cat_code, brand_codes,
-                                               base$idx, weights)
-    for (bi in seq_along(brand_codes)) {
-      bc <- brand_codes[bi]
-      if (!bc %in% names(brand_rows)) brand_rows[[bc]] <- list()
-      brand_rows[[bc]][[cat_code]] <- awareness[bi]
+    if (nrow(cat_brands) > 0) {
+      brand_codes <- as.character(cat_brands$BrandCode)
+      brand_lbls  <- if ("BrandLabel" %in% names(cat_brands))
+                       as.character(cat_brands$BrandLabel)
+                     else if ("BrandName" %in% names(cat_brands))
+                       as.character(cat_brands$BrandName)
+                     else brand_codes
+      awareness   <- .compute_category_awareness(data, cat_code, brand_codes,
+                                                 base$idx, weights)
+      for (bi in seq_along(brand_codes)) {
+        bc <- brand_codes[bi]
+        if (!bc %in% names(brand_rows)) brand_rows[[bc]] <- list()
+        brand_rows[[bc]][[cat_code]] <- awareness[bi]
+        # First-seen wins for the global brand name lookup; subsequent
+        # categories with a different label do not override an earlier
+        # populated value.
+        if (!nzchar(brand_name_map[[bc]] %||% "") && nzchar(brand_lbls[bi]))
+          brand_name_map[[bc]] <- brand_lbls[bi]
+      }
     }
   }
 
@@ -115,6 +141,8 @@ compute_footprint_matrix <- function(data, categories, structure,
       status          = "PASS",
       matrix_df       = data.frame(),
       bases_df        = data.frame(),
+      cat_names       = list(),
+      brand_names     = list(),
       suppressed_cats = suppressed
     ))
   }
@@ -147,10 +175,17 @@ compute_footprint_matrix <- function(data, categories, structure,
     stringsAsFactors = FALSE
   )
 
+  # Fill any missing brand label with the brand code.
+  for (bc in all_brands) {
+    if (!nzchar(brand_name_map[[bc]] %||% "")) brand_name_map[[bc]] <- bc
+  }
+
   list(
     status          = "PASS",
     matrix_df       = matrix_df,
     bases_df        = bases_df,
+    cat_names       = cat_name_map[ord_cats],
+    brand_names     = brand_name_map[rownames(mat)],
     suppressed_cats = suppressed
   )
 }

@@ -95,6 +95,210 @@ function pfRestorePinState(state) {
 }
 
 // ---------------------------------------------------------------------------
+// FOOTPRINT TABLE — focal switch, chip show/hide, column sorting
+// ---------------------------------------------------------------------------
+
+/**
+ * Wire up the footprint table interactions:
+ *   - Focal-brand <select> moves the focal row to row 1 + recolours its label.
+ *   - Brand chips toggle row visibility (and stay highlighted).
+ *   - Column-header clicks sort rows by that column (focal pinned to row 1).
+ * Idempotent — safe to call after re-renders.
+ */
+function pfInitFootprintTable() {
+  var table = document.querySelector('.pf-fp-table');
+  if (!table || table.dataset.pfFpBound === '1') return;
+  table.dataset.pfFpBound = '1';
+
+  var section = document.getElementById('pf-subtab-footprint');
+  if (!section) return;
+
+  // --- Focal-brand <select> -------------------------------------------------
+  var focalSelect = section.querySelector('.pf-fp-focal-select');
+  if (focalSelect) {
+    focalSelect.addEventListener('change', function () {
+      pfFpSetFocal(focalSelect.value);
+    });
+  }
+
+  // --- Chip clicks (toggle row visibility) ----------------------------------
+  section.querySelectorAll('.pf-fp-chip').forEach(function (chip) {
+    chip.classList.add('pf-fp-chip-on');  // start visible
+    chip.addEventListener('click', function () {
+      var brand = chip.getAttribute('data-pf-fp-brand');
+      var on = chip.classList.toggle('pf-fp-chip-on');
+      chip.classList.toggle('pf-fp-chip-off', !on);
+      var row = table.querySelector('tr[data-pf-fp-brand="' + cssEscape(brand) + '"]');
+      if (row) row.style.display = on ? '' : 'none';
+    });
+  });
+
+  // --- Column-header sort ---------------------------------------------------
+  // Click target is the <th> itself (no inner <button>) — keeps the
+  // thead rendering as one solid navy bar without native-button gaps.
+  table.querySelectorAll('th.pf-fp-th-sort').forEach(function (th) {
+    th.addEventListener('click', function () {
+      var key = th.getAttribute('data-pf-fp-sort');
+      pfFpSortBy(table, key);
+    });
+    // Keyboard activation (role="button" is set in the markup).
+    th.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        var key = th.getAttribute('data-pf-fp-sort');
+        pfFpSortBy(table, key);
+      }
+    });
+  });
+
+  // --- Display toggles (heatmap + show counts) ------------------------------
+  var wrap = table.closest('.pf-fp-table-wrap');
+  var hmCb = section.querySelector('input[data-pf-fp-action="heatmap"]');
+  var scCb = section.querySelector('input[data-pf-fp-action="showcounts"]');
+  if (hmCb && wrap) {
+    hmCb.addEventListener('change', function () {
+      wrap.classList.toggle('pf-fp-heatmap-on',  hmCb.checked);
+      wrap.classList.toggle('pf-fp-heatmap-off', !hmCb.checked);
+      if (typeof brSetPinState === 'function') {
+        brSetPinState('pf_fp_heatmap', hmCb.checked);
+      }
+    });
+  }
+  if (scCb && wrap) {
+    scCb.addEventListener('change', function () {
+      wrap.classList.toggle('pf-fp-show-counts', scCb.checked);
+      if (typeof brSetPinState === 'function') {
+        brSetPinState('pf_fp_show_counts', scCb.checked);
+      }
+    });
+  }
+}
+
+function pfFpSetFocal(brand) {
+  var table = document.querySelector('.pf-fp-table');
+  if (!table) return;
+  var section = document.getElementById('pf-subtab-footprint');
+
+  table.setAttribute('data-pf-focal', brand);
+
+  // Update <select> if changed externally
+  var sel = section ? section.querySelector('.pf-fp-focal-select') : null;
+  if (sel && sel.value !== brand) sel.value = brand;
+
+  // Update row classes + move the focal row to top of <tbody>.
+  var tbody = table.querySelector('tbody');
+  if (!tbody) return;
+  var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr[data-pf-fp-brand]'));
+  var focalRow = null;
+  rows.forEach(function (tr) {
+    var isFocal = tr.getAttribute('data-pf-fp-brand') === brand;
+    tr.classList.toggle('pf-fp-row-focal', isFocal);
+    tr.classList.toggle('pf-fp-row-other', !isFocal);
+    tr.setAttribute('data-pf-fp-focal', isFocal ? '1' : '0');
+    // Strip any existing FOCAL badge then re-add to the new focal row.
+    var lbl = tr.querySelector('.pf-fp-row-label');
+    if (lbl) {
+      lbl.querySelectorAll('.fn-focal-badge').forEach(function (b) { b.remove(); });
+      if (isFocal) {
+        var span = document.createElement('span');
+        span.className = 'fn-focal-badge';
+        span.textContent = 'FOCAL';
+        span.style.marginLeft = '6px';
+        lbl.appendChild(span);
+      }
+    }
+    if (isFocal) focalRow = tr;
+  });
+  if (focalRow && tbody.firstChild !== focalRow) tbody.insertBefore(focalRow, tbody.firstChild);
+
+  if (typeof brSetPinState === 'function') brSetPinState('pf_fp_focal', brand);
+}
+
+function pfFpSortBy(table, key) {
+  var tbody = table.querySelector('tbody');
+  if (!tbody) return;
+
+  // Cycle direction: none -> desc -> asc -> none.
+  var current = table.getAttribute('data-pf-fp-sort-key') === key
+    ? (table.getAttribute('data-pf-fp-sort-dir') || 'none') : 'none';
+  var next = (current === 'none') ? 'desc' : (current === 'desc' ? 'asc' : 'none');
+
+  table.setAttribute('data-pf-fp-sort-key', next === 'none' ? '' : key);
+  table.setAttribute('data-pf-fp-sort-dir', next);
+
+  // Update sort indicators + active marker (CSS lights up the chevron).
+  table.querySelectorAll('th.pf-fp-th-sort').forEach(function (th) {
+    th.removeAttribute('data-pf-fp-active');
+    var ind = th.querySelector('.pf-fp-sort-ind');
+    if (ind) ind.textContent = '↕';
+  });
+  if (next !== 'none') {
+    var activeTh = table.querySelector('th.pf-fp-th-sort[data-pf-fp-sort="' + cssEscape(key) + '"]');
+    if (activeTh) {
+      activeTh.setAttribute('data-pf-fp-active', '1');
+      var ind = activeTh.querySelector('.pf-fp-sort-ind');
+      if (ind) ind.textContent = (next === 'desc') ? '↓' : '↑';
+    }
+  }
+
+  var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr[data-pf-fp-brand]'));
+
+  if (next === 'none') {
+    // Restore data-attribute insertion order — rebuild from server-issued
+    // order stored in data-pf-fp-orig-idx (set on first sort below).
+    if (!table.dataset.pfFpOrigIndexed) {
+      rows.forEach(function (tr, i) { tr.dataset.pfFpOrigIdx = String(i); });
+      table.dataset.pfFpOrigIndexed = '1';
+    }
+    rows.sort(function (a, b) {
+      return (parseInt(a.dataset.pfFpOrigIdx, 10) || 0) -
+             (parseInt(b.dataset.pfFpOrigIdx, 10) || 0);
+    });
+  } else {
+    if (!table.dataset.pfFpOrigIndexed) {
+      rows.forEach(function (tr, i) { tr.dataset.pfFpOrigIdx = String(i); });
+      table.dataset.pfFpOrigIndexed = '1';
+    }
+    var dirSign = (next === 'desc') ? -1 : 1;
+    rows.sort(function (a, b) {
+      // Focal pinned to top regardless of sort direction
+      var fa = a.getAttribute('data-pf-fp-focal') === '1';
+      var fb = b.getAttribute('data-pf-fp-focal') === '1';
+      if (fa && !fb) return -1;
+      if (!fa && fb) return 1;
+
+      var va, vb;
+      if (key === '__brand__') {
+        va = (a.querySelector('.pf-fp-row-label-text') || {}).textContent || '';
+        vb = (b.querySelector('.pf-fp-row-label-text') || {}).textContent || '';
+        return dirSign * va.localeCompare(vb);
+      }
+      var ca = a.querySelector('td[data-pf-fp-col="' + cssEscape(key) + '"]');
+      var cb = b.querySelector('td[data-pf-fp-col="' + cssEscape(key) + '"]');
+      var na = ca ? parseFloat(ca.getAttribute('data-pf-fp-val')) : NaN;
+      var nb = cb ? parseFloat(cb.getAttribute('data-pf-fp-val')) : NaN;
+      // NA values always sort to the bottom regardless of direction.
+      var aNa = !isFinite(na), bNa = !isFinite(nb);
+      if (aNa && !bNa) return 1;
+      if (!aNa && bNa) return -1;
+      if (aNa && bNa)  return 0;
+      return dirSign * (na - nb);
+    });
+  }
+
+  rows.forEach(function (tr) { tbody.appendChild(tr); });
+
+  if (typeof brSetPinState === 'function') {
+    brSetPinState('pf_fp_sort', { key: key, dir: next });
+  }
+}
+
+function cssEscape(s) {
+  if (window.CSS && CSS.escape) return CSS.escape(s);
+  return String(s).replace(/([^a-zA-Z0-9_\-])/g, '\\$1');
+}
+
+// ---------------------------------------------------------------------------
 // Initialise on DOMContentLoaded
 // ---------------------------------------------------------------------------
 (function() {
@@ -104,6 +308,8 @@ function pfRestorePinState(state) {
     if (!panel) return;
     const activeBtn = panel.querySelector('.pf-sub-btn.active');
     if (!activeBtn) pfSwitchSubtab('footprint');
+
+    pfInitFootprintTable();
   }
 
   if (document.readyState === 'loading') {
