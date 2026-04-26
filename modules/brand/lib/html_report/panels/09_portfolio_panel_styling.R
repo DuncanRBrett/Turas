@@ -468,20 +468,97 @@ build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
 .pf-cn-reading-line { margin: 0 0 8px; }
 .pf-cn-reading-line:last-child { margin-bottom: 0; }
 
-/* JS-driven hover tooltip for Competitive Set nodes. Floats fixed to
-   the viewport so the cursor never overlaps it; one element per
-   document, repositioned on each hover. */
+/* JS-driven hover tooltip for Competitive Set nodes (and Category
+   Context dots — same floating element, reused). Multi-line tooltips
+   need `white-space: pre-line` to honour newlines from JS. */
 .pf-cn-tooltip {
   position: fixed; pointer-events: none;
   background: #1e293b; color: #fff;
-  font-size: 12px; line-height: 1.4;
-  padding: 6px 10px; border-radius: 4px;
+  font-size: 12px; line-height: 1.45;
+  padding: 8px 12px; border-radius: 4px;
   box-shadow: 0 4px 12px rgba(15,23,42,0.18);
-  max-width: 280px; z-index: 1000;
+  max-width: 320px; z-index: 1000;
   visibility: hidden; opacity: 0;
   transition: opacity 0.08s ease;
+  white-space: pre-line;
 }
 .pf-cn-tooltip[aria-hidden='false'] { opacity: 1; visibility: visible; }
+
+/* ---- Category Context (clutter quadrant) ---- */
+.pf-cl-controls {
+  display: flex; align-items: flex-start; gap: 24px;
+  flex-wrap: wrap;
+  margin: 0 0 12px;
+}
+.pf-cl-ctl-group { display: flex; flex-direction: column; gap: 6px; }
+.pf-cl-ctl-label {
+  font-size: 11px; font-weight: 600; color: #64748b;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.pf-cl-focal-select {
+  border: 1px solid #e2e8f0; border-radius: 6px; background: #fff;
+  font-size: 13px; padding: 6px 10px; color: #1e293b; min-width: 200px;
+}
+.pf-cl-focal-select:focus { outline: 2px solid %FOCAL%; outline-offset: 1px; }
+.pf-cl-cat-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.pf-cl-cat-chip {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+  color: #475569; font-size: 11px; font-weight: 500;
+  padding: 3px 10px; cursor: pointer; transition: all 0.12s;
+  text-transform: lowercase;
+}
+.pf-cl-cat-chip:hover { background: #f8fafc; color: #1e293b; }
+.pf-cl-cat-chip-on  { background: #fff; color: #1e293b; }
+.pf-cl-cat-chip-off { background: #f1f5f9; color: #94a3b8; opacity: 0.55; }
+.pf-cl-chart {
+  border: 1px solid #e2e8f0; border-radius: 8px;
+  background: #fff; padding: 12px; margin: 0 0 12px;
+}
+
+/* Coverage note — small, italic, sits above the supporting table. */
+.pf-cl-coverage {
+  font-size: 11px; color: #64748b; font-style: italic;
+  margin: 4px 4px 8px;
+}
+
+/* Supporting table — visual contract matches the Overview Category
+   detail table (dark navy header, lowercase, sentence-case body). */
+.pf-cl-table-host { margin: 0 0 12px; }
+.pf-cl-table-scroll { overflow-x: auto; }
+.pf-cl-table {
+  width: 100%; border-collapse: collapse; font-size: 12px;
+}
+.pf-cl-table thead th {
+  background: #1a2744; color: #fff;
+  font-weight: 600; font-size: 11px; letter-spacing: 0.3px;
+  padding: 10px 12px; text-align: right;
+  text-transform: lowercase;
+  border-bottom: 2px solid #0f172a;
+}
+.pf-cl-table thead th.pf-cl-th-cat { text-align: left; }
+.pf-cl-table tbody tr:nth-child(odd)  { background: #fcfdfe; }
+.pf-cl-table tbody tr:hover           { background: #f1f5f9; }
+.pf-cl-table td {
+  border-bottom: 1px solid #f1f5f9;
+  color: #1e293b;
+  padding: 9px 12px; vertical-align: middle;
+}
+.pf-cl-td-cat  { text-align: left;  font-weight: 500; }
+.pf-cl-td-num  { text-align: right; white-space: nowrap;
+                 font-variant-numeric: tabular-nums; }
+.pf-cl-table-empty {
+  font-size: 12px; color: #94a3b8; font-style: italic;
+  padding: 12px 4px;
+}
+.pf-cl-reading {
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;
+  color: #334155; font-size: 12px; line-height: 1.55;
+  margin-top: 12px; padding: 12px 16px;
+}
+.pf-cl-reading strong { color: #1e293b; }
+.pf-cl-reading em { color: #1e293b; font-style: italic; }
+.pf-cl-reading-line { margin: 0 0 8px; }
+.pf-cl-reading-line:last-child { margin-bottom: 0; }
 "
   gsub("%FOCAL%", focal_colour, tmpl, fixed = TRUE)
 }

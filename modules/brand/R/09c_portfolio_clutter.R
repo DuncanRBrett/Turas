@@ -97,8 +97,10 @@ compute_clutter_data <- function(data, categories, structure,
   min_base    <- config$portfolio_min_base  %||% 30L
   n_total     <- nrow(data)
 
-  rows       <- list()
-  suppressed <- character(0)
+  rows         <- list()
+  per_cat_full <- list()  # focal-agnostic payload (set size, all brand pcts)
+  cat_label_map<- list()
+  suppressed   <- character(0)
 
   for (i in seq_len(nrow(categories))) {
     cat_name   <- categories$Category[i]
@@ -108,10 +110,14 @@ compute_clutter_data <- function(data, categories, structure,
     )
     if (nrow(cat_brands) == 0) next
 
+    # Use the broader detector (cross_cat.awareness.<CC> too) so
+    # awareness-only categories resolve a code instead of being
+    # silently dropped — same fix as the footprint pipeline.
+    detector <- if (exists(".po_detect_cat_code", mode = "function"))
+                  .po_detect_cat_code else .detect_category_code
     cat_code <- if (!is.null(structure$questionmap) &&
                     nrow(structure$questionmap) > 0)
-      .detect_category_code(structure$questionmap, cat_brands, data)
-    else NULL
+      detector(structure$questionmap, cat_brands, data) else NULL
     if (is.null(cat_code)) next
 
     base <- build_portfolio_base(data, cat_code, timeframe, weights)
@@ -123,6 +129,13 @@ compute_clutter_data <- function(data, categories, structure,
     }
 
     brand_codes   <- as.character(cat_brands$BrandCode)
+    brand_lbls    <- if ("BrandLabel" %in% names(cat_brands))
+                       as.character(cat_brands$BrandLabel)
+                     else if ("BrandName" %in% names(cat_brands))
+                       as.character(cat_brands$BrandName)
+                     else brand_codes
+    names(brand_lbls) <- brand_codes
+
     metrics       <- .compute_category_clutter_metrics(
       data, cat_code, brand_codes, focal_brand, base$idx, weights)
 
@@ -132,6 +145,18 @@ compute_clutter_data <- function(data, categories, structure,
       metrics$focal_pct / metrics$sum_brand_pcts
     } else 0
 
+    # Per-brand awareness % across this category's buyers — needed for
+    # the JS-side focal switcher (recompute focal_share without R).
+    w     <- if (!is.null(weights)) weights else rep(1.0, n_total)
+    denom <- sum(w[base$idx], na.rm = TRUE)
+    brand_pcts <- vapply(brand_codes, function(bc) {
+      col <- paste0("BRANDAWARE_", cat_code, "_", bc)
+      if (!col %in% names(data) || denom <= 0) return(0)
+      vals <- as.integer(!is.na(data[[col]]) & data[[col]] == 1L)
+      sum(w[base$idx] * vals[base$idx], na.rm = TRUE) / denom * 100
+    }, numeric(1))
+    names(brand_pcts) <- brand_codes
+
     rows[[cat_code]] <- list(
       cat                    = cat_code,
       awareness_set_size_mean = metrics$awareness_set_size_mean,
@@ -139,12 +164,23 @@ compute_clutter_data <- function(data, categories, structure,
       cat_penetration        = cat_pen,
       fair_share             = fair_share
     )
+    per_cat_full[[cat_code]] <- list(
+      cat_code        = cat_code,
+      cat_label       = as.character(cat_name),
+      set_size_mean   = metrics$awareness_set_size_mean,
+      cat_penetration = cat_pen,
+      n_brands        = metrics$n_brands,
+      brand_pcts      = as.list(brand_pcts),
+      brand_lbls      = as.list(brand_lbls)
+    )
+    cat_label_map[[cat_code]] <- as.character(cat_name)
   }
 
   if (length(rows) == 0) {
     return(list(
       status          = "PASS",
       clutter_df      = data.frame(),
+      per_cat_full    = list(),
       ref_x           = NA_real_,
       ref_y           = NA_real_,
       suppressed_cats = suppressed
@@ -173,6 +209,7 @@ compute_clutter_data <- function(data, categories, structure,
   list(
     status          = "PASS",
     clutter_df      = clutter_df,
+    per_cat_full    = per_cat_full,
     ref_x           = ref_x,
     ref_y           = ref_y,
     suppressed_cats = suppressed

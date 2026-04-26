@@ -88,6 +88,7 @@ build_portfolio_panel_data <- function(portfolio_result, config,
   }
   list(
     clutter_df      = cl$clutter_df,
+    per_cat_full    = cl$per_cat_full %||% list(),
     ref_x           = cl$ref_x,
     ref_y           = cl$ref_y,
     suppressed_cats = cl$suppressed_cats %||% character(0)

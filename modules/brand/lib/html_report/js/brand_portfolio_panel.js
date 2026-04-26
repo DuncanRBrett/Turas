@@ -921,6 +921,451 @@ function escapeHtmlMaybe(s) {
 }
 
 // ---------------------------------------------------------------------------
+// CATEGORY CONTEXT — focal picker, client-side scatter render, hover tooltip
+// ---------------------------------------------------------------------------
+
+function pfClLoadData() {
+  var node = document.getElementById('pf-cl-data');
+  if (!node) return null;
+  try { return JSON.parse(node.textContent || '{}'); }
+  catch (e) { console.warn('[pf-cl] Failed to parse JSON:', e); return null; }
+}
+
+function pfClInit() {
+  var section = document.getElementById('pf-subtab-clutter');
+  if (!section) return;
+
+  // If the JSON payload didn't render (e.g. older R session, no per-cat
+  // data), bail BEFORE doing anything that would replace the chart's
+  // server-rendered SVG. The page still works — just without the
+  // dynamic focal switching + tooltips.
+  var data = pfClLoadData();
+  if (!data || !data.cats || Object.keys(data.cats).length === 0) {
+    return;
+  }
+
+  pfClBindHoverTooltips(section);
+
+  var sel = document.getElementById('pf-cl-focal-select');
+  if (sel) {
+    sel.addEventListener('change', function () { pfClSetFocal(sel.value); });
+  }
+
+  // Category chips — toggle which dots appear on the chart. State is
+  // read by pfClSetFocal so it survives focal switches.
+  section.querySelectorAll('.pf-cl-cat-chip').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      var on = chip.classList.toggle('pf-cl-cat-chip-on');
+      chip.classList.toggle('pf-cl-cat-chip-off', !on);
+      var focal = (sel && sel.value) ||
+        (document.getElementById('pf-clutter-chart') &&
+         document.getElementById('pf-clutter-chart').getAttribute('data-pf-cl-focal')) || '';
+      pfClSetFocal(focal);
+      if (typeof brSetPinState === 'function') {
+        var hidden = [];
+        section.querySelectorAll('.pf-cl-cat-chip-off').forEach(function (c) {
+          hidden.push(c.getAttribute('data-pf-cl-cat'));
+        });
+        brSetPinState('pf_cl_hidden_cats', hidden);
+      }
+    });
+  });
+
+  // Repaint with the current focal so the SVG carries the new
+  // tooltip-friendly data attributes that the server-side
+  // build_scatter doesn't emit.
+  var chart = document.getElementById('pf-clutter-chart');
+  var initial = chart ? chart.getAttribute('data-pf-cl-focal') : '';
+  if (initial) pfClSetFocal(initial);
+}
+
+// Read the active set of category codes from the chip row — used to
+// filter which dots get drawn. When no chips are off, returns null
+// (meaning "show all"); otherwise returns a Set of active codes.
+function pfClActiveCats() {
+  var section = document.getElementById('pf-subtab-clutter');
+  if (!section) return null;
+  var chips = section.querySelectorAll('.pf-cl-cat-chip');
+  if (chips.length === 0) return null;
+  var anyOff = false;
+  var on = {};
+  chips.forEach(function (c) {
+    var cc = c.getAttribute('data-pf-cl-cat');
+    if (c.classList.contains('pf-cl-cat-chip-off')) anyOff = true;
+    else on[cc] = true;
+  });
+  return anyOff ? on : null;
+}
+
+function pfClSetFocal(focalCode) {
+  var chart = document.getElementById('pf-clutter-chart');
+  if (!chart) return;
+  chart.setAttribute('data-pf-cl-focal', focalCode);
+
+  var sel = document.getElementById('pf-cl-focal-select');
+  if (sel && sel.value !== focalCode) sel.value = focalCode;
+
+  var data = pfClLoadData();
+  if (!data) return;
+
+  var rows = pfClBuildRows(data, focalCode);
+  // Filter rows by active category chips (if any chip is off).
+  var active = pfClActiveCats();
+  if (active) {
+    rows = rows.filter(function (r) { return !!active[r.cat_code]; });
+  }
+  var brandColour = chart.getAttribute('data-pf-cl-focal-colour') || '#1A5276';
+  var svg = pfClRenderScatter(rows, data.ref_x, brandColour);
+  chart.innerHTML = svg;
+
+  // Refresh the supporting table + coverage note for the new focal.
+  pfClRenderTable(rows, focalCode, data);
+  pfClRenderCoverageNote(data, focalCode);
+
+  if (typeof brSetPinState === 'function') {
+    brSetPinState('pf_cl_focal', focalCode);
+  }
+}
+
+// Look up the focal brand's display label across the per-cat payload —
+// first cat with a label for this code wins.
+function pfClFocalLabel(data, focalCode) {
+  if (!data || !data.cats || !focalCode) return focalCode;
+  var keys = Object.keys(data.cats);
+  for (var i = 0; i < keys.length; i++) {
+    var lbls = (data.cats[keys[i]] || {}).brand_lbls || {};
+    if (lbls[focalCode]) return lbls[focalCode];
+  }
+  return focalCode;
+}
+
+// Number of categories the focal brand is measured in vs total
+// categories in the data — drives the "N of M" coverage note.
+function pfClRenderCoverageNote(data, focalCode) {
+  var note = document.getElementById('pf-cl-coverage');
+  if (!note) return;
+  var cats = (data && data.cats) || {};
+  var keys = Object.keys(cats);
+  var total = keys.length;
+  if (total === 0) { note.textContent = ''; return; }
+  var present = 0;
+  keys.forEach(function (cc) {
+    var pcts = (cats[cc] || {}).brand_pcts || {};
+    if (Object.prototype.hasOwnProperty.call(pcts, focalCode)) present++;
+  });
+  var lbl = pfClFocalLabel(data, focalCode);
+  note.textContent = lbl + ' is measured in ' + present +
+    ' of ' + total + ' categories. Categories without ' + lbl +
+    ' in the brand list are excluded from the chart and table.';
+}
+
+// Client-side context table — rebuilt on every focal change so the
+// numbers always match the chart. Style mirrors the Overview Category
+// detail table (dark navy header, lowercase, sortable affordance).
+function pfClRenderTable(rows, focalCode, data) {
+  var host = document.getElementById('pf-cl-table-host');
+  if (!host) return;
+  if (!rows || rows.length === 0) {
+    var lbl = pfClFocalLabel(data, focalCode);
+    host.innerHTML = '<p class="pf-cl-table-empty">' +
+      pfClEsc(lbl) + ' is not measured in any of the listed categories.</p>';
+    return;
+  }
+
+  // Sort by focal share descending so the dominant cats lead.
+  var sorted = rows.slice().sort(function (a, b) {
+    return (b.focal_share || 0) - (a.focal_share || 0);
+  });
+
+  // "Focal awareness" (% of cat buyers aware of focal) is shown next
+  // to "Focal share" (focal's slice of the total awareness pie) so the
+  // user sees both metrics side by side — the two numbers can look very
+  // different, which is the source of the confusion vs the Overview tab.
+  var head = '<thead><tr>' +
+    '<th class="pf-cl-th-cat">Category</th>' +
+    '<th class="pf-cl-th-num" title="Mean number of brands a category buyer is aware of (clutter measure)">Avg brands known</th>' +
+    '<th class="pf-cl-th-num" title="% of category buyers aware of the focal brand — same metric the Overview tab uses">Focal awareness</th>' +
+    '<th class="pf-cl-th-num" title="Focal’s slice of total brand-awareness mentions in the category (= focal awareness ÷ sum of every brand’s awareness)">Focal share of awareness</th>' +
+    '<th class="pf-cl-th-num">Cat. penetration</th>' +
+    '<th class="pf-cl-th-cat">Quadrant</th>' +
+    '</tr></thead>';
+
+  var body = sorted.map(function (r) {
+    return '<tr>' +
+      '<td class="pf-cl-td-cat">' + pfClEsc(r.cat_label) + '</td>' +
+      '<td class="pf-cl-td-num">' +
+        (r.set_size_mean == null ? '—' : Number(r.set_size_mean).toFixed(1)) +
+        '</td>' +
+      '<td class="pf-cl-td-num">' +
+        (r.focal_pct == null ? '—' : Math.round(r.focal_pct) + '%') + '</td>' +
+      '<td class="pf-cl-td-num">' +
+        (r.focal_share == null ? '—' :
+          Math.round(r.focal_share * 100) + '%') + '</td>' +
+      '<td class="pf-cl-td-num">' +
+        (r.cat_penetration == null ? '—' :
+          Math.round(r.cat_penetration * 100) + '%') + '</td>' +
+      '<td class="pf-cl-td-cat">' + pfClEsc(r.quadrant || '—') + '</td>' +
+      '</tr>';
+  }).join('');
+
+  host.innerHTML =
+    '<div class="pf-cl-table-scroll"><table class="pf-cl-table">' +
+    head + '<tbody>' + body + '</tbody></table></div>';
+}
+
+function pfClBuildRows(data, focalCode) {
+  var refX = data.ref_x;
+  var cats = data.cats || {};
+  var rows = [];
+  Object.keys(cats).forEach(function (cc) {
+    var c = cats[cc] || {};
+    var pcts = c.brand_pcts || {};
+    // Skip categories where the focal brand isn't even measured (no
+    // entry in this cat's brand list). Otherwise we'd plot a 0% dot
+    // that floods the bottom row of the chart and distorts the read.
+    if (!Object.prototype.hasOwnProperty.call(pcts, focalCode)) return;
+
+    var sum = 0;
+    Object.keys(pcts).forEach(function (k) { sum += (pcts[k] || 0); });
+    var focalPct = pcts[focalCode] || 0;
+    var focalShare = sum > 0 ? focalPct / sum : 0;
+    var fairShare  = (c.n_brands && c.n_brands > 0) ? 1 / c.n_brands : null;
+    var quadrant;
+    var isStrong = fairShare != null && focalShare > fairShare;
+    var isHighClutter = (refX != null && c.set_size_mean != null &&
+                          c.set_size_mean > refX);
+    if (isStrong && !isHighClutter) quadrant = 'Dominant';
+    else if (isStrong && isHighClutter) quadrant = 'Contested';
+    else if (!isStrong && !isHighClutter) quadrant = 'Niche opportunity';
+    else quadrant = 'Forgotten / wrong battle';
+
+    rows.push({
+      cat_code:        cc,
+      cat_label:       c.cat_label || cc,
+      set_size_mean:   c.set_size_mean,
+      cat_penetration: c.cat_penetration,
+      n_brands:        c.n_brands,
+      focal_pct:       focalPct,
+      sum_pcts:        sum,
+      focal_share:     focalShare,
+      fair_share:      fairShare,
+      quadrant:        quadrant
+    });
+  });
+  return rows;
+}
+
+// Pure-JS port of build_scatter (R) — generates the same visual
+// contract: title, quadrant backings, ref lines, axes + ticks, dots
+// sized by category penetration. Each <circle> carries data-pf-cl-cat
+// so the hover handler can look up the row's full metrics.
+function pfClRenderScatter(rows, refX, focalColour) {
+  if (!rows || rows.length === 0) {
+    return '<p style="color:#94a3b8;padding:24px 0;">No category data available.</p>';
+  }
+
+  var w = 820, h = 580;
+  var ml = 70, mr = 30, mt = 50, mb = 60;
+  var pw = w - ml - mr, ph = h - mt - mb;
+
+  // X = set size; Y = focal share %, fixed to 0..max+pad. Y range
+  // intentionally extends a touch above the data so labels don't clip.
+  var xs = rows.map(function (r) { return r.set_size_mean; })
+    .filter(function (v) { return v != null && isFinite(v); });
+  var xMin = Math.min.apply(null, xs);
+  var xMax = Math.max.apply(null, xs);
+  var xPad = Math.max(0.5, (xMax - xMin) * 0.12);
+  xMin -= xPad; xMax += xPad;
+
+  var yMaxData = Math.max.apply(null, rows.map(function (r) {
+    return (r.focal_share || 0) * 100;
+  }).filter(function (v) { return isFinite(v); }));
+  var yMax = Math.max(20, Math.min(100, Math.ceil(yMaxData / 10) * 10 + 10));
+  var yMin = 0;
+
+  function sx(v) { return ml + ((v - xMin) / (xMax - xMin)) * pw; }
+  function sy(v) { return mt + ph - ((v - yMin) / (yMax - yMin)) * ph; }
+
+  var parts = [];
+
+  // Title
+  parts.push('<text x="' + ml + '" y="28" fill="#1e293b" font-size="14" ' +
+    'font-weight="700">Category context — clutter vs focal brand position</text>');
+
+  // Reference lines: vertical at ref_x (median set size), horizontal at
+  // median fair share — same convention as the R version.
+  var refY;
+  var fairs = rows.map(function (r) { return r.fair_share; })
+    .filter(function (v) { return v != null && isFinite(v); }).sort(function (a, b) { return a - b; });
+  if (fairs.length > 0) {
+    var mid = Math.floor(fairs.length / 2);
+    refY = (fairs.length % 2 ? fairs[mid] : (fairs[mid - 1] + fairs[mid]) / 2) * 100;
+  }
+
+  // Quadrant backgrounds
+  if (refX != null && refY != null) {
+    var rx = sx(refX), ry = sy(refY);
+    var fills = ['#f0fdf4', '#eff6ff', '#fefce8', '#fdf2f8'];
+    parts.push(
+      '<rect x="' + ml + '" y="' + mt + '" width="' + (rx - ml) + '" height="' + (ry - mt) + '" fill="' + fills[0] + '" opacity="0.5"/>',
+      '<rect x="' + rx + '" y="' + mt + '" width="' + (ml + pw - rx) + '" height="' + (ry - mt) + '" fill="' + fills[1] + '" opacity="0.5"/>',
+      '<rect x="' + ml + '" y="' + ry + '" width="' + (rx - ml) + '" height="' + (mt + ph - ry) + '" fill="' + fills[2] + '" opacity="0.5"/>',
+      '<rect x="' + rx + '" y="' + ry + '" width="' + (ml + pw - rx) + '" height="' + (mt + ph - ry) + '" fill="' + fills[3] + '" opacity="0.5"/>'
+    );
+    parts.push(
+      '<text x="' + (ml + 8)      + '" y="' + (mt + 16)      + '" fill="#64748b" font-size="10" font-weight="600">Dominant</text>',
+      '<text x="' + (ml + pw - 8) + '" y="' + (mt + 16)      + '" fill="#64748b" font-size="10" font-weight="600" text-anchor="end">Contested</text>',
+      '<text x="' + (ml + 8)      + '" y="' + (mt + ph - 8) + '" fill="#64748b" font-size="10" font-weight="600">Niche opportunity</text>',
+      '<text x="' + (ml + pw - 8) + '" y="' + (mt + ph - 8) + '" fill="#64748b" font-size="10" font-weight="600" text-anchor="end">Forgotten / wrong battle</text>'
+    );
+    parts.push(
+      '<line x1="' + rx + '" y1="' + mt + '" x2="' + rx + '" y2="' + (mt + ph) + '" stroke="#94a3b8" stroke-width="1" stroke-dasharray="5,3"/>',
+      '<line x1="' + ml + '" y1="' + ry + '" x2="' + (ml + pw) + '" y2="' + ry + '" stroke="#94a3b8" stroke-width="1" stroke-dasharray="5,3"/>'
+    );
+  }
+
+  // Axes (ticks + labels)
+  var xTicks = pfClPretty(xMin, xMax, 5);
+  var yTicks = pfClPretty(yMin, yMax, 5);
+  xTicks.forEach(function (t) {
+    parts.push('<text x="' + sx(t) + '" y="' + (mt + ph + 16) +
+      '" text-anchor="middle" fill="#94a3b8" font-size="10">' +
+      pfClFormatNum(t, 1) + '</text>');
+  });
+  yTicks.forEach(function (t) {
+    parts.push('<text x="' + (ml - 8) + '" y="' + sy(t) +
+      '" text-anchor="end" dominant-baseline="middle" fill="#94a3b8" font-size="10">' +
+      pfClFormatNum(t, 0) + '%</text>');
+  });
+  parts.push('<text x="' + (ml + pw / 2) + '" y="' + (h - 8) +
+    '" text-anchor="middle" fill="#64748b" font-size="11" font-weight="500">' +
+    'Awareness set size (brands known per buyer)</text>');
+  parts.push('<text x="14" y="' + (mt + ph / 2) +
+    '" text-anchor="middle" fill="#64748b" font-size="11" font-weight="500" ' +
+    'transform="rotate(-90,14,' + (mt + ph / 2) + ')">' +
+    'Focal share of awareness (%)</text>');
+
+  parts.push('<rect x="' + ml + '" y="' + mt + '" width="' + pw + '" height="' + ph +
+    '" fill="none" stroke="#e2e8f0"/>');
+
+  // Dots — radius scaled by category penetration.
+  var maxPen = Math.max.apply(null, rows.map(function (r) {
+    return r.cat_penetration || 0;
+  }));
+  if (!(maxPen > 0)) maxPen = 1;
+  rows.forEach(function (r) {
+    if (r.set_size_mean == null || r.focal_share == null) return;
+    var cx = sx(r.set_size_mean);
+    var cy = sy(r.focal_share * 100);
+    var radius = Math.max(5, Math.min(20, 5 + (r.cat_penetration / maxPen) * 15));
+    var labelLeftThird = cx > ml + pw * 0.65;
+    var labelX = labelLeftThird ? cx - radius - 4 : cx + radius + 4;
+    var anchor = labelLeftThird ? 'end' : 'start';
+    parts.push(
+      '<circle class="pf-cl-dot" data-pf-cl-cat="' + pfClEsc(r.cat_code) +
+      '" cx="' + cx + '" cy="' + cy + '" r="' + radius + '" ' +
+      'fill="' + focalColour + '" opacity="0.85" stroke="#fff" stroke-width="2" ' +
+      'style="cursor:pointer;"></circle>',
+      '<text class="pf-cl-dot-label" data-pf-cl-cat="' + pfClEsc(r.cat_code) +
+      '" x="' + labelX + '" y="' + (cy - radius - 2) +
+      '" text-anchor="' + anchor + '" fill="#1e293b" font-size="10" font-weight="500">' +
+      pfClEsc(pfClTrunc(r.cat_label, 22)) + '</text>'
+    );
+  });
+
+  return '<svg viewBox="0 0 ' + w + ' ' + h +
+    '" style="font-family:inherit;width:100%;max-width:' + w +
+    'px;height:auto;display:block;margin:0 auto;" role="img" ' +
+    'aria-label="Category context scatter">' + parts.join('') + '</svg>';
+}
+
+// Round-friendly tick generation — emulates pretty() coarsely.
+function pfClPretty(lo, hi, n) {
+  var range = hi - lo;
+  if (!(range > 0)) return [lo];
+  var step = Math.pow(10, Math.floor(Math.log10(range / n)));
+  var err  = (range / n) / step;
+  if (err >= 7.5) step *= 10;
+  else if (err >= 3.5) step *= 5;
+  else if (err >= 1.5) step *= 2;
+  var ticks = [];
+  var first = Math.ceil(lo / step) * step;
+  for (var v = first; v <= hi + 1e-9; v += step) ticks.push(v);
+  return ticks;
+}
+
+function pfClFormatNum(v, d) {
+  if (v == null || !isFinite(v)) return '—';
+  return Number(v).toFixed(d);
+}
+function pfClTrunc(s, n) {
+  if (s == null) return '';
+  s = String(s);
+  return s.length > n ? s.substring(0, n - 1) + '…' : s;
+}
+function pfClEsc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Hover tooltip — reuses the same floating <div> pattern as the
+// constellation tab, but builds a multi-line message about the cat.
+function pfClBindHoverTooltips(section) {
+  section.addEventListener('mouseover', function (ev) {
+    var dot = ev.target.closest && ev.target.closest('.pf-cl-dot');
+    if (!dot) return;
+    var tip = pfCnGetTooltip();
+    var cat = dot.getAttribute('data-pf-cl-cat');
+    var focal = section.querySelector('.pf-cl-chart')
+      ? section.querySelector('.pf-cl-chart').getAttribute('data-pf-cl-focal')
+      : '';
+    tip.textContent = pfClFormatTooltip(cat, focal);
+    tip.setAttribute('aria-hidden', 'false');
+    pfCnPositionTooltip(tip, ev);
+  });
+  section.addEventListener('mousemove', function (ev) {
+    var dot = ev.target.closest && ev.target.closest('.pf-cl-dot');
+    if (!dot) return;
+    var tip = pfCnGetTooltip();
+    if (tip.getAttribute('aria-hidden') === 'true') return;
+    pfCnPositionTooltip(tip, ev);
+  });
+  section.addEventListener('mouseout', function (ev) {
+    var dot = ev.target.closest && ev.target.closest('.pf-cl-dot');
+    if (!dot) return;
+    var to = ev.relatedTarget;
+    if (to && dot.contains(to)) return;
+    var tip = pfCnGetTooltip();
+    tip.style.opacity = '0';
+    tip.style.visibility = 'hidden';
+    tip.setAttribute('aria-hidden', 'true');
+  });
+}
+
+function pfClFormatTooltip(catCode, focalCode) {
+  var data = pfClLoadData();
+  if (!data || !data.cats || !data.cats[catCode]) return catCode;
+  var rows = pfClBuildRows(data, focalCode);
+  var r = rows.find(function (x) { return x.cat_code === catCode; });
+  if (!r) return catCode;
+  var brandLbls = (data.cats[catCode] || {}).brand_lbls || {};
+  var focalLabel = brandLbls[focalCode] || focalCode;
+  // Show BOTH the awareness rate and the share-of-awareness so the
+  // distinction (and the difference vs the Overview tab) is explicit.
+  return r.cat_label +
+    '\nQuadrant: ' + r.quadrant +
+    '\n' + focalLabel + ' awareness: ' +
+      Math.round(r.focal_pct || 0) + '% of category buyers' +
+    '\n' + focalLabel + ' share of awareness: ' +
+      Math.round(r.focal_share * 100) +
+      '% (= focal awareness ÷ sum of every brand’s awareness)' +
+    '\nSet size: ' + Number(r.set_size_mean).toFixed(1) + ' brands known per buyer' +
+    '\nCategory penetration: ' +
+      Math.round((r.cat_penetration || 0) * 100) + '% of all respondents';
+}
+
+// ---------------------------------------------------------------------------
 // Initialise on DOMContentLoaded
 // ---------------------------------------------------------------------------
 (function() {
@@ -933,6 +1378,7 @@ function escapeHtmlMaybe(s) {
 
     pfInitFootprintTable();
     pfInitConstellationChips();
+    pfClInit();
   }
 
   if (document.readyState === 'loading') {

@@ -79,7 +79,7 @@ build_br_portfolio_panel <- function(results, config) {
 
   fp_html <- .pf_footprint_subtab(portfolio, panel_data, focal_brand, focal_colour)
   cn_html <- .pf_constellation_subtab(portfolio, panel_data, focal_brand, focal_colour)
-  cl_html <- .pf_clutter_subtab(portfolio, panel_data, focal_colour)
+  cl_html <- .pf_clutter_subtab(portfolio, panel_data, focal_brand, focal_colour)
   ex_html <- .pf_extension_subtab(portfolio, panel_data, focal_brand, focal_colour)
 
   timeframe_label <- if (identical(portfolio$timeframe, "3m")) "3-month" else "13-month"
@@ -534,20 +534,24 @@ build_br_portfolio_panel <- function(results, config) {
 # CLUTTER SUBTAB
 # ==============================================================================
 
-.pf_clutter_subtab <- function(portfolio, panel_data, focal_colour) {
+.pf_clutter_subtab <- function(portfolio, panel_data, focal_brand,
+                                focal_colour) {
+  section_id <- "pf-clutter"
   cl <- portfolio$clutter
   if (is.null(cl) || is.null(cl$clutter_df) || nrow(cl$clutter_df) == 0) {
-    return('<p style="color:#94a3b8;padding:24px 0;">Category context data not available.</p>')
+    return(paste0(
+      .pf_section_toolbar(section_id),
+      '<p style="color:#94a3b8;padding:24px 0;">Category context data not available.</p>'
+    ))
   }
 
   clutter_df <- cl$clutter_df
-  section_id <- "pf-clutter"
 
-  # Convert focal_share_of_aware to 0-100 for scatter y-axis display
+  # Initial render — uses the configured focal. JS swaps the SVG to a
+  # client-rendered version when the focal picker changes.
   df_plot <- clutter_df
   df_plot$focal_share_pct <- df_plot$focal_share_of_aware * 100
-
-  chart_svg <- tryCatch(
+  initial_svg <- tryCatch(
     build_scatter(
       df              = df_plot,
       x_col           = "awareness_set_size_mean",
@@ -556,12 +560,12 @@ build_br_portfolio_panel <- function(results, config) {
       focal_label     = NULL,
       brand_colour    = focal_colour,
       comp_colour     = "#64748b",
-      title           = "Category Clutter vs Focal Brand Position",
-      x_label         = "Awareness Set Size (brands known per buyer)",
-      y_label         = "Focal Share of Awareness (%)",
+      title           = "Category context — clutter vs focal brand position",
+      x_label         = "Awareness set size (brands known per buyer)",
+      y_label         = "Focal share of awareness (%)",
       y_suffix        = "%",
       quadrant_labels = c("Dominant", "Contested",
-                          "Niche Opportunity", "Forgotten / Wrong Battle"),
+                          "Niche opportunity", "Forgotten / wrong battle"),
       ref_x           = cl$ref_x,
       ref_y           = if (!is.na(cl$ref_y)) cl$ref_y * 100 else NULL,
       size_col        = "cat_penetration"
@@ -569,22 +573,132 @@ build_br_portfolio_panel <- function(results, config) {
     error = function(e) ""
   )
 
-  context_table <- .pf_clutter_table(clutter_df)
+  # JSON payload — per-category awareness data + ref_x. JS recomputes
+  # focal_share_of_aware, fair_share and quadrant on focal change, then
+  # rebuilds the SVG without a server round-trip.
+  per_cat_full <- panel_data$clutter$per_cat_full %||% cl$per_cat_full %||% list()
+  payload_json <- .pf_cl_to_json(per_cat_full, cl$ref_x, focal_colour)
+  data_script <- sprintf(
+    '<script type="application/json" id="pf-cl-data">%s</script>',
+    payload_json
+  )
 
-  about_text <- if (!is.null(panel_data)) {
-    panel_data$about$clutter %||% ""
-  } else ""
+  # Brand picker — union of brands across all clutter cats, focal first.
+  brand_union <- list()
+  for (cc in names(per_cat_full)) {
+    pcs <- per_cat_full[[cc]]
+    codes <- names(pcs$brand_pcts %||% list())
+    lbls  <- pcs$brand_lbls %||% list()
+    for (bc in codes) {
+      if (!bc %in% names(brand_union)) {
+        brand_union[[bc]] <- as.character(lbls[[bc]] %||% bc)
+      }
+    }
+  }
+  brand_codes  <- names(brand_union)
+  brand_labels <- vapply(brand_codes, function(bc) brand_union[[bc]], character(1))
+  ord <- order(brand_codes != focal_brand, tolower(brand_labels))
+  brand_codes  <- brand_codes[ord]
+  brand_labels <- brand_labels[ord]
+
+  focal_options <- paste(vapply(seq_along(brand_codes), function(i) {
+    bc  <- brand_codes[i]
+    nm  <- brand_labels[i]
+    sel <- if (identical(bc, focal_brand)) " selected" else ""
+    sprintf('<option value="%s"%s>%s</option>',
+            .pf_esc(bc), sel, .pf_esc(nm))
+  }, character(1)), collapse = "")
+
+  # Server emits an empty table shell — JS fills it from the JSON
+  # payload so the table re-renders when the focal brand changes.
+  table_shell <- '<div id="pf-cl-table-host" class="pf-cl-table-host"></div>'
+  coverage_note <- '<p id="pf-cl-coverage" class="pf-cl-coverage"></p>'
+
+  reading_guide <- paste0(
+    '<div class="pf-cl-reading">',
+    '<p class="pf-cl-reading-line"><strong>How to read it:</strong> ',
+    'Each dot is a category. Its position is set by two numbers about your focal brand’s mental availability in that category. ',
+    'The dot size is the category’s overall penetration (how many of all respondents qualify as buyers there).</p>',
+
+    '<p class="pf-cl-reading-line"><strong>The two axes:</strong> ',
+    '<em>X (horizontal)</em> = the average number of brands a buyer in that category is aware of. Far right = cluttered mental space (consumers know lots of brands here, hard to break through). Far left = sparse mental space (few brands top-of-mind, lower threshold to be salient). ',
+    '<em>Y (vertical)</em> = your focal brand’s <em>share</em> of all brand-awareness mentions in that category. High up = focal owns a big slice of mental availability. Low down = focal is one of many or barely registers.</p>',
+
+    '<p class="pf-cl-reading-line"><strong>Why the Y axis differs from the awareness % on the Overview tab:</strong> ',
+    'These are two different metrics — the table below shows both side by side. ',
+    '<em>Focal awareness</em> (on the Overview tab) is the simple "% of category buyers aware of the focal" — e.g. <strong>58%</strong> know All Gold in Pasta Sauces. ',
+    '<em>Focal share of awareness</em> (this chart’s Y axis) is the focal’s slice of the total awareness pie: focal awareness ÷ sum of every brand’s awareness. ',
+    'In a category where buyers each know 4–5 brands on average, those individual awareness scores can sum to 400% or more, so a 58% awareness rate ends up as roughly <strong>14%</strong> share of awareness. ',
+    'Awareness % tells you how many people know the brand at all; share of awareness tells you how big a slice of mental space the brand owns once you account for how many other brands are competing for that same head-space.</p>',
+
+    '<p class="pf-cl-reading-line"><strong>The four quadrants:</strong> ',
+    '<strong>Dominant</strong> (top-left, low clutter / high share) — you own this category mentally. <em>Defend it.</em> ',
+    '<strong>Contested</strong> (top-right, high clutter / high share) — cluttered space but you’re winning. <em>Keep investing to hold ground.</em> ',
+    '<strong>Niche opportunity</strong> (bottom-left, low clutter / low share) — tractable category where presence could grow. <em>Evaluate as an expansion target.</em> ',
+    '<strong>Forgotten / wrong battle</strong> (bottom-right, high clutter / low share) — hard to break through and you have low presence. <em>Consider deprioritising marketing spend.</em></p>',
+
+    '<p class="pf-cl-reading-line"><strong>What to do with it:</strong> ',
+    'Hover any dot to see the exact set size, focal awareness, share of awareness, category penetration and quadrant. ',
+    'Switch the focal-brand picker to read the same map for any other brand — the chart redraws instantly. ',
+    'Use the table below for the precise numbers in a sortable form.</p>',
+    '</div>'
+  )
+
+  # Category show/hide chips — one per category in the data, all on by
+  # default. Toggling hides the dot from the scatter without recomputing.
+  cat_chips <- vapply(names(per_cat_full), function(cc) {
+    nm <- as.character(per_cat_full[[cc]]$cat_label %||% cc)
+    sprintf(
+      '<button type="button" class="pf-cl-cat-chip pf-cl-cat-chip-on" data-pf-cl-cat="%s">%s</button>',
+      .pf_esc(cc), .pf_esc(tolower(nm))
+    )
+  }, character(1))
 
   paste0(
     .pf_section_toolbar(section_id),
-    '<div id="', section_id, '-chart" style="margin:8px 0;">',
-    chart_svg,
+    data_script,
+    '<div class="pf-cl-controls">',
+    '<div class="pf-cl-ctl-group">',
+    '<label for="pf-cl-focal-select" class="pf-cl-ctl-label">Focal brand</label>',
+    sprintf('<select id="pf-cl-focal-select" class="pf-cl-focal-select" data-pf-cl-focal="%s">%s</select>',
+            .pf_esc(focal_brand), focal_options),
     '</div>',
-    context_table,
-    if (nzchar(about_text)) {
-      sprintf('<div class="pf-about-drawer"><strong>About this chart:</strong> %s</div>',
-              .pf_esc(about_text))
-    } else ""
+    '<div class="pf-cl-ctl-group">',
+    '<span class="pf-cl-ctl-label">Categories</span>',
+    sprintf('<div class="pf-cl-cat-chips">%s</div>',
+            paste(cat_chips, collapse = "")),
+    '</div>',
+    '</div>',
+    sprintf('<div id="%s-chart" class="pf-cl-chart" data-pf-cl-focal="%s" data-pf-cl-focal-colour="%s">%s</div>',
+            section_id, .pf_esc(focal_brand), .pf_esc(focal_colour), initial_svg),
+    coverage_note,
+    table_shell,
+    reading_guide
+  )
+}
+
+
+# JSON for the Category Context client-side renderer.
+.pf_cl_to_json <- function(per_cat_full, ref_x, focal_colour) {
+  if (!requireNamespace("jsonlite", quietly = TRUE)) return("{}")
+  payload <- list(
+    ref_x        = if (is.null(ref_x) || is.na(ref_x)) NULL else as.numeric(ref_x),
+    focal_colour = focal_colour,
+    cats         = lapply(per_cat_full, function(c) {
+      list(
+        cat_code        = c$cat_code,
+        cat_label       = c$cat_label,
+        set_size_mean   = c$set_size_mean,
+        cat_penetration = c$cat_penetration,
+        n_brands        = c$n_brands,
+        brand_pcts      = c$brand_pcts,
+        brand_lbls      = c$brand_lbls
+      )
+    })
+  )
+  tryCatch(
+    jsonlite::toJSON(payload, auto_unbox = TRUE, na = "null", digits = 4),
+    error = function(e) "{}"
   )
 }
 
