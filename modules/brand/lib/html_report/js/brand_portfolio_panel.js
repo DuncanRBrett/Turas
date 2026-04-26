@@ -512,6 +512,346 @@ function cssEscape(s) {
 }
 
 // ---------------------------------------------------------------------------
+// COMPETITIVE SET — per-category chart + focal picker + closest-competitors
+// ---------------------------------------------------------------------------
+
+function pfInitConstellationChips() {
+  var panel = document.getElementById('pf-subtab-constellation');
+  if (!panel) return;
+
+  panel.querySelectorAll('.pf-cn-cat-chip').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      var cc = chip.getAttribute('data-pf-cn-cat');
+      panel.querySelectorAll('.pf-cn-cat-chip').forEach(function (c) {
+        c.classList.toggle('pf-cn-cat-chip-on', c === chip);
+      });
+      panel.querySelectorAll('.pf-cn-cat-panel').forEach(function (p) {
+        var match = p.getAttribute('data-pf-cn-cat-panel') === cc;
+        p.classList.toggle('hidden', !match);
+      });
+      // Repopulate the focal dropdown with just THIS cat's brands.
+      pfCnRebuildFocalSelectForCat(cc);
+      if (typeof brSetPinState === 'function') {
+        brSetPinState('pf_cn_active_cat', cc);
+      }
+    });
+  });
+
+  // Focal-brand picker.
+  var sel = document.getElementById('pf-cn-focal-select');
+  if (sel) {
+    sel.addEventListener('change', function () {
+      pfCnSetFocal(sel.value);
+    });
+  }
+
+  // Initial: filter dropdown to the active cat's brands, then paint
+  // closest-competitors list across every cat panel.
+  var container = document.getElementById('pf-constellation-chart');
+  if (container) {
+    var initialFocal = (sel && sel.value) ||
+      container.getAttribute('data-pf-cn-focal') || '';
+    var activeChip = panel.querySelector('.pf-cn-cat-chip-on');
+    var initialCat = activeChip ? activeChip.getAttribute('data-pf-cn-cat') : '';
+    if (initialCat) pfCnRebuildFocalSelectForCat(initialCat, initialFocal);
+    if (initialFocal) pfCnSetFocal(initialFocal);
+  }
+}
+
+/**
+ * Rebuild the focal-brand <select> so it lists only brands present in
+ * the active category. If the previously-selected focal is still in
+ * the cat, keep it selected; otherwise select the first brand and fire
+ * pfCnSetFocal so the chart + rivals list update.
+ *
+ * @param {string} catCode  Active category code.
+ * @param {string} [preferredFocal]  Optional preferred selection (e.g. on
+ *   first init, the value the server rendered with).
+ */
+function pfCnRebuildFocalSelectForCat(catCode, preferredFocal) {
+  var sel = document.getElementById('pf-cn-focal-select');
+  if (!sel) return;
+  var data = pfCnLoadData();
+  if (!data || !data[catCode]) return;
+  var nodes = (data[catCode].nodes || []).slice();
+  if (nodes.length === 0) return;
+
+  var current = preferredFocal || sel.value || '';
+  // Sort: preferred focal first (if present), then alphabetical by label.
+  nodes.sort(function (a, b) {
+    var ap = (a.code === current) ? 0 : 1;
+    var bp = (b.code === current) ? 0 : 1;
+    if (ap !== bp) return ap - bp;
+    return (a.label || a.code).toLowerCase()
+      .localeCompare((b.label || b.code).toLowerCase());
+  });
+
+  // Build options + figure out which to pick.
+  var hasCurrent = nodes.some(function (n) { return n.code === current; });
+  var pick = hasCurrent ? current : nodes[0].code;
+
+  sel.innerHTML = nodes.map(function (n) {
+    var s = (n.code === pick) ? ' selected' : '';
+    return '<option value="' + escapeHtmlMaybe(n.code) + '"' + s + '>' +
+           escapeHtmlMaybe(n.label || n.code) + '</option>';
+  }).join('');
+
+  // If the focal had to change because the previous focal isn't in this
+  // category, propagate the new focal so chart + rivals list update.
+  if (pick !== current) {
+    pfCnSetFocal(pick);
+  }
+}
+
+function pfCnLoadData() {
+  var node = document.getElementById('pf-cn-data');
+  if (!node) return null;
+  try { return JSON.parse(node.textContent || '{}'); }
+  catch (e) { console.warn('[pf-cn] Failed to parse JSON:', e); return null; }
+}
+
+function pfCnSetFocal(focalCode) {
+  var container = document.getElementById('pf-constellation-chart');
+  if (!container) return;
+  container.setAttribute('data-pf-cn-focal', focalCode);
+
+  var brandColour = pfCnReadFocalColour();
+
+  // For every cat panel, re-style the SVG so the new focal gets the halo
+  // + brand-coloured fill + bold label, and the previous focal reverts.
+  container.querySelectorAll('.pf-cn-cat-panel').forEach(function (panel) {
+    var svg = panel.querySelector('svg');
+    if (svg) pfCnRestyleSvgForFocal(svg, focalCode, brandColour);
+    var cat = panel.getAttribute('data-pf-cn-cat-panel');
+    pfCnRenderRivals(panel, cat, focalCode);
+  });
+
+  if (typeof brSetPinState === 'function') {
+    brSetPinState('pf_cn_focal', focalCode);
+  }
+}
+
+function pfCnReadFocalColour() {
+  // The focal colour is baked onto the focal-coloured chip elsewhere; we
+  // pull it from --br-brand on :root so all tabs share one source of truth.
+  try {
+    var c = getComputedStyle(document.documentElement)
+      .getPropertyValue('--br-brand').trim();
+    if (c) return c;
+  } catch (e) {}
+  return '#1A5276';
+}
+
+function pfCnRestyleSvgForFocal(svg, focalCode, focalColour) {
+  // Clear any existing halo (server may have rendered one for the
+  // initial focal); we draw a fresh one for the new focal below.
+  svg.querySelectorAll('.pf-cn-halo').forEach(function (h) { h.remove(); });
+
+  // Reset every node + label to comparator styling.
+  svg.querySelectorAll('.pf-cn-node').forEach(function (n) {
+    var baseR = parseFloat(n.getAttribute('data-pf-cn-base-r')) || 8;
+    n.classList.remove('pf-cn-node-focal');
+    n.setAttribute('r', baseR);
+    n.setAttribute('fill', '#94a3b8');
+  });
+  svg.querySelectorAll('.pf-cn-label').forEach(function (t) {
+    t.classList.remove('pf-cn-label-focal');
+    t.setAttribute('fill', '#64748b');
+    t.setAttribute('font-size', '10');
+    t.setAttribute('font-weight', '400');
+  });
+  // Reset every edge to default (grey) styling.
+  svg.querySelectorAll('.pf-cn-edge').forEach(function (e) {
+    var baseW = parseFloat(e.getAttribute('data-pf-cn-base-w')) || 1;
+    e.setAttribute('stroke', '#94a3b8');
+    e.setAttribute('stroke-width', baseW);
+    e.classList.remove('pf-cn-edge-focal');
+  });
+
+  // Reset all <title> tooltips to bare brand label.
+  svg.querySelectorAll('.pf-cn-node').forEach(function (n) {
+    var t = n.querySelector('title');
+    if (t) t.textContent = pfCnReadNodeLabel(n);
+  });
+
+  if (!focalCode) return;
+
+  // Apply focal styling to the new focal node + label, and inject a halo.
+  var fcss = (window.CSS && CSS.escape) ? CSS.escape(focalCode)
+    : focalCode.replace(/([^a-zA-Z0-9_\-])/g, '\\$1');
+  var node  = svg.querySelector('.pf-cn-node[data-pf-cn-node="' + fcss + '"]');
+  var label = svg.querySelector('.pf-cn-label[data-pf-cn-label="' + fcss + '"]');
+  if (!node) return;
+  var baseR = parseFloat(node.getAttribute('data-pf-cn-base-r')) || 8;
+  var focalR = baseR * 1.25;
+
+  node.classList.add('pf-cn-node-focal');
+  node.setAttribute('r', focalR);
+  node.setAttribute('fill', focalColour);
+  if (label) {
+    label.classList.add('pf-cn-label-focal');
+    label.setAttribute('fill', '#1e293b');
+    label.setAttribute('font-size', '12');
+    label.setAttribute('font-weight', '700');
+  }
+
+  // Halo — dashed ring around the focal node. Insert at the END of the
+  // parent <g> (= the node-group wrapping the focal circle) so it draws
+  // beneath the circle without disturbing the <title> sibling.
+  var ns = 'http://www.w3.org/2000/svg';
+  var halo = document.createElementNS(ns, 'circle');
+  halo.setAttribute('class', 'pf-cn-halo');
+  halo.setAttribute('data-pf-cn-halo', focalCode);
+  halo.setAttribute('cx', node.getAttribute('cx'));
+  halo.setAttribute('cy', node.getAttribute('cy'));
+  halo.setAttribute('r', focalR + 6);
+  halo.setAttribute('fill', 'none');
+  halo.setAttribute('stroke', focalColour);
+  halo.setAttribute('stroke-width', '2');
+  halo.setAttribute('stroke-dasharray', '3 3');
+  halo.setAttribute('opacity', '0.55');
+  // Insert halo BEFORE the node so the dashed ring sits underneath.
+  node.parentNode.insertBefore(halo, node);
+
+  // Highlight focal-incident edges so the chart matches the rivals list.
+  // Layout (Fruchterman-Reingold) places nodes by GLOBAL stress so visual
+  // distance is not a faithful read of pairwise Jaccard with the focal —
+  // the highlighted edges show the true focal-relative ranking on top.
+  var focalEdges = svg.querySelectorAll(
+    '.pf-cn-edge[data-pf-cn-b1="' + fcss + '"], ' +
+    '.pf-cn-edge[data-pf-cn-b2="' + fcss + '"]');
+  var maxJac = 0;
+  focalEdges.forEach(function (e) {
+    var j = parseFloat(e.getAttribute('data-pf-cn-jac')) || 0;
+    if (j > maxJac) maxJac = j;
+  });
+  if (maxJac < 1e-6) maxJac = 1;
+  focalEdges.forEach(function (e) {
+    var j = parseFloat(e.getAttribute('data-pf-cn-jac')) || 0;
+    var w = 1 + (j / maxJac) * 4;            // 1px..5px
+    e.setAttribute('stroke', focalColour);
+    e.setAttribute('stroke-width', w.toFixed(2));
+    e.setAttribute('opacity', '0.85');
+    e.classList.add('pf-cn-edge-focal');
+  });
+
+  // Update node-group <title> tooltips so hovering shows
+  // "Brand X — 42% Jaccard with [Focal] (#2 closest)".
+  pfCnUpdateTooltips(svg, focalCode, label ? label.textContent : focalCode);
+}
+
+// Brand display label for a node — read the matching <text> in the
+// same SVG so the tooltip uses the human-readable name rather than the
+// brand code (which was the <title>'s initial text content).
+function pfCnReadNodeLabel(node) {
+  var code = node.getAttribute('data-pf-cn-node') || '';
+  if (!code) return '';
+  var fcss = (window.CSS && CSS.escape) ? CSS.escape(code)
+    : code.replace(/([^a-zA-Z0-9_\-])/g, '\\$1');
+  var svg = node.ownerSVGElement;
+  if (!svg) return code;
+  var lbl = svg.querySelector('.pf-cn-label[data-pf-cn-label="' + fcss + '"]');
+  return lbl ? (lbl.textContent || code) : code;
+}
+
+function pfCnUpdateTooltips(svg, focalCode, focalLabel) {
+  // Build code → Jaccard-with-focal map from focal-incident edges,
+  // and code → rank from sorted Jaccards (matches the side panel).
+  var jacByCode = {};
+  svg.querySelectorAll('.pf-cn-edge').forEach(function (e) {
+    var b1 = e.getAttribute('data-pf-cn-b1');
+    var b2 = e.getAttribute('data-pf-cn-b2');
+    var j  = parseFloat(e.getAttribute('data-pf-cn-jac')) || 0;
+    if (b1 === focalCode) jacByCode[b2] = j;
+    else if (b2 === focalCode) jacByCode[b1] = j;
+  });
+  var ranked = Object.keys(jacByCode)
+    .sort(function (a, b) { return jacByCode[b] - jacByCode[a]; });
+  var rankByCode = {};
+  ranked.forEach(function (code, i) { rankByCode[code] = i + 1; });
+
+  svg.querySelectorAll('.pf-cn-node').forEach(function (n) {
+    var code = n.getAttribute('data-pf-cn-node');
+    var title = n.querySelector('title');
+    if (!title) return;
+    var brandLabel = pfCnReadNodeLabel(n);
+    if (code === focalCode) {
+      title.textContent = brandLabel + ' — focal';
+      return;
+    }
+    var jac = jacByCode[code];
+    if (jac == null) {
+      title.textContent = brandLabel +
+        ' — no co-awareness link with ' + focalLabel;
+      return;
+    }
+    var pct  = Math.round(jac * 100);
+    var rank = rankByCode[code];
+    title.textContent = brandLabel + ' — ' + pct + '% Jaccard with ' +
+      focalLabel + ' · #' + rank + ' closest';
+  });
+}
+
+function pfCnRenderRivals(panel, catCode, focalCode) {
+  var ol = panel.querySelector('.pf-cn-rivals');
+  if (!ol) return;
+  var data = pfCnLoadData();
+  if (!data || !data[catCode]) {
+    ol.innerHTML = '<li class="pf-cn-rivals-empty">No co-awareness data for this category.</li>';
+    return;
+  }
+  var nodes = data[catCode].nodes || [];
+  var edges = data[catCode].edges || [];
+
+  // Build code → label lookup.
+  var labelOf = {};
+  nodes.forEach(function (n) { labelOf[n.code] = n.label || n.code; });
+
+  // Find edges that touch the focal, ranked by Jaccard desc.
+  var rivals = edges
+    .filter(function (e) { return e.b1 === focalCode || e.b2 === focalCode; })
+    .map(function (e) {
+      var other = (e.b1 === focalCode) ? e.b2 : e.b1;
+      return { code: other, label: labelOf[other] || other, jac: e.jac };
+    })
+    .sort(function (a, b) { return b.jac - a.jac; })
+    .slice(0, 5);
+
+  if (rivals.length === 0) {
+    var focalLabel = labelOf[focalCode] || focalCode;
+    var inCat = nodes.some(function (n) { return n.code === focalCode; });
+    var msg = inCat
+      ? 'No competitors share enough co-awareness with ' + escapeHtmlMaybe(focalLabel) +
+        ' to register in this category. ' +
+        'It either dominates mental space here or has too few aware buyers for stable comparisons.'
+      : escapeHtmlMaybe(focalLabel) + ' is not present in this category — pick another focal or a different category.';
+    ol.innerHTML = '<li class="pf-cn-rivals-empty">' + msg + '</li>';
+    return;
+  }
+
+  var maxJac = rivals[0].jac || 1;
+  ol.innerHTML = rivals.map(function (r, i) {
+    var pct = Math.round(r.jac * 100);
+    var bar = Math.max(4, Math.round((r.jac / maxJac) * 100));
+    return '<li>' +
+      '<span class="pf-cn-rival-rank">#' + (i + 1) + '</span>' +
+      '<span class="pf-cn-rival-name">' + escapeHtmlMaybe(r.label) + '</span>' +
+      '<span class="pf-cn-rival-bar"><span class="pf-cn-rival-bar-fill" style="width:' + bar + '%"></span></span>' +
+      '<span class="pf-cn-rival-jac">' + pct + '</span>' +
+      '</li>';
+  }).join('');
+}
+
+function escapeHtmlMaybe(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ---------------------------------------------------------------------------
 // Initialise on DOMContentLoaded
 // ---------------------------------------------------------------------------
 (function() {
@@ -523,6 +863,7 @@ function cssEscape(s) {
     if (!activeBtn) pfSwitchSubtab('footprint');
 
     pfInitFootprintTable();
+    pfInitConstellationChips();
   }
 
   if (document.readyState === 'loading') {

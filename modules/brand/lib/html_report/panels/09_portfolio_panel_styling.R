@@ -356,6 +356,117 @@ build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
 .pf-fp-suppressed-note {
   font-size: 11px; color: #94a3b8; margin: 8px 4px 0; font-style: italic;
 }
+
+/* ---- Competitive Set (per-category constellation picker) ---- */
+.pf-cn-controls {
+  display: flex; align-items: flex-start; gap: 24px;
+  flex-wrap: wrap;
+  margin: 0 0 12px;
+}
+.pf-cn-ctl-group { display: flex; flex-direction: column; gap: 6px; }
+.pf-cn-ctl-label {
+  font-size: 11px; font-weight: 600; color: #64748b;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.pf-cn-focal-select {
+  border: 1px solid #e2e8f0; border-radius: 6px; background: #fff;
+  font-size: 13px; padding: 6px 10px; color: #1e293b; min-width: 200px;
+}
+.pf-cn-focal-select:focus { outline: 2px solid %FOCAL%; outline-offset: 1px; }
+.pf-cn-cat-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.pf-cn-cat-chip {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+  color: #475569; font-size: 11px; font-weight: 500;
+  padding: 3px 10px; cursor: pointer; transition: all 0.12s;
+  text-transform: lowercase;
+}
+.pf-cn-cat-chip:hover { background: #f8fafc; color: #1e293b; }
+.pf-cn-cat-chip-on {
+  background: %FOCAL%; border-color: %FOCAL%;
+  color: #fff; font-weight: 600;
+}
+.pf-cn-cat-panels {
+  border: 1px solid #e2e8f0; border-radius: 8px;
+  background: #fff; padding: 12px;
+}
+.pf-cn-cat-panel.hidden { display: none; }
+
+/* Two-column layout: chart on the left, rivals list on the right.
+   Stacks below 880px so the rivals list always reads cleanly. */
+.pf-cn-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 16px;
+}
+@media (max-width: 880px) {
+  .pf-cn-layout { grid-template-columns: 1fr; }
+}
+.pf-cn-chart-wrap { min-width: 0; }
+.pf-cn-meta {
+  font-size: 11px; color: #64748b; font-style: italic;
+  margin: 0 0 6px 4px;
+}
+
+/* Side panel — closest competitors list. */
+.pf-cn-side {
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;
+  padding: 12px 14px; align-self: start;
+}
+.pf-cn-side-title {
+  margin: 0 0 4px; font-size: 12px; font-weight: 700; color: #1e293b;
+  text-transform: uppercase; letter-spacing: 0.4px;
+}
+.pf-cn-side-sub {
+  margin: 0 0 10px; font-size: 11px; color: #64748b; line-height: 1.45;
+}
+.pf-cn-rivals {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.pf-cn-rivals li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 60px 36px;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px; color: #1e293b;
+}
+.pf-cn-rival-rank {
+  font-size: 10px; font-weight: 700; color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
+.pf-cn-rival-name {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-weight: 500;
+}
+.pf-cn-rival-bar {
+  display: block; height: 6px; background: #e2e8f0; border-radius: 3px;
+  overflow: hidden; position: relative;
+}
+.pf-cn-rival-bar-fill {
+  display: block; height: 100%; background: %FOCAL%;
+  border-radius: 3px;
+}
+.pf-cn-rival-jac {
+  font-size: 11px; color: #475569; text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.pf-cn-rivals-empty {
+  font-size: 11px; color: #94a3b8; font-style: italic;
+  display: block; line-height: 1.5;
+}
+
+.pf-cn-suppressed {
+  font-size: 11px; color: #94a3b8; margin: 8px 4px 0; font-style: italic;
+}
+.pf-cn-reading {
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;
+  color: #334155; font-size: 12px; line-height: 1.55;
+  margin-top: 12px; padding: 12px 16px;
+}
+.pf-cn-reading strong { color: #1e293b; }
+.pf-cn-reading em { color: #1e293b; font-style: italic; }
+.pf-cn-reading-line { margin: 0 0 8px; }
+.pf-cn-reading-line:last-child { margin-bottom: 0; }
 "
   gsub("%FOCAL%", focal_colour, tmpl, fixed = TRUE)
 }

@@ -237,11 +237,21 @@ run_portfolio <- function(data, categories, structure, config, weights = NULL) {
     }
   )
 
-  # Phase 4: constellation
+  # Phase 4: constellation. We compute BOTH the cross-category universe
+  # constellation (legacy, for backward compat) AND a per-category set
+  # — the panel renderer prefers the per-category set since the pooled
+  # version produces an unreadable pile of brand-in-cat nodes.
   constellation_result <- tryCatch(
     compute_constellation(data, categories, structure, config, weights),
     error = function(e) {
       message(sprintf("[PORTFOLIO] Constellation failed: %s", e$message))
+      NULL
+    }
+  )
+  constellation_per_cat <- tryCatch(
+    compute_constellations_per_cat(data, categories, structure, config, weights),
+    error = function(e) {
+      message(sprintf("[PORTFOLIO] Per-category constellations failed: %s", e$message))
       NULL
     }
   )
@@ -303,6 +313,9 @@ run_portfolio <- function(data, categories, structure, config, weights = NULL) {
     constellation    = if (!is.null(constellation_result) &&
                            identical(constellation_result$status, "PASS"))
                          constellation_result else NULL,
+    constellation_per_cat = if (!is.null(constellation_per_cat) &&
+                                 identical(constellation_per_cat$status, "PASS"))
+                              constellation_per_cat else NULL,
     clutter          = clutter_result,
     strength         = if (!is.null(strength_result) &&
                            identical(strength_result$status, "PASS"))

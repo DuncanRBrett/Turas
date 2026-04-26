@@ -928,7 +928,10 @@ build_network <- function(nodes, edges, layout,
     '<text x="%d" y="22" fill="#1e293b" font-size="14" font-weight="700">%s</text>',
     pad, .br_escape(title)))
 
-  # Edges (draw before nodes so nodes sit on top)
+  # Edges (draw before nodes so nodes sit on top). Each line carries
+  # data-pf-cn-b1 / data-pf-cn-b2 / data-pf-cn-jac so the JS-side focal
+  # switcher can find and re-style the lines that touch the active focal
+  # (paint them in the brand colour, scale thickness by Jaccard).
   if (!is.null(edges) && nrow(edges) > 0) {
     max_jac <- max(edges$jaccard, 1e-6)
     for (k in seq_len(nrow(edges))) {
@@ -940,25 +943,55 @@ build_network <- function(nodes, edges, layout,
       opacity <- 0.15 + (jac / max_jac) * 0.55
       lw      <- 1 + (jac / max_jac) * 3
       parts <- c(parts, sprintf(
-        '<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="#94a3b8" stroke-width="%.1f" opacity="%.2f"/>',
+        '<line class="pf-cn-edge" data-pf-cn-b1="%s" data-pf-cn-b2="%s" data-pf-cn-jac="%.4f" data-pf-cn-base-w="%.1f" x1="%g" y1="%g" x2="%g" y2="%g" stroke="#94a3b8" stroke-width="%.1f" opacity="%.2f"/>',
+        .br_escape(b1), .br_escape(b2), jac, lw,
         n1$svgx, n1$svgy, n2$svgx, n2$svgy, lw, opacity
       ))
     }
   }
 
-  # Nodes + labels
+  # Nodes + labels. Prefer the display label (brand_lbl) when supplied
+  # by the data layer; fall back to the brand code so the legacy pooled
+  # constellation still renders.
+  #
+  # Each node, label and (when focal) halo carries a `data-pf-cn-*`
+  # attribute keyed by brand code so the JS-side focal switcher can
+  # re-style the chart in place when the user picks a different focal
+  # from the dropdown — no full re-render required.
+  has_lbl <- "brand_lbl" %in% names(nodes)
   for (i in seq_len(nrow(nodes))) {
     nd <- nodes[i, ]
-    col <- if (isTRUE(nd$is_focal)) focal_colour else comp_colour
+    is_focal <- isTRUE(nd$is_focal)
+    col      <- if (is_focal) focal_colour else comp_colour
+    radius   <- if (is_focal) nd$r * 1.25 else nd$r
+    label    <- if (has_lbl && nzchar(as.character(nd$brand_lbl)))
+                  as.character(nd$brand_lbl) else as.character(nd$brand)
+    bcode    <- .br_escape(nd$brand)
+    if (is_focal) {
+      parts <- c(parts, sprintf(
+        '<circle class="pf-cn-halo" data-pf-cn-halo="%s" cx="%g" cy="%g" r="%g" fill="none" stroke="%s" stroke-width="2" stroke-dasharray="3 3" opacity="0.55"/>',
+        bcode, nd$svgx, nd$svgy, radius + 6, focal_colour))
+    }
+    # Native SVG tooltip: <title> must be the FIRST child of the
+    # element being hovered for browsers (Chrome, Safari, Firefox) to
+    # consistently surface it. Putting it inside <circle> directly is
+    # more reliable than wrapping in a <g> — JS rewrites the title text
+    # whenever the focal changes so hover always reflects the active
+    # focal-vs-rival Jaccard.
     parts <- c(parts,
-      sprintf('<circle cx="%g" cy="%g" r="%g" fill="%s" opacity="0.85" stroke="#fff" stroke-width="2" data-brand="%s" style="cursor:pointer;" onclick="pfConstellationNodeClick(event,\'%s\')"/>',
-              nd$svgx, nd$svgy, nd$r, col,
-              .br_escape(nd$brand), .br_escape(nd$brand)),
-      sprintf('<text x="%g" y="%g" fill="%s" font-size="10" font-weight="%s">%s</text>',
-              nd$svgx + nd$r + 3, nd$svgy - nd$r - 2,
-              if (isTRUE(nd$is_focal)) "#1e293b" else "#64748b",
-              if (isTRUE(nd$is_focal)) "700" else "400",
-              .br_escape(.br_trunc(nd$brand, 16)))
+      sprintf('<circle class="pf-cn-node%s" data-pf-cn-node="%s" data-pf-cn-base-r="%g" cx="%g" cy="%g" r="%g" fill="%s" opacity="0.9" stroke="#fff" stroke-width="2" data-brand="%s" style="cursor:pointer;" onclick="pfConstellationNodeClick(event,\'%s\')"><title data-pf-cn-tip="%s">%s</title></circle>',
+              if (is_focal) " pf-cn-node-focal" else "",
+              bcode, nd$r, nd$svgx, nd$svgy, radius, col,
+              bcode, bcode,
+              bcode, .br_escape(label)),
+      sprintf('<text class="pf-cn-label%s" data-pf-cn-label="%s" x="%g" y="%g" fill="%s" font-size="%s" font-weight="%s">%s</text>',
+              if (is_focal) " pf-cn-label-focal" else "",
+              bcode,
+              nd$svgx + radius + 4, nd$svgy - radius - 2,
+              if (is_focal) "#1e293b" else "#64748b",
+              if (is_focal) "12" else "10",
+              if (is_focal) "700" else "400",
+              .br_escape(.br_trunc(label, 22)))
     )
   }
 

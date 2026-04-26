@@ -316,43 +316,216 @@ build_br_portfolio_panel <- function(results, config) {
 
 .pf_constellation_subtab <- function(portfolio, panel_data, focal_brand,
                                       focal_colour) {
-  cn <- portfolio$constellation
   section_id <- "pf-constellation"
 
-  if (is.null(cn) || is.null(cn$nodes) || nrow(cn$nodes) == 0) {
-    return('<p style="color:#94a3b8;padding:24px 0;">Competitive constellation data not available.</p>')
+  # Prefer the per-category set; fall back to the legacy pooled
+  # constellation if the per-cat compute didn't run.
+  per_cat <- portfolio$constellation_per_cat
+  has_per_cat <- !is.null(per_cat) && length(per_cat$by_cat %||% list()) > 0
+
+  if (!has_per_cat) {
+    cn <- portfolio$constellation
+    if (is.null(cn) || is.null(cn$nodes) || nrow(cn$nodes) == 0) {
+      return(paste0(
+        .pf_section_toolbar(section_id),
+        '<p style="color:#94a3b8;padding:24px 0;">Competitive constellation data not available.</p>'
+      ))
+    }
+    chart_svg <- tryCatch(
+      build_network(
+        nodes        = cn$nodes,
+        edges        = cn$edges,
+        layout       = cn$layout,
+        focal_colour = focal_colour,
+        title        = "Competitive Constellation (Co-awareness Jaccard)"
+      ),
+      error = function(e) ""
+    )
+    return(paste0(
+      .pf_section_toolbar(section_id),
+      '<div id="', section_id, '-chart" style="margin:8px 0;">',
+      chart_svg,
+      '</div>'
+    ))
   }
 
-  chart_svg <- tryCatch(
-    build_network(
-      nodes        = cn$nodes,
-      edges        = cn$edges,
-      layout       = cn$layout,
-      focal_colour = focal_colour,
-      title        = "Competitive Constellation (Co-awareness Jaccard)"
-    ),
-    error = function(e) ""
+  cat_codes <- per_cat$cat_order
+  cat_names <- per_cat$cat_names %||% list()
+  default_cat <- if (length(cat_codes) > 0) cat_codes[1] else ""
+
+  # Union of brands that appear in any per-cat network (each carries
+  # both code + display label). The focal-brand <select> picks from this
+  # union — every brand the user might want to centre the analysis on.
+  brand_union <- list()
+  for (cc in cat_codes) {
+    nd <- per_cat$by_cat[[cc]]$nodes
+    if (is.null(nd) || nrow(nd) == 0) next
+    for (i in seq_len(nrow(nd))) {
+      bc <- nd$brand[i]
+      if (!bc %in% names(brand_union)) {
+        brand_union[[bc]] <- as.character(nd$brand_lbl[i] %||% bc)
+      }
+    }
+  }
+  brand_codes  <- names(brand_union)
+  brand_labels <- vapply(brand_codes, function(bc) brand_union[[bc]], character(1))
+  ord <- order(brand_codes != focal_brand, tolower(brand_labels))
+  brand_codes  <- brand_codes[ord]
+  brand_labels <- brand_labels[ord]
+
+  focal_options <- paste(vapply(seq_along(brand_codes), function(i) {
+    bc  <- brand_codes[i]
+    nm  <- brand_labels[i]
+    sel <- if (identical(bc, focal_brand)) " selected" else ""
+    sprintf('<option value="%s"%s>%s</option>',
+            .pf_esc(bc), sel, .pf_esc(nm))
+  }, character(1)), collapse = "")
+
+  # Picker chips — one per category with a constellation.
+  chips <- vapply(seq_along(cat_codes), function(i) {
+    cc  <- cat_codes[i]
+    nm  <- as.character(cat_names[[cc]] %||% cc)
+    active_cls <- if (identical(cc, default_cat)) " pf-cn-cat-chip-on" else ""
+    sprintf(
+      '<button type="button" class="pf-cn-cat-chip%s" data-pf-cn-cat="%s">%s</button>',
+      active_cls, .pf_esc(cc), .pf_esc(tolower(nm))
+    )
+  }, character(1))
+
+  # JSON payload — one entry per cat, edges + node labels. JS uses this to
+  # rebuild the "Closest competitors to <focal>" list whenever the user
+  # changes the focal-brand picker, without the round-trip of a re-render.
+  panel_data_json <- .pf_cn_to_json(per_cat)
+  data_script <- sprintf(
+    '<script type="application/json" id="pf-cn-data">%s</script>',
+    panel_data_json
   )
 
-  engine_note <- if (!is.null(cn$layout_engine)) {
-    sprintf('<p style="font-size:10px;color:#94a3b8;margin:4px 0;">Layout: %s</p>',
-            .pf_esc(cn$layout_engine))
+  # One <div> per category — only the default starts visible. Each
+  # category panel includes the SVG chart and a side panel that JS fills
+  # with the closest-competitors list for the active focal.
+  panels <- vapply(seq_along(cat_codes), function(i) {
+    cc <- cat_codes[i]
+    nm <- as.character(cat_names[[cc]] %||% cc)
+    cn <- per_cat$by_cat[[cc]]
+    chart_svg <- tryCatch(
+      build_network(
+        nodes        = cn$nodes,
+        edges        = cn$edges,
+        layout       = cn$layout,
+        focal_colour = focal_colour,
+        title        = paste0("Competitive Constellation — ", nm)
+      ),
+      error = function(e) ""
+    )
+    n_brands <- nrow(cn$nodes)
+    n_edges  <- nrow(cn$edges)
+    sub <- sprintf("%d brands · %d co-awareness edges", n_brands, n_edges)
+    visible_cls <- if (identical(cc, default_cat)) "" else " hidden"
+    sprintf(
+      '<div class="pf-cn-cat-panel%s" data-pf-cn-cat-panel="%s">
+         <div class="pf-cn-layout">
+           <div class="pf-cn-chart-wrap">
+             <div class="pf-cn-meta">%s</div>%s
+           </div>
+           <aside class="pf-cn-side">
+             <h4 class="pf-cn-side-title">Closest competitors</h4>
+             <p class="pf-cn-side-sub">Brands ranked by co-awareness Jaccard with the focal. Higher = consumers tend to know both brands together — direct mental-space rivals.</p>
+             <ol class="pf-cn-rivals" data-pf-cn-rivals="%s"></ol>
+           </aside>
+         </div>
+       </div>',
+      visible_cls, .pf_esc(cc), .pf_esc(sub), chart_svg, .pf_esc(cc)
+    )
+  }, character(1))
+
+  # Suppressed-categories note (cats too sparse / low-base for a constellation).
+  supp_df <- per_cat$suppressed_cats
+  supp_note <- if (!is.null(supp_df) && nrow(supp_df) > 0) {
+    items <- paste(vapply(seq_len(nrow(supp_df)), function(i) {
+      sprintf("%s (%s)", .pf_esc(supp_df$cat[i]), .pf_esc(supp_df$reason[i]))
+    }, character(1)), collapse = ", ")
+    sprintf('<p class="pf-cn-suppressed">Categories without a constellation: %s</p>', items)
   } else ""
 
-  about_text <- if (!is.null(panel_data)) {
-    panel_data$about$constellation %||% ""
-  } else ""
+  reading_guide <- paste0(
+    '<div class="pf-cn-reading">',
+    '<p class="pf-cn-reading-line"><strong>How to read it:</strong> ',
+    'Each dot is a brand. The lines that light up in the focal colour connect your focal (highlighted with the dashed ring) to its co-awareness rivals — thicker line = stronger Jaccard, so a thicker line means consumers are more likely to know both brands together. ',
+    'Hover any dot to see its exact Jaccard score with the focal, plus how it ranks against the other brands in this category.</p>',
+
+    '<p class="pf-cn-reading-line"><strong>About distance on the chart:</strong> ',
+    'The position of each dot is set by a <em>force-directed layout</em> — every brand is pulled toward all the brands it shares awareness with, not just toward your focal. ',
+    'That means a brand can sit visually closer to your focal than another even though its Jaccard score is lower (it gets dragged that way by its own ties to other brands). ',
+    'Trust the highlighted lines and the side-panel ranking for the focal-vs-rival comparison; use the dot positions to read the wider <em>shape</em> of the network — clusters of brands that hang together, isolated outliers, and so on.</p>',
+
+    '<p class="pf-cn-reading-line"><strong>What the numbers mean:</strong> ',
+    'The score next to each rival in the side panel is a <em>Jaccard similarity</em> — the overlap in awareness between two brands. ',
+    'Imagine everyone in the category who is aware of <em>either</em> brand A <em>or</em> brand B. ',
+    'Jaccard asks: of those people, what percentage are aware of <em>both</em>? ',
+    '<strong>80%</strong> means almost everyone who knows one brand also knows the other — they live in the same mental space and you have to win consumer attention against them directly. ',
+    '<strong>20%</strong> means awareness barely overlaps — the two brands are known by mostly different people, so they’re not really competing for the same minds.</p>',
+
+    '<p class="pf-cn-reading-line"><strong>What to do with it:</strong> ',
+    'The brands at the top of the side list are the ones to study first — they’re your real rivals in this category. ',
+    'If your focal sits alone with no high-Jaccard neighbours, you have distinctive mental space to defend. ',
+    'If it sits inside a tight cluster, your differentiation is doing less work than the chart might suggest. ',
+    'Use the focal picker to repeat the read for any other brand in this category, or switch categories with the chips above.</p>',
+    '</div>'
+  )
 
   paste0(
     .pf_section_toolbar(section_id),
-    '<div id="', section_id, '-chart" style="margin:8px 0;">',
-    chart_svg,
+    data_script,
+    '<div class="pf-cn-controls">',
+    '<div class="pf-cn-ctl-group">',
+    '<label for="pf-cn-focal-select" class="pf-cn-ctl-label">Focal brand</label>',
+    sprintf('<select id="pf-cn-focal-select" class="pf-cn-focal-select" data-pf-cn-focal="%s">%s</select>',
+            .pf_esc(focal_brand), focal_options),
     '</div>',
-    engine_note,
-    if (nzchar(about_text)) {
-      sprintf('<div class="pf-about-drawer"><strong>About this chart:</strong> %s</div>',
-              .pf_esc(about_text))
-    } else ""
+    '<div class="pf-cn-ctl-group">',
+    '<span class="pf-cn-ctl-label">Category</span>',
+    sprintf('<div class="pf-cn-cat-chips">%s</div>',
+            paste(chips, collapse = "")),
+    '</div>',
+    '</div>',
+    sprintf('<div id="%s-chart" class="pf-cn-cat-panels" data-pf-cn-focal="%s">%s</div>',
+            section_id, .pf_esc(focal_brand), paste(panels, collapse = "")),
+    supp_note,
+    reading_guide
+  )
+}
+
+
+# Compact JSON serialiser for the per-category constellations. The
+# payload is tiny — node code + label + per-pair Jaccard — but enough
+# for the JS-side competitors-list re-compute on focal change.
+.pf_cn_to_json <- function(per_cat) {
+  if (!requireNamespace("jsonlite", quietly = TRUE)) return("{}")
+  by_cat <- per_cat$by_cat %||% list()
+  payload <- lapply(by_cat, function(cn) {
+    nodes <- cn$nodes
+    edges <- cn$edges
+    list(
+      nodes = if (!is.null(nodes) && nrow(nodes) > 0) {
+        lapply(seq_len(nrow(nodes)), function(i) list(
+          code  = as.character(nodes$brand[i]),
+          label = as.character(nodes$brand_lbl[i] %||% nodes$brand[i]),
+          n_aw  = as.numeric(nodes$n_aware_w[i])
+        ))
+      } else list(),
+      edges = if (!is.null(edges) && nrow(edges) > 0) {
+        lapply(seq_len(nrow(edges)), function(i) list(
+          b1  = as.character(edges$b1[i]),
+          b2  = as.character(edges$b2[i]),
+          jac = as.numeric(edges$jaccard[i])
+        ))
+      } else list()
+    )
+  })
+  tryCatch(
+    jsonlite::toJSON(payload, auto_unbox = TRUE, na = "null", digits = 4),
+    error = function(e) "{}"
   )
 }
 
