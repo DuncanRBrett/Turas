@@ -120,6 +120,8 @@
     bindCbBrandsFocusSelect(panel);
     bindCbBrandsChartCol(panel);
     relocateCbToolbarIntoControls(panel);
+    bindCbPinBtn(panel);
+    bindCbPngBtn(panel);
 
     renderCbStackedBars(panel, 'loyalty');
     renderCbStackedBars(panel, 'dist');
@@ -1171,5 +1173,275 @@
     });
     _cbSetActiveBtn(btn);
   };
+
+  /* ---------------------------------------------------------------------- */
+  /* CB-aware pin: shows choose-dialog scoped to the ACTIVE sub-tab          */
+  /* ---------------------------------------------------------------------- */
+
+  function bindCbPinBtn(panel) {
+    /* The toolbar is a SIBLING of .cb-panel inside .br-element-section,
+       not a descendant — panel.querySelector() will never find it.
+       Walk up to the section and search from there. */
+    var section = panel.closest('.br-element-section') || panel.parentNode;
+    var pinBtn  = section ? section.querySelector('.cb-toolbar-top .br-pin-btn') : null;
+    if (!pinBtn) return;
+
+    /* Remove the generic brTogglePin inline handler, replace with CB-aware one.
+       Do NOT guard on TurasPins here — it may not be loaded yet at init time.
+       Check inside the click handler instead (fires after all JS is parsed). */
+    pinBtn.removeAttribute('onclick');
+    pinBtn.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      cbPinDialog(panel, pinBtn);
+    });
+  }
+
+  function cbPinDialog(panel, pinBtn) {
+    if (typeof TurasPins === 'undefined') return;
+
+    var activeTab = panel.querySelector('.cb-subtab:not([hidden])');
+    if (!activeTab) return;
+    var tabKey = activeTab.getAttribute('data-cb-tab') || '';
+
+    /* Detect available content in the active sub-tab only */
+    var hasChart = false;
+    var hasTable = false;
+
+    if (tabKey === 'brands') {
+      var chartArea = activeTab.querySelector('.cb-brands-chart-area');
+      hasChart = !!(chartArea && !chartArea.hasAttribute('hidden'));
+      hasTable = !!(activeTab.querySelector('.cb-brand-freq-table'));
+    } else if (tabKey === 'loyalty' || tabKey === 'dist') {
+      var chartArea2 = activeTab.querySelector('.fn-rel-chart-area');
+      hasChart = !!(chartArea2 && !chartArea2.hasAttribute('hidden'));
+      hasTable = !!(activeTab.querySelector('.cb-rel-table'));
+    } else if (tabKey === 'dop') {
+      hasChart = false;
+      hasTable = !!(activeTab.querySelector('.cb-dop-table'));
+    }
+    /* context tab: hasChart=false, hasTable=false */
+
+    /* Insight lives at section level */
+    var section = panel.closest('.br-element-section') || panel.parentNode;
+    var editor = section ? section.querySelector('.br-insight-editor') : null;
+    var hasInsight = !!(editor && editor.value.trim());
+
+    /* Build checkbox list. available:true required by showCheckboxPopover to
+       enable the checkbox; without it all items render as disabled. */
+    var checkboxes = [];
+    if (hasChart) checkboxes.push({ key: 'chart',   label: 'Chart',   available: true, checked: true });
+    if (hasTable) checkboxes.push({ key: 'table',   label: 'Table',   available: true, checked: true });
+    checkboxes.push(          { key: 'insight', label: 'Insight', available: true, checked: hasInsight });
+
+    /* No real content (e.g. context tab) — pin directly with no dialog */
+    if (!hasChart && !hasTable) {
+      cbExecutePin(panel, activeTab, tabKey, { chart: false, table: false, insight: hasInsight }, editor);
+      return;
+    }
+
+    var anchor = pinBtn.closest('.br-section-toolbar') || pinBtn.parentElement;
+    TurasPins.showCheckboxPopover(pinBtn, checkboxes, function (flags) {
+      cbExecutePin(panel, activeTab, tabKey, flags, editor);
+    }, anchor);
+  }
+
+  function cbExecutePin(panel, activeTab, tabKey, flags, editor) {
+    if (typeof TurasPins === 'undefined') return;
+
+    /* Build title from section heading + tab label */
+    var section = panel.closest('.br-element-section') || panel.parentNode;
+    var titleEl = section ? section.querySelector('.br-element-title') : null;
+    var baseTitle = titleEl ? titleEl.textContent.trim() : '';
+    var tabLabels = { brands: 'Brand Summary', loyalty: 'Loyalty Segmentation',
+                     dist: 'Purchase Distribution', dop: 'Duplication of Purchase',
+                     context: 'Category Context' };
+    var tabLabel = tabLabels[tabKey] || tabKey;
+    var title = baseTitle ? baseTitle + ' — ' + tabLabel : tabLabel;
+
+    var content = { sectionKey: panel.id || tabKey, title: title,
+                    chartSvg: '', tableHtml: '', insightText: '' };
+
+    /* All CB charts are HTML div-based (not SVG) — capture the chart
+       container element and merge it before the table HTML in tableHtml. */
+    var capturedChartHtml = '';
+    if (flags.chart) {
+      var chartEl = null;
+      if (tabKey === 'brands') {
+        var ca = activeTab.querySelector('.cb-brands-chart-area');
+        chartEl = ca ? ca.querySelector('.cb-brands-chart') : null;
+      } else if (tabKey === 'loyalty' || tabKey === 'dist') {
+        var ca2 = activeTab.querySelector('.fn-rel-chart-area');
+        chartEl = ca2 ? ca2.querySelector('.fn-rel-chart') : null;
+      }
+      if (chartEl) {
+        capturedChartHtml = TurasPins.capturePortableHtml
+          ? TurasPins.capturePortableHtml(chartEl)
+          : chartEl.outerHTML;
+      }
+    }
+
+    /* Capture table HTML */
+    var capturedTableHtml = '';
+    if (flags.table) {
+      var tbl = activeTab.querySelector('table');
+      if (tbl) {
+        capturedTableHtml = TurasPins.capturePortableHtml
+          ? TurasPins.capturePortableHtml(tbl)
+          : tbl.outerHTML;
+      }
+    }
+
+    /* Chart HTML precedes table HTML so the pin card reads top-to-bottom */
+    content.tableHtml = capturedChartHtml + capturedTableHtml;
+
+    if (flags.insight && editor) content.insightText = editor.value.trim();
+
+    /* CB charts are HTML-based and stored in tableHtml (not chartSvg).
+       pinFlags.table must be true whenever tableHtml has any content —
+       regardless of whether the user's "Table" checkbox was checked —
+       otherwise the chart HTML is captured but never rendered in the pin card. */
+    content.pinFlags = {
+      chart:   !!flags.chart,
+      table:   !!(capturedChartHtml || capturedTableHtml),
+      insight: !!flags.insight
+    };
+    content.pinMode  = 'custom';
+    TurasPins.add(content);
+
+    /* Flash pin button (button lives in sibling toolbar, not inside .cb-panel) */
+    var pinBtn = section ? section.querySelector('.cb-toolbar-top .br-pin-btn') : null;
+    if (pinBtn) {
+      pinBtn.classList.add('pin-flash');
+      setTimeout(function () { pinBtn.classList.remove('pin-flash'); }, 600);
+    }
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* CB-aware PNG export: intercepts .br-png-btn in sibling toolbar         */
+  /* ---------------------------------------------------------------------- */
+
+  function bindCbPngBtn(panel) {
+    /* PNG button is a sibling of .cb-panel inside .br-element-section —
+       same topology as the pin button; must search from the section root. */
+    var section = panel.closest('.br-element-section') || panel.parentNode;
+    var pngBtn  = section ? section.querySelector('.cb-toolbar-top .br-png-btn') : null;
+    if (!pngBtn) return;
+
+    /* Remove generic brExportPng inline handler, replace with CB-aware one.
+       Guard on TurasPins inside the click handler, not here — it may not be
+       loaded yet when initCbPanel fires. */
+    pngBtn.removeAttribute('onclick');
+    pngBtn.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      cbPngDialog(panel, pngBtn);
+    });
+  }
+
+  function cbPngDialog(panel, pngBtn) {
+    if (typeof TurasPins === 'undefined') return;
+
+    var activeTab = panel.querySelector('.cb-subtab:not([hidden])');
+    if (!activeTab) return;
+    var tabKey = activeTab.getAttribute('data-cb-tab') || '';
+
+    /* Detect available content — mirrors cbPinDialog detection */
+    var hasChart = false;
+    var hasTable = false;
+
+    if (tabKey === 'brands') {
+      var chartArea = activeTab.querySelector('.cb-brands-chart-area');
+      hasChart = !!(chartArea && !chartArea.hasAttribute('hidden'));
+      hasTable = !!(activeTab.querySelector('.cb-brand-freq-table'));
+    } else if (tabKey === 'loyalty' || tabKey === 'dist') {
+      var chartArea2 = activeTab.querySelector('.fn-rel-chart-area');
+      hasChart = !!(chartArea2 && !chartArea2.hasAttribute('hidden'));
+      hasTable = !!(activeTab.querySelector('.cb-rel-table'));
+    } else if (tabKey === 'dop') {
+      hasChart = false;
+      hasTable = !!(activeTab.querySelector('.cb-dop-table'));
+    }
+
+    var section = panel.closest('.br-element-section') || panel.parentNode;
+    var editor  = section ? section.querySelector('.br-insight-editor') : null;
+    var hasInsight = !!(editor && editor.value.trim());
+
+    function doExport(flags) {
+      cbExecutePng(panel, activeTab, tabKey, flags, editor);
+    }
+
+    if (!hasChart && !hasTable) {
+      doExport({ chart: false, table: false, insight: hasInsight });
+      return;
+    }
+
+    var checkboxes = [];
+    if (hasChart) checkboxes.push({ key: 'chart',   label: 'Chart',   available: true, checked: true });
+    if (hasTable) checkboxes.push({ key: 'table',   label: 'Table',   available: true, checked: true });
+    checkboxes.push(              { key: 'insight', label: 'Insight', available: true, checked: hasInsight });
+
+    TurasPins.showCheckboxPopover(pngBtn, checkboxes, function (flags) {
+      doExport(flags);
+    }, null, { title: 'EXPORT AS PNG', actionLabel: 'Export' });
+  }
+
+  function cbExecutePng(panel, activeTab, tabKey, flags, editor) {
+    if (typeof TurasPins === 'undefined') return;
+
+    var section = panel.closest('.br-element-section') || panel.parentNode;
+    var titleEl = section ? section.querySelector('.br-element-title') : null;
+    var baseTitle = titleEl ? titleEl.textContent.trim() : '';
+    var tabLabels = { brands: 'Brand Summary', loyalty: 'Loyalty Segmentation',
+                     dist: 'Purchase Distribution', dop: 'Duplication of Purchase',
+                     context: 'Category Context' };
+    var tabLabel = tabLabels[tabKey] || tabKey;
+    var title = baseTitle ? baseTitle + ' — ' + tabLabel : tabLabel;
+
+    /* Capture chart HTML (all CB charts are HTML div-based) */
+    var capturedChartHtml = '';
+    if (flags.chart) {
+      var chartEl = null;
+      if (tabKey === 'brands') {
+        var ca = activeTab.querySelector('.cb-brands-chart-area');
+        chartEl = ca ? ca.querySelector('.cb-brands-chart') : null;
+      } else if (tabKey === 'loyalty' || tabKey === 'dist') {
+        var ca2 = activeTab.querySelector('.fn-rel-chart-area');
+        chartEl = ca2 ? ca2.querySelector('.fn-rel-chart') : null;
+      }
+      if (chartEl) {
+        capturedChartHtml = TurasPins.capturePortableHtml
+          ? TurasPins.capturePortableHtml(chartEl)
+          : chartEl.outerHTML;
+      }
+    }
+
+    /* Capture table HTML */
+    var capturedTableHtml = '';
+    if (flags.table) {
+      var tbl = activeTab.querySelector('table');
+      if (tbl) {
+        capturedTableHtml = TurasPins.capturePortableHtml
+          ? TurasPins.capturePortableHtml(tbl)
+          : tbl.outerHTML;
+      }
+    }
+
+    /* Chart HTML prepended to table HTML — both rendered by html2canvas in export.
+       Same pinFlags.table fix as cbExecutePin: must be true whenever there is any
+       HTML content, not just when the user's "Table" checkbox was ticked. */
+    TurasPins.exportContentAsPNG({
+      title:       title,
+      chartSvg:    '',
+      tableHtml:   capturedChartHtml + capturedTableHtml,
+      insightText: flags.insight && editor ? editor.value.trim() : '',
+      pinFlags:    {
+        chart:   !!flags.chart,
+        table:   !!(capturedChartHtml || capturedTableHtml),
+        insight: !!(flags.insight && editor && editor.value.trim())
+      },
+      pinMode:     'custom'
+    });
+  }
 
 }());
