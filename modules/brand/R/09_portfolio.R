@@ -236,6 +236,17 @@ run_portfolio <- function(data, categories, structure, config, weights = NULL) {
       NULL
     }
   )
+  # Per-brand extension — drives the JS-side focal picker on the
+  # Extension subtab. Computed eagerly so swapping focals is a pure
+  # client lookup rather than a re-render.
+  extension_per_brand <- tryCatch(
+    compute_extension_per_brand(data, categories, structure, config, weights,
+                                 footprint_result = footprint_result),
+    error = function(e) {
+      message(sprintf("[PORTFOLIO] Per-brand extension failed: %s", e$message))
+      NULL
+    }
+  )
 
   # Phase 4: constellation. We compute BOTH the cross-category universe
   # constellation (legacy, for backward compat) AND a per-category set
@@ -323,6 +334,9 @@ run_portfolio <- function(data, categories, structure, config, weights = NULL) {
     extension        = if (!is.null(extension_result) &&
                            identical(extension_result$status, "PASS"))
                          extension_result else NULL,
+    extension_per_brand = if (!is.null(extension_per_brand) &&
+                               length(extension_per_brand$per_brand %||% list()) > 0)
+                            extension_per_brand else NULL,
     supporting       = supporting_result,
     suppressions     = list(
       low_base_cats  = all_suppressed,

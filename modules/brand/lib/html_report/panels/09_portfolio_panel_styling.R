@@ -550,6 +550,103 @@ build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
   font-size: 12px; color: #94a3b8; font-style: italic;
   padding: 12px 4px;
 }
+
+/* ---- Extension subtab (strength bubbles + permission-to-extend table) ---- */
+.pf-ex-controls {
+  display: flex; align-items: flex-start; gap: 24px;
+  flex-wrap: wrap; margin: 0 0 12px;
+}
+.pf-ex-ctl-group { display: flex; flex-direction: column; gap: 6px; }
+.pf-ex-ctl-label {
+  font-size: 11px; font-weight: 600; color: #64748b;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.pf-ex-focal-select {
+  border: 1px solid #e2e8f0; border-radius: 6px; background: #fff;
+  font-size: 13px; padding: 6px 10px; color: #1e293b; min-width: 200px;
+}
+.pf-ex-focal-select:focus { outline: 2px solid %FOCAL%; outline-offset: 1px; }
+
+/* Two-pane layout: strength bubbles on the left, extension table on
+   the right. Stacks at narrow viewports so the table stays readable. */
+.pf-ex-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 16px;
+  margin: 0 0 12px;
+}
+@media (max-width: 1000px) {
+  .pf-ex-layout { grid-template-columns: 1fr; }
+}
+.pf-ex-strength {
+  border: 1px solid #e2e8f0; border-radius: 8px;
+  background: #fff; padding: 12px; min-width: 0;
+}
+.pf-ex-table-host {
+  border: 1px solid #e2e8f0; border-radius: 8px;
+  background: #fff; padding: 12px; min-width: 0;
+}
+
+/* Permission-to-extend table — same visual contract as the Overview
+   Category detail table (dark navy header, lowercase, sentence-case body). */
+.pf-ex-section-title {
+  margin: 0 0 4px; font-size: 13px; font-weight: 700; color: #1e293b;
+}
+.pf-ex-table-note {
+  font-size: 11px; color: #64748b; margin: 0 0 10px; line-height: 1.5;
+}
+.pf-ex-table-scroll { overflow-x: auto; }
+.pf-ex-table {
+  width: 100%; border-collapse: collapse; font-size: 12px;
+}
+.pf-ex-table thead th {
+  background: #1a2744; color: #fff;
+  font-weight: 600; font-size: 11px; letter-spacing: 0.3px;
+  padding: 10px 12px; text-align: right;
+  text-transform: lowercase;
+  border-bottom: 2px solid #0f172a;
+}
+.pf-ex-table thead th.pf-ex-th-cat { text-align: left; }
+.pf-ex-table tbody tr:nth-child(odd)  { background: #fcfdfe; }
+.pf-ex-table tbody tr:hover           { background: #f1f5f9; cursor: default; }
+.pf-ex-table td {
+  border-bottom: 1px solid #f1f5f9;
+  color: #1e293b;
+  padding: 9px 12px; vertical-align: middle;
+}
+.pf-ex-td-cat { text-align: left;  font-weight: 500; }
+.pf-ex-td-num { text-align: right; white-space: nowrap;
+                font-variant-numeric: tabular-nums; }
+.pf-ex-td-lift { font-weight: 600; }
+.pf-ex-td-sig  { color: %FOCAL%; font-weight: 700; }
+.pf-ex-row-home td { background: #f8fafc !important; color: #94a3b8; }
+.pf-ex-row-home .pf-ex-home-tag {
+  background: #e2e8f0; color: #475569; border-radius: 4px;
+  font-size: 10px; font-weight: 600; padding: 2px 6px;
+  text-transform: uppercase; letter-spacing: 0.4px;
+}
+.pf-ex-empty {
+  font-size: 12px; color: #94a3b8; font-style: italic;
+  padding: 12px 4px;
+}
+
+/* Reading guide — same look as the constellation/clutter guides. */
+.pf-ex-reading {
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;
+  color: #334155; font-size: 12px; line-height: 1.55;
+  margin-top: 12px; padding: 12px 16px;
+}
+.pf-ex-reading strong { color: #1e293b; }
+.pf-ex-reading em     { color: #1e293b; font-style: italic; }
+.pf-ex-reading-line   { margin: 0 0 8px; }
+.pf-ex-reading-line:last-child { margin-bottom: 0; }
+.pf-ex-formula {
+  display: inline-block;
+  background: #fff; border: 1px solid #cbd5e1; border-radius: 4px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px; color: #1e293b;
+  padding: 2px 8px; margin: 2px 0;
+}
 .pf-cl-reading {
   background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;
   color: #334155; font-size: 12px; line-height: 1.55;

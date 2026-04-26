@@ -15,6 +15,96 @@ EXTENSION_BASELINE_ALL        <- "all"
 EXTENSION_BASELINE_NON_BUYERS <- "non_buyers"
 
 
+#' Compute permission-to-extend tables for every brand in the universe.
+#'
+#' Runs \code{compute_extension_table()} once per brand so the panel's
+#' focal-brand picker can swap focals client-side without a server
+#' round-trip. Builds the brand universe from the footprint matrix
+#' (the canonical "every brand we measured" list) and excludes brands
+#' for which no cross-category awareness column exists.
+#'
+#' @inheritParams compute_extension_table
+#' @return List with:
+#'   \item{per_brand}{Named list keyed by brand code; each entry is the
+#'     full `compute_extension_table` result (extension_df, home_cat,
+#'     home_cat_source, suppressed_cats).}
+#'   \item{cat_names}{Named list cat_code → display name (taken from the
+#'     categories sheet).}
+#'   \item{brand_names}{Named list brand_code → display name.}
+#'   \item{suppressed_cats}{Character. Union of suppressed cats across runs.}
+#' @export
+compute_extension_per_brand <- function(data, categories, structure,
+                                        config, weights = NULL,
+                                        footprint_result = NULL) {
+  per_brand     <- list()
+  cat_names     <- list()
+  brand_names   <- list()
+  all_suppressed <- character(0)
+
+  # Cat-name map — straight from the categories sheet, since detection
+  # of the cat code is already handled by compute_extension_table.
+  for (i in seq_len(nrow(categories))) {
+    nm <- as.character(categories$Category[i])
+    if (!nzchar(nm)) next
+    detector <- if (exists(".po_detect_cat_code", mode = "function"))
+                  .po_detect_cat_code else .detect_category_code
+    cat_brands <- tryCatch(
+      get_brands_for_category(structure, nm),
+      error = function(e) data.frame(BrandCode = character(0))
+    )
+    if (nrow(cat_brands) == 0) next
+    cc <- if (!is.null(structure$questionmap) &&
+              nrow(structure$questionmap) > 0)
+            detector(structure$questionmap, cat_brands, data) else NULL
+    if (!is.null(cc)) cat_names[[cc]] <- nm
+
+    # While we're here, harvest brand display labels from the BrandList.
+    if ("BrandLabel" %in% names(cat_brands) ||
+        "BrandName"  %in% names(cat_brands)) {
+      lbl_col <- if ("BrandLabel" %in% names(cat_brands)) "BrandLabel" else "BrandName"
+      for (k in seq_len(nrow(cat_brands))) {
+        bc  <- as.character(cat_brands$BrandCode[k])
+        lbl <- as.character(cat_brands[[lbl_col]][k])
+        if (!nzchar(brand_names[[bc]] %||% "") && nzchar(lbl))
+          brand_names[[bc]] <- lbl
+      }
+    }
+  }
+
+  # Universe of brands — anything with at least one BRANDAWARE column.
+  aw_cols <- grep("^BRANDAWARE_[^_]+_[^_]+$", names(data), value = TRUE)
+  if (length(aw_cols) == 0) {
+    return(list(per_brand = list(), cat_names = cat_names,
+                brand_names = brand_names, suppressed_cats = character(0)))
+  }
+  universe <- unique(sub("^BRANDAWARE_[^_]+_", "", aw_cols))
+
+  # Compute extension for each brand. Pass a config clone whose
+  # focal_brand is overridden so compute_extension_table picks it up
+  # without us touching its internals.
+  for (bc in universe) {
+    cfg_for_brand <- config
+    cfg_for_brand$focal_brand <- bc
+    res <- tryCatch(
+      compute_extension_table(data, categories, structure,
+                              cfg_for_brand, weights, footprint_result),
+      error = function(e) NULL
+    )
+    if (is.null(res) || identical(res$status, "REFUSED")) next
+    per_brand[[bc]]  <- res
+    all_suppressed   <- unique(c(all_suppressed, res$suppressed_cats %||% character(0)))
+    if (!nzchar(brand_names[[bc]] %||% "")) brand_names[[bc]] <- bc
+  }
+
+  list(
+    per_brand       = per_brand,
+    cat_names       = cat_names,
+    brand_names     = brand_names,
+    suppressed_cats = all_suppressed
+  )
+}
+
+
 #' Auto-detect focal brand's home category
 #'
 #' Home = category with highest A(focal, c). Ties broken by highest category
@@ -188,10 +278,11 @@ compute_extension_table <- function(data, categories, structure,
     )
     if (nrow(cat_brands) == 0) next
 
+    detector <- if (exists(".po_detect_cat_code", mode = "function"))
+                  .po_detect_cat_code else .detect_category_code
     cat_code <- if (!is.null(structure$questionmap) &&
                     nrow(structure$questionmap) > 0)
-      .detect_category_code(structure$questionmap, cat_brands, data)
-    else NULL
+      detector(structure$questionmap, cat_brands, data) else NULL
     if (is.null(cat_code)) next
 
     # Extension table: skip home category (it's the reference, not an extension)

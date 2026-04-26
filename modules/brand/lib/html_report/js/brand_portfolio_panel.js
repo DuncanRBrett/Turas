@@ -1366,6 +1366,329 @@ function pfClFormatTooltip(catCode, focalCode) {
 }
 
 // ---------------------------------------------------------------------------
+// EXTENSION — focal picker, client-side strength bubble + extension table
+// ---------------------------------------------------------------------------
+
+function pfExLoadData() {
+  var node = document.getElementById('pf-ex-data');
+  if (!node) return null;
+  try { return JSON.parse(node.textContent || '{}'); }
+  catch (e) { console.warn('[pf-ex] Failed to parse JSON:', e); return null; }
+}
+
+function pfExInit() {
+  var section = document.getElementById('pf-subtab-extension');
+  if (!section) return;
+  var data = pfExLoadData();
+  if (!data) return;
+
+  pfExBindHoverTooltips(section);
+
+  var sel = document.getElementById('pf-ex-focal-select');
+  if (sel) {
+    sel.addEventListener('change', function () { pfExSetFocal(sel.value); });
+  }
+
+  var layout = section.querySelector('.pf-ex-layout');
+  var initial = layout ? layout.getAttribute('data-pf-ex-focal') : '';
+  if (initial) pfExSetFocal(initial);
+}
+
+function pfExSetFocal(focalCode) {
+  var section = document.getElementById('pf-subtab-extension');
+  if (!section) return;
+  var layout = section.querySelector('.pf-ex-layout');
+  if (!layout) return;
+  layout.setAttribute('data-pf-ex-focal', focalCode);
+
+  var sel = document.getElementById('pf-ex-focal-select');
+  if (sel && sel.value !== focalCode) sel.value = focalCode;
+
+  var data = pfExLoadData() || {};
+  var brandColour = layout.getAttribute('data-pf-ex-focal-colour') || '#1A5276';
+  var brandLabel  = pfExBrandLabel(data, focalCode);
+
+  // Strength bubble chart (left half).
+  var strengthHost = document.getElementById('pf-extension-strength');
+  if (strengthHost) {
+    var bubbles = (data.strength || {})[focalCode] || [];
+    strengthHost.innerHTML = pfExRenderStrength(bubbles, brandColour, brandLabel);
+  }
+
+  // Extension table (right half).
+  var tableHost = document.getElementById('pf-extension-table');
+  if (tableHost) {
+    var ext = (data.extension || {})[focalCode] || { rows: [] };
+    tableHost.innerHTML = pfExRenderTable(ext, brandLabel);
+  }
+
+  if (typeof brSetPinState === 'function') {
+    brSetPinState('pf_ex_focal', focalCode);
+  }
+}
+
+function pfExBrandLabel(data, code) {
+  if (!data || !code) return code;
+  var lbls = data.brand_names || {};
+  return lbls[code] || code;
+}
+
+// ---- Strength bubble renderer -----------------------------------------------
+
+function pfExRenderStrength(bubbles, focalColour, brandLabel) {
+  if (!bubbles || bubbles.length === 0) {
+    return '<p class="pf-ex-empty">No strength-map data for ' +
+      pfClEsc(brandLabel) + ' — the brand is not measured in any qualifying category.</p>';
+  }
+
+  var w = 560, h = 460;
+  var ml = 60, mr = 30, mt = 50, mb = 60;
+  var pw = w - ml - mr, ph = h - mt - mb;
+
+  // X = cat penetration % (0..max), Y = focal awareness % (0..100).
+  var xMax = Math.max.apply(null, bubbles.map(function (b) { return b.x; }));
+  xMax = Math.max(20, Math.ceil((xMax + 5) / 10) * 10);
+  var xMin = 0;
+  var yMax = 100;
+  var yMin = 0;
+  function sx(v) { return ml + ((v - xMin) / (xMax - xMin)) * pw; }
+  function sy(v) { return mt + ph - ((v - yMin) / (yMax - yMin)) * ph; }
+
+  var maxSize = Math.max.apply(null, bubbles.map(function (b) { return b.size || 0; }));
+  if (!(maxSize > 0)) maxSize = 1;
+
+  var parts = [];
+  parts.push('<text x="' + ml + '" y="28" fill="#1e293b" font-size="14" font-weight="700">' +
+    'Portfolio strength — ' + pfClEsc(brandLabel) + '</text>');
+
+  // Diagonal "y = x" reference (where awareness == cat penetration).
+  parts.push('<line x1="' + sx(0) + '" y1="' + sy(0) + '" x2="' + sx(Math.min(xMax, yMax)) +
+    '" y2="' + sy(Math.min(xMax, yMax)) +
+    '" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="6 4"/>');
+
+  // Axes (ticks + labels)
+  pfClPretty(xMin, xMax, 5).forEach(function (t) {
+    parts.push('<text x="' + sx(t) + '" y="' + (mt + ph + 16) +
+      '" text-anchor="middle" fill="#94a3b8" font-size="10">' +
+      pfClFormatNum(t, 0) + '%</text>');
+  });
+  pfClPretty(yMin, yMax, 5).forEach(function (t) {
+    parts.push('<text x="' + (ml - 8) + '" y="' + sy(t) +
+      '" text-anchor="end" dominant-baseline="middle" fill="#94a3b8" font-size="10">' +
+      pfClFormatNum(t, 0) + '%</text>');
+  });
+  parts.push('<text x="' + (ml + pw / 2) + '" y="' + (h - 8) +
+    '" text-anchor="middle" fill="#64748b" font-size="11" font-weight="500">' +
+    'Category penetration (% of all respondents)</text>');
+  parts.push('<text x="14" y="' + (mt + ph / 2) +
+    '" text-anchor="middle" fill="#64748b" font-size="11" font-weight="500" ' +
+    'transform="rotate(-90,14,' + (mt + ph / 2) + ')">' +
+    pfClEsc(brandLabel) + ' awareness among buyers (%)</text>');
+  parts.push('<rect x="' + ml + '" y="' + mt + '" width="' + pw + '" height="' + ph +
+    '" fill="none" stroke="#e2e8f0"/>');
+
+  // Bubbles
+  bubbles.forEach(function (b) {
+    var cx = sx(b.x), cy = sy(b.y);
+    var r = Math.max(6, Math.min(28, 6 + (b.size / maxSize) * 22));
+    var labelLeftThird = cx > ml + pw * 0.65;
+    var labelX = labelLeftThird ? cx - r - 4 : cx + r + 4;
+    var anchor = labelLeftThird ? 'end' : 'start';
+    parts.push(
+      '<circle class="pf-ex-bubble" data-pf-ex-cat="' + pfClEsc(b.cat) +
+      '" cx="' + cx + '" cy="' + cy + '" r="' + r + '" ' +
+      'fill="' + focalColour + '" opacity="0.7" stroke="#fff" stroke-width="2" ' +
+      'style="cursor:pointer;"></circle>',
+      '<text class="pf-ex-bubble-label" x="' + labelX + '" y="' + (cy - r - 2) +
+      '" text-anchor="' + anchor + '" fill="#1e293b" font-size="10" font-weight="500">' +
+      pfClEsc(pfClTrunc(b.cat_label, 22)) + '</text>'
+    );
+  });
+
+  return '<svg viewBox="0 0 ' + w + ' ' + h +
+    '" style="font-family:inherit;width:100%;max-width:' + w +
+    'px;height:auto;display:block;margin:0 auto;" role="img" ' +
+    'aria-label="Portfolio strength scatter">' + parts.join('') + '</svg>';
+}
+
+// ---- Extension table --------------------------------------------------------
+
+function pfExRenderTable(ext, brandLabel) {
+  var rows = (ext && ext.rows) || [];
+  if (rows.length === 0) {
+    return '<div class="pf-ex-empty">' +
+      '<p><strong>No extension lift data for ' + pfClEsc(brandLabel) + '.</strong></p>' +
+      '<p>Permission-to-extend analysis needs cross-category awareness data — ' +
+      'the questionnaire has to ask whether buyers in <em>other</em> categories are aware of ' +
+      pfClEsc(brandLabel) + '. ' +
+      'For this brand the questionnaire didn’t collect that data, so there are no extension ' +
+      'targets to score.</p>' +
+      '</div>';
+  }
+
+  var homeCat = ext.home_cat || '';
+  var homeRow = rows.find(function (r) { return r.is_home; });
+  var nonHome = rows.filter(function (r) { return !r.is_home; });
+  // Already sorted by lift desc on the server; defensive re-sort here too.
+  nonHome.sort(function (a, b) { return (b.lift || 0) - (a.lift || 0); });
+
+  // Sparse-coverage state: if there are no non-home cats, the brand's
+  // cross-cat awareness is limited to its home category. Show the home
+  // row plus an explanation of why there's nothing to extend INTO.
+  if (nonHome.length === 0) {
+    var homeLabel = homeRow ? (homeRow.cat_label || homeRow.cat) : (homeCat || '—');
+    return '<div class="pf-ex-empty">' +
+      '<p><strong>' + pfClEsc(brandLabel) + ' is only measured in 1 category (' +
+      pfClEsc(homeLabel) + ').</strong></p>' +
+      '<p>Permission-to-extend ranks <em>other</em> categories by their awareness lift for the focal brand — ' +
+      'so it needs at least one non-home category with cross-category awareness data. ' +
+      'For ' + pfClEsc(brandLabel) + ', the questionnaire didn’t ask buyers of other categories whether they’re aware of this brand, ' +
+      'so there are no extension targets to score.</p>' +
+      '<p>To enable extension analysis for this brand, the next wave would need to add ' + pfClEsc(brandLabel) +
+      ' to the awareness battery in additional categories.</p>' +
+      '</div>';
+  }
+
+  var rendered = [];
+  if (homeRow) rendered.push(homeRow);
+  rendered = rendered.concat(nonHome);
+
+  var head = '<thead><tr>' +
+    '<th class="pf-ex-th-cat">Category</th>' +
+    '<th class="pf-ex-th-num" title="Number of category buyers in the unweighted base">Buyers (n)</th>' +
+    '<th class="pf-ex-th-num" title="% of category buyers aware of the focal">Aware of focal</th>' +
+    '<th class="pf-ex-th-num" title="P(aware focal | bought cat) ÷ P(aware focal | baseline)">Lift</th>' +
+    '<th class="pf-ex-th-num" title="★ = significant after BH correction; † = low base">Sig.</th>' +
+    '</tr></thead>';
+
+  var body = rendered.map(function (r) {
+    var rowCls = r.is_home ? ' class="pf-ex-row-home"' : '';
+    var lbl = pfClEsc(r.cat_label || r.cat);
+    var n   = r.n_buyers_uw == null ? '—' :
+                Number(r.n_buyers_uw).toLocaleString('en-US');
+    var aw  = (r.focal_aware_pct == null || isNaN(r.focal_aware_pct)) ? '—' :
+                (Math.round(r.focal_aware_pct) + '%');
+    var lift = r.is_home ? '<span class="pf-ex-home-tag">home</span>' :
+                ((r.lift == null || isNaN(r.lift)) ? '—' :
+                  (r.low_base_flag ? Number(r.lift).toFixed(2) + ' †' :
+                                      Number(r.lift).toFixed(2)));
+    var sig = '';
+    if (!r.is_home && r.p_adj != null && !isNaN(r.p_adj) && r.p_adj < 0.05) {
+      sig = '★';
+    }
+    return '<tr' + rowCls + ' data-pf-ex-cat="' + pfClEsc(r.cat) + '">' +
+      '<td class="pf-ex-td-cat">' + lbl + '</td>' +
+      '<td class="pf-ex-td-num">' + n + '</td>' +
+      '<td class="pf-ex-td-num">' + aw + '</td>' +
+      '<td class="pf-ex-td-num pf-ex-td-lift">' + lift + '</td>' +
+      '<td class="pf-ex-td-num pf-ex-td-sig">' + sig + '</td></tr>';
+  }).join('');
+
+  // Baseline + formula caption — repeated above the table so a reader
+  // who jumps straight to the numbers sees how lift was computed
+  // without scrolling to the reading guide.
+  var formulaNote = '<p class="pf-ex-table-note">' +
+    '<strong>Lift</strong> = ' +
+    'P(aware of focal | bought category) ÷ P(aware of focal | all respondents). ' +
+    'Numerator is shown in the "aware of focal" column; baseline is the focal’s ' +
+    'awareness rate across the full sample for the same awareness column. ' +
+    '★ = significant after BH correction. † = low category base, interpret cautiously.</p>';
+
+  var homeNote = homeCat ? ('<p class="pf-ex-table-note">' +
+    'Home category: <strong>' + pfClEsc(homeCat) + '</strong>. ' +
+    'Other categories ranked by lift. The home row is greyed out as a reference, ' +
+    'not an extension target.</p>') : '';
+
+  return '<h3 class="pf-ex-section-title">Permission to extend</h3>' +
+    formulaNote + homeNote +
+    '<div class="pf-ex-table-scroll"><table class="pf-ex-table">' +
+    head + '<tbody>' + body + '</tbody></table></div>';
+}
+
+// ---- Hover tooltip ----------------------------------------------------------
+
+function pfExBindHoverTooltips(section) {
+  section.addEventListener('mouseover', function (ev) {
+    var target = ev.target;
+    var bubble = target.closest && target.closest('.pf-ex-bubble');
+    var row    = target.closest && target.closest('tr[data-pf-ex-cat]');
+    var node   = bubble || row;
+    if (!node) return;
+    var tip = pfCnGetTooltip();
+    var layout = section.querySelector('.pf-ex-layout');
+    var focal = layout ? layout.getAttribute('data-pf-ex-focal') : '';
+    var cat = node.getAttribute('data-pf-ex-cat') ||
+              node.getAttribute('data-pf-ex-cat');
+    tip.textContent = pfExFormatTooltip(cat, focal);
+    tip.setAttribute('aria-hidden', 'false');
+    pfCnPositionTooltip(tip, ev);
+  });
+  section.addEventListener('mousemove', function (ev) {
+    var target = ev.target;
+    var bubble = target.closest && target.closest('.pf-ex-bubble');
+    var row    = target.closest && target.closest('tr[data-pf-ex-cat]');
+    if (!(bubble || row)) return;
+    var tip = pfCnGetTooltip();
+    if (tip.getAttribute('aria-hidden') === 'true') return;
+    pfCnPositionTooltip(tip, ev);
+  });
+  section.addEventListener('mouseout', function (ev) {
+    var target = ev.target;
+    var bubble = target.closest && target.closest('.pf-ex-bubble');
+    var row    = target.closest && target.closest('tr[data-pf-ex-cat]');
+    var node   = bubble || row;
+    if (!node) return;
+    var to = ev.relatedTarget;
+    if (to && node.contains(to)) return;
+    var tip = pfCnGetTooltip();
+    tip.style.opacity = '0';
+    tip.style.visibility = 'hidden';
+    tip.setAttribute('aria-hidden', 'true');
+  });
+}
+
+function pfExFormatTooltip(catCode, focalCode) {
+  var data = pfExLoadData() || {};
+  var bubbles = (data.strength || {})[focalCode] || [];
+  var ext     = (data.extension || {})[focalCode] || { rows: [] };
+  var b = bubbles.find(function (x) { return x.cat === catCode; });
+  var r = (ext.rows || []).find(function (x) { return x.cat === catCode; });
+  var brandLabel = pfExBrandLabel(data, focalCode);
+  var lbl = (b && b.cat_label) || (r && r.cat_label) || catCode;
+
+  var lines = [lbl];
+  if (b) {
+    lines.push('Category penetration: ' + Math.round(b.x) + '% of all respondents');
+    lines.push(brandLabel + ' awareness: ' + Math.round(b.y) + '% of category buyers');
+  }
+  if (r && !r.is_home) {
+    if (r.lift != null && !isNaN(r.lift) &&
+        r.focal_aware_pct != null && !isNaN(r.focal_aware_pct) &&
+        r.lift > 0) {
+      // Derive the baseline awareness rate from numerator and lift so
+      // users can see both halves of the ratio without us re-computing
+      // it server-side.
+      var baselinePct = r.focal_aware_pct / r.lift;
+      lines.push('Lift = ' + Math.round(r.focal_aware_pct) +
+        '% ÷ ' + baselinePct.toFixed(0) + '% = ' +
+        Number(r.lift).toFixed(2) + '×' +
+        (r.p_adj != null && r.p_adj < 0.05 ? ' (significant)' :
+          (r.p_adj != null ? ' (not significant)' : '')));
+      lines.push('  · Numerator: ' + Math.round(r.focal_aware_pct) +
+        '% of category buyers aware of focal');
+      lines.push('  · Baseline: ' + baselinePct.toFixed(0) +
+        '% of all respondents aware of focal');
+    } else if (r.lift != null && !isNaN(r.lift)) {
+      lines.push('Lift vs baseline: ' + Number(r.lift).toFixed(2) + '×');
+    }
+    if (r.low_base_flag) lines.push('Low category base — interpret cautiously');
+  } else if (r && r.is_home) {
+    lines.push('Home category — reference point, not an extension target');
+  }
+  return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------
 // Initialise on DOMContentLoaded
 // ---------------------------------------------------------------------------
 (function() {
@@ -1379,6 +1702,7 @@ function pfClFormatTooltip(catCode, focalCode) {
     pfInitFootprintTable();
     pfInitConstellationChips();
     pfClInit();
+    pfExInit();
   }
 
   if (document.readyState === 'loading') {

@@ -46,7 +46,12 @@ compute_strength_map <- function(data, categories, structure,
   w           <- if (!is.null(weights)) weights else rep(1.0, n_total)
 
   brand_cat_rows <- list()
+  cat_name_map   <- list()  # cat_code → display label
+  brand_name_map <- list()  # brand_code → display label
   suppressed     <- character(0)
+
+  detector <- if (exists(".po_detect_cat_code", mode = "function"))
+                .po_detect_cat_code else .detect_category_code
 
   for (i in seq_len(nrow(categories))) {
     cat_name   <- categories$Category[i]
@@ -58,8 +63,7 @@ compute_strength_map <- function(data, categories, structure,
 
     cat_code <- if (!is.null(structure$questionmap) &&
                     nrow(structure$questionmap) > 0)
-      .detect_category_code(structure$questionmap, cat_brands, data)
-    else NULL
+      detector(structure$questionmap, cat_brands, data) else NULL
     if (is.null(cat_code)) next
 
     base <- build_portfolio_base(data, cat_code, timeframe, weights)
@@ -70,7 +74,15 @@ compute_strength_map <- function(data, categories, structure,
       next
     }
 
+    cat_name_map[[cat_code]] <- as.character(cat_name)
+
     brand_codes <- as.character(cat_brands$BrandCode)
+    brand_lbls  <- if ("BrandLabel" %in% names(cat_brands))
+                     as.character(cat_brands$BrandLabel)
+                   else if ("BrandName" %in% names(cat_brands))
+                     as.character(cat_brands$BrandName)
+                   else brand_codes
+    names(brand_lbls) <- brand_codes
     cat_pen     <- base$n_uw / n_total
     awareness   <- .compute_category_awareness(data, cat_code, brand_codes,
                                                base$idx, weights)
@@ -88,22 +100,28 @@ compute_strength_map <- function(data, categories, structure,
       if (!bc %in% names(brand_cat_rows)) brand_cat_rows[[bc]] <- list()
       brand_cat_rows[[bc]][[cat_code]] <- list(
         cat         = cat_code,
+        cat_label   = as.character(cat_name),
         cat_pen     = cat_pen,
         brand_aware = aw_val,
         aware_n_w   = aware_n_w
       )
+      if (!nzchar(brand_name_map[[bc]] %||% "") && nzchar(brand_lbls[[bc]] %||% ""))
+        brand_name_map[[bc]] <- as.character(brand_lbls[[bc]])
     }
   }
 
   if (length(brand_cat_rows) == 0) {
-    return(list(status = "PASS", per_brand = list(), suppressed_cats = suppressed))
+    return(list(status = "PASS", per_brand = list(),
+                cat_names = list(), brand_names = list(),
+                suppressed_cats = suppressed))
   }
 
   per_brand <- lapply(names(brand_cat_rows), function(bc) {
     rows <- brand_cat_rows[[bc]]
     if (length(rows) == 0) return(NULL)
     do.call(rbind, lapply(rows, function(r) {
-      data.frame(cat = r$cat, cat_pen = r$cat_pen,
+      data.frame(cat = r$cat, cat_label = r$cat_label,
+                 cat_pen = r$cat_pen,
                  brand_aware = r$brand_aware, aware_n_w = r$aware_n_w,
                  stringsAsFactors = FALSE)
     }))
@@ -111,5 +129,15 @@ compute_strength_map <- function(data, categories, structure,
   names(per_brand) <- names(brand_cat_rows)
   per_brand <- Filter(function(df) !is.null(df) && nrow(df) >= 1, per_brand)
 
-  list(status = "PASS", per_brand = per_brand, suppressed_cats = suppressed)
+  # Fill any missing brand label with the brand code so downstream code
+  # always has a label to display.
+  for (bc in names(per_brand)) {
+    if (!nzchar(brand_name_map[[bc]] %||% "")) brand_name_map[[bc]] <- bc
+  }
+
+  list(status = "PASS",
+       per_brand = per_brand,
+       cat_names = cat_name_map,
+       brand_names = brand_name_map,
+       suppressed_cats = suppressed)
 }

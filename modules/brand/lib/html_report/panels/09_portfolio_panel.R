@@ -738,124 +738,211 @@ build_br_portfolio_panel <- function(results, config) {
 # ==============================================================================
 
 .pf_extension_subtab <- function(portfolio, panel_data, focal_brand, focal_colour) {
-  strength  <- portfolio$strength
-  extension <- portfolio$extension
   section_id <- "pf-extension"
 
-  # --- Strength map ---
-  strength_html <- if (!is.null(strength) &&
-                        !is.null(strength$per_brand) &&
-                        focal_brand %in% names(strength$per_brand)) {
+  strength    <- portfolio$strength
+  ext_per_br  <- portfolio$extension_per_brand
+
+  if (is.null(ext_per_br) || length(ext_per_br$per_brand %||% list()) == 0) {
+    return(paste0(
+      .pf_section_toolbar(section_id),
+      '<p style="color:#94a3b8;padding:24px 0;">Extension analysis data not available.</p>'
+    ))
+  }
+
+  # ---- Brand picker — every brand for which we have an extension result.
+  # Append cat-coverage suffix to each option ("Brand (3 cats)") so the
+  # user sees up front which brands have rich cross-cat awareness data
+  # versus those measured only in their home category.
+  brand_codes  <- names(ext_per_br$per_brand)
+  brand_names  <- ext_per_br$brand_names %||% list()
+  brand_labels <- vapply(brand_codes, function(bc) {
+    v <- brand_names[[bc]]
+    if (is.null(v) || !nzchar(v)) bc else as.character(v)
+  }, character(1))
+  brand_coverage <- vapply(brand_codes, function(bc) {
+    res <- ext_per_br$per_brand[[bc]]
+    df  <- res$extension_df
+    if (is.null(df) || nrow(df) == 0) return(0L)
+    as.integer(nrow(df))
+  }, integer(1))
+  # Sort: focal first; then brands with >1 cat (more useful for extension)
+  # before single-cat brands; tiebreak alphabetical.
+  ord <- order(brand_codes != focal_brand,
+               brand_coverage <= 1,
+               tolower(brand_labels))
+  brand_codes    <- brand_codes[ord]
+  brand_labels   <- brand_labels[ord]
+  brand_coverage <- brand_coverage[ord]
+  if (!focal_brand %in% brand_codes && length(brand_codes) > 0) {
+    focal_brand <- brand_codes[1]
+  }
+
+  focal_options <- paste(vapply(seq_along(brand_codes), function(i) {
+    bc  <- brand_codes[i]
+    nm  <- brand_labels[i]
+    nc  <- brand_coverage[i]
+    sel <- if (identical(bc, focal_brand)) " selected" else ""
+    suffix <- if (nc > 0) sprintf(" (%d cat%s)", nc, if (nc == 1) "" else "s") else ""
+    sprintf('<option value="%s"%s>%s%s</option>',
+            .pf_esc(bc), sel, .pf_esc(nm), suffix)
+  }, character(1)), collapse = "")
+
+  # ---- JSON payload — strength bubbles + extension rows for every brand.
+  payload_json <- .pf_ex_to_json(strength, ext_per_br, focal_colour)
+  data_script <- sprintf(
+    '<script type="application/json" id="pf-ex-data">%s</script>',
+    payload_json
+  )
+
+  # ---- Initial server-side strength SVG so the page works pre-JS.
+  initial_svg <- ''
+  if (!is.null(strength) && !is.null(strength$per_brand) &&
+      focal_brand %in% names(strength$per_brand)) {
     fb_df <- strength$per_brand[[focal_brand]]
     if (nrow(fb_df) >= 2) {
-      fb_df$cat_pen_pct    <- fb_df$cat_pen    * 100
+      fb_df$cat_pen_pct    <- fb_df$cat_pen * 100
       fb_df$brand_aware_pct <- fb_df$brand_aware
-      chart_svg <- tryCatch(
+      initial_svg <- tryCatch(
         build_bubble_scatter(
-          df          = fb_df,
-          x_col       = "cat_pen_pct",
-          y_col       = "brand_aware_pct",
-          label_col   = "cat",
-          size_col    = "aware_n_w",
+          df           = fb_df,
+          x_col        = "cat_pen_pct",
+          y_col        = "brand_aware_pct",
+          label_col    = "cat_label",
+          size_col     = "aware_n_w",
           brand_colour = focal_colour,
-          title       = sprintf("Portfolio Strength: %s (%%)", .pf_esc(focal_brand))
+          title        = sprintf("Portfolio strength — %s",
+                                  brand_labels[match(focal_brand, brand_codes)])
         ),
         error = function(e) ""
       )
-      paste0(
-        '<h3 style="font-size:14px;font-weight:600;color:#1e293b;margin:0 0 12px;">',
-        'Portfolio Strength Map</h3>',
-        '<div style="margin:8px 0;">', chart_svg, '</div>',
-        '<p style="font-size:11px;color:#94a3b8;margin:4px 0 16px;">',
-        'Each bubble = one category. X = category penetration in sample; ',
-        'Y = brand awareness among category buyers. Diagonal = equal performance.</p>'
-      )
-    } else if (nrow(fb_df) == 1) {
-      sprintf(
-        '<div class="pf-coming-soon" style="min-height:100px;">%s is present in only one category — strength map requires two or more.</div>',
-        .pf_esc(focal_brand)
-      )
-    } else {
-      '<p style="color:#94a3b8;padding:16px 0;">Strength map data not available.</p>'
     }
-  } else {
-    '<p style="color:#94a3b8;padding:16px 0;">Strength map data not available.</p>'
   }
 
-  # --- Extension table ---
-  ext_html <- if (!is.null(extension) &&
-                   !is.null(extension$extension_df) &&
-                   nrow(extension$extension_df) > 0) {
-    home_note <- if (nzchar(extension$home_cat %||% "")) {
-      sprintf(
-        '<p style="font-size:11px;color:#64748b;margin:0 0 12px;">Home category: <strong>%s</strong> (%s). Non-home categories ranked by lift.</p>',
-        .pf_esc(extension$home_cat),
-        if (identical(extension$home_cat_source, "config")) "configured" else "auto-detected"
-      )
-    } else ""
+  reading_guide <- paste0(
+    '<div class="pf-ex-reading">',
 
-    paste0(
-      '<h3 style="font-size:14px;font-weight:600;color:#1e293b;margin:16px 0 8px;">',
-      'Permission-to-Extend</h3>',
-      home_note,
-      .pf_extension_table(extension$extension_df)
-    )
-  } else {
-    '<p style="color:#94a3b8;padding:16px 0;">Extension data not available.</p>'
-  }
+    '<p class="pf-ex-reading-line"><strong>What this tab actually answers:</strong> ',
+    'two related questions about the focal brand’s mental availability. ',
+    'The <em>strength map</em> on the left says <em>"where does this brand stand right now, across the categories we measured it in?"</em> ',
+    'The <em>extension table</em> on the right says <em>"of those measured categories, which ones could the brand plausibly extend into next?"</em></p>',
 
-  about_text <- if (!is.null(panel_data)) panel_data$about$extension %||% "" else ""
+    '<p class="pf-ex-reading-line"><strong>What it needs in the data:</strong> ',
+    'Both views can only score categories where the questionnaire actually asked buyers of that category whether they’re aware of the focal brand. ',
+    'In your study this is set by the BrandList sheet — every brand × category combination where the brand is listed has a `BRANDAWARE_<cat>_<brand>` column in the data. ',
+    'A brand listed in <em>all</em> categories (typically the study’s focal client) gets a full read. ',
+    'A brand listed in only its home category gets only one row — and the extension half can’t do anything for it until the next wave adds cross-category awareness. ',
+    'The number after each option in the picker (<em>"Brand (3 cats)"</em>) tells you up front how much data is available for that brand.</p>',
+
+    '<p class="pf-ex-reading-line"><strong>How to read the strength map:</strong> ',
+    '<em>X (horizontal)</em> = how many of all respondents are buyers of that category — its market size. ',
+    '<em>Y (vertical)</em> = the focal brand’s awareness <strong>among</strong> those buyers — how big the focal looms in the minds of people who actually shop the category. ',
+    'Bubble size = the weighted count of aware buyers; big bubbles are categories where lots of real people know the brand. ',
+    '<strong>Top-right</strong> — big category, the focal is well-known: bread-and-butter. ',
+    '<strong>Top-left</strong> — small but you dominate awareness: a defensible niche. ',
+    '<strong>Bottom-right</strong> — big category but the focal is barely known: opportunity or wrong-battle. ',
+    '<strong>Bottom-left</strong> — small and unknown: usually deprioritise.</p>',
+
+    '<p class="pf-ex-reading-line"><strong>How to read the extension table:</strong> ',
+    'For every measured category that <em>isn’t</em> the focal’s home, <em>lift</em> = how much more likely buyers of that category are to be aware of the focal compared with the baseline awareness rate. ',
+    '<strong>Lift &gt; 1</strong> means buyers of that category have an above-average awareness of the focal — there’s a halo to lean on if you launched there. ',
+    '<strong>Lift ≈ 1</strong> means no halo; entering would be cold-starting awareness. ',
+    '<strong>★</strong> = significant after BH correction across all rows; <strong>†</strong> = low category base, interpret cautiously. ',
+    'The home row sits at the top as a reference and is greyed out — it’s not an extension target, it’s where the brand already lives.</p>',
+
+    '<p class="pf-ex-reading-line"><strong>How lift is actually calculated:</strong> ',
+    '<code class="pf-ex-formula">lift(category) = P(aware of focal | bought category) ÷ P(aware of focal | baseline)</code> ',
+    'In plain English: the numerator is the share of <em>that category’s buyers</em> who are aware of the focal brand (the "Aware of focal" column in the table). ',
+    'The denominator is the share of <em>the baseline group</em> who are aware of the focal brand <em>in the same awareness column</em> — by default the baseline is <strong>all respondents</strong> in the survey (set by <code>portfolio_extension_baseline</code> in config; the alternative is <em>non-buyers of the home category</em>).</p>',
+
+    '<p class="pf-ex-reading-line"><strong>Worked example:</strong> ',
+    'Imagine the focal brand has <strong>70%</strong> awareness among Pasta Sauces buyers (numerator) and <strong>40%</strong> awareness among all 1,200 respondents in the survey (denominator, because not everyone shops Pasta Sauces). ',
+    'Lift = 70 ÷ 40 = <strong>1.75×</strong>. ',
+    'Read: Pasta Sauces buyers are 1.75× more likely than the average respondent to be aware of the focal — that’s a meaningful halo, the brand has equity to lean on if it launched a Pasta Sauces line. ',
+    'Hover any row to see both numbers (numerator + baseline) for the live data.</p>',
+
+    '<p class="pf-ex-reading-line"><strong>What to do with it:</strong> ',
+    'Hover any bubble or row to see the exact numbers. ',
+    'For a focal brand with rich coverage (the study’s focal client), the extension table is your shortlist of plausible expansion categories — high lift + statistical significance + a meaningfully large category base = a sound target. ',
+    'For a brand the questionnaire only asked about in one category, the strength map will still show that single bubble, but the extension table will explicitly tell you there’s nothing to extend into in this dataset — either accept that limitation, or add cross-category awareness for that brand in the next wave.</p>',
+    '</div>'
+  )
 
   paste0(
     .pf_section_toolbar(section_id),
-    strength_html,
-    ext_html,
-    if (nzchar(about_text)) {
-      sprintf('<div class="pf-about-drawer"><strong>About this analysis:</strong> %s</div>',
-              .pf_esc(about_text))
-    } else ""
+    data_script,
+    '<div class="pf-ex-controls">',
+    '<div class="pf-ex-ctl-group">',
+    '<label for="pf-ex-focal-select" class="pf-ex-ctl-label">Focal brand</label>',
+    sprintf('<select id="pf-ex-focal-select" class="pf-ex-focal-select" data-pf-ex-focal="%s">%s</select>',
+            .pf_esc(focal_brand), focal_options),
+    '</div>',
+    '</div>',
+    sprintf('<div class="pf-ex-layout" data-pf-ex-focal="%s" data-pf-ex-focal-colour="%s">',
+            .pf_esc(focal_brand), .pf_esc(focal_colour)),
+    sprintf('<div id="%s-strength" class="pf-ex-strength">%s</div>', section_id, initial_svg),
+    sprintf('<div id="%s-table" class="pf-ex-table-host"></div>', section_id),
+    '</div>',
+    reading_guide
   )
 }
 
 
-.pf_extension_table <- function(ext_df) {
-  if (nrow(ext_df) == 0) return("")
+# Compact JSON for the Extension subtab — strength bubbles + extension
+# rows + cat-name lookup. Iterates the per-brand extension table and
+# normalises numeric columns to plain JS-friendly arrays.
+.pf_ex_to_json <- function(strength, ext_per_br, focal_colour) {
+  if (!requireNamespace("jsonlite", quietly = TRUE)) return("{}")
+  cat_names <- ext_per_br$cat_names %||% list()
+  brand_names <- ext_per_br$brand_names %||% list()
 
-  rows_html <- paste(vapply(seq_len(nrow(ext_df)), function(i) {
-    r          <- ext_df[i, ]
-    is_home    <- isTRUE(r$is_home)
-    low_base   <- isTRUE(r$low_base_flag)
-    lift_str   <- if (!is.na(r$lift) && !is_home) {
-      if (low_base) sprintf("%.2f&#x2020;", r$lift) else sprintf("%.2f", r$lift)
-    } else if (is_home) "(home)" else "—"
-    sig_str    <- if (!is.na(r$p_adj) && !is_home) {
-      if (r$p_adj < 0.05) "&#x2605;" else ""
-    } else ""
-    row_style <- if (is_home) ' style="background:#f8fafc;color:#94a3b8;"' else ""
-    sprintf(
-      '<tr%s><td>%s</td><td style="text-align:right;">%s</td><td style="text-align:right;">%.1f%%</td><td style="text-align:right;">%s%s</td></tr>',
-      row_style,
-      .pf_esc(r$cat),
-      format(r$n_buyers_uw, big.mark = ","),
-      r$focal_aware_pct %||% 0,
-      lift_str, sig_str
+  # Strength bubbles per brand — pre-formatted for the JS bubble renderer.
+  strength_payload <- if (!is.null(strength) && !is.null(strength$per_brand)) {
+    lapply(strength$per_brand, function(df) {
+      if (is.null(df) || nrow(df) == 0) return(list())
+      lapply(seq_len(nrow(df)), function(i) {
+        list(
+          cat       = as.character(df$cat[i]),
+          cat_label = as.character(df$cat_label[i] %||% df$cat[i]),
+          x         = as.numeric(df$cat_pen[i]) * 100,
+          y         = as.numeric(df$brand_aware[i]),
+          size      = as.numeric(df$aware_n_w[i])
+        )
+      })
+    })
+  } else list()
+
+  # Extension table per brand.
+  ext_payload <- lapply(ext_per_br$per_brand, function(res) {
+    df <- res$extension_df
+    if (is.null(df) || nrow(df) == 0)
+      return(list(home_cat = res$home_cat %||% "", rows = list()))
+    list(
+      home_cat        = res$home_cat %||% "",
+      home_cat_source = res$home_cat_source %||% "",
+      rows = lapply(seq_len(nrow(df)), function(i) list(
+        cat            = as.character(df$cat[i]),
+        cat_label      = as.character(cat_names[[df$cat[i]]] %||% df$cat[i]),
+        is_home        = isTRUE(df$is_home[i]),
+        n_buyers_uw    = as.integer(df$n_buyers_uw[i]),
+        focal_aware_pct = as.numeric(df$focal_aware_pct[i]),
+        lift           = as.numeric(df$lift[i]),
+        p_adj          = as.numeric(df$p_adj[i]),
+        low_base_flag  = isTRUE(df$low_base_flag[i])
+      ))
     )
-  }, character(1)), collapse = "")
+  })
 
-  paste0(
-    '<div style="overflow-x:auto;">',
-    '<table style="width:100%;border-collapse:collapse;font-size:12px;">',
-    '<thead><tr style="background:#f8fafc;font-weight:600;color:#475569;">',
-    '<th style="padding:8px;text-align:left;border-bottom:1px solid #e2e8f0;">Category</th>',
-    '<th style="padding:8px;text-align:right;border-bottom:1px solid #e2e8f0;">Buyers (n)</th>',
-    '<th style="padding:8px;text-align:right;border-bottom:1px solid #e2e8f0;">Aware of focal</th>',
-    '<th style="padding:8px;text-align:right;border-bottom:1px solid #e2e8f0;">Lift &#x2605;=sig.</th>',
-    '</tr></thead><tbody>',
-    rows_html,
-    '</tbody></table>',
-    '<p style="font-size:10px;color:#94a3b8;margin:6px 0 0;">',
-    '&#x2605; p&lt;0.05 (BH-corrected). &#x2020; low base (n&lt;threshold).</p>',
-    '</div>'
+  payload <- list(
+    focal_colour = focal_colour,
+    cat_names    = cat_names,
+    brand_names  = brand_names,
+    strength     = strength_payload,
+    extension    = ext_payload
+  )
+  tryCatch(
+    jsonlite::toJSON(payload, auto_unbox = TRUE, na = "null", digits = 4),
+    error = function(e) "{}"
   )
 }
 
