@@ -125,8 +125,16 @@
     var btn = document.querySelector('.br-pin-btn[data-section="' + sectionId + '"]');
     if (!btn) return;
 
-    var section = document.getElementById("section-" + sectionId) ||
-                  document.querySelector('[data-section="' + sectionId + '"]');
+    var section = document.getElementById("section-" + sectionId);
+    if (!section && /^pf-/.test(sectionId)) {
+      section = document.getElementById(sectionId.replace(/^pf-/, "pf-subtab-"));
+    }
+    if (!section) {
+      var pgCandidates = document.querySelectorAll('[data-section="' + sectionId + '"]');
+      for (var pgi = 0; pgi < pgCandidates.length; pgi++) {
+        if (pgCandidates[pgi].tagName !== "BUTTON") { section = pgCandidates[pgi]; break; }
+      }
+    }
     if (!section) return;
 
     var hasChart = !!section.querySelector("svg");

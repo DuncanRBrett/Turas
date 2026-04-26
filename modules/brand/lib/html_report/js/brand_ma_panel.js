@@ -1713,6 +1713,13 @@
       ? TurasPins.capturePortableHtml(tbl) : tbl.outerHTML;
   }
 
+  // Capture arbitrary HTML for div-based sections (no SVG/table).
+  function captureHtml(el) {
+    if (!el) return '';
+    return (typeof TurasPins !== 'undefined' && TurasPins.capturePortableHtml)
+      ? TurasPins.capturePortableHtml(el) : el.outerHTML;
+  }
+
   function pinSections(panel, activeKey, optKeys) {
     if (typeof TurasPins === 'undefined') return;
     var pd = panel.__maData || {};
@@ -1760,14 +1767,18 @@
       optKeys.forEach(function (key) {
         var def = metricDefs[key]; if (!def) return;
         var el = panel.querySelector(def.sel); if (!el) return;
+        var svg = captureSvg(el);
+        var tbl = captureTable(el);
+        // hero and ranking are div-based \u2014 no SVG, no table. Fall back to full HTML.
+        var htm = (!svg && !tbl) ? captureHtml(el) : '';
         TurasPins.add({
           sectionKey: 'ma-metrics-' + key + '-' + Date.now(),
           title: baseTitle + ' \u2014 ' + def.label,
-          chartSvg: captureSvg(el), chartHtml: '',
-          tableHtml: captureTable(el),
+          chartSvg: svg, chartHtml: '',
+          tableHtml: tbl || htm,
           insightText: key === 'ranking' ? metricsInsight : '',
           pinMode: 'custom',
-          pinFlags: { chart: !!captureSvg(el), table: !!captureTable(el), insight: false }
+          pinFlags: { chart: !!svg, table: !!(tbl || htm), insight: false }
         });
       });
     }
