@@ -97,10 +97,10 @@ build_br_portfolio_panel <- function(results, config) {
       timeframe_label, n_label
     ),
 
-    # Hero strip KPI cards (§5)
-    .pf_hero_strip(portfolio$supporting, focal_brand, focal_colour,
-                    focal_brand_name = .pf_resolve_focal_name(panel_data, portfolio,
-                                                               focal_brand)),
+    # NOTE: removed the top hero KPI strip (§5) per Duncan — those four
+    # "focal category" cards were misleading because the portfolio panel
+    # has no single focal category. The four per-focal-brand cards on
+    # the Overview sub-tab cover the same information correctly.
 
     # 5-subtab nav
     .pf_sub_nav(),
@@ -592,8 +592,21 @@ build_br_portfolio_panel <- function(results, config) {
     style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;padding:5px 10px;color:#64748b;">
     &#x1F4E5; Excel
   </button>
+  <button class="br-insight-toggle" onclick="_brToggleInsight(\'%s\')"
+    style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;padding:5px 10px;color:#64748b;">
+    + Add Insight
+  </button>
+</div>
+<div class="br-insight-container" data-section="%s" style="display:none;margin-bottom:16px;position:relative;">
+  <textarea class="br-insight-editor" data-section="%s" placeholder="Type key insight here..."
+    style="width:100%%;min-height:60px;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-family:inherit;font-size:13px;resize:vertical;"></textarea>
+  <div class="br-insight-rendered" data-section="%s" ondblclick="_brToggleInsightEdit(\'%s\')"
+    style="display:none;padding:10px;border:1px solid #e2e8f0;border-radius:6px;min-height:40px;cursor:pointer;font-size:13px;line-height:1.5;"></div>
+  <button class="br-insight-dismiss" onclick="_brDismissInsight(\'%s\')"
+    style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px;position:absolute;top:4px;right:8px;">&times;</button>
 </div>',
-    section_id, section_id, section_id, section_id
+    section_id, section_id, section_id, section_id, section_id,
+    section_id, section_id, section_id, section_id, section_id
   )
 }
 

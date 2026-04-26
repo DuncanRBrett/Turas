@@ -35,15 +35,16 @@ pfo_render_table <- function(overview, focal_brand, focal_colour) {
     '<th class="pfo-th-cat">Category</th>',
     '<th class="pfo-th-depth">Type</th>',
     '<th class="pfo-th-num">Cat. usage</th>',
+    '<th class="pfo-th-num">Avg brands aware</th>',
     '<th class="pfo-th-num">Focal awareness</th>',
     '<th class="pfo-th-num">Rank</th>',
     '<th class="pfo-th-num">Gap to leader</th>',
     '<th class="pfo-th-num">Penetration</th>',
     '<th class="pfo-th-num">SCR</th>',
     '<th class="pfo-th-num">Vol share</th>',
-    '<th class="pfo-th-num">Freq</th>',
+    '<th class="pfo-th-num" title="Mean number of times the focal brand was purchased per brand buyer in the recall window">Avg purchases</th>',
     '</tr></thead><tbody>', body, '</tbody></table></div>',
-    '<p class="pfo-table-note">Rank = focal brand\u2019s position on awareness within the category. Gap = pct-point distance from the category leader. Penetration/SCR/Vol/Freq available for deep-dive categories only.</p>'
+    '<p class="pfo-table-note">Avg brands aware = mean number of brands in the awareness set per category buyer (derived from the per-brand awareness column in this row). Rank = focal brand\u2019s position on awareness within the category. Gap = pct-point distance from the category leader. Avg purchases = mean times the focal brand was bought per brand buyer in the recall window. Penetration / SCR / Vol share / Avg purchases available for deep-dive categories only.</p>'
   )
 }
 
@@ -69,19 +70,30 @@ pfo_render_table <- function(overview, focal_brand, focal_colour) {
     c$deep_dive[[focal_brand]]
   } else NULL
 
+  # Mean number of brands a category buyer is aware of. Each brand
+  # awareness column is a 0/1 indicator, so the per-buyer mean of the
+  # set size equals sum(brand_awareness_pct) / 100. Uses only brands
+  # whose awareness was actually measured (non-NA), which is the right
+  # interpretation when the questionnaire skipped brands not in the
+  # category's BrandList.
+  avg_brands_aware <- if (length(valid) > 0)
+                        sum(valid, na.rm = TRUE) / 100
+                      else NA_real_
+
   list(
-    cat_code      = c$cat_code,
-    cat_name      = c$cat_name,
-    depth         = c$analysis_depth %||% "awareness_only",
-    cat_usage_pct = c$cat_usage_pct,
-    focal_aware   = focal_aware,
-    rank          = rank_val,
-    n_brands      = n_brands_ranked,
-    gap           = gap,
-    pen_pct       = if (!is.null(dd)) dd$penetration_pct else NA_real_,
-    scr_pct       = if (!is.null(dd)) dd$scr_pct         else NA_real_,
-    vol_pct       = if (!is.null(dd)) dd$vol_share_pct   else NA_real_,
-    freq          = if (!is.null(dd)) dd$freq_mean       else NA_real_
+    cat_code         = c$cat_code,
+    cat_name         = c$cat_name,
+    depth            = c$analysis_depth %||% "awareness_only",
+    cat_usage_pct    = c$cat_usage_pct,
+    avg_brands_aware = avg_brands_aware,
+    focal_aware      = focal_aware,
+    rank             = rank_val,
+    n_brands         = n_brands_ranked,
+    gap              = gap,
+    pen_pct          = if (!is.null(dd)) dd$penetration_pct else NA_real_,
+    scr_pct          = if (!is.null(dd)) dd$scr_pct         else NA_real_,
+    vol_pct          = if (!is.null(dd)) dd$vol_share_pct   else NA_real_,
+    freq             = if (!is.null(dd)) dd$freq_mean       else NA_real_
   )
 }
 
@@ -110,6 +122,7 @@ pfo_render_table <- function(overview, focal_brand, focal_colour) {
     paste0('<tr><td class="pfo-td-cat">%s</td>',
            '<td>%s</td>',
            '<td class="pfo-td-num">%s</td>',
+           '<td class="pfo-td-num%s">%s</td>',
            '<td class="pfo-td-num pfo-td-focal">%s</td>',
            '<td class="pfo-td-num">%s</td>',
            '<td class="pfo-td-num">%s</td>',
@@ -118,7 +131,9 @@ pfo_render_table <- function(overview, focal_brand, focal_colour) {
            '<td class="pfo-td-num%s">%s</td>',
            '<td class="pfo-td-num%s">%s</td></tr>'),
     .pf_esc(r$cat_name), depth_pill,
-    fmt_pct(r$cat_usage_pct), fmt_pct(r$focal_aware),
+    fmt_pct(r$cat_usage_pct),
+    na_cls(r$avg_brands_aware), fmt_num(r$avg_brands_aware, 1),
+    fmt_pct(r$focal_aware),
     fmt_rank(r), fmt_gap(r$gap),
     na_cls(r$pen_pct), fmt_pct(r$pen_pct),
     na_cls(r$scr_pct), fmt_pct(r$scr_pct),

@@ -122,9 +122,24 @@ build_pf_footprint_html <- function(footprint, focal_brand, focal_colour,
     setNames(as.integer(bases_df$n_buyers_uw), as.character(bases_df$cat))
   } else setNames(integer(0), character(0))
 
+  # Per-brand presence across categories. Used by the popover to filter
+  # itself when categories are toggled off — a brand that only has data
+  # in hidden categories disappears from the popover automatically.
+  brand_cats_map <- lapply(brand_codes, function(bc) {
+    row_idx <- match(bc, fp$Brand)
+    if (is.na(row_idx)) return(character(0))
+    present <- vapply(cat_codes, function(cc) {
+      v <- fp[[cc]][row_idx]
+      !is.null(v) && !is.na(v) && is.finite(v)
+    }, logical(1))
+    cat_codes[present]
+  })
+  names(brand_cats_map) <- brand_codes
+
   paste0(
     .pf_fp_controls_bar(brand_codes, brand_label, cat_codes, cat_label,
-                         focal_brand, focal_colour, brand_colours),
+                         focal_brand, focal_colour, brand_colours,
+                         brand_cats_map),
     .pf_fp_table(fp, brand_codes, brand_label, cat_codes, cat_label,
                   base_n, n_total, suppressed, focal_brand, focal_colour)
   )
@@ -137,7 +152,8 @@ build_pf_footprint_html <- function(footprint, focal_brand, focal_colour,
 
 .pf_fp_controls_bar <- function(brand_codes, brand_label,
                                  cat_codes, cat_label,
-                                 focal_brand, focal_colour, brand_colours) {
+                                 focal_brand, focal_colour, brand_colours,
+                                 brand_cats_map = list()) {
   # Focal-brand <select>
   options <- vapply(seq_along(brand_codes), function(i) {
     bc  <- brand_codes[i]
@@ -148,18 +164,21 @@ build_pf_footprint_html <- function(footprint, focal_brand, focal_colour,
   }, character(1))
 
   # Brand-popover items (one row per brand, all visible by default).
+  # Each item carries data-pf-fp-cats with the comma-separated list of
+  # category codes the brand has data in — JS uses this to hide popover
+  # rows whose categories are all currently toggled off.
   brand_items <- vapply(seq_along(brand_codes), function(i) {
     bc  <- brand_codes[i]
     nm  <- brand_label[i]
     col <- .pf_brand_colour(bc, focal_brand, focal_colour, brand_colours)
     is_foc <- identical(bc, focal_brand)
     badge  <- if (is_foc) ' <span class="fn-focal-badge">FOCAL</span>' else ""
-    # Lowercase search-token attribute so the popover's filter matches
-    # case-insensitively without rebuilding the markup.
+    cats_str <- paste(brand_cats_map[[bc]] %||% character(0), collapse = ",")
     sprintf(
-      '<label class="pf-fp-pop-item%s" data-pf-fp-brand="%s" data-pf-fp-search="%s"><input type="checkbox" class="pf-fp-pop-cb" data-pf-fp-brand-cb="%s" checked><span class="pf-fp-pop-dot" style="background:%s;"></span><span class="pf-fp-pop-name">%s</span>%s</label>',
+      '<label class="pf-fp-pop-item%s" data-pf-fp-brand="%s" data-pf-fp-search="%s" data-pf-fp-cats="%s"><input type="checkbox" class="pf-fp-pop-cb" data-pf-fp-brand-cb="%s" checked><span class="pf-fp-pop-dot" style="background:%s;"></span><span class="pf-fp-pop-name">%s</span>%s</label>',
       if (is_foc) " pf-fp-pop-item-focal" else "",
-      .pf_esc(bc), .pf_esc(tolower(nm)), .pf_esc(bc), col, .pf_esc(nm), badge
+      .pf_esc(bc), .pf_esc(tolower(nm)), .pf_esc(cats_str),
+      .pf_esc(bc), col, .pf_esc(nm), badge
     )
   }, character(1))
 

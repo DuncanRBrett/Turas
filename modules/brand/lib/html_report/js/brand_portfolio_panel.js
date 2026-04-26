@@ -279,7 +279,9 @@ function pfFpInitBrandPopover(section, table) {
 /**
  * Wire the per-category chip row. Clicking a chip hides/shows that
  * category's column (header + every <td data-pf-fp-col=cc>) in the
- * table. Default state: all on.
+ * table, AND refreshes the brand popover so brands that only have
+ * data in hidden categories disappear from the brand list. Default
+ * state: all on.
  */
 function pfFpInitCategoryChips(section, table) {
   section.querySelectorAll('.pf-fp-cat-chip').forEach(function (chip) {
@@ -288,6 +290,7 @@ function pfFpInitCategoryChips(section, table) {
       var on = chip.classList.toggle('pf-fp-cat-chip-on');
       chip.classList.toggle('pf-fp-cat-chip-off', !on);
       pfFpSetColVisible(table, cc, on);
+      pfFpRefreshBrandPopoverByCats(section);
       if (typeof brSetPinState === 'function') {
         var hidden = [];
         section.querySelectorAll('.pf-fp-cat-chip-off').forEach(function (c) {
@@ -296,6 +299,30 @@ function pfFpInitCategoryChips(section, table) {
         brSetPinState('pf_fp_hidden_cats', hidden);
       }
     });
+  });
+}
+
+/**
+ * Hide popover rows for brands that have no presence in any currently
+ * active category. The focal brand is always kept visible so the user
+ * can never accidentally lose access to it.
+ */
+function pfFpRefreshBrandPopoverByCats(section) {
+  var pop = section.querySelector('.pf-fp-pop[data-pf-fp-pop="brand"]');
+  if (!pop) return;
+  var activeCats = {};
+  section.querySelectorAll('.pf-fp-cat-chip-on').forEach(function (c) {
+    activeCats[c.getAttribute('data-pf-fp-cat')] = true;
+  });
+  pop.querySelectorAll('.pf-fp-pop-item').forEach(function (item) {
+    if (item.classList.contains('pf-fp-pop-item-focal')) {
+      item.style.display = '';
+      return;
+    }
+    var cats = (item.getAttribute('data-pf-fp-cats') || '')
+      .split(',').filter(Boolean);
+    var anyActive = cats.some(function (c) { return !!activeCats[c]; });
+    item.style.display = anyActive ? '' : 'none';
   });
 }
 

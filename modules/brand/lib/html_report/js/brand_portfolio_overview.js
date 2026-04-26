@@ -122,10 +122,17 @@
     var gap = (focal != null && leader != null) ? leader - focal : null;
 
     var dd = (c.deep_dive || {})[focalCode] || null;
+    // Avg brands aware = sum(per-brand awareness pct) / 100, derived from
+    // the same `awareness_pct` map already in the payload. Same logic as
+    // the server-side R renderer in 09_portfolio_overview_subtab_parts.R.
+    var avgBrandsAware = vals.length
+      ? vals.reduce(function (a, b) { return a + b; }, 0) / 100
+      : null;
     return {
       name: c.cat_name,
       depth: c.analysis_depth || 'awareness_only',
       cat_usage: c.cat_usage_pct,
+      avg_brands_aware: avgBrandsAware,
       focal: focal,
       rank: rank, n_brands: vals.length, gap: gap,
       pen: dd ? dd.penetration_pct : null,
@@ -151,13 +158,14 @@
       '<th class="pfo-th-cat">Category</th>' +
       '<th class="pfo-th-depth">Type</th>' +
       '<th class="pfo-th-num">Cat. usage</th>' +
+      '<th class="pfo-th-num">Avg brands aware</th>' +
       '<th class="pfo-th-num">Focal awareness</th>' +
       '<th class="pfo-th-num">Rank</th>' +
       '<th class="pfo-th-num">Gap to leader</th>' +
       '<th class="pfo-th-num">Penetration</th>' +
       '<th class="pfo-th-num">SCR</th>' +
       '<th class="pfo-th-num">Vol share</th>' +
-      '<th class="pfo-th-num">Freq</th></tr></thead>';
+      '<th class="pfo-th-num" title="Mean number of times the focal brand was purchased per brand buyer in the recall window">Avg purchases</th></tr></thead>';
 
     var body = rows.map(function (r) {
       var pill = r.depth === 'full'
@@ -175,6 +183,7 @@
         '<td class="pfo-td-cat">' + esc(r.name) + '</td>' +
         '<td>' + pill + '</td>' +
         '<td class="pfo-td-num">' + fmtPct(r.cat_usage) + '</td>' +
+        tdNum(r.avg_brands_aware, function (v) { return fmtNum(v, 1); }) +
         '<td class="pfo-td-num pfo-td-focal">' + fmtPct(r.focal) + '</td>' +
         '<td class="pfo-td-num">' + rankTxt + '</td>' +
         '<td class="pfo-td-num">' + gapTxt + '</td>' +
@@ -186,9 +195,12 @@
     return '<h3 class="pfo-section-title">Category detail</h3>' +
       '<div class="pfo-table-scroll"><table class="pfo-table">' +
       head + '<tbody>' + body + '</tbody></table></div>' +
-      '<p class="pfo-table-note">Rank = focal brand\u2019s position on awareness within the category. ' +
+      '<p class="pfo-table-note">' +
+      'Avg brands aware = mean number of brands in the awareness set per category buyer. ' +
+      'Rank = focal brand\u2019s position on awareness within the category. ' +
       'Gap = pct-point distance from the category leader. ' +
-      'Penetration/SCR/Vol/Freq available for deep-dive categories only.</p>';
+      'Avg purchases = mean times the focal brand was bought per brand buyer in the recall window. ' +
+      'Penetration / SCR / Vol share / Avg purchases available for deep-dive categories only.</p>';
   }
 
   // ---- Deep-dive strip ----
@@ -268,13 +280,156 @@
 
   ready(function () {
     var sel = document.getElementById('pfo-focal-select');
-    if (!sel) return;
-    sel.addEventListener('change', function (e) {
-      var code = e.target.value;
-      if (code) swap(code);
-    });
+    if (sel) {
+      sel.addEventListener('change', function (e) {
+        var code = e.target.value;
+        if (code) swap(code);
+      });
+    }
+    initPfoPinPng();
   });
 
   // Expose for pin-state restore hooks
   window.pfoSwitchFocal = swap;
+
+  // ---------------------------------------------------------------------------
+  // Per-element pin + PNG dialogs (Overview subtab).
+  // ---------------------------------------------------------------------------
+  // Replaces the default brTogglePin / brExportPng handlers (which would
+  // capture the whole subtab as a single chart+table) with a popover
+  // letting the user tick: Hero KPI cards, Awareness chart, Category
+  // detail table, Deep-dive cards, and the section-level Insight note.
+  // Each ticked element is captured as portable HTML and concatenated
+  // into the pin's tableHtml — same approach as the cat-buying panel.
+
+  function initPfoPinPng() {
+    // The portfolio panel uses a lightweight `.pf_section_toolbar` that
+    // doesn't wrap content in `<div id="section-pf-overview">`, so we
+    // find the pin/PNG buttons directly by their data-section marker
+    // and use the closest sub-tab as the capture root.
+    var pinBtn = document.querySelector('.br-pin-btn[data-section="pf-overview"]');
+    if (!pinBtn) return;
+    var section = document.getElementById('pf-subtab-overview') || pinBtn.parentNode;
+    var pngBtn  = section.querySelector('.br-png-btn');
+    var insightToggle = section.querySelector('.br-insight-toggle');
+
+    pinBtn.removeAttribute('onclick');
+    pinBtn.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      openPfoPicker(section, pinBtn, /* isPng */ false);
+    });
+    if (pngBtn) {
+      pngBtn.removeAttribute('onclick');
+      pngBtn.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        openPfoPicker(section, pngBtn, /* isPng */ true);
+      });
+    }
+    // The shared "+ Add Insight" toggle just needs the section's insight
+    // container to exist; it's wired up by the global brand_report.js
+    // toggle handler. No extra binding needed.
+  }
+
+  function pfoElementSpecs(section) {
+    return [
+      { key: 'hero',    label: 'Headline KPI cards',     el: section.querySelector('#pfo-hero') },
+      { key: 'chart',   label: 'Focal awareness chart',  el: section.querySelector('#pfo-chart') },
+      { key: 'table',   label: 'Category detail table',  el: section.querySelector('#pfo-table') },
+      { key: 'deep',    label: 'Deep-dive context cards', el: section.querySelector('#pfo-deep') }
+    ];
+  }
+
+  function openPfoPicker(section, btn, isPng) {
+    if (typeof TurasPins === 'undefined') return;
+
+    var specs = pfoElementSpecs(section);
+    var editor = section.querySelector('.br-insight-editor[data-section="pf-overview"]');
+    var hasInsight = !!(editor && editor.value && editor.value.trim());
+
+    var checkboxes = specs
+      .filter(function (s) { return !!s.el; })
+      .map(function (s) {
+        return { key: s.key, label: s.label, available: true, checked: true };
+      });
+    checkboxes.push({ key: 'insight', label: 'Insight note',
+                      available: true, checked: hasInsight });
+
+    var popOpts = isPng
+      ? { title: 'EXPORT AS PNG', actionLabel: 'Export' }
+      : null;
+    var anchor = btn.closest('.br-section-toolbar') || btn.parentElement;
+
+    TurasPins.showCheckboxPopover(btn, checkboxes, function (flags) {
+      if (isPng) executePfoPng(section, flags, editor);
+      else       executePfoPin(section, flags, editor, btn);
+    }, anchor, popOpts);
+  }
+
+  function captureElementHtml(el) {
+    if (!el) return '';
+    var portable = (typeof TurasPins !== 'undefined' && TurasPins.capturePortableHtml)
+      ? TurasPins.capturePortableHtml
+      : function (e) { return e.outerHTML; };
+    var html = portable(el);
+    if (typeof window.brStripInteractive === 'function') {
+      html = window.brStripInteractive(html);
+    }
+    return html;
+  }
+
+  function buildPfoCapturePayload(section, flags, editor) {
+    var specs = pfoElementSpecs(section);
+    var pieces = [];
+    specs.forEach(function (s) {
+      if (!s.el) return;
+      if (!flags[s.key]) return;
+      var fragment = captureElementHtml(s.el);
+      if (fragment) pieces.push(fragment);
+    });
+    var tableHtml   = pieces.join('');
+    var insightText = (flags.insight && editor) ? (editor.value || '').trim() : '';
+    return { tableHtml: tableHtml, insightText: insightText };
+  }
+
+  function pfoTitle(section) {
+    var h = section.querySelector('h2, h3, .pfo-section-title');
+    var label = (h && h.textContent.trim()) || 'Portfolio Overview';
+    return 'Portfolio Overview — ' + label;
+  }
+
+  function executePfoPin(section, flags, editor, pinBtn) {
+    if (typeof TurasPins === 'undefined') return;
+    var p = buildPfoCapturePayload(section, flags, editor);
+    if (!p.tableHtml && !p.insightText) return;
+
+    TurasPins.add({
+      sectionKey:  'pf-overview-' + Date.now(),
+      title:       pfoTitle(section),
+      chartSvg:    '',
+      tableHtml:   p.tableHtml,
+      insightText: p.insightText,
+      pinFlags:    { chart: false, table: !!p.tableHtml, insight: !!p.insightText },
+      pinMode:     'custom'
+    });
+
+    if (pinBtn) {
+      pinBtn.classList.add('pin-flash');
+      setTimeout(function () { pinBtn.classList.remove('pin-flash'); }, 600);
+    }
+  }
+
+  function executePfoPng(section, flags, editor) {
+    if (typeof TurasPins === 'undefined') return;
+    var p = buildPfoCapturePayload(section, flags, editor);
+    TurasPins.exportContentAsPNG({
+      title:       pfoTitle(section),
+      chartSvg:    '',
+      tableHtml:   p.tableHtml,
+      insightText: p.insightText,
+      pinFlags:    { chart: false, table: !!p.tableHtml, insight: !!p.insightText },
+      pinMode:     'custom'
+    });
+  }
 })();

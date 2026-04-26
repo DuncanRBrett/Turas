@@ -256,8 +256,16 @@ build_portfolio_overview <- function(results, config) {
 
 .po_brand_names <- function(cat_brands, brand_codes) {
   default <- stats::setNames(as.list(brand_codes), brand_codes)
-  if (!"BrandName" %in% names(cat_brands)) return(default)
-  lookup <- stats::setNames(as.character(cat_brands$BrandName),
+  # The Survey_Structure template ships with `BrandLabel` (e.g. "Ina
+  # Paarman's Kitchen") — the older / external schema variant uses
+  # `BrandName`. Honour whichever is present so the focal dropdown,
+  # deep-dive cards, and any other downstream consumer get human
+  # display names instead of brand codes.
+  name_col <- if ("BrandLabel" %in% names(cat_brands)) "BrandLabel"
+              else if ("BrandName" %in% names(cat_brands)) "BrandName"
+              else NULL
+  if (is.null(name_col)) return(default)
+  lookup <- stats::setNames(as.character(cat_brands[[name_col]]),
                              as.character(cat_brands$BrandCode))
   stats::setNames(lapply(brand_codes, function(bc) {
     v <- lookup[[bc]]

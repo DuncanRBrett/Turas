@@ -112,7 +112,8 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
   cats <- overview$categories
   if (length(cats) == 0) {
     return(list(n_cats_total = 0L, n_cats_aware = 0L, n_deep = 0L,
-                avg_awareness = NA_real_, focal_brand = focal_brand))
+                avg_awareness = NA_real_, focal_brand = focal_brand,
+                focal_name = focal_brand))
   }
 
   aware_vals <- vapply(cats, function(c) {
@@ -127,12 +128,20 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
     mean(aware_vals[!is.na(aware_vals) & aware_vals > 0])
   } else NA_real_
 
+  # Look up the focal brand's display name from any cat that lists it.
+  focal_name <- focal_brand
+  for (c in cats) {
+    nm <- c$brand_names[[focal_brand]]
+    if (!is.null(nm) && nzchar(as.character(nm))) { focal_name <- as.character(nm); break }
+  }
+
   list(
     n_cats_total  = length(cats),
     n_cats_aware  = as.integer(n_aware),
     n_deep        = as.integer(sum(is_deep)),
     avg_awareness = avg_aware,
-    focal_brand   = focal_brand
+    focal_brand   = focal_brand,
+    focal_name    = focal_name
   )
 }
 
@@ -144,10 +153,11 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
     .pf_esc(value), .pf_esc(label)
   )
 
+  focal_label <- k$focal_name %||% k$focal_brand
   paste0(
     '<div class="pf-hero-strip">',
       card(sprintf("%d of %d", k$n_cats_aware, k$n_cats_total),
-           paste("Categories where", k$focal_brand, "has awareness")),
+           paste("Categories where", focal_label, "has awareness")),
       card(fmt_n(k$avg_awareness),
            "Average awareness across categories with presence"),
       card(as.character(k$n_deep),
