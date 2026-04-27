@@ -250,6 +250,37 @@ calculate_mental_advantage <- function(linkage_tensor, codes,
 }
 
 
+# ==============================================================================
+# SECTION 5: SAFE WRAPPER FOR ORCHESTRATION
+# ==============================================================================
+
+#' Run Mental Advantage with graceful degradation
+#'
+#' Wraps \code{calculate_mental_advantage()} so that any failure (including
+#' the function not being loaded) accumulates a warning and returns NULL
+#' instead of breaking the rest of the MA result. Used by
+#' \code{run_mental_availability()}.
+#' @keywords internal
+.ma_safe_advantage <- function(linkage_tensor, codes, weights, n_resp,
+                                label = "stimulus", warnings_acc = NULL) {
+  if (!exists("calculate_mental_advantage", mode = "function")) {
+    if (is.function(warnings_acc))
+      warnings_acc(sprintf("Mental Advantage skipped for %s: analytics not loaded", label))
+    return(NULL)
+  }
+  tryCatch(
+    calculate_mental_advantage(linkage_tensor, codes,
+                                weights = weights,
+                                n_respondents = n_resp),
+    error = function(e) {
+      if (is.function(warnings_acc))
+        warnings_acc(sprintf("Mental Advantage failed for %s: %s", label, e$message))
+      NULL
+    }
+  )
+}
+
+
 if (!identical(Sys.getenv("TESTTHAT"), "true")) {
   message(sprintf("TURAS>Brand Mental Advantage element loaded (v%s)",
                   MENTAL_ADVANTAGE_VERSION))

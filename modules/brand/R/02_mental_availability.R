@@ -1,3 +1,7 @@
+# SIZE-EXCEPTION: Main MA orchestrator. Holds five sequential sections
+# (linkage construction, MMS/MPen/NS, CEP x brand matrix, CEP penetration,
+# main entry point) that read as one analytical pipeline. Splitting would
+# fragment a coherent flow and force callers to source many small files.
 # ==============================================================================
 # BRAND MODULE - MENTAL AVAILABILITY ELEMENT
 # ==============================================================================
@@ -592,6 +596,22 @@ run_mental_availability <- function(linkage, cep_labels = NULL,
     n_attrs <- length(attr_codes)
   }
 
+  # --- Mental Advantage (Romaniuk) — runs whenever calculate_mental_advantage
+  # is loaded. Failures degrade to NULL so the rest of the panel survives.
+  cep_advantage <- .ma_safe_advantage(
+    linkage$linkage_tensor, cep_codes, weights, n_resp,
+    label = "CEP", warnings_acc = function(msg) warnings <<- c(warnings, msg))
+
+  attribute_advantage <- if (!is.null(attribute_linkage) &&
+                              length(attribute_linkage$linkage_tensor) > 0) {
+    .ma_safe_advantage(
+      attribute_linkage$linkage_tensor,
+      attribute_linkage$cep_codes,
+      weights, n_resp,
+      label = "attribute",
+      warnings_acc = function(msg) warnings <<- c(warnings, msg))
+  } else NULL
+
   status <- if (length(warnings) > 0) "PARTIAL" else "PASS"
 
   list(
@@ -602,8 +622,10 @@ run_mental_availability <- function(linkage, cep_labels = NULL,
     cep_brand_matrix = cep_matrix,
     cep_penetration = cep_pen,
     cep_turf = cep_turf,
+    cep_advantage = cep_advantage,
     attribute_brand_matrix = attr_matrix,
     attribute_labels = attr_labels_out,
+    attribute_advantage = attribute_advantage,
     metrics_summary = metrics_summary,
     warnings = warnings,
     n_respondents = n_resp,
@@ -612,6 +634,8 @@ run_mental_availability <- function(linkage, cep_labels = NULL,
     n_brands = length(brand_codes)
   )
 }
+
+
 
 
 # ==============================================================================

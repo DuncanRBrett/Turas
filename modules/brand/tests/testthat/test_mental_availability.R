@@ -28,6 +28,7 @@ source(file.path(TURAS_ROOT, "modules", "shared", "lib", "turf_engine.R"))
 
 # Source brand module files
 source(file.path(TURAS_ROOT, "modules", "brand", "R", "00_guard.R"))
+source(file.path(TURAS_ROOT, "modules", "brand", "R", "02b_mental_advantage.R"))
 source(file.path(TURAS_ROOT, "modules", "brand", "R", "02_mental_availability.R"))
 
 

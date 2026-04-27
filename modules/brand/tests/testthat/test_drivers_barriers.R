@@ -19,6 +19,7 @@ if (dir.exists(shared_lib)) {
   }
 }
 source(file.path(TURAS_ROOT, "modules", "brand", "R", "00_guard.R"))
+source(file.path(TURAS_ROOT, "modules", "brand", "R", "02b_mental_advantage.R"))
 source(file.path(TURAS_ROOT, "modules", "brand", "R", "02_mental_availability.R"))
 source(file.path(TURAS_ROOT, "modules", "brand", "R", "06_drivers_barriers.R"))
 
