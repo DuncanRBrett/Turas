@@ -101,7 +101,10 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
       .ma_insight_box(stim = "metrics"),
     '</div>',
 
-    .ma_about_section(panel_data),
+    # Panel-wide "About Mental Availability" drawer. Only shows for
+    # non-advantage tabs; the advantage tab carries its own Mental
+    # Advantage callout at the bottom of its own subtab.
+    sprintf('<div class="ma-about-availability">%s</div>', .ma_about_section(panel_data)),
     '</div>'
   )
 }

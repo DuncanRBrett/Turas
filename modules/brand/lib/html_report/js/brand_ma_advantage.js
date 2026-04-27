@@ -370,8 +370,10 @@
           tds.push('<td class="' + (b === focal ? 'ma-adv-matrix-focal' : '') + '">–</td>');
           return;
         }
+        // Cell formatting MUST NOT change based on significance — Duncan
+        // explicitly: "do not change the formatting" when sig. Significance
+        // surfaces in the chart bubble outline + tooltip only.
         var bg = maColour(c.ma, threshold);
-        var sigCls = c.is_sig ? ' ma-adv-sig-dot' : '';
         var focalCls = b === focal ? ' ma-adv-matrix-focal' : '';
         var counts = '<span class="ma-adv-cell-counts">a=' + Math.round(c.actual) + ' / e=' + Math.round(c.expected) + '</span>';
         var pen = block.stim_penetration[block.codes.indexOf(stim)];
@@ -380,7 +382,7 @@
         hoverPayload.push({ code: stim, label: lbl + ' × ' + nameFor(b),
                             ma: c.ma, pen: pen, size: sizeSrc,
                             decision: c.decision, isSig: c.is_sig });
-        tds.push('<td class="' + focalCls + sigCls + '" data-ma-adv-cell-bg style="background-color:' + bg +
+        tds.push('<td class="' + focalCls + '" data-ma-adv-cell-bg style="background-color:' + bg +
                  ' !important;background-image:none !important;--ma-cell-bg:' + bg +
                  ';" data-ma-adv-cell-idx="' + hi + '" data-ma-cell-brand="' + escAttr(b) +
                  '" data-ma-cell-stim="' + escAttr(stim) + '">' +
@@ -544,8 +546,25 @@
   }
 
   // ============================================================ EVENT BINDINGS
+  // Use event delegation on the advantage subtab so listeners survive
+  // any future re-render and stay attached even if buttons are
+  // dynamically replaced. A single click handler on the wrapper inspects
+  // the click target via closest() and dispatches by data-ma-action.
+  function syncSegmentedButtons(panel, action, value, valueAttr) {
+    panel.querySelectorAll('[data-ma-action="' + action + '"]').forEach(function (b) {
+      var on = b.getAttribute(valueAttr) === value;
+      b.classList.toggle('sig-btn-active', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+  function setBaseStatusLabel(panel, base) {
+    var el = panel.querySelector('[data-ma-adv-base-status]');
+    if (el) el.textContent = 'Bubbles sized by: ' + (base === 'aware' ? '% aware' : '% total');
+  }
   function bindAdvantage(panel) {
     if (panel.__maAdvBound) return; panel.__maAdvBound = true;
+
+    var subtab = panel.querySelector('.ma-subtab[data-ma-subtab="advantage"]') || panel;
 
     // Intercept the advantage Excel export button before the legacy
     // exportTable handler can run (legacy expects different data attrs).
@@ -556,103 +575,91 @@
       }, true);
     });
 
-    panel.querySelectorAll('[data-ma-action="adv-stim"]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var stim = btn.getAttribute('data-ma-adv-stim'); if (!stim) return;
+    // Single delegated click handler for all segmented controls + reset.
+    subtab.addEventListener('click', function (ev) {
+      var stimBtn = ev.target.closest('[data-ma-action="adv-stim"]');
+      if (stimBtn && subtab.contains(stimBtn)) {
+        var stim = stimBtn.getAttribute('data-ma-adv-stim');
+        if (!stim) return;
         getAdvState(panel).stim = stim;
-        panel.querySelectorAll('[data-ma-action="adv-stim"]').forEach(function (b) {
-          var on = b === btn;
-          b.classList.toggle('sig-btn-active', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
-        });
+        syncSegmentedButtons(panel, 'adv-stim', stim, 'data-ma-adv-stim');
         renderAdvantage(panel);
-      });
-    });
-
-    panel.querySelectorAll('[data-ma-action="adv-base"]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var base = btn.getAttribute('data-ma-adv-base'); if (!base) return;
+        return;
+      }
+      var baseBtn = ev.target.closest('[data-ma-action="adv-base"]');
+      if (baseBtn && subtab.contains(baseBtn)) {
+        var base = baseBtn.getAttribute('data-ma-adv-base');
+        if (!base) return;
         getAdvState(panel).base = base;
-        panel.querySelectorAll('[data-ma-action="adv-base"]').forEach(function (b) {
-          var on = b === btn;
-          b.classList.toggle('sig-btn-active', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
-        });
-        // Re-render BOTH chart and matrix so tooltip + bubble size reflect the new base.
+        syncSegmentedButtons(panel, 'adv-base', base, 'data-ma-adv-base');
+        setBaseStatusLabel(panel, base);
         renderAdvantage(panel);
-      });
-    });
-
-    panel.querySelectorAll('[data-ma-action="adv-filter"]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var f = btn.getAttribute('data-ma-adv-filter'); if (!f) return;
+        return;
+      }
+      var filtBtn = ev.target.closest('[data-ma-action="adv-filter"]');
+      if (filtBtn && subtab.contains(filtBtn)) {
+        var f = filtBtn.getAttribute('data-ma-adv-filter');
+        if (!f) return;
         getAdvState(panel).filter = f;
-        panel.querySelectorAll('[data-ma-action="adv-filter"]').forEach(function (b) {
-          var on = b === btn;
-          b.classList.toggle('sig-btn-active', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
-        });
+        syncSegmentedButtons(panel, 'adv-filter', f, 'data-ma-adv-filter');
         var block = getStimBlock(panel); if (block) renderQuadrant(panel, block);
-      });
-    });
-
-    // X-axis range inputs (live next to the chart). Empty input = auto.
-    panel.__maAdvXRange = panel.__maAdvXRange || {};
-    function readRange() {
-      var minEl = panel.querySelector('input[data-ma-action="adv-xrange-min"]');
-      var maxEl = panel.querySelector('input[data-ma-action="adv-xrange-max"]');
-      var s = panel.__maAdvXRange;
-      s.min = (minEl && minEl.value !== '') ? parseFloat(minEl.value) : null;
-      s.max = (maxEl && maxEl.value !== '') ? parseFloat(maxEl.value) : null;
-    }
-    panel.querySelectorAll('input[data-ma-action="adv-xrange-min"], input[data-ma-action="adv-xrange-max"]').forEach(function (inp) {
-      inp.addEventListener('change', function () {
-        readRange();
-        var block = getStimBlock(panel); if (block) renderQuadrant(panel, block);
-      });
-    });
-    var resetBtn = panel.querySelector('button[data-ma-action="adv-xrange-reset"]');
-    if (resetBtn) resetBtn.addEventListener('click', function () {
-      var minEl = panel.querySelector('input[data-ma-action="adv-xrange-min"]');
-      var maxEl = panel.querySelector('input[data-ma-action="adv-xrange-max"]');
-      if (minEl) minEl.value = ''; if (maxEl) maxEl.value = '';
-      panel.__maAdvXRange = {};
-      var block = getStimBlock(panel); if (block) renderQuadrant(panel, block);
-    });
-
-    var chartCb = panel.querySelector('input[data-ma-action="adv-show-chart"]');
-    if (chartCb) chartCb.addEventListener('change', function () {
-      var view = panel.querySelector('.ma-adv-quadrant-view');
-      if (!view) return;
-      if (chartCb.checked) {
-        view.removeAttribute('hidden');
-        var block = getStimBlock(panel); if (block) renderQuadrant(panel, block);
-      } else {
-        view.setAttribute('hidden', '');
-        hideTooltip(panel);
+        return;
+      }
+      var resetBtn = ev.target.closest('button[data-ma-action="adv-xrange-reset"]');
+      if (resetBtn && subtab.contains(resetBtn)) {
+        var minEl = panel.querySelector('input[data-ma-action="adv-xrange-min"]');
+        var maxEl = panel.querySelector('input[data-ma-action="adv-xrange-max"]');
+        if (minEl) minEl.value = ''; if (maxEl) maxEl.value = '';
+        panel.__maAdvXRange = {};
+        var b2 = getStimBlock(panel); if (b2) renderQuadrant(panel, b2);
+        return;
       }
     });
 
-    // Brand-column chips: toggle column visibility in the matrix. The chart
-    // shows only the focal brand's bubbles, so brand chips don't change it.
+    // X-axis range: min/max inputs are handled by the delegated change
+    // listener (above). Reset button is handled by the delegated click
+    // listener. No direct addEventListener calls — delegation only.
     panel.__maAdvHiddenBrands = panel.__maAdvHiddenBrands || {};
-    panel.querySelectorAll('button[data-ma-adv-chip-brand]').forEach(function (chip) {
-      var code = chip.getAttribute('data-ma-adv-chip-brand');
-      // Apply persisted state on bind
-      if (panel.__maAdvHiddenBrands[code]) chip.classList.add('col-chip-off');
-      chip.addEventListener('click', function () {
-        var off = chip.classList.toggle('col-chip-off');
-        panel.__maAdvHiddenBrands[code] = off;
-        applyBrandColumnVisibility(panel);
-      });
-    });
-
-    // Stim row checkboxes (added per row by renderMatrix below). Toggling a
-    // row hides the stim from BOTH the matrix and the chart bubble cloud,
-    // matching Duncan's "checks in the table - with chart to match" request.
     panel.__maAdvHiddenStims = panel.__maAdvHiddenStims || {};
 
+    // Brand-column chips: delegated click. Each chip carries the brand
+    // palette colour via inline style + --brand-chip-color (set by
+    // colourAdvantageChips below) so they match the rest of the panel.
+    subtab.addEventListener('click', function (ev) {
+      var chip = ev.target.closest('button[data-ma-adv-chip-brand]');
+      if (!chip || !subtab.contains(chip)) return;
+      var code = chip.getAttribute('data-ma-adv-chip-brand');
+      var off = chip.classList.toggle('col-chip-off');
+      panel.__maAdvHiddenBrands[code] = off;
+      applyBrandColumnVisibility(panel);
+    });
+
+    // Show counts checkbox stays as a direct change listener (single
+    // checkbox, no risk of detachment).
     var cntCb = panel.querySelector('input[data-ma-action="adv-show-counts"]');
     if (cntCb) cntCb.addEventListener('change', function () {
       var wrap = panel.querySelector('.ma-adv-matrix-wrap');
       if (wrap) wrap.classList.toggle('ma-adv-show-counts', cntCb.checked);
+    });
+
+    // Initial base-status label
+    setBaseStatusLabel(panel, getActiveBase(panel));
+  }
+
+  // Apply the same brand-palette colours used elsewhere in the MA panel
+  // to the advantage tab's "Show brands" chip row.
+  function colourAdvantageChips(panel) {
+    var pd = panel.__maData; if (!pd) return;
+    panel.querySelectorAll('button[data-ma-adv-chip-brand]').forEach(function (chip) {
+      var code = chip.getAttribute('data-ma-adv-chip-brand');
+      var col = (pd.config && pd.config.brand_colours && pd.config.brand_colours[code])
+              || (window.__maGetBrandColour && window.__maGetBrandColour(pd, code))
+              || '#64748b';
+      chip.style.setProperty('--brand-chip-color', col);
+      chip.style.backgroundColor = col;
+      chip.style.borderColor = col;
+      chip.style.color = '#fff';
+      chip.style.fontWeight = (pd.meta && code === pd.meta.focal_brand_code) ? '700' : '500';
     });
   }
 
@@ -660,12 +667,12 @@
   window.MAAdvantage = {
     init:   function (panel) {
       bindAdvantage(panel);
-      // Default state: turn on the significance dots class so the CSS
-      // shows them when toggled checked at boot.
-      var wrap = panel.querySelector('.ma-adv-matrix-wrap');
-      if (wrap) wrap.classList.add('ma-adv-show-sig');
+      colourAdvantageChips(panel);
       renderAdvantage(panel);
     },
-    render: renderAdvantage
+    render: function (panel) {
+      colourAdvantageChips(panel);
+      renderAdvantage(panel);
+    }
   };
 })();

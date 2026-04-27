@@ -198,10 +198,8 @@ table.ma-adv-matrix {
   color: #475569; margin-top: 2px; }
 .ma-adv-matrix-wrap.ma-adv-show-counts td .ma-adv-cell-counts {
   display: block; }
-.ma-adv-matrix .ma-adv-sig-dot::after {
-  content: " \\2022"; font-weight: 700; color: #0f172a; }
-.ma-adv-matrix-wrap:not(.ma-adv-show-sig) .ma-adv-sig-dot::after {
-  content: ""; }
+/* Significance is shown via the chart bubble outline + the tooltip; per
+   Duncan, the matrix cells must NOT change formatting based on significance. */
 
 /* ============== ACTION LIST ============== */
 .ma-adv-action-cols {
@@ -311,6 +309,18 @@ ol.ma-adv-action-list {
 
 /* ============== HIDE QUADRANT WHEN UNCHECKED ============== */
 .ma-adv-quadrant-view[hidden] { display: none !important; }
+
+/* Suppress the panel-wide "About Mental Availability" drawer when the
+   advantage tab is the active sub-tab. The advantage tab has its own
+   "What is Mental Advantage?" callout at the bottom of its own subtab. */
+.ma-panel.ma-active-advantage .ma-about-availability { display: none !important; }
+
+/* Visible "Bubbles sized by:" status next to the chart range bar so the
+   user can see the base toggle change at a glance. */
+.ma-adv-base-status {
+  margin-left: auto; font-size: 11px; color: #475569;
+  font-style: italic; padding: 4px 10px;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; }
 
 @media print {
   .ma-adv-controls { display: none !important; }

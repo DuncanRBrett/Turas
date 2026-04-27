@@ -299,6 +299,10 @@
         });
         // Re-render chart when tab becomes visible (in case it was
         // built while hidden and has wrong dimensions)
+        // Toggle a panel class so CSS can hide the panel-wide
+        // Mental Availability drawer when on the advantage tab
+        // (Duncan: "remove the mental availability call out" on advantage).
+        panel.classList.toggle('ma-active-advantage', target === 'advantage');
         if (target === 'attributes' || target === 'ceps') {
           renderChart(panel, target);
         } else if (target === 'metrics') {

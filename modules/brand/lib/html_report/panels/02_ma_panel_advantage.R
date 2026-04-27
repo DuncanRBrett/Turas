@@ -30,14 +30,18 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
     return(.ma_adv_empty_state())
   }
 
+  # Layout: controls -> chips -> matrix/chart/actions -> insight ->
+  # methodology drawer at the bottom -> "What is Mental Advantage?"
+  # callout at the very bottom (Duncan: "move the mental advantage
+  # callout to the bottom of the screen").
   paste0(
     '<section class="ma-section ma-advantage-section" data-ma-stim="advantage">',
-    .ma_adv_intro(adv),
     .ma_adv_controls_bar(pd, adv),
     .ma_adv_chip_row(pd),
     .ma_adv_views_layout(adv),
     .ma_adv_insight_box(),
     .ma_adv_about(adv),
+    .ma_adv_intro(adv),
     '</section>'
   )
 }
@@ -120,7 +124,6 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
     base_buttons,
     filter_buttons,
     '<label class="toggle-label"><input type="checkbox" data-ma-action="adv-show-counts"> Show counts</label>',
-    '<label class="toggle-label"><input type="checkbox" data-ma-action="adv-show-chart" checked> Show chart</label>',
     '<button type="button" class="export-btn ma-pin-dropdown-btn" data-ma-action="adv-pindropdown" data-ma-pin-scope="advantage" title="Pin a section" aria-haspopup="true">&#128204; Pin &#9662;</button>',
     '<button type="button" class="export-btn ma-png-btn" onclick="brExportPngFromEl(this)" title="Export view to PNG">&#x1F5BC; PNG</button>',
     '<button type="button" class="export-btn ma-export-btn" data-ma-action="exporttable" data-ma-stim="advantage" title="Export Mental Advantage to Excel">⭳ Excel ▾</button>',
@@ -169,7 +172,6 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
     sprintf('<span class="ma-adv-legend-item"><span class="ma-adv-legend-swatch ma-adv-legend-defend"></span>Defend (MA &ge; +%dpp)</span>', threshold),
     '<span class="ma-adv-legend-item"><span class="ma-adv-legend-swatch ma-adv-legend-maintain"></span>Maintain (within &plusmn;', threshold, 'pp)</span>',
     sprintf('<span class="ma-adv-legend-item"><span class="ma-adv-legend-swatch ma-adv-legend-build"></span>Build (MA &le; &minus;%dpp)</span>', threshold),
-    '<span class="ma-adv-legend-item"><span class="ma-adv-legend-sig">&bull;</span>Significant (chi-square |z| &gt; 1.96)</span>',
     '</div>'
   )
 }
@@ -216,6 +218,7 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
     '<label class="ma-adv-xrange-label">Max',
     '<input type="number" class="ma-adv-xrange-input" data-ma-action="adv-xrange-max" min="0" max="100" step="5" placeholder="auto"></label>',
     '<button type="button" class="ma-adv-xrange-reset" data-ma-action="adv-xrange-reset">Reset</button>',
+    '<span class="ma-adv-base-status" data-ma-adv-base-status>Bubbles sized by: % total</span>',
     '</div>',
     '<svg class="ma-adv-quadrant-svg" data-ma-adv="quadrant" xmlns="http://www.w3.org/2000/svg"></svg>',
     '</div>'
