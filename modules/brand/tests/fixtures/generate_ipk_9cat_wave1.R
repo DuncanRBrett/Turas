@@ -201,6 +201,14 @@ make_focal_block <- function(cat, id_start) {
   }
 
   # ---- Pack sizes (only for focal cat buyers) -------------------------------
+  # Snapshot/restore RNG state so this newly added block does not shift the
+  # main random stream — the portfolio-base tests assert specific counts
+  # (DSS = 506, STO = 349, ...) that depend on the unaltered post-channel
+  # sequence. A separate per-category seed gives reproducible pack data
+  # without disturbing those magic numbers.
+  .seed_save <- if (exists(".Random.seed", envir = globalenv()))
+    get(".Random.seed", envir = globalenv()) else NULL
+  set.seed(20260427L + sum(utf8ToInt(cat)))
   pack_probs <- c(SMALL = 0.32, MEDIUM = 0.62, LARGE = 0.41, MULTI = 0.18)
   pack_list <- list()
   for (ps in packsizes) {
@@ -209,6 +217,7 @@ make_focal_block <- function(cat, id_start) {
     vals[is_buyer] <- rbinom(sum(is_buyer), 1, pack_probs[[ps]])
     pack_list[[cname]] <- vals
   }
+  if (!is.null(.seed_save)) assign(".Random.seed", .seed_save, envir = globalenv())
 
   # ---- Awareness for ALL non-focal categories (full + awareness-only) --------
   # All respondents answer brand awareness for every category (not just focal).

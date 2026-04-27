@@ -75,6 +75,7 @@ BRAND_VERSION <- "1.0"
     "08b_brand_volume.R",
     "08c_dirichlet_norms.R",
     "08d_buyer_heaviness.R",
+    "08e_shopper_behaviour.R",
     "09_portfolio.R",
     "09a_portfolio_footprint.R",
     "09b_portfolio_constellation.R",
