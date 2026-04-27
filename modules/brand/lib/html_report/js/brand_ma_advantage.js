@@ -150,8 +150,6 @@
     var pd = panel.__maData;
     var focal = (panel.__maState && panel.__maState.focal) || block.focal_brand_code;
     var threshold = pd.advantage.threshold_pp || 5;
-    var base = getActiveBase(panel);
-    var filter = getActiveFilter(panel);
 
     var hidden = panel.__maAdvHiddenStims || {};
 

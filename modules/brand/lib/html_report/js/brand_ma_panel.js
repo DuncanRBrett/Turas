@@ -1842,16 +1842,12 @@
 
     } else if (activeKey === 'advantage') {
       // Capture each Mental Advantage view as a faithful snapshot of the
-      // current state (focal brand, sort, decision colours, sig markers).
-      // The pin title carries focal brand + active base so a pinned card
-      // is unambiguous about which scope it represents.
+      // current state. Romaniuk-faithful: the base is always total
+      // respondents, so the pin title hard-codes that.
       var advSubtab = panel.querySelector('.ma-subtab[data-ma-subtab="advantage"]') || panel;
       var advFocalName = (pd.meta && pd.meta.focal_brand_name) || focal || 'Focal';
-      var advBaseBtn = advSubtab.querySelector('button[data-ma-action="adv-base"].sig-btn-active');
-      var advBaseLabel = advBaseBtn
-        ? (advBaseBtn.getAttribute('data-ma-adv-base') === 'aware' ? '% aware' : '% total')
-        : '% total';
-      var advTitleSuffix = ' — Mental Advantage — ' + advFocalName + ' — ' + advBaseLabel;
+      var advBaseLabel = 'total respondents (Romaniuk)';
+      var advTitleSuffix = ' — Mental Advantage — ' + advFocalName + ' — Base: ' + advBaseLabel;
       var advInsight = '';
       if (optKeys.indexOf('insight') >= 0) {
         var taA = panel.querySelector('.ma-insight-box-text[data-ma-stim="advantage"]');
