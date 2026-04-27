@@ -82,7 +82,9 @@ build_branded_reach_panel_html <- function(panel_data,
 
 .br_reach_subtab_overview <- function(pd, cat_code, focal_colour) {
   cards <- paste(vapply(pd$ads, function(ad) {
-    .br_reach_overview_card(ad, focal_colour, pd$config$decimal_places %||% 0L)
+    .br_reach_overview_card(ad, focal_colour,
+                             pd$config$decimal_places %||% 0L,
+                             cat_code = cat_code)
   }, character(1)), collapse = "")
 
   sprintf(
@@ -94,7 +96,7 @@ build_branded_reach_panel_html <- function(panel_data,
 }
 
 
-.br_reach_overview_card <- function(ad, focal_colour, dp) {
+.br_reach_overview_card <- function(ad, focal_colour, dp, cat_code) {
   reach_pct        <- .br_reach_pct(ad$reach_pct, dp)
   branded_pct      <- .br_reach_pct(ad$branded_reach_pct, dp)
   branding_pct     <- .br_reach_pct(ad$branding_pct, dp)
@@ -104,23 +106,33 @@ build_branded_reach_panel_html <- function(panel_data,
   img_html <- .br_reach_image_block(ad)
   base_lbl <- sprintf("n eligible = %s; n saw it = %s",
                       n_eligible_lbl, n_seen_lbl)
+  section_id <- .br_reach_card_section_id(cat_code, ad$asset_code, "overview")
 
+  # data-pin-as-table on a wrapper around image + KPIs so brand_pins.js
+  # captureFromRoot has something to grab when the card has no <table>.
   sprintf(
-    '<article class="br-reach-card" data-br-asset="%s">
+    '<article class="br-reach-card br-element-section" id="section-%s" data-section="%s" data-br-asset="%s">
        <header class="br-reach-card-header">
-         <div class="br-reach-card-title">%s</div>
+         <div class="br-reach-card-titlebar">
+           <h3 class="br-reach-card-title br-element-title">%s</h3>
+           %s
+         </div>
          <div class="br-reach-card-sub">%s</div>
        </header>
-       %s
-       <div class="br-reach-kpi-row">
-         <div class="br-reach-kpi"><div class="br-reach-kpi-val">%s</div><div class="br-reach-kpi-label">Reach</div></div>
-         <div class="br-reach-kpi" style="border-color:%s"><div class="br-reach-kpi-val" style="color:%s">%s</div><div class="br-reach-kpi-label">Branded reach</div></div>
-         <div class="br-reach-kpi"><div class="br-reach-kpi-val">%s</div><div class="br-reach-kpi-label">Branding %%</div></div>
+       <div class="br-reach-card-body" data-pin-as-table>
+         %s
+         <div class="br-reach-kpi-row">
+           <div class="br-reach-kpi"><div class="br-reach-kpi-val">%s</div><div class="br-reach-kpi-label">Reach</div></div>
+           <div class="br-reach-kpi" style="border-color:%s"><div class="br-reach-kpi-val" style="color:%s">%s</div><div class="br-reach-kpi-label">Branded reach</div></div>
+           <div class="br-reach-kpi"><div class="br-reach-kpi-val">%s</div><div class="br-reach-kpi-label">Branding %%</div></div>
+         </div>
+         <div class="br-reach-card-base">%s</div>
        </div>
-       <div class="br-reach-card-base">%s</div>
      </article>',
+    .br_reach_esc(section_id), .br_reach_esc(section_id),
     .br_reach_esc(ad$asset_code),
     .br_reach_esc(ad$asset_label %||% ad$asset_code),
+    .br_reach_card_toolbar(section_id),
     .br_reach_esc(.br_reach_correct_label(ad)),
     img_html,
     reach_pct,
@@ -139,7 +151,8 @@ build_branded_reach_panel_html <- function(panel_data,
     asset_id <- ad$asset_code
     table_df <- pd$misattribution[[asset_id]]
     .br_reach_misattribution_card(ad, table_df, focal_colour,
-                                   pd$config$decimal_places %||% 0L)
+                                   pd$config$decimal_places %||% 0L,
+                                   cat_code = cat_code)
   }, character(1)), collapse = "")
 
   sprintf(
@@ -150,7 +163,8 @@ build_branded_reach_panel_html <- function(panel_data,
 }
 
 
-.br_reach_misattribution_card <- function(ad, table_df, focal_colour, dp) {
+.br_reach_misattribution_card <- function(ad, table_df, focal_colour, dp,
+                                            cat_code) {
   if (is.null(table_df) || !is.data.frame(table_df) || nrow(table_df) == 0) {
     rows <- '<tr><td colspan="3" class="br-reach-empty-cell">No attribution data for this ad.</td></tr>'
   } else {
@@ -169,22 +183,30 @@ build_branded_reach_panel_html <- function(panel_data,
     }, character(1)), collapse = "")
   }
 
-  img_html <- .br_reach_image_block(ad)
+  img_html   <- .br_reach_image_block(ad)
+  section_id <- .br_reach_card_section_id(cat_code, ad$asset_code, "misattribution")
 
   sprintf(
-    '<article class="br-reach-card" data-br-asset="%s">
+    '<article class="br-reach-card br-element-section" id="section-%s" data-section="%s" data-br-asset="%s">
        <header class="br-reach-card-header">
-         <div class="br-reach-card-title">%s</div>
+         <div class="br-reach-card-titlebar">
+           <h3 class="br-reach-card-title br-element-title">%s</h3>
+           %s
+         </div>
          <div class="br-reach-card-sub">%s</div>
        </header>
-       %s
-       <table class="br-reach-attr-table">
-         <thead><tr><th>Brand picked</th><th>%% of seen</th><th>n</th></tr></thead>
-         <tbody>%s</tbody>
-       </table>
+       <div class="br-reach-card-body">
+         %s
+         <table class="br-reach-attr-table">
+           <thead><tr><th>Brand picked</th><th>%% of seen</th><th>n</th></tr></thead>
+           <tbody>%s</tbody>
+         </table>
+       </div>
      </article>',
+    .br_reach_esc(section_id), .br_reach_esc(section_id),
     .br_reach_esc(ad$asset_code),
     .br_reach_esc(ad$asset_label %||% ad$asset_code),
+    .br_reach_card_toolbar(section_id),
     .br_reach_esc(.br_reach_correct_label(ad)),
     img_html,
     rows)
@@ -200,7 +222,8 @@ build_branded_reach_panel_html <- function(panel_data,
     asset_id <- ad$asset_code
     table_df <- pd$media_mix[[asset_id]]
     .br_reach_media_card(ad, table_df, focal_colour,
-                          pd$config$decimal_places %||% 0L)
+                          pd$config$decimal_places %||% 0L,
+                          cat_code = cat_code)
   }, character(1)), collapse = "")
 
   sprintf(
@@ -211,7 +234,7 @@ build_branded_reach_panel_html <- function(panel_data,
 }
 
 
-.br_reach_media_card <- function(ad, table_df, focal_colour, dp) {
+.br_reach_media_card <- function(ad, table_df, focal_colour, dp, cat_code) {
   if (is.null(table_df) || !is.data.frame(table_df) || nrow(table_df) == 0) {
     rows <- '<tr><td colspan="3" class="br-reach-empty-cell">No media data for this ad.</td></tr>'
   } else {
@@ -230,22 +253,30 @@ build_branded_reach_panel_html <- function(panel_data,
     }, character(1)), collapse = "")
   }
 
-  img_html <- .br_reach_image_block(ad)
+  img_html   <- .br_reach_image_block(ad)
+  section_id <- .br_reach_card_section_id(cat_code, ad$asset_code, "media")
 
   sprintf(
-    '<article class="br-reach-card" data-br-asset="%s">
+    '<article class="br-reach-card br-element-section" id="section-%s" data-section="%s" data-br-asset="%s">
        <header class="br-reach-card-header">
-         <div class="br-reach-card-title">%s</div>
+         <div class="br-reach-card-titlebar">
+           <h3 class="br-reach-card-title br-element-title">%s</h3>
+           %s
+         </div>
          <div class="br-reach-card-sub">%s</div>
        </header>
-       %s
-       <table class="br-reach-media-table">
-         <thead><tr><th>Channel</th><th></th><th>%%</th><th>n</th></tr></thead>
-         <tbody>%s</tbody>
-       </table>
+       <div class="br-reach-card-body">
+         %s
+         <table class="br-reach-media-table">
+           <thead><tr><th>Channel</th><th></th><th>%%</th><th>n</th></tr></thead>
+           <tbody>%s</tbody>
+         </table>
+       </div>
      </article>',
+    .br_reach_esc(section_id), .br_reach_esc(section_id),
     .br_reach_esc(ad$asset_code),
     .br_reach_esc(ad$asset_label %||% ad$asset_code),
+    .br_reach_card_toolbar(section_id),
     .br_reach_esc(.br_reach_correct_label(ad)),
     img_html,
     rows)
@@ -299,6 +330,28 @@ build_branded_reach_panel_html <- function(panel_data,
   if (is.null(v) || is.na(v) || !is.finite(v)) return("—")
   sprintf("%d", as.integer(round(v)))
 }
+
+.br_reach_card_section_id <- function(cat_code, asset_code, tab_key) {
+  # Match the page-builder's category id slug rule (lowercase, non-alnum -> '-')
+  cat_id   <- gsub("[^a-z0-9]", "-", tolower(as.character(cat_code %||% "cat")))
+  asset_id <- gsub("[^a-z0-9]", "-", tolower(as.character(asset_code %||% "ad")))
+  sprintf("br-reach-%s-%s-%s", cat_id, asset_id, tab_key)
+}
+
+
+.br_reach_card_toolbar <- function(section_id) {
+  # Per-card pin + PNG buttons. Onclick handlers call the existing
+  # window.brTogglePin / window.brExportPng wired by brand_pins.js — they
+  # find the section via [data-section] / id="section-<sid>".
+  sprintf(
+    '<div class="br-reach-card-toolbar" data-section="%s">
+       <button class="br-pin-btn br-reach-card-pin" data-section="%s" onclick="brTogglePin(\'%s\')" title="Pin this card">&#x1F4CC;</button>
+       <button class="br-png-btn br-reach-card-png" onclick="brExportPng(\'%s\',this)" title="Export PNG of this card">&#x1F5BC;</button>
+     </div>',
+    .br_reach_esc(section_id), .br_reach_esc(section_id),
+    .br_reach_esc(section_id), .br_reach_esc(section_id))
+}
+
 
 .br_reach_correct_label <- function(ad) {
   bc  <- ad$correct_brand %||% ""
@@ -361,10 +414,23 @@ build_branded_reach_panel_styles <- function(focal_colour = "#1A5276") {
 
 .br-reach-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; }
 
-.br-reach-card { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:14px; box-shadow: 0 1px 2px rgba(0,0,0,.03); }
+.br-reach-card { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:14px; box-shadow: 0 1px 2px rgba(0,0,0,.03); position: relative; }
 .br-reach-card-header { margin-bottom: 10px; }
-.br-reach-card-title  { font-weight: 600; font-size: 14px; color:#0f172a; }
-.br-reach-card-sub    { font-size: 11px; color:#64748b; margin-top: 2px; }
+.br-reach-card-titlebar { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.br-reach-card-title  { font-weight: 600; font-size: 14px; color:#0f172a; margin: 0; line-height: 1.3; }
+.br-reach-card-sub    { font-size: 11px; color:#64748b; margin-top: 4px; }
+
+/* Per-card pin + PNG toolbar — small, top-right, dimmed until card hover */
+.br-reach-card-toolbar { display: flex; gap: 4px; flex-shrink: 0; opacity: .35; transition: opacity .15s; }
+.br-reach-card:hover .br-reach-card-toolbar,
+.br-reach-card-toolbar:focus-within { opacity: 1; }
+.br-reach-card-pin, .br-reach-card-png {
+  background:#fff; border:1px solid #e2e8f0; border-radius:6px; cursor:pointer;
+  padding:3px 7px; font-size:13px; line-height:1; color:#64748b;
+  transition: background-color .12s, border-color .12s, color .12s;
+}
+.br-reach-card-pin:hover, .br-reach-card-png:hover { background:#f1f5f9; border-color:#cbd5e1; color:#0f172a; }
+.br-reach-card-pin.pin-flash { background: %s; border-color: %s; color:#fff; }
 
 .br-reach-img-wrap { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; margin-bottom:12px; aspect-ratio: 16 / 9; display:flex; align-items:center; justify-content:center; }
 .br-reach-img      { max-width:100%%; max-height:100%%; object-fit:contain; display:block; }
@@ -401,7 +467,7 @@ build_branded_reach_panel_styles <- function(focal_colour = "#1A5276") {
 .br-reach-na { color: #cbd5e1; font-style: italic; }
 
 .br-reach-insight-box { margin-top: 18px; }
-', focal_colour, focal_colour, focal_colour, focal_colour)
+', focal_colour, focal_colour, focal_colour, focal_colour, focal_colour, focal_colour)
 }
 
 
