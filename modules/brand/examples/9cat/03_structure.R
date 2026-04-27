@@ -809,28 +809,28 @@
   # Ad hoc question roles (illustrative; one ALL-scope and one per full
   # category to demonstrate scope handling). The companion data columns
   # (ADHOC_NPS, ADHOC_FUTURE_<CAT>) are appended in 04_data.R.
-  adhoc_rows <- c(
-    list(list(Role = "adhoc.nps.ALL",
-              ClientCode = "ADHOC_NPS",
-              QuestionText = "On a 0-10 scale, how likely are you to recommend our brand to a friend or colleague?",
-              QuestionTextShort = "NPS (0-10)",
-              Variable_Type = "Numeric",
-              ColumnPattern = "{code}",
-              OptionMapScale = "",
-              Notes = "Ad hoc — Net Promoter Score; auto-bucketed by quartile")),
-    lapply(full_cats, function(cat) {
-      list(Role = sprintf("adhoc.future_intent.%s", cat$code),
-           ClientCode = sprintf("ADHOC_FUTURE_%s", cat$code),
-           QuestionText = sprintf("How likely are you to buy %s in the next 3 months?",
-                                  tolower(cat$name)),
-           QuestionTextShort = sprintf("Future intent %s", cat$code),
-           Variable_Type = "Single_Response",
-           ColumnPattern = "{code}",
-           OptionMapScale = "future_intent_scale",
-           Notes = "Ad hoc — 5-point likelihood scale shared across full categories")
-    })
+  all_adhoc_rows <- list(
+    list(Role = "adhoc.nps.ALL",
+         ClientCode = "ADHOC_NPS",
+         QuestionText = "On a 0-10 scale, how likely are you to recommend our brand to a friend or colleague?",
+         QuestionTextShort = "NPS (0-10)",
+         Variable_Type = "Numeric",
+         ColumnPattern = "{code}",
+         OptionMapScale = "",
+         Notes = "Ad hoc — Net Promoter Score; auto-bucketed by quartile")
   )
-  adhoc_rows <- unlist(adhoc_rows, recursive = FALSE)
+  per_cat_adhoc_rows <- lapply(full_cats, function(cat) {
+    list(Role = sprintf("adhoc.future_intent.%s", cat$code),
+         ClientCode = sprintf("ADHOC_FUTURE_%s", cat$code),
+         QuestionText = sprintf("How likely are you to buy %s in the next 3 months?",
+                                tolower(cat$name)),
+         QuestionTextShort = sprintf("Future intent %s", cat$code),
+         Variable_Type = "Single_Response",
+         ColumnPattern = "{code}",
+         OptionMapScale = "future_intent_scale",
+         Notes = "Ad hoc — 5-point likelihood scale shared across full categories")
+  })
+  adhoc_rows <- c(all_adhoc_rows, per_cat_adhoc_rows)
 
   c(screener_rows, system_rows, cat_buying_rows, funnel_rows,
     channel_rows, packsize_rows,
