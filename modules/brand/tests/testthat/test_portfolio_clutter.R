@@ -302,11 +302,11 @@ test_that("fixture: awareness_set_size_mean is positive and reasonable (< n_bran
   expect_true(m > 0 && m <= 10)
 })
 
-test_that("fixture: cat_penetration equals SQ2_DSS base / total (506/1200)", {
+test_that("fixture: cat_penetration equals SQ2_DSS base / total (625/1200)", {
   dat    <- .load_cl_fixture()
   result <- compute_clutter_data(dat, .ipk_cl_categories(),
                                  .ipk_cl_structure(), .ipk_cl_config())
-  expect_equal(result$clutter_df$cat_penetration, 506 / 1200, tolerance = 1e-4)
+  expect_equal(result$clutter_df$cat_penetration, 625 / 1200, tolerance = 1e-4)
 })
 
 test_that("fixture: IPK has quadrant Dominant or Contested in DSS (focal brand, high share)", {

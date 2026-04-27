@@ -3,9 +3,14 @@
 # ==============================================================================
 # Known-answer tests for build_portfolio_base() and guard_validate_portfolio().
 # Fixture: ipk_9cat_wave1.xlsx (1,200 respondents, 9 categories).
-# Authoritative counts verified against the raw fixture on 2026-04-21:
-#   DSS: SQ1=568, SQ2=506
-#   STO: SQ1=602, SQ2=349
+# Authoritative counts verified against the raw fixture on 2026-04-27, after the
+# shopper-behaviour data block was added (commit eefabad) shifted the seed=42
+# RNG sequence:
+#   DSS: SQ1=958, SQ2=625
+#   STO: SQ1=818, SQ2=382
+# Whenever modules/brand/examples/9cat/04_data.R changes the order or count of
+# random draws BEFORE the screener loop, these expected values must be
+# regenerated via build_9cat_synthetic_example(n=1200, seed=42).
 # ==============================================================================
 
 .find_turas_root_for_test <- function() {
@@ -51,37 +56,37 @@ FIXTURE_PATH <- file.path(
 # build_portfolio_base() — happy-path known-answer tests
 # ---------------------------------------------------------------------------
 
-test_that("DSS 3m base returns correct unweighted count (506)", {
+test_that("DSS 3m base returns correct unweighted count (625)", {
   dat <- .load_fixture()
   result <- build_portfolio_base(dat, "DSS", timeframe = "3m")
   expect_null(result$status)                    # not a refusal
-  expect_equal(result$n_uw, 506L)
+  expect_equal(result$n_uw, 625L)
   expect_equal(result$col_used, "SQ2_DSS")
   expect_length(result$idx, 1200L)
-  expect_equal(sum(result$idx), 506L)
+  expect_equal(sum(result$idx), 625L)
 })
 
-test_that("DSS 13m base returns correct unweighted count (568)", {
+test_that("DSS 13m base returns correct unweighted count (958)", {
   dat <- .load_fixture()
   result <- build_portfolio_base(dat, "DSS", timeframe = "13m")
   expect_null(result$status)
-  expect_equal(result$n_uw, 568L)
+  expect_equal(result$n_uw, 958L)
   expect_equal(result$col_used, "SQ1_DSS")
 })
 
-test_that("STO 3m base returns correct unweighted count (349)", {
+test_that("STO 3m base returns correct unweighted count (382)", {
   dat <- .load_fixture()
   result <- build_portfolio_base(dat, "STO", timeframe = "3m")
   expect_null(result$status)
-  expect_equal(result$n_uw, 349L)
+  expect_equal(result$n_uw, 382L)
   expect_equal(result$col_used, "SQ2_STO")
 })
 
-test_that("STO 13m base returns correct unweighted count (602)", {
+test_that("STO 13m base returns correct unweighted count (818)", {
   dat <- .load_fixture()
   result <- build_portfolio_base(dat, "STO", timeframe = "13m")
   expect_null(result$status)
-  expect_equal(result$n_uw, 602L)
+  expect_equal(result$n_uw, 818L)
   expect_equal(result$col_used, "SQ1_STO")
 })
 
@@ -90,7 +95,7 @@ test_that("uniform weights of 1.0 produce n_w == n_uw", {
   w      <- rep(1.0, nrow(dat))
   result <- build_portfolio_base(dat, "DSS", timeframe = "3m", weights = w)
   expect_null(result$status)
-  expect_equal(result$n_w, 506.0)
+  expect_equal(result$n_w, 625.0)
   expect_equal(result$n_w, as.numeric(result$n_uw))
 })
 
@@ -99,7 +104,7 @@ test_that("doubling all weights produces n_w == 2 * n_uw", {
   w      <- rep(2.0, nrow(dat))
   result <- build_portfolio_base(dat, "DSS", timeframe = "3m", weights = w)
   expect_null(result$status)
-  expect_equal(result$n_w, 506.0 * 2.0)
+  expect_equal(result$n_w, 625.0 * 2.0)
 })
 
 test_that("NULL weights default to uniform (n_w == n_uw)", {
