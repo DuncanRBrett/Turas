@@ -555,6 +555,26 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
             }
           )
         }
+
+        # Shopper Behaviour: optional purchase channel + pack size analytics.
+        # Each role is independently optional; absence means the panel
+        # section silently hides. Both consume the same pen_mat used for
+        # Dirichlet to identify each brand's buyers.
+        sb <- .run_shopper_for_category(
+          structure   = structure,
+          cat_code    = cat_code,
+          cat_name    = cat_name,
+          cat_data    = cat_data,
+          pen_mat     = vol_result$pen_mat,
+          brand_codes = cat_brands$BrandCode,
+          weights     = cat_weights,
+          verbose     = verbose
+        )
+        cat_result$shopper_location <- sb$location
+        cat_result$shopper_packsize <- sb$packsize
+        if (length(sb$warnings) > 0) {
+          warnings_list <- c(warnings_list, sb$warnings)
+        }
       }
     }
 
@@ -955,6 +975,89 @@ if (!exists(".find_brand_col", mode = "function")) {
     `funnel.tenure_threshold`  = tenure,
     `funnel.significance_level` = alpha
   )
+}
+
+
+# ==============================================================================
+# SHOPPER BEHAVIOUR DISPATCHER (per category)
+# ==============================================================================
+
+#' Run shopper-behaviour engines for one category
+#'
+#' Resolves the optional \code{channel.purchase.{CAT}} and
+#' \code{cat_buying.packsize.{CAT}} roles via
+#' \code{resolve_shopper_role_columns()} and dispatches to the
+#' \code{run_shopper_*} engines when the columns and option sheet are both
+#' present. Absent role / absent code-list / engine REFUSED all collapse
+#' to \code{NULL}, which the panel renderer treats as "skip section".
+#'
+#' Engine errors are caught and surfaced through the \code{warnings} list
+#' so the category-level pipeline never breaks because shopper data is
+#' malformed.
+#'
+#' @return List with three slots: \code{location}, \code{packsize} (each
+#'   either NULL or an engine result), and \code{warnings} (character
+#'   vector to splice into the parent warnings list).
+#' @keywords internal
+.run_shopper_for_category <- function(structure, cat_code, cat_name,
+                                       cat_data, pen_mat, brand_codes,
+                                       weights, verbose = FALSE) {
+  loc <- .run_shopper_one(
+    structure, paste0("channel.purchase.", cat_code), "location",
+    cat_data, pen_mat, brand_codes, weights, cat_name, verbose
+  )
+  pak <- .run_shopper_one(
+    structure, paste0("cat_buying.packsize.", cat_code), "packsize",
+    cat_data, pen_mat, brand_codes, weights, cat_name, verbose
+  )
+  list(
+    location = loc$result,
+    packsize = pak$result,
+    warnings = c(loc$warnings, pak$warnings)
+  )
+}
+
+
+# Single-engine dispatcher: resolves columns, checks they exist in cat_data,
+# runs the appropriate engine, catches errors. Returns a list with
+# \code{result} (NULL when the role / columns are absent -- legitimate
+# "no question asked") and \code{warnings} (engine errors only; missing
+# data is silent).
+.run_shopper_one <- function(structure, role, kind, cat_data, pen_mat,
+                              brand_codes, weights, cat_name, verbose) {
+
+  spec <- tryCatch(
+    resolve_shopper_role_columns(structure, role, kind),
+    error = function(e) NULL
+  )
+  if (is.null(spec)) return(list(result = NULL, warnings = character(0)))
+
+  cols_present <- spec$cols %in% names(cat_data)
+  if (!any(cols_present)) {
+    return(list(result = NULL, warnings = character(0)))
+  }
+  if (!all(cols_present)) {
+    msg <- sprintf(
+      "Shopper %s for %s: %d/%d expected columns missing - skipping section.",
+      kind, cat_name, sum(!cols_present), length(spec$cols))
+    return(list(result = NULL, warnings = msg))
+  }
+
+  if (verbose) cat(sprintf("  Running shopper %s...\n", kind))
+  data_df <- cat_data[, spec$cols, drop = FALSE]
+  fn <- if (identical(kind, "location")) run_shopper_location else run_shopper_packsize
+  warnings <- character(0)
+  res <- tryCatch(
+    fn(data_df, spec$cols, spec$codes, spec$labels,
+       pen_mat = pen_mat, brand_codes = brand_codes, weights = weights),
+    error = function(e) {
+      warnings <<- sprintf("Shopper %s failed for %s: %s",
+                            kind, cat_name, e$message)
+      list(status = "REFUSED", code = "CALC_ENGINE_ERROR",
+           message = conditionMessage(e))
+    }
+  )
+  list(result = res, warnings = warnings)
 }
 
 

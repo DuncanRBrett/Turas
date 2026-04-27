@@ -357,6 +357,95 @@ run_shopper_packsize <- function(pack_data,
 
 
 # ==============================================================================
+# ROLE RESOLUTION HELPER
+# ==============================================================================
+
+#' Resolve a shopper-behaviour role to data columns
+#'
+#' Looks up a row in QuestionMap by exact role match, then expands its
+#' \code{ColumnPattern} against the matching code-list sheet
+#' (\code{Channels} or \code{PackSizes}) to produce the parallel \code{cols},
+#' \code{codes} and \code{labels} vectors that the analytical engine
+#' expects. Falls back to the bare \code{ClientCode} if the pattern lacks
+#' the expected token (legacy schemas). Returns \code{NULL} when the role
+#' is absent or the code-list sheet is missing -- a true "optional question"
+#' signal that callers can use to skip the panel section silently.
+#'
+#' @param structure List. A loaded survey structure (from
+#'   \code{load_brand_survey_structure()}).
+#' @param role Character. Exact role name to look up (e.g.
+#'   "channel.purchase.DSS" or "cat_buying.packsize.DSS").
+#' @param kind Character. Either \code{"location"} (uses Channels sheet,
+#'   keys ChannelCode/ChannelLabel) or \code{"packsize"} (PackSizes,
+#'   PackSizeCode/PackSizeLabel).
+#'
+#' @return List with \code{cols}, \code{codes}, \code{labels} (parallel
+#'   character vectors), or \code{NULL} if not resolvable.
+#'
+#' @export
+resolve_shopper_role_columns <- function(structure, role, kind) {
+
+  qmap <- structure$questionmap
+  if (is.null(qmap) || !"Role" %in% names(qmap) || nrow(qmap) == 0) return(NULL)
+  rows <- qmap[!is.na(qmap$Role) &
+                 trimws(as.character(qmap$Role)) == role, , drop = FALSE]
+  if (nrow(rows) == 0) return(NULL)
+
+  client_code <- trimws(as.character(rows$ClientCode[1]))
+  pattern     <- trimws(as.character(rows$ColumnPattern[1]))
+  if (is.na(pattern) || pattern == "") pattern <- "{code}"
+
+  list_spec <- .shopper_code_list_spec(structure, kind)
+  if (is.null(list_spec)) return(NULL)
+
+  token_present <- grepl(list_spec$token_regex, pattern)
+  if (!token_present) {
+    return(list(cols   = client_code,
+                codes  = client_code,
+                labels = client_code))
+  }
+
+  resolved <- gsub("{code}", client_code, pattern, fixed = TRUE)
+  cols <- vapply(list_spec$codes, function(cd) {
+    gsub(list_spec$token_regex, cd, resolved)
+  }, character(1))
+  list(cols = unname(cols),
+       codes = list_spec$codes,
+       labels = list_spec$labels)
+}
+
+
+# Pull the right code-list sheet + token regex for a given kind. Returns
+# NULL when the sheet is missing or empty -- the engine then refuses
+# upstream with the relevant CFG_*_LIST_MISSING message via the resolver.
+.shopper_code_list_spec <- function(structure, kind) {
+  if (identical(kind, "location")) {
+    sheet  <- structure$channels
+    keycol <- "ChannelCode"
+    lblcol <- "ChannelLabel"
+    token  <- "\\{channel(_)?code\\}"
+  } else if (identical(kind, "packsize")) {
+    sheet  <- structure$packsizes
+    keycol <- "PackSizeCode"
+    lblcol <- "PackSizeLabel"
+    token  <- "\\{packsize(_)?code\\}"
+  } else {
+    return(NULL)
+  }
+  if (is.null(sheet) || nrow(sheet) == 0 || !keycol %in% names(sheet)) {
+    return(NULL)
+  }
+  if ("DisplayOrder" %in% names(sheet)) {
+    ord <- suppressWarnings(as.numeric(sheet$DisplayOrder))
+    sheet <- sheet[order(ifelse(is.na(ord), 999L, ord)), , drop = FALSE]
+  }
+  codes  <- as.character(sheet[[keycol]])
+  labels <- if (lblcol %in% names(sheet)) as.character(sheet[[lblcol]]) else codes
+  list(codes = codes, labels = labels, token_regex = token)
+}
+
+
+# ==============================================================================
 # MODULE INITIALISATION
 # ==============================================================================
 

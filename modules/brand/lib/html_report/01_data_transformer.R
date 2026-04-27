@@ -436,6 +436,8 @@ transform_brand_panels <- function(results, config) {
         buyer_heaviness       = bh,
         cat_buying_frequency  = cbf,
         repertoire            = rep,
+        shopper_location      = cr$shopper_location,
+        shopper_packsize      = cr$shopper_packsize,
         brand_labels          = brand_labels,
         brand_colours         = brand_colours,
         cat_buying_dist_labels = config$cat_buying_dist_labels %||% NULL
