@@ -1252,6 +1252,16 @@
       return;
     }
 
+    /* Shopper tab branch — up to two independent sections + insight */
+    if (tabKey === 'shopper') {
+      var shopBoxes = cbDetectShopperCheckboxes(activeTab, hasInsight);
+      var anchorShop = pinBtn.closest('.br-section-toolbar') || pinBtn.parentElement;
+      TurasPins.showCheckboxPopover(pinBtn, shopBoxes, function (flags) {
+        cbExecuteShopperPin(panel, activeTab, flags, editor, /*asPng=*/false);
+      }, anchorShop);
+      return;
+    }
+
     /* Detect available content in the active sub-tab only */
     var hasChart = false;
     var hasTable = false;
@@ -1318,6 +1328,84 @@
     }
   }
 
+  /* ---------------------------------------------------------------------- */
+  /* Shopper Behaviour tab — independently selectable Location + Pack Size  */
+  /* sections + Insight, shared between Pin and PNG export.                 */
+  /* ---------------------------------------------------------------------- */
+  function cbDetectShopperCheckboxes(activeTab, hasInsight) {
+    var hasLoc = !!activeTab.querySelector('section[data-cb-scope="shop_loc"] table');
+    var hasPak = !!activeTab.querySelector('section[data-cb-scope="shop_pak"] table');
+    var hasKpi = !!activeTab.querySelector('.cb-kpi-strip');
+    var checkboxes = [];
+    if (hasKpi) checkboxes.push({ key: 'kpis',     label: 'KPI cards',         available: true, checked: true });
+    if (hasLoc) checkboxes.push({ key: 'location', label: 'Purchase Location', available: true, checked: true });
+    if (hasPak) checkboxes.push({ key: 'packsize', label: 'Pack Sizes',        available: true, checked: true });
+    checkboxes.push({ key: 'insight', label: 'Insight', available: true, checked: hasInsight });
+    return checkboxes;
+  }
+
+  function cbCaptureShopperHtml(activeTab, flags) {
+    var portable = (typeof TurasPins !== 'undefined' && TurasPins.capturePortableHtml)
+      ? TurasPins.capturePortableHtml
+      : function (el) { return el.outerHTML; };
+    var strip = (typeof window.brStripInteractive === 'function')
+      ? window.brStripInteractive
+      : function (s) { return s; };
+    var pieces = [];
+    if (flags.kpis) {
+      var kpi = activeTab.querySelector('.cb-kpi-strip');
+      if (kpi) pieces.push(strip(portable(kpi)));
+    }
+    if (flags.location) {
+      var locSec = activeTab.querySelector('section[data-cb-scope="shop_loc"]');
+      if (locSec) pieces.push('<h4 style="margin:12px 0 6px;font-size:13px;font-weight:600;">Purchase Location</h4>' +
+                              strip(portable(locSec)));
+    }
+    if (flags.packsize) {
+      var pakSec = activeTab.querySelector('section[data-cb-scope="shop_pak"]');
+      if (pakSec) pieces.push('<h4 style="margin:12px 0 6px;font-size:13px;font-weight:600;">Pack Sizes</h4>' +
+                              strip(portable(pakSec)));
+    }
+    return pieces.join('');
+  }
+
+  function cbExecuteShopperPin(panel, activeTab, flags, editor, asPng) {
+    if (typeof TurasPins === 'undefined') return;
+
+    var section = panel.closest('.br-element-section') || panel.parentNode;
+    var titleEl = section ? section.querySelector('.br-element-title') : null;
+    var baseTitle = titleEl ? titleEl.textContent.trim() : '';
+    var title = baseTitle ? baseTitle + ' — Shopper Behaviour' : 'Shopper Behaviour';
+
+    var html = cbCaptureShopperHtml(activeTab, flags);
+    var insightText = (flags.insight && editor) ? editor.value.trim() : '';
+    if (!html && !insightText) return;
+
+    var payload = {
+      sectionKey:  'cb-shopper-' + Date.now(),
+      title:       title,
+      chartSvg:    '',
+      tableHtml:   html,
+      insightText: insightText,
+      pinFlags:    { chart: false, table: !!html, insight: !!insightText },
+      pinMode:     'custom'
+    };
+
+    if (asPng) {
+      if (typeof TurasPins.exportContentAsPNG === 'function') {
+        TurasPins.exportContentAsPNG(payload);
+      }
+      return;
+    }
+    TurasPins.add(payload);
+
+    var pinBtn = section ? section.querySelector('.cb-toolbar-top .br-pin-btn') : null;
+    if (pinBtn) {
+      pinBtn.classList.add('pin-flash');
+      setTimeout(function () { pinBtn.classList.remove('pin-flash'); }, 600);
+    }
+  }
+
   function cbExecutePin(panel, activeTab, tabKey, flags, editor) {
     if (typeof TurasPins === 'undefined') return;
 
@@ -1327,7 +1415,7 @@
     var baseTitle = titleEl ? titleEl.textContent.trim() : '';
     var tabLabels = { brands: 'Brand Summary', loyalty: 'Loyalty Segmentation',
                      dist: 'Purchase Distribution', dop: 'Duplication of Purchase',
-                     context: 'Category Context' };
+                     context: 'Category Context', shopper: 'Shopper Behaviour' };
     var tabLabel = tabLabels[tabKey] || tabKey;
     var title = baseTitle ? baseTitle + ' — ' + tabLabel : tabLabel;
 
@@ -1439,6 +1527,15 @@
       return;
     }
 
+    /* Shopper tab branch — independently selectable Location + Pack Size sections */
+    if (tabKey === 'shopper') {
+      var shopBoxes = cbDetectShopperCheckboxes(activeTab, hasInsight);
+      TurasPins.showCheckboxPopover(pngBtn, shopBoxes, function (flags) {
+        cbExecuteShopperPin(panel, activeTab, flags, editor, /*asPng=*/true);
+      }, null, { title: 'EXPORT AS PNG', actionLabel: 'Export' });
+      return;
+    }
+
     /* Detect available content — mirrors cbPinDialog detection */
     var hasChart = false;
     var hasTable = false;
@@ -1504,7 +1601,7 @@
     var baseTitle = titleEl ? titleEl.textContent.trim() : '';
     var tabLabels = { brands: 'Brand Summary', loyalty: 'Loyalty Segmentation',
                      dist: 'Purchase Distribution', dop: 'Duplication of Purchase',
-                     context: 'Category Context' };
+                     context: 'Category Context', shopper: 'Shopper Behaviour' };
     var tabLabel = tabLabels[tabKey] || tabKey;
     var title = baseTitle ? baseTitle + ' — ' + tabLabel : tabLabel;
 
