@@ -689,6 +689,44 @@ paste0(
 .ma-bar-label    { font-size: 9px; fill: #94a3b8; }
 .ma-bar-group-label { font-size: 11px; fill: #334155; font-weight: 500; }
 .ma-bar-cat-avg  { stroke: #94a3b8; stroke-width: 1.5; stroke-dasharray: 4 3; }
+
+/* === Shopper Behaviour sub-tab — fitting overrides ============== */
+/* Compact KPI-chip variant used by Shopper Behaviour summary chips on
+   the Context tab. The default chip\'s 22px value font is too big for
+   long channel / pack-size labels, so this variant shrinks the value
+   font and lets it wrap to two lines if needed. The label text below
+   keeps the standard 11px size. Both chip body and value allow text
+   wrap so longer values like "Supermarket (88%)" do not overflow the
+   chip\'s flex container or push the row off-screen. */
+.cb-panel .cb-kpi-strip { align-items: stretch; }
+.cb-panel .cb-kpi-chip.cb-kpi-chip-text {
+  min-width: 150px; max-width: 240px; padding: 8px 14px;
+}
+.cb-panel .cb-kpi-chip.cb-kpi-chip-text .cb-kpi-val {
+  font-size: 14px; line-height: 1.25; font-weight: 600;
+  white-space: normal; overflow-wrap: break-word; word-break: keep-all;
+}
+.cb-panel .cb-kpi-chip.cb-kpi-chip-text .cb-kpi-label {
+  white-space: normal; line-height: 1.2;
+}
+
+/* Shopper section column headers: enable wrap so multi-word channel
+   labels (e.g. "Online / food delivery app") do not force the column
+   wider than the available row. Brand summary, loyalty, dist tables
+   keep their default nowrap. Selector matches the section wrappers
+   the renderer emits via data-cb-scope on cb-rel-section. */
+.cb-panel .cb-rel-section[data-cb-scope^="shop_"] .ct-table .ct-th {
+  white-space: normal; line-height: 1.25;
+  max-width: 110px; word-break: keep-all; overflow-wrap: break-word;
+  hyphens: auto;
+}
+.cb-panel .cb-rel-section[data-cb-scope^="shop_"] .ct-table .ct-th .cb-th-label {
+  white-space: normal; display: inline-block; max-width: 100%;
+}
+/* Keep the brand-label column comfortable: it is the row stub here. */
+.cb-panel .cb-rel-section[data-cb-scope^="shop_"] .ct-table .ct-th.ct-label-col {
+  max-width: none; min-width: 130px; white-space: nowrap;
+}
 </style>'
 )
 }

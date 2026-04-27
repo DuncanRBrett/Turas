@@ -42,6 +42,8 @@ cb_shopper_tab_html <- function(panel_data) {
   has_pak <- .cb_shop_section_ok(pak)
   if (!has_loc && !has_pak) return("")
 
+  buyers_pct_map <- .cb_shop_buyers_pct_map(panel_data$buyer_heaviness)
+
   parts <- character(0)
   parts <- c(parts, '<div class="cb-section-title">Shopper Behaviour</div>')
   parts <- c(parts,
@@ -54,29 +56,43 @@ cb_shopper_tab_html <- function(panel_data) {
 
   if (has_loc) {
     parts <- c(parts, .cb_shop_section(
-      result        = loc,
-      scope         = "shop_loc",
-      heading       = "Purchase Location",
-      base_label    = "Brand buyers (n=)",
-      cat_avg_label = "Category avg",
-      focal         = panel_data$focal_brand,
-      brand_labels  = panel_data$brand_labels,
-      kind_label    = "channel"
+      result         = loc,
+      scope          = "shop_loc",
+      heading        = "Purchase Location",
+      base_label     = "Brand buyers (n=)",
+      cat_avg_label  = "Category avg",
+      focal          = panel_data$focal_brand,
+      brand_labels   = panel_data$brand_labels,
+      buyers_pct_map = buyers_pct_map,
+      kind_label     = "channel"
     ))
   }
   if (has_pak) {
     parts <- c(parts, .cb_shop_section(
-      result        = pak,
-      scope         = "shop_pak",
-      heading       = "Pack Sizes",
-      base_label    = "Brand buyers (n=)",
-      cat_avg_label = "Category avg",
-      focal         = panel_data$focal_brand,
-      brand_labels  = panel_data$brand_labels,
-      kind_label    = "pack size"
+      result         = pak,
+      scope          = "shop_pak",
+      heading        = "Pack Sizes",
+      base_label     = "Brand buyers (n=)",
+      cat_avg_label  = "Category avg",
+      focal          = panel_data$focal_brand,
+      brand_labels   = panel_data$brand_labels,
+      buyers_pct_map = buyers_pct_map,
+      kind_label     = "pack size"
     ))
   }
   paste(parts, collapse = "\n")
+}
+
+
+# % of category buyers who bought each brand, derived from buyer_heaviness
+# loyalty segments (100 - NoBuy_Pct). Mirrors the parent panel's logic so
+# the % Buyers column reads identically to the Loyalty / Distribution tabs.
+.cb_shop_buyers_pct_map <- function(bh) {
+  if (is.null(bh) || identical(bh$status, "REFUSED")) return(NULL)
+  loy <- bh$brand_loyalty_segments
+  if (is.null(loy) || !"NoBuy_Pct" %in% names(loy) ||
+      !"BrandCode" %in% names(loy)) return(NULL)
+  stats::setNames(100 - as.numeric(loy$NoBuy_Pct), as.character(loy$BrandCode))
 }
 
 
@@ -93,13 +109,15 @@ cb_shopper_context_chips <- function(panel_data) {
   if (.cb_shop_section_ok(loc) && !is.null(loc$top$label)) {
     parts <- c(parts, .cb_shop_chip(
       val = sprintf("%s (%.0f%%)", loc$top$label, loc$top$pct),
-      label = "Most-used purchase channel"
+      label = "Most-used purchase channel",
+      compact = TRUE
     ))
   }
   if (.cb_shop_section_ok(pak) && !is.null(pak$top$label)) {
     parts <- c(parts, .cb_shop_chip(
       val = sprintf("%s (%.0f%%)", pak$top$label, pak$top$pct),
-      label = "Most-bought pack size"
+      label = "Most-bought pack size",
+      compact = TRUE
     ))
   }
   paste(parts, collapse = "")
@@ -115,7 +133,7 @@ cb_shopper_context_chips <- function(panel_data) {
 # styling and heatmap/sort behaviour match the Loyalty / Distribution tabs.
 .cb_shop_section <- function(result, scope, heading, base_label,
                               cat_avg_label, focal, brand_labels,
-                              kind_label) {
+                              kind_label, buyers_pct_map = NULL) {
   bm <- result$brand_matrix
   if (is.null(bm) || nrow(bm) == 0) {
     return(.cb_shop_refused_block(heading, "no brand-level data available"))
@@ -157,7 +175,7 @@ cb_shopper_context_chips <- function(panel_data) {
     brands       = brands,
     brand_names  = brand_names,
     focal        = focal,
-    buyers_pct_map = NULL,
+    buyers_pct_map = buyers_pct_map,
     base_n_map     = base_n_map,
     base_n         = NULL,
     base_label     = base_label
@@ -198,13 +216,14 @@ cb_shopper_context_chips <- function(panel_data) {
 }
 
 
-.cb_shop_chip <- function(val, label) {
+.cb_shop_chip <- function(val, label, compact = FALSE) {
+  cls <- if (isTRUE(compact)) "cb-kpi-chip cb-kpi-chip-text" else "cb-kpi-chip"
   sprintf(paste0(
-    '<div class="cb-kpi-chip">',
+    '<div class="%s">',
     '<div class="cb-kpi-val">%s</div>',
     '<div class="cb-kpi-label">%s</div>',
     '</div>'),
-    .cb_esc(val), .cb_esc(label))
+    cls, .cb_esc(val), .cb_esc(label))
 }
 
 

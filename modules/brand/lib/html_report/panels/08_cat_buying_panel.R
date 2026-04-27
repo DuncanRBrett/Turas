@@ -118,17 +118,14 @@ render_cat_buying_panel <- function(panel_data) {
                                       brand_labels, brand_colours))
 
   # ----- Tab 1: Category Context (default) -----------------------------------
+  # Shopper context chips (top channel + top pack size) live INSIDE the
+  # existing Context KPI strip alongside Avg purchases / Avg brands bought
+  # so the user sees one unified row of category-level KPIs.
+  shop_chips_html <- if (exists("cb_shopper_context_chips", mode = "function"))
+    cb_shopper_context_chips(panel_data) else ""
   parts <- c(parts, '<div class="cb-subtab" data-cb-tab="context">')
-  parts <- c(parts, .cb_context_tab(cbf, rep, dn, bh, dist_labels))
-  # Slim Shopper overview chips: top channel + top pack size, if available.
-  if (exists("cb_shopper_context_chips", mode = "function")) {
-    shop_chips <- cb_shopper_context_chips(panel_data)
-    if (nzchar(shop_chips)) {
-      parts <- c(parts, sprintf(
-        '<div class="cb-kpi-strip" style="margin-top:10px;">%s</div>',
-        shop_chips))
-    }
-  }
+  parts <- c(parts, .cb_context_tab(cbf, rep, dn, bh, dist_labels,
+                                     extra_chips = shop_chips_html))
   parts <- c(parts, '</div>')
 
   # ----- Tab 2: Brand Performance Summary ------------------------------------
@@ -248,12 +245,15 @@ render_cat_buying_panel <- function(panel_data) {
 # TAB CONTENT BUILDERS
 # ==============================================================================
 
-.cb_context_tab <- function(cbf, rep, dn = NULL, bh = NULL, dist_labels = NULL) {
+.cb_context_tab <- function(cbf, rep, dn = NULL, bh = NULL, dist_labels = NULL,
+                             extra_chips = "") {
   parts <- character(0)
   parts <- c(parts, '<div class="cb-section-title">Category Context</div>')
   parts <- c(parts, '<p style="font-size:12px;color:#64748b;margin:-4px 0 12px;">Category-level purchase frequency and brand repertoire distributions among category buyers.</p>')
 
-  # KPI strip: Avg purchases + Avg brands bought, side-by-side
+  # KPI strip: Avg purchases + Avg brands bought, then any caller-supplied
+  # extra chips (e.g. Shopper Behaviour summary chips) joined inline so
+  # all category-level KPIs sit on the same row.
   kpi_chips <- character(0)
   if (!is.null(dn) && !identical(dn$status, "REFUSED") &&
       !is.null(dn$category_metrics$mean_purchases)) {
@@ -269,10 +269,12 @@ render_cat_buying_panel <- function(panel_data) {
       '<div class="cb-kpi-chip"><div class="cb-kpi-val">%s</div><div class="cb-kpi-label">Avg brands bought / category buyer</div></div>',
       mr))
   }
-  if (length(kpi_chips) > 0) {
+  strip_html <- paste(kpi_chips, collapse = "")
+  if (nzchar(extra_chips)) strip_html <- paste0(strip_html, extra_chips)
+  if (nzchar(strip_html)) {
     parts <- c(parts, sprintf(
       '<div class="cb-kpi-strip" style="margin-bottom:16px;">%s</div>',
-      paste(kpi_chips, collapse = "")))
+      strip_html))
   }
 
   # Category freq distribution from BRANDPEN3-derived m_vec (same buckets as
