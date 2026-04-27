@@ -68,6 +68,9 @@
            valid_values_text="Y or N", dropdown=c("Y","N")),
       list(name="element_wom",             required=FALSE, default="Y",
            description="[Optional] Word-of-Mouth: received/shared x positive/negative. Full categories only",
+           valid_values_text="Y or N", dropdown=c("Y","N")),
+      list(name="element_branded_reach",   required=FALSE, default="Y",
+           description="[Optional] Branded Reach (Romaniuk): per-ad reach, branding %, branded reach, misattribution and media mix. Requires MarketingReach + ReachMedia sheets and reach.* roles in QuestionMap",
            valid_values_text="Y or N", dropdown=c("Y","N"))
     )),
     list(section_name = "DRIVERS & BARRIERS OPTIONS", fields = list(

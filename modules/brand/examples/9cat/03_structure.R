@@ -192,13 +192,15 @@
   )
 
   # Marketing reach battery (Q013–Q015 per asset; Category = asset$category)
+  # Q014 is prompted single-select brand attribution (Romaniuk style):
+  # respondents pick exactly one brand from the category brand list (or DK / OTHER).
   reach_qs <- unlist(lapply(cat9_reach_assets(), function(a) list(
     list(QuestionCode = sprintf("REACH_SEEN_%s",  a$code),
          QuestionText = sprintf("Have you seen this image (or something similar) in advertising recently? (%s)", a$label),
          VariableType = "Single_Mention", Battery = "reach", Category = a$category),
     list(QuestionCode = sprintf("REACH_BRAND_%s", a$code),
          QuestionText = sprintf("Which brand was this advertising for? (%s)", a$label),
-         VariableType = "Multi_Mention",  Battery = "reach", Category = a$category),
+         VariableType = "Single_Mention", Battery = "reach", Category = a$category),
     list(QuestionCode = sprintf("REACH_MEDIA_%s", a$code),
          QuestionText = sprintf("Where did you see this advertising? (%s)", a$label),
          VariableType = "Multi_Mention",  Battery = "reach", Category = a$category)
@@ -753,10 +755,11 @@
            ClientCode = sprintf("REACH_BRAND_%s", a$code),
            QuestionText = sprintf("Which brand was this advertising for? (%s)", a$label),
            QuestionTextShort = sprintf("Brand recall: %s", a$code),
-           Variable_Type = "Open_End",
+           Variable_Type = "Single_Response",
            ColumnPattern = "{code}",
            OptionMapScale = "",
-           Notes = "Q014 — open-ended brand recall; coded for uniqueness scoring"),
+           Notes = paste0("Q014 — prompted single-select. Cell value is a brand code from ",
+                          "the category Brands list, or 'DK' (don't know) / 'OTHER' (other).")),
       list(Role = sprintf("reach.media.%s", a$code),
            ClientCode = sprintf("REACH_MEDIA_%s", a$code),
            QuestionText = sprintf("Where did you see this advertising? (%s)", a$label),

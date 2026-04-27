@@ -542,6 +542,57 @@ transform_brand_panels <- function(results, config) {
     }
   }
 
+  # --- Branded Reach panels (per category) ---
+  if (exists("build_branded_reach_panel_data", mode = "function") &&
+      exists("build_branded_reach_panel_html", mode = "function")) {
+    for (cat_name in names(results$results$categories)) {
+      cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
+      cr <- results$results$categories[[cat_name]]
+      br <- cr$branded_reach
+      if (is.null(br) || identical(br$status, "REFUSED")) next
+      if (length(br$ads %||% list()) == 0) next
+
+      cat_brands_local <- if (!is.null(brand_list_all) &&
+                               "Category" %in% names(brand_list_all)) {
+        brand_list_all[brand_list_all$Category == cat_name, , drop = FALSE]
+      } else if (!is.null(brand_list_all)) brand_list_all else NULL
+
+      focal_colour <- .resolve_focal_colour(cat_brands_local,
+                                             config$focal_brand,
+                                             config_focal_colour)
+
+      br_pd <- tryCatch(
+        build_branded_reach_panel_data(
+          result         = br,
+          category_label = cat_name,
+          focal_brand    = config$focal_brand %||% "",
+          focal_colour   = focal_colour,
+          decimal_places = config$decimal_places %||% 0L,
+          wave_label     = as.character(config$wave %||% "")
+        ),
+        error = function(e) {
+          message(sprintf("[BRAND HTML] Branded reach panel data failed for %s: %s",
+                          cat_name, e$message))
+          NULL
+        })
+      if (is.null(br_pd)) next
+
+      br_html <- tryCatch(
+        build_branded_reach_panel_html(
+          panel_data    = br_pd,
+          category_code = cat_id,
+          focal_colour  = focal_colour),
+        error = function(e) {
+          message(sprintf("[BRAND HTML] Branded reach panel render failed for %s: %s",
+                          cat_name, e$message))
+          NULL
+        })
+      if (!is.null(br_html)) {
+        panels[[paste0("branded_reach_", cat_id)]] <- br_html
+      }
+    }
+  }
+
   panels
 }
 

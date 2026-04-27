@@ -262,6 +262,9 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
   has_wom <- !is.null(cat_results$wom) &&
     !identical(cat_results$wom$status, "REFUSED") &&
     !is.null(cat_results$wom$wom_metrics)
+  has_branded_reach <- !is.null(cat_results$branded_reach) &&
+    !identical(cat_results$branded_reach$status, "REFUSED") &&
+    length(cat_results$branded_reach$ads %||% list()) > 0
 
   # Build flat sub-tab list in the required display order.
   # Each entry: key (unique), label, subpanel (which .br-subpanel to show),
@@ -307,6 +310,12 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
                 subpanel = "wom", internal_tab = ""))
     )
   }
+  if (has_branded_reach) {
+    flat_tabs <- c(flat_tabs,
+      list(list(key = "branded_reach",   label = "Branded Reach",
+                subpanel = "br", internal_tab = ""))
+    )
+  }
 
   # Sub-tab navigation bar
   if (length(flat_tabs) > 0) {
@@ -327,10 +336,11 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
 
   # Element map: subpanel key → element name used for chart/panel lookup keys
   element_map <- list()
-  if (has_funnel)     element_map[["fn"]]  <- "funnel"
-  if (has_ma)         element_map[["ma"]]  <- "ma"
-  if (has_repertoire) element_map[["rep"]] <- "repertoire"
-  if (has_wom)        element_map[["wom"]] <- "wom"
+  if (has_funnel)        element_map[["fn"]]  <- "funnel"
+  if (has_ma)            element_map[["ma"]]  <- "ma"
+  if (has_repertoire)    element_map[["rep"]] <- "repertoire"
+  if (has_wom)           element_map[["wom"]] <- "wom"
+  if (has_branded_reach) element_map[["br"]]  <- "branded_reach"
 
   for (sp_key in names(element_map)) {
     el        <- element_map[[sp_key]]
@@ -346,13 +356,18 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
       section_id, section_id))
 
     if (!is.null(panels[[chart_key]])) {
-      # WOM and repertoire/cat-buying panels don't embed their own pin/PNG/Excel
-      # toolbar, so attach the shared one before the panel content. Funnel and
-      # MA panels embed their own controls (pin dropdown + per-view exports).
+      # WOM, branded-reach, and repertoire/cat-buying panels don't embed their
+      # own pin/PNG/Excel toolbar, so attach the shared one before the panel
+      # content. Funnel and MA panels embed their own controls.
       if (el == "wom") {
         parts <- c(parts, build_br_section_toolbar(section_id))
         parts <- c(parts, sprintf(
           '<h3 class="br-element-title">Word of Mouth \u2014 %s</h3>',
+          .br_esc(cat_name)))
+      } else if (el == "branded_reach") {
+        parts <- c(parts, build_br_section_toolbar(section_id))
+        parts <- c(parts, sprintf(
+          '<h3 class="br-element-title">Branded Reach \u2014 %s</h3>',
           .br_esc(cat_name)))
       }
       parts <- c(parts, panels[[chart_key]])

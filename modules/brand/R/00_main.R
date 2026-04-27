@@ -84,7 +84,12 @@ BRAND_VERSION <- "1.0"
     "09e_portfolio_extension.R",
     "09f_portfolio_panel_data.R",
     "09g_portfolio_output.R",
-    "09h_portfolio_overview_data.R"
+    "09h_portfolio_overview_data.R",
+    "10a_br_panel_data.R",
+    "10b_br_misattribution.R",
+    "10c_br_media_mix.R",
+    "10d_br_output.R",
+    "10_branded_reach.R"
   )
 
   for (f in module_files) {
@@ -613,6 +618,29 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
           }
         )
       }
+    }
+
+    # Branded Reach (full categories only; consumes MarketingReach + ReachMedia
+    # sheets). ALL-scoped ads run for every full category; category-coded ads
+    # only run for their matching category. Empty asset list passes silently.
+    if (isTRUE(config$element_branded_reach) && cat_depth == "full") {
+      if (verbose) cat("  Running Branded Reach...\n")
+      cat_result$branded_reach <- tryCatch(
+        run_branded_reach(
+          data        = cat_data,
+          asset_list  = structure$marketing_reach,
+          brand_list  = cat_brands,
+          media_list  = structure$reach_media,
+          weights     = cat_weights,
+          cat_code    = cat_code,
+          focal_brand = config$focal_brand
+        ),
+        error = function(e) {
+          warnings_list <<- c(warnings_list,
+            sprintf("Branded reach failed for %s: %s", cat_name, e$message))
+          list(status = "REFUSED", message = e$message)
+        }
+      )
     }
 
     # Drivers & Barriers (full categories only; requires MA linkage)

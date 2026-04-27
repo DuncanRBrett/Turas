@@ -111,9 +111,12 @@ load_brand_config <- function(config_path, project_root = NULL) {
   # Parse element toggles to logical
   element_fields <- c("element_funnel", "element_mental_avail", "element_cep_turf",
                        "element_repertoire", "element_dba", "element_portfolio",
-                       "element_wom", "element_drivers_barriers")
+                       "element_wom", "element_drivers_barriers",
+                       "element_branded_reach")
   for (ef in element_fields) {
-    config[[ef]] <- .parse_yn(config[[ef]], default = (ef != "element_dba"))
+    # element_dba and element_branded_reach default OFF; everything else defaults ON
+    default_off <- ef %in% c("element_dba", "element_branded_reach")
+    config[[ef]] <- .parse_yn(config[[ef]], default = !default_off)
   }
 
   # Parse other Y/N fields
@@ -308,7 +311,7 @@ load_brand_survey_structure <- function(structure_path) {
       # real headers at startRow 2, 3, 4
       .looks_like_data_header <- function(d) {
         any(c("BrandCode", "Category", "QuestionCode", "CEPCode", "AttrCode",
-              "AssetCode", "ChannelCode", "PackSizeCode",
+              "AssetCode", "ChannelCode", "PackSizeCode", "MediaCode",
               "Role", "Scale") %in% names(d))
       }
       if (!is.null(df) && !.looks_like_data_header(df)) {
@@ -344,6 +347,12 @@ load_brand_survey_structure <- function(structure_path) {
   # respondents about purchase channels and/or pack sizes per category).
   structure$channels  <- .load_table("Channels")
   structure$packsizes <- .load_table("PackSizes")
+
+  # Branded-reach lists (optional; only when element_branded_reach = Y).
+  # MarketingReach defines the ads; ReachMedia defines the channel options
+  # for Q015 "Where did you see this advertising?".
+  structure$marketing_reach <- .load_table("MarketingReach")
+  structure$reach_media     <- .load_table("ReachMedia")
 
   # Role-registry sheets (new architecture; see ROLE_REGISTRY.md §11).
   # Optional here: not every element has migrated yet, so projects with

@@ -298,9 +298,7 @@
 .build_9cat_reach_block <- function(n_total, focal_cats) {
 
   reach_df  <- data.frame(row.names = seq_len(n_total), stringsAsFactors = FALSE)
-  all_brands <- c("Ina Paarman's Kitchen", "Knorr", "Woolworths", "Dolmio",
-                  "Robertsons", "Pick n Pay", "Other brand", "Don't know / can't remember")
-  media_codes <- cat9_reach_media_codes <- vapply(cat9_reach_media(), function(m) m$code, character(1))
+  media_codes <- vapply(cat9_reach_media(), function(m) m$code, character(1))
 
   for (a in cat9_reach_assets()) {
     # Determine which respondents were shown this asset
@@ -311,29 +309,44 @@
     }
 
     seen_col  <- sprintf("REACH_SEEN_%s",  a$code)
-    brand_col <- sprintf("REACH_BRAND_%s", a$code)   # open-ended brand recall
-    media_col <- sprintf("REACH_MEDIA_%s", a$code)   # multi-mention media
+    brand_col <- sprintf("REACH_BRAND_%s", a$code)
+    media_col <- sprintf("REACH_MEDIA_%s", a$code)
 
     # REACH_SEEN: 1=yes, 2=no  (roughly 35–55% recognition for an average ad)
-    seen_vals        <- rep(NA_integer_, n_total)
+    seen_vals           <- rep(NA_integer_, n_total)
     seen_vals[eligible] <- ifelse(.rbern(sum(eligible), 0.42) == 1L, 1L, 2L)
     reach_df[[seen_col]] <- seen_vals
 
-    # REACH_BRAND: open-ended brand name (only if seen)
-    brand_vals           <- rep(NA_character_, n_total)
-    recognised           <- !is.na(seen_vals) & seen_vals == 1L
-    nr                   <- sum(recognised)
+    # REACH_BRAND: prompted single-select brand attribution. Cell value is a
+    # brand code (must match Brands sheet), 'DK' (don't know) or 'OTHER'.
+    # ~62% correctly attribute to the focal brand, ~24% misattribute to a
+    # competitor, ~14% pick DK / OTHER.
+    brand_vals <- rep(NA_character_, n_total)
+    recognised <- !is.na(seen_vals) & seen_vals == 1L
+    nr         <- sum(recognised)
     if (nr > 0) {
-      correct  <- c("Ina Paarman's Kitchen", "Ina Paarman", "IPK")
-      noise    <- c("Knorr", "Woolworths", "Robertsons", "Don't know")
-      picks    <- character(nr)
-      for (i in seq_len(nr))
-        picks[i] <- if (runif(1) < 0.72) sample(correct, 1) else sample(noise, 1)
-      brand_vals[recognised] <- picks
+      # Build a per-asset attribution pool: the asset's correct brand,
+      # competitor brand codes, and DK / OTHER.
+      competitor_codes <- if (!is.null(a$category) && a$category != "ALL") {
+        setdiff(vapply(cat9_brands(a$category), function(b) b$code, character(1)),
+                a$brand)
+      } else {
+        # ALL ads: synthesise a generic competitor pool from the focal-brand cats
+        unique(unlist(lapply(c("DSS", "POS", "PAS", "BAK"), function(cc)
+          setdiff(vapply(cat9_brands(cc), function(b) b$code, character(1)),
+                  a$brand))))
+      }
+      pool   <- c(a$brand, competitor_codes, "DK", "OTHER")
+      probs  <- c(0.62,
+                  rep((1 - 0.62 - 0.10 - 0.04) / max(length(competitor_codes), 1),
+                      length(competitor_codes)),
+                  0.10, 0.04)
+      probs  <- probs / sum(probs)
+      brand_vals[recognised] <- sample(pool, nr, replace = TRUE, prob = probs)
     }
     reach_df[[brand_col]] <- brand_vals
 
-    # REACH_MEDIA: comma-separated media codes (only if seen; multi-mention)
+    # REACH_MEDIA: comma-separated media codes (only if seen; multi-mention).
     media_probs <- c(TV=0.45, SOCIAL=0.38, ONLINE=0.32, PRINT=0.20,
                      OUTDOOR=0.12, RADIO=0.08, INSTORE=0.18, OTHER=0.03)
     media_vals  <- rep(NA_character_, n_total)
