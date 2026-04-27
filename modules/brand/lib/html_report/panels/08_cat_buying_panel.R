@@ -37,7 +37,8 @@ local({
   )
   for (f in c("08_cat_buying_panel_styling.R",
               "08_cat_buying_panel_chart.R",
-              "08_cat_buying_panel_table.R")) {
+              "08_cat_buying_panel_table.R",
+              "08_cat_buying_panel_shopper.R")) {
     fp <- file.path(base, f)
     if (file.exists(fp)) source(fp, local = FALSE)
   }
@@ -105,8 +106,12 @@ render_cat_buying_panel <- function(panel_data) {
   parts <- c(parts, .cb_chart_data_json(
     dn, bh, focal, fcol, brand_labels, brand_colours, dist_labels, cat_code))
 
-  # Sub-tab navigation
-  parts <- c(parts, .cb_sub_tab_nav(cat_code))
+  # Sub-tab navigation (Shopper tab only when at least one section has data)
+  has_shopper <- (!is.null(panel_data$shopper_location) &&
+                   !identical(panel_data$shopper_location$status, "REFUSED")) ||
+                 (!is.null(panel_data$shopper_packsize) &&
+                   !identical(panel_data$shopper_packsize$status, "REFUSED"))
+  parts <- c(parts, .cb_sub_tab_nav(cat_code, has_shopper = has_shopper))
 
   # Brand picker (focal <select> + show/hide chips) — BELOW the sub-tab nav
   parts <- c(parts, .cb_brand_picker(dn, bh, focal, fcol, cat_code,
@@ -115,6 +120,15 @@ render_cat_buying_panel <- function(panel_data) {
   # ----- Tab 1: Category Context (default) -----------------------------------
   parts <- c(parts, '<div class="cb-subtab" data-cb-tab="context">')
   parts <- c(parts, .cb_context_tab(cbf, rep, dn, bh, dist_labels))
+  # Slim Shopper overview chips: top channel + top pack size, if available.
+  if (exists("cb_shopper_context_chips", mode = "function")) {
+    shop_chips <- cb_shopper_context_chips(panel_data)
+    if (nzchar(shop_chips)) {
+      parts <- c(parts, sprintf(
+        '<div class="cb-kpi-strip" style="margin-top:10px;">%s</div>',
+        shop_chips))
+    }
+  }
   parts <- c(parts, '</div>')
 
   # ----- Tab 2: Brand Performance Summary ------------------------------------
@@ -191,6 +205,15 @@ render_cat_buying_panel <- function(panel_data) {
                                  brand_buyers_n = brand_buyers_n_map))
   parts <- c(parts, '</div>')
 
+  # ----- Tab 6: Shopper Behaviour (optional) --------------------------------
+  shopper_html <- if (exists("cb_shopper_tab_html", mode = "function"))
+    cb_shopper_tab_html(panel_data) else ""
+  if (nzchar(shopper_html)) {
+    parts <- c(parts, '<div class="cb-subtab" data-cb-tab="shopper" hidden>')
+    parts <- c(parts, shopper_html)
+    parts <- c(parts, '</div>')
+  }
+
   parts <- c(parts, '</div>') # close .cb-panel
   paste(parts, collapse = "\n")
 }
@@ -200,7 +223,7 @@ render_cat_buying_panel <- function(panel_data) {
 # SUB-TAB NAV
 # ==============================================================================
 
-.cb_sub_tab_nav <- function(cat_code) {
+.cb_sub_tab_nav <- function(cat_code, has_shopper = FALSE) {
   tabs <- list(
     list(key = "context",  label = "Category Context"),
     list(key = "brands",   label = "Brand Summary"),
@@ -208,6 +231,9 @@ render_cat_buying_panel <- function(panel_data) {
     list(key = "dist",     label = "Purchase Distribution"),
     list(key = "dop",      label = "Duplication of Purchase")
   )
+  if (isTRUE(has_shopper)) {
+    tabs <- c(tabs, list(list(key = "shopper", label = "Shopper Behaviour")))
+  }
   btns <- paste(vapply(tabs, function(t) {
     active <- if (identical(t$key, "context")) " active" else ""
     sprintf(
