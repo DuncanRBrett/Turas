@@ -1670,6 +1670,11 @@
       opts.push({ key: 'bars',    label: 'MMS vs SOM chart' });
       opts.push({ key: 'ranking', label: 'CEP penetration ranking' });
       opts.push({ key: 'insight', label: 'Insight note' });
+    } else if (activeKey === 'advantage') {
+      opts.push({ key: 'matrix',   label: 'Mental Advantage matrix' });
+      opts.push({ key: 'quadrant', label: 'Strategic quadrant chart' });
+      opts.push({ key: 'actions',  label: 'Action list (Defend / Build / Maintain)' });
+      opts.push({ key: 'insight',  label: 'Insight note' });
     }
 
     var dd = document.createElement('div');
@@ -1826,6 +1831,53 @@
           chartSvg: '', chartHtml: '',
           tableHtml: '',
           insightText: metricsInsight,
+          pinMode: 'custom',
+          pinFlags: { chart: false, table: false, insight: true }
+        });
+      }
+
+    } else if (activeKey === 'advantage') {
+      // Capture each Mental Advantage view as a faithful snapshot of the
+      // current state (focal brand, sort, decision colours, sig markers).
+      var advSubtab = panel.querySelector('.ma-subtab[data-ma-subtab="advantage"]') || panel;
+      var advInsight = '';
+      if (optKeys.indexOf('insight') >= 0) {
+        var taA = panel.querySelector('.ma-insight-box-text[data-ma-stim="advantage"]');
+        if (taA) advInsight = taA.value.trim();
+      }
+      var advDefs = {
+        matrix:   { sel: '.ma-adv-matrix-wrap',  label: 'Mental Advantage matrix' },
+        quadrant: { sel: '.ma-adv-quadrant-view', label: 'Strategic quadrant' },
+        actions:  { sel: '.ma-adv-action-list-view', label: 'Action list' }
+      };
+      var advOrder = ['matrix', 'quadrant', 'actions'];
+      var advPinIndex = 0;
+      advOrder.forEach(function (key) {
+        if (optKeys.indexOf(key) < 0) return;
+        var def = advDefs[key];
+        var el = advSubtab.querySelector(def.sel); if (!el) return;
+        var svg = captureSvg(el);
+        var tbl = captureTable(el);
+        var htm = (!svg && !tbl) ? captureHtml(el) : '';
+        TurasPins.add({
+          sectionKey: 'ma-advantage-' + key + '-' + Date.now(),
+          title: baseTitle + ' — ' + def.label,
+          chartSvg: svg, chartHtml: '',
+          tableHtml: tbl || htm,
+          insightText: (advPinIndex === 0) ? advInsight : '',
+          pinMode: 'custom',
+          pinFlags: { chart: !!svg, table: !!(tbl || htm),
+                      insight: (advPinIndex === 0 && !!advInsight) }
+        });
+        advPinIndex++;
+      });
+      // Insight ticked alone — standalone pin
+      if (advPinIndex === 0 && advInsight) {
+        TurasPins.add({
+          sectionKey: 'ma-advantage-insight-' + Date.now(),
+          title: baseTitle + ' — Mental Advantage — Insight',
+          chartSvg: '', chartHtml: '', tableHtml: '',
+          insightText: advInsight,
           pinMode: 'custom',
           pinFlags: { chart: false, table: false, insight: true }
         });

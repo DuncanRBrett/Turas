@@ -66,6 +66,9 @@
   function getActiveFilter(panel) {
     var st = getAdvState(panel); return st.filter || 'all';
   }
+  function getActiveXAxis(panel) {
+    var st = getAdvState(panel); return st.xaxis || 'penetration';
+  }
 
   function getStimBlock(panel) {
     var pd = panel.__maData; if (!pd || !pd.advantage) return null;
@@ -147,11 +150,30 @@
     var base = getActiveBase(panel);
     var filter = getActiveFilter(panel);
 
+    // Pre-compute average linkage per stim across all brands (for the
+    // x-axis "average linkage" option).
+    var avgLinkBy = {};
+    block.codes.forEach(function (s) {
+      var pcts = block.cells
+        .filter(function (c) { return c.stim_code === s && c.pct_total != null; })
+        .map(function (c) { return base === 'aware' && c.pct_aware != null ? c.pct_aware : c.pct_total; });
+      avgLinkBy[s] = pcts.length ? pcts.reduce(function (a, b) { return a + b; }, 0) / pcts.length : 0;
+    });
+
+    var xAxis = getActiveXAxis(panel);
+    var hidden = panel.__maAdvHiddenStims || {};
+
     var allPts = block.cells.filter(function (c) { return c.brand_code === focal; })
+      .filter(function (c) { return !hidden[c.stim_code]; })
       .map(function (c) {
-        var pen = block.stim_penetration[block.codes.indexOf(c.stim_code)];
         var sizeSrc = (base === 'aware' && c.pct_aware != null) ? c.pct_aware : c.pct_total;
-        return { code: c.stim_code, ma: c.ma, pen: pen, size: sizeSrc != null ? sizeSrc : 0,
+        var pen = block.stim_penetration[block.codes.indexOf(c.stim_code)];
+        var xVal = xAxis === 'focal_linkage' ? sizeSrc
+                 : xAxis === 'brand_avg_linkage' ? avgLinkBy[c.stim_code]
+                 : pen;
+        return { code: c.stim_code, ma: c.ma, pen: pen,
+                 x: xVal != null ? xVal : 0,
+                 size: sizeSrc != null ? sizeSrc : 0,
                  decision: c.decision, isSig: c.is_sig,
                  label: block.labels[block.codes.indexOf(c.stim_code)] };
       });
@@ -165,12 +187,15 @@
     svg.setAttribute('height', height);
 
     var pW = width - mL - mR, pH = height - mT - mB;
-    var xMax = Math.max(10, Math.ceil(Math.max.apply(null, allPts.map(function (p) { return p.pen; })) / 10) * 10);
+    var xMax = Math.max(10, Math.ceil(Math.max.apply(null, allPts.map(function (p) { return p.x; })) / 10) * 10);
     var maAbsMax = Math.max(threshold * 2,
                               Math.ceil(Math.max.apply(null, allPts.map(function (p) { return Math.abs(p.ma); }))));
     var sizeMax = Math.max(1, Math.max.apply(null, allPts.map(function (p) { return p.size; })));
-    // Mean stim penetration across the *full* stim set (vertical divider)
-    var penMean = allPts.reduce(function (s, p) { return s + p.pen; }, 0) / allPts.length;
+    // Mean of the active x-axis dimension (vertical divider).
+    var xMean = allPts.reduce(function (s, p) { return s + p.x; }, 0) / allPts.length;
+    var xLabel = xAxis === 'focal_linkage'      ? 'Focal brand linkage (' + (base === 'aware' ? '% aware' : '% total') + ')'
+              :  xAxis === 'brand_avg_linkage' ? 'Average linkage across brands (' + (base === 'aware' ? '% aware' : '% total') + ')'
+              :                                   'Stimulus penetration (any brand, %)';
 
     function toX(v) { return mL + pW * v / xMax; }
     function toY(v) { return mT + pH * (1 - (v + maAbsMax) / (2 * maAbsMax)); }
@@ -196,10 +221,10 @@
       parts.push('<text class="ma-adv-q-tick" x="' + (mL - 6) + '" y="' + gy + '" text-anchor="end" dominant-baseline="middle">' + (yv >= 0 ? '+' : '') + yv.toFixed(0) + 'pp</text>');
     }
 
-    // Vertical mean-penetration divider (the X-axis equivalent of the zero-MA line)
-    var xMean = toX(penMean);
-    parts.push('<line class="ma-adv-q-vmid" x1="' + xMean + '" y1="' + mT + '" x2="' + xMean + '" y2="' + (mT + pH) + '"/>');
-    parts.push('<text class="ma-adv-q-vmid-label" x="' + (xMean + 4) + '" y="' + (mT + pH - 6) + '">avg reach (' + penMean.toFixed(0) + '%)</text>');
+    // Vertical mean-x divider (the X-axis equivalent of the zero-MA line)
+    var xMeanPx = toX(xMean);
+    parts.push('<line class="ma-adv-q-vmid" x1="' + xMeanPx + '" y1="' + mT + '" x2="' + xMeanPx + '" y2="' + (mT + pH) + '"/>');
+    parts.push('<text class="ma-adv-q-vmid-label" x="' + (xMeanPx + 4) + '" y="' + (mT + pH - 6) + '">avg (' + xMean.toFixed(0) + '%)</text>');
 
     // Horizontal zero + threshold lines
     parts.push('<line class="ma-adv-q-zero"   x1="' + mL + '" y1="' + yZero + '" x2="' + (mL + pW) + '" y2="' + yZero + '"/>');
@@ -209,7 +234,7 @@
     // Axes + axis labels + zone labels
     parts.push('<line class="ma-adv-q-axis" x1="' + mL + '" y1="' + mT + '" x2="' + mL + '" y2="' + (mT + pH) + '"/>');
     parts.push('<line class="ma-adv-q-axis" x1="' + mL + '" y1="' + (mT + pH) + '" x2="' + (mL + pW) + '" y2="' + (mT + pH) + '"/>');
-    parts.push('<text class="ma-adv-q-axis-label" x="' + (mL + pW / 2) + '" y="' + (height - 6) + '" text-anchor="middle">Stimulus penetration (any brand, %)</text>');
+    parts.push('<text class="ma-adv-q-axis-label" x="' + (mL + pW / 2) + '" y="' + (height - 6) + '" text-anchor="middle">' + escHtml(xLabel) + '</text>');
     parts.push('<text class="ma-adv-q-axis-label" transform="rotate(-90 ' + (mL - 44) + ' ' + (mT + pH / 2) + ')" x="' + (mL - 44) + '" y="' + (mT + pH / 2) + '" text-anchor="middle">Mental Advantage (pp)</text>');
     parts.push('<text class="ma-adv-q-zone-label" x="' + (mL + pW - 6) + '" y="' + (mT + 14) + '" text-anchor="end">DEFEND</text>');
     parts.push('<text class="ma-adv-q-zone-label" x="' + (mL + 6) + '" y="' + (mT + 14) + '">AMPLIFY</text>');
@@ -219,7 +244,7 @@
     // Bubbles — store position + payload index for hover lookup
     var labelCandidates = [];
     pts.forEach(function (p, i) {
-      var cx = toX(p.pen), cy = toY(p.ma), r2 = bR(p.size);
+      var cx = toX(p.x), cy = toY(p.ma), r2 = bR(p.size);
       var cls = 'ma-adv-q-bubble ma-adv-q-bubble-' + (p.decision || 'na');
       if (p.isSig) cls += ' ma-adv-q-bubble-sig';
       parts.push('<circle class="' + cls + '" cx="' + cx + '" cy="' + cy + '" r="' + r2 +
@@ -268,6 +293,23 @@
     });
   }
 
+  // ============================================================ COLUMN/ROW VISIBILITY
+  function applyBrandColumnVisibility(panel) {
+    var hidden = panel.__maAdvHiddenBrands || {};
+    panel.querySelectorAll('.ma-adv-matrix [data-ma-cell-brand]').forEach(function (el) {
+      var code = el.getAttribute('data-ma-cell-brand');
+      el.classList.toggle('ma-adv-col-hidden', !!hidden[code]);
+    });
+  }
+  function applyStimRowVisibility(panel) {
+    var hidden = panel.__maAdvHiddenStims || {};
+    panel.querySelectorAll('tr[data-ma-adv-row-stim]').forEach(function (tr) {
+      var code = tr.getAttribute('data-ma-adv-row-stim');
+      tr.classList.toggle('ma-adv-row-hidden', !!hidden[code]);
+    });
+    var block = getStimBlock(panel); if (block) renderQuadrant(panel, block);
+  }
+
   // ============================================================ MATRIX
   function renderMatrix(panel, block) {
     var wrap = panel.querySelector('.ma-adv-matrix-wrap');
@@ -302,7 +344,7 @@
     var ths = ['<th class="ma-adv-matrix-th-stim">' + (getActiveStim(panel) === 'ceps' ? 'CEP' : 'Attribute') + '</th>'];
     brands.forEach(function (b) {
       var cls = b === focal ? 'ma-adv-matrix-th-focal' : '';
-      ths.push('<th class="' + cls + '">' + escHtml(nameFor(b)) + '</th>');
+      ths.push('<th class="' + cls + '" data-ma-cell-brand="' + escAttr(b) + '">' + escHtml(nameFor(b)) + '</th>');
     });
 
     // Build rows
@@ -311,9 +353,15 @@
 
     // Build a flat lookup so hover handlers can resolve cell payloads.
     var hoverPayload = [];
+    var hiddenStims = panel.__maAdvHiddenStims || {};
     var rows = idx.map(function (i) {
       var stim = block.codes[i], lbl = block.labels[i];
-      var tds = ['<td class="ma-adv-matrix-stim">' + escHtml(lbl) + '</td>'];
+      var checked = hiddenStims[stim] ? '' : ' checked';
+      var rowCls = hiddenStims[stim] ? 'ma-adv-row-hidden' : '';
+      var stimCell = '<td class="ma-adv-matrix-stim"><label class="ma-adv-row-toggle">' +
+                     '<input type="checkbox" data-ma-adv-stim-toggle="' + escAttr(stim) + '"' + checked + '>' +
+                     '<span class="ma-adv-row-stim-label">' + escHtml(lbl) + '</span></label></td>';
+      var tds = [stimCell];
       brands.forEach(function (b) {
         var c = cellByKey[stim + '|' + b];
         if (!c || c.ma == null) {
@@ -330,14 +378,27 @@
         hoverPayload.push({ code: stim, label: lbl + ' × ' + nameFor(b),
                             ma: c.ma, pen: pen, size: sizeSrc,
                             decision: c.decision, isSig: c.is_sig });
-        tds.push('<td class="' + focalCls + sigCls + '" style="background:' + bg +
-                 ';" data-ma-adv-cell-idx="' + hi + '">' +
+        tds.push('<td class="' + focalCls + sigCls + '" data-ma-adv-cell-bg style="background-color:' + bg +
+                 ' !important;background-image:none !important;--ma-cell-bg:' + bg +
+                 ';" data-ma-adv-cell-idx="' + hi + '" data-ma-cell-brand="' + escAttr(b) +
+                 '" data-ma-cell-stim="' + escAttr(stim) + '">' +
                  fmtScore(c.ma) + counts + '</td>');
       });
-      return '<tr>' + tds.join('') + '</tr>';
+      return '<tr data-ma-adv-row-stim="' + escAttr(stim) + '" class="' + rowCls + '">' + tds.join('') + '</tr>';
     });
 
     wrap.innerHTML = '<table class="ma-adv-matrix"><thead><tr>' + ths.join('') + '</tr></thead><tbody>' + rows.join('') + '</tbody></table>';
+
+    // Wire stim-row checkbox to hide the row + matching bubble.
+    wrap.querySelectorAll('input[data-ma-adv-stim-toggle]').forEach(function (cb) {
+      var code = cb.getAttribute('data-ma-adv-stim-toggle');
+      cb.addEventListener('change', function () {
+        panel.__maAdvHiddenStims = panel.__maAdvHiddenStims || {};
+        panel.__maAdvHiddenStims[code] = !cb.checked;
+        applyStimRowVisibility(panel);
+      });
+    });
+    applyBrandColumnVisibility(panel);
 
     // Wire matrix-cell hover tooltip (replaces slow native title tooltip).
     var base = getActiveBase(panel);
@@ -530,19 +591,30 @@
       });
     });
 
-    var chartCb = panel.querySelector('input[data-ma-action="adv-show-chart"]');
-    if (chartCb) chartCb.addEventListener('change', function () {
-      var view = panel.querySelector('.ma-adv-quadrant-view');
-      if (!view) return;
-      if (chartCb.checked) {
-        view.removeAttribute('hidden');
-        // Re-render now that the container has dimensions.
-        var block = getStimBlock(panel); if (block) renderQuadrant(panel, block);
-      } else {
-        view.setAttribute('hidden', '');
-        hideTooltip(panel);
-      }
+    var xaxisSel = panel.querySelector('select[data-ma-action="adv-xaxis"]');
+    if (xaxisSel) xaxisSel.addEventListener('change', function () {
+      getAdvState(panel).xaxis = xaxisSel.value;
+      var block = getStimBlock(panel); if (block) renderQuadrant(panel, block);
     });
+
+    // Brand-column chips: toggle column visibility in the matrix. The chart
+    // shows only the focal brand's bubbles, so brand chips don't change it.
+    panel.__maAdvHiddenBrands = panel.__maAdvHiddenBrands || {};
+    panel.querySelectorAll('button[data-ma-adv-chip-brand]').forEach(function (chip) {
+      var code = chip.getAttribute('data-ma-adv-chip-brand');
+      // Apply persisted state on bind
+      if (panel.__maAdvHiddenBrands[code]) chip.classList.add('col-chip-off');
+      chip.addEventListener('click', function () {
+        var off = chip.classList.toggle('col-chip-off');
+        panel.__maAdvHiddenBrands[code] = off;
+        applyBrandColumnVisibility(panel);
+      });
+    });
+
+    // Stim row checkboxes (added per row by renderMatrix below). Toggling a
+    // row hides the stim from BOTH the matrix and the chart bubble cloud,
+    // matching Duncan's "checks in the table - with chart to match" request.
+    panel.__maAdvHiddenStims = panel.__maAdvHiddenStims || {};
 
     var sigCb = panel.querySelector('input[data-ma-action="adv-show-sig"]');
     if (sigCb) sigCb.addEventListener('change', function () {

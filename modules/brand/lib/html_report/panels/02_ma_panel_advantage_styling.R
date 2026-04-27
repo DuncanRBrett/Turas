@@ -27,10 +27,45 @@ build_ma_advantage_styles <- function(focal_colour = "#1A5276") {
   padding: 22px 18px; color: #64748b; background: #f8fafc;
   border: 1px solid #e2e8f0; border-radius: 8px; }
 
-/* Intro text */
-.ma-adv-intro { margin: 4px 0 12px; }
-.ma-adv-intro-text { font-size: 12px; color: #475569;
-  margin: 4px 0 0; line-height: 1.55; max-width: 64ch; }
+/* Intro panel — laymans overview */
+.ma-adv-intro { margin: 4px 0 14px; }
+.ma-adv-intro-callout {
+  border: 1px solid #dbe7f5; background: #f3f8fd;
+  border-left: 4px solid %FOCAL%;
+  border-radius: 8px; padding: 8px 14px;
+  font-size: 12.5px; color: #1e293b; }
+.ma-adv-intro-callout > summary {
+  cursor: pointer; font-size: 13px; font-weight: 700; color: #0f172a;
+  list-style: none; padding: 4px 0; user-select: none; }
+.ma-adv-intro-callout > summary::-webkit-details-marker { display: none; }
+.ma-adv-intro-callout > summary::before { content: "\\25B8 "; color: %FOCAL%; }
+.ma-adv-intro-callout[open] > summary::before { content: "\\25BE "; }
+.ma-adv-intro-body { margin-top: 8px; line-height: 1.55; max-width: 78ch; }
+.ma-adv-intro-body p { margin: 0 0 8px; }
+.ma-adv-intro-body em { color: #475569; }
+.ma-adv-intro-list { margin: 6px 0 8px; padding-left: 18px; }
+.ma-adv-intro-list li { margin: 3px 0; }
+.ma-adv-intro-list strong { color: #1e293b; }
+.ma-adv-intro-source { font-size: 11px; color: #64748b; margin-top: 8px !important; }
+
+/* Chip row for brand-column visibility (matches existing MA tabs) */
+.ma-adv-chip-bar {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: 8px; margin: 0 0 12px; padding: 6px 10px;
+  background: #f8fafc; border: 1px solid #eef2f7;
+  border-radius: 6px; }
+.ma-adv-chip-bar .ma-ctl-label {
+  font-size: 11px; font-weight: 600; color: #64748b;
+  text-transform: uppercase; letter-spacing: 0.4px;
+  margin-right: 6px; }
+
+/* X-axis dropdown */
+.ma-adv-xaxis-wrap {
+  display: inline-flex; align-items: center; gap: 6px; }
+.ma-adv-xaxis-select {
+  font-size: 11.5px; padding: 4px 8px; border-radius: 4px;
+  border: 1px solid #cbd5e1; background: #fff;
+  color: #1e293b; cursor: pointer; }
 
 /* Stim/base toggle reuse sig-level-switcher styling — the MA panel CSS
    already defines those buttons; only spacing adjustments here. */
@@ -102,7 +137,27 @@ table.ma-adv-matrix {
   padding: 7px 10px; border-bottom: 1px solid #f0f0f0;
   text-align: center; vertical-align: middle;
   font-variant-numeric: tabular-nums; font-weight: 600;
-  position: relative; }
+  position: relative;
+  background-clip: padding-box;
+  background-origin: padding-box; }
+/* Defeat any global table rule that whites out cell backgrounds (e.g.
+   striped-row themes) so MA score colours always paint full-cell. The JS
+   sets background-color inline; this rule keeps it from being overridden. */
+.ma-adv-matrix td[style*="background-color"] {
+  background-image: none !important; }
+/* Hide brand columns when their chip is toggled off */
+.ma-adv-matrix col.ma-adv-col-hidden,
+.ma-adv-matrix th.ma-adv-col-hidden,
+.ma-adv-matrix td.ma-adv-col-hidden { display: none !important; }
+
+/* Hide stim rows when their per-row checkbox is unchecked. The chart
+   re-renders without those bubbles too. */
+.ma-adv-matrix tr.ma-adv-row-hidden { display: none !important; }
+.ma-adv-row-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  cursor: pointer; }
+.ma-adv-row-toggle input { margin: 0; }
+.ma-adv-row-stim-label { line-height: 1.35; }
 .ma-adv-matrix td.ma-adv-matrix-stim {
   text-align: left; font-weight: 500; color: #334155;
   white-space: normal; max-width: 260px; }

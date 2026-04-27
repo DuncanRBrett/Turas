@@ -34,6 +34,7 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
     '<section class="ma-section ma-advantage-section" data-ma-stim="advantage">',
     .ma_adv_intro(adv),
     .ma_adv_controls_bar(pd, adv),
+    .ma_adv_chip_row(pd),
     .ma_adv_views_layout(adv),
     .ma_adv_insight_box(),
     .ma_adv_about(adv),
@@ -47,18 +48,36 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
 # ==============================================================================
 
 .ma_adv_intro <- function(adv) {
-  threshold <- as.numeric(adv$threshold_pp %||% 5)
+  threshold <- as.integer(adv$threshold_pp %||% 5)
   paste0(
     '<div class="ma-adv-intro">',
     '<h3 class="ma-section-title">Mental Advantage</h3>',
-    '<p class="ma-adv-intro-text">',
-    'Mental Advantage isolates true competitive strength by removing brand-size',
-    ' and prototypicality effects. Each score is the difference, in percentage',
-    ' points, between actual brand-stimulus linkage and the linkage expected',
-    sprintf(' from category baselines. Defend (≥ +%dpp), Build (≤ -%dpp),',
-            as.integer(threshold), as.integer(threshold)),
-    ' Maintain in between.</p>',
-    '</div>'
+    '<details class="ma-adv-intro-callout" open>',
+    '<summary>What is Mental Advantage?</summary>',
+    '<div class="ma-adv-intro-body">',
+    '<p>Mental Advantage answers a simple question: <em>does this brand own this',
+    ' situation more than its size says it should?</em> A big brand attracts more',
+    ' associations on every CEP just because it is big. A widely held attribute',
+    ' (like “tastes good”) gets ticked for every brand. Raw linkage charts can’t',
+    ' tell those effects apart from real competitive strength.</p>',
+    '<p>For each brand × stimulus cell, we compare the <strong>actual</strong> number',
+    ' of respondents who linked the two, to the number we’d <strong>expect</strong>',
+    ' if linkage were purely a function of how big the brand is and how popular',
+    ' the stimulus is. The difference, expressed in percentage points of the',
+    ' sample, is the Mental Advantage score.</p>',
+    '<ul class="ma-adv-intro-list">',
+    sprintf('<li><strong>Defend</strong> &nbsp;(score &ge; +%dpp): the brand over-indexes — protect this territory.</li>', threshold),
+    sprintf('<li><strong>Build</strong> &nbsp;(score &le; &minus;%dpp): the brand under-indexes — a gap to close, especially on big stimuli.</li>', threshold),
+    '<li><strong>Maintain</strong> (in between): the brand is performing in line with its size — no urgent move.</li>',
+    '</ul>',
+    '<p>A bullet (&bull;) marks cells where the gap is large enough to be',
+    ' statistically significant (chi-square standardised residual |z| &gt; 1.96,',
+    ' p &lt; 0.05). The score itself is computed once on the total sample base',
+    ' (Romaniuk-faithful); the Base toggle changes the linkage % shown alongside',
+    ' the score, not the score itself.</p>',
+    '<p class="ma-adv-intro-source"><em>Source: Romaniuk, J. (2022). Better Brand Health',
+    ' (Ehrenberg-Bass). Worked example via Quantilope (2024).</em></p>',
+    '</div></details></div>'
   )
 }
 
@@ -94,19 +113,58 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
        <button type="button" class="sig-btn" data-ma-action="adv-filter" data-ma-adv-filter="top10" aria-pressed="false">Top 10 by |MA|</button>
      </div>'
 
+  xaxis_select <- '<div class="ma-adv-xaxis-wrap">
+       <span class="sig-level-label">X-axis:</span>
+       <select class="ma-adv-xaxis-select" data-ma-action="adv-xaxis" aria-label="Quadrant X-axis">
+         <option value="penetration" selected>Stimulus penetration (any brand)</option>
+         <option value="focal_linkage">Focal brand linkage (current base)</option>
+         <option value="brand_avg_linkage">Average linkage across brands</option>
+       </select>
+     </div>'
+
   paste0(
     '<div class="ma-controls controls-bar ma-adv-controls">',
     '<div class="ma-meta-row">',
     stim_buttons,
     base_buttons,
     filter_buttons,
+    xaxis_select,
     '<label class="toggle-label"><input type="checkbox" data-ma-action="adv-show-sig" checked> Mark significant cells</label>',
     '<label class="toggle-label"><input type="checkbox" data-ma-action="adv-show-counts"> Show counts</label>',
-    '<label class="toggle-label"><input type="checkbox" data-ma-action="adv-show-chart" checked> Show chart</label>',
-    '<button type="button" class="export-btn ma-pin-dropdown-btn" data-ma-action="pindropdown" data-ma-pin-scope="advantage" title="Pin a section" aria-haspopup="true">&#128204; Pin &#9662;</button>',
+    '<button type="button" class="export-btn ma-pin-dropdown-btn" data-ma-action="adv-pindropdown" data-ma-pin-scope="advantage" title="Pin a section" aria-haspopup="true">&#128204; Pin &#9662;</button>',
     '<button type="button" class="export-btn ma-png-btn" onclick="brExportPngFromEl(this)" title="Export view to PNG">&#x1F5BC; PNG</button>',
     '<button type="button" class="export-btn ma-export-btn" data-ma-action="exporttable" data-ma-stim="advantage" title="Export Mental Advantage to Excel">⭳ Excel ▾</button>',
     '</div>',
+    '</div>'
+  )
+}
+
+
+#' Brand-column visibility chips for the matrix and chart.
+#' Mirrors the pattern used on the existing CEPs/Attributes tabs so the
+#' interaction language is consistent across the panel. Clicking a chip
+#' toggles the brand column off/on in the matrix; the chart shows only
+#' the focal brand so chip toggles don't affect it directly, but stim
+#' rows greyed out from the matrix DO drop their bubble from the chart.
+#' @keywords internal
+.ma_adv_chip_row <- function(pd) {
+  brand_codes <- pd$config$brand_codes %||% character(0)
+  brand_names <- pd$config$brand_names %||% brand_codes
+  focal       <- pd$meta$focal_brand_code
+
+  if (length(brand_codes) == 0) return("")
+  sorted <- order(brand_codes != focal, tolower(brand_names))
+  brand_codes <- brand_codes[sorted]; brand_names <- brand_names[sorted]
+
+  chips <- paste(vapply(seq_along(brand_codes), function(i) {
+    sprintf('<button type="button" class="col-chip" data-ma-adv-chip-brand="%s">%s</button>',
+            .ma_esc(brand_codes[i]), .ma_esc(brand_names[i]))
+  }, character(1)), collapse = "")
+
+  paste0(
+    '<div class="ma-adv-chip-bar">',
+    '<span class="ma-ctl-label">Show brands</span>',
+    '<div class="ma-chip-row col-chip-bar" data-ma-adv-scope="brands">', chips, '</div>',
     '</div>'
   )
 }
