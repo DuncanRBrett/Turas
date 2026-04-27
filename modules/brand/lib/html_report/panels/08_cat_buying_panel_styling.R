@@ -690,42 +690,47 @@ paste0(
 .ma-bar-group-label { font-size: 11px; fill: #334155; font-weight: 500; }
 .ma-bar-cat-avg  { stroke: #94a3b8; stroke-width: 1.5; stroke-dasharray: 4 3; }
 
-/* === Shopper Behaviour sub-tab — fitting overrides ============== */
-/* Compact KPI-chip variant used by Shopper Behaviour summary chips on
-   the Context tab. The default chip\'s 22px value font is too big for
-   long channel / pack-size labels, so this variant shrinks the value
-   font and lets it wrap to two lines if needed. The label text below
-   keeps the standard 11px size. Both chip body and value allow text
-   wrap so longer values like "Supermarket (88%)" do not overflow the
-   chip\'s flex container or push the row off-screen. */
-.cb-panel .cb-kpi-strip { align-items: stretch; }
-.cb-panel .cb-kpi-chip.cb-kpi-chip-text {
+/* === Shopper Behaviour sub-tab — fitting overrides =====================
+   These rules drop the .cb-panel ancestor on purpose: when sections
+   are captured for pin / PNG export the cloned HTML lives outside
+   .cb-panel, so any panel-scoped rule stops applying. Selectors here
+   key off classes / data-attributes that travel with the captured
+   element. !important is used to beat the design-system base rule
+   (th[class*="-th"] { text-transform: uppercase; white-space: nowrap; })
+   which would otherwise win in the pin context where the scoped panel
+   override no longer applies. */
+
+/* Compact KPI-chip variant used by Shopper Behaviour summary chips.
+   Smaller value font for long channel / pack-size labels and a wrap-
+   friendly width cap. Used both inline on the Context tab and when
+   the chip strip is captured into a pin. */
+.cb-kpi-chip.cb-kpi-chip-text {
   min-width: 150px; max-width: 240px; padding: 8px 14px;
 }
-.cb-panel .cb-kpi-chip.cb-kpi-chip-text .cb-kpi-val {
-  font-size: 14px; line-height: 1.25; font-weight: 600;
-  white-space: normal; overflow-wrap: break-word; word-break: keep-all;
+.cb-kpi-chip.cb-kpi-chip-text .cb-kpi-val {
+  font-size: 14px !important; line-height: 1.25; font-weight: 600;
+  white-space: normal !important;
+  overflow-wrap: break-word; word-break: keep-all;
 }
-.cb-panel .cb-kpi-chip.cb-kpi-chip-text .cb-kpi-label {
-  white-space: normal; line-height: 1.2;
+.cb-kpi-chip.cb-kpi-chip-text .cb-kpi-label {
+  white-space: normal !important; line-height: 1.2;
 }
 
-/* Shopper section column headers: enable wrap so multi-word channel
-   labels (e.g. "Online / food delivery app") do not force the column
-   wider than the available row. Brand summary, loyalty, dist tables
-   keep their default nowrap. Selector matches the section wrappers
-   the renderer emits via data-cb-scope on cb-rel-section. */
-.cb-panel .cb-rel-section[data-cb-scope^="shop_"] .ct-table .ct-th {
-  white-space: normal; line-height: 1.25;
-  max-width: 110px; word-break: keep-all; overflow-wrap: break-word;
-  hyphens: auto;
+/* Shopper section column headers: wrap multi-word labels and keep them
+   at sensible width regardless of capture context. The brand label
+   column is intentionally kept nowrap as a clean row stub. */
+.cb-rel-section[data-cb-scope^="shop_"] .ct-table .ct-th {
+  white-space: normal !important; text-transform: none !important;
+  line-height: 1.25; max-width: 110px;
+  word-break: keep-all; overflow-wrap: break-word; hyphens: auto;
+  letter-spacing: 0 !important;
 }
-.cb-panel .cb-rel-section[data-cb-scope^="shop_"] .ct-table .ct-th .cb-th-label {
-  white-space: normal; display: inline-block; max-width: 100%;
+.cb-rel-section[data-cb-scope^="shop_"] .ct-table .ct-th .cb-th-label {
+  white-space: normal !important; display: inline-block; max-width: 100%;
+  text-transform: none !important;
 }
-/* Keep the brand-label column comfortable: it is the row stub here. */
-.cb-panel .cb-rel-section[data-cb-scope^="shop_"] .ct-table .ct-th.ct-label-col {
-  max-width: none; min-width: 130px; white-space: nowrap;
+.cb-rel-section[data-cb-scope^="shop_"] .ct-table .ct-th.ct-label-col {
+  max-width: none; min-width: 130px; white-space: nowrap !important;
 }
 </style>'
 )

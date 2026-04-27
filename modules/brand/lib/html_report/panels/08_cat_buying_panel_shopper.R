@@ -193,21 +193,15 @@ cb_shopper_context_chips <- function(panel_data) {
   if (.cb_shop_section_ok(loc)) {
     chips <- c(chips, .cb_shop_chip(
       val   = sprintf("%s (%.0f%%)", loc$top$label, loc$top$pct),
-      label = "Top channel"
-    ))
-    chips <- c(chips, .cb_shop_chip(
-      val   = sprintf("%.2f", loc$hhi),
-      label = "Channel HHI (0-1)"
+      label = "Top channel",
+      compact = TRUE
     ))
   }
   if (.cb_shop_section_ok(pak)) {
     chips <- c(chips, .cb_shop_chip(
       val   = sprintf("%s (%.0f%%)", pak$top$label, pak$top$pct),
-      label = "Top pack size"
-    ))
-    chips <- c(chips, .cb_shop_chip(
-      val   = sprintf("%.2f", pak$hhi),
-      label = "Pack HHI (0-1)"
+      label = "Top pack size",
+      compact = TRUE
     ))
   }
   if (length(chips) == 0) return("")
