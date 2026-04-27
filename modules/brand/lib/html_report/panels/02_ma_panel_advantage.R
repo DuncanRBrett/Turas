@@ -113,24 +113,14 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
        <button type="button" class="sig-btn" data-ma-action="adv-filter" data-ma-adv-filter="top10" aria-pressed="false">Top 10 by |MA|</button>
      </div>'
 
-  xaxis_select <- '<div class="ma-adv-xaxis-wrap">
-       <span class="sig-level-label">X-axis:</span>
-       <select class="ma-adv-xaxis-select" data-ma-action="adv-xaxis" aria-label="Quadrant X-axis">
-         <option value="penetration" selected>Stimulus penetration (any brand)</option>
-         <option value="focal_linkage">Focal brand linkage (current base)</option>
-         <option value="brand_avg_linkage">Average linkage across brands</option>
-       </select>
-     </div>'
-
   paste0(
     '<div class="ma-controls controls-bar ma-adv-controls">',
     '<div class="ma-meta-row">',
     stim_buttons,
     base_buttons,
     filter_buttons,
-    xaxis_select,
-    '<label class="toggle-label"><input type="checkbox" data-ma-action="adv-show-sig" checked> Mark significant cells</label>',
     '<label class="toggle-label"><input type="checkbox" data-ma-action="adv-show-counts"> Show counts</label>',
+    '<label class="toggle-label"><input type="checkbox" data-ma-action="adv-show-chart" checked> Show chart</label>',
     '<button type="button" class="export-btn ma-pin-dropdown-btn" data-ma-action="adv-pindropdown" data-ma-pin-scope="advantage" title="Pin a section" aria-haspopup="true">&#128204; Pin &#9662;</button>',
     '<button type="button" class="export-btn ma-png-btn" onclick="brExportPngFromEl(this)" title="Export view to PNG">&#x1F5BC; PNG</button>',
     '<button type="button" class="export-btn ma-export-btn" data-ma-action="exporttable" data-ma-stim="advantage" title="Export Mental Advantage to Excel">⭳ Excel ▾</button>',
@@ -211,12 +201,21 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
     '<summary>About this chart</summary>',
     '<p class="ma-subsection-note">',
     'Each bubble is a CEP or attribute for the focal brand. X-axis: how big',
-    ' the stimulus is in the category (any-brand penetration). Y-axis: focal',
+    ' the stimulus is in the category. Y-axis: focal',
     " brand's Mental Advantage in pp. Bubble size: focal's raw linkage % to",
-    ' that stimulus. Top-right (big + advantaged) = Defend; bottom-right',
-    ' (big + disadvantaged) = Build (biggest gaps); top-left = niche but',
-    ' advantaged (Amplify); bottom-left = low priority.',
+    ' that stimulus (on a fixed 0&ndash;100% scale, so % aware vs % total',
+    ' produces visibly different sizes). Top-right (big + advantaged) =',
+    ' Defend; bottom-right (big + disadvantaged) = Build; top-left = niche',
+    ' but advantaged (Amplify); bottom-left = low priority.',
     '</p></details>',
+    '</div>',
+    '<div class="ma-adv-quadrant-rangebar">',
+    '<span class="ma-ctl-label">X-axis range</span>',
+    '<label class="ma-adv-xrange-label">Min',
+    '<input type="number" class="ma-adv-xrange-input" data-ma-action="adv-xrange-min" min="0" max="100" step="5" placeholder="auto"></label>',
+    '<label class="ma-adv-xrange-label">Max',
+    '<input type="number" class="ma-adv-xrange-input" data-ma-action="adv-xrange-max" min="0" max="100" step="5" placeholder="auto"></label>',
+    '<button type="button" class="ma-adv-xrange-reset" data-ma-action="adv-xrange-reset">Reset</button>',
     '</div>',
     '<svg class="ma-adv-quadrant-svg" data-ma-adv="quadrant" xmlns="http://www.w3.org/2000/svg"></svg>',
     '</div>'

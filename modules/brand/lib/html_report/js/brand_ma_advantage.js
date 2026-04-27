@@ -150,29 +150,18 @@
     var base = getActiveBase(panel);
     var filter = getActiveFilter(panel);
 
-    // Pre-compute average linkage per stim across all brands (for the
-    // x-axis "average linkage" option).
-    var avgLinkBy = {};
-    block.codes.forEach(function (s) {
-      var pcts = block.cells
-        .filter(function (c) { return c.stim_code === s && c.pct_total != null; })
-        .map(function (c) { return base === 'aware' && c.pct_aware != null ? c.pct_aware : c.pct_total; });
-      avgLinkBy[s] = pcts.length ? pcts.reduce(function (a, b) { return a + b; }, 0) / pcts.length : 0;
-    });
-
-    var xAxis = getActiveXAxis(panel);
     var hidden = panel.__maAdvHiddenStims || {};
 
+    // Bubble per CEP/attribute for the focal brand. Hidden stims (row
+    // checkbox unchecked) drop their bubble from the chart but the row
+    // stays visible — Duncan: "strike and grey out, like brand attribute
+    // tabs so I can put it back."
     var allPts = block.cells.filter(function (c) { return c.brand_code === focal; })
       .filter(function (c) { return !hidden[c.stim_code]; })
       .map(function (c) {
         var sizeSrc = (base === 'aware' && c.pct_aware != null) ? c.pct_aware : c.pct_total;
         var pen = block.stim_penetration[block.codes.indexOf(c.stim_code)];
-        var xVal = xAxis === 'focal_linkage' ? sizeSrc
-                 : xAxis === 'brand_avg_linkage' ? avgLinkBy[c.stim_code]
-                 : pen;
-        return { code: c.stim_code, ma: c.ma, pen: pen,
-                 x: xVal != null ? xVal : 0,
+        return { code: c.stim_code, ma: c.ma, pen: pen, x: pen,
                  size: sizeSrc != null ? sizeSrc : 0,
                  decision: c.decision, isSig: c.is_sig,
                  label: block.labels[block.codes.indexOf(c.stim_code)] };
@@ -187,19 +176,26 @@
     svg.setAttribute('height', height);
 
     var pW = width - mL - mR, pH = height - mT - mB;
-    var xMax = Math.max(10, Math.ceil(Math.max.apply(null, allPts.map(function (p) { return p.x; })) / 10) * 10);
+    // X-axis range: user-set if provided, else auto from data.
+    var xrange = panel.__maAdvXRange || {};
+    var xAutoMax = Math.max(10, Math.ceil(Math.max.apply(null, allPts.map(function (p) { return p.x; })) / 10) * 10);
+    var xAutoMin = 0;
+    var xMin = (xrange.min != null && !isNaN(xrange.min)) ? xrange.min : xAutoMin;
+    var xMax = (xrange.max != null && !isNaN(xrange.max)) ? xrange.max : xAutoMax;
+    if (xMax <= xMin) { xMin = xAutoMin; xMax = xAutoMax; }
     var maAbsMax = Math.max(threshold * 2,
                               Math.ceil(Math.max.apply(null, allPts.map(function (p) { return Math.abs(p.ma); }))));
-    var sizeMax = Math.max(1, Math.max.apply(null, allPts.map(function (p) { return p.size; })));
+    // Bubble size: fixed 0-100% reference so toggling base actually shows
+    // bigger/smaller bubbles. Without this, normalising to dataset max
+    // cancels the constant awareness factor and the toggle looks dead.
+    var sizeRefMax = 100;
     // Mean of the active x-axis dimension (vertical divider).
     var xMean = allPts.reduce(function (s, p) { return s + p.x; }, 0) / allPts.length;
-    var xLabel = xAxis === 'focal_linkage'      ? 'Focal brand linkage (' + (base === 'aware' ? '% aware' : '% total') + ')'
-              :  xAxis === 'brand_avg_linkage' ? 'Average linkage across brands (' + (base === 'aware' ? '% aware' : '% total') + ')'
-              :                                   'Stimulus penetration (any brand, %)';
+    var xLabel = 'Stimulus penetration (any brand, %)';
 
-    function toX(v) { return mL + pW * v / xMax; }
+    function toX(v) { return mL + pW * (v - xMin) / (xMax - xMin); }
     function toY(v) { return mT + pH * (1 - (v + maAbsMax) / (2 * maAbsMax)); }
-    function bR(s)  { return Math.max(6, Math.min(22, 6 + 16 * s / sizeMax)); }
+    function bR(s)  { return Math.max(4, Math.min(22, 4 + 18 * s / sizeRefMax)); }
 
     var parts = [];
     parts.push('<rect class="ma-adv-q-bg" x="' + mL + '" y="' + mT + '" width="' + pW + '" height="' + pH + '"/>');
@@ -207,9 +203,9 @@
     parts.push('<rect class="ma-adv-q-zone-defend" x="' + mL + '" y="' + mT + '" width="' + pW + '" height="' + (yPos - mT) + '"/>');
     parts.push('<rect class="ma-adv-q-zone-build"  x="' + mL + '" y="' + yNeg + '" width="' + pW + '" height="' + (mT + pH - yNeg) + '"/>');
 
-    // Grid + tick labels (X)
+    // Grid + tick labels (X) — span the [xMin, xMax] range
     for (var xi = 0; xi <= 5; xi++) {
-      var xv = xMax * xi / 5; var gx = toX(xv);
+      var xv = xMin + (xMax - xMin) * xi / 5; var gx = toX(xv);
       parts.push('<line class="ma-adv-q-grid" x1="' + gx + '" y1="' + mT + '" x2="' + gx + '" y2="' + (mT + pH) + '"/>');
       parts.push('<text class="ma-adv-q-tick" x="' + gx + '" y="' + (mT + pH + 14) + '" text-anchor="middle">' + Math.round(xv) + '%</text>');
     }
@@ -244,6 +240,8 @@
     // Bubbles — store position + payload index for hover lookup
     var labelCandidates = [];
     pts.forEach(function (p, i) {
+      // Skip points outside the configured x-range (so manual zoom works).
+      if (p.x < xMin || p.x > xMax) return;
       var cx = toX(p.x), cy = toY(p.ma), r2 = bR(p.size);
       var cls = 'ma-adv-q-bubble ma-adv-q-bubble-' + (p.decision || 'na');
       if (p.isSig) cls += ' ma-adv-q-bubble-sig';
@@ -301,11 +299,15 @@
       el.classList.toggle('ma-adv-col-hidden', !!hidden[code]);
     });
   }
+  // Per-row checkbox: when unchecked, the row stays in the table but is
+  // greyed out and struck through, mirroring the brand-attributes tab so
+  // the user can re-check to restore. The chart drops the bubble for any
+  // unchecked stim.
   function applyStimRowVisibility(panel) {
     var hidden = panel.__maAdvHiddenStims || {};
     panel.querySelectorAll('tr[data-ma-adv-row-stim]').forEach(function (tr) {
       var code = tr.getAttribute('data-ma-adv-row-stim');
-      tr.classList.toggle('ma-adv-row-hidden', !!hidden[code]);
+      tr.classList.toggle('ma-adv-row-inactive', !!hidden[code]);
     });
     var block = getStimBlock(panel); if (block) renderQuadrant(panel, block);
   }
@@ -357,7 +359,7 @@
     var rows = idx.map(function (i) {
       var stim = block.codes[i], lbl = block.labels[i];
       var checked = hiddenStims[stim] ? '' : ' checked';
-      var rowCls = hiddenStims[stim] ? 'ma-adv-row-hidden' : '';
+      var rowCls = hiddenStims[stim] ? 'ma-adv-row-inactive' : '';
       var stimCell = '<td class="ma-adv-matrix-stim"><label class="ma-adv-row-toggle">' +
                      '<input type="checkbox" data-ma-adv-stim-toggle="' + escAttr(stim) + '"' + checked + '>' +
                      '<span class="ma-adv-row-stim-label">' + escHtml(lbl) + '</span></label></td>';
@@ -591,10 +593,41 @@
       });
     });
 
-    var xaxisSel = panel.querySelector('select[data-ma-action="adv-xaxis"]');
-    if (xaxisSel) xaxisSel.addEventListener('change', function () {
-      getAdvState(panel).xaxis = xaxisSel.value;
+    // X-axis range inputs (live next to the chart). Empty input = auto.
+    panel.__maAdvXRange = panel.__maAdvXRange || {};
+    function readRange() {
+      var minEl = panel.querySelector('input[data-ma-action="adv-xrange-min"]');
+      var maxEl = panel.querySelector('input[data-ma-action="adv-xrange-max"]');
+      var s = panel.__maAdvXRange;
+      s.min = (minEl && minEl.value !== '') ? parseFloat(minEl.value) : null;
+      s.max = (maxEl && maxEl.value !== '') ? parseFloat(maxEl.value) : null;
+    }
+    panel.querySelectorAll('input[data-ma-action="adv-xrange-min"], input[data-ma-action="adv-xrange-max"]').forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        readRange();
+        var block = getStimBlock(panel); if (block) renderQuadrant(panel, block);
+      });
+    });
+    var resetBtn = panel.querySelector('button[data-ma-action="adv-xrange-reset"]');
+    if (resetBtn) resetBtn.addEventListener('click', function () {
+      var minEl = panel.querySelector('input[data-ma-action="adv-xrange-min"]');
+      var maxEl = panel.querySelector('input[data-ma-action="adv-xrange-max"]');
+      if (minEl) minEl.value = ''; if (maxEl) maxEl.value = '';
+      panel.__maAdvXRange = {};
       var block = getStimBlock(panel); if (block) renderQuadrant(panel, block);
+    });
+
+    var chartCb = panel.querySelector('input[data-ma-action="adv-show-chart"]');
+    if (chartCb) chartCb.addEventListener('change', function () {
+      var view = panel.querySelector('.ma-adv-quadrant-view');
+      if (!view) return;
+      if (chartCb.checked) {
+        view.removeAttribute('hidden');
+        var block = getStimBlock(panel); if (block) renderQuadrant(panel, block);
+      } else {
+        view.setAttribute('hidden', '');
+        hideTooltip(panel);
+      }
     });
 
     // Brand-column chips: toggle column visibility in the matrix. The chart
@@ -616,11 +649,6 @@
     // matching Duncan's "checks in the table - with chart to match" request.
     panel.__maAdvHiddenStims = panel.__maAdvHiddenStims || {};
 
-    var sigCb = panel.querySelector('input[data-ma-action="adv-show-sig"]');
-    if (sigCb) sigCb.addEventListener('change', function () {
-      var wrap = panel.querySelector('.ma-adv-matrix-wrap');
-      if (wrap) wrap.classList.toggle('ma-adv-show-sig', sigCb.checked);
-    });
     var cntCb = panel.querySelector('input[data-ma-action="adv-show-counts"]');
     if (cntCb) cntCb.addEventListener('change', function () {
       var wrap = panel.querySelector('.ma-adv-matrix-wrap');

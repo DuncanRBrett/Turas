@@ -150,14 +150,44 @@ table.ma-adv-matrix {
 .ma-adv-matrix th.ma-adv-col-hidden,
 .ma-adv-matrix td.ma-adv-col-hidden { display: none !important; }
 
-/* Hide stim rows when their per-row checkbox is unchecked. The chart
-   re-renders without those bubbles too. */
-.ma-adv-matrix tr.ma-adv-row-hidden { display: none !important; }
+/* Per-row checkbox: when unchecked, the row stays in the table but is
+   greyed out and struck through, matching the brand-attributes tab so
+   the user can re-check to restore. The chart drops the bubble. */
+.ma-adv-matrix tr.ma-adv-row-inactive td { opacity: 0.45; }
+.ma-adv-matrix tr.ma-adv-row-inactive .ma-adv-row-stim-label {
+  text-decoration: line-through; color: #94a3b8; }
+.ma-adv-matrix tr.ma-adv-row-inactive td[data-ma-adv-cell-bg] {
+  background-color: #f8fafc !important;
+  background-image: none !important;
+  color: #94a3b8 !important; }
 .ma-adv-row-toggle {
   display: inline-flex; align-items: center; gap: 6px;
   cursor: pointer; }
 .ma-adv-row-toggle input { margin: 0; }
 .ma-adv-row-stim-label { line-height: 1.35; }
+
+/* X-axis range inputs (next to the chart) */
+.ma-adv-quadrant-rangebar {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: 10px; margin: 4px 0 12px; padding: 6px 10px;
+  background: #fafbfc; border: 1px solid #eef2f7;
+  border-radius: 6px; font-size: 11.5px; }
+.ma-adv-quadrant-rangebar .ma-ctl-label {
+  font-size: 11px; font-weight: 600; color: #64748b;
+  text-transform: uppercase; letter-spacing: 0.4px; }
+.ma-adv-xrange-label {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: #475569; font-weight: 500; }
+.ma-adv-xrange-input {
+  width: 70px; font-size: 12px; padding: 4px 6px;
+  border-radius: 4px; border: 1px solid #cbd5e1;
+  background: #fff; color: #1e293b;
+  font-variant-numeric: tabular-nums; }
+.ma-adv-xrange-reset {
+  font-size: 11.5px; padding: 4px 10px;
+  border-radius: 4px; border: 1px solid #cbd5e1;
+  background: #fff; color: #475569; cursor: pointer; }
+.ma-adv-xrange-reset:hover { background: #f1f5f9; }
 .ma-adv-matrix td.ma-adv-matrix-stim {
   text-align: left; font-weight: 500; color: #334155;
   white-space: normal; max-width: 260px; }

@@ -1839,14 +1839,22 @@
     } else if (activeKey === 'advantage') {
       // Capture each Mental Advantage view as a faithful snapshot of the
       // current state (focal brand, sort, decision colours, sig markers).
+      // The pin title carries focal brand + active base so a pinned card
+      // is unambiguous about which scope it represents.
       var advSubtab = panel.querySelector('.ma-subtab[data-ma-subtab="advantage"]') || panel;
+      var advFocalName = (pd.meta && pd.meta.focal_brand_name) || focal || 'Focal';
+      var advBaseBtn = advSubtab.querySelector('button[data-ma-action="adv-base"].sig-btn-active');
+      var advBaseLabel = advBaseBtn
+        ? (advBaseBtn.getAttribute('data-ma-adv-base') === 'aware' ? '% aware' : '% total')
+        : '% total';
+      var advTitleSuffix = ' — Mental Advantage — ' + advFocalName + ' — ' + advBaseLabel;
       var advInsight = '';
       if (optKeys.indexOf('insight') >= 0) {
         var taA = panel.querySelector('.ma-insight-box-text[data-ma-stim="advantage"]');
         if (taA) advInsight = taA.value.trim();
       }
       var advDefs = {
-        matrix:   { sel: '.ma-adv-matrix-wrap',  label: 'Mental Advantage matrix' },
+        matrix:   { sel: '.ma-adv-matrix-wrap',  label: 'Matrix' },
         quadrant: { sel: '.ma-adv-quadrant-view', label: 'Strategic quadrant' },
         actions:  { sel: '.ma-adv-action-list-view', label: 'Action list' }
       };
@@ -1861,7 +1869,9 @@
         var htm = (!svg && !tbl) ? captureHtml(el) : '';
         TurasPins.add({
           sectionKey: 'ma-advantage-' + key + '-' + Date.now(),
-          title: baseTitle + ' — ' + def.label,
+          title: cat + advTitleSuffix + ' — ' + def.label,
+          subtitle: 'Focal: ' + advFocalName + ' · Base: ' + advBaseLabel,
+          baseText: advBaseLabel,
           chartSvg: svg, chartHtml: '',
           tableHtml: tbl || htm,
           insightText: (advPinIndex === 0) ? advInsight : '',
@@ -1871,11 +1881,11 @@
         });
         advPinIndex++;
       });
-      // Insight ticked alone — standalone pin
       if (advPinIndex === 0 && advInsight) {
         TurasPins.add({
           sectionKey: 'ma-advantage-insight-' + Date.now(),
-          title: baseTitle + ' — Mental Advantage — Insight',
+          title: cat + advTitleSuffix + ' — Insight',
+          subtitle: 'Focal: ' + advFocalName + ' · Base: ' + advBaseLabel,
           chartSvg: '', chartHtml: '', tableHtml: '',
           insightText: advInsight,
           pinMode: 'custom',
