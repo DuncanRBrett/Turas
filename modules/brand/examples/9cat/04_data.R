@@ -2,7 +2,7 @@
 # 9CAT SYNTHETIC EXAMPLE - DATA GENERATOR
 # ==============================================================================
 # Generates realistic synthetic respondent data for the IPK 9-category study.
-# 400 respondents: 100 per full category (DSS, POS, PAS, BAK).
+# 1200 respondents: 300 per full category (DSS, POS, PAS, BAK).
 #
 # Each respondent fills:
 #   - Their focal category's full CBM battery (funnel + CEPs + attributes)
@@ -416,7 +416,7 @@
 #' @param overwrite   Logical. Overwrite if file exists (default: TRUE).
 #' @return Invisibly returns the output_path.
 #' @export
-generate_9cat_data <- function(output_path, n = 400, seed = 42, overwrite = TRUE) {
+generate_9cat_data <- function(output_path, n = 1200, seed = 42, overwrite = TRUE) {
 
   if (!requireNamespace("openxlsx", quietly = TRUE)) stop("Package 'openxlsx' is required")
   if (file.exists(output_path) && !overwrite) {
@@ -482,7 +482,7 @@ generate_9cat_data <- function(output_path, n = 400, seed = 42, overwrite = TRUE
     full
   })
 
-  # Awareness-only block (all 400 respondents × 5 × 10 brands = 50 columns)
+  # Awareness-only block (all n respondents × 5 cats × 10 brands = 50 columns)
   aware_only_df <- .build_9cat_aware_only_block(n_total)
 
   # WOM block (full-category brands, focal respondents only)

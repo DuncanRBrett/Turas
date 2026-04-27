@@ -1113,7 +1113,7 @@ generate_9cat_structure <- function(output_path, overwrite = TRUE) {
     title    = "DBA Asset Definitions (only if element_dba = Y in Brand_Config)",
     subtitle = paste0(
       "5 distinctive brand assets for Ina Paarman's Kitchen. ",
-      "DBA is brand-level: all 400 respondents across all 9 categories see these assets. ",
+      "DBA is brand-level: all 1200 respondents across all 9 categories see these assets. ",
       "ImagePath links to the image file shown to respondents in the survey."
     ),
     example_rows   = .build_9cat_dba_structure_rows(),
