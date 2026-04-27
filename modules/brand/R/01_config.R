@@ -308,7 +308,8 @@ load_brand_survey_structure <- function(structure_path) {
       # real headers at startRow 2, 3, 4
       .looks_like_data_header <- function(d) {
         any(c("BrandCode", "Category", "QuestionCode", "CEPCode", "AttrCode",
-              "AssetCode", "Role", "Scale") %in% names(d))
+              "AssetCode", "ChannelCode", "PackSizeCode",
+              "Role", "Scale") %in% names(d))
       }
       if (!is.null(df) && !.looks_like_data_header(df)) {
         for (.sr in 2:4) {
@@ -338,6 +339,11 @@ load_brand_survey_structure <- function(structure_path) {
   structure$ceps <- .load_table("CEPs")
   structure$attributes <- .load_table("Attributes")
   structure$dba_assets <- .load_table("DBA_Assets")
+
+  # Shopper-behaviour code lists (optional; only present when project asks
+  # respondents about purchase channels and/or pack sizes per category).
+  structure$channels  <- .load_table("Channels")
+  structure$packsizes <- .load_table("PackSizes")
 
   # Role-registry sheets (new architecture; see ROLE_REGISTRY.md §11).
   # Optional here: not every element has migrated yet, so projects with

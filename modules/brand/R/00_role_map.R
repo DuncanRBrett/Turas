@@ -31,10 +31,12 @@ BRAND_VARIABLE_TYPES <- c(
 # underscore) accept either spelling in the QuestionMap without relitigating
 # every author's preference.
 .BRAND_PATTERN_TOKENS <- list(
-  brand  = c("{brandcode}", "{brand_code}"),
-  cep    = c("{cepcode}",   "{cep_code}"),
-  asset  = c("{assetcode}", "{asset_code}"),
-  index  = c("{index}")
+  brand    = c("{brandcode}",    "{brand_code}"),
+  cep      = c("{cepcode}",      "{cep_code}"),
+  asset    = c("{assetcode}",    "{asset_code}"),
+  channel  = c("{channelcode}",  "{channel_code}"),
+  packsize = c("{packsizecode}", "{packsize_code}"),
+  index    = c("{index}")
 )
 
 
@@ -91,10 +93,12 @@ load_role_map <- function(structure,
   questionmap <- .require_questionmap(structure$questionmap)
 
   ctx <- list(
-    brand_list = brand_list %||% structure$brands,
-    cep_list   = cep_list   %||% structure$ceps,
-    asset_list = asset_list %||% structure$dba_assets,
-    optionmap  = structure$optionmap
+    brand_list    = brand_list %||% structure$brands,
+    cep_list      = cep_list   %||% structure$ceps,
+    asset_list    = asset_list %||% structure$dba_assets,
+    channel_list  = structure$channels,
+    packsize_list = structure$packsizes,
+    optionmap     = structure$optionmap
   )
 
   role_map <- list()
@@ -305,10 +309,12 @@ load_role_map <- function(structure,
   if (is.na(bucket)) .refuse_unknown_token(token_clean, role)
 
   switch(bucket,
-    brand = .values_brand(ctx$brand_list, token_clean, role),
-    cep   = .values_cep(ctx$cep_list, token_clean, role),
-    asset = .values_asset(ctx$asset_list, token_clean, role),
-    index = .values_index(ctx$asset_list, role)
+    brand    = .values_brand(ctx$brand_list, token_clean, role),
+    cep      = .values_cep(ctx$cep_list, token_clean, role),
+    asset    = .values_asset(ctx$asset_list, token_clean, role),
+    channel  = .values_channel(ctx$channel_list, token_clean, role),
+    packsize = .values_packsize(ctx$packsize_list, token_clean, role),
+    index    = .values_index(ctx$asset_list, role)
   )
 }
 
@@ -370,6 +376,38 @@ load_role_map <- function(structure,
 }
 
 
+.values_channel <- function(channel_list, token_clean, role) {
+  if (is.null(channel_list) || nrow(channel_list) == 0 ||
+      !("ChannelCode" %in% names(channel_list))) {
+    .refuse_missing_list(
+      code      = "CFG_CHANNEL_LIST_MISSING",
+      title     = "Channel List Unavailable for Pattern Expansion",
+      list_name = "Channels",
+      key_col   = "ChannelCode",
+      token     = token_clean,
+      role      = role
+    )
+  }
+  as.character(channel_list$ChannelCode)
+}
+
+
+.values_packsize <- function(packsize_list, token_clean, role) {
+  if (is.null(packsize_list) || nrow(packsize_list) == 0 ||
+      !("PackSizeCode" %in% names(packsize_list))) {
+    .refuse_missing_list(
+      code      = "CFG_PACKSIZE_LIST_MISSING",
+      title     = "Pack Size List Unavailable for Pattern Expansion",
+      list_name = "PackSizes",
+      key_col   = "PackSizeCode",
+      token     = token_clean,
+      role      = role
+    )
+  }
+  as.character(packsize_list$PackSizeCode)
+}
+
+
 .values_index <- function(asset_list, role) {
   n <- if (!is.null(asset_list)) nrow(asset_list) else 0L
   if (n == 0) {
@@ -427,11 +465,13 @@ load_role_map <- function(structure,
     ),
     how_to_fix = c(
       "Use only the supported tokens:",
-      "  {code}       - the row's ClientCode",
-      "  {brandcode}  or {brand_code} - one value per brand",
-      "  {cepcode}    or {cep_code}   - one value per CEP",
-      "  {assetcode}  or {asset_code} - one value per DBA asset",
-      "  {index}      - ordinal 1..N (asset list length)"
+      "  {code}          - the row's ClientCode",
+      "  {brandcode}     or {brand_code}    - one value per brand",
+      "  {cepcode}       or {cep_code}      - one value per CEP",
+      "  {assetcode}     or {asset_code}    - one value per DBA asset",
+      "  {channelcode}   or {channel_code}  - one value per purchase channel",
+      "  {packsizecode}  or {packsize_code} - one value per pack-size band",
+      "  {index}         - ordinal 1..N (asset list length)"
     ),
     observed = sprintf("{%s}", token_clean)
   )
