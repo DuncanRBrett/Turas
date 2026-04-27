@@ -54,6 +54,8 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
                length(panel_data$attributes$codes) > 0
   has_ceps  <- !is.null(panel_data$ceps) &&
                length(panel_data$ceps$codes) > 0
+  has_advantage <- !is.null(panel_data$advantage) &&
+                    length(panel_data$advantage$available_stims) > 0
 
   # Default tab: attributes first if present, else CEPs
   default_tab <- if (has_attrs) "attributes" else "ceps"
@@ -63,7 +65,7 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
             panel_id, focal_colour, focal_colour, excel_attr),
     sprintf('<script type="application/json" class="ma-panel-data">%s</script>',
             json_payload),
-    .ma_sub_tabs(has_attrs, has_ceps, default_tab),
+    .ma_sub_tabs(has_attrs, has_ceps, default_tab, has_advantage = has_advantage),
     .ma_focus_bar(panel_data),
 
     if (has_attrs) paste0(
@@ -88,6 +90,12 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
       '</div>'
     ) else "",
 
+    if (has_advantage) paste0(
+      '<div class="ma-subtab" data-ma-subtab="advantage" hidden>',
+      build_ma_advantage_section(panel_data, focal_colour = focal_colour),
+      '</div>'
+    ) else "",
+
     '<div class="ma-subtab" data-ma-subtab="metrics" hidden>',
       .ma_metrics_section(panel_data, focal_colour = focal_colour),
       .ma_insight_box(stim = "metrics"),
@@ -103,12 +111,14 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
 # INTERNAL: SUB-TAB NAV + FOCUS BAR
 # ==============================================================================
 
-.ma_sub_tabs <- function(has_attrs, has_ceps, default_tab) {
+.ma_sub_tabs <- function(has_attrs, has_ceps, default_tab, has_advantage = FALSE) {
   tabs <- character(0)
   if (has_attrs) tabs <- c(tabs, list(list(
     key = "attributes", label = "Brand Attributes")))
   if (has_ceps) tabs <- c(tabs, list(list(
     key = "ceps", label = "Category Entry Points")))
+  if (has_advantage) tabs <- c(tabs, list(list(
+    key = "advantage", label = "Mental Advantage")))
   tabs <- c(tabs, list(list(key = "metrics", label = "Headline Metrics")))
 
   btns <- paste(vapply(tabs, function(t) {

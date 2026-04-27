@@ -276,11 +276,21 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
     )
   }
   if (has_ma) {
+    has_ma_advantage <- !is.null(cat_results$mental_availability) && (
+      !is.null(cat_results$mental_availability$cep_advantage) ||
+      !is.null(cat_results$mental_availability$attribute_advantage))
     flat_tabs <- c(flat_tabs,
       list(list(key = "ma-attributes",   label = "Brand Attributes",
                 subpanel = "ma",  internal_tab = "attributes")),
       list(list(key = "ma-ceps",         label = "Category Entry Points",
-                subpanel = "ma",  internal_tab = "ceps")),
+                subpanel = "ma",  internal_tab = "ceps"))
+    )
+    if (has_ma_advantage) {
+      flat_tabs <- c(flat_tabs,
+        list(list(key = "ma-advantage",  label = "Mental Advantage",
+                  subpanel = "ma",  internal_tab = "advantage")))
+    }
+    flat_tabs <- c(flat_tabs,
       list(list(key = "ma-metrics",      label = "MA Metrics",
                 subpanel = "ma",  internal_tab = "metrics"))
     )

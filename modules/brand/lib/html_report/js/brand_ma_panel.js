@@ -225,6 +225,9 @@
     repositionMetricsPinnedRows(panel);
     renderMAScatter(panel);
     renderMABarChart(panel);
+    if (window.MAAdvantage && typeof window.MAAdvantage.init === 'function') {
+      try { window.MAAdvantage.init(panel); } catch (e) { /* non-fatal */ }
+    }
 
     // Re-render when the MA panel (or its chart sections) become visible
     // after starting in display:none (e.g. the parent tab wasn't active
@@ -301,6 +304,8 @@
         } else if (target === 'metrics') {
           renderMAScatter(panel);
           renderMABarChart(panel);
+        } else if (target === 'advantage' && window.MAAdvantage) {
+          try { window.MAAdvantage.render(panel); } catch (e) { /* non-fatal */ }
         }
       });
     });
@@ -344,6 +349,9 @@
     renderChart(panel, 'ceps');
     renderMAScatter(panel);
     renderMABarChart(panel);
+    if (window.MAAdvantage && typeof window.MAAdvantage.render === 'function') {
+      try { window.MAAdvantage.render(panel); } catch (e) { /* non-fatal */ }
+    }
     // Persist + broadcast
     try {
       var stored = JSON.parse(sessionStorage.getItem(FOCAL_STORAGE_KEY) || '{}');
@@ -1839,6 +1847,9 @@
         renderChart(p, 'ceps');
         renderMAScatter(p);
         renderMABarChart(p);
+        if (window.MAAdvantage) {
+          try { window.MAAdvantage.render(p); } catch (e) { /* non-fatal */ }
+        }
       });
     }, 120);
   });
