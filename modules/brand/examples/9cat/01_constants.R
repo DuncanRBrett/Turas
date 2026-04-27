@@ -469,6 +469,26 @@ cat9_channel_codes <- function() vapply(cat9_channels(), function(c) c$code, cha
 
 
 # ==============================================================================
+# PACK SIZES  (shared across all full categories — ordered: small -> large -> multi)
+# ==============================================================================
+# Used for the optional cat_buying.packsize.{CAT} role. Same logical bands
+# work across the four full categories; only the indicative gram / mL
+# ranges in the labels would differ at a real survey, but the bands stay
+# constant so cross-category comparison is straightforward.
+
+cat9_packsizes <- function() {
+  list(
+    list(code = "SMALL",  label = "Small / single-serve"),
+    list(code = "MEDIUM", label = "Medium / family pack"),
+    list(code = "LARGE",  label = "Large / value pack"),
+    list(code = "MULTI",  label = "Multi-pack / bulk")
+  )
+}
+
+cat9_packsize_codes <- function() vapply(cat9_packsizes(), function(p) p$code, character(1))
+
+
+# ==============================================================================
 # MARKETING REACH ASSETS  (Q013–Q015: ad recognition, brand recall, media)
 # ==============================================================================
 # Category = "ALL" means the ad was shown to all respondents.

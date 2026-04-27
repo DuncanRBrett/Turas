@@ -393,6 +393,31 @@
 
 
 # ==============================================================================
+# PACKSIZES SHEET  (pack-size band definitions, shared across full categories)
+# ==============================================================================
+
+.build_packsizes_columns <- function() {
+  list(
+    list(name = "PackSizeCode",  width = 14, required = TRUE,
+         description = "Short code used in column names (e.g. SMALL, MULTI)"),
+    list(name = "PackSizeLabel", width = 48, required = TRUE,
+         description = "Full pack-size label as shown to respondents"),
+    list(name = "DisplayOrder", width = 14, required = TRUE,
+         description = paste0("Order pack sizes appear in questionnaire and ",
+                              "output. Use ascending order (smallest -> largest)."))
+  )
+}
+
+.build_9cat_packsizes_rows <- function() {
+  mapply(function(p, i) list(
+    PackSizeCode  = p$code,
+    PackSizeLabel = p$label,
+    DisplayOrder  = i
+  ), cat9_packsizes(), seq_along(cat9_packsizes()), SIMPLIFY = FALSE)
+}
+
+
+# ==============================================================================
 # DBA_ASSETS SHEET  (Survey_Structure version: links to question codes + image path)
 # Extends the shared .build_dba_structure_columns() with an ImagePath column.
 # ==============================================================================
@@ -673,11 +698,10 @@
     )
   }), recursive = FALSE)
 
-  # Channel rows (1 per full category; options in Channels sheet)
-  # ColumnPattern = "{code}" resolves to CHANNEL_{CAT} (a stub — actual data
-  # columns are CHANNEL_{CAT}_{CHANNELCODE}). {channelcode} is not a supported
-  # role-map token; use {code} to avoid validation errors. The analysis engine
-  # accesses channel columns directly via the Channels sheet, not via role_map.
+  # Channel rows (1 per full category; options in Channels sheet).
+  # The role-map resolver expands {channelcode} against the Channels sheet
+  # to produce one column per option, e.g. CHANNEL_DSS_SUPMKT,
+  # CHANNEL_DSS_ONLINE, ... Consumed by run_shopper_location().
   channel_rows <- lapply(full_cats, function(cat) {
     list(Role = sprintf("channel.purchase.%s", cat$code),
          ClientCode = sprintf("CHANNEL_%s", cat$code),
@@ -685,11 +709,31 @@
                                 tolower(cat$name), cat$timeframe_target),
          QuestionTextShort = sprintf("%s channels", cat$code),
          Variable_Type = "Multi_Mention",
-         ColumnPattern = "{code}",
+         ColumnPattern = "{code}_{channelcode}",
          OptionMapScale = "",
-         Notes = paste0("Q020 — actual data cols: CHANNEL_", cat$code,
-                        "_{CHANNELCODE} e.g. CHANNEL_", cat$code,
-                        "_SUPMKT. Channel codes in Channels sheet."))
+         Notes = paste0("Q020 — multi-mention; one binary column per channel. ",
+                        "Resolves to CHANNEL_", cat$code, "_{CHANNELCODE} ",
+                        "(e.g. CHANNEL_", cat$code, "_SUPMKT)."))
+  })
+
+  # Pack-size rows (1 per full category; options in PackSizes sheet).
+  # Optional question — present only because IPK measures pack-size mix
+  # alongside channel use. Resolves to one column per band, e.g.
+  # PACKSIZE_DSS_SMALL ... PACKSIZE_DSS_MULTI. Consumed by
+  # run_shopper_packsize().
+  packsize_rows <- lapply(full_cats, function(cat) {
+    list(Role = sprintf("cat_buying.packsize.%s", cat$code),
+         ClientCode = sprintf("PACKSIZE_%s", cat$code),
+         QuestionText = sprintf(
+           "Which pack sizes of %s have you bought in the last %s?",
+           tolower(cat$name), cat$timeframe_target),
+         QuestionTextShort = sprintf("%s pack sizes", cat$code),
+         Variable_Type = "Multi_Mention",
+         ColumnPattern = "{code}_{packsizecode}",
+         OptionMapScale = "packsize_scale",
+         Notes = paste0("Optional shopper-behaviour question. Resolves to ",
+                        "PACKSIZE_", cat$code, "_{PACKSIZECODE} ",
+                        "(e.g. PACKSIZE_", cat$code, "_SMALL)."))
   })
 
   # Marketing reach rows (3 per asset: seen, brand recall, media channel)
@@ -744,7 +788,8 @@
          Notes = "Open-ended attribution; text coded to brand for uniqueness scoring")
   )), recursive = FALSE)
 
-  c(screener_rows, system_rows, cat_buying_rows, funnel_rows, channel_rows,
+  c(screener_rows, system_rows, cat_buying_rows, funnel_rows,
+    channel_rows, packsize_rows,
     cross_aware_rows, wom_rows, reach_rows, dba_rows)
 }
 
@@ -813,7 +858,19 @@
     list(Scale = "reach_seen_scale", ClientCode = "1",
          Role = "reach.recognised",     ClientLabel = "Yes, I have seen this advertising",    OrderIndex = 1),
     list(Scale = "reach_seen_scale", ClientCode = "2",
-         Role = "reach.not_recognised", ClientLabel = "No, I have not seen this advertising", OrderIndex = 2)
+         Role = "reach.not_recognised", ClientLabel = "No, I have not seen this advertising", OrderIndex = 2),
+
+    # Pack-size scale (optional shopper-behaviour question; ordered ascending).
+    # Multi-mention: each respondent flags every band they purchased in the
+    # target window. Codes match the PackSizes sheet.
+    list(Scale = "packsize_scale", ClientCode = "SMALL",
+         Role = "packsize.small",  ClientLabel = "Small / single-serve",  OrderIndex = 1),
+    list(Scale = "packsize_scale", ClientCode = "MEDIUM",
+         Role = "packsize.medium", ClientLabel = "Medium / family pack",  OrderIndex = 2),
+    list(Scale = "packsize_scale", ClientCode = "LARGE",
+         Role = "packsize.large",  ClientLabel = "Large / value pack",    OrderIndex = 3),
+    list(Scale = "packsize_scale", ClientCode = "MULTI",
+         Role = "packsize.multi",  ClientLabel = "Multi-pack / bulk",     OrderIndex = 4)
   )
 }
 
@@ -974,6 +1031,20 @@ generate_9cat_structure <- function(output_path, overwrite = TRUE) {
       "Add or remove rows to reflect channels relevant to this category set."
     ),
     example_rows   = .build_9cat_channels_rows(),
+    num_blank_rows = 3
+  )
+
+  write_table_sheet(
+    wb, "PackSizes",
+    .build_packsizes_columns(),
+    title    = "Pack Size Band Definitions (optional shopper-behaviour question)",
+    subtitle = paste0(
+      "Pack-size bands used in PACKSIZE_{CAT} questions for all 4 full categories. ",
+      "Column pattern in data: PACKSIZE_{CAT}_{PACKSIZECODE} (e.g. PACKSIZE_DSS_SMALL). ",
+      "Order rows from smallest to largest; set DisplayOrder accordingly. ",
+      "Skip the entire sheet to disable the pack-size section of the report."
+    ),
+    example_rows   = .build_9cat_packsizes_rows(),
     num_blank_rows = 3
   )
 

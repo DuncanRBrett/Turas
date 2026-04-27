@@ -54,7 +54,8 @@ cep_ranges  <- list(DSS = 1:15, POS = 16:30, PAS = 31:45, BAK = 46:60)
 n_attrs <- 5
 
 # Channel suffixes for full categories
-channels <- c("SUPMKT","SPECIA","ONLINE","CONVEN","WHOLES","MARKET","OTHER")
+channels  <- c("SUPMKT","SPECIA","ONLINE","CONVEN","WHOLES","MARKET","OTHER")
+packsizes <- c("SMALL","MEDIUM","LARGE","MULTI")
 
 # WOM brands — all brands across all 4 full categories (unique set)
 wom_brands <- unique(unlist(brands[full_cats]))
@@ -199,6 +200,16 @@ make_focal_block <- function(cat, id_start) {
     chan_list[[cname]] <- vals
   }
 
+  # ---- Pack sizes (only for focal cat buyers) -------------------------------
+  pack_probs <- c(SMALL = 0.32, MEDIUM = 0.62, LARGE = 0.41, MULTI = 0.18)
+  pack_list <- list()
+  for (ps in packsizes) {
+    cname <- paste0("PACKSIZE_", cat, "_", ps)
+    vals <- rep(0L, n)
+    vals[is_buyer] <- rbinom(sum(is_buyer), 1, pack_probs[[ps]])
+    pack_list[[cname]] <- vals
+  }
+
   # ---- Awareness for ALL non-focal categories (full + awareness-only) --------
   # All respondents answer brand awareness for every category (not just focal).
   # For full categories: conditioned on SQ1 screener, ~IPK 75%, others 20-55%.
@@ -292,6 +303,7 @@ make_focal_block <- function(cat, id_start) {
               as.data.frame(cep_list),
               as.data.frame(attr_list),
               as.data.frame(chan_list),
+              as.data.frame(pack_list),
               stringsAsFactors = FALSE)
   df <- cbind(df, as.data.frame(aware_cols), stringsAsFactors = FALSE)
   df <- cbind(df, as.data.frame(wom_list),   stringsAsFactors = FALSE)

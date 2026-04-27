@@ -191,6 +191,20 @@
     df[[col]] <- vals
   }
 
+  # Pack sizes (conditional on buying in category)
+  # PACKSIZE_{CAT}_{PACKSIZECODE} — multi-mention, buyers only.
+  # Synthetic prevalences are tuned so MEDIUM / LARGE dominate (typical for
+  # food staples), SMALL is moderate, and MULTI is a minority "bulk-buy"
+  # signal. Real surveys would calibrate these from observed shares.
+  packsize_probs <- c(SMALL = 0.32, MEDIUM = 0.62,
+                      LARGE = 0.41, MULTI = 0.18)
+  for (p in cat9_packsizes()) {
+    col      <- sprintf("PACKSIZE_%s_%s", cat_code, p$code)
+    vals     <- .rbern(n, packsize_probs[[p$code]])
+    vals[!bought] <- 0L
+    df[[col]] <- vals
+  }
+
   df
 }
 
