@@ -1,3 +1,6 @@
+# SIZE-EXCEPTION: Single panel data builder for the four MA sub-tabs;
+# slot/block construction has to stay co-located so the JSON shape is
+# auditable from one place. Any further growth should split per sub-tab.
 # ==============================================================================
 # BRAND MODULE - MA PANEL DATA BUILDER
 # ==============================================================================
@@ -50,7 +53,7 @@ build_ma_panel_data <- function(ma_result, brand_list, cep_list,
 
   if (is.null(ma_result) || identical(ma_result$status, "REFUSED")) {
     return(list(meta = list(), attributes = NULL, ceps = NULL,
-                metrics = NULL, config = list(), about = list()))
+                metrics = NULL, advantage = NULL, config = list(), about = list()))
   }
 
   brand_codes <- ma_result$cep_brand_matrix[,
@@ -109,6 +112,13 @@ build_ma_panel_data <- function(ma_result, brand_list, cep_list,
   metrics_block <- .ma_build_metrics_block(
     ma_result, brand_codes, brand_names, focal_code)
 
+  advantage_block <- if (exists("build_ma_advantage_block", mode = "function")) {
+    build_ma_advantage_block(
+      ma_result, brand_codes = brand_codes, brand_names = brand_names,
+      cep_list = cep_list, attribute_list = attribute_list,
+      awareness_by_brand = awareness_by_brand, focal_code = focal_code)
+  } else NULL
+
   about <- list(
     methodology_note = paste(
       "Mental Availability measures how accessible a brand is in memory",
@@ -146,6 +156,7 @@ build_ma_panel_data <- function(ma_result, brand_list, cep_list,
     attributes = attributes_block,
     ceps       = ceps_block,
     metrics    = metrics_block,
+    advantage  = advantage_block,
     config     = config_out,
     about      = about
   )
