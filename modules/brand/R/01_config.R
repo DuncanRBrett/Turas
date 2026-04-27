@@ -112,7 +112,8 @@ load_brand_config <- function(config_path, project_root = NULL) {
   element_fields <- c("element_funnel", "element_mental_avail", "element_cep_turf",
                        "element_repertoire", "element_dba", "element_portfolio",
                        "element_wom", "element_drivers_barriers",
-                       "element_branded_reach")
+                       "element_branded_reach", "element_demographics",
+                       "element_adhoc")
   for (ef in element_fields) {
     # element_dba and element_branded_reach default OFF; everything else defaults ON
     default_off <- ef %in% c("element_dba", "element_branded_reach")

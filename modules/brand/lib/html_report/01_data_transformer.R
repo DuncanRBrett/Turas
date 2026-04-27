@@ -542,6 +542,101 @@ transform_brand_panels <- function(results, config) {
     }
   }
 
+  # --- Demographics panels (per-category) ---
+  if (exists("build_demographics_panel_data", mode = "function") &&
+      exists("build_demographics_panel_html", mode = "function")) {
+    for (cat_name in names(results$results$categories)) {
+      cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
+      cr <- results$results$categories[[cat_name]]
+      demo <- cr$demographics
+      if (is.null(demo) || !identical(demo$status, "PASS")) next
+
+      cat_brands_local <- if (!is.null(brand_list_all) &&
+                                "Category" %in% names(brand_list_all)) {
+        brand_list_all[brand_list_all$Category == cat_name, , drop = FALSE]
+      } else if (!is.null(brand_list_all)) brand_list_all else NULL
+      focal_colour <- .resolve_focal_colour(cat_brands_local,
+                                              config$focal_brand,
+                                              config_focal_colour)
+
+      demo_pd <- tryCatch(
+        build_demographics_panel_data(
+          questions      = demo$questions,
+          focal_brand    = config$focal_brand %||% "",
+          focal_colour   = focal_colour,
+          brand_codes    = demo$brand_codes  %||% character(0),
+          brand_labels   = demo$brand_labels %||% character(0),
+          decimal_places = config$decimal_places %||% 0L,
+          wave_label     = as.character(config$wave %||% ""),
+          scope_label    = cat_name,
+          n_total        = demo$n_total %||% NA_integer_,
+          weighted       = isTRUE(demo$weighted)),
+        error = function(e) {
+          message(sprintf("[BRAND HTML] Demographics panel data failed for %s: %s",
+                          cat_name, e$message))
+          NULL
+        })
+      if (!is.null(demo_pd)) {
+        demo_html <- tryCatch(
+          build_demographics_panel_html(
+            demo_pd,
+            panel_id = paste0("demo-panel-", cat_id),
+            focal_colour = focal_colour),
+          error = function(e) {
+            message(sprintf("[BRAND HTML] Demographics panel render failed for %s: %s",
+                            cat_name, e$message))
+            NULL
+          })
+        if (!is.null(demo_html)) panels[[paste0("demographics_", cat_id)]] <- demo_html
+      }
+    }
+  }
+
+  # --- Ad Hoc panels (per-category) ---
+  if (exists("build_adhoc_panel_data", mode = "function") &&
+      exists("build_adhoc_panel_html", mode = "function")) {
+    for (cat_name in names(results$results$categories)) {
+      cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
+      cr <- results$results$categories[[cat_name]]
+      ah <- cr$adhoc
+      if (is.null(ah) || !identical(ah$status, "PASS")) next
+
+      cat_brands_local <- if (!is.null(brand_list_all) &&
+                                "Category" %in% names(brand_list_all)) {
+        brand_list_all[brand_list_all$Category == cat_name, , drop = FALSE]
+      } else if (!is.null(brand_list_all)) brand_list_all else NULL
+      focal_colour <- .resolve_focal_colour(cat_brands_local,
+                                              config$focal_brand,
+                                              config_focal_colour)
+
+      ah_pd <- tryCatch(
+        build_adhoc_panel_data(
+          questions      = ah$questions,
+          focal_brand    = config$focal_brand %||% "",
+          focal_colour   = focal_colour,
+          decimal_places = config$decimal_places %||% 0L,
+          wave_label     = as.character(config$wave %||% "")),
+        error = function(e) {
+          message(sprintf("[BRAND HTML] Ad hoc panel data failed for %s: %s",
+                          cat_name, e$message))
+          NULL
+        })
+      if (!is.null(ah_pd)) {
+        ah_html <- tryCatch(
+          build_adhoc_panel_html(
+            ah_pd,
+            panel_id = paste0("adhoc-panel-", cat_id),
+            focal_colour = focal_colour),
+          error = function(e) {
+            message(sprintf("[BRAND HTML] Ad hoc panel render failed for %s: %s",
+                            cat_name, e$message))
+            NULL
+          })
+        if (!is.null(ah_html)) panels[[paste0("adhoc_", cat_id)]] <- ah_html
+      }
+    }
+  }
+
   # --- Branded Reach panels (per category) ---
   if (exists("build_branded_reach_panel_data", mode = "function") &&
       exists("build_branded_reach_panel_html", mode = "function")) {
