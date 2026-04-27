@@ -82,9 +82,16 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
   } else ""
 
   base_buttons <- '<div class="sig-level-switcher ma-adv-base-switcher" role="group" aria-label="Linkage base">
-       <span class="sig-level-label">Bubble size:</span>
+       <span class="sig-level-label">Base:</span>
        <button type="button" class="sig-btn sig-btn-active" data-ma-action="adv-base" data-ma-adv-base="total" aria-pressed="true">% total</button>
        <button type="button" class="sig-btn" data-ma-action="adv-base" data-ma-adv-base="aware" aria-pressed="false">% aware</button>
+     </div>'
+
+  filter_buttons <- '<div class="sig-level-switcher ma-adv-filter-switcher" role="group" aria-label="Bubble filter">
+       <span class="sig-level-label">Show:</span>
+       <button type="button" class="sig-btn sig-btn-active" data-ma-action="adv-filter" data-ma-adv-filter="all" aria-pressed="true">All</button>
+       <button type="button" class="sig-btn" data-ma-action="adv-filter" data-ma-adv-filter="actionable" aria-pressed="false">Defend + Build</button>
+       <button type="button" class="sig-btn" data-ma-action="adv-filter" data-ma-adv-filter="top10" aria-pressed="false">Top 10 by |MA|</button>
      </div>'
 
   paste0(
@@ -92,12 +99,29 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
     '<div class="ma-meta-row">',
     stim_buttons,
     base_buttons,
+    filter_buttons,
     '<label class="toggle-label"><input type="checkbox" data-ma-action="adv-show-sig" checked> Mark significant cells</label>',
     '<label class="toggle-label"><input type="checkbox" data-ma-action="adv-show-counts"> Show counts</label>',
+    '<label class="toggle-label"><input type="checkbox" data-ma-action="adv-show-chart" checked> Show chart</label>',
     '<button type="button" class="export-btn ma-pin-dropdown-btn" data-ma-action="pindropdown" data-ma-pin-scope="advantage" title="Pin a section" aria-haspopup="true">&#128204; Pin &#9662;</button>',
     '<button type="button" class="export-btn ma-png-btn" onclick="brExportPngFromEl(this)" title="Export view to PNG">&#x1F5BC; PNG</button>',
     '<button type="button" class="export-btn ma-export-btn" data-ma-action="exporttable" data-ma-stim="advantage" title="Export Mental Advantage to Excel">⭳ Excel ▾</button>',
     '</div>',
+    '</div>'
+  )
+}
+
+
+#' HTML legend for the diverging palette + decision colours.
+#' @keywords internal
+.ma_adv_legend <- function(adv) {
+  threshold <- as.integer(adv$threshold_pp %||% 5)
+  paste0(
+    '<div class="ma-adv-legend" role="group" aria-label="Mental Advantage colour legend">',
+    sprintf('<span class="ma-adv-legend-item"><span class="ma-adv-legend-swatch ma-adv-legend-defend"></span>Defend (MA &ge; +%dpp)</span>', threshold),
+    '<span class="ma-adv-legend-item"><span class="ma-adv-legend-swatch ma-adv-legend-maintain"></span>Maintain (within &plusmn;', threshold, 'pp)</span>',
+    sprintf('<span class="ma-adv-legend-item"><span class="ma-adv-legend-swatch ma-adv-legend-build"></span>Build (MA &le; &minus;%dpp)</span>', threshold),
+    '<span class="ma-adv-legend-item"><span class="ma-adv-legend-sig">&bull;</span>Significant (chi-square |z| &gt; 1.96)</span>',
     '</div>'
   )
 }
@@ -110,9 +134,11 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
 .ma_adv_views_layout <- function(adv) {
   paste0(
     '<div class="ma-adv-views">',
-    .ma_adv_quadrant_view(),
+    .ma_adv_legend(adv),
     .ma_adv_matrix_view(),
+    .ma_adv_quadrant_view(),
     .ma_adv_action_list_view(),
+    '<div class="ma-adv-tooltip" role="status" aria-live="polite" hidden></div>',
     '</div>'
   )
 }

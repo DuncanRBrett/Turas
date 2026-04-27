@@ -52,7 +52,7 @@
 
   // ------------------------------------------------------------ state
   function getAdvState(panel) {
-    if (!panel.__maAdvState) panel.__maAdvState = {};
+    if (!panel.__maAdvState) panel.__maAdvState = { filter: 'all', base: 'total' };
     return panel.__maAdvState;
   }
   function getActiveStim(panel) {
@@ -63,10 +63,66 @@
   function getActiveBase(panel) {
     var st = getAdvState(panel); return st.base || 'total';
   }
+  function getActiveFilter(panel) {
+    var st = getAdvState(panel); return st.filter || 'all';
+  }
 
   function getStimBlock(panel) {
     var pd = panel.__maData; if (!pd || !pd.advantage) return null;
     return pd.advantage[getActiveStim(panel)];
+  }
+
+  // ------------------------------------------------------------ tooltip
+  // Single shared tooltip per panel; positioned by mouse coords.
+  function tooltipEl(panel) {
+    return panel.querySelector('.ma-adv-tooltip');
+  }
+  function showTooltip(panel, html, ev) {
+    var el = tooltipEl(panel); if (!el) return;
+    el.innerHTML = html;
+    el.removeAttribute('hidden');
+    moveTooltip(el, ev);
+  }
+  function moveTooltip(el, ev) {
+    if (!el || !ev) return;
+    var pad = 12;
+    el.style.left = (ev.clientX) + 'px';
+    el.style.top  = (ev.clientY - pad) + 'px';
+  }
+  function hideTooltip(panel) {
+    var el = tooltipEl(panel); if (el) el.setAttribute('hidden', '');
+  }
+  function decisionLabel(d) {
+    return d === 'defend' ? 'Defend' : d === 'build' ? 'Build' : d === 'maintain' ? 'Maintain' : '—';
+  }
+  function tooltipHtml(p, base) {
+    var rows = [
+      ['MA',                   fmtScore(p.ma) + 'pp' + (p.isSig ? ' •' : '')],
+      ['Stimulus penetration', p.pen.toFixed(1) + '%'],
+      ['Linkage (' + (base === 'aware' ? '% aware' : '% total') + ')',
+        p.size != null ? p.size.toFixed(1) + '%' : '—']
+    ];
+    var rowHtml = rows.map(function (r) {
+      return '<div class="ma-adv-tooltip-row"><span class="ma-adv-tooltip-key">' +
+             escHtml(r[0]) + '</span><span class="ma-adv-tooltip-val">' +
+             escHtml(r[1]) + '</span></div>';
+    }).join('');
+    var dec = p.decision || 'maintain';
+    return '<strong>' + escHtml(p.label) + '</strong>' + rowHtml +
+           '<div class="ma-adv-tooltip-decision ma-adv-tooltip-' + dec + '">' +
+           decisionLabel(dec) + (p.isSig ? ' • significant (p&lt;0.05)' : '') + '</div>';
+  }
+
+  // ------------------------------------------------------------ bubble filter
+  function filterPoints(pts, filter) {
+    if (filter === 'actionable') {
+      return pts.filter(function (p) { return p.decision === 'defend' || p.decision === 'build'; });
+    }
+    if (filter === 'top10') {
+      var sorted = pts.slice().sort(function (a, b) { return Math.abs(b.ma) - Math.abs(a.ma); });
+      return sorted.slice(0, 10);
+    }
+    return pts;
   }
 
   // ------------------------------------------------------------ render orchestrator
@@ -79,9 +135,9 @@
 
   // ============================================================ QUADRANT
   // SIZE-EXCEPTION: SVG composition is a sequential pipeline (scales,
-  // background zones, gridlines, threshold lines, axes, bubbles) that
-  // shares closure-scoped scaling functions; decomposing fragments the
-  // visual flow and forces redundant coordinate plumbing.
+  // background zones, gridlines, threshold + mean lines, axes, bubbles,
+  // smart labels) sharing closure-scoped scaling functions; decomposing
+  // would fragment the visual flow and force redundant coordinate plumbing.
   function renderQuadrant(panel, block) {
     var svg = panel.querySelector('svg.ma-adv-quadrant-svg');
     if (!svg) return;
@@ -89,8 +145,9 @@
     var focal = (panel.__maState && panel.__maState.focal) || block.focal_brand_code;
     var threshold = pd.advantage.threshold_pp || 5;
     var base = getActiveBase(panel);
+    var filter = getActiveFilter(panel);
 
-    var pts = block.cells.filter(function (c) { return c.brand_code === focal; })
+    var allPts = block.cells.filter(function (c) { return c.brand_code === focal; })
       .map(function (c) {
         var pen = block.stim_penetration[block.codes.indexOf(c.stim_code)];
         var sizeSrc = (base === 'aware' && c.pct_aware != null) ? c.pct_aware : c.pct_total;
@@ -98,19 +155,22 @@
                  decision: c.decision, isSig: c.is_sig,
                  label: block.labels[block.codes.indexOf(c.stim_code)] };
       });
+    var pts = filterPoints(allPts, filter);
     if (pts.length === 0) { svg.innerHTML = ''; return; }
 
     var width = svg.clientWidth || 600;
-    var height = 420;
-    var mL = 56, mR = 28, mT = 28, mB = 48;
+    var height = 460;
+    var mL = 60, mR = 28, mT = 28, mB = 52;
     svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
     svg.setAttribute('height', height);
 
     var pW = width - mL - mR, pH = height - mT - mB;
-    var xMax = Math.max(10, Math.ceil(Math.max.apply(null, pts.map(function (p) { return p.pen; })) / 10) * 10);
+    var xMax = Math.max(10, Math.ceil(Math.max.apply(null, allPts.map(function (p) { return p.pen; })) / 10) * 10);
     var maAbsMax = Math.max(threshold * 2,
-                              Math.ceil(Math.max.apply(null, pts.map(function (p) { return Math.abs(p.ma); }))));
-    var sizeMax = Math.max(1, Math.max.apply(null, pts.map(function (p) { return p.size; })));
+                              Math.ceil(Math.max.apply(null, allPts.map(function (p) { return Math.abs(p.ma); }))));
+    var sizeMax = Math.max(1, Math.max.apply(null, allPts.map(function (p) { return p.size; })));
+    // Mean stim penetration across the *full* stim set (vertical divider)
+    var penMean = allPts.reduce(function (s, p) { return s + p.pen; }, 0) / allPts.length;
 
     function toX(v) { return mL + pW * v / xMax; }
     function toY(v) { return mT + pH * (1 - (v + maAbsMax) / (2 * maAbsMax)); }
@@ -122,12 +182,13 @@
     parts.push('<rect class="ma-adv-q-zone-defend" x="' + mL + '" y="' + mT + '" width="' + pW + '" height="' + (yPos - mT) + '"/>');
     parts.push('<rect class="ma-adv-q-zone-build"  x="' + mL + '" y="' + yNeg + '" width="' + pW + '" height="' + (mT + pH - yNeg) + '"/>');
 
-    // Grid + tick labels
+    // Grid + tick labels (X)
     for (var xi = 0; xi <= 5; xi++) {
       var xv = xMax * xi / 5; var gx = toX(xv);
       parts.push('<line class="ma-adv-q-grid" x1="' + gx + '" y1="' + mT + '" x2="' + gx + '" y2="' + (mT + pH) + '"/>');
       parts.push('<text class="ma-adv-q-tick" x="' + gx + '" y="' + (mT + pH + 14) + '" text-anchor="middle">' + Math.round(xv) + '%</text>');
     }
+    // Y grid + ticks
     for (var yi = -2; yi <= 2; yi++) {
       var yv = (maAbsMax / 2) * yi; if (Math.abs(yv) > maAbsMax) continue;
       var gy = toY(yv);
@@ -135,37 +196,76 @@
       parts.push('<text class="ma-adv-q-tick" x="' + (mL - 6) + '" y="' + gy + '" text-anchor="end" dominant-baseline="middle">' + (yv >= 0 ? '+' : '') + yv.toFixed(0) + 'pp</text>');
     }
 
-    // Zero + threshold lines
+    // Vertical mean-penetration divider (the X-axis equivalent of the zero-MA line)
+    var xMean = toX(penMean);
+    parts.push('<line class="ma-adv-q-vmid" x1="' + xMean + '" y1="' + mT + '" x2="' + xMean + '" y2="' + (mT + pH) + '"/>');
+    parts.push('<text class="ma-adv-q-vmid-label" x="' + (xMean + 4) + '" y="' + (mT + pH - 6) + '">avg reach (' + penMean.toFixed(0) + '%)</text>');
+
+    // Horizontal zero + threshold lines
     parts.push('<line class="ma-adv-q-zero"   x1="' + mL + '" y1="' + yZero + '" x2="' + (mL + pW) + '" y2="' + yZero + '"/>');
     parts.push('<line class="ma-adv-q-thresh" x1="' + mL + '" y1="' + yPos + '" x2="' + (mL + pW) + '" y2="' + yPos + '"/>');
     parts.push('<line class="ma-adv-q-thresh" x1="' + mL + '" y1="' + yNeg + '" x2="' + (mL + pW) + '" y2="' + yNeg + '"/>');
 
-    // Axes + labels + zone labels
+    // Axes + axis labels + zone labels
     parts.push('<line class="ma-adv-q-axis" x1="' + mL + '" y1="' + mT + '" x2="' + mL + '" y2="' + (mT + pH) + '"/>');
     parts.push('<line class="ma-adv-q-axis" x1="' + mL + '" y1="' + (mT + pH) + '" x2="' + (mL + pW) + '" y2="' + (mT + pH) + '"/>');
     parts.push('<text class="ma-adv-q-axis-label" x="' + (mL + pW / 2) + '" y="' + (height - 6) + '" text-anchor="middle">Stimulus penetration (any brand, %)</text>');
-    parts.push('<text class="ma-adv-q-axis-label" transform="rotate(-90 ' + (mL - 40) + ' ' + (mT + pH / 2) + ')" x="' + (mL - 40) + '" y="' + (mT + pH / 2) + '" text-anchor="middle">Mental Advantage (pp)</text>');
+    parts.push('<text class="ma-adv-q-axis-label" transform="rotate(-90 ' + (mL - 44) + ' ' + (mT + pH / 2) + ')" x="' + (mL - 44) + '" y="' + (mT + pH / 2) + '" text-anchor="middle">Mental Advantage (pp)</text>');
     parts.push('<text class="ma-adv-q-zone-label" x="' + (mL + pW - 6) + '" y="' + (mT + 14) + '" text-anchor="end">DEFEND</text>');
     parts.push('<text class="ma-adv-q-zone-label" x="' + (mL + 6) + '" y="' + (mT + 14) + '">AMPLIFY</text>');
     parts.push('<text class="ma-adv-q-zone-label" x="' + (mL + pW - 6) + '" y="' + (mT + pH - 6) + '" text-anchor="end">BUILD</text>');
     parts.push('<text class="ma-adv-q-zone-label" x="' + (mL + 6) + '" y="' + (mT + pH - 6) + '">LOW PRIORITY</text>');
 
-    // Bubbles
-    pts.forEach(function (p) {
+    // Bubbles — store position + payload index for hover lookup
+    var labelCandidates = [];
+    pts.forEach(function (p, i) {
       var cx = toX(p.pen), cy = toY(p.ma), r2 = bR(p.size);
       var cls = 'ma-adv-q-bubble ma-adv-q-bubble-' + (p.decision || 'na');
       if (p.isSig) cls += ' ma-adv-q-bubble-sig';
-      parts.push('<circle class="' + cls + '" cx="' + cx + '" cy="' + cy + '" r="' + r2 + '">' +
-                 '<title>' + escHtml(p.label) + '\nMA: ' + fmtScore(p.ma) + 'pp' +
-                 '\nStim penetration: ' + p.pen.toFixed(1) + '%' +
-                 '\nFocal raw linkage: ' + (p.size != null ? p.size.toFixed(1) + '%' : '—') +
-                 (p.isSig ? '\n(significant, p<0.05)' : '') + '</title></circle>');
-      var lblX = cx + r2 + 4, anchor = 'start';
-      if (lblX + 60 > mL + pW) { lblX = cx - r2 - 4; anchor = 'end'; }
-      parts.push('<text class="ma-adv-q-label" x="' + lblX + '" y="' + (cy + 3) + '" text-anchor="' + anchor + '">' + escHtml(p.label) + '</text>');
+      parts.push('<circle class="' + cls + '" cx="' + cx + '" cy="' + cy + '" r="' + r2 +
+                 '" data-ma-adv-bubble-idx="' + i + '"></circle>');
+      labelCandidates.push({ idx: i, cx: cx, cy: cy, r: r2, p: p });
     });
 
+    // Smart label placement: only label the most extreme cells, and skip
+    // any whose box overlaps an already-placed label. Hover tooltip covers
+    // the rest.
+    var ordered = labelCandidates.slice().sort(function (a, b) {
+      return Math.abs(b.p.ma) - Math.abs(a.p.ma);
+    });
+    var placed = [];
+    var maxLabels = Math.min(10, ordered.length);
+    for (var li = 0; li < ordered.length && placed.length < maxLabels; li++) {
+      var lc = ordered[li];
+      var cx = lc.cx, cy = lc.cy, r2 = lc.r;
+      var lblX = cx + r2 + 4, anchor = 'start';
+      if (lblX + 80 > mL + pW) { lblX = cx - r2 - 4; anchor = 'end'; }
+      var box = { x: anchor === 'start' ? lblX : lblX - 80,
+                  y: cy - 6, w: 80, h: 12 };
+      var collides = placed.some(function (b) {
+        return !(box.x + box.w < b.x || box.x > b.x + b.w ||
+                 box.y + box.h < b.y || box.y > b.y + b.h);
+      });
+      if (collides) continue;
+      placed.push(box);
+      parts.push('<text class="ma-adv-q-label" x="' + lblX + '" y="' + (cy + 3) + '" text-anchor="' + anchor + '">' + escHtml(lc.p.label) + '</text>');
+    }
+
     svg.innerHTML = parts.join('');
+
+    // Wire hover tooltip on bubbles (single shared tooltip element)
+    svg.querySelectorAll('circle.ma-adv-q-bubble').forEach(function (c) {
+      var idx = parseInt(c.getAttribute('data-ma-adv-bubble-idx'), 10);
+      var p = pts[idx];
+      if (!p) return;
+      c.addEventListener('mouseenter', function (ev) {
+        showTooltip(panel, tooltipHtml(p, base), ev);
+      });
+      c.addEventListener('mousemove', function (ev) {
+        moveTooltip(tooltipEl(panel), ev);
+      });
+      c.addEventListener('mouseleave', function () { hideTooltip(panel); });
+    });
   }
 
   // ============================================================ MATRIX
@@ -209,9 +309,11 @@
     var cellByKey = {};
     block.cells.forEach(function (c) { cellByKey[c.stim_code + '|' + c.brand_code] = c; });
 
+    // Build a flat lookup so hover handlers can resolve cell payloads.
+    var hoverPayload = [];
     var rows = idx.map(function (i) {
       var stim = block.codes[i], lbl = block.labels[i];
-      var tds = ['<td class="ma-adv-matrix-stim" title="' + escAttr(lbl) + '">' + escHtml(lbl) + '</td>'];
+      var tds = ['<td class="ma-adv-matrix-stim">' + escHtml(lbl) + '</td>'];
       brands.forEach(function (b) {
         var c = cellByKey[stim + '|' + b];
         if (!c || c.ma == null) {
@@ -222,16 +324,30 @@
         var sigCls = c.is_sig ? ' ma-adv-sig-dot' : '';
         var focalCls = b === focal ? ' ma-adv-matrix-focal' : '';
         var counts = '<span class="ma-adv-cell-counts">a=' + Math.round(c.actual) + ' / e=' + Math.round(c.expected) + '</span>';
-        var tip = lbl + ' × ' + nameFor(b) + ': MA ' + fmtScore(c.ma) + 'pp' +
-                  ' (actual ' + Math.round(c.actual) + ' vs expected ' + Math.round(c.expected) + ')' +
-                  (c.is_sig ? ' • significant' : '');
-        tds.push('<td class="' + focalCls + sigCls + '" style="background:' + bg + ';" title="' + escAttr(tip) + '">' +
+        var pen = block.stim_penetration[block.codes.indexOf(stim)];
+        var sizeSrc = (getActiveBase(panel) === 'aware' && c.pct_aware != null) ? c.pct_aware : c.pct_total;
+        var hi = hoverPayload.length;
+        hoverPayload.push({ code: stim, label: lbl + ' × ' + nameFor(b),
+                            ma: c.ma, pen: pen, size: sizeSrc,
+                            decision: c.decision, isSig: c.is_sig });
+        tds.push('<td class="' + focalCls + sigCls + '" style="background:' + bg +
+                 ';" data-ma-adv-cell-idx="' + hi + '">' +
                  fmtScore(c.ma) + counts + '</td>');
       });
       return '<tr>' + tds.join('') + '</tr>';
     });
 
     wrap.innerHTML = '<table class="ma-adv-matrix"><thead><tr>' + ths.join('') + '</tr></thead><tbody>' + rows.join('') + '</tbody></table>';
+
+    // Wire matrix-cell hover tooltip (replaces slow native title tooltip).
+    var base = getActiveBase(panel);
+    wrap.querySelectorAll('td[data-ma-adv-cell-idx]').forEach(function (td) {
+      var idx2 = parseInt(td.getAttribute('data-ma-adv-cell-idx'), 10);
+      var p = hoverPayload[idx2]; if (!p) return;
+      td.addEventListener('mouseenter', function (ev) { showTooltip(panel, tooltipHtml(p, base), ev); });
+      td.addEventListener('mousemove',  function (ev) { moveTooltip(tooltipEl(panel), ev); });
+      td.addEventListener('mouseleave', function () { hideTooltip(panel); });
+    });
   }
 
   // ============================================================ ACTION LIST
@@ -397,8 +513,35 @@
           var on = b === btn;
           b.classList.toggle('sig-btn-active', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
         });
+        // Re-render BOTH chart and matrix so tooltip + bubble size reflect the new base.
+        renderAdvantage(panel);
+      });
+    });
+
+    panel.querySelectorAll('[data-ma-action="adv-filter"]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var f = btn.getAttribute('data-ma-adv-filter'); if (!f) return;
+        getAdvState(panel).filter = f;
+        panel.querySelectorAll('[data-ma-action="adv-filter"]').forEach(function (b) {
+          var on = b === btn;
+          b.classList.toggle('sig-btn-active', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
         var block = getStimBlock(panel); if (block) renderQuadrant(panel, block);
       });
+    });
+
+    var chartCb = panel.querySelector('input[data-ma-action="adv-show-chart"]');
+    if (chartCb) chartCb.addEventListener('change', function () {
+      var view = panel.querySelector('.ma-adv-quadrant-view');
+      if (!view) return;
+      if (chartCb.checked) {
+        view.removeAttribute('hidden');
+        // Re-render now that the container has dimensions.
+        var block = getStimBlock(panel); if (block) renderQuadrant(panel, block);
+      } else {
+        view.setAttribute('hidden', '');
+        hideTooltip(panel);
+      }
     });
 
     var sigCb = panel.querySelector('input[data-ma-action="adv-show-sig"]');

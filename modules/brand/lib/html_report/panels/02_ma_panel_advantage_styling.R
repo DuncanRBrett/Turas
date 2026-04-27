@@ -170,9 +170,67 @@ ol.ma-adv-action-list {
   padding: 10px 4px; color: #94a3b8; font-size: 11.5px;
   font-style: italic; text-align: center; }
 
+/* ============== LEGEND ============== */
+.ma-adv-legend {
+  display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+  padding: 8px 12px; background: #fafbfc;
+  border: 1px solid #eef2f7; border-radius: 6px;
+  font-size: 11.5px; color: #475569; }
+.ma-adv-legend-item {
+  display: inline-flex; align-items: center; gap: 6px; }
+.ma-adv-legend-swatch {
+  display: inline-block; width: 14px; height: 14px;
+  border-radius: 3px; border: 1px solid rgba(0,0,0,0.08); }
+.ma-adv-legend-defend   { background: rgba(5, 150, 105, 0.55); }
+.ma-adv-legend-maintain { background: rgba(148, 163, 184, 0.45); }
+.ma-adv-legend-build    { background: rgba(220, 38, 38, 0.55); }
+.ma-adv-legend-sig {
+  display: inline-block; width: 14px; height: 14px;
+  text-align: center; font-weight: 700; color: #0f172a;
+  font-size: 16px; line-height: 14px; }
+
+/* ============== HOVER TOOLTIP ============== */
+.ma-adv-tooltip {
+  position: fixed; z-index: 9000; pointer-events: none;
+  background: #0f172a; color: #f8fafc;
+  padding: 8px 10px; border-radius: 6px;
+  font-size: 11.5px; line-height: 1.45;
+  box-shadow: 0 6px 18px rgba(15,23,42,0.25);
+  max-width: 280px; transform: translate(-50%, -110%); }
+.ma-adv-tooltip[hidden] { display: none; }
+.ma-adv-tooltip strong {
+  color: #fff; font-size: 12px; display: block;
+  margin-bottom: 3px; }
+.ma-adv-tooltip .ma-adv-tooltip-row {
+  display: flex; justify-content: space-between;
+  gap: 12px; }
+.ma-adv-tooltip .ma-adv-tooltip-key {
+  color: #cbd5e1; }
+.ma-adv-tooltip .ma-adv-tooltip-val {
+  color: #fff; font-variant-numeric: tabular-nums; }
+.ma-adv-tooltip .ma-adv-tooltip-decision {
+  margin-top: 4px; padding-top: 4px;
+  border-top: 1px solid rgba(255,255,255,0.15);
+  font-weight: 700; }
+.ma-adv-tooltip .ma-adv-tooltip-defend  { color: #34d399; }
+.ma-adv-tooltip .ma-adv-tooltip-build   { color: #f87171; }
+.ma-adv-tooltip .ma-adv-tooltip-maintain { color: #cbd5e1; }
+.ma-adv-q-bubble { cursor: pointer; }
+
+/* ============== VERTICAL DIVIDER LINE IN QUADRANT ============== */
+.ma-adv-quadrant-svg .ma-adv-q-vmid {
+  stroke: #475569; stroke-width: 1.6;
+  stroke-dasharray: 4 3; opacity: 0.65; }
+.ma-adv-quadrant-svg .ma-adv-q-vmid-label {
+  font-size: 9px; fill: #475569; font-weight: 600; }
+
+/* ============== HIDE QUADRANT WHEN UNCHECKED ============== */
+.ma-adv-quadrant-view[hidden] { display: none !important; }
+
 @media print {
   .ma-adv-controls { display: none !important; }
   .ma-adv-views { gap: 12px; }
+  .ma-adv-tooltip { display: none !important; }
 }
 '
 
