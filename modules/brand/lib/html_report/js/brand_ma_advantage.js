@@ -594,9 +594,31 @@
       }
     });
 
-    // X-axis range: min/max inputs are handled by the delegated change
-    // listener (above). Reset button is handled by the delegated click
-    // listener. No direct addEventListener calls — delegation only.
+    // X-axis range state + delegated change listener for the two inputs.
+    // (Reset button is handled by the click delegate above.) Listener
+    // fires on `input` so the chart updates as the user types, and on
+    // `change` for completeness when the field commits.
+    panel.__maAdvXRange = panel.__maAdvXRange || {};
+    function readAndApplyXRange() {
+      var minEl = panel.querySelector('input[data-ma-action="adv-xrange-min"]');
+      var maxEl = panel.querySelector('input[data-ma-action="adv-xrange-max"]');
+      var s = panel.__maAdvXRange;
+      var minV = (minEl && minEl.value !== '') ? parseFloat(minEl.value) : NaN;
+      var maxV = (maxEl && maxEl.value !== '') ? parseFloat(maxEl.value) : NaN;
+      s.min = isNaN(minV) ? null : minV;
+      s.max = isNaN(maxV) ? null : maxV;
+      var block = getStimBlock(panel); if (block) renderQuadrant(panel, block);
+    }
+    ['input', 'change'].forEach(function (evName) {
+      subtab.addEventListener(evName, function (ev) {
+        var t = ev.target;
+        if (!t || !t.matches) return;
+        if (t.matches('input[data-ma-action="adv-xrange-min"], input[data-ma-action="adv-xrange-max"]')) {
+          readAndApplyXRange();
+        }
+      });
+    });
+
     panel.__maAdvHiddenBrands = panel.__maAdvHiddenBrands || {};
     panel.__maAdvHiddenStims = panel.__maAdvHiddenStims || {};
 

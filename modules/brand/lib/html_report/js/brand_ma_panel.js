@@ -1846,7 +1846,7 @@
       // respondents, so the pin title hard-codes that.
       var advSubtab = panel.querySelector('.ma-subtab[data-ma-subtab="advantage"]') || panel;
       var advFocalName = (pd.meta && pd.meta.focal_brand_name) || focal || 'Focal';
-      var advBaseLabel = 'total respondents (Romaniuk)';
+      var advBaseLabel = 'total respondents';
       var advTitleSuffix = ' — Mental Advantage — ' + advFocalName + ' — Base: ' + advBaseLabel;
       var advInsight = '';
       if (optKeys.indexOf('insight') >= 0) {

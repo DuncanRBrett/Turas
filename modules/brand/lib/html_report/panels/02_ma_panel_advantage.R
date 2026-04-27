@@ -74,11 +74,11 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
     sprintf('<li><strong>Build</strong> &nbsp;(score &le; &minus;%dpp): the brand under-indexes — a gap to close, especially on big stimuli.</li>', threshold),
     '<li><strong>Maintain</strong> (in between): the brand is performing in line with its size — no urgent move.</li>',
     '</ul>',
-    '<p>A bullet (&bull;) marks cells where the gap is large enough to be',
-    ' statistically significant (chi-square standardised residual |z| &gt; 1.96,',
-    ' p &lt; 0.05). The score itself is computed once on the total sample base',
-    ' (Romaniuk-faithful); the Base toggle changes the linkage % shown alongside',
-    ' the score, not the score itself.</p>',
+    '<p>An asterisk (*) on a cell marks where the gap is large enough to',
+    ' be statistically significant (chi-square standardised residual',
+    ' |z| &gt; 1.96, p &lt; 0.05). Significant bubbles also draw a',
+    ' thicker outline in the chart. The score is computed on the total',
+    ' respondent base.</p>',
     '<p class="ma-adv-intro-source"><em>Source: Romaniuk, J. (2022). Better Brand Health',
     ' (Ehrenberg-Bass). Worked example via Quantilope (2024).</em></p>',
     '</div></details></div>'
@@ -109,7 +109,7 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
   # a misleading toggle.
   base_notation <- '<div class="ma-adv-base-notation" title="Mental Advantage is computed on the total respondent base, per Romaniuk (Better Brand Health, 2022).">
        <span class="sig-level-label">Base:</span>
-       <span class="ma-adv-base-value">total respondents (Romaniuk)</span>
+       <span class="ma-adv-base-value">total respondents</span>
      </div>'
 
   paste0(
@@ -306,8 +306,7 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
     '<p><strong>Significance:</strong> chi-square standardised residual ',
     'z = (actual − expected) ÷ √expected. Cells flagged when |z| &gt; 1.96 (p &lt; 0.05). ',
     'Bootstrap confidence intervals are a documented stretch, not implemented in v1.</p>',
-    '<p><strong>Base:</strong> total respondents (Romaniuk-faithful). The bubble-size toggle ',
-    'switches the displayed raw linkage between % total and % aware; the MA score itself is computed once on the total base.</p>',
+    '<p><strong>Base:</strong> total respondents.</p>',
     '</div></details>'
   )
 }
