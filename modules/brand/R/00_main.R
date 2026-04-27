@@ -1176,50 +1176,153 @@ if (!exists(".find_brand_col", mode = "function")) {
   # the same per-category loop.
   buyer_info <- .demo_buyer_for_category(brand_volume, buyer_heaviness,
                                           config$focal_brand)
-
-  # Per-category brand pen matrix (rows aligned to cat_data row order)
-  bmat_info <- .demo_brand_matrix_for_category(brand_volume, cat_brands)
+  bmat_info  <- .demo_brand_matrix_for_category(brand_volume, cat_brands)
 
   questions <- list()
   for (i in seq_len(nrow(demo_rows))) {
-    role <- trimws(as.character(demo_rows$Role[i]))
-    spec <- resolve_demographic_role(structure, role)
-    if (is.null(spec) || !spec$column %in% names(cat_data)) {
-      if (verbose) cat(sprintf("    Demographics skip %s (unresolved or missing)\n", role))
-      next
-    }
-    res <- run_demographic_question(
-      values        = cat_data[[spec$column]],
-      option_codes  = spec$codes,
-      option_labels = spec$labels,
-      weights       = cat_weights,
-      focal_buyer   = buyer_info$focal_buyer,
-      buyer_tiers   = buyer_info$tiers,
-      pen_mat       = bmat_info$pen_mat,
-      brand_codes   = bmat_info$brand_codes,
-      brand_labels  = bmat_info$brand_labels
-    )
-    questions[[length(questions) + 1L]] <- list(
-      role = spec$role, column = spec$column,
-      question_text = spec$question_text, short_label = spec$short_label,
-      variable_type = spec$variable_type,
-      codes = spec$codes, labels = spec$labels,
-      result = res
-    )
+    entry <- .demo_question_from_role(structure, demo_rows$Role[i],
+                                       cat_data, cat_weights, buyer_info,
+                                       bmat_info, verbose = verbose)
+    if (!is.null(entry)) questions[[length(questions) + 1L]] <- entry
   }
+
+  # Synthetic questions: Buyer-status (focal-brand pen) + Heaviness (category
+  # tertiles). Both derive from buyer_info and render alongside the
+  # demographic questions in the matrix view. Skipped when the upstream
+  # vectors are unavailable (e.g. brand_volume refused, no tertile bounds).
+  syn <- .demo_synthetic_questions(cat_data, cat_weights, buyer_info,
+                                    bmat_info, config$focal_brand)
+  for (q in syn) questions[[length(questions) + 1L]] <- q
 
   if (length(questions) == 0L) {
     return(list(status = "EMPTY",
                 message = sprintf("No demographic questions resolved for %s.", cat_name)))
   }
   list(
-    status       = "PASS",
-    cat_name     = cat_name,
-    questions    = questions,
-    brand_codes  = bmat_info$brand_codes,
-    brand_labels = bmat_info$brand_labels,
-    n_total      = nrow(cat_data),
-    weighted     = !is.null(cat_weights)
+    status        = "PASS",
+    cat_name      = cat_name,
+    questions     = questions,
+    brand_codes   = bmat_info$brand_codes,
+    brand_labels  = bmat_info$brand_labels,
+    brand_colours = bmat_info$brand_colours,
+    n_total       = nrow(cat_data),
+    weighted      = !is.null(cat_weights)
+  )
+}
+
+
+# Resolve one demo.* role and run the engine. Returns NULL when the role
+# can't be resolved or its data column is absent (caller skips silently).
+.demo_question_from_role <- function(structure, role, cat_data, cat_weights,
+                                      buyer_info, bmat_info, verbose = TRUE) {
+  role <- trimws(as.character(role))
+  spec <- resolve_demographic_role(structure, role)
+  if (is.null(spec) || !spec$column %in% names(cat_data)) {
+    if (verbose) cat(sprintf("    Demographics skip %s (unresolved or missing)\n", role))
+    return(NULL)
+  }
+  res <- run_demographic_question(
+    values        = cat_data[[spec$column]],
+    option_codes  = spec$codes,
+    option_labels = spec$labels,
+    weights       = cat_weights,
+    focal_buyer   = buyer_info$focal_buyer,
+    buyer_tiers   = buyer_info$tiers,
+    pen_mat       = bmat_info$pen_mat,
+    brand_codes   = bmat_info$brand_codes,
+    brand_labels  = bmat_info$brand_labels
+  )
+  list(
+    role          = spec$role,
+    column        = spec$column,
+    question_text = spec$question_text,
+    short_label   = spec$short_label,
+    variable_type = spec$variable_type,
+    codes         = spec$codes,
+    labels        = spec$labels,
+    is_synthetic  = FALSE,
+    synthetic_kind = NA_character_,
+    result        = res
+  )
+}
+
+
+# Build the two synthetic questions ("Buyer status" + "Heaviness") that are
+# always shown at the end of the demographics matrix. Both reuse the engine
+# so percentages + Wilson CIs + brand cuts are computed identically.
+.demo_synthetic_questions <- function(cat_data, cat_weights, buyer_info,
+                                       bmat_info, focal_brand) {
+  out <- list()
+  buyer <- .demo_synthetic_buyer_status(cat_data, cat_weights, buyer_info,
+                                         bmat_info, focal_brand)
+  if (!is.null(buyer)) out[[length(out) + 1L]] <- buyer
+  hv    <- .demo_synthetic_heaviness(cat_data, cat_weights, buyer_info,
+                                      bmat_info)
+  if (!is.null(hv))    out[[length(out) + 1L]] <- hv
+  out
+}
+
+
+.demo_synthetic_buyer_status <- function(cat_data, cat_weights, buyer_info,
+                                          bmat_info, focal_brand) {
+  fb <- buyer_info$focal_buyer
+  if (is.null(fb)) return(NULL)
+  vals <- ifelse(is.na(fb), NA_character_,
+                 ifelse(as.integer(fb) > 0L, "BUYER", "NON_BUYER"))
+  focal_lbl <- if (is.null(focal_brand) || !nzchar(focal_brand))
+    "focal brand" else focal_brand
+  res <- run_demographic_question(
+    values        = vals,
+    option_codes  = c("BUYER", "NON_BUYER"),
+    option_labels = c(sprintf("Buyer of %s", focal_lbl),
+                       sprintf("Non-buyer of %s", focal_lbl)),
+    weights       = cat_weights,
+    pen_mat       = bmat_info$pen_mat,
+    brand_codes   = bmat_info$brand_codes,
+    brand_labels  = bmat_info$brand_labels
+  )
+  list(
+    role          = "demo.synthetic.buyer_status",
+    column        = NA_character_,
+    question_text = sprintf("Buyer status — %s", focal_lbl),
+    short_label   = "Buyer status",
+    variable_type = "Single_Response",
+    codes         = c("BUYER", "NON_BUYER"),
+    labels        = c(sprintf("Buyer of %s", focal_lbl),
+                       sprintf("Non-buyer of %s", focal_lbl)),
+    is_synthetic  = TRUE,
+    synthetic_kind = "buyer_status",
+    result        = res
+  )
+}
+
+
+.demo_synthetic_heaviness <- function(cat_data, cat_weights, buyer_info,
+                                       bmat_info) {
+  tiers <- buyer_info$tiers
+  if (is.null(tiers) || all(is.na(tiers))) return(NULL)
+  res <- run_demographic_question(
+    values        = tiers,
+    option_codes  = c("LIGHT", "MEDIUM", "HEAVY"),
+    option_labels = c("Light category buyer", "Medium category buyer",
+                       "Heavy category buyer"),
+    weights       = cat_weights,
+    pen_mat       = bmat_info$pen_mat,
+    brand_codes   = bmat_info$brand_codes,
+    brand_labels  = bmat_info$brand_labels
+  )
+  list(
+    role          = "demo.synthetic.heaviness",
+    column        = NA_character_,
+    question_text = "Buyer heaviness (category tertiles)",
+    short_label   = "Heaviness",
+    variable_type = "Single_Response",
+    codes         = c("LIGHT", "MEDIUM", "HEAVY"),
+    labels        = c("Light category buyer", "Medium category buyer",
+                       "Heavy category buyer"),
+    is_synthetic  = TRUE,
+    synthetic_kind = "heaviness",
+    result        = res
   )
 }
 
@@ -1258,19 +1361,32 @@ if (!exists(".find_brand_col", mode = "function")) {
   if (is.null(brand_volume) || identical(brand_volume$status, "REFUSED") ||
       is.null(brand_volume$pen_mat)) {
     return(list(pen_mat = NULL, brand_codes = character(0),
-                brand_labels = character(0)))
+                brand_labels = character(0), brand_colours = list()))
   }
   bcs <- as.character(colnames(brand_volume$pen_mat))
   bls <- bcs
-  if (!is.null(cat_brands) && nrow(cat_brands) > 0L &&
-      "BrandLabel" %in% names(cat_brands)) {
-    lookup <- stats::setNames(as.character(cat_brands$BrandLabel),
-                               as.character(cat_brands$BrandCode))
-    bls <- ifelse(bcs %in% names(lookup), lookup[bcs], bcs)
+  cols <- list()
+  if (!is.null(cat_brands) && nrow(cat_brands) > 0L) {
+    if ("BrandLabel" %in% names(cat_brands)) {
+      lookup <- stats::setNames(as.character(cat_brands$BrandLabel),
+                                 as.character(cat_brands$BrandCode))
+      bls <- ifelse(bcs %in% names(lookup), lookup[bcs], bcs)
+    }
+    if ("Colour" %in% names(cat_brands)) {
+      for (i in seq_len(nrow(cat_brands))) {
+        bc <- trimws(as.character(cat_brands$BrandCode[i]))
+        col <- trimws(as.character(cat_brands$Colour[i]))
+        if (nzchar(bc) && nzchar(col) &&
+            grepl("^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$", col)) {
+          cols[[bc]] <- col
+        }
+      }
+    }
   }
-  list(pen_mat      = brand_volume$pen_mat,
-       brand_codes  = bcs,
-       brand_labels = bls)
+  list(pen_mat       = brand_volume$pen_mat,
+       brand_codes   = bcs,
+       brand_labels  = bls,
+       brand_colours = cols)
 }
 
 

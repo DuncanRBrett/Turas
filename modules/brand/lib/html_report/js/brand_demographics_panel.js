@@ -1,43 +1,54 @@
 /* ==============================================================================
- * BRAND MODULE - DEMOGRAPHICS PANEL JS
+ * BRAND MODULE - DEMOGRAPHICS PANEL JS (matrix layout v2)
  * ==============================================================================
- * Wires the Demographics tab interactivity:
- *   - Question chip toggle (show/hide individual question cards)
- *   - Sub-tab switch (Total | Buyer | Tier | By brand) re-renders each card
- *   - Per-card brand picker (visible only on the "By brand" sub-tab)
- *   - Per-card CI overlay toggle
- *   - Heatmap cell colouring on the by-brand and tier sub-tabs
+ * Wires the Demographics matrix panel:
+ *   - Global controls: n counts / heatmap / 95% CI checkboxes (re-paint cells)
+ *   - Focal-brand picker: chips re-issue a re-render of column 2 across cards
+ *   - Brand-visibility chips: hide/show specific per-brand columns
+ *   - Question chips: hide/show whole question cards
+ *   - Per-card view toggle: table ↔ chart
  *
- * Panel data lives in <script class="demo-panel-data"> as JSON; we hydrate
- * once on first interaction and cache on the panel root element.
+ * State lives on the panel root element (panel.__state). Mutating any input
+ * re-applies the relevant DOM attributes — we do not re-render full HTML
+ * because the matrix is already laid out by the R renderer; we just toggle
+ * visibility and inline-style cells.
  *
- * Pin / PNG buttons reuse the existing brTogglePin / brExportPng handlers
- * from brand_pins.js — nothing custom required here.
+ * Pin / PNG / Excel buttons reuse the global brTogglePin / brExportPng /
+ * _brExportPanel functions wired by brand_pins.js / brand_report.js.
  * ==============================================================================*/
 
 (function () {
   "use strict";
 
   function init(panel) {
-    if (!panel || panel.__demoInit) return;
-    panel.__demoInit = true;
+    if (!panel || panel.__demoMatrixInit) return;
+    panel.__demoMatrixInit = true;
 
     const data = readPanelData(panel);
     if (!data || !data.questions || !data.questions.length) return;
-    panel.__demoData = data;
-    panel.__demoState = {
-      tab: "total",
-      brandByCard: {}, // section_id -> brand_code
-      visibleQs: new Set(data.questions.map((_, i) => i)),
-      ciOn: new Set()
+    panel.__data = data;
+    panel.__state = {
+      focal:        (data.meta && data.meta.focal_brand) || null,
+      hiddenBrands: new Set(),
+      hiddenQs:     new Set(),
+      showCounts:   false,
+      showHeatmap:  true,
+      showCI:       false,
+      viewByCard:   {} // sectionId -> "table" | "chart"
     };
 
-    bindChipRow(panel);
-    bindSubnav(panel);
-    bindCardToolbars(panel);
-    bindBrandPickers(panel);
+    bindGlobalToggles(panel);
+    bindFocalPicker(panel);
+    bindBrandChips(panel);
+    bindQuestionChips(panel);
+    bindCardViewToggles(panel);
+
+    // Initial paint reflects default state (heatmap on, counts/CI off).
+    applyHeatmap(panel);
+    applyCellExtras(panel);
   }
 
+  // ---- panel data ----
   function readPanelData(panel) {
     const node = panel.querySelector(".demo-panel-data");
     if (!node) return null;
@@ -45,262 +56,259 @@
     catch (e) { console.warn("[demographics] bad JSON payload", e); return null; }
   }
 
-  // ----- chip row (show/hide questions) -----
-  function bindChipRow(panel) {
-    panel.querySelectorAll(".demo-q-chip").forEach(chip => {
+  // ---- global toggles (n counts / heatmap / CI) ----
+  function bindGlobalToggles(panel) {
+    panel.querySelectorAll('input[data-demo-toggle]').forEach(input => {
+      input.addEventListener("change", () => {
+        const k = input.getAttribute("data-demo-toggle");
+        if      (k === "counts")  { panel.__state.showCounts  = input.checked; applyCellExtras(panel); }
+        else if (k === "heatmap") { panel.__state.showHeatmap = input.checked; applyHeatmap(panel); }
+        else if (k === "ci")      { panel.__state.showCI      = input.checked; applyCellExtras(panel); }
+      });
+    });
+  }
+
+  // Show / hide the .demo-cell-n + .demo-cell-ci spans across the panel.
+  // R renderer emits both with hidden — JS just toggles the attribute.
+  function applyCellExtras(panel) {
+    const showN  = panel.__state.showCounts;
+    const showCI = panel.__state.showCI;
+    panel.querySelectorAll(".demo-cell-n").forEach(el => {
+      el.toggleAttribute("hidden", !showN);
+    });
+    panel.querySelectorAll(".demo-cell-ci").forEach(el => {
+      el.toggleAttribute("hidden", !showCI);
+    });
+  }
+
+  // Apply the per-cell heat colour stashed on data-demo-heat. When heatmap
+  // is off we clear background-color so the white cell shows through.
+  function applyHeatmap(panel) {
+    const on = panel.__state.showHeatmap;
+    panel.querySelectorAll('td[data-demo-col="brand"], td[data-demo-col="focal"]').forEach(td => {
+      const heat = td.getAttribute("data-demo-heat") || "";
+      td.style.backgroundColor = (on && heat) ? heat : "";
+    });
+  }
+
+  // ---- focal-brand picker ----
+  // The renderer puts the focal-brand column in position 2. When the user
+  // picks a new focal, we rotate the column visually by swapping the cell
+  // contents between the old focal column and the new focal's column. To
+  // keep this code small, we re-render the whole table for each card from
+  // the JSON payload, parameterised by the new focal.
+  function bindFocalPicker(panel) {
+    panel.querySelectorAll(".demo-focal-chip").forEach(chip => {
       chip.addEventListener("click", () => {
-        const idx = parseInt(chip.getAttribute("data-demo-q-idx"), 10);
-        const visible = panel.__demoState.visibleQs;
-        if (visible.has(idx)) { visible.delete(idx); chip.classList.remove("active"); }
-        else                  { visible.add(idx);    chip.classList.add("active"); }
-        panel.querySelectorAll(`.demo-card[data-demo-q-idx="${idx}"]`).forEach(card => {
-          card.classList.toggle("hidden", !visible.has(idx));
-        });
+        panel.querySelectorAll(".demo-focal-chip.active").forEach(a => a.classList.remove("active"));
+        chip.classList.add("active");
+        panel.__state.focal = chip.getAttribute("data-demo-focal");
+        rerenderAllTables(panel);
       });
     });
   }
 
-  // ----- sub-tab nav -----
-  function bindSubnav(panel) {
-    panel.querySelectorAll(".demo-subtab-btn").forEach(btn => {
-      if (btn.classList.contains("disabled")) return;
-      btn.addEventListener("click", () => {
-        panel.querySelectorAll(".demo-subtab-btn.active").forEach(a => a.classList.remove("active"));
-        btn.classList.add("active");
-        const tab = btn.getAttribute("data-demo-tab");
-        panel.__demoState.tab = tab;
-        rerenderAllCards(panel);
-      });
-    });
-  }
-
-  // ----- per-card pin (handled by brand_pins.js) + CI toggle -----
-  function bindCardToolbars(panel) {
-    panel.querySelectorAll(".demo-ci-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const sec = btn.getAttribute("data-section");
-        const card = panel.querySelector(`.demo-card[id="${sec}"]`);
-        if (!card) return;
-        const ci = panel.__demoState.ciOn;
-        if (ci.has(sec)) { ci.delete(sec); card.classList.remove("show-ci"); btn.classList.remove("active"); }
-        else             { ci.add(sec);    card.classList.add("show-ci");    btn.classList.add("active"); }
-      });
-    });
-  }
-
-  // ----- brand pickers (per card; only meaningful on "by brand" sub-tab) -----
-  function bindBrandPickers(panel) {
-    panel.querySelectorAll(".demo-brand-picker").forEach(picker => {
-      const idx = parseInt(picker.getAttribute("data-demo-q-idx"), 10);
-      picker.querySelectorAll(".demo-brand-chip").forEach(chip => {
-        chip.addEventListener("click", () => {
-          picker.querySelectorAll(".demo-brand-chip.active").forEach(a => a.classList.remove("active"));
-          chip.classList.add("active");
-          const brand = chip.getAttribute("data-demo-brand");
-          const card = panel.querySelector(`.demo-card[data-demo-q-idx="${idx}"]`);
-          if (!card) return;
-          panel.__demoState.brandByCard[card.id] = brand;
-          rerenderCard(panel, card, idx);
-        });
-      });
-    });
-  }
-
-  // ----- rendering -----
-  function rerenderAllCards(panel) {
+  // Re-render every visible card's matrix table by rebuilding rows in JS
+  // (matches the R rendering shape exactly — same data attributes so the
+  // brand-visibility / heatmap / counts toggles continue to work).
+  function rerenderAllTables(panel) {
+    const data = panel.__data;
+    const dp   = (data.config && data.config.decimal_places) || 0;
+    const focal = panel.__state.focal;
     panel.querySelectorAll(".demo-card").forEach(card => {
       const idx = parseInt(card.getAttribute("data-demo-q-idx"), 10);
-      rerenderCard(panel, card, idx);
+      const q   = data.questions[idx];
+      if (!q) return;
+      const tableHost = card.querySelector(".demo-card-view-table");
+      if (tableHost) tableHost.innerHTML = renderMatrix(q, focal, data, dp);
+    });
+    applyHeatmap(panel);
+    applyCellExtras(panel);
+    applyBrandVisibility(panel);
+  }
+
+  // ---- brand-visibility chips ----
+  function bindBrandChips(panel) {
+    panel.querySelectorAll(".demo-brand-chip").forEach(chip => {
+      chip.addEventListener("click", () => {
+        const bc = chip.getAttribute("data-demo-brand");
+        const off = chip.classList.toggle("active") === false;
+        if (off) panel.__state.hiddenBrands.add(bc);
+        else     panel.__state.hiddenBrands.delete(bc);
+        applyBrandVisibility(panel);
+      });
     });
   }
 
-  function rerenderCard(panel, card, idx) {
-    const data = panel.__demoData;
-    const state = panel.__demoState;
-    const q = data.questions[idx];
-    const body = card.querySelector(".demo-card-body");
-    const picker = card.querySelector(".demo-brand-picker");
-    if (!q || !body) return;
-
-    const dp = (data.config && data.config.decimal_places) || 0;
-    const focal = (data.meta && data.meta.focal_colour) || "#1A5276";
-
-    // Picker visibility
-    if (picker) picker.toggleAttribute("hidden", state.tab !== "brand");
-
-    let html;
-    switch (state.tab) {
-      case "buyer": html = renderBuyerCut(q, focal, dp); break;
-      case "tier":  html = renderTierCut(q, focal, dp);  break;
-      case "brand": {
-        const brand = state.brandByCard[card.id] ||
-                       (data.brands.codes && data.brands.codes[0]);
-        html = renderBrandCut(q, brand, focal, dp, data.brands);
-        break;
-      }
-      default: html = renderTotal(q, focal, dp); break;
-    }
-    body.innerHTML = html;
+  function applyBrandVisibility(panel) {
+    const hidden = panel.__state.hiddenBrands;
+    panel.querySelectorAll('[data-demo-col="brand"][data-demo-brand]').forEach(el => {
+      el.style.display = hidden.has(el.getAttribute("data-demo-brand")) ? "none" : "";
+    });
   }
 
-  // ----- renderers -----
+  // ---- question chips ----
+  function bindQuestionChips(panel) {
+    panel.querySelectorAll(".demo-q-chip").forEach(chip => {
+      chip.addEventListener("click", () => {
+        const idx = chip.getAttribute("data-demo-q-idx");
+        const off = chip.classList.toggle("active") === false;
+        if (off) panel.__state.hiddenQs.add(idx);
+        else     panel.__state.hiddenQs.delete(idx);
+        const card = panel.querySelector(`.demo-card[data-demo-q-idx="${idx}"]`);
+        if (card) card.classList.toggle("hidden", off);
+      });
+    });
+  }
+
+  // ---- per-card table ↔ chart toggle ----
+  function bindCardViewToggles(panel) {
+    panel.querySelectorAll(".demo-card-toolbar").forEach(toolbar => {
+      const card = toolbar.closest(".demo-card");
+      if (!card) return;
+      toolbar.querySelectorAll('[data-demo-view]').forEach(btn => {
+        btn.addEventListener("click", () => {
+          const view = btn.getAttribute("data-demo-view");
+          toolbar.querySelectorAll('[data-demo-view]').forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          card.querySelectorAll(".demo-card-view").forEach(v => v.toggleAttribute("hidden", true));
+          const target = card.querySelector(".demo-card-view-" + view);
+          if (target) target.toggleAttribute("hidden", false);
+          panel.__state.viewByCard[card.id] = view;
+        });
+      });
+    });
+  }
+
+  // ============================================================================
+  // RENDERER (mirrors the R matrix-table builder so focal swaps don't need a
+  // round-trip to the engine). Kept short by sharing helpers.
+  // ============================================================================
+
+  function renderMatrix(q, focalBrand, data, dp) {
+    const rows = (q.total && q.total.rows) || [];
+    if (!rows.length) return '<div class="demo-empty">No responses for this question.</div>';
+
+    const brands = (data.brands && data.brands.codes)  || [];
+    const labels = (data.brands && data.brands.labels) || brands;
+    const order  = brandOrder(brands, focalBrand);
+    const palette = brandPalette(data, brands);
+
+    return `<div class="demo-matrix-wrap"><table class="demo-matrix">
+      ${tableHeader(brands, labels, order, focalBrand, palette)}
+      ${tableBody(rows, q, brands, order, focalBrand, dp)}
+    </table></div>`;
+  }
+
+  function brandOrder(brands, focal) {
+    const out = [];
+    const fi = brands.indexOf(focal);
+    if (fi >= 0) out.push(fi);
+    brands.forEach((b, i) => { if (i !== fi) out.push(i); });
+    return out;
+  }
+
+  function brandPalette(data, brands) {
+    const fromR = (data.brands && data.brands.colours) || {};
+    const fallback = ["#1A5276","#B7950B","#196F3D","#7E5109","#6C3483","#1E8449",
+                      "#A04000","#5D6D7E","#922B21","#4A235A"];
+    const out = {};
+    let fb = 0;
+    brands.forEach(bc => {
+      out[bc] = fromR[bc] || fallback[fb++ % fallback.length];
+    });
+    return out;
+  }
+
+  function tableHeader(brands, labels, order, focal, palette) {
+    const brandTh = order.map(i => {
+      const bc = brands[i], bl = labels[i] || bc;
+      const cls = (bc === focal) ? "demo-col-focal" : "";
+      return `<th class="${cls}" data-demo-col="brand" data-demo-brand="${esc(bc)}">
+        <span class="demo-brand-chip-swatch" style="background:${esc(palette[bc] || "#94a3b8")}"></span> ${esc(bl)}
+      </th>`;
+    }).join("");
+    return `<thead><tr>
+      <th>Option</th>
+      <th class="demo-col-focal" data-demo-col="focal">Focal</th>
+      <th class="demo-col-catavg" data-demo-col="catavg">Cat avg</th>
+      ${brandTh}
+    </tr></thead>`;
+  }
+
+  function tableBody(rows, q, brands, order, focal, dp) {
+    const byBrand = {};
+    (q.brand_cut || []).forEach(b => { byBrand[b.brand_code] = b; });
+    const trs = rows.map(r => {
+      const cat = r.pct;
+      const focalCell = brandCell(byBrand[focal], r.code, cat, dp,
+                                    "demo-col-focal", "focal", focal);
+      const avgCell = catAvgCell(r, dp);
+      const perBrandCells = order
+        .map(i => brands[i])
+        .map(bc => brandCell(byBrand[bc], r.code, cat, dp,
+                              (bc === focal ? "demo-col-focal" : ""), "brand", bc))
+        .join("");
+      return `<tr>
+        <td>${esc(r.label || r.code)}</td>
+        ${focalCell}${avgCell}${perBrandCells}
+      </tr>`;
+    }).join("");
+    return `<tbody>${trs}</tbody>`;
+  }
+
+  function brandCell(brandEntry, code, catPct, dp, extraClass, colcode, brandCode) {
+    if (!brandEntry) return naCell(extraClass, colcode, brandCode);
+    const cell = (brandEntry.cells || []).find(c => c.code === code);
+    if (!cell) return naCell(extraClass, colcode, brandCode);
+    const pct = cell.pct;
+    const diff = (catPct != null && isFinite(catPct) && pct != null && isFinite(pct))
+                 ? (pct - catPct) : null;
+    const heat = heatColour(diff);
+    const baseN = brandEntry.base_n;
+    const cellN = (isFinite(baseN) && isFinite(pct))
+                   ? Math.round(baseN * pct / 100) : null;
+    return `<td class="${extraClass}" data-demo-col="${colcode}" data-demo-brand="${esc(brandCode || "")}" data-demo-heat="${esc(heat)}">
+      ${pctStr(pct, dp)}${countSpan(cellN)}${ciSpan(cell.ci_lower, cell.ci_upper, dp)}
+    </td>`;
+  }
+
+  function catAvgCell(r, dp) {
+    return `<td class="demo-col-catavg" data-demo-col="catavg">
+      ${pctStr(r.pct, dp)}${countSpan(r.n)}${ciSpan(r.ci_lower, r.ci_upper, dp)}
+    </td>`;
+  }
+
+  function naCell(extraClass, colcode, brandCode) {
+    return `<td class="${extraClass}" data-demo-col="${colcode}" data-demo-brand="${esc(brandCode || "")}">
+      <span class="demo-na">&mdash;</span>
+    </td>`;
+  }
+
+  function heatColour(diff) {
+    if (diff == null || !isFinite(diff)) return "";
+    const max = 30;
+    const frac = Math.min(1, Math.abs(diff) / max);
+    const alpha = (0.06 + frac * 0.50).toFixed(3);
+    return diff >= 0 ? `rgba(37,99,171,${alpha})` : `rgba(192,57,43,${alpha})`;
+  }
+
   function pctStr(v, dp) {
     if (v == null || !isFinite(v)) return '<span class="demo-na">&mdash;</span>';
     return v.toFixed(dp) + "%";
   }
-  function intStr(v) {
-    if (v == null || !isFinite(v)) return "&mdash;";
-    return Math.round(v).toLocaleString();
+  function countSpan(n) {
+    if (n == null || !isFinite(n)) return "";
+    return `<span class="demo-cell-n" hidden>n=${Math.round(n)}</span>`;
+  }
+  function ciSpan(lo, hi, dp) {
+    if (lo == null || hi == null || !isFinite(lo) || !isFinite(hi)) return "";
+    return `<span class="demo-cell-ci" hidden>[${lo.toFixed(dp)}% &ndash; ${hi.toFixed(dp)}%]</span>`;
   }
   function esc(s) {
     return String(s == null ? "" : s)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
-  }
-
-  function distRowsHtml(rows, focal, dp) {
-    if (!rows || !rows.length) return '<div class="demo-empty">No data for this cut.</div>';
-    const maxPct = Math.max(...rows.map(r => r.pct || 0));
-    const denom = maxPct > 0 ? maxPct : 1;
-    const trs = rows.map(r => {
-      const w = isFinite(r.pct) ? Math.max(2, 100 * r.pct / denom) : 0;
-      return `<tr>
-        <td class="demo-row-label">${esc(r.label || r.code)}</td>
-        <td class="demo-row-bar"><div class="demo-row-bar-fill" style="width:${w.toFixed(1)}%;background-color:${focal}"></div></td>
-        <td class="demo-row-pct">${pctStr(r.pct, dp)}</td>
-        <td class="demo-row-ci">[${pctStr(r.ci_lower, dp)} &ndash; ${pctStr(r.ci_upper, dp)}]</td>
-        <td class="demo-row-n">${intStr(r.n)}</td>
-      </tr>`;
-    }).join("");
-    return `<table class="demo-table">
-      <thead><tr><th>Option</th><th></th><th>%</th><th class="demo-ci-col">95% CI</th><th>n</th></tr></thead>
-      <tbody>${trs}</tbody>
-    </table>`;
-  }
-
-  function renderTotal(q, focal, dp) {
-    return distRowsHtml((q.total && q.total.rows) || [], focal, dp);
-  }
-
-  function renderBuyerCut(q, focal, dp) {
-    if (!q.buyer_cut) return '<div class="demo-empty">No focal-brand pen data — buyer cut hidden.</div>';
-    const buyerRows = (q.buyer_cut.buyer && q.buyer_cut.buyer.rows) || [];
-    const nonRows   = (q.buyer_cut.non_buyer && q.buyer_cut.non_buyer.rows) || [];
-    return twoColTable("Buyer", "Non-buyer", buyerRows, nonRows, focal, dp);
-  }
-
-  function renderTierCut(q, focal, dp) {
-    if (!q.tier_cut) return '<div class="demo-empty">No buyer-heaviness tertiles — tier cut hidden.</div>';
-    const cols = [
-      { hdr: "Light",  rows: (q.tier_cut.light  && q.tier_cut.light.rows)  || [] },
-      { hdr: "Medium", rows: (q.tier_cut.medium && q.tier_cut.medium.rows) || [] },
-      { hdr: "Heavy",  rows: (q.tier_cut.heavy  && q.tier_cut.heavy.rows)  || [] }
-    ];
-    return manyColTable(cols, q.codes, q.labels, focal, dp);
-  }
-
-  function renderBrandCut(q, brand, focal, dp, brands) {
-    if (!q.brand_cut || !q.brand_cut.length) {
-      return '<div class="demo-empty">No brand pen data — brand cut hidden.</div>';
-    }
-    // For the active brand, render its distribution like a Total card.
-    const rec = q.brand_cut.find(b => b.brand_code === brand) || q.brand_cut[0];
-    const cells = (rec.cells || []).map(c => {
-      const i = q.codes.indexOf(c.code);
-      const lbl = (i >= 0 && q.labels[i]) || c.code;
-      return { label: lbl, code: c.code, pct: c.pct,
-               ci_lower: c.ci_lower, ci_upper: c.ci_upper, n: rec.base_n };
-    });
-    const heading = `<div class="demo-brand-heading">${esc(rec.brand_label || rec.brand_code)} buyers (n = ${intStr(rec.base_n)})</div>`;
-    const heat = brandHeatmap(q, brand, focal, dp);
-    return heading + distRowsHtml(cells, focal, dp) + heat;
-  }
-
-  function brandHeatmap(q, focalBrand, focalCol, dp) {
-    if (!q.brand_cut || !q.brand_cut.length) return "";
-    const totalRows = (q.total && q.total.rows) || [];
-    const codes = q.codes;
-    const labels = q.labels;
-    const totalByCode = new Map(totalRows.map(r => [r.code, r.pct]));
-    const headerCells = codes.map((c, i) =>
-      `<th class="demo-heat-hdr">${esc(labels[i] || c)}</th>`).join("");
-    const rowsHtml = q.brand_cut.map(b => {
-      const tds = b.cells.map(cell => {
-        const tot = totalByCode.get(cell.code);
-        const diff = (cell.pct != null && tot != null) ? cell.pct - tot : null;
-        const bg = heatColour(diff);
-        const cls = "demo-heat-cell" + (b.brand_code === focalBrand ? " focal-col" : "");
-        return `<td class="${cls}" style="background-color:${bg}" title="vs total: ${diff == null ? "—" : (diff>=0?"+":"") + diff.toFixed(dp)}pp">${pctStr(cell.pct, dp)}</td>`;
-      }).join("");
-      return `<tr><td class="demo-row-label">${esc(b.brand_label || b.brand_code)}</td>${tds}<td class="demo-row-n">${intStr(b.base_n)}</td></tr>`;
-    }).join("");
-    return `<div class="demo-heatmap-wrap" style="margin-top:14px;">
-      <div class="demo-heatmap-title" style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Heatmap &mdash; brand &times; option (% of brand buyers)</div>
-      <div style="overflow-x:auto;"><table class="demo-table demo-heatmap-table">
-        <thead><tr><th>Brand</th>${headerCells}<th>n</th></tr></thead>
-        <tbody>${rowsHtml}</tbody>
-      </table></div>
-    </div>`;
-  }
-
-  // Diverging colour: blue when above category average, red when below.
-  // Magnitude clipped to 30pp (the largest diff likely to occur for an
-  // option-share at a single demographic cut).
-  function heatColour(diff) {
-    if (diff == null || !isFinite(diff)) return "transparent";
-    const max = 30;
-    const frac = Math.min(1, Math.abs(diff) / max);
-    const alpha = (0.06 + frac * 0.50).toFixed(3);
-    return diff >= 0
-      ? `rgba(37,99,171,${alpha})`
-      : `rgba(192,57,43,${alpha})`;
-  }
-
-  function twoColTable(hdrA, hdrB, rowsA, rowsB, focal, dp) {
-    const codes = unionCodes(rowsA, rowsB);
-    const mapA = new Map(rowsA.map(r => [r.code, r]));
-    const mapB = new Map(rowsB.map(r => [r.code, r]));
-    const baseA = rowsA.length ? rowsA[0].n : null;
-    const baseB = rowsB.length ? rowsB[0].n : null;
-    const trs = codes.map(c => {
-      const ra = mapA.get(c.code) || {};
-      const rb = mapB.get(c.code) || {};
-      return `<tr>
-        <td class="demo-row-label">${esc(c.label)}</td>
-        <td class="demo-heat-cell" style="background-color:${heatColour((ra.pct||0)-(rb.pct||0))}">${pctStr(ra.pct, dp)}</td>
-        <td class="demo-heat-cell" style="background-color:${heatColour((rb.pct||0)-(ra.pct||0))}">${pctStr(rb.pct, dp)}</td>
-        <td class="demo-row-n">${intStr(ra.n)}</td>
-        <td class="demo-row-n">${intStr(rb.n)}</td>
-      </tr>`;
-    }).join("");
-    return `<table class="demo-table">
-      <thead><tr><th>Option</th><th>${esc(hdrA)} %</th><th>${esc(hdrB)} %</th><th>${esc(hdrA)} n</th><th>${esc(hdrB)} n</th></tr></thead>
-      <tbody>${trs}</tbody>
-    </table>`;
-  }
-
-  function manyColTable(cols, codes, labels, focal, dp) {
-    const headerCells = cols.map(c => `<th>${esc(c.hdr)} %</th>`).join("");
-    const trs = codes.map((cd, i) => {
-      const cells = cols.map(col => {
-        const r = (col.rows.find(x => x.code === cd)) || {};
-        return `<td class="demo-heat-cell">${pctStr(r.pct, dp)}</td>`;
-      }).join("");
-      return `<tr><td class="demo-row-label">${esc(labels[i] || cd)}</td>${cells}</tr>`;
-    }).join("");
-    return `<table class="demo-table">
-      <thead><tr><th>Option</th>${headerCells}</tr></thead>
-      <tbody>${trs}</tbody>
-    </table>`;
-  }
-
-  function unionCodes(rowsA, rowsB) {
-    const seen = new Set();
-    const out = [];
-    [...rowsA, ...rowsB].forEach(r => {
-      if (!seen.has(r.code)) { seen.add(r.code); out.push({ code: r.code, label: r.label || r.code }); }
-    });
-    return out;
   }
 
   // ---- bootstrap ----
@@ -312,9 +320,9 @@
   } else {
     bootAll();
   }
-  // Re-init when a tab containing the panel becomes active
+  // Re-init when category sub-tabs activate (panel may not exist at first paint)
   document.addEventListener("click", function (e) {
-    if (e.target && e.target.closest && e.target.closest(".br-tab-btn")) {
+    if (e.target && e.target.closest && e.target.closest(".br-tab-btn, .br-subtab-btn")) {
       setTimeout(bootAll, 0);
     }
   });

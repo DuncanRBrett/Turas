@@ -121,21 +121,23 @@ build_demographics_panel_data <- function(questions,
   )
 
   list(
-    role          = q$role,
-    column        = q$column,
-    question_text = q$question_text,
-    short_label   = q$short_label %||% q$question_text,
-    variable_type = q$variable_type %||% "Single_Response",
-    codes         = q$codes,
-    labels        = q$labels,
-    n_total       = res$n_total,
-    n_respondents = res$n_respondents,
-    weighted      = isTRUE(res$weighted),
-    conf_level    = res$conf_level %||% 0.95,
-    total         = .demo_panel_dist(res$total),
-    buyer_cut     = buyer_cut,
-    tier_cut      = tier_cut,
-    brand_cut     = brand_long
+    role           = q$role,
+    column         = q$column,
+    question_text  = q$question_text,
+    short_label    = q$short_label %||% q$question_text,
+    variable_type  = q$variable_type %||% "Single_Response",
+    codes          = q$codes,
+    labels         = q$labels,
+    is_synthetic   = isTRUE(q$is_synthetic),
+    synthetic_kind = q$synthetic_kind %||% NA_character_,
+    n_total        = res$n_total,
+    n_respondents  = res$n_respondents,
+    weighted       = isTRUE(res$weighted),
+    conf_level     = res$conf_level %||% 0.95,
+    total          = .demo_panel_dist(res$total),
+    buyer_cut      = buyer_cut,
+    tier_cut       = tier_cut,
+    brand_cut      = brand_long
   )
 }
 
