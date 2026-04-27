@@ -315,8 +315,17 @@ ol.ma-adv-action-list {
    "What is Mental Advantage?" callout at the bottom of its own subtab. */
 .ma-panel.ma-active-advantage .ma-about-availability { display: none !important; }
 
-/* Visible "Bubbles sized by:" status next to the chart range bar so the
-   user can see the base toggle change at a glance. */
+/* Static "Base:" notation (Romaniuk — total respondents only) replaces
+   the previous toggle. Lives in the controls bar. */
+.ma-adv-base-notation {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 4px;
+  background: #f8fafc; border: 1px solid #e2e8f0;
+  font-size: 11px; color: #475569; }
+.ma-adv-base-notation .ma-adv-base-value {
+  font-weight: 600; color: #1e293b; }
+
+/* Static "Bubbles sized by: % total" reminder near the chart range bar. */
 .ma-adv-base-status {
   margin-left: auto; font-size: 11px; color: #475569;
   font-style: italic; padding: 4px 10px;

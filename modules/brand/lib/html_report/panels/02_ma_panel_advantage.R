@@ -104,26 +104,21 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
     )
   } else ""
 
-  base_buttons <- '<div class="sig-level-switcher ma-adv-base-switcher" role="group" aria-label="Linkage base">
+  # Romaniuk-faithful: base is always total respondents. Shown as a
+  # static notation so the user knows the denominator without offering
+  # a misleading toggle.
+  base_notation <- '<div class="ma-adv-base-notation" title="Mental Advantage is computed on the total respondent base, per Romaniuk (Better Brand Health, 2022).">
        <span class="sig-level-label">Base:</span>
-       <button type="button" class="sig-btn sig-btn-active" data-ma-action="adv-base" data-ma-adv-base="total" aria-pressed="true">% total</button>
-       <button type="button" class="sig-btn" data-ma-action="adv-base" data-ma-adv-base="aware" aria-pressed="false">% aware</button>
-     </div>'
-
-  filter_buttons <- '<div class="sig-level-switcher ma-adv-filter-switcher" role="group" aria-label="Bubble filter">
-       <span class="sig-level-label">Show:</span>
-       <button type="button" class="sig-btn sig-btn-active" data-ma-action="adv-filter" data-ma-adv-filter="all" aria-pressed="true">All</button>
-       <button type="button" class="sig-btn" data-ma-action="adv-filter" data-ma-adv-filter="actionable" aria-pressed="false">Defend + Build</button>
-       <button type="button" class="sig-btn" data-ma-action="adv-filter" data-ma-adv-filter="top10" aria-pressed="false">Top 10 by |MA|</button>
+       <span class="ma-adv-base-value">total respondents (Romaniuk)</span>
      </div>'
 
   paste0(
     '<div class="ma-controls controls-bar ma-adv-controls">',
     '<div class="ma-meta-row">',
     stim_buttons,
-    base_buttons,
-    filter_buttons,
+    base_notation,
     '<label class="toggle-label"><input type="checkbox" data-ma-action="adv-show-counts"> Show counts</label>',
+    '<label class="toggle-label"><input type="checkbox" data-ma-action="adv-show-chart" checked> Show chart</label>',
     '<button type="button" class="export-btn ma-pin-dropdown-btn" data-ma-action="adv-pindropdown" data-ma-pin-scope="advantage" title="Pin a section" aria-haspopup="true">&#128204; Pin &#9662;</button>',
     '<button type="button" class="export-btn ma-png-btn" onclick="brExportPngFromEl(this)" title="Export view to PNG">&#x1F5BC; PNG</button>',
     '<button type="button" class="export-btn ma-export-btn" data-ma-action="exporttable" data-ma-stim="advantage" title="Export Mental Advantage to Excel">⭳ Excel ▾</button>',
@@ -218,7 +213,7 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
     '<label class="ma-adv-xrange-label">Max',
     '<input type="number" class="ma-adv-xrange-input" data-ma-action="adv-xrange-max" min="0" max="100" step="5" placeholder="auto"></label>',
     '<button type="button" class="ma-adv-xrange-reset" data-ma-action="adv-xrange-reset">Reset</button>',
-    '<span class="ma-adv-base-status" data-ma-adv-base-status>Bubbles sized by: % total</span>',
+    '<span class="ma-adv-base-status">Bubbles sized by: % total</span>',
     '</div>',
     '<svg class="ma-adv-quadrant-svg" data-ma-adv="quadrant" xmlns="http://www.w3.org/2000/svg"></svg>',
     '</div>'

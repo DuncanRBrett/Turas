@@ -52,7 +52,7 @@
 
   // ------------------------------------------------------------ state
   function getAdvState(panel) {
-    if (!panel.__maAdvState) panel.__maAdvState = { filter: 'all', base: 'total' };
+    if (!panel.__maAdvState) panel.__maAdvState = {};
     return panel.__maAdvState;
   }
   function getActiveStim(panel) {
@@ -60,14 +60,28 @@
     var st = getAdvState(panel);
     return st.stim || pd.advantage.default_stim || pd.advantage.available_stims[0];
   }
-  function getActiveBase(panel) {
-    var st = getAdvState(panel); return st.base || 'total';
+  // Base is fixed: Romaniuk uses total respondents as the denominator.
+  // The toggle has been removed; we keep the constant exposed for any
+  // downstream callers (matrix tooltip, pin titles).
+  function getActiveBase(panel) { return 'total'; }
+
+  // Brand-palette fallback shared with the existing MA panel so all
+  // chips get a colour, not just brands with an explicit Colour cell.
+  var BRAND_PALETTE = ['#4e79a7','#f28e2b','#e15759','#76b7b2','#59a14f',
+                       '#edc948','#b07aa1','#ff9da7','#9c755f','#bab0ac'];
+  function stableBrandIdx(code) {
+    var h = 5381;
+    for (var i = 0; i < (code || '').length; i++)
+      h = ((h << 5) + h + code.charCodeAt(i)) & 0x7fffffff;
+    return h % BRAND_PALETTE.length;
   }
-  function getActiveFilter(panel) {
-    var st = getAdvState(panel); return st.filter || 'all';
-  }
-  function getActiveXAxis(panel) {
-    var st = getAdvState(panel); return st.xaxis || 'penetration';
+  function brandColourFor(pd, code) {
+    if (!code) return '#94a3b8';
+    if (pd && pd.config && pd.config.brand_colours && pd.config.brand_colours[code])
+      return pd.config.brand_colours[code];
+    if (pd && pd.meta && code === pd.meta.focal_brand_code)
+      return (pd.config && pd.config.focal_colour) || '#1A5276';
+    return BRAND_PALETTE[stableBrandIdx(code)];
   }
 
   function getStimBlock(panel) {
@@ -116,17 +130,6 @@
            decisionLabel(dec) + (p.isSig ? ' • significant (p&lt;0.05)' : '') + '</div>';
   }
 
-  // ------------------------------------------------------------ bubble filter
-  function filterPoints(pts, filter) {
-    if (filter === 'actionable') {
-      return pts.filter(function (p) { return p.decision === 'defend' || p.decision === 'build'; });
-    }
-    if (filter === 'top10') {
-      var sorted = pts.slice().sort(function (a, b) { return Math.abs(b.ma) - Math.abs(a.ma); });
-      return sorted.slice(0, 10);
-    }
-    return pts;
-  }
 
   // ------------------------------------------------------------ render orchestrator
   function renderAdvantage(panel) {
@@ -155,18 +158,17 @@
     // Bubble per CEP/attribute for the focal brand. Hidden stims (row
     // checkbox unchecked) drop their bubble from the chart but the row
     // stays visible — Duncan: "strike and grey out, like brand attribute
-    // tabs so I can put it back."
+    // tabs so I can put it back." Romaniuk base only — pct_total.
     var allPts = block.cells.filter(function (c) { return c.brand_code === focal; })
       .filter(function (c) { return !hidden[c.stim_code]; })
       .map(function (c) {
-        var sizeSrc = (base === 'aware' && c.pct_aware != null) ? c.pct_aware : c.pct_total;
         var pen = block.stim_penetration[block.codes.indexOf(c.stim_code)];
         return { code: c.stim_code, ma: c.ma, pen: pen, x: pen,
-                 size: sizeSrc != null ? sizeSrc : 0,
+                 size: c.pct_total != null ? c.pct_total : 0,
                  decision: c.decision, isSig: c.is_sig,
                  label: block.labels[block.codes.indexOf(c.stim_code)] };
       });
-    var pts = filterPoints(allPts, filter);
+    var pts = allPts;
     if (pts.length === 0) { svg.innerHTML = ''; return; }
 
     var width = svg.clientWidth || 600;
@@ -370,23 +372,23 @@
           tds.push('<td class="' + (b === focal ? 'ma-adv-matrix-focal' : '') + '">–</td>');
           return;
         }
-        // Cell formatting MUST NOT change based on significance — Duncan
-        // explicitly: "do not change the formatting" when sig. Significance
-        // surfaces in the chart bubble outline + tooltip only.
+        // Cell formatting MUST NOT change based on significance.
+        // Significance is shown via an inline asterisk after the score
+        // (text-only — no class, no extra elements that affect layout).
         var bg = maColour(c.ma, threshold);
         var focalCls = b === focal ? ' ma-adv-matrix-focal' : '';
         var counts = '<span class="ma-adv-cell-counts">a=' + Math.round(c.actual) + ' / e=' + Math.round(c.expected) + '</span>';
         var pen = block.stim_penetration[block.codes.indexOf(stim)];
-        var sizeSrc = (getActiveBase(panel) === 'aware' && c.pct_aware != null) ? c.pct_aware : c.pct_total;
         var hi = hoverPayload.length;
         hoverPayload.push({ code: stim, label: lbl + ' × ' + nameFor(b),
-                            ma: c.ma, pen: pen, size: sizeSrc,
+                            ma: c.ma, pen: pen, size: c.pct_total,
                             decision: c.decision, isSig: c.is_sig });
+        var sigSfx = c.is_sig ? '*' : '';
         tds.push('<td class="' + focalCls + '" data-ma-adv-cell-bg style="background-color:' + bg +
                  ' !important;background-image:none !important;--ma-cell-bg:' + bg +
                  ';" data-ma-adv-cell-idx="' + hi + '" data-ma-cell-brand="' + escAttr(b) +
                  '" data-ma-cell-stim="' + escAttr(stim) + '">' +
-                 fmtScore(c.ma) + counts + '</td>');
+                 fmtScore(c.ma) + sigSfx + counts + '</td>');
       });
       return '<tr data-ma-adv-row-stim="' + escAttr(stim) + '" class="' + rowCls + '">' + tds.join('') + '</tr>';
     });
@@ -405,7 +407,7 @@
     applyBrandColumnVisibility(panel);
 
     // Wire matrix-cell hover tooltip (replaces slow native title tooltip).
-    var base = getActiveBase(panel);
+    var base = 'total';
     wrap.querySelectorAll('td[data-ma-adv-cell-idx]').forEach(function (td) {
       var idx2 = parseInt(td.getAttribute('data-ma-adv-cell-idx'), 10);
       var p = hoverPayload[idx2]; if (!p) return;
@@ -557,10 +559,6 @@
       b.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
   }
-  function setBaseStatusLabel(panel, base) {
-    var el = panel.querySelector('[data-ma-adv-base-status]');
-    if (el) el.textContent = 'Bubbles sized by: ' + (base === 'aware' ? '% aware' : '% total');
-  }
   function bindAdvantage(panel) {
     if (panel.__maAdvBound) return; panel.__maAdvBound = true;
 
@@ -575,7 +573,8 @@
       }, true);
     });
 
-    // Single delegated click handler for all segmented controls + reset.
+    // Single delegated click handler for the stim toggle, x-range reset
+    // and brand chips. Base toggle is removed (Romaniuk — total only).
     subtab.addEventListener('click', function (ev) {
       var stimBtn = ev.target.closest('[data-ma-action="adv-stim"]');
       if (stimBtn && subtab.contains(stimBtn)) {
@@ -584,25 +583,6 @@
         getAdvState(panel).stim = stim;
         syncSegmentedButtons(panel, 'adv-stim', stim, 'data-ma-adv-stim');
         renderAdvantage(panel);
-        return;
-      }
-      var baseBtn = ev.target.closest('[data-ma-action="adv-base"]');
-      if (baseBtn && subtab.contains(baseBtn)) {
-        var base = baseBtn.getAttribute('data-ma-adv-base');
-        if (!base) return;
-        getAdvState(panel).base = base;
-        syncSegmentedButtons(panel, 'adv-base', base, 'data-ma-adv-base');
-        setBaseStatusLabel(panel, base);
-        renderAdvantage(panel);
-        return;
-      }
-      var filtBtn = ev.target.closest('[data-ma-action="adv-filter"]');
-      if (filtBtn && subtab.contains(filtBtn)) {
-        var f = filtBtn.getAttribute('data-ma-adv-filter');
-        if (!f) return;
-        getAdvState(panel).filter = f;
-        syncSegmentedButtons(panel, 'adv-filter', f, 'data-ma-adv-filter');
-        var block = getStimBlock(panel); if (block) renderQuadrant(panel, block);
         return;
       }
       var resetBtn = ev.target.closest('button[data-ma-action="adv-xrange-reset"]');
@@ -634,27 +614,36 @@
       applyBrandColumnVisibility(panel);
     });
 
-    // Show counts checkbox stays as a direct change listener (single
-    // checkbox, no risk of detachment).
+    // Show counts and Show chart checkboxes — direct change listeners
+    // (single elements per panel, no risk of detachment).
     var cntCb = panel.querySelector('input[data-ma-action="adv-show-counts"]');
     if (cntCb) cntCb.addEventListener('change', function () {
       var wrap = panel.querySelector('.ma-adv-matrix-wrap');
       if (wrap) wrap.classList.toggle('ma-adv-show-counts', cntCb.checked);
     });
-
-    // Initial base-status label
-    setBaseStatusLabel(panel, getActiveBase(panel));
+    var chartCb = panel.querySelector('input[data-ma-action="adv-show-chart"]');
+    if (chartCb) chartCb.addEventListener('change', function () {
+      var view = panel.querySelector('.ma-adv-quadrant-view');
+      if (!view) return;
+      if (chartCb.checked) {
+        view.removeAttribute('hidden');
+        var block = getStimBlock(panel); if (block) renderQuadrant(panel, block);
+      } else {
+        view.setAttribute('hidden', '');
+        hideTooltip(panel);
+      }
+    });
   }
 
   // Apply the same brand-palette colours used elsewhere in the MA panel
-  // to the advantage tab's "Show brands" chip row.
+  // to the advantage tab's "Show brands" chip row. Falls back to the
+  // stable BRAND_PALETTE hash so EVERY chip gets a colour (was failing
+  // for brands without an explicit Colour cell — only 3/10 lit up).
   function colourAdvantageChips(panel) {
     var pd = panel.__maData; if (!pd) return;
     panel.querySelectorAll('button[data-ma-adv-chip-brand]').forEach(function (chip) {
       var code = chip.getAttribute('data-ma-adv-chip-brand');
-      var col = (pd.config && pd.config.brand_colours && pd.config.brand_colours[code])
-              || (window.__maGetBrandColour && window.__maGetBrandColour(pd, code))
-              || '#64748b';
+      var col = brandColourFor(pd, code);
       chip.style.setProperty('--brand-chip-color', col);
       chip.style.backgroundColor = col;
       chip.style.borderColor = col;
