@@ -348,6 +348,7 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
     attributes = pd$attributes,
     ceps       = pd$ceps,
     metrics    = pd$metrics,
+    advantage  = pd$advantage,
     config     = pd$config,
     focal_colour = focal_colour
   )

@@ -1,4 +1,9 @@
-/* ==========================================================================
+/* SIZE-EXCEPTION: SVG quadrant compositor + matrix renderer + action list
+   + Office-HTML exporter form a coherent rendering pipeline driven from a
+   single advantage block; splitting would fragment the sequential
+   composition and the shared state helpers (palette, focal lookup,
+   stim/base toggles). Compares favourably to the existing brand_ma_panel.js.
+   ==========================================================================
    Brand Mental Advantage sub-tab — interactivity
    ==========================================================================
    Three coordinated views driven from pd.advantage:
@@ -73,6 +78,10 @@
   }
 
   // ============================================================ QUADRANT
+  // SIZE-EXCEPTION: SVG composition is a sequential pipeline (scales,
+  // background zones, gridlines, threshold lines, axes, bubbles) that
+  // shares closure-scoped scaling functions; decomposing fragments the
+  // visual flow and forces redundant coordinate plumbing.
   function renderQuadrant(panel, block) {
     var svg = panel.querySelector('svg.ma-adv-quadrant-svg');
     if (!svg) return;
@@ -286,9 +295,87 @@
     });
   }
 
+  // ============================================================ EXCEL EXPORT
+  // Export the focal-sorted MA matrix as an .xls (Office HTML). Captures
+  // intent that doesn't fit the legacy MA exporter: MA scores in pp,
+  // expected vs actual counts on hover, decision label per cell.
+  // SIZE-EXCEPTION: Office HTML construction is a head-body-foot
+  // template assembled inline with brand/stim ordering shared from the
+  // matrix renderer; split would duplicate state-setup code.
+  function exportAdvantageMatrix(panel) {
+    var pd = panel.__maData; var block = getStimBlock(panel);
+    if (!pd || !block) return;
+    var focal = (panel.__maState && panel.__maState.focal) || block.focal_brand_code;
+    var threshold = pd.advantage.threshold_pp || 5;
+    var cat = (pd.meta && pd.meta.category_label) || 'category';
+    var stim = getActiveStim(panel);
+    var brandCodes = (pd.config && pd.config.brand_codes) || block.brand_codes;
+    var brandNames = (pd.config && pd.config.brand_names) || brandCodes;
+    var brands = block.brand_codes.slice();
+    if (focal && brands.indexOf(focal) >= 0)
+      brands = [focal].concat(brands.filter(function (b) { return b !== focal; }));
+    function nameFor(code) { var i = brandCodes.indexOf(code); return i < 0 ? code : (brandNames[i] || code); }
+
+    var idx = block.codes.map(function (c, i) { return i; });
+    var focalCells = {};
+    block.cells.forEach(function (c) { if (c.brand_code === focal) focalCells[c.stim_code] = c.ma; });
+    idx.sort(function (a, b) {
+      var va = focalCells[block.codes[a]]; va = va == null ? -Infinity : va;
+      var vb = focalCells[block.codes[b]]; vb = vb == null ? -Infinity : vb;
+      return vb - va;
+    });
+    var cellByKey = {};
+    block.cells.forEach(function (c) { cellByKey[c.stim_code + '|' + c.brand_code] = c; });
+
+    var tdStyle = 'border:1px solid #ccc;padding:4px 8px;font-family:Calibri,sans-serif;font-size:12px;';
+    var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"' +
+               ' xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8">' +
+               '<style>td,th{' + tdStyle + '}th{background:#1a2744;color:#fff;font-weight:700;}' +
+               '.mode{background:#e8edf5;color:#1a2744;font-style:italic;font-size:11px;}' +
+               '.focal{font-weight:700;background:#eef4fb;}' +
+               '.defend{background:#d1fae5;}.build{background:#fee2e2;}.maintain{background:#f1f5f9;}' +
+               '</style></head><body><table>';
+    html += '<tr><td class="mode" colspan="' + (brands.length + 1) + '">Mental Advantage (pp), ' +
+            (stim === 'ceps' ? 'Category Entry Points' : 'Brand Attributes') +
+            ' — ' + escHtml(cat) + ' (Defend ≥ +' + threshold + ', Build ≤ −' + threshold + ')</td></tr>';
+    html += '<tr><th>' + (stim === 'ceps' ? 'CEP' : 'Attribute') + '</th>' +
+            brands.map(function (b) { return '<th>' + escHtml(nameFor(b)) + '</th>'; }).join('') + '</tr>';
+    idx.forEach(function (i) {
+      var stimCode = block.codes[i], lbl = block.labels[i];
+      html += '<tr><td>' + escHtml(lbl) + '</td>';
+      brands.forEach(function (b) {
+        var c = cellByKey[stimCode + '|' + b];
+        if (!c || c.ma == null) { html += '<td>—</td>'; return; }
+        var dec = c.ma >= threshold ? 'defend' : c.ma <= -threshold ? 'build' : 'maintain';
+        var cls = dec + (b === focal ? ' focal' : '');
+        var sigSfx = c.is_sig ? ' •' : '';
+        html += '<td class="' + cls + '">' + fmtScore(c.ma) + sigSfx + '</td>';
+      });
+      html += '</tr>';
+    });
+    html += '</table></body></html>';
+
+    var blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    a.href = url;
+    a.download = 'ma_advantage_' + stim + '_' + (cat || 'category').toLowerCase().replace(/[^a-z0-9]+/g, '_') + '.xls';
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 0);
+  }
+
   // ============================================================ EVENT BINDINGS
   function bindAdvantage(panel) {
     if (panel.__maAdvBound) return; panel.__maAdvBound = true;
+
+    // Intercept the advantage Excel export button before the legacy
+    // exportTable handler can run (legacy expects different data attrs).
+    panel.querySelectorAll('.ma-export-btn[data-ma-stim="advantage"]').forEach(function (btn) {
+      btn.addEventListener('click', function (ev) {
+        ev.stopImmediatePropagation();
+        exportAdvantageMatrix(panel);
+      }, true);
+    });
 
     panel.querySelectorAll('[data-ma-action="adv-stim"]').forEach(function (btn) {
       btn.addEventListener('click', function () {
