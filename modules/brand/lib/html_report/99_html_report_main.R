@@ -174,6 +174,22 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
         paste0('<style class="br-reach-panel-styles">', css, '</style>'),
         sep = "\n")
   }
+  if (exists("build_demographics_panel_styles", mode = "function")) {
+    css <- tryCatch(build_demographics_panel_styles(brand_colour_cfg),
+                    error = function(e) "")
+    if (nzchar(trimws(css)))
+      panel_styles <- paste(panel_styles,
+        paste0('<style class="demo-panel-styles">', css, '</style>'),
+        sep = "\n")
+  }
+  if (exists("build_adhoc_panel_styles", mode = "function")) {
+    css <- tryCatch(build_adhoc_panel_styles(brand_colour_cfg),
+                    error = function(e) "")
+    if (nzchar(trimws(css)))
+      panel_styles <- paste(panel_styles,
+        paste0('<style class="adhoc-panel-styles">', css, '</style>'),
+        sep = "\n")
+  }
   if (exists("build_audience_lens_panel_styles", mode = "function")) {
     css <- tryCatch(build_audience_lens_panel_styles(brand_colour_cfg),
                     error = function(e) "")
@@ -207,6 +223,8 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
     .resolve_js("brand_portfolio_overview.js"),
     .resolve_js("brand_wom_panel.js"),
     .resolve_js("brand_branded_reach_panel.js"),
+    .resolve_js("brand_demographics_panel.js"),
+    .resolve_js("brand_adhoc_panel.js"),
     .resolve_js("brand_audience_lens_panel.js"),
     sep = "\n"
   )

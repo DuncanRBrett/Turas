@@ -248,6 +248,20 @@ generate_brand_excel <- function(results, output_path, config = NULL) {
     )
   }
 
+  # Demographics — one sheet per question, plus a roll-up
+  demo <- results$results$demographics
+  if (!is.null(demo) && identical(demo$status, "PASS") &&
+      length(demo$questions) > 0L) {
+    .write_demographic_sheets(wb, demo, header_style, .write_sheet)
+  }
+
+  # Ad Hoc — one sheet per question (scope-prefixed)
+  ah <- results$results$adhoc
+  if (!is.null(ah) && identical(ah$status, "PASS") &&
+      length(ah$questions) > 0L) {
+    .write_adhoc_sheets(wb, ah, header_style, .write_sheet)
+  }
+
   openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
 
   list(
@@ -368,6 +382,46 @@ generate_brand_csv <- function(results, output_dir, config = NULL) {
     files_written = files_written,
     n_files = length(files_written)
   )
+}
+
+
+# ==============================================================================
+# DEMOGRAPHICS / AD HOC SHEET WRITERS
+# ==============================================================================
+# One sheet per question, with the total distribution stacked above any
+# brand-cut matrix. Sheet names are kept short (<=31 chars; Excel limit) by
+# truncating the question short_label.
+
+.demo_sheet_name <- function(prefix, label, n) {
+  base <- gsub("[^A-Za-z0-9]+", "_", as.character(label %||% sprintf("Q%d", n)))
+  base <- substr(base, 1L, 31L - nchar(prefix))
+  paste0(prefix, base)
+}
+
+
+.write_demographic_sheets <- function(wb, demo, header_style, .write_sheet) {
+  for (i in seq_along(demo$questions)) {
+    q <- demo$questions[[i]]
+    sheet <- .demo_sheet_name("DEM_", q$short_label %||% q$column, i)
+    title <- paste("Demographic:", q$question_text %||% q$column)
+    if (!is.null(q$result) && !identical(q$result$status, "REFUSED")) {
+      .write_sheet(sheet, q$result$total, title)
+    }
+  }
+}
+
+
+.write_adhoc_sheets <- function(wb, ah, header_style, .write_sheet) {
+  for (i in seq_along(ah$questions)) {
+    q <- ah$questions[[i]]
+    scope <- q$scope %||% "ALL"
+    sheet <- .demo_sheet_name(paste0("ADH_", scope, "_"),
+                               q$short_label %||% q$column, i)
+    title <- sprintf("Ad hoc [%s]: %s", scope, q$question_text %||% q$column)
+    if (!is.null(q$result) && !identical(q$result$status, "REFUSED")) {
+      .write_sheet(sheet, q$result$total, title)
+    }
+  }
 }
 
 

@@ -90,6 +90,10 @@ BRAND_VERSION <- "1.0"
     "10c_br_media_mix.R",
     "10d_br_output.R",
     "10_branded_reach.R",
+    "11_demographics.R",
+    "11a_demographics_panel_data.R",
+    "12_adhoc.R",
+    "12a_adhoc_panel_data.R",
     "13_audience_lens.R",
     "13a_al_audiences.R",
     "13b_al_metrics.R",
@@ -737,6 +741,54 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       }
     }
 
+    # Demographics (per-category; full categories only — relies on cat_data
+    # being filtered to focal-category respondents and cat_result$brand_volume
+    # for the per-brand pen matrix). Awareness-only categories don't have a
+    # full brand-volume matrix, so the buyer / brand cuts collapse to the
+    # total distribution.
+    if (isTRUE(config$element_demographics %||% TRUE) && cat_depth == "full") {
+      if (verbose) cat("  Running Demographics...\n")
+      cat_result$demographics <- tryCatch(
+        .run_demographics_for_category(
+          structure   = structure, config = config,
+          cat_data    = cat_data, cat_weights = cat_weights,
+          cat_brands  = cat_brands, cat_name = cat_name,
+          brand_volume    = cat_result$brand_volume,
+          buyer_heaviness = cat_result$buyer_heaviness,
+          verbose     = verbose
+        ),
+        error = function(e) {
+          warnings_list <<- c(warnings_list,
+            sprintf("Demographics failed for %s: %s", cat_name, e$message))
+          list(status = "REFUSED", message = e$message)
+        }
+      )
+    }
+
+    # Ad Hoc (per-category; full categories only). Includes both
+    # adhoc.*.<CATCODE> roles for this category AND adhoc.*.ALL roles
+    # (the latter shown as a separate "Across all respondents" group inside
+    # the panel). Brand cuts use this category's pen matrix.
+    if (isTRUE(config$element_adhoc %||% TRUE) && cat_depth == "full") {
+      if (verbose) cat("  Running Ad Hoc...\n")
+      cat_result$adhoc <- tryCatch(
+        .run_adhoc_for_category(
+          structure   = structure, config = config,
+          data_full   = data, weights_full = weights,
+          cat_data    = cat_data, cat_weights = cat_weights,
+          cat_brands  = cat_brands, cat_name = cat_name,
+          cat_code    = cat_code,
+          brand_volume = cat_result$brand_volume,
+          verbose     = verbose
+        ),
+        error = function(e) {
+          warnings_list <<- c(warnings_list,
+            sprintf("Ad hoc failed for %s: %s", cat_name, e$message))
+          list(status = "REFUSED", message = e$message)
+        }
+      )
+    }
+
     category_results[[cat_name]] <- cat_result
   }
 
@@ -796,6 +848,9 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
   }
 
   # WOM is now per-category (see Step 4 above). No brand-level WOM.
+  # Demographics + Ad Hoc are also per-category — see the per-category
+  # block above; results land on category_results[[cat]]$demographics
+  # and $adhoc and surface as sub-tabs inside each category panel.
 
   # --- STEP 6: Determine overall status ---
   elapsed <- proc.time()["elapsed"] - start_time
@@ -1139,6 +1194,707 @@ if (!exists(".find_brand_col", mode = "function")) {
     }
   )
   list(result = res, warnings = warnings)
+}
+
+
+# ==============================================================================
+# DEMOGRAPHICS DISPATCH (per-category)
+# ==============================================================================
+# Runs the demographics engine once per full category, against that
+# category's filtered respondent set (cat_data). Buyer/tier cuts use the
+# pen matrix produced upstream by the brand_volume + buyer_heaviness
+# elements; brand_cut uses the per-category brand list. When upstream
+# elements weren't run the cut sub-results collapse to NULL and the
+# panel hides those tabs silently.
+
+.run_demographics_for_category <- function(structure, config, cat_data,
+                                            cat_weights, cat_brands, cat_name,
+                                            brand_volume, buyer_heaviness,
+                                            verbose = TRUE) {
+
+  if (is.null(structure$questionmap) || nrow(structure$questionmap) == 0L) {
+    return(list(status = "EMPTY",
+                message = "Demographics needs a QuestionMap with demo.* roles."))
+  }
+  qmap <- structure$questionmap
+  demo_rows <- qmap[grepl("^demo\\.", as.character(qmap$Role)), , drop = FALSE]
+  if (nrow(demo_rows) == 0L) {
+    return(list(status = "EMPTY",
+                message = "No demo.* roles in QuestionMap; demographics tab hidden for this category."))
+  }
+
+  # Focal-brand buyer indicator + tier vector for THIS category. Both come
+  # from the brand_volume + buyer_heaviness elements that ran earlier in
+  # the same per-category loop.
+  buyer_info <- .demo_buyer_for_category(brand_volume, buyer_heaviness,
+                                          config$focal_brand)
+  bmat_info  <- .demo_brand_matrix_for_category(brand_volume, cat_brands)
+
+  questions <- list()
+  for (i in seq_len(nrow(demo_rows))) {
+    entry <- .demo_question_from_role(structure, demo_rows$Role[i],
+                                       cat_data, cat_weights, buyer_info,
+                                       bmat_info, verbose = verbose)
+    if (!is.null(entry)) questions[[length(questions) + 1L]] <- entry
+  }
+
+  # Synthetic questions: Buyer-status (focal-brand pen) + Heaviness (category
+  # tertiles). Both derive from buyer_info and render alongside the
+  # demographic questions in the matrix view. Skipped when the upstream
+  # vectors are unavailable (e.g. brand_volume refused, no tertile bounds).
+  syn <- .demo_synthetic_questions(cat_data, cat_weights, buyer_info,
+                                    bmat_info, config$focal_brand)
+  for (q in syn) questions[[length(questions) + 1L]] <- q
+
+  if (length(questions) == 0L) {
+    return(list(status = "EMPTY",
+                message = sprintf("No demographic questions resolved for %s.", cat_name)))
+  }
+  list(
+    status        = "PASS",
+    cat_name      = cat_name,
+    questions     = questions,
+    brand_codes   = bmat_info$brand_codes,
+    brand_labels  = bmat_info$brand_labels,
+    brand_colours = bmat_info$brand_colours,
+    n_total       = nrow(cat_data),
+    weighted      = !is.null(cat_weights)
+  )
+}
+
+
+# Resolve one demo.* role and run the engine. Returns NULL when the role
+# can't be resolved or its data column is absent (caller skips silently).
+.demo_question_from_role <- function(structure, role, cat_data, cat_weights,
+                                      buyer_info, bmat_info, verbose = TRUE) {
+  role <- trimws(as.character(role))
+  spec <- resolve_demographic_role(structure, role)
+  if (is.null(spec) || !spec$column %in% names(cat_data)) {
+    if (verbose) cat(sprintf("    Demographics skip %s (unresolved or missing)\n", role))
+    return(NULL)
+  }
+  res <- run_demographic_question(
+    values        = cat_data[[spec$column]],
+    option_codes  = spec$codes,
+    option_labels = spec$labels,
+    weights       = cat_weights,
+    focal_buyer   = buyer_info$focal_buyer,
+    buyer_tiers   = buyer_info$tiers,
+    pen_mat       = bmat_info$pen_mat,
+    brand_codes   = bmat_info$brand_codes,
+    brand_labels  = bmat_info$brand_labels
+  )
+  list(
+    role          = spec$role,
+    column        = spec$column,
+    question_text = spec$question_text,
+    short_label   = spec$short_label,
+    variable_type = spec$variable_type,
+    codes         = spec$codes,
+    labels        = spec$labels,
+    is_synthetic  = FALSE,
+    synthetic_kind = NA_character_,
+    result        = res
+  )
+}
+
+
+# Build the two synthetic questions ("Buyer status" + "Heaviness") that are
+# always shown at the end of the demographics matrix. Both reuse the engine
+# so percentages + Wilson CIs + brand cuts are computed identically.
+.demo_synthetic_questions <- function(cat_data, cat_weights, buyer_info,
+                                       bmat_info, focal_brand) {
+  out <- list()
+  buyer <- .demo_synthetic_buyer_status(cat_data, cat_weights, buyer_info,
+                                         bmat_info, focal_brand)
+  if (!is.null(buyer)) out[[length(out) + 1L]] <- buyer
+  hv    <- .demo_synthetic_heaviness(cat_data, cat_weights, buyer_info,
+                                      bmat_info)
+  if (!is.null(hv))    out[[length(out) + 1L]] <- hv
+  out
+}
+
+
+.demo_synthetic_buyer_status <- function(cat_data, cat_weights, buyer_info,
+                                          bmat_info, focal_brand) {
+  fb <- buyer_info$focal_buyer
+  if (is.null(fb)) return(NULL)
+  vals <- ifelse(is.na(fb), NA_character_,
+                 ifelse(as.integer(fb) > 0L, "BUYER", "NON_BUYER"))
+  focal_lbl <- if (is.null(focal_brand) || !nzchar(focal_brand))
+    "focal brand" else focal_brand
+  res <- run_demographic_question(
+    values        = vals,
+    option_codes  = c("BUYER", "NON_BUYER"),
+    option_labels = c(sprintf("Buyer of %s", focal_lbl),
+                       sprintf("Non-buyer of %s", focal_lbl)),
+    weights       = cat_weights,
+    pen_mat       = bmat_info$pen_mat,
+    brand_codes   = bmat_info$brand_codes,
+    brand_labels  = bmat_info$brand_labels
+  )
+  list(
+    role          = "demo.synthetic.buyer_status",
+    column        = NA_character_,
+    question_text = sprintf("Buyer status — %s", focal_lbl),
+    short_label   = "Buyer status",
+    variable_type = "Single_Response",
+    codes         = c("BUYER", "NON_BUYER"),
+    labels        = c(sprintf("Buyer of %s", focal_lbl),
+                       sprintf("Non-buyer of %s", focal_lbl)),
+    is_synthetic  = TRUE,
+    synthetic_kind = "buyer_status",
+    result        = res
+  )
+}
+
+
+.demo_synthetic_heaviness <- function(cat_data, cat_weights, buyer_info,
+                                       bmat_info) {
+  tiers <- buyer_info$tiers
+  if (is.null(tiers) || all(is.na(tiers))) return(NULL)
+  res <- run_demographic_question(
+    values        = tiers,
+    option_codes  = c("LIGHT", "MEDIUM", "HEAVY"),
+    option_labels = c("Light category buyer", "Medium category buyer",
+                       "Heavy category buyer"),
+    weights       = cat_weights,
+    pen_mat       = bmat_info$pen_mat,
+    brand_codes   = bmat_info$brand_codes,
+    brand_labels  = bmat_info$brand_labels
+  )
+  list(
+    role          = "demo.synthetic.heaviness",
+    column        = NA_character_,
+    question_text = "Buyer heaviness (category tertiles)",
+    short_label   = "Heaviness",
+    variable_type = "Single_Response",
+    codes         = c("LIGHT", "MEDIUM", "HEAVY"),
+    labels        = c("Light category buyer", "Medium category buyer",
+                       "Heavy category buyer"),
+    is_synthetic  = TRUE,
+    synthetic_kind = "heaviness",
+    result        = res
+  )
+}
+
+
+.demo_buyer_for_category <- function(brand_volume, buyer_heaviness, focal_brand) {
+  if (is.null(focal_brand) || !nzchar(focal_brand) ||
+      is.null(brand_volume) || identical(brand_volume$status, "REFUSED") ||
+      is.null(brand_volume$pen_mat)) {
+    return(list(focal_buyer = NULL, tiers = NULL))
+  }
+  bcs <- as.character(colnames(brand_volume$pen_mat))
+  if (!focal_brand %in% bcs) return(list(focal_buyer = NULL, tiers = NULL))
+  j <- which(bcs == focal_brand)[1L]
+  pen_vec <- brand_volume$pen_mat[, j]
+  buyer <- as.integer(!is.na(pen_vec) & pen_vec > 0)
+
+  tiers <- rep(NA_character_, length(buyer))
+  if (!is.null(buyer_heaviness) &&
+      !identical(buyer_heaviness$status, "REFUSED") &&
+      !is.null(buyer_heaviness$tertile_bounds)) {
+    q33 <- buyer_heaviness$tertile_bounds$light[2L]
+    q67 <- buyer_heaviness$tertile_bounds$heavy[1L]
+    if (is.finite(q33) && is.finite(q67) && !is.null(brand_volume$m_vec)) {
+      m <- brand_volume$m_vec
+      is_buy <- buyer == 1L
+      tiers[is_buy & m <= q33]                   <- "LIGHT"
+      tiers[is_buy & m > q33 & m <= q67]         <- "MEDIUM"
+      tiers[is_buy & m > q67]                    <- "HEAVY"
+    }
+  }
+  list(focal_buyer = buyer, tiers = tiers)
+}
+
+
+.demo_brand_matrix_for_category <- function(brand_volume, cat_brands) {
+  if (is.null(brand_volume) || identical(brand_volume$status, "REFUSED") ||
+      is.null(brand_volume$pen_mat)) {
+    return(list(pen_mat = NULL, brand_codes = character(0),
+                brand_labels = character(0), brand_colours = list()))
+  }
+  bcs <- as.character(colnames(brand_volume$pen_mat))
+  bls <- bcs
+  cols <- list()
+  if (!is.null(cat_brands) && nrow(cat_brands) > 0L) {
+    if ("BrandLabel" %in% names(cat_brands)) {
+      lookup <- stats::setNames(as.character(cat_brands$BrandLabel),
+                                 as.character(cat_brands$BrandCode))
+      bls <- ifelse(bcs %in% names(lookup), lookup[bcs], bcs)
+    }
+    if ("Colour" %in% names(cat_brands)) {
+      for (i in seq_len(nrow(cat_brands))) {
+        bc <- trimws(as.character(cat_brands$BrandCode[i]))
+        col <- trimws(as.character(cat_brands$Colour[i]))
+        if (nzchar(bc) && nzchar(col) &&
+            grepl("^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$", col)) {
+          cols[[bc]] <- col
+        }
+      }
+    }
+  }
+  list(pen_mat       = brand_volume$pen_mat,
+       brand_codes   = bcs,
+       brand_labels  = bls,
+       brand_colours = cols)
+}
+
+
+# Legacy brand-level demographics dispatcher kept for callers that still
+# need a sample-wide view (none currently — engine runs per-category in
+# the orchestrator loop). Retained as an unused helper signature stub so
+# the function name remains greppable in case the brand-level view returns.
+.run_demographics_brand_level <- function(data, structure, config, weights,
+                                          category_results, verbose = TRUE) {
+
+  if (is.null(structure$questionmap) || nrow(structure$questionmap) == 0L) {
+    return(list(status = "REFUSED", code = "CFG_NO_QUESTIONMAP",
+                message = "Demographics needs a QuestionMap with demo.* roles."))
+  }
+
+  qmap <- structure$questionmap
+  demo_rows <- qmap[grepl("^demo\\.", as.character(qmap$Role)), , drop = FALSE]
+  if (nrow(demo_rows) == 0L) {
+    return(list(status = "EMPTY",
+                message = "No demo.* roles in QuestionMap; demographics tab hidden."))
+  }
+
+  # Build a brand-level focal-buyer vector + tier classification by union of
+  # full categories. Non-buyers are respondents with no purchase in any cat.
+  buyer_info <- .demo_brand_level_buyer_vector(data, category_results,
+                                                config$focal_brand)
+
+  # Cross-category brand pen matrix: union of pen vectors across full cats.
+  bmat_info <- .demo_brand_level_brand_matrix(data, category_results, structure)
+
+  questions <- list()
+  for (i in seq_len(nrow(demo_rows))) {
+    role <- trimws(as.character(demo_rows$Role[i]))
+    spec <- resolve_demographic_role(structure, role)
+    if (is.null(spec)) {
+      if (verbose) cat(sprintf("  Demographics: skipping %s (unresolved)\n", role))
+      next
+    }
+    if (!spec$column %in% names(data)) {
+      if (verbose) cat(sprintf("  Demographics: skipping %s (column %s missing)\n",
+                                role, spec$column))
+      next
+    }
+
+    res <- run_demographic_question(
+      values        = data[[spec$column]],
+      option_codes  = spec$codes,
+      option_labels = spec$labels,
+      weights       = weights,
+      focal_buyer   = buyer_info$focal_buyer,
+      buyer_tiers   = buyer_info$tiers,
+      pen_mat       = bmat_info$pen_mat,
+      brand_codes   = bmat_info$brand_codes,
+      brand_labels  = bmat_info$brand_labels
+    )
+
+    questions[[length(questions) + 1L]] <- list(
+      role          = spec$role,
+      column        = spec$column,
+      question_text = spec$question_text,
+      short_label   = spec$short_label,
+      variable_type = spec$variable_type,
+      codes         = spec$codes,
+      labels        = spec$labels,
+      result        = res
+    )
+  }
+
+  if (length(questions) == 0L) {
+    return(list(status = "EMPTY",
+                message = "No demographic questions could be resolved."))
+  }
+
+  list(
+    status        = "PASS",
+    questions     = questions,
+    brand_codes   = bmat_info$brand_codes,
+    brand_labels  = bmat_info$brand_labels,
+    n_total       = nrow(data),
+    weighted      = !is.null(weights)
+  )
+}
+
+
+# Build the focal-brand buyer indicator across all full categories. A
+# respondent is a buyer iff they purchased the focal brand in ANY full
+# category (BRANDPEN2_<CAT>_<BRAND> > 0). Tiers use the per-category
+# buyer-heaviness tertiles where available; respondents are assigned to the
+# heaviest tier they appear in across categories.
+.demo_brand_level_buyer_vector <- function(data, category_results, focal_brand) {
+
+  if (is.null(focal_brand) || !nzchar(focal_brand)) {
+    return(list(focal_buyer = NULL, tiers = NULL))
+  }
+
+  n <- nrow(data)
+  buyer  <- rep(0L, n)
+  tiers  <- rep(NA_character_, n)
+  rank   <- c(LIGHT = 1L, MEDIUM = 2L, HEAVY = 3L)
+
+  for (cat_name in names(category_results)) {
+    cr <- category_results[[cat_name]]
+    if (is.null(cr$brand_volume) || identical(cr$brand_volume$status, "REFUSED")) next
+    bv <- cr$brand_volume
+    if (is.null(bv$pen_mat) || is.null(bv$m_vec)) next
+
+    bcs <- as.character(colnames(bv$pen_mat))
+    if (!focal_brand %in% bcs) next
+    j <- which(bcs == focal_brand)[1L]
+
+    # bv$pen_mat rows correspond to focal-category respondents; the brand
+    # volume builder filters to focal_category respondents only. Match back
+    # to full-data row indices via the Focal_Category column.
+    focal_col <- "Focal_Category"
+    if (!focal_col %in% names(data)) next
+    cat_code <- bv$cat_code %||%
+      .demo_resolve_cat_code_from_results(cat_name, cr)
+    if (is.null(cat_code)) next
+
+    rows_in_cat <- which(!is.na(data[[focal_col]]) &
+                            data[[focal_col]] == cat_code)
+    if (length(rows_in_cat) != nrow(bv$pen_mat)) next  # row alignment broken
+
+    is_buyer <- bv$pen_mat[, j] > 0
+    buyer[rows_in_cat[is_buyer]] <- 1L
+
+    # Tier classification: use buyer_heaviness tertile bounds when available
+    bh <- cr$buyer_heaviness
+    if (!is.null(bh) && !identical(bh$status, "REFUSED") &&
+        !is.null(bh$tertile_bounds)) {
+      q33 <- bh$tertile_bounds$light[2L]
+      q67 <- bh$tertile_bounds$heavy[1L]
+      if (is.finite(q33) && is.finite(q67)) {
+        m_focal <- bv$m_vec
+        for (k in which(is_buyer)) {
+          row_idx <- rows_in_cat[k]
+          tier <- if (m_focal[k] <= q33) "LIGHT" else
+                  if (m_focal[k] <= q67) "MEDIUM" else "HEAVY"
+          # Keep the heaviest classification across categories
+          old <- tiers[row_idx]
+          if (is.na(old) || rank[[tier]] > rank[[old]]) tiers[row_idx] <- tier
+        }
+      }
+    }
+  }
+
+  list(focal_buyer = buyer, tiers = tiers)
+}
+
+
+# Resolve the short category code (e.g. "DSS") used to filter Focal_Category.
+# Falls back to a pen-prefix detection when results don't carry it explicitly.
+.demo_resolve_cat_code_from_results <- function(cat_name, cat_result) {
+  if (!is.null(cat_result$mental_availability) &&
+      !is.null(cat_result$mental_availability$cat_code)) {
+    return(cat_result$mental_availability$cat_code)
+  }
+  if (!is.null(cat_result$funnel) && !is.null(cat_result$funnel$meta)) {
+    cc <- cat_result$funnel$meta$category_code
+    if (!is.null(cc) && nzchar(cc)) return(cc)
+  }
+  # Last resort: 3-letter uppercase tail of cat_name
+  toupper(substr(gsub("[^A-Za-z]", "", cat_name), 1L, 3L))
+}
+
+
+# Build a brand-level pen matrix that maps full-data rows to brands across
+# all full categories. Each column is a brand; cell = 1 if respondent
+# bought that brand in any full category they participated in.
+.demo_brand_level_brand_matrix <- function(data, category_results, structure) {
+
+  brand_codes  <- character(0)
+  brand_labels <- character(0)
+  cat_pens     <- list()
+
+  for (cat_name in names(category_results)) {
+    cr <- category_results[[cat_name]]
+    if (is.null(cr$brand_volume) || identical(cr$brand_volume$status, "REFUSED")) next
+    bv <- cr$brand_volume
+    if (is.null(bv$pen_mat)) next
+    bcs <- as.character(colnames(bv$pen_mat))
+    new <- setdiff(bcs, brand_codes)
+    brand_codes <- c(brand_codes, new)
+    cat_pens[[cat_name]] <- list(pen = bv$pen_mat, codes = bcs,
+                                  cat_code = bv$cat_code %||%
+                                    .demo_resolve_cat_code_from_results(cat_name, cr))
+  }
+
+  if (length(brand_codes) == 0L) {
+    return(list(pen_mat = NULL, brand_codes = character(0),
+                brand_labels = character(0)))
+  }
+
+  # Brand labels lookup from structure$brands (first occurrence wins)
+  if (!is.null(structure$brands) && nrow(structure$brands) > 0L) {
+    bn <- structure$brands
+    for (bc in brand_codes) {
+      lbl <- bc
+      r <- bn[!is.na(bn$BrandCode) & as.character(bn$BrandCode) == bc, , drop = FALSE]
+      if (nrow(r) > 0L && "BrandLabel" %in% names(r)) {
+        lbl <- as.character(r$BrandLabel[1L])
+      }
+      brand_labels <- c(brand_labels, lbl)
+    }
+  } else {
+    brand_labels <- brand_codes
+  }
+
+  pen <- matrix(0L, nrow = nrow(data), ncol = length(brand_codes))
+  colnames(pen) <- brand_codes
+
+  focal_col <- "Focal_Category"
+  for (info in cat_pens) {
+    if (!focal_col %in% names(data)) break
+    rows_in_cat <- which(!is.na(data[[focal_col]]) &
+                          data[[focal_col]] == info$cat_code)
+    if (length(rows_in_cat) != nrow(info$pen)) next
+    for (j in seq_along(info$codes)) {
+      bc <- info$codes[j]
+      col_idx <- match(bc, brand_codes)
+      bought  <- info$pen[, j] > 0
+      pen[rows_in_cat[bought], col_idx] <- 1L
+    }
+  }
+
+  list(pen_mat = pen, brand_codes = brand_codes, brand_labels = brand_labels)
+}
+
+
+# ==============================================================================
+# AD HOC DISPATCH (per-category)
+# ==============================================================================
+# For each category, picks up:
+#   - adhoc.<key>.<CATCODE>  rows belonging to this category, scoped to
+#     cat_data (focal-category respondents) with this cat's brand cuts;
+#   - adhoc.<key>.ALL        rows scoped to ALL respondents (use full data)
+#     so the same brand-level question shows up consistently in every
+#     category panel without re-asking, and is rendered as a separate
+#     "Across all respondents" group inside the panel.
+
+.run_adhoc_for_category <- function(structure, config, data_full, weights_full,
+                                     cat_data, cat_weights, cat_brands, cat_name,
+                                     cat_code, brand_volume, verbose = TRUE) {
+
+  if (is.null(structure$questionmap) || nrow(structure$questionmap) == 0L) {
+    return(list(status = "EMPTY",
+                message = "No QuestionMap; ad hoc tab hidden for this category."))
+  }
+  qmap <- structure$questionmap
+  rows <- qmap[grepl("^adhoc\\.", as.character(qmap$Role)), , drop = FALSE]
+  if (nrow(rows) == 0L) {
+    return(list(status = "EMPTY",
+                message = "No adhoc.* roles in QuestionMap; ad hoc tab hidden."))
+  }
+
+  # Per-category brand pen for the per-category brand_cut. ALL-scope
+  # questions don't get a brand_cut (sample-wide context, no scope match).
+  bmat <- .demo_brand_matrix_for_category(brand_volume, cat_brands)
+
+  questions <- list()
+  for (i in seq_len(nrow(rows))) {
+    role <- trimws(as.character(rows$Role[i]))
+    spec <- resolve_adhoc_role(structure, role)
+    if (is.null(spec)) next
+
+    sc <- spec$scope %||% "ALL"
+    is_all <- identical(sc, "ALL")
+    is_cat <- !is.null(cat_code) && nzchar(cat_code) && identical(sc, cat_code)
+    if (!is_all && !is_cat) next  # belongs to another category
+
+    if (is_all) {
+      if (!spec$column %in% names(data_full)) next
+      values  <- data_full[[spec$column]]
+      weights <- weights_full
+      pen     <- NULL  # ALL-scope is sample-wide; brand cut not meaningful here
+      brand_codes <- character(0)
+      brand_labels <- character(0)
+      n_scope_base <- nrow(data_full)
+    } else {
+      if (!spec$column %in% names(cat_data)) next
+      values  <- cat_data[[spec$column]]
+      weights <- cat_weights
+      pen     <- bmat$pen_mat
+      brand_codes  <- bmat$brand_codes
+      brand_labels <- bmat$brand_labels
+      n_scope_base <- nrow(cat_data)
+    }
+
+    res <- run_adhoc_question(
+      values        = values,
+      option_codes  = spec$codes,
+      option_labels = spec$labels,
+      weights       = weights,
+      pen_mat       = pen,
+      brand_codes   = brand_codes,
+      brand_labels  = brand_labels,
+      variable_type = spec$variable_type
+    )
+    questions[[length(questions) + 1L]] <- list(
+      role = spec$role, column = spec$column, scope = sc,
+      question_text = spec$question_text, short_label = spec$short_label,
+      variable_type = spec$variable_type,
+      codes = spec$codes, labels = spec$labels,
+      brand_codes = brand_codes, brand_labels = brand_labels,
+      n_scope_base = n_scope_base, result = res
+    )
+  }
+
+  if (length(questions) == 0L) {
+    return(list(status = "EMPTY",
+                message = sprintf("No ad hoc questions resolved for %s.", cat_name)))
+  }
+  list(status = "PASS",
+       cat_name = cat_name, cat_code = cat_code,
+       questions = questions,
+       n_total = nrow(cat_data),
+       weighted = !is.null(cat_weights))
+}
+
+
+# Legacy brand-level dispatcher (kept as a stub; engine now per-category).
+# ==============================================================================
+# AD HOC DISPATCH (brand-level, legacy)
+# ==============================================================================
+# Walks "adhoc.<key>.<scope>" rows. Scope = "ALL" runs over the whole
+# sample; scope = a category code runs only over respondents in that
+# focal category. The brand_cut matrix uses the corresponding category's
+# pen matrix when scoped, or the union pen matrix when ALL.
+
+.run_adhoc_brand_level <- function(data, structure, config, weights, categories,
+                                   verbose = TRUE) {
+
+  if (is.null(structure$questionmap) || nrow(structure$questionmap) == 0L) {
+    return(list(status = "EMPTY",
+                message = "No QuestionMap; ad hoc tab hidden."))
+  }
+
+  qmap <- structure$questionmap
+  rows <- qmap[grepl("^adhoc\\.", as.character(qmap$Role)), , drop = FALSE]
+  if (nrow(rows) == 0L) {
+    return(list(status = "EMPTY",
+                message = "No adhoc.* roles in QuestionMap; ad hoc tab hidden."))
+  }
+
+  # Pre-compute brand pen matrices keyed by category code (for category-scoped
+  # ad hoc questions). ALL-scope falls back to the union matrix used by the
+  # demographics dispatcher.
+  cat_pen_by_code <- list()
+  if (!is.null(structure$brands)) {
+    for (i in seq_len(nrow(categories))) {
+      cat_name <- categories$Category[i]
+      pen_qs <- get_questions_for_battery(structure, "penetration", cat_name)
+      if (nrow(pen_qs) == 0L) next
+      pen_prefix <- pen_qs$QuestionCode[1L]
+      cat_brands <- get_brands_for_category(structure, cat_name)
+      cat_code <- toupper(substr(gsub("[^A-Za-z]", "", cat_name), 1L, 3L))
+      bcs <- as.character(cat_brands$BrandCode)
+      pen <- matrix(0L, nrow = nrow(data), ncol = length(bcs))
+      colnames(pen) <- bcs
+      for (b in seq_along(bcs)) {
+        col <- .find_brand_col(data, pen_prefix, bcs[b])
+        if (!is.null(col)) {
+          v <- data[[col]]
+          pen[, b] <- as.integer(!is.na(v) & v > 0)
+        }
+      }
+      bn <- if ("BrandLabel" %in% names(cat_brands))
+        as.character(cat_brands$BrandLabel) else bcs
+      cat_pen_by_code[[cat_code]] <- list(pen_mat = pen, brand_codes = bcs,
+                                            brand_labels = bn,
+                                            cat_name = cat_name)
+    }
+  }
+
+  questions <- list()
+  for (i in seq_len(nrow(rows))) {
+    role <- trimws(as.character(rows$Role[i]))
+    spec <- resolve_adhoc_role(structure, role)
+    if (is.null(spec)) {
+      if (verbose) cat(sprintf("  Ad hoc: skipping %s (unresolved)\n", role))
+      next
+    }
+    if (!spec$column %in% names(data)) {
+      if (verbose) cat(sprintf("  Ad hoc: skipping %s (column %s missing)\n",
+                                role, spec$column))
+      next
+    }
+
+    scope <- spec$scope %||% "ALL"
+    if (scope == "ALL") {
+      scope_rows <- rep(TRUE, nrow(data))
+      pen_info <- list(pen_mat = NULL, brand_codes = character(0),
+                       brand_labels = character(0))
+    } else {
+      focal_col <- "Focal_Category"
+      if (!focal_col %in% names(data)) {
+        if (verbose) cat(sprintf("  Ad hoc: %s — no Focal_Category column to scope by\n",
+                                  role))
+        next
+      }
+      scope_rows <- !is.na(data[[focal_col]]) & data[[focal_col]] == scope
+      info <- cat_pen_by_code[[scope]]
+      if (is.null(info)) {
+        pen_info <- list(pen_mat = NULL, brand_codes = character(0),
+                         brand_labels = character(0))
+      } else {
+        # Sub-set the pen matrix to scope rows
+        pen_info <- list(
+          pen_mat      = info$pen_mat[scope_rows, , drop = FALSE],
+          brand_codes  = info$brand_codes,
+          brand_labels = info$brand_labels
+        )
+      }
+    }
+
+    scope_data    <- data[scope_rows, , drop = FALSE]
+    scope_weights <- if (!is.null(weights)) weights[scope_rows] else NULL
+
+    res <- run_adhoc_question(
+      values        = scope_data[[spec$column]],
+      option_codes  = spec$codes,
+      option_labels = spec$labels,
+      weights       = scope_weights,
+      pen_mat       = pen_info$pen_mat,
+      brand_codes   = pen_info$brand_codes,
+      brand_labels  = pen_info$brand_labels,
+      variable_type = spec$variable_type
+    )
+
+    questions[[length(questions) + 1L]] <- list(
+      role          = spec$role,
+      column        = spec$column,
+      question_text = spec$question_text,
+      short_label   = spec$short_label,
+      variable_type = spec$variable_type,
+      scope         = scope,
+      codes         = spec$codes,
+      labels        = spec$labels,
+      brand_codes   = pen_info$brand_codes,
+      brand_labels  = pen_info$brand_labels,
+      n_scope_base  = sum(scope_rows),
+      result        = res
+    )
+  }
+
+  if (length(questions) == 0L) {
+    return(list(status = "EMPTY",
+                message = "No ad hoc questions could be resolved."))
+  }
+
+  list(
+    status    = "PASS",
+    questions = questions,
+    n_total   = nrow(data),
+    weighted  = !is.null(weights)
+  )
 }
 
 

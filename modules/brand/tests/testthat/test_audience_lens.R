@@ -22,11 +22,11 @@ source("../../R/00_guard.R", chdir = FALSE)
 source("../../R/00_role_map.R", chdir = FALSE)
 source("../../R/00_guard_role_map.R", chdir = FALSE)
 source("../../R/01_config.R", chdir = FALSE)
-source("../../R/11_audience_lens.R", chdir = FALSE)
-source("../../R/11a_al_audiences.R", chdir = FALSE)
-source("../../R/11b_al_metrics.R", chdir = FALSE)
-source("../../R/11c_al_classify.R", chdir = FALSE)
-source("../../R/11d_al_panel_data.R", chdir = FALSE)
+source("../../R/13_audience_lens.R", chdir = FALSE)
+source("../../R/13a_al_audiences.R", chdir = FALSE)
+source("../../R/13b_al_metrics.R", chdir = FALSE)
+source("../../R/13c_al_classify.R", chdir = FALSE)
+source("../../R/13d_al_panel_data.R", chdir = FALSE)
 
 
 build_al_fixture <- function() {
@@ -394,7 +394,7 @@ test_that("build_audience_lens_panel_data returns banner + cards + pair", {
 # ----------------------------------------------------------------------------
 
 test_that("build_audience_lens_panel_html emits non-trivial HTML", {
-  source("../../lib/html_report/panels/11_audience_lens_panel.R", chdir = FALSE)
+  source("../../lib/html_report/panels/13_audience_lens_panel.R", chdir = FALSE)
   fx <- build_al_fixture()
   res <- run_audience_lens(
     data = fx$data, weights = NULL,
