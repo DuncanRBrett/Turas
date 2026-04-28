@@ -90,11 +90,11 @@ BRAND_VERSION <- "1.0"
     "10c_br_media_mix.R",
     "10d_br_output.R",
     "10_branded_reach.R",
-    "11_audience_lens.R",
-    "11a_al_audiences.R",
-    "11b_al_metrics.R",
-    "11c_al_classify.R",
-    "11d_al_panel_data.R"
+    "13_audience_lens.R",
+    "13a_al_audiences.R",
+    "13b_al_metrics.R",
+    "13c_al_classify.R",
+    "13d_al_panel_data.R"
   )
 
   for (f in module_files) {
