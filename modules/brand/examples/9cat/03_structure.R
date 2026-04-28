@@ -791,9 +791,51 @@
          Notes = "Open-ended attribution; text coded to brand for uniqueness scoring")
   )), recursive = FALSE)
 
+  # Demographic question roles (one per question; data column = question code).
+  # Options live on the Options sheet keyed by the same code, populated by
+  # .build_9cat_options_rows() (dem_opts block).
+  demo_rows <- lapply(cat9_demographics(), function(d) {
+    list(Role = sprintf("demo.%s", d$code),
+         ClientCode = d$code,
+         QuestionText = d$label,
+         QuestionTextShort = d$label,
+         Variable_Type = if (identical(d$variable_type, "Single_Mention"))
+           "Single_Response" else d$variable_type,
+         ColumnPattern = "{code}",
+         OptionMapScale = "",
+         Notes = sprintf("Demographic %s — coded values map to Options sheet", d$code))
+  })
+
+  # Ad hoc question roles (illustrative; one ALL-scope and one per full
+  # category to demonstrate scope handling). The companion data columns
+  # (ADHOC_NPS, ADHOC_FUTURE_<CAT>) are appended in 04_data.R.
+  all_adhoc_rows <- list(
+    list(Role = "adhoc.nps.ALL",
+         ClientCode = "ADHOC_NPS",
+         QuestionText = "On a 0-10 scale, how likely are you to recommend our brand to a friend or colleague?",
+         QuestionTextShort = "NPS (0-10)",
+         Variable_Type = "Numeric",
+         ColumnPattern = "{code}",
+         OptionMapScale = "",
+         Notes = "Ad hoc — Net Promoter Score; auto-bucketed by quartile")
+  )
+  per_cat_adhoc_rows <- lapply(full_cats, function(cat) {
+    list(Role = sprintf("adhoc.future_intent.%s", cat$code),
+         ClientCode = sprintf("ADHOC_FUTURE_%s", cat$code),
+         QuestionText = sprintf("How likely are you to buy %s in the next 3 months?",
+                                tolower(cat$name)),
+         QuestionTextShort = sprintf("Future intent %s", cat$code),
+         Variable_Type = "Single_Response",
+         ColumnPattern = "{code}",
+         OptionMapScale = "future_intent_scale",
+         Notes = "Ad hoc — 5-point likelihood scale shared across full categories")
+  })
+  adhoc_rows <- c(all_adhoc_rows, per_cat_adhoc_rows)
+
   c(screener_rows, system_rows, cat_buying_rows, funnel_rows,
     channel_rows, packsize_rows,
-    cross_aware_rows, wom_rows, reach_rows, dba_rows)
+    cross_aware_rows, wom_rows, reach_rows, dba_rows,
+    demo_rows, adhoc_rows)
 }
 
 
@@ -873,7 +915,21 @@
     list(Scale = "packsize_scale", ClientCode = "LARGE",
          Role = "packsize.large",  ClientLabel = "Large / value pack",    OrderIndex = 3),
     list(Scale = "packsize_scale", ClientCode = "MULTI",
-         Role = "packsize.multi",  ClientLabel = "Multi-pack / bulk",     OrderIndex = 4)
+         Role = "packsize.multi",  ClientLabel = "Multi-pack / bulk",     OrderIndex = 4),
+
+    # Future-intent scale (ad hoc; shared across full categories via
+    # adhoc.future_intent.<CAT>). Five-point likelihood scale, 1 = most
+    # likely, 5 = least likely.
+    list(Scale = "future_intent_scale", ClientCode = "1",
+         Role = "intent.definitely",     ClientLabel = "Definitely will buy",     OrderIndex = 1),
+    list(Scale = "future_intent_scale", ClientCode = "2",
+         Role = "intent.probably",       ClientLabel = "Probably will buy",       OrderIndex = 2),
+    list(Scale = "future_intent_scale", ClientCode = "3",
+         Role = "intent.maybe",          ClientLabel = "Might or might not buy",  OrderIndex = 3),
+    list(Scale = "future_intent_scale", ClientCode = "4",
+         Role = "intent.probably_not",   ClientLabel = "Probably will not buy",   OrderIndex = 4),
+    list(Scale = "future_intent_scale", ClientCode = "5",
+         Role = "intent.definitely_not", ClientLabel = "Definitely will not buy", OrderIndex = 5)
   )
 }
 
@@ -1057,7 +1113,7 @@ generate_9cat_structure <- function(output_path, overwrite = TRUE) {
     title    = "DBA Asset Definitions (only if element_dba = Y in Brand_Config)",
     subtitle = paste0(
       "5 distinctive brand assets for Ina Paarman's Kitchen. ",
-      "DBA is brand-level: all 400 respondents across all 9 categories see these assets. ",
+      "DBA is brand-level: all 1200 respondents across all 9 categories see these assets. ",
       "ImagePath links to the image file shown to respondents in the survey."
     ),
     example_rows   = .build_9cat_dba_structure_rows(),

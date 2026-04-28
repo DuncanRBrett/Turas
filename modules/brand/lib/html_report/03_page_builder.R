@@ -105,6 +105,8 @@ build_br_tab_nav <- function(category_names, config) {
   # WOM is per-category (each category sub-tab). No top-level WOM tab.
   if (isTRUE(config$element_portfolio))
     btns <- c(btns, '<button class="br-tab-btn" data-tab="portfolio" onclick="switchBrandTab(\'portfolio\')">Portfolio</button>')
+  # Demographics + Ad Hoc are per-category sub-tabs (inside each category
+  # panel), not top-level tabs.
 
   btns <- c(btns, sprintf(
     '<button class="br-tab-btn" data-tab="pinned" onclick="switchBrandTab(\'pinned\')">Pinned Views <span class="br-pin-badge" id="br-pin-count-badge">0</span></button>'))
@@ -265,6 +267,12 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
   has_branded_reach <- !is.null(cat_results$branded_reach) &&
     !identical(cat_results$branded_reach$status, "REFUSED") &&
     length(cat_results$branded_reach$ads %||% list()) > 0
+  has_demographics <- !is.null(cat_results$demographics) &&
+    identical(cat_results$demographics$status, "PASS") &&
+    length(cat_results$demographics$questions %||% list()) > 0
+  has_adhoc <- !is.null(cat_results$adhoc) &&
+    identical(cat_results$adhoc$status, "PASS") &&
+    length(cat_results$adhoc$questions %||% list()) > 0
 
   # Build flat sub-tab list in the required display order.
   # Each entry: key (unique), label, subpanel (which .br-subpanel to show),
@@ -316,6 +324,18 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
                 subpanel = "br", internal_tab = ""))
     )
   }
+  if (has_demographics) {
+    flat_tabs <- c(flat_tabs,
+      list(list(key = "demographics",    label = "Demographics",
+                subpanel = "demo", internal_tab = ""))
+    )
+  }
+  if (has_adhoc) {
+    flat_tabs <- c(flat_tabs,
+      list(list(key = "adhoc",           label = "Ad Hoc",
+                subpanel = "ah", internal_tab = ""))
+    )
+  }
 
   # Sub-tab navigation bar
   if (length(flat_tabs) > 0) {
@@ -341,6 +361,8 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
   if (has_repertoire)    element_map[["rep"]] <- "repertoire"
   if (has_wom)           element_map[["wom"]] <- "wom"
   if (has_branded_reach) element_map[["br"]]  <- "branded_reach"
+  if (has_demographics)  element_map[["demo"]] <- "demographics"
+  if (has_adhoc)         element_map[["ah"]]  <- "adhoc"
 
   for (sp_key in names(element_map)) {
     el        <- element_map[[sp_key]]
@@ -368,6 +390,16 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
         parts <- c(parts, build_br_section_toolbar(section_id))
         parts <- c(parts, sprintf(
           '<h3 class="br-element-title">Branded Reach \u2014 %s</h3>',
+          .br_esc(cat_name)))
+      } else if (el == "demographics") {
+        parts <- c(parts, build_br_section_toolbar(section_id))
+        parts <- c(parts, sprintf(
+          '<h3 class="br-element-title">Demographics \u2014 %s</h3>',
+          .br_esc(cat_name)))
+      } else if (el == "adhoc") {
+        parts <- c(parts, build_br_section_toolbar(section_id))
+        parts <- c(parts, sprintf(
+          '<h3 class="br-element-title">Ad Hoc Questions \u2014 %s</h3>',
           .br_esc(cat_name)))
       }
       parts <- c(parts, panels[[chart_key]])
@@ -1007,6 +1039,10 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
 
   if (isTRUE(config$element_portfolio))
     panel_parts <- c(panel_parts, build_br_portfolio_panel(results, config))
+
+  # Demographics + Ad Hoc render as per-category sub-tabs inside each
+  # category panel (see build_br_category_panel) — no separate top-level
+  # panels.
 
   panel_parts <- c(panel_parts, build_br_pinned_panel())
   panel_parts <- c(panel_parts, build_br_about_panel(config))

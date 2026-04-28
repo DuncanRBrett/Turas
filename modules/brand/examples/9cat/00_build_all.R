@@ -4,7 +4,7 @@
 # Generates all three artefacts for the IPK 9-category brand health study:
 #   1. Brand_Config.xlsx         (polished, fully filled)
 #   2. Survey_Structure.xlsx     (polished, fully filled)
-#   3. ipk_9cat_wave1.xlsx       (400 synthetic respondents)
+#   3. ipk_9cat_wave1.xlsx       (1200 synthetic respondents — 300 per full category)
 #
 # Study design:
 #   4 FULL CBM categories (DSS, POS, PAS, BAK): complete battery
@@ -77,17 +77,17 @@
 
 #' Build the complete IPK 9-category synthetic study
 #'
-#' Generates Brand_Config.xlsx, Survey_Structure.xlsx, and a 400-row Excel
-#' data file in the specified directory. Overwrites existing files.
+#' Generates Brand_Config.xlsx, Survey_Structure.xlsx, and a 1200-row
+#' Excel data file in the specified directory. Overwrites existing files.
 #'
 #' @param output_dir Character. Destination directory. Defaults to the
 #'   OneDrive Examples/IPK_9Category folder.
 #' @param n    Integer. Total respondents; divided equally across 4 full
-#'   categories (default: 400).
+#'   categories (default: 1200 — matches the portfolio test fixture).
 #' @param seed Integer. RNG seed for reproducible data (default: 42).
 #' @return Named list with paths to the three generated files.
 #' @export
-build_9cat_synthetic_example <- function(output_dir = NULL, n = 400, seed = 42) {
+build_9cat_synthetic_example <- function(output_dir = NULL, n = 1200, seed = 42) {
 
   if (is.null(output_dir)) output_dir <- .default_9cat_output_dir()
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
