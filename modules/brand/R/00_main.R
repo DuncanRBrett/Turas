@@ -89,7 +89,12 @@ BRAND_VERSION <- "1.0"
     "10b_br_misattribution.R",
     "10c_br_media_mix.R",
     "10d_br_output.R",
-    "10_branded_reach.R"
+    "10_branded_reach.R",
+    "11_audience_lens.R",
+    "11a_al_audiences.R",
+    "11b_al_metrics.R",
+    "11c_al_classify.R",
+    "11d_al_panel_data.R"
   )
 
   for (f in module_files) {
@@ -641,6 +646,53 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
           list(status = "REFUSED", message = e$message)
         }
       )
+    }
+
+    # Audience Lens (full categories only; respects per-category opt-in via
+    # Categories$AudienceLens_Use). Runs after the upstream blocks so the
+    # engine can enrich its per-audience cards with branded-reach + WOM
+    # totals from the already-computed category result.
+    if (isTRUE(config$element_audience_lens) && cat_depth == "full") {
+      al_audiences <- tryCatch(
+        parse_audience_lens_definitions(
+          structure = structure, config = config,
+          cat_code = cat_code %||% "", cat_name = cat_name,
+          data = cat_data,
+          thresholds = list(max_audiences = as.integer(
+            config$audience_lens_max %||% 6L))),
+        error = function(e) {
+          warnings_list <<- c(warnings_list,
+            sprintf("Audience lens parse failed for %s: %s",
+                    cat_name, e$message))
+          list()
+        })
+
+      if (is.list(al_audiences) && identical(al_audiences$status, "REFUSED")) {
+        warnings_list <<- c(warnings_list,
+          sprintf("[AUDIENCE LENS %s] %s: %s",
+                  al_audiences$code, cat_name, al_audiences$message))
+        cat_result$audience_lens <- al_audiences
+      } else if (length(al_audiences) > 0) {
+        if (verbose) cat("  Running Audience Lens...\n")
+        cat_result$audience_lens <- tryCatch(
+          run_audience_lens(
+            data = cat_data, weights = cat_weights,
+            cat_brands = cat_brands,
+            cat_code = cat_code %||% "",
+            cat_name = cat_name,
+            focal_brand = config$focal_brand,
+            audiences = al_audiences,
+            structure = structure, config = config,
+            category_results = cat_result),
+          error = function(e) {
+            warnings_list <<- c(warnings_list,
+              sprintf("Audience lens failed for %s: %s",
+                      cat_name, e$message))
+            list(status = "REFUSED",
+                 code = "CALC_AUDIENCE_LENS_ERROR",
+                 message = e$message)
+          })
+      }
     }
 
     # Drivers & Barriers (full categories only; requires MA linkage)

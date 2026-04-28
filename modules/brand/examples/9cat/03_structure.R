@@ -505,6 +505,69 @@
 
 
 # ==============================================================================
+# AUDIENCE LENS SHEET
+# ==============================================================================
+# Sheet schema (parsed by parse_audience_lens_definitions in 11a):
+#   Category, AudienceID, AudienceLabel, PairID, PairRole,
+#   FilterColumn, FilterOp, FilterValue
+#
+# Two project-level (Category=ALL) demographic audiences plus one focal-brand
+# buyer pair per FULL category. The pair audiences key on
+# BRANDPEN2_<cat>_<focal> (built by 04_data.R during fixture generation).
+
+.build_audience_lens_columns <- function() {
+  list(
+    list(name = "Category",      width = 14, required = TRUE,
+         description = "ALL = project-level shared audience; <CAT_CODE> = scoped to that full category."),
+    list(name = "AudienceID",    width = 22, required = TRUE,
+         description = "Unique id within Category scope; referenced from Brand_Config Categories!AudienceLens_Use."),
+    list(name = "AudienceLabel", width = 26, required = TRUE,
+         description = "Display label shown in banner-table column headers and per-audience cards."),
+    list(name = "PairID",        width = 18, required = FALSE,
+         description = "Optional. Two rows sharing the same PairID become a buyer-vs-non-buyer pair."),
+    list(name = "PairRole",      width = 10, required = FALSE,
+         description = "A or B. Required when PairID is set."),
+    list(name = "FilterColumn",  width = 26, required = TRUE,
+         description = "Data column to filter on (must exist in the data file)."),
+    list(name = "FilterOp",      width = 12, required = TRUE,
+         description = "Comparison: == != < > <= >= in not_in is_na not_na",
+         dropdown = c("==", "!=", "<", ">", "<=", ">=",
+                       "in", "not_in", "is_na", "not_na")),
+    list(name = "FilterValue",   width = 22, required = FALSE,
+         description = "Literal value (or comma-separated for in/not_in). Leave blank for is_na/not_na.")
+  )
+}
+
+.build_9cat_audience_lens_rows <- function() {
+  rows <- list(
+    list(Category = "ALL", AudienceID = "gauteng",  AudienceLabel = "Gauteng",
+         PairID = "", PairRole = "",
+         FilterColumn = "PROVINCE", FilterOp = "==", FilterValue = "1"),
+    list(Category = "ALL", AudienceID = "under_35", AudienceLabel = "Under 35",
+         PairID = "", PairRole = "",
+         FilterColumn = "AGE", FilterOp = "in", FilterValue = "1,2")
+  )
+  for (c in cat9_full_codes()) {
+    pen2_col <- sprintf("BRANDPEN2_%s_%s", c$code, cat9_study_meta()$focal_brand)
+    pid <- sprintf("buyer_pair_%s", c$code)
+    rows <- c(rows, list(
+      list(Category = c$code,
+           AudienceID = sprintf("buyer_pair_%s_a", c$code),
+           AudienceLabel = sprintf("%s buyers", cat9_study_meta()$focal_brand),
+           PairID = pid, PairRole = "A",
+           FilterColumn = pen2_col, FilterOp = "==", FilterValue = "1"),
+      list(Category = c$code,
+           AudienceID = sprintf("buyer_pair_%s_b", c$code),
+           AudienceLabel = sprintf("%s non-buyers", cat9_study_meta()$focal_brand),
+           PairID = pid, PairRole = "B",
+           FilterColumn = pen2_col, FilterOp = "!=", FilterValue = "1")
+    ))
+  }
+  rows
+}
+
+
+# ==============================================================================
 # QUESTIONMAP SHEET
 # ==============================================================================
 
@@ -1088,6 +1151,21 @@ generate_9cat_structure <- function(output_path, overwrite = TRUE) {
     ),
     example_rows   = .build_9cat_reach_media_rows(),
     num_blank_rows = 3
+  )
+
+  write_table_sheet(
+    wb, "AudienceLens",
+    .build_audience_lens_columns(),
+    title    = "Audience Lens Definitions (only if element_audience_lens = Y)",
+    subtitle = paste0(
+      "Pre-defined audience cuts surfaced in the Audience Lens tab. ",
+      "Category=ALL = project-level shared audience (demographics); ",
+      "Category=<CAT_CODE> = scoped to that full category (typically buyer/non-buyer pairs). ",
+      "Pair audiences (PairID populated, PairRole A and B) generate side-by-side scorecards with auto-classified GROW / FIX / DEFEND chips. ",
+      "Per-category opt-in lives on Brand_Config Categories sheet (AudienceLens_Use)."
+    ),
+    example_rows   = .build_9cat_audience_lens_rows(),
+    num_blank_rows = 5
   )
 
   write_table_sheet(

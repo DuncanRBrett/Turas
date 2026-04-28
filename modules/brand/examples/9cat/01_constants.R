@@ -41,7 +41,7 @@ cat9_study_meta <- function() {
     client_name    = "Ina Paarman's Kitchen",
     focal_brand    = "IPK",
     wave           = 1,
-    sample_size    = 400,   # 100 per full category (DSS, POS, PAS, BAK)
+    sample_size    = 1200,  # 300 per full category (DSS, POS, PAS, BAK)
     study_type     = "cross-sectional",
     data_file_name = "ipk_9cat_wave1.xlsx",
     fieldwork      = "April 2026"

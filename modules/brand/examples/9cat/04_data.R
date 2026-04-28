@@ -416,7 +416,9 @@
 #' @param overwrite   Logical. Overwrite if file exists (default: TRUE).
 #' @return Invisibly returns the output_path.
 #' @export
-generate_9cat_data <- function(output_path, n = 400, seed = 42, overwrite = TRUE) {
+generate_9cat_data <- function(output_path, n = NULL, seed = 42, overwrite = TRUE) {
+
+  if (is.null(n)) n <- cat9_study_meta()$sample_size
 
   if (!requireNamespace("openxlsx", quietly = TRUE)) stop("Package 'openxlsx' is required")
   if (file.exists(output_path) && !overwrite) {

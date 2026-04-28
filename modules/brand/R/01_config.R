@@ -112,10 +112,12 @@ load_brand_config <- function(config_path, project_root = NULL) {
   element_fields <- c("element_funnel", "element_mental_avail", "element_cep_turf",
                        "element_repertoire", "element_dba", "element_portfolio",
                        "element_wom", "element_drivers_barriers",
-                       "element_branded_reach")
+                       "element_branded_reach", "element_audience_lens")
   for (ef in element_fields) {
-    # element_dba and element_branded_reach default OFF; everything else defaults ON
-    default_off <- ef %in% c("element_dba", "element_branded_reach")
+    # element_dba, element_branded_reach, element_audience_lens default OFF;
+    # everything else defaults ON
+    default_off <- ef %in% c("element_dba", "element_branded_reach",
+                              "element_audience_lens")
     config[[ef]] <- .parse_yn(config[[ef]], default = !default_off)
   }
 
@@ -312,7 +314,7 @@ load_brand_survey_structure <- function(structure_path) {
       .looks_like_data_header <- function(d) {
         any(c("BrandCode", "Category", "QuestionCode", "CEPCode", "AttrCode",
               "AssetCode", "ChannelCode", "PackSizeCode", "MediaCode",
-              "Role", "Scale") %in% names(d))
+              "Role", "Scale", "AudienceID") %in% names(d))
       }
       if (!is.null(df) && !.looks_like_data_header(df)) {
         for (.sr in 2:4) {
@@ -353,6 +355,12 @@ load_brand_survey_structure <- function(structure_path) {
   # for Q015 "Where did you see this advertising?".
   structure$marketing_reach <- .load_table("MarketingReach")
   structure$reach_media     <- .load_table("ReachMedia")
+
+  # Audience Lens definitions (optional; only when at least one Categories
+  # row sets AudienceLens_Use). Schema: Category, AudienceID, AudienceLabel,
+  # PairID, PairRole, FilterColumn, FilterOp, FilterValue. See
+  # modules/brand/R/11a_al_audiences.R for parsing + validation.
+  structure$audience_lens   <- .load_table("AudienceLens")
 
   # Role-registry sheets (new architecture; see ROLE_REGISTRY.md §11).
   # Optional here: not every element has migrated yet, so projects with

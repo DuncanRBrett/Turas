@@ -265,6 +265,9 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
   has_branded_reach <- !is.null(cat_results$branded_reach) &&
     !identical(cat_results$branded_reach$status, "REFUSED") &&
     length(cat_results$branded_reach$ads %||% list()) > 0
+  has_audience_lens <- !is.null(cat_results$audience_lens) &&
+    !identical(cat_results$audience_lens$status, "REFUSED") &&
+    length(cat_results$audience_lens$audiences %||% list()) > 0
 
   # Build flat sub-tab list in the required display order.
   # Each entry: key (unique), label, subpanel (which .br-subpanel to show),
@@ -316,6 +319,12 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
                 subpanel = "br", internal_tab = ""))
     )
   }
+  if (has_audience_lens) {
+    flat_tabs <- c(flat_tabs,
+      list(list(key = "audience_lens",   label = "Audience Lens",
+                subpanel = "al", internal_tab = ""))
+    )
+  }
 
   # Sub-tab navigation bar
   if (length(flat_tabs) > 0) {
@@ -341,6 +350,7 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
   if (has_repertoire)    element_map[["rep"]] <- "repertoire"
   if (has_wom)           element_map[["wom"]] <- "wom"
   if (has_branded_reach) element_map[["br"]]  <- "branded_reach"
+  if (has_audience_lens) element_map[["al"]]  <- "audience_lens"
 
   for (sp_key in names(element_map)) {
     el        <- element_map[[sp_key]]
@@ -368,6 +378,11 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
         parts <- c(parts, build_br_section_toolbar(section_id))
         parts <- c(parts, sprintf(
           '<h3 class="br-element-title">Branded Reach \u2014 %s</h3>',
+          .br_esc(cat_name)))
+      } else if (el == "audience_lens") {
+        parts <- c(parts, build_br_section_toolbar(section_id))
+        parts <- c(parts, sprintf(
+          '<h3 class="br-element-title">Audience Lens \u2014 %s</h3>',
           .br_esc(cat_name)))
       }
       parts <- c(parts, panels[[chart_key]])

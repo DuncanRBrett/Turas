@@ -542,6 +542,57 @@ transform_brand_panels <- function(results, config) {
     }
   }
 
+  # --- Audience Lens panels (per category) ---
+  if (exists("build_audience_lens_panel_data", mode = "function") &&
+      exists("build_audience_lens_panel_html", mode = "function")) {
+    for (cat_name in names(results$results$categories)) {
+      cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
+      cr <- results$results$categories[[cat_name]]
+      al <- cr$audience_lens
+      if (is.null(al) || identical(al$status, "REFUSED")) next
+      if (length(al$audiences %||% list()) == 0) next
+
+      cat_brands_local <- if (!is.null(brand_list_all) &&
+                               "Category" %in% names(brand_list_all)) {
+        brand_list_all[brand_list_all$Category == cat_name, , drop = FALSE]
+      } else if (!is.null(brand_list_all)) brand_list_all else NULL
+
+      focal_colour <- .resolve_focal_colour(cat_brands_local,
+                                             config$focal_brand,
+                                             config_focal_colour)
+
+      al_pd <- tryCatch(
+        build_audience_lens_panel_data(
+          result         = al,
+          category_label = cat_name,
+          focal_brand    = config$focal_brand %||% "",
+          focal_colour   = focal_colour,
+          decimal_places = config$decimal_places %||% 0L,
+          wave_label     = as.character(config$wave %||% "")
+        ),
+        error = function(e) {
+          message(sprintf("[BRAND HTML] Audience lens panel data failed for %s: %s",
+                          cat_name, e$message))
+          NULL
+        })
+      if (is.null(al_pd)) next
+
+      al_html <- tryCatch(
+        build_audience_lens_panel_html(
+          panel_data    = al_pd,
+          category_code = cat_id,
+          focal_colour  = focal_colour),
+        error = function(e) {
+          message(sprintf("[BRAND HTML] Audience lens render failed for %s: %s",
+                          cat_name, e$message))
+          NULL
+        })
+      if (!is.null(al_html)) {
+        panels[[paste0("audience_lens_", cat_id)]] <- al_html
+      }
+    }
+  }
+
   # --- Branded Reach panels (per category) ---
   if (exists("build_branded_reach_panel_data", mode = "function") &&
       exists("build_branded_reach_panel_html", mode = "function")) {

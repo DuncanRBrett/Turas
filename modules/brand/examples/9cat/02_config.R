@@ -71,7 +71,24 @@
            valid_values_text="Y or N", dropdown=c("Y","N")),
       list(name="element_branded_reach",   required=FALSE, default="Y",
            description="[Optional] Branded Reach (Romaniuk): per-ad reach, branding %, branded reach, misattribution and media mix. Requires MarketingReach + ReachMedia sheets and reach.* roles in QuestionMap",
+           valid_values_text="Y or N", dropdown=c("Y","N")),
+      list(name="element_audience_lens",   required=FALSE, default="Y",
+           description="[Optional] Audience Lens: focal-brand performance across pre-defined audience cuts (demographic + buyer-pair). Requires the AudienceLens sheet in Survey_Structure.xlsx and AudienceLens_Use on Categories sheet",
            valid_values_text="Y or N", dropdown=c("Y","N"))
+    )),
+    list(section_name = "AUDIENCE LENS OPTIONS (only if element_audience_lens = Y)", fields = list(
+      list(name="audience_lens_max",        required=FALSE, default=6L,
+           description="[Optional] Ceiling on audiences per category (pairs count as one). Exceeding triggers a TRS refusal."),
+      list(name="audience_lens_warn_base",  required=FALSE, default=75L,
+           description="[Optional] Below this unweighted base size, audiences render with a 'low base' badge. Production projects with larger samples should use 100."),
+      list(name="audience_lens_suppress_base", required=FALSE, default=30L,
+           description="[Optional] Below this unweighted base size, audiences are suppressed entirely. Demo default 30 ensures the focal-brand buyer audience renders (IPK ~13% penetration in this synthetic fixture). Production projects with stronger focal brands should use 50."),
+      list(name="audience_lens_alpha",      required=FALSE, default=0.10,
+           description="[Optional] Significance level for pair / vs-total comparisons (default 90%).",
+           numeric_range=c(0.001, 0.50)),
+      list(name="audience_lens_gap_threshold", required=FALSE, default=0.10,
+           description="[Optional] Minimum buyer-vs-non-buyer gap (proportion points) before GROW / DEFEND can fire.",
+           numeric_range=c(0.0, 1.0))
     )),
     list(section_name = "DRIVERS & BARRIERS OPTIONS", fields = list(
       list(name="db_use_catdriver",      required=FALSE, default="Y",
@@ -182,7 +199,9 @@
          description="Target analytical period (e.g. '3 months'). Full categories only"),
     list(name="Focal_Weight",    width=14, required=FALSE,
          description="Assignment weight for 'priority' routing. Must sum to 1.0 across FULL categories only. Leave blank for awareness-only categories",
-         numeric_range=c(0,1))
+         numeric_range=c(0,1)),
+    list(name="AudienceLens_Use", width=42, required=FALSE,
+         description="[Optional] Audience Lens opt-in. Comma-separated AudienceID values from Survey_Structure!AudienceLens, or ALL_AVAILABLE for every audience scoped to this category. Blank = no Audience Lens tab for this category.")
   )
 }
 
@@ -193,7 +212,12 @@
     Analysis_Depth   = c$analysis_depth,
     Timeframe_Long   = c$timeframe_long,
     Timeframe_Target = c$timeframe_target,
-    Focal_Weight     = if (c$analysis_depth == "full") 0.25 else ""
+    Focal_Weight     = if (c$analysis_depth == "full") 0.25 else "",
+    # Full categories opt in to the demographic audiences + a per-category
+    # focal-brand buyer pair (AudienceID built per-category in 03_structure.R
+    # so each cat compares its own focal-brand buyers vs non-buyers).
+    AudienceLens_Use = if (c$analysis_depth == "full")
+      sprintf("gauteng,under_35,buyer_pair_%s", c$code) else ""
   ))
 }
 

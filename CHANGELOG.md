@@ -5,6 +5,15 @@ All notable changes to TURAS are documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Brand: Audience Lens v1** — new per-category tab showing focal-brand
+  performance across pre-defined audience cuts. Banner table with all
+  audiences side-by-side, deck-ready per-audience cards, pair-audience
+  scorecards with auto-classified GROW / FIX / DEFEND chips. Pin + PNG
+  capture via TurasPins. Audience definitions live on a new `AudienceLens`
+  sheet in `Survey_Structure.xlsx`; per-category opt-in via
+  `AudienceLens_Use` on the Categories sheet of `Brand_Config.xlsx`.
+  TRS validation for malformed filters, unknown columns, and the
+  6-audience ceiling. HTML size delta +3.0% on the 9cat fixture.
 - Docker deployment support (Dockerfile, .dockerignore, TURAS_ROOT env var)
 - Platform health check script (`scripts/health_check.R`)
 - Operator quick-start guide (`OPERATOR_GUIDE.md`)
