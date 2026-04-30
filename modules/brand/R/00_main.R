@@ -53,8 +53,12 @@ BRAND_VERSION <- "1.0"
 
   module_files <- c(
     "00_guard.R",
+    "00_data_access.R",
+    "00_role_inference.R",
     "00_role_map.R",
+    "00_role_map_v2.R",
     "00_guard_role_map.R",
+    "00_guard_v2.R",
     "01_config.R",
     "02_mental_availability.R",
     "02b_mental_advantage.R",
@@ -288,6 +292,25 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
     cat(sprintf("  Focal brand: %s\n", config$focal_brand))
     cat(sprintf("  Weighted: %s\n", if (!is.null(weights)) "Yes" else "No"))
   }
+
+  # --- STEP 3b: Build v2 role map (convention-first + override) ---
+  # One pass over the full data + structure produces the resolved role map
+  # used by every v2 element. Falls back to NULL if the inferer cannot run
+  # (e.g. structure has no Questions sheet) so legacy elements still work.
+  role_map <- tryCatch({
+    if (exists("build_brand_role_map", mode = "function") &&
+        !is.null(structure$questions)) {
+      build_brand_role_map(
+        structure    = structure,
+        brand_config = list(categories = categories),
+        data         = data
+      )
+    } else NULL
+  }, error = function(e) {
+    warnings_list <<- c(warnings_list,
+      sprintf("Role map build failed: %s — v2 elements will skip", e$message))
+    NULL
+  })
 
   # --- STEP 4: Run elements per category ---
   results <- list()
@@ -629,17 +652,17 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       }
     }
 
-    # Branded Reach (full categories only; consumes MarketingReach + ReachMedia
-    # sheets). ALL-scoped ads run for every full category; category-coded ads
-    # only run for their matching category. Empty asset list passes silently.
+    # Branded Reach (full categories only; v2 entry — placeholder-aware).
+    # When structure has no MarketingReach sheet (IPK Wave 1), v2 returns a
+    # PASS placeholder so the panel-data renderer can show "Data not yet
+    # collected for Branded Reach". Otherwise delegates to run_branded_reach.
     if (isTRUE(config$element_branded_reach) && cat_depth == "full") {
       if (verbose) cat("  Running Branded Reach...\n")
       cat_result$branded_reach <- tryCatch(
-        run_branded_reach(
+        run_branded_reach_v2(
           data        = cat_data,
-          asset_list  = structure$marketing_reach,
+          structure   = structure,
           brand_list  = cat_brands,
-          media_list  = structure$reach_media,
           weights     = cat_weights,
           cat_code    = cat_code,
           focal_brand = config$focal_brand
@@ -765,22 +788,34 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       )
     }
 
-    # Ad Hoc (per-category; full categories only). Includes both
-    # adhoc.*.<CATCODE> roles for this category AND adhoc.*.ALL roles
-    # (the latter shown as a separate "Across all respondents" group inside
-    # the panel). Brand cuts use this category's pen matrix.
+    # Ad Hoc (per-category; full categories only). v2 dispatcher walks
+    # role_map for ^adhoc\.* keys. ALL-scoped questions use the full sample;
+    # CATCODE-scoped questions use cat_data + this category's brand cut.
+    # Falls through to the legacy QuestionMap dispatcher when no v2 role map
+    # was built (e.g. structure missing Questions sheet).
     if (isTRUE(config$element_adhoc %||% TRUE) && cat_depth == "full") {
       if (verbose) cat("  Running Ad Hoc...\n")
       cat_result$adhoc <- tryCatch(
-        .run_adhoc_for_category(
-          structure   = structure, config = config,
-          data_full   = data, weights_full = weights,
-          cat_data    = cat_data, cat_weights = cat_weights,
-          cat_brands  = cat_brands, cat_name = cat_name,
-          cat_code    = cat_code,
-          brand_volume = cat_result$brand_volume,
-          verbose     = verbose
-        ),
+        if (!is.null(role_map))
+          .run_adhoc_for_category_v2(
+            role_map     = role_map, structure = structure, config = config,
+            data_full    = data, weights_full = weights,
+            cat_data     = cat_data, cat_weights = cat_weights,
+            cat_brands   = cat_brands, cat_name = cat_name,
+            cat_code     = cat_code,
+            brand_volume = cat_result$brand_volume,
+            verbose      = verbose
+          )
+        else
+          .run_adhoc_for_category(
+            structure   = structure, config = config,
+            data_full   = data, weights_full = weights,
+            cat_data    = cat_data, cat_weights = cat_weights,
+            cat_brands  = cat_brands, cat_name = cat_name,
+            cat_code    = cat_code,
+            brand_volume = cat_result$brand_volume,
+            verbose     = verbose
+          ),
         error = function(e) {
           warnings_list <<- c(warnings_list,
             sprintf("Ad hoc failed for %s: %s", cat_name, e$message))
@@ -818,33 +853,36 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
 
   # --- STEP 5: Brand-level elements ---
 
-  # DBA
+  # DBA — v2 entry. Always runs when element is enabled; v2 emits a
+  # placeholder result when the structure has no DBA assets or the
+  # per-asset Fame/Unique columns are absent from data.
   if (isTRUE(config$element_dba)) {
     if (verbose) cat("\nRunning DBA (brand-level)...\n")
 
-    dba_assets <- NULL
-    if (!is.null(structure$dba_assets) && nrow(structure$dba_assets) > 0) {
-      dba_assets <- structure$dba_assets
-    } else if (!is.null(config$dba_assets) && nrow(config$dba_assets) > 0) {
-      dba_assets <- config$dba_assets
+    dba_structure <- structure
+    if ((is.null(dba_structure$dba_assets) ||
+         nrow(dba_structure$dba_assets) == 0) &&
+        !is.null(config$dba_assets) && nrow(config$dba_assets) > 0) {
+      dba_structure$dba_assets <- config$dba_assets
     }
 
-    if (!is.null(dba_assets)) {
-      results$dba <- tryCatch(
-        run_dba(
-          data, dba_assets,
-          focal_brand = config$focal_brand,
-          fame_threshold = config$dba_fame_threshold,
-          uniqueness_threshold = config$dba_uniqueness_threshold,
-          attribution_type = config$dba_attribution_type,
-          weights = weights
-        ),
-        error = function(e) {
-          warnings_list <<- c(warnings_list, sprintf("DBA failed: %s", e$message))
-          list(status = "REFUSED", message = e$message)
-        }
-      )
-    }
+    results$dba <- tryCatch(
+      run_dba_v2(
+        data                 = data,
+        structure            = dba_structure,
+        focal_brand          = config$focal_brand,
+        fame_threshold       = config$dba_fame_threshold %||%
+                                  DBA_DEFAULT_FAME_THRESHOLD,
+        uniqueness_threshold = config$dba_uniqueness_threshold %||%
+                                  DBA_DEFAULT_UNIQUENESS_THRESHOLD,
+        attribution_type     = config$dba_attribution_type %||% "open",
+        weights              = weights
+      ),
+      error = function(e) {
+        warnings_list <<- c(warnings_list, sprintf("DBA failed: %s", e$message))
+        list(status = "REFUSED", message = e$message)
+      }
+    )
   }
 
   # WOM is now per-category (see Step 4 above). No brand-level WOM.
@@ -1669,7 +1707,67 @@ if (!exists(".find_brand_col", mode = "function")) {
 
 
 # ==============================================================================
-# AD HOC DISPATCH (per-category)
+# AD HOC DISPATCH V2 (role-map driven, per-category)
+# ==============================================================================
+# v2 sibling of .run_adhoc_for_category. Walks role_map for ^adhoc\.* keys
+# instead of the legacy QuestionMap. ALL-scoped questions use data_full,
+# CATCODE-scoped questions use cat_data + the per-category brand-cut matrix
+# from brand_volume. Returns the legacy-shape PASS payload (questions[],
+# n_total, weighted) when at least one role resolves; otherwise the v2
+# placeholder so the panel-data renderer can show "Data not yet collected
+# for Ad Hoc" — matching the placeholder pattern across the rebuild.
+
+.run_adhoc_for_category_v2 <- function(role_map, structure, config,
+                                        data_full, weights_full,
+                                        cat_data, cat_weights, cat_brands,
+                                        cat_name, cat_code, brand_volume,
+                                        verbose = TRUE) {
+
+  bmat <- .demo_brand_matrix_for_category(brand_volume, cat_brands)
+
+  # ALL-scope: sample-wide context, no brand cut.
+  out_all <- run_adhoc_v2(
+    role_map     = role_map, structure = structure, data = data_full,
+    weights      = weights_full, scope_filter = "ALL",
+    pen_mat      = NULL,
+    brand_codes  = character(0), brand_labels = character(0)
+  )
+
+  # CATCODE-scope: focal-category respondents with this cat's brand cuts.
+  out_cat <- if (!is.null(cat_code) && nzchar(cat_code))
+    run_adhoc_v2(
+      role_map     = role_map, structure = structure, data = cat_data,
+      weights      = cat_weights, scope_filter = cat_code,
+      pen_mat      = bmat$pen_mat,
+      brand_codes  = bmat$brand_codes, brand_labels = bmat$brand_labels
+    )
+  else list(questions = list(), placeholder = TRUE)
+
+  questions <- c(out_all$questions %||% list(),
+                 out_cat$questions %||% list())
+
+  if (length(questions) == 0L) {
+    return(list(
+      status      = "PASS",
+      placeholder = TRUE,
+      cat_name    = cat_name, cat_code = cat_code,
+      questions   = list(),
+      n_total     = nrow(cat_data),
+      weighted    = !is.null(cat_weights),
+      note        = ADHOC_PLACEHOLDER_NOTE
+    ))
+  }
+
+  list(status   = "PASS",
+       cat_name = cat_name, cat_code = cat_code,
+       questions = questions,
+       n_total   = nrow(cat_data),
+       weighted  = !is.null(cat_weights))
+}
+
+
+# ==============================================================================
+# AD HOC DISPATCH (per-category, legacy QuestionMap path — superseded by v2)
 # ==============================================================================
 # For each category, picks up:
 #   - adhoc.<key>.<CATCODE>  rows belonging to this category, scoped to
