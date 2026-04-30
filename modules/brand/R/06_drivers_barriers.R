@@ -326,6 +326,83 @@ run_drivers_barriers <- function(linkage, cep_mat, pen, focal_brand,
 
 
 # ==============================================================================
+# V2: BUILD INPUTS FROM ROLE MAP + SLOT-INDEXED DATA
+# ==============================================================================
+
+#' Run Drivers & Barriers from a v2 role map and slot-indexed data
+#'
+#' Thin v2 wrapper that builds the CEP linkage tensor, the CEP x brand
+#' matrix, and the focal-brand buyer flag from the v2 role map, then
+#' dispatches to \code{run_drivers_barriers()}. The analytical functions
+#' (\code{calculate_differential_importance}, \code{classify_ixp_quadrants},
+#' \code{calculate_competitive_advantage}) operate on tensors / matrices
+#' and run unchanged.
+#'
+#' Required role-map entries:
+#' \itemize{
+#'   \item \code{mental_avail.cep.\{cat\}.*} — slot-indexed CEP roles
+#'   \item \code{funnel.penetration_target.\{cat\}} — BRANDPEN2 root
+#'         (target-window buyer flag for the focal brand)
+#' }
+#'
+#' @param data Data frame.
+#' @param role_map Named list from \code{build_brand_role_map()}.
+#' @param cat_code Character.
+#' @param brand_list Data frame with \code{BrandCode} column.
+#' @param focal_brand Character. Required.
+#' @param cep_labels Data frame with \code{CEPCode} + \code{CEPText}.
+#' @param weights Numeric vector or NULL.
+#' @return Same shape as \code{run_drivers_barriers()}.
+#' @export
+run_drivers_barriers_v2 <- function(data, role_map, cat_code, brand_list,
+                                    focal_brand, cep_labels = NULL,
+                                    weights = NULL) {
+  if (is.null(focal_brand) || !nzchar(focal_brand)) {
+    return(list(status = "REFUSED", code = "CFG_FOCAL_MISSING",
+                message = "Drivers & Barriers requires focal_brand"))
+  }
+  if (is.null(data) || nrow(data) == 0L) {
+    return(list(status = "REFUSED", code = "DATA_EMPTY",
+                message = "No data for Drivers & Barriers"))
+  }
+
+  pen_role <- paste0("funnel.penetration_target.", cat_code)
+  pen_entry <- role_map[[pen_role]]
+  if (is.null(pen_entry) || is.null(pen_entry$column_root)) {
+    return(list(status = "REFUSED", code = "CFG_ROLE_MISSING",
+                message = sprintf(
+                  "Drivers & Barriers requires role '%s'.", pen_role)))
+  }
+
+  # CEP linkage tensor + linkage % matrix
+  linkage <- build_cep_linkage_v2(data, role_map, cat_code, brand_list,
+                                  item_kind = "cep")
+  if (length(linkage$cep_codes) == 0L) {
+    return(list(status = "REFUSED", code = "CFG_NO_CEPS",
+                message = sprintf(
+                  "No CEP roles found for '%s' (looking for mental_avail.cep.%s.*).",
+                  cat_code, cat_code)))
+  }
+  cep_mat <- calculate_cep_brand_matrix(linkage$linkage_tensor,
+                                         linkage$cep_codes, weights)
+
+  # Focal brand penetration vector (length nrow(data))
+  pen_logical <- multi_mention_brand_matrix(data, pen_entry$column_root,
+                                            focal_brand)
+  pen <- as.integer(pen_logical[, focal_brand])
+
+  run_drivers_barriers(
+    linkage     = linkage,
+    cep_mat     = cep_mat,
+    pen         = pen,
+    focal_brand = focal_brand,
+    cep_labels  = cep_labels,
+    rejection_data = NULL  # rejection OE not yet wired in v2
+  )
+}
+
+
+# ==============================================================================
 # MODULE INITIALISATION
 # ==============================================================================
 
