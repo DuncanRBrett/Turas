@@ -133,6 +133,90 @@ build_portfolio_base <- function(data, cat_code,
 
 
 # ==============================================================================
+# V2: SLOT-INDEXED SCREENER QUALIFIER
+# ==============================================================================
+
+#' Build portfolio base from slot-indexed SQ1 / SQ2 columns
+#'
+#' v2 alternative to \code{build_portfolio_base()}. The IPK Alchemer
+#' parser-shape data uses Multi_Mention slot columns (\code{SQ1_1..N},
+#' \code{SQ2_1..N}) holding category codes as cell values, instead of
+#' the legacy column-per-category \code{SQ1_DSS=1} pattern. This helper
+#' resolves the qualifier index via \code{respondent_picked()}.
+#'
+#' Same denominator rule (§3.1 of PORTFOLIO_SPEC_v1): \code{timeframe}
+#' \code{"3m"} reads SQ2 (target window), with SQ1 fallback when SQ2
+#' columns are absent. \code{"13m"} reads SQ1 only.
+#'
+#' Returns the same list shape as \code{build_portfolio_base()} so
+#' downstream sub-analyses can consume either output identically.
+#'
+#' @param data Data frame.
+#' @param cat_code Character scalar.
+#' @param timeframe \code{"3m"} or \code{"13m"}.
+#' @param weights Numeric vector or NULL.
+#' @return List with \code{idx} / \code{n_uw} / \code{n_w} /
+#'   \code{col_used} (root, e.g. \code{"SQ2"}).
+#' @export
+build_portfolio_base_v2 <- function(data, cat_code,
+                                    timeframe = PORTFOLIO_TIMEFRAME_3M,
+                                    weights = NULL) {
+  if (is.null(data) || !is.data.frame(data) || nrow(data) == 0L) {
+    return(list(status = "REFUSED",
+                code = "DATA_PORTFOLIO_NO_AWARENESS_COLS",
+                message = "data must be a non-empty data frame",
+                how_to_fix = "Provide a non-empty data frame to build_portfolio_base_v2()"))
+  }
+  if (is.null(cat_code) || length(cat_code) != 1L ||
+      !nzchar(trimws(as.character(cat_code)))) {
+    return(list(status = "REFUSED",
+                code = "DATA_PORTFOLIO_TIMEFRAME_MISSING",
+                message = "cat_code must be a non-empty character scalar",
+                how_to_fix = "Provide a valid category code such as 'DSS'"))
+  }
+  cat_code <- trimws(as.character(cat_code))
+
+  has_sq2_slots <- length(grep("^SQ2_[0-9]+$", names(data))) > 0L
+  has_sq1_slots <- length(grep("^SQ1_[0-9]+$", names(data))) > 0L
+
+  if (identical(timeframe, PORTFOLIO_TIMEFRAME_3M)) {
+    if (has_sq2_slots) {
+      idx <- respondent_picked(data, "SQ2", cat_code); col_used <- "SQ2"
+    } else if (has_sq1_slots) {
+      idx <- respondent_picked(data, "SQ1", cat_code); col_used <- "SQ1"
+    } else {
+      idx <- NULL; col_used <- NULL
+    }
+  } else {
+    if (has_sq1_slots) {
+      idx <- respondent_picked(data, "SQ1", cat_code); col_used <- "SQ1"
+    } else {
+      idx <- NULL; col_used <- NULL
+    }
+  }
+
+  if (is.null(idx)) {
+    expected <- if (identical(timeframe, PORTFOLIO_TIMEFRAME_3M)) "SQ2" else "SQ1"
+    return(list(status = "REFUSED",
+                code = "DATA_PORTFOLIO_TIMEFRAME_MISSING",
+                message = sprintf(
+                  "No screener slot columns found for timeframe '%s'. Expected '%s_1..N'.",
+                  timeframe, expected),
+                how_to_fix = sprintf(
+                  paste0("Ensure the parsed data file contains the slot-indexed ",
+                         "Multi_Mention question '%s_1..N' with category codes ",
+                         "as cell values."),
+                  expected)))
+  }
+
+  n_uw <- sum(idx)
+  w    <- if (!is.null(weights)) weights else rep(1.0, nrow(data))
+  n_w  <- sum(w[idx], na.rm = TRUE)
+  list(idx = idx, n_uw = n_uw, n_w = n_w, col_used = col_used)
+}
+
+
+# ==============================================================================
 # MAIN ORCHESTRATOR (stub — filled in phases 2-5)
 # ==============================================================================
 
