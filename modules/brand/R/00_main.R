@@ -434,17 +434,28 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       }
     }
 
-    # Funnel (role-registry architecture; full categories only)
+    # Funnel (role-registry architecture; full categories only). v2 path
+    # passes the global role_map (built once after Step 3) directly to
+    # run_funnel — no per-category QuestionMap normalisation needed because
+    # v2 role names already carry the .{cat} suffix that .lookup_role
+    # resolves through. Legacy .run_funnel_for_category retained for
+    # structures that lack a Questions sheet (no v2 role map possible).
     if (isTRUE(config$element_funnel) && cat_depth == "full") {
       if (verbose) cat("  Running Funnel...\n")
 
-      cat_result$funnel <- .run_funnel_for_category(
-        data = cat_data, structure = structure, cat_brands = cat_brands,
-        cat_ceps = cat_ceps, config = config, weights = cat_weights,
-        cat_name = cat_name, warnings_acc = function(msg) {
-          warnings_list <<- c(warnings_list, msg)
-        }
-      )
+      cat_result$funnel <- if (!is.null(role_map))
+        .run_funnel_for_category_v2(
+          data = cat_data, role_map = role_map, cat_brands = cat_brands,
+          cat_code = cat_code, config = config, weights = cat_weights,
+          cat_name = cat_name)
+      else
+        .run_funnel_for_category(
+          data = cat_data, structure = structure, cat_brands = cat_brands,
+          cat_ceps = cat_ceps, config = config, weights = cat_weights,
+          cat_name = cat_name, warnings_acc = function(msg) {
+            warnings_list <<- c(warnings_list, msg)
+          }
+        )
     }
 
     # Repertoire (full categories only). v2 entry rebuilds penetration +
@@ -949,6 +960,31 @@ if (!exists(".find_brand_col", mode = "function")) {
 # analysis. When the structure lacks a QuestionMap sheet the funnel is
 # skipped loudly — there is no legacy fallback; the operator must add the
 # QuestionMap per modules/brand/docs/ROLE_REGISTRY.md §11.
+
+#' Run the funnel for one category against the v2 role map
+#'
+#' v2 sibling of \code{.run_funnel_for_category}. Skips the legacy
+#' QuestionMap normalisation entirely — the v2 role_map already has
+#' \code{funnel.awareness.DSS}-style keys, and \code{run_funnel}'s
+#' \code{.lookup_role} resolves them via the \code{cat_code} config field.
+#' @keywords internal
+.run_funnel_for_category_v2 <- function(data, role_map, cat_brands, cat_code,
+                                         config, weights, cat_name) {
+  funnel_cfg <- .funnel_config_from_global(config, cat_name, cat_brands)
+  funnel_cfg$cat_code <- cat_code
+
+  brand_with_refusal_handler({
+    run_funnel(
+      data       = data,
+      role_map   = role_map,
+      brand_list = cat_brands,
+      config     = funnel_cfg,
+      weights    = weights,
+      sig_tester = NULL
+    )
+  })
+}
+
 
 .run_funnel_for_category <- function(data, structure, cat_brands, cat_ceps,
                                      config, weights, cat_name,
