@@ -19,6 +19,14 @@
 
 DBA_VERSION <- "1.0"
 
+# Default Romaniuk Fame x Uniqueness thresholds (per Building Distinctive
+# Brand Assets, OUP 2018). Override via config when project-specific.
+DBA_DEFAULT_FAME_THRESHOLD <- 0.50
+DBA_DEFAULT_UNIQUENESS_THRESHOLD <- 0.50
+
+# Sentinel note rendered by the panel-data builder when DBA has no data.
+DBA_PLACEHOLDER_NOTE <- "Data not yet collected for DBA"
+
 
 #' Calculate DBA metrics for all assets
 #'
@@ -183,6 +191,101 @@ run_dba <- function(data, assets,
     metrics_summary = metrics_summary,
     n_respondents = n_resp,
     n_assets = n_assets
+  )
+}
+
+
+# ==============================================================================
+# V2 ENTRY POINT — placeholder-aware, structure-driven
+# ==============================================================================
+
+#' Run DBA analysis from a Survey_Structure (v2 entry)
+#'
+#' v2 entry point for the IPK rebuild. Reads asset definitions from
+#' \code{structure$dba_assets}. When the assets sheet is absent / empty, or
+#' the per-asset Fame/Unique question codes are absent from the data,
+#' returns a structured PASS-empty payload with \code{placeholder = TRUE}
+#' and a \code{note} field for the panel-data renderer to surface a
+#' "Data not yet collected for DBA" card.
+#'
+#' Otherwise delegates to \code{run_dba()}. DBA reads per-asset Fame /
+#' Unique columns by name from the assets data frame so no role-map
+#' intermediation is needed — this entry is a thin structure-aware wrapper.
+#'
+#' @param data Data frame.
+#' @param structure List from a Survey_Structure loader.
+#'   \code{structure$dba_assets} carries the asset definitions when
+#'   available.
+#' @param focal_brand Character. Required.
+#' @param fame_threshold Numeric. Default \code{DBA_DEFAULT_FAME_THRESHOLD}.
+#' @param uniqueness_threshold Numeric. Default
+#'   \code{DBA_DEFAULT_UNIQUENESS_THRESHOLD}.
+#' @param attribution_type Character. "open" or "closed_list".
+#' @param weights Numeric vector or NULL.
+#'
+#' @return List with status, dba_metrics, metrics_summary, n_respondents,
+#'   n_assets. PASS-empty payload sets \code{placeholder = TRUE} and
+#'   \code{note = DBA_PLACEHOLDER_NOTE} when no assets / data.
+#' @export
+run_dba_v2 <- function(data, structure, focal_brand,
+                        fame_threshold = DBA_DEFAULT_FAME_THRESHOLD,
+                        uniqueness_threshold = DBA_DEFAULT_UNIQUENESS_THRESHOLD,
+                        attribution_type = "open",
+                        weights = NULL) {
+
+  assets <- if (is.list(structure)) structure$dba_assets else NULL
+
+  if (is.null(assets) || !is.data.frame(assets) || nrow(assets) == 0L ||
+      !.dba_data_present(data, assets)) {
+    return(.dba_placeholder_result(focal_brand))
+  }
+
+  run_dba(
+    data                 = data,
+    assets               = assets,
+    focal_brand          = focal_brand,
+    fame_threshold       = fame_threshold,
+    uniqueness_threshold = uniqueness_threshold,
+    attribution_type     = attribution_type,
+    weights              = weights
+  )
+}
+
+# Internal: do the assets reference at least one column present in data?
+.dba_data_present <- function(data, assets) {
+  if (is.null(data) || !is.data.frame(data) || nrow(data) == 0L) return(FALSE)
+  fame_cols <- as.character(assets$FameQuestionCode)
+  unique_cols <- as.character(assets$UniqueQuestionCode)
+  any(c(fame_cols, unique_cols) %in% names(data))
+}
+
+# Internal: shape-equivalent to run_dba() result, populated empty.
+.dba_placeholder_result <- function(focal_brand) {
+  list(
+    status        = "PASS",
+    placeholder   = TRUE,
+    dba_metrics   = data.frame(
+      AssetCode      = character(0),
+      AssetLabel     = character(0),
+      Fame_Pct       = numeric(0),
+      Uniqueness_Pct = numeric(0),
+      Fame_n         = integer(0),
+      Uniqueness_n   = integer(0),
+      Quadrant       = character(0),
+      stringsAsFactors = FALSE
+    ),
+    metrics_summary = list(
+      focal_brand   = focal_brand,
+      n_assets      = 0L,
+      n_use_or_lose = 0L,
+      n_avoid_alone = 0L,
+      n_invest      = 0L,
+      n_ignore      = 0L,
+      note          = DBA_PLACEHOLDER_NOTE
+    ),
+    n_respondents = 0L,
+    n_assets      = 0L,
+    note          = DBA_PLACEHOLDER_NOTE
   )
 }
 

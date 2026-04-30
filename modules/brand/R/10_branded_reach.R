@@ -23,6 +23,10 @@
 
 BRAND_BRANDED_REACH_VERSION <- "1.0"
 
+# Sentinel note rendered by the panel-data builder when Branded Reach has
+# no MarketingReach assets configured (e.g. IPK Wave 1).
+BR_PLACEHOLDER_NOTE <- "Data not yet collected for Branded Reach"
+
 
 #' Run branded-reach analysis for one category
 #'
@@ -151,6 +155,86 @@ run_branded_reach <- function(data, asset_list, brand_list, media_list,
 
 if (!exists("%||%")) {
   `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
+}
+
+
+# ==============================================================================
+# V2 ENTRY POINT — placeholder-aware, structure-driven
+# ==============================================================================
+
+#' Run Branded Reach analysis from a Survey_Structure (v2 entry)
+#'
+#' v2 entry point for the IPK rebuild. Reads asset definitions from
+#' \code{structure$marketing_reach} and channel definitions from
+#' \code{structure$reach_media}. When the MarketingReach sheet is absent
+#' or empty, returns a structured PASS-empty payload with
+#' \code{placeholder = TRUE} and a \code{note} for the panel-data
+#' renderer to surface a "Data not yet collected for Branded Reach" card.
+#'
+#' Otherwise delegates to \code{run_branded_reach()}. Branded Reach reads
+#' per-asset Seen / Brand / Media columns by name from the assets data
+#' frame, so it remains a structure-level concern (unlike role-mapped
+#' elements). This v2 wrapper is consistent with the placeholder pattern
+#' used by every other element in the rebuild.
+#'
+#' @param data Data frame, already filtered to the focal-category
+#'   respondents (the per-category orchestrator handles this upstream).
+#' @param structure List from a Survey_Structure loader.
+#'   \code{structure$marketing_reach} carries asset definitions.
+#'   \code{structure$reach_media} carries channel labels.
+#' @param brand_list Data frame with BrandCode + BrandLabel columns.
+#' @param weights Numeric vector or NULL.
+#' @param cat_code Character or NULL. Category code; ALL-scoped ads run
+#'   for every category, category-coded ads only for their match.
+#' @param focal_brand Character or NULL.
+#' @param seen_recognised_value Integer. Cell value indicating "Yes,
+#'   seen" in the Seen question. Default 1L.
+#' @return Same shape as \code{run_branded_reach()} when assets are
+#'   present; placeholder payload otherwise (with \code{placeholder = TRUE}
+#'   and \code{meta$note = BR_PLACEHOLDER_NOTE}).
+#' @export
+run_branded_reach_v2 <- function(data, structure, brand_list,
+                                  weights = NULL, cat_code = NULL,
+                                  focal_brand = NULL,
+                                  seen_recognised_value = 1L) {
+
+  asset_list <- if (is.list(structure)) structure$marketing_reach else NULL
+  media_list <- if (is.list(structure)) structure$reach_media     else NULL
+
+  if (is.null(asset_list) || !is.data.frame(asset_list) ||
+      nrow(asset_list) == 0L) {
+    return(.br_placeholder_result(data, cat_code, focal_brand, weights))
+  }
+
+  run_branded_reach(
+    data        = data,
+    asset_list  = asset_list,
+    brand_list  = brand_list,
+    media_list  = media_list,
+    weights     = weights,
+    cat_code    = cat_code,
+    focal_brand = focal_brand,
+    seen_recognised_value = seen_recognised_value
+  )
+}
+
+# Internal: shape-equivalent to run_branded_reach() result, populated empty.
+.br_placeholder_result <- function(data, cat_code, focal_brand, weights) {
+  list(
+    status = "PASS",
+    placeholder = TRUE,
+    ads = list(),
+    misattribution = list(),
+    media_mix = list(),
+    meta = list(
+      n_respondents = if (is.null(data)) 0L else nrow(data),
+      n_assets      = 0L,
+      cat_code      = cat_code,
+      focal_brand   = focal_brand,
+      weighted      = !is.null(weights),
+      note          = BR_PLACEHOLDER_NOTE
+    )
+  )
 }
 
 
