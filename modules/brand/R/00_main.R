@@ -353,26 +353,29 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
                              data[[focal_col]] == cat_code]
                    } else weights
 
-    # Mental Availability (full categories only — awareness_only cats have no CEPs)
+    # Mental Availability (full categories only — awareness_only cats have no CEPs).
+    # v2 entry walks role_map for mental_avail.cep.{cat}.* (and .attr.* for the
+    # brand-image battery) and rebuilds the linkage tensor from slot-indexed
+    # data via multi_mention_brand_matrix(). Legacy
+    # build_cep_linkage_from_matrix() retained as fallback.
     if (isTRUE(config$element_mental_avail) && nrow(cat_ceps) > 0 &&
         cat_depth == "full") {
       if (verbose) cat("  Running Mental Availability...\n")
 
-      # Build CEP linkage from data
-      # Column names in data follow: QuestionCode_BrandCode pattern
-      # QuestionCode comes from Questions sheet (e.g., CEP01_DSS)
-      # We need to map CEP codes to their question codes for column matching
-      cep_questions <- get_questions_for_battery(structure, "cep_matrix", cat_name)
-      cep_col_codes <- if (nrow(cep_questions) > 0) {
-        cep_questions$QuestionCode
-      } else {
-        cat_ceps$CEPCode  # fallback to raw CEP codes
-      }
+      use_v2 <- !is.null(role_map) && !is.null(cat_code)
 
       linkage <- tryCatch(
-        build_cep_linkage_from_matrix(
-          cat_data, cep_col_codes, cat_brands$BrandCode
-        ),
+        if (use_v2) {
+          build_cep_linkage_v2(cat_data, role_map, cat_code, cat_brands,
+                                item_kind = "cep")
+        } else {
+          cep_questions <- get_questions_for_battery(structure,
+                                                     "cep_matrix", cat_name)
+          cep_col_codes <- if (nrow(cep_questions) > 0)
+            cep_questions$QuestionCode else cat_ceps$CEPCode
+          build_cep_linkage_from_matrix(cat_data, cep_col_codes,
+                                        cat_brands$BrandCode)
+        },
         error = function(e) {
           warnings_list <<- c(warnings_list,
             sprintf("MA failed for %s: %s", cat_name, e$message))
@@ -381,15 +384,18 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       )
 
       if (!is.null(linkage)) {
-        # Map question codes to CEP labels for display
+        # Map item codes to display text. v2 returns CEP01/CEP02/...
+        # already; cat_ceps carries the matching CEPText rows.
+        cep_col_codes <- linkage$cep_codes
         cep_labels_mapped <- data.frame(
           CEPCode = cep_col_codes,
-          CEPText = if (nrow(cep_questions) > 0 && nrow(cat_ceps) > 0) {
-            # Match question codes to CEP texts via position
-            cep_questions$QuestionText[seq_along(cep_col_codes)]
-          } else {
-            cep_col_codes
-          },
+          CEPText = .ma_resolve_cep_labels(cep_col_codes, cat_ceps,
+                                           use_v2,
+                                           if (!use_v2)
+                                             get_questions_for_battery(
+                                               structure, "cep_matrix",
+                                               cat_name)
+                                           else NULL),
           stringsAsFactors = FALSE
         )
 
@@ -397,9 +403,12 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
         attr_linkage <- NULL
         if (!is.null(cat_attrs) && nrow(cat_attrs) > 0) {
           attr_linkage <- tryCatch(
-            build_cep_linkage_from_matrix(
-              cat_data, cat_attrs$AttrCode, cat_brands$BrandCode
-            ),
+            if (use_v2)
+              build_cep_linkage_v2(cat_data, role_map, cat_code, cat_brands,
+                                    item_kind = "attr")
+            else
+              build_cep_linkage_from_matrix(cat_data, cat_attrs$AttrCode,
+                                             cat_brands$BrandCode),
             error = function(e) {
               warnings_list <<- c(warnings_list,
                 sprintf("MA attribute matrix failed for %s: %s",
@@ -1104,6 +1113,27 @@ if (!exists(".find_brand_col", mode = "function")) {
   rows <- wom_qs[grepl(pattern, wom_qs$QuestionCode, ignore.case = TRUE), ,
                  drop = FALSE]
   if (nrow(rows) > 0) rows$QuestionCode[1] else default
+}
+
+
+#' Map MA item codes to display labels
+#'
+#' v2 emits per-cat CEP codes (CEP01, CEP02, ...) directly — labels come from
+#' \code{cat_ceps$CEPText} indexed by \code{cat_ceps$CEPCode}. Legacy emits
+#' question codes (\code{CEP01_DSS}) — labels come from
+#' \code{cep_questions$QuestionText} by position.
+#' @keywords internal
+.ma_resolve_cep_labels <- function(cep_codes, cat_ceps, use_v2, cep_questions) {
+  if (use_v2 && !is.null(cat_ceps) && nrow(cat_ceps) > 0) {
+    out <- cat_ceps$CEPText[match(cep_codes, cat_ceps$CEPCode)]
+    out[is.na(out)] <- cep_codes[is.na(out)]
+    return(out)
+  }
+  if (!is.null(cep_questions) && nrow(cep_questions) > 0 &&
+      !is.null(cat_ceps) && nrow(cat_ceps) > 0) {
+    return(cep_questions$QuestionText[seq_along(cep_codes)])
+  }
+  cep_codes
 }
 
 
