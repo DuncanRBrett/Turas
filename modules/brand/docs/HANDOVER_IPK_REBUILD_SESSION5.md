@@ -41,18 +41,39 @@ Full list: `git log --oneline main..HEAD`. Architectural decisions in §10 of th
 
 Per memory rule [feedback_launch_turas_verification.md], the only verification path for brand reports is running `launch_turas()` and picking the Brand_Config in the GUI. **This is gating §5 cutover and PR**.
 
+**Fixture is now runnable** (commit f9f92ee). Regenerate with:
+
+```bash
+Rscript -e 'source("modules/brand/tests/fixtures/ipk_wave1/00_generate.R"); ipk_generate_fixture()'
+```
+
+Then in R:
+
+```r
+source("launch_turas.R")
+launch_turas()
+# In the GUI: pick modules/brand/tests/fixtures/ipk_wave1/Brand_Config.xlsx
+```
+
+End-to-end smoke test from the CLI confirms the orchestrator runs without REFUSED status:
+
+```bash
+Rscript -e 'source("modules/brand/R/00_main.R"); res <- run_brand("modules/brand/tests/fixtures/ipk_wave1/Brand_Config.xlsx", verbose = FALSE); cat("status:", res$status, "\n")'
+# Expected: status: PARTIAL  (DSS PASS for every v2 element; POS/PAS/BAK
+# empty because the fixture only populates DSS deep-dive data)
+```
+
 What to verify in the browser:
 
-1. **Open the IPK Brand_Config** — note: the rebuild's `tests/fixtures/ipk_wave1/Brand_Config.xlsx` is currently incomplete (missing `project_name`, `data_file`, etc. — the v1 schema fields). Either:
-   - Add a thin set of those fields to the fixture (smallest-diff path), OR
-   - Run against a real Brand_Config from a live project that's already on the v2 schema (if one exists), OR
-   - Defer browser verification to whichever Brand_Config gets rebuilt during §5 cutover.
-2. Render a full report → every panel renders cleanly.
-3. Click every panel's pin → it lands in the combined pins view with content.
-4. Export PNG of every panel → file downloads with content.
-5. Confirm the three placeholder panels (DBA, Branded Reach, Ad Hoc) render the "Data not yet collected" card with the correct sentinel text.
+1. **DSS deep dive** — every panel renders cleanly: Funnel, Mental Availability, Mental Advantage, Cat Buying / Shopper Behaviour, WOM, Repertoire, Drivers & Barriers, Demographics, Audience Lens.
+2. **Placeholder elements** — DBA, Branded Reach, Ad Hoc tabs each show the "Data not yet collected for X" card (sentinel text from the v2 placeholder payload).
+3. **POS / PAS / BAK** — these are `Analysis_Depth = full` in Brand_Config but the fixture has no populated deep-dive data. Expect graceful empty panels / "no data" state, not crashes. (If the renderer crashes, that's a render-side bug worth fixing; the engines themselves return structured refusals.)
+4. **Adjacent categories (SLD / STO / PES / COO / ANT)** — `awareness_only`. They should appear in the cross-category Portfolio view (their BRANDAWARE_{cat} columns are populated) but have no per-category sub-tab.
+5. **Pin / PNG round-trip** — click every panel's pin → lands in the combined pins view with content. Export PNG of every panel → file downloads with content.
 
 If anything fails: capture the specific panel + error and either fix in this branch or open a fix branch off it. **Do not start §5 cutover until browser verification is green.**
+
+Known issue: the cross-category Portfolio constellation refuses with `CALC_CONSTELLATION_TOO_SPARSE` because the legacy `compute_constellation` reads column-per-brand awareness while IPK Wave 1 has slot-indexed awareness. This is the §4d work — `.compute_portfolio_data` → v2. The Portfolio Overview tab (already on v2) renders correctly.
 
 ### 2. Step 4d — Portfolio cross-cat data (the one remaining v2 switch)
 
