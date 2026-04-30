@@ -1,3 +1,7 @@
+# SIZE-EXCEPTION: Stage plan + per-stage builders + nesting validator form a
+# coherent sequential pipeline; splitting them across files would fragment
+# the funnel derivation flow without improving readability.
+#
 # ==============================================================================
 # BRAND MODULE - FUNNEL STAGE DERIVATION
 # ==============================================================================
@@ -13,7 +17,12 @@
 # VERSION: 2.0
 # ==============================================================================
 
-BRAND_FUNNEL_DERIVE_VERSION <- "2.1"
+BRAND_FUNNEL_DERIVE_VERSION <- "3.0"
+
+# Default attitude codes considered "positive" for consideration. Matches the
+# IPK convention: 1 = Love, 2 = Prefer, 3 = Ambivalent. 4 = Reject and
+# 5 = No opinion are explicitly excluded. Caller can override per project.
+.FUNNEL_POSITIVE_ATTITUDE_CODES <- c("1", "2", "3")
 
 
 # ==============================================================================
@@ -94,11 +103,14 @@ BRAND_FUNNEL_DERIVE_VERSION <- "2.1"
 #'
 #' @export
 derive_funnel_stages <- function(data, role_map, category_type,
-                                 brand_list, tenure_threshold = NULL) {
+                                 brand_list, tenure_threshold = NULL,
+                                 cat_code = NULL,
+                                 positive_attitude_codes =
+                                   .FUNNEL_POSITIVE_ATTITUDE_CODES) {
 
   .check_category_type(category_type)
-  .require_role(role_map, "funnel.awareness")
-  .require_role(role_map, "funnel.attitude")
+  .require_role_lookup(role_map, "funnel.awareness", cat_code)
+  .require_role_lookup(role_map, "funnel.attitude", cat_code)
 
   plan    <- .FUNNEL_STAGE_PLAN[[category_type]]
   brands  <- as.character(brand_list$BrandCode)
@@ -111,7 +123,7 @@ derive_funnel_stages <- function(data, role_map, category_type,
   for (key in plan) {
     mat <- .derive_stage_matrix(
       key, data, role_map, brands, n_resp, category_type,
-      tenure_threshold)
+      tenure_threshold, cat_code, positive_attitude_codes)
     if (is.null(mat$matrix)) {
       warns <- c(warns, mat$warning)
       next
@@ -127,6 +139,23 @@ derive_funnel_stages <- function(data, role_map, category_type,
   }
 
   list(stages = stages_out, warnings = warns, category_type = category_type)
+}
+
+
+#' Look up an entry in a role map, preferring per-category keys
+#'
+#' For v2 role maps, awareness for DSS lives at \code{funnel.awareness.DSS}.
+#' This helper accepts the base role (\code{funnel.awareness}) plus a
+#' category code and returns the per-category entry if present, else the
+#' base entry (legacy compatibility), else NULL.
+#'
+#' @keywords internal
+.lookup_role <- function(role_map, base_role, cat_code) {
+  if (!is.null(cat_code) && nzchar(cat_code)) {
+    keyed <- paste0(base_role, ".", cat_code)
+    if (!is.null(role_map[[keyed]])) return(role_map[[keyed]])
+  }
+  role_map[[base_role]]
 }
 
 
@@ -229,6 +258,37 @@ validate_nesting <- function(stages, weights = NULL) {
 }
 
 
+#' Refuse if neither base role nor per-category role is present
+#' @keywords internal
+.require_role_lookup <- function(role_map, base_role, cat_code) {
+  if (!is.null(.lookup_role(role_map, base_role, cat_code))) {
+    return(invisible(TRUE))
+  }
+  keyed <- if (!is.null(cat_code) && nzchar(cat_code)) {
+    paste0(base_role, ".", cat_code)
+  } else base_role
+  brand_refuse(
+    code = "CFG_ROLE_MISSING",
+    title = sprintf("Funnel Needs Role '%s'", keyed),
+    problem = sprintf(
+      "The funnel derivation requires role '%s', not present in role map.",
+      keyed),
+    why_it_matters = paste(
+      "Every funnel stage begins with awareness and attitude. Without these",
+      "two roles, no stage can be derived."
+    ),
+    how_to_fix = c(
+      sprintf("Confirm '%s' question root is registered in Survey_Structure.",
+              gsub("\\.", "_", keyed)),
+      "Convention-first inference resolves this automatically when the",
+      "Questions sheet contains the canonical naming.",
+      "See modules/brand/templates/README.md for the convention table."
+    ),
+    missing = keyed
+  )
+}
+
+
 # ==============================================================================
 # INTERNAL: PER-STAGE DERIVATION
 # ==============================================================================
@@ -242,107 +302,137 @@ validate_nesting <- function(stages, weights = NULL) {
 #'
 #' @keywords internal
 .derive_stage_matrix <- function(key, data, role_map, brands, n_resp,
-                                 category_type, tenure_threshold) {
+                                 category_type, tenure_threshold,
+                                 cat_code, positive_attitude_codes) {
 
   switch(key,
-    aware = list(matrix = .per_brand_binary_matrix(
-      role_map, "funnel.awareness", data, brands, n_resp)),
-    consideration = list(matrix = .attitude_positive_matrix(
-      role_map, "funnel.attitude", data, brands, n_resp)),
+    aware = list(matrix = .stage_awareness(
+      role_map, data, brands, n_resp, cat_code)),
+    consideration = list(matrix = .stage_consideration(
+      role_map, data, brands, n_resp, cat_code, positive_attitude_codes)),
 
-    bought_long = .optional_per_brand_stage(
-      role_map, "funnel.transactional.bought_long",
-      data, brands, n_resp, "Long Period"),
-    bought_target = .optional_per_brand_stage(
-      role_map, "funnel.transactional.bought_target",
-      data, brands, n_resp, "Target Period"),
+    bought_long = .stage_penetration_long(
+      role_map, data, brands, n_resp, cat_code),
+    bought_target = .stage_penetration_target(
+      role_map, data, brands, n_resp, cat_code),
 
     current_owner_d = .single_response_brand_match_stage(
       role_map, "funnel.durable.current_owner",
-      data, brands, n_resp, "Current owner"),
+      data, brands, n_resp, "Current owner", cat_code),
     long_tenured_d = .tenure_stage(
       role_map, "funnel.durable.tenure", data, brands, n_resp,
-      tenure_threshold, "Long-tenured (durable)"),
+      tenure_threshold, "Long-tenured (durable)", cat_code),
 
     current_customer_s = .single_response_brand_match_stage(
       role_map, "funnel.service.current_customer",
-      data, brands, n_resp, "Current customer"),
+      data, brands, n_resp, "Current customer", cat_code),
     long_tenured_s = .tenure_stage(
       role_map, "funnel.service.tenure", data, brands, n_resp,
-      tenure_threshold, "Long-tenured (service)"),
+      tenure_threshold, "Long-tenured (service)", cat_code),
 
     stop(sprintf("[BUG] Unknown funnel stage key '%s'", key))
   )
 }
 
 
-#' Per-brand binary role -> logical matrix (respondents × brands)
+# ==============================================================================
+# STAGE BUILDERS — V2 (use 00_data_access.R helpers)
+# ==============================================================================
+
+#' Awareness stage — slot-indexed Multi_Mention root
 #' @keywords internal
-.per_brand_binary_matrix <- function(role_map, role_name, data, brands, n_resp) {
-  entry <- role_map[[role_name]]
-  mat <- matrix(FALSE, nrow = n_resp, ncol = length(brands),
-                dimnames = list(NULL, brands))
-  for (b in brands) {
-    col <- .column_for_brand(entry, b)
-    if (!is.null(col) && col %in% names(data)) {
-      vals <- suppressWarnings(as.numeric(data[[col]]))
-      mat[, b] <- !is.na(vals) & vals == 1
-    }
-  }
-  mat
+.stage_awareness <- function(role_map, data, brands, n_resp, cat_code) {
+  entry <- .lookup_role(role_map, "funnel.awareness", cat_code)
+  .multi_mention_or_empty(entry, data, brands, n_resp)
 }
 
-
-#' Attitude role -> logical matrix of "positive" attitude respondents
+#' Consideration stage — per-brand attitude in positive code set
 #' @keywords internal
-.attitude_positive_matrix <- function(role_map, role_name, data, brands, n_resp) {
-  entry <- role_map[[role_name]]
-  pos_codes <- .attitude_codes_matching(entry, .FUNNEL_POSITIVE_ATTITUDE_ROLES)
-
-  mat <- matrix(FALSE, nrow = n_resp, ncol = length(brands),
-                dimnames = list(NULL, brands))
-  for (b in brands) {
-    col <- .column_for_brand(entry, b)
-    if (!is.null(col) && col %in% names(data)) {
-      vals <- suppressWarnings(as.character(data[[col]]))
-      mat[, b] <- !is.na(vals) & vals %in% pos_codes
+.stage_consideration <- function(role_map, data, brands, n_resp, cat_code,
+                                 pos_codes) {
+  entry <- .lookup_role(role_map, "funnel.attitude", cat_code)
+  if (is.null(entry)) return(.empty_brand_matrix(brands, n_resp))
+  if (isTRUE(entry$per_brand)) {
+    mat <- single_response_brand_matrix(data, entry$client_code,
+                                        entry$category, brands)
+    out <- matrix(FALSE, n_resp, length(brands),
+                  dimnames = list(NULL, brands))
+    pos_codes_chr <- as.character(pos_codes)
+    for (b in brands) {
+      vals <- mat[, b]
+      out[, b] <- !is.na(vals) & as.character(vals) %in% pos_codes_chr
     }
+    out
+  } else {
+    # Fallback: single-response per-category attitude — rare in IPK
+    .empty_brand_matrix(brands, n_resp)
   }
-  mat
 }
 
-
-#' Optional per-brand stage helper (wraps the binary matrix builder, returns
-#' a warning instead of failing when the role is absent).
+#' Penetration long-window — slot-indexed Multi_Mention
 #' @keywords internal
-.optional_per_brand_stage <- function(role_map, role_name, data, brands,
-                                      n_resp, label) {
-  if (is.null(role_map[[role_name]])) {
+.stage_penetration_long <- function(role_map, data, brands, n_resp, cat_code) {
+  entry <- .lookup_role(role_map, "funnel.penetration_long", cat_code)
+  if (is.null(entry)) {
     return(list(matrix = NULL,
-                warning = sprintf("Stage '%s' dropped: role '%s' absent.",
-                                  label, role_name)))
+                warning = sprintf(
+                  "Stage 'Long Period' dropped: penetration_long role for %s absent.",
+                  cat_code %||% "(no cat)")))
   }
-  list(matrix = .per_brand_binary_matrix(role_map, role_name, data, brands, n_resp))
+  list(matrix = .multi_mention_or_empty(entry, data, brands, n_resp))
 }
 
+#' Penetration target window — slot-indexed Multi_Mention
+#' @keywords internal
+.stage_penetration_target <- function(role_map, data, brands, n_resp,
+                                      cat_code) {
+  entry <- .lookup_role(role_map, "funnel.penetration_target", cat_code)
+  if (is.null(entry)) {
+    return(list(matrix = NULL,
+                warning = sprintf(
+                  "Stage 'Target Period' dropped: penetration_target role for %s absent.",
+                  cat_code %||% "(no cat)")))
+  }
+  list(matrix = .multi_mention_or_empty(entry, data, brands, n_resp))
+}
 
+#' Resolve a Multi_Mention entry to a respondent × brand logical matrix
+#' @keywords internal
+.multi_mention_or_empty <- function(entry, data, brands, n_resp) {
+  if (is.null(entry) || is.null(entry$column_root)) {
+    return(.empty_brand_matrix(brands, n_resp))
+  }
+  multi_mention_brand_matrix(data, entry$column_root, brands)
+}
+
+.empty_brand_matrix <- function(brands, n_resp) {
+  matrix(FALSE, nrow = n_resp, ncol = length(brands),
+         dimnames = list(NULL, brands))
+}
 
 
 #' Single-response respondent-level role where value is a brand code
+#'
+#' Used for durable / service "current owner / customer" stages where a single
+#' column holds the respondent's chosen brand. Reads entry$columns[1] for v2
+#' entries (column_root for per-category single-response) or falls back to
+#' the legacy entry$columns[1] semantics.
+#'
 #' @keywords internal
 .single_response_brand_match_stage <- function(role_map, role_name,
-                                               data, brands, n_resp, label) {
-  entry <- role_map[[role_name]]
+                                               data, brands, n_resp, label,
+                                               cat_code = NULL) {
+  entry <- .lookup_role(role_map, role_name, cat_code)
   if (is.null(entry)) {
     return(list(matrix = NULL,
                 warning = sprintf("Stage '%s' dropped: role '%s' absent.",
                                   label, role_name)))
   }
-  col <- entry$columns[1]
-  if (!(col %in% names(data))) {
+  col <- if (length(entry$columns) > 0) entry$columns[1] else entry$column_root
+  if (is.null(col) || !(col %in% names(data))) {
     return(list(matrix = NULL,
                 warning = sprintf("Stage '%s' dropped: column '%s' not in data.",
-                                  label, col)))
+                                  label, col %||% "(NULL)")))
   }
   vals <- as.character(data[[col]])
   mat <- matrix(FALSE, nrow = n_resp, ncol = length(brands),
@@ -357,8 +447,8 @@ validate_nesting <- function(stages, weights = NULL) {
 #' Tenure stage (durable/service) — respondent's tenure ≥ threshold
 #' @keywords internal
 .tenure_stage <- function(role_map, role_name, data, brands, n_resp,
-                          tenure_threshold, label) {
-  entry <- role_map[[role_name]]
+                          tenure_threshold, label, cat_code = NULL) {
+  entry <- .lookup_role(role_map, role_name, cat_code)
   if (is.null(entry) || is.null(tenure_threshold) ||
       !nzchar(trimws(as.character(tenure_threshold)))) {
     return(list(matrix = NULL,
@@ -366,11 +456,11 @@ validate_nesting <- function(stages, weights = NULL) {
                   "Stage '%s' dropped: role '%s' or tenure_threshold absent.",
                   label, role_name)))
   }
-  col <- entry$columns[1]
-  if (!(col %in% names(data))) {
+  col <- if (length(entry$columns) > 0) entry$columns[1] else entry$column_root
+  if (is.null(col) || !(col %in% names(data))) {
     return(list(matrix = NULL,
                 warning = sprintf("Stage '%s' dropped: column '%s' not in data.",
-                                  label, col)))
+                                  label, col %||% "(NULL)")))
   }
 
   vals <- suppressWarnings(as.numeric(data[[col]]))
@@ -383,32 +473,6 @@ validate_nesting <- function(stages, weights = NULL) {
     mat[, b] <- long
   }
   list(matrix = mat)
-}
-
-
-# ==============================================================================
-# INTERNAL: SMALL HELPERS
-# ==============================================================================
-
-#' Find the data column for one brand within a per-brand role
-#' @keywords internal
-.column_for_brand <- function(entry, brand_code) {
-  if (is.null(entry) || length(entry$columns) == 0) return(NULL)
-  suffix <- paste0("_", brand_code)
-  hits <- entry$columns[endsWith(entry$columns, suffix)]
-  if (length(hits) == 0) return(NULL)
-  hits[1]
-}
-
-
-#' Return the ClientCode values in OptionMap that map to any of target_roles
-#' @keywords internal
-.attitude_codes_matching <- function(attitude_entry, target_roles) {
-  om <- attitude_entry$option_map
-  if (is.null(om)) return(character(0))
-  sub <- om[!is.na(om$Role) & om$Role %in% target_roles, , drop = FALSE]
-  if (nrow(sub) == 0) return(character(0))
-  trimws(as.character(sub$ClientCode))
 }
 
 

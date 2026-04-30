@@ -156,9 +156,15 @@ resolve_role_columns <- function(role_map, data) {
   for (role in names(role_map)) {
     e <- role_map[[role]]
     if (isTRUE(e$per_brand)) {
-      if (!(e$columns %in% data_names)) {
-        e$columns <- character(0)  # absent — element decides handling
+      # Compound per-brand entry: resolve to a NAMED character vector,
+      # one entry per applicable_brand whose column exists.
+      brands <- as.character(e$applicable_brands %||% character(0))
+      cols <- setNames(character(0), character(0))
+      for (b in brands) {
+        col <- paste0(e$column_root, "_", b)
+        if (col %in% data_names) cols[b] <- col
       }
+      e$columns <- cols
     } else if (e$variable_type == "Multi_Mention") {
       pat <- paste0("^", .regex_escape(e$column_root), "_[0-9]+$")
       slots <- grep(pat, data_names, value = TRUE)

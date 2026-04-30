@@ -63,12 +63,18 @@ run_funnel <- function(data, role_map, brand_list, config,
   alpha         <- .numeric_or_default(config[["funnel.significance_level"]], 0.05)
   tenure_thr    <- config[["funnel.tenure_threshold"]]
 
+  cat_code <- config$cat_code  # may be NULL for legacy single-cat callers
+  pos_codes <- config[["funnel.positive_attitude_codes"]] %||%
+    .FUNNEL_POSITIVE_ATTITUDE_CODES
+
   derived <- derive_funnel_stages(
     data          = data,
     role_map      = role_map,
     category_type = category_type,
     brand_list    = brand_list,
-    tenure_threshold = tenure_thr
+    tenure_threshold = tenure_thr,
+    cat_code      = cat_code,
+    positive_attitude_codes = pos_codes
   )
   validate_nesting(derived$stages, weights = weights)
 
@@ -87,11 +93,12 @@ run_funnel <- function(data, role_map, brand_list, config,
   }
   att_df <- if (!is.null(aware_matrix)) {
     calculate_attitude_decomposition(
-      attitude_entry   = role_map[["funnel.attitude"]],
+      attitude_entry   = .lookup_role(role_map, "funnel.attitude", cat_code),
       awareness_matrix = aware_matrix,
       data             = data,
       brand_list       = brand_list,
-      weights          = weights
+      weights          = weights,
+      positive_attitude_codes = pos_codes
     )
   } else {
     data.frame()

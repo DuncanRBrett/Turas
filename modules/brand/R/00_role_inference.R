@@ -55,17 +55,40 @@ infer_role_map <- function(questions, brands, active_cats) {
   } else list()
 
   role_map <- list()
-  q_codes  <- questions$QuestionCode
+  per_brand_collect <- list()  # role -> list(match, qrow, brands)
+  q_codes <- questions$QuestionCode
 
+  # Pass 1: per-row matching. Non-per-brand entries land directly in role_map;
+  # per-brand entries are deferred so we can aggregate brands per role.
   for (qc in q_codes) {
     qrow <- questions[questions$QuestionCode == qc, , drop = FALSE][1, ]
     matches <- .match_patterns(qc)
     for (m in matches) {
       if (!is.null(m$category) &&
           length(active_cats) > 0L && !(m$category %in% active_cats)) next
-      entry <- .build_entry_from_match(m, qc, qrow, brands_by_cat)
-      if (!is.null(entry)) role_map[[entry$role]] <- entry
+      kind <- m$column_kind %||% "system"
+      if (kind == "per_brand") {
+        # Defer — collect brands by role
+        if (is.null(per_brand_collect[[m$role]])) {
+          per_brand_collect[[m$role]] <- list(
+            match = m, qrow = qrow, brands = character(0)
+          )
+        }
+        per_brand_collect[[m$role]]$brands <- unique(c(
+          per_brand_collect[[m$role]]$brands,
+          m$detail$brand
+        ))
+      } else {
+        entry <- .build_entry_from_match(m, qc, qrow, brands_by_cat)
+        if (!is.null(entry)) role_map[[entry$role]] <- entry
+      }
     }
+  }
+
+  # Pass 2: build a single compound entry per per-brand role
+  for (role in names(per_brand_collect)) {
+    coll <- per_brand_collect[[role]]
+    role_map[[role]] <- .entry_per_brand_compound(coll, brands_by_cat)
   }
 
   role_map
@@ -289,9 +312,10 @@ infer_role_map <- function(questions, brands, active_cats) {
 }
 
 .entry_per_brand <- function(m, qc, qrow) {
-  cat <- m$category
+  # Single-brand stub used during pass 1 of infer_role_map; consolidated
+  # into a compound entry by .entry_per_brand_compound() in pass 2.
   list(
-    role = m$role, category = cat %||% NA_character_,
+    role = m$role, category = m$category %||% NA_character_,
     client_code = .extract_per_brand_root(qc),
     variable_type = qrow$Variable_Type %||% "Single_Response",
     column_root = sub(paste0("_", m$detail$brand, "$"), "", qc),
@@ -300,6 +324,36 @@ infer_role_map <- function(questions, brands, active_cats) {
     question_text = .nz(qrow$QuestionText),
     option_scale = NA_character_, option_map = NULL,
     notes = "", detail = m$detail %||% list()
+  )
+}
+
+#' Build a per-brand compound entry from collected per-brand matches
+#'
+#' Per-brand patterns (BRANDATT1_DSS_IPK, BRANDATT1_DSS_ROB, ...) all share
+#' the same role (\code{funnel.attitude.DSS}). This function aggregates
+#' them into a single entry whose \code{applicable_brands} lists every
+#' brand seen. \code{column_root} keeps the brand-stripped form so the
+#' resolver can rebuild per-brand columns by paste0(root, "_", brand).
+#'
+#' @keywords internal
+.entry_per_brand_compound <- function(coll, brands_by_cat) {
+  m <- coll$match
+  qrow <- coll$qrow
+  cat <- m$category
+  # column_root = strip brand suffix from the original question code
+  column_root <- sub(paste0("_", m$detail$brand, "$"), "",
+                     qrow$QuestionCode)
+  list(
+    role = m$role, category = cat %||% NA_character_,
+    client_code = .extract_per_brand_root(qrow$QuestionCode),
+    variable_type = qrow$Variable_Type %||% "Single_Response",
+    column_root = column_root,
+    per_brand = TRUE,
+    columns = NULL,  # populated by .resolve_columns()
+    applicable_brands = sort(unique(coll$brands)),
+    question_text = .nz(qrow$QuestionText),
+    option_scale = NA_character_, option_map = NULL,
+    notes = "", detail = list(pattern_kind = "per_brand_compound")
   )
 }
 

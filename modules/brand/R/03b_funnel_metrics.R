@@ -23,6 +23,18 @@ BRAND_FUNNEL_METRICS_VERSION <- "2.0"
   "attitude.reject", "attitude.no_opinion"
 )
 
+# IPK-canonical numeric attitude codes mapped to attitude roles. Used when
+# the role-map entry has no option_map (v2 convention-first inference).
+# Operators following a different coding scheme can supply an override via
+# attitude_entry$attitude_role_codes (a named list of role -> codes).
+.FUNNEL_DEFAULT_ATTITUDE_ROLE_CODES <- list(
+  "attitude.love"       = "1",
+  "attitude.prefer"     = "2",
+  "attitude.ambivalent" = "3",
+  "attitude.reject"     = "4",
+  "attitude.no_opinion" = "5"
+)
+
 
 # ==============================================================================
 # calculate_stage_metrics
@@ -122,24 +134,65 @@ calculate_conversions <- function(stage_metrics, method = "ratio") {
 #' @export
 calculate_attitude_decomposition <- function(attitude_entry, awareness_matrix,
                                              data, brand_list,
-                                             weights = NULL) {
-  if (is.null(attitude_entry) || is.null(attitude_entry$option_map)) {
-    return(.empty_attitude_df())
-  }
+                                             weights = NULL,
+                                             positive_attitude_codes = NULL) {
+  if (is.null(attitude_entry)) return(.empty_attitude_df())
   n_resp <- nrow(awareness_matrix)
   w <- weights %||% rep(1, n_resp)
   brands <- as.character(brand_list$BrandCode)
 
-  role_to_codes <- .option_map_by_role(attitude_entry$option_map)
+  role_to_codes <- .resolve_attitude_role_codes(attitude_entry)
   rows <- list()
-  for (b in brands) {
-    col <- .column_for_brand(attitude_entry, b)
-    if (is.null(col) || !(col %in% names(data))) next
-    rows <- c(rows, .attitude_rows_for_brand(
-      b, data[[col]], awareness_matrix[, b], w, role_to_codes))
+  if (isTRUE(attitude_entry$per_brand)) {
+    # v2 entry: read per-brand columns via the data-access layer
+    val_mat <- single_response_brand_matrix(data, attitude_entry$client_code,
+                                            attitude_entry$category, brands)
+    for (b in brands) {
+      vals <- val_mat[, b]
+      if (all(is.na(vals))) next
+      rows <- c(rows, .attitude_rows_for_brand(
+        b, vals, awareness_matrix[, b], w, role_to_codes))
+    }
+  } else if (!is.null(attitude_entry$columns)) {
+    # Legacy entry: iterate per-brand columns via column suffix matching
+    for (b in brands) {
+      col <- .legacy_column_for_brand(attitude_entry, b)
+      if (is.null(col) || !(col %in% names(data))) next
+      rows <- c(rows, .attitude_rows_for_brand(
+        b, data[[col]], awareness_matrix[, b], w, role_to_codes))
+    }
   }
   if (length(rows) == 0) return(.empty_attitude_df())
   do.call(rbind, rows)
+}
+
+
+#' Resolve attitude role -> codes mapping
+#'
+#' Order of precedence:
+#'   1. attitude_entry$attitude_role_codes (operator-supplied override)
+#'   2. attitude_entry$option_map (legacy QuestionMap path)
+#'   3. .FUNNEL_DEFAULT_ATTITUDE_ROLE_CODES (IPK convention, 1..5)
+#'
+#' @keywords internal
+.resolve_attitude_role_codes <- function(attitude_entry) {
+  if (!is.null(attitude_entry$attitude_role_codes)) {
+    return(attitude_entry$attitude_role_codes)
+  }
+  if (!is.null(attitude_entry$option_map)) {
+    return(.option_map_by_role(attitude_entry$option_map))
+  }
+  .FUNNEL_DEFAULT_ATTITUDE_ROLE_CODES
+}
+
+
+#' Find a per-brand column inside a legacy role entry's $columns vector
+#' @keywords internal
+.legacy_column_for_brand <- function(entry, brand_code) {
+  if (is.null(entry) || length(entry$columns) == 0) return(NULL)
+  hits <- entry$columns[endsWith(entry$columns, paste0("_", brand_code))]
+  if (length(hits) == 0) return(NULL)
+  hits[1]
 }
 
 

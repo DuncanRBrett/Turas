@@ -146,10 +146,12 @@ test_that("infer_role_map populates entry shape correctly", {
   expect_equal(e$detail$item_code, "CEP01")
 
   e <- rm[["funnel.attitude.DSS"]]
-  # Per-brand: detail$brand will be the LAST brand seen by inference
-  # (last write wins for compound role), but column_root strips the brand
+  # Compound per-brand entry: aggregates all per-brand questions for the
+  # role into a single entry with applicable_brands listing every brand seen.
   expect_true(e$per_brand)
   expect_equal(e$column_root, "BRANDATT1_DSS")
+  expect_equal(sort(e$applicable_brands), c("IPK", "ROB"))
+  expect_equal(e$detail$pattern_kind, "per_brand_compound")
 })
 
 
@@ -183,12 +185,13 @@ test_that("build_brand_role_map resolves slot columns against data", {
                c("BRANDAWARE_DSS_1", "BRANDAWARE_DSS_2", "BRANDAWARE_DSS_3"))
   expect_equal(rm[["funnel.penetration_long.DSS"]]$columns,
                c("BRANDPEN1_DSS_1", "BRANDPEN1_DSS_2"))
-  # Per-brand columns: each individual entry maps to one column
-  # (per-brand entries are role-map'd by role, last-write-wins; the column
-  # should be a valid existing column name for one of the brands)
+  # Per-brand compound: columns is a NAMED character vector,
+  # one entry per applicable_brand whose column exists in data
   att_entry <- rm[["funnel.attitude.DSS"]]
   expect_true(att_entry$per_brand)
-  expect_true(att_entry$columns %in% c("BRANDATT1_DSS_IPK", "BRANDATT1_DSS_ROB"))
+  expect_equal(sort(names(att_entry$columns)), c("IPK", "ROB"))
+  expect_equal(unname(att_entry$columns[c("IPK", "ROB")]),
+               c("BRANDATT1_DSS_IPK", "BRANDATT1_DSS_ROB"))
 })
 
 test_that("build_brand_role_map applies QuestionMap overrides", {
