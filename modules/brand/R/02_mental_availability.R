@@ -113,6 +113,92 @@ build_cep_linkage <- function(data, ceps, brands, questions, category) {
 }
 
 
+#' Build CEP (or attribute) linkage from v2 role registry + slot-indexed data
+#'
+#' v2 alternative to \code{build_cep_linkage()}. Reads the role map for
+#' \code{mental_avail.{kind}.{cat_code}.{ITEM}} entries (where kind is "cep"
+#' or "attr") and uses \code{multi_mention_brand_matrix()} from the
+#' data-access layer to build the linkage tensor from slot-indexed columns.
+#'
+#' Returns the same list shape as \code{build_cep_linkage()} so
+#' \code{run_mental_availability()} consumes either output identically.
+#'
+#' @param data Data frame. Survey data (one row per respondent).
+#' @param role_map Named list from \code{build_brand_role_map()}.
+#' @param cat_code Character. Category code (e.g. "DSS").
+#' @param brands Data frame with BrandCode column. Order defines tensor
+#'   column order.
+#' @param item_kind Character. "cep" (default) for CEPs, "attr" for
+#'   attribute statements. Determines which role-map entries are used:
+#'   \code{mental_avail.cep.{CAT}.*} or \code{mental_avail.attr.{CAT}.*}.
+#'
+#' @return List with the same fields as \code{build_cep_linkage()}:
+#'   linkage_tensor, respondent_cep_matrix (named cep_codes for both kinds
+#'   for downstream compatibility), brand_codes, cep_codes, n_respondents.
+#'
+#' @export
+build_cep_linkage_v2 <- function(data, role_map, cat_code, brands,
+                                 item_kind = "cep") {
+  if (!item_kind %in% c("cep", "attr")) {
+    stop("build_cep_linkage_v2: item_kind must be 'cep' or 'attr'")
+  }
+  brand_codes <- as.character(brands$BrandCode)
+  n_resp <- nrow(data)
+
+  # Walk role map for matching items
+  role_prefix <- paste0("mental_avail.", item_kind, ".", cat_code, ".")
+  matching_roles <- grep(paste0("^", .ma_regex_escape(role_prefix)),
+                         names(role_map), value = TRUE)
+  item_codes <- sub(.ma_regex_escape(role_prefix), "", matching_roles)
+
+  # Sort by trailing item-number suffix so CEP01 < CEP02 < ... in the output
+  item_codes <- item_codes[order(item_codes)]
+  matching_roles <- paste0(role_prefix, item_codes)
+
+  # Build linkage tensor: one matrix per brand [resp x items]
+  linkage_tensor <- list()
+  for (b in brand_codes) {
+    linkage_tensor[[b]] <- matrix(0L, nrow = n_resp, ncol = length(item_codes),
+                                  dimnames = list(NULL, item_codes))
+  }
+
+  for (j in seq_along(item_codes)) {
+    role <- matching_roles[j]
+    entry <- role_map[[role]]
+    if (is.null(entry) || is.null(entry$column_root)) next
+    # multi_mention_brand_matrix returns logical; coerce to integer
+    brand_mat <- multi_mention_brand_matrix(data, entry$column_root,
+                                            brand_codes)
+    for (b in brand_codes) {
+      linkage_tensor[[b]][, j] <- as.integer(brand_mat[, b])
+    }
+  }
+
+  # Respondent x item matrix: 1 if any brand linked
+  resp_item_mat <- matrix(0L, nrow = n_resp, ncol = length(item_codes),
+                          dimnames = list(NULL, item_codes))
+  for (b in brand_codes) {
+    resp_item_mat <- pmax(resp_item_mat, linkage_tensor[[b]])
+  }
+
+  list(
+    linkage_tensor        = linkage_tensor,
+    respondent_cep_matrix = resp_item_mat,
+    brand_codes           = brand_codes,
+    cep_codes             = item_codes,  # named cep_codes for back-compat
+    n_respondents         = n_resp
+  )
+}
+
+
+#' Regex-escape helper for build_cep_linkage_v2
+#' @keywords internal
+.ma_regex_escape <- function(s) {
+  gsub("([\\.\\+\\*\\?\\(\\)\\[\\]\\{\\}\\|\\^\\$])",
+       "\\\\\\1", s, perl = TRUE)
+}
+
+
 #' Build CEP linkage from a pre-shaped matrix
 #'
 #' Alternative constructor when data is already in a clean
