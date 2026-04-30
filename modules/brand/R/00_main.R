@@ -842,13 +842,20 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
 
   # --- STEP 5b: Portfolio Overview (focal-brand view across ALL categories) ---
   # Deep-dive AND awareness-only categories together, enriched with pen/SCR/vol
-  # for deep-dive cats from category_results.
+  # for deep-dive cats from category_results. v2 uses the global role_map for
+  # slot-indexed BRANDAWARE_{cat} lookups; legacy path retained as fallback.
   results$portfolio_overview <- tryCatch(
-    compute_portfolio_overview_data(
-      data, categories, structure, config,
-      weights          = weights,
-      category_results = category_results
-    ),
+    if (!is.null(role_map))
+      compute_portfolio_overview_data_v2(
+        data, role_map, categories, structure, config,
+        weights          = weights,
+        category_results = category_results)
+    else
+      compute_portfolio_overview_data(
+        data, categories, structure, config,
+        weights          = weights,
+        category_results = category_results
+      ),
     error = function(e) {
       warnings_list <<- c(warnings_list,
         sprintf("Portfolio overview failed: %s", e$message))
