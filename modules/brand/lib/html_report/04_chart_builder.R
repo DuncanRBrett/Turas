@@ -25,6 +25,37 @@ br_svg_wrap <- function(inner, width, height, aria_label) {
   )
 }
 
+#' Lighten a hex colour toward white
+#'
+#' Used to derive a rival-tier colour from the focal brand colour: the rival
+#' tier (top-N closest competitors in the constellation) sits midway between
+#' the saturated focal colour and the recessive comparator grey, so all three
+#' tiers are visually distinct without introducing a competing accent hue.
+#'
+#' @param hex Character. Hex colour, e.g. \code{"#1A5276"}. \code{NA} or empty
+#'   returns \code{"#94a3b8"} as a safe fallback.
+#' @param amount Numeric in \eqn{[0, 1]}. Mix weight toward white.
+#' @return Character. Lightened hex colour.
+#' @keywords internal
+.lighten_hex <- function(hex, amount = 0.45) {
+  if (is.null(hex) || is.na(hex) || !nzchar(hex)) return("#94a3b8")
+  hex <- gsub("^#", "", hex)
+  if (nchar(hex) == 3L) hex <- paste0(strsplit(hex, "")[[1]],
+                                        strsplit(hex, "")[[1]],
+                                        collapse = "")
+  if (nchar(hex) != 6L) return("#94a3b8")
+  r <- strtoi(substr(hex, 1, 2), 16L)
+  g <- strtoi(substr(hex, 3, 4), 16L)
+  b <- strtoi(substr(hex, 5, 6), 16L)
+  if (anyNA(c(r, g, b))) return("#94a3b8")
+  amount <- max(0, min(1, amount))
+  r <- as.integer(round(r + (255 - r) * amount))
+  g <- as.integer(round(g + (255 - g) * amount))
+  b <- as.integer(round(b + (255 - b) * amount))
+  sprintf("#%02X%02X%02X", r, g, b)
+}
+
+
 .br_escape <- function(x) {
   if (is.null(x) || is.na(x)) return("")
   x <- gsub("&", "&amp;", x, fixed = TRUE)
@@ -880,22 +911,43 @@ build_loyalty_profile_chart <- function(brand_repertoire_profile,
 #' Build competitive constellation network SVG
 #'
 #' Renders pre-computed node positions and edges as an inline SVG. Nodes are
-#' circles sized by total aware respondents. Focal brand is highlighted.
-#' Edges are drawn as lines with opacity proportional to Jaccard similarity.
+#' coloured in three visual tiers so the focal-vs-rivals-vs-rest read is
+#' immediately legible:
+#'   * Focal brand: \code{focal_colour}, dashed halo, larger radius.
+#'   * Top-N closest competitors (by Jaccard with focal): \code{rival_colour}
+#'     — a lightened shade of \code{focal_colour} by default, derived via
+#'     \code{.lighten_hex()} so it stays brand-consistent.
+#'   * All other brands: \code{comp_colour} — recessive grey.
+#' Node sizes scale with total aware respondents. Edges incident on the
+#' focal are highlighted in \code{focal_colour}; the rest stay grey.
 #'
-#' @param nodes Data frame: brand, n_aware_w, is_focal.
+#' @param nodes Data frame: brand, n_aware_w, is_focal (and optional
+#'   \code{brand_lbl} for display).
 #' @param edges Data frame: b1, b2, jaccard, cooccur_n.
 #' @param layout Data frame: brand, x, y (pre-computed positions).
-#' @param focal_colour Character. Hex colour for focal brand node.
-#' @param comp_colour Character. Hex colour for competitor nodes.
+#' @param focal_colour Character. Hex colour for focal brand node. Default
+#'   \code{"#1A5276"}.
+#' @param rival_colour Character or NULL. Hex colour for the top-N rival
+#'   tier. \code{NULL} (default) derives a lightened shade of
+#'   \code{focal_colour} via \code{.lighten_hex(focal_colour, 0.45)}.
+#' @param comp_colour Character. Hex colour for non-rival competitor nodes.
+#'   Default \code{"#94a3b8"}.
+#' @param top_n_rivals Integer. Number of closest-by-Jaccard competitors
+#'   to highlight as the rival tier. Default 5 (matches the side-panel
+#'   "Closest Competitors" list count). Set to 0 to disable the tier.
 #' @param title Character. Chart title.
 #'
 #' @return Character. Inline SVG string.
 #' @keywords internal
 build_network <- function(nodes, edges, layout,
                           focal_colour = "#1A5276",
+                          rival_colour = NULL,
                           comp_colour  = "#94a3b8",
+                          top_n_rivals = 5L,
                           title        = "Competitive Constellation") {
+  if (is.null(rival_colour) || !nzchar(rival_colour)) {
+    rival_colour <- .lighten_hex(focal_colour, 0.45)
+  }
   if (is.null(nodes) || nrow(nodes) == 0 || is.null(layout)) return("")
 
   # Bigger canvas + larger top/side margins so brand labels at the
@@ -926,6 +978,27 @@ build_network <- function(nodes, edges, layout,
   # Node radius: 8–22 px, scaled by n_aware_w
   max_aw <- max(nodes$n_aware_w, 1)
   nodes$r <- 8 + (nodes$n_aware_w / max_aw) * 14
+
+  # Top-N closest competitors to the focal, by Jaccard. Used for the
+  # rival visual tier (between focal and the recessive comparator grey)
+  # so the user can see the focal's mental-space rivals at a glance,
+  # not just from the side-panel ranking.
+  focal_idx <- which(isTRUE(any(nodes$is_focal)) & nodes$is_focal == TRUE)
+  focal_brand <- if (length(focal_idx) > 0L) {
+    as.character(nodes$brand[focal_idx[1L]])
+  } else ""
+  rival_brands <- character(0)
+  if (top_n_rivals > 0L && nzchar(focal_brand) &&
+      !is.null(edges) && nrow(edges) > 0L) {
+    inc <- edges[edges$b1 == focal_brand | edges$b2 == focal_brand, ,
+                 drop = FALSE]
+    if (nrow(inc) > 0L) {
+      inc <- inc[order(inc$jaccard, decreasing = TRUE), , drop = FALSE]
+      rivals <- ifelse(inc$b1 == focal_brand, inc$b2, inc$b1)
+      rivals <- rivals[!duplicated(rivals)]
+      rival_brands <- head(rivals, top_n_rivals)
+    }
+  }
 
   parts <- character(0)
 
@@ -968,7 +1041,10 @@ build_network <- function(nodes, edges, layout,
   for (i in seq_len(nrow(nodes))) {
     nd <- nodes[i, ]
     is_focal <- isTRUE(nd$is_focal)
-    col      <- if (is_focal) focal_colour else comp_colour
+    is_rival <- !is_focal && (nd$brand %in% rival_brands)
+    col      <- if (is_focal) focal_colour
+                else if (is_rival) rival_colour
+                else comp_colour
     radius   <- if (is_focal) nd$r * 1.25 else nd$r
     label    <- if (has_lbl && nzchar(as.character(nd$brand_lbl)))
                   as.character(nd$brand_lbl) else as.character(nd$brand)
@@ -996,24 +1072,47 @@ build_network <- function(nodes, edges, layout,
     # Hover tooltip is delivered by JS (instant, reliable) — the brand
     # display label rides on the circle as a data attribute so the
     # tooltip handler can read it without a DOM walk.
+    node_cls <- if (is_focal) " pf-cn-node-focal"
+                else if (is_rival) " pf-cn-node-rival"
+                else ""
+    label_cls <- if (is_focal) " pf-cn-label-focal"
+                 else if (is_rival) " pf-cn-label-rival"
+                 else ""
+    label_fill <- if (is_focal) "#1e293b"
+                  else if (is_rival) "#334155"
+                  else "#64748b"
+    label_size <- if (is_focal) "12"
+                  else if (is_rival) "11"
+                  else "10"
+    label_wt   <- if (is_focal) "700"
+                  else if (is_rival) "600"
+                  else "400"
+
     parts <- c(parts,
       sprintf('<circle class="pf-cn-node%s" data-pf-cn-node="%s" data-pf-cn-base-r="%g" data-pf-cn-name="%s" cx="%g" cy="%g" r="%g" fill="%s" opacity="0.9" stroke="#fff" stroke-width="2" data-brand="%s" style="cursor:pointer;" onclick="pfConstellationNodeClick(event,\'%s\')"></circle>',
-              if (is_focal) " pf-cn-node-focal" else "",
+              node_cls,
               bcode, nd$r, .br_escape(label),
               nd$svgx, nd$svgy, radius, col,
               bcode, bcode),
       sprintf('<text class="pf-cn-label%s" data-pf-cn-label="%s" x="%g" y="%g" text-anchor="%s" fill="%s" font-size="%s" font-weight="%s">%s</text>',
-              if (is_focal) " pf-cn-label-focal" else "",
+              label_cls,
               bcode,
               label_x, label_y, anchor,
-              if (is_focal) "#1e293b" else "#64748b",
-              if (is_focal) "12" else "10",
-              if (is_focal) "700" else "400",
+              label_fill, label_size, label_wt,
               .br_escape(.br_trunc(label, 24)))
     )
   }
 
-  br_svg_wrap(paste(parts, collapse = "\n"), w, h, title)
+  # Wrap the SVG and decorate with rival metadata so the JS-side focal
+  # switcher uses the same lightened shade we computed here, and can
+  # recompute the tier on focal change without re-running the layout.
+  svg <- br_svg_wrap(paste(parts, collapse = "\n"), w, h, title)
+  rivals_attr <- paste(rival_brands, collapse = ",")
+  sub("^<svg ", sprintf(
+    '<svg data-pf-cn-rival-colour="%s" data-pf-cn-rivals="%s" data-pf-cn-top-n="%d" ',
+    .br_escape(rival_colour), .br_escape(rivals_attr),
+    as.integer(top_n_rivals)
+  ), svg)
 }
 
 

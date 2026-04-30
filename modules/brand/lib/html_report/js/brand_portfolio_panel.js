@@ -758,15 +758,19 @@ function pfCnRestyleSvgForFocal(svg, focalCode, focalColour) {
   // initial focal); we draw a fresh one for the new focal below.
   svg.querySelectorAll('.pf-cn-halo').forEach(function (h) { h.remove(); });
 
-  // Reset every node + label to comparator styling.
+  // Reset every node + label to comparator styling. The rival tier
+  // (top-N closest competitors) is re-applied below from the live edge
+  // ranking once the new focal is set.
   svg.querySelectorAll('.pf-cn-node').forEach(function (n) {
     var baseR = parseFloat(n.getAttribute('data-pf-cn-base-r')) || 8;
     n.classList.remove('pf-cn-node-focal');
+    n.classList.remove('pf-cn-node-rival');
     n.setAttribute('r', baseR);
     n.setAttribute('fill', '#94a3b8');
   });
   svg.querySelectorAll('.pf-cn-label').forEach(function (t) {
     t.classList.remove('pf-cn-label-focal');
+    t.classList.remove('pf-cn-label-rival');
     t.setAttribute('fill', '#64748b');
     t.setAttribute('font-size', '10');
     t.setAttribute('font-weight', '400');
@@ -822,16 +826,20 @@ function pfCnRestyleSvgForFocal(svg, focalCode, focalColour) {
   node.parentNode.insertBefore(halo, node);
 
   // Highlight focal-incident edges so the chart matches the rivals list.
-  // Layout (Fruchterman-Reingold) places nodes by GLOBAL stress so visual
-  // distance is not a faithful read of pairwise Jaccard with the focal —
-  // the highlighted edges show the true focal-relative ranking on top.
+  // Each focal-incident edge carries a Jaccard score on data-pf-cn-jac,
+  // which we'll also use below to identify the top-N rival tier.
   var focalEdges = svg.querySelectorAll(
     '.pf-cn-edge[data-pf-cn-b1="' + fcss + '"], ' +
     '.pf-cn-edge[data-pf-cn-b2="' + fcss + '"]');
   var maxJac = 0;
+  var rivalJacs = [];  // {code, jac} per focal-incident edge
   focalEdges.forEach(function (e) {
     var j = parseFloat(e.getAttribute('data-pf-cn-jac')) || 0;
     if (j > maxJac) maxJac = j;
+    var b1 = e.getAttribute('data-pf-cn-b1');
+    var b2 = e.getAttribute('data-pf-cn-b2');
+    var rival = (b1 === focalCode) ? b2 : b1;
+    if (rival) rivalJacs.push({ code: rival, jac: j });
   });
   if (maxJac < 1e-6) maxJac = 1;
   focalEdges.forEach(function (e) {
@@ -843,8 +851,65 @@ function pfCnRestyleSvgForFocal(svg, focalCode, focalColour) {
     e.classList.add('pf-cn-edge-focal');
   });
 
+  // Rival tier — top-N closest competitors by Jaccard. The SVG carries
+  // data-pf-cn-rival-colour (lightened focal hex computed by the server)
+  // and data-pf-cn-top-n (count, default 5). When the user changes
+  // focal we recompute the top-N here from the live edges so the
+  // colour follows the picker.
+  var topN = parseInt(svg.getAttribute('data-pf-cn-top-n'), 10);
+  if (!isFinite(topN) || topN < 0) topN = 5;
+  var rivalColour = svg.getAttribute('data-pf-cn-rival-colour') ||
+                    pfCnDeriveRivalColour(focalColour);
+  rivalJacs.sort(function (a, b) { return b.jac - a.jac; });
+  var seen = {};
+  var topRivals = [];
+  for (var ri = 0; ri < rivalJacs.length && topRivals.length < topN; ri++) {
+    var rcode = rivalJacs[ri].code;
+    if (seen[rcode]) continue;
+    seen[rcode] = true;
+    topRivals.push(rcode);
+  }
+  topRivals.forEach(function (rcode) {
+    var rcss = (window.CSS && CSS.escape) ? CSS.escape(rcode)
+      : rcode.replace(/([^a-zA-Z0-9_\-])/g, '\\$1');
+    var rNode  = svg.querySelector('.pf-cn-node[data-pf-cn-node="' + rcss + '"]');
+    var rLabel = svg.querySelector('.pf-cn-label[data-pf-cn-label="' + rcss + '"]');
+    if (rNode) {
+      rNode.classList.add('pf-cn-node-rival');
+      rNode.setAttribute('fill', rivalColour);
+    }
+    if (rLabel) {
+      rLabel.classList.add('pf-cn-label-rival');
+      rLabel.setAttribute('fill', '#334155');
+      rLabel.setAttribute('font-size', '11');
+      rLabel.setAttribute('font-weight', '600');
+    }
+  });
+
   // Hover tooltip text is built on demand by pfCnFormatTooltip from
   // the live edge data, so no pre-population is needed when focal changes.
+}
+
+// Lighten a focal hex toward white by 45% — matches the server-side
+// .lighten_hex() helper so the rival colour stays consistent across
+// the initial render and JS-driven focal switches.
+function pfCnDeriveRivalColour(hex) {
+  if (!hex) return '#7DA8C4';
+  var clean = hex.replace(/^#/, '');
+  if (clean.length === 3) {
+    clean = clean.split('').map(function (c) { return c + c; }).join('');
+  }
+  if (clean.length !== 6) return '#7DA8C4';
+  var r = parseInt(clean.substr(0, 2), 16);
+  var g = parseInt(clean.substr(2, 2), 16);
+  var b = parseInt(clean.substr(4, 2), 16);
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return '#7DA8C4';
+  var amt = 0.45;
+  r = Math.round(r + (255 - r) * amt);
+  g = Math.round(g + (255 - g) * amt);
+  b = Math.round(b + (255 - b) * amt);
+  var hh = function (n) { return ('0' + n.toString(16)).slice(-2); };
+  return ('#' + hh(r) + hh(g) + hh(b)).toUpperCase();
 }
 
 // Brand display label for a node — read the matching <text> in the
