@@ -307,8 +307,13 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       )
     } else NULL
   }, error = function(e) {
+    msg <- sprintf("Role map build failed: %s", e$message)
+    cat(sprintf(
+      "\n=== TURAS BRAND ERROR ===\n[CFG_ROLE_MAP_BUILD_FAILED] %s\nHow to fix: Check Survey_Structure.xlsx has a Questions sheet with valid Role column. All v2 elements will be skipped.\n=========================\n\n",
+      msg
+    ))
     warnings_list <<- c(warnings_list,
-      sprintf("Role map build failed: %s — v2 elements will skip", e$message))
+      sprintf("%s — v2 elements will skip", msg))
     NULL
   })
 

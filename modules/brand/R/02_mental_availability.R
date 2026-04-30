@@ -140,7 +140,11 @@ build_cep_linkage <- function(data, ceps, brands, questions, category) {
 build_cep_linkage_v2 <- function(data, role_map, cat_code, brands,
                                  item_kind = "cep") {
   if (!item_kind %in% c("cep", "attr")) {
-    stop("build_cep_linkage_v2: item_kind must be 'cep' or 'attr'")
+    cat(sprintf(
+      "\n=== TURAS BRAND ERROR ===\n[DATA_MA_INVALID_ITEM_KIND] build_cep_linkage_v2: item_kind must be 'cep' or 'attr', got '%s'\nHow to fix: Pass item_kind = 'cep' for CEP linkage or item_kind = 'attr' for brand attribute linkage.\n=========================\n\n",
+      item_kind
+    ))
+    return(NULL)
   }
   brand_codes <- as.character(brands$BrandCode)
   n_resp <- nrow(data)

@@ -95,12 +95,12 @@ test_that("build_portfolio_base_v2: SQ2 absent + 3m falls back to SQ1", {
 test_that("build_portfolio_base_v2: refuses with structured shape on bad input", {
   out_empty <- build_portfolio_base_v2(data.frame(), "DSS", timeframe = "3m")
   expect_equal(out_empty$status, "REFUSED")
-  expect_equal(out_empty$code, "DATA_PORTFOLIO_NO_AWARENESS_COLS")
+  expect_equal(out_empty$code, "DATA_PORTFOLIO_NOT_DATA_FRAME")
 
   out_no_cat <- build_portfolio_base_v2(mk_pf_mini_data(), "",
                                          timeframe = "3m")
   expect_equal(out_no_cat$status, "REFUSED")
-  expect_equal(out_no_cat$code, "DATA_PORTFOLIO_TIMEFRAME_MISSING")
+  expect_equal(out_no_cat$code, "DATA_PORTFOLIO_MISSING_CAT_CODE")
 
   out_no_cols <- build_portfolio_base_v2(
     data.frame(other = 1:3, stringsAsFactors = FALSE),

@@ -170,14 +170,14 @@ build_portfolio_base_v2 <- function(data, cat_code,
                                     weights = NULL) {
   if (is.null(data) || !is.data.frame(data) || nrow(data) == 0L) {
     return(list(status = "REFUSED",
-                code = "DATA_PORTFOLIO_NO_AWARENESS_COLS",
+                code = "DATA_PORTFOLIO_NOT_DATA_FRAME",
                 message = "data must be a non-empty data frame",
                 how_to_fix = "Provide a non-empty data frame to build_portfolio_base_v2()"))
   }
   if (is.null(cat_code) || length(cat_code) != 1L ||
       !nzchar(trimws(as.character(cat_code)))) {
     return(list(status = "REFUSED",
-                code = "DATA_PORTFOLIO_TIMEFRAME_MISSING",
+                code = "DATA_PORTFOLIO_MISSING_CAT_CODE",
                 message = "cat_code must be a non-empty character scalar",
                 how_to_fix = "Provide a valid category code such as 'DSS'"))
   }

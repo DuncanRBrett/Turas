@@ -212,8 +212,12 @@ run_audience_lens <- function(data, weights = NULL, cat_brands, cat_code,
 .al_normalise_weights <- function(weights, n) {
   if (is.null(weights)) return(rep(1, n))
   if (length(weights) != n) {
-    stop(sprintf("Audience lens: weights length (%d) != data rows (%d)",
-                 length(weights), n))
+    msg <- sprintf("Audience lens: weights length (%d) != data rows (%d)", length(weights), n)
+    cat(sprintf(
+      "\n=== TURAS BRAND ERROR ===\n[DATA_AL_WEIGHTS_LENGTH_MISMATCH] %s\nHow to fix: Ensure the weights vector has one value per respondent row (length == nrow(data)).\n=========================\n\n",
+      msg
+    ))
+    stop(msg, call. = FALSE)
   }
   w <- as.numeric(weights)
   w[is.na(w)] <- 0
