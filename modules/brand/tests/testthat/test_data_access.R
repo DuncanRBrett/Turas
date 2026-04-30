@@ -157,6 +157,56 @@ test_that("single_response_brand_matrix returns 0-col matrix for empty brands", 
 
 
 # ------------------------------------------------------------------------------
+# multi_mention_indicator_matrix()
+# ------------------------------------------------------------------------------
+
+test_that("multi_mention_indicator_matrix returns 0/1 integer matrix", {
+  df <- data.frame(
+    CH_1 = c("SPMKT", "ONLINE", NA),
+    CH_2 = c("ONLINE", NA, "FARM"),
+    CH_3 = c(NA, NA, NA),
+    stringsAsFactors = FALSE
+  )
+  m <- multi_mention_indicator_matrix(df, "CH",
+                                      c("SPMKT", "ONLINE", "FARM"))
+  expect_equal(dim(m), c(3, 3))
+  expect_equal(colnames(m), c("SPMKT", "ONLINE", "FARM"))
+  expect_equal(m[, "SPMKT"],  c(1L, 0L, 0L))
+  expect_equal(m[, "ONLINE"], c(1L, 1L, 0L))
+  expect_equal(m[, "FARM"],   c(0L, 0L, 1L))
+  expect_true(is.integer(m))
+})
+
+
+# ------------------------------------------------------------------------------
+# slot_paired_numeric_matrix()
+# ------------------------------------------------------------------------------
+
+test_that("slot_paired_numeric_matrix joins codes + values by slot index", {
+  df <- data.frame(
+    BP2_1 = c("IPK", "ROB",  NA,    "IPK"),
+    BP2_2 = c("ROB", NA,     "IPK", NA),
+    BP2_3 = c(NA,    NA,     NA,    NA),
+    BP3_1 = c(5,     3,      NA,    7),
+    BP3_2 = c(2,     NA,     4,     NA),
+    BP3_3 = c(NA,    NA,     NA,    NA),
+    stringsAsFactors = FALSE
+  )
+  m <- slot_paired_numeric_matrix(df, "BP2", "BP3", c("IPK", "ROB"))
+  expect_equal(dim(m), c(4, 2))
+  expect_equal(m[, "IPK"], c(5, 0, 4, 7))
+  expect_equal(m[, "ROB"], c(2, 3, 0, 0))
+})
+
+test_that("slot_paired_numeric_matrix returns 0 matrix when roots absent", {
+  df <- data.frame(other = 1:3)
+  m <- slot_paired_numeric_matrix(df, "BP2", "BP3", c("IPK", "ROB"))
+  expect_equal(dim(m), c(3, 2))
+  expect_true(all(m == 0))
+})
+
+
+# ------------------------------------------------------------------------------
 # Integration: against the real IPK Wave 1 fixture
 # ------------------------------------------------------------------------------
 
@@ -190,4 +240,22 @@ test_that("data access works against the IPK Wave 1 fixture", {
   att_mat <- single_response_brand_matrix(dss, "BRANDATT1", "DSS",
                                           c("IPK", "ROB"))
   expect_equal(dim(att_mat), c(nrow(dss), 2))
+
+  # Channel indicator matrix
+  ch_mat <- multi_mention_indicator_matrix(dss, "CHANNEL_DSS",
+                                           c("SPMKT", "ONLINE", "FARM"))
+  expect_equal(dim(ch_mat), c(nrow(dss), 3))
+  expect_true(all(ch_mat %in% c(0L, 1L)))
+  # Most DSS focal recent buyers pick SPMKT — should be the most-picked
+  # channel by a wide margin.
+  share <- colSums(ch_mat) / nrow(dss)
+  expect_true(share[["SPMKT"]] >= max(share))
+
+  # Slot-paired purchase frequency: BRANDPEN2 codes + BRANDPEN3 counts
+  paired <- slot_paired_numeric_matrix(dss, "BRANDPEN2_DSS",
+                                       "BRANDPEN3_DSS",
+                                       c("IPK", "ROB", "KNORR"))
+  expect_equal(dim(paired), c(nrow(dss), 3))
+  expect_true(all(paired >= 0))
+  expect_true(any(paired > 0))  # at least some non-zero counts
 })

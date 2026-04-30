@@ -189,6 +189,101 @@ single_response_brand_matrix <- function(data, root, cat_code, brand_codes) {
 }
 
 
+#' Build a per-respondent x per-option 0/1 indicator matrix
+#'
+#' Adapter for elements (e.g. shopper behaviour) that expect 0/1 column-per-
+#' option data. Wraps multi_mention_brand_matrix() and coerces logical to
+#' integer.
+#'
+#' @param data Data frame.
+#' @param root Question root code (e.g. "CHANNEL_DSS").
+#' @param codes Character vector of option codes to test (e.g. channel codes).
+#' @return Integer matrix [nrow(data) x length(codes)] with codes as colnames,
+#'   1 where the respondent selected that option, 0 otherwise.
+#' @examples
+#' \dontrun{
+#'   ind <- multi_mention_indicator_matrix(data, "CHANNEL_DSS",
+#'                                         c("SPMKT","ONLINE"))
+#' }
+#' @export
+multi_mention_indicator_matrix <- function(data, root, codes) {
+  m <- multi_mention_brand_matrix(data, root, codes)
+  # Preserve dim + dimnames when coercing
+  out <- matrix(as.integer(m), nrow = nrow(m), ncol = ncol(m),
+                dimnames = dimnames(m))
+  out
+}
+
+
+#' Build a per-respondent x per-option numeric matrix from a slot-paired
+#' Multi_Mention + Continuous_Sum question pair
+#'
+#' Used for the BRANDPEN2 + BRANDPEN3 shape: BRANDPEN2_DSS_1..N hold brand
+#' codes (where the respondent bought that brand in the target window) and
+#' BRANDPEN3_DSS_1..N hold purchase counts at the same slot index. Returns
+#' a numeric matrix where cell [i, brand] = count if the brand appears in
+#' any slot for respondent i, else 0.
+#'
+#' Slot N in BRANDPEN3 maps to the brand at slot N in BRANDPEN2 — the
+#' Alchemer Continuous Sum question is piped from the previous Multi_Mention.
+#'
+#' @param data Data frame.
+#' @param root_codes Question root for the brand-code multi-mention
+#'   (e.g. "BRANDPEN2_DSS").
+#' @param root_values Question root for the numeric per-slot values
+#'   (e.g. "BRANDPEN3_DSS").
+#' @param brand_codes Character vector of brand codes.
+#' @return Numeric matrix [nrow(data) x length(brand_codes)] with brand_codes
+#'   as colnames. NA values in the value root become 0. If a brand appears
+#'   multiple times across slots for the same respondent (shouldn't happen
+#'   in a well-piped Alchemer survey), counts are summed.
+#' @examples
+#' \dontrun{
+#'   x_mat <- slot_paired_numeric_matrix(data, "BRANDPEN2_DSS",
+#'                                       "BRANDPEN3_DSS",
+#'                                       c("IPK","ROB"))
+#' }
+#' @export
+slot_paired_numeric_matrix <- function(data, root_codes, root_values,
+                                       brand_codes) {
+  .require_dataframe(data)
+  .require_root(root_codes)
+  .require_root(root_values)
+  if (length(brand_codes) == 0L) {
+    return(matrix(0, nrow = nrow(data), ncol = 0L))
+  }
+  brand_codes <- as.character(brand_codes)
+
+  code_cols <- .slot_columns(data, root_codes)
+  val_cols  <- .slot_columns(data, root_values)
+  if (length(code_cols) == 0L || length(val_cols) == 0L) {
+    return(matrix(0, nrow = nrow(data), ncol = length(brand_codes),
+                  dimnames = list(NULL, brand_codes)))
+  }
+
+  # Pair slots by trailing index. Some Alchemer surveys have BRANDPEN3 with
+  # length(brands) slots while BRANDPEN2 has length(brands)+1 (NONE option).
+  # Match on minimum index range; slots beyond either end contribute 0.
+  code_idx <- as.integer(sub(paste0("^", root_codes, "_"), "", code_cols))
+  val_idx  <- as.integer(sub(paste0("^", root_values, "_"), "", val_cols))
+  shared <- intersect(code_idx, val_idx)
+
+  out <- matrix(0, nrow = nrow(data), ncol = length(brand_codes),
+                dimnames = list(NULL, brand_codes))
+  for (slot in shared) {
+    code_vec <- as.character(data[[paste0(root_codes, "_", slot)]])
+    val_vec  <- suppressWarnings(as.numeric(
+      data[[paste0(root_values, "_", slot)]]))
+    val_vec[is.na(val_vec)] <- 0
+    for (b in brand_codes) {
+      hit <- !is.na(code_vec) & code_vec == b
+      out[hit, b] <- out[hit, b] + val_vec[hit]
+    }
+  }
+  out
+}
+
+
 # ==============================================================================
 # INTERNAL HELPERS
 # ==============================================================================

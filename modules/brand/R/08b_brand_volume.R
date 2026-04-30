@@ -13,7 +13,7 @@
 #     A comprehensive model of buying behaviour. JRSS-A 147(5), 621-655.
 # ==============================================================================
 
-BRAND_VOLUME_VERSION <- "1.0"
+BRAND_VOLUME_VERSION <- "2.0"
 
 # Threshold multiplier for 99th-percentile winsorisation
 .BV_WINSOR_MULT_DEFAULT <- 3
@@ -29,11 +29,13 @@ BRAND_VOLUME_VERSION <- "1.0"
 #' @param cat_data Data frame. Rows = respondents for the focal category.
 #' @param cat_brands Data frame. Must have a \code{BrandCode} column whose
 #'   order defines the matrix columns.
-#' @param pen_target_prefix Character. Column prefix for BRANDPEN2 columns,
-#'   e.g. \code{"BRANDPEN2"}.  Resolved to
-#'   \code{<prefix>_<cat>_<brand>} or \code{<prefix>_<brand>}.
-#' @param freq_prefix Character. Column prefix for BRANDPEN3 columns,
-#'   e.g. \code{"BRANDPEN3"}.
+#' @param pen_target_prefix Character. Question root for BRANDPEN2 columns,
+#'   e.g. \code{"BRANDPEN2_DSS"}. The function expects slot-indexed columns
+#'   matching \code{<root>_[0-9]+} (AlchemerParser shape). For backward
+#'   compatibility with legacy column-per-brand fixtures, the function
+#'   falls back to per-brand column matching when no slot columns exist.
+#' @param freq_prefix Character. Question root for BRANDPEN3 columns,
+#'   e.g. \code{"BRANDPEN3_DSS"}. Same shape as pen_target_prefix.
 #' @param winsor_mult Numeric. Multiplier applied to the 99th percentile of
 #'   per-respondent category volume to set the winsorisation cap.  Default 3.
 #' @param verbose Logical. Print reconciliation stats to console.
@@ -78,43 +80,53 @@ build_brand_volume_matrix <- function(cat_data,
   x_mat   <- matrix(0.0,  nrow = n_resp, ncol = n_brands,
                     dimnames = list(NULL, brands))
 
-  missing_pen  <- character(0)
-  missing_freq <- character(0)
   coerce_fails <- 0L
 
-  # --- Per-brand column extraction ---
-  for (bi in seq_along(brands)) {
-    br <- brands[bi]
+  # Detect column shape: slot-indexed (parser-shape) or per-brand (legacy).
+  has_slots_pen  <- length(.bv_slot_cols(cat_data, pen_target_prefix)) > 0
+  has_slots_freq <- length(.bv_slot_cols(cat_data, freq_prefix)) > 0
 
-    pen_col  <- .bv_find_col(cat_data, pen_target_prefix, br)
-    freq_col <- .bv_find_col(cat_data, freq_prefix, br)
+  if (has_slots_pen && has_slots_freq) {
+    # Slot-indexed path — use data-access helpers
+    pen_logical <- multi_mention_brand_matrix(cat_data, pen_target_prefix,
+                                              brands)
+    pen_mat <- matrix(as.integer(pen_logical), nrow = n_resp,
+                      ncol = n_brands, dimnames = list(NULL, brands))
+    x_mat <- slot_paired_numeric_matrix(cat_data, pen_target_prefix,
+                                        freq_prefix, brands)
+    x_mat[is.na(x_mat) | x_mat < 0] <- 0
+  } else {
+    # Legacy per-brand-column path — preserved for backward compatibility
+    missing_pen  <- character(0)
+    missing_freq <- character(0)
+    for (bi in seq_along(brands)) {
+      br <- brands[bi]
+      pen_col  <- .bv_find_col(cat_data, pen_target_prefix, br)
+      freq_col <- .bv_find_col(cat_data, freq_prefix, br)
+      if (is.null(pen_col))  { missing_pen  <- c(missing_pen,  br); next }
+      if (is.null(freq_col)) { missing_freq <- c(missing_freq, br); next }
 
-    if (is.null(pen_col))  { missing_pen  <- c(missing_pen,  br); next }
-    if (is.null(freq_col)) { missing_freq <- c(missing_freq, br); next }
-
-    pen_raw  <- as.integer(!is.na(cat_data[[pen_col]]) &
+      pen_raw <- as.integer(!is.na(cat_data[[pen_col]]) &
                               cat_data[[pen_col]] > 0)
-
-    # Coerce BRANDPEN3 per §5.2: character → numeric, failures → NA
-    freq_chr <- trimws(as.character(cat_data[[freq_col]]))
-    freq_num <- suppressWarnings(as.numeric(freq_chr))
-    n_fail   <- sum(is.na(freq_num) & !is.na(freq_chr) & freq_chr != "NA")
-    coerce_fails <- coerce_fails + n_fail
-    freq_num <- ifelse(is.na(freq_num) | freq_num < 0, 0.0, freq_num)
-
-    pen_mat[, bi] <- pen_raw
-    x_mat[, bi]   <- freq_num
-  }
-
-  if (length(missing_pen) > 0) {
-    return(.bv_refuse("DATA_BRANDPEN2_MISSING",
-                      sprintf("BRANDPEN2 columns missing for brands: %s",
-                              paste(missing_pen, collapse = ", "))))
-  }
-  if (length(missing_freq) > 0) {
-    return(.bv_refuse("DATA_BRANDPEN3_MISSING",
-                      sprintf("BRANDPEN3 columns missing for brands: %s",
-                              paste(missing_freq, collapse = ", "))))
+      freq_chr <- trimws(as.character(cat_data[[freq_col]]))
+      freq_num <- suppressWarnings(as.numeric(freq_chr))
+      n_fail   <- sum(is.na(freq_num) & !is.na(freq_chr) &
+                        freq_chr != "NA")
+      coerce_fails <- coerce_fails + n_fail
+      freq_num <- ifelse(is.na(freq_num) | freq_num < 0, 0.0, freq_num)
+      pen_mat[, bi] <- pen_raw
+      x_mat[, bi]   <- freq_num
+    }
+    if (length(missing_pen) > 0) {
+      return(.bv_refuse("DATA_BRANDPEN2_MISSING",
+                        sprintf("BRANDPEN2 columns missing for brands: %s",
+                                paste(missing_pen, collapse = ", "))))
+    }
+    if (length(missing_freq) > 0) {
+      return(.bv_refuse("DATA_BRANDPEN3_MISSING",
+                        sprintf("BRANDPEN3 columns missing for brands: %s",
+                                paste(missing_freq, collapse = ", "))))
+    }
   }
 
   # --- Reconciliation (§5.3) ---
@@ -197,7 +209,19 @@ build_brand_volume_matrix <- function(cat_data,
 # INTERNAL HELPERS
 # ==============================================================================
 
-#' Find a brand column by prefix + brand code
+#' Find slot-indexed columns matching ^prefix_[0-9]+$ (parser shape)
+#' @keywords internal
+.bv_slot_cols <- function(data, prefix) {
+  if (is.null(prefix) || !nzchar(prefix)) return(character(0))
+  pat <- paste0("^",
+                gsub("([\\.\\+\\*\\?\\(\\)\\[\\]\\{\\}\\|\\^\\$])",
+                     "\\\\\\1", prefix, perl = TRUE),
+                "_[0-9]+$")
+  grep(pat, names(data), value = TRUE)
+}
+
+
+#' Find a brand column by prefix + brand code (legacy column-per-brand path)
 #' @keywords internal
 .bv_find_col <- function(data, prefix, brand) {
   candidates <- c(
