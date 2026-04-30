@@ -854,9 +854,12 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
 
   # --- STEP 5a: Cross-category portfolio data (full 1200 respondents) ---
   # Computes category usage and focal brand awareness from the FULL dataset,
-  # not from per-category filtered subsets.
+  # not from per-category filtered subsets. v2 threads the global role_map
+  # through every sub-analysis so awareness columns resolve via slot-indexed
+  # parser-shape data; legacy path retained as fallback when role_map is NULL.
   results$portfolio <- .compute_portfolio_data(data, categories, structure,
-                                               config, weights)
+                                               config, weights,
+                                               role_map = role_map)
 
   # --- STEP 5b: Portfolio Overview (focal-brand view across ALL categories) ---
   # Deep-dive AND awareness-only categories together, enriched with pen/SCR/vol
@@ -2238,12 +2241,19 @@ if (!exists(".find_brand_col", mode = "function")) {
 
 #' Compute cross-category portfolio data (thin wrapper)
 #'
-#' Delegates to \code{run_portfolio()} for the full portfolio analysis.
-#' Preserves the \code{results$portfolio} output key for backwards
-#' compatibility with downstream code.
+#' Routes to \code{run_portfolio_v2()} when \code{role_map} is non-NULL — the
+#' v2 path threads the role registry through every sub-analysis and reads
+#' slot-indexed parser-shape awareness data. Falls back to legacy
+#' \code{run_portfolio()} when \code{role_map} is NULL (e.g. structure has
+#' no Questions sheet) so existing column-per-brand fixtures keep working.
+#' Preserves the \code{results$portfolio} output key for downstream code.
 #'
 #' @keywords internal
-.compute_portfolio_data <- function(data, categories, structure, config, weights) {
+.compute_portfolio_data <- function(data, categories, structure, config, weights,
+                                     role_map = NULL) {
+  if (!is.null(role_map)) {
+    return(run_portfolio_v2(data, role_map, categories, structure, config, weights))
+  }
   run_portfolio(data, categories, structure, config, weights)
 }
 

@@ -11,11 +11,12 @@
 #   SQ1_* or SQ2_* columns directly. A grep for "SQ1_" or "SQ2_" in new
 #   code should return only this function.
 #
-# SIZE-EXCEPTION: orchestrator (run_portfolio) plus the denominator helper
-# (v1 + v2) plus the supporting-metrics computation form one coherent
-# entry-point file. The legacy v1 helper + .compute_supporting_metrics
-# are scheduled for deletion at rebuild cutover (planning doc §9 step 5),
-# bringing the file back inside the 300-active-line default.
+# SIZE-EXCEPTION: orchestrator (run_portfolio + run_portfolio_v2) plus the
+# denominator helper (v1 + v2) plus the supporting-metrics computation
+# (v1 + v2) form one coherent entry-point file. The legacy v1 helper +
+# legacy run_portfolio + legacy .compute_supporting_metrics are scheduled
+# for deletion at rebuild cutover (planning doc §9 step 5), bringing the
+# file back inside the 300-active-line default.
 #
 # VERSION: 1.0
 # ==============================================================================
@@ -571,6 +572,317 @@ run_portfolio <- function(data, categories, structure, config, weights = NULL) {
     }))
     depths <- if (is.matrix(sq_mat)) rowSums(sq_mat) else sq_mat
     w_sum  <- sum(w, na.rm = TRUE)
+    if (w_sum > 0) {
+      mean_repertoire_depth <- sum(w * depths, na.rm = TRUE) / w_sum
+    }
+  }
+
+  list(
+    avg_awareness_set_size_focal_cat = avg_set_size,
+    focal_footprint_breadth          = as.integer(breadth),
+    n_cats_total                     = as.integer(n_cats_total),
+    focal_awareness_efficiency       = focal_efficiency,
+    mean_repertoire_depth            = mean_repertoire_depth,
+    home_cat                         = home_cat %||% ""
+  )
+}
+
+
+# ==============================================================================
+# V2 ORCHESTRATOR — slot-indexed parser-shape data
+# ==============================================================================
+
+#' Run portfolio mapping analysis (v2 — slot-indexed awareness)
+#'
+#' v2 alternative to \code{run_portfolio()}. Same orchestration flow, same
+#' result list shape, but every sub-analysis is the slot-indexed
+#' \code{compute_*_v2()} variant and \code{role_map} is threaded through so
+#' awareness columns resolve via the role registry / convention root rather
+#' than the legacy \code{BRANDAWARE_{cat}_{brand} == 1L} pattern.
+#'
+#' Wires the same eight sub-analyses as the legacy orchestrator:
+#' footprint matrix, clutter quadrant, strength map, extension table,
+#' per-brand extension, cross-cat constellation, per-category
+#' constellations. Hero-strip supporting metrics use a slot-aware
+#' repertoire-depth count over the categories sheet
+#' (\code{respondent_picked()} per CategoryCode) instead of the legacy
+#' column-name grep.
+#'
+#' @param data Data frame. Full survey data — all respondents, not filtered.
+#' @param role_map Named list from \code{build_brand_role_map()}. Required for
+#'   v2; pass \code{NULL} only if every sub-analysis can fall back to the
+#'   convention root (\code{BRANDAWARE_{cat_code}}).
+#' @param categories Data frame. Categories sheet from loaded brand config.
+#'   Must include a \code{CategoryCode} column.
+#' @param structure List. Loaded survey structure (from
+#'   \code{load_brand_survey_structure()}).
+#' @param config List. Loaded brand config (from \code{load_brand_config()}).
+#' @param weights Numeric vector or NULL. Survey weights, length ==
+#'   \code{nrow(data)}.
+#'
+#' @return Same list shape as \code{run_portfolio()}.
+#'
+#' @export
+#' @keywords internal
+# SIZE-EXCEPTION: parallel v2 orchestrator scheduled to replace run_portfolio
+# at rebuild cutover (planning doc §9 step 5). At cutover this function is
+# renamed to run_portfolio() and the legacy v1 above is deleted.
+run_portfolio_v2 <- function(data, role_map, categories, structure, config,
+                              weights = NULL) {
+
+  focal     <- config$focal_brand %||% ""
+  timeframe <- config$portfolio_timeframe %||% PORTFOLIO_TIMEFRAME_3M
+
+  guard_result <- tryCatch(
+    guard_validate_portfolio(data, categories, structure, config),
+    turas_refusal = function(e) {
+      list(
+        status     = "REFUSED",
+        code       = e$code,
+        message    = e$problem %||% conditionMessage(e),
+        how_to_fix = e$how_to_fix
+      )
+    }
+  )
+  if (!is.null(guard_result$status) && identical(guard_result$status, "REFUSED")) {
+    cat("\n┌─── TURAS BRAND ERROR ──────────────────────────────────────────┐\n")
+    cat("│ Context: run_portfolio_v2()\n")
+    cat(sprintf("│ Code: %s\n", guard_result$code))
+    cat(sprintf("│ Message: %s\n", guard_result$message))
+    cat(sprintf("│ How to fix: %s\n",
+                paste(guard_result$how_to_fix, collapse = "; ")))
+    cat("└────────────────────────────────────────────────────────────────┘\n\n")
+    return(guard_result)
+  }
+
+  n_total <- nrow(data)
+  total_w <- if (!is.null(weights)) sum(weights, na.rm = TRUE) else as.numeric(n_total)
+
+  # Phase 2 — footprint + clutter
+  footprint_result <- tryCatch(
+    compute_footprint_matrix_v2(data, role_map, categories, structure, config, weights),
+    error = function(e) {
+      message(sprintf("[PORTFOLIO_V2] Footprint failed: %s", e$message))
+      NULL
+    }
+  )
+
+  clutter_result <- tryCatch(
+    compute_clutter_data_v2(data, role_map, categories, structure, config, weights),
+    error = function(e) {
+      message(sprintf("[PORTFOLIO_V2] Clutter failed: %s", e$message))
+      NULL
+    }
+  )
+
+  # Phase 3 — strength map + extension + per-brand extension
+  strength_result <- tryCatch(
+    compute_strength_map_v2(data, role_map, categories, structure, config, weights),
+    error = function(e) {
+      message(sprintf("[PORTFOLIO_V2] Strength failed: %s", e$message))
+      NULL
+    }
+  )
+
+  extension_result <- tryCatch(
+    compute_extension_table_v2(data, role_map, categories, structure, config, weights,
+                                footprint_result = footprint_result),
+    error = function(e) {
+      message(sprintf("[PORTFOLIO_V2] Extension failed: %s", e$message))
+      NULL
+    }
+  )
+
+  extension_per_brand <- tryCatch(
+    compute_extension_per_brand_v2(data, role_map, categories, structure, config, weights,
+                                    footprint_result = footprint_result),
+    error = function(e) {
+      message(sprintf("[PORTFOLIO_V2] Per-brand extension failed: %s", e$message))
+      NULL
+    }
+  )
+
+  # Phase 4 — cross-cat + per-cat constellations
+  constellation_result <- tryCatch(
+    compute_constellation_v2(data, role_map, categories, structure, config, weights),
+    error = function(e) {
+      message(sprintf("[PORTFOLIO_V2] Constellation failed: %s", e$message))
+      NULL
+    }
+  )
+  constellation_per_cat <- tryCatch(
+    compute_constellations_per_cat_v2(data, role_map, categories, structure, config, weights),
+    error = function(e) {
+      message(sprintf("[PORTFOLIO_V2] Per-category constellations failed: %s", e$message))
+      NULL
+    }
+  )
+
+  all_suppressed <- unique(c(
+    if (!is.null(footprint_result)) footprint_result$suppressed_cats   else character(0),
+    if (!is.null(clutter_result))   clutter_result$suppressed_cats     else character(0),
+    if (!is.null(strength_result))  strength_result$suppressed_cats    else character(0),
+    if (!is.null(extension_result) &&
+        identical(extension_result$status, "PASS"))
+      extension_result$suppressed_cats else character(0)
+  ))
+
+  bases_per_cat <- if (!is.null(footprint_result) &&
+                        !is.null(footprint_result$bases_df) &&
+                        nrow(footprint_result$bases_df) > 0) {
+    footprint_result$bases_df
+  } else {
+    data.frame(cat = character(0), n_buyers_uw = integer(0),
+               n_buyers_w = numeric(0), stringsAsFactors = FALSE)
+  }
+
+  supporting_result <- .compute_supporting_metrics_v2(
+    data             = data,
+    weights          = if (!is.null(weights)) weights else rep(1.0, n_total),
+    timeframe        = timeframe,
+    focal            = focal,
+    categories       = categories,
+    footprint_result = footprint_result,
+    clutter_result   = clutter_result,
+    extension_result = if (!is.null(extension_result) &&
+                           identical(extension_result$status, "PASS"))
+                         extension_result else NULL,
+    n_cats_total     = nrow(categories)
+  )
+
+  list(
+    status       = "PASS",
+    focal_brand  = focal,
+    timeframe    = timeframe,
+    n_total      = n_total,
+    n_weighted   = total_w,
+    bases        = list(
+      per_category = bases_per_cat,
+      per_brand    = data.frame(
+        brand                = character(0),
+        n_aware_uw           = integer(0),
+        n_aware_w            = numeric(0),
+        n_categories_present = integer(0),
+        stringsAsFactors     = FALSE
+      )
+    ),
+    footprint_matrix = if (!is.null(footprint_result)) footprint_result$matrix_df else NULL,
+    footprint_meta   = if (!is.null(footprint_result)) list(
+                          cat_names   = footprint_result$cat_names   %||% character(0),
+                          brand_names = footprint_result$brand_names %||% character(0)
+                        ) else NULL,
+    constellation    = if (!is.null(constellation_result) &&
+                           identical(constellation_result$status, "PASS"))
+                         constellation_result else NULL,
+    constellation_per_cat = if (!is.null(constellation_per_cat) &&
+                                 identical(constellation_per_cat$status, "PASS"))
+                              constellation_per_cat else NULL,
+    clutter          = clutter_result,
+    strength         = if (!is.null(strength_result) &&
+                           identical(strength_result$status, "PASS"))
+                         strength_result else NULL,
+    extension        = if (!is.null(extension_result) &&
+                           identical(extension_result$status, "PASS"))
+                         extension_result else NULL,
+    extension_per_brand = if (!is.null(extension_per_brand) &&
+                               length(extension_per_brand$per_brand %||% list()) > 0)
+                            extension_per_brand else NULL,
+    supporting       = supporting_result,
+    suppressions     = list(
+      low_base_cats  = all_suppressed,
+      dropped_brands = character(0),
+      dropped_edges  = 0L
+    )
+  )
+}
+
+
+# ==============================================================================
+# V2 SUPPORTING METRICS HELPER
+# ==============================================================================
+
+#' Compute hero-strip supporting metrics for the portfolio tab (v2)
+#'
+#' v2 alternative to \code{.compute_supporting_metrics()}. Differs only in the
+#' repertoire-depth calculation: walks slot-indexed SQ columns via
+#' \code{respondent_picked()} for every CategoryCode in \code{categories},
+#' instead of the legacy \code{grep("^SQ[12]_")} over column-per-category data.
+#' On legacy column-per-cat data the helper returns 0 depth (slot columns
+#' are absent); the legacy v1 helper handles that fixture.
+#'
+#' @param data Data frame.
+#' @param weights Numeric vector. Survey weights.
+#' @param timeframe Character. \code{"3m"} or \code{"13m"}.
+#' @param focal Character. Focal brand code.
+#' @param categories Data frame with \code{CategoryCode} column.
+#' @param footprint_result List or NULL. From
+#'   \code{compute_footprint_matrix_v2()}.
+#' @param clutter_result List or NULL. From \code{compute_clutter_data_v2()}.
+#' @param extension_result List or NULL. From
+#'   \code{compute_extension_table_v2()} when status PASS.
+#' @param n_cats_total Integer. Total number of categories in config.
+#' @return Named list, same shape as \code{.compute_supporting_metrics()}.
+#' @keywords internal
+.compute_supporting_metrics_v2 <- function(data, weights, timeframe, focal,
+                                            categories,
+                                            footprint_result, clutter_result,
+                                            extension_result, n_cats_total) {
+  w <- weights
+
+  breadth <- 0L
+  if (!is.null(footprint_result) && !is.null(footprint_result$matrix_df)) {
+    fp <- footprint_result$matrix_df
+    if (nrow(fp) > 0 && "Brand" %in% names(fp)) {
+      focal_row <- fp[fp$Brand == focal, setdiff(names(fp), "Brand"), drop = FALSE]
+      if (nrow(focal_row) > 0) {
+        vals    <- unlist(focal_row[1L, ], use.names = FALSE)
+        breadth <- sum(!is.na(vals) & vals > 0)
+      }
+    }
+  }
+
+  home_cat <- if (!is.null(extension_result)) extension_result$home_cat else NULL
+
+  avg_set_size     <- NA_real_
+  focal_efficiency <- NA_real_
+  if (!is.null(clutter_result) && !is.null(clutter_result$clutter_df)) {
+    cl <- clutter_result$clutter_df
+    if (nrow(cl) > 0) {
+      home_row <- if (!is.null(home_cat) && home_cat %in% cl$cat) {
+        cl[cl$cat == home_cat, , drop = FALSE]
+      } else {
+        max_idx <- which.max(cl$focal_share_of_aware)
+        cl[max_idx, , drop = FALSE]
+      }
+      if (nrow(home_row) > 0) {
+        avg_set_size <- home_row$awareness_set_size_mean[1L]
+        sh  <- home_row$focal_share_of_aware[1L]
+        pen <- home_row$cat_penetration[1L]
+        if (!is.na(sh) && !is.na(pen) && pen > 0) {
+          focal_efficiency <- sh / pen
+        }
+      }
+    }
+  }
+
+  # Slot-aware repertoire depth: count picks across CategoryCodes via the
+  # parser-shape SQ slot root (SQ1 for 13m, SQ2 for 3m).
+  sq_root <- if (identical(timeframe, "13m")) "SQ1" else "SQ2"
+  cat_codes <- if (!is.null(categories) && "CategoryCode" %in% names(categories)) {
+    cc <- as.character(categories$CategoryCode)
+    cc[!is.na(cc) & nzchar(cc)]
+  } else {
+    character(0)
+  }
+
+  mean_repertoire_depth <- NA_real_
+  if (length(cat_codes) > 0L && nrow(data) > 0L) {
+    indicator_mat <- vapply(cat_codes, function(cc) {
+      as.integer(respondent_picked(data, sq_root, cc))
+    }, integer(nrow(data)))
+    depths <- if (is.matrix(indicator_mat)) rowSums(indicator_mat) else
+              as.integer(indicator_mat)
+    w_sum <- sum(w, na.rm = TRUE)
     if (w_sum > 0) {
       mean_repertoire_depth <- sum(w * depths, na.rm = TRUE) / w_sum
     }
