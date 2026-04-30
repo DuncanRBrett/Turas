@@ -18,7 +18,7 @@ Duncan.\
 Every brand report requires two Excel files:
 
 | File | What it controls |
-|------------------------------------|------------------------------------|
+|----|----|
 | `Brand_Config.xlsx` | Which analyses to run, study settings, colours, output paths |
 | `Survey_Structure.xlsx` | The data dictionary — what questions are in the data, which brands, CEPs, and how to map everything |
 
@@ -76,7 +76,7 @@ Below is every setting, in the order they appear in the sheet.
 #### STUDY IDENTIFICATION
 
 | Setting | Required? | What it does | Allowed values |
-|------------------|------------------|------------------|------------------|
+|----|----|----|----|
 | `project_name` | **Required** | Used in report titles and output file names | Free text |
 | `client_name` | **Required** | Client organisation name, shown in report header | Free text |
 | `study_type` | **Required** | Controls whether respondent IDs are expected for panel tracking | `cross-sectional` or `panel` |
@@ -98,7 +98,7 @@ These settings control how respondents are assigned to a focal category
 when the study covers more than one category.
 
 | Setting | Required? | What it does | Allowed values |
-|------------------|------------------|------------------|------------------|
+|----|----|----|----|
 | `focal_assignment` | **Required** | How respondents are assigned to their focal category | `balanced` (equal random split), `quota` (minimum n per category), `priority` (weighted over-sampling) |
 | `focal_category_col` | Optional | Column in the data containing the pre-assigned focal category code. If blank, the module derives it from config. | Column name in data, or blank |
 | `cross_category_awareness` | Optional | Whether cross-category brand awareness is included in the survey (collected for all qualifying categories, not just the focal one). Set `Y` if the Portfolio element is enabled. | `Y` or `N` |
@@ -116,7 +116,7 @@ These are Y/N toggles. `Y` = run this element and include it in the
 report. `N` = skip.
 
 | Setting | Default | What it controls |
-|------------------------|------------------------|------------------------|
+|----|----|----|
 | `element_funnel` | Y | Brand funnel: awareness → disposition → bought → primary. Core CBM output. |
 | `element_mental_avail` | Y | Mental Availability: MMS, MPen, NS, CEP × brand matrix. The centrepiece of the report. |
 | `element_cep_turf` | Y | CEP TURF reach optimisation within Mental Availability. Which CEP combination maximises mental reach? Only runs if MA is enabled. |
@@ -131,7 +131,7 @@ report. `N` = skip.
 #### DRIVERS & BARRIERS OPTIONS
 
 | Setting | Default | What it does | Allowed values |
-|------------------|------------------|------------------|------------------|
+|----|----|----|----|
 | `db_use_catdriver` | Y | Whether to use the catdriver module (SHAP values) for derived importance. More rigorous than the simple differential approach. | `Y` or `N` |
 | `db_importance_method` | `differential` | Importance method when catdriver is not used. `differential` = buyer vs non-buyer gap. | `differential` |
 
@@ -140,7 +140,7 @@ report. `N` = skip.
 #### DBA OPTIONS (only relevant if `element_dba = Y`)
 
 | Setting | Default | What it does | Allowed values |
-|------------------|------------------|------------------|------------------|
+|----|----|----|----|
 | `dba_scope` | `brand` | Whether DBA is measured at brand level (across all categories) or per category (rare). | `brand` or `category` |
 | `dba_fame_threshold` | 0.50 | Proportion threshold for classifying an asset as Famous. Above this → Famous. | 0.00 to 1.00 |
 | `dba_uniqueness_threshold` | 0.50 | Proportion threshold for classifying an asset as Unique. | 0.00 to 1.00 |
@@ -151,7 +151,7 @@ report. `N` = skip.
 #### WOM OPTIONS (only relevant if `element_wom = Y`)
 
 | Setting | Default | What it does | Allowed values |
-|------------------|------------------|------------------|------------------|
+|----|----|----|----|
 | `wom_timeframe` | `3 months` | WOM recall period label shown in charts. Should match the target timeframe. | Free text (e.g. `3 months`, `6 months`) |
 
 ------------------------------------------------------------------------
@@ -159,7 +159,7 @@ report. `N` = skip.
 #### SIGNIFICANCE TESTING
 
 | Setting | Default | What it does | Allowed values |
-|------------------|------------------|------------------|------------------|
+|----|----|----|----|
 | `alpha` | 0.05 | Primary significance level for cross-brand comparisons. | 0.01 to 0.20 |
 | `alpha_secondary` | *(blank)* | Optional second significance level for dual-alpha reporting (e.g. 0.10). Leave blank to disable. | 0.01 to 0.20, or blank |
 | `min_base_size` | 30 | Minimum base size for displaying a cell. Cells below this are suppressed with "–". | Integer ≥ 10 |
@@ -173,7 +173,7 @@ These control brand colours in all charts and chips. The focal brand's
 primary colour should be the brand's actual primary colour.
 
 | Setting | Default | What it does | Allowed values |
-|------------------|------------------|------------------|------------------|
+|----|----|----|----|
 | `colour_focal` | `#1A5276` | Primary colour for the focal brand. Saturated. | Hex colour (e.g. `#D62728`) |
 | `colour_focal_accent` | `#2E86C1` | Secondary/accent colour for focal brand secondary elements. | Hex colour |
 | `colour_competitor` | `#B0B0B0` | Colour for all competitor brands. Grey by default — this is intentional (Romaniuk design principle). | Hex colour |
@@ -184,7 +184,7 @@ primary colour should be the brand's actual primary colour.
 #### OUTPUT OPTIONS
 
 | Setting | Required? | What it does | Allowed values |
-|------------------|------------------|------------------|------------------|
+|----|----|----|----|
 | `output_dir` | **Required** | Directory where output files are saved. Relative to the config file. Created automatically if it does not exist. | e.g. `output/brand` |
 | `output_html` | Optional | Generate the self-contained HTML report. | `Y` or `N` |
 | `output_excel` | Optional | Generate an Excel workbook with all element data. | `Y` or `N` |
@@ -196,7 +196,7 @@ primary colour should be the brand's actual primary colour.
 #### REPORT OPTIONS
 
 | Setting | Required? | What it does | Allowed values |
-|------------------|------------------|------------------|------------------|
+|----|----|----|----|
 | `report_title` | Optional | Title shown in the HTML report header. | Free text |
 | `report_subtitle` | Optional | Subtitle shown under the title (e.g. `Wave 1 Baseline` or `Q1 2026`). | Free text |
 | `show_about_section` | Optional | Whether to include the About & Methodology section with academic references. | `Y` or `N` |
@@ -210,7 +210,7 @@ These are not in the template by default but can be added as extra rows
 to the Settings sheet if needed.
 
 | Setting | Default | What it does |
-|------------------------|------------------------|------------------------|
+|----|----|----|
 | `target_timeframe_months` | 3 | Target analytical window in months (e.g. last 3 months). Must be less than `longer_timeframe_months`. Used in Dirichlet norms. |
 | `longer_timeframe_months` | 12 | Longer penetration window in months (e.g. last 12 months). Must be greater than `target_timeframe_months`. |
 | `portfolio_timeframe` | `3m` | Which screener column to use as the portfolio denominator. `3m` uses `SQ2_{cat_code}` columns; `13m` uses `SQ1_{cat_code}` columns. |
@@ -228,7 +228,7 @@ One row per category in the study. The order here controls the order in
 the report.
 
 | Column | Required? | What it contains | Allowed values |
-|------------------|------------------|------------------|------------------|
+|----|----|----|----|
 | `Category` | **Required** | Category name as it appears in the data and report. Must match what's used in Survey_Structure.xlsx. | Free text (e.g. `Dry Seasonings & Spices`) |
 | `Type` | **Required** | Category type. Controls question wording, funnel structure, and penetration data handling. | `transaction` (FMCG), `durable` (electronics, cars), `service` (banking, telecoms) |
 | `Timeframe_Long` | **Required** | Longer penetration window label for reports (e.g. `12 months`). Matches `longer_timeframe_months` in Settings. | Free text |
@@ -250,7 +250,7 @@ does not exist in the template by default; add it manually.
 One row per distinctive brand asset you're testing.
 
 | Column | Required? | What it contains | Allowed values |
-|------------------|------------------|------------------|------------------|
+|----|----|----|----|
 | `AssetCode` | **Required** | Unique short code for this asset. Used in data column names. | Short uppercase code (e.g. `LOGO`, `COLOUR`, `TAGLINE`) |
 | `AssetLabel` | **Required** | Display label for charts and tables. | Free text (e.g. `Brand Logo`) |
 | `AssetType` | **Required** | What type of stimulus was shown to respondents. | `image`, `text`, or `audio` |
@@ -294,7 +294,7 @@ One row per question or question block. If a question has one column per
 brand (e.g. an awareness grid), one row here covers all brand columns.
 
 | Column | Required? | What it contains | Allowed values |
-|------------------|------------------|------------------|------------------|
+|----|----|----|----|
 | `QuestionCode` | **Required** | The column name prefix in the data file. For per-brand questions, this is the prefix — columns in data will be `{QuestionCode}_{BrandCode}`. | e.g. `BRANDAWARE_DSS` |
 | `QuestionText` | **Required** | Full question wording, for reference and report labelling. | Free text |
 | `VariableType` | **Required** | Data type — how responses are coded. | `Multi_Mention`, `Single_Mention`, `Rating`, `Open_End`, `Numeric` |
@@ -310,7 +310,7 @@ and brands are `IPK`, `ROB`, `KNO`, the data will have columns
 **Example rows:**
 
 | QuestionCode | QuestionText | VariableType | Battery | Category |
-|---------------|---------------|---------------|---------------|---------------|
+|----|----|----|----|----|
 | `BRANDAWARE_DSS` | Which brands have you heard of in the dry seasonings category? | Multi_Mention | awareness | Dry Seasonings & Spices |
 | `BRANDATTR_DSS_01` | Good for a quick weeknight meal | Multi_Mention | cep_matrix | Dry Seasonings & Spices |
 | `BRANDATT1_DSS` | How would you describe your feelings towards this brand? | Single_Mention | attitude | Dry Seasonings & Spices |
@@ -325,7 +325,7 @@ Maps coded values to display labels for single-mention questions. You
 need this for the attitude question at minimum.
 
 | Column | Required? | What it contains | Allowed values |
-|------------------|------------------|------------------|------------------|
+|----|----|----|----|
 | `QuestionCode` | **Required** | Must match a `QuestionCode` in the Questions sheet. | Existing question code |
 | `OptionText` | **Required** | The coded value in the data (what Alchemer exports — typically an integer). | e.g. `1`, `2`, `3` |
 | `DisplayText` | **Required** | The human-readable label to show in output. | Free text |
@@ -335,7 +335,7 @@ need this for the attitude question at minimum.
 **Example — Attitude question (BRANDATT1_DSS):**
 
 | QuestionCode | OptionText | DisplayText | DisplayOrder | ShowInOutput |
-|---------------|---------------|---------------|---------------|---------------|
+|----|----|----|----|----|
 | BRANDATT1_DSS | 1 | I love it / it's my favourite | 1 | Y |
 | BRANDATT1_DSS | 2 | It's among the ones I prefer | 2 | Y |
 | BRANDATT1_DSS | 3 | I wouldn't usually consider it, but I would if there's no other option | 3 | Y |
@@ -350,7 +350,7 @@ One row per brand per category. If the same brand appears in multiple
 categories (common for the focal brand), it gets a row for each.
 
 | Column | Required? | What it contains | Allowed values |
-|------------------|------------------|------------------|------------------|
+|----|----|----|----|
 | `Category` | **Required** | Category this brand appears in. Must exactly match the `Category` in Brand_Config Categories sheet. | Category name |
 | `BrandCode` | **Required** | Short unique code for this brand. Must match the column suffix in the data (e.g. `IPK` → columns named `BRANDAWARE_DSS_IPK`). | Short uppercase code |
 | `BrandLabel` | **Required** | Display name shown in charts, tables, and the report. | Free text (e.g. `Robertsons`) |
@@ -376,7 +376,7 @@ Category Entry Points — the situation-based cues used in the CEP × brand
 matrix (Mental Availability). One row per CEP per category.
 
 | Column | Required? | What it contains | Allowed values |
-|------------------|------------------|------------------|------------------|
+|----|----|----|----|
 | `Category` | **Required** | Category this CEP applies to. | Category name |
 | `CEPCode` | **Required** | Short unique code within the category (e.g. `CEP01`). Must match how CEPs are referenced in the data column names. | Short code (e.g. `CEP01`, `CEP02`) |
 | `CEPText` | **Required** | Full CEP statement text — what was shown to respondents. Should be simple, concrete, situation-based (Romaniuk). | Free text |
@@ -385,7 +385,7 @@ matrix (Mental Availability). One row per CEP per category.
 **Example:**
 
 | Category | CEPCode | CEPText | DisplayOrder |
-|------------------|------------------|------------------|------------------|
+|----|----|----|----|
 | Dry Seasonings & Spices | CEP01 | Good for a quick weeknight meal | 1 |
 | Dry Seasonings & Spices | CEP02 | Something the whole family enjoys | 2 |
 | Dry Seasonings & Spices | CEP03 | When I want a healthy option | 3 |
@@ -402,7 +402,7 @@ grid structure as CEPs but used in the Drivers & Barriers analysis
 rather than Mental Availability. Optional but recommended.
 
 | Column | Required? | What it contains | Allowed values |
-|------------------|------------------|------------------|------------------|
+|----|----|----|----|
 | `Category` | **Required** | Category this attribute applies to. | Category name |
 | `AttrCode` | **Required** | Short unique code within the category (e.g. `ATTR01`). | Short code |
 | `AttrText` | **Required** | Full attribute statement text. These are perception items, not entry points. | Free text |
@@ -426,7 +426,7 @@ this sheet tells the module which data columns contain the fame and
 uniqueness scores for each asset.
 
 | Column | Required? | What it contains |
-|------------------------|------------------------|------------------------|
+|----|----|----|
 | `AssetCode` | **Required** | Must match `AssetCode` in Brand_Config DBA_Assets sheet. |
 | `AssetLabel` | **Required** | Display label for charts. |
 | `AssetType` | **Required** | `image`, `text`, or `audio`. |
@@ -446,7 +446,7 @@ roles use a category suffix (e.g. `funnel.awareness.DSS`) so the module
 knows which columns belong to which category.
 
 | Column | Required? | What it contains |
-|------------------------|------------------------|------------------------|
+|----|----|----|
 | `Role` | **Required** | The internal role name from the role registry (see table below). |
 | `ClientCode` | **Required** | The column name prefix in your data (what Alchemer exported). For per-brand questions, this is the prefix — the module appends `_{BrandCode}` to find each brand's column. |
 | `QuestionText` | Optional | Full question wording. Used in charts and the About section. |
@@ -472,7 +472,7 @@ Alchemer (e.g. `DSS` for Dry Seasonings & Spices).
 ##### Funnel roles (one set per category)
 
 | Role | Variable_Type | What data column it maps to |
-|------------------------|------------------------|------------------------|
+|----|----|----|
 | `funnel.awareness.{CAT}` | Multi_Mention | Awareness grid prefix (e.g. `BRANDAWARE_DSS`) → data has `BRANDAWARE_DSS_IPK`, `BRANDAWARE_DSS_ROB`, etc. |
 | `funnel.attitude.{CAT}` | Single_Response | Brand attitude question prefix (e.g. `BRANDATT1_DSS`) → data has `BRANDATT1_DSS_IPK`, etc. Set `OptionMapScale = attitude_scale`. |
 | `funnel.rejection_oe.{CAT}` | Open_End | Rejection open-end prefix (e.g. `BRANDATT2_DSS`). Optional. |
@@ -487,13 +487,13 @@ Alchemer (e.g. `DSS` for Dry Seasonings & Spices).
 ##### Category buying role (one per category)
 
 | Role | Variable_Type | What data column it maps to |
-|------------------------|------------------------|------------------------|
+|----|----|----|
 | `cat_buying.frequency.{CAT}` | Single_Response | Category-level buying frequency question (e.g. `CATBUY_DSS`). Maps to a scale in OptionMap — see OptionMap section below. |
 
 ##### Portfolio roles (one per category)
 
 | Role | Variable_Type | What data column it maps to |
-|------------------------|------------------------|------------------------|
+|----|----|----|
 | `portfolio.screener.3m.{CAT}` | Single_Response | 3-month category buyer screener (e.g. `SQ2_DSS`). Used when `portfolio_timeframe = 3m`. |
 | `portfolio.screener.13m.{CAT}` | Single_Response | 13-month category buyer screener (e.g. `SQ1_DSS`). Used when `portfolio_timeframe = 13m`. |
 | `portfolio.cross_cat_awareness.{CAT}` | Multi_Mention | Cross-category awareness prefix (e.g. `BRANDAWARE_DSS`). Columns follow `BRANDAWARE_{CAT}_{BRAND}` pattern. |
@@ -501,7 +501,7 @@ Alchemer (e.g. `DSS` for Dry Seasonings & Spices).
 ##### WOM roles (brand-level, no category suffix)
 
 | Role | Variable_Type | What data column it maps to |
-|------------------------|------------------------|------------------------|
+|----|----|----|
 | `wom.received_positive` | Multi_Mention | Received positive WOM prefix (e.g. `WOM_POS_REC`) |
 | `wom.received_negative` | Multi_Mention | Received negative WOM prefix (e.g. `WOM_NEG_REC`) |
 | `wom.shared_positive_incidence` | Multi_Mention | Shared positive WOM prefix (e.g. `WOM_POS_SHARE`) |
@@ -512,7 +512,7 @@ Alchemer (e.g. `DSS` for Dry Seasonings & Spices).
 #### Example QuestionMap rows (multi-category study, DSS + RM categories)
 
 | Role | ClientCode | QuestionText | Variable_Type | OptionMapScale |
-|---------------|---------------|---------------|---------------|---------------|
+|----|----|----|----|----|
 | `funnel.awareness.DSS` | `BRANDAWARE_DSS` | Which brands have you heard of in dry seasonings? | Multi_Mention |  |
 | `funnel.attitude.DSS` | `BRANDATT1_DSS` | How would you describe your feelings towards each brand? | Single_Response | attitude_scale |
 | `funnel.transactional.bought_long.DSS` | `BRANDPEN1_DSS` | Which have you bought in the last 12 months? | Multi_Mention |  |
@@ -540,7 +540,7 @@ frequency question.
 **One row per (scale × code) combination.**
 
 | Column | Required? | What it contains |
-|------------------------|------------------------|------------------------|
+|----|----|----|
 | `Scale` | **Required** | Scale name. Must match the `OptionMapScale` value in QuestionMap. |
 | `ClientCode` | **Required** | The numeric or string code as it appears in the data (e.g. `1`, `2`, `3`). |
 | `Role` | **Required** | The attitude position sub-role this code maps to (see table below). Leave blank for non-analytic codes (e.g. "Don't know"). |
@@ -550,7 +550,7 @@ frequency question.
 #### Attitude scale (`attitude_scale`)
 
 | Scale | ClientCode | Role | ClientLabel | OrderIndex |
-|---------------|---------------|---------------|---------------|---------------|
+|----|----|----|----|----|
 | attitude_scale | 1 | attitude.love | I love it / it's my favourite | 1 |
 | attitude_scale | 2 | attitude.prefer | It's among the ones I prefer | 2 |
 | attitude_scale | 3 | attitude.ambivalent | I would buy it if no other option | 3 |
@@ -694,7 +694,7 @@ setting or column is wrong.
 ## Common errors and what they mean
 
 | Error code | What it means | How to fix it |
-|------------------------|------------------------|------------------------|
+|----|----|----|
 | `CFG_MISSING_FIELD` | A required setting in Brand_Config Settings is blank | Fill in the setting named in the error message |
 | `CFG_FOCAL_BRAND_NOT_FOUND` | `focal_brand` in Settings doesn't match any `BrandCode` in Brands sheet | Check capitalisation and spelling — these must match exactly |
 | `CFG_QUESTIONMAP_MISSING` | The QuestionMap sheet is empty or missing from Survey_Structure.xlsx | Fill in the QuestionMap sheet (Step 7 above) |
