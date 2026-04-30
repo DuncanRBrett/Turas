@@ -18,8 +18,9 @@
 
 CONSTELLATION_MIN_BRANDS <- 3L
 
-CONSTELLATION_LAYOUT_TURAS <- "Turas pure-R Fruchterman-Reingold"
+CONSTELLATION_LAYOUT_TURAS  <- "Turas pure-R Fruchterman-Reingold"
 CONSTELLATION_LAYOUT_IGRAPH <- "igraph Fruchterman-Reingold"
+CONSTELLATION_LAYOUT_KK     <- "Turas pure-R Kamada-Kawai (1 - Jaccard)"
 
 
 # ==============================================================================
@@ -137,18 +138,13 @@ CONSTELLATION_LAYOUT_IGRAPH <- "igraph Fruchterman-Reingold"
     }
   }
 
-  layout_engine <- CONSTELLATION_LAYOUT_TURAS
-  pos <- if (requireNamespace("igraph", quietly = TRUE)) {
-    tryCatch({
-      g   <- igraph::graph_from_adjacency_matrix(adj_top, mode = "undirected",
-                                                 weighted = TRUE)
-      lyt <- igraph::layout_with_fr(g)
-      layout_engine <- CONSTELLATION_LAYOUT_IGRAPH
-      lyt
-    }, error = function(e) .fr_layout_r(nb, adj_top))
-  } else {
-    .fr_layout_r(nb, adj_top)
-  }
+  # Kamada-Kawai layout — separates brands by graph distance over
+  # (1 - Jaccard) edge weights so high-co-awareness clusters stay tight
+  # without collapsing on top of each other and disconnected outliers
+  # sit at distance-meaningful gaps. Replaces Fruchterman-Reingold which
+  # squashed dense Jaccard clusters into a single dot for IPK-shape data.
+  layout_engine <- CONSTELLATION_LAYOUT_KK
+  pos <- .kk_layout_r(nb, adj_top)
 
   nodes_df <- data.frame(
     brand     = present,
@@ -288,8 +284,175 @@ compute_constellations_per_cat <- function(data, categories, structure,
 
 
 # ==============================================================================
+# Pure-R Kamada-Kawai layout (seeded, deterministic)
+# ==============================================================================
+
+#' Pure-R Kamada-Kawai layout for a weighted graph
+#'
+#' Energy-minimising layout that places every pair of nodes at a Euclidean
+#' distance proportional to their graph-theoretic distance. For our use the
+#' edge weights are \code{(1 - jaccard)} for every co-awareness edge, so two
+#' brands with Jaccard 0.9 sit close (distance 0.1) and two brands with
+#' Jaccard 0.1 sit far (distance 0.9). This is a deliberate replacement for
+#' Fruchterman-Reingold, which collapses dense high-Jaccard clusters into a
+#' single dot — see PORTFOLIO_SPEC notes on layout choice.
+#'
+#' Algorithm (Kamada & Kawai 1989, "An algorithm for drawing general
+#' undirected graphs"): minimise
+#'   \eqn{E = \sum_{i<j} k_{ij} (\|p_i - p_j\| - l_{ij})^2}
+#' where \eqn{l_{ij}} = scaled graph distance, \eqn{k_{ij} = 1 / d_{ij}^2}.
+#' Iteratively picks the node with the largest partial gradient and Newton-
+#' steps it toward its local minimum. Falls back to gradient descent when
+#' the 2x2 Hessian is singular.
+#'
+#' Disconnected pairs receive a sentinel distance of 1.5 \eqn{\times} the
+#' largest finite distance so they sit far from the connected component
+#' rather than blowing up to infinity.
+#'
+#' Deterministic for a given seed (uses \code{set.seed(seed)} for the
+#' circular-init jitter).
+#'
+#' @param n Integer. Number of nodes.
+#' @param adj Numeric matrix n x n. Adjacency Jaccard scores in
+#'   \eqn{[0, 1]}; 0 means no edge.
+#' @param n_iter_outer Integer. Maximum outer iterations
+#'   (each picks the worst-fit node). Default 200.
+#' @param n_iter_inner Integer. Maximum Newton steps per outer iteration.
+#'   Default 30.
+#' @param eps Numeric. Stop when the worst node's gradient norm < eps.
+#'   Default 1e-3.
+#' @param seed Integer. RNG seed. Default 42.
+#' @return Numeric matrix n x 2 of (x, y) positions, roughly in
+#'   \eqn{[-1, 1]} on each axis (no normalisation applied).
+#' @keywords internal
+.kk_layout_r <- function(n, adj, n_iter_outer = 200L, n_iter_inner = 30L,
+                          eps = 1e-3, seed = 42L) {
+  if (n <= 1L) return(matrix(0.0, max(n, 1L), 2L))
+  if (n == 2L) {
+    j_val <- if (adj[1L, 2L] > 0) adj[1L, 2L] else 0
+    sep   <- max(0.1, 1 - j_val)
+    return(matrix(c(-sep / 2, 0, sep / 2, 0), 2L, 2L, byrow = TRUE))
+  }
+
+  # Edge-weight matrix W: 1 - jaccard for connected pairs, NA otherwise.
+  # Jaccard >= 1 produces zero-length edges, which break the Floyd-Warshall
+  # division below; floor at a small positive epsilon so the spring still
+  # has a finite target.
+  W <- matrix(NA_real_, n, n)
+  for (i in seq_len(n - 1L)) {
+    for (j in (i + 1L):n) {
+      jac <- adj[i, j]
+      if (jac > 0) {
+        d <- max(1 - jac, 1e-3)
+        W[i, j] <- d
+        W[j, i] <- d
+      }
+    }
+  }
+
+  # Floyd-Warshall shortest paths over the weighted graph.
+  D <- W
+  D[is.na(D)] <- Inf
+  diag(D) <- 0
+  for (kk in seq_len(n)) {
+    dk_col <- D[, kk]
+    dk_row <- D[kk, ]
+    for (i in seq_len(n)) {
+      D[i, ] <- pmin(D[i, ], dk_col[i] + dk_row)
+    }
+  }
+
+  # Disconnected pairs: cap at 1.5x the max finite distance so the spring
+  # still pulls them apart, but doesn't blow up to infinity.
+  finite_vals <- D[is.finite(D) & D > 0]
+  finite_max  <- if (length(finite_vals) > 0) max(finite_vals) else 1
+  D[is.infinite(D)] <- finite_max * 1.5
+  d_max <- max(D)
+  if (d_max <= 0) d_max <- 1
+
+  # Target Euclidean distances + spring stiffness (k_ii = 0)
+  L_scale <- 1.0
+  l_ij <- L_scale * D / d_max
+  k_ij <- ifelse(D > 0, 1 / D^2, 0)
+
+  # Initial positions on a circle with a tiny seeded jitter to break symmetry
+  set.seed(seed)
+  theta <- seq(0, 2 * pi * (1 - 1 / n), length.out = n)
+  pos <- cbind(cos(theta), sin(theta)) +
+         matrix(stats::rnorm(n * 2L, 0, 0.01), n, 2L)
+
+  .grad_hess <- function(m, pos) {
+    dx_vec <- pos[m, 1L] - pos[, 1L]
+    dy_vec <- pos[m, 2L] - pos[, 2L]
+    r2     <- dx_vec * dx_vec + dy_vec * dy_vec
+    r      <- sqrt(r2)
+    keep   <- seq_len(n) != m
+    r[!keep] <- 1  # avoid /0; cancelled via mask below
+    r3     <- r * r * r
+
+    k_row <- k_ij[m, ]
+    l_row <- l_ij[m, ]
+    coef  <- k_row * (1 - l_row / r) * keep
+
+    g_x <- sum(coef * dx_vec)
+    g_y <- sum(coef * dy_vec)
+
+    Hxx <- sum(k_row * (1 - l_row * dy_vec * dy_vec / r3) * keep)
+    Hyy <- sum(k_row * (1 - l_row * dx_vec * dx_vec / r3) * keep)
+    Hxy <- sum(k_row * l_row * dx_vec * dy_vec / r3 * keep)
+
+    list(g = c(g_x, g_y),
+         H = matrix(c(Hxx, Hxy, Hxy, Hyy), 2L, 2L))
+  }
+
+  .grad_norm <- function(m, pos) {
+    dx_vec <- pos[m, 1L] - pos[, 1L]
+    dy_vec <- pos[m, 2L] - pos[, 2L]
+    r      <- sqrt(dx_vec * dx_vec + dy_vec * dy_vec)
+    keep   <- seq_len(n) != m
+    r[!keep] <- 1
+    coef <- k_ij[m, ] * (1 - l_ij[m, ] / r) * keep
+    sqrt(sum(coef * dx_vec)^2 + sum(coef * dy_vec)^2)
+  }
+
+  for (outer in seq_len(n_iter_outer)) {
+    grads <- vapply(seq_len(n), .grad_norm, numeric(1), pos = pos)
+    m_max <- which.max(grads)
+    if (grads[m_max] < eps) break
+
+    for (inner in seq_len(n_iter_inner)) {
+      gh <- .grad_hess(m_max, pos)
+      gn <- sqrt(sum(gh$g^2))
+      if (gn < eps) break
+
+      det_H <- gh$H[1L, 1L] * gh$H[2L, 2L] - gh$H[1L, 2L]^2
+      step <- if (abs(det_H) < 1e-9) {
+        -gh$g * 0.05
+      } else {
+        c(
+          (-gh$g[1L] * gh$H[2L, 2L] + gh$g[2L] * gh$H[1L, 2L]) / det_H,
+          ( gh$g[1L] * gh$H[1L, 2L] - gh$g[2L] * gh$H[1L, 1L]) / det_H
+        )
+      }
+
+      step_norm <- sqrt(sum(step^2))
+      if (step_norm > 0.5) step <- step * (0.5 / step_norm)
+
+      pos[m_max, ] <- pos[m_max, ] + step
+    }
+  }
+
+  pos
+}
+
+
+# ==============================================================================
 # Pure-R Fruchterman-Reingold layout (seeded, deterministic)
 # ==============================================================================
+# Retained for backwards compatibility with legacy v1 constellation tests.
+# Live constellations now use \code{.kk_layout_r}; this function is only
+# reached by tests that pin its name. Scheduled for deletion at rebuild
+# cutover (planning doc §9 step 5).
 
 #' Pure-R Fruchterman-Reingold layout
 #'
@@ -512,18 +675,13 @@ compute_constellation <- function(data, categories, structure,
   }
 
   # --- Layout ---
-  layout_engine <- CONSTELLATION_LAYOUT_TURAS
-  pos <- if (requireNamespace("igraph", quietly = TRUE)) {
-    tryCatch({
-      g   <- igraph::graph_from_adjacency_matrix(adj_top, mode = "undirected",
-                                                 weighted = TRUE)
-      lyt <- igraph::layout_with_fr(g)
-      layout_engine <- CONSTELLATION_LAYOUT_IGRAPH
-      lyt
-    }, error = function(e) .fr_layout_r(nb, adj_top))
-  } else {
-    .fr_layout_r(nb, adj_top)
-  }
+  # Kamada-Kawai layout — separates brands by graph distance over
+  # (1 - Jaccard) edge weights so high-co-awareness clusters stay tight
+  # without collapsing on top of each other and disconnected outliers
+  # sit at distance-meaningful gaps. Replaces Fruchterman-Reingold which
+  # squashed dense Jaccard clusters into a single dot for IPK-shape data.
+  layout_engine <- CONSTELLATION_LAYOUT_KK
+  pos <- .kk_layout_r(nb, adj_top)
 
   nodes_df <- data.frame(
     brand    = present_brands,
@@ -717,19 +875,9 @@ compute_constellation_v2 <- function(data, role_map, categories, structure,
     }
   }
 
-  layout_engine <- CONSTELLATION_LAYOUT_TURAS
-  pos <- if (requireNamespace("igraph", quietly = TRUE)) {
-    tryCatch({
-      g   <- igraph::graph_from_adjacency_matrix(adj_top,
-                                                  mode = "undirected",
-                                                  weighted = TRUE)
-      lyt <- igraph::layout_with_fr(g)
-      layout_engine <- CONSTELLATION_LAYOUT_IGRAPH
-      lyt
-    }, error = function(e) .fr_layout_r(nb, adj_top))
-  } else {
-    .fr_layout_r(nb, adj_top)
-  }
+  # Kamada-Kawai layout (see compute_constellation for rationale).
+  layout_engine <- CONSTELLATION_LAYOUT_KK
+  pos <- .kk_layout_r(nb, adj_top)
 
   nodes_df <- data.frame(
     brand    = present_brands,
@@ -949,19 +1097,9 @@ compute_constellations_per_cat_v2 <- function(data, role_map, categories,
     }
   }
 
-  layout_engine <- CONSTELLATION_LAYOUT_TURAS
-  pos <- if (requireNamespace("igraph", quietly = TRUE)) {
-    tryCatch({
-      g   <- igraph::graph_from_adjacency_matrix(adj_top,
-                                                  mode = "undirected",
-                                                  weighted = TRUE)
-      lyt <- igraph::layout_with_fr(g)
-      layout_engine <- CONSTELLATION_LAYOUT_IGRAPH
-      lyt
-    }, error = function(e) .fr_layout_r(nb, adj_top))
-  } else {
-    .fr_layout_r(nb, adj_top)
-  }
+  # Kamada-Kawai layout (see compute_constellation for rationale).
+  layout_engine <- CONSTELLATION_LAYOUT_KK
+  pos <- .kk_layout_r(nb, adj_top)
 
   nodes_df <- data.frame(
     brand     = present,
