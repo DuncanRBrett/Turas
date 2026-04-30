@@ -253,6 +253,194 @@ run_audience_lens <- function(data, weights = NULL, cat_brands, cat_code,
 }
 
 
+# ==============================================================================
+# SIZE-EXCEPTION: v1 + v2 coexist during IPK rebuild migration window.
+# v1 deletion at cutover restores this file under the 300-line guideline.
+# ==============================================================================
+
+# ==============================================================================
+# V2: ROLE-MAP-DRIVEN ENTRY (slot-indexed data access)
+# ==============================================================================
+# v2 wraps the same orchestration shape as run_audience_lens() but reads
+# respondent data via the data-access layer (00_data_access.R) and the v2
+# role registry (00_role_map_v2.R). It delegates KPI computation to the v2
+# metric block in 13b_al_metrics.R. Audience parsing (13a_al_audiences.R),
+# pair classification (13c_al_classify.R) and panel-data shaping
+# (13d_al_panel_data.R) work unchanged on the v2 result shape — those files
+# operate on the metric output, not the data layer underneath.
+#
+# Tracker-friendliness note (per memory entry
+# feedback_brand_metrics_tracker_friendly): every per-respondent KPI value
+# is derivable here from a single data-access helper call. Audience Lens
+# v3 (post-cutover, Tabs-as-engine) will materialise these as named per-
+# respondent columns so the tracker module can read them directly.
+# ==============================================================================
+
+#' Run audience-lens analysis for one category (v2 role-map driven)
+#'
+#' v2 alternative to \code{run_audience_lens()}. Reads respondent data
+#' via the slot-indexed data-access layer using the role map produced by
+#' \code{build_brand_role_map()}.
+#'
+#' Required role-map entries (per category \code{cat_code}):
+#' \itemize{
+#'   \item \code{funnel.awareness.\{cat\}} — BRANDAWARE root (Multi_Mention)
+#'   \item \code{funnel.attitude.\{cat\}} — BRANDATT1 per-brand compound
+#'   \item \code{funnel.penetration_target.\{cat\}} — BRANDPEN2 root
+#'   \item \code{funnel.frequency.\{cat\}} — BRANDPEN3 root (optional)
+#'   \item \code{mental_avail.cep.\{cat\}.*} — BRANDATTR CEPs (optional;
+#'         block is skipped when no CEP roles are present)
+#'   \item \code{wom.pos_rec.\{cat\}} / \code{wom.neg_rec.\{cat\}} /
+#'         \code{wom.pos_share.\{cat\}} / \code{wom.neg_share.\{cat\}} —
+#'         WOM mention sets (optional)
+#' }
+#'
+#' @param data Data frame. Already filtered to focal-category respondents.
+#' @param role_map Named list from \code{build_brand_role_map()}.
+#' @param cat_code Character. Category code (e.g. "DSS").
+#' @param cat_name Character. Display name (e.g. "Dishwash Soap").
+#' @param cat_brands Data frame with \code{BrandCode} (and ideally
+#'   \code{BrandLabel}) columns.
+#' @param focal_brand Character. Focal brand code.
+#' @param audiences List from \code{parse_audience_lens_definitions()}.
+#'   Empty list -> no panel.
+#' @param structure List. Loaded survey structure (used for MarketingReach
+#'   sheet only; role lookups go via role_map).
+#' @param config List. Brand config (sources thresholds + alpha).
+#' @param weights Numeric vector of length \code{nrow(data)} or NULL.
+#' @param category_results Optional per-category result block (passed
+#'   through unchanged for any future enrichment hooks).
+#'
+#' @return Same shape as \code{run_audience_lens()} (status, meta, total,
+#'   audiences, suppressed, pair_cards). v2 status carries an extra
+#'   \code{engine = "v2"} marker on the meta block.
+#' @export
+run_audience_lens_v2 <- function(data, role_map, cat_code, cat_name,
+                                 cat_brands, focal_brand, audiences,
+                                 structure, config,
+                                 weights = NULL,
+                                 category_results = NULL) {
+
+  if (is.null(data) || !is.data.frame(data) || nrow(data) == 0) {
+    return(.al_refuse("DATA_MISSING",
+      "Audience lens v2: empty data",
+      "Pass the focal-category-filtered survey data frame"))
+  }
+  if (is.null(focal_brand) || !nzchar(trimws(as.character(focal_brand)))) {
+    return(.al_refuse("CFG_FOCAL_BRAND_MISSING",
+      "Audience lens v2 requires focal_brand",
+      "Set focal_brand in Brand_Config Settings sheet"))
+  }
+  if (is.null(role_map) || length(role_map) == 0L) {
+    return(.al_refuse("CFG_ROLE_MAP_EMPTY",
+      "Audience lens v2 requires a non-empty role map",
+      "Build role_map via build_brand_role_map() before calling v2"))
+  }
+
+  if (is.null(audiences) || length(audiences) == 0) {
+    return(list(
+      status = "PASS",
+      meta = list(cat_code = cat_code, cat_name = cat_name,
+                  focal_brand = focal_brand,
+                  n_audiences = 0L, n_total = nrow(data),
+                  engine = "v2",
+                  note = "No audiences declared for this category"),
+      banner_table = NULL,
+      cards = list(),
+      pair_cards = list()
+    ))
+  }
+
+  thresholds <- .al_resolve_thresholds(config)
+  w <- .al_normalise_weights(weights, nrow(data))
+
+  # Compute total + per-audience metrics via the v2 engine.
+  metrics_total <- compute_al_metrics_for_subset_v2(
+    data = data, role_map = role_map, weights = w,
+    keep_idx = rep(TRUE, nrow(data)),
+    cat_brands = cat_brands, cat_code = cat_code,
+    focal_brand = focal_brand,
+    structure = structure, category_results = category_results,
+    config = config)
+
+  audience_blocks <- lapply(audiences, function(a) {
+    idx <- resolve_audience_index(a, data)
+    n_unweighted <- sum(idx, na.rm = TRUE)
+    n_weighted   <- sum(w[idx], na.rm = TRUE)
+    base_state   <- .al_base_state(n_unweighted, thresholds)
+    if (identical(base_state, "suppressed")) {
+      return(list(audience = a, n_unweighted = n_unweighted,
+                  n_weighted = n_weighted, base_state = base_state,
+                  metrics = NULL))
+    }
+    metrics <- compute_al_metrics_for_subset_v2(
+      data = data, role_map = role_map, weights = w, keep_idx = idx,
+      cat_brands = cat_brands, cat_code = cat_code,
+      focal_brand = focal_brand,
+      structure = structure, category_results = category_results,
+      config = config)
+    list(audience = a, n_unweighted = n_unweighted,
+         n_weighted = n_weighted, base_state = base_state,
+         metrics = metrics)
+  })
+
+  rendered <- Filter(function(b) !is.null(b$metrics), audience_blocks)
+  suppressed <- Filter(function(b) is.null(b$metrics), audience_blocks)
+
+  if (length(rendered) == 0) {
+    return(list(
+      status = "PARTIAL",
+      code = "DATA_ALL_AUDIENCES_SUPPRESSED",
+      message = sprintf(
+        "All %d declared audiences fell below the n=%d base threshold for %s",
+        length(audiences), thresholds$suppress, cat_name),
+      meta = list(cat_code = cat_code, cat_name = cat_name,
+                  focal_brand = focal_brand,
+                  n_audiences = length(audiences),
+                  n_total = nrow(data), n_total_weighted = sum(w),
+                  engine = "v2",
+                  thresholds = thresholds,
+                  suppressed = suppressed),
+      banner_table = NULL,
+      cards = list(),
+      pair_cards = list()
+    ))
+  }
+
+  pair_groups <- .al_extract_pairs(rendered)
+  pair_cards  <- lapply(pair_groups, function(pg) {
+    classify_audience_pair(
+      pair_a       = pg$a, pair_b = pg$b,
+      total        = list(metrics = metrics_total,
+                          n_unweighted = nrow(data),
+                          n_weighted = sum(w)),
+      focal_brand  = focal_brand,
+      thresholds   = thresholds)
+  })
+
+  list(
+    status = "PASS",
+    meta = list(
+      cat_code = cat_code, cat_name = cat_name,
+      focal_brand = focal_brand,
+      n_total = nrow(data), n_total_weighted = sum(w),
+      n_audiences = length(audiences),
+      n_rendered = length(rendered),
+      n_suppressed = length(suppressed),
+      thresholds = thresholds,
+      weighted = !is.null(weights),
+      engine = "v2"
+    ),
+    total = list(metrics = metrics_total,
+                 n_unweighted = nrow(data),
+                 n_weighted = sum(w)),
+    audiences = rendered,
+    suppressed = suppressed,
+    pair_cards = pair_cards
+  )
+}
+
+
 if (!exists("%||%")) {
   `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
 }
