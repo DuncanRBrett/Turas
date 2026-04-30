@@ -175,6 +175,131 @@ build_dot_plot <- function(df, focal_label = NULL,
 
 
 # ==============================================================================
+# Label placement (collision-aware)
+# ==============================================================================
+
+#' Place scatter-plot labels around their bubbles, avoiding collisions
+#'
+#' Mirrors the ggrepel approach for pure-SVG charts: for each point, picks the
+#' best of eight candidate positions (E / NE / N / NW / W / SW / S / SE) at a
+#' radial offset from the bubble, scoring each by overlap with other bubbles,
+#' already-placed labels, and the chart edges. Falls back to wider offsets
+#' (1.5x, 2x) if every direction is taken at the default distance.
+#'
+#' Categories with similar metrics genuinely sit at the same coordinates
+#' (e.g. on the IPK Wave 1 clutter chart, Salad Dressings, Stock Powder and
+#' Cook-in Sauces all sit around 7.4 brands known / 13% focal share). The
+#' bubbles are deliberately precise — only the labels move, never the points.
+#'
+#' @param points List of named lists, each with: \code{svgx}, \code{svgy},
+#'   \code{r} (bubble radius), \code{label} (display text), \code{is_focal}
+#'   (logical). Order does not matter — placement order is determined by
+#'   focal-first then label length.
+#' @param plot_left,plot_right,plot_top,plot_bot Numeric. Plot-area edges
+#'   in SVG pixels.
+#' @param font_size Numeric. Label font size in px. Default 10.
+#' @param pad Numeric. Gap between bubble edge and label box. Default 4.
+#' @return List the same length as \code{points}, each element a list with
+#'   \code{cx} / \code{cy} (label anchor coords), \code{anchor}
+#'   (\code{"start"} / \code{"middle"} / \code{"end"}), and \code{leader}
+#'   (logical — TRUE when the label is far enough from the bubble that a
+#'   thin leader line should be drawn).
+#' @keywords internal
+.place_scatter_labels <- function(points, plot_left, plot_right,
+                                   plot_top, plot_bot,
+                                   font_size = 10, pad = 4) {
+  n <- length(points)
+  if (n == 0L) return(list())
+
+  # Approximate label box dimensions for an Inter-stack font at this size.
+  char_w <- font_size * 0.55
+  text_h <- font_size * 1.15
+
+  candidates <- list(
+    list(name = "E",  dx =  1.0, dy =  0.0, anchor = "start"),
+    list(name = "NE", dx =  0.7, dy = -0.7, anchor = "start"),
+    list(name = "SE", dx =  0.7, dy =  0.7, anchor = "start"),
+    list(name = "W",  dx = -1.0, dy =  0.0, anchor = "end"),
+    list(name = "NW", dx = -0.7, dy = -0.7, anchor = "end"),
+    list(name = "SW", dx = -0.7, dy =  0.7, anchor = "end"),
+    list(name = "N",  dx =  0.0, dy = -1.0, anchor = "middle"),
+    list(name = "S",  dx =  0.0, dy =  1.0, anchor = "middle")
+  )
+
+  bbox_for <- function(pt, cand, mult) {
+    label_w <- char_w * nchar(pt$label)
+    cx <- pt$svgx + cand$dx * (pt$r + pad) * mult
+    cy <- pt$svgy + cand$dy * (pt$r + pad) * mult
+    x0 <- if (cand$anchor == "start") cx
+          else if (cand$anchor == "end") cx - label_w
+          else cx - label_w / 2
+    y0 <- cy - text_h * 0.7
+    list(x0 = x0, y0 = y0, x1 = x0 + label_w, y1 = y0 + text_h,
+         cx = cx, cy = cy, anchor = cand$anchor, mult = mult)
+  }
+
+  score_box <- function(bb, self_idx, placed) {
+    s <- 0
+    if (bb$x0 < plot_left)  s <- s + (plot_left - bb$x0) * 3
+    if (bb$x1 > plot_right) s <- s + (bb$x1 - plot_right) * 3
+    if (bb$y0 < plot_top)   s <- s + (plot_top - bb$y0) * 3
+    if (bb$y1 > plot_bot)   s <- s + (bb$y1 - plot_bot) * 3
+    for (i in seq_len(n)) {
+      if (i == self_idx) next
+      p <- points[[i]]
+      cx_clamp <- max(bb$x0, min(p$svgx, bb$x1))
+      cy_clamp <- max(bb$y0, min(p$svgy, bb$y1))
+      d <- sqrt((cx_clamp - p$svgx)^2 + (cy_clamp - p$svgy)^2)
+      if (d < p$r + pad) s <- s + (p$r + pad - d) * 8
+    }
+    for (lb in placed) {
+      if (is.null(lb)) next
+      ow <- max(0, min(bb$x1, lb$x1) - max(bb$x0, lb$x0))
+      oh <- max(0, min(bb$y1, lb$y1) - max(bb$y0, lb$y0))
+      s <- s + ow * oh * 0.15
+    }
+    s
+  }
+
+  # Process focal first, then longest labels first (hardest to fit).
+  focal_first <- which(vapply(points, function(p) isTRUE(p$is_focal), logical(1)))
+  rest <- setdiff(seq_len(n), focal_first)
+  rest <- rest[order(vapply(points[rest], function(p) nchar(p$label), integer(1)),
+                      decreasing = TRUE)]
+  proc_order <- c(focal_first, rest)
+
+  placed <- vector("list", n)
+  for (idx in proc_order) {
+    pt <- points[[idx]]
+    best <- NULL
+    best_score <- Inf
+    for (mult in c(1.0, 1.5, 2.0)) {
+      for (cand in candidates) {
+        bb <- bbox_for(pt, cand, mult)
+        sc <- score_box(bb, idx, placed)
+        if (sc < best_score) {
+          best_score <- sc
+          best <- bb
+        }
+      }
+      if (best_score < 1) break
+    }
+    placed[[idx]] <- best
+  }
+
+  # Convert internal bbox to public list shape; flag leader lines for
+  # any label drawn beyond the bubble's natural east neighbourhood.
+  lapply(seq_len(n), function(i) {
+    bb <- placed[[i]]
+    pt <- points[[i]]
+    natural <- bb$mult <= 1.0 && abs(bb$cx - pt$svgx) <= pt$r * 1.6 &&
+               abs(bb$cy - pt$svgy) <= pt$r * 1.6
+    list(cx = bb$cx, cy = bb$cy, anchor = bb$anchor, leader = !natural)
+  })
+}
+
+
+# ==============================================================================
 # 2. SCATTER PLOT (MPen×NS, I×P, DBA, Portfolio)
 # ==============================================================================
 
@@ -284,7 +409,10 @@ build_scatter <- function(df, x_col, y_col, label_col,
     }
   }
 
-  # Dots
+  # Two-pass label placement: first compute every bubble, then run
+  # collision-aware label placement so categories that share coordinates
+  # (e.g. on the IPK clutter chart) don't end up with stacked labels.
+  bubble_specs <- list()
   for (i in seq_len(nrow(df))) {
     xv <- x_vals[i]; yv <- y_vals[i]
     if (is.na(xv) || is.na(yv)) next
@@ -295,13 +423,35 @@ build_scatter <- function(df, x_col, y_col, label_col,
       sv <- df[[size_col]][i]
       max(5, min(18, 5 + (sv / max(df[[size_col]], na.rm = TRUE)) * 13))
     } else if (is_focal) 8 else 6
-    fw <- if (is_focal) "700" else "400"
-    fc <- if (is_focal) "#1e293b" else "#64748b"
+    bubble_specs[[length(bubble_specs) + 1L]] <- list(
+      svgx = sx(xv), svgy = sy(yv), r = r, label = lbl,
+      is_focal = is_focal, col = col
+    )
+  }
 
+  placements <- .place_scatter_labels(
+    points     = bubble_specs,
+    plot_left  = ml,    plot_right = ml + pw,
+    plot_top   = mt,    plot_bot   = mt + ph,
+    font_size  = 10,    pad        = 4
+  )
+
+  for (i in seq_along(bubble_specs)) {
+    pt <- bubble_specs[[i]]
+    pl <- placements[[i]]
+    fw <- if (pt$is_focal) "700" else "400"
+    fc <- if (pt$is_focal) "#1e293b" else "#64748b"
+    if (isTRUE(pl$leader)) {
+      parts <- c(parts, sprintf(
+        '<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="#cbd5e1" stroke-width="0.8" opacity="0.7"/>',
+        pt$svgx, pt$svgy, pl$cx, pl$cy
+      ))
+    }
     parts <- c(parts,
-      sprintf('<circle cx="%g" cy="%g" r="%g" fill="%s" opacity="0.8" stroke="#fff" stroke-width="1.5"/>', sx(xv), sy(yv), r, col),
-      sprintf('<text x="%g" y="%g" fill="%s" font-size="10" font-weight="%s">%s</text>',
-              sx(xv) + r + 4, sy(yv) - r - 2, fc, fw, .br_escape(lbl))
+      sprintf('<circle cx="%g" cy="%g" r="%g" fill="%s" opacity="0.8" stroke="#fff" stroke-width="1.5"/>',
+              pt$svgx, pt$svgy, pt$r, pt$col),
+      sprintf('<text x="%g" y="%g" text-anchor="%s" fill="%s" font-size="10" font-weight="%s">%s</text>',
+              pl$cx, pl$cy, pl$anchor, fc, fw, .br_escape(pt$label))
     )
   }
 

@@ -1224,6 +1224,115 @@ function pfClBuildRows(data, focalCode) {
 // contract: title, quadrant backings, ref lines, axes + ticks, dots
 // sized by category penetration. Each <circle> carries data-pf-cl-cat
 // so the hover handler can look up the row's full metrics.
+// Collision-aware scatter label placement.
+//
+// Mirrors the server-side .place_scatter_labels() in 04_chart_builder.R so
+// the JS-driven re-renders (focal change on Category Context / Extension)
+// produce the same anti-overlap layout as the initial render. Tries 8
+// candidate positions per point (E / NE / SE / W / NW / SW / N / S) at
+// progressively wider offsets, scoring each by overlap with other bubbles
+// and already-placed labels. Bubble positions are never moved — only labels.
+//
+// points: [{ svgx, svgy, r, label, isFocal }]
+// returns: [{ cx, cy, anchor, leader }] same length, same order
+function pfPlaceScatterLabels(points, plotLeft, plotRight, plotTop, plotBot,
+                               fontSize, pad) {
+  fontSize = fontSize || 10;
+  pad = (pad == null) ? 4 : pad;
+  var n = points.length;
+  if (n === 0) return [];
+
+  var charW = fontSize * 0.55;
+  var textH = fontSize * 1.15;
+
+  var candidates = [
+    { dx:  1.0, dy:  0.0, anchor: 'start'  },
+    { dx:  0.7, dy: -0.7, anchor: 'start'  },
+    { dx:  0.7, dy:  0.7, anchor: 'start'  },
+    { dx: -1.0, dy:  0.0, anchor: 'end'    },
+    { dx: -0.7, dy: -0.7, anchor: 'end'    },
+    { dx: -0.7, dy:  0.7, anchor: 'end'    },
+    { dx:  0.0, dy: -1.0, anchor: 'middle' },
+    { dx:  0.0, dy:  1.0, anchor: 'middle' }
+  ];
+
+  function bboxFor(pt, cand, mult) {
+    var labelW = charW * (pt.label ? pt.label.length : 0);
+    var cx = pt.svgx + cand.dx * (pt.r + pad) * mult;
+    var cy = pt.svgy + cand.dy * (pt.r + pad) * mult;
+    var x0 = cand.anchor === 'start' ? cx
+           : cand.anchor === 'end'   ? cx - labelW
+           :                            cx - labelW / 2;
+    var y0 = cy - textH * 0.7;
+    return {
+      x0: x0, y0: y0, x1: x0 + labelW, y1: y0 + textH,
+      cx: cx, cy: cy, anchor: cand.anchor, mult: mult
+    };
+  }
+
+  function scoreBox(bb, selfIdx, placed) {
+    var s = 0;
+    if (bb.x0 < plotLeft)  s += (plotLeft - bb.x0) * 3;
+    if (bb.x1 > plotRight) s += (bb.x1 - plotRight) * 3;
+    if (bb.y0 < plotTop)   s += (plotTop - bb.y0) * 3;
+    if (bb.y1 > plotBot)   s += (bb.y1 - plotBot) * 3;
+    for (var i = 0; i < n; i++) {
+      if (i === selfIdx) continue;
+      var p = points[i];
+      var cxC = Math.max(bb.x0, Math.min(p.svgx, bb.x1));
+      var cyC = Math.max(bb.y0, Math.min(p.svgy, bb.y1));
+      var d = Math.sqrt((cxC - p.svgx) * (cxC - p.svgx) +
+                        (cyC - p.svgy) * (cyC - p.svgy));
+      if (d < p.r + pad) s += (p.r + pad - d) * 8;
+    }
+    for (var k = 0; k < placed.length; k++) {
+      var lb = placed[k];
+      if (!lb) continue;
+      var ow = Math.max(0, Math.min(bb.x1, lb.x1) - Math.max(bb.x0, lb.x0));
+      var oh = Math.max(0, Math.min(bb.y1, lb.y1) - Math.max(bb.y0, lb.y0));
+      s += ow * oh * 0.15;
+    }
+    return s;
+  }
+
+  // Process focal first, then longest labels first.
+  var order = [];
+  for (var i = 0; i < n; i++) if (points[i].isFocal) order.push(i);
+  var rest = [];
+  for (var j = 0; j < n; j++) if (!points[j].isFocal) rest.push(j);
+  rest.sort(function (a, b) {
+    return (points[b].label || '').length - (points[a].label || '').length;
+  });
+  order = order.concat(rest);
+
+  var placed = new Array(n);
+  var mults = [1.0, 1.5, 2.0];
+
+  for (var oi = 0; oi < order.length; oi++) {
+    var idx = order[oi];
+    var pt  = points[idx];
+    var best = null, bestScore = Infinity;
+    for (var mi = 0; mi < mults.length; mi++) {
+      for (var ci = 0; ci < candidates.length; ci++) {
+        var bb = bboxFor(pt, candidates[ci], mults[mi]);
+        var sc = scoreBox(bb, idx, placed);
+        if (sc < bestScore) { bestScore = sc; best = bb; }
+      }
+      if (bestScore < 1) break;
+    }
+    placed[idx] = best;
+  }
+
+  return placed.map(function (bb, i) {
+    var pt = points[i];
+    var natural = bb.mult <= 1.0 &&
+                  Math.abs(bb.cx - pt.svgx) <= pt.r * 1.6 &&
+                  Math.abs(bb.cy - pt.svgy) <= pt.r * 1.6;
+    return { cx: bb.cx, cy: bb.cy, anchor: bb.anchor, leader: !natural };
+  });
+}
+
+
 function pfClRenderScatter(rows, refX, focalColour) {
   if (!rows || rows.length === 0) {
     return '<p style="color:#94a3b8;padding:24px 0;">No category data available.</p>';
@@ -1313,28 +1422,50 @@ function pfClRenderScatter(rows, refX, focalColour) {
   parts.push('<rect x="' + ml + '" y="' + mt + '" width="' + pw + '" height="' + ph +
     '" fill="none" stroke="#e2e8f0"/>');
 
-  // Dots — radius scaled by category penetration.
+  // Dots — radius scaled by category penetration. Two-pass placement:
+  // build bubble specs first, then run collision-aware label placement
+  // so categories sharing coordinates don't end up with stacked labels.
   var maxPen = Math.max.apply(null, rows.map(function (r) {
     return r.cat_penetration || 0;
   }));
   if (!(maxPen > 0)) maxPen = 1;
+
+  var dots = [];
   rows.forEach(function (r) {
     if (r.set_size_mean == null || r.focal_share == null) return;
     var cx = sx(r.set_size_mean);
     var cy = sy(r.focal_share * 100);
     var radius = Math.max(5, Math.min(20, 5 + (r.cat_penetration / maxPen) * 15));
-    var labelLeftThird = cx > ml + pw * 0.65;
-    var labelX = labelLeftThird ? cx - radius - 4 : cx + radius + 4;
-    var anchor = labelLeftThird ? 'end' : 'start';
+    dots.push({
+      svgx: cx, svgy: cy, r: radius,
+      label: pfClTrunc(r.cat_label, 22),
+      isFocal: false,
+      cat_code: r.cat_code
+    });
+  });
+
+  var dotPlacements = pfPlaceScatterLabels(
+    dots, ml, ml + pw, mt, mt + ph, 10, 4
+  );
+
+  dots.forEach(function (d, i) {
+    var pl = dotPlacements[i];
+    if (pl.leader) {
+      parts.push(
+        '<line x1="' + d.svgx + '" y1="' + d.svgy +
+        '" x2="' + pl.cx + '" y2="' + pl.cy +
+        '" stroke="#cbd5e1" stroke-width="0.8" opacity="0.7"/>'
+      );
+    }
     parts.push(
-      '<circle class="pf-cl-dot" data-pf-cl-cat="' + pfClEsc(r.cat_code) +
-      '" cx="' + cx + '" cy="' + cy + '" r="' + radius + '" ' +
+      '<circle class="pf-cl-dot" data-pf-cl-cat="' + pfClEsc(d.cat_code) +
+      '" cx="' + d.svgx + '" cy="' + d.svgy + '" r="' + d.r + '" ' +
       'fill="' + focalColour + '" opacity="0.85" stroke="#fff" stroke-width="2" ' +
       'style="cursor:pointer;"></circle>',
-      '<text class="pf-cl-dot-label" data-pf-cl-cat="' + pfClEsc(r.cat_code) +
-      '" x="' + labelX + '" y="' + (cy - radius - 2) +
-      '" text-anchor="' + anchor + '" fill="#1e293b" font-size="10" font-weight="500">' +
-      pfClEsc(pfClTrunc(r.cat_label, 22)) + '</text>'
+      '<text class="pf-cl-dot-label" data-pf-cl-cat="' + pfClEsc(d.cat_code) +
+      '" x="' + pl.cx + '" y="' + pl.cy +
+      '" text-anchor="' + pl.anchor + '" fill="#1e293b" font-size="10" font-weight="500">' +
+      pfClEsc(d.label) + '</text>'
     );
   });
 
@@ -1552,21 +1683,40 @@ function pfExRenderStrength(bubbles, focalColour, brandLabel) {
   parts.push('<rect x="' + ml + '" y="' + mt + '" width="' + pw + '" height="' + ph +
     '" fill="none" stroke="#e2e8f0"/>');
 
-  // Bubbles
+  // Bubbles — collision-aware label placement (same algorithm as the
+  // clutter scatter). Build bubble specs first, then place labels.
+  var exDots = [];
   bubbles.forEach(function (b) {
-    var cx = sx(b.x), cy = sy(b.y);
-    var r = Math.max(6, Math.min(28, 6 + (b.size / maxSize) * 22));
-    var labelLeftThird = cx > ml + pw * 0.65;
-    var labelX = labelLeftThird ? cx - r - 4 : cx + r + 4;
-    var anchor = labelLeftThird ? 'end' : 'start';
+    exDots.push({
+      svgx: sx(b.x), svgy: sy(b.y),
+      r: Math.max(6, Math.min(28, 6 + (b.size / maxSize) * 22)),
+      label: pfClTrunc(b.cat_label, 22),
+      isFocal: false,
+      cat: b.cat
+    });
+  });
+
+  var exPlacements = pfPlaceScatterLabels(
+    exDots, ml, ml + pw, mt, mt + ph, 10, 4
+  );
+
+  exDots.forEach(function (d, i) {
+    var pl = exPlacements[i];
+    if (pl.leader) {
+      parts.push(
+        '<line x1="' + d.svgx + '" y1="' + d.svgy +
+        '" x2="' + pl.cx + '" y2="' + pl.cy +
+        '" stroke="#cbd5e1" stroke-width="0.8" opacity="0.7"/>'
+      );
+    }
     parts.push(
-      '<circle class="pf-ex-bubble" data-pf-ex-cat="' + pfClEsc(b.cat) +
-      '" cx="' + cx + '" cy="' + cy + '" r="' + r + '" ' +
+      '<circle class="pf-ex-bubble" data-pf-ex-cat="' + pfClEsc(d.cat) +
+      '" cx="' + d.svgx + '" cy="' + d.svgy + '" r="' + d.r + '" ' +
       'fill="' + focalColour + '" opacity="0.7" stroke="#fff" stroke-width="2" ' +
       'style="cursor:pointer;"></circle>',
-      '<text class="pf-ex-bubble-label" x="' + labelX + '" y="' + (cy - r - 2) +
-      '" text-anchor="' + anchor + '" fill="#1e293b" font-size="10" font-weight="500">' +
-      pfClEsc(pfClTrunc(b.cat_label, 22)) + '</text>'
+      '<text class="pf-ex-bubble-label" x="' + pl.cx + '" y="' + pl.cy +
+      '" text-anchor="' + pl.anchor + '" fill="#1e293b" font-size="10" font-weight="500">' +
+      pfClEsc(d.label) + '</text>'
     );
   });
 
