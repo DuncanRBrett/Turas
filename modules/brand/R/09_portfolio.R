@@ -11,6 +11,12 @@
 #   SQ1_* or SQ2_* columns directly. A grep for "SQ1_" or "SQ2_" in new
 #   code should return only this function.
 #
+# SIZE-EXCEPTION: orchestrator (run_portfolio) plus the denominator helper
+# (v1 + v2) plus the supporting-metrics computation form one coherent
+# entry-point file. The legacy v1 helper + .compute_supporting_metrics
+# are scheduled for deletion at rebuild cutover (planning doc §9 step 5),
+# bringing the file back inside the 300-active-line default.
+#
 # VERSION: 1.0
 # ==============================================================================
 
@@ -213,6 +219,66 @@ build_portfolio_base_v2 <- function(data, cat_code,
   w    <- if (!is.null(weights)) weights else rep(1.0, nrow(data))
   n_w  <- sum(w[idx], na.rm = TRUE)
   list(idx = idx, n_uw = n_uw, n_w = n_w, col_used = col_used)
+}
+
+
+# ==============================================================================
+# V2: SHARED AWARENESS-MATRIX HELPER
+# ==============================================================================
+
+#' Resolve the awareness column root for a category from a v2 role map
+#'
+#' Looks up \code{portfolio.awareness.{cat_code}} (preferred) or
+#' \code{funnel.awareness.{cat_code}} in \code{role_map} and returns the
+#' \code{column_root} field. When \code{role_map} is NULL or neither entry
+#' resolves a non-empty root, falls back to the convention
+#' \code{BRANDAWARE_{cat_code}}. Returns a single character string.
+#'
+#' @param role_map Named list from \code{build_brand_role_map()} or NULL.
+#' @param cat_code Character scalar. Category code.
+#' @return Character scalar — the awareness root.
+#' @keywords internal
+.portfolio_aware_root_v2 <- function(role_map, cat_code) {
+  if (!is.null(role_map)) {
+    for (key in c(paste0("portfolio.awareness.", cat_code),
+                  paste0("funnel.awareness.",    cat_code))) {
+      entry <- role_map[[key]]
+      root  <- entry$column_root %||% NULL
+      if (!is.null(root) && nzchar(root)) return(as.character(root))
+    }
+  }
+  paste0("BRANDAWARE_", cat_code)
+}
+
+
+#' Build the per-respondent x per-brand awareness matrix for one category (v2)
+#'
+#' Single seam between portfolio sub-analyses and the slot-indexed data-access
+#' layer. Every v2 sub-analysis (footprint, constellation, clutter, strength,
+#' extension, overview) calls this helper to obtain the awareness matrix for a
+#' category, replacing the legacy \code{data[[paste0("BRANDAWARE_", cat, "_",
+#' brand)]] == 1L} reads.
+#'
+#' Returns an integer 0/1 matrix \code{[nrow(data) x length(brand_codes)]} with
+#' \code{brand_codes} as colnames. Brands whose code never appears in any slot
+#' contribute an all-zero column — caller decides whether that means "not
+#' aware" or "not asked". (For the legacy column-per-brand fixture, slot
+#' columns are absent and the helper returns an all-zero matrix; that fixture
+#' is scheduled for retirement at cutover.)
+#'
+#' @param data Data frame.
+#' @param role_map Named list from \code{build_brand_role_map()} or NULL.
+#'   When NULL, the helper falls back to the \code{BRANDAWARE_{cat}}
+#'   convention root.
+#' @param cat_code Character scalar. Category code.
+#' @param brand_codes Character vector. Brand codes in this category.
+#' @return Integer matrix \code{[nrow(data) x length(brand_codes)]}, colnames
+#'   = \code{brand_codes}, values 0 / 1.
+#' @keywords internal
+.portfolio_aware_matrix_v2 <- function(data, role_map, cat_code,
+                                       brand_codes) {
+  root <- .portfolio_aware_root_v2(role_map, cat_code)
+  multi_mention_indicator_matrix(data, root, brand_codes)
 }
 
 

@@ -18,6 +18,14 @@
 #     Presentation wrapper. Reads the pre-computed payload from results
 #     and returns it (with refusal shape on failure). Used by the HTML panel.
 #
+# SIZE-EXCEPTION: overview record builder + brand-list assembler + deep-dive
+# enrichment + cat-code detector form a coherent payload-building flow. During
+# the IPK rebuild the file holds both v1 (column-per-brand) and v2
+# (slot-indexed) variants of compute_portfolio_overview_data + the per-cat
+# record helper. The legacy v1 entries are scheduled for deletion at rebuild
+# cutover (planning doc §9 step 5), bringing the file back inside the
+# 300-active-line default.
+#
 # VERSION: 2.0 (raw-data driven)
 # ==============================================================================
 
@@ -366,6 +374,151 @@ build_portfolio_overview <- function(results, config) {
                               n_categories_present = integer(0),
                               stringsAsFactors = FALSE),
     categories  = list()
+  )
+}
+
+
+# ==============================================================================
+# V2: SLOT-INDEXED OVERVIEW DATA
+# ==============================================================================
+
+#' Build a per-category overview record using the slot-indexed helper (v2)
+#'
+#' Replaces \code{.po_build_category_record()} for the v2 entry: cat_code
+#' comes directly from \code{categories$CategoryCode}, awareness from
+#' \code{.portfolio_aware_matrix_v2()}, base from
+#' \code{build_portfolio_base_v2()}.
+#'
+#' @keywords internal
+.po_build_category_record_v2 <- function(cat_name, cat_code, analysis_depth,
+                                          data, role_map, structure,
+                                          timeframe, weights, n_total,
+                                          category_results) {
+  if (is.null(cat_code) || !nzchar(cat_code)) return(NULL)
+
+  cat_brands <- tryCatch(
+    get_brands_for_category(structure, cat_name),
+    error = function(e) data.frame(BrandCode = character(0))
+  )
+  if (nrow(cat_brands) == 0L) return(NULL)
+
+  base <- build_portfolio_base_v2(data, cat_code, timeframe, weights)
+  if (!is.null(base$status)) return(NULL)
+  # Skip categories with zero qualifiers — denominator would be 0 and
+  # the panel renderer shows a "no respondents in this category yet"
+  # placeholder downstream rather than an all-NA awareness card.
+  if (base$n_uw == 0L) return(NULL)
+
+  brand_codes  <- as.character(cat_brands$BrandCode)
+  brand_names  <- .po_brand_names(cat_brands, brand_codes)
+
+  aware_mat    <- .portfolio_aware_matrix_v2(data, role_map, cat_code,
+                                              brand_codes)
+  awareness    <- .compute_brand_awareness_pct_v2(aware_mat, base$idx,
+                                                  weights)
+  awareness_list <- stats::setNames(
+    as.list(ifelse(is.finite(awareness), as.numeric(awareness), NA_real_)),
+    brand_codes
+  )
+
+  cat_usage_pct <- if (n_total > 0L) base$n_uw / n_total * 100 else NA_real_
+
+  deep_dive <- NULL
+  if (identical(analysis_depth, "full") && !is.null(category_results)) {
+    cat_rec <- category_results[[cat_name]]
+    deep_dive <- .po_deep_dive_block(cat_rec, brand_codes)
+  }
+
+  list(
+    cat_code        = cat_code,
+    cat_name        = cat_name,
+    analysis_depth  = analysis_depth %||% "awareness_only",
+    total_n_uw      = as.integer(n_total),
+    n_buyers_uw     = as.integer(base$n_uw),
+    n_buyers_w      = as.numeric(base$n_w),
+    cat_usage_pct   = cat_usage_pct,
+    brand_codes     = brand_codes,
+    brand_names     = brand_names,
+    awareness_pct   = awareness_list,
+    deep_dive       = deep_dive
+  )
+}
+
+
+#' Compute the Portfolio Overview payload (v2 — slot-indexed)
+#'
+#' v2 alternative to \code{compute_portfolio_overview_data()}.  Uses
+#' \code{categories$CategoryCode} for direct cat_code lookup (no detection)
+#' and the slot-indexed data-access helpers for awareness reads.  Returns
+#' the same shape as the legacy entry.
+#'
+#' @param data Data frame.
+#' @param role_map Named list from \code{build_brand_role_map()} or NULL.
+#' @param categories Data frame with \code{Category} + \code{CategoryCode}
+#'   (and optional \code{Analysis_Depth}).
+#' @param structure List from a Survey_Structure loader.
+#' @param config List with \code{focal_brand} +
+#'   \code{portfolio_timeframe}.
+#' @param weights Numeric vector or NULL.
+#' @param category_results List or NULL — passes through to deep-dive
+#'   enrichment.
+#' @return Same list shape as \code{compute_portfolio_overview_data()}.
+#' @export
+compute_portfolio_overview_data_v2 <- function(data, role_map, categories,
+                                                structure, config,
+                                                weights = NULL,
+                                                category_results = NULL) {
+  if (is.null(data) || !is.data.frame(data) || nrow(data) == 0L) {
+    return(.po_refuse("DATA_OVERVIEW_NO_DATA",
+                      "data must be a non-empty data frame",
+                      "Pass the full survey data to compute_portfolio_overview_data_v2()."))
+  }
+  if (is.null(categories) || !is.data.frame(categories) ||
+      nrow(categories) == 0L) {
+    return(.po_refuse("DATA_OVERVIEW_NO_CATEGORIES",
+                      "categories must be a non-empty data frame",
+                      "Confirm config$categories is populated."))
+  }
+  if (!"CategoryCode" %in% names(categories)) {
+    return(.po_refuse("CFG_PORTFOLIO_NO_CATEGORY_CODE",
+                      "categories sheet must include a CategoryCode column for v2 portfolio analyses",
+                      "Add CategoryCode column to Brand_Config Categories sheet"))
+  }
+
+  focal     <- config$focal_brand         %||% ""
+  timeframe <- config$portfolio_timeframe %||% "3m"
+  n_total   <- nrow(data)
+
+  cats_list <- list()
+  for (i in seq_len(nrow(categories))) {
+    rec <- .po_build_category_record_v2(
+      cat_name        = as.character(categories$Category[i]),
+      cat_code        = as.character(categories$CategoryCode[i]),
+      analysis_depth  = .po_depth_from_cfg(categories, i),
+      data            = data,
+      role_map        = role_map,
+      structure       = structure,
+      timeframe       = timeframe,
+      weights         = weights,
+      n_total         = n_total,
+      category_results = category_results
+    )
+    if (!is.null(rec)) cats_list[[rec$cat_code]] <- rec
+  }
+
+  if (length(cats_list) == 0L) {
+    return(.po_refuse("DATA_OVERVIEW_NO_COVERAGE",
+                      "No category awareness could be computed.",
+                      "Confirm BRANDAWARE_*_1..N slot columns exist and CategoryCode values match the data."))
+  }
+
+  brands_df <- .po_build_brand_list(cats_list, focal)
+
+  list(
+    status      = "PASS",
+    focal_brand = focal,
+    brands      = brands_df,
+    categories  = cats_list
   )
 }
 

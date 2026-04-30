@@ -9,6 +9,10 @@
 # SIZE-EXCEPTION: sequential FR + Jaccard pipeline; decomposing into smaller
 # functions would fragment the coherent compute → layout → output flow.
 # Active line count is driven by the FR inner loop, not incidental complexity.
+# During the IPK rebuild the file holds both v1 (column-per-brand) and v2
+# (slot-indexed) variants side-by-side; v1 is scheduled for deletion at
+# rebuild cutover (planning doc §9 step 5), bringing the file back inside
+# the 300-active-line default.
 # Denominator: build_portfolio_base() per §3.1 — never inline SQ1_/SQ2_.
 # ==============================================================================
 
@@ -541,5 +545,443 @@ compute_constellation <- function(data, categories, structure,
     layout        = layout_df,
     layout_engine = layout_engine,
     suppressed_cats = suppressed
+  )
+}
+
+
+# ==============================================================================
+# V2: SLOT-INDEXED CONSTELLATIONS
+# ==============================================================================
+
+#' Compute the cross-category any-awareness matrix from the v2 helper
+#'
+#' For each category in the structure, builds a slot-indexed awareness
+#' matrix and OR-aggregates per-brand awareness into a single
+#' \code{nrow(data) x length(all_brands)} indicator matrix.  Brands without
+#' awareness in any category produce an all-zero column.
+#'
+#' @param data Data frame.
+#' @param role_map Named list from \code{build_brand_role_map()} or NULL.
+#' @param brands_df Data frame from \code{structure$brands} (must have
+#'   \code{CategoryCode}, \code{BrandCode}).
+#' @return Integer matrix \code{[nrow(data) x n_unique_brands]}.
+#' @keywords internal
+.build_aware_any_mat_v2 <- function(data, role_map, brands_df) {
+  all_brands <- unique(as.character(brands_df$BrandCode))
+  n          <- nrow(data)
+  if (length(all_brands) == 0L) {
+    return(matrix(0L, n, 0L, dimnames = list(NULL, character(0))))
+  }
+  mat <- matrix(0L, n, length(all_brands),
+                dimnames = list(NULL, all_brands))
+  cat_codes <- unique(as.character(brands_df$CategoryCode))
+  for (cc in cat_codes) {
+    if (is.na(cc) || !nzchar(cc)) next
+    cb <- as.character(brands_df$BrandCode[brands_df$CategoryCode == cc])
+    cb <- cb[cb %in% all_brands]
+    if (length(cb) == 0L) next
+    aw <- .portfolio_aware_matrix_v2(data, role_map, cc, cb)
+    for (b in cb) mat[, b] <- as.integer(mat[, b] | aw[, b])
+  }
+  mat
+}
+
+
+#' Compute competitive constellation (v2 — slot-indexed)
+#'
+#' v2 alternative to \code{compute_constellation()}.  Builds the cross-cat
+#' any-awareness matrix from \code{structure$brands} and the slot-indexed
+#' data-access layer, then runs the same Jaccard + Fruchterman-Reingold
+#' pipeline as the legacy entry.  The brand universe is derived from the
+#' Brands sheet (every declared brand) instead of a regex scan over data
+#' column names.
+#'
+#' @param data Data frame.
+#' @param role_map Named list from \code{build_brand_role_map()} or NULL.
+#' @param categories Data frame with \code{Category} + \code{CategoryCode}.
+#' @param structure List from a Survey_Structure loader (must contain
+#'   \code{brands}).
+#' @param config List with the portfolio settings.
+#' @param weights Numeric vector or NULL.
+#' @return Same list shape as \code{compute_constellation()}.
+#' @export
+compute_constellation_v2 <- function(data, role_map, categories, structure,
+                                      config, weights = NULL) {
+  focal_brand <- config$focal_brand %||% ""
+  timeframe   <- config$portfolio_timeframe %||% "3m"
+  min_base    <- config$portfolio_min_base  %||% 30L
+  cooccur_min <- config$portfolio_cooccur_min_pairs %||% 20L
+  edge_top_n  <- config$portfolio_edge_top_n %||% PORTFOLIO_EDGE_TOP_N_DEFAULT
+  n_total     <- nrow(data)
+  w           <- if (!is.null(weights)) weights else rep(1.0, n_total)
+
+  if (!"CategoryCode" %in% names(categories)) {
+    return(list(status = "REFUSED",
+                code = "CFG_PORTFOLIO_NO_CATEGORY_CODE",
+                message = "categories sheet must include a CategoryCode column for v2 portfolio analyses",
+                how_to_fix = "Add CategoryCode column to Brand_Config Categories sheet"))
+  }
+
+  brands_df <- structure$brands
+  if (is.null(brands_df) || nrow(brands_df) == 0L) {
+    return(list(status = "REFUSED",
+                code = "CFG_NO_BRAND_LIST",
+                message = "structure$brands is empty — cannot build constellation",
+                how_to_fix = "Populate the Brands sheet in Survey_Structure"))
+  }
+
+  # Restrict to active categories from the categories sheet (v2 contract)
+  active_codes <- as.character(categories$CategoryCode)
+  brands_active <- brands_df[
+    as.character(brands_df$CategoryCode) %in% active_codes, , drop = FALSE]
+
+  # Track suppressed cats (low base / no qualifiers) for transparency,
+  # mirroring the legacy "suppressed_cats" return field.
+  suppressed <- character(0)
+  for (cc in unique(as.character(brands_active$CategoryCode))) {
+    base <- build_portfolio_base_v2(data, cc, timeframe, weights)
+    if (!is.null(base$status)) next
+    if (base$n_uw == 0L || base$n_uw < min_base) {
+      suppressed <- c(suppressed, cc)
+    }
+  }
+
+  aware_mat <- .build_aware_any_mat_v2(data, role_map, brands_active)
+  all_brands <- colnames(aware_mat)
+
+  n_aware_w <- vapply(all_brands, function(bc) {
+    sum(w * aware_mat[, bc], na.rm = TRUE)
+  }, numeric(1))
+  present_brands <- all_brands[n_aware_w > 0]
+
+  if (length(present_brands) < CONSTELLATION_MIN_BRANDS) {
+    cat("\n=== TURAS BRAND ERROR ===\n")
+    cat("Context: compute_constellation_v2()\n")
+    cat("Code: CALC_CONSTELLATION_TOO_SPARSE\n")
+    cat(sprintf("Message: Only %d brands with aware respondents (need >= %d)\n",
+                length(present_brands), CONSTELLATION_MIN_BRANDS))
+    cat("=========================\n")
+    return(list(
+      status     = "REFUSED",
+      code       = "CALC_CONSTELLATION_TOO_SPARSE",
+      message    = sprintf(
+        "Only %d brands with aware respondents — need at least %d for constellation.",
+        length(present_brands), CONSTELLATION_MIN_BRANDS),
+      how_to_fix = "Ensure at least 3 brands have non-zero awareness in the data"
+    ))
+  }
+
+  nb <- length(present_brands)
+  am <- aware_mat[, present_brands, drop = FALSE]
+
+  edge_rows <- list()
+  adj_mat   <- matrix(0.0, nb, nb)
+
+  for (i in seq_len(nb - 1L)) {
+    for (j in (i + 1L):nb) {
+      both_vec   <- am[, i] * am[, j]
+      either_vec <- pmax(am[, i], am[, j])
+      w_both     <- sum(w * both_vec,   na.rm = TRUE)
+      w_either   <- sum(w * either_vec, na.rm = TRUE)
+      n_cooccur  <- sum(both_vec)
+
+      if (n_cooccur < cooccur_min || w_either <= 0) next
+      jac <- w_both / w_either
+      edge_rows[[length(edge_rows) + 1L]] <- list(
+        b1 = present_brands[i], b2 = present_brands[j],
+        jaccard = jac, cooccur_n = as.integer(n_cooccur)
+      )
+      adj_mat[i, j] <- jac
+      adj_mat[j, i] <- jac
+    }
+  }
+
+  edges_df <- if (length(edge_rows) > 0L) {
+    df <- do.call(rbind, lapply(edge_rows, as.data.frame,
+                                 stringsAsFactors = FALSE))
+    df <- df[order(df$jaccard, decreasing = TRUE), ]
+    head(df, edge_top_n)
+  } else {
+    data.frame(b1 = character(0), b2 = character(0),
+               jaccard = numeric(0), cooccur_n = integer(0),
+               stringsAsFactors = FALSE)
+  }
+
+  adj_top <- matrix(0.0, nb, nb)
+  if (nrow(edges_df) > 0L) {
+    for (k in seq_len(nrow(edges_df))) {
+      i <- which(present_brands == edges_df$b1[k])
+      j <- which(present_brands == edges_df$b2[k])
+      adj_top[i, j] <- edges_df$jaccard[k]
+      adj_top[j, i] <- edges_df$jaccard[k]
+    }
+  }
+
+  layout_engine <- CONSTELLATION_LAYOUT_TURAS
+  pos <- if (requireNamespace("igraph", quietly = TRUE)) {
+    tryCatch({
+      g   <- igraph::graph_from_adjacency_matrix(adj_top,
+                                                  mode = "undirected",
+                                                  weighted = TRUE)
+      lyt <- igraph::layout_with_fr(g)
+      layout_engine <- CONSTELLATION_LAYOUT_IGRAPH
+      lyt
+    }, error = function(e) .fr_layout_r(nb, adj_top))
+  } else {
+    .fr_layout_r(nb, adj_top)
+  }
+
+  nodes_df <- data.frame(
+    brand    = present_brands,
+    n_aware_w = n_aware_w[present_brands],
+    is_focal  = present_brands == focal_brand,
+    stringsAsFactors = FALSE
+  )
+  layout_df <- data.frame(
+    brand = present_brands,
+    x     = pos[, 1],
+    y     = pos[, 2],
+    stringsAsFactors = FALSE
+  )
+
+  list(
+    status          = "PASS",
+    nodes           = nodes_df,
+    edges           = edges_df,
+    layout          = layout_df,
+    layout_engine   = layout_engine,
+    suppressed_cats = suppressed
+  )
+}
+
+
+#' Compute per-category constellations (v2 — slot-indexed)
+#'
+#' v2 alternative to \code{compute_constellations_per_cat()}.  For each
+#' category in \code{categories}, builds the brand x respondent awareness
+#' matrix via the slot-indexed helper, restricts to category buyers, and
+#' runs the existing per-cat Jaccard layout
+#' (\code{.compute_constellation_for_cat_v2}).
+#'
+#' @param data Data frame.
+#' @param role_map Named list from \code{build_brand_role_map()} or NULL.
+#' @param categories Data frame with \code{Category} + \code{CategoryCode}.
+#' @param structure List from a Survey_Structure loader.
+#' @param config List with portfolio settings.
+#' @param weights Numeric vector or NULL.
+#' @return Same list shape as \code{compute_constellations_per_cat()}.
+#' @export
+compute_constellations_per_cat_v2 <- function(data, role_map, categories,
+                                                structure, config,
+                                                weights = NULL) {
+  focal_brand <- config$focal_brand %||% ""
+  timeframe   <- config$portfolio_timeframe %||% "3m"
+  min_base    <- config$portfolio_min_base  %||% 30L
+  cooccur_min <- config$portfolio_cooccur_min_pairs %||% 20L
+  edge_top_n  <- config$portfolio_edge_top_n %||% PORTFOLIO_EDGE_TOP_N_DEFAULT
+  n_total     <- nrow(data)
+  w           <- if (!is.null(weights)) weights else rep(1.0, n_total)
+
+  if (!"CategoryCode" %in% names(categories)) {
+    return(list(status = "REFUSED",
+                code = "CFG_PORTFOLIO_NO_CATEGORY_CODE",
+                message = "categories sheet must include a CategoryCode column for v2 portfolio analyses",
+                how_to_fix = "Add CategoryCode column to Brand_Config Categories sheet"))
+  }
+
+  by_cat       <- list()
+  cat_codes_ok <- character(0)
+  cat_n        <- integer(0)
+  cat_name_map <- list()
+  suppressed   <- list()
+
+  for (i in seq_len(nrow(categories))) {
+    cat_name <- as.character(categories$Category[i])
+    cat_code <- as.character(categories$CategoryCode[i])
+    if (is.na(cat_code) || !nzchar(cat_code)) next
+
+    cat_brands <- tryCatch(
+      get_brands_for_category(structure, cat_name),
+      error = function(e) data.frame(BrandCode = character(0))
+    )
+    if (nrow(cat_brands) == 0L) {
+      suppressed[[length(suppressed) + 1L]] <- list(
+        cat = cat_name, reason = "no brand list defined"); next
+    }
+
+    base <- build_portfolio_base_v2(data, cat_code, timeframe, weights)
+    if (!is.null(base$status)) {
+      suppressed[[length(suppressed) + 1L]] <- list(
+        cat = cat_code, reason = base$message %||% "screener missing"); next
+    }
+    if (base$n_uw == 0L) {
+      suppressed[[length(suppressed) + 1L]] <- list(
+        cat = cat_code, reason = "no qualifiers"); next
+    }
+    if (base$n_uw < min_base) {
+      suppressed[[length(suppressed) + 1L]] <- list(
+        cat = cat_code,
+        reason = sprintf("low base (n=%d < %d)", base$n_uw, min_base))
+      next
+    }
+
+    brand_codes <- as.character(cat_brands$BrandCode)
+    brand_lbls  <- if ("BrandLabel" %in% names(cat_brands))
+                     as.character(cat_brands$BrandLabel)
+                   else if ("BrandName" %in% names(cat_brands))
+                     as.character(cat_brands$BrandName)
+                   else brand_codes
+    names(brand_lbls) <- brand_codes
+
+    am <- .portfolio_aware_matrix_v2(data, role_map, cat_code, brand_codes)
+    cn <- .compute_constellation_for_cat_from_matrix(
+      am             = am,
+      brand_codes    = brand_codes,
+      brand_lbls     = brand_lbls,
+      base_idx       = base$idx,
+      weights        = w,
+      focal_brand    = focal_brand,
+      cooccur_min    = cooccur_min,
+      edge_top_n     = edge_top_n
+    )
+
+    if (identical(cn$status, "REFUSED")) {
+      suppressed[[length(suppressed) + 1L]] <- list(
+        cat = cat_code, reason = cn$message %||% "too sparse"); next
+    }
+
+    by_cat[[cat_code]]       <- cn
+    cat_codes_ok             <- c(cat_codes_ok, cat_code)
+    cat_n                    <- c(cat_n, base$n_uw)
+    cat_name_map[[cat_code]] <- cat_name
+  }
+
+  suppressed_df <- if (length(suppressed) > 0L) {
+    do.call(rbind, lapply(suppressed, as.data.frame, stringsAsFactors = FALSE))
+  } else {
+    data.frame(cat = character(0), reason = character(0),
+               stringsAsFactors = FALSE)
+  }
+
+  ord <- order(cat_n, decreasing = TRUE)
+  list(
+    status          = "PASS",
+    by_cat          = by_cat[cat_codes_ok[ord]],
+    cat_order       = cat_codes_ok[ord],
+    cat_names       = cat_name_map[cat_codes_ok[ord]],
+    suppressed_cats = suppressed_df
+  )
+}
+
+
+#' Per-cat constellation pipeline operating on a pre-built matrix (v2)
+#'
+#' Variant of \code{.compute_constellation_for_cat()} that takes the brand x
+#' respondent awareness matrix as input rather than re-reading data columns.
+#' Same Jaccard + FR pipeline; same return shape.
+#'
+#' @keywords internal
+.compute_constellation_for_cat_from_matrix <- function(am, brand_codes,
+                                                        brand_lbls, base_idx,
+                                                        weights, focal_brand,
+                                                        cooccur_min,
+                                                        edge_top_n) {
+  am_buyers <- am[base_idx, , drop = FALSE]
+  w_buyers  <- weights[base_idx]
+
+  n_aware_w <- vapply(brand_codes, function(bc) {
+    sum(w_buyers * am_buyers[, bc], na.rm = TRUE)
+  }, numeric(1))
+  present <- brand_codes[n_aware_w > 0]
+
+  if (length(present) < CONSTELLATION_MIN_BRANDS) {
+    return(list(
+      status  = "REFUSED",
+      code    = "CALC_CONSTELLATION_TOO_SPARSE",
+      message = sprintf(
+        "Only %d brand(s) with aware buyers — need at least %d.",
+        length(present), CONSTELLATION_MIN_BRANDS),
+      n_aware = setNames(as.numeric(n_aware_w), brand_codes)
+    ))
+  }
+
+  pres_am <- am_buyers[, present, drop = FALSE]
+  nb      <- length(present)
+
+  edge_rows <- list()
+  adj_mat   <- matrix(0.0, nb, nb)
+  for (i in seq_len(nb - 1L)) {
+    for (j in (i + 1L):nb) {
+      both    <- pres_am[, i] * pres_am[, j]
+      either  <- pmax(pres_am[, i], pres_am[, j])
+      w_both  <- sum(w_buyers * both,   na.rm = TRUE)
+      w_eith  <- sum(w_buyers * either, na.rm = TRUE)
+      n_co    <- sum(both)
+      if (n_co < cooccur_min || w_eith <= 0) next
+      jac <- w_both / w_eith
+      edge_rows[[length(edge_rows) + 1L]] <- list(
+        b1 = present[i], b2 = present[j],
+        jaccard = jac, cooccur_n = as.integer(n_co)
+      )
+      adj_mat[i, j] <- jac
+      adj_mat[j, i] <- jac
+    }
+  }
+
+  edges_df <- if (length(edge_rows) > 0L) {
+    df <- do.call(rbind, lapply(edge_rows, as.data.frame,
+                                 stringsAsFactors = FALSE))
+    df <- df[order(df$jaccard, decreasing = TRUE), ]
+    head(df, edge_top_n)
+  } else {
+    data.frame(b1 = character(0), b2 = character(0),
+               jaccard = numeric(0), cooccur_n = integer(0),
+               stringsAsFactors = FALSE)
+  }
+
+  adj_top <- matrix(0.0, nb, nb)
+  if (nrow(edges_df) > 0L) {
+    for (k in seq_len(nrow(edges_df))) {
+      i <- which(present == edges_df$b1[k])
+      j <- which(present == edges_df$b2[k])
+      adj_top[i, j] <- edges_df$jaccard[k]
+      adj_top[j, i] <- edges_df$jaccard[k]
+    }
+  }
+
+  layout_engine <- CONSTELLATION_LAYOUT_TURAS
+  pos <- if (requireNamespace("igraph", quietly = TRUE)) {
+    tryCatch({
+      g   <- igraph::graph_from_adjacency_matrix(adj_top,
+                                                  mode = "undirected",
+                                                  weighted = TRUE)
+      lyt <- igraph::layout_with_fr(g)
+      layout_engine <- CONSTELLATION_LAYOUT_IGRAPH
+      lyt
+    }, error = function(e) .fr_layout_r(nb, adj_top))
+  } else {
+    .fr_layout_r(nb, adj_top)
+  }
+
+  nodes_df <- data.frame(
+    brand     = present,
+    brand_lbl = brand_lbls[present],
+    n_aware_w = n_aware_w[present],
+    is_focal  = present == focal_brand,
+    stringsAsFactors = FALSE
+  )
+  layout_df <- data.frame(
+    brand = present,
+    x     = pos[, 1],
+    y     = pos[, 2],
+    stringsAsFactors = FALSE
+  )
+
+  list(
+    status        = "PASS",
+    nodes         = nodes_df,
+    edges         = edges_df,
+    layout        = layout_df,
+    layout_engine = layout_engine
   )
 }
