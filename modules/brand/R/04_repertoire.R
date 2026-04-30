@@ -378,6 +378,79 @@ run_repertoire <- function(penetration_matrix, brand_codes,
 
 
 # ==============================================================================
+# V2: BUILD MATRICES FROM ROLE MAP + SLOT-INDEXED DATA
+# ==============================================================================
+
+#' Run repertoire analysis from a v2 role map and slot-indexed data
+#'
+#' Thin v2 entry point. Reads the BRANDPEN2 root (target-window penetration)
+#' via \code{multi_mention_brand_matrix()} to build the buyer logical matrix,
+#' and the BRANDPEN2/BRANDPEN3 paired slot pair via
+#' \code{slot_paired_numeric_matrix()} to build the per-brand frequency
+#' matrix. Calls \code{run_repertoire()} on the result so all analytics
+#' (sole loyalty, duplication of purchase, share of requirements, etc.)
+#' run unchanged.
+#'
+#' Required role-map entries:
+#' \itemize{
+#'   \item \code{funnel.penetration_target.\{cat\}} — BRANDPEN2 root
+#'         (Multi_Mention slot-indexed; mandatory)
+#'   \item \code{funnel.frequency.\{cat\}} — BRANDPEN3 root
+#'         (Multi_Mention or Continuous_Sum slot-indexed; optional)
+#' }
+#'
+#' @param data Data frame. Survey data (one row per respondent).
+#' @param role_map Named list from \code{build_brand_role_map()}.
+#' @param cat_code Character. Category code (e.g. \code{"DSS"}).
+#' @param brand_list Data frame with \code{BrandCode} column.
+#' @param focal_brand Character. Focal brand code or NULL.
+#' @param weights Numeric vector or NULL.
+#' @return Same shape as \code{run_repertoire()}.
+#' @export
+run_repertoire_v2 <- function(data, role_map, cat_code, brand_list,
+                              focal_brand = NULL, weights = NULL) {
+  if (is.null(data) || nrow(data) == 0L) {
+    return(list(status = "REFUSED", code = "DATA_EMPTY",
+                message = "No data for Repertoire analysis"))
+  }
+
+  pen_role  <- paste0("funnel.penetration_target.", cat_code)
+  freq_role <- paste0("funnel.frequency.",          cat_code)
+
+  pen_entry  <- role_map[[pen_role]]
+  freq_entry <- role_map[[freq_role]]
+
+  if (is.null(pen_entry) || is.null(pen_entry$column_root)) {
+    return(list(status = "REFUSED", code = "CFG_ROLE_MISSING",
+                message = sprintf("Repertoire requires role '%s'.", pen_role)))
+  }
+
+  brand_codes <- as.character(brand_list$BrandCode)
+  pen_logical <- multi_mention_brand_matrix(data, pen_entry$column_root,
+                                            brand_codes)
+  pen_mat <- matrix(as.integer(pen_logical), nrow = nrow(data),
+                    ncol = length(brand_codes),
+                    dimnames = list(NULL, brand_codes))
+
+  freq_mat <- NULL
+  if (!is.null(freq_entry) && !is.null(freq_entry$column_root)) {
+    freq_mat <- slot_paired_numeric_matrix(data, pen_entry$column_root,
+                                           freq_entry$column_root,
+                                           brand_codes)
+    freq_mat[is.na(freq_mat) | freq_mat < 0] <- 0
+  }
+
+  run_repertoire(
+    penetration_matrix = pen_mat,
+    brand_codes        = brand_codes,
+    focal_brand        = focal_brand,
+    frequency_matrix   = freq_mat,
+    weights            = weights
+  )
+}
+
+
+# ==============================================================================
 # MODULE INITIALISATION
 # ==============================================================================
 
