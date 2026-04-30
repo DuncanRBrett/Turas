@@ -374,6 +374,115 @@ resolve_demographic_role <- function(structure, role) {
 
 
 # ==============================================================================
+# V2: ROLE-MAP-DRIVEN DEMOGRAPHIC RESOLUTION
+# ==============================================================================
+
+#' Resolve a demographic role from a v2 role map
+#'
+#' v2 alternative to \code{resolve_demographic_role()}. The legacy resolver
+#' walks a Survey_Structure QuestionMap sheet; the v2 resolver reads the
+#' inferred entry from \code{build_brand_role_map()}. The role naming
+#' convention is \code{demographics.\{key\}} (lowercase) — e.g.
+#' \code{demographics.age} for the column \code{DEMO_AGE}.
+#'
+#' Option codes/labels come from the survey structure's Options sheet
+#' (preferred) or, when missing, from the OptionMap sheet keyed by the
+#' role's \code{option_scale}. Returns NULL when the role can't be
+#' resolved or the data column is absent so the caller can skip
+#' silently.
+#'
+#' @param role_map Named list from \code{build_brand_role_map()}.
+#' @param role Character. Role name (e.g. \code{"demographics.age"}).
+#' @param structure List with \code{options} (and optionally
+#'   \code{optionmap}) data frames.
+#' @return List with \code{role}, \code{column}, \code{question_text},
+#'   \code{short_label}, \code{variable_type}, \code{codes},
+#'   \code{labels}; or NULL.
+#' @export
+resolve_demographic_role_v2 <- function(role_map, role, structure) {
+  if (is.null(role_map) || is.null(role) || is.na(role) ||
+      !nzchar(as.character(role))) return(NULL)
+  entry <- role_map[[as.character(role)]]
+  if (is.null(entry) || is.null(entry$column_root) ||
+      !nzchar(entry$column_root)) return(NULL)
+
+  column <- entry$column_root
+  question_text <- entry$question_text %||% column
+  scale_name    <- entry$option_scale  %||% ""
+  variable_type <- entry$variable_type %||% "Single_Response"
+
+  opts <- .demo_lookup_options(structure, column, scale_name)
+  if (is.null(opts)) return(NULL)
+
+  list(
+    role          = role,
+    column        = column,
+    question_text = question_text,
+    short_label   = question_text,
+    variable_type = variable_type,
+    codes         = opts$codes,
+    labels        = opts$labels
+  )
+}
+
+
+#' Build a demographics-question record from a v2 role
+#'
+#' Convenience wrapper around \code{resolve_demographic_role_v2()} +
+#' \code{run_demographic_question()} that produces the record shape
+#' \code{build_demographics_panel_data()} expects. Returns NULL when the
+#' role is unresolvable or its data column is missing.
+#'
+#' @param data Data frame.
+#' @param role_map Named list from \code{build_brand_role_map()}.
+#' @param role Character. Role name (e.g. \code{"demographics.age"}).
+#' @param structure List with \code{options} data frame.
+#' @param weights Numeric vector or NULL.
+#' @param focal_buyer Numeric/Logical vector or NULL.
+#' @param buyer_tiers Character vector or NULL.
+#' @param pen_mat Numeric matrix or NULL.
+#' @param brand_codes Character vector or NULL.
+#' @param brand_labels Character vector or NULL.
+#' @return Named list ready for \code{build_demographics_panel_data()}, or NULL.
+#' @export
+demographic_question_from_role_v2 <- function(data, role_map, role, structure,
+                                              weights = NULL,
+                                              focal_buyer = NULL,
+                                              buyer_tiers = NULL,
+                                              pen_mat = NULL,
+                                              brand_codes = NULL,
+                                              brand_labels = NULL) {
+  spec <- resolve_demographic_role_v2(role_map, role, structure)
+  if (is.null(spec)) return(NULL)
+  if (!spec$column %in% names(data)) return(NULL)
+
+  res <- run_demographic_question(
+    values        = data[[spec$column]],
+    option_codes  = spec$codes,
+    option_labels = spec$labels,
+    weights       = weights,
+    focal_buyer   = focal_buyer,
+    buyer_tiers   = buyer_tiers,
+    pen_mat       = pen_mat,
+    brand_codes   = brand_codes,
+    brand_labels  = brand_labels
+  )
+  list(
+    role           = spec$role,
+    column         = spec$column,
+    question_text  = spec$question_text,
+    short_label    = spec$short_label,
+    variable_type  = spec$variable_type,
+    codes          = spec$codes,
+    labels         = spec$labels,
+    is_synthetic   = FALSE,
+    synthetic_kind = NA_character_,
+    result         = res
+  )
+}
+
+
+# ==============================================================================
 # MODULE INITIALISATION
 # ==============================================================================
 
