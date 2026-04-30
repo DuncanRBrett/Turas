@@ -438,32 +438,24 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       )
     }
 
-    # Repertoire (full categories only — awareness_only cats have no pen data)
+    # Repertoire (full categories only). v2 entry rebuilds penetration +
+    # frequency matrices from role_map directly. Legacy path (slot-prefix
+    # sniff via .find_brand_col) used only when no v2 role map is available.
     if (isTRUE(config$element_repertoire) && cat_depth == "full") {
       if (verbose) cat("  Running Repertoire...\n")
 
-      # Build penetration matrix from cat_data (focal respondents only)
-      pen_mat <- matrix(0L, nrow = nrow(cat_data), ncol = nrow(cat_brands))
-      colnames(pen_mat) <- cat_brands$BrandCode
-
-      pen_qs <- get_questions_for_battery(structure, "penetration", cat_name)
-      if (nrow(pen_qs) > 0) {
-        pen_prefix <- pen_qs$QuestionCode[1]
-        for (b in seq_len(nrow(cat_brands))) {
-          col <- .find_brand_col(cat_data, pen_prefix, cat_brands$BrandCode[b])
-          if (!is.null(col)) {
-            vals <- cat_data[[col]]
-            pen_mat[, b] <- as.integer(!is.na(vals) & vals > 0)
-          }
-        }
-      }
-
       cat_result$repertoire <- tryCatch(
-        run_repertoire(
-          pen_mat, cat_brands$BrandCode,
-          focal_brand = config$focal_brand,
-          weights = cat_weights
-        ),
+        if (!is.null(role_map) && !is.null(cat_code))
+          run_repertoire_v2(
+            data        = cat_data,
+            role_map    = role_map,
+            cat_code    = cat_code,
+            brand_list  = cat_brands,
+            focal_brand = config$focal_brand,
+            weights     = cat_weights
+          )
+        else .legacy_repertoire_call(structure, cat_data, cat_brands,
+                                     cat_name, config, cat_weights),
         error = function(e) {
           warnings_list <<- c(warnings_list,
             sprintf("Repertoire failed for %s: %s", cat_name, e$message))
@@ -616,40 +608,30 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       }
     }
 
-    # WOM (full categories only; filtered to focal respondents for this category)
-    # WOM is category-specific because each category has a different brand list
-    # and only its focal respondents answered WOM questions for those brands.
+    # WOM (full categories only; filtered to focal respondents for this category).
+    # v2 entry walks role_map for wom.{pos|neg}_{rec|share}.{cat} +
+    # wom.{pos|neg}_count.{cat} keys; legacy run_wom (column-prefix sniffing
+    # via get_questions_for_battery) only used when role_map is unavailable.
     if (isTRUE(config$element_wom) && cat_depth == "full") {
       if (verbose) cat("  Running WOM...\n")
-      wom_qs <- get_questions_for_battery(structure, "wom")
-      if (!is.null(wom_qs) && nrow(wom_qs) > 0) {
-        pos_rec  <- .wom_prefix(wom_qs, "POS.*REC|REC.*POS",  "WOM_POS_REC")
-        neg_rec  <- .wom_prefix(wom_qs, "NEG.*REC|REC.*NEG",  "WOM_NEG_REC")
-        pos_shr  <- .wom_prefix(wom_qs, "POS.*SHARE|SHARE.*POS|POS_S", "WOM_POS_SHARE")
-        neg_shr  <- .wom_prefix(wom_qs, "NEG.*SHARE|SHARE.*NEG|NEG_S", "WOM_NEG_SHARE")
-        pos_cnt  <- .wom_prefix(wom_qs, "POS.*COUNT|COUNT.*POS|POS.*FREQ|FREQ.*POS",
-                                "WOM_POS_COUNT")
-        neg_cnt  <- .wom_prefix(wom_qs, "NEG.*COUNT|COUNT.*NEG|NEG.*FREQ|FREQ.*NEG",
-                                "WOM_NEG_COUNT")
-        cat_result$wom <- tryCatch(
-          run_wom(
-            cat_data, cat_brands$BrandCode,
-            received_pos_prefix    = pos_rec,
-            received_neg_prefix    = neg_rec,
-            shared_pos_prefix      = pos_shr,
-            shared_neg_prefix      = neg_shr,
-            shared_pos_freq_prefix = pos_cnt,
-            shared_neg_freq_prefix = neg_cnt,
+      cat_result$wom <- tryCatch(
+        if (!is.null(role_map))
+          run_wom_v2(
+            data        = cat_data,
+            role_map    = role_map,
+            cat_code    = cat_code,
+            brand_list  = cat_brands,
             focal_brand = config$focal_brand,
             weights     = cat_weights
-          ),
-          error = function(e) {
-            warnings_list <<- c(warnings_list,
-              sprintf("WOM failed for %s: %s", cat_name, e$message))
-            list(status = "REFUSED", message = e$message)
-          }
-        )
-      }
+          )
+        else .legacy_wom_call(structure, cat_data, cat_brands,
+                              config, cat_weights),
+        error = function(e) {
+          warnings_list <<- c(warnings_list,
+            sprintf("WOM failed for %s: %s", cat_name, e$message))
+          list(status = "REFUSED", message = e$message)
+        }
+      )
     }
 
     # Branded Reach (full categories only; v2 entry — placeholder-aware).
@@ -702,15 +684,27 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       } else if (length(al_audiences) > 0) {
         if (verbose) cat("  Running Audience Lens...\n")
         cat_result$audience_lens <- tryCatch(
-          run_audience_lens(
-            data = cat_data, weights = cat_weights,
-            cat_brands = cat_brands,
-            cat_code = cat_code %||% "",
-            cat_name = cat_name,
-            focal_brand = config$focal_brand,
-            audiences = al_audiences,
-            structure = structure, config = config,
-            category_results = cat_result),
+          if (!is.null(role_map))
+            run_audience_lens_v2(
+              data = cat_data, role_map = role_map,
+              cat_code = cat_code %||% "",
+              cat_name = cat_name,
+              cat_brands = cat_brands,
+              focal_brand = config$focal_brand,
+              audiences = al_audiences,
+              structure = structure, config = config,
+              weights = cat_weights,
+              category_results = cat_result)
+          else
+            run_audience_lens(
+              data = cat_data, weights = cat_weights,
+              cat_brands = cat_brands,
+              cat_code = cat_code %||% "",
+              cat_name = cat_name,
+              focal_brand = config$focal_brand,
+              audiences = al_audiences,
+              structure = structure, config = config,
+              category_results = cat_result),
           error = function(e) {
             warnings_list <<- c(warnings_list,
               sprintf("Audience lens failed for %s: %s",
@@ -722,46 +716,37 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       }
     }
 
-    # Drivers & Barriers (full categories only; requires MA linkage)
+    # Drivers & Barriers (full categories only). v2 entry rebuilds linkage
+    # + CEP-brand matrix + focal-buyer flag from role_map directly. Legacy
+    # path used only when no v2 role map is available.
     if (isTRUE(config$element_drivers_barriers) && cat_depth == "full") {
       if (verbose) cat("  Running Drivers & Barriers...\n")
 
-      db_cep_mat <- if (!is.null(cat_result$mental_availability))
-                      cat_result$mental_availability$cep_brand_matrix else NULL
+      cep_labels_df <- if (!is.null(cat_ceps) && nrow(cat_ceps) > 0)
+        data.frame(CEPCode = cat_ceps$CEPCode,
+                   CEPText = cat_ceps$CEPText,
+                   stringsAsFactors = FALSE) else NULL
 
-      # Focal brand penetration vector (reuses same question source as repertoire)
-      db_pen <- NULL
-      pen_qs <- get_questions_for_battery(structure, "penetration", cat_name)
-      if (nrow(pen_qs) > 0) {
-        pen_prefix    <- pen_qs$QuestionCode[1]
-        focal_pen_col <- .find_brand_col(cat_data, pen_prefix, config$focal_brand)
-        if (!is.null(focal_pen_col)) {
-          vals   <- cat_data[[focal_pen_col]]
-          db_pen <- as.integer(!is.na(vals) & vals > 0)
-        }
-      }
-
-      if (!is.null(linkage) && !is.null(db_cep_mat) && !is.null(db_pen)) {
-        cat_result$drivers_barriers <- tryCatch(
-          run_drivers_barriers(
-            linkage     = linkage,
-            cep_mat     = db_cep_mat,
-            pen         = db_pen,
+      cat_result$drivers_barriers <- tryCatch(
+        if (!is.null(role_map))
+          run_drivers_barriers_v2(
+            data        = cat_data,
+            role_map    = role_map,
+            cat_code    = cat_code,
+            brand_list  = cat_brands,
             focal_brand = config$focal_brand,
-            cep_labels  = if (!is.null(cat_ceps) && nrow(cat_ceps) > 0)
-              data.frame(CEPCode = cat_ceps$CEPCode,
-                         CEPText = cat_ceps$CEPText,
-                         stringsAsFactors = FALSE) else NULL
-          ),
-          error = function(e) {
-            warnings_list <<- c(warnings_list,
-              sprintf("Drivers & Barriers failed for %s: %s", cat_name, e$message))
-            list(status = "REFUSED", message = e$message)
-          }
-        )
-      } else {
-        if (verbose) cat("  Drivers & Barriers skipped: MA linkage or pen data unavailable.\n")
-      }
+            cep_labels  = cep_labels_df,
+            weights     = cat_weights
+          )
+        else .legacy_drivers_barriers_call(structure, cat_data, cat_result,
+                                           cat_brands, cat_name,
+                                           config, linkage, cep_labels_df),
+        error = function(e) {
+          warnings_list <<- c(warnings_list,
+            sprintf("Drivers & Barriers failed for %s: %s", cat_name, e$message))
+          list(status = "REFUSED", message = e$message)
+        }
+      )
     }
 
     # Demographics (per-category; full categories only — relies on cat_data
@@ -1119,6 +1104,107 @@ if (!exists(".find_brand_col", mode = "function")) {
   rows <- wom_qs[grepl(pattern, wom_qs$QuestionCode, ignore.case = TRUE), ,
                  drop = FALSE]
   if (nrow(rows) > 0) rows$QuestionCode[1] else default
+}
+
+
+#' Legacy Repertoire dispatcher (Battery-sheet + .find_brand_col path)
+#'
+#' Used only when no v2 role_map is available. The v2 path
+#' (\code{run_repertoire_v2}) is preferred — see the Repertoire block in
+#' run_brand().
+#' @keywords internal
+.legacy_repertoire_call <- function(structure, cat_data, cat_brands,
+                                    cat_name, config, cat_weights) {
+  pen_mat <- matrix(0L, nrow = nrow(cat_data), ncol = nrow(cat_brands))
+  colnames(pen_mat) <- cat_brands$BrandCode
+
+  pen_qs <- get_questions_for_battery(structure, "penetration", cat_name)
+  if (nrow(pen_qs) > 0) {
+    pen_prefix <- pen_qs$QuestionCode[1]
+    for (b in seq_len(nrow(cat_brands))) {
+      col <- .find_brand_col(cat_data, pen_prefix, cat_brands$BrandCode[b])
+      if (!is.null(col)) {
+        vals <- cat_data[[col]]
+        pen_mat[, b] <- as.integer(!is.na(vals) & vals > 0)
+      }
+    }
+  }
+  run_repertoire(
+    pen_mat, cat_brands$BrandCode,
+    focal_brand = config$focal_brand,
+    weights = cat_weights
+  )
+}
+
+
+#' Legacy Drivers & Barriers dispatcher (Battery-sheet + .find_brand_col path)
+#'
+#' Used only when no v2 role_map is available. The v2 path
+#' (\code{run_drivers_barriers_v2}) is preferred — see the D&B block in
+#' run_brand().
+#' @keywords internal
+.legacy_drivers_barriers_call <- function(structure, cat_data, cat_result,
+                                          cat_brands, cat_name, config,
+                                          linkage, cep_labels_df) {
+  db_cep_mat <- if (!is.null(cat_result$mental_availability))
+                  cat_result$mental_availability$cep_brand_matrix else NULL
+
+  db_pen <- NULL
+  pen_qs <- get_questions_for_battery(structure, "penetration", cat_name)
+  if (nrow(pen_qs) > 0) {
+    pen_prefix    <- pen_qs$QuestionCode[1]
+    focal_pen_col <- .find_brand_col(cat_data, pen_prefix, config$focal_brand)
+    if (!is.null(focal_pen_col)) {
+      vals <- cat_data[[focal_pen_col]]
+      db_pen <- as.integer(!is.na(vals) & vals > 0)
+    }
+  }
+
+  if (is.null(linkage) || is.null(db_cep_mat) || is.null(db_pen)) {
+    return(list(status = "REFUSED", code = "CFG_LEGACY_INPUTS_MISSING",
+                message = "Drivers & Barriers legacy path needs MA linkage + pen data"))
+  }
+  run_drivers_barriers(
+    linkage     = linkage,
+    cep_mat     = db_cep_mat,
+    pen         = db_pen,
+    focal_brand = config$focal_brand,
+    cep_labels  = cep_labels_df
+  )
+}
+
+
+#' Legacy WOM dispatcher (Battery-sheet column-prefix sniffing)
+#'
+#' Used only when no v2 role_map is available. The v2 path
+#' (\code{run_wom_v2}) is preferred — see the WOM block in run_brand().
+#' @keywords internal
+.legacy_wom_call <- function(structure, cat_data, cat_brands, config,
+                             cat_weights) {
+  wom_qs <- get_questions_for_battery(structure, "wom")
+  if (is.null(wom_qs) || nrow(wom_qs) == 0) {
+    return(list(status = "REFUSED", code = "CFG_WOM_BATTERY_MISSING",
+                message = "No WOM battery in Survey_Structure"))
+  }
+  run_wom(
+    cat_data, cat_brands$BrandCode,
+    received_pos_prefix    = .wom_prefix(wom_qs, "POS.*REC|REC.*POS",
+                                          "WOM_POS_REC"),
+    received_neg_prefix    = .wom_prefix(wom_qs, "NEG.*REC|REC.*NEG",
+                                          "WOM_NEG_REC"),
+    shared_pos_prefix      = .wom_prefix(wom_qs, "POS.*SHARE|SHARE.*POS|POS_S",
+                                          "WOM_POS_SHARE"),
+    shared_neg_prefix      = .wom_prefix(wom_qs, "NEG.*SHARE|SHARE.*NEG|NEG_S",
+                                          "WOM_NEG_SHARE"),
+    shared_pos_freq_prefix = .wom_prefix(wom_qs,
+                                          "POS.*COUNT|COUNT.*POS|POS.*FREQ|FREQ.*POS",
+                                          "WOM_POS_COUNT"),
+    shared_neg_freq_prefix = .wom_prefix(wom_qs,
+                                          "NEG.*COUNT|COUNT.*NEG|NEG.*FREQ|FREQ.*NEG",
+                                          "WOM_NEG_COUNT"),
+    focal_brand = config$focal_brand,
+    weights     = cat_weights
+  )
 }
 
 
