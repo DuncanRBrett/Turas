@@ -769,22 +769,31 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       )
     }
 
-    # Demographics (per-category; full categories only — relies on cat_data
-    # being filtered to focal-category respondents and cat_result$brand_volume
-    # for the per-brand pen matrix). Awareness-only categories don't have a
-    # full brand-volume matrix, so the buyer / brand cuts collapse to the
-    # total distribution.
+    # Demographics (per-category; full categories only). v2 dispatcher walks
+    # role_map for ^demographics\.* keys via demographic_question_from_role_v2.
+    # Synthetic questions (Buyer Status + Heaviness) are unchanged. Legacy
+    # path used only when no v2 role map is available.
     if (isTRUE(config$element_demographics %||% TRUE) && cat_depth == "full") {
       if (verbose) cat("  Running Demographics...\n")
       cat_result$demographics <- tryCatch(
-        .run_demographics_for_category(
-          structure   = structure, config = config,
-          cat_data    = cat_data, cat_weights = cat_weights,
-          cat_brands  = cat_brands, cat_name = cat_name,
-          brand_volume    = cat_result$brand_volume,
-          buyer_heaviness = cat_result$buyer_heaviness,
-          verbose     = verbose
-        ),
+        if (!is.null(role_map))
+          .run_demographics_for_category_v2(
+            role_map    = role_map, structure = structure, config = config,
+            cat_data    = cat_data, cat_weights = cat_weights,
+            cat_brands  = cat_brands, cat_name = cat_name,
+            brand_volume    = cat_result$brand_volume,
+            buyer_heaviness = cat_result$buyer_heaviness,
+            verbose     = verbose
+          )
+        else
+          .run_demographics_for_category(
+            structure   = structure, config = config,
+            cat_data    = cat_data, cat_weights = cat_weights,
+            cat_brands  = cat_brands, cat_name = cat_name,
+            brand_volume    = cat_result$brand_volume,
+            buyer_heaviness = cat_result$buyer_heaviness,
+            verbose     = verbose
+          ),
         error = function(e) {
           warnings_list <<- c(warnings_list,
             sprintf("Demographics failed for %s: %s", cat_name, e$message))
@@ -1403,6 +1412,65 @@ if (!exists(".find_brand_col", mode = "function")) {
 # elements; brand_cut uses the per-category brand list. When upstream
 # elements weren't run the cut sub-results collapse to NULL and the
 # panel hides those tabs silently.
+
+#' Demographics dispatcher (v2 — role-map driven)
+#'
+#' v2 sibling of \code{.run_demographics_for_category}. Walks role_map for
+#' \code{^demographics\\.*} keys (the v2 namespace; legacy used \code{demo.*})
+#' and calls \code{demographic_question_from_role_v2} for each role whose
+#' column resolves in cat_data. Synthetic Buyer Status + Heaviness questions
+#' come from the same helpers as the legacy path.
+#' @keywords internal
+.run_demographics_for_category_v2 <- function(role_map, structure, config,
+                                                cat_data, cat_weights,
+                                                cat_brands, cat_name,
+                                                brand_volume, buyer_heaviness,
+                                                verbose = TRUE) {
+
+  buyer_info <- .demo_buyer_for_category(brand_volume, buyer_heaviness,
+                                          config$focal_brand)
+  bmat_info  <- .demo_brand_matrix_for_category(brand_volume, cat_brands)
+
+  demo_roles <- grep("^demographics\\.", names(role_map), value = TRUE)
+
+  questions <- list()
+  for (role in demo_roles) {
+    rec <- demographic_question_from_role_v2(
+      data         = cat_data,
+      role_map     = role_map,
+      role         = role,
+      structure    = structure,
+      weights      = cat_weights,
+      focal_buyer  = buyer_info$focal_buyer,
+      buyer_tiers  = buyer_info$tiers,
+      pen_mat      = bmat_info$pen_mat,
+      brand_codes  = bmat_info$brand_codes,
+      brand_labels = bmat_info$brand_labels
+    )
+    if (!is.null(rec)) questions[[length(questions) + 1L]] <- rec
+  }
+
+  syn <- .demo_synthetic_questions(cat_data, cat_weights, buyer_info,
+                                    bmat_info, config$focal_brand)
+  for (q in syn) questions[[length(questions) + 1L]] <- q
+
+  if (length(questions) == 0L) {
+    return(list(status = "EMPTY",
+                message = sprintf("No demographic questions resolved for %s.",
+                                   cat_name)))
+  }
+  list(
+    status        = "PASS",
+    cat_name      = cat_name,
+    questions     = questions,
+    brand_codes   = bmat_info$brand_codes,
+    brand_labels  = bmat_info$brand_labels,
+    brand_colours = bmat_info$brand_colours,
+    n_total       = nrow(cat_data),
+    weighted      = !is.null(cat_weights)
+  )
+}
+
 
 .run_demographics_for_category <- function(structure, config, cat_data,
                                             cat_weights, cat_brands, cat_name,
