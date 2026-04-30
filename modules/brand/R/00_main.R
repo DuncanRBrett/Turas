@@ -339,10 +339,19 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
     # Detect short category code (e.g. "DSS") and filter data to focal
     # respondents for this category. Focal filtering is used for WOM so each
     # category's WOM metrics reflect its own respondent group and brand list.
+    # Resolution order: (1) categories$CategoryCode (canonical, IPK rebuild),
+    # (2) legacy QuestionMap-driven detection (.detect_category_code).
     focal_col  <- config$focal_category_col %||% "Focal_Category"
-    cat_code   <- if (cat_depth == "full" && !is.null(structure$questionmap))
-                    .detect_category_code(structure$questionmap, cat_brands, data)
-                  else NULL
+    cat_code   <- if (cat_depth == "full" &&
+                      "CategoryCode" %in% names(categories) &&
+                      !is.na(categories$CategoryCode[i]) &&
+                      nzchar(as.character(categories$CategoryCode[i]))) {
+                    as.character(categories$CategoryCode[i])
+                  } else if (cat_depth == "full" &&
+                             !is.null(structure$questionmap)) {
+                    .detect_category_code(structure$questionmap, cat_brands,
+                                           data)
+                  } else NULL
     cat_data   <- if (!is.null(cat_code) && focal_col %in% names(data)) {
                     data[!is.na(data[[focal_col]]) &
                          data[[focal_col]] == cat_code, ]

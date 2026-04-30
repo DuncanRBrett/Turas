@@ -73,14 +73,23 @@ ipk_write_brand_config <- function(path) {
   wb <- openxlsx::createWorkbook()
 
   settings <- data.frame(
-    Setting = c("element_funnel", "element_mental_avail", "element_wom",
-                "element_dba", "element_branded_reach", "element_portfolio",
-                "element_audience_lens", "element_demographics",
-                "wave", "wom_timeframe", "focal_assignment",
-                "min_base_rule"),
-    Value = c("Y", "Y", "Y", "N", "N", "Y", "Y", "Y",
-              as.character(IPK_WAVE), IPK_WOM_TIMEFRAME,
-              "balanced", "30"),
+    Setting = c(
+      # Required by guard_validate_brand_config (00_guard.R:130-131)
+      "project_name", "client_name", "focal_brand",
+      "data_file", "structure_file", "output_dir",
+      # Element toggles
+      "element_funnel", "element_mental_avail", "element_wom",
+      "element_dba", "element_branded_reach", "element_portfolio",
+      "element_audience_lens", "element_demographics",
+      # Run-time settings
+      "wave", "wom_timeframe", "focal_assignment", "min_base_rule"
+    ),
+    Value = c(
+      IPK_PROJECT_NAME, IPK_CLIENT_NAME, IPK_PROJECT_FOCAL_BRAND,
+      IPK_DATA_FILE, IPK_STRUCTURE_FILE, IPK_OUTPUT_DIR,
+      "Y", "Y", "Y", "N", "N", "Y", "Y", "Y",
+      as.character(IPK_WAVE), IPK_WOM_TIMEFRAME, "balanced", "30"
+    ),
     stringsAsFactors = FALSE
   )
   openxlsx::addWorksheet(wb, "Settings")
@@ -91,7 +100,9 @@ ipk_write_brand_config <- function(path) {
       Category         = c$label,
       CategoryCode     = c$code,
       Active           = c$active,
-      Type             = "transactional",
+      # "transaction" matches guard_validate_categories' allowed list
+      # ("transaction", "durable", "service") — 00_guard.R:252.
+      Type             = "transaction",
       Analysis_Depth   = c$analysis_depth,
       Timeframe_Long   = c$timeframe_long,
       Timeframe_Target = c$timeframe_target %||% NA_character_,

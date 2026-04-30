@@ -23,6 +23,18 @@ IPK_N_RESPONDENTS <- 1200L
 IPK_WAVE <- 1L
 IPK_WOM_TIMEFRAME <- "3 months"
 
+# Project metadata — required by brand_config guards (00_guard.R:130).
+# Wired into Brand_Config Settings sheet so the fixture is launch_turas-runnable.
+IPK_PROJECT_NAME <- "IPK Brand Health Wave 1"
+IPK_CLIENT_NAME  <- "Ina Paarman's Kitchen"
+IPK_PROJECT_FOCAL_BRAND <- "IPK"
+
+# File paths inside the fixture directory (resolved relative to Brand_Config dir
+# by load_brand_config). output/ is created on first run.
+IPK_DATA_FILE      <- "ipk_wave1_data.xlsx"
+IPK_STRUCTURE_FILE <- "Survey_Structure.xlsx"
+IPK_OUTPUT_DIR     <- "output"
+
 # ------------------------------------------------------------------------------
 # Categories: 4 Core (full deep dive scope) + 5 Adjacent (awareness only)
 # ------------------------------------------------------------------------------
