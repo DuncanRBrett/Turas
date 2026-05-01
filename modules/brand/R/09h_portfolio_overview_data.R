@@ -38,80 +38,6 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
 # LAYER A — RAW-DATA COMPUTATION (called by run_brand)
 # ==============================================================================
 
-#' Compute the Portfolio Overview payload from raw data
-#'
-#' Spans every category in \code{categories} (deep-dive and awareness-only)
-#' for every brand mapped to the category. For deep-dive categories, looks
-#' up per-brand penetration / SCR / vol share / freq from the corresponding
-#' category result (\code{category_results[[Category]]}).
-#'
-#' Pure w.r.t. the data frame (no I/O, no global writes). Depends on helpers
-#' from 09_portfolio.R (\code{build_portfolio_base}) and 09a_portfolio_footprint.R
-#' (\code{.compute_category_awareness}).
-#'
-#' @param data Data frame. Full survey data.
-#' @param categories Data frame. Categories sheet from loaded brand config.
-#' @param structure List. Loaded survey structure.
-#' @param config List. Loaded brand config.
-#' @param weights Numeric or NULL. Survey weights.
-#' @param category_results List or NULL. run_brand()'s
-#'   \code{results$categories}; supplies brand_volume / repertoire for
-#'   deep-dive enrichment. If NULL, deep-dive blocks are omitted.
-#'
-#' @return List: \code{status}, \code{focal_brand}, \code{brands} (data.frame),
-#'   \code{categories} (named list of per-category records). See file header.
-#' @export
-compute_portfolio_overview_data <- function(data, categories, structure, config,
-                                             weights = NULL,
-                                             category_results = NULL) {
-  if (is.null(data) || !is.data.frame(data) || nrow(data) == 0) {
-    return(.po_refuse("DATA_OVERVIEW_NO_DATA",
-                      "data must be a non-empty data frame",
-                      "Pass the full survey data to compute_portfolio_overview_data()."))
-  }
-  if (is.null(categories) || !is.data.frame(categories) ||
-      nrow(categories) == 0) {
-    return(.po_refuse("DATA_OVERVIEW_NO_CATEGORIES",
-                      "categories must be a non-empty data frame",
-                      "Confirm config$categories is populated."))
-  }
-
-  focal     <- config$focal_brand         %||% ""
-  timeframe <- config$portfolio_timeframe %||% "3m"
-  n_total   <- nrow(data)
-
-  cats_list <- list()
-  for (i in seq_len(nrow(categories))) {
-    rec <- .po_build_category_record(
-      cat_name_in_cfg = as.character(categories$Category[i]),
-      analysis_depth  = .po_depth_from_cfg(categories, i),
-      data            = data,
-      structure       = structure,
-      timeframe       = timeframe,
-      weights         = weights,
-      n_total         = n_total,
-      category_results = category_results
-    )
-    if (!is.null(rec)) cats_list[[rec$cat_code]] <- rec
-  }
-
-  if (length(cats_list) == 0) {
-    return(.po_refuse("DATA_OVERVIEW_NO_COVERAGE",
-                      "No category awareness could be computed.",
-                      "Confirm BRANDAWARE_*_* columns exist and that category codes map to structure$questionmap."))
-  }
-
-  brands_df <- .po_build_brand_list(cats_list, focal)
-
-  list(
-    status      = "PASS",
-    focal_brand = focal,
-    brands      = brands_df,
-    categories  = cats_list
-  )
-}
-
-
 # ==============================================================================
 # LAYER B — PRESENTATION WRAPPER (called by HTML panel)
 # ==============================================================================
@@ -150,57 +76,6 @@ build_portfolio_overview <- function(results, config) {
     tolower(as.character(categories$Analysis_Depth[i]))
   } else "awareness_only"
 }
-
-.po_build_category_record <- function(cat_name_in_cfg, analysis_depth,
-                                       data, structure, timeframe, weights,
-                                       n_total, category_results) {
-
-  cat_brands <- tryCatch(get_brands_for_category(structure, cat_name_in_cfg),
-                         error = function(e) data.frame(BrandCode = character(0)))
-  if (nrow(cat_brands) == 0) return(NULL)
-
-  cat_code <- tryCatch(
-    .po_detect_cat_code(structure$questionmap, cat_brands, data),
-    error = function(e) NULL
-  )
-  if (is.null(cat_code) || !nzchar(cat_code)) return(NULL)
-
-  base <- build_portfolio_base(data, cat_code, timeframe, weights)
-  if (!is.null(base$status) && identical(base$status, "REFUSED")) return(NULL)
-
-  brand_codes <- as.character(cat_brands$BrandCode)
-  brand_names <- .po_brand_names(cat_brands, brand_codes)
-
-  awareness <- .compute_category_awareness(data, cat_code, brand_codes,
-                                            base$idx, weights)
-  awareness_list <- stats::setNames(
-    as.list(ifelse(is.finite(awareness), as.numeric(awareness), NA_real_)),
-    brand_codes
-  )
-
-  cat_usage_pct <- if (n_total > 0) base$n_uw / n_total * 100 else NA_real_
-
-  deep_dive <- NULL
-  if (identical(analysis_depth, "full") && !is.null(category_results)) {
-    cat_rec <- category_results[[cat_name_in_cfg]]
-    deep_dive <- .po_deep_dive_block(cat_rec, brand_codes)
-  }
-
-  list(
-    cat_code        = cat_code,
-    cat_name        = cat_name_in_cfg,
-    analysis_depth  = analysis_depth %||% "awareness_only",
-    total_n_uw      = as.integer(n_total),
-    n_buyers_uw     = as.integer(base$n_uw),
-    n_buyers_w      = as.numeric(base$n_w),
-    cat_usage_pct   = cat_usage_pct,
-    brand_codes     = brand_codes,
-    brand_names     = brand_names,
-    awareness_pct   = awareness_list,
-    deep_dive       = deep_dive
-  )
-}
-
 
 # ==============================================================================
 # PRIVATE — deep-dive enrichment
