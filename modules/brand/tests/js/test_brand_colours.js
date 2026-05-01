@@ -79,7 +79,7 @@ console.log('1. Module surface');
 assert('TurasColours is defined',            typeof TurasColours !== 'undefined');
 assert('getBrandColour is a function',       typeof TurasColours.getBrandColour === 'function');
 assert('hashColour is a function',           typeof TurasColours.hashColour === 'function');
-assert('PALETTE is an array of 18 entries',  Array.isArray(TurasColours.PALETTE) && TurasColours.PALETTE.length === 18);
+assert('PALETTE is an array of 10 entries',  Array.isArray(TurasColours.PALETTE) && TurasColours.PALETTE.length === 10);
 assert('NEUTRAL is a hex string',            /^#[0-9a-f]{6}$/i.test(TurasColours.NEUTRAL));
 
 /* -------------------------------------------------------------------------- */
@@ -127,7 +127,7 @@ var pdEmpty = makePd({ focal_brand_code: 'FOCAL' });
 // djb2: h=5381, R→h=(5381<<5)+5381+82=178990, O→h=(178990<<5)+178990+79=5760489, B→h=(5760489<<5)+5760489+66=185492418
 // 185492418 % 10 = 8 → palette[8] = '#9c755f'
 var robColour = TurasColours.getBrandColour(pdEmpty, 'ROB');
-assertEqual('ROB hashes to known palette entry', robColour, '#e15759');
+assertEqual('ROB hashes to known palette entry', robColour, '#9c755f');
 
 // Known-answer: djb2('COMP1') % 10
 // C→5381→178817, O→178817→5723513, M→5723513→183553043, P→183553043→5873696643→(masked) let node compute

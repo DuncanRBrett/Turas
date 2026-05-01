@@ -36,7 +36,6 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
     '<div class="ma-controls controls-bar">',
     '<div class="ma-ctl-group"><span class="ma-ctl-label">Show brands</span>',
     '<div class="ma-chip-row col-chip-bar" data-ma-scope="metrics">', chips_html, '</div>',
-    '<button type="button" class="ma-all-toggle" data-ma-action="toggleall" data-ma-scope="metrics" title="Show or hide all brands">All</button>',
     '</div>',
     '<div class="ma-meta-row">',
     '<button type="button" class="export-btn ma-chart-select-btn" data-ma-action="chartselectmenu" aria-haspopup="true" aria-pressed="true" title="Select charts to show">&#10003; Show chart &#9662;</button>',
