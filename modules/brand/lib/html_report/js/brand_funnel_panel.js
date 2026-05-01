@@ -20,9 +20,7 @@
   if (window.__BRAND_FUNNEL_PANEL_INIT__) return;
   window.__BRAND_FUNNEL_PANEL_INIT__ = true;
 
-  // Tableau-10 palette — assigned to competitors by their index in shape_chart.competitor_series
-  var FN_COMP_COLORS = ["#4e79a7","#f28e2b","#e15759","#76b7b2","#59a14f",
-                        "#edc948","#b07aa1","#ff9da7","#9c755f","#bab0ac"];
+  // Colour resolution delegated to the shared TurasColours module (brand_colours.js).
 
   document.addEventListener("DOMContentLoaded", function(){
     var panels = document.querySelectorAll(".fn-panel");
@@ -792,26 +790,12 @@
   // Slope chart — full JS redraw (colors, legend, data points, y-axis scale)
   // ---------------------------------------------------------------------------
 
-  // Resolve a brand's display colour. Priority:
-  //   1. Brand-specific colour from the Brands sheet (pd.brand_colours map)
-  //   2. The ORIGINAL focal brand (pd.meta.focal_brand_code): pd.focal_colour
-  //   3. All other brands: Tableau-10 palette by position in competitor_series
-  //
-  // Intentionally uses the ORIGINAL focal (from data), not state.focal (current
-  // UI selection), so colours stay fixed when the user switches focal brands.
+  // Intentionally uses the ORIGINAL focal (from pd.meta.focal_brand_code), not
+  // state.focal (current UI selection), so colours stay fixed when the user
+  // switches the focal brand. The state parameter is retained in the signature
+  // for callsite compatibility but is not used inside this wrapper.
   function resolveBrandColor(pd, state, brandCode) {
-    var brandColours = pd.config && pd.config.brand_colours;
-    if (brandColours && brandColours[brandCode]) return brandColours[brandCode];
-    var origFocal = pd.meta && pd.meta.focal_brand_code;
-    if (brandCode === origFocal) return pd.focal_colour || "#1A5276";
-    return getCompColor(pd, brandCode);
-  }
-
-  function getCompColor(pd, brandCode) {
-    if (!brandCode) return '#94a3b8';
-    var h = 5381;
-    for (var i = 0; i < brandCode.length; i++) h = ((h << 5) + h + brandCode.charCodeAt(i)) & 0x7fffffff;
-    return FN_COMP_COLORS[h % FN_COMP_COLORS.length];
+    return TurasColours.getBrandColour(pd, brandCode);
   }
 
   function getBrandName(pd, brandCode) {

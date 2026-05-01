@@ -56,22 +56,10 @@
     return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
   }
 
-  var BRAND_PALETTE = ['#4e79a7','#f28e2b','#e15759','#76b7b2','#59a14f',
-                       '#edc948','#b07aa1','#ff9da7','#9c755f','#bab0ac'];
-
-  function stableBrandIdx(code) {
-    var h = 5381;
-    for (var i = 0; i < code.length; i++) h = ((h << 5) + h + code.charCodeAt(i)) & 0x7fffffff;
-    return h % BRAND_PALETTE.length;
-  }
-
+  // Colour resolution delegated to the shared TurasColours module (brand_colours.js).
+  // That module is the single source of truth for the Tableau-10 palette and hash.
   function getBrandColour(pd, code) {
-    if (!code) return '#94a3b8';
-    if (pd.config && pd.config.brand_colours && pd.config.brand_colours[code])
-      return pd.config.brand_colours[code];
-    if (code === (pd.meta && pd.meta.focal_brand_code))
-      return pd.config.focal_colour || pd.focal_colour || '#1A5276';
-    return BRAND_PALETTE[stableBrandIdx(code)];
+    return TurasColours.getBrandColour(pd, code);
   }
 
   function getBrandName(pd, code) {

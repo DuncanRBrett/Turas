@@ -215,6 +215,7 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
     paste(readLines(found[[1]], warn = FALSE), collapse = "\n")
   }
   panel_js <- paste(
+    .resolve_js("brand_colours.js"),
     .resolve_js("brand_funnel_panel.js"),
     .resolve_js("brand_ma_panel.js"),
     .resolve_js("brand_ma_advantage.js"),

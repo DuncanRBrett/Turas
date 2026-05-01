@@ -25,9 +25,6 @@
   /* Constants                                                                */
   /* ---------------------------------------------------------------------- */
 
-  var PALETTE = ['#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f',
-                 '#edc948', '#b07aa1', '#ff9da7', '#9c755f', '#bab0ac'];
-
   /* Segment colours per scope.
      Loyalty: dark-green (sole) → light-green (primary) → amber (secondary) → dark-grey (not bought).
      Dist:    light-blue → dark-blue gradient. */
@@ -51,13 +48,9 @@
       .replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  // Colour resolution delegated to the shared TurasColours module (brand_colours.js).
   function getBrandColour(pd, code) {
-    if (!pd || !code) return '#94a3b8';
-    if (pd.brandColours && pd.brandColours[code]) return pd.brandColours[code];
-    if (pd.focalBrand === code) return pd.focalColour || '#1A5276';
-    var h = 5381;
-    for (var i = 0; i < code.length; i++) h = ((h << 5) + h + code.charCodeAt(i)) & 0x7fffffff;
-    return PALETTE[h % PALETTE.length];
+    return TurasColours.getBrandColour(pd, code);
   }
 
   function getBrandName(pd, code) {
