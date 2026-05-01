@@ -1,26 +1,3 @@
-# ==============================================================================
-# BRAND MODULE - PORTFOLIO MAPPING ORCHESTRATOR
-# ==============================================================================
-# Entry point for all portfolio analyses (footprint, constellation, clutter,
-# strength, extension). Sub-analyses are delegated to 09a-09e files in
-# phases 2-5 of the build.
-#
-# DENOMINATOR RULE (§3.1 of PORTFOLIO_SPEC_v1.md):
-#   build_portfolio_base() is the single source of truth for the SQ1/SQ2
-#   qualifier filter. Every analysis calls it. No analysis file should filter
-#   SQ1_* or SQ2_* columns directly. A grep for "SQ1_" or "SQ2_" in new
-#   code should return only this function.
-#
-# SIZE-EXCEPTION: orchestrator (run_portfolio + run_portfolio) plus the
-# denominator helper (v1 + v2) plus the supporting-metrics computation
-# (v1 + v2) form one coherent entry-point file. The legacy v1 helper +
-# legacy run_portfolio + legacy .compute_supporting_metrics are scheduled
-# for deletion at rebuild cutover (planning doc §9 step 5), bringing the
-# file back inside the 300-active-line default.
-#
-# VERSION: 1.0
-# ==============================================================================
-
 PORTFOLIO_VERSION <- "1.0"
 
 PORTFOLIO_TIMEFRAME_3M  <- "3m"
@@ -191,41 +168,6 @@ build_portfolio_base <- function(data, cat_code,
 # V2 ORCHESTRATOR — slot-indexed parser-shape data
 # ==============================================================================
 
-#' Run portfolio mapping analysis (v2 — slot-indexed awareness)
-#'
-#' v2 alternative to \code{run_portfolio()}. Same orchestration flow, same
-#' result list shape, but every sub-analysis is the slot-indexed
-#' \code{compute_*_v2()} variant and \code{role_map} is threaded through so
-#' awareness columns resolve via the role registry / convention root rather
-#' than the legacy \code{BRANDAWARE_{cat}_{brand} == 1L} pattern.
-#'
-#' Wires the same eight sub-analyses as the legacy orchestrator:
-#' footprint matrix, clutter quadrant, strength map, extension table,
-#' per-brand extension, cross-cat constellation, per-category
-#' constellations. Hero-strip supporting metrics use a slot-aware
-#' repertoire-depth count over the categories sheet
-#' (\code{respondent_picked()} per CategoryCode) instead of the legacy
-#' column-name grep.
-#'
-#' @param data Data frame. Full survey data — all respondents, not filtered.
-#' @param role_map Named list from \code{build_brand_role_map()}. Required for
-#'   v2; pass \code{NULL} only if every sub-analysis can fall back to the
-#'   convention root (\code{BRANDAWARE_{cat_code}}).
-#' @param categories Data frame. Categories sheet from loaded brand config.
-#'   Must include a \code{CategoryCode} column.
-#' @param structure List. Loaded survey structure (from
-#'   \code{load_brand_survey_structure()}).
-#' @param config List. Loaded brand config (from \code{load_brand_config()}).
-#' @param weights Numeric vector or NULL. Survey weights, length ==
-#'   \code{nrow(data)}.
-#'
-#' @return Same list shape as \code{run_portfolio()}.
-#'
-#' @export
-#' @keywords internal
-# SIZE-EXCEPTION: parallel v2 orchestrator scheduled to replace run_portfolio
-# at rebuild cutover (planning doc §9 step 5). At cutover this function is
-# renamed to run_portfolio() and the legacy v1 above is deleted.
 run_portfolio <- function(data, role_map, categories, structure, config,
                               weights = NULL) {
 

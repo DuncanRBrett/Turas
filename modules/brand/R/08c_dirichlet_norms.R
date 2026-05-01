@@ -1,26 +1,3 @@
-# ==============================================================================
-# BRAND MODULE - DIRICHLET NORMS
-# ==============================================================================
-# Computes observed brand-level metrics (penetration, buy rate, SCR, 100%-loyal)
-# and Dirichlet expected benchmarks via the NBDdirichlet package.  Returns the
-# norms table, DJ curve data, and market share, all keyed by BrandCode.
-#
-# §3 of CAT_BUYING_SPEC_v3 defines the Dirichlet call.
-# §2.3 defines the observed metric formulas.
-# §5.6–5.7 define share normalisation and minimum brand count rules.
-#
-# VERSION: 1.0
-#
-# SIZE-EXCEPTION: sequential derivation pipeline (observed metrics → package
-# call → deviation joins → DJ curve).  Decomposing further would fragment a
-# single coherent analytical flow.
-#
-# REFERENCES:
-#   Goodhardt, G.J., Ehrenberg, A.S.C. & Chatfield, C. (1984).
-#   Ehrenberg, A.S.C. (1988). Repeat Buying.
-#   NBDdirichlet R package (CRAN).
-# ==============================================================================
-
 BRAND_DIRICHLET_VERSION <- "1.0"
 
 # Minimum |deviation %| to flag a brand as over / under

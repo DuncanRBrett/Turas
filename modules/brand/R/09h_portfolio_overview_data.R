@@ -1,34 +1,3 @@
-# ==============================================================================
-# BRAND MODULE - PORTFOLIO OVERVIEW DATA BUILDER
-# ==============================================================================
-# Computes the focal-brand-centred overview payload used by the Portfolio
-# Overview subtab.  Unlike the footprint matrix (§4.1, which is scoped to
-# categories with deep-dive bases), the overview spans EVERY category in the
-# study — deep-dive AND awareness-only — so the focal brand's strength and
-# weakness can be read across the full portfolio.
-#
-# Two entry points:
-#   compute_portfolio_overview_data()
-#     Raw-data-powered. Called once by run_brand() and stashed into
-#     results$portfolio_overview. Computes per-category usage, per-brand
-#     awareness, and (for deep-dive categories) penetration / SCR / vol /
-#     frequency enrichment.
-#
-#   build_portfolio_overview()
-#     Presentation wrapper. Reads the pre-computed payload from results
-#     and returns it (with refusal shape on failure). Used by the HTML panel.
-#
-# SIZE-EXCEPTION: overview record builder + brand-list assembler + deep-dive
-# enrichment + cat-code detector form a coherent payload-building flow. During
-# the IPK rebuild the file holds both v1 (column-per-brand) and v2
-# (slot-indexed) variants of compute_portfolio_overview_data + the per-cat
-# record helper. The legacy v1 entries are scheduled for deletion at rebuild
-# cutover (planning doc §9 step 5), bringing the file back inside the
-# 300-active-line default.
-#
-# VERSION: 2.0 (raw-data driven)
-# ==============================================================================
-
 PORTFOLIO_OVERVIEW_VERSION <- "2.0"
 
 if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a

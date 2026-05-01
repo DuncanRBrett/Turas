@@ -1,23 +1,3 @@
-# ==============================================================================
-# BRAND MODULE - PERMISSION-TO-EXTEND TABLE (§4.5)
-# ==============================================================================
-# For each category not the focal brand's home, computes:
-#   lift(c) = P(aware focal | bought c) / P(aware focal | baseline)
-#
-# Significance: two-proportion z-test by default; auto-fallback to Fisher's
-# exact when any expected 2×2 cell count < 5. BH correction applied across
-# all categories regardless of which test was used per row.
-#
-# Denominator: build_portfolio_base() per §3.1 — never inline SQ1_/SQ2_.
-#
-# SIZE-EXCEPTION: extension lift + per-brand walker + significance test +
-# home-cat detector form one coherent extension-table pipeline. During the
-# IPK rebuild the file holds both v1 (column-per-brand) and v2 (slot-indexed)
-# variants of compute_extension_table and compute_extension_per_brand. The
-# legacy v1 entries are scheduled for deletion at rebuild cutover (planning
-# doc §9 step 5), bringing the file back inside the 300-active-line default.
-# ==============================================================================
-
 EXTENSION_BASELINE_ALL        <- "all"
 EXTENSION_BASELINE_NON_BUYERS <- "non_buyers"
 

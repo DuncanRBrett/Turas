@@ -101,11 +101,6 @@ BRAND_AUDIENCE_LENS_VERSION <- "1.0"
 
 
 # ==============================================================================
-# SIZE-EXCEPTION: v1 + v2 coexist during IPK rebuild migration window.
-# v1 deletion at cutover restores this file under the 300-line guideline.
-# ==============================================================================
-
-# ==============================================================================
 # V2: ROLE-MAP-DRIVEN ENTRY (slot-indexed data access)
 # ==============================================================================
 # v2 wraps the same orchestration shape as run_audience_lens() but reads
