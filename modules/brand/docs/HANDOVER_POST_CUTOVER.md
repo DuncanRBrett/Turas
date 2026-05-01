@@ -35,45 +35,36 @@ Browser verification is `launch_turas()` only — never use `preview_start` for 
 
 ---
 
-## What's NEXT (priority order)
+## What's NEXT (revised order)
 
-### 1. Audience Lens v3 — parallel tabs (next major feature)
+### 1. Funnel test port (Sonnet — being run NOW on `feature/brand-ipk-rebuild`)
 
-**Branch:** `feature/audience-lens-v3-tabs` (cut from `main` after the rebuild merges).
-
-**Why:** the current Audience Lens panel renders a single audience at a time, with a focal-audience picker. Duncan wants **multiple audience tabs in parallel** — the same shape as the per-category tabs across the report. The 14 KPIs need to be re-shaped into per-respondent stable columns so the tabs module can drive cross-tabs natively, then the panel renders one tab per defined audience.
-
-**Scope:**
-- Refactor `compute_al_metrics_for_subset` so each KPI is built as a per-respondent indicator column on the data frame (already partially done in `13b_al_metrics.R` — `.al_metric_pct_from_logical`, `.al_metric_pct_from_attitude` are the right shape; the MA / WOM / SCR / purchase blocks aren't yet).
-- Push the audience cross-tab into the tabs module (which knows how to emit weighted percentages with significance against a base).
-- Replace the panel's single-tab rendering with parallel-tab navigation matching the Demographics / Cat Buying tab shells.
-- Verify: every audience defined in `audience_lens.audiences` Sheet renders its own tab, with the same 14 KPIs computed independently per audience.
-
-**Pre-existing planning:** `modules/brand/PLANNING_AUDIENCE_LENS.md` (older 6-phase plan) plus the v1 handover at `project_brand_audience_lens_v1_handover.md` in memory. Both are pre-rebuild references — review with the new architecture in mind, don't follow them blindly.
-
-**Estimated effort:** 1–2 days. Opus-level work — design judgement matters (tabs architecture, panel-data contract).
-
-### 2. Demographics rework (after Audience Lens v3)
-
-**Branch:** `feature/demographics-tabs` (cut after Audience Lens v3 merges).
-
-**Why:** same architectural shift as Audience Lens v3 — Demographics currently renders a single matrix per category with synthetic Buyer Status / Heaviness rows. Duncan wants **parallel demographic tabs** so each demographic question (age, gender, region, income, etc.) becomes its own tab with the same brand-cut + significance + chart layout.
-
-**Scope:** mirror the Audience Lens v3 approach — per-respondent indicator columns per demographic level, tabs-module-driven cross-tabs, parallel tab rendering.
-
-**Pre-existing planning:** none formal yet. Build a plan once Audience Lens v3 is shipped (the pattern will inform demographics directly).
-
-**Estimated effort:** 1 day if Audience Lens v3 establishes the pattern cleanly. Opus-level for the planning + first implementation, Sonnet-level for the rest if the pattern is mechanical.
-
-### 3. Funnel test port (Sonnet — runs in parallel, doesn't block #1 or #2)
-
-**Branch:** `feature/funnel-test-port`.
+**Branch:** `feature/brand-ipk-rebuild` — Duncan's plan is to land the funnel port + the rebuild together in one PR to `main`.
 
 **Why:** 8 funnel-legacy test files (~250 assertions) error at source time post-cutover because they reference deleted artefacts and pin the pre-migration `run_funnel()` signature. The `test_funnel.R` v2 covers core derive + metrics + integration but not the category-type variants (durable / service / transactional with tenure thresholds), edge cases, output writers, panel data builder, or HTML renderer.
 
-**Full handover:** [`HANDOVER_FUNNEL_TESTS_PORT.md`](HANDOVER_FUNNEL_TESTS_PORT.md). Self-contained, Sonnet-suitable, mechanical port against the established `test_funnel.R` template.
+**Full handover:** [`HANDOVER_FUNNEL_TESTS_PORT.md`](HANDOVER_FUNNEL_TESTS_PORT.md).
 
-**Estimated effort:** 1 day for Sonnet. Independent — can run in a separate session while you do Audience Lens v3.
+### 2. Visual polish (Duncan-led, after the combined rebuild + funnel-port PR merges to `main`)
+
+The brand module's HTML report has the data architecture right (verified by browser test on IPK Wave 1) but Duncan wants to spend time on visual polish before pursuing the next major feature. Scope is Duncan-defined as the work proceeds — typical patterns from prior brand polish rounds:
+
+- Spacing / alignment / typography sweeps across panels
+- Pin / PNG export consistency across new panels (constellation tiers, scatter labels, etc.)
+- Insight-box copy and reading-guide tightening
+- Cross-panel colour / chip / picker consistency
+
+This is iterative GUI work, not a one-shot piece. Each polish round = its own small branch + PR.
+
+### Parked: Audience Lens v3 + Demographics rework
+
+Both deferred until Duncan has thought through how the **linked tabs module** affects the design. The original plan was "push audience cross-tabs into the tabs module" — but the tabs module's own architecture (linked across what? waves? respondents? categories?) needs reconciling with the audience-lens-as-tabs concept before any code lands. **Don't start either of these without a fresh planning conversation.**
+
+Design context to keep alive (delete only when Duncan confirms the design):
+- Current Audience Lens renders a single audience at a time, focal-audience picker. Goal was multiple audience tabs in parallel, same shape as per-category tabs across the report.
+- 14 KPIs need to be re-shaped into per-respondent stable columns so any cross-tab engine can drive them natively. `13b_al_metrics.R` partially has this shape (`.al_metric_pct_from_logical`, `.al_metric_pct_from_attitude`); MA / WOM / SCR / purchase blocks don't yet.
+- Pre-existing planning: `modules/brand/PLANNING_AUDIENCE_LENS.md` (older 6-phase plan) plus the v1 handover at `project_brand_audience_lens_v1_handover.md` in memory. Both pre-date the IPK rebuild AND the linked-tabs question — review with both lenses before following.
+- Demographics rework would mirror the same pattern (per-respondent demographic indicator columns → parallel demographic tabs). Same architectural questions apply.
 
 ---
 
@@ -117,8 +108,8 @@ Future cleanup: rename engines to `compute_repertoire_metrics` / `compute_driver
 
 ## Decision when starting the next session
 
-**If the PR has merged**: pick #1 (Audience Lens v3) and start a planning conversation. Read `modules/brand/PLANNING_AUDIENCE_LENS.md` first; review against the new architecture; spec the tabs-as-engine approach before coding.
+**If the combined rebuild + funnel-port PR has merged**: ask Duncan which polish item he wants to tackle. The polish work is iterative and Duncan-led — wait for direction rather than picking a target.
 
-**If the PR has NOT merged**: open it via the URL above first. Don't start #1 on a stale base.
+**If the PR has NOT merged**: it's at https://github.com/DuncanRBrett/Turas/compare/main...feature/brand-ipk-rebuild. Either help Duncan get it merged, or wait.
 
-**Sonnet-running-in-parallel option**: tell Duncan you'll spin up #3 (the funnel test port) in a separate Sonnet session. Brief is `HANDOVER_FUNNEL_TESTS_PORT.md` — it's self-contained.
+**If Duncan says "let's do Audience Lens v3" (or Demographics)**: do not start coding. Open a planning conversation first to reconcile the tabs-as-engine design with the linked-tabs-module architecture. Both pieces are explicitly parked pending that design step.
