@@ -102,6 +102,7 @@
     bindCbSubTabs(panel);
     bindCbChips(panel);
     bindCbPanelChips(panel);
+    bindCbToggleAll(panel);
     bindCbShowChart(panel);
     bindCbHeatmapToggle(panel);
     bindCbShowCounts(panel);
@@ -256,6 +257,63 @@
         chip.classList.toggle('col-chip-off', !vis[code]);
         applyRowVisibility(panel, scope);
         renderCbStackedBars(panel, scope);
+      });
+    });
+  }
+
+  function bindCbToggleAll(panel) {
+    panel.querySelectorAll('button[data-cb-action="toggleall"]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var scope  = btn.getAttribute('data-cb-scope');
+        var focal  = panel.__cbData && panel.__cbData.focalBrand;
+
+        if (scope === 'brands') {
+          // Panel-level brand picker (Brand Summary tab)
+          var chips = panel.querySelectorAll('.fn-rel-brand-chip[data-cb-action="toggle-row"]');
+          var nonFocal = [];
+          chips.forEach(function (c) {
+            if (c.getAttribute('data-brand') !== focal) nonFocal.push(c);
+          });
+          var allOn = nonFocal.every(function (c) { return !c.classList.contains('col-chip-off'); });
+          var nextState = !allOn;
+          nonFocal.forEach(function (c) {
+            var code = c.getAttribute('data-brand');
+            c.classList.toggle('col-chip-off', !nextState);
+            ['brands', 'loyalty', 'dist'].forEach(function (s) {
+              if (panel.__cbState.visible[s]) panel.__cbState.visible[s][code] = nextState;
+            });
+            panel.querySelectorAll('.fn-rel-brand-chip[data-cb-brand="' + code + '"]').forEach(function (x) {
+              x.classList.toggle('col-chip-off', !nextState);
+            });
+          });
+          applyBrandsRowVisibility(panel);
+          applyRowVisibility(panel, 'loyalty');
+          applyRowVisibility(panel, 'dist');
+          if (panel.__cbState.showchart && panel.__cbState.showchart.brands) renderCbBrandsChart(panel);
+          renderCbStackedBars(panel, 'loyalty');
+          renderCbStackedBars(panel, 'dist');
+          btn.textContent = nextState ? 'Hide all' : 'Show all';
+          return;
+        }
+
+        // Per-tab scopes (loyalty, dist)
+        var vis = panel.__cbState.visible[scope];
+        if (!vis) return;
+        var chips = panel.querySelectorAll('.col-chip[data-cb-scope="' + scope + '"][data-cb-brand]');
+        var nonFocal = [];
+        chips.forEach(function (c) {
+          if (c.getAttribute('data-cb-brand') !== focal) nonFocal.push(c);
+        });
+        var allOn = nonFocal.every(function (c) { return !c.classList.contains('col-chip-off'); });
+        var nextState = !allOn;
+        nonFocal.forEach(function (c) {
+          var code = c.getAttribute('data-cb-brand');
+          vis[code] = nextState;
+          c.classList.toggle('col-chip-off', !nextState);
+        });
+        applyRowVisibility(panel, scope);
+        renderCbStackedBars(panel, scope);
+        btn.textContent = nextState ? 'Hide all' : 'Show all';
       });
     });
   }

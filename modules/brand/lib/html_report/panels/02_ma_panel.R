@@ -252,11 +252,15 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
   brand_codes <- pd$config$brand_codes %||% character(0)
   brand_names <- pd$config$brand_names %||% brand_codes
 
-  chips_html <- paste(vapply(seq_along(brand_codes), function(i) {
-    sprintf(
-      '<button type="button" class="col-chip chart-chip" data-ma-chart-scope="%s" data-ma-brand="%s">%s</button>',
-      stim, .ma_esc(brand_codes[i]), .ma_esc(brand_names[i]))
-  }, character(1)), collapse = "")
+  chips_html <- paste(c(
+    vapply(seq_along(brand_codes), function(i) {
+      sprintf(
+        '<button type="button" class="col-chip chart-chip" data-ma-chart-scope="%s" data-ma-brand="%s">%s</button>',
+        stim, .ma_esc(brand_codes[i]), .ma_esc(brand_names[i]))
+    }, character(1)),
+    sprintf('<button type="button" class="ma-all-toggle" data-ma-chart-action="toggleall" data-ma-chart-scope="%s">Hide all</button>',
+            .ma_esc(stim))
+  ), collapse = "")
 
   sprintf(
     '<section class="ma-chart-section" data-ma-stim="%s">

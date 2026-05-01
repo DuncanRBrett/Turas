@@ -401,6 +401,30 @@
         renderChart(panel, scope);
       });
     });
+
+    panel.querySelectorAll('.ma-all-toggle[data-ma-chart-action="toggleall"]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var scope  = btn.getAttribute('data-ma-chart-scope');
+        var focal  = panel.__maState.focal;
+        var vis    = panel.__maState.chartVisible[scope];
+        if (!vis) return;
+        var allOn = Object.keys(vis).every(function (k) {
+          if (k === focal) return true;
+          return vis[k] !== false;
+        });
+        var nextState = !allOn;
+        Object.keys(vis).forEach(function (k) {
+          if (k === focal) return;
+          vis[k] = nextState;
+        });
+        panel.querySelectorAll('.chart-chip[data-ma-chart-scope="' + scope + '"]').forEach(function (c) {
+          if (c.getAttribute('data-ma-brand') === focal) return;
+          c.classList.toggle('col-chip-off', !nextState);
+        });
+        renderChart(panel, scope);
+        btn.textContent = nextState ? 'Hide all' : 'Show all';
+      });
+    });
   }
 
   function bindChipPicker(panel) {

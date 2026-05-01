@@ -172,10 +172,13 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
   brand_codes  <- brand_codes[sorted_order]
   brand_names  <- brand_names[sorted_order]
 
-  chips_html <- paste(vapply(seq_along(brand_codes), function(i) {
-    sprintf('<button type="button" class="col-chip" data-fn-scope="table" data-fn-brand="%s">%s</button>',
-            .fn_esc(brand_codes[i]), .fn_esc(brand_names[i]))
-  }, character(1)), collapse = "")
+  chips_html <- paste(c(
+    vapply(seq_along(brand_codes), function(i) {
+      sprintf('<button type="button" class="col-chip" data-fn-scope="table" data-fn-brand="%s">%s</button>',
+              .fn_esc(brand_codes[i]), .fn_esc(brand_names[i]))
+    }, character(1)),
+    '<button type="button" class="ma-all-toggle" data-fn-action="toggleall" data-fn-scope="table">Hide all</button>'
+  ), collapse = "")
 
   paste0(
     '<div class="fn-controls controls-bar">',
@@ -304,7 +307,8 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
             cls, .fn_esc(brand_codes[i]), .fn_esc(brand_names[i]))
   }, character(1)), collapse = "")
 
-  chips_html <- paste0(cat_avg_chip, brand_chips_html)
+  toggle_chip <- '<button type="button" class="ma-all-toggle" data-fn-action="toggleall" data-fn-scope="chart">Show all</button>'
+  chips_html <- paste0(cat_avg_chip, brand_chips_html, toggle_chip)
 
   # Stage selector chips for bar view — first stage active by default
   stage_chips <- if (length(stage_keys) > 0)

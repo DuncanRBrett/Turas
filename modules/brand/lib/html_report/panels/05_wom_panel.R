@@ -91,7 +91,7 @@ build_wom_panel_html <- function(panel_data,
             .wom_esc(brand_codes[i]), sel, .wom_esc(brand_names[i]))
   }, character(1)), collapse = "")
 
-  # Coloured chips — toggle row visibility
+  # Coloured chips — toggle row visibility; includes Show all/Hide all button
   chips_html <- paste(vapply(seq_along(brand_codes), function(i) {
     bc  <- brand_codes[i]
     nm  <- brand_names[i]
@@ -112,7 +112,7 @@ build_wom_panel_html <- function(panel_data,
      <div class="wom-controls-bar">
        <div class="wom-ctl-group">
          <span class="wom-ctl-label wom-ctl-label-title">Show brands</span>
-         <div class="col-chip-bar" data-wom-scope="%s">%s</div>
+         <div class="col-chip-bar" data-wom-scope="%s">%s<button type="button" class="ma-all-toggle" data-wom-action="toggleall" data-wom-scope="%s">Hide all</button></div>
        </div>
        <div class="wom-meta-row">
          <label class="toggle-label">
@@ -130,7 +130,7 @@ build_wom_panel_html <- function(panel_data,
        </div>
      </div>',
     focus_options,
-    .wom_esc(category_code), chips_html,
+    .wom_esc(category_code), chips_html, .wom_esc(category_code),
     .wom_esc(category_code),
     .wom_esc(category_code))
 }

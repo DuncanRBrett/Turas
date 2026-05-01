@@ -49,6 +49,29 @@
       });
     });
 
+    // Show all / Hide all toggle
+    panel.querySelectorAll('[data-wom-action="toggleall"]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var focalRow = table.querySelector('tr.wom-row-focal');
+        var focalCode = focalRow ? focalRow.getAttribute('data-wom-brand') : null;
+        var chips = panel.querySelectorAll('[data-wom-action="toggle-row"]');
+        var nonFocal = [];
+        chips.forEach(function (c) {
+          if (c.getAttribute('data-wom-brand') !== focalCode) nonFocal.push(c);
+        });
+        var allOn = nonFocal.every(function (c) { return c.classList.contains('active'); });
+        var nextState = !allOn;
+        nonFocal.forEach(function (c) {
+          var bc = c.getAttribute('data-wom-brand');
+          c.classList.toggle('active', nextState);
+          var row = table.querySelector('tr[data-wom-brand="' + cssEscape(bc) + '"]');
+          if (row) row.classList.toggle('wom-row-hidden', !nextState);
+        });
+        reflowChart(panel);
+        btn.textContent = nextState ? 'Hide all' : 'Show all';
+      });
+    });
+
     // --- Column sort (Brand = alpha, data cols = numeric on data-wom-val)
     panel.querySelectorAll('[data-wom-action="sort"]').forEach(function (th) {
       th.addEventListener("click", function () {

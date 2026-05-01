@@ -125,13 +125,16 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
   # Category average chip
   avg_chip <- '<button type="button" class="col-chip fn-rel-brand-chip fn-rel-avg-chip active" data-fn-rel-brand="__avg__">Cat avg</button>'
 
+  toggle_chip <- '<button type="button" class="ma-all-toggle" data-fn-rel-action="toggleall">Hide all</button>'
+
   paste0(
     '<div class="fn-rel-controls">',
-    # Brand chips row (including cat avg)
+    # Brand chips row: cat avg first, then brands, then toggle
     '<div class="fn-rel-brand-row col-chip-bar">',
     '<span class="sig-level-label" style="flex-shrink:0;">Brands:</span>',
-    brand_chips,
     avg_chip,
+    brand_chips,
+    toggle_chip,
     '</div>',
     # Meta row: base, checkboxes, export
     '<div class="fn-rel-meta-row">',

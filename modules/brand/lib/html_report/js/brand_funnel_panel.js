@@ -203,6 +203,30 @@
       });
     });
 
+    // Show all / Hide all toggle for table and chart chip bars
+    panel.querySelectorAll('button[data-fn-action="toggleall"]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var scope = btn.getAttribute('data-fn-scope');
+        var focal = panel.__fnState.focal;
+        var bucket = scope === 'table' ? 'tableBrands' : 'chartBrands';
+        var chips = panel.querySelectorAll('button[data-fn-scope="' + scope + '"][data-fn-brand]');
+        var nonFocal = [];
+        chips.forEach(function(c) {
+          if (c.getAttribute('data-fn-brand') !== focal) nonFocal.push(c);
+        });
+        var allOn = nonFocal.every(function(c) { return !c.classList.contains('col-chip-off'); });
+        var nextState = !allOn;
+        nonFocal.forEach(function(c) {
+          var code = c.getAttribute('data-fn-brand');
+          panel.__fnState[bucket][code] = nextState;
+          c.classList.toggle('col-chip-off', !nextState);
+        });
+        if (scope === 'table') applyTableVisibility(panel);
+        else applyChartVisibility(panel);
+        btn.textContent = nextState ? 'Hide all' : 'Show all';
+      });
+    });
+
     // Add Insight toggle — shows/hides inline textarea in the insight strip
     panel.querySelectorAll('button[data-fn-action="add-insight"]').forEach(function(btn) {
       btn.addEventListener("click", function() {
@@ -1909,6 +1933,37 @@
         });
         buildRelChart(panel);
         updateRelHeadline(panel);
+      });
+    });
+
+    // Show all / Hide all toggle for relationship chip bar
+    panel.querySelectorAll('button[data-fn-rel-action="toggleall"]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var focal  = panel.__fnState.focal;
+        var hidden = panel.__fnState.relHiddenBrands;
+        var chips  = panel.querySelectorAll('[data-fn-rel-brand]');
+        var nonFocal = [];
+        chips.forEach(function(c) {
+          if (c.getAttribute('data-fn-rel-brand') !== focal) nonFocal.push(c);
+        });
+        var allOn = nonFocal.every(function(c) { return !c.classList.contains('col-chip-off'); });
+        var nextState = !allOn;
+        nonFocal.forEach(function(c) {
+          var code = c.getAttribute('data-fn-rel-brand');
+          if (nextState) {
+            hidden.delete(code);
+            c.classList.add('active');
+            c.classList.remove('col-chip-off');
+          } else {
+            hidden.add(code);
+            c.classList.remove('active');
+            c.classList.add('col-chip-off');
+          }
+        });
+        applyRelBrandVis(panel);
+        buildRelChart(panel);
+        updateRelHeadline(panel);
+        btn.textContent = nextState ? 'Hide all' : 'Show all';
       });
     });
 

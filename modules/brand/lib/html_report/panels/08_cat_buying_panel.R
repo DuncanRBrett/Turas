@@ -536,13 +536,17 @@ render_cat_buying_panel <- function(panel_data) {
     brand_names <- brand_names[sorted_order]
   }
 
-  chips_html <- paste(vapply(seq_along(brands), function(i) {
-    bc  <- brands[i]
-    nm  <- brand_names[i]
-    sprintf(
-      '<button type="button" class="col-chip" data-cb-scope="%s" data-cb-brand="%s">%s</button>',
-      .cb_esc(scope), .cb_esc(bc), .cb_esc(nm))
-  }, character(1)), collapse = "")
+  chips_html <- paste(c(
+    vapply(seq_along(brands), function(i) {
+      bc  <- brands[i]
+      nm  <- brand_names[i]
+      sprintf(
+        '<button type="button" class="col-chip" data-cb-scope="%s" data-cb-brand="%s">%s</button>',
+        .cb_esc(scope), .cb_esc(bc), .cb_esc(nm))
+    }, character(1)),
+    sprintf('<button type="button" class="ma-all-toggle" data-cb-action="toggleall" data-cb-scope="%s">Hide all</button>',
+            .cb_esc(scope))
+  ), collapse = "")
 
   sprintf(
     '<div class="cb-controls-bar">
@@ -1074,9 +1078,10 @@ render_cat_buying_panel <- function(panel_data) {
       .cb_esc(lbl), badge)
   }, character(1)), collapse = "")
 
+  toggle <- '<button type="button" class="ma-all-toggle" data-cb-action="toggleall" data-cb-scope="brands">Hide all</button>'
   sprintf(
-    '%s<div class="cb-brand-picker"><span class="cb-ctl-label cb-ctl-label-title">Show brands</span><div class="col-chip-bar">%s</div></div>',
-    focus_bar, chips)
+    '%s<div class="cb-brand-picker"><span class="cb-ctl-label cb-ctl-label-title">Show brands</span><div class="col-chip-bar">%s%s</div></div>',
+    focus_bar, chips, toggle)
 }
 
 
