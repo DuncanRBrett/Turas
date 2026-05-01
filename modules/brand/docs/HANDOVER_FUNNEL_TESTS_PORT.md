@@ -1,7 +1,7 @@
 # Handover — Port legacy funnel tests to v2-shaped fixtures
 
 **Date opened:** 2026-05-01
-**Branch (when work starts):** create from `main` after the IPK rebuild lands, e.g. `feature/funnel-test-port`
+**Branch:** `feature/brand-ipk-rebuild` — work directly on the rebuild branch. Duncan's plan is to land the funnel test port + the rebuild together in one PR to `main`, not two separate PRs. **Do NOT branch from `main` and do NOT branch from `feature/brand-ipk-rebuild`.** Just `git pull` on `feature/brand-ipk-rebuild` and commit the funnel-port commits straight onto it.
 **Recommended model:** Sonnet — bounded-scope mechanical port against an established pattern
 
 ---
