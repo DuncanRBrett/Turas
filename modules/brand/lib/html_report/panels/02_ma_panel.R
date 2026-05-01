@@ -181,7 +181,7 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
       sprintf('<button type="button" class="col-chip" data-ma-scope="%s" data-ma-brand="%s">%s</button>',
               .ma_esc(stim), .ma_esc(brand_codes[i]), .ma_esc(brand_names[i]))
     }, character(1)),
-    sprintf('<button type="button" class="ma-all-toggle" data-ma-action="toggleall" data-ma-scope="%s">All</button>',
+    sprintf('<button type="button" class="ma-all-toggle" data-ma-action="toggleall" data-ma-scope="%s">Hide all</button>',
             .ma_esc(stim))
   ), collapse = "")
 

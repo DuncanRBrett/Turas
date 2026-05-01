@@ -608,10 +608,30 @@
     panel.__maAdvHiddenBrands = panel.__maAdvHiddenBrands || {};
     panel.__maAdvHiddenStims = panel.__maAdvHiddenStims || {};
 
-    // Brand-column chips: delegated click. Each chip carries the brand
-    // palette colour via inline style + --brand-chip-color (set by
-    // colourAdvantageChips below) so they match the rest of the panel.
+    // Brand-column chips + Show all/Hide all toggle: delegated click.
     subtab.addEventListener('click', function (ev) {
+      // Show all / Hide all toggle
+      var toggleBtn = ev.target.closest('button[data-ma-adv-action="toggleall"]');
+      if (toggleBtn && subtab.contains(toggleBtn)) {
+        var focal = panel.__maState && panel.__maState.focal;
+        var chips = subtab.querySelectorAll('button[data-ma-adv-chip-brand]');
+        var nonFocal = [];
+        chips.forEach(function (c) {
+          if (c.getAttribute('data-ma-adv-chip-brand') !== focal) nonFocal.push(c);
+        });
+        var allOn = nonFocal.every(function (c) { return !c.classList.contains('col-chip-off'); });
+        var nextState = !allOn;
+        nonFocal.forEach(function (c) {
+          var code = c.getAttribute('data-ma-adv-chip-brand');
+          c.classList.toggle('col-chip-off', !nextState);
+          panel.__maAdvHiddenBrands[code] = !nextState;
+        });
+        applyBrandColumnVisibility(panel);
+        toggleBtn.textContent = nextState ? 'Hide all' : 'Show all';
+        return;
+      }
+
+      // Individual brand chip
       var chip = ev.target.closest('button[data-ma-adv-chip-brand]');
       if (!chip || !subtab.contains(chip)) return;
       var code = chip.getAttribute('data-ma-adv-chip-brand');

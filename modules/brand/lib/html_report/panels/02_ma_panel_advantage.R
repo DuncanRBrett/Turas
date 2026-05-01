@@ -152,7 +152,10 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
   paste0(
     '<div class="ma-adv-chip-bar">',
     '<span class="ma-ctl-label">Show brands</span>',
-    '<div class="ma-chip-row col-chip-bar" data-ma-adv-scope="brands">', chips, '</div>',
+    '<div class="ma-chip-row col-chip-bar" data-ma-adv-scope="brands">',
+    chips,
+    '<button type="button" class="ma-all-toggle" data-ma-adv-action="toggleall">Hide all</button>',
+    '</div>',
     '</div>'
   )
 }

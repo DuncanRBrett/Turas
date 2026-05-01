@@ -32,7 +32,7 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
         '<button type="button" class="col-chip" data-ma-scope="metrics" data-ma-brand="%s">%s</button>',
         .ma_esc(brand_codes[i]), .ma_esc(brand_names[i]))
     }, character(1)),
-    '<button type="button" class="ma-all-toggle" data-ma-action="toggleall" data-ma-scope="metrics">All</button>'
+    '<button type="button" class="ma-all-toggle" data-ma-action="toggleall" data-ma-scope="metrics">Hide all</button>'
   ), collapse = "")
 
   controls_bar <- paste0(

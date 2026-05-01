@@ -420,17 +420,53 @@
     panel.querySelectorAll('.ma-all-toggle[data-ma-action="toggleall"]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var scope = btn.getAttribute('data-ma-scope');
+        var focal = panel.__maState.focal;
+
+        if (scope === 'metrics') {
+          // Metrics visibility is DOM-based (bindMetricsChips), not in vis map
+          var allChips = panel.querySelectorAll('.col-chip[data-ma-scope="metrics"]');
+          var nonFocal = [];
+          allChips.forEach(function (c) {
+            if (c.getAttribute('data-ma-brand') !== focal) nonFocal.push(c);
+          });
+          var allOn = nonFocal.every(function (c) { return !c.classList.contains('col-chip-off'); });
+          var nextState = !allOn;
+          var table = panel.querySelector('.ma-metrics-table');
+          nonFocal.forEach(function (c) {
+            var code = c.getAttribute('data-ma-brand');
+            c.classList.toggle('col-chip-off', !nextState);
+            if (table) {
+              table.querySelectorAll('tbody tr.ma-row[data-ma-brand="' + code + '"]').forEach(function (r) {
+                r.style.display = nextState ? '' : 'none';
+              });
+            }
+          });
+          renderMAScatter(panel);
+          renderMABarChart(panel);
+          btn.textContent = nextState ? 'Hide all' : 'Show all';
+          return;
+        }
+
         var vis = panel.__maState.visible[scope];
         if (!vis) return;
-        var allOn = Object.keys(vis).every(function (k) { return vis[k] !== false; });
+        // Determine current state ignoring the focal brand (it can never be off)
+        var allOn = Object.keys(vis).every(function (k) {
+          if (k === focal) return true;
+          return vis[k] !== false;
+        });
         var nextState = !allOn;
-        Object.keys(vis).forEach(function (k) { vis[k] = nextState; });
+        // Update vis map and chip classes, skipping focal brand
+        Object.keys(vis).forEach(function (k) {
+          if (k === focal) return;
+          vis[k] = nextState;
+        });
         panel.querySelectorAll('.col-chip[data-ma-scope="' + scope + '"]').forEach(function (c) {
+          if (c.getAttribute('data-ma-brand') === focal) return;
           c.classList.toggle('col-chip-off', !nextState);
         });
         applyColumnVisibility(panel, scope);
         renderChart(panel, scope);
-        btn.textContent = nextState ? 'All' : 'None';
+        btn.textContent = nextState ? 'Hide all' : 'Show all';
       });
     });
   }
