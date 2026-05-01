@@ -175,12 +175,12 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
   brand_names  <- brand_names[sorted_order]
 
   chips_html <- paste(c(
+    sprintf('<button type="button" class="col-chip" data-ma-scope="%s" data-ma-brand="__avg__">Cat avg</button>',
+            .ma_esc(stim)),
     vapply(seq_along(brand_codes), function(i) {
       sprintf('<button type="button" class="col-chip" data-ma-scope="%s" data-ma-brand="%s">%s</button>',
               .ma_esc(stim), .ma_esc(brand_codes[i]), .ma_esc(brand_names[i]))
-    }, character(1)),
-    sprintf('<button type="button" class="col-chip" data-ma-scope="%s" data-ma-brand="__avg__">Cat avg</button>',
-            .ma_esc(stim))
+    }, character(1))
   ), collapse = "")
 
   block <- if (stim == "attributes") pd$attributes else pd$ceps
