@@ -202,7 +202,8 @@ render_cat_buying_panel <- function(panel_data) {
   # ----- Tab 5: Duplication of Purchase --------------------------------------
   parts <- c(parts, '<div class="cb-subtab" data-cb-tab="dop" hidden>')
   parts <- c(parts, .cb_dop_tab(rep, focal, brand_labels,
-                                 brand_buyers_n = brand_buyers_n_map))
+                                 brand_buyers_n = brand_buyers_n_map,
+                                 focal_colour   = fcol))
   parts <- c(parts, '</div>')
 
   # ----- Tab 6: Shopper Behaviour (optional) --------------------------------
@@ -477,7 +478,8 @@ render_cat_buying_panel <- function(panel_data) {
 }
 
 
-.cb_dop_tab <- function(rep, focal, brand_labels, brand_buyers_n = NULL) {
+.cb_dop_tab <- function(rep, focal, brand_labels, brand_buyers_n = NULL,
+                         focal_colour = "#1A5276") {
   parts <- character(0)
   parts <- c(parts, '<section class="cb-dop-section" data-cb-scope="dop">')
   parts <- c(parts, '<div class="cb-section-title">Duplication of Purchase</div>')
@@ -502,7 +504,18 @@ render_cat_buying_panel <- function(panel_data) {
     '</div>',
     '</details>'))
 
-  # Toolbar: Show heatmap (default ON) + Show counts (default OFF)
+  obs_mat <- rep$crossover_matrix %||% NULL
+
+  # Partition partners / rivals card — sits above the heatmap so the focal-
+  # brand summary is the first thing the user sees on this sub-tab.
+  if (!is.null(obs_mat) && !is.null(focal) && nzchar(focal) &&
+      exists("cb_dop_partition_card_html", mode = "function")) {
+    parts <- c(parts, cb_dop_partition_card_html(obs_mat, focal,
+                                                  brand_labels = brand_labels))
+  }
+
+  # Toolbar: Show heatmap (default ON) + Show counts (default OFF) +
+  # Show cluster map (default ON when ≥4 brands).
   parts <- c(parts, paste0(
     '<div class="cb-controls-bar" data-cb-scope="dop">',
     '<label class="toggle-label">',
@@ -511,9 +524,11 @@ render_cat_buying_panel <- function(panel_data) {
     '<label class="toggle-label">',
     '<input type="checkbox" data-cb-action="showcounts" data-cb-scope="dop"> Show counts',
     '</label>',
+    '<label class="toggle-label">',
+    '<input type="checkbox" checked data-cb-action="dop-showchart" data-cb-scope="dop"> Show cluster map',
+    '</label>',
     '</div>'))
 
-  obs_mat <- rep$crossover_matrix %||% NULL
   if (!is.null(obs_mat) && exists("cb_dop_heatmap_html", mode = "function")) {
     parts <- c(parts, cb_dop_heatmap_html(obs_mat, NULL, focal,
                                            brand_labels   = brand_labels,
@@ -522,6 +537,18 @@ render_cat_buying_panel <- function(panel_data) {
   } else {
     parts <- c(parts, '<p style="font-size:12px;color:#94a3b8;">Duplication of purchase requires BRANDPEN3 data.</p>')
   }
+
+  # Cluster map — the dendrogram itself is focal-independent (static SVG),
+  # but the focal halo + partner badges layered on top are focal-specific
+  # and re-rendered client-side on focal switch.
+  if (!is.null(obs_mat) &&
+      exists("cb_dop_cluster_map_html", mode = "function")) {
+    parts <- c(parts, cb_dop_cluster_map_html(obs_mat,
+                                               focal_brand  = focal,
+                                               focal_colour = focal_colour,
+                                               brand_labels = brand_labels))
+  }
+
   parts <- c(parts, '</section>')
   paste(parts, collapse = "\n")
 }
