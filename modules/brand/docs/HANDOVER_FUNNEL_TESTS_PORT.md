@@ -105,7 +105,7 @@ role_map <- list(
 
 4. **Delete the legacy file once its v2 replacement is green** (rename `test_funnel_durable.R` → … well, the v2 test file already exists, so add the durable category-type tests as new `test_that()` blocks inside `test_funnel.R`). Choose: one big `test_funnel.R` or per-category-type files (`test_funnel_durable.R` etc). Either is fine; match what the rest of the v2 suite does.
 
-5. **Check `_v2` naming after cutover.** The IPK rebuild's Stage 6 renames `_v2` → canonical (e.g. `run_funnel` → `run_funnel`). By the time you start this work, function names should already be canonical. Adjust calls accordingly. If not, the IPK rebuild PR hasn't merged yet — wait for it.
+5. **The IPK rebuild's Stage 6 already renamed `_v2` → canonical** (e.g. `run_funnel_v2` → `run_funnel`, `compute_extension_table_v2` → `compute_extension_table`). Function names in the codebase are now canonical. Two engines kept their `_v2` wrappers because the canonical name is held by the analytics engine they delegate to: `run_repertoire_v2` and `run_drivers_barriers_v2` — but neither matters for funnel tests.
 
 ---
 
@@ -114,9 +114,9 @@ role_map <- list(
 Before opening the PR for this work:
 
 - [ ] All 8 legacy files deleted from `modules/brand/tests/testthat/`
-- [ ] Equivalent assertions exist in `test_funnel.R` (or new v2 files) — every hand-calculated count from the legacy fixtures has a corresponding `expect_equal()` in the v2 suite
-- [ ] Full brand test suite green: `Rscript -e 'library(testthat); for (f in list.files("modules/brand/tests/testthat", "^test_.*[.]R$", full.names = TRUE)) testthat::test_file(f)'` — expect 0 failures
-- [ ] End-to-end smoke still PASS: `Rscript -e 'source("modules/brand/R/00_main.R"); res <- run_brand("modules/brand/tests/fixtures/ipk_wave1/Brand_Config.xlsx", verbose = FALSE); cat("status:", res$status, "\n")` — expect `status: PARTIAL` (DSS deep-dive still PASS, others empty as before)
+- [ ] Equivalent assertions exist in `test_funnel.R` (or new per-category-type files alongside it) — every hand-calculated count from the legacy fixtures has a corresponding `expect_equal()` in the new suite
+- [ ] Full brand test suite green: `Rscript -e 'library(testthat); for (f in list.files("modules/brand/tests/testthat", "^test_.*[.]R$", full.names = TRUE)) testthat::test_file(f)'` — expect 0 failures, 1288+ pass
+- [ ] End-to-end smoke still PASS: `Rscript -e 'source("modules/brand/R/00_main.R"); res <- run_brand("modules/brand/tests/fixtures/ipk_wave1/Brand_Config.xlsx", verbose = FALSE); cat("status:", res$status, "\n")` — expect `status: PARTIAL` (DSS deep-dive PASS, others empty as before)
 
 ---
 
@@ -124,7 +124,7 @@ Before opening the PR for this work:
 
 - Don't refactor the funnel engine itself. The migration was done; the engine is correct and verified by browser verification. This task is **tests only**.
 - Don't add new tests beyond porting the legacy coverage. If a gap exists in the legacy coverage, file it as a separate follow-up.
-- Don't touch the v2 funnel files outside of `test_funnel.R` (or the new `_v2` test files you create alongside it).
+- Don't touch the canonical funnel source files (`03_funnel.R`, `03a-d_funnel_*.R`) — only the test files in scope.
 
 ---
 
