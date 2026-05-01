@@ -409,21 +409,11 @@ transform_brand_panels <- function(results, config) {
           as.character(cat_brands_local$BrandCode))
       }
 
-      # Build brand_colours lookup from Colour column (hex codes)
-      brand_colours <- list()
-      if (!is.null(cat_brands_local) && nrow(cat_brands_local) > 0 &&
-          "BrandCode" %in% names(cat_brands_local) &&
-          "Colour" %in% names(cat_brands_local)) {
-        for (ii in seq_len(nrow(cat_brands_local))) {
-          bc_ii <- trimws(as.character(cat_brands_local$BrandCode[ii]))
-          col_ii <- cat_brands_local$Colour[ii]
-          if (is.null(col_ii) || is.na(col_ii)) next
-          col_ii <- trimws(as.character(col_ii))
-          if (!nzchar(col_ii)) next
-          if (!grepl("^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$", col_ii)) next
-          brand_colours[[bc_ii]] <- col_ii
-        }
-      }
+      brand_colours <- build_full_brand_colour_map(
+        brand_list   = cat_brands_local,
+        focal_code   = config$focal_brand %||% NULL,
+        focal_colour = focal_colour
+      )
 
       panel_data <- list(
         cat_name              = cat_name,
@@ -492,21 +482,11 @@ transform_brand_panels <- function(results, config) {
         as.character(cat_cfg_row$Timeframe_Target[1]) else NULL
       if (is.null(tf_label) || !nzchar(tf_label)) tf_label <- "last 3 months"
 
-      # Build brand_colours lookup from Colour column (hex codes)
-      wom_brand_colours <- list()
-      if (!is.null(cat_brands_local) && nrow(cat_brands_local) > 0 &&
-          "BrandCode" %in% names(cat_brands_local) &&
-          "Colour" %in% names(cat_brands_local)) {
-        for (ii in seq_len(nrow(cat_brands_local))) {
-          bc_ii <- trimws(as.character(cat_brands_local$BrandCode[ii]))
-          col_ii <- cat_brands_local$Colour[ii]
-          if (is.null(col_ii) || is.na(col_ii)) next
-          col_ii <- trimws(as.character(col_ii))
-          if (!nzchar(col_ii)) next
-          if (!grepl("^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$", col_ii)) next
-          wom_brand_colours[[bc_ii]] <- col_ii
-        }
-      }
+      wom_brand_colours <- build_full_brand_colour_map(
+        brand_list   = cat_brands_local,
+        focal_code   = config$focal_brand %||% NULL,
+        focal_colour = focal_colour
+      )
 
       wom_pd <- tryCatch(
         build_wom_panel_data(
