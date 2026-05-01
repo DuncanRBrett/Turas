@@ -452,44 +452,30 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
     # passes the global role_map (built once after Step 3) directly to
     # run_funnel — no per-category QuestionMap normalisation needed because
     # v2 role names already carry the .{cat} suffix that .lookup_role
-    # resolves through. Legacy .run_funnel_for_category retained for
-    # structures that lack a Questions sheet (no v2 role map possible).
     if (isTRUE(config$element_funnel) && cat_depth == "full") {
       if (verbose) cat("  Running Funnel...\n")
 
-      cat_result$funnel <- if (!is.null(role_map))
-        .run_funnel_for_category_v2(
-          data = cat_data, role_map = role_map, cat_brands = cat_brands,
-          cat_code = cat_code, config = config, weights = cat_weights,
-          cat_name = cat_name)
-      else
-        .run_funnel_for_category(
-          data = cat_data, structure = structure, cat_brands = cat_brands,
-          cat_ceps = cat_ceps, config = config, weights = cat_weights,
-          cat_name = cat_name, warnings_acc = function(msg) {
-            warnings_list <<- c(warnings_list, msg)
-          }
-        )
+      cat_result$funnel <- .run_funnel_for_category_v2(
+        data = cat_data, role_map = role_map, cat_brands = cat_brands,
+        cat_code = cat_code, config = config, weights = cat_weights,
+        cat_name = cat_name
+      )
     }
 
-    # Repertoire (full categories only). v2 entry rebuilds penetration +
-    # frequency matrices from role_map directly. Legacy path (slot-prefix
-    # sniff via .find_brand_col) used only when no v2 role map is available.
+    # Repertoire (full categories only). v2 rebuilds penetration +
+    # frequency matrices from role_map directly.
     if (isTRUE(config$element_repertoire) && cat_depth == "full") {
       if (verbose) cat("  Running Repertoire...\n")
 
       cat_result$repertoire <- tryCatch(
-        if (!is.null(role_map) && !is.null(cat_code))
-          run_repertoire_v2(
-            data        = cat_data,
-            role_map    = role_map,
-            cat_code    = cat_code,
-            brand_list  = cat_brands,
-            focal_brand = config$focal_brand,
-            weights     = cat_weights
-          )
-        else .legacy_repertoire_call(structure, cat_data, cat_brands,
-                                     cat_name, config, cat_weights),
+        run_repertoire_v2(
+          data        = cat_data,
+          role_map    = role_map,
+          cat_code    = cat_code,
+          brand_list  = cat_brands,
+          focal_brand = config$focal_brand,
+          weights     = cat_weights
+        ),
         error = function(e) {
           warnings_list <<- c(warnings_list,
             sprintf("Repertoire failed for %s: %s", cat_name, e$message))
@@ -649,17 +635,14 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
     if (isTRUE(config$element_wom) && cat_depth == "full") {
       if (verbose) cat("  Running WOM...\n")
       cat_result$wom <- tryCatch(
-        if (!is.null(role_map))
-          run_wom_v2(
-            data        = cat_data,
-            role_map    = role_map,
-            cat_code    = cat_code,
-            brand_list  = cat_brands,
-            focal_brand = config$focal_brand,
-            weights     = cat_weights
-          )
-        else .legacy_wom_call(structure, cat_data, cat_brands,
-                              config, cat_weights),
+        run_wom_v2(
+          data        = cat_data,
+          role_map    = role_map,
+          cat_code    = cat_code,
+          brand_list  = cat_brands,
+          focal_brand = config$focal_brand,
+          weights     = cat_weights
+        ),
         error = function(e) {
           warnings_list <<- c(warnings_list,
             sprintf("WOM failed for %s: %s", cat_name, e$message))
@@ -718,27 +701,16 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       } else if (length(al_audiences) > 0) {
         if (verbose) cat("  Running Audience Lens...\n")
         cat_result$audience_lens <- tryCatch(
-          if (!is.null(role_map))
-            run_audience_lens_v2(
-              data = cat_data, role_map = role_map,
-              cat_code = cat_code %||% "",
-              cat_name = cat_name,
-              cat_brands = cat_brands,
-              focal_brand = config$focal_brand,
-              audiences = al_audiences,
-              structure = structure, config = config,
-              weights = cat_weights,
-              category_results = cat_result)
-          else
-            run_audience_lens(
-              data = cat_data, weights = cat_weights,
-              cat_brands = cat_brands,
-              cat_code = cat_code %||% "",
-              cat_name = cat_name,
-              focal_brand = config$focal_brand,
-              audiences = al_audiences,
-              structure = structure, config = config,
-              category_results = cat_result),
+          run_audience_lens_v2(
+            data = cat_data, role_map = role_map,
+            cat_code = cat_code %||% "",
+            cat_name = cat_name,
+            cat_brands = cat_brands,
+            focal_brand = config$focal_brand,
+            audiences = al_audiences,
+            structure = structure, config = config,
+            weights = cat_weights,
+            category_results = cat_result),
           error = function(e) {
             warnings_list <<- c(warnings_list,
               sprintf("Audience lens failed for %s: %s",
@@ -750,9 +722,8 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       }
     }
 
-    # Drivers & Barriers (full categories only). v2 entry rebuilds linkage
-    # + CEP-brand matrix + focal-buyer flag from role_map directly. Legacy
-    # path used only when no v2 role map is available.
+    # Drivers & Barriers (full categories only). v2 rebuilds linkage
+    # + CEP-brand matrix + focal-buyer flag from role_map directly.
     if (isTRUE(config$element_drivers_barriers) && cat_depth == "full") {
       if (verbose) cat("  Running Drivers & Barriers...\n")
 
@@ -762,19 +733,15 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
                    stringsAsFactors = FALSE) else NULL
 
       cat_result$drivers_barriers <- tryCatch(
-        if (!is.null(role_map))
-          run_drivers_barriers_v2(
-            data        = cat_data,
-            role_map    = role_map,
-            cat_code    = cat_code,
-            brand_list  = cat_brands,
-            focal_brand = config$focal_brand,
-            cep_labels  = cep_labels_df,
-            weights     = cat_weights
-          )
-        else .legacy_drivers_barriers_call(structure, cat_data, cat_result,
-                                           cat_brands, cat_name,
-                                           config, linkage, cep_labels_df),
+        run_drivers_barriers_v2(
+          data        = cat_data,
+          role_map    = role_map,
+          cat_code    = cat_code,
+          brand_list  = cat_brands,
+          focal_brand = config$focal_brand,
+          cep_labels  = cep_labels_df,
+          weights     = cat_weights
+        ),
         error = function(e) {
           warnings_list <<- c(warnings_list,
             sprintf("Drivers & Barriers failed for %s: %s", cat_name, e$message))
@@ -785,29 +752,18 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
 
     # Demographics (per-category; full categories only). v2 dispatcher walks
     # role_map for ^demographics\.* keys via demographic_question_from_role_v2.
-    # Synthetic questions (Buyer Status + Heaviness) are unchanged. Legacy
-    # path used only when no v2 role map is available.
+    # Synthetic questions (Buyer Status + Heaviness) are unchanged.
     if (isTRUE(config$element_demographics %||% TRUE) && cat_depth == "full") {
       if (verbose) cat("  Running Demographics...\n")
       cat_result$demographics <- tryCatch(
-        if (!is.null(role_map))
-          .run_demographics_for_category_v2(
-            role_map    = role_map, structure = structure, config = config,
-            cat_data    = cat_data, cat_weights = cat_weights,
-            cat_brands  = cat_brands, cat_name = cat_name,
-            brand_volume    = cat_result$brand_volume,
-            buyer_heaviness = cat_result$buyer_heaviness,
-            verbose     = verbose
-          )
-        else
-          .run_demographics_for_category(
-            structure   = structure, config = config,
-            cat_data    = cat_data, cat_weights = cat_weights,
-            cat_brands  = cat_brands, cat_name = cat_name,
-            brand_volume    = cat_result$brand_volume,
-            buyer_heaviness = cat_result$buyer_heaviness,
-            verbose     = verbose
-          ),
+        .run_demographics_for_category_v2(
+          role_map    = role_map, structure = structure, config = config,
+          cat_data    = cat_data, cat_weights = cat_weights,
+          cat_brands  = cat_brands, cat_name = cat_name,
+          brand_volume    = cat_result$brand_volume,
+          buyer_heaviness = cat_result$buyer_heaviness,
+          verbose     = verbose
+        ),
         error = function(e) {
           warnings_list <<- c(warnings_list,
             sprintf("Demographics failed for %s: %s", cat_name, e$message))
@@ -819,31 +775,18 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
     # Ad Hoc (per-category; full categories only). v2 dispatcher walks
     # role_map for ^adhoc\.* keys. ALL-scoped questions use the full sample;
     # CATCODE-scoped questions use cat_data + this category's brand cut.
-    # Falls through to the legacy QuestionMap dispatcher when no v2 role map
-    # was built (e.g. structure missing Questions sheet).
     if (isTRUE(config$element_adhoc %||% TRUE) && cat_depth == "full") {
       if (verbose) cat("  Running Ad Hoc...\n")
       cat_result$adhoc <- tryCatch(
-        if (!is.null(role_map))
-          .run_adhoc_for_category_v2(
-            role_map     = role_map, structure = structure, config = config,
-            data_full    = data, weights_full = weights,
-            cat_data     = cat_data, cat_weights = cat_weights,
-            cat_brands   = cat_brands, cat_name = cat_name,
-            cat_code     = cat_code,
-            brand_volume = cat_result$brand_volume,
-            verbose      = verbose
-          )
-        else
-          .run_adhoc_for_category(
-            structure   = structure, config = config,
-            data_full   = data, weights_full = weights,
-            cat_data    = cat_data, cat_weights = cat_weights,
-            cat_brands  = cat_brands, cat_name = cat_name,
-            cat_code    = cat_code,
-            brand_volume = cat_result$brand_volume,
-            verbose     = verbose
-          ),
+        .run_adhoc_for_category_v2(
+          role_map     = role_map, structure = structure, config = config,
+          data_full    = data, weights_full = weights,
+          cat_data     = cat_data, cat_weights = cat_weights,
+          cat_brands   = cat_brands, cat_name = cat_name,
+          cat_code     = cat_code,
+          brand_volume = cat_result$brand_volume,
+          verbose      = verbose
+        ),
         error = function(e) {
           warnings_list <<- c(warnings_list,
             sprintf("Ad hoc failed for %s: %s", cat_name, e$message))
@@ -859,29 +802,22 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
 
   # --- STEP 5a: Cross-category portfolio data (full 1200 respondents) ---
   # Computes category usage and focal brand awareness from the FULL dataset,
-  # not from per-category filtered subsets. v2 threads the global role_map
-  # through every sub-analysis so awareness columns resolve via slot-indexed
-  # parser-shape data; legacy path retained as fallback when role_map is NULL.
+  # not from per-category filtered subsets. role_map is threaded through
+  # every sub-analysis so awareness columns resolve via slot-indexed
+  # parser-shape data.
   results$portfolio <- .compute_portfolio_data(data, categories, structure,
                                                config, weights,
                                                role_map = role_map)
 
   # --- STEP 5b: Portfolio Overview (focal-brand view across ALL categories) ---
   # Deep-dive AND awareness-only categories together, enriched with pen/SCR/vol
-  # for deep-dive cats from category_results. v2 uses the global role_map for
-  # slot-indexed BRANDAWARE_{cat} lookups; legacy path retained as fallback.
+  # for deep-dive cats from category_results. Uses the global role_map for
+  # slot-indexed BRANDAWARE_{cat} lookups.
   results$portfolio_overview <- tryCatch(
-    if (!is.null(role_map))
-      compute_portfolio_overview_data_v2(
-        data, role_map, categories, structure, config,
-        weights          = weights,
-        category_results = category_results)
-    else
-      compute_portfolio_overview_data(
-        data, categories, structure, config,
-        weights          = weights,
-        category_results = category_results
-      ),
+    compute_portfolio_overview_data_v2(
+      data, role_map, categories, structure, config,
+      weights          = weights,
+      category_results = category_results),
     error = function(e) {
       warnings_list <<- c(warnings_list,
         sprintf("Portfolio overview failed: %s", e$message))
@@ -2246,20 +2182,15 @@ if (!exists(".find_brand_col", mode = "function")) {
 
 #' Compute cross-category portfolio data (thin wrapper)
 #'
-#' Routes to \code{run_portfolio_v2()} when \code{role_map} is non-NULL — the
-#' v2 path threads the role registry through every sub-analysis and reads
-#' slot-indexed parser-shape awareness data. Falls back to legacy
-#' \code{run_portfolio()} when \code{role_map} is NULL (e.g. structure has
-#' no Questions sheet) so existing column-per-brand fixtures keep working.
-#' Preserves the \code{results$portfolio} output key for downstream code.
+#' Delegates to \code{run_portfolio_v2()} for the full portfolio analysis.
+#' Threads \code{role_map} through every sub-analysis so awareness columns
+#' resolve via the slot-indexed reader layer. Preserves the
+#' \code{results$portfolio} output key for downstream code.
 #'
 #' @keywords internal
 .compute_portfolio_data <- function(data, categories, structure, config, weights,
                                      role_map = NULL) {
-  if (!is.null(role_map)) {
-    return(run_portfolio_v2(data, role_map, categories, structure, config, weights))
-  }
-  run_portfolio(data, categories, structure, config, weights)
+  run_portfolio_v2(data, role_map, categories, structure, config, weights)
 }
 
 
