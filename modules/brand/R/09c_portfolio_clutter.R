@@ -29,7 +29,7 @@
 #' @return List: \code{awareness_set_size_mean}, \code{focal_pct},
 #'   \code{sum_brand_pcts}, \code{n_brands}, \code{brand_pcts}.
 #' @keywords internal
-.compute_clutter_metrics_v2 <- function(aware_mat, focal_brand, base_idx,
+.compute_clutter_metrics <- function(aware_mat, focal_brand, base_idx,
                                         weights) {
   brand_codes <- colnames(aware_mat) %||% character(0)
   w     <- if (!is.null(weights)) weights else rep(1.0, nrow(aware_mat))
@@ -66,7 +66,7 @@
 #'
 #' v2 alternative to \code{compute_clutter_data()} that uses the slot-indexed
 #' data-access layer. Iterates \code{categories$CategoryCode} directly (no
-#' detection); awareness comes from \code{.portfolio_aware_matrix_v2()}.
+#' detection); awareness comes from \code{.portfolio_aware_matrix()}.
 #'
 #' @param data Data frame.
 #' @param role_map Named list from \code{build_brand_role_map()} or NULL.
@@ -77,7 +77,7 @@
 #' @param weights Numeric vector or NULL.
 #' @return Same list shape as \code{compute_clutter_data()}.
 #' @export
-compute_clutter_data_v2 <- function(data, role_map, categories, structure,
+compute_clutter_data <- function(data, role_map, categories, structure,
                                      config, weights = NULL) {
   focal_brand <- config$focal_brand %||% ""
   timeframe   <- config$portfolio_timeframe %||% "3m"
@@ -107,7 +107,7 @@ compute_clutter_data_v2 <- function(data, role_map, categories, structure,
     )
     if (nrow(cat_brands) == 0L) next
 
-    base <- build_portfolio_base_v2(data, cat_code, timeframe, weights)
+    base <- build_portfolio_base(data, cat_code, timeframe, weights)
     if (!is.null(base$status)) next
     if (base$n_uw == 0L) {
       suppressed <- c(suppressed, cat_code); next
@@ -124,9 +124,9 @@ compute_clutter_data_v2 <- function(data, role_map, categories, structure,
                    else brand_codes
     names(brand_lbls) <- brand_codes
 
-    aware_mat <- .portfolio_aware_matrix_v2(data, role_map, cat_code,
+    aware_mat <- .portfolio_aware_matrix(data, role_map, cat_code,
                                             brand_codes)
-    metrics   <- .compute_clutter_metrics_v2(aware_mat, focal_brand,
+    metrics   <- .compute_clutter_metrics(aware_mat, focal_brand,
                                              base$idx, weights)
 
     cat_pen     <- base$n_uw / n_total

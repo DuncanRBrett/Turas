@@ -356,7 +356,7 @@ run_demographic_question <- function(values,
 #'   \code{short_label}, \code{variable_type}, \code{codes},
 #'   \code{labels}; or NULL.
 #' @export
-resolve_demographic_role_v2 <- function(role_map, role, structure) {
+resolve_demographic_role <- function(role_map, role, structure) {
   if (is.null(role_map) || is.null(role) || is.na(role) ||
       !nzchar(as.character(role))) return(NULL)
   entry <- role_map[[as.character(role)]]
@@ -385,7 +385,7 @@ resolve_demographic_role_v2 <- function(role_map, role, structure) {
 
 #' Build a demographics-question record from a v2 role
 #'
-#' Convenience wrapper around \code{resolve_demographic_role_v2()} +
+#' Convenience wrapper around \code{resolve_demographic_role()} +
 #' \code{run_demographic_question()} that produces the record shape
 #' \code{build_demographics_panel_data()} expects. Returns NULL when the
 #' role is unresolvable or its data column is missing.
@@ -402,14 +402,14 @@ resolve_demographic_role_v2 <- function(role_map, role, structure) {
 #' @param brand_labels Character vector or NULL.
 #' @return Named list ready for \code{build_demographics_panel_data()}, or NULL.
 #' @export
-demographic_question_from_role_v2 <- function(data, role_map, role, structure,
+demographic_question_from_role <- function(data, role_map, role, structure,
                                               weights = NULL,
                                               focal_buyer = NULL,
                                               buyer_tiers = NULL,
                                               pen_mat = NULL,
                                               brand_codes = NULL,
                                               brand_labels = NULL) {
-  spec <- resolve_demographic_role_v2(role_map, role, structure)
+  spec <- resolve_demographic_role(role_map, role, structure)
   if (is.null(spec)) return(NULL)
   if (!spec$column %in% names(data)) return(NULL)
 

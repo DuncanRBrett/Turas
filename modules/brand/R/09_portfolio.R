@@ -11,7 +11,7 @@
 #   SQ1_* or SQ2_* columns directly. A grep for "SQ1_" or "SQ2_" in new
 #   code should return only this function.
 #
-# SIZE-EXCEPTION: orchestrator (run_portfolio + run_portfolio_v2) plus the
+# SIZE-EXCEPTION: orchestrator (run_portfolio + run_portfolio) plus the
 # denominator helper (v1 + v2) plus the supporting-metrics computation
 # (v1 + v2) form one coherent entry-point file. The legacy v1 helper +
 # legacy run_portfolio + legacy .compute_supporting_metrics are scheduled
@@ -61,14 +61,14 @@ PORTFOLIO_EDGE_TOP_N_DEFAULT        <- 40L
 #' @return List with \code{idx} / \code{n_uw} / \code{n_w} /
 #'   \code{col_used} (root, e.g. \code{"SQ2"}).
 #' @export
-build_portfolio_base_v2 <- function(data, cat_code,
+build_portfolio_base <- function(data, cat_code,
                                     timeframe = PORTFOLIO_TIMEFRAME_3M,
                                     weights = NULL) {
   if (is.null(data) || !is.data.frame(data) || nrow(data) == 0L) {
     return(list(status = "REFUSED",
                 code = "DATA_PORTFOLIO_NOT_DATA_FRAME",
                 message = "data must be a non-empty data frame",
-                how_to_fix = "Provide a non-empty data frame to build_portfolio_base_v2()"))
+                how_to_fix = "Provide a non-empty data frame to build_portfolio_base()"))
   }
   if (is.null(cat_code) || length(cat_code) != 1L ||
       !nzchar(trimws(as.character(cat_code)))) {
@@ -135,7 +135,7 @@ build_portfolio_base_v2 <- function(data, cat_code,
 #' @param cat_code Character scalar. Category code.
 #' @return Character scalar — the awareness root.
 #' @keywords internal
-.portfolio_aware_root_v2 <- function(role_map, cat_code) {
+.portfolio_aware_root <- function(role_map, cat_code) {
   if (!is.null(role_map)) {
     for (key in c(paste0("portfolio.awareness.", cat_code),
                   paste0("funnel.awareness.",    cat_code))) {
@@ -172,9 +172,9 @@ build_portfolio_base_v2 <- function(data, cat_code,
 #' @return Integer matrix \code{[nrow(data) x length(brand_codes)]}, colnames
 #'   = \code{brand_codes}, values 0 / 1.
 #' @keywords internal
-.portfolio_aware_matrix_v2 <- function(data, role_map, cat_code,
+.portfolio_aware_matrix <- function(data, role_map, cat_code,
                                        brand_codes) {
-  root <- .portfolio_aware_root_v2(role_map, cat_code)
+  root <- .portfolio_aware_root(role_map, cat_code)
   multi_mention_indicator_matrix(data, root, brand_codes)
 }
 
@@ -226,7 +226,7 @@ build_portfolio_base_v2 <- function(data, cat_code,
 # SIZE-EXCEPTION: parallel v2 orchestrator scheduled to replace run_portfolio
 # at rebuild cutover (planning doc §9 step 5). At cutover this function is
 # renamed to run_portfolio() and the legacy v1 above is deleted.
-run_portfolio_v2 <- function(data, role_map, categories, structure, config,
+run_portfolio <- function(data, role_map, categories, structure, config,
                               weights = NULL) {
 
   focal     <- config$focal_brand %||% ""
@@ -245,7 +245,7 @@ run_portfolio_v2 <- function(data, role_map, categories, structure, config,
   )
   if (!is.null(guard_result$status) && identical(guard_result$status, "REFUSED")) {
     cat("\n┌─── TURAS BRAND ERROR ──────────────────────────────────────────┐\n")
-    cat("│ Context: run_portfolio_v2()\n")
+    cat("│ Context: run_portfolio()\n")
     cat(sprintf("│ Code: %s\n", guard_result$code))
     cat(sprintf("│ Message: %s\n", guard_result$message))
     cat(sprintf("│ How to fix: %s\n",
@@ -259,7 +259,7 @@ run_portfolio_v2 <- function(data, role_map, categories, structure, config,
 
   # Phase 2 — footprint + clutter
   footprint_result <- tryCatch(
-    compute_footprint_matrix_v2(data, role_map, categories, structure, config, weights),
+    compute_footprint_matrix(data, role_map, categories, structure, config, weights),
     error = function(e) {
       message(sprintf("[PORTFOLIO_V2] Footprint failed: %s", e$message))
       NULL
@@ -267,7 +267,7 @@ run_portfolio_v2 <- function(data, role_map, categories, structure, config,
   )
 
   clutter_result <- tryCatch(
-    compute_clutter_data_v2(data, role_map, categories, structure, config, weights),
+    compute_clutter_data(data, role_map, categories, structure, config, weights),
     error = function(e) {
       message(sprintf("[PORTFOLIO_V2] Clutter failed: %s", e$message))
       NULL
@@ -276,7 +276,7 @@ run_portfolio_v2 <- function(data, role_map, categories, structure, config,
 
   # Phase 3 — strength map + extension + per-brand extension
   strength_result <- tryCatch(
-    compute_strength_map_v2(data, role_map, categories, structure, config, weights),
+    compute_strength_map(data, role_map, categories, structure, config, weights),
     error = function(e) {
       message(sprintf("[PORTFOLIO_V2] Strength failed: %s", e$message))
       NULL
@@ -284,7 +284,7 @@ run_portfolio_v2 <- function(data, role_map, categories, structure, config,
   )
 
   extension_result <- tryCatch(
-    compute_extension_table_v2(data, role_map, categories, structure, config, weights,
+    compute_extension_table(data, role_map, categories, structure, config, weights,
                                 footprint_result = footprint_result),
     error = function(e) {
       message(sprintf("[PORTFOLIO_V2] Extension failed: %s", e$message))
@@ -293,7 +293,7 @@ run_portfolio_v2 <- function(data, role_map, categories, structure, config,
   )
 
   extension_per_brand <- tryCatch(
-    compute_extension_per_brand_v2(data, role_map, categories, structure, config, weights,
+    compute_extension_per_brand(data, role_map, categories, structure, config, weights,
                                     footprint_result = footprint_result),
     error = function(e) {
       message(sprintf("[PORTFOLIO_V2] Per-brand extension failed: %s", e$message))
@@ -303,14 +303,14 @@ run_portfolio_v2 <- function(data, role_map, categories, structure, config,
 
   # Phase 4 — cross-cat + per-cat constellations
   constellation_result <- tryCatch(
-    compute_constellation_v2(data, role_map, categories, structure, config, weights),
+    compute_constellation(data, role_map, categories, structure, config, weights),
     error = function(e) {
       message(sprintf("[PORTFOLIO_V2] Constellation failed: %s", e$message))
       NULL
     }
   )
   constellation_per_cat <- tryCatch(
-    compute_constellations_per_cat_v2(data, role_map, categories, structure, config, weights),
+    compute_constellations_per_cat(data, role_map, categories, structure, config, weights),
     error = function(e) {
       message(sprintf("[PORTFOLIO_V2] Per-category constellations failed: %s", e$message))
       NULL
@@ -335,7 +335,7 @@ run_portfolio_v2 <- function(data, role_map, categories, structure, config,
                n_buyers_w = numeric(0), stringsAsFactors = FALSE)
   }
 
-  supporting_result <- .compute_supporting_metrics_v2(
+  supporting_result <- .compute_supporting_metrics(
     data             = data,
     weights          = if (!is.null(weights)) weights else rep(1.0, n_total),
     timeframe        = timeframe,
@@ -415,14 +415,14 @@ run_portfolio_v2 <- function(data, role_map, categories, structure, config,
 #' @param focal Character. Focal brand code.
 #' @param categories Data frame with \code{CategoryCode} column.
 #' @param footprint_result List or NULL. From
-#'   \code{compute_footprint_matrix_v2()}.
-#' @param clutter_result List or NULL. From \code{compute_clutter_data_v2()}.
+#'   \code{compute_footprint_matrix()}.
+#' @param clutter_result List or NULL. From \code{compute_clutter_data()}.
 #' @param extension_result List or NULL. From
-#'   \code{compute_extension_table_v2()} when status PASS.
+#'   \code{compute_extension_table()} when status PASS.
 #' @param n_cats_total Integer. Total number of categories in config.
 #' @return Named list, same shape as \code{.compute_supporting_metrics()}.
 #' @keywords internal
-.compute_supporting_metrics_v2 <- function(data, weights, timeframe, focal,
+.compute_supporting_metrics <- function(data, weights, timeframe, focal,
                                             categories,
                                             footprint_result, clutter_result,
                                             extension_result, n_cats_total) {

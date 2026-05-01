@@ -34,40 +34,40 @@ You are asked to assess whether the v2 surface is production-ready **as if cutov
 - `modules/brand/R/00_guard_v2.R` — v2 guard layer
 
 ### Element entries (review only the `_v2` functions and helpers prefixed `_v2`)
-- `02_mental_availability.R` — `build_cep_linkage_v2`, `.ma_resolve_cep_labels`
+- `02_mental_availability.R` — `build_cep_linkage`, `.ma_resolve_cep_labels`
 - `03_funnel.R` — `run_funnel` v2 path (the legacy `funnel_cfg$cat_code` threading) plus `03a_funnel_derive.R`, `03b_funnel_metrics.R`, `03c_funnel_panel_data.R`, `03d_funnel_output.R`. **Skip `03e_funnel_legacy_adapter.R` — it deletes at cutover.**
 - `04_repertoire.R` — `run_repertoire_v2`
-- `05_wom.R` — `run_wom_v2`, plus `05a_wom_panel_data.R`
+- `05_wom.R` — `run_wom`, plus `05a_wom_panel_data.R`
 - `06_drivers_barriers.R` — `run_drivers_barriers_v2`
-- `07_dba.R` — `run_dba_v2` (placeholder element — verify the empty-payload contract is structured)
-- `09_portfolio.R` — `build_portfolio_base_v2`, `.portfolio_aware_root_v2`, `.portfolio_aware_matrix_v2`, `run_portfolio_v2`, `.compute_supporting_metrics_v2`
-- `09a_portfolio_footprint.R` — `compute_footprint_matrix_v2`, `.compute_brand_awareness_pct_v2`
-- `09b_portfolio_constellation.R` — `compute_constellation_v2`, `compute_constellations_per_cat_v2`
-- `09c_portfolio_clutter.R` — `compute_clutter_data_v2`, `.compute_clutter_metrics_v2`
-- `09d_portfolio_strength.R` — `compute_strength_map_v2`
-- `09e_portfolio_extension.R` — `compute_extension_table_v2`, `compute_extension_per_brand_v2`
-- `09h_portfolio_overview_data.R` — `compute_portfolio_overview_data_v2`
-- `10_branded_reach.R` — `run_branded_reach_v2` (placeholder — verify contract)
-- `11_demographics.R` — `demographic_question_from_role_v2`
-- `12_adhoc.R` — `run_adhoc_v2`, `resolve_adhoc_role_v2` (placeholder)
-- `13_audience_lens.R` — `run_audience_lens_v2`
+- `07_dba.R` — `run_dba` (placeholder element — verify the empty-payload contract is structured)
+- `09_portfolio.R` — `build_portfolio_base`, `.portfolio_aware_root`, `.portfolio_aware_matrix`, `run_portfolio`, `.compute_supporting_metrics`
+- `09a_portfolio_footprint.R` — `compute_footprint_matrix`, `.compute_brand_awareness_pct`
+- `09b_portfolio_constellation.R` — `compute_constellation`, `compute_constellations_per_cat`
+- `09c_portfolio_clutter.R` — `compute_clutter_data`, `.compute_clutter_metrics`
+- `09d_portfolio_strength.R` — `compute_strength_map`
+- `09e_portfolio_extension.R` — `compute_extension_table`, `compute_extension_per_brand`
+- `09h_portfolio_overview_data.R` — `compute_portfolio_overview_data`
+- `10_branded_reach.R` — `run_branded_reach` (placeholder — verify contract)
+- `11_demographics.R` — `demographic_question_from_role`
+- `12_adhoc.R` — `run_adhoc`, `resolve_adhoc_role` (placeholder)
+- `13_audience_lens.R` — `run_audience_lens`
 - `13b_al_metrics.R` — v2 KPI entries
 
 ### Orchestrator (`modules/brand/R/00_main.R`)
 - Step 3b — role_map build (~line 296–313)
-- Step 4 — per-category dispatcher (the `if (!is.null(role_map)) run_X_v2(...) else .legacy_X_call(...)` branches). **Review the v2 branch only.**
+- Step 4 — per-category dispatcher (the `if (!is.null(role_map)) run_X(...) else .legacy_X_call(...)` branches). **Review the v2 branch only.**
 - Step 5a — `.compute_portfolio_data` route (~line 858), `.compute_portfolio_data` body (~line 2240)
-- Step 5b — `compute_portfolio_overview_data_v2` route (~line 868)
+- Step 5b — `compute_portfolio_overview_data` route (~line 868)
 - Loader whitelist `.source_brand_module module_files` (~line 54–103)
 
 ### Tests (the v2 suite)
 ```
-test_data_access, test_role_map_v2, test_guard_v2, test_funnel_v2,
-test_brand_volume_v2, test_mental_avail_v2, test_ma_advantage_v2,
-test_wom_v2, test_repertoire_v2, test_drivers_barriers_v2,
-test_demographics_v2, test_portfolio_v2, test_portfolio_subanalyses_v2,
-test_portfolio_orchestrator_v2, test_audience_lens_v2, test_dba_v2,
-test_branded_reach_v2, test_adhoc_v2
+test_data_access, test_role_map, test_guard, test_funnel,
+test_brand_volume, test_mental_avail, test_ma_advantage,
+test_wom, test_repertoire, test_drivers_barriers,
+test_demographics, test_portfolio, test_portfolio_subanalyses,
+test_portfolio_orchestrator, test_audience_lens, test_dba,
+test_branded_reach, test_adhoc
 ```
 Expected baseline: **733 PASS / 0 FAIL** when run together. Verify.
 
@@ -84,7 +84,7 @@ These are scheduled for deletion at cutover (planning doc §9 step 5). Don't fla
    - All `compute_*` (non-`_v2`) inside 09a–09h
 2. **Legacy fallback helpers in `00_main.R`:** `.legacy_wom_call`, `.legacy_repertoire_call`, `.legacy_drivers_barriers_call`, `.run_funnel_for_category`, `.normalize_questionmap_for_category`, `.detect_category_code`, `.strip_cat_suffix_from_qmap`, `.run_demographics_for_category`, `.demo_question_from_role`, `.run_adhoc_for_category`, `resolve_adhoc_role`, `.run_adhoc_brand_level`.
 3. **Legacy files marked for deletion:** `00_role_map.R`, `00_guard_role_map.R`, `03e_funnel_legacy_adapter.R`, all legacy element tests (`test_audience_lens.R`, `test_audience_lens_audiences.R`, `test_audience_lens_metrics.R`, `test_audience_lens_classifier.R`, `test_audience_lens_panel_data.R`, plus per-element legacy tests listed in `HANDOVER_IPK_REBUILD_SESSION3.md`).
-4. **Route-or-fallback branches.** `if (!is.null(role_map)) run_X_v2(...) else run_X(...)` — review the v2 branch only; the fallback gets dropped at cutover.
+4. **Route-or-fallback branches.** `if (!is.null(role_map)) run_X(...) else run_X(...)` — review the v2 branch only; the fallback gets dropped at cutover.
 5. **`SIZE-EXCEPTION` markers.** Files with these markers are scheduled to come back under 300 active lines once legacy v1 is deleted. Don't flag the size of files with valid SIZE-EXCEPTION markers; do verify the marker text itself is honest about why and when the exception expires.
 6. **Legacy synthetic fixture:** `modules/brand/tests/fixtures/generate_ipk_9cat_wave1.R` — scheduled for deletion. The new fixture is `modules/brand/tests/fixtures/ipk_wave1/`.
 
@@ -105,7 +105,7 @@ Treat them as production code in their current form. **Do not recommend migratin
 
 ```bash
 # Full v2 suite — expect 733 PASS / 0 FAIL
-Rscript -e 'library(testthat); for (f in c("test_data_access","test_role_map_v2","test_guard_v2","test_funnel_v2","test_brand_volume_v2","test_mental_avail_v2","test_ma_advantage_v2","test_wom_v2","test_repertoire_v2","test_drivers_barriers_v2","test_demographics_v2","test_portfolio_v2","test_portfolio_subanalyses_v2","test_portfolio_orchestrator_v2","test_audience_lens_v2","test_dba_v2","test_branded_reach_v2","test_adhoc_v2")) testthat::test_file(paste0("modules/brand/tests/testthat/", f, ".R"))'
+Rscript -e 'library(testthat); for (f in c("test_data_access","test_role_map","test_guard","test_funnel","test_brand_volume","test_mental_avail","test_ma_advantage","test_wom","test_repertoire","test_drivers_barriers","test_demographics","test_portfolio","test_portfolio_subanalyses","test_portfolio_orchestrator","test_audience_lens","test_dba","test_branded_reach","test_adhoc")) testthat::test_file(paste0("modules/brand/tests/testthat/", f, ".R"))'
 
 # End-to-end orchestrator on IPK Wave 1 — expect status PARTIAL with portfolio$status PASS
 Rscript -e 'source("modules/brand/R/00_main.R"); res <- run_brand("modules/brand/tests/fixtures/ipk_wave1/Brand_Config.xlsx", verbose = FALSE); cat("status:", res$status, "  portfolio:", res$results$portfolio$status, "  constellation:", res$results$portfolio$constellation$status %||% "NULL", "\n")'

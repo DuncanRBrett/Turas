@@ -375,7 +375,7 @@ run_drivers_barriers_v2 <- function(data, role_map, cat_code, brand_list,
   }
 
   # CEP linkage tensor + linkage % matrix
-  linkage <- build_cep_linkage_v2(data, role_map, cat_code, brand_list,
+  linkage <- build_cep_linkage(data, role_map, cat_code, brand_list,
                                   item_kind = "cep")
   if (length(linkage$cep_codes) == 0L) {
     return(list(status = "REFUSED", code = "CFG_NO_CEPS",

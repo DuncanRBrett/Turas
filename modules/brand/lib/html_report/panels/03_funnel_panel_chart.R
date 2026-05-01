@@ -92,7 +92,7 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
     sprintf('<section class="fn-section fn-rel-chart-section"%s>',
             if (is.finite(n_total)) sprintf(' data-fn-rel-ntotal="%.0f"', n_total) else ""),
     .fn_rel_controls(ordered, focal),
-    .fn_rel_table_v2(ordered, focal, focal_colour, n_total),
+    .fn_rel_table(ordered, focal, focal_colour, n_total),
     '<div class="fn-rel-headline" data-fn-rel-headline style="display:none;margin-top:14px;"></div>',
     '<div class="fn-rel-chart-area" data-fn-rel-chart-area>',
     '<div class="fn-rel-chart-controls col-chip-bar">',
@@ -176,7 +176,7 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
 # INTERNAL: RELATIONSHIP TABLE v2 — BRANDS AS ROWS, ATTITUDES AS COLUMNS
 # ==============================================================================
 
-.fn_rel_table_v2 <- function(ordered, focal, focal_colour, n_total) {
+.fn_rel_table <- function(ordered, focal, focal_colour, n_total) {
   if (length(ordered) == 0) return("")
 
   att_roles  <- c("attitude.love", "attitude.prefer", "attitude.ambivalent",
@@ -277,12 +277,12 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
 
   focal_rows <- paste(vapply(
     Filter(function(b) identical(as.character(b$brand_code), as.character(focal)), ordered),
-    function(b) .fn_rel_brand_row_v2(b, att_roles, att_max, focal, n_total),
+    function(b) .fn_rel_brand_row(b, att_roles, att_max, focal, n_total),
     character(1)), collapse = "")
 
   comp_rows <- paste(vapply(
     Filter(function(b) !identical(as.character(b$brand_code), as.character(focal)), ordered),
-    function(b) .fn_rel_brand_row_v2(b, att_roles, att_max, focal, n_total),
+    function(b) .fn_rel_brand_row(b, att_roles, att_max, focal, n_total),
     character(1)), collapse = "")
 
   paste0(
@@ -298,7 +298,7 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
 }
 
 
-.fn_rel_brand_row_v2 <- function(brand, att_roles, att_max, focal, n_total) {
+.fn_rel_brand_row <- function(brand, att_roles, att_max, focal, n_total) {
   is_focal <- identical(brand$brand_code, focal)
   row_cls  <- trimws(paste("ct-row fn-rel-row",
                             if (is_focal) "fn-row-focal" else "fn-row-competitor"))

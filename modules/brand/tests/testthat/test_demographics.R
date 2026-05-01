@@ -1,5 +1,5 @@
 # ==============================================================================
-# Tests for resolve_demographic_role_v2 / demographic_question_from_role_v2
+# Tests for resolve_demographic_role / demographic_question_from_role
 # ==============================================================================
 # Step 3k of the IPK rebuild. The analytical engine
 # (run_demographic_question) is data-shape-agnostic and unchanged. What v2
@@ -21,7 +21,7 @@ ROOT <- .find_root_dem()
 source(file.path(ROOT, "modules", "brand", "R", "00_guard.R"))
 source(file.path(ROOT, "modules", "brand", "R", "00_data_access.R"))
 source(file.path(ROOT, "modules", "brand", "R", "00_role_inference.R"))
-source(file.path(ROOT, "modules", "brand", "R", "00_role_map_v2.R"))
+source(file.path(ROOT, "modules", "brand", "R", "00_role_map.R"))
 source(file.path(ROOT, "modules", "brand", "R", "11_demographics.R"))
 
 
@@ -73,12 +73,12 @@ test_that("v2 inference creates a demographics.age role with column DEMO_AGE", {
 })
 
 
-test_that("resolve_demographic_role_v2 returns codes + labels from Options sheet", {
+test_that("resolve_demographic_role returns codes + labels from Options sheet", {
   data <- mk_dem_mini_data()
   structure <- mk_dem_mini_structure()
   rm <- mk_dem_mini_role_map(data, structure)
 
-  spec <- resolve_demographic_role_v2(rm, "demographics.age", structure)
+  spec <- resolve_demographic_role(rm, "demographics.age", structure)
   expect_false(is.null(spec))
   expect_equal(spec$column, "DEMO_AGE")
   expect_equal(spec$codes,  c("1","2","3"))
@@ -86,12 +86,12 @@ test_that("resolve_demographic_role_v2 returns codes + labels from Options sheet
 })
 
 
-test_that("demographic_question_from_role_v2 returns the panel-record shape", {
+test_that("demographic_question_from_role returns the panel-record shape", {
   data <- mk_dem_mini_data()
   structure <- mk_dem_mini_structure()
   rm <- mk_dem_mini_role_map(data, structure)
 
-  q <- demographic_question_from_role_v2(data, rm, "demographics.age",
+  q <- demographic_question_from_role(data, rm, "demographics.age",
                                           structure)
   expect_false(is.null(q))
   expect_equal(q$role,   "demographics.age")
@@ -112,17 +112,17 @@ test_that("missing role / missing column / missing options return NULL", {
   rm <- mk_dem_mini_role_map(data, structure)
 
   # Role not in map
-  expect_null(resolve_demographic_role_v2(rm, "demographics.gender", structure))
+  expect_null(resolve_demographic_role(rm, "demographics.gender", structure))
   # Role exists but column not in data
   rm2 <- rm
   rm2[["demographics.age"]]$column_root <- "DEMO_GENDER"
-  expect_null(demographic_question_from_role_v2(data, rm2, "demographics.age",
+  expect_null(demographic_question_from_role(data, rm2, "demographics.age",
                                                  structure))
   # Role exists but Options sheet has no rows for this question
   structure_no_opts <- structure
   structure_no_opts$options <- structure$options[
     structure$options$QuestionCode == "OTHER", ]
-  expect_null(resolve_demographic_role_v2(rm, "demographics.age",
+  expect_null(resolve_demographic_role(rm, "demographics.age",
                                            structure_no_opts))
 })
 
@@ -165,7 +165,7 @@ test_that("IPK Wave 1: every DEMO_* role resolves and runs end-to-end", {
   # End-to-end: every DEMO_* role produces a PASS question record with
   # percentages summing to ~100 across its options.
   for (role in expected_roles) {
-    q <- demographic_question_from_role_v2(data, rm, role, structure)
+    q <- demographic_question_from_role(data, rm, role, structure)
     expect_false(is.null(q),
                  info = sprintf("question record NULL for role %s", role))
     expect_equal(q$result$status, "PASS",

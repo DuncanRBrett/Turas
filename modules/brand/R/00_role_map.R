@@ -37,7 +37,7 @@ BRAND_ROLE_MAP_V2_VERSION <- "2.0"
 #' @return Named list of role entries.
 #' @export
 build_brand_role_map <- function(structure, brand_config, data = NULL) {
-  .require_structure_v2(structure)
+  .require_structure(structure)
   questions <- structure$questions
   brands    <- structure$brands
   questionmap <- structure$questionmap  # may be NULL
@@ -85,7 +85,7 @@ resolve_role_columns <- function(role_map, data) {
   ])
 }
 
-.require_structure_v2 <- function(structure) {
+.require_structure <- function(structure) {
   if (is.null(structure)) {
     stop("build_brand_role_map: structure is NULL", call. = FALSE)
   }

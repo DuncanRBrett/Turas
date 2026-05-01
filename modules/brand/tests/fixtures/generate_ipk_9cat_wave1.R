@@ -47,11 +47,11 @@ full_cats   <- c("DSS","POS","PAS","BAK")
 aware_cats  <- c("SLD","STO","PES","COO","ANT")
 all_cats    <- c(full_cats, aware_cats)
 
-# CEP ranges per full category (numbered sequentially across categories)
-cep_ranges  <- list(DSS = 1:15, POS = 16:30, PAS = 31:45, BAK = 46:60)
+# CEPs per category (BRANDATTR_{CAT}_CEP01-10, category-relative numbering)
+n_cep_per_cat <- 10L
 
-# Attributes per full category (5 each, named {CAT}_ATTR01-05)
-n_attrs <- 5
+# Attributes per category (BRANDATTR_{CAT}_ATTR01-10)
+n_attrs <- 10L
 
 # Channel suffixes for full categories
 channels  <- c("SUPMKT","SPECIA","ONLINE","CONVEN","WHOLES","MARKET","OTHER")
@@ -162,28 +162,27 @@ make_focal_block <- function(cat, id_start) {
   colnames(pen_tgt)  <- paste0("BRANDPEN2_", cat, "_", b)
   colnames(pen_freq) <- paste0("BRANDPEN3_", cat, "_", b)
 
-  # ---- CEPs (15 per category) -----------------------------------------------
-  cep_nums <- cep_ranges[[cat]]
-  n_cep <- length(cep_nums)
+  # ---- CEPs (10 per category, BRANDATTR_{CAT}_CEP01-10) ---------------------
+  n_cep <- n_cep_per_cat
   cep_list <- list()
   for (bi in seq_len(nb)) {
     aw <- aware[, bi]
     # Each CEP: ~40% endorsement base, IPK slightly higher
     base_p <- ifelse(bi == ipk_idx, 0.45, 0.35)
     for (ci in seq_len(n_cep)) {
-      cname <- sprintf("CEP%02d_%s", cep_nums[ci], b[bi])
+      cname <- sprintf("BRANDATTR_%s_CEP%02d_%s", cat, ci, b[bi])
       vals <- rep(0L, n)
       vals[aw == 1] <- rbinom(sum(aw), 1, base_p + rnorm(1, 0, 0.05))
       cep_list[[cname]] <- vals
     }
   }
 
-  # ---- Attributes (5 per brand per category) --------------------------------
+  # ---- Attributes (10 per brand per category, BRANDATTR_{CAT}_ATTR01-10) ---
   attr_list <- list()
   for (bi in seq_len(nb)) {
     aw <- aware[, bi]
     for (ai in 1:n_attrs) {
-      aname <- sprintf("%s_ATTR%02d_%s", cat, ai, b[bi])
+      aname <- sprintf("BRANDATTR_%s_ATTR%02d_%s", cat, ai, b[bi])
       vals <- rep(0L, n)
       vals[aw == 1] <- rbinom(sum(aw), 1, 0.40)
       attr_list[[aname]] <- vals

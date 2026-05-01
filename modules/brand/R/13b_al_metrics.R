@@ -154,7 +154,7 @@ audience_lens_metric_catalog <- function() .AL_METRIC_GROUPS
 #' n_buyer_base, note).
 #'
 #' @export
-compute_al_metrics_for_subset_v2 <- function(data, role_map, weights, keep_idx,
+compute_al_metrics_for_subset <- function(data, role_map, weights, keep_idx,
                                              cat_brands, cat_code,
                                              focal_brand, structure,
                                              category_results = NULL,
@@ -218,7 +218,7 @@ compute_al_metrics_for_subset_v2 <- function(data, role_map, weights, keep_idx,
     data, weights, keep_idx, cat_code, focal_brand, structure)
 
   # ---- MENTAL AVAILABILITY -------------------------------------------------
-  ma <- .al_metric_ma_block_v2(data, role_map, weights, keep_idx,
+  ma <- .al_metric_ma_block(data, role_map, weights, keep_idx,
                                 brand_codes, cat_code, focal_brand)
   out$mpen         <- ma$mpen
   out$network_size <- ma$network_size
@@ -226,7 +226,7 @@ compute_al_metrics_for_subset_v2 <- function(data, role_map, weights, keep_idx,
   out$som          <- ma$som
 
   # ---- WORD OF MOUTH -------------------------------------------------------
-  wom <- .al_metric_wom_block_v2(data, role_map, weights, keep_idx,
+  wom <- .al_metric_wom_block(data, role_map, weights, keep_idx,
                                   cat_code, focal_brand)
   out$net_heard <- wom$net_heard
   out$net_said  <- wom$net_said
@@ -241,14 +241,14 @@ compute_al_metrics_for_subset_v2 <- function(data, role_map, weights, keep_idx,
   focal_freq <- if (!is.null(freq_mat) && focal_brand %in% colnames(freq_mat))
                   as.numeric(freq_mat[, focal_brand]) else NULL
 
-  out$loyalty_scr <- .al_metric_scr_v2(
+  out$loyalty_scr <- .al_metric_scr(
     freq_mat = freq_mat, weights = weights, buyer_keep = buyer_keep,
     focal_brand = focal_brand)
 
-  out$purchase_distribution <- .al_metric_purchase_dist_v2(
+  out$purchase_distribution <- .al_metric_purchase_dist(
     focal_freq = focal_freq, weights = weights, buyer_keep = buyer_keep)
 
-  out$purchase_frequency <- .al_metric_purchase_freq_v2(
+  out$purchase_frequency <- .al_metric_purchase_freq(
     focal_freq = focal_freq, weights = weights, buyer_keep = buyer_keep)
 
   out
@@ -305,7 +305,7 @@ compute_al_metrics_for_subset_v2 <- function(data, role_map, weights, keep_idx,
 
 #' Mental Availability block — v2 (role-map driven CEPs)
 #' @keywords internal
-.al_metric_ma_block_v2 <- function(data, role_map, weights, keep_idx,
+.al_metric_ma_block <- function(data, role_map, weights, keep_idx,
                                     brand_codes, cat_code, focal_brand) {
 
   na_block <- function(msg) list(
@@ -375,7 +375,7 @@ compute_al_metrics_for_subset_v2 <- function(data, role_map, weights, keep_idx,
 
 #' Word of Mouth block — v2 (role-map driven mention sets)
 #' @keywords internal
-.al_metric_wom_block_v2 <- function(data, role_map, weights, keep_idx,
+.al_metric_wom_block <- function(data, role_map, weights, keep_idx,
                                      cat_code, focal_brand) {
 
   net <- function(pos_role, neg_role, label) {
@@ -408,7 +408,7 @@ compute_al_metrics_for_subset_v2 <- function(data, role_map, weights, keep_idx,
 
 #' Share of Category Requirements (SCR) — v2
 #' @keywords internal
-.al_metric_scr_v2 <- function(freq_mat, weights, buyer_keep, focal_brand) {
+.al_metric_scr <- function(freq_mat, weights, buyer_keep, focal_brand) {
   if (is.null(freq_mat) || !is.matrix(freq_mat) ||
       !(focal_brand %in% colnames(freq_mat))) {
     return(list(value = NA_real_, n_base = 0L, n_buyer_base = TRUE,
@@ -431,7 +431,7 @@ compute_al_metrics_for_subset_v2 <- function(data, role_map, weights, keep_idx,
 
 #' Purchase frequency (mean focal-brand count among focal buyers) — v2
 #' @keywords internal
-.al_metric_purchase_freq_v2 <- function(focal_freq, weights, buyer_keep) {
+.al_metric_purchase_freq <- function(focal_freq, weights, buyer_keep) {
   if (is.null(focal_freq)) {
     return(list(value = NA_real_, n_base = 0L, n_buyer_base = TRUE,
                 note = "Frequency column not derivable"))
@@ -450,7 +450,7 @@ compute_al_metrics_for_subset_v2 <- function(data, role_map, weights, keep_idx,
 
 #' Purchase distribution (% heavy buyers, top tercile of frequency) — v2
 #' @keywords internal
-.al_metric_purchase_dist_v2 <- function(focal_freq, weights, buyer_keep) {
+.al_metric_purchase_dist <- function(focal_freq, weights, buyer_keep) {
   if (is.null(focal_freq)) {
     return(list(value = NA_real_, n_base = 0L, n_buyer_base = TRUE,
                 note = "Frequency column not derivable",

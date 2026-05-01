@@ -226,7 +226,7 @@ run_adhoc_question <- function(values,
 #' @return List with role, column, question_text, short_label,
 #'   variable_type, scope, codes, labels; or NULL.
 #' @export
-resolve_adhoc_role_v2 <- function(role_map, role, structure, data = NULL) {
+resolve_adhoc_role <- function(role_map, role, structure, data = NULL) {
   if (is.null(role_map) || is.null(role) || is.na(role) ||
       !nzchar(as.character(role))) return(NULL)
   entry <- role_map[[as.character(role)]]
@@ -292,7 +292,7 @@ resolve_adhoc_role_v2 <- function(role_map, role, structure, data = NULL) {
 #'   (named list of records keyed by role), n_roles, scope, n_total,
 #'   weighted, and (when placeholder) note.
 #' @export
-run_adhoc_v2 <- function(role_map, structure, data,
+run_adhoc <- function(role_map, structure, data,
                          weights      = NULL,
                          scope_filter = "ALL",
                          pen_mat      = NULL,
@@ -310,7 +310,7 @@ run_adhoc_v2 <- function(role_map, structure, data,
 
   records <- list()
   for (role in roles) {
-    spec <- resolve_adhoc_role_v2(role_map, role, structure, data)
+    spec <- resolve_adhoc_role(role_map, role, structure, data)
     if (is.null(spec)) next
     res <- run_adhoc_question(
       values        = data[[spec$column]],

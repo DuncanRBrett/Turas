@@ -1,5 +1,5 @@
 # ==============================================================================
-# Tests for run_branded_reach_v2 (Branded Reach placeholder migration — Step 3j)
+# Tests for run_branded_reach (Branded Reach placeholder migration — Step 3j)
 # ==============================================================================
 # IPK Wave 1 has no MarketingReach sheet, so v2's primary contract is the
 # placeholder path: when assets are absent or empty, return a structured
@@ -32,12 +32,12 @@ source(file.path(ROOT, "modules", "brand", "R", "10c_br_media_mix.R"))
 # Placeholder contract
 # ------------------------------------------------------------------------------
 
-test_that("run_branded_reach_v2 returns PASS-empty when structure has no MarketingReach", {
+test_that("run_branded_reach returns PASS-empty when structure has no MarketingReach", {
   data <- data.frame(x = 1:10)
   brands <- data.frame(BrandCode = c("IPK", "ROB"),
                         BrandLabel = c("IPK", "ROB"),
                         stringsAsFactors = FALSE)
-  out <- run_branded_reach_v2(
+  out <- run_branded_reach(
     data        = data,
     structure   = list(),
     brand_list  = brands,
@@ -58,7 +58,7 @@ test_that("run_branded_reach_v2 returns PASS-empty when structure has no Marketi
 })
 
 
-test_that("run_branded_reach_v2 returns PASS-empty when MarketingReach sheet is empty", {
+test_that("run_branded_reach returns PASS-empty when MarketingReach sheet is empty", {
   empty_assets <- data.frame(
     AssetCode = character(0), Brand = character(0),
     Category = character(0),
@@ -66,7 +66,7 @@ test_that("run_branded_reach_v2 returns PASS-empty when MarketingReach sheet is 
     MediaQuestionCode = character(0),
     stringsAsFactors = FALSE
   )
-  out <- run_branded_reach_v2(
+  out <- run_branded_reach(
     data       = data.frame(x = 1:5),
     structure  = list(marketing_reach = empty_assets),
     brand_list = NULL,
@@ -80,7 +80,7 @@ test_that("run_branded_reach_v2 returns PASS-empty when MarketingReach sheet is 
 
 
 test_that("placeholder result shape matches live result shape", {
-  out <- run_branded_reach_v2(
+  out <- run_branded_reach(
     data = data.frame(x = 1:5), structure = list(),
     brand_list = NULL, cat_code = "DSS", focal_brand = "IPK"
   )
@@ -101,13 +101,13 @@ test_that("placeholder result shape matches live result shape", {
 
 
 test_that("placeholder weighted flag reflects whether weights were supplied", {
-  out_unweighted <- run_branded_reach_v2(
+  out_unweighted <- run_branded_reach(
     data = data.frame(x = 1:3), structure = list(),
     brand_list = NULL, focal_brand = "IPK"
   )
   expect_false(out_unweighted$meta$weighted)
 
-  out_weighted <- run_branded_reach_v2(
+  out_weighted <- run_branded_reach(
     data = data.frame(x = 1:3), structure = list(),
     brand_list = NULL, focal_brand = "IPK",
     weights = c(1, 1, 1)
@@ -120,13 +120,13 @@ test_that("placeholder weighted flag reflects whether weights were supplied", {
 # Integration: against the IPK Wave 1 fixture (placeholder expected)
 # ------------------------------------------------------------------------------
 
-test_that("IPK Wave 1: run_branded_reach_v2 returns the placeholder payload", {
+test_that("IPK Wave 1: run_branded_reach returns the placeholder payload", {
   data_path <- file.path(ROOT, "modules", "brand", "tests", "fixtures",
                          "ipk_wave1", "ipk_wave1_data.xlsx")
   skip_if_not(file.exists(data_path), "IPK Wave 1 fixture not built")
 
   data <- openxlsx::read.xlsx(data_path)
-  out <- run_branded_reach_v2(data, structure = list(),
+  out <- run_branded_reach(data, structure = list(),
                                brand_list = NULL,
                                cat_code = "DSS",
                                focal_brand = "IPK")

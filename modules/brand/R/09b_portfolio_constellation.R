@@ -223,7 +223,7 @@ CONSTELLATION_LAYOUT_KK     <- "Turas pure-R Kamada-Kawai (1 - Jaccard)"
 #'   \code{CategoryCode}, \code{BrandCode}).
 #' @return Integer matrix \code{[nrow(data) x n_unique_brands]}.
 #' @keywords internal
-.build_aware_any_mat_v2 <- function(data, role_map, brands_df) {
+.build_aware_any_mat <- function(data, role_map, brands_df) {
   all_brands <- unique(as.character(brands_df$BrandCode))
   n          <- nrow(data)
   if (length(all_brands) == 0L) {
@@ -237,7 +237,7 @@ CONSTELLATION_LAYOUT_KK     <- "Turas pure-R Kamada-Kawai (1 - Jaccard)"
     cb <- as.character(brands_df$BrandCode[brands_df$CategoryCode == cc])
     cb <- cb[cb %in% all_brands]
     if (length(cb) == 0L) next
-    aw <- .portfolio_aware_matrix_v2(data, role_map, cc, cb)
+    aw <- .portfolio_aware_matrix(data, role_map, cc, cb)
     for (b in cb) mat[, b] <- as.integer(mat[, b] | aw[, b])
   }
   mat
@@ -262,7 +262,7 @@ CONSTELLATION_LAYOUT_KK     <- "Turas pure-R Kamada-Kawai (1 - Jaccard)"
 #' @param weights Numeric vector or NULL.
 #' @return Same list shape as \code{compute_constellation()}.
 #' @export
-compute_constellation_v2 <- function(data, role_map, categories, structure,
+compute_constellation <- function(data, role_map, categories, structure,
                                       config, weights = NULL) {
   focal_brand <- config$focal_brand %||% ""
   timeframe   <- config$portfolio_timeframe %||% "3m"
@@ -296,14 +296,14 @@ compute_constellation_v2 <- function(data, role_map, categories, structure,
   # mirroring the legacy "suppressed_cats" return field.
   suppressed <- character(0)
   for (cc in unique(as.character(brands_active$CategoryCode))) {
-    base <- build_portfolio_base_v2(data, cc, timeframe, weights)
+    base <- build_portfolio_base(data, cc, timeframe, weights)
     if (!is.null(base$status)) next
     if (base$n_uw == 0L || base$n_uw < min_base) {
       suppressed <- c(suppressed, cc)
     }
   }
 
-  aware_mat <- .build_aware_any_mat_v2(data, role_map, brands_active)
+  aware_mat <- .build_aware_any_mat(data, role_map, brands_active)
   all_brands <- colnames(aware_mat)
 
   n_aware_w <- vapply(all_brands, function(bc) {
@@ -313,7 +313,7 @@ compute_constellation_v2 <- function(data, role_map, categories, structure,
 
   if (length(present_brands) < CONSTELLATION_MIN_BRANDS) {
     cat("\n=== TURAS BRAND ERROR ===\n")
-    cat("Context: compute_constellation_v2()\n")
+    cat("Context: compute_constellation()\n")
     cat("Code: CALC_CONSTELLATION_TOO_SPARSE\n")
     cat(sprintf("Message: Only %d brands with aware respondents (need >= %d)\n",
                 length(present_brands), CONSTELLATION_MIN_BRANDS))
@@ -408,7 +408,7 @@ compute_constellation_v2 <- function(data, role_map, categories, structure,
 #' category in \code{categories}, builds the brand x respondent awareness
 #' matrix via the slot-indexed helper, restricts to category buyers, and
 #' runs the existing per-cat Jaccard layout
-#' (\code{.compute_constellation_for_cat_v2}).
+#' (\code{.compute_constellation_for_cat}).
 #'
 #' @param data Data frame.
 #' @param role_map Named list from \code{build_brand_role_map()} or NULL.
@@ -418,7 +418,7 @@ compute_constellation_v2 <- function(data, role_map, categories, structure,
 #' @param weights Numeric vector or NULL.
 #' @return Same list shape as \code{compute_constellations_per_cat()}.
 #' @export
-compute_constellations_per_cat_v2 <- function(data, role_map, categories,
+compute_constellations_per_cat <- function(data, role_map, categories,
                                                 structure, config,
                                                 weights = NULL) {
   focal_brand <- config$focal_brand %||% ""
@@ -456,7 +456,7 @@ compute_constellations_per_cat_v2 <- function(data, role_map, categories,
         cat = cat_name, reason = "no brand list defined"); next
     }
 
-    base <- build_portfolio_base_v2(data, cat_code, timeframe, weights)
+    base <- build_portfolio_base(data, cat_code, timeframe, weights)
     if (!is.null(base$status)) {
       suppressed[[length(suppressed) + 1L]] <- list(
         cat = cat_code, reason = base$message %||% "screener missing"); next
@@ -480,7 +480,7 @@ compute_constellations_per_cat_v2 <- function(data, role_map, categories,
                    else brand_codes
     names(brand_lbls) <- brand_codes
 
-    am <- .portfolio_aware_matrix_v2(data, role_map, cat_code, brand_codes)
+    am <- .portfolio_aware_matrix(data, role_map, cat_code, brand_codes)
     cn <- .compute_constellation_for_cat_from_matrix(
       am             = am,
       brand_codes    = brand_codes,

@@ -1,5 +1,5 @@
 # ==============================================================================
-# Tests for run_dba_v2 (DBA placeholder migration — Step 3h)
+# Tests for run_dba (DBA placeholder migration — Step 3h)
 # ==============================================================================
 # IPK Wave 1 has no DBA columns yet, so v2's primary contract is the
 # placeholder path: when assets are absent or the per-asset Fame / Unique
@@ -28,8 +28,8 @@ source(file.path(ROOT, "modules", "brand", "R", "07_dba.R"))
 # Placeholder contract
 # ------------------------------------------------------------------------------
 
-test_that("run_dba_v2 returns PASS-empty when structure has no dba_assets sheet", {
-  out <- run_dba_v2(
+test_that("run_dba returns PASS-empty when structure has no dba_assets sheet", {
+  out <- run_dba(
     data        = data.frame(x = 1:5),
     structure   = list(),
     focal_brand = "IPK"
@@ -44,13 +44,13 @@ test_that("run_dba_v2 returns PASS-empty when structure has no dba_assets sheet"
 })
 
 
-test_that("run_dba_v2 returns PASS-empty when dba_assets sheet is empty", {
+test_that("run_dba returns PASS-empty when dba_assets sheet is empty", {
   empty_assets <- data.frame(
     AssetCode = character(0), AssetLabel = character(0),
     FameQuestionCode = character(0), UniqueQuestionCode = character(0),
     stringsAsFactors = FALSE
   )
-  out <- run_dba_v2(
+  out <- run_dba(
     data        = data.frame(x = 1:5),
     structure   = list(dba_assets = empty_assets),
     focal_brand = "IPK"
@@ -61,7 +61,7 @@ test_that("run_dba_v2 returns PASS-empty when dba_assets sheet is empty", {
 })
 
 
-test_that("run_dba_v2 returns PASS-empty when assets reference columns absent from data", {
+test_that("run_dba returns PASS-empty when assets reference columns absent from data", {
   assets <- data.frame(
     AssetCode = "LOGO",
     AssetLabel = "Logo",
@@ -71,7 +71,7 @@ test_that("run_dba_v2 returns PASS-empty when assets reference columns absent fr
   )
   data <- data.frame(unrelated = 1:5)  # no DBA_FAME_LOGO / DBA_UNIQUE_LOGO
 
-  out <- run_dba_v2(data, structure = list(dba_assets = assets),
+  out <- run_dba(data, structure = list(dba_assets = assets),
                     focal_brand = "IPK")
   expect_true(isTRUE(out$placeholder))
   expect_equal(out$status, "PASS")
@@ -79,7 +79,7 @@ test_that("run_dba_v2 returns PASS-empty when assets reference columns absent fr
 
 
 test_that("placeholder result shape matches live result shape", {
-  placeholder <- run_dba_v2(data = data.frame(x = 1:5),
+  placeholder <- run_dba(data = data.frame(x = 1:5),
                              structure = list(), focal_brand = "IPK")
 
   # Same top-level fields as a real run_dba() result so renderers don't break.
@@ -109,7 +109,7 @@ test_that("placeholder result shape matches live result shape", {
 #   Uniqueness % = 2/3 = round(66.66..., 1) = 66.7
 # Quadrant: high fame (>=0.5) + high uniqueness (>=0.5) = "Use or Lose".
 
-test_that("run_dba_v2 reproduces hand-calculated Fame and Uniqueness", {
+test_that("run_dba reproduces hand-calculated Fame and Uniqueness", {
   data <- data.frame(
     DBA_FAME_LOGO   = c(1, 1, 2, 3),
     DBA_UNIQUE_LOGO = c("IPK", "ROB", NA, "IPK"),
@@ -122,7 +122,7 @@ test_that("run_dba_v2 reproduces hand-calculated Fame and Uniqueness", {
     UniqueQuestionCode = "DBA_UNIQUE_LOGO",
     stringsAsFactors = FALSE
   )
-  out <- run_dba_v2(data, structure = list(dba_assets = assets),
+  out <- run_dba(data, structure = list(dba_assets = assets),
                     focal_brand = "IPK", attribution_type = "open")
 
   expect_equal(out$status, "PASS")
@@ -140,7 +140,7 @@ test_that("run_dba_v2 reproduces hand-calculated Fame and Uniqueness", {
 # Integration: against the IPK Wave 1 fixture (placeholder expected)
 # ------------------------------------------------------------------------------
 
-test_that("IPK Wave 1: run_dba_v2 returns the placeholder payload", {
+test_that("IPK Wave 1: run_dba returns the placeholder payload", {
   data_path <- file.path(ROOT, "modules", "brand", "tests", "fixtures",
                          "ipk_wave1", "ipk_wave1_data.xlsx")
   ss_path <- file.path(ROOT, "modules", "brand", "tests", "fixtures",
@@ -151,7 +151,7 @@ test_that("IPK Wave 1: run_dba_v2 returns the placeholder payload", {
   data <- openxlsx::read.xlsx(data_path)
   structure <- list()  # IPK Wave 1 has no DBA_Assets sheet
 
-  out <- run_dba_v2(data, structure, focal_brand = "IPK")
+  out <- run_dba(data, structure, focal_brand = "IPK")
   expect_equal(out$status, "PASS")
   expect_true(isTRUE(out$placeholder))
   expect_equal(out$note, DBA_PLACEHOLDER_NOTE)

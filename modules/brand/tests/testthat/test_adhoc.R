@@ -1,5 +1,5 @@
 # ==============================================================================
-# Tests for run_adhoc_v2 + resolve_adhoc_role_v2 (Ad Hoc placeholder — Step 3l)
+# Tests for run_adhoc + resolve_adhoc_role (Ad Hoc placeholder — Step 3l)
 # ==============================================================================
 # IPK Wave 1 has no ADHOC_* columns, so v2's primary contract is the
 # placeholder path: when no adhoc.* roles resolve in scope, return a
@@ -24,7 +24,7 @@ ROOT <- .find_root_ah()
 
 source(file.path(ROOT, "modules", "brand", "R", "00_data_access.R"))
 source(file.path(ROOT, "modules", "brand", "R", "00_role_inference.R"))
-source(file.path(ROOT, "modules", "brand", "R", "00_role_map_v2.R"))
+source(file.path(ROOT, "modules", "brand", "R", "00_role_map.R"))
 source(file.path(ROOT, "modules", "brand", "R", "11_demographics.R"))
 source(file.path(ROOT, "modules", "brand", "R", "12_adhoc.R"))
 
@@ -33,8 +33,8 @@ source(file.path(ROOT, "modules", "brand", "R", "12_adhoc.R"))
 # Placeholder contract — empty role map / wrong-scope role
 # ------------------------------------------------------------------------------
 
-test_that("run_adhoc_v2 returns PASS-placeholder when role map has no adhoc roles", {
-  out <- run_adhoc_v2(
+test_that("run_adhoc returns PASS-placeholder when role map has no adhoc roles", {
+  out <- run_adhoc(
     role_map     = list(),
     structure    = list(),
     data         = data.frame(x = 1:5),
@@ -51,7 +51,7 @@ test_that("run_adhoc_v2 returns PASS-placeholder when role map has no adhoc role
 })
 
 
-test_that("run_adhoc_v2 returns placeholder when no roles match the scope filter", {
+test_that("run_adhoc returns placeholder when no roles match the scope filter", {
   rm <- list(
     "adhoc.nps.DSS" = list(
       role = "adhoc.nps.DSS", column_root = "ADHOC_NPS_DSS",
@@ -59,7 +59,7 @@ test_that("run_adhoc_v2 returns placeholder when no roles match the scope filter
       question_text = "NPS"
     )
   )
-  out <- run_adhoc_v2(rm, structure = list(),
+  out <- run_adhoc(rm, structure = list(),
                        data = data.frame(ADHOC_NPS_DSS = 1:5),
                        scope_filter = "ALL")  # role is DSS-scoped, not ALL
   expect_true(isTRUE(out$placeholder))
@@ -68,7 +68,7 @@ test_that("run_adhoc_v2 returns placeholder when no roles match the scope filter
 })
 
 
-test_that("run_adhoc_v2 returns placeholder when data frame is empty", {
+test_that("run_adhoc returns placeholder when data frame is empty", {
   rm <- list(
     "adhoc.nps.ALL" = list(
       role = "adhoc.nps.ALL", column_root = "ADHOC_NPS",
@@ -76,7 +76,7 @@ test_that("run_adhoc_v2 returns placeholder when data frame is empty", {
       question_text = "NPS"
     )
   )
-  out <- run_adhoc_v2(rm, structure = list(),
+  out <- run_adhoc(rm, structure = list(),
                        data = data.frame(ADHOC_NPS = numeric(0)),
                        scope_filter = "ALL")
   expect_true(isTRUE(out$placeholder))
@@ -85,17 +85,17 @@ test_that("run_adhoc_v2 returns placeholder when data frame is empty", {
 
 
 # ------------------------------------------------------------------------------
-# resolve_adhoc_role_v2 — guard rails
+# resolve_adhoc_role — guard rails
 # ------------------------------------------------------------------------------
 
-test_that("resolve_adhoc_role_v2 returns NULL for unknown role", {
-  expect_null(resolve_adhoc_role_v2(list(), "adhoc.foo.ALL", list()))
-  expect_null(resolve_adhoc_role_v2(NULL,   "adhoc.foo.ALL", list()))
-  expect_null(resolve_adhoc_role_v2(list(), NA_character_,    list()))
+test_that("resolve_adhoc_role returns NULL for unknown role", {
+  expect_null(resolve_adhoc_role(list(), "adhoc.foo.ALL", list()))
+  expect_null(resolve_adhoc_role(NULL,   "adhoc.foo.ALL", list()))
+  expect_null(resolve_adhoc_role(list(), NA_character_,    list()))
 })
 
 
-test_that("resolve_adhoc_role_v2 returns NULL when data column is missing", {
+test_that("resolve_adhoc_role returns NULL when data column is missing", {
   rm <- list(
     "adhoc.nps.ALL" = list(
       role = "adhoc.nps.ALL", column_root = "ADHOC_NPS",
@@ -104,11 +104,11 @@ test_that("resolve_adhoc_role_v2 returns NULL when data column is missing", {
     )
   )
   data <- data.frame(unrelated = 1:5)
-  expect_null(resolve_adhoc_role_v2(rm, "adhoc.nps.ALL", list(), data))
+  expect_null(resolve_adhoc_role(rm, "adhoc.nps.ALL", list(), data))
 })
 
 
-test_that("resolve_adhoc_role_v2 returns spec for numeric role without options", {
+test_that("resolve_adhoc_role returns spec for numeric role without options", {
   rm <- list(
     "adhoc.nps.ALL" = list(
       role = "adhoc.nps.ALL", column_root = "ADHOC_NPS",
@@ -116,7 +116,7 @@ test_that("resolve_adhoc_role_v2 returns spec for numeric role without options",
       question_text = "NPS likelihood"
     )
   )
-  spec <- resolve_adhoc_role_v2(rm, "adhoc.nps.ALL", list(),
+  spec <- resolve_adhoc_role(rm, "adhoc.nps.ALL", list(),
                                   data.frame(ADHOC_NPS = 1:5))
   expect_false(is.null(spec))
   expect_equal(spec$role,          "adhoc.nps.ALL")
@@ -179,7 +179,7 @@ test_that("ALL-scope dispatch resolves only ALL roles", {
   expect_true("adhoc.nps.ALL"        %in% names(rm))
   expect_true("adhoc.future.DSS"     %in% names(rm))
 
-  out <- run_adhoc_v2(rm, structure = list(), data = mk_ah_data(),
+  out <- run_adhoc(rm, structure = list(), data = mk_ah_data(),
                        scope_filter = "ALL")
   expect_equal(out$status, "PASS")
   expect_false(out$placeholder)
@@ -196,7 +196,7 @@ test_that("ALL-scope dispatch resolves only ALL roles", {
 
 test_that("DSS-scope dispatch resolves only DSS roles", {
   rm <- mk_ah_role_map()
-  out <- run_adhoc_v2(rm, structure = list(), data = mk_ah_data(),
+  out <- run_adhoc(rm, structure = list(), data = mk_ah_data(),
                        scope_filter = "DSS")
   expect_equal(out$status, "PASS")
   expect_false(out$placeholder)
@@ -210,7 +210,7 @@ test_that("DSS-scope dispatch resolves only DSS roles", {
 # Integration: against the IPK Wave 1 fixture (placeholder expected)
 # ------------------------------------------------------------------------------
 
-test_that("IPK Wave 1: run_adhoc_v2 returns the placeholder payload (no ADHOC_*)", {
+test_that("IPK Wave 1: run_adhoc returns the placeholder payload (no ADHOC_*)", {
   data_path <- file.path(ROOT, "modules", "brand", "tests", "fixtures",
                          "ipk_wave1", "ipk_wave1_data.xlsx")
   ss_path <- file.path(ROOT, "modules", "brand", "tests", "fixtures",
@@ -231,7 +231,7 @@ test_that("IPK Wave 1: run_adhoc_v2 returns the placeholder payload (no ADHOC_*)
 
   expect_equal(length(grep("^adhoc\\.", names(rm))), 0L)
 
-  out <- run_adhoc_v2(rm, structure = list(), data = data,
+  out <- run_adhoc(rm, structure = list(), data = data,
                        scope_filter = "ALL")
   expect_equal(out$status, "PASS")
   expect_true(isTRUE(out$placeholder))

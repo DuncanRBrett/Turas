@@ -162,7 +162,7 @@ BRAND_AUDIENCE_LENS_VERSION <- "1.0"
 #'   audiences, suppressed, pair_cards). v2 status carries an extra
 #'   \code{engine = "v2"} marker on the meta block.
 #' @export
-run_audience_lens_v2 <- function(data, role_map, cat_code, cat_name,
+run_audience_lens <- function(data, role_map, cat_code, cat_name,
                                  cat_brands, focal_brand, audiences,
                                  structure, config,
                                  weights = NULL,
@@ -202,7 +202,7 @@ run_audience_lens_v2 <- function(data, role_map, cat_code, cat_name,
   w <- .al_normalise_weights(weights, nrow(data))
 
   # Compute total + per-audience metrics via the v2 engine.
-  metrics_total <- compute_al_metrics_for_subset_v2(
+  metrics_total <- compute_al_metrics_for_subset(
     data = data, role_map = role_map, weights = w,
     keep_idx = rep(TRUE, nrow(data)),
     cat_brands = cat_brands, cat_code = cat_code,
@@ -220,7 +220,7 @@ run_audience_lens_v2 <- function(data, role_map, cat_code, cat_name,
                   n_weighted = n_weighted, base_state = base_state,
                   metrics = NULL))
     }
-    metrics <- compute_al_metrics_for_subset_v2(
+    metrics <- compute_al_metrics_for_subset(
       data = data, role_map = role_map, weights = w, keep_idx = idx,
       cat_brands = cat_brands, cat_code = cat_code,
       focal_brand = focal_brand,

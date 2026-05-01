@@ -21,7 +21,7 @@ ROOT <- .find_root_rep()
 source(file.path(ROOT, "modules", "brand", "R", "00_guard.R"))
 source(file.path(ROOT, "modules", "brand", "R", "00_data_access.R"))
 source(file.path(ROOT, "modules", "brand", "R", "00_role_inference.R"))
-source(file.path(ROOT, "modules", "brand", "R", "00_role_map_v2.R"))
+source(file.path(ROOT, "modules", "brand", "R", "00_role_map.R"))
 source(file.path(ROOT, "modules", "brand", "R", "04_repertoire.R"))
 
 

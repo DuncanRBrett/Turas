@@ -107,7 +107,7 @@ EXTENSION_BASELINE_NON_BUYERS <- "non_buyers"
 #'
 #' v2 alternative to \code{compute_extension_table()}.  The focal-awareness
 #' vector in each category comes from \code{respondent_picked()} on the
-#' awareness root resolved by \code{.portfolio_aware_root_v2()}.  The
+#' awareness root resolved by \code{.portfolio_aware_root()}.  The
 #' non-buyers baseline (when \code{config$portfolio_extension_baseline ==
 #' "non_buyers"}) reads SQ1 slots for the home category instead of the
 #' legacy \code{SQ1_{home_cat}} column-per-cat.
@@ -119,10 +119,10 @@ EXTENSION_BASELINE_NON_BUYERS <- "non_buyers"
 #' @param config List with portfolio settings + \code{focal_brand}.
 #' @param weights Numeric vector or NULL.
 #' @param footprint_result List or NULL. From
-#'   \code{compute_footprint_matrix_v2()} — used to auto-detect home cat.
+#'   \code{compute_footprint_matrix()} — used to auto-detect home cat.
 #' @return Same list shape as \code{compute_extension_table()}.
 #' @export
-compute_extension_table_v2 <- function(data, role_map, categories, structure,
+compute_extension_table <- function(data, role_map, categories, structure,
                                         config, weights = NULL,
                                         footprint_result = NULL) {
   focal_brand <- config$focal_brand %||% ""
@@ -199,14 +199,14 @@ compute_extension_table_v2 <- function(data, role_map, categories, structure,
 
     is_home <- identical(cat_code, home_cat)
 
-    base <- build_portfolio_base_v2(data, cat_code, timeframe, weights)
+    base <- build_portfolio_base(data, cat_code, timeframe, weights)
     if (!is.null(base$status)) next
     if (base$n_uw == 0L) { suppressed <- c(suppressed, cat_code); next }
 
     low_base_flag <- base$n_uw < min_base
     if (low_base_flag) suppressed <- c(suppressed, cat_code)
 
-    aw_root <- .portfolio_aware_root_v2(role_map, cat_code)
+    aw_root <- .portfolio_aware_root(role_map, cat_code)
     aw_vals <- as.integer(respondent_picked(data, aw_root, focal_brand))
 
     n1_w <- sum(w[base$idx], na.rm = TRUE)
@@ -285,13 +285,13 @@ compute_extension_table_v2 <- function(data, role_map, categories, structure,
 #'
 #' v2 alternative to \code{compute_extension_per_brand()}.  Walks the brand
 #' universe from \code{structure$brands$BrandCode} (instead of a regex scan
-#' over data column names) and runs \code{compute_extension_table_v2()} for
+#' over data column names) and runs \code{compute_extension_table()} for
 #' each brand.  Brands whose extension run fails (REFUSED) are skipped.
 #'
-#' @inheritParams compute_extension_table_v2
+#' @inheritParams compute_extension_table
 #' @return Same list shape as \code{compute_extension_per_brand()}.
 #' @export
-compute_extension_per_brand_v2 <- function(data, role_map, categories,
+compute_extension_per_brand <- function(data, role_map, categories,
                                             structure, config, weights = NULL,
                                             footprint_result = NULL) {
   per_brand      <- list()
@@ -339,7 +339,7 @@ compute_extension_per_brand_v2 <- function(data, role_map, categories,
     cfg_for_brand <- config
     cfg_for_brand$focal_brand <- bc
     res <- tryCatch(
-      compute_extension_table_v2(data, role_map, categories, structure,
+      compute_extension_table(data, role_map, categories, structure,
                                   cfg_for_brand, weights, footprint_result),
       error = function(e) NULL
     )

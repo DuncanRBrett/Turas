@@ -1,5 +1,5 @@
 # ==============================================================================
-# Tests for run_wom_v2 (WOM migration to slot-indexed + per-brand counts)
+# Tests for run_wom (WOM migration to slot-indexed + per-brand counts)
 # ==============================================================================
 # Step 3e of the IPK rebuild. Verifies that the v2 WOM pipeline reads
 # the four Multi_Mention mention sets via multi_mention_brand_matrix() and
@@ -21,7 +21,7 @@ ROOT <- .find_root_wom()
 source(file.path(ROOT, "modules", "brand", "R", "00_guard.R"))
 source(file.path(ROOT, "modules", "brand", "R", "00_data_access.R"))
 source(file.path(ROOT, "modules", "brand", "R", "00_role_inference.R"))
-source(file.path(ROOT, "modules", "brand", "R", "00_role_map_v2.R"))
+source(file.path(ROOT, "modules", "brand", "R", "00_role_map.R"))
 source(file.path(ROOT, "modules", "brand", "R", "05_wom.R"))
 
 
@@ -132,13 +132,13 @@ test_that("v2 role map infers all six WOM roles for the mini fixture", {
 })
 
 
-test_that("run_wom_v2 reproduces hand-calculated mention percentages", {
+test_that("run_wom reproduces hand-calculated mention percentages", {
   data <- mk_wom_mini_data()
   rm <- mk_wom_mini_role_map(data)
   brands <- data.frame(BrandCode = c("IPK","ROB","CART"),
                        BrandLabel = c("IPK","ROB","CART"),
                        stringsAsFactors = FALSE)
-  out <- run_wom_v2(data, rm, "DSS", brands, focal_brand = "IPK")
+  out <- run_wom(data, rm, "DSS", brands, focal_brand = "IPK")
 
   expect_equal(out$status, "PASS")
   expect_equal(out$n_respondents, 5L)
@@ -163,13 +163,13 @@ test_that("run_wom_v2 reproduces hand-calculated mention percentages", {
 })
 
 
-test_that("run_wom_v2 computes frequency means among sharers only", {
+test_that("run_wom computes frequency means among sharers only", {
   data <- mk_wom_mini_data()
   rm <- mk_wom_mini_role_map(data)
   brands <- data.frame(BrandCode = c("IPK","ROB","CART"),
                        BrandLabel = c("IPK","ROB","CART"),
                        stringsAsFactors = FALSE)
-  out <- run_wom_v2(data, rm, "DSS", brands)
+  out <- run_wom(data, rm, "DSS", brands)
   wm <- out$wom_metrics
   expect_equal(wm$SharedPosFreq_Mean[wm$BrandCode == "IPK"], 3)   # mean(2,4)
   expect_equal(wm$SharedPosFreq_Mean[wm$BrandCode == "ROB"], 1)
@@ -179,13 +179,13 @@ test_that("run_wom_v2 computes frequency means among sharers only", {
 })
 
 
-test_that("run_wom_v2 returns the contract net_balance / amplification / summary", {
+test_that("run_wom returns the contract net_balance / amplification / summary", {
   data <- mk_wom_mini_data()
   rm <- mk_wom_mini_role_map(data)
   brands <- data.frame(BrandCode = c("IPK","ROB","CART"),
                        BrandLabel = c("IPK","ROB","CART"),
                        stringsAsFactors = FALSE)
-  out <- run_wom_v2(data, rm, "DSS", brands, focal_brand = "IPK")
+  out <- run_wom(data, rm, "DSS", brands, focal_brand = "IPK")
 
   nb <- out$net_balance
   expect_equal(nb$Net_Received[nb$BrandCode == "IPK"],  40)  # 60 - 20
@@ -205,7 +205,7 @@ test_that("run_wom_v2 returns the contract net_balance / amplification / summary
 })
 
 
-test_that("run_wom_v2 honours weights when computing percentages and means", {
+test_that("run_wom honours weights when computing percentages and means", {
   data <- mk_wom_mini_data()
   rm <- mk_wom_mini_role_map(data)
   brands <- data.frame(BrandCode = c("IPK","ROB","CART"),
@@ -213,7 +213,7 @@ test_that("run_wom_v2 honours weights when computing percentages and means", {
                        stringsAsFactors = FALSE)
   # Triple-weight respondent 5 (the only multi-share IPK respondent).
   w <- c(1, 1, 1, 1, 3)
-  out <- run_wom_v2(data, rm, "DSS", brands, weights = w)
+  out <- run_wom(data, rm, "DSS", brands, weights = w)
   # Weighted heard pos for IPK: r1+r2+3*r5 = 1+1+3 = 5; total weight = 7;
   # 5/7 ~= 71.4%
   expect_equal(out$wom_metrics$ReceivedPos_Pct[
@@ -232,7 +232,7 @@ test_that("missing roles degrade to zero columns rather than refusing", {
   brands <- data.frame(BrandCode = c("IPK","ROB","CART"),
                        BrandLabel = c("IPK","ROB","CART"),
                        stringsAsFactors = FALSE)
-  out <- run_wom_v2(data, rm, "DSS", brands)
+  out <- run_wom(data, rm, "DSS", brands)
   expect_equal(out$status, "PASS")
   expect_true(all(out$wom_metrics$ReceivedNeg_Pct == 0))
   expect_true(all(out$wom_metrics$SharedNegFreq_Mean == 0))
@@ -246,7 +246,7 @@ test_that("missing roles degrade to zero columns rather than refusing", {
 # Integration: against the IPK Wave 1 fixture
 # ------------------------------------------------------------------------------
 
-test_that("IPK Wave 1: run_wom_v2 returns valid metrics for 15 brands", {
+test_that("IPK Wave 1: run_wom returns valid metrics for 15 brands", {
   data_path <- file.path(ROOT, "modules", "brand", "tests", "fixtures",
                          "ipk_wave1", "ipk_wave1_data.xlsx")
   ss_path <- file.path(ROOT, "modules", "brand", "tests", "fixtures",
@@ -273,7 +273,7 @@ test_that("IPK Wave 1: run_wom_v2 returns valid metrics for 15 brands", {
   expect_false(is.null(rm[["wom.pos_rec.DSS"]]))
   expect_false(is.null(rm[["wom.pos_count.DSS"]]))
 
-  out <- run_wom_v2(dss, rm, "DSS", dss_brands, focal_brand = "IPK")
+  out <- run_wom(dss, rm, "DSS", dss_brands, focal_brand = "IPK")
   expect_equal(out$status, "PASS")
   expect_equal(out$n_brands, nrow(dss_brands))
   expect_equal(out$n_respondents, nrow(dss))

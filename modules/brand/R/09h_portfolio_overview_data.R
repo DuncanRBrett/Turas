@@ -261,11 +261,11 @@ build_portfolio_overview <- function(results, config) {
 #'
 #' Replaces \code{.po_build_category_record()} for the v2 entry: cat_code
 #' comes directly from \code{categories$CategoryCode}, awareness from
-#' \code{.portfolio_aware_matrix_v2()}, base from
-#' \code{build_portfolio_base_v2()}.
+#' \code{.portfolio_aware_matrix()}, base from
+#' \code{build_portfolio_base()}.
 #'
 #' @keywords internal
-.po_build_category_record_v2 <- function(cat_name, cat_code, analysis_depth,
+.po_build_category_record <- function(cat_name, cat_code, analysis_depth,
                                           data, role_map, structure,
                                           timeframe, weights, n_total,
                                           category_results) {
@@ -277,7 +277,7 @@ build_portfolio_overview <- function(results, config) {
   )
   if (nrow(cat_brands) == 0L) return(NULL)
 
-  base <- build_portfolio_base_v2(data, cat_code, timeframe, weights)
+  base <- build_portfolio_base(data, cat_code, timeframe, weights)
   if (!is.null(base$status)) return(NULL)
   # Skip categories with zero qualifiers — denominator would be 0 and
   # the panel renderer shows a "no respondents in this category yet"
@@ -287,9 +287,9 @@ build_portfolio_overview <- function(results, config) {
   brand_codes  <- as.character(cat_brands$BrandCode)
   brand_names  <- .po_brand_names(cat_brands, brand_codes)
 
-  aware_mat    <- .portfolio_aware_matrix_v2(data, role_map, cat_code,
+  aware_mat    <- .portfolio_aware_matrix(data, role_map, cat_code,
                                               brand_codes)
-  awareness    <- .compute_brand_awareness_pct_v2(aware_mat, base$idx,
+  awareness    <- .compute_brand_awareness_pct(aware_mat, base$idx,
                                                   weights)
   awareness_list <- stats::setNames(
     as.list(ifelse(is.finite(awareness), as.numeric(awareness), NA_real_)),
@@ -339,14 +339,14 @@ build_portfolio_overview <- function(results, config) {
 #'   enrichment.
 #' @return Same list shape as \code{compute_portfolio_overview_data()}.
 #' @export
-compute_portfolio_overview_data_v2 <- function(data, role_map, categories,
+compute_portfolio_overview_data <- function(data, role_map, categories,
                                                 structure, config,
                                                 weights = NULL,
                                                 category_results = NULL) {
   if (is.null(data) || !is.data.frame(data) || nrow(data) == 0L) {
     return(.po_refuse("DATA_OVERVIEW_NO_DATA",
                       "data must be a non-empty data frame",
-                      "Pass the full survey data to compute_portfolio_overview_data_v2()."))
+                      "Pass the full survey data to compute_portfolio_overview_data()."))
   }
   if (is.null(categories) || !is.data.frame(categories) ||
       nrow(categories) == 0L) {
@@ -366,7 +366,7 @@ compute_portfolio_overview_data_v2 <- function(data, role_map, categories,
 
   cats_list <- list()
   for (i in seq_len(nrow(categories))) {
-    rec <- .po_build_category_record_v2(
+    rec <- .po_build_category_record(
       cat_name        = as.character(categories$Category[i]),
       cat_code        = as.character(categories$CategoryCode[i]),
       analysis_depth  = .po_depth_from_cfg(categories, i),

@@ -1,5 +1,5 @@
 # ==============================================================================
-# Tests for build_portfolio_base_v2 (Portfolio screener-qualifier migration)
+# Tests for build_portfolio_base (Portfolio screener-qualifier migration)
 # ==============================================================================
 # First step of §9 step 3i. Migrates the central denominator helper
 # (build_portfolio_base) to slot-indexed SQ1 / SQ2 columns. Per the spec
@@ -54,9 +54,9 @@ mk_pf_mini_data <- function() {
 }
 
 
-test_that("build_portfolio_base_v2: DSS @ 3m hits SQ2 slots", {
+test_that("build_portfolio_base: DSS @ 3m hits SQ2 slots", {
   data <- mk_pf_mini_data()
-  out <- build_portfolio_base_v2(data, "DSS", timeframe = "3m")
+  out <- build_portfolio_base(data, "DSS", timeframe = "3m")
   expect_equal(out$col_used, "SQ2")
   expect_equal(out$idx, c(TRUE, TRUE, FALSE, FALSE, FALSE, TRUE))
   expect_equal(out$n_uw, 3L)
@@ -64,45 +64,45 @@ test_that("build_portfolio_base_v2: DSS @ 3m hits SQ2 slots", {
 })
 
 
-test_that("build_portfolio_base_v2: DSS @ 13m reads SQ1 slots", {
+test_that("build_portfolio_base: DSS @ 13m reads SQ1 slots", {
   data <- mk_pf_mini_data()
-  out <- build_portfolio_base_v2(data, "DSS", timeframe = "13m")
+  out <- build_portfolio_base(data, "DSS", timeframe = "13m")
   expect_equal(out$col_used, "SQ1")
   expect_equal(out$idx, c(TRUE, TRUE, FALSE, FALSE, TRUE, TRUE))
   expect_equal(out$n_uw, 4L)
 })
 
 
-test_that("build_portfolio_base_v2: weighted base sums correctly", {
+test_that("build_portfolio_base: weighted base sums correctly", {
   data <- mk_pf_mini_data()
   w <- c(2, 1, 1, 1, 1, 3)  # r1*2, r6*3 weighted
-  out <- build_portfolio_base_v2(data, "DSS", timeframe = "3m", weights = w)
+  out <- build_portfolio_base(data, "DSS", timeframe = "3m", weights = w)
   # DSS @ 3m hits r1, r2, r6 -> w = 2 + 1 + 3 = 6
   expect_equal(out$n_w, 6)
 })
 
 
-test_that("build_portfolio_base_v2: SQ2 absent + 3m falls back to SQ1", {
+test_that("build_portfolio_base: SQ2 absent + 3m falls back to SQ1", {
   data <- mk_pf_mini_data()
   data$SQ2_1 <- NULL
   data$SQ2_2 <- NULL
-  out <- build_portfolio_base_v2(data, "DSS", timeframe = "3m")
+  out <- build_portfolio_base(data, "DSS", timeframe = "3m")
   expect_equal(out$col_used, "SQ1")
   expect_equal(out$n_uw, 4L)
 })
 
 
-test_that("build_portfolio_base_v2: refuses with structured shape on bad input", {
-  out_empty <- build_portfolio_base_v2(data.frame(), "DSS", timeframe = "3m")
+test_that("build_portfolio_base: refuses with structured shape on bad input", {
+  out_empty <- build_portfolio_base(data.frame(), "DSS", timeframe = "3m")
   expect_equal(out_empty$status, "REFUSED")
   expect_equal(out_empty$code, "DATA_PORTFOLIO_NOT_DATA_FRAME")
 
-  out_no_cat <- build_portfolio_base_v2(mk_pf_mini_data(), "",
+  out_no_cat <- build_portfolio_base(mk_pf_mini_data(), "",
                                          timeframe = "3m")
   expect_equal(out_no_cat$status, "REFUSED")
   expect_equal(out_no_cat$code, "DATA_PORTFOLIO_MISSING_CAT_CODE")
 
-  out_no_cols <- build_portfolio_base_v2(
+  out_no_cols <- build_portfolio_base(
     data.frame(other = 1:3, stringsAsFactors = FALSE),
     "DSS", timeframe = "3m")
   expect_equal(out_no_cols$status, "REFUSED")
@@ -113,19 +113,19 @@ test_that("build_portfolio_base_v2: refuses with structured shape on bad input",
 # Integration: against the IPK Wave 1 fixture
 # ------------------------------------------------------------------------------
 
-test_that("IPK Wave 1: build_portfolio_base_v2 resolves DSS qualifiers", {
+test_that("IPK Wave 1: build_portfolio_base resolves DSS qualifiers", {
   data_path <- file.path(ROOT, "modules", "brand", "tests", "fixtures",
                          "ipk_wave1", "ipk_wave1_data.xlsx")
   skip_if_not(file.exists(data_path), "IPK Wave 1 fixture not built")
   data <- openxlsx::read.xlsx(data_path)
 
-  out_3m <- build_portfolio_base_v2(data, "DSS", timeframe = "3m")
+  out_3m <- build_portfolio_base(data, "DSS", timeframe = "3m")
   expect_null(out_3m$status)  # PASS path returns no $status
   expect_equal(out_3m$col_used, "SQ2")
   expect_gt(out_3m$n_uw, 0L)
   expect_lte(out_3m$n_uw, nrow(data))
 
-  out_13m <- build_portfolio_base_v2(data, "DSS", timeframe = "13m")
+  out_13m <- build_portfolio_base(data, "DSS", timeframe = "13m")
   expect_equal(out_13m$col_used, "SQ1")
   # 13m window must include the 3m respondents (subset relationship).
   expect_gte(out_13m$n_uw, out_3m$n_uw)

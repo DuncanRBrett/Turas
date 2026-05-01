@@ -1,10 +1,10 @@
 # ==============================================================================
-# Tests for 00_role_inference.R + 00_role_map_v2.R
+# Tests for 00_role_inference.R + 00_role_map.R
 # ==============================================================================
 library(testthat)
 
 source(file.path("..", "..", "R", "00_role_inference.R"))
-source(file.path("..", "..", "R", "00_role_map_v2.R"))
+source(file.path("..", "..", "R", "00_role_map.R"))
 
 
 # Common fixtures

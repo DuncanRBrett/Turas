@@ -91,21 +91,21 @@ role_map <- list(
 )
 ```
 
-`test_funnel_v2.R` (already in repo) shows the exact pattern — read it first; treat it as your template.
+`test_funnel.R` (already in repo) shows the exact pattern — read it first; treat it as your template.
 
 ---
 
 ## Recommended approach
 
-1. **Read the template first.** `modules/brand/tests/testthat/test_funnel_v2.R` is the established v2 shape. Note how it sources `00_data_access.R` and `00_role_inference.R`, builds an in-memory role map, and threads `cat_code` through. Don't invent a different pattern.
+1. **Read the template first.** `modules/brand/tests/testthat/test_funnel.R` is the established v2 shape. Note how it sources `00_data_access.R` and `00_role_inference.R`, builds an in-memory role map, and threads `cat_code` through. Don't invent a different pattern.
 
 2. **Port one file at a time.** Start with `test_funnel_transactional.R` since transactional is the simplest category type (no tenure threshold). Get it green, commit. Then `test_funnel_service.R` (next-simplest). Then `test_funnel_durable.R` (tenure threshold adds one extra column to the fixture). Then the four "support layer" files (output, panel_data, panel_table, edge_cases, integration).
 
 3. **Verify hand-calculated counts unchanged.** Each legacy fixture has a comment block at the top listing the expected counts (e.g. `Aware: IPK=9 ROB=8 CART=7`). After porting the fixture, those numbers must hold. If they don't, you've made a fixture-translation error — go back, don't change the expected values to match a buggy port.
 
-4. **Delete the legacy file once its v2 replacement is green** (rename `test_funnel_durable.R` → … well, the v2 test file already exists, so add the durable category-type tests as new `test_that()` blocks inside `test_funnel_v2.R`). Choose: one big `test_funnel_v2.R` or per-category-type files (`test_funnel_durable_v2.R` etc). Either is fine; match what the rest of the v2 suite does.
+4. **Delete the legacy file once its v2 replacement is green** (rename `test_funnel_durable.R` → … well, the v2 test file already exists, so add the durable category-type tests as new `test_that()` blocks inside `test_funnel.R`). Choose: one big `test_funnel.R` or per-category-type files (`test_funnel_durable.R` etc). Either is fine; match what the rest of the v2 suite does.
 
-5. **Check `_v2` naming after cutover.** The IPK rebuild's Stage 6 renames `_v2` → canonical (e.g. `run_funnel_v2` → `run_funnel`). By the time you start this work, function names should already be canonical. Adjust calls accordingly. If not, the IPK rebuild PR hasn't merged yet — wait for it.
+5. **Check `_v2` naming after cutover.** The IPK rebuild's Stage 6 renames `_v2` → canonical (e.g. `run_funnel` → `run_funnel`). By the time you start this work, function names should already be canonical. Adjust calls accordingly. If not, the IPK rebuild PR hasn't merged yet — wait for it.
 
 ---
 
@@ -114,7 +114,7 @@ role_map <- list(
 Before opening the PR for this work:
 
 - [ ] All 8 legacy files deleted from `modules/brand/tests/testthat/`
-- [ ] Equivalent assertions exist in `test_funnel_v2.R` (or new v2 files) — every hand-calculated count from the legacy fixtures has a corresponding `expect_equal()` in the v2 suite
+- [ ] Equivalent assertions exist in `test_funnel.R` (or new v2 files) — every hand-calculated count from the legacy fixtures has a corresponding `expect_equal()` in the v2 suite
 - [ ] Full brand test suite green: `Rscript -e 'library(testthat); for (f in list.files("modules/brand/tests/testthat", "^test_.*[.]R$", full.names = TRUE)) testthat::test_file(f)'` — expect 0 failures
 - [ ] End-to-end smoke still PASS: `Rscript -e 'source("modules/brand/R/00_main.R"); res <- run_brand("modules/brand/tests/fixtures/ipk_wave1/Brand_Config.xlsx", verbose = FALSE); cat("status:", res$status, "\n")` — expect `status: PARTIAL` (DSS deep-dive still PASS, others empty as before)
 
@@ -124,12 +124,12 @@ Before opening the PR for this work:
 
 - Don't refactor the funnel engine itself. The migration was done; the engine is correct and verified by browser verification. This task is **tests only**.
 - Don't add new tests beyond porting the legacy coverage. If a gap exists in the legacy coverage, file it as a separate follow-up.
-- Don't touch the v2 funnel files outside of `test_funnel_v2.R` (or the new `_v2` test files you create alongside it).
+- Don't touch the v2 funnel files outside of `test_funnel.R` (or the new `_v2` test files you create alongside it).
 
 ---
 
 ## Why this was deferred
 
-Per `HANDOVER_IPK_REBUILD_SESSION5.md` §5, the cutover plan listed deletion of the legacy element tests as a single step. For seven of the eight migrated elements (audience_lens, adhoc, branded_reach, dba, demographics, drivers_barriers, mental_availability, mental_advantage, repertoire, wom, the 8 portfolio sub-tests), the v2 test files already had equivalent or better coverage so deletion was clean. For funnel, `test_funnel_v2.R` had only 4 high-level test blocks against the legacy 8 files' ~250 assertions. Deleting them at cutover would have been a real coverage loss with no replacement, so the team chose to ship the rebuild and port the funnel tests separately.
+Per `HANDOVER_IPK_REBUILD_SESSION5.md` §5, the cutover plan listed deletion of the legacy element tests as a single step. For seven of the eight migrated elements (audience_lens, adhoc, branded_reach, dba, demographics, drivers_barriers, mental_availability, mental_advantage, repertoire, wom, the 8 portfolio sub-tests), the v2 test files already had equivalent or better coverage so deletion was clean. For funnel, `test_funnel.R` had only 4 high-level test blocks against the legacy 8 files' ~250 assertions. Deleting them at cutover would have been a real coverage loss with no replacement, so the team chose to ship the rebuild and port the funnel tests separately.
 
 The cutover commit calls this gap out explicitly. Until this port lands, the brand test suite has 114 expected failures all in the funnel test files. They're easy to filter out: `[name match: ^test_funnel_(durable|edge_cases|integration|output|panel_data|panel_table|service|transactional)$]`.

@@ -227,7 +227,7 @@ run_dba <- function(data, assets,
 #'   n_assets. PASS-empty payload sets \code{placeholder = TRUE} and
 #'   \code{note = DBA_PLACEHOLDER_NOTE} when no assets / data.
 #' @export
-run_dba_v2 <- function(data, structure, focal_brand,
+run_dba <- function(data, structure, focal_brand,
                         fame_threshold = DBA_DEFAULT_FAME_THRESHOLD,
                         uniqueness_threshold = DBA_DEFAULT_UNIQUENESS_THRESHOLD,
                         attribution_type = "open",

@@ -19,7 +19,7 @@
 #'
 #' v2 alternative to \code{compute_strength_map()} that uses the slot-indexed
 #' data-access layer. Iterates \code{categories$CategoryCode} directly;
-#' awareness from \code{.portfolio_aware_matrix_v2()}.
+#' awareness from \code{.portfolio_aware_matrix()}.
 #'
 #' @param data Data frame.
 #' @param role_map Named list from \code{build_brand_role_map()} or NULL.
@@ -29,7 +29,7 @@
 #' @param weights Numeric vector or NULL.
 #' @return Same list shape as \code{compute_strength_map()}.
 #' @export
-compute_strength_map_v2 <- function(data, role_map, categories, structure,
+compute_strength_map <- function(data, role_map, categories, structure,
                                      config, weights = NULL) {
   timeframe <- config$portfolio_timeframe %||% "3m"
   min_base  <- config$portfolio_min_base  %||% 30L
@@ -59,7 +59,7 @@ compute_strength_map_v2 <- function(data, role_map, categories, structure,
     )
     if (nrow(cat_brands) == 0L) next
 
-    base <- build_portfolio_base_v2(data, cat_code, timeframe, weights)
+    base <- build_portfolio_base(data, cat_code, timeframe, weights)
     if (!is.null(base$status)) next
     if (base$n_uw == 0L) { suppressed <- c(suppressed, cat_code); next }
     if (base$n_uw < min_base) { suppressed <- c(suppressed, cat_code); next }
@@ -74,9 +74,9 @@ compute_strength_map_v2 <- function(data, role_map, categories, structure,
                    else brand_codes
     names(brand_lbls) <- brand_codes
 
-    aware_mat <- .portfolio_aware_matrix_v2(data, role_map, cat_code,
+    aware_mat <- .portfolio_aware_matrix(data, role_map, cat_code,
                                             brand_codes)
-    awareness <- .compute_brand_awareness_pct_v2(aware_mat, base$idx,
+    awareness <- .compute_brand_awareness_pct(aware_mat, base$idx,
                                                  weights)
     cat_pen   <- base$n_uw / n_total
 

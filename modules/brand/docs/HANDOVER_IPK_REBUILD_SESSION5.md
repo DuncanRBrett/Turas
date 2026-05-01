@@ -21,13 +21,13 @@ This handover continues from [HANDOVER_IPK_REBUILD_SESSION4.md](HANDOVER_IPK_REB
 
 | Commit | Step | What |
 |---|---|---|
-| cab345c | 3h / 3j / 3l | `run_dba_v2`, `run_branded_reach_v2`, `run_adhoc_v2` + `resolve_adhoc_role_v2` placeholders. PASS-empty payload + `placeholder = TRUE` + sentinel notes when no data. **+88 tests.** |
+| cab345c | 3h / 3j / 3l | `run_dba`, `run_branded_reach`, `run_adhoc` + `resolve_adhoc_role` placeholders. PASS-empty payload + `placeholder = TRUE` + sentinel notes when no data. **+88 tests.** |
 | 1817333 | 4a | Orchestrator: source v2 modules via the loader whitelist; build `role_map` once after Step 3 data load; switch DBA + Branded Reach + Ad Hoc orchestrator calls to v2 (with legacy fallbacks when role_map is NULL). |
 | e36a784 | 4b | Orchestrator: switch WOM, Repertoire, Drivers/Barriers, Audience Lens to their v2 entries. Lifted legacy column-prefix dispatch into `.legacy_wom_call`, `.legacy_repertoire_call`, `.legacy_drivers_barriers_call` for fallback. |
-| af60b46 | 4c | Orchestrator: Mental Availability — `build_cep_linkage_from_matrix` → `build_cep_linkage_v2` (CEP + attr matrices). New `.ma_resolve_cep_labels` joins display text by CEPCode for v2 vs by position for legacy. |
-| dff93f9 | 4d | Orchestrator: Funnel — new `.run_funnel_for_category_v2` passes the global v2 role_map directly with `cat_code` threaded through; bypasses the legacy QuestionMap normalisation entirely. |
-| 3038e99 | 4e | Orchestrator: Portfolio Overview — `compute_portfolio_overview_data` → `compute_portfolio_overview_data_v2`. |
-| cff0cae | 4f | Orchestrator: Demographics — new `.run_demographics_for_category_v2` walks role_map for `^demographics\.` keys via `demographic_question_from_role_v2`. Synthetic Buyer Status + Heaviness questions unchanged. |
+| af60b46 | 4c | Orchestrator: Mental Availability — `build_cep_linkage_from_matrix` → `build_cep_linkage` (CEP + attr matrices). New `.ma_resolve_cep_labels` joins display text by CEPCode for v2 vs by position for legacy. |
+| dff93f9 | 4d | Orchestrator: Funnel — new `.run_funnel_for_category` passes the global v2 role_map directly with `cat_code` threaded through; bypasses the legacy QuestionMap normalisation entirely. |
+| 3038e99 | 4e | Orchestrator: Portfolio Overview — `compute_portfolio_overview_data` → `compute_portfolio_overview_data`. |
+| cff0cae | 4f | Orchestrator: Demographics — new `.run_demographics_for_category` walks role_map for `^demographics\.` keys via `demographic_question_from_role`. Synthetic Buyer Status + Heaviness questions unchanged. |
 
 **Branch state:** 25 commits ahead of `main`, **702 PASS / 0 FAIL.**
 
@@ -77,7 +77,7 @@ Known issue: the cross-category Portfolio constellation refuses with `CALC_CONST
 
 ### 2. Step 4d — Portfolio cross-cat data (the one remaining v2 switch)
 
-The orchestrator still calls `.compute_portfolio_data(...)` → `run_portfolio(...)` which orchestrates 8 sub-analyses (`compute_footprint_matrix`, `compute_clutter_data`, `compute_strength_map`, `compute_extension_table`, `compute_extension_per_brand`, plus constellations). All 8 sub-analyses already have v2 entries (`compute_*_v2`); what's missing is a `run_portfolio_v2` that wires them together.
+The orchestrator still calls `.compute_portfolio_data(...)` → `run_portfolio(...)` which orchestrates 8 sub-analyses (`compute_footprint_matrix`, `compute_clutter_data`, `compute_strength_map`, `compute_extension_table`, `compute_extension_per_brand`, plus constellations). All 8 sub-analyses already have v2 entries (`compute_*_v2`); what's missing is a `run_portfolio` that wires them together.
 
 **Estimated effort:** half a session — `09_portfolio.R` is ~400 lines and the orchestration is sequential. Mostly mechanical: rename + thread role_map through each call. The v2 sub-analyses already exist and have tests.
 
@@ -92,7 +92,7 @@ These three elements read slot-prefix columns directly via `.find_brand_col` pat
 - They don't read role_map, so they're not blocked on the v2 architecture.
 - The IPK Wave 1 fixture has data for all three and the legacy path produces sensible output.
 
-If you want them migrated for consistency, the pattern is the same as WOM / Repertoire: write `run_X_v2(data, role_map, cat_code, brand_list, ...)` that walks the appropriate role keys (`cat_buying.frequency.{cat}`, `cat_buying.channel.{cat}`, `cat_buying.packsize.{cat}`) and delegates to the existing engine.
+If you want them migrated for consistency, the pattern is the same as WOM / Repertoire: write `run_X(data, role_map, cat_code, brand_list, ...)` that walks the appropriate role keys (`cat_buying.frequency.{cat}`, `cat_buying.channel.{cat}`, `cat_buying.packsize.{cat}`) and delegates to the existing engine.
 
 ### 4. Step 5 Cutover
 
@@ -104,7 +104,7 @@ After browser verification + Step 4d, do the cutover per planning doc §9 step 5
   - `13_audience_lens.R` (452 lines) → drop `run_audience_lens` + `compute_al_metrics_for_subset` + private legacy helpers; rename `_v2` to canonical names.
   - `13b_al_metrics.R` (914 lines) → same.
   - `02_mental_availability.R` → drop `build_cep_linkage_from_matrix` (legacy column-walk).
-  - `09_portfolio.R` + `09a..09h_portfolio_*.R` → drop legacy `compute_*` once `run_portfolio_v2` lands.
+  - `09_portfolio.R` + `09a..09h_portfolio_*.R` → drop legacy `compute_*` once `run_portfolio` lands.
   - SIZE-EXCEPTION markers should come off the migrated files at this step.
 - Delete legacy element tests:
   - `test_audience_lens.R`, `test_audience_lens_audiences.R`, `test_audience_lens_metrics.R`, `test_audience_lens_classifier.R`, `test_audience_lens_panel_data.R`
@@ -162,14 +162,14 @@ When `role_map` is non-NULL, every per-category element switches to its v2 entry
 ```
 modules/brand/R/
 ├── 00_main.R               # 8 orchestrator switches + 4 legacy fallback helpers
-├── 07_dba.R                # run_dba_v2 + .dba_data_present + .dba_placeholder_result
-├── 10_branded_reach.R      # run_branded_reach_v2 + .br_placeholder_result
-├── 12_adhoc.R              # run_adhoc_v2 + resolve_adhoc_role_v2 + helpers
+├── 07_dba.R                # run_dba + .dba_data_present + .dba_placeholder_result
+├── 10_branded_reach.R      # run_branded_reach + .br_placeholder_result
+├── 12_adhoc.R              # run_adhoc + resolve_adhoc_role + helpers
 
 modules/brand/tests/testthat/
-├── test_dba_v2.R           # 24 tests
-├── test_branded_reach_v2.R # 21 tests
-├── test_adhoc_v2.R         # 43 tests
+├── test_dba.R           # 24 tests
+├── test_branded_reach.R # 21 tests
+├── test_adhoc.R         # 43 tests
 
 modules/brand/docs/
 └── HANDOVER_IPK_REBUILD_SESSION5.md  # this file
@@ -188,7 +188,7 @@ Memory entries unchanged this session — the session 4 entry [project_brand_ipk
 Quick sanity check (run from repo root):
 
 ```bash
-Rscript -e 'library(testthat); for (f in c("test_data_access","test_role_map_v2","test_guard_v2","test_funnel_v2","test_brand_volume_v2","test_mental_avail_v2","test_ma_advantage_v2","test_wom_v2","test_repertoire_v2","test_drivers_barriers_v2","test_demographics_v2","test_portfolio_v2","test_portfolio_subanalyses_v2","test_audience_lens_v2","test_dba_v2","test_branded_reach_v2","test_adhoc_v2")) testthat::test_file(paste0("modules/brand/tests/testthat/", f, ".R"))'
+Rscript -e 'library(testthat); for (f in c("test_data_access","test_role_map","test_guard","test_funnel","test_brand_volume","test_mental_avail","test_ma_advantage","test_wom","test_repertoire","test_drivers_barriers","test_demographics","test_portfolio","test_portfolio_subanalyses","test_audience_lens","test_dba","test_branded_reach","test_adhoc")) testthat::test_file(paste0("modules/brand/tests/testthat/", f, ".R"))'
 ```
 
 Expected: **702 PASS, 0 FAIL.**
@@ -196,7 +196,7 @@ Expected: **702 PASS, 0 FAIL.**
 Smoke-test the orchestrator loads cleanly:
 
 ```bash
-Rscript -e 'source("modules/brand/R/00_main.R"); cat("brand loads:", exists("run_brand"), "\n"); cat("role map builder:", exists("build_brand_role_map"), "\n"); cat("v2 placeholder fns:", all(c("run_dba_v2","run_branded_reach_v2","run_adhoc_v2") %in% ls()), "\n")'
+Rscript -e 'source("modules/brand/R/00_main.R"); cat("brand loads:", exists("run_brand"), "\n"); cat("role map builder:", exists("build_brand_role_map"), "\n"); cat("v2 placeholder fns:", all(c("run_dba","run_branded_reach","run_adhoc") %in% ls()), "\n")'
 ```
 
 End-to-end orchestrator (won't pass yet — Brand_Config needs v1 fields):
@@ -222,11 +222,11 @@ res <- run_brand("modules/brand/tests/fixtures/ipk_wave1/Brand_Config.xlsx", ver
 
 5. **Browser verification path** — `launch_turas()` only. Don't run `preview_start` against the brand module.
 
-6. **Portfolio cross-cat data is still legacy.** The orchestrator's `.compute_portfolio_data` still calls legacy `run_portfolio`. This works for IPK Wave 1 because the legacy `compute_*` functions read slot columns when they exist. Migrating to a `run_portfolio_v2` is the last v2 switch and ideally happens before cutover so the legacy `compute_*` can all be deleted.
+6. **Portfolio cross-cat data is still legacy.** The orchestrator's `.compute_portfolio_data` still calls legacy `run_portfolio`. This works for IPK Wave 1 because the legacy `compute_*` functions read slot columns when they exist. Migrating to a `run_portfolio` is the last v2 switch and ideally happens before cutover so the legacy `compute_*` can all be deleted.
 
-7. **NEW — orchestrator route-or-fallback branches must come off at cutover.** Every v2 switch in this session uses `if (!is.null(role_map)) run_X_v2(...) else run_X(...)`. After cutover (when legacy is gone), drop the conditional + fallback so the codebase has one path through.
+7. **NEW — orchestrator route-or-fallback branches must come off at cutover.** Every v2 switch in this session uses `if (!is.null(role_map)) run_X(...) else run_X(...)`. After cutover (when legacy is gone), drop the conditional + fallback so the codebase has one path through.
 
-8. **NEW — Funnel v2 cat_code threading.** The funnel config object now carries `cat_code` so `run_funnel`'s `.lookup_role(role_map, "funnel.awareness", cat_code)` resolves to `funnel.awareness.{cat_code}`. If you write a new caller that bypasses `.run_funnel_for_category_v2`, remember to set `funnel_cfg$cat_code`.
+8. **NEW — Funnel v2 cat_code threading.** The funnel config object now carries `cat_code` so `run_funnel`'s `.lookup_role(role_map, "funnel.awareness", cat_code)` resolves to `funnel.awareness.{cat_code}`. If you write a new caller that bypasses `.run_funnel_for_category`, remember to set `funnel_cfg$cat_code`.
 
 9. **NEW — Demographics namespace migrated.** Legacy was `demo.{key}`; v2 is `demographics.{key}` (per `00_role_inference.R DEMO_{KEY}` pattern). The orchestrator's v2 dispatcher walks `^demographics\\.` not `^demo\\.`. If you have an old QuestionMap with `demo.*` rows, they need to migrate to `demographics.*` or use the QuestionMap override mechanism.
 

@@ -21,11 +21,11 @@
 #' @param aware_mat Integer matrix \code{[nrow(data) x n_brands]} with brand
 #'   codes as colnames. 1 = aware.
 #' @param base_idx Logical vector. Qualifier flags from
-#'   \code{build_portfolio_base_v2()}.
+#'   \code{build_portfolio_base()}.
 #' @param weights Numeric vector or NULL.
 #' @return Named numeric vector, length \code{ncol(aware_mat)}.
 #' @keywords internal
-.compute_brand_awareness_pct_v2 <- function(aware_mat, base_idx, weights) {
+.compute_brand_awareness_pct <- function(aware_mat, base_idx, weights) {
   brand_codes <- colnames(aware_mat) %||% character(0)
   if (length(brand_codes) == 0L) return(setNames(numeric(0), character(0)))
 
@@ -61,7 +61,7 @@
 #' @param weights Numeric vector or NULL.
 #' @return Same list shape as \code{compute_footprint_matrix()}.
 #' @export
-compute_footprint_matrix_v2 <- function(data, role_map, categories, structure,
+compute_footprint_matrix <- function(data, role_map, categories, structure,
                                          config, weights = NULL) {
   timeframe <- config$portfolio_timeframe %||% "3m"
   min_base  <- config$portfolio_min_base  %||% 30L
@@ -91,7 +91,7 @@ compute_footprint_matrix_v2 <- function(data, role_map, categories, structure,
       error = function(e) data.frame(BrandCode = character(0))
     )
 
-    base <- build_portfolio_base_v2(data, cat_code, timeframe, weights)
+    base <- build_portfolio_base(data, cat_code, timeframe, weights)
     if (!is.null(base$status)) next
 
     # Categories with zero qualifiers carry no information for the matrix
@@ -118,9 +118,9 @@ compute_footprint_matrix_v2 <- function(data, role_map, categories, structure,
                        as.character(cat_brands$BrandName)
                      else brand_codes
 
-      aware_mat <- .portfolio_aware_matrix_v2(data, role_map, cat_code,
+      aware_mat <- .portfolio_aware_matrix(data, role_map, cat_code,
                                               brand_codes)
-      awareness <- .compute_brand_awareness_pct_v2(aware_mat, base$idx,
+      awareness <- .compute_brand_awareness_pct(aware_mat, base$idx,
                                                    weights)
 
       for (bi in seq_along(brand_codes)) {

@@ -6,7 +6,7 @@
 # both consume tensors / ma_result lists rather than raw data, so they need
 # no migration. What this test file proves is that the full chain
 #
-#   build_cep_linkage_v2()  ->  run_mental_availability()  ->
+#   build_cep_linkage()  ->  run_mental_availability()  ->
 #   build_ma_advantage_block()
 #
 # returns a structurally valid panel block when fed slot-indexed
@@ -28,7 +28,7 @@ ROOT <- .find_root_ma_adv()
 source(file.path(ROOT, "modules", "brand", "R", "00_guard.R"))
 source(file.path(ROOT, "modules", "brand", "R", "00_data_access.R"))
 source(file.path(ROOT, "modules", "brand", "R", "00_role_inference.R"))
-source(file.path(ROOT, "modules", "brand", "R", "00_role_map_v2.R"))
+source(file.path(ROOT, "modules", "brand", "R", "00_role_map.R"))
 source(file.path(ROOT, "modules", "brand", "R", "02_mental_availability.R"))
 source(file.path(ROOT, "modules", "brand", "R", "02b_mental_advantage.R"))
 source(file.path(ROOT, "modules", "brand", "R", "02b_ma_advantage_data.R"))
@@ -102,7 +102,7 @@ test_that("hand-coded fixture: build_ma_advantage_block produces correct decisio
                        BrandLabel = c("IPK", "ROB", "CART"),
                        stringsAsFactors = FALSE)
 
-  cep_link <- build_cep_linkage_v2(data, rm, "DSS", brands, item_kind = "cep")
+  cep_link <- build_cep_linkage(data, rm, "DSS", brands, item_kind = "cep")
 
   # Sanity: the v2 builder built the expected counts.
   cep_counts_ipk <- colSums(cep_link$linkage_tensor$IPK)
@@ -159,7 +159,7 @@ test_that("hand-coded fixture: algebraic invariant sum(actual - expected) == 0",
                        BrandLabel = c("IPK", "ROB", "CART"),
                        stringsAsFactors = FALSE)
 
-  cep_link <- build_cep_linkage_v2(data, rm, "DSS", brands, item_kind = "cep")
+  cep_link <- build_cep_linkage(data, rm, "DSS", brands, item_kind = "cep")
   ma <- calculate_mental_advantage(cep_link$linkage_tensor,
                                     codes = c("CEP01","CEP02"),
                                     n_respondents = 6)
@@ -204,8 +204,8 @@ test_that("IPK Wave 1: MA advantage block renders for CEPs + attributes", {
     dss
   )
 
-  cep_link <- build_cep_linkage_v2(dss, rm, "DSS", dss_brands, item_kind = "cep")
-  att_link <- build_cep_linkage_v2(dss, rm, "DSS", dss_brands, item_kind = "attr")
+  cep_link <- build_cep_linkage(dss, rm, "DSS", dss_brands, item_kind = "cep")
+  att_link <- build_cep_linkage(dss, rm, "DSS", dss_brands, item_kind = "attr")
 
   ma_result <- run_mental_availability(
     linkage           = cep_link,

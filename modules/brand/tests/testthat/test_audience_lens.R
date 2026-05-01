@@ -1,9 +1,9 @@
 # ==============================================================================
-# Tests for run_audience_lens_v2 (Audience Lens migration to slot-indexed
+# Tests for run_audience_lens (Audience Lens migration to slot-indexed
 # data access + role map v2)
 # ==============================================================================
-# Step 3m of the IPK rebuild. Verifies that run_audience_lens_v2() and
-# compute_al_metrics_for_subset_v2() reproduce hand-calculated KPI values
+# Step 3m of the IPK rebuild. Verifies that run_audience_lens() and
+# compute_al_metrics_for_subset() reproduce hand-calculated KPI values
 # off the v2 data-access layer (multi_mention_brand_matrix,
 # slot_paired_numeric_matrix, respondent_picked) using a v2 role map built
 # by build_brand_role_map().
@@ -27,7 +27,7 @@ ROOT <- .find_root_al2()
 source(file.path(ROOT, "modules", "brand", "R", "00_guard.R"))
 source(file.path(ROOT, "modules", "brand", "R", "00_data_access.R"))
 source(file.path(ROOT, "modules", "brand", "R", "00_role_inference.R"))
-source(file.path(ROOT, "modules", "brand", "R", "00_role_map_v2.R"))
+source(file.path(ROOT, "modules", "brand", "R", "00_role_map.R"))
 source(file.path(ROOT, "modules", "brand", "R", "13_audience_lens.R"))
 source(file.path(ROOT, "modules", "brand", "R", "13a_al_audiences.R"))
 source(file.path(ROOT, "modules", "brand", "R", "13b_al_metrics.R"))
@@ -140,7 +140,7 @@ mk_al_mini_audiences <- function() {
 
 
 # ------------------------------------------------------------------------------
-# Hand-calculated targets (derived in test_audience_lens_v2 design notes)
+# Hand-calculated targets (derived in test_audience_lens design notes)
 # ------------------------------------------------------------------------------
 # TOTAL (n=8, weights=1):
 #   awareness     5/8   = 0.625
@@ -205,12 +205,12 @@ test_that("v2 inference creates every audience-lens role required for DSS", {
 })
 
 
-test_that("compute_al_metrics_for_subset_v2 reproduces total-set hand calcs", {
+test_that("compute_al_metrics_for_subset reproduces total-set hand calcs", {
   data <- mk_al_mini_data()
   rm   <- mk_al_mini_role_map(data)
   brands <- mk_al_mini_brands()
 
-  m <- compute_al_metrics_for_subset_v2(
+  m <- compute_al_metrics_for_subset(
     data = data, role_map = rm, weights = rep(1, 8),
     keep_idx = rep(TRUE, 8),
     cat_brands = brands, cat_code = "DSS",
@@ -236,13 +236,13 @@ test_that("compute_al_metrics_for_subset_v2 reproduces total-set hand calcs", {
 })
 
 
-test_that("compute_al_metrics_for_subset_v2 reproduces IPK-Buyer audience values", {
+test_that("compute_al_metrics_for_subset reproduces IPK-Buyer audience values", {
   data <- mk_al_mini_data()
   rm   <- mk_al_mini_role_map(data)
   brands <- mk_al_mini_brands()
   buyer_idx <- data$IS_IPK_BUYER == 1L
 
-  m <- compute_al_metrics_for_subset_v2(
+  m <- compute_al_metrics_for_subset(
     data = data, role_map = rm, weights = rep(1, 8),
     keep_idx = buyer_idx,
     cat_brands = brands, cat_code = "DSS",
@@ -264,13 +264,13 @@ test_that("compute_al_metrics_for_subset_v2 reproduces IPK-Buyer audience values
 })
 
 
-test_that("compute_al_metrics_for_subset_v2 reproduces IPK-Non-buyer audience values", {
+test_that("compute_al_metrics_for_subset reproduces IPK-Non-buyer audience values", {
   data <- mk_al_mini_data()
   rm   <- mk_al_mini_role_map(data)
   brands <- mk_al_mini_brands()
   nonbuyer_idx <- data$IS_IPK_BUYER == 0L
 
-  m <- compute_al_metrics_for_subset_v2(
+  m <- compute_al_metrics_for_subset(
     data = data, role_map = rm, weights = rep(1, 8),
     keep_idx = nonbuyer_idx,
     cat_brands = brands, cat_code = "DSS",
@@ -296,13 +296,13 @@ test_that("compute_al_metrics_for_subset_v2 reproduces IPK-Non-buyer audience va
 })
 
 
-test_that("run_audience_lens_v2 wires up audiences + classifier end-to-end", {
+test_that("run_audience_lens wires up audiences + classifier end-to-end", {
   data <- mk_al_mini_data()
   rm   <- mk_al_mini_role_map(data)
   brands <- mk_al_mini_brands()
   audiences <- mk_al_mini_audiences()
 
-  out <- run_audience_lens_v2(
+  out <- run_audience_lens(
     data = data, role_map = rm, cat_code = "DSS", cat_name = "Dishwash",
     cat_brands = brands, focal_brand = "IPK", audiences = audiences,
     structure = list(),
@@ -348,7 +348,7 @@ test_that("run_audience_lens_v2 wires up audiences + classifier end-to-end", {
 test_that("missing role map produces a structured refusal", {
   data <- mk_al_mini_data()
   brands <- mk_al_mini_brands()
-  out <- run_audience_lens_v2(
+  out <- run_audience_lens(
     data = data, role_map = list(), cat_code = "DSS", cat_name = "Dishwash",
     cat_brands = brands, focal_brand = "IPK",
     audiences = mk_al_mini_audiences(),
@@ -362,7 +362,7 @@ test_that("empty audience list returns PASS with engine=v2 marker", {
   data <- mk_al_mini_data()
   rm   <- mk_al_mini_role_map(data)
   brands <- mk_al_mini_brands()
-  out <- run_audience_lens_v2(
+  out <- run_audience_lens(
     data = data, role_map = rm, cat_code = "DSS", cat_name = "Dishwash",
     cat_brands = brands, focal_brand = "IPK",
     audiences = list(),
@@ -377,7 +377,7 @@ test_that("all-suppressed audiences return PARTIAL with the right code", {
   data <- mk_al_mini_data()
   rm   <- mk_al_mini_role_map(data)
   brands <- mk_al_mini_brands()
-  out <- run_audience_lens_v2(
+  out <- run_audience_lens(
     data = data, role_map = rm, cat_code = "DSS", cat_name = "Dishwash",
     cat_brands = brands, focal_brand = "IPK",
     audiences = mk_al_mini_audiences(),
@@ -395,7 +395,7 @@ test_that("all-suppressed audiences return PARTIAL with the right code", {
 # yet in the fixture — verify graceful behaviour on the empty-audiences path).
 # ------------------------------------------------------------------------------
 
-test_that("IPK Wave 1: run_audience_lens_v2 returns PASS with no audiences", {
+test_that("IPK Wave 1: run_audience_lens returns PASS with no audiences", {
   data_path <- file.path(ROOT, "modules", "brand", "tests", "fixtures",
                          "ipk_wave1", "ipk_wave1_data.xlsx")
   ss_path <- file.path(ROOT, "modules", "brand", "tests", "fixtures",
@@ -421,7 +421,7 @@ test_that("IPK Wave 1: run_audience_lens_v2 returns PASS with no audiences", {
 
   # Total-set metrics on the real fixture must compute without error and
   # return values in plausible ranges for every percentage-style metric.
-  m <- compute_al_metrics_for_subset_v2(
+  m <- compute_al_metrics_for_subset(
     data = dss, role_map = rm, weights = rep(1, nrow(dss)),
     keep_idx = rep(TRUE, nrow(dss)),
     cat_brands = dss_brands, cat_code = "DSS",
@@ -441,7 +441,7 @@ test_that("IPK Wave 1: run_audience_lens_v2 returns PASS with no audiences", {
 
   # Top-level orchestrator: with no AudienceLens sheet, audience list is
   # empty -> PASS with engine=v2 and zero audiences rendered.
-  out <- run_audience_lens_v2(
+  out <- run_audience_lens(
     data = dss, role_map = rm, cat_code = "DSS", cat_name = "Dishwash",
     cat_brands = dss_brands, focal_brand = "IPK", audiences = list(),
     structure = list(), config = list(), weights = NULL)

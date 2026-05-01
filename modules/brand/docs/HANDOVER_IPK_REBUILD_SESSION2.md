@@ -29,13 +29,13 @@ After elements ship, the work is §4 (output assembly + browser verification) an
 | 626c3e7 | 1c | `00_guard_v2.R` — slot-shape + active-category | 28 |
 | d013c88 | 3a | Funnel — derive + attitude decomposition | 23 |
 | b5ca831 | 3b | Cat Buying — `build_brand_volume_matrix` auto-detect | 13 |
-| 5559bfb | 3c | Mental Availability — `build_cep_linkage_v2` | 24 |
+| 5559bfb | 3c | Mental Availability — `build_cep_linkage` | 24 |
 | 6ed0cf8 | 3d | Mental Advantage — integration test | 37 |
-| 5e543f0 | 3e | WOM — `run_wom_v2` | 52 |
+| 5e543f0 | 3e | WOM — `run_wom` | 52 |
 | 6016a2b | 3f | Repertoire — `run_repertoire_v2` | 32 |
 | 0fe06ee | 3g | Drivers & Barriers — `run_drivers_barriers_v2` | 25 |
-| 36cb937 | 3k | Demographics — `resolve_demographic_role_v2` + `demographic_question_from_role_v2` | 46 |
-| 5a56731 | 3i.1 | Portfolio — `build_portfolio_base_v2` (screener helper only) | 21 |
+| 36cb937 | 3k | Demographics — `resolve_demographic_role` + `demographic_question_from_role` | 46 |
+| 5a56731 | 3i.1 | Portfolio — `build_portfolio_base` (screener helper only) | 21 |
 
 **Total: 416 tests pass / 0 fail.**
 
@@ -47,7 +47,7 @@ Run `git log --oneline main..HEAD` for the live list. Architectural decisions in
 
 ### 1. Step 3i Portfolio sub-analyses — heaviest remaining work
 
-The screener-qualifier helper (`build_portfolio_base_v2`) is done. What's left is migrating the five sub-analyses + the cross-cat overview:
+The screener-qualifier helper (`build_portfolio_base`) is done. What's left is migrating the five sub-analyses + the cross-cat overview:
 
 | File | What it reads today | v2 swap |
 |---|---|---|
@@ -68,7 +68,7 @@ Suggested approach: write **one shared helper** in `09_portfolio.R` (or a new `0
 }
 ```
 
-Then each sub-analysis calls it instead of looping `paste0("BRANDAWARE_", cat_code, "_", bc)`. Most sub-analyses also use the qualifier base — they should call `build_portfolio_base_v2()` (already shipped).
+Then each sub-analysis calls it instead of looping `paste0("BRANDAWARE_", cat_code, "_", bc)`. Most sub-analyses also use the qualifier base — they should call `build_portfolio_base()` (already shipped).
 
 Test pattern: hand-coded mini-fixture with 3 categories × 4 brands and known-answer expected counts; plus IPK Wave 1 integration verifying the footprint heatmap shape and constellation node count.
 
@@ -109,7 +109,7 @@ Per planning doc §9 step 5:
 The pattern established across 8 elements is consistent:
 
 **Per-element migration =**
-1. Add a `run_X_v2(data, role_map, cat_code, brand_list, focal_brand, weights, ...)` function alongside the existing `run_X`.
+1. Add a `run_X(data, role_map, cat_code, brand_list, focal_brand, weights, ...)` function alongside the existing `run_X`.
 2. Inside, look up roles from `role_map` and use the data-access layer:
    - Multi_Mention slot-indexed roots → `multi_mention_brand_matrix(data, root, brand_codes)`
    - Per-brand single columns → `single_response_brand_matrix(data, root, cat_code, brand_codes)`
@@ -117,7 +117,7 @@ The pattern established across 8 elements is consistent:
 3. Pass the resulting matrices through to the existing analytical function unchanged. Analytical functions consume tensors / matrices, not raw data — no rewrite needed.
 4. Return the same list shape as legacy `run_X` so the panel data builders stay unchanged.
 
-**Per-element tests =** new `test_X_v2.R` file with:
+**Per-element tests =** new `test_X.R` file with:
 1. A hand-coded slot-indexed mini-fixture with hand-calculated expected outputs.
 2. An IPK Wave 1 integration test verifying end-to-end shape + invariants.
 
@@ -151,7 +151,7 @@ Don't try to update legacy column-per-brand tests — they're scheduled for dele
 Quick sanity check (run from repo root):
 
 ```bash
-Rscript -e 'library(testthat); for (f in c("test_data_access","test_role_map_v2","test_guard_v2","test_funnel_v2","test_brand_volume_v2","test_mental_avail_v2","test_ma_advantage_v2","test_wom_v2","test_repertoire_v2","test_drivers_barriers_v2","test_demographics_v2","test_portfolio_v2")) testthat::test_file(paste0("modules/brand/tests/testthat/", f, ".R"))'
+Rscript -e 'library(testthat); for (f in c("test_data_access","test_role_map","test_guard","test_funnel","test_brand_volume","test_mental_avail","test_ma_advantage","test_wom","test_repertoire","test_drivers_barriers","test_demographics","test_portfolio")) testthat::test_file(paste0("modules/brand/tests/testthat/", f, ".R"))'
 ```
 
 Expected: 416 PASS, 0 FAIL.

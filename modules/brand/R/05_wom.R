@@ -50,7 +50,7 @@ WOM_VERSION <- "1.0"
 #'   \code{wom_metrics}, \code{net_balance}, \code{amplification},
 #'   \code{metrics_summary}, \code{n_respondents}, \code{n_brands}.
 #' @export
-run_wom_v2 <- function(data, role_map, cat_code, brand_list,
+run_wom <- function(data, role_map, cat_code, brand_list,
                        focal_brand = NULL, weights = NULL) {
   if (is.null(data) || nrow(data) == 0L) {
     return(list(status = "REFUSED", code = "DATA_EMPTY",

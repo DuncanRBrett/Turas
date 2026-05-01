@@ -193,7 +193,7 @@ if (!exists("%||%")) {
 #'   present; placeholder payload otherwise (with \code{placeholder = TRUE}
 #'   and \code{meta$note = BR_PLACEHOLDER_NOTE}).
 #' @export
-run_branded_reach_v2 <- function(data, structure, brand_list,
+run_branded_reach <- function(data, structure, brand_list,
                                   weights = NULL, cat_code = NULL,
                                   focal_brand = NULL,
                                   seen_recognised_value = 1L) {

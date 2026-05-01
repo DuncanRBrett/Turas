@@ -7,7 +7,7 @@
 # pattern (BRANDAWARE_{cat}_{brand} == 1L).
 #
 # Three test layers:
-#   1. The shared helper .portfolio_aware_matrix_v2() — known-answer.
+#   1. The shared helper .portfolio_aware_matrix() — known-answer.
 #   2. Each compute_*_v2() — known-answer on a hand-coded 3-cat x 4-brand
 #      mini-fixture, plus invariant checks (low-base suppression, missing
 #      CategoryCode refusal).
@@ -29,7 +29,7 @@ ROOT <- .find_root_pf_v2()
 source(file.path(ROOT, "modules", "brand", "R", "00_guard.R"))
 source(file.path(ROOT, "modules", "brand", "R", "00_data_access.R"))
 source(file.path(ROOT, "modules", "brand", "R", "00_role_inference.R"))
-source(file.path(ROOT, "modules", "brand", "R", "00_role_map_v2.R"))
+source(file.path(ROOT, "modules", "brand", "R", "00_role_map.R"))
 source(file.path(ROOT, "modules", "brand", "R", "01_config.R"))
 source(file.path(ROOT, "modules", "brand", "R", "09_portfolio.R"))
 source(file.path(ROOT, "modules", "brand", "R", "09a_portfolio_footprint.R"))
@@ -138,12 +138,12 @@ mk_pf_v2_config <- function(focal = "A", min_base = 1L,
 
 
 # ------------------------------------------------------------------------------
-# .portfolio_aware_matrix_v2 — known-answer
+# .portfolio_aware_matrix — known-answer
 # ------------------------------------------------------------------------------
 
-test_that(".portfolio_aware_matrix_v2: DSS produces hand-checked 0/1 matrix", {
+test_that(".portfolio_aware_matrix: DSS produces hand-checked 0/1 matrix", {
   data <- mk_pf_v2_data()
-  mat  <- .portfolio_aware_matrix_v2(data, NULL, "DSS", c("A","B","C","D"))
+  mat  <- .portfolio_aware_matrix(data, NULL, "DSS", c("A","B","C","D"))
   expect_equal(dim(mat), c(8L, 4L))
   expect_equal(colnames(mat), c("A","B","C","D"))
   # Hand-checked: A is aware in r1..r7 (NOT r8); B in r1,r2,r4,r5,r6; etc.
@@ -154,20 +154,20 @@ test_that(".portfolio_aware_matrix_v2: DSS produces hand-checked 0/1 matrix", {
 })
 
 
-test_that(".portfolio_aware_matrix_v2: empty brand list returns 0-col matrix", {
+test_that(".portfolio_aware_matrix: empty brand list returns 0-col matrix", {
   data <- mk_pf_v2_data()
-  mat  <- .portfolio_aware_matrix_v2(data, NULL, "DSS", character(0))
+  mat  <- .portfolio_aware_matrix(data, NULL, "DSS", character(0))
   expect_equal(dim(mat), c(8L, 0L))
 })
 
 
-test_that(".portfolio_aware_matrix_v2: role_map override resolves a custom root", {
+test_that(".portfolio_aware_matrix: role_map override resolves a custom root", {
   data <- mk_pf_v2_data()
   role_map <- list(
     portfolio.awareness.DSS = list(column_root = "BRANDAWARE_DSS",
                                    variable_type = "Multi_Mention")
   )
-  mat <- .portfolio_aware_matrix_v2(data, role_map, "DSS",
+  mat <- .portfolio_aware_matrix(data, role_map, "DSS",
                                      c("A","B","C","D"))
   # Same answer as convention path
   expect_equal(unname(mat[, "A"]), c(1L,1L,1L,1L,1L,0L,1L,0L))
@@ -175,16 +175,16 @@ test_that(".portfolio_aware_matrix_v2: role_map override resolves a custom root"
 
 
 # ------------------------------------------------------------------------------
-# compute_footprint_matrix_v2 — known-answer
+# compute_footprint_matrix — known-answer
 # ------------------------------------------------------------------------------
 
-test_that("compute_footprint_matrix_v2: DSS + POS rows match hand-calculated %", {
+test_that("compute_footprint_matrix: DSS + POS rows match hand-calculated %", {
   data       <- mk_pf_v2_data()
   categories <- mk_pf_v2_categories()
   structure  <- mk_pf_v2_structure()
   config     <- mk_pf_v2_config(min_base = 1L)
 
-  out <- compute_footprint_matrix_v2(data, role_map = NULL, categories,
+  out <- compute_footprint_matrix(data, role_map = NULL, categories,
                                       structure, config)
   expect_equal(out$status, "PASS")
 
@@ -212,14 +212,14 @@ test_that("compute_footprint_matrix_v2: DSS + POS rows match hand-calculated %",
 })
 
 
-test_that("compute_footprint_matrix_v2: low-base cats appear in suppressed_cats", {
+test_that("compute_footprint_matrix: low-base cats appear in suppressed_cats", {
   data       <- mk_pf_v2_data()
   categories <- mk_pf_v2_categories()
   structure  <- mk_pf_v2_structure()
   # min_base = 5 — POS (n=4) flagged, DSS (n=5) keeps
   config     <- mk_pf_v2_config(min_base = 5L)
 
-  out <- compute_footprint_matrix_v2(data, role_map = NULL, categories,
+  out <- compute_footprint_matrix(data, role_map = NULL, categories,
                                       structure, config)
   expect_true("POS" %in% out$suppressed_cats)
   expect_false("DSS" %in% out$suppressed_cats)
@@ -229,21 +229,21 @@ test_that("compute_footprint_matrix_v2: low-base cats appear in suppressed_cats"
 })
 
 
-test_that("compute_footprint_matrix_v2: refuses without CategoryCode column", {
+test_that("compute_footprint_matrix: refuses without CategoryCode column", {
   data       <- mk_pf_v2_data()
   cats_no_cc <- mk_pf_v2_categories()
   cats_no_cc$CategoryCode <- NULL
   structure  <- mk_pf_v2_structure()
   config     <- mk_pf_v2_config()
 
-  out <- compute_footprint_matrix_v2(data, role_map = NULL, cats_no_cc,
+  out <- compute_footprint_matrix(data, role_map = NULL, cats_no_cc,
                                       structure, config)
   expect_equal(out$status, "REFUSED")
   expect_equal(out$code, "CFG_PORTFOLIO_NO_CATEGORY_CODE")
 })
 
 
-test_that("compute_footprint_matrix_v2: weighted base influences awareness %", {
+test_that("compute_footprint_matrix: weighted base influences awareness %", {
   data       <- mk_pf_v2_data()
   categories <- mk_pf_v2_categories()
   structure  <- mk_pf_v2_structure()
@@ -252,7 +252,7 @@ test_that("compute_footprint_matrix_v2: weighted base influences awareness %", {
   # Heavily weight r1 (DSS qualifier, aware A+B not C+D) so DSS A/B stays
   # at 100/100 but C/D drops sharply.
   w <- c(100, 1, 1, 1, 1, 1, 1, 1)
-  out <- compute_footprint_matrix_v2(data, role_map = NULL, categories,
+  out <- compute_footprint_matrix(data, role_map = NULL, categories,
                                       structure, config, weights = w)
   expect_equal(out$status, "PASS")
   m <- out$matrix_df
@@ -269,7 +269,7 @@ test_that("compute_footprint_matrix_v2: weighted base influences awareness %", {
 # Integration: against the IPK Wave 1 fixture
 # ------------------------------------------------------------------------------
 
-test_that("IPK Wave 1: compute_footprint_matrix_v2 runs and returns a brand x cat matrix", {
+test_that("IPK Wave 1: compute_footprint_matrix runs and returns a brand x cat matrix", {
   data_path <- file.path(ROOT, "modules", "brand", "tests", "fixtures",
                           "ipk_wave1", "ipk_wave1_data.xlsx")
   ss_path   <- file.path(ROOT, "modules", "brand", "tests", "fixtures",
@@ -301,7 +301,7 @@ test_that("IPK Wave 1: compute_footprint_matrix_v2 runs and returns a brand x ca
     portfolio_edge_top_n         = 40L
   )
 
-  out <- compute_footprint_matrix_v2(data, role_map = NULL,
+  out <- compute_footprint_matrix(data, role_map = NULL,
                                       categories = active_cats,
                                       structure  = structure,
                                       config     = config)
@@ -319,16 +319,16 @@ test_that("IPK Wave 1: compute_footprint_matrix_v2 runs and returns a brand x ca
 
 
 # ------------------------------------------------------------------------------
-# compute_clutter_data_v2
+# compute_clutter_data
 # ------------------------------------------------------------------------------
 
-test_that("compute_clutter_data_v2: per-cat metrics match hand calculation", {
+test_that("compute_clutter_data: per-cat metrics match hand calculation", {
   data       <- mk_pf_v2_data()
   categories <- mk_pf_v2_categories()
   structure  <- mk_pf_v2_structure()
   config     <- mk_pf_v2_config(focal = "A", min_base = 1L)
 
-  out <- compute_clutter_data_v2(data, role_map = NULL, categories,
+  out <- compute_clutter_data(data, role_map = NULL, categories,
                                   structure, config)
   expect_equal(out$status, "PASS")
 
@@ -356,24 +356,24 @@ test_that("compute_clutter_data_v2: per-cat metrics match hand calculation", {
 })
 
 
-test_that("compute_clutter_data_v2: BAK is suppressed (zero qualifiers)", {
+test_that("compute_clutter_data: BAK is suppressed (zero qualifiers)", {
   data       <- mk_pf_v2_data()
   categories <- mk_pf_v2_categories()
   structure  <- mk_pf_v2_structure()
   config     <- mk_pf_v2_config(min_base = 1L)
 
-  out <- compute_clutter_data_v2(data, role_map = NULL, categories,
+  out <- compute_clutter_data(data, role_map = NULL, categories,
                                   structure, config)
   expect_true("BAK" %in% out$suppressed_cats)
   expect_false("BAK" %in% out$clutter_df$cat)
 })
 
 
-test_that("compute_clutter_data_v2: refuses without CategoryCode column", {
+test_that("compute_clutter_data: refuses without CategoryCode column", {
   data       <- mk_pf_v2_data()
   cats_no_cc <- mk_pf_v2_categories()
   cats_no_cc$CategoryCode <- NULL
-  out <- compute_clutter_data_v2(data, role_map = NULL, cats_no_cc,
+  out <- compute_clutter_data(data, role_map = NULL, cats_no_cc,
                                   mk_pf_v2_structure(), mk_pf_v2_config())
   expect_equal(out$status, "REFUSED")
   expect_equal(out$code, "CFG_PORTFOLIO_NO_CATEGORY_CODE")
@@ -381,16 +381,16 @@ test_that("compute_clutter_data_v2: refuses without CategoryCode column", {
 
 
 # ------------------------------------------------------------------------------
-# compute_strength_map_v2
+# compute_strength_map
 # ------------------------------------------------------------------------------
 
-test_that("compute_strength_map_v2: per-brand rows match hand calculation", {
+test_that("compute_strength_map: per-brand rows match hand calculation", {
   data       <- mk_pf_v2_data()
   categories <- mk_pf_v2_categories()
   structure  <- mk_pf_v2_structure()
   config     <- mk_pf_v2_config(min_base = 1L)
 
-  out <- compute_strength_map_v2(data, role_map = NULL, categories,
+  out <- compute_strength_map(data, role_map = NULL, categories,
                                   structure, config)
   expect_equal(out$status, "PASS")
 
@@ -413,9 +413,9 @@ test_that("compute_strength_map_v2: per-brand rows match hand calculation", {
 })
 
 
-test_that("compute_strength_map_v2: BAK is suppressed (zero qualifiers)", {
+test_that("compute_strength_map: BAK is suppressed (zero qualifiers)", {
   data       <- mk_pf_v2_data()
-  out <- compute_strength_map_v2(data, role_map = NULL,
+  out <- compute_strength_map(data, role_map = NULL,
                                   mk_pf_v2_categories(),
                                   mk_pf_v2_structure(),
                                   mk_pf_v2_config(min_base = 1L))
@@ -424,10 +424,10 @@ test_that("compute_strength_map_v2: BAK is suppressed (zero qualifiers)", {
 
 
 # ------------------------------------------------------------------------------
-# compute_extension_table_v2
+# compute_extension_table
 # ------------------------------------------------------------------------------
 
-test_that("compute_extension_table_v2: focal awareness % per cat matches hand calc", {
+test_that("compute_extension_table: focal awareness % per cat matches hand calc", {
   data       <- mk_pf_v2_data()
   categories <- mk_pf_v2_categories()
   structure  <- mk_pf_v2_structure()
@@ -435,7 +435,7 @@ test_that("compute_extension_table_v2: focal awareness % per cat matches hand ca
   config     <- mk_pf_v2_config(focal = "A", min_base = 1L)
   config$focal_home_category <- "DSS"
 
-  out <- compute_extension_table_v2(data, role_map = NULL, categories,
+  out <- compute_extension_table(data, role_map = NULL, categories,
                                      structure, config)
   expect_equal(out$status, "PASS")
   expect_equal(out$home_cat, "DSS")
@@ -459,9 +459,9 @@ test_that("compute_extension_table_v2: focal awareness % per cat matches hand ca
 })
 
 
-test_that("compute_extension_table_v2: refuses when focal not in any category", {
+test_that("compute_extension_table: refuses when focal not in any category", {
   config <- mk_pf_v2_config(focal = "Z")
-  out <- compute_extension_table_v2(mk_pf_v2_data(), role_map = NULL,
+  out <- compute_extension_table(mk_pf_v2_data(), role_map = NULL,
                                      mk_pf_v2_categories(),
                                      mk_pf_v2_structure(), config)
   expect_equal(out$status, "REFUSED")
@@ -469,9 +469,9 @@ test_that("compute_extension_table_v2: refuses when focal not in any category", 
 })
 
 
-test_that("compute_extension_table_v2: refuses with empty focal", {
+test_that("compute_extension_table: refuses with empty focal", {
   config <- mk_pf_v2_config(focal = "")
-  out <- compute_extension_table_v2(mk_pf_v2_data(), role_map = NULL,
+  out <- compute_extension_table(mk_pf_v2_data(), role_map = NULL,
                                      mk_pf_v2_categories(),
                                      mk_pf_v2_structure(), config)
   expect_equal(out$status, "REFUSED")
@@ -479,34 +479,34 @@ test_that("compute_extension_table_v2: refuses with empty focal", {
 
 
 # ------------------------------------------------------------------------------
-# compute_extension_per_brand_v2
+# compute_extension_per_brand
 # ------------------------------------------------------------------------------
 
-test_that("compute_extension_per_brand_v2: walks brand universe from structure$brands", {
+test_that("compute_extension_per_brand: walks brand universe from structure$brands", {
   data       <- mk_pf_v2_data()
   categories <- mk_pf_v2_categories()
   structure  <- mk_pf_v2_structure()
   config     <- mk_pf_v2_config(focal = "A", min_base = 1L)
   config$focal_home_category <- "DSS"
 
-  out <- compute_extension_per_brand_v2(data, role_map = NULL, categories,
+  out <- compute_extension_per_brand(data, role_map = NULL, categories,
                                          structure, config)
   # Universe is c("A","B","C","D"); D has zero non-DSS exposure but still
   # produces a PASS extension table (lift=NA where p_base=0 / p_c=0).
   expect_true(all(c("A","B","C") %in% names(out$per_brand)))
   expect_equal(out$brand_names[["A"]], "Brand_A")
 
-  # Per-brand result shape — each is a full extension_table_v2 result
+  # Per-brand result shape — each is a full extension_table result
   expect_true(is.data.frame(out$per_brand[["A"]]$extension_df))
   expect_equal(out$per_brand[["A"]]$home_cat, "DSS")
 })
 
 
 # ------------------------------------------------------------------------------
-# compute_constellation_v2 + compute_constellations_per_cat_v2
+# compute_constellation + compute_constellations_per_cat
 # ------------------------------------------------------------------------------
 
-test_that("compute_constellation_v2: returns nodes/edges/layout shape", {
+test_that("compute_constellation: returns nodes/edges/layout shape", {
   data       <- mk_pf_v2_data()
   categories <- mk_pf_v2_categories()
   structure  <- mk_pf_v2_structure()
@@ -514,7 +514,7 @@ test_that("compute_constellation_v2: returns nodes/edges/layout shape", {
   config     <- mk_pf_v2_config(min_base = 1L)
   config$portfolio_cooccur_min_pairs <- 1L
 
-  out <- compute_constellation_v2(data, role_map = NULL, categories,
+  out <- compute_constellation(data, role_map = NULL, categories,
                                    structure, config)
   expect_equal(out$status, "PASS")
   expect_true(is.data.frame(out$nodes))
@@ -527,7 +527,7 @@ test_that("compute_constellation_v2: returns nodes/edges/layout shape", {
 })
 
 
-test_that("compute_constellation_v2: refuses with too-sparse fixture", {
+test_that("compute_constellation: refuses with too-sparse fixture", {
   # Only 2 aware brands across whole fixture
   sparse <- data.frame(
     BRANDAWARE_DSS_1 = c("A","B"),
@@ -542,21 +542,21 @@ test_that("compute_constellation_v2: refuses with too-sparse fixture", {
                      BrandCode=c("A","B"),
                      BrandLabel=c("a","b"),
                      stringsAsFactors=FALSE)
-  out <- compute_constellation_v2(sparse, role_map = NULL, cats,
+  out <- compute_constellation(sparse, role_map = NULL, cats,
                                    list(brands=br), mk_pf_v2_config(min_base=1L))
   expect_equal(out$status, "REFUSED")
   expect_equal(out$code, "CALC_CONSTELLATION_TOO_SPARSE")
 })
 
 
-test_that("compute_constellations_per_cat_v2: produces one entry per qualifying cat", {
+test_that("compute_constellations_per_cat: produces one entry per qualifying cat", {
   data       <- mk_pf_v2_data()
   categories <- mk_pf_v2_categories()
   structure  <- mk_pf_v2_structure()
   config     <- mk_pf_v2_config(min_base = 1L)
   config$portfolio_cooccur_min_pairs <- 1L
 
-  out <- compute_constellations_per_cat_v2(data, role_map = NULL, categories,
+  out <- compute_constellations_per_cat(data, role_map = NULL, categories,
                                              structure, config)
   expect_equal(out$status, "PASS")
   # DSS has all 4 brands aware in qualifiers; constellation should pass.
@@ -568,16 +568,16 @@ test_that("compute_constellations_per_cat_v2: produces one entry per qualifying 
 
 
 # ------------------------------------------------------------------------------
-# compute_portfolio_overview_data_v2
+# compute_portfolio_overview_data
 # ------------------------------------------------------------------------------
 
-test_that("compute_portfolio_overview_data_v2: builds per-cat awareness records", {
+test_that("compute_portfolio_overview_data: builds per-cat awareness records", {
   data       <- mk_pf_v2_data()
   categories <- mk_pf_v2_categories()
   structure  <- mk_pf_v2_structure()
   config     <- mk_pf_v2_config(focal = "A")
 
-  out <- compute_portfolio_overview_data_v2(data, role_map = NULL, categories,
+  out <- compute_portfolio_overview_data(data, role_map = NULL, categories,
                                               structure, config)
   expect_equal(out$status, "PASS")
   expect_equal(out$focal_brand, "A")
@@ -599,10 +599,10 @@ test_that("compute_portfolio_overview_data_v2: builds per-cat awareness records"
 })
 
 
-test_that("compute_portfolio_overview_data_v2: refuses on missing CategoryCode", {
+test_that("compute_portfolio_overview_data: refuses on missing CategoryCode", {
   cats_no_cc <- mk_pf_v2_categories()
   cats_no_cc$CategoryCode <- NULL
-  out <- compute_portfolio_overview_data_v2(mk_pf_v2_data(), role_map = NULL,
+  out <- compute_portfolio_overview_data(mk_pf_v2_data(), role_map = NULL,
                                               cats_no_cc,
                                               mk_pf_v2_structure(),
                                               mk_pf_v2_config())
@@ -642,38 +642,38 @@ test_that("IPK Wave 1: every portfolio v2 sub-analysis runs end-to-end", {
     portfolio_edge_top_n         = 40L
   )
 
-  fp <- compute_footprint_matrix_v2(data, role_map = NULL, active_cats,
+  fp <- compute_footprint_matrix(data, role_map = NULL, active_cats,
                                      structure, config)
   expect_equal(fp$status, "PASS")
   expect_gt(nrow(fp$matrix_df), 0L)
 
-  cl <- compute_clutter_data_v2(data, role_map = NULL, active_cats,
+  cl <- compute_clutter_data(data, role_map = NULL, active_cats,
                                  structure, config)
   expect_equal(cl$status, "PASS")
   expect_true(is.data.frame(cl$clutter_df))
 
-  st <- compute_strength_map_v2(data, role_map = NULL, active_cats,
+  st <- compute_strength_map(data, role_map = NULL, active_cats,
                                  structure, config)
   expect_equal(st$status, "PASS")
   expect_true("IPK" %in% names(st$per_brand))
 
-  ext <- compute_extension_table_v2(data, role_map = NULL, active_cats,
+  ext <- compute_extension_table(data, role_map = NULL, active_cats,
                                      structure, config,
                                      footprint_result = fp)
   expect_equal(ext$status, "PASS")
   expect_true(nzchar(ext$home_cat))
 
-  ext_pb <- compute_extension_per_brand_v2(data, role_map = NULL, active_cats,
+  ext_pb <- compute_extension_per_brand(data, role_map = NULL, active_cats,
                                              structure, config,
                                              footprint_result = fp)
   expect_true("IPK" %in% names(ext_pb$per_brand))
 
-  cn_per <- compute_constellations_per_cat_v2(data, role_map = NULL,
+  cn_per <- compute_constellations_per_cat(data, role_map = NULL,
                                                 active_cats, structure, config)
   expect_equal(cn_per$status, "PASS")
   expect_gt(length(cn_per$by_cat), 0L)
 
-  ov <- compute_portfolio_overview_data_v2(data, role_map = NULL, active_cats,
+  ov <- compute_portfolio_overview_data(data, role_map = NULL, active_cats,
                                              structure, config)
   expect_equal(ov$status, "PASS")
   expect_gt(length(ov$categories), 0L)

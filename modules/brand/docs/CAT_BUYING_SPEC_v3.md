@@ -1,6 +1,6 @@
 # Category Buying Panel — v3 Spec (count-based, post-BRANDPEN3 clarification)
 
-**Supersedes:** `CAT_BUYING_SPEC_v2.md` (v2 assumed ordinal scale / imputation — obsolete).
+**Supersedes:** `CAT_BUYING_SPEC.md` (v2 assumed ordinal scale / imputation — obsolete).
 **Audience:** next coding session, fresh context.
 **Branch:** `feature/brand-report-nav-2layer`.
 **Precedent patterns to mirror:** `FUNNEL_SPEC_v2.md`, `panels/03_funnel_panel*.R`, `panels/02_ma_panel*.R`.

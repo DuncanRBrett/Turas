@@ -55,8 +55,8 @@ BRAND_VERSION <- "1.0"
     "00_guard.R",
     "00_data_access.R",
     "00_role_inference.R",
-    "00_role_map_v2.R",
-    "00_guard_v2.R",
+    "00_role_map.R",
+    "00_guard_role_map.R",
     "01_config.R",
     "02_mental_availability.R",
     "02b_mental_advantage.R",
@@ -374,11 +374,11 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
         cat_depth == "full") {
       if (verbose) cat("  Running Mental Availability...\n")
 
-      use_v2 <- !is.null(role_map) && !is.null(cat_code)
+      use <- !is.null(role_map) && !is.null(cat_code)
 
       linkage <- tryCatch(
-        if (use_v2) {
-          build_cep_linkage_v2(cat_data, role_map, cat_code, cat_brands,
+        if (use) {
+          build_cep_linkage(cat_data, role_map, cat_code, cat_brands,
                                 item_kind = "cep")
         } else {
           cep_questions <- get_questions_for_battery(structure,
@@ -402,8 +402,8 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
         cep_labels_mapped <- data.frame(
           CEPCode = cep_col_codes,
           CEPText = .ma_resolve_cep_labels(cep_col_codes, cat_ceps,
-                                           use_v2,
-                                           if (!use_v2)
+                                           use,
+                                           if (!use)
                                              get_questions_for_battery(
                                                structure, "cep_matrix",
                                                cat_name)
@@ -415,8 +415,8 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
         attr_linkage <- NULL
         if (!is.null(cat_attrs) && nrow(cat_attrs) > 0) {
           attr_linkage <- tryCatch(
-            if (use_v2)
-              build_cep_linkage_v2(cat_data, role_map, cat_code, cat_brands,
+            if (use)
+              build_cep_linkage(cat_data, role_map, cat_code, cat_brands,
                                     item_kind = "attr")
             else
               build_cep_linkage_from_matrix(cat_data, cat_attrs$AttrCode,
@@ -453,7 +453,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
     if (isTRUE(config$element_funnel) && cat_depth == "full") {
       if (verbose) cat("  Running Funnel...\n")
 
-      cat_result$funnel <- .run_funnel_for_category_v2(
+      cat_result$funnel <- .run_funnel_for_category(
         data = cat_data, role_map = role_map, cat_brands = cat_brands,
         cat_code = cat_code, config = config, weights = cat_weights,
         cat_name = cat_name
@@ -633,7 +633,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
     if (isTRUE(config$element_wom) && cat_depth == "full") {
       if (verbose) cat("  Running WOM...\n")
       cat_result$wom <- tryCatch(
-        run_wom_v2(
+        run_wom(
           data        = cat_data,
           role_map    = role_map,
           cat_code    = cat_code,
@@ -656,7 +656,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
     if (isTRUE(config$element_branded_reach) && cat_depth == "full") {
       if (verbose) cat("  Running Branded Reach...\n")
       cat_result$branded_reach <- tryCatch(
-        run_branded_reach_v2(
+        run_branded_reach(
           data        = cat_data,
           structure   = structure,
           brand_list  = cat_brands,
@@ -699,7 +699,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
       } else if (length(al_audiences) > 0) {
         if (verbose) cat("  Running Audience Lens...\n")
         cat_result$audience_lens <- tryCatch(
-          run_audience_lens_v2(
+          run_audience_lens(
             data = cat_data, role_map = role_map,
             cat_code = cat_code %||% "",
             cat_name = cat_name,
@@ -749,12 +749,12 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
     }
 
     # Demographics (per-category; full categories only). v2 dispatcher walks
-    # role_map for ^demographics\.* keys via demographic_question_from_role_v2.
+    # role_map for ^demographics\.* keys via demographic_question_from_role.
     # Synthetic questions (Buyer Status + Heaviness) are unchanged.
     if (isTRUE(config$element_demographics %||% TRUE) && cat_depth == "full") {
       if (verbose) cat("  Running Demographics...\n")
       cat_result$demographics <- tryCatch(
-        .run_demographics_for_category_v2(
+        .run_demographics_for_category(
           role_map    = role_map, structure = structure, config = config,
           cat_data    = cat_data, cat_weights = cat_weights,
           cat_brands  = cat_brands, cat_name = cat_name,
@@ -776,7 +776,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
     if (isTRUE(config$element_adhoc %||% TRUE) && cat_depth == "full") {
       if (verbose) cat("  Running Ad Hoc...\n")
       cat_result$adhoc <- tryCatch(
-        .run_adhoc_for_category_v2(
+        .run_adhoc_for_category(
           role_map     = role_map, structure = structure, config = config,
           data_full    = data, weights_full = weights,
           cat_data     = cat_data, cat_weights = cat_weights,
@@ -812,7 +812,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
   # for deep-dive cats from category_results. Uses the global role_map for
   # slot-indexed BRANDAWARE_{cat} lookups.
   results$portfolio_overview <- tryCatch(
-    compute_portfolio_overview_data_v2(
+    compute_portfolio_overview_data(
       data, role_map, categories, structure, config,
       weights          = weights,
       category_results = category_results),
@@ -839,7 +839,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
     }
 
     results$dba <- tryCatch(
-      run_dba_v2(
+      run_dba(
         data                 = data,
         structure            = dba_structure,
         focal_brand          = config$focal_brand,
@@ -935,7 +935,7 @@ if (!exists(".find_brand_col", mode = "function")) {
 #' \code{funnel.awareness.DSS}-style keys, and \code{run_funnel}'s
 #' \code{.lookup_role} resolves them via the \code{cat_code} config field.
 #' @keywords internal
-.run_funnel_for_category_v2 <- function(data, role_map, cat_brands, cat_code,
+.run_funnel_for_category <- function(data, role_map, cat_brands, cat_code,
                                          config, weights, cat_name) {
   funnel_cfg <- .funnel_config_from_global(config, cat_name, cat_brands)
   funnel_cfg$cat_code <- cat_code
@@ -960,8 +960,8 @@ if (!exists(".find_brand_col", mode = "function")) {
 #' question codes (\code{CEP01_DSS}) — labels come from
 #' \code{cep_questions$QuestionText} by position.
 #' @keywords internal
-.ma_resolve_cep_labels <- function(cep_codes, cat_ceps, use_v2, cep_questions) {
-  if (use_v2 && !is.null(cat_ceps) && nrow(cat_ceps) > 0) {
+.ma_resolve_cep_labels <- function(cep_codes, cat_ceps, use, cep_questions) {
+  if (use && !is.null(cat_ceps) && nrow(cat_ceps) > 0) {
     out <- cat_ceps$CEPText[match(cep_codes, cat_ceps$CEPCode)]
     out[is.na(out)] <- cep_codes[is.na(out)]
     return(out)
@@ -1101,11 +1101,11 @@ if (!exists(".find_brand_col", mode = "function")) {
 #'
 #' v2 sibling of \code{.run_demographics_for_category}. Walks role_map for
 #' \code{^demographics\\.*} keys (the v2 namespace; legacy used \code{demo.*})
-#' and calls \code{demographic_question_from_role_v2} for each role whose
+#' and calls \code{demographic_question_from_role} for each role whose
 #' column resolves in cat_data. Synthetic Buyer Status + Heaviness questions
 #' come from the same helpers as the legacy path.
 #' @keywords internal
-.run_demographics_for_category_v2 <- function(role_map, structure, config,
+.run_demographics_for_category <- function(role_map, structure, config,
                                                 cat_data, cat_weights,
                                                 cat_brands, cat_name,
                                                 brand_volume, buyer_heaviness,
@@ -1119,7 +1119,7 @@ if (!exists(".find_brand_col", mode = "function")) {
 
   questions <- list()
   for (role in demo_roles) {
-    rec <- demographic_question_from_role_v2(
+    rec <- demographic_question_from_role(
       data         = cat_data,
       role_map     = role_map,
       role         = role,
@@ -1326,7 +1326,7 @@ if (!exists(".find_brand_col", mode = "function")) {
 # placeholder so the panel-data renderer can show "Data not yet collected
 # for Ad Hoc" — matching the placeholder pattern across the rebuild.
 
-.run_adhoc_for_category_v2 <- function(role_map, structure, config,
+.run_adhoc_for_category <- function(role_map, structure, config,
                                         data_full, weights_full,
                                         cat_data, cat_weights, cat_brands,
                                         cat_name, cat_code, brand_volume,
@@ -1335,7 +1335,7 @@ if (!exists(".find_brand_col", mode = "function")) {
   bmat <- .demo_brand_matrix_for_category(brand_volume, cat_brands)
 
   # ALL-scope: sample-wide context, no brand cut.
-  out_all <- run_adhoc_v2(
+  out_all <- run_adhoc(
     role_map     = role_map, structure = structure, data = data_full,
     weights      = weights_full, scope_filter = "ALL",
     pen_mat      = NULL,
@@ -1344,7 +1344,7 @@ if (!exists(".find_brand_col", mode = "function")) {
 
   # CATCODE-scope: focal-category respondents with this cat's brand cuts.
   out_cat <- if (!is.null(cat_code) && nzchar(cat_code))
-    run_adhoc_v2(
+    run_adhoc(
       role_map     = role_map, structure = structure, data = cat_data,
       weights      = cat_weights, scope_filter = cat_code,
       pen_mat      = bmat$pen_mat,
@@ -1401,7 +1401,7 @@ if (!exists(".find_brand_col", mode = "function")) {
 
 #' Compute cross-category portfolio data (thin wrapper)
 #'
-#' Delegates to \code{run_portfolio_v2()} for the full portfolio analysis.
+#' Delegates to \code{run_portfolio()} for the full portfolio analysis.
 #' Threads \code{role_map} through every sub-analysis so awareness columns
 #' resolve via the slot-indexed reader layer. Preserves the
 #' \code{results$portfolio} output key for downstream code.
@@ -1409,7 +1409,7 @@ if (!exists(".find_brand_col", mode = "function")) {
 #' @keywords internal
 .compute_portfolio_data <- function(data, categories, structure, config, weights,
                                      role_map = NULL) {
-  run_portfolio_v2(data, role_map, categories, structure, config, weights)
+  run_portfolio(data, role_map, categories, structure, config, weights)
 }
 
 

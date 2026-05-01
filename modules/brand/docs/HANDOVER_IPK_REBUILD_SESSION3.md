@@ -21,7 +21,7 @@ After elements ship, §4 (output assembly + browser verification) and §5 (cutov
 
 | Commit | Step | Element | Tests |
 |---|---|---|---|
-| de7c410 | 3i.2 | Portfolio sub-analyses — `compute_footprint_matrix_v2`, `compute_constellation_v2`, `compute_constellations_per_cat_v2`, `compute_clutter_data_v2`, `compute_strength_map_v2`, `compute_extension_table_v2`, `compute_extension_per_brand_v2`, `compute_portfolio_overview_data_v2` | 111 |
+| de7c410 | 3i.2 | Portfolio sub-analyses — `compute_footprint_matrix`, `compute_constellation`, `compute_constellations_per_cat`, `compute_clutter_data`, `compute_strength_map`, `compute_extension_table`, `compute_extension_per_brand`, `compute_portfolio_overview_data` | 111 |
 
 **Branch state:** 17 commits ahead of `main`, **527 tests pass / 0 fail.**
 
@@ -29,7 +29,7 @@ Full list: `git log --oneline main..HEAD`. Architectural decisions in §10 of th
 
 ### Key design choices in 3i.2
 
-- **One shared helper, many callers.** [09_portfolio.R](../R/09_portfolio.R) gained `.portfolio_aware_matrix_v2(data, role_map, cat_code, brand_codes)` and `.portfolio_aware_root_v2(role_map, cat_code)`. Every v2 sub-analysis calls the helper instead of looping `paste0("BRANDAWARE_", cat, "_", brand)`. Convention fallback → `BRANDAWARE_{cat_code}` when `role_map` is NULL or missing the entry.
+- **One shared helper, many callers.** [09_portfolio.R](../R/09_portfolio.R) gained `.portfolio_aware_matrix(data, role_map, cat_code, brand_codes)` and `.portfolio_aware_root(role_map, cat_code)`. Every v2 sub-analysis calls the helper instead of looping `paste0("BRANDAWARE_", cat, "_", brand)`. Convention fallback → `BRANDAWARE_{cat_code}` when `role_map` is NULL or missing the entry.
 - **v2 contract is `(data, role_map, categories, structure, config, weights, ...)`.** Categories must carry `CategoryCode` (per the new Brand_Config schema) — no detection. Refuses `CFG_PORTFOLIO_NO_CATEGORY_CODE` when missing.
 - **Brand universe walks `structure$brands$BrandCode`** instead of `^BRANDAWARE_[^_]+_[^_]+$` regex scans over data column names. This is the cleanest swap for the constellation cross-cat universe and the extension per-brand walker.
 - **Zero-qualifier categories are recorded in `suppressed_cats` and skipped from the matrix.** Different from legacy v1 where a missing `SQ2_{cat}` column produced REFUSED on the base; in v2 the slot column always exists, so we test `base$n_uw == 0` instead.
@@ -49,7 +49,7 @@ Reads:
 
 Both upstream dependencies are already v2. The migration is a thin v2 wrapper that calls `multi_mention_brand_matrix(data, "BRANDPEN2_{cat}", brand_codes)` for buyer flags and `respondent_picked(data, "DEMO_{key}", value)` (or the demographic resolver from 3k) for audiences.
 
-**Suggested approach:** Add `run_audience_lens_v2(data, role_map, cat_code, brand_list, audiences, focal_brand, weights)` alongside the existing `run_audience_lens`. Each audience definition (from the AudienceLens sheet of Brand_Config) names a column or expression — resolve via the demographic helpers. Pass the buyer flag matrix + audience masks through to the existing analytics, which already work on tensors.
+**Suggested approach:** Add `run_audience_lens(data, role_map, cat_code, brand_list, audiences, focal_brand, weights)` alongside the existing `run_audience_lens`. Each audience definition (from the AudienceLens sheet of Brand_Config) names a column or expression — resolve via the demographic helpers. Pass the buyer flag matrix + audience masks through to the existing analytics, which already work on tensors.
 
 Test pattern: hand-coded mini-fixture with 3 brands × 2 audiences (e.g. "young", "old"); known-answer per-audience SCR/penetration values.
 
@@ -70,7 +70,7 @@ After all element migrations, switch the orchestrator (`00_main.R`) to call the 
 ```r
 compute_footprint_matrix(data, categories, structure, config, weights)
 # becomes
-compute_footprint_matrix_v2(data, role_map, categories, structure, config, weights)
+compute_footprint_matrix(data, role_map, categories, structure, config, weights)
 ```
 
 …and similarly for the other five. The role_map needs to be threaded into `run_portfolio`'s signature (or reachable via config).
@@ -95,7 +95,7 @@ Per planning doc §9 step 5:
 
 The pattern is consistent. **For per-element migrations:**
 
-1. Add a `run_X_v2(data, role_map, cat_code, brand_list, focal_brand, weights, ...)` (or the equivalent wider signature where the element walks multiple categories — Portfolio uses `(data, role_map, categories, structure, config, weights)`).
+1. Add a `run_X(data, role_map, cat_code, brand_list, focal_brand, weights, ...)` (or the equivalent wider signature where the element walks multiple categories — Portfolio uses `(data, role_map, categories, structure, config, weights)`).
 2. Inside, look up roles from `role_map` and use the data-access layer:
    - Multi_Mention slot-indexed roots → `multi_mention_brand_matrix(data, root, brand_codes)` (logical) or `multi_mention_indicator_matrix(data, root, codes)` (0/1 integer).
    - Per-brand single columns → `single_response_brand_matrix(data, root, cat_code, brand_codes)`.
@@ -104,7 +104,7 @@ The pattern is consistent. **For per-element migrations:**
 3. Pass the matrices to the existing analytical function unchanged. Analytical functions consume tensors / matrices, not raw data — no rewrite needed.
 4. Return the same list shape as legacy `run_X` so the panel data builders stay unchanged.
 
-**For per-element tests** (`test_X_v2.R`):
+**For per-element tests** (`test_X.R`):
 1. Hand-coded slot-indexed mini-fixture with hand-calculated expected outputs. Known-answer is mandatory — name the rows, list the slot values, hand-calculate the result before writing the assertion.
 2. IPK Wave 1 integration test verifying end-to-end shape + invariants.
 
@@ -115,7 +115,7 @@ Don't try to update legacy column-per-brand tests — they're scheduled for dele
 | Role pattern | Source | Used by |
 |---|---|---|
 | `funnel.awareness.{cat}` | BRANDAWARE_{cat} | funnel, portfolio |
-| `portfolio.awareness.{cat}` | BRANDAWARE_{cat} | portfolio (preferred over funnel.awareness for `.portfolio_aware_root_v2`) |
+| `portfolio.awareness.{cat}` | BRANDAWARE_{cat} | portfolio (preferred over funnel.awareness for `.portfolio_aware_root`) |
 | `funnel.attitude.{cat}` | BRANDATT1_{cat}_{brand} (compound per-brand) | funnel, drivers/barriers |
 | `funnel.penetration_long.{cat}` | BRANDPEN1_{cat} | funnel |
 | `funnel.penetration_target.{cat}` | BRANDPEN2_{cat} | funnel, repertoire, drivers/barriers, audience lens |
@@ -139,7 +139,7 @@ Don't try to update legacy column-per-brand tests — they're scheduled for dele
 Quick sanity check (run from repo root):
 
 ```bash
-Rscript -e 'library(testthat); for (f in c("test_data_access","test_role_map_v2","test_guard_v2","test_funnel_v2","test_brand_volume_v2","test_mental_avail_v2","test_ma_advantage_v2","test_wom_v2","test_repertoire_v2","test_drivers_barriers_v2","test_demographics_v2","test_portfolio_v2","test_portfolio_subanalyses_v2")) testthat::test_file(paste0("modules/brand/tests/testthat/", f, ".R"))'
+Rscript -e 'library(testthat); for (f in c("test_data_access","test_role_map","test_guard","test_funnel","test_brand_volume","test_mental_avail","test_ma_advantage","test_wom","test_repertoire","test_drivers_barriers","test_demographics","test_portfolio","test_portfolio_subanalyses")) testthat::test_file(paste0("modules/brand/tests/testthat/", f, ".R"))'
 ```
 
 Expected: **527 PASS, 0 FAIL.**
@@ -166,7 +166,7 @@ Rscript -e 'source("modules/brand/tests/fixtures/ipk_wave1/00_generate.R"); ipk_
 
 6. **Portfolio v2 zero-qualifier semantics differ from v1.** Legacy v1 returned REFUSED when `SQ2_{cat}` column was absent. v2 always finds slot columns (SQ2_1..N exist for the whole study) and instead detects `base$n_uw == 0` to skip cats. If you write a test that expects v1's REFUSED-on-missing behaviour, it will fail under v2 — assert `cat %in% suppressed_cats` instead.
 
-7. **Lift baseline in `compute_extension_table_v2` is per-cat focal awareness, not "any awareness".** When testing `lift = p_c / p_baseline`, `p_baseline` reads the focal-aware indicator from `respondent_picked(data, "BRANDAWARE_{cat}", focal_brand)` over **all 8** respondents (mode="all") for THIS category — not "focal aware in any category". Easy hand-calc trap.
+7. **Lift baseline in `compute_extension_table` is per-cat focal awareness, not "any awareness".** When testing `lift = p_c / p_baseline`, `p_baseline` reads the focal-aware indicator from `respondent_picked(data, "BRANDAWARE_{cat}", focal_brand)` over **all 8** respondents (mode="all") for THIS category — not "focal aware in any category". Easy hand-calc trap.
 
 ---
 

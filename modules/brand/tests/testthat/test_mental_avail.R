@@ -1,5 +1,5 @@
 # ==============================================================================
-# Tests for build_cep_linkage_v2 (mental availability migration)
+# Tests for build_cep_linkage (mental availability migration)
 # ==============================================================================
 # Verifies that the v2 linkage builder reads slot-indexed BRANDATTR data
 # via the role registry + data-access layer and produces the same list
@@ -21,7 +21,7 @@ ROOT <- .find_root_ma()
 source(file.path(ROOT, "modules", "brand", "R", "00_guard.R"))
 source(file.path(ROOT, "modules", "brand", "R", "00_data_access.R"))
 source(file.path(ROOT, "modules", "brand", "R", "00_role_inference.R"))
-source(file.path(ROOT, "modules", "brand", "R", "00_role_map_v2.R"))
+source(file.path(ROOT, "modules", "brand", "R", "00_role_map.R"))
 source(file.path(ROOT, "modules", "brand", "R", "02_mental_availability.R"))
 
 
@@ -83,14 +83,14 @@ mk_ma_mini_role_map <- function(data) {
     bc, data)
 }
 
-test_that("build_cep_linkage_v2 produces hand-calculated linkage tensor", {
+test_that("build_cep_linkage produces hand-calculated linkage tensor", {
   data <- mk_ma_mini_data()
   rm <- mk_ma_mini_role_map(data)
   brands <- data.frame(BrandCode = c("IPK", "ROB", "CART"),
                        BrandLabel = c("IPK", "ROB", "CART"),
                        stringsAsFactors = FALSE)
 
-  res <- build_cep_linkage_v2(data, rm, "DSS", brands, item_kind = "cep")
+  res <- build_cep_linkage(data, rm, "DSS", brands, item_kind = "cep")
 
   expect_equal(res$cep_codes, c("CEP01", "CEP02"))
   expect_equal(res$brand_codes, c("IPK", "ROB", "CART"))
@@ -120,7 +120,7 @@ test_that("downstream MA metrics consume v2 linkage unchanged", {
                        BrandLabel = c("IPK", "ROB", "CART"),
                        stringsAsFactors = FALSE)
 
-  res <- build_cep_linkage_v2(data, rm, "DSS", brands, item_kind = "cep")
+  res <- build_cep_linkage(data, rm, "DSS", brands, item_kind = "cep")
 
   # IPK total links across 2 CEPs:
   #   CEP01: IPK linked by resp 1 + 2 = 2
@@ -143,7 +143,7 @@ test_that("downstream MA metrics consume v2 linkage unchanged", {
 # Integration: against the IPK Wave 1 fixture
 # ------------------------------------------------------------------------------
 
-test_that("build_cep_linkage_v2 runs against IPK Wave 1 (15 CEPs x 15 brands)", {
+test_that("build_cep_linkage runs against IPK Wave 1 (15 CEPs x 15 brands)", {
   data_path <- file.path(ROOT, "modules", "brand", "tests", "fixtures",
                          "ipk_wave1", "ipk_wave1_data.xlsx")
   ss_path <- file.path(ROOT, "modules", "brand", "tests", "fixtures",
@@ -168,7 +168,7 @@ test_that("build_cep_linkage_v2 runs against IPK Wave 1 (15 CEPs x 15 brands)", 
   )
 
   # CEP linkage
-  cep_link <- build_cep_linkage_v2(dss, rm, "DSS", dss_brands,
+  cep_link <- build_cep_linkage(dss, rm, "DSS", dss_brands,
                                    item_kind = "cep")
   expect_equal(length(cep_link$cep_codes), 15L)
   expect_equal(length(cep_link$brand_codes), 15L)
@@ -179,7 +179,7 @@ test_that("build_cep_linkage_v2 runs against IPK Wave 1 (15 CEPs x 15 brands)", 
   expect_gt(mean(ipk_cep_pcts), 0.05)
 
   # Attribute linkage
-  att_link <- build_cep_linkage_v2(dss, rm, "DSS", dss_brands,
+  att_link <- build_cep_linkage(dss, rm, "DSS", dss_brands,
                                    item_kind = "attr")
   expect_equal(length(att_link$cep_codes), 15L)  # 15 attributes in fixture
   expect_true(all(grepl("^ATT", att_link$cep_codes)))

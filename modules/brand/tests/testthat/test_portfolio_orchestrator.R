@@ -1,7 +1,7 @@
 # ==============================================================================
-# Tests for run_portfolio_v2 — cross-cat portfolio orchestrator (Step 4d)
+# Tests for run_portfolio — cross-cat portfolio orchestrator (Step 4d)
 # ==============================================================================
-# run_portfolio_v2 wires the eight v2 sub-analyses (footprint, clutter,
+# run_portfolio wires the eight v2 sub-analyses (footprint, clutter,
 # strength, extension, per-brand extension, cross-cat constellation,
 # per-cat constellations, supporting metrics) and threads the global
 # role_map through every call. This is the last v2 switch before
@@ -32,7 +32,7 @@ source(file.path(ROOT, "modules", "shared", "lib", "trs_refusal.R"))
 source(file.path(ROOT, "modules", "brand", "R", "00_guard.R"))
 source(file.path(ROOT, "modules", "brand", "R", "00_data_access.R"))
 source(file.path(ROOT, "modules", "brand", "R", "00_role_inference.R"))
-source(file.path(ROOT, "modules", "brand", "R", "00_role_map_v2.R"))
+source(file.path(ROOT, "modules", "brand", "R", "00_role_map.R"))
 source(file.path(ROOT, "modules", "brand", "R", "01_config.R"))
 source(file.path(ROOT, "modules", "brand", "R", "09_portfolio.R"))
 source(file.path(ROOT, "modules", "brand", "R", "09a_portfolio_footprint.R"))
@@ -43,7 +43,7 @@ source(file.path(ROOT, "modules", "brand", "R", "09e_portfolio_extension.R"))
 
 
 # ------------------------------------------------------------------------------
-# Mini-fixture (shared shape with test_portfolio_subanalyses_v2.R)
+# Mini-fixture (shared shape with test_portfolio_subanalyses.R)
 # ------------------------------------------------------------------------------
 # 8 respondents × 3 categories (DSS, POS, BAK) × 4 brands (A, B, C, D)
 #
@@ -126,13 +126,13 @@ mk_pforch_config <- function(focal = "A", min_base = 1L,
 # Happy path — every panel populated
 # ------------------------------------------------------------------------------
 
-test_that("run_portfolio_v2: happy path returns PASS with footprint, clutter, strength, extension, supporting", {
+test_that("run_portfolio: happy path returns PASS with footprint, clutter, strength, extension, supporting", {
   data       <- mk_pforch_data()
   categories <- mk_pforch_categories()
   structure  <- mk_pforch_structure()
   config     <- mk_pforch_config()
 
-  out <- run_portfolio_v2(data, role_map = NULL, categories, structure, config)
+  out <- run_portfolio(data, role_map = NULL, categories, structure, config)
 
   expect_equal(out$status, "PASS")
   expect_equal(out$focal_brand, "A")
@@ -167,13 +167,13 @@ test_that("run_portfolio_v2: happy path returns PASS with footprint, clutter, st
 })
 
 
-test_that("run_portfolio_v2: supporting metrics — slot-aware repertoire depth", {
+test_that("run_portfolio: supporting metrics — slot-aware repertoire depth", {
   data       <- mk_pforch_data()
   categories <- mk_pforch_categories()
   structure  <- mk_pforch_structure()
   config     <- mk_pforch_config()
 
-  out <- run_portfolio_v2(data, role_map = NULL, categories, structure, config)
+  out <- run_portfolio(data, role_map = NULL, categories, structure, config)
 
   sup <- out$supporting
   # Hand-checked: A is aware in DSS (100%) AND POS (50%) — both > 0 -> breadth = 2
@@ -190,13 +190,13 @@ test_that("run_portfolio_v2: supporting metrics — slot-aware repertoire depth"
 })
 
 
-test_that("run_portfolio_v2: per-cat constellation populated for live cats", {
+test_that("run_portfolio: per-cat constellation populated for live cats", {
   data       <- mk_pforch_data()
   categories <- mk_pforch_categories()
   structure  <- mk_pforch_structure()
   config     <- mk_pforch_config(min_base = 1L, cooccur_min = 1L)
 
-  out <- run_portfolio_v2(data, role_map = NULL, categories, structure, config)
+  out <- run_portfolio(data, role_map = NULL, categories, structure, config)
 
   expect_false(is.null(out$constellation_per_cat))
   expect_equal(out$constellation_per_cat$status, "PASS")
@@ -205,14 +205,14 @@ test_that("run_portfolio_v2: per-cat constellation populated for live cats", {
 })
 
 
-test_that("run_portfolio_v2: suppressed_cats aggregates across sub-analyses", {
+test_that("run_portfolio: suppressed_cats aggregates across sub-analyses", {
   data       <- mk_pforch_data()
   categories <- mk_pforch_categories()
   structure  <- mk_pforch_structure()
   # min_base = 5 — POS (n=4) flagged in footprint suppressed_cats
   config     <- mk_pforch_config(min_base = 5L)
 
-  out <- run_portfolio_v2(data, role_map = NULL, categories, structure, config)
+  out <- run_portfolio(data, role_map = NULL, categories, structure, config)
 
   expect_equal(out$status, "PASS")
   expect_true("POS" %in% out$suppressions$low_base_cats)
@@ -224,27 +224,27 @@ test_that("run_portfolio_v2: suppressed_cats aggregates across sub-analyses", {
 # Guard refusal
 # ------------------------------------------------------------------------------
 
-test_that("run_portfolio_v2: refuses when cross_category_awareness disabled", {
+test_that("run_portfolio: refuses when cross_category_awareness disabled", {
   data       <- mk_pforch_data()
   categories <- mk_pforch_categories()
   structure  <- mk_pforch_structure()
   config     <- mk_pforch_config(cross_cat_aware = FALSE)
 
-  out <- run_portfolio_v2(data, role_map = NULL, categories, structure, config)
+  out <- run_portfolio(data, role_map = NULL, categories, structure, config)
 
   expect_equal(out$status, "REFUSED")
   expect_equal(out$code, "CFG_PORTFOLIO_AWARENESS_OFF")
 })
 
 
-test_that("run_portfolio_v2: refuses when no BRANDAWARE_* columns in data", {
+test_that("run_portfolio: refuses when no BRANDAWARE_* columns in data", {
   data       <- mk_pforch_data()
   data       <- data[, !grepl("^BRANDAWARE_", names(data)), drop = FALSE]
   categories <- mk_pforch_categories()
   structure  <- mk_pforch_structure()
   config     <- mk_pforch_config()
 
-  out <- run_portfolio_v2(data, role_map = NULL, categories, structure, config)
+  out <- run_portfolio(data, role_map = NULL, categories, structure, config)
 
   expect_equal(out$status, "REFUSED")
   expect_equal(out$code, "DATA_PORTFOLIO_NO_AWARENESS_COLS")
@@ -255,7 +255,7 @@ test_that("run_portfolio_v2: refuses when no BRANDAWARE_* columns in data", {
 # role_map override resolves a custom awareness root
 # ------------------------------------------------------------------------------
 
-test_that("run_portfolio_v2: role_map override threads through to sub-analyses", {
+test_that("run_portfolio: role_map override threads through to sub-analyses", {
   data       <- mk_pforch_data()
   categories <- mk_pforch_categories()
   structure  <- mk_pforch_structure()
@@ -272,7 +272,7 @@ test_that("run_portfolio_v2: role_map override threads through to sub-analyses",
                                     variable_type = "Multi_Mention")
   )
 
-  out <- run_portfolio_v2(data, role_map = role_map, categories, structure, config)
+  out <- run_portfolio(data, role_map = role_map, categories, structure, config)
   expect_equal(out$status, "PASS")
   # DSS hand-checked: A=100%, B=80%, C=40%, D=20%
   m <- out$footprint_matrix
