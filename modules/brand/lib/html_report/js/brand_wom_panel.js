@@ -37,6 +37,13 @@
 
     // --- Brand show/hide chips
     panel.querySelectorAll('[data-wom-action="toggle-row"]').forEach(function (chip) {
+      // Seed row visibility from chip .active state so chip_default = focal_only
+      // hides non-focal rows on first render.
+      var bc0 = chip.getAttribute("data-wom-brand");
+      if (bc0) {
+        var row0 = table.querySelector('tr[data-wom-brand="' + cssEscape(bc0) + '"]');
+        if (row0) row0.classList.toggle('wom-row-hidden', !chip.classList.contains('active'));
+      }
       chip.addEventListener("click", function (ev) {
         ev.preventDefault();
         var bc = chip.getAttribute("data-wom-brand");

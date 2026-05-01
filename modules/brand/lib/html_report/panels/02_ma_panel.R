@@ -38,12 +38,16 @@ BRAND_MA_PANEL_VERSION <- "1.0"
 #' @export
 build_ma_panel_html <- function(panel_data, category_code = "cat",
                                 focal_colour = "#1A5276",
-                                excel_filename = NULL) {
+                                excel_filename = NULL,
+                                chip_default = "focal_only") {
   if (is.null(panel_data) || is.null(panel_data$meta) ||
       length(panel_data$meta) == 0 ||
       (is.null(panel_data$ceps) && is.null(panel_data$attributes))) {
     return('<div class="ma-panel-empty">Mental Availability not available for this category.</div>')
   }
+
+  chip_default <- if (identical(chip_default, "all")) "all" else "focal_only"
+  panel_data$config$chip_default <- chip_default
 
   panel_id <- paste0("ma-", category_code)
   json_payload <- .ma_panel_json(panel_data, focal_colour)
@@ -61,8 +65,8 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
   default_tab <- if (has_attrs) "attributes" else "ceps"
 
   paste0(
-    sprintf('<div class="ma-panel" id="%s" data-focal-colour="%s" style="--ma-brand:%s"%s>',
-            panel_id, focal_colour, focal_colour, excel_attr),
+    sprintf('<div class="ma-panel" id="%s" data-focal-colour="%s" data-chip-default="%s" style="--ma-brand:%s"%s>',
+            panel_id, focal_colour, chip_default, focal_colour, excel_attr),
     sprintf('<script type="application/json" class="ma-panel-data">%s</script>',
             json_payload),
     .ma_sub_tabs(has_attrs, has_ceps, default_tab, has_advantage = has_advantage),
@@ -168,6 +172,10 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
   brand_codes <- pd$config$brand_codes %||% character(0)
   brand_names <- pd$config$brand_names %||% brand_codes
   focal <- pd$meta$focal_brand_code %||% brand_codes[1]
+  chip_default <- pd$config$chip_default %||% "focal_only"
+  is_focal_only <- identical(chip_default, "focal_only")
+  off_cls <- if (is_focal_only) " col-chip-off" else ""
+  toggle_label <- if (is_focal_only) "Show all" else "Hide all"
 
   # Sort: focal first, then alphabetical by brand name
   sorted_order <- order(brand_codes != focal, tolower(brand_names))
@@ -178,11 +186,13 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
     sprintf('<button type="button" class="col-chip" data-ma-scope="%s" data-ma-brand="__avg__">Cat avg</button>',
             .ma_esc(stim)),
     vapply(seq_along(brand_codes), function(i) {
-      sprintf('<button type="button" class="col-chip" data-ma-scope="%s" data-ma-brand="%s">%s</button>',
-              .ma_esc(stim), .ma_esc(brand_codes[i]), .ma_esc(brand_names[i]))
+      bc <- brand_codes[i]
+      cls <- if (!is.null(focal) && bc == focal) "col-chip" else paste0("col-chip", off_cls)
+      sprintf('<button type="button" class="%s" data-ma-scope="%s" data-ma-brand="%s">%s</button>',
+              cls, .ma_esc(stim), .ma_esc(bc), .ma_esc(brand_names[i]))
     }, character(1)),
-    sprintf('<button type="button" class="ma-all-toggle" data-ma-action="toggleall" data-ma-scope="%s">Hide all</button>',
-            .ma_esc(stim))
+    sprintf('<button type="button" class="ma-all-toggle" data-ma-action="toggleall" data-ma-scope="%s">%s</button>',
+            .ma_esc(stim), toggle_label)
   ), collapse = "")
 
   block <- if (stim == "attributes") pd$attributes else pd$ceps
@@ -251,15 +261,25 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
 .ma_chart_placeholder <- function(stim, pd) {
   brand_codes <- pd$config$brand_codes %||% character(0)
   brand_names <- pd$config$brand_names %||% brand_codes
+  focal <- pd$meta$focal_brand_code %||% brand_codes[1]
+  chip_default <- pd$config$chip_default %||% "focal_only"
+  is_focal_only <- identical(chip_default, "focal_only")
+  off_cls <- if (is_focal_only) " col-chip-off" else ""
+  toggle_label <- if (is_focal_only) "Show all" else "Hide all"
 
   chips_html <- paste(c(
     vapply(seq_along(brand_codes), function(i) {
+      bc <- brand_codes[i]
+      cls <- if (!is.null(focal) && bc == focal)
+        "col-chip chart-chip"
+      else
+        paste0("col-chip chart-chip", off_cls)
       sprintf(
-        '<button type="button" class="col-chip chart-chip" data-ma-chart-scope="%s" data-ma-brand="%s">%s</button>',
-        stim, .ma_esc(brand_codes[i]), .ma_esc(brand_names[i]))
+        '<button type="button" class="%s" data-ma-chart-scope="%s" data-ma-brand="%s">%s</button>',
+        cls, stim, .ma_esc(bc), .ma_esc(brand_names[i]))
     }, character(1)),
-    sprintf('<button type="button" class="ma-all-toggle" data-ma-chart-action="toggleall" data-ma-chart-scope="%s">Hide all</button>',
-            .ma_esc(stim))
+    sprintf('<button type="button" class="ma-all-toggle" data-ma-chart-action="toggleall" data-ma-chart-scope="%s">%s</button>',
+            .ma_esc(stim), toggle_label)
   ), collapse = "")
 
   sprintf(

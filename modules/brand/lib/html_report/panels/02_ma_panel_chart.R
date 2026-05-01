@@ -20,6 +20,10 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
   brand_codes <- pd$config$brand_codes %||% character(0)
   brand_names <- pd$config$brand_names %||% brand_codes
   focal       <- pd$meta$focal_brand_code %||% brand_codes[1]
+  chip_default <- pd$config$chip_default %||% "focal_only"
+  is_focal_only <- identical(chip_default, "focal_only")
+  off_cls <- if (is_focal_only) " col-chip-off" else ""
+  toggle_label <- if (is_focal_only) "Show all" else "Hide all"
 
   # Sort: focal first, then alphabetical by brand name
   sorted_order <- order(brand_codes != focal, tolower(brand_names))
@@ -28,11 +32,14 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
 
   chips_html <- paste(c(
     vapply(seq_along(brand_codes), function(i) {
+      bc <- brand_codes[i]
+      cls <- if (!is.null(focal) && bc == focal) "col-chip" else paste0("col-chip", off_cls)
       sprintf(
-        '<button type="button" class="col-chip" data-ma-scope="metrics" data-ma-brand="%s">%s</button>',
-        .ma_esc(brand_codes[i]), .ma_esc(brand_names[i]))
+        '<button type="button" class="%s" data-ma-scope="metrics" data-ma-brand="%s">%s</button>',
+        cls, .ma_esc(bc), .ma_esc(brand_names[i]))
     }, character(1)),
-    '<button type="button" class="ma-all-toggle" data-ma-action="toggleall" data-ma-scope="metrics">Hide all</button>'
+    sprintf('<button type="button" class="ma-all-toggle" data-ma-action="toggleall" data-ma-scope="metrics">%s</button>',
+            toggle_label)
   ), collapse = "")
 
   controls_bar <- paste0(

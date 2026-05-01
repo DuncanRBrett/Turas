@@ -86,6 +86,8 @@ render_cat_buying_panel <- function(panel_data) {
   brand_labels <- panel_data$brand_labels %||% NULL
   brand_colours <- panel_data$brand_colours %||% list()
   dist_labels  <- panel_data$cat_buying_dist_labels %||% NULL
+  chip_default <- panel_data$chip_default %||% "focal_only"
+  chip_default <- if (identical(chip_default, "all")) "all" else "focal_only"
 
   has_dn <- !is.null(dn) && !identical(dn$status, "REFUSED")
   has_bh <- !is.null(bh) && !identical(bh$status, "REFUSED")
@@ -96,8 +98,8 @@ render_cat_buying_panel <- function(panel_data) {
   if (exists("cb_panel_css", mode = "function")) parts <- c(parts, cb_panel_css())
 
   parts <- c(parts, sprintf(
-    '<div class="cb-panel cb-on-context" id="%s" data-focal-colour="%s" style="--cb-focal-colour:%s;">',
-    panel_id, .cb_esc(fcol), .cb_esc(fcol)))
+    '<div class="cb-panel cb-on-context" id="%s" data-focal-colour="%s" data-chip-default="%s" style="--cb-focal-colour:%s;">',
+    panel_id, .cb_esc(fcol), chip_default, .cb_esc(fcol)))
 
   # JSON: per-brand KPI data for focal switcher
   parts <- c(parts, .cb_kpi_json_script(dn, bh, cat_code))
@@ -115,7 +117,8 @@ render_cat_buying_panel <- function(panel_data) {
 
   # Brand picker (focal <select> + show/hide chips) — BELOW the sub-tab nav
   parts <- c(parts, .cb_brand_picker(dn, bh, focal, fcol, cat_code,
-                                      brand_labels, brand_colours))
+                                      brand_labels, brand_colours,
+                                      chip_default = chip_default))
 
   # ----- Tab 1: Category Context (default) -----------------------------------
   # Shopper context chips (top channel + top pack size) live INSIDE the
@@ -1014,7 +1017,10 @@ render_cat_buying_panel <- function(panel_data) {
 
 
 .cb_brand_picker <- function(dn, bh, focal, fcol, cat_code,
-                              brand_labels = NULL, brand_colours = list()) {
+                              brand_labels = NULL, brand_colours = list(),
+                              chip_default = "focal_only") {
+  is_focal_only <- identical(chip_default, "focal_only")
+  toggle_label <- if (is_focal_only) "Show all" else "Hide all"
   codes <- character(0)
   if (!is.null(dn) && !identical(dn$status, "REFUSED") && !is.null(dn$norms_table))
     codes <- c(codes, as.character(dn$norms_table$BrandCode))
@@ -1066,19 +1072,25 @@ render_cat_buying_panel <- function(panel_data) {
 
   # Coloured brand chips — show/hide toggles (NOT focal selectors).
   # Clicking a chip hides its row in the brand summary table via JS.
+  # Cat-buying CSS keys greyed/strikethrough to .col-chip-off (with .active kept
+  # so the brand colour styling persists — see 08_cat_buying_panel_styling.R).
   chips <- paste(vapply(seq_along(codes), function(i) {
     bc <- codes[i]
     lbl <- names_vec[i]
     col <- resolve_colour(bc, i)
     is_foc <- !is.null(focal) && bc == focal
     badge <- if (is_foc) ' <span class="fn-focal-badge">FOCAL</span>' else ""
+    off_cls <- if (is_focal_only && !is_foc) " col-chip-off" else ""
     sprintf(
-      '<button type="button" class="col-chip fn-rel-brand-chip active" data-cb-action="toggle-row" data-brand="%s" style="--brand-chip-color:%s;background-color:%s;border-color:%s;color:#fff;">%s%s</button>',
+      '<button type="button" class="col-chip fn-rel-brand-chip active%s" data-cb-action="toggle-row" data-brand="%s" style="--brand-chip-color:%s;background-color:%s;border-color:%s;color:#fff;">%s%s</button>',
+      off_cls,
       .cb_esc(bc), .cb_esc(col), .cb_esc(col), .cb_esc(col),
       .cb_esc(lbl), badge)
   }, character(1)), collapse = "")
 
-  toggle <- '<button type="button" class="ma-all-toggle" data-cb-action="toggleall" data-cb-scope="brands">Hide all</button>'
+  toggle <- sprintf(
+    '<button type="button" class="ma-all-toggle" data-cb-action="toggleall" data-cb-scope="brands">%s</button>',
+    toggle_label)
   sprintf(
     '%s<div class="cb-brand-picker"><span class="cb-ctl-label cb-ctl-label-title">Show brands</span><div class="col-chip-bar">%s%s</div></div>',
     focus_bar, chips, toggle)

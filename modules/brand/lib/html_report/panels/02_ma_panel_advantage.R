@@ -139,14 +139,20 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
   brand_codes <- pd$config$brand_codes %||% character(0)
   brand_names <- pd$config$brand_names %||% brand_codes
   focal       <- pd$meta$focal_brand_code
+  chip_default <- pd$config$chip_default %||% "focal_only"
+  is_focal_only <- identical(chip_default, "focal_only")
+  off_cls <- if (is_focal_only) " col-chip-off" else ""
+  toggle_label <- if (is_focal_only) "Show all" else "Hide all"
 
   if (length(brand_codes) == 0) return("")
   sorted <- order(brand_codes != focal, tolower(brand_names))
   brand_codes <- brand_codes[sorted]; brand_names <- brand_names[sorted]
 
   chips <- paste(vapply(seq_along(brand_codes), function(i) {
-    sprintf('<button type="button" class="col-chip" data-ma-adv-chip-brand="%s">%s</button>',
-            .ma_esc(brand_codes[i]), .ma_esc(brand_names[i]))
+    bc <- brand_codes[i]
+    cls <- if (!is.null(focal) && bc == focal) "col-chip" else paste0("col-chip", off_cls)
+    sprintf('<button type="button" class="%s" data-ma-adv-chip-brand="%s">%s</button>',
+            cls, .ma_esc(bc), .ma_esc(brand_names[i]))
   }, character(1)), collapse = "")
 
   paste0(
@@ -154,7 +160,8 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
     '<span class="ma-ctl-label">Show brands</span>',
     '<div class="ma-chip-row col-chip-bar" data-ma-adv-scope="brands">',
     chips,
-    '<button type="button" class="ma-all-toggle" data-ma-adv-action="toggleall">Hide all</button>',
+    sprintf('<button type="button" class="ma-all-toggle" data-ma-adv-action="toggleall">%s</button>',
+            toggle_label),
     '</div>',
     '</div>'
   )

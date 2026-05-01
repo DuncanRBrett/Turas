@@ -319,7 +319,8 @@ transform_brand_panels <- function(results, config) {
     panel_html <- build_funnel_panel_html(panel_data,
                                           category_code = cat_id,
                                           focal_colour = focal_colour,
-                                          excel_filename = xlsx_name)
+                                          excel_filename = xlsx_name,
+                                          chip_default = config$chip_default %||% "focal_only")
     panels[[paste0("funnel_", cat_id)]] <- panel_html
   }
 
@@ -391,7 +392,8 @@ transform_brand_panels <- function(results, config) {
 
       ma_html <- build_ma_panel_html(ma_pd,
                                       category_code = cat_id,
-                                      focal_colour = focal_colour)
+                                      focal_colour = focal_colour,
+                                      chip_default = config$chip_default %||% "focal_only")
       panels[[paste0("ma_", cat_id)]] <- ma_html
     }
   }
@@ -459,7 +461,8 @@ transform_brand_panels <- function(results, config) {
         shopper_packsize      = cr$shopper_packsize,
         brand_labels          = brand_labels,
         brand_colours         = brand_colours,
-        cat_buying_dist_labels = config$cat_buying_dist_labels %||% NULL
+        cat_buying_dist_labels = config$cat_buying_dist_labels %||% NULL,
+        chip_default          = config$chip_default %||% "focal_only"
       )
 
       cb_html <- tryCatch(
@@ -537,7 +540,8 @@ transform_brand_panels <- function(results, config) {
       wom_html <- tryCatch(
         build_wom_panel_html(wom_pd,
                              category_code = cat_id,
-                             focal_colour = focal_colour),
+                             focal_colour = focal_colour,
+                             chip_default = config$chip_default %||% "focal_only"),
         error = function(e) {
           message(sprintf("[BRAND HTML] WOM panel render failed for %s: %s",
                           cat_name, e$message))

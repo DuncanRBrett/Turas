@@ -31,18 +31,22 @@ BRAND_WOM_PANEL_VERSION <- "1.0"
 #' @export
 build_wom_panel_html <- function(panel_data,
                                  category_code = "cat",
-                                 focal_colour = "#1A5276") {
+                                 focal_colour = "#1A5276",
+                                 chip_default = "focal_only") {
   if (is.null(panel_data) || is.null(panel_data$columns) ||
       length(panel_data$brands) == 0) {
     return('<div class="wom-panel-empty">Word of Mouth not available for this category.</div>')
   }
 
+  chip_default <- if (identical(chip_default, "all")) "all" else "focal_only"
+  panel_data$config$chip_default <- chip_default
+
   panel_id <- paste0("wom-", category_code)
   json_payload <- .wom_panel_json(panel_data, focal_colour)
 
   paste0(
-    sprintf('<div class="wom-panel" id="%s" data-focal-colour="%s" data-cat-code="%s">',
-            panel_id, .wom_esc(focal_colour), .wom_esc(category_code)),
+    sprintf('<div class="wom-panel" id="%s" data-focal-colour="%s" data-cat-code="%s" data-chip-default="%s">',
+            panel_id, .wom_esc(focal_colour), .wom_esc(category_code), chip_default),
     sprintf('<script type="application/json" class="wom-panel-data">%s</script>',
             json_payload),
     .wom_controls_bar(panel_data, category_code, focal_colour),
@@ -91,6 +95,10 @@ build_wom_panel_html <- function(panel_data,
             .wom_esc(brand_codes[i]), sel, .wom_esc(brand_names[i]))
   }, character(1)), collapse = "")
 
+  chip_default <- pd$config$chip_default %||% "focal_only"
+  is_focal_only <- identical(chip_default, "focal_only")
+  toggle_label <- if (is_focal_only) "Show all" else "Hide all"
+
   # Coloured chips — toggle row visibility; includes Show all/Hide all button
   chips_html <- paste(vapply(seq_along(brand_codes), function(i) {
     bc  <- brand_codes[i]
@@ -98,8 +106,11 @@ build_wom_panel_html <- function(panel_data,
     col <- .stable_col(bc)
     is_foc <- !is.null(focal) && bc == focal
     badge  <- if (is_foc) ' <span class="fn-focal-badge">FOCAL</span>' else ""
+    # Under focal_only: only focal gets .active. Under all: every chip gets .active.
+    active_cls <- if (is_foc || !is_focal_only) " active" else ""
     sprintf(
-      '<button type="button" class="col-chip fn-rel-brand-chip active wom-brand-chip" data-wom-action="toggle-row" data-wom-brand="%s" style="--brand-chip-color:%s;background-color:%s;border-color:%s;color:#fff;">%s%s</button>',
+      '<button type="button" class="col-chip fn-rel-brand-chip%s wom-brand-chip" data-wom-action="toggle-row" data-wom-brand="%s" style="--brand-chip-color:%s;background-color:%s;border-color:%s;color:#fff;">%s%s</button>',
+      active_cls,
       .wom_esc(bc), .wom_esc(col), .wom_esc(col), .wom_esc(col),
       .wom_esc(nm), badge)
   }, character(1)), collapse = "")
@@ -112,7 +123,7 @@ build_wom_panel_html <- function(panel_data,
      <div class="wom-controls-bar">
        <div class="wom-ctl-group">
          <span class="wom-ctl-label wom-ctl-label-title">Show brands</span>
-         <div class="col-chip-bar" data-wom-scope="%s">%s<button type="button" class="ma-all-toggle" data-wom-action="toggleall" data-wom-scope="%s">Hide all</button></div>
+         <div class="col-chip-bar" data-wom-scope="%s">%s<button type="button" class="ma-all-toggle" data-wom-action="toggleall" data-wom-scope="%s">%s</button></div>
        </div>
        <div class="wom-meta-row">
          <label class="toggle-label">
@@ -130,7 +141,7 @@ build_wom_panel_html <- function(panel_data,
        </div>
      </div>',
     focus_options,
-    .wom_esc(category_code), chips_html, .wom_esc(category_code),
+    .wom_esc(category_code), chips_html, .wom_esc(category_code), toggle_label,
     .wom_esc(category_code),
     .wom_esc(category_code))
 }

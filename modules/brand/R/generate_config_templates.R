@@ -380,7 +380,11 @@ BRAND_CONFIG_VERSION <- "2.0"
         list(name = "show_about_section", required = FALSE, default = "Y",
              description = "Include an About & Methodology section in the HTML report with academic references (Romaniuk, Sharp, EBI framework). Useful for client education.",
              valid_values_text = "Y or N",
-             dropdown = c("Y", "N"))
+             dropdown = c("Y", "N")),
+        list(name = "chip_default", required = FALSE, default = "focal_only",
+             description = "Initial state of brand-chip bars across MA, Funnel, WOM and Cat Buying panels. 'focal_only' shows only focal brand + Cat avg by default; other brands are greyed off and can be enabled via their chips. 'all' shows every brand on by default.",
+             valid_values_text = "focal_only or all",
+             dropdown = c("focal_only", "all"))
       )
     )
   )

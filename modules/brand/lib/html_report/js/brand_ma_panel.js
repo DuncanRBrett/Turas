@@ -148,10 +148,15 @@
     panel.__maData = pd;
 
     var brandCodes = (pd.config && pd.config.brand_codes) || [];
+    var chipDefault = panel.getAttribute('data-chip-default') || 'focal_only';
+    var focalCode = (pd.meta && pd.meta.focal_brand_code) || brandCodes[0] || null;
 
     var makeVisMap = function () {
       var m = {};
-      brandCodes.forEach(function (c) { m[c] = true; });
+      brandCodes.forEach(function (c) {
+        // focal_only: only focal active by default. all: every chip active.
+        m[c] = (chipDefault !== 'focal_only') || (c === focalCode);
+      });
       m.__avg__ = true;
       return m;
     };
@@ -208,6 +213,23 @@
     applyBaseMode(panel, 'ceps');
     applyShowCounts(panel, 'attributes');
     applyShowCounts(panel, 'ceps');
+    // Apply chip visibility on init so chip_default = focal_only actually
+    // hides matrix columns (not just greys the chips).
+    applyColumnVisibility(panel, 'attributes');
+    applyColumnVisibility(panel, 'ceps');
+    // Metrics rows are DOM-driven (no vis map) — mirror chip col-chip-off
+    // state to row display so non-focal rows hide on init.
+    (function () {
+      var table = panel.querySelector('.ma-metrics-table');
+      if (!table) return;
+      panel.querySelectorAll('.col-chip[data-ma-scope="metrics"].col-chip-off').forEach(function (chip) {
+        var code = chip.getAttribute('data-ma-brand');
+        if (!code) return;
+        table.querySelectorAll('tbody tr.ma-row[data-ma-brand="' + code + '"]').forEach(function (r) {
+          r.style.display = 'none';
+        });
+      });
+    })();
     renderChart(panel, 'attributes');
     renderChart(panel, 'ceps');
     repositionMetricsPinnedRows(panel);

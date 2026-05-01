@@ -88,10 +88,12 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
   ordered <- c(focal_entries, comp_entries)
   if (length(ordered) == 0) return("")
 
+  chip_default <- pd$config$chip_default %||% "focal_only"
+
   paste0(
     sprintf('<section class="fn-section fn-rel-chart-section"%s>',
             if (is.finite(n_total)) sprintf(' data-fn-rel-ntotal="%.0f"', n_total) else ""),
-    .fn_rel_controls(ordered, focal),
+    .fn_rel_controls(ordered, focal, chip_default),
     .fn_rel_table(ordered, focal, focal_colour, n_total),
     '<div class="fn-rel-headline" data-fn-rel-headline style="display:none;margin-top:14px;"></div>',
     '<div class="fn-rel-chart-area" data-fn-rel-chart-area>',
@@ -111,21 +113,28 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
 # INTERNAL: RELATIONSHIP CONTROLS BAR
 # ==============================================================================
 
-.fn_rel_controls <- function(ordered, focal) {
+.fn_rel_controls <- function(ordered, focal, chip_default = "focal_only") {
+  is_focal_only <- identical(chip_default, "focal_only")
+  toggle_label <- if (is_focal_only) "Show all" else "Hide all"
+
   brand_chips <- paste(vapply(ordered, function(b) {
     code   <- as.character(b$brand_code)
     name   <- b$brand_name %||% b$brand_code
     is_foc <- identical(code, as.character(focal))
     label  <- if (is_foc) paste0(.fn_esc(name), ' <span class="fn-focal-badge">FOCAL</span>')
                else .fn_esc(name)
-    sprintf('<button type="button" class="col-chip fn-rel-brand-chip active" data-fn-rel-brand="%s">%s</button>',
-            .fn_esc(code), label)
+    # Under focal_only: only focal gets .active. Under all: every chip gets .active.
+    active_cls <- if (is_foc || !is_focal_only) " active" else ""
+    sprintf('<button type="button" class="col-chip fn-rel-brand-chip%s" data-fn-rel-brand="%s">%s</button>',
+            active_cls, .fn_esc(code), label)
   }, character(1)), collapse = "")
 
-  # Category average chip
+  # Category average chip — always active under both modes.
   avg_chip <- '<button type="button" class="col-chip fn-rel-brand-chip fn-rel-avg-chip active" data-fn-rel-brand="__avg__">Cat avg</button>'
 
-  toggle_chip <- '<button type="button" class="ma-all-toggle" data-fn-rel-action="toggleall">Hide all</button>'
+  toggle_chip <- sprintf(
+    '<button type="button" class="ma-all-toggle" data-fn-rel-action="toggleall">%s</button>',
+    toggle_label)
 
   paste0(
     '<div class="fn-rel-controls">',

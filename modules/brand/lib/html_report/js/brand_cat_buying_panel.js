@@ -76,9 +76,14 @@
     catch (e) { return; }
     panel.__cbData = pd;
 
+    var chipDefault = panel.getAttribute('data-chip-default') || 'focal_only';
+    var focalCode = pd.focalBrand || null;
     var makeVisMap = function (codes) {
       var m = {};
-      (codes || []).forEach(function (c) { m[c] = true; });
+      (codes || []).forEach(function (c) {
+        // focal_only: only focal active by default. all: every chip active.
+        m[c] = (chipDefault !== 'focal_only') || (c === focalCode);
+      });
       return m;
     };
 
@@ -116,6 +121,15 @@
     relocateCbToolbarIntoControls(panel);
     bindCbPinBtn(panel);
     bindCbPngBtn(panel);
+
+    // Apply chip visibility on init so chip_default = focal_only actually
+    // hides table rows (not just greys the chips). Click handlers call
+    // these functions; init must too.
+    if (typeof applyBrandsRowVisibility === 'function') applyBrandsRowVisibility(panel);
+    if (typeof applyRowVisibility === 'function') {
+      applyRowVisibility(panel, 'loyalty');
+      applyRowVisibility(panel, 'dist');
+    }
 
     renderCbStackedBars(panel, 'loyalty');
     renderCbStackedBars(panel, 'dist');

@@ -608,6 +608,13 @@
     panel.__maAdvHiddenBrands = panel.__maAdvHiddenBrands || {};
     panel.__maAdvHiddenStims = panel.__maAdvHiddenStims || {};
 
+    // Seed hidden state from DOM so chip_default = focal_only takes effect:
+    // any chip rendered with .col-chip-off is hidden until the user toggles it on.
+    subtab.querySelectorAll('button[data-ma-adv-chip-brand].col-chip-off').forEach(function (c) {
+      var code = c.getAttribute('data-ma-adv-chip-brand');
+      if (code) panel.__maAdvHiddenBrands[code] = true;
+    });
+
     // Brand-column chips + Show all/Hide all toggle: delegated click.
     subtab.addEventListener('click', function (ev) {
       // Show all / Hide all toggle

@@ -424,6 +424,14 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
   color: #fff !important; opacity: 1 !important;
   text-decoration: none !important;
 }
+/* Off state — chip rendered without .active under chip_default = focal_only.
+   Greyed + strikethrough so it visually matches col-chip-off panels. */
+.col-chip-bar .fn-rel-brand-chip:not(.active) {
+  background: #f8f9fa !important;
+  color: #94a3b8 !important;
+  border-color: #e2e8f0 !important;
+  text-decoration: line-through; opacity: 0.55;
+}
 /* Cat avg chip */
 .col-chip-bar .fn-rel-avg-chip.active {
   background: #64748b !important;

@@ -41,11 +41,15 @@ BRAND_FUNNEL_PANEL_VERSION <- "2.0"
 #' @export
 build_funnel_panel_html <- function(panel_data, category_code = "cat",
                                     focal_colour = "#1A5276",
-                                    excel_filename = NULL) {
+                                    excel_filename = NULL,
+                                    chip_default = "focal_only") {
   if (is.null(panel_data) || is.null(panel_data$meta) ||
       length(panel_data$meta) == 0) {
     return('<div class="fn-panel-empty">Funnel not available for this category.</div>')
   }
+
+  chip_default <- if (identical(chip_default, "all")) "all" else "focal_only"
+  panel_data$config$chip_default <- chip_default
 
   panel_id <- paste0("fn-", category_code)
   json_payload <- .funnel_panel_json(panel_data, focal_colour)
@@ -53,8 +57,8 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
     sprintf(' data-fn-excel-filename="%s"', .fn_esc(excel_filename)) else ""
 
   paste0(
-    sprintf('<div class="fn-panel" id="%s" data-focal-colour="%s"%s>',
-            panel_id, focal_colour, excel_attr),
+    sprintf('<div class="fn-panel" id="%s" data-focal-colour="%s" data-chip-default="%s"%s>',
+            panel_id, focal_colour, chip_default, excel_attr),
     sprintf('<script type="application/json" class="fn-panel-data">%s</script>',
             json_payload),
     .fn_sub_tabs(),
@@ -166,6 +170,10 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
     (pd$table$brand_codes %||% character(0))
   brand_names <- pd$table$brand_names %||% brand_codes
   focal <- pd$meta$focal_brand_code %||% brand_codes[1]
+  chip_default <- pd$config$chip_default %||% "focal_only"
+  is_focal_only <- identical(chip_default, "focal_only")
+  off_cls <- if (is_focal_only) " col-chip-off" else ""
+  toggle_label <- if (is_focal_only) "Show all" else "Hide all"
 
   # Sort: focal first, then alphabetical by brand name
   sorted_order <- order(brand_codes != focal, tolower(brand_names))
@@ -174,10 +182,13 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
 
   chips_html <- paste(c(
     vapply(seq_along(brand_codes), function(i) {
-      sprintf('<button type="button" class="col-chip" data-fn-scope="table" data-fn-brand="%s">%s</button>',
-              .fn_esc(brand_codes[i]), .fn_esc(brand_names[i]))
+      bc <- brand_codes[i]
+      cls <- if (!is.null(focal) && bc == focal) "col-chip" else paste0("col-chip", off_cls)
+      sprintf('<button type="button" class="%s" data-fn-scope="table" data-fn-brand="%s">%s</button>',
+              cls, .fn_esc(bc), .fn_esc(brand_names[i]))
     }, character(1)),
-    '<button type="button" class="ma-all-toggle" data-fn-action="toggleall" data-fn-scope="table">Hide all</button>'
+    sprintf('<button type="button" class="ma-all-toggle" data-fn-action="toggleall" data-fn-scope="table">%s</button>',
+            toggle_label)
   ), collapse = "")
 
   paste0(
@@ -292,22 +303,28 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
     (pd$table$brand_codes %||% character(0))
   brand_names <- pd$table$brand_names %||% brand_codes
   focal <- pd$meta$focal_brand_code %||% brand_codes[1]
+  chip_default <- pd$config$chip_default %||% "focal_only"
+  is_focal_only <- identical(chip_default, "focal_only")
 
   # Stage info for stacked emphasis chips
   stage_keys   <- pd$table$stage_keys   %||% character(0)
   stage_labels <- pd$table$stage_labels %||% list()
 
-  # Cat Avg chip — always first, off by default in slope (toggles the dashed line + mini funnel card)
-  cat_avg_chip <- '<button type="button" class="col-chip col-chip-off fn-chip-avg" data-fn-scope="chart" data-fn-brand="__avg__">Cat Avg</button>'
+  # Cat Avg chip — under focal_only AND all modes the cat-avg is on by default.
+  cat_avg_chip <- '<button type="button" class="col-chip fn-chip-avg" data-fn-scope="chart" data-fn-brand="__avg__">Cat Avg</button>'
 
   brand_chips_html <- paste(vapply(seq_along(brand_codes), function(i) {
-    active <- brand_codes[i] == focal
-    cls <- if (active) "col-chip" else "col-chip col-chip-off"
+    is_focal <- brand_codes[i] == focal
+    # Under focal_only: focal active, others off. Under all: every chip active.
+    cls <- if (is_focal || !is_focal_only) "col-chip" else "col-chip col-chip-off"
     sprintf('<button type="button" class="%s" data-fn-scope="chart" data-fn-brand="%s">%s</button>',
             cls, .fn_esc(brand_codes[i]), .fn_esc(brand_names[i]))
   }, character(1)), collapse = "")
 
-  toggle_chip <- '<button type="button" class="ma-all-toggle" data-fn-action="toggleall" data-fn-scope="chart">Show all</button>'
+  toggle_label <- if (is_focal_only) "Show all" else "Hide all"
+  toggle_chip <- sprintf(
+    '<button type="button" class="ma-all-toggle" data-fn-action="toggleall" data-fn-scope="chart">%s</button>',
+    toggle_label)
   chips_html <- paste0(cat_avg_chip, brand_chips_html, toggle_chip)
 
   # Stage selector chips for bar view — first stage active by default

@@ -56,13 +56,21 @@
     var stageKeys = (payload.table && payload.table.stage_keys) || [];
     panel.__fnState.barStage = stageKeys[0] || null;
 
-    // Default chip state: all brands on in table and chart; cat avg off
+    // Default chip state respects the chip_default config:
+    //   focal_only: only focal + cat-avg active; other brand chips greyed off.
+    //   all       : all brand chips active and cat-avg active.
+    // Read DOM (col-chip-off / .active) — R has rendered the right initial state.
+    var chipDefault = panel.getAttribute('data-chip-default') || 'focal_only';
+    var focalCode = (payload.meta && payload.meta.focal_brand_code) || null;
     var allBrands = (payload.table && payload.table.brand_codes) || [];
     for (var i = 0; i < allBrands.length; i++) {
-      panel.__fnState.tableBrands[allBrands[i]] = true;
-      panel.__fnState.chartBrands[allBrands[i]] = true;
+      var bcode = allBrands[i];
+      var visible = (chipDefault !== 'focal_only') || (bcode === focalCode);
+      panel.__fnState.tableBrands[bcode] = visible;
+      panel.__fnState.chartBrands[bcode] = visible;
     }
-    panel.__fnState.chartBrands["__avg__"] = false; // cat avg chip off by default
+    // Cat-avg always on under both modes.
+    panel.__fnState.chartBrands["__avg__"] = true;
     bindControls(panel);
     // Enforce initial control row visibility (chartView starts as "slope")
     panel.querySelectorAll(".fn-stk-ctl").forEach(function(el) { el.hidden = true; });
@@ -1900,6 +1908,18 @@
     panel.__fnState.tableShading    = "off";
 
     var pd = panel.__fnData;
+
+    // Seed relHiddenBrands from DOM under chip_default = focal_only — chips
+    // rendered without .active count as hidden. Also add col-chip-off so the
+    // toggleall handler (which reads col-chip-off) sees the same state.
+    panel.querySelectorAll("[data-fn-rel-brand]").forEach(function(chip) {
+      var code = chip.getAttribute("data-fn-rel-brand");
+      if (!code || code === "__avg__") return;
+      if (!chip.classList.contains("active")) {
+        panel.__fnState.relHiddenBrands.add(code);
+        chip.classList.add("col-chip-off");
+      }
+    });
 
     // Apply brand colours to brand chips from pd.config.brand_colours
     panel.querySelectorAll("[data-fn-rel-brand]").forEach(function(chip) {

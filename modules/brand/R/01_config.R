@@ -165,6 +165,17 @@ load_brand_config <- function(config_path, project_root = NULL) {
   config$respondent_id_col <- config$respondent_id_col %||% "Respondent_ID"
   config$report_title <- config$report_title %||% "Brand Health Report"
 
+  # Chip-bar default state across panels (MA, Funnel, WOM, Cat Buying).
+  # "focal_only" (default): only focal brand + Cat avg chips active; rest greyed off.
+  # "all": every chip active (legacy behaviour).
+  chip_default_raw <- tolower(trimws(as.character(
+    config$chip_default %||% "focal_only")))
+  config$chip_default <- if (chip_default_raw %in% c("all", "focal_only")) {
+    chip_default_raw
+  } else {
+    "focal_only"
+  }
+
   # Portfolio config keys (§3.3 + Q2 of PORTFOLIO_SPEC_v1.md)
   config$portfolio_min_base <- as.integer(
     config$portfolio_min_base %||% 30L)
