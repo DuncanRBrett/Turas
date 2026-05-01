@@ -1,9 +1,14 @@
 # Brand Module Rebuild — IPK as Canonical Template
 
-**Date:** 2026-04-30
-**Status:** Planning complete — ready to begin execution on a new feature branch
+**Date opened:** 2026-04-30
+**Date completed:** 2026-05-01
+**Status:** **COMPLETE — cutover landed.** All 13 elements migrated, all legacy v1 deleted, `_v2` renamed to canonical. 1288 tests pass. Ready for PR to main.
 **Project type:** Software product / module rebuild
-**Branch (to create):** `feature/brand-ipk-rebuild`
+**Branch:** `feature/brand-ipk-rebuild`
+
+**Carry-forwards (not blocking the PR):**
+- 8 funnel-legacy test files error at source time after cutover; tracked in [HANDOVER_FUNNEL_TESTS_PORT.md](HANDOVER_FUNNEL_TESTS_PORT.md). Bounded-scope test-port suitable for Sonnet, scheduled for a fresh post-merge session.
+- Two `_v2` wrapper functions kept (`run_repertoire_v2`, `run_drivers_barriers_v2`) because their canonical names are held by the analytics engines they delegate to. Future cleanup once we choose either an engine-rename pass or a `.run_X_engine` private convention.
 
 This is the governing reference for the rebuild. Build sequence, file inventory, schema specs, and verification gates all live here. Update in place as decisions evolve.
 
