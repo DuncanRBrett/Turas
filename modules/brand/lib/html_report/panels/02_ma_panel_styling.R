@@ -70,6 +70,7 @@ build_ma_panel_styles <- function(focal_colour = "#1A5276") {
 .ma-controls .toggle-label input { margin: 0; }
 
 /* Chips (brand picker) */
+.ma-ctl-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .ma-chip-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .col-chip { font-size: 11px; padding: 3px 9px; border-radius: 12px;
             border: 1px solid var(--brand-chip-color, #64748b);
@@ -79,6 +80,11 @@ build_ma_panel_styles <- function(focal_colour = "#1A5276") {
 .col-chip:hover { filter: brightness(0.88); }
 .col-chip.col-chip-off { background: #f1f5f9 !important; color: #94a3b8 !important;
                          border-color: #e2e8f0 !important; }
+.ma-all-toggle { font-size: 11px; padding: 3px 9px; border-radius: 12px;
+                 border: 1px solid #94a3b8; background: #fff; color: #64748b;
+                 cursor: pointer; font-weight: 600; transition: all 0.12s;
+                 margin-left: 4px; }
+.ma-all-toggle:hover { background: #f1f5f9; border-color: #64748b; }
 
 /* Base mode segmented */
 .ma-panel .sig-level-switcher { display: inline-flex; align-items: center; gap: 4px; }

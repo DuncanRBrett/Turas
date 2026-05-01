@@ -26,21 +26,35 @@ var TurasColours = (function () {
   // Palette
   // ---------------------------------------------------------------------------
 
-  // Tableau-10: 10 perceptually distinct, colour-blind-safe colours.
-  // Index order is part of the public contract — do not reorder. Brand codes
-  // are hashed to an index, so a reorder would change every brand's fallback
-  // colour across all existing reports.
+  // 18-entry palette for the JS hash fallback.  Must stay in sync with
+  // BRAND_COLOUR_PALETTE in 00_brand_colour_utils.R.
+  //
+  // In normal operation this fallback is never reached: R populates
+  // pd.config.brand_colours for every brand via build_full_brand_colour_map(),
+  // so getBrandColour() always hits the explicit-map branch.  The hash is
+  // only a safety net for edge cases (unknown brand codes, old reports).
+  //
+  // Index 0–7: maximally distinct hues. Index 8+ reserved for large studies
+  // and fallback edge cases.  Do not reorder indices 0–7.
   var PALETTE = [
-    '#4e79a7',  // 0 steel blue
-    '#f28e2b',  // 1 orange
-    '#e15759',  // 2 red
-    '#76b7b2',  // 3 teal
-    '#59a14f',  // 4 green
-    '#edc948',  // 5 yellow
-    '#b07aa1',  // 6 purple
-    '#ff9da7',  // 7 pink
-    '#9c755f',  // 8 brown
-    '#bab0ac'   // 9 warm grey
+    '#e15759',  //  0  red
+    '#f28e2b',  //  1  orange
+    '#59a14f',  //  2  green
+    '#edc948',  //  3  yellow
+    '#76b7b2',  //  4  teal
+    '#b07aa1',  //  5  mauve
+    '#d37295',  //  6  dark rose
+    '#9c755f',  //  7  brown
+    '#4e79a7',  //  8  steel blue
+    '#499894',  //  9  dark teal
+    '#e8a838',  // 10  amber
+    '#1e8449',  // 11  dark green
+    '#7d3c98',  // 12  deep purple
+    '#2980b9',  // 13  bright blue
+    '#ff9da7',  // 14  light rose
+    '#bab0ac',  // 15  warm grey
+    '#9d7660',  // 16  tan
+    '#79706e'   // 17  charcoal
   ];
 
   // Neutral mid-grey used for pseudo-brands such as "__avg__" that are not

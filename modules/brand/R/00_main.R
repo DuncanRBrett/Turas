@@ -52,6 +52,7 @@ BRAND_VERSION <- "1.0"
   base_dir <- .get_brand_script_dir()
 
   module_files <- c(
+    "00_brand_colour_utils.R",
     "00_guard.R",
     "00_data_access.R",
     "00_role_inference.R",

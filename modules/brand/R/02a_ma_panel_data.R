@@ -66,14 +66,13 @@ build_ma_panel_data <- function(ma_result, brand_list, cep_list,
   focal_name <- config$focal_brand_name %||%
                 brand_names[match(focal_code, brand_codes)]
 
-  brand_colours <- config$brand_colours %||% list()
-  if (!is.null(brand_list$Colour)) {
-    for (i in seq_len(nrow(brand_list))) {
-      col <- trimws(as.character(brand_list$Colour[i]))
-      if (nzchar(col) && grepl("^#[0-9A-Fa-f]{6}", col))
-        brand_colours[[brand_list$BrandCode[i]]] <- col
-    }
-  }
+  focal_colour_cfg <- config$focal_colour %||%
+                      config$colour_focal %||% "#1A5276"
+  brand_colours <- build_full_brand_colour_map(
+    brand_list   = brand_list,
+    focal_code   = focal_code,
+    focal_colour = focal_colour_cfg
+  )
 
   meta <- list(
     category_label    = config$category_label %||% "",

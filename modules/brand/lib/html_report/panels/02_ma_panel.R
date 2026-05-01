@@ -175,12 +175,12 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
   brand_names  <- brand_names[sorted_order]
 
   chips_html <- paste(c(
+    sprintf('<button type="button" class="col-chip" data-ma-scope="%s" data-ma-brand="__avg__">Cat avg</button>',
+            .ma_esc(stim)),
     vapply(seq_along(brand_codes), function(i) {
       sprintf('<button type="button" class="col-chip" data-ma-scope="%s" data-ma-brand="%s">%s</button>',
               .ma_esc(stim), .ma_esc(brand_codes[i]), .ma_esc(brand_names[i]))
-    }, character(1)),
-    sprintf('<button type="button" class="col-chip" data-ma-scope="%s" data-ma-brand="__avg__">Cat avg</button>',
-            .ma_esc(stim))
+    }, character(1))
   ), collapse = "")
 
   block <- if (stim == "attributes") pd$attributes else pd$ceps
@@ -204,8 +204,9 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
   paste0(
     '<div class="ma-controls controls-bar">',
     '<div class="ma-ctl-group"><span class="ma-ctl-label">Show brands</span>',
-    sprintf('<div class="ma-chip-row col-chip-bar" data-ma-scope="%s">%s</div></div>',
-            stim, chips_html),
+    sprintf('<div class="ma-chip-row col-chip-bar" data-ma-scope="%s">%s</div>', stim, chips_html),
+    sprintf('<button type="button" class="ma-all-toggle" data-ma-action="toggleall" data-ma-scope="%s" title="Show or hide all brands">All</button>', .ma_esc(stim)),
+    '</div>',
     '<div class="ma-meta-row">',
     base_switcher,
     heatmap_switcher,

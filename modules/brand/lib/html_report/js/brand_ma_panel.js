@@ -181,6 +181,7 @@
     bindSubTabs(panel);
     bindFocusSelect(panel);
     bindChipPicker(panel);
+    bindAllToggle(panel);
     bindChartChips(panel);
     bindToggles(panel);
     bindBaseMode(panel);
@@ -414,6 +415,25 @@
         chip.classList.toggle('col-chip-off', !vis[code]);
         applyColumnVisibility(panel, scope);
         renderChart(panel, scope);
+      });
+    });
+  }
+
+  function bindAllToggle(panel) {
+    panel.querySelectorAll('.ma-all-toggle[data-ma-action="toggleall"]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var scope = btn.getAttribute('data-ma-scope');
+        var vis = panel.__maState.visible[scope];
+        if (!vis) return;
+        var allOn = Object.keys(vis).every(function (k) { return vis[k] !== false; });
+        var nextState = !allOn;
+        Object.keys(vis).forEach(function (k) { vis[k] = nextState; });
+        panel.querySelectorAll('.col-chip[data-ma-scope="' + scope + '"]').forEach(function (chip) {
+          chip.classList.toggle('col-chip-off', !nextState);
+        });
+        applyColumnVisibility(panel, scope);
+        renderChart(panel, scope);
+        btn.textContent = nextState ? 'All' : 'None';
       });
     });
   }
@@ -736,6 +756,29 @@
         });
         renderMAScatter(panel);
         renderMABarChart(panel);
+      });
+    });
+
+    panel.querySelectorAll('.ma-all-toggle[data-ma-action="toggleall"][data-ma-scope="metrics"]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var focal  = panel.__maState.focal;
+        var chips  = Array.from(panel.querySelectorAll('.col-chip[data-ma-scope="metrics"]'));
+        var nonFocalChips = chips.filter(function (c) { return c.getAttribute('data-ma-brand') !== focal; });
+        var allOn  = nonFocalChips.every(function (c) { return !c.classList.contains('col-chip-off'); });
+        var hide   = allOn;
+        var table  = panel.querySelector('.ma-metrics-table');
+        nonFocalChips.forEach(function (chip) {
+          var code = chip.getAttribute('data-ma-brand');
+          chip.classList.toggle('col-chip-off', hide);
+          if (table) {
+            table.querySelectorAll('tbody tr.ma-row[data-ma-brand="' + code + '"]').forEach(function (r) {
+              r.style.display = hide ? 'none' : '';
+            });
+          }
+        });
+        renderMAScatter(panel);
+        renderMABarChart(panel);
+        btn.textContent = hide ? 'None' : 'All';
       });
     });
   }
