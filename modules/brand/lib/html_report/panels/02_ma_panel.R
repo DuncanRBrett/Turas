@@ -180,7 +180,9 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
     vapply(seq_along(brand_codes), function(i) {
       sprintf('<button type="button" class="col-chip" data-ma-scope="%s" data-ma-brand="%s">%s</button>',
               .ma_esc(stim), .ma_esc(brand_codes[i]), .ma_esc(brand_names[i]))
-    }, character(1))
+    }, character(1)),
+    sprintf('<button type="button" class="ma-all-toggle" data-ma-action="toggleall" data-ma-scope="%s">All</button>',
+            .ma_esc(stim))
   ), collapse = "")
 
   block <- if (stim == "attributes") pd$attributes else pd$ceps

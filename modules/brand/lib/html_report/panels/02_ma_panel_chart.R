@@ -26,11 +26,14 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
   brand_codes  <- brand_codes[sorted_order]
   brand_names  <- brand_names[sorted_order]
 
-  chips_html <- paste(vapply(seq_along(brand_codes), function(i) {
-    sprintf(
-      '<button type="button" class="col-chip" data-ma-scope="metrics" data-ma-brand="%s">%s</button>',
-      .ma_esc(brand_codes[i]), .ma_esc(brand_names[i]))
-  }, character(1)), collapse = "")
+  chips_html <- paste(c(
+    vapply(seq_along(brand_codes), function(i) {
+      sprintf(
+        '<button type="button" class="col-chip" data-ma-scope="metrics" data-ma-brand="%s">%s</button>',
+        .ma_esc(brand_codes[i]), .ma_esc(brand_names[i]))
+    }, character(1)),
+    '<button type="button" class="ma-all-toggle" data-ma-action="toggleall" data-ma-scope="metrics">All</button>'
+  ), collapse = "")
 
   controls_bar <- paste0(
     '<div class="ma-controls controls-bar">',

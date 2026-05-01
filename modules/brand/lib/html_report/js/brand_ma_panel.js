@@ -416,6 +416,23 @@
         renderChart(panel, scope);
       });
     });
+
+    panel.querySelectorAll('.ma-all-toggle[data-ma-action="toggleall"]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var scope = btn.getAttribute('data-ma-scope');
+        var vis = panel.__maState.visible[scope];
+        if (!vis) return;
+        var allOn = Object.keys(vis).every(function (k) { return vis[k] !== false; });
+        var nextState = !allOn;
+        Object.keys(vis).forEach(function (k) { vis[k] = nextState; });
+        panel.querySelectorAll('.col-chip[data-ma-scope="' + scope + '"]').forEach(function (c) {
+          c.classList.toggle('col-chip-off', !nextState);
+        });
+        applyColumnVisibility(panel, scope);
+        renderChart(panel, scope);
+        btn.textContent = nextState ? 'All' : 'None';
+      });
+    });
   }
 
   function applyColumnVisibility(panel, scope) {
