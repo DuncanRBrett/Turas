@@ -7,6 +7,37 @@
 
 if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
 
+# Position-based brand colour assignment. Self-contained — no dependency on
+# any other brand module file being in scope (this file is re-sourced at
+# report-generation time independently of the R module loader).
+.dt_brand_colours <- function(brand_list, focal_code = NULL,
+                               focal_colour = "#1A5276") {
+  if (is.null(brand_list) || !is.data.frame(brand_list) ||
+      nrow(brand_list) == 0 || !("BrandCode" %in% names(brand_list)))
+    return(list())
+  palette  <- c(
+    "#e15759","#f28e2b","#59a14f","#edc948","#76b7b2","#b07aa1",
+    "#d37295","#9c755f","#4e79a7","#499894","#e8a838","#1e8449",
+    "#7d3c98","#2980b9","#ff9da7","#bab0ac","#9d7660","#79706e"
+  )
+  has_col  <- "Colour" %in% names(brand_list)
+  out      <- list()
+  pal_idx  <- 1L
+  for (i in seq_len(nrow(brand_list))) {
+    code <- trimws(as.character(brand_list$BrandCode[i]))
+    col  <- if (has_col) trimws(as.character(brand_list$Colour[i])) else ""
+    if (nzchar(col) && grepl("^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$", col)) {
+      out[[code]] <- col
+    } else if (!is.null(focal_code) && code == focal_code) {
+      out[[code]] <- focal_colour
+    } else {
+      out[[code]] <- palette[[(pal_idx - 1L) %% 18L + 1L]]
+      pal_idx <- pal_idx + 1L
+    }
+  }
+  out
+}
+
 
 #' Transform brand results into chart data structures
 #'
@@ -409,21 +440,9 @@ transform_brand_panels <- function(results, config) {
           as.character(cat_brands_local$BrandCode))
       }
 
-      # Build brand_colours lookup from Colour column (hex codes)
-      brand_colours <- list()
-      if (!is.null(cat_brands_local) && nrow(cat_brands_local) > 0 &&
-          "BrandCode" %in% names(cat_brands_local) &&
-          "Colour" %in% names(cat_brands_local)) {
-        for (ii in seq_len(nrow(cat_brands_local))) {
-          bc_ii <- trimws(as.character(cat_brands_local$BrandCode[ii]))
-          col_ii <- cat_brands_local$Colour[ii]
-          if (is.null(col_ii) || is.na(col_ii)) next
-          col_ii <- trimws(as.character(col_ii))
-          if (!nzchar(col_ii)) next
-          if (!grepl("^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$", col_ii)) next
-          brand_colours[[bc_ii]] <- col_ii
-        }
-      }
+      brand_colours <- .dt_brand_colours(cat_brands_local,
+                                          config$focal_brand %||% NULL,
+                                          focal_colour)
 
       panel_data <- list(
         cat_name              = cat_name,
@@ -492,21 +511,9 @@ transform_brand_panels <- function(results, config) {
         as.character(cat_cfg_row$Timeframe_Target[1]) else NULL
       if (is.null(tf_label) || !nzchar(tf_label)) tf_label <- "last 3 months"
 
-      # Build brand_colours lookup from Colour column (hex codes)
-      wom_brand_colours <- list()
-      if (!is.null(cat_brands_local) && nrow(cat_brands_local) > 0 &&
-          "BrandCode" %in% names(cat_brands_local) &&
-          "Colour" %in% names(cat_brands_local)) {
-        for (ii in seq_len(nrow(cat_brands_local))) {
-          bc_ii <- trimws(as.character(cat_brands_local$BrandCode[ii]))
-          col_ii <- cat_brands_local$Colour[ii]
-          if (is.null(col_ii) || is.na(col_ii)) next
-          col_ii <- trimws(as.character(col_ii))
-          if (!nzchar(col_ii)) next
-          if (!grepl("^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$", col_ii)) next
-          wom_brand_colours[[bc_ii]] <- col_ii
-        }
-      }
+      wom_brand_colours <- .dt_brand_colours(cat_brands_local,
+                                              config$focal_brand %||% NULL,
+                                              focal_colour)
 
       wom_pd <- tryCatch(
         build_wom_panel_data(

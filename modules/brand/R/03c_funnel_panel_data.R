@@ -404,40 +404,50 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
     warn_base = config$`funnel.warn_base` %||% 75,
     suppress_base = config$`funnel.suppress_base` %||% 0,
     show_counts = isTRUE(config$show_counts),
-    brand_colours = .build_brand_colour_map(brand_list)
+    brand_colours = .build_brand_colour_map(brand_list, focal,
+                                              config$colour_focal %||% "#1A5276")
   )
 }
 
 
-#' Build a named list of brand-specific hex colours from the Brands sheet.
+#' Build a fully-populated brand colour map with position-based palette assignment.
 #'
-#' Reads the optional \code{Colour} column. Entries that are missing, NA,
-#' blank, or not a valid 6-digit hex code are silently dropped — JS falls
-#' back to the focal colour or Tableau-10 palette for those brands.
+#' Priority: explicit Colour column hex > focal colour > sequential palette slot.
+#' Every brand receives a unique colour; no brand is left out of the map.
 #'
-#' @param brand_list Data frame. Must have at least a \code{BrandCode} column.
+#' @param brand_list Data frame. Must have a \code{BrandCode} column.
 #'   May optionally have a \code{Colour} column.
+#' @param focal_code Character or NULL. Focal brand code.
+#' @param focal_colour Character. Hex colour for the focal brand.
 #'
-#' @return Named list mapping BrandCode -> hex string. Empty list if no valid
-#'   colours are present.
+#' @return Named list mapping every BrandCode to a hex string.
 #'
 #' @keywords internal
-.build_brand_colour_map <- function(brand_list) {
+.build_brand_colour_map <- function(brand_list, focal_code = NULL,
+                                    focal_colour = "#1A5276") {
   if (is.null(brand_list) || !is.data.frame(brand_list)) return(list())
-  if (!("Colour" %in% names(brand_list))) return(list())
+  if (!("BrandCode" %in% names(brand_list))) return(list())
 
-  colours <- list()
+  palette <- c(
+    "#e15759","#f28e2b","#59a14f","#edc948","#76b7b2","#b07aa1",
+    "#d37295","#9c755f","#4e79a7","#499894","#e8a838","#1e8449",
+    "#7d3c98","#2980b9","#ff9da7","#bab0ac","#9d7660","#79706e"
+  )
+  has_col  <- "Colour" %in% names(brand_list)
+  colours  <- list()
+  pal_idx  <- 1L
+
   for (i in seq_len(nrow(brand_list))) {
     code <- trimws(as.character(brand_list$BrandCode[i]))
-    col  <- brand_list$Colour[i]
-    if (is.null(col) || is.na(col)) next
-    col <- trimws(as.character(col))
-    if (!nzchar(col)) next
-    if (!grepl("^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$", col)) {
-      message(sprintf("[BRAND] Brand '%s': Colour '%s' is not a valid hex code — skipped.", code, col))
-      next
+    col  <- if (has_col) trimws(as.character(brand_list$Colour[i])) else ""
+    if (nzchar(col) && grepl("^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$", col)) {
+      colours[[code]] <- col
+    } else if (!is.null(focal_code) && code == focal_code) {
+      colours[[code]] <- focal_colour
+    } else {
+      colours[[code]] <- palette[[(pal_idx - 1L) %% 18L + 1L]]
+      pal_idx <- pal_idx + 1L
     }
-    colours[[code]] <- col
   }
   colours
 }

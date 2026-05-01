@@ -66,14 +66,32 @@ build_ma_panel_data <- function(ma_result, brand_list, cep_list,
   focal_name <- config$focal_brand_name %||%
                 brand_names[match(focal_code, brand_codes)]
 
-  brand_colours <- config$brand_colours %||% list()
-  if (!is.null(brand_list$Colour)) {
-    for (i in seq_len(nrow(brand_list))) {
-      col <- trimws(as.character(brand_list$Colour[i]))
-      if (nzchar(col) && grepl("^#[0-9A-Fa-f]{6}", col))
-        brand_colours[[brand_list$BrandCode[i]]] <- col
+  # Assign a unique colour to every brand: explicit Colour column wins,
+  # focal brand gets focal_colour, all others get sequential palette slots.
+  # Self-contained so this file can be re-sourced at report-generation time
+  # without depending on any other module file being in scope.
+  .palette <- c(
+    "#e15759","#f28e2b","#59a14f","#edc948","#76b7b2","#b07aa1",
+    "#d37295","#9c755f","#4e79a7","#499894","#e8a838","#1e8449",
+    "#7d3c98","#2980b9","#ff9da7","#bab0ac","#9d7660","#79706e"
+  )
+  focal_colour_cfg <- config$focal_colour %||% config$colour_focal %||% "#1A5276"
+  brand_colours    <- list()
+  .pal_idx         <- 1L
+  .has_col         <- "Colour" %in% names(brand_list)
+  for (.bi in seq_len(nrow(brand_list))) {
+    .bc  <- trimws(as.character(brand_list$BrandCode[.bi]))
+    .col <- if (.has_col) trimws(as.character(brand_list$Colour[.bi])) else ""
+    if (nzchar(.col) && grepl("^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$", .col)) {
+      brand_colours[[.bc]] <- .col
+    } else if (!is.null(focal_code) && .bc == focal_code) {
+      brand_colours[[.bc]] <- focal_colour_cfg
+    } else {
+      brand_colours[[.bc]] <- .palette[[((.pal_idx - 1L) %% 18L) + 1L]]
+      .pal_idx <- .pal_idx + 1L
     }
   }
+  rm(.palette, .pal_idx, .has_col, .bi, .bc, .col)
 
   meta <- list(
     category_label    = config$category_label %||% "",
