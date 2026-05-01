@@ -281,49 +281,6 @@ run_demographic_question <- function(values,
 # This resolver returns the parallel codes/labels vector regardless of which
 # of the two pathways the project uses.
 
-#' Resolve a demographic role to a data column + option list
-#'
-#' @param structure List. A loaded survey structure.
-#' @param role Character. Exact role name (e.g. "demo.AGE").
-#' @return List with column (character), codes, labels (parallel character
-#'   vectors), question_text, and variable_type. NULL when the role cannot
-#'   be resolved (caller silently skips that question).
-#' @export
-resolve_demographic_role <- function(structure, role) {
-
-  qmap <- structure$questionmap
-  if (is.null(qmap) || !"Role" %in% names(qmap) || nrow(qmap) == 0L) return(NULL)
-  rows <- qmap[!is.na(qmap$Role) &
-                 trimws(as.character(qmap$Role)) == role, , drop = FALSE]
-  if (nrow(rows) == 0L) return(NULL)
-
-  client_code <- trimws(as.character(rows$ClientCode[1]))
-  if (is.na(client_code) || !nzchar(client_code)) return(NULL)
-
-  question_text <- if ("QuestionText" %in% names(rows))
-    as.character(rows$QuestionText[1]) else client_code
-  short_label <- if ("QuestionTextShort" %in% names(rows))
-    as.character(rows$QuestionTextShort[1]) else question_text
-  variable_type <- if ("Variable_Type" %in% names(rows))
-    as.character(rows$Variable_Type[1]) else "Single_Response"
-  scale_name <- if ("OptionMapScale" %in% names(rows))
-    trimws(as.character(rows$OptionMapScale[1])) else ""
-
-  opts <- .demo_lookup_options(structure, client_code, scale_name)
-  if (is.null(opts)) return(NULL)
-
-  list(
-    role          = role,
-    column        = client_code,
-    question_text = question_text,
-    short_label   = short_label,
-    variable_type = variable_type,
-    codes         = opts$codes,
-    labels        = opts$labels
-  )
-}
-
-
 # Look up option codes/labels for a question. Tries Options sheet first
 # (QuestionCode column = question_code), then falls back to OptionMap by Scale.
 # Survey_Structure schema: Options sheet uses QuestionCode | OptionText |

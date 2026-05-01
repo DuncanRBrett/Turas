@@ -205,67 +205,6 @@ run_adhoc_question <- function(values,
 # ROLE RESOLUTION
 # ==============================================================================
 
-#' Resolve an ad hoc role to a data column + option list + scope
-#'
-#' Ad hoc roles are namespaced by category code (or "ALL") so the same
-#' QuestionMap can carry per-category and brand-level questions side by
-#' side.  Returns NULL when the role is absent or its option list cannot
-#' be resolved (caller silently skips that question).
-#'
-#' @param structure List. A loaded survey structure.
-#' @param role Character. Exact role name (e.g. "adhoc.brand_love.DSS").
-#' @return List with column, codes, labels, question_text, short_label,
-#'   variable_type, scope ("ALL" or category code). NULL when not resolvable.
-#' @export
-resolve_adhoc_role <- function(structure, role) {
-
-  qmap <- structure$questionmap
-  if (is.null(qmap) || !"Role" %in% names(qmap) || nrow(qmap) == 0L) return(NULL)
-  rows <- qmap[!is.na(qmap$Role) &
-                 trimws(as.character(qmap$Role)) == role, , drop = FALSE]
-  if (nrow(rows) == 0L) return(NULL)
-
-  client_code <- trimws(as.character(rows$ClientCode[1]))
-  if (is.na(client_code) || !nzchar(client_code)) return(NULL)
-
-  question_text <- if ("QuestionText" %in% names(rows))
-    as.character(rows$QuestionText[1]) else client_code
-  short_label <- if ("QuestionTextShort" %in% names(rows))
-    as.character(rows$QuestionTextShort[1]) else question_text
-  variable_type <- if ("Variable_Type" %in% names(rows))
-    as.character(rows$Variable_Type[1]) else "Single_Response"
-  scale_name <- if ("OptionMapScale" %in% names(rows))
-    trimws(as.character(rows$OptionMapScale[1])) else ""
-
-  # Scope = trailing token after the question key. e.g.
-  #   adhoc.brand_love.DSS   -> scope = "DSS"
-  #   adhoc.future_intent.ALL -> scope = "ALL"
-  parts <- strsplit(role, ".", fixed = TRUE)[[1]]
-  scope <- if (length(parts) >= 3L) parts[length(parts)] else "ALL"
-
-  # Numeric / Rating questions can run without an option list — engine bins
-  # them. Other types require option codes (Options or OptionMap).
-  if (!exists(".demo_lookup_options", mode = "function")) {
-    return(NULL)  # demographics module not yet sourced
-  }
-  opts <- .demo_lookup_options(structure, client_code, scale_name)
-  if (is.null(opts) && !toupper(variable_type) %in% c("NUMERIC", "RATING")) {
-    return(NULL)
-  }
-
-  list(
-    role          = role,
-    column        = client_code,
-    question_text = question_text,
-    short_label   = short_label,
-    variable_type = variable_type,
-    scope         = scope,
-    codes         = if (is.null(opts)) NULL else opts$codes,
-    labels        = if (is.null(opts)) NULL else opts$labels
-  )
-}
-
-
 # ==============================================================================
 # V2 ROLE RESOLUTION + DISPATCH (role-map driven)
 # ==============================================================================
