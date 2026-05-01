@@ -404,14 +404,43 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
     warn_base = config$`funnel.warn_base` %||% 75,
     suppress_base = config$`funnel.suppress_base` %||% 0,
     show_counts = isTRUE(config$show_counts),
-    brand_colours = build_full_brand_colour_map(
-      brand_list   = brand_list,
-      focal_code   = focal,
-      focal_colour = config$colour_focal %||% "#1A5276"
-    )
+    brand_colours = .build_brand_colour_map(brand_list)
   )
 }
 
+
+#' Build a named list of brand-specific hex colours from the Brands sheet.
+#'
+#' Reads the optional \code{Colour} column. Entries that are missing, NA,
+#' blank, or not a valid 6-digit hex code are silently dropped — JS falls
+#' back to the focal colour or Tableau-10 palette for those brands.
+#'
+#' @param brand_list Data frame. Must have at least a \code{BrandCode} column.
+#'   May optionally have a \code{Colour} column.
+#'
+#' @return Named list mapping BrandCode -> hex string. Empty list if no valid
+#'   colours are present.
+#'
+#' @keywords internal
+.build_brand_colour_map <- function(brand_list) {
+  if (is.null(brand_list) || !is.data.frame(brand_list)) return(list())
+  if (!("Colour" %in% names(brand_list))) return(list())
+
+  colours <- list()
+  for (i in seq_len(nrow(brand_list))) {
+    code <- trimws(as.character(brand_list$BrandCode[i]))
+    col  <- brand_list$Colour[i]
+    if (is.null(col) || is.na(col)) next
+    col <- trimws(as.character(col))
+    if (!nzchar(col)) next
+    if (!grepl("^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$", col)) {
+      message(sprintf("[BRAND] Brand '%s': Colour '%s' is not a valid hex code — skipped.", code, col))
+      next
+    }
+    colours[[code]] <- col
+  }
+  colours
+}
 
 
 .panel_about <- function(result, config) {
