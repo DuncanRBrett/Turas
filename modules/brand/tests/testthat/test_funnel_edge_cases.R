@@ -1,281 +1,323 @@
 # ==============================================================================
-# BRAND MODULE TESTS - FUNNEL EDGE CASES
+# BRAND MODULE TESTS — FUNNEL EDGE CASES — v2 port
 # ==============================================================================
-# Covers the non-happy paths listed in FUNNEL_SPEC_v2.md §10.2:
+# Covers the non-happy paths listed in FUNNEL_SPEC_v2 §10.2:
 #   - Zero awareness (all stages 0%, conversions NA not NaN)
 #   - All aware, none positive (Consideration = 0, later stages = 0)
 #   - Missing optional role → stage omitted + warning, rest renders
-#   - OptionMap omits Ambivalent → Consideration = Love + Prefer only
+#   - Positive-code set omits Ambivalent → Consideration = Love+Prefer only
 #   - Inverted attitude scale (codes reversed) → same stage counts
 #   - Weights all equal 1 → weighted == unweighted
-#   - Weights sum to zero handled at guard layer (covered in guard tests)
 #   - suppress_base renders "suppress" flag on stages below threshold
-#   - Frequency role absent → funnel still renders at 4 stages (heavy-buyer
-#     analysis is not a funnel stage in v2.1, so frequency is never required).
+#   - Unknown category.type refuses with CFG_CATEGORY_TYPE_INVALID
 # ==============================================================================
+library(testthat)
 
-.find_turas_root_for_test <- function() {
+.find_root <- function() {
   dir <- getwd()
   for (i in 1:10) {
-    if (file.exists(file.path(dir, "launch_turas.R")) ||
-        file.exists(file.path(dir, "CLAUDE.md"))) {
-      return(dir)
-    }
+    if (file.exists(file.path(dir, "CLAUDE.md"))) return(dir)
     dir <- dirname(dir)
   }
   getwd()
 }
+ROOT <- .find_root()
 
-TURAS_ROOT <- .find_turas_root_for_test()
-
-shared_lib <- file.path(TURAS_ROOT, "modules", "shared", "lib")
+shared_lib <- file.path(ROOT, "modules", "shared", "lib")
 for (f in sort(list.files(shared_lib, pattern = "\\.R$", full.names = TRUE))) {
   tryCatch(source(f, local = FALSE), error = function(e) NULL)
 }
-source(file.path(TURAS_ROOT, "modules", "brand", "R", "00_guard.R"))
-source(file.path(TURAS_ROOT, "modules", "brand", "R", "00_role_map.R"))
-source(file.path(TURAS_ROOT, "modules", "brand", "R", "00_guard_role_map.R"))
-source(file.path(TURAS_ROOT, "modules", "brand", "R", "03a_funnel_derive.R"))
-source(file.path(TURAS_ROOT, "modules", "brand", "R", "03b_funnel_metrics.R"))
-source(file.path(TURAS_ROOT, "modules", "brand", "R", "03_funnel.R"))
+source(file.path(ROOT, "modules", "brand", "R", "00_guard.R"))
+source(file.path(ROOT, "modules", "brand", "R", "00_data_access.R"))
+source(file.path(ROOT, "modules", "brand", "R", "00_role_inference.R"))
+source(file.path(ROOT, "modules", "brand", "R", "00_role_map.R"))
+source(file.path(ROOT, "modules", "brand", "R", "03a_funnel_derive.R"))
+source(file.path(ROOT, "modules", "brand", "R", "03b_funnel_metrics.R"))
+source(file.path(ROOT, "modules", "brand", "R", "03_funnel.R"))
 
 
-# --- Fixtures ----------------------------------------------------------------
+# ==============================================================================
+# Helpers
+# ==============================================================================
 
-.brand_list <- function(codes = c("IPK","ROB","CART")) {
+.pack_mm <- function(picks, root) {
+  n_slots <- max(vapply(picks, length, integer(1)), 1L)
+  as.data.frame(
+    setNames(
+      lapply(seq_len(n_slots), function(j)
+        vapply(picks, function(p)
+          if (j <= length(p)) p[j] else NA_character_,
+          character(1))),
+      paste0(root, "_", seq_len(n_slots))),
+    stringsAsFactors = FALSE)
+}
+
+.mm_entry <- function(role, cat, client, column_root, n_slots, qtext = "") {
+  list(role = role, category = cat, client_code = client,
+       variable_type = "Multi_Mention",
+       column_root = column_root, per_brand = FALSE,
+       columns = paste0(column_root, "_", seq_len(n_slots)),
+       applicable_brands = NULL,
+       question_text = qtext, option_scale = NA,
+       option_map = NULL, notes = "")
+}
+
+.att_entry <- function(cat, brands) {
+  colroot <- paste0("BRANDATT1_", cat)
+  named_cols <- setNames(paste0(colroot, "_", brands), brands)
+  list(role = "funnel.attitude", category = cat, client_code = "BRANDATT1",
+       variable_type = "Single_Response_Brand",
+       column_root = colroot, per_brand = TRUE,
+       columns = named_cols,
+       applicable_brands = brands,
+       question_text = "Attitude?", option_scale = NA,
+       option_map = NULL, notes = "")
+}
+
+.brands <- function(codes = c("IPK","ROB","CART")) {
   data.frame(BrandCode = codes, BrandLabel = codes, stringsAsFactors = FALSE)
 }
 
-.optionmap_attitude <- function(omit_ambivalent = FALSE, inverted = FALSE) {
-  roles <- c("attitude.love","attitude.prefer","attitude.ambivalent",
-             "attitude.reject","attitude.no_opinion")
-  codes <- if (inverted) as.character(5:1) else as.character(1:5)
-  om <- data.frame(
-    Scale = rep("attitude_scale", 5),
-    ClientCode = codes,
-    Role = roles,
-    ClientLabel = c("Love","Prefer","Ambivalent","Reject","No opinion"),
-    OrderIndex = if (inverted) 5:1 else 1:5,
-    stringsAsFactors = FALSE)
-  if (omit_ambivalent) om$Role[om$Role == "attitude.ambivalent"] <- NA
-  om
+.trans_rm_base <- function(omit = character(0)) {
+  aw <- .mm_entry("funnel.awareness", "ECX", "BRANDAWARE",
+                  "BRANDAWARE_ECX", 3)
+  at <- .att_entry("ECX", c("IPK","ROB","CART"))
+  pl <- .mm_entry("funnel.penetration_long", "ECX", "BRANDPEN1",
+                  "BRANDPEN1_ECX", 3)
+  pt <- .mm_entry("funnel.penetration_target", "ECX", "BRANDPEN2",
+                  "BRANDPEN2_ECX", 3)
+  rm <- list(
+    "funnel.awareness"          = aw,
+    "funnel.attitude"           = at,
+    "funnel.penetration_long"   = pl,
+    "funnel.penetration_target" = pt
+  )
+  rm[setdiff(names(rm), omit)]
 }
 
-.qm_transactional <- function() {
-  data.frame(
-    Role = c("funnel.awareness","funnel.attitude",
-             "funnel.transactional.bought_long",
-             "funnel.transactional.bought_target",
-             "funnel.transactional.frequency",
-             "system.respondent.id","system.respondent.weight"),
-    ClientCode = c("BRANDAWARE","QBRANDATT1",
-                   "BRANDPENTRANS1","BRANDPENTRANS2","BRANDPENTRANS3",
-                   "Respondent_ID","Weight"),
-    QuestionText = c("Aware?","Att?","Bought_Long?","Bought_Target?","Freq?","ID","W"),
-    QuestionTextShort = NA_character_,
-    Variable_Type = c("Multi_Mention","Single_Response",
-                      "Multi_Mention","Multi_Mention","Numeric",
-                      "Single_Response","Numeric"),
-    ColumnPattern = c("{code}_{brand_code}","{code}_{brand_code}",
-                      "{code}_{brand_code}","{code}_{brand_code}",
-                      "{code}_{brand_code}","{code}","{code}"),
-    OptionMapScale = c("","attitude_scale","","","","",""),
-    Notes = NA_character_, stringsAsFactors = FALSE)
-}
-
-.structure <- function(questionmap, optionmap) {
-  list(questionmap = questionmap, optionmap = optionmap,
-       brands = .brand_list(), ceps = data.frame(), dba_assets = data.frame())
-}
-
-.config <- function(...) {
-  defaults <- list(
-    `category.type` = "transactional", focal_brand = "IPK",
-    `funnel.conversion_metric` = "ratio",
-    `funnel.warn_base` = 0, `funnel.suppress_base` = 0)
+.cfg <- function(...) {
+  defaults <- list(`category.type` = "transactional", focal_brand = "IPK",
+                   `funnel.conversion_metric` = "ratio",
+                   `funnel.warn_base` = 0, `funnel.suppress_base` = 0)
   modifyList(defaults, list(...))
-}
-
-.fixture_transactional <- function() {
-  read.csv(file.path(TURAS_ROOT, "modules", "brand", "tests", "fixtures",
-                     "funnel_transactional_10resp.csv"),
-           stringsAsFactors = FALSE)
 }
 
 .pct <- function(df, key, b) {
   row <- df[df$stage_key == key & df$brand_code == b, , drop = FALSE]
-  if (nrow(row) == 0) NA_real_ else row$pct_weighted
+  if (nrow(row) == 0L) NA_real_ else row$pct_weighted
+}
+
+# The same 10-respondent transactional truth used in test_funnel_transactional.R
+.trans_data_ecx <- function() {
+  aware <- list(
+    c("IPK","ROB","CART"), c("IPK","ROB","CART"), c("IPK","CART"),
+    c("IPK","ROB","CART"), c("ROB"),              c("IPK","ROB","CART"),
+    c("IPK"),              c("IPK","ROB","CART"), c("IPK","ROB","CART"),
+    c("IPK","ROB"))
+  pen1 <- list(
+    c("IPK","ROB"), c("IPK","ROB"), c("IPK","CART"), c("ROB","CART"),
+    c("ROB"),       c("IPK","CART"), character(0),   c("IPK","CART"),
+    c("ROB","CART"), c("IPK","ROB"))
+  pen2 <- list(
+    c("IPK","ROB"), c("IPK","ROB"), c("CART"),       c("ROB","CART"),
+    character(0),   c("IPK"),       character(0),    c("IPK","CART"),
+    c("CART"),      c("IPK","ROB"))
+
+  data <- cbind(
+    data.frame(Respondent_ID = 1:10, Weight = 1, stringsAsFactors = FALSE),
+    .pack_mm(aware, "BRANDAWARE_ECX"),
+    .pack_mm(pen1,  "BRANDPEN1_ECX"),
+    .pack_mm(pen2,  "BRANDPEN2_ECX"))
+  data$BRANDATT1_ECX_IPK  <- c(1, 2, 3, 4, 5, 1, 3, 2, 5, 1)
+  data$BRANDATT1_ECX_ROB  <- c(3, 1, 5, 2, 3, 4, 5, 4, 2, 1)
+  data$BRANDATT1_ECX_CART <- c(5, 4, 2, 1, 5, 3, 5, 2, 1, 5)
+  data
 }
 
 
-# --- Zero awareness ----------------------------------------------------------
+# ==============================================================================
+# Zero awareness
+# ==============================================================================
 
 test_that("Zero awareness for all brands yields 0% at every stage, NA conversions", {
   n <- 10
-  data <- data.frame(Respondent_ID = seq_len(n), Weight = 1,
-                     stringsAsFactors = FALSE)
+  # Build slot data with no awareness (all slots NA)
+  data <- cbind(
+    data.frame(Respondent_ID = seq_len(n), Weight = 1, stringsAsFactors = FALSE),
+    data.frame(BRANDAWARE_ECX_1 = rep(NA_character_, n),
+               BRANDPEN1_ECX_1  = rep(NA_character_, n),
+               BRANDPEN2_ECX_1  = rep(NA_character_, n),
+               stringsAsFactors = FALSE))
   for (b in c("IPK","ROB","CART")) {
-    data[[paste0("BRANDAWARE_", b)]] <- 0
-    data[[paste0("QBRANDATT1_", b)]] <- as.character(5)
-    data[[paste0("BRANDPENTRANS1_", b)]] <- 0
-    data[[paste0("BRANDPENTRANS2_", b)]] <- 0
-    data[[paste0("BRANDPENTRANS3_", b)]] <- 0
+    data[[paste0("BRANDATT1_ECX_", b)]] <- as.character(5L)
   }
-  rm <- load_role_map(.structure(.qm_transactional(), .optionmap_attitude()))
-  res <- run_funnel(data, rm, .brand_list(), .config())
 
+  res <- run_funnel(data, .trans_rm_base(), .brands(), .cfg())
   for (b in c("IPK","ROB","CART")) {
-    expect_equal(.pct(res$stages, "aware", b), 0)
-    expect_equal(.pct(res$stages, "bought_target", b), 0)
+    expect_equal(.pct(res$stages, "aware", b),        0, info = b)
+    expect_equal(.pct(res$stages, "bought_target", b), 0, info = b)
   }
-  # Conversions should be NA (not NaN / not division error)
   expect_true(all(is.na(res$conversions$value)))
 })
 
 
-# --- All aware, none positive ------------------------------------------------
+# ==============================================================================
+# All aware, none positive
+# ==============================================================================
 
 test_that("All aware + none positive gives Consideration = 0 and later stages = 0", {
   n <- 10
-  data <- data.frame(Respondent_ID = seq_len(n), Weight = 1,
-                     stringsAsFactors = FALSE)
+  # All aware of all brands, all reject (code 4)
+  all_brands_list <- replicate(n, c("IPK","ROB","CART"), simplify = FALSE)
+  data <- cbind(
+    data.frame(Respondent_ID = seq_len(n), Weight = 1, stringsAsFactors = FALSE),
+    .pack_mm(all_brands_list, "BRANDAWARE_ECX"),
+    .pack_mm(all_brands_list, "BRANDPEN1_ECX"),
+    .pack_mm(all_brands_list, "BRANDPEN2_ECX"))
   for (b in c("IPK","ROB","CART")) {
-    data[[paste0("BRANDAWARE_", b)]] <- 1
-    data[[paste0("QBRANDATT1_", b)]] <- as.character(4)  # all reject
-    data[[paste0("BRANDPENTRANS1_", b)]] <- 1
-    data[[paste0("BRANDPENTRANS2_", b)]] <- 1
-    data[[paste0("BRANDPENTRANS3_", b)]] <- 3
+    data[[paste0("BRANDATT1_ECX_", b)]] <- as.character(4L)  # all reject
   }
-  rm <- load_role_map(.structure(.qm_transactional(), .optionmap_attitude()))
-  res <- run_funnel(data, rm, .brand_list(), .config())
 
+  res <- run_funnel(data, .trans_rm_base(), .brands(), .cfg())
   for (b in c("IPK","ROB","CART")) {
-    expect_equal(.pct(res$stages, "aware", b), 1)
-    expect_equal(.pct(res$stages, "consideration", b), 0)
-    expect_equal(.pct(res$stages, "bought_long", b), 0)
+    expect_equal(.pct(res$stages, "aware", b),        1,   info = b)
+    expect_equal(.pct(res$stages, "consideration", b), 0,  info = b)
+    expect_equal(.pct(res$stages, "bought_long", b),   0,  info = b)
   }
 })
 
 
-# --- Missing optional role --------------------------------------------------
+# ==============================================================================
+# Missing optional roles
+# ==============================================================================
 
-test_that("Dropping the frequency role leaves the funnel intact (4 stages, no warning)", {
-  # In v2.1 frequency is consumed by the Repertoire / Frequency element,
-  # not the funnel. Absent → funnel is unaffected; no preferred/heavy_buyer
-  # stage is produced in either case.
-  qm <- .qm_transactional()
-  qm <- qm[qm$Role != "funnel.transactional.frequency", , drop = FALSE]
-  rm <- load_role_map(.structure(qm, .optionmap_attitude()))
-
-  data <- .fixture_transactional()
-  res <- run_funnel(data, rm, .brand_list(), .config())
-
+test_that("Frequency role absent: funnel is unaffected (4 stages, PASS status)", {
+  # In v2 frequency is not a funnel stage; the role is simply not in the map.
+  res <- run_funnel(.trans_data_ecx(), .trans_rm_base(), .brands(), .cfg())
   expect_equal(res$status, "PASS")
-  expect_false("preferred" %in% res$meta$stage_keys)
+  expect_false("preferred"   %in% res$meta$stage_keys)
   expect_false("heavy_buyer" %in% res$meta$stage_keys)
-  expect_equal(res$meta$stage_count, 4)
+  expect_equal(res$meta$stage_count, 4L)
   expect_equal(.pct(res$stages, "aware", "IPK"), 0.9, tolerance = 1e-9)
 })
 
 
-test_that("Dropping bought_long and bought_target still yields a 2-stage minimum funnel", {
-  qm <- .qm_transactional()
-  qm <- qm[!qm$Role %in% c("funnel.transactional.bought_long",
-                            "funnel.transactional.bought_target",
-                            "funnel.transactional.frequency"),
-           , drop = FALSE]
-  rm <- load_role_map(.structure(qm, .optionmap_attitude()))
-  data <- .fixture_transactional()
-
-  res <- run_funnel(data, rm, .brand_list(), .config())
-  expect_equal(res$meta$stage_count, 2)
+test_that("Dropping bought_long + bought_target yields a 2-stage funnel", {
+  rm <- .trans_rm_base(omit = c("funnel.penetration_long",
+                                 "funnel.penetration_target"))
+  res <- run_funnel(.trans_data_ecx(), rm, .brands(), .cfg())
+  expect_equal(res$meta$stage_count, 2L)
   expect_setequal(res$meta$stage_keys, c("aware", "consideration"))
 })
 
 
-# --- OptionMap omits Ambivalent ---------------------------------------------
+# ==============================================================================
+# Custom positive-code set (replaces legacy OptionMap omit_ambivalent test)
+# ==============================================================================
 
-test_that("Omitting Ambivalent in OptionMap reduces Consideration to Love + Prefer only", {
-  rm <- load_role_map(.structure(.qm_transactional(),
-                                 .optionmap_attitude(omit_ambivalent = TRUE)))
-  data <- .fixture_transactional()
-  res <- run_funnel(data, rm, .brand_list(), .config())
-
-  # IPK consideration had R3(att=3) and R7(att=3) in the full set. Dropping
-  # ambivalent removes them → 7 - 2 = 5 → 50%.
+test_that("Excluding code 3 from positive_attitude_codes reduces Consideration", {
+  # IPK consideration with codes {1,2,3}: 7/10 = 70%
+  # Removing code 3 (ambivalent): R3(att=3) and R7(att=3) drop out → 5/10 = 50%
+  cfg_no_ambiv <- .cfg(`funnel.positive_attitude_codes` = c("1","2"))
+  res <- run_funnel(.trans_data_ecx(), .trans_rm_base(), .brands(), cfg_no_ambiv)
   expect_equal(.pct(res$stages, "consideration", "IPK"), 0.5, tolerance = 1e-9)
 })
 
 
-# --- Inverted attitude scale ------------------------------------------------
+# ==============================================================================
+# Inverted attitude scale
+# ==============================================================================
 
 test_that("Inverted attitude scale (5=love..1=no_opinion) yields same stage counts", {
-  data <- .fixture_transactional()
-  # Invert attitude codes in the data: map 1->5, 2->4, 3->3, 4->2, 5->1
+  data <- .trans_data_ecx()
+  # Invert attitude codes in data: map 1→5, 2→4, 3→3, 4→2, 5→1
   for (b in c("IPK","ROB","CART")) {
-    col <- paste0("QBRANDATT1_", b)
-    data[[col]] <- as.character(6 - as.integer(data[[col]]))
+    col <- paste0("BRANDATT1_ECX_", b)
+    data[[col]] <- as.character(6L - as.integer(data[[col]]))
   }
-  rm <- load_role_map(.structure(.qm_transactional(),
-                                 .optionmap_attitude(inverted = TRUE)))
-  res <- run_funnel(data, rm, .brand_list(), .config())
+  # Positive codes in the inverted scale are 5 (love), 4 (prefer), 3 (ambivalent)
+  cfg_inv <- .cfg(`funnel.positive_attitude_codes` = c("5","4","3"))
+  res <- run_funnel(data, .trans_rm_base(), .brands(), cfg_inv)
 
   expect_equal(.pct(res$stages, "consideration", "IPK"), 0.7, tolerance = 1e-9)
   expect_equal(.pct(res$stages, "bought_target", "IPK"), 0.5, tolerance = 1e-9)
 })
 
 
-# --- Weight parity ----------------------------------------------------------
+# ==============================================================================
+# Weight parity
+# ==============================================================================
 
 test_that("Weights all equal 1 produce weighted == unweighted", {
-  data <- .fixture_transactional()
-  rm <- load_role_map(.structure(.qm_transactional(), .optionmap_attitude()))
-  res_u <- run_funnel(data, rm, .brand_list(), .config())
-  res_w <- run_funnel(data, rm, .brand_list(), .config(),
-                     weights = rep(1, nrow(data)))
+  res_u <- run_funnel(.trans_data_ecx(), .trans_rm_base(), .brands(), .cfg())
+  res_w <- run_funnel(.trans_data_ecx(), .trans_rm_base(), .brands(), .cfg(),
+                      weights = rep(1, 10L))
 
-  expect_equal(res_u$stages$pct_weighted, res_w$stages$pct_weighted)
+  expect_equal(res_u$stages$pct_weighted,  res_w$stages$pct_weighted)
   expect_equal(res_u$stages$base_weighted, res_w$stages$base_weighted)
 })
 
 
-# --- Suppress base flag ------------------------------------------------------
+# ==============================================================================
+# Suppress base flag
+# ==============================================================================
 
-test_that("suppress_base = 50 marks stages with base 30-49 as 'suppress'", {
-  # Tiny fixture where Target Period base randomly falls below 50 at the
-  # brand level while Aware base (60) sits in the warn band (50..<75).
+test_that("suppress_base = 50 marks stages with base < 50 as suppress", {
   set.seed(7)
   n <- 60
-  data <- data.frame(Respondent_ID = seq_len(n), Weight = 1)
-  for (b in c("IPK","ROB","CART")) {
-    data[[paste0("BRANDAWARE_", b)]]  <- rep(1, n)
-    data[[paste0("QBRANDATT1_", b)]]  <- as.character(sample(1:2, n, replace = TRUE))
-    data[[paste0("BRANDPENTRANS1_", b)]] <- rep(1, n)
-    # Target period: only random subset → narrower base at stage 4
-    data[[paste0("BRANDPENTRANS2_", b)]] <- sample(0:1, n, replace = TRUE)
-    data[[paste0("BRANDPENTRANS3_", b)]] <- 1
+  brands <- c("IPK","ROB","CART")
+
+  # All aware of all brands
+  all_list <- replicate(n, brands, simplify = FALSE)
+  # Pen1: all bought all brands
+  pen1_list <- replicate(n, brands, simplify = FALSE)
+  # Pen2: each brand independently ~50% chance
+  set.seed(7)
+  pen2_per <- lapply(brands, function(b) sample(0:1, n, replace = TRUE))
+  names(pen2_per) <- brands
+  pen2_list <- lapply(seq_len(n), function(i)
+    brands[vapply(pen2_per, `[[`, integer(1), i) == 1L])
+
+  data <- cbind(
+    data.frame(Respondent_ID = seq_len(n), Weight = 1, stringsAsFactors = FALSE),
+    .pack_mm(all_list,  "BRANDAWARE_ECX"),
+    .pack_mm(pen1_list, "BRANDPEN1_ECX"),
+    .pack_mm(pen2_list, "BRANDPEN2_ECX"))
+  for (b in brands) {
+    data[[paste0("BRANDATT1_ECX_", b)]] <- as.character(sample(1:2, n, replace = TRUE))
   }
-  rm <- load_role_map(.structure(.qm_transactional(), .optionmap_attitude()))
-  cfg <- .config(`funnel.suppress_base` = 50, `funnel.warn_base` = 75)
-  res <- run_funnel(data, rm, .brand_list(), cfg)
+
+  # Build role map using the actual slot count from the built data
+  n_aw  <- sum(grepl("^BRANDAWARE_ECX_", names(data)))
+  n_pl  <- sum(grepl("^BRANDPEN1_ECX_",  names(data)))
+  n_pt  <- sum(grepl("^BRANDPEN2_ECX_",  names(data)))
+  rm <- list(
+    "funnel.awareness"          = .mm_entry("funnel.awareness",         "ECX", "BRANDAWARE", "BRANDAWARE_ECX", n_aw),
+    "funnel.attitude"           = .att_entry("ECX", brands),
+    "funnel.penetration_long"   = .mm_entry("funnel.penetration_long",  "ECX", "BRANDPEN1",  "BRANDPEN1_ECX",  n_pl),
+    "funnel.penetration_target" = .mm_entry("funnel.penetration_target","ECX", "BRANDPEN2",  "BRANDPEN2_ECX",  n_pt)
+  )
+
+  cfg <- .cfg(`funnel.suppress_base` = 50, `funnel.warn_base` = 75)
+  res <- run_funnel(data, rm, .brands(brands), cfg)
 
   aware_flags  <- res$stages$warning_flag[res$stages$stage_key == "aware"]
   target_flags <- res$stages$warning_flag[res$stages$stage_key == "bought_target"]
-  # Aware for every brand is 60 → between 50 and 75 → warn
+  # Aware base = 60 for all brands → between 50 and 75 → warn
   expect_true(all(aware_flags == "warn"))
-  # Target Period bases (randomish) likely below 50 → suppress
+  # Target period base (random ~30 per brand) → below 50 → suppress
   expect_true(any(target_flags == "suppress"))
 })
 
 
-# --- Category type refusal --------------------------------------------------
+# ==============================================================================
+# Category type refusal
+# ==============================================================================
 
 test_that("Unknown category.type refuses with CFG_CATEGORY_TYPE_INVALID", {
-  rm <- load_role_map(.structure(.qm_transactional(), .optionmap_attitude()))
-  data <- .fixture_transactional()
   res <- brand_with_refusal_handler(
-    run_funnel(data, rm, .brand_list(),
-               .config(`category.type` = "mystery"))
+    run_funnel(.trans_data_ecx(), .trans_rm_base(), .brands(),
+               .cfg(`category.type` = "mystery"))
   )
   expect_true(res$refused)
   expect_equal(res$code, "CFG_CATEGORY_TYPE_INVALID")

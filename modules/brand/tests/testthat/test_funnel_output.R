@@ -1,105 +1,149 @@
 # ==============================================================================
-# BRAND MODULE TESTS - FUNNEL OUTPUT (Excel + CSV per FUNNEL_SPEC §7)
+# BRAND MODULE TESTS — FUNNEL OUTPUT (Excel + CSV) — v2 port
 # ==============================================================================
+# Tests for write_funnel_excel() and write_funnel_csv() on the same
+# 10-respondent transactional fixture used in test_funnel_transactional.R.
+# Role map includes output-layer alias keys ("funnel.transactional.bought_long"
+# etc.) so 03d_funnel_output.R's .role_map_lookup_for_stages() can find them.
+# ==============================================================================
+library(testthat)
 
-.find_turas_root_for_test <- function() {
+.find_root <- function() {
   dir <- getwd()
   for (i in 1:10) {
-    if (file.exists(file.path(dir, "launch_turas.R")) ||
-        file.exists(file.path(dir, "CLAUDE.md"))) return(dir)
+    if (file.exists(file.path(dir, "CLAUDE.md"))) return(dir)
     dir <- dirname(dir)
   }
   getwd()
 }
-TURAS_ROOT <- .find_turas_root_for_test()
+ROOT <- .find_root()
 
-shared_lib <- file.path(TURAS_ROOT, "modules", "shared", "lib")
+shared_lib <- file.path(ROOT, "modules", "shared", "lib")
 for (f in sort(list.files(shared_lib, pattern = "\\.R$", full.names = TRUE))) {
   tryCatch(source(f, local = FALSE), error = function(e) NULL)
 }
-source(file.path(TURAS_ROOT, "modules", "brand", "R", "00_guard.R"))
-source(file.path(TURAS_ROOT, "modules", "brand", "R", "00_role_map.R"))
-source(file.path(TURAS_ROOT, "modules", "brand", "R", "00_guard_role_map.R"))
-source(file.path(TURAS_ROOT, "modules", "brand", "R", "03a_funnel_derive.R"))
-source(file.path(TURAS_ROOT, "modules", "brand", "R", "03b_funnel_metrics.R"))
-source(file.path(TURAS_ROOT, "modules", "brand", "R", "03_funnel.R"))
-source(file.path(TURAS_ROOT, "modules", "brand", "R", "03c_funnel_panel_data.R"))
-source(file.path(TURAS_ROOT, "modules", "brand", "R", "03e_funnel_legacy_adapter.R"))
-source(file.path(TURAS_ROOT, "modules", "brand", "R", "03d_funnel_output.R"))
+source(file.path(ROOT, "modules", "brand", "R", "00_guard.R"))
+source(file.path(ROOT, "modules", "brand", "R", "00_data_access.R"))
+source(file.path(ROOT, "modules", "brand", "R", "00_role_inference.R"))
+source(file.path(ROOT, "modules", "brand", "R", "00_role_map.R"))
+source(file.path(ROOT, "modules", "brand", "R", "03a_funnel_derive.R"))
+source(file.path(ROOT, "modules", "brand", "R", "03b_funnel_metrics.R"))
+source(file.path(ROOT, "modules", "brand", "R", "03_funnel.R"))
+source(file.path(ROOT, "modules", "brand", "R", "03c_funnel_panel_data.R"))
+source(file.path(ROOT, "modules", "brand", "R", "03e_funnel_legacy_adapter.R"))
+source(file.path(ROOT, "modules", "brand", "R", "03d_funnel_output.R"))
 
 
-# --- Fixture -----------------------------------------------------------------
+# ==============================================================================
+# Shared fixture
+# ==============================================================================
 
-.brand_list_ircc <- function() {
-  data.frame(BrandCode = c("IPK", "ROB", "CART"),
-             BrandLabel = c("IPK", "Robertsons", "Cartwright"),
+.pack_mm <- function(picks, root) {
+  n_slots <- max(vapply(picks, length, integer(1)), 1L)
+  as.data.frame(
+    setNames(
+      lapply(seq_len(n_slots), function(j)
+        vapply(picks, function(p)
+          if (j <= length(p)) p[j] else NA_character_,
+          character(1))),
+      paste0(root, "_", seq_len(n_slots))),
+    stringsAsFactors = FALSE)
+}
+
+.mm_entry <- function(role, cat, client, column_root, n_slots, qtext = "") {
+  list(role = role, category = cat, client_code = client,
+       variable_type = "Multi_Mention",
+       column_root = column_root, per_brand = FALSE,
+       columns = paste0(column_root, "_", seq_len(n_slots)),
+       applicable_brands = NULL,
+       question_text = qtext, option_scale = NA,
+       option_map = NULL, notes = "")
+}
+
+.att_entry <- function(cat, brands) {
+  colroot <- paste0("BRANDATT1_", cat)
+  named_cols <- setNames(paste0(colroot, "_", brands), brands)
+  list(role = "funnel.attitude", category = cat, client_code = "BRANDATT1",
+       variable_type = "Single_Response_Brand",
+       column_root = colroot, per_brand = TRUE,
+       columns = named_cols,
+       applicable_brands = brands,
+       question_text = "Attitude?", option_scale = NA,
+       option_map = NULL, notes = "")
+}
+
+.trans_data <- function() {
+  aware <- list(
+    c("IPK","ROB","CART"), c("IPK","ROB","CART"), c("IPK","CART"),
+    c("IPK","ROB","CART"), c("ROB"),              c("IPK","ROB","CART"),
+    c("IPK"),              c("IPK","ROB","CART"), c("IPK","ROB","CART"),
+    c("IPK","ROB"))
+  pen1 <- list(
+    c("IPK","ROB"), c("IPK","ROB"), c("IPK","CART"), c("ROB","CART"),
+    c("ROB"),       c("IPK","CART"), character(0),   c("IPK","CART"),
+    c("ROB","CART"), c("IPK","ROB"))
+  pen2 <- list(
+    c("IPK","ROB"), c("IPK","ROB"), c("CART"),       c("ROB","CART"),
+    character(0),   c("IPK"),       character(0),    c("IPK","CART"),
+    c("CART"),      c("IPK","ROB"))
+  data <- cbind(
+    data.frame(Respondent_ID = 1:10, Weight = 1, stringsAsFactors = FALSE),
+    .pack_mm(aware, "BRANDAWARE_TSX"),
+    .pack_mm(pen1,  "BRANDPEN1_TSX"),
+    .pack_mm(pen2,  "BRANDPEN2_TSX"))
+  data$BRANDATT1_TSX_IPK  <- c(1, 2, 3, 4, 5, 1, 3, 2, 5, 1)
+  data$BRANDATT1_TSX_ROB  <- c(3, 1, 5, 2, 3, 4, 5, 4, 2, 1)
+  data$BRANDATT1_TSX_CART <- c(5, 4, 2, 1, 5, 3, 5, 2, 1, 5)
+  data
+}
+
+.trans_brands <- function() {
+  data.frame(BrandCode  = c("IPK","ROB","CART"),
+             BrandLabel = c("IPK","Robertsons","Cartwright"),
              stringsAsFactors = FALSE)
 }
 
-.optionmap_attitude <- function() {
-  data.frame(Scale = rep("attitude_scale", 5),
-             ClientCode = as.character(1:5),
-             Role = c("attitude.love","attitude.prefer",
-                      "attitude.ambivalent","attitude.reject",
-                      "attitude.no_opinion"),
-             ClientLabel = c("L","P","A","R","N"),
-             OrderIndex = 1:5, stringsAsFactors = FALSE)
-}
-
-.questionmap_transactional <- function() {
-  data.frame(
-    Role = c("funnel.awareness","funnel.attitude",
-             "funnel.transactional.bought_long",
-             "funnel.transactional.bought_target",
-             "funnel.transactional.frequency",
-             "system.respondent.id","system.respondent.weight"),
-    ClientCode = c("BRANDAWARE","QBRANDATT1",
-                   "BRANDPENTRANS1","BRANDPENTRANS2","BRANDPENTRANS3",
-                   "Respondent_ID","Weight"),
-    QuestionText = c("Heard of?", "Attitude", "Bought in 12m?",
-                     "Bought in last month?", "How often?", "ID", "Weight"),
-    QuestionTextShort = NA_character_,
-    Variable_Type = c("Multi_Mention","Single_Response",
-                      "Multi_Mention","Multi_Mention","Numeric",
-                      "Single_Response","Numeric"),
-    ColumnPattern = c("{code}_{brand_code}","{code}_{brand_code}",
-                      "{code}_{brand_code}","{code}_{brand_code}",
-                      "{code}_{brand_code}","{code}","{code}"),
-    OptionMapScale = c("","attitude_scale","","","","",""),
-    Notes = NA_character_, stringsAsFactors = FALSE)
-}
-
-.structure_transactional <- function() {
-  list(questionmap = .questionmap_transactional(),
-       optionmap = .optionmap_attitude(),
-       brands = .brand_list_ircc(),
-       ceps = data.frame(), dba_assets = data.frame())
+.trans_rm <- function() {
+  aw <- .mm_entry("funnel.awareness", "TSX", "BRANDAWARE",
+                  "BRANDAWARE_TSX", 3, "Heard of?")
+  at <- .att_entry("TSX", c("IPK","ROB","CART"))
+  pl <- .mm_entry("funnel.penetration_long", "TSX", "BRANDPEN1",
+                  "BRANDPEN1_TSX", 2, "Bought in 12m?")
+  pt <- .mm_entry("funnel.penetration_target", "TSX", "BRANDPEN2",
+                  "BRANDPEN2_TSX", 2, "Bought last month?")
+  list(
+    "funnel.awareness"                   = aw,
+    "funnel.attitude"                    = at,
+    "funnel.penetration_long"            = pl,
+    "funnel.penetration_target"          = pt,
+    "funnel.transactional.bought_long"   = pl,
+    "funnel.transactional.bought_target" = pt
+  )
 }
 
 .run_fixture <- function() {
-  data <- read.csv(
-    file.path(TURAS_ROOT, "modules", "brand", "tests", "fixtures",
-              "funnel_transactional_10resp.csv"),
-    stringsAsFactors = FALSE)
-  rm <- load_role_map(.structure_transactional())
-  list(result = run_funnel(data, rm, .brand_list_ircc(), list(
-    `category.type` = "transactional", focal_brand = "IPK",
-    `funnel.conversion_metric` = "ratio",
-    `funnel.warn_base` = 0, `funnel.suppress_base` = 0,
-    `funnel.significance_level` = 0.05)),
-       role_map = rm)
+  rm <- .trans_rm()
+  list(
+    result   = run_funnel(.trans_data(), rm, .trans_brands(), list(
+      `category.type` = "transactional", focal_brand = "IPK",
+      `funnel.conversion_metric` = "ratio",
+      `funnel.warn_base` = 0, `funnel.suppress_base` = 0,
+      `funnel.significance_level` = 0.05)),
+    role_map = rm
+  )
 }
 
 
-# --- Excel tests -------------------------------------------------------------
+# ==============================================================================
+# Excel tests
+# ==============================================================================
 
 test_that("write_funnel_excel creates a 4-sheet workbook", {
   bundle <- .run_fixture()
   tmp <- tempfile(fileext = ".xlsx")
   on.exit(unlink(tmp), add = TRUE)
 
-  write_funnel_excel(bundle$result, .brand_list_ircc(),
-                     bundle$role_map, tmp,
+  write_funnel_excel(bundle$result, .trans_brands(), bundle$role_map, tmp,
                      config = list(`funnel.conversion_metric` = "ratio"))
   expect_true(file.exists(tmp))
   sheets <- openxlsx::getSheetNames(tmp)
@@ -113,10 +157,9 @@ test_that("Stage_Matrix sheet carries ClientCode and QuestionText header rows", 
   tmp <- tempfile(fileext = ".xlsx")
   on.exit(unlink(tmp), add = TRUE)
 
-  write_funnel_excel(bundle$result, .brand_list_ircc(),
-                     bundle$role_map, tmp)
+  write_funnel_excel(bundle$result, .trans_brands(), bundle$role_map, tmp)
   sm <- openxlsx::read.xlsx(tmp, sheet = "Stage_Matrix", colNames = FALSE)
-  # Row 1: label "ClientCode" + blank + client codes
+  # Row 1: label "ClientCode" + blank + client codes per stage
   expect_equal(sm[1, 1], "ClientCode")
   expect_true("BRANDAWARE" %in% as.character(unlist(sm[1, ])))
   # Row 2: "QuestionText"
@@ -130,14 +173,13 @@ test_that("Stage_Matrix body values match hand-calculated percentages", {
   tmp <- tempfile(fileext = ".xlsx")
   on.exit(unlink(tmp), add = TRUE)
 
-  write_funnel_excel(bundle$result, .brand_list_ircc(),
-                     bundle$role_map, tmp)
+  write_funnel_excel(bundle$result, .trans_brands(), bundle$role_map, tmp)
   sm <- openxlsx::read.xlsx(tmp, sheet = "Stage_Matrix", colNames = FALSE)
-  # Find IPK row — somewhere after the 3 header rows
+  # Find IPK row (after 3 header rows)
   ipk_row <- which(as.character(unlist(sm[, 1])) == "IPK")
-  expect_length(ipk_row, 1)
+  expect_length(ipk_row, 1L)
   aware_pct <- as.numeric(sm[ipk_row, 3])  # col1=code, col2=label, col3=stage1
-  expect_equal(aware_pct, 90, tolerance = 0.01)  # 90% from hand calc
+  expect_equal(aware_pct, 90, tolerance = 0.01)  # 9/10 = 90%
 })
 
 
@@ -146,14 +188,12 @@ test_that("Attitude_Decomposition sheet covers all 5 positions per brand", {
   tmp <- tempfile(fileext = ".xlsx")
   on.exit(unlink(tmp), add = TRUE)
 
-  write_funnel_excel(bundle$result, .brand_list_ircc(),
-                     bundle$role_map, tmp)
+  write_funnel_excel(bundle$result, .trans_brands(), bundle$role_map, tmp)
   att <- openxlsx::read.xlsx(tmp, sheet = "Attitude_Decomposition")
   expect_true(all(c("Love", "Prefer", "Ambivalent", "Reject",
-                    "No.Opinion", "Aware_Base_Unweighted")
-                  %in% names(att)))
-  expect_equal(nrow(att), 3)  # 3 brands
-  # IPK Love = 3/10 = 30% (total base: all 10 respondents answer attitude)
+                    "No.Opinion", "Aware_Base_Unweighted") %in% names(att)))
+  expect_equal(nrow(att), 3L)  # 3 brands
+  # IPK Love = 3/10 = 30%
   ipk_row <- att[att$BrandCode == "IPK", ]
   expect_equal(ipk_row$Love, 30, tolerance = 0.01)
 })
@@ -164,28 +204,29 @@ test_that("Metadata sheet records category_type, focal, and n counts", {
   tmp <- tempfile(fileext = ".xlsx")
   on.exit(unlink(tmp), add = TRUE)
 
-  write_funnel_excel(bundle$result, .brand_list_ircc(),
-                     bundle$role_map, tmp)
+  write_funnel_excel(bundle$result, .trans_brands(), bundle$role_map, tmp)
   md <- openxlsx::read.xlsx(tmp, sheet = "Metadata")
   md_lookup <- stats::setNames(md$Value, md$Key)
   expect_equal(md_lookup[["category_type"]], "transactional")
-  expect_equal(md_lookup[["focal_brand"]], "IPK")
-  expect_equal(md_lookup[["n_unweighted"]], "10")
+  expect_equal(md_lookup[["focal_brand"]],   "IPK")
+  expect_equal(md_lookup[["n_unweighted"]],  "10")
 })
 
 
-# --- CSV tests ---------------------------------------------------------------
+# ==============================================================================
+# CSV tests
+# ==============================================================================
 
 test_that("write_funnel_csv produces one row per brand x stage", {
   bundle <- .run_fixture()
   tmp <- tempfile(fileext = ".csv")
   on.exit(unlink(tmp), add = TRUE)
 
-  write_funnel_csv(bundle$result, .brand_list_ircc(), bundle$role_map,
-                   tmp, list(category_code = "FMCG_TEST", wave_label = "W1"))
+  write_funnel_csv(bundle$result, .trans_brands(), bundle$role_map, tmp,
+                   list(category_code = "FMCG_TEST", wave_label = "W1"))
   df <- utils::read.csv(tmp, stringsAsFactors = FALSE)
-  expect_equal(nrow(df), 12)  # 4 stages x 3 brands
-  expect_setequal(unique(df$brand_code), c("IPK", "ROB", "CART"))
+  expect_equal(nrow(df), 12L)  # 4 stages x 3 brands
+  expect_setequal(unique(df$brand_code), c("IPK","ROB","CART"))
 })
 
 
@@ -194,10 +235,10 @@ test_that("CSV carries ClientCode and QuestionText on every row", {
   tmp <- tempfile(fileext = ".csv")
   on.exit(unlink(tmp), add = TRUE)
 
-  write_funnel_csv(bundle$result, .brand_list_ircc(), bundle$role_map, tmp,
+  write_funnel_csv(bundle$result, .trans_brands(), bundle$role_map, tmp,
                    list(category_code = "FMCG_TEST"))
   df <- utils::read.csv(tmp, stringsAsFactors = FALSE)
-  expect_true("client_code" %in% names(df))
+  expect_true("client_code"   %in% names(df))
   expect_true("question_text" %in% names(df))
   aware_rows <- df[df$stage_key == "aware", ]
   expect_true(all(aware_rows$client_code == "BRANDAWARE"))
@@ -210,7 +251,7 @@ test_that("CSV pct values round-trip at full precision", {
   tmp <- tempfile(fileext = ".csv")
   on.exit(unlink(tmp), add = TRUE)
 
-  write_funnel_csv(bundle$result, .brand_list_ircc(), bundle$role_map, tmp,
+  write_funnel_csv(bundle$result, .trans_brands(), bundle$role_map, tmp,
                    list(category_code = "FMCG_TEST"))
   df <- utils::read.csv(tmp, stringsAsFactors = FALSE)
   ipk_aware <- df[df$brand_code == "IPK" & df$stage_key == "aware", ]
@@ -223,7 +264,7 @@ test_that("CSV includes wave_label and category_code metadata columns", {
   tmp <- tempfile(fileext = ".csv")
   on.exit(unlink(tmp), add = TRUE)
 
-  write_funnel_csv(bundle$result, .brand_list_ircc(), bundle$role_map, tmp,
+  write_funnel_csv(bundle$result, .trans_brands(), bundle$role_map, tmp,
                    list(category_code = "FMCG_TEST", wave_label = "W1"))
   df <- utils::read.csv(tmp, stringsAsFactors = FALSE)
   expect_true(all(df$category_code == "FMCG_TEST"))
@@ -231,13 +272,15 @@ test_that("CSV includes wave_label and category_code metadata columns", {
 })
 
 
-# --- Refusal tests -----------------------------------------------------------
+# ==============================================================================
+# Refusal tests
+# ==============================================================================
 
 test_that("write_funnel_excel refuses on a REFUSED result", {
   tmp <- tempfile(fileext = ".xlsx")
   res <- brand_with_refusal_handler(
     write_funnel_excel(list(status = "REFUSED"),
-                       .brand_list_ircc(), NULL, tmp)
+                       .trans_brands(), NULL, tmp)
   )
   expect_true(res$refused)
   expect_equal(res$code, "DATA_FUNNEL_EMPTY")
@@ -248,7 +291,7 @@ test_that("write_funnel_csv refuses on a REFUSED result", {
   tmp <- tempfile(fileext = ".csv")
   res <- brand_with_refusal_handler(
     write_funnel_csv(list(status = "REFUSED"),
-                     .brand_list_ircc(), NULL, tmp)
+                     .trans_brands(), NULL, tmp)
   )
   expect_true(res$refused)
   expect_equal(res$code, "DATA_FUNNEL_EMPTY")
