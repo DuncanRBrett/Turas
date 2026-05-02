@@ -200,17 +200,51 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
   # "% aware" base = segments[[role]] * (n_total / aware_n) — scaled up to aware denominator.
   brands_all <- ordered
 
-  # Category avg: % of aware base (default display)
+  # Category avg: % of aware base (default display).
+  #
+  # POOLED across brands rather than unweighted mean of per-brand rescaled
+  # fractions. The unweighted approach is fragile: any brand with a very
+  # low aware_base gets a huge rescale factor (n_total / aware_base),
+  # inflating its contribution and pushing the cross-brand mean far above
+  # 100% (the bug seen on the Cat avg row of this table — "No opinion"
+  # rendered as 110%, full row summed to 185%).
+  #
+  # Pooled formula: sum(segment_count) / sum(aware_base), where
+  # segment_count = segments[role] * n_total. Equivalent to treating all
+  # (brand × respondent) cells as one bag and computing the fraction of
+  # the bag falling into each segment among aware respondents. Mirrors the
+  # JS fix in buildRelChart() in brand_funnel_panel.js.
+  pooled_aware_base <- sum(vapply(brands_all, function(b) {
+    bn <- as.numeric(b$aware_base %||% NA_real_)
+    if (!is.finite(bn)) 0 else bn
+  }, numeric(1)))
+
   cat_avg_aware <- vapply(att_roles, function(role) {
-    vals <- vapply(brands_all, function(b) {
+    if (!is.finite(n_total) || pooled_aware_base <= 0) {
+      vals <- vapply(brands_all, function(b) {
+        pt <- as.numeric(b$segments[[role]] %||% NA_real_)
+        bn <- as.numeric(b$aware_base    %||% NA_real_)
+        if (!is.finite(pt) || !is.finite(bn) || !is.finite(n_total) || bn <= 0) NA_real_
+        else pt * (n_total / bn)
+      }, numeric(1))
+      vals <- vals[is.finite(vals)]
+      return(if (length(vals) == 0) NA_real_ else mean(vals))
+    }
+    counts <- vapply(brands_all, function(b) {
       pt <- as.numeric(b$segments[[role]] %||% NA_real_)
-      bn <- as.numeric(b$aware_base    %||% NA_real_)
-      if (!is.finite(pt) || !is.finite(bn) || !is.finite(n_total) || bn <= 0) NA_real_
-      else pt * (n_total / bn)
+      if (!is.finite(pt)) 0 else pt * n_total
     }, numeric(1))
-    vals <- vals[is.finite(vals)]
-    if (length(vals) == 0) NA_real_ else mean(vals)
+    sum(counts) / pooled_aware_base
   }, numeric(1))
+
+  # Safety clamp: if the pooled cat-avg row still exceeds 105% in total
+  # (data anomaly — e.g. segment definitions overlap with non-aware), re-
+  # normalise so the row sums to 100%. Keeps the relative shape; prevents
+  # any > 100% values from leaking into the rendered table.
+  cat_avg_total_check <- sum(cat_avg_aware, na.rm = TRUE)
+  if (is.finite(cat_avg_total_check) && cat_avg_total_check > 1.05) {
+    cat_avg_aware <- cat_avg_aware / cat_avg_total_check
+  }
 
   # Category avg: % of total base (for toggle)
   cat_avg_total <- vapply(att_roles, function(role) {
