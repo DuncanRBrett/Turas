@@ -2390,6 +2390,32 @@
     var pctAttr = base === "total" ? "data-fn-rel-pct-total"  : "data-fn-rel-pct-aware";
     var cntAttr = base === "total" ? "data-fn-rel-count-total" : "data-fn-rel-count-aware";
     var denomAttr = base === "total" ? "data-fn-rel-denom-total" : "data-fn-rel-denom-aware";
+
+    /* Per-brand Base column — carries both bases as data attrs; show the
+       one that matches the active toggle. In % aware mode each brand has
+       its own aware-count; in % total mode every brand reads the same
+       total respondent count (constant denominator). The low-base ⚠
+       indicator is only meaningful in % aware mode (an n<30 brand has a
+       small aware sample); in % total mode it's hidden because the n is
+       the full sample. */
+    var baseAttr = base === "total" ? "data-fn-rel-base-total" : "data-fn-rel-base-aware";
+    table.querySelectorAll("td.fn-rel-base-cell").forEach(function(td) {
+      var n = parseInt(td.getAttribute(baseAttr), 10);
+      var span = td.querySelector(".fn-rel-base-num");
+      if (!span) return;
+      if (!isFinite(n) || n <= 0) {
+        span.textContent = "—";
+        span.classList.remove("ct-low-base", "ct-base-n");
+        span.classList.add("ct-na");
+        return;
+      }
+      var warn = base === "aware" && n < 30;
+      span.textContent = "n=" + n + (warn ? " ⚠" : "");
+      span.classList.remove("ct-na");
+      span.classList.toggle("ct-low-base", warn);
+      span.classList.toggle("ct-base-n", !warn);
+    });
+
     table.querySelectorAll("td.ct-heatmap-cell[data-fn-att]").forEach(function(td) {
       var pct   = parseFloat(td.getAttribute(pctAttr));
       var cnt   = parseInt(td.getAttribute(cntAttr), 10);

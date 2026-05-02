@@ -355,15 +355,29 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
   aware_n <- as.numeric(brand$aware_base %||% NA_real_)
   focal_cls <- if (is_focal) " fn-rel-td-focal" else ""
 
+  # Base cell carries BOTH the aware base (per-brand) and the total base
+  # (constant across brands). The JS toggle in applyRelTableBase()
+  # rewrites the visible <span> when the user flips % aware \u2194 % total so
+  # the displayed n always matches the active denominator.
+  total_n <- as.integer(round(n_total))
+  total_attr <- if (is.finite(n_total) && total_n > 0)
+    sprintf(' data-fn-rel-base-total="%d"', total_n) else ""
+
   base_cell <- if (is.finite(aware_n)) {
     ni   <- as.integer(round(aware_n))
     warn <- ni < 30L
-    sprintf('<td class="ct-td ct-data-col%s"><span class="%s">n=%d%s</span></td>',
-            focal_cls,
-            if (warn) "ct-low-base" else "ct-base-n", ni,
-            if (warn) " \u26A0" else "")
+    sprintf(paste0(
+      '<td class="ct-td ct-data-col fn-rel-base-cell%s" ',
+      'data-fn-rel-base-aware="%d"%s>',
+      '<span class="%s fn-rel-base-num">n=%d%s</span></td>'),
+      focal_cls, ni, total_attr,
+      if (warn) "ct-low-base" else "ct-base-n", ni,
+      if (warn) " \u26A0" else "")
   } else {
-    sprintf('<td class="ct-td ct-data-col%s ct-na">&mdash;</td>', focal_cls)
+    sprintf(paste0(
+      '<td class="ct-td ct-data-col fn-rel-base-cell%s"%s>',
+      '<span class="ct-na fn-rel-base-num">&mdash;</span></td>'),
+      focal_cls, total_attr)
   }
 
   att_cells <- paste(vapply(att_roles, function(role) {
