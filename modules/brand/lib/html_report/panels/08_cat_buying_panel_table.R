@@ -406,10 +406,16 @@ cb_brand_freq_scr_table_html <- function(norms_table,
 
   # --- Tooltips ---
   pen_tip <- sprintf(
-    paste0("%% of respondents who bought this brand in the last %d months ",
-           "(BRANDPEN3 purchase counts, reconciled). May differ from the Brand Funnel ",
-           "by 1\u20133pp: BRANDPEN3 reconciliation promotes respondents who reported ",
-           "purchases but did not tick the buyer flag on BRANDPEN2."),
+    paste0("Penetration = %% of ALL screened category respondents who bought ",
+           "this brand in the last %d months (BRANDPEN3, reconciled). ",
+           "Base includes lapsed / zero-purchase respondents who screened ",
+           "into the category but reported no purchases in the target window. ",
+           "\u2014 The Loyalty Segmentation tab uses a tighter base (cat buyers ",
+           "only, m_vec\u00a0>\u00a00), so its \u201c%% Cat buyers\u201d value ",
+           "for the same brand will be higher. ",
+           "\u2014 May differ from the Brand Funnel by 1\u20133pp: BRANDPEN3 ",
+           "reconciliation promotes respondents who reported purchases but did ",
+           "not tick the buyer flag on BRANDPEN2."),
     as.integer(target_months))
   br_tip <- paste0(
     "Mean number of times this brand was bought by brand buyers in the target window. ",

@@ -297,7 +297,13 @@ render_cat_buying_panel <- function(panel_data) {
   parts <- character(0)
   parts <- c(parts, '<div class="cb-section-title">Brand Performance Summary</div>')
   parts <- c(parts,
-    '<p style="font-size:12px;color:#64748b;margin:-4px 0 8px;">Penetration and volume share are based on BRANDPEN3 purchase counts after reconciliation. SCR = share of category requirement (loyalty metric).</p>')
+    '<p style="font-size:12px;color:#64748b;margin:-4px 0 8px;">',
+    '<strong>Base:</strong> all screened category respondents (incl. lapsed / zero-purchase). ',
+    'Penetration and volume share use BRANDPEN3 reconciled counts; SCR = share of category requirement (loyalty). ',
+    '<em>Note:</em> the Loyalty Segmentation tab uses a narrower base (cat buyers only, ',
+    'i.e. respondents with at least one purchase in the target window) — its &ldquo;% Cat buyers&rdquo; ',
+    'reads higher than Pen here for the same brand by exactly the lapsed-rate factor.',
+    '</p>')
   has_dn <- !is.null(dn) && !identical(dn$status, "REFUSED")
   has_bh <- !is.null(bh) && !identical(bh$status, "REFUSED")
 
@@ -313,7 +319,7 @@ render_cat_buying_panel <- function(panel_data) {
     '<summary>&#9432; How to read this table</summary>',
     '<div class="cb-info-body">',
     '<ul>',
-    '<li><strong>Pen</strong> = % of respondents who bought the brand (BRANDPEN3, reconciled).</li>',
+    '<li><strong>Pen</strong> = % of <em>all screened category respondents</em> who bought the brand (BRANDPEN3, reconciled). Includes lapsed / zero-purchase. The Loyalty tab uses a tighter cat-buyer base, so its &ldquo;% Cat buyers&rdquo; reads higher.</li>',
     '<li><strong>Avg purch.</strong> = mean times bought per brand buyer.</li>',
     '<li><strong>SCR obs</strong> = share of category requirement (loyalty).</li>',
     '<li>', vol_note, '</li>',
@@ -456,7 +462,7 @@ render_cat_buying_panel <- function(panel_data) {
       '<li><strong>Primary (&gt;50% SCR)</strong> = this brand is &gt;50% of the buyer\u2019s category purchases (but they also buy other brands).</li>',
       '<li><strong>Secondary (\u226450%)</strong> = bought this brand, but another brand takes the majority of their category spend.</li>',
       '<li><strong>Not bought</strong> = category buyer who did not buy this brand in the target window.</li>',
-      '<li><strong>% Buyers</strong> = % of category buyers who bought the brand (Sole + Primary + Secondary).</li>',
+      '<li><strong>% Cat buyers</strong> = % of <em>category buyers</em> (m_vec &gt; 0 in target window) who bought the brand (Sole + Primary + Secondary). Differs from the Brand Summary tab\u2019s &ldquo;Pen&rdquo;, which uses <em>all screened category respondents</em> (incl. lapsed / zero-purchase) \u2014 Pen reads lower than %% Cat buyers for the same brand.</li>',
       ci_explainer,
       '<li><strong>Show counts</strong> toggles segment % \u2194 raw weighted N (of category buyers).</li>',
       '</ul>')
@@ -464,7 +470,7 @@ render_cat_buying_panel <- function(panel_data) {
     paste0(
       '<ul>',
       '<li>Segments are buckets of purchase <em>frequency</em> among this brand\u2019s buyers over the target window.</li>',
-      '<li><strong>% Buyers</strong> = % of category buyers who bought the brand (for context).</li>',
+      '<li><strong>% Cat buyers</strong> = % of <em>category buyers</em> (m_vec &gt; 0 in target window) who bought the brand. Differs from Brand Summary &ldquo;Pen&rdquo;, which is %% of all screened category respondents (incl. lapsed) \u2014 Pen reads lower than %% Cat buyers for the same brand.</li>',
       '<li><strong>Base (n=)</strong> = weighted count of this brand\u2019s buyers.</li>',
       ci_explainer,
       '<li><strong>Show counts</strong> toggles segment % \u2194 raw weighted N (of brand buyers).</li>',
@@ -647,18 +653,23 @@ render_cat_buying_panel <- function(panel_data) {
       .cb_esc(seg_codes[si]), 2L + si, .cb_esc(seg_labels[si]))
   }, character(1)), collapse = "")
 
+  buyers_tip <- paste0(
+    "% Cat buyers = % of CATEGORY BUYERS (3-month, m_vec > 0) who bought ",
+    "this brand. Differs from the Brand Summary tab&apos;s &ldquo;Pen&rdquo;, ",
+    "which uses ALL screened category respondents (incl. lapsed / zero-",
+    "purchase) — Pen will be lower than this value for the same brand.")
   header_html <- sprintf(paste0(
     '<tr><th class="ct-th ct-label-col">Brand</th>',
-    '<th class="ct-th ct-data-col cb-col-buyers cb-sortable" title="Click to sort" ',
+    '<th class="ct-th ct-data-col cb-col-buyers cb-sortable" title="%s" ',
     'data-cb-sort-col="1" data-cb-sort-dir="none">',
-    '<span class="cb-th-label">%% Buyers</span>',
+    '<span class="cb-th-label">%% Cat buyers</span>',
     '<span class="cb-sort-ind"></span></th>',
     '<th class="ct-th ct-data-col cb-col-base cb-sortable" title="Click to sort" ',
     'data-cb-sort-col="2" data-cb-sort-dir="none">',
     '<span class="cb-th-label">%s</span>',
     '<span class="cb-sort-ind"></span></th>',
     '%s</tr>'),
-    .cb_esc(base_label), seg_ths)
+    .cb_esc(buyers_tip), .cb_esc(base_label), seg_ths)
 
   # Per-column category avg & SD across brands (for CI band & heatmap)
   cat_avgs <- vapply(col_names, function(cn) {
