@@ -143,8 +143,8 @@
       renderStackedMiniFunnelCard(root, 'loyalty',       cat.loyalty,       brandCode, snap);
       renderStackedMiniFunnelCard(root, 'purchase_dist', cat.purchase_dist, brandCode, snap);
       renderDoPCard(root, cat.dop, brandCode, snap);
-      renderPlaceholder(root, 'cep',   'CEP dot plot — coming soon');
-      renderPlaceholder(root, 'attrs', 'Brand attributes dot plot — coming soon');
+      renderDotPlotCard(root, 'cep',   cat.cep,   brandCode, snap, /*showDecision=*/true);
+      renderDotPlotCard(root, 'attrs', cat.attrs, brandCode, snap, /*showDecision=*/false);
       /* Apply focal colour to any value text rendered inline. */
       if (snap && snap.colour) {
         $$('.brsum-focal-value', root).forEach(function (el) {
@@ -472,6 +472,105 @@
              '<span class="brsum-dop-dev">' + devTxt + '</span>' +
              '<span class="brsum-dop-vs">vs ' + Math.round(p.avg) + '% avg</span>' +
            '</li>';
+  }
+
+  /* ---------------------------------------------------------------------
+   * Dot plot card (CEP + Brand attributes, full-width)
+   *
+   * One row per stim: stim label on the left, then a horizontal lane
+   * with the cat-avg dashed marker + the focal dot + numeric % + (CEP
+   * only) the Mental Advantage decision badge (Defend / Build /
+   * Maintain) on the right.
+   * --------------------------------------------------------------------- */
+  function renderDotPlotCard(root, key, block, brandCode, snap, showDecision) {
+    var body = cardBody(root, key);
+    var meta = cardMeta(root, key);
+    if (meta) meta.textContent = block && block.available
+      ? 'Focal dot + cat-avg dashed marker'
+      : '';
+    if (!body) return;
+    if (!block || !block.available) {
+      body.innerHTML = '<div class="brsum-card-empty">Mental Availability data not available.</div>';
+      return;
+    }
+    var brand = block.brands && block.brands[brandCode];
+    if (!brand) {
+      body.innerHTML = '<div class="brsum-card-empty">No data for this brand.</div>';
+      return;
+    }
+    var col   = (snap && snap.colour) || '#1A5276';
+    var stims = block.stim_codes || [];
+    var fps   = brand.focal_pct  || [];
+    var avgs  = block.cat_avg_pct || [];
+    var decs  = brand.decision   || [];
+    var pps   = brand.advantage_pp || [];
+
+    var maxVal = 0;
+    fps.forEach(function (v) { if (v != null && !isNaN(v) && v > maxVal) maxVal = v; });
+    avgs.forEach(function (v) { if (v != null && !isNaN(v) && v > maxVal) maxVal = v; });
+    if (maxVal <= 0) maxVal = 10;
+    /* Round up to a tidy 5% step for readability. */
+    maxVal = Math.max(5, Math.ceil(maxVal / 5) * 5);
+
+    var rows = '';
+    for (var i = 0; i < stims.length; i++) {
+      var fv = fps[i];
+      var av = avgs[i];
+      var fpct = (fv == null || isNaN(fv)) ? null : Math.min(100, (fv / maxVal) * 100);
+      var apct = (av == null || isNaN(av)) ? null : Math.min(100, (av / maxVal) * 100);
+      var dec  = decs[i];
+      var pp   = pps[i];
+      var decBadge = '';
+      if (showDecision && dec) {
+        var dKey = dec.toLowerCase();
+        var ppTxt = (pp != null && !isNaN(pp))
+          ? ((pp >= 0 ? '+' : '') + pp.toFixed(1) + 'pp')
+          : '';
+        decBadge =
+          '<span class="brsum-dec-badge brsum-dec-' + escHtml(dKey) + '">' +
+            escHtml(dec) +
+            (ppTxt ? ' <em>' + ppTxt + '</em>' : '') +
+          '</span>';
+      }
+      var avgMark = apct != null
+        ? '<span class="brsum-dot-avg" style="left:' + apct.toFixed(2) + '%;" title="Cat avg: ' +
+            Math.round(av) + '%"></span>'
+        : '';
+      var focalDot = fpct != null
+        ? '<span class="brsum-dot-focal" style="left:' + fpct.toFixed(2) +
+            '%;background:' + escHtml(col) + ';" title="' +
+            escHtml((snap && snap.name) || brandCode) + ': ' +
+            (fv == null ? '—' : Math.round(fv) + '%') + '"></span>'
+        : '';
+      var focalVal = fv == null || isNaN(fv) ? '—' : Math.round(fv) + '%';
+      rows +=
+        '<div class="brsum-dot-row">' +
+          '<div class="brsum-dot-stim">' + escHtml(block.stim_labels[i] || stims[i]) + '</div>' +
+          '<div class="brsum-dot-lane">' +
+            '<div class="brsum-dot-track"></div>' +
+            avgMark + focalDot +
+          '</div>' +
+          '<div class="brsum-dot-val" style="color:' + escHtml(col) + ';">' + focalVal + '</div>' +
+          '<div class="brsum-dot-meta">' + decBadge + '</div>' +
+        '</div>';
+    }
+    /* X-axis ticks (0%, 25%, 50%, 75%, 100% of maxVal). */
+    var ticks = '';
+    for (var t = 0; t <= 4; t++) {
+      var leftPct = (t * 25);
+      var tickVal = Math.round(maxVal * t / 4);
+      ticks +=
+        '<span class="brsum-dot-tick" style="left:' + leftPct + '%;">' + tickVal + '%</span>';
+    }
+    body.innerHTML =
+      '<div class="brsum-dot-legend">' +
+        '<span class="brsum-legend-dot" style="background:' + escHtml(col) + ';"></span>' +
+        '<span class="brsum-legend-name">' + escHtml((snap && snap.name) || brandCode) + '</span>' +
+        '<span class="brsum-dot-avg-marker"></span>' +
+        '<span class="brsum-legend-name">Cat avg</span>' +
+      '</div>' +
+      '<div class="brsum-dot-rows">' + rows + '</div>' +
+      '<div class="brsum-dot-axis">' + ticks + '</div>';
   }
 
   /* -------------------------------------------------------------------------

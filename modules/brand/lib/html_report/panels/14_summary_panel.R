@@ -373,6 +373,97 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   .brsum-stack-row  { grid-template-columns: 78px 1fr; }
 }
 
+/* ---- Dot plot card (CEP + Brand attributes, full-width) ---- */
+.brsum-dot-legend {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 11px; color: #64748b; margin-bottom: 8px;
+}
+.brsum-dot-avg-marker {
+  display: inline-block; width: 16px; height: 0;
+  border-top: 1.5px dashed #94a3b8; vertical-align: middle;
+  margin-right: 4px;
+}
+.brsum-dot-rows {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 4px 0;
+}
+.brsum-dot-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 24%) 1fr 50px minmax(120px, auto);
+  align-items: center; gap: 12px; min-height: 22px;
+}
+.brsum-dot-stim {
+  font-size: 11px; font-weight: 600; color: #1e293b;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.brsum-dot-lane {
+  position: relative; height: 22px;
+}
+.brsum-dot-track {
+  position: absolute; left: 0; right: 0; top: 50%;
+  height: 1px; background: #eef2f7; transform: translateY(-50%);
+}
+.brsum-dot-avg {
+  position: absolute; top: 50%; transform: translate(-50%, -50%);
+  width: 0; height: 14px;
+  border-left: 1.5px dashed #94a3b8;
+  pointer-events: visible;
+}
+.brsum-dot-focal {
+  position: absolute; top: 50%; transform: translate(-50%, -50%);
+  width: 11px; height: 11px; border-radius: 999px;
+  background: #1A5276; border: 1.5px solid #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.18);
+  pointer-events: visible;
+}
+.brsum-dot-val {
+  font-size: 11px; font-weight: 700;
+  font-variant-numeric: tabular-nums; text-align: right;
+}
+.brsum-dot-meta { display: flex; justify-content: flex-end; }
+.brsum-dec-badge {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.4px;
+  text-transform: uppercase; padding: 3px 8px; border-radius: 999px;
+  white-space: nowrap;
+}
+.brsum-dec-badge em {
+  font-style: normal; font-weight: 600; opacity: 0.85;
+}
+.brsum-dec-defend {
+  background: #dcfce7; color: #166534; border: 1px solid #86efac;
+}
+.brsum-dec-build {
+  background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;
+}
+.brsum-dec-maintain {
+  background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1;
+}
+.brsum-dec-amplify {
+  background: #fef3c7; color: #92400e; border: 1px solid #fcd34d;
+}
+.brsum-dec-na, .brsum-dec-skip {
+  background: #f8fafc; color: #94a3b8; border: 1px solid #e2e8f0;
+}
+.brsum-dot-axis {
+  position: relative; height: 16px; margin-top: 6px;
+  margin-left: calc(180px + 12px); /* align to lane */
+  margin-right: calc(50px + 120px + 24px);
+  border-top: 1px solid #f1f5f9;
+}
+.brsum-dot-tick {
+  position: absolute; top: 4px; transform: translateX(-50%);
+  font-size: 9px; color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 720px) {
+  .brsum-dot-row {
+    grid-template-columns: minmax(120px, 30%) 1fr 44px;
+    /* hide the decision badge column on narrow screens */
+  }
+  .brsum-dot-meta { display: none; }
+  .brsum-dot-axis { margin-left: calc(120px + 12px); margin-right: calc(44px + 12px); }
+}
+
 /* ---- Empty state inherited by chip lists (closing strip uses this) ---- */
 .brsum-empty-note { font-size: 12px; color: #94a3b8; font-style: italic; }
 .brsum-chip { display: inline-flex; align-items: center; gap: 8px;
@@ -527,6 +618,16 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
     loyalty_block      <- .brsum_loyalty_minif(cr, brand_codes, label_map)
     purchase_block     <- .brsum_purchase_minif(cr, brand_codes, label_map)
     dop_block          <- .brsum_dop_minif(cr, brand_codes, label_map)
+    cep_block          <- .brsum_dotplot_data(cr$mental_availability$cep_advantage,
+                                               brand_codes, label_map,
+                                               cep_labels,
+                                               label_col = "CEPText",
+                                               code_col  = "CEPCode")
+    attrs_block        <- .brsum_dotplot_data(cr$mental_availability$attribute_advantage,
+                                               brand_codes, label_map,
+                                               attr_labels,
+                                               label_col = "AttrText",
+                                               code_col  = "AttrCode")
 
     out$categories[[cn]] <- list(
       label = cn,
@@ -541,7 +642,9 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
       attitude      = attitude_block,
       loyalty       = loyalty_block,
       purchase_dist = purchase_block,
-      dop           = dop_block
+      dop           = dop_block,
+      cep           = cep_block,
+      attrs         = attrs_block
     )
   }
   out
@@ -728,6 +831,81 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
     brands      = brands_map
   )
 }
+
+# Mental Advantage dot plot data — shared between the CEP and the Brand
+# attributes cards. Reads the matrix returned by
+# calculate_mental_advantage() (advantage / actual / decision matrices)
+# and exposes per-stim:
+#   - focal_pct   : focal brand's % of n_respondents linking to the stim
+#   - cat_avg_pct : unweighted mean across all brands of the % linked
+#   - decision    : Defend / Build / Maintain / NA for the focal at that stim
+#   - advantage_pp: focal advantage in pp (for the right-hand annotation)
+.brsum_dotplot_data <- function(adv, brand_codes, label_map,
+                                 labels_df = NULL,
+                                 label_col = NULL,
+                                 code_col  = NULL) {
+  if (is.null(adv) || identical(adv$status, "REFUSED") ||
+      is.null(adv$actual) || is.null(adv$advantage) ||
+      is.null(adv$stim_codes) || is.null(adv$brand_codes) ||
+      length(adv$stim_codes) == 0 || length(adv$brand_codes) == 0) {
+    return(list(available = FALSE))
+  }
+  stims <- as.character(adv$stim_codes)
+  bcs   <- as.character(adv$brand_codes)
+  n_resp <- as.numeric(adv$n_respondents %||% NA_real_)
+  if (!is.finite(n_resp) || n_resp <= 0) return(list(available = FALSE))
+
+  # actual is a counts matrix (stim × brand). Convert to % of n_respondents.
+  actual_pct  <- adv$actual / n_resp * 100
+  cat_avg_pct <- rowMeans(actual_pct, na.rm = TRUE)
+
+  # Resolve display labels for stims.
+  resolve_label <- function(code) {
+    if (!is.null(labels_df) && !is.null(code_col) && !is.null(label_col) &&
+        code_col %in% names(labels_df) && label_col %in% names(labels_df)) {
+      hit <- which(as.character(labels_df[[code_col]]) == code)
+      if (length(hit) >= 1) {
+        v <- as.character(labels_df[[label_col]][hit[1]])
+        if (nzchar(v)) return(v)
+      }
+    }
+    code
+  }
+  stim_labels <- vapply(stims, resolve_label, character(1))
+
+  brands_map <- list()
+  for (bc in brand_codes) {
+    if (!bc %in% bcs) {
+      brands_map[[bc]] <- list(
+        focal_pct      = rep(NA_real_, length(stims)),
+        decision       = rep(NA_character_, length(stims)),
+        advantage_pp   = rep(NA_real_, length(stims))
+      )
+      next
+    }
+    bi <- which(bcs == bc)
+    foc_pct  <- as.numeric(actual_pct[, bi])
+    adv_pp   <- as.numeric(adv$advantage[, bi])
+    dec_vec  <- as.character(adv$decision[, bi])
+    # Friendly capitalisation for display
+    dec_vec <- ifelse(is.na(dec_vec) | dec_vec == "" | dec_vec == "skip",
+                      NA_character_,
+                      tools::toTitleCase(tolower(dec_vec)))
+    brands_map[[bc]] <- list(
+      focal_pct    = foc_pct,
+      decision     = dec_vec,
+      advantage_pp = adv_pp
+    )
+  }
+  list(
+    available   = TRUE,
+    stim_codes  = stims,
+    stim_labels = unname(stim_labels),
+    cat_avg_pct = unname(as.numeric(cat_avg_pct)),
+    brands      = brands_map
+  )
+}
+
 
 # Duplication of purchase: top-3 partition partners + top-3 rivals per
 # brand (asymmetric deviation from each column's category average,
