@@ -252,6 +252,127 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   .brsum-vchip-grid { grid-template-columns: 1fr; }
 }
 
+/* ---- Brand funnel mini-funnel (stage rows, focal + cat-avg side by side) ---- */
+.brsum-funnel-legend {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 11px; color: #64748b; margin-bottom: 8px;
+}
+.brsum-legend-dot {
+  display: inline-block; width: 10px; height: 10px; border-radius: 999px;
+  vertical-align: middle; margin-right: 4px;
+}
+.brsum-legend-dot-catavg { background: #cbd5e1; }
+.brsum-legend-name { font-weight: 600; color: #334155; margin-right: 4px; }
+.brsum-funnel-rows { display: flex; flex-direction: column; gap: 6px; }
+.brsum-funnel-row {
+  display: grid; grid-template-columns: 110px 1fr; gap: 10px;
+  align-items: center;
+}
+.brsum-funnel-stage {
+  font-size: 11px; font-weight: 600; color: #475569; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.brsum-funnel-bars {
+  display: grid; grid-template-rows: 1fr 1fr; gap: 3px;
+}
+.brsum-funnel-bar {
+  position: relative; height: 16px; background: #f1f5f9;
+  border-radius: 4px; overflow: hidden;
+}
+.brsum-funnel-bar-fill {
+  position: absolute; top: 0; left: 0; height: 100%;
+  background: #cbd5e1; border-radius: 4px;
+  transition: width 0.2s ease;
+}
+.brsum-funnel-bar.catavg .brsum-funnel-bar-fill { background: #cbd5e1; }
+.brsum-funnel-bar-val {
+  position: absolute; top: 50%; right: 6px;
+  transform: translateY(-50%);
+  font-size: 10px; font-weight: 700; color: #1e293b;
+  font-variant-numeric: tabular-nums;
+  background: rgba(255, 255, 255, 0.8); padding: 0 4px; border-radius: 3px;
+  pointer-events: none;
+}
+
+/* ---- Stacked-bar mini-funnel (Brand attitude / Loyalty / Purchase dist) ---- */
+.brsum-stack-rows { display: flex; flex-direction: column; gap: 8px; }
+.brsum-stack-row {
+  display: grid; grid-template-columns: 96px 1fr; gap: 10px;
+  align-items: center;
+}
+.brsum-stack-row-label {
+  font-size: 11px; font-weight: 600; color: #475569;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.brsum-stack-row.is-focal .brsum-stack-row-label {
+  color: #1e293b; font-weight: 700;
+}
+.brsum-stack-row-track {
+  display: flex; height: 22px; background: #f1f5f9; border-radius: 4px;
+  overflow: hidden;
+}
+.brsum-stack-seg {
+  height: 100%; display: flex; align-items: center; justify-content: center;
+  white-space: nowrap; min-width: 0;
+}
+.brsum-stack-seg-lbl {
+  font-size: 10px; font-weight: 700; color: #fff;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.45);
+  font-variant-numeric: tabular-nums;
+  padding: 0 4px;
+}
+.brsum-stack-legend {
+  display: flex; flex-wrap: wrap; gap: 10px; row-gap: 4px;
+  margin-top: 10px; font-size: 10px; color: #475569;
+}
+.brsum-legend-item { display: inline-flex; align-items: center; gap: 5px; }
+.brsum-legend-swatch {
+  width: 10px; height: 10px; border-radius: 2px;
+}
+
+/* ---- Duplication of purchase card ---- */
+.brsum-dop-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+.brsum-dop-coltitle {
+  font-size: 11px; font-weight: 600; color: #1a2744; margin-bottom: 6px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.brsum-dop-hint {
+  font-size: 9px; font-weight: 400; color: #94a3b8; font-style: italic;
+}
+.brsum-dop-list {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.brsum-dop-item {
+  display: grid; grid-template-columns: 1fr auto auto auto;
+  align-items: baseline; gap: 6px;
+  padding: 5px 8px; border-radius: 5px; font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.brsum-dop-item.is-partner {
+  background: rgba(5, 150, 105, 0.10);
+  border: 1px solid rgba(5, 150, 105, 0.25);
+}
+.brsum-dop-item.is-rival {
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.22);
+}
+.brsum-dop-brand { font-weight: 600; color: #1e293b; }
+.brsum-dop-actual { font-weight: 600; color: #1e293b; }
+.brsum-dop-item.is-partner .brsum-dop-dev { font-weight: 700; color: #065f46; }
+.brsum-dop-item.is-rival   .brsum-dop-dev { font-weight: 700; color: #991b1b; }
+.brsum-dop-vs { font-size: 9px; color: #94a3b8; }
+.brsum-dop-empty {
+  padding: 5px 8px; font-size: 10px; color: #94a3b8; font-style: italic;
+}
+@media (max-width: 480px) {
+  .brsum-dop-grid { grid-template-columns: 1fr; }
+  .brsum-funnel-row { grid-template-columns: 80px 1fr; }
+  .brsum-stack-row  { grid-template-columns: 78px 1fr; }
+}
+
 /* ---- Empty state inherited by chip lists (closing strip uses this) ---- */
 .brsum-empty-note { font-size: 12px; color: #94a3b8; font-style: italic; }
 .brsum-chip { display: inline-flex; align-items: center; gap: 8px;
@@ -398,6 +519,15 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
         cat_name = cn)
     }
 
+    # Mini-funnel data (per category): each block carries the cat-avg row
+    # and a per-brand row map. Visual rendering is JS-side; R just exposes
+    # the numbers.
+    funnel_block       <- .brsum_funnel_minif(cr, brand_codes, label_map)
+    attitude_block     <- .brsum_attitude_minif(cr, brand_codes, label_map)
+    loyalty_block      <- .brsum_loyalty_minif(cr, brand_codes, label_map)
+    purchase_block     <- .brsum_purchase_minif(cr, brand_codes, label_map)
+    dop_block          <- .brsum_dop_minif(cr, brand_codes, label_map)
+
     out$categories[[cn]] <- list(
       label = cn,
       n_brands = length(brand_codes),
@@ -406,10 +536,260 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
       brand_labels = unname(vapply(brand_codes,
                                     function(b) label_map[[b]] %||% b,
                                     character(1))),
-      brands = brands
+      brands = brands,
+      funnel        = funnel_block,
+      attitude      = attitude_block,
+      loyalty       = loyalty_block,
+      purchase_dist = purchase_block,
+      dop           = dop_block
     )
   }
   out
+}
+
+
+# ==============================================================================
+# MINI-FUNNEL DATA HELPERS
+# ==============================================================================
+# Each helper returns a list with:
+#   stage_keys / seg_codes  — character vector of segment IDs in display order
+#   stage_labels / seg_labels — display labels
+#   seg_colours              — fill colours per segment (only for stacked bars)
+#   base_label               — what the percentages are computed against
+#   cat_avg                  — numeric vector, one per segment, in 0..1
+#   brands                   — named list (brand_code -> numeric vector,
+#                              same length as seg_codes, in 0..1)
+# JS reads these and renders two stacked rows (focal + cat avg).
+
+# Brand funnel: per-stage % weighted of total respondents.
+.brsum_funnel_minif <- function(cr, brand_codes, label_map) {
+  fn <- cr$funnel
+  if (is.null(fn) || identical(fn$status, "REFUSED") ||
+      is.null(fn$stages) || nrow(fn$stages) == 0) {
+    return(list(available = FALSE))
+  }
+  st <- fn$stages
+  stage_keys   <- unique(as.character(st$stage_key))
+  stage_labels <- vapply(stage_keys, function(k) {
+    rows <- st[st$stage_key == k, , drop = FALSE]
+    lbl <- if ("stage_label" %in% names(rows)) rows$stage_label[1] else NA
+    if (is.na(lbl) || !nzchar(lbl)) k else as.character(lbl)
+  }, character(1))
+
+  cat_avg <- vapply(stage_keys, function(k) {
+    vals <- as.numeric(st$pct_weighted[st$stage_key == k])
+    if (length(vals) == 0) NA_real_ else mean(vals, na.rm = TRUE)
+  }, numeric(1))
+
+  brands_map <- list()
+  for (bc in brand_codes) {
+    brands_map[[bc]] <- vapply(stage_keys, function(k) {
+      v <- as.numeric(st$pct_weighted[st$stage_key == k & st$brand_code == bc])
+      if (length(v) == 1) v else NA_real_
+    }, numeric(1))
+  }
+  list(
+    available    = TRUE,
+    stage_keys   = stage_keys,
+    stage_labels = unname(stage_labels),
+    base_label   = "% of total respondents",
+    cat_avg      = unname(cat_avg),
+    brands       = brands_map
+  )
+}
+
+# Brand attitude: 5 segments. Uses % total base (segments[[role]] is
+# already a fraction of all respondents in the engine).
+.brsum_attitude_minif <- function(cr, brand_codes, label_map) {
+  fn <- cr$funnel
+  cd <- if (!is.null(fn)) fn$consideration_detail else NULL
+  if (is.null(cd) || length(cd$brands %||% list()) == 0) {
+    return(list(available = FALSE))
+  }
+  seg_codes <- c("attitude.love", "attitude.prefer", "attitude.ambivalent",
+                 "attitude.reject", "attitude.no_opinion")
+  seg_labels <- c("Love", "Prefer", "Ambivalent", "Reject", "No opinion")
+  seg_colours <- c("#2E7D32", "#81C784", "#F9A825", "#C62828", "#90A4AE")
+
+  brands_map <- list()
+  for (bc in brand_codes) {
+    row <- Find(function(b) identical(b$brand_code, bc), cd$brands)
+    vals <- if (!is.null(row) && !is.null(row$segments)) {
+      vapply(seg_codes, function(r) {
+        v <- as.numeric(row$segments[[r]] %||% NA_real_)
+        if (!is.finite(v)) NA_real_ else v
+      }, numeric(1))
+    } else rep(NA_real_, length(seg_codes))
+    brands_map[[bc]] <- unname(vals)
+  }
+
+  cat_avg <- vapply(seq_along(seg_codes), function(i) {
+    vals <- vapply(brands_map, function(v) v[i], numeric(1))
+    vals <- vals[is.finite(vals)]
+    if (length(vals) == 0) NA_real_ else mean(vals)
+  }, numeric(1))
+
+  list(
+    available   = TRUE,
+    seg_codes   = seg_codes,
+    seg_labels  = seg_labels,
+    seg_colours = seg_colours,
+    base_label  = "% of total respondents",
+    cat_avg     = cat_avg,
+    brands      = brands_map
+  )
+}
+
+# Loyalty seg: 4 segments — Sole / Primary / Secondary / Not bought.
+# Source values are % of category buyers; each brand's row sums to 100%
+# of cat buyers. Cat avg is the unweighted mean per segment across brands.
+.brsum_loyalty_minif <- function(cr, brand_codes, label_map) {
+  bh <- cr$buyer_heaviness
+  if (is.null(bh) || identical(bh$status, "REFUSED")) {
+    return(list(available = FALSE))
+  }
+  ls <- bh$brand_loyalty_segments
+  if (is.null(ls) || nrow(ls) == 0) return(list(available = FALSE))
+  seg_codes  <- c("sole", "primary", "secondary", "nobuy")
+  seg_labels <- c("Sole", "Primary (>50% SCR)", "Secondary (≤50%)", "Not bought")
+  seg_cols   <- c("Sole_Pct", "Primary_Pct", "Secondary_Pct", "NoBuy_Pct")
+  seg_colours <- c("#15803D", "#65A30D", "#F59E0B", "#94A3B8")
+
+  brands_map <- list()
+  for (bc in brand_codes) {
+    ri <- which(ls$BrandCode == bc)
+    if (length(ri) == 1) {
+      brands_map[[bc]] <- unname(vapply(seg_cols, function(cn) {
+        v <- as.numeric(ls[[cn]][ri])
+        if (!is.finite(v)) NA_real_ else v / 100
+      }, numeric(1)))
+    } else {
+      brands_map[[bc]] <- rep(NA_real_, length(seg_codes))
+    }
+  }
+  cat_avg <- vapply(seq_along(seg_codes), function(i) {
+    vals <- vapply(brands_map, function(v) v[i], numeric(1))
+    vals <- vals[is.finite(vals)]
+    if (length(vals) == 0) NA_real_ else mean(vals)
+  }, numeric(1))
+
+  list(
+    available   = TRUE,
+    seg_codes   = seg_codes,
+    seg_labels  = seg_labels,
+    seg_colours = seg_colours,
+    base_label  = "% of category buyers",
+    cat_avg     = cat_avg,
+    brands      = brands_map
+  )
+}
+
+# Purchase distribution: 4 segments — Light / Moderate / Regular / Frequent.
+# Source values are % of brand buyers; each brand's row sums to 100% of
+# its own buyers. Cat avg is the unweighted mean per segment across brands.
+.brsum_purchase_minif <- function(cr, brand_codes, label_map) {
+  bh <- cr$buyer_heaviness
+  if (is.null(bh) || identical(bh$status, "REFUSED")) {
+    return(list(available = FALSE))
+  }
+  fd <- bh$brand_freq_dist
+  if (is.null(fd) || nrow(fd) == 0) return(list(available = FALSE))
+  seg_codes  <- c("freq1", "freq2", "freq3to5", "freq6plus")
+  seg_labels <- c("Light (1×)", "Moderate (2×)",
+                  "Regular (3–5×)", "Frequent (6+×)")
+  seg_cols   <- c("Freq1_Pct", "Freq2_Pct", "Freq3to5_Pct", "Freq6plus_Pct")
+  seg_colours <- c("#BFDBFE", "#60A5FA", "#2563EB", "#1E3A8A")
+
+  brands_map <- list()
+  for (bc in brand_codes) {
+    ri <- which(fd$BrandCode == bc)
+    if (length(ri) == 1) {
+      brands_map[[bc]] <- unname(vapply(seg_cols, function(cn) {
+        v <- as.numeric(fd[[cn]][ri])
+        if (!is.finite(v)) NA_real_ else v / 100
+      }, numeric(1)))
+    } else {
+      brands_map[[bc]] <- rep(NA_real_, length(seg_codes))
+    }
+  }
+  cat_avg <- vapply(seq_along(seg_codes), function(i) {
+    vals <- vapply(brands_map, function(v) v[i], numeric(1))
+    vals <- vals[is.finite(vals)]
+    if (length(vals) == 0) NA_real_ else mean(vals)
+  }, numeric(1))
+
+  list(
+    available   = TRUE,
+    seg_codes   = seg_codes,
+    seg_labels  = seg_labels,
+    seg_colours = seg_colours,
+    base_label  = "% of brand buyers",
+    cat_avg     = cat_avg,
+    brands      = brands_map
+  )
+}
+
+# Duplication of purchase: top-3 partition partners + top-3 rivals per
+# brand (asymmetric deviation from each column's category average,
+# matching the partition-card logic on the DoP sub-tab).
+.brsum_dop_minif <- function(cr, brand_codes, label_map) {
+  rep <- cr$repertoire
+  if (is.null(rep) || identical(rep$status, "REFUSED") ||
+      is.null(rep$crossover_matrix) ||
+      !"BrandCode" %in% names(rep$crossover_matrix)) {
+    return(list(available = FALSE))
+  }
+  obs <- rep$crossover_matrix
+  rows <- as.character(obs$BrandCode)
+  if (length(rows) < 3) return(list(available = FALSE))
+
+  # Column averages excluding diagonal.
+  col_avgs <- vapply(rows, function(col_b) {
+    v <- suppressWarnings(as.numeric(obs[[col_b]]))
+    if (length(v) != length(rows)) return(NA_real_)
+    diag_idx <- which(rows == col_b)
+    if (length(diag_idx) == 1) v[diag_idx] <- NA_real_
+    mean(v, na.rm = TRUE)
+  }, numeric(1))
+
+  brands_map <- list()
+  for (bc in brand_codes) {
+    if (!bc %in% rows) {
+      brands_map[[bc]] <- list(partners = list(), rivals = list(),
+                                weak = TRUE, max_abs_dev = 0)
+      next
+    }
+    fi <- which(rows == bc)
+    rec <- lapply(seq_along(rows), function(j) {
+      if (j == fi) return(NULL)
+      col_b <- rows[j]
+      o <- suppressWarnings(as.numeric(obs[fi, col_b]))
+      a <- col_avgs[j]
+      if (!is.finite(o) || !is.finite(a)) return(NULL)
+      list(code = col_b, label = label_map[[col_b]] %||% col_b,
+           obs = o, avg = a, dev = o - a)
+    })
+    rec <- Filter(Negate(is.null), rec)
+    devs <- vapply(rec, function(x) x$dev, numeric(1))
+    max_abs <- if (length(devs) > 0) max(abs(devs), na.rm = TRUE) else 0
+
+    partners <- rec[order(-devs)]
+    partners <- Filter(function(x) x$dev > 0, partners)
+    partners <- utils::head(partners, 3L)
+
+    rivals <- rec[order(devs)]
+    rivals <- Filter(function(x) x$dev < 0, rivals)
+    rivals <- utils::head(rivals, 3L)
+
+    brands_map[[bc]] <- list(
+      partners    = partners,
+      rivals      = rivals,
+      weak        = is.finite(max_abs) && max_abs < 5,
+      max_abs_dev = max_abs
+    )
+  }
+
+  list(available = TRUE, brands = brands_map)
 }
 
 

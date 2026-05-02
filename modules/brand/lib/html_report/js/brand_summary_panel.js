@@ -138,13 +138,13 @@
       renderBrandSummaryCard(root, snap);
       renderMAMetricsCard(root, snap);
       renderWOMCard(root, snap);
-      renderPlaceholder(root, 'funnel',        'Brand funnel mini-funnel — coming soon');
-      renderPlaceholder(root, 'attitude',      'Brand attitude mini-funnel — coming soon');
-      renderPlaceholder(root, 'loyalty',       'Loyalty segmentation mini-funnel — coming soon');
-      renderPlaceholder(root, 'purchase_dist', 'Purchase distribution mini-funnel — coming soon');
-      renderPlaceholder(root, 'dop',           'Duplication of purchase (top 3 partners / rivals) — coming soon');
-      renderPlaceholder(root, 'cep',           'CEP dot plot — coming soon');
-      renderPlaceholder(root, 'attrs',         'Brand attributes dot plot — coming soon');
+      renderBrandFunnelCard(root, cat.funnel, brandCode, snap);
+      renderStackedMiniFunnelCard(root, 'attitude',      cat.attitude,      brandCode, snap);
+      renderStackedMiniFunnelCard(root, 'loyalty',       cat.loyalty,       brandCode, snap);
+      renderStackedMiniFunnelCard(root, 'purchase_dist', cat.purchase_dist, brandCode, snap);
+      renderDoPCard(root, cat.dop, brandCode, snap);
+      renderPlaceholder(root, 'cep',   'CEP dot plot — coming soon');
+      renderPlaceholder(root, 'attrs', 'Brand attributes dot plot — coming soon');
       /* Apply focal colour to any value text rendered inline. */
       if (snap && snap.colour) {
         $$('.brsum-focal-value', root).forEach(function (el) {
@@ -282,6 +282,196 @@
     body.innerHTML = '<div class="brsum-vchip-grid brsum-vchip-grid-single">' +
       valueChip(snap.wom.label, snap.wom.value, snap.wom.cat_avg, col, '') +
     '</div>';
+  }
+
+  /* ---------------------------------------------------------------------
+   * Brand funnel mini-funnel
+   *
+   * Each stage is its own horizontal bar (NOT a stacked segmented bar).
+   * Layout: a row per stage, with two side-by-side mini-bars (focal +
+   * cat avg). The bars share the same horizontal scale so the visual
+   * comparison reads cleanly.
+   * --------------------------------------------------------------------- */
+  function fmtPctSingle(v) {
+    if (v == null || isNaN(v)) return '—';
+    return Math.round(v * 100) + '%';
+  }
+
+  function renderBrandFunnelCard(root, block, brandCode, snap) {
+    var body = cardBody(root, 'funnel');
+    var meta = cardMeta(root, 'funnel');
+    if (meta) meta.textContent = (block && block.base_label) || '';
+    if (!body) return;
+    if (!block || !block.available) {
+      body.innerHTML = '<div class="brsum-card-empty">Funnel data not available.</div>';
+      return;
+    }
+    var focalRow = (block.brands && block.brands[brandCode]) || [];
+    var catAvg   = block.cat_avg || [];
+    var col      = (snap && snap.colour) || '#1A5276';
+
+    /* Shared scale across all stages so longest bar fills the lane. */
+    var maxVal = 0;
+    focalRow.forEach(function (v) { if (v != null && !isNaN(v) && v > maxVal) maxVal = v; });
+    catAvg.forEach(function (v)  { if (v != null && !isNaN(v) && v > maxVal) maxVal = v; });
+    if (maxVal <= 0) maxVal = 1;
+
+    var rows = '';
+    for (var i = 0; i < block.stage_keys.length; i++) {
+      var fv = focalRow[i];
+      var cv = catAvg[i];
+      var fw = (fv == null || isNaN(fv)) ? 0 : Math.min(100, (fv / maxVal) * 100);
+      var cw = (cv == null || isNaN(cv)) ? 0 : Math.min(100, (cv / maxVal) * 100);
+      rows +=
+        '<div class="brsum-funnel-row">' +
+          '<div class="brsum-funnel-stage">' + escHtml(block.stage_labels[i]) + '</div>' +
+          '<div class="brsum-funnel-bars">' +
+            '<div class="brsum-funnel-bar focal">' +
+              '<div class="brsum-funnel-bar-fill" style="width:' + fw.toFixed(1) + '%;background:' + col + ';"></div>' +
+              '<span class="brsum-funnel-bar-val">' + fmtPctSingle(fv) + '</span>' +
+            '</div>' +
+            '<div class="brsum-funnel-bar catavg">' +
+              '<div class="brsum-funnel-bar-fill" style="width:' + cw.toFixed(1) + '%;"></div>' +
+              '<span class="brsum-funnel-bar-val">' + fmtPctSingle(cv) + '</span>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+    }
+    body.innerHTML =
+      '<div class="brsum-funnel-legend">' +
+        '<span class="brsum-legend-dot" style="background:' + col + '"></span>' +
+        '<span class="brsum-legend-name">' + escHtml((snap && snap.name) || brandCode) + '</span>' +
+        '<span class="brsum-legend-dot brsum-legend-dot-catavg"></span>' +
+        '<span class="brsum-legend-name">Cat avg</span>' +
+      '</div>' +
+      '<div class="brsum-funnel-rows">' + rows + '</div>';
+  }
+
+  /* ---------------------------------------------------------------------
+   * Stacked-bar mini-funnel (Brand attitude / Loyalty seg / Purchase dist)
+   *
+   * Two stacked bars (focal + cat avg). Each bar is divided into coloured
+   * segments per the segment palette in the payload. Tiny segments (< 4%)
+   * skip their inline label but keep a tooltip — same rule used on the
+   * Purchase Distribution sub-tab to avoid clipped labels.
+   * --------------------------------------------------------------------- */
+  function renderStackedMiniFunnelCard(root, key, block, brandCode, snap) {
+    var body = cardBody(root, key);
+    var meta = cardMeta(root, key);
+    if (meta) meta.textContent = (block && block.base_label) || '';
+    if (!body) return;
+    if (!block || !block.available) {
+      body.innerHTML = '<div class="brsum-card-empty">Data not available.</div>';
+      return;
+    }
+    var focalRow = (block.brands && block.brands[brandCode]) || [];
+    var catAvg   = block.cat_avg || [];
+    var name     = (snap && snap.name) || brandCode;
+
+    var rows =
+      buildStackedRow(name + ' (focal)', focalRow, block.seg_codes, block.seg_labels,
+                      block.seg_colours, true) +
+      buildStackedRow('Cat avg', catAvg, block.seg_codes, block.seg_labels,
+                      block.seg_colours, false);
+
+    var legend = '';
+    for (var i = 0; i < block.seg_codes.length; i++) {
+      legend +=
+        '<span class="brsum-legend-item">' +
+          '<span class="brsum-legend-swatch" style="background:' +
+          escHtml(block.seg_colours[i]) + ';"></span>' +
+          escHtml(block.seg_labels[i]) +
+        '</span>';
+    }
+
+    body.innerHTML =
+      '<div class="brsum-stack-rows">' + rows + '</div>' +
+      '<div class="brsum-stack-legend">' + legend + '</div>';
+  }
+
+  function buildStackedRow(label, vals, segCodes, segLabels, segColours, isFocal) {
+    var total = 0;
+    (vals || []).forEach(function (v) {
+      if (v != null && !isNaN(v) && v > 0) total += v;
+    });
+    if (total <= 0) total = 1;
+    var segs = '';
+    for (var i = 0; i < segCodes.length; i++) {
+      var v = vals && vals[i];
+      if (v == null || isNaN(v) || v <= 0) continue;
+      var pct = (v / total) * 100;
+      var pctTxt = Math.round(v * 100) + '%';
+      var showLbl = pct >= 4;
+      var inside  = showLbl
+        ? '<span class="brsum-stack-seg-lbl">' + pctTxt + '</span>'
+        : '';
+      segs +=
+        '<div class="brsum-stack-seg" title="' +
+          escHtml(segLabels[i]) + ': ' + pctTxt + '" ' +
+          'style="width:' + pct.toFixed(2) + '%;background:' +
+          escHtml(segColours[i]) + ';">' + inside +
+        '</div>';
+    }
+    return '<div class="brsum-stack-row' + (isFocal ? ' is-focal' : '') + '">' +
+             '<div class="brsum-stack-row-label">' + escHtml(label) + '</div>' +
+             '<div class="brsum-stack-row-track">' + segs + '</div>' +
+           '</div>';
+  }
+
+  /* ---------------------------------------------------------------------
+   * Duplication of purchase card — top 3 partners + top 3 rivals for the
+   * focal brand (mirrors the partition card on the DoP sub-tab).
+   * --------------------------------------------------------------------- */
+  function renderDoPCard(root, block, brandCode, snap) {
+    var body = cardBody(root, 'dop');
+    var meta = cardMeta(root, 'dop');
+    if (!body) return;
+    if (!block || !block.available) {
+      if (meta) meta.textContent = '';
+      body.innerHTML = '<div class="brsum-card-empty">Duplication of purchase data not available.</div>';
+      return;
+    }
+    var brand = block.brands && block.brands[brandCode];
+    if (!brand) {
+      if (meta) meta.textContent = '';
+      body.innerHTML = '<div class="brsum-card-empty">No data for this brand.</div>';
+      return;
+    }
+    if (meta) meta.textContent = brand.weak ? 'weak partition signal' : '';
+
+    var partnersHtml = brand.partners && brand.partners.length
+      ? brand.partners.map(function (p) { return dopRow(p, true); }).join('')
+      : '<li class="brsum-dop-empty">No brands over-index for this focal.</li>';
+    var rivalsHtml = brand.rivals && brand.rivals.length
+      ? brand.rivals.map(function (p) { return dopRow(p, false); }).join('')
+      : '<li class="brsum-dop-empty">No brands under-index for this focal.</li>';
+
+    body.innerHTML =
+      '<div class="brsum-dop-grid">' +
+        '<div class="brsum-dop-col brsum-dop-col-partners">' +
+          '<div class="brsum-dop-coltitle">Partition partners' +
+            '<span class="brsum-dop-hint">over-index vs cat avg</span>' +
+          '</div>' +
+          '<ul class="brsum-dop-list">' + partnersHtml + '</ul>' +
+        '</div>' +
+        '<div class="brsum-dop-col brsum-dop-col-rivals">' +
+          '<div class="brsum-dop-coltitle">Partition rivals' +
+            '<span class="brsum-dop-hint">under-index vs cat avg</span>' +
+          '</div>' +
+          '<ul class="brsum-dop-list">' + rivalsHtml + '</ul>' +
+        '</div>' +
+      '</div>';
+  }
+
+  function dopRow(p, isPartner) {
+    var dev = Math.round(p.dev);
+    var devTxt = (dev >= 0 ? '+' : '') + dev + 'pp';
+    return '<li class="brsum-dop-item ' + (isPartner ? 'is-partner' : 'is-rival') + '">' +
+             '<span class="brsum-dop-brand">' + escHtml(p.label || p.code) + '</span>' +
+             '<span class="brsum-dop-actual">' + Math.round(p.obs) + '%</span>' +
+             '<span class="brsum-dop-dev">' + devTxt + '</span>' +
+             '<span class="brsum-dop-vs">vs ' + Math.round(p.avg) + '% avg</span>' +
+           '</li>';
   }
 
   /* -------------------------------------------------------------------------
