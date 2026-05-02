@@ -67,10 +67,8 @@ build_brand_summary_panel <- function(results, config) {
         .brsum_header(),
         .brsum_dropdown_bar(payload),
         '<div class="brsum-dashboard" data-brsum-fade>',
-          .brsum_headline_block(),
-          .brsum_context_strip_skeleton(),
-          .brsum_focal_strip_skeleton(),
-          .brsum_diagnostic_strip_skeleton(),
+          .brsum_focal_context_strip(),
+          .brsum_card_grid_skeleton(),
         '</div>',
         .brsum_insight_editor(),
         closing_strip_html,
@@ -127,17 +125,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 [data-brsum-fade] { transition: opacity 200ms ease; }
 [data-brsum-fade].brsum-fading { opacity: 0; }
 
-/* ---- Headline block ---- */
-.brsum-headline-block { margin: 0 0 36px;
-  padding: 22px 26px;
-  background: #fff;
-  border: 1px solid #e2e8f0; border-radius: 10px;
-  border-left: 4px solid %FOCAL%; }
-.brsum-headline { font-size: 24px; font-weight: 600; color: #0f172a;
-  line-height: 1.4; margin: 0; }
-.brsum-headline-focal { color: %FOCAL%; font-weight: 700; }
-
-/* ---- Strip wrappers ---- */
+/* ---- Strip wrappers (legacy — Analyst commentary + closing strip still use the title style) ---- */
 .brsum-strip { margin: 0 0 36px; }
 .brsum-strip-title { font-size: 11px; font-weight: 700; color: #475569;
   text-transform: uppercase; letter-spacing: 1px; margin: 0 0 14px;
@@ -145,48 +133,127 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 .brsum-strip-title::after { content: ""; flex: 1; height: 1px;
   background: linear-gradient(to right, #e2e8f0, transparent); }
 
-/* ---- Category context strip (4 chips) ---- */
-.brsum-context-row { display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 14px; }
-.brsum-context-chip { background: #fff; border: 1px solid #e2e8f0;
-  border-radius: 10px; padding: 16px 20px;
-  display: flex; flex-direction: column; gap: 4px;
-  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s; }
-.brsum-context-chip:hover { transform: translateY(-1px);
-  border-color: #cbd5e1; box-shadow: 0 2px 6px rgba(15,23,42,0.04); }
-.brsum-context-label { font-size: 10px; font-weight: 600; color: #94a3b8;
-  text-transform: uppercase; letter-spacing: 0.5px; }
-.brsum-context-value { font-size: 20px; font-weight: 700; color: #1e293b;
-  line-height: 1.2; }
-.brsum-context-sub { font-size: 11px; color: #64748b; }
+/* ---- Focal context header strip ---- */
+/* Single line at the top of the dashboard naming the focal brand and
+   category. Each card below relies on this for context, so cards do not
+   repeat the focal name in their headers. */
+.brsum-focal-context {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 12px 18px; margin: 0 0 18px;
+  background: linear-gradient(135deg, %FOCAL% 0%, color-mix(in srgb, %FOCAL% 85%, #1e293b) 100%);
+  border-radius: 10px; color: #fff;
+  flex-wrap: wrap;
+}
+.brsum-fc-eyebrow {
+  font-size: 9px; font-weight: 700; letter-spacing: 1.4px;
+  text-transform: uppercase; color: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.18);
+  padding: 3px 8px; border-radius: 999px;
+}
+.brsum-fc-brand {
+  font-size: 22px; font-weight: 700; letter-spacing: -0.01em;
+  color: #fff;
+}
+.brsum-fc-divider { color: rgba(255, 255, 255, 0.45); font-size: 18px; }
+.brsum-fc-cat {
+  font-size: 16px; font-weight: 500;
+  color: rgba(255, 255, 255, 0.92);
+}
 
-/* ---- Focal strip (5 metric cards) ---- */
-.brsum-focal-row { display: grid;
-  grid-template-columns: repeat(5, 1fr); gap: 16px; }
-.brsum-focal-card { background: #fff; border: 1px solid #e2e8f0;
-  border-radius: 10px; padding: 22px; position: relative; min-width: 0;
-  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s; }
-.brsum-focal-card:hover { transform: translateY(-1px);
-  border-color: #cbd5e1; box-shadow: 0 4px 10px rgba(15,23,42,0.05); }
-.brsum-focal-label { font-size: 11px; font-weight: 600; color: #94a3b8;
-  text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 8px; }
-.brsum-focal-value { font-size: 40px; font-weight: 700; line-height: 1;
-  color: %FOCAL%; margin: 0; letter-spacing: -0.02em; }
-.brsum-focal-cat-avg { font-size: 12px; color: #64748b; margin: 10px 0 0; }
-.brsum-focal-cat-avg-num { color: #334155; font-weight: 700; }
-.brsum-rank-badge { position: absolute; top: 14px; right: 14px;
-  background: #475569; color: #fff; font-size: 10px; font-weight: 700;
-  padding: 3px 9px; border-radius: 999px; letter-spacing: 0.4px; }
+/* ---- Card grid (11 cards, 2 per row, full-width spans for dot plots) ---- */
+.brsum-card-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;
+  margin: 0 0 28px;
+}
+.brsum-card-wide { grid-column: 1 / -1; }
+.brsum-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+  padding: 16px 18px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  display: flex; flex-direction: column; min-width: 0;
+}
+.brsum-card-header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap;
+  border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; margin-bottom: 12px;
+}
+.brsum-card-title {
+  font-size: 13px; font-weight: 600; color: #1a2744;
+  margin: 0; letter-spacing: 0.1px;
+}
+.brsum-card-meta {
+  font-size: 10px; font-weight: 500; color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
+.brsum-card-body { flex: 1 1 auto; min-height: 56px; }
+.brsum-card-empty {
+  font-size: 12px; color: #94a3b8; font-style: italic;
+  padding: 8px 0;
+}
 
-/* ---- Diagnostic strip (two side-by-side cards with chip lists) ---- */
-.brsum-diagnostic-grid { display: grid;
-  grid-template-columns: 1fr 1fr; gap: 16px; }
-.brsum-diagnostic-card { background: #fff; border: 1px solid #e2e8f0;
-  border-radius: 10px; padding: 20px 22px; }
-.brsum-diagnostic-title { font-size: 13px; font-weight: 600; color: #0f172a;
-  margin: 0 0 14px; }
-.brsum-chip-list { display: flex; flex-wrap: wrap; gap: 8px; }
+/* ---- Stat rows (Category context card) ---- */
+.brsum-stat-rows {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.brsum-stat-row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; padding: 6px 0;
+  border-bottom: 1px dashed #f1f5f9;
+}
+.brsum-stat-row:last-child { border-bottom: 0; }
+.brsum-stat-label {
+  font-size: 12px; color: #64748b; font-weight: 500;
+}
+.brsum-stat-value {
+  font-size: 16px; font-weight: 700; color: #1e293b;
+  font-variant-numeric: tabular-nums;
+  display: flex; align-items: baseline; gap: 8px;
+}
+.brsum-stat-sub {
+  font-size: 10px; color: #94a3b8; font-weight: 500;
+}
+
+/* ---- Value chips (MA metrics, Brand summary, WOM cards) ---- */
+.brsum-vchip-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+}
+.brsum-vchip-grid-single {
+  grid-template-columns: 1fr;
+}
+.brsum-vchip {
+  background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 8px;
+  padding: 12px 14px; min-width: 0;
+}
+.brsum-vchip-label {
+  font-size: 10px; font-weight: 600; color: #94a3b8;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.brsum-vchip-value {
+  font-size: 26px; font-weight: 700; line-height: 1.1;
+  margin: 4px 0 6px; letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.brsum-vchip-catavg {
+  font-size: 11px; color: #64748b;
+}
+.brsum-vchip-catavg span {
+  color: #334155; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.brsum-vchip-leader {
+  font-size: 10px; color: #94a3b8; margin-top: 4px;
+}
+.brsum-vchip-leader.brsum-leader-on {
+  color: #047857; font-weight: 700; letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+@media (max-width: 480px) {
+  .brsum-vchip-grid { grid-template-columns: 1fr; }
+}
+
+/* ---- Empty state inherited by chip lists (closing strip uses this) ---- */
+.brsum-empty-note { font-size: 12px; color: #94a3b8; font-style: italic; }
 .brsum-chip { display: inline-flex; align-items: center; gap: 8px;
   background: #f1f5f9; border: 1px solid #e2e8f0;
   padding: 6px 12px; border-radius: 999px; font-size: 13px;
@@ -195,7 +262,6 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   background: #d1fae5; padding: 2px 7px; border-radius: 999px;
   line-height: 1.2; }
 .brsum-chip-delta.neg { color: #475569; background: #e2e8f0; }
-.brsum-empty-note { font-size: 12px; color: #94a3b8; font-style: italic; }
 
 /* ---- Insight editor (ported from tracker, scoped to brsum) ---- */
 .brsum-insight-block { margin: 0 0 36px; }
@@ -262,17 +328,13 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 .brsum-edu-body strong { color: #0f172a; }
 
 /* ---- Responsive collapse ---- */
-@media (max-width: 1100px) {
-  .brsum-focal-row { grid-template-columns: repeat(3, 1fr); }
-}
 @media (max-width: 820px) {
-  .brsum-focal-row { grid-template-columns: repeat(2, 1fr); }
-  .brsum-diagnostic-grid { grid-template-columns: 1fr; }
+  .brsum-card-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 600px) {
   .brsum-title { font-size: 22px; }
-  .brsum-headline { font-size: 18px; }
-  .brsum-focal-value { font-size: 32px; }
+  .brsum-fc-brand { font-size: 18px; }
+  .brsum-fc-cat { font-size: 14px; }
   .brsum-dropdown { min-width: 160px; }
   .brsum-dropdown-bar { position: static; }
 }
@@ -615,6 +677,132 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
          cat_avg = .brsum_signed(net_wom_cat_avg), rank = NA_character_)
   )
 
+  # ---- MA metrics card (4 chips: MPen, NS, MMS, SOM) ----
+  # MPen and MMS already computed above. NS comes from ma$ns; SOM is
+  # derived (MMS / MPen × 100) per the Romaniuk 2022 definition.
+  ns_value   <- NA_real_
+  ns_cat_avg <- NA_real_
+  ns_leader  <- NA_character_
+  if (!is.null(ma$ns) && nrow(ma$ns) > 0 && "NS" %in% names(ma$ns)) {
+    ns_cat_avg <- mean(ma$ns$NS, na.rm = TRUE)
+    if (brand_code %in% ma$ns$BrandCode)
+      ns_value <- ma$ns$NS[ma$ns$BrandCode == brand_code]
+    leader_idx <- which.max(ma$ns$NS)
+    if (length(leader_idx) == 1)
+      ns_leader <- as.character(ma$ns$BrandCode[leader_idx])
+  }
+
+  # SOM = MMS / MPen × 100 (share of mind vs share of awareness).
+  som_for <- function(mms_v, mpen_v) {
+    if (!is.finite(mms_v) || !is.finite(mpen_v) || mpen_v <= 0) NA_real_
+    else (mms_v / mpen_v) * 100
+  }
+  som_value <- som_for(mms_value, mpen_value)
+  som_cat_avg <- if (!is.null(ma$mms) && !is.null(ma$mpen) &&
+                      nrow(ma$mms) > 0 && nrow(ma$mpen) > 0) {
+    mer <- merge(ma$mms[, c("BrandCode", "MMS")],
+                 ma$mpen[, c("BrandCode", "MPen")],
+                 by = "BrandCode")
+    s <- vapply(seq_len(nrow(mer)), function(i)
+      som_for(mer$MMS[i], mer$MPen[i]), numeric(1))
+    mean(s, na.rm = TRUE)
+  } else NA_real_
+  som_leader <- if (!is.null(ma$mms) && !is.null(ma$mpen)) {
+    mer <- merge(ma$mms[, c("BrandCode", "MMS")],
+                 ma$mpen[, c("BrandCode", "MPen")],
+                 by = "BrandCode")
+    s <- vapply(seq_len(nrow(mer)), function(i)
+      som_for(mer$MMS[i], mer$MPen[i]), numeric(1))
+    li <- which.max(s)
+    if (length(li) == 1) as.character(mer$BrandCode[li]) else NA_character_
+  } else NA_character_
+  mpen_leader <- if (!is.null(ma$mpen) && nrow(ma$mpen) > 0) {
+    li <- which.max(ma$mpen$MPen)
+    if (length(li) == 1) as.character(ma$mpen$BrandCode[li]) else NA_character_
+  } else NA_character_
+  mms_leader <- if (!is.null(ma$mms) && nrow(ma$mms) > 0) {
+    li <- which.max(ma$mms$MMS)
+    if (length(li) == 1) as.character(ma$mms$BrandCode[li]) else NA_character_
+  } else NA_character_
+
+  ma_metrics <- list(
+    list(key = "mpen", label = "Mental Penetration (MPen)",
+         value = .brsum_pct(mpen_value, "%", scale = 100),
+         cat_avg = .brsum_pct(mpen_cat_avg, "%", scale = 100),
+         leader = label_map[[mpen_leader]] %||% mpen_leader,
+         is_leader = !is.na(mpen_leader) && identical(mpen_leader, brand_code)),
+    list(key = "ns", label = "Network Size (NS)",
+         value = .brsum_num(ns_value, digits = 2),
+         cat_avg = .brsum_num(ns_cat_avg, digits = 2),
+         leader = label_map[[ns_leader]] %||% ns_leader,
+         is_leader = !is.na(ns_leader) && identical(ns_leader, brand_code)),
+    list(key = "mms", label = "Mental Market Share (MMS)",
+         value = .brsum_pct(mms_value, "%"),
+         cat_avg = .brsum_pct(mms_cat_avg, "%"),
+         leader = label_map[[mms_leader]] %||% mms_leader,
+         is_leader = !is.na(mms_leader) && identical(mms_leader, brand_code)),
+    list(key = "som", label = "Share of Mind (SOM)",
+         value = .brsum_pct(som_value, "%", already_pct = TRUE),
+         cat_avg = .brsum_pct(som_cat_avg, "%", already_pct = TRUE),
+         leader = label_map[[som_leader]] %||% som_leader,
+         is_leader = !is.na(som_leader) && identical(som_leader, brand_code))
+  )
+
+  # ---- Brand summary card (Pen, Avg purchase, Vol share, SCR obs) ----
+  # All four come from dirichlet_norms$norms_table for the focal brand;
+  # cat avg is the unweighted mean across brands in the table.
+  brand_summary_metrics <- list(
+    list(key = "pen",       label = "Penetration",
+         value = NA_character_, cat_avg = NA_character_),
+    list(key = "buy_rate",  label = "Avg purchases / buyer",
+         value = NA_character_, cat_avg = NA_character_),
+    list(key = "vol_share", label = "Volume share",
+         value = NA_character_, cat_avg = NA_character_),
+    list(key = "scr_obs",   label = "SCR (observed)",
+         value = NA_character_, cat_avg = NA_character_)
+  )
+  dn <- cr$dirichlet_norms
+  if (!is.null(dn) && !identical(dn$status, "REFUSED") &&
+      !is.null(dn$norms_table) && nrow(dn$norms_table) > 0) {
+    nt <- dn$norms_table
+    cat_mean_purch <- if (!is.null(dn$category_metrics$mean_purchases))
+      as.numeric(dn$category_metrics$mean_purchases) else NA_real_
+    vol_share_for <- function(pen, buy_rate) {
+      if (!is.finite(pen) || !is.finite(buy_rate) || !is.finite(cat_mean_purch) ||
+          cat_mean_purch == 0) return(NA_real_)
+      buy_rate * (pen / 100) / cat_mean_purch * 100
+    }
+    pen_val   <- if (brand_code %in% nt$BrandCode)
+      as.numeric(nt$Penetration_Obs_Pct[nt$BrandCode == brand_code]) else NA_real_
+    buy_val   <- if (brand_code %in% nt$BrandCode)
+      as.numeric(nt$BuyRate_Obs[nt$BrandCode == brand_code]) else NA_real_
+    scr_val   <- if (brand_code %in% nt$BrandCode)
+      as.numeric(nt$SCR_Obs_Pct[nt$BrandCode == brand_code]) else NA_real_
+    vol_val   <- vol_share_for(pen_val, buy_val)
+    pen_avg   <- mean(as.numeric(nt$Penetration_Obs_Pct), na.rm = TRUE)
+    buy_avg   <- mean(as.numeric(nt$BuyRate_Obs),         na.rm = TRUE)
+    scr_avg   <- mean(as.numeric(nt$SCR_Obs_Pct),         na.rm = TRUE)
+    vol_avg   <- mean(vapply(seq_len(nrow(nt)), function(i)
+      vol_share_for(as.numeric(nt$Penetration_Obs_Pct[i]),
+                    as.numeric(nt$BuyRate_Obs[i])), numeric(1)), na.rm = TRUE)
+
+    brand_summary_metrics[[1]]$value   <- .brsum_pct(pen_val, "%", already_pct = TRUE)
+    brand_summary_metrics[[1]]$cat_avg <- .brsum_pct(pen_avg, "%", already_pct = TRUE)
+    brand_summary_metrics[[2]]$value   <- .brsum_num(buy_val, digits = 1)
+    brand_summary_metrics[[2]]$cat_avg <- .brsum_num(buy_avg, digits = 1)
+    brand_summary_metrics[[3]]$value   <- .brsum_pct(vol_val, "%", already_pct = TRUE)
+    brand_summary_metrics[[3]]$cat_avg <- .brsum_pct(vol_avg, "%", already_pct = TRUE)
+    brand_summary_metrics[[4]]$value   <- .brsum_pct(scr_val, "%", already_pct = TRUE)
+    brand_summary_metrics[[4]]$cat_avg <- .brsum_pct(scr_avg, "%", already_pct = TRUE)
+  }
+
+  # ---- WOM card (Net WOM only — focal vs cat avg) ----
+  wom_card <- list(
+    label   = "Net WOM",
+    value   = .brsum_signed(net_wom),
+    cat_avg = .brsum_signed(net_wom_cat_avg)
+  )
+
   # ---- Diagnostic strip: top-3 attributes + top-3 CEPs by advantage ----
   # Prefer per-category labels passed in; fall back to MA's attribute_labels
   # field (built inside the engine when survey-structure attributes were
@@ -638,7 +826,10 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
     colour = colour,
     headline = headline,
     focal_metrics = focal_metrics,
-    diagnostic = list(attributes = attr_chips, ceps = cep_chips)
+    diagnostic = list(attributes = attr_chips, ceps = cep_chips),
+    ma_metrics = ma_metrics,
+    brand_summary = brand_summary_metrics,
+    wom = wom_card
   )
 }
 
@@ -761,52 +952,56 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 }
 
 
-.brsum_headline_block <- function() {
+# ==============================================================================
+# DASHBOARD SKELETON (v2 — card grid)
+# ==============================================================================
+# Layout (top → bottom):
+#   1. Focal context strip — the chosen focal brand + category, displayed
+#      once at the top so per-card headers don't have to repeat them.
+#   2. Card grid — 11 cards, two per row, with the two dot-plots (CEP and
+#      Brand attributes) spanning full width because they need horizontal
+#      room. Card content is rendered by JS reading the JSON payload; this
+#      function only emits empty containers + section labels.
+
+.brsum_focal_context_strip <- function() {
   paste(
-    '<div class="brsum-headline-block">',
-      '<p class="brsum-headline" data-brsum-headline>&mdash;</p>',
+    '<div class="brsum-focal-context" data-brsum-focal-context>',
+      '<span class="brsum-fc-eyebrow">FOCAL</span>',
+      '<span class="brsum-fc-brand" data-brsum-fc-brand>&mdash;</span>',
+      '<span class="brsum-fc-divider">&middot;</span>',
+      '<span class="brsum-fc-cat" data-brsum-fc-cat>&mdash;</span>',
     '</div>',
     sep = "\n"
   )
 }
 
 
-.brsum_context_strip_skeleton <- function() {
+.brsum_card_grid_skeleton <- function() {
+  card <- function(key, title, wide = FALSE) {
+    cls <- if (wide) ' brsum-card-wide' else ''
+    paste0(
+      '<section class="brsum-card brsum-card-', key, cls,
+        '" data-brsum-card="', key, '">',
+        '<header class="brsum-card-header">',
+          '<h3 class="brsum-card-title">', title, '</h3>',
+          '<span class="brsum-card-meta" data-brsum-card-meta="', key, '"></span>',
+        '</header>',
+        '<div class="brsum-card-body" data-brsum-card-body="', key, '"></div>',
+      '</section>')
+  }
   paste(
-    '<div class="brsum-strip">',
-      '<div class="brsum-strip-title">Category context</div>',
-      '<div class="brsum-context-row" data-brsum-context></div>',
-    '</div>',
-    sep = "\n"
-  )
-}
-
-
-.brsum_focal_strip_skeleton <- function() {
-  paste(
-    '<div class="brsum-strip">',
-      '<div class="brsum-strip-title">Where does this brand sit?</div>',
-      '<div class="brsum-focal-row" data-brsum-focal></div>',
-    '</div>',
-    sep = "\n"
-  )
-}
-
-
-.brsum_diagnostic_strip_skeleton <- function() {
-  paste(
-    '<div class="brsum-strip">',
-      '<div class="brsum-strip-title">Why does it sit there?</div>',
-      '<div class="brsum-diagnostic-grid">',
-        '<div class="brsum-diagnostic-card">',
-          '<div class="brsum-diagnostic-title">Top brand attributes (vs category average)</div>',
-          '<div class="brsum-chip-list" data-brsum-attr-chips></div>',
-        '</div>',
-        '<div class="brsum-diagnostic-card">',
-          '<div class="brsum-diagnostic-title">Top Category Entry Points (Mental Advantage)</div>',
-          '<div class="brsum-chip-list" data-brsum-cep-chips></div>',
-        '</div>',
-      '</div>',
+    '<div class="brsum-card-grid">',
+      card("context",       "Category context"),
+      card("ma_metrics",    "Mental Availability — headline metrics"),
+      card("brand_summary", "Brand summary"),
+      card("funnel",        "Brand funnel"),
+      card("attitude",      "Brand attitude"),
+      card("loyalty",       "Loyalty segmentation"),
+      card("purchase_dist", "Purchase distribution"),
+      card("wom",           "Word of mouth"),
+      card("dop",           "Duplication of purchase"),
+      card("cep",           "Category Entry Points",  wide = TRUE),
+      card("attrs",         "Brand attributes",       wide = TRUE),
     '</div>',
     sep = "\n"
   )
@@ -919,6 +1114,13 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   if (is.null(x) || is.na(x)) return("—")
   if (x > 0) sprintf("+%.0f", x)
   else sprintf("%.0f", x)
+}
+
+
+# Plain numeric formatter (for NS, avg purchases — not a percentage)
+.brsum_num <- function(x, digits = 1) {
+  if (is.null(x) || is.na(x) || !is.finite(x)) return("—")
+  sprintf(paste0("%.", as.integer(digits), "f"), x)
 }
 
 

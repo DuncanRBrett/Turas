@@ -129,11 +129,23 @@
 
     dashboard.classList.add('brsum-fading');
     setTimeout(function () {
-      renderHeadline(root, snap);
-      renderContext(root, cat.context);
-      renderFocal(root, snap);
-      renderDiagnostic(root, snap);
-      // Apply colour again post-render (focal cards just rebuilt)
+      /* New card-grid layout — each card has a body container the
+         renderer fills. Cards that aren't wired yet show a "coming
+         soon" placeholder so the grid stays visible while we
+         incrementally implement them. */
+      renderFocalContext(root, snap, cat, catName);
+      renderCategoryContextCard(root, cat.context);
+      renderBrandSummaryCard(root, snap);
+      renderMAMetricsCard(root, snap);
+      renderWOMCard(root, snap);
+      renderPlaceholder(root, 'funnel',        'Brand funnel mini-funnel — coming soon');
+      renderPlaceholder(root, 'attitude',      'Brand attitude mini-funnel — coming soon');
+      renderPlaceholder(root, 'loyalty',       'Loyalty segmentation mini-funnel — coming soon');
+      renderPlaceholder(root, 'purchase_dist', 'Purchase distribution mini-funnel — coming soon');
+      renderPlaceholder(root, 'dop',           'Duplication of purchase (top 3 partners / rivals) — coming soon');
+      renderPlaceholder(root, 'cep',           'CEP dot plot — coming soon');
+      renderPlaceholder(root, 'attrs',         'Brand attributes dot plot — coming soon');
+      /* Apply focal colour to any value text rendered inline. */
       if (snap && snap.colour) {
         $$('.brsum-focal-value', root).forEach(function (el) {
           el.style.color = snap.colour;
@@ -143,93 +155,133 @@
     }, 200);
   }
 
-  function renderHeadline(root, snap) {
-    var el = root.querySelector('[data-brsum-headline]');
-    if (!el) return;
-    if (!snap || !snap.headline) {
-      el.textContent = '—';
-      return;
-    }
-    // Inline-emphasise the brand name
-    var html = escHtml(snap.headline);
-    if (snap.name) {
-      var brandHtml = '<span class="brsum-headline-focal">' +
-                      escHtml(snap.name) + '</span>';
-      // Replace first occurrence of the escaped brand name with the styled span
-      html = html.replace(escHtml(snap.name), brandHtml);
-    }
-    el.innerHTML = html;
+  /* ---------------------------------------------------------------------
+   * v2 card-grid renderers
+   *
+   * Each card has a body container <div data-brsum-card-body="<key>"> the
+   * renderer fills via innerHTML. The header (title) is static; the meta
+   * span next to the title can carry the leader brand or other context.
+   *
+   * Common templates:
+   *   - Focal-vs-cat-avg "value chip": large focal value + small cat avg
+   *     underneath. Used by MA metrics + Brand summary cards.
+   *   - "Statement" card (single value): used by WOM.
+   *   - "Stat row" card (label + value): used by Category context.
+   * --------------------------------------------------------------------- */
+
+  function cardBody(root, key) {
+    return root.querySelector('[data-brsum-card-body="' + key + '"]');
+  }
+  function cardMeta(root, key) {
+    return root.querySelector('[data-brsum-card-meta="' + key + '"]');
   }
 
-  function renderContext(root, ctx) {
-    var el = root.querySelector('[data-brsum-context]');
-    if (!el) return;
-    if (!ctx) { el.innerHTML = '<div class="brsum-empty-note">Category context not available.</div>'; return; }
-
-    var entries = [];
-    if (ctx.avg_purchases) entries.push(chip('Avg purchase frequency', ctx.avg_purchases.value, ctx.avg_purchases.sub));
-    if (ctx.avg_brands)    entries.push(chip('Avg brands per buyer',   ctx.avg_brands.value,    ctx.avg_brands.sub));
-    if (ctx.top_channel)   entries.push(chip('Top channel',            ctx.top_channel.value,   ctx.top_channel.sub));
-    if (ctx.top_pack)      entries.push(chip('Top pack size',          ctx.top_pack.value,      ctx.top_pack.sub));
-
-    if (entries.length === 0) {
-      el.innerHTML = '<div class="brsum-empty-note">Category context metrics not available for this category.</div>';
-      return;
-    }
-    el.innerHTML = entries.join('');
+  function renderPlaceholder(root, key, msg) {
+    var body = cardBody(root, key);
+    if (!body) return;
+    body.innerHTML = '<div class="brsum-card-empty">' + escHtml(msg || '—') + '</div>';
   }
 
-  function chip(label, value, sub) {
-    return '<div class="brsum-context-chip">' +
-             '<div class="brsum-context-label">' + escHtml(label) + '</div>' +
-             '<div class="brsum-context-value">' + escHtml(value) + '</div>' +
-             (sub ? '<div class="brsum-context-sub">' + escHtml(sub) + '</div>' : '') +
+  function renderFocalContext(root, snap, cat, catName) {
+    var brandEl = root.querySelector('[data-brsum-fc-brand]');
+    var catEl   = root.querySelector('[data-brsum-fc-cat]');
+    if (brandEl) brandEl.textContent = (snap && snap.name) ? snap.name : '—';
+    if (catEl)   catEl.textContent   = catName || (cat && cat.label) || '—';
+    /* The header strip uses the focal colour as its background gradient,
+       set via the --brsum-brand-colour custom prop on .brsum-root. */
+  }
+
+  function renderCategoryContextCard(root, ctx) {
+    var body = cardBody(root, 'context');
+    if (!body) return;
+    if (!ctx) {
+      body.innerHTML = '<div class="brsum-card-empty">Category context not available.</div>';
+      return;
+    }
+    /* Spec: avg purchases per category buyer, avg repertoire size, plus
+       top channel and top pack when shopper data is present. */
+    var rows = [];
+    if (ctx.avg_purchases) rows.push(statRow('Avg purchases / buyer', ctx.avg_purchases.value, ctx.avg_purchases.sub));
+    if (ctx.avg_brands)    rows.push(statRow('Avg repertoire size',   ctx.avg_brands.value,    ctx.avg_brands.sub));
+    if (ctx.top_channel)   rows.push(statRow('Top channel',           ctx.top_channel.value,   ctx.top_channel.sub));
+    if (ctx.top_pack)      rows.push(statRow('Top pack size',         ctx.top_pack.value,      ctx.top_pack.sub));
+    if (rows.length === 0) {
+      body.innerHTML = '<div class="brsum-card-empty">Category context metrics not available.</div>';
+      return;
+    }
+    body.innerHTML = '<div class="brsum-stat-rows">' + rows.join('') + '</div>';
+  }
+
+  function statRow(label, value, sub) {
+    return '<div class="brsum-stat-row">' +
+             '<div class="brsum-stat-label">' + escHtml(label) + '</div>' +
+             '<div class="brsum-stat-value">' + escHtml(value) +
+               (sub ? '<span class="brsum-stat-sub">' + escHtml(sub) + '</span>' : '') +
+             '</div>' +
            '</div>';
   }
 
-  function renderFocal(root, snap) {
-    var el = root.querySelector('[data-brsum-focal]');
-    if (!el) return;
-    if (!snap || !snap.focal_metrics) { el.innerHTML = ''; return; }
-
-    var html = '';
-    for (var i = 0; i < snap.focal_metrics.length; i++) {
-      var m = snap.focal_metrics[i];
-      html += '<div class="brsum-focal-card">' +
-                (m.rank ? '<span class="brsum-rank-badge">' + escHtml(m.rank) + '</span>' : '') +
-                '<div class="brsum-focal-label">' + escHtml(m.label) + '</div>' +
-                '<div class="brsum-focal-value" style="color:' + escHtml(snap.colour || '#1A5276') + '">' + escHtml(m.value) + '</div>' +
-                (m.cat_avg && m.cat_avg !== '—'
-                  ? '<div class="brsum-focal-cat-avg">cat avg <span class="brsum-focal-cat-avg-num">' + escHtml(m.cat_avg) + '</span></div>'
-                  : '') +
-              '</div>';
-    }
-    el.innerHTML = html;
+  function valueChip(label, value, catAvg, focalColour, leaderHtml) {
+    return '<div class="brsum-vchip">' +
+             '<div class="brsum-vchip-label">' + escHtml(label) + '</div>' +
+             '<div class="brsum-vchip-value brsum-focal-value" style="color:' + focalColour + '">' +
+               escHtml(value) + '</div>' +
+             (catAvg && catAvg !== '—'
+               ? '<div class="brsum-vchip-catavg">cat avg <span>' + escHtml(catAvg) + '</span></div>'
+               : '') +
+             (leaderHtml || '') +
+           '</div>';
   }
 
-  function renderDiagnostic(root, snap) {
-    var attrEl = root.querySelector('[data-brsum-attr-chips]');
-    var cepEl = root.querySelector('[data-brsum-cep-chips]');
-    if (attrEl) attrEl.innerHTML = renderChipList(snap && snap.diagnostic ? snap.diagnostic.attributes : null);
-    if (cepEl)  cepEl.innerHTML  = renderChipList(snap && snap.diagnostic ? snap.diagnostic.ceps : null);
+  function renderMAMetricsCard(root, snap) {
+    var body = cardBody(root, 'ma_metrics');
+    if (!body) return;
+    if (!snap || !snap.ma_metrics) {
+      body.innerHTML = '<div class="brsum-card-empty">Mental Availability metrics not available.</div>';
+      return;
+    }
+    var col = snap.colour || '#1A5276';
+    var html = '';
+    for (var i = 0; i < snap.ma_metrics.length; i++) {
+      var m = snap.ma_metrics[i];
+      var leader = '';
+      if (m.is_leader) {
+        leader = '<div class="brsum-vchip-leader brsum-leader-on">CATEGORY LEADER</div>';
+      } else if (m.leader && m.leader !== '—') {
+        leader = '<div class="brsum-vchip-leader">Leader: ' + escHtml(m.leader) + '</div>';
+      }
+      html += valueChip(m.label, m.value, m.cat_avg, col, leader);
+    }
+    body.innerHTML = '<div class="brsum-vchip-grid">' + html + '</div>';
   }
 
-  function renderChipList(items) {
-    if (!items || items.length === 0) {
-      return '<span class="brsum-empty-note">No standout entries above the category average.</span>';
+  function renderBrandSummaryCard(root, snap) {
+    var body = cardBody(root, 'brand_summary');
+    if (!body) return;
+    if (!snap || !snap.brand_summary) {
+      body.innerHTML = '<div class="brsum-card-empty">Brand summary metrics not available.</div>';
+      return;
     }
+    var col = snap.colour || '#1A5276';
     var html = '';
-    for (var i = 0; i < items.length; i++) {
-      var it = items[i];
-      var d = it.delta;
-      var deltaTxt = (d > 0 ? '+' : '') + d;
-      var cls = (d > 0) ? 'brsum-chip-delta' : 'brsum-chip-delta neg';
-      html += '<span class="brsum-chip">' +
-                escHtml(it.label) +
-                ' <span class="' + cls + '">' + deltaTxt + '</span>' +
-              '</span>';
+    for (var i = 0; i < snap.brand_summary.length; i++) {
+      var m = snap.brand_summary[i];
+      html += valueChip(m.label, m.value, m.cat_avg, col, '');
     }
-    return html;
+    body.innerHTML = '<div class="brsum-vchip-grid">' + html + '</div>';
+  }
+
+  function renderWOMCard(root, snap) {
+    var body = cardBody(root, 'wom');
+    if (!body) return;
+    if (!snap || !snap.wom) {
+      body.innerHTML = '<div class="brsum-card-empty">Word-of-mouth not available.</div>';
+      return;
+    }
+    var col = snap.colour || '#1A5276';
+    body.innerHTML = '<div class="brsum-vchip-grid brsum-vchip-grid-single">' +
+      valueChip(snap.wom.label, snap.wom.value, snap.wom.cat_avg, col, '') +
+    '</div>';
   }
 
   /* -------------------------------------------------------------------------
