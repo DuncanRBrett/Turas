@@ -582,6 +582,9 @@
       var c = row.getAttribute("data-fn-brand");
       row.style.display = state[c] === false ? "none" : "";
     });
+    // Mini funnels follow the same chip selection as the table, so they
+    // must rebuild whenever the top chip bar changes too.
+    buildMiniFunnels(panel);
   }
 
   // ---------------------------------------------------------------------------
@@ -725,8 +728,13 @@
       buildBarChart(panel);
     } else {
       drawSlopeSvg(panel);
-      buildMiniFunnels(panel);
     }
+    /* Mini funnels live below the chart and follow the top "SHOW BRANDS"
+       chip bar (tableBrands), not the chart's own chip bar. They must
+       refresh on EVERY visibility change — including in bar view, where
+       previously buildMiniFunnels was never called and the cards stayed
+       stuck on whatever brands were last rendered in slope view. */
+    buildMiniFunnels(panel);
   }
 
   function buildMiniFunnels(panel) {
@@ -741,6 +749,10 @@
     var brandNames  = pd.table.brand_names  || brandCodes;
     var cells       = pd.table.cells        || [];
     var focal       = panel.__fnState.focal;
+    /* Mini funnels follow the TOP "SHOW BRANDS" chip bar (tableBrands),
+       not the chart's chip bar. The two were previously decoupled so
+       toggling chart chips left mini funnels showing the wrong set. */
+    var visBrands   = panel.__fnState.tableBrands || {};
     var chartBrands = panel.__fnState.chartBrands || {};
     var state       = panel.__fnState;
     var pctMode     = state.pctMode;
@@ -760,7 +772,8 @@
 
     var html = "";
 
-    // Category average card (shown when __avg__ chip is on)
+    /* Category-average card stays governed by the chart-chip "__avg__"
+       toggle (the top chip bar has no Cat Avg chip — it's per-brand only). */
     if (chartBrands["__avg__"] !== false) {
       var avgColor = "#64748b";
       html += '<div class="fn-mini-funnel fn-mf-avg" style="border-left-color:' + avgColor + '">';
@@ -784,7 +797,10 @@
 
     for (var bi = 0; bi < brandCodes.length; bi++) {
       var code = brandCodes[bi];
-      if (chartBrands[code] === false) continue;
+      /* Skip when the top chip bar has explicitly turned this brand off.
+         Treat undefined as "show" so brands that have never been toggled
+         still render (matches the table's behaviour). */
+      if (visBrands[code] === false) continue;
       var name    = brandNames[bi] || code;
       var isFocal = code === focal;
       var color   = resolveBrandColor(pd, state, code);
