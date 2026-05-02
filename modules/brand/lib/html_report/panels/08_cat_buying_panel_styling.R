@@ -249,13 +249,15 @@ paste0(
   font-size: 11px; font-weight: 400; color: #94a3b8; font-style: italic;
 }
 /* Fit-quality badge — categorical band based on cophenetic correlation,
-   numeric coph value displayed inside, full breakdown in title tooltip. */
+   numeric coph value displayed inside, full breakdown in CSS-styled tooltip
+   that pops on hover or focus. */
 .cb-cm-fit-badge {
+  position: relative;
   display: inline-flex; align-items: center; gap: 6px;
   padding: 3px 8px 3px 10px; border-radius: 999px;
   font-size: 10px; font-weight: 600; letter-spacing: 0.3px;
   font-variant-numeric: tabular-nums; white-space: nowrap;
-  cursor: help;
+  cursor: help; outline: none;
 }
 .cb-cm-fit-badge .cb-cm-fit-num {
   background: rgba(255, 255, 255, 0.6);
@@ -266,6 +268,42 @@ paste0(
 .cb-cm-fit-weak     { background: #ffedd5; color: #9a3412; border: 1px solid #fdba74; }
 .cb-cm-fit-poor     { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
 .cb-cm-fit-na       { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
+.cb-cm-fit-badge:focus-visible { box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.18); }
+/* Tooltip popover */
+.cb-cm-fit-tip {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  background: #1e293b; color: #f8fafc;
+  padding: 10px 12px; border-radius: 8px;
+  font-size: 11px; font-weight: 500; line-height: 1.45;
+  letter-spacing: 0.1px; white-space: normal;
+  min-width: 240px; max-width: 300px;
+  display: grid; grid-template-columns: 1fr; gap: 4px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22);
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity 0.15s ease-out, visibility 0.15s ease-out;
+  z-index: 50;
+}
+.cb-cm-fit-badge:hover .cb-cm-fit-tip,
+.cb-cm-fit-badge:focus-visible .cb-cm-fit-tip {
+  opacity: 1; visibility: visible;
+}
+.cb-cm-fit-tip::before {
+  content: ""; position: absolute; top: -6px; right: 14px;
+  width: 0; height: 0; border-left: 6px solid transparent;
+  border-right: 6px solid transparent; border-bottom: 6px solid #1e293b;
+}
+.cb-cm-fit-tip-row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px;
+}
+.cb-cm-fit-tip-k { color: #cbd5e1; font-weight: 500; }
+.cb-cm-fit-tip-v {
+  color: #f8fafc; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.cb-cm-fit-tip-foot {
+  margin-top: 4px; padding-top: 6px; border-top: 1px solid #334155;
+  color: #f1f5f9; font-style: italic; font-weight: 500;
+}
 .cb-dop-cluster-svg {
   display: block; max-width: 100%; height: auto;
   background: linear-gradient(180deg, #fbfcfe 0%, #f1f5f9 100%);

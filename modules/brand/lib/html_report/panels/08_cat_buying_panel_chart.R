@@ -1345,14 +1345,28 @@ cb_dop_cluster_map_html <- function(obs_matrix,
     na       = "Could not compute reliability.")
   coph_disp <- if (is.finite(coph_corr)) sprintf("%.2f", coph_corr) else "—"
   sil_disp  <- if (is.finite(avg_sil))   sprintf("%.2f", avg_sil)   else "—"
-  fit_tooltip <- sprintf(
-    "Cophenetic correlation: %s\nSilhouette (k=%d): %s\n\n%s — %s",
+  # Multi-line tooltip via CSS popover (the native title attribute was
+  # unreliable for newline-formatted content across browsers).
+  fit_aria <- sprintf(
+    "Cophenetic correlation %s, silhouette at k=%d %s. %s: %s",
     coph_disp, as.integer(k), sil_disp, fit_label, fit_caveat)
   fit_badge_html <- sprintf(
-    paste0('<span class="cb-cm-fit-badge cb-cm-fit-%s" title="%s">',
+    paste0('<span class="cb-cm-fit-badge cb-cm-fit-%s" tabindex="0" ',
+           'role="img" aria-label="%s">',
            '<span class="cb-cm-fit-label">%s</span>',
-           '<span class="cb-cm-fit-num">%s</span></span>'),
-    fit_band, .cb_esc(fit_tooltip), fit_label, coph_disp)
+           '<span class="cb-cm-fit-num">%s</span>',
+           '<span class="cb-cm-fit-tip" role="tooltip">',
+             '<span class="cb-cm-fit-tip-row">',
+               '<span class="cb-cm-fit-tip-k">Cophenetic correlation</span>',
+               '<span class="cb-cm-fit-tip-v">%s</span></span>',
+             '<span class="cb-cm-fit-tip-row">',
+               '<span class="cb-cm-fit-tip-k">Silhouette (k=%d)</span>',
+               '<span class="cb-cm-fit-tip-v">%s</span></span>',
+             '<span class="cb-cm-fit-tip-foot">%s — %s</span>',
+           '</span>',
+         '</span>'),
+    fit_band, .cb_esc(fit_aria), fit_label, coph_disp,
+    coph_disp, as.integer(k), sil_disp, fit_label, .cb_esc(fit_caveat))
 
   # Layout.
   W <- 760L; H <- 360L

@@ -1614,6 +1614,81 @@
     return pieces.join('');
   }
 
+  /* DoP sub-tab has THREE independent elements that the user may want to
+     capture independently: the focal partition card, the DoP heatmap, and
+     the cluster-map dendrogram. Capture order matches the on-screen order. */
+  function cbDetectDopCheckboxes(activeTab, hasInsight) {
+    var checkboxes = [];
+    if (activeTab.querySelector('.cb-dop-partition-card')) {
+      checkboxes.push({ key: 'partition', label: 'Partition card',
+                        available: true, checked: true });
+    }
+    if (activeTab.querySelector('.cb-dop-table')) {
+      checkboxes.push({ key: 'table', label: 'DoP heatmap',
+                        available: true, checked: true });
+    }
+    if (activeTab.querySelector('.cb-dop-cluster-wrap')) {
+      checkboxes.push({ key: 'cluster', label: 'Cluster map',
+                        available: true, checked: true });
+    }
+    checkboxes.push({ key: 'insight', label: 'Insight',
+                      available: true, checked: hasInsight });
+    return checkboxes;
+  }
+
+  function cbCaptureDopHtml(activeTab, flags) {
+    var portable = (typeof TurasPins !== 'undefined' && TurasPins.capturePortableHtml)
+      ? TurasPins.capturePortableHtml
+      : function (el) { return el.outerHTML; };
+    var strip = (typeof window.brStripInteractive === 'function')
+      ? window.brStripInteractive
+      : function (s) { return s; };
+    var pieces = [];
+    if (flags.partition) {
+      var pc = activeTab.querySelector('.cb-dop-partition-card');
+      if (pc) pieces.push(strip(portable(pc)));
+    }
+    if (flags.table) {
+      var tbl = activeTab.querySelector('.cb-dop-table');
+      if (tbl) pieces.push(strip(portable(tbl)));
+    }
+    if (flags.cluster) {
+      var cm = activeTab.querySelector('.cb-dop-cluster-wrap');
+      if (cm) pieces.push(strip(portable(cm)));
+    }
+    return pieces.join('');
+  }
+
+  function cbExecuteDopPin(panel, activeTab, flags, editor, asPng) {
+    if (typeof TurasPins === 'undefined') return;
+    var section = panel.closest('.br-element-section') || panel.parentNode;
+    var titleEl = section ? section.querySelector('.br-element-title') : null;
+    var baseTitle = titleEl ? titleEl.textContent.trim() : '';
+    var title = baseTitle ? baseTitle + ' — Duplication of Purchase'
+                          : 'Duplication of Purchase';
+    var html = cbCaptureDopHtml(activeTab, flags);
+    var insightText = (flags.insight && editor) ? editor.value.trim() : '';
+    var payload = {
+      sectionKey:  panel.id || 'dop',
+      title:       title,
+      chartSvg:    '',
+      tableHtml:   html,
+      insightText: insightText,
+      pinFlags:    { chart: false, table: !!html, insight: !!insightText },
+      pinMode:     'custom'
+    };
+    if (asPng) {
+      TurasPins.exportContentAsPNG(payload);
+    } else {
+      TurasPins.add(payload);
+      var pinBtn = section ? section.querySelector('.cb-toolbar-top .br-pin-btn') : null;
+      if (pinBtn) {
+        pinBtn.classList.add('pin-flash');
+        setTimeout(function () { pinBtn.classList.remove('pin-flash'); }, 600);
+      }
+    }
+  }
+
   function cbPinDialog(panel, pinBtn) {
     if (typeof TurasPins === 'undefined') return;
 
@@ -1646,6 +1721,17 @@
       return;
     }
 
+    /* DoP sub-tab — three independent elements (partition card, heatmap,
+       cluster map) plus optional insight. */
+    if (tabKey === 'dop') {
+      var dopBoxes = cbDetectDopCheckboxes(activeTab, hasInsight);
+      var anchorDop = pinBtn.closest('.br-section-toolbar') || pinBtn.parentElement;
+      TurasPins.showCheckboxPopover(pinBtn, dopBoxes, function (flags) {
+        cbExecuteDopPin(panel, activeTab, flags, editor, /*asPng=*/false);
+      }, anchorDop);
+      return;
+    }
+
     /* Detect available content in the active sub-tab only */
     var hasChart = false;
     var hasTable = false;
@@ -1658,9 +1744,6 @@
       var chartArea2 = activeTab.querySelector('.fn-rel-chart-area');
       hasChart = !!(chartArea2 && !chartArea2.hasAttribute('hidden'));
       hasTable = !!(activeTab.querySelector('.cb-rel-table'));
-    } else if (tabKey === 'dop') {
-      hasChart = false;
-      hasTable = !!(activeTab.querySelector('.cb-dop-table'));
     }
 
     /* Build checkbox list. available:true required by showCheckboxPopover to
@@ -1920,6 +2003,15 @@
       return;
     }
 
+    /* DoP sub-tab — partition card + heatmap + cluster map */
+    if (tabKey === 'dop') {
+      var dopBoxes = cbDetectDopCheckboxes(activeTab, hasInsight);
+      TurasPins.showCheckboxPopover(pngBtn, dopBoxes, function (flags) {
+        cbExecuteDopPin(panel, activeTab, flags, editor, /*asPng=*/true);
+      }, null, { title: 'EXPORT AS PNG', actionLabel: 'Export' });
+      return;
+    }
+
     /* Detect available content — mirrors cbPinDialog detection */
     var hasChart = false;
     var hasTable = false;
@@ -1932,9 +2024,6 @@
       var chartArea2 = activeTab.querySelector('.fn-rel-chart-area');
       hasChart = !!(chartArea2 && !chartArea2.hasAttribute('hidden'));
       hasTable = !!(activeTab.querySelector('.cb-rel-table'));
-    } else if (tabKey === 'dop') {
-      hasChart = false;
-      hasTable = !!(activeTab.querySelector('.cb-dop-table'));
     }
 
     function doExport(flags) {
