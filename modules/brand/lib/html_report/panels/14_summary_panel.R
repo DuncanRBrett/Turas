@@ -252,6 +252,53 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   .brsum-vchip-grid { grid-template-columns: 1fr; }
 }
 
+/* ---- Word of mouth card (Heard / Said split with positive / negative / net rows) ---- */
+.brsum-wom-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+}
+.brsum-wom-col {
+  display: flex; flex-direction: column;
+  border: 1px solid #f1f5f9; border-radius: 8px; padding: 12px;
+  background: #fff;
+}
+.brsum-wom-col-title {
+  font-size: 10px; font-weight: 700; letter-spacing: 1px;
+  color: #94a3b8; text-transform: uppercase; margin-bottom: 8px;
+}
+.brsum-wom-row {
+  display: grid; grid-template-columns: 1fr auto;
+  align-items: center; gap: 12px;
+  padding: 10px 0; border-bottom: 1px solid #f1f5f9;
+}
+.brsum-wom-row:last-child { border-bottom: 0; }
+.brsum-wom-label {
+  font-size: 13px; color: #1e293b; font-weight: 500;
+}
+.brsum-wom-vals {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+}
+.brsum-wom-val {
+  font-size: 22px; font-weight: 700; line-height: 1;
+  font-variant-numeric: tabular-nums; color: #1e293b;
+  letter-spacing: -0.01em;
+}
+.brsum-wom-catavg {
+  font-size: 10px; color: #64748b;
+  font-variant-numeric: tabular-nums;
+}
+.brsum-wom-pos .brsum-wom-val { color: #15803d; }
+.brsum-wom-neg .brsum-wom-val { color: #dc2626; }
+.brsum-wom-net {
+  background: #f8fafc; border-radius: 6px;
+  margin: 4px -8px 0; padding-left: 8px; padding-right: 8px;
+  border-bottom: 0;
+}
+.brsum-wom-net .brsum-wom-label { font-weight: 700; }
+.brsum-wom-net .brsum-wom-val { color: #15803d; }
+@media (max-width: 480px) {
+  .brsum-wom-grid { grid-template-columns: 1fr; }
+}
+
 /* ---- Brand funnel mini-funnel (stage rows, focal + cat-avg side by side) ---- */
 .brsum-funnel-legend {
   display: flex; align-items: center; gap: 12px;
@@ -1354,12 +1401,56 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
     brand_summary_metrics[[4]]$cat_avg <- .brsum_pct(scr_avg, "%", already_pct = TRUE)
   }
 
-  # ---- WOM card (Net WOM only — focal vs cat avg) ----
-  wom_card <- list(
-    label   = "Net WOM",
-    value   = .brsum_signed(net_wom),
-    cat_avg = .brsum_signed(net_wom_cat_avg)
-  )
+  # ---- WOM card (Heard + Said breakdown: pos / neg / net for each) ----
+  # Pulls from wom_metrics + net_balance. All values are pp; cat avg is
+  # the unweighted mean across brands. Net = positive − negative.
+  wom_card <- list(available = FALSE)
+  wm_metrics <- if (!is.null(wm)) wm$wom_metrics else NULL
+  wm_net     <- if (!is.null(wm)) wm$net_balance else NULL
+  if (!is.null(wm_metrics) && nrow(wm_metrics) > 0 && brand_code %in% wm_metrics$BrandCode) {
+    pick <- function(df, col) {
+      if (is.null(df) || !col %in% names(df) || nrow(df) == 0) return(NA_real_)
+      v <- as.numeric(df[[col]][df$BrandCode == brand_code])
+      if (length(v) == 1) v else NA_real_
+    }
+    avg <- function(df, col) {
+      if (is.null(df) || !col %in% names(df) || nrow(df) == 0) return(NA_real_)
+      mean(as.numeric(df[[col]]), na.rm = TRUE)
+    }
+    fmt_pct1 <- function(x) {
+      if (!is.finite(x)) "—" else sprintf("%.0f%%", x)
+    }
+
+    wom_card <- list(
+      available = TRUE,
+      heard = list(
+        positive = list(label = "Heard positive",
+                         value   = fmt_pct1(pick(wm_metrics, "ReceivedPos_Pct")),
+                         cat_avg = fmt_pct1(avg(wm_metrics, "ReceivedPos_Pct")),
+                         tone    = "pos"),
+        negative = list(label = "Heard negative",
+                         value   = fmt_pct1(pick(wm_metrics, "ReceivedNeg_Pct")),
+                         cat_avg = fmt_pct1(avg(wm_metrics, "ReceivedNeg_Pct")),
+                         tone    = "neg"),
+        net      = list(label = "Net heard",
+                         value   = .brsum_signed(pick(wm_net, "Net_Received")),
+                         cat_avg = .brsum_signed(avg(wm_net, "Net_Received")))
+      ),
+      said = list(
+        positive = list(label = "Said positive",
+                         value   = fmt_pct1(pick(wm_metrics, "SharedPos_Pct")),
+                         cat_avg = fmt_pct1(avg(wm_metrics, "SharedPos_Pct")),
+                         tone    = "pos"),
+        negative = list(label = "Said negative",
+                         value   = fmt_pct1(pick(wm_metrics, "SharedNeg_Pct")),
+                         cat_avg = fmt_pct1(avg(wm_metrics, "SharedNeg_Pct")),
+                         tone    = "neg"),
+        net      = list(label = "Net said",
+                         value   = .brsum_signed(pick(wm_net, "Net_Shared")),
+                         cat_avg = .brsum_signed(avg(wm_net, "Net_Shared")))
+      )
+    )
+  }
 
   # ---- Diagnostic strip: top-3 attributes + top-3 CEPs by advantage ----
   # Prefer per-category labels passed in; fall back to MA's attribute_labels

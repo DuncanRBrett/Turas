@@ -271,17 +271,50 @@
     body.innerHTML = '<div class="brsum-vchip-grid">' + html + '</div>';
   }
 
+  /* ---------------------------------------------------------------------
+   * Word of mouth card — two columns (Heard / Said) each with three rows:
+   * positive (green), negative (red), and a highlighted net row at the
+   * bottom. Each row shows the focal value large + cat avg below.
+   * --------------------------------------------------------------------- */
   function renderWOMCard(root, snap) {
     var body = cardBody(root, 'wom');
     if (!body) return;
-    if (!snap || !snap.wom) {
+    if (!snap || !snap.wom || !snap.wom.available) {
       body.innerHTML = '<div class="brsum-card-empty">Word-of-mouth not available.</div>';
       return;
     }
-    var col = snap.colour || '#1A5276';
-    body.innerHTML = '<div class="brsum-vchip-grid brsum-vchip-grid-single">' +
-      valueChip(snap.wom.label, snap.wom.value, snap.wom.cat_avg, col, '') +
-    '</div>';
+    var w = snap.wom;
+    body.innerHTML =
+      '<div class="brsum-wom-grid">' +
+        womColumn('Heard', w.heard) +
+        womColumn('Said',  w.said)  +
+      '</div>';
+  }
+
+  function womColumn(title, col) {
+    return '<div class="brsum-wom-col">' +
+             '<div class="brsum-wom-col-title">' + escHtml(title) + '</div>' +
+             womRow(col.positive, false) +
+             womRow(col.negative, false) +
+             womRow(col.net,      true)  +
+           '</div>';
+  }
+
+  function womRow(row, isNet) {
+    if (!row) return '';
+    var toneCls = '';
+    if (row.tone === 'pos') toneCls = ' brsum-wom-pos';
+    else if (row.tone === 'neg') toneCls = ' brsum-wom-neg';
+    var cls = 'brsum-wom-row' + toneCls + (isNet ? ' brsum-wom-net' : '');
+    return '<div class="' + cls + '">' +
+             '<div class="brsum-wom-label">' + escHtml(row.label) + '</div>' +
+             '<div class="brsum-wom-vals">' +
+               '<div class="brsum-wom-val">' + escHtml(row.value || '—') + '</div>' +
+               (row.cat_avg && row.cat_avg !== '—'
+                 ? '<div class="brsum-wom-catavg">cat avg ' + escHtml(row.cat_avg) + '</div>'
+                 : '') +
+             '</div>' +
+           '</div>';
   }
 
   /* ---------------------------------------------------------------------
