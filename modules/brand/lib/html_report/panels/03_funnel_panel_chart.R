@@ -194,6 +194,16 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
   att_roles  <- c("attitude.love", "attitude.prefer", "attitude.ambivalent",
                   "attitude.reject", "attitude.no_opinion")
   att_labels <- c("Love", "Prefer", "Ambivalent", "Reject", "No opinion")
+  # L/P/A/R imply awareness; "no opinion" is the survey's catch-all and
+  # contains BOTH aware-but-no-opinion AND every unaware respondent. In
+  # % aware mode we therefore can't just rescale segments[no_opinion] —
+  # that would count unaware respondents in the numerator (the cause of
+  # the 110%/185% Cat avg bug). Instead, no_opinion is the residual:
+  #   pct_aware[no_opinion] = 1 - sum(pct_aware[L,P,A,R])
+  # so each row sums to exactly 100% in % aware mode and only aware
+  # respondents are counted in any segment.
+  aware_opinion_roles <- c("attitude.love", "attitude.prefer",
+                            "attitude.ambivalent", "attitude.reject")
 
   # After session-3 fix: brand$segments[[role]] = count / total_w = % of ALL respondents.
   # "% total" base = segments[[role]] directly.
@@ -221,6 +231,7 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
 
   cat_avg_aware <- vapply(att_roles, function(role) {
     if (!is.finite(n_total) || pooled_aware_base <= 0) {
+      # Fallback (no aware data): unweighted mean of per-brand rescaled.
       vals <- vapply(brands_all, function(b) {
         pt <- as.numeric(b$segments[[role]] %||% NA_real_)
         bn <- as.numeric(b$aware_base    %||% NA_real_)
@@ -230,6 +241,10 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
       vals <- vals[is.finite(vals)]
       return(if (length(vals) == 0) NA_real_ else mean(vals))
     }
+    if (identical(role, "attitude.no_opinion")) {
+      # Filled in below as residual against L/P/A/R.
+      return(NA_real_)
+    }
     counts <- vapply(brands_all, function(b) {
       pt <- as.numeric(b$segments[[role]] %||% NA_real_)
       if (!is.finite(pt)) 0 else pt * n_total
@@ -237,10 +252,15 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
     sum(counts) / pooled_aware_base
   }, numeric(1))
 
-  # Safety clamp: if the pooled cat-avg row still exceeds 105% in total
-  # (data anomaly — e.g. segment definitions overlap with non-aware), re-
-  # normalise so the row sums to 100%. Keeps the relative shape; prevents
-  # any > 100% values from leaking into the rendered table.
+  # Residual no_opinion for the cat avg row.
+  if (is.finite(n_total) && pooled_aware_base > 0) {
+    sum_lpar <- sum(cat_avg_aware[aware_opinion_roles], na.rm = TRUE)
+    cat_avg_aware[["attitude.no_opinion"]] <- max(0, 1 - sum_lpar)
+  }
+
+  # Safety clamp: if the row still exceeds 105% (data anomaly), re-
+  # normalise. With the residual no_opinion the row should already sum
+  # to 100% by construction, but keep the clamp as a defensive backstop.
   cat_avg_total_check <- sum(cat_avg_aware, na.rm = TRUE)
   if (is.finite(cat_avg_total_check) && cat_avg_total_check > 1.05) {
     cat_avg_aware <- cat_avg_aware / cat_avg_total_check
@@ -355,6 +375,22 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
   aware_n <- as.numeric(brand$aware_base %||% NA_real_)
   focal_cls <- if (is_focal) " fn-rel-td-focal" else ""
 
+  # Precompute the brand's aware_no_opinion residual so the cell loop can
+  # use it for the no_opinion column. L/P/A/R imply awareness, so:
+  #   aware_no_opinion = aware_base - (count_L + count_P + count_A + count_R)
+  #   pct_aware[no_opinion] = max(0, 1 - sum(pct_aware[L,P,A,R]))
+  # This avoids leaking unaware respondents into the no_opinion numerator
+  # (the root cause of the > 100% Cat avg / row-sum bug).
+  lpar_roles <- c("attitude.love", "attitude.prefer",
+                  "attitude.ambivalent", "attitude.reject")
+  pct_aware_no_opinion <- if (is.finite(aware_n) && is.finite(n_total) && aware_n > 0) {
+    sum_lpar <- sum(vapply(lpar_roles, function(r) {
+      pt <- as.numeric(brand$segments[[r]] %||% NA_real_)
+      if (!is.finite(pt)) 0 else pt * (n_total / aware_n)
+    }, numeric(1)))
+    max(0, 1 - sum_lpar)
+  } else NA_real_
+
   # Base cell carries BOTH the aware base (per-brand) and the total base
   # (constant across brands). The JS toggle in applyRelTableBase()
   # rewrites the visible <span> when the user flips % aware \u2194 % total so
@@ -386,9 +422,14 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
     if (!is.finite(pct_total))
       return(sprintf('<td class="ct-td ct-data-col%s ct-na">&mdash;</td>', focal_cls))
 
-    # Scale up to % of aware respondents
-    pct_aware <- if (is.finite(aware_n) && is.finite(n_total) && aware_n > 0)
-      pct_total * (n_total / aware_n) else NA_real_
+    # Scale up to % of aware respondents — but no_opinion comes from the
+    # residual computed above, NOT from rescaling segments[no_opinion],
+    # because that bucket includes unaware respondents.
+    pct_aware <- if (identical(role, "attitude.no_opinion")) {
+      pct_aware_no_opinion
+    } else if (is.finite(aware_n) && is.finite(n_total) && aware_n > 0) {
+      pct_total * (n_total / aware_n)
+    } else NA_real_
 
     # Heatmap colour calibrated to default display (% aware)
     display_pct <- if (is.finite(pct_aware)) pct_aware else pct_total
@@ -398,24 +439,33 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
 
     aware_attr <- if (is.finite(pct_aware))
       sprintf(' data-fn-rel-pct-aware="%.6f"', pct_aware) else ""
-    # Raw count: pct_total * n_total (same people, different denominator for %)
-    cnt_val <- if (is.finite(n_total))
+    # Raw counts:
+    #   count_total = % of all respondents in this segment * n_total
+    #   count_aware = % of aware respondents in this segment * aware_n
+    # For L/P/A/R the two are equal (same people, different denominator).
+    # For no_opinion they differ: count_aware excludes the unaware tail.
+    cnt_total_val <- if (is.finite(n_total))
       as.integer(round(pct_total * n_total)) else NA_integer_
-    count_attrs <- if (!is.na(cnt_val)) {
+    cnt_aware_val <- if (is.finite(pct_aware) && is.finite(aware_n))
+      as.integer(round(pct_aware * aware_n)) else cnt_total_val
+    count_attrs <- if (!is.na(cnt_total_val)) {
       denom_aware_str <- if (is.finite(aware_n))
         sprintf(' data-fn-rel-denom-aware="%d"', as.integer(round(aware_n))) else ""
       denom_total_str <- if (is.finite(n_total))
         sprintf(' data-fn-rel-denom-total="%d"', as.integer(round(n_total))) else ""
       paste0(
-        sprintf(' data-fn-rel-count-total="%d" data-fn-rel-count-aware="%d"', cnt_val, cnt_val),
+        sprintf(' data-fn-rel-count-total="%d" data-fn-rel-count-aware="%d"',
+                cnt_total_val,
+                if (is.na(cnt_aware_val)) cnt_total_val else cnt_aware_val),
         denom_aware_str, denom_total_str)
     } else ""
     # Initial display is % aware (default); show n=count (aware_n) format
-    freq_span <- if (!is.na(cnt_val) && is.finite(aware_n))
+    cnt_disp <- if (!is.na(cnt_aware_val)) cnt_aware_val else cnt_total_val
+    freq_span <- if (!is.na(cnt_disp) && is.finite(aware_n))
       sprintf('<span class="ct-freq fn-pct-count">n=%d (%d)</span>',
-              cnt_val, as.integer(round(aware_n)))
-    else if (!is.na(cnt_val))
-      sprintf('<span class="ct-freq fn-pct-count">n=%d</span>', cnt_val)
+              cnt_disp, as.integer(round(aware_n)))
+    else if (!is.na(cnt_disp))
+      sprintf('<span class="ct-freq fn-pct-count">n=%d</span>', cnt_disp)
     else ""
 
     sprintf(

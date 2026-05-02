@@ -2084,12 +2084,40 @@
     applyRelBrandVis(panel);
   }
 
+  /* % aware vs % total semantics:
+   *
+   * - L/P/A/R segments contain only aware respondents (you can't love a
+   *   brand you've never heard of), so they correctly rescale by
+   *   nTotal/aware_base.
+   *
+   * - The "no opinion" bucket is the survey catch-all and contains BOTH
+   *   aware-but-no-opinion AND every unaware respondent. Rescaling it
+   *   the same way leaks the unaware tail into the numerator and makes
+   *   the value explode for low-awareness brands (the 110% / 185% Cat
+   *   avg seen on the export).
+   *
+   * The right value for pct_aware[no_opinion] is the residual:
+   *   aware_no_opinion = aware_base - (count_L + count_P + count_A + count_R)
+   *   pct_aware[no_opinion] = 1 - sum(pct_aware[L,P,A,R])
+   * which counts only aware respondents and keeps the row at 100%. */
+  var REL_AWARE_OPINION_ROLES = [
+    "attitude.love", "attitude.prefer",
+    "attitude.ambivalent", "attitude.reject"
+  ];
+
   function relPct(brand, role, base, nTotal) {
     // segments[role] = count/n_total (% of total respondents, session-3 fix)
     var segVal = brand.segments && brand.segments[role] != null
       ? brand.segments[role] : 0;
-    // "% aware" = scale up to aware denominator; "% total" = use as-is
     if (base === "aware" && nTotal && brand.aware_base && brand.aware_base > 0) {
+      if (role === "attitude.no_opinion") {
+        var sumLPAR = 0;
+        REL_AWARE_OPINION_ROLES.forEach(function (r) {
+          var v = (brand.segments && brand.segments[r]) || 0;
+          sumLPAR += v * (nTotal / brand.aware_base);
+        });
+        return Math.max(0, 1 - sumLPAR);
+      }
       return segVal * (nTotal / brand.aware_base);
     }
     return segVal;
@@ -2156,19 +2184,26 @@
       var totalAware = 0;
       allBrands.forEach(function(b) { totalAware += (b.aware_base || 0); });
       if (base === "aware" && nTotal && totalAware > 0) {
-        REL_SEG_ROLES.forEach(function(role) {
+        /* L/P/A/R: pool counts then divide by total aware. */
+        REL_AWARE_OPINION_ROLES.forEach(function (role) {
           var sumCount = 0;
-          allBrands.forEach(function(b) {
+          allBrands.forEach(function (b) {
             var seg = (b.segments && b.segments[role]) || 0;
             sumCount += seg * nTotal;
           });
           avgSegments[role] = sumCount / totalAware;
         });
+        /* no_opinion: residual against L/P/A/R so the row sums to 100%
+           and unaware respondents don't leak into the numerator. */
+        var sumLPAR_avg = REL_AWARE_OPINION_ROLES.reduce(function (s, r) {
+          return s + (avgSegments[r] || 0);
+        }, 0);
+        avgSegments["attitude.no_opinion"] = Math.max(0, 1 - sumLPAR_avg);
       } else {
-        // % total or no aware data — unweighted mean is fine here.
-        REL_SEG_ROLES.forEach(function(role) {
-          var vals = allBrands.map(function(b) { return relPct(b, role, base, nTotal); });
-          avgSegments[role] = vals.reduce(function(s, v) { return s + v; }, 0) / vals.length;
+        // % total — unweighted mean across brands.
+        REL_SEG_ROLES.forEach(function (role) {
+          var vals = allBrands.map(function (b) { return relPct(b, role, base, nTotal); });
+          avgSegments[role] = vals.reduce(function (s, v) { return s + v; }, 0) / vals.length;
         });
       }
       // Safety clamp: if the pooled values still exceed 100% in total
