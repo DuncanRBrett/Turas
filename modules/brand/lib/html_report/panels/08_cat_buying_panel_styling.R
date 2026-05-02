@@ -159,6 +159,176 @@ paste0(
 }
 .cb-dop-table .cb-dop-avg-ci .ma-ci-limits span { line-height: 1; }
 
+/* DoP partition partners / rivals card */
+.cb-dop-partition-card {
+  background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px;
+  padding: 12px 14px; margin: 8px 0 16px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.cb-dop-pc-header {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  border-bottom: 1px solid #f1f5f9; padding-bottom: 8px; margin-bottom: 10px;
+}
+.cb-dop-pc-focal-badge {
+  background: var(--cb-focal-colour, #1A5276); color: #fff;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.5px;
+  padding: 2px 6px; border-radius: 3px; text-transform: uppercase;
+}
+.cb-dop-pc-focal-name {
+  font-size: 14px; font-weight: 700;
+  color: var(--cb-focal-colour, #1A5276);
+}
+.cb-dop-pc-title {
+  font-size: 13px; font-weight: 600; color: #334155; margin-left: 4px;
+}
+.cb-dop-pc-weak {
+  background: #fef9c3; border: 1px solid #fde68a; color: #92400e;
+  border-radius: 6px; padding: 6px 10px; margin: 0 0 10px;
+  font-size: 11px; line-height: 1.4;
+}
+.cb-dop-pc-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+}
+.cb-dop-pc-coltitle {
+  font-size: 12px; font-weight: 600; color: #1a2744;
+  margin-bottom: 6px; display: flex; flex-direction: column; gap: 2px;
+}
+.cb-dop-pc-hint {
+  font-size: 10px; font-weight: 400; color: #94a3b8; font-style: italic;
+}
+.cb-dop-pc-list {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.cb-dop-pc-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: baseline; gap: 8px;
+  padding: 6px 10px; border-radius: 6px; font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.cb-dop-pc-item.is-partner {
+  background: rgba(5, 150, 105, 0.10); border: 1px solid rgba(5, 150, 105, 0.25);
+}
+.cb-dop-pc-item.is-rival {
+  background: rgba(220, 38, 38, 0.08); border: 1px solid rgba(220, 38, 38, 0.22);
+}
+.cb-dop-pc-brand { font-weight: 600; color: #1e293b; }
+.cb-dop-pc-actual { font-weight: 600; color: #1e293b; }
+.cb-dop-pc-item.is-partner .cb-dop-pc-dev { font-weight: 700; color: #065f46; }
+.cb-dop-pc-item.is-rival   .cb-dop-pc-dev { font-weight: 700; color: #991b1b; }
+.cb-dop-pc-vs { font-size: 10px; color: #94a3b8; }
+.cb-dop-pc-empty {
+  padding: 6px 10px; font-size: 11px; color: #94a3b8; font-style: italic;
+}
+@media (max-width: 720px) {
+  .cb-dop-pc-grid { grid-template-columns: 1fr; }
+}
+
+/* DoP sub-tab: hide the panel-level Show brands chip bar (the focal select
+   stays). Filtering brands here would silently change column averages,
+   partition card, and cluster map — confusing rather than useful. */
+.cb-panel.cb-on-dop .cb-brand-picker { display: none; }
+
+/* DoP cluster map (dendrogram) */
+.cb-dop-cluster-wrap {
+  background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px;
+  padding: 14px 16px 12px; margin: 18px 0 8px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.cb-dop-cluster-wrap[hidden] { display: none; }
+.cb-dop-cluster-title {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap;
+  font-size: 13px; font-weight: 600; color: #1a2744;
+  margin-bottom: 10px; padding-bottom: 8px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.cb-dop-cluster-title-text { flex: 1 1 auto; min-width: 0; }
+.cb-dop-cluster-sub {
+  font-size: 11px; font-weight: 400; color: #94a3b8; font-style: italic;
+}
+/* Fit-quality badge — categorical band based on cophenetic correlation,
+   numeric coph value displayed inside, full breakdown in CSS-styled tooltip
+   that pops on hover or focus. */
+.cb-cm-fit-badge {
+  position: relative;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 8px 3px 10px; border-radius: 999px;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.3px;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+  cursor: help; outline: none;
+}
+.cb-cm-fit-badge .cb-cm-fit-num {
+  background: rgba(255, 255, 255, 0.6);
+  padding: 1px 6px; border-radius: 999px; font-weight: 700;
+}
+.cb-cm-fit-strong   { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+.cb-cm-fit-moderate { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+.cb-cm-fit-weak     { background: #ffedd5; color: #9a3412; border: 1px solid #fdba74; }
+.cb-cm-fit-poor     { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+.cb-cm-fit-na       { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
+.cb-cm-fit-badge:focus-visible { box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.18); }
+/* Tooltip popover */
+.cb-cm-fit-tip {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  background: #1e293b; color: #f8fafc;
+  padding: 10px 12px; border-radius: 8px;
+  font-size: 11px; font-weight: 500; line-height: 1.45;
+  letter-spacing: 0.1px; white-space: normal;
+  min-width: 240px; max-width: 300px;
+  display: grid; grid-template-columns: 1fr; gap: 4px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22);
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity 0.15s ease-out, visibility 0.15s ease-out;
+  z-index: 50;
+}
+.cb-cm-fit-badge:hover .cb-cm-fit-tip,
+.cb-cm-fit-badge:focus-visible .cb-cm-fit-tip {
+  opacity: 1; visibility: visible;
+}
+.cb-cm-fit-tip::before {
+  content: ""; position: absolute; top: -6px; right: 14px;
+  width: 0; height: 0; border-left: 6px solid transparent;
+  border-right: 6px solid transparent; border-bottom: 6px solid #1e293b;
+}
+.cb-cm-fit-tip-row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px;
+}
+.cb-cm-fit-tip-k { color: #cbd5e1; font-weight: 500; }
+.cb-cm-fit-tip-v {
+  color: #f8fafc; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.cb-cm-fit-tip-foot {
+  margin-top: 4px; padding-top: 6px; border-top: 1px solid #334155;
+  color: #f1f5f9; font-style: italic; font-weight: 500;
+}
+.cb-dop-cluster-svg {
+  display: block; max-width: 100%; height: auto;
+  background: linear-gradient(180deg, #fbfcfe 0%, #f1f5f9 100%);
+  border-radius: 8px;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+.cb-dop-cluster-legend {
+  font-size: 11px; color: #64748b; line-height: 1.5;
+  margin-top: 10px; padding: 8px 12px;
+  background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 6px;
+}
+.cb-dop-cluster-legend strong { color: #334155; }
+.cb-dop-cluster-legend p + p { margin-top: 6px; }
+.cb-cm-legend-plus {
+  display: inline-block; width: 14px; height: 14px; line-height: 14px;
+  text-align: center; border: 1.5px solid #15803d; border-radius: 50%;
+  color: #15803d; font-weight: 700; font-size: 11px;
+  vertical-align: middle;
+}
+/* Cluster-map focal/partner annotation hooks (SVG attribute styling) */
+.cb-cm-focal-ring  { pointer-events: visible; }
+.cb-cm-focal-tag   { pointer-events: none; }
+.cb-cm-partner-ring { pointer-events: visible; }
+.cb-cm-partner-badge { pointer-events: none; }
+
 /* Collapsible */
 .cb-details-toggle {
   font-size: 12px; color: #64748b; cursor: pointer; text-decoration: underline;

@@ -477,10 +477,12 @@ cb_dop_heatmap_html <- function(dev_matrix, obs_matrix = NULL,
     lines <- c(lines, sprintf(paste0(
       '<th class="cb-dop-col-hdr cb-sortable" ',
       'data-cb-sort-col="%d" data-cb-sort-dir="none" ',
+      'data-brand="%s" ',
       'title="Click to sort">',
       '<span class="cb-th-label">%s</span>',
       '<span class="cb-sort-ind"></span></th>'),
-      bi, .cb_esc(.cb_brand_lbl(brands[bi], brand_labels))))
+      bi, .cb_esc(brands[bi]),
+      .cb_esc(.cb_brand_lbl(brands[bi], brand_labels))))
   }
   lines <- c(lines, '</tr></thead><tbody>')
 
@@ -1062,4 +1064,561 @@ cb_purchase_dist_html <- function(freq_dist,
 
   lines <- c(lines, '</div>')
   paste(lines, collapse = "\n")
+}
+
+
+# ==============================================================================
+# DUPLICATION OF PURCHASE — PARTITION CARD
+# ==============================================================================
+# Reads the focal brand's row in the observed crossover matrix, compares each
+# column to that column's cross-brand average (the same expectation used for
+# the heatmap traffic-light shading), and surfaces the brands the focal
+# duplicates with MORE than expected (partition partners) and LESS than
+# expected (partition rivals).
+#
+# Partition partners (over-index vs DJ-Law expectation) suggest a shared sub-
+# segment or usage occasion. Partition rivals (under-index) suggest direct
+# substitution or partition exclusion.
+
+#' Build the focal-brand partition partners/rivals card
+#'
+#' @param obs_matrix Data frame. Observed crossover matrix (cells = % of row
+#'   brand's buyers who also bought column brand). Must contain a
+#'   \code{BrandCode} column plus one column per brand (named by code).
+#' @param focal_brand Character. Focal brand code. NULL or "" → empty string.
+#' @param brand_labels Named character vector or NULL. Display labels.
+#' @param top_n Integer. Max partners and rivals to surface (default 3).
+#' @param weak_threshold Numeric. If the largest absolute deviation across
+#'   the focal row is below this (in pp), the card adds a "weak signal" note.
+#'
+#' @return Character. HTML string (or "" if no focal / no data).
+#' @keywords internal
+cb_dop_partition_card_html <- function(obs_matrix,
+                                        focal_brand,
+                                        brand_labels   = NULL,
+                                        top_n          = 3L,
+                                        weak_threshold = 5) {
+  if (is.null(obs_matrix) || is.null(focal_brand) ||
+      !nzchar(focal_brand)) return("")
+  if (!"BrandCode" %in% names(obs_matrix)) return("")
+
+  brands <- as.character(obs_matrix$BrandCode)
+  n      <- length(brands)
+  if (n < 3 || !focal_brand %in% brands) return("")
+
+  col_avgs <- vapply(brands, function(col_b) {
+    v <- suppressWarnings(as.numeric(obs_matrix[[col_b]]))
+    if (length(v) != n) return(NA_real_)
+    diag_idx <- which(brands == col_b)
+    if (length(diag_idx) == 1) v[diag_idx] <- NA_real_
+    mean(v, na.rm = TRUE)
+  }, numeric(1))
+
+  focal_idx <- which(brands == focal_brand)
+
+  rec <- lapply(seq_along(brands), function(j) {
+    if (j == focal_idx) return(NULL)
+    col_b <- brands[j]
+    obs   <- suppressWarnings(as.numeric(obs_matrix[focal_idx, col_b]))
+    avg   <- col_avgs[j]
+    if (!is.finite(obs) || !is.finite(avg)) return(NULL)
+    list(code = col_b, obs = obs, avg = avg, dev = obs - avg)
+  })
+  rec <- Filter(Negate(is.null), rec)
+  if (!length(rec)) return("")
+
+  devs    <- vapply(rec, function(x) x$dev, numeric(1))
+  max_abs <- max(abs(devs), na.rm = TRUE)
+
+  partners <- rec[order(-devs)]
+  partners <- Filter(function(x) x$dev > 0, partners)
+  partners <- utils::head(partners, top_n)
+
+  rivals <- rec[order(devs)]
+  rivals <- Filter(function(x) x$dev < 0, rivals)
+  rivals <- utils::head(rivals, top_n)
+
+  fmt_pct <- function(v) sprintf("%.0f%%", v)
+  fmt_dev <- function(v) sprintf("%+.0fpp", v)
+
+  build_li <- function(x, kind) {
+    cls   <- if (kind == "partner") "is-partner" else "is-rival"
+    lbl   <- .cb_brand_lbl(x$code, brand_labels)
+    title <- sprintf("%s: focal %s vs. %s category avg (%s)",
+                     lbl, fmt_pct(x$obs), fmt_pct(x$avg), fmt_dev(x$dev))
+    sprintf(paste0(
+      '<li class="cb-dop-pc-item %s" data-brand="%s" title="%s">',
+      '<span class="cb-dop-pc-brand">%s</span>',
+      '<span class="cb-dop-pc-actual">%s</span>',
+      '<span class="cb-dop-pc-dev">%s</span>',
+      '<span class="cb-dop-pc-vs">vs %s avg</span>',
+      '</li>'),
+      cls, .cb_esc(x$code), .cb_esc(title),
+      .cb_esc(lbl),
+      fmt_pct(x$obs),
+      fmt_dev(x$dev),
+      fmt_pct(x$avg))
+  }
+
+  partners_html <- if (length(partners))
+    paste(vapply(partners, build_li, character(1), kind = "partner"),
+          collapse = "")
+  else
+    '<li class="cb-dop-pc-empty">No brands over-index for this focal.</li>'
+
+  rivals_html <- if (length(rivals))
+    paste(vapply(rivals, build_li, character(1), kind = "rival"),
+          collapse = "")
+  else
+    '<li class="cb-dop-pc-empty">No brands under-index for this focal.</li>'
+
+  weak_msg <- if (is.finite(max_abs) && max_abs < weak_threshold) {
+    signed_max <- max_abs * sign(devs[which.max(abs(devs))])
+    sprintf(paste0(
+      '<div class="cb-dop-pc-weak">Weak partition signal — this focal ',
+      'duplicates roughly in line with category averages (largest ',
+      'deviation %s).</div>'),
+      fmt_dev(signed_max))
+  } else {
+    ""
+  }
+
+  focal_lbl <- .cb_brand_lbl(focal_brand, brand_labels)
+
+  paste0(
+    '<section class="cb-dop-partition-card" data-cb-scope="dop" ',
+    'data-cb-component="partition-card" data-focal="',
+    .cb_esc(focal_brand), '">',
+    '<header class="cb-dop-pc-header">',
+    '<span class="cb-dop-pc-focal-badge">FOCAL</span>',
+    '<span class="cb-dop-pc-focal-name">', .cb_esc(focal_lbl), '</span>',
+    '<span class="cb-dop-pc-title">Partition partners &amp; rivals</span>',
+    '</header>',
+    weak_msg,
+    '<div class="cb-dop-pc-grid">',
+    '<div class="cb-dop-pc-col cb-dop-pc-partners">',
+    '<div class="cb-dop-pc-coltitle">Partition partners',
+    '<span class="cb-dop-pc-hint">duplicate above category avg — likely share shoppers/occasions</span>',
+    '</div>',
+    '<ul class="cb-dop-pc-list">', partners_html, '</ul>',
+    '</div>',
+    '<div class="cb-dop-pc-col cb-dop-pc-rivals">',
+    '<div class="cb-dop-pc-coltitle">Partition rivals',
+    '<span class="cb-dop-pc-hint">duplicate below category avg — likely substitution or distinct partition</span>',
+    '</div>',
+    '<ul class="cb-dop-pc-list">', rivals_html, '</ul>',
+    '</div>',
+    '</div>',
+    '</section>')
+}
+
+
+# ==============================================================================
+# DUPLICATION OF PURCHASE — PARTITION CLUSTER MAP (DENDROGRAM)
+# ==============================================================================
+# Hierarchical clustering on the symmetric mean-deviation matrix:
+#
+#   sym_dev[i,j] = (dev[i,j] + dev[j,i]) / 2
+#   dev[i,j]     = obs[i,j] - col_avg[j]            (focal-independent)
+#   distance     = max(sym_dev) - sym_dev           (so brands that mutually
+#                                                    over-duplicate end up close)
+#
+# Output: a dendrogram (SVG) with the leaves cut into k partitions; cluster
+# bands behind the leaf labels make the partition structure pop. Default k
+# scales with brand count (3 for ≤6 brands, 4 otherwise).
+
+#' Build the partition cluster-map (dendrogram) as inline SVG
+#'
+#' @param obs_matrix Data frame. Observed crossover matrix (must contain a
+#'   \code{BrandCode} column plus one column per brand).
+#' @param brand_labels Named character vector or NULL.
+#' @param k Integer or NULL. Number of partitions to draw. NULL → auto.
+#'
+#' @return Character. HTML-wrapped SVG (or "" if not enough brands).
+#' @keywords internal
+cb_dop_cluster_map_html <- function(obs_matrix,
+                                     focal_brand   = NULL,
+                                     focal_colour  = "#1A5276",
+                                     brand_labels  = NULL,
+                                     k             = NULL,
+                                     top_n_partners = 3L) {
+  if (is.null(obs_matrix) || !"BrandCode" %in% names(obs_matrix)) return("")
+  brands <- as.character(obs_matrix$BrandCode)
+  n      <- length(brands)
+  if (n < 4) return("")  # clustering on <4 brands is uninformative
+
+  # Build deviation matrix dev[i, j] = obs[i, j] - col_avg[j] (excl. diagonal).
+  obs_mat <- matrix(NA_real_, nrow = n, ncol = n,
+                    dimnames = list(brands, brands))
+  for (j in seq_along(brands)) {
+    col_b <- brands[j]
+    v     <- suppressWarnings(as.numeric(obs_matrix[[col_b]]))
+    if (length(v) == n) obs_mat[, j] <- v
+  }
+  diag(obs_mat) <- NA_real_
+
+  col_avgs <- vapply(seq_len(n), function(j) {
+    mean(obs_mat[, j], na.rm = TRUE)
+  }, numeric(1))
+  dev_mat <- sweep(obs_mat, 2, col_avgs, "-")
+
+  # Symmetrize: average of (dev[i,j], dev[j,i]).
+  sym_dev <- (dev_mat + t(dev_mat)) / 2
+  diag(sym_dev) <- NA_real_
+
+  if (!any(is.finite(sym_dev))) return("")
+
+  # Convert to non-negative distances: most-positive becomes 0, most-negative
+  # becomes the largest distance. Diagonal forced to 0.
+  max_sym <- max(sym_dev, na.rm = TRUE)
+  dist_mat <- max_sym - sym_dev
+  dist_mat[!is.finite(dist_mat)] <- max(dist_mat, na.rm = TRUE) +
+                                    abs(max_sym) + 1
+  diag(dist_mat) <- 0
+  rownames(dist_mat) <- colnames(dist_mat) <- brands
+
+  hc <- tryCatch(
+    stats::hclust(stats::as.dist(dist_mat), method = "average"),
+    error = function(e) NULL
+  )
+  if (is.null(hc)) return("")
+
+  # Auto-pick k.
+  if (is.null(k) || !is.finite(k)) k <- if (n <= 6) 3L else 4L
+  k <- as.integer(min(max(2L, k), n - 1L))
+  clusters <- stats::cutree(hc, k = k)
+
+  # Clustering reliability metrics:
+  #
+  #   Cophenetic correlation = correlation between the original pairwise
+  #   distances and the heights at which those pairs merge in the
+  #   dendrogram. High = the dendrogram is a faithful summary of the
+  #   underlying structure. Bands: ≥0.85 strong, ≥0.70 moderate, ≥0.55
+  #   weak, <0.55 poor.
+  #
+  #   Average silhouette width at the chosen k = how well each brand fits
+  #   its assigned cluster vs. the next-closest cluster. Diagnoses whether
+  #   k itself is sensible (cophenetic only judges the tree).
+  orig_d  <- stats::as.dist(dist_mat)
+  coph_d  <- tryCatch(stats::cophenetic(hc), error = function(e) NULL)
+  coph_corr <- if (!is.null(coph_d)) {
+    suppressWarnings(stats::cor(as.numeric(coph_d),
+                                 as.numeric(orig_d),
+                                 use = "complete.obs"))
+  } else NA_real_
+
+  avg_sil <- if (length(unique(clusters)) >= 2) {
+    sil_vals <- vapply(seq_len(n), function(i) {
+      cl_i  <- clusters[i]
+      same  <- which(clusters == cl_i & seq_len(n) != i)
+      other_cls <- setdiff(unique(clusters), cl_i)
+      a_i <- if (length(same)) mean(dist_mat[i, same]) else 0
+      b_i <- if (length(other_cls)) {
+        min(vapply(other_cls, function(c2) {
+          ix <- which(clusters == c2)
+          mean(dist_mat[i, ix])
+        }, numeric(1)))
+      } else NA_real_
+      if (!is.finite(b_i)) return(NA_real_)
+      denom <- max(a_i, b_i)
+      if (denom == 0) 0 else (b_i - a_i) / denom
+    }, numeric(1))
+    mean(sil_vals, na.rm = TRUE)
+  } else NA_real_
+
+  fit_band <- if (!is.finite(coph_corr)) "na"
+              else if (coph_corr >= 0.85) "strong"
+              else if (coph_corr >= 0.70) "moderate"
+              else if (coph_corr >= 0.55) "weak"
+              else "poor"
+  fit_label <- switch(fit_band,
+    strong   = "Strong fit",
+    moderate = "Moderate fit",
+    weak     = "Weak fit",
+    poor     = "Poor fit",
+    na       = "Fit n/a")
+  fit_caveat <- switch(fit_band,
+    strong   = "Partitions are reliable.",
+    moderate = "Broad partitions are real; some noise inside groups.",
+    weak     = "Treat partitions as exploratory — limited structure.",
+    poor     = "No clear partition structure — interpret with caution.",
+    na       = "Could not compute reliability.")
+  coph_disp <- if (is.finite(coph_corr)) sprintf("%.2f", coph_corr) else "—"
+  sil_disp  <- if (is.finite(avg_sil))   sprintf("%.2f", avg_sil)   else "—"
+  # Multi-line tooltip via CSS popover (the native title attribute was
+  # unreliable for newline-formatted content across browsers).
+  fit_aria <- sprintf(
+    "Cophenetic correlation %s, silhouette at k=%d %s. %s: %s",
+    coph_disp, as.integer(k), sil_disp, fit_label, fit_caveat)
+  fit_badge_html <- sprintf(
+    paste0('<span class="cb-cm-fit-badge cb-cm-fit-%s" tabindex="0" ',
+           'role="img" aria-label="%s">',
+           '<span class="cb-cm-fit-label">%s</span>',
+           '<span class="cb-cm-fit-num">%s</span>',
+           '<span class="cb-cm-fit-tip" role="tooltip">',
+             '<span class="cb-cm-fit-tip-row">',
+               '<span class="cb-cm-fit-tip-k">Cophenetic correlation</span>',
+               '<span class="cb-cm-fit-tip-v">%s</span></span>',
+             '<span class="cb-cm-fit-tip-row">',
+               '<span class="cb-cm-fit-tip-k">Silhouette (k=%d)</span>',
+               '<span class="cb-cm-fit-tip-v">%s</span></span>',
+             '<span class="cb-cm-fit-tip-foot">%s — %s</span>',
+           '</span>',
+         '</span>'),
+    fit_band, .cb_esc(fit_aria), fit_label, coph_disp,
+    coph_disp, as.integer(k), sil_disp, fit_label, .cb_esc(fit_caveat))
+
+  # Layout.
+  W <- 760L; H <- 360L
+  PAD_L <- 36; PAD_R <- 24
+  TREE_TOP <- 22; TREE_BOTTOM <- 188
+  BAND_TOP <- 184; BAND_HEAD_Y <- 200
+  DOT_Y <- 188; DOT_R <- 5
+  LABEL_TOP <- 220; BAND_BOTTOM <- 326
+  plot_w <- W - PAD_L - PAD_R
+  cell_w <- plot_w / n
+
+  # Leaf x positions (data space: 1..n along hc$order).
+  leaf_x <- numeric(n)
+  for (i in seq_len(n)) leaf_x[hc$order[i]] <- i
+
+  # Internal-merge x positions + cluster id of each merge:
+  # node_cluster[k] == cluster id when both children are in that cluster
+  # (within-cluster merge); 0 when the merge spans two clusters.
+  node_x       <- numeric(n - 1L)
+  node_cluster <- integer(n - 1L)
+  for (m in seq_len(n - 1L)) {
+    a <- hc$merge[m, 1L]; b <- hc$merge[m, 2L]
+    xa <- if (a < 0) leaf_x[-a] else node_x[a]
+    xb <- if (b < 0) leaf_x[-b] else node_x[b]
+    node_x[m] <- (xa + xb) / 2
+    ca <- if (a < 0) clusters[-a] else node_cluster[a]
+    cb <- if (b < 0) clusters[-b] else node_cluster[b]
+    node_cluster[m] <- if (!is.na(ca) && !is.na(cb) && ca == cb)
+      as.integer(ca) else 0L
+  }
+
+  max_h <- max(hc$height, na.rm = TRUE)
+  if (!is.finite(max_h) || max_h <= 0) max_h <- 1
+
+  to_x <- function(dx) PAD_L + (dx - 0.5) * cell_w
+  to_y <- function(dy) {
+    TREE_BOTTOM - (dy / max_h) * (TREE_BOTTOM - TREE_TOP)
+  }
+
+  # Soft, distinct cluster palette — pastel fill, mid stroke, deep edge.
+  band_fill   <- c("#e0ecff", "#dcfce7", "#fef3c7", "#fce7f3", "#ede9fe", "#fee2e2")
+  band_stroke <- c("#7da9ff", "#6ee7b7", "#fcd34d", "#f0a3c7", "#a99cf6", "#fca5a5")
+  band_edge   <- c("#1e4fbb", "#047857", "#b45309", "#9d174d", "#5b21b6", "#991b1b")
+  pal_n <- length(band_fill)
+  cls_idx <- function(cid) ((as.integer(cid) - 1L) %% pal_n) + 1L
+
+  # Cluster bands wrap around the leaf dots + labels (hclust's leaf order
+  # keeps clusters contiguous).
+  cluster_seq <- clusters[hc$order]
+  band_lines  <- character(0)
+  i <- 1L
+  while (i <= n) {
+    j <- i
+    while (j < n && cluster_seq[j + 1L] == cluster_seq[i]) j <- j + 1L
+    cid <- as.integer(cluster_seq[i])
+    ix  <- cls_idx(cid)
+    x0  <- to_x(i) - cell_w / 2 + 3
+    x1  <- to_x(j) + cell_w / 2 - 3
+    band_lines <- c(band_lines, sprintf(
+      paste0('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" ',
+             'fill="%s" stroke="%s" stroke-width="1" rx="6" ry="6" ',
+             'opacity="0.85"/>'),
+      x0, BAND_TOP, x1 - x0, BAND_BOTTOM - BAND_TOP,
+      band_fill[ix], band_stroke[ix]))
+    band_lines <- c(band_lines, sprintf(
+      paste0('<text x="%.1f" y="%.1f" text-anchor="middle" ',
+             'font-size="9" fill="%s" font-weight="700" ',
+             'letter-spacing="1.2">PARTITION %d</text>'),
+      (x0 + x1) / 2, BAND_HEAD_Y, band_edge[ix], cid))
+    i <- j + 1L
+  }
+
+  # Tree edges — within-cluster merges get the cluster colour, between-
+  # cluster merges stay neutral grey.
+  GREY <- "#94a3b8"
+  edge_lines <- character(0)
+  for (m in seq_len(n - 1L)) {
+    a  <- hc$merge[m, 1L]; b <- hc$merge[m, 2L]
+    xa <- if (a < 0) leaf_x[-a] else node_x[a]
+    xb <- if (b < 0) leaf_x[-b] else node_x[b]
+    ya <- if (a < 0) 0          else hc$height[a]
+    yb <- if (b < 0) 0          else hc$height[b]
+    yp <- hc$height[m]
+
+    sx_a <- to_x(xa); sx_b <- to_x(xb)
+    sy_a <- to_y(ya); sy_b <- to_y(yb); sy_p <- to_y(yp)
+
+    cid <- node_cluster[m]
+    stroke <- if (cid > 0) band_edge[cls_idx(cid)] else GREY
+    sw     <- if (cid > 0) 1.6 else 1.2
+    op     <- if (cid > 0) 0.85 else 0.55
+
+    edge_lines <- c(edge_lines, sprintf(
+      paste0('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" ',
+             'stroke="%s" stroke-width="%.2f" stroke-linecap="round" ',
+             'opacity="%.2f"/>'),
+      sx_a, sy_a, sx_a, sy_p, stroke, sw, op))
+    edge_lines <- c(edge_lines, sprintf(
+      paste0('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" ',
+             'stroke="%s" stroke-width="%.2f" stroke-linecap="round" ',
+             'opacity="%.2f"/>'),
+      sx_b, sy_b, sx_b, sy_p, stroke, sw, op))
+    edge_lines <- c(edge_lines, sprintf(
+      paste0('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" ',
+             'stroke="%s" stroke-width="%.2f" stroke-linecap="round" ',
+             'opacity="%.2f"/>'),
+      sx_a, sy_p, sx_b, sy_p, stroke, sw, op))
+  }
+
+  # Leaf dots — cluster-coloured circles where the tree lands inside the
+  # band; gives a clear visual anchor for each brand. data-brand attr lets
+  # JS find dots by code on focal-switch.
+  dot_lines <- character(0)
+  for (i in seq_len(n)) {
+    bc  <- brands[hc$order[i]]
+    cid <- as.integer(clusters[hc$order[i]])
+    ix  <- cls_idx(cid)
+    sx  <- to_x(i)
+    dot_lines <- c(dot_lines, sprintf(
+      paste0('<circle class="cb-cm-dot" data-brand="%s" data-x="%.1f" ',
+             'cx="%.1f" cy="%.1f" r="%.1f" fill="%s" ',
+             'stroke="#ffffff" stroke-width="1.5"/>'),
+      .cb_esc(bc), sx, sx, DOT_Y, DOT_R, band_edge[ix]))
+  }
+
+  # Leaf labels (rotated 35° — fits more breathing room than 45°).
+  label_lines <- character(0)
+  for (i in seq_len(n)) {
+    bc  <- brands[hc$order[i]]
+    lbl <- .cb_brand_lbl(bc, brand_labels)
+    sx  <- to_x(i)
+    label_lines <- c(label_lines, sprintf(
+      paste0('<text class="cb-cm-label" data-brand="%s" ',
+             'x="%.1f" y="%.1f" text-anchor="end" ',
+             'font-size="11" fill="#1e293b" font-weight="600" ',
+             'transform="rotate(-35 %.1f %.1f)">%s</text>'),
+      .cb_esc(bc), sx, LABEL_TOP + 14, sx, LABEL_TOP + 14, .cb_esc(lbl)))
+  }
+
+  # Focal halo + top-N partner badges — surfaces the apparent contradiction
+  # when the focal's strongest partners (asymmetric, focal-row) sit in
+  # different partitions from the focal's own cluster (a "bridge brand").
+  annotations <- character(0)
+  if (!is.null(focal_brand) && nzchar(focal_brand) &&
+      focal_brand %in% brands) {
+    focal_pos <- which(hc$order == which(brands == focal_brand))
+    fx <- to_x(focal_pos)
+
+    # Focal halo
+    annotations <- c(annotations, sprintf(
+      paste0('<circle class="cb-cm-focal-ring" cx="%.1f" cy="%.1f" r="9.5" ',
+             'fill="none" stroke="%s" stroke-width="2.4" opacity="0.95">',
+             '<title>Focal: %s</title></circle>'),
+      fx, DOT_Y, focal_colour, .cb_esc(focal_brand)))
+    # Small "FOCAL" tag above the halo
+    annotations <- c(annotations, sprintf(
+      paste0('<text class="cb-cm-focal-tag" x="%.1f" y="%.1f" ',
+             'text-anchor="middle" font-size="8" font-weight="700" ',
+             'fill="%s" letter-spacing="0.8">FOCAL</text>'),
+      fx, DOT_Y - 14, focal_colour))
+
+    # Compute focal's top-N partners (asymmetric — same logic as the card).
+    focal_idx <- which(brands == focal_brand)
+    rec <- lapply(seq_along(brands), function(j) {
+      if (j == focal_idx) return(NULL)
+      obs_v <- suppressWarnings(as.numeric(obs_mat[focal_idx, j]))
+      avg_v <- col_avgs[j]
+      if (!is.finite(obs_v) || !is.finite(avg_v)) return(NULL)
+      list(code = brands[j], dev = obs_v - avg_v)
+    })
+    rec <- Filter(Negate(is.null), rec)
+    rec <- rec[order(-vapply(rec, function(x) x$dev, numeric(1)))]
+    rec <- Filter(function(x) x$dev > 0, rec)
+    rec <- utils::head(rec, top_n_partners)
+
+    for (p in rec) {
+      pos <- which(hc$order == which(brands == p$code))
+      px  <- to_x(pos)
+      dev_lbl <- sprintf("+%dpp", as.integer(round(p$dev)))
+      annotations <- c(annotations, sprintf(
+        paste0('<circle class="cb-cm-partner-ring" cx="%.1f" cy="%.1f" ',
+               'r="7.5" fill="none" stroke="#15803d" stroke-width="2" ',
+               'opacity="0.9"><title>Partition partner of %s: %s</title>',
+               '</circle>'),
+        px, DOT_Y, .cb_esc(focal_brand), dev_lbl))
+      annotations <- c(annotations, sprintf(
+        paste0('<text class="cb-cm-partner-badge" x="%.1f" y="%.1f" ',
+               'text-anchor="middle" font-size="10" font-weight="700" ',
+               'fill="#15803d">+</text>'),
+        px, DOT_Y + 3.5))
+    }
+  }
+  annotations_html <- sprintf(
+    '<g class="cb-cm-annotations">%s</g>',
+    paste(annotations, collapse = "\n"))
+
+  # Y-axis: subtle dashed gridline at midpoint, plus near/far ticks.
+  mid_y <- (TREE_TOP + TREE_BOTTOM) / 2
+  axis_html <- sprintf(
+    paste0(
+      '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#e2e8f0" ',
+      'stroke-width="1" stroke-dasharray="2 3"/>',
+      '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#cbd5e1" ',
+      'stroke-width="1"/>',
+      '<text x="%.1f" y="%.1f" font-size="9" fill="#94a3b8" ',
+      'text-anchor="end">far</text>',
+      '<text x="%.1f" y="%.1f" font-size="9" fill="#94a3b8" ',
+      'text-anchor="end">near</text>'),
+    PAD_L, mid_y, W - PAD_R, mid_y,
+    PAD_L - 4, TREE_TOP, PAD_L - 4, TREE_BOTTOM,
+    PAD_L - 6, TREE_TOP + 4,
+    PAD_L - 6, TREE_BOTTOM)
+
+  legend_html <- paste0(
+    '<div class="cb-dop-cluster-legend">',
+    '<p style="margin:0 0 6px;"><strong>How to read:</strong> brands grouped ',
+    'together share more buyers than the DJ Law would predict — they may ',
+    'serve a common partition or usage occasion. Brands in different groups ',
+    'duplicate <em>less</em> than expected.</p>',
+    '<p style="margin:0;"><strong>Bridge brands:</strong> if the focal’s ',
+    'top partners (shown in the card above) sit in <em>different</em> ',
+    'partitions, the focal is acting as a <em>bridge</em> — its shoppers ',
+    'cross occasions rather than concentrating in one segment. The blue ring ',
+    'marks the focal here; the small green ',
+    '<span class="cb-cm-legend-plus">+</span> badges mark its top ',
+    as.integer(top_n_partners), ' partners.</p>',
+    '</div>')
+
+  # Paint order (back → front): axis → cluster bands → tree edges → leaf dots
+  # → focal/partner annotations → labels
+  paste0(
+    '<section class="cb-dop-cluster-wrap" data-cb-component="cluster-map" ',
+    'data-cb-scope="dop" data-focal="', .cb_esc(focal_brand %||% ""), '" ',
+    'style="--cb-cm-focal:', .cb_esc(focal_colour), ';">',
+    '<div class="cb-dop-cluster-title">',
+    '<div class="cb-dop-cluster-title-text">Partition cluster map ',
+    '<span class="cb-dop-cluster-sub">— ', as.integer(k),
+    ' groups, hierarchical clustering on symmetric DJ-Law deviation</span>',
+    '</div>',
+    fit_badge_html,
+    '</div>',
+    sprintf(paste0(
+      '<svg viewBox="0 0 %d %d" preserveAspectRatio="xMidYMid meet" ',
+      'width="100%%" height="auto" class="cb-dop-cluster-svg" ',
+      'role="img" aria-label="Partition cluster dendrogram">'), W, H),
+    axis_html,
+    paste(band_lines, collapse = "\n"),
+    paste(edge_lines, collapse = "\n"),
+    paste(dot_lines, collapse = "\n"),
+    annotations_html,
+    paste(label_lines, collapse = "\n"),
+    '</svg>',
+    legend_html,
+    '</section>')
 }

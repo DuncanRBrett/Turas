@@ -198,6 +198,14 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
         paste0('<style class="al-panel-styles">', css, '</style>'),
         sep = "\n")
   }
+  if (exists("build_summary_panel_styles", mode = "function")) {
+    css <- tryCatch(build_summary_panel_styles(brand_colour_cfg),
+                    error = function(e) "")
+    if (nzchar(trimws(css)))
+      panel_styles <- paste(panel_styles,
+        paste0('<style class="brsum-panel-styles">', css, '</style>'),
+        sep = "\n")
+  }
 
   # Resolve JS paths (funnel + MA) and concatenate into one panel_js blob
   .resolve_js <- function(filename) {
@@ -227,6 +235,7 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
     .resolve_js("brand_demographics_panel.js"),
     .resolve_js("brand_adhoc_panel.js"),
     .resolve_js("brand_audience_lens_panel.js"),
+    .resolve_js("brand_summary_panel.js"),
     sep = "\n"
   )
 

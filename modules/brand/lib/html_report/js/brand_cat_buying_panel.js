@@ -109,6 +109,7 @@
     bindCbPanelChips(panel);
     bindCbToggleAll(panel);
     bindCbShowChart(panel);
+    bindCbDopShowChart(panel);
     bindCbHeatmapToggle(panel);
     bindCbShowCounts(panel);
     bindCbSort(panel);
@@ -229,6 +230,11 @@
           else      sp.setAttribute('hidden', '');
         });
         panel.classList.toggle('cb-on-context', target === 'context');
+        /* DoP sub-tab: hide the panel-level brand show/hide chip row.
+           Filtering rows here would silently change column averages, the
+           partition card, and the cluster map — confusing rather than
+           useful. The focal <select> stays visible.                       */
+        panel.classList.toggle('cb-on-dop', target === 'dop');
 
         /* Re-apply brand visibility from panel-level state to the newly-shown tab */
         if (target === 'brands') {
@@ -366,6 +372,25 @@
         }
       });
     });
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* DoP cluster-map "Show chart" toggle                                     */
+  /* ---------------------------------------------------------------------- */
+  /* The cluster map is focal-independent and rendered server-side as a
+     static SVG, so the toggle just hides/shows the wrap.                   */
+
+  function bindCbDopShowChart(panel) {
+    panel.querySelectorAll('input[data-cb-action="dop-showchart"]')
+      .forEach(function (cb) {
+        cb.addEventListener('change', function () {
+          var wrap = panel.querySelector(
+            '.cb-dop-cluster-wrap[data-cb-component="cluster-map"]');
+          if (!wrap) return;
+          if (cb.checked) wrap.removeAttribute('hidden');
+          else            wrap.setAttribute('hidden', '');
+        });
+      });
   }
 
   /* ---------------------------------------------------------------------- */
@@ -1002,6 +1027,292 @@
   };
 
   /* ---------------------------------------------------------------------- */
+  /* DoP partition partners / rivals card                                    */
+  /* ---------------------------------------------------------------------- */
+  /* Reads the existing DoP heatmap DOM (data-brand on column headers,
+     data-v on cells) and rebuilds the partition card for the given focal.
+     Mirrors cb_dop_partition_card_html() on the R side: column averages
+     exclude the diagonal, deviation = focal-row obs minus column avg,
+     top 3 positive = partners, top 3 negative = rivals.                    */
+
+  function cbRenderDopPartitionCard(panel, focalCode) {
+    if (!panel || !focalCode) return;
+    var card = panel.querySelector(
+      '.cb-dop-partition-card[data-cb-component="partition-card"]');
+    if (!card) return;
+    var table = panel.querySelector('.cb-dop-table');
+    if (!table) return;
+
+    /* Column index → brand code (from header data-brand attrs). */
+    var colHeaders = table.querySelectorAll('thead th.cb-dop-col-hdr');
+    var colCodes   = [];
+    colHeaders.forEach(function (th) {
+      colCodes.push(th.getAttribute('data-brand') || '');
+    });
+    if (!colCodes.length) return;
+
+    /* Build values map: rows[brandCode] = { colCode: numeric (or NaN) }.
+       Cells are in column order matching colCodes; the brand label cell
+       sits at index 0 so we offset by 1.                                   */
+    var brandRows = table.querySelectorAll('tbody tr[data-brand]');
+    var values    = {};
+    brandRows.forEach(function (tr) {
+      var rowCode = tr.getAttribute('data-brand');
+      if (!rowCode) return;
+      var cells = tr.querySelectorAll('td');
+      var rowVals = {};
+      colCodes.forEach(function (colCode, j) {
+        var cell = cells[j + 1];
+        if (!cell) { rowVals[colCode] = NaN; return; }
+        var v = parseFloat(cell.getAttribute('data-v'));
+        rowVals[colCode] = isFinite(v) ? v : NaN;
+      });
+      values[rowCode] = rowVals;
+    });
+
+    /* Column averages excluding diagonal (col_b vs. itself). */
+    var colAvgs = {};
+    colCodes.forEach(function (colCode) {
+      var sum = 0, n = 0;
+      Object.keys(values).forEach(function (rowCode) {
+        if (rowCode === colCode) return;
+        var v = values[rowCode][colCode];
+        if (isFinite(v)) { sum += v; n += 1; }
+      });
+      colAvgs[colCode] = n > 0 ? sum / n : NaN;
+    });
+
+    var focalRow = values[focalCode];
+    if (!focalRow) return;
+
+    var lblFor = function (code) {
+      /* Pull display label from the column header — falls back to code. */
+      for (var i = 0; i < colCodes.length; i++) {
+        if (colCodes[i] === code) {
+          var th = colHeaders[i];
+          if (th) {
+            var span = th.querySelector('.cb-th-label');
+            if (span) return span.textContent.trim();
+          }
+        }
+      }
+      return code;
+    };
+
+    var rec = [];
+    colCodes.forEach(function (colCode) {
+      if (colCode === focalCode) return;
+      var obs = focalRow[colCode];
+      var avg = colAvgs[colCode];
+      if (!isFinite(obs) || !isFinite(avg)) return;
+      rec.push({ code: colCode, obs: obs, avg: avg, dev: obs - avg });
+    });
+    if (!rec.length) return;
+
+    var TOP_N = 3;
+    var WEAK  = 5;
+
+    var partners = rec.filter(function (x) { return x.dev > 0; })
+                      .sort(function (a, b) { return b.dev - a.dev; })
+                      .slice(0, TOP_N);
+    var rivals   = rec.filter(function (x) { return x.dev < 0; })
+                      .sort(function (a, b) { return a.dev - b.dev; })
+                      .slice(0, TOP_N);
+
+    var maxAbs = 0, signedMax = 0;
+    rec.forEach(function (x) {
+      if (Math.abs(x.dev) > maxAbs) { maxAbs = Math.abs(x.dev); signedMax = x.dev; }
+    });
+
+    var fmtPct = function (v) { return Math.round(v) + '%'; };
+    var fmtDev = function (v) {
+      var rounded = Math.round(v);
+      return (rounded >= 0 ? '+' : '') + rounded + 'pp';
+    };
+    var esc = function (s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    };
+
+    var buildItem = function (x, kind) {
+      var cls   = kind === 'partner' ? 'is-partner' : 'is-rival';
+      var lbl   = lblFor(x.code);
+      var title = lbl + ': focal ' + fmtPct(x.obs) + ' vs. ' + fmtPct(x.avg) +
+                  ' category avg (' + fmtDev(x.dev) + ')';
+      return '<li class="cb-dop-pc-item ' + cls + '" data-brand="' +
+        esc(x.code) + '" title="' + esc(title) + '">' +
+        '<span class="cb-dop-pc-brand">' + esc(lbl) + '</span>' +
+        '<span class="cb-dop-pc-actual">' + fmtPct(x.obs) + '</span>' +
+        '<span class="cb-dop-pc-dev">' + fmtDev(x.dev) + '</span>' +
+        '<span class="cb-dop-pc-vs">vs ' + fmtPct(x.avg) + ' avg</span>' +
+        '</li>';
+    };
+
+    var partnersHtml = partners.length
+      ? partners.map(function (x) { return buildItem(x, 'partner'); }).join('')
+      : '<li class="cb-dop-pc-empty">No brands over-index for this focal.</li>';
+    var rivalsHtml = rivals.length
+      ? rivals.map(function (x) { return buildItem(x, 'rival'); }).join('')
+      : '<li class="cb-dop-pc-empty">No brands under-index for this focal.</li>';
+
+    var weakHtml = (isFinite(maxAbs) && maxAbs < WEAK)
+      ? '<div class="cb-dop-pc-weak">Weak partition signal — this focal ' +
+        'duplicates roughly in line with category averages (largest ' +
+        'deviation ' + fmtDev(signedMax) + ').</div>'
+      : '';
+
+    var focalLbl = lblFor(focalCode);
+
+    card.setAttribute('data-focal', focalCode);
+    card.innerHTML =
+      '<header class="cb-dop-pc-header">' +
+        '<span class="cb-dop-pc-focal-badge">FOCAL</span>' +
+        '<span class="cb-dop-pc-focal-name">' + esc(focalLbl) + '</span>' +
+        '<span class="cb-dop-pc-title">Partition partners &amp; rivals</span>' +
+      '</header>' +
+      weakHtml +
+      '<div class="cb-dop-pc-grid">' +
+        '<div class="cb-dop-pc-col cb-dop-pc-partners">' +
+          '<div class="cb-dop-pc-coltitle">Partition partners' +
+            '<span class="cb-dop-pc-hint">duplicate above category avg — ' +
+            'likely share shoppers/occasions</span>' +
+          '</div>' +
+          '<ul class="cb-dop-pc-list">' + partnersHtml + '</ul>' +
+        '</div>' +
+        '<div class="cb-dop-pc-col cb-dop-pc-rivals">' +
+          '<div class="cb-dop-pc-coltitle">Partition rivals' +
+            '<span class="cb-dop-pc-hint">duplicate below category avg — ' +
+            'likely substitution or distinct partition</span>' +
+          '</div>' +
+          '<ul class="cb-dop-pc-list">' + rivalsHtml + '</ul>' +
+        '</div>' +
+      '</div>';
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* DoP cluster-map focal halo + partner badges                             */
+  /* ---------------------------------------------------------------------- */
+  /* The dendrogram itself stays static (computed server-side), but the
+     focal/partner annotation layer is rebuilt on focal switch. Reads dot
+     coordinates from the SVG (each dot has data-brand + cx attrs) and
+     recomputes top-3 asymmetric partners from the heatmap DOM.             */
+
+  function cbRenderDopClusterAnnotations(panel, focalCode) {
+    if (!panel) return;
+    var wrap = panel.querySelector(
+      '.cb-dop-cluster-wrap[data-cb-component="cluster-map"]');
+    if (!wrap) return;
+    var svg = wrap.querySelector('svg.cb-dop-cluster-svg');
+    if (!svg) return;
+    var ann = svg.querySelector('g.cb-cm-annotations');
+    if (!ann) return;
+
+    /* Always start fresh + record current focal. */
+    ann.innerHTML = '';
+    wrap.setAttribute('data-focal', focalCode || '');
+    if (!focalCode) return;
+
+    var focalDot = svg.querySelector('circle.cb-cm-dot[data-brand="' +
+                                      focalCode + '"]');
+    if (!focalDot) return;
+    var focalColour = (wrap.style.getPropertyValue('--cb-cm-focal') ||
+                       '').trim() || '#1A5276';
+    var fx = parseFloat(focalDot.getAttribute('cx'));
+    var fy = parseFloat(focalDot.getAttribute('cy'));
+    if (!isFinite(fx) || !isFinite(fy)) return;
+
+    var esc = function (s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    };
+
+    /* Focal halo + tag */
+    var parts = [];
+    parts.push(
+      '<circle class="cb-cm-focal-ring" cx="' + fx.toFixed(1) +
+      '" cy="' + fy.toFixed(1) + '" r="9.5" fill="none" stroke="' +
+      focalColour + '" stroke-width="2.4" opacity="0.95">' +
+      '<title>Focal: ' + esc(focalCode) + '</title></circle>');
+    parts.push(
+      '<text class="cb-cm-focal-tag" x="' + fx.toFixed(1) +
+      '" y="' + (fy - 14).toFixed(1) + '" text-anchor="middle" ' +
+      'font-size="8" font-weight="700" fill="' + focalColour +
+      '" letter-spacing="0.8">FOCAL</text>');
+
+    /* Compute top-3 asymmetric partners from heatmap DOM. */
+    var table = panel.querySelector('.cb-dop-table');
+    if (table) {
+      var colHeaders = table.querySelectorAll('thead th.cb-dop-col-hdr');
+      var colCodes   = [];
+      colHeaders.forEach(function (th) {
+        colCodes.push(th.getAttribute('data-brand') || '');
+      });
+      var brandRows = table.querySelectorAll('tbody tr[data-brand]');
+      var values    = {};
+      brandRows.forEach(function (tr) {
+        var rowCode = tr.getAttribute('data-brand');
+        if (!rowCode) return;
+        var cells = tr.querySelectorAll('td');
+        var rowVals = {};
+        colCodes.forEach(function (colCode, j) {
+          var cell = cells[j + 1];
+          var v = cell ? parseFloat(cell.getAttribute('data-v')) : NaN;
+          rowVals[colCode] = isFinite(v) ? v : NaN;
+        });
+        values[rowCode] = rowVals;
+      });
+      var colAvgs = {};
+      colCodes.forEach(function (colCode) {
+        var sum = 0, n = 0;
+        Object.keys(values).forEach(function (rowCode) {
+          if (rowCode === colCode) return;
+          var v = values[rowCode][colCode];
+          if (isFinite(v)) { sum += v; n += 1; }
+        });
+        colAvgs[colCode] = n > 0 ? sum / n : NaN;
+      });
+      var focalRow = values[focalCode];
+      if (focalRow) {
+        var rec = [];
+        colCodes.forEach(function (colCode) {
+          if (!colCode || colCode === focalCode) return;
+          var obs = focalRow[colCode];
+          var avg = colAvgs[colCode];
+          if (!isFinite(obs) || !isFinite(avg)) return;
+          rec.push({ code: colCode, dev: obs - avg });
+        });
+        var partners = rec.filter(function (x) { return x.dev > 0; })
+                          .sort(function (a, b) { return b.dev - a.dev; })
+                          .slice(0, 3);
+        partners.forEach(function (p) {
+          var dot = svg.querySelector(
+            'circle.cb-cm-dot[data-brand="' + p.code + '"]');
+          if (!dot) return;
+          var px = parseFloat(dot.getAttribute('cx'));
+          var py = parseFloat(dot.getAttribute('cy'));
+          if (!isFinite(px) || !isFinite(py)) return;
+          var devLbl = '+' + Math.round(p.dev) + 'pp';
+          parts.push(
+            '<circle class="cb-cm-partner-ring" cx="' + px.toFixed(1) +
+            '" cy="' + py.toFixed(1) + '" r="7.5" fill="none" ' +
+            'stroke="#15803d" stroke-width="2" opacity="0.9">' +
+            '<title>Partition partner of ' + esc(focalCode) + ': ' +
+            devLbl + '</title></circle>');
+          parts.push(
+            '<text class="cb-cm-partner-badge" x="' + px.toFixed(1) +
+            '" y="' + (py + 3.5).toFixed(1) + '" text-anchor="middle" ' +
+            'font-size="10" font-weight="700" fill="#15803d">+</text>');
+        });
+      }
+    }
+
+    /* SVG namespace requires inserting via DOMParser to keep the elements
+       rendering correctly. innerHTML on an SVG <g> normally works in modern
+       browsers; if it ever stops, switch to createElementNS construction.   */
+    ann.innerHTML = parts.join('\n');
+  }
+
+  /* ---------------------------------------------------------------------- */
   /* Focal brand picker (panel-level: updates tables + re-renders charts)    */
   /* ---------------------------------------------------------------------- */
 
@@ -1097,6 +1408,14 @@
         else                    tbody.appendChild(demoted);
       }
     });
+
+    /* 3e. DoP partition card: rebuild for the new focal. */
+    cbRenderDopPartitionCard(panel, brandCode);
+
+    /* 3f. DoP cluster map: rebuild the focal halo + partner badges layer.
+           The dendrogram tree itself stays — only the highlight overlay
+           changes. */
+    cbRenderDopClusterAnnotations(panel, brandCode);
 
     /* 3b. Brand Performance Summary: new focal to row 1, demoted focal to
           sortable section (below cat-avg row), FOCAL badge swapped.
@@ -1295,6 +1614,81 @@
     return pieces.join('');
   }
 
+  /* DoP sub-tab has THREE independent elements that the user may want to
+     capture independently: the focal partition card, the DoP heatmap, and
+     the cluster-map dendrogram. Capture order matches the on-screen order. */
+  function cbDetectDopCheckboxes(activeTab, hasInsight) {
+    var checkboxes = [];
+    if (activeTab.querySelector('.cb-dop-partition-card')) {
+      checkboxes.push({ key: 'partition', label: 'Partition card',
+                        available: true, checked: true });
+    }
+    if (activeTab.querySelector('.cb-dop-table')) {
+      checkboxes.push({ key: 'table', label: 'DoP heatmap',
+                        available: true, checked: true });
+    }
+    if (activeTab.querySelector('.cb-dop-cluster-wrap')) {
+      checkboxes.push({ key: 'cluster', label: 'Cluster map',
+                        available: true, checked: true });
+    }
+    checkboxes.push({ key: 'insight', label: 'Insight',
+                      available: true, checked: hasInsight });
+    return checkboxes;
+  }
+
+  function cbCaptureDopHtml(activeTab, flags) {
+    var portable = (typeof TurasPins !== 'undefined' && TurasPins.capturePortableHtml)
+      ? TurasPins.capturePortableHtml
+      : function (el) { return el.outerHTML; };
+    var strip = (typeof window.brStripInteractive === 'function')
+      ? window.brStripInteractive
+      : function (s) { return s; };
+    var pieces = [];
+    if (flags.partition) {
+      var pc = activeTab.querySelector('.cb-dop-partition-card');
+      if (pc) pieces.push(strip(portable(pc)));
+    }
+    if (flags.table) {
+      var tbl = activeTab.querySelector('.cb-dop-table');
+      if (tbl) pieces.push(strip(portable(tbl)));
+    }
+    if (flags.cluster) {
+      var cm = activeTab.querySelector('.cb-dop-cluster-wrap');
+      if (cm) pieces.push(strip(portable(cm)));
+    }
+    return pieces.join('');
+  }
+
+  function cbExecuteDopPin(panel, activeTab, flags, editor, asPng) {
+    if (typeof TurasPins === 'undefined') return;
+    var section = panel.closest('.br-element-section') || panel.parentNode;
+    var titleEl = section ? section.querySelector('.br-element-title') : null;
+    var baseTitle = titleEl ? titleEl.textContent.trim() : '';
+    var title = baseTitle ? baseTitle + ' — Duplication of Purchase'
+                          : 'Duplication of Purchase';
+    var html = cbCaptureDopHtml(activeTab, flags);
+    var insightText = (flags.insight && editor) ? editor.value.trim() : '';
+    var payload = {
+      sectionKey:  panel.id || 'dop',
+      title:       title,
+      chartSvg:    '',
+      tableHtml:   html,
+      insightText: insightText,
+      pinFlags:    { chart: false, table: !!html, insight: !!insightText },
+      pinMode:     'custom'
+    };
+    if (asPng) {
+      TurasPins.exportContentAsPNG(payload);
+    } else {
+      TurasPins.add(payload);
+      var pinBtn = section ? section.querySelector('.cb-toolbar-top .br-pin-btn') : null;
+      if (pinBtn) {
+        pinBtn.classList.add('pin-flash');
+        setTimeout(function () { pinBtn.classList.remove('pin-flash'); }, 600);
+      }
+    }
+  }
+
   function cbPinDialog(panel, pinBtn) {
     if (typeof TurasPins === 'undefined') return;
 
@@ -1327,6 +1721,17 @@
       return;
     }
 
+    /* DoP sub-tab — three independent elements (partition card, heatmap,
+       cluster map) plus optional insight. */
+    if (tabKey === 'dop') {
+      var dopBoxes = cbDetectDopCheckboxes(activeTab, hasInsight);
+      var anchorDop = pinBtn.closest('.br-section-toolbar') || pinBtn.parentElement;
+      TurasPins.showCheckboxPopover(pinBtn, dopBoxes, function (flags) {
+        cbExecuteDopPin(panel, activeTab, flags, editor, /*asPng=*/false);
+      }, anchorDop);
+      return;
+    }
+
     /* Detect available content in the active sub-tab only */
     var hasChart = false;
     var hasTable = false;
@@ -1339,9 +1744,6 @@
       var chartArea2 = activeTab.querySelector('.fn-rel-chart-area');
       hasChart = !!(chartArea2 && !chartArea2.hasAttribute('hidden'));
       hasTable = !!(activeTab.querySelector('.cb-rel-table'));
-    } else if (tabKey === 'dop') {
-      hasChart = false;
-      hasTable = !!(activeTab.querySelector('.cb-dop-table'));
     }
 
     /* Build checkbox list. available:true required by showCheckboxPopover to
@@ -1601,6 +2003,15 @@
       return;
     }
 
+    /* DoP sub-tab — partition card + heatmap + cluster map */
+    if (tabKey === 'dop') {
+      var dopBoxes = cbDetectDopCheckboxes(activeTab, hasInsight);
+      TurasPins.showCheckboxPopover(pngBtn, dopBoxes, function (flags) {
+        cbExecuteDopPin(panel, activeTab, flags, editor, /*asPng=*/true);
+      }, null, { title: 'EXPORT AS PNG', actionLabel: 'Export' });
+      return;
+    }
+
     /* Detect available content — mirrors cbPinDialog detection */
     var hasChart = false;
     var hasTable = false;
@@ -1613,9 +2024,6 @@
       var chartArea2 = activeTab.querySelector('.fn-rel-chart-area');
       hasChart = !!(chartArea2 && !chartArea2.hasAttribute('hidden'));
       hasTable = !!(activeTab.querySelector('.cb-rel-table'));
-    } else if (tabKey === 'dop') {
-      hasChart = false;
-      hasTable = !!(activeTab.querySelector('.cb-dop-table'));
     }
 
     function doExport(flags) {
