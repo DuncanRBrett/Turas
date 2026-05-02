@@ -2136,14 +2136,52 @@
       });
     }
 
-    // Cat avg segments (computed across ALL brands for consistency)
+    // Cat avg segments (computed across ALL brands for consistency).
+    //
+    // For "% aware" base, we POOL across brands instead of taking an
+    // unweighted mean of per-brand rescaled fractions. The unweighted mean
+    // is fragile: any brand with a very low aware_base gets a huge rescale
+    // factor (nTotal/aware_base), inflating its contribution and pushing
+    // the cross-brand mean far beyond 100% (the bug seen on the exported
+    // Brand Relationship slide where Cat avg row summed to 185%).
+    //
+    // Pooled formula:
+    //   cat_avg_aware[role] = sum_b(segments[b][role] * nTotal) / sum_b(aware_base[b])
+    // Conceptually: treat all (brand × respondent) cells as one bag and
+    // compute the fraction of that bag falling into each segment among
+    // aware respondents.
     var avgSegments = null;
     if (showAvg && allBrands.length > 0) {
       avgSegments = {};
-      REL_SEG_ROLES.forEach(function(role) {
-        var vals = allBrands.map(function(b) { return relPct(b, role, base, nTotal); });
-        avgSegments[role] = vals.reduce(function(s, v) { return s + v; }, 0) / vals.length;
-      });
+      var totalAware = 0;
+      allBrands.forEach(function(b) { totalAware += (b.aware_base || 0); });
+      if (base === "aware" && nTotal && totalAware > 0) {
+        REL_SEG_ROLES.forEach(function(role) {
+          var sumCount = 0;
+          allBrands.forEach(function(b) {
+            var seg = (b.segments && b.segments[role]) || 0;
+            sumCount += seg * nTotal;
+          });
+          avgSegments[role] = sumCount / totalAware;
+        });
+      } else {
+        // % total or no aware data — unweighted mean is fine here.
+        REL_SEG_ROLES.forEach(function(role) {
+          var vals = allBrands.map(function(b) { return relPct(b, role, base, nTotal); });
+          avgSegments[role] = vals.reduce(function(s, v) { return s + v; }, 0) / vals.length;
+        });
+      }
+      // Safety clamp: if the pooled values still exceed 100% in total
+      // (data anomaly — e.g. segment definitions overlap), normalise so
+      // the bar stays sensible. Keeps the relative shape, prevents the
+      // 185% nonsense from reaching the user.
+      var avgTotal = 0;
+      REL_SEG_ROLES.forEach(function(r) { avgTotal += (avgSegments[r] || 0); });
+      if (avgTotal > 1.05) {
+        REL_SEG_ROLES.forEach(function(r) {
+          avgSegments[r] = (avgSegments[r] || 0) / avgTotal;
+        });
+      }
     }
 
     // Max bar total for proportional track widths (total-base mode only)

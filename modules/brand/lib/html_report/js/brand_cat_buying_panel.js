@@ -980,13 +980,20 @@
       var isEmph = emphAll || (emph && emph[segCodes[i]] === true);
       var col    = isEmph ? colors[i] : 'rgba(148,163,184,0.18)';
       var txt    = v.toFixed(0) + '%';
-      /* Always show % inside the segment. Small (<8%) segments get a tighter
-         font & allow tiny overflow so e.g. "4%" remains readable. */
-      var tiny   = pct < 8;
-      var lblCls = 'fn-rel-seg-lbl' + (tiny ? ' fn-rel-seg-lbl-tiny' : '');
-      var inside = '<span class="' + lblCls + '" title="' + txt + '">' + txt + '</span>';
+      /* Render the % label INSIDE the segment for any segment ≥ 4% — below
+         that the track's overflow:hidden clips the label and we get the
+         garbled "%" artefact seen on the Purchase Distribution exports
+         (a 1% segment can't fit "1%" without spilling out of the track).
+         Tiny segments still get a hover tooltip via the title attribute on
+         the segment div so the value is recoverable. */
+      var tiny    = pct < 8;
+      var showLbl = pct >= 4;
+      var lblCls  = 'fn-rel-seg-lbl' + (tiny ? ' fn-rel-seg-lbl-tiny' : '');
+      var inside  = showLbl
+        ? '<span class="' + lblCls + '" title="' + txt + '">' + txt + '</span>'
+        : '';
       segHtml += '<div class="fn-rel-seg' + (tiny ? ' fn-rel-seg-tiny' : '') +
-                 '" style="width:' + pct.toFixed(1) + '%;background:' + col + ';">' +
+                 '" title="' + txt + '" style="width:' + pct.toFixed(1) + '%;background:' + col + ';">' +
                  inside + '</div>';
     });
 

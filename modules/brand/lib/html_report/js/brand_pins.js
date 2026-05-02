@@ -25,6 +25,7 @@
     '.cb-info-callout', '.cb-controls-bar',
     '.fn-controls', '.ma-controls', '.controls-bar',
     '.fn-pin-dropdown-btn', '.fn-pin-dropdown',
+    '.fn-rel-chart-controls',
     '.br-pin-btn', '.br-png-btn', '.br-export-btn', '.br-insight-toggle',
     '.fn-png-btn', '.ma-png-btn', '.fn-export-btn', '.ma-export-btn',
     '.toggle-label', '.sig-level-switcher',

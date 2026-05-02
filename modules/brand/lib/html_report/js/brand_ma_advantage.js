@@ -183,45 +183,64 @@
     function toY(v) { return mT + pH * (1 - (v + maAbsMax) / (2 * maAbsMax)); }
     function bR(s)  { return Math.max(4, Math.min(22, 4 + 18 * s / sizeRefMax)); }
 
+    /* Inline SVG presentation attributes act as a fallback for pin/PNG
+       capture: html2canvas only reliably renders SVG fills/strokes when
+       they are present as attributes on the element. Live CSS rules still
+       win during normal rendering (CSS > attributes), so the chart looks
+       identical on screen — but the captured PNG no longer ends up as a
+       solid black box when the stylesheet doesn't survive the export. */
+    var BUBBLE_FILL = {
+      defend:   'rgba(5, 150, 105, 0.78)',
+      build:    'rgba(220, 38, 38, 0.78)',
+      maintain: 'rgba(148, 163, 184, 0.78)',
+      na:       'rgba(226, 232, 240, 0.6)'
+    };
+    var BUBBLE_STROKE = {
+      defend:   '#047857',
+      build:    '#b91c1c',
+      maintain: '#64748b',
+      na:       '#cbd5e1'
+    };
+
     var parts = [];
-    parts.push('<rect class="ma-adv-q-bg" x="' + mL + '" y="' + mT + '" width="' + pW + '" height="' + pH + '"/>');
+    parts.push('<rect class="ma-adv-q-bg" fill="rgba(241, 245, 249, 0.5)" x="' + mL + '" y="' + mT + '" width="' + pW + '" height="' + pH + '"/>');
     var yZero = toY(0), yPos = toY(threshold), yNeg = toY(-threshold);
-    parts.push('<rect class="ma-adv-q-zone-defend" x="' + mL + '" y="' + mT + '" width="' + pW + '" height="' + (yPos - mT) + '"/>');
-    parts.push('<rect class="ma-adv-q-zone-build"  x="' + mL + '" y="' + yNeg + '" width="' + pW + '" height="' + (mT + pH - yNeg) + '"/>');
+    parts.push('<rect class="ma-adv-q-zone-defend" fill="rgba(5, 150, 105, 0.05)" x="' + mL + '" y="' + mT + '" width="' + pW + '" height="' + (yPos - mT) + '"/>');
+    parts.push('<rect class="ma-adv-q-zone-build"  fill="rgba(220, 38, 38, 0.05)" x="' + mL + '" y="' + yNeg + '" width="' + pW + '" height="' + (mT + pH - yNeg) + '"/>');
 
     // Grid + tick labels (X) — span the [xMin, xMax] range
     for (var xi = 0; xi <= 5; xi++) {
       var xv = xMin + (xMax - xMin) * xi / 5; var gx = toX(xv);
-      parts.push('<line class="ma-adv-q-grid" x1="' + gx + '" y1="' + mT + '" x2="' + gx + '" y2="' + (mT + pH) + '"/>');
-      parts.push('<text class="ma-adv-q-tick" x="' + gx + '" y="' + (mT + pH + 14) + '" text-anchor="middle">' + Math.round(xv) + '%</text>');
+      parts.push('<line class="ma-adv-q-grid" stroke="#eef2f7" stroke-width="1" x1="' + gx + '" y1="' + mT + '" x2="' + gx + '" y2="' + (mT + pH) + '"/>');
+      parts.push('<text class="ma-adv-q-tick" fill="#94a3b8" font-size="9" x="' + gx + '" y="' + (mT + pH + 14) + '" text-anchor="middle">' + Math.round(xv) + '%</text>');
     }
     // Y grid + ticks
     for (var yi = -2; yi <= 2; yi++) {
       var yv = (maAbsMax / 2) * yi; if (Math.abs(yv) > maAbsMax) continue;
       var gy = toY(yv);
-      parts.push('<line class="ma-adv-q-grid" x1="' + mL + '" y1="' + gy + '" x2="' + (mL + pW) + '" y2="' + gy + '"/>');
-      parts.push('<text class="ma-adv-q-tick" x="' + (mL - 6) + '" y="' + gy + '" text-anchor="end" dominant-baseline="middle">' + (yv >= 0 ? '+' : '') + yv.toFixed(0) + 'pp</text>');
+      parts.push('<line class="ma-adv-q-grid" stroke="#eef2f7" stroke-width="1" x1="' + mL + '" y1="' + gy + '" x2="' + (mL + pW) + '" y2="' + gy + '"/>');
+      parts.push('<text class="ma-adv-q-tick" fill="#94a3b8" font-size="9" x="' + (mL - 6) + '" y="' + gy + '" text-anchor="end" dominant-baseline="middle">' + (yv >= 0 ? '+' : '') + yv.toFixed(0) + 'pp</text>');
     }
 
     // Vertical mean-x divider (the X-axis equivalent of the zero-MA line)
     var xMeanPx = toX(xMean);
-    parts.push('<line class="ma-adv-q-vmid" x1="' + xMeanPx + '" y1="' + mT + '" x2="' + xMeanPx + '" y2="' + (mT + pH) + '"/>');
-    parts.push('<text class="ma-adv-q-vmid-label" x="' + (xMeanPx + 4) + '" y="' + (mT + pH - 6) + '">avg (' + xMean.toFixed(0) + '%)</text>');
+    parts.push('<line class="ma-adv-q-vmid" stroke="#475569" stroke-width="1.6" stroke-dasharray="4 3" opacity="0.65" x1="' + xMeanPx + '" y1="' + mT + '" x2="' + xMeanPx + '" y2="' + (mT + pH) + '"/>');
+    parts.push('<text class="ma-adv-q-vmid-label" fill="#475569" font-size="9" font-weight="600" x="' + (xMeanPx + 4) + '" y="' + (mT + pH - 6) + '">avg (' + xMean.toFixed(0) + '%)</text>');
 
     // Horizontal zero + threshold lines
-    parts.push('<line class="ma-adv-q-zero"   x1="' + mL + '" y1="' + yZero + '" x2="' + (mL + pW) + '" y2="' + yZero + '"/>');
-    parts.push('<line class="ma-adv-q-thresh" x1="' + mL + '" y1="' + yPos + '" x2="' + (mL + pW) + '" y2="' + yPos + '"/>');
-    parts.push('<line class="ma-adv-q-thresh" x1="' + mL + '" y1="' + yNeg + '" x2="' + (mL + pW) + '" y2="' + yNeg + '"/>');
+    parts.push('<line class="ma-adv-q-zero"   stroke="#475569" stroke-width="1.6" x1="' + mL + '" y1="' + yZero + '" x2="' + (mL + pW) + '" y2="' + yZero + '"/>');
+    parts.push('<line class="ma-adv-q-thresh" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="5 4" x1="' + mL + '" y1="' + yPos + '" x2="' + (mL + pW) + '" y2="' + yPos + '"/>');
+    parts.push('<line class="ma-adv-q-thresh" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="5 4" x1="' + mL + '" y1="' + yNeg + '" x2="' + (mL + pW) + '" y2="' + yNeg + '"/>');
 
     // Axes + axis labels + zone labels
-    parts.push('<line class="ma-adv-q-axis" x1="' + mL + '" y1="' + mT + '" x2="' + mL + '" y2="' + (mT + pH) + '"/>');
-    parts.push('<line class="ma-adv-q-axis" x1="' + mL + '" y1="' + (mT + pH) + '" x2="' + (mL + pW) + '" y2="' + (mT + pH) + '"/>');
-    parts.push('<text class="ma-adv-q-axis-label" x="' + (mL + pW / 2) + '" y="' + (height - 6) + '" text-anchor="middle">' + escHtml(xLabel) + '</text>');
-    parts.push('<text class="ma-adv-q-axis-label" transform="rotate(-90 ' + (mL - 44) + ' ' + (mT + pH / 2) + ')" x="' + (mL - 44) + '" y="' + (mT + pH / 2) + '" text-anchor="middle">Mental Advantage (pp)</text>');
-    parts.push('<text class="ma-adv-q-zone-label" x="' + (mL + pW - 6) + '" y="' + (mT + 14) + '" text-anchor="end">DEFEND</text>');
-    parts.push('<text class="ma-adv-q-zone-label" x="' + (mL + 6) + '" y="' + (mT + 14) + '">AMPLIFY</text>');
-    parts.push('<text class="ma-adv-q-zone-label" x="' + (mL + pW - 6) + '" y="' + (mT + pH - 6) + '" text-anchor="end">BUILD</text>');
-    parts.push('<text class="ma-adv-q-zone-label" x="' + (mL + 6) + '" y="' + (mT + pH - 6) + '">LOW PRIORITY</text>');
+    parts.push('<line class="ma-adv-q-axis" stroke="#94a3b8" stroke-width="1.5" x1="' + mL + '" y1="' + mT + '" x2="' + mL + '" y2="' + (mT + pH) + '"/>');
+    parts.push('<line class="ma-adv-q-axis" stroke="#94a3b8" stroke-width="1.5" x1="' + mL + '" y1="' + (mT + pH) + '" x2="' + (mL + pW) + '" y2="' + (mT + pH) + '"/>');
+    parts.push('<text class="ma-adv-q-axis-label" fill="#475569" font-size="11" font-weight="600" x="' + (mL + pW / 2) + '" y="' + (height - 6) + '" text-anchor="middle">' + escHtml(xLabel) + '</text>');
+    parts.push('<text class="ma-adv-q-axis-label" fill="#475569" font-size="11" font-weight="600" transform="rotate(-90 ' + (mL - 44) + ' ' + (mT + pH / 2) + ')" x="' + (mL - 44) + '" y="' + (mT + pH / 2) + '" text-anchor="middle">Mental Advantage (pp)</text>');
+    parts.push('<text class="ma-adv-q-zone-label" fill="#94a3b8" font-size="9" font-weight="700" x="' + (mL + pW - 6) + '" y="' + (mT + 14) + '" text-anchor="end">DEFEND</text>');
+    parts.push('<text class="ma-adv-q-zone-label" fill="#94a3b8" font-size="9" font-weight="700" x="' + (mL + 6) + '" y="' + (mT + 14) + '">AMPLIFY</text>');
+    parts.push('<text class="ma-adv-q-zone-label" fill="#94a3b8" font-size="9" font-weight="700" x="' + (mL + pW - 6) + '" y="' + (mT + pH - 6) + '" text-anchor="end">BUILD</text>');
+    parts.push('<text class="ma-adv-q-zone-label" fill="#94a3b8" font-size="9" font-weight="700" x="' + (mL + 6) + '" y="' + (mT + pH - 6) + '">LOW PRIORITY</text>');
 
     // Bubbles — store position + payload index for hover lookup
     var labelCandidates = [];
@@ -229,9 +248,15 @@
       // Skip points outside the configured x-range (so manual zoom works).
       if (p.x < xMin || p.x > xMax) return;
       var cx = toX(p.x), cy = toY(p.ma), r2 = bR(p.size);
-      var cls = 'ma-adv-q-bubble ma-adv-q-bubble-' + (p.decision || 'na');
+      var decKey = p.decision || 'na';
+      var cls = 'ma-adv-q-bubble ma-adv-q-bubble-' + decKey;
       if (p.isSig) cls += ' ma-adv-q-bubble-sig';
-      parts.push('<circle class="' + cls + '" cx="' + cx + '" cy="' + cy + '" r="' + r2 +
+      var bFill   = BUBBLE_FILL[decKey]   || BUBBLE_FILL.na;
+      var bStroke = BUBBLE_STROKE[decKey] || BUBBLE_STROKE.na;
+      var bSW     = p.isSig ? '2.5' : '1.5';
+      parts.push('<circle class="' + cls + '" fill="' + bFill +
+                 '" stroke="' + bStroke + '" stroke-width="' + bSW +
+                 '" cx="' + cx + '" cy="' + cy + '" r="' + r2 +
                  '" data-ma-adv-bubble-idx="' + i + '"></circle>');
       labelCandidates.push({ idx: i, cx: cx, cy: cy, r: r2, p: p });
     });
@@ -257,7 +282,7 @@
       });
       if (collides) continue;
       placed.push(box);
-      parts.push('<text class="ma-adv-q-label" x="' + lblX + '" y="' + (cy + 3) + '" text-anchor="' + anchor + '">' + escHtml(lc.p.label) + '</text>');
+      parts.push('<text class="ma-adv-q-label" fill="#1e293b" font-size="10" x="' + lblX + '" y="' + (cy + 3) + '" text-anchor="' + anchor + '">' + escHtml(lc.p.label) + '</text>');
     }
 
     svg.innerHTML = parts.join('');

@@ -1461,9 +1461,12 @@
     for (var g = 0; g <= gridSteps; g++) {
       var gv = maxVal * g / gridSteps;
       var gx = xZero + xScale * g / gridSteps;
-      parts.push('<line class="ma-bar-gridline" x1="' + gx + '" y1="' + marginTop +
+      /* Inline SVG presentation attrs as fallback for pin/PNG capture —
+         html2canvas drops CSS-class-only fills/strokes, so without these
+         attributes the chart renders blank or with default black strokes. */
+      parts.push('<line class="ma-bar-gridline" stroke="#f1f5f9" stroke-width="1" x1="' + gx + '" y1="' + marginTop +
                  '" x2="' + gx + '" y2="' + (dataAreaH - marginBottom) + '"/>');
-      parts.push('<text class="ma-bar-label" x="' + gx + '" y="' + (dataAreaH - marginBottom + 14) +
+      parts.push('<text class="ma-bar-label" fill="#334155" font-size="11" x="' + gx + '" y="' + (dataAreaH - marginBottom + 14) +
                  '" text-anchor="middle">' + Math.round(gv) + '%</text>');
     }
 
@@ -1482,7 +1485,7 @@
       var tspans = lblLines.map(function(line, li) {
         return '<tspan x="' + (xZero - 10) + '" y="' + (startY + li * lineH) + '">' + escHtml(line) + '</tspan>';
       });
-      parts.push('<text class="ma-bar-group-label" text-anchor="end">' + tspans.join('') + '</text>');
+      parts.push('<text class="ma-bar-group-label" fill="#1e293b" font-size="12" font-weight="600" text-anchor="end">' + tspans.join('') + '</text>');
 
       parts.push('<line x1="' + xZero + '" y1="' + dotCY + '" x2="' + xEnd + '" y2="' + dotCY +
                  '" stroke="#eef2f7" stroke-width="1"/>');
@@ -1490,7 +1493,10 @@
       var avg = block.stim_avg ? block.stim_avg[r.idx] : null;
       if (avg != null && !isNaN(avg) && baseMode === 'total') {
         var ax = xZero + xScale * avg / maxVal;
-        parts.push('<line class="ma-bar-cat-avg" x1="' + ax + '" y1="' + (rowTop + 4) +
+        /* Inline stroke + dasharray ensures the cat-avg line survives
+           html2canvas capture (PNG export). The class is kept so live
+           hover/styling continue to work via CSS. */
+        parts.push('<line class="ma-bar-cat-avg" stroke="#64748b" stroke-width="1.5" stroke-dasharray="3 3" x1="' + ax + '" y1="' + (rowTop + 4) +
                    '" x2="' + ax + '" y2="' + (rowTop + rowH - 4) + '">' +
                    '<title>Cat avg: ' + avg.toFixed(0) + '%</title></line>');
       }
@@ -1531,7 +1537,7 @@
       }
     });
 
-    parts.push('<line class="ma-bar-axis" x1="' + xZero + '" y1="' + marginTop +
+    parts.push('<line class="ma-bar-axis" stroke="#cbd5e1" stroke-width="1" x1="' + xZero + '" y1="' + marginTop +
                '" x2="' + xZero + '" y2="' + (dataAreaH - marginBottom) + '"/>');
 
     // SVG legend
