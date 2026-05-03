@@ -98,10 +98,16 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
        </th>',
       cls, .demo_table_esc(bc), .demo_table_esc(col), .demo_table_esc(bl))
   }, character(1L))
+  # Focal column header carries the actual brand name so the table reads
+  # naturally and pinned cards remain self-explanatory.
+  focal_label <- focal_brand
+  fi <- match(focal_brand, brand_codes)
+  if (!is.na(fi)) focal_label <- brand_labels[fi]
   paste0(
     '<thead><tr>',
     '<th>Option</th>',
-    '<th class="demo-col-focal" data-demo-col="focal">Focal</th>',
+    sprintf('<th class="demo-col-focal" data-demo-col="focal">%s<span class="demo-th-sub">focal</span></th>',
+            .demo_table_esc(focal_label)),
     '<th class="demo-col-catavg" data-demo-col="catavg">Cat avg</th>',
     paste(brand_th, collapse = ""),
     '</tr></thead>'

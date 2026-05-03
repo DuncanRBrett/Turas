@@ -60,8 +60,11 @@ test_that("matrix table places focal brand in column 2 and lists all brands", {
     brand_colours = list(BR_A = "#1A5276", BR_B = "#A04000"),
     panel_data = pd, decimal_places = 0L)
 
-  # Column order: Option | Focal | Cat avg | Brand A (with focal class) | Brand B
-  expect_match(html, '<th class="demo-col-focal" data-demo-col="focal">Focal</th>')
+  # Column order: Option | <focal-brand-name> | Cat avg | Brand A (with focal class) | Brand B
+  # Focal column header now carries the actual brand label (the test
+  # fixture maps BR_A -> "Brand A") plus a small "focal" subtitle.
+  expect_match(html, '<th class="demo-col-focal" data-demo-col="focal">Brand A<span class="demo-th-sub">focal</span></th>',
+               fixed = TRUE)
   expect_match(html, '<th class="demo-col-catavg" data-demo-col="catavg">Cat avg</th>')
   expect_match(html, 'data-demo-brand="BR_A"', fixed = TRUE)
   expect_match(html, 'data-demo-brand="BR_B"', fixed = TRUE)

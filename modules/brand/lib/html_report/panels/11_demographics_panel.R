@@ -125,6 +125,13 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 }
 .demo-focal-select:focus { outline: 2px solid __FOCAL__; outline-offset: 1px; }
 
+.demo-all-toggle {
+  background: #fff; border: 1px solid #cbd5e1; border-radius: 14px;
+  padding: 4px 11px; font-size: 11px; color: #475569; cursor: pointer;
+  margin-left: 6px;
+}
+.demo-all-toggle:hover { background: #f1f5f9; border-color: #94a3b8; }
+
 .demo-card-grid { display: flex; flex-direction: column; gap: 16px; }
 .demo-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 2px rgba(0,0,0,.03); position: relative; }
 .demo-card.hidden { display: none; }
@@ -142,15 +149,42 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 .demo-card-tool.active { background: __FOCAL__; border-color: __FOCAL__; color: #fff; }
 .demo-card-tool.pin-flash { background: __FOCAL__; border-color: __FOCAL__; color: #fff; }
 
-/* Matrix table */
+/* Matrix table — matches the brand-panel convention used by Cat Buying,
+   Funnel and the MA focal view: dark navy header, white text, tabular
+   numerics, left-aligned label column. */
 .demo-matrix-wrap { overflow-x: auto; }
-.demo-matrix { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 480px; }
-.demo-matrix th, .demo-matrix td { padding: 6px 9px; border-bottom: 1px solid #f1f5f9; text-align: right; vertical-align: middle; }
-.demo-matrix th { font-weight: 600; color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; background: #fafbfc; }
-.demo-matrix th:first-child, .demo-matrix td:first-child { text-align: left; color: #1e293b; font-weight: 500; }
-.demo-col-focal { background: rgba(26, 82, 118, 0.06); font-weight: 600; color: __FOCAL__; }
-.demo-col-catavg { background: #fafbfc; font-style: italic; color: #475569; }
-.demo-col-ci { color: #94a3b8; font-size: 11px; }
+.demo-matrix {
+  width: 100%; border-collapse: collapse; font-size: 12.5px;
+  min-width: 480px; font-variant-numeric: tabular-nums;
+  color: #1e293b;
+}
+.demo-matrix thead th {
+  background: #1f2a44; color: #fff; font-weight: 600;
+  padding: 9px 10px; text-align: center; vertical-align: middle;
+  font-size: 11.5px; letter-spacing: 0.2px; line-height: 1.3;
+  white-space: normal; min-width: 80px;
+}
+.demo-matrix thead th:first-child {
+  text-align: left; padding-left: 14px; min-width: 140px;
+}
+.demo-matrix thead th .demo-brand-chip-swatch {
+  background: rgba(255,255,255,0.85); border: 1px solid rgba(255,255,255,0.6);
+}
+.demo-matrix thead th .demo-th-sub {
+  display: block; font-weight: 400; font-size: 10px; color: #cbd5e1;
+  margin-top: 2px; text-transform: none;
+}
+.demo-matrix tbody td {
+  padding: 7px 10px; border-bottom: 1px solid #eef0f3;
+  text-align: center; vertical-align: middle;
+}
+.demo-matrix tbody td:first-child {
+  text-align: left; padding-left: 14px;
+  color: #1e293b; font-weight: 500;
+}
+.demo-matrix tbody tr:nth-child(even) td { background: #fafbfc; }
+.demo-col-focal { background: rgba(26, 82, 118, 0.08) !important; font-weight: 600; color: __FOCAL__; }
+.demo-col-catavg { color: #475569; font-style: italic; background: #f5f7fb !important; }
 .demo-cell-n { font-size: 10px; color: #94a3b8; margin-left: 4px; font-weight: normal; }
 .demo-na { color: #cbd5e1; font-style: italic; }
 
@@ -239,7 +273,8 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 
 # Brand-visibility chips — colour-coded, click to hide that brand's matrix
 # column. The focal brand is included so users can hide it too if they want
-# to compare competitors only.
+# to compare competitors only. A trailing "Hide all" toggles every brand
+# chip off / on (mirrors the Funnel + MA panel pattern).
 .demo_panel_brand_chips <- function(pd, brand_cols) {
   bcs <- pd$brands$codes  %||% character(0)
   bls <- pd$brands$labels %||% bcs
@@ -256,6 +291,7 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
     '<div class="demo-chip-row">',
     '<span class="demo-chip-row-label">Brands shown:</span>',
     paste(chips, collapse = ""),
+    '<button type="button" class="demo-all-toggle" data-demo-action="toggleall">Hide all</button>',
     '</div>')
 }
 
