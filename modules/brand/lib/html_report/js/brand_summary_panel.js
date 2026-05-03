@@ -202,13 +202,18 @@
       body.innerHTML = '<div class="brsum-card-empty">Category context not available.</div>';
       return;
     }
-    /* Spec: avg purchases per category buyer, avg repertoire size, plus
-       top channel and top pack when shopper data is present. */
+    /* Eight category-level metrics, sourced from funnel + mental availability
+       + cat_buying + shopper engines. Each row only renders when its source
+       engine produced data; the card is hidden if every row is missing. */
     var rows = [];
-    if (ctx.avg_purchases) rows.push(statRow('Avg purchases / buyer', ctx.avg_purchases.value, ctx.avg_purchases.sub));
-    if (ctx.avg_brands)    rows.push(statRow('Avg repertoire size',   ctx.avg_brands.value,    ctx.avg_brands.sub));
-    if (ctx.top_channel)   rows.push(statRow('Top channel',           ctx.top_channel.value,   ctx.top_channel.sub));
-    if (ctx.top_pack)      rows.push(statRow('Top pack size',         ctx.top_pack.value,      ctx.top_pack.sub));
+    if (ctx.avg_aware_brands)    rows.push(statRow('Avg awareness',     ctx.avg_aware_brands.value,    ctx.avg_aware_brands.sub));
+    if (ctx.avg_consider_brands) rows.push(statRow('Avg consideration', ctx.avg_consider_brands.value, ctx.avg_consider_brands.sub));
+    if (ctx.avg_p12m_brands)     rows.push(statRow('Avg buying (long)', ctx.avg_p12m_brands.value,     ctx.avg_p12m_brands.sub));
+    if (ctx.avg_p3m_brands)      rows.push(statRow('Avg buying (3m)',   ctx.avg_p3m_brands.value,      ctx.avg_p3m_brands.sub));
+    if (ctx.avg_ceps)            rows.push(statRow('Avg CEPs',          ctx.avg_ceps.value,            ctx.avg_ceps.sub));
+    if (ctx.avg_purchases)       rows.push(statRow('Avg purchases',     ctx.avg_purchases.value,       ctx.avg_purchases.sub));
+    if (ctx.top_channel)         rows.push(statRow('Top channel',       ctx.top_channel.value,         ctx.top_channel.sub));
+    if (ctx.top_pack)            rows.push(statRow('Top pack size',     ctx.top_pack.value,            ctx.top_pack.sub));
     if (rows.length === 0) {
       body.innerHTML = '<div class="brsum-card-empty">Category context metrics not available.</div>';
       return;

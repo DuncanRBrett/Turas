@@ -1163,12 +1163,67 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 }
 
 
-# Per-category context: 4 chips. Returns NULL fields when source is missing.
+# Per-category context: eight category-level metrics.
+# Brand-count metrics (avg # of brands at each funnel stage) sum the
+# weighted per-brand penetrations — pct_weighted is in 0..1 so the sum
+# is directly the average count of brands per respondent at that stage.
+# Avg CEPs per respondent sums cep_penetration percentages and divides
+# by 100. Returns NULL fields when the upstream engine didn't run.
 .brsum_context_for_cat <- function(cr) {
-  ctx <- list(avg_purchases = NULL, avg_brands = NULL,
-              top_channel = NULL, top_pack = NULL)
+  ctx <- list(
+    avg_aware_brands     = NULL,
+    avg_consider_brands  = NULL,
+    avg_p12m_brands      = NULL,
+    avg_p3m_brands       = NULL,
+    avg_ceps             = NULL,
+    avg_purchases        = NULL,
+    top_channel          = NULL,
+    top_pack             = NULL
+  )
 
-  # Avg purchases per category buyer (from cat_buying_frequency)
+  # ---- Brand counts per funnel stage (weighted)
+  fn <- cr$funnel
+  if (!is.null(fn) && !identical(fn$status, "REFUSED") &&
+      !is.null(fn$stages) && nrow(fn$stages) > 0) {
+    st <- fn$stages
+    .stage_brand_count <- function(key) {
+      vals <- as.numeric(st$pct_weighted[st$stage_key == key])
+      if (length(vals) == 0) return(NA_real_)
+      sum(vals, na.rm = TRUE)
+    }
+    aware_n <- .stage_brand_count("aware")
+    cons_n  <- .stage_brand_count("consideration")
+    p12m_n  <- .stage_brand_count("bought_long")
+    p3m_n   <- .stage_brand_count("bought_target")
+    if (!is.na(aware_n) && is.finite(aware_n))
+      ctx$avg_aware_brands <- list(value = sprintf("%.1f", aware_n),
+                                    sub = "brands aware (avg / respondent)")
+    if (!is.na(cons_n) && is.finite(cons_n))
+      ctx$avg_consider_brands <- list(value = sprintf("%.1f", cons_n),
+                                       sub = "brands considered (avg / respondent)")
+    if (!is.na(p12m_n) && is.finite(p12m_n))
+      ctx$avg_p12m_brands <- list(value = sprintf("%.1f", p12m_n),
+                                   sub = "brands bought long period (avg / respondent)")
+    if (!is.na(p3m_n) && is.finite(p3m_n))
+      ctx$avg_p3m_brands <- list(value = sprintf("%.1f", p3m_n),
+                                  sub = "brands bought target period (avg / respondent)")
+  }
+
+  # ---- Avg CEPs per respondent
+  # cep_penetration carries Penetration_Pct per CEP (0..100); summing
+  # gives the average count of CEPs each respondent has linked to *any*
+  # brand. Divide by 100 to convert from % share to count.
+  ma <- cr$mental_availability
+  if (!is.null(ma) && !is.null(ma$cep_penetration) &&
+      nrow(ma$cep_penetration) > 0) {
+    avg_ceps <- sum(as.numeric(ma$cep_penetration$Penetration_Pct),
+                     na.rm = TRUE) / 100
+    if (is.finite(avg_ceps))
+      ctx$avg_ceps <- list(value = sprintf("%.1f", avg_ceps),
+                            sub = "CEPs per respondent (avg)")
+  }
+
+  # ---- Avg purchases per respondent in the target period
   cbf <- cr$cat_buying_frequency
   if (!is.null(cbf) && !identical(cbf$status, "REFUSED") &&
       !is.null(cbf$mean_freq) && !is.na(cbf$mean_freq)) {
@@ -1178,17 +1233,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
     )
   }
 
-  # Avg brands per category buyer (mean_repertoire)
-  rep <- cr$repertoire
-  if (!is.null(rep) && !identical(rep$status, "REFUSED") &&
-      !is.null(rep$mean_repertoire) && !is.na(rep$mean_repertoire)) {
-    ctx$avg_brands <- list(
-      value = sprintf("%.1f", rep$mean_repertoire),
-      sub   = "brands per buyer"
-    )
-  }
-
-  # Top channel (shopper_location$top)
+  # ---- Top channel
   loc <- cr$shopper_location
   if (!is.null(loc) && !identical(loc$status, "REFUSED") &&
       !is.null(loc$top$label) && nzchar(loc$top$label)) {
@@ -1199,7 +1244,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
     )
   }
 
-  # Top pack (shopper_packsize$top)
+  # ---- Top pack
   pak <- cr$shopper_packsize
   if (!is.null(pak) && !identical(pak$status, "REFUSED") &&
       !is.null(pak$top$label) && nzchar(pak$top$label)) {
