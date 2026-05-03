@@ -9,17 +9,37 @@
         "executive_summary",
         "dba",
         "portfolio",
+        "portfolio / overview",
+        "portfolio / footprint",
+        "portfolio / constellation",
+        "portfolio / clutter",
+        "portfolio / extension",
+        "pinned",
         "about",
         "funnel",
+        "funnel / summary",
+        "funnel / relationship",
         "mental_availability",
-        "mental_advantage",
+        "mental_availability / attributes",
+        "mental_availability / ceps",
+        "mental_availability / advantage",
+        "mental_availability / metrics",
         "repertoire",
         "drivers_barriers",
         "wom",
         "cat_buying",
+        "cat_buying / context",
+        "cat_buying / brands",
+        "cat_buying / loyalty",
+        "cat_buying / dist",
+        "cat_buying / dop",
+        "cat_buying / shopper",
         "branded_reach",
         "demographics",
         "audience_lens",
+        "audience_lens / banner",
+        "audience_lens / audiences",
+        "audience_lens / pairs",
         "ad_hoc"
       ],
       "confidence": [
@@ -31,7 +51,7 @@
         "Summary"
       ]
     },
-    "pages_help": "Per-module list of canonical page names that appear in the Add Callout dropdown. Page = which top-level tab the callout sits on. Use 'parent / child' for a sub-tab. Pages get auto-added when an editor types a new value, but seeding the list here keeps name conventions consistent across reports."
+    "pages_help": "Per-module canonical page list shown in the Add Callout / Edit Page-Tab dropdown. Page = which top-level tab the callout sits on. Sub-tabs use a 'parent / child' slash separator so the editor can show the hierarchy. Pages get auto-added when an editor types a new value, but seeding the list here keeps name conventions consistent across reports. Audit source: data-tab / data-*-subtab attributes in modules/<module>/lib/html_report/panels/."
   },
   "keydriver": {
     "shapley_importance": {
