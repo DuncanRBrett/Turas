@@ -2,7 +2,36 @@
   "_meta": {
     "version": "1.0.0",
     "description": "Centralised callout text for all Turas HTML reports. Edit text here to update all reports at next generation. Callouts are educational guidance that help non-statisticians interpret results. They appear in reports but NOT in pinned views or exports.",
-    "format": "title: short heading shown in callout header. text: main body (plain text or simple HTML). context: where this appears in the report. page: which report tab/page this callout appears on."
+    "format": "title: short heading shown in callout header. text: main body (plain text or simple HTML). context: where this appears in the report. page: which report tab/page this callout appears on.",
+    "pages": {
+      "brand": [
+        "summary",
+        "executive_summary",
+        "dba",
+        "portfolio",
+        "about",
+        "funnel",
+        "mental_availability",
+        "mental_advantage",
+        "repertoire",
+        "drivers_barriers",
+        "wom",
+        "cat_buying",
+        "branded_reach",
+        "demographics",
+        "audience_lens",
+        "ad_hoc"
+      ],
+      "confidence": [
+        "Method Notes",
+        "Summary"
+      ],
+      "tabs": [
+        "Crosstabs",
+        "Summary"
+      ]
+    },
+    "pages_help": "Per-module list of canonical page names that appear in the Add Callout dropdown. Page = which top-level tab the callout sits on. Use 'parent / child' for a sub-tab. Pages get auto-added when an editor types a new value, but seeding the list here keeps name conventions consistent across reports."
   },
   "keydriver": {
     "shapley_importance": {

@@ -79,6 +79,40 @@ run_callout_editor_gui <- function() {
 
   `%||%` <- function(a, b) if (is.null(a)) b else a
 
+  # --- Page choices for a module ----------------------------------------
+  # Returns the union of:
+  #   (a) the canonical seed list at reg$_meta$pages[[module]]
+  #   (b) any pages that show up in existing callout entries for this
+  #       module (so user-added values from the past stay discoverable
+  #       even if not yet promoted into _meta.pages)
+  # Sorted, deduped, NA/empty stripped. Used for both the Add Callout
+  # modal and the Edit panel page picker.
+  pages_for_module <- function(reg, module) {
+    seed <- reg[["_meta"]]$pages[[module]] %||% list()
+    seed_v <- vapply(seed, function(x) as.character(x %||% ""), character(1))
+    df <- flatten_registry(reg)
+    used <- if (nrow(df) > 0) {
+      df$page[df$module == module]
+    } else character(0)
+    pages <- unique(c(seed_v, used))
+    pages <- pages[nzchar(pages)]
+    sort(pages)
+  }
+
+  # Append a new page to reg$_meta$pages[[module]] when an editor types
+  # one that isn't already there. Returns the (possibly mutated) reg.
+  remember_page <- function(reg, module, page) {
+    page <- trimws(page %||% "")
+    if (!nzchar(page) || !nzchar(module)) return(reg)
+    if (is.null(reg[["_meta"]])) reg[["_meta"]] <- list()
+    if (is.null(reg[["_meta"]]$pages)) reg[["_meta"]]$pages <- list()
+    cur <- reg[["_meta"]]$pages[[module]] %||% list()
+    cur_v <- vapply(cur, function(x) as.character(x %||% ""), character(1))
+    if (page %in% cur_v) return(reg)
+    reg[["_meta"]]$pages[[module]] <- as.list(c(cur_v, page))
+    reg
+  }
+
   # ============================================================================
   # UI
   # ============================================================================
@@ -309,17 +343,19 @@ run_callout_editor_gui <- function() {
           div(class = "ce-field-row",
             div(class = "ce-field", style = "flex: 1;",
               tags$label("Page / Tab", class = "ce-label"),
-              # Selectize so existing pages for this module surface as a
-              # dropdown; create=TRUE lets the user type a brand-new
-              # page name (or sub-page using "parent / child").
+              # Selectize so the canonical seed pages for this module
+              # (_meta.pages[module]) plus any other pages already used
+              # in the registry surface as a dropdown. create=TRUE lets
+              # the user type a brand-new page name (or sub-page using
+              # "parent / child"); confirm_save will remember it via
+              # remember_page() so it appears in future dropdowns.
               selectizeInput("edit_page", NULL,
                              choices = {
-                               df_all <- flatten_registry(reg)
-                               existing <- sort(unique(
-                                 df_all$page[df_all$module == sel$module &
-                                              nzchar(df_all$page)]))
+                               existing <- pages_for_module(reg, sel$module)
                                cur <- entry$page %||% ""
-                               c("", union(existing, if (nzchar(cur)) cur))
+                               vals <- c("", union(existing,
+                                                    if (nzchar(cur)) cur))
+                               vals
                              },
                              selected = entry$page %||% "",
                              multiple = FALSE,
@@ -380,12 +416,16 @@ run_callout_editor_gui <- function() {
       if (is.null(sel)) return()
 
       reg <- registry()
+      page <- trimws(input$edit_page %||% "")
       reg[[sel$module]][[sel$key]] <- list(
         title = input$edit_title %||% "",
         text = input$edit_text %||% "",
         context = input$edit_context %||% "",
-        page = input$edit_page %||% ""
+        page = page
       )
+      # Remember any newly-typed page so it appears in the dropdown next
+      # time someone opens this module.
+      reg <- remember_page(reg, sel$module, page)
 
       write_registry(reg)
       registry(reg)
@@ -444,10 +484,7 @@ run_callout_editor_gui <- function() {
       # Pre-compute the page list for the default module so the Page
       # picker has options on first paint. The picker also updates
       # reactively in observeEvent(input$new_module) below.
-      df0 <- flatten_registry(reg)
-      page_choices <- if (default_mod %in% df0$module) {
-        sort(unique(df0$page[df0$module == default_mod & nzchar(df0$page)]))
-      } else character(0)
+      page_choices <- pages_for_module(reg, default_mod)
 
       showModal(modalDialog(
         title = "Add New Callout",
@@ -463,7 +500,8 @@ run_callout_editor_gui <- function() {
           ),
           # Page picker — selectize with create=TRUE so the user can
           # either pick an existing page for this module or type a new
-          # one. Hint text explains the convention.
+          # one. Choices come from _meta.pages[module] plus any pages
+          # already in use, so the analyst doesn't have to guess names.
           selectizeInput("new_page", "Page / Tab",
                          choices = page_choices,
                          selected = NULL,
@@ -471,16 +509,22 @@ run_callout_editor_gui <- function() {
                          width = "100%",
                          options = list(
                            create = TRUE,
-                           placeholder = "Pick an existing page or type a new one",
+                           placeholder = "Pick a page from the list, or type a new one",
                            allowEmptyOption = TRUE
                          )),
           tags$p(class = "ce-add-hint",
-                 "Existing pages for the chosen module appear in the dropdown. ",
-                 "Type a new value to register it. Use a slash (e.g. ",
-                 tags$code("funnel / relationship"), ") for sub-pages."),
+                 tags$strong("Page"), " = which top-level tab the callout sits on (",
+                 tags$code("funnel"), ", ", tags$code("mental_availability"),
+                 ", ", tags$code("executive_summary"), "...). ",
+                 "Use ", tags$code("parent / child"),
+                 " for a sub-tab. ",
+                 tags$strong("Context"),
+                 " describes where on the page (e.g. ",
+                 tags$code("Brand attitude card"), "). ",
+                 "Typing a new page name here adds it to the dropdown for next time."),
           textInput("new_context", "Context",
                     width = "100%",
-                    placeholder = "Where on the page? (e.g. 'Bottom callout')"),
+                    placeholder = "Where on the page? (e.g. 'Brand attitude card')"),
           textInput("new_key", "Callout key", width = "100%",
                     placeholder = "e.g. method_explanation (snake_case)"),
           textInput("new_title", "Title", width = "100%",
@@ -494,17 +538,14 @@ run_callout_editor_gui <- function() {
     })
 
     # Refresh the Page dropdown when the user changes Module inside the
-    # Add Callout modal — pages are scoped to a module.
+    # Add Callout modal — pages are scoped to a module. Uses the shared
+    # pages_for_module() helper so the seed list in _meta.pages and any
+    # previously-typed pages both surface.
     observeEvent(input$new_module, {
       reg <- registry()
       mod <- input$new_module
       if (is.null(mod)) return()
-      df <- flatten_registry(reg)
-      if (mod == "__new__") {
-        page_choices <- character(0)
-      } else {
-        page_choices <- sort(unique(df$page[df$module == mod & nzchar(df$page)]))
-      }
+      page_choices <- if (mod == "__new__") character(0) else pages_for_module(reg, mod)
       updateSelectizeInput(session, "new_page",
                            choices = page_choices,
                            selected = "",
@@ -546,6 +587,9 @@ run_callout_editor_gui <- function() {
         context = context,
         page = page
       )
+      # Persist any newly-typed page into _meta.pages so future Add
+      # Callout dialogs surface it in the dropdown.
+      reg <- remember_page(reg, mod_name, page)
 
       write_registry(reg)
       registry(reg)
