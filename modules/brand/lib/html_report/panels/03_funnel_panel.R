@@ -69,14 +69,14 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
     '<div class="fn-subtab" data-fn-subtab="funnel">',
       .fn_table_controls(panel_data),
       .fn_table_section(panel_data, focal_colour),
+      '<div class="fn-mf-section-heading">Mini Funnels</div>',
+      '<div class="fn-mini-funnels-view" data-fn-view="minifunnels"></div>',
       '<div class="fn-chart-wrap-outer">',
         .fn_chart_header(panel_data),
         '<div class="fn-chart-view" data-fn-view="slope">',
           '<div class="fn-aware-note" style="display:none;font-size:11px;color:#64748b;padding:4px 8px 0;font-style:italic;">Awareness pinned to 100%. Chart shows conversion efficiency from awareness.</div>',
           .fn_chart_section(panel_data, focal_colour),
         '</div>',
-        '<div class="fn-mf-section-heading">Mini Funnels</div>',
-        '<div class="fn-mini-funnels-view" data-fn-view="minifunnels"></div>',
       '</div>',
       .fn_add_insight_strip(),
     '</div>',
@@ -398,57 +398,14 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
 # ==============================================================================
 
 .fn_about_section <- function(pd) {
-  a <- pd$about
-  parts <- character(0)
-
-  # Stage definitions (replaces the ? popovers on column headers)
-  stage_keys  <- pd$meta$stage_keys  %||% character(0)
-  stage_lbls  <- pd$meta$stage_labels %||% list()
-  stage_defs  <- pd$meta$stage_definitions %||% list()
-  def_items <- vapply(stage_keys, function(k) {
-    lbl <- stage_lbls[[k]] %||% k
-    def <- stage_defs[[k]] %||% ""
-    if (!nzchar(trimws(def))) return("")
-    sprintf('<dt class="fn-stage-def-term">%s</dt><dd class="fn-stage-def-body">%s</dd>',
-            .fn_esc(lbl), .fn_esc(def))
-  }, character(1))
-  def_items <- def_items[nzchar(def_items)]
-  if (length(def_items) > 0) {
-    parts <- c(parts, paste0(
-      '<p class="fn-about-item"><strong>Stage definitions:</strong></p>',
-      '<dl class="fn-stage-defs">', paste(def_items, collapse = ""), '</dl>'))
+  # Pulls the "About this funnel" body from the central callout registry
+  # (modules/shared/lib/callouts/callouts.json -> brand.funnel) so the
+  # text is editable via the Callout Editor without touching code.
+  if (exists("turas_callout", mode = "function")) {
+    turas_callout("brand", "funnel", collapsed = TRUE)
+  } else {
+    ""
   }
-
-  # Methodology notes
-  if (!is.null(a)) {
-    for (key in c("methodology_note", "base_note", "significance_note",
-                  "heavy_buyer_note", "prior_brand_note")) {
-      val <- a[[key]]
-      if (!is.null(val) && is.character(val) && nzchar(trimws(val))) {
-        parts <- c(parts, sprintf('<p class="fn-about-item"><strong>%s:</strong> %s</p>',
-                                  .fn_about_heading(key), .fn_esc(val)))
-      }
-    }
-  }
-
-  if (length(parts) == 0) return("")
-  paste0(
-    '<details class="fn-about"><summary class="fn-about-summary">About this funnel</summary>',
-    '<div class="fn-about-body">',
-    paste(parts, collapse = ""),
-    '</div></details>'
-  )
-}
-
-
-.fn_about_heading <- function(key) {
-  switch(key,
-    methodology_note   = "Methodology",
-    base_note          = "Bases",
-    significance_note  = "Significance",
-    heavy_buyer_note   = "Heavy buyers & frequency",
-    prior_brand_note   = "Prior brand",
-    key)
 }
 
 

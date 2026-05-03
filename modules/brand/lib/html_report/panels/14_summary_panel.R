@@ -299,83 +299,47 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   .brsum-wom-grid { grid-template-columns: 1fr; }
 }
 
-/* ---- Brand funnel mini-funnel (stage rows, focal + cat-avg side by side) ---- */
-.brsum-funnel-legend {
-  display: flex; align-items: center; gap: 12px;
-  font-size: 11px; color: #64748b; margin-bottom: 8px;
+/* ---- Mini-funnel cards (Brand funnel / Brand attitude / Loyalty / Purchase dist) ---- */
+/* Two side-by-side cards: focal first, cat avg second. Mirrors the brand
+   funnel sub-tab\'s mini-funnel idiom (.fn-mf-*) but scoped to brsum. */
+.brsum-mf-row {
+  display: flex; gap: 10px; align-items: stretch; flex-wrap: nowrap;
 }
-.brsum-legend-dot {
-  display: inline-block; width: 10px; height: 10px; border-radius: 999px;
-  vertical-align: middle; margin-right: 4px;
+.brsum-mf-card {
+  flex: 1 1 0; min-width: 0;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+  border-left: 4px solid #e2e8f0;
+  padding: 10px 12px;
 }
-.brsum-legend-dot-catavg { background: #cbd5e1; }
-.brsum-legend-name { font-weight: 600; color: #334155; margin-right: 4px; }
-.brsum-funnel-rows { display: flex; flex-direction: column; gap: 6px; }
-.brsum-funnel-row {
-  display: grid; grid-template-columns: 110px 1fr; gap: 10px;
-  align-items: center;
+.brsum-mf-avg { font-style: italic; }
+.brsum-mf-title {
+  font-size: 11px; font-weight: 700; color: #1e293b; text-align: center;
+  margin-bottom: 8px; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; font-style: normal;
+  display: flex; justify-content: center; align-items: center; gap: 6px;
 }
-.brsum-funnel-stage {
-  font-size: 11px; font-weight: 600; color: #475569; white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis;
+.brsum-mf-badge {
+  font-size: 8px; font-weight: 800; letter-spacing: 0.6px;
+  background: %FOCAL%; color: #fff;
+  padding: 1px 5px; border-radius: 3px;
 }
-.brsum-funnel-bars {
-  display: grid; grid-template-rows: 1fr 1fr; gap: 3px;
-}
-.brsum-funnel-bar {
-  position: relative; height: 16px; background: #f1f5f9;
-  border-radius: 4px; overflow: hidden;
-}
-.brsum-funnel-bar-fill {
-  position: absolute; top: 0; left: 0; height: 100%;
-  background: #cbd5e1; border-radius: 4px;
-  transition: width 0.2s ease;
-}
-.brsum-funnel-bar.catavg .brsum-funnel-bar-fill { background: #cbd5e1; }
-.brsum-funnel-bar-val {
-  position: absolute; top: 50%; right: 6px;
-  transform: translateY(-50%);
-  font-size: 10px; font-weight: 700; color: #1e293b;
-  font-variant-numeric: tabular-nums;
-  background: rgba(255, 255, 255, 0.8); padding: 0 4px; border-radius: 3px;
-  pointer-events: none;
-}
-
-/* ---- Stacked-bar mini-funnel (Brand attitude / Loyalty / Purchase dist) ---- */
-.brsum-stack-rows { display: flex; flex-direction: column; gap: 8px; }
-.brsum-stack-row {
-  display: grid; grid-template-columns: 96px 1fr; gap: 10px;
-  align-items: center;
-}
-.brsum-stack-row-label {
-  font-size: 11px; font-weight: 600; color: #475569;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.brsum-stack-row.is-focal .brsum-stack-row-label {
-  color: #1e293b; font-weight: 700;
-}
-.brsum-stack-row-track {
-  display: flex; height: 22px; background: #f1f5f9; border-radius: 4px;
+.brsum-mf-stages { display: flex; flex-direction: column; gap: 6px; }
+.brsum-mf-stage  { display: flex; flex-direction: column; align-items: center; }
+.brsum-mf-bar-bg {
+  width: 100%; background: #f1f5f9; border-radius: 3px; height: 16px;
   overflow: hidden;
 }
-.brsum-stack-seg {
-  height: 100%; display: flex; align-items: center; justify-content: center;
-  white-space: nowrap; min-width: 0;
+.brsum-mf-bar {
+  height: 100%; border-radius: 3px;
+  transition: width 0.3s ease;
 }
-.brsum-stack-seg-lbl {
-  font-size: 10px; font-weight: 700; color: #fff;
-  text-shadow: 0 0 2px rgba(0, 0, 0, 0.45);
-  font-variant-numeric: tabular-nums;
-  padding: 0 4px;
+.brsum-mf-label {
+  font-size: 9px; color: #94a3b8; text-align: center; margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 100%;
 }
-.brsum-stack-legend {
-  display: flex; flex-wrap: wrap; gap: 10px; row-gap: 4px;
-  margin-top: 10px; font-size: 10px; color: #475569;
-}
-.brsum-legend-item { display: inline-flex; align-items: center; gap: 5px; }
-.brsum-legend-swatch {
-  width: 10px; height: 10px; border-radius: 2px;
-}
+.brsum-mf-pct { font-weight: 700; color: #475569;
+  font-variant-numeric: tabular-nums; }
 
 /* ---- Duplication of purchase card ---- */
 .brsum-dop-grid {
@@ -416,8 +380,9 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 }
 @media (max-width: 480px) {
   .brsum-dop-grid { grid-template-columns: 1fr; }
-  .brsum-funnel-row { grid-template-columns: 80px 1fr; }
-  .brsum-stack-row  { grid-template-columns: 78px 1fr; }
+  /* On narrow screens the two mini-funnel cards stack vertically */
+  .brsum-mf-row { flex-wrap: wrap; }
+  .brsum-mf-card { flex-basis: 100%; }
 }
 
 /* ---- Dot plot card (CEP + Brand attributes, full-width) ---- */
@@ -425,6 +390,11 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   display: flex; align-items: center; gap: 12px;
   font-size: 11px; color: #64748b; margin-bottom: 8px;
 }
+.brsum-legend-dot {
+  display: inline-block; width: 10px; height: 10px; border-radius: 999px;
+  vertical-align: middle; margin-right: 4px;
+}
+.brsum-legend-name { font-weight: 600; color: #334155; margin-right: 4px; }
 .brsum-dot-avg-marker {
   display: inline-block; width: 16px; height: 0;
   border-top: 1.5px dashed #94a3b8; vertical-align: middle;
@@ -654,16 +624,20 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
       brands[[bc]] <- .brsum_brand_snapshot(
         bc, cr, label_map, brand_colours, focal_colour,
         cep_labels = cep_labels, attr_labels = attr_labels,
-        cat_name = cn)
+        cat_name = cn, config = config)
     }
 
     # Mini-funnel data (per category): each block carries the cat-avg row
     # and a per-brand row map. Visual rendering is JS-side; R just exposes
     # the numbers.
-    funnel_block       <- .brsum_funnel_minif(cr, brand_codes, label_map)
+    funnel_block       <- .brsum_funnel_minif(cr, brand_codes, label_map,
+                                                config = config)
     attitude_block     <- .brsum_attitude_minif(cr, brand_codes, label_map)
-    loyalty_block      <- .brsum_loyalty_minif(cr, brand_codes, label_map)
-    purchase_block     <- .brsum_purchase_minif(cr, brand_codes, label_map)
+    loyalty_block      <- .brsum_loyalty_minif(cr, brand_codes, label_map,
+                                                config = config)
+    purchase_block     <- .brsum_purchase_minif(cr, brand_codes, label_map,
+                                                 config = config,
+                                                 focal_brand = config$focal_brand)
     dop_block          <- .brsum_dop_minif(cr, brand_codes, label_map)
     cep_block          <- .brsum_dotplot_data(cr$mental_availability$cep_advantage,
                                                brand_codes, label_map,
@@ -711,20 +685,29 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 #                              same length as seg_codes, in 0..1)
 # JS reads these and renders two stacked rows (focal + cat avg).
 
-# Brand funnel: per-stage % weighted of total respondents.
-.brsum_funnel_minif <- function(cr, brand_codes, label_map) {
+# Brand funnel: per-stage % weighted of total respondents. Stage labels
+# pull from the same config-driven resolver that the brand-funnel sub-tab
+# uses, so the exec summary mini-funnel reads "Past 12 months / Past 3
+# months" (etc.) instead of the raw stage_keys.
+.brsum_funnel_minif <- function(cr, brand_codes, label_map, config = list()) {
   fn <- cr$funnel
   if (is.null(fn) || identical(fn$status, "REFUSED") ||
       is.null(fn$stages) || nrow(fn$stages) == 0) {
     return(list(available = FALSE))
   }
   st <- fn$stages
-  stage_keys   <- unique(as.character(st$stage_key))
-  stage_labels <- vapply(stage_keys, function(k) {
-    rows <- st[st$stage_key == k, , drop = FALSE]
-    lbl <- if ("stage_label" %in% names(rows)) rows$stage_label[1] else NA
-    if (is.na(lbl) || !nzchar(lbl)) k else as.character(lbl)
-  }, character(1))
+  stage_keys <- unique(as.character(st$stage_key))
+
+  # Use the funnel-panel-data label resolver: applies Timeframe_Long /
+  # Timeframe_Target overrides (e.g. "Past 12 months", "Past 3 months")
+  # and falls back to the canonical stage names ("Aware", "Consider").
+  stage_labels <- if (exists(".stage_labels_for", mode = "function")) {
+    overrides <- if (exists(".stage_label_overrides", mode = "function"))
+      .stage_label_overrides(config) else list()
+    .stage_labels_for(stage_keys, overrides = overrides)
+  } else {
+    stage_keys
+  }
 
   cat_avg <- vapply(stage_keys, function(k) {
     vals <- as.numeric(st$pct_weighted[st$stage_key == k])
@@ -738,22 +721,29 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
       if (length(v) == 1) v else NA_real_
     }, numeric(1))
   }
+
+  n_total <- as.numeric(fn$meta$n_unweighted %||% NA_real_)
+  base_label <- .brsum_base_text(n_total, "total_respondents") %||%
+    "% of total respondents"
+
   list(
     available    = TRUE,
     stage_keys   = stage_keys,
     stage_labels = unname(stage_labels),
-    base_label   = "% of total respondents",
+    base_label   = base_label,
     cat_avg      = unname(cat_avg),
     brands       = brands_map
   )
 }
 
-# Brand attitude: 5 segments. Uses % total base (segments[[role]] is
-# already a fraction of all respondents in the engine).
+# Brand attitude: 5 segments — Love / Prefer / Ambivalent / Reject /
+# No opinion. Reads from cr$funnel$attitude_decomposition (long data
+# frame with brand_code, attitude_role, pct columns) — pct is already a
+# fraction of total respondents in the engine.
 .brsum_attitude_minif <- function(cr, brand_codes, label_map) {
   fn <- cr$funnel
-  cd <- if (!is.null(fn)) fn$consideration_detail else NULL
-  if (is.null(cd) || length(cd$brands %||% list()) == 0) {
+  att <- if (!is.null(fn)) fn$attitude_decomposition else NULL
+  if (is.null(att) || !is.data.frame(att) || nrow(att) == 0) {
     return(list(available = FALSE))
   }
   seg_codes <- c("attitude.love", "attitude.prefer", "attitude.ambivalent",
@@ -761,15 +751,18 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   seg_labels <- c("Love", "Prefer", "Ambivalent", "Reject", "No opinion")
   seg_colours <- c("#2E7D32", "#81C784", "#F9A825", "#C62828", "#90A4AE")
 
+  att$brand_code    <- as.character(att$brand_code)
+  att$attitude_role <- as.character(att$attitude_role)
+
   brands_map <- list()
   for (bc in brand_codes) {
-    row <- Find(function(b) identical(b$brand_code, bc), cd$brands)
-    vals <- if (!is.null(row) && !is.null(row$segments)) {
-      vapply(seg_codes, function(r) {
-        v <- as.numeric(row$segments[[r]] %||% NA_real_)
-        if (!is.finite(v)) NA_real_ else v
-      }, numeric(1))
-    } else rep(NA_real_, length(seg_codes))
+    sub <- att[att$brand_code == bc, , drop = FALSE]
+    vals <- vapply(seg_codes, function(r) {
+      hit <- which(sub$attitude_role == r)
+      if (length(hit) == 0) return(NA_real_)
+      v <- as.numeric(sub$pct[hit[1]])
+      if (!is.finite(v)) NA_real_ else v
+    }, numeric(1))
     brands_map[[bc]] <- unname(vals)
   }
 
@@ -779,12 +772,17 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
     if (length(vals) == 0) NA_real_ else mean(vals)
   }, numeric(1))
 
+  n_total <- as.numeric((cr$funnel$meta$n_unweighted %||%
+    if ("base" %in% names(att) && nrow(att) > 0) att$base[1] else NA_real_))
+  base_label <- .brsum_base_text(n_total, "total_respondents") %||%
+    "% of total respondents"
+
   list(
     available   = TRUE,
     seg_codes   = seg_codes,
     seg_labels  = seg_labels,
     seg_colours = seg_colours,
-    base_label  = "% of total respondents",
+    base_label  = base_label,
     cat_avg     = cat_avg,
     brands      = brands_map
   )
@@ -793,7 +791,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 # Loyalty seg: 4 segments — Sole / Primary / Secondary / Not bought.
 # Source values are % of category buyers; each brand's row sums to 100%
 # of cat buyers. Cat avg is the unweighted mean per segment across brands.
-.brsum_loyalty_minif <- function(cr, brand_codes, label_map) {
+.brsum_loyalty_minif <- function(cr, brand_codes, label_map, config = list()) {
   bh <- cr$buyer_heaviness
   if (is.null(bh) || identical(bh$status, "REFUSED")) {
     return(list(available = FALSE))
@@ -823,12 +821,18 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
     if (length(vals) == 0) NA_real_ else mean(vals)
   }, numeric(1))
 
+  n_buy <- as.numeric(cr$dirichlet_norms$category_metrics$n_buyers %||% NA_real_)
+  base_label <- .brsum_base_text(
+    n_buy, "category_buyers",
+    target_months = config$target_timeframe_months,
+    longer_months = config$longer_timeframe_months) %||% "% of category buyers"
+
   list(
     available   = TRUE,
     seg_codes   = seg_codes,
     seg_labels  = seg_labels,
     seg_colours = seg_colours,
-    base_label  = "% of category buyers",
+    base_label  = base_label,
     cat_avg     = cat_avg,
     brands      = brands_map
   )
@@ -837,7 +841,9 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 # Purchase distribution: 4 segments — Light / Moderate / Regular / Frequent.
 # Source values are % of brand buyers; each brand's row sums to 100% of
 # its own buyers. Cat avg is the unweighted mean per segment across brands.
-.brsum_purchase_minif <- function(cr, brand_codes, label_map) {
+.brsum_purchase_minif <- function(cr, brand_codes, label_map,
+                                    config = list(),
+                                    focal_brand = NULL) {
   bh <- cr$buyer_heaviness
   if (is.null(bh) || identical(bh$status, "REFUSED")) {
     return(list(available = FALSE))
@@ -862,6 +868,23 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
       brands_map[[bc]] <- rep(NA_real_, length(seg_codes))
     }
   }
+
+  # Per-brand base label — purchase distribution is "% of THIS brand's
+  # buyers", so the n changes with the brand picker. The JS reads
+  # base_by_brand[brandCode] when rendering.
+  base_by_brand <- list()
+  nt <- cr$dirichlet_norms$norms_table
+  for (bc in brand_codes) {
+    n_bb <- if (!is.null(nt) && "Brand_Buyers_n" %in% names(nt) &&
+                bc %in% nt$BrandCode) {
+      as.numeric(nt$Brand_Buyers_n[nt$BrandCode == bc])
+    } else NA_real_
+    base_by_brand[[bc]] <- .brsum_base_text(
+      n_bb, "brand_buyers",
+      target_months = config$target_timeframe_months,
+      brand_label = label_map[[bc]] %||% bc) %||% "% of brand buyers"
+  }
+
   cat_avg <- vapply(seq_along(seg_codes), function(i) {
     vals <- vapply(brands_map, function(v) v[i], numeric(1))
     vals <- vals[is.finite(vals)]
@@ -869,13 +892,14 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   }, numeric(1))
 
   list(
-    available   = TRUE,
-    seg_codes   = seg_codes,
-    seg_labels  = seg_labels,
-    seg_colours = seg_colours,
-    base_label  = "% of brand buyers",
-    cat_avg     = cat_avg,
-    brands      = brands_map
+    available     = TRUE,
+    seg_codes     = seg_codes,
+    seg_labels    = seg_labels,
+    seg_colours   = seg_colours,
+    base_label    = base_by_brand[[focal_brand]] %||% "% of brand buyers",
+    base_by_brand = base_by_brand,
+    cat_avg       = cat_avg,
+    brands        = brands_map
   )
 }
 
@@ -944,11 +968,14 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
       advantage_pp = adv_pp
     )
   }
+  base_label <- .brsum_base_text(n_resp, "total_respondents") %||% ""
+
   list(
     available   = TRUE,
     stim_codes  = stims,
     stim_labels = unname(stim_labels),
     cat_avg_pct = unname(as.numeric(cat_avg_pct)),
+    base_label  = base_label,
     brands      = brands_map
   )
 }
@@ -1191,7 +1218,8 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 .brsum_brand_snapshot <- function(brand_code, cr, label_map,
                                    brand_colours, focal_colour,
                                    cep_labels = NULL, attr_labels = NULL,
-                                   cat_name = NA_character_) {
+                                   cat_name = NA_character_,
+                                   config = list()) {
   label <- label_map[[brand_code]] %||% brand_code
   colour <- brand_colours[[brand_code]] %||% focal_colour
 
@@ -1401,6 +1429,29 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
     brand_summary_metrics[[4]]$cat_avg <- .brsum_pct(scr_avg, "%", already_pct = TRUE)
   }
 
+  # Combined card-level base: this card mixes two denominators
+  # (penetration & volume share are over total respondents; avg purchases
+  # & SCR are over the focal brand's buyers).  Showing both lets the
+  # reader see exactly what each big number is anchored against.
+  brand_summary_base <- ""
+  if (!is.null(dn) && !is.null(dn$category_metrics)) {
+    n_total <- as.numeric(dn$category_metrics$n_respondents %||% NA_real_)
+    n_bb    <- if (!is.null(dn$norms_table) &&
+                   "Brand_Buyers_n" %in% names(dn$norms_table) &&
+                   brand_code %in% dn$norms_table$BrandCode) {
+      as.numeric(dn$norms_table$Brand_Buyers_n[
+        dn$norms_table$BrandCode == brand_code])
+    } else NA_real_
+    txt_total <- .brsum_base_text(n_total, "total_respondents")
+    txt_bb    <- .brsum_base_text(
+      n_bb, "brand_buyers",
+      target_months = config$target_timeframe_months,
+      brand_label = label)
+    parts <- c(txt_total, txt_bb)
+    parts <- parts[!vapply(parts, is.null, logical(1))]
+    brand_summary_base <- paste(parts, collapse = " · ")
+  }
+
   # ---- WOM card (Heard + Said breakdown: pos / neg / net for each) ----
   # Pulls from wom_metrics + net_balance. All values are pp; cat avg is
   # the unweighted mean across brands. Net = positive − negative.
@@ -1421,8 +1472,15 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
       if (!is.finite(x)) "—" else sprintf("%.0f%%", x)
     }
 
+    n_total_wom <- as.numeric(cr$funnel$meta$n_unweighted %||%
+                              cr$dirichlet_norms$category_metrics$n_respondents %||%
+                              NA_real_)
+    wom_base <- .brsum_base_text(n_total_wom, "total_respondents") %||%
+      "% of total respondents"
+
     wom_card <- list(
       available = TRUE,
+      base_label = wom_base,
       heard = list(
         positive = list(label = "Heard positive",
                          value   = fmt_pct1(pick(wm_metrics, "ReceivedPos_Pct")),
@@ -1478,6 +1536,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
     diagnostic = list(attributes = attr_chips, ceps = cep_chips),
     ma_metrics = ma_metrics,
     brand_summary = brand_summary_metrics,
+    brand_summary_base = brand_summary_base,
     wom = wom_card
   )
 }
@@ -1642,7 +1701,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
     '<div class="brsum-card-grid">',
       card("context",       "Category context"),
       card("ma_metrics",    "Mental Availability — headline metrics"),
-      card("brand_summary", "Brand summary"),
+      card("brand_summary", "Purchase behaviour"),
       card("funnel",        "Brand funnel"),
       card("attitude",      "Brand attitude"),
       card("loyalty",       "Loyalty segmentation"),
@@ -1717,34 +1776,48 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 
 
 .brsum_educational_callout <- function() {
-  body <- paste(
-    '<p>This Executive Summary answers one question per brand-and-category: <strong>"How is this brand doing in this category, and why?"</strong></p>',
-    '<p><strong>Category context</strong> &mdash; the size and shape of the category. Baselines, not brand metrics.</p>',
-    '<p><strong>Where the brand sits</strong> &mdash; five metrics that locate the brand. Big numbers are the brand\'s value; small numbers are the category average. MMS rank tells you where the brand stands against competitors on mental marketshare (the equity benchmark).</p>',
-    '<p><strong>Why it sits there</strong> &mdash; the diagnostic. Strongest associations (attributes) and the moments the brand owns (Category Entry Points) explain the position above.</p>',
-    '<p><strong>Analyst commentary</strong> &mdash; your written take. Drives the narrative for stakeholders who skim numbers.</p>',
-    '<p style="margin-top:12px;color:#64748b;font-size:12px;">Drill into any sub-tab on this category for the full evidence behind these summaries.</p>',
-    sep = "\n")
-
-  # TODO: when the central Turas callout editor lands, replace this static
-  # body with `turas_callout("brand", "executive_summary", collapsed = TRUE)`
-  # so the copy can be maintained outside this file.
-  paste(
-    '<div class="brsum-edu" data-brsum-edu>',
-      '<button class="brsum-edu-toggle" type="button" onclick="brsumToggleEdu(this)">',
-        '<span class="brsum-edu-arrow">&#x25B6;</span>',
-        '<span>How to read this dashboard</span>',
-      '</button>',
-      sprintf('<div class="brsum-edu-body">%s</div>', body),
-    '</div>',
-    sep = "\n"
-  )
+  # Body sourced from the central callout registry
+  # (modules/shared/lib/callouts/callouts.json -> brand.executive_summary).
+  # Editable via the Callout Editor.
+  if (exists("turas_callout", mode = "function")) {
+    turas_callout("brand", "executive_summary", collapsed = TRUE)
+  } else {
+    ""
+  }
 }
 
 
 # ==============================================================================
 # INTERNAL: FORMATTING HELPERS
 # ==============================================================================
+
+# Builds an "n=400, total respondents" / "n=390, P3M category buyers" base
+# label. Returns NULL when n is missing so callers can fall back to a plain
+# base string. target_months / longer_months are pulled from config when
+# available so the time-window prefix tracks operator settings.
+.brsum_base_text <- function(n, base_kind = "total_respondents",
+                              target_months = NULL, longer_months = NULL,
+                              brand_label = NULL) {
+  if (is.null(n) || !is.finite(n) || n <= 0) return(NULL)
+  win_lbl <- function(m) {
+    if (is.null(m) || !is.finite(m) || m <= 0) return("")
+    paste0("P", as.integer(m), "M")
+  }
+  tm <- win_lbl(target_months %||% 3)
+  lm <- win_lbl(longer_months %||% 12)
+  base <- switch(base_kind,
+    "total_respondents"     = "total respondents",
+    "category_buyers"       = paste(tm, "category buyers"),
+    "category_buyers_long"  = paste(lm, "category buyers"),
+    "brand_buyers"          = if (!is.null(brand_label) && nzchar(brand_label))
+        paste(tm, brand_label, "buyers") else paste(tm, "brand buyers"),
+    base_kind
+  )
+  sprintf("n=%s, %s",
+          format(as.integer(round(n)), big.mark = ",", scientific = FALSE),
+          base)
+}
+
 
 # Pretty percentage formatter. Handles three input shapes:
 #  - already_pct = TRUE: value is already in 0..100 scale (e.g. Sole_Pct)

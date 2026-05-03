@@ -786,9 +786,7 @@
         var barW = pct != null ? Math.max(6, Math.round(pct * 100)) : 0;
         var pctStr = pct != null ? Math.round(pct * 100) + "%" : "\u2014";
         html += '<div class="fn-mf-stage">';
-        html += '<div class="fn-mf-bar-bg"><div class="fn-mf-bar" style="width:' + barW + '%;background:' + avgColor + ';">';
-        if (barW > 22) html += pctStr;
-        html += '</div></div>';
+        html += '<div class="fn-mf-bar-bg"><div class="fn-mf-bar" style="width:' + barW + '%;background:' + avgColor + ';"></div></div>';
         html += '<div class="fn-mf-label">' + escapeAttr(stageLabels[si] || k) + ' <span class="fn-mf-pct">' + pctStr + '</span></div>';
         html += '</div>';
       }
@@ -822,9 +820,7 @@
 
         html += '<div class="fn-mf-stage">';
         html += '<div class="fn-mf-bar-bg">';
-        html += '<div class="fn-mf-bar" style="width:' + barW + '%;background:' + color + ';">';
-        if (barW > 22) html += pctStr;
-        html += "</div></div>";
+        html += '<div class="fn-mf-bar" style="width:' + barW + '%;background:' + color + ';"></div></div>';
         html += '<div class="fn-mf-label">' + escapeAttr(lbl);
         html += ' <span class="fn-mf-pct">' + pctStr + "</span></div>";
         html += "</div>";

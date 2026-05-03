@@ -138,13 +138,17 @@
       renderBrandSummaryCard(root, snap);
       renderMAMetricsCard(root, snap);
       renderWOMCard(root, snap);
-      renderBrandFunnelCard(root, cat.funnel, brandCode, snap);
-      renderStackedMiniFunnelCard(root, 'attitude',      cat.attitude,      brandCode, snap);
-      renderStackedMiniFunnelCard(root, 'loyalty',       cat.loyalty,       brandCode, snap);
-      renderStackedMiniFunnelCard(root, 'purchase_dist', cat.purchase_dist, brandCode, snap);
+      renderMiniFunnelCard(root, 'funnel',        cat.funnel,        brandCode, snap,
+                           { emptyMessage: 'Funnel data not available.' });
+      renderMiniFunnelCard(root, 'attitude',      cat.attitude,      brandCode, snap,
+                           { emptyMessage: 'Brand attitude not available.' });
+      renderMiniFunnelCard(root, 'loyalty',       cat.loyalty,       brandCode, snap,
+                           { emptyMessage: 'Loyalty segmentation not available.' });
+      renderMiniFunnelCard(root, 'purchase_dist', cat.purchase_dist, brandCode, snap,
+                           { emptyMessage: 'Purchase distribution not available.' });
       renderDoPCard(root, cat.dop, brandCode, snap);
       renderDotPlotCard(root, 'cep',   cat.cep,   brandCode, snap, /*showDecision=*/true);
-      renderDotPlotCard(root, 'attrs', cat.attrs, brandCode, snap, /*showDecision=*/false);
+      renderDotPlotCard(root, 'attrs', cat.attrs, brandCode, snap, /*showDecision=*/true);
       /* Apply focal colour to any value text rendered inline. */
       if (snap && snap.colour) {
         $$('.brsum-focal-value', root).forEach(function (el) {
@@ -257,9 +261,11 @@
 
   function renderBrandSummaryCard(root, snap) {
     var body = cardBody(root, 'brand_summary');
+    var meta = cardMeta(root, 'brand_summary');
+    if (meta) meta.textContent = (snap && snap.brand_summary_base) || '';
     if (!body) return;
     if (!snap || !snap.brand_summary) {
-      body.innerHTML = '<div class="brsum-card-empty">Brand summary metrics not available.</div>';
+      body.innerHTML = '<div class="brsum-card-empty">Purchase behaviour metrics not available.</div>';
       return;
     }
     var col = snap.colour || '#1A5276';
@@ -278,6 +284,8 @@
    * --------------------------------------------------------------------- */
   function renderWOMCard(root, snap) {
     var body = cardBody(root, 'wom');
+    var meta = cardMeta(root, 'wom');
+    if (meta) meta.textContent = (snap && snap.wom && snap.wom.base_label) || '';
     if (!body) return;
     if (!snap || !snap.wom || !snap.wom.available) {
       body.innerHTML = '<div class="brsum-card-empty">Word-of-mouth not available.</div>';
@@ -318,136 +326,84 @@
   }
 
   /* ---------------------------------------------------------------------
-   * Brand funnel mini-funnel
+   * Mini-funnel card (Brand funnel + Brand attitude + Loyalty seg +
+   * Purchase dist)
    *
-   * Each stage is its own horizontal bar (NOT a stacked segmented bar).
-   * Layout: a row per stage, with two side-by-side mini-bars (focal +
-   * cat avg). The bars share the same horizontal scale so the visual
-   * comparison reads cleanly.
+   * Two side-by-side mini-funnel cards per metric: focal brand FIRST,
+   * cat-avg SECOND. Each card lists the stages / segments stacked
+   * vertically. Each row = one stage with a horizontal bar (% scaled
+   * against a shared maximum so the comparison reads visually) and a
+   * "<label> <pct>" caption underneath — same idiom as the brand-funnel
+   * sub-tab's mini-funnels, scoped here under .brsum-mf-*.
+   *
+   * Block shape (R-side):
+   *   stage_keys / stage_labels  (Brand funnel)
+   *   seg_codes  / seg_labels    (Brand attitude / Loyalty / Purchase dist)
    * --------------------------------------------------------------------- */
   function fmtPctSingle(v) {
     if (v == null || isNaN(v)) return '—';
     return Math.round(v * 100) + '%';
   }
 
-  function renderBrandFunnelCard(root, block, brandCode, snap) {
-    var body = cardBody(root, 'funnel');
-    var meta = cardMeta(root, 'funnel');
-    if (meta) meta.textContent = (block && block.base_label) || '';
+  function renderMiniFunnelCard(root, key, block, brandCode, snap, opts) {
+    opts = opts || {};
+    var body = cardBody(root, key);
+    var meta = cardMeta(root, key);
+    /* Per-brand base map wins when available (purchase distribution
+       changes denominator with the focal); fall back to the global
+       base_label for everything else. */
+    if (meta) {
+      var perBrand = block && block.base_by_brand && block.base_by_brand[brandCode];
+      meta.textContent = perBrand || (block && block.base_label) || '';
+    }
     if (!body) return;
     if (!block || !block.available) {
-      body.innerHTML = '<div class="brsum-card-empty">Funnel data not available.</div>';
+      var msg = opts.emptyMessage || 'Data not available.';
+      body.innerHTML = '<div class="brsum-card-empty">' + escHtml(msg) + '</div>';
       return;
     }
-    var focalRow = (block.brands && block.brands[brandCode]) || [];
-    var catAvg   = block.cat_avg || [];
-    var col      = (snap && snap.colour) || '#1A5276';
+    var rowKeys   = block.stage_keys   || block.seg_codes  || [];
+    var rowLabels = block.stage_labels || block.seg_labels || rowKeys;
+    var focalRow  = (block.brands && block.brands[brandCode]) || [];
+    var catAvg    = block.cat_avg || [];
+    var col       = (snap && snap.colour) || '#1A5276';
+    var name      = (snap && snap.name)   || brandCode;
 
-    /* Shared scale across all stages so longest bar fills the lane. */
+    /* Shared scale across both cards so the longest bar fills the lane. */
     var maxVal = 0;
     focalRow.forEach(function (v) { if (v != null && !isNaN(v) && v > maxVal) maxVal = v; });
     catAvg.forEach(function (v)  { if (v != null && !isNaN(v) && v > maxVal) maxVal = v; });
     if (maxVal <= 0) maxVal = 1;
 
-    var rows = '';
-    for (var i = 0; i < block.stage_keys.length; i++) {
-      var fv = focalRow[i];
-      var cv = catAvg[i];
-      var fw = (fv == null || isNaN(fv)) ? 0 : Math.min(100, (fv / maxVal) * 100);
-      var cw = (cv == null || isNaN(cv)) ? 0 : Math.min(100, (cv / maxVal) * 100);
-      rows +=
-        '<div class="brsum-funnel-row">' +
-          '<div class="brsum-funnel-stage">' + escHtml(block.stage_labels[i]) + '</div>' +
-          '<div class="brsum-funnel-bars">' +
-            '<div class="brsum-funnel-bar focal">' +
-              '<div class="brsum-funnel-bar-fill" style="width:' + fw.toFixed(1) + '%;background:' + col + ';"></div>' +
-              '<span class="brsum-funnel-bar-val">' + fmtPctSingle(fv) + '</span>' +
-            '</div>' +
-            '<div class="brsum-funnel-bar catavg">' +
-              '<div class="brsum-funnel-bar-fill" style="width:' + cw.toFixed(1) + '%;"></div>' +
-              '<span class="brsum-funnel-bar-val">' + fmtPctSingle(cv) + '</span>' +
-            '</div>' +
+    var focalCard = buildMiniFunnel(name, focalRow, rowLabels, col, maxVal, true);
+    var avgCard   = buildMiniFunnel('Cat avg', catAvg, rowLabels, '#64748b', maxVal, false);
+
+    body.innerHTML =
+      '<div class="brsum-mf-row">' + focalCard + avgCard + '</div>';
+  }
+
+  function buildMiniFunnel(title, vals, labels, colour, maxVal, isFocal) {
+    var stages = '';
+    for (var i = 0; i < labels.length; i++) {
+      var v = vals[i];
+      var barW = (v == null || isNaN(v)) ? 0 : Math.max(6, Math.round((v / maxVal) * 100));
+      var pctStr = fmtPctSingle(v);
+      stages +=
+        '<div class="brsum-mf-stage">' +
+          '<div class="brsum-mf-bar-bg">' +
+            '<div class="brsum-mf-bar" style="width:' + barW + '%;background:' + colour + ';"></div>' +
+          '</div>' +
+          '<div class="brsum-mf-label">' + escHtml(labels[i]) +
+            ' <span class="brsum-mf-pct">' + pctStr + '</span>' +
           '</div>' +
         '</div>';
     }
-    body.innerHTML =
-      '<div class="brsum-funnel-legend">' +
-        '<span class="brsum-legend-dot" style="background:' + col + '"></span>' +
-        '<span class="brsum-legend-name">' + escHtml((snap && snap.name) || brandCode) + '</span>' +
-        '<span class="brsum-legend-dot brsum-legend-dot-catavg"></span>' +
-        '<span class="brsum-legend-name">Cat avg</span>' +
-      '</div>' +
-      '<div class="brsum-funnel-rows">' + rows + '</div>';
-  }
-
-  /* ---------------------------------------------------------------------
-   * Stacked-bar mini-funnel (Brand attitude / Loyalty seg / Purchase dist)
-   *
-   * Two stacked bars (focal + cat avg). Each bar is divided into coloured
-   * segments per the segment palette in the payload. Tiny segments (< 4%)
-   * skip their inline label but keep a tooltip — same rule used on the
-   * Purchase Distribution sub-tab to avoid clipped labels.
-   * --------------------------------------------------------------------- */
-  function renderStackedMiniFunnelCard(root, key, block, brandCode, snap) {
-    var body = cardBody(root, key);
-    var meta = cardMeta(root, key);
-    if (meta) meta.textContent = (block && block.base_label) || '';
-    if (!body) return;
-    if (!block || !block.available) {
-      body.innerHTML = '<div class="brsum-card-empty">Data not available.</div>';
-      return;
-    }
-    var focalRow = (block.brands && block.brands[brandCode]) || [];
-    var catAvg   = block.cat_avg || [];
-    var name     = (snap && snap.name) || brandCode;
-
-    var rows =
-      buildStackedRow(name + ' (focal)', focalRow, block.seg_codes, block.seg_labels,
-                      block.seg_colours, true) +
-      buildStackedRow('Cat avg', catAvg, block.seg_codes, block.seg_labels,
-                      block.seg_colours, false);
-
-    var legend = '';
-    for (var i = 0; i < block.seg_codes.length; i++) {
-      legend +=
-        '<span class="brsum-legend-item">' +
-          '<span class="brsum-legend-swatch" style="background:' +
-          escHtml(block.seg_colours[i]) + ';"></span>' +
-          escHtml(block.seg_labels[i]) +
-        '</span>';
-    }
-
-    body.innerHTML =
-      '<div class="brsum-stack-rows">' + rows + '</div>' +
-      '<div class="brsum-stack-legend">' + legend + '</div>';
-  }
-
-  function buildStackedRow(label, vals, segCodes, segLabels, segColours, isFocal) {
-    var total = 0;
-    (vals || []).forEach(function (v) {
-      if (v != null && !isNaN(v) && v > 0) total += v;
-    });
-    if (total <= 0) total = 1;
-    var segs = '';
-    for (var i = 0; i < segCodes.length; i++) {
-      var v = vals && vals[i];
-      if (v == null || isNaN(v) || v <= 0) continue;
-      var pct = (v / total) * 100;
-      var pctTxt = Math.round(v * 100) + '%';
-      var showLbl = pct >= 4;
-      var inside  = showLbl
-        ? '<span class="brsum-stack-seg-lbl">' + pctTxt + '</span>'
-        : '';
-      segs +=
-        '<div class="brsum-stack-seg" title="' +
-          escHtml(segLabels[i]) + ': ' + pctTxt + '" ' +
-          'style="width:' + pct.toFixed(2) + '%;background:' +
-          escHtml(segColours[i]) + ';">' + inside +
-        '</div>';
-    }
-    return '<div class="brsum-stack-row' + (isFocal ? ' is-focal' : '') + '">' +
-             '<div class="brsum-stack-row-label">' + escHtml(label) + '</div>' +
-             '<div class="brsum-stack-row-track">' + segs + '</div>' +
+    var cls = 'brsum-mf-card' + (isFocal ? ' brsum-mf-focal' : ' brsum-mf-avg');
+    return '<div class="' + cls + '" style="border-left-color:' + colour + ';">' +
+             '<div class="brsum-mf-title">' + escHtml(title) +
+               (isFocal ? ' <span class="brsum-mf-badge">FOCAL</span>' : '') +
+             '</div>' +
+             '<div class="brsum-mf-stages">' + stages + '</div>' +
            '</div>';
   }
 
@@ -518,9 +474,18 @@
   function renderDotPlotCard(root, key, block, brandCode, snap, showDecision) {
     var body = cardBody(root, key);
     var meta = cardMeta(root, key);
-    if (meta) meta.textContent = block && block.available
-      ? 'Focal dot + cat-avg dashed marker'
-      : '';
+    /* Card meta shows the n base when available, with a short qualifier
+       so readers know the rows are sorted by the focal brand. */
+    if (meta) {
+      if (block && block.available) {
+        var baseTxt = block.base_label || '';
+        meta.textContent = baseTxt
+          ? baseTxt + ' · sorted by focal'
+          : 'Sorted by focal brand';
+      } else {
+        meta.textContent = '';
+      }
+    }
     if (!body) return;
     if (!block || !block.available) {
       body.innerHTML = '<div class="brsum-card-empty">Mental Availability data not available.</div>';
@@ -545,8 +510,24 @@
     /* Round up to a tidy 5% step for readability. */
     maxVal = Math.max(5, Math.ceil(maxVal / 5) * 5);
 
+    /* Sort rows by focal value descending. NaN/missing focal values fall
+       to the bottom. The cat-avg + decision arrays are aligned to stim
+       index so we sort an index list, not the underlying arrays. */
+    var idx = [];
+    for (var s = 0; s < stims.length; s++) idx.push(s);
+    idx.sort(function (a, b) {
+      var va = fps[a], vb = fps[b];
+      var aMissing = (va == null || isNaN(va));
+      var bMissing = (vb == null || isNaN(vb));
+      if (aMissing && bMissing) return 0;
+      if (aMissing) return 1;
+      if (bMissing) return -1;
+      return vb - va;
+    });
+
     var rows = '';
-    for (var i = 0; i < stims.length; i++) {
+    for (var k = 0; k < idx.length; k++) {
+      var i = idx[k];
       var fv = fps[i];
       var av = avgs[i];
       var fpct = (fv == null || isNaN(fv)) ? null : Math.min(100, (fv / maxVal) * 100);

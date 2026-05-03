@@ -52,36 +52,20 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
 # ==============================================================================
 
 .ma_adv_intro <- function(adv) {
-  threshold <- as.integer(adv$threshold_pp %||% 5)
+  # Body is sourced from the central callout registry
+  # (modules/shared/lib/callouts/callouts.json -> brand.mental_advantage_intro).
+  # The section heading wraps the callout so the page still has the
+  # "Mental Advantage" h3 at the top of the section.
+  callout <- if (exists("turas_callout", mode = "function")) {
+    turas_callout("brand", "mental_advantage_intro", collapsed = FALSE)
+  } else {
+    ""
+  }
   paste0(
     '<div class="ma-adv-intro">',
     '<h3 class="ma-section-title">Mental Advantage</h3>',
-    '<details class="ma-adv-intro-callout" open>',
-    '<summary>What is Mental Advantage?</summary>',
-    '<div class="ma-adv-intro-body">',
-    '<p>Mental Advantage answers a simple question: <em>does this brand own this',
-    ' situation more than its size says it should?</em> A big brand attracts more',
-    ' associations on every CEP just because it is big. A widely held attribute',
-    ' (like “tastes good”) gets ticked for every brand. Raw linkage charts can’t',
-    ' tell those effects apart from real competitive strength.</p>',
-    '<p>For each brand × stimulus cell, we compare the <strong>actual</strong> number',
-    ' of respondents who linked the two, to the number we’d <strong>expect</strong>',
-    ' if linkage were purely a function of how big the brand is and how popular',
-    ' the stimulus is. The difference, expressed in percentage points of the',
-    ' sample, is the Mental Advantage score.</p>',
-    '<ul class="ma-adv-intro-list">',
-    sprintf('<li><strong>Defend</strong> &nbsp;(score &ge; +%dpp): the brand over-indexes — protect this territory.</li>', threshold),
-    sprintf('<li><strong>Build</strong> &nbsp;(score &le; &minus;%dpp): the brand under-indexes — a gap to close, especially on big stimuli.</li>', threshold),
-    '<li><strong>Maintain</strong> (in between): the brand is performing in line with its size — no urgent move.</li>',
-    '</ul>',
-    '<p>An asterisk (*) on a cell marks where the gap is large enough to',
-    ' be statistically significant (chi-square standardised residual',
-    ' |z| &gt; 1.96, p &lt; 0.05). Significant bubbles also draw a',
-    ' thicker outline in the chart. The score is computed on the total',
-    ' respondent base.</p>',
-    '<p class="ma-adv-intro-source"><em>Source: Romaniuk, J. (2022). Better Brand Health',
-    ' (Ehrenberg-Bass). Worked example via Quantilope (2024).</em></p>',
-    '</div></details></div>'
+    callout,
+    '</div>'
   )
 }
 
@@ -301,24 +285,13 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
 
 
 .ma_adv_about <- function(adv) {
-  threshold <- as.integer(adv$threshold_pp %||% 5)
-  paste0(
-    '<details class="ma-adv-about ma-chart-callout">',
-    '<summary>Methodology</summary>',
-    '<div class="ma-adv-about-body">',
-    '<p><strong>Source:</strong> Romaniuk, J. (2022). <em>Better Brand Health</em>; ',
-    'Quantilope (2024). <em>Mental Advantage Analysis</em>.</p>',
-    '<p><strong>Formula:</strong> ',
-    'expected[s,b] = (row_total[s] × col_total[b]) ÷ grand_total. ',
-    'MA[s,b] = (actual[s,b] − expected[s,b]) ÷ n × 100, in pp.</p>',
-    sprintf('<p><strong>Decisions:</strong> Defend if MA ≥ +%d pp, Build if MA ≤ −%d pp, Maintain in between.</p>',
-            threshold, threshold),
-    '<p><strong>Significance:</strong> chi-square standardised residual ',
-    'z = (actual − expected) ÷ √expected. Cells flagged when |z| &gt; 1.96 (p &lt; 0.05). ',
-    'Bootstrap confidence intervals are a documented stretch, not implemented in v1.</p>',
-    '<p><strong>Base:</strong> total respondents.</p>',
-    '</div></details>'
-  )
+  # Body sourced from the central callout registry
+  # (modules/shared/lib/callouts/callouts.json -> brand.mental_advantage_methodology).
+  if (exists("turas_callout", mode = "function")) {
+    turas_callout("brand", "mental_advantage_methodology", collapsed = TRUE)
+  } else {
+    ""
+  }
 }
 
 

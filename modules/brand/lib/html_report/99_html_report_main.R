@@ -68,6 +68,26 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
     if (file.exists(fp)) source(fp, local = FALSE)
   }
 
+  # --- Source the central callout registry so panels can use turas_callout() ---
+  # Mirrors the pattern in confidence/03_page_builder.R: load if available,
+  # provide a no-op fallback otherwise so panels don't crash.
+  callout_dir <- file.path(turas_root, "modules", "shared", "lib", "callouts")
+  if (!dir.exists(callout_dir)) callout_dir <- file.path("modules", "shared", "lib", "callouts")
+  if (!exists("turas_callout", mode = "function") && dir.exists(callout_dir)) {
+    tryCatch(
+      source(file.path(callout_dir, "callout_registry.R"), local = FALSE),
+      error = function(e) NULL
+    )
+  }
+  if (!exists("turas_callout", mode = "function")) {
+    turas_callout <<- function(module, key, ...) ""
+  }
+  # Force-reload registry data each render (so edits in callouts.json
+  # show up without needing to restart the R session).
+  if (exists("turas_callout_clear_cache", mode = "function")) {
+    tryCatch(turas_callout_clear_cache(), error = function(e) NULL)
+  }
+
   # --- Source MA panel data builder (analytics layer, needed by transformer) ---
   ma_data_file <- file.path(turas_root, "modules", "brand", "R", "02a_ma_panel_data.R")
   if (file.exists(ma_data_file)) source(ma_data_file, local = FALSE)

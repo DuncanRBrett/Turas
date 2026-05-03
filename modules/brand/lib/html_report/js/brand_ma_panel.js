@@ -736,6 +736,11 @@
     rows.forEach(function (r) { tbody.appendChild(r); });
     var summary = tbody.querySelector('tr.ma-row-summary');
     if (summary) tbody.appendChild(summary);
+
+    /* Re-render the matching dot-plot chart so its row order tracks the
+       table. renderChart() reads the current DOM order via
+       readTableRowOrder(). */
+    renderChart(panel, stim);
   }
 
   // -------------------------------------------------------------- metrics table sort
@@ -1343,6 +1348,22 @@
     return lines;
   }
 
+  /* Read the current row order from the matching matrix table so the
+     dot plot can track the table's sort state. Excludes the summary row.
+     Returns null when the table hasn't been rendered yet. */
+  function readTableRowOrder(panel, stim) {
+    var sec = panel.querySelector('.ma-matrix-section[data-ma-stim="' + stim + '"]');
+    if (!sec) return null;
+    var rows = sec.querySelectorAll('tbody tr.ma-row');
+    if (!rows || rows.length === 0) return null;
+    var codes = [];
+    for (var i = 0; i < rows.length; i++) {
+      var c = rows[i].getAttribute('data-ma-stim');
+      if (c) codes.push(c);
+    }
+    return codes;
+  }
+
   // -------------------------------------------------------------- dot plot chart
   function renderChart(panel, stim) {
     var sec = panel.querySelector('.ma-chart-section[data-ma-stim="' + stim + '"]');
@@ -1368,8 +1389,19 @@
     brandCodes.forEach(function (c) { if (c !== focal) orderedBrands.push(c); });
     var visibleBrands = orderedBrands.filter(function (c) { return visMap[c] !== false; });
 
-    var activeRows = (block.codes || []).map(function (code, i) {
-      return { code: code, label: block.labels[i], idx: i };
+    /* Build the row list in the SAME order the table currently shows.
+       When the user sorts the table, applySort reorders the <tr> nodes;
+       we read that DOM order back and use it here so the dot plot tracks
+       the table. Falls back to block.codes when the table isn't rendered
+       yet (initial render before sort buttons are bound). */
+    var labelByCode = {};
+    (block.codes || []).forEach(function (c, i) { labelByCode[c] = block.labels[i]; });
+    var orderedCodes = readTableRowOrder(panel, stim);
+    if (!orderedCodes || orderedCodes.length === 0) {
+      orderedCodes = block.codes || [];
+    }
+    var activeRows = orderedCodes.map(function (code) {
+      return { code: code, label: labelByCode[code] || code };
     }).filter(function (r) { return rowActive[r.code] !== false; });
 
     // Render legend

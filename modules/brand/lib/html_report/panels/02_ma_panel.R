@@ -312,57 +312,14 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
 # ==============================================================================
 
 .ma_about_section <- function(pd) {
-  a <- pd$about
-  if (is.null(a)) return("")
-  parts <- character(0)
-  for (key in c("methodology_note", "mpen_note", "ns_note", "mms_note",
-                "attribute_note", "base_note")) {
-    val <- a[[key]]
-    if (!is.null(val) && nzchar(trimws(val))) {
-      parts <- c(parts, sprintf(
-        '<p class="ma-about-item"><strong>%s:</strong> %s</p>',
-        .ma_about_heading(key), .ma_esc(val)))
-    }
+  # Pulls the "About Mental Availability" body from the central callout
+  # registry (modules/shared/lib/callouts/callouts.json -> brand.mental_availability)
+  # so the text is editable via the Callout Editor without touching code.
+  if (exists("turas_callout", mode = "function")) {
+    turas_callout("brand", "mental_availability", collapsed = TRUE)
+  } else {
+    ""
   }
-  # Metric formulas (always shown)
-  parts <- c(parts, paste0(
-    '<div class="ma-about-formulas">',
-    '<p class="ma-about-item"><strong>Metric formulas</strong></p>',
-    '<dl class="ma-formula-dl">',
-    '<dt>Mental Penetration (MPen)</dt>',
-    '<dd>Respondents linking brand to \u22651 CEP &divide; Total respondents &times; 100</dd>',
-    '<dt>Network Size (NS)</dt>',
-    '<dd>Total CEP links for brand &divide; Respondents linking \u22651 CEP (average depth)</dd>',
-    '<dt>Mental Market Share (MMS)</dt>',
-    '<dd>(MPen &times; NS) &divide; &Sigma;(MPen<sub>i</sub> &times; NS<sub>i</sub>) &times; 100 &mdash; brand\u2019s share of all category CEP associations</dd>',
-    '<dt>Share of Mind (SOM)</dt>',
-    '<dd>MMS &divide; MPen &times; 100 &mdash; CEP links as % of all links by buyers with MPen for that brand. Totals across brands exceed 100%.</dd>',
-    '<dt>Cat avg CI (mini bar)</dt>',
-    '<dd>For each stimulus row, take the brand values (v<sub>1</sub>\u2026v<sub>n</sub>), compute mean <em>m</em> and standard deviation <em>SD</em>, ',
-    'then <strong>SE = SD &divide; &radic;n</strong> and the <strong>95% CI = m &plusmn; 1.96 &times; SE</strong>. ',
-    'The shaded range on the mini bar spans lo\u2013hi; the tick marks the mean; labels below show the bounds. ',
-    'Interprets the brand values at a stimulus as a sample, so the CI narrows as more brands link to that CEP.</dd>',
-    '</dl></div>'
-  ))
-  if (length(parts) == 0) return("")
-  paste0(
-    '<details class="ma-about"><summary class="ma-about-summary">About Mental Availability</summary>',
-    '<div class="ma-about-body">',
-    paste(parts, collapse = ""),
-    '</div></details>'
-  )
-}
-
-
-.ma_about_heading <- function(key) {
-  switch(key,
-    methodology_note = "Framework",
-    mpen_note        = "Mental Penetration (MPen)",
-    ns_note          = "Network Size (NS)",
-    mms_note         = "Mental Market Share (MMS)",
-    attribute_note   = "Brand Attributes",
-    base_note        = "Bases",
-    key)
 }
 
 
