@@ -309,9 +309,26 @@ run_callout_editor_gui <- function() {
           div(class = "ce-field-row",
             div(class = "ce-field", style = "flex: 1;",
               tags$label("Page / Tab", class = "ce-label"),
-              textInput("edit_page", NULL, value = entry$page %||% "",
-                        width = "100%",
-                        placeholder = "e.g. Summary, Question Details, Method Notes")
+              # Selectize so existing pages for this module surface as a
+              # dropdown; create=TRUE lets the user type a brand-new
+              # page name (or sub-page using "parent / child").
+              selectizeInput("edit_page", NULL,
+                             choices = {
+                               df_all <- flatten_registry(reg)
+                               existing <- sort(unique(
+                                 df_all$page[df_all$module == sel$module &
+                                              nzchar(df_all$page)]))
+                               cur <- entry$page %||% ""
+                               c("", union(existing, if (nzchar(cur)) cur))
+                             },
+                             selected = entry$page %||% "",
+                             multiple = FALSE,
+                             width = "100%",
+                             options = list(
+                               create = TRUE,
+                               placeholder = "Pick an existing page or type a new one",
+                               allowEmptyOption = TRUE
+                             ))
             ),
             div(class = "ce-field", style = "flex: 2;",
               tags$label("Context", class = "ce-label"),
@@ -414,17 +431,56 @@ run_callout_editor_gui <- function() {
       mods <- setdiff(names(reg), "_meta")
       if (length(mods) == 0) mods <- c("general")
 
+      # Default to whatever module is currently filtered; otherwise the
+      # first module. Using "all" — fall through to the first.
+      default_mod <- if (!is.null(input$filter_module) &&
+                         input$filter_module != "all" &&
+                         input$filter_module %in% mods) {
+        input$filter_module
+      } else {
+        mods[1]
+      }
+
+      # Pre-compute the page list for the default module so the Page
+      # picker has options on first paint. The picker also updates
+      # reactively in observeEvent(input$new_module) below.
+      df0 <- flatten_registry(reg)
+      page_choices <- if (default_mod %in% df0$module) {
+        sort(unique(df0$page[df0$module == default_mod & nzchar(df0$page)]))
+      } else character(0)
+
       showModal(modalDialog(
         title = "Add New Callout",
         div(class = "ce-add-form",
           selectInput("new_module", "Module",
                       choices = c(mods, "-- New module --" = "__new__"),
+                      selected = default_mod,
                       width = "100%"),
           conditionalPanel(
             condition = "input.new_module == '__new__'",
             textInput("new_module_name", "New module name", width = "100%",
                       placeholder = "e.g. pricing")
           ),
+          # Page picker — selectize with create=TRUE so the user can
+          # either pick an existing page for this module or type a new
+          # one. Hint text explains the convention.
+          selectizeInput("new_page", "Page / Tab",
+                         choices = page_choices,
+                         selected = NULL,
+                         multiple = FALSE,
+                         width = "100%",
+                         options = list(
+                           create = TRUE,
+                           placeholder = "Pick an existing page or type a new one",
+                           allowEmptyOption = TRUE
+                         )),
+          tags$p(class = "ce-add-hint",
+                 "Existing pages for the chosen module appear in the dropdown. ",
+                 "Type a new value to register it. Use a slash (e.g. ",
+                 tags$code("funnel / relationship"), ") for sub-pages."),
+          textInput("new_context", "Context",
+                    width = "100%",
+                    placeholder = "Where on the page? (e.g. 'Bottom callout')"),
           textInput("new_key", "Callout key", width = "100%",
                     placeholder = "e.g. method_explanation (snake_case)"),
           textInput("new_title", "Title", width = "100%",
@@ -437,6 +493,28 @@ run_callout_editor_gui <- function() {
       ))
     })
 
+    # Refresh the Page dropdown when the user changes Module inside the
+    # Add Callout modal — pages are scoped to a module.
+    observeEvent(input$new_module, {
+      reg <- registry()
+      mod <- input$new_module
+      if (is.null(mod)) return()
+      df <- flatten_registry(reg)
+      if (mod == "__new__") {
+        page_choices <- character(0)
+      } else {
+        page_choices <- sort(unique(df$page[df$module == mod & nzchar(df$page)]))
+      }
+      updateSelectizeInput(session, "new_page",
+                           choices = page_choices,
+                           selected = "",
+                           options = list(
+                             create = TRUE,
+                             placeholder = "Pick an existing page or type a new one",
+                             allowEmptyOption = TRUE
+                           ))
+    }, ignoreInit = TRUE)
+
     observeEvent(input$confirm_add, {
       removeModal()
 
@@ -447,6 +525,8 @@ run_callout_editor_gui <- function() {
       }
       key <- trimws(input$new_key %||% "")
       title <- trimws(input$new_title %||% "")
+      page <- trimws(input$new_page %||% "")
+      context <- trimws(input$new_context %||% "")
 
       if (!nzchar(mod_name) || !nzchar(key)) {
         save_msg("Error: Module and key are required")
@@ -463,7 +543,8 @@ run_callout_editor_gui <- function() {
       reg[[mod_name]][[key]] <- list(
         title = if (nzchar(title)) title else key,
         text = "Enter callout text here.",
-        context = ""
+        context = context,
+        page = page
       )
 
       write_registry(reg)
@@ -676,6 +757,15 @@ callout_editor_css <- function() {
 
   /* Add form */
   .ce-add-form .form-group { margin-bottom: 12px; }
+  .ce-add-hint {
+    font-size: 11px; color: #94a3b8; line-height: 1.4;
+    margin: -4px 0 12px; font-style: italic;
+  }
+  .ce-add-hint code {
+    background: #f1f5f9; padding: 1px 5px; border-radius: 3px;
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+    font-style: normal; color: #475569; font-size: 10.5px;
+  }
 
   /* Override Shiny defaults */
   .form-control {
