@@ -847,19 +847,35 @@
       html += '</div></div>';
     }
 
-    /* Iterate in focal-first-then-alpha order so the mini-funnels line
-       up with the top chip bar (which uses the same sort) and the new
-       focal always appears first when the user changes the focus. */
-    var orderedIdx = brandCodes.map(function (_, i) { return i; });
-    orderedIdx.sort(function (a, b) {
-      var aIsFocal = brandCodes[a] === focal;
-      var bIsFocal = brandCodes[b] === focal;
-      if (aIsFocal && !bIsFocal) return -1;
-      if (bIsFocal && !aIsFocal) return 1;
-      var an = (brandNames[a] || brandCodes[a]).toLowerCase();
-      var bn = (brandNames[b] || brandCodes[b]).toLowerCase();
-      return an.localeCompare(bn);
-    });
+    /* Iterate in the SAME order the table currently shows so the
+       mini-funnels stay aligned with whatever sort the analyst has
+       applied. Falls back to focal-first-then-alpha when the table
+       hasn't rendered yet (initial paint, before bind). */
+    var tableOrder = readFunnelTableOrder(panel);
+    var orderedIdx;
+    if (tableOrder && tableOrder.length > 0) {
+      orderedIdx = [];
+      tableOrder.forEach(function (code) {
+        var idx = brandCodes.indexOf(code);
+        if (idx >= 0) orderedIdx.push(idx);
+      });
+      // Append any brand codes the table hasn't rendered (defensive —
+      // every brand normally has a row, but if not we still want it).
+      brandCodes.forEach(function (_, i) {
+        if (orderedIdx.indexOf(i) < 0) orderedIdx.push(i);
+      });
+    } else {
+      orderedIdx = brandCodes.map(function (_, i) { return i; });
+      orderedIdx.sort(function (a, b) {
+        var aIsFocal = brandCodes[a] === focal;
+        var bIsFocal = brandCodes[b] === focal;
+        if (aIsFocal && !bIsFocal) return -1;
+        if (bIsFocal && !aIsFocal) return 1;
+        var an = (brandNames[a] || brandCodes[a]).toLowerCase();
+        var bn = (brandNames[b] || brandCodes[b]).toLowerCase();
+        return an.localeCompare(bn);
+      });
+    }
 
     for (var ii = 0; ii < orderedIdx.length; ii++) {
       var bi = orderedIdx[ii];
@@ -1601,6 +1617,35 @@
       return dir === "asc" ? av - bv : bv - av;
     });
     competitors.forEach(function(r){ tbody.appendChild(r); });
+
+    /* The mini-funnels and slope/bar chart now follow the table's
+       current row order via readFunnelTableOrder(), so we re-render
+       them after every sort. Without this, sorting the table on, say,
+       "Past 3 months descending" left the charts in their stale order. */
+    applyChartVisibility(panel);
+  }
+
+  /* Read the current brand-row order from the funnel table tbody so the
+     mini-funnels and chart stay in lockstep with whatever sort the
+     analyst has applied. Returns brand_codes in DOM order, focal
+     pinned to position 0 (since the focal row is rendered separately
+     above the competitor rows). Falls back to null if the table isn't
+     rendered yet — caller can default to data order in that case. */
+  function readFunnelTableOrder(panel) {
+    var tbl = panel.querySelector("table.fn-table tbody");
+    if (!tbl) return null;
+    var codes = [];
+    var focalRow = tbl.querySelector("tr.fn-row-focal");
+    if (focalRow) {
+      var fc = focalRow.getAttribute("data-fn-brand");
+      if (fc) codes.push(fc);
+    }
+    var compRows = tbl.querySelectorAll("tr.fn-row-competitor");
+    for (var i = 0; i < compRows.length; i++) {
+      var c = compRows[i].getAttribute("data-fn-brand");
+      if (c) codes.push(c);
+    }
+    return codes.length > 0 ? codes : null;
   }
 
   // ---------------------------------------------------------------------------
@@ -2753,12 +2798,27 @@
       };
     });
 
-    // Sort: focal first, then descending by value
-    brandData.sort(function(a, b) {
-      if (a.code === focal) return -1;
-      if (b.code === focal) return 1;
-      return (b.val != null ? b.val : -1) - (a.val != null ? a.val : -1);
-    });
+    /* Order: follow the table's current row order so the bars stack in
+       the same sequence as the rows. Falls back to focal-first +
+       desc-by-value when the table isn't rendered yet (initial paint). */
+    var barTableOrder = readFunnelTableOrder(panel);
+    if (barTableOrder && barTableOrder.length > 0) {
+      var posMap = {};
+      barTableOrder.forEach(function (code, i) { posMap[code] = i; });
+      brandData.sort(function (a, b) {
+        var pa = posMap[a.code]; var pb = posMap[b.code];
+        if (pa == null) pa = Infinity;
+        if (pb == null) pb = Infinity;
+        return pa - pb;
+      });
+    } else {
+      // Initial fallback: focal first, then descending by value.
+      brandData.sort(function (a, b) {
+        if (a.code === focal) return -1;
+        if (b.code === focal) return 1;
+        return (b.val != null ? b.val : -1) - (a.val != null ? a.val : -1);
+      });
+    }
 
     // Category average reference value
     var catAvgVal = null;
