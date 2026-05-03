@@ -80,6 +80,12 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
                          focal_colour = focal_colour),
       .ma_chart_placeholder(stim = "attributes", pd = panel_data),
       .ma_insight_box(stim = "attributes"),
+      # Per-sub-tab callout: explains what an attribute is and how to
+      # read this specific page. Edit via the Callout Editor under
+      # brand / mental_availability_attributes.
+      if (exists("turas_callout", mode = "function"))
+        turas_callout("brand", "mental_availability_attributes",
+                       collapsed = TRUE) else "",
       '</div>'
     ) else "",
 
@@ -91,6 +97,12 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
                          focal_colour = focal_colour),
       .ma_chart_placeholder(stim = "ceps", pd = panel_data),
       .ma_insight_box(stim = "ceps"),
+      # Per-sub-tab callout: explains what a CEP is and how to read
+      # this specific page. Edit via the Callout Editor under
+      # brand / mental_availability_ceps.
+      if (exists("turas_callout", mode = "function"))
+        turas_callout("brand", "mental_availability_ceps",
+                       collapsed = TRUE) else "",
       '</div>'
     ) else "",
 
@@ -103,12 +115,11 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
     '<div class="ma-subtab" data-ma-subtab="metrics" hidden>',
       .ma_metrics_section(panel_data, focal_colour = focal_colour),
       .ma_insight_box(stim = "metrics"),
+      # The framework + metric-formula callout lives on the Metrics
+      # sub-tab where the metrics it explains are actually shown.
+      sprintf('<div class="ma-about-availability">%s</div>',
+              .ma_about_section(panel_data)),
     '</div>',
-
-    # Panel-wide "About Mental Availability" drawer. Only shows for
-    # non-advantage tabs; the advantage tab carries its own Mental
-    # Advantage callout at the bottom of its own subtab.
-    sprintf('<div class="ma-about-availability">%s</div>', .ma_about_section(panel_data)),
     '</div>'
   )
 }
