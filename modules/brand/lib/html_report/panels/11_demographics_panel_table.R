@@ -188,13 +188,12 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
     as.integer(round(base_n * pct / 100)) else NA_integer_
   sprintf(
     '<td class="%s" data-demo-col="%s" data-demo-brand="%s" data-demo-heat="%s">
-       %s%s%s
+       %s%s
      </td>',
     extra_class, colcode, .demo_table_esc(brand_code %||% ""),
     .demo_table_esc(bg),
     .demo_table_pct(pct, dp),
-    .demo_table_count_span(cell_n),
-    .demo_table_ci_span(cell$ci_lower, cell$ci_upper, dp))
+    .demo_table_count_span(cell_n))
 }
 
 
@@ -203,11 +202,10 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
   base_n <- r$n
   sprintf(
     '<td class="demo-col-catavg" data-demo-col="catavg">
-       %s%s%s
+       %s%s
      </td>',
     .demo_table_pct(pct, dp),
-    .demo_table_count_span(base_n),
-    .demo_table_ci_span(r$ci_lower, r$ci_upper, dp))
+    .demo_table_count_span(base_n))
 }
 
 
@@ -232,14 +230,6 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
 .demo_table_count_span <- function(n) {
   if (is.null(n) || is.na(n) || !is.finite(n)) return("")
   sprintf('<span class="demo-cell-n" hidden>n=%d</span>', as.integer(n))
-}
-
-
-.demo_table_ci_span <- function(lo, hi, dp) {
-  if (is.null(lo) || is.null(hi) || is.na(lo) || is.na(hi) ||
-      !is.finite(lo) || !is.finite(hi)) return("")
-  sprintf('<span class="demo-cell-ci" hidden>[%.*f%% &ndash; %.*f%%]</span>',
-          as.integer(dp), lo, as.integer(dp), hi)
 }
 
 

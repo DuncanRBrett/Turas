@@ -3,13 +3,16 @@
 # ==============================================================================
 # Lays out the per-category Demographics tab as a matrix per question:
 #
-#   Option label | Focal brand (selectable) | Cat avg (CI band) | Brand A | …
+#   Option label | Focal brand (selectable) | Cat avg | Brand A | …
+#
+# Demographics is a quick brand-vs-category-vs-other-brands comparison
+# only. Detailed demographic exploration is the tabs module's job;
+# confidence intervals were dropped to keep the read uncluttered.
 #
 # Global controls (panel header):
-#   - Focal-brand picker (chip strip; click to swap col 2)
+#   - Focal-brand picker (<select> dropdown — picks col 2)
 #   - Show counts checkbox
 #   - Heatmap checkbox
-#   - Show 95% CI checkbox
 # Brand visibility: colour-coded chip strip; click to hide / show that brand's
 #   matrix column without re-running the engine.
 # Question visibility: chip strip; click to hide / show a question card.
@@ -103,17 +106,24 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 
 .demo-chip-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0 10px; padding: 0 4px; }
 .demo-chip-row-label { font-size: 11px; color: #64748b; margin-right: 4px; }
-.demo-q-chip, .demo-brand-chip, .demo-focal-chip {
+.demo-q-chip, .demo-brand-chip {
   background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px;
   padding: 4px 10px; font-size: 11px; color: #475569; cursor: pointer;
   display: inline-flex; align-items: center; gap: 5px;
 }
-.demo-q-chip:hover, .demo-brand-chip:hover, .demo-focal-chip:hover { background: #f1f5f9; }
+.demo-q-chip:hover, .demo-brand-chip:hover { background: #f1f5f9; }
 .demo-q-chip.active { background: __FOCAL__; color: #fff; border-color: __FOCAL__; }
 .demo-q-chip:not(.active) { opacity: 0.55; text-decoration: line-through; }
 .demo-brand-chip-swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .demo-brand-chip:not(.active) { opacity: 0.45; text-decoration: line-through; }
-.demo-focal-chip.active { background: __FOCAL__; color: #fff; border-color: __FOCAL__; }
+
+.demo-focal-row { align-items: center; }
+.demo-focal-select {
+  font: inherit; font-size: 12px; color: #1e293b;
+  background: #fff; border: 1px solid #cbd5e1; border-radius: 6px;
+  padding: 4px 8px; cursor: pointer; min-width: 140px;
+}
+.demo-focal-select:focus { outline: 2px solid __FOCAL__; outline-offset: 1px; }
 
 .demo-card-grid { display: flex; flex-direction: column; gap: 16px; }
 .demo-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 2px rgba(0,0,0,.03); position: relative; }
@@ -142,7 +152,6 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 .demo-col-catavg { background: #fafbfc; font-style: italic; color: #475569; }
 .demo-col-ci { color: #94a3b8; font-size: 11px; }
 .demo-cell-n { font-size: 10px; color: #94a3b8; margin-left: 4px; font-weight: normal; }
-.demo-cell-ci { font-size: 10px; color: #94a3b8; display: block; margin-top: 1px; }
 .demo-na { color: #cbd5e1; font-style: italic; }
 
 /* Chart view */
@@ -198,36 +207,32 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
     '<span class="demo-control-label">Show:</span>',
     '<label class="demo-control-check"><input type="checkbox" data-demo-toggle="counts"> n counts</label>',
     '<label class="demo-control-check"><input type="checkbox" data-demo-toggle="heatmap" checked> Heatmap</label>',
-    '<label class="demo-control-check"><input type="checkbox" data-demo-toggle="ci"> 95% CI</label>',
     '</div>'
   )
 }
 
 
-# Focal-brand picker — colour-coded chips, one per brand. The chip in the
-# active state controls which brand becomes column 2 ("Focal brand").
+# Focal-brand picker — dropdown. Controls which brand sits in column 2
+# ("Focal") of every per-question matrix. Simple <select> rather than a
+# chip strip per Duncan's request — Demographics is a quick-comparison
+# tab, full-fidelity exploration belongs in tabs.
 .demo_panel_focal_picker <- function(pd, brand_cols) {
   bcs <- pd$brands$codes  %||% character(0)
   bls <- pd$brands$labels %||% bcs
   if (length(bcs) == 0L) return("")
   focal <- pd$meta$focal_brand %||% ""
-  if (focal %in% bcs) {
-    bcs <- c(focal, setdiff(bcs, focal))
-    bls <- bls[match(bcs, pd$brands$codes)]
-  }
-  chips <- vapply(seq_along(bcs), function(i) {
-    active <- if (i == 1L) " active" else ""
-    col    <- brand_cols[[bcs[i]]] %||% "#94a3b8"
-    sprintf(
-      '<button type="button" class="demo-focal-chip%s" data-demo-focal="%s">
-         <span class="demo-brand-chip-swatch" style="background:%s"></span>%s
-       </button>',
-      active, .demo_esc(bcs[i]), .demo_esc(col), .demo_esc(bls[i]))
+  default_code <- if (focal %in% bcs) focal else bcs[1]
+  options_html <- vapply(seq_along(bcs), function(i) {
+    sel <- if (identical(bcs[i], default_code)) ' selected' else ''
+    sprintf('<option value="%s"%s>%s</option>',
+            .demo_esc(bcs[i]), sel, .demo_esc(bls[i]))
   }, character(1L))
   paste0(
-    '<div class="demo-chip-row">',
-    '<span class="demo-chip-row-label">Focal brand:</span>',
-    paste(chips, collapse = ""),
+    '<div class="demo-chip-row demo-focal-row">',
+    '<label class="demo-chip-row-label" for="demo-focal-select">Focal brand:</label>',
+    '<select id="demo-focal-select" class="demo-focal-select" data-demo-focal-select>',
+    paste(options_html, collapse = ""),
+    '</select>',
     '</div>')
 }
 

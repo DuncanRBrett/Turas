@@ -83,14 +83,15 @@ test_that("matrix table cell percentages match engine output", {
 })
 
 
-test_that("matrix table emits hidden n + ci spans for JS toggles to reveal", {
+test_that("matrix table emits hidden n spans for the JS counts toggle to reveal", {
   pd <- .demo_test_payload()
   html <- build_demographics_matrix_table(
     pd$questions[[1]], focal_brand = "BR_A",
     brand_colours = list(BR_A = "#1A5276", BR_B = "#A04000"),
     panel_data = pd, decimal_places = 0L)
   expect_match(html, '<span class="demo-cell-n" hidden>n=', fixed = TRUE)
-  expect_match(html, '<span class="demo-cell-ci" hidden>\\[', perl = TRUE)
+  # CI ranges were dropped — Demographics tab is a quick comparison only.
+  expect_false(grepl('demo-cell-ci', html, fixed = TRUE))
 })
 
 

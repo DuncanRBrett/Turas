@@ -2,7 +2,7 @@
  * BRAND MODULE - DEMOGRAPHICS PANEL JS (matrix layout v2)
  * ==============================================================================
  * Wires the Demographics matrix panel:
- *   - Global controls: n counts / heatmap / 95% CI checkboxes (re-paint cells)
+ *   - Global controls: n counts / heatmap checkboxes (re-paint cells)
  *   - Focal-brand picker: chips re-issue a re-render of column 2 across cards
  *   - Brand-visibility chips: hide/show specific per-brand columns
  *   - Question chips: hide/show whole question cards
@@ -33,7 +33,6 @@
       hiddenQs:     new Set(),
       showCounts:   false,
       showHeatmap:  true,
-      showCI:       false,
       viewByCard:   {} // sectionId -> "table" | "chart"
     };
 
@@ -56,28 +55,23 @@
     catch (e) { console.warn("[demographics] bad JSON payload", e); return null; }
   }
 
-  // ---- global toggles (n counts / heatmap / CI) ----
+  // ---- global toggles (n counts / heatmap) ----
   function bindGlobalToggles(panel) {
     panel.querySelectorAll('input[data-demo-toggle]').forEach(input => {
       input.addEventListener("change", () => {
         const k = input.getAttribute("data-demo-toggle");
         if      (k === "counts")  { panel.__state.showCounts  = input.checked; applyCellExtras(panel); }
         else if (k === "heatmap") { panel.__state.showHeatmap = input.checked; applyHeatmap(panel); }
-        else if (k === "ci")      { panel.__state.showCI      = input.checked; applyCellExtras(panel); }
       });
     });
   }
 
-  // Show / hide the .demo-cell-n + .demo-cell-ci spans across the panel.
-  // R renderer emits both with hidden — JS just toggles the attribute.
+  // Show / hide the .demo-cell-n spans across the panel. R renderer
+  // emits them with hidden — JS just toggles the attribute.
   function applyCellExtras(panel) {
-    const showN  = panel.__state.showCounts;
-    const showCI = panel.__state.showCI;
+    const showN = panel.__state.showCounts;
     panel.querySelectorAll(".demo-cell-n").forEach(el => {
       el.toggleAttribute("hidden", !showN);
-    });
-    panel.querySelectorAll(".demo-cell-ci").forEach(el => {
-      el.toggleAttribute("hidden", !showCI);
     });
   }
 
@@ -92,19 +86,15 @@
   }
 
   // ---- focal-brand picker ----
-  // The renderer puts the focal-brand column in position 2. When the user
-  // picks a new focal, we rotate the column visually by swapping the cell
-  // contents between the old focal column and the new focal's column. To
-  // keep this code small, we re-render the whole table for each card from
-  // the JSON payload, parameterised by the new focal.
+  // <select> dropdown — picks which brand sits in column 2 ("Focal").
+  // Replaces the earlier chip strip; full per-cohort exploration is the
+  // tabs module's job, this stays a quick comparison.
   function bindFocalPicker(panel) {
-    panel.querySelectorAll(".demo-focal-chip").forEach(chip => {
-      chip.addEventListener("click", () => {
-        panel.querySelectorAll(".demo-focal-chip.active").forEach(a => a.classList.remove("active"));
-        chip.classList.add("active");
-        panel.__state.focal = chip.getAttribute("data-demo-focal");
-        rerenderAllTables(panel);
-      });
+    const sel = panel.querySelector("[data-demo-focal-select]");
+    if (!sel) return;
+    sel.addEventListener("change", () => {
+      panel.__state.focal = sel.value || panel.__state.focal;
+      rerenderAllTables(panel);
     });
   }
 
@@ -269,13 +259,13 @@
     const cellN = (isFinite(baseN) && isFinite(pct))
                    ? Math.round(baseN * pct / 100) : null;
     return `<td class="${extraClass}" data-demo-col="${colcode}" data-demo-brand="${esc(brandCode || "")}" data-demo-heat="${esc(heat)}">
-      ${pctStr(pct, dp)}${countSpan(cellN)}${ciSpan(cell.ci_lower, cell.ci_upper, dp)}
+      ${pctStr(pct, dp)}${countSpan(cellN)}
     </td>`;
   }
 
   function catAvgCell(r, dp) {
     return `<td class="demo-col-catavg" data-demo-col="catavg">
-      ${pctStr(r.pct, dp)}${countSpan(r.n)}${ciSpan(r.ci_lower, r.ci_upper, dp)}
+      ${pctStr(r.pct, dp)}${countSpan(r.n)}
     </td>`;
   }
 
@@ -300,10 +290,6 @@
   function countSpan(n) {
     if (n == null || !isFinite(n)) return "";
     return `<span class="demo-cell-n" hidden>n=${Math.round(n)}</span>`;
-  }
-  function ciSpan(lo, hi, dp) {
-    if (lo == null || hi == null || !isFinite(lo) || !isFinite(hi)) return "";
-    return `<span class="demo-cell-ci" hidden>[${lo.toFixed(dp)}% &ndash; ${hi.toFixed(dp)}%]</span>`;
   }
   function esc(s) {
     return String(s == null ? "" : s)
