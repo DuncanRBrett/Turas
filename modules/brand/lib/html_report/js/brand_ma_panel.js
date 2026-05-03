@@ -1393,15 +1393,28 @@
        When the user sorts the table, applySort reorders the <tr> nodes;
        we read that DOM order back and use it here so the dot plot tracks
        the table. Falls back to block.codes when the table isn't rendered
-       yet (initial render before sort buttons are bound). */
+       yet (initial render before sort buttons are bound).
+
+       Critical: keep the ORIGINAL stim index on each row. block.stim_avg
+       is indexed against block.codes, so without the original idx the
+       cat-avg dashed line lookup (parts.push('<line class="ma-bar-cat-avg"
+       ...) returns undefined and the line silently disappears. */
     var labelByCode = {};
-    (block.codes || []).forEach(function (c, i) { labelByCode[c] = block.labels[i]; });
+    var idxByCode = {};
+    (block.codes || []).forEach(function (c, i) {
+      labelByCode[c] = block.labels[i];
+      idxByCode[c] = i;
+    });
     var orderedCodes = readTableRowOrder(panel, stim);
     if (!orderedCodes || orderedCodes.length === 0) {
       orderedCodes = block.codes || [];
     }
     var activeRows = orderedCodes.map(function (code) {
-      return { code: code, label: labelByCode[code] || code };
+      return {
+        code: code,
+        label: labelByCode[code] || code,
+        idx: idxByCode[code]
+      };
     }).filter(function (r) { return rowActive[r.code] !== false; });
 
     // Render legend
