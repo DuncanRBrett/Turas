@@ -62,6 +62,10 @@ build_demographics_panel_html <- function(panel_data,
   json_payload <- .demo_panel_json(panel_data, focal_colour)
   brand_cols   <- .demo_brand_palette(panel_data, focal_colour)
 
+  callout_html <- if (exists("turas_callout", mode = "function")) {
+    turas_callout("brand", "demographics", collapsed = TRUE)
+  } else ""
+
   paste0(
     sprintf('<div class="demo-panel" id="%s" data-focal-colour="%s">',
             panel_id, .demo_esc(focal_colour)),
@@ -73,6 +77,7 @@ build_demographics_panel_html <- function(panel_data,
     .demo_panel_brand_chips(panel_data, brand_cols),
     .demo_panel_question_chips(panel_data),
     .demo_panel_card_grid(panel_data, panel_id, brand_cols),
+    callout_html,
     '</div>'
   )
 }
