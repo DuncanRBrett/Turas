@@ -1998,6 +1998,7 @@
       opts.push({ key: 'matrix',   label: 'Mental Advantage matrix' });
       opts.push({ key: 'quadrant', label: 'Strategic quadrant chart' });
       opts.push({ key: 'actions',  label: 'Action list (Defend / Build / Maintain)' });
+      opts.push({ key: 'focal',    label: 'Focal brand view (Drivers & Barriers)' });
       opts.push({ key: 'insight',  label: 'Insight note' });
     }
 
@@ -2176,9 +2177,10 @@
       var advDefs = {
         matrix:   { sel: '.ma-adv-matrix-wrap',  label: 'Matrix' },
         quadrant: { sel: '.ma-adv-quadrant-view', label: 'Strategic quadrant' },
-        actions:  { sel: '.ma-adv-action-list-view', label: 'Action list' }
+        actions:  { sel: '.ma-adv-action-list-view', label: 'Action list' },
+        focal:    { sel: '.ma-adv-focal-view',    label: 'Focal brand view (Drivers & Barriers)' }
       };
-      var advOrder = ['matrix', 'quadrant', 'actions'];
+      var advOrder = ['matrix', 'quadrant', 'actions', 'focal'];
       var advPinIndex = 0;
       advOrder.forEach(function (key) {
         if (optKeys.indexOf(key) < 0) return;

@@ -348,6 +348,12 @@
       "page": "mental_advantage",
       "text": "<p><strong>Source:</strong> Romaniuk, J. (2022). <em>Better Brand Health</em>; Quantilope (2024). <em>Mental Advantage Analysis</em>.</p><p><strong>Formula:</strong> expected[s,b] = (row_total[s] &times; col_total[b]) &divide; grand_total. MA[s,b] = (actual[s,b] &minus; expected[s,b]) &divide; n &times; 100, in pp.</p><p><strong>Decisions:</strong> Defend if MA &ge; +5 pp, Build if MA &le; &minus;5 pp, Maintain in between.</p><p><strong>Significance:</strong> chi-square standardised residual z = (actual &minus; expected) &divide; &radic;expected. Cells flagged when |z| &gt; 1.96 (p &lt; 0.05). Bootstrap confidence intervals are a documented stretch, not implemented in v1.</p><p><strong>Cell counts (Show counts toggle):</strong> <code>a=</code> is the <em>actual</em> respondent count linking the brand to that stim; <code>e=</code> is the <em>expected</em> count under independence. A bigger gap between <code>a</code> and <code>e</code> drives the MA score and significance.</p><p><strong>Base:</strong> total respondents.</p>"
     },
+    "ma_focal_view_intro": {
+      "title": "Focal brand view — drivers and barriers",
+      "context": "Mental Advantage tab — focal brand drill-down callout",
+      "page": "mental_advantage",
+      "text": "<p>This focal-brand table pairs each stimulus's market-relative <strong>Mental Advantage score</strong> with the focal brand's <strong>Buyer gap</strong> &mdash; the difference between focal-brand buyers and non-buyers in associating the stimulus.</p><p><strong>How to read the four labels</strong></p><dl><dt>Real strength</dt><dd>High MA <em>and</em> high buyer gap. The brand owns the cue and buyers reinforce it. Defend.</dd><dt>Fame gap</dt><dd>High MA, flat or negative buyer gap. The market thinks of the brand for this CEP, but buyers don't reinforce that association &mdash; usually a delivery or experience gap.</dd><dt>Buyer edge</dt><dd>Flat MA, high buyer gap. Buyers know it; the market doesn't yet. An awareness opportunity.</dd><dt>Weak</dt><dd>Low MA. Drop from comms or rebuild deliberately.</dd></dl><p>Buyer gap uses a 95% two-proportion z test on unweighted bases. Cells with fewer than 30 buyers or non-buyers are suppressed because the gap is too noisy to act on.</p>"
+    },
     "executive_summary": {
       "title": "How to read this dashboard",
       "context": "Brand Executive Summary panel — bottom callout",

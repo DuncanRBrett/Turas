@@ -339,6 +339,116 @@ ol.ma-adv-action-list {
   .ma-adv-views { gap: 12px; }
   .ma-adv-tooltip { display: none !important; }
 }
+
+/* Focal-brand label inside subsection titles (Strategic Quadrant,
+   Action List). Matches the focal-view title accent so the eye links
+   the three labels together. */
+.ma-adv-focal-name {
+  color: %FOCAL%; font-weight: 700;
+}
+
+/* ============================================================== */
+/* Focal Brand View (replaces standalone Drivers & Barriers page) */
+/* ============================================================== */
+.ma-adv-focal-view {
+  margin: 18px 0 4px; padding: 14px 16px 12px;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.ma-adv-focal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 10px; flex-wrap: wrap;
+}
+.ma-adv-focal-headline {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+}
+.ma-adv-focal-toolbar {
+  display: flex; gap: 6px; align-items: center;
+}
+.ma-adv-focal-toolbar .pin-flash {
+  background: #d1fae5 !important; border-color: #10b981 !important;
+  transition: background 0.3s, border-color 0.3s;
+}
+.ma-adv-focal-title {
+  margin: 0; font-size: 14px; font-weight: 700; color: #0f172a;
+}
+.ma-adv-focal-title [data-ma-focal-brand] {
+  color: %FOCAL%; font-weight: 800;
+}
+.ma-adv-focal-base {
+  font-size: 11px; color: #64748b;
+}
+.ma-adv-focal-table-wrap { overflow-x: auto; }
+.ma-adv-focal-table {
+  width: 100%; border-collapse: collapse; font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+.ma-adv-focal-table thead th {
+  background: #1f2a44; color: #fff; font-weight: 600;
+  padding: 9px 10px; text-align: center; vertical-align: middle;
+  font-size: 11.5px; letter-spacing: 0.2px;
+}
+.ma-adv-focal-table thead th.ct-lbl { text-align: left; padding-left: 14px; }
+.ma-adv-focal-table thead th.ma-adv-focal-th-gap { background: #2d4373; }
+.ma-adv-focal-sub {
+  display: block; font-weight: 400; font-size: 9.5px;
+  color: #cbd5e1; margin-top: 2px; text-transform: none;
+}
+.ma-adv-focal-table tbody td {
+  padding: 7px 10px; text-align: center;
+  border-bottom: 1px solid #eef2f7; font-weight: 600;
+}
+.ma-adv-focal-table tbody td.ct-lbl {
+  text-align: left; padding-left: 14px; font-weight: 400; color: #1f2a44;
+}
+
+/* MA score cell ramp — mirrors the matrix palette so the eye recognises
+   the same scale as upstairs. Three positive + three negative tints. */
+.ma-fv-ma-pos-3 { background: #6fcf97; color: #053a22; }
+.ma-fv-ma-pos-2 { background: #a8e0bd; color: #1f3d2c; }
+.ma-fv-ma-pos-1 { background: #d6f1e0; color: #1f3d2c; }
+.ma-fv-ma-zero  { background: #f5f6f8; color: #475569; }
+.ma-fv-ma-neg-1 { background: #fadcd9; color: #5b1d1d; }
+.ma-fv-ma-neg-2 { background: #f5b5b1; color: #5b1d1d; }
+.ma-fv-ma-neg-3 { background: #e88884; color: #fff; }
+
+/* Buyer-gap cell ramp — DELIBERATELY blue, not green. Two columns of
+   numbers in the same green-red scale would be unreadable; the blue
+   ramp keeps "buyer gap" visually distinct from "MA score". */
+.ma-fv-gap-pos-3 { background: #4f8df9; color: #fff; }
+.ma-fv-gap-pos-2 { background: #93b6fb; color: #0b203a; }
+.ma-fv-gap-pos-1 { background: #cfddf9; color: #0b203a; }
+.ma-fv-gap-zero  { background: #f5f6f8; color: #475569; }
+.ma-fv-gap-neg-1 { background: #f3d4d4; color: #5b1d1d; }
+.ma-fv-gap-neg-2 { background: #e69e9e; color: #fff; }
+.ma-fv-gap-suppressed { color: #94a3b8; font-weight: 400; }
+
+/* Read chips — four labels (locked) plus an INSUFFICIENT-base chip. */
+.ma-fv-chip {
+  display: inline-block; padding: 3px 8px; border-radius: 12px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+.ma-fv-chip-strength    { background: #d1f5e0; color: #064e2b; }
+.ma-fv-chip-fame_gap    { background: #fde7d0; color: #7c2d12; }
+.ma-fv-chip-buyer_edge  { background: #dbe9ff; color: #1e3a8a; }
+.ma-fv-chip-weak        { background: #fde2e2; color: #7f1d1d; }
+.ma-fv-chip-insufficient{ background: #f1f5f9; color: #64748b; }
+
+.ma-adv-focal-footnote {
+  margin: 10px 0 0; font-size: 11px; color: #64748b;
+  line-height: 1.45;
+}
+
+/* Sig star uses the same colour as the existing MA matrix sig markers
+   so significance reads consistently across the page. */
+.ma-adv-focal-table .ma-fv-sig {
+  font-weight: 700; margin-left: 1px;
+}
+
+@media print {
+  .ma-adv-focal-view { box-shadow: none; }
+}
 '
 
   tmpl <- gsub("%FOCAL%", focal_colour, tmpl, fixed = TRUE)

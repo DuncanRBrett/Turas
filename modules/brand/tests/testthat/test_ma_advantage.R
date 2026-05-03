@@ -300,3 +300,94 @@ test_that("IPK Wave 1: MA advantage block renders for CEPs + attributes", {
   fs1 <- block_sensitive$ceps$focal_summary
   expect_gt(fs1$counts$defend + fs1$counts$build, 0L)
 })
+
+
+# ==============================================================================
+# FOCAL-VIEW PROPAGATION (Drivers & Barriers lens)
+# ==============================================================================
+# Verifies that calculate_ma_focal_view()'s data frame survives the round
+# trip through build_ma_advantage_block() into a JSON-safe per-stimulus
+# rows list, and that absence of focal_view degrades gracefully.
+
+source(file.path(ROOT, "modules", "brand", "R", "02c_ma_focal_view.R"))
+
+test_that("focal_view data frame propagates into the advantage block", {
+  data <- mk_adv_mini_data()
+  rm   <- mk_adv_mini_role_map(data)
+  brands <- data.frame(BrandCode = c("IPK", "ROB", "CART"),
+                       BrandLabel = c("IPK", "ROB", "CART"),
+                       stringsAsFactors = FALSE)
+
+  cep_link  <- build_cep_linkage(data, rm, "DSS", brands, item_kind = "cep")
+  ma_result <- run_mental_availability(
+    linkage = cep_link, focal_brand = "IPK", weights = NULL,
+    cep_labels = data.frame(CEPCode = c("CEP01","CEP02"),
+                             CEPText = c("First stim","Second stim"),
+                             stringsAsFactors = FALSE),
+    run_cep_turf = FALSE)
+
+  # Build a focal-view df via the engine. Mini fixture has only 6 resp so
+  # every row will be Below_Min_Base (suppression path); pen is arbitrary
+  # (the fixture has no BRANDPEN2 columns — we just need a valid 6-vector).
+  pen <- as.integer(c(1, 1, 1, 0, 0, 0))
+  fv_df <- calculate_ma_focal_view(
+    linkage_tensor = cep_link$linkage_tensor,
+    codes          = c("CEP01","CEP02"),
+    focal_brand    = "IPK",
+    pen            = pen,
+    ma_advantage   = as.numeric(ma_result$cep_advantage$advantage[, "IPK"]),
+    ma_significant = as.logical(ma_result$cep_advantage$is_significant[, "IPK"]))
+  ma_result$focal_view <- list(
+    ceps = list(by_brand = list(IPK = fv_df), default_brand_code = "IPK"))
+
+  block <- build_ma_advantage_block(
+    ma_result,
+    brand_codes = c("IPK","ROB","CART"),
+    brand_names = c("IPK","ROB","CART"),
+    cep_list    = data.frame(CEPCode = c("CEP01","CEP02"),
+                              CEPText = c("First stim","Second stim"),
+                              stringsAsFactors = FALSE),
+    focal_code  = "IPK")
+
+  expect_false(is.null(block$ceps$focal_view))
+  fv_set <- block$ceps$focal_view
+  expect_equal(fv_set$default_brand_code, "IPK")
+  expect_true("IPK" %in% names(fv_set$by_brand))
+
+  fv <- fv_set$by_brand$IPK
+  expect_equal(fv$focal_brand_code, "IPK")
+  expect_equal(length(fv$rows), 2L)
+  # Below min_base on a 6-respondent fixture
+  expect_true(all(vapply(fv$rows, function(r) isTRUE(r$below_min_base), logical(1))))
+  expect_true(all(vapply(fv$rows, function(r) r$read_label == "INSUFFICIENT",
+                         logical(1))))
+  # Stimulus order matches the advantage block codes
+  expect_equal(vapply(fv$rows, function(r) r$stim_code, character(1)),
+               c("CEP01","CEP02"))
+  expect_equal(vapply(fv$rows, function(r) r$stim_label, character(1)),
+               c("First stim","Second stim"))
+})
+
+test_that("absent focal_view leaves block$ceps$focal_view as NULL", {
+  data <- mk_adv_mini_data()
+  rm   <- mk_adv_mini_role_map(data)
+  brands <- data.frame(BrandCode = c("IPK", "ROB", "CART"),
+                       BrandLabel = c("IPK", "ROB", "CART"),
+                       stringsAsFactors = FALSE)
+  cep_link  <- build_cep_linkage(data, rm, "DSS", brands, item_kind = "cep")
+  ma_result <- run_mental_availability(
+    linkage = cep_link, focal_brand = "IPK", weights = NULL,
+    cep_labels = data.frame(CEPCode = c("CEP01","CEP02"),
+                             CEPText = c("a","b"),
+                             stringsAsFactors = FALSE),
+    run_cep_turf = FALSE)
+  # No focal_view set on ma_result
+  block <- build_ma_advantage_block(
+    ma_result,
+    brand_codes = c("IPK","ROB","CART"),
+    brand_names = c("IPK","ROB","CART"),
+    cep_list = data.frame(CEPCode = c("CEP01","CEP02"),
+                          CEPText = c("a","b"), stringsAsFactors = FALSE),
+    focal_code = "IPK")
+  expect_null(block$ceps$focal_view)
+})

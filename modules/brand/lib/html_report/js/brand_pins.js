@@ -388,9 +388,11 @@
 
     // Friendlier titles for MA/funnel scopes that lack a heading element.
     if (stim) {
-      var maTitle = (stim === "attributes") ? "Brand Attributes"
-                  : (stim === "ceps")       ? "Category Entry Points"
-                  : (stim === "metrics")    ? "Headline Metrics"
+      var maTitle = (stim === "attributes")       ? "Brand Attributes"
+                  : (stim === "ceps")             ? "Category Entry Points"
+                  : (stim === "metrics")          ? "Headline Metrics"
+                  : (stim === "advantage_focal")  ? "Mental Advantage — Focal Brand View"
+                  : (stim === "advantage")        ? "Mental Advantage"
                   : stim;
       if (!content.title || content.title === sid) {
         content.title = maTitle + (catLabel ? " \u2014 " + catLabel : "");

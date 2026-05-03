@@ -39,6 +39,7 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
     .ma_adv_controls_bar(pd, adv),
     .ma_adv_chip_row(pd),
     .ma_adv_views_layout(adv),
+    .ma_adv_focal_view_section(pd),
     .ma_adv_insight_box(),
     .ma_adv_about(adv),
     .ma_adv_intro(adv),
@@ -187,7 +188,7 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
   paste0(
     '<div class="ma-adv-view ma-adv-quadrant-view" data-ma-adv-view="quadrant">',
     '<div class="ma-adv-view-header">',
-    '<h4 class="ma-subsection-title">Strategic Quadrant</h4>',
+    '<h4 class="ma-subsection-title">Strategic Quadrant&nbsp;&mdash; <span class="ma-adv-focal-name" data-ma-adv-focal-name></span></h4>',
     '<details class="ma-chart-callout">',
     '<summary>About this chart</summary>',
     '<p class="ma-subsection-note">',
@@ -247,7 +248,7 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
   paste0(
     '<div class="ma-adv-view ma-adv-action-list-view" data-ma-adv-view="actions">',
     '<div class="ma-adv-view-header">',
-    '<h4 class="ma-subsection-title">Action List — focal brand</h4>',
+    '<h4 class="ma-subsection-title">Action List&nbsp;&mdash; <span class="ma-adv-focal-name" data-ma-adv-focal-name></span></h4>',
     '<details class="ma-chart-callout">',
     '<summary>About this chart</summary>',
     '<p class="ma-subsection-note">',
@@ -279,6 +280,70 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
 # ==============================================================================
 # INTERNAL: INSIGHT BOX, ABOUT DRAWER, EMPTY STATE
 # ==============================================================================
+
+# ==============================================================================
+# INTERNAL: FOCAL-BRAND VIEW (Drivers & Barriers lens)
+# ==============================================================================
+# Replaces the standalone Drivers & Barriers HTML page. Pairs the
+# market-relative MA score with the focal brand's buyer-vs-non-buyer
+# linkage gap per stimulus, and assigns a four-way Read label.
+#
+# Renders an empty scaffold; brand_ma_advantage.js fills the table
+# whenever the stimulus toggle (CEPs / Attributes) flips, reading
+# panel.advantage.{ceps|attributes}.focal_view from the JSON payload.
+
+.ma_adv_focal_view_section <- function(pd) {
+  adv <- pd$advantage
+  has_focal <- FALSE
+  for (st in c("ceps", "attributes")) {
+    fv <- adv[[st]]$focal_view
+    if (!is.null(fv) && is.list(fv$by_brand) && length(fv$by_brand) > 0) {
+      has_focal <- TRUE; break
+    }
+  }
+  if (!has_focal) return("")
+
+  focal_label <- pd$config$focal_brand_name %||%
+                 pd$config$focal_brand_code %||% "Focal brand"
+  callout <- if (exists("turas_callout", mode = "function")) {
+    turas_callout("brand", "ma_focal_view_intro", collapsed = TRUE)
+  } else ""
+
+  paste0(
+    '<section class="ma-section ma-adv-focal-view" data-ma-focal-view="root" data-ma-stim="advantage_focal">',
+    sprintf(
+      '<div class="ma-adv-focal-header">
+         <div class="ma-adv-focal-headline">
+           <h4 class="ma-adv-focal-title">Focal brand view: <span data-ma-focal-brand>%s</span></h4>
+           <span class="ma-adv-focal-base" data-ma-focal-base></span>
+         </div>
+         <div class="ma-adv-focal-toolbar">
+           <button type="button" class="export-btn ma-pin-dropdown-btn ma-adv-focal-pin-btn" data-ma-action="adv-focal-pindropdown" title="Pin this focal-brand view" aria-haspopup="true">&#128204; Pin &#9662;</button>
+           <button type="button" class="export-btn ma-png-btn ma-adv-focal-png-btn" onclick="brExportPngFromEl(this)" title="Export the focal-brand view to PNG">&#x1F5BC; PNG</button>
+         </div>
+       </div>',
+      htmltools::htmlEscape(focal_label)),
+    callout,
+    '<div class="ma-adv-focal-table-wrap">',
+    '<table class="ct-table ma-adv-focal-table" data-ma-focal-table>',
+    '<thead><tr>',
+    '<th class="ct-lbl ma-adv-focal-th-stim">Stimulus</th>',
+    '<th class="ma-adv-focal-th-ma">MA score<span class="ma-adv-focal-sub">market-relative (pp)</span></th>',
+    '<th class="ma-adv-focal-th-gap">Buyer gap<span class="ma-adv-focal-sub">buyer % &minus; non-buyer % (pp)</span></th>',
+    '<th class="ma-adv-focal-th-read">Read</th>',
+    '</tr></thead>',
+    '<tbody data-ma-focal-tbody></tbody>',
+    '</table>',
+    '</div>',
+    '<p class="ma-adv-focal-footnote">',
+    'Buyer gap = % of focal-brand P3M buyers linking the stimulus, minus the same for non-buyers. ',
+    'Significance = 95% two-proportion z (unweighted bases). ',
+    'Cells suppressed when either base is below n=30.',
+    '</p>',
+    '</section>'
+  )
+}
+
 
 .ma_adv_insight_box <- function() {
   '<section class="ma-insight-box" data-ma-stim="advantage">

@@ -24,7 +24,7 @@ All elements are config-togglable via `element_*` settings in Brand_Config.xlsx.
 | Mental Availability | Core | MMS, MPen, NS, CEP x brand matrix, CEP TURF |
 | Funnel | Derived | Awareness > disposition > bought > primary, attitude decomposition |
 | Repertoire | Derived | Multi-brand buying, sole loyalty, share of requirements |
-| Drivers & Barriers | Derived | Importance x Performance quadrants, rejection themes |
+| Drivers & Barriers | Derived | Excel/CSV outputs (Importance x Performance, rejection themes). The HTML "drivers & barriers" view is rendered as a focal-brand drill-down on the Mental Advantage sub-tab — see `02c_ma_focal_view.R`. |
 | WOM | Own battery | Received/shared x positive/negative balance |
 | DBA | Own battery | Fame x Uniqueness grid for distinctive brand assets |
 
@@ -52,10 +52,11 @@ modules/brand/
     00_guard.R                   -- TRS guard layer
     01_config.R                  -- Config + structure loading
     02_mental_availability.R     -- MMS, MPen, NS, CEP TURF
+    02c_ma_focal_view.R          -- MA + buyer-gap focal-brand view (Drivers & Barriers HTML lens)
     03_funnel.R                  -- Derived funnel + attitude
     04_repertoire.R              -- Multi-brand buying
     05_wom.R                     -- Word-of-mouth
-    06_drivers_barriers.R        -- Derived importance
+    06_drivers_barriers.R        -- Derived importance (Excel/CSV outputs)
     07_dba.R                     -- Distinctive brand assets
     99_output.R                  -- Excel/CSV generators
     generate_config_templates.R  -- Config template generators

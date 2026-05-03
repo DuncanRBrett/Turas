@@ -60,6 +60,7 @@ BRAND_VERSION <- "1.0"
     "01_config.R",
     "02_mental_availability.R",
     "02b_mental_advantage.R",
+    "02c_ma_focal_view.R",
     "02a_ma_panel_data.R",
     "02b_ma_advantage_data.R",
     "03a_funnel_derive.R",
@@ -443,6 +444,79 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
                        AttrText = cat_attrs$AttrText,
                        stringsAsFactors = FALSE) else NULL
         )
+
+        # MA Focal Brand View — pairs MA scores with the focal brand's
+        # buyer/non-buyer linkage gap (replaces the standalone Drivers &
+        # Barriers HTML page; D&B Excel/CSV outputs are unchanged).
+        # Computed for EVERY brand so the in-page focal picker can
+        # re-render the table without re-running R. Data is keyed by
+        # brand_code under focal_view$ceps$by_brand and
+        # focal_view$attributes$by_brand.
+        if (!is.null(cat_result$mental_availability) &&
+            !identical(cat_result$mental_availability$status, "REFUSED") &&
+            exists("calculate_ma_focal_view", mode = "function")) {
+
+          pen_role  <- paste0("funnel.penetration_target.", cat_code)
+          pen_entry <- if (!is.null(role_map)) role_map[[pen_role]] else NULL
+          all_brand_codes <- as.character(cat_brands$BrandCode)
+
+          pen_mat <- if (!is.null(pen_entry) &&
+                          !is.null(pen_entry$column_root) &&
+                          exists("multi_mention_brand_matrix",
+                                 mode = "function")) {
+            tryCatch(
+              multi_mention_brand_matrix(
+                cat_data, pen_entry$column_root, all_brand_codes),
+              error = function(e) NULL
+            )
+          } else NULL
+
+          if (!is.null(pen_mat)) {
+            ma_obj <- cat_result$mental_availability
+            default_brand <- config$focal_brand %||% all_brand_codes[1]
+            fv <- list()
+
+            .build_fv_set <- function(advantage, link_tensor, label) {
+              if (is.null(advantage) || is.null(link_tensor)) return(NULL)
+              by_brand <- list()
+              codes <- advantage$stim_codes
+              for (b in all_brand_codes) {
+                if (!b %in% colnames(pen_mat)) next
+                if (!b %in% names(link_tensor)) next
+                if (!b %in% colnames(advantage$advantage)) next
+                pen_b <- as.integer(pen_mat[, b])
+                df <- tryCatch(
+                  calculate_ma_focal_view(
+                    linkage_tensor = link_tensor,
+                    codes          = codes,
+                    focal_brand    = b,
+                    pen            = pen_b,
+                    weights        = cat_weights,
+                    ma_advantage   = as.numeric(advantage$advantage[, b]),
+                    ma_significant = as.logical(advantage$is_significant[, b])),
+                  error = function(e) {
+                    warnings_list <<- c(warnings_list,
+                      sprintf("MA focal view (%s/%s) failed for %s: %s",
+                              label, b, cat_name, e$message))
+                    NULL
+                  })
+                if (!is.null(df) && nrow(df) > 0)
+                  by_brand[[b]] <- df
+              }
+              if (length(by_brand) == 0) return(NULL)
+              list(by_brand = by_brand,
+                   default_brand_code = default_brand)
+            }
+
+            fv$ceps       <- .build_fv_set(ma_obj$cep_advantage,
+                                           linkage$linkage_tensor, "CEP")
+            fv$attributes <- .build_fv_set(ma_obj$attribute_advantage,
+                                           attr_linkage$linkage_tensor, "Attr")
+
+            if (!is.null(fv$ceps) || !is.null(fv$attributes))
+              cat_result$mental_availability$focal_view <- fv
+          }
+        }
       }
     }
 

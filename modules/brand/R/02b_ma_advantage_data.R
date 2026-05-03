@@ -55,14 +55,16 @@ build_ma_advantage_block <- function(ma_result,
     raw_matrix = ma_result$cep_brand_matrix,
     label_df = cep_list, code_col = "CEPCode", text_col = "CEPText",
     brand_codes = brand_codes, brand_names = brand_names,
-    awareness_by_brand = awareness_by_brand, focal_code = focal_code)
+    awareness_by_brand = awareness_by_brand, focal_code = focal_code,
+    focal_view_set = ma_result$focal_view$ceps)
 
   attrs_block <- .ma_adv_subblock(
     advantage = ma_result$attribute_advantage,
     raw_matrix = ma_result$attribute_brand_matrix,
     label_df = attribute_list, code_col = "AttrCode", text_col = "AttrText",
     brand_codes = brand_codes, brand_names = brand_names,
-    awareness_by_brand = awareness_by_brand, focal_code = focal_code)
+    awareness_by_brand = awareness_by_brand, focal_code = focal_code,
+    focal_view_set = ma_result$focal_view$attributes)
 
   available <- character(0)
   if (!is.null(ceps_block))  available <- c(available, "ceps")
@@ -94,7 +96,8 @@ build_ma_advantage_block <- function(ma_result,
 
 .ma_adv_subblock <- function(advantage, raw_matrix, label_df, code_col, text_col,
                              brand_codes, brand_names,
-                             awareness_by_brand = NULL, focal_code = NULL) {
+                             awareness_by_brand = NULL, focal_code = NULL,
+                             focal_view_set = NULL) {
   if (is.null(advantage) || identical(advantage$status, "REFUSED")) return(NULL)
   codes <- advantage$stim_codes
   if (length(codes) == 0) return(NULL)
@@ -113,6 +116,8 @@ build_ma_advantage_block <- function(ma_result,
 
   focal_summary <- .ma_adv_focal_summary(cells, codes, focal_code, advantage$threshold_pp)
 
+  focal_view <- .ma_adv_focal_view_set(focal_view_set, codes, texts, focal_code)
+
   list(
     codes              = codes,
     labels             = texts,
@@ -125,7 +130,93 @@ build_ma_advantage_block <- function(ma_result,
     brand_links        = as.numeric(advantage$brand_links[adv_brands]),
     cells              = cells,
     focal_brand_code   = focal_code,
-    focal_summary      = focal_summary
+    focal_summary      = focal_summary,
+    focal_view         = focal_view
+  )
+}
+
+
+# ------------------------------------------------------------------
+# INTERNAL: focal-brand view block (Drivers & Barriers lens)
+# ------------------------------------------------------------------
+# Reshapes the per-brand data frames from calculate_ma_focal_view()
+# into a JSON-safe map keyed by brand code. The HTML focal picker
+# selects a brand and the JS swaps the rendered table to the matching
+# slice — no R re-run needed when focal changes in the page.
+
+.ma_adv_focal_view_set <- function(focal_view_set, codes, labels, focal_code) {
+  if (is.null(focal_view_set) || !is.list(focal_view_set)) return(NULL)
+  by_brand <- focal_view_set$by_brand
+  if (!is.list(by_brand) || length(by_brand) == 0L) return(NULL)
+
+  out <- list()
+  brand_codes_present <- names(by_brand)
+  for (b in brand_codes_present) {
+    block <- .ma_adv_focal_view_block(by_brand[[b]], codes, labels, b)
+    if (!is.null(block)) out[[b]] <- block
+  }
+  if (length(out) == 0L) return(NULL)
+
+  default <- focal_view_set$default_brand_code %||% focal_code %||% brand_codes_present[1]
+  if (!default %in% names(out)) default <- names(out)[1]
+
+  list(
+    by_brand            = out,
+    default_brand_code  = default,
+    min_base            = MA_FOCAL_VIEW_MIN_BASE
+  )
+}
+
+
+.ma_adv_focal_view_block <- function(focal_view_df, codes, labels, focal_code) {
+  if (is.null(focal_view_df) || !is.data.frame(focal_view_df) ||
+      nrow(focal_view_df) == 0L) {
+    return(NULL)
+  }
+
+  required <- c("Code", "MA_Score", "MA_Significant", "Buyer_Pct",
+                "NonBuyer_Pct", "Buyer_Gap", "Gap_Z", "Gap_Significant",
+                "N_Buyer", "N_NonBuyer", "Below_Min_Base", "Read_Label")
+  if (!all(required %in% names(focal_view_df))) return(NULL)
+
+  ord <- match(codes, focal_view_df$Code)
+  rows <- vector("list", length(codes))
+  for (i in seq_along(codes)) {
+    j <- ord[i]
+    if (is.na(j)) {
+      rows[[i]] <- list(
+        stim_code = codes[i], stim_label = labels[i],
+        ma_score = NA, ma_significant = NA,
+        buyer_pct = NA, nonbuyer_pct = NA, buyer_gap = NA,
+        gap_z = NA, gap_significant = NA,
+        below_min_base = TRUE, read_label = "INSUFFICIENT")
+      next
+    }
+    r <- focal_view_df[j, ]
+    rows[[i]] <- list(
+      stim_code       = as.character(r$Code),
+      stim_label      = labels[i],
+      ma_score        = if (is.na(r$MA_Score)) NA else round(as.numeric(r$MA_Score), 2),
+      ma_significant  = if (is.na(r$MA_Significant)) NA else as.logical(r$MA_Significant),
+      buyer_pct       = if (is.na(r$Buyer_Pct)) NA else round(as.numeric(r$Buyer_Pct), 1),
+      nonbuyer_pct    = if (is.na(r$NonBuyer_Pct)) NA else round(as.numeric(r$NonBuyer_Pct), 1),
+      buyer_gap       = if (is.na(r$Buyer_Gap)) NA else round(as.numeric(r$Buyer_Gap), 1),
+      gap_z           = if (is.na(r$Gap_Z)) NA else round(as.numeric(r$Gap_Z), 2),
+      gap_significant = if (is.na(r$Gap_Significant)) NA else as.logical(r$Gap_Significant),
+      below_min_base  = isTRUE(as.logical(r$Below_Min_Base)),
+      read_label      = as.character(r$Read_Label)
+    )
+  }
+
+  n_buy    <- as.integer(focal_view_df$N_Buyer[1L])
+  n_nonbuy <- as.integer(focal_view_df$N_NonBuyer[1L])
+
+  list(
+    focal_brand_code = focal_code,
+    n_buyer          = n_buy,
+    n_nonbuyer       = n_nonbuy,
+    min_base         = MA_FOCAL_VIEW_MIN_BASE,
+    rows             = rows
   )
 }
 

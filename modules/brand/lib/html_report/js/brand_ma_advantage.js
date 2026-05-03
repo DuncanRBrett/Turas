@@ -222,9 +222,203 @@
   // ------------------------------------------------------------ render orchestrator
   function renderAdvantage(panel) {
     var block = getStimBlock(panel); if (!block) return;
+    refreshFocalNameLabels(panel, block);
     renderQuadrant(panel, block);
     renderMatrix(panel, block);
     renderActionList(panel, block);
+    renderFocalView(panel, block);
+  }
+
+  // Populate every [data-ma-adv-focal-name] span with the current focal
+  // brand name. The Strategic Quadrant and Action List subsection titles
+  // both reference the focal brand explicitly so users can never lose
+  // track of which brand a chart is for after switching focal.
+  function refreshFocalNameLabels(panel, block) {
+    var pd = panel.__maData || {};
+    var meta = pd.meta || {};
+    var focal = (panel.__maState && panel.__maState.focal) ||
+                (block && block.focal_brand_code) ||
+                meta.focal_brand_code || '';
+    var name = focal;
+    var codes = (pd.config && pd.config.brand_codes) || [];
+    var names = (pd.config && pd.config.brand_names) || [];
+    var i = codes.indexOf(focal);
+    if (i >= 0 && names[i]) name = names[i];
+    panel.querySelectorAll('[data-ma-adv-focal-name]').forEach(function (el) {
+      el.textContent = name;
+    });
+  }
+
+
+  // ============================================================ FOCAL BRAND VIEW
+  // Pairs the MA score with the focal brand's buyer/non-buyer linkage
+  // gap per stimulus. Replaces the standalone Drivers & Barriers HTML
+  // page; rows come pre-baked from calculate_ma_focal_view() in R.
+  function focalBucket(v, kind, suppressed) {
+    if (suppressed || v == null || isNaN(v)) return kind === 'ma' ? 'ma-zero' : 'gap-zero';
+    var av = Math.abs(v);
+    if (kind === 'ma') {
+      // MA in pp; thresholds match the matrix (0/2/5).
+      if (v >=  5) return 'ma-pos-3';
+      if (v >=  2) return 'ma-pos-2';
+      if (v >   0) return 'ma-pos-1';
+      if (v <= -5) return 'ma-neg-3';
+      if (v <= -2) return 'ma-neg-2';
+      if (v <   0) return 'ma-neg-1';
+      return 'ma-zero';
+    }
+    // Buyer-gap thresholds — wider than MA because gaps move on
+    // smaller bases. (5/10/20 pp.)
+    if (v >=  20) return 'gap-pos-3';
+    if (v >=  10) return 'gap-pos-2';
+    if (v >    5) return 'gap-pos-1';
+    if (v <= -20) return 'gap-neg-2';
+    if (v <  -10) return 'gap-neg-2';
+    if (v <   -5) return 'gap-neg-1';
+    return 'gap-zero';
+  }
+
+  function fmtPp(v, suppressed) {
+    if (suppressed || v == null || isNaN(v)) return '&mdash;';
+    return (v >= 0 ? '+' : '') + (Math.round(v * 10) / 10).toFixed(1);
+  }
+
+  function readChip(label) {
+    if (!label) return '';
+    var key = String(label).toLowerCase();
+    var pretty = ({
+      strength:    'Real strength',
+      fame_gap:    'Fame gap',
+      buyer_edge:  'Buyer edge',
+      weak:        'Weak',
+      insufficient:'Base too small'
+    })[key] || label;
+    return '<span class="ma-fv-chip ma-fv-chip-' + escAttr(key) + '">' +
+           escHtml(pretty) + '</span>';
+  }
+
+  function renderFocalView(panel, block) {
+    var section = panel.querySelector('section.ma-adv-focal-view');
+    if (!section) return;
+
+    var fvSet = block && block.focal_view;
+    if (!fvSet || !fvSet.by_brand) {
+      section.style.display = 'none';
+      return;
+    }
+
+    // Pick the slice for the currently selected focal brand. If that
+    // brand has no slice (e.g. base too small for it), fall back to
+    // the default. If still missing, hide the section.
+    var pd = panel.__maData;
+    var currentFocal = (panel.__maState && panel.__maState.focal) ||
+                       block.focal_brand_code ||
+                       fvSet.default_brand_code;
+    var fv = fvSet.by_brand[currentFocal] ||
+             fvSet.by_brand[fvSet.default_brand_code];
+    if (!fv || !fv.rows || fv.rows.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+    section.style.display = '';
+
+    // Update header — show whichever brand the slice is actually for
+    // (matches the rendered numbers, even if it's not the focal the
+    // user picked because that brand had no slice).
+    var brandLabel = (function () {
+      var codes = (pd.config && pd.config.brand_codes) || [];
+      var names = (pd.config && pd.config.brand_names) || [];
+      var i = codes.indexOf(fv.focal_brand_code);
+      return i < 0 ? fv.focal_brand_code : (names[i] || fv.focal_brand_code);
+    })();
+    var brandSpan = section.querySelector('[data-ma-focal-brand]');
+    if (brandSpan) brandSpan.textContent = brandLabel || '';
+
+    var baseSpan = section.querySelector('[data-ma-focal-base]');
+    if (baseSpan) {
+      baseSpan.textContent = 'Buyers n=' + (fv.n_buyer != null ? fv.n_buyer : '–') +
+                             '  ·  Non-buyers n=' + (fv.n_nonbuyer != null ? fv.n_nonbuyer : '–');
+    }
+
+    // Build rows. Sort by MA score descending; suppressed rows fall to
+    // the bottom so attention goes to actionable lines first.
+    var rows = fv.rows.slice().sort(function (a, b) {
+      if (a.below_min_base !== b.below_min_base)
+        return a.below_min_base ? 1 : -1;
+      var av = a.ma_score == null ? -Infinity : a.ma_score;
+      var bv = b.ma_score == null ? -Infinity : b.ma_score;
+      return bv - av;
+    });
+
+    var html = rows.map(function (r) {
+      var maStar  = r.ma_significant  ? '<span class="ma-fv-sig">*</span>' : '';
+      var gapStar = r.gap_significant ? '<span class="ma-fv-sig">*</span>' : '';
+      var maCls   = 'ma-fv-' + focalBucket(r.ma_score, 'ma', false);
+      var gapCls  = r.below_min_base ? 'ma-fv-gap-suppressed'
+                                      : 'ma-fv-' + focalBucket(r.buyer_gap, 'gap', false);
+      var maTxt   = fmtPp(r.ma_score, false) + maStar;
+      var gapTxt  = r.below_min_base ? '&mdash;' : fmtPp(r.buyer_gap, false) + gapStar;
+      var stimTitle = 'Buyers ' + (r.buyer_pct != null ? r.buyer_pct.toFixed(1) : '–') +
+                      '%  ·  Non-buyers ' + (r.nonbuyer_pct != null ? r.nonbuyer_pct.toFixed(1) : '–') + '%';
+      return '<tr>' +
+        '<td class="ct-lbl" title="' + escAttr(r.stim_code) + '">' + escHtml(r.stim_label || r.stim_code) + '</td>' +
+        '<td class="' + escAttr(maCls)  + '">' + maTxt  + '</td>' +
+        '<td class="' + escAttr(gapCls) + '" title="' + escAttr(stimTitle) + '">' + gapTxt + '</td>' +
+        '<td>' + readChip(r.read_label) + '</td>' +
+      '</tr>';
+    }).join('');
+
+    var tbody = section.querySelector('[data-ma-focal-tbody]');
+    if (tbody) tbody.innerHTML = html;
+  }
+
+  // Pin the focal-brand view as its own card. Table-only — no chart on
+  // this section; no insight box of its own (the advantage sub-tab's
+  // Insight box covers the whole section).
+  function pinFocalView(panel) {
+    if (typeof TurasPins === 'undefined') return;
+    var section = panel.querySelector('section.ma-adv-focal-view');
+    if (!section || section.style.display === 'none') return;
+    var pd = panel.__maData || {};
+    var meta = pd.meta || {};
+    var cat   = meta.category_label || 'Category';
+    var focalSpan = section.querySelector('[data-ma-focal-brand]');
+    var focalName = (focalSpan && focalSpan.textContent.trim()) ||
+                    meta.focal_brand_name || '';
+    var baseSpan = section.querySelector('[data-ma-focal-base]');
+    var baseTxt  = baseSpan ? (baseSpan.textContent || '').trim() : '';
+
+    // Snapshot the table only (header + rows). Drop the toolbar buttons.
+    var tableEl = section.querySelector('table.ma-adv-focal-table');
+    if (!tableEl) return;
+    var tableHtml = (typeof TurasPins.capturePortableHtml === 'function')
+      ? TurasPins.capturePortableHtml(tableEl)
+      : tableEl.outerHTML;
+
+    var stim = (panel.__maState && panel.__maState.stim) ||
+               (pd.advantage && pd.advantage.default_stim) || 'ceps';
+    var stimLabel = (stim === 'ceps') ? 'CEPs' :
+                    (stim === 'attributes') ? 'Brand Attributes' : stim;
+
+    TurasPins.add({
+      sectionKey: 'ma-advantage-focal-' + Date.now(),
+      title: 'Mental Availability — ' + cat +
+             ' — Focal Brand View — ' + (focalName || '?') +
+             ' (' + stimLabel + ')',
+      subtitle: baseTxt,
+      baseText: 'total respondents (sample); buyer/non-buyer split per brand',
+      chartSvg: '', chartHtml: '',
+      tableHtml: tableHtml,
+      insightText: '',
+      pinMode: 'custom',
+      pinFlags: { chart: false, table: true, insight: false }
+    });
+
+    var btn = section.querySelector('.ma-adv-focal-pin-btn');
+    if (btn) {
+      btn.classList.add('pin-flash');
+      setTimeout(function () { btn.classList.remove('pin-flash'); }, 600);
+    }
   }
 
   // ============================================================ QUADRANT
@@ -735,6 +929,15 @@
         if (yMinEl) yMinEl.value = ''; if (yMaxEl) yMaxEl.value = '';
         panel.__maAdvYRange = {};
         var by = getStimBlock(panel); if (by) renderQuadrant(panel, by);
+        return;
+      }
+
+      // Dedicated Pin button on the focal-brand view section.
+      // Single content type (table) → no dropdown, just pin.
+      var fvPinBtn = ev.target.closest('[data-ma-action="adv-focal-pindropdown"]');
+      if (fvPinBtn && subtab.contains(fvPinBtn)) {
+        ev.stopPropagation();
+        pinFocalView(panel);
         return;
       }
     });
