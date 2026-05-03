@@ -270,6 +270,14 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
   off_cls <- if (is_focal_only) " col-chip-off" else ""
   toggle_label <- if (is_focal_only) "Show all" else "Hide all"
 
+  # Sort focal first, then alphabetical by brand name — same rule
+  # .ma_controls_bar() applies to the table chip bar, so the chart and
+  # the table chip bars line up and the same brand sits at the same
+  # index in both.
+  sorted_order <- order(brand_codes != focal, tolower(brand_names))
+  brand_codes  <- brand_codes[sorted_order]
+  brand_names  <- brand_names[sorted_order]
+
   chips_html <- paste(c(
     vapply(seq_along(brand_codes), function(i) {
       bc <- brand_codes[i]

@@ -608,24 +608,33 @@
     var sec = panel.querySelector('.ma-matrix-section[data-ma-stim="' + stim + '"]');
     if (!sec) return;
     // Update base row cells — always show n=aware (total)
+    /* Base row: show the n that matches the active base. In "% total"
+       mode that's the total-respondent base; in "% aware" mode it's
+       the aware-of-brand base. The previous "n=78 (78)" format was
+       redundant whenever a brand had full awareness, and even when the
+       two values differed it read as duplication rather than as
+       information. Pick one and pick the right one. */
     sec.querySelectorAll('tr.ma-row-base td.ma-base-n[data-ma-brand]').forEach(function (td) {
       var span = td.querySelector('.ma-base-val');
       if (!span) return;
       var nTotal = td.getAttribute('data-ma-n-total');
       var nAware = td.getAttribute('data-ma-n-aware');
-      if (nAware && nTotal) {
-        span.textContent = 'n=' + nAware + ' (' + nTotal + ')';
-      } else if (nTotal) {
-        span.textContent = 'n=' + nTotal;
+      var pick = (mode === 'aware' && nAware) ? nAware : nTotal;
+      if (pick) {
+        span.textContent = 'n=' + pick;
       } else {
         span.textContent = '\u2014';
       }
     });
+    /* Cells: data-ma-n-total and data-ma-n-aware always carry the SAME
+       value — both are the count of respondents who linked the brand
+       to the stim (the numerator stays constant; only the denominator
+       changes between % total and % aware). The cell count is therefore
+       a single integer; the parenthetical was always redundant. */
     sec.querySelectorAll('.ma-heatmap-cell').forEach(function (td) {
       var pctTotal = parseFloat(td.getAttribute('data-ma-pct'));
       var pctAware = parseFloat(td.getAttribute('data-ma-pct-aware'));
       var nTotal   = td.getAttribute('data-ma-n-total');
-      var nAware   = td.getAttribute('data-ma-n-aware');
       var span = td.querySelector('.ma-pct-primary');
       var nSpan = td.querySelector('.ma-n-primary');
       if (!span) return;
@@ -634,13 +643,7 @@
       if (isNaN(val)) { span.textContent = '—'; return; }
       span.textContent = Math.round(val) + '%';
       if (nSpan) {
-        if (nAware && nTotal) {
-          nSpan.textContent = 'n=' + nAware + ' (' + nTotal + ')';
-        } else if (nTotal) {
-          nSpan.textContent = 'n=' + nTotal;
-        } else {
-          nSpan.textContent = '';
-        }
+        nSpan.textContent = nTotal ? ('n=' + nTotal) : '';
       }
       td.setAttribute('data-sort-val', val.toFixed(6));
     });
