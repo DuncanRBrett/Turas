@@ -334,11 +334,12 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
 # ==============================================================================
 
 .ma_about_section <- function(pd) {
-  # Pulls the "About Mental Availability" body from the central callout
-  # registry (modules/shared/lib/callouts/callouts.json -> brand.mental_availability)
-  # so the text is editable via the Callout Editor without touching code.
+  # Metrics-tab callout — definitions for MPen / NS / MMS / SoM, the
+  # CEPs-only basis, and what the show-count denominators mean.
+  # Body lives in modules/shared/lib/callouts/callouts.json under
+  # brand.mental_availability_metrics; edit via the Callout Editor.
   if (exists("turas_callout", mode = "function")) {
-    turas_callout("brand", "mental_availability", collapsed = TRUE)
+    turas_callout("brand", "mental_availability_metrics", collapsed = TRUE)
   } else {
     ""
   }

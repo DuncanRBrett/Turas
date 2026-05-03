@@ -117,6 +117,108 @@
   }
 
 
+  // ------------------------------------------------------------ label placement
+  // Collision-aware scatter label placement. Mirrors the Portfolio scatter
+  // pfPlaceScatterLabels (and the server-side .place_scatter_labels in
+  // 04_chart_builder.R) so the visual language is consistent across charts.
+  // Tries 8 candidate positions per point at 3 progressively wider offsets,
+  // scoring each by overlap with other bubbles + already-placed labels.
+  function maPlaceScatterLabels(points, plotLeft, plotRight, plotTop, plotBot, fontSize, pad) {
+    fontSize = fontSize || 10;
+    pad = (pad == null) ? 4 : pad;
+    var n = points.length;
+    if (n === 0) return [];
+
+    var charW = fontSize * 0.55;
+    var textH = fontSize * 1.15;
+
+    var candidates = [
+      { dx:  1.0, dy:  0.0, anchor: 'start'  },
+      { dx:  0.7, dy: -0.7, anchor: 'start'  },
+      { dx:  0.7, dy:  0.7, anchor: 'start'  },
+      { dx: -1.0, dy:  0.0, anchor: 'end'    },
+      { dx: -0.7, dy: -0.7, anchor: 'end'    },
+      { dx: -0.7, dy:  0.7, anchor: 'end'    },
+      { dx:  0.0, dy: -1.0, anchor: 'middle' },
+      { dx:  0.0, dy:  1.0, anchor: 'middle' }
+    ];
+
+    function bboxFor(pt, cand, mult) {
+      var labelW = charW * (pt.label ? pt.label.length : 0);
+      var cx = pt.svgx + cand.dx * (pt.r + pad) * mult;
+      var cy = pt.svgy + cand.dy * (pt.r + pad) * mult;
+      var x0 = cand.anchor === 'start' ? cx
+             : cand.anchor === 'end'   ? cx - labelW
+             :                            cx - labelW / 2;
+      var y0 = cy - textH * 0.7;
+      return {
+        x0: x0, y0: y0, x1: x0 + labelW, y1: y0 + textH,
+        cx: cx, cy: cy, anchor: cand.anchor, mult: mult
+      };
+    }
+
+    function scoreBox(bb, selfIdx, placed) {
+      var s = 0;
+      if (bb.x0 < plotLeft)  s += (plotLeft - bb.x0) * 3;
+      if (bb.x1 > plotRight) s += (bb.x1 - plotRight) * 3;
+      if (bb.y0 < plotTop)   s += (plotTop - bb.y0) * 3;
+      if (bb.y1 > plotBot)   s += (bb.y1 - plotBot) * 3;
+      for (var i = 0; i < n; i++) {
+        if (i === selfIdx) continue;
+        var p = points[i];
+        var cxC = Math.max(bb.x0, Math.min(p.svgx, bb.x1));
+        var cyC = Math.max(bb.y0, Math.min(p.svgy, bb.y1));
+        var d = Math.sqrt((cxC - p.svgx) * (cxC - p.svgx) +
+                          (cyC - p.svgy) * (cyC - p.svgy));
+        if (d < p.r + pad) s += (p.r + pad - d) * 8;
+      }
+      for (var k = 0; k < placed.length; k++) {
+        var lb = placed[k];
+        if (!lb) continue;
+        var ow = Math.max(0, Math.min(bb.x1, lb.x1) - Math.max(bb.x0, lb.x0));
+        var oh = Math.max(0, Math.min(bb.y1, lb.y1) - Math.max(bb.y0, lb.y0));
+        s += ow * oh * 0.15;
+      }
+      return s;
+    }
+
+    // Process focal first, then longest labels first (toughest to place).
+    var order = [];
+    for (var i = 0; i < n; i++) if (points[i].isFocal) order.push(i);
+    var rest = [];
+    for (var j = 0; j < n; j++) if (!points[j].isFocal) rest.push(j);
+    rest.sort(function (a, b) {
+      return (points[b].label || '').length - (points[a].label || '').length;
+    });
+    order = order.concat(rest);
+
+    var placed = new Array(n);
+    var mults = [1.0, 1.5, 2.0];
+
+    for (var oi = 0; oi < order.length; oi++) {
+      var idx = order[oi];
+      var pt  = points[idx];
+      var best = null, bestScore = Infinity;
+      for (var mi = 0; mi < mults.length; mi++) {
+        for (var ci = 0; ci < candidates.length; ci++) {
+          var bb = bboxFor(pt, candidates[ci], mults[mi]);
+          var sc = scoreBox(bb, idx, placed);
+          if (sc < bestScore) { bestScore = sc; best = bb; }
+        }
+        if (bestScore < 1) break;
+      }
+      placed[idx] = best;
+    }
+
+    return placed.map(function (bb, i) {
+      var pt = points[i];
+      var natural = bb.mult <= 1.0 &&
+                    Math.abs(bb.cx - pt.svgx) <= pt.r * 1.6 &&
+                    Math.abs(bb.cy - pt.svgy) <= pt.r * 1.6;
+      return { cx: bb.cx, cy: bb.cy, anchor: bb.anchor, leader: !natural };
+    });
+  }
+
   // ------------------------------------------------------------ render orchestrator
   function renderAdvantage(panel) {
     var block = getStimBlock(panel); if (!block) return;
@@ -169,8 +271,17 @@
     var xMin = (xrange.min != null && !isNaN(xrange.min)) ? xrange.min : xAutoMin;
     var xMax = (xrange.max != null && !isNaN(xrange.max)) ? xrange.max : xAutoMax;
     if (xMax <= xMin) { xMin = xAutoMin; xMax = xAutoMax; }
-    var maAbsMax = Math.max(threshold * 2,
+    // Y-axis range: user-set if provided, else symmetric auto from data.
+    var yrange = panel.__maAdvYRange || {};
+    var yAutoAbs = Math.max(threshold * 2,
                               Math.ceil(Math.max.apply(null, allPts.map(function (p) { return Math.abs(p.ma); }))));
+    var maAbsMax = yAutoAbs;
+    var yMin = -yAutoAbs, yMax = yAutoAbs;
+    var yMinSet = (yrange.min != null && !isNaN(yrange.min));
+    var yMaxSet = (yrange.max != null && !isNaN(yrange.max));
+    if (yMinSet) yMin = yrange.min;
+    if (yMaxSet) yMax = yrange.max;
+    if (yMax <= yMin) { yMin = -yAutoAbs; yMax = yAutoAbs; }
     // Bubble size: fixed 0-100% reference so toggling base actually shows
     // bigger/smaller bubbles. Without this, normalising to dataset max
     // cancels the constant awareness factor and the toggle looks dead.
@@ -180,7 +291,7 @@
     var xLabel = 'Stimulus penetration (any brand, %)';
 
     function toX(v) { return mL + pW * (v - xMin) / (xMax - xMin); }
-    function toY(v) { return mT + pH * (1 - (v + maAbsMax) / (2 * maAbsMax)); }
+    function toY(v) { return mT + pH * (1 - (v - yMin) / (yMax - yMin)); }
     function bR(s)  { return Math.max(4, Math.min(22, 4 + 18 * s / sizeRefMax)); }
 
     /* Inline SVG presentation attributes act as a fallback for pin/PNG
@@ -204,9 +315,17 @@
 
     var parts = [];
     parts.push('<rect class="ma-adv-q-bg" fill="rgba(241, 245, 249, 0.5)" x="' + mL + '" y="' + mT + '" width="' + pW + '" height="' + pH + '"/>');
+    var clampY = function (y) { return Math.max(mT, Math.min(mT + pH, y)); };
     var yZero = toY(0), yPos = toY(threshold), yNeg = toY(-threshold);
-    parts.push('<rect class="ma-adv-q-zone-defend" fill="rgba(5, 150, 105, 0.05)" x="' + mL + '" y="' + mT + '" width="' + pW + '" height="' + (yPos - mT) + '"/>');
-    parts.push('<rect class="ma-adv-q-zone-build"  fill="rgba(220, 38, 38, 0.05)" x="' + mL + '" y="' + yNeg + '" width="' + pW + '" height="' + (mT + pH - yNeg) + '"/>');
+    var yZeroC = clampY(yZero), yPosC = clampY(yPos), yNegC = clampY(yNeg);
+    var defendVisible = yPosC > mT;
+    var buildVisible  = yNegC < mT + pH;
+    if (defendVisible) {
+      parts.push('<rect class="ma-adv-q-zone-defend" fill="rgba(5, 150, 105, 0.05)" x="' + mL + '" y="' + mT + '" width="' + pW + '" height="' + (yPosC - mT) + '"/>');
+    }
+    if (buildVisible) {
+      parts.push('<rect class="ma-adv-q-zone-build"  fill="rgba(220, 38, 38, 0.05)" x="' + mL + '" y="' + yNegC + '" width="' + pW + '" height="' + (mT + pH - yNegC) + '"/>');
+    }
 
     // Grid + tick labels (X) — span the [xMin, xMax] range
     for (var xi = 0; xi <= 5; xi++) {
@@ -214,9 +333,9 @@
       parts.push('<line class="ma-adv-q-grid" stroke="#eef2f7" stroke-width="1" x1="' + gx + '" y1="' + mT + '" x2="' + gx + '" y2="' + (mT + pH) + '"/>');
       parts.push('<text class="ma-adv-q-tick" fill="#94a3b8" font-size="9" x="' + gx + '" y="' + (mT + pH + 14) + '" text-anchor="middle">' + Math.round(xv) + '%</text>');
     }
-    // Y grid + ticks
-    for (var yi = -2; yi <= 2; yi++) {
-      var yv = (maAbsMax / 2) * yi; if (Math.abs(yv) > maAbsMax) continue;
+    // Y grid + ticks — five evenly-spaced ticks across the active Y range.
+    for (var yi = 0; yi <= 4; yi++) {
+      var yv = yMin + (yMax - yMin) * yi / 4;
       var gy = toY(yv);
       parts.push('<line class="ma-adv-q-grid" stroke="#eef2f7" stroke-width="1" x1="' + mL + '" y1="' + gy + '" x2="' + (mL + pW) + '" y2="' + gy + '"/>');
       parts.push('<text class="ma-adv-q-tick" fill="#94a3b8" font-size="9" x="' + (mL - 6) + '" y="' + gy + '" text-anchor="end" dominant-baseline="middle">' + (yv >= 0 ? '+' : '') + yv.toFixed(0) + 'pp</text>');
@@ -227,10 +346,18 @@
     parts.push('<line class="ma-adv-q-vmid" stroke="#475569" stroke-width="1.6" stroke-dasharray="4 3" opacity="0.65" x1="' + xMeanPx + '" y1="' + mT + '" x2="' + xMeanPx + '" y2="' + (mT + pH) + '"/>');
     parts.push('<text class="ma-adv-q-vmid-label" fill="#475569" font-size="9" font-weight="600" x="' + (xMeanPx + 4) + '" y="' + (mT + pH - 6) + '">avg (' + xMean.toFixed(0) + '%)</text>');
 
-    // Horizontal zero + threshold lines
-    parts.push('<line class="ma-adv-q-zero"   stroke="#475569" stroke-width="1.6" x1="' + mL + '" y1="' + yZero + '" x2="' + (mL + pW) + '" y2="' + yZero + '"/>');
-    parts.push('<line class="ma-adv-q-thresh" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="5 4" x1="' + mL + '" y1="' + yPos + '" x2="' + (mL + pW) + '" y2="' + yPos + '"/>');
-    parts.push('<line class="ma-adv-q-thresh" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="5 4" x1="' + mL + '" y1="' + yNeg + '" x2="' + (mL + pW) + '" y2="' + yNeg + '"/>');
+    // Horizontal zero + threshold lines — only drawn when their Y is
+    // inside the active Y range (so a custom range that excludes 0 or
+    // ±threshold doesn't paint phantom lines along the plot edge).
+    if (0 >= yMin && 0 <= yMax) {
+      parts.push('<line class="ma-adv-q-zero"   stroke="#475569" stroke-width="1.6" x1="' + mL + '" y1="' + yZero + '" x2="' + (mL + pW) + '" y2="' + yZero + '"/>');
+    }
+    if (threshold >= yMin && threshold <= yMax) {
+      parts.push('<line class="ma-adv-q-thresh" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="5 4" x1="' + mL + '" y1="' + yPos + '" x2="' + (mL + pW) + '" y2="' + yPos + '"/>');
+    }
+    if (-threshold >= yMin && -threshold <= yMax) {
+      parts.push('<line class="ma-adv-q-thresh" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="5 4" x1="' + mL + '" y1="' + yNeg + '" x2="' + (mL + pW) + '" y2="' + yNeg + '"/>');
+    }
 
     // Axes + axis labels + zone labels
     parts.push('<line class="ma-adv-q-axis" stroke="#94a3b8" stroke-width="1.5" x1="' + mL + '" y1="' + mT + '" x2="' + mL + '" y2="' + (mT + pH) + '"/>');
@@ -242,11 +369,12 @@
     parts.push('<text class="ma-adv-q-zone-label" fill="#94a3b8" font-size="9" font-weight="700" x="' + (mL + pW - 6) + '" y="' + (mT + pH - 6) + '" text-anchor="end">BUILD</text>');
     parts.push('<text class="ma-adv-q-zone-label" fill="#94a3b8" font-size="9" font-weight="700" x="' + (mL + 6) + '" y="' + (mT + pH - 6) + '">LOW PRIORITY</text>');
 
-    // Bubbles — store position + payload index for hover lookup
-    var labelCandidates = [];
+    // Bubbles + label-placement points. Out-of-range bubbles are skipped
+    // entirely (manual zoom).
+    var labelPoints = [];
     pts.forEach(function (p, i) {
-      // Skip points outside the configured x-range (so manual zoom works).
       if (p.x < xMin || p.x > xMax) return;
+      if (p.ma < yMin || p.ma > yMax) return;
       var cx = toX(p.x), cy = toY(p.ma), r2 = bR(p.size);
       var decKey = p.decision || 'na';
       var cls = 'ma-adv-q-bubble ma-adv-q-bubble-' + decKey;
@@ -258,32 +386,20 @@
                  '" stroke="' + bStroke + '" stroke-width="' + bSW +
                  '" cx="' + cx + '" cy="' + cy + '" r="' + r2 +
                  '" data-ma-adv-bubble-idx="' + i + '"></circle>');
-      labelCandidates.push({ idx: i, cx: cx, cy: cy, r: r2, p: p });
+      labelPoints.push({ svgx: cx, svgy: cy, r: r2, label: p.label, isFocal: false });
     });
 
-    // Smart label placement: only label the most extreme cells, and skip
-    // any whose box overlaps an already-placed label. Hover tooltip covers
-    // the rest.
-    var ordered = labelCandidates.slice().sort(function (a, b) {
-      return Math.abs(b.p.ma) - Math.abs(a.p.ma);
+    // Collision-aware label placement. Mirrors pfPlaceScatterLabels in
+    // the Portfolio scatter so the two charts share visual language.
+    // Every bubble gets a label; far-flung labels get a thin leader line.
+    var placements = maPlaceScatterLabels(labelPoints, mL, mL + pW, mT, mT + pH, 10, 4);
+    labelPoints.forEach(function (lp, i) {
+      var pl = placements[i]; if (!pl) return;
+      if (pl.leader) {
+        parts.push('<line class="ma-adv-q-label-leader" stroke="#cbd5e1" stroke-width="0.8" opacity="0.7" x1="' + lp.svgx + '" y1="' + lp.svgy + '" x2="' + pl.cx + '" y2="' + pl.cy + '"/>');
+      }
+      parts.push('<text class="ma-adv-q-label" fill="#1e293b" font-size="10" x="' + pl.cx + '" y="' + (pl.cy + 3) + '" text-anchor="' + pl.anchor + '">' + escHtml(lp.label) + '</text>');
     });
-    var placed = [];
-    var maxLabels = Math.min(10, ordered.length);
-    for (var li = 0; li < ordered.length && placed.length < maxLabels; li++) {
-      var lc = ordered[li];
-      var cx = lc.cx, cy = lc.cy, r2 = lc.r;
-      var lblX = cx + r2 + 4, anchor = 'start';
-      if (lblX + 80 > mL + pW) { lblX = cx - r2 - 4; anchor = 'end'; }
-      var box = { x: anchor === 'start' ? lblX : lblX - 80,
-                  y: cy - 6, w: 80, h: 12 };
-      var collides = placed.some(function (b) {
-        return !(box.x + box.w < b.x || box.x > b.x + b.w ||
-                 box.y + box.h < b.y || box.y > b.y + b.h);
-      });
-      if (collides) continue;
-      placed.push(box);
-      parts.push('<text class="ma-adv-q-label" fill="#1e293b" font-size="10" x="' + lblX + '" y="' + (cy + 3) + '" text-anchor="' + anchor + '">' + escHtml(lc.p.label) + '</text>');
-    }
 
     svg.innerHTML = parts.join('');
 
@@ -320,7 +436,11 @@
       var code = tr.getAttribute('data-ma-adv-row-stim');
       tr.classList.toggle('ma-adv-row-inactive', !!hidden[code]);
     });
-    var block = getStimBlock(panel); if (block) renderQuadrant(panel, block);
+    var block = getStimBlock(panel);
+    if (block) {
+      renderQuadrant(panel, block);
+      renderActionList(panel, block);
+    }
   }
 
   // ============================================================ MATRIX
@@ -435,12 +555,17 @@
       var i = block.codes.indexOf(code); return i < 0 ? code : block.labels[i];
     };
 
-    // Group cells by decision for the focal brand
+    // Group cells by decision for the focal brand. Honour the matrix row
+    // toggle so the action list and quadrant always reflect the same set
+    // of stimuli the user has chosen to keep visible in the table.
+    var hiddenStims = panel.__maAdvHiddenStims || {};
     var groups = { defend: [], build: [], maintain: [] };
-    block.cells.filter(function (c) { return c.brand_code === focal; }).forEach(function (c) {
-      var d = c.ma >= threshold ? 'defend' : c.ma <= -threshold ? 'build' : 'maintain';
-      groups[d].push(c);
-    });
+    block.cells.filter(function (c) { return c.brand_code === focal; })
+      .filter(function (c) { return !hiddenStims[c.stim_code]; })
+      .forEach(function (c) {
+        var d = c.ma >= threshold ? 'defend' : c.ma <= -threshold ? 'build' : 'maintain';
+        groups[d].push(c);
+      });
     groups.defend.sort(function (a, b) { return b.ma - a.ma; });
     groups.build.sort(function (a, b) { return a.ma - b.ma; });
     groups.maintain.sort(function (a, b) { return Math.abs(b.ma) - Math.abs(a.ma); });
@@ -603,6 +728,15 @@
         var b2 = getStimBlock(panel); if (b2) renderQuadrant(panel, b2);
         return;
       }
+      var yResetBtn = ev.target.closest('button[data-ma-action="adv-yrange-reset"]');
+      if (yResetBtn && subtab.contains(yResetBtn)) {
+        var yMinEl = panel.querySelector('input[data-ma-action="adv-yrange-min"]');
+        var yMaxEl = panel.querySelector('input[data-ma-action="adv-yrange-max"]');
+        if (yMinEl) yMinEl.value = ''; if (yMaxEl) yMaxEl.value = '';
+        panel.__maAdvYRange = {};
+        var by = getStimBlock(panel); if (by) renderQuadrant(panel, by);
+        return;
+      }
     });
 
     // X-axis range state + delegated change listener for the two inputs.
@@ -620,12 +754,26 @@
       s.max = isNaN(maxV) ? null : maxV;
       var block = getStimBlock(panel); if (block) renderQuadrant(panel, block);
     }
+    // Y-axis range state + delegated change listener (mirrors X).
+    panel.__maAdvYRange = panel.__maAdvYRange || {};
+    function readAndApplyYRange() {
+      var minEl = panel.querySelector('input[data-ma-action="adv-yrange-min"]');
+      var maxEl = panel.querySelector('input[data-ma-action="adv-yrange-max"]');
+      var s = panel.__maAdvYRange;
+      var minV = (minEl && minEl.value !== '') ? parseFloat(minEl.value) : NaN;
+      var maxV = (maxEl && maxEl.value !== '') ? parseFloat(maxEl.value) : NaN;
+      s.min = isNaN(minV) ? null : minV;
+      s.max = isNaN(maxV) ? null : maxV;
+      var block = getStimBlock(panel); if (block) renderQuadrant(panel, block);
+    }
     ['input', 'change'].forEach(function (evName) {
       subtab.addEventListener(evName, function (ev) {
         var t = ev.target;
         if (!t || !t.matches) return;
         if (t.matches('input[data-ma-action="adv-xrange-min"], input[data-ma-action="adv-xrange-max"]')) {
           readAndApplyXRange();
+        } else if (t.matches('input[data-ma-action="adv-yrange-min"], input[data-ma-action="adv-yrange-max"]')) {
+          readAndApplyYRange();
         }
       });
     });

@@ -165,19 +165,27 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
       "transparent")
   }
 
-  fmt_cell <- function(val, band, fmt, n = NULL) {
+  # Per-metric show-count clarification (visible when "Show count" is on).
+  # Each metric needs its own denominator narrative — a single integer is
+  # ambiguous because MMS, MPen and NS use different bases:
+  #   - MMS: brand's CEP links / total CEP links across brands
+  #   - MPen: respondents linking to >=1 CEP / total respondents (sample)
+  #   - NS:   per-brand linker base (the average's denominator)
+  #   - SoM:  same numerator/denominator as MMS (MPen factor cancels)
+  fmt_n_html <- function(label, tooltip) {
+    if (!nzchar(label)) return("")
+    sprintf('<span class="ma-n-metrics" title="%s">%s</span>',
+            .ma_esc(tooltip), label)
+  }
+  fmt_cell <- function(val, band, fmt, n_html = "") {
     if (is.null(val) || is.na(val))
       return('<td class="ct-td ct-data-col ct-na">&mdash;</td>')
     disp   <- if (fmt == "pct") sprintf(paste0("%.", dp, "f%%"), val) else sprintf("%.2f", val)
     band_s <- as.character(band %||% "within")
     bg     <- ci_bg(band_s)
-    n_html <- if (!is.null(n) && !is.na(n))
-      sprintf('<span class="ma-n-metrics">%s</span>',
-              format(as.integer(n), big.mark = ","))
-      else ""
     sprintf(
       '<td class="ct-td ct-data-col ma-heatmap-cell ma-ci-%s" style="background-color:%s;" data-sort-val="%.4f"><span class="ct-val">%s</span>%s</td>',
-      band_s, bg, val, disp, n_html)
+      band_s, bg, val, disp, n_html %||% "")
   }
 
   # Category-average cell with visual 95% CI range bar
@@ -213,6 +221,9 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
             format(as.integer(n), big.mark = ","))
   }
 
+  cat_total_links <- pd$metrics$cat_total_links
+  fmt_int <- function(x) format(as.integer(x), big.mark = ",")
+
   make_brand_row <- function(r, is_focal = FALSE) {
     cls         <- if (is_focal) "ct-row ma-row ma-metrics-focal-row" else "ct-row ma-row"
     focal_badge <- if (is_focal) ' <span class="ma-focal-badge">FOCAL</span>' else ""
@@ -222,13 +233,37 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
       .ma_esc(r$brand_name))
     n_linkers <- if (!is.null(n_resp) && !is.na(n_resp) && !is.null(r$mpen) && !is.na(r$mpen))
       as.integer(round(r$mpen / 100 * n_resp)) else NA_integer_
+
+    # Per-metric show-count strings.
+    mms_n <- if (!is.null(r$total_links) && !is.na(r$total_links) &&
+                 !is.null(cat_total_links) && !is.na(cat_total_links) && cat_total_links > 0)
+      fmt_n_html(
+        sprintf("%s / %s", fmt_int(r$total_links), fmt_int(cat_total_links)),
+        "CEP links: this brand / total across all brands") else ""
+    mpen_n <- if (!is.null(n_resp) && !is.na(n_resp) && !is.null(n_linkers) && !is.na(n_linkers))
+      fmt_n_html(
+        sprintf("%s / %s", fmt_int(n_linkers), fmt_int(n_resp)),
+        "Linkers: respondents linking >=1 CEP / total respondents") else ""
+    ns_n <- if (!is.null(n_linkers) && !is.na(n_linkers))
+      fmt_n_html(
+        sprintf("avg over n=%s linkers", fmt_int(n_linkers)),
+        "NS averages CEP links over this brand's linker base. Per-brand denominator.") else ""
+    # SoM uses a per-brand denominator (the brand's own MPen-linkers), so its
+    # show-count must read differently from MMS (category-wide denominator).
+    # Keeping them visually distinct prevents the misread that they're the
+    # same ratio just printed twice.
+    som_n <- if (!is.null(n_linkers) && !is.na(n_linkers))
+      fmt_n_html(
+        sprintf("among n=%s linkers", fmt_int(n_linkers)),
+        "Share of Mind is computed on this brand's MPen-linkers (n shown). Per-brand denominator means totals across brands can exceed 100%.") else ""
+
     paste0(
       sprintf('<tr class="%s" data-ma-brand="%s"%s>', cls, .ma_esc(r$brand_code), sort_attrs),
       sprintf('<td class="ct-td ct-label-col">%s%s</td>', .ma_esc(r$brand_name), focal_badge),
-      fmt_cell(r$mms,  r$mms_band,  "pct", n = r$total_links),
-      fmt_cell(r$mpen, r$mpen_band, "pct", n = n_resp),
-      fmt_cell(r$ns,   r$ns_band,   "num", n = n_linkers),
-      fmt_cell(r$som,  r$som_band,  "pct", n = n_resp),
+      fmt_cell(r$mms,  r$mms_band,  "pct", n_html = mms_n),
+      fmt_cell(r$mpen, r$mpen_band, "pct", n_html = mpen_n),
+      fmt_cell(r$ns,   r$ns_band,   "num", n_html = ns_n),
+      fmt_cell(r$som,  r$som_band,  "pct", n_html = som_n),
       '</tr>'
     )
   }
@@ -370,6 +405,21 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
     'double-jeopardy pattern \u2014 brands with broader reach also tend to have deeper ',
     'associations. Dashed lines mark category averages.',
     '</p></details>',
+    '<div class="ma-adv-quadrant-rangebar ma-scatter-rangebar">',
+    '<span class="ma-ctl-label">X-axis (MPen %)</span>',
+    '<label class="ma-adv-xrange-label">Min',
+    '<input type="number" class="ma-adv-xrange-input" data-ma-action="metrics-xrange-min" min="0" max="100" step="5" placeholder="auto"></label>',
+    '<label class="ma-adv-xrange-label">Max',
+    '<input type="number" class="ma-adv-xrange-input" data-ma-action="metrics-xrange-max" min="0" max="100" step="5" placeholder="auto"></label>',
+    '<button type="button" class="ma-adv-xrange-reset" data-ma-action="metrics-xrange-reset">Reset</button>',
+    '<span class="ma-adv-rangebar-sep" aria-hidden="true">|</span>',
+    '<span class="ma-ctl-label">Y-axis (NS)</span>',
+    '<label class="ma-adv-xrange-label">Min',
+    '<input type="number" class="ma-adv-xrange-input" data-ma-action="metrics-yrange-min" step="0.5" placeholder="auto"></label>',
+    '<label class="ma-adv-xrange-label">Max',
+    '<input type="number" class="ma-adv-xrange-input" data-ma-action="metrics-yrange-max" step="0.5" placeholder="auto"></label>',
+    '<button type="button" class="ma-adv-xrange-reset" data-ma-action="metrics-yrange-reset">Reset</button>',
+    '</div>',
     '<svg class="ma-scatter-svg" data-ma-stim="metrics"',
     ' xmlns="http://www.w3.org/2000/svg"></svg>',
     '</div>',

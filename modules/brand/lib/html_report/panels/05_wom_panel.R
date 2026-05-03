@@ -44,6 +44,12 @@ build_wom_panel_html <- function(panel_data,
   panel_id <- paste0("wom-", category_code)
   json_payload <- .wom_panel_json(panel_data, focal_colour)
 
+  # Page callout body lives in the central registry
+  # (modules/shared/lib/callouts/callouts.json -> brand.wom). Editable
+  # via the Callout Editor without touching code.
+  callout_html <- if (exists("turas_callout", mode = "function"))
+    turas_callout("brand", "wom", collapsed = TRUE) else ""
+
   paste0(
     sprintf('<div class="wom-panel" id="%s" data-focal-colour="%s" data-cat-code="%s" data-chip-default="%s">',
             panel_id, .wom_esc(focal_colour), .wom_esc(category_code), chip_default),
@@ -53,6 +59,7 @@ build_wom_panel_html <- function(panel_data,
     .wom_table_section(panel_data, focal_colour),
     .wom_chart_section(panel_data, category_code, focal_colour),
     .wom_insight_box(),
+    callout_html,
     '</div>'
   )
 }

@@ -420,12 +420,23 @@ build_ma_panel_data <- function(ma_result, brand_list, cep_list,
     som  = brand_codes[which.max(som)]
   )
 
+  # Total CEP links across all brands — denominator for MMS show-counts
+  # (brand links / category total). Sum the per-brand totals; ignore NA
+  # so brands with missing metrics don't poison the total.
+  total_links_vec <- vapply(table_rows, function(r) {
+    v <- r$total_links
+    if (is.null(v) || is.na(v)) 0L else as.integer(v)
+  }, integer(1))
+  cat_total_links <- sum(total_links_vec)
+
   list(
     table       = table_rows,
     focal_hero  = focal_hero,
     cat_avg     = cat_avg,
     leader      = leader,
     cep_penetration = cep_rank,
+    n_respondents   = if (is.finite(n_resp_num)) as.integer(n_resp_num) else NA_integer_,
+    cat_total_links = cat_total_links,
     max_vals = list(
       mpen = round(max(mpen, na.rm = TRUE), 1),
       ns   = round(max(ns,   na.rm = TRUE), 2),

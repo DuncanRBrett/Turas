@@ -194,6 +194,7 @@
     bindMetricsSortButtons(panel);
     bindMetricsChips(panel);
     bindMetricsShowCounts(panel);
+    bindMetricsScatterRange(panel);
     bindChartSelectMenu(panel);
     bindExport(panel);
     bindPinDropdown(panel);
@@ -1039,6 +1040,69 @@
     });
   }
 
+  // -------------------------------------------------------------- metrics scatter axis range
+  // Binds the X/Y range inputs above the Mental Space scatter. Mirrors
+  // the X/Y range plumbing on the MA Advantage quadrant. Idempotent.
+  function bindMetricsScatterRange(panel) {
+    if (panel.__maMetricsRangeBound) return;
+    panel.__maMetricsRangeBound = true;
+    panel.__maMetricsXRange = panel.__maMetricsXRange || {};
+    panel.__maMetricsYRange = panel.__maMetricsYRange || {};
+
+    function readNum(sel) {
+      var el = panel.querySelector(sel);
+      if (!el || el.value === '') return null;
+      var v = parseFloat(el.value);
+      return isNaN(v) ? null : v;
+    }
+    function applyX() {
+      panel.__maMetricsXRange = {
+        min: readNum('input[data-ma-action="metrics-xrange-min"]'),
+        max: readNum('input[data-ma-action="metrics-xrange-max"]')
+      };
+      renderMAScatter(panel);
+    }
+    function applyY() {
+      panel.__maMetricsYRange = {
+        min: readNum('input[data-ma-action="metrics-yrange-min"]'),
+        max: readNum('input[data-ma-action="metrics-yrange-max"]')
+      };
+      renderMAScatter(panel);
+    }
+
+    ['input', 'change'].forEach(function (evName) {
+      panel.addEventListener(evName, function (ev) {
+        var t = ev.target;
+        if (!t || !t.matches) return;
+        if (t.matches('input[data-ma-action="metrics-xrange-min"], input[data-ma-action="metrics-xrange-max"]')) {
+          applyX();
+        } else if (t.matches('input[data-ma-action="metrics-yrange-min"], input[data-ma-action="metrics-yrange-max"]')) {
+          applyY();
+        }
+      });
+    });
+
+    panel.addEventListener('click', function (ev) {
+      var xR = ev.target.closest('button[data-ma-action="metrics-xrange-reset"]');
+      if (xR && panel.contains(xR)) {
+        var minEl = panel.querySelector('input[data-ma-action="metrics-xrange-min"]');
+        var maxEl = panel.querySelector('input[data-ma-action="metrics-xrange-max"]');
+        if (minEl) minEl.value = ''; if (maxEl) maxEl.value = '';
+        panel.__maMetricsXRange = {};
+        renderMAScatter(panel);
+        return;
+      }
+      var yR = ev.target.closest('button[data-ma-action="metrics-yrange-reset"]');
+      if (yR && panel.contains(yR)) {
+        var yMinEl = panel.querySelector('input[data-ma-action="metrics-yrange-min"]');
+        var yMaxEl = panel.querySelector('input[data-ma-action="metrics-yrange-max"]');
+        if (yMinEl) yMinEl.value = ''; if (yMaxEl) yMaxEl.value = '';
+        panel.__maMetricsYRange = {};
+        renderMAScatter(panel);
+      }
+    });
+  }
+
   // -------------------------------------------------------------- metrics scatter (MPen × NS)
   function renderMAScatter(panel) {
     var wrap = panel.querySelector('.ma-scatter-wrap');
@@ -1077,28 +1141,43 @@
     svg.setAttribute('height', height);
     svg.style.height = height + 'px';
 
-    var xMax = 100; // always 0-100 for MPen
-    var yMax = Math.max(1, (Math.ceil(Math.max.apply(null, points.map(function (p) { return p.ns; })) * 4) / 4) + 0.5);
+    // X/Y axis ranges — user-set via the rangebar inputs, else auto.
+    // X: MPen is always a 0-100% scale unless overridden.
+    // Y: NS auto = ceil to next 0.25 + 0.5 padding so labels don't clip.
+    var xRange = panel.__maMetricsXRange || {};
+    var yRange = panel.__maMetricsYRange || {};
+    var xMinAuto = 0, xMaxAuto = 100;
+    var nsAutoMax = Math.max(1, (Math.ceil(Math.max.apply(null, points.map(function (p) { return p.ns; })) * 4) / 4) + 0.5);
+    var yMinAuto = 0, yMaxAuto = nsAutoMax;
+    var xMin = (xRange.min != null && !isNaN(xRange.min)) ? xRange.min : xMinAuto;
+    var xMax = (xRange.max != null && !isNaN(xRange.max)) ? xRange.max : xMaxAuto;
+    var yMin = (yRange.min != null && !isNaN(yRange.min)) ? yRange.min : yMinAuto;
+    var yMax = (yRange.max != null && !isNaN(yRange.max)) ? yRange.max : yMaxAuto;
+    if (xMax <= xMin) { xMin = xMinAuto; xMax = xMaxAuto; }
+    if (yMax <= yMin) { yMin = yMinAuto; yMax = yMaxAuto; }
     var mmsMax = Math.max(1, Math.max.apply(null, points.map(function (p) { return p.mms; })));
 
     var pW = width - mL - mR;
     var pH = height - mT - mB;
 
-    function toX(v) { return mL + pW * v / xMax; }
-    function toY(v) { return mT + pH * (1 - v / yMax); }
+    function toX(v) { return mL + pW * (v - xMin) / (xMax - xMin); }
+    function toY(v) { return mT + pH * (1 - (v - yMin) / (yMax - yMin)); }
     function bR(mms) { return Math.max(7, Math.min(24, 7 + 17 * mms / mmsMax)); }
 
     var parts = [];
 
-    // Subtle quadrant tint (based on cat avg)
-    var qMidX = catAvg.mpen != null ? toX(catAvg.mpen) : mL + pW / 2;
-    var qMidY = catAvg.ns   != null ? toY(catAvg.ns)   : mT + pH / 2;
+    // Subtle quadrant tint (based on cat avg). Only tint if the cat-avg
+    // crosshair falls inside the visible plot.
+    var qMidXRaw = catAvg.mpen != null ? toX(catAvg.mpen) : mL + pW / 2;
+    var qMidYRaw = catAvg.ns   != null ? toY(catAvg.ns)   : mT + pH / 2;
+    var qMidX = Math.max(mL, Math.min(mL + pW, qMidXRaw));
+    var qMidY = Math.max(mT, Math.min(mT + pH, qMidYRaw));
     parts.push('<rect x="' + qMidX + '" y="' + mT + '" width="' + (mL + pW - qMidX) + '" height="' + (qMidY - mT) + '" fill="rgba(5,150,105,0.04)"/>');
     parts.push('<rect x="' + mL + '" y="' + qMidY + '" width="' + (qMidX - mL) + '" height="' + (mT + pH - qMidY) + '" fill="rgba(220,38,38,0.04)"/>');
 
-    // Grid lines
+    // Grid lines + axis ticks span the active xMin..xMax / yMin..yMax range.
     for (var xi = 0; xi <= 5; xi++) {
-      var xv = xMax * xi / 5;
+      var xv = xMin + (xMax - xMin) * xi / 5;
       var gx = toX(xv);
       parts.push('<line x1="' + gx + '" y1="' + mT + '" x2="' + gx + '" y2="' + (mT + pH) +
                  '" stroke="#eef2f7" stroke-width="1"/>');
@@ -1106,7 +1185,7 @@
                  '" text-anchor="middle" font-size="9" fill="#94a3b8">' + Math.round(xv) + '%</text>');
     }
     for (var yi = 0; yi <= 4; yi++) {
-      var yv = yMax * yi / 4;
+      var yv = yMin + (yMax - yMin) * yi / 4;
       var gy = toY(yv);
       parts.push('<line x1="' + mL + '" y1="' + gy + '" x2="' + (width - mR) + '" y2="' + gy +
                  '" stroke="#eef2f7" stroke-width="1"/>');
@@ -1114,15 +1193,16 @@
                  '" text-anchor="end" dominant-baseline="middle" font-size="9" fill="#94a3b8">' + yv.toFixed(1) + '</text>');
     }
 
-    // Cat avg reference lines
-    if (catAvg.mpen != null) {
+    // Cat avg reference lines — only drawn if the avg falls inside the
+    // active range so a custom zoom doesn't paint phantom edge lines.
+    if (catAvg.mpen != null && catAvg.mpen >= xMin && catAvg.mpen <= xMax) {
       var ax = toX(catAvg.mpen);
       parts.push('<line x1="' + ax + '" y1="' + mT + '" x2="' + ax + '" y2="' + (mT + pH) +
                  '" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5 3"/>');
       parts.push('<text x="' + (ax + 4) + '" y="' + (mT + 11) +
                  '" font-size="9" fill="#94a3b8" font-weight="600">avg MPen</text>');
     }
-    if (catAvg.ns != null) {
+    if (catAvg.ns != null && catAvg.ns >= yMin && catAvg.ns <= yMax) {
       var ay = toY(catAvg.ns);
       parts.push('<line x1="' + mL + '" y1="' + ay + '" x2="' + (width - mR) + '" y2="' + ay +
                  '" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="5 3"/>');
@@ -1130,7 +1210,8 @@
                  '" font-size="9" fill="#94a3b8" font-weight="600">avg NS</text>');
     }
 
-    // OLS double-jeopardy trend line
+    // OLS double-jeopardy trend line — fitted from all points then
+    // clipped to the visible [xMin, xMax] x [yMin, yMax] window.
     if (points.length >= 3) {
       var n = points.length;
       var sx = 0, sy = 0, sxy = 0, sx2 = 0;
@@ -1139,14 +1220,17 @@
       if (Math.abs(den) > 1e-8) {
         var b = (sxy - sx * sy / n) / den;
         var a = sy / n - b * sx / n;
-        var lx1 = 0, ly1 = a, lx2 = xMax, ly2 = a + b * xMax;
-        if (ly1 < 0) { lx1 = -a / b; ly1 = 0; }
-        if (ly2 > yMax) { lx2 = (yMax - a) / b; ly2 = yMax; }
-        if (ly1 > yMax) { lx1 = (yMax - a) / b; ly1 = yMax; }
-        if (ly2 < 0) { lx2 = -a / b; ly2 = 0; }
-        parts.push('<line x1="' + toX(lx1) + '" y1="' + toY(ly1) + '" x2="' + toX(lx2) + '" y2="' + toY(ly2) +
-                   '" stroke="#64748b" stroke-width="1.5" stroke-dasharray="8 5" opacity="0.35">' +
-                   '<title>Double jeopardy trend</title></line>');
+        var lx1 = xMin, ly1 = a + b * xMin, lx2 = xMax, ly2 = a + b * xMax;
+        if (ly1 < yMin && Math.abs(b) > 1e-8) { lx1 = (yMin - a) / b; ly1 = yMin; }
+        if (ly2 > yMax && Math.abs(b) > 1e-8) { lx2 = (yMax - a) / b; ly2 = yMax; }
+        if (ly1 > yMax && Math.abs(b) > 1e-8) { lx1 = (yMax - a) / b; ly1 = yMax; }
+        if (ly2 < yMin && Math.abs(b) > 1e-8) { lx2 = (yMin - a) / b; ly2 = yMin; }
+        var inWindow = lx1 >= xMin && lx1 <= xMax && lx2 >= xMin && lx2 <= xMax;
+        if (inWindow) {
+          parts.push('<line x1="' + toX(lx1) + '" y1="' + toY(ly1) + '" x2="' + toX(lx2) + '" y2="' + toY(ly2) +
+                     '" stroke="#64748b" stroke-width="1.5" stroke-dasharray="8 5" opacity="0.35">' +
+                     '<title>Double jeopardy trend</title></line>');
+        }
       }
     }
 
@@ -1163,13 +1247,18 @@
     parts.push('<text x="' + (mL + pW / 2) + '" y="' + (height - 4) + '" text-anchor="middle" font-size="11" fill="#475569" font-weight="600">Mental Penetration (%)</text>');
     parts.push('<text transform="rotate(-90 ' + (mL - 40) + ' ' + (mT + pH / 2) + ')" x="' + (mL - 40) + '" y="' + (mT + pH / 2) + '" text-anchor="middle" font-size="11" fill="#475569" font-weight="600">Network Size</text>');
 
-    // Bubbles — focal on top
-    var nonFocal = points.filter(function (p) { return !p.isFocal; });
-    var focal2   = points.filter(function (p) { return p.isFocal; });
-    nonFocal.concat(focal2).forEach(function (p) {
+    // Bubbles — focal on top, out-of-range points dropped so a custom
+    // zoom doesn't render half-bubbles on the plot edge.
+    var visiblePoints = points.filter(function (p) {
+      return p.mpen >= xMin && p.mpen <= xMax && p.ns >= yMin && p.ns <= yMax;
+    });
+    var nonFocal = visiblePoints.filter(function (p) { return !p.isFocal; });
+    var focal2   = visiblePoints.filter(function (p) { return p.isFocal; });
+    var ordered  = nonFocal.concat(focal2);
+    var bubbleSpecs = [];
+    ordered.forEach(function (p) {
       var cx  = toX(p.mpen), cy = toY(p.ns), r2 = bR(p.mms);
       var col = getBrandColour(pd, p.code);
-      // Drop shadow filter id per bubble
       var filterId = 'f-' + p.code.replace(/[^a-z0-9]/gi, '');
       parts.push('<defs><filter id="' + filterId + '" x="-30%" y="-30%" width="160%" height="160%">' +
                  '<feDropShadow dx="1" dy="1" stdDeviation="2" flood-color="' + col + '" flood-opacity="0.25"/>' +
@@ -1180,24 +1269,114 @@
                  ' filter="url(#' + filterId + ')">' +
                  '<title>' + escHtml(p.name) + '\nMPen: ' + p.mpen.toFixed(dp) + '%' +
                  '\nNS: ' + p.ns.toFixed(2) + '\nMMS: ' + p.mms.toFixed(dp) + '%</title></circle>');
-      var lblLines2 = wrapSvgLabel(p.name, 14);
-      var lblFontSize = p.isFocal ? 10 : 9;
-      var lblLineH = lblFontSize + 2;
-      var lblStartY = cy - ((lblLines2.length - 1) * lblLineH) / 2 + 3;
-      // Try to offset label to avoid overlap at right edge
-      var lblX = cx + r2 + 4;
-      var anchorDir = 'start';
-      if (lblX + 60 > width - mR) { lblX = cx - r2 - 4; anchorDir = 'end'; }
-      var tspans2 = lblLines2.map(function (line, li) {
-        return '<tspan x="' + lblX + '" dy="' + (li === 0 ? 0 : lblLineH) + '">' + escHtml(line) + '</tspan>';
-      });
-      parts.push('<text x="' + lblX + '" y="' + lblStartY + '"' +
-                 ' text-anchor="' + anchorDir + '"' +
-                 ' font-size="' + lblFontSize + '" font-weight="' + (p.isFocal ? 700 : 400) + '"' +
-                 ' fill="' + col + '">' + tspans2.join('') + '</text>');
+      bubbleSpecs.push({ svgx: cx, svgy: cy, r: r2, label: p.name,
+                          isFocal: !!p.isFocal, colour: col });
+    });
+
+    // Smart label placement — port of the Portfolio scatter algorithm
+    // (mirrors maPlaceScatterLabels on the MA Advantage tab). 8-direction
+    // candidate scoring + leader lines for far-flung labels.
+    var placements = maMetricsPlaceLabels(bubbleSpecs, mL, mL + pW, mT, mT + pH, 10, 4);
+    bubbleSpecs.forEach(function (b, i) {
+      var pl = placements[i]; if (!pl) return;
+      if (pl.leader) {
+        parts.push('<line x1="' + b.svgx + '" y1="' + b.svgy + '" x2="' + pl.cx + '" y2="' + pl.cy +
+                   '" stroke="#cbd5e1" stroke-width="0.8" opacity="0.7"/>');
+      }
+      var fs = b.isFocal ? 10 : 9;
+      parts.push('<text x="' + pl.cx + '" y="' + (pl.cy + 3) + '" text-anchor="' + pl.anchor + '"' +
+                 ' font-size="' + fs + '" font-weight="' + (b.isFocal ? 700 : 400) + '"' +
+                 ' fill="' + b.colour + '">' + escHtml(b.label) + '</text>');
     });
 
     svg.innerHTML = parts.join('');
+  }
+
+  // Collision-aware scatter label placement for the Mental Space chart.
+  // Mirrors pfPlaceScatterLabels (Portfolio) and maPlaceScatterLabels (MA
+  // Advantage). 8 candidate directions x 3 distance multipliers, scored
+  // against bubbles + already-placed labels.
+  function maMetricsPlaceLabels(points, plotLeft, plotRight, plotTop, plotBot, fontSize, pad) {
+    fontSize = fontSize || 10;
+    pad = (pad == null) ? 4 : pad;
+    var n = points.length;
+    if (n === 0) return [];
+    var charW = fontSize * 0.55;
+    var textH = fontSize * 1.15;
+    var candidates = [
+      { dx:  1.0, dy:  0.0, anchor: 'start'  },
+      { dx:  0.7, dy: -0.7, anchor: 'start'  },
+      { dx:  0.7, dy:  0.7, anchor: 'start'  },
+      { dx: -1.0, dy:  0.0, anchor: 'end'    },
+      { dx: -0.7, dy: -0.7, anchor: 'end'    },
+      { dx: -0.7, dy:  0.7, anchor: 'end'    },
+      { dx:  0.0, dy: -1.0, anchor: 'middle' },
+      { dx:  0.0, dy:  1.0, anchor: 'middle' }
+    ];
+    function bboxFor(pt, cand, mult) {
+      var labelW = charW * (pt.label ? pt.label.length : 0);
+      var cx = pt.svgx + cand.dx * (pt.r + pad) * mult;
+      var cy = pt.svgy + cand.dy * (pt.r + pad) * mult;
+      var x0 = cand.anchor === 'start' ? cx
+             : cand.anchor === 'end'   ? cx - labelW
+             :                            cx - labelW / 2;
+      var y0 = cy - textH * 0.7;
+      return { x0: x0, y0: y0, x1: x0 + labelW, y1: y0 + textH,
+               cx: cx, cy: cy, anchor: cand.anchor, mult: mult };
+    }
+    function scoreBox(bb, selfIdx, placed) {
+      var s = 0;
+      if (bb.x0 < plotLeft)  s += (plotLeft - bb.x0) * 3;
+      if (bb.x1 > plotRight) s += (bb.x1 - plotRight) * 3;
+      if (bb.y0 < plotTop)   s += (plotTop - bb.y0) * 3;
+      if (bb.y1 > plotBot)   s += (bb.y1 - plotBot) * 3;
+      for (var i = 0; i < n; i++) {
+        if (i === selfIdx) continue;
+        var p = points[i];
+        var cxC = Math.max(bb.x0, Math.min(p.svgx, bb.x1));
+        var cyC = Math.max(bb.y0, Math.min(p.svgy, bb.y1));
+        var d = Math.sqrt((cxC - p.svgx) * (cxC - p.svgx) +
+                          (cyC - p.svgy) * (cyC - p.svgy));
+        if (d < p.r + pad) s += (p.r + pad - d) * 8;
+      }
+      for (var k = 0; k < placed.length; k++) {
+        var lb = placed[k]; if (!lb) continue;
+        var ow = Math.max(0, Math.min(bb.x1, lb.x1) - Math.max(bb.x0, lb.x0));
+        var oh = Math.max(0, Math.min(bb.y1, lb.y1) - Math.max(bb.y0, lb.y0));
+        s += ow * oh * 0.15;
+      }
+      return s;
+    }
+    var order = [];
+    for (var i = 0; i < n; i++) if (points[i].isFocal) order.push(i);
+    var rest = [];
+    for (var j = 0; j < n; j++) if (!points[j].isFocal) rest.push(j);
+    rest.sort(function (a, b) {
+      return (points[b].label || '').length - (points[a].label || '').length;
+    });
+    order = order.concat(rest);
+    var placed = new Array(n);
+    var mults = [1.0, 1.5, 2.0];
+    for (var oi = 0; oi < order.length; oi++) {
+      var idx = order[oi]; var pt = points[idx];
+      var best = null, bestScore = Infinity;
+      for (var mi = 0; mi < mults.length; mi++) {
+        for (var ci = 0; ci < candidates.length; ci++) {
+          var bb = bboxFor(pt, candidates[ci], mults[mi]);
+          var sc = scoreBox(bb, idx, placed);
+          if (sc < bestScore) { bestScore = sc; best = bb; }
+        }
+        if (bestScore < 1) break;
+      }
+      placed[idx] = best;
+    }
+    return placed.map(function (bb, i) {
+      var pt = points[i];
+      var natural = bb.mult <= 1.0 &&
+                    Math.abs(bb.cx - pt.svgx) <= pt.r * 1.6 &&
+                    Math.abs(bb.cy - pt.svgy) <= pt.r * 1.6;
+      return { cx: bb.cx, cy: bb.cy, anchor: bb.anchor, leader: !natural };
+    });
   }
 
   // -------------------------------------------------------------- metrics bar chart (MMS vs SOM)

@@ -188,6 +188,9 @@ table.ma-adv-matrix {
   border-radius: 4px; border: 1px solid #cbd5e1;
   background: #fff; color: #475569; cursor: pointer; }
 .ma-adv-xrange-reset:hover { background: #f1f5f9; }
+.ma-adv-rangebar-sep {
+  color: #cbd5e1; font-weight: 400; user-select: none;
+  margin: 0 2px; }
 .ma-adv-matrix td.ma-adv-matrix-stim {
   text-align: left; font-weight: 500; color: #334155;
   white-space: normal; max-width: 260px; }
