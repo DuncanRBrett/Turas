@@ -235,9 +235,9 @@ transform_brand_tables <- function(results, config) {
       # WOM is per-category
       if (!is.null(cr$wom) && !identical(cr$wom$status, "REFUSED"))
         tables[[paste0("wom_", cat_id)]] <- build_wom_tables(cr$wom, focal)
-      # Drivers & Barriers is per-category
-      if (!is.null(cr$drivers_barriers) && !identical(cr$drivers_barriers$status, "REFUSED"))
-        tables[[paste0("db_", cat_id)]] <- build_db_tables(cr$drivers_barriers, focal)
+      # Drivers & Barriers HTML moved to MA Mental Advantage focal-brand
+      # view (see 02c_ma_focal_view.R). Excel/CSV outputs from
+      # 06_drivers_barriers.R are unchanged.
     }
   }
 

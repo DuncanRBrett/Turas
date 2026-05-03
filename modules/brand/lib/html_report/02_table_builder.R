@@ -350,32 +350,6 @@ build_cat_buying_tables <- function(rep, cat_buying_freq = NULL,
 }
 
 
-#' Build all tables for Drivers & Barriers
-#' @keywords internal
-build_db_tables <- function(db, focal_brand) {
-  if (is.null(db) || identical(db$status, "REFUSED")) return("")
-
-  parts <- character(0)
-  if (!is.null(db$importance)) {
-    cols <- intersect(c("Code", "Label", "Buyer_Pct", "NonBuyer_Pct",
-                        "Differential", "Importance_Rank"), names(db$importance))
-    parts <- c(parts, build_br_table(
-      db$importance[, cols, drop = FALSE], NULL, NULL,
-      pct_cols = c("Buyer_Pct", "NonBuyer_Pct", "Differential"),
-      title = "Derived Importance (buyer vs non-buyer differential)"))
-  }
-  if (!is.null(db$ixp_quadrants)) {
-    cols <- intersect(c("Code", "Label", "Differential", "Focal_Linkage_Pct", "Quadrant"),
-                      names(db$ixp_quadrants))
-    parts <- c(parts, build_br_table(
-      db$ixp_quadrants[, cols, drop = FALSE], NULL, NULL,
-      pct_cols = c("Differential", "Focal_Linkage_Pct"),
-      title = "Importance \u00d7 Performance Quadrants"))
-  }
-  paste(parts, collapse = "\n")
-}
-
-
 #' Build WOM tables
 #' @keywords internal
 build_wom_tables <- function(wom, focal_brand) {

@@ -276,10 +276,10 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
   has_audience_lens <- !is.null(cat_results$audience_lens) &&
     !identical(cat_results$audience_lens$status, "REFUSED") &&
     length(cat_results$audience_lens$audiences %||% list()) > 0
-  has_db <- !is.null(cat_results$drivers_barriers) &&
-    !identical(cat_results$drivers_barriers$status, "REFUSED") &&
-    (!is.null(cat_results$drivers_barriers$importance) ||
-     !is.null(cat_results$drivers_barriers$ixp_quadrants))
+  # Drivers & Barriers HTML tab is retired — the focal-brand view on the
+  # Mental Advantage sub-tab carries the same diagnostic. The engine in
+  # 06_drivers_barriers.R still runs; its Importance / IxP / Competitive
+  # Advantage / Rejection sheets continue to write to Excel and CSV.
 
   # Build flat sub-tab list in the required display order.
   # Each entry: key (unique), label, subpanel (which .br-subpanel to show),
@@ -311,12 +311,6 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
     flat_tabs <- c(flat_tabs,
       list(list(key = "ma-metrics",      label = "MA Metrics",
                 subpanel = "ma",  internal_tab = "metrics"))
-    )
-  }
-  if (has_db) {
-    flat_tabs <- c(flat_tabs,
-      list(list(key = "db",              label = "Drivers & Barriers",
-                subpanel = "db", internal_tab = ""))
     )
   }
   if (has_repertoire) {
@@ -383,7 +377,6 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
   if (has_demographics)  element_map[["demo"]] <- "demographics"
   if (has_adhoc)         element_map[["ah"]]  <- "adhoc"
   if (has_audience_lens) element_map[["al"]]  <- "audience_lens"
-  if (has_db)            element_map[["db"]]  <- "db"
 
   for (sp_key in names(element_map)) {
     el        <- element_map[[sp_key]]
@@ -556,29 +549,6 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
         if (!is.null(tables[[chart_key]])) {
           parts <- c(parts, tables[[chart_key]])
         }
-      }
-    } else if (el == "db") {
-      # Drivers & Barriers — wires up the existing 06_drivers_barriers engine
-      # output (build_db_tables -> Derived Importance + IxP Quadrants tables).
-      # The table HTML is pre-built into tables[["db_<cat_id>"]] by the data
-      # transformer, so this branch just wraps it in a section toolbar +
-      # title + intro paragraph.
-      parts <- c(parts, build_br_section_toolbar(section_id))
-      parts <- c(parts, sprintf(
-        '<h3 class="br-element-title">Drivers &amp; Barriers — %s</h3>',
-        .br_esc(cat_name)))
-      parts <- c(parts,
-        '<p style="font-size:12px;color:#64748b;margin:0 0 16px;">',
-        'Derived importance compares CEP linkage between buyers and non-buyers ',
-        'of the focal brand. Larger differentials = stronger drivers of choice. ',
-        'The Importance × Performance quadrant tags each CEP as ',
-        'Maintain, Strengthen, Monitor, or Deprioritise.</p>')
-      if (!is.null(tables[[chart_key]])) {
-        parts <- c(parts, tables[[chart_key]])
-      } else {
-        parts <- c(parts,
-          '<p style="font-size:12px;color:#94a3b8;font-style:italic;">',
-          'Drivers &amp; Barriers tables not available for this category.</p>')
       }
     } else {
       # Legacy path: any future elements without a dedicated panel
