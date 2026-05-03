@@ -79,11 +79,14 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
         '</div>',
       '</div>',
       .fn_add_insight_strip(),
+      # Funnel-page callout lives INSIDE the funnel sub-tab so it doesn't
+      # leak onto the Summary or Relationship sub-tabs (each has its own
+      # callout / explanation).
+      .fn_about_section(panel_data),
     '</div>',
     '<div class="fn-subtab" data-fn-subtab="relationship" hidden>',
       .fn_relationship_section(panel_data, focal_colour),
     '</div>',
-    .fn_about_section(panel_data),
     '</div>'
   )
 }
