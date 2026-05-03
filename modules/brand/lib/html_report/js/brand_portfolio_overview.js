@@ -283,7 +283,12 @@
     if (sel) {
       sel.addEventListener('change', function (e) {
         var code = e.target.value;
-        if (code) swap(code);
+        if (!code) return;
+        // Broadcast to all portfolio sub-tabs when the helper is loaded;
+        // fall back to a local swap when running standalone (e.g. during
+        // tests where brand_portfolio_panel.js isn't bundled).
+        if (typeof pfBroadcastFocal === 'function') pfBroadcastFocal(code);
+        else                                         swap(code);
       });
     }
     initPfoPinPng();

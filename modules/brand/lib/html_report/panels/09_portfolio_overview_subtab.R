@@ -67,7 +67,11 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
     if (nzchar(about_text)) {
       sprintf('<div class="pf-about-drawer"><strong>About this view:</strong> %s</div>',
               .pf_esc(about_text))
-    } else ""
+    } else "",
+    # Bottom callout — registry: brand.portfolio_overview. Editable via
+    # the Callout Editor without code changes.
+    if (exists("turas_callout", mode = "function"))
+      turas_callout("brand", "portfolio_overview", collapsed = TRUE) else ""
   )
 }
 

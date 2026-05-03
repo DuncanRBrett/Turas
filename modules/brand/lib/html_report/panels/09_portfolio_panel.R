@@ -46,6 +46,21 @@ build_br_portfolio_panel <- function(results, config) {
   focal_colour <- config$colour_focal %||% "#1A5276"
   focal_brand  <- config$focal_brand  %||% ""
 
+  # Portfolio-wide brand-colour map. Walks the master Brands sheet once
+  # and produces a {BrandCode -> hex} dict that every Portfolio sub-tab
+  # can use to render consistent brand-coloured chips, nodes and chart
+  # bubbles. Cat Buying panels build their own per-category map via the
+  # same .dt_brand_colours() helper, so a brand with an explicit Colour
+  # cell will always render in the same colour everywhere.
+  pf_brand_colours <- if (exists(".dt_brand_colours", mode = "function") &&
+                          is.data.frame(config$brands)) {
+    blist <- config$brands
+    if ("BrandCode" %in% names(blist)) {
+      blist <- blist[!duplicated(as.character(blist$BrandCode)), , drop = FALSE]
+    }
+    .dt_brand_colours(blist, focal_brand, focal_colour)
+  } else list()
+
   portfolio <- results$results$portfolio
 
   if (is.null(portfolio) || identical(portfolio$status, "REFUSED")) {
@@ -78,7 +93,8 @@ build_br_portfolio_panel <- function(results, config) {
   }
 
   fp_html <- .pf_footprint_subtab(portfolio, panel_data, focal_brand, focal_colour)
-  cn_html <- .pf_constellation_subtab(portfolio, panel_data, focal_brand, focal_colour)
+  cn_html <- .pf_constellation_subtab(portfolio, panel_data, focal_brand, focal_colour,
+                                       brand_colours = pf_brand_colours)
   cl_html <- .pf_clutter_subtab(portfolio, panel_data, focal_brand, focal_colour)
   ex_html <- .pf_extension_subtab(portfolio, panel_data, focal_brand, focal_colour)
 
@@ -247,6 +263,21 @@ build_br_portfolio_panel <- function(results, config) {
 
 
 # ==============================================================================
+# CALLOUT HELPER
+# ==============================================================================
+
+# Pulls a portfolio sub-tab callout from the central registry. Bodies live
+# in modules/shared/lib/callouts/callouts.json under brand.portfolio_*; the
+# Callout Editor edits them without code changes. Returns "" if the helper
+# is not loaded so partial environments still build a panel.
+.pf_callout <- function(key) {
+  if (exists("turas_callout", mode = "function")) {
+    turas_callout("brand", key, collapsed = TRUE)
+  } else ""
+}
+
+
+# ==============================================================================
 # FOOTPRINT SUBTAB
 # ==============================================================================
 
@@ -305,7 +336,8 @@ build_br_portfolio_panel <- function(results, config) {
     if (nzchar(about_text)) {
       sprintf('<div class="pf-about-drawer"><strong>About this chart:</strong> %s</div>',
               .pf_esc(about_text))
-    } else ""
+    } else "",
+    .pf_callout("portfolio_footprint")
   )
 }
 
@@ -315,7 +347,7 @@ build_br_portfolio_panel <- function(results, config) {
 # ==============================================================================
 
 .pf_constellation_subtab <- function(portfolio, panel_data, focal_brand,
-                                      focal_colour) {
+                                      focal_colour, brand_colours = NULL) {
   section_id <- "pf-constellation"
 
   # Prefer the per-category set; fall back to the legacy pooled
@@ -337,6 +369,7 @@ build_br_portfolio_panel <- function(results, config) {
         edges        = cn$edges,
         layout       = cn$layout,
         focal_colour = focal_colour,
+        brand_colours = brand_colours,
         title        = "Competitive Constellation (Co-awareness Jaccard)"
       ),
       error = function(e) ""
@@ -414,6 +447,7 @@ build_br_portfolio_panel <- function(results, config) {
         edges        = cn$edges,
         layout       = cn$layout,
         focal_colour = focal_colour,
+        brand_colours = brand_colours,
         title        = paste0("Competitive Constellation — ", nm)
       ),
       error = function(e) ""
@@ -492,7 +526,8 @@ build_br_portfolio_panel <- function(results, config) {
     sprintf('<div id="%s-chart" class="pf-cn-cat-panels" data-pf-cn-focal="%s">%s</div>',
             section_id, .pf_esc(focal_brand), paste(panels, collapse = "")),
     supp_note,
-    reading_guide
+    reading_guide,
+    .pf_callout("portfolio_constellation")
   )
 }
 
@@ -669,11 +704,29 @@ build_br_portfolio_panel <- function(results, config) {
             paste(cat_chips, collapse = "")),
     '</div>',
     '</div>',
+    # Axis range inputs — auto when blank, user-set otherwise. Mirrors
+    # the MA Advantage / Metrics quadrant pattern.
+    '<div class="ma-adv-quadrant-rangebar pf-cl-rangebar">',
+    '<span class="ma-ctl-label">X-axis (set size)</span>',
+    '<label class="ma-adv-xrange-label">Min',
+    '<input type="number" class="ma-adv-xrange-input" data-pf-cl-xrange="min" step="0.5" placeholder="auto"></label>',
+    '<label class="ma-adv-xrange-label">Max',
+    '<input type="number" class="ma-adv-xrange-input" data-pf-cl-xrange="max" step="0.5" placeholder="auto"></label>',
+    '<button type="button" class="ma-adv-xrange-reset" data-pf-cl-xrange="reset">Reset</button>',
+    '<span class="ma-adv-rangebar-sep" aria-hidden="true">|</span>',
+    '<span class="ma-ctl-label">Y-axis (focal share %)</span>',
+    '<label class="ma-adv-xrange-label">Min',
+    '<input type="number" class="ma-adv-xrange-input" data-pf-cl-yrange="min" min="0" max="100" step="5" placeholder="auto"></label>',
+    '<label class="ma-adv-xrange-label">Max',
+    '<input type="number" class="ma-adv-xrange-input" data-pf-cl-yrange="max" min="0" max="100" step="5" placeholder="auto"></label>',
+    '<button type="button" class="ma-adv-xrange-reset" data-pf-cl-yrange="reset">Reset</button>',
+    '</div>',
     sprintf('<div id="%s-chart" class="pf-cl-chart" data-pf-cl-focal="%s" data-pf-cl-focal-colour="%s">%s</div>',
             section_id, .pf_esc(focal_brand), .pf_esc(focal_colour), initial_svg),
     coverage_note,
     table_shell,
-    reading_guide
+    reading_guide,
+    .pf_callout("portfolio_clutter")
   )
 }
 
@@ -878,12 +931,30 @@ build_br_portfolio_panel <- function(results, config) {
             .pf_esc(focal_brand), focal_options),
     '</div>',
     '</div>',
+    # Axis range inputs (Extension strength scatter). Same pattern as
+    # the Clutter / MA Advantage rangebar.
+    '<div class="ma-adv-quadrant-rangebar pf-ex-rangebar">',
+    '<span class="ma-ctl-label">X-axis (cat penetration %)</span>',
+    '<label class="ma-adv-xrange-label">Min',
+    '<input type="number" class="ma-adv-xrange-input" data-pf-ex-xrange="min" min="0" max="100" step="5" placeholder="auto"></label>',
+    '<label class="ma-adv-xrange-label">Max',
+    '<input type="number" class="ma-adv-xrange-input" data-pf-ex-xrange="max" min="0" max="100" step="5" placeholder="auto"></label>',
+    '<button type="button" class="ma-adv-xrange-reset" data-pf-ex-xrange="reset">Reset</button>',
+    '<span class="ma-adv-rangebar-sep" aria-hidden="true">|</span>',
+    '<span class="ma-ctl-label">Y-axis (awareness %)</span>',
+    '<label class="ma-adv-xrange-label">Min',
+    '<input type="number" class="ma-adv-xrange-input" data-pf-ex-yrange="min" min="0" max="100" step="5" placeholder="auto"></label>',
+    '<label class="ma-adv-xrange-label">Max',
+    '<input type="number" class="ma-adv-xrange-input" data-pf-ex-yrange="max" min="0" max="100" step="5" placeholder="auto"></label>',
+    '<button type="button" class="ma-adv-xrange-reset" data-pf-ex-yrange="reset">Reset</button>',
+    '</div>',
     sprintf('<div class="pf-ex-layout" data-pf-ex-focal="%s" data-pf-ex-focal-colour="%s">',
             .pf_esc(focal_brand), .pf_esc(focal_colour)),
     sprintf('<div id="%s-strength" class="pf-ex-strength">%s</div>', section_id, initial_svg),
     sprintf('<div id="%s-table" class="pf-ex-table-host"></div>', section_id),
     '</div>',
-    reading_guide
+    reading_guide,
+    .pf_callout("portfolio_extension")
   )
 }
 

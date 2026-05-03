@@ -1094,7 +1094,8 @@ build_network <- function(nodes, edges, layout,
                           rival_colour = NULL,
                           comp_colour  = "#94a3b8",
                           top_n_rivals = 5L,
-                          title        = "Competitive Constellation") {
+                          title        = "Competitive Constellation",
+                          brand_colours = NULL) {
   if (is.null(rival_colour) || !nzchar(rival_colour)) {
     rival_colour <- .lighten_hex(focal_colour, 0.45)
   }
@@ -1192,8 +1193,15 @@ build_network <- function(nodes, edges, layout,
     nd <- nodes[i, ]
     is_focal <- isTRUE(nd$is_focal)
     is_rival <- !is_focal && (nd$brand %in% rival_brands)
+    # Per-brand colour from the portfolio-wide map when supplied — keeps
+    # constellation node colours consistent with the rest of the brand
+    # module (Cat Buying / DSS chips). Falls back to the legacy
+    # focal/rival/comp single-colour scheme when no map is passed.
+    brand_specific <- if (!is.null(brand_colours))
+      brand_colours[[as.character(nd$brand)]] else NULL
     col      <- if (is_focal) focal_colour
-                else if (is_rival) rival_colour
+                else if (is_rival && (is.null(brand_specific) || !nzchar(brand_specific))) rival_colour
+                else if (!is.null(brand_specific) && nzchar(brand_specific)) brand_specific
                 else comp_colour
     radius   <- if (is_focal) nd$r * 1.25 else nd$r
     label    <- if (has_lbl && nzchar(as.character(nd$brand_lbl)))

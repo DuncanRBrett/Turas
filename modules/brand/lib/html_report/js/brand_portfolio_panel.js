@@ -6,6 +6,113 @@
 // Phase 4 additions: constellation node-click re-centre + pin, timeframe toggle.
 // ==============================================================================
 
+
+// ------------------------------------------------------------------------------
+// CROSS-SUBTAB FOCAL SYNC
+// ------------------------------------------------------------------------------
+// Each portfolio sub-tab (Overview / Footprint / Constellation / Clutter /
+// Extension) renders its own focal-brand <select>. Without sync the user
+// has to re-pick the focal on every tab. pfBroadcastFocal() updates every
+// select's .value (without firing change), then calls each sub-tab's
+// setter so the sub-tab views re-render with the new focal.
+//
+// Re-entry guard prevents the case where a setter eventually calls
+// pfBroadcastFocal again — only the outermost call propagates.
+
+// ------------------------------------------------------------------------------
+// AXIS RANGE INPUT HELPER
+// ------------------------------------------------------------------------------
+// Reads the {min, max} pair off the rangebar inputs scoped by data-attr
+// (e.g. data-pf-cl-xrange="min" / "max"). Blank input -> null (auto).
+function pfReadRange(attrPrefix) {
+  function read(which) {
+    var el = document.querySelector(
+      'input[data-' + attrPrefix + '="' + which + '"]');
+    if (!el || el.value === '') return null;
+    var v = parseFloat(el.value);
+    return isNaN(v) ? null : v;
+  }
+  return { min: read('min'), max: read('max') };
+}
+
+// Bind input/change/reset listeners on a rangebar pair scoped to a section.
+// onChange runs after every input event so the chart redraws live.
+function pfBindRangeInputs(section, attrPrefix, onChange) {
+  if (!section) return;
+  ['input', 'change'].forEach(function (evName) {
+    section.addEventListener(evName, function (ev) {
+      var t = ev.target;
+      if (!t || !t.matches) return;
+      if (t.matches('input[data-' + attrPrefix + '="min"], input[data-' +
+                     attrPrefix + '="max"]')) onChange();
+    });
+  });
+  section.addEventListener('click', function (ev) {
+    var btn = ev.target.closest('button[data-' + attrPrefix + '="reset"]');
+    if (!btn) return;
+    var minEl = section.querySelector('input[data-' + attrPrefix + '="min"]');
+    var maxEl = section.querySelector('input[data-' + attrPrefix + '="max"]');
+    if (minEl) minEl.value = '';
+    if (maxEl) maxEl.value = '';
+    onChange();
+  });
+}
+
+// Re-render the Clutter scatter with the currently-active focal. Used by
+// the axis-range inputs (no focal change, just a redraw).
+function pfClRerenderCurrentFocal() {
+  var chart = document.getElementById('pf-clutter-chart');
+  if (!chart) return;
+  var focal = chart.getAttribute('data-pf-cl-focal') || '';
+  if (focal && typeof pfClSetFocal === 'function') pfClSetFocal(focal);
+}
+
+function pfExRerenderCurrentFocal() {
+  var section = document.getElementById('pf-subtab-extension');
+  if (!section) return;
+  var layout = section.querySelector('.pf-ex-layout');
+  var focal = layout ? layout.getAttribute('data-pf-ex-focal') : '';
+  if (focal && typeof pfExSetFocal === 'function') pfExSetFocal(focal);
+}
+
+
+function pfBroadcastFocal(brand) {
+  if (!brand) return;
+  if (window.__pfFocalSyncing) return;
+  window.__pfFocalSyncing = true;
+  try {
+    // 1. Sync every focal-select widget. Setting .value programmatically
+    //    does not fire 'change', so we don't recurse through the
+    //    addEventListener('change', ...) bindings.
+    var selectors = [
+      '#pfo-focal-select',
+      '.pf-fp-focal-select',
+      '#pf-cn-focal-select',
+      '#pf-cl-focal-select',
+      '#pf-ex-focal-select'
+    ];
+    selectors.forEach(function (sel) {
+      document.querySelectorAll(sel).forEach(function (el) {
+        if (!el || el.value === brand) return;
+        var hasOption = Array.prototype.some.call(el.options || [], function (o) {
+          return o.value === brand;
+        });
+        if (hasOption) el.value = brand;
+      });
+    });
+
+    // 2. Re-render each sub-tab. Each setter is a no-op if its DOM is not
+    //    present (e.g. early in load), so we can safely call them all.
+    if (typeof window.pfoSwitchFocal === 'function') window.pfoSwitchFocal(brand);
+    if (typeof pfFpSetFocal === 'function')          pfFpSetFocal(brand);
+    if (typeof pfCnSetFocal === 'function')          pfCnSetFocal(brand);
+    if (typeof pfClSetFocal === 'function')          pfClSetFocal(brand);
+    if (typeof pfExSetFocal === 'function')          pfExSetFocal(brand);
+  } finally {
+    window.__pfFocalSyncing = false;
+  }
+}
+
 /**
  * Switch the active portfolio subtab.
  * @param {string} subtab - One of "footprint", "constellation", "clutter", "extension".
@@ -114,10 +221,12 @@ function pfInitFootprintTable() {
   if (!section) return;
 
   // --- Focal-brand <select> -------------------------------------------------
+  // Broadcast to every portfolio sub-tab so the picked focal flows
+  // across Overview / Footprint / Constellation / Clutter / Extension.
   var focalSelect = section.querySelector('.pf-fp-focal-select');
   if (focalSelect) {
     focalSelect.addEventListener('change', function () {
-      pfFpSetFocal(focalSelect.value);
+      pfBroadcastFocal(focalSelect.value);
     });
   }
 
@@ -648,11 +757,11 @@ function pfInitConstellationChips() {
     });
   });
 
-  // Focal-brand picker.
+  // Focal-brand picker. Broadcasts to every portfolio sub-tab.
   var sel = document.getElementById('pf-cn-focal-select');
   if (sel) {
     sel.addEventListener('change', function () {
-      pfCnSetFocal(sel.value);
+      pfBroadcastFocal(sel.value);
     });
   }
 
@@ -1013,8 +1122,16 @@ function pfClInit() {
 
   var sel = document.getElementById('pf-cl-focal-select');
   if (sel) {
-    sel.addEventListener('change', function () { pfClSetFocal(sel.value); });
+    sel.addEventListener('change', function () { pfBroadcastFocal(sel.value); });
   }
+
+  // Axis range inputs — re-render the scatter on input/change. Reset
+  // buttons clear the inputs (auto values). Mirrors the MA Advantage /
+  // Metrics pattern.
+  pfBindRangeInputs(section, 'pf-cl-xrange',
+    function () { pfClRerenderCurrentFocal(); });
+  pfBindRangeInputs(section, 'pf-cl-yrange',
+    function () { pfClRerenderCurrentFocal(); });
 
   // Category chips — toggle which dots appear on the chart. State is
   // read by pfClSetFocal so it survives focal switches.
@@ -1357,6 +1474,19 @@ function pfClRenderScatter(rows, refX, focalColour) {
   var yMax = Math.max(20, Math.min(100, Math.ceil(yMaxData / 10) * 10 + 10));
   var yMin = 0;
 
+  // User-set axis range overrides (read from the rangebar inputs above
+  // the chart). Blank input = use auto. Mirrors MA Advantage / Metrics.
+  var xrUser = pfReadRange('pf-cl-xrange');
+  var yrUser = pfReadRange('pf-cl-yrange');
+  if (xrUser.min != null) xMin = xrUser.min;
+  if (xrUser.max != null) xMax = xrUser.max;
+  if (yrUser.min != null) yMin = yrUser.min;
+  if (yrUser.max != null) yMax = yrUser.max;
+  if (xMax <= xMin) { xMin = Math.min.apply(null, xs) - xPad;
+                       xMax = Math.max.apply(null, xs) + xPad; }
+  if (yMax <= yMin) { yMin = 0;
+                       yMax = Math.max(20, Math.min(100, Math.ceil(yMaxData / 10) * 10 + 10)); }
+
   function sx(v) { return ml + ((v - xMin) / (xMax - xMin)) * pw; }
   function sy(v) { return mt + ph - ((v - yMin) / (yMax - yMin)) * ph; }
 
@@ -1433,8 +1563,13 @@ function pfClRenderScatter(rows, refX, focalColour) {
   var dots = [];
   rows.forEach(function (r) {
     if (r.set_size_mean == null || r.focal_share == null) return;
+    var fy = r.focal_share * 100;
+    // Skip out-of-range categories so a custom zoom doesn't paint
+    // half-bubbles on the plot edge.
+    if (r.set_size_mean < xMin || r.set_size_mean > xMax) return;
+    if (fy < yMin || fy > yMax) return;
     var cx = sx(r.set_size_mean);
-    var cy = sy(r.focal_share * 100);
+    var cy = sy(fy);
     var radius = Math.max(5, Math.min(20, 5 + (r.cat_penetration / maxPen) * 15));
     dots.push({
       svgx: cx, svgy: cy, r: radius,
@@ -1582,8 +1717,14 @@ function pfExInit() {
 
   var sel = document.getElementById('pf-ex-focal-select');
   if (sel) {
-    sel.addEventListener('change', function () { pfExSetFocal(sel.value); });
+    sel.addEventListener('change', function () { pfBroadcastFocal(sel.value); });
   }
+
+  // Axis range inputs — re-render the strength scatter on edit / reset.
+  pfBindRangeInputs(section, 'pf-ex-xrange',
+    function () { pfExRerenderCurrentFocal(); });
+  pfBindRangeInputs(section, 'pf-ex-yrange',
+    function () { pfExRerenderCurrentFocal(); });
 
   var layout = section.querySelector('.pf-ex-layout');
   var initial = layout ? layout.getAttribute('data-pf-ex-focal') : '';
@@ -1642,11 +1783,21 @@ function pfExRenderStrength(bubbles, focalColour, brandLabel) {
   var pw = w - ml - mr, ph = h - mt - mb;
 
   // X = cat penetration % (0..max), Y = focal awareness % (0..100).
-  var xMax = Math.max.apply(null, bubbles.map(function (b) { return b.x; }));
-  xMax = Math.max(20, Math.ceil((xMax + 5) / 10) * 10);
-  var xMin = 0;
-  var yMax = 100;
-  var yMin = 0;
+  var xMaxAuto = Math.max.apply(null, bubbles.map(function (b) { return b.x; }));
+  xMaxAuto = Math.max(20, Math.ceil((xMaxAuto + 5) / 10) * 10);
+  var xMin = 0, xMax = xMaxAuto;
+  var yMin = 0, yMax = 100;
+
+  // User-set axis-range overrides from the rangebar inputs.
+  var xrUser = pfReadRange('pf-ex-xrange');
+  var yrUser = pfReadRange('pf-ex-yrange');
+  if (xrUser.min != null) xMin = xrUser.min;
+  if (xrUser.max != null) xMax = xrUser.max;
+  if (yrUser.min != null) yMin = yrUser.min;
+  if (yrUser.max != null) yMax = yrUser.max;
+  if (xMax <= xMin) { xMin = 0; xMax = xMaxAuto; }
+  if (yMax <= yMin) { yMin = 0; yMax = 100; }
+
   function sx(v) { return ml + ((v - xMin) / (xMax - xMin)) * pw; }
   function sy(v) { return mt + ph - ((v - yMin) / (yMax - yMin)) * ph; }
 
@@ -1685,8 +1836,11 @@ function pfExRenderStrength(bubbles, focalColour, brandLabel) {
 
   // Bubbles — collision-aware label placement (same algorithm as the
   // clutter scatter). Build bubble specs first, then place labels.
+  // Out-of-range bubbles are dropped so custom axis zooms render cleanly.
   var exDots = [];
   bubbles.forEach(function (b) {
+    if (b.x < xMin || b.x > xMax) return;
+    if (b.y < yMin || b.y > yMax) return;
     exDots.push({
       svgx: sx(b.x), svgy: sy(b.y),
       r: Math.max(6, Math.min(28, 6 + (b.size / maxSize) * 22)),
