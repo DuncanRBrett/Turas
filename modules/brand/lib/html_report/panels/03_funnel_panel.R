@@ -306,6 +306,13 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
   chip_default <- pd$config$chip_default %||% "focal_only"
   is_focal_only <- identical(chip_default, "focal_only")
 
+  # Sort focal first, then alphabetical by brand name — same rule used
+  # by .fn_table_controls() so the two chip bars line up. JS re-applies
+  # this on focal change via reorderChipBar().
+  sorted_order <- order(brand_codes != focal, tolower(brand_names))
+  brand_codes  <- brand_codes[sorted_order]
+  brand_names  <- brand_names[sorted_order]
+
   # Stage info for stacked emphasis chips
   stage_keys   <- pd$table$stage_keys   %||% character(0)
   stage_labels <- pd$table$stage_labels %||% list()

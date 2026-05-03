@@ -470,13 +470,67 @@
       '.fn-chart-brand-chips [data-fn-scope="chart"][data-fn-brand="' + code + '"]');
     if (newFocalChip) newFocalChip.classList.remove("col-chip-off");
 
+    // Re-sort BOTH chip bars (table + chart) so the new focal appears
+    // first, matching the table row order. The DOM nodes are reused —
+    // we just reorder them inside their parent — which keeps the
+    // brand-colour styles set via inline --brand-chip-color intact.
+    reorderChipBar(panel, '.fn-chip-row.col-chip-bar', code);
+    reorderChipBar(panel, '.fn-chart-brand-chips', code);
+
     // Rebuild cards against the new focal, update title, repaint chart + mini funnels
     rebuildFunnelCards(panel, code);
     rebuildRelationshipCards(panel, code);
     updateTitleSub(panel, code);
-    drawSlopeSvg(panel);
-    buildMiniFunnels(panel);
+    /* applyChartVisibility() repaints whichever view the user is in
+       (slope or bar) — buildBarChart re-sorts focal-first, drawSlopeSvg
+       re-emits all lines, and the function also calls buildMiniFunnels
+       so we don't need to invoke it again. Previously only the slope
+       view was redrawn, leaving Bar-view users on the old focal. */
+    applyChartVisibility(panel);
     buildRelChart(panel);
+  }
+
+  /* Reorder the brand chips inside a chip-bar so the new focal sits
+     first, then alphabetical by brand name. Skips fixed leaders (Cat
+     Avg / __avg__) and trailing toggle/all-buttons so they stay where
+     they are. Leaves DOM nodes intact so inline brand-colour CSS vars
+     survive the reorder. */
+  function reorderChipBar(panel, selector, focalCode) {
+    var bar = panel.querySelector(selector);
+    if (!bar) return;
+    var children = Array.prototype.slice.call(bar.children);
+
+    // Pin Cat Avg (data-fn-brand="__avg__") and the toggle-all button
+    // wherever they currently sit so we don't accidentally lose them.
+    var leading = [];
+    var trailing = [];
+    var brandChips = [];
+    children.forEach(function (el) {
+      var brand = el.getAttribute && el.getAttribute('data-fn-brand');
+      if (brand === '__avg__') { leading.push(el); return; }
+      if (el.classList && el.classList.contains('ma-all-toggle')) {
+        trailing.push(el); return;
+      }
+      if (brand) { brandChips.push(el); return; }
+      // Anything else (separators, etc.) — keep position by treating as
+      // trailing in original order.
+      trailing.push(el);
+    });
+
+    brandChips.sort(function (a, b) {
+      var ac = a.getAttribute('data-fn-brand');
+      var bc = b.getAttribute('data-fn-brand');
+      if (ac === focalCode && bc !== focalCode) return -1;
+      if (bc === focalCode && ac !== focalCode) return 1;
+      var an = (a.textContent || '').trim().toLowerCase();
+      var bn = (b.textContent || '').trim().toLowerCase();
+      return an.localeCompare(bn);
+    });
+
+    // Re-append in the new order.
+    leading.concat(brandChips, trailing).forEach(function (el) {
+      bar.appendChild(el);
+    });
   }
 
   function rebuildFunnelCards(panel, focal) {
@@ -793,7 +847,22 @@
       html += '</div></div>';
     }
 
-    for (var bi = 0; bi < brandCodes.length; bi++) {
+    /* Iterate in focal-first-then-alpha order so the mini-funnels line
+       up with the top chip bar (which uses the same sort) and the new
+       focal always appears first when the user changes the focus. */
+    var orderedIdx = brandCodes.map(function (_, i) { return i; });
+    orderedIdx.sort(function (a, b) {
+      var aIsFocal = brandCodes[a] === focal;
+      var bIsFocal = brandCodes[b] === focal;
+      if (aIsFocal && !bIsFocal) return -1;
+      if (bIsFocal && !aIsFocal) return 1;
+      var an = (brandNames[a] || brandCodes[a]).toLowerCase();
+      var bn = (brandNames[b] || brandCodes[b]).toLowerCase();
+      return an.localeCompare(bn);
+    });
+
+    for (var ii = 0; ii < orderedIdx.length; ii++) {
+      var bi = orderedIdx[ii];
       var code = brandCodes[bi];
       /* Skip when the top chip bar has explicitly turned this brand off.
          Treat undefined as "show" so brands that have never been toggled

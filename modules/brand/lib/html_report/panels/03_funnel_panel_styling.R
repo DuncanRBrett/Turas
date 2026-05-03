@@ -171,7 +171,7 @@ build_funnel_panel_styles <- function(brand_colour = "#1A5276") {
 .fn-chip-row .col-chip:hover, .col-chip-bar .col-chip:hover { filter: brightness(0.88); }
 .fn-chip-row .col-chip-off, .col-chip-bar .col-chip-off {
   background: #f8f9fa !important; color: #94a3b8 !important; border-color: #e2e8f0 !important;
-  text-decoration: line-through; opacity: 0.55;
+  text-decoration: line-through !important; opacity: 0.55;
 }
 
 /* Tabs .toggle-label — pill with checkbox, checked-state filled */
