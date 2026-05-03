@@ -446,12 +446,12 @@ cb_brand_freq_scr_table_html <- function(norms_table,
   header_html <- paste0(
     '<thead><tr>',
     '<th class="ct-label-col" style="text-align:left;">Brand</th>',
-    sprintf('<th title="%s" class="cb-base-th">Base<br/>(n=)</th>',
-            .cb_esc("Weighted respondent count who bought this brand (BRANDPEN3 reconciled).")),
-    .sort_th("Pen",        2L, pen_tip),
-    .sort_th("Avg purch.", 3L, br_tip),
-    .sort_th("Vol share",  4L, vs_tip),
-    .sort_th("SCR obs",    5L, scr_tip),
+    sprintf('<th title="%s" class="cb-base-th"><div class="ct-header-text">Brand buyers<br/>(n=)</div></th>',
+            .cb_esc("Weighted respondent count who bought this brand in the target window (BRANDPEN3 reconciled).")),
+    .sort_th("Penetration",       2L, pen_tip),
+    .sort_th("Avg purchases",     3L, br_tip),
+    .sort_th("Volume share",      4L, vs_tip),
+    .sort_th("Loyalty (SCR)",     5L, scr_tip),
     '</tr></thead>'
   )
 

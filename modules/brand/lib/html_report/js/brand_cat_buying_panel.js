@@ -486,8 +486,13 @@
           ? panel.querySelector('.cb-dop-section[data-cb-scope="dop"]')
           : panel.querySelector('.cb-rel-section[data-cb-scope="' + scope + '"]');
         if (!sec) return;
-        /* % stays visible always; only toggle the n=X secondary label */
-        var sel = scope === 'dop' ? '.cb-dop-cell .cb-val-n' : '.cb-seg-cell .cb-val-n';
+        /* % stays visible always; only toggle the n=X secondary label.
+           For loyalty/dist we also toggle the per-brand n folded into the
+           "% Cat buyers" column (cb-col-buyers .cb-val-n) so the brand
+           buyer base shows up alongside the segment counts. */
+        var sel = scope === 'dop'
+          ? '.cb-dop-cell .cb-val-n'
+          : '.cb-seg-cell .cb-val-n, .cb-col-buyers .cb-val-n';
         sec.querySelectorAll(sel).forEach(function (n) {
           if (cb.checked) n.removeAttribute('hidden');
           else            n.setAttribute('hidden', '');
@@ -970,36 +975,62 @@
     vals.forEach(function (v) { if (v != null && !isNaN(v)) total += v; });
     if (total <= 0) total = 100;
 
+    /* Pre-compute per-segment geometry (left, width, center as percent of
+       track width) so out-of-bar labels for tiny segments can be placed
+       absolutely above the track and repelled to avoid overlap. */
     var segHtml = '';
-    /* Multi-select emphasis: emph.all → all segments coloured; else only
-       segments in emph[segCode] render coloured. Non-emphasised go muted. */
     var emphAll = emph && emph.all === true;
+    var smallLabels = [];  // [{cx, txt, segPct}]
+    var cursor = 0;
     vals.forEach(function (v, i) {
       if (v == null || isNaN(v) || v <= 0) return;
       var pct    = (v / total) * 100;
       var isEmph = emphAll || (emph && emph[segCodes[i]] === true);
       var col    = isEmph ? colors[i] : 'rgba(148,163,184,0.18)';
       var txt    = v.toFixed(0) + '%';
-      /* Render the % label INSIDE the segment for any segment ≥ 4% — below
-         that the track's overflow:hidden clips the label and we get the
-         garbled "%" artefact seen on the Purchase Distribution exports
-         (a 1% segment can't fit "1%" without spilling out of the track).
-         Tiny segments still get a hover tooltip via the title attribute on
-         the segment div so the value is recoverable. */
-      var tiny    = pct < 8;
-      var showLbl = pct >= 4;
-      var lblCls  = 'fn-rel-seg-lbl' + (tiny ? ' fn-rel-seg-lbl-tiny' : '');
-      var inside  = showLbl
+      /* Inside-the-bar label only when the segment is wide enough that the
+         text won't be clipped (>= 4%). Below that the label moves above
+         the track via the smallLabels pipeline below. */
+      var showInside = pct >= 4;
+      var lblCls     = 'fn-rel-seg-lbl' + (pct < 8 ? ' fn-rel-seg-lbl-tiny' : '');
+      var inside     = showInside
         ? '<span class="' + lblCls + '" title="' + txt + '">' + txt + '</span>'
         : '';
-      segHtml += '<div class="fn-rel-seg' + (tiny ? ' fn-rel-seg-tiny' : '') +
+      segHtml += '<div class="fn-rel-seg' + (pct < 8 ? ' fn-rel-seg-tiny' : '') +
                  '" title="' + txt + '" style="width:' + pct.toFixed(1) + '%;background:' + col + ';">' +
                  inside + '</div>';
+      if (!showInside) {
+        smallLabels.push({ cx: cursor + pct / 2, txt: txt });
+      }
+      cursor += pct;
     });
+
+    /* Repel out-of-bar labels horizontally so they don't overlap. The
+       label is small ("1%"–"3%", ~14px wide on the typical 800–1500px
+       track), so we pick a tight 1.2% half-width — that's ~10px on a
+       short track and ~18px on a wide one, enough to stop collisions
+       without yanking labels far away from their segment. Process
+       left-to-right; push right if it would collide with the previous
+       label; clamp to [0, 100]. */
+    var halfW = 1.2;
+    smallLabels.sort(function (a, b) { return a.cx - b.cx; });
+    var prevRight = -Infinity;
+    smallLabels.forEach(function (lp) {
+      var left = lp.cx - halfW;
+      if (left < prevRight) lp.cx = prevRight + halfW;
+      if (lp.cx + halfW > 100) lp.cx = 100 - halfW;
+      prevRight = lp.cx + halfW;
+    });
+    var smallHtml = smallLabels.map(function (lp) {
+      var anchorPct = Math.max(0, Math.min(100, lp.cx));
+      return '<span class="fn-rel-seg-outlabel" style="left:' + anchorPct.toFixed(1) +
+             '%;">' + lp.txt + '</span>';
+    }).join('');
 
     var rowCls = 'fn-rel-bar-row';
     if (isFocal) rowCls += ' fn-rel-bar-row-focal';
     if (isAvg)   rowCls += ' fn-rel-bar-row-avg';
+    if (smallLabels.length > 0) rowCls += ' fn-rel-bar-row-with-outlabels';
 
     var labelHtml = escHtml(label);
     if (isFocal) {
@@ -1010,9 +1041,10 @@
 
     return '<div class="' + rowCls + '"' + dbAttr + '>'
       + '<div class="fn-rel-bar-label">' + labelHtml + '</div>'
-      + '<div class="fn-rel-bar-area"><div class="fn-rel-bar-track">'
-      + segHtml
-      + '</div></div>'
+      + '<div class="fn-rel-bar-area">'
+      +   '<div class="fn-rel-bar-outlabels">' + smallHtml + '</div>'
+      +   '<div class="fn-rel-bar-track">' + segHtml + '</div>'
+      + '</div>'
       + '</div>';
   }
 
@@ -1902,11 +1934,13 @@
     if (flags.chart) {
       var chartEl = null;
       if (tabKey === 'brands') {
-        var ca = activeTab.querySelector('.cb-brands-chart-area');
-        chartEl = ca ? ca.querySelector('.cb-brands-chart') : null;
+        // Capture the whole chart area so the cat-avg legend chip and
+        // column-selector dropdown surface in the pinned/PNG view.
+        chartEl = activeTab.querySelector('.cb-brands-chart-area');
       } else if (tabKey === 'loyalty' || tabKey === 'dist') {
-        var ca2 = activeTab.querySelector('.fn-rel-chart-area');
-        chartEl = ca2 ? ca2.querySelector('.fn-rel-chart') : null;
+        // Capture the chart area (legend + bars), not just .fn-rel-chart,
+        // so the segment colour key travels with the pin/PNG export.
+        chartEl = activeTab.querySelector('.fn-rel-chart-area');
       }
       if (chartEl) {
         capturedChartHtml = TurasPins.capturePortableHtml
@@ -2090,11 +2124,13 @@
     if (flags.chart) {
       var chartEl = null;
       if (tabKey === 'brands') {
-        var ca = activeTab.querySelector('.cb-brands-chart-area');
-        chartEl = ca ? ca.querySelector('.cb-brands-chart') : null;
+        // Capture the whole chart area so the cat-avg legend chip and
+        // column-selector dropdown surface in the pinned/PNG view.
+        chartEl = activeTab.querySelector('.cb-brands-chart-area');
       } else if (tabKey === 'loyalty' || tabKey === 'dist') {
-        var ca2 = activeTab.querySelector('.fn-rel-chart-area');
-        chartEl = ca2 ? ca2.querySelector('.fn-rel-chart') : null;
+        // Capture the chart area (legend + bars), not just .fn-rel-chart,
+        // so the segment colour key travels with the pin/PNG export.
+        chartEl = activeTab.querySelector('.fn-rel-chart-area');
       }
       if (chartEl) {
         capturedChartHtml = TurasPins.capturePortableHtml

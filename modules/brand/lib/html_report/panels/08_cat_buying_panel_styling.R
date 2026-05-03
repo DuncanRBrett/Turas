@@ -561,11 +561,13 @@ paste0(
 .cb-panel .ct-table .cb-seg-cell .cb-val-pct {
   display: block; font-weight: 600;
 }
-.cb-panel .ct-table .cb-seg-cell .cb-val-n {
+.cb-panel .ct-table .cb-seg-cell .cb-val-n,
+.cb-panel .ct-table .cb-col-buyers .cb-val-n {
   display: block; font-size: 10px; color: #94a3b8;
   font-weight: 400; margin-top: 1px;
 }
-.cb-panel .ct-table .cb-seg-cell .cb-val-n[hidden] { display: none; }
+.cb-panel .ct-table .cb-seg-cell .cb-val-n[hidden],
+.cb-panel .ct-table .cb-col-buyers .cb-val-n[hidden] { display: none; }
 .cb-panel .ct-table .cb-avg-row .cb-ci-band {
   display: inline-block; margin-left: 4px; font-size: 9px;
   color: #94a3b8; font-style: italic; font-weight: 400;
@@ -648,13 +650,34 @@ paste0(
   min-width: 18px;
 }
 .cb-brands-chart-avg-line {
-  position: absolute; top: 0; bottom: 0; width: 1px;
-  background: #0f172a; opacity: 0.5;
+  position: absolute; top: 0; bottom: 0; width: 0;
+  border-left: 1.5px dashed #0f172a; opacity: 0.55;
 }
 .cb-brands-chart-title {
   font-size: 11px; font-weight: 600; color: #475569;
   text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 2px;
 }
+.cb-brands-chart-legend {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-left: 12px; font-size: 11px; color: #64748b;
+}
+.cb-brands-chart-legend-line {
+  display: inline-block; width: 22px; height: 0;
+  border-top: 1.5px dashed #0f172a; opacity: 0.55;
+}
+.cb-brands-chart-legend-label { font-style: italic; }
+.cb-rel-chart-legend {
+  display: flex; flex-wrap: wrap; gap: 8px 14px;
+  margin: 6px 0 8px; padding: 6px 8px;
+  background: #fafbfc; border: 1px solid #eef2f7; border-radius: 6px;
+  font-size: 11.5px; color: #475569;
+}
+.cb-rel-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.cb-rel-legend-swatch {
+  display: inline-block; width: 14px; height: 14px; border-radius: 2px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+.cb-rel-legend-label { font-weight: 500; }
 
 ',
 '/* === Sub-tab navigation === */
@@ -791,7 +814,32 @@ paste0(
   color: #334155; text-align: right; padding-right: 8px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.fn-rel-bar-area { flex: 1; display: flex; min-width: 0; }
+/* Bar area is a row flex (label-on-left | track) -- unchanged from before.
+   The out-labels strip floats absolutely ABOVE the area so it does not
+   change the track width or layout. Rows that have out-labels reserve
+   a small margin-top to make room for the floated strip. */
+.fn-rel-bar-area {
+  flex: 1; display: flex; min-width: 0; position: relative;
+}
+.fn-rel-bar-row-with-outlabels { margin-top: 14px; }
+.fn-rel-bar-outlabels {
+  position: absolute; left: 0; right: 0; top: -14px; height: 14px;
+  pointer-events: none;
+}
+.fn-rel-seg-outlabel {
+  position: absolute; bottom: 1px;
+  transform: translateX(-50%);
+  font-size: 9.5px; font-weight: 700;
+  color: #475569; background: #fff;
+  padding: 0 3px; border-radius: 2px;
+  white-space: nowrap;
+}
+/* Leader: thin grey tick from the label down to the segment edge. */
+.fn-rel-seg-outlabel::after {
+  content: ""; position: absolute; left: 50%;
+  bottom: -3px; width: 1px; height: 3px;
+  background: #cbd5e1; transform: translateX(-50%);
+}
 .fn-rel-bar-track {
   flex: 1; display: flex; height: 24px; border-radius: 4px;
   overflow: hidden; background: #f1f5f9;

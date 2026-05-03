@@ -165,12 +165,16 @@ render_cat_buying_panel <- function(panel_data) {
     seg_labels   = loy_seg_labels,
     focal        = focal,
     brand_labels = brand_labels,
-    description  = paste0(
-      "How category buyers relate to each brand: sole buyer | primary (>50% of their ",
-      "purchases) | secondary (\u226450%) | not bought. As % of all category buyers."),
+    description  = sprintf(paste0(
+      "How category buyers relate to each brand over the <strong>past %d months</strong> ",
+      "(target purchase window): sole buyer | primary (&gt;50%% of their purchases) | ",
+      "secondary (&le;50%%) | not bought. Base = category buyers (m_vec &gt; 0 in the ",
+      "past %d months); excludes lapsed / zero-purchase respondents."),
+      as.integer(t_months), as.integer(t_months)),
     buyers_pct_map = buyers_pct_map,
     base_n         = total_cat_buyers_n,
     base_label     = "Cat buyers (n=)",
+    target_months  = t_months,
     refused_source = bh))
   parts <- c(parts, '</div>')
 
@@ -192,10 +196,15 @@ render_cat_buying_panel <- function(panel_data) {
     seg_labels   = dist_seg_labels,
     focal        = focal,
     brand_labels = brand_labels,
-    description  = "% of brand buyers by purchase frequency in the target window. Category average shown.",
+    description  = sprintf(paste0(
+      "%% of brand buyers by purchase frequency over the <strong>past %d months</strong> ",
+      "(target purchase window). Each row sums to 100%% across the four buckets. ",
+      "Base = brand buyers (people who bought this brand at least once in the past %d months)."),
+      as.integer(t_months), as.integer(t_months)),
     buyers_pct_map = buyers_pct_map,
     base_n_map     = brand_buyers_n_map,
     base_label     = "Brand buyers (n=)",
+    target_months  = t_months,
     refused_source = bh))
   parts <- c(parts, '</div>')
 
@@ -307,34 +316,6 @@ render_cat_buying_panel <- function(panel_data) {
   has_dn <- !is.null(dn) && !identical(dn$status, "REFUSED")
   has_bh <- !is.null(bh) && !identical(bh$status, "REFUSED")
 
-  # Info callout — column definitions & how to read the table
-  cat_mean_purch <- if (has_dn && !is.null(dn$category_metrics$mean_purchases))
-    dn$category_metrics$mean_purchases else NA_real_
-  vol_note <- if (!is.na(cat_mean_purch))
-    sprintf("<strong>Vol share</strong> = (Pen \u00d7 Avg purch.) \u00f7 %.1f (category mean).",
-            cat_mean_purch)
-  else "<strong>Vol share</strong> requires category mean purchases."
-  parts <- c(parts, paste0(
-    '<details class="cb-info-callout" data-cb-scope="brands">',
-    '<summary>&#9432; How to read this table</summary>',
-    '<div class="cb-info-body">',
-    '<ul>',
-    '<li><strong>Pen</strong> = % of <em>all screened category respondents</em> who bought the brand (BRANDPEN3, reconciled). Includes lapsed / zero-purchase. The Loyalty tab uses a tighter cat-buyer base, so its &ldquo;% Cat buyers&rdquo; reads higher.</li>',
-    '<li><strong>Avg purch.</strong> = mean times bought per brand buyer.</li>',
-    '<li><strong>SCR obs</strong> = share of category requirement (loyalty).</li>',
-    '<li>', vol_note, '</li>',
-    '<li><strong>CI band on Category avg</strong> \u2014 shown as the mini bar in the Cat avg row. ',
-    'For each column we take the values across the <em>B</em> brands, compute the mean (m) and standard deviation (SD), ',
-    'and draw the shaded range as <strong>m \u00b1 1 SD</strong>. The tick marks the mean; the labels below show the lo / hi bounds. ',
-    'If brand values are roughly normal, ~68% of brands fall inside this band.</li>',
-    '<li><em>Note:</em> this is a <strong>cross-brand dispersion band</strong> (spread of brands around the category average), ',
-    'not a sampling confidence interval on the estimate itself.</li>',
-    '<li><strong>Heatmap</strong>: green = above upper band (+1 SD), red = below lower band (\u22121 SD), amber = inside the band.</li>',
-    '<li>Click a column header to sort brands.</li>',
-    '</ul>',
-    '</div>',
-    '</details>'))
-
   # Controls bar: show chart + show heatmap (both off by default)
   parts <- c(parts,
     '<div class="cb-controls-bar" data-cb-scope="brands">',
@@ -359,20 +340,30 @@ render_cat_buying_panel <- function(panel_data) {
   }
 
   # Chart placeholder (hidden until Show chart is checked) — BELOW the table.
-  # Column selector + single bar chart.
+  # Column selector + single bar chart + legend chip explaining cat-avg line.
   parts <- c(parts,
     '<div class="cb-brands-chart-area" data-cb-scope="brands" hidden>',
     '  <div class="cb-brands-chart-ctl">',
     '    <label class="cb-brands-chart-ctl-label">Column</label>',
     '    <select class="cb-brands-chart-col" data-cb-action="brandschart-col">',
     '      <option value="pen" selected>Penetration</option>',
-    '      <option value="avg">Avg purchases</option>',
-    '      <option value="vol">Vol share</option>',
-    '      <option value="scr">SCR obs</option>',
+    '      <option value="avg">Avg purchases per buyer</option>',
+    '      <option value="vol">Volume share</option>',
+    '      <option value="scr">Loyalty (SCR)</option>',
     '    </select>',
+    '    <span class="cb-brands-chart-legend" aria-hidden="true">',
+    '      <span class="cb-brands-chart-legend-line"></span>',
+    '      <span class="cb-brands-chart-legend-label">Category average</span>',
+    '    </span>',
     '  </div>',
     '  <div class="cb-brands-chart" data-cb-brands-chart="brands"></div>',
     '</div>')
+
+  # Move the page callout to the bottom of the page. Pulled from the
+  # central registry so the body is editable in the Callout Editor.
+  callout_html <- if (exists("turas_callout", mode = "function"))
+    turas_callout("brand", "cat_buying_brand_summary", collapsed = TRUE) else ""
+  if (nzchar(callout_html)) parts <- c(parts, callout_html)
 
   paste(parts, collapse = "\n")
 }
@@ -387,11 +378,13 @@ render_cat_buying_panel <- function(panel_data) {
                               base_n_map     = NULL,
                               base_n         = NULL,
                               base_label     = "Base (n=)",
+                              target_months  = NULL,
                               refused_source = NULL) {
   parts <- character(0)
+  # Description renders as HTML (callers pass <strong> for the timeframe).
   parts <- c(parts, sprintf(
     '<p style="font-size:12px;color:#64748b;margin:4px 0 10px;">%s</p>',
-    .cb_esc(description)))
+    description))
 
   if (is.null(data_df) || nrow(data_df) == 0) {
     parts <- c(parts, .cb_refused_block(refused_source,
@@ -406,8 +399,8 @@ render_cat_buying_panel <- function(panel_data) {
     lbl_fn(bc, brand_labels)
   }, character(1))
 
-  # Info callout
-  parts <- c(parts, .cb_ma_info_callout(scope))
+  # In-flow callout removed — moved to the bottom of the page (registry:
+  # brand.cat_buying_loyalty / brand.cat_buying_dist).
 
   # Controls bar: show chart + show counts + show heatmap (pin/export relocated
   # here by JS, right-aligned via .cb-toolbar-relocated).
@@ -425,23 +418,61 @@ render_cat_buying_panel <- function(panel_data) {
     '</div>'),
     scope, scope, scope, scope))
 
-  # Table: brands-as-rows, segments-as-columns (matches Brand Attitude orientation)
+  # Table: brands-as-rows, segments-as-columns. The Base column is merged
+  # into the % Cat buyers cell (n appears under the percentage when Show
+  # counts is on) — the dedicated Base column is suppressed.
   parts <- c(parts, .cb_rel_table_html(
     scope, data_df, col_names, seg_codes, seg_labels,
     brands, brand_names, focal,
     buyers_pct_map = buyers_pct_map,
     base_n_map     = base_n_map,
     base_n         = base_n,
-    base_label     = base_label))
+    base_label     = base_label,
+    base_in_buyers_cell = TRUE))
 
-  # Emphasis chips + stacked bar chart area (JS renders into fn-rel-chart div)
+  # Emphasis chips above the chart area. Segment-colour legend lives
+  # INSIDE .fn-rel-chart-area so pin / PNG capture (which clones that
+  # element) carries the colour key with it.
   parts <- c(parts, .cb_rel_emphasis_chips(scope, seg_codes, seg_labels))
   parts <- c(parts, sprintf(
     '<div class="fn-rel-chart-area" data-cb-scope="%s">
+  %s
   <div class="fn-rel-chart" data-cb-stacked-chart="%s"></div>
-</div>', scope, scope))
+</div>', scope, .cb_rel_chart_legend(scope, seg_codes, seg_labels), scope))
+
+  # Bottom-of-page callout (registry: brand.cat_buying_loyalty or _dist).
+  callout_key <- if (identical(scope, "loyalty")) "cat_buying_loyalty" else "cat_buying_dist"
+  callout_html <- if (exists("turas_callout", mode = "function"))
+    turas_callout("brand", callout_key, collapsed = TRUE) else ""
+  if (nzchar(callout_html)) parts <- c(parts, callout_html)
 
   paste(parts, collapse = "\n")
+}
+
+
+# Static legend strip — segment colour key for the stacked bar chart. Sits
+# inside the chart area so pin / PNG export captures it alongside the bars.
+# IMPORTANT: palette must mirror SEG_COLORS in brand_cat_buying_panel.js
+# exactly. If you change one, change the other in the same commit.
+.cb_rel_chart_legend <- function(scope, seg_codes, seg_labels) {
+  palette <- if (identical(scope, "loyalty"))
+    # dark green (sole) -> light green (primary) -> amber (secondary) -> grey (not bought)
+    c("#166534", "#4ade80", "#fbbf24", "#64748b")
+  else
+    # light blue -> dark blue (frequency gradient)
+    c("#bfdbfe", "#60a5fa", "#2563eb", "#1e3a8a")
+  swatches <- vapply(seq_along(seg_codes), function(i) {
+    sprintf(paste0(
+      '<span class="cb-rel-legend-item">',
+      '<span class="cb-rel-legend-swatch" style="background:%s;"></span>',
+      '<span class="cb-rel-legend-label">%s</span>',
+      '</span>'),
+      palette[((i - 1) %% length(palette)) + 1L],
+      .cb_esc(seg_labels[i]))
+  }, character(1))
+  sprintf(
+    '<div class="cb-rel-chart-legend" data-cb-scope="%s">%s</div>',
+    .cb_esc(scope), paste(swatches, collapse = ""))
 }
 
 
@@ -628,7 +659,8 @@ render_cat_buying_panel <- function(panel_data) {
                                 buyers_pct_map = NULL,
                                 base_n_map     = NULL,
                                 base_n         = NULL,
-                                base_label     = "Base (n=)") {
+                                base_label     = "Base (n=)",
+                                base_in_buyers_cell = FALSE) {
   # Heatmap CI-band classifier — same logic as Brand Summary.
   .hm_cls <- function(v, avg, sd_v) {
     if (is.na(v) || is.na(avg) || is.na(sd_v) || sd_v == 0) return("cb-hm-near")
@@ -657,19 +689,42 @@ render_cat_buying_panel <- function(panel_data) {
     "% Cat buyers = % of CATEGORY BUYERS (3-month, m_vec > 0) who bought ",
     "this brand. Differs from the Brand Summary tab&apos;s &ldquo;Pen&rdquo;, ",
     "which uses ALL screened category respondents (incl. lapsed / zero-",
-    "purchase) — Pen will be lower than this value for the same brand.")
-  header_html <- sprintf(paste0(
-    '<tr><th class="ct-th ct-label-col">Brand</th>',
-    '<th class="ct-th ct-data-col cb-col-buyers cb-sortable" title="%s" ',
-    'data-cb-sort-col="1" data-cb-sort-dir="none">',
-    '<span class="cb-th-label">%% Cat buyers</span>',
-    '<span class="cb-sort-ind"></span></th>',
-    '<th class="ct-th ct-data-col cb-col-base cb-sortable" title="Click to sort" ',
-    'data-cb-sort-col="2" data-cb-sort-dir="none">',
-    '<span class="cb-th-label">%s</span>',
-    '<span class="cb-sort-ind"></span></th>',
-    '%s</tr>'),
-    .cb_esc(buyers_tip), .cb_esc(base_label), seg_ths)
+    "purchase) — Pen will be lower than this value for the same brand. ",
+    "Toggle Show counts to reveal the underlying respondent count.")
+  # When base_in_buyers_cell = TRUE, the Base column is suppressed and the
+  # base count moves under the % Cat buyers number. Seg sort columns shift
+  # by one (no longer offset for the Base column).
+  if (isTRUE(base_in_buyers_cell)) {
+    seg_ths <- paste(vapply(seq_along(seg_codes), function(si) {
+      sprintf(paste0(
+        '<th class="ct-th ct-data-col cb-sortable" title="Click to sort" ',
+        'data-cb-seg="%s" data-cb-sort-col="%d" data-cb-sort-dir="none">',
+        '<span class="cb-th-label">%s</span>',
+        '<span class="cb-sort-ind"></span></th>'),
+        .cb_esc(seg_codes[si]), 1L + si, .cb_esc(seg_labels[si]))
+    }, character(1)), collapse = "")
+    header_html <- sprintf(paste0(
+      '<tr><th class="ct-th ct-label-col">Brand</th>',
+      '<th class="ct-th ct-data-col cb-col-buyers cb-sortable" title="%s" ',
+      'data-cb-sort-col="1" data-cb-sort-dir="none">',
+      '<span class="cb-th-label">%% Cat buyers</span>',
+      '<span class="cb-sort-ind"></span></th>',
+      '%s</tr>'),
+      .cb_esc(buyers_tip), seg_ths)
+  } else {
+    header_html <- sprintf(paste0(
+      '<tr><th class="ct-th ct-label-col">Brand</th>',
+      '<th class="ct-th ct-data-col cb-col-buyers cb-sortable" title="%s" ',
+      'data-cb-sort-col="1" data-cb-sort-dir="none">',
+      '<span class="cb-th-label">%% Cat buyers</span>',
+      '<span class="cb-sort-ind"></span></th>',
+      '<th class="ct-th ct-data-col cb-col-base cb-sortable" title="Click to sort" ',
+      'data-cb-sort-col="2" data-cb-sort-dir="none">',
+      '<span class="cb-th-label">%s</span>',
+      '<span class="cb-sort-ind"></span></th>',
+      '%s</tr>'),
+      .cb_esc(buyers_tip), .cb_esc(base_label), seg_ths)
+  }
 
   # Per-column category avg & SD across brands (for CI band & heatmap)
   cat_avgs <- vapply(col_names, function(cn) {
@@ -710,9 +765,16 @@ render_cat_buying_panel <- function(panel_data) {
     sprintf('<td class="ct-td ct-data-col cb-avg-seg-ci"><span class="cb-val-pct">%s</span>%s</td>',
             fmt_pct(v), bar)
   }, character(1)), collapse = "")
-  avg_row <- sprintf(
-    '<tr class="ct-row fn-row-avg-all cb-rel-row cb-avg-row"><td class="ct-td ct-label-col">Category avg</td><td class="ct-td ct-data-col cb-col-buyers">\u2014</td><td class="ct-td ct-data-col cb-col-base">\u2014</td>%s</tr>',
-    avg_seg_cells)
+  # Cat avg row \u2014 drops the Base column when base_in_buyers_cell is on.
+  avg_row <- if (isTRUE(base_in_buyers_cell)) {
+    sprintf(
+      '<tr class="ct-row fn-row-avg-all cb-rel-row cb-avg-row"><td class="ct-td ct-label-col">Category avg</td><td class="ct-td ct-data-col cb-col-buyers">\u2014</td>%s</tr>',
+      avg_seg_cells)
+  } else {
+    sprintf(
+      '<tr class="ct-row fn-row-avg-all cb-rel-row cb-avg-row"><td class="ct-td ct-label-col">Category avg</td><td class="ct-td ct-data-col cb-col-buyers">\u2014</td><td class="ct-td ct-data-col cb-col-base">\u2014</td>%s</tr>',
+      avg_seg_cells)
+  }
 
   order_idx <- if (!is.null(focal) && focal %in% brands) {
     c(which(brands == focal), which(brands != focal))
@@ -738,11 +800,19 @@ render_cat_buying_panel <- function(panel_data) {
     else if (!is.null(base_n)) as.numeric(base_n)
     else NA_real_
 
+    # When base_in_buyers_cell is on, the base count is folded into the
+    # % Cat buyers cell as a small line under the percentage; the existing
+    # "Show counts" toggle reveals it via the cb-val-n span (same hidden-by-
+    # default contract as the segment cells).
+    base_n_html <- if (isTRUE(base_in_buyers_cell) &&
+                       !is.null(base_val) && !is.na(base_val))
+      sprintf('<span class="cb-val-n" hidden>n=%s</span>', fmt_n(base_val))
+    else ""
     buyers_cell <- sprintf(
-      '<td class="ct-td ct-data-col cb-col-buyers" data-v="%s">%s</td>',
+      '<td class="ct-td ct-data-col cb-col-buyers" data-v="%s">%s%s</td>',
       if (!is.na(buyers_pct)) sprintf("%.4f", buyers_pct) else "",
-      fmt_pct(buyers_pct))
-    base_cell <- sprintf(
+      fmt_pct(buyers_pct), base_n_html)
+    base_cell <- if (isTRUE(base_in_buyers_cell)) "" else sprintf(
       '<td class="ct-td ct-data-col cb-col-base" data-v="%s">%s</td>',
       if (!is.null(base_val) && !is.na(base_val)) sprintf("%.4f", base_val) else "",
       fmt_n(base_val))
