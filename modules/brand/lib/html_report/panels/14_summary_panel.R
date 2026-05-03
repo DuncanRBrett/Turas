@@ -192,25 +192,54 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 }
 
 /* ---- Stat rows (Category context card) ---- */
-.brsum-stat-rows {
-  display: flex; flex-direction: column; gap: 8px;
+.brsum-stat-rows { display: flex; flex-direction: column; gap: 14px; }
+
+.brsum-stat-group { display: flex; flex-direction: column; gap: 4px; }
+.brsum-stat-group-head {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.6px;
+  text-transform: uppercase; color: #475569;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #e2e8f0;
 }
+.brsum-stat-group-icon {
+  width: 14px; height: 14px; display: inline-flex;
+  align-items: center; justify-content: center; color: #1A5276;
+}
+.brsum-stat-group-icon svg { width: 14px; height: 14px; stroke: currentColor; fill: none; }
+
 .brsum-stat-row {
-  display: flex; align-items: baseline; justify-content: space-between;
-  gap: 12px; padding: 6px 0;
+  display: grid; grid-template-columns: 1fr auto; align-items: center;
+  column-gap: 12px; padding: 6px 0;
   border-bottom: 1px dashed #f1f5f9;
 }
-.brsum-stat-row:last-child { border-bottom: 0; }
+.brsum-stat-group .brsum-stat-row:last-child { border-bottom: 0; }
+.brsum-stat-row.is-empty .brsum-stat-value { color: #cbd5e1; }
+.brsum-stat-row.is-empty .brsum-stat-sub   { font-style: italic; }
+
 .brsum-stat-label {
-  font-size: 12px; color: #64748b; font-weight: 500;
+  font-size: 12.5px; color: #1e293b; font-weight: 500; line-height: 1.3;
+}
+.brsum-stat-label-help {
+  display: inline-block; width: 12px; height: 12px;
+  border-radius: 50%; border: 1px solid #cbd5e1; color: #94a3b8;
+  font-size: 9px; font-weight: 700; text-align: center; line-height: 10px;
+  margin-left: 4px; cursor: help;
 }
 .brsum-stat-value {
-  font-size: 16px; font-weight: 700; color: #1e293b;
+  display: flex; flex-direction: column; align-items: flex-end;
   font-variant-numeric: tabular-nums;
-  display: flex; align-items: baseline; gap: 8px;
+}
+.brsum-stat-value-num {
+  font-size: 18px; font-weight: 700; color: #1e293b; line-height: 1.1;
+}
+.brsum-stat-value-text {
+  font-size: 13px; font-weight: 600; color: #1e293b; line-height: 1.2;
+  text-align: right;
 }
 .brsum-stat-sub {
-  font-size: 10px; color: #94a3b8; font-weight: 500;
+  font-size: 10.5px; color: #94a3b8; font-weight: 500;
+  line-height: 1.2; margin-top: 2px;
 }
 
 /* ---- Value chips (MA metrics, Brand summary, WOM cards) ---- */
@@ -1181,7 +1210,13 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
     top_pack             = NULL
   )
 
-  # ---- Brand counts per funnel stage (weighted)
+  # ---- Brand counts per funnel stage (weighted, all-respondents base)
+  # Note: pct_weighted is in 0..1 of total respondents, so summing across
+  # brands at a stage gives "average # of brands per respondent at that
+  # stage" with non-buyers contributing 0. This deliberately differs
+  # from repertoire-size on the Buying page (which uses a buyers-only
+  # base). The base is surfaced in the row's tooltip so users don't
+  # confuse the two reads.
   fn <- cr$funnel
   if (!is.null(fn) && !identical(fn$status, "REFUSED") &&
       !is.null(fn$stages) && nrow(fn$stages) > 0) {
@@ -1195,18 +1230,25 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
     cons_n  <- .stage_brand_count("consideration")
     p12m_n  <- .stage_brand_count("bought_long")
     p3m_n   <- .stage_brand_count("bought_target")
+    base_note <- "Base: all respondents (non-buyers count as 0)."
     if (!is.na(aware_n) && is.finite(aware_n))
       ctx$avg_aware_brands <- list(value = sprintf("%.1f", aware_n),
-                                    sub = "brands aware (avg / respondent)")
+                                    sub = "brands aware",
+                                    tooltip = base_note)
     if (!is.na(cons_n) && is.finite(cons_n))
       ctx$avg_consider_brands <- list(value = sprintf("%.1f", cons_n),
-                                       sub = "brands considered (avg / respondent)")
+                                       sub = "brands considered",
+                                       tooltip = base_note)
     if (!is.na(p12m_n) && is.finite(p12m_n))
       ctx$avg_p12m_brands <- list(value = sprintf("%.1f", p12m_n),
-                                   sub = "brands bought long period (avg / respondent)")
+                                   sub = "brands bought (long)",
+                                   tooltip = paste0(base_note,
+                                     " Differs from repertoire size on the Category Buying page, which is computed on category-buyers only."))
     if (!is.na(p3m_n) && is.finite(p3m_n))
       ctx$avg_p3m_brands <- list(value = sprintf("%.1f", p3m_n),
-                                  sub = "brands bought target period (avg / respondent)")
+                                  sub = "brands bought (3m)",
+                                  tooltip = paste0(base_note,
+                                    " Differs from repertoire size on the Category Buying page, which is computed on category-buyers only."))
   }
 
   # ---- Avg CEPs per respondent
@@ -1220,7 +1262,8 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
                      na.rm = TRUE) / 100
     if (is.finite(avg_ceps))
       ctx$avg_ceps <- list(value = sprintf("%.1f", avg_ceps),
-                            sub = "CEPs per respondent (avg)")
+                            sub = "CEPs per respondent",
+                            tooltip = "Sum of per-CEP penetration: counts each CEP a respondent linked to any brand.")
   }
 
   # ---- Avg purchases per respondent in the target period
@@ -1229,30 +1272,42 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
       !is.null(cbf$mean_freq) && !is.na(cbf$mean_freq)) {
     ctx$avg_purchases <- list(
       value = sprintf("%.1f", cbf$mean_freq),
-      sub   = cbf$frequency_unit %||% "per period"
+      sub   = cbf$frequency_unit %||% "per period",
+      tooltip = "Mean purchase frequency from the cat_buying scale; non-buyers count as 0."
     )
   }
 
-  # ---- Top channel
+  # ---- Top channel (always emit a slot so the row is visible in the
+  #      card; missing data renders as "—" rather than disappearing)
   loc <- cr$shopper_location
   if (!is.null(loc) && !identical(loc$status, "REFUSED") &&
-      !is.null(loc$top$label) && nzchar(loc$top$label)) {
+      !is.null(loc$top$label) && !is.na(loc$top$label) &&
+      nzchar(loc$top$label)) {
     ctx$top_channel <- list(
       value = as.character(loc$top$label),
       sub   = if (!is.null(loc$top$pct) && !is.na(loc$top$pct))
-                sprintf("%.0f%% of buyers", loc$top$pct) else ""
+                sprintf("%.0f%% of buyers", loc$top$pct) else "",
+      tooltip = "Most frequently picked purchase channel among category buyers."
     )
+  } else {
+    ctx$top_channel <- list(value = NA_character_, sub = "no shopper data",
+                             tooltip = NULL)
   }
 
   # ---- Top pack
   pak <- cr$shopper_packsize
   if (!is.null(pak) && !identical(pak$status, "REFUSED") &&
-      !is.null(pak$top$label) && nzchar(pak$top$label)) {
+      !is.null(pak$top$label) && !is.na(pak$top$label) &&
+      nzchar(pak$top$label)) {
     ctx$top_pack <- list(
       value = as.character(pak$top$label),
       sub   = if (!is.null(pak$top$pct) && !is.na(pak$top$pct))
-                sprintf("%.0f%% of buyers", pak$top$pct) else ""
+                sprintf("%.0f%% of buyers", pak$top$pct) else "",
+      tooltip = "Most frequently picked pack size among category buyers."
     )
+  } else {
+    ctx$top_pack <- list(value = NA_character_, sub = "no shopper data",
+                          tooltip = NULL)
   }
 
   ctx

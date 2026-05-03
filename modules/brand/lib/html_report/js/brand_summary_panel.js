@@ -202,32 +202,93 @@
       body.innerHTML = '<div class="brsum-card-empty">Category context not available.</div>';
       return;
     }
-    /* Eight category-level metrics, sourced from funnel + mental availability
-       + cat_buying + shopper engines. Each row only renders when its source
-       engine produced data; the card is hidden if every row is missing. */
-    var rows = [];
-    if (ctx.avg_aware_brands)    rows.push(statRow('Avg awareness',     ctx.avg_aware_brands.value,    ctx.avg_aware_brands.sub));
-    if (ctx.avg_consider_brands) rows.push(statRow('Avg consideration', ctx.avg_consider_brands.value, ctx.avg_consider_brands.sub));
-    if (ctx.avg_p12m_brands)     rows.push(statRow('Avg buying (long)', ctx.avg_p12m_brands.value,     ctx.avg_p12m_brands.sub));
-    if (ctx.avg_p3m_brands)      rows.push(statRow('Avg buying (3m)',   ctx.avg_p3m_brands.value,      ctx.avg_p3m_brands.sub));
-    if (ctx.avg_ceps)            rows.push(statRow('Avg CEPs',          ctx.avg_ceps.value,            ctx.avg_ceps.sub));
-    if (ctx.avg_purchases)       rows.push(statRow('Avg purchases',     ctx.avg_purchases.value,       ctx.avg_purchases.sub));
-    if (ctx.top_channel)         rows.push(statRow('Top channel',       ctx.top_channel.value,         ctx.top_channel.sub));
-    if (ctx.top_pack)            rows.push(statRow('Top pack size',     ctx.top_pack.value,            ctx.top_pack.sub));
-    if (rows.length === 0) {
+    /* Eight category-level metrics, grouped into three sections so the
+       card scans top-to-bottom: Reach (funnel-stage brand counts),
+       Engagement (CEP density + purchase frequency), Buying habits
+       (channel + pack). Channel + pack always render — missing data
+       shows "—" so the slot stays visible. */
+    var ctxGroups = [
+      { key: 'reach',      label: 'Brand reach',     icon: ICON_REACH,
+        items: [
+          { label: 'Avg awareness',     entry: ctx.avg_aware_brands,    type: 'num' },
+          { label: 'Avg consideration', entry: ctx.avg_consider_brands, type: 'num' },
+          { label: 'Avg buying (long)', entry: ctx.avg_p12m_brands,     type: 'num' },
+          { label: 'Avg buying (3m)',   entry: ctx.avg_p3m_brands,      type: 'num' }
+        ] },
+      { key: 'engagement', label: 'Engagement',      icon: ICON_ENGAGE,
+        items: [
+          { label: 'Avg CEPs',      entry: ctx.avg_ceps,      type: 'num' },
+          { label: 'Avg purchases', entry: ctx.avg_purchases, type: 'num' }
+        ] },
+      { key: 'habits',     label: 'Buying habits',   icon: ICON_HABITS,
+        items: [
+          { label: 'Top channel',  entry: ctx.top_channel, type: 'text', alwaysShow: true },
+          { label: 'Top pack',     entry: ctx.top_pack,    type: 'text', alwaysShow: true }
+        ] }
+    ];
+
+    var anyData = false;
+    var html = ctxGroups.map(function (g) {
+      var groupRows = g.items
+        .filter(function (it) { return it.entry || it.alwaysShow; })
+        .map(function (it) { if (it.entry) anyData = true; return statRow(it); })
+        .join('');
+      if (!groupRows) return '';
+      return '<div class="brsum-stat-group">' +
+               '<div class="brsum-stat-group-head">' +
+                 '<span class="brsum-stat-group-icon">' + g.icon + '</span>' +
+                 escHtml(g.label) +
+               '</div>' +
+               groupRows +
+             '</div>';
+    }).join('');
+
+    if (!anyData) {
       body.innerHTML = '<div class="brsum-card-empty">Category context metrics not available.</div>';
       return;
     }
-    body.innerHTML = '<div class="brsum-stat-rows">' + rows.join('') + '</div>';
+    body.innerHTML = '<div class="brsum-stat-rows">' + html + '</div>';
   }
 
-  function statRow(label, value, sub) {
-    return '<div class="brsum-stat-row">' +
-             '<div class="brsum-stat-label">' + escHtml(label) + '</div>' +
-             '<div class="brsum-stat-value">' + escHtml(value) +
-               (sub ? '<span class="brsum-stat-sub">' + escHtml(sub) + '</span>' : '') +
-             '</div>' +
+  function statRow(item) {
+    var entry  = item.entry;
+    var hasVal = entry && entry.value != null && entry.value !== "" && entry.value !== "NA";
+    var rowCls = hasVal ? 'brsum-stat-row' : 'brsum-stat-row is-empty';
+
+    var help = (entry && entry.tooltip)
+      ? '<span class="brsum-stat-label-help" title="' + escAttr(entry.tooltip) + '">i</span>'
+      : '';
+
+    var valueHtml;
+    if (hasVal) {
+      valueHtml = (item.type === 'num')
+        ? '<span class="brsum-stat-value-num">' + escHtml(entry.value) + '</span>'
+        : '<span class="brsum-stat-value-text">' + escHtml(entry.value) + '</span>';
+    } else {
+      valueHtml = '<span class="brsum-stat-value-text">&mdash;</span>';
+    }
+    var subHtml = (entry && entry.sub)
+      ? '<span class="brsum-stat-sub">' + escHtml(entry.sub) + '</span>'
+      : '';
+
+    return '<div class="' + rowCls + '">' +
+             '<div class="brsum-stat-label">' + escHtml(item.label) + help + '</div>' +
+             '<div class="brsum-stat-value">' + valueHtml + subHtml + '</div>' +
            '</div>';
+  }
+
+  /* Inline SVGs for the three context groups. Stroke=currentColor so the
+     icon picks up .brsum-stat-group-icon's colour. Kept tiny — just a
+     visual anchor, not decorative. */
+  var ICON_REACH = '<svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><circle cx="12" cy="12" r="7"></circle><circle cx="12" cy="12" r="10.5"></circle></svg>';
+  var ICON_ENGAGE = '<svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M5.6 18.4l2.1-2.1M12 18v3M18.4 18.4l-2.1-2.1M21 12h-3M18.4 5.6l-2.1 2.1"></path><circle cx="12" cy="12" r="4"></circle></svg>';
+  var ICON_HABITS = '<svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18l-1.5 11a2 2 0 0 1-2 1.7H6.5a2 2 0 0 1-2-1.7L3 7Z"></path><path d="M8 7V5a4 4 0 0 1 8 0v2"></path></svg>';
+
+  /* Attribute-safe escape for tooltips / titles (different rules to text). */
+  function escAttr(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
   function valueChip(label, value, catAvg, focalColour, leaderHtml) {
