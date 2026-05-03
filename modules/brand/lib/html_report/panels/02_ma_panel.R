@@ -199,11 +199,14 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
   has_aware <- !is.null(block) && !is.null(block$awareness_by_brand)
 
   base_switcher <- if (has_aware) {
+    # Order: % total first (and active), then % aware. Matches the
+    # funnel + brand-relationship pages so analysts see the same
+    # default denominator across every brand-module sub-tab.
     paste0(
       '<div class="sig-level-switcher" role="group" aria-label="Percentage base">',
       '<span class="sig-level-label">Base:</span>',
-      sprintf('<button type="button" class="sig-btn" data-ma-action="basemode" data-ma-stim="%s" data-ma-basemode="aware" aria-pressed="false">%% aware</button>', stim),
       sprintf('<button type="button" class="sig-btn sig-btn-active" data-ma-action="basemode" data-ma-stim="%s" data-ma-basemode="total" aria-pressed="true">%% total</button>', stim),
+      sprintf('<button type="button" class="sig-btn" data-ma-action="basemode" data-ma-stim="%s" data-ma-basemode="aware" aria-pressed="false">%% aware</button>', stim),
       '</div>'
     )
   } else ""
