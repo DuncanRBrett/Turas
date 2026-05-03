@@ -1648,6 +1648,22 @@
     return codes.length > 0 ? codes : null;
   }
 
+  /* Same idea but for the Brand Relationship table on the relationship
+     sub-tab. Returns competitor brand codes in DOM order — the focal
+     row is pinned separately by buildRelChart. Returns null when the
+     rel table hasn't rendered yet. */
+  function readRelTableOrder(panel) {
+    var tbl = panel.querySelector("[data-fn-rel-table] tbody");
+    if (!tbl) return null;
+    var codes = [];
+    var rows = tbl.querySelectorAll("tr.fn-row-competitor[data-fn-brand]");
+    for (var i = 0; i < rows.length; i++) {
+      var c = rows[i].getAttribute("data-fn-brand");
+      if (c) codes.push(c);
+    }
+    return codes.length > 0 ? codes : null;
+  }
+
   // ---------------------------------------------------------------------------
   // Help popovers — floated next to the header ? trigger; click outside or
   // on another ? dismisses. Content comes from the hidden <template> blocks
@@ -2025,7 +2041,10 @@
   function initRelChart(panel) {
     if (!panel.querySelector("[data-fn-rel-chart]")) return;
     panel.__fnState.relEmphasisSet  = new Set();
-    panel.__fnState.relBase         = "aware";
+    /* Default to % of total — matches the funnel table's "% of total"
+       default so analysts read the two pages on the same denominator
+       before drilling into the conversion-from-aware view. */
+    panel.__fnState.relBase         = "total";
     panel.__fnState.relSortCol      = "brand";
     panel.__fnState.relSortDir      = "asc";
     panel.__fnState.relHiddenBrands = new Set();
@@ -2275,19 +2294,38 @@
       if (b.brand_code === focal) focalBrand = b; else compBrands.push(b);
     });
 
-    var sortedComps = compBrands.slice();
-    if (sortCol === "brand") {
-      sortedComps.sort(function(a, b) {
-        var an = (a.brand_name || a.brand_code).toLowerCase();
-        var bn = (b.brand_name || b.brand_code).toLowerCase();
-        return sortDir === "asc" ? an.localeCompare(bn) : bn.localeCompare(an);
+    /* Order: follow the relationship table's current row order so the
+       chart bars stack in the same sequence as the table rows. The
+       column header click handler sorts the table first, then calls
+       buildRelChart — at that point the DOM is the source of truth.
+       Falls back to the relSort state when the table isn't rendered
+       yet (initial paint before sortRelTable runs). */
+    var sortedComps;
+    var relOrder = readRelTableOrder(panel);
+    if (relOrder && relOrder.length > 0) {
+      var posMap = {};
+      relOrder.forEach(function (code, i) { posMap[code] = i; });
+      sortedComps = compBrands.slice().sort(function (a, b) {
+        var pa = posMap[a.brand_code]; var pb = posMap[b.brand_code];
+        if (pa == null) pa = Infinity;
+        if (pb == null) pb = Infinity;
+        return pa - pb;
       });
     } else {
-      sortedComps.sort(function(a, b) {
-        var av = relPct(a, sortCol, base, nTotal);
-        var bv = relPct(b, sortCol, base, nTotal);
-        return sortDir === "desc" ? bv - av : av - bv;
-      });
+      sortedComps = compBrands.slice();
+      if (sortCol === "brand") {
+        sortedComps.sort(function(a, b) {
+          var an = (a.brand_name || a.brand_code).toLowerCase();
+          var bn = (b.brand_name || b.brand_code).toLowerCase();
+          return sortDir === "asc" ? an.localeCompare(bn) : bn.localeCompare(an);
+        });
+      } else {
+        sortedComps.sort(function(a, b) {
+          var av = relPct(a, sortCol, base, nTotal);
+          var bv = relPct(b, sortCol, base, nTotal);
+          return sortDir === "desc" ? bv - av : av - bv;
+        });
+      }
     }
 
     // Cat avg segments (computed across ALL brands for consistency).

@@ -90,6 +90,16 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
 
   chip_default <- pd$config$chip_default %||% "focal_only"
 
+  # Page-level "How to read this page" callout, sourced from the central
+  # callout registry (callouts.json -> brand.funnel_relationship). Lives
+  # at the bottom of the section so analysts can drill into the data
+  # before reading the guide.
+  rel_callout <- if (exists("turas_callout", mode = "function")) {
+    turas_callout("brand", "funnel_relationship", collapsed = TRUE)
+  } else {
+    ""
+  }
+
   paste0(
     sprintf('<section class="fn-section fn-rel-chart-section"%s>',
             if (is.finite(n_total)) sprintf(' data-fn-rel-ntotal="%.0f"', n_total) else ""),
@@ -104,6 +114,7 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
     '<div class="fn-rel-chart" data-fn-rel-chart></div>',
     '</div>',
     .fn_add_insight_strip(),
+    rel_callout,
     '</section>'
   )
 }
@@ -149,8 +160,8 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
     '<div class="fn-rel-meta-row">',
     '<div class="sig-level-switcher" role="group" aria-label="Percentage base">',
     '<span class="sig-level-label">Base:</span>',
-    '<button type="button" class="sig-btn sig-btn-active" data-fn-rel-base="aware" aria-pressed="true">% aware</button>',
-    '<button type="button" class="sig-btn" data-fn-rel-base="total" aria-pressed="false">% total</button>',
+    '<button type="button" class="sig-btn sig-btn-active" data-fn-rel-base="total" aria-pressed="true">% total</button>',
+    '<button type="button" class="sig-btn" data-fn-rel-base="aware" aria-pressed="false">% aware</button>',
     '</div>',
     '<label class="toggle-label"><input type="checkbox" data-fn-rel-showci> Show heatmap</label>',
     '<label class="toggle-label"><input type="checkbox" data-fn-rel-showcounts> Show count</label>',
