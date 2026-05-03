@@ -212,7 +212,8 @@ render_cat_buying_panel <- function(panel_data) {
   parts <- c(parts, '<div class="cb-subtab" data-cb-tab="dop" hidden>')
   parts <- c(parts, .cb_dop_tab(rep, focal, brand_labels,
                                  brand_buyers_n = brand_buyers_n_map,
-                                 focal_colour   = fcol))
+                                 focal_colour   = fcol,
+                                 t_months       = t_months))
   parts <- c(parts, '</div>')
 
   # ----- Tab 6: Shopper Behaviour (optional) --------------------------------
@@ -516,45 +517,108 @@ render_cat_buying_panel <- function(panel_data) {
 
 
 .cb_dop_tab <- function(rep, focal, brand_labels, brand_buyers_n = NULL,
-                         focal_colour = "#1A5276") {
+                         focal_colour = "#1A5276",
+                         t_months = 3L) {
   parts <- character(0)
   parts <- c(parts, '<section class="cb-dop-section" data-cb-scope="dop">')
   parts <- c(parts, '<div class="cb-section-title">Duplication of Purchase</div>')
-  parts <- c(parts, paste0(
-    '<details class="cb-info-callout" data-cb-scope="dop">',
-    '<summary>&#9432; How to read this table</summary>',
-    '<div class="cb-info-body">',
-    '<ul>',
-    '<li><strong>Read across a row:</strong> of this brand\'s buyers, what % also bought each column brand in the target window.</li>',
-    '<li><strong>Diagonal</strong> cells (brand &times; itself) are shown as \u2014 (not meaningful).</li>',
-    '<li><strong>Category avg</strong> row (first data row) = unweighted mean duplication with the column brand across all other brand rows.</li>',
-    '<li><strong>CI band on Category avg</strong> \u2014 shown as the mini bar in the Cat avg row. ',
-    'For each column we compute the mean (m) and standard deviation (SD) of the duplication values across the brand rows, ',
-    'then shade the range <strong>m \u00b1 1 SD</strong>. The tick marks the mean; labels below show the lo / hi bounds. ',
-    'If brand values are roughly normal, ~68% of brands fall inside this band.</li>',
-    '<li><em>Note:</em> this is a <strong>cross-brand dispersion band</strong> (spread of brands around the category average), ',
-    'not a sampling confidence interval on the estimate itself.</li>',
-    '<li><strong>Heatmap</strong>: green = above upper band (+1 SD), red = below lower band (\u22121 SD), amber = inside the band.</li>',
-    '<li><strong>Show counts</strong> toggles cell % \u2194 raw weighted N (co-buyers of the row brand). <strong>Show heatmap</strong> colours cells by CI band.</li>',
-    '<li>Click a column header to sort brands (Brand column sorts A-Z / Z-A).</li>',
-    '</ul>',
-    '</div>',
-    '</details>'))
+  parts <- c(parts, sprintf(paste0(
+    '<p style="font-size:12px;color:#64748b;margin:4px 0 10px;">',
+    'Reads across a row: of this brand&apos;s buyers, what %% also bought each column brand ',
+    'over the <strong>past %d months</strong> (target purchase window). ',
+    'Toggle <em>Mode</em> to switch views: <strong>Observed</strong> = raw sharing %%; ',
+    '<strong>Deviations</strong> = observed &minus; expected, in pp ',
+    '(expected = D &times; column-brand penetration when the DoP law is fitted, ',
+    'else the column average across other brand rows). Hover any cell to see the ',
+    'observed, expected, and deviation values together.',
+    '</p>'),
+    as.integer(t_months)))
 
-  obs_mat <- rep$crossover_matrix %||% NULL
+  obs_mat <- rep$crossover_matrix       %||% NULL
+  dev_mat <- rep$dop_deviation_matrix   %||% NULL
+  D_coef  <- rep$dop_D_coefficient      %||% NULL
 
-  # Partition partners / rivals card — sits above the heatmap so the focal-
-  # brand summary is the first thing the user sees on this sub-tab.
-  if (!is.null(obs_mat) && !is.null(focal) && nzchar(focal) &&
-      exists("cb_dop_partition_card_html", mode = "function")) {
-    parts <- c(parts, cb_dop_partition_card_html(obs_mat, focal,
-                                                  brand_labels = brand_labels))
+  # Engine-fitted expected matrix (D x b_y) when available — used to
+  # populate the cell tooltip with the full obs / exp / dev triple.
+  exp_mat <- rep$dop_expected_matrix    %||% NULL
+  exp_label <- "Expected (D×b)"
+
+  # Fallback: when the engine has not produced a Dawes-style deviation
+  # matrix (e.g. the no-intercept OLS fit was skipped), derive the
+  # classic "deviation from column average" matrix from the observed
+  # sharing. Matches Dawes (2016) Table 4: each cell is (actual % minus
+  # column-avg %) in pp, where the column average is the mean over the
+  # off-diagonal cells. Keeps the toggle useful even when the full
+  # DoP-law fit is unavailable. Build the matching expected (= column
+  # average) matrix so cell tooltips can show all three values.
+  if (is.null(dev_mat) && !is.null(obs_mat)) {
+    brands_vec <- as.character(obs_mat$BrandCode)
+    val_cols <- setdiff(names(obs_mat), "BrandCode")
+    col_avgs_fb <- vapply(val_cols, function(cn) {
+      v <- as.numeric(obs_mat[[cn]])
+      di <- which(brands_vec == cn)
+      if (length(di) == 1L) v[di] <- NA_real_
+      mean(v, na.rm = TRUE)
+    }, numeric(1))
+    dev_mat_local <- obs_mat
+    exp_mat_local <- obs_mat
+    for (cn in val_cols) {
+      dev_mat_local[[cn]] <- as.numeric(obs_mat[[cn]]) - col_avgs_fb[[cn]]
+      exp_mat_local[[cn]] <- rep(col_avgs_fb[[cn]], length.out = nrow(obs_mat))
+      di <- which(brands_vec == cn)
+      if (length(di) == 1L) {
+        dev_mat_local[[cn]][di] <- NA_real_
+        exp_mat_local[[cn]][di] <- NA_real_
+      }
+    }
+    dev_mat <- dev_mat_local
+    exp_mat <- exp_mat_local
+    exp_label <- "Col avg"
   }
 
-  # Toolbar: Show heatmap (default ON) + Show counts (default OFF) +
-  # Show cluster map (default ON when ≥4 brands).
+  # Mean Absolute Deviation across off-diagonal cells of the deviation
+  # matrix - Dawes (2016) summary of how well the DoP law fits the
+  # category. Shown as a small chip beside the mode toggle in deviations
+  # mode so analysts can sanity-check before reading partitions.
+  mad_val <- if (!is.null(dev_mat)) {
+    nm <- setdiff(names(dev_mat), "BrandCode")
+    abs_vals <- unlist(lapply(nm, function(cn) abs(as.numeric(dev_mat[[cn]]))),
+                       use.names = FALSE)
+    mean(abs_vals, na.rm = TRUE)
+  } else NA_real_
+
+  # Toolbar:
+  #   - Mode (Observed | Deviations) - Dawes (2016) reading: deviations
+  #     surface partitions clearly because cells over-index when brands
+  #     share buyers above what the DoP law predicts.
+  #   - Show heatmap / Show counts / Show cluster map (existing toggles).
+  has_dev <- !is.null(dev_mat)
+  d_chip <- if (!is.null(D_coef) && is.finite(D_coef))
+    sprintf('<span class="cb-dop-dchip" title="Duplication coefficient: slope of observed sharing on column-brand penetration">D = %.2f</span>', D_coef)
+  else ""
+  mad_chip <- if (is.finite(mad_val))
+    sprintf('<span class="cb-dop-madchip" title="Mean absolute deviation across off-diagonal cells - closer to 0 means the DoP law fits the category well">MAD = %.1f pp</span>', mad_val)
+  else ""
+  # Mode switcher mirrors the Funnel base-toggle styling exactly (sig-
+  # level-switcher + sig-btn). The D / MAD readout sits as a sibling so
+  # it does not crowd the segmented buttons and the user reads
+  # left-to-right: label, segmented buttons, then the goodness-of-fit
+  # statistics.
+  mode_readout <- if (nzchar(d_chip) || nzchar(mad_chip))
+    sprintf('<div class="cb-dop-fit-readout" aria-label="Goodness-of-fit statistics">%s%s</div>',
+            d_chip, mad_chip)
+  else ""
+  mode_switcher <- if (has_dev) paste0(
+    '<div class="sig-level-switcher cb-dop-mode-switcher" role="group" aria-label="DoP table mode">',
+    '<span class="sig-level-label">Mode:</span>',
+    '<button type="button" class="sig-btn sig-btn-active" data-cb-action="dop-mode" data-cb-dop-mode="obs" aria-pressed="true">Observed</button>',
+    '<button type="button" class="sig-btn" data-cb-action="dop-mode" data-cb-dop-mode="dev" aria-pressed="false">Deviations</button>',
+    '</div>',
+    mode_readout
+  ) else ""
   parts <- c(parts, paste0(
     '<div class="cb-controls-bar" data-cb-scope="dop">',
+    mode_switcher,
     '<label class="toggle-label">',
     '<input type="checkbox" checked data-cb-action="heatmapmode" data-cb-scope="dop"> Show heatmap',
     '</label>',
@@ -567,15 +631,43 @@ render_cat_buying_panel <- function(panel_data) {
     '</div>'))
 
   if (!is.null(obs_mat) && exists("cb_dop_heatmap_html", mode = "function")) {
-    parts <- c(parts, cb_dop_heatmap_html(obs_mat, NULL, focal,
-                                           brand_labels   = brand_labels,
-                                           observed       = TRUE,
-                                           brand_buyers_n = brand_buyers_n))
+    # Render BOTH the observed and (when available) deviations matrix.
+    # Default-visible: observed. JS toggles between them on Mode click.
+    obs_html <- cb_dop_heatmap_html(obs_mat, obs_mat, focal,
+                                     brand_labels    = brand_labels,
+                                     observed        = TRUE,
+                                     brand_buyers_n  = brand_buyers_n,
+                                     expected_matrix = exp_mat,
+                                     expected_label  = exp_label)
+    parts <- c(parts, sprintf(
+      '<div class="cb-dop-table-host" data-cb-dop-mode="obs">%s</div>',
+      obs_html))
+    if (has_dev) {
+      dev_html <- cb_dop_heatmap_html(dev_mat, obs_mat, focal,
+                                       brand_labels    = brand_labels,
+                                       observed        = FALSE,
+                                       brand_buyers_n  = brand_buyers_n,
+                                       expected_matrix = exp_mat,
+                                       expected_label  = exp_label)
+      parts <- c(parts, sprintf(
+        '<div class="cb-dop-table-host" data-cb-dop-mode="dev" hidden>%s</div>',
+        dev_html))
+    }
   } else {
     parts <- c(parts, '<p style="font-size:12px;color:#94a3b8;">Duplication of purchase requires BRANDPEN3 data.</p>')
   }
 
-  # Cluster map — the dendrogram itself is focal-independent (static SVG),
+  # Partition partners / rivals card - sits below the table and above
+  # the cluster map. Reads the focal row of the observed matrix to
+  # surface top-3 over-share / under-share rivals; complements the
+  # cluster map immediately below.
+  if (!is.null(obs_mat) && !is.null(focal) && nzchar(focal) &&
+      exists("cb_dop_partition_card_html", mode = "function")) {
+    parts <- c(parts, cb_dop_partition_card_html(obs_mat, focal,
+                                                  brand_labels = brand_labels))
+  }
+
+  # Cluster map - the dendrogram itself is focal-independent (static SVG),
   # but the focal halo + partner badges layered on top are focal-specific
   # and re-rendered client-side on focal switch.
   if (!is.null(obs_mat) &&
@@ -585,6 +677,11 @@ render_cat_buying_panel <- function(panel_data) {
                                                focal_colour = focal_colour,
                                                brand_labels = brand_labels))
   }
+
+  # Bottom-of-page callout (registry: brand.cat_buying_dop).
+  callout_html <- if (exists("turas_callout", mode = "function"))
+    turas_callout("brand", "cat_buying_dop", collapsed = TRUE) else ""
+  if (nzchar(callout_html)) parts <- c(parts, callout_html)
 
   parts <- c(parts, '</section>')
   paste(parts, collapse = "\n")

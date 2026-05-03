@@ -679,6 +679,47 @@ paste0(
 }
 .cb-rel-legend-label { font-weight: 500; }
 
+/* DoP mode toggle: Observed | Deviations segmented buttons. The shared
+   sig-btn / sig-level-switcher rules in the funnel + MA panels are
+   scoped to those panels, so the cb-panel needs its own copy. Mirrors
+   the funnel base-toggle styling so the user sees the same visual
+   contract everywhere. */
+.cb-panel .sig-level-switcher {
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.cb-panel .sig-level-label {
+  font-size: 11px; color: #64748b; white-space: nowrap; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.4px;
+}
+.cb-panel .sig-btn {
+  font-size: 11px; font-weight: 500;
+  padding: 5px 10px; border: 1px solid #e2e8f0; background: #fff;
+  color: #1e293b; cursor: pointer; font-family: inherit;
+  line-height: 1.4; transition: background 0.1s, color 0.1s;
+}
+.cb-panel .sig-btn:first-of-type { border-radius: 4px 0 0 4px; }
+.cb-panel .sig-btn:last-of-type  { border-radius: 0 4px 4px 0; border-left: none; }
+.cb-panel .sig-btn-active {
+  background: var(--cb-focal-colour, #1A5276); color: #fff;
+  border-color: var(--cb-focal-colour, #1A5276);
+}
+.cb-panel .sig-btn:hover:not(.sig-btn-active) { background: #e2e8f0; }
+
+/* Goodness-of-fit readout (D, MAD) — sits as a sibling of the toggle
+   so the buttons stay clean. */
+.cb-dop-fit-readout {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin-left: 12px; padding: 4px 0;
+  font-variant-numeric: tabular-nums;
+}
+.cb-dop-fit-readout .cb-dop-dchip,
+.cb-dop-fit-readout .cb-dop-madchip {
+  font-size: 11px; font-weight: 600; color: #475569;
+  padding: 2px 8px; border-radius: 10px;
+  background: #eef2f7; border: 1px solid #e2e8f0;
+}
+.cb-dop-table-host[hidden] { display: none; }
+
 ',
 '/* === Sub-tab navigation === */
 .cb-subnav {

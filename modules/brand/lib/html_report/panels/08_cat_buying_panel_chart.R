@@ -377,7 +377,9 @@ cb_dop_heatmap_html <- function(dev_matrix, obs_matrix = NULL,
                                  focal_brand    = NULL,
                                  brand_labels   = NULL,
                                  observed       = FALSE,
-                                 brand_buyers_n = NULL) {
+                                 brand_buyers_n = NULL,
+                                 expected_matrix = NULL,
+                                 expected_label  = "Expected") {
   if (is.null(dev_matrix)) return("")
 
   brands <- dev_matrix$BrandCode
@@ -431,14 +433,23 @@ cb_dop_heatmap_html <- function(dev_matrix, obs_matrix = NULL,
     else sprintf("%d", as.integer(round(n)))
   }
 
-  # Cell styling. `observed` → use CI-band traffic-light class; else legacy
-  # green/red deviation alpha shading.
-  cell_attrs <- function(val, col_idx, obs) {
+  # Cell styling. `observed` -> use CI-band traffic-light class; else legacy
+  # green/red deviation alpha shading. The tooltip carries the full
+  # observed / expected / deviation triple in BOTH modes so the user can
+  # always see the math behind the number rendered on the cell.
+  cell_attrs <- function(val, col_idx, obs, exp_val, dev_val) {
     if (is.na(val)) return(list(cls = "", style = 'background:#f8fafc;color:#94a3b8;', title = ""))
+    obs_part <- if (!is.null(obs) && !is.na(obs)) sprintf("Observed %.0f%%", obs)
+                else if (observed) sprintf("Observed %.0f%%", val) else ""
+    exp_part <- if (!is.null(exp_val) && !is.na(exp_val))
+      sprintf("%s %.1f%%", expected_label, exp_val) else ""
+    dev_part <- if (!is.null(dev_val) && !is.na(dev_val))
+      sprintf("Deviation %+.1fpp", dev_val) else ""
+    title_parts <- c(obs_part, exp_part, dev_part)
+    title <- paste(title_parts[nzchar(title_parts)], collapse = " | ")
+
     if (observed) {
       cls <- hm_cls(val, col_avgs[col_idx], col_sds[col_idx])
-      title <- sprintf("%.0f%% \u2014 col avg %.0f%%, \u00b11 SD %.1f",
-                       val, col_avgs[col_idx], col_sds[col_idx])
       return(list(cls = cls, style = "text-align:center;", title = title))
     }
     abs_val <- abs(val)
@@ -450,10 +461,9 @@ cb_dop_heatmap_html <- function(dev_matrix, obs_matrix = NULL,
       bg <- sprintf("rgba(153,27,27,%.2f)", alpha * 0.4)
       co <- if (abs_val >= 10) "#991b1b" else "#475569"
     }
-    obs_txt <- if (!is.null(obs) && !is.na(obs)) sprintf(" (obs %.0f%%)", obs) else ""
     list(cls = "",
          style = sprintf("background:%s;color:%s;text-align:center;", bg, co),
-         title = sprintf("Dev: %+.1fpp%s", val, obs_txt))
+         title = title)
   }
 
   lines <- character(0)
@@ -505,8 +515,20 @@ cb_dop_heatmap_html <- function(dev_matrix, obs_matrix = NULL,
       val <- tryCatch(as.numeric(dev_matrix[i, brands[j]]), error = function(e) NA)
       obs <- if (!is.null(obs_matrix))
         tryCatch(as.numeric(obs_matrix[i, brands[j]]), error = function(e) NULL) else NULL
+      exp_val <- if (!is.null(expected_matrix))
+        tryCatch(as.numeric(expected_matrix[i, brands[j]]), error = function(e) NULL) else NULL
+      # Compute the third member of the obs / exp / dev triple from the
+      # other two so the tooltip stays consistent in both modes:
+      #   - observed mode: dev_val derived as (obs - exp)
+      #   - deviations mode: val IS the deviation, obs comes from obs_matrix
+      if (observed) {
+        dev_val <- if (!is.null(exp_val) && !is.na(exp_val) && !is.na(val))
+          val - exp_val else NA_real_
+      } else {
+        dev_val <- val
+      }
       val_txt <- if (is.na(val)) "\u2014" else if (observed) sprintf("%.0f%%", val) else sprintf("%+.1f", val)
-      attrs <- cell_attrs(val, j, obs)
+      attrs <- cell_attrs(val, j, obs, exp_val, dev_val)
       data_v_attr <- if (!is.na(val)) sprintf(' data-v="%.4f"', val) else ' data-v=""'
       # Show-counts companion: n = pct * row_buyers / 100 (hidden by default).
       n_val <- if (!is.na(val) && is.finite(row_buyers)) val * row_buyers / 100 else NA_real_

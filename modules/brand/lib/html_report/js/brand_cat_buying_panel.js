@@ -110,6 +110,7 @@
     bindCbToggleAll(panel);
     bindCbShowChart(panel);
     bindCbDopShowChart(panel);
+    bindCbDopMode(panel);
     bindCbHeatmapToggle(panel);
     bindCbShowCounts(panel);
     bindCbSort(panel);
@@ -391,6 +392,29 @@
           else            wrap.setAttribute('hidden', '');
         });
       });
+  }
+
+  /* DoP table mode toggle: Observed | Deviations.
+     Both tables are rendered server-side; the toggle just swaps which
+     .cb-dop-table-host is visible. */
+  function bindCbDopMode(panel) {
+    panel.querySelectorAll('button[data-cb-action="dop-mode"]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var mode = btn.getAttribute('data-cb-dop-mode');
+        if (!mode) return;
+        var section = btn.closest('.cb-dop-section');
+        if (!section) return;
+        section.querySelectorAll('button[data-cb-action="dop-mode"]').forEach(function (b) {
+          var on = b.getAttribute('data-cb-dop-mode') === mode;
+          b.classList.toggle('sig-btn-active', on);
+          b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        section.querySelectorAll('.cb-dop-table-host').forEach(function (h) {
+          if (h.getAttribute('data-cb-dop-mode') === mode) h.removeAttribute('hidden');
+          else                                              h.setAttribute('hidden', '');
+        });
+      });
+    });
   }
 
   /* ---------------------------------------------------------------------- */

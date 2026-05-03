@@ -257,7 +257,11 @@ test_that("HTML contains Funnel section", {
 
   expect_true(grepl("Funnel", html))
   expect_true(grepl("Aware", html))
-  expect_true(grepl("Conversion", html))
+  # Was "Conversion" — that label is no longer in the rendered funnel
+  # (the funnel was rebuilt; conversion-between-stages is now the
+  # "% of previous" base view). Assert that base toggle instead — it's
+  # a stable, funnel-specific user-visible string.
+  expect_true(grepl("% of previous", html))
 })
 
 test_that("HTML contains WOM section", {
