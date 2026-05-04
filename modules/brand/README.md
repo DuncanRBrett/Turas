@@ -111,7 +111,7 @@ modules/brand/
       04_chart_builder.R         -- Inline SVG charts
       panels/                    -- Per-element panel renderers (auto-loaded)
   tests/
-    testthat/                    -- 431 test blocks / 1621+ assertions
+    testthat/                    -- 447 test blocks / 1651+ assertions
     fixtures/
       ipk_wave1/                 -- IPK 9-category synthetic fixture
         00_generate.R            -- Run ipk_generate_fixture() to build .xlsx files
