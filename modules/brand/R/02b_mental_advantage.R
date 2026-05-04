@@ -61,9 +61,9 @@ MA_SIG_Z_THRESHOLD <- 1.96
 .ma_count_matrix <- function(linkage_tensor, codes, weights = NULL) {
   brand_codes <- names(linkage_tensor)
   if (length(brand_codes) == 0)
-    stop("CALC_MA_NO_BRANDS: linkage_tensor has no brands")
+    stop("[CALC_MA_NO_BRANDS] linkage_tensor has no brands", call. = FALSE)
   if (length(codes) == 0)
-    stop("CALC_MA_NO_CODES: codes vector is empty")
+    stop("[CALC_MA_NO_CODES] codes vector is empty", call. = FALSE)
 
   n_brands <- length(brand_codes)
   n_stim   <- length(codes)
