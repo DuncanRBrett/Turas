@@ -1,5 +1,7 @@
 # ==============================================================================
 # BRAND MODULE - CATEGORY BUYING PANEL CSS
+# SIZE-EXCEPTION: CSS assembly pipeline — large but inseparable inline style block
+# for a complex multi-tab panel. Decomposing would break the scoping contract.
 # ==============================================================================
 # Returns a <style> block for the Category Buying (Dirichlet) panel.
 # Follows the same inline-CSS pattern as 03_funnel_panel_styling.R.

@@ -1,5 +1,8 @@
 # ==============================================================================
 # BRAND MODULE - FUNNEL PANEL CSS BUNDLE
+# SIZE-EXCEPTION: CSS assembly pipeline — the funnel panel has the most
+# complex visual contract (three table types + chart + relationship matrix).
+# All styles are scoped to .fn-* and .ct-* to prevent collisions.
 # ==============================================================================
 # Core table/chrome classes (ct-*) are lifted from the tabs module CSS so the
 # funnel panel looks visually identical to a tabs crosstab card. The tabs

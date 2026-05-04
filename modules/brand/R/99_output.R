@@ -6,6 +6,10 @@
 #
 # VERSION: 1.0
 #
+# SIZE-EXCEPTION: generate_brand_excel is a sequential write pipeline — one
+# sheet per element per category. Decomposing further would fragment a linear
+# series of write operations without improving readability.
+#
 # DEPENDENCIES:
 #   - openxlsx
 # ==============================================================================

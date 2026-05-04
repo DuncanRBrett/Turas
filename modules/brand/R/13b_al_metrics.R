@@ -61,6 +61,10 @@ BRAND_AL_METRICS_VERSION <- "1.0"
 #'
 #' Stable list used by the renderer + test suite to enumerate metrics and
 #' keep group ordering consistent.
+#'
+#' @return Named list of metric groups. Each group has \code{group} (character
+#'   label) and \code{metrics} (list of metric definitions with \code{id},
+#'   \code{label}, \code{kind}, and optional \code{buyer_base} flag).
 #' @export
 audience_lens_metric_catalog <- function() .AL_METRIC_GROUPS
 

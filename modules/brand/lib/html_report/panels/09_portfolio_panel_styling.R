@@ -1,5 +1,7 @@
 # ==============================================================================
 # BRAND MODULE - PORTFOLIO PANEL CSS (shell only)
+# SIZE-EXCEPTION: CSS assembly pipeline — scoped portfolio styles across five
+# sub-analyses. One block per sub-tab for isolation and grep-ability.
 # ==============================================================================
 # Scoped to .pf-* prefix to avoid collisions with funnel (.fn-*) and MA (.ma-*).
 # Overview-subtab-specific (.pfo-*) styles live in

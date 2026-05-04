@@ -259,7 +259,9 @@ load_brand_config <- function(config_path, project_root = NULL) {
   # Load DBA_Assets sheet if DBA is enabled
   if (isTRUE(config$element_dba)) {
     dba_assets <- tryCatch(
-      openxlsx::read.xlsx(config_path, sheet = "DBA_Assets", startRow = 3),
+      suppressWarnings(
+        openxlsx::read.xlsx(config_path, sheet = "DBA_Assets", startRow = 3)
+      ),
       error = function(e) NULL
     )
     if (!is.null(dba_assets) && nrow(dba_assets) > 0) {
@@ -318,9 +320,11 @@ load_brand_survey_structure <- function(structure_path) {
   # Auto-detects format: template (startRow=3) vs simple (startRow=1)
   .load_table <- function(sheet_name) {
     tryCatch({
-      # Try simple format first (headers in row 1) - most reliable
-      df <- openxlsx::read.xlsx(structure_path, sheet = sheet_name,
-                                startRow = 1)
+      # Suppress "No data found on worksheet" warnings from openxlsx when a
+      # sheet exists but is empty — treat the same as a missing sheet (NULL).
+      df <- suppressWarnings(
+        openxlsx::read.xlsx(structure_path, sheet = sheet_name, startRow = 1)
+      )
       # If the first column name looks like a title/description row, scan for
       # real headers at startRow 2, 3, 4
       .looks_like_data_header <- function(d) {
@@ -331,7 +335,9 @@ load_brand_survey_structure <- function(structure_path) {
       if (!is.null(df) && !.looks_like_data_header(df)) {
         for (.sr in 2:4) {
           df2 <- tryCatch(
-            openxlsx::read.xlsx(structure_path, sheet = sheet_name, startRow = .sr),
+            suppressWarnings(
+              openxlsx::read.xlsx(structure_path, sheet = sheet_name, startRow = .sr)
+            ),
             error = function(e) NULL)
           if (!is.null(df2) && .looks_like_data_header(df2)) { df <- df2; break }
         }

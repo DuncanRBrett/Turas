@@ -1,5 +1,7 @@
 # ==============================================================================
 # BRAND MODULE - AUDIENCE LENS PANEL HTML RENDERER
+# SIZE-EXCEPTION: sequential HTML assembly pipeline — three sub-tabs (Banner,
+# Pair Cards, Heatmap) each requiring their own builder and JS payload.
 # ==============================================================================
 # Renders the per-category Audience Lens tab. Three internal sub-tabs:
 #   1) Banner       — total + every audience side-by-side, all 14 metrics

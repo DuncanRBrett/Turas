@@ -1,5 +1,8 @@
 # ==============================================================================
 # BRAND MODULE - WORD OF MOUTH PANEL HTML RENDERER
+# SIZE-EXCEPTION: sequential HTML assembly pipeline — WOM panel has four
+# sub-sections (heard/said charts + per-brand table + insight box). Each
+# section is tightly coupled to its CSS and JS payload.
 # ==============================================================================
 # Emits the WOM tab's HTML fragment. Mirrors the funnel Relationship
 # ("Brand Attitude") table visual contract:

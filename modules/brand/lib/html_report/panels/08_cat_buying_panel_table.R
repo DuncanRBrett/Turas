@@ -1,5 +1,8 @@
 # ==============================================================================
 # BRAND MODULE - CATEGORY BUYING PANEL TABLE BUILDER
+# SIZE-EXCEPTION: sequential HTML assembly pipeline — one builder per table
+# type (Dirichlet norms, DoP deviation, buyer heaviness). Decomposing further
+# would split tightly coupled CSS and markup.
 # ==============================================================================
 # Builds the Dirichlet norms HTML table (§8 item 3) and the DoP deviation
 # summary for the Category Buying panel.

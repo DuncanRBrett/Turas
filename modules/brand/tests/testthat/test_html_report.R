@@ -51,7 +51,9 @@ source(file.path(TURAS_ROOT, "modules", "brand", "lib", "html_report",
       report_title = "IPK Brand Health", report_subtitle = "Wave 1 Baseline",
       show_about_section = TRUE,
       element_wom = TRUE, element_dba = FALSE, element_portfolio = FALSE,
-      element_funnel = TRUE, element_mental_avail = TRUE
+      element_funnel = TRUE, element_mental_avail = TRUE,
+      element_branded_reach = FALSE, element_audience_lens = FALSE,
+      element_summary = TRUE
     ),
     results = list(
       categories = list(

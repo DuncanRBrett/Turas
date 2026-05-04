@@ -61,9 +61,9 @@ MA_SIG_Z_THRESHOLD <- 1.96
 .ma_count_matrix <- function(linkage_tensor, codes, weights = NULL) {
   brand_codes <- names(linkage_tensor)
   if (length(brand_codes) == 0)
-    stop("Mental Advantage: linkage_tensor has no brands")
+    stop("CALC_MA_NO_BRANDS: linkage_tensor has no brands")
   if (length(codes) == 0)
-    stop("Mental Advantage: codes vector is empty")
+    stop("CALC_MA_NO_CODES: codes vector is empty")
 
   n_brands <- length(brand_codes)
   n_stim   <- length(codes)
@@ -187,22 +187,43 @@ calculate_mental_advantage <- function(linkage_tensor, codes,
                                        n_respondents = NULL,
                                        threshold_pp = MA_DEFAULT_THRESHOLD_PP) {
 
+  .ma_refuse <- function(code, problem, how_to_fix) {
+    if (exists("brand_refuse", mode = "function")) {
+      brand_refuse(code = code, title = "Mental Advantage Input Error",
+                   problem = problem,
+                   why_it_matters = "Cannot compute advantage matrix without valid inputs.",
+                   how_to_fix = how_to_fix)
+    } else {
+      stop(sprintf("[%s] %s", code, problem), call. = FALSE)
+    }
+  }
+
   if (!is.list(linkage_tensor) || length(linkage_tensor) == 0)
-    stop("Mental Advantage: linkage_tensor must be a non-empty named list")
+    return(.ma_refuse("CALC_MA_INVALID_TENSOR",
+      "linkage_tensor must be a non-empty named list",
+      "Pass a named list where each element is a respondents x stimuli binary matrix"))
   if (length(codes) == 0)
-    stop("Mental Advantage: codes must be a non-empty character vector")
+    return(.ma_refuse("CALC_MA_NO_CODES",
+      "codes must be a non-empty character vector",
+      "Pass the stimulus (CEP or attribute) codes in the desired output order"))
   if (!is.numeric(threshold_pp) || length(threshold_pp) != 1 || threshold_pp < 0)
-    stop("Mental Advantage: threshold_pp must be a single non-negative number")
+    return(.ma_refuse("CALC_MA_INVALID_THRESHOLD",
+      "threshold_pp must be a single non-negative number",
+      sprintf("Default is %g; pass a numeric scalar >= 0", MA_DEFAULT_THRESHOLD_PP)))
 
   brand_codes <- names(linkage_tensor)
   if (is.null(brand_codes) || any(!nzchar(brand_codes)))
-    stop("Mental Advantage: linkage_tensor must be a *named* list of brand matrices")
+    return(.ma_refuse("CALC_MA_UNNAMED_BRANDS",
+      "linkage_tensor must be a *named* list of brand matrices",
+      "Set names(linkage_tensor) to the brand codes before calling"))
 
   if (is.null(n_respondents)) {
     n_respondents <- if (is.null(weights)) nrow(linkage_tensor[[1]]) else sum(weights)
   }
   if (!is.numeric(n_respondents) || n_respondents <= 0)
-    stop("Mental Advantage: n_respondents must be > 0")
+    return(.ma_refuse("CALC_MA_NO_RESPONDENTS",
+      "n_respondents must be > 0",
+      "Check weights sum or ensure linkage_tensor matrices have at least one row"))
 
   actual <- .ma_count_matrix(linkage_tensor, codes, weights = weights)
 

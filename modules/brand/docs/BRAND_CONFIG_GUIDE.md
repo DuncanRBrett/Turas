@@ -230,7 +230,7 @@ the report.
 | Column | Required? | What it contains | Allowed values |
 |----|----|----|----|
 | `Category` | **Required** | Category name as it appears in the data and report. Must match what's used in Survey_Structure.xlsx. | Free text (e.g. `Dry Seasonings & Spices`) |
-| `Type` | **Required** | Category type. Controls question wording, funnel structure, and penetration data handling. | `transaction` (FMCG), `durable` (electronics, cars), `service` (banking, telecoms) |
+| `Type` | **Required** | Category type. Controls question wording, funnel structure, and penetration data handling. | `transactional` (FMCG), `durable` (electronics, cars), `service` (banking, telecoms) |
 | `Timeframe_Long` | **Required** | Longer penetration window label for reports (e.g. `12 months`). Matches `longer_timeframe_months` in Settings. | Free text |
 | `Timeframe_Target` | **Required** | Target analytical period label (e.g. `3 months`). Matches `target_timeframe_months`. Shown on charts. | Free text |
 | `Focal_Weight` | Optional | Required only when `focal_assignment = priority`. How much to over-sample this category. Must sum to 1.0 across all categories. | 0.00 to 1.00 |
@@ -476,9 +476,9 @@ Alchemer (e.g. `DSS` for Dry Seasonings & Spices).
 | `funnel.awareness.{CAT}` | Multi_Mention | Awareness grid prefix (e.g. `BRANDAWARE_DSS`) → data has `BRANDAWARE_DSS_IPK`, `BRANDAWARE_DSS_ROB`, etc. |
 | `funnel.attitude.{CAT}` | Single_Response | Brand attitude question prefix (e.g. `BRANDATT1_DSS`) → data has `BRANDATT1_DSS_IPK`, etc. Set `OptionMapScale = attitude_scale`. |
 | `funnel.rejection_oe.{CAT}` | Open_End | Rejection open-end prefix (e.g. `BRANDATT2_DSS`). Optional. |
-| `funnel.transactional.bought_long.{CAT}` | Multi_Mention | Long-window penetration prefix (e.g. `BRANDPEN1_DSS`). For `Type = transaction` only. |
-| `funnel.transactional.bought_target.{CAT}` | Multi_Mention | Target-window penetration prefix (e.g. `BRANDPEN2_DSS`). For `Type = transaction` only. |
-| `funnel.transactional.frequency.{CAT}` | Numeric | Purchase frequency prefix (e.g. `BRANDPEN3_DSS`). For `Type = transaction` only. Optional. |
+| `funnel.transactional.bought_long.{CAT}` | Multi_Mention | Long-window penetration prefix (e.g. `BRANDPEN1_DSS`). For `Type = transactional` only. |
+| `funnel.transactional.bought_target.{CAT}` | Multi_Mention | Target-window penetration prefix (e.g. `BRANDPEN2_DSS`). For `Type = transactional` only. |
+| `funnel.transactional.frequency.{CAT}` | Numeric | Purchase frequency prefix (e.g. `BRANDPEN3_DSS`). For `Type = transactional` only. Optional. |
 | `funnel.durable.current_owner.{CAT}` | Single_Response | Current ownership question (e.g. `BRANDPENDUR1_DSS`). For `Type = durable`. One brand code per respondent. |
 | `funnel.durable.tenure.{CAT}` | Single_Response | Ownership tenure (e.g. `BRANDPENDUR2_DSS`). For `Type = durable`. Optional. |
 | `funnel.service.current_customer.{CAT}` | Single_Response | Current provider (e.g. `BRANDPENSERV1_DSS`). For `Type = service`. |
@@ -624,7 +624,7 @@ you'll define this in Survey_Structure) 5. `output_dir` (e.g.
 
 Delete the example rows. Add one row per category: - `Category`: the
 display name (this is what appears in the report tabs) - `Type`:
-`transaction`, `durable`, or `service` - `Timeframe_Long` and
+`transactional`, `durable`, or `service` - `Timeframe_Long` and
 `Timeframe_Target`: the labels for the two penetration windows - If
 needed: `Analysis_Depth` column — add it and set `awareness_only` for
 any categories that only have cross-category awareness data
@@ -704,7 +704,7 @@ setting or column is wrong.
 | `IO_CONFIG_NOT_FOUND` | `Brand_Config.xlsx` not found at the path given to `run_brand()` | Check the file path argument |
 | `IO_DATA_LOAD_FAILED` | Data file cannot be read | Check `data_file` path, and that the file is a valid `.csv` or `.xlsx` |
 | `CFG_NO_CATEGORIES` | Categories sheet is empty | Add category rows to Brand_Config Categories sheet |
-| `CFG_INVALID_CATEGORY_TYPE` | A Type value in Categories sheet is not valid | Change to `transaction`, `durable`, or `service` |
+| `CFG_INVALID_CATEGORY_TYPE` | A Type value in Categories sheet is not valid | Change to `transactional`, `durable`, or `service` |
 | `CFG_PORTFOLIO_MIN_CATS` | Portfolio is enabled but only 1 category is defined | Add more categories, or set `element_portfolio = N` |
 | `CFG_TIMEFRAME_INVALID` | `target_timeframe_months` ≥ `longer_timeframe_months` | Ensure target (e.g. 3) is less than longer (e.g. 12) |
 

@@ -1,9 +1,8 @@
-# Audience Lens — Project Plan
+# Audience Lens — Project Plan (Historical)
 
-**Status:** Planning complete, awaiting implementation
-**Module:** `modules/brand/` (new sub-component)
-**Target branch:** `feature/brand-audience-lens` (to be created from `main`)
-**Estimated effort:** v1 — 1–2 weeks focused work
+**Status:** COMPLETE — implemented in `modules/brand/R/13_audience_lens.R` and sub-files
+**Merged:** `feature/brand-audience-lens` → `main`
+**Kept for:** design rationale and architectural decisions recorded below
 
 ---
 
