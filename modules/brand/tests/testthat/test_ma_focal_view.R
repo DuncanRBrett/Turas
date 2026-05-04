@@ -121,7 +121,7 @@ test_that("calculate_ma_focal_view reproduces hand-calculated buyer gaps", {
   expect_equal(out$Buyer_Gap,    c(60,  2, -40))
 })
 
-test_that("calculate_ma_focal_view two-prop z agrees with prop.test", {
+test_that("calculate_ma_focal_view two-prop z agrees with formula and prop.test", {
   fx <- .fv_make_tensor()
   out <- calculate_ma_focal_view(
     linkage_tensor = fx$tensor,
@@ -135,6 +135,11 @@ test_that("calculate_ma_focal_view two-prop z agrees with prop.test", {
   z_ref  <- (x_buy / n_buy - x_nonbuy / n_nonbuy) /
             sqrt(p_pool * (1 - p_pool) * (1 / n_buy + 1 / n_nonbuy))
   expect_equal(out$Gap_Z[1], round(z_ref, 3), tolerance = 1e-6)
+
+  # Independent check against prop.test(correct=FALSE); prop.test returns
+  # chi-sq so z = sqrt(chi-sq) (positive root; our z is signed).
+  pt <- prop.test(c(x_buy, x_nonbuy), c(n_buy, n_nonbuy), correct = FALSE)
+  expect_equal(abs(out$Gap_Z[1]), round(sqrt(unname(pt$statistic)), 3), tolerance = 1e-4)
 
   # S2 (gap = 2pp on n=50/50) should be non-significant
   expect_false(out$Gap_Significant[2])
@@ -220,10 +225,10 @@ test_that("calculate_ma_focal_view handles unmatched stimulus codes gracefully",
 # WEIGHTED PERCENTAGES
 # ==============================================================================
 
-test_that("weights only affect displayed percentages, not the z test", {
+test_that("uniform within-group weights preserve proportions and verdict but increase z", {
   fx <- .fv_make_tensor()
   w  <- rep(1, length(fx$pen))
-  w[1:50] <- 2     # double-weight the buyers; should not change the z
+  w[1:50] <- 2     # double-weight the buyers
 
   out_unw <- calculate_ma_focal_view(
     linkage_tensor = fx$tensor, codes = fx$codes,
@@ -232,11 +237,12 @@ test_that("weights only affect displayed percentages, not the z test", {
     linkage_tensor = fx$tensor, codes = fx$codes,
     focal_brand = "FOC", pen = fx$pen, weights = w)
 
-  # Same z, same significance verdict, same N_Buyer (unweighted base)
-  expect_equal(out_unw$Gap_Z, out_w$Gap_Z)
-  expect_equal(out_unw$Gap_Significant, out_w$Gap_Significant)
-  expect_equal(out_unw$N_Buyer, out_w$N_Buyer)
-  # Percentages and gaps unchanged here because the weight factor is
-  # uniform within buyers and within non-buyers (ratio-preserving).
+  # Proportions identical (ratio-preserving: all buyers scaled by same factor)
   expect_equal(out_unw$Buyer_Gap, out_w$Buyer_Gap)
+  # Weighted z uses larger effective n_buy (100 vs 50) → larger |z| every row
+  expect_true(all(abs(out_w$Gap_Z) >= abs(out_unw$Gap_Z)))
+  # Significance verdict preserved (both above / below 1.96 threshold)
+  expect_equal(out_unw$Gap_Significant, out_w$Gap_Significant)
+  # N_Buyer stays unweighted — it controls min-base suppression only
+  expect_equal(out_unw$N_Buyer, out_w$N_Buyer)
 })

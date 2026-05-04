@@ -78,6 +78,17 @@ compute_br_reach_metrics <- function(data, asset_list, weights = NULL,
     ))
   }
 
+  if (!is.null(weights) && length(weights) != nrow(data)) {
+    return(list(
+      status = "REFUSED",
+      code = "DATA_INVALID",
+      message = sprintf(
+        "Branded reach: weights length (%d) != data rows (%d)",
+        length(weights), nrow(data)
+      ),
+      how_to_fix = "Pass a weight vector with one entry per respondent row"
+    ))
+  }
   w <- .br_normalise_weights(weights, nrow(data))
 
   # Filter the asset list to ads shown in this category (ALL or matching code)
@@ -168,10 +179,6 @@ compute_br_reach_metrics <- function(data, asset_list, weights = NULL,
 
 .br_normalise_weights <- function(weights, n) {
   if (is.null(weights)) return(rep(1, n))
-  if (length(weights) != n) {
-    stop(sprintf("Branded reach: weights length (%d) != data rows (%d)",
-                 length(weights), n))
-  }
   w <- as.numeric(weights)
   w[is.na(w)] <- 0
   w

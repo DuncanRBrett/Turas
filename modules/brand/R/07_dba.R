@@ -50,8 +50,7 @@ DBA_PLACEHOLDER_NOTE <- "Data not yet collected for DBA"
 #'     Uniqueness_Pct, Fame_n, Uniqueness_n, Quadrant}
 #'   \item{metrics_summary}{Named list for AI annotations}
 #'
-#' @export
-run_dba <- function(data, assets,
+.run_dba_core <- function(data, assets,
                     focal_brand,
                     fame_threshold = 0.50,
                     uniqueness_threshold = 0.50,
@@ -208,7 +207,7 @@ run_dba <- function(data, assets,
 #' and a \code{note} field for the panel-data renderer to surface a
 #' "Data not yet collected for DBA" card.
 #'
-#' Otherwise delegates to \code{run_dba()}. DBA reads per-asset Fame /
+#' Otherwise delegates to \code{.run_dba_core()}. DBA reads per-asset Fame /
 #' Unique columns by name from the assets data frame so no role-map
 #' intermediation is needed — this entry is a thin structure-aware wrapper.
 #'
@@ -240,7 +239,7 @@ run_dba <- function(data, structure, focal_brand,
     return(.dba_placeholder_result(focal_brand))
   }
 
-  run_dba(
+  .run_dba_core(
     data                 = data,
     assets               = assets,
     focal_brand          = focal_brand,

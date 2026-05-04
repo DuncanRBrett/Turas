@@ -219,6 +219,11 @@ calculate_mental_advantage <- function(linkage_tensor, codes,
 
   advantage    <- (actual - expected) / n_respondents * 100
   safe_expected <- ifelse(expected > 0, expected, NA_real_)
+  # Pearson standardised residual — exact for unweighted data.
+  # Under rim weighting the expected cell counts still use observed marginals
+  # so this approximates the design-corrected residual; a Rao-Scott correction
+  # would be more rigorous but is not material for the typical weight ranges
+  # seen in brand tracking studies.
   std_residual  <- (actual - expected) / sqrt(safe_expected)
   std_residual[!is.finite(std_residual)] <- 0
   is_significant <- abs(std_residual) > MA_SIG_Z_THRESHOLD

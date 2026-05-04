@@ -24,7 +24,9 @@
 # Two-proportion z is the significance test for the buyer gap:
 #   z = (p_buy - p_nonbuy) /
 #       sqrt( p_pool * (1 - p_pool) * (1/n_buy + 1/n_nonbuy) )
-# with |z| > 1.96 = significant at 95%.
+# n_buy / n_nonbuy are weighted sums when weights are supplied so the
+# significance test is applied to the same proportions that are displayed.
+# Min-base suppression always uses unweighted Ns. |z| > 1.96 = significant.
 #
 # DEPENDENCIES: 02_mental_availability.R, 06_drivers_barriers.R
 # VERSION: 1.0
@@ -144,8 +146,9 @@ classify_focal_read <- function(ma_score, buyer_gap, below_min_base = FALSE,
 #'   \code{linkage_tensor}).
 #' @param pen Numeric / logical vector (length n_resp). 1 = focal-brand
 #'   buyer in the target window, 0 = non-buyer. NA = treated as non-buyer.
-#' @param weights Numeric vector or NULL. Used for the displayed
-#'   percentages and gap, but not for the z test (z uses unweighted Ns).
+#' @param weights Numeric vector or NULL. Used for displayed percentages,
+#'   gap, and the significance z-test. Min-base suppression always uses
+#'   unweighted Ns.
 #' @param ma_advantage Numeric vector. MA score in pp for the focal brand,
 #'   one entry per stimulus in \code{codes}. Optional (NA when missing).
 #' @param ma_significant Logical vector or NULL. MA |z| > 1.96 per stimulus.
@@ -162,7 +165,7 @@ classify_focal_read <- function(ma_score, buyer_gap, below_min_base = FALSE,
 #'     \item \code{Buyer_Pct}        % of buyers linking the stimulus
 #'     \item \code{NonBuyer_Pct}     % of non-buyers linking the stimulus
 #'     \item \code{Buyer_Gap}        Buyer_Pct − NonBuyer_Pct (pp)
-#'     \item \code{Gap_Z}            two-proportion z (unweighted Ns)
+#'     \item \code{Gap_Z}            two-proportion z (weighted Ns when weights supplied)
 #'     \item \code{Gap_Significant}  logical, |z| > 1.96
 #'     \item \code{N_Buyer}          unweighted buyer base
 #'     \item \code{N_NonBuyer}       unweighted non-buyer base
@@ -239,25 +242,30 @@ calculate_ma_focal_view <- function(linkage_tensor, codes, focal_brand, pen,
     col_vals <- brand_mat[, code]
     col_vals[is.na(col_vals)] <- 0
 
-    # Unweighted "yes" counts (used for the z test)
+    # Unweighted "yes" counts — used for min-base check only
     x_buy_unw    <- sum(col_vals[buyers])
     x_nonbuy_unw <- sum(col_vals[non_buyers])
 
-    # Displayed percentages (weighted if supplied)
+    # Displayed percentages and z-test inputs (weighted when weights supplied
+    # so the significance test is applied to the same proportions displayed)
     if (is.null(weights)) {
-      buyer_pct    <- if (n_buy_unw    > 0) 100 * x_buy_unw    / n_buy_unw    else NA_real_
-      nonbuyer_pct <- if (n_nonbuy_unw > 0) 100 * x_nonbuy_unw / n_nonbuy_unw else NA_real_
+      buyer_pct     <- if (n_buy_unw    > 0) 100 * x_buy_unw    / n_buy_unw    else NA_real_
+      nonbuyer_pct  <- if (n_nonbuy_unw > 0) 100 * x_nonbuy_unw / n_nonbuy_unw else NA_real_
+      x_buy_test    <- x_buy_unw;    n_buy_test    <- n_buy_unw
+      x_nonbuy_test <- x_nonbuy_unw; n_nonbuy_test <- n_nonbuy_unw
     } else {
-      buyer_pct    <- if (n_buy_disp    > 0)
-        100 * sum(weights[buyers]     * col_vals[buyers])     / n_buy_disp    else NA_real_
-      nonbuyer_pct <- if (n_nonbuy_disp > 0)
-        100 * sum(weights[non_buyers] * col_vals[non_buyers]) / n_nonbuy_disp else NA_real_
+      x_buy_w       <- sum(weights[buyers]     * col_vals[buyers])
+      x_nonbuy_w    <- sum(weights[non_buyers] * col_vals[non_buyers])
+      buyer_pct     <- if (n_buy_disp    > 0) 100 * x_buy_w    / n_buy_disp    else NA_real_
+      nonbuyer_pct  <- if (n_nonbuy_disp > 0) 100 * x_nonbuy_w / n_nonbuy_disp else NA_real_
+      x_buy_test    <- x_buy_w;    n_buy_test    <- n_buy_disp
+      x_nonbuy_test <- x_nonbuy_w; n_nonbuy_test <- n_nonbuy_disp
     }
 
     below_min <- (n_buy_unw < min_base) || (n_nonbuy_unw < min_base)
 
-    z_res <- .fv_two_prop_z(x_buy_unw, n_buy_unw,
-                             x_nonbuy_unw, n_nonbuy_unw)
+    z_res <- .fv_two_prop_z(x_buy_test, n_buy_test,
+                             x_nonbuy_test, n_nonbuy_test)
 
     if (below_min) {
       buyer_gap <- NA_real_

@@ -54,14 +54,6 @@ BRAND_AUDIENCE_LENS_VERSION <- "1.0"
 
 .al_normalise_weights <- function(weights, n) {
   if (is.null(weights)) return(rep(1, n))
-  if (length(weights) != n) {
-    msg <- sprintf("Audience lens: weights length (%d) != data rows (%d)", length(weights), n)
-    cat(sprintf(
-      "\n=== TURAS BRAND ERROR ===\n[DATA_AL_WEIGHTS_LENGTH_MISMATCH] %s\nHow to fix: Ensure the weights vector has one value per respondent row (length == nrow(data)).\n=========================\n\n",
-      msg
-    ))
-    stop(msg, call. = FALSE)
-  }
   w <- as.numeric(weights)
   w[is.na(w)] <- 0
   w
@@ -193,6 +185,17 @@ run_audience_lens <- function(data, role_map, cat_code, cat_name,
     ))
   }
 
+  if (!is.null(weights) && length(weights) != nrow(data)) {
+    return(list(
+      status = "REFUSED",
+      code = "DATA_INVALID",
+      message = sprintf(
+        "Audience lens: weights length (%d) != data rows (%d)",
+        length(weights), nrow(data)
+      ),
+      how_to_fix = "Pass a weight vector with one entry per respondent row"
+    ))
+  }
   thresholds <- .al_resolve_thresholds(config)
   w <- .al_normalise_weights(weights, nrow(data))
 

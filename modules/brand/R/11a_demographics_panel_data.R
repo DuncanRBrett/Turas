@@ -150,13 +150,11 @@ build_demographics_panel_data <- function(questions,
   base_n <- if ("Base_n" %in% names(df)) as.integer(df$Base_n[1L]) else NA_integer_
   rows <- lapply(seq_len(nrow(df)), function(i) {
     list(
-      code     = as.character(df$Code[i]),
-      label    = as.character(df$Label[i]),
-      order    = as.integer(df$Order[i]),
-      n        = as.integer(df$n[i]),
-      pct      = as.numeric(df$Pct[i]),
-      ci_lower = as.numeric(df$CI_Lower[i]),
-      ci_upper = as.numeric(df$CI_Upper[i])
+      code  = as.character(df$Code[i]),
+      label = as.character(df$Label[i]),
+      order = as.integer(df$Order[i]),
+      n     = as.integer(df$n[i]),
+      pct   = as.numeric(df$Pct[i])
     )
   })
   list(base_n = base_n, rows = rows)
@@ -171,16 +169,12 @@ build_demographics_panel_data <- function(questions,
     return(list())
   }
   pct_cols <- paste0("Pct_", codes)
-  lo_cols  <- paste0("CI_Lower_", codes)
-  hi_cols  <- paste0("CI_Upper_", codes)
 
   lapply(seq_len(nrow(brand_df)), function(i) {
     cells <- lapply(seq_along(codes), function(j) {
       list(
-        code     = codes[j],
-        pct      = as.numeric(brand_df[[pct_cols[j]]][i]),
-        ci_lower = as.numeric(brand_df[[lo_cols[j]]][i]),
-        ci_upper = as.numeric(brand_df[[hi_cols[j]]][i])
+        code = codes[j],
+        pct  = as.numeric(brand_df[[pct_cols[j]]][i])
       )
     })
     list(
