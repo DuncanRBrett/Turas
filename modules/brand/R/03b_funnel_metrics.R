@@ -436,18 +436,26 @@ run_significance_tests <- function(stage_metrics, focal_brand,
 
 #' Category average excluding one brand — used both for the focal's
 #' vs-average comparison and for every brand's own vs-average test.
+#'
+#' pct is the simple mean of per-brand percentages (not a pooled proportion).
+#' total_n is the mean per-brand eligible base, used as the denominator in
+#' the two-proportion sig test. Summing eligible N across brands inflates by
+#' k (the number of brands) because every respondent is counted once per brand;
+#' using the mean keeps the sig test at a single-brand-equivalent base.
 #' @keywords internal
 .category_average_excluding <- function(stage_rows, excluded_brand) {
   other <- stage_rows[stage_rows$brand_code != excluded_brand, , drop = FALSE]
   if (nrow(other) == 0) return(NULL)
-  tot_base <- sum(other$base_weighted, na.rm = TRUE)
-  tot_n <- sum(
-    ifelse(other$pct_weighted > 0,
-           other$base_weighted / other$pct_weighted, NA_real_),
-    na.rm = TRUE)
-  if (tot_n <= 0 || !is.finite(tot_n)) return(NULL)
-  list(base = tot_base, total_n = tot_n,
-       pct = tot_base / tot_n)
+
+  implied_n <- ifelse(other$pct_weighted > 0,
+                      other$base_weighted / other$pct_weighted, NA_real_)
+  avg_n <- mean(implied_n, na.rm = TRUE)
+  if (!is.finite(avg_n) || avg_n <= 0) return(NULL)
+
+  avg_pct <- mean(other$pct_weighted, na.rm = TRUE)
+  list(base    = avg_pct * avg_n,
+       total_n = avg_n,
+       pct     = avg_pct)
 }
 
 # Backwards-compat alias — older code paths may still reference this.

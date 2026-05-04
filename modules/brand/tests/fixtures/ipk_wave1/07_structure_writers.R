@@ -100,9 +100,7 @@ ipk_write_brand_config <- function(path) {
       Category         = c$label,
       CategoryCode     = c$code,
       Active           = c$active,
-      # "transaction" matches guard_validate_categories' allowed list
-      # ("transaction", "durable", "service") — 00_guard.R:252.
-      Type             = "transaction",
+      Type             = "transactional",
       Analysis_Depth   = c$analysis_depth,
       Timeframe_Long   = c$timeframe_long,
       Timeframe_Target = c$timeframe_target %||% NA_character_,

@@ -117,7 +117,14 @@ guard_alchemer_parser_shape <- function(data) {
 #' @return Invisibly TRUE on pass.
 #' @export
 guard_slot_columns_present <- function(data, root, min_slots = 1L) {
-  if (!is.data.frame(data)) stop("guard_slot_columns_present: data not a data frame")
+  if (!is.data.frame(data)) {
+    return(.brand_v2_refuse(
+      code     = "DATA_NOT_DATA_FRAME",
+      title    = "Data is not a data frame",
+      problem  = "guard_slot_columns_present() requires a data frame.",
+      how_to_fix = "Pass a data frame loaded from your AlchemerParser output."
+    ))
+  }
   pat <- paste0("^", .v2_regex_escape(root), "_[0-9]+$")
   found <- grep(pat, names(data), value = TRUE)
   if (length(found) < min_slots) {

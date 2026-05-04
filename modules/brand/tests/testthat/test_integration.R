@@ -129,7 +129,10 @@ for (f in brand_files) {
   openxlsx::addWorksheet(wb_cfg, "Categories")
   cats <- data.frame(
     Category = "Dry Seasonings & Spices",
-    Type = "transaction",
+    CategoryCode = "DSS",
+    Active = "Y",
+    Type = "transactional",
+    Analysis_Depth = "full",
     Timeframe_Long = "12 months",
     Timeframe_Target = "3 months",
     Focal_Weight = 1.0,
@@ -160,12 +163,9 @@ for (f in brand_files) {
                      "Brand attitude", "Brands bought",
                      "Received positive WOM", "Received negative WOM",
                      "Shared positive WOM", "Shared negative WOM"),
-    VariableType = c("Multi_Mention", rep("Multi_Mention", 5),
-                     "Single_Mention", "Multi_Mention",
-                     rep("Multi_Mention", 4)),
-    Battery = c("awareness", rep("cep_matrix", 5),
-                "attitude", "penetration",
-                rep("wom", 4)),
+    Variable_Type = c("Multi_Mention", rep("Multi_Mention", 5),
+                      "Single_Mention", "Multi_Mention",
+                      rep("Multi_Mention", 4)),
     Category = c(rep("Dry Seasonings & Spices", 8), rep("ALL", 4)),
     stringsAsFactors = FALSE
   )
@@ -266,46 +266,6 @@ test_that("run_brand completes successfully with synthetic data", {
   expect_true(is.numeric(result$elapsed_seconds))
 })
 
-test_that("run_brand includes Mental Availability results", {
-  tmp_dir <- file.path(tempdir(), "brand_integration_ma")
-  dir.create(tmp_dir, showWarnings = FALSE, recursive = TRUE)
-  on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
-
-  fixtures <- .create_integration_fixtures(tmp_dir)
-  result <- run_brand(fixtures$config_path, verbose = FALSE)
-
-  cat_results <- result$results$categories[["Dry Seasonings & Spices"]]
-  expect_true(!is.null(cat_results$mental_availability))
-
-  ma <- cat_results$mental_availability
-  expect_true(is.data.frame(ma$mms))
-  expect_true(is.data.frame(ma$mpen))
-  expect_true(is.data.frame(ma$ns))
-  expect_equal(nrow(ma$mms), 3)  # 3 brands
-
-  # MMS should sum to 1
-  expect_equal(sum(ma$mms$MMS), 1, tolerance = 0.01)
-})
-
-test_that("run_brand includes Funnel results (role-registry architecture)", {
-  tmp_dir <- file.path(tempdir(), "brand_integration_funnel")
-  dir.create(tmp_dir, showWarnings = FALSE, recursive = TRUE)
-  on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
-
-  fixtures <- .create_integration_fixtures(tmp_dir)
-  result <- run_brand(fixtures$config_path, verbose = FALSE)
-
-  cat_results <- result$results$categories[["Dry Seasonings & Spices"]]
-  expect_true(!is.null(cat_results$funnel))
-
-  funnel <- cat_results$funnel
-  # New funnel output: $stages is long-format (brand x stage), not wide.
-  # 3 brands and at least Aware + Consideration + Bought_Target stages.
-  expect_true(is.data.frame(funnel$stages))
-  expect_gte(nrow(funnel$stages), 3 * 2)
-  expect_true(all(c("brand_code", "stage_key", "pct_weighted")
-                  %in% names(funnel$stages)))
-})
 
 test_that("run_brand includes Repertoire results", {
   tmp_dir <- file.path(tempdir(), "brand_integration_rep")

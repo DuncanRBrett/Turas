@@ -17,7 +17,7 @@
 # VERSION: 2.0
 # ==============================================================================
 
-BRAND_FUNNEL_DERIVE_VERSION <- "3.0"
+BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
 
 # Default attitude codes considered "positive" for consideration. Matches the
 # IPK convention: 1 = Love, 2 = Prefer, 3 = Ambivalent. 4 = Reject and

@@ -187,14 +187,17 @@ test_that("Survey_Structure Questions sheet has correct columns", {
 
   questions <- openxlsx::read.xlsx(tmp, sheet = "Questions", startRow = 3)
 
-  expected_cols <- c("QuestionCode", "QuestionText", "VariableType",
-                     "Battery", "Category")
+  expected_cols <- c("QuestionCode", "QuestionText", "Variable_Type")
   actual_cols <- names(questions)
 
   for (col in expected_cols) {
     expect_true(col %in% actual_cols,
                 info = sprintf("Missing column: %s", col))
   }
+
+  # v2 architecture dropped Battery — role inference uses Variable_Type instead
+  expect_false("Battery" %in% actual_cols,
+               label = "Battery column should not exist in v2 Questions sheet")
 })
 
 test_that("Survey_Structure Brands sheet has example rows with IsFocal", {
@@ -276,23 +279,3 @@ test_that("Both templates can be generated to same directory", {
   expect_true(file.exists(structure_path))
 })
 
-test_that("Battery codes in Questions examples match documented CBM batteries", {
-  valid_batteries <- c("awareness", "cep_matrix", "attribute", "attitude",
-                       "attitude_oe", "cat_buying", "penetration", "wom", "dba")
-
-  tmp <- tempfile(fileext = ".xlsx")
-  on.exit(unlink(tmp), add = TRUE)
-
-  generate_brand_survey_structure_template(tmp, overwrite = TRUE)
-
-  questions <- openxlsx::read.xlsx(tmp, sheet = "Questions", startRow = 3)
-  # Filter to actual data rows (skip help text row)
-  data_rows <- questions[!grepl("^\\[", questions[, 1], perl = TRUE), ]
-  batteries_used <- unique(data_rows$Battery)
-  batteries_used <- batteries_used[!is.na(batteries_used)]
-
-  for (b in batteries_used) {
-    expect_true(b %in% valid_batteries,
-                info = sprintf("Invalid battery code: %s", b))
-  }
-})

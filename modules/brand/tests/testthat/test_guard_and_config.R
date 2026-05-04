@@ -75,7 +75,7 @@ source(file.path(TURAS_ROOT, "modules", "brand", "R", "generate_config_templates
   openxlsx::addWorksheet(wb_cfg, "Categories")
   categories <- data.frame(
     Category = c("Dry Seasonings & Spices", "Ready Meals", "Sauces"),
-    Type = c("transaction", "transaction", "transaction"),
+    Type = c("transactional", "transactional", "transactional"),
     Timeframe_Long = c("12 months", "12 months", "12 months"),
     Timeframe_Target = c("3 months", "3 months", "3 months"),
     Focal_Weight = c(0.34, 0.33, 0.33),
@@ -242,7 +242,7 @@ test_that("guard_validate_brand_config refuses invalid focal_assignment", {
 test_that("guard_validate_categories passes with valid categories", {
   cats <- data.frame(
     Category = c("Dry Seasonings & Spices", "Ready Meals"),
-    Type = c("transaction", "transaction"),
+    Type = c("transactional", "transactional"),
     Timeframe_Target = c("3 months", "3 months"),
     stringsAsFactors = FALSE
   )
@@ -271,7 +271,7 @@ test_that("guard_validate_categories refuses invalid category type", {
 test_that("guard_validate_categories refuses portfolio with single category", {
   cats <- data.frame(
     Category = "Only One",
-    Type = "transaction",
+    Type = "transactional",
     Timeframe_Target = "3 months",
     stringsAsFactors = FALSE
   )
@@ -282,7 +282,7 @@ test_that("guard_validate_categories refuses portfolio with single category", {
 test_that("guard_validate_categories validates priority weights sum", {
   cats <- data.frame(
     Category = c("A", "B"),
-    Type = c("transaction", "transaction"),
+    Type = c("transactional", "transactional"),
     Timeframe_Target = c("3m", "3m"),
     Focal_Weight = c(0.3, 0.3),  # sums to 0.6, not 1.0
     stringsAsFactors = FALSE
@@ -294,7 +294,7 @@ test_that("guard_validate_categories validates priority weights sum", {
 test_that("guard_validate_categories passes valid priority weights", {
   cats <- data.frame(
     Category = c("A", "B"),
-    Type = c("transaction", "transaction"),
+    Type = c("transactional", "transactional"),
     Timeframe_Target = c("3m", "3m"),
     Focal_Weight = c(0.6, 0.4),
     stringsAsFactors = FALSE
@@ -568,7 +568,7 @@ test_that("relative data_file path resolves correctly", {
   ))
   openxlsx::addWorksheet(wb, "Categories")
   openxlsx::writeData(wb, "Categories", data.frame(
-    Category = "FV", Type = "transaction", Timeframe_Target = "3m",
+    Category = "FV", Type = "transactional", Timeframe_Target = "3m",
     stringsAsFactors = FALSE
   ))
   openxlsx::addWorksheet(wb, "DBA_Assets")

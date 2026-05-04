@@ -46,7 +46,7 @@ BRAND_ROLE_INFERENCE_VERSION <- "1.0"
 #' @return Named list of role entries, keyed by role name.
 #' @export
 infer_role_map <- function(questions, brands, active_cats) {
-  .require_questions_df(questions)
+  if (!isTRUE(.require_questions_df(questions))) return(list())
   if (is.null(brands)) brands <- data.frame()
   if (length(active_cats) == 0L) active_cats <- character(0)
 
@@ -418,13 +418,19 @@ infer_role_map <- function(questions, brands, active_cats) {
 .nz <- function(x) if (is.null(x) || is.na(x)) NA_character_ else as.character(x)
 
 .require_questions_df <- function(qs) {
-  if (!is.data.frame(qs)) stop("infer_role_map: questions must be a data frame")
+  if (!is.data.frame(qs)) {
+    cat("\n[REFUSED: DATA_INVALID] infer_role_map: questions must be a data frame\n")
+    return(FALSE)
+  }
   required <- c("QuestionCode", "Variable_Type")
   missing <- setdiff(required, names(qs))
   if (length(missing) > 0L) {
-    stop(sprintf("infer_role_map: questions sheet missing columns: %s",
-                 paste(missing, collapse = ", ")))
+    cat(sprintf(
+      "\n[REFUSED: DATA_MISSING] infer_role_map: questions sheet missing columns: %s\n",
+      paste(missing, collapse = ", ")))
+    return(FALSE)
   }
+  TRUE
 }
 
 # `%||%` may not be defined yet (loader order); define a local copy

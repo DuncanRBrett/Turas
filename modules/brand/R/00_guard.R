@@ -249,7 +249,7 @@ guard_validate_categories <- function(categories, config) {
   }
 
   # Validate category types
-  valid_types <- c("transaction", "durable", "service")
+  valid_types <- c("transactional", "durable", "service")
   invalid_types <- setdiff(unique(categories$Type), valid_types)
   if (length(invalid_types) > 0) {
     brand_refuse(

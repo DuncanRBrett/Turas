@@ -62,7 +62,7 @@ classify_audience_pair <- function(pair_a, pair_b, total,
 
       sig <- if (!is.na(ma$value) && !is.na(mb$value) &&
                    ma$n_base > 0 && mb$n_base > 0 && m$kind != "dist")
-               .al_sig_two_props(ma, mb) else
+               .al_sig_two_props(ma, mb, alpha = thresholds$alpha) else
                list(p_value = NA_real_, sig = FALSE, test = "none")
 
       # Classification (only meaningful for proportion-style metrics)

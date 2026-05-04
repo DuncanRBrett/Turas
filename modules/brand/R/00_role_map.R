@@ -37,7 +37,7 @@ BRAND_ROLE_MAP_V2_VERSION <- "2.0"
 #' @return Named list of role entries.
 #' @export
 build_brand_role_map <- function(structure, brand_config, data = NULL) {
-  .require_structure(structure)
+  if (!isTRUE(.require_structure(structure))) return(list())
   questions <- structure$questions
   brands    <- structure$brands
   questionmap <- structure$questionmap  # may be NULL
@@ -87,12 +87,18 @@ resolve_role_columns <- function(role_map, data) {
 
 .require_structure <- function(structure) {
   if (is.null(structure)) {
-    stop("build_brand_role_map: structure is NULL", call. = FALSE)
+    cat("\n[REFUSED: DATA_MISSING] build_brand_role_map: structure is NULL\n",
+        "  Fix: Pass a valid structure list from load_brand_survey_structure()\n",
+        sep = "")
+    return(FALSE)
   }
   if (is.null(structure$questions)) {
-    stop("build_brand_role_map: structure$questions missing", call. = FALSE)
+    cat("\n[REFUSED: DATA_MISSING] build_brand_role_map: structure$questions missing\n",
+        "  Fix: Ensure Survey_Structure.xlsx has a Questions sheet\n",
+        sep = "")
+    return(FALSE)
   }
-  invisible(TRUE)
+  TRUE
 }
 
 #' Apply QuestionMap override rows to an inferred role map

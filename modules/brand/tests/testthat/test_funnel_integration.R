@@ -160,7 +160,7 @@ source(file.path(ROOT, "modules", "brand", "R", "99_output.R"))
     Category     = "FMCG Test",
     CategoryCode = "TSX",
     Active       = "Y",
-    Type         = "transaction",
+    Type         = "transactional",
     Analysis_Depth   = "full",
     Timeframe_Long   = "12 months",
     Timeframe_Target = "last month",
