@@ -41,6 +41,7 @@
     bindBrandChips(panel);
     bindQuestionChips(panel);
     bindCardViewToggles(panel);
+    bindViewAllButtons(panel);
 
     // Initial paint reflects default state (heatmap on, counts/CI off).
     applyHeatmap(panel);
@@ -190,6 +191,18 @@
   }
 
   // ---- per-card table ↔ chart toggle ----
+  function switchCardView(card, view) {
+    const toolbar = card.querySelector(".demo-card-toolbar");
+    if (toolbar) {
+      toolbar.querySelectorAll('[data-demo-view]').forEach(b => b.classList.remove("active"));
+      const active = toolbar.querySelector(`[data-demo-view="${view}"]`);
+      if (active) active.classList.add("active");
+    }
+    card.querySelectorAll(".demo-card-view").forEach(v => v.toggleAttribute("hidden", true));
+    const target = card.querySelector(".demo-card-view-" + view);
+    if (target) target.toggleAttribute("hidden", false);
+  }
+
   function bindCardViewToggles(panel) {
     panel.querySelectorAll(".demo-card-toolbar").forEach(toolbar => {
       const card = toolbar.closest(".demo-card");
@@ -197,13 +210,44 @@
       toolbar.querySelectorAll('[data-demo-view]').forEach(btn => {
         btn.addEventListener("click", () => {
           const view = btn.getAttribute("data-demo-view");
-          toolbar.querySelectorAll('[data-demo-view]').forEach(b => b.classList.remove("active"));
-          btn.classList.add("active");
-          card.querySelectorAll(".demo-card-view").forEach(v => v.toggleAttribute("hidden", true));
-          const target = card.querySelector(".demo-card-view-" + view);
-          if (target) target.toggleAttribute("hidden", false);
+          switchCardView(card, view);
           panel.__state.viewByCard[card.id] = view;
+          refreshViewAllButtons(panel);
         });
+      });
+    });
+  }
+
+  // ---- global view-all buttons (All tables / All charts) ----
+  function switchAllCards(panel, view) {
+    panel.querySelectorAll(".demo-card").forEach(card => {
+      if (card.classList.contains("hidden")) return;
+      switchCardView(card, view);
+      panel.__state.viewByCard[card.id] = view;
+    });
+    refreshViewAllButtons(panel);
+  }
+
+  function refreshViewAllButtons(panel) {
+    const btns = panel.querySelectorAll(".demo-view-all-btn");
+    if (!btns.length) return;
+    const cards = Array.from(panel.querySelectorAll(".demo-card:not(.hidden)"));
+    if (!cards.length) return;
+    const views = cards.map(c => panel.__state.viewByCard[c.id] || "table");
+    const allTable = views.every(v => v === "table");
+    const allChart = views.every(v => v === "chart");
+    btns.forEach(btn => {
+      const action = btn.getAttribute("data-demo-action");
+      btn.classList.toggle("active", action === "allTables" ? allTable : allChart);
+    });
+  }
+
+  function bindViewAllButtons(panel) {
+    panel.querySelectorAll(".demo-view-all-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const action = btn.getAttribute("data-demo-action");
+        if (action === "allTables") switchAllCards(panel, "table");
+        else if (action === "allCharts") switchAllCards(panel, "chart");
       });
     });
   }

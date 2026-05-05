@@ -136,6 +136,14 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
   margin-left: 6px;
 }
 .demo-all-toggle:hover { background: #f1f5f9; border-color: #94a3b8; }
+.demo-control-sep { width: 1px; height: 16px; background: #e2e8f0; flex-shrink: 0; }
+.demo-view-all-btn {
+  background: #fff; border: 1px solid #cbd5e1; border-radius: 14px;
+  padding: 4px 11px; font-size: 11px; color: #475569; cursor: pointer;
+  text-transform: none !important; white-space: nowrap !important;
+}
+.demo-view-all-btn:hover { background: #f1f5f9; border-color: #94a3b8; }
+.demo-view-all-btn.active { background: __FOCAL__; border-color: __FOCAL__; color: #fff !important; }
 
 .demo-card-grid { display: flex; flex-direction: column; gap: 16px; }
 .demo-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 2px rgba(0,0,0,.03); position: relative; }
@@ -188,8 +196,10 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
   color: #1e293b; font-weight: 500;
 }
 .demo-matrix tbody tr:nth-child(even) td { background: #fafbfc; }
-.demo-col-focal { background: rgba(26, 82, 118, 0.08) !important; font-weight: 600; color: __FOCAL__; }
-.demo-col-catavg { color: #475569; font-style: italic; background: #f5f7fb !important; }
+.demo-col-focal { font-weight: 600; color: __FOCAL__; }
+.demo-matrix tbody td.demo-col-focal { background: rgba(26, 82, 118, 0.08) !important; }
+.demo-col-catavg { color: #475569; font-style: italic; }
+.demo-matrix tbody td.demo-col-catavg { background: #f5f7fb !important; }
 .demo-cell-n { font-size: 10px; color: #94a3b8; margin-left: 4px; font-weight: normal; }
 .demo-na { color: #cbd5e1; font-style: italic; }
 
@@ -246,6 +256,10 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
     '<span class="demo-control-label">Show:</span>',
     '<label class="demo-control-check"><input type="checkbox" data-demo-toggle="counts"> n counts</label>',
     '<label class="demo-control-check"><input type="checkbox" data-demo-toggle="heatmap" checked> Heatmap</label>',
+    '<span class="demo-control-sep"></span>',
+    '<span class="demo-control-label">View all:</span>',
+    '<button type="button" class="demo-view-all-btn active" data-demo-action="allTables" title="Show all questions as tables">&#x2261; Tables</button>',
+    '<button type="button" class="demo-view-all-btn" data-demo-action="allCharts" title="Show all questions as charts">&#x1F4CA; Charts</button>',
     '</div>'
   )
 }
