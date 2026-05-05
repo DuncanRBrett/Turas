@@ -254,6 +254,14 @@ load_brand_config <- function(config_path, project_root = NULL) {
       !grepl("^\\[", categories$Category),
     , drop = FALSE]
   }
+  # Normalise "transaction" → "transactional" (common shorthand in config files)
+  if (!is.null(categories) && nrow(categories) > 0 && "Type" %in% names(categories)) {
+    categories$Type <- ifelse(
+      trimws(tolower(categories$Type)) == "transaction",
+      "transactional",
+      categories$Type
+    )
+  }
   config$categories <- categories
 
   # Load DBA_Assets sheet if DBA is enabled
@@ -410,17 +418,39 @@ load_brand_survey_structure <- function(structure_path) {
 }
 
 
+#' Filter a structure table by category, preferring CategoryCode when available
+#'
+#' When \code{cat_code} is supplied and the table has a \code{CategoryCode}
+#' column, filters by code (unambiguous). Falls back to \code{Category} name
+#' matching for legacy files that lack a CategoryCode column.
+#'
+#' @keywords internal
+.filter_by_category <- function(tbl, category, cat_code = NULL) {
+  if (is.null(tbl) || nrow(tbl) == 0) return(tbl)
+  if (!is.null(cat_code) && nzchar(as.character(cat_code)) &&
+      "CategoryCode" %in% names(tbl)) {
+    rows <- trimws(as.character(tbl$CategoryCode)) == trimws(as.character(cat_code))
+    return(tbl[rows, , drop = FALSE])
+  }
+  tbl[tbl$Category == category, , drop = FALSE]
+}
+
+
 #' Get brands for a specific category
 #'
 #' @param structure List. Loaded survey structure.
-#' @param category Character. Category name.
+#' @param category Character. Category display name.
+#' @param cat_code Character. Short category code (e.g. "DSS"). When supplied
+#'   and the Brands sheet has a \code{CategoryCode} column, filters by code
+#'   rather than display name — more robust when the Category name column
+#'   contains template placeholders.
 #'
 #' @return Data frame of brands for the category.
 #'
 #' @export
-get_brands_for_category <- function(structure, category) {
+get_brands_for_category <- function(structure, category, cat_code = NULL) {
   if (is.null(structure$brands)) return(data.frame())
-  brands <- structure$brands[structure$brands$Category == category, , drop = FALSE]
+  brands <- .filter_by_category(structure$brands, category, cat_code)
   if ("DisplayOrder" %in% names(brands)) {
     brands <- brands[order(brands$DisplayOrder), , drop = FALSE]
   }
@@ -431,14 +461,16 @@ get_brands_for_category <- function(structure, category) {
 #' Get CEPs for a specific category
 #'
 #' @param structure List. Loaded survey structure.
-#' @param category Character. Category name.
+#' @param category Character. Category display name.
+#' @param cat_code Character. Short category code. When supplied and the CEPs
+#'   sheet has a \code{CategoryCode} column, filters by code.
 #'
 #' @return Data frame of CEPs for the category.
 #'
 #' @export
-get_ceps_for_category <- function(structure, category) {
+get_ceps_for_category <- function(structure, category, cat_code = NULL) {
   if (is.null(structure$ceps)) return(data.frame())
-  ceps <- structure$ceps[structure$ceps$Category == category, , drop = FALSE]
+  ceps <- .filter_by_category(structure$ceps, category, cat_code)
   if ("DisplayOrder" %in% names(ceps)) {
     ceps <- ceps[order(ceps$DisplayOrder), , drop = FALSE]
   }
@@ -449,14 +481,16 @@ get_ceps_for_category <- function(structure, category) {
 #' Get attributes for a specific category
 #'
 #' @param structure List. Loaded survey structure.
-#' @param category Character. Category name.
+#' @param category Character. Category display name.
+#' @param cat_code Character. Short category code. When supplied and the
+#'   Attributes sheet has a \code{CategoryCode} column, filters by code.
 #'
 #' @return Data frame of attributes for the category.
 #'
 #' @export
-get_attributes_for_category <- function(structure, category) {
+get_attributes_for_category <- function(structure, category, cat_code = NULL) {
   if (is.null(structure$attributes)) return(data.frame())
-  attrs <- structure$attributes[structure$attributes$Category == category, , drop = FALSE]
+  attrs <- .filter_by_category(structure$attributes, category, cat_code)
   if ("DisplayOrder" %in% names(attrs)) {
     attrs <- attrs[order(attrs$DisplayOrder), , drop = FALSE]
   }

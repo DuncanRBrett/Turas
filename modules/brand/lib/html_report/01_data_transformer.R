@@ -7,6 +7,19 @@
 
 if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
 
+# Filter a brands/CEPs/attrs table to rows for this category.
+# Prefers CategoryCode exact match; falls back to Category display name.
+.filter_brands_for_cat <- function(tbl, cat_code, cat_display) {
+  if (is.null(tbl) || nrow(tbl) == 0) return(tbl)
+  if (!is.null(cat_code) && nzchar(cat_code) && "CategoryCode" %in% names(tbl)) {
+    rows <- trimws(as.character(tbl$CategoryCode)) == trimws(cat_code)
+    if (any(rows)) return(tbl[rows, , drop = FALSE])
+  }
+  if (!is.null(cat_display) && "Category" %in% names(tbl))
+    return(tbl[tbl$Category == cat_display, , drop = FALSE])
+  tbl
+}
+
 # Position-based brand colour assignment. Self-contained — no dependency on
 # any other brand module file being in scope (this file is re-sourced at
 # report-generation time independently of the R module loader).
@@ -52,11 +65,18 @@ transform_brand_charts <- function(results, config) {
   comp_colour <- config$colour_competitor %||% "#B0B0B0"
   charts <- list()
 
+  brand_list_all <- if (!is.null(results$structure) &&
+                         !is.null(results$structure$brands))
+    results$structure$brands else NULL
+
   # Per-category charts
   if (!is.null(results$results$categories)) {
-    for (cat_name in names(results$results$categories)) {
-      cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
-      cr <- results$results$categories[[cat_name]]
+    for (cat_key in names(results$results$categories)) {
+      cr           <- results$results$categories[[cat_key]]
+      cat_code_lcl <- cr$cat_code %||% NULL
+      cat_display  <- cr$category %||% cat_key
+      cat_id       <- gsub("[^a-z0-9]", "-", tolower(cat_code_lcl %||% cat_key))
+      cat_name     <- cat_display
 
       # Mental Availability: now always rendered as the polished 3-tab panel
       # (build_ma_panel_data + build_ma_panel_html in transform_brand_panels).
@@ -70,9 +90,20 @@ transform_brand_charts <- function(results, config) {
       if (!is.null(funnel) && !identical(funnel$status, "REFUSED") &&
           !is.null(funnel$stages) && nrow(funnel$stages) > 0) {
         funnel_charts <- list()
-        brand_list_local <- data.frame(
-          BrandCode = unique(as.character(funnel$stages$brand_code)),
-          stringsAsFactors = FALSE)
+        raw_codes        <- unique(as.character(funnel$stages$brand_code))
+        cat_brands_lcl   <- .filter_brands_for_cat(brand_list_all,
+                                                   cat_code_lcl, cat_display)
+        if (!is.null(cat_brands_lcl) && nrow(cat_brands_lcl) > 0 &&
+            "BrandLabel" %in% names(cat_brands_lcl)) {
+          brand_list_local <- cat_brands_lcl[
+            cat_brands_lcl$BrandCode %in% raw_codes, , drop = FALSE]
+          if (nrow(brand_list_local) == 0)
+            brand_list_local <- data.frame(BrandCode = raw_codes,
+                                           stringsAsFactors = FALSE)
+        } else {
+          brand_list_local <- data.frame(BrandCode = raw_codes,
+                                         stringsAsFactors = FALSE)
+        }
         legacy_wide <- build_funnel_legacy_wide(funnel, brand_list_local)
         legacy_conv <- build_funnel_legacy_conversions(funnel, brand_list_local)
 
@@ -221,9 +252,10 @@ transform_brand_tables <- function(results, config) {
   tables <- list()
 
   if (!is.null(results$results$categories)) {
-    for (cat_name in names(results$results$categories)) {
-      cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
-      cr <- results$results$categories[[cat_name]]
+    for (cat_key in names(results$results$categories)) {
+      cr      <- results$results$categories[[cat_key]]
+      cat_id  <- gsub("[^a-z0-9]", "-",
+                      tolower(cr$cat_code %||% cat_key))
 
       # MA is now always rendered by the new panel (build_ma_panel_html).
       # build_ma_tables() is removed; there is no old-format MA fallback.
@@ -269,18 +301,21 @@ transform_brand_panels <- function(results, config) {
     results$structure$brands
   } else NULL
 
-  for (cat_name in names(results$results$categories)) {
-    cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
-    cr <- results$results$categories[[cat_name]]
+  for (cat_key in names(results$results$categories)) {
+    cr          <- results$results$categories[[cat_key]]
+    cat_code_lc <- cr$cat_code %||% NULL
+    cat_display <- cr$category %||% cat_key
+    cat_id      <- gsub("[^a-z0-9]", "-", tolower(cat_code_lc %||% cat_key))
     funnel <- cr$funnel
     if (is.null(funnel) || identical(funnel$status, "REFUSED")) next
     if (is.null(funnel$stages) || nrow(funnel$stages) == 0) next
 
-    cat_brands <- if (!is.null(brand_list_all) &&
-                       "Category" %in% names(brand_list_all)) {
-      brand_list_all[brand_list_all$Category == cat_name, , drop = FALSE]
-    } else if (!is.null(brand_list_all)) {
-      brand_list_all
+    cat_brands <- if (!is.null(brand_list_all)) {
+      bl <- .filter_brands_for_cat(brand_list_all, cat_code_lc, cat_display)
+      if (is.null(bl) || nrow(bl) == 0)
+        data.frame(BrandCode = unique(as.character(funnel$stages$brand_code)),
+                   stringsAsFactors = FALSE)
+      else bl
     } else {
       data.frame(
         BrandCode = unique(as.character(funnel$stages$brand_code)),
@@ -294,11 +329,18 @@ transform_brand_panels <- function(results, config) {
     focal_colour <- .resolve_focal_colour(cat_brands, funnel$meta$focal_brand,
                                           config_focal_colour)
 
-    # Per-category timeframe labels (Long Period / Target Period overrides)
-    cat_cfg_row <- if (!is.null(config$categories) &&
-                       "Category" %in% names(config$categories))
-      config$categories[config$categories$Category == cat_name, , drop = FALSE]
-    else NULL
+    # Per-category timeframe labels — check by CategoryCode first, then name
+    cat_cfg_row <- if (!is.null(config$categories)) {
+      cfg_cats <- config$categories
+      if (!is.null(cat_code_lc) && "CategoryCode" %in% names(cfg_cats)) {
+        r <- cfg_cats[trimws(as.character(cfg_cats$CategoryCode)) ==
+                      trimws(cat_code_lc), , drop = FALSE]
+        if (nrow(r) > 0) r else cfg_cats[cfg_cats$Category == cat_display,
+                                          , drop = FALSE]
+      } else if ("Category" %in% names(cfg_cats)) {
+        cfg_cats[cfg_cats$Category == cat_display, , drop = FALSE]
+      } else NULL
+    } else NULL
     timeframe_long   <- if (!is.null(cat_cfg_row) && nrow(cat_cfg_row) > 0 &&
                              "Timeframe_Long"   %in% names(cat_cfg_row))
       as.character(cat_cfg_row$Timeframe_Long[1]) else NULL
@@ -307,7 +349,7 @@ transform_brand_panels <- function(results, config) {
       as.character(cat_cfg_row$Timeframe_Target[1]) else NULL
 
     panel_data <- build_funnel_panel_data(funnel, cat_brands,
-      config = list(category_label    = cat_name,
+      config = list(category_label    = cat_display,
                     wave_label        = as.character(config$wave %||% ""),
                     show_counts       = FALSE,
                     Timeframe_Long    = timeframe_long,
@@ -327,17 +369,22 @@ transform_brand_panels <- function(results, config) {
   # --- Mental Availability panels (per category) ---
   if (exists("build_ma_panel_data", mode = "function") &&
       exists("build_ma_panel_html", mode = "function")) {
-    for (cat_name in names(results$results$categories)) {
-      cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
-      cr <- results$results$categories[[cat_name]]
+    for (cat_key in names(results$results$categories)) {
+      cr          <- results$results$categories[[cat_key]]
+      cat_code_lc <- cr$cat_code %||% NULL
+      cat_display <- cr$category %||% cat_key
+      cat_id      <- gsub("[^a-z0-9]", "-", tolower(cat_code_lc %||% cat_key))
       ma <- cr$mental_availability
       if (is.null(ma) || identical(ma$status, "REFUSED")) next
       if (is.null(ma$cep_brand_matrix)) next
 
-      cat_brands <- if (!is.null(brand_list_all) &&
-                         "Category" %in% names(brand_list_all)) {
-        brand_list_all[brand_list_all$Category == cat_name, , drop = FALSE]
-      } else if (!is.null(brand_list_all)) brand_list_all else
+      cat_brands <- if (!is.null(brand_list_all)) {
+        bl <- .filter_brands_for_cat(brand_list_all, cat_code_lc, cat_display)
+        if (is.null(bl) || nrow(bl) == 0)
+          data.frame(BrandCode = setdiff(names(ma$cep_brand_matrix), "CEPCode"),
+                     stringsAsFactors = FALSE)
+        else bl
+      } else
         data.frame(BrandCode = setdiff(names(ma$cep_brand_matrix), "CEPCode"),
                    stringsAsFactors = FALSE)
       if (!("BrandLabel" %in% names(cat_brands))) {
@@ -359,18 +406,17 @@ transform_brand_panels <- function(results, config) {
 
       cep_list <- if (!is.null(results$structure) &&
                       !is.null(results$structure$ceps)) {
-        ceps_all <- results$structure$ceps
-        if ("Category" %in% names(ceps_all))
-          ceps_all[ceps_all$Category == cat_name, , drop = FALSE]
-        else ceps_all
+        .filter_brands_for_cat(results$structure$ceps, cat_code_lc, cat_display) %||%
+          data.frame(CEPCode = character(), CEPText = character(),
+                     stringsAsFactors = FALSE)
       } else data.frame(CEPCode = character(), CEPText = character(),
                         stringsAsFactors = FALSE)
 
       attr_list <- if (!is.null(results$structure) &&
                        !is.null(results$structure$attributes)) {
         at_all <- results$structure$attributes
-        if (nrow(at_all) > 0 && "Category" %in% names(at_all))
-          at_all[at_all$Category == cat_name, , drop = FALSE]
+        if (nrow(at_all) > 0)
+          .filter_brands_for_cat(at_all, cat_code_lc, cat_display)
         else at_all
       } else NULL
 
@@ -384,7 +430,7 @@ transform_brand_panels <- function(results, config) {
         attribute_list = attr_list,
         awareness_by_brand = awareness_by_brand,
         config = list(
-          category_label = cat_name,
+          category_label = cat_display,
           wave_label = as.character(config$wave %||% ""),
           focal_brand_code = config$focal_brand,
           focal_colour = focal_colour,
@@ -400,9 +446,12 @@ transform_brand_panels <- function(results, config) {
 
   # --- Category Buying (Dirichlet) panels (per category) ---
   if (exists("render_cat_buying_panel", mode = "function")) {
-    for (cat_name in names(results$results$categories)) {
-      cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
-      cr <- results$results$categories[[cat_name]]
+    for (cat_key in names(results$results$categories)) {
+      cr          <- results$results$categories[[cat_key]]
+      cat_code_lc <- cr$cat_code %||% NULL
+      cat_display <- cr$category %||% cat_key
+      cat_id      <- gsub("[^a-z0-9]", "-", tolower(cat_code_lc %||% cat_key))
+      cat_name    <- cat_display
 
       dn  <- cr$dirichlet_norms
       bh  <- cr$buyer_heaviness
@@ -417,10 +466,9 @@ transform_brand_panels <- function(results, config) {
       bh_ok <- !is.null(bh) && !identical(bh$status, "REFUSED")
       if (!dn_ok && !bh_ok) next
 
-      cat_brands_local <- if (!is.null(brand_list_all) &&
-                               "Category" %in% names(brand_list_all)) {
-        brand_list_all[brand_list_all$Category == cat_name, , drop = FALSE]
-      } else if (!is.null(brand_list_all)) brand_list_all else NULL
+      cat_brands_local <- if (!is.null(brand_list_all))
+        .filter_brands_for_cat(brand_list_all, cat_code_lc, cat_display)
+      else NULL
 
       focal_colour <- .resolve_focal_colour(cat_brands_local, config$focal_brand,
                                             config_focal_colour)
@@ -482,19 +530,25 @@ transform_brand_panels <- function(results, config) {
   # --- Word of Mouth panels (per category) ---
   if (exists("build_wom_panel_data", mode = "function") &&
       exists("build_wom_panel_html", mode = "function")) {
-    for (cat_name in names(results$results$categories)) {
-      cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
-      cr <- results$results$categories[[cat_name]]
+    for (cat_key in names(results$results$categories)) {
+      cr          <- results$results$categories[[cat_key]]
+      cat_code_lc <- cr$cat_code %||% NULL
+      cat_display <- cr$category %||% cat_key
+      cat_id      <- gsub("[^a-z0-9]", "-", tolower(cat_code_lc %||% cat_key))
+      cat_name    <- cat_display
       wom <- cr$wom
       if (is.null(wom) || identical(wom$status, "REFUSED")) next
       if (is.null(wom$wom_metrics)) next
 
-      cat_brands_local <- if (!is.null(brand_list_all) &&
-                               "Category" %in% names(brand_list_all)) {
-        brand_list_all[brand_list_all$Category == cat_name, , drop = FALSE]
-      } else if (!is.null(brand_list_all)) brand_list_all else
+      cat_brands_local <- if (!is.null(brand_list_all))
+        .filter_brands_for_cat(brand_list_all, cat_code_lc, cat_display)
+      else
         data.frame(BrandCode = as.character(wom$wom_metrics$BrandCode),
                    stringsAsFactors = FALSE)
+      if (is.null(cat_brands_local) || nrow(cat_brands_local) == 0)
+        cat_brands_local <- data.frame(
+          BrandCode = as.character(wom$wom_metrics$BrandCode),
+          stringsAsFactors = FALSE)
       if (!("BrandLabel" %in% names(cat_brands_local))) {
         cat_brands_local$BrandLabel <- cat_brands_local$BrandCode
       }
@@ -505,10 +559,17 @@ transform_brand_panels <- function(results, config) {
 
       # Timeframe label — prefer category Timeframe_Target, fall back to
       # the original WOM question wording default.
-      cat_cfg_row <- if (!is.null(config$categories) &&
-                         "Category" %in% names(config$categories))
-        config$categories[config$categories$Category == cat_name, , drop = FALSE]
-      else NULL
+      cat_cfg_row <- if (!is.null(config$categories)) {
+        cfg_cats <- config$categories
+        if (!is.null(cat_code_lc) && "CategoryCode" %in% names(cfg_cats)) {
+          r <- cfg_cats[trimws(as.character(cfg_cats$CategoryCode)) ==
+                        trimws(cat_code_lc), , drop = FALSE]
+          if (nrow(r) > 0) r else if ("Category" %in% names(cfg_cats))
+            cfg_cats[cfg_cats$Category == cat_display, , drop = FALSE] else NULL
+        } else if ("Category" %in% names(cfg_cats)) {
+          cfg_cats[cfg_cats$Category == cat_display, , drop = FALSE]
+        } else NULL
+      } else NULL
       tf_label <- if (!is.null(cat_cfg_row) && nrow(cat_cfg_row) > 0 &&
                       "Timeframe_Target" %in% names(cat_cfg_row))
         as.character(cat_cfg_row$Timeframe_Target[1]) else NULL
@@ -523,7 +584,7 @@ transform_brand_panels <- function(results, config) {
           wom_result = wom,
           brand_list = cat_brands_local,
           config = list(
-            category_label   = cat_name,
+            category_label   = cat_display,
             wave_label       = as.character(config$wave %||% ""),
             focal_brand_code = config$focal_brand,
             focal_colour     = focal_colour,
@@ -556,16 +617,17 @@ transform_brand_panels <- function(results, config) {
   # --- Demographics panels (per-category) ---
   if (exists("build_demographics_panel_data", mode = "function") &&
       exists("build_demographics_panel_html", mode = "function")) {
-    for (cat_name in names(results$results$categories)) {
-      cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
-      cr <- results$results$categories[[cat_name]]
+    for (cat_key in names(results$results$categories)) {
+      cr          <- results$results$categories[[cat_key]]
+      cat_code_lc <- cr$cat_code %||% NULL
+      cat_display <- cr$category %||% cat_key
+      cat_id      <- gsub("[^a-z0-9]", "-", tolower(cat_code_lc %||% cat_key))
       demo <- cr$demographics
       if (is.null(demo) || !identical(demo$status, "PASS")) next
 
-      cat_brands_local <- if (!is.null(brand_list_all) &&
-                                "Category" %in% names(brand_list_all)) {
-        brand_list_all[brand_list_all$Category == cat_name, , drop = FALSE]
-      } else if (!is.null(brand_list_all)) brand_list_all else NULL
+      cat_brands_local <- if (!is.null(brand_list_all))
+        .filter_brands_for_cat(brand_list_all, cat_code_lc, cat_display)
+      else NULL
       focal_colour <- .resolve_focal_colour(cat_brands_local,
                                               config$focal_brand,
                                               config_focal_colour)
@@ -580,7 +642,7 @@ transform_brand_panels <- function(results, config) {
           brand_colours  = demo$brand_colours %||% list(),
           decimal_places = config$decimal_places %||% 0L,
           wave_label     = as.character(config$wave %||% ""),
-          scope_label    = cat_name,
+          scope_label    = cat_display,
           n_total        = demo$n_total %||% NA_integer_,
           weighted       = isTRUE(demo$weighted)),
         error = function(e) {
@@ -607,16 +669,17 @@ transform_brand_panels <- function(results, config) {
   # --- Ad Hoc panels (per-category) ---
   if (exists("build_adhoc_panel_data", mode = "function") &&
       exists("build_adhoc_panel_html", mode = "function")) {
-    for (cat_name in names(results$results$categories)) {
-      cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
-      cr <- results$results$categories[[cat_name]]
+    for (cat_key in names(results$results$categories)) {
+      cr          <- results$results$categories[[cat_key]]
+      cat_code_lc <- cr$cat_code %||% NULL
+      cat_display <- cr$category %||% cat_key
+      cat_id      <- gsub("[^a-z0-9]", "-", tolower(cat_code_lc %||% cat_key))
       ah <- cr$adhoc
       if (is.null(ah) || !identical(ah$status, "PASS")) next
 
-      cat_brands_local <- if (!is.null(brand_list_all) &&
-                                "Category" %in% names(brand_list_all)) {
-        brand_list_all[brand_list_all$Category == cat_name, , drop = FALSE]
-      } else if (!is.null(brand_list_all)) brand_list_all else NULL
+      cat_brands_local <- if (!is.null(brand_list_all))
+        .filter_brands_for_cat(brand_list_all, cat_code_lc, cat_display)
+      else NULL
       focal_colour <- .resolve_focal_colour(cat_brands_local,
                                               config$focal_brand,
                                               config_focal_colour)
@@ -652,17 +715,18 @@ transform_brand_panels <- function(results, config) {
   # --- Audience Lens panels (per category) ---
   if (exists("build_audience_lens_panel_data", mode = "function") &&
       exists("build_audience_lens_panel_html", mode = "function")) {
-    for (cat_name in names(results$results$categories)) {
-      cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
-      cr <- results$results$categories[[cat_name]]
+    for (cat_key in names(results$results$categories)) {
+      cr          <- results$results$categories[[cat_key]]
+      cat_code_lc <- cr$cat_code %||% NULL
+      cat_display <- cr$category %||% cat_key
+      cat_id      <- gsub("[^a-z0-9]", "-", tolower(cat_code_lc %||% cat_key))
       al <- cr$audience_lens
       if (is.null(al) || identical(al$status, "REFUSED")) next
       if (length(al$audiences %||% list()) == 0) next
 
-      cat_brands_local <- if (!is.null(brand_list_all) &&
-                               "Category" %in% names(brand_list_all)) {
-        brand_list_all[brand_list_all$Category == cat_name, , drop = FALSE]
-      } else if (!is.null(brand_list_all)) brand_list_all else NULL
+      cat_brands_local <- if (!is.null(brand_list_all))
+        .filter_brands_for_cat(brand_list_all, cat_code_lc, cat_display)
+      else NULL
 
       focal_colour <- .resolve_focal_colour(cat_brands_local,
                                              config$focal_brand,
@@ -671,7 +735,7 @@ transform_brand_panels <- function(results, config) {
       al_pd <- tryCatch(
         build_audience_lens_panel_data(
           result         = al,
-          category_label = cat_name,
+          category_label = cat_display,
           focal_brand    = config$focal_brand %||% "",
           focal_colour   = focal_colour,
           decimal_places = config$decimal_places %||% 0L,
@@ -703,17 +767,18 @@ transform_brand_panels <- function(results, config) {
   # --- Branded Reach panels (per category) ---
   if (exists("build_branded_reach_panel_data", mode = "function") &&
       exists("build_branded_reach_panel_html", mode = "function")) {
-    for (cat_name in names(results$results$categories)) {
-      cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
-      cr <- results$results$categories[[cat_name]]
+    for (cat_key in names(results$results$categories)) {
+      cr          <- results$results$categories[[cat_key]]
+      cat_code_lc <- cr$cat_code %||% NULL
+      cat_display <- cr$category %||% cat_key
+      cat_id      <- gsub("[^a-z0-9]", "-", tolower(cat_code_lc %||% cat_key))
       br <- cr$branded_reach
       if (is.null(br) || identical(br$status, "REFUSED")) next
       if (length(br$ads %||% list()) == 0) next
 
-      cat_brands_local <- if (!is.null(brand_list_all) &&
-                               "Category" %in% names(brand_list_all)) {
-        brand_list_all[brand_list_all$Category == cat_name, , drop = FALSE]
-      } else if (!is.null(brand_list_all)) brand_list_all else NULL
+      cat_brands_local <- if (!is.null(brand_list_all))
+        .filter_brands_for_cat(brand_list_all, cat_code_lc, cat_display)
+      else NULL
 
       focal_colour <- .resolve_focal_colour(cat_brands_local,
                                              config$focal_brand,
@@ -722,7 +787,7 @@ transform_brand_panels <- function(results, config) {
       br_pd <- tryCatch(
         build_branded_reach_panel_data(
           result         = br,
-          category_label = cat_name,
+          category_label = cat_display,
           focal_brand    = config$focal_brand %||% "",
           focal_colour   = focal_colour,
           decimal_places = config$decimal_places %||% 0L,

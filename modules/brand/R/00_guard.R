@@ -432,7 +432,7 @@ guard_validate_data <- function(data, structure, config) {
 
   # Check weight column if specified
   weight_col <- config$weight_variable
-  if (!is.null(weight_col) && nchar(trimws(weight_col)) > 0) {
+  if (!is.null(weight_col) && !is.na(weight_col) && nchar(trimws(weight_col)) > 0) {
     if (!weight_col %in% names(data)) {
       warnings <- c(warnings, sprintf(
         "Weight variable '%s' not found in data. Running unweighted.", weight_col

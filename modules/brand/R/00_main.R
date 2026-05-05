@@ -277,7 +277,7 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
   # Get weights
   weights <- NULL
   weight_col <- config$weight_variable
-  if (!is.null(weight_col) && nchar(trimws(weight_col)) > 0 &&
+  if (!is.null(weight_col) && !is.na(weight_col) && nchar(trimws(weight_col)) > 0 &&
       weight_col %in% names(data)) {
     weights <- data[[weight_col]]
   }
@@ -333,18 +333,9 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
 
     if (verbose) cat(sprintf("\n--- Category: %s [%s] ---\n", cat_name, cat_depth))
 
-    cat_brands <- get_brands_for_category(structure, cat_name)
-    cat_ceps   <- get_ceps_for_category(structure, cat_name)
-    cat_attrs  <- get_attributes_for_category(structure, cat_name)
-
-    cat_result <- list(category = cat_name, analysis_depth = cat_depth)
-    linkage    <- NULL  # populated by MA block; used by D&B
-
-    # Detect short category code (e.g. "DSS") and filter data to focal
-    # respondents for this category. Focal filtering is used for WOM so each
-    # category's WOM metrics reflect its own respondent group and brand list.
-    # IPK rebuild configs always supply CategoryCode; legacy QuestionMap
-    # detection was removed in the v2 cutover (stage 3).
+    # Resolve the short category code early so brand/cep/attr lookups can use
+    # it for unambiguous CategoryCode matching (guards against misconfigured
+    # Category display-name columns in the structure file).
     focal_col  <- config$focal_category_col %||% "Focal_Category"
     cat_code   <- if (cat_depth == "full" &&
                       "CategoryCode" %in% names(categories) &&
@@ -352,6 +343,19 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
                       nzchar(as.character(categories$CategoryCode[i]))) {
                     as.character(categories$CategoryCode[i])
                   } else NULL
+
+    cat_brands <- get_brands_for_category(structure, cat_name, cat_code = cat_code)
+    cat_ceps   <- get_ceps_for_category(structure, cat_name, cat_code = cat_code)
+    cat_attrs  <- get_attributes_for_category(structure, cat_name, cat_code = cat_code)
+
+    cat_result <- list(category = cat_name, cat_code = cat_code,
+                       analysis_depth = cat_depth)
+    linkage    <- NULL  # populated by MA block; used by D&B
+
+    # Filter data to focal respondents for this category. Focal filtering is
+    # used for WOM so each category's WOM metrics reflect its own respondent
+    # group and brand list. IPK rebuild configs always supply CategoryCode;
+    # legacy QuestionMap detection was removed in the v2 cutover (stage 3).
     cat_data   <- if (!is.null(cat_code) && focal_col %in% names(data)) {
                     data[!is.na(data[[focal_col]]) &
                          data[[focal_col]] == cat_code, ]

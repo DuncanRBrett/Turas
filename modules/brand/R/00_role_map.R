@@ -116,7 +116,9 @@ resolve_role_columns <- function(role_map, data) {
     if (is.na(role) || role == "") next  # skip blank rows
 
     existing <- role_map[[role]]
-    column_root <- .nz_str(row$ColumnRoot %||% row$ColumnPattern)
+    # ColumnRoot is the canonical name; ClientCode is what the template uses —
+    # accept either so the standard QuestionMap template works without renaming.
+    column_root <- .nz_str(row$ColumnRoot %||% row$ColumnPattern %||% row$ClientCode)
     variable_type <- .nz_str(row$Variable_Type)
     option_scale  <- .nz_str(row$OptionMapScale)
 

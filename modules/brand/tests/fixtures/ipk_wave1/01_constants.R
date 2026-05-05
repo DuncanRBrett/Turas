@@ -114,6 +114,35 @@ IPK_FOCAL_BRAND <- list(
   SLD = "IPK", STO = "IPK", PES = "IPK", COO = "IPK", ANT = "IPK"
 )
 
+# Display name lookup — used by Survey_Structure Brands sheet (BrandLabel).
+# Brands absent from this map fall back to BrandCode.
+IPK_BRAND_LABELS <- c(
+  IPK    = "Ina Paarman's Kitchen",
+  # DSS
+  ROB    = "Robertsons",
+  KNORR  = "Knorr",
+  CART   = "Cartwright's",
+  CHS    = "Cape Herb & Spice",
+  FNF    = "Forage & Feast",
+  WWT    = "Woolworths House Brand",
+  PNP    = "PNP House Brand",
+  SSG    = "Six Gun Grill",
+  RAJ    = "Rajah",
+  SAF    = "Safari",
+  SPM    = "Spice Mecca",
+  CHK    = "Checkers House Brand",
+  HND    = "Hinds",
+  DEL    = "Deli Spices",
+  # Common across multiple categories
+  MAG    = "Maggi",
+  ROY    = "Royco",
+  DOL    = "Dolmio",
+  BAR    = "Barilla",
+  SACL   = "Sacla'",
+  OXO    = "OXO",
+  KFT    = "Kraft"
+)
+
 # Slot count for any Multi_Mention brand question = length(brands) + 1 (NONE)
 ipk_brand_slot_count <- function(cat_code) {
   length(IPK_BRANDS[[cat_code]]) + 1L

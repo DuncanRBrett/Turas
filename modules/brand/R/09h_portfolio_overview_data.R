@@ -241,7 +241,7 @@ build_portfolio_overview <- function(results, config) {
   if (is.null(cat_code) || !nzchar(cat_code)) return(NULL)
 
   cat_brands <- tryCatch(
-    get_brands_for_category(structure, cat_name),
+    get_brands_for_category(structure, cat_name, cat_code = cat_code),
     error = function(e) data.frame(BrandCode = character(0))
   )
   if (nrow(cat_brands) == 0L) return(NULL)

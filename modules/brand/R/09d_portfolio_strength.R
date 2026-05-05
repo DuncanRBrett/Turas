@@ -54,7 +54,7 @@ compute_strength_map <- function(data, role_map, categories, structure,
     if (is.na(cat_code) || !nzchar(cat_code)) next
 
     cat_brands <- tryCatch(
-      get_brands_for_category(structure, cat_name),
+      get_brands_for_category(structure, cat_name, cat_code = cat_code),
       error = function(e) data.frame(BrandCode = character(0))
     )
     if (nrow(cat_brands) == 0L) next

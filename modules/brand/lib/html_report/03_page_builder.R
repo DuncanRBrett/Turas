@@ -89,15 +89,20 @@ build_br_header <- function(config) {
 
 #' Build tab navigation
 #' @keywords internal
-build_br_tab_nav <- function(category_names, config) {
+build_br_tab_nav <- function(category_names, config, display_map = NULL,
+                              code_map = NULL) {
   btns <- character(0)
   btns <- c(btns, '<button class="br-tab-btn active" data-tab="summary" onclick="switchBrandTab(\'summary\')">Summary</button>')
 
   for (cat_name in category_names) {
-    cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
+    display_name <- if (!is.null(display_map) && cat_name %in% names(display_map))
+      display_map[[cat_name]] else cat_name
+    id_src  <- if (!is.null(code_map) && cat_name %in% names(code_map))
+      code_map[[cat_name]] else cat_name
+    cat_id <- gsub("[^a-z0-9]", "-", tolower(id_src))
     btns <- c(btns, sprintf(
       '<button class="br-tab-btn" data-tab="cat-%s" onclick="switchBrandTab(\'cat-%s\')">%s</button>',
-      cat_id, cat_id, .br_esc(cat_name)))
+      cat_id, cat_id, .br_esc(display_name)))
   }
 
   if (isTRUE(config$element_dba))
@@ -247,9 +252,15 @@ build_br_summary_panel <- function(results, config) {
 #'
 #' @keywords internal
 build_br_category_panel <- function(cat_name, cat_results, charts, tables,
-                                     config, panels = list()) {
-  cat_id <- gsub("[^a-z0-9]", "-", tolower(cat_name))
+                                     config, panels = list(),
+                                     cat_display_name = NULL) {
+  # cat_id is based on CategoryCode when available (same as transformer) so
+  # that panel lookup keys in the `panels` list match element IDs in the page.
+  cat_id <- gsub("[^a-z0-9]", "-",
+                 tolower(cat_results$cat_code %||% cat_name))
   panel_id <- paste0("cat-", cat_id)
+  # Use the human-readable display name for labels; fall back to the key.
+  cat_name <- cat_display_name %||% cat_results$category %||% cat_name
 
   parts <- character(0)
   parts <- c(parts, sprintf('<div class="br-panel" id="panel-%s">', panel_id))
@@ -583,27 +594,29 @@ build_br_portfolio_panel <- function(results, config) {
   focal        <- config$focal_brand %||% ""
   brand_colour <- config$colour_focal %||% "#1A5276"
 
-  port_data <- results$results$portfolio
-  cats      <- results$results$categories
+  port_overview <- results$results$portfolio_overview
+  port_data     <- results$results$portfolio
+  cats          <- results$results$categories
 
-  if ((is.null(port_data) || length(port_data$categories) == 0) &&
+  if ((is.null(port_overview) || length(port_overview$categories) == 0) &&
       (is.null(cats) || length(cats) == 0)) {
     return('<div class="br-panel" id="panel-portfolio"><div class="br-section"><p style="color:#94a3b8;padding:32px;text-align:center;">No category data available.</p></div></div>')
   }
 
   n_total    <- port_data$n_total %||% NA_integer_
   section_id <- "portfolio-overview"
-  port_rows  <- if (!is.null(port_data)) port_data$categories else list()
+  port_rows  <- if (!is.null(port_overview)) port_overview$categories else list()
 
   # Build global brand code -> name map from all category rows
   brand_map <- list()
   for (pr in port_rows) {
     bcs <- pr$brand_codes %||% character(0)
-    bns <- pr$brand_names %||% bcs
-    for (bi in seq_along(bcs)) {
-      bc <- bcs[bi]
-      bn <- if (bi <= length(bns)) bns[bi] else bc
-      if (!bc %in% names(brand_map)) brand_map[[bc]] <- bn
+    bns <- pr$brand_names %||% list()
+    for (bc in bcs) {
+      if (!bc %in% names(brand_map)) {
+        bn <- if (!is.null(bns[[bc]])) as.character(bns[[bc]]) else bc
+        brand_map[[bc]] <- bn
+      }
     }
   }
   all_bcs     <- names(brand_map)
@@ -679,17 +692,18 @@ build_br_portfolio_panel <- function(results, config) {
 <tbody>', aware_hdr))
 
   for (pr in port_rows) {
-    cat_name  <- pr$category       %||% ""
+    cat_name  <- pr$cat_name %||% pr$category %||% ""
     depth     <- pr$analysis_depth %||% "full"
     usage_pct <- pr$cat_usage_pct
-    aw_map    <- pr$brand_awareness %||% list()
+    aw_map    <- pr$awareness_pct %||% pr$brand_awareness %||% list()
     aw_json   <- .aw_json(aw_map)
 
     init_aw   <- aw_map[[active_bc]]
+    # both cat_usage_pct and awareness_pct from portfolio_overview are 0-100 scale
     usage_str <- if (!is.null(usage_pct) && is.finite(usage_pct))
-      sprintf("%.0f%%", usage_pct * 100) else "\u2014"
+      sprintf("%.0f%%", usage_pct) else "\u2014"
     aware_str <- if (!is.null(init_aw) && is.finite(init_aw))
-      sprintf("%.0f%%", init_aw * 100) else "\u2014"
+      sprintf("%.0f%%", init_aw) else "\u2014"
 
     depth_badge <- if (depth == "full")
       sprintf('<span style="background:#EBF5FB;color:%s;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:600;">Full</span>',
@@ -736,7 +750,7 @@ build_br_portfolio_panel <- function(results, config) {
       try { map = JSON.parse(row.getAttribute("data-br-port-awareness")); } catch(x) {}
       var val = map[brand];
       var cell = row.querySelector(".br-port-aware-cell");
-      if (cell) cell.textContent = (val != null && isFinite(val)) ? Math.round(val * 100) + "%%" : "\u2014";
+      if (cell) cell.textContent = (val != null && isFinite(val)) ? Math.round(val) + "%%" : "\u2014";
     });
   });
 })();
@@ -1017,6 +1031,23 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
 
   # --- Panels ---
   category_names <- names(results$results$categories)
+  # Build per-category lookup maps (key = category display-name key).
+  # display_map: human-readable label for tab buttons and section headings.
+  # code_map:    CategoryCode used for HTML element IDs (must match transformer).
+  cat_display_map <- stats::setNames(
+    vapply(category_names, function(cn) {
+      cr <- results$results$categories[[cn]]
+      cr$category %||% cn
+    }, character(1L)),
+    category_names
+  )
+  cat_code_map <- stats::setNames(
+    vapply(category_names, function(cn) {
+      cr <- results$results$categories[[cn]]
+      cr$cat_code %||% cn
+    }, character(1L)),
+    category_names
+  )
   # Only include deep-dive categories (those with MA data)
   deep_cats <- character(0)
   for (cn in category_names) {
@@ -1038,10 +1069,13 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
     panel_parts <- c(panel_parts, build_br_summary_panel(results, config))
   }
 
-  for (cat_name in deep_cats) {
+  for (cat_key in deep_cats) {
+    cr_entry    <- results$results$categories[[cat_key]]
+    cat_display <- cat_display_map[[cat_key]]
     panel_parts <- c(panel_parts, build_br_category_panel(
-      cat_name, results$results$categories[[cat_name]],
-      charts, tables, config, panels = panels
+      cat_key, cr_entry,
+      charts, tables, config, panels = panels,
+      cat_display_name = cat_display
     ))
   }
 
@@ -1101,7 +1135,8 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
     base_css, module_css,
     panel_styles,
     build_br_header(config),
-    build_br_tab_nav(deep_cats, config),
+    build_br_tab_nav(deep_cats, config, display_map = cat_display_map,
+                     code_map = cat_code_map),
     paste(panel_parts, collapse = "\n"),
     build_br_help_overlay(),
     "",

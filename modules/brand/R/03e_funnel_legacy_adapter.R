@@ -78,7 +78,7 @@ build_funnel_legacy_wide <- function(result, brand_list) {
     vals <- vapply(brand_codes, function(b) {
       row <- stages[stages$stage_key == k & stages$brand_code == b, ,
                     drop = FALSE]
-      if (nrow(row) == 0) NA_real_ else row$pct_weighted
+      if (nrow(row) == 0) NA_real_ else row$pct_weighted[1]
     }, numeric(1))
     out[[k]] <- unname(vals)
   }

@@ -353,7 +353,8 @@ ipk_write_brand_config <- function(path) {
         Category = cat_meta$label,
         CategoryCode = cat,
         BrandCode = b,
-        BrandLabel = b,
+        BrandLabel = if (exists("IPK_BRAND_LABELS") && b %in% names(IPK_BRAND_LABELS))
+          IPK_BRAND_LABELS[[b]] else b,
         DisplayOrder = j,
         IsFocal = if (b == focal) "Y" else "N",
         stringsAsFactors = FALSE

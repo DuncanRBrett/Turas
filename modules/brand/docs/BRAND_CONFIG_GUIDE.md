@@ -233,12 +233,21 @@ the report.
 
 | Column | Required? | What it contains | Allowed values |
 |----|----|----|----|
-| `Category` | **Required** | Category name as it appears in the data and report. Must match what's used in Survey_Structure.xlsx. | Free text (e.g. `Dry Seasonings & Spices`) |
+| `Category` | **Required** | Category display name as it appears in the report. | Free text (e.g. `Dry Seasonings & Spices`) |
+| `CategoryCode` | **Required** | Short unique code matching the suffix used in data column names (e.g. `DSS` → columns named `BRANDAWARE_DSS_IPK`, `SQ2_DSS`). Must match `CategoryCode` in the Survey_Structure Brands sheet. | Short uppercase code (e.g. `DSS`, `RM`, `ANT`) |
+| `Active` | Optional | Whether to include this category in the analysis. Defaults to `Y` if absent. Use `N` to exclude a category without deleting the row. | `Y` or `N` |
 | `Type` | **Required** | Category type. Controls question wording, funnel structure, and penetration data handling. | `transactional` (FMCG), `durable` (electronics, cars), `service` (banking, telecoms) |
 | `Timeframe_Long` | **Required** | Longer penetration window label for reports (e.g. `12 months`). Matches `longer_timeframe_months` in Settings. | Free text |
 | `Timeframe_Target` | **Required** | Target analytical period label (e.g. `3 months`). Matches `target_timeframe_months`. Shown on charts. | Free text |
 | `Focal_Weight` | Optional | Required only when `focal_assignment = priority`. How much to over-sample this category. Must sum to 1.0 across all categories. | 0.00 to 1.00 |
 | `Analysis_Depth` | Optional | Whether this category gets full CBM analysis or just cross-category awareness only. If the column is absent, all categories default to `full`. | `full` or `awareness_only` |
+
+**⚠️ CategoryCode is critical for Portfolio.** When the Portfolio
+element is enabled, the module matches categories between Brand_Config
+and Survey_Structure using `CategoryCode`, not `Category` display name.
+If the display names differ between the two files (e.g. `"Dry
+Seasonings"` vs `"Dry Seasonings & Spices"`), the portfolio will silently
+drop those categories unless `CategoryCode` is present and consistent.
 
 **On `Analysis_Depth`:** Use `awareness_only` for categories where you
 want to show cross-category brand presence on the Portfolio tab, but
@@ -355,22 +364,26 @@ categories (common for the focal brand), it gets a row for each.
 
 | Column | Required? | What it contains | Allowed values |
 |----|----|----|----|
-| `Category` | **Required** | Category this brand appears in. Must exactly match the `Category` in Brand_Config Categories sheet. | Category name |
+| `Category` | **Required** | Category display name this brand appears in. | Category name (matching Brand_Config Categories sheet) |
+| `CategoryCode` | **Required** | Short code for the category. Must match `CategoryCode` in Brand_Config Categories sheet. This is what the Portfolio element uses to link brands to categories. | Short uppercase code (e.g. `DSS`, `RM`) |
 | `BrandCode` | **Required** | Short unique code for this brand. Must match the column suffix in the data (e.g. `IPK` → columns named `BRANDAWARE_DSS_IPK`). | Short uppercase code |
-| `BrandLabel` | **Required** | Display name shown in charts, tables, and the report. | Free text (e.g. `Robertsons`) |
+| `BrandName` | **Required** | Display name shown in charts, tables, and the report. | Free text (e.g. `Robertsons`) |
+| `BrandLabel` | Optional | Alternative display label (used if `BrandName` is absent). | Free text |
 | `DisplayOrder` | **Required** | Sort order within the category in charts. Lower number = shown first. | Integer |
 | `IsFocal` | **Required** | Whether this is the focal (client) brand for this category. Exactly one row per category must be `Y`. | `Y` or `N` |
-| `Colour` | Optional | Hex colour for this brand in charts and chips. If blank, the focal brand uses `colour_focal` from Settings, competitors use `colour_competitor`. Set a custom colour here to override the default for specific brands. | Hex code (e.g. `#D62728`) or blank |
+| `Colour` | Optional | Hex colour for this brand in charts and chips. If blank, the focal brand uses `colour_focal` from Settings, competitors use `colour_competitor`. | Hex code (e.g. `#D62728`) or blank |
+
+**⚠️ CategoryCode in the Brands sheet must match CategoryCode in Brand_Config Categories.** These two codes are the join key that links brands to categories in the Portfolio element. A mismatch — even a whitespace difference — will cause that category's brands to be dropped from portfolio analyses without any error.
 
 **Example:**
 
-| Category                | BrandCode | BrandLabel   | DisplayOrder | IsFocal | Colour  |
-|-------------------------|-----------|--------------|--------------|---------|---------|
-| Dry Seasonings & Spices | IPK       | IPK          | 1            | Y       | #1A5276 |
-| Dry Seasonings & Spices | ROB       | Robertsons   | 2            | N       |         |
-| Dry Seasonings & Spices | KNO       | Knorr        | 3            | N       |         |
-| Ready Meals             | IPK       | IPK          | 1            | Y       | #1A5276 |
-| Ready Meals             | COMPA     | Competitor A | 2            | N       |         |
+| Category                | CategoryCode | BrandCode | BrandName    | DisplayOrder | IsFocal | Colour  |
+|-------------------------|--------------|-----------|--------------|--------------|---------|---------|
+| Dry Seasonings & Spices | DSS          | IPK       | IPK          | 1            | Y       | #1A5276 |
+| Dry Seasonings & Spices | DSS          | ROB       | Robertsons   | 2            | N       |         |
+| Dry Seasonings & Spices | DSS          | KNO       | Knorr        | 3            | N       |         |
+| Ready Meals             | RM           | IPK       | IPK          | 1            | Y       | #1A5276 |
+| Ready Meals             | RM           | COMPA     | Competitor A | 2            | N       |         |
 
 ------------------------------------------------------------------------
 
@@ -513,6 +526,19 @@ Alchemer (e.g. `DSS` for Dry Seasonings & Spices).
 | `wom.shared_negative_incidence` | Multi_Mention | Shared negative WOM prefix (e.g. `WOM_NEG_SHARE`) |
 | `wom.shared_negative_count` | Numeric | Negative WOM frequency count prefix. Optional. |
 
+##### Demographics roles (no category suffix)
+
+| Role | Variable_Type | What data column it maps to |
+|----|----|----|
+| `demographics.gender` | Single_Response | Gender column (e.g. `Gender`) |
+| `demographics.age` | Single_Response | Age or age-group column (e.g. `Age`) |
+| `demographics.region` | Single_Response | Region / province column (e.g. `Region`) |
+| `demographics.lsm` | Single_Response | LSM or SES group column (e.g. `LSM`) |
+| `demographics.{key}` | Single_Response | Any other demographic — use `key` as any short lowercase label |
+
+Demographics have **two setup routes** — see the dedicated Demographics
+section below for which to use.
+
 #### Example QuestionMap rows (multi-category study, DSS + RM categories)
 
 | Role | ClientCode | QuestionText | Variable_Type | OptionMapScale |
@@ -531,6 +557,9 @@ Alchemer (e.g. `DSS` for Dry Seasonings & Spices).
 | `wom.received_negative` | `WOM_NEG_REC` | Have you heard anyone saying negative things about these brands? | Multi_Mention |  |
 | `wom.shared_positive_incidence` | `WOM_POS_SHARE` | Have you recommended any of these brands to others? | Multi_Mention |  |
 | `wom.shared_negative_incidence` | `WOM_NEG_SHARE` | Have you said negative things about any of these brands? | Multi_Mention |  |
+| `demographics.gender` | `Gender` | What is your gender? | Single_Response |  |
+| `demographics.age` | `Age` | Which age group do you fall into? | Single_Response |  |
+| `demographics.region` | `Region` | In which province / region do you live? | Single_Response |  |
 
 ------------------------------------------------------------------------
 
@@ -578,6 +607,127 @@ display order and labels.
 | cat_buy_scale | 2          |      | 2–3 times a month   | 2          |
 | cat_buy_scale | 3          |      | About once a month  | 3          |
 | cat_buy_scale | 4          |      | Less often          | 4          |
+
+------------------------------------------------------------------------
+
+## Setting up Demographics
+
+Demographics shows a breakdown of the focal brand's buyer profile vs the
+total category sample — gender, age, region, LSM, or any other
+classification variable available in your data.
+
+There are two setup routes. **Use Route A unless your column names can't
+follow the convention.**
+
+---
+
+### Route A: DEMO_ prefix (auto-detected — no QuestionMap needed)
+
+If the demographic columns in the data are named with the `DEMO_`
+prefix, the module detects them automatically from the Questions sheet.
+No QuestionMap rows are needed.
+
+**Questions sheet rows to add:**
+
+| QuestionCode | QuestionText | Variable_Type | Battery | Category |
+|----|----|----|----|----|
+| `DEMO_GENDER` | What is your gender? | Single_Response | demographics | ALL |
+| `DEMO_AGE` | Which age group do you fall into? | Single_Response | demographics | ALL |
+| `DEMO_REGION` | In which province / region do you live? | Single_Response | demographics | ALL |
+
+The module reads the suffix after `DEMO_` (lowercased) as the display
+label. `DEMO_GENDER` → label "Gender", `DEMO_AGE` → label "Age", etc.
+
+**Options sheet rows to add** (one set per question code):
+
+| QuestionCode | OptionText | DisplayText | DisplayOrder | ShowInOutput |
+|----|----|----|----|----|
+| DEMO_GENDER | 1 | Male | 1 | Y |
+| DEMO_GENDER | 2 | Female | 2 | Y |
+| DEMO_GENDER | 3 | Other | 3 | Y |
+| DEMO_AGE | 1 | 18–24 | 1 | Y |
+| DEMO_AGE | 2 | 25–34 | 2 | Y |
+| *...etc...* | | | | |
+
+`OptionText` must match the coded value in the data exactly. `ShowInOutput = N`
+to exclude categories like "Prefer not to say" from the analysis.
+
+---
+
+### Route B: Non-standard column names (manual QuestionMap)
+
+If the data has demographic columns named without a `DEMO_` prefix
+(e.g. `Gender`, `Age_Group`, `Q_Region`), you need to add QuestionMap rows
+to tell the module which columns to use.
+
+**QuestionMap rows to add:**
+
+| Role | ClientCode | QuestionText | Variable_Type |
+|----|----|----|----|
+| `demographics.gender` | `Gender` | What is your gender? | Single_Response |
+| `demographics.age` | `Age_Group` | Which age group? | Single_Response |
+| `demographics.region` | `Q_Region` | Which region? | Single_Response |
+
+- `Role` must start with `demographics.` followed by a short lowercase key
+- `ClientCode` is the exact column name in the data file
+
+**Options sheet rows to add** — same format as Route A, but use the
+`ClientCode` value from QuestionMap (not `DEMO_*`) as the `QuestionCode`:
+
+| QuestionCode | OptionText | DisplayText | DisplayOrder | ShowInOutput |
+|----|----|----|----|----|
+| Gender | 1 | Male | 1 | Y |
+| Gender | 2 | Female | 2 | Y |
+| Age_Group | 1 | 18–24 | 1 | Y |
+| Age_Group | 2 | 25–34 | 2 | Y |
+| *...etc...* | | | | |
+
+---
+
+### Demographics checklist
+
+- [ ] `element_demographics = Y` in Brand_Config Settings
+- [ ] Demographic columns exist in the data file
+- [ ] Questions sheet has a row for each demographic (Route A: `DEMO_*` names)
+  **OR** QuestionMap has a row for each demographic (Route B: any column name)
+- [ ] Options sheet has a row for every coded value in every demographic column
+
+**If demographics shows blank panels**, check the console for
+`[demographics.*]` entries in the role map output. If the role entry has
+`column_root = NA`, it means the `ClientCode` column in QuestionMap was
+not found. Ensure the QuestionMap column is literally named `ClientCode`
+(not `ColumnRoot`).
+
+------------------------------------------------------------------------
+
+## Setting up Portfolio
+
+Portfolio analyses (Footprint, Competitive Set, Clutter Quadrant,
+Strength Map, Constellation) require:
+
+1. **2 or more categories** with `Analysis_Depth = full` (or absent)
+2. **`element_portfolio = Y`** in Settings
+3. **`cross_category_awareness = Y`** in Settings
+4. **`CategoryCode` in Brand_Config Categories sheet** — matching the suffix
+   used in column names (e.g. `DSS` if the screener column is `SQ2_DSS`)
+5. **`CategoryCode` in Survey_Structure Brands sheet** — same codes as above
+
+**Screener columns in data:** The portfolio uses `SQ1_{CAT}` (13-month buyer)
+and `SQ2_{CAT}` (3-month buyer) as the denominator. The default is `SQ2`.
+Add a QuestionMap row for each:
+
+| Role | ClientCode | Variable_Type |
+|----|----|----|----|
+| `portfolio.screener.3m.DSS` | `SQ2_DSS` | Single_Response |
+| `portfolio.screener.3m.RM` | `SQ2_RM` | Single_Response |
+
+**Cross-category awareness:** The module uses the same `BRANDAWARE_{CAT}`
+columns as the funnel. If those are in the Questions sheet, no extra
+QuestionMap rows are needed. If not, add:
+
+| Role | ClientCode | Variable_Type |
+|----|----|----|----|
+| `portfolio.cross_cat_awareness.DSS` | `BRANDAWARE_DSS` | Multi_Mention |
 
 ------------------------------------------------------------------------
 
@@ -660,15 +810,20 @@ For category buying frequency, set `OptionMapScale = cat_buy_scale` (or
 whatever you name your scale)
 
 Work through the role table systematically. For a typical transactional
-multi-category study you'll have: - One `funnel.awareness.{CAT}` row per
-category - One `funnel.attitude.{CAT}` row per category - One
-`funnel.transactional.bought_long.{CAT}` row per category - One
-`funnel.transactional.bought_target.{CAT}` row per category - One
-`funnel.transactional.frequency.{CAT}` row per category (optional) - One
-`cat_buying.frequency.{CAT}` row per category - One
-`portfolio.screener.3m.{CAT}` row per category (if portfolio enabled) -
-One `portfolio.cross_cat_awareness.{CAT}` row per category (if portfolio
-enabled) - WOM roles once (no category suffix)
+multi-category study you'll have:
+
+- One `funnel.awareness.{CAT}` row per category
+- One `funnel.attitude.{CAT}` row per category (set `OptionMapScale = attitude_scale`)
+- One `funnel.transactional.bought_long.{CAT}` row per category
+- One `funnel.transactional.bought_target.{CAT}` row per category
+- One `funnel.transactional.frequency.{CAT}` row per category (optional)
+- One `cat_buying.frequency.{CAT}` row per category (set `OptionMapScale = cat_buy_scale`)
+- One `portfolio.screener.3m.{CAT}` row per category (if portfolio enabled)
+- One `portfolio.cross_cat_awareness.{CAT}` row per category (if portfolio enabled)
+- WOM roles once (no category suffix)
+- Demographics roles if demographic column names don't start with `DEMO_`
+  (if they do use `DEMO_` names, add them to the Questions sheet instead — no
+  QuestionMap row needed)
 
 ### Step 8: Fill in Survey_Structure.xlsx — OptionMap sheet
 
@@ -677,10 +832,29 @@ frequency scale if you have that question.
 
 ### Step 9: Fill in Survey_Structure.xlsx — Questions and Options sheets
 
-These are used by the MA matrix column matching. Add rows for: - The CEP
-× brand matrix question (Battery = `cep_matrix`) - The awareness
-question (Battery = `awareness`) - The attitude question (Battery =
-`attitude`) — and its options
+The Questions sheet serves two purposes:
+
+1. **Mental Availability matrix matching** — the module uses `QuestionCode`
+   values to find CEP × brand matrix columns in the data.
+
+2. **Auto-detection** — for question codes that follow naming conventions,
+   the module detects the role automatically without needing a QuestionMap row.
+   Questions that auto-detect: `BRANDAWARE_{CAT}`, `BRANDATTR_{CAT}_CEP{N}`,
+   `BRANDATTR_{CAT}_ATT{N}`, `BRANDPEN1_{CAT}`, `BRANDPEN2_{CAT}`,
+   `BRANDPEN3_{CAT}`, `CATBUY_{CAT}`, `CHANNEL_{CAT}`, `PACK_{CAT}`,
+   `WOM_POS_REC_{CAT}`, `WOM_NEG_REC_{CAT}`, `WOM_POS_SHARE_{CAT}`,
+   `WOM_NEG_SHARE_{CAT}`, `BRANDATT1_{CAT}_{BRAND}`, `DEMO_{KEY}`,
+   `ADHOC_{KEY}`.
+
+   **If your Alchemer export uses these exact naming patterns**, simply add
+   the question code to the Questions sheet and you do NOT need a QuestionMap
+   row for that role.
+
+Add rows for:
+- All CEP × brand matrix questions (Battery = `cep_matrix`)
+- The awareness question (Battery = `awareness`)
+- The attitude question (Battery = `attitude`) — and its options in the Options sheet
+- Any `DEMO_*` demographic questions (Battery = `demographics`, Category = `ALL`)
 
 ### Step 10: Run the analysis
 
@@ -711,22 +885,58 @@ setting or column is wrong.
 | `CFG_INVALID_CATEGORY_TYPE` | A Type value in Categories sheet is not valid | Change to `transactional`, `durable`, or `service` |
 | `CFG_PORTFOLIO_MIN_CATS` | Portfolio is enabled but only 1 category is defined | Add more categories, or set `element_portfolio = N` |
 | `CFG_TIMEFRAME_INVALID` | `target_timeframe_months` ≥ `longer_timeframe_months` | Ensure target (e.g. 3) is less than longer (e.g. 12) |
+| `CFG_PORTFOLIO_NO_CATEGORY_CODE` | `CategoryCode` column is missing from Brand_Config Categories sheet | Add a `CategoryCode` column with short codes matching the data column suffixes |
+| Demographics tab blank | Demographics role entry has `column_root = NA` | Check that the QuestionMap column header is literally `ClientCode` (not `ColumnRoot`). Also verify the Options sheet has rows for that question code. |
+| Portfolio shows fewer categories than expected | Category display names don't match between Brand_Config and Survey_Structure | Add/verify `CategoryCode` in both the Brand_Config Categories sheet and Survey_Structure Brands sheet. These codes are the true join key. |
 
 ------------------------------------------------------------------------
 
 ## Checklist before handing off to Duncan
 
+**Files and paths**
 -   [ ] Both Excel files exist and are named correctly
--   [ ] `data_file` path is correct and file opens cleanly in Excel
--   [ ] All required Settings fields filled in
--   [ ] Categories sheet has all categories with correct Type and
-    timeframe labels
--   [ ] Brands sheet has all brands for all categories; focal brand has
-    `IsFocal = Y` (exactly one per category)
+-   [ ] `data_file` path in Settings is correct and the file opens cleanly
+-   [ ] `structure_file` path in Settings points to Survey_Structure.xlsx
+
+**Brand_Config**
+-   [ ] All required Settings fields filled in (project_name, client_name,
+    study_type, wave, data_file, structure_file, focal_brand, output_dir)
+-   [ ] Categories sheet has all categories with correct Type and timeframe labels
+-   [ ] Categories sheet has a `CategoryCode` column with short unique codes
+    matching column name suffixes in the data (e.g. `DSS` for `BRANDAWARE_DSS_IPK`)
+-   [ ] Element toggles set correctly (e.g. `element_portfolio = N` if only 1 category)
+
+**Survey_Structure — Brands sheet**
+-   [ ] One row per brand per category
+-   [ ] `CategoryCode` column present and matches Brand_Config Categories exactly
+-   [ ] Each category has exactly one row with `IsFocal = Y`
+
+**Survey_Structure — CEPs and Attributes sheets**
 -   [ ] CEPs sheet has 10–15 CEPs per full-analysis category
--   [ ] QuestionMap sheet has a row for every role the study uses
--   [ ] OptionMap sheet has the attitude scale rows
--   [ ] `run_brand()` runs to completion without REFUSED errors in the
-    console
+-   [ ] Attributes sheet has brand image items for Drivers & Barriers (optional but recommended)
+
+**Survey_Structure — QuestionMap sheet**
+-   [ ] A row for every funnel role needed (awareness, attitude, bought_long,
+    bought_target for each transactional category)
+-   [ ] A row for `cat_buying.frequency.{CAT}` per category
+-   [ ] A row for `portfolio.screener.3m.{CAT}` per category (if portfolio enabled)
+-   [ ] WOM roles added once (no category suffix)
+-   [ ] Demographics rows added IF column names don't start with `DEMO_`
+    (see Demographics section for Route A vs Route B)
+-   [ ] `OptionMapScale = attitude_scale` set on all attitude rows
+-   [ ] `OptionMapScale = cat_buy_scale` (or your scale name) set on cat_buying rows
+
+**Survey_Structure — OptionMap sheet**
+-   [ ] Attitude scale rows added (Scale = `attitude_scale`)
+-   [ ] Category buying frequency scale rows added per category
+
+**Survey_Structure — Questions and Options sheets**
+-   [ ] CEP × brand matrix questions listed (Battery = `cep_matrix`)
+-   [ ] Demographics added as `DEMO_*` questions (if using Route A auto-detection)
+-   [ ] Options sheet has coded value rows for every demographic question
+
+**Final check**
+-   [ ] `run_brand()` runs to completion without REFUSED errors in the console
 -   [ ] Console shows "Brand analysis complete: PASS" or "PARTIAL"
-    (PARTIAL is acceptable if some optional elements have warnings)
+    (PARTIAL is acceptable if some optional elements have low bases)
+-   [ ] HTML report opens in browser and all enabled tabs have data
