@@ -82,9 +82,10 @@ modules/tabs/
 │   ├── validation.R              # Input validation core (~1,672 lines)
 │   ├── validation_utils.R        # Validation utility functions (~428 lines)
 │   ├── question_orchestrator.R   # Question preparation (~675 lines)
-│   ├── question_dispatcher.R     # Question type routing (~423 lines)
+│   ├── question_dispatcher.R     # Question type routing (~438 lines)
 │   ├── standard_processor.R      # Single/Multi processing (~1,338 lines)
 │   ├── numeric_processor.R       # Numeric/Rating/NPS processing (~592 lines)
+│   ├── allocation_processor.R    # Allocation (constant-sum) processing (~310 lines)
 │   ├── composite_processor.R     # Composite metrics (~825 lines)
 │   ├── ranking.R                 # Ranking question processing (~1,019 lines)
 │   ├── cell_calculator.R         # Cell/row calculations (~756 lines)
@@ -469,6 +470,36 @@ Significance testing on NPS score
 **Numeric Questions:** - Calculates mean, median (optional), mode
 (optional), standard deviation - Optional: Min/Max, percentiles -
 Significance testing on means
+
+### Allocation Processor (allocation_processor.R)
+
+Processes Allocation (constant-sum / budget-allocation) questions.
+
+``` r
+process_allocation_question(data, question_info, question_options,
+                            banner_info, banner_row_indices, master_weights,
+                            banner_bases, config, is_weighted)
+```
+
+**Algorithm:** For each option (column {code}_1 ... {code}_N):
+1. Collect raw values per banner segment — NAs excluded, zeros retained
+2. Compute weighted or unweighted mean per banner column
+3. Build an Average row for that option
+4. Optionally append a significance row (t-test between banner columns)
+
+**Zero-retention:** A zero allocation is meaningful data ("respondent
+allocated nothing to this option") and is included in the mean. Only
+fully-NA respondents (skipped the question) are excluded.
+
+**Label resolution:** Uses DisplayText from the Options sheet if
+present; falls back to OptionText; falls back to `{code}_{i}`.
+
+**Output rows per option:** one `Average` row (RowType = "Average",
+RowSource = "individual") and an optional `Sig.` row.
+
+**No BoxCategory / Summary layers:** Allocation bypasses the
+BoxCategory and Summary Statistic steps that standard questions go
+through — the dispatcher returns allocation results directly.
 
 ### Ranking Processor (ranking.R)
 

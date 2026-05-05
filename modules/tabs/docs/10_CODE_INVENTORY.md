@@ -93,10 +93,10 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 |---|---:|---|
 | `lib/validation.R` | 1,672 | Core validation orchestrator; coordinates 5 validator submodules |
 | `lib/validation_utils.R` | 439 | Input validation functions (data frame, numeric, file path) |
-| `lib/validation/structure_validators.R` | 208 | Survey structure validation (duplicates, option validity) |
+| `lib/validation/structure_validators.R` | 264 | Survey structure validation (duplicates, option validity, Allocation column check) |
 | `lib/validation/config_validators.R` | 256 | Configuration parameter validation (alpha, min_base) |
 | `lib/validation/weight_validators.R` | 375 | Weight column and value validation (DEFF, distribution) |
-| `lib/validation/data_validators.R` | 398 | Data type and format validation (multi-mention, numeric) |
+| `lib/validation/data_validators.R` | 484 | Data type and format validation (multi-mention, numeric, allocation columns) |
 | `lib/validation/preflight_validators.R` | 969 | Cross-referential pre-flight checks (16 checks) |
 | | **4,317** | |
 
@@ -112,10 +112,11 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 | File | Lines | Purpose |
 |---|---:|---|
 | `lib/question_orchestrator.R` | 678 | Question data preparation and coordination |
-| `lib/question_dispatcher.R` | 423 | Route questions to processors by Variable_Type |
+| `lib/question_dispatcher.R` | 438 | Route questions to processors by Variable_Type |
 | `lib/standard_processor.R` | 1,340 | Process Single/Multi/Likert/Rating questions |
 | `lib/numeric_processor.R` | 599 | Process Numeric questions with bins |
-| | **3,031** | |
+| `lib/allocation_processor.R` | 310 | Process Allocation (constant-sum) questions; mean per option cross-tabbed by banner |
+| | **3,365** | |
 
 ### Composite Metrics
 
@@ -217,9 +218,10 @@ All packages managed via `renv.lock`. Versions current as of 15 March 2026.
 | `tests/testthat/test_validation.R` | 737 | Structure/config/weight/data/preflight validators, orchestrator, duplicate/orphan detection, colour/dashboard checks |
 | `tests/testthat/test_composite_processor.R` | 562 | Composite validation, Mean/Sum/WeightedMean calculation, NA handling, multi-composite processing, accuracy verification |
 | `tests/testthat/test_ranking_processor.R` | 683 | Ranking validation, percent_ranked_first, percent_top_n, mean_rank, normalize_rank_direction, rank_variance, edge cases |
+| `tests/testthat/test_allocation_processor.R` | 614 | Allocation known-answer fixture (50 respondents, 3 options), weighted/unweighted means, zero-retention, label resolution, validation, sig rows |
 | `tests/testthat/test_workbook_builder.R` | 495 | Style config, project info, save_workbook_safe, create_crosstabs_workbook (Summary/Run_Status sheets, E2E file write) |
 | `tests/testthat/test_e2e_integration.R` | 503 | Full pipeline: config load -> data load -> analysis -> Excel output -> HTML output using demo survey data |
-| | **9,072** | **1,008 assertions, 0 failures, 0 skips** |
+| | **9,686** | **1,833 pass, 0 failures, 9 skips** |
 
 ------------------------------------------------------------------------
 
