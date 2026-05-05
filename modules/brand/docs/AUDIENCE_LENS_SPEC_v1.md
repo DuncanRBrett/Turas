@@ -2,11 +2,11 @@
 
 **Status:** Shipped on `feature/brand-audience-lens`
 **Module:** `modules/brand/`
-**Source files:** `R/11_audience_lens.R`, `R/11a_al_audiences.R`,
-  `R/11b_al_metrics.R`, `R/11c_al_classify.R`, `R/11d_al_panel_data.R`,
-  `lib/html_report/panels/11_audience_lens_panel.R`,
+**Source files:** `R/13_audience_lens.R`, `R/13a_al_audiences.R`,
+  `R/13b_al_metrics.R`, `R/13c_al_classify.R`, `R/13d_al_panel_data.R`,
+  `lib/html_report/panels/13_audience_lens_panel.R`,
   `lib/html_report/js/brand_audience_lens_panel.js`
-**Planning doc:** `modules/brand/PLANNING_AUDIENCE_LENS.md`
+**Planning doc:** `modules/brand/docs/PLANNING_AUDIENCE_LENS.md`
 
 ---
 
@@ -56,7 +56,7 @@ Adds one column:
 
 | Setting                       | Default | Notes                                                                                                                |
 | ----------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------- |
-| `element_audience_lens`       | `Y`     | Master toggle. `N` skips the engine entirely.                                                                        |
+| `element_audience_lens`       | `N`     | Master toggle. `N` skips the engine entirely. Must be set to `Y` explicitly to enable.                               |
 | `audience_lens_max`           | `6`     | Ceiling on audiences per category (pairs count as one). Triggers `CFG_AUDIENCE_CEILING_EXCEEDED` if exceeded.        |
 | `audience_lens_warn_base`     | `100`   | Below this unweighted base, the audience renders with a yellow `low base` badge.                                     |
 | `audience_lens_suppress_base` | `50`    | Below this unweighted base, the audience is suppressed entirely (kept in the meta block but not rendered).           |
@@ -179,7 +179,7 @@ All refusals print a Shiny-visible boxed message to console.
 
 - **Whitelist loader gotcha** — every new R file in `modules/brand/R/` must
   be added to `.source_brand_module()` at `00_main.R:54-87`. The five new
-  files (11, 11a–11d) are registered there. Adding more without updating
+  files (13, 13a–13d) are registered there. Adding more without updating
   the list = silent load failure.
 - **TurasPins inliner gotcha** — all layout-critical CSS uses `!important`
   and avoids `.al-panel`-ancestor selectors so the inliner can faithfully

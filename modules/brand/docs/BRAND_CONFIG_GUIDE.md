@@ -125,6 +125,10 @@ report. `N` = skip.
 | `element_dba` | N | Distinctive Brand Assets: Fame × Uniqueness grid. Requires a DBA battery in the survey (\~2 extra minutes). |
 | `element_portfolio` | Y | Portfolio analysis: cross-category brand presence, heatmap, competitive set. Requires 2+ categories and `cross_category_awareness = Y`. |
 | `element_wom` | Y | Word-of-Mouth: received/shared × positive/negative. Requires WOM battery in survey (\~2 extra minutes). |
+| `element_branded_reach` | N | Branded Reach: ad recognition, misattribution, media mix. Requires a Branded Reach battery in the survey. |
+| `element_demographics` | Y | Demographics: focal-brand buyer profile vs category total. Derived from demographic columns in the data. |
+| `element_adhoc` | Y | Ad Hoc: custom questions appended to the HTML report as additional subtabs. Requires an AdHoc battery in the survey. |
+| `element_audience_lens` | N | Audience Lens: focal-brand KPI comparisons across defined sub-populations with GROW / FIX / DEFEND classification. Requires an AudienceLens sheet in Survey_Structure.xlsx. |
 
 ------------------------------------------------------------------------
 
