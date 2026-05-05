@@ -120,8 +120,8 @@ check_single_column <- function(question, survey_data, numeric_types, error_log)
   question_code <- trimws(question$QuestionCode)
   var_type <- question$Variable_Type
 
-  # Skip Ranking questions - they use multiple columns (Q76_Rank1, Q76_Rank2, etc.)
-  if (var_type == "Ranking") {
+  # Skip multi-column types — they have their own column-expansion check functions
+  if (var_type %in% c("Ranking", "Allocation")) {
     return(error_log)
   }
 
@@ -205,6 +205,92 @@ check_single_column <- function(question, survey_data, numeric_types, error_log)
   }
 
   return(error_log)
+}
+
+# ==============================================================================
+# ALLOCATION QUESTION VALIDATION
+# ==============================================================================
+
+#' Check Allocation question columns exist in data
+#'
+#' Verifies that all expected {code}_1 … {code}_N columns are present and
+#' contain numeric-compatible data.
+#'
+#' @keywords internal
+check_allocation_columns <- function(question, survey_data, numeric_types, error_log) {
+  question_code <- trimws(question$QuestionCode)
+  n_cols <- suppressWarnings(as.integer(question$Columns))
+
+  if (is.na(n_cols) || n_cols < 1L) {
+    error_log <- log_issue(
+      error_log,
+      "Validation",
+      "Invalid Columns Value",
+      sprintf(
+        "Allocation question '%s' has non-numeric or missing Columns value. Set Columns to the number of allocation options.",
+        question_code
+      ),
+      question_code,
+      "Error"
+    )
+    return(error_log)
+  }
+
+  expected_cols <- paste0(question_code, "_", seq_len(n_cols))
+  missing_cols  <- expected_cols[!expected_cols %in% names(survey_data)]
+
+  if (length(missing_cols) > 0) {
+    error_log <- log_issue(
+      error_log,
+      "Validation",
+      "Missing Allocation Columns",
+      sprintf(
+        "Allocation question '%s': expected data columns not found: %s. Verify the data file and Columns count.",
+        question_code,
+        paste(missing_cols, collapse = ", ")
+      ),
+      question_code,
+      "Warning"
+    )
+    return(error_log)
+  }
+
+  # Warn about columns that cannot be coerced to numeric
+  for (col in expected_cols) {
+    col_values  <- survey_data[[col]]
+    coerced     <- suppressWarnings(as.numeric(col_values))
+    non_numeric <- sum(is.na(coerced) & !is.na(col_values))
+
+    if (non_numeric > 0) {
+      error_log <- log_issue(
+        error_log,
+        "Validation",
+        "Non-Numeric Allocation Values",
+        sprintf(
+          "Allocation column '%s': %d non-numeric values found. They will be treated as missing.",
+          col, non_numeric
+        ),
+        question_code,
+        "Warning"
+      )
+    }
+  }
+
+  return(error_log)
+}
+
+#' Validate Allocation Question Configuration
+#'
+#' Validates column existence and data types for Allocation questions.
+#'
+#' @param question_info Data frame row, question metadata
+#' @param survey_data Data frame, survey data
+#' @param error_log Data frame, error log to append to
+#' @return Updated error_log
+#' @export
+validate_allocation_question <- function(question_info, survey_data, error_log) {
+  numeric_types <- c("numeric", "integer", "double", "integer64")
+  check_allocation_columns(question_info, survey_data, numeric_types, error_log)
 }
 
 # ==============================================================================

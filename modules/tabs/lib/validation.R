@@ -263,6 +263,7 @@ validate_survey_structure <- function(survey_structure, error_log, verbose = TRU
   error_log <- check_variable_types(questions_df, error_log)
   error_log <- check_ranking_questions(questions_df, error_log)
   error_log <- check_multi_mention_questions(questions_df, error_log)
+  error_log <- check_allocation_questions(questions_df, error_log)
 
   if (verbose) cat("✓ Survey structure validation complete\n")
 
@@ -385,6 +386,8 @@ validate_data_structure <- function(survey_data, survey_structure, error_log, ve
     # Dispatch to appropriate check function
     if (var_type == "Multi_Mention") {
       error_log <- check_multi_mention_columns(question, survey_data, numeric_types, error_log)
+    } else if (var_type == "Allocation") {
+      error_log <- check_allocation_columns(question, survey_data, numeric_types, error_log)
     } else {
       error_log <- check_single_column(question, survey_data, numeric_types, error_log)
     }
@@ -417,6 +420,25 @@ validate_data_structure <- function(survey_data, survey_structure, error_log, ve
   }
   # ===========================================================================
   # END OF V10.0.0 ADDITION
+  # ===========================================================================
+
+  # ===========================================================================
+  # ALLOCATION QUESTION VALIDATION
+  # ===========================================================================
+  # Validate Allocation questions — column existence and numeric compatibility
+  allocation_questions <- questions_df[questions_df$Variable_Type == "Allocation", ]
+
+  if (nrow(allocation_questions) > 0) {
+    for (i in seq_len(nrow(allocation_questions))) {
+      error_log <- validate_allocation_question(
+        allocation_questions[i, ],
+        survey_data,
+        error_log
+      )
+    }
+  }
+  # ===========================================================================
+  # END OF ALLOCATION VALIDATION
   # ===========================================================================
 
   if (verbose) cat("✓ Data structure validation complete\n")

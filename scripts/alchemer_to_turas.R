@@ -64,7 +64,7 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
   NUMBER      = "Numeric",
   SLIDER      = "Numeric",
   DEMOGRAPHIC = "Single_Response",
-  CONT_SUM    = "Numeric"
+  CONT_SUM    = "Allocation"
 )
 
 # Types with no survey output — omit from all sheets
@@ -152,7 +152,7 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
   questions[is.na(n_options), n_options := 0L]
 
   questions[, Columns := data.table::fcase(
-    Variable_Type %in% c("Multi_Mention", "Ranking") & n_options > 0L, n_options,
+    Variable_Type %in% c("Multi_Mention", "Ranking", "Allocation") & n_options > 0L, n_options,
     default = 1L
   )]
 

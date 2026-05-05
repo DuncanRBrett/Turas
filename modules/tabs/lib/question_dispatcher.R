@@ -107,6 +107,21 @@ dispatch_question <- function(data, question_info, question_options,
       error_msg = sprintf("Numeric processing failed: %s", question_code),
       silent = !config$verbose
     )
+
+  } else if (var_type == "Allocation") {
+    # -------------------------------------------------------------------------
+    # ALLOCATION QUESTIONS - Mean per option, cross-tabbed by banner
+    # -------------------------------------------------------------------------
+    primary_results <- safe_execute(
+      process_allocation_question(
+        data, question_info, question_options,
+        banner_info, banner_row_indices, master_weights,
+        banner_bases, config, is_weighted
+      ),
+      default = NULL,
+      error_msg = sprintf("Allocation processing failed: %s", question_code),
+      silent = !config$verbose
+    )
     
   } else {
     # -------------------------------------------------------------------------
@@ -216,8 +231,8 @@ dispatch_question <- function(data, question_info, question_options,
   # STEP 5: COMBINE ALL RESULTS
   # ===========================================================================
   
-  # For ranking and numeric, only primary results
-  if (var_type %in% c("Ranking", "Numeric")) {
+  # For ranking, numeric, and allocation: only primary results (no box/summary)
+  if (var_type %in% c("Ranking", "Numeric", "Allocation")) {
     if (!is.null(primary_results) && nrow(primary_results) > 0) {
       return(primary_results)
     } else {

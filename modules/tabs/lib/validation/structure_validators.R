@@ -111,7 +111,7 @@ check_orphan_options <- function(questions_df, options_df, error_log) {
 check_variable_types <- function(questions_df, error_log) {
   valid_types <- c(
     "Single_Response", "Multi_Mention", "Rating", "Likert", "NPS",
-    "Ranking", "Numeric", "Open_End", "Grid_Single", "Grid_Multi"
+    "Ranking", "Numeric", "Allocation", "Open_End", "Grid_Single", "Grid_Multi"
   )
 
   invalid_types <- questions_df$Variable_Type[!questions_df$Variable_Type %in% valid_types]
@@ -204,5 +204,61 @@ check_multi_mention_questions <- function(questions_df, error_log) {
       }
     }
   }
+  return(error_log)
+}
+
+#' Validate Allocation questions have Columns > 1
+#'
+#' Allocation (constant-sum) questions must have Columns >= 2.
+#' A single-column allocation is degenerate — use Numeric instead.
+#'
+#' @keywords internal
+check_allocation_questions <- function(questions_df, error_log) {
+  alloc_questions <- questions_df[questions_df$Variable_Type == "Allocation", ]
+  if (nrow(alloc_questions) == 0) return(error_log)
+
+  if (!"Columns" %in% names(questions_df)) {
+    error_log <- log_issue(
+      error_log,
+      "Validation",
+      "Missing Columns Specification",
+      "Allocation questions exist but Columns column missing. Add this column.",
+      "",
+      "Error"
+    )
+    return(error_log)
+  }
+
+  for (i in seq_len(nrow(alloc_questions))) {
+    q_code <- alloc_questions$QuestionCode[i]
+    n_cols  <- suppressWarnings(as.integer(alloc_questions$Columns[i]))
+
+    if (is.na(n_cols) || trimws(as.character(alloc_questions$Columns[i])) == "") {
+      error_log <- log_issue(
+        error_log,
+        "Validation",
+        "Missing Columns Values",
+        sprintf(
+          "Allocation question '%s' is missing a Columns value. Specify the number of allocation options.",
+          q_code
+        ),
+        q_code,
+        "Error"
+      )
+    } else if (n_cols < 2L) {
+      error_log <- log_issue(
+        error_log,
+        "Validation",
+        "Degenerate Allocation Question",
+        sprintf(
+          "Allocation question '%s' has Columns = %d. Allocation requires at least 2 options. Use Variable_Type = 'Numeric' for single-column numeric questions.",
+          q_code, n_cols
+        ),
+        q_code,
+        "Warning"
+      )
+    }
+  }
+
   return(error_log)
 }
