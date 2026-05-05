@@ -814,9 +814,9 @@ generate_survey_structure_template <- function(output_path) {
          description = "Full question wording as it should appear in output reports."),
     list(name = "Variable_Type", width = 18, required = TRUE,
          description = "Type of question. Determines how data is processed and displayed.",
-         dropdown = c("Single_Mention", "Multi_Mention", "Likert", "Rating", "NPS", "Ranking", "Numeric", "Open_End")),
+         dropdown = c("Single_Response", "Multi_Mention", "Likert", "Rating", "NPS", "Ranking", "Numeric", "Allocation", "Open_End")),
     list(name = "Columns", width = 10, required = TRUE,
-         description = "Number of data columns: 1 for most types, >1 for Multi_Mention (# options) and Ranking (# items).",
+         description = "Number of data columns: 1 for most types; >1 for Multi_Mention (# options), Ranking (# items), and Allocation (# options).",
          integer_range = c(1, 500)),
     list(name = "Category", width = 20, required = FALSE,
          description = "Question grouping/section label (e.g. 'Demographics', 'Satisfaction'). Used for report organisation."),
@@ -840,7 +840,7 @@ generate_survey_structure_template <- function(output_path) {
   # Example questions
   questions_examples <- list(
     list(QuestionCode = "Q_Gender", QuestionText = "What is your gender?",
-         Variable_Type = "Single_Mention", Columns = 1,
+         Variable_Type = "Single_Response", Columns = 1,
          Category = "Demographics", Notes = "Standard demographic question"),
     list(QuestionCode = "Q_Media", QuestionText = "Which media channels do you use? (Select all)",
          Variable_Type = "Multi_Mention", Columns = 5,
@@ -1012,7 +1012,8 @@ generate_survey_structure_template <- function(output_path) {
   addStyle(wb, "Variable Type Reference", make_header_style(), rows = 4, cols = 1:5, gridExpand = TRUE)
 
   ref_data <- data.frame(
-    Variable_Type = c("Single_Mention", "Multi_Mention", "Likert", "Rating", "NPS", "Ranking", "Numeric", "Open_End"),
+    Variable_Type = c("Single_Response", "Multi_Mention", "Likert", "Rating", "NPS",
+                      "Ranking", "Numeric", "Allocation", "Open_End"),
     Description = c(
       "Pick-one question: respondent selects exactly one option",
       "Check-all-that-apply: respondent can select multiple options",
@@ -1021,9 +1022,12 @@ generate_survey_structure_template <- function(output_path) {
       "Net Promoter Score (0-10 scale)",
       "Ordered preference ranking of items",
       "Open-ended numeric response (age, income, quantity)",
+      paste0("Constant-sum / budget allocation. One numeric column per option ",
+             "({code}_1 ... {code}_N). Reports mean allocation per option, ",
+             "cross-tabbed by banner."),
       "Free text response (not processed in crosstabs)"
     ),
-    Columns = c("1", ">1 (# options)", "1", "1", "1", ">1 (# items)", "1", "1"),
+    Columns = c("1", ">1 (# options)", "1", "1", "1", ">1 (# items)", "1", ">1 (# options)", "1"),
     Key_Features = c(
       "Frequencies, column %, significance tests",
       "Each option = own column. Use root code in Questions, column codes in Options",
@@ -1032,6 +1036,7 @@ generate_survey_structure_template <- function(output_path) {
       "Auto-calculates Promoters/Passives/Detractors + NPS score",
       "Rank analysis with average rank, first-choice share",
       "Mean, median, mode, outlier detection, binning via Options",
+      "Mean per option cross-tabbed by banner. Zeros retained. Optional significance tests.",
       "Displayed as text, no statistical analysis"
     ),
     Example = c(
@@ -1042,6 +1047,7 @@ generate_survey_structure_template <- function(output_path) {
       "Recommendation likelihood 0-10",
       "Rank top 3 brands, Rank features by importance",
       "Age, Household size, Monthly spend",
+      "Brand spend share, budget distribution, 100-point allocation",
       "Comments, Suggestions, Feedback"
     ),
     stringsAsFactors = FALSE
