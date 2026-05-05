@@ -79,6 +79,13 @@ launch_turas <- function() {
          recent_file = "modules/AlchemerParser/.recent_alchemerparser_projects.rds",
          recent_key = NULL),
 
+    list(id = "alchemerexport", name = "Alchemer Export",
+         description = "Fetch survey structure via the Alchemer API and generate Turas config templates",
+         category = "setup",
+         script = "modules/AlchemerExport/run_alchemerexport_gui.R",
+         recent_file = "modules/AlchemerExport/.recent_alchemerexport_projects.rds",
+         recent_key = NULL),
+
     list(id = "weighting", name = "Weighting",
          description = "Sample and rim weighting with iterative proportional fitting",
          category = "setup",
@@ -179,6 +186,8 @@ launch_turas <- function() {
     callout_editor = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>',
 
     alchemerparser = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/><polyline points="12 18 12 12 9 14"/></svg>',
+
+    alchemerexport = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg>',
 
     weighting = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="3" x2="12" y2="6"/><circle cx="12" cy="6" r="1"/><line x1="4" y1="9" x2="20" y2="9"/><path d="M4 9l-1 7h6l-1-7"/><path d="M20 9l-1 7h-6l1-7"/><line x1="2" y1="20" x2="22" y2="20"/></svg>',
 

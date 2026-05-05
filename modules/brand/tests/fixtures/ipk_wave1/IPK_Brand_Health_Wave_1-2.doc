@@ -1,0 +1,1843 @@
+ <html xmlns:o="urn:schemas-microsoft-com:office:office"
+   xmlns:w="urn:schemas-microsoft-com:office:word"
+   xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="ProgId" content="Word.Document">
+<meta name="Generator" content="SurveyGizmo 3.0">
+<meta name="Originator" content="SurveyGizmo 3.0">
+<!--[if !mso]>
+<style>
+v\:* {behavior:url(#default#VML);}
+o\:* {behavior:url(#default#VML);}
+w\:* {behavior:url(#default#VML);}
+.shape {behavior:url(#default#VML);}
+</style>
+<![endif]-->
+<style>
+<!--
+/* Style Definitions */
+p.normalText, li.normalText, div.normalText{
+   mso-style-parent: "";
+   margin: 0cm;
+   margin-bottom: 6pt;
+   mso-pagination: widow-orphan;
+   font-size: 12pt;
+   font-family: "";
+   mso-fareast-font-family: "";
+}
+
+table.normalTable{
+   mso-style-name: "Tabela com grade";
+   mso-tstyle-rowband-size: 0;
+   mso-tstyle-colband-size: 0;
+   border-collapse: collapse;
+   mso-border-alt: solid windowtext pt;
+   mso-yfti-tbllook: 480;
+   mso-padding-alt: 0cm pt 0cm pt;
+   mso-border-insideh: pt solid windowtext;
+   mso-border-insidev: pt solid windowtext;
+   mso-para-margin: 0cm;
+   mso-para-margin-bottom: .0001pt;
+   mso-pagination: widow-orphan;
+   font-size: 12pt;
+   font-family: "";
+}
+table.normalTable td{
+   border: solid windowtext 1.0pt;
+   border-left: none;
+   mso-border-left-alt: solid windowtext .5pt;
+   mso-border-alt: solid windowtext .5pt;
+   padding: 0cm 5.4pt 0cm 5.4pt;
+}
+
+table.tableWithoutGrid{
+   mso-style-name: "Tabela sem grade";
+   mso-tstyle-rowband-size: 0;
+   mso-tstyle-colband-size: 0;
+   border-collapse: collapse;
+   border: none;
+   mso-border-alt: none;
+   mso-yfti-tbllook: 480;
+   mso-padding-alt: 0cm pt 0cm pt;
+   mso-border-insideh: pt solid windowtext;
+   mso-border-insidev: pt solid windowtext;
+   mso-para-margin: 0cm;
+   mso-para-margin-bottom: .0001pt;
+   mso-pagination: widow-orphan;
+   font-size: 12pt;
+   font-family: "";
+}
+
+
+-->
+</style>
+</head>
+<body lang="" style="tab-interval: 35.4pt">
+<p class="normalText"><h1>IPK Brand Health Wave 1</h1><hr></p>
+<p class="normalText"><h2>Admin</h2></p>
+<p class="normalText"><h3></h3></p>
+<p class="normalText"><br/></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic: Hidden by default</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 2</p>
+<p class="normalText"><h3>Wave</h3></p>
+<p class="normalText">_________________________________________________</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic: Hidden by default</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 99</p>
+<p class="normalText"><h3>Is_Dummy</h3></p>
+<p class="normalText">_________________________________________________</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic: Hidden by default</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 3</p>
+<p class="normalText"><h3>Focal_Category</h3></p>
+<p class="normalText">_________________________________________________</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText"><hr></p>
+<p class="normalText"><h2>Intro & Consent</h2></p>
+<p class="normalText"><h3><p> </p>
+</h3></p>
+<p class="normalText"><br/></p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 5</p>
+<p class="normalText"><h4>I agree to participate in this survey*</h4></p>
+<p class="normalText"> [ ] I agree</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText"><hr></p>
+<p class="normalText"><h2>Qualifying Questions</h2></p>
+<p class="normalText"><h3></h3></p>
+<p class="normalText"><br/></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><strong>Page exit logic: </strong>Skip / Disqualify Logic<strong>IF: </strong> <span class="logic-id-seperator"></span>Question "Which region do you live in?" is one of the following answers ("A non metro area")<strong> THEN: </strong> Disqualify and display: "Sorry, you do not qualify to take this survey." </p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><strong>Page exit logic: </strong>Skip / Disqualify Logic<strong>IF: </strong> <span class="logic-id-seperator"></span>Question "Do you or does anyone in your household work in any of the following industries?" is one of the following answers ("Market research or opinion polling","Advertising or marketing","Food or grocery manufacturing","Retail (grocery or supermarket)")<strong> THEN: </strong> Disqualify and display: "Sorry, you do not qualify to take this survey." </p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><strong>Page exit logic: </strong>Skip / Disqualify Logic<strong>IF: </strong> <span class="logic-id-seperator"></span>Question "What is your age group?" is one of the following answers ("Under 30","50+")<strong> THEN: </strong> Disqualify and display: "Sorry, you do not qualify to take this survey." </p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><strong>Page exit logic: </strong>Disqualify — not target gender<strong>IF: </strong> <span class="logic-id-seperator"></span>Question "Which best describes you?" is not one of the following answers ("Female")<strong> THEN: </strong> Disqualify and display: "Sorry, you do not qualify to take this survey." </p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: Gender</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 14</p>
+<p class="normalText"><h4>Which best describes you?*</h4></p>
+<p class="normalText"> ( ) Female</p>
+<p class="normalText"> ( ) Male</p>
+<p class="normalText"> ( ) Non-binary or Gender diverse</p>
+<p class="normalText"> ( ) Prefer not to say</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: Age</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 16</p>
+<p class="normalText"><h4>What is your age group?*</h4></p>
+<p class="normalText"> ( ) Under 30</p>
+<p class="normalText"> ( ) 30-34</p>
+<p class="normalText"> ( ) 35-39</p>
+<p class="normalText"> ( ) 40-44</p>
+<p class="normalText"> ( ) 45-49</p>
+<p class="normalText"> ( ) 50+</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: Industry_Screen</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 18</p>
+<p class="normalText"><h4>Do you or does anyone in your household work in any of the following industries?</h4></p>
+<p class="normalText"> ( ) Market research or opinion polling</p>
+<p class="normalText"> ( ) Advertising or marketing</p>
+<p class="normalText"> ( ) Food or grocery manufacturing</p>
+<p class="normalText"> ( ) Retail (grocery or supermarket)</p>
+<p class="normalText"> ( ) None of these</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: Region</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 21</p>
+<p class="normalText"><h4>Which region do you live in?*</h4></p>
+<p class="normalText"> ( ) Gauteng Metro</p>
+<p class="normalText"> ( ) Cape Town Metro</p>
+<p class="normalText"> ( ) KZN Metro</p>
+<p class="normalText"> ( ) Gqherba Metro</p>
+<p class="normalText"> ( ) Other Metro area</p>
+<p class="normalText"> ( ) A non metro area</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText"><hr></p>
+<p class="normalText"><h2>Screener</h2></p>
+<p class="normalText"><h3></h3></p>
+<p class="normalText"><br/></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><strong>Page exit logic: </strong>Disqualify — no Core category selected<strong>IF: </strong> <span class="logic-id-seperator"></span>Question "Which of the following food and grocery categories have you personally bought or been responsible for buying in the last 12 months? Please select all that apply.<br />
+ " is not one of the following answers ("Dry Seasonings & Spices","Pour Over Sauces","Pasta Sauces","Baking Mixes")<strong> THEN: </strong> Disqualify and display: "Sorry, you do not qualify to take this survey." </p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic: Show/hide trigger exists. </b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: SQ1</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 6</p>
+<p class="normalText"><h4>Which of the following food and grocery categories have you personally bought or been responsible for buying in the last 12 months? Please select all that apply.<br />
+ *</h4></p>
+<p class="normalText"> [ ] Dry Seasonings & Spices</p>
+<p class="normalText"> [ ] Pour Over Sauces</p>
+<p class="normalText"> [ ] Pasta Sauces</p>
+<p class="normalText"> [ ] Baking Mixes</p>
+<p class="normalText"> [ ] Salad Dressings</p>
+<p class="normalText"> [ ] Stock Powder / Liquid</p>
+<p class="normalText"> [ ] Pestos</p>
+<p class="normalText"> [ ] Cook-in Sauces</p>
+<p class="normalText"> [ ] Anti-pasta</p>
+<p class="normalText"> [ ] None of these</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText"><b>Hidden Value: Assign Focal Category</b></p>
+<p class="normalText">Value: </p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText"><b>Action: JavaScript: Assign Focal Category JS</b></p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText"><hr></p>
+<p class="normalText"><h2>Target Window</h2></p>
+<p class="normalText"><h3></h3></p>
+<p class="normalText"><br/></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: SQ2</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 9</p>
+<p class="normalText"><h4>And which of these have you personally bought in the last 3 months?</h4></p>
+<p class="normalText"> [ ] Dry Seasonings & Spices</p>
+<p class="normalText"> [ ] Pour Over Sauces</p>
+<p class="normalText"> [ ] Pasta Sauces</p>
+<p class="normalText"> [ ] Baking Mixes</p>
+<p class="normalText"> [ ] Salad Dressings</p>
+<p class="normalText"> [ ] Stock Powder / Liquid</p>
+<p class="normalText"> [ ] Pestos</p>
+<p class="normalText"> [ ] Cook-in Sauces</p>
+<p class="normalText"> [ ] Anti-pasta</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText"><hr></p>
+<p class="normalText"><h2>Cross-Category Brand Awareness</h2></p>
+<p class="normalText"><h3></h3></p>
+<p class="normalText"><br/></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "Which of the following food and grocery categories have you personally bought or been responsible for buying in the last 12 months? Please select all that apply.<br />
+ " is one of the following answers ("Salad Dressings")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDAWARE_SLD</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 27</p>
+<p class="normalText"><h4>Which of the following brands of Salad Dressings have you heard of — even if you have never bought them?</h4></p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] All Gold</p>
+<p class="normalText"> [ ] Bull Brand</p>
+<p class="normalText"> [ ] Woolworths Dressings</p>
+<p class="normalText"> [ ] PnP Dressings</p>
+<p class="normalText"> [ ] Checkers Dressings</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Martinna’s</p>
+<p class="normalText"> [ ] Verlaque</p>
+<p class="normalText"> [ ] Woolworths</p>
+<p class="normalText"> [ ] Simple Truth</p>
+<p class="normalText"> [ ] Hellmann’s</p>
+<p class="normalText"> [ ] None of these</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "Which of the following food and grocery categories have you personally bought or been responsible for buying in the last 12 months? Please select all that apply.<br />
+ " is one of the following answers ("Stock Powder / Liquid")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDAWARE_STO</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 28</p>
+<p class="normalText"><h4>Which of the following brands of Stock Powder / Liquid have you heard of — even if you have never bought them?</h4></p>
+<p class="normalText"> [ ] Oxo</p>
+<p class="normalText"> [ ] Maggi</p>
+<p class="normalText"> [ ] Royco</p>
+<p class="normalText"> [ ] Schwartz</p>
+<p class="normalText"> [ ] Nature's Stock</p>
+<p class="normalText"> [ ] PnP Stock</p>
+<p class="normalText"> [ ] Checkers Stock</p>
+<p class="normalText"> [ ] NOMU</p>
+<p class="normalText"> [ ] Knorr Stock Pots</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Woolworths</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] None of these</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "Which of the following food and grocery categories have you personally bought or been responsible for buying in the last 12 months? Please select all that apply.<br />
+ " is one of the following answers ("Pestos")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDAWARE_PES</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 29</p>
+<p class="normalText"><h4>Which of the following brands of Pestos have you heard of — even if you have never bought them?</h4></p>
+<p class="normalText"> [ ] Ponti</p>
+<p class="normalText"> [ ] PnP Pestos</p>
+<p class="normalText"> [ ] Checkers Pestos</p>
+<p class="normalText"> [ ] Artisan Pesto Co.</p>
+<p class="normalText"> [ ] Pesto Princess</p>
+<p class="normalText"> [ ] Woolworths</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Sacla</p>
+<p class="normalText"> [ ] Barilla</p>
+<p class="normalText"> [ ] Ina Paarman's Kitchen</p>
+<p class="normalText"> [ ] Buonitalia</p>
+<p class="normalText"> [ ] Nature Fresh</p>
+<p class="normalText"> [ ] Mangiare</p>
+<p class="normalText"> [ ] None of these</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "Which of the following food and grocery categories have you personally bought or been responsible for buying in the last 12 months? Please select all that apply.<br />
+ " is one of the following answers ("Cook-in Sauces")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDAWARE_COO</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 30</p>
+<p class="normalText"><h4>Which of the following brands of Cook-in Sauces have you heard of — even if you have never bought them?</h4></p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Royco</p>
+<p class="normalText"> [ ] Nando’s</p>
+<p class="normalText"> [ ] Woolworths</p>
+<p class="normalText"> [ ] Simple Truth</p>
+<p class="normalText"> [ ] Old El Paso</p>
+<p class="normalText"> [ ] Patak’s</p>
+<p class="normalText"> [ ] Ina Paarman's Kitchen</p>
+<p class="normalText"> [ ] Dolmio</p>
+<p class="normalText"> [ ] PnP Cook-in</p>
+<p class="normalText"> [ ] Checkers Cook-in</p>
+<p class="normalText"> [ ] Tasty's Sauces</p>
+<p class="normalText"> [ ] None of these</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "Which of the following food and grocery categories have you personally bought or been responsible for buying in the last 12 months? Please select all that apply.<br />
+ " is one of the following answers ("Anti-pasta")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDAWARE_ANT</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 31</p>
+<p class="normalText"><h4>Which of the following brands of Anti-pasta have you heard of — even if you have never bought them?</h4></p>
+<p class="normalText"> [ ] Always Fresh</p>
+<p class="normalText"> [ ] Checkers Forage and Feast</p>
+<p class="normalText"> [ ] Woolworths</p>
+<p class="normalText"> [ ] Mediterranean Kitchen</p>
+<p class="normalText"> [ ] Buffelsfontein</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Barilla</p>
+<p class="normalText"> [ ] Sacla</p>
+<p class="normalText"> [ ] Ponti</p>
+<p class="normalText"> [ ] Buonitalia</p>
+<p class="normalText"> [ ] Della's Deli</p>
+<p class="normalText"> [ ] PnP Antipasto</p>
+<p class="normalText"> [ ] Checkers Antipasto</p>
+<p class="normalText"> [ ] Artisan Antipasto Co.</p>
+<p class="normalText"> [ ] None of these</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "Which of the following food and grocery categories have you personally bought or been responsible for buying in the last 12 months? Please select all that apply.<br />
+ " is one of the following answers ("Baking Mixes")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDAWARE_BAK</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 26</p>
+<p class="normalText"><h4>Which of the following brands of Baking Mixes have you heard of — even if you have never bought them?</h4></p>
+<p class="normalText"> [ ] Moir’s</p>
+<p class="normalText"> [ ] Fresh Earth</p>
+<p class="normalText"> [ ] Golden Cloud</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Snowflake</p>
+<p class="normalText"> [ ] NOMU</p>
+<p class="normalText"> [ ] Lifestyle Food</p>
+<p class="normalText"> [ ] Health Connection</p>
+<p class="normalText"> [ ] Woolworths</p>
+<p class="normalText"> [ ] Bakels</p>
+<p class="normalText"> [ ] Pillsbury</p>
+<p class="normalText"> [ ] PnP Baking</p>
+<p class="normalText"> [ ] Checkers Baking</p>
+<p class="normalText"> [ ] Simply the Best</p>
+<p class="normalText"> [ ] Molly Cake</p>
+<p class="normalText"> [ ] Lancewood</p>
+<p class="normalText"> [ ] None of these</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless: ( <span class="logic-id-seperator"></span>Question "Which of the following food and grocery categories have you personally bought or been responsible for buying in the last 12 months? Please select all that apply.<br />
+ " is one of the following answers ("Pasta Sauces") AND Assign Focal Category is not exactly equal to "PAS")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDAWARE_PAS</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 24</p>
+<p class="normalText"><h4>Which of the following brands of Pasta sauces have you heard of — even if you have never bought them?</h4></p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Dolmio</p>
+<p class="normalText"> [ ] Mangiare</p>
+<p class="normalText"> [ ] Cirio</p>
+<p class="normalText"> [ ] Patha Patha</p>
+<p class="normalText"> [ ] Denny</p>
+<p class="normalText"> [ ] All Joy</p>
+<p class="normalText"> [ ] Royco</p>
+<p class="normalText"> [ ] Regano</p>
+<p class="normalText"> [ ] Barilla</p>
+<p class="normalText"> [ ] Panzani</p>
+<p class="normalText"> [ ] Jamie Oliver</p>
+<p class="normalText"> [ ] Sacla</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths</p>
+<p class="normalText"> [ ] Simple Truth (Checkers)</p>
+<p class="normalText"> [ ] All Gold</p>
+<p class="normalText"> [ ] Fatti's & Moni's</p>
+<p class="normalText"> [ ] Simply Delish</p>
+<p class="normalText"> [ ] PnP Pasta Sauces</p>
+<p class="normalText"> [ ] Checkers Pasta Range</p>
+<p class="normalText"> [ ] None of these</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "Which of the following food and grocery categories have you personally bought or been responsible for buying in the last 12 months? Please select all that apply.<br />
+ " is one of the following answers ("Pour Over Sauces")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDAWARE_POS</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 25</p>
+<p class="normalText"><h4>Which of the following brands of Pour Over Sauces have you heard of — even if you have never bought them?</h4></p>
+<p class="normalText"> [ ] Maggi</p>
+<p class="normalText"> [ ] Hollandia</p>
+<p class="normalText"> [ ] PnP House Brands</p>
+<p class="normalText"> [ ] The Kitchen (Checkers)</p>
+<p class="normalText"> [ ] Wimpy</p>
+<p class="normalText"> [ ] Steers</p>
+<p class="normalText"> [ ] Spur</p>
+<p class="normalText"> [ ] Royco</p>
+<p class="normalText"> [ ] PnP Instant</p>
+<p class="normalText"> [ ] Denny</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Woolworths</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Verlaque</p>
+<p class="normalText"> [ ] Simple Truth (Checkers)</p>
+<p class="normalText"> [ ] None of these</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "Which of the following food and grocery categories have you personally bought or been responsible for buying in the last 12 months? Please select all that apply.<br />
+ " is one of the following answers ("Dry Seasonings & Spices")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDAWARE_DSS</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 23</p>
+<p class="normalText"><h4>Which of the following brands of dry seasonings & spices have you heard of — even if you have never bought them?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of these</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText"><hr></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><strong>Page entry logic: </strong>This page will show when: Assign Focal Category is exactly equal to "DSS"</p>
+<p class="normalText"><h2>DSS CEP Matrix</h2></p>
+<p class="normalText"><h3></h3></p>
+<p class="normalText"><br/></p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_CEP01</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 35</p>
+<p class="normalText"><h4><strong>To add flavour to a meal</strong> — which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_CEP02</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 37</p>
+<p class="normalText"><h4><strong>To experiment with a new dish</strong> — which dry seasoning & spice brands come to mind</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_CEP03</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 38</p>
+<p class="normalText"><h4><strong>Is good value for money</strong> — which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_CEP04</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 39</p>
+<p class="normalText"><h4><strong>Is proudly South African</strong> — which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_CEP05</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 55</p>
+<p class="normalText"><h4>CEP05— which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_CEP06</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 56</p>
+<p class="normalText"><h4>CEP06— which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_CEP07</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 57</p>
+<p class="normalText"><h4>CEP07— which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_CEP08</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 58</p>
+<p class="normalText"><h4>CEP08— which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_CEP09</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 59</p>
+<p class="normalText"><h4>CEP09— which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_CEP10</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 60</p>
+<p class="normalText"><h4>CEP10— which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_CEP11</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 61</p>
+<p class="normalText"><h4>CEP11— which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_CEP12</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 62</p>
+<p class="normalText"><h4>CEP12— which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_CEP13</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 63</p>
+<p class="normalText"><h4>CEP13— which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_CEP14</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 64</p>
+<p class="normalText"><h4>CEP14— which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_CEP15</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 65</p>
+<p class="normalText"><h4>CEP15— which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText"><hr></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><strong>Page entry logic: </strong>This page will show when: Assign Focal Category is exactly equal to "DSS"</p>
+<p class="normalText"><h2>DSS Attribute Matrix</h2></p>
+<p class="normalText"><h3></h3></p>
+<p class="normalText"><br/></p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_ATT01</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 101</p>
+<p class="normalText"><h4><strong>Good value for money</strong> — which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_ATT02</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 102</p>
+<p class="normalText"><h4><strong>To experiment with a new dish</strong> — which dry seasoning & spice brands come to mind</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_ATT03</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 103</p>
+<p class="normalText"><h4><strong>Is good value for money</strong> — which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_ATT04</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 104</p>
+<p class="normalText"><h4><strong>Is proudly South African</strong> — which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_ATT05</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 105</p>
+<p class="normalText"><h4>ATT05— which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_ATT06</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 106</p>
+<p class="normalText"><h4>ATT06— which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_ATT07</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 107</p>
+<p class="normalText"><h4>ATT07— which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_ATT08</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 108</p>
+<p class="normalText"><h4>ATT08— which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_ATT09</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 109</p>
+<p class="normalText"><h4>ATT09— which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_ATT10</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 110</p>
+<p class="normalText"><h4>ATT10— which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_ATT11</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 111</p>
+<p class="normalText"><h4>ATT11— which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_ATT12</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 112</p>
+<p class="normalText"><h4>ATT12— which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_ATT13</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 113</p>
+<p class="normalText"><h4>ATT13— which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_ATT14</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 114</p>
+<p class="normalText"><h4>ATT14— which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATTR_DSS_ATT15</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 115</p>
+<p class="normalText"><h4>ATT15— which dry seasoning & spice brands come to mind?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText"><hr></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><strong>Page entry logic: </strong>This page will show when: Assign Focal Category is exactly equal to "DSS"</p>
+<p class="normalText"><h2>DSS: Brand Attitude</h2></p>
+<p class="normalText"><h3></h3></p>
+<p class="normalText"><br/></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic: Show/hide trigger exists. </b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT1_DSS_IPK</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 40</p>
+<p class="normalText"><h4>1) Which of the following best describes how you feel about <strong>Ina Paarman's Kitchen</strong>?</h4></p>
+<p class="normalText"> ( ) I love it — it's my favourite</p>
+<p class="normalText"> ( ) It's among the ones I prefer</p>
+<p class="normalText"> ( ) I wouldn't usually consider it, but I would if no other option</p>
+<p class="normalText"> ( ) I would refuse to buy this brand</p>
+<p class="normalText"> ( ) I have no opinion / I don't know this brand</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic: Show/hide trigger exists. </b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT1_DSS_ROB</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 41</p>
+<p class="normalText"><h4>2) Which of the following best describes how you feel about <strong>Robertsons</strong>?</h4></p>
+<p class="normalText"> ( ) I love it — it's my favourite</p>
+<p class="normalText"> ( ) It's among the ones I prefer</p>
+<p class="normalText"> ( ) I wouldn't usually consider it, but I would if no other option</p>
+<p class="normalText"> ( ) I would refuse to buy this brand</p>
+<p class="normalText"> ( ) I have no opinion / I don't know this brand</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic: Show/hide trigger exists. </b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT1_DSS_KNORR</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 42</p>
+<p class="normalText"><h4>3) Which of the following best describes how you feel about <strong>Knorr</strong>?</h4></p>
+<p class="normalText"> ( ) I love it — it's my favourite</p>
+<p class="normalText"> ( ) It's among the ones I prefer</p>
+<p class="normalText"> ( ) I wouldn't usually consider it, but I would if no other option</p>
+<p class="normalText"> ( ) I would refuse to buy this brand</p>
+<p class="normalText"> ( ) I have no opinion / I don't know this brand</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic: Show/hide trigger exists. </b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT1_DSS_CART</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 43</p>
+<p class="normalText"><h4>4) Which of the following best describes how you feel about <b>Cartwright's</b>?</h4></p>
+<p class="normalText"> ( ) I love it — it's my favourite</p>
+<p class="normalText"> ( ) It's among the ones I prefer</p>
+<p class="normalText"> ( ) I wouldn't usually consider it, but I would if no other option</p>
+<p class="normalText"> ( ) I would refuse to buy this brand</p>
+<p class="normalText"> ( ) I have no opinion / I don't know this brand</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic: Show/hide trigger exists. </b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT1_DSS_CHS</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 66</p>
+<p class="normalText"><h4>5) Which of the following best describes how you feel about <b>Cape Herb & Spice</b>?</h4></p>
+<p class="normalText"> ( ) I love it — it's my favourite</p>
+<p class="normalText"> ( ) It's among the ones I prefer</p>
+<p class="normalText"> ( ) I wouldn't usually consider it, but I would if no other option</p>
+<p class="normalText"> ( ) I would refuse to buy this brand</p>
+<p class="normalText"> ( ) I have no opinion / I don't know this brand</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic: Show/hide trigger exists. </b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT1_DSS_FNF</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 67</p>
+<p class="normalText"><h4>6) Which of the following best describes how you feel about <b>Forage and Feast (Checkers)</b>?</h4></p>
+<p class="normalText"> ( ) I love it — it's my favourite</p>
+<p class="normalText"> ( ) It's among the ones I prefer</p>
+<p class="normalText"> ( ) I wouldn't usually consider it, but I would if no other option</p>
+<p class="normalText"> ( ) I would refuse to buy this brand</p>
+<p class="normalText"> ( ) I have no opinion / I don't know this brand</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic: Show/hide trigger exists. </b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT1_DSS_WWT</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 68</p>
+<p class="normalText"><h4>7) Which of the following best describes how you feel about <b>Woolworths House Brand</b>?</h4></p>
+<p class="normalText"> ( ) I love it — it's my favourite</p>
+<p class="normalText"> ( ) It's among the ones I prefer</p>
+<p class="normalText"> ( ) I wouldn't usually consider it, but I would if no other option</p>
+<p class="normalText"> ( ) I would refuse to buy this brand</p>
+<p class="normalText"> ( ) I have no opinion / I don't know this brand</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic: Show/hide trigger exists. </b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT1_DSS_PNP</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 69</p>
+<p class="normalText"><h4>8) Which of the following best describes how you feel about <b>PNP House Brand</b>?</h4></p>
+<p class="normalText"> ( ) I love it — it's my favourite</p>
+<p class="normalText"> ( ) It's among the ones I prefer</p>
+<p class="normalText"> ( ) I wouldn't usually consider it, but I would if no other option</p>
+<p class="normalText"> ( ) I would refuse to buy this brand</p>
+<p class="normalText"> ( ) I have no opinion / I don't know this brand</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic: Show/hide trigger exists. </b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT1_DSS_SSG</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 70</p>
+<p class="normalText"><h4>9) Which of the following best describes how you feel about <b>Six Gun Grill</b>?</h4></p>
+<p class="normalText"> ( ) I love it — it's my favourite</p>
+<p class="normalText"> ( ) It's among the ones I prefer</p>
+<p class="normalText"> ( ) I wouldn't usually consider it, but I would if no other option</p>
+<p class="normalText"> ( ) I would refuse to buy this brand</p>
+<p class="normalText"> ( ) I have no opinion / I don't know this brand</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic: Show/hide trigger exists. </b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT1_DSS_RAJ</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 71</p>
+<p class="normalText"><h4>10) Which of the following best describes how you feel about <b>Rajah</b>?</h4></p>
+<p class="normalText"> ( ) I love it — it's my favourite</p>
+<p class="normalText"> ( ) It's among the ones I prefer</p>
+<p class="normalText"> ( ) I wouldn't usually consider it, but I would if no other option</p>
+<p class="normalText"> ( ) I would refuse to buy this brand</p>
+<p class="normalText"> ( ) I have no opinion / I don't know this brand</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic: Show/hide trigger exists. </b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT1_DSS_SAF</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 72</p>
+<p class="normalText"><h4>11) Which of the following best describes how you feel about <b>Safari</b>?</h4></p>
+<p class="normalText"> ( ) I love it — it's my favourite</p>
+<p class="normalText"> ( ) It's among the ones I prefer</p>
+<p class="normalText"> ( ) I wouldn't usually consider it, but I would if no other option</p>
+<p class="normalText"> ( ) I would refuse to buy this brand</p>
+<p class="normalText"> ( ) I have no opinion / I don't know this brand</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic: Show/hide trigger exists. </b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT1_DSS_SPM</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 73</p>
+<p class="normalText"><h4>12) Which of the following best describes how you feel about <b>Spice Mecca</b>?</h4></p>
+<p class="normalText"> ( ) I love it — it's my favourite</p>
+<p class="normalText"> ( ) It's among the ones I prefer</p>
+<p class="normalText"> ( ) I wouldn't usually consider it, but I would if no other option</p>
+<p class="normalText"> ( ) I would refuse to buy this brand</p>
+<p class="normalText"> ( ) I have no opinion / I don't know this brand</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic: Show/hide trigger exists. </b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT1_DSS_CHK</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 74</p>
+<p class="normalText"><h4>13) Which of the following best describes how you feel about <b>Checkers House Brand</b>?</h4></p>
+<p class="normalText"> ( ) I love it — it's my favourite</p>
+<p class="normalText"> ( ) It's among the ones I prefer</p>
+<p class="normalText"> ( ) I wouldn't usually consider it, but I would if no other option</p>
+<p class="normalText"> ( ) I would refuse to buy this brand</p>
+<p class="normalText"> ( ) I have no opinion / I don't know this brand</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic: Show/hide trigger exists. </b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT1_DSS_HND</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 75</p>
+<p class="normalText"><h4>14) Which of the following best describes how you feel about <b>Hinds</b>?</h4></p>
+<p class="normalText"> ( ) I love it — it's my favourite</p>
+<p class="normalText"> ( ) It's among the ones I prefer</p>
+<p class="normalText"> ( ) I wouldn't usually consider it, but I would if no other option</p>
+<p class="normalText"> ( ) I would refuse to buy this brand</p>
+<p class="normalText"> ( ) I have no opinion / I don't know this brand</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic: Show/hide trigger exists. </b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT1_DSS_DEL</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 76</p>
+<p class="normalText"><h4>15) Which of the following best describes how you feel about <b>Deli Spices</b>?</h4></p>
+<p class="normalText"> ( ) I love it — it's my favourite</p>
+<p class="normalText"> ( ) It's among the ones I prefer</p>
+<p class="normalText"> ( ) I wouldn't usually consider it, but I would if no other option</p>
+<p class="normalText"> ( ) I would refuse to buy this brand</p>
+<p class="normalText"> ( ) I have no opinion / I don't know this brand</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText"><hr></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><strong>Page entry logic: </strong>This page will show when: Assign Focal Category is exactly equal to "DSS"</p>
+<p class="normalText"><h2>DSS: Rejection OE</h2></p>
+<p class="normalText"><h3></h3></p>
+<p class="normalText"><br/></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless: #1 <span class="logic-id-seperator"></span>Question "Which of the following best describes how you feel about <strong>Ina Paarman's Kitchen</strong>?" is one of the following answers ("I would refuse to buy this brand")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT2_DSS_IPK</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 44</p>
+<p class="normalText"><h3>16) You said you would refuse to buy <strong>Ina Paarman's Kitchen</strong>. In your own words, why is that?</h3></p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless: #2 <span class="logic-id-seperator"></span>Question "Which of the following best describes how you feel about <strong>Robertsons</strong>?" is one of the following answers ("I would refuse to buy this brand")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT2_DSS_ROB</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 78</p>
+<p class="normalText"><h3>17) You said you would refuse to buy <strong>Robertsons</strong>. In your own words, why is that?</h3></p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless: #5 <span class="logic-id-seperator"></span>Question "Which of the following best describes how you feel about <b>Cape Herb & Spice</b>?" is one of the following answers ("I would refuse to buy this brand")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT2_DSS_CHS</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 79</p>
+<p class="normalText"><h3>18) You said you would refuse to buy <strong>Cape Herb & Spice</strong>. In your own words, why is that?</h3></p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless: #6 <span class="logic-id-seperator"></span>Question "Which of the following best describes how you feel about <b>Forage and Feast (Checkers)</b>?" is one of the following answers ("I would refuse to buy this brand")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT2_DSS_FNF</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 80</p>
+<p class="normalText"><h3>19) You said you would refuse to buy <strong>Forage and Feast (Checkers)</strong>. In your own words, why is that?</h3></p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless: #7 <span class="logic-id-seperator"></span>Question "Which of the following best describes how you feel about <b>Woolworths House Brand</b>?" is one of the following answers ("I would refuse to buy this brand")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT2_DSS_WWT</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 81</p>
+<p class="normalText"><h3>20) You said you would refuse to buy <strong>Woolworths House Brand</strong>. In your own words, why is that?</h3></p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless: #8 <span class="logic-id-seperator"></span>Question "Which of the following best describes how you feel about <b>PNP House Brand</b>?" is one of the following answers ("I would refuse to buy this brand")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT2_DSS_PNP</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 82</p>
+<p class="normalText"><h3>21) You said you would refuse to buy <strong>PNP House Brand</strong>. In your own words, why is that?</h3></p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless: #3 <span class="logic-id-seperator"></span>Question "Which of the following best describes how you feel about <strong>Knorr</strong>?" is one of the following answers ("I would refuse to buy this brand")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT2_DSS_KNORR</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 83</p>
+<p class="normalText"><h3>22) You said you would refuse to buy <strong>Knorr</strong>. In your own words, why is that?</h3></p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless: #9 <span class="logic-id-seperator"></span>Question "Which of the following best describes how you feel about <b>Six Gun Grill</b>?" is one of the following answers ("I would refuse to buy this brand")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT2_DSS_SSG</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 84</p>
+<p class="normalText"><h3>23) You said you would refuse to buy <strong>Six Gun Grill</strong>. In your own words, why is that?</h3></p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless: #4 <span class="logic-id-seperator"></span>Question "Which of the following best describes how you feel about <b>Cartwright's</b>?" is one of the following answers ("I would refuse to buy this brand")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT2_DSS_CART</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 85</p>
+<p class="normalText"><h3>24) You said you would refuse to buy <strong>Cartwright's</strong>. In your own words, why is that?</h3></p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless: #10 <span class="logic-id-seperator"></span>Question "Which of the following best describes how you feel about <b>Rajah</b>?" is one of the following answers ("I would refuse to buy this brand")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT2_DSS_RAJ</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 86</p>
+<p class="normalText"><h3>25) You said you would refuse to buy <strong>Rajah</strong>. In your own words, why is that?</h3></p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless: #11 <span class="logic-id-seperator"></span>Question "Which of the following best describes how you feel about <b>Safari</b>?" is one of the following answers ("I would refuse to buy this brand")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT2_DSS_SAF</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 87</p>
+<p class="normalText"><h3>26) You said you would refuse to buy <strong>Safari</strong>. In your own words, why is that?</h3></p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless: #12 <span class="logic-id-seperator"></span>Question "Which of the following best describes how you feel about <b>Spice Mecca</b>?" is one of the following answers ("I would refuse to buy this brand")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT2_DSS_SPM</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 88</p>
+<p class="normalText"><h3>27) You said you would refuse to buy <strong>Spice Mecca</strong>. In your own words, why is that?</h3></p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless: #13 <span class="logic-id-seperator"></span>Question "Which of the following best describes how you feel about <b>Checkers House Brand</b>?" is one of the following answers ("I would refuse to buy this brand")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT2_DSS_CHK</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 89</p>
+<p class="normalText"><h3>28) You said you would refuse to buy <strong>Checkers House Brand</strong>. In your own words, why is that?</h3></p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless: #14 <span class="logic-id-seperator"></span>Question "Which of the following best describes how you feel about <b>Hinds</b>?" is one of the following answers ("I would refuse to buy this brand")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT2_DSS_HND</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 90</p>
+<p class="normalText"><h3>29) You said you would refuse to buy <strong>Hinds</strong>. In your own words, why is that?</h3></p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless: #15 <span class="logic-id-seperator"></span>Question "Which of the following best describes how you feel about <b>Deli Spices</b>?" is one of the following answers ("I would refuse to buy this brand")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDATT2_DSS_DEL</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 91</p>
+<p class="normalText"><h3>30) You said you would refuse to buy <strong>Deli Spice</strong>. In your own words, why is that?</h3></p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"> ____________________________________________ </p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText"><hr></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><strong>Page entry logic: </strong>This page will show when:  <span class="logic-id-seperator"></span>Question "Focal_Category" is exactly equal to "DSS"</p>
+<p class="normalText"><h2>DSS: WOM</h2></p>
+<p class="normalText"><h3></h3></p>
+<p class="normalText"><br/></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_POS_REC_DSS</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 45</p>
+<p class="normalText"><h4>In the last <strong>3 months</strong>, which of these dry seasoning & spice brands have you heard someone speak <strong>positively</strong> about (online or in person)?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of these</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic: Show/hide trigger exists. </b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_POS_SHARE_DSS</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 47</p>
+<p class="normalText"><h4>In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>positive</strong> about?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of these</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic: Show/hide trigger exists. </b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_NEG_SHARE_DSS</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 48</p>
+<p class="normalText"><h4>In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>negative</strong> about?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of these</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_NEG_REC_DSS</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 46</p>
+<p class="normalText"><h4>In the last <strong>3 months</strong>, which of these dry seasoning & spice brands have you heard someone speak <strong>negative</strong><strong>ly</strong> about (online or in person)?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of these</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText"><hr></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><strong>Page entry logic: </strong>This page will show when:  <span class="logic-id-seperator"></span>Question "Focal_Category" is exactly equal to "DSS"</p>
+<p class="normalText"><h2>DSS: WOM Count</h2></p>
+<p class="normalText"><h3></h3></p>
+<p class="normalText"><br/></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>positive</strong> about?" is one of the following answers ("Ina Paarman’s Kitchen")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_POS_COUNT_DSS_IPK</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 49</p>
+<p class="normalText"><h4>31) How many times did you <strong>recommend or say something positive</strong> about <strong>Ina Paarman's Kitchen</strong> in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>negative</strong> about?" is one of the following answers ("Ina Paarman’s Kitchen")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_NEG_COUNT_DSS_IPK</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 50</p>
+<p class="normalText"><h4>32) How many times did <strong>you say something negative</strong> about <strong>Ina Paarman's Kitchen</strong> in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>positive</strong> about?" is one of the following answers ("Robertsons")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_POS_COUNT_DSS_ROB</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 116</p>
+<p class="normalText"><h4>33) How many times did you <strong>recommend or say something positive</strong> about <strong>Robertsons</strong> in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>negative</strong> about?" is one of the following answers ("Robertsons")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_NEG_COUNT_DSS_ROB</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 130</p>
+<p class="normalText"><h4>34) How many times did <strong>you say something negative</strong> about <strong>Robertsons</strong> in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>positive</strong> about?" is one of the following answers ("Cape Herb & Spice")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_POS_COUNT_DSS_CHS</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 117</p>
+<p class="normalText"><h4>35) How many times did you <strong>recommend or say something positive</strong> about <strong>Cape Herb & Spice</strong> in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>negative</strong> about?" is one of the following answers ("Cape Herb & Spice")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_NEG_COUNT_DSS_CHS</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 131</p>
+<p class="normalText"><h4>36) How many times did <strong>you say something negative</strong> about <strong>Cape Herb & Spice</strong> in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>positive</strong> about?" is one of the following answers ("Forage and Feast (Checkers)")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_POS_COUNT_DSS_FNF</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 118</p>
+<p class="normalText"><h4>37) How many times did you <strong>recommend or say something positive</strong> about <strong>Forage and Feast (Checkers)</strong> in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>negative</strong> about?" is one of the following answers ("Forage and Feast (Checkers)")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_NEG_COUNT_DSS_FNF</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 132</p>
+<p class="normalText"><h4>38) How many times did <strong>you say something negative</strong> about <strong>Forage and Feast (Checkers)</strong> in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>positive</strong> about?" is one of the following answers ("Woolworths House Brand")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_POS_COUNT_DSS_WWT</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 119</p>
+<p class="normalText"><h4>39) How many times did you <strong>recommend or say something positive</strong> about <strong>Woolworths House Brand </strong>in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>negative</strong> about?" is one of the following answers ("Woolworths House Brand")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_NEG_COUNT_DSS_WWT</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 133</p>
+<p class="normalText"><h4>40) How many times did <strong>you say something negative</strong> about <strong>Woolworths House Brand</strong> in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>positive</strong> about?" is one of the following answers ("Knorr")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_POS_COUNT_DSS_KNORR</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 121</p>
+<p class="normalText"><h4>41) How many times did you <strong>recommend or say something positive</strong> about <strong>Knorr </strong>in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>negative</strong> about?" is one of the following answers ("Knorr")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_NEG_COUNT_DSS_KNORR</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 135</p>
+<p class="normalText"><h4>42) How many times did <strong>you say something negative</strong> about <strong>Knorr</strong> in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>positive</strong> about?" is one of the following answers ("PNP House Brand")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_POS_COUNT_DSS_PNP</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 120</p>
+<p class="normalText"><h4>43) How many times did you <strong>recommend or say something positive</strong> about <strong>PNP House Brand </strong>in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>negative</strong> about?" is one of the following answers ("PNP House Brand")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_NEG_COUNT_DSS_PNP</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 134</p>
+<p class="normalText"><h4>44) How many times did <strong>you say something negative</strong> about <strong>PNP House Brand</strong> in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>positive</strong> about?" is one of the following answers ("Six Gun Grill")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_POS_COUNT_DSS_SSG</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 122</p>
+<p class="normalText"><h4>45) How many times did you <strong>recommend or say something positive</strong> about <strong>Six Gun Grill </strong>in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>negative</strong> about?" is one of the following answers ("Six Gun Grill")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_NEG_COUNT_DSS_SSG</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 136</p>
+<p class="normalText"><h4>46) How many times did <strong>you say something negative</strong> about <strong>Six Gun Grill</strong> in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>positive</strong> about?" is one of the following answers ("Cartwright's")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_POS_COUNT_DSS_CART</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 123</p>
+<p class="normalText"><h4>47) How many times did you <strong>recommend or say something positive</strong> about <strong>Cartwright's </strong>in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>negative</strong> about?" is one of the following answers ("Cartwright's")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_NEG_COUNT_DSS_CART</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 137</p>
+<p class="normalText"><h4>48) How many times did <strong>you say something negative</strong> about <strong>Cartwright's</strong> in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>positive</strong> about?" is one of the following answers ("Rajah")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_POS_COUNT_DSS_RAJ</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 124</p>
+<p class="normalText"><h4>49) How many times did you <strong>recommend or say something positive</strong> about <strong>Rajah </strong>in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>negative</strong> about?" is one of the following answers ("Rajah")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_NEG_COUNT_DSS_RAJ</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 138</p>
+<p class="normalText"><h4>50) How many times did <strong>you say something negative</strong> about <strong>Rajah</strong> in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>positive</strong> about?" is one of the following answers ("Safari")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_POS_COUNT_DSS_SAF</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 125</p>
+<p class="normalText"><h4>51) How many times did you <strong>recommend or say something positive</strong> about <strong>Safari </strong>in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>negative</strong> about?" is one of the following answers ("Safari")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_NEG_COUNT_DSS_SAF</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 139</p>
+<p class="normalText"><h4>52) How many times did <strong>you say something negative</strong> about <strong>Safari</strong> in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>positive</strong> about?" is one of the following answers ("Spice Mecca")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_POS_COUNT_DSS_SPM</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 126</p>
+<p class="normalText"><h4>53) How many times did you <strong>recommend or say something positive</strong> about <strong>Spice Mecca </strong>in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>negative</strong> about?" is one of the following answers ("Spice Mecca")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_NEG_COUNT_DSS_SPM</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 140</p>
+<p class="normalText"><h4>54) How many times did <strong>you say something negative</strong> about <strong>Spice Mecca</strong> in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>positive</strong> about?" is one of the following answers ("Checkers House Brand")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_POS_COUNT_DSS_CHK</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 127</p>
+<p class="normalText"><h4>55) How many times did you <strong>recommend or say something positive</strong> about <strong>Checkers House Brand </strong>in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>negative</strong> about?" is one of the following answers ("Checkers House Brand")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_NEG_COUNT_DSS_CHK</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 141</p>
+<p class="normalText"><h4>56) How many times did <strong>you say something negative</strong> about <strong>Checkers House Brand</strong> in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>positive</strong> about?" is one of the following answers ("Hinds")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_POS_COUNT_DSS_HND</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 128</p>
+<p class="normalText"><h4>57) How many times did you <strong>recommend or say something positive</strong> about <strong>Hinds </strong>in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>negative</strong> about?" is one of the following answers ("Hinds")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_NEG_COUNT_DSS_HND</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 142</p>
+<p class="normalText"><h4>58) How many times did <strong>you say something negative</strong> about <strong>Hinds</strong> in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>positive</strong> about?" is one of the following answers ("Hinds")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_POS_COUNT_DSS_DEL</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 129</p>
+<p class="normalText"><h4>59) How many times did you <strong>recommend or say something positive</strong> about <strong>Deli Spices </strong>in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless:  <span class="logic-id-seperator"></span>Question "In the last <strong>3 months, </strong>which of these dry seasoning and spice brands have <strong>you</strong> said something <strong>negative</strong> about?" is one of the following answers ("Deli Spices")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: WOM_NEG_COUNT_DSS_DEL</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 143</p>
+<p class="normalText"><h4>60) How many times did <strong>you say something negative</strong> about <strong>Deli Spices </strong>in the last <strong>3 months</strong>?</h4></p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5 or more</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText"><hr></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><strong>Page entry logic: </strong>This page will show when: Assign Focal Category is exactly equal to "DSS"</p>
+<p class="normalText"><h2>DSS: Category Buying </h2></p>
+<p class="normalText"><h3></h3></p>
+<p class="normalText"><br/></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic: Show/hide trigger exists. </b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: CATCOUNT_DSS</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 52</p>
+<p class="normalText"><h4>61) How often would you say you have you bought <strong>dry seasonings & spices </strong>in the past 3 months?<br />
+ </h4></p>
+<p class="normalText"> ( ) None</p>
+<p class="normalText"> ( ) 1</p>
+<p class="normalText"> ( ) 2</p>
+<p class="normalText"> ( ) 3</p>
+<p class="normalText"> ( ) 4</p>
+<p class="normalText"> ( ) 5</p>
+<p class="normalText"> ( ) 6</p>
+<p class="normalText"> ( ) 7</p>
+<p class="normalText"> ( ) 8</p>
+<p class="normalText"> ( ) 9</p>
+<p class="normalText"> ( ) 10+</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: CATBUY_DSS</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 53</p>
+<p class="normalText"><h4>62) In a typical month, how often do you buy <strong>dry seasonings & spices</strong>?</h4></p>
+<p class="normalText"> ( ) A few times per week</p>
+<p class="normalText"> ( ) About once per week</p>
+<p class="normalText"> ( ) 2-3 times per month</p>
+<p class="normalText"> ( ) Once per month</p>
+<p class="normalText"> ( ) Less than once per per month</p>
+<p class="normalText"> ( ) Less than once per year</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless: #61 <span class="logic-id-seperator"></span>Question "How often would you say you have you bought <strong>dry seasonings & spices </strong>in the past 3 months?<br />
+ " is one of the following answers ("1","2","3","4","5","6","7","8","9","10+")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: CHANNEL_DSS</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 96</p>
+<p class="normalText"><h4>63) Where have you bought <strong>dry seasonings & spices</strong> in the last <strong>3 months</strong>?<br />
+Select all that apply.</h4></p>
+<p class="normalText"> [ ] Supermarket</p>
+<p class="normalText"> [ ] Deli</p>
+<p class="normalText"> [ ] Cafe</p>
+<p class="normalText"> [ ] Convenience store</p>
+<p class="normalText"> [ ] Online</p>
+<p class="normalText"> [ ] Other</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless: #61 <span class="logic-id-seperator"></span>Question "How often would you say you have you bought <strong>dry seasonings & spices </strong>in the past 3 months?<br />
+ " is one of the following answers ("1","2","3","4","5","6","7","8","9","10+")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: PACK_DSS</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 97</p>
+<p class="normalText"><h4>64) Which pack sizes of <strong>dry seasonings & spices</strong> have you bought in the last <strong>3 months</strong>? Select all that apply.</h4></p>
+<p class="normalText"> [ ] Small single serve</p>
+<p class="normalText"> [ ] Medium pack or bottle</p>
+<p class="normalText"> [ ] Large pack or bottle</p>
+<p class="normalText"> [ ] Multi-pack or bulk buy</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText"><hr></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><strong>Page entry logic: </strong>This page will show when: Assign Focal Category is exactly equal to "DSS"</p>
+<p class="normalText"><h2>DSS: Brand Penetration Long
+</h2></p>
+<p class="normalText"><h3></h3></p>
+<p class="normalText"><br/></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDPEN1_DSS</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 92</p>
+<p class="normalText"><h4>65) Which of these dry seasoning & spice brands have you personally bought in the last <strong>12 months</strong>?</h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText"><hr></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><strong>Page entry logic: </strong>This page will show when: Assign Focal Category is exactly equal to "DSS"</p>
+<p class="normalText"><h2>DSS: Brand Penetration Target</h2></p>
+<p class="normalText"><h3></h3></p>
+<p class="normalText"><br/></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic: Show/hide trigger exists. </b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDPEN2_DSS</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 144</p>
+<p class="normalText"><h4>66) Which of these dry seasoning & spice brands have you personally bought in the last <strong>3 months?</strong></h4></p>
+<p class="normalText"> [ ] Robertsons</p>
+<p class="normalText"> [ ] Cape Herb & Spice</p>
+<p class="normalText"> [ ] Ina Paarman’s Kitchen</p>
+<p class="normalText"> [ ] Forage and Feast (Checkers)</p>
+<p class="normalText"> [ ] Woolworths House Brand</p>
+<p class="normalText"> [ ] PNP House Brand</p>
+<p class="normalText"> [ ] Knorr</p>
+<p class="normalText"> [ ] Six Gun Grill</p>
+<p class="normalText"> [ ] Cartwright's</p>
+<p class="normalText"> [ ] Rajah</p>
+<p class="normalText"> [ ] Safari</p>
+<p class="normalText"> [ ] Spice Mecca</p>
+<p class="normalText"> [ ] Checkers House Brand</p>
+<p class="normalText"> [ ] Hinds</p>
+<p class="normalText"> [ ] Deli Spices</p>
+<p class="normalText"> [ ] None of the above</p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText"><hr></p>
+<p class="normalText"><h2>DSS: Purchase Frequency</h2></p>
+<p class="normalText"><h3></h3></p>
+<p class="normalText"><br/></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;">Validation: Must be numeric</p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><b>Logic:  Hidden unless: #66 <span class="logic-id-seperator"></span>Question "Which of these dry seasoning & spice brands have you personally bought in the last <strong>3 months?</strong>" is one of the following answers ("Robertsons","Cape Herb & Spice","Ina Paarman’s Kitchen","Forage and Feast (Checkers)","Woolworths House Brand","PNP House Brand","Knorr","Six Gun Grill","Cartwright's","Rajah","Safari","Spice Mecca","Checkers House Brand","Hinds","Deli Spices")</b></p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">Shortname / Alias: BRANDPEN3_DSS</p>
+<p class="normalText" style="background-color: #FFE066;padding: 5px;border: 1px solid black;">ID: 147</p>
+<p class="normalText" style="background-color: #FF7D5C;padding: 5px;border: 1px solid black;">Piping:  Piped Values From Question 66. (Which of these dry seasoning & spice brands have you personally bought in the last <strong>3 months?</strong>)</p>
+<p class="normalText"><h4>67) How many times have you bought each of these brands in the last <strong>3 months</strong>?<br /><br /><em>(If you bought more than one brand on the same shopping trip, count each brand separately.)</em></h4></p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText"><hr></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><strong>Page entry logic: </strong>This page will show when: Assign Focal Category is exactly equal to "POS"</p>
+<p class="normalText"><h2>Pour Over Sauces</h2></p>
+<p class="normalText"><h3></h3></p>
+<p class="normalText"><br/></p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText"><hr></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><strong>Page entry logic: </strong>This page will show when: Assign Focal Category is exactly equal to "PAS"</p>
+<p class="normalText"><h2>Pasta Sauces</h2></p>
+<p class="normalText"><h3></h3></p>
+<p class="normalText"><br/></p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText"><hr></p>
+<p class="normalText" style="background-color: #b7a5c9;padding: 5px;border: 1px solid black;"><strong>Page entry logic: </strong>This page will show when: Assign Focal Category is exactly equal to "BAK"</p>
+<p class="normalText"><h2>Baking Mixes</h2></p>
+<p class="normalText"><h3></h3></p>
+<p class="normalText"><br/></p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText"><hr></p>
+<p class="normalText"><h2>Thank You!</h2></p>
+<p class="normalText"><h3></h3></p>
+<p class="normalText"><br/></p>
+<p class="normalText"><p><br><br></p></p>
+<p class="normalText"><hr></p>
+</div>
+
+</body>
+</html>
