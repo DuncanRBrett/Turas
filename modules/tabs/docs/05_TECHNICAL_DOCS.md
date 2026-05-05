@@ -415,12 +415,13 @@ process_question(question_code, base_filter, survey_data,
 ```
 
 **Routing logic:** - Composite questions → composite_processor -
-Single_Mention, Multi_Mention → standard_processor - Ranking →
-ranking_processor - Numeric, Rating, NPS, Likert → numeric_processor
+Single_Response, Multi_Mention, Rating, NPS, Likert → standard_processor -
+Ranking → ranking_processor - Numeric → numeric_processor -
+Allocation → allocation_processor
 
 ### Standard Processor (standard_processor.R)
 
-Processes Single_Mention and Multi_Mention questions.
+Processes Single_Response, Multi_Mention, Rating, NPS, and Likert questions.
 
 ``` r
 process_standard_question(prepared_data, config, error_log)
@@ -437,7 +438,7 @@ into result table 3. Return structured result object
 list(
   question_code = "Q01",
   question_text = "Which brand do you prefer?",
-  question_type = "Single_Mention",
+  question_type = "Single_Response",
   base_filter = NA,
   bases = list(
     Total = list(unweighted = 500, weighted = 500, effective = 450),
@@ -822,7 +823,7 @@ for many questions 5. Call gc() after large operations
 
 ### Chi-Square Test
 
-Used for categorical data (Single_Mention, Multi_Mention).
+Used for categorical data (Single_Response, Multi_Mention).
 
 ``` r
 chi_square <- sum((O - E)^2 / E)

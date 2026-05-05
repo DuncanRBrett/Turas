@@ -1204,7 +1204,7 @@ output.
 
 **Valid types and when to use them:**
 
-**Single_Mention** - For pick-one questions where respondents choose
+**Single_Response** - For pick-one questions where respondents choose
 exactly one option. - Example: Gender, Yes/No questions, "Which brand do
 you prefer?" - Data format: One column with the selected value
 
@@ -1231,6 +1231,13 @@ score
 Example: "Rank your top 3 preferred brands" - Data format: Depends on
 Ranking_Format setting
 
+**Allocation** - For constant-sum / budget allocation questions where
+respondents distribute a fixed total across multiple options. -
+Example: "Allocate 100 points across these brands by spend share" -
+Data format: Multiple columns named {code}_1, {code}_2, ..., {code}_N.
+Zeros are retained (meaning the respondent allocated nothing to that
+option). Produces mean allocation per option cross-tabbed by banner.
+
 **Open_End** - For text responses. These are not analyzed numerically. -
 Example: "Please explain your answer" - Usually excluded from Tabs
 analysis
@@ -1247,11 +1254,11 @@ Data format: One column with numeric values
 
 **What to enter:** An integer, 1 or greater.
 
-**When to use 1:** Single_Mention, Rating, NPS, Numeric, Likert - these
+**When to use 1:** Single_Response, Rating, NPS, Numeric, Likert - these
 all use one column.
 
-**When to use more than 1:** Multi_Mention and Ranking questions that
-span multiple columns.
+**When to use more than 1:** Multi_Mention, Ranking, and Allocation
+questions that span multiple columns.
 
 **Example:** If you have Q01_1, Q01_2, Q01_3, Q01_4, Q01_5 for a
 multi-mention question, enter `5`.

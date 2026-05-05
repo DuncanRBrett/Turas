@@ -5,6 +5,14 @@ All notable changes to TURAS are documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Tabs: Allocation question type** — new `Variable_Type = "Allocation"` for
+  constant-sum / budget-allocation survey questions (Alchemer `CONT_SUM`).
+  Produces mean allocation per option cross-tabbed by banner, with optional
+  significance testing. Zero allocations retained as meaningful data.
+  Includes full TRS validation and 46 new tests (1833 total).
+  `alchemer_to_turas.R` now maps `CONT_SUM` → `Allocation` automatically.
+  Survey Structure Template updated: `Single_Mention` dropdown corrected to
+  `Single_Response`; `Allocation` added to the Variable_Type dropdown.
 - **Brand: Audience Lens v1** — new per-category tab showing focal-brand
   performance across pre-defined audience cuts. Banner table with all
   audiences side-by-side, deck-ready per-audience cards, pair-audience

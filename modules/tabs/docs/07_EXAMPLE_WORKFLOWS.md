@@ -39,10 +39,10 @@ RespondentID | Weight | Gender | Age_Group | Q01_Awareness | Q02_Preference
 
 | QuestionCode | QuestionText                  | Variable_Type  | Columns |
 |--------------|-------------------------------|----------------|---------|
-| Q01          | Which brand are you aware of? | Single_Mention | 1       |
-| Q02          | Which brand do you prefer?    | Single_Mention | 1       |
-| Gender       | Gender                        | Single_Mention | 1       |
-| Age_Group    | Age Group                     | Single_Mention | 1       |
+| Q01          | Which brand are you aware of? | Single_Response | 1       |
+| Q02          | Which brand do you prefer?    | Single_Response | 1       |
+| Gender       | Gender                        | Single_Response | 1       |
+| Age_Group    | Age Group                     | Single_Response | 1       |
 
 **Options Sheet:**
 
@@ -149,7 +149,7 @@ CustomerID | Segment    | Q01_Satisfaction | Q02_NPS
 |--------------|--------------------------------|----------------|---------|
 | Q01          | Overall Satisfaction (1-5)     | Rating         | 1       |
 | Q02          | Likelihood to recommend (0-10) | NPS            | 1       |
-| Segment      | Customer Segment               | Single_Mention | 1       |
+| Segment      | Customer Segment               | Single_Response | 1       |
 
 **Options Sheet:**
 

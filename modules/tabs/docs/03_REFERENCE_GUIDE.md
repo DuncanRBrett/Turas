@@ -64,10 +64,10 @@ variance in weights, giving you accurate p-values.
 
 ## Question Types
 
-Tabs supports seven question types. Each type is processed differently
+Tabs supports nine question types. Each type is processed differently
 and produces different output.
 
-### Single_Mention (Single Response)
+### Single_Response
 
 For questions where respondents choose exactly one option.
 
@@ -163,6 +163,27 @@ Options) - Significance testing on means
 
 **Data format:** One column containing numeric values
 
+### Allocation
+
+For constant-sum / budget-allocation questions where respondents
+distribute a fixed total (e.g. 100 points) across multiple options.
+
+**Examples:** Brand spend share, budget allocation across activities,
+100-point importance allocation
+
+**Output includes:** - Mean allocation per option, cross-tabbed by
+banner - Optional: significance testing between banner columns on each
+option's mean
+
+**Data format:** Multiple columns — one per option — named with a common
+root and numeric suffix ({code}_1, {code}_2, ..., {code}_N). Values sum
+to the allocation total (often 100) per respondent. Zero allocations are
+retained as meaningful data.
+
+**Note:** Zeros mean "respondent allocated nothing to this option" and
+are included in the mean. If a respondent skipped the question entirely
+(all columns NA), that respondent is excluded.
+
 ### Composite
 
 For calculated metrics that combine multiple questions.
@@ -203,7 +224,7 @@ Females (31%).
 
 ### Test Types
 
-**Chi-Square Test:** Used for categorical data (Single_Mention,
+**Chi-Square Test:** Used for categorical data (Single_Response,
 Multi_Mention). Tests whether the overall distribution of responses
 differs between groups.
 

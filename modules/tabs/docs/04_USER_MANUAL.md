@@ -80,12 +80,13 @@ For each question in your survey, add a row with:
 | Variable_Type | The question type (see below) |
 | Columns | Number of data columns (1 for most questions, more for multi-mention) |
 
-**Variable_Type options:** - `Single_Mention` - Pick one answer -
+**Variable_Type options:** - `Single_Response` - Pick one answer -
 `Multi_Mention` - Pick multiple answers - `Rating` - Numeric scale (1-5,
 1-10, etc.) - `Likert` - Agreement scale with index weights - `NPS` -
 Net Promoter Score (0-10) - `Ranking` - Rank items in order -
-`Numeric` - Open numeric response - `Open_End` - Text response (not
-analyzed in Tabs)
+`Numeric` - Open numeric response - `Allocation` - Constant-sum /
+budget allocation (multiple columns, one per option) - `Open_End` -
+Text response (not analyzed in Tabs)
 
 **Example Questions sheet:**
 
@@ -93,8 +94,8 @@ analyzed in Tabs)
 |--------------|---------------------------------------|----------------|---------|
 | Q01          | Overall satisfaction with our service | Rating         | 1       |
 | Q02          | Which features do you use?            | Multi_Mention  | 5       |
-| Q03          | Gender                                | Single_Mention | 1       |
-| Q04          | Age group                             | Single_Mention | 1       |
+| Q03          | Gender                                | Single_Response | 1       |
+| Q04          | Age group                             | Single_Response | 1       |
 | Q05          | Likelihood to recommend               | NPS            | 1       |
 
 ### Create the Options Sheet

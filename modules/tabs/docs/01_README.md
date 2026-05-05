@@ -40,7 +40,7 @@ Both template files are available in the `templates/` subfolder of this document
 ## Key Features
 
 -   Cross-tabulation with statistical significance testing
--   Support for multiple question types: Single, Multi, Rating, NPS, Ranking, Numeric, Composite
+-   Support for multiple question types: Single_Response, Multi_Mention, Rating, NPS, Likert, Ranking, Numeric, Allocation, Open_End, Composite
 -   Weighted data analysis with design effect (DEFF) calculations
 -   Banner breakout analysis across demographic segments
 -   Configurable Excel output with professional formatting
