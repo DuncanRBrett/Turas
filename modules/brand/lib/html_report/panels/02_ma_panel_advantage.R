@@ -37,7 +37,6 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
   paste0(
     '<section class="ma-section ma-advantage-section" data-ma-stim="advantage">',
     .ma_adv_controls_bar(pd, adv),
-    .ma_adv_chip_row(pd),
     .ma_adv_views_layout(adv),
     .ma_adv_focal_view_section(pd),
     .ma_adv_insight_box(),
@@ -97,56 +96,27 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
        <span class="ma-adv-base-value">total respondents</span>
      </div>'
 
+  # BrandSelector trigger — replaces the legacy chip strip + Hide-all toggle.
+  brand_codes <- pd$config$brand_codes %||% character(0)
+  selector_trigger <- if (length(brand_codes) > 0L) {
+    build_brand_selector_trigger(
+      panel_id = "ma-advantage",
+      n_total  = length(brand_codes),
+      label    = "Filter brands"
+    )
+  } else ""
+
   paste0(
     '<div class="ma-controls controls-bar ma-adv-controls">',
     '<div class="ma-meta-row">',
     stim_buttons,
     base_notation,
+    selector_trigger,
     '<label class="toggle-label"><input type="checkbox" data-ma-action="adv-show-counts"> Show counts</label>',
     '<label class="toggle-label"><input type="checkbox" data-ma-action="adv-show-chart" checked> Show chart</label>',
     '<button type="button" class="export-btn ma-pin-dropdown-btn" data-ma-action="adv-pindropdown" data-ma-pin-scope="advantage" title="Pin a section" aria-haspopup="true">&#128204; Pin &#9662;</button>',
     '<button type="button" class="export-btn ma-png-btn" onclick="brExportPngFromEl(this)" title="Export view to PNG">&#x1F5BC; PNG</button>',
     '<button type="button" class="export-btn ma-export-btn" data-ma-action="exporttable" data-ma-stim="advantage" title="Export Mental Advantage to Excel">⭳ Excel ▾</button>',
-    '</div>',
-    '</div>'
-  )
-}
-
-
-#' Brand-column visibility chips for the matrix and chart.
-#' Mirrors the pattern used on the existing CEPs/Attributes tabs so the
-#' interaction language is consistent across the panel. Clicking a chip
-#' toggles the brand column off/on in the matrix; the chart shows only
-#' the focal brand so chip toggles don't affect it directly, but stim
-#' rows greyed out from the matrix DO drop their bubble from the chart.
-#' @keywords internal
-.ma_adv_chip_row <- function(pd) {
-  brand_codes <- pd$config$brand_codes %||% character(0)
-  brand_names <- pd$config$brand_names %||% brand_codes
-  focal       <- pd$meta$focal_brand_code
-  chip_default <- pd$config$chip_default %||% "focal_only"
-  is_focal_only <- identical(chip_default, "focal_only")
-  off_cls <- if (is_focal_only) " col-chip-off" else ""
-  toggle_label <- if (is_focal_only) "Show all" else "Hide all"
-
-  if (length(brand_codes) == 0) return("")
-  sorted <- order(brand_codes != focal, tolower(brand_names))
-  brand_codes <- brand_codes[sorted]; brand_names <- brand_names[sorted]
-
-  chips <- paste(vapply(seq_along(brand_codes), function(i) {
-    bc <- brand_codes[i]
-    cls <- if (!is.null(focal) && bc == focal) "col-chip" else paste0("col-chip", off_cls)
-    sprintf('<button type="button" class="%s" data-ma-adv-chip-brand="%s">%s</button>',
-            cls, .ma_esc(bc), .ma_esc(brand_names[i]))
-  }, character(1)), collapse = "")
-
-  paste0(
-    '<div class="ma-adv-chip-bar">',
-    '<span class="ma-ctl-label">Show brands</span>',
-    '<div class="ma-chip-row col-chip-bar" data-ma-adv-scope="brands">',
-    chips,
-    sprintf('<button type="button" class="ma-all-toggle" data-ma-adv-action="toggleall">%s</button>',
-            toggle_label),
     '</div>',
     '</div>'
   )

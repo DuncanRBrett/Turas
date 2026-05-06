@@ -48,17 +48,6 @@ build_ma_advantage_styles <- function(focal_colour = "#1A5276") {
 .ma-adv-intro-list strong { color: #1e293b; }
 .ma-adv-intro-source { font-size: 11px; color: #64748b; margin-top: 8px !important; }
 
-/* Chip row for brand-column visibility (matches existing MA tabs) */
-.ma-adv-chip-bar {
-  display: flex; align-items: center; flex-wrap: wrap;
-  gap: 8px; margin: 0 0 12px; padding: 6px 10px;
-  background: #f8fafc; border: 1px solid #eef2f7;
-  border-radius: 6px; }
-.ma-adv-chip-bar .ma-ctl-label {
-  font-size: 11px; font-weight: 600; color: #64748b;
-  text-transform: uppercase; letter-spacing: 0.4px;
-  margin-right: 6px; }
-
 /* X-axis dropdown */
 .ma-adv-xaxis-wrap {
   display: inline-flex; align-items: center; gap: 6px; }
