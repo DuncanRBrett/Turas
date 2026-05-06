@@ -48,6 +48,15 @@ checkbox-row layout. Live updates on each toggle — no Apply / Cancel.
    itself. The static colour-legend strip below charts was tried during
    the Demographics migration and dropped per Duncan's review feedback
    ("not necessary to show the brand names" — dropdown swatches suffice).
+   **Per-chart legend (different concern):** every panel that renders a
+   multi-brand chart (Funnel, MA, WoM, Cat Buying, etc.) must keep its
+   in-chart legend intact during migration. The chip strip currently
+   doubles as the chart's colour key in some panels — when that strip
+   goes, the chart's own legend (SVG text labels or a legend block
+   inside the chart container) becomes the only colour reference while
+   the dropdown is closed. Audit each chart during its panel migration:
+   if the chart relies on the chip strip for its legend, add a proper
+   in-chart legend before removing the strip.
 5. Funnel + MA panels (which have separate table-row vs chart-series
    selection) get a "Sync table + chart" toggle inside the dropdown,
    defaulting ON; turning it OFF reveals a second checkbox column.
