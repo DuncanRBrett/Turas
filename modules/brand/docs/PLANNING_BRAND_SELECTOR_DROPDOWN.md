@@ -69,6 +69,12 @@ checkbox-row layout. Live updates on each toggle — no Apply / Cancel.
   brands)
 - Cat Buying secondary segment / comparison chips (contextual filters,
   not brand selectors)
+- Ad Hoc per-question brand picker — discovered during migration to be a
+  single-select radio (pick ONE brand to show its heatmap) rather than a
+  multi-select filter, hidden behind a "By brand" toggle. The
+  BrandSelector checkbox pattern doesn't fit. If this picker grows
+  cluttered with many brands, a separate refactor to a native
+  \code{<select>} dropdown is the right move — not this branch.
 - Tabs / Tracker / Conjoint / MaxDiff modules (separate refactor if useful)
 
 ## 4. Design

@@ -315,6 +315,11 @@
         if (state.syncMode) state.hiddenChart = arrToSet(codes);
         refreshTriggerCount(state);
       },
+      // Update which brand carries the FOCAL pill. Re-renders open popover.
+      setFocal: function (focalCode) {
+        state.brands.forEach(function (b) { b.isFocal = (b.code === focalCode); });
+        if (state.popoverEl) rebuildBody(state);
+      },
       refreshCount: function () { refreshTriggerCount(state); },
       destroy: function () { delete REGISTRY[state.panelId]; }
     };

@@ -74,13 +74,6 @@ build_wom_panel_styles <- function(focal_colour = "#1A5276") {
   opacity: 0.45; pointer-events: none;
 }
 
-/* WOM brand chips (off state) */
-.wom-brand-chip:not(.active) {
-  background: #f1f5f9 !important; color: #94a3b8 !important;
-  border-color: #e2e8f0 !important;
-  text-decoration: line-through; opacity: 0.6;
-}
-
 /* Hidden base column — shown via Show count checkbox */
 .wom-table .wom-col-base[hidden] { display: none !important; }
 
