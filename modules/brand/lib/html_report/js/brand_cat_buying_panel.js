@@ -200,7 +200,7 @@
   function bindCBBrandSelector(panel) {
     if (typeof window.BrandSelector === 'undefined') return;
     var catCode = panel.getAttribute('data-cb-cat-code') ||
-                  (panel.getAttribute('id') || '').replace(/^cb-/, '');
+                  (panel.getAttribute('id') || '').replace(/^cb-panel-/, '');
     var trigger = panel.querySelector('.bs-trigger[data-bs-panel="cb-' + catCode + '"]');
     if (!trigger) return;
     var pd = panel.__cbData; if (!pd) return;

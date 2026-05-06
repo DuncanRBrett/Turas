@@ -17,19 +17,11 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
   metrics <- pd$metrics
   if (is.null(metrics)) return("")
 
-  brand_codes <- pd$config$brand_codes %||% character(0)
-  selector_trigger <- if (length(brand_codes) > 0L) {
-    build_brand_selector_trigger(
-      panel_id = "ma-metrics",
-      n_total  = length(brand_codes),
-      label    = "Filter brands"
-    )
-  } else ""
+  # Brand selector lives in .ma_focus_bar (panel-level), shared across sub-tabs.
 
   controls_bar <- paste0(
     '<div class="ma-controls controls-bar">',
     '<div class="ma-meta-row">',
-    selector_trigger,
     '<button type="button" class="export-btn ma-chart-select-btn" data-ma-action="chartselectmenu" aria-haspopup="true" aria-pressed="true" title="Select charts to show">&#10003; Show chart &#9662;</button>',
     '<label class="toggle-label"><input type="checkbox" data-ma-action="showcounts-metrics"> Show count</label>',
     '<button type="button" class="export-btn ma-pin-dropdown-btn" data-ma-action="pindropdown" title="Pin a section" aria-haspopup="true">&#128204; Pin &#9662;</button>',

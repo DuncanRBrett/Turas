@@ -183,10 +183,8 @@
 
     bindSubTabs(panel);
     bindFocusSelect(panel);
-    bindMABrandSelector(panel, 'attributes');
-    bindMABrandSelector(panel, 'ceps');
-    bindMABrandSelector(panel, 'metrics');
-    bindCatAvgChips(panel);
+    bindMaPanelBrandSelector(panel);
+    bindCatAvgChip(panel);
     bindToggles(panel);
     bindBaseMode(panel);
     bindHeatmapMode(panel);
@@ -268,12 +266,14 @@
     } catch (e) { /* ignore */ }
   }
 
-  // BrandSelector dropdown wiring per MA sub-tab.
-  // Attributes + CEPs use split mode (table + chart, sync default ON).
-  // Metrics is unified — its row + chart visibility share the same vis map.
-  function bindMABrandSelector(panel, stim) {
+  // ONE panel-level BrandSelector controls visibility across all four MA
+  // sub-tabs (Attributes, CEPs, Mental Advantage, Metrics) in lock-step.
+  // Split mode + Sync table+chart toggle (default ON) — applies the same
+  // table/chart split across every sub-tab so analysts can desync once and
+  // see the effect everywhere.
+  function bindMaPanelBrandSelector(panel) {
     if (typeof window.BrandSelector === 'undefined') return;
-    var trigger = panel.querySelector('.bs-trigger[data-bs-panel="ma-' + stim + '"]');
+    var trigger = panel.querySelector('.bs-trigger[data-bs-panel="ma"]');
     if (!trigger) return;
     var pd = panel.__maData; if (!pd || !pd.config) return;
     var codes  = pd.config.brand_codes  || [];
@@ -288,90 +288,106 @@
       };
     });
 
-    if (stim === 'metrics') {
-      // Metrics: unified mode — row visibility is DOM-driven. Seed initial
-      // hidden state from chip_default (legacy "focal_only" hides non-focal).
-      var chipDefault = (pd.config.chip_default || 'focal_only');
-      var initialHidden = chipDefault === 'focal_only'
-        ? codes.filter(function (c) { return c !== focal; })
-        : [];
-      var table = panel.querySelector('.ma-metrics-table');
+    var chipDefault = pd.config.chip_default || 'focal_only';
+    var initialHidden = chipDefault === 'focal_only'
+      ? codes.filter(function (c) { return c !== focal; })
+      : [];
+
+    // Seed every sub-tab's visibility maps so initial render hides non-focal
+    // columns/rows correctly under chip_default = focal_only.
+    panel.__maAdvHiddenBrands = panel.__maAdvHiddenBrands || {};
+    initialHidden.forEach(function (c) {
+      if (panel.__maState.visible.attributes)      panel.__maState.visible.attributes[c]      = false;
+      if (panel.__maState.visible.ceps)            panel.__maState.visible.ceps[c]            = false;
+      if (panel.__maState.chartVisible.attributes) panel.__maState.chartVisible.attributes[c] = false;
+      if (panel.__maState.chartVisible.ceps)       panel.__maState.chartVisible.ceps[c]       = false;
+      panel.__maAdvHiddenBrands[c] = true;
+    });
+    var metricsTable = panel.querySelector('.ma-metrics-table');
+    if (metricsTable) {
       initialHidden.forEach(function (c) {
-        if (!table) return;
-        table.querySelectorAll('tbody tr.ma-row[data-ma-brand="' + c + '"]').forEach(function (r) {
+        metricsTable.querySelectorAll('tbody tr.ma-row[data-ma-brand="' + c + '"]').forEach(function (r) {
           r.style.display = 'none';
         });
       });
-      panel.__maMetricsSelector = window.BrandSelector.create({
-        panelId:       'ma-metrics',
-        triggerEl:     trigger,
-        anchorEl:      trigger.parentElement,
-        brands:        brandList,
-        mode:          'unified',
-        initialHidden: initialHidden,
-        onChange: function (hiddenSet) {
-          if (!table) return;
-          codes.forEach(function (c) {
-            table.querySelectorAll('tbody tr.ma-row[data-ma-brand="' + c + '"]').forEach(function (r) {
-              r.style.display = hiddenSet.has(c) ? 'none' : '';
-            });
-          });
-          renderMAScatter(panel);
-          renderMABarChart(panel);
-        }
-      });
-      return;
     }
 
-    // Attributes / CEPs: split mode + Sync table+chart toggle.
-    var visT = panel.__maState.visible[stim]      || {};
-    var visC = panel.__maState.chartVisible[stim] || {};
-    var initialHidden = codes.filter(function (c) { return visT[c] === false; });
-    var initialHiddenChart = codes.filter(function (c) { return visC[c] === false; });
-    var key = stim + 'Selector';
-    panel['__ma' + key.charAt(0).toUpperCase() + key.slice(1)] =
-      window.BrandSelector.create({
-        panelId:            'ma-' + stim,
-        triggerEl:          trigger,
-        anchorEl:           trigger.parentElement,
-        brands:             brandList,
-        mode:               'split',
-        syncDefault:        true,
-        initialHidden:      initialHidden,
-        initialHiddenChart: initialHiddenChart,
-        onChange: function (hiddenSet, scope) {
-          if (scope === 'all' || scope === 'table') {
-            codes.forEach(function (c) {
-              panel.__maState.visible[stim][c] = !hiddenSet.has(c);
-            });
-            applyColumnVisibility(panel, stim);
-            renderChart(panel, stim);
-          }
-          if (scope === 'all' || scope === 'chart') {
-            codes.forEach(function (c) {
-              panel.__maState.chartVisible[stim][c] = !hiddenSet.has(c);
-            });
-            renderChart(panel, stim);
-          }
-        }
-      });
+    panel.__maSelector = window.BrandSelector.create({
+      panelId:            'ma',
+      triggerEl:          trigger,
+      anchorEl:           trigger.parentElement,
+      brands:             brandList,
+      mode:               'split',
+      syncDefault:        true,
+      initialHidden:      initialHidden,
+      initialHiddenChart: initialHidden,
+      onChange: function (hiddenSet, scope) {
+        applyMaSelectorChange(panel, hiddenSet, scope);
+      }
+    });
   }
 
-  // Cat Avg standalone chips (Attributes + CEPs sub-tabs). Toggle the
-  // __avg__ column's visibility in the matrix without touching the brand
-  // selector. Cat avg is on by default; clicking flips visibility.
-  function bindCatAvgChips(panel) {
+  // Apply a hidden-set change from the panel-level BrandSelector across all
+  // four sub-tabs. scope = "table" | "chart" | "all" (sync mode).
+  function applyMaSelectorChange(panel, hiddenSet, scope) {
+    var pd = panel.__maData;
+    if (!pd) return;
+    var codes = (pd.config && pd.config.brand_codes) || [];
+
+    if (scope === 'all' || scope === 'table') {
+      codes.forEach(function (c) {
+        if (panel.__maState.visible.attributes) panel.__maState.visible.attributes[c] = !hiddenSet.has(c);
+        if (panel.__maState.visible.ceps)       panel.__maState.visible.ceps[c]       = !hiddenSet.has(c);
+        panel.__maAdvHiddenBrands[c] = hiddenSet.has(c);
+      });
+      applyColumnVisibility(panel, 'attributes');
+      applyColumnVisibility(panel, 'ceps');
+      // Metrics row visibility (DOM-driven)
+      var table = panel.querySelector('.ma-metrics-table');
+      if (table) {
+        codes.forEach(function (c) {
+          table.querySelectorAll('tbody tr.ma-row[data-ma-brand="' + c + '"]').forEach(function (r) {
+            r.style.display = hiddenSet.has(c) ? 'none' : '';
+          });
+        });
+      }
+      // Mental Advantage matrix column visibility
+      if (typeof applyBrandColumnVisibility === 'function') {
+        applyBrandColumnVisibility(panel);
+      }
+    }
+    if (scope === 'all' || scope === 'chart') {
+      codes.forEach(function (c) {
+        if (panel.__maState.chartVisible.attributes) panel.__maState.chartVisible.attributes[c] = !hiddenSet.has(c);
+        if (panel.__maState.chartVisible.ceps)       panel.__maState.chartVisible.ceps[c]       = !hiddenSet.has(c);
+      });
+      renderChart(panel, 'attributes');
+      renderChart(panel, 'ceps');
+      renderMAScatter(panel);
+      renderMABarChart(panel);
+    }
+    if (window.MAAdvantage && typeof window.MAAdvantage.render === 'function') {
+      try { window.MAAdvantage.render(panel); } catch (e) { /* non-fatal */ }
+    }
+  }
+
+  // Cat Avg standalone chip (panel-level). Toggles the __avg__ column in
+  // both the Attributes AND CEPs matrices in lock-step. Mental Advantage
+  // and Metrics don't render a Cat avg column, so this is a no-op there.
+  function bindCatAvgChip(panel) {
     panel.querySelectorAll('.ma-cat-avg-chip[data-ma-action="toggle-avg"]').forEach(function (chip) {
       chip.addEventListener('click', function () {
-        var stim = chip.getAttribute('data-ma-stim');
-        if (!stim) return;
-        var vis = panel.__maState.visible[stim];
-        if (!vis) return;
-        var on = vis['__avg__'] === false;
-        vis['__avg__'] = on;
-        chip.classList.toggle('col-chip-off', !on);
-        applyColumnVisibility(panel, stim);
-        renderChart(panel, stim);
+        ['attributes', 'ceps'].forEach(function (stim) {
+          var vis = panel.__maState.visible[stim];
+          if (!vis) return;
+          var on = vis['__avg__'] === false;
+          vis['__avg__'] = on;
+          applyColumnVisibility(panel, stim);
+          renderChart(panel, stim);
+        });
+        var anyOn = (panel.__maState.visible.attributes && panel.__maState.visible.attributes['__avg__'] !== false) ||
+                    (panel.__maState.visible.ceps       && panel.__maState.visible.ceps['__avg__']       !== false);
+        chip.classList.toggle('col-chip-off', !anyOn);
       });
     });
   }
@@ -442,18 +458,17 @@
     reorderFocalColumn(panel, code);
     refreshMetricsFocal(panel);
     refreshMetricsHero(panel);
-    // Sync FOCAL pill in each sub-tab's BrandSelector and force the new
-    // focal visible in case the user had hidden it before changing focal.
+    // Panel-level BrandSelector: move FOCAL pill, force new focal visible
+    // across all sub-tabs (attributes / ceps / advantage / metrics).
+    if (panel.__maSelector) {
+      panel.__maSelector.setFocal(code);
+      panel.__maSelector.showBrand(code);
+    }
     ['attributes', 'ceps'].forEach(function (stim) {
-      var key = '__ma' + stim.charAt(0).toUpperCase() + stim.slice(1) + 'Selector';
-      var sel = panel[key];
-      if (sel) {
-        sel.setFocal(code);
-        sel.showBrand(code);
-        panel.__maState.visible[stim][code]      = true;
-        panel.__maState.chartVisible[stim][code] = true;
-      }
+      if (panel.__maState.visible[stim])      panel.__maState.visible[stim][code]      = true;
+      if (panel.__maState.chartVisible[stim]) panel.__maState.chartVisible[stim][code] = true;
     });
+    if (panel.__maAdvHiddenBrands) panel.__maAdvHiddenBrands[code] = false;
     renderChart(panel, 'attributes');
     renderChart(panel, 'ceps');
     renderMAScatter(panel);
@@ -921,9 +936,9 @@
     // Ensure focal row is visible after a focal change
     var focalRow = tbody.querySelector('tr.ma-row[data-ma-brand="' + focal + '"]');
     if (focalRow) focalRow.style.display = '';
-    if (panel.__maMetricsSelector) {
-      panel.__maMetricsSelector.setFocal(focal);
-      panel.__maMetricsSelector.showBrand(focal);
+    if (panel.__maSelector) {
+      panel.__maSelector.setFocal(focal);
+      panel.__maSelector.showBrand(focal);
     }
 
     repositionMetricsPinnedRows(panel);
@@ -1083,8 +1098,8 @@
     var focal = panel.__maState && panel.__maState.focal;
 
     // Build vis map from BrandSelector hidden set (or from row-display fallback)
-    var hiddenSet = panel.__maMetricsSelector
-      ? panel.__maMetricsSelector.getHidden() : new Set();
+    var hiddenSet = panel.__maSelector
+      ? panel.__maSelector.getHidden() : new Set();
 
     var points = (pd.metrics.table || []).filter(function (r) {
       return !hiddenSet.has(r.brand_code) && r.mpen != null && r.ns != null;
@@ -1356,8 +1371,8 @@
 
     var focal = panel.__maState && panel.__maState.focal;
 
-    var hiddenSet = panel.__maMetricsSelector
-      ? panel.__maMetricsSelector.getHidden() : new Set();
+    var hiddenSet = panel.__maSelector
+      ? panel.__maSelector.getHidden() : new Set();
 
     // Focal first, then others by MMS desc
     var all = (pd.metrics.table || []).filter(function (r) {

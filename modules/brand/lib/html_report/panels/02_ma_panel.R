@@ -165,12 +165,24 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
             .ma_esc(brand_codes[i]), sel, .ma_esc(brand_names[i]))
   }, character(1)), collapse = "")
 
+  selector_trigger <- if (length(brand_codes) > 0L) {
+    build_brand_selector_trigger(
+      panel_id = "ma",
+      n_total  = length(brand_codes),
+      label    = "Filter brands"
+    )
+  } else ""
+
+  cat_avg_chip <- '<button type="button" class="col-chip ma-cat-avg-chip" data-ma-action="toggle-avg">Cat avg</button>'
+
   sprintf(
     '<div class="ma-focus-bar">
        <label class="ma-ctl-label">Focal brand</label>
        <select class="ma-focus-select" data-ma-action="focus">%s</select>
+       %s
+       %s
      </div>',
-    focus_options)
+    focus_options, selector_trigger, cat_avg_chip)
 }
 
 
@@ -180,20 +192,9 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
 
 .ma_controls_bar <- function(pd, stim = c("attributes", "ceps")) {
   stim <- match.arg(stim)
-  brand_codes <- pd$config$brand_codes %||% character(0)
-
-  # Cat avg stays as a standalone chip (per Decision 2). Brand list moves
-  # into the BrandSelector dropdown to its right.
-  cat_avg_chip <- sprintf(
-    '<button type="button" class="col-chip ma-cat-avg-chip" data-ma-action="toggle-avg" data-ma-stim="%s">Cat avg</button>',
-    .ma_esc(stim))
-  selector_trigger <- if (length(brand_codes) > 0L) {
-    build_brand_selector_trigger(
-      panel_id = paste0("ma-", stim),
-      n_total  = length(brand_codes),
-      label    = "Filter brands"
-    )
-  } else ""
+  # Brand selector + Cat avg chip live in .ma_focus_bar (panel-level), shared
+  # across all sub-tabs. The per-sub-tab controls bar holds only the Base /
+  # Heatmap / Show count / Show chart toggles + export buttons.
 
   block <- if (stim == "attributes") pd$attributes else pd$ceps
   has_aware <- !is.null(block) && !is.null(block$awareness_by_brand)
@@ -219,8 +220,6 @@ build_ma_panel_html <- function(panel_data, category_code = "cat",
   paste0(
     '<div class="ma-controls controls-bar">',
     '<div class="ma-meta-row">',
-    cat_avg_chip,
-    selector_trigger,
     base_switcher,
     heatmap_switcher,
     sprintf('<label class="toggle-label"><input type="checkbox" data-ma-action="showcounts" data-ma-stim="%s"> Show count</label>', stim),

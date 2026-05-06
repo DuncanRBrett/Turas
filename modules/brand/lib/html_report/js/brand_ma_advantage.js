@@ -984,8 +984,10 @@
     panel.__maAdvHiddenBrands = panel.__maAdvHiddenBrands || {};
     panel.__maAdvHiddenStims = panel.__maAdvHiddenStims || {};
 
-    // BrandSelector dropdown — replaces the legacy chip strip.
-    bindAdvantageBrandSelector(panel, subtab);
+    // Brand visibility is governed by the panel-level BrandSelector
+    // (created in brand_ma_panel.js bindMaPanelBrandSelector). The advantage
+    // sub-tab just reflects __maAdvHiddenBrands which that selector mutates.
+    applyBrandColumnVisibility(panel);
 
     // Show counts and Show chart checkboxes — direct change listeners
     // (single elements per panel, no risk of detachment).
@@ -1008,50 +1010,6 @@
     });
   }
 
-  // Wire the BrandSelector dropdown for the Mental Advantage sub-tab.
-  // Brand list / focal / chip_default come from panel.__maData.config and
-  // panel.__maData.meta. Initial visibility seeds from chip_default (the
-  // legacy "focal_only" mode hides every non-focal brand at start).
-  function bindAdvantageBrandSelector(panel, subtab) {
-    if (typeof window.BrandSelector === "undefined") return;
-    var trigger = subtab.querySelector('.bs-trigger[data-bs-panel="ma-advantage"]');
-    if (!trigger) return;
-    var pd = panel.__maData; if (!pd || !pd.config) return;
-    var codes  = pd.config.brand_codes  || [];
-    var labels = pd.config.brand_names  || codes;
-    var focal  = (pd.meta && pd.meta.focal_brand_code) || codes[0];
-    var chipDefault = pd.config.chip_default || "focal_only";
-    var initialHidden = chipDefault === "focal_only"
-      ? codes.filter(function (c) { return c !== focal; })
-      : [];
-    initialHidden.forEach(function (c) {
-      panel.__maAdvHiddenBrands[c] = true;
-    });
-    var brandList = codes.map(function (c, i) {
-      return {
-        code:    c,
-        label:   labels[i] || c,
-        color:   brandColourFor(pd, c),
-        isFocal: c === focal
-      };
-    });
-    panel.__maAdvSelector = window.BrandSelector.create({
-      panelId:       "ma-advantage",
-      triggerEl:     trigger,
-      anchorEl:      trigger.parentElement,
-      brands:        brandList,
-      mode:          "unified",
-      initialHidden: initialHidden,
-      onChange:      function (hiddenSet) {
-        codes.forEach(function (c) {
-          panel.__maAdvHiddenBrands[c] = hiddenSet.has(c);
-        });
-        applyBrandColumnVisibility(panel);
-      }
-    });
-    applyBrandColumnVisibility(panel);
-  }
-
   // ============================================================ PUBLIC API
   window.MAAdvantage = {
     init:   function (panel) {
@@ -1059,10 +1017,6 @@
       renderAdvantage(panel);
     },
     render: function (panel) {
-      // Keep the selector's focal pill in sync if focal changed externally.
-      if (panel.__maAdvSelector && panel.__maData && panel.__maData.meta) {
-        panel.__maAdvSelector.setFocal(panel.__maData.meta.focal_brand_code);
-      }
       renderAdvantage(panel);
     }
   };

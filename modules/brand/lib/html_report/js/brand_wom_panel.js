@@ -281,14 +281,22 @@
     var focalRow = table.querySelector("tr.wom-row-focal");
     if (focalRow) focalCode = focalRow.getAttribute("data-wom-brand");
 
-    // Visible competitor order (table row order)
+    // Chart visibility is governed by __womHiddenChart (split-mode capable);
+    // when not yet initialised (pre-selector init), fall back to table-row
+    // hidden class so the chart still mirrors the legacy behaviour.
+    var chartHidden = panel.__womHiddenChart;
     var visibleOrdered = [];
-    if (focalCode) visibleOrdered.push(focalCode);
+    if (focalCode && (!chartHidden || !chartHidden.has(focalCode))) {
+      visibleOrdered.push(focalCode);
+    }
     table.querySelectorAll("tbody tr.wom-row").forEach(function (tr) {
       if (tr.classList.contains("wom-row-focal")) return;
-      if (tr.classList.contains("wom-row-hidden")) return;
       var bc = tr.getAttribute("data-wom-brand");
-      if (bc) visibleOrdered.push(bc);
+      if (!bc) return;
+      var hidden = chartHidden
+        ? chartHidden.has(bc)
+        : tr.classList.contains("wom-row-hidden");
+      if (!hidden) visibleOrdered.push(bc);
     });
 
     panel.querySelectorAll(".wom-chart-svg").forEach(function (svg) {
@@ -409,6 +417,8 @@
       ? codes.filter(function (c) { return c !== focal; })
       : [];
 
+    panel.__womHiddenChart = new Set(initialHidden);
+
     initialHidden.forEach(function (bc) {
       var row = table.querySelector('tr[data-wom-brand="' + cssEscape(bc) + '"]');
       if (row) row.classList.add("wom-row-hidden");
@@ -420,13 +430,20 @@
       triggerEl:     trigger,
       anchorEl:      trigger.parentElement,
       brands:        brandList,
-      mode:          "unified",
+      mode:          "split",
+      syncDefault:   true,
       initialHidden: initialHidden,
-      onChange:      function (hiddenSet) {
-        codes.forEach(function (bc) {
-          var row = table.querySelector('tr[data-wom-brand="' + cssEscape(bc) + '"]');
-          if (row) row.classList.toggle("wom-row-hidden", hiddenSet.has(bc));
-        });
+      initialHiddenChart: initialHidden,
+      onChange:      function (hiddenSet, scope) {
+        if (scope === "all" || scope === "table") {
+          codes.forEach(function (bc) {
+            var row = table.querySelector('tr[data-wom-brand="' + cssEscape(bc) + '"]');
+            if (row) row.classList.toggle("wom-row-hidden", hiddenSet.has(bc));
+          });
+        }
+        if (scope === "all" || scope === "chart") {
+          panel.__womHiddenChart = new Set(hiddenSet);
+        }
         reflowChart(panel);
       }
     });

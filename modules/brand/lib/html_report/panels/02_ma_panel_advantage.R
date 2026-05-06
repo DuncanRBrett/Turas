@@ -96,22 +96,13 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
        <span class="ma-adv-base-value">total respondents</span>
      </div>'
 
-  # BrandSelector trigger — replaces the legacy chip strip + Hide-all toggle.
-  brand_codes <- pd$config$brand_codes %||% character(0)
-  selector_trigger <- if (length(brand_codes) > 0L) {
-    build_brand_selector_trigger(
-      panel_id = "ma-advantage",
-      n_total  = length(brand_codes),
-      label    = "Filter brands"
-    )
-  } else ""
+  # Brand selector lives in .ma_focus_bar (panel-level), shared across sub-tabs.
 
   paste0(
     '<div class="ma-controls controls-bar ma-adv-controls">',
     '<div class="ma-meta-row">',
     stim_buttons,
     base_notation,
-    selector_trigger,
     '<label class="toggle-label"><input type="checkbox" data-ma-action="adv-show-counts"> Show counts</label>',
     '<label class="toggle-label"><input type="checkbox" data-ma-action="adv-show-chart" checked> Show chart</label>',
     '<button type="button" class="export-btn ma-pin-dropdown-btn" data-ma-action="adv-pindropdown" data-ma-pin-scope="advantage" title="Pin a section" aria-haspopup="true">&#128204; Pin &#9662;</button>',

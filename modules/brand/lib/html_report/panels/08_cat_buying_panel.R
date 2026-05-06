@@ -98,8 +98,8 @@ render_cat_buying_panel <- function(panel_data) {
   if (exists("cb_panel_css", mode = "function")) parts <- c(parts, cb_panel_css())
 
   parts <- c(parts, sprintf(
-    '<div class="cb-panel cb-on-context" id="%s" data-focal-colour="%s" data-chip-default="%s" style="--cb-focal-colour:%s;">',
-    panel_id, .cb_esc(fcol), chip_default, .cb_esc(fcol)))
+    '<div class="cb-panel cb-on-context" id="%s" data-cb-cat-code="%s" data-focal-colour="%s" data-chip-default="%s" style="--cb-focal-colour:%s;">',
+    panel_id, .cb_esc(cat_code), .cb_esc(fcol), chip_default, .cb_esc(fcol)))
 
   # JSON: per-brand KPI data for focal switcher
   parts <- c(parts, .cb_kpi_json_script(dn, bh, cat_code))
