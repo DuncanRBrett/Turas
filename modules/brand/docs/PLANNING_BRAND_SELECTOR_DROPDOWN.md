@@ -178,9 +178,46 @@ After each panel migration:
 
 ---
 
-## Execution Log (filled in as work progresses)
+## Execution Log
 
 | Step | Commit | Outcome |
 |------|--------|---------|
 | Pre-flight baseline | — | 1739 pass / 0 fail / 2 skip on main |
-| Branch + plan | — | `feature/brand-selector-dropdown` created |
+| Branch + plan | b74d1ee | `feature/brand-selector-dropdown` created + planning doc |
+| Shared component | fc3a2b6 | JS + CSS + R helpers + 32 tests; 1771 / 0 / 2 |
+| Demographics migration | d77903a | Proof-of-concept panel; 1771 / 0 / 2 |
+| Inline trigger + drop legend | ff9b7dc | Per Duncan's review feedback; 1760 / 0 / 2 |
+| Per-chart legend audit note | deb714a | Doc reminder for upcoming migrations |
+| Word of Mouth migration | 6128421 | Per-category dropdown wired to wom-focus-bar |
+| MA Attitude Advantage migration | e6e335a | Inline trigger in adv-controls-bar |
+| Brand Funnel migration | a823d68 | First split-mode panel + Sync footer toggle |
+| Mental Availability migration | 579939b | 3 sub-tabs (attributes / ceps split, metrics unified) |
+| Category Buying migration | 4c0099f | Per-category dropdown wired to cb-focus-bar |
+
+**Final test count:** 1760 pass / 0 fail / 2 skip (was 1739 pre-branch — net
++21 from the new selector-widget tests, no regressions).
+
+**Panels migrated:**
+- Demographics (unified)
+- Ad Hoc (out of scope — single-select per-question picker, kept as chips)
+- Word of Mouth (unified, per-category)
+- MA Attitude Advantage (unified, brand-level)
+- Brand Funnel (split mode + Sync footer)
+- Mental Availability ×3 sub-tabs (attributes split, ceps split, metrics unified)
+- Category Buying (unified, per-category)
+
+**Skipped panels:**
+- Portfolio (category chips not brand chips — different concern, out of scope)
+- Ad Hoc per-question picker (single-select radio behaviour, not multi-select)
+- Cat Buying secondary segment / comparison chips (contextual filters, not
+  brand selectors)
+
+**What still needs verification (browser, in `launch_turas`):**
+- Click-through every migrated panel to confirm the dropdown opens, brand
+  toggles correctly hide rows / chart series, All / None / Sync work, focal
+  changes keep the FOCAL pill on the right brand and don't lose the new
+  focal's visibility.
+- Confirm Pin / PNG / Excel exports still capture the right state.
+- Per-chart legends are intact on Funnel, MA, WoM, Cat Buying multi-brand
+  charts (audit gate documented above).
+
