@@ -221,7 +221,18 @@
     }
     if (!section) return;
 
-    var hasChart = !!section.querySelector("svg");
+    // hasChart: any SVG that ISN'T a toolbar icon (inside <button>) or a
+    // decorative card icon (inside [data-pin-as-table]). Matches the
+    // captureFromRoot skip-list so the popover offers the same options the
+    // actual pin will materialise.
+    var allSvgs = section.querySelectorAll("svg");
+    var hasChart = false;
+    for (var ci = 0; ci < allSvgs.length; ci++) {
+      var s = allSvgs[ci];
+      if (!s.closest("button") && !s.closest("[data-pin-as-table]")) {
+        hasChart = true; break;
+      }
+    }
     // Match captureFromRoot's selector list so smart-skip sees the same tables
     // the actual capture will find (pfo-table, fn-table, ma-table, plain table,
     // and any [data-pin-as-table] card-grid escape hatch used by Summary).
