@@ -18,36 +18,18 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
   if (is.null(metrics)) return("")
 
   brand_codes <- pd$config$brand_codes %||% character(0)
-  brand_names <- pd$config$brand_names %||% brand_codes
-  focal       <- pd$meta$focal_brand_code %||% brand_codes[1]
-  chip_default <- pd$config$chip_default %||% "focal_only"
-  is_focal_only <- identical(chip_default, "focal_only")
-  off_cls <- if (is_focal_only) " col-chip-off" else ""
-  toggle_label <- if (is_focal_only) "Show all" else "Hide all"
-
-  # Sort: focal first, then alphabetical by brand name
-  sorted_order <- order(brand_codes != focal, tolower(brand_names))
-  brand_codes  <- brand_codes[sorted_order]
-  brand_names  <- brand_names[sorted_order]
-
-  chips_html <- paste(c(
-    vapply(seq_along(brand_codes), function(i) {
-      bc <- brand_codes[i]
-      cls <- if (!is.null(focal) && bc == focal) "col-chip" else paste0("col-chip", off_cls)
-      sprintf(
-        '<button type="button" class="%s" data-ma-scope="metrics" data-ma-brand="%s">%s</button>',
-        cls, .ma_esc(bc), .ma_esc(brand_names[i]))
-    }, character(1)),
-    sprintf('<button type="button" class="ma-all-toggle" data-ma-action="toggleall" data-ma-scope="metrics">%s</button>',
-            toggle_label)
-  ), collapse = "")
+  selector_trigger <- if (length(brand_codes) > 0L) {
+    build_brand_selector_trigger(
+      panel_id = "ma-metrics",
+      n_total  = length(brand_codes),
+      label    = "Filter brands"
+    )
+  } else ""
 
   controls_bar <- paste0(
     '<div class="ma-controls controls-bar">',
-    '<div class="ma-ctl-group"><span class="ma-ctl-label">Show brands</span>',
-    '<div class="ma-chip-row col-chip-bar" data-ma-scope="metrics">', chips_html, '</div>',
-    '</div>',
     '<div class="ma-meta-row">',
+    selector_trigger,
     '<button type="button" class="export-btn ma-chart-select-btn" data-ma-action="chartselectmenu" aria-haspopup="true" aria-pressed="true" title="Select charts to show">&#10003; Show chart &#9662;</button>',
     '<label class="toggle-label"><input type="checkbox" data-ma-action="showcounts-metrics"> Show count</label>',
     '<button type="button" class="export-btn ma-pin-dropdown-btn" data-ma-action="pindropdown" title="Pin a section" aria-haspopup="true">&#128204; Pin &#9662;</button>',
