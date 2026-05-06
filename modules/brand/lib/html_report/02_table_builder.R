@@ -366,12 +366,6 @@ build_wom_tables <- function(wom, focal_brand) {
 }
 
 
-#' Build DBA tables
-#' @keywords internal
-build_dba_tables <- function(dba) {
-  if (is.null(dba) || identical(dba$status, "REFUSED")) return("")
-  build_br_table(
-    dba$dba_metrics, NULL, NULL,
-    pct_cols = c("Fame_Pct", "Uniqueness_Pct"),
-    title = "Distinctive Brand Assets \u2014 Fame \u00d7 Uniqueness")
-}
+# DBA tables are now part of the modern DBA panel (build_dba_panel_html).
+# The legacy build_dba_tables() function was removed when the modern panel
+# landed.

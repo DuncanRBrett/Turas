@@ -214,27 +214,9 @@ transform_brand_charts <- function(results, config) {
     }
   }
 
-  # 12. DBA Fame x Uniqueness grid
-  dba <- results$results$dba
-  if (!is.null(dba) && !identical(dba$status, "REFUSED") && !is.null(dba$dba_metrics)) {
-    fame_thresh <- (config$dba_fame_threshold %||% 0.5) * 100
-    unique_thresh <- (config$dba_uniqueness_threshold %||% 0.5) * 100
-
-    charts[["dba"]] <- list(
-      list(
-        svg = build_scatter(dba$dba_metrics, "Uniqueness_Pct", "Fame_Pct",
-                            "AssetLabel", focal_label = NULL,
-                            brand_colour = brand_colour,
-                            title = "DBA Grid \u2014 Fame \u00d7 Uniqueness",
-                            x_label = "Uniqueness (%)", y_label = "Fame (%)",
-                            x_suffix = "%", y_suffix = "%",
-                            quadrant_labels = c("Invest to Build", "Use or Lose",
-                                                 "Ignore or Test", "Avoid Alone"),
-                            ref_x = unique_thresh, ref_y = fame_thresh),
-        title = "DBA Fame x Uniqueness Grid"
-      )
-    )
-  }
+  # DBA Fame x Uniqueness grid is now rendered by the modern panel
+  # (build_dba_panel_html in transform_brand_panels \u2014 see panels[["dba"]]).
+  # The legacy chart+table path was removed when the modern panel landed.
 
   charts
 }
@@ -273,8 +255,8 @@ transform_brand_tables <- function(results, config) {
     }
   }
 
-  if (!is.null(results$results$dba))
-    tables[["dba"]] <- build_dba_tables(results$results$dba)
+  # DBA table is now part of the modern DBA panel (see panels[["dba"]]).
+  # build_dba_tables() and the legacy charts/dba entry have been removed.
 
   tables
 }
@@ -813,6 +795,41 @@ transform_brand_panels <- function(results, config) {
       if (!is.null(br_html)) {
         panels[[paste0("branded_reach_", cat_id)]] <- br_html
       }
+    }
+  }
+
+  # --- Distinctive Brand Assets (project-level, brand-scoped) ---
+  if (isTRUE(config$element_dba) &&
+      exists("build_dba_panel_data", mode = "function") &&
+      exists("build_dba_panel_html", mode = "function") &&
+      !is.null(results$results$dba)) {
+    dba_pd <- tryCatch(
+      build_dba_panel_data(
+        results$results$dba,
+        focal_brand    = config$focal_brand %||% "",
+        focal_colour   = config_focal_colour,
+        decimal_places = config$decimal_places %||% 0L,
+        wave_label     = as.character(config$wave %||% "")
+      ),
+      error = function(e) {
+        message(sprintf("[BRAND HTML] DBA panel-data build failed: %s",
+                        e$message))
+        NULL
+      }
+    )
+    if (!is.null(dba_pd)) {
+      dba_html <- tryCatch(
+        build_dba_panel_html(dba_pd,
+                              scope_id     = "section-dba",
+                              focal_colour = config_focal_colour,
+                              wave_label   = as.character(config$wave %||% "")),
+        error = function(e) {
+          message(sprintf("[BRAND HTML] DBA panel HTML build failed: %s",
+                          e$message))
+          NULL
+        }
+      )
+      if (!is.null(dba_html)) panels[["dba"]] <- dba_html
     }
   }
 

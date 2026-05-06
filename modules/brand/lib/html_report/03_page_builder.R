@@ -1080,18 +1080,14 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
   }
 
   # Brand-level panels
-  if (isTRUE(config$element_dba) && !is.null(results$results$dba)) {
-    dba_id <- "dba"
-    panel_parts <- c(panel_parts, sprintf(
-      '<div class="br-panel" id="panel-dba"><div class="br-element-section" id="section-%s" data-section="%s">%s',
-      dba_id, dba_id, build_br_section_toolbar(dba_id)))
-    if (!is.null(charts[["dba"]])) {
-      for (ch in charts[["dba"]]) {
-        panel_parts <- c(panel_parts, build_br_chart_wrapper(ch$svg, ch$title %||% ""))
-      }
-    }
-    if (!is.null(tables[["dba"]])) panel_parts <- c(panel_parts, tables[["dba"]])
-    panel_parts <- c(panel_parts, '</div></div>')
+  # DBA renders as a modern panel built in transform_brand_panels()
+  # and stored at panels[["dba"]]. The br-panel wrapper preserves the
+  # existing nav-id ("panel-dba") so report navigation continues working.
+  if (isTRUE(config$element_dba) && !is.null(panels[["dba"]])) {
+    panel_parts <- c(panel_parts,
+      '<div class="br-panel" id="panel-dba">',
+      panels[["dba"]],
+      '</div>')
   }
 
   # WOM is now per-category (sub-tab inside each category panel).
