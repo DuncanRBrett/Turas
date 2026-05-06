@@ -469,8 +469,13 @@ current navigation. Polish lands inside each sub-tab:
    Swap done; verify report.
 3. `feat(brand/branded-reach): insight callouts + image fallback +
    focal-brand highlighting`
-4. `feat(brand/branded-reach): pin/PNG export per card`
-5. `test(brand): expand BR + DBA panel test coverage`
+4. ~~`feat(brand/branded-reach): pin/PNG export per card`~~ — **dropped.**
+   On reading the existing code, per-card pin + PNG export was already
+   implemented at `.br_reach_card_toolbar` and the buttons are auto-
+   stripped from PNG captures by `brand_pins.js:29`. No additional code
+   needed; pin/PNG verification rolled into commit 5 (tests).
+5. `test(brand): expand BR + DBA panel test coverage` — also covers
+   pin section-id resolution + capture-strip behaviour.
 6. `docs(brand): update README + planning doc cross-references`
 
 Each commit must leave the suite green. Note: there is no separate

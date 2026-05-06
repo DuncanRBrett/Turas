@@ -149,9 +149,12 @@ build_branded_reach_panel_data <- function(result,
     df <- misattribution[[asset_id]]
     if (is.null(df) || !is.data.frame(df) || nrow(df) == 0L) next
     # Drop the focal row, the DK row, and the OTHER row to find the
-    # single competitor pulling the most credit.
-    competitors <- df[!isTRUE(df$is_correct) &
-                       !df$BrandCode %in% c("DK", "OTHER"), , drop = FALSE]
+    # single competitor pulling the most credit. Note: use a vectorised
+    # comparison — isTRUE() returns a scalar from a vector and would
+    # leave the focal row in the candidate set.
+    not_focal  <- !(df$is_correct %in% TRUE)
+    not_bucket <- !(df$BrandCode %in% c("DK", "OTHER"))
+    competitors <- df[not_focal & not_bucket, , drop = FALSE]
     if (nrow(competitors) == 0L) next
     top <- competitors[which.max(competitors$pct_of_seen), , drop = FALSE]
     if (!is.finite(top$pct_of_seen)) next
