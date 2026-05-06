@@ -185,6 +185,25 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   font-size: 10px; font-weight: 500; color: #94a3b8;
   font-variant-numeric: tabular-nums;
 }
+.brsum-card-header-right {
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.brsum-card-pin {
+  background: none; border: 1px solid transparent;
+  border-radius: 6px; padding: 2px 6px;
+  font-size: 13px; line-height: 1; cursor: pointer;
+  color: #cbd5e1; opacity: 0;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s, background 0.15s;
+}
+.brsum-card:hover .brsum-card-pin,
+.brsum-card-pin:focus-visible { opacity: 0.85; }
+.brsum-card-pin:hover {
+  color: #1a2744; border-color: #cbd5e1;
+  background: #f8fafc; opacity: 1;
+}
+.brsum-card-pin.is-pinned {
+  color: #047857; opacity: 1;
+}
 .brsum-card-body { flex: 1 1 auto; min-height: 56px; }
 .brsum-card-empty {
   font-size: 12px; color: #94a3b8; font-style: italic;
@@ -1785,16 +1804,27 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 
 
 .brsum_card_grid_skeleton <- function() {
+  # Each card is independently pinnable via the standard brand_pins.js
+  # workflow. The section's data-section="brsum-{key}" is what brTogglePin
+  # looks up, and data-pin-as-table on the body tells captureFromRoot to
+  # grab the rendered card content (no <table> or <svg> required).
   card <- function(key, title, wide = FALSE) {
     cls <- if (wide) ' brsum-card-wide' else ''
+    section_id <- paste0('brsum-', key)
     paste0(
       '<section class="brsum-card brsum-card-', key, cls,
-        '" data-brsum-card="', key, '">',
+        '" data-brsum-card="', key, '" data-section="', section_id, '">',
         '<header class="brsum-card-header">',
           '<h3 class="brsum-card-title">', title, '</h3>',
-          '<span class="brsum-card-meta" data-brsum-card-meta="', key, '"></span>',
+          '<div class="brsum-card-header-right">',
+            '<span class="brsum-card-meta" data-brsum-card-meta="', key, '"></span>',
+            '<button type="button" class="br-pin-btn brsum-card-pin" ',
+              'data-section="', section_id, '" ',
+              'onclick="brTogglePin(\'', section_id, '\')" ',
+              'title="Pin this card" aria-label="Pin this card">&#x1F4CC;</button>',
+          '</div>',
         '</header>',
-        '<div class="brsum-card-body" data-brsum-card-body="', key, '"></div>',
+        '<div class="brsum-card-body" data-brsum-card-body="', key, '" data-pin-as-table></div>',
       '</section>')
   }
   paste(
