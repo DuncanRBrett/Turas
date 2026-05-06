@@ -46,6 +46,7 @@ build_branded_reach_panel_html <- function(panel_data,
     sprintf('<script type="application/json" class="br-reach-panel-data">%s</script>',
             json_payload),
     .br_reach_subnav(category_code),
+    .br_reach_insight_strip(panel_data),
     .br_reach_subtab_overview(panel_data, category_code, focal_colour),
     .br_reach_subtab_misattribution(panel_data, category_code, focal_colour),
     .br_reach_subtab_media(panel_data, category_code, focal_colour),
@@ -292,18 +293,61 @@ build_branded_reach_panel_html <- function(panel_data,
 
 .br_reach_image_block <- function(ad) {
   img_path <- ad$image_path
+  asset_lbl <- .br_reach_esc(ad$asset_label %||% ad$asset_code)
+  asset_id  <- .br_reach_esc(ad$asset_code %||% "")
+
   if (is.null(img_path) || is.na(img_path) || !nzchar(trimws(img_path))) {
-    return('<div class="br-reach-img-placeholder" aria-label="No image supplied"><span>No image</span></div>')
+    return(.br_reach_image_placeholder(asset_lbl, asset_id))
   }
   sprintf(
-    '<div class="br-reach-img-wrap"><img class="br-reach-img" src="%s" alt="%s" onerror="this.parentNode.innerHTML=\'<div class=\\\'br-reach-img-placeholder\\\'><span>Image not found</span></div>\'"></div>',
-    .br_reach_esc(img_path),
-    .br_reach_esc(ad$asset_label %||% ad$asset_code))
+    '<div class="br-reach-img-wrap"><img class="br-reach-img" src="%s" alt="%s" onerror="this.outerHTML=brReachImageMissing(\'%s\')"></div>',
+    .br_reach_esc(img_path), asset_lbl, asset_id)
+}
+
+.br_reach_image_placeholder <- function(asset_lbl, asset_id) {
+  sprintf(
+'<div class="br-reach-img-wrap br-reach-img-placeholder" aria-label="No image supplied for %s">
+  <svg viewBox="0 0 80 60" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <rect x="2" y="2" width="76" height="56" rx="4" fill="none" stroke="#c8c1b1" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <circle cx="28" cy="26" r="6" fill="none" stroke="#c8c1b1" stroke-width="1.5"/>
+    <path d="M2 50 L28 30 L50 44 L78 22" fill="none" stroke="#c8c1b1" stroke-width="1.5"/>
+  </svg>
+  <span class="br-reach-img-placeholder-label">%s</span>
+</div>',
+    asset_lbl, asset_id)
 }
 
 
 # ==============================================================================
-# INSIGHT BOX
+# AUTO-GENERATED INSIGHT STRIP
+# ==============================================================================
+# Surfaces the (verb, text) callouts the panel-data builder produced from
+# per-ad metrics, misattribution, and media-mix tables. Renders as a chip
+# strip above the sub-tab content. Returns "" when there are no insights
+# to surface (e.g. placeholder mode).
+
+.br_reach_insight_strip <- function(pd) {
+  insights <- pd$insights %||% list()
+  if (length(insights) == 0L) return("")
+
+  chips <- paste(vapply(insights, function(it) {
+    verb <- .br_reach_esc(it$verb %||% "")
+    text <- .br_reach_esc(it$text %||% "")
+    sprintf(
+      '<li class="br-reach-insight-chip"><span class="br-reach-insight-verb">%s</span><span class="br-reach-insight-text">%s</span></li>',
+      verb, text)
+  }, character(1)), collapse = "")
+
+  sprintf(
+'<aside class="br-reach-insight-strip" aria-label="Branded reach key takeaways">
+  <ul class="br-reach-insight-list">%s</ul>
+</aside>',
+    chips)
+}
+
+
+# ==============================================================================
+# INSIGHT BOX (analyst-editable)
 # ==============================================================================
 
 .br_reach_insight_box <- function() {
@@ -432,9 +476,39 @@ build_branded_reach_panel_styles <- function(focal_colour = "#1A5276") {
 .br-reach-card-pin:hover, .br-reach-card-png:hover { background:#f1f5f9; border-color:#cbd5e1; color:#0f172a; }
 .br-reach-card-pin.pin-flash { background: %s; border-color: %s; color:#fff; }
 
-.br-reach-img-wrap { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; margin-bottom:12px; aspect-ratio: 16 / 9; display:flex; align-items:center; justify-content:center; }
+.br-reach-img-wrap { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; margin-bottom:12px; aspect-ratio: 16 / 9; display:flex; align-items:center; justify-content:center; padding:8px; }
 .br-reach-img      { max-width:100%%; max-height:100%%; object-fit:contain; display:block; }
-.br-reach-img-placeholder { width:100%%; height:100%%; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:11px; font-style:italic; background: repeating-linear-gradient(45deg, #f8fafc, #f8fafc 8px, #eef2f7 8px, #eef2f7 16px); }
+.br-reach-img-placeholder { flex-direction:column; gap:6px; color:#9c9587; background: repeating-linear-gradient(45deg, #f8fafc, #f8fafc 8px, #eef2f7 8px, #eef2f7 16px); }
+.br-reach-img-placeholder svg { width:80px; height:60px; display:block; }
+.br-reach-img-placeholder-label { font-size:11px; letter-spacing:0.6px; text-transform:uppercase; font-weight:600; color:#9c9587; }
+
+/* Auto-generated insight strip — chips above the sub-tab content */
+.br-reach-insight-strip {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  background:#fbfaf6;
+  border: 1px solid #e6e3da;
+  border-radius: 8px;
+}
+.br-reach-insight-list {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.br-reach-insight-chip {
+  display: flex; align-items: baseline; gap: 10px;
+  font-size: 13px; line-height: 1.45; color: #1f2933;
+}
+.br-reach-insight-verb {
+  flex: 0 0 auto;
+  display: inline-block; min-width: 64px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #efece4; color: #5e574a;
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 0.4px; text-transform: uppercase;
+  text-align: center;
+}
+.br-reach-insight-text { flex: 1 1 auto; }
 
 .br-reach-kpi-row { display:flex; gap:8px; margin: 6px 0 4px; }
 .br-reach-kpi { flex:1; border:1px solid #e2e8f0; border-radius:8px; padding:10px 8px; text-align:center; background:#fff; }
