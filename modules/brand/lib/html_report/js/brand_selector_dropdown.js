@@ -320,6 +320,15 @@
         state.brands.forEach(function (b) { b.isFocal = (b.code === focalCode); });
         if (state.popoverEl) rebuildBody(state);
       },
+      // Force a brand visible — removes from BOTH hidden sets (split mode safe)
+      // and refreshes the trigger count + open popover. Used by panels that
+      // need to guarantee the focal brand is always shown after a focal-change.
+      showBrand: function (code) {
+        state.hiddenTable.delete(code);
+        state.hiddenChart.delete(code);
+        refreshTriggerCount(state);
+        if (state.popoverEl) rebuildBody(state);
+      },
       refreshCount: function () { refreshTriggerCount(state); },
       destroy: function () { delete REGISTRY[state.panelId]; }
     };
