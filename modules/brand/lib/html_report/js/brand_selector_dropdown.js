@@ -123,8 +123,13 @@
 
     pop.appendChild(buildHeader(state));
 
-    var body = makeEl("div", "bs-popover-body" + (state.mode === "split" ? " bs-popover-body-split" : ""));
-    if (state.mode === "split") {
+    // Sync toggle sits at the top (above the checkbox list) so it's never
+    // hidden behind a long brand list. Only rendered for split-mode panels.
+    if (state.mode === "split") pop.appendChild(buildSyncFooter(state));
+
+    var splitColumns = state.mode === "split" && !state.syncMode;
+    var body = makeEl("div", "bs-popover-body" + (splitColumns ? " bs-popover-body-split" : ""));
+    if (splitColumns) {
       var colHeader = makeEl("div", "bs-popover-col-header");
       colHeader.appendChild(makeEl("span", "bs-popover-col-table",
         { text: state.labels.columnTable }));
@@ -133,11 +138,9 @@
       body.appendChild(colHeader);
     }
     state.brands.forEach(function (b) {
-      body.appendChild(buildRow(b, state, state.mode === "split" && !state.syncMode));
+      body.appendChild(buildRow(b, state, splitColumns));
     });
     pop.appendChild(body);
-
-    if (state.mode === "split") pop.appendChild(buildSyncFooter(state));
 
     return pop;
   }
@@ -206,8 +209,9 @@
 
   function rebuildBody(state) {
     var oldBody = state.popoverEl.querySelector(".bs-popover-body");
-    var newBody = makeEl("div", "bs-popover-body" + (state.mode === "split" ? " bs-popover-body-split" : ""));
-    if (state.mode === "split") {
+    var splitColumns = state.mode === "split" && !state.syncMode;
+    var newBody = makeEl("div", "bs-popover-body" + (splitColumns ? " bs-popover-body-split" : ""));
+    if (splitColumns) {
       var colHeader = makeEl("div", "bs-popover-col-header");
       colHeader.appendChild(makeEl("span", "bs-popover-col-table",
         { text: state.labels.columnTable }));
@@ -216,7 +220,7 @@
       newBody.appendChild(colHeader);
     }
     state.brands.forEach(function (b) {
-      var row = buildRow(b, state, state.mode === "split" && !state.syncMode);
+      var row = buildRow(b, state, splitColumns);
       newBody.appendChild(row);
       bindRowToggle(state, row);
     });

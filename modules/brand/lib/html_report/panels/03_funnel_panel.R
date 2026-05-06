@@ -152,12 +152,21 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
             .fn_esc(brand_codes[i]), sel, .fn_esc(brand_names[i]))
   }, character(1)), collapse = "")
 
+  selector_trigger <- if (length(brand_codes) > 0L) {
+    build_brand_selector_trigger(
+      panel_id = "funnel",
+      n_total  = length(brand_codes),
+      label    = "Filter brands"
+    )
+  } else ""
+
   sprintf(
     '<div class="fn-focus-bar">
        <label class="fn-ctl-label">Focal brand</label>
        <select class="fn-focus-select" data-fn-action="focus">%s</select>
+       %s
      </div>',
-    focus_options)
+    focus_options, selector_trigger)
 }
 
 
@@ -169,24 +178,12 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
 #' - \code{.export-btn} with the \u2B73 Export \u25BE icon
 #' @keywords internal
 .fn_table_controls <- function(pd) {
-  brand_codes <- pd$config$chip_picker$all_brands %||%
-    (pd$table$brand_codes %||% character(0))
-
-  # Single BrandSelector dropdown drives both table-row and chart-series
-  # visibility (split mode + Sync table+chart toggle). Replaces the old
-  # per-chip-bar table strip; the chart strip's brand chips are also gone.
-  selector_trigger <- if (length(brand_codes) > 0L) {
-    build_brand_selector_trigger(
-      panel_id = "funnel",
-      n_total  = length(brand_codes),
-      label    = "Filter brands"
-    )
-  } else ""
+  # BrandSelector trigger lives in .fn_focus_bar (next to the focal-brand
+  # <select>) — see Demographics / WoM / Cat Buying for the same pattern.
 
   paste0(
     '<div class="fn-controls controls-bar">',
     '<div class="fn-meta-row">',
-    selector_trigger,
     '<label class="toggle-label"><input type="checkbox" data-fn-action="showci"> Show heatmap</label>',
     '<label class="toggle-label"><input type="checkbox" data-fn-action="showcounts"> Show count</label>',
     '<label class="toggle-label"><input type="checkbox" checked data-fn-action="showchart"> Show chart</label>',

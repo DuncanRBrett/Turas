@@ -69,8 +69,8 @@ build_brand_selector_styles <- function() {
 
 /* Popover — dynamically inserted, anchored under trigger */
 .bs-popover {
-  min-width: 240px;
-  max-width: 360px;
+  min-width: 300px;
+  max-width: 420px;
   max-height: 480px;
   background: #ffffff;
   border: 1px solid #cbd5e1;
@@ -81,6 +81,10 @@ build_brand_selector_styles <- function() {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+/* Split-mode (Table+Chart) needs wider min so the two label columns fit */
+.bs-popover[data-bs-panel] .bs-popover-body-split {
+  min-width: 360px;
 }
 .bs-popover-header {
   display: flex;
@@ -119,16 +123,17 @@ build_brand_selector_styles <- function() {
 }
 .bs-popover-col-header {
   display: grid;
-  grid-template-columns: 24px 24px 16px 1fr;
-  gap: 6px;
-  padding: 4px 12px 6px 12px;
-  font-size: 11px;
-  font-weight: 600;
+  grid-template-columns: 50px 50px 16px 1fr auto;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: 10px;
+  font-weight: 700;
   color: #475569;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   border-bottom: 1px solid #e2e8f0;
   margin-bottom: 4px;
+  background: #f8fafc;
 }
 .bs-popover-col-table { grid-column: 1; text-align: center; }
 .bs-popover-col-chart { grid-column: 2; text-align: center; }
@@ -143,10 +148,12 @@ build_brand_selector_styles <- function() {
 .bs-popover-row:hover { background: #f1f5f9; }
 .bs-popover-body-split .bs-popover-row {
   display: grid;
-  grid-template-columns: 24px 24px 16px 1fr auto;
-  gap: 6px;
+  grid-template-columns: 50px 50px 16px 1fr auto;
+  gap: 8px;
   align-items: center;
 }
+.bs-popover-body-split .bs-popover-checkbox-table { justify-self: center; }
+.bs-popover-body-split .bs-popover-checkbox-chart { justify-self: center; }
 .bs-popover-row-focal {
   background: rgba(26, 82, 118, 0.06);
   font-weight: 600;
@@ -183,9 +190,10 @@ build_brand_selector_styles <- function() {
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
-  border-top: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
   background: #f8fafc;
   font-size: 12px;
+  font-weight: 500;
   color: #475569;
   cursor: pointer;
   user-select: none;
