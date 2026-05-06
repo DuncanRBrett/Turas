@@ -74,6 +74,7 @@ BRAND_VERSION <- "1.0"
     "05a_wom_panel_data.R",
     "06_drivers_barriers.R",
     "07_dba.R",
+    "07a_dba_panel_data.R",
     "08_cat_buying.R",
     "08b_brand_volume.R",
     "08c_dirichlet_norms.R",
