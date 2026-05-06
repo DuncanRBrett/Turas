@@ -2,8 +2,34 @@
 
 **Author:** Duncan Brett (planning) + Claude (drafting)
 **Date:** 2026-05-06
-**Branch:** `feature/branded-reach-and-dba` (to be created from `main`)
-**Status:** PLANNING → ready for execution sign-off
+**Branch:** `feature/branded-reach-and-dba`
+**Status:** EXECUTED — ready for browser verification + PR sign-off
+
+---
+
+## Execution log (2026-05-06)
+
+| Step | Commit | Outcome |
+|------|--------|---------|
+| Pre-flight baseline | — | HTML + 1653/1651/0/2 tests captured at `~/.turas-baselines/IPK_pre_BR_DBA_branch/` |
+| Branch + plan | 735e192 | `feature/branded-reach-and-dba` created from main |
+| Fixture script | 9637f1c | `BR_DBA_test/{placeholder,populated}/` builder + readme |
+| Commit 1 — DBA panel files | b70d9bf | 7 new files (~1030 active lines), all source clean, smoke-tested |
+| Commit 2 — Wire + remove legacy | 6a0d108c | Modern panel renders; legacy chart+table fully removed |
+| Commit 3 — BR polish | 9114568d | Insight strip + SVG image fallback + (focal highlighting unchanged — was already correct) |
+| Commit 4 — BR pin/PNG | DROPPED | Already implemented at `.br_reach_card_toolbar` |
+| Commit 5 — Test coverage | 5fbcae20 | +86 tests (58 DBA panel + 28 BR polish). Caught + fixed a vectorisation bug in `.br_worst_misattribution`. |
+| Commit 6 — Docs | (this commit) | README + planning doc cross-references |
+
+**Final test counts:** 1739 total / 1737 pass / 0 fail / 2 skip (was 1653/1651/0/2). Net +86 tests, no regressions.
+
+**Canonical IPK regression:** confirmed at multiple points — no HTML elements emitted for DBA or BR (both flags remain N for IPK), only ~5KB of CSS bytes added to the bundled stylesheet (matches the convention every other panel follows).
+
+**What's left before merge:**
+1. Browser verification in `launch_turas()` against `BR_DBA_test/placeholder/` and `BR_DBA_test/populated/`.
+2. Final IPK regression run via `launch_turas()` against the canonical config — confirm no visible change to existing IPK report output.
+
+---
 
 > ## ⚠️ Hard Constraint — IPK Project Must Not Be Impacted
 >

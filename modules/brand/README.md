@@ -110,11 +110,16 @@ modules/brand/
       03_page_builder.R          -- Full HTML page assembly
       04_chart_builder.R         -- Inline SVG charts
       panels/                    -- Per-element panel renderers (auto-loaded)
+        00_shared_placeholder.R    -- shared "Data not yet collected" card
+        07_dba_panel*.R            -- DBA modern panel (orchestrator + quadrant + detail + styling)
+        10_branded_reach_panel.R   -- Branded Reach panel (3 sub-tabs)
   tests/
-    testthat/                    -- 447 test blocks / 1651+ assertions
+    testthat/                    -- 1737+ assertions (was 1651; +86 from BR + DBA panel coverage)
     fixtures/
       ipk_wave1/                 -- IPK 9-category synthetic fixture
         00_generate.R            -- Run ipk_generate_fixture() to build .xlsx files
+      br_dba_test/               -- Build script for the BR_DBA_test fixtures
+                                    in OneDrive (placeholder + populated). See README.
   docs/
     BRAND_CONFIG_GUIDE.md        -- Full configuration reference
     BRAND_REPORT_USER_GUIDE.md   -- End-user report guide
