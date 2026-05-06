@@ -188,13 +188,30 @@ process_banner_question <- function(banner_questions, banner_idx,
   is_boxcategory <- !is.na(banner_questions$BannerBoxCategory[banner_idx]) &&
                     banner_questions$BannerBoxCategory[banner_idx] == "Y"
   
-  # Get options
+  # Get options — exact root-code lookup
   options <- survey_structure$options[
     survey_structure$options$QuestionCode == banner_code &
-    (survey_structure$options$ShowInOutput == "Y" | 
-     is.na(survey_structure$options$ShowInOutput)), 
+    (survey_structure$options$ShowInOutput == "Y" |
+     is.na(survey_structure$options$ShowInOutput)),
   ]
-  
+
+  # For slot-indexed Multi_Mention questions (e.g. BRANDPEN1_DSS stored across
+  # BRANDPEN1_DSS_1, BRANDPEN1_DSS_2, ...) the Options sheet holds entries per
+  # slot rather than under the root code.  Fall back to collecting those slot
+  # options and deduplicating by OptionText so the banner processor gets the
+  # correct option list without requiring duplicate root-code entries.
+  if (nrow(options) == 0 && question_info$Variable_Type == "Multi_Mention") {
+    slot_pattern <- paste0("^", banner_code, "_[0-9]+$")
+    slot_options <- survey_structure$options[
+      grepl(slot_pattern, survey_structure$options$QuestionCode) &
+      (survey_structure$options$ShowInOutput == "Y" |
+       is.na(survey_structure$options$ShowInOutput)),
+    ]
+    if (nrow(slot_options) > 0) {
+      options <- slot_options[!duplicated(slot_options$OptionText), ]
+    }
+  }
+
   # Sort options by display order if available
   if ("DisplayOrder" %in% names(options) && 
       !all(is.na(options$DisplayOrder))) {

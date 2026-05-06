@@ -462,3 +462,138 @@ test_that("creates banner with only Total column", {
   expect_equal(length(result$columns), 1)
   expect_equal(length(result$letters), 1)
 })
+
+
+# ==============================================================================
+# 10. Slot-indexed Multi_Mention banner (CFG_BANNER_NO_OPTIONS regression)
+# ==============================================================================
+
+context("slot-indexed Multi_Mention banner")
+
+make_slot_indexed_survey_structure <- function() {
+  # Simulates BRANDPEN1_DSS stored across 3 slot columns, with options defined
+  # per-slot (BRANDPEN1_DSS_1, _2, _3) rather than under the root code.
+  brands <- c("ROB", "CHS", "IPK")
+  brand_labels <- c("Robertsons", "Cape Herb & Spice", "Ina Paarman's Kitchen")
+  slot_codes <- paste0("BRANDPEN1_DSS_", 1:3)
+
+  options_df <- do.call(rbind, lapply(slot_codes, function(code) {
+    data.frame(
+      QuestionCode   = code,
+      OptionText     = brands,
+      DisplayText    = brand_labels,
+      ShowInOutput   = "Y",
+      DisplayOrder   = seq_along(brands),
+      stringsAsFactors = FALSE
+    )
+  }))
+
+  list(
+    questions = data.frame(
+      QuestionCode  = "BRANDPEN1_DSS",
+      QuestionText  = "Which brands have you purchased?",
+      Variable_Type = "Multi_Mention",
+      Columns       = "3",
+      stringsAsFactors = FALSE
+    ),
+    options = options_df
+  )
+}
+
+make_slot_indexed_selection <- function() {
+  data.frame(
+    QuestionCode    = "BRANDPEN1_DSS",
+    Include         = "N",
+    UseBanner       = "Y",
+    BannerBoxCategory = "N",
+    DisplayOrder    = 1,
+    stringsAsFactors = FALSE
+  )
+}
+
+test_that("slot-indexed Multi_Mention banner creates structure without error", {
+  result <- tryCatch(
+    create_banner_structure(
+      make_slot_indexed_selection(),
+      make_slot_indexed_survey_structure()
+    ),
+    turas_refusal = function(e) e
+  )
+  expect_false(inherits(result, "turas_refusal"))
+  # Total + 3 brand options
+  expect_equal(length(result$columns), 4)
+  expect_true("Robertsons" %in% result$columns)
+  expect_true("Cape Herb & Spice" %in% result$columns)
+  expect_true("Ina Paarman's Kitchen" %in% result$columns)
+})
+
+test_that("slot-indexed banner deduplicates options — each brand appears once", {
+  result <- create_banner_structure(
+    make_slot_indexed_selection(),
+    make_slot_indexed_survey_structure()
+  )
+  brand_cols <- result$columns[result$columns != "Total"]
+  expect_equal(length(brand_cols), 3)
+  expect_equal(length(unique(brand_cols)), 3)
+})
+
+test_that("slot-indexed banner internal keys use root code", {
+  result <- create_banner_structure(
+    make_slot_indexed_selection(),
+    make_slot_indexed_survey_structure()
+  )
+  brand_keys <- result$internal_keys[!grepl("^TOTAL", result$internal_keys)]
+  expect_true(all(grepl("^BRANDPEN1_DSS::", brand_keys)))
+})
+
+test_that("slot-indexed Multi_Mention banner row indices use OR logic across slots", {
+  # R1: ROB in slot1 only
+  # R2: CHS in slot1, ROB in slot2
+  # R3: IPK in slot1
+  # R4: ROB in slot2
+  # R5: CHS in slot2
+  data <- data.frame(
+    BRANDPEN1_DSS_1 = c("ROB", "CHS", "IPK", NA,    "CHS"),
+    BRANDPEN1_DSS_2 = c(NA,    "ROB", NA,    "ROB", NA),
+    BRANDPEN1_DSS_3 = c(NA,    NA,    NA,    NA,    NA),
+    stringsAsFactors = FALSE
+  )
+
+  banner  <- create_banner_structure(
+    make_slot_indexed_selection(),
+    make_slot_indexed_survey_structure()
+  )
+  indices <- create_banner_row_indices(data, banner)
+
+  rob_key <- "BRANDPEN1_DSS::Robertsons"
+  chs_key <- "BRANDPEN1_DSS::Cape Herb & Spice"
+  ipk_key <- "BRANDPEN1_DSS::Ina Paarman's Kitchen"
+
+  expect_equal(sort(indices$row_indices[[rob_key]]), c(1L, 2L, 4L))
+  expect_equal(sort(indices$row_indices[[chs_key]]), c(2L, 5L))
+  expect_equal(sort(indices$row_indices[[ipk_key]]), c(3L))
+})
+
+test_that("exact root-code options take priority over slot fallback", {
+  # If the user has already defined options under the root code, use those.
+  survey_structure <- make_slot_indexed_survey_structure()
+  survey_structure$options <- rbind(
+    data.frame(
+      QuestionCode = "BRANDPEN1_DSS",
+      OptionText   = c("ROB", "CHS"),
+      DisplayText  = c("Robertsons", "Cape Herb & Spice"),
+      ShowInOutput = "Y",
+      DisplayOrder = c(1, 2),
+      stringsAsFactors = FALSE
+    ),
+    survey_structure$options
+  )
+  result <- create_banner_structure(
+    make_slot_indexed_selection(),
+    survey_structure
+  )
+  brand_cols <- result$columns[result$columns != "Total"]
+  # Only 2 columns from root-code definition, not 3 from slots
+  expect_equal(length(brand_cols), 2)
+  expect_equal(brand_cols, c("Robertsons", "Cape Herb & Spice"))
+})
