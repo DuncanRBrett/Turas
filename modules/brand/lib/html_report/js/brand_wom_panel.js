@@ -3,12 +3,13 @@
  *
  * Live controls:
  *   - Focal-brand dropdown    (.wom-focus-select)             → repins focal row
- *   - Coloured brand chips    ([data-wom-action="toggle-row"])→ show/hide row + chart bar
+ *   - BrandSelector dropdown  (.bs-trigger[data-bs-panel="wom-{cat}"])
+ *                                                              → show/hide row + chart bar
  *   - Any column header       ([data-wom-action="sort"])      → asc/desc sort
  *   - Show chart checkbox     ([data-wom-action="showchart"]) → toggles chart
  *   - Heard/Said variant seg  ([data-wom-action="variant"])   → swaps SVG variant
  *
- * Chart ↔ table coupling: any reorder or chip toggle calls reflowChart(),
+ * Chart ↔ table coupling: any reorder or selector toggle calls reflowChart(),
  * which hides/shows and repositions <g class="wom-bar-row"> groups so the
  * chart mirrors the visible row order of the table.
  */
@@ -23,6 +24,10 @@
     if (!table) return;
 
     var accent = panel.getAttribute("data-focal-colour") || "#1A5276";
+    var catCode = panel.getAttribute("data-cat-code") || "";
+    var chipDefault = panel.getAttribute("data-chip-default") || "focal_only";
+    var panelData = readWomPanelData(panel);
+    var selectorHandle = bindWomBrandSelector(panel, table, panelData, catCode, chipDefault);
 
     // --- Focal brand dropdown
     var select = panel.querySelector(".wom-focus-select");
@@ -31,53 +36,11 @@
         var brand = select.value;
         if (!brand) return;
         repinFocal(panel, table, brand, accent);
-        syncChipActivity(panel);
+        if (selectorHandle && typeof selectorHandle.setFocal === "function") {
+          selectorHandle.setFocal(brand);
+        }
       });
     }
-
-    // --- Brand show/hide chips
-    panel.querySelectorAll('[data-wom-action="toggle-row"]').forEach(function (chip) {
-      // Seed row visibility from chip .active state so chip_default = focal_only
-      // hides non-focal rows on first render.
-      var bc0 = chip.getAttribute("data-wom-brand");
-      if (bc0) {
-        var row0 = table.querySelector('tr[data-wom-brand="' + cssEscape(bc0) + '"]');
-        if (row0) row0.classList.toggle('wom-row-hidden', !chip.classList.contains('active'));
-      }
-      chip.addEventListener("click", function (ev) {
-        ev.preventDefault();
-        var bc = chip.getAttribute("data-wom-brand");
-        if (!bc) return;
-        var row = table.querySelector('tr[data-wom-brand="' + cssEscape(bc) + '"]');
-        if (!row) return;
-        var active = chip.classList.toggle("active");
-        row.classList.toggle("wom-row-hidden", !active);
-        reflowChart(panel);
-      });
-    });
-
-    // Show all / Hide all toggle
-    panel.querySelectorAll('[data-wom-action="toggleall"]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var focalRow = table.querySelector('tr.wom-row-focal');
-        var focalCode = focalRow ? focalRow.getAttribute('data-wom-brand') : null;
-        var chips = panel.querySelectorAll('[data-wom-action="toggle-row"]');
-        var nonFocal = [];
-        chips.forEach(function (c) {
-          if (c.getAttribute('data-wom-brand') !== focalCode) nonFocal.push(c);
-        });
-        var allOn = nonFocal.every(function (c) { return c.classList.contains('active'); });
-        var nextState = !allOn;
-        nonFocal.forEach(function (c) {
-          var bc = c.getAttribute('data-wom-brand');
-          c.classList.toggle('active', nextState);
-          var row = table.querySelector('tr[data-wom-brand="' + cssEscape(bc) + '"]');
-          if (row) row.classList.toggle('wom-row-hidden', !nextState);
-        });
-        reflowChart(panel);
-        btn.textContent = nextState ? 'Hide all' : 'Show all';
-      });
-    });
 
     // --- Column sort (Brand = alpha, data cols = numeric on data-wom-val)
     panel.querySelectorAll('[data-wom-action="sort"]').forEach(function (th) {
@@ -244,19 +207,6 @@
       focalLbl.appendChild(badge);
     }
 
-    // Move focal to FOCAL chip, strip badge from the old chip
-    panel.querySelectorAll(".wom-brand-chip").forEach(function (chip) {
-      var b = chip.querySelector(".fn-focal-badge");
-      if (b) b.remove();
-      if (chip.getAttribute("data-wom-brand") === focalCode) {
-        chip.appendChild(document.createTextNode(" "));
-        var nb = document.createElement("span");
-        nb.className = "fn-focal-badge";
-        nb.textContent = "FOCAL";
-        chip.appendChild(nb);
-      }
-    });
-
     compRows.sort(function (a, b) {
       return (a.dataset.womSortKey || "").localeCompare(b.dataset.womSortKey || "");
     });
@@ -331,14 +281,22 @@
     var focalRow = table.querySelector("tr.wom-row-focal");
     if (focalRow) focalCode = focalRow.getAttribute("data-wom-brand");
 
-    // Visible competitor order (table row order)
+    // Chart visibility is governed by __womHiddenChart (split-mode capable);
+    // when not yet initialised (pre-selector init), fall back to table-row
+    // hidden class so the chart still mirrors the legacy behaviour.
+    var chartHidden = panel.__womHiddenChart;
     var visibleOrdered = [];
-    if (focalCode) visibleOrdered.push(focalCode);
+    if (focalCode && (!chartHidden || !chartHidden.has(focalCode))) {
+      visibleOrdered.push(focalCode);
+    }
     table.querySelectorAll("tbody tr.wom-row").forEach(function (tr) {
       if (tr.classList.contains("wom-row-focal")) return;
-      if (tr.classList.contains("wom-row-hidden")) return;
       var bc = tr.getAttribute("data-wom-brand");
-      if (bc) visibleOrdered.push(bc);
+      if (!bc) return;
+      var hidden = chartHidden
+        ? chartHidden.has(bc)
+        : tr.classList.contains("wom-row-hidden");
+      if (!hidden) visibleOrdered.push(bc);
     });
 
     panel.querySelectorAll(".wom-chart-svg").forEach(function (svg) {
@@ -427,8 +385,81 @@
     }
   }
 
-  function syncChipActivity(panel) {
-    // No-op: chip "active" state is independent of focal selection.
+  // ---- BrandSelector dropdown wiring ----------------------------------------
+
+  function readWomPanelData(panel) {
+    var node = panel.querySelector(".wom-panel-data");
+    if (!node) return null;
+    try { return JSON.parse(node.textContent || "{}"); }
+    catch (e) { return null; }
+  }
+
+  function bindWomBrandSelector(panel, table, panelData, catCode, chipDefault) {
+    if (!panelData || !panelData.config) return null;
+    var trigger = panel.querySelector('.bs-trigger[data-bs-panel="wom-' +
+                                       catCode.replace(/"/g, "") + '"]');
+    if (!trigger || typeof window.BrandSelector === "undefined") return null;
+    var codes  = panelData.config.brand_codes  || [];
+    var labels = panelData.config.brand_names  || codes;
+    var colours = panelData.config.brand_colours || {};
+    var focal = (panelData.meta && panelData.meta.focal_brand_code) || codes[0];
+    var brandList = codes.map(function (c, i) {
+      return {
+        code:    c,
+        label:   labels[i] || c,
+        color:   colours[c] || stableColour(c, focal, panelData.focal_colour),
+        isFocal: c === focal
+      };
+    });
+
+    // Initial visibility: focal_only hides every non-focal row at start.
+    var initialHidden = chipDefault === "focal_only"
+      ? codes.filter(function (c) { return c !== focal; })
+      : [];
+
+    panel.__womHiddenChart = new Set(initialHidden);
+
+    initialHidden.forEach(function (bc) {
+      var row = table.querySelector('tr[data-wom-brand="' + cssEscape(bc) + '"]');
+      if (row) row.classList.add("wom-row-hidden");
+    });
+    reflowChart(panel);
+
+    return window.BrandSelector.create({
+      panelId:       "wom-" + catCode,
+      triggerEl:     trigger,
+      anchorEl:      trigger.parentElement,
+      brands:        brandList,
+      mode:          "split",
+      syncDefault:   true,
+      initialHidden: initialHidden,
+      initialHiddenChart: initialHidden,
+      onChange:      function (hiddenSet, scope) {
+        if (scope === "all" || scope === "table") {
+          codes.forEach(function (bc) {
+            var row = table.querySelector('tr[data-wom-brand="' + cssEscape(bc) + '"]');
+            if (row) row.classList.toggle("wom-row-hidden", hiddenSet.has(bc));
+          });
+        }
+        if (scope === "all" || scope === "chart") {
+          panel.__womHiddenChart = new Set(hiddenSet);
+        }
+        reflowChart(panel);
+      }
+    });
+  }
+
+  // DJB2-style stable colour fallback — mirrors the R side .stable_col() used
+  // when the config palette doesn't supply an explicit colour for a brand.
+  function stableColour(brandCode, focal, focalColour) {
+    var palette = ['#4e79a7','#f28e2b','#e15759','#76b7b2','#59a14f',
+                   '#edc948','#b07aa1','#ff9da7','#9c755f','#bab0ac'];
+    if (focal && brandCode === focal && focalColour) return focalColour;
+    var h = 5381;
+    for (var i = 0; i < brandCode.length; i++) {
+      h = ((h * 33) + brandCode.charCodeAt(i)) % 2147483648;
+    }
+    return palette[h % palette.length];
   }
 
   function cssEscape(s) {

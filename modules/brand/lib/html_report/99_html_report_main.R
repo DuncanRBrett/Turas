@@ -151,6 +151,11 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
   # Load panel styles + JS (funnel + mental availability)
   brand_colour_cfg <- config$colour_focal %||% "#1A5276"
   panel_styles <- ""
+  if (exists("build_brand_selector_styles", mode = "function")) {
+    panel_styles <- paste(panel_styles,
+      tryCatch(build_brand_selector_styles(), error = function(e) ""),
+      sep = "\n")
+  }
   if (exists("build_funnel_panel_styles", mode = "function")) {
     panel_styles <- paste(panel_styles,
       tryCatch(build_funnel_panel_styles(brand_colour_cfg),
@@ -260,6 +265,7 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
   }
   panel_js <- paste(
     .resolve_js("brand_colours.js"),
+    .resolve_js("brand_selector_dropdown.js"),
     .resolve_js("brand_funnel_panel.js"),
     .resolve_js("brand_ma_panel.js"),
     .resolve_js("brand_ma_advantage.js"),

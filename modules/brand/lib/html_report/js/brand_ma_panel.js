@@ -181,18 +181,15 @@
                       ceps:       { col: null, dir: 'none' } }
     };
 
-    colourChips(panel);
-
     bindSubTabs(panel);
     bindFocusSelect(panel);
-    bindChipPicker(panel);
-    bindChartChips(panel);
+    bindMaPanelBrandSelector(panel);
+    bindCatAvgChip(panel);
     bindToggles(panel);
     bindBaseMode(panel);
     bindHeatmapMode(panel);
     bindSortButtons(panel);
     bindMetricsSortButtons(panel);
-    bindMetricsChips(panel);
     bindMetricsShowCounts(panel);
     bindMetricsScatterRange(panel);
     bindChartSelectMenu(panel);
@@ -218,19 +215,9 @@
     // hides matrix columns (not just greys the chips).
     applyColumnVisibility(panel, 'attributes');
     applyColumnVisibility(panel, 'ceps');
-    // Metrics rows are DOM-driven (no vis map) — mirror chip col-chip-off
-    // state to row display so non-focal rows hide on init.
-    (function () {
-      var table = panel.querySelector('.ma-metrics-table');
-      if (!table) return;
-      panel.querySelectorAll('.col-chip[data-ma-scope="metrics"].col-chip-off').forEach(function (chip) {
-        var code = chip.getAttribute('data-ma-brand');
-        if (!code) return;
-        table.querySelectorAll('tbody tr.ma-row[data-ma-brand="' + code + '"]').forEach(function (r) {
-          r.style.display = 'none';
-        });
-      });
-    })();
+    // Metrics row visibility is seeded by bindMABrandSelector(panel,'metrics')
+    // when the dropdown is created — initialHidden hides non-focal rows when
+    // chip_default = focal_only.
     renderChart(panel, 'attributes');
     renderChart(panel, 'ceps');
     repositionMetricsPinnedRows(panel);
@@ -279,17 +266,129 @@
     } catch (e) { /* ignore */ }
   }
 
-  function colourChips(panel) {
+  // ONE panel-level BrandSelector controls visibility across all four MA
+  // sub-tabs (Attributes, CEPs, Mental Advantage, Metrics) in lock-step.
+  // Split mode + Sync table+chart toggle (default ON) — applies the same
+  // table/chart split across every sub-tab so analysts can desync once and
+  // see the effect everywhere.
+  function bindMaPanelBrandSelector(panel) {
+    if (typeof window.BrandSelector === 'undefined') return;
+    var trigger = panel.querySelector('.bs-trigger[data-bs-panel="ma"]');
+    if (!trigger) return;
+    var pd = panel.__maData; if (!pd || !pd.config) return;
+    var codes  = pd.config.brand_codes  || [];
+    var labels = pd.config.brand_names  || codes;
+    var focal  = (pd.meta && pd.meta.focal_brand_code) || codes[0];
+    var brandList = codes.map(function (c, i) {
+      return {
+        code:    c,
+        label:   labels[i] || c,
+        color:   getBrandColour(pd, c),
+        isFocal: c === focal
+      };
+    });
+
+    var chipDefault = pd.config.chip_default || 'focal_only';
+    var initialHidden = chipDefault === 'focal_only'
+      ? codes.filter(function (c) { return c !== focal; })
+      : [];
+
+    // Seed every sub-tab's visibility maps so initial render hides non-focal
+    // columns/rows correctly under chip_default = focal_only.
+    panel.__maAdvHiddenBrands = panel.__maAdvHiddenBrands || {};
+    initialHidden.forEach(function (c) {
+      if (panel.__maState.visible.attributes)      panel.__maState.visible.attributes[c]      = false;
+      if (panel.__maState.visible.ceps)            panel.__maState.visible.ceps[c]            = false;
+      if (panel.__maState.chartVisible.attributes) panel.__maState.chartVisible.attributes[c] = false;
+      if (panel.__maState.chartVisible.ceps)       panel.__maState.chartVisible.ceps[c]       = false;
+      panel.__maAdvHiddenBrands[c] = true;
+    });
+    var metricsTable = panel.querySelector('.ma-metrics-table');
+    if (metricsTable) {
+      initialHidden.forEach(function (c) {
+        metricsTable.querySelectorAll('tbody tr.ma-row[data-ma-brand="' + c + '"]').forEach(function (r) {
+          r.style.display = 'none';
+        });
+      });
+    }
+
+    panel.__maSelector = window.BrandSelector.create({
+      panelId:            'ma',
+      triggerEl:          trigger,
+      anchorEl:           trigger.parentElement,
+      brands:             brandList,
+      mode:               'split',
+      syncDefault:        true,
+      initialHidden:      initialHidden,
+      initialHiddenChart: initialHidden,
+      onChange: function (hiddenSet, scope) {
+        applyMaSelectorChange(panel, hiddenSet, scope);
+      }
+    });
+  }
+
+  // Apply a hidden-set change from the panel-level BrandSelector across all
+  // four sub-tabs. scope = "table" | "chart" | "all" (sync mode).
+  function applyMaSelectorChange(panel, hiddenSet, scope) {
     var pd = panel.__maData;
-    var focal = panel.__maState.focal;
-    panel.querySelectorAll('.col-chip[data-ma-brand]').forEach(function (chip) {
-      var code = chip.getAttribute('data-ma-brand');
-      var col  = code === '__avg__' ? '#64748b' : getBrandColour(pd, code);
-      chip.style.setProperty('--brand-chip-color', col);
-      chip.style.backgroundColor = col;
-      chip.style.borderColor = col;
-      chip.style.color = '#fff';
-      chip.style.fontWeight = code === focal ? '700' : '500';
+    if (!pd) return;
+    var codes = (pd.config && pd.config.brand_codes) || [];
+
+    if (scope === 'all' || scope === 'table') {
+      codes.forEach(function (c) {
+        if (panel.__maState.visible.attributes) panel.__maState.visible.attributes[c] = !hiddenSet.has(c);
+        if (panel.__maState.visible.ceps)       panel.__maState.visible.ceps[c]       = !hiddenSet.has(c);
+        panel.__maAdvHiddenBrands[c] = hiddenSet.has(c);
+      });
+      applyColumnVisibility(panel, 'attributes');
+      applyColumnVisibility(panel, 'ceps');
+      // Metrics row visibility (DOM-driven)
+      var table = panel.querySelector('.ma-metrics-table');
+      if (table) {
+        codes.forEach(function (c) {
+          table.querySelectorAll('tbody tr.ma-row[data-ma-brand="' + c + '"]').forEach(function (r) {
+            r.style.display = hiddenSet.has(c) ? 'none' : '';
+          });
+        });
+      }
+      // Mental Advantage matrix column visibility
+      if (typeof applyBrandColumnVisibility === 'function') {
+        applyBrandColumnVisibility(panel);
+      }
+    }
+    if (scope === 'all' || scope === 'chart') {
+      codes.forEach(function (c) {
+        if (panel.__maState.chartVisible.attributes) panel.__maState.chartVisible.attributes[c] = !hiddenSet.has(c);
+        if (panel.__maState.chartVisible.ceps)       panel.__maState.chartVisible.ceps[c]       = !hiddenSet.has(c);
+      });
+      renderChart(panel, 'attributes');
+      renderChart(panel, 'ceps');
+      renderMAScatter(panel);
+      renderMABarChart(panel);
+    }
+    if (window.MAAdvantage && typeof window.MAAdvantage.render === 'function') {
+      try { window.MAAdvantage.render(panel); } catch (e) { /* non-fatal */ }
+    }
+  }
+
+  // Cat Avg standalone chip (panel-level). Toggles the __avg__ column in
+  // both the Attributes AND CEPs matrices in lock-step. Mental Advantage
+  // and Metrics don't render a Cat avg column, so this is a no-op there.
+  function bindCatAvgChip(panel) {
+    panel.querySelectorAll('.ma-cat-avg-chip[data-ma-action="toggle-avg"]').forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        ['attributes', 'ceps'].forEach(function (stim) {
+          var vis = panel.__maState.visible[stim];
+          if (!vis) return;
+          var on = vis['__avg__'] === false;
+          vis['__avg__'] = on;
+          applyColumnVisibility(panel, stim);
+          renderChart(panel, stim);
+        });
+        var anyOn = (panel.__maState.visible.attributes && panel.__maState.visible.attributes['__avg__'] !== false) ||
+                    (panel.__maState.visible.ceps       && panel.__maState.visible.ceps['__avg__']       !== false);
+        chip.classList.toggle('col-chip-off', !anyOn);
+      });
     });
   }
 
@@ -359,7 +458,17 @@
     reorderFocalColumn(panel, code);
     refreshMetricsFocal(panel);
     refreshMetricsHero(panel);
-    colourChips(panel);
+    // Panel-level BrandSelector: move FOCAL pill, force new focal visible
+    // across all sub-tabs (attributes / ceps / advantage / metrics).
+    if (panel.__maSelector) {
+      panel.__maSelector.setFocal(code);
+      panel.__maSelector.showBrand(code);
+    }
+    ['attributes', 'ceps'].forEach(function (stim) {
+      if (panel.__maState.visible[stim])      panel.__maState.visible[stim][code]      = true;
+      if (panel.__maState.chartVisible[stim]) panel.__maState.chartVisible[stim][code] = true;
+    });
+    if (panel.__maAdvHiddenBrands) panel.__maAdvHiddenBrands[code] = false;
     renderChart(panel, 'attributes');
     renderChart(panel, 'ceps');
     renderMAScatter(panel);
@@ -408,113 +517,6 @@
     panel.querySelectorAll('.ma-metrics-table tr').forEach(function (tr) {
       var code = tr.getAttribute('data-ma-brand');
       tr.classList.toggle('ma-row-focal', code && code === focal);
-    });
-  }
-
-  // -------------------------------------------------------------- chips
-  function bindChartChips(panel) {
-    panel.querySelectorAll('.chart-chip[data-ma-chart-scope]').forEach(function (chip) {
-      chip.addEventListener('click', function () {
-        var scope = chip.getAttribute('data-ma-chart-scope');
-        var code  = chip.getAttribute('data-ma-brand');
-        var vis = panel.__maState.chartVisible[scope];
-        if (!vis) return;
-        vis[code] = !vis[code];
-        chip.classList.toggle('col-chip-off', !vis[code]);
-        renderChart(panel, scope);
-      });
-    });
-
-    panel.querySelectorAll('.ma-all-toggle[data-ma-chart-action="toggleall"]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var scope  = btn.getAttribute('data-ma-chart-scope');
-        var focal  = panel.__maState.focal;
-        var vis    = panel.__maState.chartVisible[scope];
-        if (!vis) return;
-        var allOn = Object.keys(vis).every(function (k) {
-          if (k === focal) return true;
-          return vis[k] !== false;
-        });
-        var nextState = !allOn;
-        Object.keys(vis).forEach(function (k) {
-          if (k === focal) return;
-          vis[k] = nextState;
-        });
-        panel.querySelectorAll('.chart-chip[data-ma-chart-scope="' + scope + '"]').forEach(function (c) {
-          if (c.getAttribute('data-ma-brand') === focal) return;
-          c.classList.toggle('col-chip-off', !nextState);
-        });
-        renderChart(panel, scope);
-        btn.textContent = nextState ? 'Hide all' : 'Show all';
-      });
-    });
-  }
-
-  function bindChipPicker(panel) {
-    panel.querySelectorAll('.col-chip[data-ma-scope]').forEach(function (chip) {
-      chip.addEventListener('click', function () {
-        var scope = chip.getAttribute('data-ma-scope');
-        var code  = chip.getAttribute('data-ma-brand');
-        var vis = panel.__maState.visible[scope];
-        if (!vis) return;
-        vis[code] = !vis[code];
-        chip.classList.toggle('col-chip-off', !vis[code]);
-        applyColumnVisibility(panel, scope);
-        renderChart(panel, scope);
-      });
-    });
-
-    panel.querySelectorAll('.ma-all-toggle[data-ma-action="toggleall"]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var scope = btn.getAttribute('data-ma-scope');
-        var focal = panel.__maState.focal;
-
-        if (scope === 'metrics') {
-          // Metrics visibility is DOM-based (bindMetricsChips), not in vis map
-          var allChips = panel.querySelectorAll('.col-chip[data-ma-scope="metrics"]');
-          var nonFocal = [];
-          allChips.forEach(function (c) {
-            if (c.getAttribute('data-ma-brand') !== focal) nonFocal.push(c);
-          });
-          var allOn = nonFocal.every(function (c) { return !c.classList.contains('col-chip-off'); });
-          var nextState = !allOn;
-          var table = panel.querySelector('.ma-metrics-table');
-          nonFocal.forEach(function (c) {
-            var code = c.getAttribute('data-ma-brand');
-            c.classList.toggle('col-chip-off', !nextState);
-            if (table) {
-              table.querySelectorAll('tbody tr.ma-row[data-ma-brand="' + code + '"]').forEach(function (r) {
-                r.style.display = nextState ? '' : 'none';
-              });
-            }
-          });
-          renderMAScatter(panel);
-          renderMABarChart(panel);
-          btn.textContent = nextState ? 'Hide all' : 'Show all';
-          return;
-        }
-
-        var vis = panel.__maState.visible[scope];
-        if (!vis) return;
-        // Determine current state ignoring the focal brand (it can never be off)
-        var allOn = Object.keys(vis).every(function (k) {
-          if (k === focal) return true;
-          return vis[k] !== false;
-        });
-        var nextState = !allOn;
-        // Update vis map and chip classes, skipping focal brand
-        Object.keys(vis).forEach(function (k) {
-          if (k === focal) return;
-          vis[k] = nextState;
-        });
-        panel.querySelectorAll('.col-chip[data-ma-scope="' + scope + '"]').forEach(function (c) {
-          if (c.getAttribute('data-ma-brand') === focal) return;
-          c.classList.toggle('col-chip-off', !nextState);
-        });
-        applyColumnVisibility(panel, scope);
-        renderChart(panel, scope);
-        btn.textContent = nextState ? 'Hide all' : 'Show all';
-      });
     });
   }
 
@@ -829,25 +831,6 @@
     if (baseRow)  tbody.insertBefore(baseRow,  tbody.firstChild);
   }
 
-  // -------------------------------------------------------------- metrics chips
-  function bindMetricsChips(panel) {
-    panel.querySelectorAll('.col-chip[data-ma-scope="metrics"]').forEach(function (chip) {
-      chip.addEventListener('click', function () {
-        var code  = chip.getAttribute('data-ma-brand');
-        var focal = panel.__maState.focal;
-        if (code === focal) return; // focal brand cannot be hidden
-        var isOff = chip.classList.toggle('col-chip-off');
-        var table = panel.querySelector('.ma-metrics-table');
-        if (!table) return;
-        table.querySelectorAll('tbody tr.ma-row[data-ma-brand="' + code + '"]').forEach(function (r) {
-          r.style.display = isOff ? 'none' : '';
-        });
-        renderMAScatter(panel);
-        renderMABarChart(panel);
-      });
-    });
-  }
-
   // -------------------------------------------------------------- metrics hero refresh
   function refreshMetricsHero(panel) {
     var pd = panel.__maData;
@@ -950,14 +933,13 @@
       }
     });
 
-    // Ensure focal chip is always on and row visible
-    panel.querySelectorAll('.col-chip[data-ma-scope="metrics"]').forEach(function (chip) {
-      if (chip.getAttribute('data-ma-brand') === focal) {
-        chip.classList.remove('col-chip-off');
-        var focalRow = tbody.querySelector('tr.ma-row[data-ma-brand="' + focal + '"]');
-        if (focalRow) focalRow.style.display = '';
-      }
-    });
+    // Ensure focal row is visible after a focal change
+    var focalRow = tbody.querySelector('tr.ma-row[data-ma-brand="' + focal + '"]');
+    if (focalRow) focalRow.style.display = '';
+    if (panel.__maSelector) {
+      panel.__maSelector.setFocal(focal);
+      panel.__maSelector.showBrand(focal);
+    }
 
     repositionMetricsPinnedRows(panel);
   }
@@ -1115,14 +1097,12 @@
 
     var focal = panel.__maState && panel.__maState.focal;
 
-    // Build vis map from metrics chips
-    var visMap = {};
-    panel.querySelectorAll('.col-chip[data-ma-scope="metrics"]').forEach(function (chip) {
-      visMap[chip.getAttribute('data-ma-brand')] = !chip.classList.contains('col-chip-off');
-    });
+    // Build vis map from BrandSelector hidden set (or from row-display fallback)
+    var hiddenSet = panel.__maSelector
+      ? panel.__maSelector.getHidden() : new Set();
 
     var points = (pd.metrics.table || []).filter(function (r) {
-      return visMap[r.brand_code] !== false && r.mpen != null && r.ns != null;
+      return !hiddenSet.has(r.brand_code) && r.mpen != null && r.ns != null;
     }).map(function (r) {
       return { code: r.brand_code, name: r.brand_name,
                mpen: r.mpen, ns: r.ns, mms: r.mms || 0, som: r.som || 0,
@@ -1391,14 +1371,12 @@
 
     var focal = panel.__maState && panel.__maState.focal;
 
-    var visMap = {};
-    panel.querySelectorAll('.col-chip[data-ma-scope="metrics"]').forEach(function (chip) {
-      visMap[chip.getAttribute('data-ma-brand')] = !chip.classList.contains('col-chip-off');
-    });
+    var hiddenSet = panel.__maSelector
+      ? panel.__maSelector.getHidden() : new Set();
 
     // Focal first, then others by MMS desc
     var all = (pd.metrics.table || []).filter(function (r) {
-      return visMap[r.brand_code] !== false;
+      return !hiddenSet.has(r.brand_code);
     });
     var focalRows = all.filter(function (r) { return r.brand_code === focal; });
     var others    = all.filter(function (r) { return r.brand_code !== focal; })

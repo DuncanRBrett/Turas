@@ -152,12 +152,21 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
             .fn_esc(brand_codes[i]), sel, .fn_esc(brand_names[i]))
   }, character(1)), collapse = "")
 
+  selector_trigger <- if (length(brand_codes) > 0L) {
+    build_brand_selector_trigger(
+      panel_id = "funnel",
+      n_total  = length(brand_codes),
+      label    = "Filter brands"
+    )
+  } else ""
+
   sprintf(
     '<div class="fn-focus-bar">
        <label class="fn-ctl-label">Focal brand</label>
        <select class="fn-focus-select" data-fn-action="focus">%s</select>
+       %s
      </div>',
-    focus_options)
+    focus_options, selector_trigger)
 }
 
 
@@ -169,35 +178,11 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
 #' - \code{.export-btn} with the \u2B73 Export \u25BE icon
 #' @keywords internal
 .fn_table_controls <- function(pd) {
-  brand_codes <- pd$config$chip_picker$all_brands %||%
-    (pd$table$brand_codes %||% character(0))
-  brand_names <- pd$table$brand_names %||% brand_codes
-  focal <- pd$meta$focal_brand_code %||% brand_codes[1]
-  chip_default <- pd$config$chip_default %||% "focal_only"
-  is_focal_only <- identical(chip_default, "focal_only")
-  off_cls <- if (is_focal_only) " col-chip-off" else ""
-  toggle_label <- if (is_focal_only) "Show all" else "Hide all"
-
-  # Sort: focal first, then alphabetical by brand name
-  sorted_order <- order(brand_codes != focal, tolower(brand_names))
-  brand_codes  <- brand_codes[sorted_order]
-  brand_names  <- brand_names[sorted_order]
-
-  chips_html <- paste(c(
-    vapply(seq_along(brand_codes), function(i) {
-      bc <- brand_codes[i]
-      cls <- if (!is.null(focal) && bc == focal) "col-chip" else paste0("col-chip", off_cls)
-      sprintf('<button type="button" class="%s" data-fn-scope="table" data-fn-brand="%s">%s</button>',
-              cls, .fn_esc(bc), .fn_esc(brand_names[i]))
-    }, character(1)),
-    sprintf('<button type="button" class="ma-all-toggle" data-fn-action="toggleall" data-fn-scope="table">%s</button>',
-            toggle_label)
-  ), collapse = "")
+  # BrandSelector trigger lives in .fn_focus_bar (next to the focal-brand
+  # <select>) — see Demographics / WoM / Cat Buying for the same pattern.
 
   paste0(
     '<div class="fn-controls controls-bar">',
-    '<div class="fn-ctl-group"><span class="fn-ctl-label">Show brands</span>',
-    sprintf('<div class="fn-chip-row col-chip-bar">%s</div></div>', chips_html),
     '<div class="fn-meta-row">',
     '<label class="toggle-label"><input type="checkbox" data-fn-action="showci"> Show heatmap</label>',
     '<label class="toggle-label"><input type="checkbox" data-fn-action="showcounts"> Show count</label>',
@@ -302,40 +287,14 @@ build_funnel_panel_html <- function(panel_data, category_code = "cat",
 # ==============================================================================
 
 .fn_chart_header <- function(pd) {
-  brand_codes <- pd$config$chip_picker$all_brands %||%
-    (pd$table$brand_codes %||% character(0))
-  brand_names <- pd$table$brand_names %||% brand_codes
-  focal <- pd$meta$focal_brand_code %||% brand_codes[1]
-  chip_default <- pd$config$chip_default %||% "focal_only"
-  is_focal_only <- identical(chip_default, "focal_only")
-
-  # Sort focal first, then alphabetical by brand name — same rule used
-  # by .fn_table_controls() so the two chip bars line up. JS re-applies
-  # this on focal change via reorderChipBar().
-  sorted_order <- order(brand_codes != focal, tolower(brand_names))
-  brand_codes  <- brand_codes[sorted_order]
-  brand_names  <- brand_names[sorted_order]
-
   # Stage info for stacked emphasis chips
   stage_keys   <- pd$table$stage_keys   %||% character(0)
   stage_labels <- pd$table$stage_labels %||% list()
 
-  # Cat Avg chip — under focal_only AND all modes the cat-avg is on by default.
-  cat_avg_chip <- '<button type="button" class="col-chip fn-chip-avg" data-fn-scope="chart" data-fn-brand="__avg__">Cat Avg</button>'
-
-  brand_chips_html <- paste(vapply(seq_along(brand_codes), function(i) {
-    is_focal <- brand_codes[i] == focal
-    # Under focal_only: focal active, others off. Under all: every chip active.
-    cls <- if (is_focal || !is_focal_only) "col-chip" else "col-chip col-chip-off"
-    sprintf('<button type="button" class="%s" data-fn-scope="chart" data-fn-brand="%s">%s</button>',
-            cls, .fn_esc(brand_codes[i]), .fn_esc(brand_names[i]))
-  }, character(1)), collapse = "")
-
-  toggle_label <- if (is_focal_only) "Show all" else "Hide all"
-  toggle_chip <- sprintf(
-    '<button type="button" class="ma-all-toggle" data-fn-action="toggleall" data-fn-scope="chart">%s</button>',
-    toggle_label)
-  chips_html <- paste0(cat_avg_chip, brand_chips_html, toggle_chip)
+  # Cat Avg chip stays as a standalone toggle chip (per Decision 2 — Cat avg
+  # remains a chip; the brand list moves to the BrandSelector dropdown in
+  # the table-controls bar). Cat Avg is on by default under all modes.
+  chips_html <- '<button type="button" class="col-chip fn-chip-avg" data-fn-action="toggle-avg">Cat Avg</button>'
 
   # Stage selector chips for bar view — first stage active by default
   stage_chips <- if (length(stage_keys) > 0)

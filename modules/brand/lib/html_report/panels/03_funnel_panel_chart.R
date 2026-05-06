@@ -125,36 +125,23 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
 # ==============================================================================
 
 .fn_rel_controls <- function(ordered, focal, chip_default = "focal_only") {
-  is_focal_only <- identical(chip_default, "focal_only")
-  toggle_label <- if (is_focal_only) "Show all" else "Hide all"
+  # BrandSelector trigger — replaces the legacy chip strip + Hide-all toggle.
+  # Cat avg stays as a standalone chip (Decision 2) right next to the trigger.
+  selector_trigger <- if (length(ordered) > 0L) {
+    build_brand_selector_trigger(
+      panel_id = "fn-attitude",
+      n_total  = length(ordered),
+      label    = "Filter brands"
+    )
+  } else ""
 
-  brand_chips <- paste(vapply(ordered, function(b) {
-    code   <- as.character(b$brand_code)
-    name   <- b$brand_name %||% b$brand_code
-    is_foc <- identical(code, as.character(focal))
-    label  <- if (is_foc) paste0(.fn_esc(name), ' <span class="fn-focal-badge">FOCAL</span>')
-               else .fn_esc(name)
-    # Under focal_only: only focal gets .active. Under all: every chip gets .active.
-    active_cls <- if (is_foc || !is_focal_only) " active" else ""
-    sprintf('<button type="button" class="col-chip fn-rel-brand-chip%s" data-fn-rel-brand="%s">%s</button>',
-            active_cls, .fn_esc(code), label)
-  }, character(1)), collapse = "")
-
-  # Category average chip — always active under both modes.
-  avg_chip <- '<button type="button" class="col-chip fn-rel-brand-chip fn-rel-avg-chip active" data-fn-rel-brand="__avg__">Cat avg</button>'
-
-  toggle_chip <- sprintf(
-    '<button type="button" class="ma-all-toggle" data-fn-rel-action="toggleall">%s</button>',
-    toggle_label)
+  avg_chip <- '<button type="button" class="col-chip fn-rel-avg-chip" data-fn-rel-action="toggle-avg">Cat avg</button>'
 
   paste0(
     '<div class="fn-rel-controls">',
-    # Brand chips row: cat avg first, then brands, then toggle
     '<div class="fn-rel-brand-row col-chip-bar">',
-    '<span class="sig-level-label" style="flex-shrink:0;">Brands:</span>',
+    selector_trigger,
     avg_chip,
-    brand_chips,
-    toggle_chip,
     '</div>',
     # Meta row: base, checkboxes, export
     '<div class="fn-rel-meta-row">',

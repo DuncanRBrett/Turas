@@ -103,11 +103,8 @@
       emphasis: { loyalty: { all: true }, dist: { all: true } }
     };
 
-    colourCbChips(panel);
     bindCbSubTabs(panel);
-    bindCbChips(panel);
-    bindCbPanelChips(panel);
-    bindCbToggleAll(panel);
+    bindCBBrandSelector(panel);
     bindCbShowChart(panel);
     bindCbDopShowChart(panel);
     bindCbDopMode(panel);
@@ -195,22 +192,57 @@
   /* Chip colouring (brand chips — both panel-level and per-tab)             */
   /* ---------------------------------------------------------------------- */
 
-  function colourCbChips(panel) {
-    var pd    = panel.__cbData;
-    var focal = pd && pd.focalBrand;
-    /* Panel-level chips use data-brand; per-tab chips use data-cb-brand */
-    panel.querySelectorAll(
-      '.fn-rel-brand-chip[data-cb-brand], .fn-rel-brand-chip[data-brand]'
-    ).forEach(function (chip) {
-      var code = chip.getAttribute('data-cb-brand') ||
-                 chip.getAttribute('data-brand');
-      if (!code) return;
-      var col  = getBrandColour(pd, code);
-      chip.style.setProperty('--brand-chip-color', col);
-      chip.style.backgroundColor = col;
-      chip.style.borderColor     = col;
-      chip.style.color           = '#fff';
-      chip.style.fontWeight      = code === focal ? '700' : '500';
+  /* BrandSelector dropdown — replaces colourCbChips + bindCbPanelChips +
+     bindCbToggleAll. One unified-mode dropdown drives row visibility across
+     the brands / loyalty / dist scopes simultaneously (same lock-step
+     behaviour as the legacy panel-level chip strip). Init seeds visibility
+     from the chip_default fed into __cbState. */
+  function bindCBBrandSelector(panel) {
+    if (typeof window.BrandSelector === 'undefined') return;
+    var catCode = panel.getAttribute('data-cb-cat-code') ||
+                  (panel.getAttribute('id') || '').replace(/^cb-panel-/, '');
+    var trigger = panel.querySelector('.bs-trigger[data-bs-panel="cb-' + catCode + '"]');
+    if (!trigger) return;
+    var pd = panel.__cbData; if (!pd) return;
+    var codes  = pd.brandCodes  || [];
+    var labels = pd.brandNames  || codes;
+    var colours = pd.brandColours || {};
+    var focal  = pd.focalBrand || codes[0];
+    var brandList = codes.map(function (c, i) {
+      return {
+        code:    c,
+        label:   labels[i] || c,
+        color:   colours[c] || getBrandColour(pd, c),
+        isFocal: c === focal
+      };
+    });
+    var initialHidden = codes.filter(function (c) {
+      return panel.__cbState.visible.brands[c] === false;
+    });
+    panel.__cbSelector = window.BrandSelector.create({
+      panelId:       'cb-' + catCode,
+      triggerEl:     trigger,
+      anchorEl:      trigger.parentElement,
+      brands:        brandList,
+      mode:          'unified',
+      initialHidden: initialHidden,
+      onChange: function (hiddenSet) {
+        codes.forEach(function (c) {
+          var visible = !hiddenSet.has(c);
+          ['brands', 'loyalty', 'dist'].forEach(function (scope) {
+            if (panel.__cbState.visible[scope]) {
+              panel.__cbState.visible[scope][c] = visible;
+            }
+          });
+        });
+        applyBrandsRowVisibility(panel);
+        applyRowVisibility(panel, 'loyalty');
+        applyRowVisibility(panel, 'dist');
+        if (panel.__cbState.showchart && panel.__cbState.showchart.brands)
+          renderCbBrandsChart(panel);
+        renderCbStackedBars(panel, 'loyalty');
+        renderCbStackedBars(panel, 'dist');
+      }
     });
   }
 
@@ -240,101 +272,12 @@
         /* Re-apply brand visibility from panel-level state to the newly-shown tab */
         if (target === 'brands') {
           applyBrandsRowVisibility(panel);
-          /* Sync per-tab chip off-states to match panel-level visible map */
-          syncSubTabChipStates(panel, 'brands');
         } else if (target === 'loyalty' || target === 'dist') {
           applyRowVisibility(panel, target);
-          syncSubTabChipStates(panel, target);
           renderCbStackedBars(panel, target);
         }
 
         relocateCbToolbarIntoControls(panel);
-      });
-    });
-  }
-
-  /* Mirror panel-level __cbState.visible into chip off-state CSS for a scope */
-  function syncSubTabChipStates(panel, scope) {
-    var vis = panel.__cbState.visible[scope] || {};
-    panel.querySelectorAll('.fn-rel-brand-chip[data-cb-scope="' + scope + '"]')
-      .forEach(function (chip) {
-        var code = chip.getAttribute('data-cb-brand');
-        chip.classList.toggle('col-chip-off', vis[code] === false);
-      });
-  }
-
-  /* ---------------------------------------------------------------------- */
-  /* Brand visibility chips (per-tab: fn-rel-brand-chip with data-cb-scope)  */
-  /* ---------------------------------------------------------------------- */
-
-  function bindCbChips(panel) {
-    panel.querySelectorAll('.fn-rel-brand-chip[data-cb-scope]').forEach(function (chip) {
-      chip.addEventListener('click', function () {
-        var scope = chip.getAttribute('data-cb-scope');
-        var code  = chip.getAttribute('data-cb-brand');
-        var vis   = panel.__cbState.visible[scope];
-        if (!vis) return;
-        vis[code] = !vis[code];
-        chip.classList.toggle('col-chip-off', !vis[code]);
-        applyRowVisibility(panel, scope);
-        renderCbStackedBars(panel, scope);
-      });
-    });
-  }
-
-  function bindCbToggleAll(panel) {
-    panel.querySelectorAll('button[data-cb-action="toggleall"]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var scope  = btn.getAttribute('data-cb-scope');
-        var focal  = panel.__cbData && panel.__cbData.focalBrand;
-
-        if (scope === 'brands') {
-          // Panel-level brand picker (Brand Summary tab)
-          var chips = panel.querySelectorAll('.fn-rel-brand-chip[data-cb-action="toggle-row"]');
-          var nonFocal = [];
-          chips.forEach(function (c) {
-            if (c.getAttribute('data-brand') !== focal) nonFocal.push(c);
-          });
-          var allOn = nonFocal.every(function (c) { return !c.classList.contains('col-chip-off'); });
-          var nextState = !allOn;
-          nonFocal.forEach(function (c) {
-            var code = c.getAttribute('data-brand');
-            c.classList.toggle('col-chip-off', !nextState);
-            ['brands', 'loyalty', 'dist'].forEach(function (s) {
-              if (panel.__cbState.visible[s]) panel.__cbState.visible[s][code] = nextState;
-            });
-            panel.querySelectorAll('.fn-rel-brand-chip[data-cb-brand="' + code + '"]').forEach(function (x) {
-              x.classList.toggle('col-chip-off', !nextState);
-            });
-          });
-          applyBrandsRowVisibility(panel);
-          applyRowVisibility(panel, 'loyalty');
-          applyRowVisibility(panel, 'dist');
-          if (panel.__cbState.showchart && panel.__cbState.showchart.brands) renderCbBrandsChart(panel);
-          renderCbStackedBars(panel, 'loyalty');
-          renderCbStackedBars(panel, 'dist');
-          btn.textContent = nextState ? 'Hide all' : 'Show all';
-          return;
-        }
-
-        // Per-tab scopes (loyalty, dist)
-        var vis = panel.__cbState.visible[scope];
-        if (!vis) return;
-        var chips = panel.querySelectorAll('.col-chip[data-cb-scope="' + scope + '"][data-cb-brand]');
-        var nonFocal = [];
-        chips.forEach(function (c) {
-          if (c.getAttribute('data-cb-brand') !== focal) nonFocal.push(c);
-        });
-        var allOn = nonFocal.every(function (c) { return !c.classList.contains('col-chip-off'); });
-        var nextState = !allOn;
-        nonFocal.forEach(function (c) {
-          var code = c.getAttribute('data-cb-brand');
-          vis[code] = nextState;
-          c.classList.toggle('col-chip-off', !nextState);
-        });
-        applyRowVisibility(panel, scope);
-        renderCbStackedBars(panel, scope);
-        btn.textContent = nextState ? 'Hide all' : 'Show all';
       });
     });
   }
@@ -413,41 +356,6 @@
           if (h.getAttribute('data-cb-dop-mode') === mode) h.removeAttribute('hidden');
           else                                              h.setAttribute('hidden', '');
         });
-      });
-    });
-  }
-
-  /* ---------------------------------------------------------------------- */
-  /* Panel-level brand chips: show/hide rows in the Brand Summary table      */
-  /* (chips DO NOT change the focal brand; focal changes via <select>)       */
-  /* ---------------------------------------------------------------------- */
-
-  function bindCbPanelChips(panel) {
-    panel.querySelectorAll(
-      '.fn-rel-brand-chip[data-cb-action="toggle-row"]'
-    ).forEach(function (chip) {
-      chip.addEventListener('click', function () {
-        var code = chip.getAttribute('data-brand');
-        if (!code) return;
-        /* Sync visibility across ALL scopes (brands, loyalty, dist) so the
-           panel-level chip hides the brand everywhere. */
-        var newState = !panel.__cbState.visible.brands[code];
-        ['brands', 'loyalty', 'dist'].forEach(function (scope) {
-          panel.__cbState.visible[scope][code] = newState;
-        });
-        chip.classList.toggle('col-chip-off', !newState);
-        /* Mirror state on per-tab brand chips (if any still exist) */
-        panel.querySelectorAll(
-          '.fn-rel-brand-chip[data-cb-brand="' + code + '"]'
-        ).forEach(function (c) {
-          c.classList.toggle('col-chip-off', !newState);
-        });
-        applyBrandsRowVisibility(panel);
-        applyRowVisibility(panel, 'loyalty');
-        applyRowVisibility(panel, 'dist');
-        if (panel.__cbState.showchart.brands) renderCbBrandsChart(panel);
-        renderCbStackedBars(panel, 'loyalty');
-        renderCbStackedBars(panel, 'dist');
       });
     });
   }
@@ -1560,33 +1468,20 @@
     if (panel.__cbData) {
       panel.__cbData.focalBrand  = brandCode;
       panel.__cbData.focalColour = focalColour;
-      colourCbChips(panel);
       renderCbStackedBars(panel, 'loyalty');
       renderCbStackedBars(panel, 'dist');
     }
 
-    /* 6. Panel-level brand chips: strip stale FOCAL badge from every chip,
-          add it to the newly selected focal chip. (The picker chips are
-          rendered server-side with the badge baked into the original focal;
-          without this pass the badge stays on the wrong brand.) */
-    panel.querySelectorAll(
-      '.fn-rel-brand-chip[data-brand], .fn-rel-brand-chip[data-cb-brand]'
-    ).forEach(function (chip) {
-      var code = chip.getAttribute('data-brand') ||
-                 chip.getAttribute('data-cb-brand');
-      var existing = chip.querySelector('.fn-focal-badge');
-      if (code === brandCode) {
-        if (!existing) {
-          var badge = document.createElement('span');
-          badge.className = 'fn-focal-badge';
-          badge.textContent = 'FOCAL';
-          chip.appendChild(document.createTextNode(' '));
-          chip.appendChild(badge);
-        }
-      } else if (existing) {
-        existing.parentNode.removeChild(existing);
-      }
-    });
+    /* 6. BrandSelector: move the FOCAL pill to the new focal and force the
+          brand visible (matches the legacy behaviour where the focal chip
+          could not be turned off). */
+    if (panel.__cbSelector) {
+      panel.__cbSelector.setFocal(brandCode);
+      panel.__cbSelector.showBrand(brandCode);
+      ['brands', 'loyalty', 'dist'].forEach(function (s) {
+        if (panel.__cbState.visible[s]) panel.__cbState.visible[s][brandCode] = true;
+      });
+    }
   };
 
   /* ---------------------------------------------------------------------- */

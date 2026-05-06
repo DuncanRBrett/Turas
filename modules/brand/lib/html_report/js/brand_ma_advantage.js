@@ -984,44 +984,10 @@
     panel.__maAdvHiddenBrands = panel.__maAdvHiddenBrands || {};
     panel.__maAdvHiddenStims = panel.__maAdvHiddenStims || {};
 
-    // Seed hidden state from DOM so chip_default = focal_only takes effect:
-    // any chip rendered with .col-chip-off is hidden until the user toggles it on.
-    subtab.querySelectorAll('button[data-ma-adv-chip-brand].col-chip-off').forEach(function (c) {
-      var code = c.getAttribute('data-ma-adv-chip-brand');
-      if (code) panel.__maAdvHiddenBrands[code] = true;
-    });
-
-    // Brand-column chips + Show all/Hide all toggle: delegated click.
-    subtab.addEventListener('click', function (ev) {
-      // Show all / Hide all toggle
-      var toggleBtn = ev.target.closest('button[data-ma-adv-action="toggleall"]');
-      if (toggleBtn && subtab.contains(toggleBtn)) {
-        var focal = panel.__maState && panel.__maState.focal;
-        var chips = subtab.querySelectorAll('button[data-ma-adv-chip-brand]');
-        var nonFocal = [];
-        chips.forEach(function (c) {
-          if (c.getAttribute('data-ma-adv-chip-brand') !== focal) nonFocal.push(c);
-        });
-        var allOn = nonFocal.every(function (c) { return !c.classList.contains('col-chip-off'); });
-        var nextState = !allOn;
-        nonFocal.forEach(function (c) {
-          var code = c.getAttribute('data-ma-adv-chip-brand');
-          c.classList.toggle('col-chip-off', !nextState);
-          panel.__maAdvHiddenBrands[code] = !nextState;
-        });
-        applyBrandColumnVisibility(panel);
-        toggleBtn.textContent = nextState ? 'Hide all' : 'Show all';
-        return;
-      }
-
-      // Individual brand chip
-      var chip = ev.target.closest('button[data-ma-adv-chip-brand]');
-      if (!chip || !subtab.contains(chip)) return;
-      var code = chip.getAttribute('data-ma-adv-chip-brand');
-      var off = chip.classList.toggle('col-chip-off');
-      panel.__maAdvHiddenBrands[code] = off;
-      applyBrandColumnVisibility(panel);
-    });
+    // Brand visibility is governed by the panel-level BrandSelector
+    // (created in brand_ma_panel.js bindMaPanelBrandSelector). The advantage
+    // sub-tab just reflects __maAdvHiddenBrands which that selector mutates.
+    applyBrandColumnVisibility(panel);
 
     // Show counts and Show chart checkboxes — direct change listeners
     // (single elements per panel, no risk of detachment).
@@ -1044,32 +1010,13 @@
     });
   }
 
-  // Apply the same brand-palette colours used elsewhere in the MA panel
-  // to the advantage tab's "Show brands" chip row. Falls back to the
-  // stable BRAND_PALETTE hash so EVERY chip gets a colour (was failing
-  // for brands without an explicit Colour cell — only 3/10 lit up).
-  function colourAdvantageChips(panel) {
-    var pd = panel.__maData; if (!pd) return;
-    panel.querySelectorAll('button[data-ma-adv-chip-brand]').forEach(function (chip) {
-      var code = chip.getAttribute('data-ma-adv-chip-brand');
-      var col = brandColourFor(pd, code);
-      chip.style.setProperty('--brand-chip-color', col);
-      chip.style.backgroundColor = col;
-      chip.style.borderColor = col;
-      chip.style.color = '#fff';
-      chip.style.fontWeight = (pd.meta && code === pd.meta.focal_brand_code) ? '700' : '500';
-    });
-  }
-
   // ============================================================ PUBLIC API
   window.MAAdvantage = {
     init:   function (panel) {
       bindAdvantage(panel);
-      colourAdvantageChips(panel);
       renderAdvantage(panel);
     },
     render: function (panel) {
-      colourAdvantageChips(panel);
       renderAdvantage(panel);
     }
   };

@@ -38,7 +38,7 @@
 
     bindGlobalToggles(panel);
     bindFocalPicker(panel);
-    bindBrandChips(panel);
+    bindBrandSelector(panel);
     bindQuestionChips(panel);
     bindCardViewToggles(panel);
     bindViewAllButtons(panel);
@@ -128,45 +128,35 @@
     applyBrandVisibility(panel);
   }
 
-  // ---- brand-visibility chips ----
-  function bindBrandChips(panel) {
-    panel.querySelectorAll(".demo-brand-chip").forEach(chip => {
-      chip.addEventListener("click", () => {
-        const bc = chip.getAttribute("data-demo-brand");
-        const off = chip.classList.toggle("active") === false;
-        if (off) panel.__state.hiddenBrands.add(bc);
-        else     panel.__state.hiddenBrands.delete(bc);
-        applyBrandVisibility(panel);
-        refreshAllToggleLabel(panel);
-      });
-    });
+  // ---- brand-visibility selector (dropdown) ----
+  // Replaces the legacy chip strip. State (hiddenBrands Set) and the visibility
+  // application (applyBrandVisibility) are unchanged — only the UI changed.
+  function bindBrandSelector(panel) {
+    const trigger = panel.querySelector('.bs-trigger[data-bs-panel="demographics"]');
+    if (!trigger || typeof window.BrandSelector === "undefined") return;
+    const data = panel.__data;
+    const codes  = (data.brands && data.brands.codes)  || [];
+    const labels = (data.brands && data.brands.labels) || codes;
+    const focal  = panel.__state.focal;
+    const palette = brandPalette(data, codes);
+    const brandList = codes.map((c, i) => ({
+      code:    c,
+      label:   labels[i] || c,
+      color:   palette[c] || "#94a3b8",
+      isFocal: c === focal
+    }));
 
-    // Show all / Hide all toggle — flips every brand chip in lock-step.
-    panel.querySelectorAll('button[data-demo-action="toggleall"]').forEach(btn => {
-      btn.addEventListener("click", () => {
-        const chips = Array.from(panel.querySelectorAll(".demo-brand-chip"));
-        const allOn = chips.every(c => c.classList.contains("active"));
-        const nextState = !allOn;          // if every chip is on, hide all; else show all
-        chips.forEach(c => {
-          const bc = c.getAttribute("data-demo-brand");
-          c.classList.toggle("active", nextState);
-          if (nextState) panel.__state.hiddenBrands.delete(bc);
-          else           panel.__state.hiddenBrands.add(bc);
-        });
+    window.BrandSelector.create({
+      panelId:   "demographics",
+      triggerEl: trigger,
+      anchorEl:  trigger.parentElement,
+      brands:    brandList,
+      mode:      "unified",
+      onChange:  function (hiddenSet) {
+        panel.__state.hiddenBrands = new Set(hiddenSet);
         applyBrandVisibility(panel);
-        btn.textContent = nextState ? "Hide all" : "Show all";
-      });
+      }
     });
-    refreshAllToggleLabel(panel);
-  }
-
-  // Keep the toggle-all button label in sync with current chip state.
-  function refreshAllToggleLabel(panel) {
-    const btn = panel.querySelector('button[data-demo-action="toggleall"]');
-    if (!btn) return;
-    const chips = panel.querySelectorAll(".demo-brand-chip");
-    const allOn = Array.from(chips).every(c => c.classList.contains("active"));
-    btn.textContent = allOn ? "Hide all" : "Show all";
   }
 
   function applyBrandVisibility(panel) {

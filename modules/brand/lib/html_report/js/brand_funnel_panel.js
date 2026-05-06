@@ -76,13 +76,6 @@
     panel.querySelectorAll(".fn-stk-ctl").forEach(function(el) { el.hidden = true; });
     var initBarWrap = panel.querySelector(".fn-bar-wrap");
     if (initBarWrap) initBarWrap.hidden = true;
-    // Apply brand colours to funnel table/chart chip buttons
-    panel.querySelectorAll('button[data-fn-scope][data-fn-brand]').forEach(function(btn) {
-      var code = btn.getAttribute('data-fn-brand');
-      if (code === '__avg__') return;
-      var color = resolveBrandColor(payload, panel.__fnState, code);
-      if (color) btn.style.setProperty('--brand-chip-color', color);
-    });
     applySortIndicators(panel);
     applyTableVisibility(panel);
     applyChartVisibility(panel);
@@ -204,34 +197,16 @@
       setFocal(panel, this.value);
     });
 
-    panel.querySelectorAll('button[data-fn-scope][data-fn-brand]').forEach(function(btn){
-      btn.addEventListener("click", function(){
-        toggleBrandChip(panel, btn.getAttribute("data-fn-scope"),
-                        btn.getAttribute("data-fn-brand"), btn);
-      });
-    });
+    bindFunnelBrandSelector(panel);
 
-    // Show all / Hide all toggle for table and chart chip bars
-    panel.querySelectorAll('button[data-fn-action="toggleall"]').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        var scope = btn.getAttribute('data-fn-scope');
-        var focal = panel.__fnState.focal;
-        var bucket = scope === 'table' ? 'tableBrands' : 'chartBrands';
-        var chips = panel.querySelectorAll('button[data-fn-scope="' + scope + '"][data-fn-brand]');
-        var nonFocal = [];
-        chips.forEach(function(c) {
-          if (c.getAttribute('data-fn-brand') !== focal) nonFocal.push(c);
-        });
-        var allOn = nonFocal.every(function(c) { return !c.classList.contains('col-chip-off'); });
-        var nextState = !allOn;
-        nonFocal.forEach(function(c) {
-          var code = c.getAttribute('data-fn-brand');
-          panel.__fnState[bucket][code] = nextState;
-          c.classList.toggle('col-chip-off', !nextState);
-        });
-        if (scope === 'table') applyTableVisibility(panel);
-        else applyChartVisibility(panel);
-        btn.textContent = nextState ? 'Hide all' : 'Show all';
+    // Cat Avg chip — standalone toggle in the chart-header (kept as a chip
+    // per Decision 2; the brand list lives in the BrandSelector dropdown).
+    panel.querySelectorAll('button[data-fn-action="toggle-avg"]').forEach(function (chip) {
+      chip.addEventListener("click", function () {
+        var on = !panel.__fnState.chartBrands["__avg__"];
+        panel.__fnState.chartBrands["__avg__"] = on;
+        chip.classList.toggle("col-chip-off", !on);
+        applyChartVisibility(panel);
       });
     });
 
@@ -464,18 +439,18 @@
         relTbody.insertBefore(relAvg, relFocal.nextSibling);
       }
     }
-    // Ensure new focal is always on in chart/mini-funnels; update its chip UI
+    // Ensure new focal is always on in chart/mini-funnels and table rows.
     panel.__fnState.chartBrands[code] = true;
-    var newFocalChip = panel.querySelector(
-      '.fn-chart-brand-chips [data-fn-scope="chart"][data-fn-brand="' + code + '"]');
-    if (newFocalChip) newFocalChip.classList.remove("col-chip-off");
-
-    // Re-sort BOTH chip bars (table + chart) so the new focal appears
-    // first, matching the table row order. The DOM nodes are reused —
-    // we just reorder them inside their parent — which keeps the
-    // brand-colour styles set via inline --brand-chip-color intact.
-    reorderChipBar(panel, '.fn-chip-row.col-chip-bar', code);
-    reorderChipBar(panel, '.fn-chart-brand-chips', code);
+    panel.__fnState.tableBrands[code] = true;
+    if (panel.__fnSelector) {
+      panel.__fnSelector.setFocal(code);
+      panel.__fnSelector.showBrand(code);
+    }
+    if (panel.__fnAttitudeSelector) {
+      panel.__fnAttitudeSelector.setFocal(code);
+      panel.__fnAttitudeSelector.showBrand(code);
+      panel.__fnState.relHiddenBrands.delete(code);
+    }
 
     // Rebuild cards against the new focal, update title, repaint chart + mini funnels
     rebuildFunnelCards(panel, code);
@@ -488,49 +463,6 @@
        view was redrawn, leaving Bar-view users on the old focal. */
     applyChartVisibility(panel);
     buildRelChart(panel);
-  }
-
-  /* Reorder the brand chips inside a chip-bar so the new focal sits
-     first, then alphabetical by brand name. Skips fixed leaders (Cat
-     Avg / __avg__) and trailing toggle/all-buttons so they stay where
-     they are. Leaves DOM nodes intact so inline brand-colour CSS vars
-     survive the reorder. */
-  function reorderChipBar(panel, selector, focalCode) {
-    var bar = panel.querySelector(selector);
-    if (!bar) return;
-    var children = Array.prototype.slice.call(bar.children);
-
-    // Pin Cat Avg (data-fn-brand="__avg__") and the toggle-all button
-    // wherever they currently sit so we don't accidentally lose them.
-    var leading = [];
-    var trailing = [];
-    var brandChips = [];
-    children.forEach(function (el) {
-      var brand = el.getAttribute && el.getAttribute('data-fn-brand');
-      if (brand === '__avg__') { leading.push(el); return; }
-      if (el.classList && el.classList.contains('ma-all-toggle')) {
-        trailing.push(el); return;
-      }
-      if (brand) { brandChips.push(el); return; }
-      // Anything else (separators, etc.) — keep position by treating as
-      // trailing in original order.
-      trailing.push(el);
-    });
-
-    brandChips.sort(function (a, b) {
-      var ac = a.getAttribute('data-fn-brand');
-      var bc = b.getAttribute('data-fn-brand');
-      if (ac === focalCode && bc !== focalCode) return -1;
-      if (bc === focalCode && ac !== focalCode) return 1;
-      var an = (a.textContent || '').trim().toLowerCase();
-      var bn = (b.textContent || '').trim().toLowerCase();
-      return an.localeCompare(bn);
-    });
-
-    // Re-append in the new order.
-    leading.concat(brandChips, trailing).forEach(function (el) {
-      bar.appendChild(el);
-    });
   }
 
   function rebuildFunnelCards(panel, focal) {
@@ -620,12 +552,97 @@
   // ---------------------------------------------------------------------------
   // Chip toggles — scope = "table" or "chart"
   // ---------------------------------------------------------------------------
-  function toggleBrandChip(panel, scope, code, btn) {
-    var bucket = scope === "table" ? "tableBrands" : "chartBrands";
-    panel.__fnState[bucket][code] = !panel.__fnState[bucket][code];
-    btn.classList.toggle("col-chip-off", !panel.__fnState[bucket][code]);
-    if (scope === "table") applyTableVisibility(panel);
-    else applyChartVisibility(panel);
+  // BrandSelector dropdown for the Brand Attitude (relationship) sub-tab.
+  // Unified mode — the relationship view doesn't split table/chart selection.
+  function bindFunnelAttitudeBrandSelector(panel) {
+    if (typeof window.BrandSelector === "undefined") return;
+    var trigger = panel.querySelector('.bs-trigger[data-bs-panel="fn-attitude"]');
+    if (!trigger) return;
+    var pd = panel.__fnData; if (!pd) return;
+    var codes  = (pd.relationship && pd.relationship.brand_codes)
+              || (pd.table && pd.table.brand_codes) || [];
+    var labels = (pd.relationship && pd.relationship.brand_names)
+              || (pd.table && pd.table.brand_names) || codes;
+    var focal  = (pd.meta && pd.meta.focal_brand_code) || codes[0];
+    var brandList = codes.map(function (c, i) {
+      return {
+        code:    c,
+        label:   labels[i] || c,
+        color:   resolveBrandColor(pd, panel.__fnState, c),
+        isFocal: c === focal
+      };
+    });
+    var initialHidden = Array.from(panel.__fnState.relHiddenBrands).filter(
+      function (c) { return c !== "__avg__"; });
+    panel.__fnAttitudeSelector = window.BrandSelector.create({
+      panelId:       "fn-attitude",
+      triggerEl:     trigger,
+      anchorEl:      trigger.parentElement,
+      brands:        brandList,
+      mode:          "unified",
+      initialHidden: initialHidden,
+      onChange: function (hiddenSet) {
+        var avgState = panel.__fnState.relHiddenBrands.has("__avg__");
+        var newHidden = new Set(hiddenSet);
+        if (avgState) newHidden.add("__avg__");
+        panel.__fnState.relHiddenBrands = newHidden;
+        applyRelBrandVis(panel);
+        buildRelChart(panel);
+        updateRelHeadline(panel);
+      }
+    });
+  }
+
+  // BrandSelector dropdown (split mode: drives both table-row and chart-series
+  // visibility, with a Sync table+chart footer toggle that defaults ON).
+  function bindFunnelBrandSelector(panel) {
+    if (typeof window.BrandSelector === "undefined") return;
+    var trigger = panel.querySelector('.bs-trigger[data-bs-panel="funnel"]');
+    if (!trigger) return;
+    var pd = panel.__fnData; if (!pd) return;
+    var codes = (pd.config && pd.config.chip_picker && pd.config.chip_picker.all_brands)
+      || (pd.table && pd.table.brand_codes)
+      || [];
+    var labels = (pd.table && pd.table.brand_names) || codes;
+    var focal  = (pd.meta && pd.meta.focal_brand_code) || codes[0];
+    var brandList = codes.map(function (c, i) {
+      return {
+        code:    c,
+        label:   labels[i] || c,
+        color:   resolveBrandColor(pd, panel.__fnState, c),
+        isFocal: c === focal
+      };
+    });
+    var initialHidden = Object.keys(panel.__fnState.tableBrands).filter(function (c) {
+      return panel.__fnState.tableBrands[c] === false;
+    });
+    var initialHiddenChart = Object.keys(panel.__fnState.chartBrands).filter(function (c) {
+      return c !== "__avg__" && panel.__fnState.chartBrands[c] === false;
+    });
+    panel.__fnSelector = window.BrandSelector.create({
+      panelId:            "funnel",
+      triggerEl:          trigger,
+      anchorEl:           trigger.parentElement,
+      brands:             brandList,
+      mode:               "split",
+      syncDefault:        true,
+      initialHidden:      initialHidden,
+      initialHiddenChart: initialHiddenChart,
+      onChange: function (hiddenSet, scope) {
+        if (scope === "all" || scope === "table") {
+          codes.forEach(function (c) {
+            panel.__fnState.tableBrands[c] = !hiddenSet.has(c);
+          });
+          applyTableVisibility(panel);
+        }
+        if (scope === "all" || scope === "chart") {
+          codes.forEach(function (c) {
+            panel.__fnState.chartBrands[c] = !hiddenSet.has(c);
+          });
+          applyChartVisibility(panel);
+        }
+      }
+    });
   }
 
   function applyTableVisibility(panel) {
@@ -2054,25 +2071,34 @@
 
     var pd = panel.__fnData;
 
-    // Seed relHiddenBrands from DOM under chip_default = focal_only — chips
-    // rendered without .active count as hidden. Also add col-chip-off so the
-    // toggleall handler (which reads col-chip-off) sees the same state.
-    panel.querySelectorAll("[data-fn-rel-brand]").forEach(function(chip) {
-      var code = chip.getAttribute("data-fn-rel-brand");
-      if (!code || code === "__avg__") return;
-      if (!chip.classList.contains("active")) {
-        panel.__fnState.relHiddenBrands.add(code);
-        chip.classList.add("col-chip-off");
-      }
-    });
+    // Seed relHiddenBrands from chip_default so "focal_only" mode hides every
+    // non-focal brand at first render. The BrandSelector then picks up this
+    // seeded state via initialHidden.
+    var chipDefault = panel.getAttribute('data-chip-default') || 'focal_only';
+    if (chipDefault === 'focal_only') {
+      var focalCode = panel.__fnState.focal;
+      var allBrands = (pd && pd.relationship && pd.relationship.brand_codes)
+                  || (pd && pd.table && pd.table.brand_codes) || [];
+      allBrands.forEach(function (c) {
+        if (c !== focalCode) panel.__fnState.relHiddenBrands.add(c);
+      });
+    }
 
-    // Apply brand colours to brand chips from pd.config.brand_colours
-    panel.querySelectorAll("[data-fn-rel-brand]").forEach(function(chip) {
-      var code = chip.getAttribute("data-fn-rel-brand");
-      if (code === "__avg__") return;
-      var color = (pd && pd.config && pd.config.brand_colours && pd.config.brand_colours[code])
-                  || resolveBrandColor(pd, panel.__fnState, code);
-      if (color) chip.style.setProperty("--brand-chip-color", color);
+    // BrandSelector dropdown — replaces the relationship-tab chip strip.
+    // Wires onChange to applyRelBrandVis + buildRelChart.
+    bindFunnelAttitudeBrandSelector(panel);
+
+    // Cat avg standalone chip (separate from BrandSelector per Decision 2).
+    panel.querySelectorAll('button[data-fn-rel-action="toggle-avg"]').forEach(function (chip) {
+      chip.addEventListener("click", function () {
+        var hidden = panel.__fnState.relHiddenBrands;
+        var on = hidden.has("__avg__");
+        if (on) { hidden.delete("__avg__"); chip.classList.remove("col-chip-off"); }
+        else    { hidden.add("__avg__");    chip.classList.add("col-chip-off"); }
+        applyRelBrandVis(panel);
+        buildRelChart(panel);
+        updateRelHeadline(panel);
+      });
     });
 
     // Apply sentiment colours to emphasis chips
@@ -2101,56 +2127,6 @@
       });
     });
 
-    // Show all / Hide all toggle for relationship chip bar
-    panel.querySelectorAll('button[data-fn-rel-action="toggleall"]').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        var focal  = panel.__fnState.focal;
-        var hidden = panel.__fnState.relHiddenBrands;
-        var chips  = panel.querySelectorAll('[data-fn-rel-brand]');
-        var nonFocal = [];
-        chips.forEach(function(c) {
-          if (c.getAttribute('data-fn-rel-brand') !== focal) nonFocal.push(c);
-        });
-        var allOn = nonFocal.every(function(c) { return !c.classList.contains('col-chip-off'); });
-        var nextState = !allOn;
-        nonFocal.forEach(function(c) {
-          var code = c.getAttribute('data-fn-rel-brand');
-          if (nextState) {
-            hidden.delete(code);
-            c.classList.add('active');
-            c.classList.remove('col-chip-off');
-          } else {
-            hidden.add(code);
-            c.classList.remove('active');
-            c.classList.add('col-chip-off');
-          }
-        });
-        applyRelBrandVis(panel);
-        buildRelChart(panel);
-        updateRelHeadline(panel);
-        btn.textContent = nextState ? 'Hide all' : 'Show all';
-      });
-    });
-
-    // Brand chips — toggle visibility in chart and table
-    panel.querySelectorAll("[data-fn-rel-brand]").forEach(function(chip) {
-      chip.addEventListener("click", function() {
-        var code   = chip.getAttribute("data-fn-rel-brand");
-        var hidden = panel.__fnState.relHiddenBrands;
-        if (hidden.has(code)) {
-          hidden.delete(code);
-          chip.classList.add("active");
-          chip.classList.remove("col-chip-off");
-        } else {
-          hidden.add(code);
-          chip.classList.remove("active");
-          chip.classList.add("col-chip-off");
-        }
-        applyRelBrandVis(panel);
-        buildRelChart(panel);
-        updateRelHeadline(panel);
-      });
-    });
 
     // Column header sort
     panel.querySelectorAll("[data-fn-rel-sortable]").forEach(function(th) {

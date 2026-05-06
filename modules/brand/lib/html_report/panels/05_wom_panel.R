@@ -107,34 +107,24 @@ build_wom_panel_html <- function(panel_data,
 
   chip_default <- pd$config$chip_default %||% "focal_only"
   is_focal_only <- identical(chip_default, "focal_only")
-  toggle_label <- if (is_focal_only) "Show all" else "Hide all"
 
-  # Coloured chips — toggle row visibility; includes Show all/Hide all button
-  chips_html <- paste(vapply(seq_along(brand_codes), function(i) {
-    bc  <- brand_codes[i]
-    nm  <- brand_names[i]
-    col <- .stable_col(bc)
-    is_foc <- !is.null(focal) && bc == focal
-    badge  <- if (is_foc) ' <span class="fn-focal-badge">FOCAL</span>' else ""
-    # Under focal_only: only focal gets .active. Under all: every chip gets .active.
-    active_cls <- if (is_foc || !is_focal_only) " active" else ""
-    sprintf(
-      '<button type="button" class="col-chip fn-rel-brand-chip%s wom-brand-chip" data-wom-action="toggle-row" data-wom-brand="%s" style="--brand-chip-color:%s;background-color:%s;border-color:%s;color:#fff;">%s%s</button>',
-      active_cls,
-      .wom_esc(bc), .wom_esc(col), .wom_esc(col), .wom_esc(col),
-      .wom_esc(nm), badge)
-  }, character(1)), collapse = "")
+  # Brand-visibility selector — replaces the legacy chip strip + Hide-all
+  # toggle. Brand list / palette / focal-only default are read by JS from
+  # the panel data block, so we don't repeat them in attributes here.
+  selector_panel_id <- paste0("wom-", category_code)
+  trigger_html <- build_brand_selector_trigger(
+    panel_id = selector_panel_id,
+    n_total  = length(brand_codes),
+    label    = "Filter brands"
+  )
 
   sprintf(
     '<div class="wom-focus-bar">
        <label class="wom-ctl-label">Focal brand</label>
        <select class="wom-focus-select" data-wom-action="focus">%s</select>
+       %s
      </div>
      <div class="wom-controls-bar">
-       <div class="wom-ctl-group">
-         <span class="wom-ctl-label wom-ctl-label-title">Show brands</span>
-         <div class="col-chip-bar" data-wom-scope="%s">%s<button type="button" class="ma-all-toggle" data-wom-action="toggleall" data-wom-scope="%s">%s</button></div>
-       </div>
        <div class="wom-meta-row">
          <label class="toggle-label">
            <input type="checkbox" data-wom-action="showchart" data-wom-scope="%s">
@@ -151,7 +141,7 @@ build_wom_panel_html <- function(panel_data,
        </div>
      </div>',
     focus_options,
-    .wom_esc(category_code), chips_html, .wom_esc(category_code), toggle_label,
+    trigger_html,
     .wom_esc(category_code),
     .wom_esc(category_code))
 }
