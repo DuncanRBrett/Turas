@@ -111,16 +111,16 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 
 .demo-chip-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0 10px; padding: 0 4px; }
 .demo-chip-row-label { font-size: 11px; color: #64748b; margin-right: 4px; }
-.demo-q-chip, .demo-brand-chip {
+.demo-q-chip {
   background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px;
   padding: 4px 10px; font-size: 11px; color: #475569; cursor: pointer;
   display: inline-flex; align-items: center; gap: 5px;
 }
-.demo-q-chip:hover, .demo-brand-chip:hover { background: #f1f5f9; }
+.demo-q-chip:hover { background: #f1f5f9; }
 .demo-q-chip.active { background: __FOCAL__; color: #fff; border-color: __FOCAL__; }
 .demo-q-chip:not(.active) { opacity: 0.55; text-decoration: line-through; }
+/* Brand swatch — still used in matrix table headers (legacy class name kept) */
 .demo-brand-chip-swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-.demo-brand-chip:not(.active) { opacity: 0.45; text-decoration: line-through; }
 
 .demo-focal-row { align-items: center; }
 .demo-focal-select {
@@ -130,12 +130,6 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 }
 .demo-focal-select:focus { outline: 2px solid __FOCAL__; outline-offset: 1px; }
 
-.demo-all-toggle {
-  background: #fff; border: 1px solid #cbd5e1; border-radius: 14px;
-  padding: 4px 11px; font-size: 11px; color: #475569; cursor: pointer;
-  margin-left: 6px;
-}
-.demo-all-toggle:hover { background: #f1f5f9; border-color: #94a3b8; }
 .demo-control-sep { width: 1px; height: 16px; background: #e2e8f0; flex-shrink: 0; }
 .demo-view-all-btn {
   background: #fff; border: 1px solid #cbd5e1; border-radius: 14px;
@@ -290,28 +284,33 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 }
 
 
-# Brand-visibility chips — colour-coded, click to hide that brand's matrix
-# column. The focal brand is included so users can hide it too if they want
-# to compare competitors only. A trailing "Hide all" toggles every brand
-# chip off / on (mirrors the Funnel + MA panel pattern).
+# Brand-visibility selector — replaces the legacy chip strip with a compact
+# "Filter brands ▾" dropdown (window.BrandSelector). The R helper here only
+# emits the trigger button + a static colour-legend strip; the popover and
+# All / None / live-toggle behaviour are owned by the shared JS component.
+# Brand metadata (codes, labels, palette) is read by JS from the panel
+# data JSON, so we don't duplicate it in attributes here.
 .demo_panel_brand_chips <- function(pd, brand_cols) {
   bcs <- pd$brands$codes  %||% character(0)
   bls <- pd$brands$labels %||% bcs
   if (length(bcs) == 0L) return("")
-  chips <- vapply(seq_along(bcs), function(i) {
-    col <- brand_cols[[bcs[i]]] %||% "#94a3b8"
-    sprintf(
-      '<button type="button" class="demo-brand-chip active" data-demo-brand="%s">
-         <span class="demo-brand-chip-swatch" style="background:%s"></span>%s
-       </button>',
-      .demo_esc(bcs[i]), .demo_esc(col), .demo_esc(bls[i]))
-  }, character(1L))
+  brands_for_legend <- lapply(seq_along(bcs), function(i) {
+    list(code  = bcs[i],
+         label = bls[i],
+         color = brand_cols[[bcs[i]]] %||% "#94a3b8")
+  })
+  trigger_html <- build_brand_selector_trigger(
+    panel_id = "demographics",
+    n_total  = length(bcs),
+    label    = "Filter brands"
+  )
+  legend_html <- build_brand_selector_legend(brands_for_legend)
   paste0(
     '<div class="demo-chip-row">',
     '<span class="demo-chip-row-label">Brands shown:</span>',
-    paste(chips, collapse = ""),
-    '<button type="button" class="demo-all-toggle" data-demo-action="toggleall">Hide all</button>',
-    '</div>')
+    trigger_html,
+    '</div>',
+    legend_html)
 }
 
 
