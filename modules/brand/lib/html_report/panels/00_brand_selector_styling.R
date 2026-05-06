@@ -192,30 +192,6 @@ build_brand_selector_styles <- function() {
 }
 .bs-popover-sync-cb { accent-color: #1A5276; }
 
-/* Static legend strip below charts — non-interactive */
-.bs-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 14px;
-  margin: 8px 0 4px 0;
-  padding: 6px 0;
-  font: 12px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
-  color: #475569;
-}
-.bs-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-.bs-legend-swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  flex-shrink: 0;
-}
-.bs-legend-item-hidden { opacity: 0.35; text-decoration: line-through; }
-
 /* Container — used by R helpers to wrap trigger + adjacent quick-action chips */
 .bs-toolbar-row {
   display: flex;

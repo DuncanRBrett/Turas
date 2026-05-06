@@ -59,49 +59,6 @@ test_that("trigger refuses negative n_total", {
 
 
 # ------------------------------------------------------------------------------
-# build_brand_selector_legend
-# ------------------------------------------------------------------------------
-
-test_that("legend emits one item per brand with swatch and label", {
-  brands <- list(
-    list(code = "IPK", label = "Ina Paarman's Kitchen", color = "#1A5276"),
-    list(code = "ROB", label = "Robertsons",            color = "#E07B00")
-  )
-  html <- build_brand_selector_legend(brands)
-  expect_match(html, 'class="bs-legend"', fixed = TRUE)
-  expect_match(html, 'data-bs-brand="IPK"', fixed = TRUE)
-  expect_match(html, 'data-bs-brand="ROB"', fixed = TRUE)
-  expect_match(html, "background:#1A5276", fixed = TRUE)
-  expect_match(html, "Ina Paarman", fixed = TRUE)
-})
-
-test_that("legend marks hidden brands with hidden modifier class", {
-  brands <- list(
-    list(code = "IPK", label = "IPK", color = "#1A5276"),
-    list(code = "ROB", label = "ROB", color = "#E07B00")
-  )
-  html <- build_brand_selector_legend(brands, hidden = c("ROB"))
-  expect_match(html,
-    'class="bs-legend-item bs-legend-item-hidden" data-bs-brand="ROB"',
-    fixed = TRUE)
-  expect_no_match(html,
-    'class="bs-legend-item bs-legend-item-hidden" data-bs-brand="IPK"',
-    fixed = TRUE)
-})
-
-test_that("legend returns empty string for empty brand list", {
-  expect_identical(build_brand_selector_legend(list()), "")
-})
-
-test_that("legend HTML-escapes brand labels", {
-  brands <- list(list(code = "X", label = "<b>X</b>", color = "#000"))
-  html <- build_brand_selector_legend(brands)
-  expect_no_match(html, "<b>", fixed = TRUE)
-  expect_match(html, "&lt;b&gt;", fixed = TRUE)
-})
-
-
-# ------------------------------------------------------------------------------
 # build_brand_selector_toolbar_row
 # ------------------------------------------------------------------------------
 
@@ -133,6 +90,5 @@ test_that("style block opens with <style class='bs-styles'> and contains key sel
   expect_match(css, '<style class="bs-styles">', fixed = TRUE)
   expect_match(css, ".bs-trigger",     fixed = TRUE)
   expect_match(css, ".bs-popover",     fixed = TRUE)
-  expect_match(css, ".bs-legend",      fixed = TRUE)
   expect_match(css, ".bs-popover-row", fixed = TRUE)
 })

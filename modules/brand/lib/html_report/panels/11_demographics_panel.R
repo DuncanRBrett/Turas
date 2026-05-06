@@ -74,7 +74,6 @@ build_demographics_panel_html <- function(panel_data,
     .demo_panel_header(panel_data),
     .demo_panel_global_controls(panel_data),
     .demo_panel_focal_picker(panel_data, brand_cols),
-    .demo_panel_brand_chips(panel_data, brand_cols),
     .demo_panel_question_chips(panel_data),
     .demo_panel_card_grid(panel_data, panel_id, brand_cols),
     callout_html,
@@ -259,10 +258,11 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 }
 
 
-# Focal-brand picker — dropdown. Controls which brand sits in column 2
-# ("Focal") of every per-question matrix. Simple <select> rather than a
-# chip strip per Duncan's request — Demographics is a quick-comparison
-# tab, full-fidelity exploration belongs in tabs.
+# Focal-brand picker + brand-visibility dropdown — sit on a single toolbar
+# row. The <select> picks which brand fills column 2 ("Focal") of every
+# per-question matrix; the BrandSelector trigger to its right opens the
+# checkbox popover that hides / shows brand columns across the whole panel.
+# Pairing them keeps the controls compact and avoids redundant labels.
 .demo_panel_focal_picker <- function(pd, brand_cols) {
   bcs <- pd$brands$codes  %||% character(0)
   bls <- pd$brands$labels %||% bcs
@@ -274,43 +274,19 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
     sprintf('<option value="%s"%s>%s</option>',
             .demo_esc(bcs[i]), sel, .demo_esc(bls[i]))
   }, character(1L))
+  trigger_html <- build_brand_selector_trigger(
+    panel_id = "demographics",
+    n_total  = length(bcs),
+    label    = "Filter brands"
+  )
   paste0(
     '<div class="demo-chip-row demo-focal-row">',
     '<label class="demo-chip-row-label" for="demo-focal-select">Focal brand:</label>',
     '<select id="demo-focal-select" class="demo-focal-select" data-demo-focal-select>',
     paste(options_html, collapse = ""),
     '</select>',
-    '</div>')
-}
-
-
-# Brand-visibility selector — replaces the legacy chip strip with a compact
-# "Filter brands ▾" dropdown (window.BrandSelector). The R helper here only
-# emits the trigger button + a static colour-legend strip; the popover and
-# All / None / live-toggle behaviour are owned by the shared JS component.
-# Brand metadata (codes, labels, palette) is read by JS from the panel
-# data JSON, so we don't duplicate it in attributes here.
-.demo_panel_brand_chips <- function(pd, brand_cols) {
-  bcs <- pd$brands$codes  %||% character(0)
-  bls <- pd$brands$labels %||% bcs
-  if (length(bcs) == 0L) return("")
-  brands_for_legend <- lapply(seq_along(bcs), function(i) {
-    list(code  = bcs[i],
-         label = bls[i],
-         color = brand_cols[[bcs[i]]] %||% "#94a3b8")
-  })
-  trigger_html <- build_brand_selector_trigger(
-    panel_id = "demographics",
-    n_total  = length(bcs),
-    label    = "Filter brands"
-  )
-  legend_html <- build_brand_selector_legend(brands_for_legend)
-  paste0(
-    '<div class="demo-chip-row">',
-    '<span class="demo-chip-row-label">Brands shown:</span>',
     trigger_html,
-    '</div>',
-    legend_html)
+    '</div>')
 }
 
 

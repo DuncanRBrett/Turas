@@ -51,44 +51,6 @@ build_brand_selector_trigger <- function(panel_id,
 }
 
 
-#' Build the static colour-legend strip displayed below a chart
-#'
-#' Non-interactive — a flex row of swatch+label pairs, one per brand. Brands
-#' in the \code{hidden} set render with a "hidden" modifier class so the
-#' colour reference fades when the user has filtered them out. Re-render
-#' from JS whenever the hidden set changes (or use the JS DOM update path).
-#'
-#' @param brands List of brand records, each with \code{code}, \code{label},
-#'   and \code{color} fields.
-#' @param hidden Character. Brand codes currently hidden. Default empty.
-#' @return Character. A single HTML \code{<div>} string.
-#' @export
-build_brand_selector_legend <- function(brands, hidden = character(0)) {
-  if (!is.list(brands)) {
-    stop("build_brand_selector_legend: brands must be a list")
-  }
-  if (length(brands) == 0L) return("")
-  hidden <- as.character(hidden)
-  items <- vapply(brands, function(b) {
-    code  <- as.character(b$code  %||% "")
-    label <- as.character(b$label %||% code)
-    color <- as.character(b$color %||% "#94a3b8")
-    is_hidden <- code %in% hidden
-    sprintf(
-      paste0(
-        '<span class="bs-legend-item%s" data-bs-brand="%s">',
-        '<span class="bs-legend-swatch" style="background:%s"></span>',
-        '<span class="bs-legend-label">%s</span></span>'),
-      if (is_hidden) " bs-legend-item-hidden" else "",
-      .bs_html_esc(code),
-      .bs_html_esc(color),
-      .bs_html_esc(label)
-    )
-  }, character(1L))
-  paste0('<div class="bs-legend" data-bs-legend>', paste(items, collapse = ""), '</div>')
-}
-
-
 #' Wrap a brand-selector trigger and adjacent quick-action chips in a toolbar row
 #'
 #' Convenience helper: produces a flex row containing an optional label, the

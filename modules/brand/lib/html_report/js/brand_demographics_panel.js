@@ -155,7 +155,6 @@
       onChange:  function (hiddenSet) {
         panel.__state.hiddenBrands = new Set(hiddenSet);
         applyBrandVisibility(panel);
-        applyLegendVisibility(panel);
       }
     });
   }
@@ -164,15 +163,6 @@
     const hidden = panel.__state.hiddenBrands;
     panel.querySelectorAll('[data-demo-col="brand"][data-demo-brand]').forEach(el => {
       el.style.display = hidden.has(el.getAttribute("data-demo-brand")) ? "none" : "";
-    });
-  }
-
-  // Keep the static colour-legend strip in sync — fade hidden brands.
-  function applyLegendVisibility(panel) {
-    const hidden = panel.__state.hiddenBrands;
-    panel.querySelectorAll('[data-bs-legend] [data-bs-brand]').forEach(el => {
-      const off = hidden.has(el.getAttribute("data-bs-brand"));
-      el.classList.toggle("bs-legend-item-hidden", off);
     });
   }
 

@@ -44,8 +44,10 @@ checkbox-row layout. Live updates on each toggle — no Apply / Cancel.
 2. Cat avg stays as a separate chip next to the dropdown.
 3. Show all / Hide all (and any panel-specific quick actions) move
    inside the dropdown header as buttons.
-4. Brand colour legibility preserved via a static colour-legend strip
-   below the chart (non-interactive — colour swatch + brand name).
+4. Brand colour legibility preserved by the swatches inside the dropdown
+   itself. The static colour-legend strip below charts was tried during
+   the Demographics migration and dropped per Duncan's review feedback
+   ("not necessary to show the brand names" — dropdown swatches suffice).
 5. Funnel + MA panels (which have separate table-row vs chart-series
    selection) get a "Sync table + chart" toggle inside the dropdown,
    defaulting ON; turning it OFF reveals a second checkbox column.
