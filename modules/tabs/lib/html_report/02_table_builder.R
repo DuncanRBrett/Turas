@@ -45,12 +45,19 @@ build_question_table <- function(question_data, banner_groups, config_obj,
   has_sig2 <- isTRUE(stats$has_sig2)   # Secondary sig level (dual-alpha feature, V10.10)
   has_freq <- stats$has_freq && isTRUE(config_obj$embed_frequencies)
 
-  # Parse brand colour to RGB for heatmap (with validation)
-  r <- strtoi(substr(brand_colour, 2, 3), 16L)
-  g <- strtoi(substr(brand_colour, 4, 5), 16L)
-  b <- strtoi(substr(brand_colour, 6, 7), 16L)
+  # Heatmap colour: uses accent_colour by default (warm highlight — cream tint for standard
+  # TRL configs where accent = #CC9900). Can be overridden per-project with heatmap_colour.
+  # Decoupled from brand_colour so headers/charts are not affected.
+  heat_colour <- config_obj$heatmap_colour %||%
+                 config_obj$accent_colour   %||%
+                 "#CC9900"
+
+  # Parse heatmap colour to RGB (with validation)
+  r <- strtoi(substr(heat_colour, 2, 3), 16L)
+  g <- strtoi(substr(heat_colour, 4, 5), 16L)
+  b <- strtoi(substr(heat_colour, 6, 7), 16L)
   if (is.na(r) || is.na(g) || is.na(b)) {
-    r <- 50L; g <- 51L; b <- 103L  # fallback: #323367
+    r <- 204L; g <- 153L; b <- 0L  # fallback: #CC9900
   }
 
   # Get visible internal keys (banner columns — exclude dot-prefixed metadata cols)

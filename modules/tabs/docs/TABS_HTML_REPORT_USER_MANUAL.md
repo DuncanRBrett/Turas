@@ -180,8 +180,9 @@ Male vs Female) are statistically meaningful or could be due to chance.
 | `project_title` | No | `Crosstab Report` | Title displayed in the report header and browser tab. Use your project name (e.g., "Customer Experience Survey 2025"). |
 | `company_name` | No | `The Research Lamppost` | Your company name, displayed in the report footer. |
 | `client_name` | No | *(none)* | Client name, displayed as "Prepared for [Client]" in the header. |
-| `brand_colour` | No | `#323367` | Primary brand colour as a hex code. Used for header accents, heatmap tinting, active states, and chart colours. |
-| `accent_colour` | No | `#CC9900` | Secondary accent colour. Used for toggle buttons and borders. |
+| `brand_colour` | No | `#323367` | Primary brand colour as a hex code. Used for header accents, sidebar indicators, active states, and chart fallback colours. |
+| `accent_colour` | No | `#CC9900` | Secondary accent colour. Used for the crosstab heatmap cell tint (default source), Total column header text, toggle buttons, and borders. |
+| `heatmap_colour` | No | *(accent_colour)* | Override the heatmap cell tint colour independently of `brand_colour` or `accent_colour`. Resolves via: explicit `heatmap_colour` → `accent_colour` → `#CC9900`. Set this if you want a different tint without changing your brand or accent colours. |
 | `chart_bar_colour` | No | *(brand_colour)* | Override colour for horizontal bar charts. Defaults to brand colour if not set. |
 | `researcher_logo_path` | No | *(none)* | File path to your company logo (PNG, JPG, or SVG). Displayed in the top-left of the report header. Can be absolute or relative to the config file. |
 | `client_logo_path` | No | *(none)* | File path to the client logo. Displayed in the top-right of the header. |

@@ -427,7 +427,8 @@ build_css <- function(brand_colour, accent_colour = "#CC9900") {
       border-radius: 8px;
       border: 1px solid #e5e7eb;
       box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
-      overflow: hidden;
+      overflow-x: auto;
+      overflow-y: hidden;
       -webkit-overflow-scrolling: touch;
       padding-bottom: 1px;
     }

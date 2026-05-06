@@ -46,10 +46,22 @@
     var container = document.querySelector('.question-container .chart-wrapper[data-q-code="' + qCode + '"]');
     if (!container) container = document.querySelector('.chart-wrapper[data-q-code="' + qCode + '"]');
     var qContainer = container ? container.closest(".question-container") : null;
+
+    // Fallback: find container via pin button (e.g. when show_charts is disabled
+    // and no .chart-wrapper exists in the DOM)
+    if (!qContainer) {
+      var pinBtn = document.querySelector('.pin-btn[data-q-code="' + qCode + '"]');
+      if (pinBtn) qContainer = pinBtn.closest(".question-container");
+    }
     if (!qContainer) return null;
 
     var wrapper = qContainer.querySelector(".chart-wrapper");
     var qTitle = wrapper ? wrapper.getAttribute("data-q-title") || "" : "";
+    // Fallback: read title from the visible question-text span
+    if (!qTitle) {
+      var titleEl = qContainer.querySelector(".question-text");
+      if (titleEl) qTitle = titleEl.textContent.trim();
+    }
 
     // Selected chart columns (per banner group)
     var selectedCols = [];
