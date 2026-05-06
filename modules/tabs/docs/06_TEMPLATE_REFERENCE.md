@@ -794,7 +794,8 @@ the Excel output.
 |----|----|----|----|
 | `html_report` | Generate an HTML report | Y / N | Y |
 | `brand_colour` | Primary brand colour (hex) | Any hex colour | #323367 |
-| `accent_colour` | Secondary accent colour (hex) | Any hex colour | #0d8a8a |
+| `accent_colour` | Secondary accent colour (hex) — also the default heatmap tint source | Any hex colour | #CC9900 |
+| `heatmap_colour` | Crosstab heatmap cell tint colour. Defaults to `accent_colour`. Set explicitly to override without changing other colours. | Any hex colour | *(accent_colour)* |
 | `chart_palette_preset` | Chart colour scheme | warm / cool / research / teal / red / brand | warm |
 | `logo_path` | Path to logo image for report header | File path (relative or absolute) | (none) |
 | `show_charts` | Include charts in HTML report | Y / N | Y |
@@ -885,6 +886,15 @@ Q01_2, etc.).
 **A question can be both:** Setting Include=Y and UseBanner=Y means the
 question appears both as a stub (analyzed) and as a banner (used for
 breakouts).
+
+**Multi_Mention (slot-indexed) questions as banners:** Multi_Mention
+questions where options are stored per-slot in the Options sheet (e.g.,
+`BRANDPEN1_DSS_1`, `BRANDPEN1_DSS_2`, `BRANDPEN1_DSS_3`) are fully
+supported as banners. The banner processor automatically discovers the
+options from the slot codes, deduplicates by option text, and assigns a
+respondent to a column if they selected that option in **any** slot. No
+special configuration is required — simply set `UseBanner = Y` on the
+root question code as normal.
 
 ### Column: BannerBoxCategory
 

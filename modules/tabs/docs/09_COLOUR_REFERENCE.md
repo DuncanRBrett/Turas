@@ -28,7 +28,6 @@ These colours are set per-project in the crosstab configuration and flow through
 - Insight editor: left border accent
 - Help overlay: heading colour, keyboard shortcut badges
 - Footer: link colour
-- Crosstab heatmap: cell background (RGB extracted, alpha varies by value)
 - Charts: fallback bar colour (when no semantic match), brand-derived shades
 - Dashboard: section headers, gauge labels, heatmap headers, significance cards
 
@@ -41,9 +40,25 @@ These colours are set per-project in the crosstab configuration and flow through
 **Used in:**
 
 - CSS variable `--ct-accent` (available for future use)
-- Currently minimal direct usage beyond the CSS variable declaration
+- **Crosstab heatmap cell tint** (default source — see `heatmap_colour` below)
+- Total column header text in crosstab tables
 
-### 1.3 Dashboard Threshold Cutoffs
+### 1.3 Heatmap Colour
+
+| Field | Default | Format |
+|-------|---------|--------|
+| `heatmap_colour` | *(accent_colour)* | Hex 6-digit |
+
+**What it does:** Controls the tint colour used for heatmap cell backgrounds in crosstab tables. RGB is extracted from this hex value and blended with white at varying alpha levels (0.08–0.43) proportional to the cell's value.
+
+**Resolution order:**
+1. `heatmap_colour` — explicit override per project
+2. `accent_colour` — default source (warm cream for standard TRL configs with `#CC9900`)
+3. Hard fallback `#CC9900`
+
+**Why decoupled from brand_colour:** The previous behaviour (using `brand_colour` as the heatmap tint) produced cool-blue heatmaps for the standard deep-navy brand. Defaulting to `accent_colour` gives a warm cream tint that reads more neutrally and is easier to scan. Set `heatmap_colour` explicitly if you want a different tint without changing your brand or accent colours.
+
+### 1.4 Dashboard Threshold Cutoffs
 
 These control *when* the traffic light colours change, not the colours themselves.
 
@@ -58,7 +73,7 @@ These control *when* the traffic light colours change, not the colours themselve
 | `dashboard_green_custom` | `60` | Custom metric green threshold |
 | `dashboard_amber_custom` | `40` | Custom metric amber threshold |
 
-### 1.4 Chart Bar Colour
+### 1.5 Chart Bar Colour
 
 | Field | Default | Format |
 |-------|---------|--------|
@@ -66,7 +81,7 @@ These control *when* the traffic light colours change, not the colours themselve
 
 **Used in:** Horizontal bar charts (nominal questions). When only a single banner column is displayed, this colour is used directly. When multiple banner columns are selected and no custom series colours are defined, this colour is used as the seed for auto-generating a distinct palette via HSL rotation.
 
-### 1.5 Custom Series Colours (Banner Breaks)
+### 1.6 Custom Series Colours (Banner Breaks)
 
 Optional per-series colour overrides for nominal bar charts with multiple banner columns (e.g., Total, Cape Town, Johannesburg). These allow clients to use their corporate colour scheme on bar charts.
 
