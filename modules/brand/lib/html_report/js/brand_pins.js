@@ -69,16 +69,20 @@
     var titleText = title ? title.textContent.trim() : (sectionKey || "");
 
     // Pick the first *visible* SVG in the subtree — skip SVGs inside <button>
-    // elements (e.g. toolbar download icons) which are not chart content.
-    // Fallback: any non-button SVG even if not visible (e.g. inactive tab).
+    // elements (toolbar download icons) AND SVGs inside [data-pin-as-table]
+    // (decorative card icons in the summary panel; the body is the content).
+    // Fallback: any non-button, non-decorative SVG even if not visible.
+    function skipSvg(s) {
+      return s.closest("button") || s.closest("[data-pin-as-table]");
+    }
     var svg = null;
     var svgs = root.querySelectorAll("svg");
     for (var si = 0; si < svgs.length; si++) {
-      if (isVisible(svgs[si]) && !svgs[si].closest("button")) { svg = svgs[si]; break; }
+      if (isVisible(svgs[si]) && !skipSvg(svgs[si])) { svg = svgs[si]; break; }
     }
     if (!svg) {
       for (var si2 = 0; si2 < svgs.length; si2++) {
-        if (!svgs[si2].closest("button")) { svg = svgs[si2]; break; }
+        if (!skipSvg(svgs[si2])) { svg = svgs[si2]; break; }
       }
     }
 
@@ -134,9 +138,11 @@
     // - .br-insight-editor      generic section toolbar (page_builder)
     // - .fn-insight-textarea    funnel + cat-buying panels
     // - .ma-insight-box-text    MA + WoM panels
+    // - .brsum-insight-editor   summary panel analyst commentary
     var editor = root.querySelector(".br-insight-editor")
              || root.querySelector(".fn-insight-textarea")
-             || root.querySelector(".ma-insight-box-text");
+             || root.querySelector(".ma-insight-box-text")
+             || root.querySelector(".brsum-insight-editor");
     var insightText = editor ? editor.value.trim() : "";
 
     // For sections whose chart is HTML (not SVG), capture the chart area HTML

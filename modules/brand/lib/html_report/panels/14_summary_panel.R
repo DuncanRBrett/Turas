@@ -542,6 +542,13 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 
 /* ---- Insight editor (ported from tracker, scoped to brsum) ---- */
 .brsum-insight-block { margin: 0 0 36px; }
+.brsum-insight-header {
+  display: flex; align-items: center; gap: 10px; margin: 0 0 14px;
+}
+.brsum-insight-header .brsum-strip-title {
+  flex: 1 1 auto; margin: 0;
+}
+.brsum-insight-header .brsum-card-pin { opacity: 0.85; flex: 0 0 auto; }
 .brsum-insight-toolbar { display: flex; align-items: center; gap: 6px;
   margin: 0 0 10px; flex-wrap: wrap; }
 .brsum-insight-btn { padding: 5px 11px; font-size: 13px;
@@ -1848,8 +1855,14 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 
 .brsum_insight_editor <- function() {
   paste(
-    '<div class="brsum-insight-block">',
-      '<div class="brsum-strip-title">Analyst commentary</div>',
+    '<section class="brsum-insight-block" data-section="brsum-insight">',
+      '<div class="brsum-insight-header">',
+        '<h3 class="brsum-strip-title">Analyst commentary</h3>',
+        '<button type="button" class="br-pin-btn brsum-card-pin" ',
+          'data-section="brsum-insight" ',
+          'onclick="brTogglePin(\'brsum-insight\')" ',
+          'title="Pin analyst commentary" aria-label="Pin analyst commentary">&#x1F4CC;</button>',
+      '</div>',
       '<div class="brsum-insight-toolbar">',
         '<button class="brsum-insight-btn" title="Bold" onclick="brsumInsertMd(\'**\',\'**\')"><strong>B</strong></button>',
         '<button class="brsum-insight-btn" title="Italic" onclick="brsumInsertMd(\'*\',\'*\')"><em>I</em></button>',
@@ -1859,8 +1872,8 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
         '<span class="brsum-insight-hint">**bold**, *italic*, ## heading, - bullet, &gt; quote</span>',
       '</div>',
       '<textarea class="brsum-insight-editor" id="brsum-insight-editor" rows="5" placeholder="Type the brand story for this category. The headline above is editable here." oninput="brsumRenderInsight()"></textarea>',
-      '<div class="brsum-insight-rendered" id="brsum-insight-rendered"></div>',
-    '</div>',
+      '<div class="brsum-insight-rendered" id="brsum-insight-rendered" data-pin-as-table></div>',
+    '</section>',
     sep = "\n"
   )
 }

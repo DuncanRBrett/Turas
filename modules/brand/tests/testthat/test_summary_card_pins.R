@@ -62,3 +62,20 @@ test_that("section ids are unique across the card grid", {
   ids <- regmatches(html, gregexpr('data-section="brsum-[^"]+"', html))[[1]]
   expect_identical(length(unique(ids)), 11L)
 })
+
+
+# ------------------------------------------------------------------------------
+# Analyst commentary block — pinnable as its own section
+# ------------------------------------------------------------------------------
+
+test_that("analyst commentary renders a pin button + data-pin-as-table region", {
+  html <- .brsum_insight_editor()
+  expect_match(html, 'data-section="brsum-insight"', fixed = TRUE)
+  expect_match(html, "brTogglePin\\('brsum-insight'\\)")
+  expect_match(html, 'class="br-pin-btn brsum-card-pin"', fixed = TRUE)
+  # The rendered markdown div carries data-pin-as-table so capture grabs
+  # the formatted commentary, not the raw textarea.
+  expect_match(html,
+    'class="brsum-insight-rendered" id="brsum-insight-rendered" data-pin-as-table',
+    fixed = TRUE)
+})
