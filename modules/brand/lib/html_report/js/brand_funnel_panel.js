@@ -641,6 +641,26 @@
           });
           applyChartVisibility(panel);
         }
+        // Sync to Brand Attitude (relationship) view. The focus-bar picker
+        // is visible across all funnel sub-tabs, so its table selection
+        // should also drive the relationship table + chart (the relationship
+        // view is unified — no separate chart-only selection). Without this
+        // sync, adding a brand here updates the relationship table rows via
+        // applyTableVisibility's tr[data-fn-brand] sweep, but the chart
+        // reads relHiddenBrands and stays at focal-only.
+        if (scope === "all" || scope === "table") {
+          if (!panel.__fnState.relHiddenBrands) panel.__fnState.relHiddenBrands = new Set();
+          var keepAvgHidden = panel.__fnState.relHiddenBrands.has("__avg__");
+          var newRelHidden = new Set(hiddenSet);
+          if (keepAvgHidden) newRelHidden.add("__avg__");
+          panel.__fnState.relHiddenBrands = newRelHidden;
+          applyRelBrandVis(panel);
+          buildRelChart(panel);
+          updateRelHeadline(panel);
+          if (panel.__fnAttitudeSelector) {
+            panel.__fnAttitudeSelector.setHidden(Array.from(hiddenSet));
+          }
+        }
       }
     });
   }
