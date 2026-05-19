@@ -215,7 +215,7 @@
     var hdr = "";
     if (item.panelLabel) {
       hdr += '<div style="font-size:13px;font-weight:700;color:' + brand +
-        ';text-transform:uppercase;">' + segEscapeHtml(item.panelLabel) + "</div>";
+        ';">' + segEscapeHtml(item.panelLabel) + "</div>";
     }
     hdr += '<div style="font-size:16px;font-weight:600;color:#1e293b;margin:2px 0 10px;">' +
       segEscapeHtml(item.sectionTitle || item.title || "") + "</div>";

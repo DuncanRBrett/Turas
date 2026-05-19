@@ -340,8 +340,7 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
   color: var(--seg-text-muted);
   font-weight: 600;
   font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.1px;
   padding: 12px 16px;
   text-align: left;
   border-bottom: 2px solid var(--seg-border);
@@ -419,8 +418,7 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
   border-radius: 10px;
   font-size: 10px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.1px;
 }
 
 .seg-badge-pass { background: #D1FAE5; color: #065F46; }
@@ -437,7 +435,6 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
   border-radius: 4px;
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
 }
 
 .seg-status-pass { background: #D1FAE5; color: #065F46; }
@@ -659,8 +656,7 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
 .seg-action-card-label {
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.1px;
   color: var(--seg-text-faint);
   margin-bottom: 4px;
   margin-top: 10px;
@@ -709,8 +705,7 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
   font-size: 12px;
   font-weight: 600;
   color: var(--seg-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.1px;
   margin-top: 2px;
 }
 
@@ -931,8 +926,7 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
   font-size: 11px;
   font-weight: 600;
   color: var(--seg-brand);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.1px;
 }
 
 .seg-pinned-card-section {

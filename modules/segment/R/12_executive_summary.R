@@ -829,7 +829,7 @@ format_segment_executive_summary <- function(summary_list, format = "text") {
   # Key Findings
   html <- paste0(html,
     '<h3 style="color: ', heading_color, '; font-size: 14px; font-weight: 600; ',
-    'margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">Key Findings</h3>\n',
+    'margin: 0 0 8px 0; letter-spacing: 0.1px;">Key Findings</h3>\n',
     '<ul style="margin: 0 0 20px 0; padding-left: 20px; line-height: 1.7;">\n'
   )
   for (f in s$key_findings) {
@@ -841,7 +841,7 @@ format_segment_executive_summary <- function(summary_list, format = "text") {
   # Quality Assessment
   html <- paste0(html,
     '<h3 style="color: ', heading_color, '; font-size: 14px; font-weight: 600; ',
-    'margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">Quality Assessment</h3>\n',
+    'margin: 0 0 8px 0; letter-spacing: 0.1px;">Quality Assessment</h3>\n',
     '<p style="font-size: 13px; margin: 0 0 20px 0; color: ', muted_color, '; line-height: 1.5;">',
     .seg_html_escape(s$quality_assessment %||% "Not assessed."), '</p>\n'
   )
@@ -850,7 +850,7 @@ format_segment_executive_summary <- function(summary_list, format = "text") {
   if (length(s$segment_descriptions) > 0) {
     html <- paste0(html,
       '<h3 style="color: ', heading_color, '; font-size: 14px; font-weight: 600; ',
-      'margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">Segment Profiles</h3>\n',
+      'margin: 0 0 8px 0; letter-spacing: 0.1px;">Segment Profiles</h3>\n',
       '<ul style="margin: 0 0 20px 0; padding-left: 20px; line-height: 1.7;">\n'
     )
     for (desc in s$segment_descriptions) {
@@ -879,7 +879,7 @@ format_segment_executive_summary <- function(summary_list, format = "text") {
   # Recommendations
   html <- paste0(html,
     '<h3 style="color: ', heading_color, '; font-size: 14px; font-weight: 600; ',
-    'margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">Recommendations</h3>\n',
+    'margin: 0 0 8px 0; letter-spacing: 0.1px;">Recommendations</h3>\n',
     '<ol style="margin: 0 0 12px 0; padding-left: 20px; line-height: 1.7;">\n'
   )
   for (rec in s$recommendations) {

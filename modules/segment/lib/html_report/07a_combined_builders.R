@@ -486,8 +486,7 @@ build_seg_combined_page <- function(method_html_data,
 .seg-combined-exec-stat-label {
   font-size: 11px;
   color: #94a3b8;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.1px;
 }
 
 .seg-combined-exec-stat-value {
