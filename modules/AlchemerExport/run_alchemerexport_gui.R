@@ -106,28 +106,15 @@ run_alchemerexport_gui <- function() {
         uiOutput("cred_status")
       ),
 
-      # ---- Step 2: Files ------------------------------------------------------
+      # ---- Step 2: Output -----------------------------------------------------
       div(class = "turas-card",
-        h3(class = "turas-card-title", "Step 2: Files"),
+        h3(class = "turas-card-title", "Step 2: Output Folder"),
 
         p(class = "turas-help-text",
-          "Providing the data export is optional. When supplied, a Data_Headers column ",
-          "rename map is also generated alongside the config files."),
-
-        fluidRow(
-          column(8,
-            textInput("data_export", "Data Export File (optional):",
-                      placeholder = "Leave blank to skip Data_Headers output",
-                      width = "100%")
-          ),
-          column(4,
-            br(),
-            shinyFiles::shinyFilesButton("browse_export", "Browse...",
-                                         title    = "Select Alchemer Data Export",
-                                         multiple = FALSE,
-                                         buttonType = "default")
-          )
-        ),
+          "Data_Headers.xlsx mirrors Survey_Structure exactly — one column per ",
+          "QuestionCode for single-value types, one column per option for ",
+          "Multi_Mention / Ranking / Allocation. Generated automatically from ",
+          "the API, no data export needed."),
 
         fluidRow(
           column(8,
@@ -222,9 +209,8 @@ run_alchemerexport_gui <- function() {
       recent <- load_recents()
       entry  <- recent[[input$select_recent]]
       if (is.null(entry)) return()
-      updateTextInput(session, "survey_id",   value = entry$survey_id %||% "")
-      updateTextInput(session, "output_dir",  value = entry$output_dir %||% "")
-      updateTextInput(session, "data_export", value = entry$data_export %||% "")
+      updateTextInput(session, "survey_id",  value = entry$survey_id %||% "")
+      updateTextInput(session, "output_dir", value = entry$output_dir %||% "")
       if (!is.null(entry$targets))
         updateCheckboxGroupInput(session, "targets", selected = entry$targets)
     })
@@ -244,22 +230,9 @@ run_alchemerexport_gui <- function() {
       }
     })
 
-    # File / dir browsers
+    # Dir browser
     volumes <- turas_gui_volumes()
-
-    shinyFiles::shinyFileChoose(input, "browse_export", roots = volumes, session = session,
-                                filetypes = c("xlsx", "csv"))
     shinyFiles::shinyDirChoose(input, "browse_output", roots = volumes, session = session)
-
-    observeEvent(input$browse_export, {
-      if (!is.integer(input$browse_export)) {
-        info <- shinyFiles::parseFilePaths(volumes, input$browse_export)
-        if (nrow(info) > 0) {
-          path <- normalizePath(as.character(info$datapath[1]), winslash = "/", mustWork = FALSE)
-          updateTextInput(session, "data_export", value = path)
-        }
-      }
-    })
 
     observeEvent(input$browse_output, {
       if (!is.integer(input$browse_output)) {
@@ -287,18 +260,36 @@ run_alchemerexport_gui <- function() {
             "This takes 15–30 seconds. Check the R console for live progress.")
       })
 
-      survey_id   <- trimws(input$survey_id)
-      output_dir  <- trimws(input$output_dir)
-      data_export <- if (nzchar(trimws(input$data_export))) trimws(input$data_export) else NULL
-      targets     <- if (length(input$targets) > 0L) input$targets else "tabs"
+      # Strip whitespace plus any wrapping quotes (users sometimes paste
+      # shell-style 'quoted paths', which R won't strip on its own).
+      clean_path <- function(x) {
+        x <- trimws(x %||% "")
+        x <- sub("^['\"]+", "", x)
+        x <- sub("['\"]+$", "", x)
+        trimws(x)
+      }
+      survey_id  <- clean_path(input$survey_id)
+      output_dir <- clean_path(input$output_dir)
+      targets    <- if (length(input$targets) > 0L) input$targets else "tabs"
+
+      if (!dir.exists(output_dir)) {
+        rv$complete <- FALSE
+        rv$log <- sprintf("ERROR: output directory does not exist: '%s'", output_dir)
+        output$run_status <- renderUI({
+          div(class = "turas-status-error",
+              strong("Output directory not found."),
+              br(),
+              "Use the Browse button or paste a path without surrounding quotes.")
+        })
+        return(invisible(NULL))
+      }
 
       log_lines <- capture.output({
         result <- tryCatch(
           alchemer_to_turas(
-            survey_id        = survey_id,
-            output_dir       = output_dir,
-            data_export_path = data_export,
-            targets          = targets
+            survey_id  = survey_id,
+            output_dir = output_dir,
+            targets    = targets
           ),
           error = function(e) {
             cat("ERROR:", conditionMessage(e), "\n")
@@ -317,10 +308,9 @@ run_alchemerexport_gui <- function() {
           recent <- load_recents()
           entry_name <- paste0("Survey ", survey_id)
           entry <- list(
-            survey_id   = survey_id,
-            output_dir  = output_dir,
-            data_export = data_export,
-            targets     = targets
+            survey_id  = survey_id,
+            output_dir = output_dir,
+            targets    = targets
           )
           recent <- c(setNames(list(entry), entry_name),
                       recent[names(recent) != entry_name])
@@ -413,8 +403,6 @@ run_alchemerexport_gui <- function() {
               )
             )
           )
-        } else {
-          p(class = "turas-help-text", "Data_Headers not generated (no export file provided)")
         }
       )
     })

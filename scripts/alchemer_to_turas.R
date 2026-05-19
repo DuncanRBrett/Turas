@@ -4,7 +4,12 @@
 #
 # Outputs (written to output_dir):
 #   All targets:
-#     {survey_id}_Data_Headers.xlsx          — column rename map (if data_export_path given)
+#     {survey_id}_Data_Headers.xlsx          — single row of Turas column codes
+#                                              that mirrors Survey_Structure
+#                                              (one col per QuestionCode for
+#                                              single-value types, one col per
+#                                              option for Multi_Mention /
+#                                              Ranking / Allocation).
 #   targets includes "tabs":
 #     {survey_id}_Survey_Structure.xlsx      — Questions + Options sheets populated
 #     {survey_id}_Crosstab_Config.xlsx       — Selection sheet + full Settings copy
@@ -14,12 +19,11 @@
 #
 # Usage from R:
 #   source("scripts/alchemer_to_turas.R")
-#   alchemer_to_turas(survey_id = 8822527, output_dir = "projects/my_project")
-#   alchemer_to_turas(8822527, "projects/ipk", targets = c("tabs", "brand"),
-#                     data_export_path = "projects/ipk/raw.csv")
+#   alchemer_to_turas(8822527, "projects/my_project",
+#                     targets = c("tabs", "brand"))
 #
 # Usage from CLI:
-#   Rscript scripts/alchemer_to_turas.R <survey_id> <output_dir> [data_export.csv]
+#   Rscript scripts/alchemer_to_turas.R <survey_id> <output_dir>
 
 suppressPackageStartupMessages({
   library(openxlsx)
@@ -457,103 +461,67 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
   openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
 }
 
-#' Read header row(s) from an Alchemer data export.
+# Variable_Type values in Survey_Structure that produce one data column per
+# option (rest collapse to a single column per question).
+.ATT_MULTI_COL_VTYPES <- c("Multi_Mention", "Ranking", "Allocation")
+
+#' Build Data_Headers from Survey_Structure.xlsx (questions_dt)
 #'
-#' Alchemer exports come in two shapes:
-#'   * CSV — a single header row, often using "Option text:Question shortname"
-#'     colon format for grid / multi-select columns.
-#'   * XLSX — three header rows: option position, question shortname,
-#'     option code (e.g. SQ1_1). The option code row already matches the Turas
-#'     naming convention, so we fall back to the question shortname only where
-#'     the option code is missing (simple single-column variables).
+#' Mirrors the Turas Survey_Structure exactly:
+#'   * Single-column variable types          → one column = QuestionCode
+#'   * Multi-column types (Multi_Mention,
+#'     Ranking, Allocation) with Columns > 1 → "<QuestionCode>_1" ...
+#'                                              "<QuestionCode>_Columns"
+#'
+#' No Alchemer export is consulted — column count comes from `questions_dt$Columns`,
+#' which is itself derived from the API option count. Piped / branched options
+#' that no respondent has triggered yet are still represented because they're
+#' in the survey definition.
 #'
 #' @keywords internal
-.att_read_export_headers <- function(data_export_path) {
-  ext <- tolower(tools::file_ext(data_export_path))
-  tryCatch(
-    {
-      if (ext == "csv") {
-        names(data.table::fread(data_export_path, nrows = 0L, header = TRUE))
-      } else {
-        hdr <- openxlsx::read.xlsx(data_export_path, rows = 1:3, colNames = FALSE)
-        if (is.null(hdr) || nrow(hdr) == 0L) {
-          stop("Header rows could not be read", call. = FALSE)
-        }
-        row2 <- if (nrow(hdr) >= 2L) as.character(hdr[2L, ]) else as.character(hdr[1L, ])
-        row3 <- if (nrow(hdr) >= 3L) as.character(hdr[3L, ]) else rep(NA_character_, length(row2))
-        ifelse(!is.na(row3) & nzchar(row3), row3, row2)
-      }
-    },
-    error = function(e) {
-      warning(sprintf(
-        "Could not read data export '%s': %s — Data_Headers skipped.",
-        data_export_path, e$message
-      ), call. = FALSE)
-      NULL
+.att_build_data_headers <- function(questions_dt) {
+  per_q <- vector("list", nrow(questions_dt))
+  for (i in seq_len(nrow(questions_dt))) {
+    code  <- questions_dt$QuestionCode[[i]]
+    vtype <- questions_dt$Variable_Type[[i]]
+    n_col <- questions_dt$Columns[[i]]
+    if (vtype %in% .ATT_MULTI_COL_VTYPES && !is.na(n_col) && n_col > 1L) {
+      per_q[[i]] <- paste0(code, "_", seq_len(n_col))
+    } else {
+      per_q[[i]] <- code
     }
-  )
+  }
+  unlist(per_q, use.names = FALSE)
 }
 
-.att_write_data_headers <- function(api_dt, questions_dt, data_export_path, output_path) {
-  raw_headers <- .att_read_export_headers(data_export_path)
-  if (is.null(raw_headers) || length(raw_headers) == 0L) return(invisible(NULL))
+#' Write Data_Headers.xlsx — single row, column codes mirroring Survey_Structure
+#'
+#' @keywords internal
+.att_write_data_headers <- function(questions_dt, output_path) {
+  headers <- .att_build_data_headers(questions_dt)
+  if (length(headers) == 0L) {
+    warning("No headers derived from Survey_Structure — Data_Headers skipped.",
+            call. = FALSE)
+    return(invisible(NULL))
+  }
 
-  opts_colon <- api_dt[!is.na(option_id) & !is.na(option_title) & nzchar(option_title)]
-  opts_colon[, opt_seq    := seq_len(.N), by = question_id]
-  opts_colon[, norm_title := gsub(" ", ".", trimws(option_title), fixed = TRUE)]
-  opts_colon[, turas_col  := paste0(question_shortname, "_", opt_seq)]
-  colon_lookup <- lapply(
-    split(opts_colon, by = "question_shortname", keep.by = TRUE),
-    function(dt) dt[, .(norm_title, turas_col)]
-  )
+  dupes <- headers[duplicated(headers)]
+  if (length(dupes) > 0L) {
+    warning(sprintf(
+      "Duplicate Data_Headers columns: %s — check QuestionCode values in Survey_Structure.",
+      paste(unique(dupes), collapse = ", ")
+    ), call. = FALSE)
+  }
 
-  all_codes <- questions_dt$QuestionCode
-  turas_headers <- vapply(raw_headers, function(h) {
-    if (h %in% all_codes) return(h)
-    if (grepl(":", h, fixed = TRUE)) {
-      parts <- strsplit(h, ":", fixed = TRUE)[[1L]]
-      if (length(parts) == 2L) {
-        prefix    <- parts[[1L]]
-        shortname <- parts[[2L]]
-        q_opts    <- colon_lookup[[shortname]]
-        if (!is.null(q_opts)) {
-          idx <- which(q_opts$norm_title == prefix)
-          if (length(idx) == 0L) idx <- which(tolower(q_opts$norm_title) == tolower(prefix))
-          if (length(idx) == 1L) return(q_opts$turas_col[idx])
-        }
-      }
-      return(h)
-    }
-    prefix_match <- all_codes[nchar(all_codes) >= 3L &
-                                startsWith(h, paste0(all_codes, "_"))]
-    if (length(prefix_match) >= 1L) return(h)
-    h
-  }, character(1L), USE.NAMES = FALSE)
-
-  header_dt <- as.data.table(t(turas_headers))
-  names(header_dt) <- turas_headers
-
+  header_dt <- as.data.table(setNames(as.list(headers), headers))
   wb <- openxlsx::createWorkbook()
   openxlsx::addWorksheet(wb, "Headers")
   openxlsx::writeData(wb, "Headers", header_dt, startRow = 1L, colNames = TRUE)
   openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
 
-  ext <- tolower(tools::file_ext(data_export_path))
-  if (ext == "csv") {
-    n_colon_total  <- sum(grepl(":", raw_headers, fixed = TRUE))
-    n_colon_mapped <- sum(turas_headers != raw_headers &
-                            grepl(":", raw_headers, fixed = TRUE))
-    cat(sprintf(
-      "  Data_Headers: %d cols | %d / %d colon-format mapped; %d simple; %d unresolved\n",
-      length(turas_headers), n_colon_mapped, n_colon_total,
-      sum(!grepl(":", raw_headers, fixed = TRUE)),
-      sum(turas_headers == raw_headers & grepl(":", raw_headers, fixed = TRUE))
-    ))
-  } else {
-    cat(sprintf("  Data_Headers: %d cols extracted from XLSX export\n",
-                length(turas_headers)))
-  }
-  invisible(turas_headers)
+  cat(sprintf("  Data_Headers: %d columns (mirrors Survey_Structure)\n",
+              length(headers)))
+  invisible(headers)
 }
 
 # ---- main --------------------------------------------------------------------
@@ -567,17 +535,17 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
 #' @param output_dir Path to output directory. Created if it does not exist.
 #' @param api_token  Optional API token. Defaults to ALCHEMER_API_TOKEN env var.
 #' @param api_secret Optional API secret. Defaults to ALCHEMER_API_SECRET env var.
-#' @param data_export_path Optional path to an Alchemer CSV or XLSX data export.
-#'   When provided, also writes a Data_Headers rename map.
 #' @param targets Character vector of module targets. Valid values: "tabs", "brand".
 #'   Defaults to "tabs". Pass c("tabs", "brand") to generate both.
-#' @return Invisibly, a named list of paths for files written.
+#' @return Invisibly, a named list of paths for files written. Always includes
+#'   `data_headers` (mirrors `Survey_Structure.xlsx` — one column per
+#'   QuestionCode for single-value types, one column per option for
+#'   Multi_Mention / Ranking / Allocation).
 #' @export
 alchemer_to_turas <- function(survey_id,
                                output_dir,
                                api_token        = NULL,
                                api_secret       = NULL,
-                               data_export_path = NULL,
                                targets          = "tabs") {
   if (missing(survey_id) || !nzchar(as.character(survey_id))) {
     stop("survey_id is required.", call. = FALSE)
@@ -673,19 +641,11 @@ alchemer_to_turas <- function(survey_id,
     out_paths$brand_config           <- bc_path
   }
 
-  # ---- data headers (all targets) --------------------------------------------
-  if (!is.null(data_export_path)) {
-    dh_path <- file.path(output_dir, sprintf("%s_Data_Headers.xlsx", survey_id))
-    if (!file.exists(data_export_path)) {
-      warning(sprintf(
-        "data_export_path not found: '%s' — Data_Headers skipped.", data_export_path
-      ), call. = FALSE)
-    } else {
-      cat("Writing Data_Headers.xlsx...\n")
-      .att_write_data_headers(api_dt, questions_dt, data_export_path, dh_path)
-      out_paths$data_headers <- dh_path
-    }
-  }
+  # ---- data headers (all targets, mirrors Survey_Structure) ------------------
+  dh_path <- file.path(output_dir, sprintf("%s_Data_Headers.xlsx", survey_id))
+  cat("Writing Data_Headers.xlsx...\n")
+  .att_write_data_headers(questions_dt, dh_path)
+  out_paths$data_headers <- dh_path
 
   written <- paste(sprintf("  %s", basename(unlist(out_paths))), collapse = "\n")
   cat(sprintf("\nDone. Files in: %s\n%s\n", output_dir, written))
@@ -699,13 +659,12 @@ if (sys.nframe() == 0L && !interactive()) {
   args <- commandArgs(trailingOnly = TRUE)
   if (length(args) < 2L) {
     stop(
-      "Usage: Rscript scripts/alchemer_to_turas.R <survey_id> <output_dir> [data_export.csv]",
+      "Usage: Rscript scripts/alchemer_to_turas.R <survey_id> <output_dir>",
       call. = FALSE
     )
   }
   alchemer_to_turas(
-    survey_id        = args[[1L]],
-    output_dir       = args[[2L]],
-    data_export_path = if (length(args) >= 3L) args[[3L]] else NULL
+    survey_id  = args[[1L]],
+    output_dir = args[[2L]]
   )
 }
