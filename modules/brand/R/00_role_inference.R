@@ -196,6 +196,22 @@ infer_role_map <- function(questions, brands, active_cats) {
                      column_kind = "multi_mention_root")))
   }
 
+  # Attribute matrices: BRANDATTR_{CAT}{NN}
+  # (POS convention — like BRANDATTR_<CAT>_ATT<NN> but with cat glued to the
+  # number, no _ATT separator. Maps to mental_avail.attr.<CAT>.ATT<NN> so
+  # build_cep_linkage(item_kind = "attr") picks it up alongside the
+  # DSS/PAS/BAK BRANDATTR_<CAT>_ATT<NN> form handled above.)
+  m <- regmatches(qc, regexec("^BRANDATTR_([A-Z]+)([0-9]+)$", qc))[[1]]
+  if (length(m) == 3L) {
+    cat_code <- m[2]
+    item_code <- paste0("ATT", m[3])
+    return(list(list(pattern = "brandattr_short",
+                     role = paste0("mental_avail.attr.", cat_code, ".", item_code),
+                     category = cat_code,
+                     detail = list(item_kind = "attr", item_code = item_code),
+                     column_kind = "multi_mention_root")))
+  }
+
   # WOM count per-brand: WOM_{POS|NEG}_COUNT_{CAT}_{BRAND}
   m <- regmatches(qc, regexec("^WOM_(POS|NEG)_COUNT_([A-Z0-9]+)_([A-Z0-9]+)$",
                               qc))[[1]]
