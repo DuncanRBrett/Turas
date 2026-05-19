@@ -103,13 +103,15 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
 }
 
 
-#' Five relationship / attitude-position summary cards (focal % vs avg %)
+#' Six relationship / attitude-position summary cards (focal % vs avg %)
 #' @keywords internal
 .relationship_cards <- function(att_df, focal) {
   if (is.null(att_df) || nrow(att_df) == 0) return(list())
-  positions <- c("attitude.love", "attitude.prefer",
-                 "attitude.ambivalent", "attitude.reject",
-                 "attitude.no_opinion")
+  # Canonicalise legacy "attitude.reject" → "attitude.avoid" in incoming data.
+  if ("attitude_role" %in% names(att_df)) {
+    att_df$attitude_role <- .funnel_canonical_attitude_role(att_df$attitude_role)
+  }
+  positions <- .FUNNEL_ATTITUDE_POSITIONS
   cards <- lapply(positions, function(role) {
     focal_row <- att_df[att_df$brand_code == focal &
                           att_df$attitude_role == role, , drop = FALSE]
@@ -131,10 +133,12 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
 
 
 .attitude_label_short <- function(role) {
-  labels <- c(attitude.love = "Love",
-              attitude.prefer = "Prefer",
+  role <- .funnel_canonical_attitude_role(role)
+  labels <- c(attitude.love       = "Love",
+              attitude.prefer     = "Prefer",
               attitude.ambivalent = "Ambivalent",
-              attitude.reject = "Reject",
+              attitude.price      = "Price",
+              attitude.avoid      = "Avoid",
               attitude.no_opinion = "No opinion")
   unname(labels[role]) %||% role
 }

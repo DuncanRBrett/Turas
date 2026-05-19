@@ -285,7 +285,7 @@ test_that("IPK attitude decomposition sums to 100% and matches hand calc", {
   # Ambiv(3): R3,R7 = 2/10; Reject(4): R4 = 1/10; NoOpinion(5): R5,R9 = 2/10
   expect_equal(ipk$pct[ipk$attitude_role == "attitude.love"],   3/10, tolerance = 1e-9)
   expect_equal(ipk$pct[ipk$attitude_role == "attitude.prefer"], 2/10, tolerance = 1e-9)
-  expect_equal(ipk$pct[ipk$attitude_role == "attitude.reject"], 1/10, tolerance = 1e-9)
+  expect_equal(ipk$pct[ipk$attitude_role == "attitude.avoid"], 1/10, tolerance = 1e-9)
   expect_equal(sum(ipk$pct), 1.0, tolerance = 1e-9)
 })
 

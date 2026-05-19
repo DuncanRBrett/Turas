@@ -52,7 +52,11 @@ build_funnel_legacy_wide <- function(result, brand_list) {
   out$Love_Pct        <- 100 * att_pcts$attitude.love
   out$Prefer_Pct      <- 100 * att_pcts$attitude.prefer
   out$Ambivalent_Pct  <- 100 * att_pcts$attitude.ambivalent
-  out$Reject_Pct      <- 100 * att_pcts$attitude.reject
+  out$Price_Pct       <- 100 * att_pcts$attitude.price
+  out$Avoid_Pct       <- 100 * att_pcts$attitude.avoid
+  # Back-compat: keep Reject_Pct populated (= Avoid_Pct) for any consumer not
+  # yet updated. Drop in a later release.
+  out$Reject_Pct      <- out$Avoid_Pct
   out$NoOpinion_Pct   <- 100 * att_pcts$attitude.no_opinion
   out
 }
@@ -64,7 +68,9 @@ build_funnel_legacy_wide <- function(result, brand_list) {
     Aware_Pct = numeric(0), Positive_Pct = numeric(0),
     Bought_Pct = numeric(0), Primary_Pct = numeric(0),
     Love_Pct = numeric(0), Prefer_Pct = numeric(0),
-    Ambivalent_Pct = numeric(0), Reject_Pct = numeric(0),
+    Ambivalent_Pct = numeric(0),
+    Price_Pct = numeric(0), Avoid_Pct = numeric(0),
+    Reject_Pct = numeric(0),   # back-compat alias of Avoid_Pct
     NoOpinion_Pct = numeric(0),
     stringsAsFactors = FALSE
   )
@@ -134,8 +140,10 @@ build_funnel_legacy_conversions <- function(result, brand_list) {
 
 
 .pivot_attitude_to_wide <- function(att_df, brand_codes) {
-  positions <- c("attitude.love", "attitude.prefer", "attitude.ambivalent",
-                 "attitude.reject", "attitude.no_opinion")
+  if (!is.null(att_df) && "attitude_role" %in% names(att_df)) {
+    att_df$attitude_role <- .funnel_canonical_attitude_role(att_df$attitude_role)
+  }
+  positions <- .FUNNEL_ATTITUDE_POSITIONS
   out <- list()
   for (p in positions) {
     vals <- vapply(brand_codes, function(b) {

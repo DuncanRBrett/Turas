@@ -509,10 +509,13 @@
     }
     if (!focalEntry) return;
     var roleMap = {
-      "LOVE": "attitude.love",
-      "PREFER": "attitude.prefer",
+      "LOVE":       "attitude.love",
+      "PREFER":     "attitude.prefer",
       "AMBIVALENT": "attitude.ambivalent",
-      "REJECT": "attitude.reject",
+      "PRICE":      "attitude.price",
+      "AVOID":      "attitude.avoid",
+      // Back-compat: "REJECT" label still resolves to the avoid role.
+      "REJECT":     "attitude.avoid",
       "NO OPINION": "attitude.no_opinion"
     };
     panel.querySelectorAll(".fn-card-relationship").forEach(function(card){
@@ -2066,20 +2069,22 @@
   // ---------------------------------------------------------------------------
   var REL_SEG_ROLES = [
     "attitude.love","attitude.prefer","attitude.ambivalent",
-    "attitude.reject","attitude.no_opinion"
+    "attitude.price","attitude.avoid","attitude.no_opinion"
   ];
   var REL_SEG_COLORS = {
     "attitude.love":       "#2E7D32",
     "attitude.prefer":     "#81C784",
     "attitude.ambivalent": "#F9A825",
-    "attitude.reject":     "#C62828",
+    "attitude.price":      "#EF6C00",
+    "attitude.avoid":      "#C62828",
     "attitude.no_opinion": "#90A4AE"
   };
   var REL_SEG_LABELS = {
     "attitude.love":       "Love",
     "attitude.prefer":     "Prefer",
     "attitude.ambivalent": "Ambivalent",
-    "attitude.reject":     "Reject",
+    "attitude.price":      "Price",
+    "attitude.avoid":      "Avoid",
     "attitude.no_opinion": "No opinion"
   };
 
@@ -2251,7 +2256,7 @@
    * which counts only aware respondents and keeps the row at 100%. */
   var REL_AWARE_OPINION_ROLES = [
     "attitude.love", "attitude.prefer",
-    "attitude.ambivalent", "attitude.reject"
+    "attitude.ambivalent", "attitude.price", "attitude.avoid"
   ];
 
   function relPct(brand, role, base, nTotal) {
@@ -2505,8 +2510,8 @@
     var brandName = escapeAttr(top.brand.brand_name || top.brand.brand_code);
 
     var prefix;
-    if (emphasis === "attitude.reject") {
-      prefix = "<strong>" + brandName + "</strong> has the highest active rejection";
+    if (emphasis === "attitude.avoid" || emphasis === "attitude.reject") {
+      prefix = "<strong>" + brandName + "</strong> has the highest active avoidance";
     } else if (top.brand.brand_code === focal) {
       prefix = "<strong>" + brandName + "</strong> leads on <em>" + roleName + "</em>";
     } else {

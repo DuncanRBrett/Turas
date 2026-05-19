@@ -19,9 +19,15 @@
 
 BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
 
-# Default attitude codes considered "positive" for consideration. Matches the
-# IPK convention: 1 = Love, 2 = Prefer, 3 = Ambivalent. 4 = Reject and
-# 5 = No opinion are explicitly excluded. Caller can override per project.
+# Default attitude codes considered "positive" / non-avoiding for consideration.
+# Pre-2026 5-level scale: 1=Love, 2=Prefer, 3=Ambivalent, 4=Reject, 5=NoOpinion
+#   → positive codes are 1, 2, 3.
+# 6-level scale (IPK 2026): 1=Love, 2=Prefer, 3=Ambivalent, 4=Price-conditional,
+#   5=Avoid, 6=NoOpinion → positive codes are 1, 2, 3, 4.
+# The right set is inferred at runtime from the attitude_entry$attitude_role_codes
+# override (set via OptionMap) — only roles that are NOT "attitude.avoid" /
+# "attitude.no_opinion" qualify. This hard-coded fallback covers the legacy
+# 5-level case where no override is supplied.
 .FUNNEL_POSITIVE_ATTITUDE_CODES <- c("1", "2", "3")
 
 
@@ -60,7 +66,7 @@ BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
 # override per project via config$funnel.stage_definitions.
 .FUNNEL_DEFAULT_DEFINITIONS <- list(
   aware              = "Respondents who recognise the brand (stated aided awareness).",
-  consideration      = "Aware respondents holding a positive or non-rejecting attitude (Love, Prefer, or Ambivalent — not Reject or No opinion).",
+  consideration      = "Aware respondents holding a non-avoiding attitude (Love, Prefer, Ambivalent, or Price-conditional — not Avoid and not No opinion).",
   bought_long        = "Considerers who have bought the brand in the longer timeframe asked on the survey.",
   bought_target      = "Long-period buyers who also bought the brand in the target (shorter) timeframe.",
   current_owner_d    = "Considerers who currently own this brand in the category.",
@@ -69,9 +75,12 @@ BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
   long_tenured_s     = "Current customers whose tenure meets or exceeds the configured tenure threshold."
 )
 
-# Positive attitude role set (Consideration membership).
+# Positive / non-avoiding attitude role set (Consideration membership).
+# "Price-conditional" buyers are included — they'd consider the brand at the
+# right price point. Only outright avoiders and no-opinion respondents are
+# excluded from consideration.
 .FUNNEL_POSITIVE_ATTITUDE_ROLES <- c(
-  "attitude.love", "attitude.prefer", "attitude.ambivalent"
+  "attitude.love", "attitude.prefer", "attitude.ambivalent", "attitude.price"
 )
 
 

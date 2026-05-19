@@ -18,20 +18,49 @@ BRAND_FUNNEL_METRICS_VERSION <- "2.0"
 # ==============================================================================
 
 # Attitude position roles in display order (matches ROLE_REGISTRY §4.2).
+# Six-level scale (IPK 2026 onwards):
+#   love       — "I love it. It's my favourite"
+#   prefer     — "It's one of my preferred brands"
+#   ambivalent — "I would only consider it if nothing else is available"
+#   price      — "I would only buy it if the price was right"
+#   avoid      — "I would avoid this brand"           (renamed from reject)
+#   no_opinion — "I have no opinion / don't know this brand"
 .FUNNEL_ATTITUDE_POSITIONS <- c(
   "attitude.love", "attitude.prefer", "attitude.ambivalent",
-  "attitude.reject", "attitude.no_opinion"
+  "attitude.price", "attitude.avoid", "attitude.no_opinion"
 )
 
-# IPK-canonical numeric attitude codes mapped to attitude roles. Used when
-# the role-map entry has no option_map (v2 convention-first inference).
-# Operators following a different coding scheme can supply an override via
-# attitude_entry$attitude_role_codes (a named list of role -> codes).
+# Back-compat alias: "attitude.reject" was the pre-2026 name for what is now
+# "attitude.avoid". Old role maps, fixtures, and call sites can still pass
+# the old role and we resolve it transparently.
+.FUNNEL_ATTITUDE_ROLE_ALIASES <- c(
+  "attitude.reject" = "attitude.avoid"
+)
+
+#' Canonicalise an attitude role name (handles back-compat aliases)
+#' @keywords internal
+.funnel_canonical_attitude_role <- function(role) {
+  hits <- !is.na(role) & role %in% names(.FUNNEL_ATTITUDE_ROLE_ALIASES)
+  role[hits] <- unname(.FUNNEL_ATTITUDE_ROLE_ALIASES[role[hits]])
+  role
+}
+
+# Default numeric attitude codes mapped to attitude roles. Used when the
+# role-map entry has no option_map and no explicit attitude_role_codes
+# override. Two scales coexist in the wild:
+#   * Legacy 5-level (default below):
+#       1=Love, 2=Prefer, 3=Ambivalent, 4=Avoid (was Reject), 5=NoOpinion
+#   * IPK 2026 6-level: 1=Love, 2=Prefer, 3=Ambivalent, 4=Price-conditional,
+#     5=Avoid, 6=NoOpinion → surveys on this scale MUST declare it via the
+#     OptionMap (attitude_scale rows) so .option_map_by_role() picks up the
+#     correct codes; otherwise the default below maps code 4 to Avoid and the
+#     Price segment will be empty.
+# Operators on either scale can also override via attitude_entry$attitude_role_codes.
 .FUNNEL_DEFAULT_ATTITUDE_ROLE_CODES <- list(
   "attitude.love"       = "1",
   "attitude.prefer"     = "2",
   "attitude.ambivalent" = "3",
-  "attitude.reject"     = "4",
+  "attitude.avoid"      = "4",
   "attitude.no_opinion" = "5"
 )
 

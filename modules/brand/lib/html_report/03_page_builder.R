@@ -826,8 +826,9 @@ build_br_about_panel <- function(config) {
 
       <h3 style="font-size:15px;color:%s;margin:20px 0 8px;">Brand Funnel</h3>
       <p>Funnel stages are derived from core CBM data, not from sequential funnel questions.
-      The 5-level attitude scale provides richer diagnostics than traditional binary consideration.
-      Rejection is captured explicitly (attitude code 4).</p>
+      The 6-level attitude scale (Love, Prefer, Ambivalent, Price-conditional, Avoid, No opinion)
+      provides richer diagnostics than traditional binary consideration, with avoidance captured
+      explicitly (attitude code 5).</p>
 
       <h3 style="font-size:15px;color:%s;margin:20px 0 8px;">References</h3>
       <ul style="padding-left:20px;">

@@ -662,9 +662,10 @@ build_funnel_chart <- function(funnel_df, focal_brand = NULL,
   cw <- 720 - ml - mr
   total_h <- mt + n * (bar_h * 2 + gap) + mb + 40
 
-  # Attitude colours: Love(dark blue) Prefer(mid blue) Ambivalent(light blue) Reject(muted red) NoOpinion(light grey)
-  att_cols <- c("#1A5276", "#2E86C1", "#85C1E9", "#C0392B", "#D5D8DC")
-  att_labels <- c("Love", "Prefer", "Ambivalent", "Reject", "No Opinion")
+  # Attitude colours: Love(dark blue) Prefer(mid blue) Ambivalent(light blue)
+  # Price(orange) Avoid(muted red) NoOpinion(light grey)
+  att_cols   <- c("#1A5276", "#2E86C1", "#85C1E9", "#E67E22", "#C0392B", "#D5D8DC")
+  att_labels <- c("Love",     "Prefer",  "Ambivalent","Price",   "Avoid",   "No Opinion")
 
   parts <- character(0)
   parts <- c(parts, sprintf(
@@ -697,8 +698,11 @@ build_funnel_chart <- function(funnel_df, focal_brand = NULL,
       '<rect x="%d" y="%g" width="%g" height="%d" rx="3" fill="#e2e8f0"/>', ml, y_base, aware_w, bar_h))
 
     # Attitude decomposition within aware bar
+    # Avoid_Pct is preferred; fall back to legacy Reject_Pct for older callers.
+    avoid_pct <- funnel_df$Avoid_Pct[i] %||% funnel_df$Reject_Pct[i]
+    price_pct <- funnel_df$Price_Pct[i] %||% 0
     att_pcts <- c(funnel_df$Love_Pct[i], funnel_df$Prefer_Pct[i],
-                  funnel_df$Ambivalent_Pct[i], funnel_df$Reject_Pct[i],
+                  funnel_df$Ambivalent_Pct[i], price_pct, avoid_pct,
                   funnel_df$NoOpinion_Pct[i])
     att_total <- sum(att_pcts, na.rm = TRUE)
     if (att_total > 0) {

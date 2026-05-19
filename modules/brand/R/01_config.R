@@ -194,8 +194,15 @@ load_brand_config <- function(config_path, project_root = NULL) {
   config$project_root <- project_root
   config$config_path <- config_path
 
+  # Treat NULL / NA / blank uniformly when deciding whether a path setting is
+  # populated. A freshly-generated Brand_Config from AlchemerExport leaves
+  # these blank for the analyst to fill in — without the NA guard a blank cell
+  # crashes the loader with "missing value where TRUE/FALSE needed".
+  .is_set <- function(x) !is.null(x) && length(x) > 0L && !is.na(x) &&
+                          nchar(trimws(as.character(x))) > 0L
+
   # Resolve data_file path
-  if (!is.null(config$data_file) && nchar(trimws(config$data_file)) > 0) {
+  if (.is_set(config$data_file)) {
     if (exists("resolve_path", mode = "function")) {
       config$data_file_resolved <- resolve_path(project_root, config$data_file)
     } else {
@@ -204,7 +211,7 @@ load_brand_config <- function(config_path, project_root = NULL) {
   }
 
   # Resolve structure_file path
-  if (!is.null(config$structure_file) && nchar(trimws(config$structure_file)) > 0) {
+  if (.is_set(config$structure_file)) {
     if (exists("resolve_path", mode = "function")) {
       config$structure_file_resolved <- resolve_path(project_root, config$structure_file)
     } else {
@@ -213,7 +220,7 @@ load_brand_config <- function(config_path, project_root = NULL) {
   }
 
   # Resolve output_dir path
-  if (!is.null(config$output_dir) && nchar(trimws(config$output_dir)) > 0) {
+  if (.is_set(config$output_dir)) {
     if (exists("resolve_path", mode = "function")) {
       config$output_dir_resolved <- resolve_path(project_root, config$output_dir)
     } else {

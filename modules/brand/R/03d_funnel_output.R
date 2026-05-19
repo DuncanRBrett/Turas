@@ -233,8 +233,12 @@ write_funnel_csv <- function(result, brand_list, role_map = NULL,
   att <- result$attitude_decomposition
   if (is.null(att) || nrow(att) == 0) return(invisible(NULL))
 
-  positions <- c("attitude.love","attitude.prefer","attitude.ambivalent",
-                 "attitude.reject","attitude.no_opinion")
+  # Canonicalise any legacy "attitude.reject" rows to "attitude.avoid" so the
+  # Excel writer always emits the new column names regardless of input source.
+  if ("attitude_role" %in% names(att)) {
+    att$attitude_role <- .funnel_canonical_attitude_role(att$attitude_role)
+  }
+  positions <- .FUNNEL_ATTITUDE_POSITIONS
   brands <- as.character(brand_list$BrandCode)
   labels <- as.character(brand_list$BrandLabel %||% brand_list$BrandCode)
 
@@ -395,9 +399,12 @@ write_funnel_csv <- function(result, brand_list, role_map = NULL,
 
 
 .attitude_label <- function(role) {
-  labels <- c(attitude.love = "Love", attitude.prefer = "Prefer",
+  role <- .funnel_canonical_attitude_role(role)
+  labels <- c(attitude.love       = "Love",
+              attitude.prefer     = "Prefer",
               attitude.ambivalent = "Ambivalent",
-              attitude.reject = "Reject",
+              attitude.price      = "Price",
+              attitude.avoid      = "Avoid",
               attitude.no_opinion = "No Opinion")
   unname(labels[role]) %||% role
 }

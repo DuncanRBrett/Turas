@@ -138,7 +138,7 @@ build_funnel_tables <- function(funnel, focal_brand) {
   parts <- c(parts, build_br_table(
     legacy_wide, "BrandCode", focal_brand,
     pct_cols = c("Aware_Pct", "Positive_Pct", "Love_Pct", "Prefer_Pct",
-                 "Ambivalent_Pct", "Reject_Pct", "NoOpinion_Pct",
+                 "Ambivalent_Pct", "Price_Pct", "Avoid_Pct", "NoOpinion_Pct",
                  "Bought_Pct", "Primary_Pct"),
     title = "Funnel Stage Metrics",
     caption = sprintf("Base: n = %d unweighted",

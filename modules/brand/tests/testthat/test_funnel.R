@@ -232,7 +232,7 @@ test_that("attitude decomposition produces 5 positions per brand", {
   expect_equal(nrow(att_df), 15L)  # 3 brands x 5 positions
   expect_setequal(unique(att_df$attitude_role),
                   c("attitude.love", "attitude.prefer", "attitude.ambivalent",
-                    "attitude.reject", "attitude.no_opinion"))
+                    "attitude.avoid", "attitude.no_opinion"))
 
   # IPK attitudes: 1,2,3,4,5,1,3,2,5,1 -> Love=3 Prefer=2 Ambiv=2 Reject=1 None=2
   ipk <- att_df[att_df$brand_code == "IPK", ]
@@ -305,7 +305,7 @@ test_that("run_funnel against IPK Wave 1 fixture: end-to-end", {
   # Attitude decomposition produces 5 positions per brand
   expect_setequal(unique(res$attitude_decomposition$attitude_role),
                   c("attitude.love", "attitude.prefer", "attitude.ambivalent",
-                    "attitude.reject", "attitude.no_opinion"))
+                    "attitude.avoid", "attitude.no_opinion"))
   expect_equal(nrow(res$attitude_decomposition),
                nrow(dss_brands) * 5)
 

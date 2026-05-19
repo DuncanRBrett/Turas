@@ -271,7 +271,7 @@ test_that("consideration_detail has one entry per brand with 5 attitude segments
   ipk_entry <- panel$consideration_detail$brands[[which(brands_covered == "IPK")]]
   expect_setequal(names(ipk_entry$segments),
     c("attitude.love","attitude.prefer","attitude.ambivalent",
-      "attitude.reject","attitude.no_opinion"))
+      "attitude.avoid","attitude.no_opinion"))
   # IPK love = 3/10
   expect_equal(ipk_entry$segments$attitude.love, 3/10, tolerance = 1e-9)
 })
