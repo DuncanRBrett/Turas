@@ -348,7 +348,15 @@ build_seg_css <- function(brand_colour = "#323367", accent_colour = "#CC9900") {
   white-space: normal;
 }
 
-.seg-th-num { text-align: center; }
+.seg-th-num {
+  text-align: center;
+  max-width: 110px;
+  min-width: 80px;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+  padding: 10px 8px;
+}
 .seg-th-bar { text-align: left; min-width: 150px; }
 .seg-th-rank { text-align: center; width: 50px; }
 
