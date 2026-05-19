@@ -410,9 +410,17 @@ run_significance_tests <- function(stage_metrics, focal_brand,
 
 .option_map_by_role <- function(option_map) {
   out <- list()
+  # OptionMap convention is "<scale_name>.<level>" (e.g. attitude_scale.love),
+  # while funnel positions are "attitude.<level>" (e.g. attitude.love). Accept
+  # both so the same OptionMap drives both old and new code paths. Also
+  # canonicalises the legacy "reject" name to "avoid".
   for (role in .FUNNEL_ATTITUDE_POSITIONS) {
+    alt_scale <- sub("^attitude\\.", "attitude_scale.", role)
+    alt_legacy <- if (role == "attitude.avoid") "attitude_scale.reject" else NA_character_
+    candidates <- c(role, alt_scale, alt_legacy)
+    candidates <- candidates[!is.na(candidates)]
     sub <- option_map[!is.na(option_map$Role) &
-                        option_map$Role == role, , drop = FALSE]
+                        option_map$Role %in% candidates, , drop = FALSE]
     out[[role]] <- trimws(as.character(sub$ClientCode))
   }
   out

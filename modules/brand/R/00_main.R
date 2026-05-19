@@ -317,6 +317,29 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
     NULL
   })
 
+  # Wire OptionMap's attitude_scale rows onto every funnel.attitude role
+  # entry so the funnel module's .resolve_attitude_role_codes can pick up
+  # the survey's actual scale (5-level legacy or 6-level IPK 2026) instead
+  # of silently falling back to the 5-level default. Without this the Brand
+  # Attitude bars on a 6-level survey would still show as 5 segments with
+  # code 4 mis-labelled as "Avoid" instead of "Price".
+  if (!is.null(role_map) && !is.null(structure$optionmap) &&
+      is.data.frame(structure$optionmap) &&
+      nrow(structure$optionmap) > 0L &&
+      "Scale" %in% names(structure$optionmap)) {
+    attitude_om <- structure$optionmap[
+      !is.na(structure$optionmap$Scale) &
+        trimws(as.character(structure$optionmap$Scale)) == "attitude_scale",
+      , drop = FALSE]
+    if (nrow(attitude_om) > 0L) {
+      for (rn in names(role_map)) {
+        if (grepl("^funnel\\.attitude", rn)) {
+          role_map[[rn]]$option_map <- attitude_om
+        }
+      }
+    }
+  }
+
   # --- STEP 4: Run elements per category ---
   results <- list()
   category_results <- list()

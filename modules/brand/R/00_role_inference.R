@@ -167,6 +167,7 @@ infer_role_map <- function(questions, brands, active_cats) {
   }
 
   # CEP / Attribute matrices: BRANDATTR_{CAT}_{CEP|ATT}{NN}
+  # (DSS / PAS convention — per-CEP or per-attribute question with brands as options)
   m <- regmatches(qc, regexec("^BRANDATTR_([A-Z0-9]+)_(CEP|ATT)([0-9]+)$",
                               qc))[[1]]
   if (length(m) == 4L) {
@@ -177,6 +178,21 @@ infer_role_map <- function(questions, brands, active_cats) {
                                    m[2], ".", item_code),
                      category = m[2],
                      detail = list(item_kind = item_kind, item_code = item_code),
+                     column_kind = "multi_mention_root")))
+  }
+
+  # CEP matrices: BRANDCEP_{CAT}{NN}
+  # (BAK / POS convention — same shape as BRANDATTR_<CAT>_CEP<NN> but the
+  # category is glued to the CEP number without an underscore. Maps to the
+  # same mental_avail.cep.<CAT>.CEP<NN> role so build_cep_linkage finds it.)
+  m <- regmatches(qc, regexec("^BRANDCEP_([A-Z]+)([0-9]+)$", qc))[[1]]
+  if (length(m) == 3L) {
+    cat_code <- m[2]
+    item_code <- paste0("CEP", m[3])
+    return(list(list(pattern = "brandcep",
+                     role = paste0("mental_avail.cep.", cat_code, ".", item_code),
+                     category = cat_code,
+                     detail = list(item_kind = "cep", item_code = item_code),
                      column_kind = "multi_mention_root")))
   }
 
