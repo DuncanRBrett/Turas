@@ -79,7 +79,11 @@ generate_segment_executive_summary <- function(cluster_result,
 
   # Top differentiating variables
   if (!is.null(profile_result$clustering_profile)) {
-    diff_msg <- .summarize_differentiating_variables(profile_result$clustering_profile, top_n = 3)
+    diff_msg <- .summarize_differentiating_variables(
+      profile_result$clustering_profile,
+      top_n = 3,
+      question_labels = config$question_labels
+    )
     if (!is.null(diff_msg)) {
       key_findings <- c(key_findings, diff_msg)
     }
@@ -227,7 +231,8 @@ generate_segment_executive_summary <- function(cluster_result,
 
 #' Summarize Top Differentiating Variables
 #' @keywords internal
-.summarize_differentiating_variables <- function(profile_df, top_n = 3) {
+.summarize_differentiating_variables <- function(profile_df, top_n = 3,
+                                                 question_labels = NULL) {
 
   if (is.null(profile_df) || nrow(profile_df) == 0) return(NULL)
 
@@ -256,6 +261,17 @@ generate_segment_executive_summary <- function(cluster_result,
 
   top_n_actual <- min(top_n, nrow(sorted))
   top_vars <- sorted$Variable[seq_len(top_n_actual)]
+
+  # Resolve friendly labels if available (matches table-builder idiom)
+  if (!is.null(question_labels) && length(question_labels) > 0) {
+    top_vars <- vapply(top_vars, function(v) {
+      if (v %in% names(question_labels)) {
+        as.character(question_labels[[v]])
+      } else {
+        v
+      }
+    }, character(1), USE.NAMES = FALSE)
+  }
 
   if (!is.null(eta_col)) {
     top_etas <- round(sorted[[eta_col]][seq_len(top_n_actual)], 3)
