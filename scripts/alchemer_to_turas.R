@@ -217,6 +217,25 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
   ifelse(is.na(code), as.character(opt_seq), code)
 }
 
+# Per-house convention: only questions starting with BRAND (BRANDAWARE_,
+# BRANDPEN1/2/3_, BRANDATTR_*, BRANDCEP_*) use the brand-code suffix the brand
+# module looks up by name. Every other multi-mention sticks with positional
+# Q_n naming so tabs (and any other downstream module reading by position)
+# keeps working off the same data file.
+.att_is_brand_multi <- function(shortname) {
+  if (is.null(shortname)) return(logical(0))
+  grepl("^BRAND", as.character(shortname), ignore.case = TRUE)
+}
+
+# Pick the right suffix for a multi-column option based on the question's
+# naming convention. Vectorised — accepts vectors for all four arguments.
+.att_option_suffix <- function(shortname, option_value, opt_seq,
+                                option_sku = NULL) {
+  is_brand <- .att_is_brand_multi(shortname)
+  brand_suffix <- .att_multi_suffix(option_value, opt_seq, option_sku)
+  ifelse(is_brand, brand_suffix, as.character(opt_seq))
+}
+
 .att_build_options <- function(api_dt, questions_dt) {
   q_lookup <- unique(api_dt[, .(question_id, question_shortname)])[
     questions_dt[, .(QuestionCode, Variable_Type)],
@@ -235,7 +254,11 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
   if (nrow(opts) > 0L) {
     opts <- q_lookup[opts, on = "question_id", nomatch = NULL]
     opts[, opt_seq := seq_len(.N), by = question_id]
-    opts[, opt_suffix := .att_multi_suffix(option_value, opt_seq, option_sku)]
+    # Per-house convention: brand questions use brand-code suffix (so the
+    # brand module can look up BRANDPEN2_BAK_CHK by name), everything else
+    # uses positional Q_n (so tabs and other downstream modules keep working).
+    opts[, opt_suffix := .att_option_suffix(question_shortname, option_value,
+                                             opt_seq, option_sku)]
     opts[, OptionQuestionCode := ifelse(
       Variable_Type %in% c("Multi_Mention", "Ranking", "Allocation"),
       paste0(question_shortname, "_", opt_suffix),
@@ -851,7 +874,9 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
 
   # Suffix MUST match what .att_build_options writes into Survey_Structure —
   # otherwise data column names won't line up with the structure's QuestionCodes.
-  opts[, opt_suffix := .att_multi_suffix(option_value, opt_seq, option_sku)]
+  # Same per-house convention: brand questions = brand-code, others = position.
+  opts[, opt_suffix := .att_option_suffix(question_shortname, option_value,
+                                           opt_seq, option_sku)]
   opts[, turas_code := ifelse(
     vtype %in% .ATT_MULTI_COL_VTYPES,
     paste0(question_shortname, "_", opt_suffix),
