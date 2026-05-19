@@ -472,41 +472,30 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
   cep_dt
 }
 
-#' Extract Attributes from both IPK conventions:
-#'   * BRANDATTR_<CAT>_ATT<NN>     (DSS/PAS-style — per-attribute list-brands;
-#'                                  attribute text = question_title)
-#'   * BRANDATT1_<CAT>_<BRAND>     (BAK/POS-style — per-brand list-attributes;
-#'                                  attribute statements live in the question
-#'                                  OPTIONS, so we pick the first such question
-#'                                  per category and read its options as the
-#'                                  attribute battery)
-#' Open-end follow-ups (BRANDATT2_<CAT>_<BRAND>) are intentionally skipped —
-#' those are avoidance reasons, not an attribute battery.
+#' Extract Attributes from BRANDATTR_<CAT>_ATT<NN> questions only.
+#'
+#' DSS / PAS use BRANDATTR_<CAT>_ATT<NN> — one question per attribute, with
+#' brands as options. That's the only convention that carries a real brand
+#' attribute battery in the IPK 2026 study design.
+#'
+#' BAK / POS use BRANDATT1_<CAT>_<BRAND> for per-brand attitude (1-6 attitude
+#' code, not attribute statements) so they have NO separate attribute battery.
+#' Earlier versions tried to extract BRANDATT1's *options* as attributes; that
+#' produced bogus rows like "I love it. It's my favourite" labelled as ATT01.
+#' Now we just return no attribute rows for those categories — the brand
+#' report's Attributes panel will correctly render empty for BAK / POS.
 .att_build_attributes <- function(api_dt, cat_map) {
-  # Pattern A — DSS/PAS naming
   q_a <- unique(api_dt[
     grepl("^BRANDATTR_[^_]+_ATT", question_shortname, ignore.case = TRUE),
     .(question_id, question_shortname, question_title)
   ])
-  # Pattern B — BAK/POS naming: one question per brand, attributes are options.
-  # We collapse to ONE representative question per category (the first).
-  q_b_all <- unique(api_dt[
-    grepl("^BRANDATT1_[A-Z]+_", question_shortname, ignore.case = TRUE),
-    .(question_id, question_shortname, question_title)
-  ])
-  if (nrow(q_b_all) > 0L) {
-    q_b_all[, cat_code := toupper(sub("^BRANDATT1_([A-Z]+)_.*$", "\\1",
-                                       question_shortname, ignore.case = TRUE))]
-    q_b <- q_b_all[, .SD[1L], by = cat_code]
-  } else {
-    q_b <- data.table(cat_code = character(0), question_id = character(0))
-  }
 
-  if (nrow(q_a) == 0L && nrow(q_b) == 0L) {
-    warning("No attribute questions found (neither BRANDATTR_*_ATT* nor BRANDATT1_*) — Attributes sheet will be empty.",
+  if (nrow(q_a) == 0L) {
+    warning("No BRANDATTR_*_ATT* questions found — Attributes sheet will be empty.",
             call. = FALSE)
     return(data.table(Category = character(), CategoryCode = character(),
-                      AttrCode = character(), AttrText = character(), DisplayOrder = integer()))
+                      AttrCode = character(), AttrText = character(),
+                      DisplayOrder = integer()))
   }
 
   rows_a <- lapply(seq_len(nrow(q_a)), function(i) {
@@ -522,25 +511,7 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
     )
   })
 
-  rows_b <- lapply(seq_len(nrow(q_b)), function(i) {
-    q        <- q_b[i]
-    cat_code <- q$cat_code
-    opts <- api_dt[question_id == q$question_id & !is.na(option_id) &
-                     !is.na(option_value)]
-    if (nrow(opts) == 0L) return(NULL)
-    opts[, opt_seq := seq_len(.N)]
-    data.table(
-      Category     = .att_resolve_cat_name(cat_code, cat_map),
-      CategoryCode = cat_code,
-      AttrCode     = sprintf("ATT%02d", opts$opt_seq),
-      AttrText     = opts$option_title
-    )
-  })
-
-  attr_dt <- data.table::rbindlist(
-    Filter(Negate(is.null), c(rows_a, rows_b)),
-    use.names = TRUE
-  )
+  attr_dt <- data.table::rbindlist(rows_a, use.names = TRUE)
   attr_dt[, DisplayOrder := seq_len(.N), by = CategoryCode]
   attr_dt
 }
