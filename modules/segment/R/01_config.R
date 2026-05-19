@@ -157,6 +157,28 @@ read_segment_config <- function(config_file) {
     }
   }, error = function(e) NULL)
 
+  # Load optional Labels sheet (variable -> human-readable label).
+  # Documented behaviour: this in-workbook sheet takes precedence over the
+  # question_labels_file setting when both are present.
+  config$.labels <- tryCatch({
+    lbl <- openxlsx::read.xlsx(config_file, sheet = "Labels")
+    if (!is.null(lbl) && nrow(lbl) > 0 && ncol(lbl) >= 2) {
+      lbl <- lbl[, 1:2]
+      names(lbl) <- c("variable", "label")
+      lbl <- lbl[!is.na(lbl$variable) & !is.na(lbl$label), ]
+      if (nrow(lbl) > 0) {
+        vec <- as.character(lbl$label)
+        names(vec) <- as.character(lbl$variable)
+        cat(sprintf("  Loaded %d question labels from Labels sheet\n", length(vec)))
+        vec
+      } else {
+        NULL
+      }
+    } else {
+      NULL
+    }
+  }, error = function(e) NULL)
+
   # Load optional Slides sheet (title, content, image_path)
   config$.slides <- tryCatch({
     sl <- openxlsx::read.xlsx(config_file, sheet = "Slides")
@@ -421,10 +443,13 @@ parse_segment_feature_params <- function(config, clustering_vars) {
   analyst_name <- get_char_config(config, "analyst_name", default_value = "Analyst")
   description <- as.character(get_config_value(config, "description", default_value = "") %||% "")
 
-  # Question labels
+  # Question labels.
+  # Precedence: in-workbook Labels sheet (config$.labels) > question_labels_file.
   question_labels_file <- get_config_value(config, "question_labels_file", default_value = NULL)
   question_labels <- NULL
-  if (!is.null(question_labels_file) && nzchar(trimws(as.character(question_labels_file)))) {
+  if (!is.null(config$.labels) && length(config$.labels) > 0) {
+    question_labels <- config$.labels
+  } else if (!is.null(question_labels_file) && nzchar(trimws(as.character(question_labels_file)))) {
     question_labels <- load_question_labels(question_labels_file)
   }
 
