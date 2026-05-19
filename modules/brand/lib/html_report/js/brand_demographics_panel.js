@@ -146,8 +146,13 @@
       isFocal: c === focal
     }));
 
+    // panelId MUST be unique per panel instance. BrandSelector's REGISTRY is
+    // keyed by panelId, so a hardcoded "demographics" string makes every
+    // category panel overwrite the previous one's state — closeAll() then
+    // can't find the actually-open popover and clicking outside doesn't
+    // close it. Use the panel's DOM id as the natural anchor.
     window.BrandSelector.create({
-      panelId:   "demographics",
+      panelId:   panel.id || "demographics",
       triggerEl: trigger,
       anchorEl:  trigger.parentElement,
       brands:    brandList,

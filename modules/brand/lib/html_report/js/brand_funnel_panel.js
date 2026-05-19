@@ -574,8 +574,12 @@
     });
     var initialHidden = Array.from(panel.__fnState.relHiddenBrands).filter(
       function (c) { return c !== "__avg__"; });
+    // panelId MUST be unique per panel instance — REGISTRY is keyed by panelId,
+    // and a duplicate key from a sibling category panel would overwrite this
+    // state and make closeAll() unable to find the open popover. The panel's
+    // own DOM id (e.g. "fn-dss") is the natural unique anchor.
     panel.__fnAttitudeSelector = window.BrandSelector.create({
-      panelId:       "fn-attitude",
+      panelId:       (panel.id || "fn") + "-attitude",
       triggerEl:     trigger,
       anchorEl:      trigger.parentElement,
       brands:        brandList,
@@ -619,8 +623,12 @@
     var initialHiddenChart = Object.keys(panel.__fnState.chartBrands).filter(function (c) {
       return c !== "__avg__" && panel.__fnState.chartBrands[c] === false;
     });
+    // Per-panel-instance panelId; see comment in bindRelBrandSelector above.
+    // Without this, BAK / PAS / POS / DSS all register as panelId="funnel"
+    // and only the last one wins in REGISTRY, breaking close-on-outside-click
+    // for every category panel except the most-recently-built.
     panel.__fnSelector = window.BrandSelector.create({
-      panelId:            "funnel",
+      panelId:            panel.id || "fn-funnel",
       triggerEl:          trigger,
       anchorEl:           trigger.parentElement,
       brands:             brandList,
