@@ -997,26 +997,18 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
 #' Survey_Structure layout (one cell per QuestionCode) and warns.
 #'
 #' @keywords internal
-.att_write_data_headers <- function(questions_dt, options_dt, api_dt,
-                                    output_path, data_export_path = NULL) {
-
-  use_export <- !is.null(data_export_path) && nzchar(data_export_path) &&
-                file.exists(data_export_path)
-
-  if (!use_export) {
-    headers <- .att_build_data_headers_structure_only(questions_dt)
-    .att_save_headers_workbook(headers, output_path)
-    cat(sprintf(
-      "  Data_Headers: %d cells (structure-only fallback; no data export provided)\n",
-      length(headers)))
-    return(invisible(headers))
-  }
-
+# Pure translator — does no IO and writes no log. Used by both
+# .att_write_data_headers (for writing the file) and the upstream filter
+# step (to know which Survey_Structure rows survive).
+#
+# Returns a list with: headers (Turas code per export cell), alch_row (raw
+# Alchemer header per cell), resolved_flags (logical, did we map it?),
+# header_row_index (which worksheet row was the Alchemer header), and
+# duplicate_codes (any Turas codes that needed _dupN suffixing).
+.att_translate_export_headers <- function(questions_dt, options_dt, api_dt,
+                                          data_export_path) {
   detected <- .att_detect_alchemer_header_row(data_export_path)
   alch_row <- detected$values
-  cat(sprintf("  Alchemer header detected on worksheet row %d (%d cells, %d colon-format)\n",
-              detected$row_index, length(alch_row),
-              sum(grepl(":", alch_row, fixed = TRUE), na.rm = TRUE)))
 
   lookup      <- .att_build_translation_lookup(api_dt, questions_dt)
   code_index  <- setNames(as.list(questions_dt$QuestionCode),
@@ -1035,34 +1027,113 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
   }
 
   # Disambiguate any duplicate codes by suffixing _dupN so column names stay unique
+  duplicate_codes <- character(0)
   if (anyDuplicated(out) > 0L) {
     tab <- table(out)
-    dup_codes <- names(tab[tab > 1L])
-    for (code in dup_codes) {
+    duplicate_codes <- names(tab[tab > 1L])
+    for (code in duplicate_codes) {
       idx <- which(out == code)
       out[idx] <- paste0(code, c("", paste0("_dup", seq_len(length(idx) - 1L))))
     }
-    warning(sprintf("Duplicate Turas codes encountered (suffixed with _dupN): %s",
-                    paste(dup_codes, collapse = ", ")), call. = FALSE)
   }
 
-  .att_save_headers_workbook(out, output_path)
+  list(
+    headers          = out,
+    alch_row         = alch_row,
+    resolved_flags   = resolved_flags,
+    header_row_index = detected$row_index,
+    duplicate_codes  = duplicate_codes
+  )
+}
 
-  n_total      <- length(out)
-  n_resolved   <- sum(resolved_flags)
-  n_colon_in   <- sum(grepl(":", alch_row, fixed = TRUE), na.rm = TRUE)
+.att_write_data_headers <- function(questions_dt, options_dt, api_dt,
+                                    output_path, data_export_path = NULL,
+                                    precomputed = NULL) {
+
+  use_export <- !is.null(data_export_path) && nzchar(data_export_path) &&
+                file.exists(data_export_path)
+
+  if (!use_export) {
+    headers <- .att_build_data_headers_structure_only(questions_dt)
+    .att_save_headers_workbook(headers, output_path)
+    cat(sprintf(
+      "  Data_Headers: %d cells (structure-only fallback; no data export provided)\n",
+      length(headers)))
+    return(invisible(headers))
+  }
+
+  res <- precomputed %||% .att_translate_export_headers(
+    questions_dt, options_dt, api_dt, data_export_path)
+
+  cat(sprintf("  Alchemer header detected on worksheet row %d (%d cells, %d colon-format)\n",
+              res$header_row_index, length(res$alch_row),
+              sum(grepl(":", res$alch_row, fixed = TRUE), na.rm = TRUE)))
+
+  if (length(res$duplicate_codes) > 0L) {
+    warning(sprintf("Duplicate Turas codes encountered (suffixed with _dupN): %s",
+                    paste(res$duplicate_codes, collapse = ", ")), call. = FALSE)
+  }
+
+  .att_save_headers_workbook(res$headers, output_path)
+
+  n_total      <- length(res$headers)
+  n_resolved   <- sum(res$resolved_flags)
   n_unresolved <- n_total - n_resolved
   cat(sprintf(
     "  Data_Headers: %d cells aligned to export | %d resolved to Turas codes | %d passthrough / unresolved\n",
     n_total, n_resolved, n_unresolved))
   if (n_unresolved > 0L) {
-    unresolved <- alch_row[!resolved_flags & !is.na(alch_row) & nzchar(alch_row)]
+    unresolved <- res$alch_row[!res$resolved_flags & !is.na(res$alch_row) &
+                                 nzchar(res$alch_row)]
     show <- head(unique(unresolved), 6)
     cat(sprintf("    Unresolved sample (%d unique shown): %s\n",
                 length(show), paste(sprintf("\"%s\"", substr(show, 1, 50)),
                                     collapse = ", ")))
   }
-  invisible(out)
+  invisible(res$headers)
+}
+
+# Filter questions_dt and options_dt down to questions whose expected data
+# columns actually appear in the data file. Used when AlchemerExport runs
+# with a data export — keeps Survey_Structure and Crosstab_Config in sync
+# with the scope of the export (analyst commonly excludes screener questions
+# from the export to keep the data file lean).
+.att_filter_to_data_columns <- function(questions_dt, options_dt, data_cols) {
+  data_cols <- unique(data_cols[!is.na(data_cols) & nzchar(data_cols)])
+  data_set  <- new.env(hash = TRUE, parent = emptyenv())
+  for (c in data_cols) assign(c, TRUE, envir = data_set)
+
+  has_col <- function(name) exists(name, envir = data_set, inherits = FALSE)
+
+  # Multi-column questions: keep when any QuestionCode_N column is present.
+  # Single-column questions: keep when the QuestionCode itself is present.
+  keep <- vapply(seq_len(nrow(questions_dt)), function(i) {
+    q <- questions_dt[i]
+    if (q$Variable_Type %in% c("Multi_Mention", "Ranking", "Allocation") &&
+        !is.na(q$Columns) && q$Columns > 1L) {
+      any(vapply(seq_len(q$Columns),
+                 function(n) has_col(paste0(q$QuestionCode, "_", n)),
+                 logical(1L)))
+    } else {
+      has_col(q$QuestionCode)
+    }
+  }, logical(1L))
+
+  kept_qs <- questions_dt[keep]
+  kept_codes <- kept_qs$QuestionCode
+  # Options: keep rows whose QuestionCode starts with any kept question code.
+  # (Multi-mention options use shortname_N; non-multi options use shortname.)
+  opt_keep <- vapply(options_dt$QuestionCode, function(oc) {
+    if (oc %in% kept_codes) return(TRUE)
+    parent <- sub("_[A-Za-z0-9]+$", "", oc)  # strip trailing _N or _<code>
+    parent %in% kept_codes
+  }, logical(1L), USE.NAMES = FALSE)
+
+  list(
+    questions = kept_qs,
+    options   = options_dt[opt_keep],
+    n_dropped_questions = nrow(questions_dt) - nrow(kept_qs)
+  )
 }
 
 # Fallback used when no data export is given: one cell per Survey_Structure
@@ -1226,6 +1297,26 @@ alchemer_to_turas <- function(survey_id,
   cat("Building config sheets...\n")
   questions_dt <- .att_build_questions(api_dt)
   options_dt   <- .att_build_options(api_dt, questions_dt)
+
+  # If a data export was given, translate its headers EARLY so we can prune
+  # questions_dt / options_dt down to the scope the analyst actually exported.
+  # Keeps Survey_Structure and Crosstab_Config aligned with the data file
+  # (analyst typically excludes screener questions from the export).
+  headers_precomputed <- NULL
+  if (!is.null(data_export_path) && nzchar(data_export_path) &&
+      file.exists(data_export_path)) {
+    headers_precomputed <- .att_translate_export_headers(
+      questions_dt, options_dt, api_dt, data_export_path)
+    filt <- .att_filter_to_data_columns(questions_dt, options_dt,
+                                        headers_precomputed$headers)
+    if (filt$n_dropped_questions > 0L) {
+      cat(sprintf("  Filtered Survey_Structure to data export scope: dropped %d question(s) not present in data file\n",
+                  filt$n_dropped_questions))
+    }
+    questions_dt <- filt$questions
+    options_dt   <- filt$options
+  }
+
   selection_dt <- .att_build_selection(questions_dt)
 
   cat(sprintf("  Questions: %d | Options: %d | Selection: %d (+1 Total row)\n",
@@ -1300,7 +1391,8 @@ alchemer_to_turas <- function(survey_id,
     options_dt       = options_dt,
     api_dt           = api_dt,
     output_path      = dh_path,
-    data_export_path = data_export_path
+    data_export_path = data_export_path,
+    precomputed      = headers_precomputed
   )
   out_paths$data_headers <- dh_path
 
