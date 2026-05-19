@@ -106,15 +106,31 @@ run_alchemerexport_gui <- function() {
         uiOutput("cred_status")
       ),
 
-      # ---- Step 2: Output -----------------------------------------------------
+      # ---- Step 2: Files ------------------------------------------------------
       div(class = "turas-card",
-        h3(class = "turas-card-title", "Step 2: Output Folder"),
+        h3(class = "turas-card-title", "Step 2: Files"),
 
         p(class = "turas-help-text",
-          "Data_Headers.xlsx mirrors Survey_Structure exactly — one column per ",
-          "QuestionCode for single-value types, one column per option for ",
-          "Multi_Mention / Ranking / Allocation. Generated automatically from ",
-          "the API, no data export needed."),
+          "Provide the Alchemer data export so Data_Headers can produce one ",
+          "cell per export column, each holding the Survey_Structure code that ",
+          "owns that column (colon-format options translated via the API, ",
+          "metadata cells passed through with tidy names). Without an export, ",
+          "Data_Headers falls back to a structure-only row."),
+
+        fluidRow(
+          column(8,
+            textInput("data_export", "Data Export File (CSV or XLSX):",
+                      placeholder = "/path/to/data_export.xlsx",
+                      width = "100%")
+          ),
+          column(4,
+            br(),
+            shinyFiles::shinyFilesButton("browse_export", "Browse...",
+                                         title    = "Select Alchemer Data Export",
+                                         multiple = FALSE,
+                                         buttonType = "default")
+          )
+        ),
 
         fluidRow(
           column(8,
@@ -209,8 +225,9 @@ run_alchemerexport_gui <- function() {
       recent <- load_recents()
       entry  <- recent[[input$select_recent]]
       if (is.null(entry)) return()
-      updateTextInput(session, "survey_id",  value = entry$survey_id %||% "")
-      updateTextInput(session, "output_dir", value = entry$output_dir %||% "")
+      updateTextInput(session, "survey_id",   value = entry$survey_id %||% "")
+      updateTextInput(session, "output_dir",  value = entry$output_dir %||% "")
+      updateTextInput(session, "data_export", value = entry$data_export %||% "")
       if (!is.null(entry$targets))
         updateCheckboxGroupInput(session, "targets", selected = entry$targets)
     })
@@ -230,9 +247,22 @@ run_alchemerexport_gui <- function() {
       }
     })
 
-    # Dir browser
+    # File / dir browsers
     volumes <- turas_gui_volumes()
+    shinyFiles::shinyFileChoose(input, "browse_export", roots = volumes, session = session,
+                                filetypes = c("xlsx", "csv"))
     shinyFiles::shinyDirChoose(input, "browse_output", roots = volumes, session = session)
+
+    observeEvent(input$browse_export, {
+      if (!is.integer(input$browse_export)) {
+        info <- shinyFiles::parseFilePaths(volumes, input$browse_export)
+        if (nrow(info) > 0) {
+          path <- normalizePath(as.character(info$datapath[1]),
+                                winslash = "/", mustWork = FALSE)
+          updateTextInput(session, "data_export", value = path)
+        }
+      }
+    })
 
     observeEvent(input$browse_output, {
       if (!is.integer(input$browse_output)) {
@@ -268,9 +298,11 @@ run_alchemerexport_gui <- function() {
         x <- sub("['\"]+$", "", x)
         trimws(x)
       }
-      survey_id  <- clean_path(input$survey_id)
-      output_dir <- clean_path(input$output_dir)
-      targets    <- if (length(input$targets) > 0L) input$targets else "tabs"
+      survey_id   <- clean_path(input$survey_id)
+      output_dir  <- clean_path(input$output_dir)
+      data_export <- clean_path(input$data_export %||% "")
+      if (!nzchar(data_export)) data_export <- NULL
+      targets     <- if (length(input$targets) > 0L) input$targets else "tabs"
 
       if (!dir.exists(output_dir)) {
         rv$complete <- FALSE
@@ -287,9 +319,10 @@ run_alchemerexport_gui <- function() {
       log_lines <- capture.output({
         result <- tryCatch(
           alchemer_to_turas(
-            survey_id  = survey_id,
-            output_dir = output_dir,
-            targets    = targets
+            survey_id        = survey_id,
+            output_dir       = output_dir,
+            targets          = targets,
+            data_export_path = data_export
           ),
           error = function(e) {
             cat("ERROR:", conditionMessage(e), "\n")
@@ -308,9 +341,10 @@ run_alchemerexport_gui <- function() {
           recent <- load_recents()
           entry_name <- paste0("Survey ", survey_id)
           entry <- list(
-            survey_id  = survey_id,
-            output_dir = output_dir,
-            targets    = targets
+            survey_id   = survey_id,
+            output_dir  = output_dir,
+            data_export = data_export %||% "",
+            targets     = targets
           )
           recent <- c(setNames(list(entry), entry_name),
                       recent[names(recent) != entry_name])
@@ -394,12 +428,17 @@ run_alchemerexport_gui <- function() {
           )
         },
 
-        if (!is.null(res$data_headers)) {
+        if (!is.null(res$data_headers) || !is.null(res$data_file)) {
           tagList(
             p(strong("Shared")),
             fluidRow(
               column(6,
-                downloadButton("dl_headers", "Data_Headers.xlsx", width = "100%")
+                if (!is.null(res$data_headers))
+                  downloadButton("dl_headers", "Data_Headers.xlsx", width = "100%")
+              ),
+              column(6,
+                if (!is.null(res$data_file))
+                  downloadButton("dl_data", "Turas-ready data.xlsx", width = "100%")
               )
             )
           )
@@ -426,6 +465,10 @@ run_alchemerexport_gui <- function() {
     output$dl_headers <- downloadHandler(
       filename = function() basename(rv$result$data_headers),
       content  = function(f) file.copy(rv$result$data_headers, f)
+    )
+    output$dl_data <- downloadHandler(
+      filename = function() basename(rv$result$data_file),
+      content  = function(f) file.copy(rv$result$data_file, f)
     )
   }
 
