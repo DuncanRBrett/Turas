@@ -101,10 +101,7 @@ run_alchemerexport_gui <- function() {
           )
         ),
 
-        if (!hide_recents) {
-          selectInput("recent_project", "Or load a recent survey:",
-                      choices = c("Select..." = ""), width = "50%")
-        },
+        if (!hide_recents) uiOutput("recent_ui"),
 
         uiOutput("cred_status")
       ),
@@ -185,28 +182,51 @@ run_alchemerexport_gui <- function() {
       updateTextInput(session, "survey_id", value = pre_config)
     }
 
-    # Recent surveys
-    observe({
-      if (!hide_recents && file.exists(recent_projects_file)) {
-        recent <- tryCatch(readRDS(recent_projects_file), error = function(e) NULL)
-        if (!is.null(recent) && length(recent) > 0) {
-          choices <- c("Select..." = "", setNames(names(recent), names(recent)))
-          updateSelectInput(session, "recent_project", choices = choices)
-        }
-      }
+    # Recent surveys — tile list (matches tabs/keydriver/etc. pattern)
+    recent_trigger <- reactiveVal(0L)
+    load_recents <- function() {
+      if (!file.exists(recent_projects_file)) return(list())
+      val <- tryCatch(readRDS(recent_projects_file), error = function(e) NULL)
+      if (is.null(val)) list() else val
+    }
+
+    output$recent_ui <- renderUI({
+      recent_trigger()
+      if (hide_recents) return(NULL)
+      recent <- load_recents()
+      if (length(recent) == 0L) return(NULL)
+
+      div(class = "turas-recent-section",
+        tags$hr(),
+        h4("Recent Surveys"),
+        lapply(seq_along(recent), function(i) {
+          entry <- recent[[i]]
+          key   <- names(recent)[[i]]
+          subtitle <- entry$output_dir %||% ""
+          tags$div(
+            class = "turas-recent-item",
+            onclick = sprintf(
+              "Shiny.setInputValue('select_recent', '%s', {priority: 'event'})",
+              gsub("'", "\\\\'", key, fixed = TRUE)
+            ),
+            tags$strong(sprintf("Survey %s", entry$survey_id %||% key)),
+            tags$br(),
+            tags$small(subtitle)
+          )
+        })
+      )
     })
 
-    observeEvent(input$recent_project, {
-      req(nzchar(input$recent_project))
-      recent <- tryCatch(readRDS(recent_projects_file), error = function(e) NULL)
-      if (!is.null(recent) && !is.null(recent[[input$recent_project]])) {
-        entry <- recent[[input$recent_project]]
-        updateTextInput(session, "survey_id",   value = entry$survey_id)
-        updateTextInput(session, "output_dir",  value = entry$output_dir)
-        updateTextInput(session, "data_export", value = entry$data_export %||% "")
-        if (!is.null(entry$targets))
-          updateCheckboxGroupInput(session, "targets", selected = entry$targets)
-      }
+    observeEvent(input$select_recent, {
+      req(nzchar(input$select_recent))
+      recent <- load_recents()
+      entry  <- recent[[input$select_recent]]
+      if (is.null(entry)) return()
+      updateTextInput(session, "survey_id",   value = entry$survey_id %||% "")
+      updateTextInput(session, "output_dir",  value = entry$output_dir %||% "")
+      updateTextInput(session, "data_export", value = entry$data_export %||% "")
+      if (!is.null(entry$targets))
+        updateCheckboxGroupInput(session, "targets", selected = entry$targets)
     })
 
     # API credential status
@@ -291,23 +311,22 @@ run_alchemerexport_gui <- function() {
       rv$result   <- result
       rv$complete <- !is.null(result)
 
-      # Save to recent
+      # Save to recent — newest first, deduped by survey ID, capped at TURAS_MAX_RECENTS
       if (rv$complete) {
         tryCatch({
-          recent <- if (file.exists(recent_projects_file)) {
-            readRDS(recent_projects_file)
-          } else {
-            list()
-          }
+          recent <- load_recents()
           entry_name <- paste0("Survey ", survey_id)
-          recent[[entry_name]] <- list(
+          entry <- list(
             survey_id   = survey_id,
             output_dir  = output_dir,
             data_export = data_export,
             targets     = targets
           )
-          recent <- head(recent, 5L)
+          recent <- c(setNames(list(entry), entry_name),
+                      recent[names(recent) != entry_name])
+          recent <- recent[seq_len(min(TURAS_MAX_RECENTS, length(recent)))]
           saveRDS(recent, recent_projects_file)
+          recent_trigger(recent_trigger() + 1L)
         }, error = function(e) invisible(NULL))
 
         output$run_status <- renderUI({

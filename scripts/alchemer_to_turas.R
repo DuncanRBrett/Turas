@@ -457,24 +457,46 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
   openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
 }
 
-.att_write_data_headers <- function(api_dt, questions_dt, data_export_path, output_path) {
+#' Read header row(s) from an Alchemer data export.
+#'
+#' Alchemer exports come in two shapes:
+#'   * CSV — a single header row, often using "Option text:Question shortname"
+#'     colon format for grid / multi-select columns.
+#'   * XLSX — three header rows: option position, question shortname,
+#'     option code (e.g. SQ1_1). The option code row already matches the Turas
+#'     naming convention, so we fall back to the question shortname only where
+#'     the option code is missing (simple single-column variables).
+#'
+#' @keywords internal
+.att_read_export_headers <- function(data_export_path) {
   ext <- tolower(tools::file_ext(data_export_path))
-  raw_headers <- tryCatch(
+  tryCatch(
     {
       if (ext == "csv") {
         names(data.table::fread(data_export_path, nrows = 0L, header = TRUE))
       } else {
-        names(openxlsx::read.xlsx(data_export_path, rows = 1L, colNames = TRUE))
+        hdr <- openxlsx::read.xlsx(data_export_path, rows = 1:3, colNames = FALSE)
+        if (is.null(hdr) || nrow(hdr) == 0L) {
+          stop("Header rows could not be read", call. = FALSE)
+        }
+        row2 <- if (nrow(hdr) >= 2L) as.character(hdr[2L, ]) else as.character(hdr[1L, ])
+        row3 <- if (nrow(hdr) >= 3L) as.character(hdr[3L, ]) else rep(NA_character_, length(row2))
+        ifelse(!is.na(row3) & nzchar(row3), row3, row2)
       }
     },
     error = function(e) {
       warning(sprintf(
-        "Could not read data export '%s': %s — Data_Headers skipped.", data_export_path, e$message
+        "Could not read data export '%s': %s — Data_Headers skipped.",
+        data_export_path, e$message
       ), call. = FALSE)
       NULL
     }
   )
-  if (is.null(raw_headers)) return(invisible(NULL))
+}
+
+.att_write_data_headers <- function(api_dt, questions_dt, data_export_path, output_path) {
+  raw_headers <- .att_read_export_headers(data_export_path)
+  if (is.null(raw_headers) || length(raw_headers) == 0L) return(invisible(NULL))
 
   opts_colon <- api_dt[!is.na(option_id) & !is.na(option_title) & nzchar(option_title)]
   opts_colon[, opt_seq    := seq_len(.N), by = question_id]
@@ -508,9 +530,6 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
     h
   }, character(1L), USE.NAMES = FALSE)
 
-  n_colon_total  <- sum(grepl(":", raw_headers, fixed = TRUE))
-  n_colon_mapped <- sum(turas_headers != raw_headers & grepl(":", raw_headers, fixed = TRUE))
-
   header_dt <- as.data.table(t(turas_headers))
   names(header_dt) <- turas_headers
 
@@ -519,10 +538,21 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
   openxlsx::writeData(wb, "Headers", header_dt, startRow = 1L, colNames = TRUE)
   openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
 
-  cat(sprintf("  Data_Headers: %d / %d colon-format columns mapped; %d simple columns; %d unresolved\n",
-              n_colon_mapped, n_colon_total,
-              sum(!grepl(":", raw_headers, fixed = TRUE)),
-              sum(turas_headers == raw_headers & grepl(":", raw_headers, fixed = TRUE))))
+  ext <- tolower(tools::file_ext(data_export_path))
+  if (ext == "csv") {
+    n_colon_total  <- sum(grepl(":", raw_headers, fixed = TRUE))
+    n_colon_mapped <- sum(turas_headers != raw_headers &
+                            grepl(":", raw_headers, fixed = TRUE))
+    cat(sprintf(
+      "  Data_Headers: %d cols | %d / %d colon-format mapped; %d simple; %d unresolved\n",
+      length(turas_headers), n_colon_mapped, n_colon_total,
+      sum(!grepl(":", raw_headers, fixed = TRUE)),
+      sum(turas_headers == raw_headers & grepl(":", raw_headers, fixed = TRUE))
+    ))
+  } else {
+    cat(sprintf("  Data_Headers: %d cols extracted from XLSX export\n",
+                length(turas_headers)))
+  }
   invisible(turas_headers)
 }
 
