@@ -157,6 +157,28 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
   questions <- option_counts[questions, on = "question_id"]
   questions[is.na(n_options), n_options := 0L]
 
+  # Allocation (CONT_SUM) grids in Alchemer often return zero options from the
+  # v5 API even though each brand has a numeric input column in the export.
+  # Borrow the option count from the sibling BRANDAWARE_<CAT> question when
+  # we recognise the BRAND<...>_<CAT> shortname pattern. This keeps the
+  # Questions sheet's Columns value consistent with the rows that .att_build_options
+  # will synthesise into the Options sheet (same fallback rule).
+  aware_n <- setNames(
+    questions[grepl("^BRANDAWARE_", QuestionCode, ignore.case = TRUE), n_options],
+    toupper(sub("^BRANDAWARE_", "",
+                questions[grepl("^BRANDAWARE_", QuestionCode, ignore.case = TRUE),
+                          QuestionCode], ignore.case = TRUE))
+  )
+  alloc_zero <- which(questions$Variable_Type == "Allocation" &
+                        questions$n_options == 0L)
+  for (i in alloc_zero) {
+    cat_code <- toupper(sub("^BRAND[A-Z0-9]+_", "", questions$QuestionCode[i],
+                             ignore.case = TRUE))
+    if (cat_code %in% names(aware_n)) {
+      questions$n_options[i] <- aware_n[[cat_code]]
+    }
+  }
+
   questions[, Columns := data.table::fcase(
     Variable_Type %in% c("Multi_Mention", "Ranking", "Allocation") & n_options > 0L, n_options,
     default = 1L
