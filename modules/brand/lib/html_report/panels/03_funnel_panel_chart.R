@@ -170,8 +170,15 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
 # ==============================================================================
 
 .fn_rel_emphasis_chips <- function() {
-  seg_labels <- c(All = "all", Love = "attitude.love", Prefer = "attitude.prefer",
-                  Ambivalent = "attitude.ambivalent", Reject = "attitude.reject",
+  # 6-level scale (IPK 2026): adds Price + renames Reject -> Avoid. Old
+  # 5-level surveys still work — Reject canonicalises to Avoid via the
+  # role alias and the Price column just has zero values.
+  seg_labels <- c(All = "all",
+                  Love       = "attitude.love",
+                  Prefer     = "attitude.prefer",
+                  Ambivalent = "attitude.ambivalent",
+                  Price      = "attitude.price",
+                  Avoid      = "attitude.avoid",
                   `No opinion` = "attitude.no_opinion")
   paste(vapply(seq_along(seg_labels), function(i) {
     nm     <- names(seg_labels)[i]
@@ -189,19 +196,26 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
 .fn_rel_table <- function(ordered, focal, focal_colour, n_total) {
   if (length(ordered) == 0) return("")
 
+  # 6-level scale (IPK 2026). Adds Price (between Ambivalent and Avoid) and
+  # renames Reject -> Avoid. Both old 5-level and new 6-level data flow
+  # through the same code — on 5-level data, attitude.price counts as 0%
+  # and the column just shows zeros.
   att_roles  <- c("attitude.love", "attitude.prefer", "attitude.ambivalent",
-                  "attitude.reject", "attitude.no_opinion")
-  att_labels <- c("Love", "Prefer", "Ambivalent", "Reject", "No opinion")
-  # L/P/A/R imply awareness; "no opinion" is the survey's catch-all and
-  # contains BOTH aware-but-no-opinion AND every unaware respondent. In
-  # % aware mode we therefore can't just rescale segments[no_opinion] —
-  # that would count unaware respondents in the numerator (the cause of
-  # the 110%/185% Cat avg bug). Instead, no_opinion is the residual:
-  #   pct_aware[no_opinion] = 1 - sum(pct_aware[L,P,A,R])
+                  "attitude.price", "attitude.avoid", "attitude.no_opinion")
+  att_labels <- c("Love", "Prefer", "Ambivalent", "Price", "Avoid", "No opinion")
+  # Aware-opinion roles imply awareness (the respondent had to be aware of
+  # the brand to express any of these); "no opinion" is the survey's
+  # catch-all and contains BOTH aware-but-no-opinion AND every unaware
+  # respondent. In % aware mode we therefore can't just rescale
+  # segments[no_opinion] — that would count unaware respondents in the
+  # numerator (the 110%/185% Cat avg bug). Instead no_opinion is the
+  # residual:
+  #   pct_aware[no_opinion] = 1 - sum(pct_aware[L,P,A,Price,Avoid])
   # so each row sums to exactly 100% in % aware mode and only aware
   # respondents are counted in any segment.
   aware_opinion_roles <- c("attitude.love", "attitude.prefer",
-                            "attitude.ambivalent", "attitude.reject")
+                            "attitude.ambivalent", "attitude.price",
+                            "attitude.avoid")
 
   # After session-3 fix: brand$segments[[role]] = count / total_w = % of ALL respondents.
   # "% total" base = segments[[role]] directly.
