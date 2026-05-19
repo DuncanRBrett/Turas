@@ -263,7 +263,7 @@ build_seg_importance_chart <- function(html_data, brand_colour = "#323367") {
   # Resolve labels: prefer question_labels mapping
   labels <- vi$variable
   ql <- html_data$question_labels
-  if (!is.null(ql) && is.list(ql)) {
+  if (!is.null(ql) && length(ql) > 0) {
     labels <- vapply(labels, function(v) {
       lbl <- ql[[v]]
       if (!is.null(lbl) && nzchar(lbl)) lbl else v
@@ -404,7 +404,7 @@ build_seg_heatmap_chart <- function(html_data, brand_colour = "#323367",
 
   # Resolve variable display labels
   ql <- html_data$question_labels
-  var_labels <- if (!is.null(ql) && is.list(ql)) {
+  var_labels <- if (!is.null(ql) && length(ql) > 0) {
     vapply(var_names, function(v) {
       lbl <- ql[[v]]
       if (!is.null(lbl) && nzchar(lbl)) lbl else v
@@ -1059,7 +1059,7 @@ build_seg_golden_questions_chart <- function(html_data, brand_colour = "#323367"
   # Resolve labels
   labels <- tq$variable
   ql <- html_data$question_labels
-  if (!is.null(ql) && is.list(ql)) {
+  if (!is.null(ql) && length(ql) > 0) {
     labels <- vapply(labels, function(v) {
       lbl <- ql[[v]]
       if (!is.null(lbl) && nzchar(lbl)) lbl else v
