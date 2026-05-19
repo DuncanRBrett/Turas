@@ -588,6 +588,13 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
     openxlsx::writeData(wb, "Options", options_dt, startRow = .ATT_DATA_START_ROW, colNames = FALSE)
   }
 
+  # Clear the Composite_Metrics example rows the template ships with — they
+  # reference fake questions (Q_Sat1, Q_Aware, ...) and would otherwise fail
+  # tabs' composite-validation step. Operators add their own composites later.
+  if ("Composite_Metrics" %in% openxlsx::sheets(wb)) {
+    .att_clear_examples(wb, "Composite_Metrics", n_cols = 8L)
+  }
+
   openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
 }
 
@@ -1098,6 +1105,12 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
 # with a data export — keeps Survey_Structure and Crosstab_Config in sync
 # with the scope of the export (analyst commonly excludes screener questions
 # from the export to keep the data file lean).
+#
+# Also TRIMS the Columns count for multi-column questions to the highest
+# slot present in the data (e.g. if the API said BRANDPEN3_DSS has 15 brands
+# but the export only contains _1.._14, Columns is reduced to 14 and the
+# Options sheet drops the orphan _15 row). This prevents tabs' "Missing
+# Allocation/Multi-Mention Columns" warnings.
 .att_filter_to_data_columns <- function(questions_dt, options_dt, data_cols) {
   data_cols <- unique(data_cols[!is.na(data_cols) & nzchar(data_cols)])
   data_set  <- new.env(hash = TRUE, parent = emptyenv())
@@ -1105,34 +1118,54 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
 
   has_col <- function(name) exists(name, envir = data_set, inherits = FALSE)
 
-  # Multi-column questions: keep when any QuestionCode_N column is present.
-  # Single-column questions: keep when the QuestionCode itself is present.
-  keep <- vapply(seq_len(nrow(questions_dt)), function(i) {
-    q <- questions_dt[i]
-    if (q$Variable_Type %in% c("Multi_Mention", "Ranking", "Allocation") &&
-        !is.na(q$Columns) && q$Columns > 1L) {
-      any(vapply(seq_len(q$Columns),
-                 function(n) has_col(paste0(q$QuestionCode, "_", n)),
-                 logical(1L)))
+  # Per row, decide: keep / drop, and (for multi-column) what Columns should
+  # actually be based on which slot columns are present in data.
+  kept_qs <- copy(questions_dt)
+  keep <- logical(nrow(kept_qs))
+  for (i in seq_len(nrow(kept_qs))) {
+    q <- kept_qs[i]
+    is_multi <- q$Variable_Type %in% c("Multi_Mention", "Ranking", "Allocation") &&
+                !is.na(q$Columns) && q$Columns > 1L
+    if (is_multi) {
+      present <- vapply(seq_len(q$Columns),
+                        function(n) has_col(paste0(q$QuestionCode, "_", n)),
+                        logical(1L))
+      n_present <- sum(present)
+      keep[i] <- n_present > 0L
+      if (keep[i] && n_present < q$Columns) {
+        # Trim Columns down to the largest contiguous present slot (or simply
+        # the highest present index — fine either way for tabs validation).
+        highest <- max(which(present))
+        kept_qs$Columns[i] <- highest
+      }
     } else {
-      has_col(q$QuestionCode)
+      keep[i] <- has_col(q$QuestionCode)
     }
-  }, logical(1L))
-
-  kept_qs <- questions_dt[keep]
+  }
+  kept_qs <- kept_qs[keep]
   kept_codes <- kept_qs$QuestionCode
-  # Options: keep rows whose QuestionCode starts with any kept question code.
-  # (Multi-mention options use shortname_N; non-multi options use shortname.)
+
+  # Options: drop those whose parent question got pruned AND those whose
+  # slot index now exceeds the trimmed Columns count.
+  cols_lookup <- setNames(kept_qs$Columns, kept_qs$QuestionCode)
   opt_keep <- vapply(options_dt$QuestionCode, function(oc) {
     if (oc %in% kept_codes) return(TRUE)
-    parent <- sub("_[A-Za-z0-9]+$", "", oc)  # strip trailing _N or _<code>
-    parent %in% kept_codes
+    parent <- sub("_[A-Za-z0-9]+$", "", oc)
+    if (!(parent %in% kept_codes)) return(FALSE)
+    # Multi-mention/Allocation option: keep only if slot index is within
+    # the (possibly trimmed) Columns count for the parent.
+    slot <- suppressWarnings(as.integer(sub(paste0("^", parent, "_"), "", oc)))
+    if (is.na(slot)) return(TRUE)  # non-numeric suffix (shouldn't happen now)
+    parent_cols <- cols_lookup[[parent]] %||% 0L
+    slot <= parent_cols
   }, logical(1L), USE.NAMES = FALSE)
 
   list(
     questions = kept_qs,
     options   = options_dt[opt_keep],
-    n_dropped_questions = nrow(questions_dt) - nrow(kept_qs)
+    n_dropped_questions = nrow(questions_dt) - nrow(kept_qs),
+    n_trimmed_questions = sum(kept_qs$Columns !=
+      questions_dt[QuestionCode %in% kept_codes, Columns])
   )
 }
 
@@ -1310,8 +1343,8 @@ alchemer_to_turas <- function(survey_id,
     filt <- .att_filter_to_data_columns(questions_dt, options_dt,
                                         headers_precomputed$headers)
     cat(sprintf(
-      "  Filter to data-export scope: %d kept | %d dropped (questions not present in data file)\n",
-      nrow(filt$questions), filt$n_dropped_questions))
+      "  Filter to data-export scope: %d kept | %d dropped | %d trimmed (Columns count reduced to match data)\n",
+      nrow(filt$questions), filt$n_dropped_questions, filt$n_trimmed_questions))
     if (filt$n_dropped_questions > 0L) {
       dropped <- setdiff(questions_dt$QuestionCode, filt$questions$QuestionCode)
       show <- head(dropped, 8)
