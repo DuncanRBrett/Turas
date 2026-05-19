@@ -328,6 +328,31 @@ test_that("seg_pins_extras.js has no inline text-transform: uppercase", {
                info = "No uppercase declarations in pinned-pins JS")
 })
 
+test_that("shared design-system table header rule has no uppercase or nowrap", {
+  turas_root <- Sys.getenv("TURAS_ROOT")
+  skip_if(nchar(turas_root) == 0, "TURAS_ROOT not set")
+
+  path <- file.path(turas_root, "modules", "shared", "lib", "design_system",
+                    "base_css.R")
+  skip_if_not(file.exists(path), "Shared base_css.R not found")
+
+  contents <- paste(readLines(path, warn = FALSE), collapse = "\n")
+
+  # Extract the shared th[class*="-th"] header block (it's a single CSS rule).
+  th_block_match <- regmatches(
+    contents,
+    regexpr('th\\[class\\*="-th"\\]\\s*\\{[^}]*\\}', contents)
+  )
+  skip_if(length(th_block_match) == 0,
+          "Could not isolate shared th[class*=-th] CSS block")
+
+  th_block <- th_block_match[1]
+  expect_false(grepl("text-transform:\\s*uppercase", th_block),
+               info = "Shared header rule must not force uppercase")
+  expect_false(grepl("white-space:\\s*nowrap", th_block),
+               info = "Shared header rule must allow wrapping (white-space: normal)")
+})
+
 test_that("executive summary inline H3 styles have no text-transform: uppercase", {
   turas_root <- Sys.getenv("TURAS_ROOT")
   skip_if(nchar(turas_root) == 0, "TURAS_ROOT not set")

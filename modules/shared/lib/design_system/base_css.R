@@ -424,19 +424,23 @@ turas_table_css <- function() {
       font-feature-settings: "tnum";
     }
 
-    /* --- Header cells --- */
+    /* --- Header cells ---
+       Headers render in mixed case and wrap by default. Modules that want
+       small-caps eyebrow labels should use `.t-caps` or `.t-section-label`
+       explicitly. Modules with long header text (e.g. segment-name columns)
+       can constrain width with module-specific rules — wrap behaviour is
+       already enabled here. */
     table[class*="-table"] thead th,
     th[class*="-th"] {
       padding: 10px 14px;
       font-size: 11px;
       font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
+      letter-spacing: 0.1px;
       color: #64748b;
       background: #f8f9fa;
       border-bottom: 2px solid #e2e8f0;
       text-align: left;
-      white-space: nowrap;
+      white-space: normal;
       position: relative;
     }
 
