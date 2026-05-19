@@ -1309,9 +1309,16 @@ alchemer_to_turas <- function(survey_id,
       questions_dt, options_dt, api_dt, data_export_path)
     filt <- .att_filter_to_data_columns(questions_dt, options_dt,
                                         headers_precomputed$headers)
+    cat(sprintf(
+      "  Filter to data-export scope: %d kept | %d dropped (questions not present in data file)\n",
+      nrow(filt$questions), filt$n_dropped_questions))
     if (filt$n_dropped_questions > 0L) {
-      cat(sprintf("  Filtered Survey_Structure to data export scope: dropped %d question(s) not present in data file\n",
-                  filt$n_dropped_questions))
+      dropped <- setdiff(questions_dt$QuestionCode, filt$questions$QuestionCode)
+      show <- head(dropped, 8)
+      cat(sprintf("    Dropped: %s%s\n",
+                  paste(show, collapse = ", "),
+                  if (length(dropped) > length(show))
+                    sprintf(" (+%d more)", length(dropped) - length(show)) else ""))
     }
     questions_dt <- filt$questions
     options_dt   <- filt$options
