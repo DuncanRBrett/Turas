@@ -547,12 +547,24 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
 
 #' Build Categories data for Brand_Config.xlsx from the Brands sheet.
 .att_build_categories <- function(brands_dt) {
-  if (nrow(brands_dt) == 0L) {
-    return(data.table(Category = character(), CategoryCode = character(),
-                      Active = character(), Type = character(), Analysis_Depth = character()))
-  }
+  empty <- data.table(Category = character(), CategoryCode = character(),
+                      Active = character(), Type = character(),
+                      Analysis_Depth = character(),
+                      Timeframe_Long = character(), Timeframe_Target = character())
+  if (nrow(brands_dt) == 0L) return(empty)
   cats <- unique(brands_dt[, .(Category, CategoryCode)])
-  cats[, `:=`(Active = "Y", Type = "transaction", Analysis_Depth = "full")]
+  # Sensible defaults: 'full' depth (analyst trims down to awareness_only
+  # per category as needed), standard transaction type, and 12-month / 3-month
+  # timeframes so the funnel panel renders "Past 12 months" / "Past 3 months"
+  # column headers instead of "Past NA" when the analyst hasn't filled in
+  # per-category overrides yet.
+  cats[, `:=`(
+    Active          = "Y",
+    Type            = "transaction",
+    Analysis_Depth  = "full",
+    Timeframe_Long  = "12 months",
+    Timeframe_Target = "3 months"
+  )]
   cats
 }
 

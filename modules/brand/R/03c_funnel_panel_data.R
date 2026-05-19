@@ -535,10 +535,19 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
 
 .stage_label_overrides <- function(config) {
   ov <- list()
-  if (!is.null(config$Timeframe_Long)  && nzchar(trimws(config$Timeframe_Long)))
-    ov$bought_long   <- paste("Past", trimws(config$Timeframe_Long))
-  if (!is.null(config$Timeframe_Target) && nzchar(trimws(config$Timeframe_Target)))
-    ov$bought_target <- paste("Past", trimws(config$Timeframe_Target))
+  # Treat NA, NA_character_, and the literal string "NA" (from openxlsx
+  # reading blank cells via as.character()) as "no override" — otherwise the
+  # table headers display "Past NA" instead of falling back to the default
+  # "Long Period" / "Target Period" labels.
+  .is_real <- function(x) {
+    !is.null(x) && length(x) > 0L && !is.na(x[[1L]]) &&
+      nzchar(trimws(as.character(x[[1L]]))) &&
+      !identical(tolower(trimws(as.character(x[[1L]]))), "na")
+  }
+  if (.is_real(config$Timeframe_Long))
+    ov$bought_long   <- paste("Past", trimws(as.character(config$Timeframe_Long)))
+  if (.is_real(config$Timeframe_Target))
+    ov$bought_target <- paste("Past", trimws(as.character(config$Timeframe_Target)))
   ov
 }
 
