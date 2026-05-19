@@ -187,53 +187,20 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
 
 # ---- build Options sheet -----------------------------------------------------
 
-# Sanitize an Alchemer option_value into something safe to use as a Turas column
-# suffix. Strips whitespace, replaces non-alphanumeric with "_", drops leading
-# digits/punctuation. Returns NA if the result wouldn't be a valid identifier.
-.att_sanitise_option_code <- function(option_value) {
-  vapply(option_value, function(v) {
-    if (is.na(v)) return(NA_character_)
-    cleaned <- gsub("[^A-Za-z0-9]+", "_", trimws(v))
-    cleaned <- sub("^_+", "", cleaned); cleaned <- sub("_+$", "", cleaned)
-    if (!nzchar(cleaned)) return(NA_character_)
-    # Reject pure-numeric "codes" (Alchemer default when no SKU was set) —
-    # they're indistinguishable from positions and brand-module column lookups
-    # by brand code wouldn't gain anything.
-    if (grepl("^[0-9]+$", cleaned)) return(NA_character_)
-    cleaned
-  }, character(1L), USE.NAMES = FALSE)
-}
-
-# Multi-column option suffix: prefer the sanitised option_value (Alchemer
-# "Reporting Value" — typically the brand/SKU code on per-brand questions),
-# fall back to sanitised option_sku (Alchemer sets this when "value" is left
-# blank on Allocation / CONT_SUM grids), then to the 1-based position.
-.att_multi_suffix <- function(option_value, opt_seq, option_sku = NULL) {
-  code <- .att_sanitise_option_code(option_value)
-  if (!is.null(option_sku)) {
-    sku_code <- .att_sanitise_option_code(option_sku)
-    code <- ifelse(is.na(code), sku_code, code)
-  }
-  ifelse(is.na(code), as.character(opt_seq), code)
-}
-
-# Per-house convention: only questions starting with BRAND (BRANDAWARE_,
-# BRANDPEN1/2/3_, BRANDATTR_*, BRANDCEP_*) use the brand-code suffix the brand
-# module looks up by name. Every other multi-mention sticks with positional
-# Q_n naming so tabs (and any other downstream module reading by position)
-# keeps working off the same data file.
-.att_is_brand_multi <- function(shortname) {
-  if (is.null(shortname)) return(logical(0))
-  grepl("^BRAND", as.character(shortname), ignore.case = TRUE)
-}
-
-# Pick the right suffix for a multi-column option based on the question's
-# naming convention. Vectorised — accepts vectors for all four arguments.
+# Single naming convention across all modules: positional Q_n suffix for every
+# multi-column option (multi-mention, ranking, allocation). The brand module's
+# `multi_mention_brand_matrix` and `slot_paired_numeric_matrix` expect exactly
+# this layout — they read slot columns matching ^<root>_[0-9]+$ and scan the
+# cell *values* for brand codes (the codes themselves come from the Brands
+# sheet, not from column names). Tabs reads the same shape.
+#
+# `option_value` / `option_sku` are intentionally ignored when deriving the
+# suffix; they survive in the OptionText column of Survey_Structure's Options
+# sheet, which is what the brand module actually consults to know "slot index
+# i corresponds to brand X".
 .att_option_suffix <- function(shortname, option_value, opt_seq,
                                 option_sku = NULL) {
-  is_brand <- .att_is_brand_multi(shortname)
-  brand_suffix <- .att_multi_suffix(option_value, opt_seq, option_sku)
-  ifelse(is_brand, brand_suffix, as.character(opt_seq))
+  as.character(opt_seq)
 }
 
 .att_build_options <- function(api_dt, questions_dt) {
