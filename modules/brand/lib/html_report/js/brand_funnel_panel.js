@@ -2718,11 +2718,27 @@
     });
   }
 
+  // Relationship-table significance markers (\u2191/\u2193 arrows).
+  //
+  // For each brand \u00d7 attitude cell, test whether the brand's percentage
+  // deviates significantly from the category average for that attitude
+  // segment, using a two-sided binomial CI (z = 1.96, ~95%).
+  //
+  // IMPORTANT: pct + count + n must all be in the SAME base as the active
+  // toggle (% total or % aware). Earlier versions hard-coded the aware-base
+  // attributes regardless of the toggle, which made the displayed value
+  // (% total) and the arrow direction (computed at % aware) feel
+  // disconnected \u2014 e.g. IPK Love = 22% of total but green-\u2191 because at
+  // aware base it was 56.5% vs cat avg 34%. Now the arrows reflect what
+  // the table is actually showing.
   function applyRelTableSigMarkers(panel) {
     var table = panel.querySelector("[data-fn-rel-table]");
     if (!table) return;
-    var pctAttr = "data-fn-rel-pct-aware";
-    var cntAttr = "data-fn-rel-count-aware";
+    var base = (panel.__fnState && panel.__fnState.relBase) || "aware";
+    var pctAttr = base === "total" ? "data-fn-rel-pct-total"
+                                   : "data-fn-rel-pct-aware";
+    var cntAttr = base === "total" ? "data-fn-rel-count-total"
+                                   : "data-fn-rel-count-aware";
     // Get cat avg pct per att from the avg row (uses fn-rel-td-avg, not ct-heatmap-cell)
     var avgPcts = {};
     var avgRow = table.querySelector("tr.fn-row-avg-all");
@@ -2738,14 +2754,24 @@
       row.querySelectorAll("td.ct-heatmap-cell[data-fn-att]").forEach(function(td) {
         var valEl = td.querySelector(".ct-val");
         if (!valEl) return;
-        // Remove old arrows
+        // Remove old arrows (re-rendered on every toggle change)
         valEl.querySelectorAll(".fn-sig-avg").forEach(function(a) { a.remove(); });
         var att   = td.getAttribute("data-fn-att");
         var v     = parseFloat(td.getAttribute(pctAttr));
         var cnt   = parseInt(td.getAttribute(cntAttr), 10);
         var avg   = avgPcts[att];
-        if (isNaN(v) || isNaN(cnt) || avg == null || cnt <= 0) return;
-        var n   = cnt / v;  // reverse-compute aware_n from count = pct * n
+        if (isNaN(v) || isNaN(cnt) || avg == null) return;
+        // Need the brand's denominator (n_total or n_aware) to compute SE.
+        // Prefer the explicit denom attribute when present, else
+        // reverse-compute from count / pct.
+        var denomAttr = base === "total" ? "data-fn-rel-denom-total"
+                                         : "data-fn-rel-denom-aware";
+        var n = parseFloat(td.getAttribute(denomAttr));
+        if (isNaN(n) || n <= 0) {
+          // Reverse-compute; safe only when v > 0
+          if (v <= 0 || cnt <= 0) return;
+          n = cnt / v;
+        }
         if (n <= 0 || !isFinite(n)) return;
         var se  = Math.sqrt(avg * (1 - avg) / n);
         var sig = se > 0 && Math.abs(v - avg) > 1.96 * se;
@@ -2754,6 +2780,9 @@
         var arrow = v > avg ? "\u2191" : "\u2193";
         var span = document.createElement("span");
         span.className = "fn-sig-avg " + dir;
+        span.title = "Sig " + (v > avg ? "higher" : "lower") +
+                     " than category average (p<0.05, " +
+                     (base === "total" ? "% total" : "% aware") + " base)";
         span.textContent = arrow;
         valEl.appendChild(span);
       });
