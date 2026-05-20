@@ -312,8 +312,16 @@
       });
     }
 
+    // panelId MUST be unique per panel instance — REGISTRY is keyed by
+    // panelId and a duplicate from a sibling category panel would orphan
+    // this state so the close-on-outside-click handler couldn't find the
+    // open popover. Same bug class fixed earlier on the funnel and
+    // demographics panels. The MA panel covers four sub-tabs (Mental
+    // Advantage, MA Metrics, Brand Attributes, Category Entry Points) and
+    // they all share this one selector — clicking off any of those tabs
+    // needs to close the popover. panel.id is "ma-<catcode>" e.g. "ma-bak".
     panel.__maSelector = window.BrandSelector.create({
-      panelId:            'ma',
+      panelId:            panel.id || 'ma',
       triggerEl:          trigger,
       anchorEl:           trigger.parentElement,
       brands:             brandList,
