@@ -384,11 +384,27 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
   brands <- lapply(brand_codes, function(b) {
     sub <- att[att$brand_code == b, , drop = FALSE]
     if (nrow(sub) == 0) return(NULL)
+    # Pass through the aware-base companion fields when present (added
+    # 2026-05-20 to fix "% aware" exceeding 100% on surveys that ask
+    # attitude beyond the aware set). segments stays at total base for
+    # backward compatibility with existing panel logic.
+    aware_segments <- if ("pct_aware" %in% names(sub)) {
+      stats::setNames(as.list(sub$pct_aware), sub$attitude_role)
+    } else list()
+    aware_counts <- if ("count_aware" %in% names(sub)) {
+      stats::setNames(as.list(sub$count_aware), sub$attitude_role)
+    } else list()
+    total_counts <- if ("count_total" %in% names(sub)) {
+      stats::setNames(as.list(sub$count_total), sub$attitude_role)
+    } else list()
     list(
       brand_code = b,
       brand_name = .brand_label(brand_list, b),
       aware_base = if ("aware_base" %in% names(sub)) sub$aware_base[1] else sub$base[1],
-      segments = stats::setNames(as.list(sub$pct), sub$attitude_role)
+      segments       = stats::setNames(as.list(sub$pct), sub$attitude_role),
+      segments_aware = aware_segments,
+      counts_total   = total_counts,
+      counts_aware   = aware_counts
     )
   })
   list(brands = Filter(Negate(is.null), brands),

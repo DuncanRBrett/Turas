@@ -434,10 +434,17 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
     if (!is.finite(pct_total))
       return(sprintf('<td class="ct-td ct-data-col%s ct-na">&mdash;</td>', focal_cls))
 
-    # Scale up to % of aware respondents — but no_opinion comes from the
-    # residual computed above, NOT from rescaling segments[no_opinion],
-    # because that bucket includes unaware respondents.
-    pct_aware <- if (identical(role, "attitude.no_opinion")) {
+    # Prefer the per-segment pct_aware computed at the metric layer
+    # (count_aware / aware_w — proper subset, can't exceed 100%). Falls
+    # back to the legacy rescale when segments_aware isn't present
+    # (older payloads / legacy adapter path). For "no_opinion" the
+    # residual derivation is still preferred when the metric layer
+    # didn't emit a value, because aware respondents typically pick a
+    # real attitude rather than no_opinion.
+    pct_aware_metric <- as.numeric(brand$segments_aware[[role]] %||% NA_real_)
+    pct_aware <- if (is.finite(pct_aware_metric)) {
+      pct_aware_metric
+    } else if (identical(role, "attitude.no_opinion")) {
       pct_aware_no_opinion
     } else if (is.finite(aware_n) && is.finite(n_total) && aware_n > 0) {
       pct_total * (n_total / aware_n)
@@ -452,14 +459,22 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
     aware_attr <- if (is.finite(pct_aware))
       sprintf(' data-fn-rel-pct-aware="%.6f"', pct_aware) else ""
     # Raw counts:
-    #   count_total = % of all respondents in this segment * n_total
-    #   count_aware = % of aware respondents in this segment * aware_n
-    # For L/P/A/R the two are equal (same people, different denominator).
-    # For no_opinion they differ: count_aware excludes the unaware tail.
-    cnt_total_val <- if (is.finite(n_total))
-      as.integer(round(pct_total * n_total)) else NA_integer_
-    cnt_aware_val <- if (is.finite(pct_aware) && is.finite(aware_n))
-      as.integer(round(pct_aware * aware_n)) else cnt_total_val
+    #   count_total = % of all respondents in this segment (weighted)
+    #   count_aware = % of aware respondents in this segment (weighted)
+    # Prefer counts from the metric layer (proper aware-subset
+    # intersection); fall back to derived rounding.
+    cnt_total_metric <- as.numeric(brand$counts_total[[role]] %||% NA_real_)
+    cnt_aware_metric <- as.numeric(brand$counts_aware[[role]] %||% NA_real_)
+    cnt_total_val <- if (is.finite(cnt_total_metric)) {
+      as.integer(round(cnt_total_metric))
+    } else if (is.finite(n_total)) {
+      as.integer(round(pct_total * n_total))
+    } else NA_integer_
+    cnt_aware_val <- if (is.finite(cnt_aware_metric)) {
+      as.integer(round(cnt_aware_metric))
+    } else if (is.finite(pct_aware) && is.finite(aware_n)) {
+      as.integer(round(pct_aware * aware_n))
+    } else cnt_total_val
     count_attrs <- if (!is.na(cnt_total_val)) {
       denom_aware_str <- if (is.finite(aware_n))
         sprintf(' data-fn-rel-denom-aware="%d"', as.integer(round(aware_n))) else ""

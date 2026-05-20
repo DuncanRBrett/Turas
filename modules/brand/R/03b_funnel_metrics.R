@@ -386,7 +386,8 @@ run_significance_tests <- function(stage_metrics, focal_brand,
   # Stored separately so .panel_consideration_detail can expose it as the
   # denominator for "% aware" display without changing the pct contract
   # (pct = count/total_w, the session-3 base).
-  aware_w <- sum(weights[as.logical(aware_vec)], na.rm = TRUE)
+  aware_logical <- as.logical(aware_vec)
+  aware_w <- sum(weights[aware_logical], na.rm = TRUE)
 
   # Case-insensitive value matching — see .option_map_by_role for why
   # role_to_codes carries both numeric codes ("1") and label aliases
@@ -397,13 +398,29 @@ run_significance_tests <- function(stage_metrics, focal_brand,
     codes <- role_to_codes[[role]]
     if (is.null(codes) || length(codes) == 0) next
     hits <- !is.na(values_char) & values_char %in% codes
-    pct <- sum(weights[hits], na.rm = TRUE) / total_w
+    # count_total: respondents matching this role, denominator = total_w
+    # count_aware: respondents matching this role AND aware, denominator = aware_w
+    # The two differ when the survey lets respondents express an attitude
+    # without first declaring awareness (common in Alchemer routing where
+    # BRANDATT1 is asked to everyone in a category, not just those who picked
+    # the brand in BRANDAWARE). Using count_total / aware_w would silently
+    # over-count "% aware" — sometimes far over 100% — because the numerator
+    # includes respondents not in the aware denominator. We emit both
+    # quantities so the panel renderer can show pct_aware = count_aware /
+    # aware_w (proper subset).
+    count_total <- sum(weights[hits], na.rm = TRUE)
+    count_aware <- sum(weights[hits & aware_logical], na.rm = TRUE)
+    pct <- count_total / total_w
+    pct_aware <- if (aware_w > 0) count_aware / aware_w else NA_real_
     rows[[length(rows) + 1]] <- data.frame(
-      brand_code  = brand_code,
+      brand_code    = brand_code,
       attitude_role = role,
-      pct         = pct,
-      base        = total_w,
-      aware_base  = aware_w,
+      pct           = pct,
+      pct_aware     = pct_aware,
+      count_total   = count_total,
+      count_aware   = count_aware,
+      base          = total_w,
+      aware_base    = aware_w,
       stringsAsFactors = FALSE
     )
   }
