@@ -388,7 +388,10 @@ run_significance_tests <- function(stage_metrics, focal_brand,
   # (pct = count/total_w, the session-3 base).
   aware_w <- sum(weights[as.logical(aware_vec)], na.rm = TRUE)
 
-  values_char <- as.character(col_values)
+  # Case-insensitive value matching — see .option_map_by_role for why
+  # role_to_codes carries both numeric codes ("1") and label aliases
+  # ("Love", "Price only", ...). Survey may export either form per question.
+  values_char <- tolower(trimws(as.character(col_values)))
   rows <- list()
   for (role in .FUNNEL_ATTITUDE_POSITIONS) {
     codes <- role_to_codes[[role]]
@@ -414,6 +417,26 @@ run_significance_tests <- function(stage_metrics, focal_brand,
   # while funnel positions are "attitude.<level>" (e.g. attitude.love). Accept
   # both so the same OptionMap drives both old and new code paths. Also
   # canonicalises the legacy "reject" name to "avoid".
+  #
+  # IMPORTANT — Alchemer surveys often export the per-brand attitude questions
+  # inconsistently: one column comes through as numeric codes (1..6), the next
+  # as short labels ("Love", "Prefer", "Price only", "Avoid", "No opinion")
+  # because the question's "Reporting Value" was set per question. Rather than
+  # require a survey rebuild, the brand module accepts BOTH forms: each role
+  # carries every plausible value form (ClientCode, ClientLabel, short label
+  # derived from the role name, common aliases), all lowercased for case-
+  # insensitive matching downstream in .attitude_rows_for_brand.
+  has_label <- !is.null(option_map) && "ClientLabel" %in% names(option_map)
+  hardcoded_aliases <- list(
+    attitude.love       = c("love", "i love it. it's my favourite"),
+    attitude.prefer     = c("prefer"),
+    attitude.ambivalent = c("ambivalent"),
+    attitude.price      = c("price", "price only", "price-conditional",
+                            "i would only buy it if the price was right"),
+    attitude.avoid      = c("avoid", "reject"),
+    attitude.no_opinion = c("no opinion", "no_opinion", "noopinion",
+                            "don't know", "dont know", "i have no opinion / don't know this brand")
+  )
   for (role in .FUNNEL_ATTITUDE_POSITIONS) {
     alt_scale <- sub("^attitude\\.", "attitude_scale.", role)
     alt_legacy <- if (role == "attitude.avoid") "attitude_scale.reject" else NA_character_
@@ -421,7 +444,13 @@ run_significance_tests <- function(stage_metrics, focal_brand,
     candidates <- candidates[!is.na(candidates)]
     sub <- option_map[!is.na(option_map$Role) &
                         option_map$Role %in% candidates, , drop = FALSE]
-    out[[role]] <- trimws(as.character(sub$ClientCode))
+    accepted <- character(0)
+    if (nrow(sub) > 0L) {
+      accepted <- c(accepted, trimws(as.character(sub$ClientCode)))
+      if (has_label) accepted <- c(accepted, trimws(as.character(sub$ClientLabel)))
+    }
+    accepted <- c(accepted, hardcoded_aliases[[role]] %||% character(0))
+    out[[role]] <- unique(tolower(accepted[nzchar(accepted)]))
   }
   out
 }
