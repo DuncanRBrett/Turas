@@ -391,6 +391,17 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
     opts <- api_dt[question_id == q$question_id & !is.na(option_id) & !is.na(option_value)]
     if (nrow(opts) == 0L) return(NULL)
 
+    # Drop the "None of the above" pseudo-brand. It's a survey-design escape
+    # hatch ("I recognise none of these brands"), not a real brand to score.
+    # When NONE leaks into the Brands sheet, the brand module's Mental
+    # Availability stimulus-penetration calculation inflates to ~100% on every
+    # CEP (anyone who picked NONE counts as "linked a brand"), destroying the
+    # X-axis variation in the Strategic Quadrant chart.
+    opts <- opts[!grepl("^(none|nota|n[/_.]?a|noneoftheabove)$",
+                         gsub("[^A-Za-z]", "", option_value), ignore.case = TRUE) &
+                  !grepl("^none\\s*of\\s*the\\s*above$", option_title, ignore.case = TRUE)]
+    if (nrow(opts) == 0L) return(NULL)
+
     opts[, opt_seq := seq_len(.N)]
     data.table(
       Category     = cat_name,

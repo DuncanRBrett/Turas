@@ -108,7 +108,18 @@ MA_SIG_Z_THRESHOLD <- 1.96
 
   any_link <- matrix(0L, nrow = n_resp, ncol = length(codes),
                      dimnames = list(NULL, codes))
-  for (bm in linkage_tensor) {
+  # "None of the above" pseudo-brands are a survey-design escape hatch ("I
+  # link none of these brands to this stimulus"), not a real brand. If they
+  # leak through the Brands sheet they inflate stimulus penetration to ~100%
+  # on every stimulus in small samples and ruin the X-axis variation of the
+  # Strategic Quadrant. Skip them here defensively so old Brand_Configs that
+  # still include NONE rows produce sensible MA charts.
+  brand_codes <- names(linkage_tensor)
+  is_none <- grepl("^(none|nota|n[/_.]?a|noneoftheabove)$",
+                   gsub("[^A-Za-z]", "", brand_codes %||% ""), ignore.case = TRUE)
+  for (idx in seq_along(linkage_tensor)) {
+    if (isTRUE(is_none[idx])) next
+    bm <- linkage_tensor[[idx]]
     if (is.null(bm)) next
     cols <- intersect(codes, colnames(bm))
     if (length(cols) == 0) next
