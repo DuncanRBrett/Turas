@@ -366,6 +366,13 @@ validate_nesting <- function(stages, weights = NULL) {
 }
 
 #' Consideration stage — per-brand attitude in positive code set
+#'
+#' Uses the same alias-aware matching as .attitude_rows_for_brand so a
+#' survey that exports some attitude columns as numeric codes ("1","2",
+#' "3","4") and others as text labels ("love","prefer","ambivalent",
+#' "price only") still resolves consistently. See .option_map_by_role()
+#' in 03b_funnel_metrics.R for the alias table. Falls back to the raw
+#' \code{pos_codes} fallback when no OptionMap is available on the entry.
 #' @keywords internal
 .stage_consideration <- function(role_map, data, brands, n_resp, cat_code,
                                  pos_codes) {
@@ -376,10 +383,47 @@ validate_nesting <- function(stages, weights = NULL) {
                                         entry$category, brands)
     out <- matrix(FALSE, n_resp, length(brands),
                   dimnames = list(NULL, brands))
-    pos_codes_chr <- as.character(pos_codes)
+
+    # Build the set of values considered "positive attitude".
+    #
+    # If the operator has supplied an EXPLICIT pos_codes override
+    # (i.e. positive_attitude_codes config or a non-default arg), honour
+    # it verbatim — they're deliberately narrowing/inverting the scale.
+    #
+    # Otherwise expand the per-role alias map (numeric code + ClientLabel
+    # + hardcoded synonyms, all lowercased) so a survey that exports
+    # some attitude columns as numeric codes and others as text labels
+    # still matches consistently. Only the four positive roles
+    # contribute; "attitude.avoid" and "attitude.no_opinion" are
+    # excluded by construction.
+    is_default_pos_codes <- identical(
+      as.character(pos_codes),
+      as.character(.FUNNEL_POSITIVE_ATTITUDE_CODES)
+    )
+    role_to_codes <- if (is_default_pos_codes) {
+      tryCatch(.resolve_attitude_role_codes(entry),
+               error = function(e) NULL)
+    } else NULL
+
+    if (!is.null(role_to_codes)) {
+      positive_vals <- unique(unlist(
+        role_to_codes[.FUNNEL_POSITIVE_ATTITUDE_ROLES],
+        use.names = FALSE
+      ))
+      positive_vals <- tolower(trimws(as.character(positive_vals)))
+      positive_vals <- positive_vals[nzchar(positive_vals)]
+      # Always also accept the legacy numeric fallback so a partial /
+      # missing OptionMap can't silently drop respondents whose attitude
+      # was exported as "1"/"2"/"3"/"4".
+      positive_vals <- unique(c(positive_vals,
+                                tolower(as.character(pos_codes))))
+    } else {
+      positive_vals <- tolower(trimws(as.character(pos_codes)))
+    }
+
     for (b in brands) {
-      vals <- mat[, b]
-      out[, b] <- !is.na(vals) & as.character(vals) %in% pos_codes_chr
+      vals <- tolower(trimws(as.character(mat[, b])))
+      out[, b] <- !is.na(vals) & vals %in% positive_vals
     }
     out
   } else {
