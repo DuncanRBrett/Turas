@@ -437,10 +437,9 @@ build_portfolio_panel_styles <- function(focal_colour = "#1A5276") {
   font-variant-numeric: tabular-nums;
 }
 .pf-cn-rival-name {
-  /* Wrap long brand names ("Simple Truth (Checkers)", "Ina Paarman's
-     Kitchen") onto a second line rather than truncating with ellipsis.
-     Grid align-items:center on the parent row keeps the rank, bar, and
-     jac column visually centred against the wrapped name block. */
+  /* Wrap long brand names onto a second line rather than truncating with
+     ellipsis. Grid align-items:center on the parent row keeps the rank,
+     bar, and jac column visually centred against the wrapped name block. */
   white-space: normal; overflow-wrap: anywhere;
   line-height: 1.25;
   font-weight: 500;
