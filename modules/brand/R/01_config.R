@@ -461,7 +461,12 @@ get_brands_for_category <- function(structure, category, cat_code = NULL) {
   if ("DisplayOrder" %in% names(brands)) {
     brands <- brands[order(brands$DisplayOrder), , drop = FALSE]
   }
-  brands
+  # Single source of truth for NONE-pseudo-brand exclusion across every
+  # caller. .drop_none_brands() is defined in 00_data_access.R (sourced
+  # ahead of this file by the brand-module loader) and is a no-op when
+  # no NONE rows are present, so callers without the pseudo-brand pay
+  # zero cost.
+  .drop_none_brands(brands)
 }
 
 
