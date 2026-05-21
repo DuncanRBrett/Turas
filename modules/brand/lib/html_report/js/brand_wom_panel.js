@@ -73,13 +73,20 @@
       });
     });
 
-    // --- Show count toggle (Base column visibility)
+    // --- Show count toggle
+    //   * Reveals the Base column (n= per brand row)
+    //   * Reveals the per-cell n=X spans on pct columns via show-freq class
+    //     (matches the funnel panel's .show-freq .ct-freq CSS pattern, see
+    //     .wom-panel.show-freq rule in 05_wom_panel_styling.R)
+    // net + freq columns don't carry a count span (delta / mean metrics);
+    // toggling has no effect on those cells.
     panel.querySelectorAll('[data-wom-action="showcounts"]').forEach(function (cb) {
       cb.addEventListener("change", function () {
         panel.querySelectorAll(".wom-col-base").forEach(function (el) {
           if (cb.checked) el.removeAttribute("hidden");
           else            el.setAttribute("hidden", "");
         });
+        panel.classList.toggle("show-freq", cb.checked);
       });
     });
 

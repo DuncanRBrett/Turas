@@ -22,6 +22,14 @@ build_wom_panel_styles <- function(focal_colour = "#1A5276") {
   border: 1px dashed #e2e8f0; border-radius: 8px; background: #f8fafc;
 }
 
+/* In-cell n=X spans on pct cells. Hidden by default; revealed when the
+   Show count checkbox toggles .show-freq on the panel root. Mirrors the
+   funnel panel pattern at 03_funnel_panel_styling.R line 312. */
+.wom-panel .ct-freq.wom-count {
+  display: none; font-size: 10px; color: #94a3b8; margin-top: 2px;
+}
+.wom-panel.show-freq .ct-freq.wom-count { display: block; }
+
 /* Focus bar (focal brand selector above chips) */
 .wom-focus-bar {
   display: flex; align-items: center; gap: 10px;
