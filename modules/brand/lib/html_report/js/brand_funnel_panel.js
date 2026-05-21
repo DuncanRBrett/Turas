@@ -2544,10 +2544,35 @@
   ];
 
   function relPct(brand, role, base, nTotal) {
-    // segments[role] = count/n_total (% of total respondents, session-3 fix)
+    // segments[role]       = count_total / total_w (% of all respondents)
+    // segments_aware[role] = count_aware / aware_w (% of aware respondents)
+    //
+    // For "% aware" mode we prefer segments_aware directly when present.
+    // The legacy fallback `segments[role] * nTotal / aware_base` equals
+    // count_total / aware_w, which over-counts: in Alchemer routing
+    // BRANDATT1 is asked to every category respondent, so count_total
+    // includes attitudes expressed by respondents who never picked the
+    // brand in BRANDAWARE. The R metric layer emits a separate
+    // count_aware (aware AND attitude-matched) so the chart can show
+    // the proper aware-subset proportion — same value the table reads
+    // from data-fn-rel-pct-aware.
+    //
+    // For no_opinion in the legacy-fallback path we still use the
+    // 1 - sum(L/P/A/Price/Avoid) residual so rows sum to 100%.
+    // See .attitude_rows_for_brand() in 03b_funnel_metrics.R for the
+    // counts_total / counts_aware contract.
     var segVal = brand.segments && brand.segments[role] != null
       ? brand.segments[role] : 0;
-    if (base === "aware" && nTotal && brand.aware_base && brand.aware_base > 0) {
+
+    if (base !== "aware") return segVal;
+
+    if (brand.segments_aware && brand.segments_aware[role] != null) {
+      return Number(brand.segments_aware[role]);
+    }
+
+    // Legacy fallback — only fires when segments_aware is absent
+    // (older panel data payloads pre-2026-05).
+    if (nTotal && brand.aware_base && brand.aware_base > 0) {
       if (role === "attitude.no_opinion") {
         var sumLPAR = 0;
         REL_AWARE_OPINION_ROLES.forEach(function (r) {
@@ -2641,17 +2666,29 @@
       var totalAware = 0;
       allBrands.forEach(function(b) { totalAware += (b.aware_base || 0); });
       if (base === "aware" && nTotal && totalAware > 0) {
-        /* L/P/A/R: pool counts then divide by total aware. */
+        /* Pool across brands: sum counts_aware then divide by total
+           aware. counts_aware[role] is the count of respondents who
+           both picked the brand in BRANDAWARE AND expressed the role
+           attitude — the proper aware-subset numerator. Falls back to
+           the legacy seg * nTotal approximation (= count_total) when
+           counts_aware is absent on older payloads; this is the same
+           value relPct() falls back to, so the fallback stays consistent
+           between the per-brand rows and the cat-avg row. */
         REL_AWARE_OPINION_ROLES.forEach(function (role) {
           var sumCount = 0;
           allBrands.forEach(function (b) {
-            var seg = (b.segments && b.segments[role]) || 0;
-            sumCount += seg * nTotal;
+            var ca = b.counts_aware && b.counts_aware[role];
+            if (ca != null && !isNaN(Number(ca))) {
+              sumCount += Number(ca);
+            } else {
+              var seg = (b.segments && b.segments[role]) || 0;
+              sumCount += seg * nTotal;
+            }
           });
           avgSegments[role] = sumCount / totalAware;
         });
-        /* no_opinion: residual against L/P/A/R so the row sums to 100%
-           and unaware respondents don't leak into the numerator. */
+        /* no_opinion: residual against L/P/A/Price/Avoid so the row sums
+           to 100% and unaware respondents don't leak into the numerator. */
         var sumLPAR_avg = REL_AWARE_OPINION_ROLES.reduce(function (s, r) {
           return s + (avgSegments[r] || 0);
         }, 0);
