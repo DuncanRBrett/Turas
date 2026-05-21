@@ -344,3 +344,51 @@ brand_da_refuse <- function(code, title, problem, how_to_fix,
     stop(msg, call. = FALSE)
   }
 }
+
+
+# ==============================================================================
+# PSEUDO-BRAND DETECTION
+# ==============================================================================
+
+#' Recognise "None of the above" pseudo-brand codes
+#'
+#' Survey instruments sometimes include a "None of the above" option in the
+#' BRANDAWARE pick list as an escape hatch ("I don't recognise any of these
+#' brands"). The corresponding row in the Brands sheet is a pseudo-brand,
+#' not a real one — it should never appear as a row in funnel / WoM /
+#' relationship tables, nor as a real brand in CEP linkage computations.
+#'
+#' Matches common variants case-insensitively after stripping non-letter
+#' characters: NONE, NoTA, N/A, n.a., n_a, noneoftheabove.
+#'
+#' @param brand_code Character vector of brand codes (NA-safe).
+#' @return Logical vector — TRUE where the code is a NONE pseudo-brand.
+#' @keywords internal
+.is_none_brand_code <- function(brand_code) {
+  if (is.null(brand_code) || length(brand_code) == 0L) {
+    return(logical(0))
+  }
+  bc <- gsub("[^A-Za-z]", "", as.character(brand_code))
+  out <- grepl("^(none|nota|na|noneoftheabove)$", bc, ignore.case = TRUE)
+  out[is.na(brand_code)] <- FALSE
+  out
+}
+
+
+#' Drop NONE pseudo-brand rows from a brand_list data frame
+#'
+#' Lightweight wrapper around \code{.is_none_brand_code} that filters a
+#' brand_list data frame (must contain a BrandCode column). Returns the
+#' input unchanged when no pseudo-brand rows are present.
+#'
+#' @param brand_list Data frame with at least a BrandCode column.
+#' @return Filtered data frame.
+#' @keywords internal
+.drop_none_brands <- function(brand_list) {
+  if (is.null(brand_list) || !"BrandCode" %in% names(brand_list)) {
+    return(brand_list)
+  }
+  is_none <- .is_none_brand_code(brand_list$BrandCode)
+  if (!any(is_none)) return(brand_list)
+  brand_list[!is_none, , drop = FALSE]
+}

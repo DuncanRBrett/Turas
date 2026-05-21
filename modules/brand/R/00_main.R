@@ -369,6 +369,15 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
                   } else NULL
 
     cat_brands <- get_brands_for_category(structure, cat_name, cat_code = cat_code)
+    # Drop "None of the above" pseudo-brand rows so they never appear as
+    # table rows in the funnel / WoM / relationship views. The Brands
+    # sheet sometimes carries a NONE row mirroring the survey's escape
+    # hatch in BRANDAWARE; it's not a real brand and was previously
+    # showing up alongside real brands with 0% across every funnel stage.
+    # MA modules already apply the same filter defensively at their own
+    # layer (see .ma_stimulus_penetration), so doing it upstream is
+    # belt-and-braces — both layers exclude NONE.
+    cat_brands <- .drop_none_brands(cat_brands)
     cat_ceps   <- get_ceps_for_category(structure, cat_name, cat_code = cat_code)
     cat_attrs  <- get_attributes_for_category(structure, cat_name, cat_code = cat_code)
 

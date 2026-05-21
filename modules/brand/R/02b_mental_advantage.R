@@ -142,9 +142,12 @@ MA_SIG_Z_THRESHOLD <- 1.96
   # on every stimulus in small samples and ruin the X-axis variation of the
   # Strategic Quadrant. Skip them here defensively so old Brand_Configs that
   # still include NONE rows produce sensible MA charts.
+  # Shared helper in 00_data_access.R — single source of truth for the
+  # NONE-pseudo-brand detection rule. Upstream filter in 00_main.R already
+  # drops these rows; this is belt-and-braces in case a caller passes a
+  # tensor still containing them.
   brand_codes <- names(linkage_tensor)
-  is_none <- grepl("^(none|nota|n[/_.]?a|noneoftheabove)$",
-                   gsub("[^A-Za-z]", "", brand_codes %||% ""), ignore.case = TRUE)
+  is_none <- .is_none_brand_code(brand_codes %||% character(0))
 
   # Build (respondents x stimuli) matrix of brand-link counts. Each cell
   # records how many real brands (excluding NONE pseudo-brands) this

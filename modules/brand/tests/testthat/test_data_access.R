@@ -259,3 +259,66 @@ test_that("data access works against the IPK Wave 1 fixture", {
   expect_true(all(paired >= 0))
   expect_true(any(paired > 0))  # at least some non-zero counts
 })
+
+
+# ------------------------------------------------------------------------------
+# .is_none_brand_code() + .drop_none_brands()
+# ------------------------------------------------------------------------------
+
+test_that(".is_none_brand_code matches every documented NONE variant", {
+  # Documented matches: NONE, NoTA, N/A, n.a., n_a, noneoftheabove (all case-
+  # insensitive, with non-letter characters stripped before comparison).
+  expect_true(all(.is_none_brand_code(
+    c("NONE", "none", "None of the above",
+      "NoTA", "nota",
+      "N/A",  "n.a.", "n_a",
+      "noneoftheabove"))))
+})
+
+test_that(".is_none_brand_code is FALSE for real brand codes", {
+  # Common South African dry-seasoning brand codes from the IPK fixture
+  # plus edge-case names that contain letter sequences that look like
+  # NONE but aren't ("NOMU", "Annona") — must NOT be flagged.
+  expect_equal(.is_none_brand_code(c("IPK", "ROB", "KNORR", "CART",
+                                     "NOMU", "Annona", "SSG", "HND")),
+               rep(FALSE, 8L))
+})
+
+test_that(".is_none_brand_code is NA-safe and length-preserving", {
+  expect_equal(.is_none_brand_code(NA_character_), FALSE)
+  expect_equal(.is_none_brand_code(c("IPK", NA_character_, "NONE")),
+               c(FALSE, FALSE, TRUE))
+  # Empty input
+  expect_equal(length(.is_none_brand_code(character(0))), 0L)
+  expect_equal(length(.is_none_brand_code(NULL)), 0L)
+})
+
+test_that(".drop_none_brands removes NONE rows from a brand_list", {
+  df <- data.frame(
+    BrandCode  = c("IPK", "NONE", "ROB", "n/a"),
+    BrandLabel = c("Ina Paarman", "None of the above", "Robertsons", "n/a"),
+    stringsAsFactors = FALSE
+  )
+  out <- .drop_none_brands(df)
+  expect_equal(out$BrandCode,  c("IPK", "ROB"))
+  expect_equal(out$BrandLabel, c("Ina Paarman", "Robertsons"))
+  expect_equal(nrow(out), 2L)
+})
+
+test_that(".drop_none_brands is a no-op when no NONE rows are present", {
+  df <- data.frame(
+    BrandCode = c("IPK", "ROB"),
+    BrandLabel = c("Ina Paarman", "Robertsons"),
+    stringsAsFactors = FALSE
+  )
+  out <- .drop_none_brands(df)
+  # Identical (not just equal) — function should return the input unchanged
+  # to avoid copy overhead in the common case.
+  expect_identical(out, df)
+})
+
+test_that(".drop_none_brands tolerates NULL and missing BrandCode column", {
+  expect_null(.drop_none_brands(NULL))
+  df_no_code <- data.frame(Foo = 1:3)
+  expect_identical(.drop_none_brands(df_no_code), df_no_code)
+})
