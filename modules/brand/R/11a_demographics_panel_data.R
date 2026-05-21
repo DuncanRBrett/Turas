@@ -114,11 +114,16 @@ build_demographics_panel_data <- function(questions,
   brand_nonbuyer_long <- .demo_panel_brand_long(res$brand_nonbuyer_cut,
                                                  q$codes)
   # Penetration-in-option is the table's primary metric — each cell is "% of
-  # respondents in this demographic option who buy this brand". brand_total_pen
-  # is the per-brand cat-wide baseline used for cell shading.
+  # respondents in this demographic option who buy this brand". The cat-
+  # average baseline is the PER-OPTION mean pen across brands (in
+  # option_avg_penetration) — that's what the table Cat-avg column and chart
+  # marker display, and what cells are shaded against. brand_total_pen is
+  # kept as legend context ("focal overall pen") but no longer drives shading.
   brand_pen_long  <- .demo_panel_brand_long(res$brand_penetration_long,
                                              q$codes)
   brand_total_pen <- .demo_panel_brand_total_pen(res$brand_total_penetration)
+  option_avg_pen  <- .demo_panel_option_avg_pen(res$option_avg_penetration,
+                                                 q$codes)
   buyer_cut  <- if (is.null(res$buyer_cut)) NULL else list(
     buyer     = .demo_panel_dist(res$buyer_cut$buyer),
     non_buyer = .demo_panel_dist(res$buyer_cut$non_buyer)
@@ -149,8 +154,26 @@ build_demographics_panel_data <- function(questions,
     brand_cut               = brand_long,
     brand_nonbuyer_cut      = brand_nonbuyer_long,
     brand_penetration_long  = brand_pen_long,
-    brand_total_penetration = brand_total_pen
+    brand_total_penetration = brand_total_pen,
+    option_avg_penetration  = option_avg_pen
   )
+}
+
+
+# Convert the option-mean-pen named vector into a code-keyed list the JS
+# renderer can index. Mirrors .demo_panel_brand_total_pen shape so the
+# JS-side lookup pattern is consistent.
+.demo_panel_option_avg_pen <- function(vec, codes) {
+  if (is.null(vec) || length(vec) == 0L) return(list())
+  out <- list()
+  for (cd in codes) {
+    v <- vec[[cd]]
+    out[[as.character(cd)]] <- list(
+      code = as.character(cd),
+      pct  = if (is.null(v)) NA_real_ else as.numeric(v)
+    )
+  }
+  out
 }
 
 

@@ -405,6 +405,70 @@ test_that(".demo_brand_total_penetration: returns each brand's cat-wide penetrat
 })
 
 
+test_that(".demo_option_avg_penetration: per-option mean across all brands", {
+  # 8 respondents, 2 options ("A","B"), 2 brands (X, Y).
+  #   Option A: BR_X pen = 50%, BR_Y pen = 50%   ->  mean = 50%
+  #   Option B: BR_X pen = 50%, BR_Y pen = 25%   ->  mean = 37.5%
+  values <- c("A","A","A","A","B","B","B","B")
+  pen    <- matrix(c(1,1,0,0,1,1,0,0,
+                     1,0,1,0,1,0,0,0),
+                   nrow = 8, ncol = 2,
+                   dimnames = list(NULL, c("X","Y")))
+  w <- rep(1, 8)
+  brand_pen <- .demo_brand_buyer_penetration(values, c("A","B"), pen,
+                                              c("X","Y"), c("X","Y"),
+                                              w, conf_level = 0.95)
+  avg <- .demo_option_avg_penetration(brand_pen, c("A","B"))
+  expect_equal(round(unname(avg), 1), c(50.0, 37.5))
+  expect_equal(names(avg), c("A","B"))
+})
+
+
+test_that(".demo_option_avg_penetration: NA brand cells excluded from mean", {
+  # When some brand cells are NA (e.g. an option with zero respondents for
+  # one brand) the mean is taken across the brands that DO have a value.
+  brand_pen <- data.frame(
+    BrandCode  = c("X","Y","Z"),
+    BrandLabel = c("X","Y","Z"),
+    Base_n     = c(10L, 10L, 10L),
+    "Pct_A"    = c(50, 30, NA),
+    "Pct_B"    = c(20, NA, NA),
+    check.names = FALSE, stringsAsFactors = FALSE)
+  avg <- .demo_option_avg_penetration(brand_pen, c("A","B"))
+  # A: mean(50, 30) = 40
+  # B: mean(20)     = 20
+  expect_equal(round(unname(avg), 1), c(40, 20))
+})
+
+
+test_that(".demo_option_avg_penetration: returns NA-filled vector on empty input", {
+  expect_equal(unname(.demo_option_avg_penetration(NULL, c("A","B"))),
+               c(NA_real_, NA_real_))
+  empty_df <- data.frame(BrandCode = character(0))
+  expect_equal(unname(.demo_option_avg_penetration(empty_df, c("A","B"))),
+               c(NA_real_, NA_real_))
+})
+
+
+test_that("run_demographic_question returns option_avg_penetration parallel to brand_penetration_long", {
+  values <- c("A","A","A","A","B","B","B","B")
+  pen    <- matrix(c(1,1,0,0,1,1,0,0,
+                     1,0,1,0,1,0,0,0),
+                   nrow = 8, ncol = 2,
+                   dimnames = list(NULL, c("X","Y")))
+  res <- run_demographic_question(
+    values        = values,
+    option_codes  = c("A","B"),
+    option_labels = c("A","B"),
+    pen_mat       = pen,
+    brand_codes   = c("X","Y"),
+    brand_labels  = c("X","Y"))
+  expect_false(is.null(res$option_avg_penetration))
+  expect_equal(names(res$option_avg_penetration), c("A","B"))
+  expect_equal(round(unname(res$option_avg_penetration), 1), c(50.0, 37.5))
+})
+
+
 test_that(".demo_brand_total_penetration: NA pen excluded from base", {
   pen <- matrix(c(1, 0, NA, 1), nrow = 4, ncol = 1,
                 dimnames = list(NULL, "X"))

@@ -71,18 +71,19 @@ test_that("matrix table places focal brand in column 2 and lists all brands", {
 })
 
 
-test_that("matrix table cell percentages match engine output", {
+test_that("matrix table cell percentages match engine output (penetration mode)", {
   pd <- .demo_test_payload(focal = "BR_A")
   html <- build_demographics_matrix_table(
     pd$questions[[1]], focal_brand = "BR_A",
     brand_colours = list(BR_A = "#1A5276", BR_B = "#A04000"),
     panel_data = pd, decimal_places = 0L)
 
-  # Cat avg row for "A" should be 60%, for "B" 40%
-  expect_match(html, "60%", fixed = TRUE)
-  expect_match(html, "40%", fixed = TRUE)
-  # Brand A buyers are 100% in option A, 0% in option B
+  # BR_A penetration in option A = 100%, in option B = 0%.
   expect_match(html, "100%", fixed = TRUE)
+  expect_match(html, "0%",   fixed = TRUE)
+  # Cat avg column in pen mode = per-option avg brand pen.
+  # Option A: mean of (BR_A 100%, BR_B 0%) = 50%. Same for option B.
+  expect_match(html, ">50%<", fixed = TRUE)
 })
 
 
@@ -154,14 +155,16 @@ test_that("matrix table emits hidden n spans for the JS counts toggle to reveal"
 })
 
 
-test_that("matrix table shades buyer cells vs each brand's cat-wide penetration", {
+test_that("matrix table shades cells vs per-option avg brand pen (competitive baseline)", {
   # Fixture (.demo_test_payload):
   #   Option A has 6 respondents, all buy BR_A, none buy BR_B.
   #   Option B has 4 respondents, none buy BR_A, all buy BR_B.
-  #   BR_A total pen = 60%; BR_B total pen = 40%.
-  # Cell shading per brand cell = (cell pct - that brand's total pen).
-  #   Option A, BR_A buyer = 100% vs baseline 60% → +40pp clipped to +30 → blue
-  #   Option B, BR_A buyer =   0% vs baseline 60% → -60pp clipped to -30 → red
+  # Penetration values:
+  #   Option A: BR_A pen = 100%, BR_B pen = 0%   ->  avg = 50%
+  #   Option B: BR_A pen =   0%, BR_B pen = 100% ->  avg = 50%
+  # Cell shading vs the per-option avg:
+  #   Option A, BR_A = 100 - 50 = +50pp clipped to +30 → blue
+  #   Option A, BR_B =   0 - 50 = -50pp clipped to -30 → red
   pd <- .demo_test_payload()
   html <- build_demographics_matrix_table(
     pd$questions[[1]], focal_brand = "BR_A",
@@ -169,6 +172,22 @@ test_that("matrix table shades buyer cells vs each brand's cat-wide penetration"
     panel_data = pd, decimal_places = 0L)
   expect_match(html, 'data-demo-heat="rgba\\(37,99,171,0\\.',  perl = TRUE)
   expect_match(html, 'data-demo-heat="rgba\\(192,57,43,0\\.',  perl = TRUE)
+})
+
+
+test_that("Cat-avg column in penetration mode shows the per-option mean brand pen", {
+  # Fixture: option A avg pen across BR_A (100%) + BR_B (0%) = 50%.
+  # Cat-avg column should display 50% on the buyer row of option A.
+  pd <- .demo_test_payload(focal = "BR_A")
+  html <- build_demographics_matrix_table(
+    pd$questions[[1]], focal_brand = "BR_A",
+    brand_colours = list(BR_A = "#1A5276", BR_B = "#A04000"),
+    panel_data = pd, decimal_places = 0L)
+  buyer_rows <- regmatches(html,
+    gregexpr('(?s)<tr class="demo-row-buyer">.*?</tr>', html, perl = TRUE))[[1]]
+  expect_match(buyer_rows[1],
+               'class="demo-col-catavg" data-demo-col="catavg">50%</td>',
+               fixed = TRUE)
 })
 
 
@@ -232,32 +251,79 @@ test_that("share-mode chart marker reflects per-row cat-avg %", {
 })
 
 
-test_that("penetration-mode chart marker reflects focal's cat-wide penetration", {
-  # Fixture: BR_A buys = rows 1-6 of 10 → BR_A total pen = 60%.
-  # BR_A penetration in option A = 100% (all 6 of 6 in option A buy BR_A).
-  # Scale-max therefore = 100 (max of focal bars + the 60% marker). Marker
-  # at 60/100 = 60.0% of the bar track. Legend embeds the value.
+test_that("penetration-mode chart marker reflects PER-OPTION avg brand pen (per-row)", {
+  # Fixture: option A — BR_A 100% pen, BR_B 0% pen → avg = 50%.
+  #           option B — BR_A   0% pen, BR_B 100% pen → avg = 50%.
+  # Scale-max = max(focal bars [100, 0] + markers [50, 50]) = 100.
+  # Marker in BOTH rows lands at 50/100 = 50.0% of the bar track.
+  # Legend label says "avg brand pen in option" (not a global value).
+  # The focal's cat-wide pen is shown as a footnote: "BR_A overall pen: 60.0%".
   pd <- .demo_test_payload(focal = "BR_A")
   html <- build_demographics_matrix_chart(
     pd$questions[[1]], focal_brand = "BR_A",
     brand_colours = list(BR_A = "#1A5276", BR_B = "#A04000"),
     panel_data = pd, decimal_places = 0L,
     metric = "penetration")
-  expect_match(html, "left:60\\.0%", perl = TRUE)
-  expect_match(html, "BR_A overall pen \\(60\\.0%\\)", perl = TRUE)
+  # Markers in both rows at 50.0%
+  expect_equal(length(gregexpr("left:50\\.0%", html, perl = TRUE)[[1]]), 2L)
+  # Per-row marker label
+  expect_match(html, "Marker: avg brand pen in option", fixed = TRUE)
+  # Footnote carries focal's overall pen
+  expect_match(html, "BR_A overall pen: 60\\.0%", perl = TRUE)
+})
+
+
+test_that("penetration-mode chart marker varies per row when option avg pen differs", {
+  # Construct a fixture where the per-option avg pen genuinely varies.
+  # 10 respondents, 2 options, 2 brands.
+  #   Option A (rows 1-5): BR_X buys 4 of 5 = 80%, BR_Y buys 1 of 5 = 20%
+  #     -> avg = 50%
+  #   Option B (rows 6-10): BR_X buys 1 of 5 = 20%, BR_Y buys 1 of 5 = 20%
+  #     -> avg = 20%
+  # Scale_max = max(focal bars + markers) = 80.
+  # Marker positions: A at 50/80 = 62.5%; B at 20/80 = 25.0%.
+  values <- c("A","A","A","A","A","B","B","B","B","B")
+  pen <- matrix(c(1, 1, 1, 1, 0, 1, 0, 0, 0, 0,    # BR_X
+                  1, 0, 0, 0, 0, 1, 0, 0, 0, 0),   # BR_Y
+                nrow = 10, ncol = 2,
+                dimnames = list(NULL, c("BR_X","BR_Y")))
+  res <- run_demographic_question(
+    values = values, option_codes = c("A","B"), option_labels = c("A","B"),
+    pen_mat = pen, brand_codes = c("BR_X","BR_Y"),
+    brand_labels = c("BR_X","BR_Y"))
+  pd <- build_demographics_panel_data(
+    questions = list(list(role = "t", column = "X",
+      question_text = "t", short_label = "t",
+      variable_type = "Single_Response",
+      codes = c("A","B"), labels = c("A","B"),
+      result = res)),
+    focal_brand = "BR_X",
+    brand_codes = c("BR_X","BR_Y"), brand_labels = c("BR_X","BR_Y"),
+    brand_colours = list(BR_X = "#1A5276", BR_Y = "#A04000"))
+  html <- build_demographics_matrix_chart(
+    pd$questions[[1]], focal_brand = "BR_X",
+    brand_colours = list(BR_X = "#1A5276", BR_Y = "#A04000"),
+    panel_data = pd, decimal_places = 0L,
+    metric = "penetration")
+  expect_match(html, "left:62\\.5%", perl = TRUE)
+  expect_match(html, "left:25\\.0%", perl = TRUE)
 })
 
 
 test_that("penetration-mode scale-max ignores per-row cat-avg (invisible in this mode)", {
-  # Construct a fixture where cat-avg per row is much LARGER than any focal
-  # penetration value. If scale_max were including the cat-avg row max
-  # (which is invisible in penetration mode), bars would be squashed to the
-  # left and the marker would land at the wrong proportional position.
+  # Construct a fixture where the cat-avg per row (= demographic size,
+  # r$pct) is much LARGER than any focal penetration value. Previously
+  # scale_max included r$pct unconditionally, squashing bars. After the
+  # fix scale_max should only include focal bars + the marker values
+  # (per-option avg brand pen here, NOT demographic size).
   #
   # 10 respondents, 1 option "BIG" carrying 80% of them.
-  values <- c(rep("BIG", 8), "SMALL", "SMALL")  # 80% in BIG, 20% in SMALL
-  # Focal penetration: 1 of 8 BIG buys focal = 12.5%; 1 of 2 SMALL = 50%.
-  # Focal total pen = 2/10 = 20%.
+  # Focal pen: 1 of 8 BIG = 12.5%; 1 of 2 SMALL = 50%.
+  # With one brand the per-option avg = the brand's pen itself. Markers:
+  # BIG → 12.5%, SMALL → 50%.
+  # scale_max = max(focal bars [12.5, 50] + markers [12.5, 50]) = 50.
+  # BIG row bar = 12.5 / 50 = 25.0%. SMALL row marker = 50 / 50 = 100.0%.
+  values <- c(rep("BIG", 8), "SMALL", "SMALL")
   pen <- matrix(c(1, 0, 0, 0, 0, 0, 0, 0, 1, 0), nrow = 10, ncol = 1)
   colnames(pen) <- "FX"
   res <- run_demographic_question(
@@ -278,12 +344,10 @@ test_that("penetration-mode scale-max ignores per-row cat-avg (invisible in this
     brand_colours = list(FX = "#1A5276"),
     panel_data = pd, decimal_places = 0L,
     metric = "penetration")
-  # scale_max should be 50 (max focal pen across options), NOT 80 (the BIG
-  # cat-avg row, which isn't drawn). Marker = 20 → 20/50 = 40.0%.
-  expect_match(html, "left:40\\.0%", perl = TRUE)
-  # The "BIG" row's bar should be at 12.5/50 = 25% of the track (not 12.5/80
-  # = 15.6% which would happen if cat-avg leaked into scale_max).
   expect_match(html, 'style="width:25\\.0%', perl = TRUE)
+  # Demographic size (80% for BIG) must NOT leak into scale_max — if it did,
+  # the BIG bar would render at 12.5/80 = 15.6%, not 25%.
+  expect_false(grepl('style="width:15\\.6%', html, perl = TRUE))
 })
 
 

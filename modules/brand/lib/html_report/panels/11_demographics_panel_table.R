@@ -134,31 +134,33 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
 #   Buyer-row cell    = % of respondents in this option who BUY this brand
 #   Non-buyer-row cell = 100% − Buyer-row cell (its complement)
 # Buyer + Non-buyer per cell sum to 100%, so the read is: "of the 30-35s, 29%
-# buy IPK and 71% don't". Reading down a brand's buyer rows shows which
-# demographics the brand over-performs in vs its own cat-wide average.
+# buy IPK and 71% don't".
 #
-# Heatmap shading per brand cell is driven by (cell pct − brand's cat-wide
-# penetration), clipped to ±MAX_HEAT_DIFF. Blue = brand over-performs in this
-# demographic; red = under-performs. Non-buyer rows mirror the SAME colour as
-# the matching buyer row (same over/under signal, not the mathematical inverse)
-# so reading either row gives a consistent direction.
+# Cat-avg column in penetration mode shows the per-option MEAN pen across all
+# brands — the typical brand's pen rate in this demographic. Heatmap shading
+# per brand cell is driven by (cell pct − this per-option avg pen), clipped
+# to ±MAX_HEAT_DIFF. Blue = brand over-performs vs the typical brand here;
+# red = under-performs. Non-buyer rows mirror the SAME colour as the matching
+# buyer row (same competitive direction, not the mathematical inverse) so
+# reading either row gives a consistent signal.
 
 .demo_table_body <- function(rows, q, brand_codes, focal_brand, brand_colours,
                               dp) {
-  pen_by    <- .demo_table_index_by_brand(q$brand_penetration_long)
-  total_pen <- q$brand_total_penetration %||% list()
+  pen_by      <- .demo_table_index_by_brand(q$brand_penetration_long)
+  option_avg  <- q$option_avg_penetration %||% list()
 
   trs <- vapply(seq_along(rows), function(i) {
     r <- rows[[i]]
+    cat_pct <- .demo_table_option_avg_pct(option_avg, r$code)
 
     buyer_row <- .demo_table_pen_row(
       role         = "buyer",
       label_cell   = sprintf('<td class="demo-opt-label">%s</td>',
                              .demo_table_esc(r$label %||% r$code)),
       brand_index  = pen_by,
-      total_pen    = total_pen,
+      cat_pct      = cat_pct,
       code         = r$code,
-      catavg_cell  = .demo_table_catavg_cell(r, dp),
+      catavg_cell  = .demo_table_catavg_pen_cell(r, cat_pct, dp),
       brand_codes  = brand_codes,
       focal_brand  = focal_brand,
       complement   = FALSE,
@@ -168,7 +170,7 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
       role         = "nonbuyer",
       label_cell   = '<td class="demo-opt-label demo-row-nonbuyer-label">&#8627; non-buyer</td>',
       brand_index  = pen_by,
-      total_pen    = total_pen,
+      cat_pct      = cat_pct,
       code         = r$code,
       catavg_cell  = '<td class="demo-col-catavg demo-cell-blank" data-demo-col="catavg"></td>',
       brand_codes  = brand_codes,
@@ -185,17 +187,18 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
 
 # Render one tr (buyer or non-buyer). complement=TRUE flips the cell value to
 # 100 − pct (non-buyer is the complement of buyer within the known base).
-.demo_table_pen_row <- function(role, label_cell, brand_index, total_pen,
+# cat_pct is the per-option avg-brand-pen baseline used for cell shading.
+.demo_table_pen_row <- function(role, label_cell, brand_index, cat_pct,
                                  code, catavg_cell, brand_codes, focal_brand,
                                  complement, dp) {
   focal_cell <- .demo_table_pen_cell(
-    brand_index[[focal_brand]], total_pen[[focal_brand]],
+    brand_index[[focal_brand]], cat_pct,
     code, dp, complement = complement,
     extra_class = "demo-col-focal", colcode = "focal",
     brand_code  = focal_brand)
   per_brand_cells <- vapply(brand_codes, function(bc) {
     .demo_table_pen_cell(
-      brand_index[[bc]], total_pen[[bc]],
+      brand_index[[bc]], cat_pct,
       code, dp, complement = complement,
       extra_class = "", colcode = "brand", brand_code = bc)
   }, character(1L))
@@ -203,6 +206,27 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
     '<tr class="demo-row-%s">%s%s%s%s</tr>',
     role, label_cell, focal_cell, catavg_cell,
     paste(per_brand_cells, collapse = ""))
+}
+
+
+# Look up the per-option avg brand pen from the panel payload. Returns NA
+# when the option isn't represented (defensive — shouldn't happen with a
+# well-formed engine result).
+.demo_table_option_avg_pct <- function(option_avg, code) {
+  if (is.null(option_avg) || length(option_avg) == 0L) return(NA_real_)
+  entry <- option_avg[[as.character(code)]]
+  if (is.null(entry)) return(NA_real_)
+  as.numeric(entry$pct %||% NA_real_)
+}
+
+
+# Penetration-mode Cat-avg cell. Shows the per-option mean brand pen — i.e.
+# the typical brand's pen rate in this demographic. Italic / muted styling
+# from the .demo-col-catavg class.
+.demo_table_catavg_pen_cell <- function(r, cat_pct, dp) {
+  sprintf(
+    '<td class="demo-col-catavg" data-demo-col="catavg">%s</td>',
+    .demo_table_pct(cat_pct, dp))
 }
 
 
@@ -219,11 +243,13 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
 #
 # value = buyer pct in option (from brand_index); when complement=TRUE the
 # cell shows 100 − value (the non-buyer share). Heat colour is always based
-# on the BUYER gap (cell - brand_total_pen) so buyer + non-buyer rows share
-# the same colour and signal direction.
+# on the BUYER gap (cell - cat_pct, where cat_pct is the per-option mean
+# brand pen) so buyer + non-buyer rows share the same colour and signal
+# direction — and the colour directly indicates "this brand over/under-
+# performs the typical brand in this demographic".
 #
 # Returns an NA cell when no data for this option/brand combination exists.
-.demo_table_pen_cell <- function(entry, total_pen_entry, code, dp,
+.demo_table_pen_cell <- function(entry, cat_pct, code, dp,
                                   complement = FALSE,
                                   extra_class = "", colcode = "brand",
                                   brand_code = NA_character_) {
@@ -240,9 +266,8 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
   } else {
     buyer_pct
   }
-  baseline <- (total_pen_entry %||% list())$pct %||% NA_real_
-  buyer_diff <- if (is.finite(buyer_pct) && is.finite(baseline))
-                  buyer_pct - baseline else NA_real_
+  buyer_diff <- if (is.finite(buyer_pct) && is.finite(cat_pct))
+                  buyer_pct - cat_pct else NA_real_
   bg <- .demo_table_heat_colour(buyer_diff)
 
   cell_n <- .demo_table_pen_cell_n(entry, code, buyer_pct, complement)

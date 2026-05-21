@@ -235,8 +235,9 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 .demo-chart-bar-fill { height: 100%; background: __FOCAL__; opacity: 0.85; }
 .demo-chart-bar-marker { position: absolute; top: 0; bottom: 0; width: 2px; background: #475569; }
 .demo-chart-row-value { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
-.demo-chart-legend { display: flex; gap: 14px; font-size: 11px; color: #64748b; margin-top: 8px; padding-left: 130px; }
+.demo-chart-legend { display: flex; gap: 14px; align-items: center; font-size: 11px; color: #64748b; margin-top: 8px; padding-left: 130px; flex-wrap: wrap; }
 .demo-chart-legend-swatch { display: inline-block; width: 12px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: middle; background: __FOCAL__; opacity: 0.85; }
+.demo-chart-legend-footnote { color: #94a3b8; font-style: italic; font-size: 10.5px; margin-left: auto; }
 
 .demo-empty { padding: 18px; text-align: center; color: #94a3b8; font-style: italic; font-size: 12px; }
 "

@@ -73,7 +73,8 @@ BRAND_DEMOGRAPHICS_VERSION <- "2.0"
 #'   \item{brand_cut}{NULL or data frame keyed by BrandCode + Base_n + Pct_<CODE>. Distribution of each brand's BUYERS across the option list.}
 #'   \item{brand_nonbuyer_cut}{NULL or data frame, same shape as \code{brand_cut}. Distribution of each brand's NON-BUYERS (pen == 0, not NA) across the option list.}
 #'   \item{brand_penetration_long}{NULL or data frame: one row per brand, columns Pct_<code> = % of respondents in option <code> who buy this brand, Base_n_<code> = unweighted known-base for that option. The panel cell metric — answers "is this brand over/under-performing in this demographic option?" at a glance.}
-#'   \item{brand_total_penetration}{NULL or data frame: one row per brand, Pct_Total = cat-wide penetration (% of all respondents who buy this brand). The heatmap baseline for \code{brand_penetration_long}.}
+#'   \item{brand_total_penetration}{NULL or data frame: one row per brand, Pct_Total = cat-wide penetration (% of all respondents who buy this brand). Legend / context only — not used as the cell-shading baseline (see \code{option_avg_penetration}).}
+#'   \item{option_avg_penetration}{Named numeric vector keyed by option_code: the per-option mean penetration across all brands. THIS is the competitive baseline used by the panel — table Cat-avg column and chart marker both read from this vector in penetration mode, and brand cells are shaded vs this baseline.}
 #'   \item{n_total}{Unweighted respondents with valid (non-NA) value}
 #'   \item{n_respondents}{Total rows in input}
 #'
@@ -119,6 +120,9 @@ run_demographic_question <- function(values,
   brand_total_penetration <- .demo_brand_total_penetration(
     pen_mat, brand_codes, brand_labels, w)
 
+  option_avg_penetration <- .demo_option_avg_penetration(
+    brand_penetration_long, option_codes)
+
   list(
     status                  = "PASS",
     total                   = total_df,
@@ -128,6 +132,7 @@ run_demographic_question <- function(values,
     brand_nonbuyer_cut      = brand_nonbuyer_cut,
     brand_penetration_long  = brand_penetration_long,
     brand_total_penetration = brand_total_penetration,
+    option_avg_penetration  = option_avg_penetration,
     n_total                 = sum(!is.na(values)),
     n_respondents           = n_rows,
     weighted                = !is.null(weights),
@@ -270,10 +275,31 @@ run_demographic_question <- function(values,
 }
 
 
-# Cat-wide penetration of each brand (single number per brand). Acts as the
-# heatmap baseline for the in-option cells: a brand cell shaded vs this
-# baseline answers "does this brand over/under-perform in this demographic
-# relative to its category-average pen?".
+# Per-option mean penetration across all brands. THE category-average
+# baseline in penetration mode — answers "what's the typical brand's
+# pen rate among 30-35s?". Per-row so the chart marker and the table's
+# Cat-avg column can both move down the option list. NA brand cells are
+# excluded from the mean (an option with zero respondents in one brand's
+# known base shouldn't drag the option's typical rate to NA).
+.demo_option_avg_penetration <- function(brand_pen_df, codes) {
+  out <- stats::setNames(rep(NA_real_, length(codes)), codes)
+  if (is.null(brand_pen_df) || !is.data.frame(brand_pen_df) ||
+      nrow(brand_pen_df) == 0L) return(out)
+  for (cd in codes) {
+    col <- paste0("Pct_", cd)
+    if (!col %in% names(brand_pen_df)) next
+    vals <- brand_pen_df[[col]]
+    if (all(is.na(vals))) next
+    out[[cd]] <- mean(vals, na.rm = TRUE)
+  }
+  out
+}
+
+
+# Cat-wide penetration of each brand (single number per brand). Useful as
+# legend context ("IPK overall pen = 16%") but no longer the cell-shading
+# baseline — see .demo_option_avg_penetration for the per-row competitive
+# baseline that drives both the chart marker and the table heatmap.
 .demo_brand_total_penetration <- function(pen_mat, brand_codes, brand_labels,
                                            w) {
   ctx <- .demo_brand_cut_setup(pen_mat, brand_codes, brand_labels,

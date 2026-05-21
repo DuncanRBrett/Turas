@@ -73,14 +73,21 @@ build_demographics_matrix_chart <- function(question_payload, focal_brand,
     .demo_chart_row(r, ctx, scale_max, focal_colour, decimal_places)
   }, character(1L))
 
+  footnote_html <- if (nzchar(ctx$footnote %||% ""))
+    sprintf('<span class="demo-chart-legend-footnote">%s</span>',
+            .demo_chart_esc(ctx$footnote))
+  else ""
+
   legend <- sprintf(
     '<div class="demo-chart-legend">
        <span><span class="demo-chart-legend-swatch" style="background:%s"></span>%s</span>
        <span>Marker: %s</span>
+       %s
      </div>',
     .demo_chart_esc(focal_colour),
     .demo_chart_esc(focal_brand %||% "focal"),
-    .demo_chart_esc(ctx$marker_label))
+    .demo_chart_esc(ctx$marker_label),
+    footnote_html)
 
   paste0(
     '<div class="demo-chart-wrap">',
@@ -93,34 +100,42 @@ build_demographics_matrix_chart <- function(question_payload, focal_brand,
 # Resolve the chart's data source and marker semantics for the requested
 # metric mode. Returns a list with:
 #   focal_entry   — long-list entry whose cells hold the bar values
-#   global_marker — single marker value applied to every row (penetration
-#                    mode) or NA (share mode uses per-row r$pct instead)
-#   marker_label  — short legend label, e.g. "brand cat avg pen" / "cat avg"
+#   option_avg    — code -> {code, pct} map for the per-row marker (the
+#                    PER-OPTION baseline — typical brand pen in pen mode,
+#                    demographic size in share mode). Replaces the previous
+#                    global_marker idea so the marker can vary per row.
+#   marker_label  — short legend label
+#   footnote      — optional context string (used for "focal overall: 16%")
 .demo_chart_mode_ctx <- function(q, focal_brand, metric) {
   if (identical(metric, "share")) {
+    # Share-mode marker = per-row cat-avg (% of cat in option). We bake the
+    # rows' r$pct into a code-keyed map at render time so the row builder
+    # only consults ctx and stays mode-agnostic.
     return(list(
-      mode          = "share",
-      focal_entry   = .demo_chart_focal_entry(q$brand_cut, focal_brand),
-      global_marker = NA_real_,
-      marker_label  = "cat avg"
+      mode         = "share",
+      focal_entry  = .demo_chart_focal_entry(q$brand_cut, focal_brand),
+      option_avg   = NULL,   # share mode reads r$pct directly per row
+      marker_label = "cat avg",
+      footnote     = ""
     ))
   }
-  # default: penetration
+  # default: penetration. Marker per-row = the typical brand's pen in this
+  # option (option_avg_penetration). Footnote carries the focal brand's
+  # cat-wide pen as legend context.
   total_pen_focal <- q$brand_total_penetration[[focal_brand]]
-  pen_value <- if (is.null(total_pen_focal)) NA_real_
-               else as.numeric(total_pen_focal$pct)
+  overall_pen <- if (is.null(total_pen_focal)) NA_real_
+                 else as.numeric(total_pen_focal$pct)
+  footnote <- if (is.finite(overall_pen))
+                sprintf("%s overall pen: %.1f%%",
+                        focal_brand %||% "focal", overall_pen)
+              else ""
   list(
-    mode          = "penetration",
-    focal_entry   = .demo_chart_focal_entry(q$brand_penetration_long,
-                                             focal_brand),
-    global_marker = pen_value,
-    # Embed the actual value because in penetration mode the marker sits at
-    # the same X on every row — showing it in the legend gives instant
-    # "what is the brand's overall pen?" without hovering each row.
-    marker_label  = if (is.finite(pen_value))
-                      sprintf("%s overall pen (%.1f%%)",
-                              focal_brand %||% "focal", pen_value)
-                    else "focal overall pen"
+    mode         = "penetration",
+    focal_entry  = .demo_chart_focal_entry(q$brand_penetration_long,
+                                            focal_brand),
+    option_avg   = q$option_avg_penetration %||% list(),
+    marker_label = "avg brand pen in option",
+    footnote     = footnote
   )
 }
 
@@ -143,35 +158,39 @@ build_demographics_matrix_chart <- function(question_payload, focal_brand,
 
 # Normalise bar widths against the largest value VISIBLE on the chart for
 # the active mode. Critical: we don't include values that aren't drawn,
-# otherwise bars get visually squashed by an invisible reference. Specifically
-# penetration mode draws only focal-pen bars + one global marker; share mode
-# draws focal-share bars + per-row cat-avg markers.
+# otherwise bars get visually squashed by an invisible reference. Both modes
+# now draw per-row markers (penetration → option_avg_pen[code]; share →
+# r$pct) so scale_max considers both the focal bars and the row markers.
 .demo_chart_scale_max <- function(rows, ctx) {
   vals <- numeric(0)
   if (!is.null(ctx$focal_entry)) {
     vals <- c(vals, vapply(ctx$focal_entry$cells,
                             function(c) c$pct %||% 0, numeric(1L)))
   }
-  if (identical(ctx$mode, "share")) {
-    # Per-row cat-avg markers are drawn in share mode.
-    vals <- c(vals, vapply(rows, function(r) r$pct %||% 0, numeric(1L)))
-  } else if (is.finite(ctx$global_marker)) {
-    # Single global marker drawn at the same X on every row.
-    vals <- c(vals, ctx$global_marker)
-  }
+  # Per-row markers: pen mode reads from option_avg, share mode from r$pct.
+  vals <- c(vals, vapply(rows, function(r) {
+    .demo_chart_marker_pct(ctx, r) %||% 0
+  }, numeric(1L)))
   m <- if (length(vals)) max(vals, na.rm = TRUE) else 0
   if (!is.finite(m) || m <= 0) 100 else m
 }
 
 
-.demo_chart_row <- function(r, ctx, scale_max, focal_colour, dp) {
-  focal_pct <- .demo_chart_focal_pct(ctx$focal_entry, r$code)
+# Per-row marker value lookup. Pen mode = ctx$option_avg[code]$pct; share
+# mode = r$pct (the row's overall cat-avg). NA when the option isn't in
+# the map.
+.demo_chart_marker_pct <- function(ctx, r) {
+  if (identical(ctx$mode, "share")) return(r$pct %||% NA_real_)
+  oa <- ctx$option_avg %||% list()
+  entry <- oa[[as.character(r$code %||% "")]]
+  if (is.null(entry)) return(NA_real_)
+  as.numeric(entry$pct %||% NA_real_)
+}
 
-  # Per-mode marker resolution:
-  #   penetration → single brand-cat-avg pen value applied to every row
-  #   share       → per-row cat-avg (% of cat respondents in this option)
-  marker_pct <- if (identical(ctx$mode, "penetration"))
-    ctx$global_marker else (r$pct %||% NA_real_)
+
+.demo_chart_row <- function(r, ctx, scale_max, focal_colour, dp) {
+  focal_pct  <- .demo_chart_focal_pct(ctx$focal_entry, r$code)
+  marker_pct <- .demo_chart_marker_pct(ctx, r)
 
   bar_w <- if (is.finite(focal_pct))
     max(.DEMO_CHART_MIN_BAR_WIDTH_PCT, 100 * focal_pct / scale_max)

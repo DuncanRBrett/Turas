@@ -351,23 +351,25 @@
 
   // PENETRATION mode (default). Cell = "% of respondents in this option who
   // buy this brand". Non-buyer row = complement (100 − buyer). Heat colour
-  // is driven by (buyer pct − that brand's cat-wide total penetration), so
-  // buyer + non-buyer rows share the same direction.
+  // is driven by (buyer pct − per-option avg brand pen), so blue = brand
+  // over-performs vs the typical brand in this demographic; red = under-
+  // performs. Buyer + non-buyer rows share the same colour and direction.
   function penTableBody(rows, q, brands, order, focal, dp) {
-    const penBy    = indexByBrand(q.brand_penetration_long);
-    const totalPen = q.brand_total_penetration || {};
+    const penBy     = indexByBrand(q.brand_penetration_long);
+    const optionAvg = q.option_avg_penetration || {};
     const trs = rows.map(r => {
+      const catPct = optionAvgPct(optionAvg, r.code);
       const buyerRow = penRow({
         role: "buyer",
         labelCell: `<td class="demo-opt-label">${esc(r.label || r.code)}</td>`,
-        brandIndex: penBy, totalPen,
-        code: r.code, catAvgCell: catAvgCell(r, dp),
+        brandIndex: penBy, catPct,
+        code: r.code, catAvgCell: catAvgPenCell(catPct, dp),
         brands, order, focal, complement: false, dp
       });
       const nonbuyerRow = penRow({
         role: "nonbuyer",
         labelCell: '<td class="demo-opt-label demo-row-nonbuyer-label">&#8627; non-buyer</td>',
-        brandIndex: penBy, totalPen,
+        brandIndex: penBy, catPct,
         code: r.code,
         catAvgCell: '<td class="demo-col-catavg demo-cell-blank" data-demo-col="catavg"></td>',
         brands, order, focal, complement: true, dp
@@ -378,16 +380,29 @@
   }
 
   function penRow(p) {
-    const focalCell = penCell(p.brandIndex[p.focal], p.totalPen[p.focal],
+    const focalCell = penCell(p.brandIndex[p.focal], p.catPct,
                                 p.code, p.dp, p.complement,
                                 "demo-col-focal", "focal", p.focal);
     const perBrand = p.order
       .map(i => p.brands[i])
-      .map(bc => penCell(p.brandIndex[bc], p.totalPen[bc],
+      .map(bc => penCell(p.brandIndex[bc], p.catPct,
                           p.code, p.dp, p.complement,
                           "", "brand", bc))
       .join("");
     return `<tr class="demo-row-${p.role}">${p.labelCell}${focalCell}${p.catAvgCell}${perBrand}</tr>`;
+  }
+
+  // Per-option avg brand pen lookup (mirrors R's option_avg_penetration map).
+  function optionAvgPct(optionAvg, code) {
+    const entry = (optionAvg || {})[String(code)];
+    if (!entry || entry.pct == null || !isFinite(entry.pct)) return NaN;
+    return entry.pct;
+  }
+
+  // Cat-avg cell for penetration mode — shows the per-option mean brand pen
+  // (the typical brand's pen rate in this demographic).
+  function catAvgPenCell(catPct, dp) {
+    return `<td class="demo-col-catavg" data-demo-col="catavg">${pctStr(catPct, dp)}</td>`;
   }
 
   function indexByBrand(brandLong) {
@@ -397,18 +412,19 @@
   }
 
   // Penetration cell. complement=true flips the displayed value to 100-buyer
-  // (the non-buyer share within the option). Heat colour is always based on
-  // the buyer gap, so buyer + non-buyer rows share the same colour.
-  function penCell(entry, totalPenEntry, code, dp, complement, extraClass, colcode, brandCode) {
+  // (the non-buyer share within the option). Heat colour driven by the buyer
+  // gap vs the per-option avg brand pen (catPct) so buyer + non-buyer rows
+  // carry the same competitive direction.
+  function penCell(entry, catPct, code, dp, complement, extraClass, colcode, brandCode) {
     if (!entry) return naCell(extraClass, colcode, brandCode);
     const cell = (entry.cells || []).find(c => c.code === code);
     if (!cell) return naCell(extraClass, colcode, brandCode);
     const buyerPct = cell.pct;
     const shown = (complement && buyerPct != null && isFinite(buyerPct))
                     ? (100 - buyerPct) : buyerPct;
-    const baseline = (totalPenEntry && totalPenEntry.pct != null) ? totalPenEntry.pct : null;
-    const buyerDiff = (buyerPct != null && isFinite(buyerPct) && baseline != null && isFinite(baseline))
-                      ? (buyerPct - baseline) : null;
+    const buyerDiff = (buyerPct != null && isFinite(buyerPct)
+                       && catPct != null && isFinite(catPct))
+                      ? (buyerPct - catPct) : null;
     const heat = heatColour(buyerDiff);
     const cellN = penCellN(cell, buyerPct, complement);
     return `<td class="${extraClass}" data-demo-col="${colcode}" data-demo-brand="${esc(brandCode || "")}" data-demo-heat="${esc(heat)}">${pctStr(shown, dp)}${countSpan(cellN)}</td>`;
@@ -533,9 +549,13 @@
     const scaleMax = chartScaleMax(rows, ctx);
 
     const bars = rows.map(r => chartRow(r, ctx, scaleMax, focalColour, dp)).join("");
+    const footnote = ctx.footnote
+      ? `<span class="demo-chart-legend-footnote">${esc(ctx.footnote)}</span>`
+      : "";
     const legend = `<div class="demo-chart-legend">
       <span><span class="demo-chart-legend-swatch" style="background:${esc(focalColour)}"></span>${esc(focalLabel || focalBrand || "focal")}</span>
       <span>Marker: ${esc(ctx.markerLabel)}</span>
+      ${footnote}
     </div>`;
     return `<div class="demo-chart-wrap">${bars}${legend}</div>`;
   }
@@ -548,43 +568,49 @@
       return {
         mode: "share",
         focalEntry: focalEntry,
-        globalMarker: NaN,
-        markerLabel: "cat avg"
+        optionAvg: null,    // share mode reads r.pct directly per row
+        markerLabel: "cat avg",
+        footnote: ""
       };
     }
-    // default: penetration
+    // default: penetration. Per-row marker = mean brand pen in that option.
     const focalEntry = (q.brand_penetration_long || []).find(b => b.brand_code === focalBrand) || null;
     const totalPenMap = q.brand_total_penetration || {};
     const totalPenFocal = totalPenMap[focalBrand];
-    const penValue = (totalPenFocal && isFinite(totalPenFocal.pct)) ? totalPenFocal.pct : NaN;
-    // Embed the value in the legend label because in penetration mode the
-    // marker sits at the same X on every row — showing it once in the
-    // legend gives instant "what is the brand's overall pen?" without
-    // hovering each row.
-    const markerLabel = isFinite(penValue)
-      ? `${focalBrand || "focal"} overall pen (${penValue.toFixed(1)}%)`
-      : "focal overall pen";
+    const overallPen = (totalPenFocal && isFinite(totalPenFocal.pct)) ? totalPenFocal.pct : NaN;
+    const footnote = isFinite(overallPen)
+      ? `${focalBrand || "focal"} overall pen: ${overallPen.toFixed(1)}%`
+      : "";
     return {
       mode: "penetration",
       focalEntry: focalEntry,
-      globalMarker: penValue,
-      markerLabel: markerLabel
+      optionAvg: q.option_avg_penetration || {},
+      markerLabel: "avg brand pen in option",
+      footnote: footnote
     };
   }
 
-  // Scale-max considers ONLY values that are actually drawn on the chart in
-  // the current mode. Including invisible reference values would squash all
-  // the visible bars to the left.
+  // Per-row marker value lookup. Pen mode reads from ctx.optionAvg[code];
+  // share mode reads r.pct (the row's overall cat-avg / demographic size).
+  function chartMarkerPct(ctx, r) {
+    if (ctx.mode === "share") return isFinite(r.pct) ? r.pct : NaN;
+    const entry = (ctx.optionAvg || {})[String(r.code)];
+    if (!entry || entry.pct == null || !isFinite(entry.pct)) return NaN;
+    return entry.pct;
+  }
+
+  // Scale-max considers ONLY values drawn on the chart. Both modes now draw
+  // per-row markers, so we walk the rows for marker values in addition to
+  // the focal cells.
   function chartScaleMax(rows, ctx) {
     let m = 0;
     if (ctx.focalEntry && Array.isArray(ctx.focalEntry.cells)) {
       ctx.focalEntry.cells.forEach(c => { if (isFinite(c.pct)) m = Math.max(m, c.pct); });
     }
-    if (ctx.mode === "share") {
-      rows.forEach(r => { if (isFinite(r.pct)) m = Math.max(m, r.pct); });
-    } else if (isFinite(ctx.globalMarker)) {
-      m = Math.max(m, ctx.globalMarker);
-    }
+    rows.forEach(r => {
+      const mp = chartMarkerPct(ctx, r);
+      if (isFinite(mp)) m = Math.max(m, mp);
+    });
     return (m > 0 && isFinite(m)) ? m : 100;
   }
 
@@ -593,12 +619,7 @@
       ? (ctx.focalEntry.cells || []).find(c => c.code === r.code)
       : null;
     const focalPct = (focalCell && isFinite(focalCell.pct)) ? focalCell.pct : NaN;
-
-    // Penetration mode → single global marker (focal's cat-wide pen) applied
-    // to every row. Share mode → per-row cat avg (% of cat in this option).
-    const markerPct = (ctx.mode === "penetration")
-      ? ctx.globalMarker
-      : (isFinite(r.pct) ? r.pct : NaN);
+    const markerPct = chartMarkerPct(ctx, r);
 
     const barW = isFinite(focalPct)
       ? Math.max(CHART_MIN_BAR_WIDTH_PCT, 100 * focalPct / scaleMax)
