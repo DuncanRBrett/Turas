@@ -163,6 +163,13 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
     pct_abs <- r$pct_absolute %||% NA_real_
     if (is.null(pct_abs) || is.na(pct_abs))
       return('<td class="ct-td ct-data-col ct-na fn-td-avg">&mdash;</td>')
+    # All three base values are surfaced as data attributes so applyPctMode()
+    # in brand_funnel_panel.js can reflow this cell when the user toggles
+    # between % total / % previous / % aware. Sentinel brand code "__avg__"
+    # so the cat-avg row is included by the .ct-td[data-fn-brand][data-fn-stage]
+    # selector without colliding with any real brand code.
+    pct_nes <- r$pct_nested %||% pct_abs
+    pct_aw  <- r$pct_aware  %||% pct_abs
     ci_lo   <- r$ci_lo %||% NA_real_
     ci_hi   <- r$ci_hi %||% NA_real_
     safe_max <- max(0.01, as.numeric(col_max[[k]] %||% 1), na.rm = TRUE)
@@ -181,8 +188,11 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
       sprintf('<div class="ma-ci-limits"><span>%s</span><span>%s</span></div>', lo_disp, hi_disp)
     ) else ""
     sprintf(
-      '<td class="ct-td ct-data-col fn-td-avg fn-td-avg-ci" data-sort-val="%.6f"><span class="ct-val">%s</span>%s</td>',
-      pct_abs, disp, ci_bar)
+      '<td class="ct-td ct-data-col fn-td-avg fn-td-avg-ci"
+           data-fn-stage="%s" data-fn-brand="__avg__"
+           data-fn-pct-abs="%.6f" data-fn-pct-nes="%.6f" data-fn-pct-aw="%.6f"
+           data-sort-val="%.6f"><span class="ct-val fn-pct-primary">%s</span>%s</td>',
+      .fn_esc(k), pct_abs, pct_nes, pct_aw, pct_abs, disp, ci_bar)
   }, character(1))
   paste0(
     '<tr class="ct-row fn-row-avg-all" data-locked="1">',
@@ -215,10 +225,31 @@ build_funnel_table_section <- function(pd, focal_colour = "#1A5276") {
 
 
 .fn_brand_sort_attrs <- function(cells_for, stage_keys, brand_name) {
+  # Emit one sort attribute per stage per base mode so setSort() in
+  # brand_funnel_panel.js can pick the right value when the user sorts
+  # while a non-default base is active. Without the per-mode attributes
+  # the sort silently kept ordering by % total regardless of the active
+  # toggle, so switching to % aware and re-sorting by stage produced the
+  # same brand order as % total.
+  #   data-fn-sort-<k>      -> pct_absolute (legacy / default fallback)
+  #   data-fn-sort-<k>-abs  -> pct_absolute
+  #   data-fn-sort-<k>-nes  -> pct_nested
+  #   data-fn-sort-<k>-aw   -> pct_aware
+  fmt <- function(v) if (is.na(v)) "" else sprintf("%.6f", v)
   parts <- vapply(stage_keys, function(k) {
-    v <- cells_for[[k]]$pct_absolute %||% NA_real_
-    sprintf(' data-fn-sort-%s="%s"', .fn_esc(k),
-            if (is.na(v)) "" else sprintf("%.6f", v))
+    cell <- cells_for[[k]] %||% list()
+    abs_v <- cell$pct_absolute %||% NA_real_
+    nes_v <- cell$pct_nested   %||% abs_v
+    aw_v  <- cell$pct_aware    %||% abs_v
+    sprintf(paste0(
+        ' data-fn-sort-%s="%s"',
+        ' data-fn-sort-%s-abs="%s"',
+        ' data-fn-sort-%s-nes="%s"',
+        ' data-fn-sort-%s-aw="%s"'),
+      .fn_esc(k), fmt(abs_v),
+      .fn_esc(k), fmt(abs_v),
+      .fn_esc(k), fmt(nes_v),
+      .fn_esc(k), fmt(aw_v))
   }, character(1))
   paste0(
     sprintf(' data-fn-sort-brand="%s"', .fn_esc(tolower(brand_name))),

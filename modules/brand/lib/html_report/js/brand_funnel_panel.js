@@ -133,13 +133,57 @@
     }
 
     if (mode === "heatmap") {
+      /* Per-column blue intensity proportional to each brand's value
+         RELATIVE to the column max — recomputed against the active
+         base toggle so the colours line up with the values on screen.
+         Static data-heatmap attribute is kept as a fallback for the
+         relationship table (which has its own heatmap helper) and any
+         cell that doesn't carry the per-base pct attributes. */
+      var pdHM = panel.__fnData;
+      var cellsHM     = (pdHM && pdHM.table && pdHM.table.cells) || [];
+      var stageKeysHM = (pdHM && pdHM.table && pdHM.table.stage_keys) || [];
+      var pctModeHM   = (panel.__fnState && panel.__fnState.pctMode) || "total";
+      var awareStageHM = stageKeysHM[0];
+      var brandAwarePctHM = {};
+      cellsHM.forEach(function(c){
+        if (c.stage_key === awareStageHM) brandAwarePctHM[c.brand_code] = c.pct_absolute;
+      });
+      // Per-stage column max at the active base.
+      var colMaxHM = {};
+      stageKeysHM.forEach(function(sk){
+        var maxV = 0;
+        cellsHM.forEach(function(c){
+          if (c.stage_key !== sk) return;
+          var v = cellValueForMode(c, pctModeHM, awareStageHM, brandAwarePctHM);
+          if (v != null && !isNaN(v) && v > maxV) maxV = v;
+        });
+        colMaxHM[sk] = maxV > 0 ? maxV : 1;
+      });
       panel.querySelectorAll(".ct-heatmap-cell").forEach(function(td){
         var row = td.closest("tr");
         if (row && row.classList.contains("fn-row-avg-all")) return;
         if (td.classList.contains("fn-rel-td-focal") ||
             td.classList.contains("fn-rel-td-avg")) return;
-        var colour = td.getAttribute("data-heatmap");
-        if (colour) td.style.backgroundColor = colour;
+        if (td.hasAttribute("data-fn-att")) return; // rel-table cells
+        var sk    = td.getAttribute("data-fn-stage");
+        var brand = td.getAttribute("data-fn-brand");
+        var absV  = parseFloat(td.getAttribute("data-fn-pct-abs"));
+        var nesV  = parseFloat(td.getAttribute("data-fn-pct-nes"));
+        if (!sk || isNaN(absV)) {
+          // Fallback to the static attribute when per-base data is absent.
+          var staticC = td.getAttribute("data-heatmap");
+          if (staticC) td.style.backgroundColor = staticC;
+          return;
+        }
+        var pct = cellValueForMode({
+          stage_key: sk, brand_code: brand,
+          pct_absolute: absV, pct_nested: isNaN(nesV) ? null : nesV
+        }, pctModeHM, awareStageHM, brandAwarePctHM);
+        if (pct == null || isNaN(pct)) return;
+        var cmax = colMaxHM[sk] || 1;
+        var frac = Math.min(1, Math.max(0, pct / cmax));
+        var opacity = 0.08 + frac * 0.57;
+        td.style.backgroundColor = "rgba(37,99,171," + opacity.toFixed(3) + ")";
       });
       return;
     }
@@ -260,11 +304,24 @@
         applyPctMode(panel);
         buildMiniFunnels(panel);   // mini funnels must reflect the new % base
         drawSlopeSvg(panel);       // slope chart re-renders with new base
-        // Sig arrows + CI heatmap are base-dependent — re-render so they
-        // line up with the values now displayed in each cell.
+        // Sig arrows + heatmap (both modes) are base-dependent — re-render
+        // so they line up with the values now displayed in each cell.
         applyTableSigMarkers(panel);
-        var ciOn = panel.querySelector('[data-fn-action="showci"]');
-        if (ciOn && ciOn.checked) applyTableShading(panel, "ci");
+        var activeShading = (panel.__fnState && panel.__fnState.tableShading) || "off";
+        if (activeShading !== "off") applyTableShading(panel, activeShading);
+        // Recompute the cat-avg row's range bar (the bar fill, mean tick,
+        // and lo/hi labels) at the active base. Without this the bar
+        // stayed pinned to its % total bounds — misleading the reader
+        // about brand spread at the new base.
+        updateAvgRowRangeBars(panel);
+        // Re-apply the active sort so the brand row order reflects the
+        // new base — without this, sorting by a stage and then toggling
+        // base left the rows in their old order even though setSort
+        // picks the per-mode attribute on the next click. The brand-name
+        // sort doesn't depend on base; skip the re-sort in that case to
+        // avoid spurious DOM churn.
+        var s = panel.__fnState && panel.__fnState.sort;
+        if (s && s.col && s.col !== "brand") setSort(panel, s.col, s.dir);
       });
     });
 
@@ -737,6 +794,12 @@
       (pd.table.cells || []).forEach(function(c) {
         if (c.stage_key === awareStageKey) brandAwarePct[c.brand_code] = c.pct_absolute;
       });
+      // Register the cat-avg row under the sentinel brand code "__avg__"
+      // so the same reflow path handles the Category average TDs in
+      // % aware mode (their data-fn-brand attribute is "__avg__").
+      (pd.table.avg_all_brands || []).forEach(function(r) {
+        if (r.stage_key === awareStageKey) brandAwarePct["__avg__"] = r.pct_absolute;
+      });
     }
 
     // --- 2. Rewrite primary pct text in every data cell ----------------------
@@ -897,6 +960,36 @@
       pd.table.avg_all_brands.forEach(function(r) { avgMap[r.stage_key] = r; });
     }
 
+    /* Base-mode resolution — must mirror applyPctMode (table) and the
+       headline computation (pickPct, ~line 1526) so the mini-funnel,
+       table, and chart agree on every cell.
+         "total"    -> pct_absolute (% of all respondents)
+         "previous" -> pct_nested  (% of previous stage; falls back to pct_absolute)
+         "aware"    -> pct_absolute / brand_aware_pct (stage 1 pinned to 100%)
+       Without the "aware" branch, switching the base toggle to "% aware"
+       left the mini-funnel cards stuck on % total — visually identical to
+       total mode. */
+    var awareStageKey = stageKeys[0];
+    var brandAwarePct = {};
+    cells.forEach(function (c) {
+      if (c.stage_key === awareStageKey) brandAwarePct[c.brand_code] = c.pct_absolute;
+    });
+    var avgAwarePct = (avgMap[awareStageKey] && avgMap[awareStageKey].pct_absolute) || null;
+
+    function pickMiniPct(obj, brandCode, stageIdx) {
+      if (!obj) return null;
+      if (pctMode === "previous") {
+        return obj.pct_nested != null ? obj.pct_nested : obj.pct_absolute;
+      }
+      if (pctMode === "aware") {
+        if (stageIdx === 0) return 1.0;
+        var ap = brandCode ? brandAwarePct[brandCode] : avgAwarePct;
+        if (ap && ap > 0 && obj.pct_absolute != null) return obj.pct_absolute / ap;
+        return obj.pct_absolute;
+      }
+      return obj.pct_absolute;
+    }
+
     var html = "";
 
     /* Category-average card stays governed by the chart-chip "__avg__"
@@ -909,7 +1002,7 @@
       for (var si = 0; si < stageKeys.length; si++) {
         var k = stageKeys[si];
         var r = avgMap[k];
-        var pct = r ? (pctMode === "previous" && r.pct_nested != null ? r.pct_nested : r.pct_absolute) : null;
+        var pct = pickMiniPct(r, null, si);
         var barW = pct != null ? Math.max(6, Math.round(pct * 100)) : 0;
         var pctStr = pct != null ? Math.round(pct * 100) + "%" : "\u2014";
         html += '<div class="fn-mf-stage">';
@@ -971,8 +1064,7 @@
         var k     = stageKeys[si];
         var lbl   = stageLabels[si] || k;
         var cell  = cellMap[code] && cellMap[code][k];
-        var pct   = cell ? (pctMode === "previous" && cell.pct_nested != null
-                            ? cell.pct_nested : cell.pct_absolute) : null;
+        var pct   = pickMiniPct(cell, code, si);
         var barW  = pct != null ? Math.max(6, Math.round(pct * 100)) : 0;
         var pctStr = pct != null ? Math.round(pct * 100) + "%" : "\u2014";
 
@@ -1674,6 +1766,18 @@
 
     var tbody = panel.querySelector("table.fn-table tbody");
     if (!tbody) return;
+    /* Pick the sort attribute that matches the active base toggle. The
+       table emits four attributes per stage:
+         data-fn-sort-<k>      (legacy, == abs)
+         data-fn-sort-<k>-abs  (% total)
+         data-fn-sort-<k>-nes  (% previous)
+         data-fn-sort-<k>-aw   (% aware)
+       Without the mode-aware pick, switching to % aware and re-sorting
+       silently re-applied the % total order. */
+    var pctMode = (panel.__fnState && panel.__fnState.pctMode) || "total";
+    var suffix  = pctMode === "previous" ? "-nes"
+                  : pctMode === "aware"  ? "-aw"
+                  : "-abs";
     var competitors = Array.prototype.slice.call(
       tbody.querySelectorAll('tr.fn-row-competitor'));
     competitors.sort(function(a, b){
@@ -1683,8 +1787,13 @@
         bv = b.getAttribute("data-fn-sort-brand") || "";
         return dir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
       }
-      av = parseFloat(a.getAttribute("data-fn-sort-" + col));
-      bv = parseFloat(b.getAttribute("data-fn-sort-" + col));
+      var attr = "data-fn-sort-" + col + suffix;
+      av = parseFloat(a.getAttribute(attr));
+      bv = parseFloat(b.getAttribute(attr));
+      // Defensive fallback to the legacy single-value attribute when the
+      // per-mode attribute is missing (e.g. an older cached HTML).
+      if (isNaN(av)) av = parseFloat(a.getAttribute("data-fn-sort-" + col));
+      if (isNaN(bv)) bv = parseFloat(b.getAttribute("data-fn-sort-" + col));
       if (isNaN(av)) av = -Infinity;
       if (isNaN(bv)) bv = -Infinity;
       return dir === "asc" ? av - bv : bv - av;
@@ -1880,6 +1989,90 @@
           '<span class="fn-sig-avg fn-sig-avg-dn" title="Sig lower than category average (p<0.05, ' +
           (mode === "previous" ? "% previous" : mode === "aware" ? "% aware" : "% total") +
           ' base)">\u2193</span>');
+      }
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Category-average row range bar \u2014 recompute the per-stage min/max range
+  // bar, mean tick, and lo/hi labels at the active base toggle.
+  //
+  // The cat-avg row is rendered server-side with a static CI bar built from
+  // pct_absolute (% total). When the user toggles to % previous or % aware
+  // the cell %s reflow via applyPctMode but the range bar stayed pinned to
+  // its % total bounds, which misleads the reader about how spread the
+  // brands are at the active base. This rebuilds the bar in place against
+  // the values now displayed.
+  // ---------------------------------------------------------------------------
+  function updateAvgRowRangeBars(panel) {
+    var pd = panel.__fnData;
+    if (!pd || !pd.table) return;
+    var cells       = pd.table.cells     || [];
+    var stageKeys   = pd.table.stage_keys || [];
+    if (cells.length === 0 || stageKeys.length === 0) return;
+    var pctMode     = (panel.__fnState && panel.__fnState.pctMode) || "total";
+    var awareStage  = stageKeys[0];
+
+    // brand \u2192 pct_absolute at stage 1 (used by cellValueForMode in aware mode)
+    var brandAwarePct = {};
+    cells.forEach(function(c) {
+      if (c.stage_key === awareStage) brandAwarePct[c.brand_code] = c.pct_absolute;
+    });
+
+    // For each stage, gather brand values at the active base and compute
+    // mean + 95% CI (mean \u00b1 1.96\u00b7SE). col_max is the max brand value at
+    // the active base \u2014 used as the bar's horizontal scale.
+    stageKeys.forEach(function(sk) {
+      var vals = [];
+      cells.forEach(function(c) {
+        if (c.stage_key !== sk) return;
+        var v = cellValueForMode(c, pctMode, awareStage, brandAwarePct);
+        if (v != null && !isNaN(v)) vals.push(v);
+      });
+      var td = panel.querySelector(
+        'tr.fn-row-avg-all td[data-fn-brand="__avg__"][data-fn-stage="' + sk + '"]');
+      if (!td) return;
+      var wrap   = td.querySelector(".ma-ci-bar-wrap");
+      var range  = td.querySelector(".ma-ci-bar-range");
+      var tick   = td.querySelector(".ma-ci-bar-tick");
+      var limits = td.querySelector(".ma-ci-limits");
+      if (!wrap || !range || !tick || !limits) return;
+      if (vals.length < 2) {
+        // Not enough brand variability to draw a CI band \u2014 hide the
+        // bar elements instead of leaving stale numbers visible.
+        wrap.style.visibility = "hidden";
+        limits.style.visibility = "hidden";
+        return;
+      }
+      wrap.style.visibility = "";
+      limits.style.visibility = "";
+
+      var mean = vals.reduce(function(a, b) { return a + b; }, 0) / vals.length;
+      var sd   = Math.sqrt(vals.reduce(function(a, v) { return a + (v - mean) * (v - mean); }, 0) / (vals.length - 1));
+      var se   = sd / Math.sqrt(vals.length);
+      var ciLo = mean - 1.96 * se;
+      var ciHi = mean + 1.96 * se;
+      var colMax = Math.max.apply(null, vals);
+      var safeMax = colMax > 0.01 ? colMax : 0.01;
+
+      // Mirror the R-side bar-geometry formulas (.fn_row_avg_all) so the
+      // visual stays consistent with the static initial render.
+      var fillLeft = Math.max(0, Math.min(94, 100 * ciLo / safeMax));
+      var fillW    = Math.max(4, Math.min(100 - fillLeft, 100 * (ciHi - ciLo) / safeMax));
+      var meanPct  = Math.max(1, Math.min(99, 100 * mean / safeMax));
+
+      var loStr = Math.round(ciLo * 100) + "%";
+      var hiStr = Math.round(ciHi * 100) + "%";
+
+      range.style.left  = fillLeft.toFixed(1) + "%";
+      range.style.width = fillW.toFixed(1) + "%";
+      tick.style.left   = meanPct.toFixed(1) + "%";
+      wrap.setAttribute("title", "95% CI: " + loStr + " \u2013 " + hiStr);
+
+      var spans = limits.querySelectorAll("span");
+      if (spans.length >= 2) {
+        spans[0].textContent = loStr;
+        spans[1].textContent = hiStr;
       }
     });
   }
