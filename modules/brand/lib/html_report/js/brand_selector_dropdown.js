@@ -37,6 +37,20 @@
   var REGISTRY = (window._brandSelectorRegistry = window._brandSelectorRegistry || {});
   var OUTSIDE_HANDLER = null;
 
+  // --- category-scoped cross-panel selection store -------------------------
+  // Every per-category panel (funnel, attitude, cat-buying, MA, WOM,
+  // demographics) registers under the same categoryKey (the cat code, e.g.
+  // "DSS"). When the user toggles a brand on any one panel, the new hidden
+  // set is published to every other panel in the same category so the
+  // visible-brand selection survives a tab switch.
+  //
+  // Stored value is a single canonical Set<string> of hidden brand codes —
+  // split-mode panels apply it to both their table and chart sets. Brands
+  // not present in a receiving panel's own brand list are ignored.
+  var CATEGORY_STORE = (window._brandSelectorCategoryStore =
+    window._brandSelectorCategoryStore || {});
+  var CATEGORY_SUBSCRIBERS = {};
+
   function escAttr(s) {
     return String(s == null ? "" : s)
       .replace(/&/g, "&amp;").replace(/"/g, "&quot;")
@@ -153,6 +167,53 @@
       state.opts.onChange(state.hiddenChart, "chart");
     }
     refreshTriggerCount(state);
+    // Publish to sibling panels in the same category so the visible-brand
+    // selection follows the user across tabs. Skip when applying a remote
+    // change (the receiving side fires emit() too, which would loop), and
+    // skip "chart"-only changes (table is the canonical cross-panel set —
+    // a split-mode chart-only toggle is treated as panel-local).
+    if (state.categoryKey && !state._applyingRemote && scope !== "chart") {
+      publishCategoryChange(state);
+    }
+  }
+
+  function publishCategoryChange(originState) {
+    var key = originState.categoryKey;
+    CATEGORY_STORE[key] = new Set(originState.hiddenTable);
+    var subs = CATEGORY_SUBSCRIBERS[key] || [];
+    subs.forEach(function (sub) {
+      if (sub === originState) return;
+      applyRemoteHiddenSet(sub, CATEGORY_STORE[key]);
+    });
+  }
+
+  function applyRemoteHiddenSet(state, hiddenSet) {
+    // Intersect the canonical hidden set with this panel's own brand list:
+    // a brand absent from this panel (e.g. category-specific) can't be
+    // hidden here and shouldn't pollute the set.
+    var ownCodes = {};
+    state.brands.forEach(function (b) { ownCodes[b.code] = true; });
+    var nextHidden = new Set();
+    hiddenSet.forEach(function (c) { if (ownCodes[c]) nextHidden.add(c); });
+
+    state.hiddenTable = nextHidden;
+    state.hiddenChart = new Set(nextHidden);
+
+    if (state.popoverEl) rebuildBody(state);
+    refreshTriggerCount(state);
+
+    // Fire the consumer's onChange with scope "all" so the panel re-applies
+    // its visibility — and guard against re-publish so the broadcast loop
+    // terminates here.
+    state._applyingRemote = true;
+    try {
+      state.opts.onChange(state.hiddenTable, "all");
+      if (state.mode === "split") {
+        state.opts.onChange(state.hiddenChart, "chart");
+      }
+    } finally {
+      state._applyingRemote = false;
+    }
   }
 
   function bindRowToggle(state, row) {
@@ -280,14 +341,31 @@
     if (!opts.triggerEl) throw new Error("BrandSelector.create: triggerEl required");
     if (!Array.isArray(opts.brands)) throw new Error("BrandSelector.create: brands array required");
 
+    // If a sibling panel in the same category has already published a
+    // selection, seed THIS panel from the shared store so it inherits the
+    // selection on first paint (no need to re-toggle after every tab switch).
+    var seededHidden = opts.initialHidden;
+    var seededHiddenChart = opts.initialHiddenChart || opts.initialHidden;
+    if (opts.categoryKey && CATEGORY_STORE[opts.categoryKey]) {
+      var ownCodes = {};
+      opts.brands.forEach(function (b) { ownCodes[b.code] = true; });
+      var stored = [];
+      CATEGORY_STORE[opts.categoryKey].forEach(function (c) {
+        if (ownCodes[c]) stored.push(c);
+      });
+      seededHidden = stored;
+      seededHiddenChart = stored;
+    }
+
     var state = {
       panelId: opts.panelId,
+      categoryKey: opts.categoryKey || null,
       triggerEl: opts.triggerEl,
       brands: opts.brands.slice(),
       mode: opts.mode === "split" ? "split" : "unified",
       syncMode: opts.syncDefault !== false,
-      hiddenTable: arrToSet(opts.initialHidden),
-      hiddenChart: arrToSet(opts.initialHiddenChart || opts.initialHidden),
+      hiddenTable: arrToSet(seededHidden),
+      hiddenChart: arrToSet(seededHiddenChart),
       popoverEl: null,
       labels: Object.assign({
         title: "Filter brands",
@@ -297,9 +375,15 @@
         columnTable: "Table",
         columnChart: "Chart"
       }, opts.labels || {}),
-      opts: opts
+      opts: opts,
+      _applyingRemote: false
     };
     REGISTRY[opts.panelId] = state;
+    if (state.categoryKey) {
+      CATEGORY_SUBSCRIBERS[state.categoryKey] =
+        CATEGORY_SUBSCRIBERS[state.categoryKey] || [];
+      CATEGORY_SUBSCRIBERS[state.categoryKey].push(state);
+    }
 
     state.triggerEl.setAttribute("aria-haspopup", "true");
     state.triggerEl.setAttribute("aria-expanded", "false");
@@ -334,7 +418,15 @@
         if (state.popoverEl) rebuildBody(state);
       },
       refreshCount: function () { refreshTriggerCount(state); },
-      destroy: function () { delete REGISTRY[state.panelId]; }
+      destroy: function () {
+        delete REGISTRY[state.panelId];
+        if (state.categoryKey && CATEGORY_SUBSCRIBERS[state.categoryKey]) {
+          CATEGORY_SUBSCRIBERS[state.categoryKey] =
+            CATEGORY_SUBSCRIBERS[state.categoryKey].filter(function (s) {
+              return s !== state;
+            });
+        }
+      }
     };
   }
 

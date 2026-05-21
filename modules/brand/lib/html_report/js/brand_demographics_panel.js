@@ -183,12 +183,13 @@
     // can't find the actually-open popover and clicking outside doesn't
     // close it. Use the panel's DOM id as the natural anchor.
     window.BrandSelector.create({
-      panelId:   panel.id || "demographics",
-      triggerEl: trigger,
-      anchorEl:  trigger.parentElement,
-      brands:    brandList,
-      mode:      "unified",
-      onChange:  function (hiddenSet) {
+      panelId:     panel.id || "demographics",
+      categoryKey: (panel.id || "").replace(/^demo-panel-/, ""),
+      triggerEl:   trigger,
+      anchorEl:    trigger.parentElement,
+      brands:      brandList,
+      mode:        "unified",
+      onChange:    function (hiddenSet) {
         panel.__state.hiddenBrands = new Set(hiddenSet);
         applyBrandVisibility(panel);
       }

@@ -238,6 +238,7 @@
     // reference but emphasising a smaller subset in the chart.
     panel.__cbSelector = window.BrandSelector.create({
       panelId:            'cb-' + catCode,
+      categoryKey:        catCode,
       triggerEl:          trigger,
       anchorEl:           trigger.parentElement,
       brands:             brandList,

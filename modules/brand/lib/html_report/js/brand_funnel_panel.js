@@ -665,6 +665,7 @@
     // own DOM id (e.g. "fn-dss") is the natural unique anchor.
     panel.__fnAttitudeSelector = window.BrandSelector.create({
       panelId:       (panel.id || "fn") + "-attitude",
+      categoryKey:   (panel.id || "").replace(/^fn-/, ""),
       triggerEl:     trigger,
       anchorEl:      trigger.parentElement,
       brands:        brandList,
@@ -714,6 +715,7 @@
     // for every category panel except the most-recently-built.
     panel.__fnSelector = window.BrandSelector.create({
       panelId:            panel.id || "fn-funnel",
+      categoryKey:        (panel.id || "").replace(/^fn-/, ""),
       triggerEl:          trigger,
       anchorEl:           trigger.parentElement,
       brands:             brandList,

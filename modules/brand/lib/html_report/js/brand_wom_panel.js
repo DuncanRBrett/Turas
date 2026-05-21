@@ -434,6 +434,7 @@
 
     return window.BrandSelector.create({
       panelId:       "wom-" + catCode,
+      categoryKey:   catCode,
       triggerEl:     trigger,
       anchorEl:      trigger.parentElement,
       brands:        brandList,

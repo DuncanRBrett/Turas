@@ -322,6 +322,7 @@
     // needs to close the popover. panel.id is "ma-<catcode>" e.g. "ma-bak".
     panel.__maSelector = window.BrandSelector.create({
       panelId:            panel.id || 'ma',
+      categoryKey:        (panel.id || '').replace(/^ma-/, ''),
       triggerEl:          trigger,
       anchorEl:           trigger.parentElement,
       brands:             brandList,
