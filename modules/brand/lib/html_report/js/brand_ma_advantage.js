@@ -99,9 +99,13 @@
     return d === 'defend' ? 'Defend' : d === 'build' ? 'Build' : d === 'maintain' ? 'Maintain' : '—';
   }
   function tooltipHtml(p, base) {
+    // p.penLabel is the X-axis row label including the dynamic threshold
+    // (e.g. "% buyers linking >4 brands"). Falls back to a generic
+    // wording when the threshold isn't available on the panel data.
+    var penLabel = p.penLabel || 'CEP brand density';
     var rows = [
       ['MA',                   fmtScore(p.ma) + 'pp' + (p.isSig ? ' •' : '')],
-      ['Stimulus penetration', p.pen.toFixed(1) + '%'],
+      [penLabel,               p.pen.toFixed(1) + '%'],
       ['Linkage (' + (base === 'aware' ? '% aware' : '% total') + ')',
         p.size != null ? p.size.toFixed(1) + '%' : '—']
     ];
@@ -435,6 +439,18 @@
 
     var hidden = panel.__maAdvHiddenStims || {};
 
+    // Resolve the X-axis penetration threshold + matching tooltip label
+    // up front so each point can carry the row label its tooltip will
+    // display. Server emits stim_penetration_threshold as an integer
+    // brand-link count (rounded category grand-mean) — see
+    // .ma_stimulus_penetration() in 02b_mental_advantage.R.
+    var penThresholdHere = (block && block.stim_penetration_threshold != null &&
+                            !isNaN(block.stim_penetration_threshold))
+                           ? Number(block.stim_penetration_threshold) : null;
+    var penTooltipLabel = (penThresholdHere != null)
+      ? ('% buyers linking >' + penThresholdHere + ' brands')
+      : 'CEP brand density';
+
     // Bubble per CEP/attribute for the focal brand. Hidden stims (row
     // checkbox unchecked) drop their bubble from the chart but the row
     // stays visible — Duncan: "strike and grey out, like brand attribute
@@ -446,6 +462,7 @@
         return { code: c.stim_code, ma: c.ma, pen: pen, x: pen,
                  size: c.pct_total != null ? c.pct_total : 0,
                  decision: c.decision, isSig: c.is_sig,
+                 penLabel: penTooltipLabel,
                  label: block.labels[block.codes.indexOf(c.stim_code)] };
       });
     var pts = allPts;
@@ -482,7 +499,15 @@
     var sizeRefMax = 100;
     // Mean of the active x-axis dimension (vertical divider).
     var xMean = allPts.reduce(function (s, p) { return s + p.x; }, 0) / allPts.length;
-    var xLabel = 'Stimulus penetration (any brand, %)';
+    // X-axis label reuses the same penTooltipLabel string built above so
+    // axis title, tooltip row label, and threshold semantics stay in
+    // lockstep.
+    var xLabel = penTooltipLabel + (penThresholdHere != null ? ' (%)' : ' (%)');
+    // Slightly more descriptive form for the axis (the tooltip label is
+    // a row key, so brevity matters more there than on the axis title).
+    if (penThresholdHere != null) {
+      xLabel = '% buyers linking >' + penThresholdHere + ' brands per CEP';
+    }
 
     function toX(v) { return mL + pW * (v - xMin) / (xMax - xMin); }
     function toY(v) { return mT + pH * (1 - (v - yMin) / (yMax - yMin)); }

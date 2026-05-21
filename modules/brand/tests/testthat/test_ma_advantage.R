@@ -173,6 +173,88 @@ test_that("hand-coded fixture: algebraic invariant sum(actual - expected) == 0",
 
 
 # ------------------------------------------------------------------------------
+# Stimulus penetration — threshold-relative metric (Strategic Quadrant X-axis)
+# ------------------------------------------------------------------------------
+# Hand-coded 3-resp x 3-stim fixture proving the new metric:
+#   - Build a (resp x stim) matrix of real-brand link counts (NONE excluded)
+#   - Threshold = round(grand mean across all cells)
+#   - Per-stim value = % of respondents whose link count strictly exceeds it
+#
+# Fixture link counts (brands A + B, NONE excluded):
+#         s1 s2 s3
+#  resp1   2  1  0
+#  resp2   2  1  0
+#  resp3   1  2  1
+# Grand mean = 13 / 9 = 1.444  ->  threshold = round(1.444) = 1
+# % exceeding threshold:
+#   s1: resp1(2>1) + resp2(2>1)              = 2/3 = 66.7%
+#   s2: resp3(2>1)                           = 1/3 = 33.3%
+#   s3: nobody links >1 brand                = 0/3 = 0.0%
+test_that("stim_penetration is the % > threshold-rounded grand-mean linkage", {
+  linkage <- list(
+    A = matrix(c(1, 1, 0,
+                 1, 0, 0,
+                 1, 1, 1),
+               nrow = 3, byrow = TRUE,
+               dimnames = list(NULL, c("s1", "s2", "s3"))),
+    B = matrix(c(1, 0, 0,
+                 1, 1, 0,
+                 0, 1, 0),
+               nrow = 3, byrow = TRUE,
+               dimnames = list(NULL, c("s1", "s2", "s3"))),
+    # NONE pseudo-brand: links everything, must be excluded by the function
+    NONE = matrix(1L, nrow = 3, ncol = 3,
+                  dimnames = list(NULL, c("s1", "s2", "s3")))
+  )
+  res <- .ma_stimulus_penetration(linkage, c("s1", "s2", "s3"))
+  expect_equal(attr(res, "threshold"), 1L)
+  expect_equal(unname(res["s1"]), 66.7, tolerance = 0.05)
+  expect_equal(unname(res["s2"]), 33.3, tolerance = 0.05)
+  expect_equal(unname(res["s3"]),  0.0, tolerance = 0.05)
+})
+
+
+test_that("stim_penetration degrades safely on empty / zero-resp linkage", {
+  # Helper: strip both names and the threshold attribute so the numeric
+  # comparison ignores incidental attribute differences.
+  bare <- function(x) { attributes(x) <- NULL; x }
+
+  # Empty linkage tensor (no brands at all) — should return zeros and
+  # NA threshold, not error out.
+  r_empty <- .ma_stimulus_penetration(list(), c("s1", "s2"))
+  expect_equal(bare(r_empty), c(0, 0))
+  expect_true(is.na(attr(r_empty, "threshold")))
+
+  # Zero-row matrices (no respondents) — same.
+  r_zero <- .ma_stimulus_penetration(
+    list(A = matrix(0L, nrow = 0, ncol = 2,
+                    dimnames = list(NULL, c("s1", "s2")))),
+    c("s1", "s2"))
+  expect_equal(bare(r_zero), c(0, 0))
+  expect_true(is.na(attr(r_zero, "threshold")))
+})
+
+
+test_that("stim_penetration_threshold flows through calculate_mental_advantage", {
+  # Use the same hand-coded fixture from the earlier test_that blocks so
+  # the assertions are independently traceable to its truth table.
+  data <- mk_adv_mini_data()
+  rm <- mk_adv_mini_role_map(data)
+  brands <- data.frame(BrandCode = c("IPK", "ROB", "CART"),
+                       BrandLabel = c("IPK", "ROB", "CART"),
+                       stringsAsFactors = FALSE)
+  cep_link <- build_cep_linkage(data, rm, "DSS", brands, item_kind = "cep")
+  ma <- calculate_mental_advantage(cep_link$linkage_tensor,
+                                    codes = c("CEP01", "CEP02"),
+                                    n_respondents = 6)
+  expect_true(!is.null(ma$stim_penetration_threshold))
+  expect_true(is.finite(ma$stim_penetration_threshold))
+  expect_equal(attr(ma$stim_penetration, "threshold"),
+               ma$stim_penetration_threshold)
+})
+
+
+# ------------------------------------------------------------------------------
 # Integration: full MA pipeline against the IPK Wave 1 fixture
 # ------------------------------------------------------------------------------
 
