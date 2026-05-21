@@ -359,16 +359,17 @@
     const optionAvg = q.option_avg_penetration || {};
     const trs = rows.map(r => {
       const catPct = optionAvgPct(optionAvg, r.code);
+      const optLabel = esc(r.label || r.code);
       const buyerRow = penRow({
         role: "buyer",
-        labelCell: `<td class="demo-opt-label">${esc(r.label || r.code)}</td>`,
+        labelCell: optLabelCell(optLabel, "buyer"),
         brandIndex: penBy, catPct,
         code: r.code, catAvgCell: catAvgPenCell(catPct, dp),
         brands, order, focal, complement: false, dp
       });
       const nonbuyerRow = penRow({
         role: "nonbuyer",
-        labelCell: '<td class="demo-opt-label demo-row-nonbuyer-label">&#8627; non-buyer</td>',
+        labelCell: optLabelCell(optLabel, "non-buyer"),
         brandIndex: penBy, catPct,
         code: r.code,
         catAvgCell: '<td class="demo-col-catavg demo-cell-blank" data-demo-col="catavg"></td>',
@@ -377,6 +378,18 @@
       return buyerRow + nonbuyerRow;
     }).join("");
     return `<tbody>${trs}</tbody>`;
+  }
+
+  // Build the option label cell for either row type. Both pieces (option
+  // name + role chip) always rendered so the row is self-identifying when
+  // the sibling row is toggled off.
+  function optLabelCell(optLabel, role) {
+    const roleCls = role === "non-buyer"
+      ? "demo-opt-role demo-opt-role-nonbuyer"
+      : "demo-opt-role";
+    return `<td class="demo-opt-label">
+      <span class="demo-opt-name">${optLabel}</span><span class="${roleCls}">${role}</span>
+    </td>`;
   }
 
   function penRow(p) {
@@ -449,16 +462,17 @@
     const nonbuyerBy = indexByBrand(q.brand_nonbuyer_cut);
     const trs = rows.map(r => {
       const catPct = r.pct;
+      const optLabel = esc(r.label || r.code);
       const buyerRow = shareRow({
         role: "buyer",
-        labelCell: `<td class="demo-opt-label">${esc(r.label || r.code)}</td>`,
+        labelCell: optLabelCell(optLabel, "buyer"),
         brandIndex: buyerBy,
         code: r.code, catPct, catAvgCell: catAvgCell(r, dp),
         brands, order, focal, dp
       });
       const nonbuyerRow = shareRow({
         role: "nonbuyer",
-        labelCell: '<td class="demo-opt-label demo-row-nonbuyer-label">&#8627; non-buyer</td>',
+        labelCell: optLabelCell(optLabel, "non-buyer"),
         brandIndex: nonbuyerBy,
         code: r.code, catPct,
         catAvgCell: '<td class="demo-col-catavg demo-cell-blank" data-demo-col="catavg"></td>',
@@ -548,6 +562,9 @@
     const ctx = chartModeCtx(q, focalBrand, metric);
     const scaleMax = chartScaleMax(rows, ctx);
 
+    // One row per option — buyer view only. Detail buyer-vs-non-buyer is
+    // in the table; the chart's job is the at-a-glance bar comparison
+    // which is purely a buyer-row read.
     const bars = rows.map(r => chartRow(r, ctx, scaleMax, focalColour, dp)).join("");
     const legend = chartLegend(ctx, focalBrand, focalLabel, focalColour);
     return `<div class="demo-chart-wrap">${bars}${legend}</div>`;
@@ -571,10 +588,12 @@
   // the requested metric mode. Mirrors .demo_chart_mode_ctx in R.
   function chartModeCtx(q, focalBrand, metric) {
     if (metric === "share") {
-      const focalEntry = (q.brand_cut || []).find(b => b.brand_code === focalBrand) || null;
+      const focalEntry    = (q.brand_cut || []).find(b => b.brand_code === focalBrand) || null;
+      const nonbuyerEntry = (q.brand_nonbuyer_cut || []).find(b => b.brand_code === focalBrand) || null;
       return {
         mode: "share",
         focalEntry: focalEntry,
+        nonbuyerEntry: nonbuyerEntry,
         optionAvg: null,    // share mode reads r.pct directly per row
         markerLabel: "cat avg",
         overallPen: NaN,
@@ -591,6 +610,7 @@
     return {
       mode: "penetration",
       focalEntry: focalEntry,
+      nonbuyerEntry: null,   // pen mode derives non-buyer as 100 - buyer
       optionAvg: q.option_avg_penetration || {},
       markerLabel: "avg brand pen in option",
       overallPen: overallPen,
@@ -609,9 +629,8 @@
     return entry.pct;
   }
 
-  // Scale-max considers ONLY values drawn on the chart. Pen mode draws
-  // focal bars + per-row primary marker + global overall-pen marker;
-  // share mode draws focal bars + per-row primary marker.
+  // Scale-max considers ONLY values drawn on the chart (buyer focal bars,
+  // per-row primary marker, optional global secondary marker).
   function chartScaleMax(rows, ctx) {
     let m = 0;
     if (ctx.focalEntry && Array.isArray(ctx.focalEntry.cells)) {
@@ -637,13 +656,15 @@
     const barW = isFinite(focalPct)
       ? Math.max(CHART_MIN_BAR_WIDTH_PCT, 100 * focalPct / scaleMax)
       : 0;
-    const markerL = isFinite(markerPct) ? (100 * markerPct / scaleMax) : NaN;
-    const marker = isFinite(markerL)
-      ? `<div class="demo-chart-bar-marker" style="left:${markerL.toFixed(1)}%;" title="${esc(ctx.markerLabel)} ${pctStr(markerPct, dp)}"></div>`
-      : "";
 
-    // Secondary dashed marker — focal's cat-wide overall pen. Same X every
-    // row but rendered per-row so it tracks the bar track precisely.
+    let marker = "";
+    let markerValue = "";
+    if (isFinite(markerPct)) {
+      const markerL = 100 * markerPct / scaleMax;
+      marker = `<div class="demo-chart-bar-marker" style="left:${markerL.toFixed(1)}%;" title="${esc(ctx.markerLabel)} ${pctStr(markerPct, dp)}"></div>`;
+      markerValue = `<div class="demo-chart-bar-marker-value" style="left:${markerL.toFixed(1)}%;">${pctStr(markerPct, dp)}</div>`;
+    }
+
     let overallMarker = "";
     if (ctx.mode === "penetration" && isFinite(ctx.overallPen)) {
       const overallL = 100 * ctx.overallPen / scaleMax;
@@ -651,8 +672,11 @@
     }
 
     return `<div class="demo-chart-row">
-      <div class="demo-chart-row-label">${esc(r.label || r.code)}</div>
+      <div class="demo-chart-row-label">
+        <span class="demo-chart-opt-name">${esc(r.label || r.code)}</span><span class="demo-chart-role">buyer</span>
+      </div>
       <div class="demo-chart-bar">
+        ${markerValue}
         <div class="demo-chart-bar-fill" style="width:${barW.toFixed(1)}%;background:${esc(focalColour)}"></div>
         ${marker}${overallMarker}
       </div>

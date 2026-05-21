@@ -207,9 +207,21 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
   font-style: italic; font-size: 11.5px; color: #64748b; font-weight: 400;
 }
 .demo-matrix tbody tr.demo-row-nonbuyer td .demo-cell-n { font-style: normal; }
-.demo-row-nonbuyer-label {
-  padding-left: 28px !important; font-style: italic; color: #94a3b8;
-  font-size: 11px; font-weight: 400;
+
+/* Option label cell — option name (primary) + role chip (buyer/non-buyer).
+ * Both pieces are always shown so each row is self-identifying when the
+ * other row type is toggled off. */
+.demo-opt-label .demo-opt-name {
+  display: block; color: #1e293b; font-weight: 500; font-size: 12px;
+  line-height: 1.2;
+}
+.demo-opt-label .demo-opt-role {
+  display: block; color: #64748b; font-size: 10px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.4px; line-height: 1.2;
+  margin-top: 1px;
+}
+.demo-opt-label .demo-opt-role-nonbuyer {
+  color: #94a3b8; font-style: italic;
 }
 .demo-cell-blank { background: transparent !important; }
 
@@ -228,13 +240,32 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 .demo-panel.demo-hide-buyer    .demo-row-nonbuyer td { border-bottom: 1px solid #eef0f3; }
 
 /* Chart view */
-.demo-chart-wrap { padding: 8px 4px; }
-.demo-chart-row { display: grid; grid-template-columns: 130px 1fr 80px; gap: 8px; align-items: center; padding: 4px 0; font-size: 12px; }
-.demo-chart-row-label { color: #1e293b; }
+.demo-chart-wrap { padding: 22px 4px 8px; }
+.demo-chart-row {
+  display: grid; grid-template-columns: 130px 1fr 80px;
+  gap: 8px; align-items: center;
+  padding: 14px 0 4px;   /* top space leaves room for the marker-value label */
+  font-size: 12px;
+}
+.demo-chart-row-label { color: #1e293b; line-height: 1.15; }
+.demo-chart-opt-name { display: block; font-weight: 500; }
+.demo-chart-role {
+  display: block; font-size: 10px; color: #64748b; text-transform: uppercase;
+  letter-spacing: 0.4px; margin-top: 1px;
+}
+.demo-chart-role-nonbuyer { color: #94a3b8; font-style: italic; }
 .demo-chart-bar { background: #f1f5f9; border-radius: 4px; height: 18px; position: relative; overflow: visible; }
 .demo-chart-bar-fill { height: 100%; background: __FOCAL__; opacity: 0.85; }
 /* Primary marker — typical brand pen in this option (varies row by row). */
 .demo-chart-bar-marker { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #475569; z-index: 2; }
+/* Visible value label sitting just above the primary marker. */
+.demo-chart-bar-marker-value {
+  position: absolute; top: -14px;
+  transform: translateX(-50%);
+  font-size: 10px; color: #475569; font-weight: 500;
+  white-space: nowrap; line-height: 1;
+  z-index: 3;
+}
 /* Secondary marker — focal's cat-wide overall pen. Same X on every row, so
  * we style it as a dashed faded line to distinguish from the primary. */
 .demo-chart-bar-marker-overall {
@@ -253,6 +284,7 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 .demo-chart-legend { display: flex; gap: 14px; align-items: center; font-size: 11px; color: #64748b; margin-top: 8px; padding-left: 130px; flex-wrap: wrap; }
 .demo-chart-legend-swatch { display: inline-block; width: 12px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: middle; background: __FOCAL__; opacity: 0.85; }
 .demo-chart-legend-footnote { color: #94a3b8; font-style: italic; font-size: 10.5px; margin-left: auto; }
+
 
 .demo-empty { padding: 18px; text-align: center; color: #94a3b8; font-style: italic; font-size: 12px; }
 "

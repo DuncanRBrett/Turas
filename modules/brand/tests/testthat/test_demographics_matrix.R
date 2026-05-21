@@ -97,9 +97,12 @@ test_that("each option renders TWO rows — Buyer + Non-buyer — with role clas
   # markers explicitly so a regression that strips one role class fails fast.
   expect_equal(length(gregexpr('class="demo-row-buyer"',    html, fixed = TRUE)[[1]]), 2L)
   expect_equal(length(gregexpr('class="demo-row-nonbuyer"', html, fixed = TRUE)[[1]]), 2L)
-  # Non-buyer label sits in column 1 of the comparison row.
-  expect_match(html, "demo-row-nonbuyer-label", fixed = TRUE)
-  expect_match(html, "non-buyer",               fixed = TRUE)
+  # Each row's label cell carries the option name AND a role chip so the
+  # row is self-identifying even when the sibling row type is toggled off.
+  expect_match(html, '<span class="demo-opt-name">Opt A</span>', fixed = TRUE)
+  expect_match(html, '<span class="demo-opt-role">buyer</span>', fixed = TRUE)
+  expect_match(html, '<span class="demo-opt-role demo-opt-role-nonbuyer">non-buyer</span>',
+               fixed = TRUE)
 })
 
 
@@ -222,18 +225,35 @@ test_that("buyer cell shows within-demo penetration; non-buyer cell shows its co
 # build_demographics_matrix_chart — focal bar + reference marker
 # ------------------------------------------------------------------------------
 
-test_that("matrix chart renders one row per option with focal bar fill (share mode)", {
+test_that("matrix chart renders one row per option, buyer view only", {
+  # Chart is a buyer-only view (detail buyer-vs-non-buyer is in the table).
+  # One chart row per demographic option. Row label carries the option name
+  # and a role chip identifying it as the buyer row.
   pd <- .demo_test_payload(focal = "BR_A")
   html <- build_demographics_matrix_chart(
     pd$questions[[1]], focal_brand = "BR_A",
     brand_colours = list(BR_A = "#1A5276", BR_B = "#A04000"),
     panel_data = pd, decimal_places = 0L,
     metric = "share")
-  expect_match(html, "demo-chart-row", fixed = TRUE)
-  # Two rows: A and B
   expect_equal(length(gregexpr("demo-chart-row\"", html, fixed = TRUE)[[1]]), 2L)
-  # Focal colour appears in fill
+  expect_match(html, '<span class="demo-chart-opt-name">Opt A</span>', fixed = TRUE)
+  expect_match(html, '<span class="demo-chart-role">buyer</span>',     fixed = TRUE)
   expect_match(html, "#1A5276", fixed = TRUE)
+  # No non-buyer chart rows.
+  expect_false(grepl("demo-chart-role-nonbuyer", html, fixed = TRUE))
+})
+
+
+test_that("matrix chart marker has a visible value label (not just hover title)", {
+  # Marker value rendered as a <div class="demo-chart-bar-marker-value">
+  # above each marker line so the baseline value is legible without hover.
+  pd <- .demo_test_payload(focal = "BR_A")
+  html <- build_demographics_matrix_chart(
+    pd$questions[[1]], focal_brand = "BR_A",
+    brand_colours = list(BR_A = "#1A5276", BR_B = "#A04000"),
+    panel_data = pd, decimal_places = 0L,
+    metric = "share")
+  expect_match(html, "demo-chart-bar-marker-value", fixed = TRUE)
 })
 
 

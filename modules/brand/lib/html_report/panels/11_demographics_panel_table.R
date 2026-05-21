@@ -153,10 +153,13 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
     r <- rows[[i]]
     cat_pct <- .demo_table_option_avg_pct(option_avg, r$code)
 
+    opt_label <- .demo_table_esc(r$label %||% r$code)
+
     buyer_row <- .demo_table_pen_row(
       role         = "buyer",
-      label_cell   = sprintf('<td class="demo-opt-label">%s</td>',
-                             .demo_table_esc(r$label %||% r$code)),
+      label_cell   = sprintf(
+        '<td class="demo-opt-label"><span class="demo-opt-name">%s</span><span class="demo-opt-role">buyer</span></td>',
+        opt_label),
       brand_index  = pen_by,
       cat_pct      = cat_pct,
       code         = r$code,
@@ -168,7 +171,9 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
 
     nonbuyer_row <- .demo_table_pen_row(
       role         = "nonbuyer",
-      label_cell   = '<td class="demo-opt-label demo-row-nonbuyer-label">&#8627; non-buyer</td>',
+      label_cell   = sprintf(
+        '<td class="demo-opt-label"><span class="demo-opt-name">%s</span><span class="demo-opt-role demo-opt-role-nonbuyer">non-buyer</span></td>',
+        opt_label),
       brand_index  = pen_by,
       cat_pct      = cat_pct,
       code         = r$code,

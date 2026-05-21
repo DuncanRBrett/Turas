@@ -69,6 +69,10 @@ build_demographics_matrix_chart <- function(question_payload, focal_brand,
   ctx <- .demo_chart_mode_ctx(q, focal_brand, metric)
   scale_max <- .demo_chart_scale_max(rows, ctx)
 
+  # One row per option — buyer view only. The non-buyer cell value in pen
+  # mode is the complement (100 − buyer) and tells you nothing the buyer
+  # row doesn't already, while visually crushing the buyer bars. Detail
+  # buyer-vs-non-buyer is in the table.
   bars <- vapply(rows, function(r) {
     .demo_chart_row(r, ctx, scale_max, focal_colour, decimal_places)
   }, character(1L))
@@ -121,15 +125,19 @@ build_demographics_matrix_chart <- function(question_payload, focal_brand,
 #   footnote      — optional context string (used for "focal overall: 16%")
 .demo_chart_mode_ctx <- function(q, focal_brand, metric) {
   if (identical(metric, "share")) {
-    # Share-mode marker = per-row cat-avg (% of cat in option). We bake the
-    # rows' r$pct into a code-keyed map at render time so the row builder
-    # only consults ctx and stays mode-agnostic.
+    # Share-mode marker = per-row cat-avg (% of cat in option). Non-buyer
+    # row reads its bar value from brand_nonbuyer_cut (a separate share-of-
+    # audience distribution for the focal's non-buyers).
     return(list(
-      mode         = "share",
-      focal_entry  = .demo_chart_focal_entry(q$brand_cut, focal_brand),
-      option_avg   = NULL,   # share mode reads r$pct directly per row
-      marker_label = "cat avg",
-      footnote     = ""
+      mode             = "share",
+      focal_entry      = .demo_chart_focal_entry(q$brand_cut, focal_brand),
+      nonbuyer_entry   = .demo_chart_focal_entry(q$brand_nonbuyer_cut,
+                                                  focal_brand),
+      option_avg       = NULL,   # share mode reads r$pct directly per row
+      marker_label     = "cat avg",
+      overall_pen      = NA_real_,
+      overall_marker_label = "",
+      footnote         = ""
     ))
   }
   # default: penetration. Two markers per row:
@@ -144,6 +152,7 @@ build_demographics_matrix_chart <- function(question_payload, focal_brand,
     mode                = "penetration",
     focal_entry         = .demo_chart_focal_entry(q$brand_penetration_long,
                                                    focal_brand),
+    nonbuyer_entry      = NULL,  # pen mode derives non-buyer as 100 - buyer
     option_avg          = q$option_avg_penetration %||% list(),
     marker_label        = "avg brand pen in option",
     overall_pen         = overall_pen,
@@ -151,7 +160,7 @@ build_demographics_matrix_chart <- function(question_payload, focal_brand,
                              sprintf("%s overall pen (%.1f%%)",
                                      focal_brand %||% "focal", overall_pen)
                            else "",
-    footnote            = ""   # no longer needed — the overall marker carries its own label
+    footnote            = ""
   )
 }
 
@@ -206,6 +215,11 @@ build_demographics_matrix_chart <- function(question_payload, focal_brand,
 }
 
 
+# Render one chart row for an option. Layout: option name + role chip on
+# the left (role is always "buyer" — the chart is a buyer-only view);
+# horizontal bar with primary + optional secondary markers; numeric bar
+# value on the right. The primary marker carries a visible value label
+# above it so the baseline value is legible without hovering.
 .demo_chart_row <- function(r, ctx, scale_max, focal_colour, dp) {
   focal_pct  <- .demo_chart_focal_pct(ctx$focal_entry, r$code)
   marker_pct <- .demo_chart_marker_pct(ctx, r)
@@ -213,38 +227,43 @@ build_demographics_matrix_chart <- function(question_payload, focal_brand,
   bar_w <- if (is.finite(focal_pct))
     max(.DEMO_CHART_MIN_BAR_WIDTH_PCT, 100 * focal_pct / scale_max)
   else 0
-  marker_l <- if (is.finite(marker_pct))
-    100 * marker_pct / scale_max
-  else NA_real_
-  marker_html <- if (!is.na(marker_l))
-    sprintf('<div class="demo-chart-bar-marker" style="left:%.1f%%;" title="%s %s"></div>',
-            marker_l,
-            .demo_chart_esc(ctx$marker_label),
-            .demo_chart_pct(marker_pct, dp))
-  else ""
 
-  # Penetration mode also draws a secondary dashed marker at the focal
-  # brand's cat-wide overall pen. Same X on every row but emitted per-row
-  # so the line tracks the bar width and renders crisply at any scale.
+  marker_html <- ""
+  marker_value_html <- ""
+  if (is.finite(marker_pct)) {
+    marker_l <- 100 * marker_pct / scale_max
+    marker_html <- sprintf(
+      '<div class="demo-chart-bar-marker" style="left:%.1f%%;" title="%s %s"></div>',
+      marker_l,
+      .demo_chart_esc(ctx$marker_label),
+      .demo_chart_pct(marker_pct, dp))
+    marker_value_html <- sprintf(
+      '<div class="demo-chart-bar-marker-value" style="left:%.1f%%;">%s</div>',
+      marker_l, .demo_chart_pct(marker_pct, dp))
+  }
+
   overall_marker_html <- ""
   if (identical(ctx$mode, "penetration") && is.finite(ctx$overall_pen)) {
     overall_l <- 100 * ctx$overall_pen / scale_max
     overall_marker_html <- sprintf(
       '<div class="demo-chart-bar-marker-overall" style="left:%.1f%%;" title="%s"></div>',
-      overall_l,
-      .demo_chart_esc(ctx$overall_marker_label))
+      overall_l, .demo_chart_esc(ctx$overall_marker_label))
   }
 
   sprintf(
     '<div class="demo-chart-row">
-       <div class="demo-chart-row-label">%s</div>
+       <div class="demo-chart-row-label">
+         <span class="demo-chart-opt-name">%s</span><span class="demo-chart-role">buyer</span>
+       </div>
        <div class="demo-chart-bar">
+         %s
          <div class="demo-chart-bar-fill" style="width:%.1f%%;background:%s"></div>
          %s%s
        </div>
        <div class="demo-chart-row-value">%s</div>
      </div>',
     .demo_chart_esc(r$label %||% r$code),
+    marker_value_html,
     bar_w, .demo_chart_esc(focal_colour),
     marker_html, overall_marker_html,
     .demo_chart_pct(focal_pct, dp))
