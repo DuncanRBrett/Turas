@@ -549,18 +549,25 @@
     const scaleMax = chartScaleMax(rows, ctx);
 
     const bars = rows.map(r => chartRow(r, ctx, scaleMax, focalColour, dp)).join("");
-    const footnote = ctx.footnote
-      ? `<span class="demo-chart-legend-footnote">${esc(ctx.footnote)}</span>`
-      : "";
-    const legend = `<div class="demo-chart-legend">
-      <span><span class="demo-chart-legend-swatch" style="background:${esc(focalColour)}"></span>${esc(focalLabel || focalBrand || "focal")}</span>
-      <span>Marker: ${esc(ctx.markerLabel)}</span>
-      ${footnote}
-    </div>`;
+    const legend = chartLegend(ctx, focalBrand, focalLabel, focalColour);
     return `<div class="demo-chart-wrap">${bars}${legend}</div>`;
   }
 
-  // Resolve which long-list drives the bars and what the marker means for
+  // Legend: focal swatch + primary-marker label + optional secondary-marker
+  // label (penetration mode only).
+  function chartLegend(ctx, focalBrand, focalLabel, focalColour) {
+    const primary = `<span><span class="demo-chart-legend-swatch-line"></span>${esc(ctx.markerLabel)}</span>`;
+    const secondary = (ctx.mode === "penetration" && isFinite(ctx.overallPen))
+      ? `<span><span class="demo-chart-legend-swatch-line-dashed"></span>${esc(ctx.overallMarkerLabel)}</span>`
+      : "";
+    return `<div class="demo-chart-legend">
+      <span><span class="demo-chart-legend-swatch" style="background:${esc(focalColour)}"></span>${esc(focalLabel || focalBrand || "focal")}</span>
+      ${primary}
+      ${secondary}
+    </div>`;
+  }
+
+  // Resolve which long-list drives the bars and what each marker means for
   // the requested metric mode. Mirrors .demo_chart_mode_ctx in R.
   function chartModeCtx(q, focalBrand, metric) {
     if (metric === "share") {
@@ -570,23 +577,26 @@
         focalEntry: focalEntry,
         optionAvg: null,    // share mode reads r.pct directly per row
         markerLabel: "cat avg",
-        footnote: ""
+        overallPen: NaN,
+        overallMarkerLabel: ""
       };
     }
-    // default: penetration. Per-row marker = mean brand pen in that option.
+    // default: penetration. Two markers per row:
+    //   primary  = mean brand pen in that option (per-row)
+    //   secondary = focal's cat-wide overall pen (constant; dashed line)
     const focalEntry = (q.brand_penetration_long || []).find(b => b.brand_code === focalBrand) || null;
     const totalPenMap = q.brand_total_penetration || {};
     const totalPenFocal = totalPenMap[focalBrand];
     const overallPen = (totalPenFocal && isFinite(totalPenFocal.pct)) ? totalPenFocal.pct : NaN;
-    const footnote = isFinite(overallPen)
-      ? `${focalBrand || "focal"} overall pen: ${overallPen.toFixed(1)}%`
-      : "";
     return {
       mode: "penetration",
       focalEntry: focalEntry,
       optionAvg: q.option_avg_penetration || {},
       markerLabel: "avg brand pen in option",
-      footnote: footnote
+      overallPen: overallPen,
+      overallMarkerLabel: isFinite(overallPen)
+        ? `${focalBrand || "focal"} overall pen (${overallPen.toFixed(1)}%)`
+        : ""
     };
   }
 
@@ -599,9 +609,9 @@
     return entry.pct;
   }
 
-  // Scale-max considers ONLY values drawn on the chart. Both modes now draw
-  // per-row markers, so we walk the rows for marker values in addition to
-  // the focal cells.
+  // Scale-max considers ONLY values drawn on the chart. Pen mode draws
+  // focal bars + per-row primary marker + global overall-pen marker;
+  // share mode draws focal bars + per-row primary marker.
   function chartScaleMax(rows, ctx) {
     let m = 0;
     if (ctx.focalEntry && Array.isArray(ctx.focalEntry.cells)) {
@@ -611,6 +621,9 @@
       const mp = chartMarkerPct(ctx, r);
       if (isFinite(mp)) m = Math.max(m, mp);
     });
+    if (ctx.mode === "penetration" && isFinite(ctx.overallPen)) {
+      m = Math.max(m, ctx.overallPen);
+    }
     return (m > 0 && isFinite(m)) ? m : 100;
   }
 
@@ -628,11 +641,20 @@
     const marker = isFinite(markerL)
       ? `<div class="demo-chart-bar-marker" style="left:${markerL.toFixed(1)}%;" title="${esc(ctx.markerLabel)} ${pctStr(markerPct, dp)}"></div>`
       : "";
+
+    // Secondary dashed marker — focal's cat-wide overall pen. Same X every
+    // row but rendered per-row so it tracks the bar track precisely.
+    let overallMarker = "";
+    if (ctx.mode === "penetration" && isFinite(ctx.overallPen)) {
+      const overallL = 100 * ctx.overallPen / scaleMax;
+      overallMarker = `<div class="demo-chart-bar-marker-overall" style="left:${overallL.toFixed(1)}%;" title="${esc(ctx.overallMarkerLabel)}"></div>`;
+    }
+
     return `<div class="demo-chart-row">
       <div class="demo-chart-row-label">${esc(r.label || r.code)}</div>
       <div class="demo-chart-bar">
         <div class="demo-chart-bar-fill" style="width:${barW.toFixed(1)}%;background:${esc(focalColour)}"></div>
-        ${marker}
+        ${marker}${overallMarker}
       </div>
       <div class="demo-chart-row-value">${pctStr(focalPct, dp)}</div>
     </div>`;

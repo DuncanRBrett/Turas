@@ -231,9 +231,24 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 .demo-chart-wrap { padding: 8px 4px; }
 .demo-chart-row { display: grid; grid-template-columns: 130px 1fr 80px; gap: 8px; align-items: center; padding: 4px 0; font-size: 12px; }
 .demo-chart-row-label { color: #1e293b; }
-.demo-chart-bar { background: #f1f5f9; border-radius: 4px; height: 18px; position: relative; overflow: hidden; }
+.demo-chart-bar { background: #f1f5f9; border-radius: 4px; height: 18px; position: relative; overflow: visible; }
 .demo-chart-bar-fill { height: 100%; background: __FOCAL__; opacity: 0.85; }
-.demo-chart-bar-marker { position: absolute; top: 0; bottom: 0; width: 2px; background: #475569; }
+/* Primary marker — typical brand pen in this option (varies row by row). */
+.demo-chart-bar-marker { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #475569; z-index: 2; }
+/* Secondary marker — focal's cat-wide overall pen. Same X on every row, so
+ * we style it as a dashed faded line to distinguish from the primary. */
+.demo-chart-bar-marker-overall {
+  position: absolute; top: -2px; bottom: -2px; width: 0; z-index: 1;
+  border-left: 2px dashed #94a3b8;
+}
+.demo-chart-legend-swatch-line {
+  display: inline-block; width: 12px; height: 0; border-top: 2px solid #475569;
+  margin-right: 4px; vertical-align: middle;
+}
+.demo-chart-legend-swatch-line-dashed {
+  display: inline-block; width: 12px; height: 0; border-top: 2px dashed #94a3b8;
+  margin-right: 4px; vertical-align: middle;
+}
 .demo-chart-row-value { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 .demo-chart-legend { display: flex; gap: 14px; align-items: center; font-size: 11px; color: #64748b; margin-top: 8px; padding-left: 130px; flex-wrap: wrap; }
 .demo-chart-legend-swatch { display: inline-block; width: 12px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: middle; background: __FOCAL__; opacity: 0.85; }

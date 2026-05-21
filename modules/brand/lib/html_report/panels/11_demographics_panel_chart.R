@@ -73,27 +73,40 @@ build_demographics_matrix_chart <- function(question_payload, focal_brand,
     .demo_chart_row(r, ctx, scale_max, focal_colour, decimal_places)
   }, character(1L))
 
-  footnote_html <- if (nzchar(ctx$footnote %||% ""))
-    sprintf('<span class="demo-chart-legend-footnote">%s</span>',
-            .demo_chart_esc(ctx$footnote))
-  else ""
-
-  legend <- sprintf(
-    '<div class="demo-chart-legend">
-       <span><span class="demo-chart-legend-swatch" style="background:%s"></span>%s</span>
-       <span>Marker: %s</span>
-       %s
-     </div>',
-    .demo_chart_esc(focal_colour),
-    .demo_chart_esc(focal_brand %||% "focal"),
-    .demo_chart_esc(ctx$marker_label),
-    footnote_html)
+  legend <- .demo_chart_legend(ctx, focal_brand, focal_colour)
 
   paste0(
     '<div class="demo-chart-wrap">',
     paste(bars, collapse = ""),
     legend,
     '</div>')
+}
+
+
+# Legend: focal swatch + primary-marker label + optional secondary-marker
+# label (penetration mode only — focal brand's cat-wide overall pen).
+.demo_chart_legend <- function(ctx, focal_brand, focal_colour) {
+  primary_marker_html <- sprintf(
+    '<span><span class="demo-chart-legend-swatch-line"></span>%s</span>',
+    .demo_chart_esc(ctx$marker_label))
+
+  secondary_marker_html <- if (identical(ctx$mode, "penetration") &&
+                                is.finite(ctx$overall_pen)) {
+    sprintf(
+      '<span><span class="demo-chart-legend-swatch-line-dashed"></span>%s</span>',
+      .demo_chart_esc(ctx$overall_marker_label))
+  } else ""
+
+  sprintf(
+    '<div class="demo-chart-legend">
+       <span><span class="demo-chart-legend-swatch" style="background:%s"></span>%s</span>
+       %s
+       %s
+     </div>',
+    .demo_chart_esc(focal_colour),
+    .demo_chart_esc(focal_brand %||% "focal"),
+    primary_marker_html,
+    secondary_marker_html)
 }
 
 
@@ -119,23 +132,26 @@ build_demographics_matrix_chart <- function(question_payload, focal_brand,
       footnote     = ""
     ))
   }
-  # default: penetration. Marker per-row = the typical brand's pen in this
-  # option (option_avg_penetration). Footnote carries the focal brand's
-  # cat-wide pen as legend context.
+  # default: penetration. Two markers per row:
+  #   primary (per-row)  = mean brand pen in that option (the typical brand)
+  #   secondary (global) = focal's cat-wide overall pen — same X every row,
+  #                         rendered as a dashed lighter line so the two are
+  #                         visually distinct.
   total_pen_focal <- q$brand_total_penetration[[focal_brand]]
   overall_pen <- if (is.null(total_pen_focal)) NA_real_
                  else as.numeric(total_pen_focal$pct)
-  footnote <- if (is.finite(overall_pen))
-                sprintf("%s overall pen: %.1f%%",
-                        focal_brand %||% "focal", overall_pen)
-              else ""
   list(
-    mode         = "penetration",
-    focal_entry  = .demo_chart_focal_entry(q$brand_penetration_long,
-                                            focal_brand),
-    option_avg   = q$option_avg_penetration %||% list(),
-    marker_label = "avg brand pen in option",
-    footnote     = footnote
+    mode                = "penetration",
+    focal_entry         = .demo_chart_focal_entry(q$brand_penetration_long,
+                                                   focal_brand),
+    option_avg          = q$option_avg_penetration %||% list(),
+    marker_label        = "avg brand pen in option",
+    overall_pen         = overall_pen,
+    overall_marker_label = if (is.finite(overall_pen))
+                             sprintf("%s overall pen (%.1f%%)",
+                                     focal_brand %||% "focal", overall_pen)
+                           else "",
+    footnote            = ""   # no longer needed — the overall marker carries its own label
   )
 }
 
@@ -158,19 +174,21 @@ build_demographics_matrix_chart <- function(question_payload, focal_brand,
 
 # Normalise bar widths against the largest value VISIBLE on the chart for
 # the active mode. Critical: we don't include values that aren't drawn,
-# otherwise bars get visually squashed by an invisible reference. Both modes
-# now draw per-row markers (penetration → option_avg_pen[code]; share →
-# r$pct) so scale_max considers both the focal bars and the row markers.
+# otherwise bars get visually squashed by an invisible reference. Pen mode
+# draws focal bars + per-row primary marker + global overall-pen marker;
+# share mode draws focal bars + per-row primary marker (r$pct).
 .demo_chart_scale_max <- function(rows, ctx) {
   vals <- numeric(0)
   if (!is.null(ctx$focal_entry)) {
     vals <- c(vals, vapply(ctx$focal_entry$cells,
                             function(c) c$pct %||% 0, numeric(1L)))
   }
-  # Per-row markers: pen mode reads from option_avg, share mode from r$pct.
   vals <- c(vals, vapply(rows, function(r) {
     .demo_chart_marker_pct(ctx, r) %||% 0
   }, numeric(1L)))
+  if (identical(ctx$mode, "penetration") && is.finite(ctx$overall_pen)) {
+    vals <- c(vals, ctx$overall_pen)
+  }
   m <- if (length(vals)) max(vals, na.rm = TRUE) else 0
   if (!is.finite(m) || m <= 0) 100 else m
 }
@@ -205,18 +223,30 @@ build_demographics_matrix_chart <- function(question_payload, focal_brand,
             .demo_chart_pct(marker_pct, dp))
   else ""
 
+  # Penetration mode also draws a secondary dashed marker at the focal
+  # brand's cat-wide overall pen. Same X on every row but emitted per-row
+  # so the line tracks the bar width and renders crisply at any scale.
+  overall_marker_html <- ""
+  if (identical(ctx$mode, "penetration") && is.finite(ctx$overall_pen)) {
+    overall_l <- 100 * ctx$overall_pen / scale_max
+    overall_marker_html <- sprintf(
+      '<div class="demo-chart-bar-marker-overall" style="left:%.1f%%;" title="%s"></div>',
+      overall_l,
+      .demo_chart_esc(ctx$overall_marker_label))
+  }
+
   sprintf(
     '<div class="demo-chart-row">
        <div class="demo-chart-row-label">%s</div>
        <div class="demo-chart-bar">
          <div class="demo-chart-bar-fill" style="width:%.1f%%;background:%s"></div>
-         %s
+         %s%s
        </div>
        <div class="demo-chart-row-value">%s</div>
      </div>',
     .demo_chart_esc(r$label %||% r$code),
     bar_w, .demo_chart_esc(focal_colour),
-    marker_html,
+    marker_html, overall_marker_html,
     .demo_chart_pct(focal_pct, dp))
 }
 

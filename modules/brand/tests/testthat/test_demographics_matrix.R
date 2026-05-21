@@ -240,6 +240,8 @@ test_that("matrix chart renders one row per option with focal bar fill (share mo
 test_that("share-mode chart marker reflects per-row cat-avg %", {
   # Fixture: option A has cat-avg 60% (6 of 10 rows). Scale-max for the
   # chart is 100 (BR_A reaches 100% on A). Marker at 60/100 = 60.0%.
+  # Legend label format: line-swatch + bare "cat avg" (no "Marker:" prefix
+  # any more — the line swatch icon visually identifies it as a marker).
   pd <- .demo_test_payload(focal = "BR_A")
   html <- build_demographics_matrix_chart(
     pd$questions[[1]], focal_brand = "BR_A",
@@ -247,29 +249,38 @@ test_that("share-mode chart marker reflects per-row cat-avg %", {
     panel_data = pd, decimal_places = 0L,
     metric = "share")
   expect_match(html, "left:60\\.0%", perl = TRUE)
-  expect_match(html, "Marker: cat avg", fixed = TRUE)
+  expect_match(html, "demo-chart-legend-swatch-line", fixed = TRUE)
+  expect_match(html, "cat avg", fixed = TRUE)
 })
 
 
-test_that("penetration-mode chart marker reflects PER-OPTION avg brand pen (per-row)", {
+test_that("penetration-mode chart has TWO markers per row: per-option avg + focal overall", {
   # Fixture: option A — BR_A 100% pen, BR_B 0% pen → avg = 50%.
   #           option B — BR_A   0% pen, BR_B 100% pen → avg = 50%.
-  # Scale-max = max(focal bars [100, 0] + markers [50, 50]) = 100.
-  # Marker in BOTH rows lands at 50/100 = 50.0% of the bar track.
-  # Legend label says "avg brand pen in option" (not a global value).
-  # The focal's cat-wide pen is shown as a footnote: "BR_A overall pen: 60.0%".
+  #           BR_A cat-wide overall pen = 60%.
+  # Scale-max = max(100, 50, 60) = 100.
+  #   Primary marker (per-row avg) at 50/100 = 50.0% on BOTH rows.
+  #   Secondary marker (focal overall) at 60/100 = 60.0% on BOTH rows
+  #     (dashed, demo-chart-bar-marker-overall class).
   pd <- .demo_test_payload(focal = "BR_A")
   html <- build_demographics_matrix_chart(
     pd$questions[[1]], focal_brand = "BR_A",
     brand_colours = list(BR_A = "#1A5276", BR_B = "#A04000"),
     panel_data = pd, decimal_places = 0L,
     metric = "penetration")
-  # Markers in both rows at 50.0%
-  expect_equal(length(gregexpr("left:50\\.0%", html, perl = TRUE)[[1]]), 2L)
-  # Per-row marker label
-  expect_match(html, "Marker: avg brand pen in option", fixed = TRUE)
-  # Footnote carries focal's overall pen
-  expect_match(html, "BR_A overall pen: 60\\.0%", perl = TRUE)
+  # Primary marker present in both rows at the same X (per-option avg).
+  expect_equal(
+    length(gregexpr('demo-chart-bar-marker" style="left:50\\.0%',
+                    html, perl = TRUE)[[1]]),
+    2L)
+  # Secondary dashed marker present in both rows at the focal overall pen.
+  expect_equal(
+    length(gregexpr('demo-chart-bar-marker-overall" style="left:60\\.0%',
+                    html, perl = TRUE)[[1]]),
+    2L)
+  # Legend carries both labels
+  expect_match(html, "avg brand pen in option", fixed = TRUE)
+  expect_match(html, "BR_A overall pen \\(60\\.0%\\)", perl = TRUE)
 })
 
 
