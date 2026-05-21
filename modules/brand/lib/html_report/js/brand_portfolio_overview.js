@@ -219,18 +219,18 @@
         var d = dd[bc]; if (!d) return null;
         return {
           code: bc, name: (c.brand_names || {})[bc] || bc,
-          pen: d.penetration_pct, scr: d.scr_pct,
+          pen: d.penetration_pct, scr: d.scr_pct, vol: d.vol_share_pct,
           isFocal: bc === focalCode
         };
       }).filter(Boolean)
         .sort(function (a, b) {
-          return (b.scr == null ? -1 : b.scr) - (a.scr == null ? -1 : a.scr);
+          return (b.vol == null ? -1 : b.vol) - (a.vol == null ? -1 : a.vol);
         }).slice(0, 5);
 
       var rankBody = rows.map(function (r, i) {
         var cls = r.isFocal ? ' class="pfo-deep-focal"' : '';
         return '<tr' + cls + '><td>#' + (i + 1) + ' ' + esc(r.name) + '</td>' +
-          '<td class="pfo-td-num">' + fmtPct(r.scr) + '</td>' +
+          '<td class="pfo-td-num">' + fmtPct(r.vol) + '</td>' +
           '<td class="pfo-td-num">' + fmtPct(r.pen) + '</td></tr>';
       }).join('');
 
@@ -240,19 +240,30 @@
       return '<div class="pfo-deep-card">' +
         '<div class="pfo-deep-card-head">' +
         '<span class="pfo-deep-card-title">' + esc(c.cat_name) + '</span>' +
-        '<span class="pfo-deep-card-rank">Focal: ' + esc(focalRankTxt) + ' by SCR</span></div>' +
+        '<span class="pfo-deep-card-rank">Focal: ' + esc(focalRankTxt) + ' by vol share</span></div>' +
         '<div class="pfo-deep-card-kpis">' +
-        '<div><span class="pfo-kpi-mini-v">' + fmtPct(focal.scr_pct) + '</span>' +
-        '<span class="pfo-kpi-mini-l">SCR</span></div>' +
+        '<div><span class="pfo-kpi-mini-v">' + fmtPct(focal.vol_share_pct) + '</span>' +
+        '<span class="pfo-kpi-mini-l">Vol share</span></div>' +
         '<div><span class="pfo-kpi-mini-v">' + fmtPct(focal.penetration_pct) + '</span>' +
         '<span class="pfo-kpi-mini-l">Penetration</span></div>' +
-        '<div><span class="pfo-kpi-mini-v">' + fmtPct(focal.vol_share_pct) + '</span>' +
-        '<span class="pfo-kpi-mini-l">Vol share</span></div></div>' +
-        '<table class="pfo-deep-rank"><tbody>' + rankBody + '</tbody></table></div>';
+        '<div><span class="pfo-kpi-mini-v">' + fmtPct(focal.scr_pct) + '</span>' +
+        '<span class="pfo-kpi-mini-l">SCR</span></div></div>' +
+        '<table class="pfo-deep-rank"><thead><tr><th>Brand</th>' +
+        '<th class="pfo-td-num">Vol share</th>' +
+        '<th class="pfo-td-num">Pen</th></tr></thead><tbody>' +
+        rankBody + '</tbody></table></div>';
     }).join('');
 
+    // Even layout: 4 deep-dives wrap to 2x2; 1-3 fit one row; 5-6 wrap to 3.
+    var n = deepKeys.length;
+    var col = n === 4 ? 'repeat(2, 1fr)'
+            : (n >= 1 && n <= 3) ? 'repeat(' + n + ', 1fr)'
+            : (n >= 5 && n <= 6) ? 'repeat(3, 1fr)'
+            : '';
+    var styleAttr = col ? ' style="grid-template-columns: ' + col + ';"' : '';
+
     return '<h3 class="pfo-section-title">Deep-dive competitive context</h3>' +
-      '<div class="pfo-deep-grid">' + cards + '</div>';
+      '<div class="pfo-deep-grid"' + styleAttr + '>' + cards + '</div>';
   }
 
   // ---- Picker binding + orchestration ----
