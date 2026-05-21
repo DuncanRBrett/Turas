@@ -767,11 +767,13 @@
         }
       }
 
-      // Reclassify each brand cell in this row against the new CI band.
-      // The CSS rules paint the cell background green/amber/red based on
-      // these classes — without recomputing, the heatmap colours stayed
-      // anchored to the % total band even when the user was looking at
-      // % aware values.
+      // Reclassify each brand cell in this row against the new CI band,
+      // and recompute its diff-heatmap colour against the new cat-avg
+      // mean. The CSS rules paint the CI background green/amber/red
+      // based on the ma-ci-* classes; the diff heatmap (Heatmap mode =
+      // "diff" toggle) reads data-ma-heatmap as its background colour
+      // — both were anchored to the % total band/mean at render time,
+      // so both need to be refreshed when the user toggles base.
       row.querySelectorAll('td.ma-heatmap-cell').forEach(function (cellTd) {
         var v = parseFloat(cellTd.getAttribute(cellAttr));
         if (isNaN(v)) {
@@ -779,6 +781,7 @@
           v = parseFloat(cellTd.getAttribute('data-ma-pct'));
           if (isNaN(v)) return;
         }
+        // CI band reclassification
         cellTd.classList.remove('ma-ci-above', 'ma-ci-within', 'ma-ci-below');
         var band;
         if (v > ciHi) band = 'above';
@@ -786,8 +789,44 @@
         else band = 'within';
         cellTd.classList.add('ma-ci-' + band);
         cellTd.setAttribute('data-ma-ci-band', band);
+
+        // Diff heatmap colour — diff_vs_avg at the active base.
+        var diffAtBase = v - mean;
+        cellTd.setAttribute('data-ma-heatmap',
+                            maDiffHeatmapRgba(diffAtBase, MA_DIFF_HEATMAP_MAX_ABS));
+        cellTd.setAttribute('data-ma-diff', diffAtBase.toFixed(1));
       });
     });
+
+    // If the section is currently in "diff" heatmap mode, repaint cells
+    // with the freshly-computed data-ma-heatmap values. CI and Off modes
+    // don't read data-ma-heatmap so no repaint needed.
+    var hmMode = (panel.__maState && panel.__maState.heatmap &&
+                  panel.__maState.heatmap[stim]) || 'ci';
+    if (hmMode === 'diff') applyHeatmapMode(panel, stim);
+  }
+
+  // Per-row diff cap for the diverging blue/red heatmap. Mirrors the
+  // hardcoded `40` in .ma_diff_heatmap()'s call site at
+  // 02_ma_panel_table.R:241. Keep these in lockstep — if you change one
+  // change the other.
+  var MA_DIFF_HEATMAP_MAX_ABS = 40;
+
+  // JS port of .ma_diff_heatmap() in 02_ma_panel_table.R. Returns the
+  // rgba() colour string for a given (signed) percentage-point diff
+  // against the row's cat-avg, capped at maxAbsDiff.
+  //   diff >= 0  -> blue   rgba(37, 99,171, alpha)
+  //   diff <  0  -> red    rgba(192,57, 43, alpha)
+  //   alpha = 0.08 + frac * 0.55  where  frac = min(1, |diff| / maxAbsDiff)
+  // Returns "" for NA / non-finite diff or non-positive maxAbsDiff so
+  // applyHeatmapMode treats it as no-shade.
+  function maDiffHeatmapRgba(diff, maxAbsDiff) {
+    if (diff == null || isNaN(diff) || !isFinite(diff)) return '';
+    if (!(maxAbsDiff > 0)) return '';
+    var frac  = Math.min(1, Math.max(0, Math.abs(diff) / maxAbsDiff));
+    var alpha = 0.08 + frac * 0.55;
+    var rgb   = diff >= 0 ? '37,99,171' : '192,57,43';
+    return 'rgba(' + rgb + ',' + alpha.toFixed(3) + ')';
   }
 
   // -------------------------------------------------------------- row active (grey-out)
