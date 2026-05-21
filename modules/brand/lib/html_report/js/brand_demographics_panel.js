@@ -530,7 +530,7 @@
 
     const focalColour = palette[focalBrand] || "#1A5276";
     const ctx = chartModeCtx(q, focalBrand, metric);
-    const scaleMax = chartScaleMax(rows, ctx.focalEntry, ctx.globalMarker);
+    const scaleMax = chartScaleMax(rows, ctx);
 
     const bars = rows.map(r => chartRow(r, ctx, scaleMax, focalColour, dp)).join("");
     const legend = `<div class="demo-chart-legend">
@@ -556,21 +556,35 @@
     const focalEntry = (q.brand_penetration_long || []).find(b => b.brand_code === focalBrand) || null;
     const totalPenMap = q.brand_total_penetration || {};
     const totalPenFocal = totalPenMap[focalBrand];
+    const penValue = (totalPenFocal && isFinite(totalPenFocal.pct)) ? totalPenFocal.pct : NaN;
+    // Embed the value in the legend label because in penetration mode the
+    // marker sits at the same X on every row — showing it once in the
+    // legend gives instant "what is the brand's overall pen?" without
+    // hovering each row.
+    const markerLabel = isFinite(penValue)
+      ? `${focalBrand || "focal"} overall pen (${penValue.toFixed(1)}%)`
+      : "focal overall pen";
     return {
       mode: "penetration",
       focalEntry: focalEntry,
-      globalMarker: (totalPenFocal && isFinite(totalPenFocal.pct)) ? totalPenFocal.pct : NaN,
-      markerLabel: "brand cat avg pen"
+      globalMarker: penValue,
+      markerLabel: markerLabel
     };
   }
 
-  function chartScaleMax(rows, focalEntry, globalMarker) {
+  // Scale-max considers ONLY values that are actually drawn on the chart in
+  // the current mode. Including invisible reference values would squash all
+  // the visible bars to the left.
+  function chartScaleMax(rows, ctx) {
     let m = 0;
-    rows.forEach(r => { if (isFinite(r.pct)) m = Math.max(m, r.pct); });
-    if (focalEntry && Array.isArray(focalEntry.cells)) {
-      focalEntry.cells.forEach(c => { if (isFinite(c.pct)) m = Math.max(m, c.pct); });
+    if (ctx.focalEntry && Array.isArray(ctx.focalEntry.cells)) {
+      ctx.focalEntry.cells.forEach(c => { if (isFinite(c.pct)) m = Math.max(m, c.pct); });
     }
-    if (isFinite(globalMarker)) m = Math.max(m, globalMarker);
+    if (ctx.mode === "share") {
+      rows.forEach(r => { if (isFinite(r.pct)) m = Math.max(m, r.pct); });
+    } else if (isFinite(ctx.globalMarker)) {
+      m = Math.max(m, ctx.globalMarker);
+    }
     return (m > 0 && isFinite(m)) ? m : 100;
   }
 

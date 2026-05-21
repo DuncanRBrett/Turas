@@ -235,7 +235,8 @@ test_that("share-mode chart marker reflects per-row cat-avg %", {
 test_that("penetration-mode chart marker reflects focal's cat-wide penetration", {
   # Fixture: BR_A buys = rows 1-6 of 10 → BR_A total pen = 60%.
   # BR_A penetration in option A = 100% (all 6 of 6 in option A buy BR_A).
-  # Scale-max therefore = 100. Marker = 60% (BR_A total pen) → at 60.0%.
+  # Scale-max therefore = 100 (max of focal bars + the 60% marker). Marker
+  # at 60/100 = 60.0% of the bar track. Legend embeds the value.
   pd <- .demo_test_payload(focal = "BR_A")
   html <- build_demographics_matrix_chart(
     pd$questions[[1]], focal_brand = "BR_A",
@@ -243,11 +244,46 @@ test_that("penetration-mode chart marker reflects focal's cat-wide penetration",
     panel_data = pd, decimal_places = 0L,
     metric = "penetration")
   expect_match(html, "left:60\\.0%", perl = TRUE)
-  expect_match(html, "Marker: brand cat avg pen", fixed = TRUE)
-  # And the bar value should be the penetration value, not the share value
-  # (here they happen to coincide at 100% for option A, but option B
-  # penetration is 0% — same as share — so we assert via the marker label
-  # that the right code path ran).
+  expect_match(html, "BR_A overall pen \\(60\\.0%\\)", perl = TRUE)
+})
+
+
+test_that("penetration-mode scale-max ignores per-row cat-avg (invisible in this mode)", {
+  # Construct a fixture where cat-avg per row is much LARGER than any focal
+  # penetration value. If scale_max were including the cat-avg row max
+  # (which is invisible in penetration mode), bars would be squashed to the
+  # left and the marker would land at the wrong proportional position.
+  #
+  # 10 respondents, 1 option "BIG" carrying 80% of them.
+  values <- c(rep("BIG", 8), "SMALL", "SMALL")  # 80% in BIG, 20% in SMALL
+  # Focal penetration: 1 of 8 BIG buys focal = 12.5%; 1 of 2 SMALL = 50%.
+  # Focal total pen = 2/10 = 20%.
+  pen <- matrix(c(1, 0, 0, 0, 0, 0, 0, 0, 1, 0), nrow = 10, ncol = 1)
+  colnames(pen) <- "FX"
+  res <- run_demographic_question(
+    values = values, option_codes = c("BIG", "SMALL"),
+    option_labels = c("BIG","SMALL"),
+    pen_mat = pen, brand_codes = "FX", brand_labels = "FX")
+  pd <- build_demographics_panel_data(
+    questions = list(list(role = "t", column = "X",
+      question_text = "t", short_label = "t",
+      variable_type = "Single_Response",
+      codes = c("BIG","SMALL"), labels = c("BIG","SMALL"),
+      result = res)),
+    focal_brand = "FX",
+    brand_codes = "FX", brand_labels = "FX",
+    brand_colours = list(FX = "#1A5276"))
+  html <- build_demographics_matrix_chart(
+    pd$questions[[1]], focal_brand = "FX",
+    brand_colours = list(FX = "#1A5276"),
+    panel_data = pd, decimal_places = 0L,
+    metric = "penetration")
+  # scale_max should be 50 (max focal pen across options), NOT 80 (the BIG
+  # cat-avg row, which isn't drawn). Marker = 20 → 20/50 = 40.0%.
+  expect_match(html, "left:40\\.0%", perl = TRUE)
+  # The "BIG" row's bar should be at 12.5/50 = 25% of the track (not 12.5/80
+  # = 15.6% which would happen if cat-avg leaked into scale_max).
+  expect_match(html, 'style="width:25\\.0%', perl = TRUE)
 })
 
 
