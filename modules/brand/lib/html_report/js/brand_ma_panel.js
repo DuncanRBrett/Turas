@@ -463,6 +463,14 @@
     opts = opts || {};
     if (!code) return;
     panel.__maState.focal = code;
+    // Repaint the panel's --ma-brand CSS variable so sub-tab indicators,
+    // chip backgrounds, focal badges, and insight-box accents follow the
+    // newly-picked focal. Without this, every accent stays painted in the
+    // report-default focal colour regardless of selection.
+    try {
+      var newColour = getBrandColour(panel.__maData, code);
+      if (newColour) panel.style.setProperty('--ma-brand', newColour);
+    } catch (e) { /* fall through; accents stay on the prior colour */ }
     refreshFocalAccents(panel);
     reorderFocalColumn(panel, code);
     refreshMetricsFocal(panel);

@@ -462,6 +462,13 @@
     if (!code) return;
     panel.__fnState.focal = code;
     panel.setAttribute("data-fn-focal", code);
+    // Repaint --fn-brand so sub-tab indicators, pin buttons, focal-row
+    // outlines, and chip accents follow the newly-picked focal instead of
+    // staying on the report-default colour.
+    try {
+      var newColour = TurasColours.getBrandColour(panel.__fnData, code);
+      if (newColour) panel.style.setProperty('--fn-brand', newColour);
+    } catch (e) { /* accents stay on prior colour */ }
     // Move the FOCAL row class + badge
     panel.querySelectorAll("tr[data-fn-brand]").forEach(function(row){
       var isFocal = row.getAttribute("data-fn-brand") === code;

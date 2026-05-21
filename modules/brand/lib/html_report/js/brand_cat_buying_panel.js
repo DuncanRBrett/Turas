@@ -1333,7 +1333,18 @@
     var brandCode = btn.tagName === 'SELECT'
       ? btn.value
       : btn.getAttribute('data-brand');
-    var focalColour = panel.dataset.focalColour || '#1A5276';
+    // Resolve the new focal's true colour (Brands-sheet Colour column) so
+    // dots, labels, focal rows, and the --cb-focal-colour CSS variable
+    // all repaint to the brand the user picked, not the report-default focal.
+    var focalColour;
+    try {
+      focalColour = getBrandColour(panel.__cbData, brandCode) ||
+                    panel.dataset.focalColour ||
+                    '#1A5276';
+    } catch (e) {
+      focalColour = panel.dataset.focalColour || '#1A5276';
+    }
+    panel.style.setProperty('--cb-focal-colour', focalColour);
 
     /* Capture the previous focal BEFORE any class mutations below
        (section 3 strips focal-row from non-new-focal rows, which would
