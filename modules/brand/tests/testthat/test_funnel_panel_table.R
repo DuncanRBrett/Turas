@@ -190,8 +190,9 @@ test_that("Stage column headers render for every stage", {
 
 test_that("Per-column heatmap: two cells at the same value get the same shade", {
   html <- .flatten_html(.render_table())
-  # IPK/ROB both 60% at bought_long → same column max → same rgba in data-heatmap
-  rgx <- 'data-heatmap="rgba\\(37,99,171,([0-9.]+)\\)"[^>]*data-fn-stage="bought_long" data-fn-brand="(IPK|ROB)"'
+  # ROB / CART both 40% at bought_long under top-2 attitude consider → same
+  # column-relative position → same rgba in data-heatmap.
+  rgx <- 'data-heatmap="rgba\\(37,99,171,([0-9.]+)\\)"[^>]*data-fn-stage="bought_long" data-fn-brand="(ROB|CART)"'
   hits <- regmatches(html, gregexpr(rgx, html))[[1]]
   expect_gte(length(hits), 2)
   opacities <- regmatches(hits, regexpr('rgba\\(37,99,171,[0-9.]+\\)', hits))

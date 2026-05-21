@@ -19,16 +19,30 @@
 
 BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
 
-# Default attitude codes considered "positive" / non-avoiding for consideration.
-# Pre-2026 5-level scale: 1=Love, 2=Prefer, 3=Ambivalent, 4=Reject, 5=NoOpinion
-#   → positive codes are 1, 2, 3.
-# 6-level scale (IPK 2026): 1=Love, 2=Prefer, 3=Ambivalent, 4=Price-conditional,
-#   5=Avoid, 6=NoOpinion → positive codes are 1, 2, 3, 4.
-# The right set is inferred at runtime from the attitude_entry$attitude_role_codes
-# override (set via OptionMap) — only roles that are NOT "attitude.avoid" /
-# "attitude.no_opinion" qualify. This hard-coded fallback covers the legacy
-# 5-level case where no override is supplied.
-.FUNNEL_POSITIVE_ATTITUDE_CODES <- c("1", "2", "3")
+# Consider-stage definition (IPK 2026 v2, 2026-05-21):
+#
+#   The funnel models the buyer journey as a classical brand funnel:
+#     Aware (recognise the brand)
+#     -> Consider (Love or Prefer attitude — top-2 of the 6-level scale)
+#     -> Bought 12 months (long-period physical penetration)
+#     -> Bought 3 months  (target-window physical penetration)
+#
+#   Choice of top-2 attitude codes (Love + Prefer) over the legacy top-4
+#   (Love + Prefer + Ambivalent + Price-conditional):
+#     - Top-4 produced "everyone aware considers" collapse — for popular
+#       brands in IPK 2026, top-4 let 85-97% of aware respondents through
+#       so the consideration stage barely narrowed the funnel.
+#     - Top-2 produces meaningful narrowing across all 51 brand-cats
+#       (51/51 monotonic) and gives the strongest cross-brand predictor
+#       of past-3-month purchase (Pearson avg 0.97 vs purchase, beating
+#       awareness and CEP-based Mental Penetration).
+#
+#   Mental Availability (CEP-based MPen, MMS, Network Size, etc.) lives
+#   on the Mental Availability tab in full Romaniuk-canonical form. The
+#   funnel and the MA tab measure DIFFERENT constructs by design and so
+#   carry different numbers — the funnel tracks loyalty-style buyer
+#   conversion, the MA tab tracks growth-potential memory presence.
+.FUNNEL_POSITIVE_ATTITUDE_CODES <- c("1", "2")
 
 
 # ==============================================================================
@@ -66,7 +80,7 @@ BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
 # override per project via config$funnel.stage_definitions.
 .FUNNEL_DEFAULT_DEFINITIONS <- list(
   aware              = "Respondents who recognise the brand (stated aided awareness).",
-  consideration      = "Aware respondents holding a non-avoiding attitude (Love, Prefer, Ambivalent, or Price-conditional — not Avoid and not No opinion).",
+  consideration      = "Aware respondents who actively prefer the brand — Love (it's my favourite / I always pick it) or Prefer (I prefer it but don't always get it). Ambivalent, Price-conditional, Avoid, and No-opinion respondents are excluded. Mental Availability (CEP-based memory presence) is reported separately on the Mental Availability tab.",
   bought_long        = "Considerers who have bought the brand in the longer timeframe asked on the survey.",
   bought_target      = "Long-period buyers who also bought the brand in the target (shorter) timeframe.",
   current_owner_d    = "Considerers who currently own this brand in the category.",
@@ -75,12 +89,13 @@ BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
   long_tenured_s     = "Current customers whose tenure meets or exceeds the configured tenure threshold."
 )
 
-# Positive / non-avoiding attitude role set (Consideration membership).
-# "Price-conditional" buyers are included — they'd consider the brand at the
-# right price point. Only outright avoiders and no-opinion respondents are
-# excluded from consideration.
+# Positive attitude role set used as the Consider membership gate when the
+# survey carries an OptionMap on the attitude column. Top-2 only (Love +
+# Prefer) — the industry-conventional top-2-box consider definition.
+# Ambivalent and Price-conditional respondents are NOT considered: they
+# don't have an active preference, only a conditional willingness.
 .FUNNEL_POSITIVE_ATTITUDE_ROLES <- c(
-  "attitude.love", "attitude.prefer", "attitude.ambivalent", "attitude.price"
+  "attitude.love", "attitude.prefer"
 )
 
 
@@ -365,14 +380,22 @@ validate_nesting <- function(stages, weights = NULL) {
   .multi_mention_or_empty(entry, data, brands, n_resp)
 }
 
-#' Consideration stage — per-brand attitude in positive code set
+#' Consideration stage — attitude top-2 (Love + Prefer)
 #'
-#' Uses the same alias-aware matching as .attitude_rows_for_brand so a
-#' survey that exports some attitude columns as numeric codes ("1","2",
-#' "3","4") and others as text labels ("love","prefer","ambivalent",
-#' "price only") still resolves consistently. See .option_map_by_role()
-#' in 03b_funnel_metrics.R for the alias table. Falls back to the raw
-#' \code{pos_codes} fallback when no OptionMap is available on the entry.
+#' A respondent passes the Consider stage for a brand iff they are aware
+#' of the brand AND hold a top-2 positive attitude (Love or Prefer).
+#' Ambivalent / Price-conditional / Avoid / No-opinion respondents are
+#' excluded.
+#'
+#' Uses alias-aware matching via \code{.option_map_by_role()} in
+#' 03b_funnel_metrics.R, so a survey that exports some attitude columns
+#' as numeric codes ("1", "2") and others as text labels ("love",
+#' "prefer") still resolves consistently. Falls back to the raw
+#' \code{pos_codes} when no OptionMap is available on the entry.
+#'
+#' Mental Penetration (≥1 CEP linkage, per Romaniuk Better Brand Health)
+#' is reported separately on the Mental Availability tab, not in the
+#' funnel.
 #' @keywords internal
 .stage_consideration <- function(role_map, data, brands, n_resp, cat_code,
                                  pos_codes) {
@@ -384,18 +407,6 @@ validate_nesting <- function(stages, weights = NULL) {
     out <- matrix(FALSE, n_resp, length(brands),
                   dimnames = list(NULL, brands))
 
-    # Build the set of values considered "positive attitude".
-    #
-    # If the operator has supplied an EXPLICIT pos_codes override
-    # (i.e. positive_attitude_codes config or a non-default arg), honour
-    # it verbatim — they're deliberately narrowing/inverting the scale.
-    #
-    # Otherwise expand the per-role alias map (numeric code + ClientLabel
-    # + hardcoded synonyms, all lowercased) so a survey that exports
-    # some attitude columns as numeric codes and others as text labels
-    # still matches consistently. Only the four positive roles
-    # contribute; "attitude.avoid" and "attitude.no_opinion" are
-    # excluded by construction.
     is_default_pos_codes <- identical(
       as.character(pos_codes),
       as.character(.FUNNEL_POSITIVE_ATTITUDE_CODES)
@@ -412,9 +423,6 @@ validate_nesting <- function(stages, weights = NULL) {
       ))
       positive_vals <- tolower(trimws(as.character(positive_vals)))
       positive_vals <- positive_vals[nzchar(positive_vals)]
-      # Always also accept the legacy numeric fallback so a partial /
-      # missing OptionMap can't silently drop respondents whose attitude
-      # was exported as "1"/"2"/"3"/"4".
       positive_vals <- unique(c(positive_vals,
                                 tolower(as.character(pos_codes))))
     } else {
@@ -427,7 +435,6 @@ validate_nesting <- function(stages, weights = NULL) {
     }
     out
   } else {
-    # Fallback: single-response per-category attitude — rare in IPK
     .empty_brand_matrix(brands, n_resp)
   }
 }

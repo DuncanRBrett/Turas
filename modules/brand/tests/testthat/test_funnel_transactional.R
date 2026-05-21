@@ -156,12 +156,27 @@ source(file.path(ROOT, "modules", "brand", "R", "03_funnel.R"))
   modifyList(defaults, list(...))
 }
 
-# Expected values (hand-calculated; see header)
+# Expected values (hand-calculated for top-2 attitude consider — codes 1, 2).
+# Consider = aware AND attitude in {Love, Prefer}. Codes 3 (Would consider),
+# 4 (Ambivalent), 5 (Price/No-opinion in old 5-scale) are excluded.
+#
+# Per-respondent attitude codes from the fixture (Row -> I R C):
+#   1: 1 3 5    6: 1 4 3
+#   2: 2 1 4    7: 3 5 5
+#   3: 3 5 2    8: 2 4 2
+#   4: 4 2 1    9: 5 2 1
+#   5: 5 3 5   10: 1 1 5
+#
+# IPK aware (all but R5):   consider rows = {R1, R2, R6, R8, R10} = 5/10  = 0.5
+# ROB aware (not R3/R7):    consider rows = {R2, R4, R9, R10}     = 4/10  = 0.4
+# CART aware (not R5/R7/R10): consider rows = {R3, R4, R8, R9}    = 4/10  = 0.4
+# Bought_long = consider AND bought_long_marks (see header table).
+# Bought_target = bought_long AND bought_target_marks.
 .expected_pct <- list(
   aware         = c(IPK = 0.9, ROB = 0.8, CART = 0.7),
-  consideration = c(IPK = 0.7, ROB = 0.6, CART = 0.5),
-  bought_long   = c(IPK = 0.6, ROB = 0.6, CART = 0.5),
-  bought_target = c(IPK = 0.5, ROB = 0.4, CART = 0.4)
+  consideration = c(IPK = 0.5, ROB = 0.4, CART = 0.4),
+  bought_long   = c(IPK = 0.5, ROB = 0.4, CART = 0.4),
+  bought_target = c(IPK = 0.5, ROB = 0.3, CART = 0.4)
 )
 
 .pct_for <- function(df, stage_key, brand_code) {
@@ -245,20 +260,20 @@ test_that("IPK conversion ratios match hand-calculated drops", {
   res <- run_funnel(.trans_data(), .trans_rm(), .trans_brands(), .trans_cfg())
   ipk <- res$conversions[res$conversions$brand_code == "IPK", ]
 
-  # Aware -> Consideration = 0.7 / 0.9
+  # Aware -> Consideration (top-2) = 0.5 / 0.9
   expect_equal(
     ipk$value[ipk$from_stage == "aware" & ipk$to_stage == "consideration"],
-    0.7 / 0.9, tolerance = 1e-6)
+    0.5 / 0.9, tolerance = 1e-6)
 
-  # Consideration -> Bought_Long = 0.6 / 0.7
+  # Consideration -> Bought_Long = 0.5 / 0.5
   expect_equal(
     ipk$value[ipk$from_stage == "consideration" & ipk$to_stage == "bought_long"],
-    0.6 / 0.7, tolerance = 1e-6)
+    0.5 / 0.5, tolerance = 1e-6)
 
-  # Bought_Long -> Bought_Target = 0.5 / 0.6
+  # Bought_Long -> Bought_Target = 0.5 / 0.5
   expect_equal(
     ipk$value[ipk$from_stage == "bought_long" & ipk$to_stage == "bought_target"],
-    0.5 / 0.6, tolerance = 1e-6)
+    0.5 / 0.5, tolerance = 1e-6)
 })
 
 
@@ -268,7 +283,7 @@ test_that("absolute_gap method returns percentage-point drops", {
   ipk <- res$conversions[res$conversions$brand_code == "IPK", ]
   expect_equal(
     ipk$value[ipk$from_stage == "aware" & ipk$to_stage == "consideration"],
-    0.7 - 0.9, tolerance = 1e-9)
+    0.5 - 0.9, tolerance = 1e-9)
 })
 
 
@@ -308,7 +323,10 @@ test_that("biggest_drop identifies IPK's weakest stage-to-stage", {
   res <- run_funnel(.trans_data(), .trans_rm(), .trans_brands(), .trans_cfg())
   ms <- res$metrics_summary
   expect_true(!is.null(ms$biggest_drop))
-  # IPK ratios: aware->cons = 0.778 (weakest), cons->BL = 0.857, BL->BT = 0.833
+  # IPK ratios (top-2 consider):
+  #   aware->cons = 0.5/0.9 = 0.556 (weakest)
+  #   cons->BL    = 0.5/0.5 = 1.000
+  #   BL->BT      = 0.5/0.5 = 1.000
   expect_equal(ms$biggest_drop$from_stage, "aware")
   expect_equal(ms$biggest_drop$to_stage,   "consideration")
 })

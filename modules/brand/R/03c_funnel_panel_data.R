@@ -516,6 +516,7 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
 
 .stage_label <- function(key, overrides = list()) {
   if (!is.null(overrides[[key]])) return(as.character(overrides[[key]]))
+  # Must mirror .FUNNEL_DEFAULT_LABELS in 03a_funnel_derive.R.
   labels <- c(
     aware              = "Aware",
     consideration      = "Consider",

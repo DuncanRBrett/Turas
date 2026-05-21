@@ -171,9 +171,9 @@ test_that("derive_funnel_stages produces hand-calculated counts", {
   aw <- derived$stages$aware$matrix
   expect_equal(unname(colSums(aw)), c(9, 8, 7))  # IPK ROB CART
 
-  # Consideration nested with awareness — codes 1/2/3 = positive
+  # Consideration nested with awareness — top-2 codes 1/2 = positive (Love+Prefer)
   cons <- derived$stages$consideration$matrix
-  expect_equal(unname(colSums(cons)), c(7, 6, 5))
+  expect_equal(unname(colSums(cons)), c(5, 4, 4))
 
   # Bought_long nested with consideration
   pen1 <- derived$stages$bought_long$matrix

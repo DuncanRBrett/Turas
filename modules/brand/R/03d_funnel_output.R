@@ -384,6 +384,7 @@ write_funnel_csv <- function(result, brand_list, role_map = NULL,
 
 
 .stage_label_export <- function(key) {
+  # Must mirror .FUNNEL_DEFAULT_LABELS in 03a_funnel_derive.R.
   labels <- c(
     aware              = "Aware",
     consideration      = "Consider",

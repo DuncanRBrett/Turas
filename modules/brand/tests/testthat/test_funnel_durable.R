@@ -169,10 +169,14 @@ source(file.path(ROOT, "modules", "brand", "R", "03_funnel.R"))
   if (nrow(row) == 0L) NA_real_ else row$pct_weighted
 }
 
-# Expected values at threshold = 3 (hand-calculated; see header)
+# Expected values at threshold = 3 (hand-calculated for top-2 attitude consider).
+# Consider = aware AND att in {Love, Prefer} = aware AND code in {1, 2}.
+# Per-brand owners and tenure happen to all have top-2 attitudes in this
+# fixture, so current_owner_d and long_tenured_d are unchanged from the
+# top-3 expected values.
 .expected_pct <- list(
   aware           = c(IPK = 0.9, ROB = 0.8, CART = 0.7),
-  consideration   = c(IPK = 0.7, ROB = 0.6, CART = 0.5),
+  consideration   = c(IPK = 0.5, ROB = 0.4, CART = 0.4),
   current_owner_d = c(IPK = 0.4, ROB = 0.2, CART = 0.2),
   long_tenured_d  = c(IPK = 0.3, ROB = 0.0, CART = 0.1)
 )
