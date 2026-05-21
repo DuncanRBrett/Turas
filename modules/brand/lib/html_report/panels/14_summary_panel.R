@@ -58,6 +58,18 @@ build_brand_summary_panel <- function(results, config) {
 
   closing_strip_html <- .brsum_closing_strip(deep_cats, payload, focal_brand)
 
+  # Sample-wide shopper context + focal-brand engagement sections. Both are
+  # NULL-safe — render returns "" when the corresponding engine wasn't run or
+  # found no source columns (e.g. a project without IPK_*/GroceryChains).
+  shopper_summary_html <- if (exists("build_shopper_summary_sections",
+                                      mode = "function")) {
+    tryCatch(build_shopper_summary_sections(
+      list(shopper_context  = results$results$shopper_context,
+           focal_engagement = results$results$focal_engagement),
+      modifyList(config, list(brand_colours = brand_colours))),
+      error = function(e) "")
+  } else ""
+
   # Wrapper carries the JSON and default selections; JS picks them up on init.
   paste(
     '<div class="br-panel active" id="panel-summary">',
@@ -73,6 +85,7 @@ build_brand_summary_panel <- function(results, config) {
           .brsum_card_grid_skeleton(),
         '</div>',
         .brsum_insight_editor(),
+        shopper_summary_html,
         closing_strip_html,
         .brsum_educational_callout(),
       '</div>',

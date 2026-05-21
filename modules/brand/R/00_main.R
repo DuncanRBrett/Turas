@@ -102,7 +102,8 @@ BRAND_VERSION <- "1.0"
     "13a_al_audiences.R",
     "13b_al_metrics.R",
     "13c_al_classify.R",
-    "13d_al_panel_data.R"
+    "13d_al_panel_data.R",
+    "14_shopper_summary.R"
   )
 
   for (f in module_files) {
@@ -964,6 +965,31 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
   # Demographics + Ad Hoc are also per-category — see the per-category
   # block above; results land on category_results[[cat]]$demographics
   # and $adhoc and surface as sub-tabs inside each category panel.
+
+  # --- STEP 5c: Sample-wide shopper context + focal brand engagement ---
+  # Both engines are NULL-safe: if the source columns aren't in the data,
+  # they return NULL and the summary panel skips the section. No element
+  # flag — these surface whenever the columns are present.
+  if (exists("compute_shopper_context", mode = "function")) {
+    results$shopper_context <- tryCatch(
+      compute_shopper_context(data, structure, weights),
+      error = function(e) {
+        warnings_list <<- c(warnings_list,
+          sprintf("Shopper context failed: %s", e$message))
+        NULL
+      }
+    )
+  }
+  if (exists("compute_focal_engagement", mode = "function")) {
+    results$focal_engagement <- tryCatch(
+      compute_focal_engagement(data, config$focal_brand %||% "IPK", weights),
+      error = function(e) {
+        warnings_list <<- c(warnings_list,
+          sprintf("Focal engagement failed: %s", e$message))
+        NULL
+      }
+    )
+  }
 
   # --- STEP 6: Determine overall status ---
   elapsed <- proc.time()["elapsed"] - start_time
