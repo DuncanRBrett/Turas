@@ -196,6 +196,37 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 .demo-cell-n { font-size: 10px; color: #94a3b8; margin-left: 4px; font-weight: normal; }
 .demo-na { color: #cbd5e1; font-style: italic; }
 
+/* Two-row option layout: a Buyer row and a Non-buyer row per demographic
+ * option. Background colour on each cell shows over/under-indexing vs the
+ * Cat avg baseline (blue = over, red = under). The Non-buyer row is the
+ * comparison; styled lighter / italic so the Buyer row is the dominant read.
+ * Show / hide the Non-buyer rows via the .demo-hide-nonbuyer panel modifier. */
+.demo-matrix tbody tr.demo-row-buyer    td { border-bottom: 1px solid #f1f5f9; }
+.demo-matrix tbody tr.demo-row-nonbuyer td { border-bottom: 2px solid #e2e8f0; }
+.demo-matrix tbody tr.demo-row-nonbuyer td:not(.demo-cell-blank):not(.demo-opt-label) {
+  font-style: italic; font-size: 11.5px; color: #64748b; font-weight: 400;
+}
+.demo-matrix tbody tr.demo-row-nonbuyer td .demo-cell-n { font-style: normal; }
+.demo-row-nonbuyer-label {
+  padding-left: 28px !important; font-style: italic; color: #94a3b8;
+  font-size: 11px; font-weight: 400;
+}
+.demo-cell-blank { background: transparent !important; }
+
+/* Strip the prior zebra striping — alternating colour at half-option
+ * boundaries was visually confusing. Subtle borders group the two rows of
+ * each option instead. */
+.demo-matrix tbody tr:nth-child(even) td { background: inherit; }
+
+/* Row toggles. Panel root carries .demo-hide-buyer / .demo-hide-nonbuyer
+ * when each control is off; CSS hides the matching rows. When one row is
+ * hidden the remaining row's bottom border lightens so the single-row look
+ * is intentional. */
+.demo-panel.demo-hide-nonbuyer .demo-row-nonbuyer { display: none; }
+.demo-panel.demo-hide-nonbuyer .demo-row-buyer td { border-bottom: 1px solid #eef0f3; }
+.demo-panel.demo-hide-buyer    .demo-row-buyer    { display: none; }
+.demo-panel.demo-hide-buyer    .demo-row-nonbuyer td { border-bottom: 1px solid #eef0f3; }
+
 /* Chart view */
 .demo-chart-wrap { padding: 8px 4px; }
 .demo-chart-row { display: grid; grid-template-columns: 130px 1fr 80px; gap: 8px; align-items: center; padding: 4px 0; font-size: 12px; }
@@ -246,9 +277,15 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 .demo_panel_global_controls <- function(pd) {
   paste0(
     '<div class="demo-control-bar">',
+    '<span class="demo-control-label">Cells:</span>',
+    '<label class="demo-control-check" title="% of respondents in this demographic option who buy this brand. Cells sum to 100% (buyer + non-buyer) within each option. Best for finding where a brand over- or under-performs."><input type="radio" name="demo-metric" data-demo-metric="penetration" checked> % who buy</label>',
+    '<label class="demo-control-check" title="% of this brand’s buyers who fall in this option. Brand column sums to 100%. Best for describing what a brand’s buyer audience looks like demographically."><input type="radio" name="demo-metric" data-demo-metric="share"> % of buyers</label>',
+    '<span class="demo-control-sep"></span>',
     '<span class="demo-control-label">Show:</span>',
     '<label class="demo-control-check"><input type="checkbox" data-demo-toggle="counts"> n counts</label>',
     '<label class="demo-control-check"><input type="checkbox" data-demo-toggle="heatmap" checked> Heatmap</label>',
+    '<label class="demo-control-check" title="Show the per-brand buyer row for each option"><input type="checkbox" data-demo-toggle="buyer" checked> Buyer row</label>',
+    '<label class="demo-control-check" title="Show the per-brand non-buyer row for each option"><input type="checkbox" data-demo-toggle="nonbuyer" checked> Non-buyer row</label>',
     '<span class="demo-control-sep"></span>',
     '<span class="demo-control-label">View all:</span>',
     '<button type="button" class="demo-view-all-btn active" data-demo-action="allTables" title="Show all questions as tables">&#x2261; Tables</button>',

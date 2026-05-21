@@ -86,6 +86,62 @@ test_that("matrix table cell percentages match engine output", {
 })
 
 
+test_that("each option renders TWO rows — Buyer + Non-buyer — with role classes", {
+  pd <- .demo_test_payload(focal = "BR_A")
+  html <- build_demographics_matrix_table(
+    pd$questions[[1]], focal_brand = "BR_A",
+    brand_colours = list(BR_A = "#1A5276", BR_B = "#A04000"),
+    panel_data = pd, decimal_places = 0L)
+  # Two options × two rows = 4 <tr> elements in the body. Count the role
+  # markers explicitly so a regression that strips one role class fails fast.
+  expect_equal(length(gregexpr('class="demo-row-buyer"',    html, fixed = TRUE)[[1]]), 2L)
+  expect_equal(length(gregexpr('class="demo-row-nonbuyer"', html, fixed = TRUE)[[1]]), 2L)
+  # Non-buyer label sits in column 1 of the comparison row.
+  expect_match(html, "demo-row-nonbuyer-label", fixed = TRUE)
+  expect_match(html, "non-buyer",               fixed = TRUE)
+})
+
+
+test_that("buyer row carries the brand's buyer pct; non-buyer row the non-buyer pct", {
+  # Fixture: BR_A buyers are rows 1-6 (all option A), non-buyers rows 7-10
+  # (all option B). Option-A Buyer row in BR_A column should show 100%.
+  # Option-A Non-buyer row in BR_A column should show 0%.
+  pd <- .demo_test_payload(focal = "BR_A")
+  html <- build_demographics_matrix_table(
+    pd$questions[[1]], focal_brand = "BR_A",
+    brand_colours = list(BR_A = "#1A5276", BR_B = "#A04000"),
+    panel_data = pd, decimal_places = 0L)
+  # Use (?s) for DOTALL — cell content can span newlines in the HTML.
+  buyer_rows <- regmatches(html,
+    gregexpr('(?s)<tr class="demo-row-buyer">.*?</tr>', html, perl = TRUE))[[1]]
+  nonbuyer_rows <- regmatches(html,
+    gregexpr('(?s)<tr class="demo-row-nonbuyer">.*?</tr>', html, perl = TRUE))[[1]]
+  expect_true(any(grepl("100%", buyer_rows, fixed = TRUE)))    # buyer in option A
+  expect_true(any(grepl("0%",   nonbuyer_rows, fixed = TRUE))) # non-buyer in option A
+})
+
+
+test_that("focal brand is NOT duplicated in the per-brand column block", {
+  pd <- .demo_test_payload(focal = "BR_A")
+  html <- build_demographics_matrix_table(
+    pd$questions[[1]], focal_brand = "BR_A",
+    brand_colours = list(BR_A = "#1A5276", BR_B = "#A04000"),
+    panel_data = pd, decimal_places = 0L)
+  # focal brand BR_A should NOT appear in any per-brand <td>; it only appears
+  # in the pinned column 2 (data-demo-col="focal").
+  td_focal_in_brand <- gregexpr(
+    '<td[^>]*data-demo-col="brand" data-demo-brand="BR_A"',
+    html, perl = TRUE)[[1]]
+  expect_equal(length(td_focal_in_brand[td_focal_in_brand != -1L]), 0L)
+  # BR_B (non-focal) should appear once per cell: 2 options × 2 rows = 4 td's.
+  # (The column header is a <th>, not a <td>, so this doesn't count it.)
+  td_brB <- gregexpr(
+    '<td[^>]*data-demo-col="brand" data-demo-brand="BR_B"',
+    html, perl = TRUE)[[1]]
+  expect_equal(length(td_brB[td_brB != -1L]), 4L)
+})
+
+
 test_that("matrix table emits hidden n spans for the JS counts toggle to reveal", {
   pd <- .demo_test_payload()
   html <- build_demographics_matrix_table(
@@ -98,14 +154,48 @@ test_that("matrix table emits hidden n spans for the JS counts toggle to reveal"
 })
 
 
-test_that("matrix table uses heat colour data attribute on brand cells", {
+test_that("matrix table shades buyer cells vs each brand's cat-wide penetration", {
+  # Fixture (.demo_test_payload):
+  #   Option A has 6 respondents, all buy BR_A, none buy BR_B.
+  #   Option B has 4 respondents, none buy BR_A, all buy BR_B.
+  #   BR_A total pen = 60%; BR_B total pen = 40%.
+  # Cell shading per brand cell = (cell pct - that brand's total pen).
+  #   Option A, BR_A buyer = 100% vs baseline 60% → +40pp clipped to +30 → blue
+  #   Option B, BR_A buyer =   0% vs baseline 60% → -60pp clipped to -30 → red
   pd <- .demo_test_payload()
   html <- build_demographics_matrix_table(
     pd$questions[[1]], focal_brand = "BR_A",
     brand_colours = list(BR_A = "#1A5276", BR_B = "#A04000"),
     panel_data = pd, decimal_places = 0L)
-  # Brand A is 100% on option A vs cat avg 60% — diff = +40, clipped to +30 → blue.
-  expect_match(html, 'data-demo-heat="rgba\\(37,99,171,0\\.', perl = TRUE)
+  expect_match(html, 'data-demo-heat="rgba\\(37,99,171,0\\.',  perl = TRUE)
+  expect_match(html, 'data-demo-heat="rgba\\(192,57,43,0\\.',  perl = TRUE)
+})
+
+
+test_that("buyer cell shows within-demo penetration; non-buyer cell shows its complement", {
+  # Option A has 6 respondents, all buying BR_A.
+  # BR_A buyer cell in option A = 100% (all 6 of 6 buy BR_A).
+  # BR_A non-buyer cell in option A = 0% (none of 6 are non-buyers of BR_A).
+  # Option A has 6 respondents, none buying BR_B.
+  # BR_B buyer cell in option A = 0%. Non-buyer cell = 100%.
+  pd <- .demo_test_payload(focal = "BR_A")
+  html <- build_demographics_matrix_table(
+    pd$questions[[1]], focal_brand = "BR_A",
+    brand_colours = list(BR_A = "#1A5276", BR_B = "#A04000"),
+    panel_data = pd, decimal_places = 0L)
+
+  buyer_rows <- regmatches(html,
+    gregexpr('(?s)<tr class="demo-row-buyer">.*?</tr>', html, perl = TRUE))[[1]]
+  nonbuyer_rows <- regmatches(html,
+    gregexpr('(?s)<tr class="demo-row-nonbuyer">.*?</tr>', html, perl = TRUE))[[1]]
+
+  # First option (A) — buyer row shows 100% for BR_A and 0% for BR_B
+  expect_match(buyer_rows[1], "100%", fixed = TRUE)
+  expect_match(buyer_rows[1], "0%",   fixed = TRUE)
+  # First option (A) — non-buyer row shows 0% for BR_A and 100% for BR_B
+  # (complements of the buyer cells)
+  expect_match(nonbuyer_rows[1], "100%", fixed = TRUE)
+  expect_match(nonbuyer_rows[1], "0%",   fixed = TRUE)
 })
 
 

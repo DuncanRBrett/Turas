@@ -1,6 +1,13 @@
 # ==============================================================================
 # BRAND MODULE - DEMOGRAPHICS ELEMENT
 # ==============================================================================
+# SIZE-EXCEPTION: ~315 active lines. The file is a cohesive engine pipeline —
+# one `run_demographic_question()` entry point and five private helper
+# sections (total distribution, focal-brand buyer/non-buyer cut, light/medium/
+# heavy tier cut, per-brand audience-share cut, per-brand penetration-in-
+# option + cat-wide baseline). Splitting helpers across files would fragment
+# a single computation flow that's only readable end-to-end here.
+# ==============================================================================
 # Computes the demographic profile of the sample as a whole and by brand.
 # A "demographic question" is any QuestionMap row whose Role is prefixed with
 # "demo." (e.g. demo.AGE, demo.PROVINCE). The role's ClientCode resolves to
@@ -10,17 +17,23 @@
 #   - the role-registry OptionMap sheet keyed by OptionMapScale.
 #
 # The engine produces, per question:
-#   * total       - weighted % of all respondents in each option
-#   * buyer_cut   - % among focal-brand BUYERS vs NON-BUYERS  (when pen vec given)
-#   * tier_cut    - % among LIGHT / MEDIUM / HEAVY focal buyers (when supplied)
-#   * brand_cut   - % among each brand's buyers (matrix of brand x option)
+#   * total                   - weighted % of all respondents in each option
+#   * buyer_cut               - % among focal-brand BUYERS vs NON-BUYERS
+#   * tier_cut                - % among LIGHT / MEDIUM / HEAVY focal buyers
+#   * brand_cut               - % among each brand's BUYERS  (audience share)
+#   * brand_nonbuyer_cut      - % among each brand's NON-BUYERS (audience share)
+#   * brand_penetration_long  - within-option penetration per brand (the
+#                                primary panel cell metric — "% of 30-35s
+#                                who buy IPK")
+#   * brand_total_penetration - per-brand cat-wide penetration (the heatmap
+#                                baseline for brand_penetration_long)
 #
 # All percentages are weighted-aware. Wilson 95% CIs accompany every cell.
 #
-# VERSION: 1.0
+# VERSION: 2.0
 # ==============================================================================
 
-BRAND_DEMOGRAPHICS_VERSION <- "1.0"
+BRAND_DEMOGRAPHICS_VERSION <- "2.0"
 
 
 # ==============================================================================
@@ -55,9 +68,12 @@ BRAND_DEMOGRAPHICS_VERSION <- "1.0"
 #'
 #' @return List with status PASS/REFUSED and:
 #'   \item{total}{Data frame: Code | Label | Order | n | Pct | CI_Lower | CI_Upper}
-#'   \item{buyer_cut}{NULL or list(buyer = df, non_buyer = df) with same columns}
-#'   \item{tier_cut}{NULL or list(light = df, medium = df, heavy = df)}
-#'   \item{brand_cut}{NULL or data frame keyed by BrandCode + Base_n + Pct_<CODE>}
+#'   \item{buyer_cut}{NULL or list(buyer = df, non_buyer = df) with same columns. Focal-brand only.}
+#'   \item{tier_cut}{NULL or list(light = df, medium = df, heavy = df). Focal-brand only.}
+#'   \item{brand_cut}{NULL or data frame keyed by BrandCode + Base_n + Pct_<CODE>. Distribution of each brand's BUYERS across the option list.}
+#'   \item{brand_nonbuyer_cut}{NULL or data frame, same shape as \code{brand_cut}. Distribution of each brand's NON-BUYERS (pen == 0, not NA) across the option list.}
+#'   \item{brand_penetration_long}{NULL or data frame: one row per brand, columns Pct_<code> = % of respondents in option <code> who buy this brand, Base_n_<code> = unweighted known-base for that option. The panel cell metric — answers "is this brand over/under-performing in this demographic option?" at a glance.}
+#'   \item{brand_total_penetration}{NULL or data frame: one row per brand, Pct_Total = cat-wide penetration (% of all respondents who buy this brand). The heatmap baseline for \code{brand_penetration_long}.}
 #'   \item{n_total}{Unweighted respondents with valid (non-NA) value}
 #'   \item{n_respondents}{Total rows in input}
 #'
@@ -92,16 +108,30 @@ run_demographic_question <- function(values,
   brand_cut <- .demo_brand_cut(values, option_codes, pen_mat,
                                 brand_codes, brand_labels, w, conf_level)
 
+  brand_nonbuyer_cut <- .demo_brand_nonbuyer_cut(
+    values, option_codes, pen_mat,
+    brand_codes, brand_labels, w, conf_level)
+
+  brand_penetration_long <- .demo_brand_buyer_penetration(
+    values, option_codes, pen_mat,
+    brand_codes, brand_labels, w, conf_level)
+
+  brand_total_penetration <- .demo_brand_total_penetration(
+    pen_mat, brand_codes, brand_labels, w)
+
   list(
-    status        = "PASS",
-    total         = total_df,
-    buyer_cut     = buyer_cut,
-    tier_cut      = tier_cut,
-    brand_cut     = brand_cut,
-    n_total       = sum(!is.na(values)),
-    n_respondents = n_rows,
-    weighted      = !is.null(weights),
-    conf_level    = conf_level
+    status                  = "PASS",
+    total                   = total_df,
+    buyer_cut               = buyer_cut,
+    tier_cut                = tier_cut,
+    brand_cut               = brand_cut,
+    brand_nonbuyer_cut      = brand_nonbuyer_cut,
+    brand_penetration_long  = brand_penetration_long,
+    brand_total_penetration = brand_total_penetration,
+    n_total                 = sum(!is.na(values)),
+    n_respondents           = n_rows,
+    weighted                = !is.null(weights),
+    conf_level              = conf_level
   )
 }
 
@@ -142,29 +172,167 @@ run_demographic_question <- function(values,
 
 
 # ==============================================================================
-# INTERNAL: BRAND CUT (brand x option matrix)
+# INTERNAL: BRAND CUTS (brand x option matrices)
 # ==============================================================================
-# For every brand: filter to that brand's buyers (pen > 0), then compute the
-# distribution over the option list. Returns one row per brand with Pct_<CODE>
-# columns. CIs are returned in long form alongside (CI_<CODE>_Lower/Upper).
+# Two parallel views of the demographic distribution, one row per brand:
+#   .demo_brand_cut          — buyers of that brand   (pen > 0)
+#   .demo_brand_nonbuyer_cut — non-buyers of that brand (pen == 0, not NA)
+#
+# Both share .demo_per_brand_distribution which turns a respondent-x-brand
+# logical mask matrix into the long-format Pct_<CODE> + CI_<CODE>_*
+# row-per-brand data frame the panel renderer consumes.
+#
+# Non-buyer semantics:
+#   pen == 0   -> respondent was asked and did NOT pick this brand (non-buyer)
+#   pen >  0   -> respondent picked the brand (buyer)
+#   pen == NA  -> respondent was not asked (routing skip; cross-category run);
+#                 excluded from BOTH cuts to avoid inflating the non-buyer
+#                 base with respondents who were never given the chance to
+#                 answer. The per-brand Base_n reflects this exclusion.
 
 .demo_brand_cut <- function(values, codes, pen_mat, brand_codes,
                              brand_labels, w, conf_level) {
+  ctx <- .demo_brand_cut_setup(pen_mat, brand_codes, brand_labels,
+                                length(values))
+  if (is.null(ctx)) return(NULL)
+  buyer_mask <- ctx$pen_mat > 0 & !is.na(ctx$pen_mat)
+  .demo_per_brand_distribution(values, codes, buyer_mask,
+                                brand_codes, ctx$brand_labels,
+                                w, conf_level)
+}
+
+
+.demo_brand_nonbuyer_cut <- function(values, codes, pen_mat, brand_codes,
+                                      brand_labels, w, conf_level) {
+  ctx <- .demo_brand_cut_setup(pen_mat, brand_codes, brand_labels,
+                                length(values))
+  if (is.null(ctx)) return(NULL)
+  nonbuyer_mask <- !is.na(ctx$pen_mat) & ctx$pen_mat == 0
+  .demo_per_brand_distribution(values, codes, nonbuyer_mask,
+                                brand_codes, ctx$brand_labels,
+                                w, conf_level)
+}
+
+
+# ==============================================================================
+# INTERNAL: PENETRATION-IN-OPTION (the v2 panel metric)
+# ==============================================================================
+# Cell semantics:
+#   "% of respondents in this demographic option who buy this brand"
+# i.e. the within-demo penetration. Different from .demo_brand_cut, which is
+# the share of a brand's audience that falls in each option. Penetration-in-
+# option lets the panel render buyer% + non-buyer% summing to 100% per cell
+# and answer "is brand X over- or under-performing in 30-35?" at a glance.
+#
+# NA handling — NA pen entries (routing skips) are excluded from BOTH the
+# numerator AND the per-option denominator so the buyer + complement still
+# sum to 100% within the known base. Base_n_<code> exposes the option's
+# unweighted known-base so the panel can warn on small-base cells.
+
+.demo_brand_buyer_penetration <- function(values, codes, pen_mat,
+                                           brand_codes, brand_labels,
+                                           w, conf_level) {
+  ctx <- .demo_brand_cut_setup(pen_mat, brand_codes, brand_labels,
+                                length(values))
+  if (is.null(ctx)) return(NULL)
+
+  # Per-option known-base counts (same for all brands — known-base is per
+  # respondent x brand, but for IPK-style per-cat data NAs are uniform per
+  # column). For NA-heavy multi-cat data we compute per-brand later if needed.
+  per_brand <- lapply(seq_along(brand_codes), function(b) {
+    pen_b      <- ctx$pen_mat[, b]
+    known      <- !is.na(pen_b)
+    is_buyer   <- known & pen_b > 0
+
+    pct_cells <- vapply(codes, function(cd) {
+      mask_opt   <- !is.na(values) & as.character(values) == cd
+      mask_known <- mask_opt & known
+      base_w     <- sum(w[mask_known])
+      if (base_w <= 0) return(NA_real_)
+      100 * sum(w[mask_known & is_buyer]) / base_w
+    }, numeric(1L))
+
+    base_cells <- vapply(codes, function(cd) {
+      mask_opt   <- !is.na(values) & as.character(values) == cd
+      as.integer(sum(mask_opt & known))
+    }, integer(1L))
+
+    row <- c(
+      list(BrandCode  = brand_codes[b],
+           BrandLabel = brand_labels[b],
+           Base_n     = as.integer(sum(known))),
+      stats::setNames(as.list(pct_cells),  paste0("Pct_",    codes)),
+      stats::setNames(as.list(base_cells), paste0("Base_n_", codes))
+    )
+    as.data.frame(row, stringsAsFactors = FALSE, check.names = FALSE)
+  })
+  do.call(rbind, per_brand)
+}
+
+
+# Cat-wide penetration of each brand (single number per brand). Acts as the
+# heatmap baseline for the in-option cells: a brand cell shaded vs this
+# baseline answers "does this brand over/under-perform in this demographic
+# relative to its category-average pen?".
+.demo_brand_total_penetration <- function(pen_mat, brand_codes, brand_labels,
+                                           w) {
+  ctx <- .demo_brand_cut_setup(pen_mat, brand_codes, brand_labels,
+                                length(w))
+  if (is.null(ctx)) return(NULL)
+
+  out <- lapply(seq_along(brand_codes), function(b) {
+    pen_b    <- ctx$pen_mat[, b]
+    known    <- !is.na(pen_b)
+    is_buyer <- known & pen_b > 0
+    base_w   <- sum(w[known])
+    pct      <- if (base_w > 0) 100 * sum(w[is_buyer]) / base_w
+                else NA_real_
+    data.frame(
+      BrandCode  = brand_codes[b],
+      BrandLabel = ctx$brand_labels[b],
+      Pct_Total  = pct,
+      Base_n     = as.integer(sum(known)),
+      stringsAsFactors = FALSE, check.names = FALSE)
+  })
+  do.call(rbind, out)
+}
+
+
+# Shared input validation + coercion for both per-brand cuts. Returns NULL on
+# any shape mismatch; otherwise a list with the coerced pen_mat + resolved
+# brand_labels so the caller doesn't need to re-validate.
+.demo_brand_cut_setup <- function(pen_mat, brand_codes, brand_labels, n_rows) {
   if (is.null(pen_mat) || is.null(brand_codes) || length(brand_codes) == 0L) {
     return(NULL)
   }
   pen_mat <- as.matrix(pen_mat)
   if (ncol(pen_mat) != length(brand_codes)) return(NULL)
-  if (nrow(pen_mat) != length(values)) return(NULL)
+  if (nrow(pen_mat) != n_rows) return(NULL)
   if (is.null(brand_labels) || length(brand_labels) != length(brand_codes)) {
     brand_labels <- brand_codes
   }
+  list(pen_mat = pen_mat, brand_labels = brand_labels)
+}
 
+
+# Distribution of a categorical demographic across every brand, given a
+# respondent-x-brand logical mask matrix (one column per brand, TRUE = include
+# that respondent in that brand's cut). Same row shape as v1 brand_cut.
+#
+# IMPORTANT — column-name preservation. Option codes that contain spaces or
+# punctuation (e.g. "Gauteng Metro", "R25-R35") would be silently munged by
+# the default as.data.frame() name-fixer to "Pct_Gauteng.Metro" etc., which
+# then breaks the downstream paste0("Pct_", codes) lookup in
+# .demo_panel_brand_long. check.names = FALSE keeps the literal "Pct_<code>"
+# names so the panel builder can find them.
+.demo_per_brand_distribution <- function(values, codes, mask_mat,
+                                          brand_codes, brand_labels,
+                                          w, conf_level) {
   per_brand <- lapply(seq_along(brand_codes), function(b) {
-    is_buyer <- pen_mat[, b] > 0 & !is.na(pen_mat[, b])
-    base_n   <- as.integer(sum(is_buyer))
+    mask     <- mask_mat[, b]
+    base_n   <- as.integer(sum(mask))
     dist_df  <- .demo_distribution(values, codes, codes,
-                                    is_buyer, w, conf_level)
+                                    mask, w, conf_level)
     pct_cells <- stats::setNames(as.list(dist_df$Pct), paste0("Pct_", codes))
     lo_cells  <- stats::setNames(as.list(dist_df$CI_Lower),
                                  paste0("CI_Lower_", codes))
@@ -174,7 +342,8 @@ run_demographic_question <- function(values,
                           BrandLabel = brand_labels[b],
                           Base_n     = base_n),
                      pct_cells, lo_cells, hi_cells),
-                   stringsAsFactors = FALSE)
+                   stringsAsFactors = FALSE,
+                   check.names = FALSE)
   })
   do.call(rbind, per_brand)
 }
@@ -364,7 +533,13 @@ resolve_demographic_role <- function(role_map, role, structure) {
       !nzchar(entry$column_root)) return(NULL)
 
   column <- entry$column_root
-  question_text <- entry$question_text %||% column
+  # %||% only catches NULL; entry$question_text is typically NA_character_
+  # when no Questions-sheet row exists for the column (common when the
+  # demographic is wired purely through a QuestionMap override). Use the
+  # humanised role tail as the fallback ("demographics.age" -> "Age") so
+  # the panel's question chips never render literal "NA".
+  question_text <- .demo_resolve_question_text(entry$question_text,
+                                                role, column)
   scale_name    <- entry$option_scale  %||% ""
   variable_type <- entry$variable_type %||% "Single_Response"
 
@@ -380,6 +555,32 @@ resolve_demographic_role <- function(role_map, role, structure) {
     codes         = opts$codes,
     labels        = opts$labels
   )
+}
+
+
+# Derive a display label for a demographic question. Priority:
+#   1. The QuestionText supplied on the Questions sheet (entry$question_text)
+#   2. The humanised role suffix ("demographics.age" -> "Age", or
+#      "demographics.household_income" -> "Household Income")
+#   3. The data column name as last resort
+.demo_resolve_question_text <- function(entry_qt, role, column) {
+  if (!is.null(entry_qt) && !is.na(entry_qt) &&
+      nzchar(trimws(as.character(entry_qt)))) {
+    return(as.character(entry_qt))
+  }
+  tail <- sub("^demographics\\.", "", as.character(role))
+  if (nzchar(tail) && !identical(tail, as.character(role))) {
+    parts <- strsplit(tail, "[_.]")[[1]]
+    parts <- parts[nzchar(parts)]
+    if (length(parts) > 0L) {
+      humanised <- paste(
+        toupper(substr(parts, 1L, 1L)),
+        substr(parts, 2L, nchar(parts)),
+        sep = "", collapse = " ")
+      return(humanised)
+    }
+  }
+  as.character(column)
 }
 
 

@@ -104,12 +104,21 @@ build_demographics_panel_data <- function(questions,
 
 
 # Convert one engine result into the JSON-friendly per-question payload.
-# Brand_cut is reshaped into a long list so jsonlite emits it cleanly and
-# the JS heatmap renderer can iterate without column gymnastics.
+# Brand_cut + brand_nonbuyer_cut are reshaped into parallel long lists so
+# jsonlite emits them cleanly. The panel table joins them brand-by-brand at
+# render time to draw buyer-vs-non-buyer cells.
 .demo_panel_one_question <- function(q) {
   res <- q$result
 
-  brand_long <- .demo_panel_brand_long(res$brand_cut, q$codes)
+  brand_long          <- .demo_panel_brand_long(res$brand_cut, q$codes)
+  brand_nonbuyer_long <- .demo_panel_brand_long(res$brand_nonbuyer_cut,
+                                                 q$codes)
+  # Penetration-in-option is the table's primary metric — each cell is "% of
+  # respondents in this demographic option who buy this brand". brand_total_pen
+  # is the per-brand cat-wide baseline used for cell shading.
+  brand_pen_long  <- .demo_panel_brand_long(res$brand_penetration_long,
+                                             q$codes)
+  brand_total_pen <- .demo_panel_brand_total_pen(res$brand_total_penetration)
   buyer_cut  <- if (is.null(res$buyer_cut)) NULL else list(
     buyer     = .demo_panel_dist(res$buyer_cut$buyer),
     non_buyer = .demo_panel_dist(res$buyer_cut$non_buyer)
@@ -121,24 +130,44 @@ build_demographics_panel_data <- function(questions,
   )
 
   list(
-    role           = q$role,
-    column         = q$column,
-    question_text  = q$question_text,
-    short_label    = q$short_label %||% q$question_text,
-    variable_type  = q$variable_type %||% "Single_Response",
-    codes          = q$codes,
-    labels         = q$labels,
-    is_synthetic   = isTRUE(q$is_synthetic),
-    synthetic_kind = q$synthetic_kind %||% NA_character_,
-    n_total        = res$n_total,
-    n_respondents  = res$n_respondents,
-    weighted       = isTRUE(res$weighted),
-    conf_level     = res$conf_level %||% 0.95,
-    total          = .demo_panel_dist(res$total),
-    buyer_cut      = buyer_cut,
-    tier_cut       = tier_cut,
-    brand_cut      = brand_long
+    role               = q$role,
+    column             = q$column,
+    question_text      = q$question_text,
+    short_label        = q$short_label %||% q$question_text,
+    variable_type      = q$variable_type %||% "Single_Response",
+    codes              = q$codes,
+    labels             = q$labels,
+    is_synthetic       = isTRUE(q$is_synthetic),
+    synthetic_kind     = q$synthetic_kind %||% NA_character_,
+    n_total            = res$n_total,
+    n_respondents      = res$n_respondents,
+    weighted           = isTRUE(res$weighted),
+    conf_level         = res$conf_level %||% 0.95,
+    total                   = .demo_panel_dist(res$total),
+    buyer_cut               = buyer_cut,
+    tier_cut                = tier_cut,
+    brand_cut               = brand_long,
+    brand_nonbuyer_cut      = brand_nonbuyer_long,
+    brand_penetration_long  = brand_pen_long,
+    brand_total_penetration = brand_total_pen
   )
+}
+
+
+# Convert the brand_total_penetration data frame into a name -> pct map the
+# JS renderer can index by brand_code. Order doesn't matter; we look up by
+# brand_code at render time.
+.demo_panel_brand_total_pen <- function(df) {
+  if (is.null(df) || !is.data.frame(df) || nrow(df) == 0L) return(list())
+  out <- list()
+  for (i in seq_len(nrow(df))) {
+    out[[as.character(df$BrandCode[i])]] <- list(
+      brand_code = as.character(df$BrandCode[i]),
+      pct        = as.numeric(df$Pct_Total[i]),
+      base_n     = as.integer(df$Base_n[i])
+    )
+  }
+  out
 }
 
 
@@ -161,21 +190,28 @@ build_demographics_panel_data <- function(questions,
 }
 
 
-# Re-emit the brand_cut data frame as one entry per brand x option, plus the
-# per-brand base_n. The renderer turns this into the rows of the brand
-# heatmap (brand -> option -> pct + CI bounds).
+# Re-emit a brand_cut / brand_nonbuyer_cut / brand_penetration_long data frame
+# as one entry per brand x option. brand_penetration_long carries an extra
+# per-option Base_n_<code> column — when present, it's forwarded as
+# base_n_in_option on the cell so the panel can compute buyer/non-buyer n.
 .demo_panel_brand_long <- function(brand_df, codes) {
   if (is.null(brand_df) || !is.data.frame(brand_df) || nrow(brand_df) == 0L) {
     return(list())
   }
-  pct_cols <- paste0("Pct_", codes)
+  pct_cols      <- paste0("Pct_",    codes)
+  base_opt_cols <- paste0("Base_n_", codes)
+  has_per_opt_base <- all(base_opt_cols %in% names(brand_df))
 
   lapply(seq_len(nrow(brand_df)), function(i) {
     cells <- lapply(seq_along(codes), function(j) {
-      list(
+      cell <- list(
         code = codes[j],
         pct  = as.numeric(brand_df[[pct_cols[j]]][i])
       )
+      if (has_per_opt_base) {
+        cell$base_n_in_option <- as.integer(brand_df[[base_opt_cols[j]]][i])
+      }
+      cell
     })
     list(
       brand_code  = as.character(brand_df$BrandCode[i]),

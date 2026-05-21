@@ -1,6 +1,11 @@
 /* ==============================================================================
  * BRAND MODULE - DEMOGRAPHICS PANEL JS (matrix layout v2)
  * ==============================================================================
+ * SIZE-EXCEPTION: single panel controller — table + chart + focal picker +
+ * three toggle behaviours share state on a single panel root element. Splitting
+ * across files would force a JS module loader and scoped imports the rest of
+ * the brand-module client code intentionally avoids. ~325 active lines.
+ * ==============================================================================
  * Wires the Demographics matrix panel:
  *   - Global controls: n counts / heatmap checkboxes (re-paint cells)
  *   - Focal-brand picker: chips re-issue a re-render of column 2 across cards
@@ -28,24 +33,40 @@
     if (!data || !data.questions || !data.questions.length) return;
     panel.__data = data;
     panel.__state = {
-      focal:        (data.meta && data.meta.focal_brand) || null,
-      hiddenBrands: new Set(),
-      hiddenQs:     new Set(),
-      showCounts:   false,
-      showHeatmap:  true,
-      viewByCard:   {} // sectionId -> "table" | "chart"
+      focal:         (data.meta && data.meta.focal_brand) || null,
+      hiddenBrands:  new Set(),
+      hiddenQs:      new Set(),
+      showCounts:    false,
+      showHeatmap:   true,
+      showBuyer:     true,
+      showNonbuyer:  true,
+      cellMetric:    "penetration", // "penetration" | "share"
+      viewByCard:    {} // sectionId -> "table" | "chart"
     };
 
     bindGlobalToggles(panel);
+    bindMetricRadios(panel);
     bindFocalPicker(panel);
     bindBrandSelector(panel);
     bindQuestionChips(panel);
     bindCardViewToggles(panel);
     bindViewAllButtons(panel);
 
-    // Initial paint reflects default state (heatmap on, counts/CI off).
+    // Initial paint reflects default state (heatmap on, counts off, both rows visible).
     applyHeatmap(panel);
     applyCellExtras(panel);
+    applyRowToggles(panel);
+  }
+
+  // ---- cell-metric radio (Penetration vs Share of buyers) ----
+  function bindMetricRadios(panel) {
+    panel.querySelectorAll('input[data-demo-metric]').forEach(input => {
+      input.addEventListener("change", () => {
+        if (!input.checked) return;
+        panel.__state.cellMetric = input.getAttribute("data-demo-metric");
+        rerenderAllTables(panel);
+      });
+    });
   }
 
   // ---- panel data ----
@@ -56,15 +77,24 @@
     catch (e) { console.warn("[demographics] bad JSON payload", e); return null; }
   }
 
-  // ---- global toggles (n counts / heatmap) ----
+  // ---- global toggles (n counts / heatmap / buyer row / non-buyer row) ----
   function bindGlobalToggles(panel) {
     panel.querySelectorAll('input[data-demo-toggle]').forEach(input => {
       input.addEventListener("change", () => {
         const k = input.getAttribute("data-demo-toggle");
-        if      (k === "counts")  { panel.__state.showCounts  = input.checked; applyCellExtras(panel); }
-        else if (k === "heatmap") { panel.__state.showHeatmap = input.checked; applyHeatmap(panel); }
+        if      (k === "counts")   { panel.__state.showCounts   = input.checked; applyCellExtras(panel); }
+        else if (k === "heatmap")  { panel.__state.showHeatmap  = input.checked; applyHeatmap(panel); }
+        else if (k === "buyer")    { panel.__state.showBuyer    = input.checked; applyRowToggles(panel); }
+        else if (k === "nonbuyer") { panel.__state.showNonbuyer = input.checked; applyRowToggles(panel); }
       });
     });
+  }
+
+  // Toggle .demo-row-buyer / .demo-row-nonbuyer across all matrix tables via
+  // panel root classes; CSS does the actual hide/show.
+  function applyRowToggles(panel) {
+    panel.classList.toggle("demo-hide-buyer",    !panel.__state.showBuyer);
+    panel.classList.toggle("demo-hide-nonbuyer", !panel.__state.showNonbuyer);
   }
 
   // Show / hide the .demo-cell-n spans across the panel. R renderer
@@ -113,12 +143,13 @@
     const fi = brands.indexOf(focal);
     const focalLabel = fi >= 0 ? (labels[fi] || focal) : (focal || "");
 
+    const metric = panel.__state.cellMetric || "penetration";
     panel.querySelectorAll(".demo-card").forEach(card => {
       const idx = parseInt(card.getAttribute("data-demo-q-idx"), 10);
       const q   = data.questions[idx];
       if (!q) return;
       const tableHost = card.querySelector(".demo-card-view-table");
-      if (tableHost) tableHost.innerHTML = renderMatrix(q, focal, data, dp);
+      if (tableHost) tableHost.innerHTML = renderMatrix(q, focal, data, dp, metric);
       const chartHost = card.querySelector(".demo-card-view-chart");
       if (chartHost) chartHost.innerHTML = renderChart(q, focal, focalLabel,
                                                        palette, dp);
@@ -252,7 +283,7 @@
   // round-trip to the engine). Kept short by sharing helpers.
   // ============================================================================
 
-  function renderMatrix(q, focalBrand, data, dp) {
+  function renderMatrix(q, focalBrand, data, dp, metric) {
     const rows = (q.total && q.total.rows) || [];
     if (!rows.length) return '<div class="demo-empty">No responses for this question.</div>';
 
@@ -263,14 +294,15 @@
 
     return `<div class="demo-matrix-wrap"><table class="demo-matrix">
       ${tableHeader(brands, labels, order, focalBrand, palette)}
-      ${tableBody(rows, q, brands, order, focalBrand, dp)}
+      ${tableBody(rows, q, brands, order, focalBrand, dp, metric)}
     </table></div>`;
   }
 
   function brandOrder(brands, focal) {
+    // Focal lives in its own pinned column 2; exclude it from the per-brand
+    // block to avoid rendering the same brand twice.
     const out = [];
     const fi = brands.indexOf(focal);
-    if (fi >= 0) out.push(fi);
     brands.forEach((b, i) => { if (i !== fi) out.push(i); });
     return out;
   }
@@ -288,15 +320,16 @@
   }
 
   function tableHeader(brands, labels, order, focal, palette) {
+    // Look up focal label from the ORIGINAL brand list (order excludes focal).
+    const fi = brands.indexOf(focal);
+    const focalLabel = (fi >= 0 ? (labels[fi] || focal) : focal) || "Focal";
     const brandTh = order.map(i => {
       const bc = brands[i], bl = labels[i] || bc;
-      const cls = (bc === focal) ? "demo-col-focal" : "";
-      return `<th class="${cls}" data-demo-col="brand" data-demo-brand="${esc(bc)}">
+      // order excludes focal — every entry here is a non-focal brand.
+      return `<th class="" data-demo-col="brand" data-demo-brand="${esc(bc)}">
         <span class="demo-brand-chip-swatch" style="background:${esc(palette[bc] || "#94a3b8")}"></span> ${esc(bl)}
       </th>`;
     }).join("");
-    const fi = brands.indexOf(focal);
-    const focalLabel = (fi >= 0 ? (labels[fi] || focal) : focal) || "Focal";
     return `<thead><tr>
       <th>Option</th>
       <th class="demo-col-focal" data-demo-col="focal">${esc(focalLabel)}<span class="demo-th-sub">focal</span></th>
@@ -305,41 +338,148 @@
     </tr></thead>`;
   }
 
-  function tableBody(rows, q, brands, order, focal, dp) {
-    const byBrand = {};
-    (q.brand_cut || []).forEach(b => { byBrand[b.brand_code] = b; });
+  // Dispatch on the current cell-metric mode. Same row structure (two rows
+  // per option, focal pinned in column 2, per-brand block to the right) but
+  // different cell semantics and shading baseline per mode — see penTableBody
+  // and shareTableBody for the details.
+  function tableBody(rows, q, brands, order, focal, dp, metric) {
+    if (metric === "share") {
+      return shareTableBody(rows, q, brands, order, focal, dp);
+    }
+    return penTableBody(rows, q, brands, order, focal, dp);
+  }
+
+  // PENETRATION mode (default). Cell = "% of respondents in this option who
+  // buy this brand". Non-buyer row = complement (100 − buyer). Heat colour
+  // is driven by (buyer pct − that brand's cat-wide total penetration), so
+  // buyer + non-buyer rows share the same direction.
+  function penTableBody(rows, q, brands, order, focal, dp) {
+    const penBy    = indexByBrand(q.brand_penetration_long);
+    const totalPen = q.brand_total_penetration || {};
     const trs = rows.map(r => {
-      const cat = r.pct;
-      const focalCell = brandCell(byBrand[focal], r.code, cat, dp,
-                                    "demo-col-focal", "focal", focal);
-      const avgCell = catAvgCell(r, dp);
-      const perBrandCells = order
-        .map(i => brands[i])
-        .map(bc => brandCell(byBrand[bc], r.code, cat, dp,
-                              (bc === focal ? "demo-col-focal" : ""), "brand", bc))
-        .join("");
-      return `<tr>
-        <td>${esc(r.label || r.code)}</td>
-        ${focalCell}${avgCell}${perBrandCells}
-      </tr>`;
+      const buyerRow = penRow({
+        role: "buyer",
+        labelCell: `<td class="demo-opt-label">${esc(r.label || r.code)}</td>`,
+        brandIndex: penBy, totalPen,
+        code: r.code, catAvgCell: catAvgCell(r, dp),
+        brands, order, focal, complement: false, dp
+      });
+      const nonbuyerRow = penRow({
+        role: "nonbuyer",
+        labelCell: '<td class="demo-opt-label demo-row-nonbuyer-label">&#8627; non-buyer</td>',
+        brandIndex: penBy, totalPen,
+        code: r.code,
+        catAvgCell: '<td class="demo-col-catavg demo-cell-blank" data-demo-col="catavg"></td>',
+        brands, order, focal, complement: true, dp
+      });
+      return buyerRow + nonbuyerRow;
     }).join("");
     return `<tbody>${trs}</tbody>`;
   }
 
-  function brandCell(brandEntry, code, catPct, dp, extraClass, colcode, brandCode) {
-    if (!brandEntry) return naCell(extraClass, colcode, brandCode);
-    const cell = (brandEntry.cells || []).find(c => c.code === code);
+  function penRow(p) {
+    const focalCell = penCell(p.brandIndex[p.focal], p.totalPen[p.focal],
+                                p.code, p.dp, p.complement,
+                                "demo-col-focal", "focal", p.focal);
+    const perBrand = p.order
+      .map(i => p.brands[i])
+      .map(bc => penCell(p.brandIndex[bc], p.totalPen[bc],
+                          p.code, p.dp, p.complement,
+                          "", "brand", bc))
+      .join("");
+    return `<tr class="demo-row-${p.role}">${p.labelCell}${focalCell}${p.catAvgCell}${perBrand}</tr>`;
+  }
+
+  function indexByBrand(brandLong) {
+    const out = {};
+    (brandLong || []).forEach(b => { out[b.brand_code] = b; });
+    return out;
+  }
+
+  // Penetration cell. complement=true flips the displayed value to 100-buyer
+  // (the non-buyer share within the option). Heat colour is always based on
+  // the buyer gap, so buyer + non-buyer rows share the same colour.
+  function penCell(entry, totalPenEntry, code, dp, complement, extraClass, colcode, brandCode) {
+    if (!entry) return naCell(extraClass, colcode, brandCode);
+    const cell = (entry.cells || []).find(c => c.code === code);
+    if (!cell) return naCell(extraClass, colcode, brandCode);
+    const buyerPct = cell.pct;
+    const shown = (complement && buyerPct != null && isFinite(buyerPct))
+                    ? (100 - buyerPct) : buyerPct;
+    const baseline = (totalPenEntry && totalPenEntry.pct != null) ? totalPenEntry.pct : null;
+    const buyerDiff = (buyerPct != null && isFinite(buyerPct) && baseline != null && isFinite(baseline))
+                      ? (buyerPct - baseline) : null;
+    const heat = heatColour(buyerDiff);
+    const cellN = penCellN(cell, buyerPct, complement);
+    return `<td class="${extraClass}" data-demo-col="${colcode}" data-demo-brand="${esc(brandCode || "")}" data-demo-heat="${esc(heat)}">${pctStr(shown, dp)}${countSpan(cellN)}</td>`;
+  }
+
+  function penCellN(cell, buyerPct, complement) {
+    const baseInOpt = cell.base_n_in_option;
+    if (baseInOpt == null || !isFinite(baseInOpt)
+        || buyerPct == null || !isFinite(buyerPct)) return null;
+    const buyerN = Math.round(baseInOpt * buyerPct / 100);
+    return complement ? (baseInOpt - buyerN) : buyerN;
+  }
+
+  // SHARE OF BUYERS mode. Cell = "% of this brand's buyers who fall in this
+  // option" (audience-share). The buyer row sums to 100% down a brand column;
+  // the non-buyer row is a SEPARATE distribution (% of brand's non-buyers in
+  // this option) and also sums to 100% down its column. Heat colour is the
+  // gap vs Cat avg (% of cat respondents in this option) — the audience-share
+  // baseline, restored from v1.
+  function shareTableBody(rows, q, brands, order, focal, dp) {
+    const buyerBy    = indexByBrand(q.brand_cut);
+    const nonbuyerBy = indexByBrand(q.brand_nonbuyer_cut);
+    const trs = rows.map(r => {
+      const catPct = r.pct;
+      const buyerRow = shareRow({
+        role: "buyer",
+        labelCell: `<td class="demo-opt-label">${esc(r.label || r.code)}</td>`,
+        brandIndex: buyerBy,
+        code: r.code, catPct, catAvgCell: catAvgCell(r, dp),
+        brands, order, focal, dp
+      });
+      const nonbuyerRow = shareRow({
+        role: "nonbuyer",
+        labelCell: '<td class="demo-opt-label demo-row-nonbuyer-label">&#8627; non-buyer</td>',
+        brandIndex: nonbuyerBy,
+        code: r.code, catPct,
+        catAvgCell: '<td class="demo-col-catavg demo-cell-blank" data-demo-col="catavg"></td>',
+        brands, order, focal, dp
+      });
+      return buyerRow + nonbuyerRow;
+    }).join("");
+    return `<tbody>${trs}</tbody>`;
+  }
+
+  function shareRow(p) {
+    const focalCell = shareCell(p.brandIndex[p.focal], p.code, p.catPct, p.dp,
+                                  "demo-col-focal", "focal", p.focal);
+    const perBrand = p.order
+      .map(i => p.brands[i])
+      .map(bc => shareCell(p.brandIndex[bc], p.code, p.catPct, p.dp,
+                            "", "brand", bc))
+      .join("");
+    return `<tr class="demo-row-${p.role}">${p.labelCell}${focalCell}${p.catAvgCell}${perBrand}</tr>`;
+  }
+
+  // Share-of-audience cell. Pct = % of brand's buyers (or non-buyers) in
+  // this option. Heat colour reflects (pct − cat avg in this option), i.e.
+  // is this audience over- or under-represented in this option vs the
+  // overall sample?
+  function shareCell(entry, code, catPct, dp, extraClass, colcode, brandCode) {
+    if (!entry) return naCell(extraClass, colcode, brandCode);
+    const cell = (entry.cells || []).find(c => c.code === code);
     if (!cell) return naCell(extraClass, colcode, brandCode);
     const pct = cell.pct;
     const diff = (catPct != null && isFinite(catPct) && pct != null && isFinite(pct))
-                 ? (pct - catPct) : null;
+                  ? (pct - catPct) : null;
     const heat = heatColour(diff);
-    const baseN = brandEntry.base_n;
-    const cellN = (isFinite(baseN) && isFinite(pct))
+    const baseN = entry.base_n;
+    const cellN = (baseN != null && isFinite(baseN) && pct != null && isFinite(pct))
                    ? Math.round(baseN * pct / 100) : null;
-    return `<td class="${extraClass}" data-demo-col="${colcode}" data-demo-brand="${esc(brandCode || "")}" data-demo-heat="${esc(heat)}">
-      ${pctStr(pct, dp)}${countSpan(cellN)}
-    </td>`;
+    return `<td class="${extraClass}" data-demo-col="${colcode}" data-demo-brand="${esc(brandCode || "")}" data-demo-heat="${esc(heat)}">${pctStr(pct, dp)}${countSpan(cellN)}</td>`;
   }
 
   function catAvgCell(r, dp) {
