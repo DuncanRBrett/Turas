@@ -106,22 +106,23 @@
     var dashboard = root.querySelector('[data-brsum-fade]');
     if (!dashboard) return;
 
-    // Resolve brand colour via TurasColours (hash + focal-aware) when
-    // available; fall back to whatever the R payload supplied.
+    // Resolve brand colour. Priority: brand_colours_map[code] (Brands-sheet
+    // Colour column — single source of truth) → focal_colour iff this brand
+    // IS the project focal AND has no map entry (legacy fallback) → hash.
+    // The user-selected focal does NOT change the colour: every brand keeps
+    // its own colour from the map regardless of which brand is being viewed.
     var brandColour = (snap && snap.colour) ? snap.colour : '#1A5276';
     if (typeof TurasColours !== 'undefined' && brandCode) {
       try {
-        var pdLike = { config: {
-          brand_colours: payload.brand_colours_map || {},
-          focal_colour: payload.focal_colour
-        } };
-        // Mark the focal brand so TurasColours uses focal_colour for it
-        if (payload.default_brand && payload.default_brand === brandCode) {
-          // Focal: use focal_colour directly
-          brandColour = payload.focal_colour || brandColour;
-        } else {
-          brandColour = TurasColours.getBrandColour(pdLike, brandCode) || brandColour;
-        }
+        var pdLike = {
+          config: {
+            brand_colours: payload.brand_colours_map || {},
+            focal_colour: payload.focal_colour
+          },
+          meta: { focal_brand_code: payload.focal_brand_code ||
+                                    payload.default_brand }
+        };
+        brandColour = TurasColours.getBrandColour(pdLike, brandCode) || brandColour;
       } catch (e) { /* fallback already set */ }
     }
     snap.colour = brandColour;

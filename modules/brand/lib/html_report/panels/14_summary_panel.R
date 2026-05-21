@@ -48,9 +48,11 @@ build_brand_summary_panel <- function(results, config) {
 
   payload <- .brsum_build_payload(deep_cats, cats, results, config,
                                   brand_colours, focal_colour)
-  payload$default_category <- default_cat
-  payload$default_brand    <- focal_brand
-  payload$focal_colour     <- focal_colour
+  payload$default_category   <- default_cat
+  payload$default_brand      <- focal_brand
+  payload$focal_brand_code   <- focal_brand
+  payload$focal_colour       <- focal_colour
+  payload$brand_colours_map  <- brand_colours
 
   json_payload <- .brsum_json(payload)
 
@@ -1176,12 +1178,30 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 }
 
 
-# Map BrandCode -> hex colour from config or panel data fallbacks.
+# Map BrandCode -> hex colour, sourced from the Brands sheet `Colour` column.
+# Single source of truth across the report: same lookup other panels use via
+# `.dt_brand_colours()`. Falls back to `config$brand_colours` (a legacy
+# config-level override path) when the structure sheet is unavailable.
 .brsum_brand_colour_map <- function(results, config) {
   out <- list()
+  brands <- results$structure$brands
+  if (!is.null(brands) && is.data.frame(brands) && nrow(brands) > 0 &&
+      all(c("BrandCode", "Colour") %in% names(brands))) {
+    for (i in seq_len(nrow(brands))) {
+      code <- trimws(as.character(brands$BrandCode[i]))
+      col  <- trimws(as.character(brands$Colour[i]))
+      if (nzchar(code) && nzchar(col) &&
+          grepl("^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$", col) &&
+          is.null(out[[code]])) {
+        out[[code]] <- col
+      }
+    }
+  }
   bc <- config$brand_colours
   if (is.list(bc) || is.character(bc)) {
-    for (k in names(bc)) out[[k]] <- as.character(bc[[k]])
+    for (k in names(bc)) {
+      if (is.null(out[[k]])) out[[k]] <- as.character(bc[[k]])
+    }
   }
   out
 }

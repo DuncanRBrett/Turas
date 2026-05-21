@@ -95,8 +95,10 @@ build_br_portfolio_panel <- function(results, config) {
   fp_html <- .pf_footprint_subtab(portfolio, panel_data, focal_brand, focal_colour)
   cn_html <- .pf_constellation_subtab(portfolio, panel_data, focal_brand, focal_colour,
                                        brand_colours = pf_brand_colours)
-  cl_html <- .pf_clutter_subtab(portfolio, panel_data, focal_brand, focal_colour)
-  ex_html <- .pf_extension_subtab(portfolio, panel_data, focal_brand, focal_colour)
+  cl_html <- .pf_clutter_subtab(portfolio, panel_data, focal_brand, focal_colour,
+                                 brand_colours = pf_brand_colours)
+  ex_html <- .pf_extension_subtab(portfolio, panel_data, focal_brand, focal_colour,
+                                   brand_colours = pf_brand_colours)
 
   timeframe_label <- if (identical(portfolio$timeframe, "3m")) "3-month" else "13-month"
   n_label         <- format(portfolio$n_total %||% 0L, big.mark = ",")
@@ -428,7 +430,7 @@ build_br_portfolio_panel <- function(results, config) {
   # JSON payload — one entry per cat, edges + node labels. JS uses this to
   # rebuild the "Closest competitors to <focal>" list whenever the user
   # changes the focal-brand picker, without the round-trip of a re-render.
-  panel_data_json <- .pf_cn_to_json(per_cat)
+  panel_data_json <- .pf_cn_to_json(per_cat, focal_colour, brand_colours)
   data_script <- sprintf(
     '<script type="application/json" id="pf-cn-data">%s</script>',
     panel_data_json
@@ -535,10 +537,11 @@ build_br_portfolio_panel <- function(results, config) {
 # Compact JSON serialiser for the per-category constellations. The
 # payload is tiny — node code + label + per-pair Jaccard — but enough
 # for the JS-side competitors-list re-compute on focal change.
-.pf_cn_to_json <- function(per_cat) {
+.pf_cn_to_json <- function(per_cat, focal_colour = NULL,
+                            brand_colours = NULL) {
   if (!requireNamespace("jsonlite", quietly = TRUE)) return("{}")
   by_cat <- per_cat$by_cat %||% list()
-  payload <- lapply(by_cat, function(cn) {
+  cats <- lapply(by_cat, function(cn) {
     nodes <- cn$nodes
     edges <- cn$edges
     list(
@@ -558,6 +561,11 @@ build_br_portfolio_panel <- function(results, config) {
       } else list()
     )
   })
+  payload <- list(
+    focal_colour  = focal_colour,
+    brand_colours = brand_colours %||% list(),
+    cats          = cats
+  )
   tryCatch(
     jsonlite::toJSON(payload, auto_unbox = TRUE, na = "null", digits = 4),
     error = function(e) "{}"
@@ -570,7 +578,7 @@ build_br_portfolio_panel <- function(results, config) {
 # ==============================================================================
 
 .pf_clutter_subtab <- function(portfolio, panel_data, focal_brand,
-                                focal_colour) {
+                                focal_colour, brand_colours = NULL) {
   section_id <- "pf-clutter"
   cl <- portfolio$clutter
   if (is.null(cl) || is.null(cl$clutter_df) || nrow(cl$clutter_df) == 0) {
@@ -612,7 +620,8 @@ build_br_portfolio_panel <- function(results, config) {
   # focal_share_of_aware, fair_share and quadrant on focal change, then
   # rebuilds the SVG without a server round-trip.
   per_cat_full <- panel_data$clutter$per_cat_full %||% cl$per_cat_full %||% list()
-  payload_json <- .pf_cl_to_json(per_cat_full, cl$ref_x, focal_colour)
+  payload_json <- .pf_cl_to_json(per_cat_full, cl$ref_x, focal_colour,
+                                  brand_colours = brand_colours)
   data_script <- sprintf(
     '<script type="application/json" id="pf-cl-data">%s</script>',
     payload_json
@@ -732,11 +741,13 @@ build_br_portfolio_panel <- function(results, config) {
 
 
 # JSON for the Category Context client-side renderer.
-.pf_cl_to_json <- function(per_cat_full, ref_x, focal_colour) {
+.pf_cl_to_json <- function(per_cat_full, ref_x, focal_colour,
+                            brand_colours = NULL) {
   if (!requireNamespace("jsonlite", quietly = TRUE)) return("{}")
   payload <- list(
-    ref_x        = if (is.null(ref_x) || is.na(ref_x)) NULL else as.numeric(ref_x),
-    focal_colour = focal_colour,
+    ref_x         = if (is.null(ref_x) || is.na(ref_x)) NULL else as.numeric(ref_x),
+    focal_colour  = focal_colour,
+    brand_colours = brand_colours %||% list(),
     cats         = lapply(per_cat_full, function(c) {
       list(
         cat_code        = c$cat_code,
@@ -790,7 +801,8 @@ build_br_portfolio_panel <- function(results, config) {
 # EXTENSION SUBTAB
 # ==============================================================================
 
-.pf_extension_subtab <- function(portfolio, panel_data, focal_brand, focal_colour) {
+.pf_extension_subtab <- function(portfolio, panel_data, focal_brand, focal_colour,
+                                  brand_colours = NULL) {
   section_id <- "pf-extension"
 
   strength    <- portfolio$strength
@@ -842,7 +854,8 @@ build_br_portfolio_panel <- function(results, config) {
   }, character(1)), collapse = "")
 
   # ---- JSON payload — strength bubbles + extension rows for every brand.
-  payload_json <- .pf_ex_to_json(strength, ext_per_br, focal_colour)
+  payload_json <- .pf_ex_to_json(strength, ext_per_br, focal_colour,
+                                  brand_colours = brand_colours)
   data_script <- sprintf(
     '<script type="application/json" id="pf-ex-data">%s</script>',
     payload_json
@@ -962,7 +975,8 @@ build_br_portfolio_panel <- function(results, config) {
 # Compact JSON for the Extension subtab — strength bubbles + extension
 # rows + cat-name lookup. Iterates the per-brand extension table and
 # normalises numeric columns to plain JS-friendly arrays.
-.pf_ex_to_json <- function(strength, ext_per_br, focal_colour) {
+.pf_ex_to_json <- function(strength, ext_per_br, focal_colour,
+                            brand_colours = NULL) {
   if (!requireNamespace("jsonlite", quietly = TRUE)) return("{}")
   cat_names <- ext_per_br$cat_names %||% list()
   brand_names <- ext_per_br$brand_names %||% list()
@@ -1005,11 +1019,12 @@ build_br_portfolio_panel <- function(results, config) {
   })
 
   payload <- list(
-    focal_colour = focal_colour,
-    cat_names    = cat_names,
-    brand_names  = brand_names,
-    strength     = strength_payload,
-    extension    = ext_payload
+    focal_colour  = focal_colour,
+    brand_colours = brand_colours %||% list(),
+    cat_names     = cat_names,
+    brand_names   = brand_names,
+    strength      = strength_payload,
+    extension     = ext_payload
   )
   tryCatch(
     jsonlite::toJSON(payload, auto_unbox = TRUE, na = "null", digits = 4),

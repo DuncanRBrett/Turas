@@ -791,9 +791,9 @@ function pfInitConstellationChips() {
 function pfCnRebuildFocalSelectForCat(catCode, preferredFocal) {
   var sel = document.getElementById('pf-cn-focal-select');
   if (!sel) return;
-  var data = pfCnLoadData();
-  if (!data || !data[catCode]) return;
-  var nodes = (data[catCode].nodes || []).slice();
+  var cats = pfCnLoadCats();
+  if (!cats || !cats[catCode]) return;
+  var nodes = (cats[catCode].nodes || []).slice();
   if (nodes.length === 0) return;
 
   var current = preferredFocal || sel.value || '';
@@ -830,12 +830,29 @@ function pfCnLoadData() {
   catch (e) { console.warn('[pf-cn] Failed to parse JSON:', e); return null; }
 }
 
+// The cat-keyed map sits under `.cats`; brand_colours + focal_colour are
+// peers. Older payloads put cats at top level — `data.cats || data` keeps
+// pre-rendered reports working until they're regenerated.
+function pfCnLoadCats() {
+  var data = pfCnLoadData();
+  if (!data) return null;
+  return data.cats || data;
+}
+
+function pfCnResolveBrandColour(focalCode) {
+  var data = pfCnLoadData() || {};
+  var bc   = data.brand_colours || {};
+  if (focalCode && bc[focalCode]) return bc[focalCode];
+  if (data.focal_colour) return data.focal_colour;
+  return pfCnReadFocalColour();
+}
+
 function pfCnSetFocal(focalCode) {
   var container = document.getElementById('pf-constellation-chart');
   if (!container) return;
   container.setAttribute('data-pf-cn-focal', focalCode);
 
-  var brandColour = pfCnReadFocalColour();
+  var brandColour = pfCnResolveBrandColour(focalCode);
 
   // For every cat panel, re-style the SVG so the new focal gets the halo
   // + brand-coloured fill + bold label, and the previous focal reverts.
@@ -1038,13 +1055,13 @@ function pfCnReadNodeLabel(node) {
 function pfCnRenderRivals(panel, catCode, focalCode) {
   var ol = panel.querySelector('.pf-cn-rivals');
   if (!ol) return;
-  var data = pfCnLoadData();
-  if (!data || !data[catCode]) {
+  var cats = pfCnLoadCats();
+  if (!cats || !cats[catCode]) {
     ol.innerHTML = '<li class="pf-cn-rivals-empty">No co-awareness data for this category.</li>';
     return;
   }
-  var nodes = data[catCode].nodes || [];
-  var edges = data[catCode].edges || [];
+  var nodes = cats[catCode].nodes || [];
+  var edges = cats[catCode].edges || [];
 
   // Build code → label lookup.
   var labelOf = {};
@@ -1196,7 +1213,12 @@ function pfClSetFocal(focalCode) {
   if (active) {
     rows = rows.filter(function (r) { return !!active[r.cat_code]; });
   }
-  var brandColour = chart.getAttribute('data-pf-cl-focal-colour') || '#1A5276';
+  // Brand-keyed map (Brands sheet Colour) wins; fall back to the render-time
+  // focal colour, then the report-default focal colour attribute.
+  var brandColour = ((data.brand_colours || {})[focalCode]) ||
+                    data.focal_colour ||
+                    chart.getAttribute('data-pf-cl-focal-colour') ||
+                    '#1A5276';
   var svg = pfClRenderScatter(rows, data.ref_x, brandColour);
   chart.innerHTML = svg;
 
@@ -1742,7 +1764,10 @@ function pfExSetFocal(focalCode) {
   if (sel && sel.value !== focalCode) sel.value = focalCode;
 
   var data = pfExLoadData() || {};
-  var brandColour = layout.getAttribute('data-pf-ex-focal-colour') || '#1A5276';
+  var brandColour = ((data.brand_colours || {})[focalCode]) ||
+                    data.focal_colour ||
+                    layout.getAttribute('data-pf-ex-focal-colour') ||
+                    '#1A5276';
   var brandLabel  = pfExBrandLabel(data, focalCode);
 
   // Strength bubble chart (left half).
