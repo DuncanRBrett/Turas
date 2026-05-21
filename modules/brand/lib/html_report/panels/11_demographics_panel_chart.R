@@ -2,23 +2,35 @@
 # BRAND MODULE - DEMOGRAPHICS PANEL: PER-QUESTION SVG CHART
 # ==============================================================================
 # Pure HTML / SVG builder for the chart view of a single demographic question.
-# Layout: one row per option, with a horizontal bar showing the focal brand %
-# and a vertical marker showing the cat-avg %. Per-brand cells are NOT shown
-# in the chart view to keep it readable — the matrix table is the place to
-# see all brands at once. The chart is for the focal brand vs reference.
+# Layout: one row per option, with a horizontal bar showing the focal brand
+# value and a vertical marker showing a reference baseline. Per-brand cells
+# are NOT shown in the chart view to keep it readable — the matrix table is
+# the place to see all brands at once. The chart is for the focal brand vs
+# its reference baseline.
+#
+# Two modes (mirror the matrix table's cell-metric toggle):
+#   "penetration" (default) — bar = % of THIS option who buy focal; marker
+#                              = focal's cat-wide penetration. Reading: bar
+#                              longer than marker = focal over-performs in
+#                              this demographic.
+#   "share"                 — bar = % of focal buyers in THIS option (audience
+#                              share); marker = % of cat respondents in this
+#                              option (cat avg). Reading: bar longer than
+#                              marker = focal's audience over-represented in
+#                              this demographic vs the population.
 #
 # Design choices:
 #   - SVG-free: pure HTML/CSS bars (gradient div + marker line), no inline SVG
 #     so the markup is a fraction of the size and renders identically when
 #     pinned (TurasPin clones the DOM, no SVG sandboxing required).
 #   - Bar widths normalised to the largest pct value in the row (focal or
-#     cat-avg), so a 50% option doesn't get drowned out by a 90% option.
-#   - Focal value is the bar fill, cat-avg is a vertical reference marker.
+#     marker), so a 50% option doesn't get drowned out by a 90% option.
+#   - Focal value is the bar fill, marker is a vertical reference line.
 #
-# VERSION: 1.0
+# VERSION: 2.0
 # ==============================================================================
 
-BRAND_DEMOGRAPHICS_PANEL_CHART_VERSION <- "1.0"
+BRAND_DEMOGRAPHICS_PANEL_CHART_VERSION <- "2.0"
 
 # Minimum bar fill width so 0% bars are still visibly present (otherwise the
 # row looks like the chart didn't render). 2% of the available width.
@@ -29,18 +41,22 @@ BRAND_DEMOGRAPHICS_PANEL_CHART_VERSION <- "1.0"
 # PUBLIC API
 # ==============================================================================
 
-#' Build the per-question chart view (focal vs cat-avg horizontal bars)
+#' Build the per-question chart view (focal vs reference baseline)
 #'
 #' @param question_payload List. One entry from \code{panel_data$questions}.
 #' @param focal_brand Character. Brand code whose value is the bar fill.
 #' @param brand_colours Named list. brand_code -> hex colour.
 #' @param panel_data List. Full panel data (used for focal colour fallback).
 #' @param decimal_places Integer. Display precision for percentages.
+#' @param metric Character. \code{"penetration"} (default) or \code{"share"}.
+#'   Controls which engine output drives the bar values and what the marker
+#'   represents. See file header.
 #' @return Character. HTML fragment for the chart view.
 #' @export
 build_demographics_matrix_chart <- function(question_payload, focal_brand,
                                              brand_colours, panel_data,
-                                             decimal_places = 0L) {
+                                             decimal_places = 0L,
+                                             metric = "penetration") {
   q     <- question_payload
   rows  <- q$total$rows %||% list()
   if (length(rows) == 0L) {
@@ -50,26 +66,55 @@ build_demographics_matrix_chart <- function(question_payload, focal_brand,
   focal_colour <- brand_colours[[focal_brand]] %||%
                    panel_data$meta$focal_colour %||% "#1A5276"
 
-  focal_entry <- .demo_chart_focal_entry(q$brand_cut, focal_brand)
-  scale_max   <- .demo_chart_scale_max(rows, focal_entry)
+  ctx <- .demo_chart_mode_ctx(q, focal_brand, metric)
+  scale_max <- .demo_chart_scale_max(rows, ctx$focal_entry, ctx$global_marker)
 
   bars <- vapply(rows, function(r) {
-    .demo_chart_row(r, focal_entry, scale_max, focal_colour, decimal_places)
+    .demo_chart_row(r, ctx, scale_max, focal_colour, decimal_places)
   }, character(1L))
 
   legend <- sprintf(
     '<div class="demo-chart-legend">
        <span><span class="demo-chart-legend-swatch" style="background:%s"></span>%s</span>
-       <span>Marker: cat avg</span>
+       <span>Marker: %s</span>
      </div>',
     .demo_chart_esc(focal_colour),
-    .demo_chart_esc(focal_brand %||% "focal"))
+    .demo_chart_esc(focal_brand %||% "focal"),
+    .demo_chart_esc(ctx$marker_label))
 
   paste0(
     '<div class="demo-chart-wrap">',
     paste(bars, collapse = ""),
     legend,
     '</div>')
+}
+
+
+# Resolve the chart's data source and marker semantics for the requested
+# metric mode. Returns a list with:
+#   focal_entry   — long-list entry whose cells hold the bar values
+#   global_marker — single marker value applied to every row (penetration
+#                    mode) or NA (share mode uses per-row r$pct instead)
+#   marker_label  — short legend label, e.g. "brand cat avg pen" / "cat avg"
+.demo_chart_mode_ctx <- function(q, focal_brand, metric) {
+  if (identical(metric, "share")) {
+    return(list(
+      mode          = "share",
+      focal_entry   = .demo_chart_focal_entry(q$brand_cut, focal_brand),
+      global_marker = NA_real_,
+      marker_label  = "cat avg"
+    ))
+  }
+  # default: penetration
+  total_pen_focal <- q$brand_total_penetration[[focal_brand]]
+  list(
+    mode          = "penetration",
+    focal_entry   = .demo_chart_focal_entry(q$brand_penetration_long,
+                                             focal_brand),
+    global_marker = if (is.null(total_pen_focal)) NA_real_
+                    else as.numeric(total_pen_focal$pct),
+    marker_label  = "brand cat avg pen"
+  )
 }
 
 
@@ -89,32 +134,42 @@ build_demographics_matrix_chart <- function(question_payload, focal_brand,
 }
 
 
-# Normalise bar widths against the largest value visible on the chart.
-# Considers the cat-avg (rows) AND the focal cell so neither overflows.
-.demo_chart_scale_max <- function(rows, focal_entry) {
-  cat_max <- max(vapply(rows, function(r) r$pct %||% 0, numeric(1L)),
+# Normalise bar widths against the largest value visible on the chart so a
+# 50% option doesn't get drowned out by a 90% option. Considers the focal
+# cells AND every marker value that could appear (per-row r$pct in share
+# mode, a single global_marker in penetration mode).
+.demo_chart_scale_max <- function(rows, focal_entry, global_marker = NA_real_) {
+  row_max <- max(vapply(rows, function(r) r$pct %||% 0, numeric(1L)),
                   na.rm = TRUE)
   focal_max <- if (is.null(focal_entry)) 0 else
     max(vapply(focal_entry$cells, function(c) c$pct %||% 0,
                 numeric(1L)), na.rm = TRUE)
-  m <- max(c(cat_max, focal_max), na.rm = TRUE)
+  marker_max <- if (is.finite(global_marker)) global_marker else 0
+  m <- max(c(row_max, focal_max, marker_max), na.rm = TRUE)
   if (!is.finite(m) || m <= 0) 100 else m
 }
 
 
-.demo_chart_row <- function(r, focal_entry, scale_max, focal_colour, dp) {
-  cat_pct   <- r$pct %||% NA_real_
-  focal_pct <- .demo_chart_focal_pct(focal_entry, r$code)
+.demo_chart_row <- function(r, ctx, scale_max, focal_colour, dp) {
+  focal_pct <- .demo_chart_focal_pct(ctx$focal_entry, r$code)
+
+  # Per-mode marker resolution:
+  #   penetration → single brand-cat-avg pen value applied to every row
+  #   share       → per-row cat-avg (% of cat respondents in this option)
+  marker_pct <- if (identical(ctx$mode, "penetration"))
+    ctx$global_marker else (r$pct %||% NA_real_)
 
   bar_w <- if (is.finite(focal_pct))
     max(.DEMO_CHART_MIN_BAR_WIDTH_PCT, 100 * focal_pct / scale_max)
   else 0
-  marker_l <- if (is.finite(cat_pct))
-    100 * cat_pct / scale_max
+  marker_l <- if (is.finite(marker_pct))
+    100 * marker_pct / scale_max
   else NA_real_
   marker_html <- if (!is.na(marker_l))
-    sprintf('<div class="demo-chart-bar-marker" style="left:%.1f%%;" title="Cat avg %s"></div>',
-            marker_l, .demo_chart_pct(cat_pct, dp))
+    sprintf('<div class="demo-chart-bar-marker" style="left:%.1f%%;" title="%s %s"></div>',
+            marker_l,
+            .demo_chart_esc(ctx$marker_label),
+            .demo_chart_pct(marker_pct, dp))
   else ""
 
   sprintf(

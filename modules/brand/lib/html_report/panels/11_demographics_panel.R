@@ -361,8 +361,12 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
   dp <- pd$config$decimal_places %||% 0L
   focal <- pd$meta$focal_brand %||% ""
 
+  # Initial paint uses the default metric ("penetration") — matches the
+  # default state of the cell-metric radio at the top of the panel. The JS
+  # rebuilds both views when the user switches mode.
   table_html <- build_demographics_matrix_table(q, focal, brand_cols, pd, dp)
-  chart_html <- build_demographics_matrix_chart(q, focal, brand_cols, pd, dp)
+  chart_html <- build_demographics_matrix_chart(q, focal, brand_cols, pd, dp,
+                                                  metric = "penetration")
 
   sprintf(
     '<article class="demo-card br-element-section" id="%s" data-section="%s" data-demo-q-idx="%d">

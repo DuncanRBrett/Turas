@@ -152,7 +152,7 @@
       if (tableHost) tableHost.innerHTML = renderMatrix(q, focal, data, dp, metric);
       const chartHost = card.querySelector(".demo-card-view-chart");
       if (chartHost) chartHost.innerHTML = renderChart(q, focal, focalLabel,
-                                                       palette, dp);
+                                                       palette, dp, metric);
     });
     applyHeatmap(panel);
     applyCellExtras(panel);
@@ -524,44 +524,74 @@
   // ============================================================================
   const CHART_MIN_BAR_WIDTH_PCT = 2;
 
-  function renderChart(q, focalBrand, focalLabel, palette, dp) {
+  function renderChart(q, focalBrand, focalLabel, palette, dp, metric) {
     const rows = (q.total && q.total.rows) || [];
     if (!rows.length) return '<div class="demo-empty">No responses for this question.</div>';
 
     const focalColour = palette[focalBrand] || "#1A5276";
-    const focalEntry  = (q.brand_cut || []).find(b => b.brand_code === focalBrand) || null;
-    const scaleMax    = chartScaleMax(rows, focalEntry);
+    const ctx = chartModeCtx(q, focalBrand, metric);
+    const scaleMax = chartScaleMax(rows, ctx.focalEntry, ctx.globalMarker);
 
-    const bars = rows.map(r => chartRow(r, focalEntry, scaleMax, focalColour, dp)).join("");
+    const bars = rows.map(r => chartRow(r, ctx, scaleMax, focalColour, dp)).join("");
     const legend = `<div class="demo-chart-legend">
       <span><span class="demo-chart-legend-swatch" style="background:${esc(focalColour)}"></span>${esc(focalLabel || focalBrand || "focal")}</span>
-      <span>Marker: cat avg</span>
+      <span>Marker: ${esc(ctx.markerLabel)}</span>
     </div>`;
     return `<div class="demo-chart-wrap">${bars}${legend}</div>`;
   }
 
-  function chartScaleMax(rows, focalEntry) {
+  // Resolve which long-list drives the bars and what the marker means for
+  // the requested metric mode. Mirrors .demo_chart_mode_ctx in R.
+  function chartModeCtx(q, focalBrand, metric) {
+    if (metric === "share") {
+      const focalEntry = (q.brand_cut || []).find(b => b.brand_code === focalBrand) || null;
+      return {
+        mode: "share",
+        focalEntry: focalEntry,
+        globalMarker: NaN,
+        markerLabel: "cat avg"
+      };
+    }
+    // default: penetration
+    const focalEntry = (q.brand_penetration_long || []).find(b => b.brand_code === focalBrand) || null;
+    const totalPenMap = q.brand_total_penetration || {};
+    const totalPenFocal = totalPenMap[focalBrand];
+    return {
+      mode: "penetration",
+      focalEntry: focalEntry,
+      globalMarker: (totalPenFocal && isFinite(totalPenFocal.pct)) ? totalPenFocal.pct : NaN,
+      markerLabel: "brand cat avg pen"
+    };
+  }
+
+  function chartScaleMax(rows, focalEntry, globalMarker) {
     let m = 0;
     rows.forEach(r => { if (isFinite(r.pct)) m = Math.max(m, r.pct); });
     if (focalEntry && Array.isArray(focalEntry.cells)) {
       focalEntry.cells.forEach(c => { if (isFinite(c.pct)) m = Math.max(m, c.pct); });
     }
+    if (isFinite(globalMarker)) m = Math.max(m, globalMarker);
     return (m > 0 && isFinite(m)) ? m : 100;
   }
 
-  function chartRow(r, focalEntry, scaleMax, focalColour, dp) {
-    const catPct = isFinite(r.pct) ? r.pct : NaN;
-    const focalCell = focalEntry
-      ? (focalEntry.cells || []).find(c => c.code === r.code)
+  function chartRow(r, ctx, scaleMax, focalColour, dp) {
+    const focalCell = ctx.focalEntry
+      ? (ctx.focalEntry.cells || []).find(c => c.code === r.code)
       : null;
     const focalPct = (focalCell && isFinite(focalCell.pct)) ? focalCell.pct : NaN;
+
+    // Penetration mode → single global marker (focal's cat-wide pen) applied
+    // to every row. Share mode → per-row cat avg (% of cat in this option).
+    const markerPct = (ctx.mode === "penetration")
+      ? ctx.globalMarker
+      : (isFinite(r.pct) ? r.pct : NaN);
 
     const barW = isFinite(focalPct)
       ? Math.max(CHART_MIN_BAR_WIDTH_PCT, 100 * focalPct / scaleMax)
       : 0;
-    const markerL = isFinite(catPct) ? (100 * catPct / scaleMax) : NaN;
+    const markerL = isFinite(markerPct) ? (100 * markerPct / scaleMax) : NaN;
     const marker = isFinite(markerL)
-      ? `<div class="demo-chart-bar-marker" style="left:${markerL.toFixed(1)}%;" title="Cat avg ${pctStr(catPct, dp)}"></div>`
+      ? `<div class="demo-chart-bar-marker" style="left:${markerL.toFixed(1)}%;" title="${esc(ctx.markerLabel)} ${pctStr(markerPct, dp)}"></div>`
       : "";
     return `<div class="demo-chart-row">
       <div class="demo-chart-row-label">${esc(r.label || r.code)}</div>

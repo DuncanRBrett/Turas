@@ -200,15 +200,16 @@ test_that("buyer cell shows within-demo penetration; non-buyer cell shows its co
 
 
 # ------------------------------------------------------------------------------
-# build_demographics_matrix_chart — focal bar + cat-avg marker
+# build_demographics_matrix_chart — focal bar + reference marker
 # ------------------------------------------------------------------------------
 
-test_that("matrix chart renders one row per option with focal bar fill", {
+test_that("matrix chart renders one row per option with focal bar fill (share mode)", {
   pd <- .demo_test_payload(focal = "BR_A")
   html <- build_demographics_matrix_chart(
     pd$questions[[1]], focal_brand = "BR_A",
     brand_colours = list(BR_A = "#1A5276", BR_B = "#A04000"),
-    panel_data = pd, decimal_places = 0L)
+    panel_data = pd, decimal_places = 0L,
+    metric = "share")
   expect_match(html, "demo-chart-row", fixed = TRUE)
   # Two rows: A and B
   expect_equal(length(gregexpr("demo-chart-row\"", html, fixed = TRUE)[[1]]), 2L)
@@ -217,14 +218,71 @@ test_that("matrix chart renders one row per option with focal bar fill", {
 })
 
 
-test_that("matrix chart marker reflects cat-avg %", {
+test_that("share-mode chart marker reflects per-row cat-avg %", {
+  # Fixture: option A has cat-avg 60% (6 of 10 rows). Scale-max for the
+  # chart is 100 (BR_A reaches 100% on A). Marker at 60/100 = 60.0%.
   pd <- .demo_test_payload(focal = "BR_A")
   html <- build_demographics_matrix_chart(
     pd$questions[[1]], focal_brand = "BR_A",
     brand_colours = list(BR_A = "#1A5276", BR_B = "#A04000"),
-    panel_data = pd, decimal_places = 0L)
-  # Cat avg 60% on option A — chart_max = 100 → marker at 60.0%
+    panel_data = pd, decimal_places = 0L,
+    metric = "share")
   expect_match(html, "left:60\\.0%", perl = TRUE)
+  expect_match(html, "Marker: cat avg", fixed = TRUE)
+})
+
+
+test_that("penetration-mode chart marker reflects focal's cat-wide penetration", {
+  # Fixture: BR_A buys = rows 1-6 of 10 → BR_A total pen = 60%.
+  # BR_A penetration in option A = 100% (all 6 of 6 in option A buy BR_A).
+  # Scale-max therefore = 100. Marker = 60% (BR_A total pen) → at 60.0%.
+  pd <- .demo_test_payload(focal = "BR_A")
+  html <- build_demographics_matrix_chart(
+    pd$questions[[1]], focal_brand = "BR_A",
+    brand_colours = list(BR_A = "#1A5276", BR_B = "#A04000"),
+    panel_data = pd, decimal_places = 0L,
+    metric = "penetration")
+  expect_match(html, "left:60\\.0%", perl = TRUE)
+  expect_match(html, "Marker: brand cat avg pen", fixed = TRUE)
+  # And the bar value should be the penetration value, not the share value
+  # (here they happen to coincide at 100% for option A, but option B
+  # penetration is 0% — same as share — so we assert via the marker label
+  # that the right code path ran).
+})
+
+
+test_that("penetration-mode chart bar value reads penetration not share", {
+  # Construct a fixture where penetration and share would differ to prove
+  # the chart is reading from brand_penetration_long, not brand_cut.
+  values <- c("A","A","B","B","B","B")   # cat A=2/6=33.3%, B=4/6=66.7%
+  pen <- matrix(c(1, 0, 1, 1, 0, 0), nrow = 6, ncol = 1)
+  colnames(pen) <- c("BR_X")
+  res <- run_demographic_question(
+    values = values, option_codes = c("A","B"), option_labels = c("A","B"),
+    pen_mat = pen, brand_codes = "BR_X", brand_labels = "Brand X")
+  # Share of BR_X buyers in option A = 1/3 (one of three buyers is in A)
+  # Penetration of BR_X in option A = 1/2 (one of two A respondents buys)
+  # — different values, so the chart code path is observable.
+  pd <- build_demographics_panel_data(
+    questions = list(list(
+      role = "demo.t", column = "X", question_text = "T", short_label = "T",
+      variable_type = "Single_Response",
+      codes = c("A","B"), labels = c("A","B"), result = res)),
+    focal_brand = "BR_X",
+    brand_codes = "BR_X", brand_labels = "Brand X",
+    brand_colours = list(BR_X = "#1A5276"))
+  pen_html <- build_demographics_matrix_chart(
+    pd$questions[[1]], focal_brand = "BR_X",
+    brand_colours = list(BR_X = "#1A5276"),
+    panel_data = pd, decimal_places = 0L, metric = "penetration")
+  share_html <- build_demographics_matrix_chart(
+    pd$questions[[1]], focal_brand = "BR_X",
+    brand_colours = list(BR_X = "#1A5276"),
+    panel_data = pd, decimal_places = 0L, metric = "share")
+  # Penetration mode: option-A row-value shows 50%
+  expect_match(pen_html,   "demo-chart-row-value\">50%",   fixed = TRUE)
+  # Share mode: option-A row-value shows 33% (1/3 of BR_X buyers in A)
+  expect_match(share_html, "demo-chart-row-value\">33%",   fixed = TRUE)
 })
 
 
