@@ -32,8 +32,15 @@
 # VERSION: 1.0
 # ==============================================================================
 
-MA_FOCAL_VIEW_VERSION   <- "1.0"
-MA_FOCAL_VIEW_MIN_BASE  <- 30L
+MA_FOCAL_VIEW_VERSION   <- "1.1"
+# Minimum unweighted base per side (buyer / non-buyer) before the row is
+# marked Below_Min_Base and the Read chip collapses to "Base too small".
+# 20 is the directional-read floor: a 5pp gap on n=20 is one respondent so
+# the per-row Gap_Significant flag (|z| > 1.96) is what actually qualifies
+# a cell as reliable. Above 20 we render numbers and rely on the sig star;
+# below 20 we suppress, because zoom-in on a focal brand with <20 buyers is
+# misleading regardless of how the calc lands.
+MA_FOCAL_VIEW_MIN_BASE  <- 20L
 MA_FOCAL_VIEW_GAP_THR   <- 5    # pp
 MA_FOCAL_VIEW_MA_THR    <- 5    # pp — match MA_DEFAULT_THRESHOLD_PP
 MA_FOCAL_VIEW_Z_THR     <- 1.96

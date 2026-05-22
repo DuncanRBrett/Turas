@@ -5,17 +5,19 @@
 # Outputs (written to output_dir):
 #   All targets:
 #     {survey_id}_Data_Headers.xlsx          — single row of Turas column codes
-#                                              that mirrors Survey_Structure
-#                                              (one col per QuestionCode for
-#                                              single-value types, one col per
-#                                              option for Multi_Mention /
-#                                              Ranking / Allocation).
+#                                              aligned 1:1 with the data export.
+#     {survey_id}_data.xlsx                  — Turas-ready data file: raw export
+#                                              with Data_Headers as the single
+#                                              header row. Only when a data
+#                                              export was provided.
 #   targets includes "tabs":
 #     {survey_id}_Survey_Structure.xlsx      — Questions + Options sheets populated
 #     {survey_id}_Crosstab_Config.xlsx       — Selection sheet + full Settings copy
 #   targets includes "brand":
 #     {survey_id}_Survey_Structure_Brand.xlsx — Brand survey structure
-#     {survey_id}_Brand_Config.xlsx           — Brand config with Categories pre-filled
+#     {survey_id}_Brand_Config.xlsx           — Brand config with Categories +
+#                                                survey-specific filenames
+#                                                pre-filled
 #
 # Usage from R:
 #   source("scripts/alchemer_to_turas.R")
@@ -155,6 +157,28 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
   questions <- option_counts[questions, on = "question_id"]
   questions[is.na(n_options), n_options := 0L]
 
+  # Allocation (CONT_SUM) grids in Alchemer often return zero options from the
+  # v5 API even though each brand has a numeric input column in the export.
+  # Borrow the option count from the sibling BRANDAWARE_<CAT> question when
+  # we recognise the BRAND<...>_<CAT> shortname pattern. This keeps the
+  # Questions sheet's Columns value consistent with the rows that .att_build_options
+  # will synthesise into the Options sheet (same fallback rule).
+  aware_n <- setNames(
+    questions[grepl("^BRANDAWARE_", QuestionCode, ignore.case = TRUE), n_options],
+    toupper(sub("^BRANDAWARE_", "",
+                questions[grepl("^BRANDAWARE_", QuestionCode, ignore.case = TRUE),
+                          QuestionCode], ignore.case = TRUE))
+  )
+  alloc_zero <- which(questions$Variable_Type == "Allocation" &
+                        questions$n_options == 0L)
+  for (i in alloc_zero) {
+    cat_code <- toupper(sub("^BRAND[A-Z0-9]+_", "", questions$QuestionCode[i],
+                             ignore.case = TRUE))
+    if (cat_code %in% names(aware_n)) {
+      questions$n_options[i] <- aware_n[[cat_code]]
+    }
+  }
+
   questions[, Columns := data.table::fcase(
     Variable_Type %in% c("Multi_Mention", "Ranking", "Allocation") & n_options > 0L, n_options,
     default = 1L
@@ -185,6 +209,22 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
 
 # ---- build Options sheet -----------------------------------------------------
 
+# Single naming convention across all modules: positional Q_n suffix for every
+# multi-column option (multi-mention, ranking, allocation). The brand module's
+# `multi_mention_brand_matrix` and `slot_paired_numeric_matrix` expect exactly
+# this layout — they read slot columns matching ^<root>_[0-9]+$ and scan the
+# cell *values* for brand codes (the codes themselves come from the Brands
+# sheet, not from column names). Tabs reads the same shape.
+#
+# `option_value` / `option_sku` are intentionally ignored when deriving the
+# suffix; they survive in the OptionText column of Survey_Structure's Options
+# sheet, which is what the brand module actually consults to know "slot index
+# i corresponds to brand X".
+.att_option_suffix <- function(shortname, option_value, opt_seq,
+                                option_sku = NULL) {
+  as.character(opt_seq)
+}
+
 .att_build_options <- function(api_dt, questions_dt) {
   q_lookup <- unique(api_dt[, .(question_id, question_shortname)])[
     questions_dt[, .(QuestionCode, Variable_Type)],
@@ -192,17 +232,61 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
     nomatch = NULL
   ]
 
-  opts <- api_dt[!is.na(option_id) & !is.na(option_value)]
+  # Keep options where EITHER option_value or option_sku is populated. Allocation
+  # (CONT_SUM) grids often leave option_value blank but set option_sku to the
+  # brand code — without this fallback those questions emit zero option rows
+  # and the brand module can't find the per-brand columns.
+  opts <- api_dt[!is.na(option_id) &
+                   (!is.na(option_value) | !is.na(option_sku))]
+  if (nrow(opts) == 0L) opts <- data.table()
+
+  if (nrow(opts) > 0L) {
+    opts <- q_lookup[opts, on = "question_id", nomatch = NULL]
+    opts[, opt_seq := seq_len(.N), by = question_id]
+    # Per-house convention: brand questions use brand-code suffix (so the
+    # brand module can look up BRANDPEN2_BAK_CHK by name), everything else
+    # uses positional Q_n (so tabs and other downstream modules keep working).
+    opts[, opt_suffix := .att_option_suffix(question_shortname, option_value,
+                                             opt_seq, option_sku)]
+    opts[, OptionQuestionCode := ifelse(
+      Variable_Type %in% c("Multi_Mention", "Ranking", "Allocation"),
+      paste0(question_shortname, "_", opt_suffix),
+      question_shortname
+    )]
+  } else {
+    opts <- data.table(
+      question_id = character(0), question_shortname = character(0),
+      Variable_Type = character(0), option_value = character(0),
+      option_title = character(0), opt_seq = integer(0),
+      OptionQuestionCode = character(0)
+    )
+  }
+
+  # Per-brand fallback for Allocation / CONT_SUM grids that the Alchemer API
+  # returns *without* an option list. These questions are typically per-brand
+  # buy-frequency batteries (BRANDPEN3_<CAT>) — their column count and brand
+  # codes are the same as the BRANDAWARE_<CAT> options. Synthesise rows so
+  # Survey_Structure has something for the brand module to look up.
+  alloc_qs <- questions_dt[Variable_Type == "Allocation", QuestionCode]
+  for (alloc_code in alloc_qs) {
+    if (alloc_code %in% opts$question_shortname) next  # already has options
+    # Look for "BRANDPEN<N>_<CAT>" patterns; the sibling is BRANDAWARE_<CAT>
+    cat_code <- sub("^BRAND[A-Z0-9]+_", "", alloc_code)
+    aware_q <- opts[question_shortname == paste0("BRANDAWARE_", cat_code)]
+    if (nrow(aware_q) == 0L) next
+    synth <- data.table(
+      question_id        = NA_character_,
+      question_shortname = alloc_code,
+      Variable_Type      = "Allocation",
+      option_value       = aware_q$option_value,
+      option_title       = aware_q$option_title,
+      opt_seq            = aware_q$opt_seq,
+      OptionQuestionCode = paste0(alloc_code, "_", aware_q$opt_suffix)
+    )
+    opts <- rbind(opts, synth, fill = TRUE)
+  }
+
   if (nrow(opts) == 0L) return(data.table())
-
-  opts <- q_lookup[opts, on = "question_id", nomatch = NULL]
-  opts[, opt_seq := seq_len(.N), by = question_id]
-
-  opts[, OptionQuestionCode := ifelse(
-    Variable_Type %in% c("Multi_Mention", "Ranking"),
-    paste0(question_shortname, "_", opt_seq),
-    question_shortname
-  )]
 
   opts[, ExcludeFromIndex := ifelse(
     Variable_Type %in% c("Rating", "Likert", "NPS") &
@@ -263,6 +347,30 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
 #' Extract Brands sheet from BRANDAWARE_{CAT} question options.
 #' BrandCode = option_value (reporting code), BrandLabel = option_title (display name).
 #' IsFocal defaults to N — analyst sets one Y per category.
+# Extract a category display name from a BRANDAWARE_<CAT> question title.
+# IPK titles read "Which of the following brands of <CATEGORY> have you heard
+# of — even if you have never bought them?", so we lift the bit between
+# "brands of" and "have you heard of". Falls back to the category code if the
+# title doesn't match the pattern.
+.att_category_name_from_aware <- function(question_title, cat_code) {
+  if (is.null(question_title) || is.na(question_title) ||
+      !nzchar(question_title)) return(cat_code)
+  # Alchemer titles often contain U+00A0 (non-breaking space) where a normal
+  # space would be expected — collapsing all whitespace to plain spaces lets
+  # the regex match reliably.
+  clean <- gsub("[[:space:] ]+", " ", question_title, perl = TRUE)
+  m <- regmatches(
+    clean,
+    regexec("which of the following brands of (.+?) have you (heard|ever heard) of",
+            clean, ignore.case = TRUE)
+  )[[1L]]
+  if (length(m) >= 2L) {
+    candidate <- trimws(m[[2L]])
+    if (nzchar(candidate) && nchar(candidate) < 80L) return(candidate)
+  }
+  cat_code
+}
+
 .att_build_brands <- function(api_dt) {
   aware_q <- unique(api_dt[
     grepl("^BRANDAWARE_", question_shortname, ignore.case = TRUE),
@@ -278,10 +386,20 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
   rows <- lapply(seq_len(nrow(aware_q)), function(i) {
     q        <- aware_q[i]
     cat_code <- toupper(sub("^BRANDAWARE_", "", q$question_shortname, ignore.case = TRUE))
-    cat_name <- .att_strip_label_prefix(q$question_title)
-    if (!nzchar(trimws(cat_name)) || cat_name == q$question_title) cat_name <- cat_code
+    cat_name <- .att_category_name_from_aware(q$question_title, cat_code)
 
     opts <- api_dt[question_id == q$question_id & !is.na(option_id) & !is.na(option_value)]
+    if (nrow(opts) == 0L) return(NULL)
+
+    # Drop the "None of the above" pseudo-brand. It's a survey-design escape
+    # hatch ("I recognise none of these brands"), not a real brand to score.
+    # When NONE leaks into the Brands sheet, the brand module's Mental
+    # Availability stimulus-penetration calculation inflates to ~100% on every
+    # CEP (anyone who picked NONE counts as "linked a brand"), destroying the
+    # X-axis variation in the Strategic Quadrant chart.
+    opts <- opts[!grepl("^(none|nota|n[/_.]?a|noneoftheabove)$",
+                         gsub("[^A-Za-z]", "", option_value), ignore.case = TRUE) &
+                  !grepl("^none\\s*of\\s*the\\s*above$", option_title, ignore.case = TRUE)]
     if (nrow(opts) == 0L) return(NULL)
 
     opts[, opt_seq := seq_len(.N)]
@@ -297,80 +415,161 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
   data.table::rbindlist(Filter(Negate(is.null), rows), use.names = TRUE)
 }
 
-#' Extract CEPs from BRANDATTR_{CAT}_CEP{NN} questions.
-#' CEPCode = shortname suffix (e.g. CEP01), CEPText = question_title with prefix stripped.
+.att_resolve_cat_name <- function(cat_code, cat_map) {
+  if (!is.null(cat_map) && cat_code %in% cat_map$CategoryCode) {
+    cat_map[CategoryCode == cat_code, Category][[1L]]
+  } else {
+    cat_code
+  }
+}
+
+#' Extract CEPs from both IPK naming conventions:
+#'   * BRANDATTR_<CAT>_CEP<NN>  (DSS/PAS-style — per-CEP list-brands question)
+#'   * BRANDCEP_<CAT><NN>       (BAK/POS-style — per-CEP list-brands question)
+#' CEPText is taken from each question's title (the CEP statement itself).
 .att_build_ceps <- function(api_dt, cat_map) {
-  cep_q <- unique(api_dt[
+  # Pattern A — DSS/PAS naming
+  q_a <- unique(api_dt[
     grepl("^BRANDATTR_[^_]+_CEP", question_shortname, ignore.case = TRUE),
     .(question_id, question_shortname, question_title)
   ])
-  if (nrow(cep_q) == 0L) {
-    warning("No BRANDATTR_*_CEP* questions found — CEPs sheet will be empty.", call. = FALSE)
+  # Pattern B — BAK/POS naming
+  q_b <- unique(api_dt[
+    grepl("^BRANDCEP_[A-Z]+[0-9]+$", question_shortname, ignore.case = TRUE),
+    .(question_id, question_shortname, question_title)
+  ])
+
+  if (nrow(q_a) == 0L && nrow(q_b) == 0L) {
+    warning("No CEP questions found (neither BRANDATTR_*_CEP* nor BRANDCEP_*) — CEPs sheet will be empty.",
+            call. = FALSE)
     return(data.table(Category = character(), CategoryCode = character(),
                       CEPCode = character(), CEPText = character(), DisplayOrder = integer()))
   }
 
-  rows <- lapply(seq_len(nrow(cep_q)), function(i) {
-    q        <- cep_q[i]
-    parts    <- strsplit(q$question_shortname, "_", fixed = TRUE)[[1L]]
+  rows_a <- lapply(seq_len(nrow(q_a)), function(i) {
+    q     <- q_a[i]
+    parts <- strsplit(q$question_shortname, "_", fixed = TRUE)[[1L]]
     cat_code <- toupper(parts[[2L]])
     cep_code <- paste(parts[seq(3L, length(parts))], collapse = "_")
-    cep_text <- .att_strip_label_prefix(q$question_title)
-    if (!nzchar(trimws(cep_text)) || cep_text == q$question_title) cep_text <- q$question_title
-
-    cat_name <- if (!is.null(cat_map) && cat_code %in% cat_map$CategoryCode) {
-      cat_map[CategoryCode == cat_code, Category][[1L]]
-    } else {
-      cat_code
-    }
-    data.table(Category = cat_name, CategoryCode = cat_code, CEPCode = cep_code, CEPText = cep_text)
+    data.table(
+      Category     = .att_resolve_cat_name(cat_code, cat_map),
+      CategoryCode = cat_code,
+      CEPCode      = cep_code,
+      CEPText      = q$question_title
+    )
   })
-  cep_dt <- data.table::rbindlist(rows, use.names = TRUE)
+
+  rows_b <- lapply(seq_len(nrow(q_b)), function(i) {
+    q <- q_b[i]
+    m <- regmatches(q$question_shortname,
+                    regexec("^BRANDCEP_([A-Z]+)([0-9]+)$", q$question_shortname,
+                            ignore.case = TRUE))[[1L]]
+    if (length(m) < 3L) return(NULL)
+    cat_code <- toupper(m[[2L]])
+    cep_num  <- m[[3L]]
+    data.table(
+      Category     = .att_resolve_cat_name(cat_code, cat_map),
+      CategoryCode = cat_code,
+      CEPCode      = paste0("CEP", cep_num),
+      CEPText      = q$question_title
+    )
+  })
+
+  cep_dt <- data.table::rbindlist(
+    Filter(Negate(is.null), c(rows_a, rows_b)),
+    use.names = TRUE
+  )
   cep_dt[, DisplayOrder := seq_len(.N), by = CategoryCode]
   cep_dt
 }
 
-#' Extract Attributes from BRANDATTR_{CAT}_ATT{NN} questions.
-#' AttrCode = shortname suffix (e.g. ATT01), AttrText = question_title with prefix stripped.
+#' Extract Attributes from BRANDATTR_<CAT>_ATT<NN> and BRANDATTR_<CAT><NN>
+#' questions. Both carry per-attribute multi-mention data (brands as options).
+#'
+#'  * BRANDATTR_<CAT>_ATT<NN> — DSS / PAS / BAK convention.
+#'  * BRANDATTR_<CAT><NN>     — POS convention (no _ATT separator).
+#'
+#' BAK / POS also have BRANDATT1_<CAT>_<BRAND> per-brand attitude questions
+#' (1-6 attitude code, NOT attribute statements). Those are intentionally
+#' excluded — early versions extracted their *options* as bogus attributes
+#' which produced rows like "I love it. It's my favourite" labelled as ATT01.
 .att_build_attributes <- function(api_dt, cat_map) {
-  attr_q <- unique(api_dt[
-    grepl("^BRANDATTR_[^_]+_ATT", question_shortname, ignore.case = TRUE),
+  # Pattern A — DSS / PAS / BAK: BRANDATTR_<CAT>_ATT<NN>
+  q_a <- unique(api_dt[
+    grepl("^BRANDATTR_[^_]+_ATT[0-9]+$", question_shortname, ignore.case = TRUE),
     .(question_id, question_shortname, question_title)
   ])
-  if (nrow(attr_q) == 0L) {
-    warning("No BRANDATTR_*_ATT* questions found — Attributes sheet will be empty.", call. = FALSE)
+  # Pattern B — POS: BRANDATTR_<CAT><NN> (cat glued to number, no _ATT)
+  q_b <- unique(api_dt[
+    grepl("^BRANDATTR_[A-Z]+[0-9]+$", question_shortname, ignore.case = TRUE),
+    .(question_id, question_shortname, question_title)
+  ])
+
+  if (nrow(q_a) == 0L && nrow(q_b) == 0L) {
+    warning("No BRANDATTR_*_ATT* or BRANDATTR_<CAT><NN> questions found — Attributes sheet will be empty.",
+            call. = FALSE)
     return(data.table(Category = character(), CategoryCode = character(),
-                      AttrCode = character(), AttrText = character(), DisplayOrder = integer()))
+                      AttrCode = character(), AttrText = character(),
+                      DisplayOrder = integer()))
   }
 
-  rows <- lapply(seq_len(nrow(attr_q)), function(i) {
-    q         <- attr_q[i]
+  rows_a <- lapply(seq_len(nrow(q_a)), function(i) {
+    q         <- q_a[i]
     parts     <- strsplit(q$question_shortname, "_", fixed = TRUE)[[1L]]
     cat_code  <- toupper(parts[[2L]])
     attr_code <- paste(parts[seq(3L, length(parts))], collapse = "_")
-    attr_text <- .att_strip_label_prefix(q$question_title)
-    if (!nzchar(trimws(attr_text)) || attr_text == q$question_title) attr_text <- q$question_title
-
-    cat_name <- if (!is.null(cat_map) && cat_code %in% cat_map$CategoryCode) {
-      cat_map[CategoryCode == cat_code, Category][[1L]]
-    } else {
-      cat_code
-    }
-    data.table(Category = cat_name, CategoryCode = cat_code, AttrCode = attr_code, AttrText = attr_text)
+    data.table(
+      Category     = .att_resolve_cat_name(cat_code, cat_map),
+      CategoryCode = cat_code,
+      AttrCode     = attr_code,
+      AttrText     = q$question_title
+    )
   })
-  attr_dt <- data.table::rbindlist(rows, use.names = TRUE)
+
+  rows_b <- lapply(seq_len(nrow(q_b)), function(i) {
+    q <- q_b[i]
+    m <- regmatches(q$question_shortname,
+                    regexec("^BRANDATTR_([A-Z]+)([0-9]+)$",
+                            q$question_shortname, ignore.case = TRUE))[[1L]]
+    if (length(m) < 3L) return(NULL)
+    cat_code <- toupper(m[[2L]])
+    attr_num <- m[[3L]]
+    data.table(
+      Category     = .att_resolve_cat_name(cat_code, cat_map),
+      CategoryCode = cat_code,
+      AttrCode     = paste0("ATT", attr_num),
+      AttrText     = q$question_title
+    )
+  })
+
+  attr_dt <- data.table::rbindlist(
+    Filter(Negate(is.null), c(rows_a, rows_b)),
+    use.names = TRUE
+  )
   attr_dt[, DisplayOrder := seq_len(.N), by = CategoryCode]
   attr_dt
 }
 
 #' Build Categories data for Brand_Config.xlsx from the Brands sheet.
 .att_build_categories <- function(brands_dt) {
-  if (nrow(brands_dt) == 0L) {
-    return(data.table(Category = character(), CategoryCode = character(),
-                      Active = character(), Type = character(), Analysis_Depth = character()))
-  }
+  empty <- data.table(Category = character(), CategoryCode = character(),
+                      Active = character(), Type = character(),
+                      Analysis_Depth = character(),
+                      Timeframe_Long = character(), Timeframe_Target = character())
+  if (nrow(brands_dt) == 0L) return(empty)
   cats <- unique(brands_dt[, .(Category, CategoryCode)])
-  cats[, `:=`(Active = "Y", Type = "transaction", Analysis_Depth = "full")]
+  # Sensible defaults: 'full' depth (analyst trims down to awareness_only
+  # per category as needed), standard transaction type, and 12-month / 3-month
+  # timeframes so the funnel panel renders "Past 12 months" / "Past 3 months"
+  # column headers instead of "Past NA" when the analyst hasn't filled in
+  # per-category overrides yet.
+  cats[, `:=`(
+    Active          = "Y",
+    Type            = "transaction",
+    Analysis_Depth  = "full",
+    Timeframe_Long  = "12 months",
+    Timeframe_Target = "3 months"
+  )]
   cats
 }
 
@@ -406,6 +605,13 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
     openxlsx::writeData(wb, "Options", options_dt, startRow = .ATT_DATA_START_ROW, colNames = FALSE)
   }
 
+  # Clear the Composite_Metrics example rows the template ships with — they
+  # reference fake questions (Q_Sat1, Q_Aware, ...) and would otherwise fail
+  # tabs' composite-validation step. Operators add their own composites later.
+  if ("Composite_Metrics" %in% openxlsx::sheets(wb)) {
+    .att_clear_examples(wb, "Composite_Metrics", n_cols = 8L)
+  }
+
   openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
 }
 
@@ -420,7 +626,8 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
 
 .att_write_brand_survey_structure <- function(questions_dt, options_dt,
                                                brands_dt, ceps_dt, attrs_dt,
-                                               output_path) {
+                                               output_path,
+                                               attitude_optionmap_dt = NULL) {
   wb <- openxlsx::loadWorkbook(.att_ss_brand_template())
 
   .att_clear_examples(wb, "Questions", n_cols = ncol(questions_dt))
@@ -446,10 +653,109 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
     openxlsx::writeData(wb, "Attributes", attrs_dt, startRow = .ATT_DATA_START_ROW, colNames = FALSE)
   }
 
+  # OptionMap: overwrite the template's attitude_scale rows with whatever scale
+  # the actual survey uses. This is what makes the brand funnel module treat
+  # code 4 as Price (vs Avoid) on the 6-level IPK 2026 scale automatically —
+  # without it the analyst has to hand-edit the OptionMap to match.
+  if (!is.null(attitude_optionmap_dt) && nrow(attitude_optionmap_dt) > 0L) {
+    .att_overwrite_attitude_optionmap(wb, attitude_optionmap_dt)
+  }
+
   openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
 }
 
-.att_write_brand_config <- function(categories_dt, output_path) {
+# Map attitude option text to a canonical role token. Order-sensitive — earlier
+# patterns win — so we put narrower expressions first (e.g. "price" before the
+# generic "right").
+.ATT_ATTITUDE_ROLE_PATTERNS <- list(
+  list(role = "love",       pat = "love|favourite|favorite"),
+  list(role = "prefer",     pat = "prefer"),
+  list(role = "price",      pat = "price"),
+  list(role = "avoid",      pat = "avoid|refuse|reject"),
+  list(role = "no_opinion", pat = "no opinion|don.?t know|don.?t have an opinion|never heard"),
+  list(role = "ambivalent", pat = "no other option|nothing else|only consider|acceptable|wouldn.?t usually|if no alternative")
+)
+
+.att_infer_attitude_role <- function(option_text) {
+  if (is.null(option_text) || is.na(option_text) || !nzchar(option_text)) {
+    return(NA_character_)
+  }
+  text_lc <- tolower(option_text)
+  for (p in .ATT_ATTITUDE_ROLE_PATTERNS) {
+    if (grepl(p$pat, text_lc, perl = TRUE)) return(p$role)
+  }
+  NA_character_
+}
+
+#' Build an OptionMap dt for the attitude_scale from the first per-brand
+#' attitude question (BRANDATT1_<cat>_<brand>). One row per option, ordered
+#' by position. Roles inferred from option text via keyword matching; any
+#' option whose role can't be inferred is still emitted with role = NA so the
+#' analyst can fill it in by hand.
+#'
+#' @keywords internal
+.att_build_attitude_optionmap <- function(api_dt) {
+  q <- unique(api_dt[
+    grepl("^BRANDATT1_[A-Z]+_", question_shortname, ignore.case = TRUE),
+    .(question_id)
+  ])
+  if (nrow(q) == 0L) return(NULL)
+  first_q <- q$question_id[[1L]]
+  opts <- api_dt[question_id == first_q & !is.na(option_id) & !is.na(option_value)]
+  if (nrow(opts) == 0L) return(NULL)
+  opts[, opt_seq := seq_len(.N)]
+
+  roles <- vapply(opts$option_title, .att_infer_attitude_role,
+                  character(1L), USE.NAMES = FALSE)
+  data.table(
+    Scale       = "attitude_scale",
+    ClientCode  = as.character(opts$option_value),
+    Role        = ifelse(is.na(roles), NA_character_,
+                          paste0("attitude_scale.", roles)),
+    ClientLabel = opts$option_title,
+    OrderIndex  = opts$opt_seq
+  )
+}
+
+# Wipe the attitude_scale rows currently in the OptionMap template (rows 5+)
+# and write the freshly-inferred ones in their place, preserving every other
+# scale block (cat_buy_scale, reach_seen_scale, etc.).
+.att_overwrite_attitude_optionmap <- function(wb, new_rows) {
+  existing <- tryCatch(
+    openxlsx::read.xlsx(wb, sheet = "OptionMap",
+                        startRow = .ATT_DATA_START_ROW, colNames = FALSE,
+                        skipEmptyRows = FALSE),
+    error = function(e) NULL
+  )
+  keep <- if (is.null(existing) || nrow(existing) == 0L) {
+    data.table()
+  } else {
+    as.data.table(existing)[!grepl("^attitude_scale", as.character(get("X1")),
+                                    ignore.case = TRUE)]
+  }
+  # Coerce both blocks to a common 5-column shape (Scale, ClientCode, Role,
+  # ClientLabel, OrderIndex) before stacking.
+  to_block <- function(dt) {
+    if (is.null(dt) || nrow(dt) == 0L) {
+      return(data.table(Scale = character(0), ClientCode = character(0),
+                        Role = character(0), ClientLabel = character(0),
+                        OrderIndex = integer(0)))
+    }
+    if (!"Scale" %in% names(dt)) {
+      setnames(dt, paste0("X", seq_len(ncol(dt))))
+      dt <- dt[, .(Scale = as.character(X1), ClientCode = as.character(X2),
+                   Role  = as.character(X3), ClientLabel = as.character(X4),
+                   OrderIndex = suppressWarnings(as.integer(X5)))]
+    }
+    dt
+  }
+  combined <- rbind(to_block(keep), to_block(new_rows), use.names = TRUE, fill = TRUE)
+  .att_clear_examples(wb, "OptionMap", n_cols = 5L)
+  openxlsx::writeData(wb, "OptionMap", combined,
+                      startRow = .ATT_DATA_START_ROW, colNames = FALSE)
+}
+
+.att_write_brand_config <- function(categories_dt, output_path, survey_id) {
   wb <- openxlsx::loadWorkbook(.att_bc_template())
 
   .att_clear_examples(wb, "Categories", n_cols = ncol(categories_dt))
@@ -458,71 +764,513 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
                         startRow = .ATT_DATA_START_ROW, colNames = FALSE)
   }
 
+  # Pre-populate the Settings sheet with survey-specific defaults so the
+  # analyst doesn't have to type filenames the script already knows. Anything
+  # not in this list keeps the template's default value.
+  #
+  # `data_file` is a *suggested filename* — the analyst saves their cleaned
+  # data file (with the Data_Headers row pasted as the top row) under exactly
+  # this name in the same folder, and it just works.
+  defaults <- list(
+    project_name   = sprintf("Survey %s", survey_id),
+    data_file      = sprintf("%s_data.xlsx", survey_id),
+    structure_file = sprintf("%s_Survey_Structure_Brand.xlsx", survey_id),
+    output_html    = "Y"
+  )
+  .att_fill_brand_settings(wb, defaults)
+
   openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
 }
 
-# Variable_Type values in Survey_Structure that produce one data column per
-# option (rest collapse to a single column per question).
-.ATT_MULTI_COL_VTYPES <- c("Multi_Mention", "Ranking", "Allocation")
+# Write values into the Settings sheet's Value column by matching on the
+# Setting name in column A. Silently skips names not present in the template.
+.att_fill_brand_settings <- function(wb, settings) {
+  s_raw <- openxlsx::readWorkbook(wb, sheet = "Settings", colNames = FALSE,
+                                  skipEmptyRows = FALSE)
+  setting_names <- trimws(as.character(s_raw[[1]]))
+  for (nm in names(settings)) {
+    row_idx <- which(setting_names == nm)
+    if (length(row_idx) == 1L) {
+      openxlsx::writeData(wb, "Settings", settings[[nm]],
+                          startRow = row_idx, startCol = 2L, colNames = FALSE)
+    }
+  }
+}
 
-#' Build Data_Headers from Survey_Structure.xlsx (questions_dt)
+#' Locate the Alchemer header row in a data export
 #'
-#' Mirrors the Turas Survey_Structure exactly:
-#'   * Single-column variable types          → one column = QuestionCode
-#'   * Multi-column types (Multi_Mention,
-#'     Ranking, Allocation) with Columns > 1 → "<QuestionCode>_1" ...
-#'                                              "<QuestionCode>_Columns"
+#' Alchemer exports may have one or more rows above the data — sometimes just
+#' the standard header, sometimes prefixed with manually-added Turas codes or
+#' blank separators. We scan the first few rows and pick the one with the most
+#' "<option>:<question_label>" colon-format cells, which is the unambiguous
+#' fingerprint of Alchemer's actual header row.
 #'
-#' No Alchemer export is consulted — column count comes from `questions_dt$Columns`,
-#' which is itself derived from the API option count. Piped / branched options
-#' that no respondent has triggered yet are still represented because they're
-#' in the survey definition.
+#' Returns a list with `row_index` (1-based, into the worksheet) and `values`
+#' (character vector of cell contents for that row).
 #'
 #' @keywords internal
-.att_build_data_headers <- function(questions_dt) {
+.att_detect_alchemer_header_row <- function(data_export_path, max_scan = 5L) {
+  ext <- tolower(tools::file_ext(data_export_path))
+  if (ext == "csv") {
+    h <- names(data.table::fread(data_export_path, nrows = 0L, header = TRUE))
+    return(list(row_index = 1L, values = h))
+  }
+  block <- openxlsx::read.xlsx(data_export_path, sheet = 1L,
+                               rows = seq_len(max_scan), colNames = FALSE,
+                               skipEmptyRows = FALSE, skipEmptyCols = FALSE)
+  best <- list(row_index = 1L, n_colon = -1L, values = character(0))
+  for (i in seq_len(nrow(block))) {
+    vals    <- as.character(block[i, ])
+    n_colon <- sum(grepl(":", vals, fixed = TRUE), na.rm = TRUE)
+    if (n_colon > best$n_colon) {
+      best <- list(row_index = i, n_colon = n_colon, values = vals)
+    }
+  }
+  list(row_index = best$row_index, values = best$values)
+}
+
+# Normalise a key for lookup: strip HTML, collapse whitespace, lowercase,
+# canonicalise smart-quote / dash variants. This makes the Alchemer colon
+# headers (often HTML-rich) match the API option strings.
+.att_norm_key <- function(x) {
+  if (is.null(x)) return(character(0))
+  out <- as.character(x)
+  out <- ifelse(is.na(out), "", out)
+  # Inline (vectorised) HTML strip — .att_strip_html is scalar.
+  out <- gsub("&amp;",   "&",  out, fixed = TRUE)
+  out <- gsub("&lt;",    "<",  out, fixed = TRUE)
+  out <- gsub("&gt;",    ">",  out, fixed = TRUE)
+  out <- gsub("&quot;",  "\"", out, fixed = TRUE)
+  out <- gsub("&#39;",   "'",  out, fixed = TRUE)
+  out <- gsub("&nbsp;",  " ",  out, fixed = TRUE)
+  out <- gsub("&ndash;", "-",  out, fixed = TRUE)
+  out <- gsub("&mdash;", "-",  out, fixed = TRUE)
+  out <- gsub("<[^>]+>", "",   out, perl  = TRUE)
+  # Smart-quote / dash normalisation so "Ina Paarman's" matches "Ina Paarman’s"
+  out <- gsub("[‘’‚‛]", "'", out, perl = TRUE)
+  out <- gsub("[“”„‟]", "\"", out, perl = TRUE)
+  out <- gsub("[‐‑‒–—―]", "-", out, perl = TRUE)
+  out <- gsub("\\s+", " ", out, perl = TRUE)
+  tolower(trimws(out))
+}
+
+#' Build the export → Turas code lookup table
+#'
+#' One row per (question, option). Used to resolve Alchemer colon-format
+#' headers ("<option_text>:<question_label>") to Turas option codes
+#' ("<shortname>_<position>").
+#'
+#' @keywords internal
+.att_build_translation_lookup <- function(api_dt, questions_dt) {
+  opts <- api_dt[!is.na(option_id) &
+                   (!is.na(option_value) | !is.na(option_sku) |
+                      !is.na(option_title))]
+  if (nrow(opts) == 0L) {
+    return(data.table::data.table(
+      q_key = character(0), opt_key = character(0), turas_code = character(0)
+    ))
+  }
+  opts <- data.table::copy(opts)
+  opts[, opt_seq    := seq_len(.N), by = question_id]
+  opts[, q_title_lc := .att_norm_key(question_title)]
+  opts[, q_short_lc := .att_norm_key(question_shortname)]
+  opts[, opt_t_lc   := .att_norm_key(option_title)]
+  opts[, opt_v_lc   := .att_norm_key(option_value)]
+  opts[, opt_sku_lc := .att_norm_key(option_sku)]
+
+  # Per-question Turas QuestionCode (Multi_Mention/Ranking/Allocation → shortname_N;
+  # other types → shortname). We use this as the base code so the result matches
+  # exactly what Survey_Structure declares.
+  q_meta <- questions_dt[, .(q_short_lc = tolower(trimws(QuestionCode)),
+                             vtype      = Variable_Type)]
+  opts <- q_meta[opts, on = "q_short_lc", nomatch = NA]
+
+  # Suffix MUST match what .att_build_options writes into Survey_Structure —
+  # otherwise data column names won't line up with the structure's QuestionCodes.
+  # Same per-house convention: brand questions = brand-code, others = position.
+  opts[, opt_suffix := .att_option_suffix(question_shortname, option_value,
+                                           opt_seq, option_sku)]
+  opts[, turas_code := ifelse(
+    vtype %in% .ATT_MULTI_COL_VTYPES,
+    paste0(question_shortname, "_", opt_suffix),
+    question_shortname
+  )]
+
+  # Allocation-grid fallback (mirrors .att_build_options): for each
+  # Allocation question without API options, borrow the brand list from the
+  # sibling BRANDAWARE_<CAT> question so the data translator can resolve
+  # colon-format export headers like "Knorr:BRANDPEN3_BAK".
+  alloc_short <- questions_dt[Variable_Type == "Allocation", QuestionCode]
+  for (alloc_code in alloc_short) {
+    if (alloc_code %in% opts$question_shortname) next
+    cat_code <- sub("^BRAND[A-Z0-9]+_", "", alloc_code)
+    aware   <- opts[question_shortname == paste0("BRANDAWARE_", cat_code)]
+    if (nrow(aware) == 0L) next
+    synth <- aware[, .(
+      question_id        = NA_character_,
+      question_shortname = alloc_code,
+      question_title     = NA_character_,
+      question_type      = "CONT_SUM",
+      option_id          = option_id,
+      option_sku         = option_sku,
+      option_value       = option_value,
+      option_title       = option_title,
+      opt_seq            = opt_seq,
+      q_title_lc         = "",
+      q_short_lc         = .att_norm_key(alloc_code),
+      opt_t_lc           = opt_t_lc,
+      opt_v_lc           = opt_v_lc,
+      opt_sku_lc         = opt_sku_lc,
+      vtype              = "Allocation",
+      opt_suffix         = opt_suffix,
+      turas_code         = paste0(alloc_code, "_", opt_suffix)
+    )]
+    opts <- rbind(opts, synth, fill = TRUE)
+  }
+
+  # Long table — one row per (q_key, opt_key, turas_code) covering every
+  # plausible matching key for the colon-format export header.
+  pairs <- list(
+    opts[nzchar(q_short_lc) & nzchar(opt_t_lc),
+         .(q_key = q_short_lc, opt_key = opt_t_lc,   turas_code)],
+    opts[nzchar(q_short_lc) & nzchar(opt_v_lc),
+         .(q_key = q_short_lc, opt_key = opt_v_lc,   turas_code)],
+    opts[nzchar(q_short_lc) & nzchar(opt_sku_lc),
+         .(q_key = q_short_lc, opt_key = opt_sku_lc, turas_code)],
+    opts[nzchar(q_title_lc) & nzchar(opt_t_lc),
+         .(q_key = q_title_lc, opt_key = opt_t_lc,   turas_code)],
+    opts[nzchar(q_title_lc) & nzchar(opt_v_lc),
+         .(q_key = q_title_lc, opt_key = opt_v_lc,   turas_code)],
+    opts[nzchar(q_title_lc) & nzchar(opt_sku_lc),
+         .(q_key = q_title_lc, opt_key = opt_sku_lc, turas_code)]
+  )
+  rbindlist(pairs, fill = TRUE)[
+    !duplicated(paste(q_key, opt_key, sep = "▁"))]
+}
+
+#' Translate one Alchemer header cell to a Turas code
+#'
+#' Order of resolution:
+#'   1. Colon-format "<option>:<label>" → lookup by question label + option text.
+#'   2. Cell matches a Survey_Structure QuestionCode → keep verbatim.
+#'   3. Cell matches a question_title → use that question's QuestionCode.
+#'   4. Cell matches a known Alchemer metadata header → normalised passthrough.
+#'   5. Anything else → original cell, with a flag for the warning count.
+#'
+#' Returns a list(code, resolved) so the caller can tally resolution stats.
+#'
+#' @keywords internal
+.att_translate_one <- function(cell, lookup, code_index, title_index, meta_index) {
+  if (is.na(cell) || !nzchar(cell)) return(list(code = cell, resolved = FALSE))
+  cell_clean <- sub("^﻿", "", cell)            # strip BOM
+  cell_clean <- gsub("^\"|\"$", "", cell_clean)     # strip wrapping quotes
+  key_full   <- .att_norm_key(cell_clean)
+
+  if (grepl(":", cell_clean, fixed = TRUE)) {
+    parts <- strsplit(cell_clean, ":", fixed = TRUE)[[1L]]
+    label <- parts[[length(parts)]]
+    text  <- paste(parts[-length(parts)], collapse = ":")
+    hit   <- lookup[q_key == .att_norm_key(label) &
+                    opt_key == .att_norm_key(text)]
+    if (nrow(hit) == 1L) return(list(code = hit$turas_code, resolved = TRUE))
+  }
+
+  if (!is.null(code_index[[key_full]])) {
+    return(list(code = code_index[[key_full]], resolved = TRUE))
+  }
+  if (!is.null(title_index[[key_full]])) {
+    return(list(code = title_index[[key_full]], resolved = TRUE))
+  }
+  if (!is.null(meta_index[[key_full]])) {
+    return(list(code = meta_index[[key_full]], resolved = TRUE))
+  }
+  list(code = cell_clean, resolved = FALSE)
+}
+
+# Standard Alchemer metadata column names → tidier passthrough labels
+.ATT_META_MAP <- c(
+  "response id"    = "ResponseID",
+  "time started"   = "TimeStarted",
+  "date submitted" = "DateSubmitted",
+  "status"         = "Status",
+  "contact id"     = "ContactID",
+  "legacy comments"= "LegacyComments",
+  "comments"       = "Comments",
+  "language"       = "Language",
+  "referer"        = "Referer",
+  "sessionid"      = "SessionID",
+  "user agent"     = "UserAgent",
+  "tags"           = "Tags",
+  "ip address"     = "IPAddress",
+  "longitude"      = "Longitude",
+  "latitude"       = "Latitude",
+  "country"        = "Country",
+  "city"           = "City",
+  "state/region"   = "StateRegion",
+  "postal"         = "Postal",
+  "url variable: id" = "URL_id",
+  "id"             = "URL_id",
+  "wave"           = "Wave"
+)
+
+#' Write Data_Headers.xlsx aligned to the Alchemer data export
+#'
+#' One row, one cell per export column, each cell holds the Survey_Structure
+#' QuestionCode that owns that column (or a tidy passthrough for Alchemer
+#' metadata cols). When no export is provided, falls back to a pure
+#' Survey_Structure layout (one cell per QuestionCode) and warns.
+#'
+#' @keywords internal
+# Pure translator — does no IO and writes no log. Used by both
+# .att_write_data_headers (for writing the file) and the upstream filter
+# step (to know which Survey_Structure rows survive).
+#
+# Returns a list with: headers (Turas code per export cell), alch_row (raw
+# Alchemer header per cell), resolved_flags (logical, did we map it?),
+# header_row_index (which worksheet row was the Alchemer header), and
+# duplicate_codes (any Turas codes that needed _dupN suffixing).
+.att_translate_export_headers <- function(questions_dt, options_dt, api_dt,
+                                          data_export_path) {
+  detected <- .att_detect_alchemer_header_row(data_export_path)
+  alch_row <- detected$values
+
+  lookup      <- .att_build_translation_lookup(api_dt, questions_dt)
+  code_index  <- setNames(as.list(questions_dt$QuestionCode),
+                          .att_norm_key(questions_dt$QuestionCode))
+  title_index <- setNames(as.list(questions_dt$QuestionCode),
+                          .att_norm_key(questions_dt$QuestionText))
+  meta_index  <- setNames(as.list(unname(.ATT_META_MAP)),
+                          .att_norm_key(names(.ATT_META_MAP)))
+
+  out <- character(length(alch_row))
+  resolved_flags <- logical(length(alch_row))
+  for (i in seq_along(alch_row)) {
+    res <- .att_translate_one(alch_row[i], lookup, code_index, title_index, meta_index)
+    out[i] <- res$code %||% NA_character_
+    resolved_flags[i] <- res$resolved
+  }
+
+  # Disambiguate any duplicate codes by suffixing _dupN so column names stay unique
+  duplicate_codes <- character(0)
+  if (anyDuplicated(out) > 0L) {
+    tab <- table(out)
+    duplicate_codes <- names(tab[tab > 1L])
+    for (code in duplicate_codes) {
+      idx <- which(out == code)
+      out[idx] <- paste0(code, c("", paste0("_dup", seq_len(length(idx) - 1L))))
+    }
+  }
+
+  list(
+    headers          = out,
+    alch_row         = alch_row,
+    resolved_flags   = resolved_flags,
+    header_row_index = detected$row_index,
+    duplicate_codes  = duplicate_codes
+  )
+}
+
+.att_write_data_headers <- function(questions_dt, options_dt, api_dt,
+                                    output_path, data_export_path = NULL,
+                                    precomputed = NULL) {
+
+  use_export <- !is.null(data_export_path) && nzchar(data_export_path) &&
+                file.exists(data_export_path)
+
+  if (!use_export) {
+    headers <- .att_build_data_headers_structure_only(questions_dt)
+    .att_save_headers_workbook(headers, output_path)
+    cat(sprintf(
+      "  Data_Headers: %d cells (structure-only fallback; no data export provided)\n",
+      length(headers)))
+    return(invisible(headers))
+  }
+
+  res <- precomputed %||% .att_translate_export_headers(
+    questions_dt, options_dt, api_dt, data_export_path)
+
+  cat(sprintf("  Alchemer header detected on worksheet row %d (%d cells, %d colon-format)\n",
+              res$header_row_index, length(res$alch_row),
+              sum(grepl(":", res$alch_row, fixed = TRUE), na.rm = TRUE)))
+
+  if (length(res$duplicate_codes) > 0L) {
+    warning(sprintf("Duplicate Turas codes encountered (suffixed with _dupN): %s",
+                    paste(res$duplicate_codes, collapse = ", ")), call. = FALSE)
+  }
+
+  .att_save_headers_workbook(res$headers, output_path)
+
+  n_total      <- length(res$headers)
+  n_resolved   <- sum(res$resolved_flags)
+  n_unresolved <- n_total - n_resolved
+  cat(sprintf(
+    "  Data_Headers: %d cells aligned to export | %d resolved to Turas codes | %d passthrough / unresolved\n",
+    n_total, n_resolved, n_unresolved))
+  if (n_unresolved > 0L) {
+    unresolved <- res$alch_row[!res$resolved_flags & !is.na(res$alch_row) &
+                                 nzchar(res$alch_row)]
+    show <- head(unique(unresolved), 6)
+    cat(sprintf("    Unresolved sample (%d unique shown): %s\n",
+                length(show), paste(sprintf("\"%s\"", substr(show, 1, 50)),
+                                    collapse = ", ")))
+  }
+  invisible(res$headers)
+}
+
+# Filter questions_dt and options_dt down to questions whose expected data
+# columns actually appear in the data file. Used when AlchemerExport runs
+# with a data export — keeps Survey_Structure and Crosstab_Config in sync
+# with the scope of the export (analyst commonly excludes screener questions
+# from the export to keep the data file lean).
+#
+# Also TRIMS the Columns count for multi-column questions to the highest
+# slot present in the data (e.g. if the API said BRANDPEN3_DSS has 15 brands
+# but the export only contains _1.._14, Columns is reduced to 14 and the
+# Options sheet drops the orphan _15 row). This prevents tabs' "Missing
+# Allocation/Multi-Mention Columns" warnings.
+.att_filter_to_data_columns <- function(questions_dt, options_dt, data_cols) {
+  data_cols <- unique(data_cols[!is.na(data_cols) & nzchar(data_cols)])
+  data_set  <- new.env(hash = TRUE, parent = emptyenv())
+  for (c in data_cols) assign(c, TRUE, envir = data_set)
+
+  has_col <- function(name) exists(name, envir = data_set, inherits = FALSE)
+
+  # Per row, decide: keep / drop, and (for multi-column) what Columns should
+  # actually be based on which slot columns are present in data.
+  kept_qs <- copy(questions_dt)
+  keep <- logical(nrow(kept_qs))
+  for (i in seq_len(nrow(kept_qs))) {
+    q <- kept_qs[i]
+    is_multi <- q$Variable_Type %in% c("Multi_Mention", "Ranking", "Allocation") &&
+                !is.na(q$Columns) && q$Columns > 1L
+    if (is_multi) {
+      present <- vapply(seq_len(q$Columns),
+                        function(n) has_col(paste0(q$QuestionCode, "_", n)),
+                        logical(1L))
+      n_present <- sum(present)
+      keep[i] <- n_present > 0L
+      if (keep[i] && n_present < q$Columns) {
+        # Trim Columns down to the largest contiguous present slot (or simply
+        # the highest present index — fine either way for tabs validation).
+        highest <- max(which(present))
+        kept_qs$Columns[i] <- highest
+      }
+    } else {
+      keep[i] <- has_col(q$QuestionCode)
+    }
+  }
+  kept_qs <- kept_qs[keep]
+  kept_codes <- kept_qs$QuestionCode
+
+  # Options: drop those whose parent question got pruned AND those whose
+  # slot index now exceeds the trimmed Columns count.
+  cols_lookup <- setNames(kept_qs$Columns, kept_qs$QuestionCode)
+  opt_keep <- vapply(options_dt$QuestionCode, function(oc) {
+    if (oc %in% kept_codes) return(TRUE)
+    parent <- sub("_[A-Za-z0-9]+$", "", oc)
+    if (!(parent %in% kept_codes)) return(FALSE)
+    # Multi-mention/Allocation option: keep only if slot index is within
+    # the (possibly trimmed) Columns count for the parent.
+    slot <- suppressWarnings(as.integer(sub(paste0("^", parent, "_"), "", oc)))
+    if (is.na(slot)) return(TRUE)  # non-numeric suffix (shouldn't happen now)
+    parent_cols <- cols_lookup[[parent]] %||% 0L
+    slot <= parent_cols
+  }, logical(1L), USE.NAMES = FALSE)
+
+  list(
+    questions = kept_qs,
+    options   = options_dt[opt_keep],
+    n_dropped_questions = nrow(questions_dt) - nrow(kept_qs),
+    n_trimmed_questions = sum(kept_qs$Columns !=
+      questions_dt[QuestionCode %in% kept_codes, Columns])
+  )
+}
+
+# Fallback used when no data export is given: one cell per Survey_Structure
+# QuestionCode (Multi/Ranking/Allocation get one cell per option).
+.att_build_data_headers_structure_only <- function(questions_dt) {
   per_q <- vector("list", nrow(questions_dt))
   for (i in seq_len(nrow(questions_dt))) {
     code  <- questions_dt$QuestionCode[[i]]
     vtype <- questions_dt$Variable_Type[[i]]
     n_col <- questions_dt$Columns[[i]]
-    if (vtype %in% .ATT_MULTI_COL_VTYPES && !is.na(n_col) && n_col > 1L) {
-      per_q[[i]] <- paste0(code, "_", seq_len(n_col))
+    per_q[[i]] <- if (vtype %in% .ATT_MULTI_COL_VTYPES && !is.na(n_col) && n_col > 1L) {
+      paste0(code, "_", seq_len(n_col))
     } else {
-      per_q[[i]] <- code
+      code
     }
   }
   unlist(per_q, use.names = FALSE)
 }
 
-#' Write Data_Headers.xlsx — single row, column codes mirroring Survey_Structure
-#'
-#' @keywords internal
-.att_write_data_headers <- function(questions_dt, output_path) {
-  headers <- .att_build_data_headers(questions_dt)
+.att_save_headers_workbook <- function(headers, output_path) {
   if (length(headers) == 0L) {
-    warning("No headers derived from Survey_Structure — Data_Headers skipped.",
-            call. = FALSE)
+    warning("No headers to write — Data_Headers skipped.", call. = FALSE)
     return(invisible(NULL))
   }
-
-  dupes <- headers[duplicated(headers)]
-  if (length(dupes) > 0L) {
-    warning(sprintf(
-      "Duplicate Data_Headers columns: %s — check QuestionCode values in Survey_Structure.",
-      paste(unique(dupes), collapse = ", ")
-    ), call. = FALSE)
-  }
-
   header_dt <- as.data.table(setNames(as.list(headers), headers))
   wb <- openxlsx::createWorkbook()
   openxlsx::addWorksheet(wb, "Headers")
   openxlsx::writeData(wb, "Headers", header_dt, startRow = 1L, colNames = TRUE)
   openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
-
-  cat(sprintf("  Data_Headers: %d columns (mirrors Survey_Structure)\n",
-              length(headers)))
-  invisible(headers)
 }
+
+#' Write a Turas-ready data file from the raw Alchemer export
+#'
+#' Strips the Alchemer multi-row header, swaps in the single-row Turas code
+#' header produced by `.att_write_data_headers`, and writes the result as
+#' `<survey_id>_data.xlsx` — exactly the filename the generated Brand_Config
+#' defaults to. So once AlchemerExport finishes the analyst can run the brand
+#' / tabs module immediately without any manual header paste.
+#'
+#' Column counts that don't match (export wider than Data_Headers, or vice
+#' versa) get logged as a warning and the file is trimmed to the smaller of
+#' the two — better to produce a usable file with a clear log line than fail.
+#'
+#' @keywords internal
+.att_write_turas_ready_data <- function(data_export_path, turas_headers,
+                                        output_path) {
+  detected   <- .att_detect_alchemer_header_row(data_export_path)
+  header_row <- detected$row_index
+  ext        <- tolower(tools::file_ext(data_export_path))
+
+  if (ext == "csv") {
+    all <- data.table::fread(data_export_path, header = FALSE)
+  } else {
+    all <- openxlsx::read.xlsx(data_export_path, sheet = 1L, colNames = FALSE,
+                               skipEmptyRows = FALSE, skipEmptyCols = FALSE)
+  }
+  if (is.null(all) || nrow(all) <= header_row) {
+    warning("No data rows found below the detected header — data file skipped.",
+            call. = FALSE)
+    return(invisible(NULL))
+  }
+
+  data_rows <- all[(header_row + 1L):nrow(all), , drop = FALSE]
+  n_export  <- ncol(data_rows)
+  n_hdr     <- length(turas_headers)
+
+  if (n_export != n_hdr) {
+    warning(sprintf(
+      "Column count mismatch: export has %d cols, Data_Headers has %d — data file trimmed to %d.",
+      n_export, n_hdr, min(n_export, n_hdr)), call. = FALSE)
+  }
+  n <- min(n_export, n_hdr)
+  data_rows <- data_rows[, seq_len(n), drop = FALSE]
+  names(data_rows) <- turas_headers[seq_len(n)]
+
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "Data")
+  openxlsx::writeData(wb, "Data", data_rows, startRow = 1L, colNames = TRUE)
+  openxlsx::saveWorkbook(wb, output_path, overwrite = TRUE)
+
+  cat(sprintf("  Turas-ready data: %d records x %d columns\n",
+              nrow(data_rows), ncol(data_rows)))
+  invisible(output_path)
+}
+
+# Variable_Type values in Survey_Structure that produce one data column per option.
+.ATT_MULTI_COL_VTYPES <- c("Multi_Mention", "Ranking", "Allocation")
 
 # ---- main --------------------------------------------------------------------
 
@@ -537,16 +1285,21 @@ source(file.path(.att_turas_root(), "scripts", "fetch_alchemer_reporting_values.
 #' @param api_secret Optional API secret. Defaults to ALCHEMER_API_SECRET env var.
 #' @param targets Character vector of module targets. Valid values: "tabs", "brand".
 #'   Defaults to "tabs". Pass c("tabs", "brand") to generate both.
+#' @param data_export_path Optional path to an Alchemer data export (CSV or
+#'   XLSX). When provided, Data_Headers is built with one cell per export
+#'   column and each cell holds the Survey_Structure QuestionCode that owns
+#'   that column (colon-format Alchemer cells are translated via the API
+#'   option list; metadata cells are passed through with tidy names). Without
+#'   an export, falls back to a row of QuestionCodes mirroring Survey_Structure.
 #' @return Invisibly, a named list of paths for files written. Always includes
-#'   `data_headers` (mirrors `Survey_Structure.xlsx` — one column per
-#'   QuestionCode for single-value types, one column per option for
-#'   Multi_Mention / Ranking / Allocation).
+#'   `data_headers`.
 #' @export
 alchemer_to_turas <- function(survey_id,
                                output_dir,
                                api_token        = NULL,
                                api_secret       = NULL,
-                               targets          = "tabs") {
+                               targets          = "tabs",
+                               data_export_path = NULL) {
   if (missing(survey_id) || !nzchar(as.character(survey_id))) {
     stop("survey_id is required.", call. = FALSE)
   }
@@ -594,6 +1347,33 @@ alchemer_to_turas <- function(survey_id,
   cat("Building config sheets...\n")
   questions_dt <- .att_build_questions(api_dt)
   options_dt   <- .att_build_options(api_dt, questions_dt)
+
+  # If a data export was given, translate its headers EARLY so we can prune
+  # questions_dt / options_dt down to the scope the analyst actually exported.
+  # Keeps Survey_Structure and Crosstab_Config aligned with the data file
+  # (analyst typically excludes screener questions from the export).
+  headers_precomputed <- NULL
+  if (!is.null(data_export_path) && nzchar(data_export_path) &&
+      file.exists(data_export_path)) {
+    headers_precomputed <- .att_translate_export_headers(
+      questions_dt, options_dt, api_dt, data_export_path)
+    filt <- .att_filter_to_data_columns(questions_dt, options_dt,
+                                        headers_precomputed$headers)
+    cat(sprintf(
+      "  Filter to data-export scope: %d kept | %d dropped | %d trimmed (Columns count reduced to match data)\n",
+      nrow(filt$questions), filt$n_dropped_questions, filt$n_trimmed_questions))
+    if (filt$n_dropped_questions > 0L) {
+      dropped <- setdiff(questions_dt$QuestionCode, filt$questions$QuestionCode)
+      show <- head(dropped, 8)
+      cat(sprintf("    Dropped: %s%s\n",
+                  paste(show, collapse = ", "),
+                  if (length(dropped) > length(show))
+                    sprintf(" (+%d more)", length(dropped) - length(show)) else ""))
+    }
+    questions_dt <- filt$questions
+    options_dt   <- filt$options
+  }
+
   selection_dt <- .att_build_selection(questions_dt)
 
   cat(sprintf("  Questions: %d | Options: %d | Selection: %d (+1 Total row)\n",
@@ -631,21 +1411,55 @@ alchemer_to_turas <- function(survey_id,
     bc_path       <- file.path(output_dir, sprintf("%s_Brand_Config.xlsx", survey_id))
 
     cat("Writing Survey_Structure_Brand.xlsx...\n")
+    attitude_om <- .att_build_attitude_optionmap(api_dt)
+    if (!is.null(attitude_om) && nrow(attitude_om) > 0L) {
+      n_unmapped <- sum(is.na(attitude_om$Role))
+      cat(sprintf("  Attitude scale: %d levels detected (%d auto-mapped to roles)\n",
+                  nrow(attitude_om), nrow(attitude_om) - n_unmapped))
+      if (n_unmapped > 0L) {
+        cat(sprintf("    %d option(s) need a manual Role in Survey_Structure_Brand > OptionMap\n",
+                    n_unmapped))
+      }
+    }
     .att_write_brand_survey_structure(questions_dt, options_dt,
-                                      brands_dt, ceps_dt, attrs_dt, ss_brand_path)
+                                      brands_dt, ceps_dt, attrs_dt, ss_brand_path,
+                                      attitude_optionmap_dt = attitude_om)
 
     cat("Writing Brand_Config.xlsx...\n")
-    .att_write_brand_config(cats_dt, bc_path)
+    .att_write_brand_config(cats_dt, bc_path, survey_id = survey_id)
 
     out_paths$survey_structure_brand <- ss_brand_path
     out_paths$brand_config           <- bc_path
   }
 
-  # ---- data headers (all targets, mirrors Survey_Structure) ------------------
+  # ---- data headers (all targets) --------------------------------------------
   dh_path <- file.path(output_dir, sprintf("%s_Data_Headers.xlsx", survey_id))
   cat("Writing Data_Headers.xlsx...\n")
-  .att_write_data_headers(questions_dt, dh_path)
+  if (!is.null(data_export_path) && nzchar(data_export_path) &&
+      !file.exists(data_export_path)) {
+    warning(sprintf(
+      "data_export_path not found: '%s' — falling back to structure-only.",
+      data_export_path
+    ), call. = FALSE)
+    data_export_path <- NULL
+  }
+  turas_headers <- .att_write_data_headers(
+    questions_dt     = questions_dt,
+    options_dt       = options_dt,
+    api_dt           = api_dt,
+    output_path      = dh_path,
+    data_export_path = data_export_path,
+    precomputed      = headers_precomputed
+  )
   out_paths$data_headers <- dh_path
+
+  # ---- Turas-ready data file (only when a data export was provided) ----------
+  if (!is.null(data_export_path) && length(turas_headers) > 0L) {
+    data_out <- file.path(output_dir, sprintf("%s_data.xlsx", survey_id))
+    cat("Writing Turas-ready data file...\n")
+    .att_write_turas_ready_data(data_export_path, turas_headers, data_out)
+    out_paths$data_file <- data_out
+  }
 
   written <- paste(sprintf("  %s", basename(unlist(out_paths))), collapse = "\n")
   cat(sprintf("\nDone. Files in: %s\n%s\n", output_dir, written))
@@ -659,12 +1473,13 @@ if (sys.nframe() == 0L && !interactive()) {
   args <- commandArgs(trailingOnly = TRUE)
   if (length(args) < 2L) {
     stop(
-      "Usage: Rscript scripts/alchemer_to_turas.R <survey_id> <output_dir>",
+      "Usage: Rscript scripts/alchemer_to_turas.R <survey_id> <output_dir> [data_export]",
       call. = FALSE
     )
   }
   alchemer_to_turas(
-    survey_id  = args[[1L]],
-    output_dir = args[[2L]]
+    survey_id        = args[[1L]],
+    output_dir       = args[[2L]],
+    data_export_path = if (length(args) >= 3L) args[[3L]] else NULL
   )
 }

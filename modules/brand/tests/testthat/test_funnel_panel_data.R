@@ -209,12 +209,12 @@ test_that("table cells cover every (stage, brand) pair with absolute and nested 
   expect_equal(ipk_aware$pct_nested,   0.9, tolerance = 1e-9)
   expect_equal(ipk_aware$sig_vs_focal, "focal")
 
-  # IPK consideration: absolute = 0.7; nested = 0.7/0.9
+  # IPK consideration (top-2 attitude): absolute = 0.5; nested = 0.5/0.9
   ipk_cons <- Filter(function(c)
     c$stage_key == "consideration" && c$brand_code == "IPK",
     panel$table$cells)[[1]]
-  expect_equal(ipk_cons$pct_absolute, 0.7, tolerance = 1e-9)
-  expect_equal(ipk_cons$pct_nested,   0.7 / 0.9, tolerance = 1e-9)
+  expect_equal(ipk_cons$pct_absolute, 0.5, tolerance = 1e-9)
+  expect_equal(ipk_cons$pct_nested,   0.5 / 0.9, tolerance = 1e-9)
 })
 
 
@@ -238,9 +238,9 @@ test_that("table includes Average-of-all-brands row with both pct modes", {
   expect_equal(aware_avg$pct_nested,   0.8, tolerance = 1e-9)  # stage 1 no prior
 
   cons_avg <- panel$table$avg_all_brands[[2]]
-  # absolute mean = mean(0.7,0.6,0.5) = 0.6; nested = 0.6 / 0.8 = 0.75
-  expect_equal(cons_avg$pct_absolute, 0.6,  tolerance = 1e-9)
-  expect_equal(cons_avg$pct_nested,   0.75, tolerance = 1e-9)
+  # absolute mean (top-2 attitude) = mean(0.5, 0.4, 0.4) = 0.4333; nested = 0.4333 / 0.8
+  expect_equal(cons_avg$pct_absolute, mean(c(0.5, 0.4, 0.4)),  tolerance = 1e-9)
+  expect_equal(cons_avg$pct_nested,   mean(c(0.5, 0.4, 0.4)) / 0.8, tolerance = 1e-9)
 })
 
 
@@ -271,7 +271,7 @@ test_that("consideration_detail has one entry per brand with 5 attitude segments
   ipk_entry <- panel$consideration_detail$brands[[which(brands_covered == "IPK")]]
   expect_setequal(names(ipk_entry$segments),
     c("attitude.love","attitude.prefer","attitude.ambivalent",
-      "attitude.reject","attitude.no_opinion"))
+      "attitude.avoid","attitude.no_opinion"))
   # IPK love = 3/10
   expect_equal(ipk_entry$segments$attitude.love, 3/10, tolerance = 1e-9)
 })

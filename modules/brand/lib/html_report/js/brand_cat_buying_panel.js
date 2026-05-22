@@ -92,7 +92,18 @@
       heatmap:    { brands: false, loyalty: false, dist: false, dop: true },
       showcounts: { loyalty: false, dist: false, dop: false },
       brandsChartCol: 'pen',
+      /* visible.* governs TABLE-row visibility per sub-tab. */
       visible: {
+        loyalty: makeVisMap(pd.brandCodes),
+        dist:    makeVisMap(pd.brandCodes),
+        brands:  makeVisMap(pd.brandCodes)
+      },
+      /* chart_visible.* governs CHART-series visibility per sub-tab. Starts
+         identical to visible.* so the default (sync mode ON in the Filter
+         brands popover) keeps table and chart in lockstep. When the user
+         turns sync OFF in the popover they can hide brands from charts
+         independently of the table rows. */
+      chart_visible: {
         loyalty: makeVisMap(pd.brandCodes),
         dist:    makeVisMap(pd.brandCodes),
         brands:  makeVisMap(pd.brandCodes)
@@ -219,29 +230,47 @@
     var initialHidden = codes.filter(function (c) {
       return panel.__cbState.visible.brands[c] === false;
     });
+    // Split mode (matches the funnel panel): "Sync table + chart" toggle
+    // visible at the top of the popover, defaults ON. With sync ON, table-
+    // row and chart-series visibility move together. With sync OFF, the
+    // analyst can hide brands from the chart while keeping them in the
+    // table (or vice versa) — useful when showing the full table for
+    // reference but emphasising a smaller subset in the chart.
     panel.__cbSelector = window.BrandSelector.create({
-      panelId:       'cb-' + catCode,
-      triggerEl:     trigger,
-      anchorEl:      trigger.parentElement,
-      brands:        brandList,
-      mode:          'unified',
-      initialHidden: initialHidden,
-      onChange: function (hiddenSet) {
+      panelId:            'cb-' + catCode,
+      categoryKey:        catCode,
+      triggerEl:          trigger,
+      anchorEl:           trigger.parentElement,
+      brands:             brandList,
+      mode:               'split',
+      syncDefault:        true,
+      initialHidden:      initialHidden,
+      initialHiddenChart: initialHidden,
+      onChange: function (hiddenSet, scope) {
+        var updateTable = scope === 'all' || scope === 'table';
+        var updateChart = scope === 'all' || scope === 'chart';
         codes.forEach(function (c) {
           var visible = !hiddenSet.has(c);
-          ['brands', 'loyalty', 'dist'].forEach(function (scope) {
-            if (panel.__cbState.visible[scope]) {
-              panel.__cbState.visible[scope][c] = visible;
+          ['brands', 'loyalty', 'dist'].forEach(function (sub) {
+            if (updateTable && panel.__cbState.visible[sub]) {
+              panel.__cbState.visible[sub][c] = visible;
+            }
+            if (updateChart && panel.__cbState.chart_visible[sub]) {
+              panel.__cbState.chart_visible[sub][c] = visible;
             }
           });
         });
-        applyBrandsRowVisibility(panel);
-        applyRowVisibility(panel, 'loyalty');
-        applyRowVisibility(panel, 'dist');
-        if (panel.__cbState.showchart && panel.__cbState.showchart.brands)
-          renderCbBrandsChart(panel);
-        renderCbStackedBars(panel, 'loyalty');
-        renderCbStackedBars(panel, 'dist');
+        if (updateTable) {
+          applyBrandsRowVisibility(panel);
+          applyRowVisibility(panel, 'loyalty');
+          applyRowVisibility(panel, 'dist');
+        }
+        if (updateChart) {
+          if (panel.__cbState.showchart && panel.__cbState.showchart.brands)
+            renderCbBrandsChart(panel);
+          renderCbStackedBars(panel, 'loyalty');
+          renderCbStackedBars(panel, 'dist');
+        }
       }
     });
   }
@@ -711,7 +740,13 @@
 
     var pd    = panel.__cbData || {};
     var focal = pd.focalBrand;
-    var vis   = (panel.__cbState.visible && panel.__cbState.visible.brands) || {};
+    // Chart-series visibility (independent from table-row visibility when the
+    // Filter brands "Sync table + chart" toggle is OFF). Falls back to
+    // visible.brands for back-compat when chart_visible isn't populated.
+    var vis   = (panel.__cbState.chart_visible &&
+                 panel.__cbState.chart_visible.brands) ||
+                (panel.__cbState.visible &&
+                 panel.__cbState.visible.brands) || {};
 
     var rows = Array.prototype.slice.call(
       table.querySelectorAll('tbody tr[data-brand]'));
@@ -859,7 +894,10 @@
     var chartDiv = panel.querySelector('.fn-rel-chart[data-cb-stacked-chart="' + scope + '"]');
     if (!chartDiv) return;
 
-    var vis    = (panel.__cbState.visible  || {})[scope] || {};
+    // Chart-series visibility (independent from table-row visibility when
+    // the Filter brands sync toggle is OFF).
+    var vis    = (panel.__cbState.chart_visible || {})[scope] ||
+                 (panel.__cbState.visible || {})[scope] || {};
     var emph   = (panel.__cbState.emphasis || {})[scope] || { all: true };
     var focal  = pd.focalBrand;
     var colors = SEG_COLORS[scope] || SEG_COLORS.loyalty;
@@ -1295,7 +1333,18 @@
     var brandCode = btn.tagName === 'SELECT'
       ? btn.value
       : btn.getAttribute('data-brand');
-    var focalColour = panel.dataset.focalColour || '#1A5276';
+    // Resolve the new focal's true colour (Brands-sheet Colour column) so
+    // dots, labels, focal rows, and the --cb-focal-colour CSS variable
+    // all repaint to the brand the user picked, not the report-default focal.
+    var focalColour;
+    try {
+      focalColour = getBrandColour(panel.__cbData, brandCode) ||
+                    panel.dataset.focalColour ||
+                    '#1A5276';
+    } catch (e) {
+      focalColour = panel.dataset.focalColour || '#1A5276';
+    }
+    panel.style.setProperty('--cb-focal-colour', focalColour);
 
     /* Capture the previous focal BEFORE any class mutations below
        (section 3 strips focal-row from non-new-focal rows, which would
@@ -1474,12 +1523,16 @@
 
     /* 6. BrandSelector: move the FOCAL pill to the new focal and force the
           brand visible (matches the legacy behaviour where the focal chip
-          could not be turned off). */
+          could not be turned off). Force it visible in BOTH the table-row
+          and chart-series visibility maps so a focal switch always brings
+          the new focal back into view, regardless of the Sync toggle. */
     if (panel.__cbSelector) {
       panel.__cbSelector.setFocal(brandCode);
       panel.__cbSelector.showBrand(brandCode);
       ['brands', 'loyalty', 'dist'].forEach(function (s) {
         if (panel.__cbState.visible[s]) panel.__cbState.visible[s][brandCode] = true;
+        if (panel.__cbState.chart_visible && panel.__cbState.chart_visible[s])
+          panel.__cbState.chart_visible[s][brandCode] = true;
       });
     }
   };

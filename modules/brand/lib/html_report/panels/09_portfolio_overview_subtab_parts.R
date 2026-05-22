@@ -159,9 +159,18 @@ pfo_render_deep_strip <- function(overview, focal_brand, focal_colour) {
     .pfo_deep_card_html(c, focal_brand, focal_colour)
   }, character(1)), collapse = "")
 
+  # Balanced layout: an exact 4 wraps into 2x2 instead of 3+1; small N gets
+  # one row; large N falls back to auto-fit so the cards stay readable.
+  n <- length(deep)
+  col_style <- if (n == 4) 'grid-template-columns: repeat(2, 1fr);'
+               else if (n >= 1 && n <= 3) sprintf('grid-template-columns: repeat(%d, 1fr);', n)
+               else if (n >= 5 && n <= 6) 'grid-template-columns: repeat(3, 1fr);'
+               else ''
+
   paste0(
     '<h3 class="pfo-section-title">Deep-dive competitive context</h3>',
-    '<div class="pfo-deep-grid">', cards, '</div>'
+    sprintf('<div class="pfo-deep-grid" style="%s">', col_style),
+    cards, '</div>'
   )
 }
 
@@ -170,7 +179,9 @@ pfo_render_deep_strip <- function(overview, focal_brand, focal_colour) {
   focal_dd <- dd[[focal_brand]]
   if (is.null(focal_dd)) return("")
 
-  # Build ranked list of top 5 competitors by SCR
+  # Rank by volume share \u2014 the strongest commercial signal of competitive
+  # position in the category. SCR is informative but reflects loyalty among
+  # a brand's existing buyers, not market position. Vol share is everyone.
   rows <- lapply(c$brand_codes, function(bc) {
     bdd <- dd[[bc]]
     if (is.null(bdd)) return(NULL)
@@ -184,7 +195,7 @@ pfo_render_deep_strip <- function(overview, focal_brand, focal_colour) {
     )
   })
   rows <- Filter(Negate(is.null), rows)
-  rows <- rows[order(-vapply(rows, function(r) r$scr %||% -1, numeric(1)))]
+  rows <- rows[order(-vapply(rows, function(r) r$vol %||% -1, numeric(1)))]
   top_n <- min(5L, length(rows))
   rows <- rows[seq_len(top_n)]
 
@@ -194,7 +205,7 @@ pfo_render_deep_strip <- function(overview, focal_brand, focal_colour) {
     sprintf(
       '<tr%s><td>#%d %s</td><td class="pfo-td-num">%s</td><td class="pfo-td-num">%s</td></tr>',
       cls, i, .pf_esc(r$name),
-      if (is.na(r$scr)) "\u2014" else sprintf("%.0f%%", r$scr),
+      if (is.na(r$vol)) "\u2014" else sprintf("%.0f%%", r$vol),
       if (is.na(r$pen)) "\u2014" else sprintf("%.0f%%", r$pen)
     )
   }, character(1)), collapse = "")
@@ -205,16 +216,16 @@ pfo_render_deep_strip <- function(overview, focal_brand, focal_colour) {
   sprintf(
     paste0('<div class="pfo-deep-card">',
            '<div class="pfo-deep-card-head"><span class="pfo-deep-card-title">%s</span>',
-           '<span class="pfo-deep-card-rank">Focal: %s by SCR</span></div>',
-           '<div class="pfo-deep-card-kpis"><div><span class="pfo-kpi-mini-v">%s</span><span class="pfo-kpi-mini-l">SCR</span></div>',
+           '<span class="pfo-deep-card-rank">Focal: %s by vol share</span></div>',
+           '<div class="pfo-deep-card-kpis"><div><span class="pfo-kpi-mini-v">%s</span><span class="pfo-kpi-mini-l">Vol share</span></div>',
            '<div><span class="pfo-kpi-mini-v">%s</span><span class="pfo-kpi-mini-l">Penetration</span></div>',
-           '<div><span class="pfo-kpi-mini-v">%s</span><span class="pfo-kpi-mini-l">Vol share</span></div></div>',
-           '<table class="pfo-deep-rank"><tbody>%s</tbody></table>',
+           '<div><span class="pfo-kpi-mini-v">%s</span><span class="pfo-kpi-mini-l">SCR</span></div></div>',
+           '<table class="pfo-deep-rank"><thead><tr><th>Brand</th><th class="pfo-td-num">Vol share</th><th class="pfo-td-num">Pen</th></tr></thead><tbody>%s</tbody></table>',
            '</div>'),
     .pf_esc(c$cat_name), .pf_esc(focal_rank_txt),
-    if (is.na(focal_dd$scr_pct %||% NA)) "\u2014" else sprintf("%.0f%%", focal_dd$scr_pct),
-    if (is.na(focal_dd$penetration_pct %||% NA)) "\u2014" else sprintf("%.0f%%", focal_dd$penetration_pct),
     if (is.na(focal_dd$vol_share_pct %||% NA)) "\u2014" else sprintf("%.0f%%", focal_dd$vol_share_pct),
+    if (is.na(focal_dd$penetration_pct %||% NA)) "\u2014" else sprintf("%.0f%%", focal_dd$penetration_pct),
+    if (is.na(focal_dd$scr_pct %||% NA)) "\u2014" else sprintf("%.0f%%", focal_dd$scr_pct),
     rank_body
   )
 }

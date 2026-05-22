@@ -55,10 +55,15 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
 
   brand_codes  <- panel_data$brands$codes  %||% character(0)
   brand_labels <- panel_data$brands$labels %||% brand_codes
+  # Look up the focal-brand display label from the FULL brand list before
+  # we drop focal from the per-brand block. Otherwise the header function
+  # can't resolve "BR_A" → "Brand A".
+  focal_label  <- .demo_table_focal_label(brand_codes, brand_labels,
+                                           focal_brand)
   ord          <- .demo_table_brand_order(brand_codes, focal_brand)
 
   thead <- .demo_table_header(brand_codes[ord], brand_labels[ord],
-                               focal_brand, brand_colours)
+                               focal_brand, focal_label, brand_colours)
   tbody <- .demo_table_body(rows, q, brand_codes[ord], focal_brand,
                              brand_colours, decimal_places)
 
@@ -73,11 +78,22 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
 # ==============================================================================
 
 .demo_table_brand_order <- function(brand_codes, focal_brand) {
+  # Focal lives in its own pinned column 2 (rendered separately). The
+  # per-brand block excludes the focal so we don't show the same brand
+  # twice — fixed 2026-05-22 after a UX review flagged the duplication.
   if (length(brand_codes) == 0L) return(integer(0))
-  fi <- if (focal_brand %in% brand_codes) which(brand_codes == focal_brand)[1L]
-        else integer(0)
-  rest <- setdiff(seq_along(brand_codes), fi)
-  c(fi, rest)
+  fi <- which(brand_codes == focal_brand)
+  setdiff(seq_along(brand_codes), fi)
+}
+
+
+# Resolve the display label for the focal brand from the original (full)
+# brand list. Called BEFORE per-brand ordering subset because excluding
+# focal from the per-brand block would otherwise lose its label.
+.demo_table_focal_label <- function(brand_codes, brand_labels, focal_brand) {
+  fi <- match(focal_brand, brand_codes)
+  if (is.na(fi)) return(focal_brand)
+  brand_labels[fi]
 }
 
 
@@ -86,7 +102,7 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
 # ==============================================================================
 
 .demo_table_header <- function(brand_codes, brand_labels, focal_brand,
-                                brand_colours) {
+                                focal_label, brand_colours) {
   brand_th <- vapply(seq_along(brand_codes), function(i) {
     bc  <- brand_codes[i]
     bl  <- brand_labels[i]
@@ -98,11 +114,6 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
        </th>',
       cls, .demo_table_esc(bc), .demo_table_esc(col), .demo_table_esc(bl))
   }, character(1L))
-  # Focal column header carries the actual brand name so the table reads
-  # naturally and pinned cards remain self-explanatory.
-  focal_label <- focal_brand
-  fi <- match(focal_brand, brand_codes)
-  if (!is.na(fi)) focal_label <- brand_labels[fi]
   paste0(
     '<thead><tr>',
     '<th>Option</th>',
@@ -116,90 +127,195 @@ build_demographics_matrix_table <- function(question_payload, focal_brand,
 
 
 # ==============================================================================
-# INTERNAL: BODY (one row per option)
+# INTERNAL: BODY (two rows per option — Buyer + Non-buyer)
 # ==============================================================================
 
-# SIZE-EXCEPTION: per-row builder weaves five cell types (focal, cat-avg,
-# per-brand × N, n counts, CI bounds, heatmap shading) and is clearer as a
-# single sequential function than as four extract-this / extract-that helpers
-# that would each take the same six args.
+# Cell semantics: penetration WITHIN the demographic option.
+#   Buyer-row cell    = % of respondents in this option who BUY this brand
+#   Non-buyer-row cell = 100% − Buyer-row cell (its complement)
+# Buyer + Non-buyer per cell sum to 100%, so the read is: "of the 30-35s, 29%
+# buy IPK and 71% don't".
+#
+# Cat-avg column in penetration mode shows the per-option MEAN pen across all
+# brands — the typical brand's pen rate in this demographic. Heatmap shading
+# per brand cell is driven by (cell pct − this per-option avg pen), clipped
+# to ±MAX_HEAT_DIFF. Blue = brand over-performs vs the typical brand here;
+# red = under-performs. Non-buyer rows mirror the SAME colour as the matching
+# buyer row (same competitive direction, not the mathematical inverse) so
+# reading either row gives a consistent signal.
+
 .demo_table_body <- function(rows, q, brand_codes, focal_brand, brand_colours,
                               dp) {
-  # Brand_cut indexed by code -> cells list (parallel to q$codes order)
-  brand_by <- list()
-  for (b in (q$brand_cut %||% list())) {
-    brand_by[[b$brand_code]] <- b
-  }
+  pen_by      <- .demo_table_index_by_brand(q$brand_penetration_long)
+  option_avg  <- q$option_avg_penetration %||% list()
 
   trs <- vapply(seq_along(rows), function(i) {
     r <- rows[[i]]
-    cat_pct <- r$pct %||% NA_real_
+    cat_pct <- .demo_table_option_avg_pct(option_avg, r$code)
 
-    focal_cell <- .demo_table_brand_cell(brand_by[[focal_brand]], r$code,
-                                          cat_pct, dp,
-                                          extra_class = "demo-col-focal",
-                                          colcode = "focal",
-                                          brand_code = focal_brand)
-    catavg_cell <- .demo_table_catavg_cell(r, dp)
-    # Per-brand block always lists every brand in declared order, including
-    # the focal brand. The "Focal" column 2 is a pinned reference of whichever
-    # brand the user currently picks; the per-brand block is the full
-    # comparison set. Showing focal twice is intentional (matches Excel pivot
-    # with a "Selected" row pinned at top).
-    per_brand_cells <- vapply(brand_codes, function(bc) {
-      .demo_table_brand_cell(brand_by[[bc]], r$code, cat_pct, dp,
-                              extra_class = if (identical(bc, focal_brand))
-                                "demo-col-focal" else "",
-                              colcode = "brand", brand_code = bc)
-    }, character(1L))
+    opt_label <- .demo_table_esc(r$label %||% r$code)
 
-    paste0(
-      '<tr>',
-      sprintf('<td>%s</td>', .demo_table_esc(r$label %||% r$code)),
-      focal_cell, catavg_cell, paste(per_brand_cells, collapse = ""),
-      '</tr>'
-    )
+    buyer_row <- .demo_table_pen_row(
+      role         = "buyer",
+      label_cell   = sprintf(
+        '<td class="demo-opt-label"><span class="demo-opt-name">%s</span><span class="demo-opt-role">buyer</span></td>',
+        opt_label),
+      brand_index  = pen_by,
+      cat_pct      = cat_pct,
+      code         = r$code,
+      catavg_cell  = .demo_table_catavg_pen_cell(r, cat_pct, dp),
+      brand_codes  = brand_codes,
+      focal_brand  = focal_brand,
+      complement   = FALSE,
+      dp           = dp)
+
+    nonbuyer_row <- .demo_table_pen_row(
+      role         = "nonbuyer",
+      label_cell   = sprintf(
+        '<td class="demo-opt-label"><span class="demo-opt-name">%s</span><span class="demo-opt-role demo-opt-role-nonbuyer">non-buyer</span></td>',
+        opt_label),
+      brand_index  = pen_by,
+      cat_pct      = cat_pct,
+      code         = r$code,
+      catavg_cell  = '<td class="demo-col-catavg demo-cell-blank" data-demo-col="catavg"></td>',
+      brand_codes  = brand_codes,
+      focal_brand  = focal_brand,
+      complement   = TRUE,
+      dp           = dp)
+
+    paste0(buyer_row, nonbuyer_row)
   }, character(1L))
 
   paste0('<tbody>', paste(trs, collapse = ""), '</tbody>')
 }
 
 
-# Per-brand cell — primary % + optional n + optional CI + heatmap diff.
-# colcode controls data-demo-col (used by JS visibility toggles).
-.demo_table_brand_cell <- function(brand_entry, code, cat_pct, dp,
-                                    extra_class = "", colcode = "brand",
-                                    brand_code = NA_character_) {
-  if (is.null(brand_entry)) {
-    return(sprintf(
-      '<td class="%s" data-demo-col="%s" data-demo-brand="%s">
-         <span class="demo-na">&mdash;</span>
-       </td>',
-      extra_class, colcode, .demo_table_esc(brand_code %||% "")))
-  }
-  cell <- .demo_table_find_cell(brand_entry$cells, code)
-  if (is.null(cell)) {
-    return(sprintf(
-      '<td class="%s" data-demo-col="%s" data-demo-brand="%s">
-         <span class="demo-na">&mdash;</span>
-       </td>',
-      extra_class, colcode, .demo_table_esc(brand_code %||% "")))
-  }
-  pct <- cell$pct
-  diff <- if (!is.null(cat_pct) && is.finite(cat_pct) && is.finite(pct))
-    pct - cat_pct else NA_real_
-  bg <- .demo_table_heat_colour(diff)
-  base_n <- brand_entry$base_n %||% NA_integer_
-  cell_n <- if (is.finite(base_n) && is.finite(pct))
-    as.integer(round(base_n * pct / 100)) else NA_integer_
+# Render one tr (buyer or non-buyer). complement=TRUE flips the cell value to
+# 100 − pct (non-buyer is the complement of buyer within the known base).
+# cat_pct is the per-option avg-brand-pen baseline used for cell shading.
+.demo_table_pen_row <- function(role, label_cell, brand_index, cat_pct,
+                                 code, catavg_cell, brand_codes, focal_brand,
+                                 complement, dp) {
+  focal_cell <- .demo_table_pen_cell(
+    brand_index[[focal_brand]], cat_pct,
+    code, dp, complement = complement,
+    extra_class = "demo-col-focal", colcode = "focal",
+    brand_code  = focal_brand)
+  per_brand_cells <- vapply(brand_codes, function(bc) {
+    .demo_table_pen_cell(
+      brand_index[[bc]], cat_pct,
+      code, dp, complement = complement,
+      extra_class = "", colcode = "brand", brand_code = bc)
+  }, character(1L))
   sprintf(
-    '<td class="%s" data-demo-col="%s" data-demo-brand="%s" data-demo-heat="%s">
-       %s%s
-     </td>',
+    '<tr class="demo-row-%s">%s%s%s%s</tr>',
+    role, label_cell, focal_cell, catavg_cell,
+    paste(per_brand_cells, collapse = ""))
+}
+
+
+# Look up the per-option avg brand pen from the panel payload. Returns NA
+# when the option isn't represented (defensive — shouldn't happen with a
+# well-formed engine result).
+.demo_table_option_avg_pct <- function(option_avg, code) {
+  if (is.null(option_avg) || length(option_avg) == 0L) return(NA_real_)
+  entry <- option_avg[[as.character(code)]]
+  if (is.null(entry)) return(NA_real_)
+  as.numeric(entry$pct %||% NA_real_)
+}
+
+
+# Penetration-mode Cat-avg cell. Shows the per-option mean brand pen — i.e.
+# the typical brand's pen rate in this demographic. Italic / muted styling
+# from the .demo-col-catavg class.
+.demo_table_catavg_pen_cell <- function(r, cat_pct, dp) {
+  sprintf(
+    '<td class="demo-col-catavg" data-demo-col="catavg">%s</td>',
+    .demo_table_pct(cat_pct, dp))
+}
+
+
+.demo_table_index_by_brand <- function(brand_long) {
+  out <- list()
+  for (b in (brand_long %||% list())) {
+    out[[b$brand_code]] <- b
+  }
+  out
+}
+
+
+# Render one cell in the penetration table.
+#
+# value = buyer pct in option (from brand_index); when complement=TRUE the
+# cell shows 100 − value (the non-buyer share). Heat colour is always based
+# on the BUYER gap (cell - cat_pct, where cat_pct is the per-option mean
+# brand pen) so buyer + non-buyer rows share the same colour and signal
+# direction — and the colour directly indicates "this brand over/under-
+# performs the typical brand in this demographic".
+#
+# Returns an NA cell when no data for this option/brand combination exists.
+.demo_table_pen_cell <- function(entry, cat_pct, code, dp,
+                                  complement = FALSE,
+                                  extra_class = "", colcode = "brand",
+                                  brand_code = NA_character_) {
+  if (is.null(entry)) {
+    return(.demo_table_na_cell(extra_class, colcode, brand_code))
+  }
+  cell <- .demo_table_find_cell(entry$cells %||% list(), code)
+  if (is.null(cell)) {
+    return(.demo_table_na_cell(extra_class, colcode, brand_code))
+  }
+  buyer_pct <- cell$pct
+  shown_pct <- if (isTRUE(complement)) {
+    if (is.finite(buyer_pct)) 100 - buyer_pct else NA_real_
+  } else {
+    buyer_pct
+  }
+  buyer_diff <- if (is.finite(buyer_pct) && is.finite(cat_pct))
+                  buyer_pct - cat_pct else NA_real_
+  bg <- .demo_table_heat_colour(buyer_diff)
+
+  cell_n <- .demo_table_pen_cell_n(entry, code, buyer_pct, complement)
+
+  sprintf(
+    '<td class="%s" data-demo-col="%s" data-demo-brand="%s" data-demo-heat="%s">%s%s</td>',
     extra_class, colcode, .demo_table_esc(brand_code %||% ""),
     .demo_table_esc(bg),
-    .demo_table_pct(pct, dp),
+    .demo_table_pct(shown_pct, dp),
     .demo_table_count_span(cell_n))
+}
+
+
+# Unweighted cell count behind the displayed pct. For the BUYER row this is
+# round(base_n * buyer_pct / 100); for NON-BUYER it's base_n − buyer_n. The
+# per-option Base_n is exposed as Base_n_<code> on the engine output and the
+# panel-data builder forwards it on each cells[] entry as base_n_in_option.
+.demo_table_pen_cell_n <- function(entry, code, buyer_pct, complement) {
+  if (is.null(entry)) return(NA_integer_)
+  cell <- .demo_table_find_cell(entry$cells %||% list(), code)
+  if (is.null(cell)) return(NA_integer_)
+  base_in_opt <- cell$base_n_in_option %||% NA_integer_
+  if (!is.finite(base_in_opt) || !is.finite(buyer_pct)) return(NA_integer_)
+  buyer_n <- as.integer(round(base_in_opt * buyer_pct / 100))
+  if (isTRUE(complement)) base_in_opt - buyer_n else buyer_n
+}
+
+
+# Compute the unweighted respondent count behind a percentage cell, given the
+# brand's base size and the weighted pct. Returns NA when either is unknown.
+.demo_table_cell_n <- function(brand_entry, pct) {
+  base_n <- (brand_entry %||% list())$base_n %||% NA_integer_
+  if (!is.finite(base_n) || !is.finite(pct)) return(NA_integer_)
+  as.integer(round(base_n * pct / 100))
+}
+
+
+.demo_table_na_cell <- function(extra_class, colcode, brand_code) {
+  sprintf(
+    '<td class="%s" data-demo-col="%s" data-demo-brand="%s">
+       <span class="demo-na">&mdash;</span>
+     </td>',
+    extra_class, colcode, .demo_table_esc(brand_code %||% ""))
 }
 
 

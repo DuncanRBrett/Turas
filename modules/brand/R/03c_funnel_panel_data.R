@@ -103,13 +103,15 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
 }
 
 
-#' Five relationship / attitude-position summary cards (focal % vs avg %)
+#' Six relationship / attitude-position summary cards (focal % vs avg %)
 #' @keywords internal
 .relationship_cards <- function(att_df, focal) {
   if (is.null(att_df) || nrow(att_df) == 0) return(list())
-  positions <- c("attitude.love", "attitude.prefer",
-                 "attitude.ambivalent", "attitude.reject",
-                 "attitude.no_opinion")
+  # Canonicalise legacy "attitude.reject" → "attitude.avoid" in incoming data.
+  if ("attitude_role" %in% names(att_df)) {
+    att_df$attitude_role <- .funnel_canonical_attitude_role(att_df$attitude_role)
+  }
+  positions <- .FUNNEL_ATTITUDE_POSITIONS
   cards <- lapply(positions, function(role) {
     focal_row <- att_df[att_df$brand_code == focal &
                           att_df$attitude_role == role, , drop = FALSE]
@@ -131,10 +133,12 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
 
 
 .attitude_label_short <- function(role) {
-  labels <- c(attitude.love = "Love",
-              attitude.prefer = "Prefer",
+  role <- .funnel_canonical_attitude_role(role)
+  labels <- c(attitude.love       = "Love",
+              attitude.prefer     = "Prefer",
               attitude.ambivalent = "Ambivalent",
-              attitude.reject = "Reject",
+              attitude.price      = "Price",
+              attitude.avoid      = "Avoid",
               attitude.no_opinion = "No opinion")
   unname(labels[role]) %||% role
 }
@@ -380,11 +384,27 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
   brands <- lapply(brand_codes, function(b) {
     sub <- att[att$brand_code == b, , drop = FALSE]
     if (nrow(sub) == 0) return(NULL)
+    # Pass through the aware-base companion fields when present (added
+    # 2026-05-20 to fix "% aware" exceeding 100% on surveys that ask
+    # attitude beyond the aware set). segments stays at total base for
+    # backward compatibility with existing panel logic.
+    aware_segments <- if ("pct_aware" %in% names(sub)) {
+      stats::setNames(as.list(sub$pct_aware), sub$attitude_role)
+    } else list()
+    aware_counts <- if ("count_aware" %in% names(sub)) {
+      stats::setNames(as.list(sub$count_aware), sub$attitude_role)
+    } else list()
+    total_counts <- if ("count_total" %in% names(sub)) {
+      stats::setNames(as.list(sub$count_total), sub$attitude_role)
+    } else list()
     list(
       brand_code = b,
       brand_name = .brand_label(brand_list, b),
       aware_base = if ("aware_base" %in% names(sub)) sub$aware_base[1] else sub$base[1],
-      segments = stats::setNames(as.list(sub$pct), sub$attitude_role)
+      segments       = stats::setNames(as.list(sub$pct), sub$attitude_role),
+      segments_aware = aware_segments,
+      counts_total   = total_counts,
+      counts_aware   = aware_counts
     )
   })
   list(brands = Filter(Negate(is.null), brands),
@@ -496,6 +516,7 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
 
 .stage_label <- function(key, overrides = list()) {
   if (!is.null(overrides[[key]])) return(as.character(overrides[[key]]))
+  # Must mirror .FUNNEL_DEFAULT_LABELS in 03a_funnel_derive.R.
   labels <- c(
     aware              = "Aware",
     consideration      = "Consider",
@@ -535,10 +556,19 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
 
 .stage_label_overrides <- function(config) {
   ov <- list()
-  if (!is.null(config$Timeframe_Long)  && nzchar(trimws(config$Timeframe_Long)))
-    ov$bought_long   <- paste("Past", trimws(config$Timeframe_Long))
-  if (!is.null(config$Timeframe_Target) && nzchar(trimws(config$Timeframe_Target)))
-    ov$bought_target <- paste("Past", trimws(config$Timeframe_Target))
+  # Treat NA, NA_character_, and the literal string "NA" (from openxlsx
+  # reading blank cells via as.character()) as "no override" — otherwise the
+  # table headers display "Past NA" instead of falling back to the default
+  # "Long Period" / "Target Period" labels.
+  .is_real <- function(x) {
+    !is.null(x) && length(x) > 0L && !is.na(x[[1L]]) &&
+      nzchar(trimws(as.character(x[[1L]]))) &&
+      !identical(tolower(trimws(as.character(x[[1L]]))), "na")
+  }
+  if (.is_real(config$Timeframe_Long))
+    ov$bought_long   <- paste("Past", trimws(as.character(config$Timeframe_Long)))
+  if (.is_real(config$Timeframe_Target))
+    ov$bought_target <- paste("Past", trimws(as.character(config$Timeframe_Target)))
   ov
 }
 

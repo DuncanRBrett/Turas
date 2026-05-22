@@ -95,11 +95,21 @@ build_cep_linkage <- function(data, role_map, cat_code, brands,
     }
   }
 
-  # Respondent x item matrix: 1 if any brand linked
+  # Respondent x item matrix: 1 if any *real* brand linked. Exclude the
+  # "None of the above" pseudo-brand so respondents whose only "link" was
+  # the escape hatch don't inflate item penetration to ~100% in small samples
+  # (the Strategic Quadrant chart's X-axis was pinned to 100% on every CEP
+  # for POS because of this).
+  # Use the shared .is_none_brand_code helper from 00_data_access.R so the
+  # NONE-detection rule lives in exactly one place. brand_list is also
+  # filtered upstream in 00_main.R; this is belt-and-braces in case some
+  # caller passes a tensor that still contains the pseudo-brand.
+  is_none_brand <- .is_none_brand_code(brand_codes)
   resp_item_mat <- matrix(0L, nrow = n_resp, ncol = length(item_codes),
                           dimnames = list(NULL, item_codes))
-  for (b in brand_codes) {
-    resp_item_mat <- pmax(resp_item_mat, linkage_tensor[[b]])
+  for (i in seq_along(brand_codes)) {
+    if (isTRUE(is_none_brand[i])) next
+    resp_item_mat <- pmax(resp_item_mat, linkage_tensor[[brand_codes[i]]])
   }
 
   list(

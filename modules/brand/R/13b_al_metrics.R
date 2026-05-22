@@ -82,6 +82,14 @@ audience_lens_metric_catalog <- function() .AL_METRIC_GROUPS
   if (is.null(am) || !is.data.frame(am) || nrow(am) == 0) {
     return(.al_na_metric("No MarketingReach assets configured"))
   }
+  # Early-out when the question-code columns aren't declared. IPK 2026 and
+  # similar surveys list assets without per-asset question wiring; the
+  # branded-reach element is gated off in that case and this metric should
+  # simply be NA rather than crash the audience-lens engine.
+  if (!all(c("SeenQuestionCode", "BrandQuestionCode") %in% names(am))) {
+    return(.al_na_metric(
+      "MarketingReach sheet missing SeenQuestionCode / BrandQuestionCode"))
+  }
   am <- am[!is.na(am$AssetCode) & nzchar(trimws(as.character(am$AssetCode))) &
              !is.na(am$Brand), , drop = FALSE]
   if (nrow(am) == 0) return(.al_na_metric("No focal-brand reach assets"))
@@ -100,7 +108,11 @@ audience_lens_metric_catalog <- function() .AL_METRIC_GROUPS
   for (i in seq_len(nrow(am))) {
     seen_col  <- as.character(am$SeenQuestionCode[i])
     brand_col <- as.character(am$BrandQuestionCode[i])
-    if (!seen_col %in% names(data) || !brand_col %in% names(data)) next
+    # Defensive: skip rows with NA / blank question codes, or codes that
+    # aren't present in the data. isTRUE() collapses length-0 / NA to FALSE
+    # so the || never sees an NA.
+    if (!isTRUE(nzchar(seen_col) && seen_col %in% names(data))) next
+    if (!isTRUE(nzchar(brand_col) && brand_col %in% names(data))) next
     sv <- data[[seen_col]]; bv <- data[[brand_col]]
     elig_i <- !is.na(sv)
     seen_i <- elig_i & sv == 1L  # 1 = recognised per reach_seen_scale

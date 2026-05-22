@@ -104,7 +104,7 @@ source(file.path(TURAS_ROOT, "modules", "brand", "R", "99_output.R"))
               brand_code = rep(c("IPK", "MC"), each = 5),
               attitude_role = rep(c("attitude.love", "attitude.prefer",
                                     "attitude.ambivalent",
-                                    "attitude.reject",
+                                    "attitude.avoid",
                                     "attitude.no_opinion"), 2),
               pct = c(0.20, 0.25, 0.10, 0.05, 0.40,
                       0.15, 0.20, 0.05, 0.08, 0.52),

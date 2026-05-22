@@ -270,9 +270,13 @@ build_wom_panel_html <- function(panel_data,
   focal_cls <- if (is_focal) " fn-rel-td-focal" else ""
   base_cell <- .wom_base_cell(pd$meta$n_unweighted, focal_cls)
 
+  # base_n for in-cell counts: WoM is measured on the focal-cat sample
+  # so the same denominator applies to every brand row. Counts only
+  # render for pct columns inside .wom_data_cell.
+  base_n <- as.numeric(pd$meta$n_unweighted %||% NA_real_)
   data_cells <- paste(vapply(columns, function(col) {
     v <- brand$values[[col$key]]
-    .wom_data_cell(v, col, focal_cls, pd$cat_avg[[col$key]])
+    .wom_data_cell(v, col, focal_cls, pd$cat_avg[[col$key]], base_n = base_n)
   }, character(1)), collapse = "")
 
   sort_key <- tolower(as.character(brand$brand_name %||% brand$brand_code))
@@ -287,9 +291,10 @@ build_wom_panel_html <- function(panel_data,
 # ---- Category-average row with CI mini-bars ----
 
 .wom_cat_avg_row <- function(cat_avg, columns, pd) {
+  base_n <- as.numeric(pd$meta$n_unweighted %||% NA_real_)
   cells <- paste(vapply(columns, function(col) {
     stats_block <- cat_avg[[col$key]]
-    .wom_cat_avg_cell(stats_block, col)
+    .wom_cat_avg_cell(stats_block, col, base_n = base_n)
   }, character(1)), collapse = "")
 
   paste0(
@@ -318,7 +323,8 @@ build_wom_panel_html <- function(panel_data,
 }
 
 
-.wom_data_cell <- function(value, col, focal_cls, stats_block) {
+.wom_data_cell <- function(value, col, focal_cls, stats_block,
+                            base_n = NA_integer_) {
   if (is.null(value) || is.na(value) || !is.finite(value)) {
     return(sprintf('<td class="ct-td ct-data-col%s ct-na">&mdash;</td>', focal_cls))
   }
@@ -335,12 +341,23 @@ build_wom_panel_html <- function(panel_data,
   #   within the band -> wom-hm-near  (amber)
   hm_cls <- .wom_hm_cls(value, stats_block)
 
+  # In-cell count span (hidden by default; revealed when the panel is
+  # toggled to .show-freq via the Show count checkbox). Only emitted for
+  # pct columns \u2014 net and freq metrics are deltas and means, so a count
+  # doesn't apply. count = round(pct * base_n / 100).
+  count_html <- ""
+  if (identical(val_type, "pct") && is.finite(base_n) && base_n > 0) {
+    cnt <- as.integer(round(value * base_n / 100))
+    count_html <- sprintf('<span class="ct-freq wom-count">n=%d</span>', cnt)
+  }
+
   sprintf(
-    '<td class="ct-td ct-data-col%s%s%s" data-wom-col="%s" data-wom-val="%.3f"><span class="ct-val">%s</span></td>',
+    '<td class="ct-td ct-data-col%s%s%s" data-wom-col="%s" data-wom-val="%.3f"><span class="ct-val">%s</span>%s</td>',
     focal_cls, type_cls, hm_cls,
     .wom_esc(col$key),
     value,
-    display)
+    display,
+    count_html)
 }
 
 
@@ -356,7 +373,7 @@ build_wom_panel_html <- function(panel_data,
 }
 
 
-.wom_cat_avg_cell <- function(stats_block, col) {
+.wom_cat_avg_cell <- function(stats_block, col, base_n = NA_real_) {
   if (is.null(stats_block) || is.null(stats_block$mean) ||
       is.na(stats_block$mean)) {
     return('<td class="ct-td ct-data-col fn-rel-td-avg wom-td-avg ct-na">&mdash;</td>')
@@ -369,13 +386,21 @@ build_wom_panel_html <- function(panel_data,
   display  <- .wom_format_value(m, val_type)
   # CI mini-bar: calibrated 0..100 for pct, else to local range.
   ci_bar <- .wom_ci_bar(m, lo, hi, val_type)
+  # In-cell count for the category-average row: only meaningful for pct
+  # metrics; net deltas and freq means don't have a respondent count.
+  count_html <- if (identical(val_type, "pct") &&
+                    is.finite(base_n) && base_n > 0) {
+    sprintf('<span class="ct-freq wom-count">n=%d</span>',
+            as.integer(round(m * base_n / 100)))
+  } else ""
   sprintf(
-    '<td class="ct-td ct-data-col fn-rel-td-avg wom-td-avg" data-wom-col="%s" data-wom-ci-lo="%s" data-wom-ci-hi="%s"><span class="ct-val">%s</span>%s</td>',
+    '<td class="ct-td ct-data-col fn-rel-td-avg wom-td-avg" data-wom-col="%s" data-wom-ci-lo="%s" data-wom-ci-hi="%s"><span class="ct-val">%s</span>%s%s</td>',
     .wom_esc(col$key),
     if (is.finite(lo)) sprintf("%.3f", lo) else "",
     if (is.finite(hi)) sprintf("%.3f", hi) else "",
     display,
-    ci_bar)
+    ci_bar,
+    count_html)
 }
 
 

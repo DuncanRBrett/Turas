@@ -228,6 +228,16 @@ build_portfolio_overview_subtab_styles <- function(focal_colour = "#1A5276") {
   text-transform: uppercase;
 }
 .pfo-deep-rank { width: 100%%; }
+.pfo-deep-rank th {
+  border-bottom: 1px solid #e2e8f0;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 4px 0 6px;
+  text-align: left;
+  text-transform: uppercase;
+}
+.pfo-deep-rank th.pfo-td-num { text-align: right; }
 .pfo-deep-rank td {
   border: 0;
   color: #475569;

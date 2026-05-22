@@ -19,10 +19,30 @@
 
 BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
 
-# Default attitude codes considered "positive" for consideration. Matches the
-# IPK convention: 1 = Love, 2 = Prefer, 3 = Ambivalent. 4 = Reject and
-# 5 = No opinion are explicitly excluded. Caller can override per project.
-.FUNNEL_POSITIVE_ATTITUDE_CODES <- c("1", "2", "3")
+# Consider-stage definition (IPK 2026 v2, 2026-05-21):
+#
+#   The funnel models the buyer journey as a classical brand funnel:
+#     Aware (recognise the brand)
+#     -> Consider (Love or Prefer attitude — top-2 of the 6-level scale)
+#     -> Bought 12 months (long-period physical penetration)
+#     -> Bought 3 months  (target-window physical penetration)
+#
+#   Choice of top-2 attitude codes (Love + Prefer) over the legacy top-4
+#   (Love + Prefer + Ambivalent + Price-conditional):
+#     - Top-4 produced "everyone aware considers" collapse — for popular
+#       brands in IPK 2026, top-4 let 85-97% of aware respondents through
+#       so the consideration stage barely narrowed the funnel.
+#     - Top-2 produces meaningful narrowing across all 51 brand-cats
+#       (51/51 monotonic) and gives the strongest cross-brand predictor
+#       of past-3-month purchase (Pearson avg 0.97 vs purchase, beating
+#       awareness and CEP-based Mental Penetration).
+#
+#   Mental Availability (CEP-based MPen, MMS, Network Size, etc.) lives
+#   on the Mental Availability tab in full Romaniuk-canonical form. The
+#   funnel and the MA tab measure DIFFERENT constructs by design and so
+#   carry different numbers — the funnel tracks loyalty-style buyer
+#   conversion, the MA tab tracks growth-potential memory presence.
+.FUNNEL_POSITIVE_ATTITUDE_CODES <- c("1", "2")
 
 
 # ==============================================================================
@@ -60,7 +80,7 @@ BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
 # override per project via config$funnel.stage_definitions.
 .FUNNEL_DEFAULT_DEFINITIONS <- list(
   aware              = "Respondents who recognise the brand (stated aided awareness).",
-  consideration      = "Aware respondents holding a positive or non-rejecting attitude (Love, Prefer, or Ambivalent — not Reject or No opinion).",
+  consideration      = "Aware respondents who actively prefer the brand — Love (it's my favourite / I always pick it) or Prefer (I prefer it but don't always get it). Ambivalent, Price-conditional, Avoid, and No-opinion respondents are excluded. Mental Availability (CEP-based memory presence) is reported separately on the Mental Availability tab.",
   bought_long        = "Considerers who have bought the brand in the longer timeframe asked on the survey.",
   bought_target      = "Long-period buyers who also bought the brand in the target (shorter) timeframe.",
   current_owner_d    = "Considerers who currently own this brand in the category.",
@@ -69,9 +89,13 @@ BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
   long_tenured_s     = "Current customers whose tenure meets or exceeds the configured tenure threshold."
 )
 
-# Positive attitude role set (Consideration membership).
+# Positive attitude role set used as the Consider membership gate when the
+# survey carries an OptionMap on the attitude column. Top-2 only (Love +
+# Prefer) — the industry-conventional top-2-box consider definition.
+# Ambivalent and Price-conditional respondents are NOT considered: they
+# don't have an active preference, only a conditional willingness.
 .FUNNEL_POSITIVE_ATTITUDE_ROLES <- c(
-  "attitude.love", "attitude.prefer", "attitude.ambivalent"
+  "attitude.love", "attitude.prefer"
 )
 
 
@@ -356,7 +380,22 @@ validate_nesting <- function(stages, weights = NULL) {
   .multi_mention_or_empty(entry, data, brands, n_resp)
 }
 
-#' Consideration stage — per-brand attitude in positive code set
+#' Consideration stage — attitude top-2 (Love + Prefer)
+#'
+#' A respondent passes the Consider stage for a brand iff they are aware
+#' of the brand AND hold a top-2 positive attitude (Love or Prefer).
+#' Ambivalent / Price-conditional / Avoid / No-opinion respondents are
+#' excluded.
+#'
+#' Uses alias-aware matching via \code{.option_map_by_role()} in
+#' 03b_funnel_metrics.R, so a survey that exports some attitude columns
+#' as numeric codes ("1", "2") and others as text labels ("love",
+#' "prefer") still resolves consistently. Falls back to the raw
+#' \code{pos_codes} when no OptionMap is available on the entry.
+#'
+#' Mental Penetration (≥1 CEP linkage, per Romaniuk Better Brand Health)
+#' is reported separately on the Mental Availability tab, not in the
+#' funnel.
 #' @keywords internal
 .stage_consideration <- function(role_map, data, brands, n_resp, cat_code,
                                  pos_codes) {
@@ -367,14 +406,35 @@ validate_nesting <- function(stages, weights = NULL) {
                                         entry$category, brands)
     out <- matrix(FALSE, n_resp, length(brands),
                   dimnames = list(NULL, brands))
-    pos_codes_chr <- as.character(pos_codes)
+
+    is_default_pos_codes <- identical(
+      as.character(pos_codes),
+      as.character(.FUNNEL_POSITIVE_ATTITUDE_CODES)
+    )
+    role_to_codes <- if (is_default_pos_codes) {
+      tryCatch(.resolve_attitude_role_codes(entry),
+               error = function(e) NULL)
+    } else NULL
+
+    if (!is.null(role_to_codes)) {
+      positive_vals <- unique(unlist(
+        role_to_codes[.FUNNEL_POSITIVE_ATTITUDE_ROLES],
+        use.names = FALSE
+      ))
+      positive_vals <- tolower(trimws(as.character(positive_vals)))
+      positive_vals <- positive_vals[nzchar(positive_vals)]
+      positive_vals <- unique(c(positive_vals,
+                                tolower(as.character(pos_codes))))
+    } else {
+      positive_vals <- tolower(trimws(as.character(pos_codes)))
+    }
+
     for (b in brands) {
-      vals <- mat[, b]
-      out[, b] <- !is.na(vals) & as.character(vals) %in% pos_codes_chr
+      vals <- tolower(trimws(as.character(mat[, b])))
+      out[, b] <- !is.na(vals) & vals %in% positive_vals
     }
     out
   } else {
-    # Fallback: single-response per-category attitude — rare in IPK
     .empty_brand_matrix(brands, n_resp)
   }
 }

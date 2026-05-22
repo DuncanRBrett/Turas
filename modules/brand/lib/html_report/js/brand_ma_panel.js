@@ -312,8 +312,17 @@
       });
     }
 
+    // panelId MUST be unique per panel instance — REGISTRY is keyed by
+    // panelId and a duplicate from a sibling category panel would orphan
+    // this state so the close-on-outside-click handler couldn't find the
+    // open popover. Same bug class fixed earlier on the funnel and
+    // demographics panels. The MA panel covers four sub-tabs (Mental
+    // Advantage, MA Metrics, Brand Attributes, Category Entry Points) and
+    // they all share this one selector — clicking off any of those tabs
+    // needs to close the popover. panel.id is "ma-<catcode>" e.g. "ma-bak".
     panel.__maSelector = window.BrandSelector.create({
-      panelId:            'ma',
+      panelId:            panel.id || 'ma',
+      categoryKey:        (panel.id || '').replace(/^ma-/, ''),
       triggerEl:          trigger,
       anchorEl:           trigger.parentElement,
       brands:             brandList,
@@ -454,6 +463,14 @@
     opts = opts || {};
     if (!code) return;
     panel.__maState.focal = code;
+    // Repaint the panel's --ma-brand CSS variable so sub-tab indicators,
+    // chip backgrounds, focal badges, and insight-box accents follow the
+    // newly-picked focal. Without this, every accent stays painted in the
+    // report-default focal colour regardless of selection.
+    try {
+      var newColour = getBrandColour(panel.__maData, code);
+      if (newColour) panel.style.setProperty('--ma-brand', newColour);
+    } catch (e) { /* fall through; accents stay on the prior colour */ }
     refreshFocalAccents(panel);
     reorderFocalColumn(panel, code);
     refreshMetricsFocal(panel);
@@ -650,6 +667,175 @@
       }
       td.setAttribute('data-sort-val', val.toFixed(6));
     });
+
+    // Recompute cat-avg cells and their CI bands at the active base. The
+    // server renders stim_avg / stim_ci at % total only; without this the
+    // cat-avg column kept showing % total values + CI bounds even after
+    // the user switched to % aware, and each cell's above/within/below CI
+    // classification (heatmap shading + visual band) stayed wrong because
+    // it was anchored to the % total band.
+    updateCatAvgRowAtBase(panel, stim);
+  }
+
+  // ---------------------------------------------------------------------
+  // Recompute the cat-avg column and CI bands for one matrix section at
+  // the active base mode. Mirrors the funnel's updateAvgRowRangeBars
+  // pattern: for each stim row, derive mean + 95% CI from the brand
+  // cells at the active base, update the cat-avg cell's value text,
+  // CI bar geometry, and lo/hi labels, and reclassify every cell's
+  // ma-ci-{above,within,below} CSS class against the new band.
+  // ---------------------------------------------------------------------
+  function updateCatAvgRowAtBase(panel, stim) {
+    var sec = panel.querySelector('.ma-matrix-section[data-ma-stim="' + stim + '"]');
+    if (!sec) return;
+    var pd = panel.__maData;
+    var block = pd && pd[stim];
+    if (!block) return;
+    var mode = (panel.__maState && panel.__maState.basemode &&
+                panel.__maState.basemode[stim]) || 'total';
+    var pctField = mode === 'aware' ? 'pct_aware' : 'pct_total';
+    var cellAttr = mode === 'aware' ? 'data-ma-pct-aware' : 'data-ma-pct';
+
+    // Group cells by stim_code so we can compute per-row statistics in
+    // one pass.
+    var cellsByStim = {};
+    (block.cells || []).forEach(function (c) {
+      if (!cellsByStim[c.stim_code]) cellsByStim[c.stim_code] = [];
+      cellsByStim[c.stim_code].push(c);
+    });
+
+    sec.querySelectorAll('tr.ma-row').forEach(function (row) {
+      var stimCode = row.getAttribute('data-ma-stim');
+      if (!stimCode) return;
+      var rowCells = cellsByStim[stimCode] || [];
+      var vals = [];
+      rowCells.forEach(function (c) {
+        var v = c[pctField];
+        if (v != null && !isNaN(v)) vals.push(Number(v));
+      });
+
+      var avgCell = row.querySelector('td.ma-td-catavg');
+      if (!avgCell) return;
+
+      // Not enough variability (1 brand only, or all NA) — hide the bar.
+      if (vals.length < 2) {
+        var w = avgCell.querySelector('.ma-ci-bar-wrap');
+        var L = avgCell.querySelector('.ma-ci-limits');
+        if (w) w.style.visibility = 'hidden';
+        if (L) L.style.visibility = 'hidden';
+        if (vals.length === 1) {
+          var valSpan1 = avgCell.querySelector('.ct-val');
+          if (valSpan1) valSpan1.textContent = Math.round(vals[0]) + '%';
+        }
+        return;
+      }
+
+      var mean = vals.reduce(function (a, b) { return a + b; }, 0) / vals.length;
+      var sd = Math.sqrt(
+        vals.reduce(function (a, v) { return a + (v - mean) * (v - mean); }, 0) /
+        (vals.length - 1));
+      var se = sd / Math.sqrt(vals.length);
+      var ciLo = mean - 1.96 * se;
+      var ciHi = mean + 1.96 * se;
+
+      // Update cat-avg cell value text.
+      var valSpan = avgCell.querySelector('.ct-val');
+      if (valSpan) valSpan.textContent = Math.round(mean) + '%';
+      avgCell.setAttribute('data-ma-ci-lower', ciLo.toFixed(3));
+      avgCell.setAttribute('data-ma-ci-upper', ciHi.toFixed(3));
+      avgCell.setAttribute('data-sort-val', mean.toFixed(6));
+
+      // Rebuild CI bar geometry. safeMax = 100 because cells carry
+      // 0-100 percentage values; mirrors .ma_catavg_cell_html in
+      // 02_ma_panel_table.R.
+      var wrap   = avgCell.querySelector('.ma-ci-bar-wrap');
+      var range  = avgCell.querySelector('.ma-ci-bar-range');
+      var tick   = avgCell.querySelector('.ma-ci-bar-tick');
+      var limits = avgCell.querySelector('.ma-ci-limits');
+      if (wrap && range && tick) {
+        wrap.style.visibility = '';
+        if (limits) limits.style.visibility = '';
+        var safeMax = 100;
+        var clampedLo = Math.max(0, Math.min(safeMax, ciLo));
+        var clampedHi = Math.max(clampedLo, Math.min(safeMax, ciHi));
+        var fillLeft = Math.max(0, Math.min(94, 100 * clampedLo / safeMax));
+        var fillW    = Math.max(4, Math.min(100 - fillLeft, 100 * (clampedHi - clampedLo) / safeMax));
+        var meanPct  = Math.max(1, Math.min(99, 100 * mean / safeMax));
+        range.style.left  = fillLeft.toFixed(1) + '%';
+        range.style.width = fillW.toFixed(1) + '%';
+        tick.style.left   = meanPct.toFixed(1) + '%';
+        var loStr = Math.round(clampedLo) + '%';
+        var hiStr = Math.round(clampedHi) + '%';
+        wrap.setAttribute('title', '95% CI: ' + loStr + ' – ' + hiStr);
+        if (limits) {
+          var spans = limits.querySelectorAll('span');
+          if (spans.length >= 2) {
+            spans[0].textContent = loStr;
+            spans[1].textContent = hiStr;
+          }
+        }
+      }
+
+      // Reclassify each brand cell in this row against the new CI band,
+      // and recompute its diff-heatmap colour against the new cat-avg
+      // mean. The CSS rules paint the CI background green/amber/red
+      // based on the ma-ci-* classes; the diff heatmap (Heatmap mode =
+      // "diff" toggle) reads data-ma-heatmap as its background colour
+      // — both were anchored to the % total band/mean at render time,
+      // so both need to be refreshed when the user toggles base.
+      row.querySelectorAll('td.ma-heatmap-cell').forEach(function (cellTd) {
+        var v = parseFloat(cellTd.getAttribute(cellAttr));
+        if (isNaN(v)) {
+          // Fall back to % total attr (some cells may lack the aware variant).
+          v = parseFloat(cellTd.getAttribute('data-ma-pct'));
+          if (isNaN(v)) return;
+        }
+        // CI band reclassification
+        cellTd.classList.remove('ma-ci-above', 'ma-ci-within', 'ma-ci-below');
+        var band;
+        if (v > ciHi) band = 'above';
+        else if (v < ciLo) band = 'below';
+        else band = 'within';
+        cellTd.classList.add('ma-ci-' + band);
+        cellTd.setAttribute('data-ma-ci-band', band);
+
+        // Diff heatmap colour — diff_vs_avg at the active base.
+        var diffAtBase = v - mean;
+        cellTd.setAttribute('data-ma-heatmap',
+                            maDiffHeatmapRgba(diffAtBase, MA_DIFF_HEATMAP_MAX_ABS));
+        cellTd.setAttribute('data-ma-diff', diffAtBase.toFixed(1));
+      });
+    });
+
+    // If the section is currently in "diff" heatmap mode, repaint cells
+    // with the freshly-computed data-ma-heatmap values. CI and Off modes
+    // don't read data-ma-heatmap so no repaint needed.
+    var hmMode = (panel.__maState && panel.__maState.heatmap &&
+                  panel.__maState.heatmap[stim]) || 'ci';
+    if (hmMode === 'diff') applyHeatmapMode(panel, stim);
+  }
+
+  // Per-row diff cap for the diverging blue/red heatmap. Mirrors the
+  // hardcoded `40` in .ma_diff_heatmap()'s call site at
+  // 02_ma_panel_table.R:241. Keep these in lockstep — if you change one
+  // change the other.
+  var MA_DIFF_HEATMAP_MAX_ABS = 40;
+
+  // JS port of .ma_diff_heatmap() in 02_ma_panel_table.R. Returns the
+  // rgba() colour string for a given (signed) percentage-point diff
+  // against the row's cat-avg, capped at maxAbsDiff.
+  //   diff >= 0  -> blue   rgba(37, 99,171, alpha)
+  //   diff <  0  -> red    rgba(192,57, 43, alpha)
+  //   alpha = 0.08 + frac * 0.55  where  frac = min(1, |diff| / maxAbsDiff)
+  // Returns "" for NA / non-finite diff or non-positive maxAbsDiff so
+  // applyHeatmapMode treats it as no-shade.
+  function maDiffHeatmapRgba(diff, maxAbsDiff) {
+    if (diff == null || isNaN(diff) || !isFinite(diff)) return '';
+    if (!(maxAbsDiff > 0)) return '';
+    var frac  = Math.min(1, Math.max(0, Math.abs(diff) / maxAbsDiff));
+    var alpha = 0.08 + frac * 0.55;
+    var rgb   = diff >= 0 ? '37,99,171' : '192,57,43';
+    return 'rgba(' + rgb + ',' + alpha.toFixed(3) + ')';
   }
 
   // -------------------------------------------------------------- row active (grey-out)

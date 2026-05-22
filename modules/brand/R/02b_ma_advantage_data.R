@@ -119,19 +119,20 @@ build_ma_advantage_block <- function(ma_result,
   focal_view <- .ma_adv_focal_view_set(focal_view_set, codes, texts, focal_code)
 
   list(
-    codes              = codes,
-    labels             = texts,
-    brand_codes        = adv_brands,
-    n_respondents      = as.numeric(advantage$n_respondents),
-    grand_total        = as.numeric(advantage$grand_total),
-    threshold_pp       = as.numeric(advantage$threshold_pp),
-    stim_penetration   = round(as.numeric(advantage$stim_penetration[codes]), 1),
-    stim_links         = as.numeric(advantage$stim_links[codes]),
-    brand_links        = as.numeric(advantage$brand_links[adv_brands]),
-    cells              = cells,
-    focal_brand_code   = focal_code,
-    focal_summary      = focal_summary,
-    focal_view         = focal_view
+    codes                      = codes,
+    labels                     = texts,
+    brand_codes                = adv_brands,
+    n_respondents              = as.numeric(advantage$n_respondents),
+    grand_total                = as.numeric(advantage$grand_total),
+    threshold_pp               = as.numeric(advantage$threshold_pp),
+    stim_penetration           = round(as.numeric(advantage$stim_penetration[codes]), 1),
+    stim_penetration_threshold = as.integer(advantage$stim_penetration_threshold %||% NA_integer_),
+    stim_links                 = as.numeric(advantage$stim_links[codes]),
+    brand_links                = as.numeric(advantage$brand_links[adv_brands]),
+    cells                      = cells,
+    focal_brand_code           = focal_code,
+    focal_summary              = focal_summary,
+    focal_view                 = focal_view
   )
 }
 

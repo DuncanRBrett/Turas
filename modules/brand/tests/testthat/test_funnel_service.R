@@ -173,10 +173,10 @@ source(file.path(ROOT, "modules", "brand", "R", "03_funnel.R"))
   if (nrow(row) == 0L) NA_real_ else row$pct_weighted
 }
 
-# Expected values (hand-calculated; see header)
+# Expected values (hand-calculated for top-2 attitude consider — codes 1, 2).
 .expected_pct <- list(
   aware               = c(IPK = 0.9, ROB = 0.8, CART = 0.7),
-  consideration       = c(IPK = 0.7, ROB = 0.6, CART = 0.5),
+  consideration       = c(IPK = 0.5, ROB = 0.4, CART = 0.4),
   current_customer_s  = c(IPK = 0.4, ROB = 0.2, CART = 0.2),
   long_tenured_s      = c(IPK = 0.3, ROB = 0.0, CART = 0.1)
 )

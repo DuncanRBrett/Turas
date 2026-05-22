@@ -247,6 +247,13 @@ generate_brand_html_report <- function(results, output_path, config = NULL) {
         paste0('<style class="brsum-panel-styles">', css, '</style>'),
         sep = "\n")
   }
+  if (exists("build_shopper_summary_styles", mode = "function")) {
+    css <- tryCatch(build_shopper_summary_styles(), error = function(e) "")
+    if (nzchar(trimws(css)))
+      panel_styles <- paste(panel_styles,
+        paste0('<style class="brss-panel-styles">', css, '</style>'),
+        sep = "\n")
+  }
 
   # Resolve JS paths (funnel + MA) and concatenate into one panel_js blob
   .resolve_js <- function(filename) {

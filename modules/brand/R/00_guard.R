@@ -132,7 +132,13 @@ guard_validate_brand_config <- function(config) {
 
   for (field in required_fields) {
     val <- config[[field]]
-    if (is.null(val) || (is.character(val) && trimws(val) == "")) {
+    # Treat NULL, length-0, NA, and whitespace-only strings as missing. The
+    # raw-NA case (e.g. an empty Excel cell) used to slip through the type-
+    # narrowing `is.character(val) && trimws(val) == ""` and crash `if (NA)`.
+    is_missing <- is.null(val) || length(val) == 0L ||
+      (is.atomic(val) && (is.na(val[[1L]]) ||
+                          (is.character(val) && trimws(val[[1L]]) == "")))
+    if (is_missing) {
       brand_refuse(
         code = "CFG_MISSING_FIELD",
         title = sprintf("Missing Required Setting: %s", field),

@@ -92,37 +92,100 @@ MA_SIG_Z_THRESHOLD <- 1.96
 
 #' Calculate stimulus penetration — % of respondents linking any brand
 #'
-#' Used as the X-axis of the strategic quadrant: a stimulus that no one ever
-#' associates with any brand is uninteresting, regardless of any single
-#' brand's relative advantage on it.
+#' Stimulus "competitiveness" — % of respondents who link more brands than
+#' the category-wide average to each stimulus.
+#'
+#' Used as the X-axis of the Strategic Quadrant. The previous metric
+#' (% of respondents linking >=1 brand) collapsed to ~99% on every CEP
+#' in surveys where Alchemer routes a CATA "which brands come to mind"
+#' question — respondents pick at least one brand for nearly every CEP,
+#' so the X-axis lost all discriminating power.
+#'
+#' The new metric is threshold-relative:
+#'   1. Build a (respondents x stimuli) matrix of brand-link counts —
+#'      for each cell, how many real brands the respondent linked to
+#'      that stimulus.
+#'   2. Compute the grand mean of that matrix (across all resp x stim
+#'      pairs). The threshold is round(grand_mean).
+#'   3. For each stimulus, return the % of respondents whose brand-link
+#'      count strictly exceeds the threshold.
+#'
+#' This auto-calibrates per category (a category whose buyers think of
+#' many brands per CEP gets a higher threshold) and produces meaningful
+#' spread across CEPs even when the legacy >=1 metric is saturated.
+#' Cross-category comparison of the raw % is no longer meaningful (the
+#' threshold differs), but the Strategic Quadrant is read within a
+#' category so this is the right tradeoff.
 #'
 #' @param linkage_tensor Named list of brand matrices.
 #' @param codes Character vector. Stimulus codes.
 #' @param weights Numeric vector or NULL.
 #' @return Numeric vector (0..100), names = stimulus codes.
+#'   The threshold (rounded grand-mean brand-link count) is attached as
+#'   \code{attr(result, "threshold")} so the renderer can show it in the
+#'   X-axis label.
 #' @keywords internal
 .ma_stimulus_penetration <- function(linkage_tensor, codes, weights = NULL) {
-  if (length(linkage_tensor) == 0) return(stats::setNames(numeric(0), codes))
+  if (length(linkage_tensor) == 0) {
+    return(structure(stats::setNames(rep(0, length(codes)), codes),
+                     threshold = NA_integer_))
+  }
   n_resp <- nrow(linkage_tensor[[1]])
-  if (is.null(n_resp) || n_resp == 0) return(stats::setNames(rep(0, length(codes)), codes))
+  if (is.null(n_resp) || n_resp == 0) {
+    return(structure(stats::setNames(rep(0, length(codes)), codes),
+                     threshold = NA_integer_))
+  }
 
-  any_link <- matrix(0L, nrow = n_resp, ncol = length(codes),
-                     dimnames = list(NULL, codes))
-  for (bm in linkage_tensor) {
+  # "None of the above" pseudo-brands are a survey-design escape hatch ("I
+  # link none of these brands to this stimulus"), not a real brand. If they
+  # leak through the Brands sheet they inflate stimulus penetration to ~100%
+  # on every stimulus in small samples and ruin the X-axis variation of the
+  # Strategic Quadrant. Skip them here defensively so old Brand_Configs that
+  # still include NONE rows produce sensible MA charts.
+  # Shared helper in 00_data_access.R — single source of truth for the
+  # NONE-pseudo-brand detection rule. Upstream filter in 00_main.R already
+  # drops these rows; this is belt-and-braces in case a caller passes a
+  # tensor still containing them.
+  brand_codes <- names(linkage_tensor)
+  is_none <- .is_none_brand_code(brand_codes %||% character(0))
+
+  # Build (respondents x stimuli) matrix of brand-link counts. Each cell
+  # records how many real brands (excluding NONE pseudo-brands) this
+  # respondent linked to this stimulus.
+  link_counts <- matrix(0L, nrow = n_resp, ncol = length(codes),
+                        dimnames = list(NULL, codes))
+  for (idx in seq_along(linkage_tensor)) {
+    if (isTRUE(is_none[idx])) next
+    bm <- linkage_tensor[[idx]]
     if (is.null(bm)) next
     cols <- intersect(codes, colnames(bm))
     if (length(cols) == 0) next
-    any_link[, cols] <- pmax(any_link[, cols], bm[, cols])
+    link_counts[, cols] <- link_counts[, cols] + bm[, cols]
   }
 
-  if (is.null(weights)) {
-    stats::setNames(round(colMeans(any_link) * 100, 1), codes)
-  } else {
-    w_total <- sum(weights)
-    pct <- if (w_total > 0)
-      colSums(any_link * weights) / w_total * 100 else rep(0, length(codes))
-    stats::setNames(round(pct, 1), codes)
+  # Grand mean across all (resp x stim) cells. Threshold = nearest integer.
+  # When the grand mean rounds to 0 (degenerate data with almost no
+  # linkages) fall back to threshold = 1 so the metric reads as the
+  # legacy >= 1 behaviour rather than 0% on every CEP.
+  w_total <- if (is.null(weights)) n_resp else sum(weights, na.rm = TRUE)
+  if (!is.finite(w_total) || w_total <= 0) {
+    return(structure(stats::setNames(rep(0, length(codes)), codes),
+                     threshold = NA_integer_))
   }
+  grand_total_links <- if (is.null(weights)) sum(link_counts) else {
+    sum(rowSums(link_counts) * weights, na.rm = TRUE)
+  }
+  grand_mean <- grand_total_links / (w_total * length(codes))
+  threshold  <- max(1L, as.integer(round(grand_mean)))
+
+  exceeds <- link_counts > threshold
+  if (is.null(weights)) {
+    pct <- colMeans(exceeds) * 100
+  } else {
+    pct <- colSums(exceeds * weights, na.rm = TRUE) / w_total * 100
+  }
+  structure(stats::setNames(round(pct, 1), codes),
+            threshold = threshold)
 }
 
 
@@ -254,24 +317,28 @@ calculate_mental_advantage <- function(linkage_tensor, codes,
                      dimnames = dimnames(actual))
 
   stim_penetration <- .ma_stimulus_penetration(linkage_tensor, codes, weights)
+  # Pull the threshold (rounded grand-mean brand-link count) off the
+  # attribute so downstream layers can surface it in the X-axis label.
+  stim_pen_threshold <- attr(stim_penetration, "threshold", exact = TRUE)
 
   list(
-    status           = "PASS",
-    version          = MENTAL_ADVANTAGE_VERSION,
-    threshold_pp     = as.numeric(threshold_pp),
-    brand_codes      = brand_codes,
-    stim_codes       = codes,
-    n_respondents    = as.numeric(n_respondents),
-    grand_total      = as.numeric(grand_total),
-    stim_links       = stim_links,
-    brand_links      = brand_links,
-    actual           = actual,
-    expected         = expected,
-    advantage        = advantage,
-    std_residual     = std_residual,
-    is_significant   = is_significant,
-    decision         = decision,
-    stim_penetration = stim_penetration
+    status                     = "PASS",
+    version                    = MENTAL_ADVANTAGE_VERSION,
+    threshold_pp               = as.numeric(threshold_pp),
+    brand_codes                = brand_codes,
+    stim_codes                 = codes,
+    n_respondents              = as.numeric(n_respondents),
+    grand_total                = as.numeric(grand_total),
+    stim_links                 = stim_links,
+    brand_links                = brand_links,
+    actual                     = actual,
+    expected                   = expected,
+    advantage                  = advantage,
+    std_residual               = std_residual,
+    is_significant             = is_significant,
+    decision                   = decision,
+    stim_penetration           = stim_penetration,
+    stim_penetration_threshold = stim_pen_threshold
   )
 }
 

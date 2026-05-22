@@ -54,8 +54,14 @@ check_selection_vs_questions <- function(selection_df, questions_df, error_log) 
   sel_codes <- unique(selection_df$QuestionCode)
   q_codes <- unique(questions_df$QuestionCode)
 
+  # "Total" is a magic banner code that the tabs engine produces internally —
+  # the standard Crosstab_Config template ships with it on row 5 of Selection.
+  # It must NOT be required to also appear in the Survey_Structure Questions
+  # sheet, otherwise every freshly-generated config fails preflight.
+  TABS_MAGIC_BANNER_CODES <- c("Total")
+
   # Selected questions not in structure (critical - will fail at runtime)
-  missing_in_structure <- setdiff(sel_codes, q_codes)
+  missing_in_structure <- setdiff(sel_codes, c(q_codes, TABS_MAGIC_BANNER_CODES))
   if (length(missing_in_structure) > 0) {
     error_log <- log_issue(
       error_log, "Preflight", "Selection/Structure Mismatch",

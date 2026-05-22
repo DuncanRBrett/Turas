@@ -102,7 +102,8 @@ BRAND_VERSION <- "1.0"
     "13a_al_audiences.R",
     "13b_al_metrics.R",
     "13c_al_classify.R",
-    "13d_al_panel_data.R"
+    "13d_al_panel_data.R",
+    "14_shopper_summary.R"
   )
 
   for (f in module_files) {
@@ -317,6 +318,29 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
     NULL
   })
 
+  # Wire OptionMap's attitude_scale rows onto every funnel.attitude role
+  # entry so the funnel module's .resolve_attitude_role_codes can pick up
+  # the survey's actual scale (5-level legacy or 6-level IPK 2026) instead
+  # of silently falling back to the 5-level default. Without this the Brand
+  # Attitude bars on a 6-level survey would still show as 5 segments with
+  # code 4 mis-labelled as "Avoid" instead of "Price".
+  if (!is.null(role_map) && !is.null(structure$optionmap) &&
+      is.data.frame(structure$optionmap) &&
+      nrow(structure$optionmap) > 0L &&
+      "Scale" %in% names(structure$optionmap)) {
+    attitude_om <- structure$optionmap[
+      !is.na(structure$optionmap$Scale) &
+        trimws(as.character(structure$optionmap$Scale)) == "attitude_scale",
+      , drop = FALSE]
+    if (nrow(attitude_om) > 0L) {
+      for (rn in names(role_map)) {
+        if (grepl("^funnel\\.attitude", rn)) {
+          role_map[[rn]]$option_map <- attitude_om
+        }
+      }
+    }
+  }
+
   # --- STEP 4: Run elements per category ---
   results <- list()
   category_results <- list()
@@ -346,6 +370,11 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
                   } else NULL
 
     cat_brands <- get_brands_for_category(structure, cat_name, cat_code = cat_code)
+    # NONE pseudo-brand filter is applied at the source inside
+    # get_brands_for_category() (see 01_config.R), so cat_brands is
+    # already clean here. The MA modules also apply .is_none_brand_code
+    # defensively at their own layer in case a tensor is ever
+    # constructed via a path that bypasses get_brands_for_category().
     cat_ceps   <- get_ceps_for_category(structure, cat_name, cat_code = cat_code)
     cat_attrs  <- get_attributes_for_category(structure, cat_name, cat_code = cat_code)
 
@@ -558,36 +587,57 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
     }
 
     # Category Buying Frequency (full categories only)
-    # Reads the cat_buying.frequency.{cat_code} role from QuestionMap and maps
-    # coded responses through the cat_buy_scale OptionMap scale.
+    # Resolves the cat_buying.frequency.{cat_code} role and maps coded
+    # responses through the cat_buy_scale OptionMap scale. Lookup order:
+    # (1) QuestionMap explicit row (if structure has one); (2) inferred
+    # role_map (auto from CATBUY_<CAT> or CAT_FREQ_<CAT> column names).
+    # The fallback to (2) means surveys with mixed CATBUY/CAT_FREQ naming
+    # don't need every cat manually wired in QuestionMap.
     if (isTRUE(config$element_repertoire) && cat_depth == "full" &&
-        !is.null(cat_code) && !is.null(structure$questionmap) &&
-        nrow(structure$questionmap) > 0) {
+        !is.null(cat_code)) {
       freq_role <- paste0("cat_buying.frequency.", cat_code)
-      qmap_rows <- structure$questionmap
-      freq_row  <- qmap_rows[
-        !is.na(qmap_rows$Role) &
-          trimws(as.character(qmap_rows$Role)) == freq_role,
-        , drop = FALSE]
-      if (nrow(freq_row) > 0) {
-        freq_col_name <- trimws(as.character(freq_row$ClientCode[1]))
-        if (!is.na(freq_col_name) && nzchar(freq_col_name) &&
-            freq_col_name %in% names(cat_data)) {
-          if (verbose) cat("  Running Category Buying Frequency...\n")
-          cat_result$cat_buying_frequency <- tryCatch(
-            run_cat_buying_frequency(
-              cat_data[[freq_col_name]],
-              option_map = structure$optionmap,
-              weights    = cat_weights
-            ),
-            error = function(e) {
-              warnings_list <<- c(warnings_list,
-                sprintf("Cat buying frequency failed for %s: %s",
-                        cat_name, e$message))
-              list(status = "REFUSED", message = e$message)
-            }
-          )
+      freq_col_name <- NA_character_
+
+      # Path 1: QuestionMap explicit row
+      if (!is.null(structure$questionmap) &&
+          nrow(structure$questionmap) > 0) {
+        qmap_rows <- structure$questionmap
+        freq_row  <- qmap_rows[
+          !is.na(qmap_rows$Role) &
+            trimws(as.character(qmap_rows$Role)) == freq_role,
+          , drop = FALSE]
+        if (nrow(freq_row) > 0) {
+          freq_col_name <- trimws(as.character(freq_row$ClientCode[1]))
         }
+      }
+
+      # Path 2: inferred role_map fallback
+      if ((is.na(freq_col_name) || !nzchar(freq_col_name)) &&
+          !is.null(role_map) && !is.null(role_map[[freq_role]])) {
+        entry <- role_map[[freq_role]]
+        if (!is.null(entry$columns) && length(entry$columns) >= 1L) {
+          freq_col_name <- as.character(entry$columns[1])
+        } else if (!is.null(entry$column_root)) {
+          freq_col_name <- as.character(entry$column_root)
+        }
+      }
+
+      if (!is.na(freq_col_name) && nzchar(freq_col_name) &&
+          freq_col_name %in% names(cat_data)) {
+        if (verbose) cat("  Running Category Buying Frequency...\n")
+        cat_result$cat_buying_frequency <- tryCatch(
+          run_cat_buying_frequency(
+            cat_data[[freq_col_name]],
+            option_map = structure$optionmap,
+            weights    = cat_weights
+          ),
+          error = function(e) {
+            warnings_list <<- c(warnings_list,
+              sprintf("Cat buying frequency failed for %s: %s",
+                      cat_name, e$message))
+            list(status = "REFUSED", message = e$message)
+          }
+        )
       }
     }
 
@@ -698,6 +748,26 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
         if (length(sb$warnings) > 0) {
           warnings_list <- c(warnings_list, sb$warnings)
         }
+      }
+
+      # Slot-indexed buying-location fallback. The 08e shopper engine above
+      # requires QuestionMap rows + per-channel indicator columns. Surveys
+      # that store channels in slot columns (CHANNEL_<CAT>_1..6 or
+      # CAT_LOC_<CAT>_1..6, each slot carrying the channel code as text)
+      # don't fit that resolver — compute a simple distribution here so the
+      # cat panel can still render a "buying location" section.
+      if (is.null(cat_result$shopper_location) &&
+          exists("compute_buying_location", mode = "function")) {
+        cat_result$buying_location <- tryCatch(
+          compute_buying_location(cat_data, cat_code, structure,
+                                   weights = cat_weights),
+          error = function(e) {
+            warnings_list <<- c(warnings_list,
+              sprintf("Buying location failed for %s: %s",
+                      cat_name, e$message))
+            NULL
+          }
+        )
       }
     }
 
@@ -936,6 +1006,31 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
   # Demographics + Ad Hoc are also per-category — see the per-category
   # block above; results land on category_results[[cat]]$demographics
   # and $adhoc and surface as sub-tabs inside each category panel.
+
+  # --- STEP 5c: Sample-wide shopper context + focal brand engagement ---
+  # Both engines are NULL-safe: if the source columns aren't in the data,
+  # they return NULL and the summary panel skips the section. No element
+  # flag — these surface whenever the columns are present.
+  if (exists("compute_shopper_context", mode = "function")) {
+    results$shopper_context <- tryCatch(
+      compute_shopper_context(data, structure, weights),
+      error = function(e) {
+        warnings_list <<- c(warnings_list,
+          sprintf("Shopper context failed: %s", e$message))
+        NULL
+      }
+    )
+  }
+  if (exists("compute_focal_engagement", mode = "function")) {
+    results$focal_engagement <- tryCatch(
+      compute_focal_engagement(data, config$focal_brand %||% "IPK", weights),
+      error = function(e) {
+        warnings_list <<- c(warnings_list,
+          sprintf("Focal engagement failed: %s", e$message))
+        NULL
+      }
+    )
+  }
 
   # --- STEP 6: Determine overall status ---
   elapsed <- proc.time()["elapsed"] - start_time

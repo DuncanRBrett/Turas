@@ -234,7 +234,7 @@ for (f in brand_files) {
     Scale = rep("attitude_scale", 5),
     ClientCode = as.character(1:5),
     Role = c("attitude.love", "attitude.prefer", "attitude.ambivalent",
-             "attitude.reject", "attitude.no_opinion"),
+             "attitude.avoid", "attitude.no_opinion"),
     ClientLabel = c("Love", "Prefer", "Ambivalent", "Reject", "No opinion"),
     OrderIndex = 1:5,
     stringsAsFactors = FALSE

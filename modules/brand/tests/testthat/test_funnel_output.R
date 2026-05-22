@@ -183,14 +183,17 @@ test_that("Stage_Matrix body values match hand-calculated percentages", {
 })
 
 
-test_that("Attitude_Decomposition sheet covers all 5 positions per brand", {
+test_that("Attitude_Decomposition sheet covers all attitude positions per brand", {
   bundle <- .run_fixture()
   tmp <- tempfile(fileext = ".xlsx")
   on.exit(unlink(tmp), add = TRUE)
 
   write_funnel_excel(bundle$result, .trans_brands(), bundle$role_map, tmp)
   att <- openxlsx::read.xlsx(tmp, sheet = "Attitude_Decomposition")
-  expect_true(all(c("Love", "Prefer", "Ambivalent", "Reject",
+  # Pre-2026 fixtures use the 5-level scale; new column name is "Avoid"
+  # (renamed from "Reject"). Fixtures that include the 6-level scale will also
+  # have a "Price" column, but it isn't required.
+  expect_true(all(c("Love", "Prefer", "Ambivalent", "Avoid",
                     "No.Opinion", "Aware_Base_Unweighted") %in% names(att)))
   expect_equal(nrow(att), 3L)  # 3 brands
   # IPK Love = 3/10 = 30%

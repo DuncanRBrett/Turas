@@ -170,8 +170,15 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
 # ==============================================================================
 
 .fn_rel_emphasis_chips <- function() {
-  seg_labels <- c(All = "all", Love = "attitude.love", Prefer = "attitude.prefer",
-                  Ambivalent = "attitude.ambivalent", Reject = "attitude.reject",
+  # 6-level scale (IPK 2026): adds Price + renames Reject -> Avoid. Old
+  # 5-level surveys still work — Reject canonicalises to Avoid via the
+  # role alias and the Price column just has zero values.
+  seg_labels <- c(All = "all",
+                  Love       = "attitude.love",
+                  Prefer     = "attitude.prefer",
+                  Ambivalent = "attitude.ambivalent",
+                  Price      = "attitude.price",
+                  Avoid      = "attitude.avoid",
                   `No opinion` = "attitude.no_opinion")
   paste(vapply(seq_along(seg_labels), function(i) {
     nm     <- names(seg_labels)[i]
@@ -189,19 +196,26 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
 .fn_rel_table <- function(ordered, focal, focal_colour, n_total) {
   if (length(ordered) == 0) return("")
 
+  # 6-level scale (IPK 2026). Adds Price (between Ambivalent and Avoid) and
+  # renames Reject -> Avoid. Both old 5-level and new 6-level data flow
+  # through the same code — on 5-level data, attitude.price counts as 0%
+  # and the column just shows zeros.
   att_roles  <- c("attitude.love", "attitude.prefer", "attitude.ambivalent",
-                  "attitude.reject", "attitude.no_opinion")
-  att_labels <- c("Love", "Prefer", "Ambivalent", "Reject", "No opinion")
-  # L/P/A/R imply awareness; "no opinion" is the survey's catch-all and
-  # contains BOTH aware-but-no-opinion AND every unaware respondent. In
-  # % aware mode we therefore can't just rescale segments[no_opinion] —
-  # that would count unaware respondents in the numerator (the cause of
-  # the 110%/185% Cat avg bug). Instead, no_opinion is the residual:
-  #   pct_aware[no_opinion] = 1 - sum(pct_aware[L,P,A,R])
+                  "attitude.price", "attitude.avoid", "attitude.no_opinion")
+  att_labels <- c("Love", "Prefer", "Ambivalent", "Price", "Avoid", "No opinion")
+  # Aware-opinion roles imply awareness (the respondent had to be aware of
+  # the brand to express any of these); "no opinion" is the survey's
+  # catch-all and contains BOTH aware-but-no-opinion AND every unaware
+  # respondent. In % aware mode we therefore can't just rescale
+  # segments[no_opinion] — that would count unaware respondents in the
+  # numerator (the 110%/185% Cat avg bug). Instead no_opinion is the
+  # residual:
+  #   pct_aware[no_opinion] = 1 - sum(pct_aware[L,P,A,Price,Avoid])
   # so each row sums to exactly 100% in % aware mode and only aware
   # respondents are counted in any segment.
   aware_opinion_roles <- c("attitude.love", "attitude.prefer",
-                            "attitude.ambivalent", "attitude.reject")
+                            "attitude.ambivalent", "attitude.price",
+                            "attitude.avoid")
 
   # After session-3 fix: brand$segments[[role]] = count / total_w = % of ALL respondents.
   # "% total" base = segments[[role]] directly.
@@ -420,10 +434,17 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
     if (!is.finite(pct_total))
       return(sprintf('<td class="ct-td ct-data-col%s ct-na">&mdash;</td>', focal_cls))
 
-    # Scale up to % of aware respondents — but no_opinion comes from the
-    # residual computed above, NOT from rescaling segments[no_opinion],
-    # because that bucket includes unaware respondents.
-    pct_aware <- if (identical(role, "attitude.no_opinion")) {
+    # Prefer the per-segment pct_aware computed at the metric layer
+    # (count_aware / aware_w — proper subset, can't exceed 100%). Falls
+    # back to the legacy rescale when segments_aware isn't present
+    # (older payloads / legacy adapter path). For "no_opinion" the
+    # residual derivation is still preferred when the metric layer
+    # didn't emit a value, because aware respondents typically pick a
+    # real attitude rather than no_opinion.
+    pct_aware_metric <- as.numeric(brand$segments_aware[[role]] %||% NA_real_)
+    pct_aware <- if (is.finite(pct_aware_metric)) {
+      pct_aware_metric
+    } else if (identical(role, "attitude.no_opinion")) {
       pct_aware_no_opinion
     } else if (is.finite(aware_n) && is.finite(n_total) && aware_n > 0) {
       pct_total * (n_total / aware_n)
@@ -438,14 +459,22 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
     aware_attr <- if (is.finite(pct_aware))
       sprintf(' data-fn-rel-pct-aware="%.6f"', pct_aware) else ""
     # Raw counts:
-    #   count_total = % of all respondents in this segment * n_total
-    #   count_aware = % of aware respondents in this segment * aware_n
-    # For L/P/A/R the two are equal (same people, different denominator).
-    # For no_opinion they differ: count_aware excludes the unaware tail.
-    cnt_total_val <- if (is.finite(n_total))
-      as.integer(round(pct_total * n_total)) else NA_integer_
-    cnt_aware_val <- if (is.finite(pct_aware) && is.finite(aware_n))
-      as.integer(round(pct_aware * aware_n)) else cnt_total_val
+    #   count_total = % of all respondents in this segment (weighted)
+    #   count_aware = % of aware respondents in this segment (weighted)
+    # Prefer counts from the metric layer (proper aware-subset
+    # intersection); fall back to derived rounding.
+    cnt_total_metric <- as.numeric(brand$counts_total[[role]] %||% NA_real_)
+    cnt_aware_metric <- as.numeric(brand$counts_aware[[role]] %||% NA_real_)
+    cnt_total_val <- if (is.finite(cnt_total_metric)) {
+      as.integer(round(cnt_total_metric))
+    } else if (is.finite(n_total)) {
+      as.integer(round(pct_total * n_total))
+    } else NA_integer_
+    cnt_aware_val <- if (is.finite(cnt_aware_metric)) {
+      as.integer(round(cnt_aware_metric))
+    } else if (is.finite(pct_aware) && is.finite(aware_n)) {
+      as.integer(round(pct_aware * aware_n))
+    } else cnt_total_val
     count_attrs <- if (!is.na(cnt_total_val)) {
       denom_aware_str <- if (is.finite(aware_n))
         sprintf(' data-fn-rel-denom-aware="%d"', as.integer(round(aware_n))) else ""

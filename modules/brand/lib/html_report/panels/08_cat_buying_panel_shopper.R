@@ -270,6 +270,54 @@ cb_shopper_context_chips <- function(panel_data) {
 
 
 # ==============================================================================
+# SAMPLE-LEVEL BUYING LOCATION (Q2 fallback)
+# ==============================================================================
+# When the per-brand shopper engine isn't wired (no QuestionMap row + the
+# data uses slot-indexed CHANNEL_<CAT>_1..6 / CAT_LOC_<CAT>_* convention),
+# the orchestrator computes a simpler sample-level distribution and we
+# render it here as a small bar chart on the Category Context tab.
+
+#' Render sample-level buying location as a bar chart
+#'
+#' @param result Output of compute_buying_location() — list with rows,
+#'   n_total, cat_code.
+#' @param focal_colour Hex colour for bar fills.
+#' @return Character HTML fragment.
+#' @export
+cb_buying_location_html <- function(result, focal_colour = "#1A5276") {
+  if (is.null(result) || length(result$rows) == 0) return("")
+  max_pct <- max(vapply(result$rows, function(r) r$pct_weighted %||% 0,
+                         numeric(1)), na.rm = TRUE)
+  if (!isTRUE(max_pct > 0)) max_pct <- 1
+  bars <- paste(vapply(result$rows, function(r) {
+    label <- r$label %||% r$value %||% "—"
+    pct   <- r$pct_weighted %||% 0
+    width <- max(2, min(100, pct / max_pct * 100))
+    sprintf(paste0(
+      '<div class="cb-bl-row">',
+        '<div class="cb-bl-label" title="%s">%s</div>',
+        '<div class="cb-bl-track">',
+          '<div class="cb-bl-fill" style="width:%.1f%%;background:%s;"></div>',
+        '</div>',
+        '<div class="cb-bl-value">%.0f%%</div>',
+      '</div>'),
+      .cb_esc(label), .cb_esc(label),
+      width, .cb_esc(focal_colour), pct)
+  }, character(1)), collapse = "")
+  sprintf(paste0(
+    '<div class="cb-section-title" style="margin-top:18px;">',
+      'Where category respondents shop',
+    '</div>',
+    '<p style="font-size:12px;color:#64748b;margin:-4px 0 12px;">',
+      'Multi-mention: respondents can pick more than one channel, so bars ',
+      'may sum to more than 100%%. Base: %d category respondents.',
+    '</p>',
+    '<div class="cb-bl-chart">%s</div>'),
+    result$n_total %||% 0L, bars)
+}
+
+
+# ==============================================================================
 # MODULE INITIALISATION
 # ==============================================================================
 

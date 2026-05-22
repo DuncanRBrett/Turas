@@ -58,6 +58,13 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
   brand_names <- pd$config$brand_names %||% pd$config$brand_codes
 
   leader_name <- function(code) {
+    # No clear leader case (length-0 / NA / empty string) — happens when a
+    # metric has no non-NA values across brands (very small base, sparse
+    # category). Return em-dash placeholder instead of crashing the whole
+    # panel transform with "argument is of length zero".
+    if (length(code) == 0L || is.na(code[[1L]]) || !nzchar(code[[1L]])) {
+      return("—")
+    }
     idx <- match(code, pd$config$brand_codes)
     if (is.na(idx)) code else brand_names[idx]
   }

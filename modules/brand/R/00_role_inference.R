@@ -167,6 +167,7 @@ infer_role_map <- function(questions, brands, active_cats) {
   }
 
   # CEP / Attribute matrices: BRANDATTR_{CAT}_{CEP|ATT}{NN}
+  # (DSS / PAS convention — per-CEP or per-attribute question with brands as options)
   m <- regmatches(qc, regexec("^BRANDATTR_([A-Z0-9]+)_(CEP|ATT)([0-9]+)$",
                               qc))[[1]]
   if (length(m) == 4L) {
@@ -177,6 +178,37 @@ infer_role_map <- function(questions, brands, active_cats) {
                                    m[2], ".", item_code),
                      category = m[2],
                      detail = list(item_kind = item_kind, item_code = item_code),
+                     column_kind = "multi_mention_root")))
+  }
+
+  # CEP matrices: BRANDCEP_{CAT}{NN}
+  # (BAK / POS convention — same shape as BRANDATTR_<CAT>_CEP<NN> but the
+  # category is glued to the CEP number without an underscore. Maps to the
+  # same mental_avail.cep.<CAT>.CEP<NN> role so build_cep_linkage finds it.)
+  m <- regmatches(qc, regexec("^BRANDCEP_([A-Z]+)([0-9]+)$", qc))[[1]]
+  if (length(m) == 3L) {
+    cat_code <- m[2]
+    item_code <- paste0("CEP", m[3])
+    return(list(list(pattern = "brandcep",
+                     role = paste0("mental_avail.cep.", cat_code, ".", item_code),
+                     category = cat_code,
+                     detail = list(item_kind = "cep", item_code = item_code),
+                     column_kind = "multi_mention_root")))
+  }
+
+  # Attribute matrices: BRANDATTR_{CAT}{NN}
+  # (POS convention — like BRANDATTR_<CAT>_ATT<NN> but with cat glued to the
+  # number, no _ATT separator. Maps to mental_avail.attr.<CAT>.ATT<NN> so
+  # build_cep_linkage(item_kind = "attr") picks it up alongside the
+  # DSS/PAS/BAK BRANDATTR_<CAT>_ATT<NN> form handled above.)
+  m <- regmatches(qc, regexec("^BRANDATTR_([A-Z]+)([0-9]+)$", qc))[[1]]
+  if (length(m) == 3L) {
+    cat_code <- m[2]
+    item_code <- paste0("ATT", m[3])
+    return(list(list(pattern = "brandattr_short",
+                     role = paste0("mental_avail.attr.", cat_code, ".", item_code),
+                     category = cat_code,
+                     detail = list(item_kind = "attr", item_code = item_code),
                      column_kind = "multi_mention_root")))
   }
 
@@ -233,24 +265,38 @@ infer_role_map <- function(questions, brands, active_cats) {
     }
   }
 
-  # Cat-buying per-category roots
+  # Cat-buying per-category roots. CAT_FREQ aliases CATBUY and CAT_LOC aliases
+  # CHANNEL so legacy IPK-style naming (where DSS uses CATBUY/CHANNEL and other
+  # cats use CAT_FREQ/CAT_LOC) auto-resolves without manual QuestionMap rows.
+  # `roles` is a character vector: each matching column emits one entry per
+  # role string. Channels emit BOTH cat_buying.channel.{cat} (legacy) and
+  # channel.purchase.{cat} (orchestrator + shopper engine lookup) so existing
+  # code on either name continues to work.
   per_cat_roots <- list(
-    list(prefix = "CATBUY",   role = "cat_buying.frequency.",
+    list(prefix = "CATBUY",   roles = "cat_buying.frequency.",
          kind = "per_category"),
-    list(prefix = "CATCOUNT", role = "cat_buying.count.",
+    list(prefix = "CAT_FREQ", roles = "cat_buying.frequency.",
          kind = "per_category"),
-    list(prefix = "CHANNEL",  role = "cat_buying.channel.",
+    list(prefix = "CATCOUNT", roles = "cat_buying.count.",
+         kind = "per_category"),
+    list(prefix = "CHANNEL",  roles = c("cat_buying.channel.",
+                                         "channel.purchase."),
          kind = "multi_mention_root"),
-    list(prefix = "PACK",     role = "cat_buying.packsize.",
+    list(prefix = "CAT_LOC",  roles = c("cat_buying.channel.",
+                                         "channel.purchase."),
+         kind = "multi_mention_root"),
+    list(prefix = "PACK",     roles = "cat_buying.packsize.",
          kind = "multi_mention_root")
   )
   for (def in per_cat_roots) {
     m <- regmatches(qc,
                     regexec(paste0("^", def$prefix, "_([A-Z0-9]+)$"), qc))[[1]]
     if (length(m) == 2L) {
-      return(list(list(pattern = tolower(def$prefix),
-                       role = paste0(def$role, m[2]),
-                       category = m[2], column_kind = def$kind)))
+      return(lapply(def$roles, function(role_prefix) {
+        list(pattern = tolower(def$prefix),
+             role = paste0(role_prefix, m[2]),
+             category = m[2], column_kind = def$kind)
+      }))
     }
   }
 
