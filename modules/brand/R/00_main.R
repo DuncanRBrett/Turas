@@ -587,36 +587,57 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
     }
 
     # Category Buying Frequency (full categories only)
-    # Reads the cat_buying.frequency.{cat_code} role from QuestionMap and maps
-    # coded responses through the cat_buy_scale OptionMap scale.
+    # Resolves the cat_buying.frequency.{cat_code} role and maps coded
+    # responses through the cat_buy_scale OptionMap scale. Lookup order:
+    # (1) QuestionMap explicit row (if structure has one); (2) inferred
+    # role_map (auto from CATBUY_<CAT> or CAT_FREQ_<CAT> column names).
+    # The fallback to (2) means surveys with mixed CATBUY/CAT_FREQ naming
+    # don't need every cat manually wired in QuestionMap.
     if (isTRUE(config$element_repertoire) && cat_depth == "full" &&
-        !is.null(cat_code) && !is.null(structure$questionmap) &&
-        nrow(structure$questionmap) > 0) {
+        !is.null(cat_code)) {
       freq_role <- paste0("cat_buying.frequency.", cat_code)
-      qmap_rows <- structure$questionmap
-      freq_row  <- qmap_rows[
-        !is.na(qmap_rows$Role) &
-          trimws(as.character(qmap_rows$Role)) == freq_role,
-        , drop = FALSE]
-      if (nrow(freq_row) > 0) {
-        freq_col_name <- trimws(as.character(freq_row$ClientCode[1]))
-        if (!is.na(freq_col_name) && nzchar(freq_col_name) &&
-            freq_col_name %in% names(cat_data)) {
-          if (verbose) cat("  Running Category Buying Frequency...\n")
-          cat_result$cat_buying_frequency <- tryCatch(
-            run_cat_buying_frequency(
-              cat_data[[freq_col_name]],
-              option_map = structure$optionmap,
-              weights    = cat_weights
-            ),
-            error = function(e) {
-              warnings_list <<- c(warnings_list,
-                sprintf("Cat buying frequency failed for %s: %s",
-                        cat_name, e$message))
-              list(status = "REFUSED", message = e$message)
-            }
-          )
+      freq_col_name <- NA_character_
+
+      # Path 1: QuestionMap explicit row
+      if (!is.null(structure$questionmap) &&
+          nrow(structure$questionmap) > 0) {
+        qmap_rows <- structure$questionmap
+        freq_row  <- qmap_rows[
+          !is.na(qmap_rows$Role) &
+            trimws(as.character(qmap_rows$Role)) == freq_role,
+          , drop = FALSE]
+        if (nrow(freq_row) > 0) {
+          freq_col_name <- trimws(as.character(freq_row$ClientCode[1]))
         }
+      }
+
+      # Path 2: inferred role_map fallback
+      if ((is.na(freq_col_name) || !nzchar(freq_col_name)) &&
+          !is.null(role_map) && !is.null(role_map[[freq_role]])) {
+        entry <- role_map[[freq_role]]
+        if (!is.null(entry$columns) && length(entry$columns) >= 1L) {
+          freq_col_name <- as.character(entry$columns[1])
+        } else if (!is.null(entry$column_root)) {
+          freq_col_name <- as.character(entry$column_root)
+        }
+      }
+
+      if (!is.na(freq_col_name) && nzchar(freq_col_name) &&
+          freq_col_name %in% names(cat_data)) {
+        if (verbose) cat("  Running Category Buying Frequency...\n")
+        cat_result$cat_buying_frequency <- tryCatch(
+          run_cat_buying_frequency(
+            cat_data[[freq_col_name]],
+            option_map = structure$optionmap,
+            weights    = cat_weights
+          ),
+          error = function(e) {
+            warnings_list <<- c(warnings_list,
+              sprintf("Cat buying frequency failed for %s: %s",
+                      cat_name, e$message))
+            list(status = "REFUSED", message = e$message)
+          }
+        )
       }
     }
 
@@ -727,6 +748,26 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
         if (length(sb$warnings) > 0) {
           warnings_list <- c(warnings_list, sb$warnings)
         }
+      }
+
+      # Slot-indexed buying-location fallback. The 08e shopper engine above
+      # requires QuestionMap rows + per-channel indicator columns. Surveys
+      # that store channels in slot columns (CHANNEL_<CAT>_1..6 or
+      # CAT_LOC_<CAT>_1..6, each slot carrying the channel code as text)
+      # don't fit that resolver — compute a simple distribution here so the
+      # cat panel can still render a "buying location" section.
+      if (is.null(cat_result$shopper_location) &&
+          exists("compute_buying_location", mode = "function")) {
+        cat_result$buying_location <- tryCatch(
+          compute_buying_location(cat_data, cat_code, structure,
+                                   weights = cat_weights),
+          error = function(e) {
+            warnings_list <<- c(warnings_list,
+              sprintf("Buying location failed for %s: %s",
+                      cat_name, e$message))
+            NULL
+          }
+        )
       }
     }
 

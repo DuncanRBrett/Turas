@@ -129,6 +129,14 @@ render_cat_buying_panel <- function(panel_data) {
   parts <- c(parts, '<div class="cb-subtab" data-cb-tab="context">')
   parts <- c(parts, .cb_context_tab(cbf, rep, dn, bh, dist_labels,
                                      extra_chips = shop_chips_html))
+  # Sample-level buying location (Q2). Surfaces when the per-brand shopper
+  # engine wasn't wired but slot-indexed CHANNEL_<CAT>_1..6 / CAT_LOC_<CAT>_*
+  # data is present. Bar chart of "where category respondents shop" — the
+  # cross-brand totals, not per-brand.
+  if (!is.null(panel_data$buying_location) &&
+      exists("cb_buying_location_html", mode = "function")) {
+    parts <- c(parts, cb_buying_location_html(panel_data$buying_location, fcol))
+  }
   parts <- c(parts, '</div>')
 
   # ----- Tab 2: Brand Performance Summary ------------------------------------

@@ -404,6 +404,21 @@ paste0(
   display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0;
 }
 @media (max-width: 560px) { .cb-context-tables { grid-template-columns: 1fr; } }
+
+/* Sample-level buying-location bar chart */
+.cb-bl-chart { display: flex; flex-direction: column; gap: 4px; }
+.cb-bl-row {
+  align-items: center; display: grid; font-size: 11px; gap: 8px;
+  grid-template-columns: 200px 1fr 40px;
+}
+.cb-bl-label {
+  color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cb-bl-track {
+  background: #f1f5f9; border-radius: 3px; height: 14px; overflow: hidden;
+}
+.cb-bl-fill { border-radius: 3px; height: 100%%; transition: width 0.2s ease; }
+.cb-bl-value { color: #1e293b; font-weight: 600; text-align: right; }
 .cb-ctx-subtitle {
   font-size: 12px; font-weight: 600; color: #475569;
   margin: 0 0 6px; padding-bottom: 4px; border-bottom: 1px solid #e2e8f0;

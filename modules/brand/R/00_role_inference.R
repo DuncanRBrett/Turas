@@ -265,24 +265,38 @@ infer_role_map <- function(questions, brands, active_cats) {
     }
   }
 
-  # Cat-buying per-category roots
+  # Cat-buying per-category roots. CAT_FREQ aliases CATBUY and CAT_LOC aliases
+  # CHANNEL so legacy IPK-style naming (where DSS uses CATBUY/CHANNEL and other
+  # cats use CAT_FREQ/CAT_LOC) auto-resolves without manual QuestionMap rows.
+  # `roles` is a character vector: each matching column emits one entry per
+  # role string. Channels emit BOTH cat_buying.channel.{cat} (legacy) and
+  # channel.purchase.{cat} (orchestrator + shopper engine lookup) so existing
+  # code on either name continues to work.
   per_cat_roots <- list(
-    list(prefix = "CATBUY",   role = "cat_buying.frequency.",
+    list(prefix = "CATBUY",   roles = "cat_buying.frequency.",
          kind = "per_category"),
-    list(prefix = "CATCOUNT", role = "cat_buying.count.",
+    list(prefix = "CAT_FREQ", roles = "cat_buying.frequency.",
          kind = "per_category"),
-    list(prefix = "CHANNEL",  role = "cat_buying.channel.",
+    list(prefix = "CATCOUNT", roles = "cat_buying.count.",
+         kind = "per_category"),
+    list(prefix = "CHANNEL",  roles = c("cat_buying.channel.",
+                                         "channel.purchase."),
          kind = "multi_mention_root"),
-    list(prefix = "PACK",     role = "cat_buying.packsize.",
+    list(prefix = "CAT_LOC",  roles = c("cat_buying.channel.",
+                                         "channel.purchase."),
+         kind = "multi_mention_root"),
+    list(prefix = "PACK",     roles = "cat_buying.packsize.",
          kind = "multi_mention_root")
   )
   for (def in per_cat_roots) {
     m <- regmatches(qc,
                     regexec(paste0("^", def$prefix, "_([A-Z0-9]+)$"), qc))[[1]]
     if (length(m) == 2L) {
-      return(list(list(pattern = tolower(def$prefix),
-                       role = paste0(def$role, m[2]),
-                       category = m[2], column_kind = def$kind)))
+      return(lapply(def$roles, function(role_prefix) {
+        list(pattern = tolower(def$prefix),
+             role = paste0(role_prefix, m[2]),
+             category = m[2], column_kind = def$kind)
+      }))
     }
   }
 

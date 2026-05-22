@@ -131,3 +131,64 @@ test_that("build_shopper_summary_sections: returns empty when both engines NULL"
     list(focal_brand = "IPK"))
   expect_equal(html, "")
 })
+
+
+test_that("compute_buying_location: picks up CHANNEL_<CAT> slot pattern", {
+  data <- data.frame(
+    CHANNEL_DSS_1 = c("SPMKT", "SPMKT", "DELI", NA),
+    CHANNEL_DSS_2 = c("DELI", NA, NA, "ONLINE"),
+    stringsAsFactors = FALSE
+  )
+  res <- compute_buying_location(data, "DSS", structure = list())
+  expect_false(is.null(res))
+  expect_equal(res$cat_code, "DSS")
+  expect_equal(res$n_total, 4L)
+  by_label <- setNames(vapply(res$rows, function(r) r$n, integer(1)),
+                       vapply(res$rows, function(r) r$label, character(1)))
+  expect_equal(by_label[["SPMKT"]], 2L)
+  expect_equal(by_label[["DELI"]],  2L)
+  expect_equal(by_label[["ONLINE"]], 1L)
+})
+
+
+test_that("compute_buying_location: falls back to CAT_LOC_<CAT> legacy naming", {
+  data <- data.frame(
+    CAT_LOC_BAK_1 = c("SPMKT", "DELI"),
+    CAT_LOC_BAK_2 = c(NA, NA),
+    stringsAsFactors = FALSE
+  )
+  res <- compute_buying_location(data, "BAK", structure = list())
+  expect_false(is.null(res))
+  expect_equal(res$n_total, 2L)
+  expect_equal(length(res$rows), 2L)
+})
+
+
+test_that("compute_buying_location: NULL when neither root present", {
+  data <- data.frame(other = 1:3, stringsAsFactors = FALSE)
+  expect_null(compute_buying_location(data, "DSS", structure = list()))
+})
+
+
+test_that("infer_role_map: CAT_FREQ + CAT_LOC aliases produce expected roles", {
+  brands <- data.frame(
+    CategoryCode = c("DSS", "BAK"), Category = c("DSS", "BAK"),
+    BrandCode = c("IPK", "IPK"), BrandLabel = c("IPK", "IPK"),
+    stringsAsFactors = FALSE)
+  questions <- data.frame(
+    QuestionCode = c("CATBUY_DSS", "CAT_FREQ_BAK",
+                     "CHANNEL_DSS", "CAT_LOC_BAK"),
+    Variable_Type = c("Single_Response", "Single_Response",
+                       "Multi_Mention", "Multi_Mention"),
+    stringsAsFactors = FALSE)
+  rm <- infer_role_map(questions, brands, active_cats = c("DSS", "BAK"))
+  # Frequency: both DSS (legacy CATBUY) and BAK (new CAT_FREQ) resolve
+  expect_true("cat_buying.frequency.DSS" %in% names(rm))
+  expect_true("cat_buying.frequency.BAK" %in% names(rm))
+  # Channels: each column emits BOTH role aliases
+  expect_true("cat_buying.channel.DSS" %in% names(rm))
+  expect_true("channel.purchase.DSS"   %in% names(rm))
+  expect_true("cat_buying.channel.BAK" %in% names(rm))
+  expect_true("channel.purchase.BAK"   %in% names(rm))
+  expect_equal(rm[["channel.purchase.BAK"]]$column_root, "CAT_LOC_BAK")
+})

@@ -183,6 +183,42 @@ compute_shopper_context <- function(data, structure, weights = NULL) {
 }
 
 
+#' Per-category buying location (Q2: "Where bought [cat] last 3 months?")
+#'
+#' Slot-indexed multi-mention: `<root>_1..6` where each slot carries an
+#' option code (e.g. "SPMKT") when picked, NA otherwise. Roots tried in
+#' order: `CHANNEL_<CAT>` (canonical), `CAT_LOC_<CAT>` (legacy IPK naming).
+#' Returns NULL when neither root has columns in the data — callers should
+#' skip rendering rather than treating absence as an error.
+#'
+#' Labels come from the Options sheet keyed on the same root code (the
+#' OptionValue → OptionText map). When the sheet has no row the engine
+#' falls back to the raw value as both code and label.
+#'
+#' @param data Data frame of respondents in this category.
+#' @param cat_code Cat code (e.g. "BAK"). Used to construct the data-column
+#'   root.
+#' @param structure Survey structure (for Options sheet lookup).
+#' @param weights Optional numeric weights, length nrow(data).
+#' @return List shaped like other shopper questions:
+#'   `question_root` / `cat_code` / `n_total` / `rows`. NULL if absent.
+#' @export
+compute_buying_location <- function(data, cat_code, structure,
+                                     weights = NULL) {
+  if (is.null(data) || !is.data.frame(data) || nrow(data) == 0 ||
+      is.null(cat_code) || !nzchar(cat_code)) return(NULL)
+  for (root in c(paste0("CHANNEL_", cat_code),
+                 paste0("CAT_LOC_", cat_code))) {
+    out <- .shopper_multi_mention(data, root, structure, weights)
+    if (!is.null(out)) {
+      out$cat_code <- cat_code
+      return(out)
+    }
+  }
+  NULL
+}
+
+
 #' Compute focal-brand engagement KPIs (website / books / recipes-tried)
 #'
 #' @param data Data frame of respondent rows.
