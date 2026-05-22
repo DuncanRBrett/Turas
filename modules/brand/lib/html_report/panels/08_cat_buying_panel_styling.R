@@ -417,7 +417,7 @@ paste0(
 .cb-bl-track {
   background: #f1f5f9; border-radius: 3px; height: 14px; overflow: hidden;
 }
-.cb-bl-fill { border-radius: 3px; height: 100%%; transition: width 0.2s ease; }
+.cb-bl-fill { border-radius: 3px; height: 100%; transition: width 0.2s ease; }
 .cb-bl-value { color: #1e293b; font-weight: 600; text-align: right; }
 .cb-ctx-subtitle {
   font-size: 12px; font-weight: 600; color: #475569;
