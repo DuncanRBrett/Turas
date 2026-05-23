@@ -387,7 +387,7 @@ write_funnel_csv <- function(result, brand_list, role_map = NULL,
   # Must mirror .FUNNEL_DEFAULT_LABELS in 03a_funnel_derive.R.
   labels <- c(
     aware              = "Aware",
-    consideration      = "Consider",
+    consideration      = "Prefer",
     bought_long        = "Long Period",
     bought_target      = "Target Period",
     current_owner_d    = "Current owner",

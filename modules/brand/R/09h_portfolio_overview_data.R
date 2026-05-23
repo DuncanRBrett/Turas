@@ -58,23 +58,36 @@ build_portfolio_overview <- function(results, config) {
   x_mat     <- if (!is.null(brand_vol)) brand_vol$x_mat   else NULL
   if (is.null(pen_mat) || is.null(x_mat)) return(NULL)
 
+  # Build MPen lookup from MA result (% scale, NA when MA not configured)
+  ma_res  <- cat_rec$mental_availability
+  mpen_df <- if (!is.null(ma_res) && !is.null(ma_res$mpen) &&
+                   "BrandCode" %in% names(ma_res$mpen) &&
+                   "MPen" %in% names(ma_res$mpen)) ma_res$mpen else NULL
+  mpen_lookup <- if (!is.null(mpen_df))
+    stats::setNames(as.list(mpen_df$MPen), as.character(mpen_df$BrandCode))
+  else list()
+
   n_resp <- nrow(pen_mat)
   cat_total_volume <- sum(x_mat, na.rm = TRUE)
   sor_df <- if (!is.null(rep_res) && !is.null(rep_res$share_of_requirements))
     rep_res$share_of_requirements else NULL
 
   per_brand <- lapply(brand_codes, function(bc) {
-    .po_brand_deep_dive(bc, pen_mat, x_mat, n_resp, cat_total_volume, sor_df)
+    mpen_pct <- if (!is.null(mpen_lookup[[bc]]) && is.finite(mpen_lookup[[bc]]))
+      round(mpen_lookup[[bc]] * 100, 1) else NA_real_
+    .po_brand_deep_dive(bc, pen_mat, x_mat, n_resp, cat_total_volume, sor_df,
+                        mpen_pct)
   })
   names(per_brand) <- brand_codes
   per_brand
 }
 
 .po_brand_deep_dive <- function(brand_code, pen_mat, x_mat, n_resp,
-                                 cat_total_volume, sor_df) {
+                                 cat_total_volume, sor_df,
+                                 mpen_pct = NA_real_) {
   empty <- list(penetration_pct = NA_real_, scr_pct = NA_real_,
                 freq_mean = NA_real_, vol_share_pct = NA_real_,
-                buyers_n = 0L)
+                mpen_pct = NA_real_, buyers_n = 0L)
   if (!brand_code %in% colnames(pen_mat)) return(empty)
 
   pen_col <- pen_mat[, brand_code]
@@ -97,6 +110,7 @@ build_portfolio_overview <- function(results, config) {
     scr_pct         = scr_pct,
     freq_mean       = if (is.finite(freq)) freq else NA_real_,
     vol_share_pct   = vol,
+    mpen_pct        = mpen_pct,
     buyers_n        = as.integer(buyers)
   )
 }

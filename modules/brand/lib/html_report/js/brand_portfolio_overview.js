@@ -220,17 +220,29 @@
         return {
           code: bc, name: (c.brand_names || {})[bc] || bc,
           pen: d.penetration_pct, scr: d.scr_pct, vol: d.vol_share_pct,
+          mpen: d.mpen_pct,
           isFocal: bc === focalCode
         };
       }).filter(Boolean)
         .sort(function (a, b) {
+          // Sort by MPen; fall back to vol share when MPen is unavailable
+          var hasMpenA = a.mpen != null && isFinite(a.mpen);
+          var hasMpenB = b.mpen != null && isFinite(b.mpen);
+          if (hasMpenA || hasMpenB) {
+            var av = hasMpenA ? a.mpen : -1;
+            var bv = hasMpenB ? b.mpen : -1;
+            return bv - av;
+          }
           return (b.vol == null ? -1 : b.vol) - (a.vol == null ? -1 : a.vol);
         }).slice(0, 5);
 
+      var hasMpen = rows.some(function (r) { return r.mpen != null && isFinite(r.mpen); });
+      var rankColHeader = hasMpen ? 'MPen' : 'Vol share';
       var rankBody = rows.map(function (r, i) {
         var cls = r.isFocal ? ' class="pfo-deep-focal"' : '';
+        var rankVal = hasMpen ? fmtPct(r.mpen) : fmtPct(r.vol);
         return '<tr' + cls + '><td>#' + (i + 1) + ' ' + esc(r.name) + '</td>' +
-          '<td class="pfo-td-num">' + fmtPct(r.vol) + '</td>' +
+          '<td class="pfo-td-num">' + rankVal + '</td>' +
           '<td class="pfo-td-num">' + fmtPct(r.pen) + '</td></tr>';
       }).join('');
 
@@ -240,7 +252,7 @@
       return '<div class="pfo-deep-card">' +
         '<div class="pfo-deep-card-head">' +
         '<span class="pfo-deep-card-title">' + esc(c.cat_name) + '</span>' +
-        '<span class="pfo-deep-card-rank">Focal: ' + esc(focalRankTxt) + ' by vol share</span></div>' +
+        '<span class="pfo-deep-card-rank">Focal: ' + esc(focalRankTxt) + ' by ' + rankColHeader + '</span></div>' +
         '<div class="pfo-deep-card-kpis">' +
         '<div><span class="pfo-kpi-mini-v">' + fmtPct(focal.vol_share_pct) + '</span>' +
         '<span class="pfo-kpi-mini-l">Vol share</span></div>' +
@@ -249,7 +261,7 @@
         '<div><span class="pfo-kpi-mini-v">' + fmtPct(focal.scr_pct) + '</span>' +
         '<span class="pfo-kpi-mini-l">SCR</span></div></div>' +
         '<table class="pfo-deep-rank"><thead><tr><th>Brand</th>' +
-        '<th class="pfo-td-num">Vol share</th>' +
+        '<th class="pfo-td-num">' + rankColHeader + '</th>' +
         '<th class="pfo-td-num">Pen</th></tr></thead><tbody>' +
         rankBody + '</tbody></table></div>';
     }).join('');

@@ -66,7 +66,7 @@ BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
 # runtime via config$funnel.stage_labels_override.
 .FUNNEL_DEFAULT_LABELS <- list(
   aware              = "Aware",
-  consideration      = "Consider",
+  consideration      = "Prefer",
   bought_long        = "Long Period",
   bought_target      = "Target Period",
   current_owner_d    = "Current owner",
@@ -81,11 +81,11 @@ BRAND_FUNNEL_DERIVE_VERSION <- "2.0"
 .FUNNEL_DEFAULT_DEFINITIONS <- list(
   aware              = "Respondents who recognise the brand (stated aided awareness).",
   consideration      = "Aware respondents who actively prefer the brand — Love (it's my favourite / I always pick it) or Prefer (I prefer it but don't always get it). Ambivalent, Price-conditional, Avoid, and No-opinion respondents are excluded. Mental Availability (CEP-based memory presence) is reported separately on the Mental Availability tab.",
-  bought_long        = "Considerers who have bought the brand in the longer timeframe asked on the survey.",
+  bought_long        = "Those who prefer the brand and have bought it in the longer timeframe asked on the survey.",
   bought_target      = "Long-period buyers who also bought the brand in the target (shorter) timeframe.",
-  current_owner_d    = "Considerers who currently own this brand in the category.",
+  current_owner_d    = "Those who prefer the brand and currently own it in the category.",
   long_tenured_d     = "Current owners whose tenure meets or exceeds the configured tenure threshold.",
-  current_customer_s = "Considerers who are current customers of this brand.",
+  current_customer_s = "Those who prefer the brand and are current customers.",
   long_tenured_s     = "Current customers whose tenure meets or exceeds the configured tenure threshold."
 )
 
