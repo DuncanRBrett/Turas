@@ -659,27 +659,27 @@ render_cat_buying_panel <- function(panel_data) {
   paste0(
     '<div class="cb-kpi-strip" style="margin:8px 0 14px;">',
     sprintf(paste0(
-      '<div class="cb-kpi-chip" title="%% of %s buyers who are heavy buyers of the CATEGORY overall (top tertile by total category purchases) — not heavy buyers of %s itself.">',
-      '<div class="cb-kpi-val">%s</div>',
-      '<div class="cb-kpi-label">%s buyers who are heavy <em>category</em> buyers</div>',
+      '<div class="cb-kpi-chip" data-kpi="hv-heavy" title="%% of %s buyers who are heavy buyers of the CATEGORY overall (top tertile by total category purchases) — not heavy buyers of %s itself.">',
+      '<div class="cb-kpi-val" data-kpi-val>%s</div>',
+      '<div class="cb-kpi-label"><span data-kpi-focal-label>%s</span> buyers who are heavy <em>category</em> buyers</div>',
       '</div>'),
       .cb_esc(focal_lbl), .cb_esc(focal_lbl), fmt_pct(heavy_p), .cb_esc(focal_lbl)),
     sprintf(paste0(
-      '<div class="cb-kpi-chip" title="Average total category purchases per %s buyer over the past %d months (counting every brand they bought, not just %s) vs the average category buyer. Same metric, same formula, same base as the &lsquo;Avg purchases / category buyer&rsquo; chip on the Category Context tab — so the cat-avg figures here and there should match.">',
-      '<div class="cb-kpi-val">%s</div>',
-      '<div class="cb-kpi-label">Avg purchases / category buyer ',
-      '<span style="color:#475569;">(cat avg %s &middot; <strong>%s</strong>)</span>',
+      '<div class="cb-kpi-chip" data-kpi="hv-wbar" title="The big number is the average total category purchases by %s&apos;s buyers over the past %d months (counting every brand they bought, not just %s). The (cat avg …) in parens is the same metric averaged across ALL category buyers — that figure matches the &lsquo;Avg purchases / category buyer&rsquo; chip on the Category Context tab. The two numbers should differ: focal&apos;s buyers are a SUBSET of category buyers, and the gap tells you whether they buy more or less of the category than average.">',
+      '<div class="cb-kpi-val" data-kpi-val>%s</div>',
+      '<div class="cb-kpi-label">Avg category purchases per <em><span data-kpi-focal-label>%s</span></em> buyer ',
+      '<span style="color:#475569;" data-kpi-sub>(all cat buyers avg %s &middot; gap <strong>%s</strong>)</span>',
       '</div>',
       '</div>'),
       .cb_esc(focal_lbl), t_months, .cb_esc(focal_lbl),
-      fmt_n(wbar_b), fmt_n(wbar_c), fmt_gap(wbar_g)),
+      fmt_n(wbar_b), .cb_esc(focal_lbl), fmt_n(wbar_c), fmt_gap(wbar_g)),
     sprintf(paste0(
-      '<div class="cb-kpi-chip" title="Light-buyer index = brand&apos;s %% of light category buyers ÷ category&apos;s %% of light category buyers × 100. ',
+      '<div class="cb-kpi-chip" data-kpi="hv-light" title="Light-buyer index = brand&apos;s %% of light category buyers ÷ category&apos;s %% of light category buyers × 100. ',
       'Above 100 = brand&apos;s base is more light-skewed than the category — the Natural Monopoly Law signature (typical of mass / leader brands). ',
       'Around 100 = brand mirrors the category. Below 100 = brand over-recruits heavy category buyers (niche / specialist).">',
-      '<div class="cb-kpi-val">%s</div>',
+      '<div class="cb-kpi-val" data-kpi-val>%s</div>',
       '<div class="cb-kpi-label">Light-buyer index ',
-      '<span style="display:inline-block;padding:1px 7px;border-radius:8px;background:%s;color:#fff;font-size:10px;margin-left:4px;">%s</span>',
+      '<span data-kpi-verdict style="display:inline-block;padding:1px 7px;border-radius:8px;background:%s;color:#fff;font-size:10px;margin-left:4px;">%s</span>',
       '</div>',
       '</div>'),
       if (!is.finite(nmi)) "&mdash;" else sprintf("%.0f", nmi),
@@ -757,13 +757,16 @@ render_cat_buying_panel <- function(panel_data) {
     'brand&apos;s buyers, the share who sit in the top category-purchase tertile. ',
     'Above ~40% is notable; above ~50% means the brand is being picked by people ',
     'who buy the category a lot overall.</li>',
-    '<li><strong>Avg purchases / category buyer</strong>: average total ',
-    'category purchases of this brand&apos;s buyers (counting every brand they ',
-    'bought in the past ', as.integer(t_months), ' months, not just this one), ',
-    'compared to the average category buyer. Positive gap = brand recruits ',
-    'category-heavy users. <em>Same metric, same formula as the ',
-    '&ldquo;Avg purchases / category buyer&rdquo; chip on the Category Context ',
-    'tab &mdash; the cat-avg figure should be identical between the two pages.</em></li>',
+    '<li><strong>Avg category purchases per focal buyer</strong>: the big ',
+    'number is the average total category purchases by <em>this brand&apos;s ',
+    'buyers</em> (counting every brand they bought in the past ',
+    as.integer(t_months), ' months, not just this one). The smaller (all ',
+    'cat buyers avg …) figure in parens is the same metric averaged across ',
+    '<em>all</em> category buyers &mdash; that figure equals the &ldquo;Avg ',
+    'purchases / category buyer&rdquo; chip on the Category Context tab. ',
+    'The two numbers usually differ because the focal&apos;s buyers are a ',
+    'SUBSET of all category buyers; a positive gap means this brand pulls ',
+    'category-heavy users.</li>',
     '<li><strong>Light-buyer index</strong>: brand&apos;s % of light category ',
     'buyers &divide; category&apos;s % of light category buyers &times; 100. ',
     'Per Ehrenberg-Bass&apos;s <strong>Natural Monopoly Law</strong>, bigger ',
@@ -1737,6 +1740,15 @@ render_cat_buying_panel <- function(panel_data) {
     scr_obs <- "\u2014"; scr_exp <- ""
     loy_obs <- "\u2014"; loy_exp <- ""
     nmi_txt <- "\u2014"; nmi_arrow <- ""
+    # Heaviness focal KPI strip fields (per-focal-brand, so they must be
+    # in this map so _cbSetFocal can swap them on dropdown change).
+    hv_heavy   <- "\u2014"
+    hv_wbar    <- "\u2014"
+    hv_wbar_cat <- "\u2014"
+    hv_wbar_gap <- "\u2014"
+    hv_idx     <- "\u2014"
+    hv_verdict_label  <- "n/a"
+    hv_verdict_colour <- "#94a3b8"
 
     if (has_dn) {
       nt <- dn$norms_table; ri <- which(nt$BrandCode == bc)
@@ -1749,17 +1761,47 @@ render_cat_buying_panel <- function(panel_data) {
     }
     if (has_bh) {
       bh_df <- bh$brand_heaviness; ri <- which(bh_df$BrandCode == bc)
-      if (length(ri) == 1 && "NaturalMonopolyIndex" %in% names(bh_df)) {
-        nmi_v <- bh_df$NaturalMonopolyIndex[ri]
-        if (!is.na(nmi_v)) {
-          nmi_txt   <- sprintf("%.0f", nmi_v)
-          nmi_arrow <- if (nmi_v < 85) "\u2193" else if (nmi_v > 115) "\u2191" else "\u2192"
+      if (length(ri) == 1) {
+        if ("NaturalMonopolyIndex" %in% names(bh_df)) {
+          nmi_v <- bh_df$NaturalMonopolyIndex[ri]
+          if (!is.na(nmi_v)) {
+            nmi_txt   <- sprintf("%.0f", nmi_v)
+            nmi_arrow <- if (nmi_v < 85) "\u2193" else if (nmi_v > 115) "\u2191" else "\u2192"
+            hv_idx    <- nmi_txt
+            hv_verdict_label <- if (nmi_v < 70)   "Niche / specialist"
+                          else if (nmi_v < 90)   "Heavy-skewed base"
+                          else if (nmi_v <= 110) "Mirrors category"
+                          else if (nmi_v <= 130) "Mass pattern (NML)"
+                          else                   "Strong light-buyer skew"
+            hv_verdict_colour <- if (nmi_v < 70)   "#7c3aed"
+                            else if (nmi_v < 90)   "#a855f7"
+                            else if (nmi_v <= 110) "#0891b2"
+                            else if (nmi_v <= 130) "#0d9488"
+                            else                   "#059669"
+          }
+        }
+        if ("Heavy_Pct"  %in% names(bh_df) && !is.na(bh_df$Heavy_Pct[ri]))
+          hv_heavy <- sprintf("%.0f%%", bh_df$Heavy_Pct[ri])
+        if ("WBar_Brand" %in% names(bh_df) && !is.na(bh_df$WBar_Brand[ri]))
+          hv_wbar  <- sprintf("%.1f", bh_df$WBar_Brand[ri])
+        if ("WBar_Category" %in% names(bh_df) && !is.na(bh_df$WBar_Category[ri]))
+          hv_wbar_cat <- sprintf("%.1f", bh_df$WBar_Category[ri])
+        if ("WBar_Gap" %in% names(bh_df) && !is.na(bh_df$WBar_Gap[ri])) {
+          g <- bh_df$WBar_Gap[ri]
+          hv_wbar_gap <- sprintf("%s%.1f", if (g >= 0) "+" else "", g)
         }
       }
     }
     entries[[bc]] <- list(scr_obs = scr_obs, scr_exp = scr_exp,
                           loyal_obs = loy_obs, loyal_exp = loy_exp,
-                          nmi = nmi_txt, nmi_arrow = nmi_arrow)
+                          nmi = nmi_txt, nmi_arrow = nmi_arrow,
+                          hv_heavy = hv_heavy,
+                          hv_wbar = hv_wbar,
+                          hv_wbar_cat = hv_wbar_cat,
+                          hv_wbar_gap = hv_wbar_gap,
+                          hv_idx = hv_idx,
+                          hv_verdict_label = hv_verdict_label,
+                          hv_verdict_colour = hv_verdict_colour)
   }
 
   json_str <- tryCatch(

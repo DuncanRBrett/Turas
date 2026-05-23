@@ -1516,6 +1516,17 @@
       try { kpiMap = JSON.parse(scriptEl.textContent); } catch (e) { kpiMap = null; }
       if (kpiMap) {
         var kd = kpiMap[brandCode];
+        /* Resolve the focal brand's display label from the chart-data
+           payload so we can keep inline focal-name spans in chip labels
+           in sync (e.g. "Avg category purchases per <Focal> buyer"). */
+        var newFocalLabel = brandCode;
+        if (panel.__cbData && Array.isArray(panel.__cbData.brandCodes)
+            && Array.isArray(panel.__cbData.brandNames)) {
+          var nfi = panel.__cbData.brandCodes.indexOf(brandCode);
+          if (nfi >= 0 && panel.__cbData.brandNames[nfi]) {
+            newFocalLabel = panel.__cbData.brandNames[nfi];
+          }
+        }
         if (kd) {
           panel.querySelectorAll('[data-kpi]').forEach(function (chip) {
             var kpiKey = chip.getAttribute('data-kpi');
@@ -1529,7 +1540,28 @@
               if (subEl) subEl.textContent = kd.loyal_exp || '';
             } else if (kpiKey === 'nmi') {
               if (valEl) valEl.textContent = (kd.nmi || '\u2014') + (kd.nmi_arrow || '');
+            } else if (kpiKey === 'hv-heavy') {
+              if (valEl) valEl.textContent = kd.hv_heavy || '\u2014';
+            } else if (kpiKey === 'hv-wbar') {
+              if (valEl) valEl.textContent = kd.hv_wbar || '\u2014';
+              if (subEl) subEl.innerHTML =
+                '(all cat buyers avg ' + (kd.hv_wbar_cat || '\u2014') +
+                ' \u00b7 gap <strong>' + (kd.hv_wbar_gap || '\u2014') + '</strong>)';
+            } else if (kpiKey === 'hv-light') {
+              if (valEl) valEl.textContent = kd.hv_idx || '\u2014';
+              var verdictEl = chip.querySelector('[data-kpi-verdict]');
+              if (verdictEl) {
+                verdictEl.textContent = kd.hv_verdict_label || '';
+                if (kd.hv_verdict_colour) {
+                  verdictEl.style.background = kd.hv_verdict_colour;
+                }
+              }
             }
+          });
+          /* Sync any inline focal-name spans (chip labels referencing the
+             focal brand by name, e.g. "<Focal> buyers who are heavy ..."). */
+          panel.querySelectorAll('[data-kpi-focal-label]').forEach(function (el) {
+            el.textContent = newFocalLabel;
           });
         }
       }
