@@ -698,8 +698,8 @@ build_funnel_chart <- function(funnel_df, focal_brand = NULL,
       '<rect x="%d" y="%g" width="%g" height="%d" rx="3" fill="#e2e8f0"/>', ml, y_base, aware_w, bar_h))
 
     # Attitude decomposition within aware bar
-    # Avoid_Pct is preferred; fall back to legacy Reject_Pct for older callers.
-    avoid_pct <- funnel_df$Avoid_Pct[i] %||% funnel_df$Reject_Pct[i]
+    # 6-level scale (IPK 2026): Avoid replaced Reject. Single column only.
+    avoid_pct <- funnel_df$Avoid_Pct[i]
     price_pct <- funnel_df$Price_Pct[i] %||% 0
     att_pcts <- c(funnel_df$Love_Pct[i], funnel_df$Prefer_Pct[i],
                   funnel_df$Ambivalent_Pct[i], price_pct, avoid_pct,

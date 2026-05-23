@@ -345,8 +345,21 @@ run_significance_tests <- function(stage_metrics, focal_brand,
   pct_u <- colSums(m, na.rm = TRUE) / n_resp
   base_w <- colSums(m * w, na.rm = TRUE)
   base_u <- colSums(m, na.rm = TRUE)
-  flag <- ifelse(base_u < suppress_base, "suppress",
-                 ifelse(base_u < warn_base, "warn", "none"))
+  # Brands with no data column at all for this stage (entire column NA)
+  # carry NA through, not 0. Required so a brand declared in the awareness
+  # battery but missing from the per-brand attitude battery (column-name
+  # mismatch) shows "—" in the consideration column instead of a misleading
+  # 0% and a false nesting violation downstream.
+  all_na_cols <- colSums(!is.na(m)) == 0
+  if (any(all_na_cols)) {
+    pct_w[all_na_cols] <- NA_real_
+    pct_u[all_na_cols] <- NA_real_
+    base_w[all_na_cols] <- NA_real_
+    base_u[all_na_cols] <- NA_real_
+  }
+  flag <- ifelse(is.na(base_u), "no_data",
+          ifelse(base_u < suppress_base, "suppress",
+                 ifelse(base_u < warn_base, "warn", "none")))
   data.frame(brand_code = brands,
              stage_key = rep(stage$key, length(brands)),
              pct_weighted = unname(pct_w),

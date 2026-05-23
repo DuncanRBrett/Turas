@@ -91,7 +91,19 @@ build_br_header <- function(config) {
 #' @keywords internal
 build_br_tab_nav <- function(category_names, config, display_map = NULL,
                               code_map = NULL) {
+  # Tab order:
+  #   Portfolio (when enabled) — cross-cat lens comes first so the reader
+  #     opens on the brand's whole-portfolio picture before drilling in.
+  #   Summary — per-cat snapshot for any picked category.
+  #   Per-category tabs — order driven by the Categories sheet in
+  #     Brand_Config.xlsx; reorder rows there to change tab order.
+  #   Brand Assets (when enabled).
+  #   Pinned Views, About — always trailing.
   btns <- character(0)
+
+  if (isTRUE(config$element_portfolio))
+    btns <- c(btns, '<button class="br-tab-btn" data-tab="portfolio" onclick="switchBrandTab(\'portfolio\')">Portfolio</button>')
+
   btns <- c(btns, '<button class="br-tab-btn active" data-tab="summary" onclick="switchBrandTab(\'summary\')">Summary</button>')
 
   for (cat_name in category_names) {
@@ -108,8 +120,6 @@ build_br_tab_nav <- function(category_names, config, display_map = NULL,
   if (isTRUE(config$element_dba))
     btns <- c(btns, '<button class="br-tab-btn" data-tab="dba" onclick="switchBrandTab(\'dba\')">Brand Assets</button>')
   # WOM is per-category (each category sub-tab). No top-level WOM tab.
-  if (isTRUE(config$element_portfolio))
-    btns <- c(btns, '<button class="br-tab-btn" data-tab="portfolio" onclick="switchBrandTab(\'portfolio\')">Portfolio</button>')
   # Demographics + Ad Hoc are per-category sub-tabs (inside each category
   # panel), not top-level tabs.
 

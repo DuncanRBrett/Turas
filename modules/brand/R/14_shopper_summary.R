@@ -41,6 +41,10 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
   if (nrow(rows) == 0) return(NULL)
   values <- as.character(rows[[val_col]])
   labels <- as.character(rows[[lbl_col]])
+  # When OptionValue is blank/NA for a row, the OptionText IS the data value
+  # (questions where the data carries the label directly, no separate code).
+  empty_v <- is.na(values) | !nzchar(trimws(values))
+  values[empty_v] <- labels[empty_v]
   order_v <- if (!is.na(ord_col)) suppressWarnings(as.integer(rows[[ord_col]]))
              else seq_len(nrow(rows))
   order_v[is.na(order_v)] <- 9999L

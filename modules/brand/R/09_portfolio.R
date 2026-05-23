@@ -259,6 +259,17 @@ run_portfolio <- function(data, role_map, categories, structure, config,
     }
   )
 
+  # Duplication of Awareness — Sharp / Ehrenberg analogue on awareness
+  # penetration, complements the constellation chart in the Competitive
+  # Set sub-tab with a quantitative pairwise matrix per category.
+  dop_awareness_result <- tryCatch(
+    compute_dop_awareness_per_cat(data, role_map, categories, structure, config, weights),
+    error = function(e) {
+      message(sprintf("[PORTFOLIO_V2] Duplication of Awareness failed: %s", e$message))
+      NULL
+    }
+  )
+
   all_suppressed <- unique(c(
     if (!is.null(footprint_result)) footprint_result$suppressed_cats   else character(0),
     if (!is.null(clutter_result))   clutter_result$suppressed_cats     else character(0),
@@ -318,6 +329,9 @@ run_portfolio <- function(data, role_map, categories, structure, config,
     constellation_per_cat = if (!is.null(constellation_per_cat) &&
                                  identical(constellation_per_cat$status, "PASS"))
                               constellation_per_cat else NULL,
+    dop_awareness    = if (!is.null(dop_awareness_result) &&
+                            identical(dop_awareness_result$status, "PASS"))
+                          dop_awareness_result else NULL,
     clutter          = clutter_result,
     strength         = if (!is.null(strength_result) &&
                            identical(strength_result$status, "PASS"))

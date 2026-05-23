@@ -806,10 +806,12 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   )
 }
 
-# Brand attitude: 5 segments — Love / Prefer / Ambivalent / Reject /
-# No opinion. Reads from cr$funnel$attitude_decomposition (long data
-# frame with brand_code, attitude_role, pct columns) — pct is already a
-# fraction of total respondents in the engine.
+# Brand attitude: 6 segments (IPK 2026 scale) — Love / Prefer / Ambivalent /
+# Price / Avoid / No opinion. Reads from cr$funnel$attitude_decomposition (long
+# data frame with brand_code, attitude_role, pct columns) — pct is already a
+# fraction of total respondents in the engine. Legacy 5-level surveys are
+# auto-canonicalised: their "reject" rolls into "avoid", and the price column
+# carries zero values.
 .brsum_attitude_minif <- function(cr, brand_codes, label_map) {
   fn <- cr$funnel
   att <- if (!is.null(fn)) fn$attitude_decomposition else NULL
@@ -817,9 +819,9 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
     return(list(available = FALSE))
   }
   seg_codes <- c("attitude.love", "attitude.prefer", "attitude.ambivalent",
-                 "attitude.reject", "attitude.no_opinion")
-  seg_labels <- c("Love", "Prefer", "Ambivalent", "Reject", "No opinion")
-  seg_colours <- c("#2E7D32", "#81C784", "#F9A825", "#C62828", "#90A4AE")
+                 "attitude.price", "attitude.avoid", "attitude.no_opinion")
+  seg_labels <- c("Love", "Prefer", "Ambivalent", "Price", "Avoid", "No opinion")
+  seg_colours <- c("#2E7D32", "#81C784", "#F9A825", "#FB8C00", "#C62828", "#90A4AE")
 
   att$brand_code    <- as.character(att$brand_code)
   att$attitude_role <- as.character(att$attitude_role)

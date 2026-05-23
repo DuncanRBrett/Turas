@@ -26,11 +26,15 @@
   /* ---------------------------------------------------------------------- */
 
   /* Segment colours per scope.
-     Loyalty: dark-green (sole) → light-green (primary) → amber (secondary) → dark-grey (not bought).
-     Dist:    light-blue → dark-blue gradient. */
+     Loyalty:   dark-green (sole) → light-green (primary) → amber (secondary) → dark-grey (not bought).
+     Dist:      light-blue → dark-blue gradient.
+     Heaviness: dark-purple (Heavy category buyer) → mid-purple (Medium) → pale-purple (Light).
+                Sequential intensity reads as "engagement strength" and pairs visually with
+                Purchase Distribution's blue gradient without clashing. */
   var SEG_COLORS = {
-    loyalty: ['#166534', '#4ade80', '#fbbf24', '#64748b'],
-    dist:    ['#bfdbfe', '#60a5fa', '#2563eb', '#1e3a8a']
+    loyalty:   ['#166534', '#4ade80', '#fbbf24', '#64748b'],
+    dist:      ['#bfdbfe', '#60a5fa', '#2563eb', '#1e3a8a'],
+    heaviness: ['#6b21a8', '#c084fc', '#e9d5ff']
   };
 
   /* ---------------------------------------------------------------------- */
@@ -88,15 +92,17 @@
     };
 
     panel.__cbState = {
-      showchart:  { loyalty: true, dist: true, brands: false },
-      heatmap:    { brands: false, loyalty: false, dist: false, dop: true },
-      showcounts: { loyalty: false, dist: false, dop: false },
+      showchart:  { loyalty: true, dist: true, heaviness: true, brands: false },
+      heatmap:    { brands: false, loyalty: false, dist: false,
+                    heaviness: false, dop: true },
+      showcounts: { loyalty: false, dist: false, heaviness: false, dop: false },
       brandsChartCol: 'pen',
       /* visible.* governs TABLE-row visibility per sub-tab. */
       visible: {
-        loyalty: makeVisMap(pd.brandCodes),
-        dist:    makeVisMap(pd.brandCodes),
-        brands:  makeVisMap(pd.brandCodes)
+        loyalty:   makeVisMap(pd.brandCodes),
+        dist:      makeVisMap(pd.brandCodes),
+        heaviness: makeVisMap(pd.brandCodes),
+        brands:    makeVisMap(pd.brandCodes)
       },
       /* chart_visible.* governs CHART-series visibility per sub-tab. Starts
          identical to visible.* so the default (sync mode ON in the Filter
@@ -104,14 +110,16 @@
          turns sync OFF in the popover they can hide brands from charts
          independently of the table rows. */
       chart_visible: {
-        loyalty: makeVisMap(pd.brandCodes),
-        dist:    makeVisMap(pd.brandCodes),
-        brands:  makeVisMap(pd.brandCodes)
+        loyalty:   makeVisMap(pd.brandCodes),
+        dist:      makeVisMap(pd.brandCodes),
+        heaviness: makeVisMap(pd.brandCodes),
+        brands:    makeVisMap(pd.brandCodes)
       },
       /* Emphasis is multi-select: an object with a {all: true} default,
          or {seg1: true, seg2: true, ...} when user picks specific segs.
          When 'all' is true, every segment renders in its colour. */
-      emphasis: { loyalty: { all: true }, dist: { all: true } }
+      emphasis: { loyalty: { all: true }, dist: { all: true },
+                  heaviness: { all: true } }
     };
 
     bindCbSubTabs(panel);
@@ -139,10 +147,12 @@
     if (typeof applyRowVisibility === 'function') {
       applyRowVisibility(panel, 'loyalty');
       applyRowVisibility(panel, 'dist');
+      applyRowVisibility(panel, 'heaviness');
     }
 
     renderCbStackedBars(panel, 'loyalty');
     renderCbStackedBars(panel, 'dist');
+    renderCbStackedBars(panel, 'heaviness');
 
     /* Re-render when chart areas come into view (hidden tabs) */
     if (typeof IntersectionObserver !== 'undefined') {
@@ -251,7 +261,7 @@
         var updateChart = scope === 'all' || scope === 'chart';
         codes.forEach(function (c) {
           var visible = !hiddenSet.has(c);
-          ['brands', 'loyalty', 'dist'].forEach(function (sub) {
+          ['brands', 'loyalty', 'dist', 'heaviness'].forEach(function (sub) {
             if (updateTable && panel.__cbState.visible[sub]) {
               panel.__cbState.visible[sub][c] = visible;
             }
@@ -264,12 +274,14 @@
           applyBrandsRowVisibility(panel);
           applyRowVisibility(panel, 'loyalty');
           applyRowVisibility(panel, 'dist');
+          applyRowVisibility(panel, 'heaviness');
         }
         if (updateChart) {
           if (panel.__cbState.showchart && panel.__cbState.showchart.brands)
             renderCbBrandsChart(panel);
           renderCbStackedBars(panel, 'loyalty');
           renderCbStackedBars(panel, 'dist');
+          renderCbStackedBars(panel, 'heaviness');
         }
       }
     });
@@ -301,7 +313,7 @@
         /* Re-apply brand visibility from panel-level state to the newly-shown tab */
         if (target === 'brands') {
           applyBrandsRowVisibility(panel);
-        } else if (target === 'loyalty' || target === 'dist') {
+        } else if (target === 'loyalty' || target === 'dist' || target === 'heaviness') {
           applyRowVisibility(panel, target);
           renderCbStackedBars(panel, target);
         }
@@ -861,7 +873,7 @@
 
   /* Apply segment colours to the emphasis chips so users see the mapping */
   function colourCbEmphasisChips(panel) {
-    ['loyalty', 'dist'].forEach(function (scope) {
+    ['loyalty', 'dist', 'heaviness'].forEach(function (scope) {
       var colors  = SEG_COLORS[scope] || [];
       var chips   = panel.querySelectorAll(
         '.cb-rel-seg-chip[data-cb-scope="' + scope + '"]');
@@ -888,7 +900,7 @@
     if (panel.__cbState && panel.__cbState.showchart[scope] === false) return;
 
     var pd       = panel.__cbData;
-    var block    = pd && (scope === 'loyalty' ? pd.loyalty : pd.dist);
+    var block    = pd && pd[scope];          // pd.loyalty / pd.dist / pd.heaviness
     if (!pd || !block) return;
 
     var chartDiv = panel.querySelector('.fn-rel-chart[data-cb-stacked-chart="' + scope + '"]');
@@ -1519,6 +1531,7 @@
       panel.__cbData.focalColour = focalColour;
       renderCbStackedBars(panel, 'loyalty');
       renderCbStackedBars(panel, 'dist');
+      renderCbStackedBars(panel, 'heaviness');
     }
 
     /* 6. BrandSelector: move the FOCAL pill to the new focal and force the
@@ -1529,7 +1542,7 @@
     if (panel.__cbSelector) {
       panel.__cbSelector.setFocal(brandCode);
       panel.__cbSelector.showBrand(brandCode);
-      ['brands', 'loyalty', 'dist'].forEach(function (s) {
+      ['brands', 'loyalty', 'dist', 'heaviness'].forEach(function (s) {
         if (panel.__cbState.visible[s]) panel.__cbState.visible[s][brandCode] = true;
         if (panel.__cbState.chart_visible && panel.__cbState.chart_visible[s])
           panel.__cbState.chart_visible[s][brandCode] = true;
@@ -1751,7 +1764,7 @@
       var chartArea = activeTab.querySelector('.cb-brands-chart-area');
       hasChart = !!(chartArea && !chartArea.hasAttribute('hidden'));
       hasTable = !!(activeTab.querySelector('.cb-brand-freq-table'));
-    } else if (tabKey === 'loyalty' || tabKey === 'dist') {
+    } else if (tabKey === 'loyalty' || tabKey === 'dist' || tabKey === 'heaviness') {
       var chartArea2 = activeTab.querySelector('.fn-rel-chart-area');
       hasChart = !!(chartArea2 && !chartArea2.hasAttribute('hidden'));
       hasTable = !!(activeTab.querySelector('.cb-rel-table'));
@@ -1909,7 +1922,7 @@
         // Capture the whole chart area so the cat-avg legend chip and
         // column-selector dropdown surface in the pinned/PNG view.
         chartEl = activeTab.querySelector('.cb-brands-chart-area');
-      } else if (tabKey === 'loyalty' || tabKey === 'dist') {
+      } else if (tabKey === 'loyalty' || tabKey === 'dist' || tabKey === 'heaviness') {
         // Capture the chart area (legend + bars), not just .fn-rel-chart,
         // so the segment colour key travels with the pin/PNG export.
         chartEl = activeTab.querySelector('.fn-rel-chart-area');
@@ -2033,7 +2046,7 @@
       var chartArea = activeTab.querySelector('.cb-brands-chart-area');
       hasChart = !!(chartArea && !chartArea.hasAttribute('hidden'));
       hasTable = !!(activeTab.querySelector('.cb-brand-freq-table'));
-    } else if (tabKey === 'loyalty' || tabKey === 'dist') {
+    } else if (tabKey === 'loyalty' || tabKey === 'dist' || tabKey === 'heaviness') {
       var chartArea2 = activeTab.querySelector('.fn-rel-chart-area');
       hasChart = !!(chartArea2 && !chartArea2.hasAttribute('hidden'));
       hasTable = !!(activeTab.querySelector('.cb-rel-table'));
@@ -2099,7 +2112,7 @@
         // Capture the whole chart area so the cat-avg legend chip and
         // column-selector dropdown surface in the pinned/PNG view.
         chartEl = activeTab.querySelector('.cb-brands-chart-area');
-      } else if (tabKey === 'loyalty' || tabKey === 'dist') {
+      } else if (tabKey === 'loyalty' || tabKey === 'dist' || tabKey === 'heaviness') {
         // Capture the chart area (legend + bars), not just .fn-rel-chart,
         // so the segment colour key travels with the pin/PNG export.
         chartEl = activeTab.querySelector('.fn-rel-chart-area');

@@ -751,6 +751,10 @@ function pfInitConstellationChips() {
       });
       // Repopulate the focal dropdown with just THIS cat's brands.
       pfCnRebuildFocalSelectForCat(cc);
+      // Tell the Duplication of Awareness table to redraw for the new cat.
+      if (typeof pfDopaRenderForCat === 'function') {
+        pfDopaRenderForCat(cc);
+      }
       if (typeof brSetPinState === 'function') {
         brSetPinState('pf_cn_active_cat', cc);
       }
@@ -2083,6 +2087,184 @@ function pfExFormatTooltip(catCode, focalCode) {
 }
 
 // ---------------------------------------------------------------------------
+// Duplication of Awareness — table hydrator
+// ---------------------------------------------------------------------------
+// Renders the Sharp / Ehrenberg DoA matrix beneath the constellation chart.
+// View toggle (observed / expected / deviation) and category-chip changes
+// drive a single pure-JS re-render; no server round trip.
+
+var PF_DOPA_STATE = { view: 'observed', cat: null };
+
+function pfDopaLoadData() {
+  var node = document.getElementById('pf-dopa-data');
+  if (!node) return null;
+  try { return JSON.parse(node.textContent || '{}'); }
+  catch (e) { console.warn('[pf-dopa] JSON parse failed:', e); return null; }
+}
+
+function pfDopaFocal() {
+  var host = document.getElementById('pf-dopa-table-host');
+  return host ? (host.getAttribute('data-pf-dopa-focal') || '') : '';
+}
+
+function pfDopaActiveCat() {
+  var panel = document.getElementById('pf-subtab-constellation');
+  if (!panel) return null;
+  var chip = panel.querySelector('.pf-cn-cat-chip-on');
+  return chip ? chip.getAttribute('data-pf-cn-cat') : null;
+}
+
+function pfDopaPickMatrix(catObj, view) {
+  if (!catObj) return null;
+  if (view === 'expected')  return catObj.expected;
+  if (view === 'deviation') return catObj.deviation;
+  return catObj.observed;
+}
+
+// Heat ramp for observed/expected: focal-colour alpha scaled by value (0-100).
+function pfDopaHeatBg(v, focalColour, view) {
+  if (v == null || isNaN(v)) return 'transparent';
+  if (view === 'deviation') {
+    // Diverging red-green ramp centred on 0. Cap at +/-30pp for the alpha.
+    var t = Math.max(-30, Math.min(30, v)) / 30;
+    if (t >= 0) return 'rgba(34, 139, 34, ' + (0.08 + 0.55 * t).toFixed(2) + ')';
+    return 'rgba(176, 0, 32, ' + (0.08 + 0.55 * -t).toFixed(2) + ')';
+  }
+  var hex = (focalColour || '#1A5276').replace(/^#/, '');
+  if (hex.length !== 6) hex = '1A5276';
+  var r = parseInt(hex.substr(0, 2), 16);
+  var g = parseInt(hex.substr(2, 2), 16);
+  var b = parseInt(hex.substr(4, 2), 16);
+  var intensity = Math.max(0, Math.min(1, v / 100));
+  var alpha = 0.05 + 0.55 * intensity;
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha.toFixed(2) + ')';
+}
+
+function pfDopaFmt(v, view) {
+  if (v == null || isNaN(v)) return '—';
+  if (view === 'deviation') {
+    return (v >= 0 ? '+' : '') + v.toFixed(1);
+  }
+  return v.toFixed(1);
+}
+
+function pfDopaOrderRows(catObj, focal) {
+  var codes = (catObj.brand_codes || []).slice();
+  var labels = catObj.brand_lbls || codes;
+  var rows = codes.map(function (code, i) {
+    return { code: code, label: labels[i] || code, idx: i };
+  });
+  rows.sort(function (a, b) {
+    var ap = (a.code === focal) ? 0 : 1;
+    var bp = (b.code === focal) ? 0 : 1;
+    if (ap !== bp) return ap - bp;
+    return (a.label || a.code).toLowerCase()
+      .localeCompare((b.label || b.code).toLowerCase());
+  });
+  return rows;
+}
+
+function pfDopaBuildTable(catObj, view, focal, focalColour) {
+  var rows = pfDopaOrderRows(catObj, focal);
+  var awarePcts = catObj.aware_pcts || [];
+  var nAwUw     = catObj.n_aware_uw || [];
+  var lowBase   = (catObj.low_base_brands || []);
+  var mat       = pfDopaPickMatrix(catObj, view);
+  if (!mat) return '<p style="color:#94a3b8;padding:12px 0;">No matrix data for this category.</p>';
+
+  var html = ['<div class="pf-dopa-table-wrap">'];
+  html.push('<table class="pf-dopa-table">');
+  html.push('<thead><tr>');
+  html.push('<th class="pf-dopa-corner">Of brand row’s awares</th>');
+  html.push('<th class="pf-dopa-aware-col">aware %</th>');
+  rows.forEach(function (r) {
+    html.push('<th class="pf-dopa-col-h" title="' + escapeHtmlMaybe(r.label) + '">' +
+              escapeHtmlMaybe(r.label) + '</th>');
+  });
+  html.push('</tr></thead><tbody>');
+
+  rows.forEach(function (rRow) {
+    var isFocal = rRow.code === focal;
+    var rowCls = 'pf-dopa-row' + (isFocal ? ' pf-dopa-row-focal' : '');
+    var lowB   = lowBase.indexOf(rRow.code) >= 0;
+    var lowFlag = lowB ? ' <span class="pf-dopa-lowbase" title="n aware = ' + (nAwUw[rRow.idx] || 0) + '">†</span>' : '';
+    html.push('<tr class="' + rowCls + '">');
+    html.push('<th scope="row" class="pf-dopa-row-h">' +
+              escapeHtmlMaybe(rRow.label) + lowFlag + '</th>');
+    html.push('<td class="pf-dopa-aware-cell">' + pfDopaFmt(awarePcts[rRow.idx], 'observed') + '%</td>');
+    rows.forEach(function (rCol) {
+      var v = (mat[rRow.idx] || [])[rCol.idx];
+      var bg = pfDopaHeatBg(v, focalColour, view);
+      var isDiag = rRow.code === rCol.code;
+      var diagCls = isDiag ? ' pf-dopa-diag' : '';
+      var txt = isDiag && view !== 'deviation' ? '—' : pfDopaFmt(v, view);
+      var suffix = (view === 'deviation' || isDiag) ? '' : '%';
+      html.push('<td class="pf-dopa-cell' + diagCls + '" style="background:' + bg + ';">' +
+                txt + (txt === '—' ? '' : suffix) + '</td>');
+    });
+    html.push('</tr>');
+  });
+
+  html.push('</tbody></table></div>');
+  if (lowBase.length > 0) {
+    html.push('<p class="pf-dopa-footnote">† = row brand has n aware &lt; 30; ' +
+              'observed values for that row are noisy. Sharp&rsquo;s D fit uses all off-diagonal cells.</p>');
+  }
+  return html.join('');
+}
+
+function pfDopaRenderForCat(catCode) {
+  var data = pfDopaLoadData();
+  if (!data || !data.cats) return;
+  var catObj = data.cats[catCode];
+  var host = document.getElementById('pf-dopa-table-host');
+  if (!host) return;
+  if (!catObj) {
+    host.innerHTML = '<p style="color:#94a3b8;padding:12px 0;">No Duplication of Awareness data for this category.</p>';
+    var dEmpty = document.querySelector('[data-pf-dopa-d]');
+    if (dEmpty) dEmpty.textContent = '—';
+    var catEmpty = document.querySelector('[data-pf-dopa-cat-label]');
+    if (catEmpty) catEmpty.textContent = '—';
+    PF_DOPA_STATE.cat = catCode;
+    return;
+  }
+  PF_DOPA_STATE.cat = catCode;
+  var focal = pfDopaFocal();
+  var fc = data.focal_colour || '#1A5276';
+  host.innerHTML = pfDopaBuildTable(catObj, PF_DOPA_STATE.view, focal, fc);
+
+  var dEl = document.querySelector('[data-pf-dopa-d]');
+  if (dEl) dEl.textContent = (catObj.D != null && !isNaN(catObj.D))
+    ? Number(catObj.D).toFixed(3) : '—';
+  var catEl = document.querySelector('[data-pf-dopa-cat-label]');
+  if (catEl) catEl.textContent = catObj.cat_label || catCode;
+}
+
+function pfDopaInit() {
+  var host = document.getElementById('pf-dopa-table-host');
+  if (!host) return;
+
+  // View toggle.
+  var btns = document.querySelectorAll('.pf-dopa-view-btn');
+  btns.forEach(function (b) {
+    b.addEventListener('click', function () {
+      var view = b.getAttribute('data-pf-dopa-view') || 'observed';
+      PF_DOPA_STATE.view = view;
+      btns.forEach(function (other) {
+        other.classList.toggle('pf-dopa-view-on', other === b);
+      });
+      var cc = PF_DOPA_STATE.cat || pfDopaActiveCat();
+      if (cc) pfDopaRenderForCat(cc);
+    });
+  });
+
+  // Initial render: take active category from the constellation chip.
+  var initial = pfDopaActiveCat();
+  if (initial) pfDopaRenderForCat(initial);
+}
+
+
+// ---------------------------------------------------------------------------
 // Initialise on DOMContentLoaded
 // ---------------------------------------------------------------------------
 (function() {
@@ -2095,6 +2277,7 @@ function pfExFormatTooltip(catCode, focalCode) {
 
     pfInitFootprintTable();
     pfInitConstellationChips();
+    pfDopaInit();
     pfClInit();
     pfExInit();
   }

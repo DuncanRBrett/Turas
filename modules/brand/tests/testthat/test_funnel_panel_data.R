@@ -362,7 +362,9 @@ test_that("legacy wide adapter produces BrandCode + stage-pct columns", {
   expect_true(all(c("BrandCode","Aware_Pct","Positive_Pct",
                     "Bought_Pct","Primary_Pct",
                     "Love_Pct","Prefer_Pct","Ambivalent_Pct",
-                    "Reject_Pct","NoOpinion_Pct") %in% names(wide)))
+                    "Price_Pct","Avoid_Pct","NoOpinion_Pct") %in% names(wide)))
+  # 6-level scale (IPK 2026): single Avoid column; legacy Reject_Pct removed
+  expect_false("Reject_Pct" %in% names(wide))
   # IPK aware = 90% (values in 0-100 range)
   expect_equal(wide$Aware_Pct[wide$BrandCode == "IPK"], 90, tolerance = 1e-9)
 })

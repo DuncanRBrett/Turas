@@ -388,13 +388,17 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
   focal_cls <- if (is_focal) " fn-rel-td-focal" else ""
 
   # Precompute the brand's aware_no_opinion residual so the cell loop can
-  # use it for the no_opinion column. L/P/A/R imply awareness, so:
-  #   aware_no_opinion = aware_base - (count_L + count_P + count_A + count_R)
-  #   pct_aware[no_opinion] = max(0, 1 - sum(pct_aware[L,P,A,R]))
+  # use it for the no_opinion column. All aware-opinion segments imply
+  # awareness, so for the 6-level IPK 2026 scale (Love / Prefer / Ambivalent
+  # / Price / Avoid):
+  #   aware_no_opinion = aware_base - sum(L,P,A,Price,Avoid)
+  #   pct_aware[no_opinion] = max(0, 1 - sum(pct_aware[L,P,A,Price,Avoid]))
   # This avoids leaking unaware respondents into the no_opinion numerator
-  # (the root cause of the > 100% Cat avg / row-sum bug).
+  # (root cause of the > 100% Cat avg / row-sum bug). Legacy 5-level scales
+  # auto-canonicalise (reject → avoid; price = 0).
   lpar_roles <- c("attitude.love", "attitude.prefer",
-                  "attitude.ambivalent", "attitude.reject")
+                  "attitude.ambivalent", "attitude.price",
+                  "attitude.avoid")
   pct_aware_no_opinion <- if (is.finite(aware_n) && is.finite(n_total) && aware_n > 0) {
     sum_lpar <- sum(vapply(lpar_roles, function(r) {
       pt <- as.numeric(brand$segments[[r]] %||% NA_real_)

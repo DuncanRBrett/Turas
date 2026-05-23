@@ -209,30 +209,49 @@ run_buyer_heaviness <- function(pen_mat,
   total_w  <- sum(w_sorted)
   target   <- total_w / 3
 
-  # Find q33: smallest m where cumulative weight >= target
+  # Find q33: smallest m where cumulative weight >= target.
+  # By construction this gives light_p >= 1/3. When ties at q33 push light_p
+  # outside tolerance, the only way to reduce light is to drop the tied group
+  # at q33 into medium — i.e. step q33 DOWN to the next distinct value below.
+  # We compare both candidates (current and next-lower) and keep whichever is
+  # closer to 1/3. Pushing q33 UP would only enlarge light and is incorrect.
   q33_idx <- which(cumw >= target)[1]
   q33     <- m_sorted[q33_idx]
-
-  # Tie-break: if many respondents share this value, push them all to medium
-  # until light tertile is within ±5pp of 1/3
-  while (TRUE) {
-    light_w  <- sum(w_buyers[m_buyers <= q33])
-    light_p  <- light_w / total_w
-    if (abs(light_p - 1/3) <= .BH_TERTILE_TOL) break
-    # Find next distinct value above q33
-    above    <- unique(m_sorted[m_sorted > q33])
-    if (length(above) == 0) break
-    q33 <- above[1]
+  light_p <- sum(w_buyers[m_buyers <= q33]) / total_w
+  if (abs(light_p - 1/3) > .BH_TERTILE_TOL) {
+    below <- unique(m_sorted[m_sorted < q33])
+    if (length(below) > 0) {
+      alt_q33 <- below[length(below)]
+      alt_light_p <- sum(w_buyers[m_buyers <= alt_q33]) / total_w
+      if (abs(alt_light_p - 1/3) < abs(light_p - 1/3)) {
+        q33 <- alt_q33
+      }
+    }
   }
 
-  # q67: light+medium = 2/3
+  # q67: light+medium = 2/3 of total weight. Same direction logic as q33:
+  # initial q67 gives cumulative >= 2/3 (so medium+light may overshoot). When
+  # outside tolerance, try dropping q67 to the next-lower distinct value
+  # (provided it remains > q33 to keep medium non-empty); keep whichever is
+  # closer to 2/3.
   q67_idx <- which(cumw >= 2 * target)[1]
   q67     <- m_sorted[q67_idx]
-
+  # If ties placed q67 at or below q33, push UP until strictly greater
   while (q67 <= q33 && q67 < max(m_sorted)) {
     above <- unique(m_sorted[m_sorted > q67])
     if (length(above) == 0) break
     q67 <- above[1]
+  }
+  lm_p <- sum(w_buyers[m_buyers <= q67]) / total_w
+  if (abs(lm_p - 2/3) > .BH_TERTILE_TOL) {
+    below <- unique(m_sorted[m_sorted < q67 & m_sorted > q33])
+    if (length(below) > 0) {
+      alt_q67 <- below[length(below)]
+      alt_lm_p <- sum(w_buyers[m_buyers <= alt_q67]) / total_w
+      if (abs(alt_lm_p - 2/3) < abs(lm_p - 2/3)) {
+        q67 <- alt_q67
+      }
+    }
   }
 
   list(q33 = q33, q67 = q67)

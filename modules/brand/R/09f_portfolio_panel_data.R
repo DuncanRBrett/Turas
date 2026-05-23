@@ -47,14 +47,16 @@ build_portfolio_panel_data <- function(portfolio_result, config,
                       character(0)
   )
 
-  footprint_block <- .portfolio_footprint_block(portfolio_result)
-  clutter_block   <- .portfolio_clutter_block(portfolio_result)
+  footprint_block    <- .portfolio_footprint_block(portfolio_result)
+  clutter_block      <- .portfolio_clutter_block(portfolio_result)
+  dop_aware_block    <- .portfolio_dop_aware_block(portfolio_result)
 
   list(
-    meta      = meta,
-    footprint = footprint_block,
-    clutter   = clutter_block,
-    about     = .portfolio_about_text()
+    meta          = meta,
+    footprint     = footprint_block,
+    clutter       = clutter_block,
+    dop_awareness = dop_aware_block,
+    about         = .portfolio_about_text()
   )
 }
 
@@ -78,6 +80,20 @@ build_portfolio_panel_data <- function(portfolio_result, config,
     n_total         = portfolio_result$n_total %||% NA_integer_,
     suppressed_cats = portfolio_result$suppressions$low_base_cats %||%
                       character(0)
+  )
+}
+
+.portfolio_dop_aware_block <- function(portfolio_result) {
+  da <- portfolio_result$dop_awareness
+  if (is.null(da) || !identical(da$status, "PASS")) return(NULL)
+  if (length(da$by_cat %||% list()) == 0) return(NULL)
+  list(
+    by_cat          = da$by_cat,
+    cat_order       = da$cat_order %||% character(0),
+    cat_names       = da$cat_names %||% list(),
+    suppressed_cats = da$suppressed_cats %||%
+                       data.frame(cat = character(0), reason = character(0)),
+    meta            = da$meta %||% list()
   )
 }
 
@@ -115,6 +131,15 @@ build_portfolio_panel_data <- function(portfolio_result, config,
       "Competitive Constellation: edges represent Jaccard similarity of",
       "co-awareness across the brand universe. Node size = total aware",
       "respondents. Layout: Fruchterman-Reingold."
+    ),
+    dop_awareness = paste(
+      "Duplication of Awareness: each cell shows the % of brand row's awares",
+      "(in the active category) who are also aware of brand column. Sharp's",
+      "Duplication Law predicts cell = D × awareness of column-brand, where",
+      "D is fit from off-diagonal cells. Deviation = observed − expected,",
+      "in percentage points. Positive deviation = pair over-shares awareness",
+      "(direct rivals); negative = partition brand whose awares are less",
+      "likely than expected to also know the partner."
     ),
     extension = paste(
       "Permission-to-Extend: lift = P(aware of focal | bought category C) /",

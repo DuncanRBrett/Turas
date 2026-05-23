@@ -83,6 +83,7 @@ BRAND_VERSION <- "1.0"
     "09_portfolio.R",
     "09a_portfolio_footprint.R",
     "09b_portfolio_constellation.R",
+    "09b_portfolio_dop_awareness.R",
     "09c_portfolio_clutter.R",
     "09d_portfolio_strength.R",
     "09e_portfolio_extension.R",
@@ -1328,19 +1329,15 @@ if (!exists(".find_brand_col", mode = "function")) {
 
 # Resolve one demo.* role and run the engine. Returns NULL when the role
 # can't be resolved or its data column is absent (caller skips silently).
-# Build the two synthetic questions ("Buyer status" + "Heaviness") that are
-# always shown at the end of the demographics matrix. Both reuse the engine
-# so percentages + Wilson CIs + brand cuts are computed identically.
+# Synthetic "Buyer status" + "Heaviness" demographic tables removed from the
+# panel per Duncan 2026-05-23 — they duplicated information already shown in
+# the brand-level Buyer Heaviness analysis (BuyHvy Excel sheet) and the
+# Repertoire / SoR panels, and added noise to the demographics matrix. The
+# constructor functions (.demo_synthetic_buyer_status / .demo_synthetic_heaviness)
+# are retained for direct test access but no longer wired into the panel.
 .demo_synthetic_questions <- function(cat_data, cat_weights, buyer_info,
                                        bmat_info, focal_brand) {
-  out <- list()
-  buyer <- .demo_synthetic_buyer_status(cat_data, cat_weights, buyer_info,
-                                         bmat_info, focal_brand)
-  if (!is.null(buyer)) out[[length(out) + 1L]] <- buyer
-  hv    <- .demo_synthetic_heaviness(cat_data, cat_weights, buyer_info,
-                                      bmat_info)
-  if (!is.null(hv))    out[[length(out) + 1L]] <- hv
-  out
+  list()
 }
 
 

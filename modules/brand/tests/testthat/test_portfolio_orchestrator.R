@@ -140,11 +140,13 @@ test_that("run_portfolio: happy path returns PASS with footprint, clutter, stren
   expect_equal(out$n_total, 8L)
   expect_equal(out$n_weighted, 8.0)
 
-  # Top-level shape parity with v1
+  # Top-level shape parity with v1 (plus dop_awareness — Sharp / Ehrenberg
+  # Duplication of Awareness matrix per category, added with the Competitive
+  # Set sub-tab in feature/portfolio-duplication-of-awareness).
   expect_named(out, c(
     "status", "focal_brand", "timeframe", "n_total", "n_weighted",
     "bases", "footprint_matrix", "footprint_meta",
-    "constellation", "constellation_per_cat",
+    "constellation", "constellation_per_cat", "dop_awareness",
     "clutter", "strength", "extension", "extension_per_brand",
     "supporting", "suppressions"
   ), ignore.order = TRUE)

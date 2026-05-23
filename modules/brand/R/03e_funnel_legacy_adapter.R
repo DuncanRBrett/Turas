@@ -54,9 +54,9 @@ build_funnel_legacy_wide <- function(result, brand_list) {
   out$Ambivalent_Pct  <- 100 * att_pcts$attitude.ambivalent
   out$Price_Pct       <- 100 * att_pcts$attitude.price
   out$Avoid_Pct       <- 100 * att_pcts$attitude.avoid
-  # Back-compat: keep Reject_Pct populated (= Avoid_Pct) for any consumer not
-  # yet updated. Drop in a later release.
-  out$Reject_Pct      <- out$Avoid_Pct
+  # 6-level scale (IPK 2026 onward) renamed "Reject" to "Avoid" — single
+  # column only. Legacy 5-level surveys feed through the same canonicalisation,
+  # so the Avoid_Pct column carries both old "reject" and new "avoid" values.
   out$NoOpinion_Pct   <- 100 * att_pcts$attitude.no_opinion
   out
 }
@@ -70,7 +70,6 @@ build_funnel_legacy_wide <- function(result, brand_list) {
     Love_Pct = numeric(0), Prefer_Pct = numeric(0),
     Ambivalent_Pct = numeric(0),
     Price_Pct = numeric(0), Avoid_Pct = numeric(0),
-    Reject_Pct = numeric(0),   # back-compat alias of Avoid_Pct
     NoOpinion_Pct = numeric(0),
     stringsAsFactors = FALSE
   )

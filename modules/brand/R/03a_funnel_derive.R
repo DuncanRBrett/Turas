@@ -207,10 +207,21 @@ validate_nesting <- function(stages, weights = NULL) {
 
   keys <- names(stages)
   for (i in seq(2, length(keys))) {
-    prev_counts <- colSums(stages[[keys[i - 1]]]$matrix * w, na.rm = TRUE)
-    curr_counts <- colSums(stages[[keys[i]]]$matrix * w, na.rm = TRUE)
-    if (any(curr_counts > prev_counts + 1e-9)) {
-      bad <- which(curr_counts > prev_counts + 1e-9)
+    prev_mat <- stages[[keys[i - 1]]]$matrix
+    curr_mat <- stages[[keys[i]]]$matrix
+    prev_counts <- colSums(prev_mat * w, na.rm = TRUE)
+    curr_counts <- colSums(curr_mat * w, na.rm = TRUE)
+    # Skip brands where either stage is entirely NA (missing data column
+    # for that brand-stage combination, e.g. retailer brand in awareness
+    # battery has no matching per-brand attitude column). Such brands carry
+    # NA through the pipeline rather than zero, so the nesting check
+    # doesn't apply to them.
+    prev_all_na <- colSums(!is.na(prev_mat)) == 0
+    curr_all_na <- colSums(!is.na(curr_mat)) == 0
+    skip <- prev_all_na | curr_all_na
+    violations <- curr_counts > prev_counts + 1e-9 & !skip
+    if (any(violations)) {
+      bad <- which(violations)
       brand_refuse(
         code = "CALC_NESTING_VIOLATED",
         title = "Funnel Stage Nesting Violated",
@@ -429,8 +440,20 @@ validate_nesting <- function(stages, weights = NULL) {
       positive_vals <- tolower(trimws(as.character(pos_codes)))
     }
 
+    # When a brand has NO per-brand attitude column (column-name mismatch
+    # between awareness and attitude — e.g. PAS list contains WWT but data
+    # exports BRANDATT1_PAS_WWPS only), single_response_brand_matrix returns
+    # an all-NA column for that brand. Treating that as FALSE silently
+    # collapses every downstream stage to 0% AND trips the nesting check
+    # against bought_long. Mark these columns NA on the consideration
+    # matrix so the metrics layer reports NA (not 0) and nesting skips them.
     for (b in brands) {
-      vals <- tolower(trimws(as.character(mat[, b])))
+      raw_b <- mat[, b]
+      if (all(is.na(raw_b))) {
+        out[, b] <- NA
+        next
+      }
+      vals <- tolower(trimws(as.character(raw_b)))
       out[, b] <- !is.na(vals) & vals %in% positive_vals
     }
     out

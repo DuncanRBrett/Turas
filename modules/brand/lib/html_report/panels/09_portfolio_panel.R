@@ -100,7 +100,8 @@ build_br_portfolio_panel <- function(results, config) {
   ex_html <- .pf_extension_subtab(portfolio, panel_data, focal_brand, focal_colour,
                                    brand_colours = pf_brand_colours)
 
-  timeframe_label <- if (identical(portfolio$timeframe, "3m")) "3-month" else "13-month"
+  timeframe_label <- if (identical(portfolio$timeframe, "3m"))
+                       "past 3 months" else "past 12 months"
   n_label         <- format(portfolio$n_total %||% 0L, big.mark = ",")
 
   paste0(
@@ -111,7 +112,7 @@ build_br_portfolio_panel <- function(results, config) {
     # Panel header
     '<h2 style="font-size:20px;color:#1e293b;margin:0 0 4px;">Portfolio Mapping</h2>',
     sprintf(
-      '<p style="font-size:12px;color:#64748b;margin:0 0 16px;">Cross-category brand presence. Timeframe: %s. Base: all %s respondents.</p>',
+      '<p style="font-size:12px;color:#64748b;margin:0 0 16px;">Brands heard of in each category, by category buyers (%s). Base: all %s respondents.</p>',
       timeframe_label, n_label
     ),
 
@@ -529,6 +530,13 @@ build_br_portfolio_panel <- function(results, config) {
             section_id, .pf_esc(focal_brand), paste(panels, collapse = "")),
     supp_note,
     reading_guide,
+    if (exists("build_pf_dop_aware_block", mode = "function")) {
+      build_pf_dop_aware_block(
+        dop_aware    = panel_data$dop_awareness,
+        focal_brand  = focal_brand,
+        focal_colour = focal_colour
+      )
+    } else "",
     .pf_callout("portfolio_constellation")
   )
 }
