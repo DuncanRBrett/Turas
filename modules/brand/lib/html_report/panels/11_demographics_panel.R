@@ -425,9 +425,9 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
          </div>
          %s
        </header>
-       <div class="demo-card-body" data-pin-as-table>
-         <div class="demo-card-view demo-card-view-table">%s</div>
-         <div class="demo-card-view demo-card-view-chart" hidden>%s</div>
+       <div class="demo-card-body">
+         <div class="demo-card-view demo-card-view-table" data-pin-as-table>%s</div>
+         <div class="demo-card-view demo-card-view-chart" data-pin-as-chart hidden>%s</div>
        </div>
      </article>',
     .demo_esc(section_id), .demo_esc(section_id), idx,

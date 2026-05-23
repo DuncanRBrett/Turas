@@ -286,6 +286,11 @@ cb_shopper_context_chips <- function(panel_data) {
 #' @export
 cb_buying_location_html <- function(result, focal_colour = "#1A5276") {
   if (is.null(result) || length(result$rows) == 0) return("")
+  # Sort by % desc so the most-used channel reads at the top. The engine
+  # returns rows in OptionMap display order, which isn't useful when the
+  # reader just wants to see "where do they shop most".
+  result$rows <- result$rows[order(-vapply(result$rows,
+    function(r) r$pct_weighted %||% 0, numeric(1)))]
   max_pct <- max(vapply(result$rows, function(r) r$pct_weighted %||% 0,
                          numeric(1)), na.rm = TRUE)
   if (!isTRUE(max_pct > 0)) max_pct <- 1

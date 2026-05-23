@@ -472,8 +472,10 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
   list(
     question_texts = .question_texts_from_warnings(result),
     methodology_note = paste(
-      "Each stage is measured by its own survey question (BRANDAWARE,",
-      "BRANDATT1, BRANDPEN1, BRANDPEN2), not by routing or skip logic.",
+      "Each stage is measured by its own survey question — \"which of these",
+      "brands have you heard of?\", the per-brand attitude question (\"how do",
+      "you feel about [brand]?\"), \"bought in the last 12 months\", and",
+      "\"bought in the last 3 months\" — not by routing or skip logic.",
       "Aggregate counts almost always nest because most respondents are",
       "coherent, and Turas refuses to render brands whose aggregate stage",
       "counts violate nesting. Conversion ratios are aggregate ratios",

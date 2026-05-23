@@ -583,9 +583,12 @@
           tbody.__cbDefaultStamped = true;
         }
 
-        var avgRow = tbody.querySelector('.cb-avg-row');
-        var rows = Array.prototype.slice.call(
+        var avgRow   = tbody.querySelector('.cb-avg-row');
+        var focalRow = tbody.querySelector('tr.fn-row-focal[data-cb-brand]');
+        var allRows  = Array.prototype.slice.call(
           tbody.querySelectorAll('tr[data-cb-brand]'));
+        /* Focal stays pinned at row 1 — only competitors sort. */
+        var rows = allRows.filter(function (r) { return r !== focalRow; });
 
         var readVal = function (tr) {
           var cells = tr.children;
@@ -609,9 +612,10 @@
           });
         }
 
+        /* Re-attach in canonical order: focal → cat avg → sorted competitors */
         rows.forEach(function (r) { tbody.appendChild(r); });
-        /* Keep Category avg always first */
-        if (avgRow) tbody.insertBefore(avgRow, tbody.firstChild);
+        if (avgRow)   tbody.insertBefore(avgRow, tbody.firstChild);
+        if (focalRow) tbody.insertBefore(focalRow, tbody.firstChild);
 
         /* Chart follows sort */
         renderCbStackedBars(panel, scope);
@@ -1406,19 +1410,25 @@
       }
     });
 
-    /* 3c. Loyalty / Dist tables — move new focal row to top (after cat avg),
-           demoted focal returns to its natural index among non-focal rows.
-           We use the original `data-default-order` stamp if present, else
-           sort stays as-is. */
+    /* 3c. Loyalty / Dist / Heaviness tables — match the funnel convention:
+           new focal pinned at row 1 (above the cat-avg row); demoted focal
+           drops below the cat-avg row into the sortable competitor block. */
     panel.querySelectorAll('.cb-rel-section .cb-rel-table').forEach(function (table) {
       var tbody = table.querySelector('tbody');
       if (!tbody) return;
-      var avgRow = tbody.querySelector('.cb-avg-row');
+      var avgRow   = tbody.querySelector('.cb-avg-row');
       var newFocal = tbody.querySelector('tr[data-cb-brand="' + brandCode + '"]');
-      if (newFocal) {
-        if (avgRow && avgRow.nextSibling) tbody.insertBefore(newFocal, avgRow.nextSibling);
-        else if (avgRow)                  tbody.appendChild(newFocal);
-        else                              tbody.insertBefore(newFocal, tbody.firstChild);
+      var demoted  = (prevFocal && prevFocal !== brandCode)
+        ? tbody.querySelector('tr[data-cb-brand="' + prevFocal + '"]')
+        : null;
+      if (newFocal && avgRow) {
+        tbody.insertBefore(newFocal, avgRow);
+      } else if (newFocal) {
+        tbody.insertBefore(newFocal, tbody.firstChild);
+      }
+      if (demoted && avgRow) {
+        if (avgRow.nextSibling) tbody.insertBefore(demoted, avgRow.nextSibling);
+        else                    tbody.appendChild(demoted);
       }
     });
 

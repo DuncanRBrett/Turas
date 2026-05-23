@@ -149,9 +149,9 @@ cb_norms_table_html <- function(norms_table,
 
   footer_txt <- sprintf(
     paste0("Category mean purchases per buyer over the last %d months \u2014 ",
-           "BRANDPEN3: %s; CATBUY stated scale: %s. ",
-           "Dirichlet uses BRANDPEN3 (direct measurement). ",
-           "\u0394%% flags: \u2265\u00b120%% shaded. ",
+           "from per-brand purchase counts: %s; from the stated-frequency ",
+           "scale: %s. Dirichlet uses the per-brand counts (direct ",
+           "measurement). \u0394%% flags: \u2265\u00b120%% shaded. ",
            "Source: Goodhardt, Ehrenberg &amp; Chatfield (1984)."),
     target_months, m_brand, m_stated)
 
@@ -216,7 +216,7 @@ cb_freq_repertoire_tables_html <- function(cat_fd = NULL, rep = NULL,
                                  lbl_i, pct_i))
     }
     lines <- c(lines, '</tbody></table>')
-    lines <- c(lines, '<p style="font-size:10px;color:#94a3b8;margin:4px 0 0;font-style:italic;">% of category buyers by total category purchases in target window (BRANDPEN3).</p>')
+    lines <- c(lines, '<p style="font-size:10px;color:#94a3b8;margin:4px 0 0;font-style:italic;">% of category buyers by total category purchases in the target window (from the &ldquo;how many times have you bought each of these brands&rdquo; question, summed across brands).</p>')
   } else {
     lines <- c(lines, '<p style="font-size:12px;color:#94a3b8;">Category frequency data not available.</p>')
   }
@@ -410,16 +410,19 @@ cb_brand_freq_scr_table_html <- function(norms_table,
   # --- Tooltips ---
   pen_tip <- sprintf(
     paste0("Penetration = %% of ALL screened category respondents who bought ",
-           "this brand in the last %d months (BRANDPEN3, reconciled). ",
+           "this brand in the last %d months, from the per-brand purchase ",
+           "counts reconciled against the past-%d-month multi-pick. ",
            "Base includes lapsed / zero-purchase respondents who screened ",
            "into the category but reported no purchases in the target window. ",
-           "\u2014 The Loyalty Segmentation tab uses a tighter base (cat buyers ",
-           "only, m_vec\u00a0>\u00a00), so its \u201c%% Cat buyers\u201d value ",
-           "for the same brand will be higher. ",
-           "\u2014 May differ from the Brand Funnel by 1\u20133pp: BRANDPEN3 ",
-           "reconciliation promotes respondents who reported purchases but did ",
-           "not tick the buyer flag on BRANDPEN2."),
-    as.integer(target_months))
+           "\u2014 The Loyalty Segmentation tab uses a tighter base (only ",
+           "people who bought at least one brand in the past %d months), so ",
+           "its \u201c%% Cat buyers\u201d value for the same brand will be higher. ",
+           "\u2014 May differ from the Brand Funnel by 1\u20133pp: the ",
+           "reconciliation pass promotes respondents who reported per-brand ",
+           "purchase counts but didn't tick the brand on the past-%d-month ",
+           "multi-pick."),
+    as.integer(target_months), as.integer(target_months),
+    as.integer(target_months), as.integer(target_months))
   br_tip <- paste0(
     "Mean number of times this brand was bought by brand buyers in the target window. ",
     "Only counts respondents who bought this brand (i.e. brand buyers, not all respondents).")
@@ -450,7 +453,7 @@ cb_brand_freq_scr_table_html <- function(norms_table,
     '<thead><tr>',
     '<th class="ct-label-col" style="text-align:left;">Brand</th>',
     sprintf('<th title="%s" class="cb-base-th"><div class="ct-header-text">Brand buyers<br/>(n=)</div></th>',
-            .cb_esc("Weighted respondent count who bought this brand in the target window (BRANDPEN3 reconciled).")),
+            .cb_esc("Weighted respondent count who bought this brand in the target window (per-brand purchase counts reconciled against the past-3-month multi-pick).")),
     .sort_th("Penetration",       2L, pen_tip),
     .sort_th("Avg purchases",     3L, br_tip),
     .sort_th("Volume share",      4L, vs_tip),

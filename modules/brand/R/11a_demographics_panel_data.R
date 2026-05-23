@@ -200,7 +200,14 @@ build_demographics_panel_data <- function(questions,
 .demo_panel_dist <- function(df) {
   if (is.null(df) || !is.data.frame(df) || nrow(df) == 0L) return(list())
   base_n <- if ("Base_n" %in% names(df)) as.integer(df$Base_n[1L]) else NA_integer_
-  rows <- lapply(seq_len(nrow(df)), function(i) {
+  # Drop options with zero respondents — these are screen-outs (e.g. IPK 2026
+  # excluded under-30 / 51+ ages, Prefer-not-to-answer race, income brackets
+  # below the screening cutoff, regions outside the targeted provinces).
+  # Empty rows otherwise render as zero-filled cells that misleadingly look
+  # like a real demographic group with no buyers.
+  keep_idx <- which(!is.na(df$n) & as.integer(df$n) > 0L)
+  if (length(keep_idx) == 0L) return(list(base_n = base_n, rows = list()))
+  rows <- lapply(keep_idx, function(i) {
     list(
       code  = as.character(df$Code[i]),
       label = as.character(df$Label[i]),

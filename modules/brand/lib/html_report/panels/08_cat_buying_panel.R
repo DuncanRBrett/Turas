@@ -174,10 +174,10 @@ render_cat_buying_panel <- function(panel_data) {
     focal        = focal,
     brand_labels = brand_labels,
     description  = sprintf(paste0(
-      "How category buyers relate to each brand over the <strong>past %d months</strong> ",
-      "(target purchase window): sole buyer | primary (&gt;50%% of their purchases) | ",
-      "secondary (&le;50%%) | not bought. Base = category buyers (m_vec &gt; 0 in the ",
-      "past %d months); excludes lapsed / zero-purchase respondents."),
+      "How category buyers relate to each brand over the <strong>past %d months</strong>: ",
+      "sole buyer | primary (&gt;50%% of their purchases) | secondary (&le;50%%) | ",
+      "not bought. Base = past-%d-month category buyers (anyone who bought at ",
+      "least one brand in the window); excludes lapsed / zero-purchase respondents."),
       as.integer(t_months), as.integer(t_months)),
     buyers_pct_map = buyers_pct_map,
     base_n         = total_cat_buyers_n,
@@ -217,12 +217,13 @@ render_cat_buying_panel <- function(panel_data) {
   parts <- c(parts, '</div>')
 
   # ----- Tab 5: Buyer Heaviness ----------------------------------------------
-  # Romaniuk's Natural Monopoly diagnostic: where do this brand's buyers sit
-  # in the overall category-frequency distribution (Heavy / Medium / Light
-  # category buyer tertiles)? Complements Purchase Distribution: that shows
-  # *depth within the brand* (how often a buyer buys this brand); Heaviness
-  # shows *category engagement of the brand's buyers* (whether the brand
-  # over- or under-recruits the heavy end of the category).
+  # Ehrenberg-Bass Natural Monopoly Law diagnostic. The cut is on CATEGORY
+  # tertiles (Heavy / Medium / Light category buyers — heaviness in the
+  # whole category, not in this brand). Complements Purchase Distribution:
+  # that tab is *depth within the brand* (how often a buyer buys this
+  # brand); Heaviness is *category engagement of the brand's buyers*
+  # (whether the brand over- or under-recruits the heavy / light ends of
+  # the category overall).
   hv_seg_codes  <- c("heavy", "medium", "light")
   hv_seg_labels <- c("Heavy category buyer", "Medium category buyer",
                      "Light category buyer")
@@ -337,6 +338,14 @@ render_cat_buying_panel <- function(panel_data) {
   if (exists("cb_freq_repertoire_tables_html", mode = "function")) {
     parts <- c(parts, cb_freq_repertoire_tables_html(cat_fd, rep, dist_labels))
   }
+
+  # Bottom-of-tab "How to read this page" callout — explains bases,
+  # KPI formulas, the multi-mention "Where shop" chart, and the
+  # different denominator each block uses.
+  if (exists("turas_callout", mode = "function")) {
+    parts <- c(parts, turas_callout("brand", "cat_buying_context",
+                                    collapsed = TRUE))
+  }
   paste(parts, collapse = "\n")
 }
 
@@ -347,7 +356,7 @@ render_cat_buying_panel <- function(panel_data) {
   parts <- c(parts,
     '<p style="font-size:12px;color:#64748b;margin:-4px 0 8px;">',
     '<strong>Base:</strong> all screened category respondents (incl. lapsed / zero-purchase). ',
-    'Penetration and volume share use BRANDPEN3 reconciled counts; SCR = share of category requirement (loyalty). ',
+    'Penetration and volume share come from the per-brand purchase counts (reconciled against the past-3-month multi-pick); SCR = share of category requirement (loyalty). ',
     '<em>Note:</em> the Loyalty Segmentation tab uses a narrower base (cat buyers only, ',
     'i.e. respondents with at least one purchase in the target window) — its &ldquo;% Cat buyers&rdquo; ',
     'reads higher than Pen here for the same brand by exactly the lapsed-rate factor.',
@@ -493,7 +502,7 @@ render_cat_buying_panel <- function(panel_data) {
 # BUYER HEAVINESS TAB
 # ==============================================================================
 #
-# Romaniuk's category-engagement diagnostic, distinct from Purchase Distribution.
+# Ehrenberg-Bass category-engagement diagnostic, distinct from Purchase Distribution.
 # Purchase Distribution asks: "of THIS brand's buyers, how often did they buy
 # this brand?" (within-brand frequency depth). Buyer Heaviness asks: "of this
 # brand's buyers, where do they sit in the OVERALL category-frequency
@@ -502,18 +511,21 @@ render_cat_buying_panel <- function(panel_data) {
 # moderate purchase-frequency profile while skewing strongly toward heavy
 # category buyers (the IPK pattern across DSS / PAS / POS in this study).
 #
-# The headline metric beyond the tertile split is the Natural Monopoly Index
-# (NMI = brand's Light-tertile share ÷ category's Light-tertile share × 100):
-#   * NMI ~ 100 = follows Natural Monopoly Law (typical mass-market leader)
-#   * NMI < 100 = over-recruits heavy buyers (niche / premium / specialist)
-#   * NMI > 100 = unusual; over-recruits light buyers (rarely seen in practice)
+# Headline metric beyond the tertile split is the Light-buyer index (engine
+# field NaturalMonopolyIndex, kept for backwards compatibility):
+#   index = brand's % light category buyers ÷ category's % light category buyers × 100.
+# Per Ehrenberg-Bass's Natural Monopoly Law, bigger brands have a MORE
+# light-skewed base than the category average, so:
+#   * Index > 110 = mass / leader pattern (NML signature — more light-skewed than cat)
+#   * Index 90-110 = brand mix mirrors the category (no skew either way)
+#   * Index < 90 = niche / specialist pattern (over-recruits heavy category buyers)
 #
 # Layout:
 #   1. One-line description (timeframe-aware)
-#   2. Focal-brand KPI strip: Heavy %, WBar vs category avg, NMI w/ verdict
+#   2. Focal-brand KPI strip: Heavy %, WBar vs category avg, Light-buyer index w/ verdict
 #   3. Brands-as-rows × Heavy / Medium / Light table (.cb_rel_table_html)
 #   4. Stacked H/M/L bar chart (.fn-rel-chart-area, JS renders)
-#   5. Expandable "How to read this tab" explainer with the NMI key
+#   5. Expandable "How to read this tab" explainer with the Light-buyer index key
 #
 .cb_heaviness_tab <- function(data_df, col_names, seg_codes, seg_labels,
                                focal, brand_labels,
@@ -527,14 +539,17 @@ render_cat_buying_panel <- function(panel_data) {
   scope <- "heaviness"
   t_months <- as.integer(target_months %||% 3L)
 
-  # Description: one-line that anchors the timeframe and the construct.
+  # Description: one-line that anchors the timeframe and pins down the
+  # category-vs-brand distinction (this tab is easily confused with
+  # Purchase Distribution, which is the brand-frequency cut).
   parts <- c(parts, sprintf(
     paste0(
       '<p style="font-size:12px;color:#64748b;margin:4px 0 10px;">',
-      'Where each brand&apos;s buyers sit in the <strong>category frequency tertiles</strong> ',
-      'over the <strong>past %d months</strong> (target purchase window). ',
-      'Category buyers are split into equal-weighted thirds by total category purchases ',
-      '(Light / Medium / Heavy); each row sums to 100%% across the three tertiles. ',
+      'Tertiles are built from <strong>total category purchases per respondent</strong> ',
+      'over the <strong>past %d months</strong> &mdash; not per-brand. Every category buyer ',
+      'is placed into one of three equal-weighted thirds (Light / Medium / Heavy ',
+      '<em>category</em> buyers). Each brand row then shows what %% of <em>that brand&apos;s ',
+      'buyers</em> come from each category tertile (sums to 100%% across the row). ',
       'Base = brand buyers in the target window.',
       '</p>'),
     t_months))
@@ -545,7 +560,7 @@ render_cat_buying_panel <- function(panel_data) {
     return(paste(parts, collapse = "\n"))
   }
 
-  # Focal KPI strip: Heavy %, WBar vs cat-avg, NMI with verdict chip
+  # Focal KPI strip: Heavy %, WBar vs cat-avg, Light-buyer index with verdict chip
   parts <- c(parts, .cb_heaviness_focal_kpis(data_df, focal, brand_labels,
                                               tertile_bounds, t_months))
 
@@ -590,9 +605,9 @@ render_cat_buying_panel <- function(panel_data) {
 </div>', scope, .cb_rel_chart_legend(scope, seg_codes, seg_labels), scope))
 
   # In-flow "How to read this tab" explainer. Inline rather than via the
-  # central callout registry so the NMI interpretation lives with the
-  # numbers it explains — the construct is unfamiliar enough that the
-  # explainer earns its own real estate.
+  # central callout registry so the Light-buyer index interpretation lives
+  # with the numbers it explains — the construct is unfamiliar enough
+  # that the explainer earns its own real estate.
   parts <- c(parts, .cb_heaviness_explainer(t_months, tertile_bounds))
 
   paste(parts, collapse = "\n")
@@ -600,8 +615,9 @@ render_cat_buying_panel <- function(panel_data) {
 
 
 # Focal-brand KPI strip for the Heaviness tab.
-# Three chips: Heavy %, average purchases (focal vs category avg with delta),
-# Natural Monopoly Index with a one-word verdict chip.
+# Three chips: % of focal's buyers who are heavy category buyers, average
+# category purchases per focal buyer (vs category avg with delta), and the
+# Light-buyer index with a one-word verdict chip.
 .cb_heaviness_focal_kpis <- function(data_df, focal, brand_labels,
                                       tertile_bounds, t_months) {
   if (is.null(focal) || !nzchar(focal) || !(focal %in% data_df$BrandCode))
@@ -619,13 +635,17 @@ render_cat_buying_panel <- function(panel_data) {
     function(code, bl) tools::toTitleCase(tolower(as.character(code)))
   focal_lbl <- lbl_fn(focal, brand_labels)
 
-  # NMI verdict — keyed to Romaniuk's Natural Monopoly thresholds
+  # Light-buyer index verdict. The index is brand's % Light category buyers
+  # ÷ category's % Light category buyers × 100. The Ehrenberg-Bass Natural
+  # Monopoly Law predicts that bigger brands have a MORE light-skewed buyer
+  # base than the category average — so values above 100 are the mass / leader
+  # signature, not below.
   nmi_verdict <- if (!is.finite(nmi)) c(label = "n/a", colour = "#94a3b8")
-    else if (nmi < 70)  c(label = "Niche / specialist",  colour = "#7c3aed")
-    else if (nmi < 90)  c(label = "Slight heavy skew",   colour = "#a855f7")
-    else if (nmi <= 110) c(label = "Natural Monopoly",   colour = "#0891b2")
-    else if (nmi <= 130) c(label = "Light-buyer skew",   colour = "#0d9488")
-    else                c(label = "Strong light-buyer recruit", colour = "#059669")
+    else if (nmi < 70)   c(label = "Niche / specialist",       colour = "#7c3aed")
+    else if (nmi < 90)   c(label = "Heavy-skewed base",        colour = "#a855f7")
+    else if (nmi <= 110) c(label = "Mirrors category",         colour = "#0891b2")
+    else if (nmi <= 130) c(label = "Mass pattern (NML)",       colour = "#0d9488")
+    else                 c(label = "Strong light-buyer skew",  colour = "#059669")
 
   # Format helpers
   fmt_pct <- function(x) if (!is.finite(x)) "&mdash;" else sprintf("%.0f%%", x)
@@ -639,24 +659,26 @@ render_cat_buying_panel <- function(panel_data) {
   paste0(
     '<div class="cb-kpi-strip" style="margin:8px 0 14px;">',
     sprintf(paste0(
-      '<div class="cb-kpi-chip" title="%% of %s buyers who are in the Heavy category-buyer tertile">',
+      '<div class="cb-kpi-chip" title="%% of %s buyers who are heavy buyers of the CATEGORY overall (top tertile by total category purchases) — not heavy buyers of %s itself.">',
       '<div class="cb-kpi-val">%s</div>',
-      '<div class="cb-kpi-label">%s buyers in Heavy tertile</div>',
+      '<div class="cb-kpi-label">%s buyers who are heavy <em>category</em> buyers</div>',
       '</div>'),
-      .cb_esc(focal_lbl), fmt_pct(heavy_p), .cb_esc(focal_lbl)),
+      .cb_esc(focal_lbl), .cb_esc(focal_lbl), fmt_pct(heavy_p), .cb_esc(focal_lbl)),
     sprintf(paste0(
-      '<div class="cb-kpi-chip" title="Average category purchases per %s buyer over the past %d months (vs category average)">',
+      '<div class="cb-kpi-chip" title="Average total category purchases per %s buyer over the past %d months (counting every brand they bought, not just %s) vs the average category buyer. Same metric, same formula, same base as the &lsquo;Avg purchases / category buyer&rsquo; chip on the Category Context tab — so the cat-avg figures here and there should match.">',
       '<div class="cb-kpi-val">%s</div>',
-      '<div class="cb-kpi-label">Avg cat purchases / buyer ',
-      '<span style="color:#475569;">(cat avg %s &middot; <strong>%s pp</strong>)</span>',
+      '<div class="cb-kpi-label">Avg purchases / category buyer ',
+      '<span style="color:#475569;">(cat avg %s &middot; <strong>%s</strong>)</span>',
       '</div>',
       '</div>'),
-      .cb_esc(focal_lbl), t_months,
+      .cb_esc(focal_lbl), t_months, .cb_esc(focal_lbl),
       fmt_n(wbar_b), fmt_n(wbar_c), fmt_gap(wbar_g)),
     sprintf(paste0(
-      '<div class="cb-kpi-chip" title="Natural Monopoly Index. 100 = follows Natural Monopoly Law (typical mass brand). Below 100 = over-recruits heavy buyers (niche pattern). Above 100 = over-recruits light buyers (uncommon).">',
+      '<div class="cb-kpi-chip" title="Light-buyer index = brand&apos;s %% of light category buyers ÷ category&apos;s %% of light category buyers × 100. ',
+      'Above 100 = brand&apos;s base is more light-skewed than the category — the Natural Monopoly Law signature (typical of mass / leader brands). ',
+      'Around 100 = brand mirrors the category. Below 100 = brand over-recruits heavy category buyers (niche / specialist).">',
       '<div class="cb-kpi-val">%s</div>',
-      '<div class="cb-kpi-label">Natural Monopoly Index ',
+      '<div class="cb-kpi-label">Light-buyer index ',
       '<span style="display:inline-block;padding:1px 7px;border-radius:8px;background:%s;color:#fff;font-size:10px;margin-left:4px;">%s</span>',
       '</div>',
       '</div>'),
@@ -668,7 +690,8 @@ render_cat_buying_panel <- function(panel_data) {
 
 
 # Inline "How to read this tab" explainer. Spelled out because the
-# Natural Monopoly Law construct is unfamiliar to most clients.
+# Light-buyer index and the Natural Monopoly Law are unfamiliar to most
+# clients — and because the category-vs-brand distinction is easy to lose.
 .cb_heaviness_explainer <- function(t_months, tertile_bounds = NULL) {
   # If we have actual tertile cutoffs, surface them so the explainer is
   # concrete rather than purely conceptual.
@@ -693,25 +716,35 @@ render_cat_buying_panel <- function(panel_data) {
     '<div class="cb-info-body">',
 
     '<p style="margin:6px 0;">',
-    '<strong>What this measures.</strong> Category buyers are split into three ',
-    'equal-weighted thirds &mdash; Light, Medium and Heavy &mdash; by how many ',
-    'category purchases each respondent made in the past ', as.integer(t_months),
-    ' months. Each brand row then shows the % of <em>that brand&apos;s buyers</em> ',
-    'who fall into each tertile. This is different from Purchase Distribution: ',
-    'that tab shows how often someone bought <em>this brand</em>; Buyer Heaviness ',
-    'shows how engaged with <em>the whole category</em> the brand&apos;s buyers are.',
+    '<strong>What this measures &mdash; and what it doesn&apos;t.</strong> ',
+    'Everything on this tab is about the <em>category</em>, not any one brand. ',
+    'We take every category buyer in the study and split them into three ',
+    'equal-weighted thirds &mdash; Light, Medium and Heavy <em>category</em> ',
+    'buyers &mdash; based on how many total category purchases each person made ',
+    'in the past ', as.integer(t_months), ' months (their total across every ',
+    'brand they bought, not just one). Each brand row then asks: <em>of the ',
+    'people who bought this brand, what mix of light / medium / heavy ',
+    'category buyers do they pull from?</em>',
+    '</p>',
+    '<p style="margin:6px 0;">',
+    'This is the opposite question to the Purchase Distribution tab. Purchase ',
+    'Distribution asks how often a brand&apos;s buyers bought <em>that brand</em> ',
+    '(within-brand frequency). Heaviness asks how engaged with the <em>whole ',
+    'category</em> a brand&apos;s buyers are. A brand can have buyers who buy it ',
+    'just once and still pull in heavy category buyers (they buy a lot of other ',
+    'brands too), or the reverse.',
     '</p>',
 
     '<ul>',
     cutoff_line,
     '<li><strong>Heavy category buyer</strong> &mdash; respondent is in the top ',
-    'third of the category by total purchases. These buyers are worth more to ',
-    'every brand they consider.</li>',
-    '<li><strong>Medium</strong> &mdash; middle third of category buyers.</li>',
-    '<li><strong>Light</strong> &mdash; bottom third of category buyers; ',
-    'occasional or low-volume buyers.</li>',
+    'third by total category purchases. They buy the category often (not ',
+    'necessarily this brand often).</li>',
+    '<li><strong>Medium category buyer</strong> &mdash; middle third.</li>',
+    '<li><strong>Light category buyer</strong> &mdash; bottom third; occasional ',
+    'or low-volume buyers of the category.</li>',
     '<li><strong>Each row sums to 100%</strong> &mdash; the bar shows the ',
-    'composition of one brand&apos;s buyer base, not its category penetration.</li>',
+    'category-engagement mix of one brand&apos;s buyer base, not its penetration.</li>',
     '<li><strong>Show counts</strong> toggles segment % &harr; weighted N of ',
     'brand buyers.</li>',
     '</ul>',
@@ -720,35 +753,41 @@ render_cat_buying_panel <- function(panel_data) {
     '<strong>Reading the focal KPI strip.</strong>',
     '</p>',
     '<ul>',
-    '<li><strong>Buyers in Heavy tertile</strong>: the share of this brand&apos;s ',
-    'buyers who are heavy category buyers. Above ~40% is notable; above ~50% ',
-    'signals strong premium / engaged-buyer recruitment.</li>',
-    '<li><strong>Avg cat purchases / buyer (vs cat avg)</strong>: how many ',
-    'category purchases this brand&apos;s buyers make on average, vs every category ',
-    'buyer. A positive gap means this brand recruits above-average category users.</li>',
-    '<li><strong>Natural Monopoly Index (NMI)</strong>: Romaniuk&apos;s diagnostic. ',
-    'Calculated as (focal brand&apos;s % Light buyers) &divide; (category&apos;s % Light ',
-    'buyers) &times; 100.',
+    '<li><strong>% buyers who are heavy category buyers</strong>: of this ',
+    'brand&apos;s buyers, the share who sit in the top category-purchase tertile. ',
+    'Above ~40% is notable; above ~50% means the brand is being picked by people ',
+    'who buy the category a lot overall.</li>',
+    '<li><strong>Avg purchases / category buyer</strong>: average total ',
+    'category purchases of this brand&apos;s buyers (counting every brand they ',
+    'bought in the past ', as.integer(t_months), ' months, not just this one), ',
+    'compared to the average category buyer. Positive gap = brand recruits ',
+    'category-heavy users. <em>Same metric, same formula as the ',
+    '&ldquo;Avg purchases / category buyer&rdquo; chip on the Category Context ',
+    'tab &mdash; the cat-avg figure should be identical between the two pages.</em></li>',
+    '<li><strong>Light-buyer index</strong>: brand&apos;s % of light category ',
+    'buyers &divide; category&apos;s % of light category buyers &times; 100. ',
+    'Per Ehrenberg-Bass&apos;s <strong>Natural Monopoly Law</strong>, bigger ',
+    'brands have a buyer base that is <em>more</em> light-skewed than the ',
+    'category average, not less &mdash; they sweep in occasional category buyers ',
+    'because they show up everywhere.',
     '<ul>',
-    '<li>NMI <strong>around 100</strong> &mdash; the brand follows the ',
-    '<strong>Natural Monopoly Law</strong>: it recruits light, medium and heavy ',
-    'buyers in roughly the same proportion as the category itself. This is the ',
-    'pattern Romaniuk &amp; Sharp observe for most leading mass-market brands.</li>',
-    '<li>NMI <strong>below 100</strong> &mdash; the brand <strong>under-recruits ',
-    'light buyers and over-recruits heavy ones</strong>. Typical of premium / ',
-    'niche / specialist brands. Tells you the brand is winning where it competes, ',
-    'but its growth ceiling is bounded by how many heavy category buyers exist.</li>',
-    '<li>NMI <strong>above 100</strong> &mdash; the brand over-recruits light ',
-    'buyers (uncommon). Often a sign of light-user-skewed distribution (e.g. an ',
-    'occasional / impulse purchase).</li>',
+    '<li><strong>Index above 100</strong> &mdash; the brand&apos;s base is ',
+    'more light-skewed than the category. This is the Natural Monopoly Law ',
+    'signature: typical of mass / leader brands.</li>',
+    '<li><strong>Index around 100</strong> &mdash; the brand&apos;s buyer mix ',
+    'mirrors the category. No skew either way.</li>',
+    '<li><strong>Index below 100</strong> &mdash; the brand <em>under-recruits ',
+    'light category buyers and over-recruits heavy ones</em>. The niche / ',
+    'specialist signature. The brand wins where it competes, but its growth ',
+    'ceiling is bounded by the size of the heavy-buyer pool.</li>',
     '</ul>',
     '</li>',
     '</ul>',
 
     '<p style="margin:10px 0 4px;color:#475569;">',
     '<em>Source:</em> Romaniuk &amp; Sharp, <em>How Brands Grow Part 2</em> ',
-    '(2022). Cutoffs are recomputed per category from the BRANDPEN3 ',
-    'category-purchase data; tie-break tolerance &plusmn;5pp from the ',
+    '(2022). Cutoffs are recomputed per category from the per-brand ',
+    'purchase-count data; tie-break tolerance &plusmn;5pp from the ',
     'one-third boundary.',
     '</p>',
 
@@ -805,7 +844,7 @@ render_cat_buying_panel <- function(panel_data) {
       '<li><strong>Primary (&gt;50% SCR)</strong> = this brand is &gt;50% of the buyer\u2019s category purchases (but they also buy other brands).</li>',
       '<li><strong>Secondary (\u226450%)</strong> = bought this brand, but another brand takes the majority of their category spend.</li>',
       '<li><strong>Not bought</strong> = category buyer who did not buy this brand in the target window.</li>',
-      '<li><strong>% Cat buyers</strong> = % of <em>category buyers</em> (m_vec &gt; 0 in target window) who bought the brand (Sole + Primary + Secondary). Differs from the Brand Summary tab\u2019s &ldquo;Pen&rdquo;, which uses <em>all screened category respondents</em> (incl. lapsed / zero-purchase) \u2014 Pen reads lower than %% Cat buyers for the same brand.</li>',
+      '<li><strong>% Cat buyers</strong> = % of <em>category buyers</em> (anyone who bought any brand in the past 3 months) who bought the brand (Sole + Primary + Secondary). Differs from the Brand Summary tab\u2019s &ldquo;Pen&rdquo;, which uses <em>all screened category respondents</em> (incl. lapsed / zero-purchase) \u2014 Pen reads lower than %% Cat buyers for the same brand.</li>',
       ci_explainer,
       '<li><strong>Show counts</strong> toggles segment % \u2194 raw weighted N (of category buyers).</li>',
       '</ul>')
@@ -813,7 +852,7 @@ render_cat_buying_panel <- function(panel_data) {
     paste0(
       '<ul>',
       '<li>Segments are buckets of purchase <em>frequency</em> among this brand\u2019s buyers over the target window.</li>',
-      '<li><strong>% Cat buyers</strong> = % of <em>category buyers</em> (m_vec &gt; 0 in target window) who bought the brand. Differs from Brand Summary &ldquo;Pen&rdquo;, which is %% of all screened category respondents (incl. lapsed) \u2014 Pen reads lower than %% Cat buyers for the same brand.</li>',
+      '<li><strong>% Cat buyers</strong> = % of <em>category buyers</em> (anyone who bought any brand in the past 3 months) who bought the brand. Differs from Brand Summary &ldquo;Pen&rdquo;, which is %% of all screened category respondents (incl. lapsed) \u2014 Pen reads lower than %% Cat buyers for the same brand.</li>',
       '<li><strong>Base (n=)</strong> = weighted count of this brand\u2019s buyers.</li>',
       ci_explainer,
       '<li><strong>Show counts</strong> toggles segment % \u2194 raw weighted N (of brand buyers).</li>',
@@ -965,7 +1004,7 @@ render_cat_buying_panel <- function(panel_data) {
         dev_html))
     }
   } else {
-    parts <- c(parts, '<p style="font-size:12px;color:#94a3b8;">Duplication of purchase requires BRANDPEN3 data.</p>')
+    parts <- c(parts, '<p style="font-size:12px;color:#94a3b8;">Duplication of purchase requires per-brand purchase-count data.</p>')
   }
 
   # Partition partners / rivals card - sits below the table and above
@@ -1094,7 +1133,8 @@ render_cat_buying_panel <- function(panel_data) {
   }, character(1)), collapse = "")
 
   buyers_tip <- paste0(
-    "% Cat buyers = % of CATEGORY BUYERS (3-month, m_vec > 0) who bought ",
+    "% Cat buyers = % of CATEGORY BUYERS (anyone who bought any brand in ",
+    "the past 3 months) who bought ",
     "this brand. Differs from the Brand Summary tab&apos;s &ldquo;Pen&rdquo;, ",
     "which uses ALL screened category respondents (incl. lapsed / zero-",
     "purchase) — Pen will be lower than this value for the same brand. ",
@@ -1222,15 +1262,16 @@ render_cat_buying_panel <- function(panel_data) {
       avg_seg_cells)
   }
 
-  order_idx <- if (!is.null(focal) && focal %in% brands) {
-    c(which(brands == focal), which(brands != focal))
-  } else seq_along(brands)
-  ord_brands <- brands[order_idx]
-  ord_names  <- brand_names[order_idx]
+  # Row order — match the funnel / Brand Summary convention:
+  #   1. Focal brand (pinned)
+  #   2. Category avg
+  #   3. Other brands (sortable)
+  # The JS sort handler (bindCbRelSort) preserves this layout when the user
+  # clicks a column header — only the competitor block reorders.
+  focal_idx  <- if (!is.null(focal) && focal %in% brands) which(brands == focal) else integer(0)
+  others_idx <- setdiff(seq_along(brands), focal_idx)
 
-  rows_html <- paste(vapply(seq_along(ord_brands), function(i) {
-    bc      <- ord_brands[i]
-    nm      <- ord_names[i]
+  .build_rel_row <- function(bc, nm) {
     is_foc  <- !is.null(focal) && bc == focal
     row_cls <- if (is_foc)
       "ct-row fn-rel-row fn-row-focal cb-rel-row"
@@ -1286,18 +1327,25 @@ render_cat_buying_panel <- function(panel_data) {
       '<tr class="%s" data-cb-brand="%s"><td class="ct-td ct-label-col">%s %s</td>%s%s%s</tr>',
       row_cls, .cb_esc(bc), .cb_esc(nm), badge,
       buyers_cell, base_cell, data_cells)
-  }, character(1)), collapse = "\n")
+  }
+
+  focal_html <- if (length(focal_idx) == 1L)
+    .build_rel_row(brands[focal_idx], brand_names[focal_idx]) else ""
+  others_html <- if (length(others_idx) > 0L)
+    paste(vapply(others_idx,
+                 function(i) .build_rel_row(brands[i], brand_names[i]),
+                 character(1)), collapse = "\n") else ""
 
   sprintf(
     '<section class="cb-rel-section" data-cb-scope="%s">
   <div class="ma-table-wrap" style="overflow-x:auto;">
     <table class="ct-table cb-rel-table">
       <thead>%s</thead>
-      <tbody>%s%s</tbody>
+      <tbody>%s%s%s</tbody>
     </table>
   </div>
 </section>',
-    scope, header_html, avg_row, rows_html)
+    scope, header_html, focal_html, avg_row, others_html)
 }
 
 
@@ -1598,7 +1646,7 @@ render_cat_buying_panel <- function(panel_data) {
       if (nmi_val < 85) " \u2193" else if (nmi_val > 115) " \u2191" else " \u2192"
     } else ""
     chips <- c(chips, sprintf(
-      '<div class="cb-kpi-chip amber" data-kpi="nmi"><div class="cb-kpi-val amber" data-kpi-val>%s%s</div><div class="cb-kpi-label">Focal NMI (100 = avg)</div></div>',
+      '<div class="cb-kpi-chip amber" data-kpi="nmi" title="Light-buyer index = brand&apos;s %% of light category buyers ÷ category&apos;s %% × 100. Above 100 = mass / leader pattern (Natural Monopoly Law). Below 100 = niche / heavy-skewed base."><div class="cb-kpi-val amber" data-kpi-val>%s%s</div><div class="cb-kpi-label">Focal Light-buyer index (100 = mirrors cat)</div></div>',
       nmi_txt, nmi_arrow))
   }
 

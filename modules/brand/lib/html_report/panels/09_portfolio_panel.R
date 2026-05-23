@@ -960,7 +960,7 @@ build_br_portfolio_panel <- function(results, config) {
 
     '<p class="pf-ex-reading-line"><strong>What it needs in the data:</strong> ',
     'Both views can only score categories where the questionnaire actually asked buyers of that category whether they’re aware of the focal brand. ',
-    'In your study this is set by the BrandList sheet — every brand × category combination where the brand is listed has a `BRANDAWARE_<cat>_<brand>` column in the data. ',
+    'In your study this is set by the BrandList sheet — every brand × category combination where the brand is listed gets its own "are you aware of this brand" reading in the data. ',
     'A brand listed in <em>all</em> categories (typically the study’s focal client) gets a full read. ',
     'A brand listed in only its home category gets only one row — and the extension half can’t do anything for it until the next wave adds cross-category awareness. ',
     'The number after each option in the picker (<em>"Brand (3 cats)"</em>) tells you up front how much data is available for that brand.</p>',

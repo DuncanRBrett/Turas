@@ -34,17 +34,51 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
   if (is.null(opts) || !is.data.frame(opts) || nrow(opts) == 0) return(NULL)
   qc_col   <- intersect(c("QuestionCode", "Code"), names(opts))[1]
   val_col  <- intersect(c("OptionValue", "Value"), names(opts))[1]
-  lbl_col  <- intersect(c("OptionText", "OptionLabel", "Label"), names(opts))[1]
+  lbl_col  <- intersect(c("OptionText", "OptionLabel", "Label"),
+                       names(opts))[1]
+  # DisplayText is the human label for slot-pattern OptionMap rows
+  # (e.g. CHANNEL_DSS_1 → OptionText="SPMKT" / DisplayText="Supermarket").
+  # When the root-level lookup matches, OptionText is itself the label, so
+  # we fall back through this list.
+  disp_col <- intersect(c("DisplayText", "DisplayLabel", "Label"),
+                       names(opts))[1]
   ord_col  <- intersect(c("SortOrder", "Sort", "DisplayOrder"), names(opts))[1]
   if (any(is.na(c(qc_col, val_col, lbl_col)))) return(NULL)
   rows <- opts[trimws(as.character(opts[[qc_col]])) == qcode, , drop = FALSE]
-  if (nrow(rows) == 0) return(NULL)
+  use_slot_keys <- nrow(rows) == 0L
+  if (use_slot_keys) {
+    # Fallback: per-slot keys (e.g. CHANNEL_DSS_1, CHANNEL_DSS_2…) where each
+    # slot row carries the option assigned to that slot, with OptionText
+    # holding the data code and DisplayText holding the human label.
+    pat <- paste0("^", qcode, "_[0-9]+$")
+    rows <- opts[grepl(pat, trimws(as.character(opts[[qc_col]]))),
+                 , drop = FALSE]
+    if (nrow(rows) == 0L) return(NULL)
+  }
   values <- as.character(rows[[val_col]])
   labels <- as.character(rows[[lbl_col]])
   # When OptionValue is blank/NA for a row, the OptionText IS the data value
   # (questions where the data carries the label directly, no separate code).
   empty_v <- is.na(values) | !nzchar(trimws(values))
   values[empty_v] <- labels[empty_v]
+  # For slot-pattern fallback, OptionText carries the data code while
+  # DisplayText carries the human label. Swap so values = data code,
+  # labels = human label. When DisplayText is absent / blank, leave the
+  # OptionText as the label so the bar still has a name.
+  if (use_slot_keys && !is.na(disp_col)) {
+    disp_vals <- as.character(rows[[disp_col]])
+    has_disp <- !is.na(disp_vals) & nzchar(trimws(disp_vals))
+    values <- as.character(rows[[lbl_col]])         # OptionText = code
+    labels <- ifelse(has_disp, disp_vals, values)   # DisplayText = label
+  }
+  # Slot-pattern fallback can include the same option in multiple slot
+  # rows when the survey lists it more than once. Collapse to unique
+  # (value, label) pairs, keeping the first occurrence's order.
+  if (use_slot_keys) {
+    keep <- !duplicated(values)
+    values <- values[keep]; labels <- labels[keep]
+    rows   <- rows[keep, , drop = FALSE]
+  }
   order_v <- if (!is.na(ord_col)) suppressWarnings(as.integer(rows[[ord_col]]))
              else seq_len(nrow(rows))
   order_v[is.na(order_v)] <- 9999L
