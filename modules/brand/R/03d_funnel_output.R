@@ -404,7 +404,7 @@ write_funnel_csv <- function(result, brand_list, role_map = NULL,
   labels <- c(attitude.love       = "Love",
               attitude.prefer     = "Prefer",
               attitude.ambivalent = "Ambivalent",
-              attitude.price      = "Price",
+              attitude.price      = "Price-only",
               attitude.avoid      = "Avoid",
               attitude.no_opinion = "No Opinion")
   unname(labels[role]) %||% role

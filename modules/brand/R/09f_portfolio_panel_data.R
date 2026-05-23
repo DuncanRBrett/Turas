@@ -114,10 +114,13 @@ build_portfolio_panel_data <- function(portfolio_result, config,
 .portfolio_about_text <- function() {
   list(
     footprint = paste(
-      "Footprint Heatmap: Each cell shows the % of buyers in a category who",
-      "are aware of a brand. Denominator = screener-qualified buyers for that",
-      "category (SQ2 for 3-month window, SQ1 for 13-month). A dash (\u2014) means",
-      "the brand was not measured in that category — not that awareness is 0%."
+      "Footprint Heatmap: Each cell is the % of that category's buyers who",
+      "are aware of the brand. Numerator = upfront BRANDAWARE multi-pick",
+      "(\"which of these brands have you heard of?\"). Denominator =",
+      "screener-qualified category buyers (SQ2 for 3-month window,",
+      "SQ1 for 12-month). No purchase / volume data feeds into these cells -",
+      "it is a pure mental-availability map. A dash (\u2014) means the brand was",
+      "not in that category's awareness battery — not that awareness is 0%."
     ),
     clutter = paste(
       "Clutter Quadrant: x-axis = how many brands a typical category buyer",

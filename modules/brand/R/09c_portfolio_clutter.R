@@ -179,10 +179,14 @@ compute_clutter_data <- function(data, role_map, categories, structure,
     is_high_clutter <- !is.na(clutter_df$awareness_set_size_mean[i]) &&
                        !is.na(ref_x) &&
                        clutter_df$awareness_set_size_mean[i] > ref_x
+    # Labels describe the structural state of the focal brand in each
+    # category's mental space — they deliberately avoid prescribing action
+    # ("opportunity", "deprioritise") because that depends on the category's
+    # commercial role for the brand, not the chart position.
     if (is_strong && !is_high_clutter) return("Dominant")
     if (is_strong && is_high_clutter)  return("Contested")
-    if (!is_strong && !is_high_clutter) return("Niche Opportunity")
-    "Forgotten / Wrong Battle"
+    if (!is_strong && !is_high_clutter) return("Open space")
+    "Crowded out"
   }, character(1))
 
   list(

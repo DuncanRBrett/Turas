@@ -644,10 +644,34 @@ function pfCnFormatTooltip(node, focalCode) {
   var code = node.getAttribute('data-pf-cn-node');
   if (!focalCode || code === focalCode) return brandLabel + ' — focal';
 
-  // Compute Jaccard with focal + rank from the SVG's edges.
+  // Build the Jaccard map for the focal brand from the FULL pairwise list
+  // (all_edges) embedded in the JSON payload — not just the top-N edges
+  // drawn on the SVG. The chart only renders the top-N edges to stay
+  // readable, but every brand still has a real Jaccard value with the
+  // focal; the tooltip should surface it.
   var svg = node.ownerSVGElement;
   var jacByCode = {};
-  if (svg) {
+  var usedFullList = false;
+
+  // Find the cat code by walking up from the node to its enclosing
+  // cat-panel container.
+  var catPanel = node.closest && node.closest('.pf-cn-cat-panel');
+  var catCode  = catPanel ? catPanel.getAttribute('data-pf-cn-cat-panel') : null;
+
+  var cats = pfCnLoadCats();
+  if (cats && catCode && cats[catCode] && Array.isArray(cats[catCode].all_edges)) {
+    cats[catCode].all_edges.forEach(function (e) {
+      if (!e) return;
+      if (e.b1 === focalCode)      jacByCode[e.b2] = e.jac;
+      else if (e.b2 === focalCode) jacByCode[e.b1] = e.jac;
+    });
+    usedFullList = Object.keys(jacByCode).length > 0;
+  }
+
+  // Fallback: pre-rebuild reports / older payloads only carry the top-N
+  // edges on the SVG. Use those so the tooltip still works, but the
+  // "below display threshold" caveat will reappear for non-edge brands.
+  if (!usedFullList && svg) {
     svg.querySelectorAll('.pf-cn-edge').forEach(function (e) {
       var b1 = e.getAttribute('data-pf-cn-b1');
       var b2 = e.getAttribute('data-pf-cn-b2');
@@ -656,10 +680,15 @@ function pfCnFormatTooltip(node, focalCode) {
       else if (b2 === focalCode) jacByCode[b1] = j;
     });
   }
+
+  // Rank = position of this brand in the focal's sorted-by-Jaccard list.
+  // When the full list is used, the rank is the true category rank
+  // (1..N-1); when the fallback is used, it's only ranked among drawn
+  // edges (1..top_n) — same behaviour as the previous implementation.
   var ranked = Object.keys(jacByCode)
     .sort(function (a, b) { return jacByCode[b] - jacByCode[a]; });
-  var rank = ranked.indexOf(code) + 1;
-  var jac  = jacByCode[code];
+  var rank   = ranked.indexOf(code) + 1;
+  var jac    = jacByCode[code];
 
   // Look up the focal's brand label too so the tooltip reads naturally.
   var focalLabel = focalCode;
@@ -674,11 +703,20 @@ function pfCnFormatTooltip(node, focalCode) {
   }
 
   if (jac == null) {
-    return brandLabel + ' — no co-awareness link with ' + focalLabel;
+    // Only reached when neither all_edges nor the top-N SVG edges contain
+    // the pair (e.g. brand wasn't in the awareness battery for this cat).
+    return brandLabel + ' — no co-awareness data with ' + focalLabel +
+           ' in this category';
   }
-  var pct = Math.round(jac * 100);
-  return brandLabel + ' — ' + pct + '% Jaccard with ' + focalLabel +
-         ' · #' + rank + ' closest';
+
+  // Jaccard is a 0–1 similarity ratio. We deliberately render it as the
+  // raw decimal (e.g. 0.56), NOT a percentage — clients tend to misread
+  // "56%" as "56% of focal awares know this brand", which is the wrong
+  // interpretation. See the "About this chart" callout for the symmetric
+  // overlap interpretation.
+  var jacText  = jac.toFixed(2);
+  var rankNote = rank > 0 ? ' · #' + rank + ' closest' : '';
+  return brandLabel + ' — Jaccard ' + jacText + ' with ' + focalLabel + rankNote;
 }
 
 function pfCnPositionTooltip(tip, ev) {
@@ -1095,13 +1133,16 @@ function pfCnRenderRivals(panel, catCode, focalCode) {
 
   var maxJac = rivals[0].jac || 1;
   ol.innerHTML = rivals.map(function (r, i) {
-    var pct = Math.round(r.jac * 100);
-    var bar = Math.max(4, Math.round((r.jac / maxJac) * 100));
+    // Show the raw 0–1 Jaccard value (e.g. 0.56) rather than a 56% format,
+    // for the same reason the tooltip does: "%" implies "% of focal awares
+    // know this brand", which is not what Jaccard measures.
+    var jacText = (r.jac || 0).toFixed(2);
+    var bar     = Math.max(4, Math.round((r.jac / maxJac) * 100));
     return '<li>' +
       '<span class="pf-cn-rival-rank">#' + (i + 1) + '</span>' +
       '<span class="pf-cn-rival-name">' + escapeHtmlMaybe(r.label) + '</span>' +
       '<span class="pf-cn-rival-bar"><span class="pf-cn-rival-bar-fill" style="width:' + bar + '%"></span></span>' +
-      '<span class="pf-cn-rival-jac">' + pct + '</span>' +
+      '<span class="pf-cn-rival-jac" title="Jaccard similarity (0–1). 0 = no shared awares. 1 = perfect overlap.">' + jacText + '</span>' +
       '</li>';
   }).join('');
 }
@@ -1344,8 +1385,8 @@ function pfClBuildRows(data, focalCode) {
                           c.set_size_mean > refX);
     if (isStrong && !isHighClutter) quadrant = 'Dominant';
     else if (isStrong && isHighClutter) quadrant = 'Contested';
-    else if (!isStrong && !isHighClutter) quadrant = 'Niche opportunity';
-    else quadrant = 'Forgotten / wrong battle';
+    else if (!isStrong && !isHighClutter) quadrant = 'Open space';
+    else quadrant = 'Crowded out';
 
     rows.push({
       cat_code:        cc,
@@ -1545,8 +1586,8 @@ function pfClRenderScatter(rows, refX, focalColour) {
     parts.push(
       '<text x="' + (ml + 8)      + '" y="' + (mt + 16)      + '" fill="#64748b" font-size="10" font-weight="600">Dominant</text>',
       '<text x="' + (ml + pw - 8) + '" y="' + (mt + 16)      + '" fill="#64748b" font-size="10" font-weight="600" text-anchor="end">Contested</text>',
-      '<text x="' + (ml + 8)      + '" y="' + (mt + ph - 8) + '" fill="#64748b" font-size="10" font-weight="600">Niche opportunity</text>',
-      '<text x="' + (ml + pw - 8) + '" y="' + (mt + ph - 8) + '" fill="#64748b" font-size="10" font-weight="600" text-anchor="end">Forgotten / wrong battle</text>'
+      '<text x="' + (ml + 8)      + '" y="' + (mt + ph - 8) + '" fill="#64748b" font-size="10" font-weight="600">Open space</text>',
+      '<text x="' + (ml + pw - 8) + '" y="' + (mt + ph - 8) + '" fill="#64748b" font-size="10" font-weight="600" text-anchor="end">Crowded out</text>'
     );
     parts.push(
       '<line x1="' + rx + '" y1="' + mt + '" x2="' + rx + '" y2="' + (mt + ph) + '" stroke="#94a3b8" stroke-width="1" stroke-dasharray="5,3"/>',

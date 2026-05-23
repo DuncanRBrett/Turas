@@ -174,12 +174,12 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
   # 5-level surveys still work — Reject canonicalises to Avoid via the
   # role alias and the Price column just has zero values.
   seg_labels <- c(All = "all",
-                  Love       = "attitude.love",
-                  Prefer     = "attitude.prefer",
-                  Ambivalent = "attitude.ambivalent",
-                  Price      = "attitude.price",
-                  Avoid      = "attitude.avoid",
-                  `No opinion` = "attitude.no_opinion")
+                  Love              = "attitude.love",
+                  Prefer            = "attitude.prefer",
+                  Ambivalent        = "attitude.ambivalent",
+                  `Price-only`      = "attitude.price",
+                  Avoid             = "attitude.avoid",
+                  `No opinion`      = "attitude.no_opinion")
   paste(vapply(seq_along(seg_labels), function(i) {
     nm     <- names(seg_labels)[i]
     active <- if (nm == "All") " active" else ""
@@ -202,7 +202,7 @@ build_funnel_relationship_section <- function(pd, focal_colour = "#1A5276") {
   # and the column just shows zeros.
   att_roles  <- c("attitude.love", "attitude.prefer", "attitude.ambivalent",
                   "attitude.price", "attitude.avoid", "attitude.no_opinion")
-  att_labels <- c("Love", "Prefer", "Ambivalent", "Price", "Avoid", "No opinion")
+  att_labels <- c("Love", "Prefer", "Ambivalent", "Price-only", "Avoid", "No opinion")
   # Aware-opinion roles imply awareness (the respondent had to be aware of
   # the brand to express any of these); "no opinion" is the survey's
   # catch-all and contains BOTH aware-but-no-opinion AND every unaware

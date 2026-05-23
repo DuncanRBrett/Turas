@@ -353,16 +353,21 @@ compute_constellation <- function(data, role_map, categories, structure,
     }
   }
 
-  edges_df <- if (length(edge_rows) > 0L) {
+  # Full pairwise table (sorted desc) — kept alongside the chart-rendered
+  # top-N so tooltips / Excel can surface the Jaccard for any pair, not
+  # just the ones drawn as edges.
+  edges_full_df <- if (length(edge_rows) > 0L) {
     df <- do.call(rbind, lapply(edge_rows, as.data.frame,
                                  stringsAsFactors = FALSE))
-    df <- df[order(df$jaccard, decreasing = TRUE), ]
-    head(df, edge_top_n)
+    df[order(df$jaccard, decreasing = TRUE), ]
   } else {
     data.frame(b1 = character(0), b2 = character(0),
                jaccard = numeric(0), cooccur_n = integer(0),
                stringsAsFactors = FALSE)
   }
+  edges_df <- if (nrow(edges_full_df) > 0L) {
+    head(edges_full_df, edge_top_n)
+  } else edges_full_df
 
   adj_top <- matrix(0.0, nb, nb)
   if (nrow(edges_df) > 0L) {
@@ -395,6 +400,7 @@ compute_constellation <- function(data, role_map, categories, structure,
     status          = "PASS",
     nodes           = nodes_df,
     edges           = edges_df,
+    edges_full      = edges_full_df,
     layout          = layout_df,
     layout_engine   = layout_engine,
     suppressed_cats = suppressed
@@ -575,16 +581,21 @@ compute_constellations_per_cat <- function(data, role_map, categories,
     }
   }
 
-  edges_df <- if (length(edge_rows) > 0L) {
+  # Full pairwise table (sorted desc) — kept alongside the chart-rendered
+  # top-N so the tooltip can surface the actual Jaccard for any pair, not
+  # just the ones drawn as edges.
+  edges_full_df <- if (length(edge_rows) > 0L) {
     df <- do.call(rbind, lapply(edge_rows, as.data.frame,
                                  stringsAsFactors = FALSE))
-    df <- df[order(df$jaccard, decreasing = TRUE), ]
-    head(df, edge_top_n)
+    df[order(df$jaccard, decreasing = TRUE), ]
   } else {
     data.frame(b1 = character(0), b2 = character(0),
                jaccard = numeric(0), cooccur_n = integer(0),
                stringsAsFactors = FALSE)
   }
+  edges_df <- if (nrow(edges_full_df) > 0L) {
+    head(edges_full_df, edge_top_n)
+  } else edges_full_df
 
   adj_top <- matrix(0.0, nb, nb)
   if (nrow(edges_df) > 0L) {
@@ -618,6 +629,7 @@ compute_constellations_per_cat <- function(data, role_map, categories,
     status        = "PASS",
     nodes         = nodes_df,
     edges         = edges_df,
+    edges_full    = edges_full_df,
     layout        = layout_df,
     layout_engine = layout_engine
   )

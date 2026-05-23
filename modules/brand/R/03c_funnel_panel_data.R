@@ -137,7 +137,7 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
   labels <- c(attitude.love       = "Love",
               attitude.prefer     = "Prefer",
               attitude.ambivalent = "Ambivalent",
-              attitude.price      = "Price",
+              attitude.price      = "Price-only",
               attitude.avoid      = "Avoid",
               attitude.no_opinion = "No opinion")
   unname(labels[role]) %||% role
@@ -472,8 +472,13 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
   list(
     question_texts = .question_texts_from_warnings(result),
     methodology_note = paste(
-      "Funnel stages are nested: each stage is a subset of the previous.",
-      "Conversion ratios show proportional drop-off between stages."),
+      "Each stage is measured by its own survey question (BRANDAWARE,",
+      "BRANDATT1, BRANDPEN1, BRANDPEN2), not by routing or skip logic.",
+      "Aggregate counts almost always nest because most respondents are",
+      "coherent, and Turas refuses to render brands whose aggregate stage",
+      "counts violate nesting. Conversion ratios are aggregate ratios",
+      "(total at stage N divided by total at stage N-1), not individual",
+      "respondent transitions."),
     base_note = sprintf(
       "Base: n = %d unweighted, %.1f weighted. Focal brand: %s.",
       result$meta$n_unweighted, result$meta$n_weighted,

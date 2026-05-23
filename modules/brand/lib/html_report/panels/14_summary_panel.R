@@ -820,7 +820,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   }
   seg_codes <- c("attitude.love", "attitude.prefer", "attitude.ambivalent",
                  "attitude.price", "attitude.avoid", "attitude.no_opinion")
-  seg_labels <- c("Love", "Prefer", "Ambivalent", "Price", "Avoid", "No opinion")
+  seg_labels <- c("Love", "Prefer", "Ambivalent", "Price-only", "Avoid", "No opinion")
   seg_colours <- c("#2E7D32", "#81C784", "#F9A825", "#FB8C00", "#C62828", "#90A4AE")
 
   att$brand_code    <- as.character(att$brand_code)

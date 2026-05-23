@@ -34,17 +34,24 @@ pfo_render_table <- function(overview, focal_brand, focal_colour) {
     '<thead><tr>',
     '<th class="pfo-th-cat">Category</th>',
     '<th class="pfo-th-depth">Type</th>',
-    '<th class="pfo-th-num">Cat. usage</th>',
-    '<th class="pfo-th-num">Avg brands aware</th>',
-    '<th class="pfo-th-num">Focal awareness</th>',
-    '<th class="pfo-th-num">Rank</th>',
-    '<th class="pfo-th-num">Gap to leader</th>',
-    '<th class="pfo-th-num">Penetration</th>',
-    '<th class="pfo-th-num">SCR</th>',
-    '<th class="pfo-th-num">Vol share</th>',
-    '<th class="pfo-th-num" title="Mean number of times the focal brand was purchased per brand buyer in the recall window">Avg purchases</th>',
+    '<th class="pfo-th-num" title="% of all respondents who bought in this category in the recall window">Cat. usage</th>',
+    '<th class="pfo-th-num" title="Mean number of brands the average category buyer is aware of">Avg brands aware</th>',
+    '<th class="pfo-th-num" title="% of category buyers aware of the focal brand">Focal awareness</th>',
+    '<th class="pfo-th-num" title="Focal brand\u2019s awareness rank within the category">Rank</th>',
+    '<th class="pfo-th-num" title="Awareness pp gap from the category leader">Gap to leader</th>',
+    '<th class="pfo-th-num" title="% of focal-cat deep-dive sample who bought the focal brand (deep-dive cats only)">% who bought</th>',
+    '<th class="pfo-th-num" title="Share of category requirements \u2014 % of the focal brand buyer\u2019s category purchases that go to the focal brand (deep-dive cats only)">Loyalty (SCR)</th>',
+    '<th class="pfo-th-num" title="Focal brand\u2019s share of total category volume in the deep-dive sample (deep-dive cats only)">Volume share</th>',
+    '<th class="pfo-th-num" title="Mean number of times the focal brand was purchased per focal-brand buyer in the recall window">Avg purchases</th>',
     '</tr></thead><tbody>', body, '</tbody></table></div>',
-    '<p class="pfo-table-note">Avg brands aware = mean number of brands in the awareness set per category buyer (derived from the per-brand awareness column in this row). Rank = focal brand\u2019s position on awareness within the category. Gap = pct-point distance from the category leader. Avg purchases = mean times the focal brand was bought per brand buyer in the recall window. Penetration / SCR / Vol share / Avg purchases available for deep-dive categories only.</p>'
+    '<p class="pfo-table-note">',
+    '<strong>Awareness columns</strong> (Avg brands aware / Focal awareness / Rank / Gap) use the ',
+    '<em>category-buyer base</em> for each row \u2014 every respondent who said they bought in that category. ',
+    '<strong>Behaviour columns</strong> (% who bought / Loyalty (SCR) / Volume share / Avg purchases) only populate for ',
+    '<em>deep-dive categories</em>, and use the smaller focal-cat sample. ',
+    'See the &ldquo;Why awareness here can differ from the per-category deep-dive numbers&rdquo; note at the top of this panel ',
+    'for why a brand\u2019s awareness in this table can read differently from its per-category deep-dive view.',
+    '</p>'
   )
 }
 
@@ -179,23 +186,26 @@ pfo_render_deep_strip <- function(overview, focal_brand, focal_colour) {
   focal_dd <- dd[[focal_brand]]
   if (is.null(focal_dd)) return("")
 
-  # Rank by volume share \u2014 the strongest commercial signal of competitive
-  # position in the category. SCR is informative but reflects loyalty among
-  # a brand's existing buyers, not market position. Vol share is everyone.
+  # Rank by awareness. The Portfolio panel is fundamentally an awareness lens,
+  # so the leaderboard reads as "who's best-known in this category". Volume
+  # share / Buyers / SCR are still surfaced as supporting columns but they
+  # use the smaller focal-cat-deep-dive base, while awareness uses the wider
+  # category-buyer base from the Portfolio engine. Both numbers are exposed
+  # so the reader can see the gap between mental and physical position.
   rows <- lapply(c$brand_codes, function(bc) {
     bdd <- dd[[bc]]
-    if (is.null(bdd)) return(NULL)
     list(
       code = bc,
       name = c$brand_names[[bc]] %||% bc,
-      pen  = bdd$penetration_pct,
-      scr  = bdd$scr_pct,
-      vol  = bdd$vol_share_pct,
+      aware = c$awareness_pct[[bc]],
+      mpen  = if (!is.null(bdd)) bdd$mpen_pct else NA_real_,
+      pen   = if (!is.null(bdd)) bdd$penetration_pct else NA_real_,
+      scr   = if (!is.null(bdd)) bdd$scr_pct else NA_real_,
+      vol   = if (!is.null(bdd)) bdd$vol_share_pct else NA_real_,
       is_focal = identical(bc, focal_brand)
     )
   })
-  rows <- Filter(Negate(is.null), rows)
-  rows <- rows[order(-vapply(rows, function(r) r$vol %||% -1, numeric(1)))]
+  rows <- rows[order(-vapply(rows, function(r) r$aware %||% -1, numeric(1)))]
   top_n <- min(5L, length(rows))
   rows <- rows[seq_len(top_n)]
 
@@ -203,29 +213,56 @@ pfo_render_deep_strip <- function(overview, focal_brand, focal_colour) {
     r <- rows[[i]]
     cls <- if (r$is_focal) ' class="pfo-deep-focal"' else ""
     sprintf(
-      '<tr%s><td>#%d %s</td><td class="pfo-td-num">%s</td><td class="pfo-td-num">%s</td></tr>',
+      paste0('<tr%s><td>#%d %s</td>',
+             '<td class="pfo-td-num">%s</td>',
+             '<td class="pfo-td-num">%s</td>',
+             '<td class="pfo-td-num">%s</td></tr>'),
       cls, i, .pf_esc(r$name),
-      if (is.na(r$vol)) "\u2014" else sprintf("%.0f%%", r$vol),
-      if (is.na(r$pen)) "\u2014" else sprintf("%.0f%%", r$pen)
+      if (is.na(r$aware)) "\u2014" else sprintf("%.0f%%", r$aware),
+      if (is.na(r$vol))   "\u2014" else sprintf("%.0f%%", r$vol),
+      if (is.na(r$pen))   "\u2014" else sprintf("%.0f%%", r$pen)
     )
   }, character(1)), collapse = "")
 
   focal_rank <- which(vapply(rows, function(r) r$is_focal, logical(1)))
   focal_rank_txt <- if (length(focal_rank) == 1) sprintf("#%d", focal_rank) else "Not top 5"
 
+  # Base annotation. Awareness uses category-buyer base from Portfolio engine;
+  # Volume share / % who bought / SCR use the smaller focal-cat-deep-dive
+  # sample. Two bases in one card \u2014 call it out so readers don't read the
+  # gap as a calculation error.
+  cat_buyer_n <- c$n_buyers_uw %||% NA_integer_
+  base_line <- if (!is.null(cat_buyer_n) && is.finite(cat_buyer_n) && cat_buyer_n > 0)
+    sprintf("Awareness base: %s category buyers &middot; Volume share / %% who bought / Loyalty: focal-cat deep-dive sample",
+            format(cat_buyer_n, big.mark = ","))
+  else "Awareness uses category-buyer base; Volume share / % who bought / Loyalty use the focal-cat deep-dive sample."
+
+  focal_aware_val <- c$awareness_pct[[focal_brand]] %||% NA_real_
+
   sprintf(
     paste0('<div class="pfo-deep-card">',
            '<div class="pfo-deep-card-head"><span class="pfo-deep-card-title">%s</span>',
-           '<span class="pfo-deep-card-rank">Focal: %s by vol share</span></div>',
-           '<div class="pfo-deep-card-kpis"><div><span class="pfo-kpi-mini-v">%s</span><span class="pfo-kpi-mini-l">Vol share</span></div>',
-           '<div><span class="pfo-kpi-mini-v">%s</span><span class="pfo-kpi-mini-l">Penetration</span></div>',
-           '<div><span class="pfo-kpi-mini-v">%s</span><span class="pfo-kpi-mini-l">SCR</span></div></div>',
-           '<table class="pfo-deep-rank"><thead><tr><th>Brand</th><th class="pfo-td-num">Vol share</th><th class="pfo-td-num">Pen</th></tr></thead><tbody>%s</tbody></table>',
+           '<span class="pfo-deep-card-rank">Focal: %s by awareness</span></div>',
+           '<div class="pfo-deep-card-kpis">',
+             '<div><span class="pfo-kpi-mini-v">%s</span><span class="pfo-kpi-mini-l">Awareness</span></div>',
+             '<div><span class="pfo-kpi-mini-v">%s</span><span class="pfo-kpi-mini-l">%% who bought</span></div>',
+             '<div><span class="pfo-kpi-mini-v">%s</span><span class="pfo-kpi-mini-l">Volume share</span></div>',
+             '<div><span class="pfo-kpi-mini-v">%s</span><span class="pfo-kpi-mini-l">Loyalty (SCR)</span></div>',
+           '</div>',
+           '<table class="pfo-deep-rank"><thead><tr>',
+             '<th>Brand</th>',
+             '<th class="pfo-td-num">Awareness</th>',
+             '<th class="pfo-td-num">Volume share</th>',
+             '<th class="pfo-td-num">%% who bought</th>',
+           '</tr></thead><tbody>%s</tbody></table>',
+           '<p class="pfo-deep-card-base-note" style="font-size:10px;color:#94a3b8;margin:6px 0 0;line-height:1.4;">%s</p>',
            '</div>'),
     .pf_esc(c$cat_name), .pf_esc(focal_rank_txt),
-    if (is.na(focal_dd$vol_share_pct %||% NA)) "\u2014" else sprintf("%.0f%%", focal_dd$vol_share_pct),
+    if (is.na(focal_aware_val)) "\u2014" else sprintf("%.0f%%", focal_aware_val),
     if (is.na(focal_dd$penetration_pct %||% NA)) "\u2014" else sprintf("%.0f%%", focal_dd$penetration_pct),
-    if (is.na(focal_dd$scr_pct %||% NA)) "\u2014" else sprintf("%.0f%%", focal_dd$scr_pct),
-    rank_body
+    if (is.na(focal_dd$vol_share_pct  %||% NA)) "\u2014" else sprintf("%.0f%%", focal_dd$vol_share_pct),
+    if (is.na(focal_dd$scr_pct        %||% NA)) "\u2014" else sprintf("%.0f%%", focal_dd$scr_pct),
+    rank_body,
+    base_line
   )
 }

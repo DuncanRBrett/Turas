@@ -37,7 +37,14 @@ build_ma_metrics_section <- function(pd, focal_colour = "#1A5276") {
     controls_bar,
     .ma_metrics_table(pd, focal_colour),
     .ma_metrics_charts(pd),
-    .ma_cep_ranking(pd, focal_colour),
+    # CEP penetration ranking ("any brand") removed for IPK wave 1.
+    # In a well-designed CEP battery every CEP lands with ~98-100% of
+    # category buyers, so the chart is a wall of full bars with no
+    # discriminating signal — dead weight in the current report. The
+    # engine still computes pd$metrics$cep_penetration so it's available
+    # for wave-on-wave tracking and questionnaire-validation use cases
+    # in future projects; restore the line below to re-enable.
+    # .ma_cep_ranking(pd, focal_colour),
     '</section>'
   )
 }

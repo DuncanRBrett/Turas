@@ -2376,7 +2376,7 @@
     "attitude.love":       "Love",
     "attitude.prefer":     "Prefer",
     "attitude.ambivalent": "Ambivalent",
-    "attitude.price":      "Price",
+    "attitude.price":      "Price-only",
     "attitude.avoid":      "Avoid",
     "attitude.no_opinion": "No opinion"
   };

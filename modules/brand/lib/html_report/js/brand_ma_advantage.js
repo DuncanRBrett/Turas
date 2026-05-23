@@ -102,7 +102,11 @@
     // p.penLabel is the X-axis row label including the dynamic threshold
     // (e.g. "% buyers linking >4 brands"). Falls back to a generic
     // wording when the threshold isn't available on the panel data.
-    var penLabel = p.penLabel || 'CEP brand density';
+    // Tooltip row label for the X-axis value. When the dynamic threshold
+    // is available the caller passes a sharper phrasing in p.penLabel
+    // ("% buyers linking >N brands"); the fallback here covers the rare
+    // case where the threshold isn't on the panel payload.
+    var penLabel = p.penLabel || '% buyers linking this CEP to multiple brands';
     var rows = [
       ['MA',                   fmtScore(p.ma) + 'pp' + (p.isSig ? ' •' : '')],
       [penLabel,               p.pen.toFixed(1) + '%'],
@@ -449,7 +453,7 @@
                            ? Number(block.stim_penetration_threshold) : null;
     var penTooltipLabel = (penThresholdHere != null)
       ? ('% buyers linking >' + penThresholdHere + ' brands')
-      : 'CEP brand density';
+      : '% buyers linking this CEP to multiple brands';
 
     // Bubble per CEP/attribute for the focal brand. Hidden stims (row
     // checkbox unchecked) drop their bubble from the chart but the row

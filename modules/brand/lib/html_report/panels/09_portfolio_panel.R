@@ -97,8 +97,15 @@ build_br_portfolio_panel <- function(results, config) {
                                        brand_colours = pf_brand_colours)
   cl_html <- .pf_clutter_subtab(portfolio, panel_data, focal_brand, focal_colour,
                                  brand_colours = pf_brand_colours)
-  ex_html <- .pf_extension_subtab(portfolio, panel_data, focal_brand, focal_colour,
-                                   brand_colours = pf_brand_colours)
+  # Extension subtab removed for IPK wave 1 — the awareness-lift metric alone
+  # didn't carry enough strategic signal to justify the real estate (lift > 1
+  # is the structural norm for any well-known focal, and the panel encouraged
+  # over-reading awareness halo as permission-to-extend). Engine + renderer
+  # kept in place (.pf_extension_subtab / compute_extension_table) so future
+  # projects can re-enable by restoring the three references below.
+  # ex_html <- .pf_extension_subtab(portfolio, panel_data, focal_brand,
+  #                                  focal_colour,
+  #                                  brand_colours = pf_brand_colours)
 
   timeframe_label <- if (identical(portfolio$timeframe, "3m"))
                        "past 3 months" else "past 12 months"
@@ -112,8 +119,39 @@ build_br_portfolio_panel <- function(results, config) {
     # Panel header
     '<h2 style="font-size:20px;color:#1e293b;margin:0 0 4px;">Portfolio Mapping</h2>',
     sprintf(
-      '<p style="font-size:12px;color:#64748b;margin:0 0 16px;">Brands heard of in each category, by category buyers (%s). Base: all %s respondents.</p>',
-      timeframe_label, n_label
+      paste0(
+        '<p style="font-size:12px;color:#64748b;margin:0 0 8px;">',
+        'Brands heard of in each category, by category buyers (%s). ',
+        'Base: all %s respondents.',
+        '</p>',
+        '<details class="pf-base-note" style="margin:0 0 16px;">',
+        '<summary style="font-size:12px;color:#475569;cursor:pointer;">',
+        '&#9432; Why awareness here can differ from the per-category deep-dive numbers',
+        '</summary>',
+        '<div style="font-size:12px;color:#475569;padding:8px 12px;',
+        'background:#f8fafc;border-left:3px solid #cbd5e1;margin-top:6px;line-height:1.5;">',
+        '<p style="margin:0 0 6px;">',
+        '<strong>Portfolio Mapping</strong> reports awareness for each ',
+        'category against the <strong>full set of category buyers</strong> in the ',
+        'sample (everyone who said they bought in that category in the %s &mdash; ',
+        'typically 600&ndash;1,000 per category here).',
+        '</p>',
+        '<p style="margin:0 0 6px;">',
+        'Each <strong>per-category deep-dive tab</strong> reports awareness ',
+        'against the <strong>smaller subset assigned to that category&rsquo;s ',
+        'deep-dive section</strong> (250&ndash;350 respondents per category, set by ',
+        'the focal-category routing). Different denominators &rarr; different ',
+        'percentages, even though both are measuring the same underlying ',
+        'awareness response.',
+        '</p>',
+        '<p style="margin:0;color:#64748b;">',
+        'Both views are correct. Use Portfolio Mapping for the cross-category ',
+        'pattern at scale; use the deep-dive for everything that depends on the ',
+        'narrower focal sample (mental availability, funnel, repertoire, etc.).',
+        '</p>',
+        '</div></details>'
+      ),
+      timeframe_label, n_label, timeframe_label
     ),
 
     # NOTE: removed the top hero KPI strip (§5) per Duncan — those four
@@ -144,10 +182,8 @@ build_br_portfolio_panel <- function(results, config) {
     cl_html,
     '</div>',
 
-    # Extension subtab
-    '<div class="pf-subtab" id="pf-subtab-extension">',
-    ex_html,
-    '</div>',
+    # Extension subtab removed for IPK wave 1 — see note next to ex_html
+    # above. Restore alongside `ex_html` to re-enable.
 
     '</div>',  # .pf-panel
     '</div>',  # .br-section
@@ -257,9 +293,11 @@ build_br_portfolio_panel <- function(results, config) {
     '<button class="pf-sub-btn" data-pf-subtab="clutter"',
     '  onclick="pfSwitchSubtab(\'clutter\')"',
     '  role="tab" aria-selected="false">Category Context</button>',
-    '<button class="pf-sub-btn" data-pf-subtab="extension"',
-    '  onclick="pfSwitchSubtab(\'extension\')"',
-    '  role="tab" aria-selected="false">Extension</button>',
+    # Extension sub-tab button removed for IPK wave 1 — re-enable by
+    # restoring the button + the matching subtab body + ex_html call.
+    # '<button class="pf-sub-btn" data-pf-subtab="extension"',
+    # '  onclick="pfSwitchSubtab(\'extension\')"',
+    # '  role="tab" aria-selected="false">Extension</button>',
     '</div>'
   )
 }
@@ -496,12 +534,14 @@ build_br_portfolio_panel <- function(results, config) {
     'That means a brand can sit visually closer to your focal than another even though its Jaccard score is lower (it gets dragged that way by its own ties to other brands). ',
     'Trust the highlighted lines and the side-panel ranking for the focal-vs-rival comparison; use the dot positions to read the wider <em>shape</em> of the network — clusters of brands that hang together, isolated outliers, and so on.</p>',
 
-    '<p class="pf-cn-reading-line"><strong>What the numbers mean:</strong> ',
-    'The score next to each rival in the side panel is a <em>Jaccard similarity</em> — the overlap in awareness between two brands. ',
-    'Imagine everyone in the category who is aware of <em>either</em> brand A <em>or</em> brand B. ',
-    'Jaccard asks: of those people, what percentage are aware of <em>both</em>? ',
-    '<strong>80%</strong> means almost everyone who knows one brand also knows the other — they live in the same mental space and you have to win consumer attention against them directly. ',
-    '<strong>20%</strong> means awareness barely overlaps — the two brands are known by mostly different people, so they’re not really competing for the same minds.</p>',
+    '<p class="pf-cn-reading-line"><strong>What the Jaccard score means:</strong> ',
+    'The number next to each rival is the <em>Jaccard similarity</em> between that brand and your focal &mdash; a <strong>0&ndash;1 score</strong>, where 0 means no shared awares and 1 means perfect overlap. ',
+    'It is a <em>symmetric overlap measure</em>, not a percentage of any one brand&rsquo;s awares. ',
+    'The actual interpretation is: <em>&ldquo;Of all the people in this category who are aware of <strong>either</strong> brand A <strong>or</strong> brand B, what proportion are aware of <strong>both</strong>?&rdquo;</em> ',
+    'So a Jaccard of <strong>0.56</strong> between IPK and Knorr means 56% of everyone who knows either IPK or Knorr knows both &mdash; the same number from either brand&rsquo;s perspective. ',
+    '<strong>0.80</strong> means almost everyone who knows one brand also knows the other &mdash; they share mental space and you compete for the same attention. ',
+    '<strong>0.20</strong> means the two awareness sets barely overlap &mdash; the brands are known by mostly different people, so they aren&rsquo;t really competing for the same minds. ',
+    'A common misreading is &ldquo;0.56 = 56% of IPK awares know Knorr&rdquo; &mdash; that is <em>not</em> what this score is; that conditional number lives on the Duplication of Awareness table below.</p>',
 
     '<p class="pf-cn-reading-line"><strong>What to do with it:</strong> ',
     'The brands at the top of the side list are the ones to study first — they’re your real rivals in this category. ',
@@ -550,8 +590,9 @@ build_br_portfolio_panel <- function(results, config) {
   if (!requireNamespace("jsonlite", quietly = TRUE)) return("{}")
   by_cat <- per_cat$by_cat %||% list()
   cats <- lapply(by_cat, function(cn) {
-    nodes <- cn$nodes
-    edges <- cn$edges
+    nodes      <- cn$nodes
+    edges      <- cn$edges       # top-N for drawing
+    edges_full <- cn$edges_full  # complete pairwise table for tooltip lookup
     list(
       nodes = if (!is.null(nodes) && nrow(nodes) > 0) {
         lapply(seq_len(nrow(nodes)), function(i) list(
@@ -561,6 +602,22 @@ build_br_portfolio_panel <- function(results, config) {
         ))
       } else list(),
       edges = if (!is.null(edges) && nrow(edges) > 0) {
+        lapply(seq_len(nrow(edges)), function(i) list(
+          b1  = as.character(edges$b1[i]),
+          b2  = as.character(edges$b2[i]),
+          jac = as.numeric(edges$jaccard[i])
+        ))
+      } else list(),
+      # All pairs (sorted desc) — sent so the hover tooltip can surface the
+      # actual Jaccard for any pair, not just the top-N drawn as edges.
+      # Falls back to chart edges if the engine didn't populate edges_full.
+      all_edges = if (!is.null(edges_full) && nrow(edges_full) > 0) {
+        lapply(seq_len(nrow(edges_full)), function(i) list(
+          b1  = as.character(edges_full$b1[i]),
+          b2  = as.character(edges_full$b2[i]),
+          jac = as.numeric(edges_full$jaccard[i])
+        ))
+      } else if (!is.null(edges) && nrow(edges) > 0) {
         lapply(seq_len(nrow(edges)), function(i) list(
           b1  = as.character(edges$b1[i]),
           b2  = as.character(edges$b2[i]),
@@ -611,12 +668,12 @@ build_br_portfolio_panel <- function(results, config) {
       focal_label     = NULL,
       brand_colour    = focal_colour,
       comp_colour     = "#64748b",
-      title           = "Category context — clutter vs focal brand position",
+      title           = "Where the focal brand sits in each category's mental space",
       x_label         = "Awareness set size (brands known per buyer)",
       y_label         = "Focal share of awareness (%)",
       y_suffix        = "%",
       quadrant_labels = c("Dominant", "Contested",
-                          "Niche opportunity", "Forgotten / wrong battle"),
+                          "Open space", "Crowded out"),
       ref_x           = cl$ref_x,
       ref_y           = if (!is.na(cl$ref_y)) cl$ref_y * 100 else NULL,
       size_col        = "cat_penetration"
@@ -683,11 +740,11 @@ build_br_portfolio_panel <- function(results, config) {
     'In a category where buyers each know 4–5 brands on average, those individual awareness scores can sum to 400% or more, so a 58% awareness rate ends up as roughly <strong>14%</strong> share of awareness. ',
     'Awareness % tells you how many people know the brand at all; share of awareness tells you how big a slice of mental space the brand owns once you account for how many other brands are competing for that same head-space.</p>',
 
-    '<p class="pf-cl-reading-line"><strong>The four quadrants:</strong> ',
-    '<strong>Dominant</strong> (top-left, low clutter / high share) — you own this category mentally. <em>Defend it.</em> ',
-    '<strong>Contested</strong> (top-right, high clutter / high share) — cluttered space but you’re winning. <em>Keep investing to hold ground.</em> ',
-    '<strong>Niche opportunity</strong> (bottom-left, low clutter / low share) — tractable category where presence could grow. <em>Evaluate as an expansion target.</em> ',
-    '<strong>Forgotten / wrong battle</strong> (bottom-right, high clutter / low share) — hard to break through and you have low presence. <em>Consider deprioritising marketing spend.</em></p>',
+    '<p class="pf-cl-reading-line"><strong>The four quadrants</strong> describe the <em>state</em> of the focal brand in each category&rsquo;s mental space &mdash; not what to do about it. The strategic call always depends on the category&rsquo;s commercial role for the brand. ',
+    '<strong>Dominant</strong> (top-left, low clutter / high share) &mdash; few brands compete for awareness here and you own a big slice of it. ',
+    '<strong>Contested</strong> (top-right, high clutter / high share) &mdash; many brands compete and you hold your own; you are winning ground in a busy mental space. ',
+    '<strong>Open space</strong> (bottom-left, low clutter / low share) &mdash; few brands compete for awareness, but you don&rsquo;t yet have much of it. Could be a small category, an under-developed one, or one you simply haven&rsquo;t built awareness in &mdash; read alongside category penetration (the dot size) before drawing conclusions. ',
+    '<strong>Crowded out</strong> (bottom-right, high clutter / low share) &mdash; many brands compete and you have a small share of awareness. You are in this category but not winning the awareness fight. Whether to push harder or accept the position depends on whether this category is a strategic priority &mdash; the chart does not answer that.</p>',
 
     '<p class="pf-cl-reading-line"><strong>What to do with it:</strong> ',
     'Hover any dot to see the exact set size, focal awareness, share of awareness, category penetration and quadrant. ',

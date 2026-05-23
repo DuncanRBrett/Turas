@@ -665,7 +665,7 @@ build_funnel_chart <- function(funnel_df, focal_brand = NULL,
   # Attitude colours: Love(dark blue) Prefer(mid blue) Ambivalent(light blue)
   # Price(orange) Avoid(muted red) NoOpinion(light grey)
   att_cols   <- c("#1A5276", "#2E86C1", "#85C1E9", "#E67E22", "#C0392B", "#D5D8DC")
-  att_labels <- c("Love",     "Prefer",  "Ambivalent","Price",   "Avoid",   "No Opinion")
+  att_labels <- c("Love",     "Prefer",  "Ambivalent","Price-only","Avoid",   "No Opinion")
 
   parts <- character(0)
   parts <- c(parts, sprintf(

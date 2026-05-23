@@ -1134,14 +1134,52 @@ render_cat_buying_panel <- function(panel_data) {
       .cb_esc(buyers_tip), .cb_esc(base_label), seg_ths)
   }
 
-  # Per-column category avg & SD across brands (for CI band & heatmap)
+  # Per-column category avg & SD across brands (for CI band & heatmap).
+  #
+  # Two regimes:
+  #   1. Per-brand base (Distribution, Heaviness) — base_n_map carries the
+  #      brand-buyer count per brand. The Cat avg uses the POOLED formula:
+  #         sum(pct_i × base_i) / sum(base_i)
+  #      which is "across every (brand × buyer) cell, what % fall in this
+  #      segment?" — the population-correct centre. Necessary because a
+  #      small brand (e.g. n=5 buyers, Freq6+=80%) would dominate an
+  #      unweighted brand-percentage mean. SD uses the matching weighted
+  #      variance so the heatmap CI band stays coherent with the centre.
+  #   2. Uniform base (Loyalty: % of category buyers; base_n_map NULL,
+  #      base_n is a single scalar) — pooled and unweighted are
+  #      mathematically equal, so the simple mean/sd is fine and slightly
+  #      faster.
+  use_pooled <- !is.null(base_n_map) && length(base_n_map) > 0L
+  brand_bases <- if (use_pooled) {
+    vapply(as.character(data_df$BrandCode), function(b) {
+      v <- base_n_map[[b]]
+      if (is.null(v) || !is.finite(v)) 0 else as.numeric(v)
+    }, numeric(1))
+  } else NULL
   cat_avgs <- vapply(col_names, function(cn) {
     if (!cn %in% names(data_df)) return(NA_real_)
-    mean(as.numeric(data_df[[cn]]), na.rm = TRUE)
+    vals <- as.numeric(data_df[[cn]])
+    if (use_pooled) {
+      ok <- is.finite(vals) & is.finite(brand_bases) & brand_bases > 0
+      if (!any(ok)) return(NA_real_)
+      sum(vals[ok] * brand_bases[ok]) / sum(brand_bases[ok])
+    } else {
+      mean(vals, na.rm = TRUE)
+    }
   }, numeric(1))
   cat_sds <- vapply(col_names, function(cn) {
     if (!cn %in% names(data_df)) return(NA_real_)
-    sd(as.numeric(data_df[[cn]]), na.rm = TRUE)
+    vals <- as.numeric(data_df[[cn]])
+    if (use_pooled) {
+      ok <- is.finite(vals) & is.finite(brand_bases) & brand_bases > 0
+      if (sum(ok) < 2L) return(NA_real_)
+      v  <- vals[ok]; b <- brand_bases[ok]
+      mu <- sum(v * b) / sum(b)
+      # Weighted variance (population form); matches the pooled mean centre.
+      sqrt(sum(b * (v - mu)^2) / sum(b))
+    } else {
+      sd(vals, na.rm = TRUE)
+    }
   }, numeric(1))
 
   # Category avg row — funnel-style CI mini-bar per seg cell (avg \u00b11 SD).
@@ -1464,9 +1502,35 @@ render_cat_buying_panel <- function(panel_data) {
   })
   names(values) <- codes
 
+  # Cat avg per segment column. Mirror the table-side logic: when the
+  # base differs per brand (brand_freq_dist / brand_heaviness, base =
+  # brand buyers) use the POOLED formula so the chart's Cat avg row
+  # matches the table's. For brand_loyalty_segments the base is uniform
+  # (total category buyers) so unweighted mean = pooled and we keep
+  # the simple mean. Per-brand base comes from bh$brand_heaviness, which
+  # carries Brand_Buyers_n for every brand in the category.
+  uniform_base <- identical(df_name, "brand_loyalty_segments")
+  base_map <- NULL
+  if (!uniform_base && !is.null(bh) && !is.null(bh$brand_heaviness) &&
+      "Brand_Buyers_n" %in% names(bh$brand_heaviness)) {
+    base_map <- setNames(
+      as.numeric(bh$brand_heaviness$Brand_Buyers_n),
+      as.character(bh$brand_heaviness$BrandCode))
+  }
   cat_avgs <- unname(vapply(col_names, function(cn) {
     if (is.null(df) || !cn %in% names(df)) return(NA_real_)
-    mean(as.numeric(df[[cn]]), na.rm = TRUE)
+    vals <- as.numeric(df[[cn]])
+    if (!is.null(base_map)) {
+      bases <- vapply(as.character(df$BrandCode), function(b) {
+        v <- base_map[[b]]
+        if (is.null(v) || !is.finite(v)) 0 else as.numeric(v)
+      }, numeric(1))
+      ok <- is.finite(vals) & is.finite(bases) & bases > 0
+      if (!any(ok)) return(NA_real_)
+      sum(vals[ok] * bases[ok]) / sum(bases[ok])
+    } else {
+      mean(vals, na.rm = TRUE)
+    }
   }, numeric(1)))
 
   list(

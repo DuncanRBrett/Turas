@@ -333,7 +333,11 @@ test_that("invalid hex values in Colour column are silently dropped with a messa
 test_that("about carries canonical methodology, heavy-buyer pointer, and panel-disclosure notes", {
   panel <- build_funnel_panel_data(.run_fixture(), .trans_brands(), list())
   expect_true(nzchar(panel$about$methodology_note))
-  expect_true(grepl("nested", panel$about$methodology_note, ignore.case = TRUE))
+  # Methodology note now describes stages as independently-measured with
+  # aggregate-level nesting (Turas refuses to render brands whose aggregate
+  # stage counts violate nesting). Check for that key phrasing.
+  expect_true(grepl("aggregate|independently",
+                    panel$about$methodology_note, ignore.case = TRUE))
   expect_true(grepl("non-probability|panel sampling",
                     panel$about$significance_note, ignore.case = TRUE))
   expect_true(grepl("Repertoire|Frequency|heavy",

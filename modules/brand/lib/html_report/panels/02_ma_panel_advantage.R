@@ -30,18 +30,18 @@ build_ma_advantage_section <- function(pd, focal_colour = "#1A5276") {
     return(.ma_adv_empty_state())
   }
 
-  # Layout: controls -> chips -> matrix/chart/actions -> insight ->
-  # methodology drawer at the bottom -> "What is Mental Advantage?"
-  # callout at the very bottom (Duncan: "move the mental advantage
-  # callout to the bottom of the screen").
+  # Layout: intro callout at top (explains the matrix below) -> controls ->
+  # matrix/chart -> focal-brand view (with its own callout placed just above
+  # its table) -> insight editor -> methodology drawer (formulas etc. at the
+  # bottom). Each callout sits next to the thing it explains.
   paste0(
     '<section class="ma-section ma-advantage-section" data-ma-stim="advantage">',
+    .ma_adv_intro(adv),
     .ma_adv_controls_bar(pd, adv),
     .ma_adv_views_layout(adv),
     .ma_adv_focal_view_section(pd),
     .ma_adv_insight_box(),
     .ma_adv_about(adv),
-    .ma_adv_intro(adv),
     '</section>'
   )
 }
