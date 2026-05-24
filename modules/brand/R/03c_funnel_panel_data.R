@@ -189,11 +189,12 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
   stage_labels <- .stage_labels_for(stage_keys, overrides = lbl_overrides)
 
   # Nested pct = stage pct / previous stage pct (category-wide). Stage 1
-  # has no previous stage so nested = absolute. Aware pct = stage pct /
-  # brand's stage-1 (awareness) pct — stage 1 pins to 1.0. All precomputed
-  # so the JS toggle can switch view without extra computation.
+  # has no previous stage so nested = absolute. Aware pct is the
+  # within-aware conditional rate: count of (aware AND stage) / count of
+  # aware. Computed in the engine (calculate_stage_metrics) using the
+  # per-respondent stage matrices, so it correctly subsets to aware
+  # respondents rather than dividing aggregate counts. Always in [0, 1].
   prev_pct  <- list()
-  aware_pct <- list()  # brand -> awareness pct (stage 1 absolute)
   cells <- list()
   for (key in stage_keys) {
     for (b in brand_codes) {
@@ -206,16 +207,11 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
       } else {
         abs_pct / prev_pct[[b]]
       }
-      # Stage 1 = brand's awareness baseline; pin to 1.0 for % of aware display.
-      if (is.null(aware_pct[[b]])) aware_pct[[b]] <- abs_pct
-      aware_val <- aware_pct[[b]]
-      pct_aw <- if (key == stage_keys[1]) {
-        1.0
-      } else if (is.finite(aware_val) && aware_val > 0 && is.finite(abs_pct)) {
-        abs_pct / aware_val
-      } else {
-        NA_real_
-      }
+      # Within-aware conditional rate — set by calculate_stage_metrics
+      # via per-respondent intersection of the stage matrix with the
+      # aware matrix. Aware stage pins to 1.0 by construction there.
+      pct_aw <- if (nrow(row) == 0 || !("pct_aware_filtered" %in% names(row)))
+        NA_real_ else row$pct_aware_filtered
       cells[[length(cells) + 1]] <- list(
         stage_key = key, brand_code = b,
         pct_absolute = abs_pct,
@@ -223,6 +219,9 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
         pct_aware    = pct_aw,
         base_weighted   = if (nrow(row) == 0) NA_real_ else row$base_weighted,
         base_unweighted = if (nrow(row) == 0) NA_real_ else row$base_unweighted,
+        base_aware_filtered = if (nrow(row) == 0 ||
+                                  !("base_aware_filtered" %in% names(row)))
+          NA_real_ else row$base_aware_filtered,
         sig_vs_focal = .sig_vs_focal_for(result$sig_results, key, b,
                                          result$meta$focal_brand),
         sig_vs_avg = .sig_vs_avg_for_brand(result$sig_results, key, b),

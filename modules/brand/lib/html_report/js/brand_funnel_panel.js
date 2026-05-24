@@ -1909,11 +1909,16 @@
   // Cell value for the active % base mode.
   //   "total"    \u2192 pct_absolute (% of all category respondents)
   //   "previous" \u2192 pct_nested   (% of previous stage)
-  //   "aware"    \u2192 pct_absolute / brand's aware pct (% of aware respondents)
+  //   "aware"    \u2192 pct_aware     (within-aware conditional rate; count of
+  //                                  aware AND stage / count of aware)
   //
-  // Returns null when the value isn't computable (e.g. aware mode with no
-  // aware baseline, or stage-1 in previous mode where pct_nested is null).
-  // For "aware" + the first/awareness stage, pinned to 1.0 (100% of itself).
+  // Note: "aware" used to be computed here as a simple ratio of aggregate
+  // counts (pct_absolute / brand_aware_pct). Under the aggregate funnel
+  // semantics that could exceed 100% when a later stage's raw count
+  // exceeded the aware count (e.g. positive attitude on aided prompt for
+  // respondents who didn't tick the brand in spontaneous awareness). The
+  // engine now pre-computes pct_aware as the true within-aware conditional
+  // rate via per-respondent intersection, so it always sits in [0, 1].
   // ---------------------------------------------------------------------------
   function cellValueForMode(cell, mode, awareStageKey, brandAwarePct) {
     if (!cell) return null;
@@ -1921,9 +1926,12 @@
       return cell.pct_nested != null ? cell.pct_nested : cell.pct_absolute;
     }
     if (mode === "aware") {
+      // Engine-computed conditional rate. Aware stage itself pins to 1.0
+      // in calculate_stage_metrics().
+      if (cell.pct_aware != null) return cell.pct_aware;
+      // Fallback (legacy payloads without pct_aware): pin aware stage,
+      // otherwise null.
       if (cell.stage_key === awareStageKey) return 1.0;
-      var ap = brandAwarePct[cell.brand_code];
-      if (ap && ap > 0 && cell.pct_absolute != null) return cell.pct_absolute / ap;
       return null;
     }
     return cell.pct_absolute;

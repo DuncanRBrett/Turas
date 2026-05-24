@@ -92,7 +92,49 @@ calculate_stage_metrics <- function(stages, weights = NULL,
   out_list <- lapply(stages, function(stage) {
     .one_stage_row(stage, w, sum_w, n_resp, warn_base, suppress_base)
   })
-  do.call(rbind, out_list)
+  df <- do.call(rbind, out_list)
+
+  # Aware-conditional rates: % of aware respondents who also pass each
+  # subsequent stage. Computed via per-respondent intersection of the
+  # stage matrix with the aware matrix — gives a within-aware conditional
+  # rate that always sits in [0, 1] regardless of how the raw stages nest.
+  # The "% of aware" toggle in the funnel panel JS reads this so it reports
+  # a true subset-of-aware view, not an aggregate ratio that can exceed 100%.
+  # Aware stage itself pins to 1.0 (every aware respondent is aware).
+  awareness_key <- names(stages)[1]  # awareness is always the first stage
+  aware_matrix  <- stages[[awareness_key]]$matrix
+  if (!is.null(aware_matrix)) {
+    df$pct_aware_filtered <- NA_real_
+    df$base_aware_filtered <- NA_real_
+    brand_codes <- colnames(aware_matrix)
+    # Per-brand aware weighted count (denominator)
+    aware_counts <- vapply(brand_codes, function(b) {
+      vec <- aware_matrix[, b]
+      sum(w[vec], na.rm = TRUE)
+    }, numeric(1))
+    for (i in seq_len(nrow(df))) {
+      sk <- df$stage_key[i]
+      b  <- df$brand_code[i]
+      stage <- stages[[sk]]
+      if (is.null(stage) || is.null(stage$matrix)) next
+      if (!(b %in% colnames(stage$matrix))) next
+      if (sk == awareness_key) {
+        df$pct_aware_filtered[i] <- if (aware_counts[[b]] > 0) 1.0 else NA_real_
+      } else {
+        stage_vec <- stage$matrix[, b]
+        aware_vec <- aware_matrix[, b]
+        both <- stage_vec & aware_vec
+        num  <- sum(w[both], na.rm = TRUE)
+        df$pct_aware_filtered[i] <- if (aware_counts[[b]] > 0)
+          num / aware_counts[[b]] else NA_real_
+      }
+      df$base_aware_filtered[i] <- aware_counts[[b]]
+    }
+  } else {
+    df$pct_aware_filtered  <- NA_real_
+    df$base_aware_filtered <- NA_real_
+  }
+  df
 }
 
 
