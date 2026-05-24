@@ -89,6 +89,42 @@ test_that("build_br_section_toolbar without internal_tab emits no wrapper", {
   expect_false(grepl("data-insight-internal-tab", html))
 })
 
+test_that("multiple toolbars per sub-panel each have a unique anchor + visible state", {
+  # When build_br_category_panel emits the per-sub-tab toolbars for the
+  # Funnel and MA panels, the FIRST toolbar must render visible
+  # (initial_visible=TRUE → display:block) and the rest hidden
+  # (initial_visible=FALSE → display:none). The JS sub-tab switcher
+  # (brand_report.js::switchCategorySubtab) flips these on click.
+  html_first <- build_br_section_toolbar(
+    "funnel-bak", internal_tab = "funnel", initial_visible = TRUE)
+  html_other <- build_br_section_toolbar(
+    "attitude-bak", internal_tab = "relationship", initial_visible = FALSE)
+
+  expect_match(html_first, 'data-insight-internal-tab="funnel"[^>]*style="display:block;"')
+  expect_match(html_other, 'data-insight-internal-tab="relationship"[^>]*style="display:none;"')
+  expect_match(html_first, 'data-section="funnel-bak"')
+  expect_match(html_other, 'data-section="attitude-bak"')
+})
+
+test_that("emitted CSS has single %% (not %%%% leftover from sprintf escaping)", {
+  # Regression guard for the v1.1 narrow-textarea bug: style strings
+  # built with paste0() then substituted into sprintf via %s do NOT get
+  # %% reduced to %. A leftover %% in the rendered CSS is invalid and
+  # the browser silently drops the rule.
+  html_empty   <- build_br_section_toolbar("test-section")
+  html_filled  <- build_br_section_toolbar("test-section",
+                                            prefill_text = "hello")
+  html_wrap    <- build_br_section_toolbar("test-section",
+                                            internal_tab    = "funnel",
+                                            initial_visible = TRUE)
+  for (h in list(html_empty, html_filled, html_wrap)) {
+    expect_false(grepl("%%", h),
+                 info = "Toolbar HTML must not contain literal %% in CSS")
+    # Width must end up as single % so the browser honours it
+    expect_match(h, "width:100%;")
+  }
+})
+
 test_that(".brand_section_anchor is case-insensitive on Section", {
   expect_equal(.brand_section_anchor("POS", "brand funnel"), "funnel-pos")
   expect_equal(.brand_section_anchor("POS", "BRAND FUNNEL"), "funnel-pos")

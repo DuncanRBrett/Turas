@@ -169,13 +169,18 @@ build_br_section_toolbar <- function(section_id, prefill_text = NULL,
   # the full available row width regardless of whether the parent panel
   # uses grid, flex, or a constrained column layout. Without these the
   # textarea was being squeezed into ~250px on the Funnel + MA panels.
-  base_container <- "margin-bottom:16px;position:relative;width:100%%;max-width:none;box-sizing:border-box;grid-column:1 / -1;"
+  #
+  # USE SINGLE % HERE. These strings are substituted into the sprintf
+  # format below via %s, which does NOT reduce %% → %. A leftover %% in
+  # the rendered CSS is invalid and the browser silently drops the rule —
+  # the v1.1 narrow-textarea regression. See memory:r-sprintf-css-gotchas.
+  base_container <- "margin-bottom:16px;position:relative;width:100%;max-width:none;box-sizing:border-box;grid-column:1 / -1;"
   container_style <- if (has_text) {
     paste0("display:block;", base_container)
   } else {
     paste0("display:none;", base_container)
   }
-  base_textarea <- "width:100%%;min-width:0;min-height:140px;border:1px solid #e2e8f0;border-radius:6px;padding:12px;font-family:inherit;font-size:13px;line-height:1.55;resize:vertical;box-sizing:border-box;"
+  base_textarea <- "width:100%;min-width:0;min-height:140px;border:1px solid #e2e8f0;border-radius:6px;padding:12px;font-family:inherit;font-size:13px;line-height:1.55;resize:vertical;box-sizing:border-box;"
   textarea_style <- if (has_text) {
     paste0(base_textarea, "display:none;")
   } else {
@@ -698,12 +703,13 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
         cb_insight_text <- section_insight_for(config$section_insights,
                                                section_id)
         cb_has <- nzchar(cb_insight_text)
-        cb_base_container <- "margin-top:12px;position:relative;width:100%%;max-width:none;box-sizing:border-box;grid-column:1 / -1;"
+        # Single % — see note in build_br_section_toolbar above.
+        cb_base_container <- "margin-top:12px;position:relative;width:100%;max-width:none;box-sizing:border-box;grid-column:1 / -1;"
         cb_container_style <- if (cb_has)
           paste0("display:block;", cb_base_container)
         else
           paste0("display:none;", cb_base_container)
-        cb_base_textarea <- "width:100%%;min-width:0;min-height:140px;border:1px solid #e2e8f0;border-radius:6px;padding:12px;font-family:inherit;font-size:13px;line-height:1.55;resize:vertical;box-sizing:border-box;"
+        cb_base_textarea <- "width:100%;min-width:0;min-height:140px;border:1px solid #e2e8f0;border-radius:6px;padding:12px;font-family:inherit;font-size:13px;line-height:1.55;resize:vertical;box-sizing:border-box;"
         cb_textarea_style <- if (cb_has)
           paste0(cb_base_textarea, "display:none;")
         else

@@ -1137,12 +1137,15 @@ build_br_portfolio_panel <- function(results, config) {
   prefill_text <- .pf_lookup_insight(section_id)
   has_text <- nzchar(prefill_text)
 
-  base_container <- "margin-bottom:16px;position:relative;width:100%%;max-width:none;box-sizing:border-box;grid-column:1 / -1;"
+  # Single % — these strings are substituted via %s in the sprintf call
+  # below, which does not reduce %% → %. See build_br_section_toolbar in
+  # 03_page_builder.R for the regression history.
+  base_container <- "margin-bottom:16px;position:relative;width:100%;max-width:none;box-sizing:border-box;grid-column:1 / -1;"
   container_style <- if (has_text)
     paste0("display:block;", base_container)
   else
     paste0("display:none;", base_container)
-  base_textarea <- "width:100%%;min-width:0;min-height:140px;border:1px solid #e2e8f0;border-radius:6px;padding:12px;font-family:inherit;font-size:13px;line-height:1.55;resize:vertical;box-sizing:border-box;"
+  base_textarea <- "width:100%;min-width:0;min-height:140px;border:1px solid #e2e8f0;border-radius:6px;padding:12px;font-family:inherit;font-size:13px;line-height:1.55;resize:vertical;box-sizing:border-box;"
   textarea_style <- if (has_text)
     paste0(base_textarea, "display:none;")
   else
