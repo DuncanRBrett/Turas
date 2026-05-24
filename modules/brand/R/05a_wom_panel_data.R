@@ -125,8 +125,25 @@ build_wom_panel_data <- function(wom_result,
   )
 
   # --- Category averages + 95% CI per column (across brand values) ---
+  #
+  # WOM-active mask: a brand that is 0 on EVERY WOM percentage is almost
+  # certainly "not in the WOM survey for this category" rather than
+  # "scored zero across the board". A real WOM survey produces at least
+  # some non-zero readings on at least one of Heard pos / Heard neg /
+  # Said pos / Said neg for every brand respondents recognise. Including
+  # all-zero rows in the cat avg drags every metric down by ~1/n per
+  # zero-data brand and pulls cat avgs across categories toward a common
+  # diluted floor — making genuinely different categories look similar.
+  #
+  # Engine confirms the "no data" -> 0 path: pct_from_logical_matrix and
+  # freq_from_per_brand both return 0 when the role can't be resolved
+  # (no WOM column for the brand) or no respondent has a positive value.
+  # Filtering all-zero rows from cat avg restores the honest mean across
+  # brands that actually have WOM data. The all-zero brands still render
+  # as rows in the table — they just don't drag the cat-avg row.
+  wom_active <- (rp > 0) | (rn > 0) | (sp > 0) | (sn > 0)
   cat_avg <- lapply(col_values, function(v) {
-    finite_v <- v[is.finite(v)]
+    finite_v <- v[is.finite(v) & wom_active]
     n <- length(finite_v)
     if (n == 0) {
       return(list(mean = NA_real_, ci_lower = NA_real_,

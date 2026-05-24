@@ -1591,6 +1591,12 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   # ---- WOM card (Heard + Said breakdown: pos / neg / net for each) ----
   # Pulls from wom_metrics + net_balance. All values are pp; cat avg is
   # the unweighted mean across brands. Net = positive − negative.
+  #
+  # WOM-active filter mirrors build_wom_panel_data: brands that are 0 on
+  # every WOM percentage are "no WOM data collected" rather than "scored
+  # zero everywhere", and including them in the cat-avg drags every
+  # category mean down toward a diluted floor. Filtering them out keeps
+  # the Summary card's cat avg consistent with the WOM deep-dive tab's.
   wom_card <- list(available = FALSE)
   wm_metrics <- if (!is.null(wm)) wm$wom_metrics else NULL
   wm_net     <- if (!is.null(wm)) wm$net_balance else NULL
@@ -1600,9 +1606,20 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
       v <- as.numeric(df[[col]][df$BrandCode == brand_code])
       if (length(v) == 1) v else NA_real_
     }
+    # Resolve the WOM-active brand mask once so every avg() call applies
+    # the same filter.
+    .wom_active <- {
+      rp <- as.numeric(wm_metrics$ReceivedPos_Pct %||% rep(0, nrow(wm_metrics)))
+      rn <- as.numeric(wm_metrics$ReceivedNeg_Pct %||% rep(0, nrow(wm_metrics)))
+      sp <- as.numeric(wm_metrics$SharedPos_Pct   %||% rep(0, nrow(wm_metrics)))
+      sn <- as.numeric(wm_metrics$SharedNeg_Pct   %||% rep(0, nrow(wm_metrics)))
+      (rp > 0) | (rn > 0) | (sp > 0) | (sn > 0)
+    }
+    .wom_active_codes <- as.character(wm_metrics$BrandCode[.wom_active])
     avg <- function(df, col) {
       if (is.null(df) || !col %in% names(df) || nrow(df) == 0) return(NA_real_)
-      mean(as.numeric(df[[col]]), na.rm = TRUE)
+      keep <- as.character(df$BrandCode) %in% .wom_active_codes
+      mean(as.numeric(df[[col]][keep]), na.rm = TRUE)
     }
     fmt_pct1 <- function(x) {
       if (!is.finite(x)) "—" else sprintf("%.0f%%", x)
