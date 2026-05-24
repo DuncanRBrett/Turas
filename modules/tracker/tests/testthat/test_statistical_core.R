@@ -830,5 +830,35 @@ test_that("calculate_custom_range handles min > max", {
 
 
 # ==============================================================================
+# Regression: t-test is variance-sensitive (CCS anomaly, 2026-05-24)
+# ==============================================================================
+# Pins the behaviour Duncan flagged on the Coca-Cola Peninsula Beverages W25
+# report: "Rate CCS in their handling..." showed delta -0.90 NOT significant,
+# while "Equipment Cleanliness" showed delta -0.83 significant — at the same
+# sample size. This is correct behaviour: the pooled t-test penalises noisier
+# data, so a larger raw delta in high-variance data can legitimately fail to
+# clear p<0.05.
+
+test_that("t_test_for_means is variance-sensitive (CCS regression)", {
+  # CCS-style: wide disagreement among retailers, delta -0.90 sits just over p=0.05
+  ccs_like <- t_test_for_means(mean1 = 7.0, sd1 = 3.2, n1 = 100,
+                                mean2 = 6.1, sd2 = 3.3, n2 = 100)
+  expect_false(ccs_like$significant)
+  expect_true(ccs_like$p_value > 0.05)
+  expect_true(ccs_like$p_value < 0.10)  # close to threshold, not far from it
+
+  # Equipment-cleanliness-style: tighter ratings, smaller delta clears p<0.05
+  cleanliness_like <- t_test_for_means(mean1 = 8.1, sd1 = 2.0, n1 = 100,
+                                        mean2 = 7.3, sd2 = 2.1, n2 = 100)
+  expect_true(cleanliness_like$significant)
+  expect_true(cleanliness_like$p_value < 0.01)
+
+  # The variance-sensitive case is documented behaviour, not a bug.
+  # If this test fails, the t-test calculation has changed in a way that
+  # changes the variance / pooled-SD weighting — investigate before adjusting.
+})
+
+
+# ==============================================================================
 # END OF TEST SUITE
 # ==============================================================================

@@ -704,12 +704,22 @@ calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, con
     # Store basic counts (shared across all metrics)
     # Use which() to get numeric indices (avoids NA issues)
     valid_idx <- which(!is.na(q_data) & !is.na(wave_df$weight_var) & wave_df$weight_var > 0)
+
+    # Compute effective N once at the wave level, independent of which metric
+    # specs ran. metrics$eff_n is only populated when "mean" is in specs_list,
+    # so relying on it would silently fall back to n_unweighted for box-only
+    # configs — losing the design-effect adjustment for weighted significance.
+    w_valid <- wave_df$weight_var[valid_idx]
+    sum_w_valid <- sum(w_valid)
+    sum_w2_valid <- sum(w_valid^2)
+    wave_eff_n <- if (sum_w2_valid > 0) (sum_w_valid^2) / sum_w2_valid else 0
+
     wave_results[[wave_id]] <- list(
       available = TRUE,
       metrics = metrics,
       n_unweighted = length(valid_idx),
-      n_weighted = sum(wave_df$weight_var[valid_idx]),
-      eff_n = metrics$eff_n,
+      n_weighted = sum_w_valid,
+      eff_n = wave_eff_n,
       values = q_data,
       weights = wave_df$weight_var
     )
@@ -881,13 +891,21 @@ calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, 
     metrics <- calculate_metrics_from_specs(composite_values, wave_df$weight_var, specs_list,
                                              wave_struct, composite_wave_col)
 
+    # Compute effective N once at the wave level — see note in
+    # calculate_rating_trend_enhanced. Avoids silently falling back to
+    # n_unweighted when metric specs omit "mean".
+    w_valid <- wave_df$weight_var[valid_idx]
+    sum_w_valid <- sum(w_valid)
+    sum_w2_valid <- sum(w_valid^2)
+    wave_eff_n <- if (sum_w2_valid > 0) (sum_w_valid^2) / sum_w2_valid else 0
+
     # Store results
     wave_results[[wave_id]] <- list(
       available = TRUE,
       metrics = metrics,
       n_unweighted = length(valid_idx),
-      n_weighted = sum(wave_df$weight_var[valid_idx]),
-      eff_n = metrics$eff_n,
+      n_weighted = sum_w_valid,
+      eff_n = wave_eff_n,
       values = composite_values,
       weights = wave_df$weight_var,
       source_questions = source_questions
