@@ -73,7 +73,11 @@ source(file.path(ROOT, "modules", "brand", "R", "03_funnel.R"))
 # Tests
 # ==============================================================================
 
-test_that("derived stages are nested by construction across a large fixture", {
+test_that("derived stages nest in aggregate when raw data is coherent", {
+  # v3 aggregate funnel: stages don't AND into each other in code, but
+  # they SHOULD still nest when raw data is coherent (every penetration_target
+  # respondent is also flagged as aware in the underlying data). This
+  # fixture constructs bt as a subset of aware so nesting holds.
   set.seed(42)
   n <- 100
   brands <- c("IPK","ROB","CART")
@@ -127,7 +131,10 @@ test_that("derived stages are nested by construction across a large fixture", {
 })
 
 
-test_that("validate_nesting refuses loud on a fabricated violation", {
+test_that("validate_nesting returns warnings on a fabricated violation (no refusal)", {
+  # v3 aggregate funnel: validate_nesting no longer refuses. Non-monotonic
+  # brands surface as warnings attached to the funnel result so the
+  # operator can investigate, but the engine reports the data as recorded.
   m1 <- matrix(c(1,1,0,  0,0,0), nrow = 2, ncol = 3, byrow = TRUE,
                dimnames = list(NULL, c("IPK","ROB","CART")))
   m2 <- matrix(c(1,1,1,  1,1,1), nrow = 2, ncol = 3, byrow = TRUE,
@@ -138,28 +145,38 @@ test_that("validate_nesting refuses loud on a fabricated violation", {
     consideration = list(key = "consideration", label = "Consideration",
                          matrix = m2 == 1)
   )
-  res <- brand_with_refusal_handler(validate_nesting(stages))
-  expect_true(res$refused)
-  expect_equal(res$code, "CALC_NESTING_VIOLATED")
+  res <- validate_nesting(stages)
+  expect_false(res$ok)
+  expect_true(length(res$warnings) >= 1)
+  # All three brands violate (consideration > aware for each)
+  expect_match(paste(res$warnings, collapse = " | "), "IPK")
+  expect_match(paste(res$warnings, collapse = " | "), "ROB")
+  expect_match(paste(res$warnings, collapse = " | "), "CART")
 })
 
 
-test_that("validate_nesting passes when stage counts equal the previous", {
+test_that("validate_nesting reports ok when stage counts equal the previous", {
   m <- matrix(c(1,1,0,  1,1,0), nrow = 2, ncol = 3, byrow = TRUE,
               dimnames = list(NULL, c("IPK","ROB","CART")))
   stages <- list(
     a = list(key="a", label="A", matrix = m == 1),
     b = list(key="b", label="B", matrix = m == 1)
   )
-  expect_true(validate_nesting(stages))
+  res <- validate_nesting(stages)
+  expect_true(res$ok)
+  expect_equal(length(res$warnings), 0)
 })
 
 
 test_that("validate_nesting is a no-op with fewer than 2 stages", {
-  expect_true(validate_nesting(list()))
-  expect_true(validate_nesting(list(
+  res_empty <- validate_nesting(list())
+  expect_true(res_empty$ok)
+  expect_equal(length(res_empty$warnings), 0)
+  res_one <- validate_nesting(list(
     only = list(key="only", label="Only",
                 matrix = matrix(TRUE, nrow = 3, ncol = 2,
                                 dimnames = list(NULL, c("A","B"))))
-  )))
+  ))
+  expect_true(res_one$ok)
+  expect_equal(length(res_one$warnings), 0)
 })

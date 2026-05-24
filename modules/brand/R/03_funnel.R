@@ -76,7 +76,13 @@ run_funnel <- function(data, role_map, brand_list, config,
     cat_code      = cat_code,
     positive_attitude_codes = pos_codes
   )
-  validate_nesting(derived$stages, weights = weights)
+  # v3 aggregate funnel: validate_nesting returns structured warnings rather
+  # than refusing. Non-monotonic brands are reported as recorded; warnings
+  # are surfaced via the funnel result so the operator can investigate.
+  nesting_check <- validate_nesting(derived$stages, weights = weights)
+  if (is.list(nesting_check) && length(nesting_check$warnings) > 0) {
+    derived$warnings <- c(derived$warnings, nesting_check$warnings)
+  }
 
   stage_df <- calculate_stage_metrics(
     stages        = derived$stages,

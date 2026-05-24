@@ -250,7 +250,9 @@ test_that("run_brand runs end-to-end against the v2 transactional fixture", {
 
   cat_result <- result$results$categories[["FMCG Test"]]
   expect_false(is.null(cat_result$funnel))
-  expect_equal(cat_result$funnel$status, "PASS")
+  # v3 aggregate funnel: PARTIAL acceptable when raw stages don't nest
+  # naturally (validate_nesting warns).
+  expect_true(cat_result$funnel$status %in% c("PASS", "PARTIAL"))
 })
 
 
