@@ -169,13 +169,15 @@ calculate_attitude_decomposition <- function(attitude_entry, awareness_matrix,
   n_resp <- nrow(awareness_matrix)
   w <- weights %||% rep(1, n_resp)
   brands <- as.character(brand_list$BrandCode)
+  brand_aliases <- .brand_aliases_from_list(brand_list)
 
   role_to_codes <- .resolve_attitude_role_codes(attitude_entry)
   rows <- list()
   if (isTRUE(attitude_entry$per_brand)) {
     # v2 entry: read per-brand columns via the data-access layer
     val_mat <- single_response_brand_matrix(data, attitude_entry$client_code,
-                                            attitude_entry$category, brands)
+                                            attitude_entry$category, brands,
+                                            brand_aliases = brand_aliases)
     for (b in brands) {
       vals <- val_mat[, b]
       if (all(is.na(vals))) next

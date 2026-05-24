@@ -74,6 +74,7 @@ build_brand_volume_matrix <- function(cat_data,
   n_resp   <- nrow(cat_data)
   brands   <- as.character(cat_brands$BrandCode)
   n_brands <- length(brands)
+  brand_aliases <- .brand_aliases_from_list(cat_brands)
 
   pen_mat <- matrix(0L, nrow = n_resp, ncol = n_brands,
                     dimnames = list(NULL, brands))
@@ -89,11 +90,13 @@ build_brand_volume_matrix <- function(cat_data,
   if (has_slots_pen && has_slots_freq) {
     # Slot-indexed path — use data-access helpers
     pen_logical <- multi_mention_brand_matrix(cat_data, pen_target_prefix,
-                                              brands)
+                                              brands,
+                                              brand_aliases = brand_aliases)
     pen_mat <- matrix(as.integer(pen_logical), nrow = n_resp,
                       ncol = n_brands, dimnames = list(NULL, brands))
     x_mat <- slot_paired_numeric_matrix(cat_data, pen_target_prefix,
-                                        freq_prefix, brands)
+                                        freq_prefix, brands,
+                                        brand_aliases = brand_aliases)
     x_mat[is.na(x_mat) | x_mat < 0] <- 0
   } else {
     # Legacy per-brand-column path — preserved for backward compatibility

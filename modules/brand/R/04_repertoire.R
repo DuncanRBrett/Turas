@@ -426,8 +426,10 @@ run_repertoire_v2 <- function(data, role_map, cat_code, brand_list,
   }
 
   brand_codes <- as.character(brand_list$BrandCode)
+  brand_aliases <- .brand_aliases_from_list(brand_list)
   pen_logical <- multi_mention_brand_matrix(data, pen_entry$column_root,
-                                            brand_codes)
+                                            brand_codes,
+                                            brand_aliases = brand_aliases)
   pen_mat <- matrix(as.integer(pen_logical), nrow = nrow(data),
                     ncol = length(brand_codes),
                     dimnames = list(NULL, brand_codes))

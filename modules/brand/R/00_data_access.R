@@ -38,13 +38,17 @@ BRAND_DATA_ACCESS_VERSION <- "1.0"
 #' @param root Question root code (e.g. \code{"BRANDAWARE_DSS"}).
 #' @param option_code Option code to test for (character; e.g.
 #'   \code{"IPK"}, \code{"NONE"}).
+#' @param aliases Optional character vector of alternate values that should
+#'   also count as a hit (e.g. \code{"FNF"} for F&F when the survey was
+#'   programmed with an alias). NA / empty / duplicate-of-\code{option_code}
+#'   entries are dropped.
 #' @return Logical vector, length \code{nrow(data)}.
 #' @examples
 #' \dontrun{
 #'   ipk_aware <- respondent_picked(data, "BRANDAWARE_DSS", "IPK")
 #' }
 #' @export
-respondent_picked <- function(data, root, option_code) {
+respondent_picked <- function(data, root, option_code, aliases = NULL) {
   .require_dataframe(data)
   .require_root(root)
   if (length(option_code) != 1L) {
@@ -63,10 +67,16 @@ respondent_picked <- function(data, root, option_code) {
     return(rep(FALSE, nrow(data)))
   }
   target <- as.character(option_code)
+  if (!is.null(aliases) && length(aliases) > 0L) {
+    a <- as.character(aliases)
+    a <- a[!is.na(a) & nzchar(trimws(a))]
+    a <- a[a != target]
+    target <- unique(c(target, a))
+  }
   hit <- rep(FALSE, nrow(data))
   for (col in cols) {
     vals <- as.character(data[[col]])
-    hit <- hit | (!is.na(vals) & vals == target)
+    hit <- hit | (!is.na(vals) & vals %in% target)
   }
   hit
 }
@@ -79,7 +89,16 @@ respondent_picked <- function(data, root, option_code) {
 #'
 #' @param data Data frame.
 #' @param root Question root code (e.g. \code{"BRANDAWARE_DSS"}).
-#' @param brand_codes Character vector of brand codes.
+#' @param brand_codes Character vector of brand codes (or a brand_list data
+#'   frame with a \code{BrandCode} column — and optionally
+#'   \code{BrandCodeAlias} for the alias-aware path).
+#' @param brand_aliases Optional named character vector mapping BrandCode →
+#'   alternate option-value suffix that may appear in the data slots. Used to
+#'   reconcile cases where the Alchemer survey was programmed with a
+#'   different option-value than the canonical brand code (see
+#'   BrandCodeAlias in the Brands sheet, BRAND_CONFIG_GUIDE.md). When a
+#'   respondent slot holds the alias value, the cell is counted as a hit for
+#'   the canonical brand code. NULL = exact-match only.
 #' @return Logical matrix of dimension \code{[nrow(data) × length(brand_codes)]},
 #'   with \code{brand_codes} as \code{colnames}.
 #' @examples
@@ -88,9 +107,18 @@ respondent_picked <- function(data, root, option_code) {
 #'                                     c("IPK", "ROB", "KNORR"))
 #' }
 #' @export
-multi_mention_brand_matrix <- function(data, root, brand_codes) {
+multi_mention_brand_matrix <- function(data, root, brand_codes,
+                                        brand_aliases = NULL) {
   .require_dataframe(data)
   .require_root(root)
+  # Accept brand_list data frame for ergonomic call sites — extract codes +
+  # auto-detect aliases. Existing character-vector callers are untouched.
+  if (is.data.frame(brand_codes)) {
+    bl <- brand_codes
+    brand_codes <- as.character(bl$BrandCode)
+    if (is.null(brand_aliases))
+      brand_aliases <- .brand_aliases_from_list(bl)
+  }
   if (length(brand_codes) == 0L) {
     return(matrix(FALSE, nrow = nrow(data), ncol = 0L))
   }
@@ -103,9 +131,19 @@ multi_mention_brand_matrix <- function(data, root, brand_codes) {
   # Cache the slot column values once
   slot_vals <- lapply(cols, function(col) as.character(data[[col]]))
   for (b in brand_codes) {
+    # Match the canonical brand code AND its alias (if declared). The alias
+    # path was added to handle Alchemer surveys programmed with a different
+    # option value than the structure's BrandCode — e.g. IPK 2026 POS where
+    # F&F's option value was 'FNF' but the brand code is 'FNFPS'.
+    targets <- b
+    if (!is.null(brand_aliases) && b %in% names(brand_aliases)) {
+      alias <- as.character(brand_aliases[[b]])
+      if (!is.na(alias) && nzchar(trimws(alias)) && !identical(alias, b))
+        targets <- c(b, alias)
+    }
     hit <- rep(FALSE, nrow(data))
     for (vals in slot_vals) {
-      hit <- hit | (!is.na(vals) & vals == b)
+      hit <- hit | (!is.na(vals) & vals %in% targets)
     }
     mat[, b] <- hit
   }
@@ -162,17 +200,36 @@ single_response_brand_column <- function(data, root, cat_code, brand_code) {
 #' @param data Data frame.
 #' @param root Question root (e.g. \code{"BRANDATT1"}).
 #' @param cat_code Category code (e.g. \code{"DSS"}).
-#' @param brand_codes Character vector of brand codes.
+#' @param brand_codes Character vector of brand codes (or a brand_list data
+#'   frame with a \code{BrandCode} column — and optionally
+#'   \code{BrandCodeAlias} for the alias-aware path).
+#' @param brand_aliases Optional named character vector mapping BrandCode →
+#'   alternate column-suffix that may appear in the data. Used to reconcile
+#'   surveys where the per-brand column was named with a different suffix
+#'   than the canonical brand code (see BrandCodeAlias in the Brands sheet,
+#'   BRAND_CONFIG_GUIDE.md). When the exact column is missing but the alias
+#'   column exists, the alias column's values are used. NULL = exact-match
+#'   only.
 #' @return Character matrix \code{[nrow(data) × length(brand_codes)]} with
-#'   \code{brand_codes} as \code{colnames}. NA where the column is absent.
+#'   \code{brand_codes} as \code{colnames}. NA where neither column is
+#'   present.
 #' @examples
 #' \dontrun{
 #'   mat <- single_response_brand_matrix(data, "BRANDATT1", "DSS",
 #'                                       c("IPK", "ROB"))
 #' }
 #' @export
-single_response_brand_matrix <- function(data, root, cat_code, brand_codes) {
+single_response_brand_matrix <- function(data, root, cat_code, brand_codes,
+                                          brand_aliases = NULL) {
   .require_dataframe(data)
+  # Accept brand_list data frame for ergonomic call sites — extract codes +
+  # auto-detect aliases. Existing character-vector callers are untouched.
+  if (is.data.frame(brand_codes)) {
+    bl <- brand_codes
+    brand_codes <- as.character(bl$BrandCode)
+    if (is.null(brand_aliases))
+      brand_aliases <- .brand_aliases_from_list(bl)
+  }
   if (length(brand_codes) == 0L) {
     return(matrix(NA_character_, nrow = nrow(data), ncol = 0L))
   }
@@ -183,9 +240,45 @@ single_response_brand_matrix <- function(data, root, cat_code, brand_codes) {
     col <- paste0(root, "_", cat_code, "_", b)
     if (col %in% names(data)) {
       mat[, b] <- as.character(data[[col]])
+      next
+    }
+    # Alias fallback: e.g. IPK 2026 POS where F&F's data column was named
+    # with suffix 'FNF' but the structure's BrandCode is 'FNFPS'. Declared
+    # via the optional BrandCodeAlias column on the Brands sheet.
+    if (!is.null(brand_aliases) && b %in% names(brand_aliases)) {
+      alias <- as.character(brand_aliases[[b]])
+      if (!is.na(alias) && nzchar(trimws(alias)) && !identical(alias, b)) {
+        alias_col <- paste0(root, "_", cat_code, "_", alias)
+        if (alias_col %in% names(data)) {
+          mat[, b] <- as.character(data[[alias_col]])
+        }
+      }
     }
   }
   mat
+}
+
+
+#' Extract BrandCodeAlias mappings from a brand_list data frame
+#'
+#' Reads the optional \code{BrandCodeAlias} column on a brand_list and returns
+#' a named character vector mapping \code{BrandCode → alias suffix}. Drops
+#' rows where the alias is NA / blank / identical to the BrandCode. Returns
+#' NULL when no alias column is present or no row declares one (so callers
+#' can branch on \code{is.null(.)} cheaply).
+#'
+#' @param brand_list Data frame with at least \code{BrandCode}.
+#' @return Named character vector or NULL.
+#' @keywords internal
+.brand_aliases_from_list <- function(brand_list) {
+  if (is.null(brand_list) || !is.data.frame(brand_list)) return(NULL)
+  if (!"BrandCodeAlias" %in% names(brand_list)) return(NULL)
+  alias <- as.character(brand_list$BrandCodeAlias)
+  code  <- as.character(brand_list$BrandCode)
+  keep  <- !is.na(alias) & nzchar(trimws(alias)) & !is.na(code) &
+           trimws(alias) != trimws(code)
+  if (!any(keep)) return(NULL)
+  stats::setNames(trimws(alias[keep]), trimws(code[keep]))
 }
 
 
@@ -232,7 +325,13 @@ multi_mention_indicator_matrix <- function(data, root, codes) {
 #'   (e.g. "BRANDPEN2_DSS").
 #' @param root_values Question root for the numeric per-slot values
 #'   (e.g. "BRANDPEN3_DSS").
-#' @param brand_codes Character vector of brand codes.
+#' @param brand_codes Character vector of brand codes (or a brand_list data
+#'   frame with a \code{BrandCode} column — and optionally
+#'   \code{BrandCodeAlias} for the alias-aware path).
+#' @param brand_aliases Optional named character vector mapping BrandCode →
+#'   alternate option-value that may appear in the data slots (see
+#'   BrandCodeAlias in the Brands sheet, BRAND_CONFIG_GUIDE.md). NULL =
+#'   exact-match only.
 #' @return Numeric matrix [nrow(data) x length(brand_codes)] with brand_codes
 #'   as colnames. NA values in the value root become 0. If a brand appears
 #'   multiple times across slots for the same respondent (shouldn't happen
@@ -245,10 +344,16 @@ multi_mention_indicator_matrix <- function(data, root, codes) {
 #' }
 #' @export
 slot_paired_numeric_matrix <- function(data, root_codes, root_values,
-                                       brand_codes) {
+                                       brand_codes, brand_aliases = NULL) {
   .require_dataframe(data)
   .require_root(root_codes)
   .require_root(root_values)
+  if (is.data.frame(brand_codes)) {
+    bl <- brand_codes
+    brand_codes <- as.character(bl$BrandCode)
+    if (is.null(brand_aliases))
+      brand_aliases <- .brand_aliases_from_list(bl)
+  }
   if (length(brand_codes) == 0L) {
     return(matrix(0, nrow = nrow(data), ncol = 0L))
   }
@@ -276,7 +381,13 @@ slot_paired_numeric_matrix <- function(data, root_codes, root_values,
       data[[paste0(root_values, "_", slot)]]))
     val_vec[is.na(val_vec)] <- 0
     for (b in brand_codes) {
-      hit <- !is.na(code_vec) & code_vec == b
+      targets <- b
+      if (!is.null(brand_aliases) && b %in% names(brand_aliases)) {
+        alias <- as.character(brand_aliases[[b]])
+        if (!is.na(alias) && nzchar(trimws(alias)) && !identical(alias, b))
+          targets <- c(b, alias)
+      }
+      hit <- !is.na(code_vec) & code_vec %in% targets
       out[hit, b] <- out[hit, b] + val_vec[hit]
     }
   }

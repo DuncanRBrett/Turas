@@ -181,6 +181,10 @@ compute_al_metrics_for_subset <- function(data, role_map, weights, keep_idx,
   keep_idx[is.na(keep_idx)] <- FALSE
 
   brand_codes <- as.character(cat_brands$BrandCode)
+  brand_aliases <- .brand_aliases_from_list(cat_brands)
+  focal_aliases <- if (!is.null(brand_aliases) &&
+                       focal_brand %in% names(brand_aliases))
+    as.character(brand_aliases[[focal_brand]]) else NULL
 
   aware_role <- paste0("funnel.awareness.", cat_code)
   att_role   <- paste0("funnel.attitude.", cat_code)
@@ -193,9 +197,11 @@ compute_al_metrics_for_subset <- function(data, role_map, weights, keep_idx,
 
   # Per-respondent focal indicators (logical/numeric; tracker-portable shape)
   awareness_ind <- if (!is.null(aware_root))
-    respondent_picked(data, aware_root, focal_brand) else NULL
+    respondent_picked(data, aware_root, focal_brand,
+                       aliases = focal_aliases) else NULL
   p3m_ind <- if (!is.null(pen2_root))
-    respondent_picked(data, pen2_root, focal_brand) else NULL
+    respondent_picked(data, pen2_root, focal_brand,
+                       aliases = focal_aliases) else NULL
 
   # Buyer mask within the subset (for brand-buyer-base metrics)
   buyer_idx <- if (!is.null(p3m_ind)) p3m_ind else rep(FALSE, nrow(data))
@@ -235,7 +241,8 @@ compute_al_metrics_for_subset <- function(data, role_map, weights, keep_idx,
 
   # ---- MENTAL AVAILABILITY -------------------------------------------------
   ma <- .al_metric_ma_block(data, role_map, weights, keep_idx,
-                                brand_codes, cat_code, focal_brand)
+                                brand_codes, cat_code, focal_brand,
+                                brand_aliases = brand_aliases)
   out$mpen         <- ma$mpen
   out$network_size <- ma$network_size
   out$mms          <- ma$mms
@@ -322,7 +329,8 @@ compute_al_metrics_for_subset <- function(data, role_map, weights, keep_idx,
 #' Mental Availability block — v2 (role-map driven CEPs)
 #' @keywords internal
 .al_metric_ma_block <- function(data, role_map, weights, keep_idx,
-                                    brand_codes, cat_code, focal_brand) {
+                                    brand_codes, cat_code, focal_brand,
+                                    brand_aliases = NULL) {
 
   na_block <- function(msg) list(
     mpen = .al_na_metric(msg), network_size = .al_na_metric(msg),
@@ -341,7 +349,8 @@ compute_al_metrics_for_subset <- function(data, role_map, weights, keep_idx,
   for (rk in cep_roles) {
     e <- role_map[[rk]]
     if (is.null(e$column_root)) next
-    m <- multi_mention_brand_matrix(data, e$column_root, brand_codes)
+    m <- multi_mention_brand_matrix(data, e$column_root, brand_codes,
+                                     brand_aliases = brand_aliases)
     if (is.null(m) || ncol(m) == 0L) next
     link_mats[[length(link_mats) + 1L]] <- matrix(as.integer(m),
                                                    nrow = nrow(m),

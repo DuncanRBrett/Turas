@@ -388,7 +388,9 @@ run_drivers_barriers_v2 <- function(data, role_map, cat_code, brand_list,
 
   # Focal brand penetration vector (length nrow(data))
   pen_logical <- multi_mention_brand_matrix(data, pen_entry$column_root,
-                                            focal_brand)
+                                            focal_brand,
+                                            brand_aliases =
+                                              .brand_aliases_from_list(brand_list))
   pen <- as.integer(pen_logical[, focal_brand])
 
   run_drivers_barriers(

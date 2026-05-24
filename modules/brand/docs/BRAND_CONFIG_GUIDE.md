@@ -372,8 +372,37 @@ categories (common for the focal brand), it gets a row for each.
 | `DisplayOrder` | **Required** | Sort order within the category in charts. Lower number = shown first. | Integer |
 | `IsFocal` | **Required** | Whether this is the focal (client) brand for this category. Exactly one row per category must be `Y`. | `Y` or `N` |
 | `Colour` | Optional | Hex colour for this brand in charts and chips. If blank, the focal brand uses `colour_focal` from Settings, competitors use `colour_competitor`. | Hex code (e.g. `#D62728`) or blank |
+| `BrandCodeAlias` | Optional | Alternate suffix / option value the *data file* uses for this brand in this category. Leave blank when the data column suffix matches `BrandCode` exactly. Set when the Alchemer survey was programmed with a different SKU / option value (e.g. `FNF` for a brand whose canonical BrandCode is `FNFPS`). The engine accepts BOTH `BrandCode` AND `BrandCodeAlias` when resolving per-brand columns and slot values. | Short code matching the data, or blank |
 
 **⚠️ CategoryCode in the Brands sheet must match CategoryCode in Brand_Config Categories.** These two codes are the join key that links brands to categories in the Portfolio element. A mismatch — even a whitespace difference — will cause that category's brands to be dropped from portfolio analyses without any error.
+
+**When to use `BrandCodeAlias`:**
+
+If your data file's per-brand column suffix differs from the canonical
+BrandCode for a given category, declare the alternate suffix as the alias.
+The brand engine will try the canonical `BrandCode` first, then fall back
+to the alias. This is the right answer when:
+
+* The Alchemer survey was programmed with a different option-value SKU for
+  one brand in one category (a programming inconsistency you can't easily
+  re-export around).
+* You want cross-category aggregations (Portfolio, Cross-cat Awareness)
+  to keep treating the brand as a SINGLE entity — they identify brands by
+  `BrandCode`, so changing the BrandCode itself would split the brand into
+  two phantom entities in the cross-cat view.
+
+Example — F&F's data in POS used the suffix `FNF` despite the canonical
+BrandCode `FNFPS`:
+
+| Category | CategoryCode | BrandCode | BrandLabel | DisplayOrder | IsFocal | Colour | BrandCodeAlias |
+|---|---|---|---|---|---|---|---|
+| Pasta Sauces | PAS | FNFPS | Forage and Feast (Checkers) | 5 | N |  |  |
+| Pour Over Sauces | POS | FNFPS | Forage and Feast (Checkers) | 5 | N |  | `FNF` |
+| Dry Seasonings | DSS | FNFPS | Forage and Feast (Checkers) | 8 | N |  |  |
+
+The alias applies to *every* per-brand path: BRANDATT, WOM_COUNT,
+BRANDPEN2 slot values, BRANDAWARE slot values, and the focal-brand
+single-mention lookups.
 
 **Example:**
 

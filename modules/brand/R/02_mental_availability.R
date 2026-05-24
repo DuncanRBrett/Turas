@@ -65,6 +65,9 @@ build_cep_linkage <- function(data, role_map, cat_code, brands,
   }
   brand_codes <- as.character(brands$BrandCode)
   n_resp <- nrow(data)
+  # See BrandCodeAlias in BRAND_CONFIG_GUIDE.md — handles surveys where the
+  # option value in the data differs from the canonical brand code.
+  brand_aliases <- .brand_aliases_from_list(brands)
 
   # Walk role map for matching items
   role_prefix <- paste0("mental_avail.", item_kind, ".", cat_code, ".")
@@ -89,7 +92,8 @@ build_cep_linkage <- function(data, role_map, cat_code, brands,
     if (is.null(entry) || is.null(entry$column_root)) next
     # multi_mention_brand_matrix returns logical; coerce to integer
     brand_mat <- multi_mention_brand_matrix(data, entry$column_root,
-                                            brand_codes)
+                                            brand_codes,
+                                            brand_aliases = brand_aliases)
     for (b in brand_codes) {
       linkage_tensor[[b]][, j] <- as.integer(brand_mat[, b])
     }

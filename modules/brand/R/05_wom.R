@@ -59,12 +59,17 @@ run_wom <- function(data, role_map, cat_code, brand_list,
   brand_codes <- as.character(brand_list$BrandCode)
   n_brands <- length(brand_codes)
   n_resp <- nrow(data)
+  # Optional alias map (BrandCode → data-suffix) for surveys programmed with
+  # an option value that differs from the canonical brand code. See
+  # BrandCodeAlias in the Brands sheet.
+  brand_aliases <- .brand_aliases_from_list(brand_list)
 
   pct_from_logical_matrix <- function(role) {
     entry <- role_map[[role]]
     if (is.null(entry) || is.null(entry$column_root))
       return(rep(0, n_brands))
-    mat <- multi_mention_brand_matrix(data, entry$column_root, brand_codes)
+    mat <- multi_mention_brand_matrix(data, entry$column_root, brand_codes,
+                                       brand_aliases = brand_aliases)
     if (is.null(weights)) {
       colMeans(mat) * 100
     } else {
@@ -78,7 +83,8 @@ run_wom <- function(data, role_map, cat_code, brand_list,
     if (is.null(entry) || is.null(entry$client_code))
       return(rep(0, n_brands))
     char_mat <- single_response_brand_matrix(data, entry$client_code,
-                                             cat_code, brand_codes)
+                                             cat_code, brand_codes,
+                                             brand_aliases = brand_aliases)
     out <- numeric(n_brands)
     for (i in seq_along(brand_codes)) {
       vals <- suppressWarnings(as.numeric(char_mat[, i]))

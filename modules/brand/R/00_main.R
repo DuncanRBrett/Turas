@@ -490,6 +490,9 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
           pen_role  <- paste0("funnel.penetration_target.", cat_code)
           pen_entry <- if (!is.null(role_map)) role_map[[pen_role]] else NULL
           all_brand_codes <- as.character(cat_brands$BrandCode)
+          brand_aliases <- if (exists(".brand_aliases_from_list",
+                                       mode = "function"))
+            .brand_aliases_from_list(cat_brands) else NULL
 
           pen_mat <- if (!is.null(pen_entry) &&
                           !is.null(pen_entry$column_root) &&
@@ -497,7 +500,8 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
                                  mode = "function")) {
             tryCatch(
               multi_mention_brand_matrix(
-                cat_data, pen_entry$column_root, all_brand_codes),
+                cat_data, pen_entry$column_root, all_brand_codes,
+                brand_aliases = brand_aliases),
               error = function(e) NULL
             )
           } else NULL

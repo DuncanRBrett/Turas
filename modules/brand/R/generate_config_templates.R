@@ -792,7 +792,9 @@ BRAND_CONFIG_VERSION <- "2.0"
          description = "Y = this is the focal (client) brand for this category. Exactly one Y per category. Must match focal_brand in Brand_Config Settings.",
          dropdown = c("Y", "N")),
     list(name = "Colour", width = 16, required = FALSE,
-         description = "Optional hex colour (#RRGGBB) for this brand in charts and chips. Focal brand should match colour_focal in Brand_Config. Leave blank to use category defaults.")
+         description = "Optional hex colour (#RRGGBB) for this brand in charts and chips. Focal brand should match colour_focal in Brand_Config. Leave blank to use category defaults."),
+    list(name = "BrandCodeAlias", width = 18, required = FALSE,
+         description = "Optional alternate suffix / option-value the data uses for this brand in this category. Leave blank when BrandCode matches the data. Set when the Alchemer survey was programmed with a different SKU than the canonical BrandCode (e.g. 'FNF' for a brand whose canonical code is 'FNFPS'). The engine accepts BOTH BrandCode and BrandCodeAlias when resolving per-brand columns and slot values.")
   )
 }
 
