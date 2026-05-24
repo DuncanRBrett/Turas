@@ -146,8 +146,24 @@ derive_funnel_stages <- function(data, role_map, category_type,
 
   stages_out <- list()
   warns      <- character(0)
-  prev_mat   <- NULL
 
+  # AGGREGATE FUNNEL — each stage uses its own raw survey response matrix
+  # (no AND with prior stages). The funnel narrows in aggregate because most
+  # respondents are coherent (aware → positive → bought past 12m → bought past
+  # 3m forms a nesting hierarchy for the majority), but non-monotonic answers
+  # (e.g. respondent ticks "bought past 3m" but didn't tick the brand in the
+  # awareness battery) are reported as recorded rather than forced into the
+  # prior stage's intersection. This matches the explainer text in the panel
+  # ("each stage is asked independently … the funnel narrows in aggregate, but
+  # it is not a respondent journey") and the Romaniuk / Ehrenberg-Bass treatment
+  # of aggregate-ratio funnels.
+  #
+  # Cumulative-AND behaviour (matrix & prev_mat) was removed 2026-05-24 after
+  # it was found to silently drop ~11pp of IPK POS past-3m buyers vs the raw
+  # BRANDPEN2 count. See validate_nesting() below — it now functions as a
+  # genuine post-hoc check on the data rather than a tautology guaranteed by
+  # the AND. Brands whose aggregate counts violate nesting are surfaced via
+  # a PARTIAL warning in stage rendering rather than forcibly clamped.
   for (key in plan) {
     mat <- .derive_stage_matrix(
       key, data, role_map, brands, n_resp, category_type,
@@ -157,13 +173,10 @@ derive_funnel_stages <- function(data, role_map, category_type,
       warns <- c(warns, mat$warning)
       next
     }
-    combined <- if (is.null(prev_mat)) mat$matrix else mat$matrix & prev_mat
-    prev_mat <- combined
-
     stages_out[[key]] <- list(
       key    = key,
       label  = .FUNNEL_DEFAULT_LABELS[[key]],
-      matrix = combined
+      matrix = mat$matrix
     )
   }
 
@@ -207,9 +220,10 @@ derive_funnel_stages <- function(data, role_map, category_type,
 #'
 #' @export
 validate_nesting <- function(stages, weights = NULL) {
-  if (length(stages) < 2) return(invisible(TRUE))
+  if (length(stages) < 2) return(invisible(list(ok = TRUE, warnings = character(0))))
   w <- weights %||% rep(1, nrow(stages[[1]]$matrix))
 
+  warnings_out <- character(0)
   keys <- names(stages)
   for (i in seq(2, length(keys))) {
     prev_mat <- stages[[keys[i - 1]]]$matrix
@@ -227,28 +241,23 @@ validate_nesting <- function(stages, weights = NULL) {
     violations <- curr_counts > prev_counts + 1e-9 & !skip
     if (any(violations)) {
       bad <- which(violations)
-      brand_refuse(
-        code = "CALC_NESTING_VIOLATED",
-        title = "Funnel Stage Nesting Violated",
-        problem = sprintf(
-          "Stage '%s' count exceeds stage '%s' for brand(s): %s.",
-          keys[i], keys[i - 1],
-          paste(names(curr_counts)[bad], collapse = ", ")),
-        why_it_matters = paste(
-          "Every funnel stage must be a subset of the previous stage so",
-          "conversion ratios are honest. A violation indicates a logic",
-          "bug in the derivation layer."
-        ),
-        how_to_fix = c(
-          "Report this to the module maintainer.",
-          "Do not rely on the resulting percentages."
-        ),
-        details = sprintf("Offending stages: %s > %s.",
-                          keys[i], keys[i - 1])
-      )
+      for (bi in bad) {
+        warnings_out <- c(warnings_out, sprintf(
+          "Brand %s: stage '%s' count (%.0f) exceeds stage '%s' count (%.0f) — non-monotonic survey responses reported as recorded.",
+          names(curr_counts)[bi], keys[i], curr_counts[bi],
+          keys[i - 1], prev_counts[bi]))
+      }
     }
   }
-  invisible(TRUE)
+  # v3 (2026-05-24): aggregate funnel — non-monotonic stages no longer
+  # refuse. Returns a structured result so callers can attach warnings to
+  # the funnel result's $warnings field. Old loud-refusal behaviour was
+  # removed alongside the cumulative-AND in derive_funnel_stages() — both
+  # contradicted the panel's own explainer text ("each stage is asked
+  # independently"; "the funnel narrows in aggregate, but it is not a
+  # respondent journey"; non-monotonic answers should be reported, not
+  # silently dropped).
+  invisible(list(ok = length(warnings_out) == 0, warnings = warnings_out))
 }
 
 
@@ -363,14 +372,16 @@ validate_nesting <- function(stages, weights = NULL) {
       data, brands, n_resp, "Current owner", cat_code, brand_aliases),
     long_tenured_d = .tenure_stage(
       role_map, "funnel.durable.tenure", data, brands, n_resp,
-      tenure_threshold, "Long-tenured (durable)", cat_code, brand_aliases),
+      tenure_threshold, "Long-tenured (durable)", cat_code, brand_aliases,
+      owner_role = "funnel.durable.current_owner"),
 
     current_customer_s = .single_response_brand_match_stage(
       role_map, "funnel.service.current_customer",
       data, brands, n_resp, "Current customer", cat_code, brand_aliases),
     long_tenured_s = .tenure_stage(
       role_map, "funnel.service.tenure", data, brands, n_resp,
-      tenure_threshold, "Long-tenured (service)", cat_code, brand_aliases),
+      tenure_threshold, "Long-tenured (service)", cat_code, brand_aliases,
+      owner_role = "funnel.service.current_customer"),
 
     {
       # Programming-error sentinel: an unrecognised stage key has reached
@@ -563,11 +574,26 @@ validate_nesting <- function(stages, weights = NULL) {
 }
 
 
-#' Tenure stage (durable/service) — respondent's tenure ≥ threshold
+#' Tenure stage (durable/service) — respondent's tenure ≥ threshold,
+#' coupled to current-owner / current-customer for brand specificity
+#'
+#' Tenure is a single numeric column with no brand information of its own —
+#' it's the answer to "how long have you owned/used your current brand?".
+#' Brand specificity comes from the paired current_owner_d (durable) /
+#' current_customer_s (service) column, which says WHICH brand the
+#' respondent uses. The two columns together define this stage:
+#'   mat[i, b] = (current_owner[i] == b) AND (tenure[i] >= threshold)
+#'
+#' This is a definitional coupling at the stage level — composing the
+#' two source questions to derive the stage's brand×respondent matrix —
+#' not a cumulative-AND across funnel stages. See the AGGREGATE FUNNEL
+#' note in derive_funnel_stages() for the distinction.
+#'
 #' @keywords internal
 .tenure_stage <- function(role_map, role_name, data, brands, n_resp,
                           tenure_threshold, label, cat_code = NULL,
-                          brand_aliases = NULL) {
+                          brand_aliases = NULL,
+                          owner_role = NULL) {
   entry <- .lookup_role(role_map, role_name, cat_code)
   if (is.null(entry) || is.null(tenure_threshold) ||
       !nzchar(trimws(as.character(tenure_threshold)))) {
@@ -587,10 +613,47 @@ validate_nesting <- function(stages, weights = NULL) {
   thr <- suppressWarnings(as.numeric(tenure_threshold))
   long <- !is.na(vals) & !is.na(thr) & vals >= thr
 
+  # Look up the paired owner / customer role for brand specificity.
+  # Without it, tenure has no per-brand meaning (every brand would
+  # receive the same flag for every long-tenured respondent).
+  owner_entry <- if (!is.null(owner_role))
+    .lookup_role(role_map, owner_role, cat_code) else NULL
+  if (is.null(owner_entry)) {
+    # No paired owner role — fall back to brand-agnostic (every brand gets
+    # the same long-tenured flag). Surfaces a warning so the operator
+    # notices.
+    mat <- matrix(FALSE, nrow = n_resp, ncol = length(brands),
+                  dimnames = list(NULL, brands))
+    for (b in brands) mat[, b] <- long
+    return(list(matrix = mat,
+                warning = sprintf(
+                  "Stage '%s': paired owner/customer role absent — tenure flag applied to every brand identically.",
+                  label)))
+  }
+
+  owner_col <- if (length(owner_entry$columns) > 0) owner_entry$columns[1]
+               else owner_entry$column_root
+  if (is.null(owner_col) || !(owner_col %in% names(data))) {
+    mat <- matrix(FALSE, nrow = n_resp, ncol = length(brands),
+                  dimnames = list(NULL, brands))
+    for (b in brands) mat[, b] <- long
+    return(list(matrix = mat,
+                warning = sprintf(
+                  "Stage '%s': owner column '%s' not in data — tenure flag applied to every brand identically.",
+                  label, owner_col %||% "(NULL)")))
+  }
+
+  owner_vals <- as.character(data[[owner_col]])
   mat <- matrix(FALSE, nrow = n_resp, ncol = length(brands),
                 dimnames = list(NULL, brands))
   for (b in brands) {
-    mat[, b] <- long
+    targets <- b
+    if (!is.null(brand_aliases) && b %in% names(brand_aliases)) {
+      alias <- as.character(brand_aliases[[b]])
+      if (!is.na(alias) && nzchar(trimws(alias)) && !identical(alias, b))
+        targets <- c(b, alias)
+    }
+    mat[, b] <- long & !is.na(owner_vals) & owner_vals %in% targets
   }
   list(matrix = mat)
 }

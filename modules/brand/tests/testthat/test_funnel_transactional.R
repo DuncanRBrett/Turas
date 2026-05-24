@@ -156,9 +156,12 @@ source(file.path(ROOT, "modules", "brand", "R", "03_funnel.R"))
   modifyList(defaults, list(...))
 }
 
-# Expected values (hand-calculated for top-2 attitude consider — codes 1, 2).
-# Consider = aware AND attitude in {Love, Prefer}. Codes 3 (Would consider),
-# 4 (Ambivalent), 5 (Price/No-opinion in old 5-scale) are excluded.
+# Expected values — AGGREGATE funnel (v3, 2026-05-24).
+# Each stage uses its own raw survey response (per the panel explainer:
+# "each stage is asked independently … the funnel narrows in aggregate,
+# but it is not a respondent journey"). No cumulative AND with prior
+# stages — matches what derive_funnel_stages() now does after the
+# cumulative-AND was removed at 03a_funnel_derive.R:160.
 #
 # Per-respondent attitude codes from the fixture (Row -> I R C):
 #   1: 1 3 5    6: 1 4 3
@@ -167,16 +170,32 @@ source(file.path(ROOT, "modules", "brand", "R", "03_funnel.R"))
 #   4: 4 2 1    9: 5 2 1
 #   5: 5 3 5   10: 1 1 5
 #
-# IPK aware (all but R5):   consider rows = {R1, R2, R6, R8, R10} = 5/10  = 0.5
-# ROB aware (not R3/R7):    consider rows = {R2, R4, R9, R10}     = 4/10  = 0.4
-# CART aware (not R5/R7/R10): consider rows = {R3, R4, R8, R9}    = 4/10  = 0.4
-# Bought_long = consider AND bought_long_marks (see header table).
-# Bought_target = bought_long AND bought_target_marks.
+# Aware (raw multi-mention of brand in aware slots):
+#   IPK: R1,R2,R3,R4,R6,R7,R8,R9,R10        = 9/10 = 0.9
+#   ROB: R1,R2,R4,R5,R6,R8,R9,R10           = 8/10 = 0.8
+#   CART: R1,R2,R3,R4,R6,R8,R9              = 7/10 = 0.7
+#
+# Consideration (raw attitude in top-2 codes {1, 2}; no aware filter):
+#   IPK att = (1,2,3,4,5,1,3,2,5,1) → top-2 rows {1,2,6,8,10} = 5/10 = 0.5
+#   ROB att = (3,1,5,2,3,4,5,4,2,1) → top-2 rows {2,4,9,10}   = 4/10 = 0.4
+#   CART att = (5,4,2,1,5,3,5,2,1,5) → top-2 rows {3,4,8,9}   = 4/10 = 0.4
+#   (Coincides with old cumulative result because no fixture row has
+#    positive attitude without also being aware.)
+#
+# Bought_long (raw BRANDPEN1 multi-mention; no upstream filter):
+#   IPK pen1 rows = {1,2,3,6,8,10}    = 6/10 = 0.6
+#   ROB pen1 rows = {1,2,4,5,9,10}    = 6/10 = 0.6
+#   CART pen1 rows = {3,4,6,8,9}      = 5/10 = 0.5
+#
+# Bought_target (raw BRANDPEN2 multi-mention; no upstream filter):
+#   IPK pen2 rows = {1,2,6,8,10}      = 5/10 = 0.5
+#   ROB pen2 rows = {1,2,4,10}        = 4/10 = 0.4
+#   CART pen2 rows = {3,4,8,9}        = 4/10 = 0.4
 .expected_pct <- list(
   aware         = c(IPK = 0.9, ROB = 0.8, CART = 0.7),
   consideration = c(IPK = 0.5, ROB = 0.4, CART = 0.4),
-  bought_long   = c(IPK = 0.5, ROB = 0.4, CART = 0.4),
-  bought_target = c(IPK = 0.5, ROB = 0.3, CART = 0.4)
+  bought_long   = c(IPK = 0.6, ROB = 0.6, CART = 0.5),
+  bought_target = c(IPK = 0.5, ROB = 0.4, CART = 0.4)
 )
 
 .pct_for <- function(df, stage_key, brand_code) {
@@ -196,9 +215,12 @@ source(file.path(ROOT, "modules", "brand", "R", "03_funnel.R"))
 # Tests: stage metrics
 # ==============================================================================
 
-test_that("run_funnel returns PASS status on complete transactional fixture", {
+test_that("run_funnel returns PASS or PARTIAL status on complete transactional fixture", {
+  # v3 aggregate funnel: status may be PARTIAL when raw counts don't nest
+  # (e.g. bought_long > consideration for a brand). That's a warning, not
+  # an error — the engine reports the data as recorded.
   res <- run_funnel(.trans_data(), .trans_rm(), .trans_brands(), .trans_cfg())
-  expect_equal(res$status, "PASS")
+  expect_true(res$status %in% c("PASS", "PARTIAL"))
 })
 
 
@@ -256,24 +278,29 @@ test_that("Preferred/heavy_buyer stages are not materialised", {
 # Tests: conversions
 # ==============================================================================
 
-test_that("IPK conversion ratios match hand-calculated drops", {
+test_that("IPK conversion ratios match hand-calculated drops (aggregate)", {
+  # Aggregate funnel — conversion ratios are aggregate ratios per the
+  # panel explainer: total count at later stage / total count at earlier
+  # stage. Not a per-respondent transition.
   res <- run_funnel(.trans_data(), .trans_rm(), .trans_brands(), .trans_cfg())
   ipk <- res$conversions[res$conversions$brand_code == "IPK", ]
 
-  # Aware -> Consideration (top-2) = 0.5 / 0.9
+  # Aware -> Consideration = 0.5 / 0.9
   expect_equal(
     ipk$value[ipk$from_stage == "aware" & ipk$to_stage == "consideration"],
     0.5 / 0.9, tolerance = 1e-6)
 
-  # Consideration -> Bought_Long = 0.5 / 0.5
+  # Consideration -> Bought_Long = 0.6 / 0.5 (aggregate; raw bought_long
+  # count exceeds raw consideration count because some IPK buyers have an
+  # attitude code outside the top-2)
   expect_equal(
     ipk$value[ipk$from_stage == "consideration" & ipk$to_stage == "bought_long"],
-    0.5 / 0.5, tolerance = 1e-6)
+    0.6 / 0.5, tolerance = 1e-6)
 
-  # Bought_Long -> Bought_Target = 0.5 / 0.5
+  # Bought_Long -> Bought_Target = 0.5 / 0.6
   expect_equal(
     ipk$value[ipk$from_stage == "bought_long" & ipk$to_stage == "bought_target"],
-    0.5 / 0.5, tolerance = 1e-6)
+    0.5 / 0.6, tolerance = 1e-6)
 })
 
 

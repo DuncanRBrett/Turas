@@ -165,9 +165,13 @@ test_that("Zero awareness for all brands yields 0% at every stage, NA conversion
 # All aware, none positive
 # ==============================================================================
 
-test_that("All aware + none positive gives Consideration = 0 and later stages = 0", {
+test_that("All aware + none positive gives Consideration = 0 (bought stages report raw)", {
+  # v3 aggregate funnel: bought_long / bought_target use raw BRANDPEN1 /
+  # BRANDPEN2 counts. When every respondent is aware AND bought every brand
+  # but no one is in Love/Prefer (all att=4), bought stages will be 100% raw
+  # even though consideration is 0%. The funnel reports the data as
+  # recorded; validate_nesting will warn about the non-monotonic shape.
   n <- 10
-  # All aware of all brands, all reject (code 4)
   all_brands_list <- replicate(n, c("IPK","ROB","CART"), simplify = FALSE)
   data <- cbind(
     data.frame(Respondent_ID = seq_len(n), Weight = 1, stringsAsFactors = FALSE),
@@ -175,15 +179,19 @@ test_that("All aware + none positive gives Consideration = 0 and later stages = 
     .pack_mm(all_brands_list, "BRANDPEN1_ECX"),
     .pack_mm(all_brands_list, "BRANDPEN2_ECX"))
   for (b in c("IPK","ROB","CART")) {
-    data[[paste0("BRANDATT1_ECX_", b)]] <- as.character(4L)  # all reject
+    data[[paste0("BRANDATT1_ECX_", b)]] <- as.character(4L)  # all ambivalent / reject
   }
 
   res <- run_funnel(data, .trans_rm_base(), .brands(), .cfg())
   for (b in c("IPK","ROB","CART")) {
-    expect_equal(.pct(res$stages, "aware", b),        1,   info = b)
-    expect_equal(.pct(res$stages, "consideration", b), 0,  info = b)
-    expect_equal(.pct(res$stages, "bought_long", b),   0,  info = b)
+    expect_equal(.pct(res$stages, "aware", b),         1,   info = b)
+    expect_equal(.pct(res$stages, "consideration", b), 0,   info = b)
+    # bought_long / bought_target are raw BRANDPEN counts, NOT cumulative
+    expect_equal(.pct(res$stages, "bought_long", b),   1,   info = b)
+    expect_equal(.pct(res$stages, "bought_target", b), 1,   info = b)
   }
+  # Status should be PARTIAL because bought stages exceed consideration
+  expect_equal(res$status, "PARTIAL")
 })
 
 
@@ -191,10 +199,12 @@ test_that("All aware + none positive gives Consideration = 0 and later stages = 
 # Missing optional roles
 # ==============================================================================
 
-test_that("Frequency role absent: funnel is unaffected (4 stages, PASS status)", {
+test_that("Frequency role absent: funnel is unaffected (4 stages, PASS or PARTIAL status)", {
   # In v2 frequency is not a funnel stage; the role is simply not in the map.
+  # v3 aggregate funnel: PARTIAL is acceptable when raw counts don't nest
+  # naturally in the fixture (validate_nesting warns but doesn't refuse).
   res <- run_funnel(.trans_data_ecx(), .trans_rm_base(), .brands(), .cfg())
-  expect_equal(res$status, "PASS")
+  expect_true(res$status %in% c("PASS", "PARTIAL"))
   expect_false("preferred"   %in% res$meta$stage_keys)
   expect_false("heavy_buyer" %in% res$meta$stage_keys)
   expect_equal(res$meta$stage_count, 4L)

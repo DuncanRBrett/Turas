@@ -175,19 +175,19 @@ test_that("derive_funnel_stages produces hand-calculated counts", {
   cons <- derived$stages$consideration$matrix
   expect_equal(unname(colSums(cons)), c(5, 4, 4))
 
-  # Bought_long nested with consideration
+  # v3 aggregate funnel: bought_long / bought_target are RAW BRANDPEN1 /
+  # BRANDPEN2 counts, not cumulative. They may exceed consideration when
+  # respondents bought but report an attitude outside the top-2. The funnel
+  # surfaces a PARTIAL status + warning rather than forcing the nest.
   pen1 <- derived$stages$bought_long$matrix
-  # Pen1 raw: IPK=6 ROB=6 CART=5 — all are subset of consideration in this set
-  # But CART resp 4 has attitude 1 (positive) and pen1 yes -> counts.
-  # Resp 5 ROB has attitude 3 (positive) but no pen1 — drops.
-  # We expect pen1 ⊆ consideration; just check monotone decline.
-  expect_true(all(colSums(pen1) <= colSums(cons)))
-
-  # Bought_target nested with bought_long
+  # Raw BRANDPEN1 counts from the mini_data fixture (lines 90-96)
+  expect_equal(unname(colSums(pen1)), c(6, 5, 5))
   pen2 <- derived$stages$bought_target$matrix
-  expect_true(all(colSums(pen2) <= colSums(pen1)))
+  # Raw BRANDPEN2 counts from the mini_data fixture (lines 97-103)
+  expect_equal(unname(colSums(pen2)), c(5, 4, 4))
 
-  # No warnings — all roles present
+  # No derivation warnings — validate_nesting warnings are attached
+  # downstream in run_funnel(), not in derive_funnel_stages().
   expect_length(derived$warnings, 0L)
 })
 
@@ -284,7 +284,9 @@ test_that("run_funnel against IPK Wave 1 fixture: end-to-end", {
   res <- run_funnel(dss_data, rm, dss_brands, config,
                     weights = NULL, sig_tester = NULL)
 
-  expect_equal(res$status, "PASS")
+  # v3 aggregate funnel: PARTIAL is expected on real survey data because
+  # a few brands' raw stages don't nest perfectly (validate_nesting warns).
+  expect_true(res$status %in% c("PASS", "PARTIAL"))
   expect_true(nrow(res$stages) > 0)
   expect_equal(res$meta$category_type, "transactional")
   expect_equal(res$meta$focal_brand, "IPK")
