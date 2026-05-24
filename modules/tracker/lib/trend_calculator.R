@@ -528,17 +528,20 @@ calculate_single_choice_trend_enhanced <- function(q_code, question_map, wave_da
 #' @return Named list of calculated metrics
 #' @keywords internal
 calculate_metrics_from_specs <- function(values, weights, specs_list,
-                                          wave_struct = NULL, wave_col = NULL) {
+                                          wave_struct = NULL, wave_col = NULL,
+                                          alpha = DEFAULT_ALPHA) {
   metrics <- list()
 
   for (spec in specs_list) {
     spec_lower <- tolower(trimws(spec))
 
     if (spec_lower == "mean") {
-      result <- calculate_weighted_mean(values, weights)
+      result <- calculate_weighted_mean(values, weights, alpha = alpha)
       metrics$mean <- result$mean
       metrics$sd <- result$sd
       metrics$eff_n <- result$eff_n
+      # CI bounds available on result$ci_lower / result$ci_upper if needed.
+      # Not propagated to metrics$ for now to keep the metrics contract stable.
 
     } else if (spec_lower == "top_box") {
       result <- calculate_top_box(values, weights, n_boxes = 1)
@@ -698,18 +701,31 @@ calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, con
     q_data <- resolve_question_values(q_data, wave_struct, wave_col)
 
     # Calculate each requested metric using shared dispatch
-    metrics <- calculate_metrics_from_specs(q_data, wave_df$weight_var, specs_list,
-                                             wave_struct, wave_col)
+    metrics <- calculate_metrics_from_specs(
+      q_data, wave_df$weight_var, specs_list,
+      wave_struct, wave_col,
+      alpha = get_setting(config, "alpha", default = DEFAULT_ALPHA)
+    )
 
     # Store basic counts (shared across all metrics)
     # Use which() to get numeric indices (avoids NA issues)
     valid_idx <- which(!is.na(q_data) & !is.na(wave_df$weight_var) & wave_df$weight_var > 0)
+
+    # Compute effective N once at the wave level, independent of which metric
+    # specs ran. metrics$eff_n is only populated when "mean" is in specs_list,
+    # so relying on it would silently fall back to n_unweighted for box-only
+    # configs — losing the design-effect adjustment for weighted significance.
+    w_valid <- wave_df$weight_var[valid_idx]
+    sum_w_valid <- sum(w_valid)
+    sum_w2_valid <- sum(w_valid^2)
+    wave_eff_n <- if (sum_w2_valid > 0) (sum_w_valid^2) / sum_w2_valid else 0
+
     wave_results[[wave_id]] <- list(
       available = TRUE,
       metrics = metrics,
       n_unweighted = length(valid_idx),
-      n_weighted = sum(wave_df$weight_var[valid_idx]),
-      eff_n = metrics$eff_n,
+      n_weighted = sum_w_valid,
+      eff_n = wave_eff_n,
       values = q_data,
       weights = wave_df$weight_var
     )
@@ -878,16 +894,27 @@ calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, 
       get_wave_question_code(question_map, q_code, wave_id),
       error = function(e) q_code
     )
-    metrics <- calculate_metrics_from_specs(composite_values, wave_df$weight_var, specs_list,
-                                             wave_struct, composite_wave_col)
+    metrics <- calculate_metrics_from_specs(
+      composite_values, wave_df$weight_var, specs_list,
+      wave_struct, composite_wave_col,
+      alpha = get_setting(config, "alpha", default = DEFAULT_ALPHA)
+    )
+
+    # Compute effective N once at the wave level — see note in
+    # calculate_rating_trend_enhanced. Avoids silently falling back to
+    # n_unweighted when metric specs omit "mean".
+    w_valid <- wave_df$weight_var[valid_idx]
+    sum_w_valid <- sum(w_valid)
+    sum_w2_valid <- sum(w_valid^2)
+    wave_eff_n <- if (sum_w2_valid > 0) (sum_w_valid^2) / sum_w2_valid else 0
 
     # Store results
     wave_results[[wave_id]] <- list(
       available = TRUE,
       metrics = metrics,
       n_unweighted = length(valid_idx),
-      n_weighted = sum(wave_df$weight_var[valid_idx]),
-      eff_n = metrics$eff_n,
+      n_weighted = sum_w_valid,
+      eff_n = wave_eff_n,
       values = composite_values,
       weights = wave_df$weight_var,
       source_questions = source_questions

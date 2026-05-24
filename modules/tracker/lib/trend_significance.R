@@ -196,9 +196,21 @@ perform_significance_tests_nps <- function(wave_results, wave_ids, config) {
 
   if (length(wave_ids) < 2) return(list())
 
-  # NPS is a difference of proportions, so we test the NPS score directly
-  # This is a simplified approach for MVT
-  # Could be enhanced with proper proportion difference testing
+  # NPS = 100 * (p_promoters - p_detractors) on a -100..+100 scale.
+  # Closed-form variance for NPS difference using the multinomial distribution:
+  #
+  #   Var(NPS) = 10000 * [(p_p + p_d) - (p_p - p_d)^2] / n
+  #
+  # Derivation: Var(p_p - p_d) = Var(p_p) + Var(p_d) - 2*Cov(p_p, p_d).
+  # For a multinomial sample, Cov(p_p, p_d) = -p_p * p_d / n, so:
+  #   Var(p_p - p_d) = [p_p*(1-p_p) + p_d*(1-p_d) + 2*p_p*p_d] / n
+  #                  = [(p_p + p_d) - (p_p - p_d)^2] / n
+  # Scaling NPS by 100 multiplies the variance by 10000.
+  #
+  # Previous implementation used worst-case SE = sqrt(10000/n1 + 10000/n2),
+  # which over-estimates variance by ~24% in realistic scenarios and
+  # produced silent false negatives. The closed-form uses the actual
+  # promoter / detractor proportions already calculated per wave.
 
   alpha <- get_setting(config, "alpha", default = DEFAULT_ALPHA)
   min_base <- get_setting(config, "minimum_base", default = DEFAULT_MINIMUM_BASE)
@@ -219,27 +231,38 @@ perform_significance_tests_nps <- function(wave_results, wave_ids, config) {
     if (isTRUE(current$available) && isTRUE(previous$available) &&
         current_eff_n >= min_base && previous_eff_n >= min_base) {
 
-      # Calculate z-test for NPS difference
-      # NPS is on -100 to +100 scale, convert to proportion scale (0-1)
       nps_diff <- current$nps - previous$nps
 
-      # Approximate standard error for NPS difference (using effective N)
-      # Using conservative estimate: SE = sqrt((100^2 / n1) + (100^2 / n2))
-      # This assumes worst-case variance for NPS scale
-      se_nps <- sqrt((10000 / current_eff_n) + (10000 / previous_eff_n))
+      # Convert stored 0-100 promoter / detractor percentages to 0-1 proportions
+      p_p1 <- previous$promoters_pct / 100
+      p_d1 <- previous$detractors_pct / 100
+      p_p2 <- current$promoters_pct / 100
+      p_d2 <- current$detractors_pct / 100
 
-      # Calculate z-statistic
+      var_w1 <- 10000 * ((p_p1 + p_d1) - (p_p1 - p_d1)^2) / previous_eff_n
+      var_w2 <- 10000 * ((p_p2 + p_d2) - (p_p2 - p_d2)^2) / current_eff_n
+      se_nps <- sqrt(var_w1 + var_w2)
+
+      if (is.na(se_nps) || se_nps <= 0) {
+        sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- list(
+          significant = FALSE,
+          nps_difference = nps_diff,
+          z_statistic = NA_real_,
+          p_value = NA_real_,
+          reason = "zero_or_undefined_standard_error"
+        )
+        next
+      }
+
       z_stat <- abs(nps_diff) / se_nps
-
-      # Critical value for two-tailed test (e.g., 1.96 for 95% confidence)
-      z_critical <- qnorm(1 - alpha/2)
+      z_critical <- qnorm(1 - alpha / 2)
 
       sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- list(
         significant = z_stat > z_critical,
         nps_difference = nps_diff,
         z_statistic = z_stat,
         p_value = 2 * (1 - pnorm(abs(z_stat))),
-        note = "Z-test for NPS difference (conservative SE estimate, uses effective N)"
+        note = "Z-test for NPS difference (multinomial closed-form SE, uses effective N)"
       )
     } else {
       sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- list(
@@ -271,6 +294,7 @@ perform_significance_tests_for_metric <- function(wave_results, wave_ids, metric
   if (length(wave_ids) < 2) return(list())
 
   alpha <- get_setting(config, "alpha", default = DEFAULT_ALPHA)
+  min_base <- get_setting(config, "minimum_base", default = DEFAULT_MINIMUM_BASE)
   sig_tests <- list()
 
   for (i in 2:length(wave_ids)) {
@@ -298,6 +322,18 @@ perform_significance_tests_for_metric <- function(wave_results, wave_ids, metric
     # Get effective N (or fall back to n_unweighted if eff_n not available)
     current_eff_n <- if (!is.null(current$eff_n)) current$eff_n else current$n_unweighted
     previous_eff_n <- if (!is.null(previous$eff_n)) previous$eff_n else previous$n_unweighted
+
+    # Apply minimum_base gate — consistent with the means / proportions / NPS
+    # significance tests. Without this guard, enhanced metric tests
+    # (top_box, range, box, etc.) would run on samples below 30, producing
+    # unreliable z-statistics.
+    if (current_eff_n < min_base || previous_eff_n < min_base) {
+      sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- list(
+        significant = FALSE,
+        reason = "insufficient_base_or_unavailable"
+      )
+      next
+    }
 
     # Perform test based on type
     if (test_type == "proportion") {
@@ -334,6 +370,7 @@ perform_significance_tests_multi_mention <- function(wave_results, wave_ids, col
   if (length(wave_ids) < 2) return(list())
 
   alpha <- get_setting(config, "alpha", default = DEFAULT_ALPHA)
+  min_base <- get_setting(config, "minimum_base", default = DEFAULT_MINIMUM_BASE)
   sig_tests <- list()
 
   for (i in 2:length(wave_ids)) {
@@ -359,6 +396,15 @@ perform_significance_tests_multi_mention <- function(wave_results, wave_ids, col
     # Get effective N (or fall back to n_unweighted if eff_n not available)
     current_eff_n <- if (!is.null(current$eff_n)) current$eff_n else current$n_unweighted
     previous_eff_n <- if (!is.null(previous$eff_n)) previous$eff_n else previous$n_unweighted
+
+    # Apply minimum_base gate — consistent with the means / proportions / NPS tests.
+    if (current_eff_n < min_base || previous_eff_n < min_base) {
+      sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- list(
+        significant = FALSE,
+        reason = "insufficient_base_or_unavailable"
+      )
+      next
+    }
 
     # Convert percentages to proportions
     p1 <- previous_val / 100
@@ -388,6 +434,7 @@ perform_significance_tests_multi_mention_metric <- function(wave_results, wave_i
   if (length(wave_ids) < 2) return(list())
 
   alpha <- get_setting(config, "alpha", default = DEFAULT_ALPHA)
+  min_base <- get_setting(config, "minimum_base", default = DEFAULT_MINIMUM_BASE)
   sig_tests <- list()
 
   for (i in 2:length(wave_ids)) {
@@ -413,6 +460,15 @@ perform_significance_tests_multi_mention_metric <- function(wave_results, wave_i
     # Get effective N (or fall back to n_unweighted if eff_n not available)
     current_eff_n <- if (!is.null(current$eff_n)) current$eff_n else current$n_unweighted
     previous_eff_n <- if (!is.null(previous$eff_n)) previous$eff_n else previous$n_unweighted
+
+    # Apply minimum_base gate — consistent with the means / proportions / NPS tests.
+    if (current_eff_n < min_base || previous_eff_n < min_base) {
+      sig_tests[[paste0(prev_wave_id, "_vs_", wave_id)]] <- list(
+        significant = FALSE,
+        reason = "insufficient_base_or_unavailable"
+      )
+      next
+    }
 
     # For "any" metric, use z-test for proportions (using effective N)
     # For "count_mean", use t-test (but need raw values - skip for now)

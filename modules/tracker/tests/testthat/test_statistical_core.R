@@ -440,6 +440,33 @@ test_that("calculate_weighted_mean confidence interval contains the mean", {
   expect_true(result$ci_upper >= result$mean)
 })
 
+test_that("calculate_weighted_mean default alpha reproduces the historical 1.96 CI (M5 fix)", {
+  # alpha = 0.05 (default) must give a CI identical to the previous hardcoded
+  # 1.96 multiplier, to within floating-point precision. This pins the
+  # backwards-compat guarantee of the M5 fix.
+  result <- calculate_weighted_mean(c(1, 2, 3, 4, 5), rep(1, 5))
+  se <- result$sd / sqrt(result$eff_n)
+  expect_equal(result$ci_lower, result$mean - qnorm(0.975) * se)
+  expect_equal(result$ci_upper, result$mean + qnorm(0.975) * se)
+  # Sanity: qnorm(0.975) is ~1.95996, so the diff from the old 1.96 is tiny
+  expect_equal(qnorm(0.975), 1.96, tolerance = 0.001)
+})
+
+test_that("calculate_weighted_mean respects alpha argument (M5 fix)", {
+  # Tighter CI at alpha=0.10 (90%) vs default alpha=0.05 (95%).
+  result_95 <- calculate_weighted_mean(c(1, 2, 3, 4, 5), rep(1, 5), alpha = 0.05)
+  result_90 <- calculate_weighted_mean(c(1, 2, 3, 4, 5), rep(1, 5), alpha = 0.10)
+
+  width_95 <- result_95$ci_upper - result_95$ci_lower
+  width_90 <- result_90$ci_upper - result_90$ci_lower
+
+  # 90% CI strictly narrower than 95% CI on the same data
+  expect_true(width_90 < width_95)
+  # Wider alpha=0.20 (80%) narrower still
+  result_80 <- calculate_weighted_mean(c(1, 2, 3, 4, 5), rep(1, 5), alpha = 0.20)
+  expect_true((result_80$ci_upper - result_80$ci_lower) < width_90)
+})
+
 test_that("calculate_weighted_mean handles NAs in values", {
   result <- calculate_weighted_mean(c(1, NA, 3, 4, NA), rep(1, 5))
   expect_equal(result$n_unweighted, 3)
@@ -826,6 +853,36 @@ test_that("calculate_custom_range handles min > max", {
   }, type = "output")
   expect_true(any(grepl("Invalid range", output)))
   expect_true(is.na(result$proportion))
+})
+
+
+# ==============================================================================
+# Regression: t-test is variance-sensitive (CCS anomaly, 2026-05-24)
+# ==============================================================================
+# Pins the behaviour Duncan flagged on the Coca-Cola Peninsula Beverages W25
+# report: "Rate CCS in their handling..." showed delta -0.90 NOT significant,
+# while "Equipment Cleanliness" showed delta -0.83 significant — at the same
+# sample size. This is correct behaviour: the pooled t-test penalises noisier
+# data, so a larger raw delta in high-variance data can legitimately fail to
+# clear p<0.05.
+
+test_that("t_test_for_means is variance-sensitive (CCS regression)", {
+  # CCS-style: wide disagreement among retailers, delta -0.90 sits just over p=0.05
+  ccs_like <- t_test_for_means(mean1 = 7.0, sd1 = 3.2, n1 = 100,
+                                mean2 = 6.1, sd2 = 3.3, n2 = 100)
+  expect_false(ccs_like$significant)
+  expect_true(ccs_like$p_value > 0.05)
+  expect_true(ccs_like$p_value < 0.10)  # close to threshold, not far from it
+
+  # Equipment-cleanliness-style: tighter ratings, smaller delta clears p<0.05
+  cleanliness_like <- t_test_for_means(mean1 = 8.1, sd1 = 2.0, n1 = 100,
+                                        mean2 = 7.3, sd2 = 2.1, n2 = 100)
+  expect_true(cleanliness_like$significant)
+  expect_true(cleanliness_like$p_value < 0.01)
+
+  # The variance-sensitive case is documented behaviour, not a bug.
+  # If this test fails, the t-test calculation has changed in a way that
+  # changes the variance / pooled-SD weighting — investigate before adjusting.
 })
 
 

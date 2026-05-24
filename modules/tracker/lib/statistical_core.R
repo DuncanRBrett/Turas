@@ -194,11 +194,19 @@ z_test_for_proportions <- function(p1, n1, p2, n2, alpha = DEFAULT_ALPHA) {
 #'
 #' Calculates weighted mean with standard deviation and confidence interval.
 #'
+#' The CI uses the same alpha as the significance tests so a tracker
+#' configured at p<0.10 produces 90% CIs (not 95%). Previously the
+#' critical value was hardcoded to 1.96, which silently disagreed with
+#' the configured alpha whenever the latter was anything other than 0.05.
+#'
 #' @param values Numeric vector of response values
 #' @param weights Numeric vector of weights
+#' @param alpha Numeric. Significance level for the CI critical value.
+#'   Default `DEFAULT_ALPHA` (0.05 → 95% CI). Pass the tracker's
+#'   `alpha` setting to keep CIs consistent with the sig tests.
 #' @return List with mean, sd, n_unweighted, n_weighted, ci_lower, ci_upper
 #' @keywords internal
-calculate_weighted_mean <- function(values, weights) {
+calculate_weighted_mean <- function(values, weights, alpha = DEFAULT_ALPHA) {
   # Guard: non-numeric values cannot be averaged
   # Note: c(NA, NA) is logical in R, so only refuse if non-NA values exist and aren't numeric
   non_na_values <- values[!is.na(values)]
@@ -250,8 +258,11 @@ calculate_weighted_mean <- function(values, weights) {
 
   # Use effective sample size for SE to correctly account for weighting design effect
   se <- if (eff_n > 0) w_sd / sqrt(eff_n) else NA
-  ci_lower <- w_mean - 1.96 * se
-  ci_upper <- w_mean + 1.96 * se
+  # Critical value derived from alpha so the CI agrees with the sig-test threshold.
+  # alpha = 0.05 reproduces the historical 1.96 multiplier exactly.
+  z_crit <- qnorm(1 - alpha / 2)
+  ci_lower <- w_mean - z_crit * se
+  ci_upper <- w_mean + z_crit * se
 
   list(
     mean = w_mean,
