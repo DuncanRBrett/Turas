@@ -906,6 +906,8 @@ run_brand <- function(config_path, project_root = NULL, verbose = TRUE) {
           cat_brands  = cat_brands, cat_name = cat_name,
           brand_volume    = cat_result$brand_volume,
           buyer_heaviness = cat_result$buyer_heaviness,
+          study_data    = data,
+          study_weights = weights,
           verbose     = verbose
         ),
         error = function(e) {
@@ -1280,6 +1282,8 @@ if (!exists(".find_brand_col", mode = "function")) {
                                                 cat_data, cat_weights,
                                                 cat_brands, cat_name,
                                                 brand_volume, buyer_heaviness,
+                                                study_data    = NULL,
+                                                study_weights = NULL,
                                                 verbose = TRUE) {
 
   buyer_info <- .demo_buyer_for_category(brand_volume, buyer_heaviness,
@@ -1291,16 +1295,18 @@ if (!exists(".find_brand_col", mode = "function")) {
   questions <- list()
   for (role in demo_roles) {
     rec <- demographic_question_from_role(
-      data         = cat_data,
-      role_map     = role_map,
-      role         = role,
-      structure    = structure,
-      weights      = cat_weights,
-      focal_buyer  = buyer_info$focal_buyer,
-      buyer_tiers  = buyer_info$tiers,
-      pen_mat      = bmat_info$pen_mat,
-      brand_codes  = bmat_info$brand_codes,
-      brand_labels = bmat_info$brand_labels
+      data          = cat_data,
+      role_map      = role_map,
+      role          = role,
+      structure     = structure,
+      weights       = cat_weights,
+      focal_buyer   = buyer_info$focal_buyer,
+      buyer_tiers   = buyer_info$tiers,
+      pen_mat       = bmat_info$pen_mat,
+      brand_codes   = bmat_info$brand_codes,
+      brand_labels  = bmat_info$brand_labels,
+      study_data    = study_data,
+      study_weights = study_weights
     )
     if (!is.null(rec)) questions[[length(questions) + 1L]] <- rec
   }

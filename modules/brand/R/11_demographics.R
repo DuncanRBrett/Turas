@@ -82,13 +82,15 @@ BRAND_DEMOGRAPHICS_VERSION <- "2.0"
 run_demographic_question <- function(values,
                                      option_codes,
                                      option_labels,
-                                     weights      = NULL,
-                                     focal_buyer  = NULL,
-                                     buyer_tiers  = NULL,
-                                     pen_mat      = NULL,
-                                     brand_codes  = NULL,
-                                     brand_labels = NULL,
-                                     conf_level   = 0.95) {
+                                     weights        = NULL,
+                                     focal_buyer    = NULL,
+                                     buyer_tiers    = NULL,
+                                     pen_mat        = NULL,
+                                     brand_codes    = NULL,
+                                     brand_labels   = NULL,
+                                     study_values   = NULL,
+                                     study_weights  = NULL,
+                                     conf_level     = 0.95) {
 
   guard <- .demo_guard_inputs(values, option_codes, option_labels, weights)
   if (identical(guard$status, "REFUSED")) return(guard)
@@ -99,6 +101,19 @@ run_demographic_question <- function(values,
   total_df <- .demo_distribution(values, option_codes, option_labels,
                                  mask = rep(TRUE, n_rows), w = w,
                                  conf_level = conf_level)
+
+  # Optional second baseline — distribution across the full screened
+  # study sample (not just cat-routed respondents). The panel toggles
+  # between this and total_df when the user picks "Total sample" vs
+  # "Cat avg" as the baseline. Computed only when study_values supplied.
+  study_total_df <- NULL
+  if (!is.null(study_values) && length(study_values) > 0L) {
+    sn  <- length(study_values)
+    sw  <- .demo_normalise_weights(study_weights, sn)
+    study_total_df <- .demo_distribution(
+      study_values, option_codes, option_labels,
+      mask = rep(TRUE, sn), w = sw, conf_level = conf_level)
+  }
 
   buyer_cut <- .demo_buyer_cut(values, option_codes, option_labels,
                                 focal_buyer, w, conf_level)
@@ -126,6 +141,7 @@ run_demographic_question <- function(values,
   list(
     status                  = "PASS",
     total                   = total_df,
+    total_study_sample      = study_total_df,
     buyer_cut               = buyer_cut,
     tier_cut                = tier_cut,
     brand_cut               = brand_cut,
@@ -134,6 +150,7 @@ run_demographic_question <- function(values,
     brand_total_penetration = brand_total_penetration,
     option_avg_penetration  = option_avg_penetration,
     n_total                 = sum(!is.na(values)),
+    n_study_total           = if (!is.null(study_values)) sum(!is.na(study_values)) else NA_integer_,
     n_respondents           = n_rows,
     weighted                = !is.null(weights),
     conf_level              = conf_level
@@ -635,10 +652,19 @@ demographic_question_from_role <- function(data, role_map, role, structure,
                                               buyer_tiers = NULL,
                                               pen_mat = NULL,
                                               brand_codes = NULL,
-                                              brand_labels = NULL) {
+                                              brand_labels = NULL,
+                                              study_data = NULL,
+                                              study_weights = NULL) {
   spec <- resolve_demographic_role(role_map, role, structure)
   if (is.null(spec)) return(NULL)
   if (!spec$column %in% names(data)) return(NULL)
+
+  # If study_data is provided and carries the same column, pass the full
+  # screened-sample values through so the engine can compute a total-sample
+  # baseline alongside the cat-buyer baseline.
+  sv <- if (!is.null(study_data) && spec$column %in% names(study_data))
+    study_data[[spec$column]] else NULL
+  sw <- if (!is.null(sv)) study_weights else NULL
 
   res <- run_demographic_question(
     values        = data[[spec$column]],
@@ -649,7 +675,9 @@ demographic_question_from_role <- function(data, role_map, role, structure,
     buyer_tiers   = buyer_tiers,
     pen_mat       = pen_mat,
     brand_codes   = brand_codes,
-    brand_labels  = brand_labels
+    brand_labels  = brand_labels,
+    study_values  = sv,
+    study_weights = sw
   )
   list(
     role           = spec$role,

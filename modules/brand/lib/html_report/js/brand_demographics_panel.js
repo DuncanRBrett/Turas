@@ -41,11 +41,13 @@
       showBuyer:     true,
       showNonbuyer:  true,
       cellMetric:    "penetration", // "penetration" | "share"
+      baseline:      "cat",         // "cat" | "study" — affects Share mode only
       viewByCard:    {} // sectionId -> "table" | "chart"
     };
 
     bindGlobalToggles(panel);
     bindMetricRadios(panel);
+    bindBaselineRadios(panel);
     bindFocalPicker(panel);
     bindBrandSelector(panel);
     bindQuestionChips(panel);
@@ -64,6 +66,22 @@
       input.addEventListener("change", () => {
         if (!input.checked) return;
         panel.__state.cellMetric = input.getAttribute("data-demo-metric");
+        rerenderAllTables(panel);
+      });
+    });
+  }
+
+  // ---- baseline radio (Cat avg vs Total sample) ----
+  // Affects Share-of-buyers mode: swaps the Cat-avg column + heatmap
+  // shading + chart marker between the cat-buyer distribution (r.pct)
+  // and the total-study-sample distribution (q.total_study_sample.rows[i].pct).
+  // Penetration mode is unaffected because its baseline is per-option
+  // mean brand pen (option_avg_penetration), not a sample distribution.
+  function bindBaselineRadios(panel) {
+    panel.querySelectorAll('input[data-demo-baseline]').forEach(input => {
+      input.addEventListener("change", () => {
+        if (!input.checked) return;
+        panel.__state.baseline = input.getAttribute("data-demo-baseline");
         rerenderAllTables(panel);
       });
     });
@@ -143,16 +161,17 @@
     const fi = brands.indexOf(focal);
     const focalLabel = fi >= 0 ? (labels[fi] || focal) : (focal || "");
 
-    const metric = panel.__state.cellMetric || "penetration";
+    const metric   = panel.__state.cellMetric || "penetration";
+    const baseline = panel.__state.baseline   || "cat";
     panel.querySelectorAll(".demo-card").forEach(card => {
       const idx = parseInt(card.getAttribute("data-demo-q-idx"), 10);
       const q   = data.questions[idx];
       if (!q) return;
       const tableHost = card.querySelector(".demo-card-view-table");
-      if (tableHost) tableHost.innerHTML = renderMatrix(q, focal, data, dp, metric);
+      if (tableHost) tableHost.innerHTML = renderMatrix(q, focal, data, dp, metric, baseline);
       const chartHost = card.querySelector(".demo-card-view-chart");
       if (chartHost) chartHost.innerHTML = renderChart(q, focal, focalLabel,
-                                                       palette, dp, metric);
+                                                       palette, dp, metric, baseline);
     });
     applyHeatmap(panel);
     applyCellExtras(panel);
@@ -284,7 +303,7 @@
   // round-trip to the engine). Kept short by sharing helpers.
   // ============================================================================
 
-  function renderMatrix(q, focalBrand, data, dp, metric) {
+  function renderMatrix(q, focalBrand, data, dp, metric, baseline) {
     const rows = (q.total && q.total.rows) || [];
     if (!rows.length) return '<div class="demo-empty">No responses for this question.</div>';
 
@@ -294,8 +313,8 @@
     const palette = brandPalette(data, brands);
 
     return `<div class="demo-matrix-wrap"><table class="demo-matrix">
-      ${tableHeader(brands, labels, order, focalBrand, palette)}
-      ${tableBody(rows, q, brands, order, focalBrand, dp, metric)}
+      ${tableHeader(brands, labels, order, focalBrand, palette, baseline)}
+      ${tableBody(rows, q, brands, order, focalBrand, dp, metric, baseline)}
     </table></div>`;
   }
 
@@ -320,7 +339,7 @@
     return out;
   }
 
-  function tableHeader(brands, labels, order, focal, palette) {
+  function tableHeader(brands, labels, order, focal, palette, baseline) {
     // Look up focal label from the ORIGINAL brand list (order excludes focal).
     const fi = brands.indexOf(focal);
     const focalLabel = (fi >= 0 ? (labels[fi] || focal) : focal) || "Focal";
@@ -331,10 +350,11 @@
         <span class="demo-brand-chip-swatch" style="background:${esc(palette[bc] || "#94a3b8")}"></span> ${esc(bl)}
       </th>`;
     }).join("");
+    const baselineLabel = baseline === "study" ? "Total sample" : "Cat avg";
     return `<thead><tr>
       <th>Option</th>
       <th class="demo-col-focal" data-demo-col="focal">${esc(focalLabel)}<span class="demo-th-sub">focal</span></th>
-      <th class="demo-col-catavg" data-demo-col="catavg">Cat avg</th>
+      <th class="demo-col-catavg" data-demo-col="catavg">${esc(baselineLabel)}</th>
       ${brandTh}
     </tr></thead>`;
   }
@@ -343,11 +363,26 @@
   // per option, focal pinned in column 2, per-brand block to the right) but
   // different cell semantics and shading baseline per mode — see penTableBody
   // and shareTableBody for the details.
-  function tableBody(rows, q, brands, order, focal, dp, metric) {
+  function tableBody(rows, q, brands, order, focal, dp, metric, baseline) {
     if (metric === "share") {
-      return shareTableBody(rows, q, brands, order, focal, dp);
+      return shareTableBody(rows, q, brands, order, focal, dp, baseline);
     }
     return penTableBody(rows, q, brands, order, focal, dp);
+  }
+
+  // Look up the baseline pct for a row in Share mode.
+  //   baseline = "cat"   -> r.pct (% of CAT BUYERS in this option)
+  //   baseline = "study" -> q.total_study_sample.rows[i].pct (% of ALL
+  //                         screened study sample in this option)
+  // The total_study_sample distribution is computed by the engine when
+  // study_values is supplied; for backwards compatibility, if it's missing
+  // the lookup falls back to r.pct (no toggle effect).
+  function shareBaselinePct(q, r, baseline) {
+    if (baseline !== "study") return r.pct;
+    const ss = q.total_study_sample;
+    if (!ss || !Array.isArray(ss.rows)) return r.pct;
+    const hit = ss.rows.find(x => x.code === r.code);
+    return (hit && isFinite(hit.pct)) ? hit.pct : r.pct;
   }
 
   // PENETRATION mode (default). Cell = "% of respondents in this option who
@@ -458,17 +493,18 @@
   // this option) and also sums to 100% down its column. Heat colour is the
   // gap vs Cat avg (% of cat respondents in this option) — the audience-share
   // baseline, restored from v1.
-  function shareTableBody(rows, q, brands, order, focal, dp) {
+  function shareTableBody(rows, q, brands, order, focal, dp, baseline) {
     const buyerBy    = indexByBrand(q.brand_cut);
     const nonbuyerBy = indexByBrand(q.brand_nonbuyer_cut);
     const trs = rows.map(r => {
-      const catPct = r.pct;
+      const catPct = shareBaselinePct(q, r, baseline);
       const optLabel = esc(r.label || r.code);
       const buyerRow = shareRow({
         role: "buyer",
         labelCell: optLabelCell(optLabel, "buyer"),
         brandIndex: buyerBy,
-        code: r.code, catPct, catAvgCell: catAvgCell(r, dp),
+        code: r.code, catPct,
+        catAvgCell: catAvgCellBaseline(catPct, r, dp, baseline),
         brands, order, focal, dp
       });
       const nonbuyerRow = shareRow({
@@ -482,6 +518,12 @@
       return buyerRow + nonbuyerRow;
     }).join("");
     return `<tbody>${trs}</tbody>`;
+  }
+
+  // Cat-avg cell for Share mode — displays the baseline pct chosen by the
+  // user (cat-buyer distribution OR total-study-sample distribution).
+  function catAvgCellBaseline(catPct, r, dp, baseline) {
+    return `<td class="demo-col-catavg" data-demo-col="catavg">${pctStr(catPct, dp)}</td>`;
   }
 
   function shareRow(p) {
@@ -555,12 +597,12 @@
   // ============================================================================
   const CHART_MIN_BAR_WIDTH_PCT = 2;
 
-  function renderChart(q, focalBrand, focalLabel, palette, dp, metric) {
+  function renderChart(q, focalBrand, focalLabel, palette, dp, metric, baseline) {
     const rows = (q.total && q.total.rows) || [];
     if (!rows.length) return '<div class="demo-empty">No responses for this question.</div>';
 
     const focalColour = palette[focalBrand] || "#1A5276";
-    const ctx = chartModeCtx(q, focalBrand, metric);
+    const ctx = chartModeCtx(q, focalBrand, metric, baseline);
     const scaleMax = chartScaleMax(rows, ctx);
 
     // One row per option — buyer view only. Detail buyer-vs-non-buyer is
@@ -587,16 +629,20 @@
 
   // Resolve which long-list drives the bars and what each marker means for
   // the requested metric mode. Mirrors .demo_chart_mode_ctx in R.
-  function chartModeCtx(q, focalBrand, metric) {
+  function chartModeCtx(q, focalBrand, metric, baseline) {
     if (metric === "share") {
       const focalEntry    = (q.brand_cut || []).find(b => b.brand_code === focalBrand) || null;
       const nonbuyerEntry = (q.brand_nonbuyer_cut || []).find(b => b.brand_code === focalBrand) || null;
+      const useStudy = baseline === "study";
       return {
         mode: "share",
         focalEntry: focalEntry,
         nonbuyerEntry: nonbuyerEntry,
-        optionAvg: null,    // share mode reads r.pct directly per row
-        markerLabel: "cat avg",
+        // share mode marker reads r.pct (cat) or total_study_sample (study)
+        optionAvg: null,
+        baseline: useStudy ? "study" : "cat",
+        studyTotal: useStudy ? (q.total_study_sample || null) : null,
+        markerLabel: useStudy ? "total sample" : "cat avg",
         overallPen: NaN,
         overallMarkerLabel: ""
       };
@@ -622,9 +668,17 @@
   }
 
   // Per-row marker value lookup. Pen mode reads from ctx.optionAvg[code];
-  // share mode reads r.pct (the row's overall cat-avg / demographic size).
+  // share mode reads r.pct (cat baseline) or the total-study-sample row pct
+  // (study baseline). Falls back to r.pct if study data is missing.
   function chartMarkerPct(ctx, r) {
-    if (ctx.mode === "share") return isFinite(r.pct) ? r.pct : NaN;
+    if (ctx.mode === "share") {
+      if (ctx.baseline === "study" && ctx.studyTotal &&
+          Array.isArray(ctx.studyTotal.rows)) {
+        const hit = ctx.studyTotal.rows.find(x => x.code === r.code);
+        if (hit && isFinite(hit.pct)) return hit.pct;
+      }
+      return isFinite(r.pct) ? r.pct : NaN;
+    }
     const entry = (ctx.optionAvg || {})[String(r.code)];
     if (!entry || entry.pct == null || !isFinite(entry.pct)) return NaN;
     return entry.pct;
