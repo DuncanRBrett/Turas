@@ -20,6 +20,22 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
   tbl
 }
 
+# Drop the "None of the above" pseudo-brand from a brand list. The engine
+# filters this in get_brands_for_category() in 01_config.R, but the HTML
+# transformer reads structure$brands directly so it has to repeat the
+# filter here. Self-contained — does not rely on .drop_none_brands() being
+# in scope (the transformer is sourced independently of the module loader
+# in some pipelines, per the comment in .dt_brand_colours below).
+.dt_drop_none_brands <- function(tbl) {
+  if (is.null(tbl) || nrow(tbl) == 0 || !"BrandCode" %in% names(tbl))
+    return(tbl)
+  bc <- gsub("[^A-Za-z]", "", as.character(tbl$BrandCode))
+  is_none <- !is.na(tbl$BrandCode) &
+             grepl("^(none|nota|na|noneoftheabove)$", bc, ignore.case = TRUE)
+  if (!any(is_none)) return(tbl)
+  tbl[!is_none, , drop = FALSE]
+}
+
 # Position-based brand colour assignment. Self-contained — no dependency on
 # any other brand module file being in scope (this file is re-sourced at
 # report-generation time independently of the R module loader).
@@ -67,7 +83,7 @@ transform_brand_charts <- function(results, config) {
 
   brand_list_all <- if (!is.null(results$structure) &&
                          !is.null(results$structure$brands))
-    results$structure$brands else NULL
+    .dt_drop_none_brands(results$structure$brands) else NULL
 
   # Per-category charts
   if (!is.null(results$results$categories)) {
@@ -280,7 +296,7 @@ transform_brand_panels <- function(results, config) {
 
   brand_list_all <- if (!is.null(results$structure) &&
                          !is.null(results$structure$brands)) {
-    results$structure$brands
+    .dt_drop_none_brands(results$structure$brands)
   } else NULL
 
   for (cat_key in names(results$results$categories)) {
