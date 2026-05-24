@@ -64,6 +64,20 @@
         '.br-subpanel[data-group="' + group + '"][data-subpanel="' + subpanel + '"]'
       );
       if (activeSubPanel) {
+        // Show only the per-sub-tab insight toolbar that matches the active
+        // internal tab. Section_Insights v1.1 emits one .br-insight-wrap per
+        // internal sub-tab (funnel/relationship/attributes/etc.) so each
+        // sub-tab has its own anchor; hide the others to keep one insight
+        // visible at a time.
+        var wraps = activeSubPanel.querySelectorAll(
+          '.br-insight-wrap[data-insight-internal-tab]'
+        );
+        wraps.forEach(function (w) {
+          w.style.display =
+            (w.getAttribute('data-insight-internal-tab') === internalTab)
+              ? 'block' : 'none';
+        });
+
         // MA panel: click the hidden .ma-subtab-btn
         var maBtn = activeSubPanel.querySelector(
           '.ma-subtab-btn[data-ma-subtab-target="' + internalTab + '"]'

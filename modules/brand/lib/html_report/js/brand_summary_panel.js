@@ -166,6 +166,59 @@
       }
       dashboard.classList.remove('brsum-fading');
     }, 200);
+
+    /* Closing strip: re-render outside the fade so it updates immediately
+       on brand change. Spelled-out metric names + active-brand-specific
+       numbers — Duncan's v1.1 polish. */
+    renderClosingStrip(root, brandCode);
+  }
+
+
+  /* -------------------------------------------------------------------------
+   * Closing strip: <brand> across all categories.
+   *
+   * One mini-card per deep-dive category; each card pulls Mental Market
+   * Share / Mental Penetration / Bought past 3 months for the currently
+   * selected brand from payload.categories[cat].brands[brand]. Re-runs on
+   * every brand-picker change so the strip always reflects the dropdown,
+   * not the config-time focal.
+   * ------------------------------------------------------------------------- */
+  function renderClosingStrip(root, brandCode) {
+    var closing = root.querySelector('[data-brsum-closing]');
+    if (!closing) return;
+    var payload = root.__brsumPayload;
+    if (!payload || !payload.categories) return;
+
+    /* Resolve the brand's display name from any category's snap. */
+    var brandName = brandCode;
+    var cats = payload.categories;
+    var firstName = null;
+    Object.keys(cats).some(function (cn) {
+      var snap = cats[cn] && cats[cn].brands && cats[cn].brands[brandCode];
+      if (snap && snap.name) { firstName = snap.name; return true; }
+      return false;
+    });
+    if (firstName) brandName = firstName;
+
+    var title = closing.querySelector('[data-brsum-closing-title]');
+    if (title) title.textContent = brandName + ' across all categories';
+
+    var cards = closing.querySelectorAll('[data-brsum-mini-cat]');
+    cards.forEach(function (card) {
+      var cn = card.getAttribute('data-brsum-mini-cat');
+      var snap = cats[cn] && cats[cn].brands && cats[cn].brands[brandCode];
+      var fm = (snap && snap.focal_metrics) ? snap.focal_metrics : null;
+      var mms  = (fm && fm[0]) ? fm[0].value : '—';
+      var mpen = (fm && fm[1]) ? fm[1].value : '—';
+      var bt   = (fm && fm[2]) ? fm[2].value : '—';
+      var setVal = function (sel, v) {
+        var el = card.querySelector('[data-brsum-mini-metric="' + sel + '"]');
+        if (el) el.innerHTML = (v == null || v === '') ? '—' : escHtml(String(v));
+      };
+      setVal('mms',  mms);
+      setVal('mpen', mpen);
+      setVal('bt',   bt);
+    });
   }
 
   /* ---------------------------------------------------------------------

@@ -656,6 +656,10 @@ render_cat_buying_panel <- function(panel_data) {
     sprintf("%s%.1f", sgn, x)
   }
 
+  # Light-buyer index card is hidden in v1.1 — Duncan flagged it as confusing
+  # against the rest of the Heaviness narrative. The NMI computation +
+  # verdict mapping above remain in code so the card can be reinstated by
+  # restoring the third sprintf() block below.
   paste0(
     '<div class="cb-kpi-strip" style="margin:8px 0 14px;">',
     sprintf(paste0(
@@ -673,17 +677,18 @@ render_cat_buying_panel <- function(panel_data) {
       '</div>'),
       .cb_esc(focal_lbl), t_months, .cb_esc(focal_lbl),
       fmt_n(wbar_b), .cb_esc(focal_lbl), fmt_n(wbar_c), fmt_gap(wbar_g)),
-    sprintf(paste0(
-      '<div class="cb-kpi-chip" data-kpi="hv-light" title="Light-buyer index = brand&apos;s %% of light category buyers ÷ category&apos;s %% of light category buyers × 100. ',
-      'Above 100 = brand&apos;s base is more light-skewed than the category — the Natural Monopoly Law signature (typical of mass / leader brands). ',
-      'Around 100 = brand mirrors the category. Below 100 = brand over-recruits heavy category buyers (niche / specialist).">',
-      '<div class="cb-kpi-val" data-kpi-val>%s</div>',
-      '<div class="cb-kpi-label">Light-buyer index ',
-      '<span data-kpi-verdict style="display:inline-block;padding:1px 7px;border-radius:8px;background:%s;color:#fff;font-size:10px;margin-left:4px;">%s</span>',
-      '</div>',
-      '</div>'),
-      if (!is.finite(nmi)) "&mdash;" else sprintf("%.0f", nmi),
-      nmi_verdict[["colour"]], nmi_verdict[["label"]]),
+    # ---- DISABLED: Light-buyer index card (revive by uncommenting) ----
+    # sprintf(paste0(
+    #   '<div class="cb-kpi-chip" data-kpi="hv-light" title="Light-buyer index = brand&apos;s %% of light category buyers ÷ category&apos;s %% of light category buyers × 100. ',
+    #   'Above 100 = brand&apos;s base is more light-skewed than the category — the Natural Monopoly Law signature (typical of mass / leader brands). ',
+    #   'Around 100 = brand mirrors the category. Below 100 = brand over-recruits heavy category buyers (niche / specialist).">',
+    #   '<div class="cb-kpi-val" data-kpi-val>%s</div>',
+    #   '<div class="cb-kpi-label">Light-buyer index ',
+    #   '<span data-kpi-verdict style="display:inline-block;padding:1px 7px;border-radius:8px;background:%s;color:#fff;font-size:10px;margin-left:4px;">%s</span>',
+    #   '</div>',
+    #   '</div>'),
+    #   if (!is.finite(nmi)) "&mdash;" else sprintf("%.0f", nmi),
+    #   nmi_verdict[["colour"]], nmi_verdict[["label"]]),
     '</div>'
   )
 }
@@ -767,24 +772,9 @@ render_cat_buying_panel <- function(panel_data) {
     'The two numbers usually differ because the focal&apos;s buyers are a ',
     'SUBSET of all category buyers; a positive gap means this brand pulls ',
     'category-heavy users.</li>',
-    '<li><strong>Light-buyer index</strong>: brand&apos;s % of light category ',
-    'buyers &divide; category&apos;s % of light category buyers &times; 100. ',
-    'Per Ehrenberg-Bass&apos;s <strong>Natural Monopoly Law</strong>, bigger ',
-    'brands have a buyer base that is <em>more</em> light-skewed than the ',
-    'category average, not less &mdash; they sweep in occasional category buyers ',
-    'because they show up everywhere.',
-    '<ul>',
-    '<li><strong>Index above 100</strong> &mdash; the brand&apos;s base is ',
-    'more light-skewed than the category. This is the Natural Monopoly Law ',
-    'signature: typical of mass / leader brands.</li>',
-    '<li><strong>Index around 100</strong> &mdash; the brand&apos;s buyer mix ',
-    'mirrors the category. No skew either way.</li>',
-    '<li><strong>Index below 100</strong> &mdash; the brand <em>under-recruits ',
-    'light category buyers and over-recruits heavy ones</em>. The niche / ',
-    'specialist signature. The brand wins where it competes, but its growth ',
-    'ceiling is bounded by the size of the heavy-buyer pool.</li>',
-    '</ul>',
-    '</li>',
+    # Light-buyer index card was removed for clarity in v1.1 (see
+    # .cb_heaviness_focal_kpis above). Its explainer section is hidden here
+    # too — restore alongside the card when reinstating.
     '</ul>',
 
     '<p style="margin:10px 0 4px;color:#475569;">',

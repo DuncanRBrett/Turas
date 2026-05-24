@@ -2023,31 +2023,28 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   # categories. Single-category reports (the common case) don't benefit from
   # this view — it just adds noise.
   if (length(deep_cats) < 2 || !nzchar(focal_brand)) return("")
+  # v1.1: emit a skeleton with one card per deep-dive category. JS
+  # (brand_summary_panel.js::renderClosingStrip) fills the title + numbers
+  # from payload$categories[[cat]]$brands[[active_brand]] every time the
+  # brand picker changes, so the strip tracks the dropdown rather than the
+  # config-time focal brand. Spelled-out metric names (Mental Market Share /
+  # Mental Penetration / Bought past 3 months) — Duncan's polish request.
   cards <- character(0)
   for (cn in deep_cats) {
-    cat_payload <- payload$categories[[cn]]
-    if (is.null(cat_payload)) next
-    snap <- cat_payload$brands[[focal_brand]]
-    if (is.null(snap)) next
-    mms <- snap$focal_metrics[[1]]$value
-    mpen <- snap$focal_metrics[[2]]$value
-    bt   <- snap$focal_metrics[[3]]$value
     cards <- c(cards, sprintf(
-      '<div class="brsum-mini-card" onclick="brsumSwitchCat(\'%s\')">
+      '<div class="brsum-mini-card" data-brsum-mini-cat="%s" onclick="brsumSwitchCat(\'%s\')">
          <div class="brsum-mini-cat">%s</div>
-         <div class="brsum-mini-row"><span>MMS</span><span class="brsum-mini-num">%s</span></div>
-         <div class="brsum-mini-row"><span>MPen</span><span class="brsum-mini-num">%s</span></div>
-         <div class="brsum-mini-row"><span>Bought-T</span><span class="brsum-mini-num">%s</span></div>
+         <div class="brsum-mini-row"><span>Mental Market Share</span><span class="brsum-mini-num" data-brsum-mini-metric="mms">&mdash;</span></div>
+         <div class="brsum-mini-row"><span>Mental Penetration</span><span class="brsum-mini-num" data-brsum-mini-metric="mpen">&mdash;</span></div>
+         <div class="brsum-mini-row"><span>Bought past 3 months</span><span class="brsum-mini-num" data-brsum-mini-metric="bt">&mdash;</span></div>
        </div>',
-      .brsum_esc(cn), .brsum_esc(cn), .brsum_esc(mms),
-      .brsum_esc(mpen), .brsum_esc(bt)
+      .brsum_esc(cn), .brsum_esc(cn), .brsum_esc(cn)
     ))
   }
   if (length(cards) == 0) return("")
   paste(
-    '<div class="brsum-closing">',
-      sprintf('<div class="brsum-strip-title">%s across all categories</div>',
-              .brsum_esc(payload$categories[[deep_cats[1]]]$brands[[focal_brand]]$name %||% focal_brand)),
+    '<div class="brsum-closing" data-brsum-closing>',
+      '<div class="brsum-strip-title" data-brsum-closing-title>Brand across all categories</div>',
       '<div class="brsum-mini-grid">',
         paste(cards, collapse = "\n"),
       '</div>',

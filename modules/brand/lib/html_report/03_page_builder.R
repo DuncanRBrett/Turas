@@ -144,9 +144,19 @@ build_br_tab_nav <- function(category_names, config, display_map = NULL,
 #'   is rendered visible by default with the text pre-populated in both the
 #'   raw textarea and the rendered display div. This is the seam that lets
 #'   the Section_Insights config sheet survive report re-runs.
+#' @param internal_tab Optional character. When this toolbar belongs to a
+#'   specific internal sub-tab inside a multi-tab panel (Funnel or Mental
+#'   Availability), tag it with the data-internal-tab attribute. The JS
+#'   sub-tab switcher (brand_report.js::switchCategorySubtab) hides every
+#'   toolbar except the one whose internal_tab matches the active sub-tab.
+#' @param initial_visible Logical. When emitting multiple toolbars per
+#'   sub-panel, only the first should be visible at render time; later
+#'   ones are hidden until the matching sub-tab becomes active.
 #'
 #' @keywords internal
-build_br_section_toolbar <- function(section_id, prefill_text = NULL) {
+build_br_section_toolbar <- function(section_id, prefill_text = NULL,
+                                      internal_tab = NULL,
+                                      initial_visible = TRUE) {
   has_text <- !is.null(prefill_text) && !is.na(prefill_text) &&
               nzchar(trimws(as.character(prefill_text)))
   prefill_text <- if (has_text) as.character(prefill_text) else ""
@@ -154,20 +164,28 @@ build_br_section_toolbar <- function(section_id, prefill_text = NULL) {
   # When pre-filled, the container is open by default and the rendered view
   # is shown (textarea hidden) so the analyst sees the insight as published.
   # Double-click the rendered view to edit (matches existing UX).
+  #
+  # width:100%; max-width:none; grid-column:1/-1 force the container to span
+  # the full available row width regardless of whether the parent panel
+  # uses grid, flex, or a constrained column layout. Without these the
+  # textarea was being squeezed into ~250px on the Funnel + MA panels.
+  base_container <- "margin-bottom:16px;position:relative;width:100%%;max-width:none;box-sizing:border-box;grid-column:1 / -1;"
   container_style <- if (has_text) {
-    "display:block;margin-bottom:16px;position:relative;"
+    paste0("display:block;", base_container)
   } else {
-    "display:none;margin-bottom:16px;position:relative;"
+    paste0("display:none;", base_container)
   }
+  base_textarea <- "width:100%%;min-width:0;min-height:140px;border:1px solid #e2e8f0;border-radius:6px;padding:12px;font-family:inherit;font-size:13px;line-height:1.55;resize:vertical;box-sizing:border-box;"
   textarea_style <- if (has_text) {
-    "width:100%%;min-height:60px;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-family:inherit;font-size:13px;resize:vertical;display:none;"
+    paste0(base_textarea, "display:none;")
   } else {
-    "width:100%%;min-height:60px;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-family:inherit;font-size:13px;resize:vertical;"
+    base_textarea
   }
+  base_rendered <- "padding:12px 14px;border:1px solid #e2e8f0;border-radius:6px;min-height:48px;cursor:pointer;font-size:13px;line-height:1.55;box-sizing:border-box;"
   rendered_style <- if (has_text) {
-    "display:block;padding:10px;border:1px solid #e2e8f0;border-radius:6px;min-height:40px;cursor:pointer;font-size:13px;line-height:1.5;background:#f8fafc;"
+    paste0("display:block;background:#f8fafc;", base_rendered)
   } else {
-    "display:none;padding:10px;border:1px solid #e2e8f0;border-radius:6px;min-height:40px;cursor:pointer;font-size:13px;line-height:1.5;"
+    paste0("display:none;", base_rendered)
   }
   toggle_label <- if (has_text) "Edit Insight" else "+ Add Insight"
   # When pre-filled the container is open by default and the rendered view
@@ -180,7 +198,22 @@ build_br_section_toolbar <- function(section_id, prefill_text = NULL) {
   # by the existing JS editor when the analyst opens the textarea.
   rendered_html <- if (has_text) .br_render_insight_md(prefill_text) else ""
 
-  sprintf('
+  # Optional per-sub-tab wrapper. When this toolbar belongs to a specific
+  # internal sub-tab inside a multi-tab panel (Funnel or Mental Avail), we
+  # wrap it in a div with data-insight-internal-tab + display state, so the
+  # sub-tab switcher in brand_report.js can show one at a time.
+  wrapper_open <- ""
+  wrapper_close <- ""
+  if (!is.null(internal_tab) && nzchar(internal_tab)) {
+    wrapper_style <- if (isTRUE(initial_visible))
+      "display:block;" else "display:none;"
+    wrapper_open <- sprintf(
+      '<div class="br-insight-wrap" data-insight-internal-tab="%s" style="%s">',
+      .br_esc(internal_tab), wrapper_style)
+    wrapper_close <- "</div>"
+  }
+
+  inner <- sprintf('
 <div class="br-section-toolbar" style="display:flex;gap:8px;margin-bottom:12px;">
   <button class="br-pin-btn" data-section="%s" onclick="brTogglePin(\'%s\')" title="Pin to Views"
     style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:15px;padding:5px 10px;color:#94a3b8;transition:all 0.15s;">
@@ -213,6 +246,8 @@ build_br_section_toolbar <- function(section_id, prefill_text = NULL) {
     section_id, textarea_style, .br_esc(prefill_text),
     section_id, section_id, rendered_style, rendered_html,
     section_id)
+
+  paste0(wrapper_open, inner, wrapper_close)
 }
 
 
@@ -560,11 +595,35 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
           '<h3 class="br-element-title">Audience Lens \u2014 %s</h3>',
           .br_esc(cat_name)))
       } else if (el == "funnel" || el == "ma") {
-        # v1.0 of the Section_Insights workflow: funnel + MA panels don't
-        # carry their own insight editor (they're rendered client-side from
-        # JSON). Prepend the shared toolbar so analysts can attach an
-        # insight via the Section_Insights config sheet.
-        parts <- c(parts, toolbar_for(section_id))
+        # Per-sub-tab insight toolbars. The funnel panel has 2 internal
+        # sub-tabs (funnel / relationship) and the MA panel has 4 (attributes
+        # / advantage / ceps / metrics). Emit one toolbar per sub-tab, tagged
+        # with data-insight-internal-tab so the JS sub-tab switcher
+        # (brand_report.js::switchCategorySubtab) can hide all but the active
+        # one. Anchors: <internal-tab>-<cat_id>, e.g. funnel-bak, ceps-pos.
+        sub_specs <- if (el == "funnel") {
+          list(
+            list(anchor_el = "funnel",       internal = "funnel"),
+            list(anchor_el = "attitude",     internal = "relationship")
+          )
+        } else {
+          list(
+            list(anchor_el = "attributes",   internal = "attributes"),
+            list(anchor_el = "advantage",    internal = "advantage"),
+            list(anchor_el = "ceps",         internal = "ceps"),
+            list(anchor_el = "metrics",      internal = "metrics")
+          )
+        }
+        for (i in seq_along(sub_specs)) {
+          sp <- sub_specs[[i]]
+          sub_anchor <- paste0(sp$anchor_el, "-", cat_id)
+          parts <- c(parts, build_br_section_toolbar(
+            section_id      = sub_anchor,
+            prefill_text    = section_insight_for(config$section_insights,
+                                                  sub_anchor),
+            internal_tab    = sp$internal,
+            initial_visible = (i == 1L)))
+        }
       }
       parts <- c(parts, panels[[chart_key]])
     } else if (el == "ma") {
@@ -639,18 +698,21 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
         cb_insight_text <- section_insight_for(config$section_insights,
                                                section_id)
         cb_has <- nzchar(cb_insight_text)
+        cb_base_container <- "margin-top:12px;position:relative;width:100%%;max-width:none;box-sizing:border-box;grid-column:1 / -1;"
         cb_container_style <- if (cb_has)
-          "display:block;margin-top:12px;position:relative;"
+          paste0("display:block;", cb_base_container)
         else
-          "display:none;margin-top:12px;position:relative;"
+          paste0("display:none;", cb_base_container)
+        cb_base_textarea <- "width:100%%;min-width:0;min-height:140px;border:1px solid #e2e8f0;border-radius:6px;padding:12px;font-family:inherit;font-size:13px;line-height:1.55;resize:vertical;box-sizing:border-box;"
         cb_textarea_style <- if (cb_has)
-          "width:100%%;min-height:60px;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-family:inherit;font-size:13px;resize:vertical;display:none;"
+          paste0(cb_base_textarea, "display:none;")
         else
-          "width:100%%;min-height:60px;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-family:inherit;font-size:13px;resize:vertical;"
+          cb_base_textarea
+        cb_base_rendered <- "padding:12px 14px;border:1px solid #e2e8f0;border-radius:6px;min-height:48px;cursor:pointer;font-size:13px;line-height:1.55;box-sizing:border-box;"
         cb_rendered_style <- if (cb_has)
-          "display:block;padding:10px;border:1px solid #e2e8f0;border-radius:6px;min-height:40px;cursor:pointer;font-size:13px;line-height:1.5;background:#f8fafc;"
+          paste0("display:block;background:#f8fafc;", cb_base_rendered)
         else
-          "display:none;padding:10px;border:1px solid #e2e8f0;border-radius:6px;min-height:40px;cursor:pointer;font-size:13px;line-height:1.5;"
+          paste0("display:none;", cb_base_rendered)
         cb_toggle_label <- if (cb_has) "Edit Insight" else "+ Add Insight"
         cb_toggle_handler <- if (cb_has) "_brToggleInsightEdit" else "_brToggleInsight"
         cb_rendered_html <- if (cb_has) .br_render_insight_md(cb_insight_text) else ""

@@ -1137,18 +1137,21 @@ build_br_portfolio_panel <- function(results, config) {
   prefill_text <- .pf_lookup_insight(section_id)
   has_text <- nzchar(prefill_text)
 
+  base_container <- "margin-bottom:16px;position:relative;width:100%%;max-width:none;box-sizing:border-box;grid-column:1 / -1;"
   container_style <- if (has_text)
-    "display:block;margin-bottom:16px;position:relative;"
+    paste0("display:block;", base_container)
   else
-    "display:none;margin-bottom:16px;position:relative;"
+    paste0("display:none;", base_container)
+  base_textarea <- "width:100%%;min-width:0;min-height:140px;border:1px solid #e2e8f0;border-radius:6px;padding:12px;font-family:inherit;font-size:13px;line-height:1.55;resize:vertical;box-sizing:border-box;"
   textarea_style <- if (has_text)
-    "width:100%%;min-height:60px;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-family:inherit;font-size:13px;resize:vertical;display:none;"
+    paste0(base_textarea, "display:none;")
   else
-    "width:100%%;min-height:60px;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-family:inherit;font-size:13px;resize:vertical;"
+    base_textarea
+  base_rendered <- "padding:12px 14px;border:1px solid #e2e8f0;border-radius:6px;min-height:48px;cursor:pointer;font-size:13px;line-height:1.55;box-sizing:border-box;"
   rendered_style <- if (has_text)
-    "display:block;padding:10px;border:1px solid #e2e8f0;border-radius:6px;min-height:40px;cursor:pointer;font-size:13px;line-height:1.5;background:#f8fafc;"
+    paste0("display:block;background:#f8fafc;", base_rendered)
   else
-    "display:none;padding:10px;border:1px solid #e2e8f0;border-radius:6px;min-height:40px;cursor:pointer;font-size:13px;line-height:1.5;"
+    paste0("display:none;", base_rendered)
   toggle_label <- if (has_text) "Edit Insight" else "+ Add Insight"
   toggle_handler <- if (has_text) "_brToggleInsightEdit" else "_brToggleInsight"
   rendered_html <- if (has_text && exists(".br_render_insight_md", mode = "function"))

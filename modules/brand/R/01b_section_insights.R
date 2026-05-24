@@ -70,19 +70,68 @@ BRAND_SECTION_INSIGHTS_VERSION <- "1.0"
 # Per-category friendly-to-element map. Anchor = element-{cat_id} where
 # cat_id is the lower-cased CategoryCode with non-alphanumerics replaced
 # by hyphens — same rule as build_br_category_panel() in 03_page_builder.R.
+#
+# v1.1: Funnel + Mental Availability now have per-sub-tab anchors so the
+# analyst can write a distinct insight on each sub-tab. The element keys
+# below match the data-internal-tab attribute used by switchCategorySubtab
+# in brand_report.js. Names chosen to match the visible UI label where
+# possible (Brand Attitude → attitude, not relationship).
 .BRAND_CATEGORY_SECTION_MAP <- list(
-  "brand funnel"     = "funnel",
-  "mental advantage" = "ma",
-  "category buying"  = "repertoire",
-  "cat buying"       = "repertoire",
-  "repertoire"       = "repertoire",
-  "word of mouth"    = "wom",
-  "wom"              = "wom",
-  "branded reach"    = "branded_reach",
-  "demographics"     = "demographics",
-  "ad hoc"           = "adhoc",
-  "adhoc"            = "adhoc",
-  "audience lens"    = "audience_lens"
+  # Brand Funnel panel sub-tabs
+  "brand funnel"           = "funnel",        # Brand Funnel sub-tab
+  "brand attitude"         = "attitude",      # Brand Attitude sub-tab
+  "attitude"               = "attitude",
+  # Mental Availability panel sub-tabs
+  "brand attributes"       = "attributes",    # Brand Attributes sub-tab
+  "attributes"             = "attributes",
+  "category entry points"  = "ceps",          # CEPs sub-tab
+  "ceps"                   = "ceps",
+  "mental advantage"       = "advantage",     # Mental Advantage sub-tab
+  "advantage"              = "advantage",
+  "ma metrics"             = "metrics",       # Headline Metrics sub-tab
+  "headline metrics"       = "metrics",
+  "metrics"                = "metrics",
+  # Category Buying — single tab today
+  "category buying"        = "repertoire",
+  "cat buying"             = "repertoire",
+  "repertoire"             = "repertoire",
+  # Other element panels
+  "word of mouth"          = "wom",
+  "wom"                    = "wom",
+  "branded reach"          = "branded_reach",
+  "demographics"           = "demographics",
+  "ad hoc"                 = "adhoc",
+  "adhoc"                  = "adhoc",
+  "audience lens"          = "audience_lens"
+)
+
+# Internal-tab aliases. The brand_report.js sub-tab switcher uses these
+# names in data-internal-tab attributes. The page builder maps each
+# friendly label above to one of these so the insight toolbar tags itself
+# with the right internal tab and the JS shows/hides correctly.
+#
+# Note "attitude" → JS uses "relationship" historically; we expose
+# "attitude" as the anchor name (matches the UI label) and translate to
+# the JS internal-tab name at render time.
+.BRAND_ELEMENT_TO_INTERNAL_TAB <- c(
+  funnel       = "funnel",
+  attitude     = "relationship",
+  attributes   = "attributes",
+  ceps         = "ceps",
+  advantage    = "advantage",
+  metrics      = "metrics"
+)
+
+# Which sub-panel (subpanel key in build_br_category_panel) each element
+# anchor belongs to. Used by the page builder to emit toolbars in the
+# right wrapper.
+.BRAND_ELEMENT_TO_SUBPANEL <- c(
+  funnel     = "fn",
+  attitude   = "fn",
+  attributes = "ma",
+  ceps       = "ma",
+  advantage  = "ma",
+  metrics    = "ma"
 )
 
 

@@ -52,16 +52,30 @@ Use these in the `Section` column. Lookup is case-insensitive.
 
 ### Per-category (Category = `CategoryCode` from your Categories sheet)
 
-| Section label      | Renders into anchor          | Where it appears |
-|--------------------|------------------------------|------------------|
-| `Brand Funnel`     | `funnel-{cat}`               | Category tab → Brand Funnel sub-tab |
-| `Mental Advantage` | `ma-{cat}`                   | Category tab → Mental Advantage sub-tab |
-| `Category Buying`  | `repertoire-{cat}`           | Category tab → Category Buying sub-tab, footer insight |
-| `Word of Mouth`    | `wom-{cat}`                  | Category tab → Word of Mouth sub-tab |
-| `Branded Reach`    | `branded_reach-{cat}`        | Category tab → Branded Reach sub-tab (when enabled) |
-| `Demographics`     | `demographics-{cat}`         | Category tab → Demographics sub-tab |
-| `Ad Hoc`           | `adhoc-{cat}`                | Category tab → Ad Hoc sub-tab |
-| `Audience Lens`    | `audience_lens-{cat}`        | Category tab → Audience Lens sub-tab (when enabled) |
+The Funnel and Mental Availability panels each carry multiple sub-tabs.
+v1.1 emits one insight editor per sub-tab so the analyst's note shows on
+the right view rather than the panel wrapper.
+
+| Section label             | Renders into anchor          | Where it appears |
+|---------------------------|------------------------------|------------------|
+| `Brand Funnel`            | `funnel-{cat}`               | Category tab → Brand Funnel sub-tab |
+| `Brand Attitude`          | `attitude-{cat}`             | Category tab → Brand Attitude sub-tab |
+| `Brand Attributes`        | `attributes-{cat}`           | Category tab → Brand Attributes sub-tab |
+| `Category Entry Points`   | `ceps-{cat}`                 | Category tab → CEPs sub-tab |
+| `Mental Advantage`        | `advantage-{cat}`            | Category tab → Mental Advantage sub-tab |
+| `Headline Metrics` (or `MA Metrics`) | `metrics-{cat}`     | Category tab → MA Metrics sub-tab |
+| `Category Buying`         | `repertoire-{cat}`           | Category tab → Category Buying sub-tab, footer insight |
+| `Word of Mouth`           | `wom-{cat}`                  | Category tab → Word of Mouth sub-tab |
+| `Branded Reach`           | `branded_reach-{cat}`        | Category tab → Branded Reach sub-tab (when enabled) |
+| `Demographics`            | `demographics-{cat}`         | Category tab → Demographics sub-tab |
+| `Ad Hoc`                  | `adhoc-{cat}`                | Category tab → Ad Hoc sub-tab |
+| `Audience Lens`           | `audience_lens-{cat}`        | Category tab → Audience Lens sub-tab (when enabled) |
+
+> **Migration note:** v1.0 treated `Mental Advantage` as a panel-wide
+> anchor (`ma-{cat}`). v1.1 maps it specifically to the Mental Advantage
+> sub-tab (`advantage-{cat}`). Old `ma-{cat}` rows still render but as
+> orphan anchors with no editor binding — switch them to one of the four
+> MA sub-tab labels above.
 
 `{cat}` is the lower-cased `CategoryCode` with non-alphanumerics replaced by
 hyphens — so `POS` → `pos`, `Baking Mixes` → `baking-mixes`,

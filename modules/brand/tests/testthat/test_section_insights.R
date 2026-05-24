@@ -48,12 +48,45 @@ test_that(".brand_section_anchor maps reserved labels to anchor IDs", {
 })
 
 test_that(".brand_section_anchor maps per-category labels to element-cat IDs", {
+  # Funnel-panel sub-tabs (v1.1: distinct anchors per internal sub-tab)
   expect_equal(.brand_section_anchor("POS", "Brand Funnel"), "funnel-pos")
-  expect_equal(.brand_section_anchor("PAS", "Mental Advantage"), "ma-pas")
+  expect_equal(.brand_section_anchor("POS", "Brand Attitude"), "attitude-pos")
+  expect_equal(.brand_section_anchor("POS", "Attitude"), "attitude-pos")
+  # MA-panel sub-tabs (v1.1: 4 distinct anchors)
+  expect_equal(.brand_section_anchor("PAS", "Brand Attributes"), "attributes-pas")
+  expect_equal(.brand_section_anchor("PAS", "Attributes"), "attributes-pas")
+  expect_equal(.brand_section_anchor("PAS", "Category Entry Points"), "ceps-pas")
+  expect_equal(.brand_section_anchor("PAS", "CEPs"), "ceps-pas")
+  expect_equal(.brand_section_anchor("PAS", "Mental Advantage"), "advantage-pas")
+  expect_equal(.brand_section_anchor("PAS", "Advantage"), "advantage-pas")
+  expect_equal(.brand_section_anchor("PAS", "MA Metrics"), "metrics-pas")
+  expect_equal(.brand_section_anchor("PAS", "Headline Metrics"), "metrics-pas")
+  expect_equal(.brand_section_anchor("PAS", "Metrics"), "metrics-pas")
+  # Other elements
   expect_equal(.brand_section_anchor("DSS", "Category Buying"), "repertoire-dss")
   expect_equal(.brand_section_anchor("BAK", "Word of Mouth"), "wom-bak")
   expect_equal(.brand_section_anchor("BAK", "Demographics"), "demographics-bak")
   expect_equal(.brand_section_anchor("BAK", "Ad Hoc"), "adhoc-bak")
+})
+
+test_that("build_br_section_toolbar accepts internal_tab + initial_visible", {
+  # Hidden by default when not the first wrapper in a stack
+  html_hidden <- build_br_section_toolbar(
+    "attitude-bak", prefill_text = NULL,
+    internal_tab = "relationship", initial_visible = FALSE)
+  expect_match(html_hidden, 'data-insight-internal-tab="relationship"')
+  expect_match(html_hidden, 'display:none;')
+  # Visible when first
+  html_visible <- build_br_section_toolbar(
+    "funnel-bak", prefill_text = NULL,
+    internal_tab = "funnel", initial_visible = TRUE)
+  expect_match(html_visible, 'data-insight-internal-tab="funnel"')
+  expect_match(html_visible, 'display:block;')
+})
+
+test_that("build_br_section_toolbar without internal_tab emits no wrapper", {
+  html <- build_br_section_toolbar("wom-bak")
+  expect_false(grepl("data-insight-internal-tab", html))
 })
 
 test_that(".brand_section_anchor is case-insensitive on Section", {
@@ -78,8 +111,10 @@ test_that(".brand_section_anchor normalises CategoryCode for anchor", {
   # Hyphenisable codes
   expect_equal(.brand_section_anchor("Pour Over Sauce", "Brand Funnel"),
                "funnel-pour-over-sauce")
+  # v1.1: "Mental Advantage" resolves to the MA Advantage sub-tab, not the
+  # legacy panel-wide ma-{cat} anchor
   expect_equal(.brand_section_anchor("BAKING_MIXES", "Mental Advantage"),
-               "ma-baking-mixes")
+               "advantage-baking-mixes")
 })
 
 test_that(".brand_section_anchor returns NA on unusable input", {
@@ -154,10 +189,11 @@ test_that("load_section_insights_sheet resolves friendly labels to anchors", {
 
   expect_type(res, "character")
   expect_setequal(names(res),
-                  c("_EXECUTIVE_SUMMARY", "pf-overview", "funnel-pos", "ma-bak"))
+                  c("_EXECUTIVE_SUMMARY", "pf-overview",
+                    "funnel-pos", "advantage-bak"))
   expect_equal(unname(res["_EXECUTIVE_SUMMARY"]), "Topline story")
   expect_equal(unname(res["funnel-pos"]), "POS funnel notes")
-  expect_equal(unname(res["ma-bak"]), "BAK gap to leader")
+  expect_equal(unname(res["advantage-bak"]), "BAK gap to leader")
 })
 
 test_that("load_section_insights_sheet honours Order column", {
