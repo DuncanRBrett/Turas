@@ -202,11 +202,12 @@ test_that("table cells cover every (stage, brand) pair with absolute and nested 
   expect_equal(length(panel$table$brand_codes), 3L)
   expect_equal(length(panel$table$cells), 12L)
 
-  # IPK aware: absolute = 0.9; nested = same for stage 1 (no prior stage)
+  # IPK aware: absolute = 0.9; nested pins to 1.0 (aware is 100% of itself
+  # in the cumulative-chain view used by the "% of previous" toggle).
   ipk_aware <- Filter(function(c)
     c$stage_key == "aware" && c$brand_code == "IPK", panel$table$cells)[[1]]
   expect_equal(ipk_aware$pct_absolute, 0.9, tolerance = 1e-9)
-  expect_equal(ipk_aware$pct_nested,   0.9, tolerance = 1e-9)
+  expect_equal(ipk_aware$pct_nested,   1.0, tolerance = 1e-9)
   expect_equal(ipk_aware$sig_vs_focal, "focal")
 
   # IPK consideration (top-2 attitude): absolute = 0.5; nested = 0.5/0.9

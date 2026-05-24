@@ -94,45 +94,79 @@ calculate_stage_metrics <- function(stages, weights = NULL,
   })
   df <- do.call(rbind, out_list)
 
-  # Aware-conditional rates: % of aware respondents who also pass each
-  # subsequent stage. Computed via per-respondent intersection of the
-  # stage matrix with the aware matrix — gives a within-aware conditional
-  # rate that always sits in [0, 1] regardless of how the raw stages nest.
-  # The "% of aware" toggle in the funnel panel JS reads this so it reports
-  # a true subset-of-aware view, not an aggregate ratio that can exceed 100%.
-  # Aware stage itself pins to 1.0 (every aware respondent is aware).
-  awareness_key <- names(stages)[1]  # awareness is always the first stage
-  aware_matrix  <- stages[[awareness_key]]$matrix
-  if (!is.null(aware_matrix)) {
-    df$pct_aware_filtered <- NA_real_
-    df$base_aware_filtered <- NA_real_
-    brand_codes <- colnames(aware_matrix)
-    # Per-brand aware weighted count (denominator)
-    aware_counts <- vapply(brand_codes, function(b) {
-      vec <- aware_matrix[, b]
-      sum(w[vec], na.rm = TRUE)
-    }, numeric(1))
-    for (i in seq_len(nrow(df))) {
-      sk <- df$stage_key[i]
-      b  <- df$brand_code[i]
-      stage <- stages[[sk]]
-      if (is.null(stage) || is.null(stage$matrix)) next
-      if (!(b %in% colnames(stage$matrix))) next
-      if (sk == awareness_key) {
-        df$pct_aware_filtered[i] <- if (aware_counts[[b]] > 0) 1.0 else NA_real_
-      } else {
-        stage_vec <- stage$matrix[, b]
-        aware_vec <- aware_matrix[, b]
-        both <- stage_vec & aware_vec
-        num  <- sum(w[both], na.rm = TRUE)
-        df$pct_aware_filtered[i] <- if (aware_counts[[b]] > 0)
-          num / aware_counts[[b]] else NA_real_
-      }
-      df$base_aware_filtered[i] <- aware_counts[[b]]
-    }
-  } else {
+  # ===========================================================================
+  # Cumulative-chain rates for the "% of previous" and "% of aware" toggles.
+  # The headline % (pct_weighted / pct_unweighted) is the RAW aggregate
+  # rate — each stage uses its own survey response, independent of the
+  # other stages (per the panel explainer; aggregate semantics).
+  #
+  # The two filtered toggles, by contrast, walk a per-respondent cumulative
+  # chain so they describe the funnel as a respondent journey:
+  #   cum[1]     = stage[1] matrix (aware)
+  #   cum[k]     = cum[k-1] AND stage[k] matrix
+  #   pct_aware  = sum(cum[k] * w) / sum(cum[1] * w)
+  #   pct_nested = sum(cum[k] * w) / sum(cum[k-1] * w)
+  #
+  # Both ratios live in [0, 1] by construction (each cum matrix is a
+  # subset of the previous). When pct_total of stage[k] exceeds stage[k-1]
+  # (non-monotonic shape under aggregate), the cum-chain numerator drops
+  # rather than overflowing — visible to the analyst as a steep drop in
+  # the toggle view, which is the honest portrayal: of the people who
+  # actually qualified for the previous stage AND this one, how many
+  # carried through?
+  # ===========================================================================
+  stage_names <- names(stages)
+  if (length(stage_names) >= 1L) {
+    aware_matrix <- stages[[stage_names[1]]]$matrix
     df$pct_aware_filtered  <- NA_real_
+    df$pct_nested_filtered <- NA_real_
     df$base_aware_filtered <- NA_real_
+    if (!is.null(aware_matrix)) {
+      brand_codes <- colnames(aware_matrix)
+      # Build cum_matrix for each stage and weighted counts per brand
+      cum_counts <- matrix(NA_real_, nrow = length(stage_names),
+                           ncol = length(brand_codes),
+                           dimnames = list(stage_names, brand_codes))
+      cum_matrix <- NULL
+      for (sk in stage_names) {
+        sm <- stages[[sk]]$matrix
+        if (is.null(sm)) next
+        cum_matrix <- if (is.null(cum_matrix)) sm else (cum_matrix & sm)
+        for (b in brand_codes) {
+          if (!(b %in% colnames(cum_matrix))) next
+          cum_counts[sk, b] <- sum(w[cum_matrix[, b]], na.rm = TRUE)
+        }
+      }
+      aware_counts <- cum_counts[stage_names[1], ]
+      for (i in seq_len(nrow(df))) {
+        sk <- df$stage_key[i]
+        b  <- df$brand_code[i]
+        if (!(sk %in% rownames(cum_counts)) || !(b %in% colnames(cum_counts))) next
+        cum_b <- cum_counts[sk, b]
+        aware_b <- aware_counts[[b]]
+        df$base_aware_filtered[i] <- aware_b
+        # % of aware = cumulative count at this stage / aware count
+        df$pct_aware_filtered[i] <- if (!is.na(aware_b) && aware_b > 0)
+          cum_b / aware_b else NA_real_
+        # % of previous = cumulative count at this stage / cumulative count at prior
+        if (sk == stage_names[1]) {
+          df$pct_nested_filtered[i] <- if (!is.na(aware_b) && aware_b > 0) 1.0 else NA_real_
+        } else {
+          # Walk back to find the immediately-previous valid stage (skipping
+          # any stages that were dropped, e.g. when a role is absent).
+          prev_idx <- match(sk, stage_names) - 1L
+          while (prev_idx >= 1L &&
+                 is.na(cum_counts[stage_names[prev_idx], b])) {
+            prev_idx <- prev_idx - 1L
+          }
+          if (prev_idx >= 1L) {
+            prev_b <- cum_counts[stage_names[prev_idx], b]
+            df$pct_nested_filtered[i] <- if (!is.na(prev_b) && prev_b > 0)
+              cum_b / prev_b else NA_real_
+          }
+        }
+      }
+    }
   }
   df
 }

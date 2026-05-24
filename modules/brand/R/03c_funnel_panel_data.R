@@ -188,34 +188,32 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
   lbl_overrides <- .stage_label_overrides(config)
   stage_labels <- .stage_labels_for(stage_keys, overrides = lbl_overrides)
 
-  # Nested pct = stage pct / previous stage pct (category-wide). Stage 1
-  # has no previous stage so nested = absolute. Aware pct is the
-  # within-aware conditional rate: count of (aware AND stage) / count of
-  # aware. Computed in the engine (calculate_stage_metrics) using the
-  # per-respondent stage matrices, so it correctly subsets to aware
-  # respondents rather than dividing aggregate counts. Always in [0, 1].
-  prev_pct  <- list()
+  # All three % views:
+  #   pct_absolute  = raw stage count / total respondents (independent per
+  #                   stage; used by the "% of total" toggle)
+  #   pct_nested    = cumulative-chain count at this stage / cumulative
+  #                   count at the immediately previous stage (% previous)
+  #   pct_aware     = cumulative-chain count at this stage / aware count
+  #                   (% aware)
+  # The chained values come from calculate_stage_metrics() which walks
+  # the per-respondent matrices: cum[k] = cum[k-1] AND stage[k]. Both
+  # filtered views live in [0, 1] by construction — they describe the
+  # funnel as a respondent journey, while pct_absolute keeps the raw
+  # per-stage rate the explainer's "aggregate counts" view requires.
   cells <- list()
   for (key in stage_keys) {
     for (b in brand_codes) {
       row <- stages[stages$stage_key == key & stages$brand_code == b, ,
                     drop = FALSE]
       abs_pct <- if (nrow(row) == 0) NA_real_ else row$pct_weighted
-      nested_pct <- if (is.null(prev_pct[[b]]) || !is.finite(prev_pct[[b]]) ||
-                        prev_pct[[b]] <= 0 || !is.finite(abs_pct)) {
-        abs_pct
-      } else {
-        abs_pct / prev_pct[[b]]
-      }
-      # Within-aware conditional rate — set by calculate_stage_metrics
-      # via per-respondent intersection of the stage matrix with the
-      # aware matrix. Aware stage pins to 1.0 by construction there.
       pct_aw <- if (nrow(row) == 0 || !("pct_aware_filtered" %in% names(row)))
         NA_real_ else row$pct_aware_filtered
+      pct_prev <- if (nrow(row) == 0 || !("pct_nested_filtered" %in% names(row)))
+        NA_real_ else row$pct_nested_filtered
       cells[[length(cells) + 1]] <- list(
         stage_key = key, brand_code = b,
         pct_absolute = abs_pct,
-        pct_nested   = nested_pct,
+        pct_nested   = pct_prev,
         pct_aware    = pct_aw,
         base_weighted   = if (nrow(row) == 0) NA_real_ else row$base_weighted,
         base_unweighted = if (nrow(row) == 0) NA_real_ else row$base_unweighted,
@@ -227,7 +225,6 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
         sig_vs_avg = .sig_vs_avg_for_brand(result$sig_results, key, b),
         warning_flag = if (nrow(row) == 0) "na" else row$warning_flag
       )
-      prev_pct[[b]] <- abs_pct
     }
   }
 
