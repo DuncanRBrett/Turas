@@ -6,7 +6,7 @@ editor_options:
 
 # Turas Tracker - Technical Documentation
 
-**Version:** 10.1 **Last Updated:** 28 December 2025 **Target
+**Module Version:** 10.2 **Last Reviewed:** 24 May 2026 **Target
 Audience:** Developers, Technical Contributors, Module Maintainers
 
 ------------------------------------------------------------------------

@@ -6,7 +6,7 @@ editor_options:
 
 # Turas Tracker - Reference Guide
 
-**Version:** 10.0 **Last Updated:** 22 December 2025 **Target
+**Module Version:** 10.2 **Last Reviewed:** 24 May 2026 **Target
 Audience:** Analysts, Project Managers, Technical Users
 
 ------------------------------------------------------------------------

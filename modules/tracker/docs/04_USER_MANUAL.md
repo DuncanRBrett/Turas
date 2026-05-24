@@ -6,7 +6,7 @@ editor_options:
 
 # TurasTracker User Manual
 
-**Version 2.3** \| February 2026
+**Module Version:** 10.2 **Last Updated:** 24 May 2026
 
 ------------------------------------------------------------------------
 
