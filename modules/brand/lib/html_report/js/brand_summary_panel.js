@@ -542,6 +542,12 @@
         '</ul>'
       : '<div class="brsum-dop-empty">No under-indexing rivals.</div>';
     body.innerHTML =
+      '<p class="brsum-card-blurb">' +
+        'Among this brand’s buyers, who else ends up in the basket? ' +
+        '<strong>Partners</strong> show up more than their overall popularity predicts — ' +
+        'natural co-buys. <strong>Rivals</strong> show up less — head-to-head substitutes. ' +
+        'Percentage points (pp) compare each brand’s share among focal buyers with its share across the whole category.' +
+      '</p>' +
       '<div class="brsum-conv-dop-row">' +
         '<div class="brsum-conv-dop-side">' +
           '<div class="brsum-conv-dop-side-title">Partners — over-index</div>' +

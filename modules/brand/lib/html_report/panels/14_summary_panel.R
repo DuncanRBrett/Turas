@@ -330,6 +330,12 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   font-size: 10px; font-weight: 700; color: #64748b;
   text-transform: uppercase; letter-spacing: 0.4px;
 }
+/* ---- Card-level explainer (one-sentence plain-English subtitle) ---- */
+.brsum-card-blurb {
+  font-size: 12px; line-height: 1.45; color: #475569;
+  margin: 0 0 12px 0;
+}
+.brsum-card-blurb strong { color: #1f2937; }
 @media (max-width: 720px) {
   .brsum-conv-grid     { grid-template-columns: 1fr; }
   .brsum-conv-dop-row  { grid-template-columns: 1fr; }
