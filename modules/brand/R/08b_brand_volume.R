@@ -132,7 +132,24 @@ build_brand_volume_matrix <- function(cat_data,
     }
   }
 
+  # Preserve the raw (unreconciled) BRANDPEN2 buyer flags BEFORE
+  # reconciliation. Downstream metrics that should match the Funnel's
+  # `bought_target` stage exactly (Portfolio overview "% who bought" is
+  # the headline case) read this raw matrix so the two views report the
+  # same number for the same construct.
+  pen_mat_raw <- pen_mat
+
   # --- Reconciliation (§5.3) ---
+  # Auto-corrects two known paired-question inconsistencies:
+  #   Case A: BRANDPEN2 says "bought" but BRANDPEN3 (frequency) is 0 →
+  #           bump frequency to 1 (you can't buy zero times). Needed for
+  #           Dirichlet, repertoire, and any per-buyer mean.
+  #   Case B: BRANDPEN2 says "didn't buy" but BRANDPEN3 > 0 → promote to
+  #           buyer (trust the frequency answer). Inflates the buyer
+  #           count vs the raw BRANDPEN2 flag — diverges from the funnel.
+  # We keep both A and B for downstream consumers that need the cleaned
+  # matrix (sole loyalty, SCR, Dirichlet), but Portfolio overview reads
+  # pen_mat_raw above so its "% who bought" tracks the funnel exactly.
   rec <- .bv_reconcile(pen_mat, x_mat, n_resp, n_brands, brands)
   pen_mat           <- rec$pen_mat
   x_mat             <- rec$x_mat
@@ -199,6 +216,9 @@ build_brand_volume_matrix <- function(cat_data,
   result <- list(
     status         = if (length(warnings_out) > 0) "PARTIAL" else "PASS",
     pen_mat        = pen_mat,
+    pen_mat_raw    = pen_mat_raw,  # BRANDPEN2 unreconciled — used by
+                                    # Portfolio overview "% who bought"
+                                    # so it matches the Funnel exactly.
     x_mat          = x_mat,
     m_vec          = m_vec,
     reconciliation = recon_list,

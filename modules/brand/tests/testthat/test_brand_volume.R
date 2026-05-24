@@ -73,6 +73,39 @@ test_that("build_brand_volume_matrix reads slot-indexed BRANDPEN2 + BRANDPEN3", 
   expect_equal(res$x_mat[, "IPK"],  c(5, 4, 0, 0))
   expect_equal(res$x_mat[, "ROB"],  c(2, 0, 3, 0))
   expect_equal(res$x_mat[, "CART"], c(0, 0, 6, 0))
+  # pen_mat_raw is the unreconciled BRANDPEN2 buyer flag — Portfolio
+  # overview reads this so its "% who bought" matches the funnel exactly.
+  # In this fixture there's no pen=0/freq>0 inconsistency so raw == reconciled.
+  expect_equal(res$pen_mat_raw, res$pen_mat)
+})
+
+test_that("pen_mat_raw is present and identical to pen_mat in the no-conflict case", {
+  # The simple slot-indexed mini-fixture has no pen=0/freq>0 inconsistency
+  # to reconcile, so raw and reconciled pen_mat should match exactly. The
+  # contract that matters is: pen_mat_raw is always populated so the
+  # Portfolio overview reader (09h_portfolio_overview_data.R) can rely on
+  # `brand_vol$pen_mat_raw %||% brand_vol$pen_mat` to get the un-reconciled
+  # BRANDPEN2 buyer flag matching the funnel's `bought_target` stage.
+  cat_data <- data.frame(
+    BRANDPEN2_DSS_1 = c("IPK",  "IPK",  "ROB",  NA),
+    BRANDPEN2_DSS_2 = c("ROB",  NA,     "CART", NA),
+    BRANDPEN3_DSS_1 = c(5,      4,      3,      NA),
+    BRANDPEN3_DSS_2 = c(2,      NA,     6,      NA),
+    stringsAsFactors = FALSE
+  )
+  brands <- data.frame(
+    BrandCode = c("IPK", "ROB", "CART"),
+    BrandLabel = c("IPK", "ROB", "CART"),
+    stringsAsFactors = FALSE
+  )
+  res <- build_brand_volume_matrix(
+    cat_data = cat_data, cat_brands = brands,
+    pen_target_prefix = "BRANDPEN2_DSS",
+    freq_prefix = "BRANDPEN3_DSS"
+  )
+  expect_false(is.null(res$pen_mat_raw))
+  expect_equal(dim(res$pen_mat_raw), dim(res$pen_mat))
+  expect_equal(res$pen_mat_raw, res$pen_mat)
 })
 
 

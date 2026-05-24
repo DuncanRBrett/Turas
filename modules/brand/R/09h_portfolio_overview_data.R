@@ -54,8 +54,14 @@ build_portfolio_overview <- function(results, config) {
   if (is.null(cat_rec)) return(NULL)
   brand_vol <- cat_rec$brand_volume
   rep_res   <- cat_rec$repertoire
-  pen_mat   <- if (!is.null(brand_vol)) brand_vol$pen_mat else NULL
-  x_mat     <- if (!is.null(brand_vol)) brand_vol$x_mat   else NULL
+  # Use the raw (unreconciled) BRANDPEN2 matrix for the "% who bought"
+  # column so it matches the Funnel's `bought_target` stage exactly.
+  # x_mat stays as the reconciled version because volume share rolls
+  # through the cleaned frequency. See pen_mat_raw in 08b_brand_volume.R
+  # for the rationale.
+  pen_mat <- if (!is.null(brand_vol))
+    (brand_vol$pen_mat_raw %||% brand_vol$pen_mat) else NULL
+  x_mat   <- if (!is.null(brand_vol)) brand_vol$x_mat else NULL
   if (is.null(pen_mat) || is.null(x_mat)) return(NULL)
 
   # Build MPen + MMS lookups from MA result (% scale, NA when MA not
