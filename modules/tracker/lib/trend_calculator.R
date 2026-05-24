@@ -528,17 +528,20 @@ calculate_single_choice_trend_enhanced <- function(q_code, question_map, wave_da
 #' @return Named list of calculated metrics
 #' @keywords internal
 calculate_metrics_from_specs <- function(values, weights, specs_list,
-                                          wave_struct = NULL, wave_col = NULL) {
+                                          wave_struct = NULL, wave_col = NULL,
+                                          alpha = DEFAULT_ALPHA) {
   metrics <- list()
 
   for (spec in specs_list) {
     spec_lower <- tolower(trimws(spec))
 
     if (spec_lower == "mean") {
-      result <- calculate_weighted_mean(values, weights)
+      result <- calculate_weighted_mean(values, weights, alpha = alpha)
       metrics$mean <- result$mean
       metrics$sd <- result$sd
       metrics$eff_n <- result$eff_n
+      # CI bounds available on result$ci_lower / result$ci_upper if needed.
+      # Not propagated to metrics$ for now to keep the metrics contract stable.
 
     } else if (spec_lower == "top_box") {
       result <- calculate_top_box(values, weights, n_boxes = 1)
@@ -698,8 +701,11 @@ calculate_rating_trend_enhanced <- function(q_code, question_map, wave_data, con
     q_data <- resolve_question_values(q_data, wave_struct, wave_col)
 
     # Calculate each requested metric using shared dispatch
-    metrics <- calculate_metrics_from_specs(q_data, wave_df$weight_var, specs_list,
-                                             wave_struct, wave_col)
+    metrics <- calculate_metrics_from_specs(
+      q_data, wave_df$weight_var, specs_list,
+      wave_struct, wave_col,
+      alpha = get_setting(config, "alpha", default = DEFAULT_ALPHA)
+    )
 
     # Store basic counts (shared across all metrics)
     # Use which() to get numeric indices (avoids NA issues)
@@ -888,8 +894,11 @@ calculate_composite_trend_enhanced <- function(q_code, question_map, wave_data, 
       get_wave_question_code(question_map, q_code, wave_id),
       error = function(e) q_code
     )
-    metrics <- calculate_metrics_from_specs(composite_values, wave_df$weight_var, specs_list,
-                                             wave_struct, composite_wave_col)
+    metrics <- calculate_metrics_from_specs(
+      composite_values, wave_df$weight_var, specs_list,
+      wave_struct, composite_wave_col,
+      alpha = get_setting(config, "alpha", default = DEFAULT_ALPHA)
+    )
 
     # Compute effective N once at the wave level — see note in
     # calculate_rating_trend_enhanced. Avoids silently falling back to
