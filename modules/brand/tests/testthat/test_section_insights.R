@@ -89,6 +89,33 @@ test_that("build_br_section_toolbar without internal_tab emits no wrapper", {
   expect_false(grepl("data-insight-internal-tab", html))
 })
 
+test_that("omit_chart_buttons strips pin / PNG / Excel from the toolbar", {
+  # Funnel + MA sub-tab toolbars use this mode to avoid duplicating the
+  # panel's own pin / PNG / Excel buttons. Only the Add/Edit Insight
+  # toggle + container should render.
+  html_full <- build_br_section_toolbar(
+    "wom-bak", omit_chart_buttons = FALSE)
+  html_slim <- build_br_section_toolbar(
+    "funnel-bak", omit_chart_buttons = TRUE)
+
+  # Full toolbar: all 4 buttons present
+  expect_match(html_full, "br-pin-btn")
+  expect_match(html_full, "br-png-btn")
+  expect_match(html_full, "br-export-btn")
+  expect_match(html_full, "br-insight-toggle")
+
+  # Slim toolbar: only the insight toggle survives
+  expect_false(grepl("br-pin-btn", html_slim),
+               info = "Slim toolbar must not emit a pin button")
+  expect_false(grepl("br-png-btn", html_slim),
+               info = "Slim toolbar must not emit a PNG button")
+  expect_false(grepl("br-export-btn", html_slim),
+               info = "Slim toolbar must not emit an Excel button")
+  expect_match(html_slim, "br-insight-toggle")
+  # Insight container itself stays — that's the point of the toolbar
+  expect_match(html_slim, 'class="br-insight-container"')
+})
+
 test_that("multiple toolbars per sub-panel each have a unique anchor + visible state", {
   # When build_br_category_panel emits the per-sub-tab toolbars for the
   # Funnel and MA panels, the FIRST toolbar must render visible

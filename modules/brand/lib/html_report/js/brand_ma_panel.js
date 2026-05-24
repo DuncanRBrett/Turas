@@ -2257,8 +2257,26 @@
         chartSvg = captureSvg(chartSec);
       }
       if (optKeys.indexOf('insight') >= 0) {
-        var ta = panel.querySelector('.ma-insight-box-text[data-ma-stim="' + activeKey + '"]');
-        if (ta) insightText = ta.value.trim();
+        // v1.1: prefer the Section_Insights editor (.br-insight-editor)
+        // in the surrounding section — the section's currently-visible
+        // .br-insight-wrap carries the active sub-tab's editor. Falls
+        // back to the panel-internal session-storage textarea.
+        var maSection = panel.closest('.br-element-section');
+        if (maSection) {
+          var visibleWrap = null;
+          maSection.querySelectorAll('.br-insight-wrap[data-insight-internal-tab]')
+            .forEach(function (w) {
+              if (w.style.display !== 'none' && !visibleWrap) visibleWrap = w;
+            });
+          var brEd = visibleWrap
+            ? visibleWrap.querySelector('.br-insight-editor')
+            : maSection.querySelector('.br-insight-editor');
+          if (brEd) insightText = brEd.value.trim();
+        }
+        if (!insightText) {
+          var ta = panel.querySelector('.ma-insight-box-text[data-ma-stim="' + activeKey + '"]');
+          if (ta) insightText = ta.value.trim();
+        }
       }
       // Active "Base:" toggle for the current MA sub-tab. Scope to the
       // sub-tab wrapper so we don't accidentally read another sub-tab's
@@ -2283,8 +2301,24 @@
       // metrics never get the insight surreptitiously attached to ranking.
       var metricsInsight = '';
       if (optKeys.indexOf('insight') >= 0) {
-        var taM = panel.querySelector('.ma-insight-box-text[data-ma-stim="metrics"]');
-        if (taM) metricsInsight = taM.value.trim();
+        // v1.1: prefer Section_Insights editor — same logic as the
+        // matrix branch above. See the comment block there.
+        var metricsSection = panel.closest('.br-element-section');
+        if (metricsSection) {
+          var metricsVisibleWrap = null;
+          metricsSection.querySelectorAll('.br-insight-wrap[data-insight-internal-tab]')
+            .forEach(function (w) {
+              if (w.style.display !== 'none' && !metricsVisibleWrap) metricsVisibleWrap = w;
+            });
+          var metricsBrEd = metricsVisibleWrap
+            ? metricsVisibleWrap.querySelector('.br-insight-editor')
+            : metricsSection.querySelector('.br-insight-editor');
+          if (metricsBrEd) metricsInsight = metricsBrEd.value.trim();
+        }
+        if (!metricsInsight) {
+          var taM = panel.querySelector('.ma-insight-box-text[data-ma-stim="metrics"]');
+          if (taM) metricsInsight = taM.value.trim();
+        }
       }
       var metricDefs = {
         hero:     { sel: '.ma-hero-strip',    label: 'Headline metrics' },

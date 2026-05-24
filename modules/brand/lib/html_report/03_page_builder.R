@@ -152,11 +152,17 @@ build_br_tab_nav <- function(category_names, config, display_map = NULL,
 #' @param initial_visible Logical. When emitting multiple toolbars per
 #'   sub-panel, only the first should be visible at render time; later
 #'   ones are hidden until the matching sub-tab becomes active.
+#' @param omit_chart_buttons Logical. When TRUE, only the "Add / Edit
+#'   Insight" toggle + insight container are emitted — the pin / PNG /
+#'   Excel buttons are skipped. Used for Funnel and Mental Availability
+#'   sub-tab toolbars where the panel already renders its own pin /
+#'   PNG / Excel controls and a duplicate would clutter the UI.
 #'
 #' @keywords internal
 build_br_section_toolbar <- function(section_id, prefill_text = NULL,
                                       internal_tab = NULL,
-                                      initial_visible = TRUE) {
+                                      initial_visible = TRUE,
+                                      omit_chart_buttons = FALSE) {
   has_text <- !is.null(prefill_text) && !is.na(prefill_text) &&
               nzchar(trimws(as.character(prefill_text)))
   prefill_text <- if (has_text) as.character(prefill_text) else ""
@@ -218,7 +224,28 @@ build_br_section_toolbar <- function(section_id, prefill_text = NULL,
     wrapper_close <- "</div>"
   }
 
-  inner <- sprintf('
+  # Two toolbar layouts:
+  #   * Full toolbar (omit_chart_buttons=FALSE): pin / PNG / Excel /
+  #     Add Insight. Used by WOM, Demographics, Adhoc, Branded Reach,
+  #     Audience Lens, Cat-Buying fallback, and Portfolio sub-tabs.
+  #   * Insight-only toolbar (omit_chart_buttons=TRUE): just the Add /
+  #     Edit Insight button. Used by Funnel and MA sub-tabs where the
+  #     panel itself renders its own pin / PNG / Excel controls; the
+  #     duplicate cluttered the UI and the bottom pin (panel's own)
+  #     handles chart + table capture. The panel pin dropdowns
+  #     ("Insights" item) read .br-insight-editor from the parent
+  #     section so the Section_Insights text still pins correctly.
+  toolbar_html <- if (isTRUE(omit_chart_buttons)) {
+    sprintf('
+<div class="br-section-toolbar" style="display:flex;gap:8px;margin-bottom:12px;">
+  <button class="br-insight-toggle" onclick="%s(\'%s\')"
+    style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;padding:5px 10px;color:#64748b;">
+    %s
+  </button>
+</div>',
+      toggle_handler, section_id, toggle_label)
+  } else {
+    sprintf('
 <div class="br-section-toolbar" style="display:flex;gap:8px;margin-bottom:12px;">
   <button class="br-pin-btn" data-section="%s" onclick="brTogglePin(\'%s\')" title="Pin to Views"
     style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:15px;padding:5px 10px;color:#94a3b8;transition:all 0.15s;">
@@ -236,7 +263,12 @@ build_br_section_toolbar <- function(section_id, prefill_text = NULL,
     style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;padding:5px 10px;color:#64748b;">
     %s
   </button>
-</div>
+</div>',
+      section_id, section_id, section_id, section_id,
+      toggle_handler, section_id, toggle_label)
+  }
+
+  container_html <- sprintf('
 <div class="br-insight-container" data-section="%s" data-prefilled="%s" style="%s">
   <textarea class="br-insight-editor" data-section="%s" placeholder="Type key insight here..."
     style="%s">%s</textarea>
@@ -245,14 +277,12 @@ build_br_section_toolbar <- function(section_id, prefill_text = NULL,
   <button class="br-insight-dismiss" onclick="_brDismissInsight(\'%s\')"
     style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px;position:absolute;top:4px;right:8px;">&times;</button>
 </div>',
-    section_id, section_id, section_id, section_id,
-    toggle_handler, section_id, toggle_label,
     section_id, if (has_text) "true" else "false", container_style,
     section_id, textarea_style, .br_esc(prefill_text),
     section_id, section_id, rendered_style, rendered_html,
     section_id)
 
-  paste0(wrapper_open, inner, wrapper_close)
+  paste0(wrapper_open, toolbar_html, container_html, wrapper_close)
 }
 
 
@@ -606,6 +636,13 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
         # with data-insight-internal-tab so the JS sub-tab switcher
         # (brand_report.js::switchCategorySubtab) can hide all but the active
         # one. Anchors: <internal-tab>-<cat_id>, e.g. funnel-bak, ceps-pos.
+        #
+        # omit_chart_buttons=TRUE — the panel itself emits its own pin /
+        # PNG / Excel toolbar (data-fn-action="pindropdown" /
+        # ma-pin-dropdown-btn), so we render only the Add/Edit Insight
+        # toggle here to avoid duplicate pin buttons. The panel pin
+        # dropdowns read .br-insight-editor from the parent section so
+        # the Section_Insights text still pins correctly.
         sub_specs <- if (el == "funnel") {
           list(
             list(anchor_el = "funnel",       internal = "funnel"),
@@ -623,11 +660,12 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
           sp <- sub_specs[[i]]
           sub_anchor <- paste0(sp$anchor_el, "-", cat_id)
           parts <- c(parts, build_br_section_toolbar(
-            section_id      = sub_anchor,
-            prefill_text    = section_insight_for(config$section_insights,
-                                                  sub_anchor),
-            internal_tab    = sp$internal,
-            initial_visible = (i == 1L)))
+            section_id         = sub_anchor,
+            prefill_text       = section_insight_for(config$section_insights,
+                                                     sub_anchor),
+            internal_tab       = sp$internal,
+            initial_visible    = (i == 1L),
+            omit_chart_buttons = TRUE))
         }
       }
       parts <- c(parts, panels[[chart_key]])

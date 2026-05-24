@@ -2301,9 +2301,30 @@
           if (!el) return;
 
           if (/insight/i.test(label)) {
-            // Read textarea value — do NOT capture the DOM element itself
-            var ta  = el.querySelector(".fn-insight-textarea");
-            var txt = ta ? ta.value.trim() : "";
+            // Read textarea value — do NOT capture the DOM element itself.
+            // v1.1: prefer the Section_Insights editor (.br-insight-editor)
+            // in the surrounding section over the panel-internal session
+            // textarea (.fn-insight-textarea). The Section_Insights editor
+            // is config-persistent; the panel one is session-only.
+            var txt = "";
+            var section = panel.closest(".br-element-section");
+            if (section) {
+              // Pick the .br-insight-editor inside the currently-visible
+              // .br-insight-wrap so the right sub-tab editor is read.
+              var visibleWrap = null;
+              section.querySelectorAll(".br-insight-wrap[data-insight-internal-tab]")
+                .forEach(function (w) {
+                  if (w.style.display !== "none" && !visibleWrap) visibleWrap = w;
+                });
+              var brEd = visibleWrap
+                ? visibleWrap.querySelector(".br-insight-editor")
+                : section.querySelector(".br-insight-editor");
+              if (brEd) txt = brEd.value.trim();
+            }
+            if (!txt) {
+              var ta = el.querySelector(".fn-insight-textarea");
+              if (ta) txt = ta.value.trim();
+            }
             if (txt) { insightText = txt; hasInsight = true; }
           } else if (label === "Chart" && !chartSvg) {
             // Use bar wrap when bar view is active; slope container otherwise.
