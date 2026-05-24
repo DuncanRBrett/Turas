@@ -153,10 +153,11 @@
       renderFocalContext(root, snap, cat, catName);
       renderHeroCard(root, snap, cat, catName, brandCode);
       renderMentalCard(root, snap);
-      renderPhysicalCard(root, cat.funnel, brandCode, snap);
+      renderFunnelCard(root, cat.funnel, brandCode, snap);
       renderWorkingCard(root, cat, brandCode, snap);
       renderWeakCard(root, cat, brandCode, snap);
-      renderConversationCard(root, snap, cat.dop, brandCode);
+      renderWomCard(root, snap);
+      renderRepertoireCard(root, cat.dop, brandCode);
       /* Apply focal colour to any value text rendered inline. */
       if (snap && snap.colour) {
         $$('.brsum-focal-value', root).forEach(function (el) {
@@ -378,13 +379,15 @@
   }
 
   /* ---------------------------------------------------------------------
-   * Physical conversion card — collapsed Aware -> Prefer -> Bought
-   * funnel. Reuses the mini-funnel renderer (focal + cat-avg side-by-
-   * side, stacked stage bars) — same widget as the old Brand funnel
-   * card, just under the "physical" key.
+   * Buying funnel card — collapsed Aware -> Prefer -> Bought funnel.
+   * The label was "Physical conversion" in the first cut — corrected:
+   * these stages are all CLAIMED BUYING (% who say they're aware, who
+   * prefer, who bought in N months). Physical availability (in-store
+   * distribution) is not measured in this study. Reuses the mini-funnel
+   * renderer (focal + cat-avg side-by-side, stacked stage bars).
    * --------------------------------------------------------------------- */
-  function renderPhysicalCard(root, funnelBlock, brandCode, snap) {
-    renderMiniFunnelCard(root, 'physical', funnelBlock, brandCode, snap,
+  function renderFunnelCard(root, funnelBlock, brandCode, snap) {
+    renderMiniFunnelCard(root, 'funnel', funnelBlock, brandCode, snap,
       { emptyMessage: 'Funnel data not available.' });
   }
 
@@ -431,19 +434,29 @@
     var labels = block.stim_labels || stims;
     var avgs   = block.cat_avg_pct || [];
     var fps    = brand.focal_pct   || [];
-    var pps    = brand.advantage_pp || [];
+    /* Delta is computed as focal_pct - cat_avg_pct so the displayed +/-pp
+       matches the displayed focal and cat-avg values exactly. We do NOT
+       use brand.advantage_pp here — that's the MA engine's own advantage
+       metric (focal minus a model-based expected value), which would not
+       equal focal-minus-cat-avg and would confuse the reader who reads
+       both numbers off the row. The MA decision (Defend / Build /
+       Maintain) lives on the deep-dive MA tab; the Summary card uses
+       the simpler arithmetic delta. */
     var ranked = [];
     for (var i = 0; i < stims.length; i++) {
-      var pp = pps[i];
-      if (pp == null || isNaN(pp)) continue;
-      ranked.push({ idx: i, pp: pp });
+      var fv = fps[i], av = avgs[i];
+      if (fv == null || isNaN(fv) || av == null || isNaN(av)) continue;
+      var delta = fv - av;
+      ranked.push({ idx: i, delta: delta });
     }
     if (!ranked.length) return '';
-    ranked.sort(function (a, b) { return direction === 'top' ? b.pp - a.pp : a.pp - b.pp; });
+    ranked.sort(function (a, b) {
+      return direction === 'top' ? b.delta - a.delta : a.delta - b.delta;
+    });
     /* Drop wrong-sign rows so the "Working" card never lists negatives
        and "Weak" never lists positives — those don't fit the heading. */
     ranked = ranked.filter(function (r) {
-      return direction === 'top' ? r.pp > 0 : r.pp < 0;
+      return direction === 'top' ? r.delta > 0 : r.delta < 0;
     });
     if (!ranked.length) {
       return '<div class="brsum-adv-col">' +
@@ -456,17 +469,17 @@
     ranked = ranked.slice(0, 3);
     var rows = ranked.map(function (r) {
       var i = r.idx;
-      var fv = fps[i], av = avgs[i], pp = r.pp;
-      var ppTxt = (pp >= 0 ? '+' : '') + pp.toFixed(1) + 'pp';
+      var fv = fps[i], av = avgs[i], delta = r.delta;
+      var deltaTxt = (delta >= 0 ? '+' : '') + delta.toFixed(1) + 'pp';
       return '<li class="brsum-adv-item ' +
                (direction === 'top' ? 'is-over' : 'is-under') + '">' +
                '<span class="brsum-adv-label">' +
                  escHtml(labels[i] || stims[i]) + '</span>' +
                '<span class="brsum-adv-focal" style="color:' + col + '">' +
-                 (fv == null || isNaN(fv) ? '—' : Math.round(fv) + '%') + '</span>' +
+                 Math.round(fv) + '%</span>' +
                '<span class="brsum-adv-cat">vs ' +
-                 (av == null || isNaN(av) ? '—' : Math.round(av) + '%') + ' avg</span>' +
-               '<span class="brsum-adv-delta">' + ppTxt + '</span>' +
+                 Math.round(av) + '% avg</span>' +
+               '<span class="brsum-adv-delta">' + deltaTxt + '</span>' +
              '</li>';
     }).join('');
     return '<div class="brsum-adv-col">' +
@@ -476,43 +489,46 @@
   }
 
   /* ---------------------------------------------------------------------
-   * Conversation card — WOM (net heard / net said / occasions) on the
-   * left, DoP partners + rivals on the right. Two halves in one card so
-   * the reader sees "is this brand talked about?" and "who does it
-   * compete against?" together — the last beat in the story arc.
+   * Word of mouth card — Heard + Said columns (positive / negative / net
+   * per side), each row showing focal value + cat avg under. Uses the
+   * shared womColumn / womRow helpers. The original cut combined this
+   * with DoP partners/rivals in one card — split per Duncan's review.
    * --------------------------------------------------------------------- */
-  function renderConversationCard(root, snap, dopBlock, brandCode) {
+  function renderWomCard(root, snap) {
     var body = cardBody(root, 'conversation');
     if (!body) return;
-    var womHtml = renderConversationWom(snap);
-    var dopHtml = renderConversationDop(dopBlock, brandCode);
-    if (!womHtml && !dopHtml) {
-      body.innerHTML = '<div class="brsum-card-empty">Conversation data not available.</div>';
+    if (!snap || !snap.wom || !snap.wom.available) {
+      body.innerHTML = '<div class="brsum-card-empty">Word of mouth not available.</div>';
       return;
     }
+    var w = snap.wom;
     body.innerHTML =
-      '<div class="brsum-conv-grid">' +
-        (womHtml || '<div class="brsum-conv-half brsum-conv-empty">WOM not available.</div>') +
-        (dopHtml || '<div class="brsum-conv-half brsum-conv-empty">DoP not available.</div>') +
+      '<div class="brsum-wom-grid">' +
+        womColumn('Heard', w.heard) +
+        womColumn('Said',  w.said)  +
       '</div>';
   }
 
-  function renderConversationWom(snap) {
-    if (!snap || !snap.wom || !snap.wom.available) return '';
-    var w = snap.wom;
-    return '<div class="brsum-conv-half brsum-conv-wom">' +
-             '<div class="brsum-conv-coltitle">Word of mouth</div>' +
-             '<div class="brsum-wom-grid">' +
-               womColumn('Heard', w.heard) +
-               womColumn('Said',  w.said)  +
-             '</div>' +
-           '</div>';
-  }
-
-  function renderConversationDop(dopBlock, brandCode) {
-    if (!dopBlock || !dopBlock.available) return '';
+  /* ---------------------------------------------------------------------
+   * Repertoire ties card — top 2 DoP partners + top 2 rivals for the
+   * focal brand. Partners over-index, rivals under-index, both measured
+   * vs the column average across other brand rows (the partition-card
+   * metric on the DoP sub-tab). Split out from the merged "Conversation
+   * & competitive ties" card so the WOM read and the repertoire read
+   * each get their own real estate.
+   * --------------------------------------------------------------------- */
+  function renderRepertoireCard(root, dopBlock, brandCode) {
+    var body = cardBody(root, 'repertoire');
+    if (!body) return;
+    if (!dopBlock || !dopBlock.available) {
+      body.innerHTML = '<div class="brsum-card-empty">Duplication of purchase data not available.</div>';
+      return;
+    }
     var brand = dopBlock.brands && dopBlock.brands[brandCode];
-    if (!brand) return '';
+    if (!brand) {
+      body.innerHTML = '<div class="brsum-card-empty">No DoP data for this brand.</div>';
+      return;
+    }
     var partners = (brand.partners || []).slice(0, 2);
     var rivals   = (brand.rivals   || []).slice(0, 2);
     var partnersHtml = partners.length
@@ -525,19 +541,17 @@
           rivals.map(function (p) { return dopRow(p, false); }).join('') +
         '</ul>'
       : '<div class="brsum-dop-empty">No under-indexing rivals.</div>';
-    return '<div class="brsum-conv-half brsum-conv-dop">' +
-             '<div class="brsum-conv-coltitle">Competitive ties</div>' +
-             '<div class="brsum-conv-dop-row">' +
-               '<div class="brsum-conv-dop-side">' +
-                 '<div class="brsum-conv-dop-side-title">Partners</div>' +
-                 partnersHtml +
-               '</div>' +
-               '<div class="brsum-conv-dop-side">' +
-                 '<div class="brsum-conv-dop-side-title">Rivals</div>' +
-                 rivalsHtml +
-               '</div>' +
-             '</div>' +
-           '</div>';
+    body.innerHTML =
+      '<div class="brsum-conv-dop-row">' +
+        '<div class="brsum-conv-dop-side">' +
+          '<div class="brsum-conv-dop-side-title">Partners — over-index</div>' +
+          partnersHtml +
+        '</div>' +
+        '<div class="brsum-conv-dop-side">' +
+          '<div class="brsum-conv-dop-side-title">Rivals — under-index</div>' +
+          rivalsHtml +
+        '</div>' +
+      '</div>';
   }
 
   /* WOM column helpers — shared by renderConversationCard. */

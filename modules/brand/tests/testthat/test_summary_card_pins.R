@@ -21,8 +21,9 @@ source(file.path(ROOT, "modules", "brand", "lib", "html_report", "panels",
                  "14_summary_panel.R"))
 
 
-SUMMARY_CARD_KEYS <- c("hero", "mental", "physical",
-                       "working", "weak", "conversation")
+SUMMARY_CARD_KEYS <- c("hero", "mental", "funnel",
+                       "working", "weak",
+                       "conversation", "repertoire")
 SUMMARY_CARD_COUNT <- length(SUMMARY_CARD_KEYS)
 
 

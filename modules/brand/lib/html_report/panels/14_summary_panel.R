@@ -731,6 +731,18 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   st <- fn$stages
   stage_keys <- unique(as.character(st$stage_key))
 
+  # Synthesise the string-label keys the stage-label resolver expects
+  # from the numeric *_timeframe_months keys that the brand config
+  # always carries. Without this the resolver falls back to the
+  # canonical "Long Period" / "Target Period" defaults — the funnel
+  # deep-dive tab reads its labels from the per-category Brand
+  # Categories sheet which DOES carry Timeframe_Long / Timeframe_Target
+  # strings, but the summary-panel call site doesn't see that sheet.
+  if (is.null(config$Timeframe_Long) && !is.null(config$longer_timeframe_months))
+    config$Timeframe_Long <- paste0(config$longer_timeframe_months, " months")
+  if (is.null(config$Timeframe_Target) && !is.null(config$target_timeframe_months))
+    config$Timeframe_Target <- paste0(config$target_timeframe_months, " months")
+
   # Use the funnel-panel-data label resolver: applies Timeframe_Long /
   # Timeframe_Target overrides (e.g. "Past 12 months", "Past 3 months")
   # and falls back to the canonical stage names ("Aware", "Consider").
@@ -1815,17 +1827,20 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   # to grab the rendered card content (no <table> or <svg> required).
   #
   # Card story arc (top -> bottom):
-  #   1. Hero       — single-sentence verdict + 4 anchor numbers (MMS / MPen
-  #                   / % bought / SCR). Full-width.
-  #   2. Mental     — MMS / SoM / Network Size vs leader. The mental-
-  #                   availability story.
-  #   3. Physical   — Aware -> Prefer -> Bought -> SCR funnel collapsed.
-  #                   The physical-conversion story.
-  #   4. Working    — Top 3 CEPs + top 3 attributes the focal over-indexes
-  #                   on. Wide so two columns can sit side-by-side.
-  #   5. Weak       — Bottom 3 CEPs + bottom 3 attributes the focal
-  #                   under-indexes on. Wide for the same reason.
-  #   6. Conversation — WOM (heard / said) + top 2 DoP partners + rivals.
+  #   1. Hero          — single-sentence verdict + 4 anchor numbers (MMS /
+  #                      MPen / % bought / SCR). Full-width.
+  #   2. Mental        — MMS / SoM / Network Size vs leader. The mental-
+  #                      availability story.
+  #   3. Funnel        — Aware -> Prefer -> Bought funnel (claimed
+  #                      buying behaviour, not physical distribution).
+  #   4. Working       — Top 3 CEPs + top 3 attributes the focal over-
+  #                      indexes on. Wide for the side-by-side columns.
+  #   5. Weak          — Bottom 3 CEPs + bottom 3 attributes the focal
+  #                      under-indexes on. Wide for the same reason.
+  #   6. Conversation  — Word of mouth (heard + said + occasions).
+  #   7. Repertoire    — Top 2 DoP partners + top 2 rivals (who focal's
+  #                      buyers cohabit with above / below the column
+  #                      average; complements the funnel + WOM view).
   card <- function(key, title, wide = FALSE) {
     cls <- if (wide) ' brsum-card-wide' else ''
     section_id <- paste0('brsum-', key)
@@ -1847,12 +1862,13 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   }
   paste(
     '<div class="brsum-card-grid">',
-      card("hero",         "Brand at a glance",                          wide = TRUE),
+      card("hero",         "Brand at a glance",                                  wide = TRUE),
       card("mental",       "Mental availability"),
-      card("physical",     "Physical conversion"),
-      card("working",      "What’s working &mdash; over-indexers",   wide = TRUE),
-      card("weak",         "Where the brand is weakest &mdash; under-indexers", wide = TRUE),
-      card("conversation", "Conversation &amp; competitive ties"),
+      card("funnel",       "Buying funnel"),
+      card("working",      "What’s working &mdash; over-indexers",               wide = TRUE),
+      card("weak",         "Where the brand is weakest &mdash; under-indexers",  wide = TRUE),
+      card("conversation", "Word of mouth"),
+      card("repertoire",   "Repertoire ties &mdash; who focal buyers also buy"),
     '</div>',
     sep = "\n"
   )
