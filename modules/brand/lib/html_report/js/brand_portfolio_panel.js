@@ -1,6 +1,13 @@
 // ==============================================================================
 // BRAND MODULE - PORTFOLIO PANEL INTERACTIVITY
 // ==============================================================================
+// SIZE-EXCEPTION: single IIFE driving five Portfolio sub-tabs
+// (Overview, Footprint, Constellation, Clutter, Extension). Sub-tabs
+// share the focal-brand selection state + JSON payload parser; they
+// can't be split into separate files without a global namespace or
+// module loader. Future refactor: split once a JS bundler is in
+// place (see growth path doc).
+//
 // Phase 2: subtab switching.
 // Phase 3 additions: brand chip picker (strength map).
 // Phase 4 additions: constellation node-click re-centre + pin, timeframe toggle.

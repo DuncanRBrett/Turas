@@ -1,6 +1,12 @@
 # ==============================================================================
 # BRAND HTML REPORT - PAGE BUILDER
 # ==============================================================================
+# SIZE-EXCEPTION: final HTML assembly seam. The tab-bar navigation,
+# all inline CSS, all inline JS sourcing, and the per-category page
+# assembly all hang off the single build_brand_report_html() entry.
+# Splitting would require duplicating the head/body scaffold across
+# multiple files with no readability gain.
+#
 # Assembles the complete HTML document from tables, charts, and data.
 # Layer 4 of the 4-layer pipeline.
 # ==============================================================================

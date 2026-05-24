@@ -1,6 +1,10 @@
 # ==============================================================================
 # 9CAT SYNTHETIC EXAMPLE - Survey_Structure.xlsx GENERATOR
 # ==============================================================================
+# SIZE-EXCEPTION: example data generator covering 9 categories
+# (4 full CBM + 5 awareness-only). Each sheet built inline so a new
+# developer can read the whole synthetic study top-to-bottom.
+#
 # Generates a fully-filled Survey_Structure.xlsx for the IPK 9-category study:
 #   4 full CBM categories  : DSS, POS, PAS, BAK
 #   5 awareness-only cats  : SLD, STO, PES, COO, ANT

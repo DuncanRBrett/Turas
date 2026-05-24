@@ -1,6 +1,12 @@
 # ==============================================================================
 # BRAND MODULE - CONFIG TEMPLATE GENERATORS
 # ==============================================================================
+# SIZE-EXCEPTION: openxlsx workbook-builder pipeline. Each sheet is
+# defined inline (column specs + descriptions + example rows + styles)
+# so the template generation is one self-contained call. Splitting per
+# sheet would multiply file count for no readability gain — the
+# sheets are read top-to-bottom as a single Excel file.
+#
 # Generates professional Excel config templates for the brand module:
 #   1. Brand_Config_Template.xlsx
 #        Analysis settings: element toggles, routing, stats, colours, output.

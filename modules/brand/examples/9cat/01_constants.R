@@ -1,6 +1,11 @@
 # ==============================================================================
 # 9CAT SYNTHETIC EXAMPLE - CONSTANTS
 # ==============================================================================
+# SIZE-EXCEPTION: 9 categories × multiple brand lists × CEP / attribute
+# code lists × shopper channels × pack sizes. The exhaustive declaration
+# block lives in one file so a new developer can grep for any code and
+# find its source in one place.
+#
 # Nine-category CBM study matching the Better Brand Health questionnaire template
 # (Prof. Jenni Romaniuk / Ehrenberg-Bass Institute).
 #

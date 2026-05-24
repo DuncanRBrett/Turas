@@ -1,6 +1,12 @@
 # ==============================================================================
 # BRAND HTML REPORT - CHART BUILDER
 # ==============================================================================
+# SIZE-EXCEPTION: every chart shape in the brand report (bar, dot,
+# funnel, dot-plot, scatter, mini-bars, attitude segmented bar) is
+# emitted via inline SVG from this file. The chart types share scale
+# helpers + label placement + tick formatters, so consolidating them
+# here keeps the math in one place.
+#
 # Pure inline SVG charts for the brand report.
 # Layer 3 of the 4-layer pipeline. No external dependencies.
 #

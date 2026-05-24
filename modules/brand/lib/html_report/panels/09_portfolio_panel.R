@@ -1,6 +1,12 @@
 # ==============================================================================
 # BRAND MODULE - PORTFOLIO PANEL HTML RENDERER
 # ==============================================================================
+# SIZE-EXCEPTION: 5 portfolio sub-tabs (Overview, Footprint,
+# Constellation, Clutter, Extension) each emit their own HTML
+# section but share the picker, focal-colour resolution, and
+# data-payload JSON pipeline. Co-locating them keeps the sub-tab
+# routing in one place.
+#
 # Overrides build_br_portfolio_panel() from 03_page_builder.R with a new
 # implementation that consumes run_portfolio() output (§6.1 data structure).
 #

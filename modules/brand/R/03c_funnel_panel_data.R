@@ -1,6 +1,12 @@
 # ==============================================================================
 # BRAND MODULE - FUNNEL PANEL DATA CONTRACT (FUNNEL_SPEC_v2.md §6)
 # ==============================================================================
+# SIZE-EXCEPTION: single panel data builder for the funnel. Holds the
+# panel_meta + panel_table (cell-by-cell brand x stage matrix) +
+# panel_shape_chart + consideration_detail builders + the attitude
+# relationship-card pipeline. Splitting these introduces coupling
+# between four mutually-dependent helpers without reducing complexity.
+#
 # Pure transformation: run_funnel() result -> HTML panel data contract.
 # Separated from run_funnel() so other consumers (Excel long-format
 # exporter, tracker wave diffing, AI callouts) can read the same shape.

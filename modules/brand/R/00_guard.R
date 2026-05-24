@@ -1,6 +1,11 @@
 # ==============================================================================
 # BRAND MODULE - GUARD LAYER (TRS v1.0)
 # ==============================================================================
+# SIZE-EXCEPTION: single guard surface for every brand module entry point.
+# Each section is a different validation domain (config, structure, role
+# map, data columns, weights) and shares the boxed-refusal helper.
+# Splitting would duplicate the refusal-helper boilerplate per file.
+#
 # Input validation and structured refusal handling for the brand module.
 # Every config parameter and data column is validated here before analysis.
 #

@@ -1,6 +1,10 @@
 # ==============================================================================
 # BRAND MODULE - FUNNEL PANEL CHART + RELATIONSHIP DETAIL
 # ==============================================================================
+# SIZE-EXCEPTION: SVG slope chart + per-brand attitude stacked strip
+# share scales, label placement, and palette. Splitting would force
+# duplicating those helpers and the inline CSS that styles both.
+#
 # Slope chart: focal brand solid, category average dashed, min/max range
 # shaded band. Competitor lines added by JS when the user toggles chips.
 #

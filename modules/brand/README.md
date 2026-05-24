@@ -114,7 +114,7 @@ modules/brand/
         07_dba_panel*.R            -- DBA modern panel (orchestrator + quadrant + detail + styling)
         10_branded_reach_panel.R   -- Branded Reach panel (3 sub-tabs)
   tests/
-    testthat/                    -- 1737+ assertions (was 1651; +86 from BR + DBA panel coverage)
+    testthat/                    -- ~2,000 expectations across 55+ test files
     fixtures/
       ipk_wave1/                 -- IPK 9-category synthetic fixture
         00_generate.R            -- Run ipk_generate_fixture() to build .xlsx files

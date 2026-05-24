@@ -1,6 +1,12 @@
 /* ==========================================================================
    Brand Mental Availability Panel — interactivity
    ==========================================================================
+   SIZE-EXCEPTION: single IIFE driving three MA sub-tabs (Attributes,
+   CEPs, Metrics) plus the cross-panel focal-brand sync. Sub-tabs
+   share the focal selection state + heatmap mode + brand chip
+   palette; splitting per sub-tab would require a global namespace
+   or module loader. Future refactor tracked in growth path.
+
    Features:
    - Sub-tab switch (Attributes / CEPs / Metrics)
    - Focal brand change, persisted across panels via a CustomEvent on window

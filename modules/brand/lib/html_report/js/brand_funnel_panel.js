@@ -1,6 +1,14 @@
 // =============================================================================
 // BRAND FUNNEL PANEL — INTERACTIVE BEHAVIOUR (FUNNEL_SPEC_v2 §6)
 // =============================================================================
+// SIZE-EXCEPTION: vanilla JS (no bundler), single IIFE encapsulating
+// table render + slope chart + view-mode toggle + competitor chip bar +
+// pin/PNG export + insight editor. The pieces share the same payload
+// parser and DOM-traversal helpers; splitting into sub-files would
+// require a global namespace and bigger surface. Future refactor:
+// split into funnel_table.js / funnel_chart.js / funnel_controls.js
+// once a module loader is in place.
+//
 // Each .fn-panel carries a <script type="application/json" class="fn-panel-data">
 // with the full panel payload. Controls operate on the panel in-place:
 //

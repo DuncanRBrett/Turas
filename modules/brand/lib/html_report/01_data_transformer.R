@@ -1,6 +1,12 @@
 # ==============================================================================
 # BRAND HTML REPORT - DATA TRANSFORMER
 # ==============================================================================
+# SIZE-EXCEPTION: single transformation seam between run_brand() output
+# and the HTML / chart / table builders. Every element (funnel, MA,
+# WOM, repertoire, portfolio, demographics, etc.) hangs off the same
+# results structure and benefits from sharing the brand_list +
+# focal-colour resolution helpers in one place.
+#
 # Transforms run_brand() results into chart-ready and table-ready structures.
 # Layer 1 of the 4-layer pipeline.
 # ==============================================================================

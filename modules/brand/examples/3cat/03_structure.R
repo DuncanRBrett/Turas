@@ -1,6 +1,11 @@
 # ==============================================================================
 # 3CAT SYNTHETIC EXAMPLE - Survey_Structure.xlsx GENERATOR
 # ==============================================================================
+# SIZE-EXCEPTION: example data generator. Each sheet (Questions,
+# Options, Brands, CEPs, Attributes, QuestionMap, OptionMap, etc.)
+# is built inline so the whole synthetic study is one self-contained
+# script for new developers to read top-to-bottom.
+#
 # Generates a fully-filled Survey_Structure.xlsx for the IPK 3-category study.
 # Uses write_settings_sheet / write_table_sheet from template_styles.R.
 #
