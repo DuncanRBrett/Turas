@@ -6,7 +6,7 @@ editor_options:
 
 # Turas Tracker Module
 
-**Version:** 10.2 **Last Updated:** 21 March 2026
+**Version:** 10.2 **Last Updated:** 24 May 2026
 
 Time-series tracking and trend analysis for longitudinal survey studies.
 
@@ -63,28 +63,69 @@ template documentation.
 
 ```
 tracker/
-├── run_tracker.R           # Main entry point
-├── run_tracker_gui.R       # Shiny GUI
+├── run_tracker.R                   # Main entry point (CLI / programmatic)
+├── run_tracker_gui.R               # Shiny GUI launcher
 └── lib/
-    ├── 00_guard.R              # TRS guard layer
-    ├── constants.R             # Module constants
-    ├── tracker_config_loader.R # Configuration parsing
-    ├── wave_loader.R           # Wave data loading
-    ├── question_mapper.R       # Question mapping
-    ├── validation_tracker.R    # Input validation
-    ├── trend_calculator.R      # Trend algorithms
-    ├── banner_trends.R         # Banner breakouts
-    ├── formatting_utils.R      # Formatting helpers
-    ├── tracker_output.R        # Excel output
-    ├── tracker_dashboard_reports.R # Dashboard reports
-    ├── metric_types.R          # Metric constants & validation (v10.1)
-    ├── trend_changes.R         # Change calculations (v10.1)
-    ├── trend_significance.R    # Significance testing (v10.1)
-    └── output_formatting.R     # Excel styles (v10.1)
+    │
+    ├── Bootstrapping & shared helpers
+    │   ├── 00_guard.R              # TRS guard layer + refusal fallback
+    │   ├── constants.R             # Module constants (alpha, min_base, etc.)
+    │   └── formatting_utils.R      # Shared number / label formatters
+    │
+    ├── Config & input loading
+    │   ├── tracker_config_loader.R # tracking_config.xlsx parser
+    │   ├── question_mapper.R       # Question code mapping across waves
+    │   ├── wave_loader.R           # Wave data ingest (.xlsx/.csv/.sav)
+    │   ├── validation_tracker.R    # Post-load validation
+    │   └── validation/
+    │       └── preflight_validators.R  # Pre-run config sanity checks
+    │
+    ├── Trend & significance engine
+    │   ├── metric_types.R          # Metric type constants & validators
+    │   ├── statistical_core.R      # Single source for t-test, z-test,
+    │   │                           #   weighted mean, NPS, proportions,
+    │   │                           #   top/bottom box, custom range
+    │   ├── trend_changes.R         # Wave-over-wave change calculations
+    │   ├── trend_significance.R    # Significance test orchestration
+    │   ├── trend_calculator.R      # Per-question trend orchestration
+    │   └── banner_trends.R         # Demographic-banner breakouts
+    │
+    ├── Tracking crosstab engine
+    │   ├── tracking_crosstab_engine.R   # Crosstab calculation core
+    │   └── tracking_crosstab_excel.R    # Crosstab Excel writer
+    │
+    ├── Excel output
+    │   ├── output_formatting.R         # Shared Excel styles
+    │   ├── tracker_output.R            # Main detailed / wave-history writer
+    │   ├── tracker_output_banners.R    # Banner-cut Excel writer
+    │   ├── tracker_output_extended.R   # Extended-format Excel writer
+    │   └── tracker_dashboard_reports.R # Dashboard / sig-matrix writer
+    │
+    ├── HTML report
+    │   └── html_report/
+    │       ├── 00_html_guard.R         # HTML report guard layer
+    │       ├── 01_data_transformer.R   # Trend results → render model
+    │       ├── 02_table_builder.R      # Per-question table HTML
+    │       ├── 03_page_builder.R       # Page assembly
+    │       ├── 03a_page_styling.R      # CSS + design tokens
+    │       ├── 03b_page_components.R   # Reusable HTML components
+    │       ├── 03c_summary_builder.R   # Executive summary builder
+    │       ├── 03f_heatmap_builder.R   # Significance heatmap
+    │       ├── 04_html_writer.R        # Final HTML emission
+    │       ├── 05_chart_builder.R      # Trend chart SVG/HTML
+    │       └── 99_html_report_main.R   # HTML report orchestrator
+    │
+    └── Template generation (script, not runtime)
+        └── generate_config_templates.R # Builds Tracker_Config_Template.xlsx
 ```
 
-**Note:** Version 10.1 (December 2025) introduced 4 new extracted modules
-to reduce code duplication and improve maintainability.
+**v10.2 (March 2026):** added `Generate_Stats_Pack` config field + STUDY
+IDENTIFICATION section. Diagnostic workbook is produced by the same
+output layer.
+
+**v10.1 (December 2025):** extracted four sub-modules from `trend_calculator.R`
+(`metric_types`, `trend_changes`, `trend_significance`, `output_formatting`)
+to reduce duplication and isolate the statistical core.
 
 ------------------------------------------------------------------------
 
@@ -103,22 +144,27 @@ shinyFiles (\>= 0.9.0) - File selection in GUI
 
 | Document | Purpose |
 |--------------------------------------|----------------------------------|
-| [01_README.md](01_README.md) | This file - quick start and overview |
-| [02_TRACKER_OVERVIEW.md](02_TRACKER_OVERVIEW.md) | Module introduction and capabilities |
-| [03_REFERENCE_GUIDE.md](03_REFERENCE_GUIDE.md) | Authoritative architecture reference |
-| [04_USER_MANUAL.md](04_USER_MANUAL.md) | End-user operational guide |
-| [05_TECHNICAL_DOCS.md](05_TECHNICAL_DOCS.md) | Developer documentation |
-| [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md) | Template field reference |
-| [07_EXAMPLE_WORKFLOWS.md](07_EXAMPLE_WORKFLOWS.md) | Practical examples and tutorials |
+| `README.md` (this file) | Quick start, architecture, dependencies, version history |
+| [docs/02_TRACKER_OVERVIEW.md](docs/02_TRACKER_OVERVIEW.md) | Module introduction and capabilities |
+| [docs/03_REFERENCE_GUIDE.md](docs/03_REFERENCE_GUIDE.md) | Authoritative architecture reference |
+| [docs/04_USER_MANUAL.md](docs/04_USER_MANUAL.md) | End-user operational guide |
+| [docs/05_TECHNICAL_DOCS.md](docs/05_TECHNICAL_DOCS.md) | Developer documentation |
+| [docs/06_TEMPLATE_REFERENCE.md](docs/06_TEMPLATE_REFERENCE.md) | Template field reference |
+| [docs/07_EXAMPLE_WORKFLOWS.md](docs/07_EXAMPLE_WORKFLOWS.md) | Practical examples and tutorials |
+| [docs/MULTI_MENTION_TRACKING_INSTRUCTIONS.md](docs/MULTI_MENTION_TRACKING_INSTRUCTIONS.md) | Multi-mention configuration deep-dive |
+| [docs/CODE_INVENTORY.md](docs/CODE_INVENTORY.md) | File-by-file inventory |
+| [docs/PRODUCTION_REVIEW_2026-05-24.md](docs/PRODUCTION_REVIEW_2026-05-24.md) | Most recent production review |
+| [docs/GROWTH_PATH_2026-05-24.md](docs/GROWTH_PATH_2026-05-24.md) | Growth path from that review |
 
 ------------------------------------------------------------------------
 
 ## Templates
 
-Template files are located in the `templates/` subfolder:
+Template files are located in [`docs/templates/`](docs/templates/):
 
--   `Tracker_Config_Template.xlsx` - Configuration template
--   `Tracker_Question_Mapping_Template.xlsx` - Question mapping template
+-   `Tracking_Config.xlsx` — Configuration template
+-   `Question_Mapping.xlsx` — Question mapping template
+-   `generate_templates.R` — Script to regenerate templates after schema changes
 
 ## Stats Pack
 
