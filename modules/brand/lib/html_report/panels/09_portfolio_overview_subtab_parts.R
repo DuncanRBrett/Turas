@@ -1,10 +1,17 @@
 # ==============================================================================
-# BRAND MODULE - PORTFOLIO OVERVIEW SUBTAB: TABLE + DEEP-DIVE PARTS
+# BRAND MODULE - PORTFOLIO OVERVIEW SUBTAB: TABLE PARTS
 # ==============================================================================
 # Helpers kept in a separate file to keep the main subtab renderer
 # (09_portfolio_overview_subtab.R) under the 300-line active-line limit.
 #
-# Exports: pfo_render_table(), pfo_render_deep_strip()
+# Exports: pfo_render_table().
+#
+# History: a pfo_render_deep_strip() helper used to live here, emitting a
+# "Deep-dive competitive context" 4-card grid below the table. It was
+# removed 2026-05-24 because the cards mixed broad awareness (full sample)
+# with MPen / MMS / SCR / vol share / % bought (focal-cat deep-dive
+# sample) inside one card with no visual base signal. The per-category
+# Footprint sub-tab carries the deep-dive metrics against a clean base.
 # ==============================================================================
 
 if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) b else a
@@ -150,135 +157,11 @@ pfo_render_table <- function(overview, focal_brand, focal_colour) {
 }
 
 
-# ==============================================================================
-# DEEP-DIVE STRIP (competitive context for each deep-dive category)
-# ==============================================================================
-
-#' Render deep-dive category cards showing focal brand's competitive position
-#' @keywords internal
-pfo_render_deep_strip <- function(overview, focal_brand, focal_colour) {
-  cats <- overview$categories
-  deep <- Filter(function(c) identical(c$analysis_depth, "full") &&
-                   !is.null(c$deep_dive), cats)
-  if (length(deep) == 0) return("")
-
-  cards <- paste(vapply(deep, function(c) {
-    .pfo_deep_card_html(c, focal_brand, focal_colour)
-  }, character(1)), collapse = "")
-
-  # Balanced layout: an exact 4 wraps into 2x2 instead of 3+1; small N gets
-  # one row; large N falls back to auto-fit so the cards stay readable.
-  n <- length(deep)
-  col_style <- if (n == 4) 'grid-template-columns: repeat(2, 1fr);'
-               else if (n >= 1 && n <= 3) sprintf('grid-template-columns: repeat(%d, 1fr);', n)
-               else if (n >= 5 && n <= 6) 'grid-template-columns: repeat(3, 1fr);'
-               else ''
-
-  paste0(
-    '<h3 class="pfo-section-title">Deep-dive competitive context</h3>',
-    sprintf('<div class="pfo-deep-grid" style="%s">', col_style),
-    cards, '</div>'
-  )
-}
-
-.pfo_deep_card_html <- function(c, focal_brand, focal_colour) {
-  dd <- c$deep_dive
-  focal_dd <- dd[[focal_brand]]
-  if (is.null(focal_dd)) return("")
-
-  # Three bases live in this card and the reader needs to see all three.
-  #   * Broad awareness \u2014 % aware on the Portfolio engine's cat-buyer base
-  #     (anyone who bought in the category, regardless of which deep-dive
-  #     they were routed to). Wider denominator.
-  #   * MPen + MMS \u2014 Mental Availability metrics on the deep-dive sample
-  #     (respondents routed to THIS focal cat). MPen = % linking the brand
-  #     to >= 1 CEP. MMS = brand's share of all CEP-brand associations.
-  #   * Volume share / % bought / SCR \u2014 physical-behaviour metrics on the
-  #     same deep-dive sample.
-  # The base note at the bottom of the card spells this out.
-  rows <- lapply(c$brand_codes, function(bc) {
-    bdd <- dd[[bc]]
-    list(
-      code = bc,
-      name = c$brand_names[[bc]] %||% bc,
-      aware = c$awareness_pct[[bc]],
-      mpen  = if (!is.null(bdd)) bdd$mpen_pct else NA_real_,
-      mms   = if (!is.null(bdd)) bdd$mms_pct  else NA_real_,
-      pen   = if (!is.null(bdd)) bdd$penetration_pct else NA_real_,
-      scr   = if (!is.null(bdd)) bdd$scr_pct else NA_real_,
-      vol   = if (!is.null(bdd)) bdd$vol_share_pct else NA_real_,
-      is_focal = identical(bc, focal_brand)
-    )
-  })
-  rows <- rows[order(-vapply(rows, function(r) r$aware %||% -1, numeric(1)))]
-  top_n <- min(5L, length(rows))
-  rows <- rows[seq_len(top_n)]
-
-  fmt_pct1 <- function(v) if (is.na(v)) "\u2014" else sprintf("%.1f%%", v)
-  fmt_pct0 <- function(v) if (is.na(v)) "\u2014" else sprintf("%.0f%%", v)
-
-  rank_body <- paste(vapply(seq_along(rows), function(i) {
-    r <- rows[[i]]
-    cls <- if (r$is_focal) ' class="pfo-deep-focal"' else ""
-    sprintf(
-      paste0('<tr%s><td>#%d %s</td>',
-             '<td class="pfo-td-num">%s</td>',
-             '<td class="pfo-td-num">%s</td>',
-             '<td class="pfo-td-num">%s</td>',
-             '<td class="pfo-td-num">%s</td>',
-             '<td class="pfo-td-num">%s</td></tr>'),
-      cls, i, .pf_esc(r$name),
-      fmt_pct0(r$aware),
-      fmt_pct0(r$mpen),
-      fmt_pct1(r$mms),
-      fmt_pct0(r$vol),
-      fmt_pct0(r$pen)
-    )
-  }, character(1)), collapse = "")
-
-  focal_rank <- which(vapply(rows, function(r) r$is_focal, logical(1)))
-  focal_rank_txt <- if (length(focal_rank) == 1) sprintf("#%d", focal_rank) else "Not top 5"
-
-  # Base annotation. Three bases in one card \u2014 spell them out so readers
-  # don't read the gap as a calculation error.
-  cat_buyer_n <- c$n_buyers_uw %||% NA_integer_
-  base_line <- if (!is.null(cat_buyer_n) && is.finite(cat_buyer_n) && cat_buyer_n > 0)
-    sprintf("Broad awareness: %s category buyers (Portfolio engine base) &middot; MPen / MMS / Volume share / %% bought / Loyalty: focal-cat deep-dive sample",
-            format(cat_buyer_n, big.mark = ","))
-  else "Broad awareness uses category-buyer base; MPen / MMS / Volume share / % bought / Loyalty use the focal-cat deep-dive sample."
-
-  focal_aware_val <- c$awareness_pct[[focal_brand]] %||% NA_real_
-
-  sprintf(
-    paste0('<div class="pfo-deep-card">',
-           '<div class="pfo-deep-card-head"><span class="pfo-deep-card-title">%s</span>',
-           '<span class="pfo-deep-card-rank">Focal: %s by awareness</span></div>',
-           '<div class="pfo-deep-card-kpis">',
-             '<div><span class="pfo-kpi-mini-v">%s</span><span class="pfo-kpi-mini-l">Broad awareness</span></div>',
-             '<div><span class="pfo-kpi-mini-v">%s</span><span class="pfo-kpi-mini-l">MPen (deep-dive)</span></div>',
-             '<div><span class="pfo-kpi-mini-v">%s</span><span class="pfo-kpi-mini-l">MMS</span></div>',
-             '<div><span class="pfo-kpi-mini-v">%s</span><span class="pfo-kpi-mini-l">%% who bought</span></div>',
-             '<div><span class="pfo-kpi-mini-v">%s</span><span class="pfo-kpi-mini-l">Volume share</span></div>',
-             '<div><span class="pfo-kpi-mini-v">%s</span><span class="pfo-kpi-mini-l">Loyalty (SCR)</span></div>',
-           '</div>',
-           '<table class="pfo-deep-rank"><thead><tr>',
-             '<th>Brand</th>',
-             '<th class="pfo-td-num">Broad aware</th>',
-             '<th class="pfo-td-num">MPen</th>',
-             '<th class="pfo-td-num">MMS</th>',
-             '<th class="pfo-td-num">Volume share</th>',
-             '<th class="pfo-td-num">%% who bought</th>',
-           '</tr></thead><tbody>%s</tbody></table>',
-           '<p class="pfo-deep-card-base-note" style="font-size:10px;color:#94a3b8;margin:6px 0 0;line-height:1.4;">%s</p>',
-           '</div>'),
-    .pf_esc(c$cat_name), .pf_esc(focal_rank_txt),
-    fmt_pct0(focal_aware_val),
-    fmt_pct0(focal_dd$mpen_pct        %||% NA_real_),
-    fmt_pct1(focal_dd$mms_pct         %||% NA_real_),
-    fmt_pct0(focal_dd$penetration_pct %||% NA_real_),
-    fmt_pct0(focal_dd$vol_share_pct   %||% NA_real_),
-    fmt_pct0(focal_dd$scr_pct         %||% NA_real_),
-    rank_body,
-    base_line
-  )
-}
+# Deep-dive cards renderer removed 2026-05-24. The 4-card "Deep-dive
+# competitive context" grid was retired because it mixed bases (broad
+# awareness on full sample; MPen / MMS / SCR / vol share / % bought on
+# the focal-cat deep-dive sample) inside one card with no visual signal,
+# encouraging unreconcilable comparisons. The per-category Footprint
+# sub-tab carries the same metrics against a clean base. See git
+# history (commit removing pfo_render_deep_strip) for the original
+# implementation if it ever needs to be revived.

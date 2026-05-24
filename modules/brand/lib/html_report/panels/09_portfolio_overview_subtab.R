@@ -47,7 +47,12 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
   hero_html   <- .pfo_hero_host(overview, focal_brand, focal_colour)
   chart_html  <- .pfo_chart_host(overview, focal_brand, focal_colour)
   table_html  <- .pfo_table_host(overview, focal_brand, focal_colour)
-  deep_html   <- .pfo_deep_host(overview, focal_brand, focal_colour)
+  # Deep-dive competitive-context cards were removed 2026-05-24: they
+  # mixed bases inside one card (broad awareness on full sample;
+  # MPen / MMS / SCR / vol share / % bought on the focal-cat deep-dive
+  # sample) with no visual signal, encouraging unreconcilable comparisons.
+  # The per-category Footprint sub-tab carries the same metrics against
+  # a clean base.
 
   data_script <- sprintf(
     '<script type="application/json" id="pf-overview-data">%s</script>',
@@ -62,7 +67,6 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
       '<div class="pfo-hero-wrap" id="pfo-hero">', hero_html, '</div>',
       '<div class="pfo-chart-wrap" id="pfo-chart">', chart_html, '</div>',
       '<div class="pfo-table-wrap" id="pfo-table">', table_html, '</div>',
-      '<div class="pfo-deep-wrap" id="pfo-deep">', deep_html, '</div>',
     '</div>',
     if (nzchar(about_text)) {
       sprintf('<div class="pf-about-drawer"><strong>About this view:</strong> %s</div>',
@@ -225,15 +229,11 @@ if (!exists("%||%")) `%||%` <- function(a, b) if (is.null(a) || length(a) == 0) 
 
 
 # ==============================================================================
-# SUMMARY TABLE + DEEP-DIVE STRIP  (see 09_portfolio_overview_subtab_parts.R)
+# SUMMARY TABLE  (see 09_portfolio_overview_subtab_parts.R)
 # ==============================================================================
 
 .pfo_table_host <- function(overview, focal_brand, focal_colour) {
   pfo_render_table(overview, focal_brand, focal_colour)
-}
-
-.pfo_deep_host <- function(overview, focal_brand, focal_colour) {
-  pfo_render_deep_strip(overview, focal_brand, focal_colour)
 }
 
 

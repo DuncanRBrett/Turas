@@ -203,80 +203,12 @@
       'Penetration / SCR / Vol share / Avg purchases available for deep-dive categories only.</p>';
   }
 
-  // ---- Deep-dive strip ----
-  function renderDeepStrip(payload, focalCode) {
-    var cats = payload.categories || {};
-    var deepKeys = Object.keys(cats).filter(function (k) {
-      return cats[k].analysis_depth === 'full' && cats[k].deep_dive;
-    });
-    if (deepKeys.length === 0) return '';
-
-    var cards = deepKeys.map(function (k) {
-      var c = cats[k];
-      var dd = c.deep_dive || {};
-      var focal = dd[focalCode] || {};
-      var rows = (c.brand_codes || []).map(function (bc) {
-        var d = dd[bc]; if (!d) return null;
-        return {
-          code: bc, name: (c.brand_names || {})[bc] || bc,
-          pen: d.penetration_pct, scr: d.scr_pct, vol: d.vol_share_pct,
-          mpen: d.mpen_pct,
-          isFocal: bc === focalCode
-        };
-      }).filter(Boolean)
-        .sort(function (a, b) {
-          // Sort by MPen; fall back to vol share when MPen is unavailable
-          var hasMpenA = a.mpen != null && isFinite(a.mpen);
-          var hasMpenB = b.mpen != null && isFinite(b.mpen);
-          if (hasMpenA || hasMpenB) {
-            var av = hasMpenA ? a.mpen : -1;
-            var bv = hasMpenB ? b.mpen : -1;
-            return bv - av;
-          }
-          return (b.vol == null ? -1 : b.vol) - (a.vol == null ? -1 : a.vol);
-        }).slice(0, 5);
-
-      var hasMpen = rows.some(function (r) { return r.mpen != null && isFinite(r.mpen); });
-      var rankColHeader = hasMpen ? 'MPen' : 'Vol share';
-      var rankBody = rows.map(function (r, i) {
-        var cls = r.isFocal ? ' class="pfo-deep-focal"' : '';
-        var rankVal = hasMpen ? fmtPct(r.mpen) : fmtPct(r.vol);
-        return '<tr' + cls + '><td>#' + (i + 1) + ' ' + esc(r.name) + '</td>' +
-          '<td class="pfo-td-num">' + rankVal + '</td>' +
-          '<td class="pfo-td-num">' + fmtPct(r.pen) + '</td></tr>';
-      }).join('');
-
-      var focalIdx = rows.findIndex(function (r) { return r.isFocal; });
-      var focalRankTxt = focalIdx >= 0 ? '#' + (focalIdx + 1) : 'Not top 5';
-
-      return '<div class="pfo-deep-card">' +
-        '<div class="pfo-deep-card-head">' +
-        '<span class="pfo-deep-card-title">' + esc(c.cat_name) + '</span>' +
-        '<span class="pfo-deep-card-rank">Focal: ' + esc(focalRankTxt) + ' by ' + rankColHeader + '</span></div>' +
-        '<div class="pfo-deep-card-kpis">' +
-        '<div><span class="pfo-kpi-mini-v">' + fmtPct(focal.vol_share_pct) + '</span>' +
-        '<span class="pfo-kpi-mini-l">Vol share</span></div>' +
-        '<div><span class="pfo-kpi-mini-v">' + fmtPct(focal.penetration_pct) + '</span>' +
-        '<span class="pfo-kpi-mini-l">Penetration</span></div>' +
-        '<div><span class="pfo-kpi-mini-v">' + fmtPct(focal.scr_pct) + '</span>' +
-        '<span class="pfo-kpi-mini-l">SCR</span></div></div>' +
-        '<table class="pfo-deep-rank"><thead><tr><th>Brand</th>' +
-        '<th class="pfo-td-num">' + rankColHeader + '</th>' +
-        '<th class="pfo-td-num">Pen</th></tr></thead><tbody>' +
-        rankBody + '</tbody></table></div>';
-    }).join('');
-
-    // Even layout: 4 deep-dives wrap to 2x2; 1-3 fit one row; 5-6 wrap to 3.
-    var n = deepKeys.length;
-    var col = n === 4 ? 'repeat(2, 1fr)'
-            : (n >= 1 && n <= 3) ? 'repeat(' + n + ', 1fr)'
-            : (n >= 5 && n <= 6) ? 'repeat(3, 1fr)'
-            : '';
-    var styleAttr = col ? ' style="grid-template-columns: ' + col + ';"' : '';
-
-    return '<h3 class="pfo-section-title">Deep-dive competitive context</h3>' +
-      '<div class="pfo-deep-grid"' + styleAttr + '>' + cards + '</div>';
-  }
+  // Deep-dive 4-card strip renderer was removed 2026-05-24. The grid
+  // mixed bases (broad awareness vs focal-cat deep-dive sample) inside
+  // one card without a visual signal — the per-category Footprint sub-tab
+  // already carries the same metrics against a clean base. The
+  // deep_dive payload field is preserved because the Category detail
+  // table still consumes it.
 
   // ---- Picker binding + orchestration ----
   function swap(focalCode) {
@@ -287,11 +219,9 @@
     var h = document.getElementById('pfo-hero');
     var c = document.getElementById('pfo-chart');
     var t = document.getElementById('pfo-table');
-    var d = document.getElementById('pfo-deep');
     if (h) h.innerHTML = renderHero(payload, focalCode, colour);
     if (c) c.innerHTML = renderChart(payload, focalCode, colour);
     if (t) t.innerHTML = renderTable(payload, focalCode);
-    if (d) d.innerHTML = renderDeepStrip(payload, focalCode);
 
     var sel = document.getElementById('pfo-focal-select');
     if (sel && sel.value !== focalCode) sel.value = focalCode;
@@ -364,8 +294,7 @@
     return [
       { key: 'hero',    label: 'Headline KPI cards',     el: section.querySelector('#pfo-hero') },
       { key: 'chart',   label: 'Focal awareness chart',  el: section.querySelector('#pfo-chart') },
-      { key: 'table',   label: 'Category detail table',  el: section.querySelector('#pfo-table') },
-      { key: 'deep',    label: 'Deep-dive context cards', el: section.querySelector('#pfo-deep') }
+      { key: 'table',   label: 'Category detail table',  el: section.querySelector('#pfo-table') }
     ];
   }
 
