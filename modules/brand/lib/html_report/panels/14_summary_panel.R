@@ -1,19 +1,28 @@
 # ==============================================================================
 # BRAND MODULE - EXECUTIVE SUMMARY PANEL
 # ==============================================================================
-# Per-category executive summary with two dropdowns (Category + Brand) at the
-# top. Renders a layered dashboard:
-#   1. Category context strip (4 neutral chips: avg purchases / avg brands /
-#      top channel / top pack — graceful drop when missing)
-#   2. Headline sentence (auto-seeded from metrics)
-#   3. Focal strip (5 metric cards with cat-avg under, MMS rank badge)
-#   4. Diagnostic strip (Top-3 attribute chips + Top-3 CEP chips with delta)
-#   5. Analyst commentary (markdown editor — ported from tracker)
-#   6. Closing "all categories at a glance" mini-card strip (core cats only)
-#   7. Collapsible educational callout
+# SIZE-EXCEPTION: this file mixes (a) a large CSS template embedded as a
+# single gsub() string (~600 lines of styles for the dashboard's many
+# widgets), (b) panel skeleton HTML, and (c) per-category / per-brand
+# payload-building helpers that share state and partial-result types.
+# Decomposing across files would fragment a single data-shape contract
+# and force the renderer to recompose it at the call site — net loss of
+# readability. The CSS template alone is past the size limit by design.
+#
+# Per-category executive summary with two dropdowns (Category + Brand) at
+# the top. Renders a 6-card narrative dashboard:
+#   1. Hero        — auto-generated verdict + 4 anchor numbers (MMS /
+#                    MPen / % bought / SCR) + MMS rank badge
+#   2. Mental availability — MMS / SoM / Network Size vs leader
+#   3. Physical conversion — collapsed Aware -> Prefer -> Bought funnel
+#   4. What's working      — top-3 CEPs + top-3 attributes (over-index)
+#   5. Where weakest       — bottom-3 CEPs + bottom-3 attributes
+#   6. Conversation & DoP  — WOM (heard / said) + top-2 partners + rivals
+# Plus an analyst commentary editor, a closing all-cats strip, and a
+# collapsible educational callout.
 #
 # Data flow: pre-compute a per-(cat, brand) payload in R, embed as JSON, JS
-# reads dropdown values + payload to render the dashboard. No re-render of
+# reads dropdown values + payload to render the cards. No re-render of
 # heavy chart elements — just card values + chip labels.
 #
 # JS: js/brand_summary_panel.js
@@ -225,58 +234,108 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   padding: 8px 0;
 }
 
-/* ---- Stat rows (Category context card) ---- */
-.brsum-stat-rows { display: flex; flex-direction: column; gap: 14px; }
-
-.brsum-stat-group { display: flex; flex-direction: column; gap: 4px; }
-.brsum-stat-group-head {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 10px; font-weight: 700; letter-spacing: 0.6px;
-  text-transform: uppercase; color: #475569;
-  padding-bottom: 4px;
-  border-bottom: 1px solid #e2e8f0;
+/* ---- Hero card (1st card — auto-generated verdict + 4 anchor numbers) ---- */
+.brsum-hero { display: flex; flex-direction: column; gap: 12px; }
+.brsum-hero-rank {
+  display: inline-block; align-self: flex-start;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.4px;
+  text-transform: uppercase; color: %FOCAL%;
+  padding: 4px 10px; border-radius: 999px;
+  background: rgba(26, 82, 118, 0.08); border: 1px solid rgba(26, 82, 118, 0.18);
 }
-.brsum-stat-group-icon {
-  width: 14px; height: 14px; display: inline-flex;
-  align-items: center; justify-content: center; color: #1A5276;
+.brsum-hero-verdict {
+  font-size: 16px; line-height: 1.45; font-weight: 600; color: #0f172a;
+  letter-spacing: -0.005em;
 }
-.brsum-stat-group-icon svg { width: 14px; height: 14px; stroke: currentColor; fill: none; }
-
-.brsum-stat-row {
-  display: grid; grid-template-columns: 1fr auto; align-items: center;
-  column-gap: 12px; padding: 6px 0;
-  border-bottom: 1px dashed #f1f5f9;
+.brsum-hero-anchors {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+  padding: 14px 0 4px; border-top: 1px solid #e2e8f0;
 }
-.brsum-stat-group .brsum-stat-row:last-child { border-bottom: 0; }
-.brsum-stat-row.is-empty .brsum-stat-value { color: #cbd5e1; }
-.brsum-stat-row.is-empty .brsum-stat-sub   { font-style: italic; }
-
-.brsum-stat-label {
-  font-size: 12.5px; color: #1e293b; font-weight: 500; line-height: 1.3;
-}
-.brsum-stat-label-help {
-  display: inline-block; width: 12px; height: 12px;
-  border-radius: 50%; border: 1px solid #cbd5e1; color: #94a3b8;
-  font-size: 9px; font-weight: 700; text-align: center; line-height: 10px;
-  margin-left: 4px; cursor: help;
-}
-.brsum-stat-value {
-  display: flex; flex-direction: column; align-items: flex-end;
+.brsum-hero-anchor { display: flex; flex-direction: column; gap: 2px; }
+.brsum-hero-anchor-v {
+  font-size: 28px; font-weight: 700; color: #1e293b; line-height: 1;
   font-variant-numeric: tabular-nums;
 }
-.brsum-stat-value-num {
-  font-size: 18px; font-weight: 700; color: #1e293b; line-height: 1.1;
+.brsum-hero-anchor-l {
+  font-size: 11px; font-weight: 600; color: #475569;
+  text-transform: uppercase; letter-spacing: 0.4px;
 }
-.brsum-stat-value-text {
-  font-size: 13px; font-weight: 600; color: #1e293b; line-height: 1.2;
-  text-align: right;
-}
-.brsum-stat-sub {
-  font-size: 10.5px; color: #94a3b8; font-weight: 500;
-  line-height: 1.2; margin-top: 2px;
+.brsum-hero-anchor-a { font-size: 10px; color: #94a3b8; }
+@media (max-width: 720px) {
+  .brsum-hero-anchors { grid-template-columns: repeat(2, 1fr); }
 }
 
-/* ---- Value chips (MA metrics, Brand summary, WOM cards) ---- */
+/* ---- Working / Weak cards (top-3 over/under-indexers, side-by-side) ---- */
+.brsum-adv-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+}
+.brsum-adv-col {
+  display: flex; flex-direction: column; gap: 8px; min-width: 0;
+}
+.brsum-adv-coltitle {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.6px;
+  text-transform: uppercase; color: #475569;
+  padding-bottom: 4px; border-bottom: 1px solid #e2e8f0;
+}
+.brsum-adv-empty {
+  font-size: 11px; color: #94a3b8; font-style: italic; padding: 6px 0;
+}
+.brsum-adv-list { list-style: none; padding: 0; margin: 0; }
+.brsum-adv-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center; gap: 10px;
+  padding: 6px 8px; border-radius: 6px; margin-bottom: 4px;
+  font-size: 12px;
+}
+.brsum-adv-item.is-over  { background: #f0fdf4; border-left: 3px solid #16a34a; }
+.brsum-adv-item.is-under { background: #fef2f2; border-left: 3px solid #dc2626; }
+.brsum-adv-label { font-weight: 600; color: #1e293b; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brsum-adv-focal {
+  font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.brsum-adv-cat { font-size: 10.5px; color: #64748b; }
+.brsum-adv-delta {
+  font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;
+  padding: 2px 7px; border-radius: 999px;
+}
+.brsum-adv-item.is-over  .brsum-adv-delta { color: #065f46; background: #d1fae5; }
+.brsum-adv-item.is-under .brsum-adv-delta { color: #991b1b; background: #fee2e2; }
+@media (max-width: 720px) {
+  .brsum-adv-grid { grid-template-columns: 1fr; }
+}
+
+/* ---- Conversation card (WOM + DoP partners/rivals, half-and-half) ---- */
+.brsum-conv-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+}
+.brsum-conv-half {
+  display: flex; flex-direction: column; gap: 8px; min-width: 0;
+}
+.brsum-conv-empty {
+  font-size: 11px; color: #94a3b8; font-style: italic;
+  padding: 6px 0; align-items: flex-start;
+}
+.brsum-conv-coltitle {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.6px;
+  text-transform: uppercase; color: #475569;
+  padding-bottom: 4px; border-bottom: 1px solid #e2e8f0;
+}
+.brsum-conv-dop-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+.brsum-conv-dop-side { display: flex; flex-direction: column; gap: 4px; }
+.brsum-conv-dop-side-title {
+  font-size: 10px; font-weight: 700; color: #64748b;
+  text-transform: uppercase; letter-spacing: 0.4px;
+}
+@media (max-width: 720px) {
+  .brsum-conv-grid     { grid-template-columns: 1fr; }
+  .brsum-conv-dop-row  { grid-template-columns: 1fr; }
+}
+
+/* ---- Value chips (Mental availability card, leader benchmark) ---- */
 .brsum-vchip-grid {
   display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
 }
@@ -446,102 +505,6 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   /* On narrow screens the two mini-funnel cards stack vertically */
   .brsum-mf-row { flex-wrap: wrap; }
   .brsum-mf-card { flex-basis: 100%; }
-}
-
-/* ---- Dot plot card (CEP + Brand attributes, full-width) ---- */
-.brsum-dot-legend {
-  display: flex; align-items: center; gap: 12px;
-  font-size: 11px; color: #64748b; margin-bottom: 8px;
-}
-.brsum-legend-dot {
-  display: inline-block; width: 10px; height: 10px; border-radius: 999px;
-  vertical-align: middle; margin-right: 4px;
-}
-.brsum-legend-name { font-weight: 600; color: #334155; margin-right: 4px; }
-.brsum-dot-avg-marker {
-  display: inline-block; width: 16px; height: 0;
-  border-top: 1.5px dashed #94a3b8; vertical-align: middle;
-  margin-right: 4px;
-}
-.brsum-dot-rows {
-  display: flex; flex-direction: column; gap: 4px;
-  padding: 4px 0;
-}
-.brsum-dot-row {
-  display: grid;
-  grid-template-columns: minmax(180px, 24%) 1fr 50px minmax(120px, auto);
-  align-items: center; gap: 12px; min-height: 22px;
-}
-.brsum-dot-stim {
-  font-size: 11px; font-weight: 600; color: #1e293b;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.brsum-dot-lane {
-  position: relative; height: 22px;
-}
-.brsum-dot-track {
-  position: absolute; left: 0; right: 0; top: 50%;
-  height: 1px; background: #eef2f7; transform: translateY(-50%);
-}
-.brsum-dot-avg {
-  position: absolute; top: 50%; transform: translate(-50%, -50%);
-  width: 0; height: 14px;
-  border-left: 1.5px dashed #94a3b8;
-  pointer-events: visible;
-}
-.brsum-dot-focal {
-  position: absolute; top: 50%; transform: translate(-50%, -50%);
-  width: 11px; height: 11px; border-radius: 999px;
-  background: #1A5276; border: 1.5px solid #fff;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.18);
-  pointer-events: visible;
-}
-.brsum-dot-val {
-  font-size: 11px; font-weight: 700;
-  font-variant-numeric: tabular-nums; text-align: right;
-}
-.brsum-dot-meta { display: flex; justify-content: flex-end; }
-.brsum-dec-badge {
-  font-size: 9px; font-weight: 700; letter-spacing: 0.4px;
-  text-transform: uppercase; padding: 3px 8px; border-radius: 999px;
-  white-space: nowrap;
-}
-.brsum-dec-badge em {
-  font-style: normal; font-weight: 600; opacity: 0.85;
-}
-.brsum-dec-defend {
-  background: #dcfce7; color: #166534; border: 1px solid #86efac;
-}
-.brsum-dec-build {
-  background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;
-}
-.brsum-dec-maintain {
-  background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1;
-}
-.brsum-dec-amplify {
-  background: #fef3c7; color: #92400e; border: 1px solid #fcd34d;
-}
-.brsum-dec-na, .brsum-dec-skip {
-  background: #f8fafc; color: #94a3b8; border: 1px solid #e2e8f0;
-}
-.brsum-dot-axis {
-  position: relative; height: 16px; margin-top: 6px;
-  margin-left: calc(180px + 12px); /* align to lane */
-  margin-right: calc(50px + 120px + 24px);
-  border-top: 1px solid #f1f5f9;
-}
-.brsum-dot-tick {
-  position: absolute; top: 4px; transform: translateX(-50%);
-  font-size: 9px; color: #94a3b8;
-  font-variant-numeric: tabular-nums;
-}
-@media (max-width: 720px) {
-  .brsum-dot-row {
-    grid-template-columns: minmax(120px, 30%) 1fr 44px;
-    /* hide the decision badge column on narrow screens */
-  }
-  .brsum-dot-meta { display: none; }
-  .brsum-dot-axis { margin-left: calc(120px + 12px); margin-right: calc(44px + 12px); }
 }
 
 /* ---- Empty state inherited by chip lists (closing strip uses this) ---- */
@@ -1846,10 +1809,23 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 
 
 .brsum_card_grid_skeleton <- function() {
-  # Each card is independently pinnable via the standard brand_pins.js
-  # workflow. The section's data-section="brsum-{key}" is what brTogglePin
-  # looks up, and data-pin-as-table on the body tells captureFromRoot to
-  # grab the rendered card content (no <table> or <svg> required).
+  # 6-card narrative layout. Each card is independently pinnable via the
+  # standard brand_pins.js workflow — section data-section="brsum-{key}"
+  # is what brTogglePin looks up; data-pin-as-table tells captureFromRoot
+  # to grab the rendered card content (no <table> or <svg> required).
+  #
+  # Card story arc (top -> bottom):
+  #   1. Hero       — single-sentence verdict + 4 anchor numbers (MMS / MPen
+  #                   / % bought / SCR). Full-width.
+  #   2. Mental     — MMS / SoM / Network Size vs leader. The mental-
+  #                   availability story.
+  #   3. Physical   — Aware -> Prefer -> Bought -> SCR funnel collapsed.
+  #                   The physical-conversion story.
+  #   4. Working    — Top 3 CEPs + top 3 attributes the focal over-indexes
+  #                   on. Wide so two columns can sit side-by-side.
+  #   5. Weak       — Bottom 3 CEPs + bottom 3 attributes the focal
+  #                   under-indexes on. Wide for the same reason.
+  #   6. Conversation — WOM (heard / said) + top 2 DoP partners + rivals.
   card <- function(key, title, wide = FALSE) {
     cls <- if (wide) ' brsum-card-wide' else ''
     section_id <- paste0('brsum-', key)
@@ -1871,17 +1847,12 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   }
   paste(
     '<div class="brsum-card-grid">',
-      card("context",       "Category context"),
-      card("ma_metrics",    "Mental Availability — headline metrics"),
-      card("brand_summary", "Purchase behaviour"),
-      card("funnel",        "Brand funnel"),
-      card("attitude",      "Brand attitude"),
-      card("loyalty",       "Loyalty segmentation"),
-      card("purchase_dist", "Purchase distribution"),
-      card("wom",           "Word of mouth"),
-      card("dop",           "Duplication of purchase"),
-      card("cep",           "Category Entry Points",  wide = TRUE),
-      card("attrs",         "Brand attributes",       wide = TRUE),
+      card("hero",         "Brand at a glance",                          wide = TRUE),
+      card("mental",       "Mental availability"),
+      card("physical",     "Physical conversion"),
+      card("working",      "What’s working &mdash; over-indexers",   wide = TRUE),
+      card("weak",         "Where the brand is weakest &mdash; under-indexers", wide = TRUE),
+      card("conversation", "Conversation &amp; competitive ties"),
     '</div>',
     sep = "\n"
   )

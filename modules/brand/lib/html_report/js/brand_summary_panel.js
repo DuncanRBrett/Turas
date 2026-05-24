@@ -1,14 +1,30 @@
 /* =============================================================================
  * BRAND MODULE — EXECUTIVE SUMMARY PANEL JS
  * -----------------------------------------------------------------------------
+ * SIZE-EXCEPTION: this file is the full set of card renderers for the
+ * summary panel. Each renderer is short, but they share helpers (escHtml,
+ * cardBody, valueChip, dopRow, womColumn, fmtPctSingle) and a single
+ * orchestrator (`render()`) — splitting across files would force the
+ * orchestrator to import the helpers from another file purely to keep
+ * line counts down, with no readability win.
+ *
  * Reads the per-(category, brand) JSON payload embedded in
- * <script type="application/json" class="brsum-data"> and renders the four
- * dashboard strips (context, focal, diagnostic, headline) when the user
- * changes either dropdown.
+ * <script type="application/json" class="brsum-data"> and renders the
+ * 6-card narrative dashboard when the user changes either dropdown.
+ *
+ * Card renderers (in render-order):
+ *   renderFocalContext       — header strip (focal name + cat label)
+ *   renderHeroCard           — auto-headline + 4 anchor numbers
+ *   renderMentalCard         — MMS / SoM / Network Size value-chips
+ *   renderPhysicalCard       — collapsed funnel (mini-funnel renderer)
+ *   renderWorkingCard / renderWeakCard
+ *                            — top/bottom-3 CEPs + attributes by
+ *                              advantage_pp (shared renderAdvantageCard)
+ *   renderConversationCard   — WOM (heard/said) + DoP partners/rivals
  *
  * Public functions exposed on window:
- *   brsumSwitchCat(catName)    — programmatic category change (used by the
- *                                closing-strip mini-cards)
+ *   brsumSwitchCat(catName)     — programmatic category change (used by
+ *                                 the closing-strip mini-cards)
  *   brsumInsertMd(before,after) — markdown toolbar handler (insight editor)
  *   brsumRenderInsight()        — re-render markdown preview
  *   brsumToggleEdu(btn)         — collapse/expand educational callout
@@ -130,26 +146,17 @@
 
     dashboard.classList.add('brsum-fading');
     setTimeout(function () {
-      /* New card-grid layout — each card has a body container the
-         renderer fills. Cards that aren't wired yet show a "coming
-         soon" placeholder so the grid stays visible while we
-         incrementally implement them. */
+      /* 6-card narrative layout. Each renderer reads the payload and
+         fills its own card body — they're independent so any single
+         card can degrade to "data not available" without breaking
+         the rest. Order matches the visual top-to-bottom flow. */
       renderFocalContext(root, snap, cat, catName);
-      renderCategoryContextCard(root, cat.context);
-      renderBrandSummaryCard(root, snap);
-      renderMAMetricsCard(root, snap);
-      renderWOMCard(root, snap);
-      renderMiniFunnelCard(root, 'funnel',        cat.funnel,        brandCode, snap,
-                           { emptyMessage: 'Funnel data not available.' });
-      renderMiniFunnelCard(root, 'attitude',      cat.attitude,      brandCode, snap,
-                           { emptyMessage: 'Brand attitude not available.' });
-      renderMiniFunnelCard(root, 'loyalty',       cat.loyalty,       brandCode, snap,
-                           { emptyMessage: 'Loyalty segmentation not available.' });
-      renderMiniFunnelCard(root, 'purchase_dist', cat.purchase_dist, brandCode, snap,
-                           { emptyMessage: 'Purchase distribution not available.' });
-      renderDoPCard(root, cat.dop, brandCode, snap);
-      renderDotPlotCard(root, 'cep',   cat.cep,   brandCode, snap, /*showDecision=*/true);
-      renderDotPlotCard(root, 'attrs', cat.attrs, brandCode, snap, /*showDecision=*/true);
+      renderHeroCard(root, snap, cat, catName, brandCode);
+      renderMentalCard(root, snap);
+      renderPhysicalCard(root, cat.funnel, brandCode, snap);
+      renderWorkingCard(root, cat, brandCode, snap);
+      renderWeakCard(root, cat, brandCode, snap);
+      renderConversationCard(root, snap, cat.dop, brandCode);
       /* Apply focal colour to any value text rendered inline. */
       if (snap && snap.colour) {
         $$('.brsum-focal-value', root).forEach(function (el) {
@@ -196,95 +203,6 @@
        set via the --brsum-brand-colour custom prop on .brsum-root. */
   }
 
-  function renderCategoryContextCard(root, ctx) {
-    var body = cardBody(root, 'context');
-    if (!body) return;
-    if (!ctx) {
-      body.innerHTML = '<div class="brsum-card-empty">Category context not available.</div>';
-      return;
-    }
-    /* Eight category-level metrics, grouped into three sections so the
-       card scans top-to-bottom: Reach (funnel-stage brand counts),
-       Engagement (CEP density + purchase frequency), Buying habits
-       (channel + pack). Channel + pack always render — missing data
-       shows "—" so the slot stays visible. */
-    var ctxGroups = [
-      { key: 'reach',      label: 'Brand reach',     icon: ICON_REACH,
-        items: [
-          { label: 'Avg awareness',     entry: ctx.avg_aware_brands,    type: 'num' },
-          { label: 'Avg consideration', entry: ctx.avg_consider_brands, type: 'num' },
-          { label: 'Avg buying (long)', entry: ctx.avg_p12m_brands,     type: 'num' },
-          { label: 'Avg buying (3m)',   entry: ctx.avg_p3m_brands,      type: 'num' }
-        ] },
-      { key: 'engagement', label: 'Engagement',      icon: ICON_ENGAGE,
-        items: [
-          { label: 'Avg CEPs',      entry: ctx.avg_ceps,      type: 'num' },
-          { label: 'Avg purchases', entry: ctx.avg_purchases, type: 'num' }
-        ] },
-      { key: 'habits',     label: 'Buying habits',   icon: ICON_HABITS,
-        items: [
-          { label: 'Top channel',  entry: ctx.top_channel, type: 'text', alwaysShow: true },
-          { label: 'Top pack',     entry: ctx.top_pack,    type: 'text', alwaysShow: true }
-        ] }
-    ];
-
-    var anyData = false;
-    var html = ctxGroups.map(function (g) {
-      var groupRows = g.items
-        .filter(function (it) { return it.entry || it.alwaysShow; })
-        .map(function (it) { if (it.entry) anyData = true; return statRow(it); })
-        .join('');
-      if (!groupRows) return '';
-      return '<div class="brsum-stat-group">' +
-               '<div class="brsum-stat-group-head">' +
-                 '<span class="brsum-stat-group-icon">' + g.icon + '</span>' +
-                 escHtml(g.label) +
-               '</div>' +
-               groupRows +
-             '</div>';
-    }).join('');
-
-    if (!anyData) {
-      body.innerHTML = '<div class="brsum-card-empty">Category context metrics not available.</div>';
-      return;
-    }
-    body.innerHTML = '<div class="brsum-stat-rows">' + html + '</div>';
-  }
-
-  function statRow(item) {
-    var entry  = item.entry;
-    var hasVal = entry && entry.value != null && entry.value !== "" && entry.value !== "NA";
-    var rowCls = hasVal ? 'brsum-stat-row' : 'brsum-stat-row is-empty';
-
-    var help = (entry && entry.tooltip)
-      ? '<span class="brsum-stat-label-help" title="' + escAttr(entry.tooltip) + '">i</span>'
-      : '';
-
-    var valueHtml;
-    if (hasVal) {
-      valueHtml = (item.type === 'num')
-        ? '<span class="brsum-stat-value-num">' + escHtml(entry.value) + '</span>'
-        : '<span class="brsum-stat-value-text">' + escHtml(entry.value) + '</span>';
-    } else {
-      valueHtml = '<span class="brsum-stat-value-text">&mdash;</span>';
-    }
-    var subHtml = (entry && entry.sub)
-      ? '<span class="brsum-stat-sub">' + escHtml(entry.sub) + '</span>'
-      : '';
-
-    return '<div class="' + rowCls + '">' +
-             '<div class="brsum-stat-label">' + escHtml(item.label) + help + '</div>' +
-             '<div class="brsum-stat-value">' + valueHtml + subHtml + '</div>' +
-           '</div>';
-  }
-
-  /* Inline SVGs for the three context groups. Stroke=currentColor so the
-     icon picks up .brsum-stat-group-icon's colour. Kept tiny — just a
-     visual anchor, not decorative. */
-  var ICON_REACH = '<svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><circle cx="12" cy="12" r="7"></circle><circle cx="12" cy="12" r="10.5"></circle></svg>';
-  var ICON_ENGAGE = '<svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M5.6 18.4l2.1-2.1M12 18v3M18.4 18.4l-2.1-2.1M21 12h-3M18.4 5.6l-2.1 2.1"></path><circle cx="12" cy="12" r="4"></circle></svg>';
-  var ICON_HABITS = '<svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18l-1.5 11a2 2 0 0 1-2 1.7H6.5a2 2 0 0 1-2-1.7L3 7Z"></path><path d="M8 7V5a4 4 0 0 1 8 0v2"></path></svg>';
-
   /* Attribute-safe escape for tooltips / titles (different rules to text). */
   function escAttr(s) {
     return String(s == null ? "" : s)
@@ -304,10 +222,143 @@
            '</div>';
   }
 
-  function renderMAMetricsCard(root, snap) {
-    var body = cardBody(root, 'ma_metrics');
+  /* ---------------------------------------------------------------------
+   * Hero card — the headline. Auto-generated single-sentence verdict
+   * + 4 anchor numbers (MMS / MPen / % bought / SCR), all on the focal
+   * brand. Sets the story for everything below.
+   * --------------------------------------------------------------------- */
+  function renderHeroCard(root, snap, cat, catName, brandCode) {
+    var body = cardBody(root, 'hero');
     if (!body) return;
-    if (!snap || !snap.ma_metrics) {
+    if (!snap) {
+      body.innerHTML = '<div class="brsum-card-empty">No data for this brand.</div>';
+      return;
+    }
+    var col      = snap.colour || '#1A5276';
+    var fname    = snap.name || brandCode || 'Focal brand';
+    var anchors  = heroAnchors(snap);
+    var verdict  = heroHeadline(snap, cat, catName, fname, anchors);
+    var rankBadge = anchors.mms_rank
+      ? '<div class="brsum-hero-rank">#' + escHtml(anchors.mms_rank) +
+          ' by MMS in ' + escHtml(catName) + '</div>'
+      : '';
+    var anchorsHtml = [
+      heroAnchor('Mental Market Share', anchors.mms,   anchors.mms_avg,  col),
+      heroAnchor('Mental Penetration',  anchors.mpen,  anchors.mpen_avg, col),
+      heroAnchor('% who bought',        anchors.pen,   anchors.pen_avg,  col),
+      heroAnchor('Loyalty (SCR)',       anchors.scr,   anchors.scr_avg,  col)
+    ].join('');
+    body.innerHTML =
+      '<div class="brsum-hero">' +
+        rankBadge +
+        '<div class="brsum-hero-verdict">' + escHtml(verdict) + '</div>' +
+        '<div class="brsum-hero-anchors">' + anchorsHtml + '</div>' +
+      '</div>';
+  }
+
+  function heroAnchor(label, value, catAvg, colour) {
+    return '<div class="brsum-hero-anchor">' +
+             '<div class="brsum-hero-anchor-v brsum-focal-value" style="color:' + colour + '">' +
+               escHtml(value || '—') + '</div>' +
+             '<div class="brsum-hero-anchor-l">' + escHtml(label) + '</div>' +
+             (catAvg && catAvg !== '—'
+               ? '<div class="brsum-hero-anchor-a">cat avg ' + escHtml(catAvg) + '</div>'
+               : '') +
+           '</div>';
+  }
+
+  /* Resolve the 4 anchor numbers + rank from the snapshot. Falls back to
+     a "—" string when the source field is missing or NA. */
+  function heroAnchors(snap) {
+    var out = { mms: '—', mms_avg: '—', mms_rank: null,
+                mpen: '—', mpen_avg: '—',
+                pen:  '—', pen_avg:  '—',
+                scr:  '—', scr_avg:  '—' };
+    if (snap.ma_metrics && snap.ma_metrics.length) {
+      for (var i = 0; i < snap.ma_metrics.length; i++) {
+        var m = snap.ma_metrics[i];
+        var lab = (m.label || '').toLowerCase();
+        if (lab.indexOf('mental market share') >= 0 || lab === 'mms') {
+          out.mms = m.value; out.mms_avg = m.cat_avg;
+          if (m.rank) out.mms_rank = m.rank;
+        } else if (lab.indexOf('mental penetration') >= 0 || lab === 'mpen') {
+          out.mpen = m.value; out.mpen_avg = m.cat_avg;
+        }
+      }
+    }
+    if (snap.brand_summary && snap.brand_summary.length) {
+      for (var j = 0; j < snap.brand_summary.length; j++) {
+        var s = snap.brand_summary[j];
+        var sl = (s.label || '').toLowerCase();
+        if (sl.indexOf('penetration') >= 0 || sl.indexOf('% who bought') >= 0 ||
+            sl === '% bought' || sl === 'pen') {
+          out.pen = s.value; out.pen_avg = s.cat_avg;
+        } else if (sl.indexOf('scr') >= 0 || sl.indexOf('loyalty') >= 0) {
+          out.scr = s.value; out.scr_avg = s.cat_avg;
+        }
+      }
+    }
+    return out;
+  }
+
+  /* Auto-headline. Picks one of a small set of fact-driven templates
+     based on MMS rank, MPen-vs-cat-avg, and pen-vs-cat-avg. Never
+     generates flowery prose — every output is a direct fact statement
+     the reader can verify against the anchor numbers above. */
+  function heroHeadline(snap, cat, catName, fname, a) {
+    var rank   = a.mms_rank ? parseInt(a.mms_rank, 10) : null;
+    var nBrands = (cat && cat.n_brands) ? cat.n_brands : null;
+    var mpenCmp = compareToAvg(a.mpen, a.mpen_avg);
+    var penCmp  = compareToAvg(a.pen,  a.pen_avg);
+    var rankClause = '';
+    if (rank === 1) rankClause = fname + ' is the category leader by Mental Market Share in ' + catName + '.';
+    else if (rank === 2 || rank === 3) rankClause = fname + ' ranks #' + rank + ' by MMS in ' + catName + '.';
+    else if (rank && nBrands && rank >= Math.ceil(nBrands * 0.75))
+      rankClause = fname + ' sits at #' + rank + ' of ' + nBrands + ' by MMS in ' + catName + ' — bottom-quartile mental position.';
+    else if (rank) rankClause = fname + ' ranks #' + rank + (nBrands ? ' of ' + nBrands : '') + ' by MMS in ' + catName + '.';
+    else rankClause = fname + ' in ' + catName + '.';
+
+    /* Verdict clause — adds one fact about the brand vs cat avg. */
+    var verdictClause = '';
+    if (mpenCmp === 'above' && penCmp === 'above')
+      verdictClause = ' Strong on both mental (MPen) and physical (% bought) availability.';
+    else if (mpenCmp === 'above' && penCmp === 'below')
+      verdictClause = ' Mental availability is above the category average, but physical purchase is lagging — a conversion gap.';
+    else if (mpenCmp === 'below' && penCmp === 'above')
+      verdictClause = ' Punching above its mental availability on physical purchase — but the mental base is the constraint.';
+    else if (mpenCmp === 'below' && penCmp === 'below')
+      verdictClause = ' Below the category average on both mental and physical availability.';
+    else verdictClause = '';
+    return rankClause + verdictClause;
+  }
+
+  /* Comparison helper. Strips % / digits-only-with-comma formatting and
+     compares numerically. Returns 'above' / 'at' / 'below' or null. */
+  function compareToAvg(v, avg) {
+    var nv = parseNumericLike(v);
+    var na = parseNumericLike(avg);
+    if (nv == null || na == null) return null;
+    if (nv > na * 1.05) return 'above';
+    if (nv < na * 0.95) return 'below';
+    return 'at';
+  }
+  function parseNumericLike(s) {
+    if (s == null) return null;
+    var t = String(s).replace(/[%,\s]/g, '').replace(/[^\d.\-]/g, '');
+    if (!t) return null;
+    var n = parseFloat(t);
+    return isNaN(n) ? null : n;
+  }
+
+  /* ---------------------------------------------------------------------
+   * Mental availability card — MMS / SoM / Network Size value-chips,
+   * each with cat-avg under and a leader badge / leader name. Same
+   * value-chip widget as the old MA card; just narrower scope.
+   * --------------------------------------------------------------------- */
+  function renderMentalCard(root, snap) {
+    var body = cardBody(root, 'mental');
+    if (!body) return;
+    if (!snap || !snap.ma_metrics || !snap.ma_metrics.length) {
       body.innerHTML = '<div class="brsum-card-empty">Mental Availability metrics not available.</div>';
       return;
     }
@@ -326,46 +377,170 @@
     body.innerHTML = '<div class="brsum-vchip-grid">' + html + '</div>';
   }
 
-  function renderBrandSummaryCard(root, snap) {
-    var body = cardBody(root, 'brand_summary');
-    var meta = cardMeta(root, 'brand_summary');
-    if (meta) meta.textContent = (snap && snap.brand_summary_base) || '';
-    if (!body) return;
-    if (!snap || !snap.brand_summary) {
-      body.innerHTML = '<div class="brsum-card-empty">Purchase behaviour metrics not available.</div>';
-      return;
-    }
-    var col = snap.colour || '#1A5276';
-    var html = '';
-    for (var i = 0; i < snap.brand_summary.length; i++) {
-      var m = snap.brand_summary[i];
-      html += valueChip(m.label, m.value, m.cat_avg, col, '');
-    }
-    body.innerHTML = '<div class="brsum-vchip-grid">' + html + '</div>';
+  /* ---------------------------------------------------------------------
+   * Physical conversion card — collapsed Aware -> Prefer -> Bought
+   * funnel. Reuses the mini-funnel renderer (focal + cat-avg side-by-
+   * side, stacked stage bars) — same widget as the old Brand funnel
+   * card, just under the "physical" key.
+   * --------------------------------------------------------------------- */
+  function renderPhysicalCard(root, funnelBlock, brandCode, snap) {
+    renderMiniFunnelCard(root, 'physical', funnelBlock, brandCode, snap,
+      { emptyMessage: 'Funnel data not available.' });
   }
 
   /* ---------------------------------------------------------------------
-   * Word of mouth card — two columns (Heard / Said) each with three rows:
-   * positive (green), negative (red), and a highlighted net row at the
-   * bottom. Each row shows the focal value large + cat avg below.
+   * What's working card — top-3 CEPs + top-3 attributes the focal brand
+   * over-indexes on (by advantage_pp, focal value minus cat avg in pp).
+   * Two columns side-by-side. Each item shows label, focal value, cat
+   * avg, signed delta.
    * --------------------------------------------------------------------- */
-  function renderWOMCard(root, snap) {
-    var body = cardBody(root, 'wom');
-    var meta = cardMeta(root, 'wom');
-    if (meta) meta.textContent = (snap && snap.wom && snap.wom.base_label) || '';
+  function renderWorkingCard(root, cat, brandCode, snap) {
+    renderAdvantageCard(root, 'working', cat, brandCode, snap, 'top');
+  }
+  function renderWeakCard(root, cat, brandCode, snap) {
+    renderAdvantageCard(root, 'weak', cat, brandCode, snap, 'bottom');
+  }
+
+  /* Shared engine for the Working / Weak cards. direction = 'top' takes
+     the 3 items with the largest positive advantage_pp; 'bottom' takes
+     the 3 with the largest negative advantage_pp. CEP + attributes
+     render side-by-side. Each side falls back to "no items in this
+     direction" when no qualifying entry exists. */
+  function renderAdvantageCard(root, key, cat, brandCode, snap, direction) {
+    var body = cardBody(root, key);
     if (!body) return;
-    if (!snap || !snap.wom || !snap.wom.available) {
-      body.innerHTML = '<div class="brsum-card-empty">Word-of-mouth not available.</div>';
+    var col = (snap && snap.colour) || '#1A5276';
+    var cepHtml  = advantageCol(cat.cep,   brandCode, direction, col, 'CEPs');
+    var attrHtml = advantageCol(cat.attrs, brandCode, direction, col, 'Attributes');
+    if (!cepHtml && !attrHtml) {
+      body.innerHTML = '<div class="brsum-card-empty">Mental Availability data not available.</div>';
       return;
     }
-    var w = snap.wom;
     body.innerHTML =
-      '<div class="brsum-wom-grid">' +
-        womColumn('Heard', w.heard) +
-        womColumn('Said',  w.said)  +
+      '<div class="brsum-adv-grid">' +
+        (cepHtml  || '<div class="brsum-adv-col brsum-adv-empty">No CEP data.</div>') +
+        (attrHtml || '<div class="brsum-adv-col brsum-adv-empty">No attribute data.</div>') +
       '</div>';
   }
 
+  function advantageCol(block, brandCode, direction, col, title) {
+    if (!block || !block.available) return '';
+    var brand = block.brands && block.brands[brandCode];
+    if (!brand) return '';
+    var stims  = block.stim_codes  || [];
+    var labels = block.stim_labels || stims;
+    var avgs   = block.cat_avg_pct || [];
+    var fps    = brand.focal_pct   || [];
+    var pps    = brand.advantage_pp || [];
+    var ranked = [];
+    for (var i = 0; i < stims.length; i++) {
+      var pp = pps[i];
+      if (pp == null || isNaN(pp)) continue;
+      ranked.push({ idx: i, pp: pp });
+    }
+    if (!ranked.length) return '';
+    ranked.sort(function (a, b) { return direction === 'top' ? b.pp - a.pp : a.pp - b.pp; });
+    /* Drop wrong-sign rows so the "Working" card never lists negatives
+       and "Weak" never lists positives — those don't fit the heading. */
+    ranked = ranked.filter(function (r) {
+      return direction === 'top' ? r.pp > 0 : r.pp < 0;
+    });
+    if (!ranked.length) {
+      return '<div class="brsum-adv-col">' +
+               '<div class="brsum-adv-coltitle">' + escHtml(title) + '</div>' +
+               '<div class="brsum-adv-empty">No ' +
+                 (direction === 'top' ? 'over-indexers' : 'under-indexers') +
+               ' for this brand.</div>' +
+             '</div>';
+    }
+    ranked = ranked.slice(0, 3);
+    var rows = ranked.map(function (r) {
+      var i = r.idx;
+      var fv = fps[i], av = avgs[i], pp = r.pp;
+      var ppTxt = (pp >= 0 ? '+' : '') + pp.toFixed(1) + 'pp';
+      return '<li class="brsum-adv-item ' +
+               (direction === 'top' ? 'is-over' : 'is-under') + '">' +
+               '<span class="brsum-adv-label">' +
+                 escHtml(labels[i] || stims[i]) + '</span>' +
+               '<span class="brsum-adv-focal" style="color:' + col + '">' +
+                 (fv == null || isNaN(fv) ? '—' : Math.round(fv) + '%') + '</span>' +
+               '<span class="brsum-adv-cat">vs ' +
+                 (av == null || isNaN(av) ? '—' : Math.round(av) + '%') + ' avg</span>' +
+               '<span class="brsum-adv-delta">' + ppTxt + '</span>' +
+             '</li>';
+    }).join('');
+    return '<div class="brsum-adv-col">' +
+             '<div class="brsum-adv-coltitle">' + escHtml(title) + '</div>' +
+             '<ul class="brsum-adv-list">' + rows + '</ul>' +
+           '</div>';
+  }
+
+  /* ---------------------------------------------------------------------
+   * Conversation card — WOM (net heard / net said / occasions) on the
+   * left, DoP partners + rivals on the right. Two halves in one card so
+   * the reader sees "is this brand talked about?" and "who does it
+   * compete against?" together — the last beat in the story arc.
+   * --------------------------------------------------------------------- */
+  function renderConversationCard(root, snap, dopBlock, brandCode) {
+    var body = cardBody(root, 'conversation');
+    if (!body) return;
+    var womHtml = renderConversationWom(snap);
+    var dopHtml = renderConversationDop(dopBlock, brandCode);
+    if (!womHtml && !dopHtml) {
+      body.innerHTML = '<div class="brsum-card-empty">Conversation data not available.</div>';
+      return;
+    }
+    body.innerHTML =
+      '<div class="brsum-conv-grid">' +
+        (womHtml || '<div class="brsum-conv-half brsum-conv-empty">WOM not available.</div>') +
+        (dopHtml || '<div class="brsum-conv-half brsum-conv-empty">DoP not available.</div>') +
+      '</div>';
+  }
+
+  function renderConversationWom(snap) {
+    if (!snap || !snap.wom || !snap.wom.available) return '';
+    var w = snap.wom;
+    return '<div class="brsum-conv-half brsum-conv-wom">' +
+             '<div class="brsum-conv-coltitle">Word of mouth</div>' +
+             '<div class="brsum-wom-grid">' +
+               womColumn('Heard', w.heard) +
+               womColumn('Said',  w.said)  +
+             '</div>' +
+           '</div>';
+  }
+
+  function renderConversationDop(dopBlock, brandCode) {
+    if (!dopBlock || !dopBlock.available) return '';
+    var brand = dopBlock.brands && dopBlock.brands[brandCode];
+    if (!brand) return '';
+    var partners = (brand.partners || []).slice(0, 2);
+    var rivals   = (brand.rivals   || []).slice(0, 2);
+    var partnersHtml = partners.length
+      ? '<ul class="brsum-dop-list">' +
+          partners.map(function (p) { return dopRow(p, true);  }).join('') +
+        '</ul>'
+      : '<div class="brsum-dop-empty">No over-indexing partners.</div>';
+    var rivalsHtml = rivals.length
+      ? '<ul class="brsum-dop-list">' +
+          rivals.map(function (p) { return dopRow(p, false); }).join('') +
+        '</ul>'
+      : '<div class="brsum-dop-empty">No under-indexing rivals.</div>';
+    return '<div class="brsum-conv-half brsum-conv-dop">' +
+             '<div class="brsum-conv-coltitle">Competitive ties</div>' +
+             '<div class="brsum-conv-dop-row">' +
+               '<div class="brsum-conv-dop-side">' +
+                 '<div class="brsum-conv-dop-side-title">Partners</div>' +
+                 partnersHtml +
+               '</div>' +
+               '<div class="brsum-conv-dop-side">' +
+                 '<div class="brsum-conv-dop-side-title">Rivals</div>' +
+                 rivalsHtml +
+               '</div>' +
+             '</div>' +
+           '</div>';
+  }
+
+  /* WOM column helpers — shared by renderConversationCard. */
   function womColumn(title, col) {
     return '<div class="brsum-wom-col">' +
              '<div class="brsum-wom-col-title">' + escHtml(title) + '</div>' +
@@ -474,51 +649,7 @@
            '</div>';
   }
 
-  /* ---------------------------------------------------------------------
-   * Duplication of purchase card — top 3 partners + top 3 rivals for the
-   * focal brand (mirrors the partition card on the DoP sub-tab).
-   * --------------------------------------------------------------------- */
-  function renderDoPCard(root, block, brandCode, snap) {
-    var body = cardBody(root, 'dop');
-    var meta = cardMeta(root, 'dop');
-    if (!body) return;
-    if (!block || !block.available) {
-      if (meta) meta.textContent = '';
-      body.innerHTML = '<div class="brsum-card-empty">Duplication of purchase data not available.</div>';
-      return;
-    }
-    var brand = block.brands && block.brands[brandCode];
-    if (!brand) {
-      if (meta) meta.textContent = '';
-      body.innerHTML = '<div class="brsum-card-empty">No data for this brand.</div>';
-      return;
-    }
-    if (meta) meta.textContent = brand.weak ? 'weak partition signal' : '';
-
-    var partnersHtml = brand.partners && brand.partners.length
-      ? brand.partners.map(function (p) { return dopRow(p, true); }).join('')
-      : '<li class="brsum-dop-empty">No brands over-index for this focal.</li>';
-    var rivalsHtml = brand.rivals && brand.rivals.length
-      ? brand.rivals.map(function (p) { return dopRow(p, false); }).join('')
-      : '<li class="brsum-dop-empty">No brands under-index for this focal.</li>';
-
-    body.innerHTML =
-      '<div class="brsum-dop-grid">' +
-        '<div class="brsum-dop-col brsum-dop-col-partners">' +
-          '<div class="brsum-dop-coltitle">Partition partners' +
-            '<span class="brsum-dop-hint">over-index vs cat avg</span>' +
-          '</div>' +
-          '<ul class="brsum-dop-list">' + partnersHtml + '</ul>' +
-        '</div>' +
-        '<div class="brsum-dop-col brsum-dop-col-rivals">' +
-          '<div class="brsum-dop-coltitle">Partition rivals' +
-            '<span class="brsum-dop-hint">under-index vs cat avg</span>' +
-          '</div>' +
-          '<ul class="brsum-dop-list">' + rivalsHtml + '</ul>' +
-        '</div>' +
-      '</div>';
-  }
-
+  /* DoP row helper — shared by renderConversationDop. */
   function dopRow(p, isPartner) {
     var dev = Math.round(p.dev);
     var devTxt = (dev >= 0 ? '+' : '') + dev + 'pp';
@@ -528,130 +659,6 @@
              '<span class="brsum-dop-dev">' + devTxt + '</span>' +
              '<span class="brsum-dop-vs">vs ' + Math.round(p.avg) + '% avg</span>' +
            '</li>';
-  }
-
-  /* ---------------------------------------------------------------------
-   * Dot plot card (CEP + Brand attributes, full-width)
-   *
-   * One row per stim: stim label on the left, then a horizontal lane
-   * with the cat-avg dashed marker + the focal dot + numeric % + (CEP
-   * only) the Mental Advantage decision badge (Defend / Build /
-   * Maintain) on the right.
-   * --------------------------------------------------------------------- */
-  function renderDotPlotCard(root, key, block, brandCode, snap, showDecision) {
-    var body = cardBody(root, key);
-    var meta = cardMeta(root, key);
-    /* Card meta shows the n base when available, with a short qualifier
-       so readers know the rows are sorted by the focal brand. */
-    if (meta) {
-      if (block && block.available) {
-        var baseTxt = block.base_label || '';
-        meta.textContent = baseTxt
-          ? baseTxt + ' · sorted by focal'
-          : 'Sorted by focal brand';
-      } else {
-        meta.textContent = '';
-      }
-    }
-    if (!body) return;
-    if (!block || !block.available) {
-      body.innerHTML = '<div class="brsum-card-empty">Mental Availability data not available.</div>';
-      return;
-    }
-    var brand = block.brands && block.brands[brandCode];
-    if (!brand) {
-      body.innerHTML = '<div class="brsum-card-empty">No data for this brand.</div>';
-      return;
-    }
-    var col   = (snap && snap.colour) || '#1A5276';
-    var stims = block.stim_codes || [];
-    var fps   = brand.focal_pct  || [];
-    var avgs  = block.cat_avg_pct || [];
-    var decs  = brand.decision   || [];
-    var pps   = brand.advantage_pp || [];
-
-    var maxVal = 0;
-    fps.forEach(function (v) { if (v != null && !isNaN(v) && v > maxVal) maxVal = v; });
-    avgs.forEach(function (v) { if (v != null && !isNaN(v) && v > maxVal) maxVal = v; });
-    if (maxVal <= 0) maxVal = 10;
-    /* Round up to a tidy 5% step for readability. */
-    maxVal = Math.max(5, Math.ceil(maxVal / 5) * 5);
-
-    /* Sort rows by focal value descending. NaN/missing focal values fall
-       to the bottom. The cat-avg + decision arrays are aligned to stim
-       index so we sort an index list, not the underlying arrays. */
-    var idx = [];
-    for (var s = 0; s < stims.length; s++) idx.push(s);
-    idx.sort(function (a, b) {
-      var va = fps[a], vb = fps[b];
-      var aMissing = (va == null || isNaN(va));
-      var bMissing = (vb == null || isNaN(vb));
-      if (aMissing && bMissing) return 0;
-      if (aMissing) return 1;
-      if (bMissing) return -1;
-      return vb - va;
-    });
-
-    var rows = '';
-    for (var k = 0; k < idx.length; k++) {
-      var i = idx[k];
-      var fv = fps[i];
-      var av = avgs[i];
-      var fpct = (fv == null || isNaN(fv)) ? null : Math.min(100, (fv / maxVal) * 100);
-      var apct = (av == null || isNaN(av)) ? null : Math.min(100, (av / maxVal) * 100);
-      var dec  = decs[i];
-      var pp   = pps[i];
-      var decBadge = '';
-      if (showDecision && dec) {
-        var dKey = dec.toLowerCase();
-        var ppTxt = (pp != null && !isNaN(pp))
-          ? ((pp >= 0 ? '+' : '') + pp.toFixed(1) + 'pp')
-          : '';
-        decBadge =
-          '<span class="brsum-dec-badge brsum-dec-' + escHtml(dKey) + '">' +
-            escHtml(dec) +
-            (ppTxt ? ' <em>' + ppTxt + '</em>' : '') +
-          '</span>';
-      }
-      var avgMark = apct != null
-        ? '<span class="brsum-dot-avg" style="left:' + apct.toFixed(2) + '%;" title="Cat avg: ' +
-            Math.round(av) + '%"></span>'
-        : '';
-      var focalDot = fpct != null
-        ? '<span class="brsum-dot-focal" style="left:' + fpct.toFixed(2) +
-            '%;background:' + escHtml(col) + ';" title="' +
-            escHtml((snap && snap.name) || brandCode) + ': ' +
-            (fv == null ? '—' : Math.round(fv) + '%') + '"></span>'
-        : '';
-      var focalVal = fv == null || isNaN(fv) ? '—' : Math.round(fv) + '%';
-      rows +=
-        '<div class="brsum-dot-row">' +
-          '<div class="brsum-dot-stim">' + escHtml(block.stim_labels[i] || stims[i]) + '</div>' +
-          '<div class="brsum-dot-lane">' +
-            '<div class="brsum-dot-track"></div>' +
-            avgMark + focalDot +
-          '</div>' +
-          '<div class="brsum-dot-val" style="color:' + escHtml(col) + ';">' + focalVal + '</div>' +
-          '<div class="brsum-dot-meta">' + decBadge + '</div>' +
-        '</div>';
-    }
-    /* X-axis ticks (0%, 25%, 50%, 75%, 100% of maxVal). */
-    var ticks = '';
-    for (var t = 0; t <= 4; t++) {
-      var leftPct = (t * 25);
-      var tickVal = Math.round(maxVal * t / 4);
-      ticks +=
-        '<span class="brsum-dot-tick" style="left:' + leftPct + '%;">' + tickVal + '%</span>';
-    }
-    body.innerHTML =
-      '<div class="brsum-dot-legend">' +
-        '<span class="brsum-legend-dot" style="background:' + escHtml(col) + ';"></span>' +
-        '<span class="brsum-legend-name">' + escHtml((snap && snap.name) || brandCode) + '</span>' +
-        '<span class="brsum-dot-avg-marker"></span>' +
-        '<span class="brsum-legend-name">Cat avg</span>' +
-      '</div>' +
-      '<div class="brsum-dot-rows">' + rows + '</div>' +
-      '<div class="brsum-dot-axis">' + ticks + '</div>';
   }
 
   /* -------------------------------------------------------------------------

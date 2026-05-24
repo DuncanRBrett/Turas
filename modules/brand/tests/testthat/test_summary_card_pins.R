@@ -21,12 +21,14 @@ source(file.path(ROOT, "modules", "brand", "lib", "html_report", "panels",
                  "14_summary_panel.R"))
 
 
+SUMMARY_CARD_KEYS <- c("hero", "mental", "physical",
+                       "working", "weak", "conversation")
+SUMMARY_CARD_COUNT <- length(SUMMARY_CARD_KEYS)
+
+
 test_that("each summary card renders a unique data-section + pin button", {
   html <- .brsum_card_grid_skeleton()
-  expected_keys <- c("context", "ma_metrics", "brand_summary", "funnel",
-                     "attitude", "loyalty", "purchase_dist", "wom",
-                     "dop", "cep", "attrs")
-  for (k in expected_keys) {
+  for (k in SUMMARY_CARD_KEYS) {
     expect_match(html,
       paste0('data-section="brsum-', k, '"'),
       fixed = TRUE,
@@ -40,10 +42,9 @@ test_that("each summary card renders a unique data-section + pin button", {
 
 test_that("each summary card body is marked data-pin-as-table for capture", {
   html <- .brsum_card_grid_skeleton()
-  # 11 cards × 1 body each = 11 markers
   matches <- gregexpr("data-pin-as-table", html, fixed = TRUE)[[1]]
   hits <- if (length(matches) == 1L && matches[1] == -1L) 0L else length(matches)
-  expect_identical(hits, 11L)
+  expect_identical(hits, SUMMARY_CARD_COUNT)
 })
 
 
@@ -51,16 +52,16 @@ test_that("pin buttons carry the shared br-pin-btn class so brand_pins.js wires 
   html <- .brsum_card_grid_skeleton()
   matches <- gregexpr('class="br-pin-btn brsum-card-pin"', html, fixed = TRUE)[[1]]
   hits <- if (length(matches) == 1L && matches[1] == -1L) 0L else length(matches)
-  expect_identical(hits, 11L)
+  expect_identical(hits, SUMMARY_CARD_COUNT)
 })
 
 
 test_that("section ids are unique across the card grid", {
   html <- .brsum_card_grid_skeleton()
   # data-section appears twice per card (once on <section>, once on the
-  # <button>) — that's expected. Check 11 unique values.
+  # <button>) — that's expected. Check unique values match the card count.
   ids <- regmatches(html, gregexpr('data-section="brsum-[^"]+"', html))[[1]]
-  expect_identical(length(unique(ids)), 11L)
+  expect_identical(length(unique(ids)), SUMMARY_CARD_COUNT)
 })
 
 
