@@ -57,6 +57,11 @@ BRAND_CONFIG_VERSION <- "2.0"
     if (file.exists(path)) return(path)
   }
 
+  # TRS-FALLBACK: template-generation helper, not analytical code. The
+  # template_styles.R loader is a hard prerequisite — if it's missing,
+  # there's no graceful degradation possible. stop() surfaces the
+  # message immediately because TRS infrastructure isn't loaded yet
+  # (template generation runs ahead of the brand module).
   stop("Cannot find modules/shared/template_styles.R. Set TURAS_ROOT or source it manually.")
 }
 
@@ -1456,6 +1461,9 @@ generate_brand_config_template <- function(output_path, overwrite = FALSE) {
   output_dir <- dirname(output_path)
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
+  # TRS-FALLBACK: rethrow template-styles loader failure with a tagged
+  # message. Template generation is a developer tool that runs ahead of
+  # the brand module — TRS infrastructure isn't loaded at this point.
   tryCatch(.ensure_template_styles(),
            error = function(e) stop(sprintf("Cannot load template styles: %s", e$message)))
 
@@ -1538,6 +1546,9 @@ generate_brand_survey_structure_template <- function(output_path,
   output_dir <- dirname(output_path)
   if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
+  # TRS-FALLBACK: rethrow template-styles loader failure with a tagged
+  # message. Template generation is a developer tool that runs ahead of
+  # the brand module — TRS infrastructure isn't loaded at this point.
   tryCatch(.ensure_template_styles(),
            error = function(e) stop(sprintf("Cannot load template styles: %s", e$message)))
 

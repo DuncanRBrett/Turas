@@ -373,6 +373,11 @@ validate_nesting <- function(stages, weights = NULL) {
       tenure_threshold, "Long-tenured (service)", cat_code, brand_aliases),
 
     {
+      # Programming-error sentinel: an unrecognised stage key has reached
+      # this dispatcher despite the upstream plan validation. Should never
+      # fire in normal operation — listed in PRODUCTION_REVIEW_BRAND.md I1
+      # as an acceptable TRS-FALLBACK because the boxed brand_refuse path
+      # is preferred and the stop() is the last-resort guard.
       msg <- sprintf("BUG_UNKNOWN_STAGE: Unknown funnel stage key '%s'. File a bug — this should not occur with valid config.", key)
       if (exists("brand_refuse", mode = "function")) {
         brand_refuse(code = "BUG_UNKNOWN_STAGE", title = "Unknown Funnel Stage Key",
@@ -380,7 +385,7 @@ validate_nesting <- function(stages, weights = NULL) {
                      why_it_matters = "An unrecognised key in the execution plan means no stage data will be produced.",
                      how_to_fix = "This is an internal error — file a bug report. The key should never reach this function unless the plan was corrupted.")
       } else {
-        stop(msg, call. = FALSE)
+        stop(msg, call. = FALSE)  # TRS-FALLBACK: bootstrap path only
       }
     }
   )

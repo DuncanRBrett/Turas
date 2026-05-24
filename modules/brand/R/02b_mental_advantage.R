@@ -59,6 +59,11 @@ MA_SIG_Z_THRESHOLD <- 1.96
 #' @return Numeric matrix with rows = stimuli, cols = brand codes.
 #' @keywords internal
 .ma_count_matrix <- function(linkage_tensor, codes, weights = NULL) {
+  # TRS-FALLBACK: programmer-error sentinels for an INTERNAL helper.
+  # Callers (calculate_mental_advantage etc.) guard inputs at the public
+  # entry, so an empty linkage_tensor / codes vector arriving here is a
+  # bug in the caller. Stop() makes the error visible in the calling
+  # tryCatch upstream where it gets converted to a TRS refusal.
   brand_codes <- names(linkage_tensor)
   if (length(brand_codes) == 0)
     stop("[CALC_MA_NO_BRANDS] linkage_tensor has no brands", call. = FALSE)
@@ -257,6 +262,8 @@ calculate_mental_advantage <- function(linkage_tensor, codes,
                    why_it_matters = "Cannot compute advantage matrix without valid inputs.",
                    how_to_fix = how_to_fix)
     } else {
+      # TRS-FALLBACK: brand_refuse() is the canonical path; this only
+      # fires if 00_guard.R hasn't loaded ahead of this file.
       stop(sprintf("[%s] %s", code, problem), call. = FALSE)
     }
   }

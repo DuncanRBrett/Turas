@@ -58,6 +58,8 @@
     applyHeatmap(panel);
     applyCellExtras(panel);
     applyRowToggles(panel);
+    // Default metric = penetration, so the baseline group starts disabled.
+    applyBaselineEnabledState(panel);
   }
 
   // ---- cell-metric radio (Penetration vs Share of buyers) ----
@@ -66,6 +68,7 @@
       input.addEventListener("change", () => {
         if (!input.checked) return;
         panel.__state.cellMetric = input.getAttribute("data-demo-metric");
+        applyBaselineEnabledState(panel);
         rerenderAllTables(panel);
       });
     });
@@ -76,7 +79,10 @@
   // shading + chart marker between the cat-buyer distribution (r.pct)
   // and the total-study-sample distribution (q.total_study_sample.rows[i].pct).
   // Penetration mode is unaffected because its baseline is per-option
-  // mean brand pen (option_avg_penetration), not a sample distribution.
+  // mean brand pen (option_avg_penetration), not a sample distribution —
+  // the baseline radios are visually disabled in Pen mode (see
+  // applyBaselineEnabledState below) so the reader doesn't perceive a
+  // broken control.
   function bindBaselineRadios(panel) {
     panel.querySelectorAll('input[data-demo-baseline]').forEach(input => {
       input.addEventListener("change", () => {
@@ -84,6 +90,27 @@
         panel.__state.baseline = input.getAttribute("data-demo-baseline");
         rerenderAllTables(panel);
       });
+    });
+  }
+
+  // Toggle the baseline-radio group's disabled look + native input
+  // disabled attribute based on the current cell-metric. The 'Baseline'
+  // wrapper carries a data-demo-baseline-group marker rendered by the R
+  // panel builder; we add .demo-disabled (CSS opacity / cursor) when in
+  // Pen mode and a hover tooltip explaining why.
+  function applyBaselineEnabledState(panel) {
+    const wrap = panel.querySelector('[data-demo-baseline-group]');
+    if (!wrap) return;
+    const isPen = (panel.__state.cellMetric || "penetration") === "penetration";
+    wrap.classList.toggle("demo-disabled", isPen);
+    wrap.setAttribute(
+      "title",
+      isPen
+        ? "Baseline only applies when Cells = '% of buyers'. In '% who buy' mode the cat-avg column reads from the per-option mean brand penetration regardless of which baseline is selected."
+        : ""
+    );
+    wrap.querySelectorAll('input[data-demo-baseline]').forEach(input => {
+      input.disabled = isPen;
     });
   }
 

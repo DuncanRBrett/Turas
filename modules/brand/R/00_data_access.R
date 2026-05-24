@@ -452,6 +452,12 @@ brand_da_refuse <- function(code, title, problem, how_to_fix,
                    code, title, problem,
                    paste(how_to_fix, collapse = "; "))
     cat("\n=== TURAS ERROR ===\n", msg, "\n===================\n", sep = "")
+    # TRS-FALLBACK: brand_refuse() is the canonical refusal path. This
+    # stop() only fires during the rebuild when this file is sourced
+    # before 00_guard.R (i.e. brand_refuse isn't yet defined). The boxed
+    # message above is already TRS-formatted, so the user-facing output
+    # is identical to a normal refusal — only the control-flow shape
+    # differs (raised error instead of returned list).
     stop(msg, call. = FALSE)
   }
 }

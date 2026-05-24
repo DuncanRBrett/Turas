@@ -72,7 +72,11 @@ brand_refuse <- function(code, title, problem, why_it_matters, how_to_fix,
     turas_refuse(code, title, problem, why_it_matters, how_to_fix,
                  expected, observed, missing, details, module = "BRAND")
   } else {
-    # Fallback if TRS not loaded
+    # TRS-FALLBACK: turas_refuse() is the canonical TRS handler. This
+    # branch fires only if shared/lib/trs_refusal.R isn't loaded ahead
+    # of the brand module — bootstrap edge case. The boxed cat() above
+    # already mirrors the TRS format, so user-facing output is
+    # identical.
     cat("\n=== TURAS BRAND ERROR ===\n")
     cat("Code:", code, "\n")
     cat("Title:", title, "\n")

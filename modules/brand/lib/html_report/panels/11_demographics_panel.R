@@ -107,6 +107,10 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
 .demo-control-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: .4px; margin-right: 6px; }
 .demo-control-check { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: #334155; cursor: pointer; user-select: none; }
 .demo-control-check input { cursor: pointer; }
+.demo-baseline-wrap { display: inline-flex; align-items: center; gap: 12px; }
+.demo-baseline-wrap.demo-disabled { opacity: 0.45; }
+.demo-baseline-wrap.demo-disabled .demo-control-check,
+.demo-baseline-wrap.demo-disabled .demo-control-check input { cursor: not-allowed; }
 
 .demo-chip-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0 10px; padding: 0 4px; }
 .demo-chip-row-label { font-size: 11px; color: #64748b; margin-right: 4px; }
@@ -329,9 +333,16 @@ build_demographics_panel_styles <- function(focal_colour = "#1A5276") {
     '<label class="demo-control-check" title="% of respondents in this demographic option who buy this brand. Cells sum to 100% (buyer + non-buyer) within each option. Best for finding where a brand over- or under-performs."><input type="radio" name="demo-metric" data-demo-metric="penetration" checked> % who buy</label>',
     '<label class="demo-control-check" title="% of this brand’s buyers who fall in this option. Brand column sums to 100%. Best for describing what a brand’s buyer audience looks like demographically."><input type="radio" name="demo-metric" data-demo-metric="share"> % of buyers</label>',
     '<span class="demo-control-sep"></span>',
+    # Baseline radios — toggled to disabled-look in Penetration mode (their
+    # only effect is on Share-of-buyers; in Pen mode the cat-avg column reads
+    # from option_avg_penetration regardless). brand_demographics_panel.js
+    # updates the wrap class + input disabled attribute when the metric
+    # radio flips.
+    '<span class="demo-baseline-wrap" data-demo-baseline-group>',
     '<span class="demo-control-label">Baseline:</span>',
     '<label class="demo-control-check" title="Compare focal brand against the CATEGORY-BUYER average for this question. Best for spotting what is distinctive about this brand within its category — the academic default (Romaniuk / Ehrenberg-Bass)."><input type="radio" name="demo-baseline" data-demo-baseline="cat" checked> Cat avg</label>',
     '<label class="demo-control-check" title="Compare focal brand against the WHOLE SCREENED SAMPLE for this question. Best for cross-category reads (same denominator across all categories) and for population-relative skews."><input type="radio" name="demo-baseline" data-demo-baseline="study"> Total sample</label>',
+    '</span>',
     '<span class="demo-control-sep"></span>',
     '<span class="demo-control-label">Show:</span>',
     '<label class="demo-control-check"><input type="checkbox" data-demo-toggle="counts"> n counts</label>',

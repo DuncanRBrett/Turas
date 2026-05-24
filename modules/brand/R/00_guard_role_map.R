@@ -264,6 +264,9 @@ resolve_active_categories <- function(data, brand_config) {
                  why_it_matters = "Brand module rebuild guard.",
                  how_to_fix = how_to_fix, missing = missing, ...)
   } else {
+    # TRS-FALLBACK: brand_refuse() is the canonical handler; this
+    # branch only fires if 00_guard.R hasn't loaded before this file.
+    # Boxed cat() above already provides TRS-formatted user output.
     msg <- sprintf("[%s] %s — %s\nHow to fix: %s",
                    code, title, problem,
                    paste(how_to_fix, collapse = "; "))
