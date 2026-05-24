@@ -349,11 +349,27 @@ build_ma_panel_data <- function(ma_result, brand_list, cep_list,
   # approximation for cross-brand links).
   som <- round(ifelse(mpen > 0, mms * 100 / mpen, NA_real_), 1)
 
-  # CI band classification vs category average for each metric
-  mms_band  <- .calc_metric_ci_bands(mms)
-  mpen_band <- .calc_metric_ci_bands(mpen)
-  ns_band   <- .calc_metric_ci_bands(ns)
-  som_band  <- .calc_metric_ci_bands(som)
+  # Silent-zero mask (mirrors C1 fix in 14_summary_panel.R). The MA engine
+  # returns 0 (not NA) for brands with no linkage data — including those
+  # zeros in the cat-avg / CI bounds drags the reference distribution
+  # toward a diluted floor and lets the per-brand band classification
+  # ("above" / "below" / "within") read against a wrong mean. Marking
+  # inactive brands NA on the masked vectors lets the existing
+  # na.rm = TRUE bounds + the band function's existing NA-to-"na"
+  # branch do the right thing with no further changes.
+  ma_active <- (!is.na(mpen) & mpen > 0) |
+               (!is.na(ns)   & ns   > 0) |
+               (!is.na(mms)  & mms  > 0)
+  mpen_m <- ifelse(ma_active, mpen, NA_real_)
+  ns_m   <- ifelse(ma_active, ns,   NA_real_)
+  mms_m  <- ifelse(ma_active, mms,  NA_real_)
+  som_m  <- ifelse(ma_active, som,  NA_real_)
+
+  # CI band classification vs category average for each metric (masked)
+  mms_band  <- .calc_metric_ci_bands(mms_m)
+  mpen_band <- .calc_metric_ci_bands(mpen_m)
+  ns_band   <- .calc_metric_ci_bands(ns_m)
+  som_band  <- .calc_metric_ci_bands(som_m)
 
   n_resp_num <- as.numeric(ma_result$n_respondents %||% NA_real_)
 
@@ -391,17 +407,18 @@ build_ma_panel_data <- function(ma_result, brand_list, cep_list,
     som  = if (!is.na(focal_idx)) round(som[focal_idx], 1)  else NA_real_
   )
 
-  # Category average (mean across brands) for context + 95% CI bounds
-  mpen_bounds <- .calc_metric_ci_bounds(mpen)
-  ns_bounds   <- .calc_metric_ci_bounds(ns)
-  mms_bounds  <- .calc_metric_ci_bounds(mms)
-  som_bounds  <- .calc_metric_ci_bounds(som)
+  # Category average (mean across brands) for context + 95% CI bounds.
+  # Uses the masked vectors so silent-zero (no-data) brands are excluded.
+  mpen_bounds <- .calc_metric_ci_bounds(mpen_m)
+  ns_bounds   <- .calc_metric_ci_bounds(ns_m)
+  mms_bounds  <- .calc_metric_ci_bounds(mms_m)
+  som_bounds  <- .calc_metric_ci_bounds(som_m)
 
   cat_avg <- list(
-    mpen       = round(mean(mpen, na.rm = TRUE), 1),
-    ns         = round(mean(ns,   na.rm = TRUE), 2),
-    mms        = round(mean(mms,  na.rm = TRUE), 1),
-    som        = round(mean(som,  na.rm = TRUE), 1),
+    mpen       = round(mean(mpen_m, na.rm = TRUE), 1),
+    ns         = round(mean(ns_m,   na.rm = TRUE), 2),
+    mms        = round(mean(mms_m,  na.rm = TRUE), 1),
+    som        = round(mean(som_m,  na.rm = TRUE), 1),
     mpen_ci_lo = mpen_bounds$lower,
     mpen_ci_hi = mpen_bounds$upper,
     ns_ci_lo   = ns_bounds$lower,

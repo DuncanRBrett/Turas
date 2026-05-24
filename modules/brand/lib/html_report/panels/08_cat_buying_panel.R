@@ -1568,6 +1568,17 @@ render_cat_buying_panel <- function(panel_data) {
       as.numeric(bh$brand_heaviness$Brand_Buyers_n),
       as.character(bh$brand_heaviness$BrandCode))
   }
+  # When df is brand_loyalty_segments the engine treats each brand row
+  # as a % of THAT brand's buyers. The cat-avg here is the unweighted
+  # mean across brands (a known convention — matches the deep-dive tab's
+  # display). Mask zero-buyer brands so they don't drag the mean toward
+  # a diluted floor — same silent-zero pattern as C1 in the Summary
+  # panel. base_map is the per-brand buyer count from bh$brand_heaviness
+  # whenever it's available (including the uniform_base branch).
+  unif_base_map <- if (!is.null(bh) && !is.null(bh$brand_heaviness) &&
+                       "Brand_Buyers_n" %in% names(bh$brand_heaviness))
+    setNames(as.numeric(bh$brand_heaviness$Brand_Buyers_n),
+             as.character(bh$brand_heaviness$BrandCode)) else NULL
   cat_avgs <- unname(vapply(col_names, function(cn) {
     if (is.null(df) || !cn %in% names(df)) return(NA_real_)
     vals <- as.numeric(df[[cn]])
@@ -1579,6 +1590,17 @@ render_cat_buying_panel <- function(panel_data) {
       ok <- is.finite(vals) & is.finite(bases) & bases > 0
       if (!any(ok)) return(NA_real_)
       sum(vals[ok] * bases[ok]) / sum(bases[ok])
+    } else if (!is.null(unif_base_map)) {
+      # uniform_base branch — keep the unweighted mean but exclude
+      # zero-buyer brands (silent-zero rows that would otherwise drag
+      # the cat-avg toward zero).
+      bases <- vapply(as.character(df$BrandCode), function(b) {
+        v <- unif_base_map[[b]]
+        if (is.null(v) || !is.finite(v)) 0 else as.numeric(v)
+      }, numeric(1))
+      ok <- is.finite(vals) & bases > 0
+      if (!any(ok)) return(NA_real_)
+      mean(vals[ok])
     } else {
       mean(vals, na.rm = TRUE)
     }
