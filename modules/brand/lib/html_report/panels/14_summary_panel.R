@@ -1364,6 +1364,57 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   rep <- cr$repertoire
   wm <- cr$wom
 
+  # ---- Silent-zero masks (see PRODUCTION_REVIEW_BRAND.md §C1) -----------------
+  # The MA / repertoire / WOM engines return 0 (not NA) for brands without
+  # data — a config edge case (brand declared in awareness but absent from a
+  # specific element battery) silently pulls cat-avgs toward zero. The May
+  # 2026 WOM incident was the same class of bug. These masks identify
+  # "data-active" brands per engine so cat-avgs reflect the honest mean
+  # across brands that actually have data.
+  .ma_active_codes <- {
+    codes <- character(0)
+    if (!is.null(ma$mpen) && nrow(ma$mpen) > 0)
+      codes <- union(codes,
+        as.character(ma$mpen$BrandCode[as.numeric(ma$mpen$MPen) > 0]))
+    if (!is.null(ma$ns) && nrow(ma$ns) > 0)
+      codes <- union(codes,
+        as.character(ma$ns$BrandCode[as.numeric(ma$ns$NS) > 0]))
+    if (!is.null(ma$mms) && nrow(ma$mms) > 0)
+      codes <- union(codes,
+        as.character(ma$mms$BrandCode[as.numeric(ma$mms$MMS) > 0]))
+    codes
+  }
+  .loy_active_codes <- {
+    brp0 <- rep$brand_repertoire_profile
+    if (!is.null(brp0) && nrow(brp0) > 0 && "Brand_Buyers_n" %in% names(brp0))
+      as.character(brp0$BrandCode[as.integer(brp0$Brand_Buyers_n) > 0])
+    else character(0)
+  }
+  .wom_active_codes <- {
+    wmx <- wm$wom_metrics
+    if (!is.null(wmx) && nrow(wmx) > 0) {
+      rp0 <- as.numeric(wmx$ReceivedPos_Pct %||% rep(0, nrow(wmx)))
+      rn0 <- as.numeric(wmx$ReceivedNeg_Pct %||% rep(0, nrow(wmx)))
+      sp0 <- as.numeric(wmx$SharedPos_Pct   %||% rep(0, nrow(wmx)))
+      sn0 <- as.numeric(wmx$SharedNeg_Pct   %||% rep(0, nrow(wmx)))
+      as.character(wmx$BrandCode[(rp0 > 0) | (rn0 > 0) |
+                                   (sp0 > 0) | (sn0 > 0)])
+    } else character(0)
+  }
+  # Masked-mean helper: NA-safe mean restricted to rows whose BrandCode is in
+  # `active`. Returns NA_real_ when no active rows remain (so the chip
+  # renders "—" rather than 0). Empty `active` means "no brand has data for
+  # this engine in this category" — also NA, not a silent zero (this is
+  # the C1 invariant — see test_summary_cat_avg_masks.R).
+  .masked_mean <- function(df, col, active) {
+    if (is.null(df) || nrow(df) == 0L || !col %in% names(df))
+      return(NA_real_)
+    if (length(active) == 0L) return(NA_real_)
+    keep <- as.character(df$BrandCode) %in% active
+    if (!any(keep)) return(NA_real_)
+    mean(as.numeric(df[[col]][keep]), na.rm = TRUE)
+  }
+
   # ---- MMS + rank ----
   mms_value <- NA_real_
   mms_cat_avg <- NA_real_
@@ -1371,7 +1422,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   n_brands <- NA_integer_
   if (!is.null(ma$mms) && nrow(ma$mms) > 0) {
     n_brands <- nrow(ma$mms)
-    mms_cat_avg <- mean(ma$mms$MMS, na.rm = TRUE)
+    mms_cat_avg <- .masked_mean(ma$mms, "MMS", .ma_active_codes)
     if (brand_code %in% ma$mms$BrandCode) {
       mms_value <- ma$mms$MMS[ma$mms$BrandCode == brand_code]
       mms_rank <- which(order(-ma$mms$MMS) ==
@@ -1383,13 +1434,15 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   mpen_value <- NA_real_
   mpen_cat_avg <- NA_real_
   if (!is.null(ma$mpen) && nrow(ma$mpen) > 0) {
-    mpen_cat_avg <- mean(ma$mpen$MPen, na.rm = TRUE)
+    mpen_cat_avg <- .masked_mean(ma$mpen, "MPen", .ma_active_codes)
     if (brand_code %in% ma$mpen$BrandCode) {
       mpen_value <- ma$mpen$MPen[ma$mpen$BrandCode == brand_code]
     }
   }
 
   # ---- Funnel: bought_target ----
+  # Funnel engine already NAs missing rows (03b_funnel_metrics.R:348-359), so
+  # mean(..., na.rm = TRUE) is already honest — no additional mask needed.
   bt_value <- NA_real_
   bt_cat_avg <- NA_real_
   if (!is.null(fn$stages) && nrow(fn$stages) > 0) {
@@ -1406,7 +1459,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   loy_cat_avg <- NA_real_
   brp <- rep$brand_repertoire_profile
   if (!is.null(brp) && nrow(brp) > 0 && "Sole_Pct" %in% names(brp)) {
-    loy_cat_avg <- mean(brp$Sole_Pct, na.rm = TRUE)
+    loy_cat_avg <- .masked_mean(brp, "Sole_Pct", .loy_active_codes)
     if (brand_code %in% brp$BrandCode) {
       loy_value <- brp$Sole_Pct[brp$BrandCode == brand_code]
     }
@@ -1417,7 +1470,8 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   net_wom_cat_avg <- NA_real_
   if (!is.null(wm$net_balance) && nrow(wm$net_balance) > 0 &&
       "Net_Received" %in% names(wm$net_balance)) {
-    net_wom_cat_avg <- mean(wm$net_balance$Net_Received, na.rm = TRUE)
+    net_wom_cat_avg <- .masked_mean(wm$net_balance, "Net_Received",
+                                     .wom_active_codes)
     if (brand_code %in% wm$net_balance$BrandCode) {
       net_wom <- wm$net_balance$Net_Received[
         wm$net_balance$BrandCode == brand_code]
@@ -1453,7 +1507,7 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
   ns_cat_avg <- NA_real_
   ns_leader  <- NA_character_
   if (!is.null(ma$ns) && nrow(ma$ns) > 0 && "NS" %in% names(ma$ns)) {
-    ns_cat_avg <- mean(ma$ns$NS, na.rm = TRUE)
+    ns_cat_avg <- .masked_mean(ma$ns, "NS", .ma_active_codes)
     if (brand_code %in% ma$ns$BrandCode)
       ns_value <- ma$ns$NS[ma$ns$BrandCode == brand_code]
     leader_idx <- which.max(ma$ns$NS)
@@ -1472,9 +1526,16 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
     mer <- merge(ma$mms[, c("BrandCode", "MMS")],
                  ma$mpen[, c("BrandCode", "MPen")],
                  by = "BrandCode")
-    s <- vapply(seq_len(nrow(mer)), function(i)
-      som_for(mer$MMS[i], mer$MPen[i]), numeric(1))
-    mean(s, na.rm = TRUE)
+    # Mask via MA-active set so cat-avg matches the other MA chips.
+    keep <- if (length(.ma_active_codes) > 0L)
+      as.character(mer$BrandCode) %in% .ma_active_codes
+    else rep(TRUE, nrow(mer))
+    if (!any(keep)) NA_real_
+    else {
+      s <- vapply(which(keep), function(i)
+        som_for(mer$MMS[i], mer$MPen[i]), numeric(1))
+      mean(s, na.rm = TRUE)
+    }
   } else NA_real_
   som_leader <- if (!is.null(ma$mms) && !is.null(ma$mpen)) {
     mer <- merge(ma$mms[, c("BrandCode", "MMS")],
