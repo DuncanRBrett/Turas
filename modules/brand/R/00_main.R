@@ -58,6 +58,7 @@ BRAND_VERSION <- "1.0"
     "00_role_map.R",
     "00_guard_role_map.R",
     "01_config.R",
+    "01b_section_insights.R",
     "02_mental_availability.R",
     "02b_mental_advantage.R",
     "02c_ma_focal_view.R",

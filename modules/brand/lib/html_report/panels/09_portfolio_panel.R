@@ -52,6 +52,13 @@ build_br_portfolio_panel <- function(results, config) {
   focal_colour <- config$colour_focal %||% "#1A5276"
   focal_brand  <- config$focal_brand  %||% ""
 
+  # Section_Insights stash: every .pf_section_toolbar() call below reads
+  # this map to pre-fill insight editors from the config workbook.
+  # Cleared on each render so a stale map from a previous run cannot leak
+  # into the current report.
+  .pf_set_section_insights(config$section_insights)
+  on.exit(.pf_set_section_insights(NULL), add = TRUE)
+
   # Portfolio-wide brand-colour map. Walks the master Brands sheet once
   # and produces a {BrandCode -> hex} dict that every Portfolio sub-tab
   # can use to render consistent brand-coloured chips, nodes and chart
@@ -1108,7 +1115,48 @@ build_br_portfolio_panel <- function(results, config) {
 # SHARED HELPERS
 # ==============================================================================
 
+# Per-render stash for the Section_Insights map. build_br_portfolio_panel()
+# sets this once at the top of every render; each .pf_*_subtab() function
+# calls .pf_section_toolbar(section_id) without needing the map in its own
+# signature. Keeps the subtab signatures stable.
+.pf_section_insights_env <- new.env(parent = emptyenv())
+
+.pf_set_section_insights <- function(section_insights) {
+  .pf_section_insights_env$current <- if (is.null(section_insights))
+    character(0) else section_insights
+}
+
+.pf_lookup_insight <- function(section_id) {
+  m <- .pf_section_insights_env$current
+  if (is.null(m) || length(m) == 0L) return("")
+  val <- m[[section_id]]
+  if (is.null(val) || is.na(val)) "" else as.character(val)
+}
+
 .pf_section_toolbar <- function(section_id) {
+  prefill_text <- .pf_lookup_insight(section_id)
+  has_text <- nzchar(prefill_text)
+
+  container_style <- if (has_text)
+    "display:block;margin-bottom:16px;position:relative;"
+  else
+    "display:none;margin-bottom:16px;position:relative;"
+  textarea_style <- if (has_text)
+    "width:100%%;min-height:60px;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-family:inherit;font-size:13px;resize:vertical;display:none;"
+  else
+    "width:100%%;min-height:60px;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-family:inherit;font-size:13px;resize:vertical;"
+  rendered_style <- if (has_text)
+    "display:block;padding:10px;border:1px solid #e2e8f0;border-radius:6px;min-height:40px;cursor:pointer;font-size:13px;line-height:1.5;background:#f8fafc;"
+  else
+    "display:none;padding:10px;border:1px solid #e2e8f0;border-radius:6px;min-height:40px;cursor:pointer;font-size:13px;line-height:1.5;"
+  toggle_label <- if (has_text) "Edit Insight" else "+ Add Insight"
+  toggle_handler <- if (has_text) "_brToggleInsightEdit" else "_brToggleInsight"
+  rendered_html <- if (has_text && exists(".br_render_insight_md", mode = "function"))
+    .br_render_insight_md(prefill_text)
+  else if (has_text)
+    .pf_esc(prefill_text)
+  else ""
+
   sprintf(
     '<div class="br-section-toolbar" style="display:flex;gap:8px;margin-bottom:12px;">
   <button class="br-pin-btn" data-section="%s" onclick="brTogglePin(\'%s\')" title="Pin to Views"
@@ -1123,21 +1171,25 @@ build_br_portfolio_panel <- function(results, config) {
     style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;padding:5px 10px;color:#64748b;">
     &#x1F4E5; Excel
   </button>
-  <button class="br-insight-toggle" onclick="_brToggleInsight(\'%s\')"
+  <button class="br-insight-toggle" onclick="%s(\'%s\')"
     style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;padding:5px 10px;color:#64748b;">
-    + Add Insight
+    %s
   </button>
 </div>
-<div class="br-insight-container" data-section="%s" style="display:none;margin-bottom:16px;position:relative;">
+<div class="br-insight-container" data-section="%s" data-prefilled="%s" style="%s">
   <textarea class="br-insight-editor" data-section="%s" placeholder="Type key insight here..."
-    style="width:100%%;min-height:60px;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-family:inherit;font-size:13px;resize:vertical;"></textarea>
+    style="%s">%s</textarea>
   <div class="br-insight-rendered" data-section="%s" ondblclick="_brToggleInsightEdit(\'%s\')"
-    style="display:none;padding:10px;border:1px solid #e2e8f0;border-radius:6px;min-height:40px;cursor:pointer;font-size:13px;line-height:1.5;"></div>
+    style="%s">%s</div>
   <button class="br-insight-dismiss" onclick="_brDismissInsight(\'%s\')"
     style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px;position:absolute;top:4px;right:8px;">&times;</button>
 </div>',
-    section_id, section_id, section_id, section_id, section_id,
-    section_id, section_id, section_id, section_id, section_id
+    section_id, section_id, section_id, section_id,
+    toggle_handler, section_id, toggle_label,
+    section_id, if (has_text) "true" else "false", container_style,
+    section_id, textarea_style, .pf_esc(prefill_text),
+    section_id, section_id, rendered_style, rendered_html,
+    section_id
   )
 }
 

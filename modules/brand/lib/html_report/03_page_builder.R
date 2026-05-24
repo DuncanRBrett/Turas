@@ -138,8 +138,48 @@ build_br_tab_nav <- function(category_names, config, display_map = NULL,
 
 
 #' Build section toolbar (pin + PNG export + Excel export + insight)
+#'
+#' @param section_id   Anchor ID for this section (drives pin / insight wiring).
+#' @param prefill_text Optional character. When non-empty, the insight container
+#'   is rendered visible by default with the text pre-populated in both the
+#'   raw textarea and the rendered display div. This is the seam that lets
+#'   the Section_Insights config sheet survive report re-runs.
+#'
 #' @keywords internal
-build_br_section_toolbar <- function(section_id) {
+build_br_section_toolbar <- function(section_id, prefill_text = NULL) {
+  has_text <- !is.null(prefill_text) && !is.na(prefill_text) &&
+              nzchar(trimws(as.character(prefill_text)))
+  prefill_text <- if (has_text) as.character(prefill_text) else ""
+
+  # When pre-filled, the container is open by default and the rendered view
+  # is shown (textarea hidden) so the analyst sees the insight as published.
+  # Double-click the rendered view to edit (matches existing UX).
+  container_style <- if (has_text) {
+    "display:block;margin-bottom:16px;position:relative;"
+  } else {
+    "display:none;margin-bottom:16px;position:relative;"
+  }
+  textarea_style <- if (has_text) {
+    "width:100%%;min-height:60px;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-family:inherit;font-size:13px;resize:vertical;display:none;"
+  } else {
+    "width:100%%;min-height:60px;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-family:inherit;font-size:13px;resize:vertical;"
+  }
+  rendered_style <- if (has_text) {
+    "display:block;padding:10px;border:1px solid #e2e8f0;border-radius:6px;min-height:40px;cursor:pointer;font-size:13px;line-height:1.5;background:#f8fafc;"
+  } else {
+    "display:none;padding:10px;border:1px solid #e2e8f0;border-radius:6px;min-height:40px;cursor:pointer;font-size:13px;line-height:1.5;"
+  }
+  toggle_label <- if (has_text) "Edit Insight" else "+ Add Insight"
+  # When pre-filled the container is open by default and the rendered view
+  # is showing; the toggle button switches between rendered and edit modes.
+  # When empty the toggle hides/shows the whole container.
+  toggle_handler <- if (has_text) "_brToggleInsightEdit" else "_brToggleInsight"
+
+  # Pre-render the markdown server-side for the rendered view. Conservative:
+  # bold/italic and basic line breaks. Full markdown is handled client-side
+  # by the existing JS editor when the analyst opens the textarea.
+  rendered_html <- if (has_text) .br_render_insight_md(prefill_text) else ""
+
   sprintf('
 <div class="br-section-toolbar" style="display:flex;gap:8px;margin-bottom:12px;">
   <button class="br-pin-btn" data-section="%s" onclick="brTogglePin(\'%s\')" title="Pin to Views"
@@ -154,21 +194,80 @@ build_br_section_toolbar <- function(section_id) {
     style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;padding:5px 10px;color:#64748b;">
     &#x1F4E5; Excel
   </button>
-  <button class="br-insight-toggle" onclick="_brToggleInsight(\'%s\')"
+  <button class="br-insight-toggle" onclick="%s(\'%s\')"
     style="background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:12px;padding:5px 10px;color:#64748b;">
-    + Add Insight
+    %s
   </button>
 </div>
-<div class="br-insight-container" data-section="%s" style="display:none;margin-bottom:16px;">
+<div class="br-insight-container" data-section="%s" data-prefilled="%s" style="%s">
   <textarea class="br-insight-editor" data-section="%s" placeholder="Type key insight here..."
-    style="width:100%%;min-height:60px;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-family:inherit;font-size:13px;resize:vertical;"></textarea>
+    style="%s">%s</textarea>
   <div class="br-insight-rendered" data-section="%s" ondblclick="_brToggleInsightEdit(\'%s\')"
-    style="display:none;padding:10px;border:1px solid #e2e8f0;border-radius:6px;min-height:40px;cursor:pointer;font-size:13px;line-height:1.5;"></div>
+    style="%s">%s</div>
   <button class="br-insight-dismiss" onclick="_brDismissInsight(\'%s\')"
     style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px;position:absolute;top:4px;right:8px;">&times;</button>
 </div>',
-    section_id, section_id, section_id, section_id, section_id,
-    section_id, section_id, section_id, section_id, section_id)
+    section_id, section_id, section_id, section_id,
+    toggle_handler, section_id, toggle_label,
+    section_id, if (has_text) "true" else "false", container_style,
+    section_id, textarea_style, .br_esc(prefill_text),
+    section_id, section_id, rendered_style, rendered_html,
+    section_id)
+}
+
+
+#' Render markdown to safe HTML for the insight rendered view
+#'
+#' Conservative subset: **bold**, *italic*, `code`, line breaks, and bullets
+#' (lines starting with "- "). Full editing experience still uses the
+#' client-side JS editor. Escapes HTML before applying markdown so analyst
+#' text can never inject markup.
+#'
+#' @keywords internal
+.br_render_insight_md <- function(txt) {
+  if (is.null(txt) || !nzchar(txt)) return("")
+  s <- .br_esc(txt)
+  # Bold: **text**
+  s <- gsub("\\*\\*([^*]+)\\*\\*", "<strong>\\1</strong>", s, perl = TRUE)
+  # Italic: *text* (after bold so leftover singles don't capture pairs)
+  s <- gsub("(?<![*])\\*([^*]+)\\*(?![*])", "<em>\\1</em>", s, perl = TRUE)
+  # Inline code: `text`
+  s <- gsub("`([^`]+)`", "<code>\\1</code>", s, perl = TRUE)
+  # Bullets: lines starting with "- ". Builds <ul><li>...</li></ul> blocks
+  # that survive the line-break pass intact. Plain text lines are joined by
+  # <br> for readability inside the rendered insight box.
+  lines <- strsplit(s, "\n", fixed = TRUE)[[1]]
+  out_blocks <- character(0)   # joined as-is, no <br> between
+  buf <- character(0)          # accumulating plain lines for current block
+  in_ul <- FALSE
+  ul_items <- character(0)
+  flush_text <- function() {
+    if (length(buf) > 0L) {
+      out_blocks <<- c(out_blocks, paste(buf, collapse = "<br>"))
+      buf <<- character(0)
+    }
+  }
+  flush_ul <- function() {
+    if (in_ul) {
+      out_blocks <<- c(out_blocks,
+                       paste0("<ul>", paste(ul_items, collapse = ""), "</ul>"))
+      ul_items <<- character(0)
+      in_ul <<- FALSE
+    }
+  }
+  for (ln in lines) {
+    if (grepl("^- ", ln)) {
+      flush_text()
+      in_ul <- TRUE
+      ul_items <- c(ul_items, sprintf("<li>%s</li>", sub("^- ", "", ln)))
+    } else {
+      flush_ul()
+      buf <- c(buf, ln)
+    }
+  }
+  flush_ul()
+  flush_text()
+  paste(out_blocks, collapse = "")
 }
 
 
@@ -203,7 +302,9 @@ build_br_summary_panel <- function(results, config) {
   parts <- c(parts, sprintf(
     '<div class="br-element-section" id="section-%s" data-section="%s">',
     section_id, section_id))
-  parts <- c(parts, build_br_section_toolbar(section_id))
+  parts <- c(parts, build_br_section_toolbar(
+    section_id,
+    prefill_text = section_insight_for(config$section_insights, section_id)))
 
   cats <- results$results$categories
   if (!is.null(cats)) {
@@ -277,6 +378,15 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
   panel_id <- paste0("cat-", cat_id)
   # Use the human-readable display name for labels; fall back to the key.
   cat_name <- cat_display_name %||% cat_results$category %||% cat_name
+
+  # Local helper — looks up the optional pre-filled insight text from the
+  # config and forwards it to the toolbar builder. Keeps every call site
+  # below to a single line.
+  toolbar_for <- function(sid) {
+    build_br_section_toolbar(
+      sid,
+      prefill_text = section_insight_for(config$section_insights, sid))
+  }
 
   parts <- character(0)
   parts <- c(parts, sprintf('<div class="br-panel" id="panel-%s">', panel_id))
@@ -419,34 +529,42 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
       section_id, section_id))
 
     if (!is.null(panels[[chart_key]])) {
-      # WOM, branded-reach, and repertoire/cat-buying panels don't embed their
-      # own pin/PNG/Excel toolbar, so attach the shared one before the panel
-      # content. Funnel and MA panels embed their own controls.
+      # WOM, branded-reach, repertoire/cat-buying, funnel, and MA panels
+      # all get the shared section toolbar prepended. Funnel and MA also
+      # render their own internal pin/PNG controls (different position) \u2014
+      # the shared toolbar carries the insight editor which the embedded
+      # controls do not.
       if (el == "wom") {
-        parts <- c(parts, build_br_section_toolbar(section_id))
+        parts <- c(parts, toolbar_for(section_id))
         parts <- c(parts, sprintf(
           '<h3 class="br-element-title">Word of Mouth \u2014 %s</h3>',
           .br_esc(cat_name)))
       } else if (el == "branded_reach") {
-        parts <- c(parts, build_br_section_toolbar(section_id))
+        parts <- c(parts, toolbar_for(section_id))
         parts <- c(parts, sprintf(
           '<h3 class="br-element-title">Branded Reach \u2014 %s</h3>',
           .br_esc(cat_name)))
       } else if (el == "demographics") {
-        parts <- c(parts, build_br_section_toolbar(section_id))
+        parts <- c(parts, toolbar_for(section_id))
         parts <- c(parts, sprintf(
           '<h3 class="br-element-title">Demographics \u2014 %s</h3>',
           .br_esc(cat_name)))
       } else if (el == "adhoc") {
-        parts <- c(parts, build_br_section_toolbar(section_id))
+        parts <- c(parts, toolbar_for(section_id))
         parts <- c(parts, sprintf(
           '<h3 class="br-element-title">Ad Hoc Questions \u2014 %s</h3>',
           .br_esc(cat_name)))
       } else if (el == "audience_lens") {
-        parts <- c(parts, build_br_section_toolbar(section_id))
+        parts <- c(parts, toolbar_for(section_id))
         parts <- c(parts, sprintf(
           '<h3 class="br-element-title">Audience Lens \u2014 %s</h3>',
           .br_esc(cat_name)))
+      } else if (el == "funnel" || el == "ma") {
+        # v1.0 of the Section_Insights workflow: funnel + MA panels don't
+        # carry their own insight editor (they're rendered client-side from
+        # JSON). Prepend the shared toolbar so analysts can attach an
+        # insight via the Section_Insights config sheet.
+        parts <- c(parts, toolbar_for(section_id))
       }
       parts <- c(parts, panels[[chart_key]])
     } else if (el == "ma") {
@@ -462,13 +580,13 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
       # tables otherwise.
       wom_key <- paste0("wom_", cat_id)
       if (!is.null(panels[[wom_key]])) {
-        parts <- c(parts, build_br_section_toolbar(section_id))
+        parts <- c(parts, toolbar_for(section_id))
         parts <- c(parts, sprintf(
           '<h3 class="br-element-title">Word of Mouth \u2014 %s</h3>',
           .br_esc(cat_name)))
         parts <- c(parts, panels[[wom_key]])
       } else {
-        parts <- c(parts, build_br_section_toolbar(section_id))
+        parts <- c(parts, toolbar_for(section_id))
         parts <- c(parts, sprintf(
           '<h3 class="br-element-title">Word of Mouth \u2014 %s</h3>',
           .br_esc(cat_name)))
@@ -515,26 +633,51 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
 </div>',
           section_id, section_id, section_id, section_id, section_id))
         parts <- c(parts, panels[[cb_panel_key]])
+        # Cat-Buying insight footer. Supports Section_Insights prefill via
+        # the standard config$section_insights lookup. When pre-filled the
+        # container opens by default and the rendered view shows the text.
+        cb_insight_text <- section_insight_for(config$section_insights,
+                                               section_id)
+        cb_has <- nzchar(cb_insight_text)
+        cb_container_style <- if (cb_has)
+          "display:block;margin-top:12px;position:relative;"
+        else
+          "display:none;margin-top:12px;position:relative;"
+        cb_textarea_style <- if (cb_has)
+          "width:100%%;min-height:60px;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-family:inherit;font-size:13px;resize:vertical;display:none;"
+        else
+          "width:100%%;min-height:60px;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-family:inherit;font-size:13px;resize:vertical;"
+        cb_rendered_style <- if (cb_has)
+          "display:block;padding:10px;border:1px solid #e2e8f0;border-radius:6px;min-height:40px;cursor:pointer;font-size:13px;line-height:1.5;background:#f8fafc;"
+        else
+          "display:none;padding:10px;border:1px solid #e2e8f0;border-radius:6px;min-height:40px;cursor:pointer;font-size:13px;line-height:1.5;"
+        cb_toggle_label <- if (cb_has) "Edit Insight" else "+ Add Insight"
+        cb_toggle_handler <- if (cb_has) "_brToggleInsightEdit" else "_brToggleInsight"
+        cb_rendered_html <- if (cb_has) .br_render_insight_md(cb_insight_text) else ""
+
         parts <- c(parts, sprintf('
 <div class="cb-insight-footer" style="margin-top:20px;">
-  <button class="br-insight-toggle" onclick="_brToggleInsight(\'%s\')"
+  <button class="br-insight-toggle" onclick="%s(\'%s\')"
     style="width:100%%;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:13px;padding:10px 14px;color:#334155;background:#f8fafc;font-weight:600;">
-    + Add Insight
+    %s
   </button>
-  <div class="br-insight-container" data-section="%s" style="display:none;margin-top:12px;position:relative;">
+  <div class="br-insight-container" data-section="%s" data-prefilled="%s" style="%s">
     <textarea class="br-insight-editor" data-section="%s" placeholder="Type key insight here..."
-      style="width:100%%;min-height:60px;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-family:inherit;font-size:13px;resize:vertical;"></textarea>
+      style="%s">%s</textarea>
     <div class="br-insight-rendered" data-section="%s" ondblclick="_brToggleInsightEdit(\'%s\')"
-      style="display:none;padding:10px;border:1px solid #e2e8f0;border-radius:6px;min-height:40px;cursor:pointer;font-size:13px;line-height:1.5;"></div>
+      style="%s">%s</div>
     <button class="br-insight-dismiss" onclick="_brDismissInsight(\'%s\')"
       style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px;position:absolute;top:4px;right:8px;">&times;</button>
   </div>
 </div>',
-          section_id, section_id, section_id, section_id,
-          section_id, section_id))
+          cb_toggle_handler, section_id, cb_toggle_label,
+          section_id, if (cb_has) "true" else "false", cb_container_style,
+          section_id, cb_textarea_style, .br_esc(cb_insight_text),
+          section_id, section_id, cb_rendered_style, cb_rendered_html,
+          section_id))
       } else {
         # Legacy fallback: frequency KPI strip + SVG charts + legacy tables
-        parts <- c(parts, build_br_section_toolbar(section_id))
+        parts <- c(parts, toolbar_for(section_id))
         parts <- c(parts, sprintf(
           '<h3 class="br-element-title">Category Buying \u2014 %s</h3>',
           .br_esc(cat_name)))
@@ -579,7 +722,7 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
       }
     } else {
       # Legacy path: any future elements without a dedicated panel
-      parts <- c(parts, build_br_section_toolbar(section_id))
+      parts <- c(parts, toolbar_for(section_id))
       if (!is.null(charts[[chart_key]])) {
         for (ch in charts[[chart_key]]) {
           parts <- c(parts, build_br_chart_wrapper(ch$svg, ch$title %||% ""))
@@ -663,7 +806,13 @@ build_br_portfolio_panel <- function(results, config) {
   parts <- c(parts, sprintf(
     '<div class="br-element-section" id="section-%s" data-section="%s">',
     section_id, section_id))
-  parts <- c(parts, build_br_section_toolbar(section_id))
+  # Legacy portfolio overview uses anchor "portfolio-overview". The new
+  # portfolio panel (panels/09_portfolio_panel.R) uses "pf-overview" etc.
+  # Both keys can appear in config$section_insights — the resolver passes
+  # raw anchors through unchanged so each one wires correctly.
+  parts <- c(parts, build_br_section_toolbar(
+    section_id,
+    prefill_text = section_insight_for(config$section_insights, section_id)))
 
   # Brand picker chip row
   if (length(ordered_bcs) > 0L) {
@@ -825,10 +974,27 @@ build_br_pinned_panel <- function() {
 #' Build about panel
 #' @keywords internal
 build_br_about_panel <- function(config) {
+  # Optional project background block, sourced from the Section_Insights
+  # config sheet under reserved anchor `_BACKGROUND`. Rendered above the
+  # methodology copy so the project context is the first thing the reader
+  # sees on the About tab.
+  background_text <- if (exists("section_insight_for", mode = "function")) {
+    section_insight_for(config$section_insights, "_BACKGROUND")
+  } else ""
+  background_html <- if (nzchar(background_text)) {
+    rendered <- if (exists(".br_render_insight_md", mode = "function"))
+      .br_render_insight_md(background_text)
+    else
+      .br_esc(background_text)
+    sprintf('<div class="br-about-background" data-section="_BACKGROUND" style="background:#f8fafc;border-left:3px solid %s;padding:16px 20px;margin:0 0 20px;font-size:13px;line-height:1.6;color:#334155;border-radius:0 6px 6px 0;"><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;margin:0 0 8px;font-weight:600;">Project background</div>%s</div>',
+            config$colour_focal %||% "#1A5276", rendered)
+  } else ""
+
   sprintf('
 <div class="br-panel" id="panel-about">
   <div class="br-section" style="max-width:800px;">
     <h2 style="font-size:20px;color:#1e293b;margin:0 0 16px;">About & Methodology</h2>
+    %s
     <div style="font-size:13px;line-height:1.7;color:#475569;">
       <p>This report uses the <strong>Category Buyer Mindset (CBM)</strong> framework
       developed by Jenni Romaniuk at the Ehrenberg-Bass Institute for Marketing Science.</p>
@@ -858,6 +1024,7 @@ build_br_about_panel <- function(config) {
     </div>
   </div>
 </div>',
+    background_html,
     config$colour_focal %||% "#1A5276",
     config$colour_focal %||% "#1A5276",
     config$colour_focal %||% "#1A5276",

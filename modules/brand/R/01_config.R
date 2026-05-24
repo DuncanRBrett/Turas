@@ -289,6 +289,16 @@ load_brand_config <- function(config_path, project_root = NULL) {
     config$dba_assets <- dba_assets
   }
 
+  # Load optional Section_Insights sheet — analyst-authored insights keyed
+  # by HTML section anchor, pre-filled into each panel's "+ Add Insight"
+  # editor at render time. Survives any re-run because it lives in the
+  # config workbook, not in the generated HTML. See R/01b_section_insights.R.
+  if (exists("load_section_insights_sheet", mode = "function")) {
+    config$section_insights <- load_section_insights_sheet(config_path)
+  } else {
+    config$section_insights <- NULL
+  }
+
   # Validate
   guard_result <- guard_validate_brand_config(config)
   if (!is.null(guard_result) && guard_result$status == "REFUSED") {

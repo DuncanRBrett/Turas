@@ -93,7 +93,10 @@ build_brand_summary_panel <- function(results, config) {
           .brsum_focal_context_strip(),
           .brsum_card_grid_skeleton(),
         '</div>',
-        .brsum_insight_editor(),
+        .brsum_insight_editor(
+          prefill_text = if (exists("section_insight_for", mode = "function"))
+            section_insight_for(config$section_insights, "_EXECUTIVE_SUMMARY")
+          else ""),
         shopper_summary_html,
         closing_strip_html,
         .brsum_educational_callout(),
@@ -1959,7 +1962,34 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
 }
 
 
-.brsum_insight_editor <- function() {
+.brsum_insight_editor <- function(prefill_text = "") {
+  # Optional prefill from the Section_Insights config sheet under the
+  # reserved anchor `_EXECUTIVE_SUMMARY`. This is the headline commentary
+  # that survives report re-runs.
+  has_text <- !is.null(prefill_text) &&
+              nzchar(trimws(as.character(prefill_text)))
+  prefill_text <- if (has_text) as.character(prefill_text) else ""
+
+  textarea_attrs <- if (has_text) {
+    'data-prefilled="true"'
+  } else {
+    'data-prefilled="false"'
+  }
+  rendered_attrs <- if (has_text) {
+    'style="display:block;"'
+  } else {
+    ''
+  }
+  rendered_html <- if (has_text && exists(".br_render_insight_md", mode = "function"))
+    .br_render_insight_md(prefill_text)
+  else if (has_text)
+    htmltools::htmlEscape(prefill_text)
+  else ""
+
+  textarea_inner <- if (has_text) {
+    .brsum_esc(prefill_text)
+  } else ""
+
   paste(
     '<section class="brsum-insight-block" data-section="brsum-insight">',
       '<div class="brsum-insight-header">',
@@ -1975,10 +2005,13 @@ build_summary_panel_styles <- function(brand_colour = "#1A5276") {
         '<button class="brsum-insight-btn" title="Heading" onclick="brsumInsertMd(\'## \',\'\')">H2</button>',
         '<button class="brsum-insight-btn" title="Bullet" onclick="brsumInsertMd(\'- \',\'\')">&bull;</button>',
         '<button class="brsum-insight-btn" title="Quote" onclick="brsumInsertMd(\'&gt; \',\'\')">&ldquo;</button>',
-        '<span class="brsum-insight-hint">**bold**, *italic*, ## heading, - bullet, &gt; quote</span>',
+        '<span class="brsum-insight-hint">**bold**, *italic*, ## heading, - bullet, &gt; quote &middot; ',
+          'Pre-fill from Section_Insights sheet, anchor <code>_EXECUTIVE_SUMMARY</code></span>',
       '</div>',
-      '<textarea class="brsum-insight-editor" id="brsum-insight-editor" rows="5" placeholder="Type the brand story for this category. The headline above is editable here." oninput="brsumRenderInsight()"></textarea>',
-      '<div class="brsum-insight-rendered" id="brsum-insight-rendered" data-pin-as-table></div>',
+      sprintf('<textarea class="brsum-insight-editor" id="brsum-insight-editor" rows="5" %s placeholder="Type the brand story for this category. The headline above is editable here." oninput="brsumRenderInsight()">%s</textarea>',
+              textarea_attrs, textarea_inner),
+      sprintf('<div class="brsum-insight-rendered" id="brsum-insight-rendered" data-pin-as-table %s>%s</div>',
+              rendered_attrs, rendered_html),
     '</section>',
     sep = "\n"
   )
