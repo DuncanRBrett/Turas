@@ -1129,6 +1129,10 @@ build_br_portfolio_panel <- function(results, config) {
 .pf_lookup_insight <- function(section_id) {
   m <- .pf_section_insights_env$current
   if (is.null(m) || length(m) == 0L) return("")
+  # Use `[` not `[[` — `[[` throws "subscript out of bounds" when the
+  # section_id isn't in the names of a named character vector. `[` returns
+  # an NA-named element instead, which we then handle below.
+  if (!(section_id %in% names(m))) return("")
   val <- m[[section_id]]
   if (is.null(val) || is.na(val)) "" else as.character(val)
 }
