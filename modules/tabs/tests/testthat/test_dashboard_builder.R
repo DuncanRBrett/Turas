@@ -390,3 +390,23 @@ test_that("build_svg_gauge supports hero mode", {
   expect_true(grepl('width="240"', result_hero))
   expect_true(grepl('width="130"', result_normal))
 })
+
+test_that("detect_metric_by_type skips Ranking and Numeric questions for MEAN", {
+  banner_info <- list(internal_keys = c("TOTAL::Total"))
+
+  avg_table <- data.frame(
+    RowLabel = "Average",
+    RowType  = "Average",
+    `TOTAL::Total` = 7.4,
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+
+  rating_q  <- list(question_type = "Single_Choice", table = avg_table)
+  ranking_q <- list(question_type = "Ranking",       table = avg_table)
+  numeric_q <- list(question_type = "Numeric",       table = avg_table)
+
+  expect_false(is.null(detect_metric_by_type(rating_q,  "MEAN", banner_info)))
+  expect_null(detect_metric_by_type(ranking_q, "MEAN", banner_info))
+  expect_null(detect_metric_by_type(numeric_q, "MEAN", banner_info))
+})

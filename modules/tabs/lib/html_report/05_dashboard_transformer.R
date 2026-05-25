@@ -175,10 +175,12 @@ detect_metric_by_type <- function(q_result, req_type, banner_info) {
   table <- q_result$table
   if (is.null(table) || nrow(table) == 0) return(NULL)
 
-  # Skip ranking questions — Mean Rank is a position, not a metric
+  # Skip ranking and free-numeric questions — Mean Rank is a position, and
+  # numeric averages (hours, days, counts) aren't comparable to rating means
+  # on a shared Highest/Lowest gauge grid.
   if (!is.null(q_result$question_type) &&
       length(q_result$question_type) > 0 &&
-      q_result$question_type == "Ranking") {
+      q_result$question_type %in% c("Ranking", "Numeric")) {
     return(NULL)
   }
 
