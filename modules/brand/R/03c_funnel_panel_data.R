@@ -193,33 +193,35 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
   #                   stage; used by the "% of total" toggle)
   #   pct_nested    = cumulative-chain count at this stage / cumulative
   #                   count at the immediately previous stage (% previous)
-  #   pct_aware     = cumulative-chain count at this stage / aware count
-  #                   (% aware)
-  # The chained values come from calculate_stage_metrics() which walks
-  # the per-respondent matrices: cum[k] = cum[k-1] AND stage[k]. Both
-  # filtered views live in [0, 1] by construction — they describe the
-  # funnel as a respondent journey, while pct_absolute keeps the raw
-  # per-stage rate the explainer's "aggregate counts" view requires.
+  #   pct_aware     = (stage[k] AND aware) count / aware count — independent
+  #                   intersection with aware, NOT chained through prior
+  #                   behaviour stages (% aware)
+  # Counts for the n=X (Y) display under each toggle:
+  #   base_unweighted             = raw stage count (% total view)
+  #   base_stage_aware_filtered   = (stage AND aware) count (% aware view)
+  #   base_chain_filtered         = cumulative-chain count (% previous view)
+  #   base_aware_filtered         = aware count (denominator for % aware)
+  .safe <- function(row, col) {
+    if (nrow(row) == 0 || !(col %in% names(row))) NA_real_ else row[[col]]
+  }
   cells <- list()
   for (key in stage_keys) {
     for (b in brand_codes) {
       row <- stages[stages$stage_key == key & stages$brand_code == b, ,
                     drop = FALSE]
-      abs_pct <- if (nrow(row) == 0) NA_real_ else row$pct_weighted
-      pct_aw <- if (nrow(row) == 0 || !("pct_aware_filtered" %in% names(row)))
-        NA_real_ else row$pct_aware_filtered
-      pct_prev <- if (nrow(row) == 0 || !("pct_nested_filtered" %in% names(row)))
-        NA_real_ else row$pct_nested_filtered
       cells[[length(cells) + 1]] <- list(
         stage_key = key, brand_code = b,
-        pct_absolute = abs_pct,
-        pct_nested   = pct_prev,
-        pct_aware    = pct_aw,
-        base_weighted   = if (nrow(row) == 0) NA_real_ else row$base_weighted,
-        base_unweighted = if (nrow(row) == 0) NA_real_ else row$base_unweighted,
-        base_aware_filtered = if (nrow(row) == 0 ||
-                                  !("base_aware_filtered" %in% names(row)))
-          NA_real_ else row$base_aware_filtered,
+        pct_absolute = .safe(row, "pct_weighted"),
+        pct_nested   = .safe(row, "pct_nested_filtered"),
+        pct_aware    = .safe(row, "pct_aware_filtered"),
+        base_weighted   = .safe(row, "base_weighted"),
+        base_unweighted = .safe(row, "base_unweighted"),
+        base_aware_filtered       = .safe(row, "base_aware_filtered"),
+        base_stage_aware_filtered = .safe(row, "base_stage_aware_filtered"),
+        base_chain_filtered       = .safe(row, "base_chain_filtered"),
+        base_aware_unweighted       = .safe(row, "base_aware_unweighted"),
+        base_stage_aware_unweighted = .safe(row, "base_stage_aware_unweighted"),
+        base_chain_unweighted       = .safe(row, "base_chain_unweighted"),
         sig_vs_focal = .sig_vs_focal_for(result$sig_results, key, b,
                                          result$meta$focal_brand),
         sig_vs_avg = .sig_vs_avg_for_brand(result$sig_results, key, b),
@@ -236,32 +238,28 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
 }
 
 
-#' Category-average row: mean pct across every brand per stage (absolute +
-#' nested variants). Included as its own row in the rendered table.
+#' Category-average row: applies each toggle's formula at the category
+#' level by averaging the per-brand toggle values across brands. So:
+#'   cat-avg pct_absolute[k] = mean across brands of pct_weighted[k]
+#'   cat-avg pct_aware[k]    = mean across brands of pct_aware_filtered[k]
+#'   cat-avg pct_nested[k]   = mean across brands of pct_nested_filtered[k]
+#' The CI band still comes from the brand-to-brand spread of pct_weighted.
 #' @keywords internal
 .avg_all_brands_row <- function(stages, stage_keys) {
-  prev_avg  <- NA_real_
-  aware_avg <- NA_real_
+  .mean_col <- function(col, key) {
+    if (!(col %in% names(stages))) return(NA_real_)
+    vals <- stages[[col]][stages$stage_key == key]
+    v    <- vals[!is.na(vals)]
+    if (length(v) == 0) NA_real_ else mean(v)
+  }
   out <- list()
   for (key in stage_keys) {
+    abs_mean    <- .mean_col("pct_weighted",        key)
+    aware_mean  <- .mean_col("pct_aware_filtered",  key)
+    nested_mean <- .mean_col("pct_nested_filtered", key)
+    # 95% CI around the absolute-pct mean based on brand-to-brand variability
     vals <- stages$pct_weighted[stages$stage_key == key]
     v    <- vals[!is.na(vals)]
-    abs_mean <- if (length(v) == 0) NA_real_ else mean(v)
-    nested_mean <- if (!is.finite(prev_avg) || prev_avg <= 0 ||
-                       !is.finite(abs_mean)) {
-      abs_mean
-    } else {
-      abs_mean / prev_avg
-    }
-    if (key == stage_keys[1]) aware_avg <- abs_mean
-    aware_mean <- if (key == stage_keys[1]) {
-      1.0
-    } else if (is.finite(aware_avg) && aware_avg > 0 && is.finite(abs_mean)) {
-      abs_mean / aware_avg
-    } else {
-      NA_real_
-    }
-    # 95% CI around the mean based on brand-to-brand variability
     ci_lo <- NA_real_; ci_hi <- NA_real_
     if (length(v) >= 2) {
       se    <- stats::sd(v) / sqrt(length(v))
@@ -276,7 +274,6 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
       ci_lo        = ci_lo,
       ci_hi        = ci_hi
     )
-    prev_avg <- abs_mean
   }
   out
 }
@@ -295,28 +292,21 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
     s
   })
 
-  stage_all_pct <- unname(vapply(stage_keys, function(k) {
-    mean(stages$pct_weighted[stages$stage_key == k], na.rm = TRUE)
-  }, numeric(1)))
-
-  # Nested version of category average (each stage as % of previous)
-  stage_all_pct_nes <- stage_all_pct
-  for (.j in seq(2, length(stage_all_pct))) {
-    .prev <- stage_all_pct[.j - 1L]
-    stage_all_pct_nes[.j] <- if (!is.na(.prev) && .prev > 0)
-                               stage_all_pct[.j] / .prev else NA_real_
+  # Category-average lines for each base toggle. Same convention as
+  # .avg_all_brands_row: average each per-brand toggle value across brands
+  # rather than dividing means.
+  .mean_at_stage <- function(col, k) {
+    if (!(col %in% names(stages))) return(NA_real_)
+    vals <- stages[[col]][stages$stage_key == k]
+    v    <- vals[!is.na(vals)]
+    if (length(v) == 0) NA_real_ else mean(v)
   }
-  # Aware-indexed version of category average (each stage / average awareness)
-  stage_all_pct_aw <- stage_all_pct
-  .avg_aware <- if (length(stage_all_pct) > 0 && !is.na(stage_all_pct[1]) &&
-                    stage_all_pct[1] > 0) stage_all_pct[1] else NA_real_
-  if (!is.na(.avg_aware)) {
-    stage_all_pct_aw[1] <- 1.0
-    for (.j in seq(2, length(stage_all_pct))) {
-      stage_all_pct_aw[.j] <- if (!is.na(stage_all_pct[.j]))
-                                stage_all_pct[.j] / .avg_aware else NA_real_
-    }
-  }
+  stage_all_pct <- unname(vapply(stage_keys, function(k)
+    .mean_at_stage("pct_weighted",        k), numeric(1)))
+  stage_all_pct_nes <- unname(vapply(stage_keys, function(k)
+    .mean_at_stage("pct_nested_filtered", k), numeric(1)))
+  stage_all_pct_aw  <- unname(vapply(stage_keys, function(k)
+    .mean_at_stage("pct_aware_filtered",  k), numeric(1)))
 
   # Envelope = min/max across all brands per stage. Used to render the
   # light-grey shaded band behind the focal line (spec outline).
@@ -348,34 +338,18 @@ build_funnel_panel_data <- function(result, brand_list, config = list()) {
 
 
 .series_for_brand <- function(stages, brand_code, stage_keys) {
-  vals <- unname(vapply(stage_keys, function(k) {
-    row <- stages[stages$stage_key == k & stages$brand_code == brand_code, ,
-                  drop = FALSE]
-    if (nrow(row) == 0) NA_real_ else row$pct_weighted
-  }, numeric(1)))
-  base <- unname(vapply(stage_keys, function(k) {
-    row <- stages[stages$stage_key == k & stages$brand_code == brand_code, ,
-                  drop = FALSE]
-    if (nrow(row) == 0) NA_real_ else row$base_weighted
-  }, numeric(1)))
-  # Nested: each stage as proportion of the previous absolute stage
-  nes <- vals
-  for (j in seq(2, length(vals))) {
-    prev <- vals[j - 1L]
-    nes[j] <- if (!is.na(prev) && prev > 0) vals[j] / prev else NA_real_
-  }
-  # Aware-indexed: each stage as proportion of awareness (stage 0).
-  # Awareness is pinned to 1.0 so all brands start at the same point on the chart.
-  aw <- vals
-  aware_val <- if (length(vals) > 0 && !is.na(vals[1]) && vals[1] > 0) vals[1] else NA_real_
-  if (!is.na(aware_val)) {
-    aw[1] <- 1.0
-    for (j in seq(2, length(vals))) {
-      aw[j] <- if (!is.na(vals[j])) vals[j] / aware_val else NA_real_
-    }
+  pull <- function(col) {
+    unname(vapply(stage_keys, function(k) {
+      row <- stages[stages$stage_key == k & stages$brand_code == brand_code, ,
+                    drop = FALSE]
+      if (nrow(row) == 0 || !(col %in% names(row))) NA_real_ else row[[col]]
+    }, numeric(1)))
   }
   list(brand_code = brand_code, stage_keys = stage_keys,
-       pct_values = vals, pct_values_nes = nes, pct_values_aw = aw, base_values = base)
+       pct_values     = pull("pct_weighted"),
+       pct_values_nes = pull("pct_nested_filtered"),
+       pct_values_aw  = pull("pct_aware_filtered"),
+       base_values    = pull("base_weighted"))
 }
 
 

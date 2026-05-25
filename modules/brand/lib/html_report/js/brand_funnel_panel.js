@@ -177,6 +177,7 @@
         var brand = td.getAttribute("data-fn-brand");
         var absV  = parseFloat(td.getAttribute("data-fn-pct-abs"));
         var nesV  = parseFloat(td.getAttribute("data-fn-pct-nes"));
+        var awV   = parseFloat(td.getAttribute("data-fn-pct-aw"));
         if (!sk || isNaN(absV)) {
           // Fallback to the static attribute when per-base data is absent.
           var staticC = td.getAttribute("data-heatmap");
@@ -185,7 +186,9 @@
         }
         var pct = cellValueForMode({
           stage_key: sk, brand_code: brand,
-          pct_absolute: absV, pct_nested: isNaN(nesV) ? null : nesV
+          pct_absolute: absV,
+          pct_nested: isNaN(nesV) ? null : nesV,
+          pct_aware:  isNaN(awV)  ? null : awV
         }, pctModeHM, awareStageHM, brandAwarePctHM);
         if (pct == null || isNaN(pct)) return;
         var cmax = colMaxHM[sk] || 1;
@@ -238,11 +241,13 @@
         var brand = td.getAttribute("data-fn-brand");
         var absV  = parseFloat(td.getAttribute("data-fn-pct-abs"));
         var nesV  = parseFloat(td.getAttribute("data-fn-pct-nes"));
+        var awV   = parseFloat(td.getAttribute("data-fn-pct-aw"));
         var pct = cellValueForMode({
           stage_key:    sk,
           brand_code:   brand,
           pct_absolute: isNaN(absV) ? null : absV,
-          pct_nested:   isNaN(nesV) ? null : nesV
+          pct_nested:   isNaN(nesV) ? null : nesV,
+          pct_aware:    isNaN(awV)  ? null : awV
         }, pctMode, awareStage, brandAwarePct);
         if (pct == null || isNaN(pct)) return;
         var cls = pct > bnds.upper ? "fn-ci-above"
@@ -791,11 +796,13 @@
   // ---------------------------------------------------------------------------
   // % mode — rewrite cell text, base row n=, and cell count spans.
   //
-  // "total"    → pct_absolute from data-fn-pct-abs attribute
-  // "previous" → pct_nested from data-fn-pct-nes attribute
-  // "aware"    → computed on the fly from pct_absolute / brand_aware_pct using
-  //              the JSON payload (pd.table.cells), so it works without
-  //              regenerating the HTML. Stage 1 (aware) pinned to 100%.
+  // All three toggles read pre-computed values from data-* attributes set by
+  // the R template (.fn_cell_html in 03_funnel_panel_table.R):
+  //   "total"    → data-fn-pct-abs (pct_weighted)
+  //   "previous" → data-fn-pct-nes (pct_nested_filtered, cumulative chain)
+  //   "aware"    → data-fn-pct-aw  (pct_aware_filtered, independent
+  //                                  intersection with aware — see
+  //                                  calculate_stage_metrics)
   //
   // Cell count format (Show count on): n=<stage_count> (<mode_denom>)
   // Base row format: n=300 (varies by brand) for non-total modes ≥ stage 2.
@@ -804,52 +811,16 @@
     var mode = panel.__fnState.pctMode;
     var pd   = panel.__fnData;
 
-    // --- 1. Build aware-pct lookup (brand → pct_absolute at stage 1) -----------
-    var brandAwarePct = {}; // used for "aware" mode computations
-    if (pd && pd.table) {
-      var awareStageKey = (pd.table.stage_keys || [])[0];
-      (pd.table.cells || []).forEach(function(c) {
-        if (c.stage_key === awareStageKey) brandAwarePct[c.brand_code] = c.pct_absolute;
+    // --- 1. Rewrite primary pct text in every data cell ----------------------
+    var primaryAttr = mode === "previous" ? "data-fn-pct-nes"
+                    : mode === "aware"    ? "data-fn-pct-aw"
+                    : "data-fn-pct-abs";
+    panel.querySelectorAll(".ct-td[data-fn-pct-abs], .fn-td[data-fn-pct-abs]")
+      .forEach(function(td) {
+        var v = parseFloat(td.getAttribute(primaryAttr));
+        var primary = td.querySelector(".fn-pct-primary");
+        if (primary && !isNaN(v)) primary.textContent = Math.round(v * 100) + "%";
       });
-      // Register the cat-avg row under the sentinel brand code "__avg__"
-      // so the same reflow path handles the Category average TDs in
-      // % aware mode (their data-fn-brand attribute is "__avg__").
-      (pd.table.avg_all_brands || []).forEach(function(r) {
-        if (r.stage_key === awareStageKey) brandAwarePct["__avg__"] = r.pct_absolute;
-      });
-    }
-
-    // --- 2. Rewrite primary pct text in every data cell ----------------------
-    if (mode === "aware") {
-      // Compute aware-indexed values on the fly — works regardless of whether
-      // data-fn-pct-aw is present in the HTML (backward-compatible).
-      panel.querySelectorAll(".ct-td[data-fn-brand][data-fn-stage], .fn-td[data-fn-brand][data-fn-stage]")
-        .forEach(function(td) {
-          var brand   = td.getAttribute("data-fn-brand");
-          var stage   = td.getAttribute("data-fn-stage");
-          var primary = td.querySelector(".fn-pct-primary");
-          if (!primary) return;
-          var ap    = brandAwarePct[brand];
-          var absV  = parseFloat(td.getAttribute("data-fn-pct-abs"));
-          var v;
-          if (stage === awareStageKey) {
-            v = 1.0; // Aware stage = 100% of itself by definition
-          } else if (ap && ap > 0 && !isNaN(absV)) {
-            v = absV / ap;
-          } else {
-            return;
-          }
-          primary.textContent = Math.round(v * 100) + "%";
-        });
-    } else {
-      var attr = mode === "previous" ? "data-fn-pct-nes" : "data-fn-pct-abs";
-      panel.querySelectorAll(".ct-td[data-fn-pct-abs], .fn-td[data-fn-pct-abs]")
-        .forEach(function(td) {
-          var v = parseFloat(td.getAttribute(attr));
-          var primary = td.querySelector(".fn-pct-primary");
-          if (primary && !isNaN(v)) primary.textContent = Math.round(v * 100) + "%";
-        });
-    }
 
     // --- 3. Funnel-inversion warnings (% previous mode only) -----------------
     panel.querySelectorAll(".ct-td[data-fn-pct-nes]").forEach(function(td) {
@@ -871,14 +842,15 @@
     var nTotal    = Math.round(pd.meta.n_weighted || 0);
     var stageKeys = pd.table.stage_keys || [];
 
-    // Build per-brand base_unweighted lookup (count at each stage per brand).
-    var brandCountByStage = {};
+    // Build per-brand cell lookup so the count display can read the new
+    // unweighted base fields (base_stage_aware_unweighted, base_chain_unweighted).
+    var cellByBrandStage = {};
     (pd.table.cells || []).forEach(function(c) {
-      if (!brandCountByStage[c.brand_code]) brandCountByStage[c.brand_code] = {};
-      brandCountByStage[c.brand_code][c.stage_key] = c.base_unweighted;
+      if (!cellByBrandStage[c.brand_code]) cellByBrandStage[c.brand_code] = {};
+      cellByBrandStage[c.brand_code][c.stage_key] = c;
     });
 
-    // --- 4. Update base row --------------------------------------------------
+    // --- 3. Update base row --------------------------------------------------
     // "total":    n=300  (all stages)
     // "previous": n=300  (stage 1),  n=300 (varies by brand)  (subsequent)
     // "aware":    n=300  (aware),    n=300 (varies by brand)  (subsequent)
@@ -896,34 +868,42 @@
       });
     }
 
-    // --- 5. Update cell count spans: n=<stage_count> (<mode_denom>) ----------
+    // --- 4. Update cell count spans: n=<num> (<denom>) -----------------------
+    //   "total"    -> n=<base_unweighted>                       (raw stage count)
+    //   "aware"    -> n=<base_stage_aware_unweighted> (<base_aware_unweighted>)
+    //                                                            (stage∩aware / aware)
+    //   "previous" -> n=<base_chain_unweighted> (<prev base_chain_unweighted>)
+    //                                                            (cum chain / prev cum chain)
+    function roundOrNull(v) {
+      return (v == null || isNaN(v)) ? null : Math.round(v);
+    }
     panel.querySelectorAll(".ct-td[data-fn-brand][data-fn-stage]").forEach(function(td) {
       var brand = td.getAttribute("data-fn-brand");
       var stage = td.getAttribute("data-fn-stage");
       var countSpan = td.querySelector(".fn-pct-count");
       if (!countSpan) return;
-      var rawBase   = td.getAttribute("data-fn-base");
-      var stageCount = (rawBase !== "" && rawBase != null) ? parseInt(rawBase, 10) : null;
-      if (stageCount == null || isNaN(stageCount)) { countSpan.textContent = ""; return; }
+      var cell = (cellByBrandStage[brand] || {})[stage];
+      if (!cell) { countSpan.textContent = ""; return; }
 
-      var denom = null;
+      var num = null, denom = null;
       if (mode === "aware") {
-        var awareKey = stageKeys[0];
-        denom = (stage !== awareKey)
-          ? ((brandCountByStage[brand] || {})[awareKey] || null)
-          : nTotal;
+        num   = roundOrNull(cell.base_stage_aware_unweighted);
+        denom = roundOrNull(cell.base_aware_unweighted);
       } else if (mode === "previous") {
+        num = roundOrNull(cell.base_chain_unweighted);
         var stageIdx = stageKeys.indexOf(stage);
         if (stageIdx > 0) {
-          denom = (brandCountByStage[brand] || {})[stageKeys[stageIdx - 1]] || null;
-        } else {
-          denom = nTotal;
+          var prevCell = (cellByBrandStage[brand] || {})[stageKeys[stageIdx - 1]];
+          denom = prevCell ? roundOrNull(prevCell.base_chain_unweighted) : null;
         }
+      } else {
+        num = roundOrNull(cell.base_unweighted);
       }
 
+      if (num == null) { countSpan.textContent = ""; return; }
       countSpan.textContent = (denom != null)
-        ? "n=" + stageCount + " (" + denom + ")"
-        : "n=" + stageCount;
+        ? "n=" + num + " (" + denom + ")"
+        : "n=" + num;
     });
   }
 
@@ -977,21 +957,13 @@
       pd.table.avg_all_brands.forEach(function(r) { avgMap[r.stage_key] = r; });
     }
 
-    /* Base-mode resolution — must mirror applyPctMode (table) and the
-       headline computation (pickPct, ~line 1526) so the mini-funnel,
-       table, and chart agree on every cell.
-         "total"    -> pct_absolute (% of all respondents)
-         "previous" -> pct_nested  (% of previous stage; falls back to pct_absolute)
-         "aware"    -> pct_absolute / brand_aware_pct (stage 1 pinned to 100%)
-       Without the "aware" branch, switching the base toggle to "% aware"
-       left the mini-funnel cards stuck on % total — visually identical to
-       total mode. */
+    /* Base-mode resolution — reads the engine-computed pct fields directly
+       so the mini-funnel, table, and chart agree on every cell.
+         "total"    -> pct_absolute (pct_weighted)
+         "previous" -> pct_nested   (pct_nested_filtered, cumulative chain)
+         "aware"    -> pct_aware    (pct_aware_filtered, independent
+                                     intersection with aware) */
     var awareStageKey = stageKeys[0];
-    var brandAwarePct = {};
-    cells.forEach(function (c) {
-      if (c.stage_key === awareStageKey) brandAwarePct[c.brand_code] = c.pct_absolute;
-    });
-    var avgAwarePct = (avgMap[awareStageKey] && avgMap[awareStageKey].pct_absolute) || null;
 
     function pickMiniPct(obj, brandCode, stageIdx) {
       if (!obj) return null;
@@ -999,10 +971,9 @@
         return obj.pct_nested != null ? obj.pct_nested : obj.pct_absolute;
       }
       if (pctMode === "aware") {
+        if (obj.pct_aware != null) return obj.pct_aware;
         if (stageIdx === 0) return 1.0;
-        var ap = brandCode ? brandAwarePct[brandCode] : avgAwarePct;
-        if (ap && ap > 0 && obj.pct_absolute != null) return obj.pct_absolute / ap;
-        return obj.pct_absolute;
+        return null;
       }
       return obj.pct_absolute;
     }
@@ -1622,24 +1593,15 @@
     var nTotal = pd.meta ? Math.round(pd.meta.n_weighted || 0) : 0;
     var awareStageKey = stageKeys[0];
 
-    // Brand aware pct lookup — mirrors applyPctMode logic for on-the-fly computation.
-    var brandAwarePct = {};
-    cells.forEach(function(c) {
-      if (c.stage_key === awareStageKey) brandAwarePct[c.brand_code] = c.pct_absolute;
-    });
-    var avgAwarePct = (avgMap[awareStageKey] && avgMap[awareStageKey].pct_absolute) || null;
-
-    // Pick the correct pct value for the current mode.
-    // "aware" computed on the fly (pct_absolute / brand_aware_pct) — no dependency
-    // on pct_aware being present in the JSON payload.
+    // Pick the correct pct value for the current mode — reads engine-computed
+    // pct fields directly from the cell payload.
     function pickPct(obj, brandCode, stageIdx) {
       if (!obj) return null;
       if (pctMode === "previous") return obj.pct_nested != null ? obj.pct_nested : obj.pct_absolute;
       if (pctMode === "aware") {
+        if (obj.pct_aware != null) return obj.pct_aware;
         if (stageIdx === 0) return 1.0;
-        var ap = brandCode ? brandAwarePct[brandCode] : avgAwarePct;
-        if (ap && ap > 0 && obj.pct_absolute != null) return obj.pct_absolute / ap;
-        return obj.pct_absolute;
+        return null;
       }
       return obj.pct_absolute;
     }
@@ -1652,22 +1614,29 @@
       return nTotal ? "n=" + nTotal + " (varies by brand)" : "";
     }
 
-    // Helper: cell count — n=<stage_count> (<mode_denom>) per brand.
+    function roundOrNull(v) {
+      return (v == null || isNaN(v)) ? null : Math.round(v);
+    }
+
+    // Helper: cell count — n=<num> (<denom>) per brand at the active mode.
     function cellCountStr(code, sk, stageIdx) {
       var c = cellMap[code] && cellMap[code][sk];
-      if (!c || c.base_unweighted == null) return "";
-      var count = Math.round(c.base_unweighted);
-      var denom = null;
-      if (pctMode === "aware" && stageIdx > 0) {
-        var awareCell = cellMap[code] && cellMap[code][awareStageKey];
-        denom = awareCell && awareCell.base_unweighted != null
-          ? Math.round(awareCell.base_unweighted) : null;
-      } else if (pctMode === "previous" && stageIdx > 0) {
-        var prevCell = cellMap[code] && cellMap[code][stageKeys[stageIdx - 1]];
-        denom = prevCell && prevCell.base_unweighted != null
-          ? Math.round(prevCell.base_unweighted) : null;
+      if (!c) return "";
+      var num = null, denom = null;
+      if (pctMode === "aware") {
+        num   = roundOrNull(c.base_stage_aware_unweighted);
+        denom = roundOrNull(c.base_aware_unweighted);
+      } else if (pctMode === "previous") {
+        num = roundOrNull(c.base_chain_unweighted);
+        if (stageIdx > 0) {
+          var prevCell = cellMap[code] && cellMap[code][stageKeys[stageIdx - 1]];
+          denom = prevCell ? roundOrNull(prevCell.base_chain_unweighted) : null;
+        }
+      } else {
+        num = roundOrNull(c.base_unweighted);
       }
-      return denom != null ? "n=" + count + " (" + denom + ")" : "n=" + count;
+      if (num == null) return "";
+      return denom != null ? "n=" + num + " (" + denom + ")" : "n=" + num;
     }
 
     var focal = panel.__fnState.focal;
@@ -1994,11 +1963,13 @@
       // Reconstruct cell-like object from data-attributes for cellValueForMode.
       var absV  = parseFloat(td.getAttribute("data-fn-pct-abs"));
       var nesV  = parseFloat(td.getAttribute("data-fn-pct-nes"));
+      var awV   = parseFloat(td.getAttribute("data-fn-pct-aw"));
       var cell = {
         stage_key:    sk,
         brand_code:   brand,
         pct_absolute: isNaN(absV) ? null : absV,
-        pct_nested:   isNaN(nesV) ? null : nesV
+        pct_nested:   isNaN(nesV) ? null : nesV,
+        pct_aware:    isNaN(awV)  ? null : awV
       };
       var pct = cellValueForMode(cell, mode, awareStageKey, brandAwarePct);
       if (pct == null || isNaN(pct)) return;

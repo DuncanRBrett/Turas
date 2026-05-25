@@ -235,13 +235,25 @@ test_that("table includes Average-of-all-brands row with both pct modes", {
 
   aware_avg <- panel$table$avg_all_brands[[1]]
   expect_equal(aware_avg$stage_key,    "aware")
-  expect_equal(aware_avg$pct_absolute, 0.8, tolerance = 1e-9)  # mean(0.9,0.8,0.7)
-  expect_equal(aware_avg$pct_nested,   0.8, tolerance = 1e-9)  # stage 1 no prior
+  expect_equal(aware_avg$pct_absolute, 0.8, tolerance = 1e-9)  # mean(0.9, 0.8, 0.7)
+  # Aware stage is the funnel entry — both filtered toggles pin every brand
+  # to 1.0 there, so the mean across brands is also 1.0.
+  expect_equal(aware_avg$pct_nested, 1.0, tolerance = 1e-9)
+  expect_equal(aware_avg$pct_aware,  1.0, tolerance = 1e-9)
 
+  # Category-average row at the consideration stage. Per spec, each toggle's
+  # value is the simple mean of the per-brand toggle values at that stage —
+  # apply each formula at the per-brand level, then average across brands.
+  # That is *not* the same as ratio-of-means when brand bases differ.
   cons_avg <- panel$table$avg_all_brands[[2]]
-  # absolute mean (top-2 attitude) = mean(0.5, 0.4, 0.4) = 0.4333; nested = 0.4333 / 0.8
-  expect_equal(cons_avg$pct_absolute, mean(c(0.5, 0.4, 0.4)),  tolerance = 1e-9)
-  expect_equal(cons_avg$pct_nested,   mean(c(0.5, 0.4, 0.4)) / 0.8, tolerance = 1e-9)
+  cons_rows <- .run_fixture()$stages[
+    .run_fixture()$stages$stage_key == "consideration", , drop = FALSE]
+  expect_equal(cons_avg$pct_absolute, mean(cons_rows$pct_weighted),
+               tolerance = 1e-9)
+  expect_equal(cons_avg$pct_nested,   mean(cons_rows$pct_nested_filtered),
+               tolerance = 1e-9)
+  expect_equal(cons_avg$pct_aware,    mean(cons_rows$pct_aware_filtered),
+               tolerance = 1e-9)
 })
 
 
