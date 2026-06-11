@@ -1,0 +1,15 @@
+{
+  "campus_exact_rate": 1.0,
+  "other_banners_all_cells": {
+    "cells": 10669,
+    "mean_abs_err_pp": 4.627,
+    "p90_abs_err_pp": 11.111,
+    "max_abs_err_pp": 150.0
+  },
+  "other_banners_base_ge_threshold": {
+    "cells": 6526,
+    "mean_abs_err_pp": 1.815,
+    "p90_abs_err_pp": 4.478,
+    "max_abs_err_pp": 72.222
+  }
+}

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<!-- Turas data-centric report v2 · fable prototype · generated {{GENERATED}} -->
+<!-- Single self-contained file: published tables + prior wave + synthetic
+     microdata + one fixed renderer. No network requests, no installs. -->
+<style>
+{{CSS}}
+</style>
+</head>
+<body>
+<noscript>
+  <div style="max-width:640px;margin:80px auto;font-family:sans-serif;color:#1e293b;">
+    <h1>This report needs JavaScript</h1>
+    <p>All tables and views render from data embedded in this file using in-file
+    JavaScript only — nothing is fetched from the network and nothing needs to
+    be installed. Please enable JavaScript.</p>
+  </div>
+</noscript>
+<div id="app" class="app"></div>
+<script type="application/json" id="data-agg">
+{{DATA_AGG}}
+</script>
+<script type="application/json" id="data-micro">
+{{DATA_MICRO}}
+</script>
+<script type="application/json" id="data-prev">
+{{DATA_PREV}}
+</script>
+<script type="application/json" id="user-state">
+null
+</script>
+<script type="application/json" id="data-verify">
+{{DATA_VERIFY}}
+</script>
+<script>
+{{JS}}
+</script>
+</body>
+</html>
