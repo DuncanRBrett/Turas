@@ -157,8 +157,9 @@
       '<option value="dual"' + (s.sigMode === "dual" ? " selected" : "") + ">95% + 80%</option>" +
       "</select></label>" +
       (TR.d2.tracking().enabled
-        ? toggle("showDeltas", "Δ vs " +
-            fmt.escapeHtml(TR.PREV.wave.replace("Annual ", "")))
+        ? toggle("showDeltas", "Δ + trend",
+            "Change vs the most recent prior wave with this question, " +
+            "plus the wave strip")
         : "") +
       '<span class="pinwrap"><button data-act="columns" aria-haspopup="true" ' +
       'title="Choose which banner columns show in the table and on the chart">' +
@@ -228,8 +229,11 @@
         fmt.base(model.columns[0].base) + "</span>"
       : '<span class="badge-published" title="Published 2025 value, verbatim">PUBLISHED</span>';
     var prevBadge = model.prevWave
-      ? '<span class="badge-prev" title="2024 base n=' + fmt.base(model.prevWave.base) +
-        '">tracked vs 2024</span>'
+      ? '<span class="badge-prev" title="' + model.history.length +
+        " prior wave" + (model.history.length > 1 ? "s" : "") + " · latest " +
+        fmt.escapeHtml(model.prevWave.wave) + " (n=" +
+        fmt.base(model.prevWave.base) + ')">tracked since ' +
+        model.history[0].year + "</span>"
       : '<span class="badge-prev off">new in 2025</span>';
 
     // context strip: filters + custom banner can never get lost (item 14/15)
@@ -330,9 +334,10 @@
       "<li><strong>▲ letters</strong> — significantly higher than that lettered column. With the 80% option on: UPPERCASE = 95% confidence, lowercase = 80%.</li>" +
       "<li><strong>⚠ low base</strong> — fewer than " + p.low_base_threshold +
       " respondents; excluded from significance testing.</li>" +
-      "<li><strong>▲/▼ chips on Total</strong> — change vs " +
-      (TR.PREV ? fmt.escapeHtml(TR.PREV.wave) : "the prior wave") +
-      "; outlined chips are significant changes.</li>" +
+      "<li><strong>▲/▼ chips on Total</strong> — change vs the most recent " +
+      "prior wave carrying this question; outlined chips are significant " +
+      "changes. The wave strip under tracked questions plots the full " +
+      "published history.</li>" +
       "<li><strong>PUBLISHED / COMPUTED</strong> — published figures are the report of record; filtered or custom-banner figures recompute live and are badged.</li>" +
       "<li><strong>NET rows</strong> (navy edge) combine categories; <strong>Index rows</strong> (gold edge) are score-weighted means. Sort by clicking a column header; hide rows/columns with ✕.</li>" +
       "</ul></div></div>" +

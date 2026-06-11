@@ -1,0 +1,48 @@
+{
+  "_about": [
+    "Cross-wave question mapping: historical normalised title -> 2025 normalised",
+    "title (both via the shared norm(): lowercase, collapse whitespace, strip",
+    "non-alphanumerics). Mirrors the tracker module's question-mapper config:",
+    "only same-metric rewordings are mapped; restructured batteries (WIL split",
+    "per programme, practicum 'part 2', support-hub service breakouts) are NOT",
+    "mapped and correctly show no history. Review when 2026 titles change."
+  ],
+  "_judgment_calls": {
+    "the health and wellbeing emotional support you receive from the student support and development team": "renamed to 'student wellness and counselling support' in 2025 — same battery slot",
+    "the academic support you receive from student services": "Student Services became the Student Support and Development Team — same metric"
+  },
+  "aliases": {
+    "which campus are you currently studying at": "which campus did you register to study with",
+    "which campus did you originally register with at the beginning of your course": "which campus did you register to study with",
+    "what year did you start studying at sacap": "which year did you start studying at sacap",
+    "what year did you start studying at sacap current qualification": "which year did you start studying at sacap",
+    "this current term did you register for the 1st time or did you reregisterreenrol": "this year did you register for the 1st time or did you reregister",
+    "last term ie term 2 2020 did you register for the 1st time or did you reregisterreenrol": "this year did you register for the 1st time or did you reregister",
+    "last term ie term 2 2021 did you register for the 1st time or did you reregisterreenrol": "this year did you register for the 1st time or did you reregister",
+    "last term ie term 2 2022 did you register for the 1st time or did you reregisterreenrol": "this year did you register for the 1st time or did you reregister",
+    "last term ie term 2 2023 did you register for the 1st time or did you reregisterreenrol": "this year did you register for the 1st time or did you reregister",
+    "last term ie term 2 2024 did you register for the 1st time or did you reregisterreenrol": "this year did you register for the 1st time or did you reregister",
+    "rate the admissions team in your sacap application": "how would you rate the support you received from the admissions team during your sacap application process",
+    "rate how you found the registration process": "how would you rate your experience with the registration process at sacap",
+    "how did you find the student registration process": "how would you rate your experience with the registration process at sacap",
+    "rate how you found the reregistrationreenrolment process": "how would you rate your experience with the reregistration process at sacap",
+    "how did you find the reenrolmentreregistration process": "how would you rate your experience with the reregistration process at sacap",
+    "how did you find the online reenrolmentreregistration process": "how would you rate your experience with the reregistration process at sacap",
+    "how did you find the orientation overall": "how would you rate the orientation at preparing you for your studies at sacap",
+    "would you recommend sacap to others as a place to study psychology": "would you recommend sacap to others as a place to study",
+    "the value for money that you get from studying at sacap": "please rate the value for money that you get from studying at sacap",
+    "the usability of mysacap": "rate the usability of mysacap",
+    "rate the service you receive at the library": "please rate the service you receive at the library",
+    "the finance department at dealing with finance issues when needed": "please rate the finance department at dealing with finance issues when needed eg statements balance inquiries",
+    "the finance department at dealing with finance issues when needed eg statements balance enquiries": "please rate the finance department at dealing with finance issues when needed eg statements balance inquiries",
+    "the student administrative department at dealing with admin issues when needed": "the student administration department at dealing with admin issues when needed eg queries related to mysacapreenrolment",
+    "the student administrative department at dealing with admin issues when needed eg queries related to mysacap reenrolment": "the student administration department at dealing with admin issues when needed eg queries related to mysacapreenrolment",
+    "the student administration department at dealing with admin issues when needed": "the student administration department at dealing with admin issues when needed eg queries related to mysacapreenrolment",
+    "have you experienced a problem with accounts this year": "have you experienced any errors with your account this year",
+    "have you experienced a problem with your account this year": "have you experienced any errors with your account this year",
+    "how well was the problem dealt with": "how well was that specific account error dealt with",
+    "which province do you live in": "which province do you currently live in",
+    "the academic support you receive from student services": "the academic support you receive from the student support and development team",
+    "the health and wellbeing emotional support you receive from the student support and development team": "the student wellness and counselling support you receive from the student support and development team"
+  }
+}

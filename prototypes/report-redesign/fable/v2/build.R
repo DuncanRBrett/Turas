@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 # Build the single-file SACAP v2 report: template + CSS + JS (shared v1
 # engine modules + v2 modules) + four data islands (2025 aggregates,
-# synthetic microdata, 2024 wave, microdata verification).
+# synthetic microdata, 2018-2024 wave history, microdata verification).
 #
 # Usage: Rscript build.R            # -> sacap_report_v2.html
 
@@ -23,7 +23,7 @@ build <- function(base_dir) {
     css = file.path(base_dir, "src", "styles.css"),
     agg = file.path(base_dir, "data", "sacap_2025.json"),
     micro = file.path(base_dir, "data", "sacap_microdata.json"),
-    prev = file.path(base_dir, "data", "sacap_2024.json"),
+    prev = file.path(base_dir, "data", "sacap_waves.json"),
     verify = file.path(base_dir, "data", "microdata_verification.json")
   )
   for (p in c(unlist(paths), file.path(v1_dir, V1_MODULES))) {

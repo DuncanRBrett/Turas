@@ -33,7 +33,7 @@ for (const f of readdirSync(V2_JS).filter((x) => x.endsWith(".js")).sort()) {
 const TR = sandbox.TR;
 TR.AGG = JSON.parse(readFileSync(path.join(BASE, "data", "sacap_2025.json"), "utf8"));
 TR.MICRO = JSON.parse(readFileSync(path.join(BASE, "data", "sacap_microdata.json"), "utf8"));
-TR.PREV = JSON.parse(readFileSync(path.join(BASE, "data", "sacap_2024.json"), "utf8"));
+TR.PREV = JSON.parse(readFileSync(path.join(BASE, "data", "sacap_waves.json"), "utf8"));
 
 const campus = TR.AGG.banner_groups[0].id;
 let baseMismatch = 0, cellMismatch = 0, cells = 0;

@@ -2,8 +2,8 @@
  * v2 view model — ONE interface the whole UI renders from. For the default
  * view (built-in banner, no filter) it returns the PUBLISHED numbers
  * verbatim; with a filter or custom banner it recomputes everything from
- * microdata and marks the model "computed". Wave-on-wave deltas attach to
- * the Total column when the 2024 wave carries a matching question.
+ * microdata and marks the model "computed". Wave history (trend series +
+ * deltas vs previous and baseline waves) attaches via TR.waves.
  *
  * SIZE-EXCEPTION: a single coherent assembly flow over published/computed/
  * prior-wave sources; splitting it would scatter the model contract.
@@ -23,16 +23,6 @@
     return String(text || "").toLowerCase().replace(/\s+/g, " ")
       .replace(/[^a-z0-9 ]/g, "").trim();
   };
-
-  var prevIndex = null;
-  function prevQuestion(q) {
-    if (!TR.PREV) return null;
-    if (!prevIndex) {
-      prevIndex = {};
-      TR.PREV.questions.forEach(function (p) { prevIndex[p.title_norm] = p; });
-    }
-    return prevIndex[model.norm(q.title)] || null;
-  }
 
   /** Published view: columns restricted to Total + the chosen banner group.
    *  With dual=true, 80%-level lowercase letters are computed from the
@@ -172,51 +162,6 @@
     });
   }
 
-  /** Attach 2024 deltas to the Total column of a model (in place). */
-  function attachDeltas(q, viewModel) {
-    var prev = prevQuestion(q);
-    viewModel.prevWave = prev ? { base: prev.base } : null;
-    if (!prev) return viewModel;
-    viewModel.rows.forEach(function (row) {
-      if (row.kind === "mean") {
-        var prevMean = prevIndexMean(q, prev);
-        if (prevMean !== null && row.cells[0].mean !== null) {
-          row.delta = { prev: prevMean, diff: row.cells[0].mean - prevMean,
-            sig: false, isMean: true };
-        }
-        return;
-      }
-      var hit = prev.rows[model.norm(row.label)];
-      if (!hit || hit.pct === undefined) return;
-      var cur = row.cells[0].pct;
-      if (cur === null || cur === undefined) return;
-      var curBase = viewModel.columns[0].base || 0;
-      var sig = false;
-      if (prev.base && curBase) {
-        sig = TR.stats.propHigher(Math.round(cur / 100 * curBase), curBase,
-                Math.round(hit.pct / 100 * prev.base), prev.base) ||
-              TR.stats.propHigher(Math.round(hit.pct / 100 * prev.base), prev.base,
-                Math.round(cur / 100 * curBase), curBase);
-      }
-      row.delta = { prev: hit.pct, diff: cur - hit.pct, sig: sig, isMean: false };
-    });
-    return viewModel;
-  }
-
-  /** Prior-wave index mean recomputed from the 2024 distribution. */
-  function prevIndexMean(q, prev) {
-    if (!q.index_scores) return null;
-    var sum = 0, weight = 0;
-    Object.keys(q.index_scores).forEach(function (label) {
-      var hit = prev.rows[model.norm(label)];
-      if (hit && hit.pct !== undefined) {
-        sum += q.index_scores[label] * hit.pct;
-        weight += hit.pct;
-      }
-    });
-    return weight > 0 ? sum / weight : null;
-  }
-
   /**
    * The model the UI renders: published when possible, computed when the
    * state demands it (filter active or custom banner).
@@ -296,7 +241,7 @@
     viewModel.type = q.type;
     viewModel.category = q.category;
     viewModel.lowBaseThreshold = lowThreshold();
-    attachDeltas(q, viewModel);
+    TR.waves.attachDeltas(q, viewModel);
     var hidden = opts.hiddenCols !== undefined
       ? opts.hiddenCols : TR.d2.hiddenFor(bannerId);
     applyHiddenColumns(viewModel, hidden);

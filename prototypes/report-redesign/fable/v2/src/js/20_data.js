@@ -81,9 +81,13 @@
   /** Tracking config: project.tracking with safe defaults. */
   d2.tracking = function () {
     var cfg = (TR.AGG.project && TR.AGG.project.tracking) || {};
+    var available = !!(TR.PREV && TR.PREV.waves && TR.PREV.waves.length);
     return {
-      enabled: cfg.enabled !== false && !!TR.PREV,
-      defaultScope: cfg.default_scope === "all" ? "all" : "key"
+      enabled: cfg.enabled !== false && available,
+      defaultScope: cfg.default_scope === "all" ? "all" : "key",
+      waves: available ? TR.PREV.waves.map(function (w) {
+        return { wave: w.wave, year: w.year };
+      }) : []
     };
   };
 
@@ -100,6 +104,10 @@
     }
     if (!agg || !Array.isArray(agg.columns) || !agg.columns.length) {
       errors.push({ code: "DATA_NO_COLUMNS", message: "banner columns missing" });
+    }
+    if (prev && !Array.isArray(prev.waves)) {
+      errors.push({ code: "DATA_WAVES_SHAPE",
+        message: "prior-wave island is not a waves payload (schema_version 2)" });
     }
     if (micro && agg) {
       var n = micro.n;
