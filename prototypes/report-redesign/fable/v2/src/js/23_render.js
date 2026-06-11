@@ -49,11 +49,13 @@
       : Math.abs(delta.diff).toFixed(0);
     if (!delta.isMean && Math.abs(delta.diff) < 1) return "";
     return '<span class="delta ' + (up ? "up" : "down") +
-      (delta.sig ? " sig" : "") + '" title="2024: ' +
+      (delta.sig ? " sig" : "") + '" title="' +
+      (delta.year || "prior wave") + ": " +
       (delta.isMean ? delta.prev.toFixed(1) : Math.round(delta.prev) + "%") +
       (delta.sig ? " · significant change" : "") + '">' +
       (up ? "▲" : "▼") + size + "</span>";
   }
+  render.deltaChip = deltaChip;
 
   /** Crosstab table from a view model. */
   render.tableHtml = function (model, opts) {

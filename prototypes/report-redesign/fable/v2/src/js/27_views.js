@@ -1,10 +1,10 @@
 /**
  * v2 analytical views — Dashboard (gauges + heatmap with its own banner
- * picker, Excel export and pin-to-story), Tracking (scoped, searchable,
- * sortable) and Differences (banner-filterable, sortable, names what each
- * cell beats). All render from view models, so global filters apply.
+ * picker, Excel export and pin-to-story) and Differences (banner-
+ * filterable, sortable, names what each cell beats). The Tracking view
+ * lives in 27t_tracking.js and shares this module's helpers.
  *
- * SIZE-EXCEPTION: three sibling read-only views sharing ranking helpers.
+ * SIZE-EXCEPTION: sibling read-only views sharing ranking helpers.
  */
 (function (global) {
   "use strict";
@@ -12,7 +12,6 @@
 
   var views = TR.views = {};
   var heatBanner = null;        // dashboard heatmap banner override
-  var movedSort = null;         // {col, dir}
   var diffSort = null;
   var diffBanner = null;
 
@@ -185,99 +184,6 @@
     return html.join("");
   }
 
-  /* ---------------- Tracking ---------------- */
-
-  views.whatMoved = function (host) {
-    if (!TR.d2.tracking().enabled) {
-      host.innerHTML = '<div class="page"><div class="card"><h2>Tracking</h2>' +
-        "<p>No prior wave is configured, so there is nothing to track. With wave " +
-        "history supplied (one wave or many), this tab ranks every tracked metric " +
-        "by movement.</p></div></div>";
-      return;
-    }
-    var scope = TR.d2.state.movedScope || TR.d2.tracking().defaultScope;
-    var moved = [];
-    TR.AGG.questions.forEach(function (q) {
-      var model = modelFor(q.code);
-      model.rows.forEach(function (row) {
-        if (!row.delta) return;
-        if (scope === "key" && row.kind === "category") return;
-        var magnitude = Math.abs(row.delta.diff);
-        if (magnitude < (row.delta.isMean ? 1 : 2)) return;
-        moved.push({ code: q.code, title: q.title, category: q.category,
-          label: row.label, kind: row.kind, delta: row.delta,
-          cur: row.kind === "mean" ? row.cells[0].mean : row.cells[0].pct });
-      });
-    });
-    var sort = movedSort || { col: "change", dir: "desc" };
-    moved.sort(function (a, b) {
-      var v;
-      if (sort.col === "prev") v = (b.delta.prev || 0) - (a.delta.prev || 0);
-      else if (sort.col === "cur") v = (b.cur || 0) - (a.cur || 0);
-      else if (sort.col === "question") v = a.code < b.code ? 1 : -1;
-      else {
-        if (a.delta.sig !== b.delta.sig) v = a.delta.sig ? 1 : -1;
-        else v = Math.abs(a.delta.diff) - Math.abs(b.delta.diff);
-        v = -v;
-      }
-      return sort.dir === "asc" ? v : -v;
-    });
-    // note: default ordering = significance first then magnitude, descending
-    var cats = {};
-    TR.AGG.questions.forEach(function (q) { cats[q.category] = true; });
-    var html = ['<div class="page"><div class="card"><h2>Tracking · what moved since 2024</h2>' +
-      "<p>Tracked metrics ranked by year-on-year change; <strong>bold</strong> = " +
-      "significant at 95%. Search or narrow by section, click headers to sort.</p>" +
-      '<div class="scopebar"><button class="btab' + (scope === "key" ? " on" : "") +
-      '" data-scope="key">Key metrics · NPS, indexes &amp; rating NETs</button>' +
-      '<button class="btab' + (scope === "all" ? " on" : "") +
-      '" data-scope="all">All tracked rows</button>' +
-      '<input id="moved-search" type="search" placeholder="Search rows…">' +
-      '<select id="moved-cat"><option value="">All sections</option>' +
-      Object.keys(cats).map(function (c) {
-        return '<option value="' + fmt.escapeHtml(c) + '">' + fmt.escapeHtml(c) + "</option>";
-      }).join("") + "</select></div>" +
-      '<table class="moved"><thead><tr>' +
-      th("question", "Question", sort) + "<th>Row</th>" +
-      th("prev", "2024", sort) + th("cur", "2025", sort) +
-      th("change", "Change", sort) + "</tr></thead><tbody>"];
-    moved.slice(0, 120).forEach(function (m) {
-      var f = m.delta.isMean
-        ? function (v) { return v === null ? "–" : v.toFixed(1); }
-        : function (v) { return v === null ? "–" : Math.round(v) + "%"; };
-      html.push('<tr class="' + (m.delta.sig ? "sig" : "") + '" data-cat="' +
-        fmt.escapeHtml(m.category) + '" data-search="' +
-        fmt.escapeHtml((m.code + " " + m.title + " " + m.label).toLowerCase()) + '">' +
-        '<td><button class="linklike" data-goq="' + m.code + '">' + m.code + " · " +
-        fmt.escapeHtml(TR.charts.clip(m.title, 44)) + "</button></td>" +
-        "<td>" + fmt.escapeHtml(TR.charts.clip(m.label, 38)) +
-        (m.kind !== "category" ? ' <span class="kindtag">' + m.kind + "</span>" : "") + "</td>" +
-        "<td>" + f(m.delta.prev) + "</td><td>" + f(m.cur) + "</td>" +
-        '<td class="' + (m.delta.diff >= 0 ? "up" : "down") + '">' +
-        (m.delta.diff >= 0 ? "▲ +" : "▼ −") +
-        Math.abs(m.delta.diff).toFixed(m.delta.isMean ? 1 : 0) +
-        (m.delta.isMean ? "" : "pp") + "</td></tr>");
-    });
-    html.push("</tbody></table></div></div>");
-    host.innerHTML = html.join("");
-    wireLinks(host);
-    host.querySelectorAll("[data-scope]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        TR.d2.state.movedScope = btn.getAttribute("data-scope");
-        views.whatMoved(host);
-      });
-    });
-    host.querySelectorAll("th[data-sort]").forEach(function (el) {
-      el.addEventListener("click", function () {
-        var col = el.getAttribute("data-sort");
-        movedSort = (movedSort && movedSort.col === col && movedSort.dir === "desc")
-          ? { col: col, dir: "asc" } : { col: col, dir: "desc" };
-        views.whatMoved(host);
-      });
-    });
-    wireRowFilter(host, "moved-search", "moved-cat");
-  };
-
   function th(key, label, sort) {
     var arrow = sort && sort.col === key ? (sort.dir === "desc" ? " ↓" : " ↑") : "";
     return '<th data-sort="' + key + '" class="sortable">' + label + arrow + "</th>";
@@ -395,5 +301,10 @@
       });
     });
   }
+
+  /* shared with the Tracking view (27t_tracking.js) */
+  views._th = th;
+  views._wireRowFilter = wireRowFilter;
+  views._wireLinks = wireLinks;
 
 })(typeof window !== "undefined" ? window : globalThis);

@@ -124,9 +124,13 @@
     return Math.round(value / 100 * waveQ.base);
   }
 
-  /** Two-sided 95% z-test of current vs a wave point (proportions only). */
+  /** Two-sided 95% z-test of current vs a wave point (proportions only).
+   *  Bases under the low-base threshold are excluded, mirroring the
+   *  crosstab convention (weighting.R). */
   function sigVs(curX, curBase, point) {
     if (point.x === null || !point.base || !curBase) return false;
+    var threshold = TR.AGG.project.low_base_threshold || 30;
+    if (point.base < threshold || curBase < threshold) return false;
     return TR.stats.propHigher(curX, curBase, point.x, point.base) ||
       TR.stats.propHigher(point.x, point.base, curX, curBase);
   }

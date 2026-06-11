@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SACAP 2025 Annual Student Survey — Turas Report v2</title>
-<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 00:07 SAST -->
+<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 00:16 SAST -->
 <!-- Single self-contained file: published tables + prior wave + synthetic
      microdata + one fixed renderer. No network requests, no installs. -->
 <style>
@@ -195,6 +195,16 @@ table.moved { border-collapse: collapse; width: 100%; font-size: 12.5px; margin-
 .moved .down { color: var(--red); }
 .kindtag { font-size: 9px; font-weight: 700; letter-spacing: .6px; background: var(--soft); color: var(--muted); border-radius: 4px; padding: 1px 5px; text-transform: uppercase; }
 .beats { background: var(--soft); border-radius: 999px; padding: 2px 9px; font-size: 11px; font-weight: 600; color: var(--brand); }
+
+/* ---------- tracking (wave columns + sparkline) ---------- */
+.trkwrap { overflow-x: auto; }
+.moved.trk th.wv, .moved.trk td.wv { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.moved.trk td.wv.none, .moved.trk td.wv.dnone { color: var(--faint); }
+.moved.trk td.wv.cur { font-weight: 700; background: var(--soft); }
+.moved.trk td.wv.dsig { font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
+.moved.trk td.sparkcell { padding: 2px 8px; }
+.moved.trk td.sparkcell .spark { display: block; }
+.trknote { font-size: 11.5px; color: var(--muted); margin-top: 8px; }
 
 /* ---------- story + present ---------- */
 .story-actions .sa-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
@@ -1807,9 +1817,13 @@ null
     return Math.round(value / 100 * waveQ.base);
   }
 
-  /** Two-sided 95% z-test of current vs a wave point (proportions only). */
+  /** Two-sided 95% z-test of current vs a wave point (proportions only).
+   *  Bases under the low-base threshold are excluded, mirroring the
+   *  crosstab convention (weighting.R). */
   function sigVs(curX, curBase, point) {
     if (point.x === null || !point.base || !curBase) return false;
+    var threshold = TR.AGG.project.low_base_threshold || 30;
+    if (point.base < threshold || curBase < threshold) return false;
     return TR.stats.propHigher(curX, curBase, point.x, point.base) ||
       TR.stats.propHigher(point.x, point.base, curX, curBase);
   }
@@ -1916,11 +1930,13 @@ null
       : Math.abs(delta.diff).toFixed(0);
     if (!delta.isMean && Math.abs(delta.diff) < 1) return "";
     return '<span class="delta ' + (up ? "up" : "down") +
-      (delta.sig ? " sig" : "") + '" title="2024: ' +
+      (delta.sig ? " sig" : "") + '" title="' +
+      (delta.year || "prior wave") + ": " +
       (delta.isMean ? delta.prev.toFixed(1) : Math.round(delta.prev) + "%") +
       (delta.sig ? " · significant change" : "") + '">' +
       (up ? "▲" : "▼") + size + "</span>";
   }
+  render.deltaChip = deltaChip;
 
   /** Crosstab table from a view model. */
   render.tableHtml = function (model, opts) {
@@ -2306,6 +2322,7 @@ null
     if (type === "stacked") return render.stackedChart(model, cols);
     if (type === "pie") return render.pieChart(model, cols[0] || 0);
     if (type === "dot") return render.dotChart(model, cols);
+    if (type === "line") return render.trendChart(model);
     return render.barChart(model, cols);
   };
 
@@ -2528,6 +2545,214 @@ null
     body.push(legend.body);
     return S.root(W, y + legend.height + 10,
       model.code + " — dot plot", body.join(""));
+  };
+
+})(typeof window !== "undefined" ? window : globalThis);
+
+/**
+ * Trend visuals over wave history — the inline sparkline used by tracking
+ * rows and wave strips, and the full "line over waves" chart (chart type
+ * "line"). Series points are published wave Totals (row.waves from
+ * TR.waves.attachDeltas) plus the current wave's Total cell; banner
+ * columns are deliberately ignored — history has no banner cuts.
+ */
+(function (global) {
+  "use strict";
+  var TR = global.TR, S = TR.svg;
+
+  var render = TR.render;
+
+  render.CHART_TYPES.push(["line", "Trend · waves"]);
+
+  /** Current-wave year parsed from project.wave ("Annual 2025" -> 2025). */
+  render.currentYear = function () {
+    var m = /(\d{4})/.exec((TR.AGG.project && TR.AGG.project.wave) || "");
+    return m ? parseInt(m[1], 10) : null;
+  };
+
+  /** Full point list for a model row: history + the current Total value. */
+  render.wavePoints = function (row) {
+    var points = (row.waves || []).map(function (w) {
+      return { year: w.year, value: w.value, base: w.base, current: false };
+    });
+    var cur = row.kind === "mean" ? row.cells[0].mean : row.cells[0].pct;
+    if (cur !== null && cur !== undefined) {
+      points.push({ year: render.currentYear(), value: cur,
+        base: null, current: true });
+    }
+    return points;
+  };
+
+  function fmtVal(v, isMean) {
+    if (v === null || v === undefined) return "–";
+    return isMean ? (Math.round(v * 10) / 10).toString() : Math.round(v) + "%";
+  }
+
+  /**
+   * Inline sparkline for a tracking row. Pure SVG string, ~96x26, scaled
+   * to the series' own min-max band; the current wave's point is accented.
+   */
+  render.sparkline = function (points, isMean) {
+    if (!points || !points.length) return "";
+    var W = 96, H = 26, pad = 4;
+    var values = points.map(function (p) { return p.value; });
+    var min = Math.min.apply(null, values), max = Math.max.apply(null, values);
+    if (max - min < 1e-9) { max += 1; min -= 1; }
+    var y0 = points[0].year, y1 = points[points.length - 1].year;
+    var xOf = function (p) {
+      return y1 === y0 ? W / 2 : pad + (p.year - y0) / (y1 - y0) * (W - pad * 2);
+    };
+    var yOf = function (p) {
+      return H - pad - (p.value - min) / (max - min) * (H - pad * 2);
+    };
+    var path = points.map(function (p, i) {
+      return (i ? "L" : "M") + xOf(p).toFixed(1) + " " + yOf(p).toFixed(1);
+    }).join(" ");
+    var body = [];
+    if (points.length > 1) {
+      body.push(S.el("path", { d: path, fill: "none",
+        stroke: TR.charts.brandOf(), "stroke-width": 1.6,
+        "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    }
+    points.forEach(function (p) {
+      body.push(S.el("circle", { cx: xOf(p).toFixed(1), cy: yOf(p).toFixed(1),
+        r: p.current ? 2.6 : 1.6,
+        fill: p.current ? TR.charts.accentOf() : TR.charts.brandOf() }));
+    });
+    var title = points.map(function (p) {
+      return p.year + ": " + fmtVal(p.value, isMean);
+    }).join(" · ");
+    return '<svg class="spark" viewBox="0 0 ' + W + " " + H + '" width="' + W +
+      '" height="' + H + '" role="img" aria-label="' +
+      TR.fmt.escapeHtml(title) + '"><title>' + TR.fmt.escapeHtml(title) +
+      "</title>" + body.join("") + "</svg>";
+  };
+
+  /** Rows to trend: summary prefers NET/mean/diff metrics, detail the cats. */
+  function trendRows(model) {
+    var withHistory = model.rows.filter(function (r) {
+      return r.waves && r.waves.length;
+    });
+    var kind = model.chartKind === "summary" ? "summary"
+      : model.chartKind === "detail" ? "detail" : "auto";
+    var summary = withHistory.filter(function (r) { return r.kind !== "category"; });
+    var detail = withHistory.filter(function (r) { return r.kind === "category"; });
+    if (kind === "summary") return summary.length ? summary : detail;
+    if (kind === "detail") return detail.length ? detail : summary;
+    return summary.length ? summary : detail;
+  }
+
+  /**
+   * Wave trend line chart for a question model (chart type "line").
+   * One series per row with history; up to 6 series. Mean-scale rows
+   * (0-10 means) and percentage/index rows never share an axis — the
+   * dominant group wins and the rest are dropped with a note.
+   */
+  render.trendChart = function (model) {
+    var rows = trendRows(model);
+    if (!rows.length) return "";
+    var small = rows.filter(function (r) {
+      return r.kind === "mean" && Math.max.apply(null, r.waves.map(function (w) {
+        return w.value;
+      })) <= 10;
+    });
+    var pct = rows.filter(function (r) { return small.indexOf(r) === -1; });
+    var meanScale = small.length > pct.length;
+    rows = (meanScale ? small : pct).slice(0, 6);
+    var dropped = trendRows(model).length - rows.length;
+
+    var series = rows.map(function (r) {
+      return { label: r.label, isMean: r.kind === "mean",
+        points: render.wavePoints(r), sigNow: !!(r.delta && r.delta.sig) };
+    });
+    var years = [];
+    series.forEach(function (s) {
+      s.points.forEach(function (p) {
+        if (p.year !== null && years.indexOf(p.year) === -1) years.push(p.year);
+      });
+    });
+    years.sort();
+    var lo = 0, hi = 0;
+    series.forEach(function (s) {
+      s.points.forEach(function (p) {
+        if (p.value < lo) lo = p.value;
+        if (p.value > hi) hi = p.value;
+      });
+    });
+    var axisMax = meanScale ? Math.max(S.niceMax(hi), 10) : S.niceMax(hi);
+    var axisMin = lo < 0 ? -S.niceMax(-lo) : 0;
+
+    var W = 660, H = 240, padL = 46, padR = 110, padT = 18, padB = 30;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+    var xOf = function (year) {
+      return years.length === 1 ? padL + plotW / 2
+        : padL + (years.indexOf(year)) / (years.length - 1) * plotW;
+    };
+    var yOf = function (v) {
+      return padT + plotH - (v - axisMin) / (axisMax - axisMin) * plotH;
+    };
+    var palette = render.palette();
+    var body = [];
+    [0, 0.25, 0.5, 0.75, 1].forEach(function (f) {
+      var v = axisMin + (axisMax - axisMin) * f;
+      body.push(S.el("line", { x1: padL, y1: yOf(v), x2: padL + plotW,
+        y2: yOf(v), stroke: f === 0 ? "#d8dcea" : "#eef0f7" }));
+      body.push(S.text(padL - 6, yOf(v) + 3,
+        meanScale ? (Math.round(v * 10) / 10) : Math.round(v) + "%",
+        { "text-anchor": "end", "font-size": 9.5, fill: "#9aa1b1" }));
+    });
+    years.forEach(function (year) {
+      body.push(S.text(xOf(year), padT + plotH + 16, String(year),
+        { "text-anchor": "middle", "font-size": 10, fill: "#6b7280" }));
+    });
+    var endLabels = [];
+    series.forEach(function (s, k) {
+      var colour = palette[k % palette.length];
+      var d = s.points.map(function (p, i) {
+        return (i ? "L" : "M") + xOf(p.year).toFixed(1) + " " +
+          yOf(p.value).toFixed(1);
+      }).join(" ");
+      if (s.points.length > 1) {
+        body.push(S.el("path", { d: d, fill: "none", stroke: colour,
+          "stroke-width": 2.2, "stroke-linejoin": "round" }));
+      }
+      s.points.forEach(function (p) {
+        body.push(S.el("circle", { cx: xOf(p.year).toFixed(1),
+          cy: yOf(p.value).toFixed(1), r: p.current ? 4 : 2.6, fill: colour,
+          stroke: "#fff", "stroke-width": 1 }));
+        if (series.length === 1) {
+          body.push(S.text(xOf(p.year), yOf(p.value) - 8,
+            fmtVal(p.value, s.isMean),
+            { "text-anchor": "middle", "font-size": 9.5,
+              "font-weight": p.current ? 700 : 400, fill: "#1c2333" }));
+        }
+      });
+      var last = s.points[s.points.length - 1];
+      endLabels.push({ pos: yOf(last.value), colour: colour, sig: s.sigNow,
+        text: fmtVal(last.value, s.isMean) +
+          (series.length > 1 ? " " + TR.charts.clip(s.label, 14) : "") });
+    });
+    render.repel(endLabels, 13, padT + 4, padT + plotH);
+    endLabels.forEach(function (l) {
+      // trailing dot marks a significant change vs the prior wave
+      body.push(S.text(padL + plotW + 8, l.pos + 3,
+        l.text + (l.sig ? " •" : ""),
+        { "font-size": 10, "font-weight": 700, fill: l.colour }));
+    });
+    var note = "Published wave Totals · " + years[0] + "–" +
+      years[years.length - 1] + (dropped > 0 ? " · " + dropped +
+      " series hidden (mixed scales or >6)" : "");
+    body.push(S.text(padL, H - 4, note, { "font-size": 9.5, fill: "#9aa1b1" }));
+    var legend = null, height = H;
+    if (series.length > 1) {
+      legend = S.legend(series.map(function (s, k) {
+        return { label: TR.charts.clip(s.label, 30),
+          colour: palette[k % palette.length] };
+      }), padL, H + 4, W - padL - 10);
+      body.push(legend.body);
+      height = H + legend.height + 8;
+    }
+    return S.root(W, height, model.code + " — trend over waves", body.join(""));
   };
 
 })(typeof window !== "undefined" ? window : globalThis);
@@ -3479,11 +3704,11 @@ null
 
 /**
  * v2 analytical views — Dashboard (gauges + heatmap with its own banner
- * picker, Excel export and pin-to-story), Tracking (scoped, searchable,
- * sortable) and Differences (banner-filterable, sortable, names what each
- * cell beats). All render from view models, so global filters apply.
+ * picker, Excel export and pin-to-story) and Differences (banner-
+ * filterable, sortable, names what each cell beats). The Tracking view
+ * lives in 27t_tracking.js and shares this module's helpers.
  *
- * SIZE-EXCEPTION: three sibling read-only views sharing ranking helpers.
+ * SIZE-EXCEPTION: sibling read-only views sharing ranking helpers.
  */
 (function (global) {
   "use strict";
@@ -3491,7 +3716,6 @@ null
 
   var views = TR.views = {};
   var heatBanner = null;        // dashboard heatmap banner override
-  var movedSort = null;         // {col, dir}
   var diffSort = null;
   var diffBanner = null;
 
@@ -3664,99 +3888,6 @@ null
     return html.join("");
   }
 
-  /* ---------------- Tracking ---------------- */
-
-  views.whatMoved = function (host) {
-    if (!TR.d2.tracking().enabled) {
-      host.innerHTML = '<div class="page"><div class="card"><h2>Tracking</h2>' +
-        "<p>No prior wave is configured, so there is nothing to track. With wave " +
-        "history supplied (one wave or many), this tab ranks every tracked metric " +
-        "by movement.</p></div></div>";
-      return;
-    }
-    var scope = TR.d2.state.movedScope || TR.d2.tracking().defaultScope;
-    var moved = [];
-    TR.AGG.questions.forEach(function (q) {
-      var model = modelFor(q.code);
-      model.rows.forEach(function (row) {
-        if (!row.delta) return;
-        if (scope === "key" && row.kind === "category") return;
-        var magnitude = Math.abs(row.delta.diff);
-        if (magnitude < (row.delta.isMean ? 1 : 2)) return;
-        moved.push({ code: q.code, title: q.title, category: q.category,
-          label: row.label, kind: row.kind, delta: row.delta,
-          cur: row.kind === "mean" ? row.cells[0].mean : row.cells[0].pct });
-      });
-    });
-    var sort = movedSort || { col: "change", dir: "desc" };
-    moved.sort(function (a, b) {
-      var v;
-      if (sort.col === "prev") v = (b.delta.prev || 0) - (a.delta.prev || 0);
-      else if (sort.col === "cur") v = (b.cur || 0) - (a.cur || 0);
-      else if (sort.col === "question") v = a.code < b.code ? 1 : -1;
-      else {
-        if (a.delta.sig !== b.delta.sig) v = a.delta.sig ? 1 : -1;
-        else v = Math.abs(a.delta.diff) - Math.abs(b.delta.diff);
-        v = -v;
-      }
-      return sort.dir === "asc" ? v : -v;
-    });
-    // note: default ordering = significance first then magnitude, descending
-    var cats = {};
-    TR.AGG.questions.forEach(function (q) { cats[q.category] = true; });
-    var html = ['<div class="page"><div class="card"><h2>Tracking · what moved since 2024</h2>' +
-      "<p>Tracked metrics ranked by year-on-year change; <strong>bold</strong> = " +
-      "significant at 95%. Search or narrow by section, click headers to sort.</p>" +
-      '<div class="scopebar"><button class="btab' + (scope === "key" ? " on" : "") +
-      '" data-scope="key">Key metrics · NPS, indexes &amp; rating NETs</button>' +
-      '<button class="btab' + (scope === "all" ? " on" : "") +
-      '" data-scope="all">All tracked rows</button>' +
-      '<input id="moved-search" type="search" placeholder="Search rows…">' +
-      '<select id="moved-cat"><option value="">All sections</option>' +
-      Object.keys(cats).map(function (c) {
-        return '<option value="' + fmt.escapeHtml(c) + '">' + fmt.escapeHtml(c) + "</option>";
-      }).join("") + "</select></div>" +
-      '<table class="moved"><thead><tr>' +
-      th("question", "Question", sort) + "<th>Row</th>" +
-      th("prev", "2024", sort) + th("cur", "2025", sort) +
-      th("change", "Change", sort) + "</tr></thead><tbody>"];
-    moved.slice(0, 120).forEach(function (m) {
-      var f = m.delta.isMean
-        ? function (v) { return v === null ? "–" : v.toFixed(1); }
-        : function (v) { return v === null ? "–" : Math.round(v) + "%"; };
-      html.push('<tr class="' + (m.delta.sig ? "sig" : "") + '" data-cat="' +
-        fmt.escapeHtml(m.category) + '" data-search="' +
-        fmt.escapeHtml((m.code + " " + m.title + " " + m.label).toLowerCase()) + '">' +
-        '<td><button class="linklike" data-goq="' + m.code + '">' + m.code + " · " +
-        fmt.escapeHtml(TR.charts.clip(m.title, 44)) + "</button></td>" +
-        "<td>" + fmt.escapeHtml(TR.charts.clip(m.label, 38)) +
-        (m.kind !== "category" ? ' <span class="kindtag">' + m.kind + "</span>" : "") + "</td>" +
-        "<td>" + f(m.delta.prev) + "</td><td>" + f(m.cur) + "</td>" +
-        '<td class="' + (m.delta.diff >= 0 ? "up" : "down") + '">' +
-        (m.delta.diff >= 0 ? "▲ +" : "▼ −") +
-        Math.abs(m.delta.diff).toFixed(m.delta.isMean ? 1 : 0) +
-        (m.delta.isMean ? "" : "pp") + "</td></tr>");
-    });
-    html.push("</tbody></table></div></div>");
-    host.innerHTML = html.join("");
-    wireLinks(host);
-    host.querySelectorAll("[data-scope]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        TR.d2.state.movedScope = btn.getAttribute("data-scope");
-        views.whatMoved(host);
-      });
-    });
-    host.querySelectorAll("th[data-sort]").forEach(function (el) {
-      el.addEventListener("click", function () {
-        var col = el.getAttribute("data-sort");
-        movedSort = (movedSort && movedSort.col === col && movedSort.dir === "desc")
-          ? { col: col, dir: "asc" } : { col: col, dir: "desc" };
-        views.whatMoved(host);
-      });
-    });
-    wireRowFilter(host, "moved-search", "moved-cat");
-  };
-
   function th(key, label, sort) {
     var arrow = sort && sort.col === key ? (sort.dir === "desc" ? " ↓" : " ↑") : "";
     return '<th data-sort="' + key + '" class="sortable">' + label + arrow + "</th>";
@@ -3874,6 +4005,196 @@ null
       });
     });
   }
+
+  /* shared with the Tracking view (27t_tracking.js) */
+  views._th = th;
+  views._wireRowFilter = wireRowFilter;
+  views._wireLinks = wireLinks;
+
+})(typeof window !== "undefined" ? window : globalThis);
+
+/**
+ * v2 Tracking view — tracker-module parity over the wave history: every
+ * tracked metric as a row with column-per-wave published values, an
+ * inline sparkline, change vs the previous wave AND vs the baseline wave
+ * (pooled-z sig flags on both), per-wave bases in tooltips, drill-down,
+ * search / section filter / sort, and key-vs-all scope. Renders entirely
+ * from view models, so the current-wave column respects live filters.
+ */
+(function (global) {
+  "use strict";
+  var TR = global.TR, fmt = TR.fmt;
+
+  var views = TR.views;
+  var trkSort = null;           // {col, dir}
+  var MAX_ROWS = 200;
+
+  function fmtVal(v, isMean) {
+    if (v === null || v === undefined) return "–";
+    return isMean ? (Math.round(v * 10) / 10).toString() : Math.round(v) + "%";
+  }
+
+  function collectMetrics(scope) {
+    var metrics = [], newQ = [];
+    TR.AGG.questions.forEach(function (q) {
+      var model = views._modelFor(q.code);
+      if (!model.prevWave) { newQ.push(q.code); return; }
+      model.rows.forEach(function (row) {
+        if (!row.waves || !row.waves.length) return;
+        if (scope === "key" && row.kind === "category") return;
+        var byYear = {};
+        row.waves.forEach(function (w) { byYear[w.year] = w; });
+        metrics.push({ code: q.code, title: q.title, category: q.category,
+          label: row.label, kind: row.kind, isMean: row.kind === "mean",
+          byYear: byYear, row: row, delta: row.delta || null,
+          deltaBase: row.deltaBase || null,
+          cur: row.kind === "mean" ? row.cells[0].mean : row.cells[0].pct });
+      });
+    });
+    return { metrics: metrics, newQ: newQ };
+  }
+
+  function applySort(metrics, sort) {
+    var byDelta = function (a, b, key) {
+      var da = a[key], db = b[key];
+      if (!da && !db) return 0;
+      if (!da) return 1;
+      if (!db) return -1;
+      if (da.sig !== db.sig) return da.sig ? -1 : 1;
+      return Math.abs(db.diff) - Math.abs(da.diff);
+    };
+    metrics.sort(function (a, b) {
+      var v;
+      if (sort.col === "question") v = a.code < b.code ? -1 : 1;
+      else if (sort.col === "cur") v = (b.cur || 0) - (a.cur || 0);
+      else if (sort.col === "base") v = byDelta(a, b, "deltaBase");
+      else v = byDelta(a, b, "delta");
+      return sort.dir === "asc" ? -v : v;
+    });
+  }
+
+  function deltaCell(d) {
+    if (!d) return '<td class="wv dnone">–</td>';
+    var up = d.diff >= 0;
+    return '<td class="wv ' + (up ? "up" : "down") + (d.sig ? " dsig" : "") +
+      '" title="vs ' + d.year + ": " + fmtVal(d.prev, d.isMean) +
+      (d.sig ? " · significant at 95%" : "") + '">' +
+      (up ? "▲ +" : "▼ −") + Math.abs(d.diff).toFixed(d.isMean ? 1 : 0) +
+      (d.isMean ? "" : "pp") + "</td>";
+  }
+
+  function metricRow(m, years) {
+    var cells = ['<td><button class="linklike" data-goq="' + m.code + '">' +
+      m.code + " · " + fmt.escapeHtml(TR.charts.clip(m.title, 38)) +
+      "</button></td>",
+      "<td>" + fmt.escapeHtml(TR.charts.clip(m.label, 30)) +
+      (m.kind !== "category"
+        ? ' <span class="kindtag">' + (m.row.diff ? "net diff" : m.kind) + "</span>"
+        : "") + "</td>"];
+    var threshold = TR.AGG.project.low_base_threshold || 30;
+    years.forEach(function (year) {
+      var w = m.byYear[year];
+      var low = w && w.base !== null && w.base < threshold;
+      cells.push(w
+        ? '<td class="wv' + (low ? " lowb" : "") + '" title="' + year +
+          " base n=" + fmt.base(w.base) +
+          (low ? " — below " + threshold + ", excluded from significance" : "") +
+          '">' + fmtVal(w.value, m.isMean) + (low ? " ⚠" : "") + "</td>"
+        : '<td class="wv none">–</td>');
+    });
+    cells.push('<td class="wv cur">' + fmtVal(m.cur, m.isMean) + "</td>");
+    cells.push('<td class="sparkcell">' +
+      TR.render.sparkline(TR.render.wavePoints(m.row), m.isMean) + "</td>");
+    cells.push(deltaCell(m.delta));
+    cells.push(deltaCell(m.deltaBase));
+    return '<tr data-cat="' + fmt.escapeHtml(m.category) + '" data-search="' +
+      fmt.escapeHtml((m.code + " " + m.title + " " + m.label).toLowerCase()) +
+      '">' + cells.join("") + "</tr>";
+  }
+
+  views.whatMoved = function (host) {
+    if (!TR.d2.tracking().enabled) {
+      host.innerHTML = '<div class="page"><div class="card"><h2>Tracking</h2>' +
+        "<p>No wave history is configured, so there is nothing to track. With " +
+        "history supplied (one wave or many), this tab shows every tracked " +
+        "metric across waves with sparklines and significance-tested change.</p>" +
+        "</div></div>";
+      return;
+    }
+    var years = TR.d2.tracking().waves.map(function (w) { return w.year; });
+    var curYear = TR.render.currentYear();
+    var scope = TR.d2.state.movedScope || TR.d2.tracking().defaultScope;
+    var collected = collectMetrics(scope);
+    var sort = trkSort || { col: "change", dir: "desc" };
+    applySort(collected.metrics, sort);
+    var cats = {};
+    TR.AGG.questions.forEach(function (q) { cats[q.category] = true; });
+    var th = views._th;
+
+    var html = ['<div class="page"><div class="card trkcard">' +
+      "<h2>Tracking · " + years[0] + "–" + curYear + "</h2>" +
+      "<p>Published wave Totals for every tracked metric" +
+      (TR.d2.filtersActive()
+        ? " — <strong>filters apply to the " + curYear + " column only</strong>" +
+          " (history has no respondent-level data)"
+        : "") +
+      ". <strong>Δ prev</strong> compares " + curYear + " with the most " +
+      "recent wave carrying the metric, <strong>Δ first</strong> with its " +
+      "baseline wave; outlined chips are significant at 95% (pooled z on " +
+      "published bases). Hover any wave for its base; click a question to " +
+      "drill into the full crosstab with the trend chart.</p>" +
+      '<div class="scopebar"><button class="btab' + (scope === "key" ? " on" : "") +
+      '" data-scope="key">Key metrics · NPS, indexes &amp; NETs</button>' +
+      '<button class="btab' + (scope === "all" ? " on" : "") +
+      '" data-scope="all">All tracked rows</button>' +
+      '<input id="trk-search" type="search" placeholder="Search metrics…">' +
+      '<select id="trk-cat"><option value="">All sections</option>' +
+      Object.keys(cats).map(function (c) {
+        return '<option value="' + fmt.escapeHtml(c) + '">' +
+          fmt.escapeHtml(c) + "</option>";
+      }).join("") + "</select></div>" +
+      '<div class="trkwrap"><table class="moved trk"><thead><tr>' +
+      th("question", "Question", sort) + "<th>Metric</th>" +
+      years.map(function (y) { return "<th class='wv'>" + y + "</th>"; }).join("") +
+      th("cur", String(curYear), sort) + "<th>Trend</th>" +
+      th("change", "Δ prev", sort) + th("base", "Δ first", sort) +
+      "</tr></thead><tbody>"];
+    collected.metrics.slice(0, MAX_ROWS).forEach(function (m) {
+      html.push(metricRow(m, years));
+    });
+    html.push("</tbody></table></div>");
+    var notes = [];
+    if (collected.metrics.length > MAX_ROWS) {
+      notes.push("Showing the top " + MAX_ROWS + " of " +
+        collected.metrics.length + " tracked rows — search or filter to narrow.");
+    }
+    if (collected.newQ.length) {
+      notes.push(collected.newQ.length + " questions are new in " + curYear +
+        " with no history; they appear in Crosstabs only.");
+    }
+    if (notes.length) {
+      html.push('<p class="trknote">' + fmt.escapeHtml(notes.join("  ")) + "</p>");
+    }
+    html.push("</div></div>");
+    host.innerHTML = html.join("");
+
+    views._wireLinks(host);
+    host.querySelectorAll("[data-scope]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        TR.d2.state.movedScope = btn.getAttribute("data-scope");
+        views.whatMoved(host);
+      });
+    });
+    host.querySelectorAll("th[data-sort]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        var col = el.getAttribute("data-sort");
+        trkSort = (trkSort && trkSort.col === col && trkSort.dir === "desc")
+          ? { col: col, dir: "asc" } : { col: col, dir: "desc" };
+        views.whatMoved(host);
+      });
+    });
+    views._wireRowFilter(host, "trk-search", "trk-cat");
+  };
 
 })(typeof window !== "undefined" ? window : globalThis);
 

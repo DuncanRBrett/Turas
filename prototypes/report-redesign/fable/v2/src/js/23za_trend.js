@@ -1,0 +1,207 @@
+/**
+ * Trend visuals over wave history — the inline sparkline used by tracking
+ * rows and wave strips, and the full "line over waves" chart (chart type
+ * "line"). Series points are published wave Totals (row.waves from
+ * TR.waves.attachDeltas) plus the current wave's Total cell; banner
+ * columns are deliberately ignored — history has no banner cuts.
+ */
+(function (global) {
+  "use strict";
+  var TR = global.TR, S = TR.svg;
+
+  var render = TR.render;
+
+  render.CHART_TYPES.push(["line", "Trend · waves"]);
+
+  /** Current-wave year parsed from project.wave ("Annual 2025" -> 2025). */
+  render.currentYear = function () {
+    var m = /(\d{4})/.exec((TR.AGG.project && TR.AGG.project.wave) || "");
+    return m ? parseInt(m[1], 10) : null;
+  };
+
+  /** Full point list for a model row: history + the current Total value. */
+  render.wavePoints = function (row) {
+    var points = (row.waves || []).map(function (w) {
+      return { year: w.year, value: w.value, base: w.base, current: false };
+    });
+    var cur = row.kind === "mean" ? row.cells[0].mean : row.cells[0].pct;
+    if (cur !== null && cur !== undefined) {
+      points.push({ year: render.currentYear(), value: cur,
+        base: null, current: true });
+    }
+    return points;
+  };
+
+  function fmtVal(v, isMean) {
+    if (v === null || v === undefined) return "–";
+    return isMean ? (Math.round(v * 10) / 10).toString() : Math.round(v) + "%";
+  }
+
+  /**
+   * Inline sparkline for a tracking row. Pure SVG string, ~96x26, scaled
+   * to the series' own min-max band; the current wave's point is accented.
+   */
+  render.sparkline = function (points, isMean) {
+    if (!points || !points.length) return "";
+    var W = 96, H = 26, pad = 4;
+    var values = points.map(function (p) { return p.value; });
+    var min = Math.min.apply(null, values), max = Math.max.apply(null, values);
+    if (max - min < 1e-9) { max += 1; min -= 1; }
+    var y0 = points[0].year, y1 = points[points.length - 1].year;
+    var xOf = function (p) {
+      return y1 === y0 ? W / 2 : pad + (p.year - y0) / (y1 - y0) * (W - pad * 2);
+    };
+    var yOf = function (p) {
+      return H - pad - (p.value - min) / (max - min) * (H - pad * 2);
+    };
+    var path = points.map(function (p, i) {
+      return (i ? "L" : "M") + xOf(p).toFixed(1) + " " + yOf(p).toFixed(1);
+    }).join(" ");
+    var body = [];
+    if (points.length > 1) {
+      body.push(S.el("path", { d: path, fill: "none",
+        stroke: TR.charts.brandOf(), "stroke-width": 1.6,
+        "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    }
+    points.forEach(function (p) {
+      body.push(S.el("circle", { cx: xOf(p).toFixed(1), cy: yOf(p).toFixed(1),
+        r: p.current ? 2.6 : 1.6,
+        fill: p.current ? TR.charts.accentOf() : TR.charts.brandOf() }));
+    });
+    var title = points.map(function (p) {
+      return p.year + ": " + fmtVal(p.value, isMean);
+    }).join(" · ");
+    return '<svg class="spark" viewBox="0 0 ' + W + " " + H + '" width="' + W +
+      '" height="' + H + '" role="img" aria-label="' +
+      TR.fmt.escapeHtml(title) + '"><title>' + TR.fmt.escapeHtml(title) +
+      "</title>" + body.join("") + "</svg>";
+  };
+
+  /** Rows to trend: summary prefers NET/mean/diff metrics, detail the cats. */
+  function trendRows(model) {
+    var withHistory = model.rows.filter(function (r) {
+      return r.waves && r.waves.length;
+    });
+    var kind = model.chartKind === "summary" ? "summary"
+      : model.chartKind === "detail" ? "detail" : "auto";
+    var summary = withHistory.filter(function (r) { return r.kind !== "category"; });
+    var detail = withHistory.filter(function (r) { return r.kind === "category"; });
+    if (kind === "summary") return summary.length ? summary : detail;
+    if (kind === "detail") return detail.length ? detail : summary;
+    return summary.length ? summary : detail;
+  }
+
+  /**
+   * Wave trend line chart for a question model (chart type "line").
+   * One series per row with history; up to 6 series. Mean-scale rows
+   * (0-10 means) and percentage/index rows never share an axis — the
+   * dominant group wins and the rest are dropped with a note.
+   */
+  render.trendChart = function (model) {
+    var rows = trendRows(model);
+    if (!rows.length) return "";
+    var small = rows.filter(function (r) {
+      return r.kind === "mean" && Math.max.apply(null, r.waves.map(function (w) {
+        return w.value;
+      })) <= 10;
+    });
+    var pct = rows.filter(function (r) { return small.indexOf(r) === -1; });
+    var meanScale = small.length > pct.length;
+    rows = (meanScale ? small : pct).slice(0, 6);
+    var dropped = trendRows(model).length - rows.length;
+
+    var series = rows.map(function (r) {
+      return { label: r.label, isMean: r.kind === "mean",
+        points: render.wavePoints(r), sigNow: !!(r.delta && r.delta.sig) };
+    });
+    var years = [];
+    series.forEach(function (s) {
+      s.points.forEach(function (p) {
+        if (p.year !== null && years.indexOf(p.year) === -1) years.push(p.year);
+      });
+    });
+    years.sort();
+    var lo = 0, hi = 0;
+    series.forEach(function (s) {
+      s.points.forEach(function (p) {
+        if (p.value < lo) lo = p.value;
+        if (p.value > hi) hi = p.value;
+      });
+    });
+    var axisMax = meanScale ? Math.max(S.niceMax(hi), 10) : S.niceMax(hi);
+    var axisMin = lo < 0 ? -S.niceMax(-lo) : 0;
+
+    var W = 660, H = 240, padL = 46, padR = 110, padT = 18, padB = 30;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+    var xOf = function (year) {
+      return years.length === 1 ? padL + plotW / 2
+        : padL + (years.indexOf(year)) / (years.length - 1) * plotW;
+    };
+    var yOf = function (v) {
+      return padT + plotH - (v - axisMin) / (axisMax - axisMin) * plotH;
+    };
+    var palette = render.palette();
+    var body = [];
+    [0, 0.25, 0.5, 0.75, 1].forEach(function (f) {
+      var v = axisMin + (axisMax - axisMin) * f;
+      body.push(S.el("line", { x1: padL, y1: yOf(v), x2: padL + plotW,
+        y2: yOf(v), stroke: f === 0 ? "#d8dcea" : "#eef0f7" }));
+      body.push(S.text(padL - 6, yOf(v) + 3,
+        meanScale ? (Math.round(v * 10) / 10) : Math.round(v) + "%",
+        { "text-anchor": "end", "font-size": 9.5, fill: "#9aa1b1" }));
+    });
+    years.forEach(function (year) {
+      body.push(S.text(xOf(year), padT + plotH + 16, String(year),
+        { "text-anchor": "middle", "font-size": 10, fill: "#6b7280" }));
+    });
+    var endLabels = [];
+    series.forEach(function (s, k) {
+      var colour = palette[k % palette.length];
+      var d = s.points.map(function (p, i) {
+        return (i ? "L" : "M") + xOf(p.year).toFixed(1) + " " +
+          yOf(p.value).toFixed(1);
+      }).join(" ");
+      if (s.points.length > 1) {
+        body.push(S.el("path", { d: d, fill: "none", stroke: colour,
+          "stroke-width": 2.2, "stroke-linejoin": "round" }));
+      }
+      s.points.forEach(function (p) {
+        body.push(S.el("circle", { cx: xOf(p.year).toFixed(1),
+          cy: yOf(p.value).toFixed(1), r: p.current ? 4 : 2.6, fill: colour,
+          stroke: "#fff", "stroke-width": 1 }));
+        if (series.length === 1) {
+          body.push(S.text(xOf(p.year), yOf(p.value) - 8,
+            fmtVal(p.value, s.isMean),
+            { "text-anchor": "middle", "font-size": 9.5,
+              "font-weight": p.current ? 700 : 400, fill: "#1c2333" }));
+        }
+      });
+      var last = s.points[s.points.length - 1];
+      endLabels.push({ pos: yOf(last.value), colour: colour, sig: s.sigNow,
+        text: fmtVal(last.value, s.isMean) +
+          (series.length > 1 ? " " + TR.charts.clip(s.label, 14) : "") });
+    });
+    render.repel(endLabels, 13, padT + 4, padT + plotH);
+    endLabels.forEach(function (l) {
+      // trailing dot marks a significant change vs the prior wave
+      body.push(S.text(padL + plotW + 8, l.pos + 3,
+        l.text + (l.sig ? " •" : ""),
+        { "font-size": 10, "font-weight": 700, fill: l.colour }));
+    });
+    var note = "Published wave Totals · " + years[0] + "–" +
+      years[years.length - 1] + (dropped > 0 ? " · " + dropped +
+      " series hidden (mixed scales or >6)" : "");
+    body.push(S.text(padL, H - 4, note, { "font-size": 9.5, fill: "#9aa1b1" }));
+    var legend = null, height = H;
+    if (series.length > 1) {
+      legend = S.legend(series.map(function (s, k) {
+        return { label: TR.charts.clip(s.label, 30),
+          colour: palette[k % palette.length] };
+      }), padL, H + 4, W - padL - 10);
+      body.push(legend.body);
+      height = H + legend.height + 8;
+    }
+    return S.root(W, height, model.code + " — trend over waves", body.join(""));
+  };
+
+})(typeof window !== "undefined" ? window : globalThis);

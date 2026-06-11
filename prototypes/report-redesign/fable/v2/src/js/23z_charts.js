@@ -53,6 +53,7 @@
     if (type === "stacked") return render.stackedChart(model, cols);
     if (type === "pie") return render.pieChart(model, cols[0] || 0);
     if (type === "dot") return render.dotChart(model, cols);
+    if (type === "line") return render.trendChart(model);
     return render.barChart(model, cols);
   };
 
