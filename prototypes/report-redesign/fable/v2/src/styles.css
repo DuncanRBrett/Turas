@@ -196,6 +196,20 @@ table.moved { border-collapse: collapse; width: 100%; font-size: 12.5px; margin-
 .moved.trk td.sparkcell .spark { display: block; }
 .trknote { font-size: 11.5px; color: var(--muted); margin-top: 8px; }
 
+/* ---------- wave strip (question card) ---------- */
+.wavestrip { margin: 12px 18px 4px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; background: #fbfbfe; overflow-x: auto; }
+.ws-head { font-size: 12px; color: var(--muted); display: flex; gap: 8px; align-items: baseline; }
+.ws-head .linklike { margin-left: auto; font-size: 11.5px; }
+table.ws { border-collapse: collapse; font-size: 12px; margin-top: 6px; min-width: 520px; }
+table.ws th { font-size: 10px; text-transform: uppercase; letter-spacing: .7px; color: var(--faint); padding: 3px 9px; text-align: right; }
+table.ws td { padding: 3px 9px; border-top: 1px solid var(--line); }
+table.ws th.wv, table.ws td.wv { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.ws td.lab { color: var(--muted); max-width: 240px; }
+table.ws .ws-base td { color: var(--faint); font-size: 11px; }
+table.ws td.wv.none { color: var(--faint); }
+table.ws th.wv.cur, table.ws td.wv.cur { font-weight: 700; background: var(--soft); }
+table.ws td.sparkcell { padding: 1px 8px; }
+
 /* ---------- story + present ---------- */
 .story-actions .sa-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .t-btnish { display: inline-flex; align-items: center; cursor: pointer; }

@@ -288,6 +288,9 @@
       heatmap: s.heatmap, showCounts: s.showCounts,
       showDeltas: s.showDeltas && TR.d2.tracking().enabled,
       hideable: true, rowHideable: true, sortable: true }) + "</div>";
+    if (s.showDeltas && TR.d2.tracking().enabled) {
+      html += TR.render.waveStripHtml(model);
+    }
 
     var bannerName = TR.d2.bannerDescription().replace("Banner: ", "");
     html += '<div class="insight"><div class="insight-head">Analyst insight · ' +
@@ -543,6 +546,11 @@
           chartSvg: TR.d2.state.showChart ? cards2.chartString() : null });
       }
       if (action === "pin") openPinMenu();
+      if (action === "fulltrend") {
+        TR.d2.state.showChart = true;
+        TR.d2.state.chartType = "line";
+        cards2.renderActive();
+      }
       if (action === "showall") {
         delete TR.d2.state.hiddenCols[TR.d2.state.banner];
         delete TR.d2.state.hiddenRows[TR.d2.state.activeQ];

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SACAP 2025 Annual Student Survey — Turas Report v2</title>
-<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 00:16 SAST -->
+<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 00:18 SAST -->
 <!-- Single self-contained file: published tables + prior wave + synthetic
      microdata + one fixed renderer. No network requests, no installs. -->
 <style>
@@ -205,6 +205,20 @@ table.moved { border-collapse: collapse; width: 100%; font-size: 12.5px; margin-
 .moved.trk td.sparkcell { padding: 2px 8px; }
 .moved.trk td.sparkcell .spark { display: block; }
 .trknote { font-size: 11.5px; color: var(--muted); margin-top: 8px; }
+
+/* ---------- wave strip (question card) ---------- */
+.wavestrip { margin: 12px 18px 4px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; background: #fbfbfe; overflow-x: auto; }
+.ws-head { font-size: 12px; color: var(--muted); display: flex; gap: 8px; align-items: baseline; }
+.ws-head .linklike { margin-left: auto; font-size: 11.5px; }
+table.ws { border-collapse: collapse; font-size: 12px; margin-top: 6px; min-width: 520px; }
+table.ws th { font-size: 10px; text-transform: uppercase; letter-spacing: .7px; color: var(--faint); padding: 3px 9px; text-align: right; }
+table.ws td { padding: 3px 9px; border-top: 1px solid var(--line); }
+table.ws th.wv, table.ws td.wv { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.ws td.lab { color: var(--muted); max-width: 240px; }
+table.ws .ws-base td { color: var(--faint); font-size: 11px; }
+table.ws td.wv.none { color: var(--faint); }
+table.ws th.wv.cur, table.ws td.wv.cur { font-weight: 700; background: var(--soft); }
+table.ws td.sparkcell { padding: 1px 8px; }
 
 /* ---------- story + present ---------- */
 .story-actions .sa-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
@@ -2589,12 +2603,12 @@ null
   }
 
   /**
-   * Inline sparkline for a tracking row. Pure SVG string, ~96x26, scaled
-   * to the series' own min-max band; the current wave's point is accented.
+   * Inline sparkline for a tracking row. Pure SVG string (default 96x26),
+   * scaled to the series' own min-max band; the current point is accented.
    */
-  render.sparkline = function (points, isMean) {
+  render.sparkline = function (points, isMean, opts) {
     if (!points || !points.length) return "";
-    var W = 96, H = 26, pad = 4;
+    var W = (opts && opts.w) || 96, H = (opts && opts.h) || 26, pad = 4;
     var values = points.map(function (p) { return p.value; });
     var min = Math.min.apply(null, values), max = Math.max.apply(null, values);
     if (max - min < 1e-9) { max += 1; min -= 1; }
@@ -2626,6 +2640,65 @@ null
       '" height="' + H + '" role="img" aria-label="' +
       TR.fmt.escapeHtml(title) + '"><title>' + TR.fmt.escapeHtml(title) +
       "</title>" + body.join("") + "</svg>";
+  };
+
+  /**
+   * Wave strip for a question card: per-wave bases + the headline tracked
+   * metrics (means first, then NETs, then NET POSITIVE; max 3) with a
+   * sparkline each and a jump to the full trend chart. "" when no history.
+   */
+  render.waveStripHtml = function (model) {
+    if (!model.history || !model.history.length) return "";
+    var fmt = TR.fmt;
+    var years = model.history.map(function (h) { return h.year; });
+    var curYear = render.currentYear();
+    var priority = function (r) {
+      if (r.kind === "mean") return 0;
+      if (r.kind === "net" && !r.diff) return 1;
+      if (r.diff) return 2;
+      return 3;
+    };
+    var rows = model.rows.filter(function (r) {
+      return r.waves && r.waves.length;
+    }).sort(function (a, b) { return priority(a) - priority(b); }).slice(0, 3);
+    if (!rows.length) return "";
+    var threshold = model.lowBaseThreshold || 30;
+
+    var out = ['<div class="wavestrip"><div class="ws-head">' +
+      "<strong>Wave history</strong> · published Totals " + years[0] + "–" +
+      curYear + '<button class="linklike" data-act="fulltrend" title="Switch ' +
+      'the chart to the trend-over-waves type">full trend chart ↗</button></div>' +
+      '<table class="ws"><thead><tr><th></th>'];
+    years.forEach(function (y) { out.push('<th class="wv">' + y + "</th>"); });
+    out.push('<th class="wv cur">' + curYear + "</th><th></th></tr></thead><tbody>");
+    out.push('<tr class="ws-base"><td class="lab">Base (n=)</td>');
+    model.history.forEach(function (h) {
+      var low = h.base !== null && h.base < threshold;
+      out.push('<td class="wv' + (low ? " lowb" : "") + '">' +
+        fmt.base(h.base) + (low ? " ⚠" : "") + "</td>");
+    });
+    out.push('<td class="wv cur">' + fmt.base(model.columns[0].base) +
+      "</td><td></td></tr>");
+    rows.forEach(function (r) {
+      var isMean = r.kind === "mean";
+      var byYear = {};
+      r.waves.forEach(function (w) { byYear[w.year] = w; });
+      out.push('<tr><td class="lab">' +
+        fmt.escapeHtml(TR.charts.clip(r.label, 36)) + "</td>");
+      years.forEach(function (y) {
+        var w = byYear[y];
+        out.push(w ? '<td class="wv">' + fmtVal(w.value, isMean) + "</td>"
+          : '<td class="wv none">–</td>');
+      });
+      var cur = isMean ? r.cells[0].mean : r.cells[0].pct;
+      out.push('<td class="wv cur">' + fmtVal(cur, isMean) +
+        (r.delta ? TR.render.deltaChip(r.delta) : "") + "</td>");
+      out.push('<td class="sparkcell">' +
+        render.sparkline(render.wavePoints(r), isMean, { w: 120, h: 30 }) +
+        "</td></tr>");
+    });
+    out.push("</tbody></table></div>");
+    return out.join("");
   };
 
   /** Rows to trend: summary prefers NET/mean/diff metrics, detail the cats. */
@@ -3217,6 +3290,9 @@ null
       heatmap: s.heatmap, showCounts: s.showCounts,
       showDeltas: s.showDeltas && TR.d2.tracking().enabled,
       hideable: true, rowHideable: true, sortable: true }) + "</div>";
+    if (s.showDeltas && TR.d2.tracking().enabled) {
+      html += TR.render.waveStripHtml(model);
+    }
 
     var bannerName = TR.d2.bannerDescription().replace("Banner: ", "");
     html += '<div class="insight"><div class="insight-head">Analyst insight · ' +
@@ -3472,6 +3548,11 @@ null
           chartSvg: TR.d2.state.showChart ? cards2.chartString() : null });
       }
       if (action === "pin") openPinMenu();
+      if (action === "fulltrend") {
+        TR.d2.state.showChart = true;
+        TR.d2.state.chartType = "line";
+        cards2.renderActive();
+      }
       if (action === "showall") {
         delete TR.d2.state.hiddenCols[TR.d2.state.banner];
         delete TR.d2.state.hiddenRows[TR.d2.state.activeQ];

@@ -38,12 +38,12 @@
   }
 
   /**
-   * Inline sparkline for a tracking row. Pure SVG string, ~96x26, scaled
-   * to the series' own min-max band; the current wave's point is accented.
+   * Inline sparkline for a tracking row. Pure SVG string (default 96x26),
+   * scaled to the series' own min-max band; the current point is accented.
    */
-  render.sparkline = function (points, isMean) {
+  render.sparkline = function (points, isMean, opts) {
     if (!points || !points.length) return "";
-    var W = 96, H = 26, pad = 4;
+    var W = (opts && opts.w) || 96, H = (opts && opts.h) || 26, pad = 4;
     var values = points.map(function (p) { return p.value; });
     var min = Math.min.apply(null, values), max = Math.max.apply(null, values);
     if (max - min < 1e-9) { max += 1; min -= 1; }
@@ -75,6 +75,65 @@
       '" height="' + H + '" role="img" aria-label="' +
       TR.fmt.escapeHtml(title) + '"><title>' + TR.fmt.escapeHtml(title) +
       "</title>" + body.join("") + "</svg>";
+  };
+
+  /**
+   * Wave strip for a question card: per-wave bases + the headline tracked
+   * metrics (means first, then NETs, then NET POSITIVE; max 3) with a
+   * sparkline each and a jump to the full trend chart. "" when no history.
+   */
+  render.waveStripHtml = function (model) {
+    if (!model.history || !model.history.length) return "";
+    var fmt = TR.fmt;
+    var years = model.history.map(function (h) { return h.year; });
+    var curYear = render.currentYear();
+    var priority = function (r) {
+      if (r.kind === "mean") return 0;
+      if (r.kind === "net" && !r.diff) return 1;
+      if (r.diff) return 2;
+      return 3;
+    };
+    var rows = model.rows.filter(function (r) {
+      return r.waves && r.waves.length;
+    }).sort(function (a, b) { return priority(a) - priority(b); }).slice(0, 3);
+    if (!rows.length) return "";
+    var threshold = model.lowBaseThreshold || 30;
+
+    var out = ['<div class="wavestrip"><div class="ws-head">' +
+      "<strong>Wave history</strong> · published Totals " + years[0] + "–" +
+      curYear + '<button class="linklike" data-act="fulltrend" title="Switch ' +
+      'the chart to the trend-over-waves type">full trend chart ↗</button></div>' +
+      '<table class="ws"><thead><tr><th></th>'];
+    years.forEach(function (y) { out.push('<th class="wv">' + y + "</th>"); });
+    out.push('<th class="wv cur">' + curYear + "</th><th></th></tr></thead><tbody>");
+    out.push('<tr class="ws-base"><td class="lab">Base (n=)</td>');
+    model.history.forEach(function (h) {
+      var low = h.base !== null && h.base < threshold;
+      out.push('<td class="wv' + (low ? " lowb" : "") + '">' +
+        fmt.base(h.base) + (low ? " ⚠" : "") + "</td>");
+    });
+    out.push('<td class="wv cur">' + fmt.base(model.columns[0].base) +
+      "</td><td></td></tr>");
+    rows.forEach(function (r) {
+      var isMean = r.kind === "mean";
+      var byYear = {};
+      r.waves.forEach(function (w) { byYear[w.year] = w; });
+      out.push('<tr><td class="lab">' +
+        fmt.escapeHtml(TR.charts.clip(r.label, 36)) + "</td>");
+      years.forEach(function (y) {
+        var w = byYear[y];
+        out.push(w ? '<td class="wv">' + fmtVal(w.value, isMean) + "</td>"
+          : '<td class="wv none">–</td>');
+      });
+      var cur = isMean ? r.cells[0].mean : r.cells[0].pct;
+      out.push('<td class="wv cur">' + fmtVal(cur, isMean) +
+        (r.delta ? TR.render.deltaChip(r.delta) : "") + "</td>");
+      out.push('<td class="sparkcell">' +
+        render.sparkline(render.wavePoints(r), isMean, { w: 120, h: 30 }) +
+        "</td></tr>");
+    });
+    out.push("</tbody></table></div>");
+    return out.join("");
   };
 
   /** Rows to trend: summary prefers NET/mean/diff metrics, detail the cats. */
