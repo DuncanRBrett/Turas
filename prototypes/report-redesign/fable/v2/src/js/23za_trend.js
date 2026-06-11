@@ -136,7 +136,9 @@
     return out.join("");
   };
 
-  /** Rows to trend: summary prefers NET/mean/diff metrics, detail the cats. */
+  /** Rows to trend: summary prefers NET/mean/diff metrics, detail the cats.
+   *  Shared with the native PPTX trend chart so both plot the same series. */
+  render.trendRows = trendRows;
   function trendRows(model) {
     var withHistory = model.rows.filter(function (r) {
       return r.waves && r.waves.length;

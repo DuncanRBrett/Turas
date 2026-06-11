@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SACAP 2025 Annual Student Survey — Turas Report v2</title>
-<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 00:26 SAST -->
+<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 00:31 SAST -->
 <!-- Single self-contained file: published tables + prior wave + synthetic
      microdata + one fixed renderer. No network requests, no installs. -->
 <style>
@@ -2706,7 +2706,9 @@ null
     return out.join("");
   };
 
-  /** Rows to trend: summary prefers NET/mean/diff metrics, detail the cats. */
+  /** Rows to trend: summary prefers NET/mean/diff metrics, detail the cats.
+   *  Shared with the native PPTX trend chart so both plot the same series. */
+  render.trendRows = trendRows;
   function trendRows(model) {
     var withHistory = model.rows.filter(function (r) {
       return r.waves && r.waves.length;
@@ -4769,9 +4771,7 @@ null
    * union of years incl. the current wave. {xml, workbook} or null.
    */
   exporter.buildTrendChart = function (model) {
-    var rows = model.rows.filter(function (r) {
-      return r.waves && r.waves.length;
-    }).slice(0, 6);
+    var rows = TR.render.trendRows(model).slice(0, 6);
     if (!rows.length) return null;
     var palette = TR.render.palette();
     var years = [];
@@ -5866,7 +5866,48 @@ null
           var m = TR.model.forQuestion(q.code, TR.AGG.banner_groups[0].id, []);
           if (m.prevWave) matched++;
         });
-        eq(matched >= 60, true, "at least 60 questions tracked vs 2024, got " + matched);
+        eq(matched >= 60, true, "at least 60 questions tracked, got " + matched);
+      } },
+      { name: "multi-wave known answers (registration: NET, Index, sig)", fn: function () {
+        // workbook ground truth: 2022 'Good or excellent' = 83, Index = 82
+        var q = TR.AGG.questions.filter(function (qq) {
+          return TR.model.norm(qq.title) ===
+            "how would you rate your experience with the registration process at sacap";
+        })[0];
+        var m = TR.model.forQuestion(q.code, TR.AGG.banner_groups[0].id, []);
+        eq(m.history.length, 7, "all seven waves matched via title aliases");
+        var net = null, index = null, avg = null;
+        m.rows.forEach(function (r) {
+          var label = TR.model.norm(r.label);
+          if (r.kind === "net" && label === "good or excellent") net = r;
+          if (r.kind === "mean") index = r;
+          if (r.kind === "category" && label === "about average") avg = r;
+        });
+        var at = function (row, year) {
+          return row.waves.filter(function (w) { return w.year === year; })[0];
+        };
+        eq(at(net, 2022).value, 83, "published 2022 NET");
+        eq(at(index, 2022).value, 82, "published 2022 Index (Index row)");
+        eq(net.delta.year, 2024, "Δprev compares the latest matched wave");
+        eq(net.deltaBase.year, 2018, "Δfirst compares the baseline wave");
+        eq(Math.round(net.deltaBase.diff), 10, "NET +10pp on the 2018 baseline");
+        // 'About average' is flat on 2024 but well down on 2018:
+        eq(avg.delta.sig, false, "no significant change vs previous wave");
+        eq(avg.deltaBase.sig, true, "significant change vs baseline wave");
+      } },
+      { name: "sparkline geometry known answer", fn: function () {
+        var svg = TR.render.sparkline([
+          { year: 2020, value: 10 }, { year: 2021, value: 20 },
+          { year: 2022, value: 30, current: true }], false, { w: 100, h: 30 });
+        eq((svg.match(/<circle/g) || []).length, 3, "one dot per point");
+        var ys = [];
+        svg.replace(/cy="([0-9.]+)"/g, function (all, v) {
+          ys.push(parseFloat(v));
+          return all;
+        });
+        eq(ys[0] > ys[2], true, "rising series slopes upward (y falls)");
+        eq(svg.indexOf('r="2.6"') !== -1, true, "current point accented");
+        eq(svg.indexOf("2020: 10%") !== -1, true, "tooltip carries per-year values");
       } },
       { name: "pptx deck builds from a story model", fn: function () {
         var model = TR.model.forQuestion(TR.AGG.questions[0].code,

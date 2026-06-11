@@ -365,9 +365,7 @@
    * union of years incl. the current wave. {xml, workbook} or null.
    */
   exporter.buildTrendChart = function (model) {
-    var rows = model.rows.filter(function (r) {
-      return r.waves && r.waves.length;
-    }).slice(0, 6);
+    var rows = TR.render.trendRows(model).slice(0, 6);
     if (!rows.length) return null;
     var palette = TR.render.palette();
     var years = [];

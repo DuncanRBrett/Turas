@@ -83,6 +83,59 @@ run("story deck -> structurally valid native pptx (python)", () => {
   assert(report.startsWith("OK"), report);
 });
 
+run("wave history: per-year question-match rates meet thresholds", () => {
+  const floor = { 2018: 0.45, 2019: 0.45, 2020: 0.45, 2021: 0.55,
+    2022: 0.70, 2023: 0.80, 2024: 0.85 };
+  const report = TR.PREV.match_report || {};
+  for (const year of Object.keys(floor)) {
+    assert(report[year], `match report missing ${year}`);
+    assert(report[year].rate >= floor[year],
+      `${year}: rate ${report[year].rate} below floor ${floor[year]}`);
+  }
+});
+
+run("exhibit slide: TWO native chart objects on one slide (python)", () => {
+  const item = { kind: "exhibit", qs: ["Q008"], banner: TR.AGG.banner_groups[0].id,
+    filters: [], flags: { dist: true, trend: true, table: false, insight: true },
+    distType: "column", chartKind: "summary", chartCols: [0],
+    note: "two-panel flagship known answer" };
+  const slide = TR.exhibit.slide(item);
+  assert(slide.charts.length === 2, "expected 2 chart parts, got " + slide.charts.length);
+  assert(slide.xml.includes('r:id="rId2"') && slide.xml.includes('r:id="rId3"'),
+    "both chart frames referenced");
+  // the trend panel plots summary metrics, not raw scale categories
+  const trendXml = slide.charts[1].xml;
+  assert(trendXml.includes("Index"), "Index series present in trend chart");
+  assert(!/<c:tx>[\s\S]{0,200}?<c:v>Excellent<\/c:v>/.test(trendXml),
+    "raw category rows are not trend series");
+  // cross-section composite: 2 charts + the metric-by-wave native table
+  const composite = TR.exhibit.slide({ kind: "exhibit",
+    qs: ["Q017", "Q016", "Q008"], banner: TR.AGG.banner_groups[0].id,
+    filters: [], flags: { dist: true, trend: true, table: true, insight: true },
+    distType: "column", note: "composite known answer" });
+  assert(composite.charts.length === 2, "composite chart parts");
+  const bytes = TR.pptx.package([TR.exporter.titleSlide(2), slide, composite],
+    { project: TR.AGG.project });
+  const tmp = path.join(BASE, "tests", "tmp");
+  mkdirSync(tmp, { recursive: true });
+  const out = path.join(tmp, "v2_exhibit.pptx");
+  writeFileSync(out, bytes);
+  const report = execFileSync("python3",
+    [path.join(path.dirname(BASE), "tests", "verify_pptx.py"), out], { encoding: "utf8" });
+  assert(report.startsWith("OK"), report);
+});
+
+run("native trend chart: year categories + one series per metric", () => {
+  const m = TR.model.forQuestion("Q017", TR.AGG.banner_groups[0].id, []);
+  m.chartKind = "summary";
+  const chart = TR.exporter.buildTrendChart(m);
+  const sers = (chart.xml.match(/<c:ser>/g) || []).length;
+  assert(sers >= 3 && sers <= 6, "series count " + sers);
+  assert(chart.xml.includes("<c:v>2018</c:v>") && chart.xml.includes("<c:v>2025</c:v>"),
+    "categories span 2018 to the current wave");
+  assert(chart.workbook && chart.workbook.length > 500, "embedded workbook present");
+});
+
 run("deltas: most questions tracked, new ones flagged", () => {
   let tracked = 0, withDeltaRows = 0;
   for (const q of TR.AGG.questions) {

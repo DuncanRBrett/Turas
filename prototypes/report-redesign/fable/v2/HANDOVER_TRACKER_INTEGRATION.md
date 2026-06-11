@@ -1,5 +1,15 @@
 # HANDOVER — Tracker Integration into the v2 Data-Centric Report
 
+> **STATUS: COMPLETE (2026-06-12).** All six mission items shipped on
+> `feature/report-data-layer` (commits `2888dca9`, `064c7c73`, `a5d1932f`,
+> `52a3cdfd` + tests/docs). Gates: 19 v2 + 21 v1, all green; browser-verified
+> after tab-bouncing with cache-busting and computed styles; in-browser
+> selftest 10/10. See README "Round 4 — tracker integration" for the summary.
+> **Remaining manual step for Duncan:** open `tests/tmp/v2_exhibit.pptx` in
+> PowerPoint and confirm "Edit Data" opens Excel on BOTH charts of slide 2.
+> **Next phase:** full production review (`duncan-production-review`), then
+> the advanced modules (confidence first) get this look and feel.
+
 **For:** a fresh session. Read this cold; it is self-contained.
 **Mission:** replace the v2 report's basic Tracking tab with full tracker-module
 functionality (15+ waves), then redesign composites around it. After this

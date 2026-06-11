@@ -12,9 +12,14 @@ offline. Append `#selftest` to run the in-browser verification panel.
 ## What's in it
 
 **Real data.** All 79 questions / 598 rows / 35 banner columns extracted from
-the published 2025 report (`pipeline/extract_2025_html.py`), plus the real 2024
-wave from the prior-year workbook (66/79 questions matched by title for
-year-on-year tracking).
+the published 2025 report (`pipeline/extract_2025_html.py`), plus the real
+**2018–2024 wave history** from all seven prior-year workbooks
+(`pipeline/extract_waves.py`). Cross-wave question matching is by normalised
+title with a reviewable alias map (`pipeline/wave_title_aliases.json`, the
+tracker module's question-mapper pattern) — match rates 90% (2024) / 87%
+(2023) / 76% (2022) tapering to 48% (2018), the rest being genuinely new or
+restructured questions. History values are always **published wave Totals**;
+the synthetic microdata never filters prior waves.
 
 **Feature parity with the live report** — categorised sidebar + search, five
 banner groups per question, sig letters, heatmap shading, counts toggle,
@@ -27,8 +32,11 @@ About/methodology.
 |---|---|
 | **Filter the whole report** ("Online students only") | every table/dashboard recomputes live from embedded respondent-level microdata, with correct bases and significance |
 | **Custom banners** — cross anything by anything | `+ Custom…` on the banner strip |
-| **Δ vs 2024** on every tracked row | chips on the Total column; bold = significant change |
-| **What Moved** tab | every tracked row ranked by year-on-year change, significance first |
+| **Full tracking, 2018–2025** | Tracking tab at tracker-module parity: column-per-wave published values, inline sparklines, Δ vs previous wave AND Δ vs baseline (pooled-z sig on both, low-base excluded + ⚠), per-wave bases, drill-down, search/section/sort, key-vs-all scope |
+| **Δ + trend** on every tracked question | delta chips on the Total column (vs the latest matched wave) plus a **wave strip** under the table: per-wave bases and the headline metrics with sparklines |
+| **Trend chart type** | "Trend · waves" in the chart picker — line over waves for any tracked question |
+| **Two-panel trend exhibit** (the flagship pin) | 📈 in the pin menu: this-wave distribution chart + trend-over-waves below; presents full-screen and exports as **two native editable chart objects on one PPTX slide** |
+| **Cross-section composites** | Story → "+ Composite exhibit…": any tracked questions, each contributing its headline metric (Index/NPS → NET → NET POSITIVE) as a bar and a trend series, plus a metric-by-wave table |
 | **Findings** tab | deterministic ranking of significant banner gaps, deep-linked |
 | **Story tab** | pins capture the exact view (banner+filter), commentary attached, reorder, **Present mode** (full-screen, arrow keys) |
 | **Native PPTX export** | story → real editable PowerPoint (text + tables, no screenshots), built by ~29 KB of in-file code, not 0.94 MB of PptxGenJS |
@@ -54,11 +62,19 @@ only because this prototype works backwards from a rendered HTML file.
 ```bash
 cd prototypes/report-redesign/fable/v2
 python3 pipeline/extract_2025_html.py "<2025 report.html>" data/sacap_2025.json
-python3 pipeline/extract_2024_xlsx.py "<2024 crosstabs.xlsx>" data/sacap_2024.json
+python3 pipeline/extract_waves.py --aliases pipeline/wave_title_aliases.json \
+    data/sacap_2025.json data/sacap_waves.json \
+    2018="<2018 crosstabs.xlsx>" ... 2024="<2024 crosstabs.xlsx>"
 python3 pipeline/generate_microdata.py data/sacap_2025.json data/sacap_microdata.json data/microdata_verification.json
-Rscript build.R                  # -> sacap_report_v2.html (0.87 MB)
-node tests/run_tests_v2.mjs      # 14 tests incl. golden parity; exit 0 = green
+Rscript build.R                  # -> sacap_report_v2.html (1.25 MB)
+node tests/run_tests_v2.mjs      # 19 tests incl. golden parity + 2-chart pptx gate
 ```
+
+The wave extractor reads the Total column of each workbook's Crosstabs sheet
+(`ws.reset_dimensions()` is mandatory — the workbooks ship broken dimension
+records) and, unlike the retired single-wave extractor, also captures the
+NET-style `Column %`-only rows (NETs, NET POSITIVE, Detractor/Passive/
+Promoter) and the Index / Average / Score stat rows.
 
 Browser-verified end-to-end (Chromium): boot, dashboard (32 gauges + heatmap
 grid), banner switching incl. 17-column Course, NET-expansion filters
@@ -79,15 +95,24 @@ python-validated, 8/8 in-browser selftests.
 ## Known limitations
 
 - PowerPoint open test is manual (structure is machine-validated): build the
-  story deck and double-click it — the gate file is `tests/tmp/v2_story.pptx`.
+  story deck and double-click it — gate files are `tests/tmp/v2_story.pptx`
+  and `tests/tmp/v2_exhibit.pptx` (the two-chart exhibit slide; "Edit Data"
+  on each chart must open Excel).
 - Insights/pins persist in `localStorage` per browser; the export/import JSON
   sidecar is the durable path.
-- 13 questions are new in 2025 and correctly show "new in 2025" (no deltas).
+- 8 questions are new in 2025 and correctly show "new in 2025" (no history).
 - The sig engine is ~90% letter-identical to the published report (documented
   above); published views always show published letters, so nothing a client
   sees in the default view differs from the report of record.
-- 2024 comparisons are always against the full published 2024 wave, including
-  when a 2025-side filter is active (noted in the UI).
+- Wave comparisons are always against the full published wave Totals,
+  including when a 2025-side filter is active (noted in the UI).
+- The cross-wave alias map contains two analyst judgment calls (the Student
+  Support & Development Team renames) — documented in
+  `pipeline/wave_title_aliases.json` `_judgment_calls`; review them before
+  presenting long trends on those metrics.
+- Index values for waves whose workbooks omit Index rows (2021, 2024) are
+  recomputed from the published distributions via the 2025 index weights —
+  exact to ±0.5 of the published convention.
 
 ## Round 3 additions (Duncan's 30-item review)
 
@@ -117,3 +142,28 @@ or imported images ≤1.5 MB each — e.g. qual slides saved as pictures), About
 **Save copy** (header): clones the report into a single .html with all
 insights, story items and report sections embedded — recipients open it with
 every annotation intact, no installs.
+
+## Round 4 — tracker integration (2018–2025)
+
+Replaces the basic single-prev-wave tracking with tracker-module parity:
+
+- **Data:** `pipeline/extract_waves.py` + `wave_title_aliases.json` →
+  `data/sacap_waves.json` (7 waves, per-year match report embedded).
+- **Engine:** `22w_waves.js` — per-row trend series from published wave
+  Totals; Δ vs latest matched wave AND vs baseline with pooled-z sig on both
+  (published counts when present, low-base excluded); NET member-sum,
+  NET POSITIVE plus−minus and Index-recompute fallbacks for waves published
+  without those rows.
+- **Tracking tab** (`27t_tracking.js`): column-per-wave values with bases in
+  tooltips, sparklines, Δ prev / Δ first, drill-down, search/section/sort,
+  key-vs-all scope, top-200 cap with count note.
+- **Crosstabs:** wave strip under tracked questions (per-wave bases +
+  headline metrics + sparklines + "full trend chart ↗"), new "Trend · waves"
+  chart type (`23za_trend.js`).
+- **Exhibits** (`30x_exhibit.js`): the flagship two-panel pin (distribution
+  + trend, TWO native chart objects on one PPTX slide) and the cross-section
+  composite builder that replaced the parked per-section composite (old item
+  kind kept for back-compat with saved pins).
+- **Gates:** 19 v2 tests — multi-wave known answers against workbook ground
+  truth (2022 registration NET 83 / Index 82), baseline-vs-prev sig flags,
+  sparkline geometry, per-year match-rate floors, two-chart PPTX validation.
