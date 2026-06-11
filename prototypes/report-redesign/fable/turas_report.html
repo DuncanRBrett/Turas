@@ -1,0 +1,3048 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meridian Coffee Brand Tracker — Turas Report</title>
+<!-- Turas data-centric report · fable prototype · generated 2026-06-11 13:34 SAST -->
+<!-- Single self-contained file: embedded data + one fixed renderer. No network requests. -->
+<style>
+/* Turas data-centric report — design system (fable prototype).
+   SIZE-EXCEPTION: single cohesive stylesheet; splitting CSS harms cohesion. */
+
+:root {
+  --brand: #323367;
+  --accent: #C9A84C;
+  --sidebar-fg: #ffffff;
+  --ink: #1c2333;
+  --muted: #6b7280;
+  --bg: #eef0f6;
+  --card: #ffffff;
+  --line: #e5e7ef;
+  --soft: #f3f4f8;
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 8px 24px rgba(16, 24, 40, .06);
+  --font: ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 14px; }
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+/* ---------- buttons ---------- */
+button {
+  appearance: none; border: 1px solid var(--line); background: #fff; color: var(--ink);
+  border-radius: 9px; padding: 6px 12px; font: 600 12.5px var(--font);
+  cursor: pointer; transition: border-color .15s, color .15s, background .15s;
+}
+button:hover { border-color: var(--brand); color: var(--brand); }
+button.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+button.primary:hover { filter: brightness(1.15); color: #fff; }
+button.wide { display: block; width: 100%; margin-top: 10px; padding: 10px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- top bar ---------- */
+.topbar {
+  position: sticky; top: 0; z-index: 50; display: flex; align-items: center; gap: 18px;
+  padding: 10px 22px; background: #fff; border-bottom: 1px solid var(--line);
+}
+.brandmark { display: flex; align-items: center; gap: 8px; font-weight: 800; color: var(--brand); font-size: 15px; }
+.brandmark .dot { width: 13px; height: 13px; border-radius: 4px;
+  background: linear-gradient(135deg, var(--brand), var(--accent)); }
+.brandmark .proto { color: var(--muted); font-weight: 500; margin-left: 2px; }
+.projmeta { flex: 1; display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.projmeta strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.projmeta span { color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+.topactions { display: flex; gap: 8px; }
+.topactions .count {
+  background: rgba(255, 255, 255, .25); border-radius: 999px;
+  padding: 1px 7px; font-size: 11px; margin-left: 2px;
+}
+
+/* ---------- layout + sidebar ---------- */
+.layout { display: flex; align-items: flex-start; }
+.sidebar {
+  width: 280px; flex: none; position: sticky; top: 54px; height: calc(100vh - 54px);
+  overflow-y: auto; background: var(--brand); color: var(--sidebar-fg); padding: 16px 14px 22px;
+}
+.sidebar input[type="search"] {
+  width: 100%; background: rgba(255, 255, 255, .14); border: 1px solid rgba(255, 255, 255, .28);
+  color: inherit; border-radius: 8px; padding: 8px 11px; font: 13px var(--font);
+}
+.sidebar input::placeholder { color: inherit; opacity: .65; }
+.navsec { margin: 16px 4px 4px; font-size: 10.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1.2px; opacity: .6; }
+.navlink {
+  display: flex; gap: 9px; align-items: baseline; padding: 7px 9px; border-radius: 8px;
+  color: inherit; text-decoration: none; font-size: 13px;
+}
+.navlink:hover { background: rgba(255, 255, 255, .12); }
+.navlink.hidden { display: none; }
+.navlink .code { font-weight: 700; font-size: 11px; opacity: .75; min-width: 26px; }
+.navlink .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidefoot {
+  margin-top: 20px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, .22);
+  font-size: 11px; line-height: 1.5; opacity: .65;
+}
+
+/* ---------- main + hero ---------- */
+main { flex: 1; min-width: 0; padding: 24px 30px 90px; max-width: 1060px; }
+.hero {
+  background: linear-gradient(135deg, var(--brand), color-mix(in srgb, var(--brand) 72%, #8b8fd9));
+  color: #fff; border-radius: var(--radius); padding: 26px 28px; margin-bottom: 22px;
+  box-shadow: var(--shadow);
+}
+.hero h1 { margin: 0 0 4px; font-size: 24px; }
+.hero .sub { margin: 0; opacity: .85; font-size: 13.5px; }
+.herostats { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.stat {
+  background: rgba(255, 255, 255, .14); border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 10px; padding: 8px 16px 9px; font-size: 11.5px;
+}
+.stat b { display: block; font-size: 17px; }
+.signote { margin: 14px 0 0; font-size: 11.5px; opacity: .8; }
+
+/* ---------- cards ---------- */
+.card {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 20px 22px; margin-bottom: 20px;
+}
+.card.hidden { display: none; }
+.card.composite { border-left: 4px solid var(--accent); }
+.cardmeta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cardhead h2 { font-size: 16.5px; margin: 10px 0 3px; line-height: 1.35; }
+.qcode {
+  background: var(--soft); color: var(--brand); font-weight: 800; font-size: 11px;
+  padding: 3px 9px; border-radius: 6px; border: 1px solid var(--line);
+}
+.qtype {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .8px; font-weight: 700;
+  padding: 3px 9px; border-radius: 999px; background: var(--soft); color: var(--muted);
+}
+.qtype-single { background: #e8eaf6; color: #323367; }
+.qtype-multi { background: #e3f2ed; color: #1b6e53; }
+.qtype-scale { background: #fdf3df; color: #8a6d1f; }
+.qtype-nps { background: #fbe9e7; color: #a3402f; }
+.qtype-numeric { background: #e7f0fb; color: #23589c; }
+.qtype-trend { background: #f0eefc; color: #5b4ba8; }
+.baseline { color: var(--muted); font-size: 12px; margin: 0; }
+.cardactions { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+.cardbody.pending {
+  min-height: 240px; display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font-size: 12px;
+}
+
+/* chips */
+.chips { display: flex; gap: 6px; margin: 12px 0 2px; flex-wrap: wrap; }
+.chip { border-radius: 999px; padding: 4px 13px; font-size: 12px; font-weight: 500; }
+.chip[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 600; }
+
+/* charts + tables */
+.chart { margin-top: 12px; }
+.chart svg { display: block; max-width: 100%; height: auto; }
+.chart-error {
+  background: #fdf2f2; border: 1px solid #f2c4c4; color: #8a2f2f;
+  padding: 10px 13px; border-radius: 8px; font-size: 12.5px;
+}
+.tablewrap { margin-top: 14px; overflow-x: auto; }
+table.qtable { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+.qtable th {
+  background: var(--brand); color: #fff; padding: 7px 10px; font-weight: 600;
+  text-align: center; font-size: 12px;
+}
+.qtable th:first-child { border-radius: 8px 0 0 0; }
+.qtable th:last-child { border-radius: 0 8px 0 0; }
+.qtable th .letter { display: block; font-size: 9.5px; opacity: .7; font-weight: 700; letter-spacing: 1px; }
+.qtable td { padding: 6px 10px; text-align: center; border-bottom: 1px solid var(--line); }
+.qtable td.lab { text-align: left; }
+.qtable tbody tr:nth-child(even) td { background: #fafbfe; }
+.qtable .baserow td { color: var(--muted); font-style: italic; font-size: 11.5px; }
+.qtable .statrow td { font-weight: 700; border-top: 2px solid #d8dcea; background: var(--soft); }
+.baselab { font-weight: 400; }
+sup.sig { color: #8a6d1f; font-weight: 800; font-size: 9px; margin-left: 2px; letter-spacing: .5px; }
+
+/* ---------- drawers ---------- */
+#drawer-backdrop { position: fixed; inset: 0; background: rgba(20, 24, 40, .45); z-index: 90; }
+.drawer {
+  position: fixed; right: 0; top: 0; bottom: 0; width: 400px; max-width: 94vw;
+  background: #fff; z-index: 100; box-shadow: -12px 0 40px rgba(16, 24, 40, .18);
+  padding: 18px 20px 26px; overflow-y: auto;
+}
+.drawerhead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.drawerhead h2 { font-size: 15px; margin: 0; }
+.drawerhint { color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+.field { margin: 12px 0; }
+.field label { display: block; font-size: 11.5px; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
+.field select { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font: 13px var(--font); }
+.qpick {
+  display: flex; gap: 9px; align-items: baseline; padding: 7px 9px;
+  border-radius: 8px; cursor: pointer; font-size: 13px;
+}
+.qpick:hover { background: var(--soft); }
+.qpick input { accent-color: var(--brand); }
+.qpick .code { font-weight: 700; font-size: 11px; color: var(--brand); min-width: 26px; }
+.drawer-errors {
+  color: #8a2f2f; background: #fdf2f2; border: 1px solid #f2c4c4;
+  padding: 8px 12px 8px 26px; border-radius: 8px; font-size: 12.5px; margin: 10px 0 0;
+}
+.deckitem {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+  margin-bottom: 6px; font-size: 12.5px;
+}
+
+/* ---------- toast + fatal + selftest ---------- */
+#toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 200; pointer-events: none; }
+.toastmsg {
+  background: var(--ink); color: #fff; padding: 10px 18px; border-radius: 10px;
+  font-size: 13px; box-shadow: var(--shadow); opacity: 0; transition: opacity .25s; margin-top: 6px;
+}
+.toastmsg.show { opacity: 1; }
+.fatal {
+  max-width: 760px; margin: 60px auto; background: #fff; border-radius: var(--radius);
+  padding: 26px 30px; border-top: 6px solid #b3372f; box-shadow: var(--shadow);
+}
+.fatal h1 { font-size: 18px; margin-top: 0; }
+.fatal code { background: var(--soft); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+.fatal li { margin: 6px 0; }
+.selftest { border-left: 5px solid #1b6e53; }
+.selftest-fail { border-left-color: #b3372f; }
+.selftest li { font-size: 13px; margin: 4px 0; }
+
+/* ---------- small screens ---------- */
+@media (max-width: 940px) {
+  .layout { display: block; }
+  .sidebar { position: static; width: auto; height: auto; max-height: 38vh; }
+  main { padding: 16px 14px 70px; }
+  .cardactions { margin-left: 0; }
+}
+</style>
+</head>
+<body>
+<noscript>
+  <div style="max-width:640px;margin:80px auto;font-family:sans-serif;color:#1c2333;">
+    <h1>This report needs JavaScript</h1>
+    <p>Tables and charts render from data embedded in this file using in-file
+    JavaScript only — nothing is fetched from the network and nothing needs to be
+    installed. Please enable JavaScript, or open the file in any modern browser
+    with default settings.</p>
+  </div>
+</noscript>
+<div id="app" class="app"></div>
+<script type="application/json" id="turas-data">
+{
+  "schema_version": 1,
+  "project": {
+    "name": "Meridian Coffee Brand Tracker",
+    "client": "Meridian Beverages Ltd",
+    "wave": "Wave 3 · April 2026",
+    "fieldwork": "Online panel · 2–14 April 2026 · n=500",
+    "brand_colour": "#323367",
+    "accent_colour": "#C9A84C",
+    "sig_note": "Superscript letters mark values significantly higher than that banner column at 95% confidence. The Total column is not tested.",
+    "export": { "pptx": true },
+    "format": { "percent_decimals": 0 }
+  },
+  "banner": {
+    "label": "Age groups",
+    "columns": ["Total", "18–34", "35–54", "55+"],
+    "letters": ["T", "A", "B", "C"]
+  },
+  "sections": [
+    { "id": "s1", "title": "Brand health", "questions": ["q1", "q2"] },
+    { "id": "s2", "title": "Experience", "questions": ["q3", "q7", "q4"] },
+    { "id": "s3", "title": "Usage & behaviour", "questions": ["q5", "q6", "q8"] }
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "code": "Q1",
+      "title": "Which coffee brand do you buy most often?",
+      "type": "single",
+      "base_label": "All respondents",
+      "bases": [500, 180, 190, 130],
+      "rows": [
+        { "label": "Meridian", "values": [34, 41, 33, 26], "sig": ["", "C", "", ""] },
+        { "label": "Café Royale", "values": [24, 18, 26, 30], "sig": ["", "", "", "A"] },
+        { "label": "Union Roast", "values": [18, 16, 19, 20], "sig": ["", "", "", ""] },
+        { "label": "Birdsong", "values": [12, 15, 11, 10], "sig": ["", "", "", ""] },
+        { "label": "Another brand", "values": [8, 7, 8, 9], "sig": ["", "", "", ""] },
+        { "label": "No usual brand", "values": [4, 3, 3, 5], "sig": ["", "", "", ""] }
+      ]
+    },
+    {
+      "id": "q2",
+      "code": "Q2",
+      "title": "Which of these brands have you purchased in the last 3 months?",
+      "type": "multi",
+      "base_label": "All respondents",
+      "bases": [500, 180, 190, 130],
+      "rows": [
+        { "label": "Meridian", "values": [56, 63, 55, 47], "sig": ["", "C", "", ""] },
+        { "label": "Café Royale", "values": [44, 39, 46, 49], "sig": ["", "", "", ""] },
+        { "label": "Private label / store brand", "values": [38, 33, 38, 45], "sig": ["", "", "", "A"] },
+        { "label": "Union Roast", "values": [31, 29, 33, 30], "sig": ["", "", "", ""] },
+        { "label": "Birdsong", "values": [24, 30, 22, 18], "sig": ["", "C", "", ""] },
+        { "label": "A specialty / local roaster", "values": [18, 26, 16, 10], "sig": ["", "BC", "", ""] },
+        { "label": "None of these", "values": [6, 4, 6, 9], "sig": ["", "", "", ""] }
+      ]
+    },
+    {
+      "id": "q3",
+      "code": "Q3",
+      "title": "Overall, how satisfied are you with your main coffee brand?",
+      "type": "scale",
+      "scale": { "min": 1, "max": 5 },
+      "base_label": "All respondents",
+      "bases": [500, 180, 190, 130],
+      "rows": [
+        { "label": "Very dissatisfied (1)", "values": [4, 3, 4, 6], "sig": ["", "", "", ""] },
+        { "label": "Dissatisfied (2)", "values": [9, 7, 9, 12], "sig": ["", "", "", ""] },
+        { "label": "Neutral (3)", "values": [24, 20, 24, 29], "sig": ["", "", "", "A"] },
+        { "label": "Satisfied (4)", "values": [38, 40, 38, 35], "sig": ["", "", "", ""] },
+        { "label": "Very satisfied (5)", "values": [25, 30, 25, 18], "sig": ["", "C", "", ""] }
+      ],
+      "stats": [
+        { "label": "Mean (1–5)", "values": [3.71, 3.87, 3.71, 3.47], "sig": ["", "C", "C", ""], "format": "dec1" },
+        { "label": "Top-2 box", "values": [63, 70, 63, 53], "sig": ["", "C", "", ""], "format": "pct" }
+      ],
+      "meta": {
+        "waves": {
+          "stat": "Mean (1–5)",
+          "format": "dec1",
+          "labels": ["Apr 2025", "Oct 2025", "Apr 2026"],
+          "series": [
+            { "column": "Total", "values": [3.55, 3.64, 3.71] },
+            { "column": "18–34", "values": [3.7, 3.79, 3.87] },
+            { "column": "35–54", "values": [3.52, 3.62, 3.71] },
+            { "column": "55+", "values": [3.41, 3.45, 3.47] }
+          ]
+        }
+      }
+    },
+    {
+      "id": "q7",
+      "code": "Q4",
+      "title": "How would you rate your main brand on value for money?",
+      "type": "scale",
+      "scale": { "min": 1, "max": 5 },
+      "base_label": "All respondents",
+      "bases": [500, 180, 190, 130],
+      "rows": [
+        { "label": "Very poor value (1)", "values": [7, 5, 7, 9], "sig": ["", "", "", ""] },
+        { "label": "Poor value (2)", "values": [15, 12, 15, 19], "sig": ["", "", "", ""] },
+        { "label": "Average (3)", "values": [33, 30, 33, 36], "sig": ["", "", "", ""] },
+        { "label": "Good value (4)", "values": [31, 34, 31, 27], "sig": ["", "", "", ""] },
+        { "label": "Excellent value (5)", "values": [14, 19, 14, 9], "sig": ["", "C", "", ""] }
+      ],
+      "stats": [
+        { "label": "Mean (1–5)", "values": [3.3, 3.5, 3.3, 3.08], "sig": ["", "C", "C", ""], "format": "dec1" },
+        { "label": "Top-2 box", "values": [45, 53, 45, 36], "sig": ["", "C", "", ""], "format": "pct" }
+      ],
+      "meta": {
+        "waves": {
+          "stat": "Mean (1–5)",
+          "format": "dec1",
+          "labels": ["Apr 2025", "Oct 2025", "Apr 2026"],
+          "series": [
+            { "column": "Total", "values": [3.52, 3.41, 3.3] },
+            { "column": "18–34", "values": [3.66, 3.58, 3.5] },
+            { "column": "35–54", "values": [3.5, 3.4, 3.3] },
+            { "column": "55+", "values": [3.31, 3.19, 3.08] }
+          ]
+        }
+      }
+    },
+    {
+      "id": "q4",
+      "code": "Q5",
+      "title": "How likely are you to recommend your main brand to a friend or colleague?",
+      "type": "nps",
+      "base_label": "All respondents",
+      "bases": [500, 180, 190, 130],
+      "rows": [
+        { "label": "Promoters (9–10)", "values": [32, 38, 31, 25], "sig": ["", "C", "", ""] },
+        { "label": "Passives (7–8)", "values": [41, 39, 43, 41], "sig": ["", "", "", ""] },
+        { "label": "Detractors (0–6)", "values": [27, 23, 26, 34], "sig": ["", "", "", "A"] }
+      ],
+      "stats": [
+        { "label": "NPS", "values": [5, 15, 5, -9], "sig": ["", "C", "", ""], "format": "nps" }
+      ],
+      "meta": {
+        "waves": {
+          "stat": "NPS",
+          "format": "nps",
+          "labels": ["Apr 2025", "Oct 2025", "Apr 2026"],
+          "series": [
+            { "column": "Total", "values": [-2, 1, 5] },
+            { "column": "18–34", "values": [6, 11, 15] },
+            { "column": "35–54", "values": [-2, 1, 5] },
+            { "column": "55+", "values": [-15, -12, -9] }
+          ]
+        }
+      }
+    },
+    {
+      "id": "q5",
+      "code": "Q6",
+      "title": "On a typical weekday, how many cups of coffee do you drink?",
+      "type": "numeric",
+      "base_label": "All respondents",
+      "bases": [500, 180, 190, 130],
+      "rows": [
+        { "label": "None", "values": [9, 6, 8, 14], "sig": ["", "", "", "A"] },
+        { "label": "1 cup", "values": [22, 18, 21, 29], "sig": ["", "", "", "A"] },
+        { "label": "2 cups", "values": [31, 30, 32, 30], "sig": ["", "", "", ""] },
+        { "label": "3 cups", "values": [21, 24, 21, 16], "sig": ["", "", "", ""] },
+        { "label": "4 or more", "values": [17, 22, 18, 11], "sig": ["", "C", "", ""] }
+      ],
+      "stats": [
+        { "label": "Mean cups", "values": [2.2, 2.6, 2.3, 1.8], "sig": ["", "BC", "C", ""], "format": "dec1" },
+        { "label": "Median cups", "values": [2, 2, 2, 2], "sig": ["", "", "", ""], "format": "int" }
+      ]
+    },
+    {
+      "id": "q6",
+      "code": "Q7",
+      "title": "Where do you usually buy your coffee?",
+      "type": "single",
+      "base_label": "All respondents",
+      "bases": [500, 180, 190, 130],
+      "rows": [
+        { "label": "Supermarket", "values": [52, 41, 53, 65], "sig": ["", "", "A", "AB"] },
+        { "label": "Coffee shop / café", "values": [17, 22, 17, 11], "sig": ["", "C", "", ""] },
+        { "label": "Online subscription", "values": [14, 24, 12, 4], "sig": ["", "BC", "C", ""] },
+        { "label": "Convenience store", "values": [11, 9, 12, 12], "sig": ["", "", "", ""] },
+        { "label": "Somewhere else", "values": [6, 4, 6, 8], "sig": ["", "", "", ""] }
+      ]
+    },
+    {
+      "id": "q8",
+      "code": "Q8",
+      "title": "Why do you choose your main brand? (all reasons)",
+      "type": "multi",
+      "base_label": "Respondents with a usual brand",
+      "bases": [480, 172, 183, 125],
+      "rows": [
+        { "label": "Taste / flavour", "values": [64, 61, 66, 65], "sig": ["", "", "", ""] },
+        { "label": "Price / promotions", "values": [41, 38, 40, 47], "sig": ["", "", "", ""] },
+        { "label": "Availability where I shop", "values": [33, 30, 34, 36], "sig": ["", "", "", ""] },
+        { "label": "Trust in the brand", "values": [28, 24, 29, 32], "sig": ["", "", "", ""] },
+        { "label": "Habit — always bought it", "values": [26, 19, 26, 35], "sig": ["", "", "", "A"] },
+        { "label": "Ethical / sustainable sourcing", "values": [22, 31, 20, 13], "sig": ["", "BC", "", ""] },
+        { "label": "Packaging / design", "values": [12, 16, 11, 8], "sig": ["", "C", "", ""] },
+        { "label": "Recommended by someone", "values": [9, 13, 8, 5], "sig": ["", "C", "", ""] }
+      ]
+    }
+  ]
+}
+</script>
+<script>
+/**
+ * Turas data-centric report prototype (fable) — namespace + constants.
+ *
+ * Every module attaches to the TR namespace. Modules numbered 00–06 and
+ * 13–15 are pure (no DOM access) so they can be unit-tested in node.
+ * Every magic number in the prototype lives in TR.CONST.
+ */
+(function (global) {
+  "use strict";
+
+  var TR = global.TR = global.TR || {};
+
+  TR.CONST = {
+    SCHEMA_VERSION: 1,
+
+    /* number formatting */
+    PCT_DECIMALS_DEFAULT: 0,
+
+    /* chart geometry (SVG user units) */
+    CHART_WIDTH: 660,
+    CHART_LABEL_WIDTH: 170,
+    CHART_VALUE_WIDTH: 64,
+    BAR_HEIGHT: 22,
+    BAR_GAP: 10,
+    CHART_PAD_TOP: 8,
+    CHART_PAD_BOTTOM: 26,
+    STACK_ROW_HEIGHT: 30,
+    STACK_ROW_GAP: 12,
+    TREND_HEIGHT: 190,
+
+    /* cross-question composer */
+    COMPOSE_MIN: 2,
+    COMPOSE_MAX: 6,
+
+    /* PNG export */
+    EXPORT_SCALE: 3,
+    EXPORT_WIDTH: 920,
+
+    /* PPTX geometry (EMU = English Metric Units) */
+    EMU_PER_INCH: 914400,
+    SLIDE_W_IN: 13.333,
+    SLIDE_H_IN: 7.5,
+    PPTX_TABLE_ROWS_PER_SLIDE: 16,
+
+    /* deterministic ZIP timestamp: 2026-01-01 00:00 in DOS format */
+    ZIP_DOS_DATE: ((2026 - 1980) << 9) | (1 << 5) | 1,
+    ZIP_DOS_TIME: 0
+  };
+
+  /** Question types the renderer understands. */
+  TR.QUESTION_TYPES = ["single", "multi", "scale", "nps", "numeric"];
+
+  /** Fallback brand identity when the payload omits colours. */
+  TR.DEFAULT_BRAND = "#323367";
+  TR.DEFAULT_ACCENT = "#C9A84C";
+
+})(typeof window !== "undefined" ? window : globalThis);
+
+/**
+ * Pure formatting helpers — escaping, number formats, significance markup.
+ * No DOM access; fully unit-tested in tests/run_tests.mjs.
+ */
+(function (global) {
+  "use strict";
+  var TR = global.TR;
+
+  var fmt = TR.fmt = {};
+
+  /** Escape a string for safe insertion into HTML text or attributes. */
+  fmt.escapeHtml = function (value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  };
+
+  /** Escape a string for OOXML text nodes and attributes. */
+  fmt.escapeXml = function (value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+  };
+
+  /** Percent decimal places for a payload (project override or default). */
+  fmt.pctDecimals = function (payload) {
+    var f = payload && payload.project && payload.project.format;
+    return f && f.percent_decimals != null
+      ? f.percent_decimals
+      : TR.CONST.PCT_DECIMALS_DEFAULT;
+  };
+
+  /**
+   * Format a numeric cell.
+   * @param {number|null} value - raw value; null/NaN renders as an en dash.
+   * @param {string} format - "pct" (default) | "dec1" | "int" | "nps".
+   * @param {number} [pctDecimals] - decimals for "pct" (default from CONST).
+   * @returns {string}
+   */
+  fmt.num = function (value, format, pctDecimals) {
+    if (value == null || (typeof value === "number" && isNaN(value))) return "–";
+    var f = format || "pct";
+    if (f === "pct") {
+      var d = pctDecimals == null ? TR.CONST.PCT_DECIMALS_DEFAULT : pctDecimals;
+      return Number(value).toFixed(d) + "%";
+    }
+    if (f === "dec1") return Number(value).toFixed(1);
+    if (f === "int" || f === "nps") {
+      var rounded = Math.round(Number(value));
+      return f === "nps" && rounded > 0 ? "+" + rounded : String(rounded);
+    }
+    return String(value);
+  };
+
+  /** Render significance letters as superscript HTML ("" stays ""). */
+  fmt.sigSup = function (letters) {
+    if (!letters) return "";
+    var safe = fmt.escapeHtml(letters);
+    return '<sup class="sig" title="Significantly higher than column(s) ' +
+      safe + ' at 95% confidence">' + safe + "</sup>";
+  };
+
+  /** Base sizes with thin-space thousands separator: 12345 -> "12 345". */
+  fmt.base = function (n) {
+    if (n == null || (typeof n === "number" && isNaN(n))) return "–";
+    return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, "\u202F");
+  };
+
+  /** Filename-safe slug, capped at 48 characters. */
+  fmt.slug = function (text) {
+    return String(text || "export").replace(/[^a-zA-Z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "").substring(0, 48) || "export";
+  };
+
+})(typeof window !== "undefined" ? window : globalThis);
+
+/**
+ * Data layer — payload validation (error-accumulating, TRS-style codes)
+ * and read helpers. Pure; the payload schema is documented in README.md.
+ */
+(function (global) {
+  "use strict";
+  var TR = global.TR;
+
+  var data = TR.data = {};
+
+  function err(errors, code, message) {
+    errors.push({ code: code, message: message });
+  }
+
+  /**
+   * Validate a report payload. Accumulates every problem found so the
+   * report author sees the full list at once (never fail-fast on data).
+   * @returns {{ok: boolean, errors: Array<{code: string, message: string}>}}
+   */
+  data.validate = function (payload) {
+    var errors = [];
+    if (!payload || typeof payload !== "object") {
+      err(errors, "DATA_NOT_OBJECT", "Report payload is not a JSON object.");
+      return { ok: false, errors: errors };
+    }
+    if (!payload.project || !payload.project.name) {
+      err(errors, "DATA_NO_PROJECT", "project.name is missing.");
+    }
+    var banner = payload.banner;
+    if (!banner || !Array.isArray(banner.columns) || banner.columns.length === 0) {
+      err(errors, "DATA_NO_BANNER", "banner.columns must be a non-empty array.");
+    }
+    if (!Array.isArray(payload.questions) || payload.questions.length === 0) {
+      err(errors, "DATA_NO_QUESTIONS", "questions must be a non-empty array.");
+      return { ok: errors.length === 0, errors: errors };
+    }
+    var seen = {};
+    payload.questions.forEach(function (q, i) {
+      validateQuestion(q, i, payload, seen, errors);
+    });
+    return { ok: errors.length === 0, errors: errors };
+  };
+
+  function validateQuestion(q, i, payload, seen, errors) {
+    var label = "questions[" + i + "]" + (q && q.id ? " (" + q.id + ")" : "");
+    if (!q || typeof q !== "object") {
+      err(errors, "DATA_Q_NOT_OBJECT", label + " is not an object.");
+      return;
+    }
+    if (!q.id) {
+      err(errors, "DATA_Q_NO_ID", label + ": id is missing.");
+    } else if (seen[q.id]) {
+      err(errors, "DATA_Q_DUP_ID", label + ": duplicate id '" + q.id + "'.");
+    } else {
+      seen[q.id] = true;
+    }
+    if (!q.title) err(errors, "DATA_Q_NO_TITLE", label + ": title is missing.");
+    if (TR.QUESTION_TYPES.indexOf(q.type) === -1) {
+      err(errors, "DATA_Q_BAD_TYPE", label + ": type '" + q.type +
+        "' is not one of " + TR.QUESTION_TYPES.join("/") + ".");
+    }
+    var nCols = data.bannerColumns(payload, q).length;
+    if (q.bases && q.bases.length !== nCols) {
+      err(errors, "DATA_Q_BASES_LEN", label + ": bases has " + q.bases.length +
+        " entries; banner has " + nCols + " columns.");
+    }
+    (q.rows || []).forEach(function (row, r) {
+      if (!row || !Array.isArray(row.values) || row.values.length !== nCols) {
+        err(errors, "DATA_ROW_LEN", label + " rows[" + r + "]: values must have " +
+          nCols + " entries (one per banner column).");
+      }
+      if (row && Array.isArray(row.sig) && row.sig.length !== nCols) {
+        err(errors, "DATA_ROW_SIG_LEN", label + " rows[" + r + "]: sig must have " +
+          nCols + " entries.");
+      }
+    });
+    (q.stats || []).forEach(function (s, r) {
+      if (!s || !Array.isArray(s.values) || s.values.length !== nCols) {
+        err(errors, "DATA_STAT_LEN", label + " stats[" + r + "]: values must have " +
+          nCols + " entries.");
+      }
+    });
+    if ((!q.rows || q.rows.length === 0) && (!q.stats || q.stats.length === 0)) {
+      err(errors, "DATA_Q_EMPTY", label + ": needs at least one row or stat.");
+    }
+    validateWaves(q, label, errors);
+  }
+
+  function validateWaves(q, label, errors) {
+    var waves = q.meta && q.meta.waves;
+    if (!waves) return;
+    if (!Array.isArray(waves.labels) || waves.labels.length < 2) {
+      err(errors, "DATA_WAVES_LABELS", label + ": meta.waves.labels needs >= 2 wave labels.");
+      return;
+    }
+    (waves.series || []).forEach(function (s, i) {
+      if (!s || !Array.isArray(s.values) || s.values.length !== waves.labels.length) {
+        err(errors, "DATA_WAVES_LEN", label + " waves.series[" + i +
+          "]: values must have " + waves.labels.length + " entries (one per wave).");
+      }
+    });
+  }
+
+  /** Banner columns for a question (per-question override wins). */
+  data.bannerColumns = function (payload, q) {
+    if (q && Array.isArray(q.banner) && q.banner.length) return q.banner;
+    return (payload.banner && payload.banner.columns) || [];
+  };
+
+  /** Sig letters for the banner columns; generated T/A/B/C… when absent. */
+  data.bannerLetters = function (payload, q) {
+    var cols = data.bannerColumns(payload, q);
+    var letters = (!q || !q.banner) && payload.banner && payload.banner.letters
+      ? payload.banner.letters : [];
+    return cols.map(function (_, i) {
+      return letters[i] || (i === 0 ? "T" : String.fromCharCode(64 + i));
+    });
+  };
+
+  /** Find a question by id; null when missing. */
+  data.questionById = function (payload, id) {
+    for (var i = 0; i < payload.questions.length; i++) {
+      if (payload.questions[i].id === id) return payload.questions[i];
+    }
+    return null;
+  };
+
+  /** Largest row value across ALL banner columns (stable chart axis). */
+  data.maxRowValue = function (q) {
+    var max = 0;
+    (q.rows || []).forEach(function (row) {
+      (row.values || []).forEach(function (v) {
+        if (typeof v === "number" && v > max) max = v;
+      });
+    });
+    return max;
+  };
+
+  /** The wave series for a banner column, falling back to the first series. */
+  data.waveSeriesFor = function (q, columnName) {
+    var waves = q.meta && q.meta.waves;
+    if (!waves || !Array.isArray(waves.series) || !waves.series.length) return null;
+    for (var i = 0; i < waves.series.length; i++) {
+      if (waves.series[i].column === columnName) return waves.series[i];
+    }
+    return waves.series[0];
+  };
+
+})(typeof window !== "undefined" ? window : globalThis);
+
+/**
+ * Low-level SVG string builders + scale helpers. Pure string output: charts
+ * carry literal colours (no CSS variables), so the same string renders in
+ * the page, rasterises to PNG, and unit-tests in node without a DOM.
+ */
+(function (global) {
+  "use strict";
+  var TR = global.TR;
+  var esc = TR.fmt.escapeHtml;
+
+  var svg = TR.svg = {};
+
+  /**
+   * Build an SVG element string.
+   * @param {string} name - tag name.
+   * @param {object} attrs - attributes (null/undefined/false skipped).
+   * @param {string|string[]} [children] - inner content; omit to self-close.
+   */
+  svg.el = function (name, attrs, children) {
+    var out = "<" + name;
+    Object.keys(attrs || {}).forEach(function (k) {
+      var v = attrs[k];
+      if (v === null || v === undefined || v === false) return;
+      out += " " + k + '="' + esc(v) + '"';
+    });
+    if (children === undefined || children === null) return out + "/>";
+    var inner = Array.isArray(children) ? children.join("") : String(children);
+    return out + ">" + inner + "</" + name + ">";
+  };
+
+  /** Text node helper (content is escaped). */
+  svg.text = function (x, y, str, attrs) {
+    var merged = { x: x, y: y };
+    Object.keys(attrs || {}).forEach(function (k) { merged[k] = attrs[k]; });
+    return svg.el("text", merged, esc(str));
+  };
+
+  /** Round a positive max up to a "nice" chart axis maximum. */
+  svg.niceMax = function (value) {
+    if (!(value > 0)) return 10;
+    var steps = [5, 10, 20, 25, 40, 50, 60, 75, 80, 100];
+    for (var i = 0; i < steps.length; i++) {
+      if (value <= steps[i]) return steps[i];
+    }
+    return Math.ceil(value / 50) * 50;
+  };
+
+  /** Linear scale: domain [0, domainMax] -> range [0, rangeMax]. */
+  svg.linear = function (domainMax, rangeMax) {
+    return function (v) {
+      return domainMax === 0 ? 0 : (v / domainMax) * rangeMax;
+    };
+  };
+
+  /**
+   * Mix a hex colour towards white. strength 1 = full colour, 0 = white.
+   * shade("#000000", 0.5) === "#808080".
+   */
+  svg.shade = function (hex, strength) {
+    var c = String(hex || TR.DEFAULT_BRAND).replace("#", "");
+    if (c.length === 3) c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2];
+    var channel = function (pos) {
+      var raw = parseInt(c.substr(pos, 2), 16);
+      var mixed = Math.round(255 - (255 - raw) * strength);
+      return ("0" + mixed.toString(16)).slice(-2);
+    };
+    return "#" + channel(0) + channel(2) + channel(4);
+  };
+
+  /** Wrap a chart body in a root <svg> with viewBox + accessible title. */
+  svg.root = function (width, height, title, body) {
+    return svg.el("svg", {
+      xmlns: "http://www.w3.org/2000/svg",
+      viewBox: "0 0 " + width + " " + height,
+      width: "100%",
+      role: "img",
+      "aria-label": title,
+      "font-family": "-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
+    }, [svg.el("title", {}, esc(title)), body]);
+  };
+
+  /**
+   * Simple inline legend. Wraps to new lines when items overflow maxW.
+   * @returns {{body: string, height: number}}
+   */
+  svg.legend = function (items, x0, y0, maxW) {
+    var parts = [], x = x0, y = y0;
+    var lineH = 18, charW = 6.2, swatch = 11;
+    items.forEach(function (item) {
+      var w = swatch + 6 + String(item.label).length * charW + 16;
+      if (x + w > x0 + maxW && x > x0) { x = x0; y += lineH; }
+      parts.push(svg.el("rect", {
+        x: x, y: y - 9, width: swatch, height: swatch, rx: 3, fill: item.colour
+      }));
+      parts.push(svg.text(x + swatch + 5, y + 1, item.label,
+        { "font-size": 11, fill: "#4b5263" }));
+      x += w;
+    });
+    return { body: parts.join(""), height: y - y0 + lineH };
+  };
+
+})(typeof window !== "undefined" ? window : globalThis);
+
+/**
+ * Bar-family chart builders: horizontal bars (single/multi/numeric buckets)
+ * and column charts (numeric stats). Pure string output from the payload.
+ */
+(function (global) {
+  "use strict";
+  var TR = global.TR, C = TR.CONST, S = TR.svg, fmt = TR.fmt;
+
+  var charts = TR.charts = TR.charts || {};
+
+  /** Truncate a label to fit chart margins. */
+  charts.clip = function (label, max) {
+    var s = String(label == null ? "" : label);
+    return s.length > max ? s.slice(0, max - 1) + "…" : s;
+  };
+
+  /** Project brand colour with fallback. */
+  charts.brandOf = function (payload) {
+    return (payload.project && payload.project.brand_colour) || TR.DEFAULT_BRAND;
+  };
+
+  /** Project accent colour with fallback. */
+  charts.accentOf = function (payload) {
+    return (payload.project && payload.project.accent_colour) || TR.DEFAULT_ACCENT;
+  };
+
+  function axisNote(height, label) {
+    return S.text(C.CHART_LABEL_WIDTH, height - 8, label,
+      { "font-size": 10, fill: "#9aa1b1" });
+  }
+
+  /**
+   * Horizontal bars for one banner column. The axis maximum is computed
+   * across ALL banner columns so switching columns keeps a stable scale.
+   */
+  charts.hBars = function (q, payload, colIndex) {
+    var rows = q.rows || [];
+    var cols = TR.data.bannerColumns(payload, q);
+    var pd = fmt.pctDecimals(payload);
+    var axisMax = S.niceMax(TR.data.maxRowValue(q));
+    var plotW = C.CHART_WIDTH - C.CHART_LABEL_WIDTH - C.CHART_VALUE_WIDTH;
+    var x = S.linear(axisMax, plotW);
+    var brand = charts.brandOf(payload);
+    var body = [], y = C.CHART_PAD_TOP;
+
+    rows.forEach(function (row) {
+      var v = row.values ? row.values[colIndex] : null;
+      var w = typeof v === "number" ? Math.max(x(v), 0) : 0;
+      body.push(S.text(C.CHART_LABEL_WIDTH - 8, y + C.BAR_HEIGHT * 0.72,
+        charts.clip(row.label, 26),
+        { "text-anchor": "end", "font-size": 12, fill: "#3b4252" }));
+      body.push(S.el("rect", { x: C.CHART_LABEL_WIDTH, y: y, width: plotW,
+        height: C.BAR_HEIGHT, fill: "#eef0f7", rx: 4 }));
+      body.push(S.el("rect", { x: C.CHART_LABEL_WIDTH, y: y, width: w,
+        height: C.BAR_HEIGHT, fill: brand, rx: 4 }));
+      var sig = row.sig && row.sig[colIndex] ? " " + row.sig[colIndex] : "";
+      body.push(S.text(C.CHART_LABEL_WIDTH + w + 6, y + C.BAR_HEIGHT * 0.72,
+        fmt.num(v, row.format || "pct", pd) + sig,
+        { "font-size": 12, "font-weight": 600, fill: "#1c2333" }));
+      y += C.BAR_HEIGHT + C.BAR_GAP;
+    });
+
+    var height = y - C.BAR_GAP + C.CHART_PAD_BOTTOM;
+    body.push(axisNote(height,
+      "0–" + axisMax + "% scale · " + (cols[colIndex] || "Total")));
+    return S.root(C.CHART_WIDTH, height,
+      q.title + " — " + (cols[colIndex] || "Total"), body.join(""));
+  };
+
+  /**
+   * Vertical columns of the first stat row across banner columns —
+   * used for numeric questions that carry stats but no bucket rows.
+   */
+  charts.columns = function (q, payload) {
+    var stat = (q.stats || [])[0];
+    if (!stat) return "";
+    var cols = TR.data.bannerColumns(payload, q);
+    var brand = charts.brandOf(payload);
+    var numbers = stat.values.filter(function (v) { return typeof v === "number"; });
+    if (!numbers.length) return "";
+    var axisMax = S.niceMax(Math.max.apply(null, numbers));
+    var plotH = 150, padT = 24, padB = 40;
+    var slot = (C.CHART_WIDTH - C.CHART_LABEL_WIDTH) / cols.length;
+    var body = [];
+
+    cols.forEach(function (col, i) {
+      var v = stat.values[i];
+      var h = typeof v === "number" ? (v / axisMax) * plotH : 0;
+      var cx = C.CHART_LABEL_WIDTH + i * slot + slot / 2;
+      var barW = Math.min(slot * 0.55, 56);
+      body.push(S.el("rect", { x: cx - barW / 2, y: padT + plotH - h,
+        width: barW, height: h, fill: i === 0 ? brand : S.shade(brand, 0.55), rx: 4 }));
+      body.push(S.text(cx, padT + plotH - h - 6, fmt.num(v, stat.format || "dec1"),
+        { "text-anchor": "middle", "font-size": 12, "font-weight": 600, fill: "#1c2333" }));
+      body.push(S.text(cx, padT + plotH + 16, charts.clip(col, 12),
+        { "text-anchor": "middle", "font-size": 11, fill: "#6b7280" }));
+    });
+    body.push(S.text(C.CHART_LABEL_WIDTH, 14, stat.label,
+      { "font-size": 11, fill: "#9aa1b1" }));
+    var height = padT + plotH + padB;
+    return S.root(C.CHART_WIDTH, height, q.title + " — " + stat.label, body.join(""));
+  };
+
+})(typeof window !== "undefined" ? window : globalThis);
+
+/**
+ * Distribution + trend chart builders: 100% stacked scale rows, NPS stacks,
+ * wave trend lines, and the per-type dispatcher. Pure string output.
+ */
+(function (global) {
+  "use strict";
+  var TR = global.TR, C = TR.CONST, S = TR.svg, fmt = TR.fmt;
+
+  var charts = TR.charts = TR.charts || {};
+
+  var NPS_DETRACTOR = "#C0655B";
+  var NPS_PASSIVE = "#CBD2E1";
+
+  /** Shared layout for one 100%-stacked row per banner column. */
+  function stackedRows(q, payload, segments) {
+    var cols = TR.data.bannerColumns(payload, q);
+    var pd = fmt.pctDecimals(payload);
+    var plotW = C.CHART_WIDTH - C.CHART_LABEL_WIDTH - C.CHART_VALUE_WIDTH;
+    var statRow = (q.stats || [])[0] || null;
+    var body = [], y = C.CHART_PAD_TOP + (statRow ? 16 : 0);
+
+    if (statRow) {
+      body.push(S.text(C.CHART_WIDTH - 2, y - 6, charts.clip(statRow.label, 20),
+        { "text-anchor": "end", "font-size": 10, fill: "#9aa1b1" }));
+    }
+    cols.forEach(function (col, ci) {
+      body.push(S.text(C.CHART_LABEL_WIDTH - 8, y + C.STACK_ROW_HEIGHT * 0.65,
+        charts.clip(col, 24),
+        { "text-anchor": "end", "font-size": 12, fill: "#3b4252" }));
+      var xPos = C.CHART_LABEL_WIDTH;
+      segments.forEach(function (seg) {
+        var v = seg.row.values && typeof seg.row.values[ci] === "number"
+          ? seg.row.values[ci] : 0;
+        var w = Math.max((v / 100) * plotW, 0);
+        body.push(S.el("rect", { x: xPos, y: y, width: w,
+          height: C.STACK_ROW_HEIGHT, fill: seg.colour }));
+        if (v >= 8) {
+          body.push(S.text(xPos + w / 2, y + C.STACK_ROW_HEIGHT * 0.65,
+            fmt.num(v, "pct", pd), { "text-anchor": "middle", "font-size": 11,
+              fill: seg.darkText ? "#1c2333" : "#ffffff" }));
+        }
+        xPos += w;
+      });
+      if (statRow) {
+        var sig = statRow.sig && statRow.sig[ci] ? " " + statRow.sig[ci] : "";
+        body.push(S.text(C.CHART_LABEL_WIDTH + plotW + 8,
+          y + C.STACK_ROW_HEIGHT * 0.65,
+          fmt.num(statRow.values[ci], statRow.format || "dec1", pd) + sig,
+          { "font-size": 12, "font-weight": 700, fill: "#1c2333" }));
+      }
+      y += C.STACK_ROW_HEIGHT + C.STACK_ROW_GAP;
+    });
+
+    var legend = S.legend(segments.map(function (seg) {
+      return { label: seg.row.label, colour: seg.colour };
+    }), C.CHART_LABEL_WIDTH, y + 8, C.CHART_WIDTH - C.CHART_LABEL_WIDTH - 10);
+    body.push(legend.body);
+    var height = y + 8 + legend.height + 6;
+    return S.root(C.CHART_WIDTH, height, q.title + " — distribution", body.join(""));
+  }
+
+  /** Scale question: brand-ramp stacked distribution per banner column. */
+  charts.stackedScale = function (q, payload) {
+    var rows = q.rows || [];
+    if (!rows.length) return "";
+    var brand = charts.brandOf(payload);
+    var segments = rows.map(function (row, i) {
+      var strength = 0.16 + 0.84 * (i / Math.max(rows.length - 1, 1));
+      return { row: row, colour: S.shade(brand, strength), darkText: strength < 0.55 };
+    });
+    return stackedRows(q, payload, segments);
+  };
+
+  /** NPS question: detractors / passives / promoters stack + NPS column. */
+  charts.npsStacked = function (q, payload) {
+    var rows = q.rows || [];
+    if (!rows.length) return "";
+    var brand = charts.brandOf(payload);
+    var find = function (re) {
+      for (var i = 0; i < rows.length; i++) if (re.test(rows[i].label)) return rows[i];
+      return null;
+    };
+    var det = find(/detract/i), pas = find(/passive/i), pro = find(/promot/i);
+    if (!det || !pas || !pro) return charts.stackedScale(q, payload);
+    var segments = [
+      { row: det, colour: NPS_DETRACTOR, darkText: false },
+      { row: pas, colour: NPS_PASSIVE, darkText: true },
+      { row: pro, colour: brand, darkText: false }
+    ];
+    return stackedRows(q, payload, segments);
+  };
+
+  /** Wave trend lines. Total emphasised; selected column in accent. */
+  charts.trend = function (q, payload, colIndex) {
+    var waves = q.meta && q.meta.waves;
+    if (!waves || !Array.isArray(waves.series) || !waves.series.length) return "";
+    var cols = TR.data.bannerColumns(payload, q);
+    var width = C.CHART_WIDTH, height = C.TREND_HEIGHT;
+    var padL = 50, padR = 130, padT = 22, padB = 30;
+    var all = [];
+    waves.series.forEach(function (s) {
+      (s.values || []).forEach(function (v) {
+        if (typeof v === "number") all.push(v);
+      });
+    });
+    if (!all.length) return "";
+    var lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
+    var pad = Math.max((hi - lo) * 0.25, 0.1);
+    lo -= pad; hi += pad;
+    var nWaves = waves.labels.length;
+    var xAt = function (i) { return padL + (i / (nWaves - 1)) * (width - padL - padR); };
+    var yAt = function (v) {
+      return padT + (1 - (v - lo) / (hi - lo)) * (height - padT - padB);
+    };
+    var brand = charts.brandOf(payload), accent = charts.accentOf(payload);
+    var body = [], endLabels = [];
+
+    waves.labels.forEach(function (label, i) {
+      body.push(S.el("line", { x1: xAt(i), y1: padT, x2: xAt(i),
+        y2: height - padB, stroke: "#eef0f7" }));
+      body.push(S.text(xAt(i), height - 10, charts.clip(label, 14),
+        { "text-anchor": "middle", "font-size": 11, fill: "#6b7280" }));
+    });
+    body.push(S.text(padL, 12, "Trend · " + (waves.stat || "value") + " by wave",
+      { "font-size": 10, fill: "#9aa1b1" }));
+
+    waves.series.forEach(function (series) {
+      var isTotal = series.column === cols[0];
+      var isSelected = colIndex > 0 && series.column === cols[colIndex];
+      var emphasised = isTotal || isSelected;
+      var colour = isTotal ? brand : (isSelected ? accent : "#c9cedd");
+      var pts = series.values.map(function (v, i) {
+        return xAt(i) + "," + yAt(v);
+      }).join(" ");
+      body.push(S.el("polyline", { points: pts, fill: "none", stroke: colour,
+        "stroke-width": isTotal ? 3 : 2, "stroke-linecap": "round" }));
+      series.values.forEach(function (v, i) {
+        body.push(S.el("circle", { cx: xAt(i), cy: yAt(v), r: 3, fill: colour }));
+      });
+      if (emphasised || waves.series.length <= 4) {
+        var last = series.values[series.values.length - 1];
+        endLabels.push({ y: yAt(last) + 4, emphasised: emphasised,
+          text: charts.clip(series.column, 10) + "  " +
+            fmt.num(last, waves.format || "dec1") });
+      }
+    });
+    declutter(endLabels, padT + 8, height - padB).forEach(function (label) {
+      body.push(S.text(xAt(nWaves - 1) + 8, label.y, label.text,
+        { "font-size": 11, "font-weight": label.emphasised ? 700 : 400,
+          fill: label.emphasised ? "#1c2333" : "#9aa1b1" }));
+    });
+    return S.root(width, height, q.title + " — trend by wave", body.join(""));
+  };
+
+  /** Nudge end-of-line labels apart so they never overprint (min 13px gap). */
+  function declutter(labels, minY, maxY) {
+    var GAP = 13;
+    labels.sort(function (a, b) { return a.y - b.y; });
+    for (var i = 1; i < labels.length; i++) {
+      if (labels[i].y - labels[i - 1].y < GAP) {
+        labels[i].y = labels[i - 1].y + GAP;
+      }
+    }
+    var overshoot = labels.length ? labels[labels.length - 1].y - maxY : 0;
+    if (overshoot > 0) {
+      labels.forEach(function (label) {
+        label.y = Math.max(minY, label.y - overshoot);
+      });
+      for (var j = labels.length - 2; j >= 0; j--) {
+        if (labels[j + 1].y - labels[j].y < GAP) {
+          labels[j].y = labels[j + 1].y - GAP;
+        }
+      }
+    }
+    return labels;
+  }
+
+  /** Dispatcher: the right primary chart for a question type. */
+  charts.forQuestion = function (q, payload, colIndex) {
+    if (q.type === "scale") return charts.stackedScale(q, payload);
+    if (q.type === "nps") return charts.npsStacked(q, payload);
+    if (q.type === "numeric") {
+      return q.rows && q.rows.length
+        ? charts.hBars(q, payload, colIndex)
+        : charts.columns(q, payload);
+    }
+    return charts.hBars(q, payload, colIndex);
+  };
+
+})(typeof window !== "undefined" ? window : globalThis);
+
+/**
+ * Table builders. One matrix model feeds four renderers: report HTML,
+ * clipboard HTML (inline styles, pastes as an editable PowerPoint/Excel
+ * table), TSV plain text, and (in later modules) SVG + native PPTX tables.
+ */
+(function (global) {
+  "use strict";
+  var TR = global.TR, fmt = TR.fmt;
+
+  var tables = TR.tables = {};
+
+  /**
+   * Plain matrix model of a question table.
+   * @returns {{head: string[], body: Array<{kind: string, cells: string[]}>}}
+   *   kind is "base" | "row" | "stat". Sig letters are appended " A".
+   */
+  tables.matrix = function (q, payload) {
+    var cols = TR.data.bannerColumns(payload, q);
+    var letters = TR.data.bannerLetters(payload, q);
+    var pd = fmt.pctDecimals(payload);
+    var head = [""].concat(cols.map(function (c, i) {
+      return c + " (" + letters[i] + ")";
+    }));
+    var body = [];
+    if (q.bases) {
+      body.push({ kind: "base", cells: ["Base (n)"].concat(
+        q.bases.map(function (b) { return fmt.base(b); })) });
+    }
+    (q.rows || []).forEach(function (row) {
+      body.push({ kind: "row", cells: [String(row.label)].concat(
+        (row.values || []).map(function (v, i) {
+          var sig = row.sig && row.sig[i] ? " " + row.sig[i] : "";
+          return fmt.num(v, row.format || "pct", pd) + sig;
+        })) });
+    });
+    (q.stats || []).forEach(function (stat) {
+      body.push({ kind: "stat", cells: [String(stat.label)].concat(
+        (stat.values || []).map(function (v, i) {
+          var sig = stat.sig && stat.sig[i] ? " " + stat.sig[i] : "";
+          return fmt.num(v, stat.format || "dec1", pd) + sig;
+        })) });
+    });
+    return { head: head, body: body };
+  };
+
+  /** Report table HTML (rich: sig as <sup>, styled by the report CSS). */
+  tables.html = function (q, payload) {
+    var cols = TR.data.bannerColumns(payload, q);
+    var letters = TR.data.bannerLetters(payload, q);
+    var pd = fmt.pctDecimals(payload);
+    var out = ['<table class="qtable"><thead><tr><th class="lab" scope="col">' +
+      '<span class="visually-hidden">Row</span></th>'];
+    cols.forEach(function (c, i) {
+      out.push('<th scope="col">' + fmt.escapeHtml(c) +
+        '<span class="letter">' + fmt.escapeHtml(letters[i]) + "</span></th>");
+    });
+    out.push("</tr></thead><tbody>");
+    if (q.bases) {
+      out.push('<tr class="baserow"><td class="lab">Base (n)' +
+        (q.base_label ? ' <span class="baselab">— ' +
+          fmt.escapeHtml(q.base_label) + "</span>" : "") + "</td>");
+      q.bases.forEach(function (b) { out.push("<td>" + fmt.base(b) + "</td>"); });
+      out.push("</tr>");
+    }
+    (q.rows || []).forEach(function (row) {
+      out.push('<tr><td class="lab">' + fmt.escapeHtml(row.label) + "</td>");
+      (row.values || []).forEach(function (v, i) {
+        out.push("<td>" + fmt.num(v, row.format || "pct", pd) +
+          (row.sig ? fmt.sigSup(row.sig[i]) : "") + "</td>");
+      });
+      out.push("</tr>");
+    });
+    (q.stats || []).forEach(function (stat) {
+      out.push('<tr class="statrow"><td class="lab">' +
+        fmt.escapeHtml(stat.label) + "</td>");
+      (stat.values || []).forEach(function (v, i) {
+        out.push("<td>" + fmt.num(v, stat.format || "dec1", pd) +
+          (stat.sig ? fmt.sigSup(stat.sig[i]) : "") + "</td>");
+      });
+      out.push("</tr>");
+    });
+    out.push("</tbody></table>");
+    return out.join("");
+  };
+
+  /** Tab-separated plain text (clipboard text/plain flavour). */
+  tables.tsv = function (q, payload) {
+    var m = tables.matrix(q, payload);
+    var lines = [m.head.join("\t")];
+    m.body.forEach(function (row) { lines.push(row.cells.join("\t")); });
+    return lines.join("\n");
+  };
+
+  /**
+   * Inline-styled HTML table for the clipboard. PowerPoint, Word and Excel
+   * all paste this as a real, editable table — no screenshots involved.
+   */
+  tables.clipboardHtml = function (q, payload) {
+    var m = tables.matrix(q, payload);
+    var brand = TR.charts.brandOf(payload);
+    var cellBase = 'padding:4px 9px;font-size:11pt;border:1px solid #d8dcea;';
+    var out = ['<table style="border-collapse:collapse;font-family:Calibri,Arial,sans-serif;">'];
+    out.push("<tr>");
+    m.head.forEach(function (h, i) {
+      out.push('<th style="' + cellBase + "background:" + brand +
+        ";color:#ffffff;font-weight:bold;text-align:" +
+        (i === 0 ? "left" : "center") + ';">' + fmt.escapeHtml(h) + "</th>");
+    });
+    out.push("</tr>");
+    m.body.forEach(function (row) {
+      var style = cellBase + (row.kind === "base"
+        ? "color:#6b7280;font-style:italic;"
+        : row.kind === "stat" ? "font-weight:bold;background:#f3f4f8;" : "");
+      out.push("<tr>");
+      row.cells.forEach(function (cell, i) {
+        out.push('<td style="' + style + "text-align:" +
+          (i === 0 ? "left" : "center") + ';">' + fmt.escapeHtml(cell) + "</td>");
+      });
+      out.push("</tr>");
+    });
+    out.push("</table>");
+    return out.join("");
+  };
+
+})(typeof window !== "undefined" ? window : globalThis);
+
+/**
+ * Question cards — DOM rendering of one question from the data layer.
+ * Chart failures are contained per-slot: a broken chart shows an inline
+ * notice while the table still renders (robustness criterion).
+ */
+(function (global) {
+  "use strict";
+  var TR = global.TR, fmt = TR.fmt;
+
+  var cards = TR.cards = {};
+
+  var TYPE_LABELS = { single: "Single", multi: "Multi", scale: "Scale",
+    nps: "NPS", numeric: "Numeric" };
+
+  /** Card header HTML (rendered eagerly so search/nav work pre-fill). */
+  cards.headHtml = function (q, payload) {
+    var base = q.bases && q.bases.length ? q.bases[0] : null;
+    var baseline = "Base: " + (q.base_label || "All respondents") +
+      (base != null ? " · n=" + fmt.base(base) : "");
+    return '<header class="cardhead">' +
+      '<div class="cardmeta">' +
+      '<span class="qcode">' + fmt.escapeHtml(q.code || q.id) + "</span>" +
+      '<span class="qtype qtype-' + fmt.escapeHtml(q.type) + '">' +
+      (TYPE_LABELS[q.type] || fmt.escapeHtml(q.type)) + "</span>" +
+      (q.meta && q.meta.waves ? '<span class="qtype qtype-trend">Trended</span>' : "") +
+      '<div class="cardactions">' +
+      '<button type="button" data-action="copy-table" title="Copy as an editable table — paste into PowerPoint, Word or Excel">Copy table</button>' +
+      '<button type="button" data-action="copy-chart" title="Copy the chart as a high-resolution image">Copy chart</button>' +
+      '<button type="button" data-action="download-png" title="Download this card as a high-resolution PNG">PNG</button>' +
+      '<button type="button" class="primary" data-action="deck-add" title="Add to the PowerPoint deck">+ Deck</button>' +
+      "</div></div>" +
+      "<h2>" + fmt.escapeHtml(q.title) + "</h2>" +
+      '<p class="baseline">' + fmt.escapeHtml(baseline) + "</p>" +
+      "</header>";
+  };
+
+  /** Banner-column chips (chart column selector). */
+  function chipsHtml(q, payload, colIndex) {
+    var cols = TR.data.bannerColumns(payload, q);
+    if (q.type === "scale" || q.type === "nps" || cols.length < 2) return "";
+    var out = ['<div class="chips" role="group" aria-label="Chart banner column">'];
+    cols.forEach(function (col, i) {
+      out.push('<button type="button" class="chip" data-action="col" data-col="' +
+        i + '" aria-pressed="' + (i === colIndex) + '">' +
+        fmt.escapeHtml(col) + "</button>");
+    });
+    out.push("</div>");
+    return out.join("");
+  }
+
+  /** Render a chart builder safely into a slot element. */
+  cards.renderSlot = function (slot, builder, emptyOk) {
+    try {
+      var svgString = builder();
+      if (!svgString) {
+        slot.hidden = true;
+        return emptyOk ? true : false;
+      }
+      slot.hidden = false;
+      slot.innerHTML = svgString;
+      return true;
+    } catch (e) {
+      slot.hidden = false;
+      slot.innerHTML = '<div class="chart-error" role="note">Chart unavailable (' +
+        fmt.escapeHtml(e.message) + "). The data table below is unaffected.</div>";
+      if (global.console) console.error("[TurasReport] chart render failed:", e);
+      return false;
+    }
+  };
+
+  /**
+   * Fill a lazily-rendered card body. The shell article carries
+   * data-q (question id) and data-col (selected banner column).
+   */
+  cards.fill = function (article, payload) {
+    var q = TR.data.questionById(payload, article.getAttribute("data-q"));
+    if (!q) return;
+    var colIndex = parseInt(article.getAttribute("data-col") || "0", 10) || 0;
+    var body = article.querySelector(".cardbody");
+    body.classList.remove("pending");
+    body.innerHTML = chipsHtml(q, payload, colIndex) +
+      '<div class="chart" data-slot="chart"></div>' +
+      '<div class="chart" data-slot="trend"></div>' +
+      '<div class="tablewrap" data-slot="table"></div>';
+    cards.refreshCharts(article, payload);
+    try {
+      body.querySelector('[data-slot="table"]').innerHTML = TR.tables.html(q, payload);
+    } catch (e) {
+      body.querySelector('[data-slot="table"]').innerHTML =
+        '<div class="chart-error">Table unavailable (' +
+        fmt.escapeHtml(e.message) + ").</div>";
+      if (global.console) console.error("[TurasReport] table render failed:", e);
+    }
+  };
+
+  /** Re-render the chart + trend slots (after a column chip click). */
+  cards.refreshCharts = function (article, payload) {
+    var q = TR.data.questionById(payload, article.getAttribute("data-q"));
+    if (!q) return;
+    var colIndex = parseInt(article.getAttribute("data-col") || "0", 10) || 0;
+    var chartSlot = article.querySelector('[data-slot="chart"]');
+    var trendSlot = article.querySelector('[data-slot="trend"]');
+    if (chartSlot) {
+      cards.renderSlot(chartSlot, function () {
+        return TR.charts.forQuestion(q, payload, colIndex);
+      }, true);
+    }
+    if (trendSlot) {
+      cards.renderSlot(trendSlot, function () {
+        return TR.charts.trend(q, payload, colIndex);
+      }, true);
+    }
+    article.querySelectorAll('.chip[data-action="col"]').forEach(function (chip) {
+      chip.setAttribute("aria-pressed",
+        String(parseInt(chip.getAttribute("data-col"), 10) === colIndex));
+    });
+  };
+
+})(typeof window !== "undefined" ? window : globalThis);
+
+/**
+ * Application shell — boot, theming, fatal-error panel, sidebar navigation
+ * and the lazily-rendered card list. Event wiring lives in 09_wire.js.
+ */
+(function (global) {
+  "use strict";
+  var TR = global.TR, fmt = TR.fmt;
+
+  var app = TR.app = {};
+
+  /** Parse + validate the embedded payload, then render the shell. */
+  app.boot = function () {
+    var holder = document.getElementById("turas-data");
+    var payload;
+    try {
+      payload = JSON.parse(holder.textContent);
+    } catch (e) {
+      app.fatal([{ code: "IO_DATA_PARSE",
+        message: "Embedded JSON failed to parse: " + e.message }]);
+      return;
+    }
+    var check = TR.data.validate(payload);
+    if (!check.ok) { app.fatal(check.errors); return; }
+
+    TR.state = { payload: payload };
+    app.applyTheme(payload);
+    document.title = payload.project.name + " — Turas Report";
+    document.getElementById("app").innerHTML = shellHtml(payload);
+    buildNav(payload);
+    buildCards(payload);
+    TR.wire.init(payload);
+    if (location.hash === "#selftest" && TR.selftest) TR.selftest.run();
+  };
+
+  /** Console + on-page refusal panel listing every accumulated error. */
+  app.fatal = function (errors) {
+    var lines = ["", "=== TURAS REPORT ERROR ==="];
+    errors.forEach(function (e) { lines.push(e.code + ": " + e.message); });
+    lines.push("==========================", "");
+    if (global.console) console.error(lines.join("\n"));
+    var items = errors.map(function (e) {
+      return "<li><code>" + fmt.escapeHtml(e.code) + "</code> " +
+        fmt.escapeHtml(e.message) + "</li>";
+    }).join("");
+    document.getElementById("app").innerHTML =
+      '<div class="fatal" role="alert"><h1>This report cannot be displayed</h1>' +
+      "<p>The embedded data failed validation. Fix the data layer and rebuild — " +
+      "every problem found is listed below.</p><ul>" + items + "</ul></div>";
+  };
+
+  /** Apply brand colours from the payload; keep sidebar text readable. */
+  app.applyTheme = function (payload) {
+    var brand = TR.charts.brandOf(payload);
+    var accent = TR.charts.accentOf(payload);
+    var rootStyle = document.documentElement.style;
+    rootStyle.setProperty("--brand", brand);
+    rootStyle.setProperty("--accent", accent);
+    rootStyle.setProperty("--sidebar-fg", luminance(brand) > 0.55 ? "#1c2333" : "#ffffff");
+  };
+
+  /** WCAG-ish relative luminance of a hex colour (0 dark – 1 light). */
+  function luminance(hex) {
+    var c = String(hex).replace("#", "");
+    if (c.length === 3) c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2];
+    var lin = function (pos) {
+      var v = parseInt(c.substr(pos, 2), 16) / 255;
+      return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * lin(0) + 0.7152 * lin(2) + 0.0722 * lin(4);
+  }
+
+  function shellHtml(payload) {
+    var p = payload.project;
+    var nQ = payload.questions.length;
+    var nCols = (payload.banner.columns || []).length;
+    var pptxOn = !p.export || p.export.pptx !== false;
+    return '<header class="topbar">' +
+      '<div class="brandmark"><span class="dot" aria-hidden="true"></span>Turas' +
+      '<span class="proto">report</span></div>' +
+      '<div class="projmeta"><strong>' + fmt.escapeHtml(p.name) + "</strong>" +
+      "<span>" + fmt.escapeHtml(p.wave || "") + "</span></div>" +
+      '<div class="topactions">' +
+      '<button type="button" data-action="compose-open">⧉ Compose</button>' +
+      (pptxOn ? '<button type="button" class="primary" data-action="deck-open">' +
+        'Deck <span class="count" id="deck-count">0</span></button>' : "") +
+      "</div></header>" +
+      '<div class="layout">' +
+      '<nav class="sidebar" aria-label="Questions">' +
+      '<input id="search" type="search" placeholder="Search questions…" ' +
+      'aria-label="Search questions" autocomplete="off">' +
+      '<div id="nav"></div>' +
+      '<div class="sidefoot">Single self-contained file · renders from embedded ' +
+      "data · no network, no installs</div></nav>" +
+      '<main id="main">' + heroHtml(p, nQ, nCols) +
+      '<div id="composites"></div><div id="cards"></div></main></div>' +
+      '<div id="drawer-backdrop" hidden></div>' +
+      '<aside id="composer-drawer" class="drawer" role="dialog" aria-modal="true" ' +
+      'aria-label="Cross-question composer" hidden></aside>' +
+      '<aside id="deck-drawer" class="drawer" role="dialog" aria-modal="true" ' +
+      'aria-label="Export deck" hidden></aside>' +
+      '<div id="toast" role="status" aria-live="polite"></div>';
+  }
+
+  function heroHtml(p, nQ, nCols) {
+    return '<section class="hero"><h1>' + fmt.escapeHtml(p.name) + "</h1>" +
+      '<p class="sub">' + fmt.escapeHtml([p.client, p.wave, p.fieldwork]
+        .filter(Boolean).join(" · ")) + "</p>" +
+      '<div class="herostats">' +
+      '<div class="stat"><b>' + nQ + "</b>questions</div>" +
+      '<div class="stat"><b>' + nCols + "</b>banner columns</div>" +
+      '<div class="stat"><b>0</b>external requests</div></div>' +
+      (p.sig_note ? '<p class="signote">' + fmt.escapeHtml(p.sig_note) + "</p>" : "") +
+      "</section>";
+  }
+
+  function buildNav(payload) {
+    var nav = document.getElementById("nav");
+    var out = [];
+    var sections = Array.isArray(payload.sections) && payload.sections.length
+      ? payload.sections
+      : [{ id: "all", title: "Questions",
+          questions: payload.questions.map(function (q) { return q.id; }) }];
+    sections.forEach(function (section) {
+      out.push('<div class="navsec">' + fmt.escapeHtml(section.title) + "</div>");
+      (section.questions || []).forEach(function (qid) {
+        var q = TR.data.questionById(payload, qid);
+        if (!q) return;
+        out.push('<a class="navlink" href="#card-' + fmt.escapeHtml(q.id) +
+          '" data-q="' + fmt.escapeHtml(q.id) + '"><span class="code">' +
+          fmt.escapeHtml(q.code || q.id) + '</span><span class="t">' +
+          fmt.escapeHtml(q.title) + "</span></a>");
+      });
+    });
+    nav.innerHTML = out.join("");
+  }
+
+  /** Card shells only — bodies render lazily as they scroll into view. */
+  function buildCards(payload) {
+    var holder = document.getElementById("cards");
+    var out = [];
+    payload.questions.forEach(function (q) {
+      out.push('<article class="card" id="card-' + fmt.escapeHtml(q.id) +
+        '" data-q="' + fmt.escapeHtml(q.id) + '" data-col="0" data-search="' +
+        fmt.escapeHtml(((q.code || "") + " " + q.title).toLowerCase()) + '">' +
+        TR.cards.headHtml(q, payload) +
+        '<div class="cardbody pending">Rendering…</div></article>');
+    });
+    holder.innerHTML = out.join("");
+  }
+
+  if (typeof document !== "undefined") {
+    document.addEventListener("DOMContentLoaded", app.boot);
+  }
+
+})(typeof window !== "undefined" ? window : globalThis);
+
+/**
+ * Event wiring — lazy rendering, search, delegated actions, drawers with
+ * focus management, and toast feedback. Separated from the shell so the
+ * shell stays declarative.
+ */
+(function (global) {
+  "use strict";
+  var TR = global.TR;
+
+  var wire = TR.wire = {};
+  var lastFocus = null;
+
+  wire.init = function (payload) {
+    observeCards(payload);
+    wireSearch();
+    wireActions(payload);
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") wire.closeDrawers();
+    });
+  };
+
+  /**
+   * Render card bodies as they approach the viewport, with a progressive
+   * background backstop: a timer fills remaining cards a few at a time, so
+   * every card renders even if IntersectionObserver never fires (printing,
+   * zero-height embeds) — scroll just jumps the queue.
+   */
+  var FILL_BATCH = 2, FILL_INTERVAL_MS = 80;
+
+  function observeCards(payload) {
+    var cardsEls = Array.prototype.slice.call(
+      document.querySelectorAll("#cards .card"));
+    var fill = function (el) {
+      var body = el.querySelector(".cardbody");
+      if (body && body.classList.contains("pending")) TR.cards.fill(el, payload);
+    };
+    if ("IntersectionObserver" in global) {
+      var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          observer.unobserve(entry.target);
+          fill(entry.target);
+        });
+      }, { rootMargin: "900px 0px" });
+      cardsEls.forEach(function (el) { observer.observe(el); });
+    }
+    var queue = cardsEls.slice();
+    var timer = setInterval(function () {
+      var done = 0;
+      while (queue.length && done < FILL_BATCH) {
+        fill(queue.shift());
+        done++;
+      }
+      if (!queue.length) clearInterval(timer);
+    }, FILL_INTERVAL_MS);
+  }
+
+  /** Ensure a card body exists right now (export paths need filled DOM). */
+  wire.ensureFilled = function (article, payload) {
+    var body = article.querySelector(".cardbody");
+    if (body && body.classList.contains("pending")) TR.cards.fill(article, payload);
+  };
+
+  function wireSearch() {
+    var input = document.getElementById("search");
+    if (!input) return;
+    input.addEventListener("input", function () {
+      var term = input.value.trim().toLowerCase();
+      document.querySelectorAll("#cards .card").forEach(function (card) {
+        card.classList.toggle("hidden",
+          !!term && card.getAttribute("data-search").indexOf(term) === -1);
+      });
+      document.querySelectorAll("#nav .navlink").forEach(function (link) {
+        var card = document.getElementById("card-" + link.getAttribute("data-q"));
+        link.classList.toggle("hidden", !!card && card.classList.contains("hidden"));
+      });
+    });
+  }
+
+  /** One delegated click handler for every [data-action] button. */
+  function wireActions(payload) {
+    document.addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-action]");
+      if (!btn) return;
+      var action = btn.getAttribute("data-action");
+      var card = btn.closest(".card");
+      var handlers = {
+        "col": function () { selectColumn(btn, card, payload); },
+        "copy-table": function () { TR.exportCopy.copyTable(card, payload); },
+        "copy-chart": function () { TR.exportCopy.copyChart(card, payload); },
+        "download-png": function () { TR.exportPng.downloadCard(card, payload); },
+        "deck-add": function () { TR.deck.addQuestion(card, payload); },
+        "deck-open": function () { TR.deck.openDrawer(payload); },
+        "deck-download": function () { TR.deck.download(payload); },
+        "deck-clear": function () { TR.deck.clear(payload); },
+        "deck-remove": function () {
+          TR.deck.removeAt(parseInt(btn.getAttribute("data-index"), 10), payload);
+        },
+        "compose-open": function () { TR.composer.openDrawer(payload); },
+        "compose-submit": function () { TR.composer.submit(payload); },
+        "composite-remove": function () { TR.composer.removeCard(card); },
+        "composite-deck": function () { TR.composer.addToDeck(card, payload); },
+        "composite-png": function () { TR.composer.downloadPng(card, payload); },
+        "composite-copy": function () { TR.composer.copyPng(card, payload); },
+        "drawer-close": function () { wire.closeDrawers(); }
+      };
+      if (handlers[action]) handlers[action]();
+    });
+  }
+
+  function selectColumn(btn, card, payload) {
+    card.setAttribute("data-col", btn.getAttribute("data-col"));
+    TR.cards.refreshCharts(card, payload);
+  }
+
+  /** Open a drawer with backdrop + focus capture. */
+  wire.openDrawer = function (id) {
+    wire.closeDrawers();
+    lastFocus = document.activeElement;
+    document.getElementById("drawer-backdrop").hidden = false;
+    var drawer = document.getElementById(id);
+    drawer.hidden = false;
+    var focusable = drawer.querySelector("input, select, button");
+    if (focusable) focusable.focus();
+  };
+
+  /** Close any open drawer and restore focus to the opener. */
+  wire.closeDrawers = function () {
+    var backdrop = document.getElementById("drawer-backdrop");
+    if (backdrop) backdrop.hidden = true;
+    ["composer-drawer", "deck-drawer"].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.hidden = true;
+    });
+    if (lastFocus && lastFocus.focus) { lastFocus.focus(); lastFocus = null; }
+  };
+
+  /** Toast feedback (aria-live region announced by screen readers). */
+  wire.toast = function (message) {
+    var holder = document.getElementById("toast");
+    if (!holder) return;
+    var note = document.createElement("div");
+    note.className = "toastmsg";
+    note.textContent = message;
+    holder.appendChild(note);
+    requestAnimationFrame(function () { note.classList.add("show"); });
+    setTimeout(function () {
+      note.classList.remove("show");
+      setTimeout(function () { note.remove(); }, 400);
+    }, 2600);
+  };
+
+  if (typeof document !== "undefined") {
+    document.addEventListener("click", function (e) {
+      if (e.target && e.target.id === "drawer-backdrop") wire.closeDrawers();
+    });
+  }
+
+})(typeof window !== "undefined" ? window : globalThis);
+
+/**
+ * Cross-question composer — pick >=2 questions and render one combined
+ * view from the data layer: aligned bars on a SHARED percentage axis,
+ * plus aligned wave-trend strips for trended questions. compose() and
+ * renderSvg() are pure so they unit-test in node and feed PNG/PPTX export.
+ */
+(function (global) {
+  "use strict";
+  var TR = global.TR, C = TR.CONST, S = TR.svg, fmt = TR.fmt;
+
+  var composer = TR.composer = {};
+  composer._models = {};
+  var nextId = 1;
+
+  /**
+   * Build a composite model (pure, error-accumulating).
+   * Only %-formatted rows join the shared bar axis; means/NPS trends render
+   * as per-question strips because they do not share a unit.
+   */
+  composer.compose = function (payload, ids, colIndex) {
+    var errors = [];
+    if (!Array.isArray(ids) || ids.length < C.COMPOSE_MIN) {
+      errors.push({ code: "CFG_COMPOSE_MIN",
+        message: "Pick at least " + C.COMPOSE_MIN + " questions to compose." });
+    }
+    if (Array.isArray(ids) && ids.length > C.COMPOSE_MAX) {
+      errors.push({ code: "CFG_COMPOSE_MAX",
+        message: "Pick at most " + C.COMPOSE_MAX + " questions." });
+    }
+    var cols = (payload.banner && payload.banner.columns) || [];
+    if (colIndex < 0 || colIndex >= cols.length) {
+      errors.push({ code: "CFG_COMPOSE_COL",
+        message: "Banner column index " + colIndex + " is out of range." });
+    }
+    if (errors.length) return { ok: false, errors: errors, model: null };
+
+    var columnName = cols[colIndex];
+    var items = [], trends = [], maxValue = 0, waveLabels = null, mixedWaves = false;
+    ids.forEach(function (id) {
+      var q = TR.data.questionById(payload, id);
+      if (!q) {
+        errors.push({ code: "CFG_COMPOSE_UNKNOWN", message: "Unknown question id '" + id + "'." });
+        return;
+      }
+      var rows = (q.rows || [])
+        .filter(function (r) { return (r.format || "pct") === "pct"; })
+        .map(function (r) {
+          var v = r.values[colIndex];
+          if (typeof v === "number" && v > maxValue) maxValue = v;
+          return { label: r.label, value: v,
+            sig: r.sig ? r.sig[colIndex] || "" : "" };
+        });
+      items.push({ id: q.id, code: q.code || q.id, title: q.title, type: q.type,
+        base: q.bases ? q.bases[colIndex] : null, rows: rows });
+      var waves = q.meta && q.meta.waves;
+      if (waves) {
+        var series = TR.data.waveSeriesFor(q, columnName);
+        if (series) {
+          if (!waveLabels) waveLabels = waves.labels;
+          else if (waveLabels.join("|") !== waves.labels.join("|")) mixedWaves = true;
+          trends.push({ code: q.code || q.id, title: q.title,
+            stat: waves.stat || "value", format: waves.format || "dec1",
+            labels: waves.labels, values: series.values });
+        }
+      }
+    });
+    if (errors.length) return { ok: false, errors: errors, model: null };
+
+    return { ok: true, errors: [], model: {
+      column: columnName, colIndex: colIndex, items: items,
+      sharedMax: S.niceMax(maxValue),
+      trends: trends, waveLabels: waveLabels, mixedWaves: mixedWaves
+    } };
+  };
+
+  /** Composite SVG: aligned bar panels + aligned trend strips (pure). */
+  composer.renderSvg = function (model, payload) {
+    var brand = TR.charts.brandOf(payload);
+    var accent = TR.charts.accentOf(payload);
+    var width = C.CHART_WIDTH;
+    var plotW = width - C.CHART_LABEL_WIDTH - C.CHART_VALUE_WIDTH;
+    var x = S.linear(model.sharedMax, plotW);
+    var body = [], y = 6;
+
+    model.items.forEach(function (item, idx) {
+      var colour = idx % 2 === 0 ? brand : S.shade(brand, 0.55);
+      body.push(S.text(10, y + 12, item.code + " · " + TR.charts.clip(item.title, 64),
+        { "font-size": 12.5, "font-weight": 700, fill: "#1c2333" }));
+      body.push(S.text(width - 10, y + 12,
+        "n=" + (item.base != null ? fmt.base(item.base) : "–"),
+        { "text-anchor": "end", "font-size": 10.5, fill: "#9aa1b1" }));
+      y += 22;
+      item.rows.forEach(function (row) {
+        var w = typeof row.value === "number" ? Math.max(x(row.value), 0) : 0;
+        body.push(S.text(C.CHART_LABEL_WIDTH - 8, y + 13, TR.charts.clip(row.label, 26),
+          { "text-anchor": "end", "font-size": 11.5, fill: "#3b4252" }));
+        body.push(S.el("rect", { x: C.CHART_LABEL_WIDTH, y: y, width: plotW,
+          height: 18, fill: "#eef0f7", rx: 3 }));
+        body.push(S.el("rect", { x: C.CHART_LABEL_WIDTH, y: y, width: w,
+          height: 18, fill: colour, rx: 3 }));
+        body.push(S.text(C.CHART_LABEL_WIDTH + w + 6, y + 13,
+          fmt.num(row.value, "pct", fmt.pctDecimals(payload)) +
+          (row.sig ? " " + row.sig : ""),
+          { "font-size": 11.5, "font-weight": 600, fill: "#1c2333" }));
+        y += 24;
+      });
+      y += 10;
+      if (idx < model.items.length - 1) {
+        body.push(S.el("line", { x1: 10, y1: y, x2: width - 10, y2: y, stroke: "#e5e7ef" }));
+        y += 12;
+      }
+    });
+    body.push(S.text(C.CHART_LABEL_WIDTH, y + 4,
+      "Shared axis 0–" + model.sharedMax + "% · column: " + model.column,
+      { "font-size": 10, fill: "#9aa1b1" }));
+    y += 18;
+    y = renderTrendStrips(model, body, y, width, brand, accent);
+    return S.root(width, y, "Composite view — " + model.items.length +
+      " questions · " + model.column, body.join(""));
+  };
+
+  /** Aligned per-question trend strips (each strip keeps its own unit). */
+  function renderTrendStrips(model, body, y, width, brand, accent) {
+    if (!model.trends.length || !model.waveLabels) return y;
+    y += 10;
+    body.push(S.el("line", { x1: 10, y1: y, x2: width - 10, y2: y, stroke: "#e5e7ef" }));
+    y += 18;
+    body.push(S.text(10, y, "Trend by wave · " + model.column +
+      (model.mixedWaves ? " · note: wave labels differ, aligned by position" : ""),
+      { "font-size": 11, "font-weight": 700, fill: "#1c2333" }));
+    y += 10;
+    var padL = 190, padR = 110, stripH = 44;
+    var nWaves = model.waveLabels.length;
+    var xAt = function (i) { return padL + (i / (nWaves - 1)) * (width - padL - padR); };
+
+    model.trends.forEach(function (trend, ti) {
+      var numbers = trend.values.filter(function (v) { return typeof v === "number"; });
+      if (!numbers.length) return;
+      var lo = Math.min.apply(null, numbers), hi = Math.max.apply(null, numbers);
+      var pad = Math.max((hi - lo) * 0.3, 0.1);
+      var yAt = function (v) {
+        return y + 12 + (1 - (v - (lo - pad)) / ((hi + pad) - (lo - pad))) * (stripH - 16);
+      };
+      var colour = ti % 2 === 0 ? brand : accent;
+      body.push(S.text(padL - 10, y + stripH / 2 + 4,
+        TR.charts.clip(trend.code + " " + trend.stat, 24),
+        { "text-anchor": "end", "font-size": 11, fill: "#3b4252" }));
+      var pts = trend.values.map(function (v, i) { return xAt(i) + "," + yAt(v); }).join(" ");
+      body.push(S.el("polyline", { points: pts, fill: "none", stroke: colour,
+        "stroke-width": 2.5, "stroke-linecap": "round" }));
+      trend.values.forEach(function (v, i) {
+        body.push(S.el("circle", { cx: xAt(i), cy: yAt(v), r: 3, fill: colour }));
+      });
+      body.push(S.text(xAt(nWaves - 1) + 8, yAt(trend.values[nWaves - 1]) + 4,
+        fmt.num(trend.values[nWaves - 1], trend.format),
+        { "font-size": 11, "font-weight": 700, fill: "#1c2333" }));
+      y += stripH;
+    });
+    y += 6;
+    model.waveLabels.forEach(function (label, i) {
+      body.push(S.text(xAt(i), y + 6, TR.charts.clip(label, 14),
+        { "text-anchor": "middle", "font-size": 10.5, fill: "#6b7280" }));
+    });
+    return y + 22;
+  }
+
+  /* ----- drawer UI + mounted composite cards (DOM from here down) ----- */
+
+  composer.openDrawer = function (payload) {
+    var drawer = document.getElementById("composer-drawer");
+    var cols = payload.banner.columns;
+    var picks = payload.questions.map(function (q) {
+      return '<label class="qpick"><input type="checkbox" value="' +
+        fmt.escapeHtml(q.id) + '"><span class="code">' +
+        fmt.escapeHtml(q.code || q.id) + "</span><span>" +
+        fmt.escapeHtml(TR.charts.clip(q.title, 60)) +
+        (q.meta && q.meta.waves ? " ↗" : "") + "</span></label>";
+    }).join("");
+    drawer.innerHTML = '<div class="drawerhead"><h2>Compose a cross-question view</h2>' +
+      '<button type="button" data-action="drawer-close" aria-label="Close">✕</button></div>' +
+      "<p class='drawerhint'>Pick " + C.COMPOSE_MIN + "–" + C.COMPOSE_MAX +
+      " questions. Percentages share one axis; trended questions (↗) also get " +
+      "aligned wave strips.</p>" +
+      '<div class="field"><label for="compose-col">Banner column</label>' +
+      '<select id="compose-col">' + cols.map(function (c, i) {
+        return '<option value="' + i + '">' + fmt.escapeHtml(c) + "</option>";
+      }).join("") + "</select></div>" +
+      '<div id="compose-list">' + picks + "</div>" +
+      '<div id="compose-errors" role="alert"></div>' +
+      '<button type="button" class="primary wide" data-action="compose-submit">Compose view</button>';
+    TR.wire.openDrawer("composer-drawer");
+  };
+
+  composer.submit = function (payload) {
+    var ids = Array.prototype.map.call(
+      document.querySelectorAll("#compose-list input:checked"),
+      function (el) { return el.value; });
+    var colIndex = parseInt(document.getElementById("compose-col").value, 10) || 0;
+    var result = composer.compose(payload, ids, colIndex);
+    if (!result.ok) {
+      document.getElementById("compose-errors").innerHTML =
+        '<ul class="drawer-errors">' + result.errors.map(function (e) {
+          return "<li>" + fmt.escapeHtml(e.message) + "</li>";
+        }).join("") + "</ul>";
+      return;
+    }
+    mountCard(result.model, payload);
+    TR.wire.closeDrawers();
+    TR.wire.toast("Composite view created");
+  };
+
+  function mountCard(model, payload) {
+    var id = "comp-" + nextId++;
+    composer._models[id] = model;
+    var holder = document.getElementById("composites");
+    var article = document.createElement("article");
+    article.className = "card composite";
+    article.id = id;
+    article.setAttribute("data-comp", id);
+    article.innerHTML = '<header class="cardhead"><div class="cardmeta">' +
+      '<span class="qcode">Composite</span>' +
+      '<span class="qtype qtype-trend">' + model.items.length + " questions</span>" +
+      '<div class="cardactions">' +
+      '<button type="button" data-action="composite-copy">Copy PNG</button>' +
+      '<button type="button" data-action="composite-png">PNG</button>' +
+      '<button type="button" class="primary" data-action="composite-deck">+ Deck</button>' +
+      '<button type="button" data-action="composite-remove" aria-label="Remove composite">✕</button>' +
+      "</div></div><h2>" + fmt.escapeHtml(model.items.map(function (i) {
+        return i.code; }).join(" + ")) + " — combined view</h2>" +
+      '<p class="baseline">Column: ' + fmt.escapeHtml(model.column) +
+      " · composed from the embedded data layer</p></header>" +
+      '<div class="chart" data-slot="composite"></div>';
+    holder.prepend(article);
+    TR.cards.renderSlot(article.querySelector('[data-slot="composite"]'),
+      function () { return composer.renderSvg(model, payload); }, false);
+    article.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  composer.modelFor = function (card) {
+    return composer._models[card.getAttribute("data-comp")] || null;
+  };
+
+  composer.removeCard = function (card) { card.remove(); };
+
+  composer.addToDeck = function (card, payload) {
+    var model = composer.modelFor(card);
+    if (model) TR.deck.addComposite(model, payload);
+  };
+
+  composer.downloadPng = function (card, payload) {
+    var model = composer.modelFor(card);
+    if (model) TR.exportPng.downloadComposite(model, payload);
+  };
+
+  composer.copyPng = function (card, payload) {
+    var model = composer.modelFor(card);
+    if (model) TR.exportCopy.copyCompositePng(model, payload);
+  };
+
+})(typeof window !== "undefined" ? window : globalThis);
+
+/**
+ * Tier A export — hi-res PNG. The whole card (title, meta, chart, table)
+ * is assembled as ONE pure SVG string from the data layer, then rasterised
+ * at 3x. No DOM screenshots, no html2canvas, no CSS-variable resolution.
+ */
+(function (global) {
+  "use strict";
+  var TR = global.TR, C = TR.CONST, S = TR.svg, fmt = TR.fmt;
+
+  var png = TR.exportPng = {};
+  var PAD = 24;
+
+  /** Word-wrap text to lines of roughly maxChars. */
+  png.wrap = function (text, maxChars) {
+    var words = String(text || "").split(" "), lines = [], current = "";
+    words.forEach(function (word) {
+      var candidate = current ? current + " " + word : word;
+      if (candidate.length > maxChars && current) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = candidate;
+      }
+    });
+    if (current) lines.push(current);
+    return lines;
+  };
+
+  /** Draw a table matrix as SVG rows. Returns {body, height}. */
+  png.svgTable = function (matrix, x, y, width, brand) {
+    var nCols = matrix.head.length;
+    var labelW = Math.round(width * 0.3);
+    var colW = (width - labelW) / Math.max(nCols - 1, 1);
+    var headH = 26, rowH = 20;
+    var parts = [], rowY = y;
+    var cellX = function (i) {
+      return i === 0 ? x + 8 : x + labelW + (i - 1) * colW + colW / 2;
+    };
+    parts.push(S.el("rect", { x: x, y: rowY, width: width, height: headH,
+      fill: brand, rx: 4 }));
+    matrix.head.forEach(function (h, i) {
+      parts.push(S.text(cellX(i), rowY + 17, TR.charts.clip(h, i === 0 ? 40 : 14),
+        { "text-anchor": i === 0 ? "start" : "middle", "font-size": 10.5,
+          "font-weight": 700, fill: "#ffffff" }));
+    });
+    rowY += headH;
+    matrix.body.forEach(function (row, r) {
+      var fill = row.kind === "stat" ? "#f3f4f8"
+        : (r % 2 === 1 ? "#fafbfe" : "#ffffff");
+      parts.push(S.el("rect", { x: x, y: rowY, width: width, height: rowH, fill: fill }));
+      var colour = row.kind === "base" ? "#6b7280" : "#1c2333";
+      row.cells.forEach(function (cell, i) {
+        parts.push(S.text(cellX(i), rowY + 14, TR.charts.clip(cell, i === 0 ? 42 : 12),
+          { "text-anchor": i === 0 ? "start" : "middle", "font-size": 10.5,
+            "font-weight": row.kind === "stat" ? 700 : 400,
+            "font-style": row.kind === "base" ? "italic" : null, fill: colour }));
+      });
+      rowY += rowH;
+    });
+    parts.push(S.el("rect", { x: x, y: y, width: width, height: rowY - y,
+      fill: "none", stroke: "#e5e7ef" }));
+    return { body: parts.join(""), height: rowY - y };
+  };
+
+  /** Re-anchor a chart SVG string inside a parent SVG. {svg, height}. */
+  png.nest = function (chartSvg, x, y, targetW) {
+    var vb = chartSvg.match(/viewBox="0 0 ([0-9.]+) ([0-9.]+)"/);
+    if (!vb) return { svg: "", height: 0 };
+    var h = (parseFloat(vb[2]) / parseFloat(vb[1])) * targetW;
+    return {
+      svg: chartSvg.replace('width="100%"',
+        'x="' + x + '" y="' + y + '" width="' + targetW + '" height="' + h + '"'),
+      height: h
+    };
+  };
+
+  /** Assemble a full export card SVG (pure). */
+  png.cardSvg = function (title, metaLine, chartSvgs, matrix, payload) {
+    var width = C.EXPORT_WIDTH, innerW = width - PAD * 2;
+    var brand = TR.charts.brandOf(payload);
+    var parts = [], y = PAD + 14;
+    var titleLines = png.wrap(title, 70);
+    titleLines.forEach(function (line) {
+      parts.push(S.text(PAD, y, line,
+        { "font-size": 18, "font-weight": 700, fill: "#1c2333" }));
+      y += 24;
+    });
+    parts.push(S.text(PAD, y, metaLine, { "font-size": 11.5, fill: "#6b7280" }));
+    y += 18;
+    (chartSvgs || []).forEach(function (chartSvg) {
+      if (!chartSvg) return;
+      var nested = png.nest(chartSvg, PAD, y, innerW);
+      parts.push(nested.svg);
+      y += nested.height + 10;
+    });
+    if (matrix) {
+      var table = png.svgTable(matrix, PAD, y, innerW, brand);
+      parts.push(table.body);
+      y += table.height;
+    }
+    var height = y + PAD;
+    var frame = S.el("rect", { x: 0, y: 0, width: width, height: height,
+      fill: "#ffffff" }) +
+      S.el("rect", { x: 0, y: 0, width: width, height: 5, fill: brand });
+    return S.root(width, height, title, frame + parts.join(""));
+  };
+
+  /** Rasterise an SVG string to a canvas at EXPORT_SCALE. */
+  png.toCanvas = function (svgString, callback) {
+    var vb = svgString.match(/viewBox="0 0 ([0-9.]+) ([0-9.]+)"/);
+    if (!vb) { callback(null); return; }
+    var w = parseFloat(vb[1]), h = parseFloat(vb[2]), scale = C.EXPORT_SCALE;
+    var img = new Image();
+    img.onload = function () {
+      var canvas = document.createElement("canvas");
+      canvas.width = Math.round(w * scale);
+      canvas.height = Math.round(h * scale);
+      var ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      callback(canvas);
+    };
+    img.onerror = function () { callback(null); };
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgString);
+  };
+
+  /** SVG string -> PNG blob (or null on failure). */
+  png.toBlob = function (svgString, callback) {
+    png.toCanvas(svgString, function (canvas) {
+      if (!canvas) { callback(null); return; }
+      canvas.toBlob(function (blob) { callback(blob); }, "image/png");
+    });
+  };
+
+  function triggerDownload(blob, filename) {
+    var link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+  }
+
+  /** Build the export SVG for a question card. */
+  png.questionSvg = function (q, payload, colIndex) {
+    var cols = TR.data.bannerColumns(payload, q);
+    var meta = [payload.project.name, payload.project.wave,
+      "Chart column: " + (cols[colIndex] || "Total"),
+      "Base: n=" + (q.bases ? fmt.base(q.bases[0]) : "–")]
+      .filter(Boolean).join(" · ");
+    var chartSvgs = [];
+    try { chartSvgs.push(TR.charts.forQuestion(q, payload, colIndex)); } catch (e) { /* chart skipped, table still exports */ }
+    try { chartSvgs.push(TR.charts.trend(q, payload, colIndex)); } catch (e) { /* trend skipped */ }
+    return png.cardSvg((q.code || q.id) + " — " + q.title, meta, chartSvgs,
+      TR.tables.matrix(q, payload), payload);
+  };
+
+  /** Download a question card as PNG. */
+  png.downloadCard = function (card, payload) {
+    var q = TR.data.questionById(payload, card.getAttribute("data-q"));
+    if (!q) return;
+    var colIndex = parseInt(card.getAttribute("data-col") || "0", 10) || 0;
+    png.toBlob(png.questionSvg(q, payload, colIndex), function (blob) {
+      if (!blob) { TR.wire.toast("PNG export failed — see console"); return; }
+      triggerDownload(blob, fmt.slug((q.code || q.id) + "_" + q.title) + ".png");
+      TR.wire.toast("PNG downloaded");
+    });
+  };
+
+  /** Download a composite view as PNG. */
+  png.downloadComposite = function (model, payload) {
+    var svgString = png.cardSvg("Composite view — " + model.items.map(function (i) {
+      return i.code; }).join(" + "),
+      payload.project.name + " · " + (payload.project.wave || "") +
+      " · column: " + model.column,
+      [TR.composer.renderSvg(model, payload)], null, payload);
+    png.toBlob(svgString, function (blob) {
+      if (!blob) { TR.wire.toast("PNG export failed — see console"); return; }
+      triggerDownload(blob, fmt.slug("composite_" + model.items.map(function (i) {
+        return i.code; }).join("_")) + ".png");
+      TR.wire.toast("PNG downloaded");
+    });
+  };
+
+})(typeof window !== "undefined" ? window : globalThis);
+
+/**
+ * Tier A export — clipboard. Tables copy as rich HTML + TSV so PowerPoint,
+ * Word and Excel paste a real editable table; charts copy as hi-res PNG.
+ * Falls back to execCommand (rich) or download (image) on older engines.
+ */
+(function (global) {
+  "use strict";
+  var TR = global.TR, fmt = TR.fmt;
+
+  var copy = TR.exportCopy = {};
+
+  /** Write {html, text} to the clipboard; resolves true on success. */
+  function writeRich(html, text) {
+    if (navigator.clipboard && global.ClipboardItem) {
+      var item = new ClipboardItem({
+        "text/html": new Blob([html], { type: "text/html" }),
+        "text/plain": new Blob([text], { type: "text/plain" })
+      });
+      return navigator.clipboard.write([item]).then(function () { return true; },
+        function () { return writeFallback(html); });
+    }
+    return Promise.resolve(writeFallback(html));
+  }
+
+  /** Legacy rich-text fallback: select an off-screen node and copy it. */
+  function writeFallback(html) {
+    var holder = document.createElement("div");
+    holder.style.cssText = "position:fixed;left:-9999px;top:0;";
+    holder.innerHTML = html;
+    document.body.appendChild(holder);
+    var range = document.createRange();
+    range.selectNodeContents(holder);
+    var selection = getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    var ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    selection.removeAllRanges();
+    document.body.removeChild(holder);
+    return ok;
+  }
+
+  /** Copy a question's table as an editable rich table. */
+  copy.copyTable = function (card, payload) {
+    var q = TR.data.questionById(payload, card.getAttribute("data-q"));
+    if (!q) return;
+    writeRich(TR.tables.clipboardHtml(q, payload), TR.tables.tsv(q, payload))
+      .then(function (ok) {
+        TR.wire.toast(ok
+          ? "Table copied — paste into PowerPoint, Word or Excel"
+          : "Copy failed — your browser blocked clipboard access");
+      });
+  };
+
+  /** Copy a PNG blob; Safari needs the promise-flavoured ClipboardItem. */
+  function writeImage(svgString, filenameHint) {
+    if (navigator.clipboard && global.ClipboardItem) {
+      var blobPromise = new Promise(function (resolve, reject) {
+        TR.exportPng.toBlob(svgString, function (blob) {
+          if (blob) resolve(blob); else reject(new Error("rasterise failed"));
+        });
+      });
+      return navigator.clipboard
+        .write([new ClipboardItem({ "image/png": blobPromise })])
+        .then(function () { return "copied"; }, function () {
+          return downloadInstead(svgString, filenameHint);
+        });
+    }
+    return downloadInstead(svgString, filenameHint);
+  }
+
+  function downloadInstead(svgString, filenameHint) {
+    return new Promise(function (resolve) {
+      TR.exportPng.toBlob(svgString, function (blob) {
+        if (!blob) { resolve("failed"); return; }
+        var link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = filenameHint + ".png";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+        resolve("downloaded");
+      });
+    });
+  }
+
+  var COPY_TOASTS = {
+    copied: "Chart copied as image",
+    downloaded: "Clipboard images not supported here — PNG downloaded instead",
+    failed: "Image export failed — see console"
+  };
+
+  /** Copy a question's chart (+trend) as a hi-res PNG. */
+  copy.copyChart = function (card, payload) {
+    var q = TR.data.questionById(payload, card.getAttribute("data-q"));
+    if (!q) return;
+    var colIndex = parseInt(card.getAttribute("data-col") || "0", 10) || 0;
+    var chartSvgs = [TR.charts.forQuestion(q, payload, colIndex),
+      TR.charts.trend(q, payload, colIndex)];
+    var cols = TR.data.bannerColumns(payload, q);
+    var svgString = TR.exportPng.cardSvg((q.code || q.id) + " — " + q.title,
+      payload.project.name + " · column: " + (cols[colIndex] || "Total"),
+      chartSvgs, null, payload);
+    writeImage(svgString, fmt.slug((q.code || q.id) + "_chart"))
+      .then(function (outcome) { TR.wire.toast(COPY_TOASTS[outcome]); });
+  };
+
+  /** Copy a composite view as a hi-res PNG. */
+  copy.copyCompositePng = function (model, payload) {
+    var svgString = TR.exportPng.cardSvg("Composite view — " +
+      model.items.map(function (i) { return i.code; }).join(" + "),
+      payload.project.name + " · column: " + model.column,
+      [TR.composer.renderSvg(model, payload)], null, payload);
+    writeImage(svgString, "composite")
+      .then(function (outcome) { TR.wire.toast(COPY_TOASTS[outcome]); });
+  };
+
+})(typeof window !== "undefined" ? window : globalThis);
+
+/**
+ * Minimal deterministic ZIP writer (method = STORE, fixed timestamp) plus
+ * CRC-32. This is all OOXML needs: a .pptx is a zip of XML parts, and
+ * PowerPoint accepts stored (uncompressed) entries. ~120 lines replace the
+ * compression half of a 0.94 MB vendored library. Pure — tested in node.
+ */
+(function (global) {
+  "use strict";
+  var TR = global.TR, C = TR.CONST;
+
+  var zip = TR.zip = {};
+
+  var CRC_TABLE = (function () {
+    var table = new Uint32Array(256);
+    for (var n = 0; n < 256; n++) {
+      var c = n;
+      for (var k = 0; k < 8; k++) {
+        c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      }
+      table[n] = c >>> 0;
+    }
+    return table;
+  })();
+
+  /** CRC-32. Known answer: crc32(bytes("123456789")) === 0xCBF43926. */
+  zip.crc32 = function (bytes) {
+    var c = 0xFFFFFFFF;
+    for (var i = 0; i < bytes.length; i++) {
+      c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+    }
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  };
+
+  /** UTF-8 encode a string. */
+  zip.bytes = function (str) {
+    return new TextEncoder().encode(str);
+  };
+
+  function le16(arr, v) { arr.push(v & 255, (v >>> 8) & 255); }
+  function le32(arr, v) {
+    arr.push(v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255);
+  }
+
+  /**
+   * Build a ZIP archive. Deterministic: same entries -> same bytes.
+   * @param {Array<{name: string, data: string|Uint8Array}>} entries
+   * @returns {Uint8Array}
+   * @throws {Error} when entries is empty (a zip with no parts is a bug).
+   */
+  zip.build = function (entries) {
+    if (!Array.isArray(entries) || entries.length === 0) {
+      throw new Error("IO_ZIP_EMPTY: zip.build needs at least one entry.");
+    }
+    var chunks = [], central = [], offset = 0;
+
+    entries.forEach(function (entry) {
+      var nameBytes = zip.bytes(entry.name);
+      var data = typeof entry.data === "string" ? zip.bytes(entry.data) : entry.data;
+      var crc = zip.crc32(data);
+
+      var local = [];
+      le32(local, 0x04034B50);            // local file header signature
+      le16(local, 20); le16(local, 0); le16(local, 0); // version, flags, method=store
+      le16(local, C.ZIP_DOS_TIME); le16(local, C.ZIP_DOS_DATE);
+      le32(local, crc); le32(local, data.length); le32(local, data.length);
+      le16(local, nameBytes.length); le16(local, 0);
+      chunks.push(new Uint8Array(local), nameBytes, data);
+
+      var cd = [];
+      le32(cd, 0x02014B50);               // central directory signature
+      le16(cd, 20); le16(cd, 20); le16(cd, 0); le16(cd, 0);
+      le16(cd, C.ZIP_DOS_TIME); le16(cd, C.ZIP_DOS_DATE);
+      le32(cd, crc); le32(cd, data.length); le32(cd, data.length);
+      le16(cd, nameBytes.length); le16(cd, 0); le16(cd, 0);
+      le16(cd, 0); le16(cd, 0); le32(cd, 0); le32(cd, offset);
+      central.push(new Uint8Array(cd), nameBytes);
+
+      offset += local.length + nameBytes.length + data.length;
+    });
+
+    var cdSize = central.reduce(function (sum, c) { return sum + c.length; }, 0);
+    var eocd = [];
+    le32(eocd, 0x06054B50);               // end of central directory
+    le16(eocd, 0); le16(eocd, 0);
+    le16(eocd, entries.length); le16(eocd, entries.length);
+    le32(eocd, cdSize); le32(eocd, offset); le16(eocd, 0);
+
+    var out = new Uint8Array(offset + cdSize + eocd.length);
+    var pos = 0;
+    chunks.concat(central, [new Uint8Array(eocd)]).forEach(function (chunk) {
+      out.set(chunk, pos);
+      pos += chunk.length;
+    });
+    return out;
+  };
+
+})(typeof window !== "undefined" ? window : globalThis);
+
+/**
+ * PPTX package scaffolding — the fixed OOXML parts (content types, rels,
+ * master, layout, theme) and the packager that zips parts + slides into a
+ * valid .pptx. Slide content builders live in 15_pptx_slides.js. Pure.
+ *
+ * SIZE-EXCEPTION: mostly literal OOXML boilerplate strings; splitting the
+ * package definition across files would hurt readability, and the active
+ * logic is small.
+ */
+(function (global) {
+  "use strict";
+  var TR = global.TR;
+
+  var pptx = TR.pptx = TR.pptx || {};
+
+  var XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+  var NS_A = "http://schemas.openxmlformats.org/drawingml/2006/main";
+  var NS_R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+  var NS_P = "http://schemas.openxmlformats.org/presentationml/2006/main";
+  var REL = "http://schemas.openxmlformats.org/package/2006/relationships";
+  var RT = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
+  var CT_BASE = "application/vnd.openxmlformats-officedocument";
+
+  pptx.NS = { a: NS_A, r: NS_R, p: NS_P };
+
+  function contentTypes(slideCount) {
+    var overrides = [
+      ["/ppt/presentation.xml", CT_BASE + ".presentationml.presentation.main+xml"],
+      ["/ppt/slideMasters/slideMaster1.xml", CT_BASE + ".presentationml.slideMaster+xml"],
+      ["/ppt/slideLayouts/slideLayout1.xml", CT_BASE + ".presentationml.slideLayout+xml"],
+      ["/ppt/theme/theme1.xml", CT_BASE + ".theme+xml"],
+      ["/ppt/presProps.xml", CT_BASE + ".presentationml.presProps+xml"],
+      ["/ppt/viewProps.xml", CT_BASE + ".presentationml.viewProps+xml"],
+      ["/ppt/tableStyles.xml", CT_BASE + ".presentationml.tableStyles+xml"]
+    ];
+    for (var i = 1; i <= slideCount; i++) {
+      overrides.push(["/ppt/slides/slide" + i + ".xml",
+        CT_BASE + ".presentationml.slide+xml"]);
+    }
+    return XML + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      overrides.map(function (o) {
+        return '<Override PartName="' + o[0] + '" ContentType="' + o[1] + '"/>';
+      }).join("") + "</Types>";
+  }
+
+  function rels(list) {
+    return XML + '<Relationships xmlns="' + REL + '">' +
+      list.map(function (r) {
+        return '<Relationship Id="' + r[0] + '" Type="' + RT + r[1] +
+          '" Target="' + r[2] + '"/>';
+      }).join("") + "</Relationships>";
+  }
+
+  function presentation(slideCount) {
+    var sldIds = [];
+    for (var i = 0; i < slideCount; i++) {
+      sldIds.push('<p:sldId id="' + (256 + i) + '" r:id="rId' + (2 + i) + '"/>');
+    }
+    return XML + '<p:presentation xmlns:a="' + NS_A + '" xmlns:r="' + NS_R +
+      '" xmlns:p="' + NS_P + '">' +
+      '<p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst>' +
+      "<p:sldIdLst>" + sldIds.join("") + "</p:sldIdLst>" +
+      '<p:sldSz cx="12192000" cy="6858000"/><p:notesSz cx="6858000" cy="9144000"/>' +
+      "</p:presentation>";
+  }
+
+  function presentationRels(slideCount) {
+    var list = [["rId1", "slideMaster", "slideMasters/slideMaster1.xml"]];
+    for (var i = 0; i < slideCount; i++) {
+      list.push(["rId" + (2 + i), "slide", "slides/slide" + (i + 1) + ".xml"]);
+    }
+    list.push(["rId" + (2 + slideCount), "presProps", "presProps.xml"]);
+    list.push(["rId" + (3 + slideCount), "viewProps", "viewProps.xml"]);
+    list.push(["rId" + (4 + slideCount), "tableStyles", "tableStyles.xml"]);
+    return rels(list);
+  }
+
+  var EMPTY_SP_TREE = "<p:spTree><p:nvGrpSpPr>" +
+    '<p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>' +
+    '<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/>' +
+    '<a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr></p:spTree>';
+
+  function slideMaster() {
+    return XML + '<p:sldMaster xmlns:a="' + NS_A + '" xmlns:r="' + NS_R +
+      '" xmlns:p="' + NS_P + '"><p:cSld>' +
+      '<p:bg><p:bgPr><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill>' +
+      "<a:effectLst/></p:bgPr></p:bg>" + EMPTY_SP_TREE + "</p:cSld>" +
+      '<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" ' +
+      'accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" ' +
+      'accent6="accent6" hlink="hlink" folHlink="folHlink"/>' +
+      '<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst>' +
+      "<p:txStyles><p:titleStyle/><p:bodyStyle/><p:otherStyle/></p:txStyles>" +
+      "</p:sldMaster>";
+  }
+
+  function slideLayout() {
+    return XML + '<p:sldLayout xmlns:a="' + NS_A + '" xmlns:r="' + NS_R +
+      '" xmlns:p="' + NS_P + '" type="blank" preserve="1">' +
+      '<p:cSld name="Blank">' + EMPTY_SP_TREE + "</p:cSld>" +
+      "<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>";
+  }
+
+  function theme(brand, accent) {
+    var b = String(brand).replace("#", "").toUpperCase();
+    var ac = String(accent).replace("#", "").toUpperCase();
+    var fill = '<a:solidFill><a:schemeClr val="phClr"/></a:solidFill>';
+    var line = '<a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln>';
+    var effect = "<a:effectStyle><a:effectLst/></a:effectStyle>";
+    return XML + '<a:theme xmlns:a="' + NS_A + '" name="Turas"><a:themeElements>' +
+      '<a:clrScheme name="Turas">' +
+      '<a:dk1><a:srgbClr val="1C2333"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1>' +
+      '<a:dk2><a:srgbClr val="' + b + '"/></a:dk2><a:lt2><a:srgbClr val="F3F4F8"/></a:lt2>' +
+      '<a:accent1><a:srgbClr val="' + b + '"/></a:accent1>' +
+      '<a:accent2><a:srgbClr val="' + ac + '"/></a:accent2>' +
+      '<a:accent3><a:srgbClr val="7A7FB6"/></a:accent3>' +
+      '<a:accent4><a:srgbClr val="C0655B"/></a:accent4>' +
+      '<a:accent5><a:srgbClr val="5B8FA8"/></a:accent5>' +
+      '<a:accent6><a:srgbClr val="6B7280"/></a:accent6>' +
+      '<a:hlink><a:srgbClr val="0563C1"/></a:hlink>' +
+      '<a:folHlink><a:srgbClr val="954F72"/></a:folHlink></a:clrScheme>' +
+      '<a:fontScheme name="Turas">' +
+      '<a:majorFont><a:latin typeface="Calibri Light"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont>' +
+      '<a:minorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont>' +
+      "</a:fontScheme>" +
+      '<a:fmtScheme name="Office">' +
+      "<a:fillStyleLst>" + fill + fill + fill + "</a:fillStyleLst>" +
+      "<a:lnStyleLst>" + line + line + line + "</a:lnStyleLst>" +
+      "<a:effectStyleLst>" + effect + effect + effect + "</a:effectStyleLst>" +
+      "<a:bgFillStyleLst>" + fill + fill + fill + "</a:bgFillStyleLst>" +
+      "</a:fmtScheme></a:themeElements></a:theme>";
+  }
+
+  /**
+   * Package slide XML strings into a complete .pptx archive.
+   * @param {string[]} slideXmls - from TR.pptxSlides builders.
+   * @param {object} payload - report payload (brand colours for the theme).
+   * @returns {Uint8Array} the .pptx bytes.
+   * @throws {Error} when slideXmls is empty.
+   */
+  pptx.package = function (slideXmls, payload) {
+    if (!Array.isArray(slideXmls) || slideXmls.length === 0) {
+      throw new Error("CFG_PPTX_EMPTY: cannot build a deck with zero slides.");
+    }
+    var n = slideXmls.length;
+    var entries = [
+      { name: "[Content_Types].xml", data: contentTypes(n) },
+      { name: "_rels/.rels", data: rels([["rId1", "officeDocument", "ppt/presentation.xml"]]) },
+      { name: "ppt/presentation.xml", data: presentation(n) },
+      { name: "ppt/_rels/presentation.xml.rels", data: presentationRels(n) },
+      { name: "ppt/presProps.xml", data: XML + '<p:presentationPr xmlns:p="' + NS_P + '"/>' },
+      { name: "ppt/viewProps.xml", data: XML + '<p:viewPr xmlns:p="' + NS_P + '"/>' },
+      { name: "ppt/tableStyles.xml", data: XML + '<a:tblStyleLst xmlns:a="' + NS_A +
+        '" def="{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"/>' },
+      { name: "ppt/theme/theme1.xml",
+        data: theme(TR.charts.brandOf(payload), TR.charts.accentOf(payload)) },
+      { name: "ppt/slideMasters/slideMaster1.xml", data: slideMaster() },
+      { name: "ppt/slideMasters/_rels/slideMaster1.xml.rels",
+        data: rels([["rId1", "slideLayout", "../slideLayouts/slideLayout1.xml"],
+          ["rId2", "theme", "../theme/theme1.xml"]]) },
+      { name: "ppt/slideLayouts/slideLayout1.xml", data: slideLayout() },
+      { name: "ppt/slideLayouts/_rels/slideLayout1.xml.rels",
+        data: rels([["rId1", "slideMaster", "../slideMasters/slideMaster1.xml"]]) }
+    ];
+    slideXmls.forEach(function (xml, i) {
+      entries.push({ name: "ppt/slides/slide" + (i + 1) + ".xml", data: xml });
+      entries.push({ name: "ppt/slides/_rels/slide" + (i + 1) + ".xml.rels",
+        data: rels([["rId1", "slideLayout", "../slideLayouts/slideLayout1.xml"]]) });
+    });
+    return TR.zip.build(entries);
+  };
+
+})(typeof window !== "undefined" ? window : globalThis);
+
+/**
+ * PPTX slide builders — native, editable slide content from the data layer:
+ * real text boxes, real tables, bar charts drawn as PowerPoint SHAPES (each
+ * bar a rectangle you can recolour/move). No screenshots anywhere. Pure.
+ *
+ * SIZE-EXCEPTION: sequential slide-assembly flow over OOXML strings;
+ * fragmenting it would obscure the slide geometry story.
+ */
+(function (global) {
+  "use strict";
+  var TR = global.TR, C = TR.CONST, esc = TR.fmt.escapeXml, fmt = TR.fmt;
+
+  var slides = TR.pptxSlides = {};
+
+  var INK = "1C2333", GREY = "6B7280", WHITE = "FFFFFF", ZEBRA = "F3F4F8";
+  var MARGIN_IN = 0.55, TITLE_H_IN = 0.62, META_H_IN = 0.3, CONTENT_TOP_IN = 1.55;
+
+  function emu(inches) { return Math.round(inches * C.EMU_PER_INCH); }
+  function hex(colour) { return String(colour).replace("#", "").toUpperCase(); }
+
+  /** One paragraph with one run. Empty text -> empty paragraph. */
+  function para(text, opts) {
+    if (!text) return "<a:p/>";
+    return "<a:p><a:pPr" + (opts.align ? ' algn="' + opts.align + '"' : "") + "/>" +
+      '<a:r><a:rPr lang="en-US" dirty="0" sz="' + Math.round(opts.size * 100) + '"' +
+      (opts.bold ? ' b="1"' : "") + (opts.italic ? ' i="1"' : "") + ">" +
+      '<a:solidFill><a:srgbClr val="' + (opts.colour || INK) + '"/></a:solidFill>' +
+      "</a:rPr><a:t>" + esc(text) + "</a:t></a:r></a:p>";
+  }
+
+  /** A plain text box shape. box in inches {x,y,w,h}. */
+  function textBox(id, name, box, paras) {
+    return '<p:sp><p:nvSpPr><p:cNvPr id="' + id + '" name="' + esc(name) + '"/>' +
+      '<p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>' +
+      '<p:spPr><a:xfrm><a:off x="' + emu(box.x) + '" y="' + emu(box.y) + '"/>' +
+      '<a:ext cx="' + emu(box.w) + '" cy="' + emu(box.h) + '"/></a:xfrm>' +
+      '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>' +
+      '<p:txBody><a:bodyPr wrap="square"><a:normAutofit/></a:bodyPr><a:lstStyle/>' +
+      paras.join("") + "</p:txBody></p:sp>";
+  }
+
+  /** A filled rectangle shape (a chart bar). */
+  function barShape(id, box, colour) {
+    return '<p:sp><p:nvSpPr><p:cNvPr id="' + id + '" name="Bar"/>' +
+      "<p:cNvSpPr/><p:nvPr/></p:nvSpPr>" +
+      '<p:spPr><a:xfrm><a:off x="' + emu(box.x) + '" y="' + emu(box.y) + '"/>' +
+      '<a:ext cx="' + emu(box.w) + '" cy="' + emu(box.h) + '"/></a:xfrm>' +
+      '<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val 18000"/></a:avLst></a:prstGeom>' +
+      '<a:solidFill><a:srgbClr val="' + colour + '"/></a:solidFill>' +
+      "<a:ln><a:noFill/></a:ln></p:spPr>" +
+      "<p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody></p:sp>";
+  }
+
+  /** Native a:tbl from a tables.matrix model. box in inches. */
+  function tableFrame(id, box, matrix, brand, fontSize) {
+    var nCols = matrix.head.length;
+    var labelW = Math.min(box.w * 0.3, 3.2);
+    var colW = (box.w - labelW) / Math.max(nCols - 1, 1);
+    var rowH = Math.round(emu(Math.min(0.32, box.h / (matrix.body.length + 1))));
+    var grid = '<a:gridCol w="' + emu(labelW) + '"/>';
+    for (var i = 1; i < nCols; i++) grid += '<a:gridCol w="' + emu(colW) + '"/>';
+
+    var cell = function (text, opts) {
+      return "<a:tc><a:txBody><a:bodyPr/><a:lstStyle/>" +
+        para(text, opts) + "</a:txBody>" +
+        '<a:tcPr marL="27432" marR="27432" marT="13716" marB="13716" anchor="ctr">' +
+        '<a:solidFill><a:srgbClr val="' + opts.fill + '"/></a:solidFill></a:tcPr></a:tc>';
+    };
+    var rows = ['<a:tr h="' + rowH + '">' + matrix.head.map(function (h, i) {
+      return cell(h, { size: fontSize, bold: true, colour: WHITE, fill: brand,
+        align: i === 0 ? "l" : "ctr" });
+    }).join("") + "</a:tr>"];
+
+    matrix.body.forEach(function (row, r) {
+      var fill = row.kind === "stat" ? ZEBRA : (r % 2 === 1 ? "FAFBFE" : WHITE);
+      var colour = row.kind === "base" ? GREY : INK;
+      rows.push('<a:tr h="' + rowH + '">' + row.cells.map(function (text, i) {
+        return cell(text, { size: fontSize, bold: row.kind === "stat",
+          italic: row.kind === "base", colour: colour, fill: fill,
+          align: i === 0 ? "l" : "ctr" });
+      }).join("") + "</a:tr>");
+    });
+
+    return '<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="' + id +
+      '" name="Table"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr>' +
+      '<p:xfrm><a:off x="' + emu(box.x) + '" y="' + emu(box.y) + '"/>' +
+      '<a:ext cx="' + emu(box.w) + '" cy="' + emu(box.h) + '"/></p:xfrm>' +
+      '<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table">' +
+      '<a:tbl><a:tblPr firstRow="1"/><a:tblGrid>' + grid + "</a:tblGrid>" +
+      rows.join("") + "</a:tbl></a:graphicData></a:graphic></p:graphicFrame>";
+  }
+
+  /** Editable bar chart: label + bar + value, one trio of shapes per row. */
+  function barGroup(idRef, box, rows, axisMax, brand, payload) {
+    var parts = [];
+    var labelW = Math.min(1.7, box.w * 0.4), valueW = Math.min(0.85, box.w * 0.2);
+    var plotW = Math.max(box.w - labelW - valueW, 0.4);
+    var step = Math.min(0.46, box.h / Math.max(rows.length, 1));
+    var barH = step * 0.62;
+    var pd = fmt.pctDecimals(payload);
+    rows.forEach(function (row, i) {
+      var y = box.y + i * step;
+      var v = typeof row.value === "number" ? row.value : 0;
+      var w = axisMax > 0 ? (v / axisMax) * plotW : 0;
+      parts.push(textBox(idRef.next(), "Label", { x: box.x, y: y, w: labelW, h: step },
+        [para(TR.charts.clip(row.label, 24), { size: 10, colour: INK, align: "r" })]));
+      parts.push(barShape(idRef.next(),
+        { x: box.x + labelW + 0.05, y: y + (step - barH) / 2, w: Math.max(w, 0.02), h: barH },
+        brand));
+      parts.push(textBox(idRef.next(), "Value",
+        { x: box.x + labelW + 0.1 + w, y: y, w: valueW, h: step },
+        [para(fmt.num(v, "pct", pd) + (row.sig ? " " + row.sig : ""),
+          { size: 10, bold: true, colour: INK })]));
+    });
+    return parts.join("");
+  }
+
+  function wrap(contentXml) {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      '<p:sld xmlns:a="' + TR.pptx.NS.a + '" xmlns:r="' + TR.pptx.NS.r +
+      '" xmlns:p="' + TR.pptx.NS.p + '"><p:cSld><p:spTree>' +
+      '<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>' +
+      '<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/>' +
+      '<a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>' +
+      contentXml + "</p:spTree></p:cSld>" +
+      "<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>";
+  }
+
+  function idCounter() {
+    var n = 1;
+    return { next: function () { return ++n; } };
+  }
+
+  function header(idRef, title, metaLine, brand) {
+    return barShape(idRef.next(), { x: 0, y: 0, w: C.SLIDE_W_IN, h: 0.07 }, brand) +
+      textBox(idRef.next(), "Title",
+        { x: MARGIN_IN, y: 0.32, w: C.SLIDE_W_IN - MARGIN_IN * 2, h: TITLE_H_IN },
+        [para(title, { size: 21, bold: true, colour: brand })]) +
+      textBox(idRef.next(), "Meta",
+        { x: MARGIN_IN, y: 1.0, w: C.SLIDE_W_IN - MARGIN_IN * 2, h: META_H_IN },
+        [para(metaLine, { size: 11, colour: GREY })]);
+  }
+
+  /** Title slide for the deck. */
+  slides.titleSlide = function (payload, slideCount) {
+    var p = payload.project;
+    var brand = hex(TR.charts.brandOf(payload));
+    var ids = idCounter();
+    var content = barShape(ids.next(), { x: 0, y: 0, w: C.SLIDE_W_IN, h: C.SLIDE_H_IN }, brand) +
+      textBox(ids.next(), "Title",
+        { x: 1.0, y: 2.4, w: C.SLIDE_W_IN - 2, h: 1.2 },
+        [para(p.name, { size: 36, bold: true, colour: WHITE })]) +
+      textBox(ids.next(), "Sub", { x: 1.0, y: 3.6, w: C.SLIDE_W_IN - 2, h: 0.9 },
+        [para([p.client, p.wave].filter(Boolean).join(" · "),
+          { size: 16, colour: "D9DCEC" }),
+         para(slideCount + " exhibits · native editable slides built in-report by Turas",
+          { size: 12, colour: "B9BEDC" })]);
+    return wrap(content);
+  };
+
+  /** Chunk matrix body rows for table pagination. */
+  function chunkMatrix(matrix) {
+    var per = C.PPTX_TABLE_ROWS_PER_SLIDE;
+    if (matrix.body.length <= per) return [matrix];
+    var chunks = [];
+    for (var i = 0; i < matrix.body.length; i += per) {
+      chunks.push({ head: matrix.head, body: matrix.body.slice(i, i + per) });
+    }
+    return chunks;
+  }
+
+  /**
+   * Slides for one question: bars (as shapes) + native table when compact,
+   * otherwise full-width table paginated across continuation slides.
+   * @returns {string[]} one or more slide XML strings.
+   */
+  slides.questionSlides = function (q, payload, colIndex) {
+    var brand = hex(TR.charts.brandOf(payload));
+    var cols = TR.data.bannerColumns(payload, q);
+    var matrix = TR.tables.matrix(q, payload);
+    var metaLine = [payload.project.name, payload.project.wave,
+      "Base: " + (q.base_label || "All respondents") +
+      (q.bases ? " · n=" + fmt.base(q.bases[0]) : "")].filter(Boolean).join(" · ");
+    var title = (q.code || q.id) + " — " + q.title;
+    var contentH = C.SLIDE_H_IN - CONTENT_TOP_IN - 0.45;
+    var compact = (q.rows || []).length > 0 && (q.rows || []).length <= 9 &&
+      cols.length <= 6 && matrix.body.length <= C.PPTX_TABLE_ROWS_PER_SLIDE;
+
+    if (compact) {
+      var ids = idCounter();
+      var barRows = q.rows.map(function (row) {
+        return { label: row.label, value: row.values[colIndex],
+          sig: row.sig ? row.sig[colIndex] : "" };
+      });
+      var axisMax = TR.svg.niceMax(TR.data.maxRowValue(q));
+      var content = header(ids, title, metaLine +
+          " · bars: " + (cols[colIndex] || "Total"), brand) +
+        barGroup(ids, { x: MARGIN_IN, y: CONTENT_TOP_IN, w: 5.4, h: contentH },
+          barRows, axisMax, brand, payload) +
+        tableFrame(ids.next(), { x: 6.3, y: CONTENT_TOP_IN,
+          w: C.SLIDE_W_IN - 6.3 - MARGIN_IN,
+          h: Math.min(contentH, (matrix.body.length + 1) * 0.32) },
+          matrix, brand, 10);
+      return [wrap(content)];
+    }
+
+    return chunkMatrix(matrix).map(function (chunk, i, all) {
+      var ids = idCounter();
+      var suffix = all.length > 1 ? " (" + (i + 1) + "/" + all.length + ")" : "";
+      return wrap(header(ids, title + suffix, metaLine, brand) +
+        tableFrame(ids.next(), { x: MARGIN_IN, y: CONTENT_TOP_IN,
+          w: C.SLIDE_W_IN - MARGIN_IN * 2,
+          h: Math.min(contentH, (chunk.body.length + 1) * 0.3) },
+          chunk, brand, matrix.head.length > 7 ? 9 : 10));
+    });
+  };
+
+  /** One slide for a composite view: grouped editable bars per question. */
+  slides.compositeSlide = function (model, payload) {
+    var brand = hex(TR.charts.brandOf(payload));
+    var light = hex(TR.svg.shade(TR.charts.brandOf(payload), 0.55));
+    var ids = idCounter();
+    var title = "Composite — " + model.items.map(function (i) { return i.code; }).join(" + ");
+    var metaLine = payload.project.name + " · column: " + model.column +
+      " · shared axis 0–" + model.sharedMax + "%";
+    var content = header(ids, title, metaLine, brand);
+    var contentH = C.SLIDE_H_IN - CONTENT_TOP_IN - 0.4;
+    var slotW = (C.SLIDE_W_IN - MARGIN_IN * 2) / model.items.length;
+    model.items.forEach(function (item, i) {
+      var x = MARGIN_IN + i * slotW;
+      content += textBox(ids.next(), "QTitle",
+        { x: x, y: CONTENT_TOP_IN, w: slotW - 0.2, h: 0.5 },
+        [para(item.code + " · " + TR.charts.clip(item.title, 38),
+          { size: 11, bold: true, colour: INK }),
+         para("n=" + (item.base != null ? fmt.base(item.base) : "–"),
+          { size: 9, colour: GREY })]);
+      content += barGroup(ids, { x: x, y: CONTENT_TOP_IN + 0.6,
+        w: slotW - 0.3, h: contentH - 0.6 },
+        item.rows.slice(0, 8).map(function (r) { return r; }),
+        model.sharedMax, i % 2 === 0 ? brand : light, payload);
+    });
+    return wrap(content);
+  };
+
+})(typeof window !== "undefined" ? window : globalThis);
+
+/**
+ * Deck builder (Tier B) — collect questions and composite views, then
+ * download a native, editable .pptx built entirely in-file (13_zip +
+ * 14_pptx_parts + 15_pptx_slides). Shipped only when project.export.pptx
+ * is enabled; the whole tier costs ~20 KB of source, not 0.94 MB.
+ */
+(function (global) {
+  "use strict";
+  var TR = global.TR, fmt = TR.fmt;
+
+  var deck = TR.deck = {};
+  deck.items = [];
+
+  function refreshCount() {
+    var badge = document.getElementById("deck-count");
+    if (badge) badge.textContent = String(deck.items.length);
+  }
+
+  /** Add a question card (with its selected chart column) to the deck. */
+  deck.addQuestion = function (card, payload) {
+    var q = TR.data.questionById(payload, card.getAttribute("data-q"));
+    if (!q) return;
+    deck.items.push({ kind: "question", qid: q.id,
+      colIndex: parseInt(card.getAttribute("data-col") || "0", 10) || 0,
+      label: (q.code || q.id) + " — " + TR.charts.clip(q.title, 48) });
+    refreshCount();
+    TR.wire.toast("Added to deck (" + deck.items.length + ")");
+  };
+
+  /** Add a composite model snapshot to the deck. */
+  deck.addComposite = function (model, payload) {
+    deck.items.push({ kind: "composite", model: model,
+      label: "Composite — " + model.items.map(function (i) {
+        return i.code; }).join(" + ") });
+    refreshCount();
+    TR.wire.toast("Composite added to deck (" + deck.items.length + ")");
+  };
+
+  deck.removeAt = function (index, payload) {
+    deck.items.splice(index, 1);
+    refreshCount();
+    deck.openDrawer(payload);
+  };
+
+  deck.clear = function (payload) {
+    deck.items = [];
+    refreshCount();
+    deck.openDrawer(payload);
+  };
+
+  deck.openDrawer = function (payload) {
+    var drawer = document.getElementById("deck-drawer");
+    var list = deck.items.length
+      ? deck.items.map(function (item, i) {
+          return '<div class="deckitem"><span>' + (i + 1) + ". " +
+            fmt.escapeHtml(item.label) + "</span>" +
+            '<button type="button" data-action="deck-remove" data-index="' + i +
+            '" aria-label="Remove from deck">✕</button></div>';
+        }).join("")
+      : '<p class="drawerhint">The deck is empty. Use <strong>+ Deck</strong> on any ' +
+        "question or composite view, then download a native PowerPoint file — " +
+        "real text and tables, every bar an editable shape. No screenshots.</p>";
+    drawer.innerHTML = '<div class="drawerhead"><h2>Export deck</h2>' +
+      '<button type="button" data-action="drawer-close" aria-label="Close">✕</button></div>' +
+      list +
+      (deck.items.length
+        ? '<button type="button" class="primary wide" data-action="deck-download">' +
+          "Download .pptx (" + deck.items.length + " exhibits)</button>" +
+          '<button type="button" class="wide" data-action="deck-clear">Clear deck</button>'
+        : "");
+    TR.wire.openDrawer("deck-drawer");
+  };
+
+  /** Build the slide XML list for the current deck (pure given payload). */
+  deck.buildSlides = function (payload) {
+    var slideXmls = [TR.pptxSlides.titleSlide(payload, deck.items.length)];
+    deck.items.forEach(function (item) {
+      if (item.kind === "question") {
+        var q = TR.data.questionById(payload, item.qid);
+        if (q) {
+          slideXmls.push.apply(slideXmls,
+            TR.pptxSlides.questionSlides(q, payload, item.colIndex));
+        }
+      } else {
+        slideXmls.push(TR.pptxSlides.compositeSlide(item.model, payload));
+      }
+    });
+    return slideXmls;
+  };
+
+  /** Package and download the deck as a .pptx. */
+  deck.download = function (payload) {
+    var bytes;
+    try {
+      bytes = TR.pptx.package(deck.buildSlides(payload), payload);
+    } catch (e) {
+      if (global.console) console.error("[TurasReport] pptx build failed:", e);
+      TR.wire.toast("PPTX build failed — see console");
+      return;
+    }
+    var blob = new Blob([bytes], {
+      type: "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    });
+    var link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = fmt.slug(payload.project.name) + "_deck.pptx";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+    TR.wire.closeDrawers();
+    TR.wire.toast("Native PowerPoint downloaded — fully editable");
+  };
+
+})(typeof window !== "undefined" ? window : globalThis);
+
+/**
+ * In-browser self-test — open the report with #selftest appended to the URL
+ * and a pass/fail panel renders at the top. Mirrors the node known-answer
+ * suite so the report can be verified without any tooling installed.
+ */
+(function (global) {
+  "use strict";
+  var TR = global.TR;
+
+  var selftest = TR.selftest = {};
+
+  function assertEqual(actual, expected, label) {
+    var a = JSON.stringify(actual), e = JSON.stringify(expected);
+    if (a !== e) throw new Error(label + ": expected " + e + ", got " + a);
+  }
+
+  /** Shared known-answer cases (also run by tests/run_tests.mjs via node). */
+  selftest.cases = function () {
+    return [
+      { name: "fmt.num percent rounding", fn: function () {
+        assertEqual(TR.fmt.num(42.4, "pct"), "42%", "42.4 pct");
+        assertEqual(TR.fmt.num(42.5, "pct"), "43%", "42.5 pct");
+        assertEqual(TR.fmt.num(3.84, "dec1"), "3.8", "3.84 dec1");
+        assertEqual(TR.fmt.num(5, "nps"), "+5", "nps positive");
+        assertEqual(TR.fmt.num(-9, "nps"), "-9", "nps negative");
+        assertEqual(TR.fmt.num(null, "pct"), "–", "null");
+      } },
+      { name: "fmt.base thousands", fn: function () {
+        assertEqual(TR.fmt.base(12345), "12\u202F345", "12345");
+        assertEqual(TR.fmt.base(500), "500", "500");
+      } },
+      { name: "escaping", fn: function () {
+        assertEqual(TR.fmt.escapeHtml('<b a="1">'), "&lt;b a=&quot;1&quot;&gt;", "html");
+        assertEqual(TR.fmt.escapeXml("a&'b"), "a&amp;&apos;b", "xml");
+      } },
+      { name: "svg.niceMax steps", fn: function () {
+        assertEqual(TR.svg.niceMax(47), 50, "47");
+        assertEqual(TR.svg.niceMax(82), 100, "82");
+        assertEqual(TR.svg.niceMax(130), 150, "130");
+        assertEqual(TR.svg.niceMax(0), 10, "0");
+      } },
+      { name: "svg.shade colour mix", fn: function () {
+        assertEqual(TR.svg.shade("#000000", 0.5), "#808080", "black 0.5");
+        assertEqual(TR.svg.shade("#323367", 1), "#323367", "full strength");
+      } },
+      { name: "crc32 known answers", fn: function () {
+        assertEqual(TR.zip.crc32(TR.zip.bytes("123456789")), 0xCBF43926, "123456789");
+        assertEqual(TR.zip.crc32(TR.zip.bytes("")), 0, "empty");
+      } },
+      { name: "zip structure", fn: function () {
+        var bytes = TR.zip.build([{ name: "a.txt", data: "hello" },
+          { name: "b/c.xml", data: "<x/>" }]);
+        assertEqual([bytes[0], bytes[1], bytes[2], bytes[3]],
+          [0x50, 0x4B, 0x03, 0x04], "local header signature");
+        var eocd = bytes.length - 22;
+        assertEqual([bytes[eocd], bytes[eocd + 1], bytes[eocd + 2], bytes[eocd + 3]],
+          [0x50, 0x4B, 0x05, 0x06], "EOCD signature");
+        assertEqual(bytes[eocd + 10] + (bytes[eocd + 11] << 8), 2, "entry count");
+      } },
+      { name: "validate accumulates errors", fn: function () {
+        var bad = { project: {}, banner: { columns: ["Total", "A"] },
+          questions: [{ id: "x", title: "t", type: "wrong",
+            rows: [{ label: "r", values: [1] }] }] };
+        var res = TR.data.validate(bad);
+        assertEqual(res.ok, false, "ok flag");
+        var codes = res.errors.map(function (e) { return e.code; });
+        assertEqual(codes.indexOf("DATA_NO_PROJECT") >= 0, true, "project error");
+        assertEqual(codes.indexOf("DATA_Q_BAD_TYPE") >= 0, true, "type error");
+        assertEqual(codes.indexOf("DATA_ROW_LEN") >= 0, true, "row length error");
+      } },
+      { name: "bar geometry known answer", fn: function () {
+        var payload = { project: { name: "t", brand_colour: "#323367" },
+          banner: { columns: ["Total"] },
+          questions: [] };
+        var q = { id: "k", title: "k", type: "single",
+          rows: [{ label: "Row", values: [25] }] };
+        var svgString = TR.charts.hBars(q, payload, 0);
+        // plot width = 660-170-64 = 426; axis max 25 -> 25; bar = full 426
+        assertEqual(svgString.indexOf('width="426"') >= 0, true, "bar width 426");
+      } },
+      { name: "composer.compose model", fn: function () {
+        var payload = { project: { name: "t" },
+          banner: { columns: ["Total", "A"] },
+          questions: [
+            { id: "a", code: "A1", title: "A", type: "single", bases: [10, 5],
+              rows: [{ label: "x", values: [40, 20] }] },
+            { id: "b", code: "B1", title: "B", type: "single", bases: [10, 5],
+              rows: [{ label: "y", values: [60, 30] }] }
+          ] };
+        var res = TR.composer.compose(payload, ["a", "b"], 0);
+        assertEqual(res.ok, true, "ok");
+        assertEqual(res.model.items.length, 2, "items");
+        assertEqual(res.model.sharedMax, 60, "shared max");
+        assertEqual(res.model.trends.length, 0, "no trends");
+        var tooFew = TR.composer.compose(payload, ["a"], 0);
+        assertEqual(tooFew.ok, false, "min enforced");
+      } },
+      { name: "pptx package parts", fn: function () {
+        var payload = { project: { name: "t", brand_colour: "#323367" },
+          banner: { columns: ["Total"] }, questions: [] };
+        var bytes = TR.pptx.package([TR.pptxSlides.titleSlide(payload, 1)], payload);
+        assertEqual(bytes.length > 2000, true, "non-trivial size");
+        assertEqual([bytes[0], bytes[1]], [0x50, 0x4B], "zip magic");
+      } },
+      { name: "renderer survives broken question (browser)", fn: function () {
+        if (typeof document === "undefined") return;
+        var payload = TR.state.payload;
+        var broken = { id: "__broken__", code: "X", title: "Broken", type: "single",
+          rows: null, stats: [{ label: "Mean", values: payload.banner.columns.map(
+            function () { return 1; }) }] };
+        var article = document.createElement("article");
+        article.setAttribute("data-q", "__broken__");
+        article.setAttribute("data-col", "0");
+        article.innerHTML = '<div class="cardbody pending"></div>';
+        var patched = { project: payload.project, banner: payload.banner,
+          questions: [broken] };
+        TR.cards.fill(article, patched);
+        var table = article.querySelector('[data-slot="table"]');
+        assertEqual(!!table && table.innerHTML.indexOf("Mean") >= 0, true,
+          "table renders despite missing rows");
+      } }
+    ];
+  };
+
+  /** Run all cases; render a panel in the browser, return results. */
+  selftest.run = function () {
+    var results = selftest.cases().map(function (testCase) {
+      try {
+        testCase.fn();
+        return { name: testCase.name, ok: true, error: null };
+      } catch (e) {
+        return { name: testCase.name, ok: false, error: e.message };
+      }
+    });
+    if (typeof document !== "undefined") {
+      var failed = results.filter(function (r) { return !r.ok; }).length;
+      var panel = document.createElement("section");
+      panel.className = "card selftest" + (failed ? " selftest-fail" : "");
+      panel.innerHTML = "<h2>Self-test: " + (results.length - failed) + "/" +
+        results.length + " passed</h2><ul>" + results.map(function (r) {
+          return "<li>" + (r.ok ? "✓" : "✗") + " " + TR.fmt.escapeHtml(r.name) +
+            (r.error ? " — <code>" + TR.fmt.escapeHtml(r.error) + "</code>" : "") +
+            "</li>";
+        }).join("") + "</ul>";
+      var main = document.getElementById("main");
+      if (main) main.prepend(panel);
+    }
+    return results;
+  };
+
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+</body>
+</html>

@@ -1,0 +1,206 @@
+{
+  "schema_version": 1,
+  "project": {
+    "name": "Meridian Coffee Brand Tracker",
+    "client": "Meridian Beverages Ltd",
+    "wave": "Wave 3 · April 2026",
+    "fieldwork": "Online panel · 2–14 April 2026 · n=500",
+    "brand_colour": "#323367",
+    "accent_colour": "#C9A84C",
+    "sig_note": "Superscript letters mark values significantly higher than that banner column at 95% confidence. The Total column is not tested.",
+    "export": { "pptx": true },
+    "format": { "percent_decimals": 0 }
+  },
+  "banner": {
+    "label": "Age groups",
+    "columns": ["Total", "18–34", "35–54", "55+"],
+    "letters": ["T", "A", "B", "C"]
+  },
+  "sections": [
+    { "id": "s1", "title": "Brand health", "questions": ["q1", "q2"] },
+    { "id": "s2", "title": "Experience", "questions": ["q3", "q7", "q4"] },
+    { "id": "s3", "title": "Usage & behaviour", "questions": ["q5", "q6", "q8"] }
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "code": "Q1",
+      "title": "Which coffee brand do you buy most often?",
+      "type": "single",
+      "base_label": "All respondents",
+      "bases": [500, 180, 190, 130],
+      "rows": [
+        { "label": "Meridian", "values": [34, 41, 33, 26], "sig": ["", "C", "", ""] },
+        { "label": "Café Royale", "values": [24, 18, 26, 30], "sig": ["", "", "", "A"] },
+        { "label": "Union Roast", "values": [18, 16, 19, 20], "sig": ["", "", "", ""] },
+        { "label": "Birdsong", "values": [12, 15, 11, 10], "sig": ["", "", "", ""] },
+        { "label": "Another brand", "values": [8, 7, 8, 9], "sig": ["", "", "", ""] },
+        { "label": "No usual brand", "values": [4, 3, 3, 5], "sig": ["", "", "", ""] }
+      ]
+    },
+    {
+      "id": "q2",
+      "code": "Q2",
+      "title": "Which of these brands have you purchased in the last 3 months?",
+      "type": "multi",
+      "base_label": "All respondents",
+      "bases": [500, 180, 190, 130],
+      "rows": [
+        { "label": "Meridian", "values": [56, 63, 55, 47], "sig": ["", "C", "", ""] },
+        { "label": "Café Royale", "values": [44, 39, 46, 49], "sig": ["", "", "", ""] },
+        { "label": "Private label / store brand", "values": [38, 33, 38, 45], "sig": ["", "", "", "A"] },
+        { "label": "Union Roast", "values": [31, 29, 33, 30], "sig": ["", "", "", ""] },
+        { "label": "Birdsong", "values": [24, 30, 22, 18], "sig": ["", "C", "", ""] },
+        { "label": "A specialty / local roaster", "values": [18, 26, 16, 10], "sig": ["", "BC", "", ""] },
+        { "label": "None of these", "values": [6, 4, 6, 9], "sig": ["", "", "", ""] }
+      ]
+    },
+    {
+      "id": "q3",
+      "code": "Q3",
+      "title": "Overall, how satisfied are you with your main coffee brand?",
+      "type": "scale",
+      "scale": { "min": 1, "max": 5 },
+      "base_label": "All respondents",
+      "bases": [500, 180, 190, 130],
+      "rows": [
+        { "label": "Very dissatisfied (1)", "values": [4, 3, 4, 6], "sig": ["", "", "", ""] },
+        { "label": "Dissatisfied (2)", "values": [9, 7, 9, 12], "sig": ["", "", "", ""] },
+        { "label": "Neutral (3)", "values": [24, 20, 24, 29], "sig": ["", "", "", "A"] },
+        { "label": "Satisfied (4)", "values": [38, 40, 38, 35], "sig": ["", "", "", ""] },
+        { "label": "Very satisfied (5)", "values": [25, 30, 25, 18], "sig": ["", "C", "", ""] }
+      ],
+      "stats": [
+        { "label": "Mean (1–5)", "values": [3.71, 3.87, 3.71, 3.47], "sig": ["", "C", "C", ""], "format": "dec1" },
+        { "label": "Top-2 box", "values": [63, 70, 63, 53], "sig": ["", "C", "", ""], "format": "pct" }
+      ],
+      "meta": {
+        "waves": {
+          "stat": "Mean (1–5)",
+          "format": "dec1",
+          "labels": ["Apr 2025", "Oct 2025", "Apr 2026"],
+          "series": [
+            { "column": "Total", "values": [3.55, 3.64, 3.71] },
+            { "column": "18–34", "values": [3.7, 3.79, 3.87] },
+            { "column": "35–54", "values": [3.52, 3.62, 3.71] },
+            { "column": "55+", "values": [3.41, 3.45, 3.47] }
+          ]
+        }
+      }
+    },
+    {
+      "id": "q7",
+      "code": "Q4",
+      "title": "How would you rate your main brand on value for money?",
+      "type": "scale",
+      "scale": { "min": 1, "max": 5 },
+      "base_label": "All respondents",
+      "bases": [500, 180, 190, 130],
+      "rows": [
+        { "label": "Very poor value (1)", "values": [7, 5, 7, 9], "sig": ["", "", "", ""] },
+        { "label": "Poor value (2)", "values": [15, 12, 15, 19], "sig": ["", "", "", ""] },
+        { "label": "Average (3)", "values": [33, 30, 33, 36], "sig": ["", "", "", ""] },
+        { "label": "Good value (4)", "values": [31, 34, 31, 27], "sig": ["", "", "", ""] },
+        { "label": "Excellent value (5)", "values": [14, 19, 14, 9], "sig": ["", "C", "", ""] }
+      ],
+      "stats": [
+        { "label": "Mean (1–5)", "values": [3.3, 3.5, 3.3, 3.08], "sig": ["", "C", "C", ""], "format": "dec1" },
+        { "label": "Top-2 box", "values": [45, 53, 45, 36], "sig": ["", "C", "", ""], "format": "pct" }
+      ],
+      "meta": {
+        "waves": {
+          "stat": "Mean (1–5)",
+          "format": "dec1",
+          "labels": ["Apr 2025", "Oct 2025", "Apr 2026"],
+          "series": [
+            { "column": "Total", "values": [3.52, 3.41, 3.3] },
+            { "column": "18–34", "values": [3.66, 3.58, 3.5] },
+            { "column": "35–54", "values": [3.5, 3.4, 3.3] },
+            { "column": "55+", "values": [3.31, 3.19, 3.08] }
+          ]
+        }
+      }
+    },
+    {
+      "id": "q4",
+      "code": "Q5",
+      "title": "How likely are you to recommend your main brand to a friend or colleague?",
+      "type": "nps",
+      "base_label": "All respondents",
+      "bases": [500, 180, 190, 130],
+      "rows": [
+        { "label": "Promoters (9–10)", "values": [32, 38, 31, 25], "sig": ["", "C", "", ""] },
+        { "label": "Passives (7–8)", "values": [41, 39, 43, 41], "sig": ["", "", "", ""] },
+        { "label": "Detractors (0–6)", "values": [27, 23, 26, 34], "sig": ["", "", "", "A"] }
+      ],
+      "stats": [
+        { "label": "NPS", "values": [5, 15, 5, -9], "sig": ["", "C", "", ""], "format": "nps" }
+      ],
+      "meta": {
+        "waves": {
+          "stat": "NPS",
+          "format": "nps",
+          "labels": ["Apr 2025", "Oct 2025", "Apr 2026"],
+          "series": [
+            { "column": "Total", "values": [-2, 1, 5] },
+            { "column": "18–34", "values": [6, 11, 15] },
+            { "column": "35–54", "values": [-2, 1, 5] },
+            { "column": "55+", "values": [-15, -12, -9] }
+          ]
+        }
+      }
+    },
+    {
+      "id": "q5",
+      "code": "Q6",
+      "title": "On a typical weekday, how many cups of coffee do you drink?",
+      "type": "numeric",
+      "base_label": "All respondents",
+      "bases": [500, 180, 190, 130],
+      "rows": [
+        { "label": "None", "values": [9, 6, 8, 14], "sig": ["", "", "", "A"] },
+        { "label": "1 cup", "values": [22, 18, 21, 29], "sig": ["", "", "", "A"] },
+        { "label": "2 cups", "values": [31, 30, 32, 30], "sig": ["", "", "", ""] },
+        { "label": "3 cups", "values": [21, 24, 21, 16], "sig": ["", "", "", ""] },
+        { "label": "4 or more", "values": [17, 22, 18, 11], "sig": ["", "C", "", ""] }
+      ],
+      "stats": [
+        { "label": "Mean cups", "values": [2.2, 2.6, 2.3, 1.8], "sig": ["", "BC", "C", ""], "format": "dec1" },
+        { "label": "Median cups", "values": [2, 2, 2, 2], "sig": ["", "", "", ""], "format": "int" }
+      ]
+    },
+    {
+      "id": "q6",
+      "code": "Q7",
+      "title": "Where do you usually buy your coffee?",
+      "type": "single",
+      "base_label": "All respondents",
+      "bases": [500, 180, 190, 130],
+      "rows": [
+        { "label": "Supermarket", "values": [52, 41, 53, 65], "sig": ["", "", "A", "AB"] },
+        { "label": "Coffee shop / café", "values": [17, 22, 17, 11], "sig": ["", "C", "", ""] },
+        { "label": "Online subscription", "values": [14, 24, 12, 4], "sig": ["", "BC", "C", ""] },
+        { "label": "Convenience store", "values": [11, 9, 12, 12], "sig": ["", "", "", ""] },
+        { "label": "Somewhere else", "values": [6, 4, 6, 8], "sig": ["", "", "", ""] }
+      ]
+    },
+    {
+      "id": "q8",
+      "code": "Q8",
+      "title": "Why do you choose your main brand? (all reasons)",
+      "type": "multi",
+      "base_label": "Respondents with a usual brand",
+      "bases": [480, 172, 183, 125],
+      "rows": [
+        { "label": "Taste / flavour", "values": [64, 61, 66, 65], "sig": ["", "", "", ""] },
+        { "label": "Price / promotions", "values": [41, 38, 40, 47], "sig": ["", "", "", ""] },
+        { "label": "Availability where I shop", "values": [33, 30, 34, 36], "sig": ["", "", "", ""] },
+        { "label": "Trust in the brand", "values": [28, 24, 29, 32], "sig": ["", "", "", ""] },
+        { "label": "Habit — always bought it", "values": [26, 19, 26, 35], "sig": ["", "", "", "A"] },
+        { "label": "Ethical / sustainable sourcing", "values": [22, 31, 20, 13], "sig": ["", "BC", "", ""] },
+        { "label": "Packaging / design", "values": [12, 16, 11, 8], "sig": ["", "C", "", ""] },
+        { "label": "Recommended by someone", "values": [9, 13, 8, 5], "sig": ["", "C", "", ""] }
+      ]
+    }
+  ]
+}
