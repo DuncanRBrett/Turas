@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SACAP 2025 Annual Student Survey — Turas Report v2</title>
-<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 00:18 SAST -->
+<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 00:26 SAST -->
 <!-- Single self-contained file: published tables + prior wave + synthetic
      microdata + one fixed renderer. No network requests, no installs. -->
 <style>
@@ -71,6 +71,11 @@ h1, h2, h3 { line-height: 1.25; letter-spacing: -.2px; }
 .fpick-q.hidden { display: none; }
 .fpick-q .qc { color: var(--brand); font-weight: 700; font-size: 11px; }
 .fpick-vals { max-height: 300px; overflow: auto; margin-bottom: 8px; }
+.fpick-foot { display: flex; gap: 14px; align-items: center; margin-top: 10px; font-size: 12.5px; }
+.fpick-foot label { cursor: pointer; }
+label.fpick-q { display: block; cursor: pointer; }
+.pinmenu .pm-sep { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 9px; }
+.ex-chart + .ex-chart { margin-top: 6px; }
 .fval { display: block; padding: 6px 9px; border-radius: 7px; cursor: pointer; font-size: 12.5px; }
 .fval:hover { background: var(--soft); }
 .fval input { accent-color: var(--brand); margin-right: 7px; }
@@ -2754,6 +2759,8 @@ null
     });
     var axisMax = meanScale ? Math.max(S.niceMax(hi), 10) : S.niceMax(hi);
     var axisMin = lo < 0 ? -S.niceMax(-lo) : 0;
+    // % suffix only when every plotted series is a proportion
+    var pctAxis = rows.every(function (r) { return r.kind !== "mean"; });
 
     var W = 660, H = 240, padL = 46, padR = 110, padT = 18, padB = 30;
     var plotW = W - padL - padR, plotH = H - padT - padB;
@@ -2771,7 +2778,8 @@ null
       body.push(S.el("line", { x1: padL, y1: yOf(v), x2: padL + plotW,
         y2: yOf(v), stroke: f === 0 ? "#d8dcea" : "#eef0f7" }));
       body.push(S.text(padL - 6, yOf(v) + 3,
-        meanScale ? (Math.round(v * 10) / 10) : Math.round(v) + "%",
+        meanScale ? (Math.round(v * 10) / 10)
+          : Math.round(v) + (pctAxis ? "%" : ""),
         { "text-anchor": "end", "font-size": 9.5, fill: "#9aa1b1" }));
     });
     years.forEach(function (year) {
@@ -3372,13 +3380,21 @@ null
         }
       });
     }, 0);
+    var tracked = !!cards2.activeModel().prevWave;
     menu.innerHTML = '<div class="pm-title">Pin to story</div>' +
       '<label><input type="checkbox" id="pm-chart"' +
       (s.showChart ? " checked" : "") + "> Chart (" +
       fmt.escapeHtml(s.chartType) + ")</label>" +
       '<label><input type="checkbox" id="pm-table" checked> Table</label>' +
       '<label><input type="checkbox" id="pm-insight" checked> Insight</label>' +
-      '<button class="primary wide" id="pm-go">Pin</button>';
+      '<button class="primary wide" id="pm-go">Pin</button>' +
+      (tracked
+        ? '<div class="pm-title pm-sep">Trend exhibit</div>' +
+          '<button class="wide" id="pm-exhibit" title="Two-panel exhibit: this ' +
+          "wave's distribution chart with the trend over waves below — exports " +
+          'to PowerPoint as two editable chart objects on one slide">' +
+          "📈 Pin distribution + trend</button>"
+        : "");
     document.getElementById("pm-go").addEventListener("click", function () {
       var flags = {
         chart: document.getElementById("pm-chart").checked,
@@ -3392,6 +3408,13 @@ null
       }
       TR.story2.pinCurrent(flags);
     });
+    var exhibitBtn = document.getElementById("pm-exhibit");
+    if (exhibitBtn) {
+      exhibitBtn.addEventListener("click", function () {
+        menu.hidden = true;
+        TR.story2.pinExhibit();
+      });
+    }
   }
 
   function step(delta) {
@@ -4631,14 +4654,15 @@ null
     'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" ' +
     'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
 
-  function chartAxes(catPos, valPos) {
+  function chartAxes(catPos, valPos, fmtCode) {
     return '<c:catAx><c:axId val="111111111"/><c:scaling>' +
       '<c:orientation val="minMax"/></c:scaling><c:delete val="0"/>' +
       '<c:axPos val="' + catPos + '"/><c:crossAx val="222222222"/></c:catAx>' +
       '<c:valAx><c:axId val="222222222"/><c:scaling>' +
       '<c:orientation val="minMax"/></c:scaling><c:delete val="0"/>' +
       '<c:axPos val="' + valPos + '"/><c:majorGridlines/>' +
-      '<c:numFmt formatCode="0&quot;%&quot;" sourceLinked="0"/>' +
+      '<c:numFmt formatCode="' + (fmtCode || "0&quot;%&quot;") +
+      '" sourceLinked="0"/>' +
       '<c:crossAx val="111111111"/></c:valAx>';
   }
 
@@ -4737,6 +4761,129 @@ null
       }));
     }));
     return { xml: xml, workbook: TR.xlsx.bytes("Chart data", workbookRows) };
+  };
+
+  /**
+   * Native line chart over wave years for the trended rows of a model
+   * (real or pseudo): one series per row with history, categories = the
+   * union of years incl. the current wave. {xml, workbook} or null.
+   */
+  exporter.buildTrendChart = function (model) {
+    var rows = model.rows.filter(function (r) {
+      return r.waves && r.waves.length;
+    }).slice(0, 6);
+    if (!rows.length) return null;
+    var palette = TR.render.palette();
+    var years = [];
+    rows.forEach(function (r) {
+      TR.render.wavePoints(r).forEach(function (p) {
+        if (p.year !== null && years.indexOf(p.year) === -1) years.push(p.year);
+      });
+    });
+    years.sort();
+    var pointsOf = function (r) {
+      var byYear = {};
+      TR.render.wavePoints(r).forEach(function (p) { byYear[p.year] = p.value; });
+      return years.map(function (y) {
+        return byYear[y] === undefined ? null : Math.round(byYear[y] * 10) / 10;
+      });
+    };
+    var catPts = years.map(function (y, i) {
+      return '<c:pt idx="' + i + '"><c:v>' + y + "</c:v></c:pt>";
+    }).join("");
+    var catRef = '<c:cat><c:strRef><c:f>Sheet1!$A$2:$A$' + (years.length + 1) +
+      '</c:f><c:strCache><c:ptCount val="' + years.length + '"/>' + catPts +
+      "</c:strCache></c:strRef></c:cat>";
+    var series = rows.map(function (r, k) {
+      var colour = palette[k % palette.length].replace("#", "").toUpperCase();
+      var letter = String.fromCharCode(66 + k);
+      var valPts = pointsOf(r).map(function (v, i) {
+        return '<c:pt idx="' + i + '"><c:v>' + (v === null ? "" : v) + "</c:v></c:pt>";
+      }).join("");
+      return '<c:ser><c:idx val="' + k + '"/><c:order val="' + k + '"/>' +
+        '<c:tx><c:strRef><c:f>Sheet1!$' + letter + '$1</c:f><c:strCache>' +
+        '<c:ptCount val="1"/><c:pt idx="0"><c:v>' + esc(r.label) +
+        "</c:v></c:pt></c:strCache></c:strRef></c:tx>" +
+        '<c:spPr><a:ln w="28575"><a:solidFill><a:srgbClr val="' + colour +
+        '"/></a:solidFill></a:ln></c:spPr>' +
+        '<c:marker><c:symbol val="circle"/><c:size val="6"/>' +
+        '<c:spPr><a:solidFill><a:srgbClr val="' + colour + '"/></a:solidFill></c:spPr></c:marker>' +
+        catRef +
+        '<c:val><c:numRef><c:f>Sheet1!$' + letter + "$2:$" + letter + "$" +
+        (years.length + 1) + '</c:f><c:numCache><c:formatCode>General</c:formatCode>' +
+        '<c:ptCount val="' + years.length + '"/>' + valPts +
+        "</c:numCache></c:numRef></c:val></c:ser>";
+    }).join("");
+    var pctOnly = rows.every(function (r) { return r.kind !== "mean"; });
+    var xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      "<c:chartSpace " + C_NS + "><c:chart><c:plotArea><c:layout/>" +
+      '<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>' +
+      series + '<c:marker val="1"/>' +
+      '<c:axId val="111111111"/><c:axId val="222222222"/></c:lineChart>' +
+      chartAxes("b", "l", pctOnly ? null : "General") + "</c:plotArea>" +
+      (rows.length > 1
+        ? '<c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend>' : "") +
+      '<c:plotVisOnly val="1"/></c:chart>' +
+      '<c:externalData r:id="rId1"><c:autoUpdate val="0"/></c:externalData></c:chartSpace>';
+    var workbookRows = [[""].concat(rows.map(function (r) { return r.label; }))]
+      .concat(years.map(function (y, i) {
+        return [y].concat(rows.map(function (r) {
+          var v = pointsOf(r)[i];
+          return v === null ? "" : v;
+        }));
+      }));
+    return { xml: xml, workbook: TR.xlsx.bytes("Trend data", workbookRows) };
+  };
+
+  /**
+   * Exhibit slide: stacked native chart objects (each its own editable
+   * chart, rels rId2..rId(1+n)) + optional table + insight band.
+   * @param {object} spec - {title, meta, charts, matrix, note}.
+   */
+  exporter.exhibitSlide = function (spec) {
+    var brand = TR.charts.brandOf().replace("#", "").toUpperCase();
+    var id = 1;
+    var next = function () { return ++id; };
+    var contentW = SLIDE_W - MARGIN * 2;
+    var hasNote = !!(spec.note && spec.note.trim());
+    var noteLines = hasNote ? wrapText(spec.note, 150).slice(0, 3) : [];
+    var noteH = hasNote ? 0.45 + noteLines.length * 0.24 : 0;
+    var content =
+      rectShape(next(), { x: 0, y: 0, w: SLIDE_W, h: 0.07 }, brand) +
+      textBox(next(), { x: MARGIN, y: 0.3, w: contentW, h: 0.65 },
+        [para(spec.title, { size: 19, bold: true, colour: brand })]) +
+      textBox(next(), { x: MARGIN, y: 0.95, w: contentW, h: 0.3 },
+        [para(spec.meta || "", { size: 10.5, colour: GREY })]);
+    var top = 1.45, bottom = SLIDE_H - 0.35 - noteH;
+    var charts = spec.charts || [];
+    var blocks = charts.length + (spec.matrix ? 1 : 0);
+    var blockH = blocks ? (bottom - top - (blocks - 1) * 0.2) / blocks : 0;
+    charts.forEach(function (_, k) {
+      content += chartFrame(next(),
+        { x: MARGIN, y: top, w: contentW, h: blockH }, "rId" + (2 + k));
+      top += blockH + 0.2;
+    });
+    if (spec.matrix) {
+      var matrix = spec.matrix;
+      var maxRows = Math.max(3, Math.floor(blockH / 0.28) - 1);
+      if (matrix.body.length > maxRows) {
+        matrix = { head: matrix.head, body: matrix.body.slice(0, maxRows) };
+      }
+      content += tableFrame(next(), { x: MARGIN, y: top, w: contentW,
+        h: Math.min(blockH, (matrix.body.length + 1) * 0.28) }, matrix, brand,
+        matrix.head.length > 8 ? 8.5 : 10);
+    }
+    if (hasNote) {
+      var noteY = SLIDE_H - 0.25 - noteH;
+      content += rectShape(next(), { x: MARGIN, y: noteY, w: contentW, h: noteH }, "FBF6E8") +
+        rectShape(next(), { x: MARGIN, y: noteY, w: 0.05, h: noteH }, "CC9900") +
+        textBox(next(), { x: MARGIN + 0.2, y: noteY + 0.08, w: contentW - 0.4, h: noteH - 0.12 },
+          [para("ANALYST INSIGHT", { size: 8.5, bold: true, colour: "CC9900" })]
+            .concat(noteLines.map(function (line) {
+              return para(line, { size: 11.5, colour: INK });
+            })));
+    }
+    return { xml: wrapSlide(content), charts: charts };
   };
 
   function chartFrame(id, box, relId) {
@@ -4959,6 +5106,63 @@ null
     TR.shell.toast("Pinned to story (" + load().length + ") — see the Story tab");
   };
 
+  /** The flagship two-panel pin: this-wave distribution + trend-over-waves. */
+  story2.pinExhibit = function () {
+    var s = TR.d2.state;
+    var chartState = TR.cards2.chartState();
+    load().push({ kind: "exhibit", qs: [s.activeQ], banner: s.banner,
+      filters: JSON.parse(JSON.stringify(s.filters)),
+      flags: { dist: true, trend: true, table: false, insight: true },
+      distType: chartState.type === "line" ? "column" : chartState.type,
+      chartKind: chartState.kind, chartCols: chartState.cols, note: "" });
+    persist();
+    TR.shell.toast("Trend exhibit pinned (" + load().length + ") — see the Story tab");
+  };
+
+  /** Composite exhibit: any tracked questions, each via its headline metric. */
+  story2.addExhibit = function () {
+    var tracked = TR.AGG.questions.filter(function (q) {
+      var m = TR.model.forQuestion(q.code, TR.AGG.banner_groups[0].id, []);
+      return m && m.prevWave && TR.exhibit.headlineRow(m);
+    });
+    var holder = document.getElementById("story-picker");
+    holder.hidden = false;
+    holder.innerHTML = '<div class="fpick"><div class="fpick-head">Composite ' +
+      "exhibit — pick any tracked questions (any sections); each contributes " +
+      'its headline metric<button data-close aria-label="Close">✕</button></div>' +
+      '<div class="fpick-list">' + tracked.map(function (q) {
+        return '<label class="fpick-q"><input type="checkbox" value="' + q.code +
+          '"> ' + q.code + " · " + fmt.escapeHtml(TR.charts.clip(q.title, 64)) +
+          ' <span class="kindtag">' + fmt.escapeHtml(q.category) + "</span></label>";
+      }).join("") + "</div>" +
+      '<div class="fpick-foot"><span>Panels:</span>' +
+      '<label><input type="checkbox" id="ex-dist" checked> this wave</label>' +
+      '<label><input type="checkbox" id="ex-trend" checked> trend</label>' +
+      '<label><input type="checkbox" id="ex-table" checked> table</label>' +
+      '<button class="primary" id="ex-add">Add exhibit</button></div></div>';
+    holder.querySelector("[data-close]").addEventListener("click", function () {
+      holder.hidden = true;
+    });
+    holder.querySelector("#ex-add").addEventListener("click", function () {
+      var qs = Array.prototype.slice.call(
+        holder.querySelectorAll(".fpick-list input:checked")).map(function (el) {
+          return el.value;
+        });
+      if (!qs.length) { TR.shell.toast("Pick at least one question"); return; }
+      load().push({ kind: "exhibit", qs: qs,
+        banner: TR.d2.state.banner.indexOf("custom:") === 0
+          ? TR.AGG.banner_groups[0].id : TR.d2.state.banner,
+        filters: JSON.parse(JSON.stringify(TR.d2.state.filters)),
+        flags: { dist: holder.querySelector("#ex-dist").checked,
+          trend: holder.querySelector("#ex-trend").checked,
+          table: holder.querySelector("#ex-table").checked, insight: true },
+        distType: "column", note: "" });
+      persist();
+      holder.hidden = true;
+      story2.renderTab(document.getElementById("tabhost"));
+    });
+  };
+
   story2.pinHeatmap = function (banner) {
     load().push({ kind: "heatmap", banner: banner,
       filters: JSON.parse(JSON.stringify(TR.d2.state.filters)), note: "" });
@@ -5091,10 +5295,10 @@ null
       '<button data-sact="pptx" class="primary"' + (list.length ? "" : " disabled") +
       ">Download .pptx</button>" +
       '<button data-sact="divider">+ Section divider</button>' +
-      /* "+ Composite…" is PARKED pending the tracker integration redesign:
-         composites need to mix wave trends with current-wave distributions,
-         chart (not just table) and cross-section cuts. story2.addComposite
-         and the composite item kind stay for back-compat with saved pins. */
+      /* the exhibit builder replaces the parked per-section composite;
+         story2.addComposite and the old "composite" item kind stay for
+         back-compat with previously saved pins */
+      '<button data-sact="exhibit">+ Composite exhibit…</button>' +
       '<button data-sact="export">Export insights JSON</button>' +
       '<label class="t-btnish">Import JSON<input id="story-import" type="file" accept=".json" hidden></label>' +
       '<button data-sact="clear">Clear</button></div>' +
@@ -5127,6 +5331,26 @@ null
         '<div class="si-head"><span class="qcode">' + (i + 1) + "</span>" +
         '<strong class="divider-title">— ' + fmt.escapeHtml(item.title) + " —</strong>" +
         buttons + "</div></div>";
+    }
+    if (item.kind === "exhibit") {
+      var exModels = TR.exhibit.models(item);
+      var exFlags = item.flags || {};
+      var exToggles = ["dist", "trend", "table", "insight"].map(function (k) {
+        return '<label class="si-flag"><input type="checkbox" data-flag="' + k +
+          '"' + (exFlags[k] ? " checked" : "") + "> " +
+          (k === "dist" ? "this wave" : k) + "</label>";
+      }).join("");
+      return '<div class="card story-item" data-i="' + i + '">' +
+        '<div class="si-head"><span class="qcode">' + (i + 1) + ". TREND</span>" +
+        "<strong>" + fmt.escapeHtml(TR.charts.clip(
+          TR.exhibit.titleFor(item, exModels), 90)) + "</strong>" +
+        '<span class="si-ctx">' +
+        fmt.escapeHtml(TR.exhibit.contextLine(item, exModels)) + "</span>" +
+        '<span class="si-flags">' + exToggles + "</span>" + buttons + "</div>" +
+        TR.exhibit.panelsHtml(item) +
+        (exFlags.insight !== false
+          ? '<textarea class="si-note" placeholder="Commentary for this slide…">' +
+            fmt.escapeHtml(item.note || "") + "</textarea>" : "");
     }
     if (item.kind === "heatmap" || item.kind === "composite") {
       var matrix = item.kind === "heatmap" ? heatmapMatrix(item) : compositeMatrix(item);
@@ -5249,6 +5473,11 @@ null
         slides.push(TR.exporter.dividerSlide(item.title, item.note || ""));
         return;
       }
+      if (item.kind === "exhibit") {
+        var exSlide = TR.exhibit.slide(item);
+        if (exSlide) slides.push(exSlide);
+        return;
+      }
       if (item.kind === "heatmap") {
         slides.push(TR.exporter.matrixSlide("Index heatmap",
           contextLine(item) + (item.note ? " · " + item.note : ""),
@@ -5281,6 +5510,7 @@ null
       story2.renderTab(document.getElementById("tabhost"));
     }
     if (action === "divider") story2.addDivider();
+    if (action === "exhibit") story2.addExhibit();
     if (action === "composite") story2.addComposite();
     if (action === "export") TR.insights.exportJson();
     if (action === "pptx") {
@@ -5329,6 +5559,13 @@ null
     if (item.kind === "divider") {
       body = '<div class="pr-divider"><h1>' + fmt.escapeHtml(item.title) + "</h1>" +
         (item.note ? '<p class="pr-ctx">' + fmt.escapeHtml(item.note) + "</p>" : "") + "</div>";
+    } else if (item.kind === "exhibit") {
+      var exModels = TR.exhibit.models(item);
+      body = "<h1>" + fmt.escapeHtml(TR.exhibit.titleFor(item, exModels)) + "</h1>" +
+        '<p class="pr-ctx">' +
+        fmt.escapeHtml(TR.exhibit.contextLine(item, exModels)) + "</p>" +
+        (item.note ? '<div class="pr-note">' + fmt.escapeHtml(item.note) + "</div>" : "") +
+        '<div class="pr-table pr-chart">' + TR.exhibit.panelsHtml(item) + "</div>";
     } else if (item.kind === "heatmap" || item.kind === "composite") {
       var matrix = item.kind === "heatmap" ? heatmapMatrix(item) : compositeMatrix(item);
       body = "<h1>" + (item.kind === "heatmap" ? "Index heatmap"
@@ -5355,6 +5592,204 @@ null
       '<div class="pr-foot">← → to navigate · Esc to exit</div></div>';
     overlay.querySelector("#pr-close").addEventListener("click", closePresent);
   }
+
+})(typeof window !== "undefined" ? window : globalThis);
+
+/**
+ * Exhibit engine — the two-panel trend exhibit (this-wave distribution
+ * chart + line-over-waves chart below) and its cross-section composite
+ * generalisation: any questions, any mix of distribution / trend / table.
+ * One item kind ("exhibit") powers the story card, present mode and the
+ * PPTX slide with one NATIVE chart object per panel (rels rId2+k).
+ *
+ * Single-question exhibits chart the real view model; multi-question
+ * exhibits chart each question's HEADLINE tracked metric (Index/NPS mean
+ * first, then top NET, then NET POSITIVE) as one series/bar per question.
+ */
+(function (global) {
+  "use strict";
+  var TR = global.TR, fmt = TR.fmt;
+
+  var exhibit = TR.exhibit = {};
+
+  /** Headline tracked row of a model: mean > NET > NET POSITIVE > category. */
+  exhibit.headlineRow = function (model) {
+    var priority = function (r) {
+      if (r.kind === "mean") return 0;
+      if (r.kind === "net" && !r.diff) return 1;
+      if (r.diff) return 2;
+      return 3;
+    };
+    var rows = model.rows.filter(function (r) {
+      return r.waves && r.waves.length;
+    }).sort(function (a, b) { return priority(a) - priority(b); });
+    return rows[0] || null;
+  };
+
+  exhibit.models = function (item) {
+    return (item.qs || []).map(function (code) {
+      return TR.model.forQuestion(code, item.banner, item.filters || [],
+        { hiddenCols: [] });
+    }).filter(Boolean);
+  };
+
+  exhibit.titleFor = function (item, models) {
+    if (item.title) return item.title;
+    if (models.length === 1) return models[0].code + " — " + models[0].title;
+    return "Composite — " + models.length + " tracked metrics";
+  };
+
+  function curOf(row) {
+    return row.kind === "mean" ? row.cells[0].mean : row.cells[0].pct;
+  }
+
+  function shortLabel(model, row) {
+    return model.code + " · " + TR.charts.clip(model.title, 26);
+  }
+
+  /** Distribution panel model: real for one question, headline bars for many. */
+  exhibit.distModel = function (item, models) {
+    if (models.length === 1) {
+      var m = models[0];
+      m.chartKind = item.chartKind || m.chartKind || "auto";
+      return m;
+    }
+    var rows = [];
+    models.forEach(function (m) {
+      var row = exhibit.headlineRow(m);
+      if (!row) return;
+      rows.push({ kind: "category", label: shortLabel(m, row),
+        cells: [{ pct: curOf(row), n: null, mean: null, sig: "" }] });
+    });
+    return { code: "COMPOSITE", title: "This wave", source: "published",
+      chartKind: "detail", lowBaseThreshold: 30,
+      columns: [{ label: "Total", letter: "", base: null, low: false }],
+      rows: rows };
+  };
+
+  /** Trend panel model: real for one question, headline series for many. */
+  exhibit.trendModel = function (item, models) {
+    if (models.length === 1) {
+      var m = models[0];
+      m.chartKind = item.chartKind || m.chartKind || "auto";
+      return m;
+    }
+    var rows = [];
+    models.forEach(function (m) {
+      var row = exhibit.headlineRow(m);
+      if (!row) return;
+      rows.push({ kind: row.kind, diff: row.diff, label: shortLabel(m, row),
+        waves: row.waves, delta: row.delta, cells: [row.cells[0]] });
+    });
+    return { code: "COMPOSITE", title: "Trend", source: "published",
+      chartKind: "summary", lowBaseThreshold: 30,
+      columns: [{ label: "Total", letter: "", base: null, low: false }],
+      rows: rows };
+  };
+
+  function fmtVal(v, isMean) {
+    if (v === null || v === undefined) return "–";
+    return isMean ? (Math.round(v * 10) / 10).toString() : Math.round(v) + "%";
+  }
+
+  function deltaText(d) {
+    if (!d) return "–";
+    return (d.diff >= 0 ? "▲ +" : "▼ −") +
+      Math.abs(d.diff).toFixed(d.isMean ? 1 : 0) + (d.isMean ? "" : "pp") +
+      (d.sig ? " •" : "");
+  }
+
+  /** Metric × wave matrix (also the PPTX table): one row per question. */
+  exhibit.matrix = function (item, models) {
+    var years = TR.d2.tracking().waves.map(function (w) { return w.year; });
+    var curYear = TR.render.currentYear();
+    var head = ["Metric"].concat(years).concat([String(curYear), "Δ prev", "Δ first"]);
+    var body = [];
+    models.forEach(function (m) {
+      var row = exhibit.headlineRow(m);
+      if (!row) return;
+      var isMean = row.kind === "mean";
+      var byYear = {};
+      (row.waves || []).forEach(function (w) { byYear[w.year] = w; });
+      body.push({ kind: "row", cells:
+        [shortLabel(m, row) + " — " + TR.charts.clip(row.label, 20)]
+          .concat(years.map(function (y) {
+            return byYear[y] ? fmtVal(byYear[y].value, isMean) : "–";
+          }))
+          .concat([fmtVal(curOf(row), isMean),
+            deltaText(row.delta), deltaText(row.deltaBase)]) });
+    });
+    return { head: head, body: body };
+  };
+
+  function tableHtml(matrix) {
+    return '<table class="ct"><thead><tr>' + matrix.head.map(function (h, i) {
+      return '<th class="' + (i === 0 ? "lab" : "") + '">' +
+        fmt.escapeHtml(String(h)) + "</th>";
+    }).join("") + "</tr></thead><tbody>" + matrix.body.map(function (row) {
+      return "<tr>" + row.cells.map(function (cell, i) {
+        return "<td" + (i === 0 ? ' class="lab"' : "") + ">" +
+          fmt.escapeHtml(String(cell)) + "</td>";
+      }).join("") + "</tr>";
+    }).join("") + "</tbody></table>";
+  }
+
+  /** Distribution / trend / table panels as HTML (story card + present). */
+  exhibit.panelsHtml = function (item) {
+    var models = exhibit.models(item);
+    if (!models.length) return "";
+    var flags = item.flags || {};
+    var out = [];
+    if (flags.dist) {
+      var dist = exhibit.distModel(item, models);
+      var type = item.distType === "line" ? "column" : (item.distType || "column");
+      out.push('<div class="chart ex-chart">' +
+        TR.render.chartBy(type, dist, item.chartCols || [0]) + "</div>");
+    }
+    if (flags.trend) {
+      out.push('<div class="chart ex-chart">' +
+        TR.render.trendChart(exhibit.trendModel(item, models)) + "</div>");
+    }
+    if (flags.table) {
+      out.push('<div class="si-table">' +
+        tableHtml(exhibit.matrix(item, models)) + "</div>");
+    }
+    return out.join("");
+  };
+
+  exhibit.contextLine = function (item, models) {
+    var bits = [TR.d2.bannerDescription(item.banner),
+      "history: published wave Totals"];
+    if (item.filters && item.filters.length) {
+      bits.push("Filtered " + TR.render.currentYear() + " column");
+    }
+    return bits.join(" · ");
+  };
+
+  /** PPTX slide: one native chart object per visible chart panel. */
+  exhibit.slide = function (item) {
+    var models = exhibit.models(item);
+    if (!models.length) return null;
+    var flags = item.flags || {};
+    var charts = [];
+    if (flags.dist) {
+      var type = item.distType === "line" ? "column" : (item.distType || "column");
+      var chart = TR.exporter.buildChart(exhibit.distModel(item, models),
+        type, item.chartCols && item.chartCols.length ? item.chartCols : [0]);
+      if (chart) charts.push(chart);
+    }
+    if (flags.trend) {
+      var trend = TR.exporter.buildTrendChart(exhibit.trendModel(item, models));
+      if (trend) charts.push(trend);
+    }
+    return TR.exporter.exhibitSlide({
+      title: exhibit.titleFor(item, models),
+      meta: exhibit.contextLine(item, models),
+      charts: charts,
+      matrix: flags.table ? exhibit.matrix(item, models) : null,
+      note: (flags.insight !== false && item.note) ? item.note : ""
+    });
+  };
 
 })(typeof window !== "undefined" ? window : globalThis);
 

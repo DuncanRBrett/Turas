@@ -250,14 +250,15 @@
     'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" ' +
     'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
 
-  function chartAxes(catPos, valPos) {
+  function chartAxes(catPos, valPos, fmtCode) {
     return '<c:catAx><c:axId val="111111111"/><c:scaling>' +
       '<c:orientation val="minMax"/></c:scaling><c:delete val="0"/>' +
       '<c:axPos val="' + catPos + '"/><c:crossAx val="222222222"/></c:catAx>' +
       '<c:valAx><c:axId val="222222222"/><c:scaling>' +
       '<c:orientation val="minMax"/></c:scaling><c:delete val="0"/>' +
       '<c:axPos val="' + valPos + '"/><c:majorGridlines/>' +
-      '<c:numFmt formatCode="0&quot;%&quot;" sourceLinked="0"/>' +
+      '<c:numFmt formatCode="' + (fmtCode || "0&quot;%&quot;") +
+      '" sourceLinked="0"/>' +
       '<c:crossAx val="111111111"/></c:valAx>';
   }
 
@@ -356,6 +357,129 @@
       }));
     }));
     return { xml: xml, workbook: TR.xlsx.bytes("Chart data", workbookRows) };
+  };
+
+  /**
+   * Native line chart over wave years for the trended rows of a model
+   * (real or pseudo): one series per row with history, categories = the
+   * union of years incl. the current wave. {xml, workbook} or null.
+   */
+  exporter.buildTrendChart = function (model) {
+    var rows = model.rows.filter(function (r) {
+      return r.waves && r.waves.length;
+    }).slice(0, 6);
+    if (!rows.length) return null;
+    var palette = TR.render.palette();
+    var years = [];
+    rows.forEach(function (r) {
+      TR.render.wavePoints(r).forEach(function (p) {
+        if (p.year !== null && years.indexOf(p.year) === -1) years.push(p.year);
+      });
+    });
+    years.sort();
+    var pointsOf = function (r) {
+      var byYear = {};
+      TR.render.wavePoints(r).forEach(function (p) { byYear[p.year] = p.value; });
+      return years.map(function (y) {
+        return byYear[y] === undefined ? null : Math.round(byYear[y] * 10) / 10;
+      });
+    };
+    var catPts = years.map(function (y, i) {
+      return '<c:pt idx="' + i + '"><c:v>' + y + "</c:v></c:pt>";
+    }).join("");
+    var catRef = '<c:cat><c:strRef><c:f>Sheet1!$A$2:$A$' + (years.length + 1) +
+      '</c:f><c:strCache><c:ptCount val="' + years.length + '"/>' + catPts +
+      "</c:strCache></c:strRef></c:cat>";
+    var series = rows.map(function (r, k) {
+      var colour = palette[k % palette.length].replace("#", "").toUpperCase();
+      var letter = String.fromCharCode(66 + k);
+      var valPts = pointsOf(r).map(function (v, i) {
+        return '<c:pt idx="' + i + '"><c:v>' + (v === null ? "" : v) + "</c:v></c:pt>";
+      }).join("");
+      return '<c:ser><c:idx val="' + k + '"/><c:order val="' + k + '"/>' +
+        '<c:tx><c:strRef><c:f>Sheet1!$' + letter + '$1</c:f><c:strCache>' +
+        '<c:ptCount val="1"/><c:pt idx="0"><c:v>' + esc(r.label) +
+        "</c:v></c:pt></c:strCache></c:strRef></c:tx>" +
+        '<c:spPr><a:ln w="28575"><a:solidFill><a:srgbClr val="' + colour +
+        '"/></a:solidFill></a:ln></c:spPr>' +
+        '<c:marker><c:symbol val="circle"/><c:size val="6"/>' +
+        '<c:spPr><a:solidFill><a:srgbClr val="' + colour + '"/></a:solidFill></c:spPr></c:marker>' +
+        catRef +
+        '<c:val><c:numRef><c:f>Sheet1!$' + letter + "$2:$" + letter + "$" +
+        (years.length + 1) + '</c:f><c:numCache><c:formatCode>General</c:formatCode>' +
+        '<c:ptCount val="' + years.length + '"/>' + valPts +
+        "</c:numCache></c:numRef></c:val></c:ser>";
+    }).join("");
+    var pctOnly = rows.every(function (r) { return r.kind !== "mean"; });
+    var xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      "<c:chartSpace " + C_NS + "><c:chart><c:plotArea><c:layout/>" +
+      '<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>' +
+      series + '<c:marker val="1"/>' +
+      '<c:axId val="111111111"/><c:axId val="222222222"/></c:lineChart>' +
+      chartAxes("b", "l", pctOnly ? null : "General") + "</c:plotArea>" +
+      (rows.length > 1
+        ? '<c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend>' : "") +
+      '<c:plotVisOnly val="1"/></c:chart>' +
+      '<c:externalData r:id="rId1"><c:autoUpdate val="0"/></c:externalData></c:chartSpace>';
+    var workbookRows = [[""].concat(rows.map(function (r) { return r.label; }))]
+      .concat(years.map(function (y, i) {
+        return [y].concat(rows.map(function (r) {
+          var v = pointsOf(r)[i];
+          return v === null ? "" : v;
+        }));
+      }));
+    return { xml: xml, workbook: TR.xlsx.bytes("Trend data", workbookRows) };
+  };
+
+  /**
+   * Exhibit slide: stacked native chart objects (each its own editable
+   * chart, rels rId2..rId(1+n)) + optional table + insight band.
+   * @param {object} spec - {title, meta, charts, matrix, note}.
+   */
+  exporter.exhibitSlide = function (spec) {
+    var brand = TR.charts.brandOf().replace("#", "").toUpperCase();
+    var id = 1;
+    var next = function () { return ++id; };
+    var contentW = SLIDE_W - MARGIN * 2;
+    var hasNote = !!(spec.note && spec.note.trim());
+    var noteLines = hasNote ? wrapText(spec.note, 150).slice(0, 3) : [];
+    var noteH = hasNote ? 0.45 + noteLines.length * 0.24 : 0;
+    var content =
+      rectShape(next(), { x: 0, y: 0, w: SLIDE_W, h: 0.07 }, brand) +
+      textBox(next(), { x: MARGIN, y: 0.3, w: contentW, h: 0.65 },
+        [para(spec.title, { size: 19, bold: true, colour: brand })]) +
+      textBox(next(), { x: MARGIN, y: 0.95, w: contentW, h: 0.3 },
+        [para(spec.meta || "", { size: 10.5, colour: GREY })]);
+    var top = 1.45, bottom = SLIDE_H - 0.35 - noteH;
+    var charts = spec.charts || [];
+    var blocks = charts.length + (spec.matrix ? 1 : 0);
+    var blockH = blocks ? (bottom - top - (blocks - 1) * 0.2) / blocks : 0;
+    charts.forEach(function (_, k) {
+      content += chartFrame(next(),
+        { x: MARGIN, y: top, w: contentW, h: blockH }, "rId" + (2 + k));
+      top += blockH + 0.2;
+    });
+    if (spec.matrix) {
+      var matrix = spec.matrix;
+      var maxRows = Math.max(3, Math.floor(blockH / 0.28) - 1);
+      if (matrix.body.length > maxRows) {
+        matrix = { head: matrix.head, body: matrix.body.slice(0, maxRows) };
+      }
+      content += tableFrame(next(), { x: MARGIN, y: top, w: contentW,
+        h: Math.min(blockH, (matrix.body.length + 1) * 0.28) }, matrix, brand,
+        matrix.head.length > 8 ? 8.5 : 10);
+    }
+    if (hasNote) {
+      var noteY = SLIDE_H - 0.25 - noteH;
+      content += rectShape(next(), { x: MARGIN, y: noteY, w: contentW, h: noteH }, "FBF6E8") +
+        rectShape(next(), { x: MARGIN, y: noteY, w: 0.05, h: noteH }, "CC9900") +
+        textBox(next(), { x: MARGIN + 0.2, y: noteY + 0.08, w: contentW - 0.4, h: noteH - 0.12 },
+          [para("ANALYST INSIGHT", { size: 8.5, bold: true, colour: "CC9900" })]
+            .concat(noteLines.map(function (line) {
+              return para(line, { size: 11.5, colour: INK });
+            })));
+    }
+    return { xml: wrapSlide(content), charts: charts };
   };
 
   function chartFrame(id, box, relId) {

@@ -189,6 +189,8 @@
     });
     var axisMax = meanScale ? Math.max(S.niceMax(hi), 10) : S.niceMax(hi);
     var axisMin = lo < 0 ? -S.niceMax(-lo) : 0;
+    // % suffix only when every plotted series is a proportion
+    var pctAxis = rows.every(function (r) { return r.kind !== "mean"; });
 
     var W = 660, H = 240, padL = 46, padR = 110, padT = 18, padB = 30;
     var plotW = W - padL - padR, plotH = H - padT - padB;
@@ -206,7 +208,8 @@
       body.push(S.el("line", { x1: padL, y1: yOf(v), x2: padL + plotW,
         y2: yOf(v), stroke: f === 0 ? "#d8dcea" : "#eef0f7" }));
       body.push(S.text(padL - 6, yOf(v) + 3,
-        meanScale ? (Math.round(v * 10) / 10) : Math.round(v) + "%",
+        meanScale ? (Math.round(v * 10) / 10)
+          : Math.round(v) + (pctAxis ? "%" : ""),
         { "text-anchor": "end", "font-size": 9.5, fill: "#9aa1b1" }));
     });
     years.forEach(function (year) {

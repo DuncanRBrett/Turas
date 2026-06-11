@@ -72,6 +72,63 @@
     TR.shell.toast("Pinned to story (" + load().length + ") — see the Story tab");
   };
 
+  /** The flagship two-panel pin: this-wave distribution + trend-over-waves. */
+  story2.pinExhibit = function () {
+    var s = TR.d2.state;
+    var chartState = TR.cards2.chartState();
+    load().push({ kind: "exhibit", qs: [s.activeQ], banner: s.banner,
+      filters: JSON.parse(JSON.stringify(s.filters)),
+      flags: { dist: true, trend: true, table: false, insight: true },
+      distType: chartState.type === "line" ? "column" : chartState.type,
+      chartKind: chartState.kind, chartCols: chartState.cols, note: "" });
+    persist();
+    TR.shell.toast("Trend exhibit pinned (" + load().length + ") — see the Story tab");
+  };
+
+  /** Composite exhibit: any tracked questions, each via its headline metric. */
+  story2.addExhibit = function () {
+    var tracked = TR.AGG.questions.filter(function (q) {
+      var m = TR.model.forQuestion(q.code, TR.AGG.banner_groups[0].id, []);
+      return m && m.prevWave && TR.exhibit.headlineRow(m);
+    });
+    var holder = document.getElementById("story-picker");
+    holder.hidden = false;
+    holder.innerHTML = '<div class="fpick"><div class="fpick-head">Composite ' +
+      "exhibit — pick any tracked questions (any sections); each contributes " +
+      'its headline metric<button data-close aria-label="Close">✕</button></div>' +
+      '<div class="fpick-list">' + tracked.map(function (q) {
+        return '<label class="fpick-q"><input type="checkbox" value="' + q.code +
+          '"> ' + q.code + " · " + fmt.escapeHtml(TR.charts.clip(q.title, 64)) +
+          ' <span class="kindtag">' + fmt.escapeHtml(q.category) + "</span></label>";
+      }).join("") + "</div>" +
+      '<div class="fpick-foot"><span>Panels:</span>' +
+      '<label><input type="checkbox" id="ex-dist" checked> this wave</label>' +
+      '<label><input type="checkbox" id="ex-trend" checked> trend</label>' +
+      '<label><input type="checkbox" id="ex-table" checked> table</label>' +
+      '<button class="primary" id="ex-add">Add exhibit</button></div></div>';
+    holder.querySelector("[data-close]").addEventListener("click", function () {
+      holder.hidden = true;
+    });
+    holder.querySelector("#ex-add").addEventListener("click", function () {
+      var qs = Array.prototype.slice.call(
+        holder.querySelectorAll(".fpick-list input:checked")).map(function (el) {
+          return el.value;
+        });
+      if (!qs.length) { TR.shell.toast("Pick at least one question"); return; }
+      load().push({ kind: "exhibit", qs: qs,
+        banner: TR.d2.state.banner.indexOf("custom:") === 0
+          ? TR.AGG.banner_groups[0].id : TR.d2.state.banner,
+        filters: JSON.parse(JSON.stringify(TR.d2.state.filters)),
+        flags: { dist: holder.querySelector("#ex-dist").checked,
+          trend: holder.querySelector("#ex-trend").checked,
+          table: holder.querySelector("#ex-table").checked, insight: true },
+        distType: "column", note: "" });
+      persist();
+      holder.hidden = true;
+      story2.renderTab(document.getElementById("tabhost"));
+    });
+  };
+
   story2.pinHeatmap = function (banner) {
     load().push({ kind: "heatmap", banner: banner,
       filters: JSON.parse(JSON.stringify(TR.d2.state.filters)), note: "" });
@@ -204,10 +261,10 @@
       '<button data-sact="pptx" class="primary"' + (list.length ? "" : " disabled") +
       ">Download .pptx</button>" +
       '<button data-sact="divider">+ Section divider</button>' +
-      /* "+ Composite…" is PARKED pending the tracker integration redesign:
-         composites need to mix wave trends with current-wave distributions,
-         chart (not just table) and cross-section cuts. story2.addComposite
-         and the composite item kind stay for back-compat with saved pins. */
+      /* the exhibit builder replaces the parked per-section composite;
+         story2.addComposite and the old "composite" item kind stay for
+         back-compat with previously saved pins */
+      '<button data-sact="exhibit">+ Composite exhibit…</button>' +
       '<button data-sact="export">Export insights JSON</button>' +
       '<label class="t-btnish">Import JSON<input id="story-import" type="file" accept=".json" hidden></label>' +
       '<button data-sact="clear">Clear</button></div>' +
@@ -240,6 +297,26 @@
         '<div class="si-head"><span class="qcode">' + (i + 1) + "</span>" +
         '<strong class="divider-title">— ' + fmt.escapeHtml(item.title) + " —</strong>" +
         buttons + "</div></div>";
+    }
+    if (item.kind === "exhibit") {
+      var exModels = TR.exhibit.models(item);
+      var exFlags = item.flags || {};
+      var exToggles = ["dist", "trend", "table", "insight"].map(function (k) {
+        return '<label class="si-flag"><input type="checkbox" data-flag="' + k +
+          '"' + (exFlags[k] ? " checked" : "") + "> " +
+          (k === "dist" ? "this wave" : k) + "</label>";
+      }).join("");
+      return '<div class="card story-item" data-i="' + i + '">' +
+        '<div class="si-head"><span class="qcode">' + (i + 1) + ". TREND</span>" +
+        "<strong>" + fmt.escapeHtml(TR.charts.clip(
+          TR.exhibit.titleFor(item, exModels), 90)) + "</strong>" +
+        '<span class="si-ctx">' +
+        fmt.escapeHtml(TR.exhibit.contextLine(item, exModels)) + "</span>" +
+        '<span class="si-flags">' + exToggles + "</span>" + buttons + "</div>" +
+        TR.exhibit.panelsHtml(item) +
+        (exFlags.insight !== false
+          ? '<textarea class="si-note" placeholder="Commentary for this slide…">' +
+            fmt.escapeHtml(item.note || "") + "</textarea>" : "");
     }
     if (item.kind === "heatmap" || item.kind === "composite") {
       var matrix = item.kind === "heatmap" ? heatmapMatrix(item) : compositeMatrix(item);
@@ -362,6 +439,11 @@
         slides.push(TR.exporter.dividerSlide(item.title, item.note || ""));
         return;
       }
+      if (item.kind === "exhibit") {
+        var exSlide = TR.exhibit.slide(item);
+        if (exSlide) slides.push(exSlide);
+        return;
+      }
       if (item.kind === "heatmap") {
         slides.push(TR.exporter.matrixSlide("Index heatmap",
           contextLine(item) + (item.note ? " · " + item.note : ""),
@@ -394,6 +476,7 @@
       story2.renderTab(document.getElementById("tabhost"));
     }
     if (action === "divider") story2.addDivider();
+    if (action === "exhibit") story2.addExhibit();
     if (action === "composite") story2.addComposite();
     if (action === "export") TR.insights.exportJson();
     if (action === "pptx") {
@@ -442,6 +525,13 @@
     if (item.kind === "divider") {
       body = '<div class="pr-divider"><h1>' + fmt.escapeHtml(item.title) + "</h1>" +
         (item.note ? '<p class="pr-ctx">' + fmt.escapeHtml(item.note) + "</p>" : "") + "</div>";
+    } else if (item.kind === "exhibit") {
+      var exModels = TR.exhibit.models(item);
+      body = "<h1>" + fmt.escapeHtml(TR.exhibit.titleFor(item, exModels)) + "</h1>" +
+        '<p class="pr-ctx">' +
+        fmt.escapeHtml(TR.exhibit.contextLine(item, exModels)) + "</p>" +
+        (item.note ? '<div class="pr-note">' + fmt.escapeHtml(item.note) + "</div>" : "") +
+        '<div class="pr-table pr-chart">' + TR.exhibit.panelsHtml(item) + "</div>";
     } else if (item.kind === "heatmap" || item.kind === "composite") {
       var matrix = item.kind === "heatmap" ? heatmapMatrix(item) : compositeMatrix(item);
       body = "<h1>" + (item.kind === "heatmap" ? "Index heatmap"

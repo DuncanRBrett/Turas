@@ -370,13 +370,21 @@
         }
       });
     }, 0);
+    var tracked = !!cards2.activeModel().prevWave;
     menu.innerHTML = '<div class="pm-title">Pin to story</div>' +
       '<label><input type="checkbox" id="pm-chart"' +
       (s.showChart ? " checked" : "") + "> Chart (" +
       fmt.escapeHtml(s.chartType) + ")</label>" +
       '<label><input type="checkbox" id="pm-table" checked> Table</label>' +
       '<label><input type="checkbox" id="pm-insight" checked> Insight</label>' +
-      '<button class="primary wide" id="pm-go">Pin</button>';
+      '<button class="primary wide" id="pm-go">Pin</button>' +
+      (tracked
+        ? '<div class="pm-title pm-sep">Trend exhibit</div>' +
+          '<button class="wide" id="pm-exhibit" title="Two-panel exhibit: this ' +
+          "wave's distribution chart with the trend over waves below — exports " +
+          'to PowerPoint as two editable chart objects on one slide">' +
+          "📈 Pin distribution + trend</button>"
+        : "");
     document.getElementById("pm-go").addEventListener("click", function () {
       var flags = {
         chart: document.getElementById("pm-chart").checked,
@@ -390,6 +398,13 @@
       }
       TR.story2.pinCurrent(flags);
     });
+    var exhibitBtn = document.getElementById("pm-exhibit");
+    if (exhibitBtn) {
+      exhibitBtn.addEventListener("click", function () {
+        menu.hidden = true;
+        TR.story2.pinExhibit();
+      });
+    }
   }
 
   function step(delta) {
