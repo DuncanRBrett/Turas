@@ -15,8 +15,10 @@
 > will t-test means per trend_significance.R); annotations and compare-
 > across-questions overlays are noted as Visualise stretch items; built
 > report is 1.90 MB of its 2 MB budget (per-segment data costs ~0.6 MB).
-> **Next phase:** full production review (`duncan-production-review`), then
-> the advanced modules (confidence first) get this look and feel.
+> **Next phase (sequence revised 2026-06-12):** confidence module
+> integration FIRST — see `HANDOVER_CONFIDENCE_INTEGRATION.md` — so the
+> statistical layer is complete before the one full production review
+> (`duncan-production-review`); then the remaining advanced modules.
 
 **For:** a fresh session. Read this cold; it is self-contained.
 **Mission:** replace the v2 report's basic Tracking tab with full tracker-module
