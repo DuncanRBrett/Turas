@@ -15,6 +15,7 @@
     banner: null,           // banner group id ("Q002") or "custom:<qcode>"
     filters: [],            // [{q: "Q006", rows: [9, 10]}]
     showCounts: false,
+    showIntervals: false,   // 95% interval ranges under every value
     heatmap: true,
     showChart: false,
     showDeltas: true,
@@ -181,6 +182,7 @@
     if (s.activeQ) parts.push("q=" + s.activeQ);
     if (s.banner) parts.push("banner=" + s.banner);
     if (s.showCounts) parts.push("count=1");
+    if (s.showIntervals) parts.push("iv=1");
     if (s.showChart) parts.push("chart=1");
     if (!s.heatmap) parts.push("heat=0");
     if (s.filters.length) {
@@ -201,6 +203,7 @@
       if (k === "q") s.activeQ = v;
       if (k === "banner") s.banner = v;
       if (k === "count") s.showCounts = v === "1";
+      if (k === "iv") s.showIntervals = v === "1";
       if (k === "chart") s.showChart = v === "1";
       if (k === "heat") s.heatmap = v !== "0";
       if (k === "filter") {

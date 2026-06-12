@@ -40,8 +40,55 @@
   }
 
   function modelFor(code, banner) {
+    // intervals ride along for the gauge + heatmap tooltips (additive)
     return TR.model.forQuestion(code, banner || TR.d2.state.banner,
-      TR.d2.state.filters, { hiddenCols: [] });
+      TR.d2.state.filters, { hiddenCols: [], intervals: true });
+  }
+
+  /** "95% SI 82.6–85.6 · n=519" tooltip fragment for a mean cell. */
+  function intervalTip(cell, base) {
+    if (!cell || !cell.ci) return "";
+    return " · 95% " + TR.conf.labels().interval_abbrev + " " +
+      TR.conf.fmtRange(cell.ci.lo, cell.ci.hi, true) +
+      (base ? " · n=" + fmt.base(base) : "");
+  }
+
+  /**
+   * The dashboard's plain-language precision chip: worst-case ±pp at the
+   * overall base vs the smallest column of the heatmap banner — all
+   * computed live from the report's own bases.
+   */
+  function moeChipHtml(qs, heatModels) {
+    var labels = TR.conf.labels();
+    var overall = 0;
+    var smallest = null;
+    qs.forEach(function (q) {
+      var m = heatModels[q.code];
+      if (!m || !m.columns[0] || !m.columns[0].base) return;
+      if (m.columns[0].base > overall) {
+        overall = m.columns[0].base;
+        smallest = null;
+        m.columns.forEach(function (col, i) {
+          if (i === 0 || !col.base) return;
+          if (!smallest || col.base < smallest.n) {
+            smallest = { label: col.label, n: col.base };
+          }
+        });
+      }
+    });
+    if (!overall) return "";
+    var bits = "At n=" + fmt.base(overall) +
+      ", overall percentages are stable to about ±" +
+      TR.conf.maxMoePct(overall).toFixed(1) + "pp";
+    if (smallest) {
+      bits += "; smaller cuts swing more — " + fmt.escapeHtml(smallest.label) +
+        " (n=" + fmt.base(smallest.n) + ") about ±" +
+        TR.conf.maxMoePct(smallest.n).toFixed(1) + "pp";
+    }
+    return '<p class="moechip" title="Worst-case 95% ' +
+      labels.precision_term + " at each base — see “How sure can I be of " +
+      'these numbers?” on the Crosstabs tab">' +
+      labels.moe_name + " (" + labels.moe_abbrev + "): " + bits + ".</p>";
   }
 
   function meanRow(model) {
@@ -77,7 +124,8 @@
       "— <span class='gl g'>strong ≥75%</span> <span class='gl a'>moderate 50–74%</span> " +
       "<span class='gl r'>weak &lt;50%</span> of each scale's maximum. " +
       (TR.d2.filtersActive() ? "<strong>Filtered audience — recomputed live.</strong> " : "") +
-      "▲▼ chips show change vs 2024. Click any card or cell to open the full table.</p></div>"];
+      "▲▼ chips show change vs 2024. Click any card or cell to open the full table.</p>" +
+      moeChipHtml(qs, heatModels) + "</div>"];
 
     Object.keys(byCat).forEach(function (cat) {
       html.push('<div class="dash-cat"><h3>' + fmt.escapeHtml(cat) + "</h3><div class='gauges'>");
@@ -85,7 +133,10 @@
         var row = meanRow(models[q.code]);
         var value = row ? row.cells[0].mean : null;
         var delta = row && row.delta ? row.delta : null;
-        html.push('<button class="gauge" data-goq="' + q.code + '" style="--gc:' +
+        html.push('<button class="gauge" data-goq="' + q.code + '" title="' +
+          fmt.escapeHtml(q.title) +
+          (row ? intervalTip(row.cells[0], models[q.code].columns[0].base) : "") +
+          '" style="--gc:' +
           gaugeColour(value, scoreMax(q)) + '">' +
           '<span class="gv">' + (value === null ? "–" : value.toFixed(1)) + "</span>" +
           (delta ? '<span class="gd ' + (delta.diff >= 0 ? "up" : "down") + '">' +
@@ -174,7 +225,8 @@
         html.push('<td style="background:' +
           (v === null ? "#f3f4f8" : gaugeColour(v, max) +
             Math.round(40 + norm / 100 * 50).toString(16)) +
-          '" title="' + fmt.escapeHtml(model.columns[i].label) + '">' +
+          '" title="' + fmt.escapeHtml(model.columns[i].label) +
+          intervalTip(cell, model.columns[i].base) + '">' +
           (v === null ? "–" : (max <= 10 ? v.toFixed(1) : Math.round(v))) +
           (low ? " ⚠" : "") + "</td>");
       });

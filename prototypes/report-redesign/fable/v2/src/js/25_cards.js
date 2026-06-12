@@ -28,7 +28,8 @@
       hiddenRows: s.hiddenRows[s.activeQ] || [],
       rowScope: TR.d2.rowScope(),
       sort: s.sorts[s.activeQ] || null,
-      dual: s.sigMode === "dual"
+      dual: s.sigMode === "dual",
+      intervals: s.showIntervals
     };
   }
 
@@ -148,6 +149,10 @@
       toggle("heatmap", "Heatmap") +
       toggle("showChart", "Chart") +
       toggle("showCounts", "Counts") +
+      toggle("showIntervals", "Intervals",
+        "Show the 95% " + TR.conf.labels().interval_term +
+        " under every value — the range the number would likely land in " +
+        "if the survey were repeated") +
       toggle("showDetail", "Detail rows", "Show the detailed category rows") +
       toggle("showSummary", "Summary rows", "Show NET and Index rows") +
       '<label class="tg" title="Show/hide significance letters and choose the confidence level(s)">Sig ' +
@@ -317,6 +322,7 @@
     }
     html += '<div class="twrap">' + TR.render.tableHtml(model, {
       heatmap: s.heatmap, showCounts: s.showCounts,
+      intervals: s.showIntervals,
       showDeltas: s.showDeltas && TR.d2.tracking().enabled,
       hideable: true, rowHideable: true, sortable: true }) + "</div>";
     if (s.showWaveStrip && TR.d2.tracking().enabled) {
@@ -384,7 +390,8 @@
       "convention). Letters are only awarded when expected counts are ≥ 5 in both " +
       "columns and both bases are at least " + p.low_base_threshold + ". Index " +
       "means use <strong>Welch's t-test</strong> on banded scores. Year-on-year " +
-      "chips test this wave's Total against the prior wave's Total.</p></div></div>";
+      "chips test this wave's Total against the prior wave's Total.</p></div></div>" +
+      TR.conf.calloutHtml();
   }
 
   function openPinMenu() {
@@ -590,7 +597,8 @@
       if (action === "copy") TR.exporter.copyTable(model);
       if (action === "excel") {
         TR.xlsx.download(model.code + "_" + model.title, model.code,
-          TR.xlsx.rowsFromMatrix(TR.render.matrix(model)));
+          TR.xlsx.rowsFromMatrix(TR.render.matrix(model,
+            { intervals: TR.d2.state.showIntervals })));
       }
       if (action === "png") {
         TR.exporter.downloadPng(model, TR.d2.filterDescription(), {

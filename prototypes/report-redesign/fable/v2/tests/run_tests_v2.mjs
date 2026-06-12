@@ -208,6 +208,26 @@ run("deltas: most questions tracked, new ones flagged", () => {
   assert(withDeltaRows >= 55, "questions with row-level deltas: " + withDeltaRows);
 });
 
+run("confidence: explainer + sampling vocabulary ship in the artifact", () => {
+  // the callout is built live from the report's own data
+  const callout = TR.conf.calloutHtml();
+  assert(callout.includes("How sure can I be of these numbers"),
+    "callout headline missing");
+  // fmt.base uses a narrow no-break space as the thousands separator
+  assert(/Based on \d[\d,\s  ]* answers, this \d+% would likely land between/
+    .test(callout), "worked example not computed from the data");
+  assert(/has only \d[\d,\s  ]* respondents/.test(callout),
+    "small-group example not computed from the data");
+  assert(callout.includes("stability intervals (SI)"),
+    "SACAP (Not_Specified) must use the honest SI vocabulary");
+  const out = path.join(BASE, "sacap_report_v2.html");
+  const html = readFileSync(out, "utf8");
+  assert(html.includes('"sampling_method":"Not_Specified"'),
+    "project config in the artifact misses sampling_method");
+  assert(html.includes("How sure can I be of these numbers"),
+    "explainer builder missing from the artifact bundle");
+});
+
 run("built artifact exists, self-contained, < 2 MB", () => {
   const out = path.join(BASE, "sacap_report_v2.html");
   assert(existsSync(out), "run Rscript build.R first");

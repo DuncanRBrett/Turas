@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SACAP 2025 Annual Student Survey — Turas Report v2</title>
-<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 16:09 SAST -->
+<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 16:11 SAST -->
 <!-- Single self-contained file: published tables + prior wave + synthetic
      microdata + one fixed renderer. No network requests, no installs. -->
 <style>
@@ -157,6 +157,7 @@ table.ct { border-collapse: collapse; width: 100%; font-size: 12px; }
 .ct .sg { color: var(--green); font-weight: 800; font-size: 9px; margin-left: 3px; font-family: ui-monospace, monospace; }
 .ct .fq { font-size: 10px; color: var(--faint); }
 .civ { font-size: 10px; color: var(--faint); line-height: 1.15; font-style: normal; font-weight: 400; cursor: help; }
+.moechip { margin: 8px 0 0; padding: 7px 11px; background: #faf8f5; border: 1px solid var(--line); border-radius: 7px; font-size: 12px; color: #475569; cursor: help; }
 .ct .lowb { color: #a3402f; font-weight: 600; }
 .ct .idxd { font-size: 10px; color: var(--faint); font-weight: 400; }
 .delta { font-size: 9.5px; font-weight: 600; margin-left: 4px; padding: 1px 5px; border-radius: 5px; }
@@ -1044,6 +1045,7 @@ null
     banner: null,           // banner group id ("Q002") or "custom:<qcode>"
     filters: [],            // [{q: "Q006", rows: [9, 10]}]
     showCounts: false,
+    showIntervals: false,   // 95% interval ranges under every value
     heatmap: true,
     showChart: false,
     showDeltas: true,
@@ -1210,6 +1212,7 @@ null
     if (s.activeQ) parts.push("q=" + s.activeQ);
     if (s.banner) parts.push("banner=" + s.banner);
     if (s.showCounts) parts.push("count=1");
+    if (s.showIntervals) parts.push("iv=1");
     if (s.showChart) parts.push("chart=1");
     if (!s.heatmap) parts.push("heat=0");
     if (s.filters.length) {
@@ -1230,6 +1233,7 @@ null
       if (k === "q") s.activeQ = v;
       if (k === "banner") s.banner = v;
       if (k === "count") s.showCounts = v === "1";
+      if (k === "iv") s.showIntervals = v === "1";
       if (k === "chart") s.showChart = v === "1";
       if (k === "heat") s.heatmap = v !== "0";
       if (k === "filter") {
@@ -3695,7 +3699,8 @@ null
       hiddenRows: s.hiddenRows[s.activeQ] || [],
       rowScope: TR.d2.rowScope(),
       sort: s.sorts[s.activeQ] || null,
-      dual: s.sigMode === "dual"
+      dual: s.sigMode === "dual",
+      intervals: s.showIntervals
     };
   }
 
@@ -3815,6 +3820,10 @@ null
       toggle("heatmap", "Heatmap") +
       toggle("showChart", "Chart") +
       toggle("showCounts", "Counts") +
+      toggle("showIntervals", "Intervals",
+        "Show the 95% " + TR.conf.labels().interval_term +
+        " under every value — the range the number would likely land in " +
+        "if the survey were repeated") +
       toggle("showDetail", "Detail rows", "Show the detailed category rows") +
       toggle("showSummary", "Summary rows", "Show NET and Index rows") +
       '<label class="tg" title="Show/hide significance letters and choose the confidence level(s)">Sig ' +
@@ -3984,6 +3993,7 @@ null
     }
     html += '<div class="twrap">' + TR.render.tableHtml(model, {
       heatmap: s.heatmap, showCounts: s.showCounts,
+      intervals: s.showIntervals,
       showDeltas: s.showDeltas && TR.d2.tracking().enabled,
       hideable: true, rowHideable: true, sortable: true }) + "</div>";
     if (s.showWaveStrip && TR.d2.tracking().enabled) {
@@ -4051,7 +4061,8 @@ null
       "convention). Letters are only awarded when expected counts are ≥ 5 in both " +
       "columns and both bases are at least " + p.low_base_threshold + ". Index " +
       "means use <strong>Welch's t-test</strong> on banded scores. Year-on-year " +
-      "chips test this wave's Total against the prior wave's Total.</p></div></div>";
+      "chips test this wave's Total against the prior wave's Total.</p></div></div>" +
+      TR.conf.calloutHtml();
   }
 
   function openPinMenu() {
@@ -4257,7 +4268,8 @@ null
       if (action === "copy") TR.exporter.copyTable(model);
       if (action === "excel") {
         TR.xlsx.download(model.code + "_" + model.title, model.code,
-          TR.xlsx.rowsFromMatrix(TR.render.matrix(model)));
+          TR.xlsx.rowsFromMatrix(TR.render.matrix(model,
+            { intervals: TR.d2.state.showIntervals })));
       }
       if (action === "png") {
         TR.exporter.downloadPng(model, TR.d2.filterDescription(), {
@@ -4541,8 +4553,55 @@ null
   }
 
   function modelFor(code, banner) {
+    // intervals ride along for the gauge + heatmap tooltips (additive)
     return TR.model.forQuestion(code, banner || TR.d2.state.banner,
-      TR.d2.state.filters, { hiddenCols: [] });
+      TR.d2.state.filters, { hiddenCols: [], intervals: true });
+  }
+
+  /** "95% SI 82.6–85.6 · n=519" tooltip fragment for a mean cell. */
+  function intervalTip(cell, base) {
+    if (!cell || !cell.ci) return "";
+    return " · 95% " + TR.conf.labels().interval_abbrev + " " +
+      TR.conf.fmtRange(cell.ci.lo, cell.ci.hi, true) +
+      (base ? " · n=" + fmt.base(base) : "");
+  }
+
+  /**
+   * The dashboard's plain-language precision chip: worst-case ±pp at the
+   * overall base vs the smallest column of the heatmap banner — all
+   * computed live from the report's own bases.
+   */
+  function moeChipHtml(qs, heatModels) {
+    var labels = TR.conf.labels();
+    var overall = 0;
+    var smallest = null;
+    qs.forEach(function (q) {
+      var m = heatModels[q.code];
+      if (!m || !m.columns[0] || !m.columns[0].base) return;
+      if (m.columns[0].base > overall) {
+        overall = m.columns[0].base;
+        smallest = null;
+        m.columns.forEach(function (col, i) {
+          if (i === 0 || !col.base) return;
+          if (!smallest || col.base < smallest.n) {
+            smallest = { label: col.label, n: col.base };
+          }
+        });
+      }
+    });
+    if (!overall) return "";
+    var bits = "At n=" + fmt.base(overall) +
+      ", overall percentages are stable to about ±" +
+      TR.conf.maxMoePct(overall).toFixed(1) + "pp";
+    if (smallest) {
+      bits += "; smaller cuts swing more — " + fmt.escapeHtml(smallest.label) +
+        " (n=" + fmt.base(smallest.n) + ") about ±" +
+        TR.conf.maxMoePct(smallest.n).toFixed(1) + "pp";
+    }
+    return '<p class="moechip" title="Worst-case 95% ' +
+      labels.precision_term + " at each base — see “How sure can I be of " +
+      'these numbers?” on the Crosstabs tab">' +
+      labels.moe_name + " (" + labels.moe_abbrev + "): " + bits + ".</p>";
   }
 
   function meanRow(model) {
@@ -4578,7 +4637,8 @@ null
       "— <span class='gl g'>strong ≥75%</span> <span class='gl a'>moderate 50–74%</span> " +
       "<span class='gl r'>weak &lt;50%</span> of each scale's maximum. " +
       (TR.d2.filtersActive() ? "<strong>Filtered audience — recomputed live.</strong> " : "") +
-      "▲▼ chips show change vs 2024. Click any card or cell to open the full table.</p></div>"];
+      "▲▼ chips show change vs 2024. Click any card or cell to open the full table.</p>" +
+      moeChipHtml(qs, heatModels) + "</div>"];
 
     Object.keys(byCat).forEach(function (cat) {
       html.push('<div class="dash-cat"><h3>' + fmt.escapeHtml(cat) + "</h3><div class='gauges'>");
@@ -4586,7 +4646,10 @@ null
         var row = meanRow(models[q.code]);
         var value = row ? row.cells[0].mean : null;
         var delta = row && row.delta ? row.delta : null;
-        html.push('<button class="gauge" data-goq="' + q.code + '" style="--gc:' +
+        html.push('<button class="gauge" data-goq="' + q.code + '" title="' +
+          fmt.escapeHtml(q.title) +
+          (row ? intervalTip(row.cells[0], models[q.code].columns[0].base) : "") +
+          '" style="--gc:' +
           gaugeColour(value, scoreMax(q)) + '">' +
           '<span class="gv">' + (value === null ? "–" : value.toFixed(1)) + "</span>" +
           (delta ? '<span class="gd ' + (delta.diff >= 0 ? "up" : "down") + '">' +
@@ -4675,7 +4738,8 @@ null
         html.push('<td style="background:' +
           (v === null ? "#f3f4f8" : gaugeColour(v, max) +
             Math.round(40 + norm / 100 * 50).toString(16)) +
-          '" title="' + fmt.escapeHtml(model.columns[i].label) + '">' +
+          '" title="' + fmt.escapeHtml(model.columns[i].label) +
+          intervalTip(cell, model.columns[i].base) + '">' +
           (v === null ? "–" : (max <= 10 ? v.toFixed(1) : Math.round(v))) +
           (low ? " ⚠" : "") + "</td>");
       });
