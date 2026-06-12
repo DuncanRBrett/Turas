@@ -3,15 +3,21 @@
 > **STATUS: COMPLETE (2026-06-12).** Shipped in 5 commits on
 > `feature/report-data-layer` (confidence core → crosstabs/dashboard →
 > tracking → pins/exports → docs). All 7 required-functionality items
-> delivered; gates 30/30 v2 + 21/21 v1 + 15/15 in-browser; artifact
-> 1.96 MB; browser-verified with cache-busting + computed styles.
-> See README "Round 7 — confidence integration" for what shipped and the
-> documented divergences (z-vs-t mean CIs, rounded-pct fallback, no
-> effective-n hook). Also fixed in passing: the story exhibit card's
-> unclosed `</div>` (later story cards nested inside pinned exhibits).
-> **Next phase:** full production review via `duncan-production-review`
-> (section 7), then the advanced modules in order. The original brief is
-> preserved below for context.
+> delivered. See README "Round 7 — confidence integration" for what
+> shipped and the documented divergences (z-vs-t mean CIs, rounded-pct
+> fallback, no effective-n hook). Also fixed in passing: the story
+> exhibit card's unclosed `</div>` (later story cards nested inside
+> pinned exhibits).
+>
+> **PRODUCTION REVIEW DONE (2026-06-12)** on
+> `review/report-v2-production-2026-06` — findings, fixes and verdict in
+> `PRODUCTION_REVIEW_2026-06.md`, forward plan in `GROWTH_PATH.md`,
+> changes summarised in README "Round 8". Gates now 35/35 v2 + 21/21 v1
+> + 15/15 in-browser; artifact 1.97 MB. One review fix touches this
+> document's subject matter: `TR.conf.methodNote(kind)` is now
+> kind-aware (props/means/mixed) so mean-band exports no longer claim
+> Wilson. **Next phase:** the advanced modules in order (section 7).
+> The original brief is preserved below for context.
 
 **For:** a fresh session. Read this cold; it is self-contained.
 **Mission:** give every number in the v2 report an honest, plainly-worded

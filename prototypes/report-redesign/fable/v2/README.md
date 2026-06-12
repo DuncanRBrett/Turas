@@ -60,6 +60,11 @@ only because this prototype works backwards from a rendered HTML file.
 
 ## Build + verify
 
+The extracted JSON data layer is **committed** (`data/*.json`) — to build
+and test you only need the last two commands. The three pipeline steps are
+needed only to regenerate the data from the source report HTML and the
+wave workbooks (not in the repo).
+
 ```bash
 cd prototypes/report-redesign/fable/v2
 python3 pipeline/extract_2025_html.py "<2025 report.html>" data/sacap_2025.json
@@ -67,8 +72,9 @@ python3 pipeline/extract_waves.py --aliases pipeline/wave_title_aliases.json \
     data/sacap_2025.json data/sacap_waves.json \
     2018="<2018 crosstabs.xlsx>" ... 2024="<2024 crosstabs.xlsx>"
 python3 pipeline/generate_microdata.py data/sacap_2025.json data/sacap_microdata.json data/microdata_verification.json
-Rscript build.R                  # -> sacap_report_v2.html (1.96 MB)
-node tests/run_tests_v2.mjs      # 30 tests incl. golden parity + 2-chart pptx gate
+Rscript build.R                  # -> sacap_report_v2.html (1.97 MB)
+node tests/run_tests_v2.mjs      # 35 tests incl. golden parity + 2-chart pptx gate
+node ../tests/run_tests.mjs      # v1 gate (21) — the shared engine files
 ```
 
 The wave extractor reads the Total column of each workbook's Crosstabs sheet
@@ -113,7 +119,13 @@ python-validated, 8/8 in-browser selftests.
   presenting long trends on those metrics.
 - Index values for waves whose workbooks omit Index rows (2021, 2024) are
   recomputed from the published distributions via the 2025 index weights —
-  exact to ±0.5 of the published convention.
+  exact to ±0.5 of the published convention. (NPS has no equivalent
+  distribution-recompute fallback — no wave needed one.)
+- Negative metric values (a negative NPS as a composite-exhibit headline —
+  SACAP has none) floor at the axis in the SVG bar/column/dot/pie charts;
+  the value label shows the true negative number. The trend chart and the
+  native PPTX charts plot negatives correctly. Proper signed axes in the
+  distribution charts are a production item.
 
 ## Round 3 additions (Duncan's 30-item review)
 
@@ -246,7 +258,10 @@ What shipped on each surface:
 - **Crosstabs:** "Intervals" toggle (hash `iv=1`) — per-cell ranges under
   every value, worst-case ±pp on the base row, Excel exports grow explicit
   lo/hi columns. Pins capture the state: story cards, present mode, PNG meta
-  and the PPTX slide meta line ("95% SI (Wilson)").
+  and the PPTX slide meta line. Method notes name what was computed:
+  "95% SI (Wilson)" for pure-proportion tables, "95% SI (Wilson; means
+  z·SD/√n)" when Index/mean rows carry intervals, "95% SI (z·SD/√n)" for
+  pinned mean/Index/NPS series exhibits.
 - **Dashboard:** Precision Estimate chip on the intro card (overall ±pp vs
   smallest-cut ±pp, computed from real bases); gauges and heatmap cells
   carry the interval + base in tooltips.
@@ -268,3 +283,25 @@ revisit in production): mean intervals use z where `05_means.R` uses t
 compute p from published counts when present, else the rounded published
 percentage; weighted effective-n (`03_study_level.R`) is not wired — the
 prototype's published bases are unweighted.
+
+## Round 8 — production review (2026-06)
+
+Full `duncan-production-review` pass (independent session; findings +
+growth path in `PRODUCTION_REVIEW_2026-06.md` / `GROWTH_PATH.md`):
+
+- **Interval method notes tell the truth per metric type** — pinned
+  mean/Index/NPS exhibits no longer claim "(Wilson)" for z·SD/√n bands;
+  crosstab surfaces say "Wilson; means z·SD/√n" when both are present.
+- **PPTX tables say when rows were dropped** to fit the slide
+  ("… +N more rows — see the full report") instead of truncating silently.
+- **Pinned crosstab cards reproduce the on-screen table**: rowScope, sort,
+  hidden rows/columns and dual-sig travel with the pin (older pins keep
+  the historic full-table render).
+- **Golden parity now enforces a sig-agreement floor** (85%; measured
+  89.6%) instead of printing the rate.
+- Negative chart values floor at the axis (see known limitations);
+  present mode survives stale pins; URL-hash filters validate against the
+  data instead of silently zeroing every base; top-level listeners gained
+  the singleton guard; added-slide image src escaped (defence in depth).
+- Gates grew 32 → 35 v2 tests; v1 gate and golden parity untouched
+  elsewhere and green throughout.
