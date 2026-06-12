@@ -212,7 +212,17 @@
           var bits = part.split(":");
           return { q: bits[0], rows: (bits[1] || "").split(",")
             .map(Number).filter(function (x) { return !isNaN(x); }) };
-        }).filter(function (f) { return f.q && f.rows.length; });
+        }).filter(function (f) {
+          if (!f.q || !f.rows.length) return false;
+          // a typo'd or crafted hash must not silently zero every base:
+          // the question must exist and every row index must be one of
+          // its category rows (boot decodes after the islands parse)
+          if (!TR.AGG) return true;
+          var q = d2.questionByCode(f.q);
+          return !!q && f.rows.every(function (ri) {
+            return q.rows[ri] && q.rows[ri].kind === "category";
+          });
+        });
       }
     });
   };

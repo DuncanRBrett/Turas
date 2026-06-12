@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SACAP 2025 Annual Student Survey — Turas Report v2</title>
-<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 18:47 SAST -->
+<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 18:48 SAST -->
 <!-- Single self-contained file: published tables + prior wave + synthetic
      microdata + one fixed renderer. No network requests, no installs. -->
 <style>
@@ -1294,7 +1294,17 @@ null
           var bits = part.split(":");
           return { q: bits[0], rows: (bits[1] || "").split(",")
             .map(Number).filter(function (x) { return !isNaN(x); }) };
-        }).filter(function (f) { return f.q && f.rows.length; });
+        }).filter(function (f) {
+          if (!f.q || !f.rows.length) return false;
+          // a typo'd or crafted hash must not silently zero every base:
+          // the question must exist and every row index must be one of
+          // its category rows (boot decodes after the islands parse)
+          if (!TR.AGG) return true;
+          var q = d2.questionByCode(f.q);
+          return !!q && f.rows.every(function (ri) {
+            return q.rows[ri] && q.rows[ri].kind === "category";
+          });
+        });
       }
     });
   };
@@ -8702,7 +8712,10 @@ null
       '<div class="added-slides">' + s.slides.map(function (slide, i) {
         return '<div class="added-slide" data-i="' + i + '">' +
           (slide.image
-            ? '<img src="' + slide.image + '" alt="' + fmt.escapeHtml(slide.title || "Added slide") + '">'
+            // FileReader data URLs only today, but stored state outlives
+            // the writer — escape the attribute like every other value
+            ? '<img src="' + fmt.escapeHtml(slide.image) + '" alt="' +
+              fmt.escapeHtml(slide.title || "Added slide") + '">'
             : '<div class="as-text">' + fmt.escapeHtml(slide.text || "") + "</div>") +
           '<div class="as-foot"><input type="text" class="as-title" value="' +
           fmt.escapeHtml(slide.title || "") + '" placeholder="Caption…">' +

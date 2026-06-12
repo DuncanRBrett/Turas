@@ -87,7 +87,10 @@
       '<div class="added-slides">' + s.slides.map(function (slide, i) {
         return '<div class="added-slide" data-i="' + i + '">' +
           (slide.image
-            ? '<img src="' + slide.image + '" alt="' + fmt.escapeHtml(slide.title || "Added slide") + '">'
+            // FileReader data URLs only today, but stored state outlives
+            // the writer — escape the attribute like every other value
+            ? '<img src="' + fmt.escapeHtml(slide.image) + '" alt="' +
+              fmt.escapeHtml(slide.title || "Added slide") + '">'
             : '<div class="as-text">' + fmt.escapeHtml(slide.text || "") + "</div>") +
           '<div class="as-foot"><input type="text" class="as-title" value="' +
           fmt.escapeHtml(slide.title || "") + '" placeholder="Caption…">' +
