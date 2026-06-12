@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SACAP 2025 Annual Student Survey — Turas Report v2</title>
-<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 18:02 SAST -->
+<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 18:07 SAST -->
 <!-- Single self-contained file: published tables + prior wave + synthetic
      microdata + one fixed renderer. No network requests, no installs. -->
 <style>
@@ -373,7 +373,22 @@ table.ws td.sparkcell { padding: 1px 8px; }
 
 /* tracking scope + findings */
 .scopebar { display: flex; gap: 6px; margin: 10px 0 4px; }
-.beatenlist { font-size: 11.5px; color: var(--muted); max-width: 320px; }
+/* Differences — question-grouped finding cards (27d_diffs.js) */
+.df-card { padding: 12px 16px; }
+.df-qhead { display: flex; align-items: baseline; gap: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.df-qhead .linklike { font-weight: 700; font-size: 13.5px; text-align: left; }
+.df-line { padding: 10px 0 8px; border-bottom: 1px dashed var(--line); }
+.df-line:last-child { border-bottom: none; }
+.df-sentence { font-size: 13px; margin-bottom: 6px; }
+.dfb { display: grid; gap: 3px; max-width: 520px; }
+.dfb-row { display: grid; grid-template-columns: 130px 1fr 44px; align-items: center; gap: 8px; }
+.dfb-name { font-size: 11px; color: var(--muted); text-align: right; }
+.dfb-track { background: #eef0f7; border-radius: 4px; height: 12px; }
+.dfb-bar { height: 12px; border-radius: 4px; }
+.dfb-bar.dfb-group { background: var(--brand); }
+.dfb-bar.dfb-total { background: #b8bdcf; }
+.dfb-val { font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.df-beats { font-size: 11.5px; color: var(--muted); margin-top: 5px; }
 .si-chart { max-width: 720px; }
 .pr-chart { padding: 14px 18px; margin-bottom: 10px; }
 
@@ -4622,8 +4637,6 @@ null
 
   var views = TR.views = {};
   var heatBanner = null;        // dashboard heatmap banner override
-  var diffSort = null;
-  var diffBanner = null;
 
   function scoreMax(q) {
     var max = 0;
@@ -4846,11 +4859,6 @@ null
     return html.join("");
   }
 
-  function th(key, label, sort) {
-    var arrow = sort && sort.col === key ? (sort.dir === "desc" ? " ↓" : " ↑") : "";
-    return '<th data-sort="' + key + '" class="sortable">' + label + arrow + "</th>";
-  }
-
   function wireRowFilter(host, searchId, catId) {
     var apply = function () {
       var term = (document.getElementById(searchId).value || "").toLowerCase();
@@ -4867,16 +4875,52 @@ null
     if (cat) cat.addEventListener("change", apply);
   }
 
-  /* ---------------- Differences ---------------- */
+  /* The Differences view lives in 27d_diffs.js (question-grouped cards). */
 
-  views.findings = function (host) {
-    var banner = diffBanner || TR.d2.state.banner;
-    if (banner.indexOf("custom:") === 0) banner = TR.AGG.banner_groups[0].id;
+  function wireLinks(host) {
+    host.querySelectorAll("[data-goq]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        TR.shell.goQuestion(el.getAttribute("data-goq"));
+      });
+    });
+  }
+
+  /* shared with the Tracking + Differences views (27t / 27d) */
+  views._wireRowFilter = wireRowFilter;
+  views._wireLinks = wireLinks;
+  views._bannerPickerHtml = bannerPickerHtml;
+
+})(typeof window !== "undefined" ? window : globalThis);
+
+/**
+ * Differences view — significant banner gaps for LAY readers.
+ *
+ * The old flat table (Question | Row | Column | Value | Total | Higher
+ * than) read like database output. This view groups findings by QUESTION
+ * into ranked cards; each line inside a card is one group that stands
+ * out, told as a sentence with a two-bar comparison (group vs overall)
+ * and the groups it is statistically ahead of. Same deterministic
+ * engine underneath: a finding appears when a column is significantly
+ * higher than two or more sibling columns at 95% (pooled z), ranked by
+ * sig-count × gap. The shared confidence explainer renders at the foot.
+ */
+(function (global) {
+  "use strict";
+  var TR = global.TR, fmt = TR.fmt;
+
+  var views = TR.views;
+  var MAX_FINDINGS = 80;        // ranked cut-off, surfaced in the UI note
+  var diffBanner = null;        // banner override (default: report banner)
+  var diffSort = "standout";    // "standout" (top score) | "question"
+
+  /** All findings for a banner: {code,title,category,label,column,pct,
+   *  total,gap,beaten[],score}. Pure given the models. */
+  function collectFindings(banner) {
     var bannerSource = banner.replace("custom:", "").split(":")[0];
     var findings = [];
     TR.AGG.questions.forEach(function (q) {
-      if (q.code === bannerSource) return;
-      var model = modelFor(q.code, banner);
+      if (q.code === bannerSource) return;   // a banner never "beats" itself
+      var model = views._modelFor(q.code, banner);
       var labelByLetter = {};
       model.columns.forEach(function (col) {
         if (col.letter) labelByLetter[col.letter] = col.label;
@@ -4890,54 +4934,111 @@ null
           if (cell.pct === null || total === null) return;
           findings.push({ code: q.code, title: q.title, category: q.category,
             label: row.label, column: model.columns[i].label,
-            pct: cell.pct, total: total,
+            pct: cell.pct, total: total, gap: cell.pct - total,
             beaten: sig95.split("").map(function (letter) {
               return labelByLetter[letter] || letter;
             }),
-            gap: cell.pct - total,
             score: sig95.length * Math.abs(cell.pct - total) });
         });
       });
     });
-    var sort = diffSort || { col: "score", dir: "desc" };
-    findings.sort(function (a, b) {
-      var v;
-      if (sort.col === "value") v = a.pct - b.pct;
-      else if (sort.col === "total") v = a.total - b.total;
-      else if (sort.col === "question") v = a.code < b.code ? -1 : 1;
-      else v = a.score - b.score;
-      return sort.dir === "asc" ? v : -v;
+    findings.sort(function (a, b) { return b.score - a.score; });
+    return findings;
+  }
+
+  /** Group the ranked findings by question, preserving rank order. */
+  function groupByQuestion(findings) {
+    var byCode = {}, groups = [];
+    findings.forEach(function (f) {
+      if (!byCode[f.code]) {
+        byCode[f.code] = { code: f.code, title: f.title,
+          category: f.category, top: f.score, items: [] };
+        groups.push(byCode[f.code]);
+      }
+      byCode[f.code].items.push(f);
     });
-    var groupName = TR.AGG.banner_groups.filter(function (g) { return g.id === banner; })[0];
-    var html = ['<div class="page"><div class="card"><h2>Significant differences · ' +
-      fmt.escapeHtml(groupName ? groupName.name : banner) + " banner</h2>" +
-      "<p>Every within-survey significant difference in one place (this wave; " +
-      "year-on-year lives in Tracking). A row appears when a column is " +
-      "significantly higher than two or more sibling columns at 95%; " +
-      "<strong>higher than</strong> names exactly what it beats. Click headers to sort.</p>" +
-      '<div class="scopebar">' + bannerPickerHtml(banner, "diffbanner") +
-      '<input id="diff-search" type="search" placeholder="Search…"></div>' +
-      '<table class="moved"><thead><tr>' +
-      th("question", "Question", sort) + "<th>Row</th><th>Column</th>" +
-      th("value", "Value", sort) + th("total", "Total", sort) +
-      th("score", "Higher than", sort) + "</tr></thead><tbody>"];
-    findings.slice(0, 80).forEach(function (f) {
-      html.push('<tr data-search="' +
-        fmt.escapeHtml((f.code + " " + f.title + " " + f.label + " " + f.column).toLowerCase()) +
-        '" data-cat="' + fmt.escapeHtml(f.category) + '">' +
-        '<td><button class="linklike" data-goq="' + f.code + '">' +
-        f.code + " · " + fmt.escapeHtml(TR.charts.clip(f.title, 40)) + "</button></td>" +
-        "<td>" + fmt.escapeHtml(TR.charts.clip(f.label, 30)) + "</td>" +
-        "<td><strong>" + fmt.escapeHtml(TR.charts.clip(f.column, 24)) + "</strong></td>" +
-        "<td><strong>" + Math.round(f.pct) + "%</strong></td>" +
-        "<td>" + Math.round(f.total) + "%</td>" +
-        '<td class="beatenlist">' + fmt.escapeHtml(
-          f.beaten.map(function (b) { return TR.charts.clip(b, 22); }).join(" · ")) +
-        "</td></tr>");
-    });
-    html.push("</tbody></table></div></div>");
+    return groups;
+  }
+
+  /** Two-bar comparison: the group's value vs everyone, same scale. */
+  function barsHtml(f) {
+    var bar = function (value, cls, name) {
+      return '<div class="dfb-row"><span class="dfb-name">' + name + "</span>" +
+        '<div class="dfb-track"><div class="dfb-bar ' + cls + '" style="width:' +
+        Math.min(Math.max(value, 0), 100).toFixed(1) + '%"></div></div>' +
+        '<span class="dfb-val">' + Math.round(value) + "%</span></div>";
+    };
+    return '<div class="dfb">' +
+      bar(f.pct, "dfb-group", fmt.escapeHtml(TR.charts.clip(f.column, 24))) +
+      bar(f.total, "dfb-total", "Everyone") + "</div>";
+  }
+
+  /** One finding as a plain-English line inside its question card. */
+  function lineHtml(f) {
+    var direction = f.gap >= 0 ? "+" : "−";
+    return '<div class="df-line">' +
+      '<div class="df-sentence"><strong>' + fmt.escapeHtml(f.column) +
+      "</strong> — " + Math.round(f.pct) + "% say “" +
+      fmt.escapeHtml(f.label) + "” vs " + Math.round(f.total) +
+      "% of everyone (" + direction + Math.abs(Math.round(f.gap)) + "pp)" +
+      "</div>" + barsHtml(f) +
+      '<div class="df-beats">statistically ahead of ' +
+      fmt.escapeHtml(f.beaten.join(" · ")) + "</div></div>";
+  }
+
+  function cardHtml(group) {
+    var search = (group.code + " " + group.title + " " +
+      group.items.map(function (f) { return f.label + " " + f.column; })
+        .join(" ")).toLowerCase();
+    return '<div class="card df-card" data-search="' +
+      fmt.escapeHtml(search) + '">' +
+      '<div class="df-qhead"><button class="linklike" data-goq="' +
+      group.code + '">' + group.code + " · " +
+      fmt.escapeHtml(group.title) + "</button>" +
+      '<span class="kindtag">' + fmt.escapeHtml(group.category) +
+      "</span></div>" +
+      group.items.map(lineHtml).join("") + "</div>";
+  }
+
+  views.findings = function (host) {
+    var banner = diffBanner || TR.d2.state.banner;
+    if (banner.indexOf("custom:") === 0) banner = TR.AGG.banner_groups[0].id;
+    var all = collectFindings(banner);
+    var shown = all.slice(0, MAX_FINDINGS);
+    var groups = groupByQuestion(shown);
+    if (diffSort === "question") {
+      groups.sort(function (a, b) { return a.code < b.code ? -1 : 1; });
+    }
+    var groupName = TR.AGG.banner_groups.filter(function (g) {
+      return g.id === banner;
+    })[0];
+    var html = ['<div class="page"><div class="card"><h2>Where groups differ · ' +
+      fmt.escapeHtml(groupName ? groupName.name : banner) + "</h2>" +
+      "<p>Each card is one question; each line is one group that genuinely " +
+      "stands out — what it says, how far it sits from everyone, and which " +
+      "groups it is statistically ahead of (95% level, this wave; " +
+      "year-on-year changes live in Tracking).</p>" +
+      '<div class="scopebar">' + views._bannerPickerHtml(banner, "diffbanner") +
+      '<select data-diffsort>' +
+      '<option value="standout"' + (diffSort === "standout" ? " selected" : "") +
+      ">Biggest standouts first</option>" +
+      '<option value="question"' + (diffSort === "question" ? " selected" : "") +
+      ">Question order</option></select>" +
+      '<input id="diff-search" type="search" placeholder="Search questions, ' +
+      'answers or groups…">' +
+      (all.length > MAX_FINDINGS
+        ? '<span class="trknote">top ' + MAX_FINDINGS + " of " + all.length +
+          " differences shown</span>" : "") + "</div></div>"];
+    if (!groups.length) {
+      html.push('<div class="card"><p>No group is significantly ahead of two ' +
+        "or more others on this banner.</p></div>");
+    }
+    groups.forEach(function (group) { html.push(cardHtml(group)); });
+    html.push(TR.conf.calloutHtml());
+    html.push("</div>");
     host.innerHTML = html.join("");
-    wireLinks(host);
+
+    views._wireLinks(host);
     var picker = host.querySelector('[data-act="diffbanner"]');
     if (picker) {
       picker.addEventListener("change", function () {
@@ -4945,29 +5046,25 @@ null
         views.findings(host);
       });
     }
-    host.querySelectorAll("th[data-sort]").forEach(function (el) {
-      el.addEventListener("click", function () {
-        var col = el.getAttribute("data-sort");
-        diffSort = (diffSort && diffSort.col === col && diffSort.dir === "desc")
-          ? { col: col, dir: "asc" } : { col: col, dir: "desc" };
-        views.findings(host);
+    host.querySelector("[data-diffsort]").addEventListener("change", function (e) {
+      diffSort = e.target.value;
+      views.findings(host);
+    });
+    var search = host.querySelector("#diff-search");
+    search.addEventListener("input", function () {
+      var term = search.value.trim().toLowerCase();
+      host.querySelectorAll(".df-card").forEach(function (card) {
+        card.classList.toggle("hidden",
+          !!term && card.getAttribute("data-search").indexOf(term) === -1);
       });
     });
-    wireRowFilter(host, "diff-search", "none");
+    var callout = host.querySelector("[data-callout]");
+    if (callout) {
+      callout.addEventListener("click", function () {
+        callout.closest(".callout").classList.toggle("collapsed");
+      });
+    }
   };
-
-  function wireLinks(host) {
-    host.querySelectorAll("[data-goq]").forEach(function (el) {
-      el.addEventListener("click", function () {
-        TR.shell.goQuestion(el.getAttribute("data-goq"));
-      });
-    });
-  }
-
-  /* shared with the Tracking view (27t_tracking.js) */
-  views._th = th;
-  views._wireRowFilter = wireRowFilter;
-  views._wireLinks = wireLinks;
 
 })(typeof window !== "undefined" ? window : globalThis);
 

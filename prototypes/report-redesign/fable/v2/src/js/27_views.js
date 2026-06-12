@@ -12,8 +12,6 @@
 
   var views = TR.views = {};
   var heatBanner = null;        // dashboard heatmap banner override
-  var diffSort = null;
-  var diffBanner = null;
 
   function scoreMax(q) {
     var max = 0;
@@ -236,11 +234,6 @@
     return html.join("");
   }
 
-  function th(key, label, sort) {
-    var arrow = sort && sort.col === key ? (sort.dir === "desc" ? " ↓" : " ↑") : "";
-    return '<th data-sort="' + key + '" class="sortable">' + label + arrow + "</th>";
-  }
-
   function wireRowFilter(host, searchId, catId) {
     var apply = function () {
       var term = (document.getElementById(searchId).value || "").toLowerCase();
@@ -257,94 +250,7 @@
     if (cat) cat.addEventListener("change", apply);
   }
 
-  /* ---------------- Differences ---------------- */
-
-  views.findings = function (host) {
-    var banner = diffBanner || TR.d2.state.banner;
-    if (banner.indexOf("custom:") === 0) banner = TR.AGG.banner_groups[0].id;
-    var bannerSource = banner.replace("custom:", "").split(":")[0];
-    var findings = [];
-    TR.AGG.questions.forEach(function (q) {
-      if (q.code === bannerSource) return;
-      var model = modelFor(q.code, banner);
-      var labelByLetter = {};
-      model.columns.forEach(function (col) {
-        if (col.letter) labelByLetter[col.letter] = col.label;
-      });
-      model.rows.forEach(function (row) {
-        if (row.kind === "mean") return;
-        row.cells.forEach(function (cell, i) {
-          var sig95 = (cell.sig || "").replace(/[a-z]/g, "");
-          if (i === 0 || sig95.length < 2) return;
-          var total = row.cells[0].pct;
-          if (cell.pct === null || total === null) return;
-          findings.push({ code: q.code, title: q.title, category: q.category,
-            label: row.label, column: model.columns[i].label,
-            pct: cell.pct, total: total,
-            beaten: sig95.split("").map(function (letter) {
-              return labelByLetter[letter] || letter;
-            }),
-            gap: cell.pct - total,
-            score: sig95.length * Math.abs(cell.pct - total) });
-        });
-      });
-    });
-    var sort = diffSort || { col: "score", dir: "desc" };
-    findings.sort(function (a, b) {
-      var v;
-      if (sort.col === "value") v = a.pct - b.pct;
-      else if (sort.col === "total") v = a.total - b.total;
-      else if (sort.col === "question") v = a.code < b.code ? -1 : 1;
-      else v = a.score - b.score;
-      return sort.dir === "asc" ? v : -v;
-    });
-    var groupName = TR.AGG.banner_groups.filter(function (g) { return g.id === banner; })[0];
-    var html = ['<div class="page"><div class="card"><h2>Significant differences · ' +
-      fmt.escapeHtml(groupName ? groupName.name : banner) + " banner</h2>" +
-      "<p>Every within-survey significant difference in one place (this wave; " +
-      "year-on-year lives in Tracking). A row appears when a column is " +
-      "significantly higher than two or more sibling columns at 95%; " +
-      "<strong>higher than</strong> names exactly what it beats. Click headers to sort.</p>" +
-      '<div class="scopebar">' + bannerPickerHtml(banner, "diffbanner") +
-      '<input id="diff-search" type="search" placeholder="Search…"></div>' +
-      '<table class="moved"><thead><tr>' +
-      th("question", "Question", sort) + "<th>Row</th><th>Column</th>" +
-      th("value", "Value", sort) + th("total", "Total", sort) +
-      th("score", "Higher than", sort) + "</tr></thead><tbody>"];
-    findings.slice(0, 80).forEach(function (f) {
-      html.push('<tr data-search="' +
-        fmt.escapeHtml((f.code + " " + f.title + " " + f.label + " " + f.column).toLowerCase()) +
-        '" data-cat="' + fmt.escapeHtml(f.category) + '">' +
-        '<td><button class="linklike" data-goq="' + f.code + '">' +
-        f.code + " · " + fmt.escapeHtml(TR.charts.clip(f.title, 40)) + "</button></td>" +
-        "<td>" + fmt.escapeHtml(TR.charts.clip(f.label, 30)) + "</td>" +
-        "<td><strong>" + fmt.escapeHtml(TR.charts.clip(f.column, 24)) + "</strong></td>" +
-        "<td><strong>" + Math.round(f.pct) + "%</strong></td>" +
-        "<td>" + Math.round(f.total) + "%</td>" +
-        '<td class="beatenlist">' + fmt.escapeHtml(
-          f.beaten.map(function (b) { return TR.charts.clip(b, 22); }).join(" · ")) +
-        "</td></tr>");
-    });
-    html.push("</tbody></table></div></div>");
-    host.innerHTML = html.join("");
-    wireLinks(host);
-    var picker = host.querySelector('[data-act="diffbanner"]');
-    if (picker) {
-      picker.addEventListener("change", function () {
-        diffBanner = picker.value;
-        views.findings(host);
-      });
-    }
-    host.querySelectorAll("th[data-sort]").forEach(function (el) {
-      el.addEventListener("click", function () {
-        var col = el.getAttribute("data-sort");
-        diffSort = (diffSort && diffSort.col === col && diffSort.dir === "desc")
-          ? { col: col, dir: "asc" } : { col: col, dir: "desc" };
-        views.findings(host);
-      });
-    });
-    wireRowFilter(host, "diff-search", "none");
-  };
+  /* The Differences view lives in 27d_diffs.js (question-grouped cards). */
 
   function wireLinks(host) {
     host.querySelectorAll("[data-goq]").forEach(function (el) {
@@ -354,9 +260,9 @@
     });
   }
 
-  /* shared with the Tracking view (27t_tracking.js) */
-  views._th = th;
+  /* shared with the Tracking + Differences views (27t / 27d) */
   views._wireRowFilter = wireRowFilter;
   views._wireLinks = wireLinks;
+  views._bannerPickerHtml = bannerPickerHtml;
 
 })(typeof window !== "undefined" ? window : globalThis);
