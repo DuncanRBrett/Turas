@@ -356,7 +356,10 @@
         return v === null || v === undefined ? "" : Math.round(v * 10) / 10;
       }));
     }));
-    return { xml: xml, workbook: TR.xlsx.bytes("Chart data", workbookRows) };
+    // the sheet MUST be named Sheet1: the c:f formula refs above say
+    // Sheet1!… — on "Edit Data" Excel resolves them against the embedded
+    // workbook, and any other sheet name turns every series into #REF!
+    return { xml: xml, workbook: TR.xlsx.bytes("Sheet1", workbookRows) };
   };
 
   /**
@@ -426,7 +429,8 @@
           return v === null ? "" : v;
         }));
       }));
-    return { xml: xml, workbook: TR.xlsx.bytes("Trend data", workbookRows) };
+    // sheet name must match the Sheet1!… formula refs (see buildChart)
+    return { xml: xml, workbook: TR.xlsx.bytes("Sheet1", workbookRows) };
   };
 
   /**

@@ -3,6 +3,8 @@
 parts present, every XML part well-formed, slide count consistent).
 Exit 0 = valid, exit 1 = problems (all accumulated and printed)."""
 
+import io
+import posixpath
 import sys
 import zipfile
 import xml.etree.ElementTree as ET
@@ -22,6 +24,54 @@ REQUIRED = [
 ]
 P_NS = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
 A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+C_NS = "{http://schemas.openxmlformats.org/drawingml/2006/chart}"
+R_NS = "{http://schemas.openxmlformats.org/package/2006/relationships}"
+S_NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+
+
+def check_chart_workbooks(archive, names, errors):
+    """Every c:f formula in a chart must reference a sheet that exists in
+    that chart's embedded workbook. PowerPoint renders happily from the
+    cached values either way, but "Edit Data" makes Excel resolve the
+    formulas — a missing sheet turns every series into #REF! the moment
+    the workbook closes (caught manually by Duncan, 2026-06-12)."""
+    charts = [n for n in names
+              if n.startswith("ppt/charts/chart") and n.endswith(".xml")]
+    for chart_name in charts:
+        chart = ET.fromstring(archive.read(chart_name))
+        refs = [f.text for f in chart.iter(f"{C_NS}f") if f.text]
+        if not refs:
+            continue
+        ref_sheets = set()
+        for ref in refs:
+            sheet = ref.split("!")[0].strip("'").replace("''", "'")
+            ref_sheets.add(sheet)
+        rels_name = ("ppt/charts/_rels/" +
+                     chart_name.split("/")[-1] + ".rels")
+        if rels_name not in names:
+            errors.append(f"CHART_NO_RELS: {chart_name} has formulas "
+                          "but no rels part (no embedded workbook)")
+            continue
+        rels = ET.fromstring(archive.read(rels_name))
+        targets = [rel.get("Target") for rel in rels.iter(f"{R_NS}Relationship")
+                   if rel.get("Target", "").endswith(".xlsx")]
+        if not targets:
+            errors.append(f"CHART_NO_WORKBOOK: {chart_name} has formulas "
+                          "but no embedded .xlsx relationship")
+            continue
+        workbook_name = posixpath.normpath(
+            posixpath.join("ppt/charts", targets[0]))
+        if workbook_name not in names:
+            errors.append(f"CHART_WORKBOOK_MISSING: {workbook_name}")
+            continue
+        embedded = zipfile.ZipFile(io.BytesIO(archive.read(workbook_name)))
+        workbook = ET.fromstring(embedded.read("xl/workbook.xml"))
+        sheet_names = {s.get("name") for s in workbook.iter(f"{S_NS}sheet")}
+        for sheet in sorted(ref_sheets - sheet_names):
+            errors.append(
+                f"CHART_REF_SHEET: {chart_name} formulas reference "
+                f"'{sheet}!…' but {workbook_name} only has sheets "
+                f"{sorted(sheet_names)} — Edit Data would #REF! the chart")
 
 
 def validate(path):
@@ -68,6 +118,8 @@ def validate(path):
             for n in slide_parts)
         if not has_table:
             errors.append("PKG_NO_NATIVE_TABLE: no a:tbl found in any slide")
+
+    check_chart_workbooks(archive, names, errors)
 
     return errors
 
