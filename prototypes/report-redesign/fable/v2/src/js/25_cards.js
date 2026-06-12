@@ -162,8 +162,9 @@
             "plus the wave strip")
         : "") +
       '<span class="pinwrap"><button data-act="columns" aria-haspopup="true" ' +
-      'title="Choose which banner columns show in the table and on the chart">' +
-      "Columns…</button>" +
+      'title="One place to choose which rows and banner columns show on the ' +
+      'table and the chart">' +
+      "Rows &amp; columns…</button>" +
       '<span id="colmenu" class="pinmenu colmenu" hidden></span></span>' +
       '<span class="ctl-spacer"></span>' +
       '<button data-act="copy">Copy table</button>' +
@@ -173,7 +174,9 @@
       '<span id="pinmenu" class="pinmenu" hidden></span></span>';
   }
 
-  /** (Re)build the columns panel for the active question's banner. */
+  /** (Re)build the rows & columns panel for the active question. One
+   *  panel configures the table AND the chart — columns (table/chart
+   *  checks), row visibility, and which row kind the chart plots. */
   function buildColumnsPanel() {
     var menu = document.getElementById("colmenu");
     if (!menu) return;
@@ -181,7 +184,8 @@
     if (!chartModel) { menu.innerHTML = ""; return; }
     var s = TR.d2.state;
     var hidden = TR.d2.hiddenFor(s.banner);
-    var rows = chartModel.columns.map(function (col, i) {
+    var hiddenRows = s.hiddenRows[s.activeQ] || [];
+    var cols = chartModel.columns.map(function (col, i) {
       var inTable = hidden.indexOf(col.label) === -1;
       var inChart = s.chartColLabels.indexOf(i === 0 ? "Total" : col.label) !== -1;
       return '<div class="cm-row"><span class="cm-label" title="' +
@@ -192,8 +196,34 @@
         '<label><input type="checkbox" data-cmchart="' + fmt.escapeHtml(col.label) +
         '"' + (inChart ? " checked" : "") + "></label></div>";
     }).join("");
-    menu.innerHTML = '<div class="cm-head"><span>Column</span><span>Table</span>' +
-      "<span>Chart</span></div><div class='cm-body'>" + rows + "</div>" +
+    var rows = chartModel.rows.map(function (row) {
+      return '<div class="cm-row"><span class="cm-label" title="' +
+        fmt.escapeHtml(row.label) + '">' +
+        fmt.escapeHtml(TR.charts.clip(row.label, 26)) +
+        (row.kind !== "category" ? ' <span class="kindtag">' +
+          (row.diff ? "diff" : row.kind) + "</span>" : "") + "</span>" +
+        '<label><input type="checkbox" data-cmrow="' + fmt.escapeHtml(row.label) +
+        '"' + (hiddenRows.indexOf(row.label) === -1 ? " checked" : "") +
+        "></label><span></span></div>";
+    }).join("");
+    var kind = cards2.resolveChartKind(chartModel);
+    var hasNets = TR.render.hasNetRows(chartModel);
+    menu.innerHTML =
+      '<div class="cm-sect">Columns</div>' +
+      '<div class="cm-head"><span>Column</span><span>Table</span>' +
+      "<span>Chart</span></div><div class='cm-body'>" + cols + "</div>" +
+      '<div class="cm-sect">Rows</div>' +
+      '<div class="cm-head"><span>Row</span><span>Show</span><span></span></div>' +
+      "<div class='cm-body'>" + rows + "</div>" +
+      '<div class="cm-sect">Chart plots</div>' +
+      '<select data-chartkindsel class="wide"' +
+      (hasNets ? "" : ' disabled title="This question has no NET rows — detail only"') +
+      '><option value="detail"' + (kind === "detail" ? " selected" : "") +
+      ">Detail categories</option>" +
+      '<option value="summary"' + (kind === "summary" ? " selected" : "") +
+      ">Groupings (NETs)</option>" +
+      '<option value="both"' + (kind === "both" ? " selected" : "") +
+      ">Both</option></select>" +
       '<button class="primary wide" data-act="columns-done">Done</button>';
   }
 
@@ -256,25 +286,20 @@
     if (s.showChart) {
       chartModel = cards2.chartModel();
       var kind = chartModel ? chartModel.chartKind : "detail";
+      // row kind + chart columns are configured in the single
+      // "Rows & columns…" panel on the controls bar — no duplicate
+      // triggers here (the toolbar keeps only the chart type)
       html += '<div class="charttools"><label class="ctlab" for="charttype-sel">Type</label>' +
         '<select id="charttype-sel" data-charttypesel>' +
         TR.render.CHART_TYPES.map(function (t) {
           return '<option value="' + t[0] + '"' +
             (s.chartType === t[0] ? " selected" : "") + ">" + t[1] + "</option>";
         }).join("") + "</select>" +
-        '<label class="ctlab" for="chartkind-sel">Rows</label>' +
-        '<select id="chartkind-sel" data-chartkindsel' +
-        (TR.render.hasNetRows(chartModel) ? "" :
-          ' disabled title="This question has no NET rows — detail only"') + ">" +
-        '<option value="detail"' + (kind === "detail" ? " selected" : "") +
-        ">Detail categories</option>" +
-        '<option value="summary"' + (kind === "summary" ? " selected" : "") +
-        ">Groupings (NETs)</option>" +
-        '<option value="both"' + (kind === "both" ? " selected" : "") +
-        ">Both</option></select>" +
-        '<button data-act="columns" title="Choose which banner columns show ' +
-        'in the table and on the chart">Columns… (' +
-        cards2.chartCols(chartModel).length + " on chart)</button></div>" +
+        '<span class="ctlab chartmeta">' +
+        cards2.chartCols(chartModel).length + " column" +
+        (cards2.chartCols(chartModel).length === 1 ? "" : "s") + " · " +
+        (kind === "summary" ? "groupings" : kind === "both" ? "detail + groupings"
+          : "detail rows") + " — change under Rows &amp; columns…</span></div>" +
         '<div class="chart">' + safeChart(chartModel) + "</div>";
     }
     if (model.hiddenCount || model.hiddenRowCount) {
@@ -492,6 +517,19 @@
         var pos = labels.indexOf(chartLabel);
         if (pos === -1) labels.push(chartLabel);
         else if (labels.length > 1) labels.splice(pos, 1);
+        cards2.renderActive();
+        buildColumnsPanel();
+        return;
+      }
+      var cmRow = e.target.closest("[data-cmrow]");
+      if (cmRow) {
+        var rowQ = TR.d2.state.activeQ;
+        var rowList = TR.d2.state.hiddenRows[rowQ] =
+          TR.d2.state.hiddenRows[rowQ] || [];
+        var rowLabel = cmRow.getAttribute("data-cmrow");
+        var rowAt = rowList.indexOf(rowLabel);
+        if (rowAt === -1) rowList.push(rowLabel);
+        else rowList.splice(rowAt, 1);
         cards2.renderActive();
         buildColumnsPanel();
         return;

@@ -1,17 +1,22 @@
 /**
  * v2 Tracking workspace — tracker-module parity over the wave history.
- * This file: the sub-tab shell (Summary | Metrics | Segments | Visualise),
- * the shared tracking helpers (TR.trk) and the Metrics view (every tracked
- * metric, column-per-wave, for Total OR any tracked banner segment).
- * Summary lives in 27u_summary.js; Segments + Visualise in 27v_visualise.js.
+ * This file: the sub-tab shell (Summary | Explorer | Visualise) and the
+ * shared tracking helpers (TR.trk). The Summary lives in 27u_summary.js;
+ * the Explorer heatmap + Visualise live in 27v_visualise.js.
+ *
+ * KEY METRICS are evaluative only — questions carrying an Index / NPS /
+ * Mean row contribute exactly that mean row plus their top-box NET (the
+ * NET whose members sit highest on the scale), one heatmap row per
+ * question, mirroring the tracker module's configured tracking specs.
+ * Profile questions (campus, age, intake…) appear under "all tracked
+ * rows" only.
  *
  * Tracking views always show PUBLISHED figures — current wave included —
  * so segment columns and history stay comparable; report-level filters
  * deliberately do not apply here (noted in the UI when active).
  *
- * SIZE-EXCEPTION: one tracking workspace shell + its shared data helpers;
- * the metric list, segment lookups and formatting are used by all three
- * view files and splitting them would scatter the contract.
+ * SIZE-EXCEPTION: the workspace shell + shared data helpers used by all
+ * tracking views; splitting them would scatter the metric contract.
  */
 (function (global) {
   "use strict";
@@ -23,16 +28,17 @@
   /** Workspace state — survives tab switches (module scope, not DOM). */
   trk.state = {
     sub: "summary",
-    scope: null,            // "key" | "all" (Metrics view)
-    segment: null,          // segment norm, null = Total (Metrics view)
-    metricKey: null,        // Segments/Visualise context metric
+    explorerMode: "qfs",    // qfs = questions for segment, sfq = segments for question
+    scope: null,            // "key" | "all" (Explorer mode A)
+    segment: null,          // segment norm, null = Total (Explorer mode A)
+    display: "abs",         // abs | prev | base (Explorer cell mode)
+    expSort: "original",    // original | value | change
+    expWaves: null,         // {year: bool} or null = all
+    metricKey: null,        // Explorer mode B / Visualise context metric
     visSegs: null,          // [segNorm|"total"] selected for Visualise
-    visMode: "absolute",    // absolute | prev | base
-    visCI: false, visLabels: "last", visWaves: null,
+    visMode: "absolute", visCI: false, visLabels: "last", visWaves: null,
     yMin: null, yMax: null
   };
-  var sort = null;
-  var MAX_ROWS = 200;
 
   /* ---------------- shared helpers (used by 27u/27v) ---------------- */
 
@@ -48,7 +54,7 @@
   var pubCache = {};
   /** Published, unfiltered model for a question under a banner group. */
   trk.publishedModel = function (code, group) {
-    var key = code + "::" + (group || "total");
+    var key = code + "::" + (group || "default");
     if (!pubCache[key]) {
       pubCache[key] = TR.model.forQuestion(code,
         group || TR.AGG.banner_groups[0].id, [], { hiddenCols: [] });
@@ -56,11 +62,32 @@
     return pubCache[key];
   };
 
+  function metricEntry(q, model, row, ri) {
+    return { key: q.code + "::" + ri, code: q.code, title: q.title,
+      category: q.category, label: row.label, kind: row.kind,
+      isMean: row.kind === "mean", diff: !!row.diff, ri: ri,
+      q: TR.d2.questionByCode(q.code), row: row };
+  }
+
+  /** Top-box NET row index: the non-diff NET whose members sit highest. */
+  function topNetIndex(q, model) {
+    var best = -1, bestRank = -1;
+    model.rows.forEach(function (row, ri) {
+      if (row.kind !== "net" || row.diff) return;
+      if (!row.waves || !row.waves.length) return;
+      var members = q.net_members && q.net_members[String(ri)];
+      if (!members || !members.length) return;
+      var rank = Math.max.apply(null, members);
+      if (rank > bestRank) { bestRank = rank; best = ri; }
+    });
+    return best;
+  }
+
   var metricCache = {};
   /**
-   * Every tracked metric row: [{key, code, title, category, label, kind,
-   * isMean, diff, ri, q, row}] — ri indexes the unfiltered model's rows
-   * (same order as q.rows). scope "key" = non-category rows only.
+   * Tracked metrics. scope "key": evaluative questions only — the mean
+   * row (Index/NPS/Mean) plus the top-box NET, in question order.
+   * scope "all": every row with history on every tracked question.
    */
   trk.metricList = function (scope) {
     if (metricCache[scope]) return metricCache[scope];
@@ -68,17 +95,32 @@
     TR.AGG.questions.forEach(function (q) {
       var model = trk.publishedModel(q.code, null);
       if (!model || !model.prevWave) return;
+      if (scope === "key") {
+        var hasMean = model.rows.some(function (r) { return r.kind === "mean"; });
+        if (!hasMean) return;   // profile question — not a key metric
+        model.rows.forEach(function (row, ri) {
+          if (row.kind === "mean" && row.waves && row.waves.length) {
+            out.push(metricEntry(q, model, row, ri));
+          }
+        });
+        var top = topNetIndex(TR.d2.questionByCode(q.code), model);
+        if (top >= 0) out.push(metricEntry(q, model, model.rows[top], top));
+        return;
+      }
       model.rows.forEach(function (row, ri) {
         if (!row.waves || !row.waves.length) return;
-        if (scope === "key" && row.kind === "category") return;
-        out.push({ key: q.code + "::" + ri, code: q.code, title: q.title,
-          category: q.category, label: row.label, kind: row.kind,
-          isMean: row.kind === "mean", diff: !!row.diff, ri: ri,
-          q: TR.d2.questionByCode(q.code), row: row });
+        out.push(metricEntry(q, model, row, ri));
       });
     });
     metricCache[scope] = out;
     return out;
+  };
+
+  /** Key proportion metrics: the top-box NET per evaluative question. */
+  trk.keyNets = function () {
+    return trk.metricList("key").filter(function (m) {
+      return !m.isMean && !m.diff;
+    });
   };
 
   trk.metricByKey = function (key) {
@@ -106,7 +148,8 @@
       var cell = metric.row.cells[0];
       var v = metric.isMean ? cell.mean : cell.pct;
       if (v === null || v === undefined) return null;
-      return { value: v, base: trk.publishedModel(metric.code, null).columns[0].base,
+      return { value: v,
+        base: trk.publishedModel(metric.code, null).columns[0].base,
         x: cell.n !== null && cell.n !== undefined ? cell.n : null };
     }
     var seg = trk.segmentByNorm(segNorm);
@@ -147,7 +190,7 @@
     return TR.waves.cellsFor(points, canSig);
   };
 
-  /* ---- KPI thresholds (tracker defaults, project-overridable) ---- */
+  /* ---- thresholds + cell colouring (tracker defaults, overridable) ---- */
 
   var THRESHOLDS = { pct: { green: 70, amber: 50 },
     index: { green: 70, amber: 50 }, mean: { green: 7, amber: 5 },
@@ -161,31 +204,41 @@
     return "index";
   };
 
-  trk.band = function (type, value) {
+  trk.thresholds = function (type) {
     var cfg = (TR.AGG.project.tracking || {}).thresholds || {};
-    var t = cfg[type] || THRESHOLDS[type] || THRESHOLDS.pct;
+    return cfg[type] || THRESHOLDS[type] || THRESHOLDS.pct;
+  };
+
+  trk.band = function (type, value) {
     if (value === null || value === undefined) return "";
+    var t = trk.thresholds(type);
     return value >= t.green ? "g" : value >= t.amber ? "a" : "r";
   };
 
-  trk.dirArrow = function (cell) {
-    if (!cell || cell.change_prev === null) return "";
-    if (cell.sig_prev) return cell.change_prev >= 0 ? "↑" : "↓";
-    return "→";
+  /** Signed change text: "+20pp" / "−1.3" ("" when not computable). */
+  trk.changeText = function (change, isMean) {
+    if (change === null || change === undefined) return "";
+    return (change >= 0 ? "+" : "−") +
+      Math.abs(change).toFixed(isMean ? 1 : 0) + (isMean ? "" : "pp");
   };
 
   /* ---------------- shell ---------------- */
 
-  var SUBS = [["summary", "Summary"], ["metrics", "Metrics"],
-    ["segments", "Segments"], ["visualise", "Visualise"]];
+  var SUBS = [["summary", "Summary"], ["explorer", "Explorer"],
+    ["visualise", "Visualise"]];
 
   views.whatMoved = function (host) {
     if (!TR.d2.tracking().enabled) {
       host.innerHTML = '<div class="page"><div class="card"><h2>Tracking</h2>' +
         "<p>No wave history is configured, so there is nothing to track. With " +
         "history supplied (one wave or many), this workspace provides the " +
-        "summary, per-metric, per-segment and visualise tracking views.</p></div></div>";
+        "summary, explorer and visualise tracking views.</p></div></div>";
       return;
+    }
+    // migrate pre-round-6 state
+    if (trk.state.sub === "metrics" || trk.state.sub === "segments") {
+      trk.state.explorerMode = trk.state.sub === "segments" ? "sfq" : "qfs";
+      trk.state.sub = "explorer";
     }
     var wrap = document.createElement("div");
     var years = trk.years();
@@ -207,8 +260,7 @@
       });
     });
     var sub = document.getElementById("trkhost");
-    if (trk.state.sub === "metrics") renderMetrics(sub);
-    else if (trk.state.sub === "segments") TR.trkVis.renderSegments(sub);
+    if (trk.state.sub === "explorer") TR.trkVis.renderExplorer(sub);
     else if (trk.state.sub === "visualise") TR.trkVis.renderVisualise(sub);
     else TR.trkSummary.render(sub);
   };
@@ -217,176 +269,5 @@
   trk.rerender = function () {
     views.whatMoved(document.getElementById("tabhost"));
   };
-
-  /* ---------------- Metrics view ---------------- */
-
-  function applySort(list, sortSpec) {
-    var byDelta = function (a, b) {
-      var da = a.last, db = b.last;
-      if (!da && !db) return 0;
-      if (!da) return 1;
-      if (!db) return -1;
-      if (da.sig_prev !== db.sig_prev) return da.sig_prev ? -1 : 1;
-      return Math.abs(db.change_prev || 0) - Math.abs(da.change_prev || 0);
-    };
-    list.sort(function (a, b) {
-      var v;
-      if (sortSpec.col === "question") v = a.code < b.code ? -1 : 1;
-      else if (sortSpec.col === "cur") {
-        v = ((b.last && b.last.value) || -1e9) - ((a.last && a.last.value) || -1e9);
-      } else v = byDelta(a, b);
-      return sortSpec.dir === "asc" ? -v : v;
-    });
-  }
-
-  function changeCell(cell, isMean, vsBase) {
-    var change = vsBase ? cell.change_base : cell.change_prev;
-    var sig = vsBase ? cell.sig_base : cell.sig_prev;
-    if (change === null || change === undefined) return '<td class="wv dnone">–</td>';
-    var up = change >= 0;
-    return '<td class="wv ' + (up ? "up" : "down") + (sig ? " dsig" : "") +
-      '" title="' + (vsBase ? "vs baseline wave" : "vs previous wave") +
-      (sig ? " · significant at 95%" : "") + '">' +
-      (up ? "▲ +" : "▼ −") + Math.abs(change).toFixed(isMean ? 1 : 0) +
-      (isMean ? "" : "pp") + "</td>";
-  }
-
-  function renderMetrics(host) {
-    var s = trk.state;
-    var years = trk.years();
-    var scope = s.scope || TR.d2.tracking().defaultScope;
-    var segments = TR.waves.segments();
-    var threshold = TR.AGG.project.low_base_threshold || 30;
-    var entries = trk.metricList(scope).map(function (metric) {
-      var cells = trk.points(metric, s.segment);
-      var byYear = {};
-      cells.forEach(function (c) { if (!c.current) byYear[c.year] = c; });
-      return { code: metric.code, title: metric.title, category: metric.category,
-        label: metric.label, kind: metric.kind, diff: metric.diff,
-        isMean: metric.isMean, key: metric.key, metric: metric,
-        byYear: byYear, cells: cells,
-        last: cells.length && cells[cells.length - 1].current
-          ? cells[cells.length - 1] : null };
-    }).filter(function (e) { return e.cells.length; });
-    applySort(entries, sort || { col: "change", dir: "desc" });
-    var cats = {};
-    TR.AGG.questions.forEach(function (q) { cats[q.category] = true; });
-    var th = views._th;
-    var segPicker = '<select data-trkseg><option value="">Total</option>' +
-      segments.map(function (seg) {
-        return '<option value="' + seg.norm + '"' +
-          (s.segment === seg.norm ? " selected" : "") + ">" +
-          fmt.escapeHtml(seg.label) + " (" + seg.years[0] + "–" +
-          seg.years[seg.years.length - 1] + ")</option>";
-      }).join("") + "</select>";
-
-    var html = ['<div class="card trkcard"><p>Published values per wave for ' +
-      "<strong>" + (s.segment ? fmt.escapeHtml(trk.segmentByNorm(s.segment).label)
-        : "Total") + "</strong>. <strong>Δ prev</strong> = latest vs the most " +
-      "recent wave carrying the metric, <strong>Δ first</strong> = vs its " +
-      "baseline; outlined = significant at 95% (pooled z, bases under " + threshold +
-      " excluded). Hover wave cells for bases; click a question to drill down.</p>" +
-      '<div class="scopebar"><button class="btab' + (scope === "key" ? " on" : "") +
-      '" data-scope="key">Key metrics</button>' +
-      '<button class="btab' + (scope === "all" ? " on" : "") +
-      '" data-scope="all">All tracked rows</button>' + segPicker +
-      '<input id="trk-search" type="search" placeholder="Search metrics…">' +
-      '<select id="trk-cat"><option value="">All sections</option>' +
-      Object.keys(cats).map(function (c) {
-        return '<option value="' + fmt.escapeHtml(c) + '">' + fmt.escapeHtml(c) +
-          "</option>";
-      }).join("") + "</select></div>" +
-      '<div class="trkwrap"><table class="moved trk"><thead><tr>' +
-      th("question", "Question", sort) + "<th>Metric</th>" +
-      years.map(function (y) { return "<th class='wv'>" + y + "</th>"; }).join("") +
-      th("cur", String(TR.render.currentYear()), sort) + "<th>Trend</th>" +
-      th("change", "Δ prev", sort) + "<th>Δ first</th>" +
-      "</tr></thead><tbody>"];
-    entries.slice(0, MAX_ROWS).forEach(function (e) {
-      var cells = ['<td><button class="linklike" data-goq="' + e.code + '">' +
-        e.code + " · " + fmt.escapeHtml(TR.charts.clip(e.title, 38)) +
-        "</button></td>",
-        '<td><button class="linklike" data-seg-metric="' + e.key + '">' +
-        fmt.escapeHtml(TR.charts.clip(e.label, 30)) + "</button>" +
-        (e.kind !== "category"
-          ? ' <span class="kindtag">' + (e.diff ? "net diff" : e.kind) + "</span>"
-          : "") + "</td>"];
-      years.forEach(function (y) {
-        var c = e.byYear[y];
-        var low = c && c.base !== null && c.base < threshold;
-        cells.push(c
-          ? '<td class="wv' + (low ? " lowb" : "") + '" title="' + y +
-            " base n=" + fmt.base(c.base) +
-            (low ? " — below " + threshold + ", excluded from significance" : "") +
-            '">' + trk.fmtVal(c.value, e.isMean) + (low ? " ⚠" : "") + "</td>"
-          : '<td class="wv none">–</td>');
-      });
-      cells.push('<td class="wv cur">' +
-        (e.last ? trk.fmtVal(e.last.value, e.isMean) : "–") + "</td>");
-      cells.push('<td class="sparkcell">' + TR.render.sparkline(
-        e.cells.map(function (c) {
-          return { year: c.year, value: c.value, current: c.current };
-        }), e.isMean) + "</td>");
-      cells.push(e.last ? changeCell(e.last, e.isMean, false)
-        : '<td class="wv dnone">–</td>');
-      cells.push(e.last ? changeCell(e.last, e.isMean, true)
-        : '<td class="wv dnone">–</td>');
-      html.push('<tr data-cat="' + fmt.escapeHtml(e.category) + '" data-search="' +
-        fmt.escapeHtml((e.code + " " + e.title + " " + e.label).toLowerCase()) +
-        '">' + cells.join("") + "</tr>");
-    });
-    html.push("</tbody></table></div>");
-    var notes = [];
-    if (entries.length > MAX_ROWS) {
-      notes.push("Showing the top " + MAX_ROWS + " of " + entries.length +
-        " tracked rows — search or filter to narrow.");
-    }
-    if (s.segment) {
-      var seg = trk.segmentByNorm(s.segment);
-      notes.push(seg.label + " history exists for " + seg.years.join(", ") +
-        "; other waves were published without this segment.");
-    }
-    var newQ = trk.newQuestions();
-    if (newQ.length) {
-      notes.push(newQ.length + " questions are new in " + TR.render.currentYear() +
-        " with no history; they appear in Crosstabs only.");
-    }
-    if (notes.length) {
-      html.push('<p class="trknote">' + fmt.escapeHtml(notes.join("  ")) + "</p>");
-    }
-    html.push("</div>");
-    host.innerHTML = html.join("");
-
-    views._wireLinks(host);
-    host.querySelectorAll("[data-seg-metric]").forEach(function (el) {
-      el.addEventListener("click", function () {
-        trk.state.metricKey = el.getAttribute("data-seg-metric");
-        trk.state.sub = "segments";
-        trk.rerender();
-      });
-    });
-    host.querySelectorAll("[data-scope]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        trk.state.scope = btn.getAttribute("data-scope");
-        trk.rerender();
-      });
-    });
-    var segSel = host.querySelector("[data-trkseg]");
-    if (segSel) {
-      segSel.addEventListener("change", function () {
-        trk.state.segment = segSel.value || null;
-        trk.rerender();
-      });
-    }
-    host.querySelectorAll("th[data-sort]").forEach(function (el) {
-      el.addEventListener("click", function () {
-        var col = el.getAttribute("data-sort");
-        sort = (sort && sort.col === col && sort.dir === "desc")
-          ? { col: col, dir: "asc" } : { col: col, dir: "desc" };
-        trk.rerender();
-      });
-    });
-    views._wireRowFilter(host, "trk-search", "trk-cat");
-  }
 
 })(typeof window !== "undefined" ? window : globalThis);

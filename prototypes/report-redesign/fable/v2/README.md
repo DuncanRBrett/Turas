@@ -32,7 +32,7 @@ About/methodology.
 |---|---|
 | **Filter the whole report** ("Online students only") | every table/dashboard recomputes live from embedded respondent-level microdata, with correct bases and significance |
 | **Custom banners** — cross anything by anything | `+ Custom…` on the banner strip |
-| **Full tracking workspace, 2018–2025** | Four tracker-parity views under Tracking: **Summary** (threshold-banded KPI scorecard with sparklines, sig up/down/stable pulse bar, significant-changes cards across Total + segments, metric × segment significance heatmap), **Metrics** (every tracked metric column-per-wave for Total or any banner segment), **Segments** (one metric across every tracked segment, tick → visualise), **Visualise** (multi-series wave chart: absolute / vs previous / vs baseline, 95% CI bands from published bases, value-label modes, wave chips, y-axis override, low-base warnings, insight note, Excel + pin-to-story) |
+| **Full tracking workspace, 2018–2025** | Three tracker-parity views under Tracking: **Summary** (threshold-banded KPI scorecard with sparklines, sig up/down/stable pulse bar, significant-changes cards with full question text across Total + segments, metric × segment change matrix with pp values), **Explorer** (the tracker overview heatmap: Questions-for-segment / Segments-for-question modes, value-in-cell green/amber/red threshold colouring, Absolute / vs Previous / vs Baseline, sort, wave chips, legend, Excel), **Visualise** (multi-series wave chart: display modes, 95% CI bands from published bases, value-label modes, wave chips, y-axis override, low-base warnings, insight note, Excel + pin-to-story) |
 | **Per-segment history** | wave workbooks' banner columns extracted and matched to 2025 banner columns (Campus 2020-2022+2024; Intensity + Course 2024); NETs/Index recompute per segment where waves published categories only |
 | **Δ + trend** on every tracked question | delta chips on the Total column (vs the latest matched wave) plus a **wave strip** under the table: per-wave bases and the headline metrics with sparklines |
 | **Trend chart type** | "Trend · waves" in the chart picker — line over waves for any tracked question |
@@ -184,9 +184,21 @@ explorer functionality (`modules/tracker/lib/html_report/js/explorer_view.js`
   `waves.cellsFor(points)` produce the tracker cell shape — per wave:
   value, base, change vs previous, change vs baseline, pooled-z sig on
   both, low-base excluded. `waves.segments()` registers tracked segments.
-- **Workspace** (`27t/27u/27v`): Summary / Metrics / Segments / Visualise
+- **Workspace** (`27t/27u/27v`): Summary / Explorer / Visualise
   (see the feature table above). Published figures everywhere — report
   filters deliberately do not apply inside Tracking.
+- **Round 6 (Duncan's UX review):** KEY METRICS are evaluative only —
+  each question carrying an Index/NPS/Mean contributes that mean row plus
+  its top-box NET (one matrix row per question; profile questions appear
+  under "all tracked rows" only). Significant-changes cards carry the full
+  question text and an explicit "55% in 2024 → 91% in 2025" statement.
+  The Summary matrix shows the pp change in every cell (coloured = sig).
+  The Explorer is the tracker-style overview heatmap: Questions-for-
+  segment / Segments-for-question modes, value-in-cell with green/amber/
+  red threshold colouring, Absolute / vs Previous / vs Baseline display
+  modes, sort, wave chips, legend, Excel. Crosstabs now have ONE
+  "Rows & columns…" panel (columns x table/chart, row visibility, chart
+  row kind) replacing the duplicated Columns buttons.
 - **Pins:** any Visualise view pins to the story as a two-chart native
   PPTX exhibit (current-wave by segment + trend by segment + optional
   metric-by-wave table).

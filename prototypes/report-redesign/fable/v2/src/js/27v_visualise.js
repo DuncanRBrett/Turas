@@ -1,23 +1,37 @@
 /**
- * Tracking Segments + Visualise views — the tracker explorer rebuilt on
- * published wave history. Segments: one metric across Total + every
- * tracked banner segment (column-per-wave, sparkline, Δs, checkboxes).
- * Visualise: the selected metric × segments as a multi-series wave chart
- * with display modes (absolute / vs previous / vs baseline), optional 95%
- * CI bands (proportions, from published bases), value-label modes, wave
- * chips, y-axis override, low-base warnings, a per-view insight note,
- * Excel export and pin-to-story (native two-chart exhibit).
+ * Tracking Explorer + Visualise — the tracker module's explorer UX on the
+ * published wave history.
  *
- * SIZE-EXCEPTION: one explorer workflow (pick segments -> visualise);
- * the selection, transform and rendering share the metric context.
+ * Explorer = the overview heatmap with two modes:
+ *   Questions for segment — every key (or all) tracked metric for one
+ *     segment, value-in-cell with green/amber/red threshold colouring,
+ *     grouped means/indexes vs top-box NETs, then by section.
+ *   Segments for question — one metric across Total + every tracked
+ *     segment, tick rows → Visualise.
+ * Both share display modes (Absolute / vs Previous / vs Baseline — change
+ * cells colour only when significant), sort, wave chips, a legend and
+ * Excel export. Click any row to visualise it.
+ *
+ * Visualise = the selected metric × segments as a multi-series wave chart
+ * with CI bands (proportions), value-label modes, wave chips, y-axis
+ * override, low-base warnings, insight note, Excel and pin-to-story.
+ *
+ * SIZE-EXCEPTION: one explorer workflow (heatmap -> selection ->
+ * visualise); the cell renderers and metric context are shared throughout.
  */
 (function (global) {
   "use strict";
   var TR = global.TR, fmt = TR.fmt;
 
   var vis = TR.trkVis = {};
+  var MAX_ROWS = 250;
 
   function trk() { return TR.trk; }
+
+  function lastOf(cells) {
+    return cells.length && cells[cells.length - 1].current
+      ? cells[cells.length - 1] : null;
+  }
 
   function metricOptions(selected) {
     return trk().metricList("key").map(function (m) {
@@ -33,95 +47,347 @@
     return m || trk().metricList("key")[0] || null;
   }
 
-  /** Rows of the segment table: Total first, then every tracked segment. */
-  function segEntries(metric) {
-    var rows = [{ norm: "", label: "Total" }].concat(
-      TR.waves.segments().map(function (s) {
-        return { norm: s.norm, label: s.label };
-      }));
-    return rows.map(function (seg) {
-      var cells = trk().points(metric, seg.norm || null);
-      return { seg: seg, cells: cells,
-        last: cells.length && cells[cells.length - 1].current
-          ? cells[cells.length - 1] : null };
-    }).filter(function (e) { return e.cells.length > 1; });
+  /* ---------------- shared explorer pieces ---------------- */
+
+  function activeYears() {
+    var all = trk().years().concat([TR.render.currentYear()]);
+    var set = trk().state.expWaves;
+    return all.filter(function (y) { return !set || set[y]; });
   }
 
-  /* ---------------- Segments view (one metric across segments) ---------- */
+  function waveChipsHtml() {
+    var all = trk().years().concat([TR.render.currentYear()]);
+    var set = trk().state.expWaves;
+    return '<div class="scopebar wavechips"><span class="trknote">Waves:</span>' +
+      all.map(function (y) {
+        var on = !set || set[y];
+        return '<button class="btab' + (on ? " on" : "") + '" data-wavechip="' +
+          y + '">' + y + "</button>";
+      }).join("") +
+      '<button class="linklike" data-waveall>all</button>' +
+      '<button class="linklike" data-wavelast>last 3</button></div>';
+  }
 
-  vis.renderSegments = function (host) {
-    var metric = contextMetric();
-    if (!metric) { host.innerHTML = ""; return; }
-    trk().state.metricKey = metric.key;
-    var years = trk().years();
-    var threshold = TR.AGG.project.low_base_threshold || 30;
-    var entries = segEntries(metric);
-    var selected = trk().state.visSegs || ["total"];
+  function legendHtml() {
+    return '<div class="trklegend"><span class="lg cb-g">strong · ≥70% / 7+ ' +
+      "mean / 30+ NPS</span><span class='lg cb-a'>moderate</span>" +
+      "<span class='lg cb-r'>weak</span>" +
+      "<span class='lg'>▲▼ coloured = significant vs comparison wave (95%, " +
+      "pooled z, proportions only)</span><span class='lg'>⚠ base under " +
+      (TR.AGG.project.low_base_threshold || 30) + "</span></div>";
+  }
 
-    var html = ['<div class="card trkcard"><div class="heathead">' +
-      "<h3>Segments · one metric across every tracked segment</h3>" +
-      '<select data-trkmetric>' + metricOptions(metric.key) + "</select></div>" +
-      "<p class='trknote'>Published values per wave. Tick segments and open " +
-      "Visualise to chart them together; segment coverage varies by wave " +
-      "(– = the wave was published without that segment).</p>" +
-      '<div class="trkwrap"><table class="moved trk"><thead><tr><th></th>' +
-      "<th>Segment</th>" + years.map(function (y) {
-        return "<th class='wv'>" + y + "</th>";
-      }).join("") + "<th class='wv'>" + TR.render.currentYear() +
-      "</th><th>Trend</th><th>Δ prev</th><th>Δ first</th></tr></thead><tbody>"];
-    entries.forEach(function (e) {
+  function displayChips(display) {
+    return [["abs", "Absolute"], ["prev", "vs Previous"], ["base", "vs Baseline"]]
+      .map(function (d) {
+        return '<button class="btab' + (display === d[0] ? " on" : "") +
+          '" data-display="' + d[0] + '">' + d[1] + "</button>";
+      }).join("");
+  }
+
+  /** One wave cell: value + threshold colour, or change + sig colour. */
+  function waveCell(metric, c, display, threshold) {
+    if (!c) return '<td class="wv none">–</td>';
+    var low = c.base !== null && c.base < threshold;
+    if (display === "abs") {
+      var band = trk().band(trk().kpiType(metric), c.value);
+      return '<td class="wv cb-' + band + (c.current ? " curw" : "") +
+        '" title="base n=' + fmt.base(c.base) +
+        (low ? " — below threshold, excluded from significance" : "") + '">' +
+        trk().fmtVal(c.value, metric.isMean) + (low ? " ⚠" : "") + "</td>";
+    }
+    var change = display === "prev" ? c.change_prev : c.change_base;
+    var sig = display === "prev" ? c.sig_prev : c.sig_base;
+    if (change === null || change === undefined) {
+      return '<td class="wv none">·</td>';
+    }
+    return '<td class="wv ' + (sig ? (change >= 0 ? "hm-up" : "hm-down") : "chg") +
+      '" title="' + trk().fmtVal(c.value, metric.isMean) + " in " + c.year +
+      (sig ? " · significant at 95%" : "") + '">' +
+      (sig ? (change >= 0 ? "▲" : "▼") : "") +
+      trk().changeText(change, metric.isMean).replace("pp", "") + "</td>";
+  }
+
+  function changeChip(last, isMean) {
+    if (!last || last.change_prev === null) return '<td class="wv dnone">–</td>';
+    return '<td class="wv ' + (last.change_prev >= 0 ? "up" : "down") +
+      (last.sig_prev ? " dsig" : "") + '" title="latest vs previous wave' +
+      (last.sig_prev ? " · significant at 95%" : "") + '">' +
+      (last.change_prev >= 0 ? "▲ +" : "▼ −") +
+      Math.abs(last.change_prev).toFixed(isMean ? 1 : 0) +
+      (isMean ? "" : "pp") + "</td>";
+  }
+
+  function sparkCell(cells, isMean) {
+    return '<td class="sparkcell">' + TR.render.sparkline(
+      cells.map(function (c) {
+        return { year: c.year, value: c.value, current: c.current };
+      }), isMean) + "</td>";
+  }
+
+  function applySort(entries) {
+    var mode = trk().state.expSort;
+    if (mode === "value") {
+      entries.sort(function (a, b) {
+        return ((b.last && b.last.value) || -1e9) - ((a.last && a.last.value) || -1e9);
+      });
+    } else if (mode === "change") {
+      entries.sort(function (a, b) {
+        var sa = a.last && a.last.sig_prev, sb = b.last && b.last.sig_prev;
+        if (sa !== sb) return sa ? -1 : 1;
+        return Math.abs((b.last && b.last.change_prev) || 0) -
+          Math.abs((a.last && a.last.change_prev) || 0);
+      });
+    }
+    return entries;
+  }
+
+  function exportExplorer(rows, years, name) {
+    var head = ["Metric"].concat(years.map(String)).concat(["Δ prev"]);
+    var body = rows.map(function (e) {
       var byYear = {};
-      e.cells.forEach(function (c) { if (!c.current) byYear[c.year] = c; });
-      var id = e.seg.norm || "total";
-      var cells = ['<td><input type="checkbox" data-segpick="' + id + '"' +
-        (selected.indexOf(id) !== -1 ? " checked" : "") + "></td>",
-        "<td>" + fmt.escapeHtml(e.seg.label) + "</td>"];
-      years.forEach(function (y) {
-        var c = byYear[y];
-        var low = c && c.base !== null && c.base < threshold;
-        cells.push(c
-          ? '<td class="wv' + (low ? " lowb" : "") + '" title="' + y +
-            " base n=" + fmt.base(c.base) + '">' +
-            trk().fmtVal(c.value, metric.isMean) + (low ? " ⚠" : "") + "</td>"
-          : '<td class="wv none">–</td>');
-      });
-      cells.push('<td class="wv cur">' +
-        (e.last ? trk().fmtVal(e.last.value, metric.isMean) : "–") + "</td>");
-      cells.push('<td class="sparkcell">' + TR.render.sparkline(
-        e.cells.map(function (c) {
-          return { year: c.year, value: c.value, current: c.current };
-        }), metric.isMean) + "</td>");
-      ["change_prev", "change_base"].forEach(function (key) {
-        var change = e.last ? e.last[key] : null;
-        var sig = e.last ? e.last[key === "change_prev" ? "sig_prev" : "sig_base"] : false;
-        cells.push(change === null || change === undefined
-          ? '<td class="wv dnone">–</td>'
-          : '<td class="wv ' + (change >= 0 ? "up" : "down") + (sig ? " dsig" : "") +
-            '">' + (change >= 0 ? "▲ +" : "▼ −") +
-            Math.abs(change).toFixed(metric.isMean ? 1 : 0) +
-            (metric.isMean ? "" : "pp") + "</td>");
-      });
-      html.push("<tr>" + cells.join("") + "</tr>");
+      e.cells.forEach(function (c) { byYear[c.year] = c; });
+      return [e.exportLabel].concat(years.map(function (y) {
+        return byYear[y] ? byYear[y].value : "";
+      })).concat([e.last && e.last.change_prev !== null
+        ? e.last.change_prev : ""]);
     });
-    html.push("</tbody></table></div>" +
-      '<div class="scopebar"><button class="primary" data-tovis>Visualise ' +
-      "selection →</button></div></div>");
+    TR.xlsx.download(name, "Tracking", [head].concat(body));
+  }
+
+  /* ---------------- Explorer ---------------- */
+
+  vis.renderExplorer = function (host) {
+    var s = trk().state;
+    var mode = s.explorerMode || "qfs";
+    var display = s.display || "abs";
+    var years = activeYears();
+    var threshold = TR.AGG.project.low_base_threshold || 30;
+    var html = ['<div class="card trkcard">'];
+
+    html.push('<div class="scopebar">' +
+      '<button class="btab' + (mode === "qfs" ? " on" : "") +
+      '" data-expmode="qfs">Questions for segment</button>' +
+      '<button class="btab' + (mode === "sfq" ? " on" : "") +
+      '" data-expmode="sfq">Segments for question</button>' +
+      '<span class="ctl-spacer"></span>' + displayChips(display) +
+      '<select data-expsort>' +
+      [["original", "Original order"], ["value", "Current value"],
+        ["change", "Largest change"]].map(function (o) {
+          return '<option value="' + o[0] + '"' +
+            (s.expSort === o[0] ? " selected" : "") + ">" + o[1] + "</option>";
+        }).join("") + "</select>" +
+      '<button data-expexcel>Excel</button></div>');
+
+    var entries, tableHead, exportName;
+    if (mode === "qfs") {
+      var scope = s.scope || "key";
+      var segments = TR.waves.segments();
+      html.push('<div class="scopebar">' +
+        '<label class="tg">Segment <select data-trkseg>' +
+        '<option value="">Total</option>' + segments.map(function (seg) {
+          return '<option value="' + seg.norm + '"' +
+            (s.segment === seg.norm ? " selected" : "") + ">" +
+            fmt.escapeHtml(seg.label) + " (" + seg.years[0] + "–" +
+            seg.years[seg.years.length - 1] + ")</option>";
+        }).join("") + "</select></label>" +
+        '<button class="btab' + (scope === "key" ? " on" : "") +
+        '" data-scope="key">Key metrics</button>' +
+        '<button class="btab' + (scope === "all" ? " on" : "") +
+        '" data-scope="all">All tracked rows</button>' +
+        '<input id="trk-search" type="search" placeholder="Search metrics…">' +
+        "</div>");
+      entries = trk().metricList(scope).map(function (m) {
+        var cells = trk().points(m, s.segment);
+        return { metric: m, cells: cells, last: lastOf(cells),
+          exportLabel: m.code + " " + m.title + " — " + m.label };
+      }).filter(function (e) { return e.cells.length; });
+      exportName = "tracking_" + (s.segment || "total");
+    } else {
+      var metric = contextMetric();
+      if (!metric) { host.innerHTML = ""; return; }
+      trk().state.metricKey = metric.key;
+      html.push('<div class="scopebar"><label class="tg">Metric ' +
+        '<select data-trkmetric>' + metricOptions(metric.key) +
+        "</select></label>" +
+        '<button class="primary" data-tovis>Visualise selection →</button></div>');
+      var segRows = [{ norm: "", label: "Total" }].concat(
+        TR.waves.segments().map(function (x) {
+          return { norm: x.norm, label: x.label };
+        }));
+      entries = segRows.map(function (seg) {
+        var cells = trk().points(metric, seg.norm || null);
+        return { metric: metric, seg: seg, cells: cells, last: lastOf(cells),
+          exportLabel: seg.label };
+      }).filter(function (e) { return e.cells.length > 1; });
+      exportName = metric.code + "_segments";
+    }
+    applySort(entries);
+
+    html.push(waveChipsHtml());
+    tableHead = '<div class="trkwrap"><table class="moved trk"><thead><tr>' +
+      (mode === "sfq" ? "<th></th><th>Segment</th>" : "<th>Metric</th>") +
+      years.map(function (y) {
+        return "<th class='wv'>" + y + "</th>";
+      }).join("") + "<th>Trend</th><th>Δ prev</th></tr></thead><tbody>";
+    html.push(tableHead);
+
+    var rowHtml = function (e, labelCells) {
+      var byYear = {};
+      e.cells.forEach(function (c) { byYear[c.year] = c; });
+      return "<tr" + (mode === "qfs" ? ' data-cat="' +
+        fmt.escapeHtml(e.metric.category) + '" data-search="' +
+        fmt.escapeHtml((e.metric.code + " " + e.metric.title + " " +
+          e.metric.label).toLowerCase()) + '"' : "") + ">" + labelCells +
+        years.map(function (y) {
+          return waveCell(e.metric, byYear[y], display, threshold);
+        }).join("") + sparkCell(e.cells, e.metric.isMean) +
+        changeChip(e.last, e.metric.isMean) + "</tr>";
+    };
+
+    if (mode === "qfs") {
+      var groups = [
+        { title: "Means, indexes & NPS", match: function (m) { return m.isMean; } },
+        { title: "Top-box NETs (% — significance-tested)",
+          match: function (m) { return !m.isMean; } }];
+      var emitted = 0;
+      groups.forEach(function (g) {
+        var inGroup = entries.filter(function (e) { return g.match(e.metric); });
+        if (!inGroup.length) return;
+        html.push('<tr class="grp"><td colspan="' + (years.length + 3) + '">' +
+          g.title + "</td></tr>");
+        var lastCat = null;
+        inGroup.forEach(function (e) {
+          if (emitted >= MAX_ROWS) return;
+          if ((s.expSort || "original") === "original" &&
+              e.metric.category !== lastCat && (s.scope || "key") === "key") {
+            lastCat = e.metric.category;
+            html.push('<tr class="cat"><td colspan="' + (years.length + 3) +
+              '">' + fmt.escapeHtml(lastCat) + "</td></tr>");
+          }
+          emitted++;
+          html.push(rowHtml(e,
+            '<td class="lab"><button class="linklike" data-vis="' + e.metric.key +
+            '" title="' + fmt.escapeHtml(e.metric.title + " — " + e.metric.label) +
+            '">' + e.metric.code + " · " +
+            fmt.escapeHtml(TR.charts.clip(e.metric.title, 42)) + "</button>" +
+            '<div class="idxd">' + fmt.escapeHtml(TR.charts.clip(e.metric.label, 36)) +
+            "</div></td>"));
+        });
+      });
+      if (entries.length > MAX_ROWS) {
+        html.push('<tr><td colspan="' + (years.length + 3) +
+          '" class="trknote">Showing ' + MAX_ROWS + " of " + entries.length +
+          " rows — search to narrow.</td></tr>");
+      }
+    } else {
+      var selected = trk().state.visSegs || ["total"];
+      entries.forEach(function (e) {
+        var id = e.seg.norm || "total";
+        html.push(rowHtml(e,
+          '<td><input type="checkbox" data-segpick="' + id + '"' +
+          (selected.indexOf(id) !== -1 ? " checked" : "") + "></td>" +
+          '<td class="lab"><button class="linklike" data-vis="' + e.metric.key +
+          '" data-visseg="' + id + '">' + fmt.escapeHtml(e.seg.label) +
+          "</button></td>"));
+      });
+    }
+    html.push("</tbody></table></div>");
+    html.push(legendHtml());
+    html.push("</div>");
     host.innerHTML = html.join("");
 
-    host.querySelector("[data-trkmetric]").addEventListener("change", function (e) {
-      trk().state.metricKey = e.target.value;
-      trk().state.visSegs = null;
+    /* ---- wiring ---- */
+    host.querySelectorAll("[data-expmode]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        trk().state.explorerMode = btn.getAttribute("data-expmode");
+        trk().rerender();
+      });
+    });
+    host.querySelectorAll("[data-display]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        trk().state.display = btn.getAttribute("data-display");
+        trk().rerender();
+      });
+    });
+    host.querySelector("[data-expsort]").addEventListener("change", function (e) {
+      trk().state.expSort = e.target.value;
       trk().rerender();
     });
-    host.querySelector("[data-tovis]").addEventListener("click", function () {
-      var picked = Array.prototype.slice.call(
-        host.querySelectorAll("[data-segpick]:checked")).map(function (el) {
-          return el.getAttribute("data-segpick");
-        });
-      trk().state.visSegs = picked.length ? picked : ["total"];
-      trk().state.sub = "visualise";
+    host.querySelector("[data-expexcel]").addEventListener("click", function () {
+      exportExplorer(entries, years, exportName);
+    });
+    host.querySelectorAll("[data-wavechip]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var year = parseInt(btn.getAttribute("data-wavechip"), 10);
+        var all = trk().years().concat([TR.render.currentYear()]);
+        var set = trk().state.expWaves;
+        if (!set) {
+          set = {};
+          all.forEach(function (y) { set[y] = true; });
+        }
+        set[year] = !set[year];
+        trk().state.expWaves = set;
+        trk().rerender();
+      });
+    });
+    host.querySelector("[data-waveall]").addEventListener("click", function () {
+      trk().state.expWaves = null;
       trk().rerender();
     });
+    host.querySelector("[data-wavelast]").addEventListener("click", function () {
+      var all = trk().years().concat([TR.render.currentYear()]);
+      var set = {};
+      all.forEach(function (y, i) { set[y] = i >= all.length - 3; });
+      trk().state.expWaves = set;
+      trk().rerender();
+    });
+    host.querySelectorAll("[data-vis]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        trk().state.metricKey = el.getAttribute("data-vis");
+        var seg = el.getAttribute("data-visseg") ||
+          (trk().state.segment || "total");
+        trk().state.visSegs = [seg];
+        trk().state.sub = "visualise";
+        trk().rerender();
+      });
+    });
+    var segSel = host.querySelector("[data-trkseg]");
+    if (segSel) {
+      segSel.addEventListener("change", function () {
+        trk().state.segment = segSel.value || null;
+        trk().rerender();
+      });
+    }
+    host.querySelectorAll("[data-scope]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        trk().state.scope = btn.getAttribute("data-scope");
+        trk().rerender();
+      });
+    });
+    var metricSel = host.querySelector("[data-trkmetric]");
+    if (metricSel) {
+      metricSel.addEventListener("change", function () {
+        trk().state.metricKey = metricSel.value;
+        trk().state.visSegs = null;
+        trk().rerender();
+      });
+    }
+    var toVis = host.querySelector("[data-tovis]");
+    if (toVis) {
+      toVis.addEventListener("click", function () {
+        var picked = Array.prototype.slice.call(
+          host.querySelectorAll("[data-segpick]:checked")).map(function (el) {
+            return el.getAttribute("data-segpick");
+          });
+        trk().state.visSegs = picked.length ? picked : ["total"];
+        trk().state.sub = "visualise";
+        trk().rerender();
+      });
+    }
+    if (document.getElementById("trk-search")) {
+      TR.views._wireRowFilter(host, "trk-search", "none");
+    }
   };
 
   /* ---------------- Visualise view ---------------- */
@@ -201,7 +467,8 @@
     };
     var html = ['<div class="card trkcard"><div class="heathead">' +
       "<h3>Visualise · " + metric.code + " · " +
-      fmt.escapeHtml(TR.charts.clip(metric.label, 40)) + "</h3>" +
+      fmt.escapeHtml(TR.charts.clip(metric.title, 50)) + " — " +
+      fmt.escapeHtml(TR.charts.clip(metric.label, 30)) + "</h3>" +
       '<select data-trkmetric>' + metricOptions(metric.key) + "</select></div>" +
       '<div class="scopebar">' + modeBtn("absolute", "Absolute") +
       modeBtn("prev", "vs Previous") + modeBtn("base", "vs Baseline") +
@@ -229,7 +496,7 @@
       '<div class="chart">' + (chart ||
         '<div class="chart-error">No data for this selection.</div>') + "</div>"];
 
-    // table: per segment, value per wave (+ change sub-rows in absolute mode)
+    // table: per segment, value per wave + change sub-rows
     var shownYears = allYears.filter(function (y) {
       return !yearSet || yearSet[y];
     });

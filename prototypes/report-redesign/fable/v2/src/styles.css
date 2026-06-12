@@ -230,8 +230,21 @@ table.moved { border-collapse: collapse; width: 100%; font-size: 12.5px; margin-
 .sigcard .sig-dir { font-size: 14px; font-weight: 800; }
 .sigcard.up .sig-dir { color: var(--green); }
 .sigcard.down .sig-dir { color: var(--red); }
-.sigcard .sig-metric { font-size: 12px; font-weight: 600; color: var(--ink); }
+.sigcard .sig-title, .sigcard .sig-metric { font-size: 12px; font-weight: 600; color: var(--ink); }
 .sigcard .sig-detail { font-size: 11px; color: var(--muted); }
+.moved.trk td.cb-g { background: #e4efe8; }
+.moved.trk td.cb-a { background: #fdf3df; }
+.moved.trk td.cb-r { background: #f9ecea; }
+.moved.trk td.curw { font-weight: 800; }
+.moved.trk td.chg { color: var(--muted); }
+.moved.trk tr.grp td { background: var(--brand); color: #fff; font-size: 10.5px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; padding: 5px 10px; }
+.moved.trk tr.cat td { background: var(--soft); color: var(--muted); font-size: 10.5px; font-weight: 700; padding: 4px 10px; }
+.moved.trk td.lab .idxd { font-size: 10px; color: var(--faint); }
+.trklegend { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; font-size: 11px; color: var(--muted); }
+.trklegend .lg { padding: 3px 9px; border-radius: 6px; background: #fff; border: 1px solid var(--line); }
+.trklegend .lg.cb-g { background: #e4efe8; }
+.trklegend .lg.cb-a { background: #fdf3df; }
+.trklegend .lg.cb-r { background: #f9ecea; }
 .moved.trk.hm td.hm-up { background: #e8f0eb; color: var(--green); font-weight: 800; text-align: center; }
 .moved.trk.hm td.hm-down { background: #f9ecea; color: var(--red); font-weight: 800; text-align: center; }
 .moved.trk.hm td.hm-flat { color: var(--faint); text-align: center; }
@@ -396,6 +409,11 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .colmenu .cm-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .colmenu .cm-row label { text-align: center; cursor: pointer; }
 .colmenu .wide { width: calc(100% - 28px); margin: 10px 14px 12px; }
+.colmenu .cm-sect { padding: 9px 14px 6px; font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--brand); border-top: 1px solid var(--line); }
+.colmenu .cm-sect:first-child { border-top: none; }
+.colmenu .cm-body { max-height: 180px; }
+.colmenu select.wide { font: 12px var(--font); padding: 6px 9px; border: 1px solid var(--line); border-radius: 8px; }
+.charttools .chartmeta { text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 11px; }
 
 /* question list: wrap to two lines (tooltip carries the full text) */
 .qlink { align-items: flex-start; }
