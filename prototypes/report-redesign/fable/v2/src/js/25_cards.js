@@ -601,7 +601,9 @@
             { intervals: TR.d2.state.showIntervals })));
       }
       if (action === "png") {
-        TR.exporter.downloadPng(model, TR.d2.filterDescription(), {
+        TR.exporter.downloadPng(model, [TR.d2.filterDescription(),
+          TR.d2.state.showIntervals ? TR.conf.methodNote() : ""]
+          .filter(Boolean).join(" · "), {
           chartSvg: TR.d2.state.showChart ? cards2.chartString() : null });
       }
       if (action === "pin") openPinMenu();

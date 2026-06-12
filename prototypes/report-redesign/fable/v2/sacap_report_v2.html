@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SACAP 2025 Annual Student Survey — Turas Report v2</title>
-<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 16:15 SAST -->
+<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 16:18 SAST -->
 <!-- Single self-contained file: published tables + prior wave + synthetic
      microdata + one fixed renderer. No network requests, no installs. -->
 <style>
@@ -4276,7 +4276,9 @@ null
             { intervals: TR.d2.state.showIntervals })));
       }
       if (action === "png") {
-        TR.exporter.downloadPng(model, TR.d2.filterDescription(), {
+        TR.exporter.downloadPng(model, [TR.d2.filterDescription(),
+          TR.d2.state.showIntervals ? TR.conf.methodNote() : ""]
+          .filter(Boolean).join(" · "), {
           chartSvg: TR.d2.state.showChart ? cards2.chartString() : null });
       }
       if (action === "pin") openPinMenu();
@@ -7024,6 +7026,7 @@ null
       textBox(next(), { x: MARGIN, y: 0.95, w: contentW, h: 0.3 },
         [para([TR.AGG.project.name, TR.AGG.project.wave,
           model.source === "computed" ? "filtered audience (live recompute)" : "published values",
+          flags.intervals ? TR.conf.methodNote() : "",
           model.filterNote || ""].filter(Boolean).join(" · "),
           { size: 10.5, colour: GREY })]);
     var top = 1.45, bottom = SLIDE_H - 0.35 - noteH;
@@ -7204,6 +7207,7 @@ null
       chartType: chartState.type,
       chartKind: chartState.kind,
       chartCols: chartState.cols,
+      intervals: !!s.showIntervals,   // pin shows exactly what was on screen
       note: ""
     });
     persist();
@@ -7230,6 +7234,7 @@ null
     load().push({ kind: "exhibit", title: spec.title, qs: spec.qs.slice(),
       series: JSON.parse(JSON.stringify(spec.series)),
       annotations: JSON.parse(JSON.stringify(spec.annotations || [])),
+      ci: !!spec.ci,
       banner: TR.AGG.banner_groups[0].id, filters: [],
       flags: { dist: !!flags.dist, trend: !!flags.trend,
         table: !!flags.table, insight: flags.insight !== false },
@@ -7333,7 +7338,7 @@ null
 
   function modelFor(item) {
     var model = TR.model.forQuestion(item.q, item.banner, item.filters || [],
-      { hiddenCols: [] });
+      { hiddenCols: [], intervals: !!item.intervals });
     if (model) {
       model.filterNote = filterNote(item);
       model.chartKind = item.chartKind || "detail";
@@ -7394,6 +7399,7 @@ null
     if (item.kind === "question") {
       bits.push(TR.d2.bannerDescription(item.banner));
       if (model) bits.push(model.source === "computed" ? "computed live" : "published");
+      if (item.intervals) bits.push(TR.conf.methodNote());
     }
     if (item.kind === "heatmap") bits.push(TR.d2.bannerDescription(item.banner));
     if (item.kind === "composite") {
@@ -7494,7 +7500,8 @@ null
         TR.render.chartBy(item.chartType || "bar", model, item.chartCols || [0]) +
         "</div>" : "") +
       (flags.table ? '<div class="si-table">' + TR.render.tableHtml(model,
-        { heatmap: true, showDeltas: TR.d2.tracking().enabled }) + "</div>" : "") +
+        { heatmap: true, showDeltas: TR.d2.tracking().enabled,
+          intervals: !!item.intervals }) + "</div>" : "") +
       (flags.insight ? '<textarea class="si-note" placeholder="Commentary for this slide…">' +
         fmt.escapeHtml(item.note || TR.insights.get(item.q, item.banner) || "") +
         "</textarea>" : "") + "</div>";
@@ -7599,7 +7606,8 @@ null
           item.note || TR.insights.get(item.q, item.banner) || "",
           { chart: flags.chart, table: flags.table, insight: flags.insight,
             chartType: item.chartType || "bar",
-            chartCols: item.chartCols || [0] }));
+            chartCols: item.chartCols || [0],
+            intervals: !!item.intervals }));
       }
     });
     return slides;
@@ -7687,7 +7695,8 @@ null
           TR.render.chartBy(item.chartType || "bar", model, item.chartCols || [0]) +
           "</div>" : "") +
         (flags.table !== false ? '<div class="pr-table">' + TR.render.tableHtml(model,
-          { heatmap: true, showDeltas: TR.d2.tracking().enabled }) + "</div>" : "");
+          { heatmap: true, showDeltas: TR.d2.tracking().enabled,
+            intervals: !!item.intervals }) + "</div>" : "");
     }
     overlay.hidden = false;
     overlay.innerHTML = '<div class="present">' + head + body +
@@ -7788,8 +7797,22 @@ null
       if (!points.length) return null;
       return { kind: metric.kind, diff: metric.diff, label: entry.label,
         isMean: metric.isMean, waves: points,
+        // runtime-only refs for the interval-band callback (never persisted)
+        _metric: metric, _seg: entry.seg,
         cells: [{ pct: null, mean: null, n: null, sig: "" }] };
     }).filter(Boolean);
+  }
+
+  /** Interval-band callback for pinned Visualise views (item.ci). The
+   *  bounds come from the same ciBounds the live view uses. */
+  function seriesCi(item) {
+    if (!item.ci) return null;
+    return function (row, point) {
+      return row._metric
+        ? TR.trkVis._ciBounds(row._metric,
+            row._seg === "total" ? "total" : row._seg, point)
+        : null;
+    };
   }
 
   function curOf(row) {
@@ -7941,7 +7964,8 @@ null
     if (flags.trend) {
       out.push('<div class="chart ex-chart">' +
         TR.render.trendChart(exhibit.trendModel(item, models),
-          { annotations: item.annotations || [] }) + "</div>");
+          { annotations: item.annotations || [],
+            ci: seriesCi(item) }) + "</div>");
     }
     if (flags.table) {
       out.push('<div class="si-table">' +
@@ -7955,7 +7979,8 @@ null
       var labels = (seriesList(item, models) || []).map(function (e) {
         return e.label;
       });
-      return "Series: " + labels.join(" · ") + " · published wave history";
+      return "Series: " + labels.join(" · ") + " · published wave history" +
+        (item.ci ? " · " + TR.conf.methodNote() + " bands" : "");
     }
     var bits = [TR.d2.bannerDescription(item.banner),
       "history: published wave Totals"];

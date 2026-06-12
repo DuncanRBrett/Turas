@@ -66,6 +66,7 @@
       chartType: chartState.type,
       chartKind: chartState.kind,
       chartCols: chartState.cols,
+      intervals: !!s.showIntervals,   // pin shows exactly what was on screen
       note: ""
     });
     persist();
@@ -92,6 +93,7 @@
     load().push({ kind: "exhibit", title: spec.title, qs: spec.qs.slice(),
       series: JSON.parse(JSON.stringify(spec.series)),
       annotations: JSON.parse(JSON.stringify(spec.annotations || [])),
+      ci: !!spec.ci,
       banner: TR.AGG.banner_groups[0].id, filters: [],
       flags: { dist: !!flags.dist, trend: !!flags.trend,
         table: !!flags.table, insight: flags.insight !== false },
@@ -195,7 +197,7 @@
 
   function modelFor(item) {
     var model = TR.model.forQuestion(item.q, item.banner, item.filters || [],
-      { hiddenCols: [] });
+      { hiddenCols: [], intervals: !!item.intervals });
     if (model) {
       model.filterNote = filterNote(item);
       model.chartKind = item.chartKind || "detail";
@@ -256,6 +258,7 @@
     if (item.kind === "question") {
       bits.push(TR.d2.bannerDescription(item.banner));
       if (model) bits.push(model.source === "computed" ? "computed live" : "published");
+      if (item.intervals) bits.push(TR.conf.methodNote());
     }
     if (item.kind === "heatmap") bits.push(TR.d2.bannerDescription(item.banner));
     if (item.kind === "composite") {
@@ -356,7 +359,8 @@
         TR.render.chartBy(item.chartType || "bar", model, item.chartCols || [0]) +
         "</div>" : "") +
       (flags.table ? '<div class="si-table">' + TR.render.tableHtml(model,
-        { heatmap: true, showDeltas: TR.d2.tracking().enabled }) + "</div>" : "") +
+        { heatmap: true, showDeltas: TR.d2.tracking().enabled,
+          intervals: !!item.intervals }) + "</div>" : "") +
       (flags.insight ? '<textarea class="si-note" placeholder="Commentary for this slide…">' +
         fmt.escapeHtml(item.note || TR.insights.get(item.q, item.banner) || "") +
         "</textarea>" : "") + "</div>";
@@ -461,7 +465,8 @@
           item.note || TR.insights.get(item.q, item.banner) || "",
           { chart: flags.chart, table: flags.table, insight: flags.insight,
             chartType: item.chartType || "bar",
-            chartCols: item.chartCols || [0] }));
+            chartCols: item.chartCols || [0],
+            intervals: !!item.intervals }));
       }
     });
     return slides;
@@ -549,7 +554,8 @@
           TR.render.chartBy(item.chartType || "bar", model, item.chartCols || [0]) +
           "</div>" : "") +
         (flags.table !== false ? '<div class="pr-table">' + TR.render.tableHtml(model,
-          { heatmap: true, showDeltas: TR.d2.tracking().enabled }) + "</div>" : "");
+          { heatmap: true, showDeltas: TR.d2.tracking().enabled,
+            intervals: !!item.intervals }) + "</div>" : "");
     }
     overlay.hidden = false;
     overlay.innerHTML = '<div class="present">' + head + body +

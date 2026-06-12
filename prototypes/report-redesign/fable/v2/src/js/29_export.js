@@ -514,6 +514,7 @@
       textBox(next(), { x: MARGIN, y: 0.95, w: contentW, h: 0.3 },
         [para([TR.AGG.project.name, TR.AGG.project.wave,
           model.source === "computed" ? "filtered audience (live recompute)" : "published values",
+          flags.intervals ? TR.conf.methodNote() : "",
           model.filterNote || ""].filter(Boolean).join(" · "),
           { size: 10.5, colour: GREY })]);
     var top = 1.45, bottom = SLIDE_H - 0.35 - noteH;

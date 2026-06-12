@@ -89,8 +89,22 @@
       if (!points.length) return null;
       return { kind: metric.kind, diff: metric.diff, label: entry.label,
         isMean: metric.isMean, waves: points,
+        // runtime-only refs for the interval-band callback (never persisted)
+        _metric: metric, _seg: entry.seg,
         cells: [{ pct: null, mean: null, n: null, sig: "" }] };
     }).filter(Boolean);
+  }
+
+  /** Interval-band callback for pinned Visualise views (item.ci). The
+   *  bounds come from the same ciBounds the live view uses. */
+  function seriesCi(item) {
+    if (!item.ci) return null;
+    return function (row, point) {
+      return row._metric
+        ? TR.trkVis._ciBounds(row._metric,
+            row._seg === "total" ? "total" : row._seg, point)
+        : null;
+    };
   }
 
   function curOf(row) {
@@ -242,7 +256,8 @@
     if (flags.trend) {
       out.push('<div class="chart ex-chart">' +
         TR.render.trendChart(exhibit.trendModel(item, models),
-          { annotations: item.annotations || [] }) + "</div>");
+          { annotations: item.annotations || [],
+            ci: seriesCi(item) }) + "</div>");
     }
     if (flags.table) {
       out.push('<div class="si-table">' +
@@ -256,7 +271,8 @@
       var labels = (seriesList(item, models) || []).map(function (e) {
         return e.label;
       });
-      return "Series: " + labels.join(" · ") + " · published wave history";
+      return "Series: " + labels.join(" · ") + " · published wave history" +
+        (item.ci ? " · " + TR.conf.methodNote() + " bands" : "");
     }
     var bits = [TR.d2.bannerDescription(item.banner),
       "history: published wave Totals"];

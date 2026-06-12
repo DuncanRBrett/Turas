@@ -218,6 +218,28 @@ run("trend chart draws the interval band from {lo, hi} bounds", () => {
   assert(!plain.includes('fill-opacity="0.12"'), "band must be opt-in");
 });
 
+run("pins + slides carry the interval vocabulary", () => {
+  // pinned Visualise view with bands -> context line names the method
+  const nps = TR.trk.metricList("key").find((m) =>
+    TR.model.norm(m.label) === "nps score");
+  const item = { kind: "exhibit", qs: [nps.code], ci: true,
+    series: [{ code: nps.code, ri: nps.ri, label: "Total", seg: "total" }],
+    banner: TR.AGG.banner_groups[0].id, filters: [],
+    flags: { trend: true }, distType: "column", note: "" };
+  const models = TR.exhibit.models(item);
+  const ctx = TR.exhibit.contextLine(item, models);
+  assert(ctx.includes("95% SI (Wilson) bands"), "exhibit context: " + ctx);
+  // crosstab pin with intervals -> PPTX meta line names the method
+  const model = TR.model.forQuestion("Q008", TR.AGG.banner_groups[0].id, [],
+    { intervals: true });
+  const slide = TR.exporter.slideForModel(model, "", {
+    table: true, insight: false, intervals: true });
+  assert(slide.xml.includes("95% SI (Wilson)"), "slide meta misses method");
+  const plainSlide = TR.exporter.slideForModel(model, "", { table: true });
+  assert(!plainSlide.xml.includes("95% SI (Wilson)"),
+    "method note must be opt-in");
+});
+
 run("confidence: explainer + sampling vocabulary ship in the artifact", () => {
   // the callout is built live from the report's own data
   const callout = TR.conf.calloutHtml();
