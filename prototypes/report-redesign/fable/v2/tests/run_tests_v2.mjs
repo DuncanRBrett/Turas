@@ -296,6 +296,47 @@ run("pins + slides carry the interval vocabulary", () => {
   assert(!plainSlide.xml.includes("95% SI"), "method note must be opt-in");
 });
 
+run("pins reproduce the table view state (sort, hidden rows/cols, dual)", () => {
+  const s = TR.d2.state;
+  const banner = TR.AGG.banner_groups[0].id;
+  const hideCol = TR.model.forQuestion("Q008", banner, []).columns[1].label;
+  const saved = { activeQ: s.activeQ, banner: s.banner, sigMode: s.sigMode };
+  try {
+    s.activeQ = "Q008";
+    s.banner = banner;
+    s.hiddenRows.Q008 = ["Good"];
+    s.hiddenCols[banner] = [hideCol];
+    s.sorts.Q008 = { col: 0, dir: "desc" };
+    s.sigMode = "dual";
+    TR.story2.pinCurrent({ chart: false, table: true, insight: false });
+    const item = TR.story2.items()[TR.story2.items().length - 1];
+    assert(item.hiddenRows.indexOf("Good") !== -1 && item.dual === true &&
+      item.sort && item.sort.dir === "desc" &&
+      item.hiddenCols.indexOf(hideCol) !== -1, "pin captured the view state");
+    const model = TR.story2._modelFor(item);
+    assert(!model.rows.some((r) => r.label === "Good"),
+      "hidden table row stays hidden on the story card");
+    assert(!model.columns.some((c) => c.label === hideCol),
+      "hidden column stays hidden on the story card");
+    const cats = model.rows.filter((r) => r.kind === "category");
+    for (let i = 1; i < cats.length; i++) {
+      const a = cats[i - 1].cells[0].pct, b = cats[i].cells[0].pct;
+      assert(b === null || (a !== null && a >= b), "sort travels with the pin");
+    }
+    // an old pin without the new fields renders the full default table
+    const legacy = TR.story2._modelFor({ q: "Q008", banner: banner });
+    assert(legacy.rows.some((r) => r.label === "Good") &&
+      legacy.columns.some((c) => c.label === hideCol),
+      "legacy pins keep the historic full-table behaviour");
+  } finally {
+    TR.story2.items().pop();
+    delete s.hiddenRows.Q008;
+    delete s.hiddenCols[banner];
+    delete s.sorts.Q008;
+    s.activeQ = saved.activeQ; s.banner = saved.banner; s.sigMode = saved.sigMode;
+  }
+});
+
 run("PPTX tables that cannot fit say so instead of truncating silently", () => {
   const tall = { head: ["Metric", "Total"],
     body: Array.from({ length: 30 }, (_, i) =>

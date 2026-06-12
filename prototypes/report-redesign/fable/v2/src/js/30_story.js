@@ -37,6 +37,7 @@
     try {
       if (global.localStorage) localStorage.setItem(KEY, JSON.stringify(load()));
     } catch (e) { /* in-memory only */ }
+    if (typeof document === "undefined") return;   // headless (node gate)
     var badge = document.getElementById("story-count");
     if (badge) badge.textContent = String(load().length);
   }
@@ -67,6 +68,15 @@
       chartKind: chartState.kind,
       chartCols: chartState.cols,
       hiddenChartRows: (s.hiddenChartRows[s.activeQ] || []).slice(),
+      // the pinned TABLE reproduces the screen too: scope, sort, hidden
+      // rows/columns and the dual-sig setting travel with the pin
+      // (older pins lack these fields and render the full default table)
+      rowScope: TR.d2.rowScope(),
+      sort: s.sorts[s.activeQ]
+        ? JSON.parse(JSON.stringify(s.sorts[s.activeQ])) : null,
+      hiddenRows: (s.hiddenRows[s.activeQ] || []).slice(),
+      hiddenCols: TR.d2.hiddenFor(s.banner).slice(),
+      dual: s.sigMode === "dual",
       intervals: !!s.showIntervals,   // pin shows exactly what was on screen
       note: ""
     });
@@ -200,7 +210,12 @@
 
   function modelFor(item) {
     var model = TR.model.forQuestion(item.q, item.banner, item.filters || [],
-      { hiddenCols: [], intervals: !!item.intervals });
+      { hiddenCols: item.hiddenCols || [],
+        hiddenRows: item.hiddenRows || [],
+        rowScope: item.rowScope || "all",
+        sort: item.sort || null,
+        dual: !!item.dual,
+        intervals: !!item.intervals });
     if (model) {
       model.filterNote = filterNote(item);
       model.chartKind = item.chartKind || "detail";
@@ -208,6 +223,7 @@
     }
     return model;
   }
+  story2._modelFor = modelFor;   // exposed for the node gate
 
   function filterNote(item) {
     if (!item.filters || !item.filters.length) return "";
@@ -548,6 +564,12 @@
         '<p class="pr-ctx">' + fmt.escapeHtml(contextLine(item)) + "</p>" +
         (item.note ? '<div class="pr-note">' + fmt.escapeHtml(item.note) + "</div>" : "") +
         '<div class="pr-table">' + matrixTable(matrix) + "</div>";
+    } else if (!modelFor(item)) {
+      // a stale pin (question no longer in this report) must not crash
+      // present mode — itemHtml and the PPTX path already skip it
+      body = '<div class="pr-divider"><h1>Unavailable exhibit</h1>' +
+        '<p class="pr-ctx">This pin references a question that is not in ' +
+        "this report.</p></div>";
     } else {
       var model = modelFor(item);
       var flags = item.flags || { table: true, insight: true };

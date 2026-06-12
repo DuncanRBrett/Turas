@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SACAP 2025 Annual Student Survey — Turas Report v2</title>
-<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 18:44 SAST -->
+<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 18:46 SAST -->
 <!-- Single self-contained file: published tables + prior wave + synthetic
      microdata + one fixed renderer. No network requests, no installs. -->
 <style>
@@ -3712,6 +3712,10 @@ null
   };
 
   function wireTopLevel() {
+    // singleton guard: document/window listeners must never stack, even
+    // if boot were ever re-entered (hard-won guardrail)
+    if (shell._wiredTopLevel) return;
+    shell._wiredTopLevel = true;
     document.querySelector(".tabs").addEventListener("click", function (e) {
       var btn = e.target.closest(".tabbtn");
       if (btn) shell.goTab(btn.getAttribute("data-tab"));
@@ -3751,6 +3755,7 @@ null
   };
 
   shell.toast = function (message) {
+    if (typeof document === "undefined") return;   // headless (node gate)
     var holder = document.getElementById("toast");
     if (!holder) return;
     var note = document.createElement("div");
@@ -7405,6 +7410,7 @@ null
     try {
       if (global.localStorage) localStorage.setItem(KEY, JSON.stringify(load()));
     } catch (e) { /* in-memory only */ }
+    if (typeof document === "undefined") return;   // headless (node gate)
     var badge = document.getElementById("story-count");
     if (badge) badge.textContent = String(load().length);
   }
@@ -7435,6 +7441,15 @@ null
       chartKind: chartState.kind,
       chartCols: chartState.cols,
       hiddenChartRows: (s.hiddenChartRows[s.activeQ] || []).slice(),
+      // the pinned TABLE reproduces the screen too: scope, sort, hidden
+      // rows/columns and the dual-sig setting travel with the pin
+      // (older pins lack these fields and render the full default table)
+      rowScope: TR.d2.rowScope(),
+      sort: s.sorts[s.activeQ]
+        ? JSON.parse(JSON.stringify(s.sorts[s.activeQ])) : null,
+      hiddenRows: (s.hiddenRows[s.activeQ] || []).slice(),
+      hiddenCols: TR.d2.hiddenFor(s.banner).slice(),
+      dual: s.sigMode === "dual",
       intervals: !!s.showIntervals,   // pin shows exactly what was on screen
       note: ""
     });
@@ -7568,7 +7583,12 @@ null
 
   function modelFor(item) {
     var model = TR.model.forQuestion(item.q, item.banner, item.filters || [],
-      { hiddenCols: [], intervals: !!item.intervals });
+      { hiddenCols: item.hiddenCols || [],
+        hiddenRows: item.hiddenRows || [],
+        rowScope: item.rowScope || "all",
+        sort: item.sort || null,
+        dual: !!item.dual,
+        intervals: !!item.intervals });
     if (model) {
       model.filterNote = filterNote(item);
       model.chartKind = item.chartKind || "detail";
@@ -7576,6 +7596,7 @@ null
     }
     return model;
   }
+  story2._modelFor = modelFor;   // exposed for the node gate
 
   function filterNote(item) {
     if (!item.filters || !item.filters.length) return "";
@@ -7916,6 +7937,12 @@ null
         '<p class="pr-ctx">' + fmt.escapeHtml(contextLine(item)) + "</p>" +
         (item.note ? '<div class="pr-note">' + fmt.escapeHtml(item.note) + "</div>" : "") +
         '<div class="pr-table">' + matrixTable(matrix) + "</div>";
+    } else if (!modelFor(item)) {
+      // a stale pin (question no longer in this report) must not crash
+      // present mode — itemHtml and the PPTX path already skip it
+      body = '<div class="pr-divider"><h1>Unavailable exhibit</h1>' +
+        '<p class="pr-ctx">This pin references a question that is not in ' +
+        "this report.</p></div>";
     } else {
       var model = modelFor(item);
       var flags = item.flags || { table: true, insight: true };

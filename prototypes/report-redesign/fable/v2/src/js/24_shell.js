@@ -133,6 +133,10 @@
   };
 
   function wireTopLevel() {
+    // singleton guard: document/window listeners must never stack, even
+    // if boot were ever re-entered (hard-won guardrail)
+    if (shell._wiredTopLevel) return;
+    shell._wiredTopLevel = true;
     document.querySelector(".tabs").addEventListener("click", function (e) {
       var btn = e.target.closest(".tabbtn");
       if (btn) shell.goTab(btn.getAttribute("data-tab"));
@@ -172,6 +176,7 @@
   };
 
   shell.toast = function (message) {
+    if (typeof document === "undefined") return;   // headless (node gate)
     var holder = document.getElementById("toast");
     if (!holder) return;
     var note = document.createElement("div");
