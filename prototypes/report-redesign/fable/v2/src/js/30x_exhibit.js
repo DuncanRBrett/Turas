@@ -39,35 +39,56 @@
   exhibit.titleFor = function (item, models) {
     if (item.title) return item.title;
     if (item.segments && models.length === 1) {
-      return models[0].code + " · " +
-        TR.charts.clip(item.metricLabel || "", 30) + " — by segment";
+      // round-5 pins without an explicit title
+      return models[0].code + " · " + TR.charts.clip(models[0].title, 56) +
+        " — " + TR.charts.clip(item.metricLabel || "", 26) + " · by segment";
     }
     if (models.length === 1) return models[0].code + " — " + models[0].title;
     return "Composite — " + models.length + " tracked metrics";
   };
 
-  /* ---------- segment exhibits (pinned tracking Visualise views) ---------- */
+  /* ---------- series exhibits (pinned tracking Visualise views) ---------- */
 
-  function segMetric(item, models) {
-    var model = models[0];
-    var ri = item.metricRi || 0;
-    var row = model.rows[ri];
-    return { q: TR.d2.questionByCode(model.code), code: model.code,
-      title: model.title, label: row.label, kind: row.kind,
-      isMean: row.kind === "mean", diff: !!row.diff, ri: ri, row: row,
-      key: model.code + "::" + ri };
+  /** Explicit series list of a pinned view: [{code, ri, label, seg}].
+   *  Round-5 pins stored {segments, metricRi, metricLabel} — normalise. */
+  function seriesList(item, models) {
+    if (item.series) return item.series;
+    if (item.segments) {
+      var model = models[0];
+      var ri = item.metricRi || 0;
+      return item.segments.map(function (id) {
+        var seg = id === "total" ? null : TR.trk.segmentByNorm(id);
+        return { code: model.code, ri: ri, seg: id,
+          label: seg ? seg.label : "Total" };
+      });
+    }
+    return null;
   }
 
-  /** One pseudo trend row per pinned segment (current point embedded). */
-  function segPseudoRows(item, models) {
-    var metric = segMetric(item, models);
-    return (item.segments || []).map(function (id) {
-      var seg = id === "total" ? null : TR.trk.segmentByNorm(id);
-      if (id !== "total" && !seg) return null;
-      var points = TR.trk.points(metric, id === "total" ? null : id);
+  function isSeriesItem(item) {
+    return !!(item.series || item.segments);
+  }
+
+  function seriesMetric(models, entry) {
+    var model = models.filter(function (m) { return m.code === entry.code; })[0];
+    if (!model) return null;
+    var row = model.rows[entry.ri];
+    if (!row) return null;
+    return { q: TR.d2.questionByCode(entry.code), code: entry.code,
+      title: model.title, label: row.label, kind: row.kind,
+      isMean: row.kind === "mean", diff: !!row.diff, ri: entry.ri, row: row };
+  }
+
+  /** One pseudo trend row per pinned series (current point embedded). */
+  function seriesPseudoRows(item, models) {
+    return (seriesList(item, models) || []).map(function (entry) {
+      var metric = seriesMetric(models, entry);
+      if (!metric) return null;
+      var points = TR.trk.points(metric,
+        entry.seg === "total" ? null : entry.seg);
       if (!points.length) return null;
-      return { kind: metric.kind, diff: metric.diff,
-        label: seg ? seg.label : "Total", waves: points,
+      return { kind: metric.kind, diff: metric.diff, label: entry.label,
+        isMean: metric.isMean, waves: points,
         cells: [{ pct: null, mean: null, n: null, sig: "" }] };
     }).filter(Boolean);
   }
@@ -82,13 +103,13 @@
 
   /** Distribution panel model: real for one question, headline bars for many. */
   exhibit.distModel = function (item, models) {
-    if (item.segments) {
-      var rows = segPseudoRows(item, models).map(function (r) {
+    if (isSeriesItem(item)) {
+      var rows = seriesPseudoRows(item, models).map(function (r) {
         var last = r.waves[r.waves.length - 1];
         return { kind: "category", label: r.label,
           cells: [{ pct: last.value, n: null, mean: null, sig: "" }] };
       });
-      return { code: models[0].code, title: "This wave by segment",
+      return { code: models[0].code, title: "This wave",
         source: "published", chartKind: "detail", lowBaseThreshold: 30,
         columns: [{ label: "Total", letter: "", base: null, low: false }],
         rows: rows };
@@ -113,11 +134,11 @@
 
   /** Trend panel model: real for one question, headline series for many. */
   exhibit.trendModel = function (item, models) {
-    if (item.segments) {
-      return { code: models[0].code, title: "Trend by segment",
+    if (isSeriesItem(item)) {
+      return { code: models[0].code, title: "Trend",
         source: "published", chartKind: "summary", lowBaseThreshold: 30,
         columns: [{ label: "Total", letter: "", base: null, low: false }],
-        rows: segPseudoRows(item, models) };
+        rows: seriesPseudoRows(item, models) };
     }
     if (models.length === 1) {
       var m = models[0];
@@ -156,9 +177,9 @@
     var curYear = TR.render.currentYear();
     var head = ["Metric"].concat(years).concat([String(curYear), "Δ prev", "Δ first"]);
     var body = [];
-    if (item.segments) {
-      var isMean = segMetric(item, models).isMean;
-      segPseudoRows(item, models).forEach(function (r) {
+    if (isSeriesItem(item)) {
+      seriesPseudoRows(item, models).forEach(function (r) {
+        var isMean = !!r.isMean;
         var byYear = {};
         r.waves.forEach(function (c) { byYear[c.year] = c; });
         var last = r.waves[r.waves.length - 1];
@@ -218,7 +239,8 @@
     }
     if (flags.trend) {
       out.push('<div class="chart ex-chart">' +
-        TR.render.trendChart(exhibit.trendModel(item, models)) + "</div>");
+        TR.render.trendChart(exhibit.trendModel(item, models),
+          { annotations: item.annotations || [] }) + "</div>");
     }
     if (flags.table) {
       out.push('<div class="si-table">' +
@@ -228,13 +250,11 @@
   };
 
   exhibit.contextLine = function (item, models) {
-    if (item.segments) {
-      var labels = item.segments.map(function (id) {
-        if (id === "total") return "Total";
-        var seg = TR.trk.segmentByNorm(id);
-        return seg ? seg.label : id;
+    if (isSeriesItem(item)) {
+      var labels = (seriesList(item, models) || []).map(function (e) {
+        return e.label;
       });
-      return "Segments: " + labels.join(" · ") + " · published wave history";
+      return "Series: " + labels.join(" · ") + " · published wave history";
     }
     var bits = [TR.d2.bannerDescription(item.banner),
       "history: published wave Totals"];

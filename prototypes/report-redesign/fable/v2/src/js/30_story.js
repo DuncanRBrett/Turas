@@ -85,15 +85,20 @@
     TR.shell.toast("Trend exhibit pinned (" + load().length + ") — see the Story tab");
   };
 
-  /** Pin a tracking Visualise view: one metric across selected segments. */
-  story2.pinTrackingView = function (metric, segIds) {
-    load().push({ kind: "exhibit", qs: [metric.code], metricRi: metric.ri,
-      metricLabel: metric.label, segments: segIds.slice(),
+  /** Pin a tracking Visualise view exactly as selected: explicit series
+   *  (metric × segment each), the elements chosen in the pin popover,
+   *  the analyst insight and any data-point annotations. */
+  story2.pinTrackingView = function (spec, flags) {
+    load().push({ kind: "exhibit", title: spec.title, qs: spec.qs.slice(),
+      series: JSON.parse(JSON.stringify(spec.series)),
+      annotations: JSON.parse(JSON.stringify(spec.annotations || [])),
       banner: TR.AGG.banner_groups[0].id, filters: [],
-      flags: { dist: true, trend: true, table: false, insight: true },
-      distType: "column", note: "" });
+      flags: { dist: !!flags.dist, trend: !!flags.trend,
+        table: !!flags.table, insight: flags.insight !== false },
+      distType: "column", note: spec.note || "" });
     persist();
-    TR.shell.toast("Trend view pinned (" + load().length + ") — see the Story tab");
+    TR.shell.toast("Pinned exactly as selected (" + load().length +
+      ") — see the Story tab");
   };
 
   /** Composite exhibit: any tracked questions, each via its headline metric. */

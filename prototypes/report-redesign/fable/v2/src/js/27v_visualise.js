@@ -4,20 +4,23 @@
  *
  * Explorer = the overview heatmap with two modes:
  *   Questions for segment — every key (or all) tracked metric for one
- *     segment, value-in-cell with green/amber/red threshold colouring,
- *     grouped means/indexes vs top-box NETs, then by section.
+ *     segment, value-in-cell with green/amber/red threshold colouring;
+ *     tick several metrics -> Visualise overlays them for that segment.
  *   Segments for question — one metric across Total + every tracked
- *     segment, tick rows → Visualise.
+ *     segment; tick segments -> Visualise overlays them for that metric.
  * Both share display modes (Absolute / vs Previous / vs Baseline — change
  * cells colour only when significant), sort, wave chips, a legend and
- * Excel export. Click any row to visualise it.
+ * Excel export.
  *
- * Visualise = the selected metric × segments as a multi-series wave chart
- * with CI bands (proportions), value-label modes, wave chips, y-axis
- * override, low-base warnings, insight note, Excel and pin-to-story.
+ * Visualise = the ticked selection as a multi-series wave chart with CI
+ * bands, data-point ANNOTATIONS (click a point to tag it — "Campaign
+ * launched"), value-label modes, wave chips, y-axis override, low-base
+ * warnings, a colour-keyed series table with optional change rows, an
+ * insight note, Excel, and a pin popover that chooses WHICH elements to
+ * pin (this-wave chart / trend / table / insight) before pinning.
  *
  * SIZE-EXCEPTION: one explorer workflow (heatmap -> selection ->
- * visualise); the cell renderers and metric context are shared throughout.
+ * visualise -> pin); the selection model is shared throughout.
  */
 (function (global) {
   "use strict";
@@ -25,6 +28,7 @@
 
   var vis = TR.trkVis = {};
   var MAX_ROWS = 250;
+  var MAX_SERIES = 6;
 
   function trk() { return TR.trk; }
 
@@ -45,6 +49,54 @@
   function contextMetric() {
     var m = trk().metricByKey(trk().state.metricKey);
     return m || trk().metricList("key")[0] || null;
+  }
+
+  /* ---------------- the Visualise selection model ---------------- */
+
+  /** {metrics: [metricKey], segs: [segId]} — one side is usually 1. */
+  function selection() {
+    var s = trk().state;
+    if (!s.visSel || !s.visSel.metrics || !s.visSel.metrics.length) {
+      var m = contextMetric();
+      s.visSel = { metrics: m ? [m.key] : [], segs: ["total"] };
+    }
+    return s.visSel;
+  }
+
+  /** Cross product of the selection, capped: [{metric, segId, segLabel}]. */
+  function seriesSpecs(sel) {
+    var specs = [];
+    sel.metrics.forEach(function (mk) {
+      var m = trk().metricByKey(mk);
+      if (!m) return;
+      sel.segs.forEach(function (segId) {
+        var seg = segId === "total" ? null : trk().segmentByNorm(segId);
+        if (segId !== "total" && !seg) return;
+        specs.push({ metric: m, segId: segId,
+          segLabel: seg ? seg.label : "Total" });
+      });
+    });
+    return specs.slice(0, MAX_SERIES);
+  }
+
+  function specLabel(spec, sel) {
+    if (sel.metrics.length > 1) {
+      return spec.metric.code + " · " + TR.charts.clip(spec.metric.label, 18) +
+        (sel.segs.length > 1 ? " · " + spec.segLabel : "");
+    }
+    return spec.segLabel;
+  }
+
+  function visTitle(sel, specs) {
+    if (sel.metrics.length === 1 && specs.length) {
+      var m = specs[0].metric;
+      return m.code + " · " + TR.charts.clip(m.title, 60) + " — " +
+        TR.charts.clip(m.label, 28) +
+        (sel.segs.length > 1 ? " · " + sel.segs.length + " segments"
+          : " · " + specs[0].segLabel);
+    }
+    return sel.metrics.length + " metrics · " +
+      (specs.length ? specs[0].segLabel : "");
   }
 
   /* ---------------- shared explorer pieces ---------------- */
@@ -179,7 +231,7 @@
         }).join("") + "</select>" +
       '<button data-expexcel>Excel</button></div>');
 
-    var entries, tableHead, exportName;
+    var entries, exportName, pickAttr;
     if (mode === "qfs") {
       var scope = s.scope || "key";
       var segments = TR.waves.segments();
@@ -196,13 +248,15 @@
         '<button class="btab' + (scope === "all" ? " on" : "") +
         '" data-scope="all">All tracked rows</button>' +
         '<input id="trk-search" type="search" placeholder="Search metrics…">' +
-        "</div>");
+        '<button class="primary" data-tovis>Visualise ticked (or click a ' +
+        "metric) →</button></div>");
       entries = trk().metricList(scope).map(function (m) {
         var cells = trk().points(m, s.segment);
         return { metric: m, cells: cells, last: lastOf(cells),
           exportLabel: m.code + " " + m.title + " — " + m.label };
       }).filter(function (e) { return e.cells.length; });
       exportName = "tracking_" + (s.segment || "total");
+      pickAttr = function (e) { return e.metric.key; };
     } else {
       var metric = contextMetric();
       if (!metric) { host.innerHTML = ""; return; }
@@ -210,7 +264,7 @@
       html.push('<div class="scopebar"><label class="tg">Metric ' +
         '<select data-trkmetric>' + metricOptions(metric.key) +
         "</select></label>" +
-        '<button class="primary" data-tovis>Visualise selection →</button></div>');
+        '<button class="primary" data-tovis>Visualise ticked →</button></div>');
       var segRows = [{ norm: "", label: "Total" }].concat(
         TR.waves.segments().map(function (x) {
           return { norm: x.norm, label: x.label };
@@ -221,24 +275,26 @@
           exportLabel: seg.label };
       }).filter(function (e) { return e.cells.length > 1; });
       exportName = metric.code + "_segments";
+      pickAttr = function (e) { return e.seg.norm || "total"; };
     }
     applySort(entries);
 
     html.push(waveChipsHtml());
-    tableHead = '<div class="trkwrap"><table class="moved trk"><thead><tr>' +
-      (mode === "sfq" ? "<th></th><th>Segment</th>" : "<th>Metric</th>") +
+    html.push('<div class="trkwrap"><table class="moved trk"><thead><tr>' +
+      "<th></th>" + (mode === "sfq" ? "<th>Segment</th>" : "<th>Metric</th>") +
       years.map(function (y) {
         return "<th class='wv'>" + y + "</th>";
-      }).join("") + "<th>Trend</th><th>Δ prev</th></tr></thead><tbody>";
-    html.push(tableHead);
+      }).join("") + "<th>Trend</th><th>Δ prev</th></tr></thead><tbody>");
 
-    var rowHtml = function (e, labelCells) {
+    var rowHtml = function (e, labelCell) {
       var byYear = {};
       e.cells.forEach(function (c) { byYear[c.year] = c; });
       return "<tr" + (mode === "qfs" ? ' data-cat="' +
         fmt.escapeHtml(e.metric.category) + '" data-search="' +
         fmt.escapeHtml((e.metric.code + " " + e.metric.title + " " +
-          e.metric.label).toLowerCase()) + '"' : "") + ">" + labelCells +
+          e.metric.label).toLowerCase()) + '"' : "") + ">" +
+        '<td><input type="checkbox" data-pick="' + fmt.escapeHtml(pickAttr(e)) +
+        '"></td>' + labelCell +
         years.map(function (y) {
           return waveCell(e.metric, byYear[y], display, threshold);
         }).join("") + sparkCell(e.cells, e.metric.isMean) +
@@ -254,7 +310,7 @@
       groups.forEach(function (g) {
         var inGroup = entries.filter(function (e) { return g.match(e.metric); });
         if (!inGroup.length) return;
-        html.push('<tr class="grp"><td colspan="' + (years.length + 3) + '">' +
+        html.push('<tr class="grp"><td colspan="' + (years.length + 4) + '">' +
           g.title + "</td></tr>");
         var lastCat = null;
         inGroup.forEach(function (e) {
@@ -262,7 +318,7 @@
           if ((s.expSort || "original") === "original" &&
               e.metric.category !== lastCat && (s.scope || "key") === "key") {
             lastCat = e.metric.category;
-            html.push('<tr class="cat"><td colspan="' + (years.length + 3) +
+            html.push('<tr class="cat"><td colspan="' + (years.length + 4) +
               '">' + fmt.escapeHtml(lastCat) + "</td></tr>");
           }
           emitted++;
@@ -276,20 +332,16 @@
         });
       });
       if (entries.length > MAX_ROWS) {
-        html.push('<tr><td colspan="' + (years.length + 3) +
+        html.push('<tr><td colspan="' + (years.length + 4) +
           '" class="trknote">Showing ' + MAX_ROWS + " of " + entries.length +
           " rows — search to narrow.</td></tr>");
       }
     } else {
-      var selected = trk().state.visSegs || ["total"];
       entries.forEach(function (e) {
-        var id = e.seg.norm || "total";
         html.push(rowHtml(e,
-          '<td><input type="checkbox" data-segpick="' + id + '"' +
-          (selected.indexOf(id) !== -1 ? " checked" : "") + "></td>" +
           '<td class="lab"><button class="linklike" data-vis="' + e.metric.key +
-          '" data-visseg="' + id + '">' + fmt.escapeHtml(e.seg.label) +
-          "</button></td>"));
+          '" data-visseg="' + (e.seg.norm || "total") + '">' +
+          fmt.escapeHtml(e.seg.label) + "</button></td>"));
       });
     }
     html.push("</tbody></table></div>");
@@ -347,11 +399,32 @@
         trk().state.metricKey = el.getAttribute("data-vis");
         var seg = el.getAttribute("data-visseg") ||
           (trk().state.segment || "total");
-        trk().state.visSegs = [seg];
+        trk().state.visSel = { metrics: [el.getAttribute("data-vis")],
+          segs: [seg] };
         trk().state.sub = "visualise";
         trk().rerender();
       });
     });
+    var toVis = host.querySelector("[data-tovis]");
+    if (toVis) {
+      toVis.addEventListener("click", function () {
+        var picked = Array.prototype.slice.call(
+          host.querySelectorAll("[data-pick]:checked")).map(function (el) {
+            return el.getAttribute("data-pick");
+          });
+        if (mode === "qfs") {
+          if (!picked.length) { TR.shell.toast("Tick at least one metric"); return; }
+          trk().state.metricKey = picked[0];
+          trk().state.visSel = { metrics: picked.slice(0, MAX_SERIES),
+            segs: [trk().state.segment || "total"] };
+        } else {
+          trk().state.visSel = { metrics: [contextMetric().key],
+            segs: (picked.length ? picked : ["total"]).slice(0, MAX_SERIES) };
+        }
+        trk().state.sub = "visualise";
+        trk().rerender();
+      });
+    }
     var segSel = host.querySelector("[data-trkseg]");
     if (segSel) {
       segSel.addEventListener("change", function () {
@@ -369,19 +442,7 @@
     if (metricSel) {
       metricSel.addEventListener("change", function () {
         trk().state.metricKey = metricSel.value;
-        trk().state.visSegs = null;
-        trk().rerender();
-      });
-    }
-    var toVis = host.querySelector("[data-tovis]");
-    if (toVis) {
-      toVis.addEventListener("click", function () {
-        var picked = Array.prototype.slice.call(
-          host.querySelectorAll("[data-segpick]:checked")).map(function (el) {
-            return el.getAttribute("data-segpick");
-          });
-        trk().state.visSegs = picked.length ? picked : ["total"];
-        trk().state.sub = "visualise";
+        trk().state.visSel = null;
         trk().rerender();
       });
     }
@@ -399,13 +460,11 @@
     return 1.96 * Math.sqrt(p * (1 - p) / point.base) * 100;
   }
 
-  /** Selected segment series transformed for the active display mode. */
-  function visSeries(metric, mode, yearSet) {
-    var ids = trk().state.visSegs || ["total"];
-    return ids.map(function (id) {
-      var seg = id === "total" ? null : trk().segmentByNorm(id);
-      if (id !== "total" && !seg) return null;
-      var cells = trk().points(metric, id === "total" ? null : id);
+  /** Series for the chart/table: spec points transformed for the mode. */
+  function buildSeries(specs, sel, mode, yearSet) {
+    return specs.map(function (spec) {
+      var cells = trk().points(spec.metric,
+        spec.segId === "total" ? null : spec.segId);
       if (!cells.length) return null;
       var points = cells.map(function (c, i) {
         var value = c.value;
@@ -413,43 +472,55 @@
         if (mode === "base") value = i === 0 ? null : c.change_base;
         if (value === null || value === undefined) return null;
         return { wave: c.wave, year: c.year, value: value, base: c.base,
-          current: c.current, cell: c };
+          current: c.current };
       }).filter(Boolean).filter(function (p) {
         return !yearSet || yearSet[p.year];
       });
-      return { id: id, label: seg ? seg.label : "Total", points: points,
+      return { spec: spec, label: specLabel(spec, sel), points: points,
         cells: cells };
     }).filter(Boolean).filter(function (s) { return s.points.length; });
   }
 
   vis.renderVisualise = function (host) {
     var s = trk().state;
-    var metric = contextMetric();
-    if (!metric) { host.innerHTML = ""; return; }
-    trk().state.metricKey = metric.key;
+    var sel = selection();
+    var specs = seriesSpecs(sel);
+    if (!specs.length) { host.innerHTML = ""; return; }
+    var singleMetric = sel.metrics.length === 1 ? specs[0].metric : null;
+    if (singleMetric) trk().state.metricKey = singleMetric.key;
     var mode = s.visMode || "absolute";
     var threshold = TR.AGG.project.low_base_threshold || 30;
     var allYears = trk().years().concat([TR.render.currentYear()]);
     var yearSet = s.visWaves;
-    var series = visSeries(metric, mode === "absolute" ? "absolute" : mode, yearSet);
+    var series = buildSeries(specs, sel,
+      mode === "absolute" ? "absolute" : mode, yearSet);
+    var palette = TR.render.palette();
+    var anyMean = specs.some(function (sp) { return sp.metric.isMean; });
+    var notes = singleMetric ? TR.notes.forMetric(singleMetric.key) : [];
 
-    // pseudo-model rows: one per segment, current point embedded in waves
-    var pseudo = { code: metric.code, title: metric.title, source: "published",
+    var pseudo = { code: singleMetric ? singleMetric.code : "VIS",
+      title: visTitle(sel, specs), source: "published",
       chartKind: "summary", lowBaseThreshold: threshold,
       columns: [{ label: "Total", letter: "", base: null, low: false }],
       rows: series.map(function (sr) {
-        return { kind: mode === "absolute" ? metric.kind : "net",
-          diff: metric.diff, label: sr.label, waves: sr.points,
+        return { kind: mode === "absolute" ? sr.spec.metric.kind : "net",
+          diff: sr.spec.metric.diff, label: sr.label, waves: sr.points,
           cells: [{ pct: null, mean: null, n: null, sig: "" }] };
       }) };
     var chart = TR.render.trendChart(pseudo, {
       yMin: s.yMin, yMax: s.yMax, labels: s.visLabels || "last",
       ci: (mode === "absolute" && s.visCI) ? function (row, point) {
-        return ciHalfWidth(metric, point);
+        var sr = series.filter(function (x) { return x.label === row.label; })[0];
+        return sr ? ciHalfWidth(sr.spec.metric, point) : null;
       } : null,
+      annotations: notes.map(function (n) {
+        return { year: n.year, label: n.text };
+      }),
+      clickable: !!singleMetric,
       note: (mode === "absolute" ? "Published values" :
         mode === "prev" ? "Change vs previous wave (pp)" :
-        "Change vs baseline wave (pp)") + " · " + fmt.escapeHtml(metric.label)
+        "Change vs baseline wave (pp)") +
+        (singleMetric ? " · " + fmt.escapeHtml(singleMetric.label) : "")
     });
 
     var lowPoints = [];
@@ -466,14 +537,15 @@
         '" data-vismode="' + id + '">' + label + "</button>";
     };
     var html = ['<div class="card trkcard"><div class="heathead">' +
-      "<h3>Visualise · " + metric.code + " · " +
-      fmt.escapeHtml(TR.charts.clip(metric.title, 50)) + " — " +
-      fmt.escapeHtml(TR.charts.clip(metric.label, 30)) + "</h3>" +
-      '<select data-trkmetric>' + metricOptions(metric.key) + "</select></div>" +
+      "<h3>Visualise · " + fmt.escapeHtml(visTitle(sel, specs)) + "</h3>" +
+      (singleMetric
+        ? '<select data-trkmetric>' + metricOptions(singleMetric.key) + "</select>"
+        : '<button class="linklike" data-backexp>← change selection in ' +
+          "Explorer</button>") + "</div>" +
       '<div class="scopebar">' + modeBtn("absolute", "Absolute") +
       modeBtn("prev", "vs Previous") + modeBtn("base", "vs Baseline") +
       '<label class="tg"><input type="checkbox" data-visci' +
-      (s.visCI ? " checked" : "") + (mode !== "absolute" || metric.isMean
+      (s.visCI ? " checked" : "") + (mode !== "absolute" || anyMean
         ? " disabled" : "") + "> 95% CI bands</label>" +
       '<label class="tg">Labels <select data-vislabels>' +
       ["last", "all", "none"].map(function (l) {
@@ -487,27 +559,48 @@
       '<button data-yreset title="Auto scale">↺</button></label>' +
       '<span class="ctl-spacer"></span>' +
       '<button data-visexcel>Excel</button>' +
-      '<button class="primary" data-vispin>📌 Pin to story</button></div>' +
+      '<span class="pinwrap"><button class="primary" data-vispinbtn>📌 Pin…</button>' +
+      '<span class="pinmenu" data-vispinmenu hidden></span></span></div>' +
       '<div class="scopebar wavechips">' + allYears.map(function (y) {
         var on = !yearSet || yearSet[y];
         return '<button class="btab' + (on ? " on" : "") + '" data-wavechip="' +
           y + '">' + y + "</button>";
       }).join("") + '<button class="linklike" data-waveall>all</button></div>' +
-      '<div class="chart">' + (chart ||
-        '<div class="chart-error">No data for this selection.</div>') + "</div>"];
+      '<div class="chart" data-vischart>' + (chart ||
+        '<div class="chart-error">No data for this selection.</div>') + "</div>" +
+      (singleMetric
+        ? '<p class="trknote">💬 Click any data point to tag it with a note ' +
+          "(e.g. “Campaign launched”) — tags travel with pins and saved copies.</p>"
+        : "")];
 
-    // table: per segment, value per wave + change sub-rows
+    if (notes.length) {
+      html.push('<div class="notechips">' + notes.map(function (n) {
+        return '<span class="notechip">' + n.year + " · " +
+          fmt.escapeHtml(TR.charts.clip(n.text, 44)) +
+          '<button data-delnote="' + n.year + '" title="Remove note">✕</button></span>';
+      }).join("") + "</div>");
+    }
+
+    // series table: colour key dot, values, optional change rows
     var shownYears = allYears.filter(function (y) {
       return !yearSet || yearSet[y];
     });
+    html.push('<div class="scopebar"><span class="trknote">Table rows:</span>' +
+      '<label class="tg"><input type="checkbox" data-rowprev' +
+      (s.visRowPrev !== false ? " checked" : "") + "> vs previous</label>" +
+      '<label class="tg"><input type="checkbox" data-rowbase' +
+      (s.visRowBase ? " checked" : "") + "> vs baseline</label></div>");
     html.push('<div class="trkwrap"><table class="moved trk"><thead><tr>' +
       "<th>Series</th>" + shownYears.map(function (y) {
         return "<th class='wv'>" + y + "</th>";
       }).join("") + "</tr></thead><tbody>");
-    series.forEach(function (sr) {
+    series.forEach(function (sr, k) {
+      var isMean = sr.spec.metric.isMean;
       var byYear = {};
       sr.cells.forEach(function (c) { byYear[c.year] = c; });
-      var row = ["<td class='lab'>" + fmt.escapeHtml(sr.label) + "</td>"];
+      var dot = '<span class="dot" style="background:' +
+        palette[k % palette.length] + '"></span>';
+      var row = ["<td class='lab'>" + dot + fmt.escapeHtml(sr.label) + "</td>"];
       var prevRow = ["<td class='lab sub'>vs previous</td>"];
       var baseRow = ["<td class='lab sub'>vs baseline</td>"];
       shownYears.forEach(function (y) {
@@ -521,19 +614,23 @@
         var low = c.base !== null && c.base < threshold;
         row.push('<td class="wv' + (c.current ? " cur" : "") +
           (low ? " lowb" : "") + '" title="base n=' + fmt.base(c.base) + '">' +
-          trk().fmtVal(c.value, metric.isMean) + (low ? " ⚠" : "") + "</td>");
+          trk().fmtVal(c.value, isMean) + (low ? " ⚠" : "") + "</td>");
         var chg = function (change, sig) {
           if (change === null || change === undefined) return '<td class="wv"></td>';
           return '<td class="wv sub ' + (change >= 0 ? "up" : "down") +
             (sig ? " dsig" : "") + '">' + (change >= 0 ? "+" : "−") +
-            Math.abs(change).toFixed(metric.isMean ? 1 : 0) + "</td>";
+            Math.abs(change).toFixed(isMean ? 1 : 0) + "</td>";
         };
         prevRow.push(chg(c.change_prev, c.sig_prev));
         baseRow.push(chg(c.change_base, c.sig_base));
       });
       html.push("<tr>" + row.join("") + "</tr>");
-      html.push('<tr class="subrow">' + prevRow.join("") + "</tr>");
-      html.push('<tr class="subrow">' + baseRow.join("") + "</tr>");
+      if (s.visRowPrev !== false) {
+        html.push('<tr class="subrow">' + prevRow.join("") + "</tr>");
+      }
+      if (s.visRowBase) {
+        html.push('<tr class="subrow">' + baseRow.join("") + "</tr>");
+      }
     });
     html.push("</tbody></table></div>");
     if (lowPoints.length) {
@@ -543,46 +640,57 @@
         (lowPoints.length > 8 ? " +" + (lowPoints.length - 8) + " more" : "") +
         "</p>");
     }
-    html.push('<div class="insight"><div class="insight-head">Analyst insight · ' +
-      "tracking</div><textarea data-visnote placeholder=\"Insight for this trend " +
-      'view… (saved locally, exported with insights JSON)">' +
-      fmt.escapeHtml(TR.insights.get(metric.code, "tracking") || "") +
-      "</textarea></div></div>");
+    if (singleMetric) {
+      html.push('<div class="insight"><div class="insight-head">Analyst insight · ' +
+        "tracking</div><textarea data-visnote placeholder=\"Insight for this trend " +
+        'view… (saved locally, pinned with the exhibit)">' +
+        fmt.escapeHtml(TR.insights.get(singleMetric.code, "tracking") || "") +
+        "</textarea></div>");
+    }
+    html.push("</div>");
     host.innerHTML = html.join("");
 
     /* ---- wiring ---- */
-    host.querySelector("[data-trkmetric]").addEventListener("change", function (e) {
+    var rerender = function () { trk().rerender(); };
+    var msel = host.querySelector("[data-trkmetric]");
+    if (msel) msel.addEventListener("change", function (e) {
       trk().state.metricKey = e.target.value;
-      trk().state.visSegs = null;
-      trk().rerender();
+      trk().state.visSel = { metrics: [e.target.value], segs: sel.segs };
+      rerender();
+    });
+    var back = host.querySelector("[data-backexp]");
+    if (back) back.addEventListener("click", function () {
+      trk().state.sub = "explorer";
+      rerender();
     });
     host.querySelectorAll("[data-vismode]").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        trk().state.visMode = btn.getAttribute("data-vismode");
-        trk().rerender();
+        trk().state.visMode = btn.getAttribute("data-vismode") === "abs"
+          ? "absolute" : btn.getAttribute("data-vismode");
+        rerender();
       });
     });
     var ci = host.querySelector("[data-visci]");
     if (ci) ci.addEventListener("change", function () {
       trk().state.visCI = ci.checked;
-      trk().rerender();
+      rerender();
     });
     host.querySelector("[data-vislabels]").addEventListener("change", function (e) {
       trk().state.visLabels = e.target.value;
-      trk().rerender();
+      rerender();
     });
     var applyY = function () {
       var lo = parseFloat(host.querySelector("[data-ymin]").value);
       var hi = parseFloat(host.querySelector("[data-ymax]").value);
       trk().state.yMin = isNaN(lo) ? null : lo;
       trk().state.yMax = isNaN(hi) ? null : hi;
-      trk().rerender();
+      rerender();
     };
     host.querySelector("[data-ymin]").addEventListener("change", applyY);
     host.querySelector("[data-ymax]").addEventListener("change", applyY);
     host.querySelector("[data-yreset]").addEventListener("click", function () {
       trk().state.yMin = trk().state.yMax = null;
-      trk().rerender();
+      rerender();
     });
     host.querySelectorAll("[data-wavechip]").forEach(function (btn) {
       btn.addEventListener("click", function () {
@@ -594,12 +702,42 @@
         }
         set[year] = !set[year];
         trk().state.visWaves = set;
-        trk().rerender();
+        rerender();
       });
     });
     host.querySelector("[data-waveall]").addEventListener("click", function () {
       trk().state.visWaves = null;
-      trk().rerender();
+      rerender();
+    });
+    host.querySelectorAll("[data-rowprev], [data-rowbase]").forEach(function (el) {
+      el.addEventListener("change", function () {
+        trk().state.visRowPrev =
+          host.querySelector("[data-rowprev]").checked;
+        trk().state.visRowBase =
+          host.querySelector("[data-rowbase]").checked;
+        rerender();
+      });
+    });
+    // annotation tagging: click a chart point (single-metric views)
+    if (singleMetric) {
+      host.querySelector("[data-vischart]").addEventListener("click", function (e) {
+        var pt = e.target.closest("circle.trendpt");
+        if (!pt) return;
+        var year = parseInt(pt.getAttribute("data-year"), 10);
+        var existing = TR.notes.get(singleMetric.key, year);
+        var text = prompt("Note for " + year +
+          " (e.g. “Campaign launched”) — leave blank to remove:", existing);
+        if (text === null) return;
+        TR.notes.set(singleMetric.key, year, text);
+        rerender();
+      });
+    }
+    host.querySelectorAll("[data-delnote]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        TR.notes.set(singleMetric.key,
+          parseInt(btn.getAttribute("data-delnote"), 10), "");
+        rerender();
+      });
     });
     host.querySelector("[data-visexcel]").addEventListener("click", function () {
       var head = ["Series"].concat(shownYears.map(String));
@@ -614,13 +752,50 @@
           return byYear[y] ? byYear[y].base : "";
         })));
       });
-      TR.xlsx.download(metric.code + "_trend", "Trend", [head].concat(rows));
+      TR.xlsx.download((singleMetric ? singleMetric.code : "metrics") + "_trend",
+        "Trend", [head].concat(rows));
     });
-    host.querySelector("[data-vispin]").addEventListener("click", function () {
-      TR.story2.pinTrackingView(metric, trk().state.visSegs || ["total"]);
+    // pin popover: choose WHICH elements to pin before pinning
+    var pinBtn = host.querySelector("[data-vispinbtn]");
+    var pinMenu = host.querySelector("[data-vispinmenu]");
+    pinBtn.addEventListener("click", function () {
+      if (!pinMenu.hidden) { pinMenu.hidden = true; return; }
+      pinMenu.hidden = false;
+      pinMenu.innerHTML = '<div class="pm-title">Pin to story</div>' +
+        '<label><input type="checkbox" data-pf="dist"> This-wave chart</label>' +
+        '<label><input type="checkbox" data-pf="trend" checked> Trend chart</label>' +
+        '<label><input type="checkbox" data-pf="table"> Data table</label>' +
+        '<label><input type="checkbox" data-pf="insight" checked> Insight</label>' +
+        '<button class="primary wide" data-pingo>Pin</button>';
+      pinMenu.querySelector("[data-pingo]").addEventListener("click", function () {
+        var flags = {};
+        pinMenu.querySelectorAll("[data-pf]").forEach(function (cb) {
+          flags[cb.getAttribute("data-pf")] = cb.checked;
+        });
+        pinMenu.hidden = true;
+        if (!flags.dist && !flags.trend && !flags.table) {
+          TR.shell.toast("Pick at least one chart or the table");
+          return;
+        }
+        TR.story2.pinTrackingView({
+          title: visTitle(sel, specs),
+          qs: specs.map(function (sp) { return sp.metric.code; })
+            .filter(function (c, i, a) { return a.indexOf(c) === i; }),
+          series: specs.map(function (sp) {
+            return { code: sp.metric.code, ri: sp.metric.ri,
+              label: specLabel(sp, sel), seg: sp.segId };
+          }),
+          annotations: notes.map(function (n) {
+            return { year: n.year, label: n.text };
+          }),
+          note: singleMetric
+            ? (TR.insights.get(singleMetric.code, "tracking") || "") : ""
+        }, flags);
+      });
     });
-    host.querySelector("[data-visnote]").addEventListener("input", function (e) {
-      TR.insights.set(metric.code, e.target.value, "tracking");
+    var noteBox = host.querySelector("[data-visnote]");
+    if (noteBox) noteBox.addEventListener("input", function (e) {
+      TR.insights.set(singleMetric.code, e.target.value, "tracking");
     });
   };
 

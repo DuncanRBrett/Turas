@@ -196,12 +196,16 @@
         '<label><input type="checkbox" data-cmchart="' + fmt.escapeHtml(col.label) +
         '"' + (inChart ? " checked" : "") + "></label></div>";
     }).join("");
-    var rows = chartModel.rows.map(function (row) {
+    // list ALL rows of the question (not the filtered model) so a row
+    // hidden here can always be un-hidden here
+    var q = TR.d2.questionByCode(s.activeQ);
+    var rows = q.rows.map(function (row, ri) {
+      var diff = !!(q.net_diffs && q.net_diffs[String(ri)]);
       return '<div class="cm-row"><span class="cm-label" title="' +
         fmt.escapeHtml(row.label) + '">' +
         fmt.escapeHtml(TR.charts.clip(row.label, 26)) +
         (row.kind !== "category" ? ' <span class="kindtag">' +
-          (row.diff ? "diff" : row.kind) + "</span>" : "") + "</span>" +
+          (diff ? "diff" : row.kind) + "</span>" : "") + "</span>" +
         '<label><input type="checkbox" data-cmrow="' + fmt.escapeHtml(row.label) +
         '"' + (hiddenRows.indexOf(row.label) === -1 ? " checked" : "") +
         "></label><span></span></div>";

@@ -162,7 +162,8 @@
    * dominant group wins and the rest are dropped with a note.
    * @param {object} [opts] - Visualise overrides: {yMin, yMax,
    *   labels: "auto"|"all"|"last"|"none", ci: (row, point) => halfwidth,
-   *   note: axis note override}.
+   *   note: axis note override, annotations: [{year, label}] (dashed
+   *   markers), clickable: data-year attrs on points for tagging}.
    */
   render.trendChart = function (model, opts) {
     opts = opts || {};
@@ -228,6 +229,15 @@
       body.push(S.text(xOf(year), padT + plotH + 16, String(year),
         { "text-anchor": "middle", "font-size": 10, fill: "#6b7280" }));
     });
+    // analyst annotations: dashed marker + label at the tagged wave
+    (opts.annotations || []).forEach(function (a) {
+      if (years.indexOf(a.year) === -1) return;
+      var ax = xOf(a.year);
+      body.push(S.el("line", { x1: ax, y1: padT, x2: ax, y2: padT + plotH,
+        stroke: "#a8842c", "stroke-width": 1.2, "stroke-dasharray": "4 3" }));
+      body.push(S.text(ax + 4, padT + 9, TR.charts.clip(a.label, 26),
+        { "font-size": 9, "font-style": "italic", fill: "#a8842c" }));
+    });
     var clampY = function (v) {
       return Math.max(padT, Math.min(padT + plotH, yOf(v)));
     };
@@ -264,9 +274,15 @@
       var labelAll = labelMode === "all" ||
         (labelMode === "auto" && series.length === 1);
       s.points.forEach(function (p, pi) {
-        body.push(S.el("circle", { cx: xOf(p.year).toFixed(1),
-          cy: yOf(p.value).toFixed(1), r: p.current ? 4 : 2.6, fill: colour,
-          stroke: "#fff", "stroke-width": 1 }));
+        var dot = { cx: xOf(p.year).toFixed(1), cy: yOf(p.value).toFixed(1),
+          r: p.current ? 4 : 2.6, fill: colour,
+          stroke: "#fff", "stroke-width": 1 };
+        if (opts.clickable) {
+          dot["data-year"] = p.year;
+          dot["class"] = "trendpt";
+          dot.r = p.current ? 5 : 4;   // bigger hit target when taggable
+        }
+        body.push(S.el("circle", dot));
         var labelThis = labelAll || (labelMode === "last" &&
           pi === s.points.length - 1 && series.length > 1);
         if (labelThis && labelMode !== "none") {

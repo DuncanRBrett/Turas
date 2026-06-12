@@ -187,6 +187,7 @@
     var state = {
       saved: true,
       insights: TR.insights.all(),
+      annotations: TR.notes.all(),
       story: TR.story2.items(),
       report: store()
     };
