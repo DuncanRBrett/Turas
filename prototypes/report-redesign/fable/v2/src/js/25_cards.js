@@ -636,7 +636,8 @@
       }
       if (action === "png") {
         TR.exporter.downloadPng(model, [TR.d2.filterDescription(),
-          TR.d2.state.showIntervals ? TR.conf.methodNote() : ""]
+          TR.d2.state.showIntervals
+            ? TR.conf.methodNote(TR.conf.modelIntervalKind(model)) : ""]
           .filter(Boolean).join(" · "), {
           chartSvg: TR.d2.state.showChart ? cards2.chartString() : null });
       }

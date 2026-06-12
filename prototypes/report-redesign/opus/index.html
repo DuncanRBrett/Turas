@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Turas Report — data-centric prototype (Opus)</title>
+<!--
+  OPUS PROTOTYPE — Turas report re-architecture (feature/report-data-layer)
+  Per prototypes/report-redesign/SPEC.md. Self-contained: no CDNs, no installs,
+  in-file vanilla JS only. Everything below renders from the embedded data island
+  (#report-data). Swap that JSON for any project's data and the report regenerates
+  with no code change — that is the "generic by construction" requirement.
+-->
+<style>
+  :root{
+    --brand:#323367; --accent:#CC9900;
+    --text:#1e293b; --muted:#64748b; --faint:#94a3b8;
+    --page:#f8f7f5; --surface:#fff; --line:#e2e8f0; --line-strong:#cbd5e1;
+    --up:#0f7a52; --up-bg:#e7f4ee; --down:#b1493f; --down-bg:#fbeceb;
+    --radius:10px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--page);color:var(--text);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .topbar{background:var(--brand);color:#fff;padding:14px 22px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  .topbar h1{font-size:17px;font-weight:600}
+  .topbar .wave{color:#c7c8e0;font-size:13px}
+  .topbar .badge{margin-left:auto;font-size:11px;color:#c7c8e0;border:1px solid rgba(255,255,255,.25);
+    padding:3px 9px;border-radius:999px}
+  .layout{display:flex;align-items:flex-start;gap:22px;max-width:1180px;margin:0 auto;padding:22px}
+  /* Sticky question index — the wayfinding the 7MB report lacks */
+  .toc{position:sticky;top:18px;flex:0 0 232px;background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--radius);padding:14px;max-height:calc(100vh - 36px);overflow:auto}
+  .toc h2{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin-bottom:10px}
+  .toc a{display:block;color:var(--text);text-decoration:none;padding:6px 8px;border-radius:6px;font-size:13px}
+  .toc a:hover{background:var(--page)}
+  .toc a .q{color:var(--faint);font-variant-numeric:tabular-nums;margin-right:6px}
+  .main{flex:1;min-width:0}
+  .toolbar{display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+  button{font:inherit;font-size:12px;border:1px solid var(--line-strong);background:var(--surface);
+    color:var(--text);padding:6px 11px;border-radius:7px;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+  button:hover{background:var(--page)}
+  button.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
+  button.primary:hover{filter:brightness(1.08)}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px 18px;margin-bottom:18px;scroll-margin-top:18px}
+  .card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+  .card-head .title{font-size:15px;font-weight:600}
+  .card-head .sub{font-size:12px;color:var(--muted);margin-top:2px}
+  .card-actions{display:flex;gap:6px;flex-wrap:wrap;flex:none}
+  table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:12.5px}
+  th,td{padding:6px 9px;text-align:right;border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child{text-align:left}
+  thead th{color:var(--muted);font-weight:600;border-bottom:1.5px solid var(--line-strong);white-space:nowrap}
+  tbody tr:hover{background:var(--page)}
+  td .sig{font-size:10px;margin-left:3px}
+  td.up{background:var(--up-bg)} td.up .sig{color:var(--up)}
+  td.down{background:var(--down-bg)} td.down .sig{color:var(--down)}
+  .base-row td{color:var(--faint);font-size:11px;border-bottom:none;padding-top:8px}
+  .chart-wrap{margin-top:14px}
+  .grid2{display:grid;grid-template-columns:1.25fr 1fr;gap:18px;align-items:start}
+  .composite{border:1.5px solid var(--brand)}
+  .composite .tag{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--brand);
+    background:#ececf5;padding:3px 9px;border-radius:999px}
+  .series-pick{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .chip{font-size:11px;border:1px solid var(--line-strong);border-radius:999px;padding:3px 10px;cursor:pointer;background:var(--surface);color:var(--muted)}
+  .chip.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .legend{display:flex;gap:14px;font-size:11px;color:var(--muted);margin:4px 0 0 2px;flex-wrap:wrap}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:4px}
+  .empty{color:var(--faint);font-size:12px;padding:8px 0}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--brand);color:#fff;
+    padding:9px 16px;border-radius:8px;font-size:12px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:50}
+  .toast.show{opacity:1}
+  .foot{max-width:1180px;margin:0 auto;padding:0 22px 40px;color:var(--faint);font-size:11px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1 id="proj-name">—</h1>
+  <span class="wave" id="proj-wave"></span>
+  <span class="badge">self-contained · no dependencies · rendered from embedded data</span>
+</div>
+
+<div class="layout">
+  <nav class="toc"><h2>Questions</h2><div id="toc"></div></nav>
+  <main class="main">
+    <div class="toolbar">
+      <button class="primary" id="btn-example">Compose: mean trend + latest distribution</button>
+      <button id="btn-clear">Clear composite</button>
+      <span class="empty" id="compose-hint">— or tick a series on any card to combine across questions</span>
+    </div>
+    <div id="composite-slot"></div>
+    <div id="report"></div>
+  </main>
+</div>
+<div class="foot">Opus prototype · acceptance self-check in NOTES.md · this file has zero external requests — open it offline.</div>
+<div class="toast" id="toast"></div>
+
+<script type="application/json" id="report-data">
+{
+  "project": { "name": "Acme Student Pulse", "wave": "2025 · Wave 4", "brand_colour": "#323367" },
+  "banner": ["Total", "First-year", "Senior", "Online", "On-campus"],
+  "questions": [
+    {
+      "id": "q_overall",
+      "title": "Overall satisfaction with the institution",
+      "type": "scale",
+      "scale": { "min": 1, "max": 5 },
+      "base": { "Total": 812, "First-year": 402, "Senior": 410, "Online": 300, "On-campus": 512 },
+      "dist": {
+        "labels": ["5 — Very satisfied", "4", "3", "2", "1 — Very dissatisfied"],
+        "values": {
+          "Total": [32, 38, 18, 8, 4], "First-year": [28, 40, 20, 8, 4], "Senior": [38, 36, 16, 6, 4],
+          "Online": [26, 34, 22, 12, 6], "On-campus": [36, 40, 15, 6, 3]
+        }
+      },
+      "trend": {
+        "waves": ["W1", "W2", "W3", "W4"],
+        "mean": {
+          "Total": [3.4, 3.6, 3.5, 3.8], "First-year": [3.3, 3.5, 3.4, 3.6], "Senior": [3.6, 3.7, 3.7, 3.9],
+          "Online": [3.2, 3.3, 3.3, 3.4], "On-campus": [3.5, 3.7, 3.6, 3.9]
+        }
+      }
+    },
+    {
+      "id": "q_recommend",
+      "title": "Likelihood to recommend",
+      "type": "single",
+      "unit": "%",
+      "base": { "Total": 812, "First-year": 402, "Senior": 410, "Online": 300, "On-campus": 512 },
+      "rows": [
+        { "label": "Promoters (9–10)", "values": { "Total": 41, "First-year": 36, "Senior": 46, "Online": 33, "On-campus": 45 } },
+        { "label": "Passives (7–8)",   "values": { "Total": 38, "First-year": 40, "Senior": 36, "Online": 41, "On-campus": 37 } },
+        { "label": "Detractors (0–6)", "values": { "Total": 21, "First-year": 24, "Senior": 18, "Online": 26, "On-campus": 18 } }
+      ]
+    },
+    {
+      "id": "q_reasons",
+      "title": "Main drivers of the rating",
+      "type": "multi",
+      "unit": "%",
+      "base": { "Total": 812, "First-year": 402, "Senior": 410, "Online": 300, "On-campus": 512 },
+      "rows": [
+        { "label": "Teaching quality",   "values": { "Total": 58, "First-year": 52, "Senior": 63, "Online": 49, "On-campus": 62 } },
+        { "label": "Facilities",          "values": { "Total": 44, "First-year": 47, "Senior": 41, "Online": 28, "On-campus": 52 } },
+        { "label": "Support services",    "values": { "Total": 39, "First-year": 45, "Senior": 33, "Online": 43, "On-campus": 37 } },
+        { "label": "Cost / value",        "values": { "Total": 36, "First-year": 33, "Senior": 39, "Online": 41, "On-campus": 33 } },
+        { "label": "Reputation",          "values": { "Total": 29, "First-year": 31, "Senior": 27, "Online": 26, "On-campus": 30 } }
+      ]
+    },
+    {
+      "id": "q_value",
+      "title": "Value for money",
+      "type": "single",
+      "unit": "%",
+      "base": { "Total": 812, "First-year": 402, "Senior": 410, "Online": 300, "On-campus": 512 },
+      "rows": [
+        { "label": "Good value",   "values": { "Total": 47, "First-year": 43, "Senior": 51, "Online": 44, "On-campus": 49 } },
+        { "label": "Fair",         "values": { "Total": 38, "First-year": 39, "Senior": 37, "Online": 38, "On-campus": 38 } },
+        { "label": "Poor value",   "values": { "Total": 15, "First-year": 18, "Senior": 12, "Online": 18, "On-campus": 13 } }
+      ]
+    }
+  ]
+}
+</script>
+
+<script>
+"use strict";
+/* ── Fixed renderer. Reads only from DATA; makes no per-project assumptions. ── */
+var DATA, BANNER, BRAND;
+try {
+  DATA = JSON.parse(document.getElementById("report-data").textContent);
+  BANNER = DATA.banner || ["Total"];
+  BRAND = (DATA.project && DATA.project.brand_colour) || "#323367";
+} catch (e) {
+  document.body.innerHTML = "<p style='padding:24px'>Could not read report data: " + e.message + "</p>";
+  throw e;
+}
+
+function el(tag, cls, html) {
+  var n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (html != null) n.innerHTML = html;
+  return n;
+}
+function fmtNum(v) { return (Math.round(v * 10) / 10).toString().replace(/\.0$/, ""); }
+function totalOf(valuesObj) { return valuesObj[BANNER[0]]; }
+
+/* Simple illustrative significance: subgroup vs Total, ±6pt threshold. */
+function sigClass(val, tot) {
+  if (val == null || tot == null) return "";
+  if (val - tot >= 6) return "up";
+  if (tot - val >= 6) return "down";
+  return "";
+}
+function sigMark(cls) { return cls === "up" ? "▲" : cls === "down" ? "▼" : ""; }
+
+/* ── Tables (native HTML — this is what clipboard export hands to PowerPoint) ── */
+function crosstab(q) {
+  var rows = q.rows || (q.dist ? q.dist.labels.map(function (lab, i) {
+    var v = {}; BANNER.forEach(function (b) { v[b] = q.dist.values[b][i]; }); return { label: lab, values: v };
+  }) : []);
+  var unit = q.unit || (q.type === "scale" ? "%" : "");
+  var t = el("table");
+  var thead = el("thead"), htr = el("tr");
+  htr.appendChild(el("th", null, ""));
+  BANNER.forEach(function (b) { htr.appendChild(el("th", null, b)); });
+  thead.appendChild(htr); t.appendChild(thead);
+  var tb = el("tbody");
+  rows.forEach(function (r) {
+    var tr = el("tr");
+    tr.appendChild(el("td", null, r.label));
+    var tot = r.values[BANNER[0]];
+    BANNER.forEach(function (b, i) {
+      var v = r.values[b];
+      var cls = i === 0 ? "" : sigClass(v, tot);
+      var td = el("td", cls, fmtNum(v) + (unit ? unit : "") + (cls ? " <span class='sig'>" + sigMark(cls) + "</span>" : ""));
+      tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb);
+  if (q.base) {
+    var br = el("tr", "base-row");
+    br.appendChild(el("td", null, "Base (n)"));
+    BANNER.forEach(function (b) { br.appendChild(el("td", null, q.base[b] != null ? q.base[b] : "—")); });
+    tb.appendChild(br);
+  }
+  return t;
+}
+
+/* ── SVG charts (built from data; tiny and self-contained) ── */
+function svg(w, h) {
+  var s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  s.setAttribute("viewBox", "0 0 " + w + " " + h); s.setAttribute("width", "100%");
+  s.setAttribute("role", "img"); s.style.fontFamily = "Inter,system-ui,sans-serif"; s.style.maxHeight = h + "px";
+  return s;
+}
+function svgEl(name, attrs, text) {
+  var n = document.createElementNS("http://www.w3.org/2000/svg", name);
+  for (var k in attrs) n.setAttribute(k, attrs[k]);
+  if (text != null) n.textContent = text;
+  return n;
+}
+function barChart(labels, vals, opts) {
+  opts = opts || {}; var W = 520, rowH = 30, top = 8, left = opts.labelW || 150;
+  var H = top + labels.length * rowH + 6;
+  var max = Math.max.apply(null, vals.concat([1])); var bw = W - left - 52;
+  var s = svg(W, H); s.setAttribute("aria-label", (opts.aria || "bar chart"));
+  labels.forEach(function (lab, i) {
+    var y = top + i * rowH;
+    s.appendChild(svgEl("text", { x: left - 8, y: y + 17, "text-anchor": "end", "font-size": 12, fill: "#475569" }, lab));
+    s.appendChild(svgEl("rect", { x: left, y: y + 6, width: Math.max(1, bw * vals[i] / max), height: 16, rx: 3, fill: opts.color || BRAND }));
+    s.appendChild(svgEl("text", { x: left + Math.max(1, bw * vals[i] / max) + 6, y: y + 18, "font-size": 12, fill: "#334155" }, fmtNum(vals[i]) + (opts.unit || "")));
+  });
+  return s;
+}
+
+/* Linked composite: mean trend (line) + current-wave distribution (bars). */
+function linkedTrendDist(q, cut) {
+  cut = cut || BANNER[0];
+  var W = 620, H = 250, s = svg(W, H);
+  s.setAttribute("aria-label", "Mean of " + q.title + " across waves, linked to the latest-wave distribution");
+  var waves = q.trend.waves, means = q.trend.mean[cut];
+  var lo = Math.min.apply(null, means) - 0.2, hi = Math.max.apply(null, means) + 0.2;
+  var x0 = 50, x1 = 300, yTop = 45, yBot = 205;
+  function tx(i) { return x0 + (x1 - x0) * (waves.length === 1 ? 0.5 : i / (waves.length - 1)); }
+  function ty(v) { return yBot - (v - lo) / (hi - lo) * (yBot - yTop); }
+  s.appendChild(svgEl("text", { x: x0, y: 18, "font-size": 12, "font-weight": 600, fill: "#475569" }, "mean across waves (" + cut + ")"));
+  [lo, (lo + hi) / 2, hi].forEach(function (gv) {
+    s.appendChild(svgEl("line", { x1: x0, y1: ty(gv), x2: x1, y2: ty(gv), stroke: "#e2e8f0" }));
+    s.appendChild(svgEl("text", { x: x0 - 6, y: ty(gv) + 4, "text-anchor": "end", "font-size": 11, fill: "#94a3b8" }, fmtNum(gv)));
+  });
+  var d = "M" + means.map(function (m, i) { return tx(i) + "," + ty(m); }).join(" L");
+  s.appendChild(svgEl("path", { d: d, fill: "none", stroke: "#1D9E75", "stroke-width": 2.5, "stroke-linejoin": "round" }));
+  means.forEach(function (m, i) {
+    var last = i === means.length - 1;
+    s.appendChild(svgEl("circle", { cx: tx(i), cy: ty(m), r: last ? 6 : 3.5, fill: "#1D9E75" }));
+    if (last) s.appendChild(svgEl("circle", { cx: tx(i), cy: ty(m), r: 2.5, fill: "#fff" }));
+    s.appendChild(svgEl("text", { x: tx(i), y: yBot + 18, "text-anchor": "middle", "font-size": 11, fill: "#94a3b8" }, waves[i]));
+  });
+  s.appendChild(svgEl("text", { x: tx(means.length - 1), y: ty(means[means.length - 1]) - 11, "text-anchor": "middle", "font-size": 11, "font-weight": 600, fill: "#475569" }, fmtNum(means[means.length - 1])));
+  // connector → distribution
+  s.appendChild(svgEl("path", { d: "M" + (tx(means.length - 1) + 3) + "," + ty(means[means.length - 1]) + " C 340,60 350,30 372,24", fill: "none", stroke: "#94a3b8", "stroke-width": 1.2, "stroke-dasharray": "3 3" }));
+  s.appendChild(svgEl("line", { x1: 330, y1: 40, x2: 330, y2: 205, stroke: "#e2e8f0" }));
+  // distribution bars (latest wave)
+  s.appendChild(svgEl("text", { x: 360, y: 18, "font-size": 12, "font-weight": 600, fill: "#475569" }, "latest wave distribution"));
+  var dl = q.dist.labels, dv = q.dist.values[cut], dmax = Math.max.apply(null, dv);
+  dl.forEach(function (lab, i) {
+    var y = 50 + i * 31, bw = 180 * dv[i] / dmax;
+    s.appendChild(svgEl("text", { x: 388, y: y + 13, "text-anchor": "end", "font-size": 11, fill: "#94a3b8" }, lab.split(" ")[0]));
+    s.appendChild(svgEl("rect", { x: 395, y: y, width: 185, height: 18, rx: 3, fill: "#f1f5f9" }));
+    s.appendChild(svgEl("rect", { x: 395, y: y, width: Math.max(2, bw), height: 18, rx: 3, fill: "#378ADD" }));
+    s.appendChild(svgEl("text", { x: 395 + Math.max(2, bw) + 6, y: y + 13, "font-size": 11, fill: "#334155" }, dv[i] + "%"));
+  });
+  return s;
+}
+
+/* ── Export: native (clipboard HTML → editable in PowerPoint) + PNG snapshot ── */
+function toast(msg) { var t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show"); setTimeout(function () { t.classList.remove("show"); }, 1800); }
+function copyNode(node) {
+  var html = "<meta charset='utf-8'>" + node.outerHTML, text = node.innerText || "";
+  if (navigator.clipboard && window.ClipboardItem) {
+    navigator.clipboard.write([new ClipboardItem({
+      "text/html": new Blob([html], { type: "text/html" }),
+      "text/plain": new Blob([text], { type: "text/plain" })
+    })]).then(function () { toast("Copied — paste into PowerPoint as an editable object"); },
+      function () { fallbackCopy(node); });
+  } else { fallbackCopy(node); }
+}
+function fallbackCopy(node) {
+  try { var r = document.createRange(); r.selectNode(node); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); document.execCommand("copy"); sel.removeAllRanges(); toast("Copied to clipboard"); }
+  catch (e) { toast("Copy not supported in this browser"); }
+}
+function downloadPng(svgNode, name) {
+  try {
+    var vb = svgNode.viewBox.baseVal, scale = 2;
+    var xml = new XMLSerializer().serializeToString(svgNode);
+    var url = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(xml)));
+    var img = new Image();
+    img.onload = function () {
+      var c = document.createElement("canvas"); c.width = (vb.width || 600) * scale; c.height = (vb.height || 300) * scale;
+      var ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      c.toBlob(function (b) { var a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = (name || "chart") + ".png"; a.click(); });
+    };
+    img.onerror = function () { toast("PNG export failed"); };
+    img.src = url;
+  } catch (e) { toast("PNG export failed: " + e.message); }
+}
+
+/* ── Compose state ── */
+var selected = []; // {qid, kind}
+function keyOf(s) { return s.qid + ":" + s.kind; }
+function toggleSeries(s, chip) {
+  var i = selected.findIndex(function (x) { return keyOf(x) === keyOf(s); });
+  if (i >= 0) { selected.splice(i, 1); chip.classList.remove("on"); }
+  else { selected.push(s); chip.classList.add("on"); }
+  renderComposite();
+}
+function qById(id) { return DATA.questions.filter(function (q) { return q.id === id; })[0]; }
+
+function renderComposite() {
+  var slot = document.getElementById("composite-slot"); slot.innerHTML = "";
+  document.getElementById("compose-hint").style.display = selected.length ? "none" : "";
+  if (!selected.length) return;
+  var card = el("div", "card composite");
+  var head = el("div", "card-head");
+  var hl = el("div"); hl.appendChild(el("span", "tag", "◆ Composite — built from the data, not pasted pictures"));
+  hl.appendChild(el("div", "title", "Cross-question view")); head.appendChild(hl);
+  var act = el("div", "card-actions");
+  var bCopy = el("button", null, "Copy"); bCopy.onclick = function () { copyNode(body); };
+  var bPng = el("button", null, "PNG"); act.appendChild(bCopy); act.appendChild(bPng);
+  head.appendChild(act); card.appendChild(head);
+  var body = el("div");
+
+  // Special case: a question's mean-trend + its own distribution → linked view
+  var trend = selected.filter(function (s) { return s.kind === "trend"; })[0];
+  var dist = selected.filter(function (s) { return s.kind === "dist"; })[0];
+  var firstSvg = null;
+  if (trend && dist && trend.qid === dist.qid) {
+    var q = qById(trend.qid);
+    body.appendChild(el("div", "sub", q.title + " — mean across waves linked to the latest-wave spread"));
+    var sv = linkedTrendDist(q, BANNER[0]); body.appendChild(sv); firstSvg = sv;
+  } else {
+    // Generic: render each selected series side by side
+    var grid = el("div", "grid2");
+    selected.forEach(function (s) {
+      var q = qById(s.qid), col = el("div");
+      col.appendChild(el("div", "sub", q.title + " · " + s.kind));
+      var c;
+      if (s.kind === "trend" && q.trend) {
+        c = trendOnly(q, BANNER[0]);
+      } else if (s.kind === "dist" && q.dist) {
+        c = barChart(q.dist.labels.map(function (l) { return l.split(" ")[0]; }), q.dist.values[BANNER[0]], { unit: "%", labelW: 28, color: "#378ADD", aria: q.title });
+      } else {
+        var rows = q.rows || [];
+        c = barChart(rows.map(function (r) { return r.label; }), rows.map(function (r) { return totalOf(r.values); }), { unit: q.unit || "", aria: q.title });
+      }
+      col.appendChild(c); if (!firstSvg) firstSvg = c;
+      grid.appendChild(col);
+    });
+    body.appendChild(grid);
+  }
+  card.appendChild(body);
+  bPng.onclick = function () { if (firstSvg) downloadPng(firstSvg, "composite"); };
+  slot.appendChild(card);
+  card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function trendOnly(q, cut) {
+  var W = 320, H = 180, s = svg(W, H), waves = q.trend.waves, means = q.trend.mean[cut];
+  var lo = Math.min.apply(null, means) - 0.2, hi = Math.max.apply(null, means) + 0.2, x0 = 40, x1 = 300, yt = 20, yb = 150;
+  function tx(i) { return x0 + (x1 - x0) * (i / (waves.length - 1)); }
+  function ty(v) { return yb - (v - lo) / (hi - lo) * (yb - yt); }
+  s.appendChild(svgEl("path", { d: "M" + means.map(function (m, i) { return tx(i) + "," + ty(m); }).join(" L"), fill: "none", stroke: "#1D9E75", "stroke-width": 2.5 }));
+  means.forEach(function (m, i) { s.appendChild(svgEl("circle", { cx: tx(i), cy: ty(m), r: 3.5, fill: "#1D9E75" })); s.appendChild(svgEl("text", { x: tx(i), y: yb + 18, "text-anchor": "middle", "font-size": 11, fill: "#94a3b8" }, waves[i])); });
+  return s;
+}
+
+/* ── Render TOC + report ── */
+function seriesChips(q) {
+  var wrap = el("div", "series-pick");
+  function chip(kind, label) { var c = el("span", "chip", "＋ " + label); c.onclick = function () { toggleSeries({ qid: q.id, kind: kind }, c); }; wrap.appendChild(c); }
+  if (q.trend) chip("trend", "mean trend");
+  if (q.dist) chip("dist", "distribution");
+  if (q.rows) chip("values", "values");
+  return wrap;
+}
+function renderReport() {
+  document.getElementById("proj-name").textContent = DATA.project.name;
+  document.getElementById("proj-wave").textContent = DATA.project.wave;
+  var toc = document.getElementById("toc"), report = document.getElementById("report");
+  DATA.questions.forEach(function (q, idx) {
+    var a = el("a", null, "<span class='q'>Q" + (idx + 1) + "</span>" + q.title); a.href = "#" + q.id; toc.appendChild(a);
+
+    var card = el("div", "card"); card.id = q.id;
+    var head = el("div", "card-head");
+    var hl = el("div");
+    hl.appendChild(el("div", "title", "Q" + (idx + 1) + ". " + q.title));
+    hl.appendChild(el("div", "sub", "Base n=" + (q.base ? q.base[BANNER[0]] : "—") + (q.type === "scale" ? " · 1–5 scale" : "") + " · ▲▼ = ±6pt vs Total"));
+    hl.appendChild(seriesChips(q));
+    head.appendChild(hl);
+    var act = el("div", "card-actions");
+    var table = crosstab(q);
+    var bCopy = el("button", null, "Copy table"); bCopy.onclick = function () { copyNode(table); };
+    act.appendChild(bCopy);
+    head.appendChild(act); card.appendChild(head);
+    card.appendChild(table);
+
+    // chart
+    try {
+      var cw = el("div", "chart-wrap"), chart, bPng = el("button", null, "PNG");
+      if (q.dist) {
+        chart = barChart(q.dist.labels.map(function (l) { return l.split(" ")[0]; }), q.dist.values[BANNER[0]], { unit: "%", labelW: 28, color: BRAND, aria: q.title });
+      } else if (q.rows) {
+        chart = barChart(q.rows.map(function (r) { return r.label; }), q.rows.map(function (r) { return totalOf(r.values); }), { unit: q.unit || "", aria: q.title });
+      }
+      if (chart) { cw.appendChild(chart); bPng.onclick = function () { downloadPng(chart, q.id); }; act.appendChild(bPng); card.appendChild(cw); }
+    } catch (e) { /* robust: table still shows if a chart fails */ }
+
+    report.appendChild(card);
+  });
+}
+
+document.getElementById("btn-example").onclick = function () {
+  selected = [{ qid: "q_overall", kind: "trend" }, { qid: "q_overall", kind: "dist" }];
+  document.querySelectorAll(".chip").forEach(function (c) { c.classList.remove("on"); });
+  renderComposite();
+};
+document.getElementById("btn-clear").onclick = function () {
+  selected = []; document.querySelectorAll(".chip").forEach(function (c) { c.classList.remove("on"); }); renderComposite();
+};
+
+renderReport();
+</script>
+</body>
+</html>

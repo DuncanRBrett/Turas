@@ -83,9 +83,33 @@
     return out;
   };
 
-  /** Short method tag for meta lines and band notes: "95% SI (Wilson)". */
-  conf.methodNote = function () {
-    return "95% " + conf.labels().interval_abbrev + " (Wilson)";
+  /**
+   * Short method tag for meta lines and band notes. The bracket must name
+   * what was actually computed: proportions use Wilson, but mean/Index/NPS
+   * intervals are z·SD/√n on the distribution-derived SD — calling those
+   * "Wilson" would be dishonest on exported artifacts.
+   * @param {string} [kind] - "props" (default): "95% SI (Wilson)";
+   *   "means": "95% SI (z·SD/√n)"; "mixed": both named.
+   */
+  conf.methodNote = function (kind) {
+    var abbrev = conf.labels().interval_abbrev;
+    if (kind === "means") return "95% " + abbrev + " (z·SD/√n)";
+    if (kind === "mixed") {
+      return "95% " + abbrev + " (Wilson; means z·SD/√n)";
+    }
+    return "95% " + abbrev + " (Wilson)";
+  };
+
+  /** methodNote kind for a crosstab model: "mixed" when any mean row
+   *  carries an interval (Index/NPS rows in an interval view), else
+   *  "props". Run on models built with {intervals: true}. */
+  conf.modelIntervalKind = function (model) {
+    var hasMeanCi = !!(model && model.rows && model.rows.some(function (r) {
+      return r.kind === "mean" && (r.cells || []).some(function (c) {
+        return c && c.ci;
+      });
+    }));
+    return hasMeanCi ? "mixed" : "props";
   };
 
   /* ---------------- Wilson score interval ---------------- */

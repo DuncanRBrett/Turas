@@ -313,13 +313,28 @@
     return out.join("");
   };
 
+  /** Interval kind of a pinned series list: the bands use Wilson for
+   *  proportion metrics but z·SD/√n for mean/Index/NPS — the context
+   *  line must name the method that actually drew them. */
+  function seriesIntervalKind(item, models) {
+    var means = 0, props = 0;
+    (seriesList(item, models) || []).forEach(function (entry) {
+      var metric = seriesMetric(models, entry);
+      if (!metric) return;
+      if (metric.isMean) means++; else props++;
+    });
+    if (means && props) return "mixed";
+    return means ? "means" : "props";
+  }
+
   exhibit.contextLine = function (item, models) {
     if (isSeriesItem(item)) {
       var labels = (seriesList(item, models) || []).map(function (e) {
         return e.label;
       });
       return "Series: " + labels.join(" · ") + " · published wave history" +
-        (item.ci ? " · " + TR.conf.methodNote() + " bands" : "");
+        (item.ci ? " · " +
+          TR.conf.methodNote(seriesIntervalKind(item, models)) + " bands" : "");
     }
     var bits = [TR.d2.bannerDescription(item.banner),
       "history: published wave Totals"];

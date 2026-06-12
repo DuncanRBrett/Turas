@@ -265,7 +265,8 @@ run("trend chart draws the interval band from {lo, hi} bounds", () => {
 });
 
 run("pins + slides carry the interval vocabulary", () => {
-  // pinned Visualise view with bands -> context line names the method
+  // pinned NPS Visualise view: the bands are z·SD/√n on the
+  // distribution-derived SD — the context line must NOT claim Wilson
   const nps = TR.trk.metricList("key").find((m) =>
     TR.model.norm(m.label) === "nps score");
   const item = { kind: "exhibit", qs: [nps.code], ci: true,
@@ -274,16 +275,25 @@ run("pins + slides carry the interval vocabulary", () => {
     flags: { trend: true }, distType: "column", note: "" };
   const models = TR.exhibit.models(item);
   const ctx = TR.exhibit.contextLine(item, models);
-  assert(ctx.includes("95% SI (Wilson) bands"), "exhibit context: " + ctx);
-  // crosstab pin with intervals -> PPTX meta line names the method
+  assert(ctx.includes("95% SI (z·SD/√n) bands"), "exhibit context: " + ctx);
+  assert(!ctx.includes("Wilson"), "mean-metric bands must not claim Wilson");
+  // crosstab pin with intervals: Q008 carries an Index (mean) row, so the
+  // PPTX meta line names both methods
   const model = TR.model.forQuestion("Q008", TR.AGG.banner_groups[0].id, [],
     { intervals: true });
   const slide = TR.exporter.slideForModel(model, "", {
     table: true, insight: false, intervals: true });
-  assert(slide.xml.includes("95% SI (Wilson)"), "slide meta misses method");
+  assert(slide.xml.includes("95% SI (Wilson; means z·SD/√n)"),
+    "mixed slide meta misses both methods");
+  // a question with no mean row stays pure Wilson
+  const propsModel = TR.model.forQuestion("Q002", TR.AGG.banner_groups[1].id,
+    [], { intervals: true });
+  const propsSlide = TR.exporter.slideForModel(propsModel, "", {
+    table: true, insight: false, intervals: true });
+  assert(propsSlide.xml.includes("95% SI (Wilson)") &&
+    !propsSlide.xml.includes("z·SD"), "props-only slide meta");
   const plainSlide = TR.exporter.slideForModel(model, "", { table: true });
-  assert(!plainSlide.xml.includes("95% SI (Wilson)"),
-    "method note must be opt-in");
+  assert(!plainSlide.xml.includes("95% SI"), "method note must be opt-in");
 });
 
 run("confidence: explainer + sampling vocabulary ship in the artifact", () => {

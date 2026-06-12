@@ -262,7 +262,9 @@
     if (item.kind === "question") {
       bits.push(TR.d2.bannerDescription(item.banner));
       if (model) bits.push(model.source === "computed" ? "computed live" : "published");
-      if (item.intervals) bits.push(TR.conf.methodNote());
+      if (item.intervals) {
+        bits.push(TR.conf.methodNote(TR.conf.modelIntervalKind(model)));
+      }
     }
     if (item.kind === "heatmap") bits.push(TR.d2.bannerDescription(item.banner));
     if (item.kind === "composite") {

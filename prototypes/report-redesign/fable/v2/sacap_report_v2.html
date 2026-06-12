@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SACAP 2025 Annual Student Survey — Turas Report v2</title>
-<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 18:13 SAST -->
+<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 18:43 SAST -->
 <!-- Single self-contained file: published tables + prior wave + synthetic
      microdata + one fixed renderer. No network requests, no installs. -->
 <style>
@@ -1680,9 +1680,33 @@ null
     return out;
   };
 
-  /** Short method tag for meta lines and band notes: "95% SI (Wilson)". */
-  conf.methodNote = function () {
-    return "95% " + conf.labels().interval_abbrev + " (Wilson)";
+  /**
+   * Short method tag for meta lines and band notes. The bracket must name
+   * what was actually computed: proportions use Wilson, but mean/Index/NPS
+   * intervals are z·SD/√n on the distribution-derived SD — calling those
+   * "Wilson" would be dishonest on exported artifacts.
+   * @param {string} [kind] - "props" (default): "95% SI (Wilson)";
+   *   "means": "95% SI (z·SD/√n)"; "mixed": both named.
+   */
+  conf.methodNote = function (kind) {
+    var abbrev = conf.labels().interval_abbrev;
+    if (kind === "means") return "95% " + abbrev + " (z·SD/√n)";
+    if (kind === "mixed") {
+      return "95% " + abbrev + " (Wilson; means z·SD/√n)";
+    }
+    return "95% " + abbrev + " (Wilson)";
+  };
+
+  /** methodNote kind for a crosstab model: "mixed" when any mean row
+   *  carries an interval (Index/NPS rows in an interval view), else
+   *  "props". Run on models built with {intervals: true}. */
+  conf.modelIntervalKind = function (model) {
+    var hasMeanCi = !!(model && model.rows && model.rows.some(function (r) {
+      return r.kind === "mean" && (r.cells || []).some(function (c) {
+        return c && c.ci;
+      });
+    }));
+    return hasMeanCi ? "mixed" : "props";
   };
 
   /* ---------------- Wilson score interval ---------------- */
@@ -4385,7 +4409,8 @@ null
       }
       if (action === "png") {
         TR.exporter.downloadPng(model, [TR.d2.filterDescription(),
-          TR.d2.state.showIntervals ? TR.conf.methodNote() : ""]
+          TR.d2.state.showIntervals
+            ? TR.conf.methodNote(TR.conf.modelIntervalKind(model)) : ""]
           .filter(Boolean).join(" · "), {
           chartSvg: TR.d2.state.showChart ? cards2.chartString() : null });
       }
@@ -7223,7 +7248,8 @@ null
       textBox(next(), { x: MARGIN, y: 0.95, w: contentW, h: 0.3 },
         [para([TR.AGG.project.name, TR.AGG.project.wave,
           model.source === "computed" ? "filtered audience (live recompute)" : "published values",
-          flags.intervals ? TR.conf.methodNote() : "",
+          flags.intervals
+            ? TR.conf.methodNote(TR.conf.modelIntervalKind(model)) : "",
           model.filterNote || ""].filter(Boolean).join(" · "),
           { size: 10.5, colour: GREY })]);
     var top = 1.45, bottom = SLIDE_H - 0.35 - noteH;
@@ -7600,7 +7626,9 @@ null
     if (item.kind === "question") {
       bits.push(TR.d2.bannerDescription(item.banner));
       if (model) bits.push(model.source === "computed" ? "computed live" : "published");
-      if (item.intervals) bits.push(TR.conf.methodNote());
+      if (item.intervals) {
+        bits.push(TR.conf.methodNote(TR.conf.modelIntervalKind(model)));
+      }
     }
     if (item.kind === "heatmap") bits.push(TR.d2.bannerDescription(item.banner));
     if (item.kind === "composite") {
@@ -8222,13 +8250,28 @@ null
     return out.join("");
   };
 
+  /** Interval kind of a pinned series list: the bands use Wilson for
+   *  proportion metrics but z·SD/√n for mean/Index/NPS — the context
+   *  line must name the method that actually drew them. */
+  function seriesIntervalKind(item, models) {
+    var means = 0, props = 0;
+    (seriesList(item, models) || []).forEach(function (entry) {
+      var metric = seriesMetric(models, entry);
+      if (!metric) return;
+      if (metric.isMean) means++; else props++;
+    });
+    if (means && props) return "mixed";
+    return means ? "means" : "props";
+  }
+
   exhibit.contextLine = function (item, models) {
     if (isSeriesItem(item)) {
       var labels = (seriesList(item, models) || []).map(function (e) {
         return e.label;
       });
       return "Series: " + labels.join(" · ") + " · published wave history" +
-        (item.ci ? " · " + TR.conf.methodNote() + " bands" : "");
+        (item.ci ? " · " +
+          TR.conf.methodNote(seriesIntervalKind(item, models)) + " bands" : "");
     }
     var bits = [TR.d2.bannerDescription(item.banner),
       "history: published wave Totals"];
