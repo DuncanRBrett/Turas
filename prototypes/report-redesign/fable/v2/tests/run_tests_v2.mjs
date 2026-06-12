@@ -296,6 +296,28 @@ run("pins + slides carry the interval vocabulary", () => {
   assert(!plainSlide.xml.includes("95% SI"), "method note must be opt-in");
 });
 
+run("negative values floor at the axis in dist charts (NPS composites)", () => {
+  // a composite exhibit charts headline metrics as pseudo category rows —
+  // an NPS can be negative; SVG must stay valid and the label honest
+  const model = { code: "NEG", title: "t", chartKind: "detail",
+    lowBaseThreshold: 30,
+    columns: [{ label: "Total", letter: "", base: null, low: false }],
+    rows: [
+      { kind: "category", label: "NPS A", cells: [{ pct: -22, n: null, mean: null, sig: "" }] },
+      { kind: "category", label: "NPS B", cells: [{ pct: 35, n: null, mean: null, sig: "" }] }
+    ] };
+  const column = TR.render.columnChart(model, [0]);
+  assert(!/height="-/.test(column), "no negative-height rects");
+  assert(column.includes("-22%"), "true negative value still labelled");
+  const bar = TR.render.barChart(model, [0]);
+  assert(!/width="-/.test(bar) && bar.includes("-22%"), "bar chart honest");
+  const dot = TR.render.dotChart(model, [0]);
+  assert(!/cx="-/.test(dot), "dots never draw left of the axis");
+  const pie = TR.render.pieChart(model, 0);
+  assert(pie.includes("35%") && !pie.includes("-22%"),
+    "pie floors negatives at zero share");
+});
+
 run("pins reproduce the table view state (sort, hidden rows/cols, dual)", () => {
   const s = TR.d2.state;
   const banner = TR.AGG.banner_groups[0].id;

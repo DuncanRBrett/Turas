@@ -87,7 +87,11 @@ console.log(`means checked: ${meanChecked}, off>1.0: ${meanOff}`);
 console.log(`sig letter agreement: ${sigAgree}/${sigTotal} (${(sigAgree / sigTotal * 100).toFixed(1)}%)`);
 examples.forEach((e) => console.log("  ", e));
 
+// sig agreement is a documented property (~90%, README) — enforce a floor
+// so a regression in the engine can't slip through as a printed statistic
+const SIG_AGREEMENT_FLOOR = 0.85;
 const hardFail = cellMismatch > 0 || baseMismatch > 0 || netOff > netChecked * 0.02 ||
-  meanOff > meanChecked * 0.1;
+  meanOff > meanChecked * 0.1 ||
+  (sigTotal > 0 && sigAgree / sigTotal < SIG_AGREEMENT_FLOOR);
 console.log(hardFail ? "\nGOLDEN PARITY: FAIL" : "\nGOLDEN PARITY: PASS");
 process.exit(hardFail ? 1 : 0);

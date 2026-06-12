@@ -71,7 +71,10 @@
       var groupW = barW * cols.length;
       cols.forEach(function (ci, k) {
         var v = r.cells[ci] ? r.cells[ci].pct : null;
-        var h = v === null ? 0 : v / data.axisMax * plotH;
+        // negative values (an NPS headline in a composite exhibit) floor
+        // at the axis — a negative height is invalid SVG and the rect
+        // would silently vanish; the label still shows the true value
+        var h = v === null ? 0 : Math.max(v, 0) / data.axisMax * plotH;
         body.push(S.el("rect", { x: cx - groupW / 2 + k * barW,
           y: padT + plotH - h, width: barW - 2, height: h,
           fill: palette[k % palette.length], rx: 3 }));
@@ -179,15 +182,18 @@
     var brand = TR.charts.brandOf();
     var palette = render.palette().concat(
       data.rows.map(function (_, i) { return S.shade(brand, 0.2 + (i % 5) * 0.16); }));
+    // negative values cannot be a share of a whole — floor at 0 so a
+    // negative NPS headline cannot draw a backwards arc
+    var sliceOf = function (r) {
+      return Math.max((r.cells[colIndex] && r.cells[colIndex].pct) || 0, 0);
+    };
     var total = 0;
-    data.rows.forEach(function (r) {
-      total += (r.cells[colIndex] && r.cells[colIndex].pct) || 0;
-    });
+    data.rows.forEach(function (r) { total += sliceOf(r); });
     if (total <= 0) return "";
     var body = [], angle = -Math.PI / 2;
     var outside = { left: [], right: [] };
     data.rows.forEach(function (r, i) {
-      var v = (r.cells[colIndex] && r.cells[colIndex].pct) || 0;
+      var v = sliceOf(r);
       var sweep = v / total * Math.PI * 2;
       var a2 = angle + sweep;
       var large = sweep > Math.PI ? 1 : 0;
@@ -261,7 +267,8 @@
       cols.forEach(function (ci, k) {
         var v = r.cells[ci] ? r.cells[ci].pct : null;
         if (v === null) return;
-        body.push(S.el("circle", { cx: LABEL + x(v), cy: y, r: 5.5,
+        // negative values sit on the axis rather than drawing off-plot
+        body.push(S.el("circle", { cx: LABEL + Math.max(x(v), 0), cy: y, r: 5.5,
           fill: palette[k % palette.length], stroke: "#fff", "stroke-width": 1.5 }));
       });
       y += thisRowH;
