@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SACAP 2025 Annual Student Survey — Turas Report v2</title>
-<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 16:18 SAST -->
+<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 16:27 SAST -->
 <!-- Single self-contained file: published tables + prior wave + synthetic
      microdata + one fixed renderer. No network requests, no installs. -->
 <style>
@@ -7472,7 +7472,7 @@ null
         TR.exhibit.panelsHtml(item) +
         (exFlags.insight !== false
           ? '<textarea class="si-note" placeholder="Commentary for this slide…">' +
-            fmt.escapeHtml(item.note || "") + "</textarea>" : "");
+            fmt.escapeHtml(item.note || "") + "</textarea>" : "") + "</div>";
     }
     if (item.kind === "heatmap" || item.kind === "composite") {
       var matrix = item.kind === "heatmap" ? heatmapMatrix(item) : compositeMatrix(item);

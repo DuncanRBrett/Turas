@@ -331,7 +331,7 @@
         TR.exhibit.panelsHtml(item) +
         (exFlags.insight !== false
           ? '<textarea class="si-note" placeholder="Commentary for this slide…">' +
-            fmt.escapeHtml(item.note || "") + "</textarea>" : "");
+            fmt.escapeHtml(item.note || "") + "</textarea>" : "") + "</div>";
     }
     if (item.kind === "heatmap" || item.kind === "composite") {
       var matrix = item.kind === "heatmap" ? heatmapMatrix(item) : compositeMatrix(item);
