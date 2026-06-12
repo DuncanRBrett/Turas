@@ -29,7 +29,8 @@
     colMenuOpen: false,     // columns panel visibility survives re-renders
     movedScope: null,       // "key" | "all" (null = use project config)
     hiddenCols: {},         // {bannerSelection: [column labels]}
-    hiddenRows: {},         // {qcode: [row labels]}
+    hiddenRows: {},         // {qcode: [row labels]} — hidden from the table
+    hiddenChartRows: {},    // {qcode: [row labels]} — excluded from the chart
     sorts: {},              // {qcode: {col, dir}}
     activeQ: null
   };

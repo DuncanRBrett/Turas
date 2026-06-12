@@ -66,6 +66,7 @@
       chartType: chartState.type,
       chartKind: chartState.kind,
       chartCols: chartState.cols,
+      hiddenChartRows: (s.hiddenChartRows[s.activeQ] || []).slice(),
       intervals: !!s.showIntervals,   // pin shows exactly what was on screen
       note: ""
     });
@@ -81,7 +82,9 @@
       filters: JSON.parse(JSON.stringify(s.filters)),
       flags: { dist: true, trend: true, table: false, insight: true },
       distType: chartState.type === "line" ? "column" : chartState.type,
-      chartKind: chartState.kind, chartCols: chartState.cols, note: "" });
+      chartKind: chartState.kind, chartCols: chartState.cols,
+      hiddenChartRows: (s.hiddenChartRows[s.activeQ] || []).slice(),
+      note: "" });
     persist();
     TR.shell.toast("Trend exhibit pinned (" + load().length + ") — see the Story tab");
   };
@@ -201,6 +204,7 @@
     if (model) {
       model.filterNote = filterNote(item);
       model.chartKind = item.chartKind || "detail";
+      model.hiddenChartRows = item.hiddenChartRows || [];
     }
     return model;
   }

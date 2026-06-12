@@ -133,6 +133,7 @@
     if (models.length === 1) {
       var m = models[0];
       m.chartKind = item.chartKind || m.chartKind || "auto";
+      m.hiddenChartRows = item.hiddenChartRows || [];
       return m;
     }
     var rows = [];
@@ -159,6 +160,7 @@
     if (models.length === 1) {
       var m = models[0];
       m.chartKind = item.chartKind || m.chartKind || "auto";
+      m.hiddenChartRows = item.hiddenChartRows || [];
       return m;
     }
     var rows = [];

@@ -143,8 +143,9 @@
    *  Shared with the native PPTX trend chart so both plot the same series. */
   render.trendRows = trendRows;
   function trendRows(model) {
+    var hidden = model.hiddenChartRows || [];
     var withHistory = model.rows.filter(function (r) {
-      return r.waves && r.waves.length;
+      return r.waves && r.waves.length && hidden.indexOf(r.label) === -1;
     });
     var kind = model.chartKind === "summary" ? "summary"
       : model.chartKind === "detail" ? "detail" : "auto";

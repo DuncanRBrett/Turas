@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SACAP 2025 Annual Student Survey — Turas Report v2</title>
-<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 17:58 SAST -->
+<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 18:02 SAST -->
 <!-- Single self-contained file: published tables + prior wave + synthetic
      microdata + one fixed renderer. No network requests, no installs. -->
 <style>
@@ -1096,7 +1096,8 @@ null
     colMenuOpen: false,     // columns panel visibility survives re-renders
     movedScope: null,       // "key" | "all" (null = use project config)
     hiddenCols: {},         // {bannerSelection: [column labels]}
-    hiddenRows: {},         // {qcode: [row labels]}
+    hiddenRows: {},         // {qcode: [row labels]} — hidden from the table
+    hiddenChartRows: {},    // {qcode: [row labels]} — excluded from the chart
     sorts: {},              // {qcode: {col, dir}}
     activeQ: null
   };
@@ -2734,6 +2735,12 @@ null
       : ["category"];
     var rows = pick(kinds);
     if (!rows.length) rows = pick(["category", "net"]);
+    // per-row chart selection from the Rows & columns panel — rows the
+    // user unticked for the chart (the table is governed separately)
+    var hidden = model.hiddenChartRows || [];
+    if (hidden.length) {
+      rows = rows.filter(function (r) { return hidden.indexOf(r.label) === -1; });
+    }
     var max = 0;
     rows.forEach(function (r) {
       r.cells.forEach(function (c) { if (c.pct > max) max = c.pct; });
@@ -3340,8 +3347,9 @@ null
    *  Shared with the native PPTX trend chart so both plot the same series. */
   render.trendRows = trendRows;
   function trendRows(model) {
+    var hidden = model.hiddenChartRows || [];
     var withHistory = model.rows.filter(function (r) {
-      return r.waves && r.waves.length;
+      return r.waves && r.waves.length && hidden.indexOf(r.label) === -1;
     });
     var kind = model.chartKind === "summary" ? "summary"
       : model.chartKind === "detail" ? "detail" : "auto";
@@ -3782,7 +3790,10 @@ null
     opts.rowScope = "all";
     opts.hiddenCols = [];
     var model = TR.model.forQuestion(s.activeQ, s.banner, s.filters, opts);
-    if (model) model.chartKind = cards2.resolveChartKind(model);
+    if (model) {
+      model.chartKind = cards2.resolveChartKind(model);
+      model.hiddenChartRows = s.hiddenChartRows[s.activeQ] || [];
+    }
     return applySigMode(model);
   };
 
@@ -3928,15 +3939,35 @@ null
     // list ALL rows of the question (not the filtered model) so a row
     // hidden here can always be un-hidden here
     var q = TR.d2.questionByCode(s.activeQ);
+    var hiddenChartRows = s.hiddenChartRows[s.activeQ] || [];
+    // which rows the chart WOULD plot before per-row unticks — the kind
+    // dropdown governs scope, the checkboxes govern membership within it
+    var scopeModel = {};
+    Object.keys(chartModel).forEach(function (k) { scopeModel[k] = chartModel[k]; });
+    scopeModel.hiddenChartRows = [];
+    var inScope = {};
+    TR.render.chartRows(scopeModel).rows.forEach(function (r) {
+      inScope[r.label] = true;
+    });
     var rows = q.rows.map(function (row, ri) {
       var diff = !!(q.net_diffs && q.net_diffs[String(ri)]);
+      var chartable = !!inScope[row.label];
+      var chartChecked = chartable &&
+        hiddenChartRows.indexOf(row.label) === -1;
       return '<div class="cm-row"><span class="cm-label">' +
         fmt.escapeHtml(row.label) +
         (row.kind !== "category" ? ' <span class="kindtag">' +
           (diff ? "diff" : row.kind) + "</span>" : "") + "</span>" +
         '<label><input type="checkbox" data-cmrow="' + fmt.escapeHtml(row.label) +
         '"' + (hiddenRows.indexOf(row.label) === -1 ? " checked" : "") +
-        "></label><span></span></div>";
+        "></label>" +
+        '<label' + (chartable ? "" : ' title="' + (diff
+          ? "Score differences have no single base — never charted"
+          : "Outside the current “Chart plots” choice below — switch it to " +
+            "include this row kind") + '"') + ">" +
+        '<input type="checkbox" data-cmchartrow="' + fmt.escapeHtml(row.label) +
+        '"' + (chartChecked ? " checked" : "") + (chartable ? "" : " disabled") +
+        "></label></div>";
     }).join("");
     var kind = cards2.resolveChartKind(chartModel);
     var hasNets = TR.render.hasNetRows(chartModel);
@@ -3945,7 +3976,7 @@ null
       '<div class="cm-head"><span>Column</span><span>Table</span>' +
       "<span>Chart</span></div><div class='cm-body'>" + cols + "</div>" +
       '<div class="cm-sect">Rows</div>' +
-      '<div class="cm-head"><span>Row</span><span>Show</span><span></span></div>' +
+      '<div class="cm-head"><span>Row</span><span>Table</span><span>Chart</span></div>' +
       "<div class='cm-body'>" + rows + "</div>" +
       '<div class="cm-sect">Chart plots</div>' +
       '<select data-chartkindsel class="wide"' +
@@ -4260,6 +4291,19 @@ null
         buildColumnsPanel();
         return;
       }
+      var cmChartRow = e.target.closest("[data-cmchartrow]");
+      if (cmChartRow) {
+        var crQ = TR.d2.state.activeQ;
+        var crList = TR.d2.state.hiddenChartRows[crQ] =
+          TR.d2.state.hiddenChartRows[crQ] || [];
+        var crLabel = cmChartRow.getAttribute("data-cmchartrow");
+        var crAt = crList.indexOf(crLabel);
+        if (crAt === -1) crList.push(crLabel);
+        else crList.splice(crAt, 1);
+        cards2.renderActive();
+        buildColumnsPanel();
+        return;
+      }
       if (e.target.closest('[data-act="columns-done"]')) {
         closeColMenu();
         return;
@@ -4336,6 +4380,7 @@ null
       if (action === "showall") {
         delete TR.d2.state.hiddenCols[TR.d2.state.banner];
         delete TR.d2.state.hiddenRows[TR.d2.state.activeQ];
+        delete TR.d2.state.hiddenChartRows[TR.d2.state.activeQ];
         cards2.renderActive();
       }
       if (action === "custom-banner") TR.filterBar.openCustomBanner();
@@ -7259,6 +7304,7 @@ null
       chartType: chartState.type,
       chartKind: chartState.kind,
       chartCols: chartState.cols,
+      hiddenChartRows: (s.hiddenChartRows[s.activeQ] || []).slice(),
       intervals: !!s.showIntervals,   // pin shows exactly what was on screen
       note: ""
     });
@@ -7274,7 +7320,9 @@ null
       filters: JSON.parse(JSON.stringify(s.filters)),
       flags: { dist: true, trend: true, table: false, insight: true },
       distType: chartState.type === "line" ? "column" : chartState.type,
-      chartKind: chartState.kind, chartCols: chartState.cols, note: "" });
+      chartKind: chartState.kind, chartCols: chartState.cols,
+      hiddenChartRows: (s.hiddenChartRows[s.activeQ] || []).slice(),
+      note: "" });
     persist();
     TR.shell.toast("Trend exhibit pinned (" + load().length + ") — see the Story tab");
   };
@@ -7394,6 +7442,7 @@ null
     if (model) {
       model.filterNote = filterNote(item);
       model.chartKind = item.chartKind || "detail";
+      model.hiddenChartRows = item.hiddenChartRows || [];
     }
     return model;
   }
@@ -7893,6 +7942,7 @@ null
     if (models.length === 1) {
       var m = models[0];
       m.chartKind = item.chartKind || m.chartKind || "auto";
+      m.hiddenChartRows = item.hiddenChartRows || [];
       return m;
     }
     var rows = [];
@@ -7919,6 +7969,7 @@ null
     if (models.length === 1) {
       var m = models[0];
       m.chartKind = item.chartKind || m.chartKind || "auto";
+      m.hiddenChartRows = item.hiddenChartRows || [];
       return m;
     }
     var rows = [];

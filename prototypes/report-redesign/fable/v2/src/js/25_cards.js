@@ -59,7 +59,10 @@
     opts.rowScope = "all";
     opts.hiddenCols = [];
     var model = TR.model.forQuestion(s.activeQ, s.banner, s.filters, opts);
-    if (model) model.chartKind = cards2.resolveChartKind(model);
+    if (model) {
+      model.chartKind = cards2.resolveChartKind(model);
+      model.hiddenChartRows = s.hiddenChartRows[s.activeQ] || [];
+    }
     return applySigMode(model);
   };
 
@@ -205,15 +208,35 @@
     // list ALL rows of the question (not the filtered model) so a row
     // hidden here can always be un-hidden here
     var q = TR.d2.questionByCode(s.activeQ);
+    var hiddenChartRows = s.hiddenChartRows[s.activeQ] || [];
+    // which rows the chart WOULD plot before per-row unticks — the kind
+    // dropdown governs scope, the checkboxes govern membership within it
+    var scopeModel = {};
+    Object.keys(chartModel).forEach(function (k) { scopeModel[k] = chartModel[k]; });
+    scopeModel.hiddenChartRows = [];
+    var inScope = {};
+    TR.render.chartRows(scopeModel).rows.forEach(function (r) {
+      inScope[r.label] = true;
+    });
     var rows = q.rows.map(function (row, ri) {
       var diff = !!(q.net_diffs && q.net_diffs[String(ri)]);
+      var chartable = !!inScope[row.label];
+      var chartChecked = chartable &&
+        hiddenChartRows.indexOf(row.label) === -1;
       return '<div class="cm-row"><span class="cm-label">' +
         fmt.escapeHtml(row.label) +
         (row.kind !== "category" ? ' <span class="kindtag">' +
           (diff ? "diff" : row.kind) + "</span>" : "") + "</span>" +
         '<label><input type="checkbox" data-cmrow="' + fmt.escapeHtml(row.label) +
         '"' + (hiddenRows.indexOf(row.label) === -1 ? " checked" : "") +
-        "></label><span></span></div>";
+        "></label>" +
+        '<label' + (chartable ? "" : ' title="' + (diff
+          ? "Score differences have no single base — never charted"
+          : "Outside the current “Chart plots” choice below — switch it to " +
+            "include this row kind") + '"') + ">" +
+        '<input type="checkbox" data-cmchartrow="' + fmt.escapeHtml(row.label) +
+        '"' + (chartChecked ? " checked" : "") + (chartable ? "" : " disabled") +
+        "></label></div>";
     }).join("");
     var kind = cards2.resolveChartKind(chartModel);
     var hasNets = TR.render.hasNetRows(chartModel);
@@ -222,7 +245,7 @@
       '<div class="cm-head"><span>Column</span><span>Table</span>' +
       "<span>Chart</span></div><div class='cm-body'>" + cols + "</div>" +
       '<div class="cm-sect">Rows</div>' +
-      '<div class="cm-head"><span>Row</span><span>Show</span><span></span></div>' +
+      '<div class="cm-head"><span>Row</span><span>Table</span><span>Chart</span></div>' +
       "<div class='cm-body'>" + rows + "</div>" +
       '<div class="cm-sect">Chart plots</div>' +
       '<select data-chartkindsel class="wide"' +
@@ -537,6 +560,19 @@
         buildColumnsPanel();
         return;
       }
+      var cmChartRow = e.target.closest("[data-cmchartrow]");
+      if (cmChartRow) {
+        var crQ = TR.d2.state.activeQ;
+        var crList = TR.d2.state.hiddenChartRows[crQ] =
+          TR.d2.state.hiddenChartRows[crQ] || [];
+        var crLabel = cmChartRow.getAttribute("data-cmchartrow");
+        var crAt = crList.indexOf(crLabel);
+        if (crAt === -1) crList.push(crLabel);
+        else crList.splice(crAt, 1);
+        cards2.renderActive();
+        buildColumnsPanel();
+        return;
+      }
       if (e.target.closest('[data-act="columns-done"]')) {
         closeColMenu();
         return;
@@ -613,6 +649,7 @@
       if (action === "showall") {
         delete TR.d2.state.hiddenCols[TR.d2.state.banner];
         delete TR.d2.state.hiddenRows[TR.d2.state.activeQ];
+        delete TR.d2.state.hiddenChartRows[TR.d2.state.activeQ];
         cards2.renderActive();
       }
       if (action === "custom-banner") TR.filterBar.openCustomBanner();

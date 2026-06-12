@@ -246,6 +246,12 @@
       : ["category"];
     var rows = pick(kinds);
     if (!rows.length) rows = pick(["category", "net"]);
+    // per-row chart selection from the Rows & columns panel — rows the
+    // user unticked for the chart (the table is governed separately)
+    var hidden = model.hiddenChartRows || [];
+    if (hidden.length) {
+      rows = rows.filter(function (r) { return hidden.indexOf(r.label) === -1; });
+    }
     var max = 0;
     rows.forEach(function (r) {
       r.cells.forEach(function (c) { if (c.pct > max) max = c.pct; });

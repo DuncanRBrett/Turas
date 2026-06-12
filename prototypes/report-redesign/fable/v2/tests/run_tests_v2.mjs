@@ -208,6 +208,24 @@ run("deltas: most questions tracked, new ones flagged", () => {
   assert(withDeltaRows >= 55, "questions with row-level deltas: " + withDeltaRows);
 });
 
+run("per-row chart selection: unticked rows leave the chart only", () => {
+  const m = TR.model.forQuestion("Q008", TR.AGG.banner_groups[0].id, []);
+  m.chartKind = "detail";
+  const all = TR.render.chartRows(m).rows.map((r) => r.label);
+  assert(all.includes("Good"), "baseline includes the Good row");
+  m.hiddenChartRows = ["Good"];
+  const picked = TR.render.chartRows(m).rows.map((r) => r.label);
+  assert(!picked.includes("Good"), "Good removed from the chart");
+  assert(picked.length === all.length - 1, "exactly one row removed");
+  // the table is governed separately — its rows are untouched
+  assert(m.rows.some((r) => r.label === "Good"), "table row still present");
+  // trend rows honour the same selection
+  m.chartKind = "summary";
+  m.hiddenChartRows = ["Good or excellent"];
+  const trend = TR.render.trendRows(m).map((r) => r.label);
+  assert(!trend.includes("Good or excellent"), "trend row removed");
+});
+
 run("trend chart draws the interval band from {lo, hi} bounds", () => {
   const m = TR.model.forQuestion("Q008", TR.AGG.banner_groups[0].id, []);
   m.chartKind = "summary";
