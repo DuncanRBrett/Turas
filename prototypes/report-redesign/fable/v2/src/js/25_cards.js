@@ -195,9 +195,8 @@
     var cols = chartModel.columns.map(function (col, i) {
       var inTable = hidden.indexOf(col.label) === -1;
       var inChart = s.chartColLabels.indexOf(i === 0 ? "Total" : col.label) !== -1;
-      return '<div class="cm-row"><span class="cm-label" title="' +
-        fmt.escapeHtml(col.label) + '">' +
-        fmt.escapeHtml(TR.charts.clip(col.label, 30)) + "</span>" +
+      return '<div class="cm-row"><span class="cm-label">' +
+        fmt.escapeHtml(col.label) + "</span>" +
         '<label><input type="checkbox" data-cmtable="' + fmt.escapeHtml(col.label) +
         '"' + (inTable ? " checked" : "") + (i === 0 ? " disabled" : "") + "></label>" +
         '<label><input type="checkbox" data-cmchart="' + fmt.escapeHtml(col.label) +
@@ -208,9 +207,8 @@
     var q = TR.d2.questionByCode(s.activeQ);
     var rows = q.rows.map(function (row, ri) {
       var diff = !!(q.net_diffs && q.net_diffs[String(ri)]);
-      return '<div class="cm-row"><span class="cm-label" title="' +
-        fmt.escapeHtml(row.label) + '">' +
-        fmt.escapeHtml(TR.charts.clip(row.label, 26)) +
+      return '<div class="cm-row"><span class="cm-label">' +
+        fmt.escapeHtml(row.label) +
         (row.kind !== "category" ? ' <span class="kindtag">' +
           (diff ? "diff" : row.kind) + "</span>" : "") + "</span>" +
         '<label><input type="checkbox" data-cmrow="' + fmt.escapeHtml(row.label) +

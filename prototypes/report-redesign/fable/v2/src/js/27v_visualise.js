@@ -81,9 +81,11 @@
 
   function specLabel(spec, sel) {
     if (sel.metrics.length > 1) {
-      // question TEXT, not the code — codes are meaningless on a chart
-      return TR.charts.clip(spec.metric.title, 36) + " · " +
-        TR.charts.clip(spec.metric.label, 14) +
+      // question TEXT, not the code — codes are meaningless on a chart.
+      // No display clipping: the chart legend wraps and the table cells
+      // wrap; the bound below only guards against degenerate data.
+      return TR.charts.clip(spec.metric.title, 300) + " · " +
+        TR.charts.clip(spec.metric.label, 120) +
         (sel.segs.length > 1 ? " · " + spec.segLabel : "");
     }
     return spec.segLabel;

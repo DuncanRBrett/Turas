@@ -82,7 +82,7 @@
               "font-weight": 600, fill: "#1c2333" }));
         }
       });
-      wrapLabel(body, TR.charts.clip(r.label, 26), cx, padT + plotH + 12);
+      wrapLabel(body, TR.charts.clip(r.label, 48), cx, padT + plotH + 12);
     });
     body.push(S.el("line", { x1: padL, y1: padT + plotH, x2: W - padL,
       y2: padT + plotH, stroke: "#d8dcea" }));
@@ -99,13 +99,7 @@
   };
 
   function wrapLabel(body, label, cx, y) {
-    var words = String(label).split(" "), line = "", lines = [];
-    words.forEach(function (w) {
-      if ((line + " " + w).trim().length > 14 && line) { lines.push(line); line = w; }
-      else line = (line + " " + w).trim();
-    });
-    if (line) lines.push(line);
-    lines.slice(0, 2).forEach(function (l, i) {
+    S.wrapText(label, 14).slice(0, 3).forEach(function (l, i) {
       body.push(S.text(cx, y + i * 11, l,
         { "text-anchor": "middle", "font-size": 9.5, fill: "#6b7280" }));
     });
@@ -167,7 +161,7 @@
       y = barY + rowH + gap;
     });
     var legend = S.legend(data.rows.map(function (r, i) {
-      return { label: TR.charts.clip(r.label, 28), colour: ramp[i] };
+      return { label: TR.charts.clip(r.label, 80), colour: ramp[i] };
     }), LABEL, y + 6, W - LABEL - 10);
     body.push(legend.body);
     return S.root(W, y + legend.height + 12,
@@ -234,7 +228,7 @@
       TR.charts.clip(model.columns[colIndex] ? model.columns[colIndex].label : "", 12),
       { "text-anchor": "middle", "font-size": 11, "font-weight": 700, fill: "#1c2333" }));
     var legend = S.legend(data.rows.map(function (r, i) {
-      return { label: TR.charts.clip(r.label, 30), colour: palette[i % palette.length] };
+      return { label: TR.charts.clip(r.label, 80), colour: palette[i % palette.length] };
     }), 320, 40, W - 330);
     body.push(legend.body);
     return S.root(W, Math.max(H, 50 + legend.height),
@@ -251,8 +245,14 @@
     var palette = render.palette();
     var body = [], y = 12;
     data.rows.forEach(function (r) {
-      body.push(S.text(LABEL - 8, y + 4, TR.charts.clip(r.label, 34),
-        { "text-anchor": "end", "font-size": 11.5, fill: "#3b4252" }));
+      // full label, wrapped — the row grows to fit (no ellipses)
+      var lines = S.wrapText(r.label, 32);
+      var thisRowH = Math.max(rowH, lines.length * 12 + 6);
+      var labelTop = y + 4 - (lines.length - 1) * 6;
+      lines.forEach(function (line, li) {
+        body.push(S.text(LABEL - 8, labelTop + li * 12, line,
+          { "text-anchor": "end", "font-size": 11.5, fill: "#3b4252" }));
+      });
       body.push(S.el("line", { x1: LABEL, y1: y, x2: LABEL + plotW, y2: y,
         stroke: "#eef0f7", "stroke-width": 2 }));
       cols.forEach(function (ci, k) {
@@ -261,7 +261,7 @@
         body.push(S.el("circle", { cx: LABEL + x(v), cy: y, r: 5.5,
           fill: palette[k % palette.length], stroke: "#fff", "stroke-width": 1.5 }));
       });
-      y += rowH;
+      y += thisRowH;
     });
     [0, 0.25, 0.5, 0.75, 1].forEach(function (f) {
       body.push(S.text(LABEL + plotW * f, y + 10,

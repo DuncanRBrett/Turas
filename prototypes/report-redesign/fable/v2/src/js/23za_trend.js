@@ -287,8 +287,10 @@
           dot.r = p.current ? 5 : 4;   // bigger hit target when taggable
         }
         body.push(S.el("circle", dot));
-        var labelThis = labelAll || (labelMode === "last" &&
-          pi === s.points.length - 1 && series.length > 1);
+        // the end-of-line label (right edge) already carries the final
+        // value — per-point labels stop one short so the last value never
+        // renders twice; "last" mode is the end labels alone
+        var labelThis = labelAll && pi < s.points.length - 1;
         if (labelThis && labelMode !== "none") {
           body.push(S.text(xOf(p.year), yOf(p.value) - 8,
             fmtVal(p.value, s.isMean),
@@ -316,7 +318,8 @@
     var legend = null, height = H;
     if (series.length > 1) {
       legend = S.legend(series.map(function (s, k) {
-        return { label: TR.charts.clip(s.label, 52),
+        // full text — the legend wraps long labels; clip only the extreme
+        return { label: TR.charts.clip(s.label, 300),
           colour: palette[k % palette.length] };
       }), padL, H + 4, W - padL - 10);
       body.push(legend.body);

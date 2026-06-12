@@ -286,25 +286,33 @@
     var x = S.linear(data.axisMax, plotW);
     var palette = render.palette();
     var body = [], y = 8;
+    var labelLineH = 12;
     data.rows.forEach(function (r) {
-      body.push(S.text(LABEL - 8, y + (barH * cols.length) / 2 + 4,
-        TR.charts.clip(r.label, 34),
-        { "text-anchor": "end", "font-size": 11.5, fill: "#3b4252" }));
+      // full label, wrapped — the row grows to fit the text (no ellipses)
+      var labelLines = S.wrapText(r.label, 32);
+      var barBlock = (barH + 2) * cols.length - 2;
+      var rowH = Math.max(barBlock, labelLines.length * labelLineH - 2);
+      var labelTop = y + rowH / 2 + 4 - (labelLines.length - 1) * labelLineH / 2;
+      labelLines.forEach(function (line, li) {
+        body.push(S.text(LABEL - 8, labelTop + li * labelLineH, line,
+          { "text-anchor": "end", "font-size": 11.5, fill: "#3b4252" }));
+      });
+      var barY = y + (rowH - barBlock) / 2;
       cols.forEach(function (ci, k) {
         var cell = r.cells[ci];
         var v = cell ? cell.pct : null;
         var w = v === null ? 0 : Math.max(x(v), 0);
-        body.push(S.el("rect", { x: LABEL, y: y, width: plotW, height: barH,
+        body.push(S.el("rect", { x: LABEL, y: barY, width: plotW, height: barH,
           fill: "#eef0f7", rx: 3 }));
-        body.push(S.el("rect", { x: LABEL, y: y, width: w, height: barH,
+        body.push(S.el("rect", { x: LABEL, y: barY, width: w, height: barH,
           fill: palette[k % palette.length], rx: 3 }));
-        body.push(S.text(LABEL + w + 6, y + barH * 0.78,
+        body.push(S.text(LABEL + w + 6, barY + barH * 0.78,
           fmtPct(v) + (cols.length === 1 && cell && cell.sig ? " ▲" + cell.sig : ""),
           { "font-size": cols.length > 1 ? 10 : 11.5, "font-weight": 600,
             fill: "#1c2333" }));
-        y += barH + 2;
+        barY += barH + 2;
       });
-      y += groupGap;
+      y += rowH + groupGap;
     });
     var note = "0–" + data.axisMax + "% scale";
     if (cols.length === 1 && model.columns[cols[0]]) {

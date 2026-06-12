@@ -80,23 +80,60 @@
   };
 
   /**
-   * Simple inline legend. Wraps to new lines when items overflow maxW.
+   * Word-wrap text into lines of at most maxChars characters. Never
+   * truncates: a single word longer than maxChars gets its own line.
+   * @returns {string[]} at least one line
+   */
+  svg.wrapText = function (text, maxChars) {
+    var words = String(text == null ? "" : text).split(/\s+/);
+    var lines = [], line = "";
+    words.forEach(function (word) {
+      if (!line.length) { line = word; return; }
+      if ((line + " " + word).length <= maxChars) line += " " + word;
+      else { lines.push(line); line = word; }
+    });
+    if (line.length) lines.push(line);
+    return lines.length ? lines : [""];
+  };
+
+  /**
+   * Inline legend. Items flow left-to-right and wrap to new rows; a label
+   * too long for one row breaks into multiple text lines under its swatch
+   * (full text, no ellipses) and occupies its own row.
    * @returns {{body: string, height: number}}
    */
   svg.legend = function (items, x0, y0, maxW) {
     var parts = [], x = x0, y = y0;
-    var lineH = 18, charW = 6.2, swatch = 11;
+    var lineH = 18, subLineH = 13, charW = 6.2, swatch = 11;
+    var labelMax = Math.max(8, Math.floor((maxW - swatch - 22) / charW));
+    var entry = function (xAt, yAt, colour, lines) {
+      parts.push(svg.el("rect", { x: xAt, y: yAt - 9, width: swatch,
+        height: swatch, rx: 3, fill: colour }));
+      lines.forEach(function (line, li) {
+        parts.push(svg.text(xAt + swatch + 5, yAt + 1 + li * subLineH, line,
+          { "font-size": 11, fill: "#4b5263" }));
+      });
+    };
+    var bottom = y0;
     items.forEach(function (item) {
-      var w = swatch + 6 + String(item.label).length * charW + 16;
+      var label = String(item.label);
+      var lines = svg.wrapText(label, labelMax);
+      if (lines.length > 1) {
+        // long label: flush to its own full-width row, then continue below
+        if (x > x0) { x = x0; y += lineH; }
+        entry(x, y, item.colour, lines);
+        bottom = Math.max(bottom, y + (lines.length - 1) * subLineH);
+        x = x0;
+        y += lineH + (lines.length - 1) * subLineH;
+        return;
+      }
+      var w = swatch + 6 + label.length * charW + 16;
       if (x + w > x0 + maxW && x > x0) { x = x0; y += lineH; }
-      parts.push(svg.el("rect", {
-        x: x, y: y - 9, width: swatch, height: swatch, rx: 3, fill: item.colour
-      }));
-      parts.push(svg.text(x + swatch + 5, y + 1, item.label,
-        { "font-size": 11, fill: "#4b5263" }));
+      entry(x, y, item.colour, lines);
+      bottom = Math.max(bottom, y);
       x += w;
     });
-    return { body: parts.join(""), height: y - y0 + lineH };
+    return { body: parts.join(""), height: bottom - y0 + lineH };
   };
 
 })(typeof window !== "undefined" ? window : globalThis);
