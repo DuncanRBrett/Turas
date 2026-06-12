@@ -32,7 +32,7 @@ About/methodology.
 |---|---|
 | **Filter the whole report** ("Online students only") | every table/dashboard recomputes live from embedded respondent-level microdata, with correct bases and significance |
 | **Custom banners** — cross anything by anything | `+ Custom…` on the banner strip |
-| **Full tracking workspace, 2018–2025** | Three tracker-parity views under Tracking: **Summary** (threshold-banded KPI scorecard with sparklines, sig up/down/stable pulse bar, significant-changes cards with full question text across Total + segments, metric × segment change matrix with pp values), **Explorer** (the tracker overview heatmap: Questions-for-segment / Segments-for-question modes, value-in-cell green/amber/red threshold colouring, Absolute / vs Previous / vs Baseline, sort, wave chips, legend, Excel), **Visualise** (multi-series wave chart: display modes, 95% CI bands from published bases, value-label modes, wave chips, y-axis override, low-base warnings, insight note, Excel + pin-to-story) |
+| **Full tracking workspace, 2018–2025** | Three tracker-parity views under Tracking: **Summary** (threshold-banded KPI scorecard with sparklines, sig up/down/stable pulse bar, significant-changes cards with full question text across Total + segments, metric × segment change matrix with pp values), **Explorer** (the tracker overview heatmap: Questions-for-segment / Segments-for-question modes, value-in-cell green/amber/red threshold colouring, Absolute / vs Previous / vs Baseline, sort, wave chips, legend, Excel), **Visualise** (multi-series wave chart: display modes, 95% interval bands — Wilson score, sampling-aware vocabulary — value-label modes, wave chips, y-axis override, low-base warnings, insight note, Excel + pin-to-story) |
 | **Per-segment history** | wave workbooks' banner columns extracted and matched to 2025 banner columns (Campus 2020-2022+2024; Intensity + Course 2024); NETs/Index recompute per segment where waves published categories only |
 | **Δ + trend** on every tracked question | delta chips on the Total column (vs the latest matched wave) plus a **wave strip** under the table: per-wave bases and the headline metrics with sparklines |
 | **Trend chart type** | "Trend · waves" in the chart picker — line over waves for any tracked question |
@@ -67,8 +67,8 @@ python3 pipeline/extract_waves.py --aliases pipeline/wave_title_aliases.json \
     data/sacap_2025.json data/sacap_waves.json \
     2018="<2018 crosstabs.xlsx>" ... 2024="<2024 crosstabs.xlsx>"
 python3 pipeline/generate_microdata.py data/sacap_2025.json data/sacap_microdata.json data/microdata_verification.json
-Rscript build.R                  # -> sacap_report_v2.html (1.25 MB)
-node tests/run_tests_v2.mjs      # 19 tests incl. golden parity + 2-chart pptx gate
+Rscript build.R                  # -> sacap_report_v2.html (1.96 MB)
+node tests/run_tests_v2.mjs      # 30 tests incl. golden parity + 2-chart pptx gate
 ```
 
 The wave extractor reads the Total column of each workbook's Crosstabs sheet
@@ -213,3 +213,58 @@ explorer functionality (`modules/tracker/lib/html_report/js/explorer_view.js`
   2020 = 35, current = the published campus cell verbatim), 2021 NET via
   member-sum (CT 87, base 36), per-year segment coverage, segment-pin
   PPTX with one series per pinned segment.
+
+## Round 7 — confidence integration (sampling-aware intervals everywhere)
+
+Confidence is a property of every number, not a destination tab. Two
+non-negotiable principles (Duncan's), both ported from the production
+confidence module into `21c_confidence.js` (`TR.conf`):
+
+1. **Confidence is a function of THE SAMPLE.** `get_sampling_labels()` from
+   `modules/confidence/R/sampling_labels.R` is ported near-verbatim:
+   probability designs (Random/Stratified/Cluster/Census) speak standard
+   statistics (Confidence Interval / CI / Margin of Error / MOE);
+   non-probability designs (Quota/Online_Panel/Self_Selected/Not_Specified)
+   get honest softened language (Stability Interval / SI / Precision
+   Estimate / PE). The design is `project.sampling_method` in the agg config
+   (the pipeline writes it; SACAP = `Not_Specified`, the cautious default,
+   so this report says **SI/PE** throughout). Every user-facing interval
+   string flows through the labels port.
+2. **Report readers are NOT statisticians.** A third collapsible footer
+   callout — *"How sure can I be of these numbers?"* — renders on Crosstabs
+   AND across the Tracking workspace, with examples computed live from the
+   report's own data (worked Wilson example, smallest-column caution,
+   one-sentence "significant", the honest sampling-design line).
+
+What shipped on each surface:
+
+- **Intervals are Wilson score** (`calculate_proportion_ci_wilson()` ported
+  verbatim, z = qnorm(0.975) so bounds agree with R to 1e-9; asymmetric —
+  every surface shows [lo, hi], never ±). Mean/Index/NPS intervals are
+  z·SD/√n on the distribution-derived SD (`scoreMap`/`sdFromPairs` — the
+  single SD source; NOT forked).
+- **Crosstabs:** "Intervals" toggle (hash `iv=1`) — per-cell ranges under
+  every value, worst-case ±pp on the base row, Excel exports grow explicit
+  lo/hi columns. Pins capture the state: story cards, present mode, PNG meta
+  and the PPTX slide meta line ("95% SI (Wilson)").
+- **Dashboard:** Precision Estimate chip on the intro card (overall ±pp vs
+  smallest-cut ±pp, computed from real bases); gauges and heatmap cells
+  carry the interval + base in tooltips.
+- **Tracking:** Visualise bands now drawn from Wilson [lo, hi]; toggle, note
+  and Excel speak the sampling vocabulary; interval views export lo/hi rows;
+  KPI scorecard tooltips carry the interval; pinned Visualise views re-draw
+  their bands and name the method in HTML/present/PPTX context lines.
+- **Gates:** 30 v2 node tests / 15 in-browser; new known answers — Wilson
+  bounds vs the R module (3 cases incl. small-p and small-n), label
+  switching (Random→CI/MOE, Online_Panel→SI/PE, Not_Specified→SI/PE),
+  max-MOE, the Q008 84%/n=519 → "81–87" golden spot-check (published values
+  proven unchanged), band-from-bounds geometry, pin/slide vocabulary.
+- Also fixed in passing: the story exhibit card's unclosed `</div>` (every
+  later story card silently nested inside a pinned exhibit).
+
+Documented divergences from the R module (acceptable for the prototype,
+revisit in production): mean intervals use z where `05_means.R` uses t
+(< 1.5% narrower at this report's bases, n ≥ 70); published-table intervals
+compute p from published counts when present, else the rounded published
+percentage; weighted effective-n (`03_study_level.R`) is not wired — the
+prototype's published bases are unweighted.
