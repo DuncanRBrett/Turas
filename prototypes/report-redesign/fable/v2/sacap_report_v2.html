@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SACAP 2025 Annual Student Survey — Turas Report v2</title>
-<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 08:14 SAST -->
+<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 08:27 SAST -->
 <!-- Single self-contained file: published tables + prior wave + synthetic
      microdata + one fixed renderer. No network requests, no installs. -->
 <style>
@@ -260,6 +260,19 @@ table.moved { border-collapse: collapse; width: 100%; font-size: 12.5px; margin-
 .notechip { background: #fdf3df; border: 1px solid #e7d9b3; color: #8a6d1f; border-radius: 999px; padding: 3px 10px; font-size: 11.5px; }
 .notechip button { border: none; background: none; cursor: pointer; color: #8a6d1f; margin-left: 4px; }
 circle.trendpt { cursor: pointer; }
+.chart[data-vischart] { position: relative; }
+.notepop { position: absolute; z-index: 90; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 10px 12px; width: 250px; }
+.notepop .np-title { font-size: 10.5px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; color: var(--faint); margin-bottom: 6px; }
+.notepop input { width: 100%; box-sizing: border-box; padding: 6px 9px; border: 1px solid var(--line); border-radius: 7px; font: 12.5px var(--font); }
+.notepop .np-btns { display: flex; gap: 6px; margin-top: 8px; }
+
+/* sticky lead columns on the wide tracking tables */
+.trkwrap table.trk th:first-child, .trkwrap table.trk td:first-child { position: sticky; left: 0; z-index: 2; background: #fff; }
+.trkwrap table.trk thead th:first-child { background: #fff; }
+table.trk.haspick th:first-child, table.trk.haspick td:first-child { width: 28px; min-width: 28px; }
+table.trk.haspick th:nth-child(2), table.trk.haspick td:nth-child(2) { position: sticky; left: 36px; z-index: 2; background: #fff; }
+.moved.trk tr.grp td, .moved.trk tr.cat td { position: static; }
+.stickyhdr { position: sticky; left: 12px; display: inline-block; }
 .moved.trk.hm td.hm-up { background: #e8f0eb; color: var(--green); font-weight: 800; text-align: center; }
 .moved.trk.hm td.hm-down { background: #f9ecea; color: var(--red); font-weight: 800; text-align: center; }
 .moved.trk.hm td.hm-flat { color: var(--faint); text-align: center; }
@@ -1033,6 +1046,7 @@ null
     heatmap: true,
     showChart: false,
     showDeltas: true,
+    showWaveStrip: true,    // per-question wave history strip
     showDetail: true,       // category rows visible
     showSummary: true,      // NET + index rows visible
     sigMode: "95",          // significance display: off | 95 | dual (95+80)
@@ -1929,6 +1943,86 @@ null
     return waveQ.base || null;
   }
 
+  /* ---------- spread of mean-kind metrics (from published distributions) --- */
+
+  /** Per-category respondent scores behind a mean-kind row: {ri: score}.
+   *  Index rows use the configured index weights; NPS maps 9-10/7-8/0-6
+   *  to +100/0/-100; plain means use the numeric category labels. */
+  waves.scoreMap = function (q, row) {
+    var label = TR.model.norm(row.label);
+    var type = label.indexOf("nps") !== -1 ? "nps"
+      : label === "mean" ? "mean" : "index";
+    var map = {}, any = false;
+    q.rows.forEach(function (r, ri) {
+      if (r.kind !== "category") return;
+      var score = null;
+      if (type === "index") {
+        var w = q.index_scores && q.index_scores[r.label];
+        if (w !== undefined && w !== null) score = w;
+      } else {
+        var v = parseFloat(r.label);
+        if (isFinite(v)) {
+          score = type === "nps" ? (v >= 9 ? 100 : v >= 7 ? 0 : -100) : v;
+        }
+      }
+      if (score !== null) { map[ri] = score; any = true; }
+    });
+    return any ? map : null;
+  };
+
+  function sdFromPairs(pairs) {
+    var weight = 0, mean = 0;
+    pairs.forEach(function (d) { weight += d.p; mean += d.p * d.s; });
+    if (weight <= 0) return null;
+    mean /= weight;
+    var variance = 0;
+    pairs.forEach(function (d) {
+      variance += d.p * (d.s - mean) * (d.s - mean);
+    });
+    return Math.sqrt(variance / weight);
+  }
+  waves.sdFromPairs = sdFromPairs;
+
+  /** SD of a mean-kind row in one HISTORY wave (per segment), derived
+   *  exactly from that wave's published category distribution. */
+  waves.sdAtWave = function (q, row, waveQ, seg) {
+    var scores = waves.scoreMap(q, row);
+    if (!scores) return null;
+    var pairs = [];
+    Object.keys(scores).forEach(function (ri) {
+      var v = waves.valueAt(q, q.rows[ri], parseInt(ri, 10), waveQ, seg || null);
+      if (v !== null && v !== undefined) pairs.push({ p: v, s: scores[ri] });
+    });
+    return sdFromPairs(pairs);
+  };
+
+  /** SD of a mean-kind row in the CURRENT wave from a view model's Total
+   *  column (rows still aligned with q.rows — pre row-ops). */
+  function sdFromModel(q, row, viewModel) {
+    var scores = waves.scoreMap(q, row);
+    if (!scores) return null;
+    var pairs = [];
+    Object.keys(scores).forEach(function (ri) {
+      var cell = viewModel.rows[ri] && viewModel.rows[ri].cells[0];
+      if (cell && cell.pct !== null && cell.pct !== undefined) {
+        pairs.push({ p: cell.pct, s: scores[ri] });
+      }
+    });
+    return sdFromPairs(pairs);
+  }
+
+  /** Two-sided 95% Welch test between two mean points carrying sd + base.
+   *  Same low-base exclusion as the proportion path. */
+  function meanSigBetween(a, b) {
+    if (a.sd === null || a.sd === undefined ||
+        b.sd === null || b.sd === undefined) return false;
+    if (!a.base || !b.base) return false;
+    var threshold = TR.AGG.project.low_base_threshold || 30;
+    if (a.base < threshold || b.base < threshold) return false;
+    var z = TR.stats.meanZ(a.value, a.sd, a.base, b.value, b.sd, b.base);
+    return z !== null && Math.abs(z) > 1.96;
+  }
+
   /** Count for sig testing: published n (Total only), else pct-derived. */
   function countOf(waveQ, row, value, seg) {
     if (!seg) {
@@ -1962,7 +2056,9 @@ null
       if (value === null || value === undefined) return;
       series.push({ wave: h.wave, year: h.year, value: value,
         base: baseOf(h.q, seg || null),
-        x: isMean || row.diff ? null : countOf(h.q, row, value, seg || null) });
+        x: isMean || row.diff ? null : countOf(h.q, row, value, seg || null),
+        sd: isMean && !row.diff
+          ? waves.sdAtWave(q, row, h.q, seg || null) : undefined });
     });
     return series;
   };
@@ -1970,19 +2066,26 @@ null
   /**
    * Tracker-shaped cells: every point of a series (typically with the
    * current wave appended by the caller) annotated with change vs the
-   * PREVIOUS point and vs the FIRST point, pooled-z sig on both.
-   * canSig is false for means/indexes and NET POSITIVE (score) rows.
+   * PREVIOUS point and vs the FIRST point, significance on both.
+   * Proportions (canSig) use the pooled z; points carrying a
+   * distribution-derived `sd` (means/indexes/NPS) use a Welch test;
+   * NET POSITIVE (score difference) rows stay untested.
    */
   waves.cellsFor = function (points, canSig) {
+    var sig = function (a, b) {
+      if (canSig) return sigBetween(a, b);
+      if (a.sd !== undefined && a.sd !== null) return meanSigBetween(a, b);
+      return false;
+    };
     return points.map(function (p, i) {
       var prev = i > 0 ? points[i - 1] : null;
       var first = i > 0 ? points[0] : null;
       return { wave: p.wave, year: p.year, value: p.value, base: p.base,
-        x: p.x, current: !!p.current,
+        x: p.x, sd: p.sd, current: !!p.current,
         change_prev: prev ? p.value - prev.value : null,
-        sig_prev: prev && canSig ? sigBetween(p, prev) : false,
+        sig_prev: prev ? sig(p, prev) : false,
         change_base: first ? p.value - first.value : null,
-        sig_base: first && canSig ? sigBetween(p, first) : false };
+        sig_base: first ? sig(p, first) : false };
     });
   };
 
@@ -2015,16 +2118,20 @@ null
       var curX = !canSig ? null
         : (row.cells[0].n !== null && row.cells[0].n !== undefined
           ? row.cells[0].n : Math.round(cur / 100 * curBase));
-      var curPoint = { value: cur, base: curBase, x: curX };
+      var curPoint = { value: cur, base: curBase, x: curX,
+        sd: isMean && !row.diff ? sdFromModel(q, row, viewModel) : undefined };
+      var sigVs = function (point) {
+        if (canSig) return sigBetween(curPoint, point);
+        if (isMean && !row.diff) return meanSigBetween(curPoint, point);
+        return false;
+      };
       var latest = series[series.length - 1];
       row.delta = { prev: latest.value, wave: latest.wave, year: latest.year,
-        diff: cur - latest.value, isMean: isMean,
-        sig: canSig ? sigBetween(curPoint, latest) : false };
+        diff: cur - latest.value, isMean: isMean, sig: sigVs(latest) };
       var first = series[0];
       if (first.year !== latest.year) {
         row.deltaBase = { prev: first.value, wave: first.wave, year: first.year,
-          diff: cur - first.value, isMean: isMean,
-          sig: canSig ? sigBetween(curPoint, first) : false };
+          diff: cur - first.value, isMean: isMean, sig: sigVs(first) };
       }
     });
     return viewModel;
@@ -2997,9 +3104,10 @@ null
         }
       });
       var last = s.points[s.points.length - 1];
+      // end labels carry the VALUE only — series names live in the
+      // bottom legend where there is room for the full question text
       endLabels.push({ pos: yOf(last.value), colour: colour, sig: s.sigNow,
-        text: (labelMode === "none" ? "" : fmtVal(last.value, s.isMean) + " ") +
-          (series.length > 1 ? TR.charts.clip(s.label, 14) : "") });
+        text: labelMode === "none" ? "" : fmtVal(last.value, s.isMean) });
     });
     render.repel(endLabels, 13, padT + 4, padT + plotH);
     endLabels.forEach(function (l) {
@@ -3015,7 +3123,7 @@ null
     var legend = null, height = H;
     if (series.length > 1) {
       legend = S.legend(series.map(function (s, k) {
-        return { label: TR.charts.clip(s.label, 30),
+        return { label: TR.charts.clip(s.label, 52),
           colour: palette[k % palette.length] };
       }), padL, H + 4, W - padL - 10);
       body.push(legend.body);
@@ -3174,6 +3282,30 @@ null
       shell.route();
     });
   }
+
+  /**
+   * Shared pin popover: one look everywhere something pins to the story.
+   * @param {Element} menu - the .pinmenu element to fill.
+   * @param {Array} items - [{key, label, checked}] element checkboxes.
+   * @param {Function} onPin - receives {key: bool} flags.
+   * @param {string} [extraHtml] - appended below the Pin button.
+   */
+  shell.pinMenu = function (menu, items, onPin, extraHtml) {
+    menu.innerHTML = '<div class="pm-title">Pin to story</div>' +
+      items.map(function (it) {
+        return '<label><input type="checkbox" data-pf="' + it.key + '"' +
+          (it.checked ? " checked" : "") + "> " + it.label + "</label>";
+      }).join("") +
+      '<button class="primary wide" data-pingo>Pin</button>' +
+      (extraHtml || "");
+    menu.querySelector("[data-pingo]").addEventListener("click", function () {
+      var flags = {};
+      menu.querySelectorAll("[data-pf]").forEach(function (cb) {
+        flags[cb.getAttribute("data-pf")] = cb.checked;
+      });
+      onPin(flags);
+    });
+  };
 
   shell.toast = function (message) {
     var holder = document.getElementById("toast");
@@ -3355,9 +3487,11 @@ null
       '<option value="dual"' + (s.sigMode === "dual" ? " selected" : "") + ">95% + 80%</option>" +
       "</select></label>" +
       (TR.d2.tracking().enabled
-        ? toggle("showDeltas", "Δ + trend",
-            "Change vs the most recent prior wave with this question, " +
-            "plus the wave strip")
+        ? toggle("showDeltas", "Δ chips",
+            "Change chips on the Total column vs the most recent prior " +
+            "wave with this question") +
+          toggle("showWaveStrip", "Wave history",
+            "Show the per-question wave history strip under the table")
         : "") +
       '<span class="pinwrap"><button data-act="columns" aria-haspopup="true" ' +
       'title="One place to choose which rows and banner columns show on the ' +
@@ -3515,7 +3649,7 @@ null
       heatmap: s.heatmap, showCounts: s.showCounts,
       showDeltas: s.showDeltas && TR.d2.tracking().enabled,
       hideable: true, rowHideable: true, sortable: true }) + "</div>";
-    if (s.showDeltas && TR.d2.tracking().enabled) {
+    if (s.showWaveStrip && TR.d2.tracking().enabled) {
       html += TR.render.waveStripHtml(model);
     }
 
@@ -3598,33 +3732,25 @@ null
       });
     }, 0);
     var tracked = !!cards2.activeModel().prevWave;
-    menu.innerHTML = '<div class="pm-title">Pin to story</div>' +
-      '<label><input type="checkbox" id="pm-chart"' +
-      (s.showChart ? " checked" : "") + "> Chart (" +
-      fmt.escapeHtml(s.chartType) + ")</label>" +
-      '<label><input type="checkbox" id="pm-table" checked> Table</label>' +
-      '<label><input type="checkbox" id="pm-insight" checked> Insight</label>' +
-      '<button class="primary wide" id="pm-go">Pin</button>' +
-      (tracked
-        ? '<div class="pm-title pm-sep">Trend exhibit</div>' +
-          '<button class="wide" id="pm-exhibit" title="Two-panel exhibit: this ' +
-          "wave's distribution chart with the trend over waves below — exports " +
-          'to PowerPoint as two editable chart objects on one slide">' +
-          "📈 Pin distribution + trend</button>"
-        : "");
-    document.getElementById("pm-go").addEventListener("click", function () {
-      var flags = {
-        chart: document.getElementById("pm-chart").checked,
-        table: document.getElementById("pm-table").checked,
-        insight: document.getElementById("pm-insight").checked
-      };
+    TR.shell.pinMenu(menu, [
+      { key: "chart", label: "Chart (" + fmt.escapeHtml(s.chartType) + ")",
+        checked: s.showChart },
+      { key: "table", label: "Table", checked: true },
+      { key: "insight", label: "Insight", checked: true }
+    ], function (flags) {
       menu.hidden = true;
       if (!flags.chart && !flags.table && !flags.insight) {
         TR.shell.toast("Pick at least one element to pin");
         return;
       }
       TR.story2.pinCurrent(flags);
-    });
+    }, tracked
+      ? '<div class="pm-title pm-sep">Trend exhibit</div>' +
+        '<button class="wide" id="pm-exhibit" title="Two-panel exhibit: this ' +
+        "wave's distribution chart with the trend over waves below — exports " +
+        'to PowerPoint as two editable chart objects on one slide">' +
+        "📈 Pin distribution + trend</button>"
+      : "");
     var exhibitBtn = document.getElementById("pm-exhibit");
     if (exhibitBtn) {
       exhibitBtn.addEventListener("click", function () {
@@ -4586,9 +4712,50 @@ null
   };
 
   /**
+   * SD of a mean-kind metric at one point (Total or a segment), derived
+   * exactly from the published category distribution of that wave.
+   * History waves read the wave payload; the current wave reads the
+   * published model cells. null when not a mean or no distribution.
+   */
+  trk.sdAt = function (metric, segNorm, year) {
+    if (!metric.isMean || metric.diff) return null;
+    if (year !== TR.render.currentYear()) {
+      var hit = TR.waves.history(metric.q).filter(function (h) {
+        return h.year === year;
+      })[0];
+      return hit
+        ? TR.waves.sdAtWave(metric.q, metric.row, hit.q, segNorm || null) : null;
+    }
+    var scores = TR.waves.scoreMap(metric.q, metric.row);
+    if (!scores) return null;
+    var ci = 0, model;
+    if (segNorm) {
+      var seg = trk.segmentByNorm(segNorm);
+      if (!seg) return null;
+      model = trk.publishedModel(metric.code, seg.group);
+      ci = -1;
+      model.columns.forEach(function (col, i) {
+        if (col.label === seg.label) ci = i;
+      });
+      if (ci < 0) return null;
+    } else {
+      model = trk.publishedModel(metric.code, null);
+    }
+    var pairs = [];
+    Object.keys(scores).forEach(function (ri) {
+      var cell = model.rows[ri] && model.rows[ri].cells[ci];
+      if (cell && cell.pct !== null && cell.pct !== undefined) {
+        pairs.push({ p: cell.pct, s: scores[ri] });
+      }
+    });
+    return TR.waves.sdFromPairs(pairs);
+  };
+
+  /**
    * Full tracker-shaped point list for a metric in a segment (or Total):
    * history series + the current wave, each with change/sig vs previous
-   * point and vs the first point. [] when no history for that segment.
+   * point and vs the first point — pooled z for proportions, Welch on
+   * distribution-derived SDs for means/indexes/NPS. [] when no history.
    */
   trk.points = function (metric, segNorm) {
     var series = TR.waves.series(metric.q, metric.row, metric.ri, segNorm || null);
@@ -4601,6 +4768,8 @@ null
         value: cur.value, base: cur.base,
         x: canSig ? (cur.x !== null ? cur.x
           : Math.round(cur.value / 100 * (cur.base || 0))) : null,
+        sd: metric.isMean && !metric.diff
+          ? trk.sdAt(metric, segNorm, TR.render.currentYear()) : undefined,
         current: true });
     }
     return TR.waves.cellsFor(points, canSig);
@@ -4696,8 +4865,10 @@ null
  * a segment filter, and the metric × segment significance matrix.
  *
  * Key metrics are evaluative only (one mean row + one top-box NET per
- * question — see 27t); the matrix and pulse run on the top-box NETs, the
- * only rows that are significance-testable from published totals.
+ * question — see 27t). Significance: proportions via pooled z; means,
+ * indexes and NPS via a Welch test on the spread derived from each
+ * wave's published category distribution. The matrix shows the top-box
+ * NETs (one row per question).
  */
 (function (global) {
   "use strict";
@@ -4736,7 +4907,7 @@ null
       '<span class="kpi-chg ' + (change >= 0 ? "up" : "down") + '">' +
       (change >= 0 ? "▲ +" : "▼ −") + Math.abs(change).toFixed(1) + " vs " +
       (card.cells.length > 1 ? card.cells[card.cells.length - 2].year : "") +
-      "</span>";
+      (last.sig_prev ? " · sig" : "") + "</span>";
     return '<button class="kpi band-' + card.band + '" data-vis="' + m.key +
       '" title="' + fmt.escapeHtml(m.title) + ' — click to visualise">' +
       '<span class="kpi-label">' + m.code + " · " +
@@ -4758,7 +4929,8 @@ null
         return { norm: s.norm, label: s.label };
       }));
     var out = [];
-    trk.keyNets().forEach(function (m) {
+    trk.metricList("key").filter(function (m) { return !m.diff; })
+      .forEach(function (m) {
       segs.forEach(function (seg) {
         var cells = trk.points(m, seg.norm || null);
         var last = lastCell(cells);
@@ -4781,15 +4953,15 @@ null
       '" data-vis="' + c.metric.key + '" data-seglabel="' +
       fmt.escapeHtml(c.segment) + '">' +
       '<span class="sig-dir">' + (c.change >= 0 ? "▲" : "▼") + " " +
-      trk.changeText(c.change, false) + " · " + fmt.escapeHtml(c.segment) +
-      "</span>" +
+      trk.changeText(c.change, c.metric.isMean) + " · " +
+      fmt.escapeHtml(c.segment) + "</span>" +
       '<span class="sig-title">' +
       fmt.escapeHtml(TR.charts.clip(c.metric.title, 64)) + "</span>" +
       '<span class="sig-detail">' + c.metric.code + " · " +
       fmt.escapeHtml(c.metric.label) + " — " +
-      trk.fmtVal(c.prev.value, false) + " in " + c.prev.year + " → " +
-      "<strong>" + trk.fmtVal(c.cur.value, false) + "</strong> in " +
-      c.cur.year + "</span></button>";
+      trk.fmtVal(c.prev.value, c.metric.isMean) + " in " + c.prev.year +
+      " → <strong>" + trk.fmtVal(c.cur.value, c.metric.isMean) +
+      "</strong> in " + c.cur.year + "</span></button>";
   }
 
   /* ---------------- significance matrix ---------------- */
@@ -4849,7 +5021,9 @@ null
     var trk = TR.trk;
     var cards = kpiCards();
     var changes = sigChanges();
-    var tested = trk.keyNets().length;
+    var tested = trk.metricList("key").filter(function (m) {
+      return !m.diff;
+    }).length;
     var totalUp = changes.filter(function (c) {
       return c.segment === "Total" && c.change >= 0;
     }).length;
@@ -4863,10 +5037,10 @@ null
     var html = ['<div class="card"><h3>Key metric scorecard · ' +
       fmt.escapeHtml(TR.AGG.project.wave) + "</h3>" +
       "<p class='trknote'>Card colour bands the latest value against the " +
-      "tracker thresholds (green strong / amber moderate / red weak per metric " +
-      "type). Means, indexes and NPS scores show direction only — published " +
-      "wave totals carry no spread, so only proportion metrics are " +
-      "significance-tested.</p>" +
+      "tracker thresholds (green strong / amber moderate / red weak per " +
+      "metric type). Significance: proportions use the pooled z; means, " +
+      "indexes and NPS use a Welch test on the spread derived from each " +
+      "wave's published category distribution.</p>" +
       '<div class="kpis">' + cards.map(kpiCardHtml).join("") + "</div></div>"];
 
     html.push('<div class="card"><div class="pulse">' +
@@ -4874,8 +5048,9 @@ null
       '<span class="pulse-chip down">▼ ' + totalDown + " significant decreases</span>" +
       '<span class="pulse-chip">→ ' + Math.max(tested - totalUp - totalDown, 0) +
       " stable</span>" +
-      '<span class="trknote">Total only · one top-box NET per key question · ' +
-      "latest wave vs previous</span></div></div>");
+      '<span class="trknote">Total only · all key metrics (means Welch-' +
+      "tested on published-distribution SDs, %s pooled z) · latest wave vs " +
+      "previous</span></div></div>");
 
     html.push('<div class="card"><div class="heathead"><h3>Significant changes · ' +
       "latest wave</h3><select data-sigseg><option value=''>All segments</option>" +
@@ -5025,7 +5200,9 @@ null
 
   function specLabel(spec, sel) {
     if (sel.metrics.length > 1) {
-      return spec.metric.code + " · " + TR.charts.clip(spec.metric.label, 18) +
+      // question TEXT, not the code — codes are meaningless on a chart
+      return TR.charts.clip(spec.metric.title, 36) + " · " +
+        TR.charts.clip(spec.metric.label, 14) +
         (sel.segs.length > 1 ? " · " + spec.segLabel : "");
     }
     return spec.segLabel;
@@ -5068,8 +5245,9 @@ null
     return '<div class="trklegend"><span class="lg cb-g">strong · ≥70% / 7+ ' +
       "mean / 30+ NPS</span><span class='lg cb-a'>moderate</span>" +
       "<span class='lg cb-r'>weak</span>" +
-      "<span class='lg'>▲▼ coloured = significant vs comparison wave (95%, " +
-      "pooled z, proportions only)</span><span class='lg'>⚠ base under " +
+      "<span class='lg'>▲▼ coloured = significant at 95% vs the comparison " +
+      "wave — pooled z for %, Welch on published-distribution SDs for " +
+      "means/indexes/NPS</span><span class='lg'>⚠ base under " +
       (TR.AGG.project.low_base_threshold || 30) + "</span></div>";
   }
 
@@ -5224,7 +5402,7 @@ null
     applySort(entries);
 
     html.push(waveChipsHtml());
-    html.push('<div class="trkwrap"><table class="moved trk"><thead><tr>' +
+    html.push('<div class="trkwrap"><table class="moved trk haspick"><thead><tr>' +
       "<th></th>" + (mode === "sfq" ? "<th>Segment</th>" : "<th>Metric</th>") +
       years.map(function (y) {
         return "<th class='wv'>" + y + "</th>";
@@ -5254,8 +5432,8 @@ null
       groups.forEach(function (g) {
         var inGroup = entries.filter(function (e) { return g.match(e.metric); });
         if (!inGroup.length) return;
-        html.push('<tr class="grp"><td colspan="' + (years.length + 4) + '">' +
-          g.title + "</td></tr>");
+        html.push('<tr class="grp"><td colspan="' + (years.length + 4) +
+          '"><span class="stickyhdr">' + g.title + "</span></td></tr>");
         var lastCat = null;
         inGroup.forEach(function (e) {
           if (emitted >= MAX_ROWS) return;
@@ -5263,7 +5441,8 @@ null
               e.metric.category !== lastCat && (s.scope || "key") === "key") {
             lastCat = e.metric.category;
             html.push('<tr class="cat"><td colspan="' + (years.length + 4) +
-              '">' + fmt.escapeHtml(lastCat) + "</td></tr>");
+              '"><span class="stickyhdr">' + fmt.escapeHtml(lastCat) +
+              "</span></td></tr>");
           }
           emitted++;
           html.push(rowHtml(e,
@@ -5397,78 +5576,9 @@ null
 
   /* ---------------- Visualise view ---------------- */
 
-  /** Per-category respondent scores for a mean-kind metric: {ri: score}.
-   *  Index rows use the configured index weights; NPS maps 9-10/7-8/0-6
-   *  to +100/0/-100; plain means use the numeric category labels. */
-  function scoreMap(metric) {
-    var q = metric.q;
-    var type = trk().kpiType(metric);
-    var map = {}, any = false;
-    q.rows.forEach(function (row, ri) {
-      if (row.kind !== "category") return;
-      var score = null;
-      if (type === "index") {
-        var w = q.index_scores && q.index_scores[row.label];
-        if (w !== undefined && w !== null) score = w;
-      } else {
-        var v = parseFloat(row.label);
-        if (isFinite(v)) {
-          score = type === "nps" ? (v >= 9 ? 100 : v >= 7 ? 0 : -100) : v;
-        }
-      }
-      if (score !== null) { map[ri] = score; any = true; }
-    });
-    return any ? map : null;
-  }
-
-  /** SD of a mean-kind metric at one wave/segment, derived exactly from
-   *  the PUBLISHED category distribution of that point. null = no data. */
-  function sdAt(metric, segId, year) {
-    var scores = scoreMap(metric);
-    if (!scores) return null;
-    var q = metric.q;
-    var seg = segId === "total" ? null : segId;
-    var dist = [];
-    if (year === TR.render.currentYear()) {
-      var segMeta = seg ? trk().segmentByNorm(seg) : null;
-      var model = trk().publishedModel(q.code, segMeta ? segMeta.group : null);
-      var ci = 0;
-      if (segMeta) {
-        ci = -1;
-        model.columns.forEach(function (col, i) {
-          if (col.label === segMeta.label) ci = i;
-        });
-        if (ci < 0) return null;
-      }
-      Object.keys(scores).forEach(function (ri) {
-        var cell = model.rows[ri] && model.rows[ri].cells[ci];
-        if (cell && cell.pct !== null && cell.pct !== undefined) {
-          dist.push({ p: cell.pct, s: scores[ri] });
-        }
-      });
-    } else {
-      var hit = TR.waves.history(q).filter(function (h) {
-        return h.year === year;
-      })[0];
-      if (!hit) return null;
-      Object.keys(scores).forEach(function (ri) {
-        var v = TR.waves.valueAt(q, q.rows[ri], parseInt(ri, 10), hit.q, seg);
-        if (v !== null && v !== undefined) dist.push({ p: v, s: scores[ri] });
-      });
-    }
-    var weight = 0, mean = 0;
-    dist.forEach(function (d) { weight += d.p; mean += d.p * d.s; });
-    if (weight <= 0) return null;
-    mean /= weight;
-    var variance = 0;
-    dist.forEach(function (d) {
-      variance += d.p * (d.s - mean) * (d.s - mean);
-    });
-    return Math.sqrt(variance / weight);
-  }
-
   /** 95% CI half-width at a point: p(1-p)/n for proportions; for means,
-   *  indexes and NPS the SD comes from the published distribution. */
+   *  indexes and NPS the SD comes from the published distribution
+   *  (TR.trk.sdAt — the same spread that powers their sig testing). */
   function ciHalfWidth(metric, segId, point) {
     if (metric.diff) return null;     // score differences: no single base
     if (!point.base || point.value === null) return null;
@@ -5476,7 +5586,7 @@ null
       var p = Math.min(Math.max(point.value / 100, 0.001), 0.999);
       return 1.96 * Math.sqrt(p * (1 - p) / point.base) * 100;
     }
-    var sd = sdAt(metric, segId, point.year);
+    var sd = trk().sdAt(metric, segId === "total" ? null : segId, point.year);
     return sd === null ? null : 1.96 * sd / Math.sqrt(point.base);
   }
 
@@ -5744,18 +5854,52 @@ null
         rerender();
       });
     });
-    // annotation tagging: click a chart point (single-metric views)
+    // annotation tagging: click a chart point -> inline editor (no prompt)
     if (singleMetric) {
-      host.querySelector("[data-vischart]").addEventListener("click", function (e) {
+      var chartHost = host.querySelector("[data-vischart]");
+      chartHost.addEventListener("click", function (e) {
         var pt = e.target.closest("circle.trendpt");
         if (!pt) return;
         var year = parseInt(pt.getAttribute("data-year"), 10);
+        var old = chartHost.querySelector(".notepop");
+        if (old) old.remove();
         var existing = TR.notes.get(singleMetric.key, year);
-        var text = prompt("Note for " + year +
-          " (e.g. “Campaign launched”) — leave blank to remove:", existing);
-        if (text === null) return;
-        TR.notes.set(singleMetric.key, year, text);
-        rerender();
+        var pop = document.createElement("div");
+        pop.className = "notepop";
+        var rect = chartHost.getBoundingClientRect();
+        pop.style.left = Math.max(8, Math.min(e.clientX - rect.left - 20,
+          rect.width - 260)) + "px";
+        pop.style.top = Math.max(8, e.clientY - rect.top + 10) + "px";
+        pop.innerHTML = '<div class="np-title">Tag ' + year + " · " +
+          fmt.escapeHtml(TR.charts.clip(singleMetric.label, 24)) + "</div>" +
+          '<input type="text" maxlength="60" placeholder="e.g. Campaign ' +
+          'launched" value="' + fmt.escapeHtml(existing) + '">' +
+          '<div class="np-btns"><button class="primary" data-npsave>Save</button>' +
+          (existing ? "<button data-npremove>Remove</button>" : "") +
+          "<button data-npcancel>Cancel</button></div>";
+        chartHost.appendChild(pop);
+        var input = pop.querySelector("input");
+        input.focus();
+        input.select();
+        var save = function () {
+          TR.notes.set(singleMetric.key, year, input.value);
+          rerender();
+        };
+        pop.querySelector("[data-npsave]").addEventListener("click", save);
+        input.addEventListener("keydown", function (ev) {
+          if (ev.key === "Enter") save();
+          if (ev.key === "Escape") pop.remove();
+        });
+        var remove = pop.querySelector("[data-npremove]");
+        if (remove) {
+          remove.addEventListener("click", function () {
+            TR.notes.set(singleMetric.key, year, "");
+            rerender();
+          });
+        }
+        pop.querySelector("[data-npcancel]").addEventListener("click", function () {
+          pop.remove();
+        });
       });
     }
     host.querySelectorAll("[data-delnote]").forEach(function (btn) {
@@ -5787,17 +5931,12 @@ null
     pinBtn.addEventListener("click", function () {
       if (!pinMenu.hidden) { pinMenu.hidden = true; return; }
       pinMenu.hidden = false;
-      pinMenu.innerHTML = '<div class="pm-title">Pin to story</div>' +
-        '<label><input type="checkbox" data-pf="dist"> This-wave chart</label>' +
-        '<label><input type="checkbox" data-pf="trend" checked> Trend chart</label>' +
-        '<label><input type="checkbox" data-pf="table"> Data table</label>' +
-        '<label><input type="checkbox" data-pf="insight" checked> Insight</label>' +
-        '<button class="primary wide" data-pingo>Pin</button>';
-      pinMenu.querySelector("[data-pingo]").addEventListener("click", function () {
-        var flags = {};
-        pinMenu.querySelectorAll("[data-pf]").forEach(function (cb) {
-          flags[cb.getAttribute("data-pf")] = cb.checked;
-        });
+      TR.shell.pinMenu(pinMenu, [
+        { key: "dist", label: "This-wave chart", checked: false },
+        { key: "trend", label: "Trend chart", checked: true },
+        { key: "table", label: "Data table", checked: false },
+        { key: "insight", label: "Insight", checked: true }
+      ], function (flags) {
         pinMenu.hidden = true;
         if (!flags.dist && !flags.trend && !flags.table) {
           TR.shell.toast("Pick at least one chart or the table");
@@ -6872,20 +7011,16 @@ null
         buttons + "</div></div>";
     }
     if (item.kind === "exhibit") {
+      // elements were chosen at pin time — story shows exactly the pin
       var exModels = TR.exhibit.models(item);
       var exFlags = item.flags || {};
-      var exToggles = ["dist", "trend", "table", "insight"].map(function (k) {
-        return '<label class="si-flag"><input type="checkbox" data-flag="' + k +
-          '"' + (exFlags[k] ? " checked" : "") + "> " +
-          (k === "dist" ? "this wave" : k) + "</label>";
-      }).join("");
       return '<div class="card story-item" data-i="' + i + '">' +
         '<div class="si-head"><span class="qcode">' + (i + 1) + ". TREND</span>" +
         "<strong>" + fmt.escapeHtml(TR.charts.clip(
           TR.exhibit.titleFor(item, exModels), 90)) + "</strong>" +
         '<span class="si-ctx">' +
         fmt.escapeHtml(TR.exhibit.contextLine(item, exModels)) + "</span>" +
-        '<span class="si-flags">' + exToggles + "</span>" + buttons + "</div>" +
+        buttons + "</div>" +
         TR.exhibit.panelsHtml(item) +
         (exFlags.insight !== false
           ? '<textarea class="si-note" placeholder="Commentary for this slide…">' +
@@ -6908,15 +7043,11 @@ null
     var model = modelFor(item);
     if (!model) return "";
     var flags = item.flags || { chart: false, table: true, insight: true };
-    var flagToggles = ["chart", "table", "insight"].map(function (k) {
-      return '<label class="si-flag"><input type="checkbox" data-flag="' + k +
-        '"' + (flags[k] ? " checked" : "") + "> " + k + "</label>";
-    }).join("");
     return '<div class="card story-item" data-i="' + i + '">' +
       '<div class="si-head"><span class="qcode">' + (i + 1) + ". " + model.code +
       "</span> <strong>" + fmt.escapeHtml(TR.charts.clip(model.title, 90)) + "</strong>" +
       '<span class="si-ctx">' + fmt.escapeHtml(contextLine(item, model)) + "</span>" +
-      '<span class="si-flags">' + flagToggles + "</span>" + buttons + "</div>" +
+      buttons + "</div>" +
       (flags.chart ? '<div class="chart si-chart">' +
         TR.render.chartBy(item.chartType || "bar", model, item.chartCols || [0]) +
         "</div>" : "") +
@@ -6982,16 +7113,6 @@ null
         load()[parseInt(card.getAttribute("data-i"), 10)].note = e.target.value;
         persist();
       }
-    });
-    host.addEventListener("change", function (e) {
-      var flag = e.target.getAttribute && e.target.getAttribute("data-flag");
-      if (!flag) return;
-      var card = e.target.closest(".story-item");
-      var item = load()[parseInt(card.getAttribute("data-i"), 10)];
-      item.flags = item.flags || { chart: false, table: true, insight: true };
-      item.flags[flag] = e.target.checked;
-      persist();
-      story2.renderTab(document.getElementById("tabhost"));
     });
     var importer = host.querySelector("#story-import");
     if (importer) {
@@ -7234,7 +7355,9 @@ null
   }
 
   function shortLabel(model, row) {
-    return model.code + " · " + TR.charts.clip(model.title, 26);
+    // question TEXT first — codes are meaningless on a chart
+    return TR.charts.clip(model.title, 32) + " · " +
+      TR.charts.clip(row.label, 14);
   }
 
   /** Distribution panel model: real for one question, headline bars for many. */

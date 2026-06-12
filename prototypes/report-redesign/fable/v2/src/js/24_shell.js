@@ -147,6 +147,30 @@
     });
   }
 
+  /**
+   * Shared pin popover: one look everywhere something pins to the story.
+   * @param {Element} menu - the .pinmenu element to fill.
+   * @param {Array} items - [{key, label, checked}] element checkboxes.
+   * @param {Function} onPin - receives {key: bool} flags.
+   * @param {string} [extraHtml] - appended below the Pin button.
+   */
+  shell.pinMenu = function (menu, items, onPin, extraHtml) {
+    menu.innerHTML = '<div class="pm-title">Pin to story</div>' +
+      items.map(function (it) {
+        return '<label><input type="checkbox" data-pf="' + it.key + '"' +
+          (it.checked ? " checked" : "") + "> " + it.label + "</label>";
+      }).join("") +
+      '<button class="primary wide" data-pingo>Pin</button>' +
+      (extraHtml || "");
+    menu.querySelector("[data-pingo]").addEventListener("click", function () {
+      var flags = {};
+      menu.querySelectorAll("[data-pf]").forEach(function (cb) {
+        flags[cb.getAttribute("data-pf")] = cb.checked;
+      });
+      onPin(flags);
+    });
+  };
+
   shell.toast = function (message) {
     var holder = document.getElementById("toast");
     if (!holder) return;

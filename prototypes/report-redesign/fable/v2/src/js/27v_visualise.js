@@ -81,7 +81,9 @@
 
   function specLabel(spec, sel) {
     if (sel.metrics.length > 1) {
-      return spec.metric.code + " · " + TR.charts.clip(spec.metric.label, 18) +
+      // question TEXT, not the code — codes are meaningless on a chart
+      return TR.charts.clip(spec.metric.title, 36) + " · " +
+        TR.charts.clip(spec.metric.label, 14) +
         (sel.segs.length > 1 ? " · " + spec.segLabel : "");
     }
     return spec.segLabel;
@@ -124,8 +126,9 @@
     return '<div class="trklegend"><span class="lg cb-g">strong · ≥70% / 7+ ' +
       "mean / 30+ NPS</span><span class='lg cb-a'>moderate</span>" +
       "<span class='lg cb-r'>weak</span>" +
-      "<span class='lg'>▲▼ coloured = significant vs comparison wave (95%, " +
-      "pooled z, proportions only)</span><span class='lg'>⚠ base under " +
+      "<span class='lg'>▲▼ coloured = significant at 95% vs the comparison " +
+      "wave — pooled z for %, Welch on published-distribution SDs for " +
+      "means/indexes/NPS</span><span class='lg'>⚠ base under " +
       (TR.AGG.project.low_base_threshold || 30) + "</span></div>";
   }
 
@@ -280,7 +283,7 @@
     applySort(entries);
 
     html.push(waveChipsHtml());
-    html.push('<div class="trkwrap"><table class="moved trk"><thead><tr>' +
+    html.push('<div class="trkwrap"><table class="moved trk haspick"><thead><tr>' +
       "<th></th>" + (mode === "sfq" ? "<th>Segment</th>" : "<th>Metric</th>") +
       years.map(function (y) {
         return "<th class='wv'>" + y + "</th>";
@@ -310,8 +313,8 @@
       groups.forEach(function (g) {
         var inGroup = entries.filter(function (e) { return g.match(e.metric); });
         if (!inGroup.length) return;
-        html.push('<tr class="grp"><td colspan="' + (years.length + 4) + '">' +
-          g.title + "</td></tr>");
+        html.push('<tr class="grp"><td colspan="' + (years.length + 4) +
+          '"><span class="stickyhdr">' + g.title + "</span></td></tr>");
         var lastCat = null;
         inGroup.forEach(function (e) {
           if (emitted >= MAX_ROWS) return;
@@ -319,7 +322,8 @@
               e.metric.category !== lastCat && (s.scope || "key") === "key") {
             lastCat = e.metric.category;
             html.push('<tr class="cat"><td colspan="' + (years.length + 4) +
-              '">' + fmt.escapeHtml(lastCat) + "</td></tr>");
+              '"><span class="stickyhdr">' + fmt.escapeHtml(lastCat) +
+              "</span></td></tr>");
           }
           emitted++;
           html.push(rowHtml(e,
@@ -453,78 +457,9 @@
 
   /* ---------------- Visualise view ---------------- */
 
-  /** Per-category respondent scores for a mean-kind metric: {ri: score}.
-   *  Index rows use the configured index weights; NPS maps 9-10/7-8/0-6
-   *  to +100/0/-100; plain means use the numeric category labels. */
-  function scoreMap(metric) {
-    var q = metric.q;
-    var type = trk().kpiType(metric);
-    var map = {}, any = false;
-    q.rows.forEach(function (row, ri) {
-      if (row.kind !== "category") return;
-      var score = null;
-      if (type === "index") {
-        var w = q.index_scores && q.index_scores[row.label];
-        if (w !== undefined && w !== null) score = w;
-      } else {
-        var v = parseFloat(row.label);
-        if (isFinite(v)) {
-          score = type === "nps" ? (v >= 9 ? 100 : v >= 7 ? 0 : -100) : v;
-        }
-      }
-      if (score !== null) { map[ri] = score; any = true; }
-    });
-    return any ? map : null;
-  }
-
-  /** SD of a mean-kind metric at one wave/segment, derived exactly from
-   *  the PUBLISHED category distribution of that point. null = no data. */
-  function sdAt(metric, segId, year) {
-    var scores = scoreMap(metric);
-    if (!scores) return null;
-    var q = metric.q;
-    var seg = segId === "total" ? null : segId;
-    var dist = [];
-    if (year === TR.render.currentYear()) {
-      var segMeta = seg ? trk().segmentByNorm(seg) : null;
-      var model = trk().publishedModel(q.code, segMeta ? segMeta.group : null);
-      var ci = 0;
-      if (segMeta) {
-        ci = -1;
-        model.columns.forEach(function (col, i) {
-          if (col.label === segMeta.label) ci = i;
-        });
-        if (ci < 0) return null;
-      }
-      Object.keys(scores).forEach(function (ri) {
-        var cell = model.rows[ri] && model.rows[ri].cells[ci];
-        if (cell && cell.pct !== null && cell.pct !== undefined) {
-          dist.push({ p: cell.pct, s: scores[ri] });
-        }
-      });
-    } else {
-      var hit = TR.waves.history(q).filter(function (h) {
-        return h.year === year;
-      })[0];
-      if (!hit) return null;
-      Object.keys(scores).forEach(function (ri) {
-        var v = TR.waves.valueAt(q, q.rows[ri], parseInt(ri, 10), hit.q, seg);
-        if (v !== null && v !== undefined) dist.push({ p: v, s: scores[ri] });
-      });
-    }
-    var weight = 0, mean = 0;
-    dist.forEach(function (d) { weight += d.p; mean += d.p * d.s; });
-    if (weight <= 0) return null;
-    mean /= weight;
-    var variance = 0;
-    dist.forEach(function (d) {
-      variance += d.p * (d.s - mean) * (d.s - mean);
-    });
-    return Math.sqrt(variance / weight);
-  }
-
   /** 95% CI half-width at a point: p(1-p)/n for proportions; for means,
-   *  indexes and NPS the SD comes from the published distribution. */
+   *  indexes and NPS the SD comes from the published distribution
+   *  (TR.trk.sdAt — the same spread that powers their sig testing). */
   function ciHalfWidth(metric, segId, point) {
     if (metric.diff) return null;     // score differences: no single base
     if (!point.base || point.value === null) return null;
@@ -532,7 +467,7 @@
       var p = Math.min(Math.max(point.value / 100, 0.001), 0.999);
       return 1.96 * Math.sqrt(p * (1 - p) / point.base) * 100;
     }
-    var sd = sdAt(metric, segId, point.year);
+    var sd = trk().sdAt(metric, segId === "total" ? null : segId, point.year);
     return sd === null ? null : 1.96 * sd / Math.sqrt(point.base);
   }
 
@@ -800,18 +735,52 @@
         rerender();
       });
     });
-    // annotation tagging: click a chart point (single-metric views)
+    // annotation tagging: click a chart point -> inline editor (no prompt)
     if (singleMetric) {
-      host.querySelector("[data-vischart]").addEventListener("click", function (e) {
+      var chartHost = host.querySelector("[data-vischart]");
+      chartHost.addEventListener("click", function (e) {
         var pt = e.target.closest("circle.trendpt");
         if (!pt) return;
         var year = parseInt(pt.getAttribute("data-year"), 10);
+        var old = chartHost.querySelector(".notepop");
+        if (old) old.remove();
         var existing = TR.notes.get(singleMetric.key, year);
-        var text = prompt("Note for " + year +
-          " (e.g. “Campaign launched”) — leave blank to remove:", existing);
-        if (text === null) return;
-        TR.notes.set(singleMetric.key, year, text);
-        rerender();
+        var pop = document.createElement("div");
+        pop.className = "notepop";
+        var rect = chartHost.getBoundingClientRect();
+        pop.style.left = Math.max(8, Math.min(e.clientX - rect.left - 20,
+          rect.width - 260)) + "px";
+        pop.style.top = Math.max(8, e.clientY - rect.top + 10) + "px";
+        pop.innerHTML = '<div class="np-title">Tag ' + year + " · " +
+          fmt.escapeHtml(TR.charts.clip(singleMetric.label, 24)) + "</div>" +
+          '<input type="text" maxlength="60" placeholder="e.g. Campaign ' +
+          'launched" value="' + fmt.escapeHtml(existing) + '">' +
+          '<div class="np-btns"><button class="primary" data-npsave>Save</button>' +
+          (existing ? "<button data-npremove>Remove</button>" : "") +
+          "<button data-npcancel>Cancel</button></div>";
+        chartHost.appendChild(pop);
+        var input = pop.querySelector("input");
+        input.focus();
+        input.select();
+        var save = function () {
+          TR.notes.set(singleMetric.key, year, input.value);
+          rerender();
+        };
+        pop.querySelector("[data-npsave]").addEventListener("click", save);
+        input.addEventListener("keydown", function (ev) {
+          if (ev.key === "Enter") save();
+          if (ev.key === "Escape") pop.remove();
+        });
+        var remove = pop.querySelector("[data-npremove]");
+        if (remove) {
+          remove.addEventListener("click", function () {
+            TR.notes.set(singleMetric.key, year, "");
+            rerender();
+          });
+        }
+        pop.querySelector("[data-npcancel]").addEventListener("click", function () {
+          pop.remove();
+        });
       });
     }
     host.querySelectorAll("[data-delnote]").forEach(function (btn) {
@@ -843,17 +812,12 @@
     pinBtn.addEventListener("click", function () {
       if (!pinMenu.hidden) { pinMenu.hidden = true; return; }
       pinMenu.hidden = false;
-      pinMenu.innerHTML = '<div class="pm-title">Pin to story</div>' +
-        '<label><input type="checkbox" data-pf="dist"> This-wave chart</label>' +
-        '<label><input type="checkbox" data-pf="trend" checked> Trend chart</label>' +
-        '<label><input type="checkbox" data-pf="table"> Data table</label>' +
-        '<label><input type="checkbox" data-pf="insight" checked> Insight</label>' +
-        '<button class="primary wide" data-pingo>Pin</button>';
-      pinMenu.querySelector("[data-pingo]").addEventListener("click", function () {
-        var flags = {};
-        pinMenu.querySelectorAll("[data-pf]").forEach(function (cb) {
-          flags[cb.getAttribute("data-pf")] = cb.checked;
-        });
+      TR.shell.pinMenu(pinMenu, [
+        { key: "dist", label: "This-wave chart", checked: false },
+        { key: "trend", label: "Trend chart", checked: true },
+        { key: "table", label: "Data table", checked: false },
+        { key: "insight", label: "Insight", checked: true }
+      ], function (flags) {
         pinMenu.hidden = true;
         if (!flags.dist && !flags.trend && !flags.table) {
           TR.shell.toast("Pick at least one chart or the table");

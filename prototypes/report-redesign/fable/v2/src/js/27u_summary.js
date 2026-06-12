@@ -6,8 +6,10 @@
  * a segment filter, and the metric × segment significance matrix.
  *
  * Key metrics are evaluative only (one mean row + one top-box NET per
- * question — see 27t); the matrix and pulse run on the top-box NETs, the
- * only rows that are significance-testable from published totals.
+ * question — see 27t). Significance: proportions via pooled z; means,
+ * indexes and NPS via a Welch test on the spread derived from each
+ * wave's published category distribution. The matrix shows the top-box
+ * NETs (one row per question).
  */
 (function (global) {
   "use strict";
@@ -46,7 +48,7 @@
       '<span class="kpi-chg ' + (change >= 0 ? "up" : "down") + '">' +
       (change >= 0 ? "▲ +" : "▼ −") + Math.abs(change).toFixed(1) + " vs " +
       (card.cells.length > 1 ? card.cells[card.cells.length - 2].year : "") +
-      "</span>";
+      (last.sig_prev ? " · sig" : "") + "</span>";
     return '<button class="kpi band-' + card.band + '" data-vis="' + m.key +
       '" title="' + fmt.escapeHtml(m.title) + ' — click to visualise">' +
       '<span class="kpi-label">' + m.code + " · " +
@@ -68,7 +70,8 @@
         return { norm: s.norm, label: s.label };
       }));
     var out = [];
-    trk.keyNets().forEach(function (m) {
+    trk.metricList("key").filter(function (m) { return !m.diff; })
+      .forEach(function (m) {
       segs.forEach(function (seg) {
         var cells = trk.points(m, seg.norm || null);
         var last = lastCell(cells);
@@ -91,15 +94,15 @@
       '" data-vis="' + c.metric.key + '" data-seglabel="' +
       fmt.escapeHtml(c.segment) + '">' +
       '<span class="sig-dir">' + (c.change >= 0 ? "▲" : "▼") + " " +
-      trk.changeText(c.change, false) + " · " + fmt.escapeHtml(c.segment) +
-      "</span>" +
+      trk.changeText(c.change, c.metric.isMean) + " · " +
+      fmt.escapeHtml(c.segment) + "</span>" +
       '<span class="sig-title">' +
       fmt.escapeHtml(TR.charts.clip(c.metric.title, 64)) + "</span>" +
       '<span class="sig-detail">' + c.metric.code + " · " +
       fmt.escapeHtml(c.metric.label) + " — " +
-      trk.fmtVal(c.prev.value, false) + " in " + c.prev.year + " → " +
-      "<strong>" + trk.fmtVal(c.cur.value, false) + "</strong> in " +
-      c.cur.year + "</span></button>";
+      trk.fmtVal(c.prev.value, c.metric.isMean) + " in " + c.prev.year +
+      " → <strong>" + trk.fmtVal(c.cur.value, c.metric.isMean) +
+      "</strong> in " + c.cur.year + "</span></button>";
   }
 
   /* ---------------- significance matrix ---------------- */
@@ -159,7 +162,9 @@
     var trk = TR.trk;
     var cards = kpiCards();
     var changes = sigChanges();
-    var tested = trk.keyNets().length;
+    var tested = trk.metricList("key").filter(function (m) {
+      return !m.diff;
+    }).length;
     var totalUp = changes.filter(function (c) {
       return c.segment === "Total" && c.change >= 0;
     }).length;
@@ -173,10 +178,10 @@
     var html = ['<div class="card"><h3>Key metric scorecard · ' +
       fmt.escapeHtml(TR.AGG.project.wave) + "</h3>" +
       "<p class='trknote'>Card colour bands the latest value against the " +
-      "tracker thresholds (green strong / amber moderate / red weak per metric " +
-      "type). Means, indexes and NPS scores show direction only — published " +
-      "wave totals carry no spread, so only proportion metrics are " +
-      "significance-tested.</p>" +
+      "tracker thresholds (green strong / amber moderate / red weak per " +
+      "metric type). Significance: proportions use the pooled z; means, " +
+      "indexes and NPS use a Welch test on the spread derived from each " +
+      "wave's published category distribution.</p>" +
       '<div class="kpis">' + cards.map(kpiCardHtml).join("") + "</div></div>"];
 
     html.push('<div class="card"><div class="pulse">' +
@@ -184,8 +189,9 @@
       '<span class="pulse-chip down">▼ ' + totalDown + " significant decreases</span>" +
       '<span class="pulse-chip">→ ' + Math.max(tested - totalUp - totalDown, 0) +
       " stable</span>" +
-      '<span class="trknote">Total only · one top-box NET per key question · ' +
-      "latest wave vs previous</span></div></div>");
+      '<span class="trknote">Total only · all key metrics (means Welch-' +
+      "tested on published-distribution SDs, %s pooled z) · latest wave vs " +
+      "previous</span></div></div>");
 
     html.push('<div class="card"><div class="heathead"><h3>Significant changes · ' +
       "latest wave</h3><select data-sigseg><option value=''>All segments</option>" +

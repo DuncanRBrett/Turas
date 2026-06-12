@@ -315,20 +315,16 @@
         buttons + "</div></div>";
     }
     if (item.kind === "exhibit") {
+      // elements were chosen at pin time — story shows exactly the pin
       var exModels = TR.exhibit.models(item);
       var exFlags = item.flags || {};
-      var exToggles = ["dist", "trend", "table", "insight"].map(function (k) {
-        return '<label class="si-flag"><input type="checkbox" data-flag="' + k +
-          '"' + (exFlags[k] ? " checked" : "") + "> " +
-          (k === "dist" ? "this wave" : k) + "</label>";
-      }).join("");
       return '<div class="card story-item" data-i="' + i + '">' +
         '<div class="si-head"><span class="qcode">' + (i + 1) + ". TREND</span>" +
         "<strong>" + fmt.escapeHtml(TR.charts.clip(
           TR.exhibit.titleFor(item, exModels), 90)) + "</strong>" +
         '<span class="si-ctx">' +
         fmt.escapeHtml(TR.exhibit.contextLine(item, exModels)) + "</span>" +
-        '<span class="si-flags">' + exToggles + "</span>" + buttons + "</div>" +
+        buttons + "</div>" +
         TR.exhibit.panelsHtml(item) +
         (exFlags.insight !== false
           ? '<textarea class="si-note" placeholder="Commentary for this slide…">' +
@@ -351,15 +347,11 @@
     var model = modelFor(item);
     if (!model) return "";
     var flags = item.flags || { chart: false, table: true, insight: true };
-    var flagToggles = ["chart", "table", "insight"].map(function (k) {
-      return '<label class="si-flag"><input type="checkbox" data-flag="' + k +
-        '"' + (flags[k] ? " checked" : "") + "> " + k + "</label>";
-    }).join("");
     return '<div class="card story-item" data-i="' + i + '">' +
       '<div class="si-head"><span class="qcode">' + (i + 1) + ". " + model.code +
       "</span> <strong>" + fmt.escapeHtml(TR.charts.clip(model.title, 90)) + "</strong>" +
       '<span class="si-ctx">' + fmt.escapeHtml(contextLine(item, model)) + "</span>" +
-      '<span class="si-flags">' + flagToggles + "</span>" + buttons + "</div>" +
+      buttons + "</div>" +
       (flags.chart ? '<div class="chart si-chart">' +
         TR.render.chartBy(item.chartType || "bar", model, item.chartCols || [0]) +
         "</div>" : "") +
@@ -425,16 +417,6 @@
         load()[parseInt(card.getAttribute("data-i"), 10)].note = e.target.value;
         persist();
       }
-    });
-    host.addEventListener("change", function (e) {
-      var flag = e.target.getAttribute && e.target.getAttribute("data-flag");
-      if (!flag) return;
-      var card = e.target.closest(".story-item");
-      var item = load()[parseInt(card.getAttribute("data-i"), 10)];
-      item.flags = item.flags || { chart: false, table: true, insight: true };
-      item.flags[flag] = e.target.checked;
-      persist();
-      story2.renderTab(document.getElementById("tabhost"));
     });
     var importer = host.querySelector("#story-import");
     if (importer) {

@@ -18,6 +18,7 @@
     heatmap: true,
     showChart: false,
     showDeltas: true,
+    showWaveStrip: true,    // per-question wave history strip
     showDetail: true,       // category rows visible
     showSummary: true,      // NET + index rows visible
     sigMode: "95",          // significance display: off | 95 | dual (95+80)

@@ -98,7 +98,9 @@
   }
 
   function shortLabel(model, row) {
-    return model.code + " · " + TR.charts.clip(model.title, 26);
+    // question TEXT first — codes are meaningless on a chart
+    return TR.charts.clip(model.title, 32) + " · " +
+      TR.charts.clip(row.label, 14);
   }
 
   /** Distribution panel model: real for one question, headline bars for many. */

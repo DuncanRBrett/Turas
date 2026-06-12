@@ -170,9 +170,50 @@
   };
 
   /**
+   * SD of a mean-kind metric at one point (Total or a segment), derived
+   * exactly from the published category distribution of that wave.
+   * History waves read the wave payload; the current wave reads the
+   * published model cells. null when not a mean or no distribution.
+   */
+  trk.sdAt = function (metric, segNorm, year) {
+    if (!metric.isMean || metric.diff) return null;
+    if (year !== TR.render.currentYear()) {
+      var hit = TR.waves.history(metric.q).filter(function (h) {
+        return h.year === year;
+      })[0];
+      return hit
+        ? TR.waves.sdAtWave(metric.q, metric.row, hit.q, segNorm || null) : null;
+    }
+    var scores = TR.waves.scoreMap(metric.q, metric.row);
+    if (!scores) return null;
+    var ci = 0, model;
+    if (segNorm) {
+      var seg = trk.segmentByNorm(segNorm);
+      if (!seg) return null;
+      model = trk.publishedModel(metric.code, seg.group);
+      ci = -1;
+      model.columns.forEach(function (col, i) {
+        if (col.label === seg.label) ci = i;
+      });
+      if (ci < 0) return null;
+    } else {
+      model = trk.publishedModel(metric.code, null);
+    }
+    var pairs = [];
+    Object.keys(scores).forEach(function (ri) {
+      var cell = model.rows[ri] && model.rows[ri].cells[ci];
+      if (cell && cell.pct !== null && cell.pct !== undefined) {
+        pairs.push({ p: cell.pct, s: scores[ri] });
+      }
+    });
+    return TR.waves.sdFromPairs(pairs);
+  };
+
+  /**
    * Full tracker-shaped point list for a metric in a segment (or Total):
    * history series + the current wave, each with change/sig vs previous
-   * point and vs the first point. [] when no history for that segment.
+   * point and vs the first point — pooled z for proportions, Welch on
+   * distribution-derived SDs for means/indexes/NPS. [] when no history.
    */
   trk.points = function (metric, segNorm) {
     var series = TR.waves.series(metric.q, metric.row, metric.ri, segNorm || null);
@@ -185,6 +226,8 @@
         value: cur.value, base: cur.base,
         x: canSig ? (cur.x !== null ? cur.x
           : Math.round(cur.value / 100 * (cur.base || 0))) : null,
+        sd: metric.isMean && !metric.diff
+          ? trk.sdAt(metric, segNorm, TR.render.currentYear()) : undefined,
         current: true });
     }
     return TR.waves.cellsFor(points, canSig);

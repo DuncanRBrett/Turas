@@ -157,9 +157,11 @@
       '<option value="dual"' + (s.sigMode === "dual" ? " selected" : "") + ">95% + 80%</option>" +
       "</select></label>" +
       (TR.d2.tracking().enabled
-        ? toggle("showDeltas", "Δ + trend",
-            "Change vs the most recent prior wave with this question, " +
-            "plus the wave strip")
+        ? toggle("showDeltas", "Δ chips",
+            "Change chips on the Total column vs the most recent prior " +
+            "wave with this question") +
+          toggle("showWaveStrip", "Wave history",
+            "Show the per-question wave history strip under the table")
         : "") +
       '<span class="pinwrap"><button data-act="columns" aria-haspopup="true" ' +
       'title="One place to choose which rows and banner columns show on the ' +
@@ -317,7 +319,7 @@
       heatmap: s.heatmap, showCounts: s.showCounts,
       showDeltas: s.showDeltas && TR.d2.tracking().enabled,
       hideable: true, rowHideable: true, sortable: true }) + "</div>";
-    if (s.showDeltas && TR.d2.tracking().enabled) {
+    if (s.showWaveStrip && TR.d2.tracking().enabled) {
       html += TR.render.waveStripHtml(model);
     }
 
@@ -400,33 +402,25 @@
       });
     }, 0);
     var tracked = !!cards2.activeModel().prevWave;
-    menu.innerHTML = '<div class="pm-title">Pin to story</div>' +
-      '<label><input type="checkbox" id="pm-chart"' +
-      (s.showChart ? " checked" : "") + "> Chart (" +
-      fmt.escapeHtml(s.chartType) + ")</label>" +
-      '<label><input type="checkbox" id="pm-table" checked> Table</label>' +
-      '<label><input type="checkbox" id="pm-insight" checked> Insight</label>' +
-      '<button class="primary wide" id="pm-go">Pin</button>' +
-      (tracked
-        ? '<div class="pm-title pm-sep">Trend exhibit</div>' +
-          '<button class="wide" id="pm-exhibit" title="Two-panel exhibit: this ' +
-          "wave's distribution chart with the trend over waves below — exports " +
-          'to PowerPoint as two editable chart objects on one slide">' +
-          "📈 Pin distribution + trend</button>"
-        : "");
-    document.getElementById("pm-go").addEventListener("click", function () {
-      var flags = {
-        chart: document.getElementById("pm-chart").checked,
-        table: document.getElementById("pm-table").checked,
-        insight: document.getElementById("pm-insight").checked
-      };
+    TR.shell.pinMenu(menu, [
+      { key: "chart", label: "Chart (" + fmt.escapeHtml(s.chartType) + ")",
+        checked: s.showChart },
+      { key: "table", label: "Table", checked: true },
+      { key: "insight", label: "Insight", checked: true }
+    ], function (flags) {
       menu.hidden = true;
       if (!flags.chart && !flags.table && !flags.insight) {
         TR.shell.toast("Pick at least one element to pin");
         return;
       }
       TR.story2.pinCurrent(flags);
-    });
+    }, tracked
+      ? '<div class="pm-title pm-sep">Trend exhibit</div>' +
+        '<button class="wide" id="pm-exhibit" title="Two-panel exhibit: this ' +
+        "wave's distribution chart with the trend over waves below — exports " +
+        'to PowerPoint as two editable chart objects on one slide">' +
+        "📈 Pin distribution + trend</button>"
+      : "");
     var exhibitBtn = document.getElementById("pm-exhibit");
     if (exhibitBtn) {
       exhibitBtn.addEventListener("click", function () {

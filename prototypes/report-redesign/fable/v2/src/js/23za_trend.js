@@ -293,9 +293,10 @@
         }
       });
       var last = s.points[s.points.length - 1];
+      // end labels carry the VALUE only — series names live in the
+      // bottom legend where there is room for the full question text
       endLabels.push({ pos: yOf(last.value), colour: colour, sig: s.sigNow,
-        text: (labelMode === "none" ? "" : fmtVal(last.value, s.isMean) + " ") +
-          (series.length > 1 ? TR.charts.clip(s.label, 14) : "") });
+        text: labelMode === "none" ? "" : fmtVal(last.value, s.isMean) });
     });
     render.repel(endLabels, 13, padT + 4, padT + plotH);
     endLabels.forEach(function (l) {
@@ -311,7 +312,7 @@
     var legend = null, height = H;
     if (series.length > 1) {
       legend = S.legend(series.map(function (s, k) {
-        return { label: TR.charts.clip(s.label, 30),
+        return { label: TR.charts.clip(s.label, 52),
           colour: palette[k % palette.length] };
       }), padL, H + 4, W - padL - 10);
       body.push(legend.body);

@@ -202,10 +202,13 @@ explorer functionality (`modules/tracker/lib/html_report/js/explorer_view.js`
 - **Pins:** any Visualise view pins to the story as a two-chart native
   PPTX exhibit (current-wave by segment + trend by segment + optional
   metric-by-wave table).
-- **Honesty rule:** means/indexes/NPS scores carry direction only — the
-  published wave totals have no spread, so only proportion metrics are
-  significance-tested (the production path with real microdata will t-test
-  means exactly as `modules/tracker/lib/trend_significance.R` does).
+- **Significance for every metric type:** proportions use the pooled z;
+  means, indexes and NPS use a **Welch test on the SD derived from each
+  wave's published category distribution** (Index via the index weights,
+  NPS via +100/0/−100, means via the numeric labels) — the same spread
+  powers their 95% CI bands. NET POSITIVE (score differences) stays
+  untested. The production path with real microdata will use
+  `modules/tracker/lib/trend_significance.R` directly.
 - **Gates:** 22 v2 tests; new known answers — per-segment NPS (Cape Town
   2020 = 35, current = the published campus cell verbatim), 2021 NET via
   member-sum (CT 87, base 36), per-year segment coverage, segment-pin

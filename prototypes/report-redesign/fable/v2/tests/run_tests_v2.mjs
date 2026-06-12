@@ -162,6 +162,28 @@ run("segment pin exhibit: 2 native charts + table (python)", () => {
   assert(report.startsWith("OK"), report);
 });
 
+run("means significance: Welch on distribution-derived SDs", () => {
+  // SD known answer (hand-computed): Q008 2025 Index distribution
+  // 0/3/12/37/47 over scores 0/25/50/75/100 -> SD 19.86
+  const idx8 = TR.trk.metricList("key").find((m) =>
+    m.code === "Q008" && m.isMean);
+  const sd = TR.trk.sdAt(idx8, null, TR.render.currentYear());
+  assert(Math.abs(sd - 19.86) < 0.05, "Q008 Index SD " + sd);
+  // big index moves flag, small ones don't
+  const means = TR.trk.metricList("key").filter((m) => m.isMean);
+  let sig = 0;
+  for (const m of means) {
+    const cells = TR.trk.points(m, null);
+    const last = cells[cells.length - 1];
+    if (last && last.current && last.sig_prev) sig++;
+  }
+  assert(sig >= 5 && sig < means.length / 2,
+    "significant mean changes: " + sig + " of " + means.length);
+  const m10 = TR.model.forQuestion("Q010", TR.AGG.banner_groups[0].id, []);
+  const idxRow = m10.rows.find((r) => r.kind === "mean");
+  assert(idxRow.delta.sig === false, "Q010 Index -0.9 must NOT flag");
+});
+
 run("native trend chart: year categories + one series per metric", () => {
   const m = TR.model.forQuestion("Q017", TR.AGG.banner_groups[0].id, []);
   m.chartKind = "summary";

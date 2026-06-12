@@ -152,6 +152,86 @@
     return waveQ.base || null;
   }
 
+  /* ---------- spread of mean-kind metrics (from published distributions) --- */
+
+  /** Per-category respondent scores behind a mean-kind row: {ri: score}.
+   *  Index rows use the configured index weights; NPS maps 9-10/7-8/0-6
+   *  to +100/0/-100; plain means use the numeric category labels. */
+  waves.scoreMap = function (q, row) {
+    var label = TR.model.norm(row.label);
+    var type = label.indexOf("nps") !== -1 ? "nps"
+      : label === "mean" ? "mean" : "index";
+    var map = {}, any = false;
+    q.rows.forEach(function (r, ri) {
+      if (r.kind !== "category") return;
+      var score = null;
+      if (type === "index") {
+        var w = q.index_scores && q.index_scores[r.label];
+        if (w !== undefined && w !== null) score = w;
+      } else {
+        var v = parseFloat(r.label);
+        if (isFinite(v)) {
+          score = type === "nps" ? (v >= 9 ? 100 : v >= 7 ? 0 : -100) : v;
+        }
+      }
+      if (score !== null) { map[ri] = score; any = true; }
+    });
+    return any ? map : null;
+  };
+
+  function sdFromPairs(pairs) {
+    var weight = 0, mean = 0;
+    pairs.forEach(function (d) { weight += d.p; mean += d.p * d.s; });
+    if (weight <= 0) return null;
+    mean /= weight;
+    var variance = 0;
+    pairs.forEach(function (d) {
+      variance += d.p * (d.s - mean) * (d.s - mean);
+    });
+    return Math.sqrt(variance / weight);
+  }
+  waves.sdFromPairs = sdFromPairs;
+
+  /** SD of a mean-kind row in one HISTORY wave (per segment), derived
+   *  exactly from that wave's published category distribution. */
+  waves.sdAtWave = function (q, row, waveQ, seg) {
+    var scores = waves.scoreMap(q, row);
+    if (!scores) return null;
+    var pairs = [];
+    Object.keys(scores).forEach(function (ri) {
+      var v = waves.valueAt(q, q.rows[ri], parseInt(ri, 10), waveQ, seg || null);
+      if (v !== null && v !== undefined) pairs.push({ p: v, s: scores[ri] });
+    });
+    return sdFromPairs(pairs);
+  };
+
+  /** SD of a mean-kind row in the CURRENT wave from a view model's Total
+   *  column (rows still aligned with q.rows — pre row-ops). */
+  function sdFromModel(q, row, viewModel) {
+    var scores = waves.scoreMap(q, row);
+    if (!scores) return null;
+    var pairs = [];
+    Object.keys(scores).forEach(function (ri) {
+      var cell = viewModel.rows[ri] && viewModel.rows[ri].cells[0];
+      if (cell && cell.pct !== null && cell.pct !== undefined) {
+        pairs.push({ p: cell.pct, s: scores[ri] });
+      }
+    });
+    return sdFromPairs(pairs);
+  }
+
+  /** Two-sided 95% Welch test between two mean points carrying sd + base.
+   *  Same low-base exclusion as the proportion path. */
+  function meanSigBetween(a, b) {
+    if (a.sd === null || a.sd === undefined ||
+        b.sd === null || b.sd === undefined) return false;
+    if (!a.base || !b.base) return false;
+    var threshold = TR.AGG.project.low_base_threshold || 30;
+    if (a.base < threshold || b.base < threshold) return false;
+    var z = TR.stats.meanZ(a.value, a.sd, a.base, b.value, b.sd, b.base);
+    return z !== null && Math.abs(z) > 1.96;
+  }
+
   /** Count for sig testing: published n (Total only), else pct-derived. */
   function countOf(waveQ, row, value, seg) {
     if (!seg) {
@@ -185,7 +265,9 @@
       if (value === null || value === undefined) return;
       series.push({ wave: h.wave, year: h.year, value: value,
         base: baseOf(h.q, seg || null),
-        x: isMean || row.diff ? null : countOf(h.q, row, value, seg || null) });
+        x: isMean || row.diff ? null : countOf(h.q, row, value, seg || null),
+        sd: isMean && !row.diff
+          ? waves.sdAtWave(q, row, h.q, seg || null) : undefined });
     });
     return series;
   };
@@ -193,19 +275,26 @@
   /**
    * Tracker-shaped cells: every point of a series (typically with the
    * current wave appended by the caller) annotated with change vs the
-   * PREVIOUS point and vs the FIRST point, pooled-z sig on both.
-   * canSig is false for means/indexes and NET POSITIVE (score) rows.
+   * PREVIOUS point and vs the FIRST point, significance on both.
+   * Proportions (canSig) use the pooled z; points carrying a
+   * distribution-derived `sd` (means/indexes/NPS) use a Welch test;
+   * NET POSITIVE (score difference) rows stay untested.
    */
   waves.cellsFor = function (points, canSig) {
+    var sig = function (a, b) {
+      if (canSig) return sigBetween(a, b);
+      if (a.sd !== undefined && a.sd !== null) return meanSigBetween(a, b);
+      return false;
+    };
     return points.map(function (p, i) {
       var prev = i > 0 ? points[i - 1] : null;
       var first = i > 0 ? points[0] : null;
       return { wave: p.wave, year: p.year, value: p.value, base: p.base,
-        x: p.x, current: !!p.current,
+        x: p.x, sd: p.sd, current: !!p.current,
         change_prev: prev ? p.value - prev.value : null,
-        sig_prev: prev && canSig ? sigBetween(p, prev) : false,
+        sig_prev: prev ? sig(p, prev) : false,
         change_base: first ? p.value - first.value : null,
-        sig_base: first && canSig ? sigBetween(p, first) : false };
+        sig_base: first ? sig(p, first) : false };
     });
   };
 
@@ -238,16 +327,20 @@
       var curX = !canSig ? null
         : (row.cells[0].n !== null && row.cells[0].n !== undefined
           ? row.cells[0].n : Math.round(cur / 100 * curBase));
-      var curPoint = { value: cur, base: curBase, x: curX };
+      var curPoint = { value: cur, base: curBase, x: curX,
+        sd: isMean && !row.diff ? sdFromModel(q, row, viewModel) : undefined };
+      var sigVs = function (point) {
+        if (canSig) return sigBetween(curPoint, point);
+        if (isMean && !row.diff) return meanSigBetween(curPoint, point);
+        return false;
+      };
       var latest = series[series.length - 1];
       row.delta = { prev: latest.value, wave: latest.wave, year: latest.year,
-        diff: cur - latest.value, isMean: isMean,
-        sig: canSig ? sigBetween(curPoint, latest) : false };
+        diff: cur - latest.value, isMean: isMean, sig: sigVs(latest) };
       var first = series[0];
       if (first.year !== latest.year) {
         row.deltaBase = { prev: first.value, wave: first.wave, year: first.year,
-          diff: cur - first.value, isMean: isMean,
-          sig: canSig ? sigBetween(curPoint, first) : false };
+          diff: cur - first.value, isMean: isMean, sig: sigVs(first) };
       }
     });
     return viewModel;
