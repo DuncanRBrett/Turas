@@ -296,6 +296,21 @@ run("pins + slides carry the interval vocabulary", () => {
   assert(!plainSlide.xml.includes("95% SI"), "method note must be opt-in");
 });
 
+run("PPTX tables that cannot fit say so instead of truncating silently", () => {
+  const tall = { head: ["Metric", "Total"],
+    body: Array.from({ length: 30 }, (_, i) =>
+      ({ kind: "row", cells: ["Row " + i, String(i)] })) };
+  const xml = TR.exporter.matrixSlide("Tall table", "", tall);
+  assert(xml.includes("+16 more rows"), "truncation note missing");
+  assert((xml.match(/<a:tr /g) || []).length === 16,
+    "head + 14 data rows + the note row");
+  // a table that fits is left alone
+  const small = { head: ["Metric", "Total"],
+    body: [{ kind: "row", cells: ["Only row", "1"] }] };
+  assert(!TR.exporter.matrixSlide("Small", "", small).includes("more rows"),
+    "no note when nothing was dropped");
+});
+
 run("confidence: explainer + sampling vocabulary ship in the artifact", () => {
   // the callout is built live from the report's own data
   const callout = TR.conf.calloutHtml();

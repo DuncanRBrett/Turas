@@ -230,6 +230,19 @@
       rows.join("") + "</a:tbl></a:graphicData></a:graphic></p:graphicFrame>";
   }
 
+  /** Fit a matrix to a slide's row budget. When rows must be dropped the
+   *  last visible row says how many — a silently truncated table reads
+   *  as complete, which misstates the data. */
+  function fitMatrix(matrix, maxRows) {
+    if (matrix.body.length <= maxRows) return matrix;
+    var kept = matrix.body.slice(0, Math.max(maxRows - 1, 1));
+    var note = ["… +" + (matrix.body.length - kept.length) +
+      " more rows — see the full report"];
+    while (note.length < matrix.head.length) note.push("");
+    return { head: matrix.head,
+      body: kept.concat([{ kind: "base", cells: note }]) };
+  }
+
   function wrapSlide(content) {
     return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
       '<p:sld xmlns:a="' + TR.pptx.NS.a + '" xmlns:r="' + TR.pptx.NS.r +
@@ -462,11 +475,8 @@
       top += blockH + 0.2;
     });
     if (spec.matrix) {
-      var matrix = spec.matrix;
-      var maxRows = Math.max(3, Math.floor(blockH / 0.28) - 1);
-      if (matrix.body.length > maxRows) {
-        matrix = { head: matrix.head, body: matrix.body.slice(0, maxRows) };
-      }
+      var matrix = fitMatrix(spec.matrix,
+        Math.max(3, Math.floor(blockH / 0.28) - 1));
       content += tableFrame(next(), { x: MARGIN, y: top, w: contentW,
         h: Math.min(blockH, (matrix.body.length + 1) * 0.28) }, matrix, brand,
         matrix.head.length > 8 ? 8.5 : 10);
@@ -536,11 +546,8 @@
       }
     }
     if (flags.table) {
-      var matrix = TR.render.matrix(model);
-      var maxRows = Math.max(4, Math.floor((bottom - top) / 0.3) - 1);
-      if (matrix.body.length > maxRows) {
-        matrix = { head: matrix.head, body: matrix.body.slice(0, maxRows) };
-      }
+      var matrix = fitMatrix(TR.render.matrix(model),
+        Math.max(4, Math.floor((bottom - top) / 0.3) - 1));
       content += tableFrame(next(), { x: MARGIN, y: top, w: contentW,
         h: Math.min(bottom - top, (matrix.body.length + 1) * 0.3) }, matrix, brand,
         matrix.head.length > 7 ? 9 : 10);
@@ -577,10 +584,7 @@
     var brand = TR.charts.brandOf().replace("#", "").toUpperCase();
     var id = 1;
     var next = function () { return ++id; };
-    var maxRows = 15;
-    if (matrix.body.length > maxRows) {
-      matrix = { head: matrix.head, body: matrix.body.slice(0, maxRows) };
-    }
+    matrix = fitMatrix(matrix, 15);
     return wrapSlide(
       rectShape(next(), { x: 0, y: 0, w: SLIDE_W, h: 0.07 }, brand) +
       textBox(next(), { x: MARGIN, y: 0.3, w: SLIDE_W - MARGIN * 2, h: 0.6 },
