@@ -82,7 +82,7 @@
               "font-weight": 600, fill: "#1c2333" }));
         }
       });
-      wrapLabel(body, TR.charts.clip(r.label, 48), cx, padT + plotH + 12);
+      wrapLabel(body, r.label, cx, padT + plotH + 12, slot);
     });
     body.push(S.el("line", { x1: padL, y1: padT + plotH, x2: W - padL,
       y2: padT + plotH, stroke: "#d8dcea" }));
@@ -98,8 +98,11 @@
     return S.root(W, y + 14, model.code + " — column chart", body.join(""));
   };
 
-  function wrapLabel(body, label, cx, y) {
-    S.wrapText(label, 14).slice(0, 3).forEach(function (l, i) {
+  function wrapLabel(body, label, cx, y, slotW) {
+    // line length follows the column's slot width so wide slots keep the
+    // full text; three 9.5px lines fit inside the fixed x-axis band
+    var maxChars = Math.max(14, Math.floor((slotW || 90) / 6));
+    S.wrapText(label, maxChars).slice(0, 3).forEach(function (l, i) {
       body.push(S.text(cx, y + i * 11, l,
         { "text-anchor": "middle", "font-size": 9.5, fill: "#6b7280" }));
     });

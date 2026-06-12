@@ -208,6 +208,34 @@ run("deltas: most questions tracked, new ones flagged", () => {
   assert(withDeltaRows >= 55, "questions with row-level deltas: " + withDeltaRows);
 });
 
+run("composite exhibit: one scale per chart, everything in the table", () => {
+  // Q017 NPS (0-100 family) + Q016 trust mean (0-10) + Q008 Index (0-100)
+  const item = { kind: "exhibit", qs: ["Q017", "Q016", "Q008"],
+    banner: TR.AGG.banner_groups[0].id, filters: [],
+    flags: { dist: true, trend: true, table: true }, distType: "column",
+    note: "" };
+  const models = TR.exhibit.models(item);
+  const dist = TR.exhibit.distModel(item, models);
+  assert(dist.rows.length === 2, "dominant 0-100 family plots: " +
+    dist.rows.map((r) => r.label).join(" | "));
+  assert(dist._dropped.length === 1 && /trust/i.test(dist._dropped[0]),
+    "the 0-10 trust mean is named as table-only");
+  const matrix = TR.exhibit.matrix(item, models);
+  assert(matrix.body.length === 3, "the table keeps all three metrics");
+  for (const row of matrix.body) {
+    const label = row.cells[0];
+    const tail = label.split("·").pop().trim();
+    assert(label.split(tail).length === 2,
+      "metric label not duplicated: " + label);
+  }
+  const html = TR.exhibit.panelsHtml(item);
+  assert(html.includes("Different scale — not on this chart"),
+    "story card carries the scale note");
+  const slide = TR.exhibit.slide(item);
+  assert(slide.xml.includes("different scale, table only"),
+    "PPTX meta carries the scale note");
+});
+
 run("per-row chart selection: unticked rows leave the chart only", () => {
   const m = TR.model.forQuestion("Q008", TR.AGG.banner_groups[0].id, []);
   m.chartKind = "detail";

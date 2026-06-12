@@ -112,15 +112,47 @@
   }
 
   function shortLabel(model, row) {
-    // question TEXT first — codes are meaningless on a chart
-    return TR.charts.clip(model.title, 32) + " · " +
-      TR.charts.clip(row.label, 14);
+    // question TEXT first — codes are meaningless on a chart; generous
+    // clips only (chart labels and legends wrap, table cells wrap)
+    return TR.charts.clip(model.title, 120) + " · " +
+      TR.charts.clip(row.label, 40);
   }
 
-  /** Distribution panel model: real for one question, headline bars for many. */
+  /**
+   * Composite metrics share one chart axis only within a scale family:
+   * 0–10 means vs everything else (%/Index/NPS on 0–100). The dominant
+   * family plots; the rest are named in a note under the chart and stay
+   * in the table. The trend chart applies the same rule internally —
+   * this keeps the two exhibit panels consistent.
+   */
+  function dominantScale(entries, maxOf, isMeanOf) {
+    var isSmall = function (e) { return isMeanOf(e) && maxOf(e) <= 10; };
+    var small = entries.filter(isSmall);
+    var large = entries.filter(function (e) { return !isSmall(e); });
+    var keep = small.length > large.length ? small : large;
+    var dropped = small.length > large.length ? large : small;
+    return { keep: keep, dropped: dropped };
+  }
+
+  function waveMax(waves, current) {
+    var max = current === null || current === undefined ? 0 : Math.abs(current);
+    (waves || []).forEach(function (w) {
+      if (w.value !== null && Math.abs(w.value) > max) max = Math.abs(w.value);
+    });
+    return max;
+  }
+
+  /** Distribution panel model: real for one question, headline bars for
+   *  many — restricted to the dominant scale family (model._dropped names
+   *  what the chart cannot carry; the table keeps everything). */
   exhibit.distModel = function (item, models) {
     if (isSeriesItem(item)) {
-      var rows = seriesPseudoRows(item, models).map(function (r) {
+      var split = dominantScale(seriesPseudoRows(item, models),
+        function (r) {
+          return waveMax(r.waves, null);
+        },
+        function (r) { return !!r.isMean; });
+      var rows = split.keep.map(function (r) {
         var last = r.waves[r.waves.length - 1];
         return { kind: "category", label: r.label,
           cells: [{ pct: last.value, n: null, mean: null, sig: "" }] };
@@ -128,7 +160,8 @@
       return { code: models[0].code, title: "This wave",
         source: "published", chartKind: "detail", lowBaseThreshold: 30,
         columns: [{ label: "Total", letter: "", base: null, low: false }],
-        rows: rows };
+        rows: rows,
+        _dropped: split.dropped.map(function (r) { return r.label; }) };
     }
     if (models.length === 1) {
       var m = models[0];
@@ -136,17 +169,24 @@
       m.hiddenChartRows = item.hiddenChartRows || [];
       return m;
     }
-    var rows = [];
+    var entries = [];
     models.forEach(function (m) {
       var row = exhibit.headlineRow(m);
-      if (!row) return;
-      rows.push({ kind: "category", label: shortLabel(m, row),
-        cells: [{ pct: curOf(row), n: null, mean: null, sig: "" }] });
+      if (row) entries.push({ m: m, row: row });
     });
+    var compSplit = dominantScale(entries,
+      function (e) { return waveMax(e.row.waves, curOf(e.row)); },
+      function (e) { return e.row.kind === "mean"; });
     return { code: "COMPOSITE", title: "This wave", source: "published",
       chartKind: "detail", lowBaseThreshold: 30,
       columns: [{ label: "Total", letter: "", base: null, low: false }],
-      rows: rows };
+      rows: compSplit.keep.map(function (e) {
+        return { kind: "category", label: shortLabel(e.m, e.row),
+          cells: [{ pct: curOf(e.row), n: null, mean: null, sig: "" }] };
+      }),
+      _dropped: compSplit.dropped.map(function (e) {
+        return shortLabel(e.m, e.row);
+      }) };
   };
 
   /** Trend panel model: real for one question, headline series for many. */
@@ -221,7 +261,7 @@
       var byYear = {};
       (row.waves || []).forEach(function (w) { byYear[w.year] = w; });
       body.push({ kind: "row", cells:
-        [shortLabel(m, row) + " — " + TR.charts.clip(row.label, 20)]
+        [shortLabel(m, row)]
           .concat(years.map(function (y) {
             return byYear[y] ? fmtVal(byYear[y].value, isMean) : "–";
           }))
@@ -254,6 +294,11 @@
       var type = item.distType === "line" ? "column" : (item.distType || "column");
       out.push('<div class="chart ex-chart">' +
         TR.render.chartBy(type, dist, item.chartCols || [0]) + "</div>");
+      if (dist._dropped && dist._dropped.length) {
+        out.push('<p class="trknote">Different scale — not on this chart, ' +
+          "see the table: " +
+          fmt.escapeHtml(dist._dropped.join(" · ")) + "</p>");
+      }
     }
     if (flags.trend) {
       out.push('<div class="chart ex-chart">' +
@@ -290,11 +335,17 @@
     if (!models.length) return null;
     var flags = item.flags || {};
     var charts = [];
+    var scaleNote = "";
     if (flags.dist) {
       var type = item.distType === "line" ? "column" : (item.distType || "column");
-      var chart = TR.exporter.buildChart(exhibit.distModel(item, models),
+      var dist = exhibit.distModel(item, models);
+      var chart = TR.exporter.buildChart(dist,
         type, item.chartCols && item.chartCols.length ? item.chartCols : [0]);
       if (chart) charts.push(chart);
+      if (dist._dropped && dist._dropped.length) {
+        scaleNote = " · different scale, table only: " +
+          dist._dropped.join(" · ");
+      }
     }
     if (flags.trend) {
       var trend = TR.exporter.buildTrendChart(exhibit.trendModel(item, models));
@@ -302,7 +353,7 @@
     }
     return TR.exporter.exhibitSlide({
       title: exhibit.titleFor(item, models),
-      meta: exhibit.contextLine(item, models),
+      meta: exhibit.contextLine(item, models) + scaleNote,
       charts: charts,
       matrix: flags.table ? exhibit.matrix(item, models) : null,
       note: (flags.insight !== false && item.note) ? item.note : ""
