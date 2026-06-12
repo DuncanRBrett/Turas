@@ -49,8 +49,18 @@
       (change >= 0 ? "▲ +" : "▼ −") + Math.abs(change).toFixed(1) + " vs " +
       (card.cells.length > 1 ? card.cells[card.cells.length - 2].year : "") +
       (last.sig_prev ? " · sig" : "") + "</span>";
+    // interval in the tooltip: same SD source as the sig test (trk.sdAt)
+    var sd = trk.sdAt(m, null, TR.render.currentYear());
+    var bounds = sd === null || !last.base ? null
+      : TR.conf.meanCI(last.value, sd, last.base);
+    var intervalTip = bounds
+      ? " — 95% " + TR.conf.labels().interval_abbrev + " " +
+        TR.conf.fmtRange(bounds.lo, bounds.hi, true) +
+        " (n=" + fmt.base(last.base) + ")"
+      : "";
     return '<button class="kpi band-' + card.band + '" data-vis="' + m.key +
-      '" title="' + fmt.escapeHtml(m.title) + ' — click to visualise">' +
+      '" title="' + fmt.escapeHtml(m.title) + intervalTip +
+      ' — click to visualise">' +
       '<span class="kpi-label">' + m.code + " · " +
       fmt.escapeHtml(TR.charts.clip(m.title, 44)) + "</span>" +
       '<span class="kpi-value">' + trk.fmtVal(last.value, true) +

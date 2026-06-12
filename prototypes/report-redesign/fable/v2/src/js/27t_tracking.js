@@ -294,7 +294,8 @@
       (TR.d2.filtersActive()
         ? '<span class="trkfilternote">⚠ report filters do not apply here — ' +
           "tracking always compares published figures</span>" : "") +
-      "</div><div id='trkhost'></div></div>";
+      "</div><div id='trkhost'></div>" +
+      TR.conf.calloutHtml() + "</div>";
     host.replaceChildren(wrap);
     wrap.querySelectorAll("[data-sub]").forEach(function (btn) {
       btn.addEventListener("click", function () {
@@ -302,6 +303,13 @@
         views.whatMoved(host);
       });
     });
+    // the shared confidence explainer (fresh wrapper -> no stacked handlers)
+    var callout = wrap.querySelector("[data-callout]");
+    if (callout) {
+      callout.addEventListener("click", function () {
+        callout.closest(".callout").classList.toggle("collapsed");
+      });
+    }
     var sub = document.getElementById("trkhost");
     if (trk.state.sub === "explorer") TR.trkVis.renderExplorer(sub);
     else if (trk.state.sub === "visualise") TR.trkVis.renderVisualise(sub);

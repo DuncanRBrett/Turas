@@ -245,19 +245,23 @@
     var endLabels = [];
     series.forEach(function (s, k) {
       var colour = palette[k % palette.length];
-      // optional 95% CI band behind the line (Visualise toggle)
+      // optional 95% interval band behind the line (Visualise toggle).
+      // opts.ci returns absolute {lo, hi} bounds — Wilson intervals are
+      // asymmetric around the value, so the band is NOT value ± half.
       if (opts.ci) {
-        var banded = s.points.filter(function (p) {
-          return opts.ci(s.row || s, p) !== null;
+        var banded = [];
+        s.points.forEach(function (p) {
+          var bounds = opts.ci(s.row || s, p);
+          if (bounds) banded.push({ x: xOf(p.year), bounds: bounds });
         });
         if (banded.length > 1) {
-          var upper = banded.map(function (p, i) {
-            return (i ? "L" : "M") + xOf(p.year).toFixed(1) + " " +
-              clampY(p.value + opts.ci(s.row || s, p)).toFixed(1);
+          var upper = banded.map(function (e, i) {
+            return (i ? "L" : "M") + e.x.toFixed(1) + " " +
+              clampY(e.bounds.hi).toFixed(1);
           }).join(" ");
-          var lower = banded.slice().reverse().map(function (p) {
-            return "L" + xOf(p.year).toFixed(1) + " " +
-              clampY(p.value - opts.ci(s.row || s, p)).toFixed(1);
+          var lower = banded.slice().reverse().map(function (e) {
+            return "L" + e.x.toFixed(1) + " " +
+              clampY(e.bounds.lo).toFixed(1);
           }).join(" ");
           body.push(S.el("path", { d: upper + lower + " Z", fill: colour,
             "fill-opacity": 0.12, stroke: "none" }));

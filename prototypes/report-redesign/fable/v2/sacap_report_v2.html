@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SACAP 2025 Annual Student Survey — Turas Report v2</title>
-<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 16:11 SAST -->
+<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-12 16:15 SAST -->
 <!-- Single self-contained file: published tables + prior wave + synthetic
      microdata + one fixed renderer. No network requests, no installs. -->
 <style>
@@ -3397,19 +3397,23 @@ null
     var endLabels = [];
     series.forEach(function (s, k) {
       var colour = palette[k % palette.length];
-      // optional 95% CI band behind the line (Visualise toggle)
+      // optional 95% interval band behind the line (Visualise toggle).
+      // opts.ci returns absolute {lo, hi} bounds — Wilson intervals are
+      // asymmetric around the value, so the band is NOT value ± half.
       if (opts.ci) {
-        var banded = s.points.filter(function (p) {
-          return opts.ci(s.row || s, p) !== null;
+        var banded = [];
+        s.points.forEach(function (p) {
+          var bounds = opts.ci(s.row || s, p);
+          if (bounds) banded.push({ x: xOf(p.year), bounds: bounds });
         });
         if (banded.length > 1) {
-          var upper = banded.map(function (p, i) {
-            return (i ? "L" : "M") + xOf(p.year).toFixed(1) + " " +
-              clampY(p.value + opts.ci(s.row || s, p)).toFixed(1);
+          var upper = banded.map(function (e, i) {
+            return (i ? "L" : "M") + e.x.toFixed(1) + " " +
+              clampY(e.bounds.hi).toFixed(1);
           }).join(" ");
-          var lower = banded.slice().reverse().map(function (p) {
-            return "L" + xOf(p.year).toFixed(1) + " " +
-              clampY(p.value - opts.ci(s.row || s, p)).toFixed(1);
+          var lower = banded.slice().reverse().map(function (e) {
+            return "L" + e.x.toFixed(1) + " " +
+              clampY(e.bounds.lo).toFixed(1);
           }).join(" ");
           body.push(S.el("path", { d: upper + lower + " Z", fill: colour,
             "fill-opacity": 0.12, stroke: "none" }));
@@ -5237,7 +5241,8 @@ null
       (TR.d2.filtersActive()
         ? '<span class="trkfilternote">⚠ report filters do not apply here — ' +
           "tracking always compares published figures</span>" : "") +
-      "</div><div id='trkhost'></div></div>";
+      "</div><div id='trkhost'></div>" +
+      TR.conf.calloutHtml() + "</div>";
     host.replaceChildren(wrap);
     wrap.querySelectorAll("[data-sub]").forEach(function (btn) {
       btn.addEventListener("click", function () {
@@ -5245,6 +5250,13 @@ null
         views.whatMoved(host);
       });
     });
+    // the shared confidence explainer (fresh wrapper -> no stacked handlers)
+    var callout = wrap.querySelector("[data-callout]");
+    if (callout) {
+      callout.addEventListener("click", function () {
+        callout.closest(".callout").classList.toggle("collapsed");
+      });
+    }
     var sub = document.getElementById("trkhost");
     if (trk.state.sub === "explorer") TR.trkVis.renderExplorer(sub);
     else if (trk.state.sub === "visualise") TR.trkVis.renderVisualise(sub);
@@ -5309,8 +5321,18 @@ null
       (change >= 0 ? "▲ +" : "▼ −") + Math.abs(change).toFixed(1) + " vs " +
       (card.cells.length > 1 ? card.cells[card.cells.length - 2].year : "") +
       (last.sig_prev ? " · sig" : "") + "</span>";
+    // interval in the tooltip: same SD source as the sig test (trk.sdAt)
+    var sd = trk.sdAt(m, null, TR.render.currentYear());
+    var bounds = sd === null || !last.base ? null
+      : TR.conf.meanCI(last.value, sd, last.base);
+    var intervalTip = bounds
+      ? " — 95% " + TR.conf.labels().interval_abbrev + " " +
+        TR.conf.fmtRange(bounds.lo, bounds.hi, true) +
+        " (n=" + fmt.base(last.base) + ")"
+      : "";
     return '<button class="kpi band-' + card.band + '" data-vis="' + m.key +
-      '" title="' + fmt.escapeHtml(m.title) + ' — click to visualise">' +
+      '" title="' + fmt.escapeHtml(m.title) + intervalTip +
+      ' — click to visualise">' +
       '<span class="kpi-label">' + m.code + " · " +
       fmt.escapeHtml(TR.charts.clip(m.title, 44)) + "</span>" +
       '<span class="kpi-value">' + trk.fmtVal(last.value, true) +
@@ -5977,19 +5999,20 @@ null
 
   /* ---------------- Visualise view ---------------- */
 
-  /** 95% CI half-width at a point: p(1-p)/n for proportions; for means,
-   *  indexes and NPS the SD comes from the published distribution
-   *  (TR.trk.sdAt — the same spread that powers their sig testing). */
-  function ciHalfWidth(metric, segId, point) {
+  /** 95% interval bounds {lo, hi} at a point: Wilson score on the
+   *  published base for proportions (asymmetric — never a plain ±);
+   *  for means, indexes and NPS z·SD/√n with the SD derived from the
+   *  published distribution (TR.trk.sdAt — the same spread that powers
+   *  their sig testing; the single SD source). */
+  function ciBounds(metric, segId, point) {
     if (metric.diff) return null;     // score differences: no single base
     if (!point.base || point.value === null) return null;
-    if (!metric.isMean) {
-      var p = Math.min(Math.max(point.value / 100, 0.001), 0.999);
-      return 1.96 * Math.sqrt(p * (1 - p) / point.base) * 100;
-    }
+    if (!metric.isMean) return TR.conf.wilsonPct(point.value, point.base);
     var sd = trk().sdAt(metric, segId === "total" ? null : segId, point.year);
-    return sd === null ? null : 1.96 * sd / Math.sqrt(point.base);
+    return sd === null ? null
+      : TR.conf.meanCI(point.value, sd, point.base);
   }
+  vis._ciBounds = ciBounds;   // exposed for pinned exhibits + tests
 
   /** Series for the chart/table: spec points transformed for the mode. */
   function buildSeries(specs, sel, mode, yearSet) {
@@ -6041,7 +6064,7 @@ null
       yMin: s.yMin, yMax: s.yMax, labels: s.visLabels || "last",
       ci: (mode === "absolute" && s.visCI) ? function (row, point) {
         var sr = series.filter(function (x) { return x.label === row.label; })[0];
-        return sr ? ciHalfWidth(sr.spec.metric, sr.spec.segId, point) : null;
+        return sr ? ciBounds(sr.spec.metric, sr.spec.segId, point) : null;
       } : null,
       annotations: notes.map(function (n) {
         return { year: n.year, label: n.text };
@@ -6074,11 +6097,11 @@ null
           "Explorer</button>") + "</div>" +
       '<div class="scopebar">' + modeBtn("absolute", "Absolute") +
       modeBtn("prev", "vs Previous") + modeBtn("base", "vs Baseline") +
-      '<label class="tg" title="Proportions: p(1−p)/n on the published base. ' +
-      "Means, indexes and NPS: SD derived from the published category " +
-      'distribution of each wave."><input type="checkbox" data-visci' +
+      '<label class="tg" title="Proportions: Wilson score interval on the ' +
+      "published base. Means, indexes and NPS: SD derived from the " +
+      'published category distribution of each wave."><input type="checkbox" data-visci' +
       (s.visCI ? " checked" : "") + (mode !== "absolute" ? " disabled" : "") +
-      "> 95% CI bands</label>" +
+      "> 95% " + TR.conf.labels().interval_abbrev + " bands</label>" +
       '<label class="tg">Labels <select data-vislabels>' +
       ["last", "all", "none"].map(function (l) {
         return '<option value="' + l + '"' +
@@ -6101,9 +6124,13 @@ null
       '<div class="chart" data-vischart>' + (chart ||
         '<div class="chart-error">No data for this selection.</div>') + "</div>" +
       (s.visCI && mode === "absolute"
-        ? '<p class="trknote">95% CI bands — proportions: p(1−p)/n on the ' +
-          "published base; means, indexes and NPS: SD derived from the " +
-          "published category distribution of each wave.</p>"
+        ? '<p class="trknote">95% ' + TR.conf.labels().interval_term +
+          " bands — proportions: Wilson score interval on the published " +
+          "base; means, indexes and NPS: SD derived from the published " +
+          "category distribution of each wave." +
+          (TR.conf.labels().is_probability ? "" :
+            " Quoted as stability intervals: this survey did not use " +
+            "formal random sampling.") + "</p>"
         : "") +
       (singleMetric
         ? '<p class="trknote">💬 Click any data point to tag it with a note ' +
@@ -6322,6 +6349,19 @@ null
         rows.push([sr.label + " · base"].concat(shownYears.map(function (y) {
           return byYear[y] ? byYear[y].base : "";
         })));
+        if (s.visCI && mode === "absolute") {
+          // interval views export their bounds explicitly (lo/hi rows)
+          var abbrev = TR.conf.labels().interval_abbrev;
+          var boundRow = function (which) {
+            return shownYears.map(function (y) {
+              var c = byYear[y];
+              var bounds = c ? ciBounds(sr.spec.metric, sr.spec.segId, c) : null;
+              return bounds ? Math.round(bounds[which] * 10) / 10 : "";
+            });
+          };
+          rows.push([sr.label + " · 95% " + abbrev + " lo"].concat(boundRow("lo")));
+          rows.push([sr.label + " · 95% " + abbrev + " hi"].concat(boundRow("hi")));
+        }
       });
       TR.xlsx.download((singleMetric ? singleMetric.code : "metrics") + "_trend",
         "Trend", [head].concat(rows));
@@ -6345,6 +6385,7 @@ null
         }
         TR.story2.pinTrackingView({
           title: visTitle(sel, specs),
+          ci: !!(s.visCI && mode === "absolute"),
           qs: specs.map(function (sp) { return sp.metric.code; })
             .filter(function (c, i, a) { return a.indexOf(c) === i; }),
           series: specs.map(function (sp) {

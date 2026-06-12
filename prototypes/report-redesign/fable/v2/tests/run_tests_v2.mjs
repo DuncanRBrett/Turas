@@ -208,6 +208,16 @@ run("deltas: most questions tracked, new ones flagged", () => {
   assert(withDeltaRows >= 55, "questions with row-level deltas: " + withDeltaRows);
 });
 
+run("trend chart draws the interval band from {lo, hi} bounds", () => {
+  const m = TR.model.forQuestion("Q008", TR.AGG.banner_groups[0].id, []);
+  m.chartKind = "summary";
+  const ci = (row, p) => p.base ? TR.conf.wilsonPct(p.value, p.base) : null;
+  const banded = TR.render.trendChart(m, { ci });
+  assert(banded.includes('fill-opacity="0.12"'), "band path missing");
+  const plain = TR.render.trendChart(m, {});
+  assert(!plain.includes('fill-opacity="0.12"'), "band must be opt-in");
+});
+
 run("confidence: explainer + sampling vocabulary ship in the artifact", () => {
   // the callout is built live from the report's own data
   const callout = TR.conf.calloutHtml();

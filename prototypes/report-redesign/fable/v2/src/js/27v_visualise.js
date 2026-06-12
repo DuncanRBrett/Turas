@@ -457,19 +457,20 @@
 
   /* ---------------- Visualise view ---------------- */
 
-  /** 95% CI half-width at a point: p(1-p)/n for proportions; for means,
-   *  indexes and NPS the SD comes from the published distribution
-   *  (TR.trk.sdAt — the same spread that powers their sig testing). */
-  function ciHalfWidth(metric, segId, point) {
+  /** 95% interval bounds {lo, hi} at a point: Wilson score on the
+   *  published base for proportions (asymmetric — never a plain ±);
+   *  for means, indexes and NPS z·SD/√n with the SD derived from the
+   *  published distribution (TR.trk.sdAt — the same spread that powers
+   *  their sig testing; the single SD source). */
+  function ciBounds(metric, segId, point) {
     if (metric.diff) return null;     // score differences: no single base
     if (!point.base || point.value === null) return null;
-    if (!metric.isMean) {
-      var p = Math.min(Math.max(point.value / 100, 0.001), 0.999);
-      return 1.96 * Math.sqrt(p * (1 - p) / point.base) * 100;
-    }
+    if (!metric.isMean) return TR.conf.wilsonPct(point.value, point.base);
     var sd = trk().sdAt(metric, segId === "total" ? null : segId, point.year);
-    return sd === null ? null : 1.96 * sd / Math.sqrt(point.base);
+    return sd === null ? null
+      : TR.conf.meanCI(point.value, sd, point.base);
   }
+  vis._ciBounds = ciBounds;   // exposed for pinned exhibits + tests
 
   /** Series for the chart/table: spec points transformed for the mode. */
   function buildSeries(specs, sel, mode, yearSet) {
@@ -521,7 +522,7 @@
       yMin: s.yMin, yMax: s.yMax, labels: s.visLabels || "last",
       ci: (mode === "absolute" && s.visCI) ? function (row, point) {
         var sr = series.filter(function (x) { return x.label === row.label; })[0];
-        return sr ? ciHalfWidth(sr.spec.metric, sr.spec.segId, point) : null;
+        return sr ? ciBounds(sr.spec.metric, sr.spec.segId, point) : null;
       } : null,
       annotations: notes.map(function (n) {
         return { year: n.year, label: n.text };
@@ -554,11 +555,11 @@
           "Explorer</button>") + "</div>" +
       '<div class="scopebar">' + modeBtn("absolute", "Absolute") +
       modeBtn("prev", "vs Previous") + modeBtn("base", "vs Baseline") +
-      '<label class="tg" title="Proportions: p(1−p)/n on the published base. ' +
-      "Means, indexes and NPS: SD derived from the published category " +
-      'distribution of each wave."><input type="checkbox" data-visci' +
+      '<label class="tg" title="Proportions: Wilson score interval on the ' +
+      "published base. Means, indexes and NPS: SD derived from the " +
+      'published category distribution of each wave."><input type="checkbox" data-visci' +
       (s.visCI ? " checked" : "") + (mode !== "absolute" ? " disabled" : "") +
-      "> 95% CI bands</label>" +
+      "> 95% " + TR.conf.labels().interval_abbrev + " bands</label>" +
       '<label class="tg">Labels <select data-vislabels>' +
       ["last", "all", "none"].map(function (l) {
         return '<option value="' + l + '"' +
@@ -581,9 +582,13 @@
       '<div class="chart" data-vischart>' + (chart ||
         '<div class="chart-error">No data for this selection.</div>') + "</div>" +
       (s.visCI && mode === "absolute"
-        ? '<p class="trknote">95% CI bands — proportions: p(1−p)/n on the ' +
-          "published base; means, indexes and NPS: SD derived from the " +
-          "published category distribution of each wave.</p>"
+        ? '<p class="trknote">95% ' + TR.conf.labels().interval_term +
+          " bands — proportions: Wilson score interval on the published " +
+          "base; means, indexes and NPS: SD derived from the published " +
+          "category distribution of each wave." +
+          (TR.conf.labels().is_probability ? "" :
+            " Quoted as stability intervals: this survey did not use " +
+            "formal random sampling.") + "</p>"
         : "") +
       (singleMetric
         ? '<p class="trknote">💬 Click any data point to tag it with a note ' +
@@ -802,6 +807,19 @@
         rows.push([sr.label + " · base"].concat(shownYears.map(function (y) {
           return byYear[y] ? byYear[y].base : "";
         })));
+        if (s.visCI && mode === "absolute") {
+          // interval views export their bounds explicitly (lo/hi rows)
+          var abbrev = TR.conf.labels().interval_abbrev;
+          var boundRow = function (which) {
+            return shownYears.map(function (y) {
+              var c = byYear[y];
+              var bounds = c ? ciBounds(sr.spec.metric, sr.spec.segId, c) : null;
+              return bounds ? Math.round(bounds[which] * 10) / 10 : "";
+            });
+          };
+          rows.push([sr.label + " · 95% " + abbrev + " lo"].concat(boundRow("lo")));
+          rows.push([sr.label + " · 95% " + abbrev + " hi"].concat(boundRow("hi")));
+        }
       });
       TR.xlsx.download((singleMetric ? singleMetric.code : "metrics") + "_trend",
         "Trend", [head].concat(rows));
@@ -825,6 +843,7 @@
         }
         TR.story2.pinTrackingView({
           title: visTitle(sel, specs),
+          ci: !!(s.visCI && mode === "absolute"),
           qs: specs.map(function (sp) { return sp.metric.code; })
             .filter(function (c, i, a) { return a.indexOf(c) === i; }),
           series: specs.map(function (sp) {
