@@ -87,12 +87,19 @@
         "</th>");
     });
     out.push("</tr></thead><tbody>");
+    var ivLabels = opts.intervals ? TR.conf.labels() : null;
     out.push('<tr class="rb"><td class="lab">Base (n=)</td>');
     model.columns.forEach(function (col) {
+      var moe = opts.intervals && col.base ? TR.conf.maxMoePct(col.base) : null;
       out.push("<td>" + (col.low
         ? '<span class="lowb" title="Base below ' + model.lowBaseThreshold +
           ' — interpret with caution">' + fmt.base(col.base) + " ⚠</span>"
-        : fmt.base(col.base)) + "</td>");
+        : fmt.base(col.base)) +
+        (moe !== null
+          ? '<div class="civ" title="Worst-case 95% ' +
+            ivLabels.precision_term + " at this base (" +
+            ivLabels.moe_abbrev + ')">±' + moe.toFixed(1) + "pp</div>"
+          : "") + "</td>");
     });
     out.push("</tr>");
 
@@ -122,6 +129,14 @@
             fmt.escapeHtml(cell.sig) + '">▲' + fmt.escapeHtml(cell.sig) + "</span>";
         }
         if (i === 0 && opts.showDeltas && row.delta) body += deltaChip(row.delta);
+        if (opts.intervals && cell.ci) {
+          body += '<div class="civ" title="95% ' + ivLabels.interval_name +
+            ": the value would likely land between " +
+            TR.conf.fmtRange(cell.ci.lo, cell.ci.hi, row.kind === "mean") +
+            ' if the survey were repeated">' +
+            TR.conf.fmtRange(cell.ci.lo, cell.ci.hi, row.kind === "mean") +
+            "</div>";
+        }
         if (opts.showCounts && row.kind !== "mean") {
           body += '<div class="fq">' + (cell.n === null || cell.n === undefined
             ? "" : "n=" + fmt.base(cell.n)) + "</div>";
@@ -134,24 +149,40 @@
     return out.join("");
   };
 
-  /** Plain matrix for exports (clipboard / PPTX / PNG-table). */
+  /** Plain matrix for exports (clipboard / PPTX / PNG-table). With
+   *  opts.intervals each banner column gains "… lo"/"… hi" columns so
+   *  Excel exports of interval views carry the 95% bounds explicitly. */
   render.matrix = function (model, opts) {
     opts = opts || {};
-    var head = ["Response"].concat(model.columns.map(function (col) {
-      return col.label + (col.letter ? " (" + col.letter + ")" : "");
-    }));
-    var body = [{ kind: "base", cells: ["Base (n=)"].concat(
-      model.columns.map(function (col) {
-        return fmt.base(col.base) + (col.low ? " ⚠" : "");
-      })) }];
+    var iv = !!opts.intervals;
+    var perCol = function (label, lo, hi) {
+      return iv ? [label, lo, hi] : [label];
+    };
+    var head = ["Response"];
+    model.columns.forEach(function (col) {
+      var label = col.label + (col.letter ? " (" + col.letter + ")" : "");
+      head = head.concat(perCol(label, label + " lo", label + " hi"));
+    });
+    var baseCells = ["Base (n=)"];
+    model.columns.forEach(function (col) {
+      baseCells = baseCells.concat(
+        perCol(fmt.base(col.base) + (col.low ? " ⚠" : ""), "", ""));
+    });
+    var body = [{ kind: "base", cells: baseCells }];
+    var round1 = function (v) { return Math.round(v * 10) / 10; };
     model.rows.forEach(function (row) {
       if (opts.categoriesOnly && row.kind !== "category") return;
+      var cells = [row.label];
+      row.cells.forEach(function (cell) {
+        var value = row.kind === "mean" ? fmtMean(cell.mean) : fmtPct(cell.pct);
+        cells = cells.concat(perCol(
+          value + (cell.sig ? " " + cell.sig : ""),
+          cell.ci ? round1(cell.ci.lo) : "",
+          cell.ci ? round1(cell.ci.hi) : ""));
+      });
       body.push({
         kind: row.kind === "mean" ? "stat" : row.kind === "net" ? "stat" : "row",
-        cells: [row.label].concat(row.cells.map(function (cell) {
-          var value = row.kind === "mean" ? fmtMean(cell.mean) : fmtPct(cell.pct);
-          return value + (cell.sig ? " " + cell.sig : "");
-        }))
+        cells: cells
       });
     });
     return { head: head, body: body };

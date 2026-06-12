@@ -170,6 +170,49 @@
   model._computedModel = computedModel;
   model._publishedModel = publishedModel;
 
+  /**
+   * Attach 95% interval bounds to every cell (cell.ci = {lo, hi}).
+   * ADDITIVE display only — values never change. Proportions: Wilson on
+   * the exact count when published, the displayed pct otherwise. Means:
+   * z·SD/√n with the SD derived from the column's own category
+   * distribution via TR.waves.scoreMap + sdFromPairs — the same single
+   * SD source the significance tests use (guardrail: never fork it).
+   * Must run BEFORE row ops so mean rows still align with q.rows.
+   */
+  function attachIntervals(viewModel, q) {
+    viewModel.rows.forEach(function (row) {
+      if (row.diff) return;      // score differences have no single base
+      if (row.kind === "mean") {
+        var scores = TR.waves.scoreMap(q, row);
+        if (!scores) return;
+        row.cells.forEach(function (cell, ci) {
+          if (cell.mean === null || cell.mean === undefined) return;
+          var pairs = [];
+          Object.keys(scores).forEach(function (ri) {
+            var catCell = viewModel.rows[ri] && viewModel.rows[ri].cells[ci];
+            if (catCell && catCell.pct !== null && catCell.pct !== undefined) {
+              pairs.push({ p: catCell.pct, s: scores[ri] });
+            }
+          });
+          var sd = TR.waves.sdFromPairs(pairs);
+          var base = viewModel.columns[ci] ? viewModel.columns[ci].base : null;
+          var bounds = sd === null ? null : TR.conf.meanCI(cell.mean, sd, base);
+          if (bounds) cell.ci = bounds;
+        });
+        return;
+      }
+      row.cells.forEach(function (cell, ci) {
+        if (cell.pct === null || cell.pct === undefined) return;
+        var base = viewModel.columns[ci] ? viewModel.columns[ci].base : null;
+        if (!base) return;
+        var p = cell.n !== null && cell.n !== undefined
+          ? cell.n / base : cell.pct / 100;
+        var w = TR.conf.wilson(Math.min(Math.max(p, 0), 1), base);
+        if (w) cell.ci = { lo: w.lower * 100, hi: w.upper * 100 };
+      });
+    });
+  }
+
   /** Drop hidden columns from a model (Total is never hidden). */
   function applyHiddenColumns(viewModel, hiddenLabels) {
     if (!hiddenLabels || !hiddenLabels.length) return viewModel;
@@ -221,7 +264,8 @@
 
   /**
    * The model the UI renders.
-   * @param {object} [opts] - {hiddenCols, hiddenRows, rowScope, sort, dual}.
+   * @param {object} [opts] - {hiddenCols, hiddenRows, rowScope, sort, dual,
+   *   intervals} — intervals=true attaches 95% bounds to every cell.
    */
   model.forQuestion = function (code, bannerId, filters, opts) {
     opts = opts || {};
@@ -242,6 +286,7 @@
     viewModel.category = q.category;
     viewModel.lowBaseThreshold = lowThreshold();
     TR.waves.attachDeltas(q, viewModel);
+    if (opts.intervals) attachIntervals(viewModel, q);
     var hidden = opts.hiddenCols !== undefined
       ? opts.hiddenCols : TR.d2.hiddenFor(bannerId);
     applyHiddenColumns(viewModel, hidden);

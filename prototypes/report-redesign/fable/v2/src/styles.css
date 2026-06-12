@@ -146,6 +146,7 @@ table.ct { border-collapse: collapse; width: 100%; font-size: 12px; }
 .ct .rm td.lab { border-left: 3px solid var(--accent); padding-left: 11px; }
 .ct .sg { color: var(--green); font-weight: 800; font-size: 9px; margin-left: 3px; font-family: ui-monospace, monospace; }
 .ct .fq { font-size: 10px; color: var(--faint); }
+.civ { font-size: 10px; color: var(--faint); line-height: 1.15; font-style: normal; font-weight: 400; cursor: help; }
 .ct .lowb { color: #a3402f; font-weight: 600; }
 .ct .idxd { font-size: 10px; color: var(--faint); font-weight: 400; }
 .delta { font-size: 9.5px; font-weight: 600; margin-left: 4px; padding: 1px 5px; border-radius: 5px; }

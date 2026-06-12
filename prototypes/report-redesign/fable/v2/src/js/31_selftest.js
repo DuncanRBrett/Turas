@@ -151,6 +151,78 @@
         eq(bytes[0] === 0x50 && bytes[1] === 0x4B, true, "zip magic");
         eq(bytes.length > 4000, true, "non-trivial deck");
       } },
+      { name: "Wilson intervals match the R confidence module", fn: function () {
+        // oracle: calculate_proportion_ci_wilson() run in R (04_proportions.R)
+        var close = function (actual, expected, label) {
+          if (Math.abs(actual - expected) > 1e-9) {
+            throw new Error(label + ": expected " + expected + ", got " + actual);
+          }
+        };
+        var w = TR.conf.wilson(0.05, 200);          // small p
+        close(w.lower, 0.0273826456, "p=.05 n=200 lower");
+        close(w.upper, 0.0895781481, "p=.05 n=200 upper");
+        // asymmetric around p: more room above 5% than below
+        eq((w.upper - 0.05) > (0.05 - w.lower), true, "asymmetry");
+        w = TR.conf.wilson(0.84, 519);              // the explainer example
+        close(w.lower, 0.8059787004, "p=.84 n=519 lower");
+        close(w.upper, 0.8690251541, "p=.84 n=519 upper");
+        w = TR.conf.wilson(0.50, 49);               // small n
+        close(w.lower, 0.3651873344, "p=.50 n=49 lower");
+        close(w.upper, 0.6348126656, "p=.50 n=49 upper");
+        eq(TR.conf.wilson(1.2, 100), null, "invalid p refused");
+        eq(TR.conf.wilson(0.5, 0), null, "invalid n refused");
+      } },
+      { name: "sampling labels switch on the sampling method", fn: function () {
+        var random = TR.conf.labels("Random");
+        eq(random.interval_abbrev, "CI", "Random -> CI");
+        eq(random.moe_abbrev, "MOE", "Random -> MOE");
+        eq(random.is_probability, true, "Random is probability");
+        var panel = TR.conf.labels("Online_Panel");
+        eq(panel.interval_abbrev, "SI", "Online_Panel -> SI");
+        eq(panel.moe_abbrev, "PE", "Online_Panel -> PE");
+        eq(panel.is_probability, false, "panel is non-probability");
+        eq(TR.conf.labels("Not_Specified").interval_abbrev, "SI",
+          "Not_Specified -> SI (cautious default)");
+        eq(TR.conf.labels("garbage").interval_abbrev, "SI",
+          "unrecognised -> cautious default");
+        // this report: SACAP is configured Not_Specified -> SI/PE everywhere
+        eq(TR.conf.labels().interval_name, "Stability Interval",
+          "project default vocabulary");
+      } },
+      { name: "max margin-of-error known answers (dashboard chip)", fn: function () {
+        // hand-verifiable: 1.96 * sqrt(.25/n) * 100
+        eq(Math.abs(TR.conf.maxMoePct(1363) - 2.654) < 0.01, true,
+          "n=1363 -> +/-2.7pp, got " + TR.conf.maxMoePct(1363));
+        eq(Math.abs(TR.conf.maxMoePct(75) - 11.316) < 0.01, true,
+          "n=75 -> +/-11.3pp, got " + TR.conf.maxMoePct(75));
+      } },
+      { name: "crosstab intervals: golden spot-check, additive only", fn: function () {
+        var withCi = TR.model.forQuestion("Q008", TR.AGG.banner_groups[0].id,
+          [], { intervals: true });
+        var net = withCi.rows.filter(function (r) {
+          return r.kind === "net" &&
+            TR.model.norm(r.label) === "good or excellent";
+        })[0];
+        eq(net.cells[0].pct, 84, "published value unchanged (84)");
+        var range = TR.conf.fmtRange(net.cells[0].ci.lo, net.cells[0].ci.hi);
+        eq(range, "81–87", "the handover's worked example");
+        var html = TR.render.tableHtml(withCi, { intervals: true });
+        eq(html.indexOf("81–87") !== -1, true, "range rendered in the table");
+        var plain = TR.model.forQuestion("Q008", TR.AGG.banner_groups[0].id, []);
+        var plainNet = plain.rows.filter(function (r) {
+          return r.kind === "net" &&
+            TR.model.norm(r.label) === "good or excellent";
+        })[0];
+        eq(plainNet.cells[0].ci === undefined, true,
+          "no intervals attached unless asked");
+        // mean rows: distribution-SD interval brackets the mean
+        var meanRow = withCi.rows.filter(function (r) {
+          return r.kind === "mean";
+        })[0];
+        var cell = meanRow.cells[0];
+        eq(cell.ci && cell.ci.lo < cell.mean && cell.mean < cell.ci.hi, true,
+          "mean interval brackets the mean");
+      } },
       { name: "renderer survives a broken model", fn: function () {
         var html = TR.render.tableHtml({ code: "X", title: "broken",
           columns: [{ label: "Total", letter: "", base: 0, low: true }],

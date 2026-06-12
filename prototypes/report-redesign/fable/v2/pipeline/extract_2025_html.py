@@ -275,6 +275,12 @@ def main():
             "accent_colour": "#CC9900",
             "low_base_threshold": 30,
             "alpha": 0.05,
+            # sampling design drives interval vocabulary (mirrors
+            # modules/confidence/R/sampling_labels.R): probability designs
+            # say CI/MOE; Quota/Online_Panel/Self_Selected/Not_Specified get
+            # honest SI/PE language. SACAP is a student census-attempt
+            # online survey -> the cautious default.
+            "sampling_method": "Not_Specified",
             # tracking is per-project config: enabled=False ships an
             # untracked report; default_scope "key" limits the Tracking tab
             # to NPS / index / rating-NET metrics ("all" adds every row)
