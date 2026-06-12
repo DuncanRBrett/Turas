@@ -100,6 +100,34 @@
         eq(avg.delta.sig, false, "no significant change vs previous wave");
         eq(avg.deltaBase.sig, true, "significant change vs baseline wave");
       } },
+      { name: "per-segment tracking known answers (campus, published)", fn: function () {
+        // NPS by segment: history from wave workbooks, current = published cell
+        var nps = TR.trk.metricList("key").filter(function (m) {
+          return TR.model.norm(m.label) === "nps score";
+        })[0];
+        var ct = TR.trk.points(nps, "cape town");
+        eq(ct.filter(function (c) { return c.year === 2020; })[0].value, 35,
+          "2020 Cape Town NPS (workbook)");
+        var cur = ct[ct.length - 1];
+        eq(cur.current, true, "series ends on the current wave");
+        var seg = TR.trk.segmentByNorm("cape town");
+        var pm = TR.trk.publishedModel(nps.code, seg.group);
+        var ci = -1;
+        pm.columns.forEach(function (c, i) { if (c.label === "Cape Town") ci = i; });
+        eq(cur.value, pm.rows[nps.ri].cells[ci].mean,
+          "current segment value = published cell");
+        eq(cur.base, pm.columns[ci].base, "current segment base = published base");
+        // NET via member-sum where the wave published no NET rows (2021):
+        // workbook Cape Town Good 31 + Excellent 56 = 87
+        var reg = TR.trk.metricList("key").filter(function (m) {
+          return m.code === "Q010" &&
+            TR.model.norm(m.label) === "good or excellent";
+        })[0];
+        var reg21 = TR.waves.series(reg.q, reg.row, reg.ri, "cape town")
+          .filter(function (p) { return p.year === 2021; })[0];
+        eq(reg21.value, 87, "2021 CT NET from member-sum fallback");
+        eq(reg21.base, 36, "2021 CT base from the workbook Base row");
+      } },
       { name: "sparkline geometry known answer", fn: function () {
         var svg = TR.render.sparkline([
           { year: 2020, value: 10 }, { year: 2021, value: 20 },

@@ -1,12 +1,20 @@
 # HANDOVER — Tracker Integration into the v2 Data-Centric Report
 
-> **STATUS: COMPLETE (2026-06-12).** All six mission items shipped on
-> `feature/report-data-layer` (commits `2888dca9`, `064c7c73`, `a5d1932f`,
-> `52a3cdfd` + tests/docs). Gates: 19 v2 + 21 v1, all green; browser-verified
-> after tab-bouncing with cache-busting and computed styles; in-browser
-> selftest 10/10. See README "Round 4 — tracker integration" for the summary.
-> **Remaining manual step for Duncan:** open `tests/tmp/v2_exhibit.pptx` in
-> PowerPoint and confirm "Edit Data" opens Excel on BOTH charts of slide 2.
+> **STATUS: COMPLETE incl. explorer parity (2026-06-12).** Round 4 (Totals
+> tracking, flagship pin, composites) PLUS round 5 (per-segment workspace:
+> Summary scorecard / Metrics / Segments / Visualise absorbing the tracker
+> module's explorer_view + metrics_view + summary builder) shipped on
+> `feature/report-data-layer`. Gates: 22 v2 + 21 v1, all green;
+> browser-verified after tab-bouncing with cache-busting and computed
+> styles; in-browser selftest 11/11. See README "Round 4" + "Round 5".
+> **Remaining manual step for Duncan:** open `tests/tmp/v2_exhibit.pptx`
+> and `tests/tmp/v2_segpin.pptx` in PowerPoint — "Edit Data" must open
+> Excel on BOTH charts of slide 2 in each.
+> **Known limits for the production review:** means/indexes/NPS show
+> direction only (published totals carry no spread — the real pipeline
+> will t-test means per trend_significance.R); annotations and compare-
+> across-questions overlays are noted as Visualise stretch items; built
+> report is 1.90 MB of its 2 MB budget (per-segment data costs ~0.6 MB).
 > **Next phase:** full production review (`duncan-production-review`), then
 > the advanced modules (confidence first) get this look and feel.
 

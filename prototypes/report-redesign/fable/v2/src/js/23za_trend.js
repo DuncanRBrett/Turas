@@ -19,10 +19,13 @@
     return m ? parseInt(m[1], 10) : null;
   };
 
-  /** Full point list for a model row: history + the current Total value. */
+  /** Full point list for a model row: history + the current Total value.
+   *  Rows whose .waves already embed the current point (Visualise pseudo
+   *  rows) keep it — nothing is appended when the cells carry no value. */
   render.wavePoints = function (row) {
     var points = (row.waves || []).map(function (w) {
-      return { year: w.year, value: w.value, base: w.base, current: false };
+      return { year: w.year, value: w.value, base: w.base,
+        current: !!w.current };
     });
     var cur = row.kind === "mean" ? row.cells[0].mean : row.cells[0].pct;
     if (cur !== null && cur !== undefined) {
@@ -157,8 +160,12 @@
    * One series per row with history; up to 6 series. Mean-scale rows
    * (0-10 means) and percentage/index rows never share an axis — the
    * dominant group wins and the rest are dropped with a note.
+   * @param {object} [opts] - Visualise overrides: {yMin, yMax,
+   *   labels: "auto"|"all"|"last"|"none", ci: (row, point) => halfwidth,
+   *   note: axis note override}.
    */
-  render.trendChart = function (model) {
+  render.trendChart = function (model, opts) {
+    opts = opts || {};
     var rows = trendRows(model);
     if (!rows.length) return "";
     var small = rows.filter(function (r) {
@@ -172,7 +179,7 @@
     var dropped = trendRows(model).length - rows.length;
 
     var series = rows.map(function (r) {
-      return { label: r.label, isMean: r.kind === "mean",
+      return { label: r.label, isMean: r.kind === "mean", row: r,
         points: render.wavePoints(r), sigNow: !!(r.delta && r.delta.sig) };
     });
     var years = [];
@@ -191,6 +198,9 @@
     });
     var axisMax = meanScale ? Math.max(S.niceMax(hi), 10) : S.niceMax(hi);
     var axisMin = lo < 0 ? -S.niceMax(-lo) : 0;
+    if (opts.yMax !== undefined && opts.yMax !== null) axisMax = opts.yMax;
+    if (opts.yMin !== undefined && opts.yMin !== null) axisMin = opts.yMin;
+    if (axisMax <= axisMin) axisMax = axisMin + 1;
     // % suffix only when every plotted series is a proportion
     var pctAxis = rows.every(function (r) { return r.kind !== "mean"; });
 
@@ -218,9 +228,31 @@
       body.push(S.text(xOf(year), padT + plotH + 16, String(year),
         { "text-anchor": "middle", "font-size": 10, fill: "#6b7280" }));
     });
+    var clampY = function (v) {
+      return Math.max(padT, Math.min(padT + plotH, yOf(v)));
+    };
+    var labelMode = opts.labels || "auto";
     var endLabels = [];
     series.forEach(function (s, k) {
       var colour = palette[k % palette.length];
+      // optional 95% CI band behind the line (Visualise toggle)
+      if (opts.ci) {
+        var banded = s.points.filter(function (p) {
+          return opts.ci(s.row || s, p) !== null;
+        });
+        if (banded.length > 1) {
+          var upper = banded.map(function (p, i) {
+            return (i ? "L" : "M") + xOf(p.year).toFixed(1) + " " +
+              clampY(p.value + opts.ci(s.row || s, p)).toFixed(1);
+          }).join(" ");
+          var lower = banded.slice().reverse().map(function (p) {
+            return "L" + xOf(p.year).toFixed(1) + " " +
+              clampY(p.value - opts.ci(s.row || s, p)).toFixed(1);
+          }).join(" ");
+          body.push(S.el("path", { d: upper + lower + " Z", fill: colour,
+            "fill-opacity": 0.12, stroke: "none" }));
+        }
+      }
       var d = s.points.map(function (p, i) {
         return (i ? "L" : "M") + xOf(p.year).toFixed(1) + " " +
           yOf(p.value).toFixed(1);
@@ -229,11 +261,15 @@
         body.push(S.el("path", { d: d, fill: "none", stroke: colour,
           "stroke-width": 2.2, "stroke-linejoin": "round" }));
       }
-      s.points.forEach(function (p) {
+      var labelAll = labelMode === "all" ||
+        (labelMode === "auto" && series.length === 1);
+      s.points.forEach(function (p, pi) {
         body.push(S.el("circle", { cx: xOf(p.year).toFixed(1),
           cy: yOf(p.value).toFixed(1), r: p.current ? 4 : 2.6, fill: colour,
           stroke: "#fff", "stroke-width": 1 }));
-        if (series.length === 1) {
+        var labelThis = labelAll || (labelMode === "last" &&
+          pi === s.points.length - 1 && series.length > 1);
+        if (labelThis && labelMode !== "none") {
           body.push(S.text(xOf(p.year), yOf(p.value) - 8,
             fmtVal(p.value, s.isMean),
             { "text-anchor": "middle", "font-size": 9.5,
@@ -242,8 +278,8 @@
       });
       var last = s.points[s.points.length - 1];
       endLabels.push({ pos: yOf(last.value), colour: colour, sig: s.sigNow,
-        text: fmtVal(last.value, s.isMean) +
-          (series.length > 1 ? " " + TR.charts.clip(s.label, 14) : "") });
+        text: (labelMode === "none" ? "" : fmtVal(last.value, s.isMean) + " ") +
+          (series.length > 1 ? TR.charts.clip(s.label, 14) : "") });
     });
     render.repel(endLabels, 13, padT + 4, padT + plotH);
     endLabels.forEach(function (l) {
@@ -252,8 +288,8 @@
         l.text + (l.sig ? " •" : ""),
         { "font-size": 10, "font-weight": 700, fill: l.colour }));
     });
-    var note = "Published wave Totals · " + years[0] + "–" +
-      years[years.length - 1] + (dropped > 0 ? " · " + dropped +
+    var note = (opts.note || "Published wave Totals · " + years[0] + "–" +
+      years[years.length - 1]) + (dropped > 0 ? " · " + dropped +
       " series hidden (mixed scales or >6)" : "");
     body.push(S.text(padL, H - 4, note, { "font-size": 9.5, fill: "#9aa1b1" }));
     var legend = null, height = H;

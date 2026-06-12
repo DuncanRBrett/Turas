@@ -32,7 +32,8 @@ About/methodology.
 |---|---|
 | **Filter the whole report** ("Online students only") | every table/dashboard recomputes live from embedded respondent-level microdata, with correct bases and significance |
 | **Custom banners** — cross anything by anything | `+ Custom…` on the banner strip |
-| **Full tracking, 2018–2025** | Tracking tab at tracker-module parity: column-per-wave published values, inline sparklines, Δ vs previous wave AND Δ vs baseline (pooled-z sig on both, low-base excluded + ⚠), per-wave bases, drill-down, search/section/sort, key-vs-all scope |
+| **Full tracking workspace, 2018–2025** | Four tracker-parity views under Tracking: **Summary** (threshold-banded KPI scorecard with sparklines, sig up/down/stable pulse bar, significant-changes cards across Total + segments, metric × segment significance heatmap), **Metrics** (every tracked metric column-per-wave for Total or any banner segment), **Segments** (one metric across every tracked segment, tick → visualise), **Visualise** (multi-series wave chart: absolute / vs previous / vs baseline, 95% CI bands from published bases, value-label modes, wave chips, y-axis override, low-base warnings, insight note, Excel + pin-to-story) |
+| **Per-segment history** | wave workbooks' banner columns extracted and matched to 2025 banner columns (Campus 2020-2022+2024; Intensity + Course 2024); NETs/Index recompute per segment where waves published categories only |
 | **Δ + trend** on every tracked question | delta chips on the Total column (vs the latest matched wave) plus a **wave strip** under the table: per-wave bases and the headline metrics with sparklines |
 | **Trend chart type** | "Trend · waves" in the chart picker — line over waves for any tracked question |
 | **Two-panel trend exhibit** (the flagship pin) | 📈 in the pin menu: this-wave distribution chart + trend-over-waves below; presents full-screen and exports as **two native editable chart objects on one PPTX slide** |
@@ -167,3 +168,33 @@ Replaces the basic single-prev-wave tracking with tracker-module parity:
 - **Gates:** 19 v2 tests — multi-wave known answers against workbook ground
   truth (2022 registration NET 83 / Index 82), baseline-vs-prev sig flags,
   sparkline geometry, per-year match-rate floors, two-chart PPTX validation.
+
+## Round 5 — tracker explorer parity (per-segment workspace)
+
+Round 4 tracked published Totals only; round 5 absorbs the tracker module's
+explorer functionality (`modules/tracker/lib/html_report/js/explorer_view.js`
+/ `metrics_view.js` / `03c_summary_builder.R` were inventoried first):
+
+- **Data:** the wave extractor now reads every banner-segment column that
+  maps onto a 2025 banner column (`segment_aliases` in the alias file;
+  Campus 2020-2022 + 2024, Intensity/Course 2024; 2018/2019/2023 were
+  published Total-only). Per-segment cells store Column % + per-segment
+  bases; counts derive as round(pct × base).
+- **Engine** (`22w_waves.js`): `waves.series(q,row,ri,segment)` +
+  `waves.cellsFor(points)` produce the tracker cell shape — per wave:
+  value, base, change vs previous, change vs baseline, pooled-z sig on
+  both, low-base excluded. `waves.segments()` registers tracked segments.
+- **Workspace** (`27t/27u/27v`): Summary / Metrics / Segments / Visualise
+  (see the feature table above). Published figures everywhere — report
+  filters deliberately do not apply inside Tracking.
+- **Pins:** any Visualise view pins to the story as a two-chart native
+  PPTX exhibit (current-wave by segment + trend by segment + optional
+  metric-by-wave table).
+- **Honesty rule:** means/indexes/NPS scores carry direction only — the
+  published wave totals have no spread, so only proportion metrics are
+  significance-tested (the production path with real microdata will t-test
+  means exactly as `modules/tracker/lib/trend_significance.R` does).
+- **Gates:** 22 v2 tests; new known answers — per-segment NPS (Cape Town
+  2020 = 35, current = the published campus cell verbatim), 2021 NET via
+  member-sum (CT 87, base 36), per-year segment coverage, segment-pin
+  PPTX with one series per pinned segment.

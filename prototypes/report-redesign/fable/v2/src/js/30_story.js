@@ -85,6 +85,17 @@
     TR.shell.toast("Trend exhibit pinned (" + load().length + ") — see the Story tab");
   };
 
+  /** Pin a tracking Visualise view: one metric across selected segments. */
+  story2.pinTrackingView = function (metric, segIds) {
+    load().push({ kind: "exhibit", qs: [metric.code], metricRi: metric.ri,
+      metricLabel: metric.label, segments: segIds.slice(),
+      banner: TR.AGG.banner_groups[0].id, filters: [],
+      flags: { dist: true, trend: true, table: false, insight: true },
+      distType: "column", note: "" });
+    persist();
+    TR.shell.toast("Trend view pinned (" + load().length + ") — see the Story tab");
+  };
+
   /** Composite exhibit: any tracked questions, each via its headline metric. */
   story2.addExhibit = function () {
     var tracked = TR.AGG.questions.filter(function (q) {

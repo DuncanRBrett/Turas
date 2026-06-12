@@ -7,6 +7,14 @@
     "per programme, practicum 'part 2', support-hub service breakouts) are NOT",
     "mapped and correctly show no history. Review when 2026 titles change."
   ],
+  "_segment_aliases_about": [
+    "Historical banner-column labels -> 2025 banner-column labels (normalised",
+    "on both sides). Only columns that resolve to a 2025 banner column are",
+    "extracted; unmatched columns are skipped."
+  ],
+  "segment_aliases": {
+    "online": "online campus"
+  },
   "_judgment_calls": {
     "the health and wellbeing emotional support you receive from the student support and development team": "renamed to 'student wellness and counselling support' in 2025 — same battery slot",
     "the academic support you receive from student services": "Student Services became the Student Support and Development Team — same metric"

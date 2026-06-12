@@ -125,6 +125,43 @@ run("exhibit slide: TWO native chart objects on one slide (python)", () => {
   assert(report.startsWith("OK"), report);
 });
 
+run("segment extraction: per-year coverage matches the workbooks", () => {
+  const report = TR.PREV.match_report;
+  const want = { 2018: 0, 2019: 0, 2020: 5, 2021: 5, 2022: 5, 2023: 0, 2024: 24 };
+  for (const [year, n] of Object.entries(want)) {
+    assert(report[year].segments === n,
+      `${year}: ${report[year].segments} segments, expected ${n}`);
+  }
+  const segs = TR.waves.segments();
+  assert(segs.length === 24, "tracked segments " + segs.length);
+  const campus = segs.filter((s) => s.group === "Q002");
+  assert(campus.length === 5 && campus[0].label === "Online campus",
+    "campus segments resolved incl. the Online alias");
+});
+
+run("segment pin exhibit: 2 native charts + table (python)", () => {
+  const nps = TR.trk.metricList("key").find((m) =>
+    TR.model.norm(m.label) === "nps score");
+  const item = { kind: "exhibit", qs: [nps.code], metricRi: nps.ri,
+    metricLabel: nps.label, segments: ["total", "online campus", "cape town"],
+    banner: TR.AGG.banner_groups[0].id, filters: [],
+    flags: { dist: true, trend: true, table: true, insight: true },
+    distType: "column", note: "segment trend known answer" };
+  const slide = TR.exhibit.slide(item);
+  assert(slide.charts.length === 2, "chart parts " + slide.charts.length);
+  assert((slide.charts[1].xml.match(/<c:ser>/g) || []).length === 3,
+    "one trend series per pinned segment");
+  const bytes = TR.pptx.package([TR.exporter.titleSlide(1), slide],
+    { project: TR.AGG.project });
+  const tmp = path.join(BASE, "tests", "tmp");
+  mkdirSync(tmp, { recursive: true });
+  const out = path.join(tmp, "v2_segpin.pptx");
+  writeFileSync(out, bytes);
+  const report = execFileSync("python3",
+    [path.join(path.dirname(BASE), "tests", "verify_pptx.py"), out], { encoding: "utf8" });
+  assert(report.startsWith("OK"), report);
+});
+
 run("native trend chart: year categories + one series per metric", () => {
   const m = TR.model.forQuestion("Q017", TR.AGG.banner_groups[0].id, []);
   m.chartKind = "summary";
