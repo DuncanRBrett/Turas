@@ -653,7 +653,12 @@ if (isTRUE(config_result$config_obj$html_report)) {
 # Excel/HTML writers run above and are byte-identical whether this is on or
 # off — this block only ever WRITES NEW FILES, never modifies the classic.
 
-if (isTRUE(config_result$config_obj$html_report_v2)) {
+# Enabled by the config Settings sheet (html_report_v2) OR the GUI checkbox
+# (TURAS_HTML_REPORT_V2, set by run_tabs_gui in this process).
+.html_report_v2_on <- isTRUE(config_result$config_obj$html_report_v2) ||
+  isTRUE(get0("TURAS_HTML_REPORT_V2", ifnotfound = FALSE))
+
+if (.html_report_v2_on) {
   v2_out <- config_result$output_path
 
   # 1) JSON data layer (sidecar; also embedded in the report, and the input

@@ -313,6 +313,9 @@ run_tabs_gui <- function() {
           div(style = "margin-top: 12px;",
             checkboxInput("prepare_deliverable",
                          "Prepare client deliverable (minify for delivery)",
+                         value = FALSE),
+            checkboxInput("html_report_v2",
+                         "Also build the new data-centric report (v2) — additive, classic outputs unchanged",
                          value = FALSE)
           )
         )
@@ -389,6 +392,11 @@ run_tabs_gui <- function() {
 
         # Set config_file as global variable (script expects this)
         assign("config_file", file.path(data$path, current_config), envir = .GlobalEnv)
+
+        # Pass the data-centric report v2 toggle (additive; run_crosstabs
+        # Step 4d also honours html_report_v2 in the config's Settings sheet)
+        assign("TURAS_HTML_REPORT_V2",
+               isTRUE(input$html_report_v2), envir = .GlobalEnv)
 
         # Pass deliverable flag and load minification functions if needed
         assign("TURAS_PREPARE_DELIVERABLE",
