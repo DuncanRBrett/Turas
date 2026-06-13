@@ -213,6 +213,7 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base) {
   ord_labels <- unique(table$RowLabel[!is.na(table$RowLabel) & nzchar(table$RowLabel)])
 
   rows <- list()
+  metric_type <- NA_character_   # the headline summary-stat kind, if any
   for (lbl in ord_labels) {
     lbl_types <- unique(table$RowType[!is.na(table$RowLabel) & table$RowLabel == lbl])
     # Base rows are carried by bases[] — skip them here
@@ -224,6 +225,9 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base) {
     if (cl == "mean") {
       mrt <- intersect(lbl_types, mean_types)
       if (length(mrt) == 0) next
+      if (is.na(metric_type) && mrt[1] %in% c("Average", "Mean", "Index", "Score")) {
+        metric_type <- mrt[1]
+      }
       rows[[length(rows) + 1]] <- list(
         kind = "mean", label = lbl,
         pct = as.list(vals_for(lbl, mrt[1])), n = null_vec(), sig = empty_sig())
@@ -258,13 +262,26 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base) {
   cat_val <- if (is.null(cat_val) || length(cat_val) == 0 || is.na(cat_val[1])) ""
              else as.character(cat_val[1])
 
+  # Scale maximum for the dashboard gauge/heatmap ("% of each scale's
+  # maximum"). Without it the renderer assumes 100, so a 0-10 mean reads as
+  # ~7% and every card shows weak/red. Sourced from the project's configured
+  # scale (dashboard_scale_mean / dashboard_scale_index). NA -> null for
+  # questions with no summary-stat row (they are not on the dashboard).
+  scale_max <- NA_real_
+  if (!is.na(metric_type)) {
+    scale_max <- if (metric_type == "Index") as.numeric(config_obj$dashboard_scale_index %||% 10)
+                 else if (metric_type == "Score") 100
+                 else as.numeric(config_obj$dashboard_scale_mean %||% 10)
+  }
+
   list(
-    code     = as.character(q_result$question_code %||% ""),
-    title    = as.character(q_result$question_text %||% ""),
-    category = cat_val,
-    type     = map_question_type(q_result$question_type),
-    bases    = bases,
-    rows     = rows
+    code      = as.character(q_result$question_code %||% ""),
+    title     = as.character(q_result$question_text %||% ""),
+    category  = cat_val,
+    type      = map_question_type(q_result$question_type),
+    bases     = bases,
+    rows      = rows,
+    scale_max = scale_max
   )
 }
 

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SACAP 2025 Annual Student Survey — Turas Report v2</title>
-<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-13 20:56 SAST -->
+<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-13 21:38 SAST -->
 <!-- Single self-contained file: published tables + prior wave + synthetic
      microdata + one fixed renderer. No network requests, no installs. -->
 <style>
@@ -4692,6 +4692,10 @@ null
   var heatBanner = null;        // dashboard heatmap banner override
 
   function scoreMax(q) {
+    // Tabs supplies the configured scale max (e.g. 10 for a 0-10 rating);
+    // the prototype's SACAP data instead carries index_scores. Either gives
+    // the denominator for the "% of each scale's maximum" gauge colouring.
+    if (q.scale_max) return q.scale_max;
     var max = 0;
     if (q.index_scores) {
       Object.keys(q.index_scores).forEach(function (k) {

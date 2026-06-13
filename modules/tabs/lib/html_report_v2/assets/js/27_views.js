@@ -14,6 +14,10 @@
   var heatBanner = null;        // dashboard heatmap banner override
 
   function scoreMax(q) {
+    // Tabs supplies the configured scale max (e.g. 10 for a 0-10 rating);
+    // the prototype's SACAP data instead carries index_scores. Either gives
+    // the denominator for the "% of each scale's maximum" gauge colouring.
+    if (q.scale_max) return q.scale_max;
     var max = 0;
     if (q.index_scores) {
       Object.keys(q.index_scores).forEach(function (k) {

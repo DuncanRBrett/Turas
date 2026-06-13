@@ -275,6 +275,15 @@ test_that("question type mapping covers the tabs vocabulary", {
   expect_equal(map_question_type(NULL), "single")
 })
 
+test_that("scale_max is emitted from the configured scale (dashboard colouring)", {
+  cfg <- make_dl_config(dashboard_scale_mean = 10, dashboard_scale_index = 10)
+  dl <- build_data_layer(make_dl_results(), make_dl_banner_info(), cfg)
+  q2 <- Filter(function(q) q$code == "Q2", dl$questions)[[1]]   # has an Index row
+  expect_equal(q2$scale_max, 10)
+  q1 <- Filter(function(q) q$code == "Q1", dl$questions)[[1]]   # no summary row
+  expect_true(is.na(q1$scale_max))   # -> null in JSON; renderer falls back
+})
+
 # ==============================================================================
 # 4. write_data_layer — on-disk JSON honours the renderer contract
 # ==============================================================================
