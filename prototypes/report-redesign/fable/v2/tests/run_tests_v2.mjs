@@ -48,6 +48,44 @@ for (const c of TR.selftest2.cases()) run(c.name, c.fn);
 
 console.log("Node-only suite:");
 
+run("no-banner (Total-only) report validates and renders without crashing", () => {
+  // Regression: a survey with no banner cuts. boot used to do
+  // banner_groups[0].id unconditionally and threw on the empty array.
+  const noBannerAgg = {
+    schema_version: 2,
+    project: { name: "Total Only", low_base_threshold: 30,
+      sampling_method: "Not_Specified", tracking: { enabled: false } },
+    columns: [{ key: "TOTAL::Total", group: "total", label: "Total", letter: "" }],
+    banner_groups: [],
+    categories: ["Cat"],
+    questions: [{
+      code: "Q1", title: "Q1", category: "Cat", type: "scale",
+      bases: [{ n: 60, low: false }],
+      rows: [
+        { kind: "category", label: "Poor", pct: [20], n: [12], sig: [""] },
+        { kind: "category", label: "Good", pct: [80], n: [48], sig: [""] },
+        { kind: "mean", label: "Mean", pct: [7.4], n: [null], sig: [""] }
+      ]
+    }]
+  };
+  const saved = { agg: TR.AGG, micro: TR.MICRO, prev: TR.PREV, idx: TR.d2._qIndex };
+  try {
+    TR.AGG = noBannerAgg; TR.MICRO = null; TR.PREV = null; TR.d2._qIndex = null;
+    assert(TR.d2.validate(noBannerAgg, null, null).ok, "no-banner agg should validate");
+    // boot's fallback for no groups is "" — which must match no column group
+    const defBanner = (noBannerAgg.banner_groups && noBannerAgg.banner_groups.length)
+      ? noBannerAgg.banner_groups[0].id : "";
+    assert(defBanner === "", 'no-banner default should be ""');
+    assert(TR.d2.groupCols("").length === 0, 'groupCols("") should be empty');
+    const m = TR.model.forQuestion("Q1", defBanner, []);
+    assert(m && m.columns.length === 1, "expected a single Total column");
+    assert(m.columns[0].label === "Total", "the only column should be Total");
+    assert(m.rows.length === 3 && m.rows[0].cells.length === 1, "Total-only cells");
+  } finally {
+    TR.AGG = saved.agg; TR.MICRO = saved.micro; TR.PREV = saved.prev; TR.d2._qIndex = saved.idx;
+  }
+});
+
 run("golden parity suite passes (subprocess)", () => {
   const res = spawnSync("node", [path.join(BASE, "tests", "golden_parity.mjs")],
     { encoding: "utf8" });

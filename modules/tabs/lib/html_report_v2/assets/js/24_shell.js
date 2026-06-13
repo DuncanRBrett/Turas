@@ -32,7 +32,10 @@
 
     var d2 = TR.d2;
     var wantSelftest = location.hash.indexOf("selftest") >= 0;
-    d2.state.banner = agg.banner_groups[0].id;
+    // A report with no banner groups (Total-only survey) has no default
+    // banner; "" matches no column group, so views show the Total column.
+    d2.state.banner = (agg.banner_groups && agg.banner_groups.length)
+      ? agg.banner_groups[0].id : "";
     d2.decodeHash(location.hash);
     if (!d2.questionByCode(d2.state.activeQ)) {
       d2.state.activeQ = agg.questions[0].code;
