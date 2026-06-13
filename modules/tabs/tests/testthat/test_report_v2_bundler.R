@@ -181,3 +181,23 @@ test_that("refuses an empty data layer", {
   expect_equal(res$status, "REFUSED")
   expect_equal(res$code, "DATA_LAYER_EMPTY")
 })
+
+# ==============================================================================
+# 4. additive-only contract — v2 never clobbers the classic outputs
+# ==============================================================================
+
+context("report_v2_bundler: additive-only output paths")
+
+test_that("v2 output paths can never collide with the classic outputs", {
+  # Mirrors run_crosstabs Step 4d / 4b path derivation from one base .xlsx
+  output_path  <- "/proj/MyStudy.xlsx"
+  classic_xlsx <- output_path
+  classic_html <- sub("\\.xlsx$", ".html", output_path)
+  v2_report    <- sub("\\.xlsx$", "_report_v2.html", output_path)
+  v2_json      <- sub("\\.xlsx$", "_data.json", output_path)
+
+  paths <- c(classic_xlsx, classic_html, v2_report, v2_json)
+  expect_equal(length(unique(paths)), 4)             # all distinct
+  expect_false(v2_report %in% c(classic_xlsx, classic_html))
+  expect_false(v2_json %in% c(classic_xlsx, classic_html))
+})
