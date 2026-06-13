@@ -325,7 +325,13 @@
    * the on-screen render.stackedChart so the PPTX matches the report/PNG.
    */
   function chartSeriesStacked(model, rows, cols) {
-    var palette = TR.render.palette();
+    // Colour the stacked segments with the SAME sequential brand ramp the
+    // on-screen render.stackedChart uses, so the PPTX matches the report/PNG.
+    var brand = TR.charts.brandOf();
+    var rampColour = function (i) {
+      return S.shade(brand, 0.16 + 0.84 * (i / Math.max(rows.length - 1, 1)))
+        .replace("#", "").toUpperCase();
+    };
     var catPts = cols.map(function (ci, i) {
       var c = model.columns[ci];
       return '<c:pt idx="' + i + '"><c:v>' + esc(c ? c.label : "Series") + "</c:v></c:pt>";
@@ -334,7 +340,7 @@
       '</c:f><c:strCache><c:ptCount val="' + cols.length + '"/>' + catPts +
       "</c:strCache></c:strRef></c:cat>";
     return rows.map(function (r, k) {
-      var colour = palette[k % palette.length].replace("#", "").toUpperCase();
+      var colour = rampColour(k);
       var letter = String.fromCharCode(66 + k);
       var valPts = cols.map(function (ci, i) {
         var v = r.cells[ci] ? r.cells[ci].pct : null;

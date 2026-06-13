@@ -27,8 +27,16 @@
     return max > 0 ? max : 100;
   }
 
-  function gaugeColour(value, max) {
+  function gaugeColour(value, max, q) {
     if (value === null || value === undefined) return "#94a3b8";
+    // Classic-report parity: when tabs supplies the configured raw thresholds
+    // (e.g. >=7 green / >=5 amber on a 0-10 scale) colour against them; else
+    // fall back to % of the scale max (75/50), as the SACAP prototype does.
+    if (q && q.gauge_green != null && q.gauge_amber != null) {
+      if (value >= q.gauge_green) return "#1b6e53";
+      if (value >= q.gauge_amber) return "#a8842c";
+      return "#b3372f";
+    }
     var pct = value / (max || 100) * 100;
     if (pct >= 75) return "#1b6e53";
     if (pct >= 50) return "#a8842c";
@@ -139,7 +147,7 @@
           fmt.escapeHtml(q.title) +
           (row ? intervalTip(row.cells[0], models[q.code].columns[0].base) : "") +
           '" style="--gc:' +
-          gaugeColour(value, scoreMax(q)) + '">' +
+          gaugeColour(value, scoreMax(q), q) + '">' +
           '<span class="gv">' + (value === null ? "–" : value.toFixed(1)) + "</span>" +
           (delta ? '<span class="gd ' + (delta.diff >= 0 ? "up" : "down") + '">' +
             (delta.diff >= 0 ? "▲" : "▼") + Math.abs(delta.diff).toFixed(1) + "</span>" : "") +
@@ -225,7 +233,7 @@
         var norm = v === null ? 0 : Math.min(Math.max(v / max * 100, 0), 100);
         var low = model.columns[i].low;
         html.push('<td style="background:' +
-          (v === null ? "#f3f4f8" : gaugeColour(v, max) +
+          (v === null ? "#f3f4f8" : gaugeColour(v, max, q) +
             Math.round(40 + norm / 100 * 50).toString(16)) +
           '" title="' + fmt.escapeHtml(model.columns[i].label) +
           intervalTip(cell, model.columns[i].base) + '">' +

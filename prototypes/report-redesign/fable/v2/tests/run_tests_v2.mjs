@@ -104,6 +104,11 @@ run("stacked chart export is transposed (segments=series, columns=bars)", () => 
   assert(catCount === "1", "Total-only stacked should have one category bar; got " + catCount);
   assert(/<c:legend>/.test(stacked.xml), "stacked needs a legend to label its segments");
   assert((bar.xml.match(/<c:ser>/g) || []).length === 1, "a plain bar over Total stays one series");
+  // segments use the brand ramp (mirrors render.stackedChart), not the
+  // categorical palette — which would inject the gold accent colour.
+  const accent = TR.charts.accentOf().replace("#", "").toUpperCase();
+  assert(!new RegExp('srgbClr val="' + accent + '"').test(stacked.xml),
+    "stacked segments must use the brand ramp, not the accent palette");
 });
 
 run("golden parity suite passes (subprocess)", () => {

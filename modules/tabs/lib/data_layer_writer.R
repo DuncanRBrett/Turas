@@ -267,21 +267,36 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base) {
   # ~7% and every card shows weak/red. Sourced from the project's configured
   # scale (dashboard_scale_mean / dashboard_scale_index). NA -> null for
   # questions with no summary-stat row (they are not on the dashboard).
+  # scale_max feeds the gauge/heatmap normalisation; gauge_green/gauge_amber
+  # are the project's configured colour thresholds (raw values, e.g. >=7
+  # green / >=5 amber) so the v2 dashboard colours match the classic report.
   scale_max <- NA_real_
+  gauge_green <- NA_real_
+  gauge_amber <- NA_real_
   if (!is.na(metric_type)) {
-    scale_max <- if (metric_type == "Index") as.numeric(config_obj$dashboard_scale_index %||% 10)
-                 else if (metric_type == "Score") 100
-                 else as.numeric(config_obj$dashboard_scale_mean %||% 10)
+    if (metric_type == "Index") {
+      scale_max   <- as.numeric(config_obj$dashboard_scale_index %||% 10)
+      gauge_green <- as.numeric(config_obj$dashboard_green_index %||% 7)
+      gauge_amber <- as.numeric(config_obj$dashboard_amber_index %||% 5)
+    } else if (metric_type == "Score") {
+      scale_max <- 100   # NPS-style; no configured raw thresholds -> % fallback
+    } else {
+      scale_max   <- as.numeric(config_obj$dashboard_scale_mean %||% 10)
+      gauge_green <- as.numeric(config_obj$dashboard_green_mean %||% 7)
+      gauge_amber <- as.numeric(config_obj$dashboard_amber_mean %||% 5)
+    }
   }
 
   list(
-    code      = as.character(q_result$question_code %||% ""),
-    title     = as.character(q_result$question_text %||% ""),
-    category  = cat_val,
-    type      = map_question_type(q_result$question_type),
-    bases     = bases,
-    rows      = rows,
-    scale_max = scale_max
+    code        = as.character(q_result$question_code %||% ""),
+    title       = as.character(q_result$question_text %||% ""),
+    category    = cat_val,
+    type        = map_question_type(q_result$question_type),
+    bases       = bases,
+    rows        = rows,
+    scale_max   = scale_max,
+    gauge_green = gauge_green,
+    gauge_amber = gauge_amber
   )
 }
 
