@@ -220,6 +220,18 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
 
     # V10.3 HTML Report settings
     html_report = safe_logical(get_config_value(config, "html_report", FALSE)),
+
+    # V11 data-centric report (data-layer JSON for the v2 renderer).
+    # Additive: when TRUE, a *_data.json island is written alongside the
+    # existing Excel/HTML outputs. Old paths are untouched when FALSE.
+    html_report_v2 = safe_logical(get_config_value(config, "html_report_v2", FALSE)),
+    # Sample design — drives honest confidence vocabulary in the v2 report
+    # (probability designs speak CI/MOE; non-probability designs speak the
+    # softened SI/PE). Cautious default: Not_Specified -> SI/PE.
+    sampling_method = get_config_value(config, "sampling_method", "Not_Specified"),
+    # Optional wave label shown in the v2 report header (e.g. "Annual 2025").
+    wave = get_config_value(config, "wave", ""),
+
     brand_colour = get_config_value(config, "brand_colour", "#323367"),
     accent_colour = get_config_value(config, "accent_colour", "#CC9900"),
     project_title = get_config_value(config, "project_title", NULL),
@@ -545,7 +557,8 @@ load_crosstabs_config <- function(config_file) {
     # Stats pack
     "generate_stats_pack",
     # HTML report
-    "html_report", "brand_colour", "accent_colour", "project_title", "project_name",
+    "html_report", "html_report_v2", "sampling_method", "wave",
+    "brand_colour", "accent_colour", "project_title", "project_name",
     "company_name", "client_name",
     "researcher_logo_path", "client_logo_path", "logo_path",
     "chart_bar_colour", "chart_palette_preset",

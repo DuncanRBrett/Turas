@@ -216,6 +216,60 @@ classify_row_labels <- function(question_table, question_type = "Single_Choice")
 }
 
 
+#' Normalise a Question Table for Row Matching
+#'
+#' Trims RowLabel/RowType and forward-fills RowLabel and RowSource so every
+#' sub-row (Column %, Sig., ...) inherits its parent option's label/source.
+#' The source data only sets these on the first RowType for each item.
+#'
+#' Shared by the HTML transformer (transform_single_question) and the JSON
+#' data-layer writer so both classify rows from an identical table shape.
+#'
+#' @param table Data.frame from all_results[[q]]$table (needs RowLabel, RowType)
+#' @return The same data.frame with RowLabel/RowType trimmed and RowLabel +
+#'   RowSource (if present) forward-filled.
+#' @export
+normalize_question_table <- function(table) {
+  # Coerce RowLabel to character and trim whitespace to avoid matching issues
+  table$RowLabel <- trimws(as.character(table$RowLabel))
+  table$RowType <- trimws(as.character(table$RowType))
+
+  # Forward-fill RowLabel: the source data only sets RowLabel on the first
+  # RowType for each item (typically Frequency), leaving Column %, Sig., etc.
+  # with empty labels. Propagate each non-empty label downward.
+  #
+  # Sig rows (RowType "Sig." / "Sig.2") are excluded from setting last_label
+  # because in dual-alpha mode they carry a confidence label ("Sig. (95%)")
+  # rather than the option label. They must inherit the option label like any
+  # other sub-row, so the matcher can pair them with their parent option.
+  sig_row_types_ff <- c("Sig.", "Sig.2")
+  last_label <- ""
+  for (i in seq_len(nrow(table))) {
+    if (!is.na(table$RowLabel[i]) && nzchar(table$RowLabel[i]) &&
+        !table$RowType[i] %in% sig_row_types_ff) {
+      last_label <- table$RowLabel[i]
+    } else {
+      table$RowLabel[i] <- last_label
+    }
+  }
+
+  # Forward-fill RowSource: same logic as RowLabel — sub-rows (Column %, Sig.)
+  # inherit the source type from their parent frequency row.
+  if ("RowSource" %in% names(table)) {
+    last_source <- ""
+    for (i in seq_len(nrow(table))) {
+      if (!is.na(table$RowSource[i]) && nzchar(table$RowSource[i])) {
+        last_source <- table$RowSource[i]
+      } else {
+        table$RowSource[i] <- last_source
+      }
+    }
+  }
+
+  table
+}
+
+
 #' Transform a Single Question for HTML Display
 #'
 #' Converts a question's table data.frame into a flat data.frame
@@ -239,43 +293,9 @@ transform_single_question <- function(q_result, banner_info, config_obj) {
   bases <- q_result$bases
   stats <- detect_available_stats(table)
 
-  # Coerce RowLabel to character and trim whitespace to avoid matching issues
-  table$RowLabel <- trimws(as.character(table$RowLabel))
-  table$RowType <- trimws(as.character(table$RowType))
-
-  # Forward-fill RowLabel: the source data only sets RowLabel on the first
-  # RowType for each item (typically Frequency), leaving Column %, Sig., etc.
-  # with empty labels. Propagate each non-empty label downward.
-  #
-  # Sig rows (RowType "Sig." / "Sig.2") are excluded from setting last_label
-  # because in dual-alpha mode they carry a confidence label ("Sig. (95%)")
-  # rather than the option label. They must inherit the option label like any
-  # other sub-row, so the matcher can pair them with their parent option.
-  sig_row_types_ff <- c("Sig.", "Sig.2")
-  last_label <- ""
-  for (i in seq_len(nrow(table))) {
-    if (!is.na(table$RowLabel[i]) && nzchar(table$RowLabel[i]) &&
-        !table$RowType[i] %in% sig_row_types_ff) {
-      last_label <- table$RowLabel[i]
-    } else {
-      table$RowLabel[i] <- last_label
-    }
-  }
-  rm(sig_row_types_ff)
-
-  # Forward-fill RowSource: same logic as RowLabel — sub-rows (Column %, Sig.)
-
-  # inherit the source type from their parent frequency row.
-  if ("RowSource" %in% names(table)) {
-    last_source <- ""
-    for (i in seq_len(nrow(table))) {
-      if (!is.na(table$RowSource[i]) && nzchar(table$RowSource[i])) {
-        last_source <- table$RowSource[i]
-      } else {
-        table$RowSource[i] <- last_source
-      }
-    }
-  }
+  # Trim + forward-fill RowLabel/RowSource (shared with the JSON data-layer
+  # writer so both paths classify rows from an identical table shape).
+  table <- normalize_question_table(table)
 
   # Get all internal keys (columns in the table beyond RowLabel/RowType)
   all_keys <- banner_info$internal_keys

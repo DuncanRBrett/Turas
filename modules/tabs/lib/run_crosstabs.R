@@ -185,6 +185,10 @@ tabs_source("crosstabs", "workbook_builder.R")
 # V10.3: HTML Report module (loaded conditionally, sources its own submodules)
 tabs_source("html_report", "99_html_report_main.R")
 
+# V11: data-layer writer for the data-centric report v2 (reuses the HTML
+# transformer's row helpers, so it must load after the html_report module).
+source(file.path(script_dir, "data_layer_writer.R"))
+
 # ==============================================================================
 # SIGNIFICANCE TESTING FUNCTIONS
 # ==============================================================================
@@ -637,6 +641,36 @@ if (isTRUE(config_result$config_obj$html_report)) {
     if (exists("turas_prepare_deliverable", mode = "function")) {
       turas_prepare_deliverable(html_output_path)
     }
+  }
+}
+
+# ==============================================================================
+# STEP 4d: WRITE DATA-LAYER JSON (data-centric report v2, if enabled)
+# ==============================================================================
+# Additive: emits a *_data.json island for the v2 renderer alongside the
+# existing outputs. Old Excel/HTML paths are untouched when the flag is off.
+
+if (isTRUE(config_result$config_obj$html_report_v2)) {
+  data_layer_path <- sub("\\.xlsx$", "_data.json", config_result$output_path)
+
+  data_layer_result <- tryCatch({
+    write_data_layer(
+      all_results      = analysis_result$all_results,
+      banner_info      = analysis_result$banner_info,
+      config_obj       = config_result$config_obj,
+      output_path      = data_layer_path,
+      survey_structure = data_result$survey_structure
+    )
+  }, error = function(e) {
+    cat("\n[WARNING] Data-layer JSON generation failed:", conditionMessage(e), "\n")
+    cat("  The Excel and HTML outputs were not affected.\n\n")
+    NULL
+  })
+
+  if (!is.null(data_layer_result) && data_layer_result$status == "PASS") {
+    cat(sprintf("  Data Layer: %s (%.2f MB, %d questions)\n",
+        basename(data_layer_result$output_file),
+        data_layer_result$file_size_mb, data_layer_result$n_questions))
   }
 }
 
