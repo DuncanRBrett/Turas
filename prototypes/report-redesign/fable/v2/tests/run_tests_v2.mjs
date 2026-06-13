@@ -86,6 +86,26 @@ run("no-banner (Total-only) report validates and renders without crashing", () =
   }
 });
 
+run("stacked chart export is transposed (segments=series, columns=bars)", () => {
+  // Regression: the PPTX stacked export reused the bar layout (rows as
+  // categories, one series per column), so each option rendered as its own
+  // 100% bar. A 100% stacked bar must transpose — columns are the bars,
+  // segments are the stacked series — matching render.stackedChart + the PNG.
+  const q = TR.AGG.questions.filter((x) => x.type === "scale")[0] || TR.AGG.questions[0];
+  const m = TR.model.forQuestion(q.code, TR.AGG.banner_groups[0].id, []);
+  const segs = TR.render.chartRows(m).rows.length;
+  const stacked = TR.exporter.buildChart(m, "stacked", [0]);
+  const bar = TR.exporter.buildChart(m, "bar", [0]);
+  assert(stacked, "stacked chart should build");
+  assert(/grouping val="percentStacked"/.test(stacked.xml), "stacked must be percentStacked");
+  const serCount = (stacked.xml.match(/<c:ser>/g) || []).length;
+  assert(serCount === segs, "stacked needs one series per segment; got " + serCount + " of " + segs);
+  const catCount = (stacked.xml.match(/<c:cat>[\s\S]*?ptCount val="(\d+)"/) || [])[1];
+  assert(catCount === "1", "Total-only stacked should have one category bar; got " + catCount);
+  assert(/<c:legend>/.test(stacked.xml), "stacked needs a legend to label its segments");
+  assert((bar.xml.match(/<c:ser>/g) || []).length === 1, "a plain bar over Total stays one series");
+});
+
 run("golden parity suite passes (subprocess)", () => {
   const res = spawnSync("node", [path.join(BASE, "tests", "golden_parity.mjs")],
     { encoding: "utf8" });

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SACAP 2025 Annual Student Survey — Turas Report v2</title>
-<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-13 19:23 SAST -->
+<!-- Turas data-centric report v2 · fable prototype · generated 2026-06-13 20:56 SAST -->
 <!-- Single self-contained file: published tables + prior wave + synthetic
      microdata + one fixed renderer. No network requests, no installs. -->
 <style>
@@ -7074,6 +7074,43 @@ null
   }
 
   /**
+   * Series for a 100%-stacked bar: TRANSPOSED relative to chartSeries —
+   * categories are the selected columns (one bar each) and there is one
+   * series per row (the segments that stack), coloured by segment. Mirrors
+   * the on-screen render.stackedChart so the PPTX matches the report/PNG.
+   */
+  function chartSeriesStacked(model, rows, cols) {
+    var palette = TR.render.palette();
+    var catPts = cols.map(function (ci, i) {
+      var c = model.columns[ci];
+      return '<c:pt idx="' + i + '"><c:v>' + esc(c ? c.label : "Series") + "</c:v></c:pt>";
+    }).join("");
+    var catRef = '<c:cat><c:strRef><c:f>Sheet1!$A$2:$A$' + (cols.length + 1) +
+      '</c:f><c:strCache><c:ptCount val="' + cols.length + '"/>' + catPts +
+      "</c:strCache></c:strRef></c:cat>";
+    return rows.map(function (r, k) {
+      var colour = palette[k % palette.length].replace("#", "").toUpperCase();
+      var letter = String.fromCharCode(66 + k);
+      var valPts = cols.map(function (ci, i) {
+        var v = r.cells[ci] ? r.cells[ci].pct : null;
+        return '<c:pt idx="' + i + '"><c:v>' +
+          (v === null || v === undefined ? "" : Math.round(v * 10) / 10) +
+          "</c:v></c:pt>";
+      }).join("");
+      return '<c:ser><c:idx val="' + k + '"/><c:order val="' + k + '"/>' +
+        '<c:tx><c:strRef><c:f>Sheet1!$' + letter + '$1</c:f><c:strCache>' +
+        '<c:ptCount val="1"/><c:pt idx="0"><c:v>' + esc(r.label) +
+        "</c:v></c:pt></c:strCache></c:strRef></c:tx>" +
+        '<c:spPr><a:solidFill><a:srgbClr val="' + colour + '"/></a:solidFill></c:spPr>' +
+        catRef +
+        '<c:val><c:numRef><c:f>Sheet1!$' + letter + "$2:$" + letter + "$" +
+        (cols.length + 1) + '</c:f><c:numCache><c:formatCode>General</c:formatCode>' +
+        '<c:ptCount val="' + cols.length + '"/>' + valPts +
+        "</c:numCache></c:numRef></c:val></c:ser>";
+    }).join("");
+  }
+
+  /**
    * Build a native chart for a model: {xml, workbook} ready for the
    * packager, honouring chart type, row kind (detail/NETs) and columns.
    */
@@ -7081,7 +7118,9 @@ null
     var rows = TR.render.chartRows(model).rows;
     if (!rows.length || !cols.length) return null;
     if (type === "pie") cols = [cols[0]];
-    var series = chartSeries(model, rows, cols, type);
+    var series = type === "stacked"
+      ? chartSeriesStacked(model, rows, cols)
+      : chartSeries(model, rows, cols, type);
     var plot, axesXml = "";
     if (type === "column") {
       plot = '<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/>' +
@@ -7112,18 +7151,30 @@ null
     var xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
       "<c:chartSpace " + C_NS + "><c:chart><c:plotArea><c:layout/>" +
       plot + axesXml + "</c:plotArea>" +
-      ((cols.length > 1 || type === "pie")
+      ((cols.length > 1 || type === "pie" || type === "stacked")
         ? '<c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend>' : "") +
       '<c:plotVisOnly val="1"/></c:chart>' +
       '<c:externalData r:id="rId1"><c:autoUpdate val="0"/></c:externalData></c:chartSpace>';
-    var workbookRows = [[""].concat(cols.map(function (ci) {
-      return model.columns[ci] ? model.columns[ci].label : "Series";
-    }))].concat(rows.map(function (r) {
-      return [r.label].concat(cols.map(function (ci) {
-        var v = r.cells[ci] ? r.cells[ci].pct : null;
-        return v === null || v === undefined ? "" : Math.round(v * 10) / 10;
-      }));
-    }));
+    // Embedded workbook must mirror the series layout so "Edit Data" resolves:
+    // stacked is transposed (columns down col A, one segment-series per column).
+    var num = function (v) {
+      return v === null || v === undefined ? "" : Math.round(v * 10) / 10;
+    };
+    var workbookRows = type === "stacked"
+      ? [[""].concat(rows.map(function (r) { return r.label; }))].concat(
+          cols.map(function (ci) {
+            return [model.columns[ci] ? model.columns[ci].label : "Series"]
+              .concat(rows.map(function (r) {
+                return num(r.cells[ci] ? r.cells[ci].pct : null);
+              }));
+          }))
+      : [[""].concat(cols.map(function (ci) {
+          return model.columns[ci] ? model.columns[ci].label : "Series";
+        }))].concat(rows.map(function (r) {
+          return [r.label].concat(cols.map(function (ci) {
+            return num(r.cells[ci] ? r.cells[ci].pct : null);
+          }));
+        }));
     // the sheet MUST be named Sheet1: the c:f formula refs above say
     // Sheet1!… — on "Edit Data" Excel resolves them against the embedded
     // workbook, and any other sheet name turns every series into #REF!
