@@ -641,91 +641,6 @@ if (isTRUE(config_result$config_obj$html_report)) {
 }
 
 # ==============================================================================
-# STEP 4c: GENERATE STATS PACK
-# ==============================================================================
-
-stats_pack_file <- NULL
-generate_stats_pack_flag <- isTRUE(
-  toupper(config_result$config_obj$generate_stats_pack %||% "Y") == "Y"
-) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
-
-if (generate_stats_pack_flag && exists("turas_write_stats_pack", mode = "function")) {
-  stats_pack_file <- tryCatch({
-    generate_tabs_stats_pack(
-      config_result  = config_result,
-      data_result    = data_result,
-      analysis_result = analysis_result,
-      workbook_result = workbook_result,
-      start_time     = start_time,
-      script_version = SCRIPT_VERSION
-    )
-  }, error = function(e) {
-    cat(sprintf("\n[WARNING] Stats pack generation failed: %s\n", conditionMessage(e)))
-    NULL
-  })
-  if (!is.null(stats_pack_file)) {
-    cat(sprintf("  Stats Pack: %s\n", basename(stats_pack_file)))
-  }
-}
-
-# ==============================================================================
-# STEP 5: COMPLETION SUMMARY
-# ==============================================================================
-
-elapsed <- difftime(Sys.time(), start_time, units = "secs")
-
-# Get run result for final banner
-run_result <- workbook_result$run_result
-
-# Print final banner
-if (!is.null(run_result) && exists("turas_print_final_banner", mode = "function")) {
-  turas_print_final_banner(run_result)
-} else {
-  cat("\n")
-  cat(paste(rep("=", 80), collapse=""), "\n")
-  cat("ANALYSIS COMPLETE - TURAS V10.2 (REFACTORED)\n")
-  cat(paste(rep("=", 80), collapse=""), "\n\n")
-
-  if (analysis_result$run_status == "PARTIAL") {
-    cat("  TRS Status: PARTIAL (see Run_Status sheet for details)\n")
-    if (length(analysis_result$skipped_questions) > 0) {
-      cat(sprintf("  Questions skipped: %d\n", length(analysis_result$skipped_questions)))
-    }
-    if (length(analysis_result$partial_questions) > 0) {
-      cat(sprintf("  Questions with missing sections: %d\n", length(analysis_result$partial_questions)))
-    }
-  } else {
-    cat("  TRS Status: PASS\n")
-  }
-  cat("\n")
-}
-
-cat("  Project:", workbook_result$project_name, "\n")
-cat("  Questions:", length(analysis_result$all_results), "\n")
-cat("  Responses:", nrow(data_result$survey_data), "\n")
-
-if (config_result$config_obj$apply_weighting) {
-  cat("  Weighting:", config_result$config_obj$weight_variable, "\n")
-  cat("  Effective N:", data_result$effective_n, "\n")
-}
-
-cat("  Significance:", if (config_result$config_obj$enable_significance_testing) "ENABLED" else "disabled", "\n")
-if (config_result$config_obj$enable_significance_testing) {
-  cat("  Alpha (p-value):", sprintf("%.3f", config_result$config_obj$alpha), "\n")
-}
-cat("  Output:", workbook_result$output_path, "\n")
-cat("  Duration:", format_seconds(as.numeric(elapsed)), "\n")
-
-if (nrow(analysis_result$error_log) > 0) {
-  cat("  Issues:", nrow(analysis_result$error_log), "(see Error Log)\n")
-}
-
-cat("\n")
-cat("TURAS Tabs V10.8.1\n")
-cat("\n")
-cat(paste(rep("=", 80), collapse=""), "\n")
-
-# ==============================================================================
 # STATS PACK HELPER
 # ==============================================================================
 
@@ -852,6 +767,92 @@ generate_tabs_stats_pack <- function(config_result, data_result,
 
   output_path
 }
+
+# ==============================================================================
+# STEP 4c: GENERATE STATS PACK
+# ==============================================================================
+
+stats_pack_file <- NULL
+generate_stats_pack_flag <- isTRUE(
+  toupper(config_result$config_obj$generate_stats_pack %||% "Y") == "Y"
+) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
+
+if (generate_stats_pack_flag && exists("turas_write_stats_pack", mode = "function")) {
+  stats_pack_file <- tryCatch({
+    generate_tabs_stats_pack(
+      config_result  = config_result,
+      data_result    = data_result,
+      analysis_result = analysis_result,
+      workbook_result = workbook_result,
+      start_time     = start_time,
+      script_version = SCRIPT_VERSION
+    )
+  }, error = function(e) {
+    cat(sprintf("\n[WARNING] Stats pack generation failed: %s\n", conditionMessage(e)))
+    NULL
+  })
+  if (!is.null(stats_pack_file)) {
+    cat(sprintf("  Stats Pack: %s\n", basename(stats_pack_file)))
+  }
+}
+
+# ==============================================================================
+# STEP 5: COMPLETION SUMMARY
+# ==============================================================================
+
+elapsed <- difftime(Sys.time(), start_time, units = "secs")
+
+# Get run result for final banner
+run_result <- workbook_result$run_result
+
+# Print final banner
+if (!is.null(run_result) && exists("turas_print_final_banner", mode = "function")) {
+  turas_print_final_banner(run_result)
+} else {
+  cat("\n")
+  cat(paste(rep("=", 80), collapse=""), "\n")
+  cat("ANALYSIS COMPLETE - TURAS V10.2 (REFACTORED)\n")
+  cat(paste(rep("=", 80), collapse=""), "\n\n")
+
+  if (analysis_result$run_status == "PARTIAL") {
+    cat("  TRS Status: PARTIAL (see Run_Status sheet for details)\n")
+    if (length(analysis_result$skipped_questions) > 0) {
+      cat(sprintf("  Questions skipped: %d\n", length(analysis_result$skipped_questions)))
+    }
+    if (length(analysis_result$partial_questions) > 0) {
+      cat(sprintf("  Questions with missing sections: %d\n", length(analysis_result$partial_questions)))
+    }
+  } else {
+    cat("  TRS Status: PASS\n")
+  }
+  cat("\n")
+}
+
+cat("  Project:", workbook_result$project_name, "\n")
+cat("  Questions:", length(analysis_result$all_results), "\n")
+cat("  Responses:", nrow(data_result$survey_data), "\n")
+
+if (config_result$config_obj$apply_weighting) {
+  cat("  Weighting:", config_result$config_obj$weight_variable, "\n")
+  cat("  Effective N:", data_result$effective_n, "\n")
+}
+
+cat("  Significance:", if (config_result$config_obj$enable_significance_testing) "ENABLED" else "disabled", "\n")
+if (config_result$config_obj$enable_significance_testing) {
+  cat("  Alpha (p-value):", sprintf("%.3f", config_result$config_obj$alpha), "\n")
+}
+cat("  Output:", workbook_result$output_path, "\n")
+cat("  Duration:", format_seconds(as.numeric(elapsed)), "\n")
+
+if (nrow(analysis_result$error_log) > 0) {
+  cat("  Issues:", nrow(analysis_result$error_log), "(see Error Log)\n")
+}
+
+cat("\n")
+cat("TURAS Tabs V10.8.1\n")
+cat("\n")
+cat(paste(rep("=", 80), collapse=""), "\n")
+
 
 # ==============================================================================
 # END OF SCRIPT
