@@ -146,6 +146,28 @@ run("story deck -> structurally valid native pptx (python)", () => {
   assert(report.startsWith("OK"), report);
 });
 
+run("dot-plot pin -> native shapes (no chart part), packs to valid pptx", () => {
+  // PowerPoint has no horizontal dot-plot chart type, so a dot pin renders as
+  // positioned ellipse shapes — one per category, no chart object — and the
+  // deck must still package and validate structurally.
+  const m = TR.model.forQuestion("Q008", TR.AGG.banner_groups[0].id, []);
+  const segs = TR.render.chartRows(m).rows.length;
+  const slide = TR.exporter.slideForModel(m, "dot note",
+    { chart: true, chartType: "dot", chartCols: [0], table: true, insight: true });
+  assert(slide.charts.length === 0, "a dot pin must not create a chart part");
+  assert(!/<c:chart /.test(slide.xml), "a dot pin must not embed a chart frame");
+  const dots = (slide.xml.match(/prst="ellipse"/g) || []).length;
+  assert(dots >= segs, "expected one dot per category; got " + dots + " of " + segs);
+  const bytes = TR.pptx.package([TR.exporter.titleSlide(1), slide], { project: TR.AGG.project });
+  const tmp = path.join(BASE, "tests", "tmp");
+  mkdirSync(tmp, { recursive: true });
+  const out = path.join(tmp, "v2_dotplot.pptx");
+  writeFileSync(out, bytes);
+  const report = execFileSync("python3",
+    [path.join(path.dirname(BASE), "tests", "verify_pptx.py"), out], { encoding: "utf8" });
+  assert(report.startsWith("OK"), report);
+});
+
 run("wave history: per-year question-match rates meet thresholds", () => {
   const floor = { 2018: 0.45, 2019: 0.45, 2020: 0.45, 2021: 0.55,
     2022: 0.70, 2023: 0.80, 2024: 0.85 };

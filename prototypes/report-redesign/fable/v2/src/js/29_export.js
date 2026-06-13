@@ -197,6 +197,96 @@
       "<p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody></p:sp>";
   }
 
+  // Sharp-cornered filled rectangle (axis baselines, gridlines).
+  function fillRect(id, box, colour) {
+    return '<p:sp><p:nvSpPr><p:cNvPr id="' + id + '" name="Rule"/><p:cNvSpPr/>' +
+      "<p:nvPr/></p:nvSpPr><p:spPr>" +
+      '<a:xfrm><a:off x="' + inch(box.x) + '" y="' + inch(box.y) + '"/>' +
+      '<a:ext cx="' + inch(box.w) + '" cy="' + inch(box.h) + '"/></a:xfrm>' +
+      '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>' +
+      '<a:solidFill><a:srgbClr val="' + colour + '"/></a:solidFill>' +
+      "<a:ln><a:noFill/></a:ln></p:spPr>" +
+      "<p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody></p:sp>";
+  }
+
+  // Filled ellipse with a thin white halo — a dot-plot marker.
+  function ellipseShape(id, box, colour) {
+    return '<p:sp><p:nvSpPr><p:cNvPr id="' + id + '" name="Dot"/><p:cNvSpPr/>' +
+      "<p:nvPr/></p:nvSpPr><p:spPr>" +
+      '<a:xfrm><a:off x="' + inch(box.x) + '" y="' + inch(box.y) + '"/>' +
+      '<a:ext cx="' + inch(box.w) + '" cy="' + inch(box.h) + '"/></a:xfrm>' +
+      '<a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom>' +
+      '<a:solidFill><a:srgbClr val="' + colour + '"/></a:solidFill>' +
+      '<a:ln w="12700"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:ln>' +
+      "</p:spPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody></p:sp>";
+  }
+
+  /**
+   * Horizontal dot plot as native shapes (PowerPoint has no dot-plot chart
+   * type). Mirrors render.dotChart — category labels left, a faint baseline
+   * per row, vertical gridlines + % ticks, one positioned dot per column,
+   * coloured from the report palette. Editable shapes (no "Edit Data", which
+   * a dot plot does not need). Returns the shape XML for the slide tree.
+   */
+  function dotPlotShapes(next, box, model, cols) {
+    var data = TR.render.chartRows(model);
+    var rows = data.rows || [];
+    if (!rows.length) return "";
+    var axisMax = data.axisMax || 100;
+    var palette = TR.render.palette();
+    var multi = cols.length > 1;
+    var labelW = Math.min(box.w * 0.34, 3.2);
+    var plotX = box.x + labelW;
+    var plotW = box.w - labelW - 0.35;
+    var axisH = 0.3, legendH = multi ? 0.35 : 0;
+    var usableH = Math.max(box.h - axisH - legendH, 0.5);
+    var rowH = usableH / rows.length;
+    var dotD = Math.min(0.16, rowH * 0.5);
+    var xml = "";
+    [0, 0.25, 0.5, 0.75, 1].forEach(function (f) {
+      var gx = plotX + plotW * f;
+      xml += fillRect(next(), { x: gx, y: box.y, w: 0.008, h: usableH }, "EEF0F7");
+      xml += textBox(next(), { x: gx - 0.3, y: box.y + usableH + 0.02, w: 0.6, h: 0.2 },
+        [para(Math.round(axisMax * f) + "%", { size: 8, colour: GREY, align: "ctr" })]);
+    });
+    rows.forEach(function (r, i) {
+      var cy = box.y + i * rowH + rowH / 2;
+      var labH = Math.min(rowH - 0.04, 0.5);
+      xml += textBox(next(), { x: box.x, y: cy - labH / 2, w: labelW - 0.12, h: labH },
+        [para(r.label, { size: 9, colour: INK, align: "l" })]);
+      xml += fillRect(next(), { x: plotX, y: cy - 0.006, w: plotW, h: 0.012 }, "E7E9F2");
+      cols.forEach(function (ci, k) {
+        var v = r.cells[ci] ? r.cells[ci].pct : null;
+        if (v === null || v === undefined) return;
+        var frac = Math.max(Math.min(v / axisMax, 1), 0);
+        var cx = plotX + frac * plotW;
+        var colour = palette[k % palette.length].replace("#", "").toUpperCase();
+        xml += ellipseShape(next(), { x: cx - dotD / 2, y: cy - dotD / 2, w: dotD, h: dotD }, colour);
+        // value label beside the dot (bold, dot-coloured), like the IPK deck;
+        // flips to the left of the dot near the right edge so it never clips
+        var labelLeft = frac > 0.82;
+        xml += textBox(next(),
+          labelLeft ? { x: cx - dotD / 2 - 0.55, y: cy - 0.11, w: 0.5, h: 0.22 }
+                    : { x: cx + dotD / 2 + 0.03, y: cy - 0.11, w: 0.5, h: 0.22 },
+          [para(String(Math.round(v)), { size: 9, bold: true, colour: colour,
+            align: labelLeft ? "r" : "l" })]);
+      });
+    });
+    if (multi) {
+      var lx = plotX, ly = box.y + usableH + axisH;
+      cols.forEach(function (ci, k) {
+        var lbl = model.columns[ci] ? model.columns[ci].label : "?";
+        xml += ellipseShape(next(), { x: lx, y: ly + 0.02, w: 0.14, h: 0.14 },
+          palette[k % palette.length].replace("#", "").toUpperCase());
+        var lw = Math.min(2.2, 0.3 + lbl.length * 0.075);
+        xml += textBox(next(), { x: lx + 0.2, y: ly - 0.04, w: lw, h: 0.24 },
+          [para(lbl, { size: 9, colour: INK })]);
+        lx += 0.2 + lw + 0.25;
+      });
+    }
+    return xml;
+  }
+
   function tableFrame(id, box, matrix, brand, fontSize) {
     var nCols = matrix.head.length;
     var labelW = Math.min(box.w * 0.28, 3.4);
@@ -591,15 +681,22 @@
           { size: 10.5, colour: GREY })]);
     var top = 1.45, bottom = SLIDE_H - 0.35 - noteH;
     if (flags.chart) {
-      var chart = exporter.buildChart(model, flags.chartType || "bar",
-        (flags.chartCols && flags.chartCols.length ? flags.chartCols : [0]));
-      if (chart) {
-        charts.push(chart);
-        var chartH = flags.table
-          ? Math.min(2.9, bottom - top - 1.4) : bottom - top;
-        content += chartFrame(next(),
-          { x: MARGIN, y: top, w: contentW, h: chartH }, "rId2");
+      var dcols = (flags.chartCols && flags.chartCols.length) ? flags.chartCols : [0];
+      var chartH = flags.table ? Math.min(2.9, bottom - top - 1.4) : bottom - top;
+      if ((flags.chartType || "bar") === "dot") {
+        // A horizontal dot plot has no native PowerPoint chart type — draw it
+        // as shapes (matches the on-screen pin; no chart part for this slide).
+        content += dotPlotShapes(next, { x: MARGIN, y: top, w: contentW, h: chartH },
+          model, dcols);
         top += chartH + 0.2;
+      } else {
+        var chart = exporter.buildChart(model, flags.chartType || "bar", dcols);
+        if (chart) {
+          charts.push(chart);
+          content += chartFrame(next(),
+            { x: MARGIN, y: top, w: contentW, h: chartH }, "rId2");
+          top += chartH + 0.2;
+        }
       }
     }
     if (flags.table) {
