@@ -188,6 +188,7 @@ tabs_source("html_report", "99_html_report_main.R")
 # V11: data-layer writer for the data-centric report v2 (reuses the HTML
 # transformer's row helpers, so it must load after the html_report module).
 source(file.path(script_dir, "data_layer_writer.R"))
+source(file.path(script_dir, "html_report_v2", "build_report_v2.R"))
 
 # ==============================================================================
 # SIGNIFICANCE TESTING FUNCTIONS
@@ -645,20 +646,24 @@ if (isTRUE(config_result$config_obj$html_report)) {
 }
 
 # ==============================================================================
-# STEP 4d: WRITE DATA-LAYER JSON (data-centric report v2, if enabled)
+# STEP 4d: DATA-CENTRIC REPORT v2 (if enabled)
 # ==============================================================================
-# Additive: emits a *_data.json island for the v2 renderer alongside the
-# existing outputs. Old Excel/HTML paths are untouched when the flag is off.
+# Additive: emits a *_data.json island AND a self-contained *_report_v2.html
+# (renderer + data inlined) alongside the existing outputs. The classic
+# Excel/HTML writers run above and are byte-identical whether this is on or
+# off — this block only ever WRITES NEW FILES, never modifies the classic.
 
 if (isTRUE(config_result$config_obj$html_report_v2)) {
-  data_layer_path <- sub("\\.xlsx$", "_data.json", config_result$output_path)
+  v2_out <- config_result$output_path
 
+  # 1) JSON data layer (sidecar; also embedded in the report, and the input
+  #    a future wave-tracking config will read).
   data_layer_result <- tryCatch({
     write_data_layer(
       all_results      = analysis_result$all_results,
       banner_info      = analysis_result$banner_info,
       config_obj       = config_result$config_obj,
-      output_path      = data_layer_path,
+      output_path      = sub("\\.xlsx$", "_data.json", v2_out),
       survey_structure = data_result$survey_structure
     )
   }, error = function(e) {
@@ -667,10 +672,24 @@ if (isTRUE(config_result$config_obj$html_report_v2)) {
     NULL
   })
 
+  # 2) Self-contained v2 report, built from the same data layer.
   if (!is.null(data_layer_result) && data_layer_result$status == "PASS") {
-    cat(sprintf("  Data Layer: %s (%.2f MB, %d questions)\n",
-        basename(data_layer_result$output_file),
-        data_layer_result$file_size_mb, data_layer_result$n_questions))
+    report_v2_result <- tryCatch({
+      dl <- build_data_layer(analysis_result$all_results,
+                             analysis_result$banner_info,
+                             config_result$config_obj)
+      write_html_report_v2(serialize_data_layer(dl), config_result$config_obj,
+                           sub("\\.xlsx$", "_report_v2.html", v2_out))
+    }, error = function(e) {
+      cat("\n[WARNING] Report v2 build failed:", conditionMessage(e), "\n")
+      cat("  The Excel and HTML outputs were not affected.\n\n")
+      NULL
+    })
+
+    if (!is.null(report_v2_result) && report_v2_result$status == "PASS" &&
+        exists("turas_prepare_deliverable", mode = "function")) {
+      turas_prepare_deliverable(report_v2_result$output_file)
+    }
   }
 }
 

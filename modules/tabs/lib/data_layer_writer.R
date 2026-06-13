@@ -297,6 +297,19 @@ build_data_layer <- function(all_results, banner_info, config_obj) {
 }
 
 
+#' Serialise a data-layer list to the JSON string the renderer reads
+#'
+#' Arrays are preserved (never unboxed); NA cells become JSON null.
+#'
+#' @param data_layer A list from build_data_layer()
+#' @return A single JSON string
+#' @export
+serialize_data_layer <- function(data_layer) {
+  jsonlite::toJSON(data_layer, auto_unbox = TRUE, na = "null",
+                   null = "null", digits = 6, pretty = FALSE)
+}
+
+
 #' Write the data-layer JSON island for the v2 renderer
 #'
 #' @param all_results List of question results from the tabs run
@@ -356,8 +369,7 @@ write_data_layer <- function(all_results, banner_info, config_obj,
                   "Confirm the questions have RowLabel/RowType tables."))
   }
 
-  json <- jsonlite::toJSON(data_layer, auto_unbox = TRUE, na = "null",
-                           null = "null", digits = 6, pretty = FALSE)
+  json <- serialize_data_layer(data_layer)
 
   written <- tryCatch({
     writeLines(json, output_path, useBytes = TRUE); TRUE
