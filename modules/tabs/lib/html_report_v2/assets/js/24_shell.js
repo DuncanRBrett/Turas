@@ -78,12 +78,16 @@
     var brandmark = p.researcher_logo
       ? '<img class="hdr-logo" src="' + p.researcher_logo + '" alt="">'
       : '<span class="dot" aria-hidden="true"></span>';
+    // optional client logo, shown on the right of the header
+    var clientLogo = p.client_logo
+      ? '<img class="hdr-clientlogo" src="' + p.client_logo + '" alt="">' : "";
     return '<header class="hdr"><div class="hdr-in">' +
       '<div class="hdr-brand">' + brandmark +
       "<div><h1>" + fmt.escapeHtml(p.name) + "</h1>" +
       '<div class="hdr-sub">' + fmt.escapeHtml(p.client || "") +
       ' · <strong>data-centric report prototype</strong> · single file · works offline</div></div></div>' +
-      '<div class="hdr-meta"><span class="wavechip">' + fmt.escapeHtml(p.wave || "") + "</span>" +
+      '<div class="hdr-meta">' + clientLogo +
+      '<span class="wavechip">' + fmt.escapeHtml(p.wave || "") + "</span>" +
       waveHistoryChip() +
       '<button class="savecopy" data-savecopy title="Save a single .html copy with your ' +
       'insights, story and report sections embedded — ready to send">💾 Save copy</button>' +

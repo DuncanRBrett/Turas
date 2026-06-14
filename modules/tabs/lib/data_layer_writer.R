@@ -66,12 +66,42 @@ build_sig_note <- function(alpha = 0.05, sampling_method = "Not_Specified") {
 }
 
 
+#' Encode an image file as a base64 data URI for inline embedding
+#'
+#' Supports SVG / PNG / JPG. Returns NULL when the path is missing, the file
+#' does not exist, the format is unsupported, or base64enc is unavailable — the
+#' renderer then falls back to the brand dot. (The classic HTML report has its
+#' own equivalent embed_logo; sharing them is a safe future refactor.)
+#'
+#' @param path Absolute path to a logo image, or NULL
+#' @return A "data:...;base64,..." string, or NULL
+#' @export
+encode_logo_data_uri <- function(path) {
+  if (is.null(path) || !nzchar(as.character(path)) || !file.exists(path)) return(NULL)
+  if (!requireNamespace("base64enc", quietly = TRUE)) return(NULL)
+  ext <- tolower(tools::file_ext(path))
+  if (ext == "svg") {
+    svg <- paste(readLines(path, warn = FALSE), collapse = "\n")
+    return(paste0("data:image/svg+xml;base64,", base64enc::base64encode(charToRaw(svg))))
+  }
+  if (ext %in% c("png", "jpg", "jpeg")) {
+    mime <- if (ext == "png") "image/png" else "image/jpeg"
+    raw_bytes <- readBin(path, "raw", file.info(path)$size)
+    return(paste0("data:", mime, ";base64,", base64enc::base64encode(raw_bytes)))
+  }
+  NULL
+}
+
+
 #' Build the project block of the data layer
 #'
 #' @param config_obj The tabs config object
+#' @param tracking_enabled Logical; TRUE when a tracking island will be inlined
+#'   (the renderer only shows the Tracking tab when this is TRUE AND a prior-wave
+#'   island is present)
 #' @return A named list of project metadata
 #' @export
-build_dl_project <- function(config_obj) {
+build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
   blank <- function(x) is.null(x) || length(x) == 0 ||
     (length(x) == 1 && (is.na(x) || !nzchar(as.character(x))))
   name <- if (!blank(config_obj$project_title)) config_obj$project_title
@@ -79,7 +109,7 @@ build_dl_project <- function(config_obj) {
           else "Turas Report"
   alpha <- as.numeric(config_obj$alpha %||% 0.05)
   sm <- as.character(config_obj$sampling_method %||% "Not_Specified")
-  list(
+  proj <- list(
     name               = as.character(name),
     client             = if (blank(config_obj$client_name)) "" else as.character(config_obj$client_name),
     wave               = if (blank(config_obj$wave)) "" else as.character(config_obj$wave),
@@ -89,8 +119,16 @@ build_dl_project <- function(config_obj) {
     alpha              = alpha,
     sampling_method    = sm,
     sig_note           = build_sig_note(alpha, sm),
-    tracking           = list(enabled = FALSE, default_scope = "all")
+    tracking           = list(enabled = isTRUE(tracking_enabled), default_scope = "all")
   )
+  # Inline researcher / client logos as data URIs when configured; omit (the
+  # renderer shows the brand dot) otherwise. researcher_logo_path falls back to
+  # the legacy single logo_path, mirroring the classic report.
+  researcher <- encode_logo_data_uri(config_obj$researcher_logo_path %||% config_obj$logo_path)
+  if (!is.null(researcher)) proj$researcher_logo <- researcher
+  client_logo <- encode_logo_data_uri(config_obj$client_logo_path)
+  if (!is.null(client_logo)) proj$client_logo <- client_logo
+  proj
 }
 
 
@@ -165,9 +203,12 @@ build_dl_categories <- function(all_results) {
 #' @param banner_info Banner structure (supplies the column order)
 #' @param config_obj The tabs config object
 #' @param low_base Numeric low-base threshold
+#' @param survey_structure Optional structure; when supplied, scale/NPS questions
+#'   carry index_scores so means recompute live under filters / custom banners
 #' @return A question list, or NULL if the result has no usable table
 #' @export
-build_dl_question <- function(q_result, banner_info, config_obj, low_base) {
+build_dl_question <- function(q_result, banner_info, config_obj, low_base,
+                              survey_structure = NULL) {
   table <- q_result$table
   if (is.null(table) || !is.data.frame(table) || nrow(table) == 0) return(NULL)
   if (!all(c("RowLabel", "RowType") %in% names(table))) return(NULL)
@@ -287,7 +328,13 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base) {
     }
   }
 
-  list(
+  # index_scores (display label -> numeric score) lets the renderer recompute
+  # means/NPS from microdata under a live filter or custom banner. Omitted
+  # (NULL -> absent in JSON) when the structure is not supplied or the type
+  # carries no per-option score — the published mean still shows unfiltered.
+  index_scores <- derive_index_scores(q_result, survey_structure)
+
+  out <- list(
     code        = as.character(q_result$question_code %||% ""),
     title       = as.character(q_result$question_text %||% ""),
     category    = cat_val,
@@ -298,6 +345,8 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base) {
     gauge_green = gauge_green,
     gauge_amber = gauge_amber
   )
+  if (!is.null(index_scores)) out$index_scores <- index_scores
+  out
 }
 
 
@@ -306,15 +355,21 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base) {
 #' @param all_results List of question results
 #' @param banner_info Banner structure
 #' @param config_obj Configuration object
+#' @param survey_structure Optional structure; threaded to build_dl_question so
+#'   scale/NPS questions carry index_scores for live mean recompute
+#' @param tracking_enabled Logical; sets project.tracking.enabled (the Tracking
+#'   tab also requires a prior-wave island to actually appear)
 #' @return A list mirroring the data-agg JSON shape
 #' @export
-build_data_layer <- function(all_results, banner_info, config_obj) {
-  project <- build_dl_project(config_obj)
+build_data_layer <- function(all_results, banner_info, config_obj,
+                             survey_structure = NULL, tracking_enabled = FALSE) {
+  project <- build_dl_project(config_obj, tracking_enabled = tracking_enabled)
   low_base <- project$low_base_threshold
 
   questions <- list()
   for (q_code in names(all_results)) {
-    q <- build_dl_question(all_results[[q_code]], banner_info, config_obj, low_base)
+    q <- build_dl_question(all_results[[q_code]], banner_info, config_obj, low_base,
+                           survey_structure)
     if (!is.null(q)) questions[[length(questions) + 1]] <- q
   }
 
@@ -390,7 +445,7 @@ write_data_layer <- function(all_results, banner_info, config_obj,
   }
 
   data_layer <- tryCatch(
-    build_data_layer(all_results, banner_info, config_obj),
+    build_data_layer(all_results, banner_info, config_obj, survey_structure),
     error = function(e) e)
   if (inherits(data_layer, "error")) {
     return(refuse("DATA_LAYER_BUILD_FAILED", conditionMessage(data_layer),

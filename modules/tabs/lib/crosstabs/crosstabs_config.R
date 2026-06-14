@@ -225,6 +225,16 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # Additive: when TRUE, a *_data.json island is written alongside the
     # existing Excel/HTML outputs. Old paths are untouched when FALSE.
     html_report_v2 = safe_logical(get_config_value(config, "html_report_v2", FALSE)),
+    # V11 tabs-integrated tracker (OFF by default). When TRUE AND a waves_source
+    # resolves, the v2 report gains a Tracking tab built from anonymised per-wave
+    # microdata. Independent of the standalone tracker module, which is untouched.
+    html_report_v2_tracking = safe_logical(get_config_value(config, "html_report_v2_tracking", FALSE)),
+    # Folder holding prior waves' *_wave.json tracking contributions (emitted by
+    # each wave's own tabs run). Empty -> no history, Tracking tab stays hidden.
+    waves_source = get_config_value(config, "waves_source", ""),
+    # Numeric x-axis order key for this wave (e.g. 2025 or 2025.5 for twice-yearly
+    # so two same-year waves never collide). Blank -> derived from the wave label.
+    wave_order = get_config_value(config, "wave_order", ""),
     # Sample design — drives honest confidence vocabulary in the v2 report
     # (probability designs speak CI/MOE; non-probability designs speak the
     # softened SI/PE). Cautious default: Not_Specified -> SI/PE.
@@ -557,7 +567,8 @@ load_crosstabs_config <- function(config_file) {
     # Stats pack
     "generate_stats_pack",
     # HTML report
-    "html_report", "html_report_v2", "sampling_method", "wave",
+    "html_report", "html_report_v2", "html_report_v2_tracking",
+    "waves_source", "wave_order", "sampling_method", "wave",
     "brand_colour", "accent_colour", "project_title", "project_name",
     "company_name", "client_name",
     "researcher_logo_path", "client_logo_path", "logo_path",

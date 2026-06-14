@@ -30,6 +30,7 @@ h1, h2, h3 { line-height: 1.25; letter-spacing: -.2px; }
 .hdr-brand { display: flex; align-items: center; gap: 13px; flex: 1; min-width: 280px; }
 .hdr-brand .dot { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg, var(--accent), #fff3); flex: none; }
 .hdr-brand .hdr-logo { height: 36px; width: auto; max-width: 200px; flex: none; object-fit: contain; }
+.hdr-meta .hdr-clientlogo { height: 30px; width: auto; max-width: 160px; flex: none; object-fit: contain; background: #fff; border-radius: 6px; padding: 3px 6px; }
 .hdr h1 { font-size: 19px; color: #fff; }
 .hdr-sub { font-size: 11.5px; color: #b9c2d8; }
 .hdr-sub strong { color: #e8d9a8; font-weight: 600; }

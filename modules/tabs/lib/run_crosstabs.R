@@ -187,7 +187,10 @@ tabs_source("html_report", "99_html_report_main.R")
 
 # V11: data-layer writer for the data-centric report v2 (reuses the HTML
 # transformer's row helpers, so it must load after the html_report module).
+source(file.path(script_dir, "score_utils.R"))
 source(file.path(script_dir, "data_layer_writer.R"))
+source(file.path(script_dir, "microdata_writer.R"))
+source(file.path(script_dir, "tracking_island.R"))
 source(file.path(script_dir, "html_report_v2", "build_report_v2.R"))
 
 # ==============================================================================
@@ -677,14 +680,61 @@ if (.html_report_v2_on) {
     NULL
   })
 
-  # 2) Self-contained v2 report, built from the same data layer.
+  # 2) Self-contained v2 report, built from the same data layer. The anonymised
+  #    microdata island (per-respondent indices + weights) is built alongside so
+  #    the live filter bar + "+ Custom…" banner light up and recompute weighted
+  #    figures; build_microdata returns NULL when it cannot be built, degrading
+  #    the report to published-only.
   if (!is.null(data_layer_result) && data_layer_result$status == "PASS") {
     report_v2_result <- tryCatch({
+      # Build the data layer ONCE and reuse it for the microdata island, the
+      # tracking contribution and the report (project.tracking.enabled is set by
+      # mutation at the end so nothing is recomputed).
       dl <- build_data_layer(analysis_result$all_results,
                              analysis_result$banner_info,
-                             config_result$config_obj)
+                             config_result$config_obj,
+                             data_result$survey_structure)
+
+      # Anonymised microdata island (per-respondent indices + weights) so the
+      # live filter bar + "+ Custom…" banner light up and recompute weighted
+      # figures; NULL on failure degrades the report to published-only.
+      micro <- tryCatch(
+        build_microdata(dl, data_result$survey_data, data_result$survey_structure,
+                        analysis_result$banner_info, config_result$config_obj),
+        error = function(e) {
+          cat("\n[WARNING] Microdata island generation failed:", conditionMessage(e), "\n")
+          cat("  The v2 report still builds (published figures only).\n\n")
+          NULL
+        })
+
+      # Tabs-integrated tracker (OFF by default): emit this wave's contribution,
+      # then — when enabled and a waves_source resolves — assemble the tracking
+      # island from the prior waves' contributions plus this one.
+      prev_json <- NULL
+      tracking_on <- FALSE
+      if (isTRUE(config_result$config_obj$html_report_v2_tracking)) {
+        tracking_on <- tryCatch({
+          contrib <- wave_contribution(dl, micro, config_result$config_obj)
+          wave_path <- sub("\\.xlsx$", "_wave.json", v2_out)
+          write_wave_contribution(contrib, wave_path)
+          priors <- read_wave_contributions(config_result$config_obj$waves_source, wave_path)
+          island <- build_tracking_island(contrib, priors)
+          if (!is.null(island) && length(island$waves) > 1) {
+            prev_json <- serialize_tracking_island(island)
+            TRUE
+          } else FALSE
+        }, error = function(e) {
+          cat("\n[WARNING] Tracking island assembly failed:", conditionMessage(e), "\n")
+          cat("  The v2 report still builds (no Tracking tab).\n\n")
+          FALSE
+        })
+      }
+
+      dl$project$tracking$enabled <- tracking_on   # show the Tracking tab iff built
       write_html_report_v2(serialize_data_layer(dl), config_result$config_obj,
-                           sub("\\.xlsx$", "_report_v2.html", v2_out))
+                           sub("\\.xlsx$", "_report_v2.html", v2_out),
+                           prev_json = prev_json,
+                           micro_json = serialize_microdata(micro))
     }, error = function(e) {
       cat("\n[WARNING] Report v2 build failed:", conditionMessage(e), "\n")
       cat("  The Excel and HTML outputs were not affected.\n\n")

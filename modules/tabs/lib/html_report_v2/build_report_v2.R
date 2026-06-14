@@ -75,7 +75,7 @@ bundle_report_v2_js <- function(assets_dir = report_v2_assets_dir()) {
 build_report_v2_html <- function(data_json, config_obj,
                                   assets_dir = report_v2_assets_dir(),
                                   generated = format(Sys.time(), "%Y-%m-%d %H:%M %Z"),
-                                  prev_json = NULL) {
+                                  prev_json = NULL, micro_json = NULL) {
   read_text <- function(path) paste(readLines(path, warn = FALSE), collapse = "\n")
 
   template_path <- file.path(assets_dir, "template.html")
@@ -109,7 +109,13 @@ build_report_v2_html <- function(data_json, config_obj,
   html <- replace_token(html, "{{GENERATED}}", generated)
   html <- replace_token(html, "{{CSS}}", read_text(css_path))
   html <- replace_token(html, "{{DATA_AGG}}", escape_island(data_json))
-  html <- replace_token(html, "{{DATA_MICRO}}", "null")   # no microdata in this cut
+  # Microdata island: inline when supplied (anonymised per-respondent indices +
+  # weights) so the live filter bar and "+ Custom…" banner light up and the
+  # stats engine recomputes weighted figures; else null (published-only report).
+  micro_inlined <- if (!is.null(micro_json) && nzchar(micro_json) && micro_json != "null") {
+    escape_island(micro_json)
+  } else "null"
+  html <- replace_token(html, "{{DATA_MICRO}}", micro_inlined)
   # Prior-wave / tracking island: inline when supplied (same </ escaping as the
   # agg island), else null so the Tracking tab stays hidden. Carries the wave
   # history — for trackers, anonymised per-wave microdata the engine recomputes.
@@ -145,7 +151,7 @@ build_report_v2_html <- function(data_json, config_obj,
 #' @export
 write_html_report_v2 <- function(data_json, config_obj, output_path,
                                  assets_dir = report_v2_assets_dir(),
-                                 prev_json = NULL) {
+                                 prev_json = NULL, micro_json = NULL) {
   refuse <- function(code, message, how_to_fix) {
     cat("\n=== TURAS ERROR ===\n")
     cat("Code:", code, "\n")
@@ -162,7 +168,8 @@ write_html_report_v2 <- function(data_json, config_obj, output_path,
   }
 
   html <- tryCatch(
-    build_report_v2_html(data_json, config_obj, assets_dir, prev_json = prev_json),
+    build_report_v2_html(data_json, config_obj, assets_dir,
+                         prev_json = prev_json, micro_json = micro_json),
     error = function(e) e)
   if (inherits(html, "error")) {
     return(refuse("REPORT_V2_BUILD_FAILED", conditionMessage(html),
