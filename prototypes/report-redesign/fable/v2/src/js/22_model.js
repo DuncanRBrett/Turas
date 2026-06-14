@@ -137,7 +137,24 @@
       indexDesc: r.index_desc || null, cells: cells };
   }
 
+  /** Build a NET row model from a {wbase, n, effBase}[] counts array. */
+  function netRowFromCounts(r, counts, letters, threshold, dual) {
+    var sigCells = counts.map(function (c) {
+      var p = c.wbase ? c.n / c.wbase : null;
+      return { x: p === null ? 0 : p * c.effBase, base: c.effBase };
+    });
+    var sigs = TR.stats.sigLetters(sigCells, letters, threshold, false, dual);
+    return rowModel(r, counts.map(function (c, i) {
+      return { pct: c.wbase ? c.n / c.wbase * 100 : null,
+        n: c.n, mean: null, sig: sigs[i] };
+    }));
+  }
+
   function netRow(q, r, ri, columns, mask, tabs, letters, threshold, dual) {
+    // Box-category membership (TR.MICRO.boxes) recomputes box NETs directly from
+    // each respondent's box — works whether the underlying scale is shown
+    // (SACAP) or hidden (CCS shows only the boxes). Falls back to net_members.
+    var boxes = TR.MICRO.boxes && TR.MICRO.boxes[q.code];
     var diff = q.net_diffs && q.net_diffs[String(ri)];
     if (diff !== undefined) {
       var diffRow = function (cells) {
@@ -145,15 +162,20 @@
         m.diff = true;
         return m;
       };
-      var plus = q.rows[diff.plus], minus = q.rows[diff.minus];
-      var plusCells = netOrRowCounts(q, plus, diff.plus, columns, mask, tabs);
-      var minusCells = netOrRowCounts(q, minus, diff.minus, columns, mask, tabs);
+      var plusCells = boxes ? TR.stats.boxCounts(q.code, diff.plus, columns, mask)
+        : netOrRowCounts(q, q.rows[diff.plus], diff.plus, columns, mask, tabs);
+      var minusCells = boxes ? TR.stats.boxCounts(q.code, diff.minus, columns, mask)
+        : netOrRowCounts(q, q.rows[diff.minus], diff.minus, columns, mask, tabs);
       return diffRow(plusCells.map(function (p, i) {
         var m = minusCells[i];
         var pct = (p.wbase && m.wbase)
           ? (p.n / p.wbase - m.n / m.wbase) * 100 : null;
         return { pct: pct, n: null, mean: null, sig: "" };
       }));
+    }
+    if (boxes) {
+      return netRowFromCounts(r, TR.stats.boxCounts(q.code, ri, columns, mask),
+        letters, threshold, dual);
     }
     var members = q.net_members && q.net_members[String(ri)];
     if (!members) {

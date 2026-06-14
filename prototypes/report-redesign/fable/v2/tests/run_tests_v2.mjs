@@ -160,6 +160,37 @@ run("microdata scores: means recompute from per-respondent scores (hidden catego
   }
 });
 
+run("box-category NETs recompute from per-respondent box membership", () => {
+  // A hidden-scale rating that publishes only its boxes: rows Low(0) / High(1) /
+  // NET POSITIVE(2) / Mean(3). boxes [0,1,0,1,null] -> Low 2/4=50%, High 50%,
+  // NET POSITIVE = High - Low = 0. Recomputes with no displayed category rows.
+  const agg = { schema_version: 2,
+    project: { name: "B", low_base_threshold: 1, alpha: 0.05, tracking: { enabled: false } },
+    columns: [{ key: "TOTAL::Total", group: "total", label: "Total", letter: "" }],
+    banner_groups: [], categories: ["c"],
+    questions: [{ code: "QB", title: "QB", category: "c", type: "scale",
+      bases: [{ n: 4, low: false }],
+      net_diffs: { "2": { plus: 1, minus: 0 } },
+      rows: [{ kind: "net", label: "Low", pct: [50], n: [null], sig: [""] },
+             { kind: "net", label: "High", pct: [50], n: [null], sig: [""] },
+             { kind: "net", label: "NET POSITIVE (High - Low)", pct: [0], n: [null], sig: [""] },
+             { kind: "mean", label: "Mean", pct: [3], n: [null], sig: [""] }] }] };
+  const saved = { agg: TR.AGG, micro: TR.MICRO, prev: TR.PREV, idx: TR.d2._qIndex };
+  try {
+    TR.AGG = agg; TR.PREV = null; TR.d2._qIndex = null;
+    TR.MICRO = { n: 4, answers: { QB: [null, null, null, null] }, banner_vars: {},
+      weights: [1, 1, 1, 1], boxes: { QB: [0, 1, 0, 1] } };
+    const m = TR.model.forQuestion("QB", "custom:QB", []);   // force a computed view
+    const tot = m.columns.findIndex(c => c.label === "Total");
+    const byLabel = (l) => m.rows.find(r => r.label === l).cells[tot].pct;
+    assert(Math.abs(byLabel("Low") - 50) < 1e-9, "Low box = 50%");
+    assert(Math.abs(byLabel("High") - 50) < 1e-9, "High box = 50%");
+    assert(Math.abs(byLabel("NET POSITIVE (High - Low)") - 0) < 1e-9, "NET POSITIVE = High - Low = 0");
+  } finally {
+    TR.AGG = saved.agg; TR.MICRO = saved.micro; TR.PREV = saved.prev; TR.d2._qIndex = saved.idx;
+  }
+});
+
 run("stacked chart export is transposed (segments=series, columns=bars)", () => {
   // Regression: the PPTX stacked export reused the bar layout (rows as
   // categories, one series per column), so each option rendered as its own

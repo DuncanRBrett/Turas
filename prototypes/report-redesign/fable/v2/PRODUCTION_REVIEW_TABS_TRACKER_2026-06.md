@@ -134,14 +134,15 @@ anonymisation (it extracted the built island and verified no strings leak). It
 rated test quality "good, not vacuous", and raised two IMPORTANT findings the
 author's review under-weighted — **both now addressed:**
 
-- **I-NET — NET rows blank under a live filter / custom banner.** Confirmed: the
-  writer emits no `net_members`, so `computedModel.netRow` returns null cells for
-  Top-2-Box / summary NETs under a filter. *Response:* the renderer already shows
-  these as "–" (`fmtPct(null)` → "–", never blank or zero); the limitation is now
-  documented prominently (docs §"Current scope") and `net_members` emission is the
-  **top** growth-path item. Not fixed in code (a wrong NET would be worse than an
-  honest "–"; the real fix needs its own known-answer tests). Blocks *enabling*
-  for NET-heavy reports, not the off-by-default merge.
+- **I-NET — NET rows blank under a live filter / custom banner.** *Response: FIXED
+  (2026-06-14, after Duncan hit it live on a SACAP-via-tabs report).* Rather than
+  `net_members` (which only works when the underlying scale is shown), the
+  microdata now carries each respondent's **box membership** (`TR.MICRO.boxes`)
+  plus `net_diffs`; the engine's `stats.boxCounts` re-sums box NETs under any
+  filter / custom banner — verified on real CCS Q15 (hidden scale: Poor/Average/
+  Good recompute to the published 33/33/33, non-null under a filter). Known-answer
+  gates added (R: box membership + net_diffs; node: box-NET recompute). Additive —
+  SACAP (no `boxes`) keeps its `net_members` path, gates byte-identical.
 - **I-WTRACK — weighted tracker mixed weighted crosstab + unweighted trend.**
   *Response: FIXED.* `wave_contribution` now returns NULL when
   `apply_weighting = TRUE` and Step 4d prints a clear NOTE — the Tracking tab is
@@ -155,6 +156,7 @@ fragile; the `-2` sentinel is duplicated across R/JS (well-commented). Added to
 the growth path: a golden test feeding **actual** `build_microdata` output through
 `d2.validate` + a recompute, to lock the writer↔renderer seam.
 
-**Net position:** with I-WTRACK fixed and I-NET documented + honestly degraded,
-the conditions are met for the **off-by-default merge**; emitting `net_members`
-is the remaining gate before enabling on a NET-heavy client report.
+**Net position:** with **both** I-WTRACK and I-NET now FIXED in code (and verified
+on real CCS data), the conditions are met not only for the off-by-default merge
+but for enabling the v2 report on real crosstab / NET-heavy reports. Remaining
+follow-ups are enhancements (weighted wave trends; rare non-box one-off NETs).

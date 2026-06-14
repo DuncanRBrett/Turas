@@ -386,6 +386,50 @@ micro_scores_for_question <- function(dl_q, survey_data, survey_structure, n) {
 }
 
 
+#' Per-respondent box-category membership for one question
+#'
+#' Maps each respondent to the data-layer row index of their box-category NET
+#' (e.g. "Good (9-10)"), derived from their raw value's BoxCategory. Lets the
+#' renderer recompute box NET rows under a filter / custom banner even when the
+#' underlying scale is hidden (only the boxes are displayed). NULL when the
+#' question has no box-category NET rows or no BoxCategory in the structure.
+#'
+#' @param dl_q One built data-layer question
+#' @param survey_data Respondent data
+#' @param survey_structure Loaded structure (needs $options$BoxCategory)
+#' @param n Respondent count
+#' @return Integer vector length n (box NET row index, or NA), or NULL
+#' @keywords internal
+micro_box_membership <- function(dl_q, survey_data, survey_structure, n) {
+  box_label_to_index <- list()
+  for (i in seq_along(dl_q$rows)) {
+    r <- dl_q$rows[[i]]
+    if (identical(r$kind, "net")) {
+      box_label_to_index[[trimws(as.character(r$label))]] <- i - 1L
+    }
+  }
+  if (length(box_label_to_index) == 0) return(NULL)
+
+  opt <- survey_structure$options
+  if (is.null(opt) || !all(c("QuestionCode", "BoxCategory") %in% names(opt))) return(NULL)
+  qopt <- opt[!is.na(opt$QuestionCode) & opt$QuestionCode == dl_q$code, , drop = FALSE]
+  if (nrow(qopt) == 0) return(NULL)
+  has_box <- !is.na(qopt$BoxCategory) & nzchar(trimws(as.character(qopt$BoxCategory)))
+  if (!any(has_box) || !(dl_q$code %in% names(survey_data))) return(NULL)
+
+  raw_to_box <- setNames(trimws(as.character(qopt$BoxCategory)),
+                         trimws(as.character(qopt$OptionText)))
+  keys <- trimws(as.character(survey_data[[dl_q$code]]))
+  boxcat <- unname(raw_to_box[keys])
+  idx <- vapply(boxcat, function(bc) {
+    hit <- if (!is.na(bc)) box_label_to_index[[bc]] else NULL
+    if (is.null(hit)) NA_integer_ else as.integer(hit)
+  }, integer(1))
+  idx[is.na(keys) | keys == ""] <- NA_integer_
+  if (all(is.na(idx))) NULL else as.integer(idx)
+}
+
+
 #' Build the complete TR.MICRO payload (pure — no file I/O)
 #'
 #' @param data_layer The built data layer (from build_data_layer)
@@ -408,10 +452,13 @@ build_microdata <- function(data_layer, survey_data, survey_structure,
   n <- nrow(survey_data)
   answers <- list()
   scores <- list()
+  boxes <- list()
   for (q in data_layer$questions) {
     answers[[q$code]] <- micro_answers_for_question(q, survey_data, survey_structure, n)
     sc <- micro_scores_for_question(q, survey_data, survey_structure, n)
     if (!is.null(sc) && any(!is.na(sc))) scores[[q$code]] <- I(sc)
+    bx <- micro_box_membership(q, survey_data, survey_structure, n)
+    if (!is.null(bx)) boxes[[q$code]] <- I(bx)
   }
   out <- list(
     n           = n,
@@ -419,9 +466,11 @@ build_microdata <- function(data_layer, survey_data, survey_structure,
     banner_vars = micro_banner_vars(banner_info, survey_data, survey_structure, n),
     weights     = I(micro_weights(survey_data, config_obj))
   )
-  # Per-respondent mean scores (rating/Likert/NPS/numeric) — the robust source
-  # for live mean recompute; omitted when no question carries one.
+  # Per-respondent mean scores (rating/Likert/NPS/numeric) and box-category
+  # membership — the sources for live mean / box-NET recompute; each omitted when
+  # no question carries one.
   if (length(scores) > 0) out$scores <- scores
+  if (length(boxes) > 0) out$boxes <- boxes
   out
 }
 

@@ -267,3 +267,57 @@ test_that("build_dl_project inlines a researcher logo when a path resolves", {
   expect_match(proj$researcher_logo, "^data:image/svg")
   expect_null(build_dl_project(mw_config())$researcher_logo)   # omitted when none
 })
+
+# ==============================================================================
+# 6. box-category NET recompute: box membership + net_diffs
+# ==============================================================================
+
+context("microdata_writer: box-category NETs")
+
+test_that("micro_box_membership maps each respondent to their box row index", {
+  dl_q <- list(code = "QB", rows = list(
+    list(kind = "net", label = "Low"),     # row 0
+    list(kind = "net", label = "High"),    # row 1
+    list(kind = "mean", label = "Mean")))
+  structure <- list(options = data.frame(
+    QuestionCode = c("QB", "QB", "QB", "QB"),
+    OptionText   = c("1", "2", "4", "5"),
+    BoxCategory  = c("Low", "Low", "High", "High"),
+    stringsAsFactors = FALSE))
+  survey_data <- data.frame(QB = c("1", "5", "2", "4", NA), stringsAsFactors = FALSE)
+  # 1->Low(0), 5->High(1), 2->Low(0), 4->High(1), NA->NA
+  expect_equal(micro_box_membership(dl_q, survey_data, structure, 5),
+               c(0L, 1L, 0L, 1L, NA_integer_))
+})
+
+test_that("micro_box_membership returns NULL without box NET rows or BoxCategory", {
+  dl_q_nonet <- list(code = "QB", rows = list(list(kind = "category", label = "1")))
+  structure <- list(options = data.frame(QuestionCode = "QB", OptionText = "1",
+    BoxCategory = "Low", stringsAsFactors = FALSE))
+  expect_null(micro_box_membership(dl_q_nonet, data.frame(QB = "1"), structure, 1))
+})
+
+test_that("derive_net_diffs picks top (last non-DK box) minus bottom (first box)", {
+  rows <- list(
+    list(kind = "net", label = "Do not trust"),    # 0 = bottom
+    list(kind = "net", label = "Some trust"),       # 1
+    list(kind = "net", label = "Fully trust"),      # 2 = top
+    list(kind = "net", label = "NET POSITIVE (Fully trust - Do not trust)"),  # 3
+    list(kind = "mean", label = "Mean"))
+  expect_equal(derive_net_diffs(rows), list("3" = list(plus = 2, minus = 0)))
+})
+
+test_that("derive_net_diffs excludes a Don't-know box from the top", {
+  rows <- list(
+    list(kind = "net", label = "Poor (1 - 5)"),     # 0 = bottom
+    list(kind = "net", label = "Good (9 - 10)"),    # 1 = top (last non-DK)
+    list(kind = "net", label = "Don't know"),        # 2 = DK, excluded
+    list(kind = "net", label = "NET POSITIVE (Good - Poor)"))  # 3
+  expect_equal(derive_net_diffs(rows), list("3" = list(plus = 1, minus = 0)))
+})
+
+test_that("derive_net_diffs returns NULL without a NET POSITIVE row", {
+  rows <- list(list(kind = "net", label = "Poor"), list(kind = "net", label = "Good"),
+               list(kind = "mean", label = "Mean"))
+  expect_null(derive_net_diffs(rows))
+})

@@ -212,6 +212,31 @@
   };
 
   /**
+   * Weighted count of respondents whose box-category membership equals a given
+   * box row index, per column. Reads TR.MICRO.boxes[qcode] (one box row index
+   * per respondent) so box-category NET rows recompute under a filter / custom
+   * banner even when the underlying scale is hidden (only the boxes are shown).
+   * Returns the same {base, n, wbase, effBase} shape as netCounts.
+   */
+  stats.boxCounts = function (qcode, boxRi, columns, mask) {
+    var boxes = TR.MICRO.boxes[qcode];
+    return columns.map(function (col) {
+      var hit = 0, base = 0, wbase = 0, sumW2 = 0;
+      for (var r = 0; r < mask.length; r++) {
+        if (!mask[r]) continue;
+        if (col.member && !col.member[r]) continue;
+        var b = boxes[r];
+        if (b === null || b === undefined) continue;
+        var w = weightAt(r);
+        base++; wbase += w; sumW2 += w * w;
+        if (b === boxRi) hit += w;
+      }
+      return { base: base, n: hit, wbase: wbase,
+        effBase: effectiveBase(wbase, sumW2) };
+    });
+  };
+
+  /**
    * Weighted mean / sd / effective base for one column from a per-respondent
    * score function (null score = excluded). mean = Σws/Σw (the published
    * weighted mean, exact). The SD reduces to the prior unweighted (k-1) sample

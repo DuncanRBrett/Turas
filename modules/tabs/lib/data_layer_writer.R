@@ -333,6 +333,9 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   # (NULL -> absent in JSON) when the structure is not supplied or the type
   # carries no per-option score — the published mean still shows unfiltered.
   index_scores <- derive_index_scores(q_result, survey_structure)
+  # net_diffs (NET POSITIVE = top box - bottom box) lets that row recompute too;
+  # box NET rows recompute from per-respondent box membership (TR.MICRO.boxes).
+  net_diffs <- derive_net_diffs(rows)
 
   out <- list(
     code        = as.character(q_result$question_code %||% ""),
@@ -346,6 +349,7 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
     gauge_amber = gauge_amber
   )
   if (!is.null(index_scores)) out$index_scores <- index_scores
+  if (!is.null(net_diffs)) out$net_diffs <- net_diffs
   out
 }
 

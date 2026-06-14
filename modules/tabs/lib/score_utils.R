@@ -1,11 +1,12 @@
 # ==============================================================================
-# TABS — SCORING HELPERS (data-centric report v2)
+# TABS — SCORING & NET-STRUCTURE HELPERS (data-centric report v2)
 # ==============================================================================
-# Numeric scoring helpers shared by the data-layer writer (index_scores) and the
-# microdata writer (per-respondent mean scores). They reproduce the crosstab
-# processors' option->value logic exactly, so a recompute reproduces published
-# means. Kept in one place so the two writers can never drift on how an option
-# becomes a score. Must be sourced BEFORE data_layer_writer.R / microdata_writer.R.
+# Shared helpers for the v2 data layer + microdata writers: numeric scoring
+# (index_scores / per-respondent mean scores) and NET-structure derivation
+# (the top-minus-bottom net difference). They reproduce the crosstab processors'
+# logic exactly, so a recompute reproduces published figures. Kept in one place
+# so the writers can never drift. Sourced BEFORE data_layer_writer.R /
+# microdata_writer.R.
 # ==============================================================================
 
 if (!exists("%||%", mode = "function")) {
@@ -46,6 +47,40 @@ nps_bucket_score <- function(v) {
   if (v >= 7) return(0)
   if (v >= 0) return(-100)
   NA_real_
+}
+
+
+#' Derive net_diffs (NET POSITIVE = top box - bottom box) from data-layer rows
+#'
+#' Mirrors the processor's identify_top_bottom_categories: the bottom box is the
+#' first box-category NET row, the top box is the last non-DK box NET row, and a
+#' "NET POSITIVE (...)" row is their difference. Keyed by the NET POSITIVE row's
+#' zero-based index; values are the plus/minus box row indices the renderer's
+#' net_diff path reads. Derived by ORDER (not by parsing the label), so box names
+#' that themselves contain dashes (e.g. "Good (9 - 10)") are handled safely.
+#'
+#' @param rows The built rows[] list of a data-layer question
+#' @return Named list "<npIndex>" -> list(plus, minus), or NULL
+#' @export
+derive_net_diffs <- function(rows) {
+  net_idx <- which(vapply(rows, function(r) identical(r$kind, "net"), logical(1)))
+  if (length(net_idx) < 3) return(NULL)
+  is_np <- vapply(net_idx, function(i) grepl("^NET POSITIVE", rows[[i]]$label, ignore.case = TRUE),
+                  logical(1))
+  np <- net_idx[is_np]
+  box_rows <- net_idx[!is_np]
+  if (length(np) == 0 || length(box_rows) < 2) return(NULL)
+  dk_pat <- "don'?t know|^DK$|not applicable|^NA$"
+  is_dk <- vapply(box_rows, function(i) {
+    grepl(dk_pat, rows[[i]]$label, ignore.case = TRUE)
+  }, logical(1))
+  non_dk <- box_rows[!is_dk]
+  if (length(non_dk) == 0) return(NULL)
+  bottom <- box_rows[1] - 1L                    # first box (zero-based)
+  top <- non_dk[length(non_dk)] - 1L            # last non-DK box (zero-based)
+  diffs <- list()
+  for (i in np) diffs[[as.character(i - 1L)]] <- list(plus = top, minus = bottom)
+  diffs
 }
 
 

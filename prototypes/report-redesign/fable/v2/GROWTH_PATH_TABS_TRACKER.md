@@ -32,21 +32,14 @@ Requires significant rework:
 
 ## Natural next steps
 
-### 1. Recompute-ready NET / box-category rows under filter (top gap)
-**What:** Emit `net_members` (and `net_diffs`) per question so Top-2-Box / summary
-NETs recompute live instead of showing "–" under a filter.
-**Why now:** The independent cold review flagged this as the most user-visible gap
-in the filtered-recompute feature — Top-box NETs are common tracker headline
-metrics. It is the **gate before enabling the v2 report on a NET-heavy client
-report** (today: honest "–" under a filter; correct unfiltered).
-**Effort:** Medium — derive box-category membership from the structure (the
-classifier already identifies NET rows + their member options); the engine
-already consumes `net_members` / `net_diffs`.
-**Risk:** Medium — membership derivation must match the processor's box logic
-exactly. Cover with known-answer tests (a filtered Top-2-Box reproduces the
-hand-summed member %).
+### ~~1. Recompute-ready NET / box-category rows under filter~~ — DONE (2026-06-14)
+Shipped: the microdata carries per-respondent **box membership** (`TR.MICRO.boxes`)
++ `net_diffs`; `stats.boxCounts` re-sums box NETs (and the top−bottom difference)
+under any filter / custom banner, for shown OR hidden scales. Verified on real CCS.
+*(Remaining NET edge: arbitrary one-off NETs that aren't box-categories still show
+the published value unfiltered — rare; revisit only if a project needs it.)*
 
-### 2. Weighted wave trends (lifts the current guard)
+### 1. Weighted wave trends (lifts the current guard)
 **What:** Carry per-wave `weights` in the contribution; weight `meanOfScores` /
 `sdOfScores`.
 **Why now:** Tracking is currently *guarded off* on weighted studies (so a weighted

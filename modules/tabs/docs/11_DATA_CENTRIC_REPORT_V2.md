@@ -76,7 +76,10 @@ historical) figures are badged as computed.
   "weights": [1, 1, 1, ...],                  // per-respondent weight (length n; all 1 = unweighted)
   "scores": {                                 // per-respondent mean score (rating value / Likert weight /
     "Q015": [4, 7, null, 9, ...]              //   NPS ±100), length n. The robust mean-recompute source —
-  }                                           //   works even when a rating publishes only its Mean.
+  },                                          //   works even when a rating publishes only its Mean.
+  "boxes": {                                  // per-respondent box-category membership: the data-layer row
+    "Q015": [1, 0, null, 2, ...]              //   index of the respondent's box NET (e.g. "Good (9-10)"),
+  }                                           //   so box NETs recompute even when the scale is hidden.
 }
 ```
 
@@ -166,15 +169,13 @@ onward; a back-catalogue can be produced by running each historical wave once.)
 Read these before enabling the v2 report for a live client deliverable. None
 produce a *wrong* number — each is an honest degrade or a guard.
 
-- **NET rows do not recompute under a live filter / custom banner.** The writer
-  does not yet emit `net_members`, so the renderer cannot recompute Top-2-Box /
-  summary-NET rows for a filtered audience: published / unfiltered NETs are
-  correct, but **under an active filter every NET row shows "–"** (an explicit
-  "not available", never a zero or a stale value) while detail rows and means
-  recompute normally. Common in tracker / crosstab reporting, so weigh this
-  before enabling for a NET-heavy report. The fix — emitting `net_members`
-  (and `net_diffs`) from `build_dl_question` so `netCounts` can recompute — is
-  the top scoped follow-up.
+- **Box-category NETs recompute under a live filter / custom banner** (e.g.
+  "Top-2-Box", "Good (9-10)", and the "NET POSITIVE (top − bottom)" difference).
+  The microdata carries each respondent's **box membership** (`TR.MICRO.boxes`)
+  plus `net_diffs`, so these rows re-sum for a filtered audience — and it works
+  whether the underlying scale is shown (SACAP shows 0–10) or hidden (CCS shows
+  only the boxes). Verified on real CCS data. *(Arbitrary one-off NETs that are
+  not box-categories still fall back to the published value unfiltered.)*
 - **Tracking is built for unweighted studies only.** The wave engine averages
   per-respondent scores *unweighted* (`meanOfScores`). On a **weighted** study a
   trend mean would silently disagree with the (weighted) crosstab mean, so the
