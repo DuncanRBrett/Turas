@@ -1,3 +1,9 @@
+> **STATUS 2026-06-14: PRODUCTIONISED.** The microdata writer + tracking-island
+> assembler are wired into the tabs module (Step 4d), off by default, tested and
+> verified on real CCS data. The authoritative reference is
+> `modules/tabs/docs/11_DATA_CENTRIC_REPORT_V2.md` (options, TR.MICRO + tracking
+> contracts, enabling, governance). This file is kept as the original build plan.
+
 # Session 3 — Tracking in the data-centric report v2 (build plan)
 
 **Goal:** light up the v2 report's built-in Tracking tab (Summary / Explorer /

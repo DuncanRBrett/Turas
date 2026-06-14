@@ -106,3 +106,10 @@ __pycache__/
 # Mac OS artifacts
 __MACOSX/
 *.zip
+
+# CCS tabs-tracker spike: real CCPB client data + one-time backfill artifacts.
+# Kept on disk for the backfill but NEVER committed (client-data governance).
+prototypes/report-redesign/fable/v2/ccs_backfill/
+prototypes/report-redesign/fable/v2/data/ccs_*.json
+# Tabs-tracker per-wave contribution sidecars (may carry client microdata)
+*_wave.json
