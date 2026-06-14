@@ -83,7 +83,8 @@ derive_index_scores <- function(q_result, survey_structure) {
   for (i in seq_len(nrow(qopt))) {
     row_i <- qopt[i, , drop = FALSE]
     sc <- if (source == "index") {
-      if ("Index_Weight" %in% names(row_i)) suppressWarnings(as.numeric(row_i$Index_Weight)) else NA_real_
+      iw <- if ("Index_Weight" %in% names(row_i)) row_i$Index_Weight else NA
+      suppressWarnings(as.numeric(iw))
     } else if (source == "nps") {
       nps_bucket_score(option_numeric_value(row_i))
     } else {

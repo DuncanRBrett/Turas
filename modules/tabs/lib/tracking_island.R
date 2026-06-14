@@ -116,7 +116,10 @@ wave_contribution <- function(data_layer, micro, config_obj) {
 build_tracking_island <- function(current_contribution, prior_contributions = list()) {
   if (is.null(current_contribution)) return(NULL)
   current_contribution$current <- TRUE
-  priors <- lapply(prior_contributions, function(w) { w$current <- FALSE; w })
+  priors <- lapply(prior_contributions, function(w) {
+    w$current <- FALSE
+    w
+  })
   priors <- priors[!vapply(priors, is.null, logical(1))]
   waves <- c(priors, list(current_contribution))
 
@@ -153,8 +156,10 @@ write_wave_contribution <- function(contribution, output_path) {
   if (!requireNamespace("jsonlite", quietly = TRUE)) return(invisible(NULL))
   json <- jsonlite::toJSON(contribution, auto_unbox = TRUE, na = "null",
                            null = "null", digits = 6, pretty = FALSE)
-  written <- tryCatch({ writeLines(json, output_path, useBytes = TRUE); TRUE },
-                      error = function(e) FALSE)
+  written <- tryCatch({
+    writeLines(json, output_path, useBytes = TRUE)
+    TRUE
+  }, error = function(e) FALSE)
   if (!written) return(invisible(NULL))
   cat(sprintf("  Wave contribution: %s\n", basename(output_path)))
   invisible(output_path)

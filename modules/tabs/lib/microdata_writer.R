@@ -273,12 +273,15 @@ micro_banner_vars <- function(banner_info, survey_data, survey_structure, n) {
     if (is.null(grp_keys) || length(grp_keys) == 0) next
     banner_code <- if (!is.null(c2b) && grp_keys[1] %in% names(c2b)) {
       unname(c2b[[grp_keys[1]]])
-    } else gname
+    } else {
+      gname
+    }
 
     # display label -> AGG column index for this group's columns
     lbl_to_agg <- integer(0)
     for (gk in grp_keys) {
-      lbl <- if (!is.null(k2d) && gk %in% names(k2d)) trimws(as.character(k2d[[gk]])) else NA_character_
+      have_lbl <- !is.null(k2d) && gk %in% names(k2d)
+      lbl <- if (have_lbl) trimws(as.character(k2d[[gk]])) else NA_character_
       if (!is.na(lbl) && gk %in% names(key_to_agg)) lbl_to_agg[[lbl]] <- key_to_agg[[gk]]
     }
 
@@ -286,7 +289,9 @@ micro_banner_vars <- function(banner_info, survey_data, survey_structure, n) {
     qcode <- tryCatch(as.character(grp$question$QuestionCode[1]), error = function(e) NA_character_)
     disp_map <- if (!is.na(qcode) && qcode %in% names(survey_data)) {
       micro_display_map(qcode, survey_structure)
-    } else NULL
+    } else {
+      NULL
+    }
     if (!is.null(disp_map)) {
       keysr <- trimws(as.character(survey_data[[qcode]]))
       labels <- unname(disp_map[keysr])                  # respondent -> display label
@@ -338,7 +343,8 @@ micro_score_value_map <- function(qcode, survey_structure, vt) {
   if (nrow(qopt) == 0) return(empty)
   vals <- vapply(seq_len(nrow(qopt)), function(i) {
     if (vt == "Likert") {
-      if ("Index_Weight" %in% names(qopt)) suppressWarnings(as.numeric(qopt$Index_Weight[i])) else NA_real_
+      iw <- if ("Index_Weight" %in% names(qopt)) qopt$Index_Weight[i] else NA
+      suppressWarnings(as.numeric(iw))
     } else {
       v <- option_numeric_value(qopt[i, , drop = FALSE])
       if (vt == "NPS") nps_bucket_score(v) else v
