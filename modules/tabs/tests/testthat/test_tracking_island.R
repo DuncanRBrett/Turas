@@ -109,12 +109,59 @@ test_that("wave_contribution returns NULL when no metric carries scores", {
               list(wave = "W")))
 })
 
-test_that("wave_contribution refuses a weighted study (unweighted-trend guard)", {
-  # The wave engine averages scores unweighted; on a weighted study a trend
-  # would silently disagree with the weighted crosstab, so no contribution is
-  # built (weighted wave trends are a documented follow-up).
-  expect_null(wave_contribution(ti_data_layer(), ti_micro(),
-              list(wave = "Wave 1", wave_order = 2024, apply_weighting = TRUE)))
+test_that("wave_contribution carries the question code and per-respondent weights", {
+  micro <- list(n = 3, scores = list(Q1 = I(c(6, 8, 7))), weights = I(c(2, 1, 1)))
+  dl <- list(questions = list(list(code = "Q1", title = "Overall rating", type = "scale")))
+  contrib <- wave_contribution(dl, micro, list(wave = "W", wave_order = 2024))
+  q <- contrib$questions[[1]]
+  expect_equal(q$code, "Q1")                       # code carried so waves link
+  expect_equal(as.numeric(q$weights), c(2, 1, 1))  # weights carried (weighted trend)
+})
+
+test_that("wave_contribution omits weights when the study is unweighted", {
+  contrib <- wave_contribution(ti_data_layer(), ti_micro(), list(wave = "W", wave_order = 2024))
+  expect_null(contrib$questions[[1]]$weights)       # all-1 weights -> omitted
+})
+
+# ==============================================================================
+# 5. question mapping (curated cross-wave link)
+# ==============================================================================
+
+context("tracking_island: question mapping")
+
+ti_mapping <- function() data.frame(
+  QuestionCode  = c("Track_01", "Track_02", "Track_12"),
+  QuestionText  = c("Overall rating", "Appearance", "Recommend"),
+  QuestionType  = c("Rating", "Rating", "NPS"),
+  Wave24        = c("Q32", "Q36", "Q60"),     # prior wave used different codes (renames)
+  Wave25        = c("Q20", "Q23", "Q51"),     # this wave's codes match the data layer
+  TrackingSpecs = c("mean", "mean", "nps_score"),
+  stringsAsFactors = FALSE)
+
+ti_dl_coded <- function() list(questions = list(
+  list(code = "Q20", title = "How would you rate overall?", type = "scale"),
+  list(code = "Q51", title = "Likely to recommend?", type = "nps"),
+  list(code = "Q99", title = "Untracked", type = "single")))
+
+test_that("detect_wave_column finds the column matching this wave's codes", {
+  expect_equal(detect_wave_column(ti_mapping(), ti_dl_coded()), "Wave25")
+})
+
+test_that("tracking_metrics uses the canonical key + this wave's code from the mapping", {
+  m <- tracking_metrics(ti_dl_coded(), ti_mapping())
+  # Q20 + Q51 are present; Q23 is not in the data layer -> dropped; Q99 untracked
+  codes <- vapply(m, function(x) x$code, character(1))
+  expect_setequal(codes, c("Q20", "Q51"))
+  q20 <- Find(function(x) x$code == "Q20", m)
+  expect_equal(q20$key, tracking_norm("Track_01"))   # canonical, not the title
+  q51 <- Find(function(x) x$code == "Q51", m)
+  expect_equal(q51$score_type, "nps")                # from TrackingSpecs
+})
+
+test_that("tracking_metrics falls back to title-match when no mapping", {
+  m <- tracking_metrics(ti_dl_coded(), NULL)
+  q20 <- Find(function(x) x$code == "Q20", m)
+  expect_equal(q20$key, tracking_norm("How would you rate overall?"))
 })
 
 # ==============================================================================

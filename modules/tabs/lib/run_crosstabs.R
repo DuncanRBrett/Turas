@@ -712,19 +712,12 @@ if (.html_report_v2_on) {
       # island from the prior waves' contributions plus this one.
       prev_json <- NULL
       tracking_on <- FALSE
-      if (isTRUE(config_result$config_obj$html_report_v2_tracking) &&
-          isTRUE(config_result$config_obj$apply_weighting)) {
-        # Guard: the wave engine averages per-respondent scores UNWEIGHTED, so on
-        # a weighted study the Tracking tab's trend means would silently disagree
-        # with the (weighted) crosstab / Explorer means. Refuse to build it rather
-        # than ship that discrepancy; weighted wave trends are a documented
-        # follow-up. The weighted crosstab + filtering still ship.
-        cat("\n[NOTE] Tabs-integrated tracking is not built for weighted studies\n")
-        cat("  (the crosstab is weighted but the wave trend would be unweighted).\n")
-        cat("  The v2 report still builds with its weighted crosstab + filtering.\n\n")
-      } else if (isTRUE(config_result$config_obj$html_report_v2_tracking)) {
+      if (isTRUE(config_result$config_obj$html_report_v2_tracking)) {
         tracking_on <- tryCatch({
-          contrib <- wave_contribution(dl, micro, config_result$config_obj)
+          # The classic tracker's Question_Mapping (when configured) links waves
+          # by a canonical key — robust to renames + curates which metrics track.
+          mapping <- load_question_mapping(config_result$config_obj$question_mapping)
+          contrib <- wave_contribution(dl, micro, config_result$config_obj, mapping)
           wave_path <- sub("\\.xlsx$", "_wave.json", v2_out)
           write_wave_contribution(contrib, wave_path)
           priors <- read_wave_contributions(config_result$config_obj$waves_source, wave_path)

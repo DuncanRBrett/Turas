@@ -103,10 +103,12 @@ for hidden-category questions and is preferred when present.
   "waves": [
     { "wave": "Wave 24", "year": 2025.5, "current": false, "segments": [],
       "questions": [
-        { "match_key": "overall rating",      // = renderer model.norm(title); links waves
+        { "code": "Q20",                      // this wave's question code (links via aggKeys)
+          "match_key": "track_01",            // canonical key (from Question_Mapping) or norm(title)
           "title": "Overall rating", "base": 58,
           "score_type": "mean",               // "mean" | "nps"
-          "scores": [6, 8, 7, ...] }          // per-respondent metric values for that wave
+          "scores": [6, 8, 7, ...],           // per-respondent metric values for that wave
+          "weights": [1.2, 0.9, ...] }        // per-respondent weights (omitted when unweighted)
       ] },
     { "wave": "Wave 25", "year": 2026, "current": true, ... }   // current wave flagged
   ]
@@ -128,8 +130,9 @@ GUI tick-box for option 2):
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `html_report_v2` | `N` | Emit the v2 report + `_data.json` (Option 2). |
-| `html_report_v2_tracking` | `N` | Add the Tracking tab (Option 3). Requires `html_report_v2 = Y` and a `waves_source` with prior contributions. **Unweighted studies only** — on a weighted study the Tracking tab is deliberately not built (see limitations); the weighted crosstab + filtering still ship. |
+| `html_report_v2_tracking` | `N` | Add the Tracking tab (Option 3). Requires `html_report_v2 = Y` and a `waves_source` with prior contributions. Weighted studies are supported (the wave trend is weighted to match the crosstab). |
 | `waves_source` | *(blank)* | Folder holding prior waves' `*_wave.json` contributions (see Forward path). |
+| `question_mapping` | *(blank)* | Optional path to the classic tracker's `Question_Mapping.xlsx`. When set, waves link by its **canonical key** (`Track_01`…) — robust to question renames/rewording — and only the mapped metrics track, each with its `TrackingSpecs` metric. Blank → metrics match by question **title** (fragile to wording drift). |
 | `wave` | *(blank)* | Wave label shown in the header and used as the trend label. |
 | `wave_order` | *(blank)* | Numeric x-axis order key for this wave (e.g. `2025.5`). Blank → a 4-digit year is parsed from the `wave` label. |
 | `researcher_logo_path` / `client_logo_path` | *(blank)* | Logos embedded (base64) into the v2 header. |
@@ -176,13 +179,12 @@ produce a *wrong* number — each is an honest degrade or a guard.
   whether the underlying scale is shown (SACAP shows 0–10) or hidden (CCS shows
   only the boxes). Verified on real CCS data. *(Arbitrary one-off NETs that are
   not box-categories still fall back to the published value unfiltered.)*
-- **Tracking is built for unweighted studies only.** The wave engine averages
-  per-respondent scores *unweighted* (`meanOfScores`). On a **weighted** study a
-  trend mean would silently disagree with the (weighted) crosstab mean, so the
-  Tracking tab is **deliberately not built** when `apply_weighting = TRUE`
-  (guarded in `wave_contribution` + a console NOTE in Step 4d); the weighted
-  crosstab + filtering still ship. Weighting the wave trend (carry per-wave
-  weights + weight `meanOfScores`) is the second scoped follow-up.
+- **Cross-wave matching is by question title unless a `question_mapping` is set.**
+  Title-matching is fragile to rewording ("…in 2025" vs "…in 2026" won't link).
+  Point `question_mapping` at the classic tracker's `Question_Mapping.xlsx` and
+  waves link by the canonical `Track_NN` key instead — robust to renames, and the
+  same curated config drives both the classic tracker and this Tracking tab. (The
+  current wave's column in the mapping is auto-detected by matching codes.)
 - **Numeric (binned) means** also show "–" under a filter (the mean is over raw
   values, not bins) — honest degrade.
 - **Data-derived multi-select categories** whose published label is a *semantic*

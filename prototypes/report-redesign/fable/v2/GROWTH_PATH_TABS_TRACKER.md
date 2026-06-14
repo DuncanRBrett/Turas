@@ -39,18 +39,19 @@ under any filter / custom banner, for shown OR hidden scales. Verified on real C
 *(Remaining NET edge: arbitrary one-off NETs that aren't box-categories still show
 the published value unfiltered — rare; revisit only if a project needs it.)*
 
-### 1. Weighted wave trends (lifts the current guard)
-**What:** Carry per-wave `weights` in the contribution; weight `meanOfScores` /
-`sdOfScores`.
-**Why now:** Tracking is currently *guarded off* on weighted studies (so a weighted
-crosstab and an unweighted trend can never disagree). This lifts the guard.
-**Effort:** Small — one field in `wave_contribution`, a weighted reducer in
-`22w_waves.js` (guard so absent weights = current unweighted behaviour), and
-remove the `apply_weighting` refusal in `wave_contribution` + Step 4d.
-**Dependencies:** None.
-**Risk:** Low — additive, falls back to unweighted.
+### ~~Weighted wave trends~~ — DONE (2026-06-14)
+Shipped: `wave_contribution` carries per-wave `weights`; `22w_waves.js`
+`meanOfScores`/`sdOfScores` weight (Kish effN sample SD; unweighted reduces
+exactly); the guard is removed. Known-answer gate (`tests/wave_trends.mjs`).
 
-### 2b. Writer↔renderer golden test (cold-review suggestion)
+### ~~Question-mapping / curated cross-wave linkage~~ — DONE (2026-06-14)
+Shipped: `load_question_mapping` reads the classic tracker's `Question_Mapping`;
+waves link by the canonical key (auto-detecting this wave's column); the engine's
+`aggKeys` prefers the current wave's carried codes. Verified on real CCS:
+**6 → 14 metrics** (10 spanning all 4 waves; the rest correctly link across the
+waves they exist in). The same config now drives both trackers.
+
+### 1. Writer↔renderer golden test (cold-review suggestion)
 **What:** A committed test that feeds **actual** `build_microdata` output (from a
 synthetic survey) through the JS `d2.validate` + a recompute, asserting it
 reproduces the published Total. **Why now:** locks the R-writer ⇆ JS-renderer seam

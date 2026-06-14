@@ -23,6 +23,9 @@
   var aggKeys = null;      // 2025 qcode -> occurrence-ordered match key
   var segCache = null;     // ordered tracked segments
 
+  /** Drop the lazy caches (call if TR.PREV / TR.AGG are swapped at runtime). */
+  waves.reset = function () { waveIndexes = null; aggKeys = null; segCache = null; };
+
   function ensureIndexes() {
     if (waveIndexes) return;
     waveIndexes = (TR.PREV && TR.PREV.waves ? TR.PREV.waves : []).map(function (w) {
@@ -33,8 +36,21 @@
       return { wave: w.wave, year: w.year, current: !!w.current, index: index };
     });
     aggKeys = {};
+    // Prefer the current wave's explicit question code -> match_key map (carried
+    // when a question mapping links waves by a canonical key, robust to renames);
+    // fall back to occurrence-ordered normalised title for unmapped questions, so
+    // the title-match path and SACAP (no current/code map) are unaffected.
+    var mapped = {};
+    waveIndexes.forEach(function (w) {
+      if (!w.current) return;
+      Object.keys(w.index).forEach(function (key) {
+        var p = w.index[key];
+        if (p.code) { aggKeys[p.code] = key; mapped[p.code] = true; }
+      });
+    });
     var seen = {};
     TR.AGG.questions.forEach(function (q) {
+      if (mapped[q.code]) return;
       var t = TR.model.norm(q.title);
       var k = seen[t] || 0;
       seen[t] = k + 1;
@@ -68,13 +84,26 @@
     return null;
   };
 
+  /** Per-respondent weights for q in the CURRENT wave (parallel to
+   *  currentScores), or null when the wave is unweighted. */
+  waves.currentWeights = function (q) {
+    ensureIndexes();
+    for (var i = 0; i < waveIndexes.length; i++) {
+      if (!waveIndexes[i].current) continue;
+      var hit = waveIndexes[i].index[aggKeys[q.code]];
+      if (hit && hit.scores) return hit.weights || null;
+    }
+    return null;
+  };
+
   /** Current-wave point {value, base, sd} recomputed from microdata (Total),
    *  or null. Treating the current wave exactly like history keeps the whole
    *  series internally consistent — full precision, no rounded summary. */
   waves.currentPoint = function (q) {
     var s = waves.currentScores(q);
     if (!s || !s.length) return null;
-    return { value: meanOfScores(s), base: s.length, sd: sdOfScores(s) };
+    var w = waves.currentWeights(q);
+    return { value: meanOfScores(s, w), base: s.length, sd: sdOfScores(s, w) };
   };
 
   /**
@@ -149,22 +178,34 @@
    * (e.g. SACAP), every path below falls back to stats/distribution, so
    * existing reports are byte-for-byte unaffected. Total column only for now
    * (per-segment microdata recompute arrives with banner-aware waves). */
-  function meanOfScores(s) {
+  // Per-respondent score reducers. An optional parallel weights array makes the
+  // wave mean/SD weighted (so the trend matches a weighted crosstab); absent or
+  // all-1 weights reduce to the prior unweighted formulas exactly.
+  function meanOfScores(s, w) {
     if (!s || !s.length) return null;
-    var sum = 0;
-    for (var i = 0; i < s.length; i++) sum += s[i];
-    return sum / s.length;
+    var sum = 0, wsum = 0;
+    for (var i = 0; i < s.length; i++) {
+      var wi = w ? w[i] : 1; sum += wi * s[i]; wsum += wi;
+    }
+    return wsum ? sum / wsum : null;
   }
-  function sdOfScores(s) {
+  function sdOfScores(s, w) {
     if (!s || s.length < 2) return null;
-    var m = meanOfScores(s), v = 0;
-    for (var i = 0; i < s.length; i++) { var d = s[i] - m; v += d * d; }
-    return Math.sqrt(v / (s.length - 1));   // sample SD
+    var m = meanOfScores(s, w);
+    if (m === null) return null;
+    var v = 0, wsum = 0, sumW2 = 0;
+    for (var i = 0; i < s.length; i++) {
+      var wi = w ? w[i] : 1, d = s[i] - m;
+      v += wi * d * d; wsum += wi; sumW2 += wi * wi;
+    }
+    var effN = sumW2 > 0 ? (wsum * wsum) / sumW2 : 0;   // Kish effective base
+    if (effN <= 1) return null;
+    return Math.sqrt((v / wsum) * effN / (effN - 1));    // sample SD (effN df)
   }
   waves.sdFromScores = sdOfScores;
 
   function meanValue(q, row, waveQ, seg) {
-    if (!seg && waveQ.scores) return meanOfScores(waveQ.scores);   // microdata
+    if (!seg && waveQ.scores) return meanOfScores(waveQ.scores, waveQ.weights);  // microdata
     var stats = (seg ? (waveQ.seg_stats || {})[seg] : waveQ.stats) || {};
     var label = TR.model.norm(row.label);
     if (label.indexOf("nps") !== -1) {
@@ -243,7 +284,7 @@
   /** SD of a mean-kind row in one HISTORY wave (per segment), derived
    *  exactly from that wave's published category distribution. */
   waves.sdAtWave = function (q, row, waveQ, seg) {
-    if (!seg && waveQ.scores) return sdOfScores(waveQ.scores);   // microdata
+    if (!seg && waveQ.scores) return sdOfScores(waveQ.scores, waveQ.weights);  // microdata
     var scores = waves.scoreMap(q, row);
     if (!scores) return null;
     var pairs = [];

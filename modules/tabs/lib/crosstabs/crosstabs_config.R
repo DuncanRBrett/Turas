@@ -232,6 +232,10 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # Folder holding prior waves' *_wave.json tracking contributions (emitted by
     # each wave's own tabs run). Empty -> no history, Tracking tab stays hidden.
     waves_source = get_config_value(config, "waves_source", ""),
+    # Optional classic-tracker Question_Mapping workbook: links waves by a
+    # canonical key (robust to renames) + curates which metrics track. Empty ->
+    # the tabs-tracker falls back to matching metrics by question title.
+    question_mapping = get_config_value(config, "question_mapping", ""),
     # Numeric x-axis order key for this wave (e.g. 2025 or 2025.5 for twice-yearly
     # so two same-year waves never collide). Blank -> derived from the wave label.
     wave_order = get_config_value(config, "wave_order", ""),
@@ -568,7 +572,7 @@ load_crosstabs_config <- function(config_file) {
     "generate_stats_pack",
     # HTML report
     "html_report", "html_report_v2", "html_report_v2_tracking",
-    "waves_source", "wave_order", "sampling_method", "wave",
+    "waves_source", "question_mapping", "wave_order", "sampling_method", "wave",
     "brand_colour", "accent_colour", "project_title", "project_name",
     "company_name", "client_name",
     "researcher_logo_path", "client_logo_path", "logo_path",

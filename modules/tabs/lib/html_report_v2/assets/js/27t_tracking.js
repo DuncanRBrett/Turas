@@ -221,7 +221,7 @@
     // significance even when the published distribution is absent.
     if (!segNorm) {
       var curScores = TR.waves.currentScores(metric.q);
-      if (curScores) return TR.waves.sdFromScores(curScores);
+      if (curScores) return TR.waves.sdFromScores(curScores, TR.waves.currentWeights(metric.q));
     }
     var scores = TR.waves.scoreMap(metric.q, metric.row);
     if (!scores) return null;

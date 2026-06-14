@@ -66,36 +66,131 @@ wave_order_key <- function(config_obj) {
 }
 
 
+#' Load a classic-tracker Question_Mapping workbook (the curated link)
+#'
+#' Reads the "QuestionMap" sheet (the classic tracker's format): one row per
+#' tracked metric with a canonical QuestionCode (the stable cross-wave key),
+#' per-wave question codes (Wave22..Wave25, the rename map), and TrackingSpecs
+#' (mean / nps_score). Returns the body data frame, or NULL when absent/unusable.
+#'
+#' @param path Path to the Question_Mapping workbook
+#' @return Data frame of tracked metrics, or NULL
+#' @export
+load_question_mapping <- function(path) {
+  if (is.null(path) || !nzchar(as.character(path)) || !file.exists(path)) return(NULL)
+  if (!requireNamespace("openxlsx", quietly = TRUE)) return(NULL)
+  sheets <- tryCatch(openxlsx::getSheetNames(path), error = function(e) character(0))
+  sheet <- if ("QuestionMap" %in% sheets) "QuestionMap" else sheets[1]
+  raw <- tryCatch(openxlsx::read.xlsx(path, sheet = sheet, colNames = FALSE),
+                  error = function(e) NULL)
+  if (is.null(raw) || nrow(raw) == 0) return(NULL)
+  hrow <- which(raw[[1]] == "QuestionCode")[1]
+  if (is.na(hrow)) return(NULL)
+  names(raw) <- as.character(unlist(raw[hrow, ]))
+  body <- raw[(hrow + 1):nrow(raw), , drop = FALSE]
+  body <- body[!is.na(body$QuestionCode) & grepl("^[A-Za-z]", body$QuestionCode) &
+               !grepl("^\\[", body$QuestionCode), , drop = FALSE]
+  if (nrow(body) == 0 || !("QuestionCode" %in% names(body))) return(NULL)
+  body
+}
+
+
+#' Detect which mapping wave-column matches the current data layer
+#'
+#' The current wave is the Wave* column whose question codes best match the
+#' questions present in this run's data layer (so no per-wave config is needed).
+#'
+#' @param mapping A Question_Mapping body (from load_question_mapping)
+#' @param data_layer The built data layer
+#' @return The matching column name (e.g. "Wave25"), or NULL
+#' @export
+detect_wave_column <- function(mapping, data_layer) {
+  wave_cols <- grep("^Wave", names(mapping), value = TRUE)
+  if (length(wave_cols) == 0) return(NULL)
+  dl_codes <- vapply(data_layer$questions, function(q) as.character(q$code), character(1))
+  hits <- vapply(wave_cols, function(wc) {
+    sum(as.character(mapping[[wc]]) %in% dl_codes, na.rm = TRUE)
+  }, integer(1))
+  if (max(hits) == 0) return(NULL)
+  wave_cols[which.max(hits)]
+}
+
+
+#' The tracked metrics for this wave: {code, key, title, score_type}
+#'
+#' With a mapping: the curated metrics, keyed by the canonical QuestionCode
+#' (stable across renames), resolved to this wave's question code. Without one:
+#' every question carrying a mean, keyed by normalised title (the quick view).
+#'
+#' @param data_layer The built data layer
+#' @param mapping Optional Question_Mapping body
+#' @return A list of metric descriptors
+#' @export
+tracking_metrics <- function(data_layer, mapping = NULL) {
+  dl_codes <- vapply(data_layer$questions, function(q) as.character(q$code), character(1))
+  if (!is.null(mapping)) {
+    wc <- detect_wave_column(mapping, data_layer)
+    if (!is.null(wc)) {
+      out <- list()
+      for (i in seq_len(nrow(mapping))) {
+        code <- as.character(mapping[[wc]][i])
+        if (is.na(code) || !(code %in% dl_codes)) next
+        spec <- tolower(as.character(mapping$TrackingSpecs[i] %||% ""))
+        out[[length(out) + 1]] <- list(
+          code = code,
+          key = tracking_norm(mapping$QuestionCode[i]),
+          title = as.character(mapping$QuestionText[i] %||% mapping$QuestionCode[i]),
+          score_type = if (grepl("nps", spec)) "nps" else "mean")
+      }
+      if (length(out) > 0) return(out)
+    }
+  }
+  # No mapping: list every question; wave_contribution keeps only those that
+  # actually carry microdata scores (which only mean-kind questions do).
+  out <- list()
+  for (q in data_layer$questions) {
+    out[[length(out) + 1]] <- list(code = as.character(q$code),
+      key = tracking_norm(q$title), title = as.character(q$title),
+      score_type = if (identical(q$type, "nps")) "nps" else "mean")
+  }
+  out
+}
+
+
 #' Build this wave's tracking contribution from its data layer + microdata
 #'
-#' One entry per mean-kind metric (rating/Likert/NPS) that carries microdata
-#' scores: the per-respondent scores (NA dropped), matched by normalised title.
+#' One entry per tracked metric that carries microdata scores: the per-respondent
+#' scores (NA dropped) and their weights, keyed by the canonical metric key (from
+#' the mapping) or the normalised title. Carries each question's own code so the
+#' wave engine can link it to history by the canonical key.
 #'
-#' @param data_layer The built data layer (for titles + types)
-#' @param micro The TR.MICRO payload (for $scores)
+#' @param data_layer The built data layer (for codes + titles + types)
+#' @param micro The TR.MICRO payload (for $scores, $weights)
 #' @param config_obj The tabs config (for wave label + order key)
-#' @return A wave contribution list, or NULL when no metric carries scores or the
-#'   study is weighted (the wave engine averages scores unweighted; weighted
-#'   trends are a documented follow-up — building one would silently disagree
-#'   with the weighted crosstab)
+#' @param mapping Optional Question_Mapping body (the curated cross-wave link)
+#' @return A wave contribution list, or NULL when no metric carries scores
 #' @export
-wave_contribution <- function(data_layer, micro, config_obj) {
+wave_contribution <- function(data_layer, micro, config_obj, mapping = NULL) {
   if (is.null(micro) || is.null(micro$scores)) return(NULL)
-  if (isTRUE(config_obj$apply_weighting)) return(NULL)
+  weights <- if (!is.null(micro$weights)) as.numeric(micro$weights) else rep(1, micro$n %||% 0)
+  metrics <- tracking_metrics(data_layer, mapping)
   questions <- list()
-  for (q in data_layer$questions) {
-    sc <- micro$scores[[q$code]]
+  for (mt in metrics) {
+    sc <- micro$scores[[mt$code]]
     if (is.null(sc)) next
     sc <- as.numeric(sc)
     keep <- !is.na(sc)
     if (!any(keep)) next
+    qw <- weights[keep]
     questions[[length(questions) + 1]] <- list(
-      match_key  = tracking_norm(q$title),
-      title      = as.character(q$title),
+      code       = mt$code,
+      match_key  = mt$key,
+      title      = mt$title,
       base       = sum(keep),
-      score_type = if (identical(q$type, "nps")) "nps" else "mean",
-      scores     = as.list(round(sc[keep], 4))
-    )
+      score_type = mt$score_type,
+      scores     = as.list(round(sc[keep], 4)),
+      # weights omitted (-> unweighted reducer) when every weight is 1
+      weights    = if (all(qw == 1)) NULL else as.list(round(qw, 6)))
   }
   if (length(questions) == 0) return(NULL)
   list(

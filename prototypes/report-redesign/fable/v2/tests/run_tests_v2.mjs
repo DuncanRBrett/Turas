@@ -160,6 +160,14 @@ run("microdata scores: means recompute from per-respondent scores (hidden catego
   }
 });
 
+run("weighted wave trend + canonical-key linkage (subprocess)", () => {
+  // Spawned in a fresh VM (the wave engine caches indexes per load, so a custom
+  // TR.PREV must not pollute the shared SACAP wave tests).
+  const res = spawnSync("node", [path.join(BASE, "tests", "wave_trends.mjs")],
+    { encoding: "utf8" });
+  assert(res.status === 0, "wave trends failed:\n" + res.stdout);
+});
+
 run("box-category NETs recompute from per-respondent box membership", () => {
   // A hidden-scale rating that publishes only its boxes: rows Low(0) / High(1) /
   // NET POSITIVE(2) / Mean(3). boxes [0,1,0,1,null] -> Low 2/4=50%, High 50%,
