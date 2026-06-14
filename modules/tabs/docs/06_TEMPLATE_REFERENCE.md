@@ -805,6 +805,23 @@ the Excel output.
 | `fieldwork_dates` | Fieldwork period description | Text | (none) |
 | `analyst_name` | Analyst contact name | Text | (none) |
 
+### Data-Centric Report v2 Settings (optional)
+
+Additive, off by default — the classic Excel/HTML outputs are unchanged. These
+build the interactive, self-contained **data-centric report v2** (live audience
+filter, custom banners, confidence intervals) and an optional **Tracking tab**.
+Full reference: [11_DATA_CENTRIC_REPORT_V2.md](11_DATA_CENTRIC_REPORT_V2.md).
+
+| Setting | Description | Values | Default |
+|----|----|----|----|
+| `html_report_v2` | Also build the interactive v2 report (`*_report_v2.html`) | TRUE / FALSE | FALSE |
+| `sampling_method` | Sample design — drives honest CI vocabulary (probability → CI/MOE; else stability/PE) | Not_Specified / Random / Stratified / Cluster / Census / Convenience / Quota | Not_Specified |
+| `wave` | Wave label (v2 header + tracking trend label) | Text, e.g. `Wave 25 - May 2026` | (none) |
+| `html_report_v2_tracking` | Add a Tracking tab built from per-wave microdata. Needs `html_report_v2=TRUE` + a `waves_source` | TRUE / FALSE | FALSE |
+| `waves_source` | Folder holding prior waves' `*_wave.json` contributions | Folder path | (none) |
+| `wave_order` | Numeric x-axis order key (e.g. `2025.5` for twice-yearly) | Number | *(year parsed from `wave`)* |
+| `question_mapping` | Path to the classic tracker's `Question_Mapping.xlsx` — links waves by a canonical key (robust to renames) + curates tracked metrics | File path, or blank to auto-detect in `waves_source` | *(auto)* |
+
 ### Dashboard Settings
 
 | Setting | Description | Values | Default |
