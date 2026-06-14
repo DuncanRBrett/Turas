@@ -86,6 +86,80 @@ run("no-banner (Total-only) report validates and renders without crashing", () =
   }
 });
 
+run("weighted recompute: weighted %, Kish effective base, weighted mean (known answers)", () => {
+  // 4 respondents, weights [3,1,1,1].
+  //   Q1 single Yes/No, answers [0,0,1,1]: Yes Σw = 3+1 = 4, No = 1+1 = 2,
+  //     wbase = 6 -> Yes 66.667%. Kish n_eff = 6^2 / (9+1+1+1) = 36/12 = 3.
+  //   Q2 scale rows 1/2/3 + Mean, index_scores {1,2,3}, answers [0,2,2,1]:
+  //     weighted mean = (3*1 + 1*3 + 1*3 + 1*2) / 6 = 11/6.
+  const agg = { schema_version: 2,
+    project: { name: "W", low_base_threshold: 1, alpha: 0.05, tracking: { enabled: false } },
+    columns: [{ key: "TOTAL::Total", group: "total", label: "Total", letter: "" }],
+    banner_groups: [], categories: ["c"],
+    questions: [
+      { code: "Q1", title: "Q1", category: "c", type: "single", bases: [{ n: 4, low: false }],
+        rows: [{ kind: "category", label: "Yes", pct: [66.7], n: [4], sig: [""] },
+               { kind: "category", label: "No", pct: [33.3], n: [2], sig: [""] }] },
+      { code: "Q2", title: "Q2", category: "c", type: "scale", bases: [{ n: 4, low: false }],
+        index_scores: { "1": 1, "2": 2, "3": 3 },
+        rows: [{ kind: "category", label: "1", pct: [25], n: [1], sig: [""] },
+               { kind: "category", label: "2", pct: [25], n: [1], sig: [""] },
+               { kind: "category", label: "3", pct: [50], n: [2], sig: [""] },
+               { kind: "mean", label: "Mean", pct: [2], n: [null], sig: [""] }] }
+    ] };
+  const saved = { agg: TR.AGG, micro: TR.MICRO, prev: TR.PREV, idx: TR.d2._qIndex };
+  try {
+    TR.AGG = agg; TR.PREV = null; TR.d2._qIndex = null;
+    TR.MICRO = { n: 4, answers: { Q1: [0, 0, 1, 1], Q2: [0, 2, 2, 1] }, banner_vars: {}, weights: [3, 1, 1, 1] };
+    const total = [{ label: "Total", member: null }], mask = new Uint8Array(4).fill(1);
+    const t = TR.stats.tabulate(agg.questions[0], total, mask)[0];
+    assert(t.base === 4, "unweighted base 4");
+    assert(t.wbase === 6, "weighted base Σw = 6");
+    assert(t.counts[0] === 4, "Yes weighted count 4");
+    assert(Math.abs(t.effBase - 3) < 1e-9, "Kish effBase 36/12 = 3");
+    assert(Math.abs(TR.stats.pct(t, 0) - (4 / 6 * 100)) < 1e-9, "Yes weighted % 66.667");
+    const m = TR.stats.indexMeans(agg.questions[1], total, mask)[0];
+    assert(Math.abs(m.mean - 11 / 6) < 1e-9, "Q2 weighted mean 11/6");
+    assert(Math.abs(m.k - 3) < 1e-9, "Q2 mean effBase 3");
+    // Invariant: with no weights, wbase === base === effBase === count
+    TR.MICRO = { n: 4, answers: { Q1: [0, 0, 1, 1], Q2: [0, 2, 2, 1] }, banner_vars: {} };
+    const u = TR.stats.tabulate(agg.questions[0], total, mask)[0];
+    assert(u.base === u.wbase && u.wbase === u.effBase && u.effBase === 4,
+      "unweighted: base = wbase = effBase = 4");
+  } finally {
+    TR.AGG = saved.agg; TR.MICRO = saved.micro; TR.PREV = saved.prev; TR.d2._qIndex = saved.idx;
+  }
+});
+
+run("microdata scores: means recompute from per-respondent scores (hidden categories + NPS)", () => {
+  // Q1 rating publishes ONLY a Mean (all categories hidden — no category rows);
+  //   the per-respondent scores [4,7,9] still give mean (4+7+9)/3 = 6.6667.
+  // Q2 NPS scores via ±100 mapping [100,100,-100] -> (100+100-100)/3 = 33.33.
+  const agg = { schema_version: 2,
+    project: { name: "S", low_base_threshold: 1, alpha: 0.05, tracking: { enabled: false } },
+    columns: [{ key: "TOTAL::Total", group: "total", label: "Total", letter: "" }],
+    banner_groups: [], categories: ["c"],
+    questions: [
+      { code: "Q1", title: "Q1", category: "c", type: "scale", bases: [{ n: 3, low: false }],
+        rows: [{ kind: "mean", label: "Mean", pct: [6.7], n: [null], sig: [""] }] },
+      { code: "Q2", title: "Q2", category: "c", type: "nps", bases: [{ n: 3, low: false }],
+        rows: [{ kind: "mean", label: "NPS Score", pct: [33], n: [null], sig: [""] }] }
+    ] };
+  const saved = { agg: TR.AGG, micro: TR.MICRO, prev: TR.PREV, idx: TR.d2._qIndex };
+  try {
+    TR.AGG = agg; TR.PREV = null; TR.d2._qIndex = null;
+    TR.MICRO = { n: 3, answers: { Q1: [null, null, null], Q2: [null, null, null] },
+      banner_vars: {}, weights: [1, 1, 1], scores: { Q1: [4, 7, 9], Q2: [100, 100, -100] } };
+    const total = [{ label: "Total", member: null }], mask = new Uint8Array(3).fill(1);
+    const m1 = TR.stats.indexMeans(agg.questions[0], total, mask)[0];
+    assert(Math.abs(m1.mean - 20 / 3) < 1e-9, "rating mean from scores = 6.667 (no category rows)");
+    const m2 = TR.stats.indexMeans(agg.questions[1], total, mask)[0];
+    assert(Math.abs(m2.mean - 100 / 3) < 1e-9, "NPS from ±100 scores = 33.33");
+  } finally {
+    TR.AGG = saved.agg; TR.MICRO = saved.micro; TR.PREV = saved.prev; TR.d2._qIndex = saved.idx;
+  }
+});
+
 run("stacked chart export is transposed (segments=series, columns=bars)", () => {
   // Regression: the PPTX stacked export reused the bar layout (rows as
   // categories, one series per column), so each option rendered as its own

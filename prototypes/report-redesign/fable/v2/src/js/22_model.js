@@ -18,6 +18,11 @@
     return TR.AGG.project.low_base_threshold || 30;
   }
 
+  /** A standard-deviation summary row (reports spread, not the mean). */
+  function isStdDevRow(label) {
+    return /^(std\.?\s*dev|standard deviation)/i.test(String(label || ""));
+  }
+
   /** Normalise a label/title for cross-wave matching (mirrors pipeline). */
   model.norm = function (text) {
     return String(text || "").toLowerCase().replace(/\s+/g, " ")
@@ -87,21 +92,35 @@
             return { mean: null, n: null, pct: null, sig: "" };
           }));
         }
-        var sig = TR.stats.sigLetters(means, letters, threshold, true, dual);
+        // A "Standard Deviation" row is a mean-kind row but reports the spread,
+        // not the centre — show the recomputed SD (untested) so a filtered view
+        // never displays the mean in the SD row.
+        var sd = isStdDevRow(r.label);
+        var sig = sd ? null : TR.stats.sigLetters(means, letters, threshold, true, dual);
         return rowModel(r, means.map(function (m, i) {
-          return { mean: m.mean, n: null, pct: null, sig: sig[i] };
+          return { mean: sd ? m.sd : m.mean, n: null, pct: null,
+            sig: sd ? "" : sig[i] };
         }));
       }
       if (r.kind === "net") {
         return netRow(q, r, ri, spec.columns, mask, tabs, letters, threshold, dual);
       }
+      // Weighted: % = Σw(row) / Σw(base); displayed n = weighted count (the
+      // published Frequency); significance is sized by the effective base.
+      // Unweighted (every weight 1): wbase === base === effBase, so this is
+      // numerically identical to the prior count-based path.
       var cells = tabs.map(function (tab) {
-        return { x: tab.counts[ri] || 0, base: tab.base };
+        var wcount = tab.counts[ri] || 0;
+        return { wcount: wcount, p: tab.wbase ? wcount / tab.wbase : null,
+          effBase: tab.effBase };
       });
-      var sigs = TR.stats.sigLetters(cells, letters, threshold, false, dual);
+      var sigCells = cells.map(function (c) {
+        return { x: c.p === null ? 0 : c.p * c.effBase, base: c.effBase };
+      });
+      var sigs = TR.stats.sigLetters(sigCells, letters, threshold, false, dual);
       return rowModel(r, cells.map(function (cell, i) {
-        return { pct: cell.base ? cell.x / cell.base * 100 : null,
-          n: cell.x, mean: null, sig: sigs[i] };
+        return { pct: cell.p === null ? null : cell.p * 100,
+          n: cell.wcount, mean: null, sig: sigs[i] };
       }));
     });
     return { source: "computed", columns: columns, rows: rows,
@@ -131,8 +150,8 @@
       var minusCells = netOrRowCounts(q, minus, diff.minus, columns, mask, tabs);
       return diffRow(plusCells.map(function (p, i) {
         var m = minusCells[i];
-        var pct = (p.base && m.base)
-          ? (p.n / p.base - m.n / m.base) * 100 : null;
+        var pct = (p.wbase && m.wbase)
+          ? (p.n / p.wbase - m.n / m.wbase) * 100 : null;
         return { pct: pct, n: null, mean: null, sig: "" };
       }));
     }
@@ -142,12 +161,15 @@
         return { pct: null, n: null, mean: null, sig: "" };
       }));
     }
+    // Weighted NET: % = Σw(hit) / Σw(base), significance sized by effBase.
     var counts = TR.stats.netCounts(q, members, columns, mask);
-    var sigs = TR.stats.sigLetters(counts.map(function (c) {
-      return { x: c.n, base: c.base };
-    }), letters, threshold, false, dual);
+    var sigCells = counts.map(function (c) {
+      var p = c.wbase ? c.n / c.wbase : null;
+      return { x: p === null ? 0 : p * c.effBase, base: c.effBase };
+    });
+    var sigs = TR.stats.sigLetters(sigCells, letters, threshold, false, dual);
     return rowModel(r, counts.map(function (c, i) {
-      return { pct: c.base ? c.n / c.base * 100 : null,
+      return { pct: c.wbase ? c.n / c.wbase * 100 : null,
         n: c.n, mean: null, sig: sigs[i] };
     }));
   }
@@ -158,7 +180,8 @@
       if (members) return TR.stats.netCounts(q, members, columns, mask);
     }
     return tabs.map(function (tab) {
-      return { base: tab.base, n: tab.counts[ri] || 0 };
+      return { base: tab.base, n: tab.counts[ri] || 0,
+        wbase: tab.wbase, effBase: tab.effBase };
     });
   }
 
