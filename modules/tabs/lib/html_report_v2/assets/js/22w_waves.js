@@ -30,7 +30,7 @@
       (w.questions || []).forEach(function (p) {
         index[p.match_key || p.title_norm] = p;
       });
-      return { wave: w.wave, year: w.year, index: index };
+      return { wave: w.wave, year: w.year, current: !!w.current, index: index };
     });
     aggKeys = {};
     var seen = {};
@@ -47,10 +47,34 @@
     ensureIndexes();
     var out = [];
     waveIndexes.forEach(function (w) {
+      if (w.current) return;   // the current wave is handled by the live model
       var hit = w.index[aggKeys[q.code]];
       if (hit) out.push({ wave: w.wave, year: w.year, base: hit.base, q: hit });
     });
     return out;
+  };
+
+  /** Per-respondent scores for q in the CURRENT wave (the island wave flagged
+   *  `current`), or null. Lets the live model derive the current point's SD
+   *  from microdata when its published distribution is absent — so wave-on-wave
+   *  significance holds without any pre-calculated figure. */
+  waves.currentScores = function (q) {
+    ensureIndexes();
+    for (var i = 0; i < waveIndexes.length; i++) {
+      if (!waveIndexes[i].current) continue;
+      var hit = waveIndexes[i].index[aggKeys[q.code]];
+      if (hit && hit.scores) return hit.scores;
+    }
+    return null;
+  };
+
+  /** Current-wave point {value, base, sd} recomputed from microdata (Total),
+   *  or null. Treating the current wave exactly like history keeps the whole
+   *  series internally consistent — full precision, no rounded summary. */
+  waves.currentPoint = function (q) {
+    var s = waves.currentScores(q);
+    if (!s || !s.length) return null;
+    return { value: meanOfScores(s), base: s.length, sd: sdOfScores(s) };
   };
 
   /**
@@ -79,6 +103,7 @@
   /* ---------- per-row published values (seg = null means Total) ---------- */
 
   function rowValue(waveQ, label, seg) {
+    if (!waveQ.rows) return null;   // microdata-only wave: no published distribution
     var hit = waveQ.rows[TR.model.norm(label)];
     if (!hit) return null;
     if (seg) {
@@ -116,7 +141,30 @@
     return weight > 0 ? sum / weight : null;
   }
 
+  /* ---------- microdata recompute (per-respondent scores) ----------
+   * A wave question may carry `scores`: per-respondent metric values (the
+   * rating for means; +100/0/-100 for NPS). When present, the headline value
+   * and its SD are recomputed directly from them — the flexible model that
+   * needs no published distribution and no pre-baked significance. Absent
+   * (e.g. SACAP), every path below falls back to stats/distribution, so
+   * existing reports are byte-for-byte unaffected. Total column only for now
+   * (per-segment microdata recompute arrives with banner-aware waves). */
+  function meanOfScores(s) {
+    if (!s || !s.length) return null;
+    var sum = 0;
+    for (var i = 0; i < s.length; i++) sum += s[i];
+    return sum / s.length;
+  }
+  function sdOfScores(s) {
+    if (!s || s.length < 2) return null;
+    var m = meanOfScores(s), v = 0;
+    for (var i = 0; i < s.length; i++) { var d = s[i] - m; v += d * d; }
+    return Math.sqrt(v / (s.length - 1));   // sample SD
+  }
+  waves.sdFromScores = sdOfScores;
+
   function meanValue(q, row, waveQ, seg) {
+    if (!seg && waveQ.scores) return meanOfScores(waveQ.scores);   // microdata
     var stats = (seg ? (waveQ.seg_stats || {})[seg] : waveQ.stats) || {};
     var label = TR.model.norm(row.label);
     if (label.indexOf("nps") !== -1) {
@@ -195,6 +243,7 @@
   /** SD of a mean-kind row in one HISTORY wave (per segment), derived
    *  exactly from that wave's published category distribution. */
   waves.sdAtWave = function (q, row, waveQ, seg) {
+    if (!seg && waveQ.scores) return sdOfScores(waveQ.scores);   // microdata
     var scores = waves.scoreMap(q, row);
     if (!scores) return null;
     var pairs = [];

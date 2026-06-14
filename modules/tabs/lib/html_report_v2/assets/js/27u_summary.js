@@ -47,7 +47,7 @@
     var chip = change === null ? "" :
       '<span class="kpi-chg ' + (change >= 0 ? "up" : "down") + '">' +
       (change >= 0 ? "▲ +" : "▼ −") + Math.abs(change).toFixed(1) + " vs " +
-      (card.cells.length > 1 ? card.cells[card.cells.length - 2].year : "") +
+      (card.cells.length > 1 ? trk.yLabel(card.cells[card.cells.length - 2].year) : "") +
       (last.sig_prev ? " · sig" : "") + "</span>";
     // interval in the tooltip: same SD source as the sig test (trk.sdAt)
     var sd = trk.sdAt(m, null, TR.render.currentYear());
@@ -110,9 +110,9 @@
       fmt.escapeHtml(TR.charts.clip(c.metric.title, 64)) + "</span>" +
       '<span class="sig-detail">' + c.metric.code + " · " +
       fmt.escapeHtml(c.metric.label) + " — " +
-      trk.fmtVal(c.prev.value, c.metric.isMean) + " in " + c.prev.year +
+      trk.fmtVal(c.prev.value, c.metric.isMean) + " in " + trk.yLabel(c.prev.year) +
       " → <strong>" + trk.fmtVal(c.cur.value, c.metric.isMean) +
-      "</strong> in " + c.cur.year + "</span></button>";
+      "</strong> in " + trk.yLabel(c.cur.year) + "</span></button>";
   }
 
   /* ---------------- significance matrix ---------------- */
@@ -149,8 +149,8 @@
         var cls = last.sig_prev
           ? (last.change_prev >= 0 ? "hm-up" : "hm-down") : "hm-flat";
         return '<td class="wv ' + cls + '" title="' +
-          trk.fmtVal(prev.value, false) + " (" + prev.year + ") → " +
-          trk.fmtVal(last.value, false) + " (" + last.year + ")" +
+          trk.fmtVal(prev.value, false) + " (" + trk.yLabel(prev.year) + ") → " +
+          trk.fmtVal(last.value, false) + " (" + trk.yLabel(last.year) + ")" +
           (last.sig_prev ? " · significant at 95%" : " · not significant") + '">' +
           (last.sig_prev ? (last.change_prev >= 0 ? "▲" : "▼") : "") +
           trk.changeText(last.change_prev, false).replace("pp", "") + "</td>";

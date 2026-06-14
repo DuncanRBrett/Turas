@@ -118,7 +118,7 @@
       all.map(function (y) {
         var on = !set || set[y];
         return '<button class="btab' + (on ? " on" : "") + '" data-wavechip="' +
-          y + '">' + y + "</button>";
+          y + '">' + trk().yLabel(y) + "</button>";
       }).join("") +
       '<button class="linklike" data-waveall>all</button>' +
       '<button class="linklike" data-wavelast>last 3</button></div>';
@@ -234,7 +234,7 @@
           return '<option value="' + o[0] + '"' +
             (s.expSort === o[0] ? " selected" : "") + ">" + o[1] + "</option>";
         }).join("") + "</select>" +
-      '<button data-expexcel>Excel</button></div>');
+      '<button class="t-btn" data-expexcel>Excel</button></div>');
 
     var entries, exportName, pickAttr;
     if (mode === "qfs") {
@@ -288,7 +288,7 @@
     html.push('<div class="trkwrap"><table class="moved trk haspick"><thead><tr>' +
       "<th></th>" + (mode === "sfq" ? "<th>Segment</th>" : "<th>Metric</th>") +
       years.map(function (y) {
-        return "<th class='wv'>" + y + "</th>";
+        return "<th class='wv'>" + trk().yLabel(y) + "</th>";
       }).join("") + "<th>Trend</th><th>Δ prev</th></tr></thead><tbody>");
 
     var rowHtml = function (e, labelCell) {
@@ -509,7 +509,19 @@
     var series = buildSeries(specs, sel,
       mode === "absolute" ? "absolute" : mode, yearSet);
     var palette = TR.render.palette();
-    var notes = singleMetric ? TR.notes.forMetric(singleMetric.key) : [];
+    // annotations work across every plotted line: gather notes from all the
+    // displayed metrics (deduped), each tagged with its metric so a click on
+    // any line's point tags the right series.
+    var noteMetrics = specs.map(function (sp) { return sp.metric; })
+      .filter(function (m, i, a) {
+        return a.map(function (x) { return x.key; }).indexOf(m.key) === i;
+      });
+    var notes = [];
+    noteMetrics.forEach(function (m) {
+      TR.notes.forMetric(m.key).forEach(function (n) {
+        notes.push({ year: n.year, text: n.text, metricKey: m.key });
+      });
+    });
 
     var pseudo = { code: singleMetric ? singleMetric.code : "VIS",
       title: visTitle(sel, specs), source: "published",
@@ -518,6 +530,7 @@
       rows: series.map(function (sr) {
         return { kind: mode === "absolute" ? sr.spec.metric.kind : "net",
           diff: sr.spec.metric.diff, label: sr.label, waves: sr.points,
+          metricKey: sr.spec.metric.key,
           cells: [{ pct: null, mean: null, n: null, sig: "" }] };
       }) };
     var chart = TR.render.trendChart(pseudo, {
@@ -529,7 +542,7 @@
       annotations: notes.map(function (n) {
         return { year: n.year, label: n.text };
       }),
-      clickable: !!singleMetric,
+      clickable: true,   // tag a point on any line (single or multi-series)
       note: (mode === "absolute" ? "Published values" :
         mode === "prev" ? "Change vs previous wave (pp)" :
         "Change vs baseline wave (pp)") +
@@ -571,15 +584,15 @@
       (s.yMin === null || s.yMin === undefined ? "" : s.yMin) + '">–' +
       '<input type="number" data-ymax placeholder="max" value="' +
       (s.yMax === null || s.yMax === undefined ? "" : s.yMax) + '">' +
-      '<button data-yreset title="Auto scale">↺</button></label>' +
+      '<button class="t-btn" data-yreset title="Auto scale">↺</button></label>' +
       '<span class="ctl-spacer"></span>' +
-      '<button data-visexcel>Excel</button>' +
+      '<button class="t-btn" data-visexcel>Excel</button>' +
       '<span class="pinwrap"><button class="primary" data-vispinbtn>📌 Pin…</button>' +
       '<span class="pinmenu" data-vispinmenu hidden></span></span></div>' +
       '<div class="scopebar wavechips">' + allYears.map(function (y) {
         var on = !yearSet || yearSet[y];
         return '<button class="btab' + (on ? " on" : "") + '" data-wavechip="' +
-          y + '">' + y + "</button>";
+          y + '">' + trk().yLabel(y) + "</button>";
       }).join("") + '<button class="linklike" data-waveall>all</button></div>' +
       '<div class="chart" data-vischart>' + (chart ||
         '<div class="chart-error">No data for this selection.</div>') + "</div>" +
@@ -592,16 +605,17 @@
             " Quoted as stability intervals: this survey did not use " +
             "formal random sampling.") + "</p>"
         : "") +
-      (singleMetric
-        ? '<p class="trknote">💬 Click any data point to tag it with a note ' +
-          "(e.g. “Campaign launched”) — tags travel with pins and saved copies.</p>"
-        : "")];
+      '<p class="trknote">💬 Click any data point to tag it with a note ' +
+      "(e.g. “Campaign launched”) — tags travel with pins and saved copies.</p>"];
 
     if (notes.length) {
       html.push('<div class="notechips">' + notes.map(function (n) {
-        return '<span class="notechip">' + n.year + " · " +
+        var m = trk().metricByKey(n.metricKey);
+        var pre = (noteMetrics.length > 1 && m) ? fmt.escapeHtml(m.code) + " · " : "";
+        return '<span class="notechip">' + pre + trk().yLabel(n.year) + " · " +
           fmt.escapeHtml(TR.charts.clip(n.text, 44)) +
-          '<button data-delnote="' + n.year + '" title="Remove note">✕</button></span>';
+          '<button data-delnote="' + n.year + '" data-delmetric="' +
+          fmt.escapeHtml(n.metricKey) + '" title="Remove note">✕</button></span>';
       }).join("") + "</div>");
     }
 
@@ -616,7 +630,7 @@
       (s.visRowBase ? " checked" : "") + "> vs baseline</label></div>");
     html.push('<div class="trkwrap"><table class="moved trk"><thead><tr>' +
       "<th>Series</th>" + shownYears.map(function (y) {
-        return "<th class='wv'>" + y + "</th>";
+        return "<th class='wv'>" + trk().yLabel(y) + "</th>";
       }).join("") + "</tr></thead><tbody>");
     series.forEach(function (sr, k) {
       var isMean = sr.spec.metric.isMean;
@@ -742,24 +756,29 @@
         rerender();
       });
     });
-    // annotation tagging: click a chart point -> inline editor (no prompt)
-    if (singleMetric) {
-      var chartHost = host.querySelector("[data-vischart]");
+    // annotation tagging: click ANY line's point -> inline editor (no prompt).
+    // The clicked point carries data-metric, so tagging works for single or
+    // multi-series charts (each tag belongs to the line it was placed on).
+    var chartHost = host.querySelector("[data-vischart]");
+    if (chartHost) {
       chartHost.addEventListener("click", function (e) {
         var pt = e.target.closest("circle.trendpt");
         if (!pt) return;
-        var year = parseInt(pt.getAttribute("data-year"), 10);
+        var year = parseFloat(pt.getAttribute("data-year"));  // float: twice-yearly keys (2025.5)
+        var mKey = pt.getAttribute("data-metric") || (singleMetric && singleMetric.key);
+        if (!mKey || isNaN(year)) return;
+        var mObj = trk().metricByKey(mKey) || singleMetric;
         var old = chartHost.querySelector(".notepop");
         if (old) old.remove();
-        var existing = TR.notes.get(singleMetric.key, year);
+        var existing = TR.notes.get(mKey, year);
         var pop = document.createElement("div");
         pop.className = "notepop";
         var rect = chartHost.getBoundingClientRect();
         pop.style.left = Math.max(8, Math.min(e.clientX - rect.left - 20,
           rect.width - 260)) + "px";
         pop.style.top = Math.max(8, e.clientY - rect.top + 10) + "px";
-        pop.innerHTML = '<div class="np-title">Tag ' + year + " · " +
-          fmt.escapeHtml(TR.charts.clip(singleMetric.label, 24)) + "</div>" +
+        pop.innerHTML = '<div class="np-title">Tag ' + trk().yLabel(year) + " · " +
+          fmt.escapeHtml(TR.charts.clip(mObj ? mObj.label : "", 24)) + "</div>" +
           '<input type="text" maxlength="60" placeholder="e.g. Campaign ' +
           'launched" value="' + fmt.escapeHtml(existing) + '">' +
           '<div class="np-btns"><button class="primary" data-npsave>Save</button>' +
@@ -770,7 +789,7 @@
         input.focus();
         input.select();
         var save = function () {
-          TR.notes.set(singleMetric.key, year, input.value);
+          TR.notes.set(mKey, year, input.value);
           rerender();
         };
         pop.querySelector("[data-npsave]").addEventListener("click", save);
@@ -781,7 +800,7 @@
         var remove = pop.querySelector("[data-npremove]");
         if (remove) {
           remove.addEventListener("click", function () {
-            TR.notes.set(singleMetric.key, year, "");
+            TR.notes.set(mKey, year, "");
             rerender();
           });
         }
@@ -792,8 +811,8 @@
     }
     host.querySelectorAll("[data-delnote]").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        TR.notes.set(singleMetric.key,
-          parseInt(btn.getAttribute("data-delnote"), 10), "");
+        TR.notes.set(btn.getAttribute("data-delmetric") || (singleMetric && singleMetric.key),
+          parseFloat(btn.getAttribute("data-delnote")), "");
         rerender();
       });
     });

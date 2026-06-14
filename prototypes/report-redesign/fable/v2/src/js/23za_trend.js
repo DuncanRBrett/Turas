@@ -227,7 +227,8 @@
         { "text-anchor": "end", "font-size": 9.5, fill: "#9aa1b1" }));
     });
     years.forEach(function (year) {
-      body.push(S.text(xOf(year), padT + plotH + 16, String(year),
+      var ylab = (TR.trk && TR.trk.yLabel) ? TR.trk.yLabel(year) : String(year);
+      body.push(S.text(xOf(year), padT + plotH + 16, ylab,
         { "text-anchor": "middle", "font-size": 10, fill: "#6b7280" }));
     });
     // analyst annotations: dashed marker + label at the tagged wave
@@ -244,6 +245,7 @@
     };
     var labelMode = opts.labels || "auto";
     var endLabels = [];
+    var pointLabels = [];   // per-point value labels — repelled per wave column
     series.forEach(function (s, k) {
       var colour = palette[k % palette.length];
       // optional 95% interval band behind the line (Visualise toggle).
@@ -285,18 +287,18 @@
         if (opts.clickable) {
           dot["data-year"] = p.year;
           dot["class"] = "trendpt";
+          if (s.row && s.row.metricKey) dot["data-metric"] = s.row.metricKey;
           dot.r = p.current ? 5 : 4;   // bigger hit target when taggable
         }
         body.push(S.el("circle", dot));
-        // the end-of-line label (right edge) already carries the final
-        // value — per-point labels stop one short so the last value never
-        // renders twice; "last" mode is the end labels alone
+        // per-point value labels are collected, then repelled per wave column
+        // (below) so multi-series labels never overlap; the end label at the
+        // right edge already carries the final value, so stop one short.
         var labelThis = labelAll && pi < s.points.length - 1;
         if (labelThis && labelMode !== "none") {
-          body.push(S.text(xOf(p.year), yOf(p.value) - 8,
-            fmtVal(p.value, s.isMean),
-            { "text-anchor": "middle", "font-size": 9.5,
-              "font-weight": p.current ? 700 : 400, fill: "#1c2333" }));
+          pointLabels.push({ x: xOf(p.year), pos: yOf(p.value) - 8,
+            text: fmtVal(p.value, s.isMean), colour: colour,
+            weight: p.current ? 700 : 400 });
         }
       });
       var last = s.points[s.points.length - 1];
@@ -304,6 +306,24 @@
       // bottom legend where there is room for the full question text
       endLabels.push({ pos: yOf(last.value), colour: colour, sig: s.sigNow,
         text: labelMode === "none" ? "" : fmtVal(last.value, s.isMean) });
+    });
+    // repel per-point value labels within each wave column so they never
+    // overlap (matches the end-label behaviour, now for every point).
+    var labelCols = {};
+    pointLabels.forEach(function (l) {
+      var key = Math.round(l.x);
+      (labelCols[key] = labelCols[key] || []).push(l);
+    });
+    Object.keys(labelCols).forEach(function (key) {
+      render.repel(labelCols[key], 12, padT + 4, padT + plotH);
+    });
+    pointLabels.forEach(function (l) {
+      // white halo (paint-order: stroke) keeps the label legible where it sits
+      // over its own point, the line, or a neighbouring series.
+      body.push(S.text(l.x, l.pos, l.text,
+        { "text-anchor": "middle", "font-size": 9.5,
+          "font-weight": l.weight, fill: l.colour,
+          stroke: "#fff", "stroke-width": 3, "paint-order": "stroke" }));
     });
     render.repel(endLabels, 13, padT + 4, padT + plotH);
     endLabels.forEach(function (l) {

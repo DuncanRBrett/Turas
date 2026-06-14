@@ -51,13 +51,39 @@
     return TR.d2.tracking().waves.map(function (w) { return w.year; });
   };
 
+  /* Wave-axis display. The year value is only a unique, ordered x-KEY (so
+   * twice-yearly waves never collide); the label shown to users comes from the
+   * wave's own name. Built once from the history waves + the current wave. */
+  var yLabelMap = null;
+  trk.currentWaveLabel = function () {
+    var w = (TR.AGG.project && TR.AGG.project.wave) || "";
+    var m = /wave\s*\d+/i.exec(w);
+    if (m) return m[0].replace(/\s+/g, " ");
+    var cy = TR.render.currentYear();
+    return cy != null ? String(cy) : "Current";
+  };
+  trk.yLabel = function (y) {
+    if (!yLabelMap) {
+      yLabelMap = {};
+      TR.d2.tracking().waves.forEach(function (w) {
+        yLabelMap[w.year] = w.label || w.wave || String(w.year);
+      });
+      var cy = TR.render.currentYear();
+      if (cy != null && yLabelMap[cy] === undefined) yLabelMap[cy] = trk.currentWaveLabel();
+    }
+    return yLabelMap[y] != null ? yLabelMap[y] : String(y);
+  };
+
   var pubCache = {};
   /** Published, unfiltered model for a question under a banner group. */
   trk.publishedModel = function (code, group) {
-    var key = code + "::" + (group || "default");
+    // Total-only reports have no banner groups — fall back to the Total column
+    // ("") rather than assuming a first group exists.
+    var grp = group ||
+      (TR.AGG.banner_groups.length ? TR.AGG.banner_groups[0].id : "");
+    var key = code + "::" + (grp || "default");
     if (!pubCache[key]) {
-      pubCache[key] = TR.model.forQuestion(code,
-        group || TR.AGG.banner_groups[0].id, [], { hiddenCols: [] });
+      pubCache[key] = TR.model.forQuestion(code, grp, [], { hiddenCols: [] });
     }
     return pubCache[key];
   };
@@ -145,6 +171,13 @@
   /** Published CURRENT value of a metric for Total or a segment. */
   trk.currentFor = function (metric, segNorm) {
     if (!segNorm) {
+      // Microdata waves: recompute the current point too, so the whole series
+      // is one consistent model (full precision; sig holds without a published
+      // distribution). The 1-dp display is unchanged.
+      if (metric.isMean && !metric.diff) {
+        var cp = TR.waves.currentPoint(metric.q);
+        if (cp) return { value: cp.value, base: cp.base, x: null };
+      }
       var cell = metric.row.cells[0];
       var v = metric.isMean ? cell.mean : cell.pct;
       if (v === null || v === undefined) return null;
@@ -183,6 +216,12 @@
       })[0];
       return hit
         ? TR.waves.sdAtWave(metric.q, metric.row, hit.q, segNorm || null) : null;
+    }
+    // Current wave: prefer microdata (Total) — its SD powers the latest-wave
+    // significance even when the published distribution is absent.
+    if (!segNorm) {
+      var curScores = TR.waves.currentScores(metric.q);
+      if (curScores) return TR.waves.sdFromScores(curScores);
     }
     var scores = TR.waves.scoreMap(metric.q, metric.row);
     if (!scores) return null;

@@ -74,8 +74,12 @@
 
   function frameHtml() {
     var p = TR.AGG.project;
+    // researcher logo (embedded data URI) when supplied, else the brand dot
+    var brandmark = p.researcher_logo
+      ? '<img class="hdr-logo" src="' + p.researcher_logo + '" alt="">'
+      : '<span class="dot" aria-hidden="true"></span>';
     return '<header class="hdr"><div class="hdr-in">' +
-      '<div class="hdr-brand"><span class="dot" aria-hidden="true"></span>' +
+      '<div class="hdr-brand">' + brandmark +
       "<div><h1>" + fmt.escapeHtml(p.name) + "</h1>" +
       '<div class="hdr-sub">' + fmt.escapeHtml(p.client || "") +
       ' · <strong>data-centric report prototype</strong> · single file · works offline</div></div></div>' +

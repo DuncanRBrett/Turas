@@ -45,7 +45,7 @@
     Object.keys(store()).forEach(function (k) {
       var at = k.lastIndexOf("::");
       if (k.slice(0, at) !== metricKey) return;
-      out.push({ year: parseInt(k.slice(at + 2), 10), text: store()[k] });
+      out.push({ year: parseFloat(k.slice(at + 2)), text: store()[k] });
     });
     out.sort(function (a, b) { return a.year - b.year; });
     return out;

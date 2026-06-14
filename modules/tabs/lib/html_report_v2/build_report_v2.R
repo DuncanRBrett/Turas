@@ -74,7 +74,8 @@ bundle_report_v2_js <- function(assets_dir = report_v2_assets_dir()) {
 #' @export
 build_report_v2_html <- function(data_json, config_obj,
                                   assets_dir = report_v2_assets_dir(),
-                                  generated = format(Sys.time(), "%Y-%m-%d %H:%M %Z")) {
+                                  generated = format(Sys.time(), "%Y-%m-%d %H:%M %Z"),
+                                  prev_json = NULL) {
   read_text <- function(path) paste(readLines(path, warn = FALSE), collapse = "\n")
 
   template_path <- file.path(assets_dir, "template.html")
@@ -109,7 +110,11 @@ build_report_v2_html <- function(data_json, config_obj,
   html <- replace_token(html, "{{CSS}}", read_text(css_path))
   html <- replace_token(html, "{{DATA_AGG}}", escape_island(data_json))
   html <- replace_token(html, "{{DATA_MICRO}}", "null")   # no microdata in this cut
-  html <- replace_token(html, "{{DATA_PREV}}", "null")    # no prior-wave island yet
+  # Prior-wave / tracking island: inline when supplied (same </ escaping as the
+  # agg island), else null so the Tracking tab stays hidden. Carries the wave
+  # history — for trackers, anonymised per-wave microdata the engine recomputes.
+  prev_inlined <- if (!is.null(prev_json) && nzchar(prev_json)) escape_island(prev_json) else "null"
+  html <- replace_token(html, "{{DATA_PREV}}", prev_inlined)
   html <- replace_token(html, "{{DATA_VERIFY}}", "null")
   html <- replace_token(html, "{{JS}}", bundle_report_v2_js(assets_dir))
 
@@ -139,7 +144,8 @@ build_report_v2_html <- function(data_json, config_obj,
 #' }
 #' @export
 write_html_report_v2 <- function(data_json, config_obj, output_path,
-                                 assets_dir = report_v2_assets_dir()) {
+                                 assets_dir = report_v2_assets_dir(),
+                                 prev_json = NULL) {
   refuse <- function(code, message, how_to_fix) {
     cat("\n=== TURAS ERROR ===\n")
     cat("Code:", code, "\n")
@@ -156,7 +162,7 @@ write_html_report_v2 <- function(data_json, config_obj, output_path,
   }
 
   html <- tryCatch(
-    build_report_v2_html(data_json, config_obj, assets_dir),
+    build_report_v2_html(data_json, config_obj, assets_dir, prev_json = prev_json),
     error = function(e) e)
   if (inherits(html, "error")) {
     return(refuse("REPORT_V2_BUILD_FAILED", conditionMessage(html),

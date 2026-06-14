@@ -88,8 +88,10 @@
     return {
       enabled: cfg.enabled !== false && available,
       defaultScope: cfg.default_scope === "all" ? "all" : "key",
-      waves: available ? TR.PREV.waves.map(function (w) {
-        return { wave: w.wave, year: w.year };
+      waves: available ? TR.PREV.waves.filter(function (w) {
+        return !w.current;   // the current wave is the live AGG, not history
+      }).map(function (w) {
+        return { wave: w.wave, year: w.year, label: w.label };
       }) : []
     };
   };
