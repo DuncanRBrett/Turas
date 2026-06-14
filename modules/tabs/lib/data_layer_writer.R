@@ -102,8 +102,17 @@ encode_logo_data_uri <- function(path) {
 #' @return A named list of project metadata
 #' @export
 build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
-  blank <- function(x) is.null(x) || length(x) == 0 ||
-    (length(x) == 1 && (is.na(x) || !nzchar(as.character(x))))
+  # The config loader surfaces an empty cell as the literal string "NA", so
+  # treat that (and whitespace-only) as blank — no display/metadata field is
+  # ever legitimately "NA", and shipping a bare "NA" into the report header or
+  # the About panel would look like a defect.
+  blank <- function(x) {
+    if (is.null(x) || length(x) == 0) return(TRUE)
+    if (length(x) > 1) return(FALSE)
+    if (is.na(x)) return(TRUE)
+    s <- trimws(as.character(x))
+    !nzchar(s) || s == "NA"
+  }
   name <- if (!blank(config_obj$project_title)) config_obj$project_title
           else if (!blank(config_obj$project_name)) config_obj$project_name
           else "Turas Report"
@@ -128,6 +137,24 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
   if (!is.null(researcher)) proj$researcher_logo <- researcher
   client_logo <- encode_logo_data_uri(config_obj$client_logo_path)
   if (!is.null(client_logo)) proj$client_logo <- client_logo
+
+  # Report metadata — pre-fills the v2 Report tab's editable Background / About
+  # (analyst, contact, disclaimer) from the config, mirroring the classic
+  # report's closing section. Carried only when at least one field is set; the
+  # analyst can still override any of it in the report (their edits persist).
+  cfg_chr <- function(key) {
+    if (blank(config_obj[[key]])) "" else as.character(config_obj[[key]])
+  }
+  meta <- list(
+    analyst   = cfg_chr("analyst_name"),
+    email     = cfg_chr("analyst_email"),
+    phone     = cfg_chr("analyst_phone"),
+    company   = cfg_chr("company_name"),
+    fieldwork = cfg_chr("fieldwork_dates"),
+    closing   = cfg_chr("closing_notes"),
+    verbatim  = cfg_chr("verbatim_filename")
+  )
+  if (any(nzchar(unlist(meta)))) proj$report_meta <- meta
   proj
 }
 

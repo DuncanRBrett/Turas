@@ -201,6 +201,50 @@ test_that("a probability design switches to confidence-interval wording", {
   expect_match(p$sig_note, "confidence intervals")
 })
 
+test_that("report_meta carries the config's analyst / contact / closing fields", {
+  cfg <- make_dl_config(
+    analyst_name = "Jess Taylor", analyst_email = "jess@researchlamppost.co.za",
+    analyst_phone = "+27 11 123 4567", company_name = "The Research Lamppost",
+    fieldwork_dates = "May 2026", closing_notes = "Confidential.",
+    verbatim_filename = "v.xlsx")
+  p <- build_data_layer(make_dl_results(), make_dl_banner_info(), cfg)$project
+  expect_equal(p$report_meta$analyst, "Jess Taylor")
+  expect_equal(p$report_meta$email, "jess@researchlamppost.co.za")
+  expect_equal(p$report_meta$phone, "+27 11 123 4567")
+  expect_equal(p$report_meta$company, "The Research Lamppost")
+  expect_equal(p$report_meta$fieldwork, "May 2026")
+  expect_equal(p$report_meta$closing, "Confidential.")
+})
+
+test_that("report_meta is omitted entirely when no analyst metadata is configured", {
+  # default config has no analyst / company / closing keys
+  p <- build_data_layer(make_dl_results(), make_dl_banner_info(), make_dl_config())$project
+  expect_null(p$report_meta)
+})
+
+test_that("config fields surfaced as the literal string 'NA' are treated as blank", {
+  # the config loader returns an empty cell as the string "NA" (not a real NA);
+  # those must not leak a bare "NA" into the header or About panel
+  cfg <- make_dl_config(
+    analyst_name = "Jess Taylor", analyst_phone = "NA",
+    company_name = "The Research Lamppost", closing_notes = "NA",
+    fieldwork_dates = " NA ")
+  p <- build_data_layer(make_dl_results(), make_dl_banner_info(), cfg)$project
+  expect_equal(p$report_meta$analyst, "Jess Taylor")
+  expect_equal(p$report_meta$company, "The Research Lamppost")
+  expect_equal(p$report_meta$phone, "")        # literal "NA" -> blank
+  expect_equal(p$report_meta$closing, "")       # literal "NA" -> blank
+  expect_equal(p$report_meta$fieldwork, "")     # whitespace-padded "NA" -> blank
+})
+
+test_that("a header field of literal 'NA' falls back rather than showing 'NA'", {
+  # client_name "NA" must not render as the header subtitle
+  cfg <- make_dl_config(client_name = "NA", wave = "NA")
+  p <- build_data_layer(make_dl_results(), make_dl_banner_info(), cfg)$project
+  expect_equal(p$client, "")
+  expect_equal(p$wave, "")
+})
+
 # ==============================================================================
 # 3. question pivot — kinds, cell arrays, type mapping
 # ==============================================================================

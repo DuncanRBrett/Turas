@@ -63,6 +63,25 @@
 
   report.data = function () { return store(); };
 
+  /* Defaults imported from the config (project.report_meta) — shown until the
+   * analyst types their own. A field set in localStorage (even to "") wins, so
+   * the analyst can always override; an untouched field falls back here. */
+  function metaOf() { return (TR.AGG.project && TR.AGG.project.report_meta) || {}; }
+  function aboutDefault(field) {
+    var m = metaOf();
+    if (field === "analyst") return m.analyst || "";
+    if (field === "contact") {
+      return [m.company, m.email, m.phone].filter(function (x) { return x; }).join(" · ");
+    }
+    if (field === "disclaimer") return m.closing || "";
+    return "";
+  }
+  function sectionDefault(sec) {
+    var m = metaOf();
+    if (sec === "background" && m.fieldwork) return "Fieldwork: " + m.fieldwork + ".";
+    return "";
+  }
+
   report.renderTab = function (host) {
     var s = store();
     var html = ['<div class="page">'];
@@ -72,10 +91,11 @@
       "to produce a single .html with your insights, story and these sections " +
       "baked in, ready to send.</p></div>");
     SECTIONS.forEach(function (sec) {
+      var secVal = sec[0] in s.sections ? s.sections[sec[0]] : sectionDefault(sec[0]);
       html.push('<div class="card"><h3>' + sec[1] + "</h3>" +
         '<textarea class="rpt-section" data-section="' + sec[0] +
         '" placeholder="' + fmt.escapeHtml(sec[2]) + '">' +
-        fmt.escapeHtml(s.sections[sec[0]] || "") + "</textarea></div>");
+        fmt.escapeHtml(secVal) + "</textarea></div>");
     });
 
     html.push('<div class="card"><h3>Added slides</h3><p>Import exhibits from outside ' +
@@ -99,9 +119,10 @@
 
     html.push('<div class="card"><h3>About this report</h3>' +
       ABOUT_FIELDS.map(function (f) {
+        var aboutVal = f[0] in s.about ? s.about[f[0]] : aboutDefault(f[0]);
         return '<div class="rpt-field"><label>' + f[1] + "</label>" +
           '<input type="text" class="rpt-about" data-field="' + f[0] + '" value="' +
-          fmt.escapeHtml(s.about[f[0]] || "") + '"></div>';
+          fmt.escapeHtml(aboutVal) + '"></div>';
       }).join("") + autoAboutHtml() + "</div>");
     html.push("</div>");
     // fresh wrapper per render — never stack duplicate listeners

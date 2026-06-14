@@ -81,11 +81,16 @@
     // optional client logo, shown on the right of the header
     var clientLogo = p.client_logo
       ? '<img class="hdr-clientlogo" src="' + p.client_logo + '" alt="">' : "";
+    // subtitle: client · interactive report · single file · works offline
+    // (client omitted cleanly when blank, so there is never a leading " · ")
+    var subBits = [];
+    if (p.client) subBits.push(fmt.escapeHtml(p.client));
+    subBits.push("<strong>interactive report</strong>");
+    subBits.push("single file &middot; works offline");
     return '<header class="hdr"><div class="hdr-in">' +
       '<div class="hdr-brand">' + brandmark +
       "<div><h1>" + fmt.escapeHtml(p.name) + "</h1>" +
-      '<div class="hdr-sub">' + fmt.escapeHtml(p.client || "") +
-      ' · <strong>data-centric report prototype</strong> · single file · works offline</div></div></div>' +
+      '<div class="hdr-sub">' + subBits.join(" &middot; ") + "</div></div></div>" +
       '<div class="hdr-meta">' + clientLogo +
       '<span class="wavechip">' + fmt.escapeHtml(p.wave || "") + "</span>" +
       waveHistoryChip() +
