@@ -109,6 +109,14 @@ test_that("wave_contribution returns NULL when no metric carries scores", {
               list(wave = "W")))
 })
 
+test_that("wave_contribution refuses a weighted study (unweighted-trend guard)", {
+  # The wave engine averages scores unweighted; on a weighted study a trend
+  # would silently disagree with the weighted crosstab, so no contribution is
+  # built (weighted wave trends are a documented follow-up).
+  expect_null(wave_contribution(ti_data_layer(), ti_micro(),
+              list(wave = "Wave 1", wave_order = 2024, apply_weighting = TRUE)))
+})
+
 # ==============================================================================
 # 3. build_tracking_island
 # ==============================================================================

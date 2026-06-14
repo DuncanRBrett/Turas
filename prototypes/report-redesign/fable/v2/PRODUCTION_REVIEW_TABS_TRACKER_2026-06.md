@@ -120,3 +120,41 @@ tracking as clearly-scoped, documented follow-ups. Two IMPORTANT findings were
 fixed during the review; no CRITICALs. Because builder and reviewer were the same
 session, a brief independent cold pass (Phase 2 cold-start + Phase 3 spot-trace)
 is recommended before merging to `main`.
+
+---
+
+## Independent cold-review addendum (2026-06-14)
+
+A second reviewer with **no prior context** re-ran every gate, wrote its **own**
+known-answer harnesses (not the author's tests), and independently confirmed: the
+weighted math (Kish n_eff, weighted %/mean, two-proportion z), the row-index
+mapping (cannot map to the wrong row), the hidden-category `-2` handling, the
+length-n / `d2.validate` contract, byte-identical-when-unweighted, and the
+anonymisation (it extracted the built island and verified no strings leak). It
+rated test quality "good, not vacuous", and raised two IMPORTANT findings the
+author's review under-weighted — **both now addressed:**
+
+- **I-NET — NET rows blank under a live filter / custom banner.** Confirmed: the
+  writer emits no `net_members`, so `computedModel.netRow` returns null cells for
+  Top-2-Box / summary NETs under a filter. *Response:* the renderer already shows
+  these as "–" (`fmtPct(null)` → "–", never blank or zero); the limitation is now
+  documented prominently (docs §"Current scope") and `net_members` emission is the
+  **top** growth-path item. Not fixed in code (a wrong NET would be worse than an
+  honest "–"; the real fix needs its own known-answer tests). Blocks *enabling*
+  for NET-heavy reports, not the off-by-default merge.
+- **I-WTRACK — weighted tracker mixed weighted crosstab + unweighted trend.**
+  *Response: FIXED.* `wave_contribution` now returns NULL when
+  `apply_weighting = TRUE` and Step 4d prints a clear NOTE — the Tracking tab is
+  not built on weighted studies (weighted crosstab + filtering still ship), so the
+  silent discrepancy cannot occur. Tested (`test_tracking_island.R`, 30/30).
+
+Cold-review MINORs accepted, none fixed this pass: `stop()` inside the bundler's
+`tryCatch` guards vs the TRS mandate (degrade safely); Step 4d after the stats
+pack would be marginally safer; `micro_banner_vars` ~52 lines; the dash class is
+fragile; the `-2` sentinel is duplicated across R/JS (well-commented). Added to
+the growth path: a golden test feeding **actual** `build_microdata` output through
+`d2.validate` + a recompute, to lock the writer↔renderer seam.
+
+**Net position:** with I-WTRACK fixed and I-NET documented + honestly degraded,
+the conditions are met for the **off-by-default merge**; emitting `net_members`
+is the remaining gate before enabling on a NET-heavy client report.

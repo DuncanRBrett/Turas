@@ -32,23 +32,37 @@ Requires significant rework:
 
 ## Natural next steps
 
-### 1. Weighted wave trends
+### 1. Recompute-ready NET / box-category rows under filter (top gap)
+**What:** Emit `net_members` (and `net_diffs`) per question so Top-2-Box / summary
+NETs recompute live instead of showing "–" under a filter.
+**Why now:** The independent cold review flagged this as the most user-visible gap
+in the filtered-recompute feature — Top-box NETs are common tracker headline
+metrics. It is the **gate before enabling the v2 report on a NET-heavy client
+report** (today: honest "–" under a filter; correct unfiltered).
+**Effort:** Medium — derive box-category membership from the structure (the
+classifier already identifies NET rows + their member options); the engine
+already consumes `net_members` / `net_diffs`.
+**Risk:** Medium — membership derivation must match the processor's box logic
+exactly. Cover with known-answer tests (a filtered Top-2-Box reproduces the
+hand-summed member %).
+
+### 2. Weighted wave trends (lifts the current guard)
 **What:** Carry per-wave `weights` in the contribution; weight `meanOfScores` /
 `sdOfScores`.
-**Why now:** The live wave is already weighted-correct; the trend should match.
+**Why now:** Tracking is currently *guarded off* on weighted studies (so a weighted
+crosstab and an unweighted trend can never disagree). This lifts the guard.
 **Effort:** Small — one field in `wave_contribution`, a weighted reducer in
-`22w_waves.js` (guard so absent weights = current unweighted behaviour).
+`22w_waves.js` (guard so absent weights = current unweighted behaviour), and
+remove the `apply_weighting` refusal in `wave_contribution` + Step 4d.
 **Dependencies:** None.
 **Risk:** Low — additive, falls back to unweighted.
 
-### 2. Recompute-ready NET / box-category rows under filter
-**What:** Emit `net_members` per question so top-2-box etc. recompute live instead
-of showing "—".
-**Why now:** Top-box NETs are common tracker headline metrics.
-**Effort:** Medium — derive box-category membership from the structure; the engine
-already consumes `net_members`.
-**Risk:** Medium — membership derivation must match the processor's box logic
-exactly (cover with known-answer tests).
+### 2b. Writer↔renderer golden test (cold-review suggestion)
+**What:** A committed test that feeds **actual** `build_microdata` output (from a
+synthetic survey) through the JS `d2.validate` + a recompute, asserting it
+reproduces the published Total. **Why now:** locks the R-writer ⇆ JS-renderer seam
+that today is covered only by separate unit tests + manual CCS verification.
+**Effort:** Small. **Risk:** Low.
 
 ### 3. Structure-bridged value recodes (the `DK` → "Don't know" edge)
 **What:** When a multi-select has no options but the data uses canonical missing

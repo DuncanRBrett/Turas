@@ -125,7 +125,7 @@ GUI tick-box for option 2):
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `html_report_v2` | `N` | Emit the v2 report + `_data.json` (Option 2). |
-| `html_report_v2_tracking` | `N` | Add the Tracking tab (Option 3). Requires `html_report_v2 = Y` and a `waves_source` with prior contributions. |
+| `html_report_v2_tracking` | `N` | Add the Tracking tab (Option 3). Requires `html_report_v2 = Y` and a `waves_source` with prior contributions. **Unweighted studies only** — on a weighted study the Tracking tab is deliberately not built (see limitations); the weighted crosstab + filtering still ship. |
 | `waves_source` | *(blank)* | Folder holding prior waves' `*_wave.json` contributions (see Forward path). |
 | `wave` | *(blank)* | Wave label shown in the header and used as the trend label. |
 | `wave_order` | *(blank)* | Numeric x-axis order key for this wave (e.g. `2025.5`). Blank → a 4-digit year is parsed from the `wave` label. |
@@ -163,17 +163,34 @@ onward; a back-catalogue can be produced by running each historical wave once.)
 
 ## Current scope & known limitations
 
-- **Weighted recompute** (filter / custom banner) is correct (values weighted;
-  significance on effective n). **Tracking** wave means are currently *unweighted*
-  (`meanOfScores`); weighting the wave trend is a scoped follow-up (carry per-wave
-  weights + weight `meanOfScores`).
-- **Means / NPS** recompute live; arbitrary **BoxCategory NET** rows and **numeric
-  (binned) means** show "—" under an active filter rather than a stale number
-  (honest degrade) — recompute-ready NET structure is a follow-up.
+Read these before enabling the v2 report for a live client deliverable. None
+produce a *wrong* number — each is an honest degrade or a guard.
+
+- **NET rows do not recompute under a live filter / custom banner.** The writer
+  does not yet emit `net_members`, so the renderer cannot recompute Top-2-Box /
+  summary-NET rows for a filtered audience: published / unfiltered NETs are
+  correct, but **under an active filter every NET row shows "–"** (an explicit
+  "not available", never a zero or a stale value) while detail rows and means
+  recompute normally. Common in tracker / crosstab reporting, so weigh this
+  before enabling for a NET-heavy report. The fix — emitting `net_members`
+  (and `net_diffs`) from `build_dl_question` so `netCounts` can recompute — is
+  the top scoped follow-up.
+- **Tracking is built for unweighted studies only.** The wave engine averages
+  per-respondent scores *unweighted* (`meanOfScores`). On a **weighted** study a
+  trend mean would silently disagree with the (weighted) crosstab mean, so the
+  Tracking tab is **deliberately not built** when `apply_weighting = TRUE`
+  (guarded in `wave_contribution` + a console NOTE in Step 4d); the weighted
+  crosstab + filtering still ship. Weighting the wave trend (carry per-wave
+  weights + weight `meanOfScores`) is the second scoped follow-up.
+- **Numeric (binned) means** also show "–" under a filter (the mean is over raw
+  values, not bins) — honest degrade.
 - **Data-derived multi-select categories** whose published label is a *semantic*
   recode of the raw value (e.g. `DK` → `Don't know`) with **no** structure option
   to bridge them may under-count under a custom filter. Fix data-side by defining
   the option in `Survey_Structure`.
+
+Everything else — values, weighted recompute, significance (effective n),
+means / NPS — recomputes correctly and matches the published figures.
 
 ---
 

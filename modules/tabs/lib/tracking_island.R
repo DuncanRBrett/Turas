@@ -74,10 +74,14 @@ wave_order_key <- function(config_obj) {
 #' @param data_layer The built data layer (for titles + types)
 #' @param micro The TR.MICRO payload (for $scores)
 #' @param config_obj The tabs config (for wave label + order key)
-#' @return A wave contribution list, or NULL when no metric carries scores
+#' @return A wave contribution list, or NULL when no metric carries scores or the
+#'   study is weighted (the wave engine averages scores unweighted; weighted
+#'   trends are a documented follow-up — building one would silently disagree
+#'   with the weighted crosstab)
 #' @export
 wave_contribution <- function(data_layer, micro, config_obj) {
   if (is.null(micro) || is.null(micro$scores)) return(NULL)
+  if (isTRUE(config_obj$apply_weighting)) return(NULL)
   questions <- list()
   for (q in data_layer$questions) {
     sc <- micro$scores[[q$code]]
