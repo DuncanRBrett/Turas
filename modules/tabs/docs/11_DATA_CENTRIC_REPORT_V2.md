@@ -132,7 +132,7 @@ GUI tick-box for option 2):
 | `html_report_v2` | `N` | Emit the v2 report + `_data.json` (Option 2). |
 | `html_report_v2_tracking` | `N` | Add the Tracking tab (Option 3). Requires `html_report_v2 = Y` and a `waves_source` with prior contributions. Weighted studies are supported (the wave trend is weighted to match the crosstab). |
 | `waves_source` | *(blank)* | Folder holding prior waves' `*_wave.json` contributions (see Forward path). |
-| `question_mapping` | *(blank)* | Optional path to the classic tracker's `Question_Mapping.xlsx`. When set, waves link by its **canonical key** (`Track_01`…) — robust to question renames/rewording — and only the mapped metrics track, each with its `TrackingSpecs` metric. Blank → metrics match by question **title** (fragile to wording drift). |
+| `question_mapping` | *(auto)* | Path to the classic tracker's `Question_Mapping.xlsx` (absolute, or relative to the project root / config dir). **Blank → auto-detected**: a `*Question_Mapping*.xlsx` in `waves_source`, the project root, or the config dir. When found, waves link by its **canonical key** (`Track_01`…) — robust to renames — and only the mapped metrics track, each with its `TrackingSpecs` metric. None found → metrics match by question **title** (fragile to wording drift). |
 | `wave` | *(blank)* | Wave label shown in the header and used as the trend label. |
 | `wave_order` | *(blank)* | Numeric x-axis order key for this wave (e.g. `2025.5`). Blank → a 4-digit year is parsed from the `wave` label. |
 | `researcher_logo_path` / `client_logo_path` | *(blank)* | Logos embedded (base64) into the v2 header. |

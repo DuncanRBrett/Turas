@@ -201,3 +201,24 @@ test_that("v2 output paths can never collide with the classic outputs", {
   expect_false(v2_report %in% c(classic_xlsx, classic_html))
   expect_false(v2_json %in% c(classic_xlsx, classic_html))
 })
+
+# ==============================================================================
+# question_mapping resolution (tabs-tracker)
+# ==============================================================================
+
+context("report_v2_bundler: question_mapping resolution")
+
+test_that("resolve_question_mapping finds an explicit path and auto-detects a folder", {
+  dir <- tempfile("qm_"); dir.create(dir)
+  on.exit(unlink(dir, recursive = TRUE), add = TRUE)
+  qm <- file.path(dir, "Proj_Question_Mapping.xlsx"); file.create(qm)
+  # explicit absolute path
+  expect_equal(normalizePath(resolve_question_mapping(qm, "", dirname(dir),
+                                                      file.path(dir, "c.xlsx"))),
+               normalizePath(qm))
+  # blank -> auto-detected in waves_source
+  expect_equal(normalizePath(resolve_question_mapping("", dir, "/nope", "/nope/c.xlsx")),
+               normalizePath(qm))
+  # nothing configured and nothing to find
+  expect_equal(resolve_question_mapping("", "/no/dir", "/no/dir", "/no/dir/c.xlsx"), "")
+})

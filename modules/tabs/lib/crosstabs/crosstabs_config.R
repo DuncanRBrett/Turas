@@ -521,6 +521,44 @@ load_qualitative_sheet <- function(config_file) {
 # ==============================================================================
 
 #' Load Complete Crosstabs Configuration
+#' Resolve the tabs-tracker Question_Mapping path (explicit or auto-detected)
+#'
+#' An explicit `question_mapping` is tried as-is, then relative to the project
+#' root and the config directory. When blank, a `*Question_Mapping*.xlsx` is
+#' auto-detected in `waves_source`, the project root, or the config directory —
+#' so pointing `waves_source` at a tracker's Crosswave folder is enough.
+#'
+#' @param raw_path The configured question_mapping value (may be blank)
+#' @param waves_source The configured waves_source folder (may be blank)
+#' @param project_root Project root directory
+#' @param config_file The config file path (its directory is searched too)
+#' @return An absolute path to a readable mapping workbook, or "" if none
+#' @keywords internal
+resolve_question_mapping <- function(raw_path, waves_source, project_root, config_file) {
+  raw_path <- as.character(raw_path %||% "")
+  if (nzchar(raw_path)) {
+    rp <- normalize_path_separators(raw_path)
+    for (cand in c(rp, file.path(project_root, rp), file.path(dirname(config_file), rp))) {
+      if (file.exists(cand)) return(normalizePath(cand))
+    }
+    cat(sprintf("  [WARNING] question_mapping not found (tracking falls back to title match): %s\n",
+                raw_path))
+    return("")
+  }
+  dirs <- c(as.character(waves_source %||% ""), project_root, dirname(config_file))
+  for (d in dirs) {
+    if (!nzchar(d) || !dir.exists(d)) next
+    hit <- list.files(d, pattern = "Question_Mapping.*\\.xlsx$",
+                      full.names = TRUE, ignore.case = TRUE)
+    if (length(hit) > 0) {
+      cat(sprintf("  Question mapping auto-detected: %s\n", basename(hit[1])))
+      return(normalizePath(hit[1]))
+    }
+  }
+  ""
+}
+
+
 #'
 #' Main entry point for loading all configuration.
 #' Loads settings, builds config object, and returns all needed paths.
@@ -658,6 +696,12 @@ load_crosstabs_config <- function(config_file) {
   # Legacy single logo_path: used as researcher logo fallback
   config_obj$logo_path <- resolve_logo_path(
     config_obj$logo_path, "Logo")
+
+  # Resolve the tabs-tracker question mapping: an explicit path (absolute, or
+  # relative to the project root / config dir), else auto-detected — a
+  # *Question_Mapping*.xlsx in waves_source, the project root, or the config dir.
+  config_obj$question_mapping <- resolve_question_mapping(
+    config_obj$question_mapping, config_obj$waves_source, project_root, config_file)
 
   # Build output path
   output_path <- get_output_path(
