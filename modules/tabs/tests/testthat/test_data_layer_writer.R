@@ -286,6 +286,39 @@ test_that("blank / literal-'NA' comment text is dropped", {
   expect_equal(dl$comments$Q2[[1]]$text, "Real insight.")
 })
 
+# ------------------------------------------------------------------------------
+# category + question ordering (Selection sheet CategoryOrder → classic order)
+# ------------------------------------------------------------------------------
+context("data_layer_writer: ordering")
+
+test_that("categories + questions order by CategoryOrder then appearance", {
+  ar <- list(
+    Q1 = list(category = "Service",  category_order = 2),
+    Q2 = list(category = "Overall",  category_order = 1),
+    Q3 = list(category = "Service",  category_order = 2),
+    Q4 = list(category = "Overall",  category_order = 1),
+    Q5 = list(category = "",         category_order = NA))
+  expect_equal(.dl_category_seq(ar), c("Overall", "Service"))
+  # grouped: Overall (Q2,Q4) → Service (Q1,Q3) → uncategorised (Q5) last
+  expect_equal(.dl_ordered_codes(ar), c("Q2", "Q4", "Q1", "Q3", "Q5"))
+})
+
+test_that("no CategoryOrder falls back to first-appearance, still grouped", {
+  ar <- list(Q1 = list(category = "B"), Q2 = list(category = "A"),
+             Q3 = list(category = "B"), Q4 = list(category = "A"))
+  expect_equal(.dl_category_seq(ar), c("B", "A"))         # appearance order
+  expect_equal(.dl_ordered_codes(ar), c("Q1", "Q3", "Q2", "Q4"))   # B's together, then A's
+})
+
+test_that("build_data_layer emits questions in category order (Overall first)", {
+  r <- make_dl_results()                                  # Q1=Awareness, Q2=Satisfaction
+  r$Q1$category_order <- 2
+  r$Q2$category_order <- 1
+  dl <- build_data_layer(r, make_dl_banner_info(), make_dl_config())
+  expect_equal(dl$questions[[1]]$category, "Satisfaction")   # order 1 leads
+  expect_equal(unlist(dl$categories), c("Satisfaction", "Awareness"))
+})
+
 # ==============================================================================
 # 3. question pivot — kinds, cell arrays, type mapping
 # ==============================================================================

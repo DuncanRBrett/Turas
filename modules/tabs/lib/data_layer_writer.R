@@ -205,22 +205,66 @@ build_dl_banner_groups <- function(banner_info) {
 }
 
 
+#' Category label of one result ("" when none)
+#' @keywords internal
+.dl_cat_label <- function(q) {
+  cc <- q$category
+  blank <- is.null(cc) || length(cc) < 1 || is.na(cc[1]) ||
+    !nzchar(as.character(cc[1]))
+  if (blank) "" else as.character(cc[1])
+}
+
+#' Unique non-blank categories in the classic report's order
+#'
+#' Ordered by the Selection sheet's CategoryOrder (numeric) then
+#' first-appearance, like the crosstab workbook (workbook_builder.R).
+#' Categories without a CategoryOrder sort after those with one (key = Inf),
+#' keeping appearance order — so a config that sets no order is unchanged.
+#'
+#' @param all_results The tabs results list
+#' @return Character vector of category labels, ordered
+#' @keywords internal
+.dl_category_seq <- function(all_results) {
+  codes <- names(all_results)
+  cats <- vapply(all_results, .dl_cat_label, character(1))
+  uniq <- setdiff(unique(cats), "")
+  if (!length(uniq)) return(character(0))
+  key <- vapply(uniq, function(cc) {
+    raw <- all_results[[codes[match(cc, cats)]]]$category_order
+    ord <- suppressWarnings(as.numeric(raw))
+    if (length(ord) == 1 && !is.na(ord)) ord else Inf
+  }, numeric(1))
+  uniq[order(key, seq_along(uniq))]
+}
+
+#' Question codes grouped by category, in the classic report's order
+#'
+#' Categories ordered by CategoryOrder then appearance; questions keep their
+#' within-category (Selection) order; uncategorised questions sort last. This
+#' is the order the crosstab workbook uses, so the v2 report groups and starts
+#' the same way (e.g. an "Overall metrics" category with CategoryOrder 1 leads).
+#'
+#' @param all_results The tabs results list
+#' @return Character vector of question codes, reordered
+#' @keywords internal
+.dl_ordered_codes <- function(all_results) {
+  codes <- names(all_results)
+  cats <- vapply(all_results, .dl_cat_label, character(1))
+  grouped <- unlist(lapply(.dl_category_seq(all_results),
+                           function(cc) codes[cats == cc]), use.names = FALSE)
+  c(grouped, codes[cats == ""])
+}
+
 #' Build the categories[] array of the data layer
 #'
-#' Unique non-blank question categories, in first-appearance order.
+#' Unique non-blank question categories, in the classic report's order
+#' (CategoryOrder then first-appearance).
 #'
 #' @param all_results The tabs results list
 #' @return A list of category-label strings
 #' @export
 build_dl_categories <- function(all_results) {
-  cats <- character(0)
-  for (q in all_results) {
-    cc <- q$category
-    if (!is.null(cc) && length(cc) >= 1 && !is.na(cc[1]) && nzchar(as.character(cc[1]))) {
-      cats <- c(cats, as.character(cc[1]))
-    }
-  }
-  as.list(unique(cats))
+  as.list(.dl_category_seq(all_results))
 }
 
 
@@ -434,8 +478,10 @@ build_data_layer <- function(all_results, banner_info, config_obj,
   project <- build_dl_project(config_obj, tracking_enabled = tracking_enabled)
   low_base <- project$low_base_threshold
 
+  # Group questions by category in the classic report's order (CategoryOrder
+  # then appearance) so the v2 report opens on, and groups by, the same sections.
   questions <- list()
-  for (q_code in names(all_results)) {
+  for (q_code in .dl_ordered_codes(all_results)) {
     q <- build_dl_question(all_results[[q_code]], banner_info, config_obj, low_base,
                            survey_structure)
     if (!is.null(q)) questions[[length(questions) + 1]] <- q

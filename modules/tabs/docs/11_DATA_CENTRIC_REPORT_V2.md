@@ -128,6 +128,18 @@ Like the classic report, the v2 report fills its narrative from the config's
 All of this is omitted from the data layer when not configured, so a report
 without a Comments sheet is byte-identical to before.
 
+#### Question & category order (Selection sheet)
+
+The data layer emits `questions[]` grouped by category in the Selection sheet's
+order — categories by `CategoryOrder` (then first-appearance), questions in
+their within-category order, uncategorised last — exactly like the crosstab
+workbook (`workbook_builder.R`). So the v2 report opens on, and groups by, the
+same sections as the classic report (e.g. an "Overall metrics" category with
+`CategoryOrder = 1` leads, and `state.activeQ` defaults to its first question).
+`categories[]` carries the same order; the renderer's `d2.categories()` groups
+by `questions[]` appearance, so nothing else needs to know the order. A config
+that sets no `CategoryOrder` keeps first-appearance order (still grouped).
+
 ### The tracking island contract (`TR.PREV`)
 
 ```jsonc
