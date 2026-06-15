@@ -88,12 +88,17 @@ build_segment_data_layer <- function(results, config) {
   )
 
   # ---- questions: one per profile variable, a single mean row ------------
+  # f_stat / p_value (ANOVA differentiation, when the profile carries them) are
+  # attached as extra fields the segment-native Importance view reads; the
+  # engine's d2.validate / model ignore unknown question fields.
+  has_f <- "F_statistic" %in% names(cp)
+  has_p <- "p_value" %in% names(cp)
   cat_label <- "Segment profile"
   questions <- lapply(seq_len(nrow(cp)), function(r) {
     v <- as.character(cp$Variable[r])
     means <- c(as.numeric(cp$Overall[r]),
                vapply(seg_cols, function(sc) as.numeric(cp[[sc]][r]), numeric(1)))
-    list(
+    q <- list(
       code = v, title = qlab(v), category = cat_label, type = "scale",
       bases = bases,
       rows = list(list(kind = "mean", label = "Mean",
@@ -101,6 +106,9 @@ build_segment_data_layer <- function(results, config) {
                        n = null_vec(), sig = empty_sig())),
       scale_max = scale_max, gauge_green = gauge_green, gauge_amber = gauge_amber
     )
+    if (has_f) q$f_stat  <- as.numeric(cp$F_statistic[r])
+    if (has_p) q$p_value <- as.numeric(cp$p_value[r])
+    q
   })
 
   # ---- project ------------------------------------------------------------

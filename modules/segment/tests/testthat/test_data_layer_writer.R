@@ -58,6 +58,9 @@ test_that("build_segment_data_layer emits the v2 agg contract shape", {
   expect_equal(length(dl$banner_groups), 1L)
   expect_equal(dl$banner_groups[[1]]$id, "segment")
   expect_equal(length(dl$questions), nrow(f$profile))
+  # ANOVA differentiation stats carried for the native Importance view
+  expect_true(is.numeric(dl$questions[[1]]$f_stat))
+  expect_true(is.numeric(dl$questions[[1]]$p_value))
 })
 
 

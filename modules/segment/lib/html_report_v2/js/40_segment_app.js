@@ -151,12 +151,54 @@
   };
 
   // -------------------------------------------------------------------------
+  // Variable importance — how strongly each variable separates the segments
+  // (ANOVA F carried on the question by the data-layer writer)
+  // -------------------------------------------------------------------------
+  seg.importance = function (host) {
+    var rows = questions().map(function (q) {
+      return { title: q.title || q.code,
+               f: (typeof q.f_stat === "number" && !isNaN(q.f_stat)) ? q.f_stat : null,
+               p: (typeof q.p_value === "number" && !isNaN(q.p_value)) ? q.p_value : null };
+    }).filter(function (d) { return d.f != null; })
+      .sort(function (a, b) { return b.f - a.f; });
+
+    var intro = '<h2 style="font-size:20px;font-weight:500;margin:8px 0 4px">Variable importance</h2>';
+    if (!rows.length) {
+      host.innerHTML = '<section style="padding:8px 0 24px">' + intro +
+        '<p style="color:var(--muted)">No differentiation statistics are available for this solution.</p></section>';
+      return;
+    }
+    var maxF = rows[0].f || 1;
+    var bars = rows.map(function (d) {
+      var w = Math.max(2, Math.round(d.f / maxF * 100));
+      var sig = (d.p != null && d.p < 0.05)
+        ? '<span style="color:var(--green)">sig.</span>'
+        : (d.p != null ? '<span style="color:var(--faint)">ns</span>' : "");
+      return '<div style="display:grid;grid-template-columns:minmax(140px,220px) 1fr 96px;' +
+        'align-items:center;gap:10px;margin:5px 0">' +
+        '<div style="font-size:13px">' + fmt.escapeHtml(d.title) + "</div>" +
+        '<div style="background:var(--soft);border-radius:5px;overflow:hidden">' +
+        '<div style="background:var(--brand);height:16px;width:' + w + '%"></div></div>' +
+        '<div style="font-size:12px;color:var(--muted);text-align:right">F=' +
+        fmt.num(d.f, "dec1") + " " + sig + "</div></div>";
+    }).join("");
+    host.innerHTML =
+      '<section style="padding:8px 0 24px">' + intro +
+      '<p style="color:var(--muted);margin:0 0 14px;max-width:62ch;line-height:1.6">How strongly each ' +
+      'variable distinguishes the segments (one-way ANOVA F across segments — longer bars separate the ' +
+      'segments more). “sig.” marks variables that differ significantly at p &lt; 0.05.</p>' +
+      bars + "</section>";
+  };
+
+  // -------------------------------------------------------------------------
   // Register the host-app tab set. "report" has no route here, so it falls
   // through to the engine's generic Report (metadata) tab.
   // -------------------------------------------------------------------------
   TR.app = {
-    tabs: [["seg_overview", "Overview"], ["seg_profiles", "Profiles"], ["report", "Report"]],
-    routes: { seg_overview: seg.overview, seg_profiles: seg.profiles },
+    tabs: [["seg_overview", "Overview"], ["seg_profiles", "Profiles"],
+           ["seg_importance", "Importance"], ["report", "Report"]],
+    routes: { seg_overview: seg.overview, seg_profiles: seg.profiles,
+              seg_importance: seg.importance },
     defaultTab: "seg_overview"
   };
 
