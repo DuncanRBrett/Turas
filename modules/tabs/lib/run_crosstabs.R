@@ -185,6 +185,14 @@ tabs_source("crosstabs", "workbook_builder.R")
 # V10.3: HTML Report module (loaded conditionally, sources its own submodules)
 tabs_source("html_report", "99_html_report_main.R")
 
+# V11: data-layer writer for the data-centric report v2 (reuses the HTML
+# transformer's row helpers, so it must load after the html_report module).
+source(file.path(script_dir, "score_utils.R"))
+source(file.path(script_dir, "data_layer_writer.R"))
+source(file.path(script_dir, "microdata_writer.R"))
+source(file.path(script_dir, "tracking_island.R"))
+source(file.path(script_dir, "html_report_v2", "build_report_v2.R"))
+
 # ==============================================================================
 # SIGNIFICANCE TESTING FUNCTIONS
 # ==============================================================================
@@ -641,89 +649,107 @@ if (isTRUE(config_result$config_obj$html_report)) {
 }
 
 # ==============================================================================
-# STEP 4c: GENERATE STATS PACK
+# STEP 4d: DATA-CENTRIC REPORT v2 (if enabled)
 # ==============================================================================
+# Additive: emits a *_data.json island AND a self-contained *_report_v2.html
+# (renderer + data inlined) alongside the existing outputs. The classic
+# Excel/HTML writers run above and are byte-identical whether this is on or
+# off — this block only ever WRITES NEW FILES, never modifies the classic.
 
-stats_pack_file <- NULL
-generate_stats_pack_flag <- isTRUE(
-  toupper(config_result$config_obj$generate_stats_pack %||% "Y") == "Y"
-) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
+# Enabled by the config Settings sheet (html_report_v2) OR the GUI checkbox
+# (TURAS_HTML_REPORT_V2, set by run_tabs_gui in this process).
+.html_report_v2_on <- isTRUE(config_result$config_obj$html_report_v2) ||
+  isTRUE(get0("TURAS_HTML_REPORT_V2", ifnotfound = FALSE))
 
-if (generate_stats_pack_flag && exists("turas_write_stats_pack", mode = "function")) {
-  stats_pack_file <- tryCatch({
-    generate_tabs_stats_pack(
-      config_result  = config_result,
-      data_result    = data_result,
-      analysis_result = analysis_result,
-      workbook_result = workbook_result,
-      start_time     = start_time,
-      script_version = SCRIPT_VERSION
+if (.html_report_v2_on) {
+  v2_out <- config_result$output_path
+
+  # 1) JSON data layer (sidecar; also embedded in the report, and the input
+  #    a future wave-tracking config will read).
+  data_layer_result <- tryCatch({
+    write_data_layer(
+      all_results      = analysis_result$all_results,
+      banner_info      = analysis_result$banner_info,
+      config_obj       = config_result$config_obj,
+      output_path      = sub("\\.xlsx$", "_data.json", v2_out),
+      survey_structure = data_result$survey_structure
     )
   }, error = function(e) {
-    cat(sprintf("\n[WARNING] Stats pack generation failed: %s\n", conditionMessage(e)))
+    cat("\n[WARNING] Data-layer JSON generation failed:", conditionMessage(e), "\n")
+    cat("  The Excel and HTML outputs were not affected.\n\n")
     NULL
   })
-  if (!is.null(stats_pack_file)) {
-    cat(sprintf("  Stats Pack: %s\n", basename(stats_pack_file)))
+
+  # 2) Self-contained v2 report, built from the same data layer. The anonymised
+  #    microdata island (per-respondent indices + weights) is built alongside so
+  #    the live filter bar + "+ Custom…" banner light up and recompute weighted
+  #    figures; build_microdata returns NULL when it cannot be built, degrading
+  #    the report to published-only.
+  if (!is.null(data_layer_result) && data_layer_result$status == "PASS") {
+    report_v2_result <- tryCatch({
+      # Build the data layer ONCE and reuse it for the microdata island, the
+      # tracking contribution and the report (project.tracking.enabled is set by
+      # mutation at the end so nothing is recomputed).
+      dl <- build_data_layer(analysis_result$all_results,
+                             analysis_result$banner_info,
+                             config_result$config_obj,
+                             data_result$survey_structure)
+
+      # Anonymised microdata island (per-respondent indices + weights) so the
+      # live filter bar + "+ Custom…" banner light up and recompute weighted
+      # figures; NULL on failure degrades the report to published-only.
+      micro <- tryCatch(
+        build_microdata(dl, data_result$survey_data, data_result$survey_structure,
+                        analysis_result$banner_info, config_result$config_obj),
+        error = function(e) {
+          cat("\n[WARNING] Microdata island generation failed:", conditionMessage(e), "\n")
+          cat("  The v2 report still builds (published figures only).\n\n")
+          NULL
+        })
+
+      # Tabs-integrated tracker (OFF by default): emit this wave's contribution,
+      # then — when enabled and a waves_source resolves — assemble the tracking
+      # island from the prior waves' contributions plus this one.
+      prev_json <- NULL
+      tracking_on <- FALSE
+      if (isTRUE(config_result$config_obj$html_report_v2_tracking)) {
+        tracking_on <- tryCatch({
+          # The classic tracker's Question_Mapping (when configured) links waves
+          # by a canonical key — robust to renames + curates which metrics track.
+          mapping <- load_question_mapping(config_result$config_obj$question_mapping)
+          contrib <- wave_contribution(dl, micro, config_result$config_obj, mapping)
+          wave_path <- sub("\\.xlsx$", "_wave.json", v2_out)
+          write_wave_contribution(contrib, wave_path)
+          priors <- read_wave_contributions(config_result$config_obj$waves_source, wave_path)
+          island <- build_tracking_island(contrib, priors)
+          if (!is.null(island) && length(island$waves) > 1) {
+            prev_json <- serialize_tracking_island(island)
+            TRUE
+          } else FALSE
+        }, error = function(e) {
+          cat("\n[WARNING] Tracking island assembly failed:", conditionMessage(e), "\n")
+          cat("  The v2 report still builds (no Tracking tab).\n\n")
+          FALSE
+        })
+      }
+
+      dl$project$tracking$enabled <- tracking_on   # show the Tracking tab iff built
+      write_html_report_v2(serialize_data_layer(dl), config_result$config_obj,
+                           sub("\\.xlsx$", "_report_v2.html", v2_out),
+                           prev_json = prev_json,
+                           micro_json = serialize_microdata(micro))
+    }, error = function(e) {
+      cat("\n[WARNING] Report v2 build failed:", conditionMessage(e), "\n")
+      cat("  The Excel and HTML outputs were not affected.\n\n")
+      NULL
+    })
+
+    if (!is.null(report_v2_result) && report_v2_result$status == "PASS" &&
+        exists("turas_prepare_deliverable", mode = "function")) {
+      turas_prepare_deliverable(report_v2_result$output_file)
+    }
   }
 }
-
-# ==============================================================================
-# STEP 5: COMPLETION SUMMARY
-# ==============================================================================
-
-elapsed <- difftime(Sys.time(), start_time, units = "secs")
-
-# Get run result for final banner
-run_result <- workbook_result$run_result
-
-# Print final banner
-if (!is.null(run_result) && exists("turas_print_final_banner", mode = "function")) {
-  turas_print_final_banner(run_result)
-} else {
-  cat("\n")
-  cat(paste(rep("=", 80), collapse=""), "\n")
-  cat("ANALYSIS COMPLETE - TURAS V10.2 (REFACTORED)\n")
-  cat(paste(rep("=", 80), collapse=""), "\n\n")
-
-  if (analysis_result$run_status == "PARTIAL") {
-    cat("  TRS Status: PARTIAL (see Run_Status sheet for details)\n")
-    if (length(analysis_result$skipped_questions) > 0) {
-      cat(sprintf("  Questions skipped: %d\n", length(analysis_result$skipped_questions)))
-    }
-    if (length(analysis_result$partial_questions) > 0) {
-      cat(sprintf("  Questions with missing sections: %d\n", length(analysis_result$partial_questions)))
-    }
-  } else {
-    cat("  TRS Status: PASS\n")
-  }
-  cat("\n")
-}
-
-cat("  Project:", workbook_result$project_name, "\n")
-cat("  Questions:", length(analysis_result$all_results), "\n")
-cat("  Responses:", nrow(data_result$survey_data), "\n")
-
-if (config_result$config_obj$apply_weighting) {
-  cat("  Weighting:", config_result$config_obj$weight_variable, "\n")
-  cat("  Effective N:", data_result$effective_n, "\n")
-}
-
-cat("  Significance:", if (config_result$config_obj$enable_significance_testing) "ENABLED" else "disabled", "\n")
-if (config_result$config_obj$enable_significance_testing) {
-  cat("  Alpha (p-value):", sprintf("%.3f", config_result$config_obj$alpha), "\n")
-}
-cat("  Output:", workbook_result$output_path, "\n")
-cat("  Duration:", format_seconds(as.numeric(elapsed)), "\n")
-
-if (nrow(analysis_result$error_log) > 0) {
-  cat("  Issues:", nrow(analysis_result$error_log), "(see Error Log)\n")
-}
-
-cat("\n")
-cat("TURAS Tabs V10.8.1\n")
-cat("\n")
-cat(paste(rep("=", 80), collapse=""), "\n")
 
 # ==============================================================================
 # STATS PACK HELPER
@@ -852,6 +878,92 @@ generate_tabs_stats_pack <- function(config_result, data_result,
 
   output_path
 }
+
+# ==============================================================================
+# STEP 4c: GENERATE STATS PACK
+# ==============================================================================
+
+stats_pack_file <- NULL
+generate_stats_pack_flag <- isTRUE(
+  toupper(config_result$config_obj$generate_stats_pack %||% "Y") == "Y"
+) || isTRUE(getOption("turas.generate_stats_pack", FALSE))
+
+if (generate_stats_pack_flag && exists("turas_write_stats_pack", mode = "function")) {
+  stats_pack_file <- tryCatch({
+    generate_tabs_stats_pack(
+      config_result  = config_result,
+      data_result    = data_result,
+      analysis_result = analysis_result,
+      workbook_result = workbook_result,
+      start_time     = start_time,
+      script_version = SCRIPT_VERSION
+    )
+  }, error = function(e) {
+    cat(sprintf("\n[WARNING] Stats pack generation failed: %s\n", conditionMessage(e)))
+    NULL
+  })
+  if (!is.null(stats_pack_file)) {
+    cat(sprintf("  Stats Pack: %s\n", basename(stats_pack_file)))
+  }
+}
+
+# ==============================================================================
+# STEP 5: COMPLETION SUMMARY
+# ==============================================================================
+
+elapsed <- difftime(Sys.time(), start_time, units = "secs")
+
+# Get run result for final banner
+run_result <- workbook_result$run_result
+
+# Print final banner
+if (!is.null(run_result) && exists("turas_print_final_banner", mode = "function")) {
+  turas_print_final_banner(run_result)
+} else {
+  cat("\n")
+  cat(paste(rep("=", 80), collapse=""), "\n")
+  cat("ANALYSIS COMPLETE - TURAS V10.2 (REFACTORED)\n")
+  cat(paste(rep("=", 80), collapse=""), "\n\n")
+
+  if (analysis_result$run_status == "PARTIAL") {
+    cat("  TRS Status: PARTIAL (see Run_Status sheet for details)\n")
+    if (length(analysis_result$skipped_questions) > 0) {
+      cat(sprintf("  Questions skipped: %d\n", length(analysis_result$skipped_questions)))
+    }
+    if (length(analysis_result$partial_questions) > 0) {
+      cat(sprintf("  Questions with missing sections: %d\n", length(analysis_result$partial_questions)))
+    }
+  } else {
+    cat("  TRS Status: PASS\n")
+  }
+  cat("\n")
+}
+
+cat("  Project:", workbook_result$project_name, "\n")
+cat("  Questions:", length(analysis_result$all_results), "\n")
+cat("  Responses:", nrow(data_result$survey_data), "\n")
+
+if (config_result$config_obj$apply_weighting) {
+  cat("  Weighting:", config_result$config_obj$weight_variable, "\n")
+  cat("  Effective N:", data_result$effective_n, "\n")
+}
+
+cat("  Significance:", if (config_result$config_obj$enable_significance_testing) "ENABLED" else "disabled", "\n")
+if (config_result$config_obj$enable_significance_testing) {
+  cat("  Alpha (p-value):", sprintf("%.3f", config_result$config_obj$alpha), "\n")
+}
+cat("  Output:", workbook_result$output_path, "\n")
+cat("  Duration:", format_seconds(as.numeric(elapsed)), "\n")
+
+if (nrow(analysis_result$error_log) > 0) {
+  cat("  Issues:", nrow(analysis_result$error_log), "(see Error Log)\n")
+}
+
+cat("\n")
+cat("TURAS Tabs V10.8.1\n")
+cat("\n")
+cat(paste(rep("=", 80), collapse=""), "\n")
+
 
 # ==============================================================================
 # END OF SCRIPT

@@ -477,6 +477,46 @@ generate_crosstab_config_template <- function(output_path,
       )
     ),
 
+    # ---- DATA-CENTRIC REPORT v2 (OPTIONAL, ADDITIVE) ----
+    list(
+      section_name = "DATA-CENTRIC REPORT V2 (OPTIONAL)",
+      fields = list(
+        list(name = "html_report_v2", default = "FALSE", required = FALSE,
+             description = paste0("Also build the interactive, self-contained data-centric report v2 ",
+               "(live audience filter, custom banners, confidence intervals). Additive: the classic ",
+               "Excel/HTML outputs are unchanged. See docs/11_DATA_CENTRIC_REPORT_V2.md."),
+             valid_values_text = "TRUE or FALSE",
+             dropdown = c("TRUE", "FALSE")),
+        list(name = "sampling_method", default = "Not_Specified", required = FALSE,
+             description = paste0("Sample design — drives honest confidence vocabulary in the v2 report ",
+               "(probability designs speak confidence intervals / margin of error; otherwise stability ",
+               "intervals / point estimates)."),
+             valid_values_text = "Not_Specified, Random, Stratified, Cluster, Census, Convenience, Quota",
+             dropdown = c("Not_Specified", "Random", "Stratified", "Cluster",
+                          "Census", "Convenience", "Quota")),
+        list(name = "wave", default = "", required = FALSE,
+             description = "Wave label shown in the v2 report header and used as the tracking trend label (e.g. Wave 25 - May 2026).",
+             valid_values_text = "Free text, or leave blank"),
+        list(name = "html_report_v2_tracking", default = "FALSE", required = FALSE,
+             description = paste0("Add a Tracking tab to the v2 report, built from anonymised per-wave ",
+               "microdata. Requires html_report_v2=TRUE and a waves_source with prior waves' ",
+               "contributions. The standalone tracker module is unaffected."),
+             valid_values_text = "TRUE or FALSE",
+             dropdown = c("TRUE", "FALSE")),
+        list(name = "waves_source", default = "", required = FALSE,
+             description = "Folder holding prior waves' *_wave.json tracking contributions (each wave's own tabs run writes one). Blank -> no history, Tracking tab stays hidden.",
+             valid_values_text = "Folder path, or leave blank"),
+        list(name = "wave_order", default = "", required = FALSE,
+             description = "Numeric x-axis order key for this wave (e.g. 2025.5 so two same-year waves never collide). Blank -> a 4-digit year is parsed from the wave label.",
+             valid_values_text = "Number (e.g. 2026 or 2025.5), or leave blank"),
+        list(name = "question_mapping", default = "", required = FALSE,
+             description = paste0("Path to the classic tracker's Question_Mapping.xlsx. Links waves by a ",
+               "canonical key (robust to question renames) + curates which metrics track. Blank -> ",
+               "auto-detected in waves_source, else metrics match by question title."),
+             valid_values_text = "File path, or leave blank to auto-detect")
+      )
+    ),
+
     # ---- ROW DESCRIPTORS ----
     list(
       section_name = "ROW DESCRIPTORS (HTML Report)",

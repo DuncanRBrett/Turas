@@ -220,6 +220,32 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
 
     # V10.3 HTML Report settings
     html_report = safe_logical(get_config_value(config, "html_report", FALSE)),
+
+    # V11 data-centric report (data-layer JSON for the v2 renderer).
+    # Additive: when TRUE, a *_data.json island is written alongside the
+    # existing Excel/HTML outputs. Old paths are untouched when FALSE.
+    html_report_v2 = safe_logical(get_config_value(config, "html_report_v2", FALSE)),
+    # V11 tabs-integrated tracker (OFF by default). When TRUE AND a waves_source
+    # resolves, the v2 report gains a Tracking tab built from anonymised per-wave
+    # microdata. Independent of the standalone tracker module, which is untouched.
+    html_report_v2_tracking = safe_logical(get_config_value(config, "html_report_v2_tracking", FALSE)),
+    # Folder holding prior waves' *_wave.json tracking contributions (emitted by
+    # each wave's own tabs run). Empty -> no history, Tracking tab stays hidden.
+    waves_source = get_config_value(config, "waves_source", ""),
+    # Optional classic-tracker Question_Mapping workbook: links waves by a
+    # canonical key (robust to renames) + curates which metrics track. Empty ->
+    # the tabs-tracker falls back to matching metrics by question title.
+    question_mapping = get_config_value(config, "question_mapping", ""),
+    # Numeric x-axis order key for this wave (e.g. 2025 or 2025.5 for twice-yearly
+    # so two same-year waves never collide). Blank -> derived from the wave label.
+    wave_order = get_config_value(config, "wave_order", ""),
+    # Sample design — drives honest confidence vocabulary in the v2 report
+    # (probability designs speak CI/MOE; non-probability designs speak the
+    # softened SI/PE). Cautious default: Not_Specified -> SI/PE.
+    sampling_method = get_config_value(config, "sampling_method", "Not_Specified"),
+    # Optional wave label shown in the v2 report header (e.g. "Annual 2025").
+    wave = get_config_value(config, "wave", ""),
+
     brand_colour = get_config_value(config, "brand_colour", "#323367"),
     accent_colour = get_config_value(config, "accent_colour", "#CC9900"),
     project_title = get_config_value(config, "project_title", NULL),
@@ -495,6 +521,44 @@ load_qualitative_sheet <- function(config_file) {
 # ==============================================================================
 
 #' Load Complete Crosstabs Configuration
+#' Resolve the tabs-tracker Question_Mapping path (explicit or auto-detected)
+#'
+#' An explicit `question_mapping` is tried as-is, then relative to the project
+#' root and the config directory. When blank, a `*Question_Mapping*.xlsx` is
+#' auto-detected in `waves_source`, the project root, or the config directory —
+#' so pointing `waves_source` at a tracker's Crosswave folder is enough.
+#'
+#' @param raw_path The configured question_mapping value (may be blank)
+#' @param waves_source The configured waves_source folder (may be blank)
+#' @param project_root Project root directory
+#' @param config_file The config file path (its directory is searched too)
+#' @return An absolute path to a readable mapping workbook, or "" if none
+#' @keywords internal
+resolve_question_mapping <- function(raw_path, waves_source, project_root, config_file) {
+  raw_path <- as.character(raw_path %||% "")
+  if (nzchar(raw_path)) {
+    rp <- normalize_path_separators(raw_path)
+    for (cand in c(rp, file.path(project_root, rp), file.path(dirname(config_file), rp))) {
+      if (file.exists(cand)) return(normalizePath(cand))
+    }
+    cat(sprintf("  [WARNING] question_mapping not found (tracking falls back to title match): %s\n",
+                raw_path))
+    return("")
+  }
+  dirs <- c(as.character(waves_source %||% ""), project_root, dirname(config_file))
+  for (d in dirs) {
+    if (!nzchar(d) || !dir.exists(d)) next
+    hit <- list.files(d, pattern = "Question_Mapping.*\\.xlsx$",
+                      full.names = TRUE, ignore.case = TRUE)
+    if (length(hit) > 0) {
+      cat(sprintf("  Question mapping auto-detected: %s\n", basename(hit[1])))
+      return(normalizePath(hit[1]))
+    }
+  }
+  ""
+}
+
+
 #'
 #' Main entry point for loading all configuration.
 #' Loads settings, builds config object, and returns all needed paths.
@@ -545,7 +609,9 @@ load_crosstabs_config <- function(config_file) {
     # Stats pack
     "generate_stats_pack",
     # HTML report
-    "html_report", "brand_colour", "accent_colour", "project_title", "project_name",
+    "html_report", "html_report_v2", "html_report_v2_tracking",
+    "waves_source", "question_mapping", "wave_order", "sampling_method", "wave",
+    "brand_colour", "accent_colour", "project_title", "project_name",
     "company_name", "client_name",
     "researcher_logo_path", "client_logo_path", "logo_path",
     "chart_bar_colour", "chart_palette_preset",
@@ -630,6 +696,12 @@ load_crosstabs_config <- function(config_file) {
   # Legacy single logo_path: used as researcher logo fallback
   config_obj$logo_path <- resolve_logo_path(
     config_obj$logo_path, "Logo")
+
+  # Resolve the tabs-tracker question mapping: an explicit path (absolute, or
+  # relative to the project root / config dir), else auto-detected — a
+  # *Question_Mapping*.xlsx in waves_source, the project root, or the config dir.
+  config_obj$question_mapping <- resolve_question_mapping(
+    config_obj$question_mapping, config_obj$waves_source, project_root, config_file)
 
   # Build output path
   output_path <- get_output_path(

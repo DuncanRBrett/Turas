@@ -48,6 +48,202 @@ for (const c of TR.selftest2.cases()) run(c.name, c.fn);
 
 console.log("Node-only suite:");
 
+run("no-banner (Total-only) report validates and renders without crashing", () => {
+  // Regression: a survey with no banner cuts. boot used to do
+  // banner_groups[0].id unconditionally and threw on the empty array.
+  const noBannerAgg = {
+    schema_version: 2,
+    project: { name: "Total Only", low_base_threshold: 30,
+      sampling_method: "Not_Specified", tracking: { enabled: false } },
+    columns: [{ key: "TOTAL::Total", group: "total", label: "Total", letter: "" }],
+    banner_groups: [],
+    categories: ["Cat"],
+    questions: [{
+      code: "Q1", title: "Q1", category: "Cat", type: "scale",
+      bases: [{ n: 60, low: false }],
+      rows: [
+        { kind: "category", label: "Poor", pct: [20], n: [12], sig: [""] },
+        { kind: "category", label: "Good", pct: [80], n: [48], sig: [""] },
+        { kind: "mean", label: "Mean", pct: [7.4], n: [null], sig: [""] }
+      ]
+    }]
+  };
+  const saved = { agg: TR.AGG, micro: TR.MICRO, prev: TR.PREV, idx: TR.d2._qIndex };
+  try {
+    TR.AGG = noBannerAgg; TR.MICRO = null; TR.PREV = null; TR.d2._qIndex = null;
+    assert(TR.d2.validate(noBannerAgg, null, null).ok, "no-banner agg should validate");
+    // boot's fallback for no groups is "" — which must match no column group
+    const defBanner = (noBannerAgg.banner_groups && noBannerAgg.banner_groups.length)
+      ? noBannerAgg.banner_groups[0].id : "";
+    assert(defBanner === "", 'no-banner default should be ""');
+    assert(TR.d2.groupCols("").length === 0, 'groupCols("") should be empty');
+    const m = TR.model.forQuestion("Q1", defBanner, []);
+    assert(m && m.columns.length === 1, "expected a single Total column");
+    assert(m.columns[0].label === "Total", "the only column should be Total");
+    assert(m.rows.length === 3 && m.rows[0].cells.length === 1, "Total-only cells");
+  } finally {
+    TR.AGG = saved.agg; TR.MICRO = saved.micro; TR.PREV = saved.prev; TR.d2._qIndex = saved.idx;
+  }
+});
+
+run("weighted recompute: weighted %, Kish effective base, weighted mean (known answers)", () => {
+  // 4 respondents, weights [3,1,1,1].
+  //   Q1 single Yes/No, answers [0,0,1,1]: Yes Σw = 3+1 = 4, No = 1+1 = 2,
+  //     wbase = 6 -> Yes 66.667%. Kish n_eff = 6^2 / (9+1+1+1) = 36/12 = 3.
+  //   Q2 scale rows 1/2/3 + Mean, index_scores {1,2,3}, answers [0,2,2,1]:
+  //     weighted mean = (3*1 + 1*3 + 1*3 + 1*2) / 6 = 11/6.
+  const agg = { schema_version: 2,
+    project: { name: "W", low_base_threshold: 1, alpha: 0.05, tracking: { enabled: false } },
+    columns: [{ key: "TOTAL::Total", group: "total", label: "Total", letter: "" }],
+    banner_groups: [], categories: ["c"],
+    questions: [
+      { code: "Q1", title: "Q1", category: "c", type: "single", bases: [{ n: 4, low: false }],
+        rows: [{ kind: "category", label: "Yes", pct: [66.7], n: [4], sig: [""] },
+               { kind: "category", label: "No", pct: [33.3], n: [2], sig: [""] }] },
+      { code: "Q2", title: "Q2", category: "c", type: "scale", bases: [{ n: 4, low: false }],
+        index_scores: { "1": 1, "2": 2, "3": 3 },
+        rows: [{ kind: "category", label: "1", pct: [25], n: [1], sig: [""] },
+               { kind: "category", label: "2", pct: [25], n: [1], sig: [""] },
+               { kind: "category", label: "3", pct: [50], n: [2], sig: [""] },
+               { kind: "mean", label: "Mean", pct: [2], n: [null], sig: [""] }] }
+    ] };
+  const saved = { agg: TR.AGG, micro: TR.MICRO, prev: TR.PREV, idx: TR.d2._qIndex };
+  try {
+    TR.AGG = agg; TR.PREV = null; TR.d2._qIndex = null;
+    TR.MICRO = { n: 4, answers: { Q1: [0, 0, 1, 1], Q2: [0, 2, 2, 1] }, banner_vars: {}, weights: [3, 1, 1, 1] };
+    const total = [{ label: "Total", member: null }], mask = new Uint8Array(4).fill(1);
+    const t = TR.stats.tabulate(agg.questions[0], total, mask)[0];
+    assert(t.base === 4, "unweighted base 4");
+    assert(t.wbase === 6, "weighted base Σw = 6");
+    assert(t.counts[0] === 4, "Yes weighted count 4");
+    assert(Math.abs(t.effBase - 3) < 1e-9, "Kish effBase 36/12 = 3");
+    assert(Math.abs(TR.stats.pct(t, 0) - (4 / 6 * 100)) < 1e-9, "Yes weighted % 66.667");
+    const m = TR.stats.indexMeans(agg.questions[1], total, mask)[0];
+    assert(Math.abs(m.mean - 11 / 6) < 1e-9, "Q2 weighted mean 11/6");
+    assert(Math.abs(m.k - 3) < 1e-9, "Q2 mean effBase 3");
+    // Invariant: with no weights, wbase === base === effBase === count
+    TR.MICRO = { n: 4, answers: { Q1: [0, 0, 1, 1], Q2: [0, 2, 2, 1] }, banner_vars: {} };
+    const u = TR.stats.tabulate(agg.questions[0], total, mask)[0];
+    assert(u.base === u.wbase && u.wbase === u.effBase && u.effBase === 4,
+      "unweighted: base = wbase = effBase = 4");
+  } finally {
+    TR.AGG = saved.agg; TR.MICRO = saved.micro; TR.PREV = saved.prev; TR.d2._qIndex = saved.idx;
+  }
+});
+
+run("microdata scores: means recompute from per-respondent scores (hidden categories + NPS)", () => {
+  // Q1 rating publishes ONLY a Mean (all categories hidden — no category rows);
+  //   the per-respondent scores [4,7,9] still give mean (4+7+9)/3 = 6.6667.
+  // Q2 NPS scores via ±100 mapping [100,100,-100] -> (100+100-100)/3 = 33.33.
+  const agg = { schema_version: 2,
+    project: { name: "S", low_base_threshold: 1, alpha: 0.05, tracking: { enabled: false } },
+    columns: [{ key: "TOTAL::Total", group: "total", label: "Total", letter: "" }],
+    banner_groups: [], categories: ["c"],
+    questions: [
+      { code: "Q1", title: "Q1", category: "c", type: "scale", bases: [{ n: 3, low: false }],
+        rows: [{ kind: "mean", label: "Mean", pct: [6.7], n: [null], sig: [""] }] },
+      { code: "Q2", title: "Q2", category: "c", type: "nps", bases: [{ n: 3, low: false }],
+        rows: [{ kind: "mean", label: "NPS Score", pct: [33], n: [null], sig: [""] }] }
+    ] };
+  const saved = { agg: TR.AGG, micro: TR.MICRO, prev: TR.PREV, idx: TR.d2._qIndex };
+  try {
+    TR.AGG = agg; TR.PREV = null; TR.d2._qIndex = null;
+    TR.MICRO = { n: 3, answers: { Q1: [null, null, null], Q2: [null, null, null] },
+      banner_vars: {}, weights: [1, 1, 1], scores: { Q1: [4, 7, 9], Q2: [100, 100, -100] } };
+    const total = [{ label: "Total", member: null }], mask = new Uint8Array(3).fill(1);
+    const m1 = TR.stats.indexMeans(agg.questions[0], total, mask)[0];
+    assert(Math.abs(m1.mean - 20 / 3) < 1e-9, "rating mean from scores = 6.667 (no category rows)");
+    const m2 = TR.stats.indexMeans(agg.questions[1], total, mask)[0];
+    assert(Math.abs(m2.mean - 100 / 3) < 1e-9, "NPS from ±100 scores = 33.33");
+  } finally {
+    TR.AGG = saved.agg; TR.MICRO = saved.micro; TR.PREV = saved.prev; TR.d2._qIndex = saved.idx;
+  }
+});
+
+run("weighted wave trend + canonical-key linkage (subprocess)", () => {
+  // Spawned in a fresh VM (the wave engine caches indexes per load, so a custom
+  // TR.PREV must not pollute the shared SACAP wave tests).
+  const res = spawnSync("node", [path.join(BASE, "tests", "wave_trends.mjs")],
+    { encoding: "utf8" });
+  assert(res.status === 0, "wave trends failed:\n" + res.stdout);
+});
+
+run("Report tab pre-fills Background / About from config report_meta (subprocess)", () => {
+  // Spawned fresh: report.store() memoises a per-page cache, so the override /
+  // cleared-field cases need an isolated VM each, mirroring one page load.
+  const res = spawnSync("node", [path.join(BASE, "tests", "report_prefill.mjs")],
+    { encoding: "utf8" });
+  assert(res.status === 0, "report pre-fill failed:\n" + res.stdout);
+});
+
+run("Tracking dual-significance: soft (80%) flagging in dual mode (subprocess)", () => {
+  const res = spawnSync("node", [path.join(BASE, "tests", "soft_sig.mjs")],
+    { encoding: "utf8" });
+  assert(res.status === 0, "soft-sig flagging failed:\n" + res.stdout);
+});
+
+run("Tracking Summary: 'Nearly significant' cards render in dual mode (subprocess)", () => {
+  const res = spawnSync("node", [path.join(BASE, "tests", "tracking_render.mjs")],
+    { encoding: "utf8" });
+  assert(res.status === 0, "tracking render failed:\n" + res.stdout);
+});
+
+run("box-category NETs recompute from per-respondent box membership", () => {
+  // A hidden-scale rating that publishes only its boxes: rows Low(0) / High(1) /
+  // NET POSITIVE(2) / Mean(3). boxes [0,1,0,1,null] -> Low 2/4=50%, High 50%,
+  // NET POSITIVE = High - Low = 0. Recomputes with no displayed category rows.
+  const agg = { schema_version: 2,
+    project: { name: "B", low_base_threshold: 1, alpha: 0.05, tracking: { enabled: false } },
+    columns: [{ key: "TOTAL::Total", group: "total", label: "Total", letter: "" }],
+    banner_groups: [], categories: ["c"],
+    questions: [{ code: "QB", title: "QB", category: "c", type: "scale",
+      bases: [{ n: 4, low: false }],
+      net_diffs: { "2": { plus: 1, minus: 0 } },
+      rows: [{ kind: "net", label: "Low", pct: [50], n: [null], sig: [""] },
+             { kind: "net", label: "High", pct: [50], n: [null], sig: [""] },
+             { kind: "net", label: "NET POSITIVE (High - Low)", pct: [0], n: [null], sig: [""] },
+             { kind: "mean", label: "Mean", pct: [3], n: [null], sig: [""] }] }] };
+  const saved = { agg: TR.AGG, micro: TR.MICRO, prev: TR.PREV, idx: TR.d2._qIndex };
+  try {
+    TR.AGG = agg; TR.PREV = null; TR.d2._qIndex = null;
+    TR.MICRO = { n: 4, answers: { QB: [null, null, null, null] }, banner_vars: {},
+      weights: [1, 1, 1, 1], boxes: { QB: [0, 1, 0, 1] } };
+    const m = TR.model.forQuestion("QB", "custom:QB", []);   // force a computed view
+    const tot = m.columns.findIndex(c => c.label === "Total");
+    const byLabel = (l) => m.rows.find(r => r.label === l).cells[tot].pct;
+    assert(Math.abs(byLabel("Low") - 50) < 1e-9, "Low box = 50%");
+    assert(Math.abs(byLabel("High") - 50) < 1e-9, "High box = 50%");
+    assert(Math.abs(byLabel("NET POSITIVE (High - Low)") - 0) < 1e-9, "NET POSITIVE = High - Low = 0");
+  } finally {
+    TR.AGG = saved.agg; TR.MICRO = saved.micro; TR.PREV = saved.prev; TR.d2._qIndex = saved.idx;
+  }
+});
+
+run("stacked chart export is transposed (segments=series, columns=bars)", () => {
+  // Regression: the PPTX stacked export reused the bar layout (rows as
+  // categories, one series per column), so each option rendered as its own
+  // 100% bar. A 100% stacked bar must transpose — columns are the bars,
+  // segments are the stacked series — matching render.stackedChart + the PNG.
+  const q = TR.AGG.questions.filter((x) => x.type === "scale")[0] || TR.AGG.questions[0];
+  const m = TR.model.forQuestion(q.code, TR.AGG.banner_groups[0].id, []);
+  const segs = TR.render.chartRows(m).rows.length;
+  const stacked = TR.exporter.buildChart(m, "stacked", [0]);
+  const bar = TR.exporter.buildChart(m, "bar", [0]);
+  assert(stacked, "stacked chart should build");
+  assert(/grouping val="percentStacked"/.test(stacked.xml), "stacked must be percentStacked");
+  const serCount = (stacked.xml.match(/<c:ser>/g) || []).length;
+  assert(serCount === segs, "stacked needs one series per segment; got " + serCount + " of " + segs);
+  const catCount = (stacked.xml.match(/<c:cat>[\s\S]*?ptCount val="(\d+)"/) || [])[1];
+  assert(catCount === "1", "Total-only stacked should have one category bar; got " + catCount);
+  assert(/<c:legend>/.test(stacked.xml), "stacked needs a legend to label its segments");
+  assert((bar.xml.match(/<c:ser>/g) || []).length === 1, "a plain bar over Total stays one series");
+  // segments use the brand ramp (mirrors render.stackedChart), not the
+  // categorical palette — which would inject the gold accent colour.
+  const accent = TR.charts.accentOf().replace("#", "").toUpperCase();
+  assert(!new RegExp('srgbClr val="' + accent + '"').test(stacked.xml),
+    "stacked segments must use the brand ramp, not the accent palette");
+});
+
 run("golden parity suite passes (subprocess)", () => {
   const res = spawnSync("node", [path.join(BASE, "tests", "golden_parity.mjs")],
     { encoding: "utf8" });
@@ -77,6 +273,28 @@ run("story deck -> structurally valid native pptx (python)", () => {
   const tmp = path.join(BASE, "tests", "tmp");
   mkdirSync(tmp, { recursive: true });
   const out = path.join(tmp, "v2_story.pptx");
+  writeFileSync(out, bytes);
+  const report = execFileSync("python3",
+    [path.join(path.dirname(BASE), "tests", "verify_pptx.py"), out], { encoding: "utf8" });
+  assert(report.startsWith("OK"), report);
+});
+
+run("dot-plot pin -> native shapes (no chart part), packs to valid pptx", () => {
+  // PowerPoint has no horizontal dot-plot chart type, so a dot pin renders as
+  // positioned ellipse shapes — one per category, no chart object — and the
+  // deck must still package and validate structurally.
+  const m = TR.model.forQuestion("Q008", TR.AGG.banner_groups[0].id, []);
+  const segs = TR.render.chartRows(m).rows.length;
+  const slide = TR.exporter.slideForModel(m, "dot note",
+    { chart: true, chartType: "dot", chartCols: [0], table: true, insight: true });
+  assert(slide.charts.length === 0, "a dot pin must not create a chart part");
+  assert(!/<c:chart /.test(slide.xml), "a dot pin must not embed a chart frame");
+  const dots = (slide.xml.match(/prst="ellipse"/g) || []).length;
+  assert(dots >= segs, "expected one dot per category; got " + dots + " of " + segs);
+  const bytes = TR.pptx.package([TR.exporter.titleSlide(1), slide], { project: TR.AGG.project });
+  const tmp = path.join(BASE, "tests", "tmp");
+  mkdirSync(tmp, { recursive: true });
+  const out = path.join(tmp, "v2_dotplot.pptx");
   writeFileSync(out, bytes);
   const report = execFileSync("python3",
     [path.join(path.dirname(BASE), "tests", "verify_pptx.py"), out], { encoding: "utf8" });

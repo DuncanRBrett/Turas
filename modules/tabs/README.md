@@ -44,6 +44,9 @@ Both template files are available in the `templates/` subfolder of this document
 -   Weighted data analysis with design effect (DEFF) calculations
 -   Banner breakout analysis across demographic segments
 -   Configurable Excel output with professional formatting
+-   Optional self-contained, interactive **data-centric report v2** (live audience
+    filter, custom banners, confidence intervals, and an optional Tracking tab) —
+    additive and off by default; see [11_DATA_CENTRIC_REPORT_V2.md](11_DATA_CENTRIC_REPORT_V2.md)
 
 ## Documentation
 
@@ -57,6 +60,7 @@ This documentation pack contains everything you need:
 | [05_TECHNICAL_DOCS.md](05_TECHNICAL_DOCS.md) | Developer and architecture reference |
 | [06_TEMPLATE_REFERENCE.md](06_TEMPLATE_REFERENCE.md) | Detailed template field specifications |
 | [07_EXAMPLE_WORKFLOWS.md](07_EXAMPLE_WORKFLOWS.md) | Real-world usage examples |
+| [11_DATA_CENTRIC_REPORT_V2.md](11_DATA_CENTRIC_REPORT_V2.md) | The interactive v2 report: options, TR.MICRO/tracking contracts, enabling, governance |
 
 ## Dependencies
 

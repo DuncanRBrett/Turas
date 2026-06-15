@@ -574,15 +574,13 @@ calculate_single_response_base <- function(data_subset, question_code, question_
 
   col_values <- data_subset[[question_code]]
 
-  # V9.9.2: Type-robust "has response" detection
+  # V10.8.2: Type-robust "has response" detection.
+  # Numeric: 0 is a real answer (e.g. a R0 spend or a 0 count) - only NA
+  # means no response. Previously 0 was treated as no-response, which
+  # understated bases while means/frequencies still included the zeros.
+  # Character: blank/whitespace-only means no response.
   if (is.numeric(col_values)) {
-    # For NPS and Rating questions, 0 may be a valid response
-    # Include 0 if it's a valid score on the scale
-    if (question_info$Variable_Type %in% c("NPS", "Rating", "Likert")) {
-      has_response <- !is.na(col_values)
-    } else {
-      has_response <- !is.na(col_values) & col_values != 0
-    }
+    has_response <- !is.na(col_values)
   } else {
     col_str <- trimws(as.character(col_values))
     has_response <- !is.na(col_str) & nzchar(col_str)
