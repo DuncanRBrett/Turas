@@ -77,9 +77,18 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
   # Build CSS
   css <- build_seg_css(brand_colour, accent_colour)
 
-  # Determine section visibility from config flags
-  show_rules <- isTRUE(config$html_show_rules) &&
-    !is.null(html_data$enhanced$classification_rules)
+  # Determine section visibility from config flags.
+  # NOTE: the orchestrator (R/00_main.R) stores enhanced features under
+  # enhanced$rules and enhanced$cards. The rules gate previously checked
+  # "classification_rules" (a key that never exists) AND defaulted to hidden,
+  # so the Rules section silently dropped even when generated — fixed here
+  # (default visible, consistent with cards: rules only exist when
+  # generate_rules = TRUE). The Segment Cards gate has the SAME wrong-key issue
+  # ("segment_cards"), but build_seg_cards_section also assumes a different card
+  # data shape than generate_segment_cards returns, so cards are left untouched
+  # and tracked separately rather than half-fixed into a page-assembly error.
+  show_rules <- isTRUE(config$html_show_rules %||% TRUE) &&
+    !is.null(html_data$enhanced$rules)
   show_cards <- isTRUE(config$html_show_cards %||% TRUE) &&
     !is.null(html_data$enhanced$segment_cards)
   show_gmm <- (html_data$method %in% c("gmm", "mclust")) &&

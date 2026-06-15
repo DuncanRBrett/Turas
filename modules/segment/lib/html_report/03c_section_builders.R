@@ -616,7 +616,7 @@ build_seg_rules_section <- function(tables, html_data) {
   title_row <- build_seg_section_title_row("Classification Rules", "rules")
   insight_area <- build_seg_insight_area("rules")
 
-  rules <- html_data$enhanced$classification_rules
+  rules <- html_data$enhanced$rules
 
   # Rules table
   table_el <- NULL

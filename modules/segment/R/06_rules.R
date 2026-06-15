@@ -147,11 +147,20 @@ extract_rules_from_tree <- function(tree, question_labels = NULL,
   # For each leaf, trace path back to root
   leaf_indices <- which(frame$var == "<leaf>")
 
+  # rpart class-tree yval2 layout: [ fitted class | counts(k) | probs(k) | nodeprob ]
+  # The columns are not named, so the class-probability block is selected
+  # positionally as (k+2):(2k+1) — deriving k from ncol (2k+2).
+  n_classes <- (ncol(frame$yval2) - 2L) %/% 2L
+  prob_cols <- if (n_classes >= 1L) (n_classes + 2L):(2L * n_classes + 1L) else integer(0)
+
   for (i in seq_along(leaf_indices)) {
     leaf_idx <- leaf_indices[i]
 
-    # Get predicted class for this leaf
-    predicted_class <- which.max(frame$yval2[leaf_idx, paste0("nodeprob.", 1:ncol(frame$yval2))])
+    # Get predicted class for this leaf. For an rpart classification tree the
+    # fitted class code (1-based index into the response levels) is frame$yval;
+    # the previous code indexed yval2 by column names ("nodeprob.N") that rpart
+    # never assigns, which threw "subscript out of bounds".
+    predicted_class <- as.integer(frame$yval[leaf_idx])
 
     # Get segment name
     if (!is.null(segment_names) && length(segment_names) >= predicted_class) {
@@ -171,11 +180,16 @@ extract_rules_from_tree <- function(tree, question_labels = NULL,
       rule_text <- sprintf("DEFAULT: %s", seg_name)
     }
 
-    # Get accuracy for this rule (proportion correctly classified at leaf)
+    # Get accuracy for this rule: the leaf's purity = probability of the fitted
+    # class = the max of the class-probability columns. (The previous code keyed
+    # off names matching "^prob", but rpart leaves yval2 columns unnamed, so it
+    # silently returned -Inf.)
     leaf_n <- frame$n[leaf_idx]
-    class_probs <- frame$yval2[leaf_idx, ]
-    max_prob <- max(class_probs[grep("^prob", names(class_probs))], na.rm = TRUE)
-    leaf_accuracy <- max_prob
+    leaf_accuracy <- if (length(prob_cols) && ncol(frame$yval2) >= max(prob_cols)) {
+      max(frame$yval2[leaf_idx, prob_cols])
+    } else {
+      NA_real_
+    }
 
     rules_text <- c(rules_text, rule_text)
     segment_accuracy <- c(segment_accuracy, leaf_accuracy)
