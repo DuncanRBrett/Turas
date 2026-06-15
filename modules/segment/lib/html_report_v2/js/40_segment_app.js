@@ -1,0 +1,163 @@
+/**
+ * Segment-native views for the data-centric report v2.
+ *
+ * This module is segment-SPECIFIC and layered ON TOP of the vendored engine
+ * (it is bundled after assets/js/*). It registers a host-app tab set + routes
+ * via TR.app (the backward-compatible seam in 24_shell.js), so the segment
+ * report opens reader-in (Overview → Profiles) instead of the engine's
+ * crosstab tabs. It reads the v2 data layer (TR.AGG): segments are the banner
+ * columns, each question is a profile variable carrying a single mean row.
+ *
+ * Presentation only — no statistics here. Charts/heatmap use plain HTML + the
+ * engine's CSS variables (var(--brand/--ink/--line/--green/--red/...)).
+ */
+(function (global) {
+  "use strict";
+  var TR = global.TR, fmt = TR.fmt;
+  var seg = TR.segViews = {};
+
+  function project()  { return (TR.AGG && TR.AGG.project) || {}; }
+  function columns()  { return (TR.AGG && TR.AGG.columns) || []; }
+  function questions(){ return (TR.AGG && TR.AGG.questions) || []; }
+  function dec1(v)    { return fmt.num(v, "dec1"); }
+
+  function totalIndex() {
+    var c = columns();
+    for (var i = 0; i < c.length; i++) if (c[i].group === "total") return i;
+    return 0;
+  }
+  function segIndexes() {
+    var out = [], c = columns();
+    for (var i = 0; i < c.length; i++) if (c[i].group === "segment") out.push(i);
+    return out;
+  }
+  // The single mean row each profile-variable question carries.
+  function meanRow(q) {
+    var rows = q.rows || [];
+    for (var i = 0; i < rows.length; i++) if (rows[i].kind === "mean") return rows[i];
+    return rows[0] || { pct: [] };
+  }
+  function baseN(colIdx) {
+    var q = questions()[0];
+    return (q && q.bases && q.bases[colIdx]) ? q.bases[colIdx].n : null;
+  }
+
+  // -------------------------------------------------------------------------
+  // Overview — reader-in segment scorecards
+  // -------------------------------------------------------------------------
+  seg.overview = function (host) {
+    var ti = totalIndex(), segs = segIndexes(), qs = questions();
+    var totalN = baseN(ti);
+
+    function gapLine(d, positive) {
+      var arrow = positive ? "▲" : "▼";
+      var colour = positive ? "var(--green)" : "var(--red)";
+      return '<li style="margin:2px 0">' +
+        '<span style="color:' + colour + ';font-weight:500">' + arrow + " " + dec1(d.sv) +
+        '</span> <span style="color:var(--muted)">vs ' + dec1(d.ov) + " overall</span> &mdash; " +
+        fmt.escapeHtml(d.title) + "</li>";
+    }
+
+    var cards = segs.map(function (si) {
+      var col = columns()[si], n = baseN(si);
+      var pct = (totalN && n != null) ? Math.round(n / totalN * 100) : null;
+      var diffs = qs.map(function (q) {
+        var r = meanRow(q), ov = r.pct[ti], sv = r.pct[si];
+        return { title: q.title || q.code, ov: ov, sv: sv,
+                 diff: (ov != null && sv != null) ? sv - ov : null };
+      }).filter(function (d) { return d.diff != null; })
+        .sort(function (a, b) { return b.diff - a.diff; });
+      var highs = diffs.slice(0, 2);
+      var lows  = diffs.slice(-2).reverse();
+
+      return '<div style="background:var(--card);border:1px solid var(--line);' +
+        'border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow)">' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">' +
+        '<span style="display:inline-flex;width:24px;height:24px;border-radius:6px;' +
+        'background:var(--brand);color:#fff;align-items:center;justify-content:center;' +
+        'font-weight:500;font-size:13px">' + fmt.escapeHtml(col.letter || "") + "</span>" +
+        '<h3 style="margin:0;font-size:16px;font-weight:500">' + fmt.escapeHtml(col.label) + "</h3></div>" +
+        '<div style="color:var(--muted);font-size:13px;margin:0 0 12px">' +
+        (n != null ? "n = " + fmt.num(n, "int") : "") +
+        (pct != null ? " &middot; " + pct + "% of sample" : "") + "</div>" +
+        '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin-bottom:2px">Stands out for</div>' +
+        '<ul style="margin:0 0 10px;padding-left:0;list-style:none;font-size:13px;line-height:1.45">' +
+        (highs.length ? highs.map(function (d) { return gapLine(d, true); }).join("") : "<li style=\"color:var(--muted)\">–</li>") + "</ul>" +
+        '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin-bottom:2px">Lags on</div>' +
+        '<ul style="margin:0;padding-left:0;list-style:none;font-size:13px;line-height:1.45">' +
+        (lows.length ? lows.map(function (d) { return gapLine(d, false); }).join("") : "<li style=\"color:var(--muted)\">–</li>") + "</ul>" +
+        "</div>";
+    }).join("");
+
+    host.innerHTML =
+      '<section style="padding:8px 0 24px">' +
+      '<h2 style="font-size:20px;font-weight:500;margin:8px 0 4px">' +
+        fmt.escapeHtml(project().name || "Segmentation") + "</h2>" +
+      '<p style="color:var(--muted);margin:0 0 18px;max-width:62ch;line-height:1.6">' +
+        segs.length + " segments" +
+        (totalN != null ? " from " + fmt.num(totalN, "int") + " respondents" : "") +
+        ". Each card shows the segment’s size and the variables where it most over- and " +
+        "under-indexes against the overall average. See the Profiles tab for the full matrix.</p>" +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px">' +
+        cards + "</div></section>";
+  };
+
+  // -------------------------------------------------------------------------
+  // Profiles — variables × segments heatmap (shaded vs the overall mean)
+  // -------------------------------------------------------------------------
+  function tint(diff, scaleMax) {
+    if (diff == null) return "";
+    var span = (scaleMax || 10) * 0.25;                 // ±25% of scale = full intensity
+    var a = Math.max(0, Math.min(1, Math.abs(diff) / span)) * 0.55;
+    var rgb = diff >= 0 ? "27,110,83" : "179,55,47";    // --green / --red
+    return "background:rgba(" + rgb + "," + a.toFixed(2) + ")";
+  }
+
+  seg.profiles = function (host) {
+    var ti = totalIndex(), segs = segIndexes(), cols = columns(), qs = questions();
+    var order = [ti].concat(segs);
+
+    var head = '<th style="text-align:left;position:sticky;left:0;background:var(--card);' +
+      'padding:8px 10px;border-bottom:2px solid var(--line)">Variable</th>' +
+      order.map(function (ci) {
+        var c = cols[ci];
+        return '<th style="padding:8px 10px;border-bottom:2px solid var(--line);' +
+          'font-weight:500;min-width:78px">' + fmt.escapeHtml(c.label) +
+          (c.letter ? ' <span style="color:var(--faint)">' + c.letter + "</span>" : "") + "</th>";
+      }).join("");
+
+    var body = qs.map(function (q) {
+      var r = meanRow(q), ov = r.pct[ti], sm = q.scale_max || 10;
+      var cells = order.map(function (ci) {
+        var v = r.pct[ci], isTotal = ci === ti;
+        var style = "padding:7px 10px;text-align:center;border-bottom:1px solid var(--line);" +
+          (isTotal ? "color:var(--muted);font-weight:500"
+                   : tint((v != null && ov != null) ? v - ov : null, sm));
+        return '<td style="' + style + '">' + dec1(v) + "</td>";
+      }).join("");
+      return '<tr><td style="text-align:left;position:sticky;left:0;background:var(--card);' +
+        'padding:7px 10px;border-bottom:1px solid var(--line)">' +
+        fmt.escapeHtml(q.title || q.code) + "</td>" + cells + "</tr>";
+    }).join("");
+
+    host.innerHTML =
+      '<section style="padding:8px 0 24px">' +
+      '<h2 style="font-size:20px;font-weight:500;margin:8px 0 4px">Segment profiles</h2>' +
+      '<p style="color:var(--muted);margin:0 0 14px;max-width:62ch;line-height:1.6">Mean score per ' +
+      'variable by segment. Cells are shaded green where a segment scores above the overall average ' +
+      'and red where it scores below; the Total column is the overall sample.</p>' +
+      '<div style="overflow:auto"><table style="border-collapse:collapse;font-size:13px;width:100%">' +
+      "<thead><tr>" + head + "</tr></thead><tbody>" + body + "</tbody></table></div></section>";
+  };
+
+  // -------------------------------------------------------------------------
+  // Register the host-app tab set. "report" has no route here, so it falls
+  // through to the engine's generic Report (metadata) tab.
+  // -------------------------------------------------------------------------
+  TR.app = {
+    tabs: [["seg_overview", "Overview"], ["seg_profiles", "Profiles"], ["report", "Report"]],
+    routes: { seg_overview: seg.overview, seg_profiles: seg.profiles },
+    defaultTab: "seg_overview"
+  };
+
+})(typeof window !== "undefined" ? window : globalThis);

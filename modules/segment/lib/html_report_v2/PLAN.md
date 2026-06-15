@@ -109,12 +109,19 @@ Also modes to cover later: **exploration** (k-selection) and **combined**
   NOTE: this first cut renders through the existing (crosstab-flavoured)
   Dashboard/Crosstabs views; sig is empty (no false claims); a "Segment sizes"
   question + diagnostics are deferred to the native views.
-- **Phase 3 — Vertical slice: native Profiles tab.** NEXT. Replace the
-  crosstab-flavoured views with a segment-native Profiles view (heatmap +
-  per-segment explorer + variable importance) and retarget `24_shell` tab
-  list/routing. Then pin → PNG → PPTX. (In-browser boot verification is
-  Duncan's launch step — the node gates confirm data + model only.)
-- **Phase 4 — Fan out** the remaining views + exploration/combined modes.
+- **Phase 3 — Native views (first cut DONE).** Added a backward-compatible
+  `TR.app` seam to `24_shell.js` (tab list / default tab / route precedence —
+  the one documented engine edit, see `assets/README.md`) and a segment-native
+  module `js/40_segment_app.js` (kept OUT of the vendored `assets/js/`). The
+  report now opens reader-in: **Overview** (segment scorecards — size + top
+  over/under-indexing variables) → **Profiles** (variables × segments heatmap,
+  shaded vs the overall mean) → **Report** (engine metadata tab). Verified
+  headless in node (seam registers; both views render expected content). Gates:
+  `test_report_v2_bundler.R`. STILL TODO in Phase 3: per-segment explorer +
+  variable-importance view, interactivity (click-to-drill), pin → PNG → PPTX,
+  and an in-browser boot check (Duncan's launch step).
+- **Phase 4 — Fan out** the remaining views (Quality/validation, sizes,
+  vulnerability, golden questions) + exploration/combined modes.
 - **Phase 5 — Parity, gates, review.** Self-test cases, golden tests, the
   PowerPoint "Edit Data" round-trip test, production review, merge + GUI checkbox.
 - **Phase 6 — Extraction.** Promote the proven-generic core into a shared

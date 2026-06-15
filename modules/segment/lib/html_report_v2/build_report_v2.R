@@ -47,8 +47,17 @@ seg_bundle_report_v2_js <- function(assets_dir = seg_report_v2_assets_dir()) {
     stop(sprintf("[IO_REPORT_V2_JS_MISSING] renderer module(s) missing from %s: %s",
                  js_dir, paste(missing, collapse = ", ")))
   }
-  bundle <- paste(vapply(file.path(js_dir, ordered), read_text, character(1)),
-                  collapse = "\n\n")
+
+  # Segment-specific modules (the native views) live OUTSIDE the vendored
+  # assets/js/ so that dir stays a pristine 0-drift copy of the engine. They are
+  # appended LAST so they can register TR.app after the engine defines TR.*.
+  seg_js_dir <- file.path(dirname(assets_dir), "js")
+  seg_paths <- if (dir.exists(seg_js_dir)) {
+    sort(list.files(seg_js_dir, pattern = "\\.js$", full.names = TRUE))
+  } else character(0)
+
+  all_paths <- c(file.path(js_dir, ordered), seg_paths)
+  bundle <- paste(vapply(all_paths, read_text, character(1)), collapse = "\n\n")
   if (grepl("</script", bundle, fixed = TRUE)) {
     stop("[CFG_REPORT_V2_JS_EMBED] renderer JS contains '</script' — cannot inline safely.")
   }

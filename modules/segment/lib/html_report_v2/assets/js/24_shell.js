@@ -11,6 +11,11 @@
 
   /** Tab list; Tracking only appears when a prior wave is configured. */
   function tabList() {
+    // App extension point: a host module (e.g. segmentation) may supply its own
+    // tab set via TR.app.tabs. Backward-compatible — absent TR.app, the default
+    // crosstab tabs are returned unchanged. (Upstream this seam to the tabs/
+    // prototype copy at the Phase-6 platform extraction to restore 0-drift.)
+    if (TR.app && Array.isArray(TR.app.tabs) && TR.app.tabs.length) return TR.app.tabs;
     var tabs = [
       ["dashboard", "Dashboard"],
       ["crosstabs", "Crosstabs"],
@@ -39,6 +44,12 @@
     d2.decodeHash(location.hash);
     if (!d2.questionByCode(d2.state.activeQ)) {
       d2.state.activeQ = agg.questions[0].code;
+    }
+    // App extension: default the active tab into a host app's tab set (the
+    // engine's "dashboard" default is not among custom tabs like segmentation's).
+    if (TR.app && TR.app.defaultTab) {
+      var appIds = tabList().map(function (t) { return t[0]; });
+      if (appIds.indexOf(d2.state.tab) < 0) d2.state.tab = TR.app.defaultTab;
     }
     document.title = agg.project.name + " — Turas Report v2";
     applyTheme();
@@ -125,6 +136,10 @@
       btn.setAttribute("aria-selected",
         String(btn.getAttribute("data-tab") === d2.state.tab));
     });
+    // App extension: host-supplied routes take precedence (segmentation's native
+    // views). Falls through to the engine's own tabs when not matched.
+    var appRoute = TR.app && TR.app.routes && TR.app.routes[d2.state.tab];
+    if (appRoute) { appRoute(host); d2.pushHash(); return; }
     if (d2.state.tab === "crosstabs") TR.cards2.renderTab(host);
     else if (d2.state.tab === "dashboard") TR.views.dashboard(host);
     else if (d2.state.tab === "moved") TR.views.whatMoved(host);

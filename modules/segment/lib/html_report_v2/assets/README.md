@@ -22,12 +22,22 @@ lead copy. If the engine changes there (or in the prototype), re-copy here. A
 0-drift check should diff segment's `js/` against the tabs copy (the tabs build
 already gates 0-drift against the prototype).
 
-## Do not hand-edit
+## Do not hand-edit (one documented exception)
 
 These are the shared engine. Segment-specific behaviour belongs in segment's own
-modules layered on top (and ultimately in the extracted platform's extension
-points), **not** in forks of these files — forking here is exactly the drift the
-extraction phase exists to prevent.
+modules layered on top, **not** in forks of these files — forking here is exactly
+the drift the extraction phase exists to prevent.
+
+Segment-native code therefore lives **outside** this `assets/js/` dir, in
+`../js/` (e.g. `40_segment_app.js`); the bundler appends it after the engine.
+
+**The one allowed engine edit** is a backward-compatible *seam* in `js/24_shell.js`:
+`tabList()` / `shell.boot` / `shell.route` now consult an optional `TR.app`
+(`{tabs, routes, defaultTab}`) that a host module supplies, and otherwise behave
+exactly as before. This is a generic platform extension point, not segment logic.
+It means `24_shell.js` currently differs from the tabs copy — **upstream this seam
+to the tabs/prototype copy at the Phase-6 extraction to restore 0-drift.** All
+other files here must stay byte-identical to the tabs copy.
 
 ## What's wired today
 
