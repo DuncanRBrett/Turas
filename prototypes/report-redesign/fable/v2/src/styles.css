@@ -239,6 +239,8 @@ table.moved { border-collapse: collapse; width: 100%; font-size: 12.5px; margin-
 .sigcard.down .sig-dir { color: var(--red); }
 .sigcard .sig-title, .sigcard .sig-metric { font-size: 12px; font-weight: 600; color: var(--ink); }
 .sigcard .sig-detail { font-size: 11px; color: var(--muted); }
+.sigcard.soft { border-style: dashed; background: #fffdf7; }
+.sigcard .sig-badge { font-size: 9.5px; font-weight: 700; color: #9a7400; background: #fdf3df; border-radius: 6px; padding: 1px 5px; vertical-align: middle; }
 .moved.trk td.cb-g { background: #e4efe8; }
 .moved.trk td.cb-a { background: #fdf3df; }
 .moved.trk td.cb-r { background: #f9ecea; }

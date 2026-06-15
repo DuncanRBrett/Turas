@@ -73,7 +73,9 @@
 
   /* ---------------- pulse + significant changes ---------------- */
 
-  function sigChanges() {
+  /** Changes (metric × segment) whose latest cell passes `pick`, sorted
+   *  increases-first then by magnitude. pick = strong (sig_prev) or soft. */
+  function changeCards(pick) {
     var trk = TR.trk;
     var segs = [{ norm: "", label: "Total" }].concat(
       TR.waves.segments().map(function (s) {
@@ -85,7 +87,7 @@
       segs.forEach(function (seg) {
         var cells = trk.points(m, seg.norm || null);
         var last = lastCell(cells);
-        if (!last || !last.sig_prev) return;
+        if (!last || !pick(last)) return;
         out.push({ metric: m, segment: seg.label,
           change: last.change_prev, prev: cells[cells.length - 2],
           cur: last });
@@ -97,15 +99,20 @@
     });
     return out;
   }
+  function sigChanges() { return changeCards(function (l) { return l.sig_prev; }); }
+  function softChanges() { return changeCards(function (l) { return l.soft_prev; }); }
 
-  function sigCardHtml(c) {
+  function sigCardHtml(c, soft) {
     var trk = TR.trk;
+    var arrow = c.change >= 0 ? (soft ? "△" : "▲") : (soft ? "▽" : "▼");
     return '<button class="sigcard ' + (c.change >= 0 ? "up" : "down") +
+      (soft ? " soft" : "") +
       '" data-vis="' + c.metric.key + '" data-seglabel="' +
       fmt.escapeHtml(c.segment) + '">' +
-      '<span class="sig-dir">' + (c.change >= 0 ? "▲" : "▼") + " " +
+      '<span class="sig-dir">' + arrow + " " +
       trk.changeText(c.change, c.metric.isMean) + " · " +
-      fmt.escapeHtml(c.segment) + "</span>" +
+      fmt.escapeHtml(c.segment) +
+      (soft ? ' <span class="sig-badge">80%</span>' : "") + "</span>" +
       '<span class="sig-title">' +
       fmt.escapeHtml(TR.charts.clip(c.metric.title, 64)) + "</span>" +
       '<span class="sig-detail">' + c.metric.code + " · " +
@@ -242,10 +249,24 @@
       }).join("") + "</select></div>" +
       (changes.length ? "" :
         "<p class='trknote'>No significant wave-on-wave changes.</p>") +
-      '<div class="sigcards">' + shown.map(sigCardHtml).join("") + "</div>" +
+      '<div class="sigcards">' + shown.map(function (c) { return sigCardHtml(c); }).join("") +
+      "</div>" +
       (changes.length > 24 && !showAllSig
         ? '<button class="linklike" data-sigmore>Show all ' + changes.length +
           " significant changes</button>" : "") + "</div>");
+
+    // The 80% "nearly significant" moves as their own cards, so the pulse's
+    // "≈ N nearly significant" count is something you can actually inspect.
+    var softCards = TR.d2.state.sigMode === "dual" ? softChanges() : [];
+    if (softCards.length) {
+      html.push('<div class="card"><div class="heathead"><h3>Nearly significant ' +
+        "· 80% level · latest wave</h3></div>" +
+        "<p class='trknote'>Moved enough to clear the 80% threshold but not 95% " +
+        "— watch items, not confirmed shifts. Click one to visualise it.</p>" +
+        '<div class="sigcards">' +
+        softCards.map(function (c) { return sigCardHtml(c, true); }).join("") +
+        "</div></div>");
+    }
 
     html.push(matrixHtml());
     host.innerHTML = html.join("");
