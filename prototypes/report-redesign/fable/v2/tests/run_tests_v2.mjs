@@ -176,6 +176,12 @@ run("Report tab pre-fills Background / About from config report_meta (subprocess
   assert(res.status === 0, "report pre-fill failed:\n" + res.stdout);
 });
 
+run("Tracking dual-significance: soft (80%) flagging in dual mode (subprocess)", () => {
+  const res = spawnSync("node", [path.join(BASE, "tests", "soft_sig.mjs")],
+    { encoding: "utf8" });
+  assert(res.status === 0, "soft-sig flagging failed:\n" + res.stdout);
+});
+
 run("box-category NETs recompute from per-respondent box membership", () => {
   // A hidden-scale rating that publishes only its boxes: rows Low(0) / High(1) /
   // NET POSITIVE(2) / Mean(3). boxes [0,1,0,1,null] -> Low 2/4=50%, High 50%,

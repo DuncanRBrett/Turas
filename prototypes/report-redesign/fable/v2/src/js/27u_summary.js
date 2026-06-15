@@ -48,7 +48,7 @@
       '<span class="kpi-chg ' + (change >= 0 ? "up" : "down") + '">' +
       (change >= 0 ? "▲ +" : "▼ −") + Math.abs(change).toFixed(1) + " vs " +
       (card.cells.length > 1 ? trk.yLabel(card.cells[card.cells.length - 2].year) : "") +
-      (last.sig_prev ? " · sig" : "") + "</span>";
+      (last.sig_prev ? " · sig" : last.soft_prev ? " · sig 80%" : "") + "</span>";
     // interval in the tooltip: same SD source as the sig test (trk.sdAt)
     var sd = trk.sdAt(m, null, TR.render.currentYear());
     var bounds = sd === null || !last.base ? null
@@ -133,9 +133,11 @@
       }).join("") + "</select></div>" +
       "<p class='trknote'>One top-box NET per question. Cells show the " +
       "percentage-point change vs the previous wave with this segment; " +
-      "<strong>coloured = significant at 95%</strong>, grey = direction only, " +
-      "– = no history. Hover for the underlying values; click a metric to " +
-      "explore it across segments.</p>" +
+      "<strong>filled ▲▼ = significant at 95%</strong>, " +
+      (TR.d2.state.sigMode === "dual"
+        ? "hollow △▽ = significant at 80% (not 95%), " : "") +
+      "grey = direction only, – = no history. Hover for the underlying " +
+      "values; click a metric to explore it across segments.</p>" +
       '<div class="trkwrap"><table class="moved trk hm"><thead><tr><th>Metric</th>' +
       "<th class='wv'>Total</th>" + segs.map(function (s) {
         return "<th class='wv'>" + fmt.escapeHtml(TR.charts.clip(s.label, 16)) + "</th>";
@@ -146,13 +148,19 @@
         var last = lastCell(cells);
         if (!last || last.change_prev === null) return '<td class="wv none">–</td>';
         var prev = cells[cells.length - 2];
-        var cls = last.sig_prev
-          ? (last.change_prev >= 0 ? "hm-up" : "hm-down") : "hm-flat";
+        var dir = last.change_prev >= 0;
+        // strong (95%) = filled triangle + full colour; soft (80%, dual mode
+        // only) = hollow triangle + lighter "soft" tint; else direction-only.
+        var cls = last.sig_prev ? (dir ? "hm-up" : "hm-down")
+          : last.soft_prev ? (dir ? "hm-up soft" : "hm-down soft") : "hm-flat";
+        var mark = last.sig_prev ? (dir ? "▲" : "▼")
+          : last.soft_prev ? (dir ? "△" : "▽") : "";
+        var lvlTip = last.sig_prev ? " · significant at 95%"
+          : last.soft_prev ? " · significant at 80% (not 95%)" : " · not significant";
         return '<td class="wv ' + cls + '" title="' +
           trk.fmtVal(prev.value, false) + " (" + trk.yLabel(prev.year) + ") → " +
           trk.fmtVal(last.value, false) + " (" + trk.yLabel(last.year) + ")" +
-          (last.sig_prev ? " · significant at 95%" : " · not significant") + '">' +
-          (last.sig_prev ? (last.change_prev >= 0 ? "▲" : "▼") : "") +
+          lvlTip + '">' + mark +
           trk.changeText(last.change_prev, false).replace("pp", "") + "</td>";
       }).join("");
       html.push('<tr><td class="lab"><button class="linklike" data-seg-metric="' +
@@ -181,6 +189,17 @@
     var totalDown = changes.filter(function (c) {
       return c.segment === "Total" && c.change < 0;
     }).length;
+    // dual mode only: Total metrics that moved enough for 80% but not 95% —
+    // surfaced as a separate "nearly significant" tally so they no longer hide
+    // inside "stable" (soft_prev is false whenever sig_prev is true, so a
+    // strong move is never also counted here).
+    var totalSoft = TR.d2.state.sigMode === "dual"
+      ? trk.metricList("key").filter(function (m) { return !m.diff; })
+          .filter(function (m) {
+            var last = lastCell(trk.points(m, null));
+            return last && last.soft_prev;
+          }).length
+      : 0;
     var shown = showAllSig ? changes : changes.slice(0, 24);
     var segOptions = {};
     changes.forEach(function (c) { segOptions[c.segment] = true; });
@@ -197,7 +216,10 @@
     html.push('<div class="card"><div class="pulse">' +
       '<span class="pulse-chip up">▲ ' + totalUp + " significant increases</span>" +
       '<span class="pulse-chip down">▼ ' + totalDown + " significant decreases</span>" +
-      '<span class="pulse-chip">→ ' + Math.max(tested - totalUp - totalDown, 0) +
+      (totalSoft ? '<span class="pulse-chip soft">≈ ' + totalSoft +
+        " nearly significant (80%)</span>" : "") +
+      '<span class="pulse-chip">→ ' +
+      Math.max(tested - totalUp - totalDown - totalSoft, 0) +
       " stable</span>" +
       '<span class="trknote">Total only · all key metrics (means Welch-' +
       "tested on published-distribution SDs, %s pooled z) · latest wave vs " +

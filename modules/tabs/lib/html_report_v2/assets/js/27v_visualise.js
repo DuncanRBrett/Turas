@@ -155,21 +155,28 @@
     }
     var change = display === "prev" ? c.change_prev : c.change_base;
     var sig = display === "prev" ? c.sig_prev : c.sig_base;
+    var soft = display === "prev" ? c.soft_prev : c.soft_base;
     if (change === null || change === undefined) {
       return '<td class="wv none">·</td>';
     }
-    return '<td class="wv ' + (sig ? (change >= 0 ? "hm-up" : "hm-down") : "chg") +
+    var dir = change >= 0;
+    var cls = sig ? (dir ? "hm-up" : "hm-down")
+      : soft ? (dir ? "hm-up soft" : "hm-down soft") : "chg";
+    var mark = sig ? (dir ? "▲" : "▼") : soft ? (dir ? "△" : "▽") : "";
+    return '<td class="wv ' + cls +
       '" title="' + trk().fmtVal(c.value, metric.isMean) + " in " + c.year +
-      (sig ? " · significant at 95%" : "") + '">' +
-      (sig ? (change >= 0 ? "▲" : "▼") : "") +
-      trk().changeText(change, metric.isMean).replace("pp", "") + "</td>";
+      (sig ? " · significant at 95%"
+        : soft ? " · significant at 80% (not 95%)" : "") + '">' +
+      mark + trk().changeText(change, metric.isMean).replace("pp", "") + "</td>";
   }
 
   function changeChip(last, isMean) {
     if (!last || last.change_prev === null) return '<td class="wv dnone">–</td>';
     return '<td class="wv ' + (last.change_prev >= 0 ? "up" : "down") +
-      (last.sig_prev ? " dsig" : "") + '" title="latest vs previous wave' +
-      (last.sig_prev ? " · significant at 95%" : "") + '">' +
+      (last.sig_prev ? " dsig" : last.soft_prev ? " dsig soft" : "") +
+      '" title="latest vs previous wave' +
+      (last.sig_prev ? " · significant at 95%"
+        : last.soft_prev ? " · significant at 80% (not 95%)" : "") + '">' +
       (last.change_prev >= 0 ? "▲ +" : "▼ −") +
       Math.abs(last.change_prev).toFixed(isMean ? 1 : 0) +
       (isMean ? "" : "pp") + "</td>";
@@ -189,9 +196,13 @@
         return ((b.last && b.last.value) || -1e9) - ((a.last && a.last.value) || -1e9);
       });
     } else if (mode === "change") {
+      // rank strong (95%) above soft (80%) above direction-only; soft_prev is
+      // always false outside dual mode, so this is unchanged there.
+      var rank = function (x) {
+        return x && x.last ? (x.last.sig_prev ? 2 : x.last.soft_prev ? 1 : 0) : 0;
+      };
       entries.sort(function (a, b) {
-        var sa = a.last && a.last.sig_prev, sb = b.last && b.last.sig_prev;
-        if (sa !== sb) return sa ? -1 : 1;
+        if (rank(a) !== rank(b)) return rank(b) - rank(a);
         return Math.abs((b.last && b.last.change_prev) || 0) -
           Math.abs((a.last && a.last.change_prev) || 0);
       });

@@ -310,17 +310,26 @@
     return sdFromPairs(pairs);
   }
 
-  /** Two-sided 95% Welch test between two mean points carrying sd + base.
-   *  Same low-base exclusion as the proportion path. */
-  function meanSigBetween(a, b) {
+  /**
+   * Welch significance LEVEL between two mean points carrying sd + base:
+   *   2 = significant at 95% · 1 = significant at 80% (not 95%) · 0 = neither.
+   * Same low-base exclusion as the proportion path. The 80% band is the
+   * report's optional dual-significance level (95% + 80%); callers decide
+   * whether to surface it.
+   */
+  function meanLevel(a, b) {
     if (a.sd === null || a.sd === undefined ||
-        b.sd === null || b.sd === undefined) return false;
-    if (!a.base || !b.base) return false;
+        b.sd === null || b.sd === undefined) return 0;
+    if (!a.base || !b.base) return 0;
     var threshold = TR.AGG.project.low_base_threshold || 30;
-    if (a.base < threshold || b.base < threshold) return false;
+    if (a.base < threshold || b.base < threshold) return 0;
     var z = TR.stats.meanZ(a.value, a.sd, a.base, b.value, b.sd, b.base);
-    return z !== null && Math.abs(z) > 1.96;
+    if (z === null) return 0;
+    var az = Math.abs(z);
+    return az > TR.stats.Z95 ? 2 : az > TR.stats.Z80 ? 1 : 0;
   }
+  /** Strong (95%) Welch test — unchanged semantics for non-dual callers. */
+  function meanSigBetween(a, b) { return meanLevel(a, b) === 2; }
 
   /** Count for sig testing: published n (Total only), else pct-derived. */
   function countOf(waveQ, row, value, seg) {
@@ -332,16 +341,23 @@
     return base ? Math.round(value / 100 * base) : null;
   }
 
-  /** Two-sided 95% z-test between two series points (proportions only).
-   *  Bases under the low-base threshold are excluded, mirroring the
-   *  crosstab convention (weighting.R). */
-  function sigBetween(a, b) {
-    if (a.x === null || b.x === null || !a.base || !b.base) return false;
+  /**
+   * Pooled-z significance LEVEL between two series points (proportions):
+   *   2 = significant at 95% · 1 = significant at 80% (not 95%) · 0 = neither.
+   * Bases under the low-base threshold are excluded, mirroring the crosstab
+   * convention (weighting.R).
+   */
+  function propLevel(a, b) {
+    if (a.x === null || b.x === null || !a.base || !b.base) return 0;
     var threshold = TR.AGG.project.low_base_threshold || 30;
-    if (a.base < threshold || b.base < threshold) return false;
-    return TR.stats.propHigher(a.x, a.base, b.x, b.base) ||
-      TR.stats.propHigher(b.x, b.base, a.x, a.base);
+    if (a.base < threshold || b.base < threshold) return 0;
+    var z = TR.stats.propZ(a.x, a.base, b.x, b.base);
+    if (z === null) return 0;
+    var az = Math.abs(z);
+    return az > TR.stats.Z95 ? 2 : az > TR.stats.Z80 ? 1 : 0;
   }
+  /** Strong (95%) proportion test — unchanged semantics for non-dual callers. */
+  function sigBetween(a, b) { return propLevel(a, b) === 2; }
 
   /**
    * Trend series for a model row, Total (seg null) or one segment:
@@ -369,22 +385,31 @@
    * Proportions (canSig) use the pooled z; points carrying a
    * distribution-derived `sd` (means/indexes/NPS) use a Welch test;
    * NET POSITIVE (score difference) rows stay untested.
+   *
+   * sig_prev/sig_base stay the strong (95%) booleans — unchanged for every
+   * existing reader. With dual=true (the report's "95% + 80%" mode) each cell
+   * also carries soft_prev/soft_base: significant at 80% but NOT 95%, so the
+   * renderers can flag "nearly significant" moves with a lighter marker.
+   * dual is omitted (falsy) everywhere by default, so single-mode output is
+   * byte-identical to before.
    */
-  waves.cellsFor = function (points, canSig) {
-    var sig = function (a, b) {
-      if (canSig) return sigBetween(a, b);
-      if (a.sd !== undefined && a.sd !== null) return meanSigBetween(a, b);
-      return false;
+  waves.cellsFor = function (points, canSig, dual) {
+    var level = function (a, b) {
+      if (canSig) return propLevel(a, b);
+      if (a.sd !== undefined && a.sd !== null) return meanLevel(a, b);
+      return 0;
     };
     return points.map(function (p, i) {
       var prev = i > 0 ? points[i - 1] : null;
       var first = i > 0 ? points[0] : null;
+      var lp = prev ? level(p, prev) : 0;
+      var lb = first ? level(p, first) : 0;
       return { wave: p.wave, year: p.year, value: p.value, base: p.base,
         x: p.x, sd: p.sd, current: !!p.current,
         change_prev: prev ? p.value - prev.value : null,
-        sig_prev: prev ? sig(p, prev) : false,
+        sig_prev: lp === 2, soft_prev: !!dual && lp === 1,
         change_base: first ? p.value - first.value : null,
-        sig_base: first ? sig(p, first) : false };
+        sig_base: lb === 2, soft_base: !!dual && lb === 1 };
     });
   };
 

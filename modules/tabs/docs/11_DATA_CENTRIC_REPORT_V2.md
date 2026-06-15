@@ -94,6 +94,19 @@ Indices are zero-based positions into each question's `rows[]` array
 scale/NPS question as the shown-category mean path; `scores` is the robust path
 for hidden-category questions and is preferred when present.
 
+#### Dual significance on the Tracking tab (95% + 80%)
+
+The Tracking tab honours the report's significance selector (top of the
+Crosstabs tab). With **95% + 80%** chosen, every wave-on-wave comparison carries
+two flags instead of one: `sig_prev`/`sig_base` (significant at 95%, the solid
+▲▼ marker) and `soft_prev`/`soft_base` (significant at **80% but not 95%**, the
+hollow △▽ marker + a "nearly significant" pulse tally). The soft flags are only
+populated in dual mode, so the default **95%-only** report is unchanged. This
+catches real-but-noisy moves — e.g. an NPS that, at n≈60, has a ±28-point 95%
+margin, so a 25-point drop reads as nearly-significant rather than vanishing into
+"stable". The 80% level is the same one the crosstab tab marks with lowercase
+letters; thresholds are `stats.Z95` / `stats.Z80`.
+
 ### The tracking island contract (`TR.PREV`)
 
 ```jsonc

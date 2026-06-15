@@ -227,6 +227,7 @@ table.moved { border-collapse: collapse; width: 100%; font-size: 12.5px; margin-
 .pulse-chip { border-radius: 999px; padding: 5px 14px; font-size: 12.5px; font-weight: 700; background: var(--soft); color: var(--muted); }
 .pulse-chip.up { background: #e8f0eb; color: var(--green); }
 .pulse-chip.down { background: #f9ecea; color: var(--red); }
+.pulse-chip.soft { background: #fdf3df; color: #9a7400; }
 .sigcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 8px; margin-top: 10px; }
 .sigcard { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; text-align: left; background: #fff; cursor: pointer; display: flex; flex-direction: column; gap: 2px; font: inherit; }
 .sigcard:hover { border-color: var(--brand); }
@@ -272,6 +273,11 @@ table.trk.haspick th:nth-child(2), table.trk.haspick td:nth-child(2) { position:
 .moved.trk td.hm-up { background: #e8f0eb; color: var(--green); font-weight: 800; text-align: center; }
 .moved.trk td.hm-down { background: #f9ecea; color: var(--red); font-weight: 800; text-align: center; }
 .moved.trk td.hm-flat { color: var(--faint); text-align: center; }
+/* soft (80%, dual-sig mode only): lighter tint + thin ring so a "nearly
+   significant" cell reads one step below the solid 95% cell (hollow △▽ glyph). */
+.moved.trk td.hm-up.soft { background: #f1f7f3; color: var(--green); font-weight: 600; box-shadow: inset 0 0 0 1px #cfe3d6; }
+.moved.trk td.hm-down.soft { background: #fcf2f0; color: var(--red); font-weight: 600; box-shadow: inset 0 0 0 1px #eed5d0; }
+.moved.trk td.wv.dsig.soft { font-weight: 700; text-decoration-style: dotted; }
 .moved.trk tr.subrow td { border-top: none; padding-top: 0; font-size: 11px; color: var(--muted); }
 .moved.trk td.lab.sub { padding-left: 20px; font-size: 10.5px; color: var(--faint); }
 .moved.trk td.wv.sub.up { color: var(--green); }
