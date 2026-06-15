@@ -213,6 +213,7 @@
       "wave's published category distribution.</p>" +
       '<div class="kpis">' + cards.map(kpiCardHtml).join("") + "</div></div>"];
 
+    var sm = TR.d2.state.sigMode;
     html.push('<div class="card"><div class="pulse">' +
       '<span class="pulse-chip up">▲ ' + totalUp + " significant increases</span>" +
       '<span class="pulse-chip down">▼ ' + totalDown + " significant decreases</span>" +
@@ -221,6 +222,13 @@
       '<span class="pulse-chip">→ ' +
       Math.max(tested - totalUp - totalDown - totalSoft, 0) +
       " stable</span>" +
+      '<label class="trk-sigctl" title="Significance level shown across the ' +
+      'Tracking tab (shared with the Crosstabs tab)">Significance ' +
+      '<select data-trk-sigmode>' +
+      '<option value="off"' + (sm === "off" ? " selected" : "") + ">off</option>" +
+      '<option value="95"' + (sm === "95" ? " selected" : "") + ">95%</option>" +
+      '<option value="dual"' + (sm === "dual" ? " selected" : "") +
+      ">95% + 80%</option></select></label>" +
       '<span class="trknote">Total only · all key metrics (means Welch-' +
       "tested on published-distribution SDs, %s pooled z) · latest wave vs " +
       "previous</span></div></div>");
@@ -283,6 +291,14 @@
     if (hmSel) {
       hmSel.addEventListener("change", function () {
         hmGroup = hmSel.value;
+        trk.rerender();
+      });
+    }
+    // significance level — shared global setting (also drives the Crosstabs tab)
+    var sigModeSel = host.querySelector("[data-trk-sigmode]");
+    if (sigModeSel) {
+      sigModeSel.addEventListener("change", function () {
+        TR.d2.state.sigMode = sigModeSel.value;
         trk.rerender();
       });
     }

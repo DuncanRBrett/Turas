@@ -386,14 +386,16 @@
    * distribution-derived `sd` (means/indexes/NPS) use a Welch test;
    * NET POSITIVE (score difference) rows stay untested.
    *
-   * sig_prev/sig_base stay the strong (95%) booleans — unchanged for every
-   * existing reader. With dual=true (the report's "95% + 80%" mode) each cell
-   * also carries soft_prev/soft_base: significant at 80% but NOT 95%, so the
-   * renderers can flag "nearly significant" moves with a lighter marker.
-   * dual is omitted (falsy) everywhere by default, so single-mode output is
-   * byte-identical to before.
+   * `mode` is the report's significance setting (TR.d2.state.sigMode):
+   *   "off"  → no flags (sig_prev/soft_prev all false)
+   *   "95"   → sig_prev/sig_base = strong (95%) booleans; no soft
+   *   "dual" → also soft_prev/soft_base: significant at 80% but NOT 95%
+   * mode defaults to "on" when omitted, so a bare cellsFor(points, canSig)
+   * keeps the strong-only behaviour (and 95%/single output is byte-identical).
    */
-  waves.cellsFor = function (points, canSig, dual) {
+  waves.cellsFor = function (points, canSig, mode) {
+    var on = mode !== "off";        // significance display master switch
+    var dual = mode === "dual";     // also flag the 80% (soft) band
     var level = function (a, b) {
       if (canSig) return propLevel(a, b);
       if (a.sd !== undefined && a.sd !== null) return meanLevel(a, b);
@@ -407,9 +409,9 @@
       return { wave: p.wave, year: p.year, value: p.value, base: p.base,
         x: p.x, sd: p.sd, current: !!p.current,
         change_prev: prev ? p.value - prev.value : null,
-        sig_prev: lp === 2, soft_prev: !!dual && lp === 1,
+        sig_prev: on && lp === 2, soft_prev: dual && lp === 1,
         change_base: first ? p.value - first.value : null,
-        sig_base: lb === 2, soft_base: !!dual && lb === 1 };
+        sig_base: on && lb === 2, soft_base: dual && lb === 1 };
     });
   };
 

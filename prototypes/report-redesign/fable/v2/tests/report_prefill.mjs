@@ -33,7 +33,7 @@ const documentStub = {
 };
 
 // fresh sandbox each call → fresh module caches (mirrors one page load)
-function render(userState, reportMeta) {
+function render(userState, reportMeta, comments) {
   const sandbox = { console, TextEncoder, URL, document: documentStub };
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
@@ -49,36 +49,67 @@ function render(userState, reportMeta) {
   TR.VERIFY = {};
   if (reportMeta) TR.AGG.project.report_meta = reportMeta;
   else delete TR.AGG.project.report_meta;
+  if (comments) TR.AGG.comments = comments;
+  else delete TR.AGG.comments;
   TR.userState = userState;
   TR.report.renderTab(documentStub.getElementById());
-  return lastWrap._html;
+  return { html: lastWrap._html, TR: TR };
 }
 
 const META = {
   analyst: "Jess Taylor", email: "jess@researchlamppost.co.za",
   phone: "+27 11 123 4567", company: "The Research Lamppost",
-  fieldwork: "May 2026", closing: "Confidential — for CCPB internal use only."
+  fieldwork: "May 2026", closing: "Confidential — for CCPB internal use only.",
+  background: "60 key account stores were interviewed by phone.",
+  exec_summary: "Service rated lower this wave; NPS fell 25 points."
 };
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) { pass++; console.log("  ✓ " + m); } else { fail++; console.log("  ✗ " + m); } };
 
-let h = render(null, META);
-ok(h.includes("Jess Taylor"), "About 'analyst' pre-fills analyst_name");
-ok(h.includes("The Research Lamppost · jess@researchlamppost.co.za · +27 11 123 4567"),
-   "About 'contact' joins company · email · phone");
-ok(h.includes("Confidential — for CCPB internal use only."), "About 'disclaimer' pre-fills closing_notes");
-ok(h.includes("Fieldwork: May 2026."), "Background section pre-fills fieldwork_dates");
+// ---- Background & Executive summary pre-fill (editable sections) ----
+let r = render(null, META);
+ok(r.html.includes("60 key account stores were interviewed by phone."),
+   "Background section pre-fills config _BACKGROUND");
+ok(r.html.includes("Service rated lower this wave; NPS fell 25 points."),
+   "Executive summary pre-fills config _EXECUTIVE_SUMMARY");
 
-h = render({ report: { sections: {}, about: { analyst: "Someone Else" }, slides: [] } }, META);
-ok(h.includes("Someone Else") && !h.includes("Jess Taylor"), "user-typed analyst overrides the config default");
+r = render(null, { fieldwork: "May 2026" });
+ok(r.html.includes("Fieldwork: May 2026."),
+   "Background falls back to fieldwork when no _BACKGROUND configured");
 
-h = render({ report: { sections: {}, about: { analyst: "" }, slides: [] } }, META);
-ok(!h.includes("Jess Taylor"), "user-cleared analyst stays empty (empty string wins over default)");
+// ---- About is read-only, sourced from config ----
+r = render(null, META);
+ok(r.html.includes("Jess Taylor"), "About shows analyst (read-only)");
+ok(r.html.includes("The Research Lamppost · jess@researchlamppost.co.za · +27 11 123 4567"),
+   "About contact joins company · email · phone");
+ok(r.html.includes("Confidential — for CCPB internal use only."), "About shows disclaimer (closing_notes)");
+ok(!/class="rpt-about"/.test(r.html) && !/<input[^>]*data-field/.test(r.html),
+   "About is read-only — no editable input fields");
+ok(r.html.includes("Set from the project configuration."), "About shows the read-only hint");
 
-h = render(null, null);
-ok(h.includes('data-field="analyst"') && !h.includes("Jess Taylor"),
-   "no report_meta → About fields render empty (no crash, no leakage)");
+r = render({ report: { sections: {}, about: { analyst: "Someone Else" }, slides: [] } }, META);
+ok(r.html.includes("Jess Taylor") && !r.html.includes("Someone Else"),
+   "About ignores stored user edits (read-only)");
+
+r = render(null, null);
+ok(!r.html.includes("Jess Taylor"), "no report_meta → About empty, no leakage");
+
+// ---- per-question insights pre-fill from AGG.comments ----
+r = render(null, META, { Q9: [{ banner: null, text: "Half the stores are very satisfied." }] });
+ok(r.TR.insights.get("Q9", "") === "Half the stores are very satisfied.",
+   "insight pre-fills from config comment (general)");
+ok(r.TR.insights.get("Q9", "Campus") === "Half the stores are very satisfied.",
+   "insight falls back to the general comment for any banner");
+
+r = render(null, META, { Q9: [{ banner: null, text: "general" }, { banner: "Campus", text: "campus-only" }] });
+ok(r.TR.insights.get("Q9", "Campus") === "campus-only", "banner-specific config comment wins");
+
+r = render({ insights: { Q9: "analyst wrote this" } }, META, { Q9: [{ banner: null, text: "config" }] });
+ok(r.TR.insights.get("Q9", "") === "analyst wrote this", "a user insight overrides the config comment");
+
+r = render(null, META, null);
+ok(r.TR.insights.get("Q9", "") === "", "no config comment → empty insight");
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

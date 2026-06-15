@@ -38,13 +38,34 @@
   }
 
   /**
+   * Config-provided default for a question (the classic report's Comments
+   * sheet, carried as TR.AGG.comments[code] = [{banner, text}]). Banner-
+   * specific entry wins; general entry (banner null) is the fallback. Shown
+   * until the analyst types their own — their edit always takes precedence.
+   */
+  function configDefault(code, banner) {
+    var all = (TR.AGG && TR.AGG.comments) || {};
+    var entries = all[code];
+    if (!entries || !entries.length) return "";
+    var general = "";
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (banner && e.banner === banner) return e.text;
+      if ((e.banner === null || e.banner === undefined) && !general) general = e.text;
+    }
+    return general;
+  }
+
+  /**
    * Insights can be banner-specific (a Campus story differs from a Course
-   * story): keyed code::banner with fallback to the general code key.
+   * story): keyed code::banner with fallback to the general code key, then to
+   * the config-provided default (so report comments pre-fill the box).
    */
   insights.get = function (code, banner) {
     var s = store();
     if (banner && s[code + "::" + banner]) return s[code + "::" + banner];
-    return s[code] || "";
+    if (s[code]) return s[code];
+    return configDefault(code, banner);
   };
 
   insights.set = function (code, text, banner) {

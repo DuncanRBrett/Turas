@@ -78,7 +78,11 @@
   }
   function sectionDefault(sec) {
     var m = metaOf();
-    if (sec === "background" && m.fieldwork) return "Fieldwork: " + m.fieldwork + ".";
+    if (sec === "background") {
+      if (m.background) return m.background;            // config Comments _BACKGROUND
+      if (m.fieldwork) return "Fieldwork: " + m.fieldwork + ".";
+    }
+    if (sec === "exec" && m.exec_summary) return m.exec_summary;  // _EXECUTIVE_SUMMARY
     return "";
   }
 
@@ -86,10 +90,10 @@
     var s = store();
     var html = ['<div class="page">'];
     html.push('<div class="card"><h2>Report</h2><p>The narrative around the numbers. ' +
-      "Everything below is editable, saved in this browser, and embedded in " +
-      "<strong>saved copies</strong> of the report — use <em>Save copy</em> (top right) " +
-      "to produce a single .html with your insights, story and these sections " +
-      "baked in, ready to send.</p></div>");
+      "Background &amp; method and the Executive summary are editable, saved in " +
+      "this browser, and embedded in <strong>saved copies</strong> of the report " +
+      "— use <em>Save copy</em> (top right) to produce a single .html with your " +
+      "insights, story and these sections baked in, ready to send.</p></div>");
     SECTIONS.forEach(function (sec) {
       var secVal = sec[0] in s.sections ? s.sections[sec[0]] : sectionDefault(sec[0]);
       html.push('<div class="card"><h3>' + sec[1] + "</h3>" +
@@ -117,12 +121,16 @@
           '<button data-removeslide="' + i + '" aria-label="Remove">✕</button></div></div>';
       }).join("") + "</div></div>");
 
+    // About is read-only: it is set from the project configuration (analyst,
+    // contact, disclaimers) and is not an editable workspace. Only populated
+    // fields are shown.
     html.push('<div class="card"><h3>About this report</h3>' +
+      '<p class="hint">Set from the project configuration.</p>' +
       ABOUT_FIELDS.map(function (f) {
-        var aboutVal = f[0] in s.about ? s.about[f[0]] : aboutDefault(f[0]);
+        var aboutVal = aboutDefault(f[0]);
+        if (!aboutVal) return "";
         return '<div class="rpt-field"><label>' + f[1] + "</label>" +
-          '<input type="text" class="rpt-about" data-field="' + f[0] + '" value="' +
-          fmt.escapeHtml(aboutVal) + '"></div>';
+          '<div class="rpt-about-static">' + fmt.escapeHtml(aboutVal) + "</div></div>";
       }).join("") + autoAboutHtml() + "</div>");
     html.push("</div>");
     // fresh wrapper per render — never stack duplicate listeners
@@ -155,10 +163,6 @@
     host.addEventListener("input", function (e) {
       if (e.target.classList.contains("rpt-section")) {
         store().sections[e.target.getAttribute("data-section")] = e.target.value;
-        persist();
-      }
-      if (e.target.classList.contains("rpt-about")) {
-        store().about[e.target.getAttribute("data-field")] = e.target.value;
         persist();
       }
       if (e.target.classList.contains("as-title")) {

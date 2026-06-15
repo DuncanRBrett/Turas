@@ -39,46 +39,53 @@ function meanPair(z) {
   var d = z * Math.SQRT2;
   return [{ value: 50, base: 100, sd: 10 }, { value: 50 + d, base: 100, sd: 10 }];
 }
-function lastCell(points, dual) {
-  return TR.waves.cellsFor(points, false, dual)[1];   // canSig=false → mean path
+function lastCell(points, mode) {
+  return TR.waves.cellsFor(points, false, mode)[1];   // canSig=false → mean path
 }
 // proportion points: x = count, base = n; canSig=true → propLevel(propZ).
-function propLast(x1, x2, dual) {
+function propLast(x1, x2, mode) {
   var pts = [{ value: x1, x: x1, base: 100 }, { value: x2, x: x2, base: 100 }];
-  return TR.waves.cellsFor(pts, true, dual)[1];
+  return TR.waves.cellsFor(pts, true, mode)[1];
 }
 
-// ---- means ----
-var strong = lastCell(meanPair(2.5), true);
-ok(strong.sig_prev === true && strong.soft_prev === false, "mean strong (z=2.5): sig, not soft");
-var strongS = lastCell(meanPair(2.5), false);
-ok(strongS.sig_prev === true && strongS.soft_prev === false, "mean strong single mode: sig unchanged, no soft");
+// ---- means · mode = "off" | "95" | "dual" ----
+var strong = lastCell(meanPair(2.5), "dual");
+ok(strong.sig_prev === true && strong.soft_prev === false, "mean strong (z=2.5) DUAL: sig, not soft");
+var strongS = lastCell(meanPair(2.5), "95");
+ok(strongS.sig_prev === true && strongS.soft_prev === false, "mean strong 95%: sig unchanged, no soft");
+var strongOff = lastCell(meanPair(2.5), "off");
+ok(strongOff.sig_prev === false && strongOff.soft_prev === false, "mean strong OFF: no flag at all");
 
-var soft = lastCell(meanPair(1.5), true);
+var soft = lastCell(meanPair(1.5), "dual");
 ok(soft.sig_prev === false && soft.soft_prev === true, "mean soft (z=1.5) DUAL: soft flagged, not strong");
-var softSingle = lastCell(meanPair(1.5), false);
-ok(softSingle.sig_prev === false && softSingle.soft_prev === false, "mean soft (z=1.5) SINGLE: nothing flagged");
+var softSingle = lastCell(meanPair(1.5), "95");
+ok(softSingle.sig_prev === false && softSingle.soft_prev === false, "mean soft (z=1.5) 95%: nothing flagged");
 
-var none = lastCell(meanPair(1.0), true);
+var none = lastCell(meanPair(1.0), "dual");
 ok(none.sig_prev === false && none.soft_prev === false, "mean weak (z=1.0) DUAL: nothing flagged");
 
+// default (mode omitted) keeps strong-only behaviour (back-compat)
+ok(lastCell(meanPair(2.5)).sig_prev === true && lastCell(meanPair(2.5)).soft_prev === false,
+   "mode omitted → strong-only (byte-compatible default)");
+
 // boundary: just above/below the 80% cut (Z80 = 1.2816)
-ok(lastCell(meanPair(1.30), true).soft_prev === true, "mean z=1.30 (>Z80) DUAL: soft");
-ok(lastCell(meanPair(1.26), true).soft_prev === false, "mean z=1.26 (<Z80) DUAL: not soft");
+ok(lastCell(meanPair(1.30), "dual").soft_prev === true, "mean z=1.30 (>Z80) DUAL: soft");
+ok(lastCell(meanPair(1.26), "dual").soft_prev === false, "mean z=1.26 (<Z80) DUAL: not soft");
 
 // ---- proportions (pooled z) ----
 // 50 vs 70 of 100 → |z|≈2.89 (strong); 58 vs 70 → ≈1.77 (soft); 65 vs 70 → ≈0.76 (none)
-ok(propLast(50, 70, true).sig_prev === true && propLast(50, 70, true).soft_prev === false,
+ok(propLast(50, 70, "dual").sig_prev === true && propLast(50, 70, "dual").soft_prev === false,
    "prop strong (50→70): sig, not soft");
-ok(propLast(58, 70, true).sig_prev === false && propLast(58, 70, true).soft_prev === true,
+ok(propLast(50, 70, "off").sig_prev === false, "prop strong (50→70) OFF: no flag");
+ok(propLast(58, 70, "dual").sig_prev === false && propLast(58, 70, "dual").soft_prev === true,
    "prop soft (58→70) DUAL: soft flagged");
-ok(propLast(58, 70, false).soft_prev === false,
-   "prop soft (58→70) SINGLE: not flagged");
-ok(propLast(65, 70, true).sig_prev === false && propLast(65, 70, true).soft_prev === false,
+ok(propLast(58, 70, "95").soft_prev === false,
+   "prop soft (58→70) 95%: not flagged");
+ok(propLast(65, 70, "dual").sig_prev === false && propLast(65, 70, "dual").soft_prev === false,
    "prop weak (65→70): nothing flagged");
 
 // sig_base mirrors sig_prev on a 2-point series (first === prev)
-var sb = lastCell(meanPair(1.5), true);
+var sb = lastCell(meanPair(1.5), "dual");
 ok(sb.soft_base === true && sb.sig_base === false, "soft_base mirrors soft_prev on a 2-point series");
 
 console.log(`\n${pass} passed, ${fail} failed`);

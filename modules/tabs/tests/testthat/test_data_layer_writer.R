@@ -245,6 +245,47 @@ test_that("a header field of literal 'NA' falls back rather than showing 'NA'", 
   expect_equal(p$wave, "")
 })
 
+test_that("report_meta carries the config Background & Executive summary", {
+  cfg <- make_dl_config(
+    background_text = "60 stores were interviewed by phone.",
+    executive_summary = "Service rated lower this wave.")
+  p <- build_data_layer(make_dl_results(), make_dl_banner_info(), cfg)$project
+  expect_equal(p$report_meta$background, "60 stores were interviewed by phone.")
+  expect_equal(p$report_meta$exec_summary, "Service rated lower this wave.")
+})
+
+# ------------------------------------------------------------------------------
+# per-question comments (config Comments sheet → AGG.comments)
+# ------------------------------------------------------------------------------
+context("data_layer_writer: comments")
+
+test_that("per-question comments are emitted keyed by code, with banner null", {
+  cfg <- make_dl_config(comments = list(
+    Q1 = list(list(banner = NA, text = "Half the stores are satisfied.")),
+    Q2 = list(list(banner = "Male", text = "Men rate this higher."),
+              list(banner = NA, text = "General note for Q2."))))
+  dl <- build_data_layer(make_dl_results(), make_dl_banner_info(), cfg)
+  expect_false(is.null(dl$comments))
+  expect_equal(dl$comments$Q1[[1]]$text, "Half the stores are satisfied.")
+  expect_true(is.na(dl$comments$Q1[[1]]$banner))          # general → JSON null
+  expect_equal(dl$comments$Q2[[1]]$banner, "Male")        # banner-specific kept
+  expect_equal(length(dl$comments$Q2), 2L)
+})
+
+test_that("comments key is omitted entirely when none are configured", {
+  dl <- build_data_layer(make_dl_results(), make_dl_banner_info(), make_dl_config())
+  expect_false("comments" %in% names(dl))                 # existing reports unchanged
+})
+
+test_that("blank / literal-'NA' comment text is dropped", {
+  cfg <- make_dl_config(comments = list(
+    Q1 = list(list(banner = NA, text = "NA"), list(banner = NA, text = "  ")),
+    Q2 = list(list(banner = NA, text = "Real insight."))))
+  dl <- build_data_layer(make_dl_results(), make_dl_banner_info(), cfg)
+  expect_null(dl$comments$Q1)                             # all entries blank → dropped
+  expect_equal(dl$comments$Q2[[1]]$text, "Real insight.")
+})
+
 # ==============================================================================
 # 3. question pivot — kinds, cell arrays, type mapping
 # ==============================================================================

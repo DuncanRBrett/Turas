@@ -269,9 +269,9 @@
           ? trk.sdAt(metric, segNorm, TR.render.currentYear()) : undefined,
         current: true });
     }
-    // honour the report's significance toggle: in "95% + 80%" mode the cells
-    // also carry soft_prev/soft_base for moves significant at 80% but not 95%.
-    return TR.waves.cellsFor(points, canSig, TR.d2.state.sigMode === "dual");
+    // honour the report's significance setting (off / 95% / 95%+80%): "dual"
+    // adds soft_prev/soft_base, "off" suppresses all sig flags.
+    return TR.waves.cellsFor(points, canSig, TR.d2.state.sigMode);
   };
 
   /* ---- thresholds + cell colouring (tracker defaults, overridable) ---- */

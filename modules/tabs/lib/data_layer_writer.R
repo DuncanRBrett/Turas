@@ -138,21 +138,24 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
   client_logo <- encode_logo_data_uri(config_obj$client_logo_path)
   if (!is.null(client_logo)) proj$client_logo <- client_logo
 
-  # Report metadata — pre-fills the v2 Report tab's editable Background / About
-  # (analyst, contact, disclaimer) from the config, mirroring the classic
-  # report's closing section. Carried only when at least one field is set; the
-  # analyst can still override any of it in the report (their edits persist).
+  # Report metadata — pre-fills the v2 Report tab's Background & method,
+  # Executive summary and (read-only) About from the config's Comments sheet
+  # and closing section, mirroring the classic report. Background/exec stay
+  # editable (analyst can refine); the analyst's edits persist. Carried only
+  # when at least one field is set.
   cfg_chr <- function(key) {
     if (blank(config_obj[[key]])) "" else as.character(config_obj[[key]])
   }
   meta <- list(
-    analyst   = cfg_chr("analyst_name"),
-    email     = cfg_chr("analyst_email"),
-    phone     = cfg_chr("analyst_phone"),
-    company   = cfg_chr("company_name"),
-    fieldwork = cfg_chr("fieldwork_dates"),
-    closing   = cfg_chr("closing_notes"),
-    verbatim  = cfg_chr("verbatim_filename")
+    analyst     = cfg_chr("analyst_name"),
+    email       = cfg_chr("analyst_email"),
+    phone       = cfg_chr("analyst_phone"),
+    company     = cfg_chr("company_name"),
+    fieldwork   = cfg_chr("fieldwork_dates"),
+    closing     = cfg_chr("closing_notes"),
+    verbatim    = cfg_chr("verbatim_filename"),
+    background  = cfg_chr("background_text"),
+    exec_summary = cfg_chr("executive_summary")
   )
   if (any(nzchar(unlist(meta)))) proj$report_meta <- meta
   proj
@@ -381,6 +384,40 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
 }
 
 
+#' Per-question analyst comments from the config's Comments sheet
+#'
+#' Keyed by question code; each value a list of \code{{banner, text}} entries
+#' (banner NA = general, serialises to JSON null). These pre-fill the v2
+#' report's per-question insight box, mirroring the classic report; the
+#' analyst's own edits in the report override them. Returns NULL when no
+#' comments are configured, so the key is omitted and existing reports are
+#' byte-identical.
+#'
+#' @param config_obj Configuration object (config_obj$comments)
+#' @return Named list keyed by question code, or NULL
+#' @keywords internal
+build_dl_comments <- function(config_obj) {
+  cm <- config_obj$comments
+  if (is.null(cm) || length(cm) == 0) return(NULL)
+  out <- list()
+  for (code in names(cm)) {
+    entries <- cm[[code]]
+    if (is.null(entries) || length(entries) == 0) next
+    clean <- list()
+    for (e in entries) {
+      txt <- if (is.null(e$text)) "" else trimws(as.character(e$text))
+      if (!nzchar(txt) || identical(txt, "NA")) next
+      banner_blank <- is.null(e$banner) ||
+        (length(e$banner) == 1 && is.na(e$banner))
+      bn <- if (banner_blank) NA_character_ else as.character(e$banner)
+      clean[[length(clean) + 1]] <- list(banner = bn, text = txt)
+    }
+    if (length(clean)) out[[code]] <- clean
+  }
+  if (length(out)) out else NULL
+}
+
+
 #' Build the complete data-agg structure (pure — no file I/O)
 #'
 #' @param all_results List of question results
@@ -404,7 +441,7 @@ build_data_layer <- function(all_results, banner_info, config_obj,
     if (!is.null(q)) questions[[length(questions) + 1]] <- q
   }
 
-  list(
+  dl <- list(
     schema_version = 2L,
     project        = project,
     columns        = build_dl_columns(banner_info),
@@ -412,6 +449,11 @@ build_data_layer <- function(all_results, banner_info, config_obj,
     categories     = build_dl_categories(all_results),
     questions      = questions
   )
+  # Per-question analyst comments (config Comments sheet) pre-fill the report's
+  # insight boxes. Omitted entirely when none are configured.
+  comments <- build_dl_comments(config_obj)
+  if (!is.null(comments)) dl$comments <- comments
+  dl
 }
 
 
