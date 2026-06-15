@@ -93,15 +93,27 @@ Also modes to cover later: **exploration** (k-selection) and **combined**
 
 - **Phase 0 — Reference + lock.** DONE. Baseline generated on the synthetic
   fixture; parity checklist + IA locked.
-- **Phase 1 — Platform bring-up.** Decide vendoring source-of-truth (prototype
-  vs tabs vendored copy — see open issue), vendor the generic assets, retarget
-  `24_shell` tab list/routing, boot an empty segment shell.
-- **Phase 2 — Data-layer writer.** `build_dl_segments()` etc. — pure
-  re-presentation of the existing `results` object (the `transform_segment_for_html`
-  shape). Gate with `d2.validate`.
-- **Phase 3 — Vertical slice: Profiles tab.** Heatmap + per-segment explorer +
-  variable importance, end-to-end, with working pin → PNG → PPTX. Proves the
-  whole approach.
+- **Phase 1 — Platform bring-up.** DONE. Vendored the assembled v2 engine
+  (29 JS + `styles.css` + `template.html`) into `assets/` from
+  `modules/tabs/lib/html_report_v2/assets/` (provenance + 0-drift note in
+  `assets/README.md`); ported the bundler to `build_report_v2.R` (`seg_*` fns,
+  segment asset dir).
+- **Phase 2 — Data-layer writer.** DONE (first cut). `data_layer_writer.R`
+  `build_segment_data_layer()` maps the profile onto the v2 `agg` contract
+  (segments → columns, variables → mean-row questions) — pure re-presentation,
+  no stats recomputed. Verified: passes the REAL engine `d2.validate` (ok=true)
+  AND the full engine resolves the correct view-model means in node (q1 Total
+  5.31 / Seg1 2.90 / Seg2 7.97 / Seg3 5.00 == profile). R gate
+  `tests/testthat/test_data_layer_writer.R` (21/0); `tools/build_report_v2.R`
+  builds a self-contained `segment_report_v2.html` (0.41 MB) on the fixture.
+  NOTE: this first cut renders through the existing (crosstab-flavoured)
+  Dashboard/Crosstabs views; sig is empty (no false claims); a "Segment sizes"
+  question + diagnostics are deferred to the native views.
+- **Phase 3 — Vertical slice: native Profiles tab.** NEXT. Replace the
+  crosstab-flavoured views with a segment-native Profiles view (heatmap +
+  per-segment explorer + variable importance) and retarget `24_shell` tab
+  list/routing. Then pin → PNG → PPTX. (In-browser boot verification is
+  Duncan's launch step — the node gates confirm data + model only.)
 - **Phase 4 — Fan out** the remaining views + exploration/combined modes.
 - **Phase 5 — Parity, gates, review.** Self-test cases, golden tests, the
   PowerPoint "Edit Data" round-trip test, production review, merge + GUI checkbox.

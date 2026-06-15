@@ -53,6 +53,8 @@ test_output/
 *.html
 !modules/hub_app/app/index.html
 !**/tests/**/fixtures/**/*.html
+# v2 report engine template is a vendored SOURCE asset, not a generated report
+!**/lib/html_report_v2/assets/template.html
 
 # Temporary files
 *.tmp
