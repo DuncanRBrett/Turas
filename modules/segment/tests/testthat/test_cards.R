@@ -109,3 +109,55 @@ test_that("cards_df has required columns", {
                      "Headline", "Key_Traits", "Strengths", "Pain_Points", "Actions")
   expect_true(all(expected_cols %in% names(result$cards_df)))
 })
+
+
+test_that("the Segment Action Cards section renders in the HTML report", {
+  # Guards the page-builder gate + builder shape. The section previously keyed
+  # on a non-existent "segment_cards" field, and once pointed at enhanced$cards
+  # iterated the wrapper list and hit the atomic cards_text vector ("$ operator
+  # is invalid for atomic vectors"). It must now render the inner per-card list.
+  skip_if_not(requireNamespace("htmltools", quietly = TRUE), "htmltools not installed")
+  skip_if_not(exists("generate_segment_html_report", mode = "function"),
+              "HTML report pipeline not loaded")
+
+  td <- generate_segment_test_data(n = 300, k_true = 3, n_vars = 10, seed = 42)
+  cfg <- generate_test_config(td, mode = "final", method = "kmeans", k_fixed = 3)
+  cfg$generate_action_cards <- TRUE
+  cfg$scale_max <- 10
+
+  num <- td$data[, td$clustering_vars, drop = FALSE]
+  for (col in td$clustering_vars) {
+    num[[col]][is.na(num[[col]])] <- median(num[[col]], na.rm = TRUE)
+  }
+  sc <- scale(num)
+  dl <- list(original_data = td$data, data = td$data, scaled_data = sc,
+             clustering_data = num, clustering_vars = td$clustering_vars, config = cfg,
+             scale_params = list(center = attr(sc, "scaled:center"),
+                                 scale = attr(sc, "scaled:scale")))
+  g <- segment_guard_init()
+  cr <- run_clustering(dl, cfg, g)
+  vm <- calculate_validation_metrics(data = sc, model = cr$model, k = cr$k,
+                                     clusters = cr$clusters, calculate_gap = FALSE)
+  sn <- paste("Segment", seq_len(cr$k))
+  pr <- create_full_segment_profile(data = td$data, clusters = cr$clusters,
+          clustering_vars = td$clustering_vars, profile_vars = cfg$profile_vars)
+  cards <- generate_segment_cards(td$data, cr$clusters, td$clustering_vars,
+             sn, td$question_labels, 10)
+
+  results <- list(mode = "final", cluster_result = cr, validation_metrics = vm,
+    profile_result = pr, segment_names = sn, enhanced = list(cards = cards),
+    data_list = dl)
+
+  out <- tempfile(fileext = ".html")
+  on.exit(unlink(out), add = TRUE)
+  rep <- generate_segment_html_report(results = results, config = cfg, output_path = out)
+
+  expect_equal(rep$status, "PASS")
+  html <- paste(readLines(out, warn = FALSE), collapse = "\n")
+  expect_true(grepl('data-seg-section="cards"', html, fixed = TRUE),
+              info = "Cards section must be present in the rendered report")
+  expect_true(grepl("seg-action-card-name", html, fixed = TRUE),
+              info = "Individual cards must render")
+  expect_true(grepl("Recommended Actions", html, fixed = TRUE),
+              info = "Card content (recommended actions) must render")
+})

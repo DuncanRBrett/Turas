@@ -684,8 +684,21 @@ build_seg_cards_section <- function(html_data) {
   title_row <- build_seg_section_title_row("Segment Action Cards", "cards")
   insight_area <- build_seg_insight_area("cards")
 
-  cards_data <- html_data$enhanced$segment_cards
-  if (is.null(cards_data)) {
+  # The orchestrator (R/00_main.R) stores generate_segment_cards()'s full return
+  # at enhanced$cards: list(cards = <per-segment cards>, cards_df, cards_text,
+  # segment_stats). The per-segment cards live in $cards; each is a list with
+  # segment_name / size / headline / defining_traits / strengths / pain_points /
+  # recommended_actions. (Previously this read enhanced$segment_cards — a key
+  # that never exists — and, once pointed at enhanced$cards, iterated the wrapper
+  # list and hit the atomic cards_text vector: "$ operator is invalid for atomic
+  # vectors". Read the inner $cards list and guard against atomic elements.)
+  cards_bundle <- html_data$enhanced$cards
+  cards_list <- if (is.list(cards_bundle) && !is.null(cards_bundle$cards)) {
+    cards_bundle$cards
+  } else {
+    cards_bundle
+  }
+  if (is.null(cards_list) || length(cards_list) == 0) {
     return(htmltools::tags$div(
       class = "seg-section",
       id = "seg-cards",
@@ -697,75 +710,55 @@ build_seg_cards_section <- function(html_data) {
     ))
   }
 
-  # Build individual cards
-  card_els <- lapply(cards_data, function(card) {
-    # Strengths list
-    strengths_el <- NULL
-    if (!is.null(card$strengths) && length(card$strengths) > 0) {
-      strengths_items <- lapply(card$strengths, function(s) {
-        htmltools::tags$li(s)
-      })
-      strengths_el <- htmltools::tagList(
-        htmltools::tags$div(class = "seg-action-card-label", "Strengths"),
-        htmltools::tags$ul(class = "seg-action-card-list", strengths_items)
-      )
-    }
+  # A labelled bullet list, or NULL when there are no values to show.
+  bullet_block <- function(label, values) {
+    if (is.null(values) || length(values) == 0) return(NULL)
+    items <- lapply(values, function(v) htmltools::tags$li(v))
+    htmltools::tagList(
+      htmltools::tags$div(class = "seg-action-card-label", label),
+      htmltools::tags$ul(class = "seg-action-card-list", items)
+    )
+  }
 
-    # Pain points list
-    pain_el <- NULL
-    if (!is.null(card$pain_points) && length(card$pain_points) > 0) {
-      pain_items <- lapply(card$pain_points, function(p) {
-        htmltools::tags$li(p)
-      })
-      pain_el <- htmltools::tagList(
-        htmltools::tags$div(class = "seg-action-card-label", "Pain Points"),
-        htmltools::tags$ul(class = "seg-action-card-list", pain_items)
-      )
-    }
+  # Build individual cards from the real card shape (with fallbacks to the
+  # builder's historical field names so a future shape change degrades safely).
+  card_els <- lapply(cards_list, function(card) {
+    if (!is.list(card)) return(NULL)
 
-    # Actions list
-    actions_el <- NULL
-    if (!is.null(card$actions) && length(card$actions) > 0) {
-      action_items <- lapply(card$actions, function(a) {
-        htmltools::tags$li(a)
-      })
-      actions_el <- htmltools::tagList(
-        htmltools::tags$div(class = "seg-action-card-label", "Recommended Actions"),
-        htmltools::tags$ul(class = "seg-action-card-list", action_items)
-      )
-    }
+    seg_name <- card$segment_name %||% card$name %||% "Segment"
 
-    # Description
-    desc_el <- NULL
-    if (!is.null(card$description) && nzchar(card$description %||% "")) {
-      desc_el <- htmltools::tags$div(
-        class = "seg-action-card-text",
-        card$description
-      )
-    }
+    # generate_segment_cards provides a pre-formatted size string; fall back to
+    # n/pct if a future shape supplies those instead.
+    size_text <- card$size %||% (
+      if (!is.null(card$n) && !is.null(card$pct)) {
+        sprintf("n = %s (%s%%)", format(card$n, big.mark = ","), card$pct)
+      } else if (!is.null(card$n)) {
+        sprintf("n = %s", format(card$n, big.mark = ","))
+      } else {
+        NULL
+      }
+    )
 
-    # Size info
-    size_text <- ""
-    if (!is.null(card$n) && !is.null(card$pct)) {
-      size_text <- sprintf("n = %s (%s%%)",
-                           format(card$n, big.mark = ","), card$pct)
-    } else if (!is.null(card$n)) {
-      size_text <- sprintf("n = %s", format(card$n, big.mark = ","))
+    lead <- card$headline %||% card$description
+    desc_el <- if (!is.null(lead) && nzchar(lead)) {
+      htmltools::tags$div(class = "seg-action-card-text", lead)
     }
 
     htmltools::tags$div(
       class = "seg-action-card",
-      htmltools::tags$div(class = "seg-action-card-name",
-                          card$name %||% card$segment_name %||% "Segment"),
-      if (nzchar(size_text)) {
+      htmltools::tags$div(class = "seg-action-card-name", seg_name),
+      if (!is.null(size_text) && nzchar(size_text)) {
         htmltools::tags$div(class = "seg-action-card-size", size_text)
       },
       desc_el,
-      strengths_el,
-      pain_el,
-      actions_el
+      bullet_block("Defining Traits", card$defining_traits),
+      bullet_block("Strengths", card$strengths),
+      bullet_block("Pain Points", card$pain_points),
+      bullet_block("Recommended Actions",
+                   card$recommended_actions %||% card$actions)
     )
   })
+  card_els <- Filter(Negate(is.null), card_els)
 
   htmltools::tags$div(
     class = "seg-section",
