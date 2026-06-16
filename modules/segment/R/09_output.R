@@ -71,11 +71,16 @@ export_segment_assignments <- function(data, clusters, segment_names, id_var, ou
                                       outlier_flags = NULL, probabilities = NULL) {
   cat(sprintf("  Exporting segment assignments: %s\n", basename(output_path)))
 
-  # Create assignments data frame
+  # Create assignments data frame. Guard the name lookup: an NA cluster id
+  # (flagged outlier) or an out-of-range id would otherwise yield an NA segment
+  # name and silently corrupt this file — and this is the join table that feeds
+  # the segment-as-banner workflow in tabs.
+  seg_name_col <- segment_names[clusters]
+  seg_name_col[is.na(seg_name_col)] <- "Unassigned"
   assignments <- data.frame(
     respondent_id = data[[id_var]],
     segment_id = clusters,
-    segment_name = segment_names[clusters],
+    segment_name = seg_name_col,
     stringsAsFactors = FALSE
   )
 

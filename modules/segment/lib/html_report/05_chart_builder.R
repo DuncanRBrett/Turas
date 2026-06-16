@@ -265,7 +265,7 @@ build_seg_importance_chart <- function(html_data, brand_colour = "#323367") {
   ql <- html_data$question_labels
   if (!is.null(ql) && length(ql) > 0) {
     labels <- vapply(labels, function(v) {
-      lbl <- ql[[v]]
+      lbl <- if (v %in% names(ql)) ql[[v]] else NULL
       if (!is.null(lbl) && nzchar(lbl)) lbl else v
     }, character(1), USE.NAMES = FALSE)
   }
@@ -400,13 +400,18 @@ build_seg_heatmap_chart <- function(html_data, brand_colour = "#323367",
   if (k == 0 || n_vars == 0) return(htmltools::HTML(""))
 
   var_names <- colnames(centers) %||% paste0("V", seq_len(n_vars))
-  seg_names <- html_data$segment_names %||% paste0("Seg ", seq_len(k))
+  seg_names <- if (!is.null(html_data$segment_names) &&
+                   length(html_data$segment_names) >= k) {
+    html_data$segment_names
+  } else {
+    paste0("Seg ", seq_len(k))
+  }
 
   # Resolve variable display labels
   ql <- html_data$question_labels
   var_labels <- if (!is.null(ql) && length(ql) > 0) {
     vapply(var_names, function(v) {
-      lbl <- ql[[v]]
+      lbl <- if (v %in% names(ql)) ql[[v]] else NULL
       if (!is.null(lbl) && nzchar(lbl)) lbl else v
     }, character(1), USE.NAMES = FALSE)
   } else {
@@ -885,7 +890,12 @@ build_seg_overlap_heatmap <- function(html_data, brand_colour = "#323367") {
   k <- nrow(centers)
   if (k < 2) return(htmltools::HTML(""))
 
-  seg_names <- html_data$segment_names %||% paste0("Seg ", seq_len(k))
+  seg_names <- if (!is.null(html_data$segment_names) &&
+                   length(html_data$segment_names) >= k) {
+    html_data$segment_names
+  } else {
+    paste0("Seg ", seq_len(k))
+  }
 
   # Compute pairwise Euclidean distances between centroids
   dist_matrix <- as.matrix(stats::dist(centers, method = "euclidean"))
@@ -1061,7 +1071,7 @@ build_seg_golden_questions_chart <- function(html_data, brand_colour = "#323367"
   ql <- html_data$question_labels
   if (!is.null(ql) && length(ql) > 0) {
     labels <- vapply(labels, function(v) {
-      lbl <- ql[[v]]
+      lbl <- if (v %in% names(ql)) ql[[v]] else NULL
       if (!is.null(lbl) && nzchar(lbl)) lbl else v
     }, character(1), USE.NAMES = FALSE)
   }

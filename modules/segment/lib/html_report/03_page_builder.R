@@ -77,11 +77,17 @@ build_seg_html_page <- function(html_data, tables, charts, config) {
   # Build CSS
   css <- build_seg_css(brand_colour, accent_colour)
 
-  # Determine section visibility from config flags
-  show_rules <- isTRUE(config$html_show_rules) &&
-    !is.null(html_data$enhanced$classification_rules)
+  # Determine section visibility from config flags.
+  # NOTE: the orchestrator (R/00_main.R) stores enhanced features under
+  # enhanced$rules and enhanced$cards. Both gates previously checked keys that
+  # never exist ("classification_rules" / "segment_cards"), and the rules gate
+  # also defaulted to hidden, so both sections silently dropped even when
+  # generated. Fixed to the real keys and defaulted visible (they only exist
+  # when generate_rules / generate_action_cards is enabled).
+  show_rules <- isTRUE(config$html_show_rules %||% TRUE) &&
+    !is.null(html_data$enhanced$rules)
   show_cards <- isTRUE(config$html_show_cards %||% TRUE) &&
-    !is.null(html_data$enhanced$segment_cards)
+    !is.null(html_data$enhanced$cards)
   show_gmm <- (html_data$method %in% c("gmm", "mclust")) &&
     !is.null(html_data$gmm_membership)
   show_exec <- isTRUE(config$html_show_exec_summary %||% TRUE)
