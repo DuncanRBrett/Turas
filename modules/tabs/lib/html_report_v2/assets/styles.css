@@ -351,8 +351,24 @@ table.ws td.sparkcell { padding: 1px 8px; }
   .tabhost, .fb-in, .hdr-in, .tabs { padding-left: 14px; padding-right: 14px; }
 }
 @media print {
-  .filterbar, .tabs, .controls, .side, .insight, .qnav { display: none !important; }
-  .card { box-shadow: none; }
+  /* hide interactive chrome — keep content (gauge cards are buttons, so target
+     control classes, never the button tag) */
+  .filterbar, .tabs, .controls, .side, .qnav, .heat-actions, .sa-btns, .pinwrap,
+  .tg, .t-btn, .t-btnish, .btab, .scopebar, .rowx, #qsearch,
+  [data-act], [data-png], [data-copy], [data-sact] { display: none !important; }
+  /* backgrounds/colours must survive print (navy headers, RAG, heatmap, charts) */
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  body, .page, .content { background: #fff !important; }
+  .card, .gauge, .si-card, .heatgrid-card, .ex-chart, .ex-scorecard {
+    box-shadow: none !important; break-inside: avoid; page-break-inside: avoid; }
+  .ct thead { display: table-header-group; }           /* repeat headers across pages */
+  .ct tr { break-inside: avoid; page-break-inside: avoid; }
+  .xtab-layout { display: block !important; }           /* drop the question sidebar */
+  .content { width: 100% !important; max-width: none !important; }
+  /* the analyst commentary prints as clean text, not a form field */
+  .insight textarea, .si-note { border: none !important; background: none !important;
+    resize: none !important; padding: 0 !important; min-height: 0 !important; }
+  @page { margin: 14mm; }
 }
 
 /* ---------- explainer callouts ---------- */
