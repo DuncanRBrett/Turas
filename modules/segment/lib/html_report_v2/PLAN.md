@@ -116,12 +116,24 @@ Also modes to cover later: **exploration** (k-selection) and **combined**
   report now opens reader-in: **Overview** (segment scorecards — size + top
   over/under-indexing variables) → **Profiles** (variables × segments heatmap,
   shaded vs the overall mean) → **Report** (engine metadata tab). Verified
-  headless in node (seam registers; both views render expected content). Gates:
-  `test_report_v2_bundler.R`. STILL TODO in Phase 3: per-segment explorer +
-  variable-importance view, interactivity (click-to-drill), pin → PNG → PPTX,
-  and an in-browser boot check (Duncan's launch step).
-- **Phase 4 — Fan out** the remaining views (Quality/validation, sizes,
-  vulnerability, golden questions) + exploration/combined modes.
+  headless in node. Added **Importance** (ANOVA F bars) and made **Profiles
+  interactive** (commit 91790af9): click a segment to rank variables by its gap
+  vs overall, toggle Means/“vs overall” — **segment-comparison only, no
+  microdata (DECISION A)**. Gates: `test_report_v2_bundler.R` +
+  `test_data_layer_writer.R`. STILL TODO: in-browser boot check (Duncan's).
+- **DIVISION OF LABOUR (decided 2026-06-15).** The HTML report stays LEAN — the
+  segmentation *story* + segment-comparison interactivity. The exhaustive detail
+  (validation, rules, vulnerability, full profiles, GMM) already lives in the
+  Excel report / `stats_pack.xlsx`; the HTML does **not** re-create it (at most a
+  one-line quality headline + pointer). Crosstab-any-question-by-segment lives in
+  **tabs** via `segment_name` as a banner (already supported). Report + tabs ship
+  together (report hub). This deliberately RETIRES the "reach v1 feature parity"
+  goal.
+- **Phase 4 — Lean fan-out (re-scoped).** (1) frictionless allocation→tabs
+  handoff: emit a tabs-ready data file with `segment_name` merged in; (2) one-
+  line Quality headline on Overview (carry silhouette into project metadata);
+  (3) wire pins → PNG → PPTX from native views; (4) exploration/combined modes.
+  NOT re-creating v1's validation/rules/vulnerability sections (stats-pack’s job).
 - **Phase 5 — Parity, gates, review.** Self-test cases, golden tests, the
   PowerPoint "Edit Data" round-trip test, production review, merge + GUI checkbox.
 - **Phase 6 — Extraction.** Promote the proven-generic core into a shared
