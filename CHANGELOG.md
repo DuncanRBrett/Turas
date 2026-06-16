@@ -39,6 +39,27 @@ All notable changes to TURAS are documented in this file.
 
 ### Fixed
 - CatDriver: `run_bootstrap_ci()` call corrected to `run_bootstrap_or()`
+- **Segment (classic v1 report): silently-dropped sections.** Production bug
+  audit fixed the class where a section vanishes because its analytic crashes
+  (swallowed by `tryCatch → NULL`) or a data key/shape mismatches:
+  - **Classification Rules** was always missing — `generate_segment_rules()`
+    indexed rpart's `yval2` by names it never assigns, and the page builder
+    gated on a non-existent key. Fixed (`06_rules.R`, `03_page_builder.R`).
+  - **Segment Cards** was always missing — wrong gate key + a card data-shape
+    mismatch in the builder. Fixed (`03_page_builder.R`, `03c_section_builders.R`).
+  - Variable-Importance / Profile-heatmap / Golden-questions **charts crashed**
+    (silently dropped) on a `question_labels` vector that didn't cover every
+    variable (`ql[[v]]` on a named vector). Guarded (`05_chart_builder.R`).
+  - `generate_headline()` crashed on an all-NA segment variable → Cards dropped
+    (`07_cards.R`, now `na.rm` + finite guards).
+  - About panel always printed "Average silhouette: 0.000" (wrong key).
+  - Segment-assignments file (the segment-as-banner join table for Tabs) could
+    carry NA segment names for outlier/NA clusters → now `"Unassigned"`.
+  Standard final-mode report verified end-to-end; new regression tests
+  (`test_html_robustness.R`, `test_rules.R`); segment suite 1026 pass / 0 fail.
+  Audit + verdict: `modules/segment/docs/V1_BUG_AUDIT_2026-06.md`. Exploration
+  and combined/multi-method modes have audit-flagged suspects deferred to a
+  follow-up pass.
 
 ## [10.1] - 2025-12-28
 
