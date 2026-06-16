@@ -33,6 +33,8 @@ test_that("bundle includes the engine, the shell seam, and segment-native views"
   expect_true(grepl("Segment profiles", js, fixed = TRUE))
   expect_true(grepl("seg.profilesHtml", js, fixed = TRUE))  # interactive Profiles render
   expect_true(grepl("data-sortcol", js, fixed = TRUE))      # segment-comparison controls
+  expect_true(grepl("seg.golden", js, fixed = TRUE))        # golden questions view
+  expect_true(grepl("Golden questions", js, fixed = TRUE))
   expect_false(grepl("</script", js, fixed = TRUE))       # safe to inline in <script>
 })
 

@@ -28,6 +28,38 @@ if (!exists("%||%", mode = "function")) {
   !nzchar(s) || s == "NA"
 }
 
+# Map identify_golden_questions() output to the v2 `golden` island: the smallest
+# set of questions that type a respondent into a segment (RF importance +
+# cumulative accuracy curve). Returns NULL when golden questions weren't computed.
+.seg_dl_golden <- function(gq, qlab) {
+  if (is.null(gq)) return(NULL)
+  if (!(gq$status %||% "PASS") %in% c("PASS", "PARTIAL")) return(NULL)
+  tq <- gq$top_questions
+  if (is.null(tq) || !is.data.frame(tq) || nrow(tq) == 0) return(NULL)
+  pct_col <- intersect(c("pct_of_total", "importance_pct"), names(tq))[1]
+  has_cum <- "cumulative_accuracy" %in% names(tq)
+  qs <- lapply(seq_len(nrow(tq)), function(i) {
+    v <- as.character(tq$variable[i])
+    list(
+      code = v, title = qlab(v),
+      importance_pct = if (!is.na(pct_col)) as.numeric(tq[[pct_col]][i]) else NA_real_,
+      cumulative_accuracy = if (has_cum) as.numeric(tq$cumulative_accuracy[i]) else NA_real_,
+      rank = as.integer(if ("rank" %in% names(tq)) tq$rank[i] else i)
+    )
+  })
+  per_seg <- NULL
+  psa <- gq$per_segment_accuracy
+  if (!is.null(psa) && length(psa) > 0) {
+    nm <- names(psa)
+    per_seg <- lapply(seq_along(psa), function(i) {
+      list(label = if (!is.null(nm)) as.character(nm[i]) else paste("Segment", i),
+           accuracy = as.numeric(psa[i]))
+    })
+  }
+  list(overall_accuracy = as.numeric(gq$accuracy %||% NA_real_),
+       n_questions = nrow(tq), questions = qs, per_segment = per_seg)
+}
+
 
 #' Build the v2 data layer (agg) for a segmentation result
 #'
@@ -133,7 +165,11 @@ build_segment_data_layer <- function(results, config) {
   analyst <- if (blank(config$analyst_name)) "" else as.character(config$analyst_name)
   if (nzchar(analyst)) project$report_meta <- list(analyst = analyst)
 
-  list(
+  # Golden questions (RF typing model) — a top-level island the native Golden
+  # Questions view reads; the engine ignores unknown top-level fields.
+  golden <- .seg_dl_golden(results$golden_questions, qlab)
+
+  dl <- list(
     schema_version = 2L,
     project        = project,
     columns        = cols,
@@ -141,6 +177,8 @@ build_segment_data_layer <- function(results, config) {
     categories     = list(cat_label),
     questions      = questions
   )
+  if (!is.null(golden)) dl$golden <- golden
+  dl
 }
 
 

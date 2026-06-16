@@ -252,14 +252,63 @@
   };
 
   // -------------------------------------------------------------------------
+  // Golden questions — the smallest set of questions that types a respondent
+  // into a segment (RF predictive model + cumulative-accuracy curve). A key
+  // operational output: which questions to ask to allocate someone in future.
+  // -------------------------------------------------------------------------
+  seg.golden = function (host) {
+    var g = TR.AGG && TR.AGG.golden;
+    var intro = '<h2 style="font-size:20px;font-weight:500;margin:8px 0 4px">Golden questions</h2>';
+    if (!g || !g.questions || !g.questions.length) {
+      host.innerHTML = '<section style="padding:8px 0 24px">' + intro +
+        '<p style="color:var(--muted)">Golden questions were not computed for this solution.</p></section>';
+      return;
+    }
+    var pct = function (x) { return (x == null || isNaN(x)) ? "–" : Math.round(x * 100) + "%"; };
+    var qs = g.questions.slice().sort(function (a, b) { return (a.rank || 0) - (b.rank || 0); });
+    var headline = (g.overall_accuracy != null) ? Math.round(g.overall_accuracy * 100) : null;
+    var firstCum = (qs[0] && qs[0].cumulative_accuracy != null)
+      ? Math.round(qs[0].cumulative_accuracy * 100) : null;
+
+    var rows = qs.map(function (q) {
+      var cum = q.cumulative_accuracy;
+      var w = (cum != null) ? Math.max(2, Math.round(cum * 100)) : 0;
+      return '<div style="display:grid;grid-template-columns:24px minmax(150px,1fr) 1fr 118px;' +
+        'align-items:center;gap:10px;margin:5px 0">' +
+        '<span style="display:inline-flex;width:22px;height:22px;border-radius:6px;background:var(--soft);' +
+        'color:var(--ink);align-items:center;justify-content:center;font-size:12px;font-weight:500">' + q.rank + "</span>" +
+        '<div style="font-size:13px">' + fmt.escapeHtml(q.title || q.code) + "</div>" +
+        '<div style="background:var(--soft);border-radius:5px;overflow:hidden">' +
+        '<div style="background:var(--brand);height:16px;width:' + w + '%"></div></div>' +
+        '<div style="font-size:12px;color:var(--muted);text-align:right">' + pct(cum) + " cumulative</div></div>";
+    }).join("");
+
+    var perSeg = (g.per_segment && g.per_segment.length)
+      ? '<div style="margin-top:14px;font-size:12.5px;color:var(--muted)">Per-segment hit rate: ' +
+        g.per_segment.map(function (s) { return fmt.escapeHtml(s.label) + " " + pct(s.accuracy); }).join(" · ") + "</div>"
+      : "";
+
+    host.innerHTML =
+      '<section style="padding:8px 0 24px">' + intro +
+      '<p style="color:var(--muted);margin:0 0 14px;max-width:64ch;line-height:1.6">The smallest set of ' +
+      'questions that can place a respondent into the right segment (random-forest typing model). ' +
+      (headline != null ? '<strong style="color:var(--ink)">Just these ' + qs.length + ' questions classify ' +
+        headline + '% of respondents correctly</strong>' +
+        (firstCum != null ? '; the single strongest question already reaches ' + firstCum + '%.' : '.') : '') + "</p>" +
+      '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin:0 0 6px">' +
+      'Question · cumulative accuracy as it is added</div>' + rows + perSeg + "</section>";
+  };
+
+  // -------------------------------------------------------------------------
   // Register the host-app tab set. "report" has no route here, so it falls
   // through to the engine's generic Report (metadata) tab.
   // -------------------------------------------------------------------------
   TR.app = {
     tabs: [["seg_overview", "Overview"], ["seg_profiles", "Profiles"],
-           ["seg_importance", "Importance"], ["report", "Report"]],
+           ["seg_golden", "Golden questions"], ["seg_importance", "Importance"],
+           ["report", "Report"]],
     routes: { seg_overview: seg.overview, seg_profiles: seg.profiles,
-              seg_importance: seg.importance },
+              seg_golden: seg.golden, seg_importance: seg.importance },
     defaultTab: "seg_overview"
   };
 

@@ -85,6 +85,31 @@ test_that("each question carries a mean row whose pct matches the profile means"
 })
 
 
+test_that("build_segment_data_layer carries golden questions when present", {
+  skip_if_not_installed("randomForest")
+  skip_if_not(exists("build_segment_data_layer", mode = "function"), "v2 writer not loaded")
+  skip_if_not(exists("identify_golden_questions", mode = "function"), "golden questions not loaded")
+
+  f <- .seg_v2_fixture()
+  num <- f$results$data_list$clustering_data
+  gq <- identify_golden_questions(data = num, clusters = f$results$cluster_result$clusters,
+          segment_names = f$results$segment_names, n_top = 4, n_trees = 100)
+  skip_if(is.null(gq) || gq$status == "SKIPPED", "golden questions not computed")
+
+  res <- f$results
+  res$golden_questions <- gq
+  dl <- build_segment_data_layer(res, f$config)
+
+  expect_false(is.null(dl$golden))
+  expect_true(length(dl$golden$questions) >= 1L)
+  expect_true(is.numeric(dl$golden$overall_accuracy))
+  q1 <- dl$golden$questions[[1]]
+  expect_true(is.numeric(q1$cumulative_accuracy))   # the accuracy curve value
+  expect_true(is.numeric(q1$importance_pct))
+  expect_true(nzchar(q1$title))                      # mapped to a question label
+})
+
+
 test_that("serialize_segment_data_layer produces engine-parseable JSON", {
   skip_if_not(exists("serialize_segment_data_layer", mode = "function"), "v2 writer not loaded")
   f <- .seg_v2_fixture()
