@@ -286,12 +286,17 @@
     var model = cards2.activeModel();
     if (!model) { holder.innerHTML = ""; return; }
 
-    var sourceBadge = model.source === "computed"
-      ? '<span class="badge-computed" title="' +
-        fmt.escapeHtml("Recomputed live from microdata. " +
-          (TR.d2.filterDescription() || "")) + '">COMPUTED · n=' +
-        fmt.base(model.columns[0].base) + "</span>"
-      : '<span class="badge-published" title="Published 2025 value, verbatim">PUBLISHED</span>';
+    var sourceBadge = model.notRecomputable
+      ? '<span class="badge-computed na" title="' +
+        fmt.escapeHtml("Derived ranking / score with no per-respondent data — it " +
+          "can't be recomputed for a filtered or custom-banner subset, so no " +
+          "figures are shown for this view.") + '">n/a under filter</span>'
+      : model.source === "computed"
+        ? '<span class="badge-computed" title="' +
+          fmt.escapeHtml("Recomputed live from microdata. " +
+            (TR.d2.filterDescription() || "")) + '">COMPUTED · n=' +
+          fmt.base(model.columns[0].base) + "</span>"
+        : '<span class="badge-published" title="Published 2025 value, verbatim">PUBLISHED</span>';
     var prevBadge = model.prevWave
       ? '<span class="badge-prev" title="' + model.history.length +
         " prior wave" + (model.history.length > 1 ? "s" : "") + " · latest " +

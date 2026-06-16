@@ -540,6 +540,83 @@ run("box-category NETs recompute from per-respondent box membership", () => {
   }
 });
 
+run("hidden-scale box-only question: filtered base counts box members, not null answers", () => {
+  // The CCPB regression. A satisfaction question whose 1-10 scale is hidden
+  // publishes only its boxes, so TR.MICRO.answers[code] is all null and the
+  // respondents live in TR.MICRO.boxes. Under a filter the box cells recompute
+  // correctly, but the displayed base used to read 0 (tabulate skipped every
+  // null answer) -> "COMPUTED · n=0 / low base" beside real box counts. The
+  // base must fall back to box membership so it matches the box-row counts.
+  const agg = { schema_version: 2,
+    project: { name: "B", low_base_threshold: 30, alpha: 0.05, tracking: { enabled: false } },
+    columns: [{ key: "TOTAL::Total", group: "total", label: "Total", letter: "" }],
+    banner_groups: [], categories: ["c"],
+    questions: [{ code: "QS", title: "QS", category: "c", type: "scale",
+      bases: [{ n: 5, low: false }],
+      rows: [{ kind: "net", label: "Low", pct: [40], n: [null], sig: [""] },
+             { kind: "net", label: "High", pct: [60], n: [null], sig: [""] },
+             { kind: "mean", label: "Mean", pct: [7], n: [null], sig: [""] }] }] };
+  const saved = { agg: TR.AGG, micro: TR.MICRO, prev: TR.PREV, idx: TR.d2._qIndex };
+  try {
+    TR.AGG = agg; TR.PREV = null; TR.d2._qIndex = null;
+    // 5 respondents, ALL answered (box set), raw answers all null. boxes:
+    // High(1)=resp 0,1,3 ; Low(0)=resp 2,4. group G: 0=resp 0,1,2 ; 1=resp 3,4.
+    TR.MICRO = { n: 5, answers: { QS: [null, null, null, null, null] },
+      banner_vars: { G: [0, 0, 0, 1, 1] }, weights: [1, 1, 1, 1, 1],
+      boxes: { QS: [1, 1, 0, 1, 0] } };
+    // Forced compute, unfiltered: base must be all 5 box members (not 0).
+    const m = TR.model.forQuestion("QS", "custom:QS", []);
+    assert(m.source === "computed", "custom banner forces a computed view");
+    assert(m.columns[0].base === 5, "unfiltered box-only base = 5 (got " + m.columns[0].base + ")");
+    // Filter G=0 -> respondents 0,1,2: base 3, High = 2/3, and the box-row
+    // counts must sum back to the base (the heart of the bug).
+    const mf = TR.model.forQuestion("QS", null, [{ q: "G", rows: [0] }]);
+    assert(mf.source === "computed", "filter forces a computed view");
+    assert(mf.columns[0].base === 3, "filtered base = masked box members = 3 (got " + mf.columns[0].base + ")");
+    const high = mf.rows.find((r) => r.label === "High").cells[0];
+    const low = mf.rows.find((r) => r.label === "Low").cells[0];
+    assert(high.n === 2 && low.n === 1, "filtered box counts High=2 Low=1 (got " + high.n + "/" + low.n + ")");
+    assert(low.n + high.n === mf.columns[0].base, "box-row counts sum to the base");
+    assert(Math.abs(high.pct - 200 / 3) < 1e-9, "filtered High = 2/3 (got " + high.pct + ")");
+  } finally {
+    TR.AGG = saved.agg; TR.MICRO = saved.micro; TR.PREV = saved.prev; TR.d2._qIndex = saved.idx;
+  }
+});
+
+run("derived-metric question (no microdata) reports 'not recomputable', not a 0 base", () => {
+  // Ranking / derived questions carry NO per-respondent data (answers all null,
+  // no boxes, no scores). A filtered or custom-banner recompute must flag the
+  // model notRecomputable and null the base — never "COMPUTED · n=0 / low base"
+  // against a real published base (the CCPB Q73/Q76 case found while fixing the
+  // box-only base bug above).
+  const agg = { schema_version: 2,
+    project: { name: "B", low_base_threshold: 30, alpha: 0.05, tracking: { enabled: false } },
+    columns: [{ key: "TOTAL::Total", group: "total", label: "Total", letter: "" }],
+    banner_groups: [], categories: ["c"],
+    questions: [{ code: "QR", title: "QR", category: "c", type: "single",
+      bases: [{ n: 200, low: false }],
+      rows: [{ kind: "category", label: "Stock - % Ranked 1st", pct: [30], n: [null], sig: [""] },
+             { kind: "mean", label: "Stock - Mean Rank", pct: [2.1], n: [null], sig: [""] }] }] };
+  const saved = { agg: TR.AGG, micro: TR.MICRO, prev: TR.PREV, idx: TR.d2._qIndex };
+  try {
+    TR.AGG = agg; TR.PREV = null; TR.d2._qIndex = null;
+    TR.MICRO = { n: 3, answers: { QR: [null, null, null] },
+      banner_vars: { G: [0, 0, 1] }, weights: [1, 1, 1] };   // no boxes, no scores
+    const m = TR.model.forQuestion("QR", null, [{ q: "G", rows: [0] }]);
+    assert(m.source === "computed", "filter forces a computed view");
+    assert(m.notRecomputable === true, "derived-metric question flagged notRecomputable");
+    assert(m.columns[0].base === null, "base is null (renders '–'), not 0 (got " + m.columns[0].base + ")");
+    assert(m.columns[0].low === false, "no false low-base flag on a null base");
+    // Give the same question box membership and it becomes recomputable again.
+    TR.MICRO.boxes = { QR: [0, 1, 0] };
+    const m2 = TR.model.forQuestion("QR", null, [{ q: "G", rows: [0] }]);
+    assert(m2.notRecomputable === false, "box membership makes it recomputable");
+    assert(m2.columns[0].base === 2, "recomputable base counts masked box members (got " + m2.columns[0].base + ")");
+  } finally {
+    TR.AGG = saved.agg; TR.MICRO = saved.micro; TR.PREV = saved.prev; TR.d2._qIndex = saved.idx;
+  }
+});
+
 run("stacked chart export is transposed (segments=series, columns=bars)", () => {
   // Regression: the PPTX stacked export reused the bar layout (rows as
   // categories, one series per column), so each option rendered as its own

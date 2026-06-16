@@ -71,6 +71,24 @@
     return { source: "published", columns: columns, rows: rows };
   }
 
+  /**
+   * True when the question carries per-respondent data we can re-tabulate
+   * under a filter / custom banner — raw answers, box membership or scores.
+   * Ranking and other derived-metric questions carry none (answers all null,
+   * no boxes, no scores), so a filtered recompute can only honestly report
+   * "not available" — never a base of 0 against real published figures.
+   */
+  function recomputable(q) {
+    if (TR.MICRO.boxes && TR.MICRO.boxes[q.code]) return true;
+    if (TR.MICRO.scores && TR.MICRO.scores[q.code]) return true;
+    var a = TR.MICRO.answers[q.code];
+    if (!a) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] !== null && a[i] !== undefined) return true;
+    }
+    return false;
+  }
+
   /** Computed view from microdata for any banner/filter combination. */
   function computedModel(q, bannerId, filters, dual) {
     var spec = TR.stats.columnsFor(bannerId);
@@ -79,10 +97,15 @@
     var letters = spec.columns.map(function (c) { return c.letter; });
     var threshold = lowThreshold();
     var means = stash(q, spec.columns, mask);
+    // A derived-metric question (ranking, etc.) has no microdata to re-tabulate:
+    // its base would compute to 0 against a real published base, so report it as
+    // "not recomputable" (null base -> "–", no false low-base flag) instead.
+    var canRecompute = recomputable(q);
 
     var columns = spec.columns.map(function (col, i) {
       return { label: col.label, letter: col.letter,
-        base: tabs[i].base, low: tabs[i].base < threshold };
+        base: canRecompute ? tabs[i].base : null,
+        low: canRecompute && tabs[i].base < threshold };
     });
 
     var rows = q.rows.map(function (r, ri) {
@@ -124,6 +147,7 @@
       }));
     });
     return { source: "computed", columns: columns, rows: rows,
+      notRecomputable: !canRecompute,
       maskCount: TR.stats.maskCount(mask), custom: !!spec.custom,
       customSource: spec.source ? spec.source.code : null };
   }

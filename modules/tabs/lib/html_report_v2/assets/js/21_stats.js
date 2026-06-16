@@ -150,6 +150,7 @@
    */
   stats.tabulate = function (q, columns, mask) {
     var answers = TR.MICRO.answers[q.code];
+    var boxes = TR.MICRO.boxes && TR.MICRO.boxes[q.code];
     var catRows = TR.d2.catRows(q);
     var result = columns.map(function (col) {
       var counts = {}, base = 0, wbase = 0, sumW2 = 0;
@@ -158,9 +159,21 @@
         if (!mask[r]) continue;
         if (col.member && !col.member[r]) continue;
         var a = answers[r];
-        if (a === null || a === undefined) continue;
+        var answered = a !== null && a !== undefined;
+        // Hidden-scale box-only questions (CCS/CSAT style) carry no raw answer
+        // — only the respondent's box membership records that they answered.
+        // Fall back to it so the base / % denominator reflect the real
+        // respondent universe (matching the box-category recompute) instead of
+        // collapsing to 0. Shown scales have both (answer ⇒ box), so this is a
+        // no-op there and the unweighted base stays byte-identical.
+        if (!answered && boxes) {
+          var b = boxes[r];
+          answered = b !== null && b !== undefined;
+        }
+        if (!answered) continue;
         var w = weightAt(r);
         base++; wbase += w; sumW2 += w * w;
+        if (a === null || a === undefined) continue;  // box-only: no row to tally
         if (Array.isArray(a)) {
           for (var j = 0; j < a.length; j++) {
             if (counts[a[j]] !== undefined) counts[a[j]] += w;

@@ -91,7 +91,8 @@
   exporter.cardSvg = function (model, note, opts) {
     opts = opts || {};
     var meta = [TR.AGG.project.name, TR.AGG.project.wave,
-      model.source === "computed" ? "COMPUTED · filtered audience" : "published values",
+      model.notRecomputable ? "n/a under filter — not recomputable"
+        : model.source === "computed" ? "COMPUTED · filtered audience" : "published values",
       note || ""].filter(Boolean).join(" · ");
     var matrix = opts.includeTable !== false ? TR.render.matrix(model) : null;
     return exporter.cardSvgRaw(model.code + " — " + model.title, meta, opts.chartSvg, matrix);
