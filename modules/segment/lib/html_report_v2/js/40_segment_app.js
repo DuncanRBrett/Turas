@@ -113,41 +113,102 @@
     return "background:rgba(" + rgb + "," + a.toFixed(2) + ")";
   }
 
-  seg.profiles = function (host) {
-    var ti = totalIndex(), segs = segIndexes(), cols = columns(), qs = questions();
+  // Variables in display order: sorted by a segment's gap vs overall when a
+  // sort column is set (segment comparison — decision A, no microdata), else
+  // the natural order.
+  function rowsForState(state) {
+    var ti = totalIndex(), qs = questions().slice();
+    if (state.sortCol != null) {
+      qs.sort(function (a, b) {
+        function gap(q) {
+          var r = meanRow(q), ov = r.pct[ti], v = r.pct[state.sortCol];
+          return (ov != null && v != null) ? (v - ov) : -Infinity;
+        }
+        return gap(b) - gap(a);
+      });
+    }
+    return qs;
+  }
+
+  // Pure render of the profiles table for a {sortCol, mode} state — exposed so
+  // the sort/compare logic is testable without a DOM; seg.profiles wires it.
+  seg.profilesHtml = function (state) {
+    state = state || { sortCol: null, mode: "mean" };
+    var ti = totalIndex(), segs = segIndexes(), cols = columns();
     var order = [ti].concat(segs);
+    var qs = rowsForState(state);
+
+    function chip(attr, val, label, on) {
+      return '<button ' + attr + '="' + val + '" style="font:inherit;font-size:12px;cursor:pointer;' +
+        'border:1px solid ' + (on ? "var(--brand)" : "var(--line)") + ';border-radius:6px;padding:3px 9px;' +
+        'background:' + (on ? "var(--brand)" : "var(--card)") + ';color:' + (on ? "#fff" : "var(--ink)") +
+        '">' + label + "</button>";
+    }
+    var controls =
+      '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 12px">' +
+      '<span style="font-size:12px;color:var(--faint)">Rank by</span>' +
+      segs.map(function (ci) {
+        return chip("data-sortcol", ci, fmt.escapeHtml(cols[ci].label) +
+          (cols[ci].letter ? " " + cols[ci].letter : ""), state.sortCol === ci);
+      }).join("") +
+      (state.sortCol != null ? chip("data-sortcol", -1, "Clear", false) : "") +
+      '<span style="width:12px"></span><span style="font-size:12px;color:var(--faint)">Show</span>' +
+      chip("data-mode", "mean", "Means", state.mode !== "delta") +
+      chip("data-mode", "delta", "vs overall", state.mode === "delta") + "</div>";
 
     var head = '<th style="text-align:left;position:sticky;left:0;background:var(--card);' +
       'padding:8px 10px;border-bottom:2px solid var(--line)">Variable</th>' +
       order.map(function (ci) {
-        var c = cols[ci];
-        return '<th style="padding:8px 10px;border-bottom:2px solid var(--line);' +
-          'font-weight:500;min-width:78px">' + fmt.escapeHtml(c.label) +
+        var c = cols[ci], hl = state.sortCol === ci;
+        return '<th style="padding:8px 10px;border-bottom:2px solid var(--line);font-weight:500;' +
+          'min-width:78px' + (hl ? ";background:rgba(50,51,103,.10)" : "") + '">' + fmt.escapeHtml(c.label) +
           (c.letter ? ' <span style="color:var(--faint)">' + c.letter + "</span>" : "") + "</th>";
       }).join("");
 
     var body = qs.map(function (q) {
       var r = meanRow(q), ov = r.pct[ti], sm = q.scale_max || 10;
       var cells = order.map(function (ci) {
-        var v = r.pct[ci], isTotal = ci === ti;
+        var v = r.pct[ci], isTotal = ci === ti, hl = state.sortCol === ci;
+        var diff = (v != null && ov != null) ? v - ov : null;
+        var show = (state.mode === "delta" && !isTotal)
+          ? (diff == null ? "–" : (diff >= 0 ? "+" : "") + fmt.num(diff, "dec1"))
+          : fmt.num(v, "dec1");
         var style = "padding:7px 10px;text-align:center;border-bottom:1px solid var(--line);" +
-          (isTotal ? "color:var(--muted);font-weight:500"
-                   : tint((v != null && ov != null) ? v - ov : null, sm));
-        return '<td style="' + style + '">' + dec1(v) + "</td>";
+          (isTotal ? "color:var(--muted);font-weight:500" : tint(diff, sm)) +
+          (hl ? ";outline:2px solid rgba(50,51,103,.18);outline-offset:-2px" : "");
+        return '<td style="' + style + '">' + show + "</td>";
       }).join("");
       return '<tr><td style="text-align:left;position:sticky;left:0;background:var(--card);' +
         'padding:7px 10px;border-bottom:1px solid var(--line)">' +
         fmt.escapeHtml(q.title || q.code) + "</td>" + cells + "</tr>";
     }).join("");
 
-    host.innerHTML =
-      '<section style="padding:8px 0 24px">' +
+    return '<section style="padding:8px 0 24px">' +
       '<h2 style="font-size:20px;font-weight:500;margin:8px 0 4px">Segment profiles</h2>' +
-      '<p style="color:var(--muted);margin:0 0 14px;max-width:62ch;line-height:1.6">Mean score per ' +
-      'variable by segment. Cells are shaded green where a segment scores above the overall average ' +
-      'and red where it scores below; the Total column is the overall sample.</p>' +
+      '<p style="color:var(--muted);margin:0 0 12px;max-width:62ch;line-height:1.6">Mean score per ' +
+      'variable by segment, shaded vs the overall average. Click a segment to rank the variables it ' +
+      'most over- and under-indexes on; switch to “vs overall” to read the gaps directly.</p>' + controls +
       '<div style="overflow:auto"><table style="border-collapse:collapse;font-size:13px;width:100%">' +
       "<thead><tr>" + head + "</tr></thead><tbody>" + body + "</tbody></table></div></section>";
+  };
+
+  seg.profiles = function (host) {
+    var state = { sortCol: null, mode: "mean" };
+    function draw() {
+      host.innerHTML = seg.profilesHtml(state);
+      // Fresh listeners each render (innerHTML replaced the old nodes — no stacking).
+      host.querySelectorAll("[data-sortcol]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          var ci = parseInt(b.getAttribute("data-sortcol"), 10);
+          state.sortCol = (ci < 0 || state.sortCol === ci) ? null : ci;
+          draw();
+        });
+      });
+      host.querySelectorAll("[data-mode]").forEach(function (b) {
+        b.addEventListener("click", function () { state.mode = b.getAttribute("data-mode"); draw(); });
+      });
+    }
+    draw();
   };
 
   // -------------------------------------------------------------------------
