@@ -78,6 +78,7 @@
       hiddenCols: TR.d2.hiddenFor(s.banner).slice(),
       dual: s.sigMode === "dual",
       intervals: !!s.showIntervals,   // pin shows exactly what was on screen
+      counts: !!s.showCounts,         // the "Counts" toggle travels with the pin
       note: ""
     });
     persist();
@@ -382,7 +383,7 @@
         "</div>" : "") +
       (flags.table ? '<div class="si-table">' + TR.render.tableHtml(model,
         { heatmap: true, showDeltas: TR.d2.tracking().enabled,
-          intervals: !!item.intervals }) + "</div>" : "") +
+          intervals: !!item.intervals, showCounts: !!item.counts }) + "</div>" : "") +
       (flags.insight ? '<textarea class="si-note" placeholder="Commentary for this slide…">' +
         fmt.escapeHtml(item.note || TR.insights.get(item.q, item.banner) || "") +
         "</textarea>" : "") + "</div>";
@@ -583,7 +584,7 @@
           "</div>" : "") +
         (flags.table !== false ? '<div class="pr-table">' + TR.render.tableHtml(model,
           { heatmap: true, showDeltas: TR.d2.tracking().enabled,
-            intervals: !!item.intervals }) + "</div>" : "");
+            intervals: !!item.intervals, showCounts: !!item.counts }) + "</div>" : "");
     }
     overlay.hidden = false;
     overlay.innerHTML = '<div class="present">' + head + body +

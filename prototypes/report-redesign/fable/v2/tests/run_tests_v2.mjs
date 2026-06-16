@@ -115,6 +115,47 @@ run("dashboard excludes numeric questions (open counts are not rated touchpoints
   }
 });
 
+run("pinning a table carries the Counts toggle (showCounts round-trips into the pin)", () => {
+  // Regression: pinCurrent captured intervals but not showCounts, so a table
+  // pinned with "Counts" on rendered without n= in the Story. The flag must
+  // travel with the pin and drive the rendered table.
+  const agg = { schema_version: 2,
+    project: { name: "C", low_base_threshold: 30, tracking: { enabled: false } },
+    columns: [{ key: "TOTAL::Total", group: "total", label: "Total", letter: "" }],
+    banner_groups: [], categories: ["c"],
+    questions: [{ code: "Q1", title: "Q1", category: "c", type: "single",
+      bases: [{ n: 60, low: false }],
+      rows: [{ kind: "category", label: "Yes", pct: [60], n: [36], sig: [""] },
+             { kind: "category", label: "No", pct: [40], n: [24], sig: [""] }] }] };
+  const saved = { agg: TR.AGG, micro: TR.MICRO, prev: TR.PREV, idx: TR.d2._qIndex,
+    state: JSON.parse(JSON.stringify(TR.d2.state)), len: TR.story2.items().length };
+  try {
+    TR.AGG = agg; TR.MICRO = null; TR.PREV = null; TR.d2._qIndex = null;
+    TR.d2.state.activeQ = "Q1"; TR.d2.state.banner = ""; TR.d2.state.filters = [];
+    TR.d2.state.showIntervals = false; TR.d2.state.sigMode = "single";
+
+    TR.d2.state.showCounts = true;
+    TR.story2.pinCurrent();
+    var on = TR.story2.items()[TR.story2.items().length - 1];
+    assert(on.counts === true, "pinCurrent must capture showCounts=true");
+    // The per-cell count is a <div class="fq">; the Base row always says "n="
+    // so match the count cell specifically.
+    var htmlOn = TR.render.tableHtml(TR.story2._modelFor(on), { showCounts: !!on.counts });
+    assert(htmlOn.indexOf('class="fq"') !== -1, "pinned table shows count cells when captured");
+
+    TR.d2.state.showCounts = false;
+    TR.story2.pinCurrent();
+    var off = TR.story2.items()[TR.story2.items().length - 1];
+    assert(off.counts === false, "pinCurrent must capture showCounts=false");
+    var htmlOff = TR.render.tableHtml(TR.story2._modelFor(off), { showCounts: !!off.counts });
+    assert(htmlOff.indexOf('class="fq"') === -1, "pinned table omits count cells when off");
+  } finally {
+    TR.story2.items().length = saved.len;   // drop the pins this test added
+    TR.AGG = saved.agg; TR.MICRO = saved.micro; TR.PREV = saved.prev; TR.d2._qIndex = saved.idx;
+    Object.keys(saved.state).forEach(function (k) { TR.d2.state[k] = saved.state[k]; });
+  }
+});
+
 run("weighted recompute: weighted %, Kish effective base, weighted mean (known answers)", () => {
   // 4 respondents, weights [3,1,1,1].
   //   Q1 single Yes/No, answers [0,0,1,1]: Yes Σw = 3+1 = 4, No = 1+1 = 2,
