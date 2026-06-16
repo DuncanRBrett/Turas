@@ -229,20 +229,11 @@
         '<p style="color:var(--muted)">No differentiation statistics are available for this solution.</p></section>';
       return;
     }
-    var maxF = rows[0].f || 1;
-    var bars = rows.map(function (d) {
-      var w = Math.max(2, Math.round(d.f / maxF * 100));
-      var sig = (d.p != null && d.p < 0.05)
-        ? '<span style="color:var(--green)">sig.</span>'
-        : (d.p != null ? '<span style="color:var(--faint)">ns</span>' : "");
-      return '<div style="display:grid;grid-template-columns:minmax(140px,220px) 1fr 96px;' +
-        'align-items:center;gap:10px;margin:5px 0">' +
-        '<div style="font-size:13px">' + fmt.escapeHtml(d.title) + "</div>" +
-        '<div style="background:var(--soft);border-radius:5px;overflow:hidden">' +
-        '<div style="background:var(--brand);height:16px;width:' + w + '%"></div></div>' +
-        '<div style="font-size:12px;color:var(--muted);text-align:right">F=' +
-        fmt.num(d.f, "dec1") + " " + sig + "</div></div>";
-    }).join("");
+    var bars = '<div style="overflow:auto">' + segHBarsSvg(rows.map(function (d) {
+      return { label: d.title, value: d.f,
+        valueLabel: "F=" + fmt.num(d.f, "dec1") + (d.p != null ? (d.p < 0.05 ? "  sig." : "  ns") : "") };
+    }), { max: rows[0].f || 1, colour: brandHex(), gutter: 200, barW: 280,
+      title: "Variable importance (ANOVA F)" }) + "</div>";
     host.innerHTML =
       '<section style="padding:8px 0 24px">' + intro +
       '<p style="color:var(--muted);margin:0 0 14px;max-width:62ch;line-height:1.6">How strongly each ' +
@@ -304,6 +295,12 @@
     var P = function (x) { return (x == null || isNaN(x)) ? "–" : Math.round(x * 100) + "%"; };
     var overall = g.overall_accuracy, oob = (overall != null) ? Math.round((1 - overall) * 100) : null;
     var est = seg.goldenEstimate(incr, sel, overall), nSel = sel.filter(Boolean).length;
+    var curvePts = qs.map(function (q, i) { return { x: i + 1, y: q.cumulative_accuracy }; })
+      .filter(function (p) { return p.y != null; });
+    var curve = (curvePts.length > 1)
+      ? '<div style="overflow:auto;margin:0 0 14px">' + segLineSvg(curvePts, { xMax: qs.length, yMax: 1,
+          colour: brandHex(), title: "Classification accuracy as questions are added",
+          xLabel: "number of golden questions" }) + "</div>" : "";
 
     var trs = qs.map(function (q, i) {
       var gain = (i > 0 && incr[i] != null)
@@ -337,7 +334,7 @@
         Math.round(overall * 100) + "%</strong> using all " + qs.length + " questions" +
         (oob != null ? " (OOB error " + oob + "%)" : "") + ".</div>" : "") +
       '<div data-estimate style="font-size:13px;margin-top:4px">Using <strong>' + nSel + " of " + qs.length +
-      "</strong> questions &middot; estimated accuracy <strong>" + Math.round(est * 100) + "%</strong></div></div>" +
+      "</strong> questions &middot; estimated accuracy <strong>" + Math.round(est * 100) + "%</strong></div></div>" + curve +
       '<div style="overflow:auto"><table style="border-collapse:collapse;font-size:13px;width:100%"><thead><tr>' +
       '<th style="padding:7px 8px;border-bottom:2px solid var(--line)"></th>' +
       '<th style="padding:7px 8px;border-bottom:2px solid var(--line);text-align:left;color:var(--faint);font-weight:500">#</th>' +
@@ -413,6 +410,35 @@
         return '<span style="margin-right:14px"><strong style="color:var(--ink)">' + letterOf(i) +
           "</strong> " + fmt.escapeHtml(l) + "</span>";
       }).join("") + "</div>";
+  }
+
+  // Line chart for one series of {x, y} points (y a proportion 0..1), with a
+  // soft area fill, gridlines and an x-axis count. Used for the golden curve.
+  function segLineSvg(points, opts) {
+    opts = opts || {};
+    var W = opts.width || 480, H = opts.height || 196, padL = 40, padB = 34, padT = 12, padR = 14;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+    var xMax = opts.xMax || points.length, yMax = opts.yMax || 1, colour = opts.colour || brandHex();
+    var sx = function (x) { return padL + (xMax <= 1 ? plotW / 2 : (x - 1) / (xMax - 1) * plotW); };
+    var sy = function (y) { return padT + plotH - Math.max(0, Math.min(1, y / yMax)) * plotH; };
+    var els = [];
+    [0, 0.25, 0.5, 0.75, 1].forEach(function (gv) {
+      var y = sy(gv);
+      els.push(S.el("line", { x1: padL, y1: y, x2: padL + plotW, y2: y, stroke: "#eceae3", "stroke-width": 1 }));
+      els.push(S.text(padL - 6, y + 4, Math.round(gv * 100) + "%", { "text-anchor": "end", "font-size": 10, fill: "#94a3b8" }));
+    });
+    points.forEach(function (p) {
+      els.push(S.text(sx(p.x), padT + plotH + 15, String(p.x), { "text-anchor": "middle", "font-size": 10, fill: "#94a3b8" }));
+    });
+    els.push(S.text(padL + plotW / 2, H - 3, opts.xLabel || "number of questions", { "text-anchor": "middle", "font-size": 11, fill: "#64748b" }));
+    var line = points.map(function (p, i) { return (i ? "L" : "M") + sx(p.x).toFixed(1) + " " + sy(p.y).toFixed(1); }).join(" ");
+    var area = "M" + sx(points[0].x).toFixed(1) + " " + sy(0).toFixed(1) + " " +
+      points.map(function (p) { return "L" + sx(p.x).toFixed(1) + " " + sy(p.y).toFixed(1); }).join(" ") +
+      " L" + sx(points[points.length - 1].x).toFixed(1) + " " + sy(0).toFixed(1) + " Z";
+    els.push(S.el("path", { d: area, fill: S.shade(colour, 0.13), stroke: "none" }));
+    els.push(S.el("path", { d: line, fill: "none", stroke: colour, "stroke-width": 2.5, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    points.forEach(function (p) { els.push(S.el("circle", { cx: sx(p.x), cy: sy(p.y), r: 3.5, fill: colour })); });
+    return S.root(W, H, opts.title || "line chart", S.el("g", {}, els.join("")));
   }
 
   // -------------------------------------------------------------------------
