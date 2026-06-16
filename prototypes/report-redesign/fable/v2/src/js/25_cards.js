@@ -186,6 +186,41 @@
       '<span id="pinmenu" class="pinmenu" hidden></span></span>';
   }
 
+  /** Row labels the chart would plot under the current "Chart plots" scope,
+   *  before any per-row unticks — the membership a "select all charts" spans. */
+  function chartableRowLabels() {
+    var cm = cards2.chartModel();
+    if (!cm) return [];
+    var sm = {};
+    Object.keys(cm).forEach(function (k) { sm[k] = cm[k]; });
+    sm.hiddenChartRows = [];
+    return TR.render.chartRows(sm).rows.map(function (r) { return r.label; });
+  }
+
+  /**
+   * Bulk select / clear a whole Table or Chart column in the panel. `on` = the
+   * header checkbox's new state. Hidden-lists store what's OFF; chartColLabels
+   * stores what's ON (and keeps the Total column so the chart always has one).
+   * Pure state mutation — exposed for the gate test; the UI re-renders after.
+   */
+  cards2._setAll = function (which, on) {
+    var st = TR.d2.state, cm = cards2.chartModel();
+    if (!cm) return;
+    if (which === "col-table") {
+      st.hiddenCols[st.banner] = on ? []
+        : cm.columns.slice(1).map(function (c) { return c.label; });
+    } else if (which === "col-chart") {
+      st.chartColLabels = on
+        ? cm.columns.map(function (c, i) { return i === 0 ? "Total" : c.label; })
+        : ["Total"];
+    } else if (which === "row-table") {
+      var q = TR.d2.questionByCode(st.activeQ);
+      st.hiddenRows[st.activeQ] = on ? [] : q.rows.map(function (r) { return r.label; });
+    } else if (which === "row-chart") {
+      st.hiddenChartRows[st.activeQ] = on ? [] : chartableRowLabels();
+    }
+  };
+
   /** (Re)build the rows & columns panel for the active question. One
    *  panel configures the table AND the chart — columns (table/chart
    *  checks), row visibility, and which row kind the chart plots. */
@@ -207,19 +242,19 @@
         '<label><input type="checkbox" data-cmchart="' + fmt.escapeHtml(col.label) +
         '"' + (inChart ? " checked" : "") + "></label></div>";
     }).join("");
+    var colTableTotal = 0, colTableChecked = 0, colChartChecked = 0;
+    chartModel.columns.forEach(function (col, i) {
+      if (i !== 0) { colTableTotal++; if (hidden.indexOf(col.label) === -1) colTableChecked++; }
+      if (s.chartColLabels.indexOf(i === 0 ? "Total" : col.label) !== -1) colChartChecked++;
+    });
     // list ALL rows of the question (not the filtered model) so a row
     // hidden here can always be un-hidden here
     var q = TR.d2.questionByCode(s.activeQ);
     var hiddenChartRows = s.hiddenChartRows[s.activeQ] || [];
     // which rows the chart WOULD plot before per-row unticks — the kind
     // dropdown governs scope, the checkboxes govern membership within it
-    var scopeModel = {};
-    Object.keys(chartModel).forEach(function (k) { scopeModel[k] = chartModel[k]; });
-    scopeModel.hiddenChartRows = [];
     var inScope = {};
-    TR.render.chartRows(scopeModel).rows.forEach(function (r) {
-      inScope[r.label] = true;
-    });
+    chartableRowLabels().forEach(function (l) { inScope[l] = true; });
     var rows = q.rows.map(function (row, ri) {
       var diff = !!(q.net_diffs && q.net_diffs[String(ri)]);
       var chartable = !!inScope[row.label];
@@ -240,15 +275,38 @@
         '"' + (chartChecked ? " checked" : "") + (chartable ? "" : " disabled") +
         "></label></div>";
     }).join("");
+    var rowTableChecked = 0, rowChartTotal = 0, rowChartChecked = 0;
+    q.rows.forEach(function (row) {
+      if (hiddenRows.indexOf(row.label) === -1) rowTableChecked++;
+      if (inScope[row.label]) {
+        rowChartTotal++;
+        if (hiddenChartRows.indexOf(row.label) === -1) rowChartChecked++;
+      }
+    });
+    // "Select all" header row: a checkbox is checked when every (enabled) item
+    // is on, indeterminate when mixed; toggling it bulk-sets the matching list.
+    var allRow = function (tKey, tChk, tTot, cKey, cChk, cTot) {
+      var box = function (key, chk, tot) {
+        return '<label><input type="checkbox" data-cmall="' + key + '"' +
+          (tot && chk === tot ? " checked" : "") + (tot ? "" : " disabled") +
+          ' data-mixed="' + (chk > 0 && chk < tot ? "1" : "") + '"></label>';
+      };
+      return '<div class="cm-row cm-allrow"><span class="cm-label">Select all</span>' +
+        box(tKey, tChk, tTot) + box(cKey, cChk, cTot) + "</div>";
+    };
+    var colAll = allRow("col-table", colTableChecked, colTableTotal,
+      "col-chart", colChartChecked, chartModel.columns.length);
+    var rowAll = allRow("row-table", rowTableChecked, q.rows.length,
+      "row-chart", rowChartChecked, rowChartTotal);
     var kind = cards2.resolveChartKind(chartModel);
     var hasNets = TR.render.hasNetRows(chartModel);
     menu.innerHTML =
       '<div class="cm-sect">Columns</div>' +
       '<div class="cm-head"><span>Column</span><span>Table</span>' +
-      "<span>Chart</span></div><div class='cm-body'>" + cols + "</div>" +
+      "<span>Chart</span></div><div class='cm-body'>" + colAll + cols + "</div>" +
       '<div class="cm-sect">Rows</div>' +
       '<div class="cm-head"><span>Row</span><span>Table</span><span>Chart</span></div>' +
-      "<div class='cm-body'>" + rows + "</div>" +
+      "<div class='cm-body'>" + rowAll + rows + "</div>" +
       '<div class="cm-sect">Chart plots</div>' +
       '<select data-chartkindsel class="wide"' +
       (hasNets ? "" : ' disabled title="This question has no NET rows — detail only"') +
@@ -259,6 +317,9 @@
       '<option value="both"' + (kind === "both" ? " selected" : "") +
       ">Both</option></select>" +
       '<button class="primary wide" data-act="columns-done">Done</button>';
+    menu.querySelectorAll("[data-cmall][data-mixed='1']").forEach(function (cb) {
+      cb.indeterminate = true;   // header reflects a mixed selection
+    });
   }
 
   function bannerTabsHtml() {
@@ -528,6 +589,13 @@
         TR.d2.state.chartColLabels = ["Total"];  // selection is per banner
         closeColMenu();
         cards2.renderActive();
+        return;
+      }
+      var cmAll = e.target.closest("[data-cmall]");
+      if (cmAll) {
+        cards2._setAll(cmAll.getAttribute("data-cmall"), cmAll.checked);
+        cards2.renderActive();
+        buildColumnsPanel();
         return;
       }
       var cmTable = e.target.closest("[data-cmtable]");

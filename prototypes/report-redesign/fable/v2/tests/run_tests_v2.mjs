@@ -735,6 +735,49 @@ run("Differences view: 95%+80% dual mode adds soft 'nearly significant' findings
   }
 });
 
+run("Crosstabs panel: 'Select all' bulk-sets table/chart columns and rows", () => {
+  // The Rows & columns panel's header "Select all" toggle. Hidden-lists store
+  // what's OFF (empty = everything shown); chartColLabels stores what's ON and
+  // always keeps the Total column so the chart has at least one.
+  const saved = { banner: TR.d2.state.banner, q: TR.d2.state.activeQ,
+    hc: TR.d2.state.hiddenCols, hr: TR.d2.state.hiddenRows,
+    hcr: TR.d2.state.hiddenChartRows, ccl: TR.d2.state.chartColLabels };
+  try {
+    const banner = TR.AGG.banner_groups[0].id;
+    const q = TR.AGG.questions.filter((x) => x.type === "scale")[0] || TR.AGG.questions[0];
+    TR.d2.state.banner = banner; TR.d2.state.activeQ = q.code;
+    TR.d2.state.hiddenCols = {}; TR.d2.state.hiddenRows = {};
+    TR.d2.state.hiddenChartRows = {}; TR.d2.state.chartColLabels = ["Total"];
+    const nCols = TR.cards2.chartModel().columns.length;   // Total + banner columns
+    assert(nCols > 1, "banner has columns to toggle");
+
+    TR.cards2._setAll("col-table", false);
+    assert(TR.d2.state.hiddenCols[banner].length === nCols - 1, "clear table-cols hides all but Total");
+    TR.cards2._setAll("col-table", true);
+    assert(TR.d2.state.hiddenCols[banner].length === 0, "select table-cols hides none");
+
+    TR.cards2._setAll("col-chart", true);
+    assert(TR.d2.state.chartColLabels.length === nCols, "select chart-cols charts every column");
+    TR.cards2._setAll("col-chart", false);
+    assert(TR.d2.state.chartColLabels.length === 1 && TR.d2.state.chartColLabels[0] === "Total",
+      "clear chart-cols keeps only Total");
+
+    TR.cards2._setAll("row-table", false);
+    assert(TR.d2.state.hiddenRows[q.code].length === q.rows.length, "clear table-rows hides every row");
+    TR.cards2._setAll("row-table", true);
+    assert(TR.d2.state.hiddenRows[q.code].length === 0, "select table-rows hides none");
+
+    TR.cards2._setAll("row-chart", false);
+    assert(TR.d2.state.hiddenChartRows[q.code].length > 0, "clear chart-rows hides the chartable rows");
+    TR.cards2._setAll("row-chart", true);
+    assert(TR.d2.state.hiddenChartRows[q.code].length === 0, "select chart-rows hides none");
+  } finally {
+    TR.d2.state.banner = saved.banner; TR.d2.state.activeQ = saved.q;
+    TR.d2.state.hiddenCols = saved.hc; TR.d2.state.hiddenRows = saved.hr;
+    TR.d2.state.hiddenChartRows = saved.hcr; TR.d2.state.chartColLabels = saved.ccl;
+  }
+});
+
 run("stacked chart export is transposed (segments=series, columns=bars)", () => {
   // Regression: the PPTX stacked export reused the bar layout (rows as
   // categories, one series per column), so each option rendered as its own

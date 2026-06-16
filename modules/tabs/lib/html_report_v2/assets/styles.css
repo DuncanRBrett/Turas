@@ -490,6 +490,8 @@ table.ws td.sparkcell { padding: 1px 8px; }
 .colmenu .cm-body { max-height: 280px; overflow-y: auto; padding: 4px 14px; }
 .colmenu .cm-row { display: grid; grid-template-columns: 1fr 48px 48px; gap: 6px; align-items: center; padding: 5px 0; border-top: none; }
 .colmenu .cm-row + .cm-row { border-top: 1px solid var(--soft); }
+.colmenu .cm-allrow { font-weight: 700; color: var(--brand); }
+.colmenu .cm-allrow + .cm-row { border-top: 1px solid var(--line); }
 .colmenu .cm-row:hover { background: #fafbfe; }
 .colmenu .cm-label { white-space: normal; overflow-wrap: anywhere; line-height: 1.25; }
 .colmenu .cm-row label { text-align: center; cursor: pointer; }
