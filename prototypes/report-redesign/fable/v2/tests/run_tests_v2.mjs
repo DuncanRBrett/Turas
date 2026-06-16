@@ -696,6 +696,45 @@ run("Differences view: surfaces significant MEAN / index / NPS standouts (recomp
   }
 });
 
+run("Differences view: 95%+80% dual mode adds soft 'nearly significant' findings", () => {
+  // The report's significance toggle (off | 95 | dual) applies here. A group ~1.5
+  // SE above the rest is significant at 80% but not 95%: absent at "95", and
+  // present-but-flagged-soft at "dual" with a "nearly significant (80%)" verdict.
+  const agg = { schema_version: 2,
+    project: { name: "B", low_base_threshold: 5, alpha: 0.05, tracking: { enabled: false } },
+    columns: [{ key: "T::Total", group: "total", label: "Total", letter: "" },
+              { key: "G::A", group: "G", label: "A", letter: "A" },
+              { key: "G::B", group: "G", label: "B", letter: "B" },
+              { key: "G::C", group: "G", label: "C", letter: "C" }],
+    banner_groups: [{ id: "G", name: "G" }], categories: ["c"],
+    questions: [{ code: "QM", title: "Mean", category: "c", type: "scale",
+      bases: [{ n: 90, low: false }, { n: 30, low: false }, { n: 30, low: false }, { n: 30, low: false }],
+      rows: [{ kind: "mean", label: "Mean", pct: [6.3, 7, 6, 6], n: [null, null, null, null], sig: ["", "", "", ""] }] }] };
+  const saved = { agg: TR.AGG, micro: TR.MICRO, prev: TR.PREV, idx: TR.d2._qIndex, sig: TR.d2.state.sigMode };
+  try {
+    TR.AGG = agg; TR.PREV = null; TR.d2._qIndex = null;
+    const sc = [], bv = [];
+    for (let i = 0; i < 30; i++) { sc.push(i % 2 ? 4 : 10); bv.push(1); }  // A: mean 7, wide spread
+    for (let i = 0; i < 30; i++) { sc.push(i % 2 ? 3 : 9); bv.push(2); }   // B: mean 6
+    for (let i = 0; i < 30; i++) { sc.push(i % 2 ? 3 : 9); bv.push(3); }   // C: mean 6
+    TR.MICRO = { n: 90, answers: { QM: sc.map(() => null) }, banner_vars: { G: bv },
+      weights: sc.map(() => 1), scores: { QM: sc } };
+    TR.d2.state.sigMode = "95";
+    assert(!TR.views._collectFindings("G").some((f) => f.isMean && f.column === "A"),
+      "A is NOT a finding at 95% (z ~1.5 < 1.96)");
+    TR.d2.state.sigMode = "dual";
+    const a = TR.views._collectFindings("G").find((f) => f.isMean && f.column === "A");
+    assert(a, "A surfaces as a finding in dual mode");
+    assert(a.soft === true, "A is flagged soft (nearly significant)");
+    const line = TR.views._diffLineHtml(a);
+    assert(/nearly significant \(80%\)/.test(line), "soft verdict reads 'nearly significant (80%)'");
+    assert(/df-line soft/.test(line), "soft finding carries the soft class");
+  } finally {
+    TR.AGG = saved.agg; TR.MICRO = saved.micro; TR.PREV = saved.prev;
+    TR.d2._qIndex = saved.idx; TR.d2.state.sigMode = saved.sig;
+  }
+});
+
 run("stacked chart export is transposed (segments=series, columns=bars)", () => {
   // Regression: the PPTX stacked export reused the bar layout (rows as
   // categories, one series per column), so each option rendered as its own

@@ -1,14 +1,19 @@
 /**
  * Differences view — significant banner gaps for LAY readers.
  *
- * The old flat table (Question | Row | Column | Value | Total | Higher
- * than) read like database output. This view groups findings by QUESTION
- * into ranked cards; each line inside a card is one group that stands
- * out, told as a sentence with a two-bar comparison (group vs overall)
- * and the groups it is statistically ahead of. Same deterministic
- * engine underneath: a finding appears when a column is significantly
- * higher than two or more sibling columns at 95% (pooled z), ranked by
- * sig-count × gap. The shared confidence explainer renders at the foot.
+ * Findings are grouped by QUESTION into ranked cards; each line is one group
+ * that genuinely stands out, told as a sentence with a two-bar comparison
+ * (group vs THE REST — everyone except it) and a plain-English verdict.
+ * Percentages surface when a group beats 2+ siblings (the published letters);
+ * mean / index / NPS are recomputed from microdata and surface when a group
+ * differs from the rest, in either direction. Honours the report's 95% /
+ * 95%+80% significance toggle: in dual mode nearly-significant (80%) findings
+ * also show, flagged soft and ranked below the solid 95% ones. The shared
+ * confidence explainer renders at the foot.
+ *
+ * SIZE-EXCEPTION: one cohesive lay-reader view (rest recompute + categorical
+ * and mean/index/NPS finders + render + scope controls); splitting it would
+ * scatter a single deterministic finding contract.
  */
 (function (global) {
   "use strict";
@@ -69,7 +74,7 @@
    * percentage findings. Returns [] for derived / ranking questions with no
    * recomputable score.
    */
-  function meanFindings(q, spec, mask, threshold) {
+  function meanFindings(q, spec, mask, threshold, dual) {
     var out = [], row = null;
     q.rows.forEach(function (r) {
       if (!row && r.kind === "mean" && !isSpreadRow(r.label)) row = r;
@@ -96,15 +101,19 @@
       var rm = TR.stats.indexMeans(q, [{ member: rest }], mask)[0];
       if (!rm || rm.mean === null || !rm.k || rm.k < threshold) return;
       var z = TR.stats.meanZ(means[i].mean, means[i].sd, means[i].k, rm.mean, rm.sd, rm.k);
-      if (z === null || Math.abs(z) <= TR.stats.Z95) return;   // not different from the rest
+      if (z === null) return;
+      var az = Math.abs(z);
+      if (az <= TR.stats.Z80) return;             // not different from the rest at all
+      var soft = az <= TR.stats.Z95;              // 80% but not 95% — "nearly significant"
+      if (soft && !dual) return;                  // soft findings only when 95%+80% is on
       var gap = means[i].mean - rm.mean;
       out.push({ code: q.code, title: q.title, category: q.category,
-        label: row.label, column: col.label, isMean: true,
+        label: row.label, column: col.label, isMean: true, soft: soft,
         direction: gap >= 0 ? "ahead" : "behind",
         value: means[i].mean, rest: rm.mean, overall: means[0].mean,
         gap: gap, decimals: decimals, scaleMin: scaleMin, scaleMax: scaleMax,
         beaten: [],
-        score: (Math.abs(z) / TR.stats.Z95) * Math.abs(gap) / range * 100 });
+        score: (az / TR.stats.Z95) * Math.abs(gap) / range * 100 });
     });
     return out;
   }
@@ -119,10 +128,12 @@
     var spec = micro ? TR.stats.columnsFor(banner) : null;
     var mask = micro ? TR.stats.mask(TR.d2.state.filters) : null;
     var threshold = TR.AGG.project.low_base_threshold || 30;
+    var dual = TR.d2.state.sigMode === "dual";   // also surface nearly-significant (80%)
     var findings = [];
     TR.AGG.questions.forEach(function (q) {
       if (q.code === bannerSource) return;   // a banner never "beats" itself
-      var model = views._modelFor(q.code, banner);
+      var model = TR.model.forQuestion(q.code, banner, TR.d2.state.filters,
+        { hiddenCols: [], dual: dual });
       var labelByLetter = {};
       model.columns.forEach(function (col) {
         if (col.letter) labelByLetter[col.letter] = col.label;
@@ -132,29 +143,38 @@
       model.rows.forEach(function (row, ri) {
         if (row.kind === "mean") return;       // means handled below (recomputed)
         row.cells.forEach(function (cell, i) {
-          var sig95 = (cell.sig || "").replace(/[a-z]/g, "");
-          if (i === 0 || sig95.length < 2) return;
+          if (i === 0) return;
+          var sig = cell.sig || "";
+          var solid = sig.replace(/[a-z]/g, "");              // beaten at 95%
+          var soft80 = dual ? sig.replace(/[A-Z]/g, "") : ""; // beaten only at 80%
+          var is95 = solid.length >= 2;
+          var is80 = !is95 && (solid.length + soft80.length) >= 2;
+          if (!is95 && !is80) return;
           var overall = row.cells[0].pct;
           if (cell.pct === null || overall === null) return;
           var rest = restPct(q, ri, spec ? spec.columns[i].member : null, mask,
             cell, row.cells[0], model.columns[i].base, model.columns[0].base);
           var baseline = rest === null ? overall : rest;
+          var letters = is95 ? solid : solid + soft80;
           findings.push({ code: q.code, title: q.title, category: q.category,
             label: row.label, column: model.columns[i].label, isMean: false,
-            value: cell.pct, rest: rest, overall: overall,
+            soft: is80, value: cell.pct, rest: rest, overall: overall,
             gap: cell.pct - baseline,
-            beaten: sig95.split("").map(function (letter) {
-              return labelByLetter[letter] || letter;
+            beaten: letters.split("").map(function (l) {
+              return labelByLetter[l.toUpperCase()] || l;
             }),
-            score: sig95.length * Math.abs(cell.pct - baseline) });
+            score: letters.length * Math.abs(cell.pct - baseline) });
         });
       });
       // Mean / index / NPS standouts — recomputed from microdata (the published
       // data has no significance for them), arguably the headline differences.
-      if (spec) meanFindings(q, spec, mask, threshold)
+      if (spec) meanFindings(q, spec, mask, threshold, dual)
         .forEach(function (f) { findings.push(f); });
     });
-    findings.sort(function (a, b) { return b.score - a.score; });
+    // solid (95%) findings rank above nearly-significant (80%) ones, then by score
+    findings.sort(function (a, b) {
+      return (a.soft ? 1 : 0) - (b.soft ? 1 : 0) || b.score - a.score;
+    });
     return findings;
   }
 
@@ -216,15 +236,17 @@
       ? fmtMetric(f, f.rest) + " of the rest (" + fmtMetric(f, f.overall) +
         " overall)"
       : fmtMetric(f, f.overall) + (f.isMean ? " overall" : " of everyone");
-    return '<div class="df-line">' +
+    var tail = f.isMean
+      ? (f.direction === "ahead" ? "ahead of" : "behind") + " the rest"
+      : "ahead of " + fmt.escapeHtml(f.beaten.join(" · "));
+    var verdict = f.soft
+      ? tail + " — nearly significant (80%)"
+      : "statistically " + tail;
+    return '<div class="df-line' + (f.soft ? " soft" : "") + '">' +
       '<div class="df-sentence"><strong>' + fmt.escapeHtml(f.column) +
       "</strong> — " + lead + " vs " + baseline + " · " + direction + gapTxt +
       "</div>" + barsHtml(f) +
-      '<div class="df-beats">' + (f.isMean
-        ? "statistically " + (f.direction === "ahead" ? "ahead of" : "behind") +
-          " the rest"
-        : "statistically ahead of " + fmt.escapeHtml(f.beaten.join(" · "))) +
-      "</div></div>";
+      '<div class="df-beats">' + verdict + "</div></div>";
   }
 
   /* exposed for the differences gate test */
@@ -248,8 +270,13 @@
   views.findings = function (host) {
     var banner = diffBanner || TR.d2.state.banner;
     if (banner.indexOf("custom:") === 0) banner = TR.AGG.banner_groups[0].id;
+    var dual = TR.d2.state.sigMode === "dual";
     var all = collectFindings(banner);
-    var shown = all.slice(0, MAX_FINDINGS);
+    // 95% findings get the full budget; nearly-significant (80%) ones get their
+    // own, so turning on dual mode ADDS soft findings without ever crowding out
+    // a solid one — even on dense banners that already have 80+ solid findings.
+    var shown = all.filter(function (f) { return !f.soft; }).slice(0, MAX_FINDINGS)
+      .concat(all.filter(function (f) { return f.soft; }).slice(0, MAX_FINDINGS));
     var groups = groupByQuestion(shown);
     if (diffSort === "question") {
       groups.sort(function (a, b) { return a.code < b.code ? -1 : 1; });
@@ -263,17 +290,22 @@
       "stands out — on a percentage, average, index or NPS — measured against " +
       "the rest (the whole-sample figure is in brackets). Percentages name the " +
       "groups they beat; averages show whether they sit above or below the rest " +
-      "(95% level, this wave; year-on-year changes live in Tracking).</p>" +
+      "(" + (dual ? "95%, plus nearly-significant differences at 80%" : "95% level") +
+      ", this wave; year-on-year changes live in Tracking).</p>" +
       '<div class="scopebar">' + views._bannerPickerHtml(banner, "diffbanner") +
       '<select data-diffsort>' +
       '<option value="standout"' + (diffSort === "standout" ? " selected" : "") +
       ">Biggest standouts first</option>" +
       '<option value="question"' + (diffSort === "question" ? " selected" : "") +
       ">Question order</option></select>" +
+      '<select data-diffsig title="Significance level">' +
+      '<option value="95"' + (!dual ? " selected" : "") + ">95%</option>" +
+      '<option value="dual"' + (dual ? " selected" : "") + ">95% + 80%</option>" +
+      "</select>" +
       '<input id="diff-search" type="search" placeholder="Search questions, ' +
       'answers or groups…">' +
-      (all.length > MAX_FINDINGS
-        ? '<span class="trknote">top ' + MAX_FINDINGS + " of " + all.length +
+      (all.length > shown.length
+        ? '<span class="trknote">top ' + shown.length + " of " + all.length +
           " differences shown</span>" : "") + "</div></div>"];
     if (!groups.length) {
       html.push('<div class="card"><p>No group is significantly ahead of two ' +
@@ -296,6 +328,13 @@
       diffSort = e.target.value;
       views.findings(host);
     });
+    var sigSel = host.querySelector("[data-diffsig]");
+    if (sigSel) {
+      sigSel.addEventListener("change", function () {
+        TR.d2.state.sigMode = sigSel.value;   // shared report-wide setting
+        views.findings(host);
+      });
+    }
     var search = host.querySelector("#diff-search");
     search.addEventListener("input", function () {
       var term = search.value.trim().toLowerCase();
