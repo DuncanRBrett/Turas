@@ -349,6 +349,147 @@
       "questions are added in rank order; a custom subset is an approximation — confirm a final screener on fresh data.</p></section>";
   };
 
+  // ===========================================================================
+  // Chart toolkit — polished, on-brand SVG via the engine's TR.svg primitives.
+  // ===========================================================================
+  var S = TR.svg;
+  function brandHex()  { return (TR.charts && TR.charts.brandOf) ? TR.charts.brandOf() : "#323367"; }
+  function accentHex() { return (TR.charts && TR.charts.accentOf) ? TR.charts.accentOf() : "#CC9900"; }
+  function letterOf(i) { return i < 26 ? String.fromCharCode(65 + i) : String(i + 1); }
+
+  // Horizontal bar chart. items = [{label, value, valueLabel}].
+  function segHBarsSvg(items, opts) {
+    opts = opts || {};
+    var n = items.length, rowH = 32, top = 6, gut = opts.gutter || 150,
+        barW = opts.barW || 300, pad = 10;
+    var w = gut + barW + 110, h = top + n * rowH + pad, colour = opts.colour || brandHex();
+    var max = opts.max || Math.max.apply(null, items.map(function (d) { return d.value || 0; })) || 1;
+    var scale = S.linear(max, barW), els = [];
+    items.forEach(function (d, i) {
+      var y = top + i * rowH;
+      els.push(S.text(gut - 8, y + rowH / 2 + 4, d.label, { "text-anchor": "end", "font-size": 13, fill: "#1e293b" }));
+      els.push(S.el("rect", { x: gut, y: y + 6, width: barW, height: 16, rx: 5, fill: "#f3f4f8" }));
+      els.push(S.el("rect", { x: gut, y: y + 6, width: Math.max(2, scale(d.value || 0)), height: 16, rx: 5, fill: colour }));
+      els.push(S.text(gut + barW + 8, y + rowH / 2 + 4, d.valueLabel != null ? d.valueLabel : String(d.value),
+        { "font-size": 12, fill: "#64748b" }));
+    });
+    return S.root(w, h, opts.title || "bar chart", S.el("g", {}, els.join("")));
+  }
+
+  // Square matrix heatmap (letters on the axes). matrix[i][j] numeric.
+  function segMatrixSvg(matrix, opts) {
+    opts = opts || {};
+    var k = matrix.length, cell = opts.cell || 52, gut = 30, top = 24, pad = 10;
+    var w = gut + k * cell + pad, h = top + k * cell + pad, colour = opts.colour || brandHex();
+    var max = opts.max || 1, els = [], j, i, jj;
+    for (j = 0; j < k; j++) {
+      els.push(S.text(gut + j * cell + cell / 2, top - 8, letterOf(j),
+        { "text-anchor": "middle", "font-size": 12, "font-weight": 500, fill: "#5f5e5a" }));
+    }
+    for (i = 0; i < k; i++) {
+      els.push(S.text(gut - 8, top + i * cell + cell / 2 + 4, letterOf(i),
+        { "text-anchor": "end", "font-size": 12, "font-weight": 500, fill: "#5f5e5a" }));
+      for (jj = 0; jj < k; jj++) {
+        var v = matrix[i][jj], blank = opts.diagBlank && i === jj;
+        var strength = (max > 0) ? Math.max(0.06, Math.min(1, v / max)) : 0.06;
+        els.push(S.el("rect", { x: gut + jj * cell + 2, y: top + i * cell + 2, width: cell - 4,
+          height: cell - 4, rx: 5, fill: blank ? "#f3f4f8" : S.shade(colour, strength) }));
+        if (!blank) {
+          var label = opts.fmt ? opts.fmt(v) : String(v);
+          if (label !== "") {
+            els.push(S.text(gut + jj * cell + cell / 2, top + i * cell + cell / 2 + 4, label,
+              { "text-anchor": "middle", "font-size": 12, fill: (max > 0 && v / max > 0.55) ? "#fff" : "#2c2c2a" }));
+          }
+        }
+      }
+    }
+    return S.root(w, h, opts.title || "matrix", S.el("g", {}, els.join("")));
+  }
+
+  // Legend mapping the axis letters back to segment labels.
+  function letterLegend(labels) {
+    return '<div style="font-size:12.5px;color:var(--muted);margin-top:8px">' +
+      labels.map(function (l, i) {
+        return '<span style="margin-right:14px"><strong style="color:var(--ink)">' + letterOf(i) +
+          "</strong> " + fmt.escapeHtml(l) + "</span>";
+      }).join("") + "</div>";
+  }
+
+  // -------------------------------------------------------------------------
+  // Segment distinctiveness (overlap) — pairwise distance between centroids
+  // -------------------------------------------------------------------------
+  seg.overlap = function (host) {
+    var o = TR.AGG && TR.AGG.overlap;
+    var head = '<h2 style="font-size:20px;font-weight:500;margin:8px 0 4px">Segment distinctiveness</h2>';
+    if (!o || !o.distance || !o.labels || o.labels.length < 2) {
+      host.innerHTML = '<section style="padding:8px 0 24px">' + head +
+        '<p style="color:var(--muted)">Distinctiveness needs at least two segments.</p></section>';
+      return;
+    }
+    var labels = o.labels, M = o.distance, k = labels.length;
+    var max = 0, minV = Infinity, maxV = -Infinity, minPair = null, maxPair = null, i, j;
+    for (i = 0; i < k; i++) for (j = 0; j < k; j++) if (i !== j) {
+      var v = M[i][j];
+      if (v > max) max = v;
+      if (v > maxV) { maxV = v; maxPair = [i, j]; }
+      if (v < minV) { minV = v; minPair = [i, j]; }
+    }
+    var heat = segMatrixSvg(M, { max: max, colour: accentHex(), diagBlank: true,
+      fmt: function (x) { return x.toFixed(1); }, title: "Segment distance matrix" });
+    var callout = (maxPair && minPair)
+      ? '<p style="font-size:13px;color:var(--muted);margin-top:6px;max-width:62ch">Most distinct: ' +
+        '<strong style="color:var(--ink)">' + letterOf(maxPair[0]) + " &harr; " + letterOf(maxPair[1]) +
+        "</strong> (" + maxV.toFixed(1) + '). Closest / most overlap: <strong style="color:var(--ink)">' +
+        letterOf(minPair[0]) + " &harr; " + letterOf(minPair[1]) + "</strong> (" + minV.toFixed(1) + ").</p>"
+      : "";
+    host.innerHTML = '<section style="padding:8px 0 24px">' + head +
+      '<p style="color:var(--muted);margin:0 0 14px;max-width:64ch;line-height:1.6">How far apart the segments ' +
+      'sit in the clustering space (distance between their centres). Larger numbers = more distinct, ' +
+      'well-separated segments; small numbers = segments that overlap and can be harder to tell apart.</p>' +
+      '<div style="overflow:auto">' + heat + "</div>" + letterLegend(labels) + callout + "</section>";
+  };
+
+  // -------------------------------------------------------------------------
+  // Segment vulnerability — boundary respondents who could switch segment
+  // -------------------------------------------------------------------------
+  seg.vulnerability = function (host) {
+    var v = TR.AGG && TR.AGG.vulnerability;
+    var head = '<h2 style="font-size:20px;font-weight:500;margin:8px 0 4px">Segment vulnerability</h2>';
+    if (!v || !v.segments || !v.segments.length) {
+      host.innerHTML = '<section style="padding:8px 0 24px">' + head +
+        '<p style="color:var(--muted)">Vulnerability analysis was not computed for this solution.</p></section>';
+      return;
+    }
+    var overall = v.overall_pct_vulnerable;
+    var bars = segHBarsSvg(v.segments.map(function (s) {
+      return { label: s.label, value: s.pct_vulnerable,
+        valueLabel: (s.pct_vulnerable != null ? Math.round(s.pct_vulnerable) + "%" : "–") +
+          (s.avg_confidence != null ? "  ·  conf " + s.avg_confidence.toFixed(2) : "") };
+    }), { max: Math.max(5, Math.max.apply(null, v.segments.map(function (s) { return s.pct_vulnerable || 0; }))),
+      colour: brandHex(), gutter: 150, barW: 280, title: "Percent vulnerable by segment" });
+
+    var switchBlock = "";
+    var sw = v.switching;
+    if (sw && sw.matrix && sw.labels && sw.labels.length) {
+      var smax = 0;
+      sw.matrix.forEach(function (r, ri) { r.forEach(function (x, ci) { if (ri !== ci && x > smax) smax = x; }); });
+      var smat = segMatrixSvg(sw.matrix, { max: smax || 1, colour: brandHex(), diagBlank: true,
+        fmt: function (x) { return x ? String(x) : ""; }, title: "Switching matrix" });
+      switchBlock = '<h3 style="font-size:15px;font-weight:500;margin:20px 0 4px">Where at-risk members would move</h3>' +
+        '<p style="color:var(--muted);margin:0 0 10px;max-width:62ch;font-size:13px">Row = current segment; ' +
+        'column = the segment its boundary members sit closest to.</p>' +
+        '<div style="overflow:auto">' + smat + "</div>" + letterLegend(sw.labels);
+    }
+    host.innerHTML = '<section style="padding:8px 0 24px">' + head +
+      '<p style="color:var(--muted);margin:0 0 12px;max-width:64ch;line-height:1.6">Respondents who sit close to ' +
+      'the boundary with another segment — their assignment is less certain, so they could plausibly belong ' +
+      'elsewhere. A segment with many such members is less stable.</p>' +
+      (overall != null ? '<div style="background:var(--soft);border-radius:8px;padding:12px 14px;margin:0 0 14px;font-size:13px">' +
+        '<strong style="color:var(--ink)">' + Math.round(overall) + '% of respondents sit near a boundary</strong>' +
+        (v.threshold != null ? " (assignment confidence below " + v.threshold + ")." : ".") + "</div>" : "") +
+      '<div style="overflow:auto">' + bars + "</div>" + switchBlock + "</section>";
+  };
+
   // -------------------------------------------------------------------------
   // Register the host-app tab set. "report" has no route here, so it falls
   // through to the engine's generic Report (metadata) tab.
@@ -356,9 +497,11 @@
   TR.app = {
     tabs: [["seg_overview", "Overview"], ["seg_profiles", "Profiles"],
            ["seg_golden", "Golden questions"], ["seg_importance", "Importance"],
+           ["seg_overlap", "Distinctiveness"], ["seg_vulnerability", "Vulnerability"],
            ["report", "Report"]],
     routes: { seg_overview: seg.overview, seg_profiles: seg.profiles,
-              seg_golden: seg.golden, seg_importance: seg.importance },
+              seg_golden: seg.golden, seg_importance: seg.importance,
+              seg_overlap: seg.overlap, seg_vulnerability: seg.vulnerability },
     defaultTab: "seg_overview"
   };
 

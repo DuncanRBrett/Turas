@@ -37,6 +37,9 @@ test_that("bundle includes the engine, the shell seam, and segment-native views"
   expect_true(grepl("Golden questions", js, fixed = TRUE))
   expect_true(grepl("goldenEstimate", js, fixed = TRUE))    # interactive screener maths
   expect_true(grepl("data-gq", js, fixed = TRUE))           # screener checkboxes
+  expect_true(grepl("seg.overlap", js, fixed = TRUE))       # distinctiveness view
+  expect_true(grepl("seg.vulnerability", js, fixed = TRUE)) # vulnerability view
+  expect_true(grepl("segMatrixSvg", js, fixed = TRUE))      # SVG heatmap chart toolkit
   expect_false(grepl("</script", js, fixed = TRUE))       # safe to inline in <script>
 })
 

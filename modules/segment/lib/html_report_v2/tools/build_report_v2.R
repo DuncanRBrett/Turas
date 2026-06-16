@@ -41,10 +41,12 @@ pr <- create_full_segment_profile(data = td$data, clusters = cr$clusters,
 gq <- tryCatch(identify_golden_questions(data = num, clusters = cr$clusters,
         segment_names = sn, n_top = length(td$clustering_vars), n_trees = 200),
         error = function(e) NULL)   # all questions -> full short-form screener
+vuln <- tryCatch(calculate_vulnerability(data = sc, clusters = cr$clusters,
+        centers = cr$centers, method = "kmeans"), error = function(e) NULL)
 
 results <- list(mode = "final", cluster_result = cr, validation_metrics = vm,
                 profile_result = pr, segment_names = sn, golden_questions = gq,
-                data_list = dl_in)
+                vulnerability = vuln, data_list = dl_in)
 
 # --- data layer -> JSON island ---------------------------------------------
 dl <- build_segment_data_layer(results, cfg)

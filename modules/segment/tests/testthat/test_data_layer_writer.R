@@ -110,6 +110,43 @@ test_that("build_segment_data_layer carries golden questions when present", {
 })
 
 
+test_that("build_segment_data_layer carries overlap (centroid distances)", {
+  skip_if_not(exists("build_segment_data_layer", mode = "function"), "v2 writer not loaded")
+  f <- .seg_v2_fixture()
+  dl <- build_segment_data_layer(f$results, f$config)
+
+  expect_false(is.null(dl$overlap))
+  expect_equal(length(dl$overlap$labels), f$k)
+  expect_equal(length(dl$overlap$distance), f$k)
+  d <- dl$overlap$distance
+  expect_equal(as.numeric(d[[1]][[1]]), 0)                                   # self-distance
+  expect_equal(as.numeric(d[[1]][[2]]), as.numeric(d[[2]][[1]]), tolerance = 1e-6)  # symmetric
+})
+
+
+test_that("build_segment_data_layer carries vulnerability when present", {
+  skip_if_not(exists("build_segment_data_layer", mode = "function"), "v2 writer not loaded")
+  skip_if_not(exists("calculate_vulnerability", mode = "function"), "vulnerability not loaded")
+
+  f <- .seg_v2_fixture()
+  vuln <- tryCatch(calculate_vulnerability(data = f$results$data_list$scaled_data,
+            clusters = f$results$cluster_result$clusters,
+            centers = f$results$cluster_result$centers, method = "kmeans"),
+            error = function(e) NULL)
+  skip_if(is.null(vuln), "vulnerability not computed")
+
+  res <- f$results
+  res$vulnerability <- vuln
+  dl <- build_segment_data_layer(res, f$config)
+
+  expect_false(is.null(dl$vulnerability))
+  expect_equal(length(dl$vulnerability$segments), f$k)
+  expect_true(is.numeric(dl$vulnerability$segments[[1]]$pct_vulnerable))
+  expect_true(is.numeric(dl$vulnerability$overall_pct_vulnerable))
+  expect_false(is.null(dl$vulnerability$switching))                          # where members would move
+})
+
+
 test_that("serialize_segment_data_layer produces engine-parseable JSON", {
   skip_if_not(exists("serialize_segment_data_layer", mode = "function"), "v2 writer not loaded")
   f <- .seg_v2_fixture()

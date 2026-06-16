@@ -168,6 +168,9 @@ build_segment_data_layer <- function(results, config) {
   # Golden questions (RF typing model) — a top-level island the native Golden
   # Questions view reads; the engine ignores unknown top-level fields.
   golden <- .seg_dl_golden(results$golden_questions, qlab)
+  # Vulnerability (boundary/switching) + overlap (centroid distinctiveness).
+  vulnerability <- .seg_dl_vulnerability(results$vulnerability)
+  overlap <- .seg_dl_overlap(results$cluster_result$centers, seg_names)
 
   dl <- list(
     schema_version = 2L,
@@ -178,7 +181,57 @@ build_segment_data_layer <- function(results, config) {
     questions      = questions
   )
   if (!is.null(golden)) dl$golden <- golden
+  if (!is.null(vulnerability)) dl$vulnerability <- vulnerability
+  if (!is.null(overlap)) dl$overlap <- overlap
   dl
+}
+
+
+# Map calculate_vulnerability() output to the v2 `vulnerability` island:
+# per-segment boundary risk (% vulnerable + mean confidence) and the switching
+# matrix (where at-risk members would move). NULL when not computed.
+.seg_dl_vulnerability <- function(vuln) {
+  if (is.null(vuln)) return(NULL)
+  ss <- vuln$segment_summary
+  if (is.null(ss) || !is.data.frame(ss) || nrow(ss) == 0) return(NULL)
+  segs <- lapply(seq_len(nrow(ss)), function(i) {
+    list(label = as.character(ss$segment[i]),
+         n = as.integer(ss$n[i]),
+         pct_vulnerable = as.numeric(ss$pct_vulnerable[i]),
+         avg_confidence = as.numeric(ss$avg_confidence[i]))
+  })
+  switching <- NULL
+  sw <- vuln$switching_matrix
+  if (!is.null(sw) && is.matrix(sw) && nrow(sw) >= 1) {
+    labs <- rownames(sw)
+    if (is.null(labs)) labs <- paste("Segment", seq_len(nrow(sw)))
+    switching <- list(
+      labels = as.list(as.character(labs)),
+      matrix = lapply(seq_len(nrow(sw)), function(i) as.list(as.integer(sw[i, ]))))
+  }
+  list(overall_pct_vulnerable = as.numeric(vuln$overall_pct_vulnerable %||% NA_real_),
+       overall_avg_confidence = as.numeric(vuln$overall_avg_confidence %||% NA_real_),
+       threshold = as.numeric(vuln$threshold %||% NA_real_),
+       segments = segs, switching = switching)
+}
+
+
+# Pairwise centroid distances from the cluster centres -> the v2 `overlap`
+# island (segment distinctiveness: larger distance = more separated). NULL when
+# fewer than two segments / no centres.
+.seg_dl_overlap <- function(centers, seg_names) {
+  if (is.null(centers)) return(NULL)
+  centers <- tryCatch(as.matrix(centers), error = function(e) NULL)
+  if (is.null(centers) || nrow(centers) < 2) return(NULL)
+  d <- as.matrix(stats::dist(centers))
+  k <- nrow(d)
+  labs <- if (!is.null(seg_names) && length(seg_names) >= k) {
+    seg_names[seq_len(k)]
+  } else {
+    paste("Segment", seq_len(k))
+  }
+  list(labels = as.list(as.character(labs)),
+       distance = lapply(seq_len(k), function(i) as.list(round(as.numeric(d[i, ]), 3))))
 }
 
 
