@@ -94,8 +94,11 @@
   function visTitle(sel, specs) {
     if (sel.metrics.length === 1 && specs.length) {
       var m = specs[0].metric;
-      return m.code + " · " + TR.charts.clip(m.title, 60) + " — " +
-        TR.charts.clip(m.label, 28) +
+      // Full question text — the header (.heathead h3) wraps, so don't ellipsis
+      // it; the bounds below only guard against degenerate data (matches
+      // specLabel). Previously clip(…,60) truncated the question mid-word.
+      return m.code + " · " + TR.charts.clip(m.title, 300) + " — " +
+        TR.charts.clip(m.label, 120) +
         (sel.segs.length > 1 ? " · " + sel.segs.length + " segments"
           : " · " + specs[0].segLabel);
     }
@@ -484,6 +487,7 @@
       : TR.conf.meanCI(point.value, sd, point.base);
   }
   vis._ciBounds = ciBounds;   // exposed for pinned exhibits + tests
+  vis._visTitle = visTitle;   // exposed for the node gate
 
   /** Series for the chart/table: spec points transformed for the mode. */
   function buildSeries(specs, sel, mode, yearSet) {

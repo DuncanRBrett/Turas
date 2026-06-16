@@ -224,6 +224,17 @@ run("tracking keeps the full current-wave name (date not truncated)", () => {
   }
 });
 
+run("Visualise header keeps the full question (wraps, no mid-word ellipsis)", () => {
+  // Regression: clip(title, 60) truncated the question mid-word in the panel
+  // header; the .heathead h3 wraps, so the full text should travel.
+  var longTitle = "How would you rate your satisfaction with the merchandiser(s) in your store overall?";
+  var sel = { metrics: [{ key: "Q38::Mean" }], segs: [{}] };
+  var specs = [{ metric: { code: "Q38", title: longTitle, label: "Mean" }, segLabel: "Total" }];
+  var title = TR.trkVis._visTitle(sel, specs);
+  assert(title.indexOf(longTitle) !== -1, "full question text retained, got: " + title);
+  assert(title.indexOf("…") === -1, "no ellipsis truncation");
+});
+
 run("weighted recompute: weighted %, Kish effective base, weighted mean (known answers)", () => {
   // 4 respondents, weights [3,1,1,1].
   //   Q1 single Yes/No, answers [0,0,1,1]: Yes Σw = 3+1 = 4, No = 1+1 = 2,
