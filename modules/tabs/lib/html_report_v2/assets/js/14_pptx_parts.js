@@ -45,6 +45,7 @@
       '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
       '<Default Extension="xml" ContentType="application/xml"/>' +
       '<Default Extension="xlsx" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"/>' +
+      '<Default Extension="png" ContentType="image/png"/>' +
       overrides.map(function (o) {
         return '<Override PartName="' + o[0] + '" ContentType="' + o[1] + '"/>';
       }).join("") + "</Types>";
@@ -177,9 +178,18 @@
       { name: "ppt/slideLayouts/_rels/slideLayout1.xml.rels",
         data: rels([["rId1", "slideMaster", "../slideMasters/slideMaster1.xml"]]) }
     ];
-    var chartIndex = 0;
+    var chartIndex = 0, imageIndex = 0;
     slideObjs.forEach(function (slide, i) {
       var slideRels = [["rId1", "slideLayout", "../slideLayouts/slideLayout1.xml"]];
+      // Image (PNG) slides: one media part + rel per image, numbered after any
+      // charts on the same slide so the rIds never collide.
+      var imgBase = 2 + (slide.charts ? slide.charts.length : 0);
+      (slide.images || []).forEach(function (img, k) {
+        imageIndex++;
+        slideRels.push(["rId" + (imgBase + k), "image",
+          "../media/image" + imageIndex + ".png"]);
+        entries.push({ name: "ppt/media/image" + imageIndex + ".png", data: img.bytes });
+      });
       (slide.charts || []).forEach(function (chart, k) {
         chartIndex++;
         slideRels.push(["rId" + (2 + k), "chart",

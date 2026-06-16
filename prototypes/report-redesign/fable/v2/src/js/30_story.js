@@ -309,14 +309,21 @@
       '<button data-sact="present" class="primary"' + (list.length ? "" : " disabled") +
       ">▶ Present</button>" +
       '<button data-sact="pptx" class="primary"' + (list.length ? "" : " disabled") +
-      ">Download .pptx</button>" +
+      ' title="Editable native PowerPoint charts (Edit Data)">Download .pptx (editable)</button>' +
+      '<button data-sact="pptx-img" class="primary"' + (list.length ? "" : " disabled") +
+      ' title="Pixel-perfect image slides — exactly what is on screen (not editable)">' +
+      "Download .pptx (images)</button>" +
       '<button data-sact="divider">+ Section divider</button>' +
       /* the exhibit builder replaces the parked per-section composite;
          story2.addComposite and the old "composite" item kind stay for
          back-compat with previously saved pins */
       '<button data-sact="exhibit">+ Composite exhibit…</button>' +
-      '<button data-sact="export">Export insights JSON</button>' +
-      '<label class="t-btnish">Import JSON<input id="story-import" type="file" accept=".json" hidden></label>' +
+      '<button data-sact="export" title="Save your insights + pinned story to a small ' +
+      'file. Re-import it into a future wave report to carry your commentary forward — ' +
+      'Save copy is a frozen snapshot and cannot do that.">Export insights JSON</button>' +
+      '<label class="t-btnish" title="Merge insights + story from a previous Export back ' +
+      'into this report (e.g. carry last wave commentary forward).">Import JSON' +
+      '<input id="story-import" type="file" accept=".json" hidden></label>' +
       '<button data-sact="clear">Clear</button></div>' +
       '<div id="story-picker" hidden></div>' +
       (list.length ? "" : "<p>Pin questions from Crosstabs (📌), the dashboard heatmap, " +
@@ -503,6 +510,44 @@
     return slides;
   }
 
+  /** One story item -> a card SVG for the pixel-perfect image deck. Mirrors the
+   *  on-screen render of each item kind; null when the item has nothing to show
+   *  (e.g. an exhibit with no resolvable questions). */
+  function itemCardSvg(item) {
+    if (item.kind === "divider") {
+      return TR.exporter.cardSvgRaw(item.title || "Section", item.note || "", null, null);
+    }
+    if (item.kind === "heatmap") {
+      return TR.exporter.cardSvgRaw("Index heatmap",
+        contextLine(item) + (item.note ? " · " + item.note : ""), null, heatmapMatrix(item));
+    }
+    if (item.kind === "composite") {
+      return TR.exporter.cardSvgRaw("Composite — " + item.category,
+        contextLine(item) + (item.note ? " · " + item.note : ""), null, compositeMatrix(item));
+    }
+    if (item.kind === "exhibit") {
+      var models = TR.exhibit.models(item);
+      if (!models.length) return null;
+      var ef = item.flags || {};
+      var chartSvg = null;
+      if (ef.trend !== false) chartSvg = TR.render.trendChart(TR.exhibit.trendModel(item, models));
+      else if (ef.dist) chartSvg = TR.render.chartBy(item.distType === "line"
+        ? "column" : (item.distType || "column"),
+        TR.exhibit.distModel(item, models), item.chartCols || [0]);
+      return TR.exporter.cardSvgRaw(TR.exhibit.titleFor(item, models),
+        TR.exhibit.contextLine(item, models), chartSvg,
+        ef.table ? TR.exhibit.matrix(item, models) : null);
+    }
+    var model = modelFor(item);
+    if (!model) return null;
+    var flags = item.flags || { chart: false, table: true, insight: true };
+    var chart = flags.chart
+      ? TR.render.chartBy(item.chartType || "bar", model, item.chartCols || [0]) : null;
+    return TR.exporter.cardSvg(model,
+      item.note || TR.insights.get(item.q, item.banner) || "",
+      { chartSvg: chart, includeTable: flags.table !== false });
+  }
+
   function topAction(action) {
     if (action === "clear") {
       items = [];
@@ -516,6 +561,10 @@
     if (action === "pptx") {
       TR.exporter.downloadDeck(slidesFor(load()),
         fmt.slug(TR.AGG.project.name) + "_story.pptx");
+    }
+    if (action === "pptx-img") {
+      TR.exporter.downloadImageDeck(load().map(itemCardSvg),
+        fmt.slug(TR.AGG.project.name) + "_story_images.pptx");
     }
     if (action === "present") startPresent();
   }

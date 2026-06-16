@@ -303,6 +303,31 @@ run("tracking view pins on a Total-only report (no banner_groups)", () => {
   }
 });
 
+run("PPTX image deck: PNG slides pack into a structurally valid deck (python)", () => {
+  // The "download as PNGs" path renders each card to a PNG and packs it as a
+  // full-slide image. Validates imageSlide + the packer's media-part support.
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "base64");
+  const slide = TR.exporter.imageSlide({ bytes: png, w: 660, h: 400 });
+  assert(slide.images && slide.images.length === 1, "slide declares one image");
+  assert(slide.xml.indexOf("<p:pic>") !== -1 && slide.xml.indexOf('r:embed="rId2"') !== -1,
+    "slide has a picture referencing rId2");
+  const bytes = TR.pptx.package([TR.exporter.titleSlide(1), slide], { project: TR.AGG.project });
+  // the PNG media part must actually be embedded (the zip names it) — the python
+  // check below does not verify the pic->media rel resolves.
+  assert(new TextDecoder("latin1").decode(bytes).indexOf("ppt/media/image1.png") !== -1,
+    "image media part embedded in the package");
+  const tmp = path.join(BASE, "tests", "tmp");
+  mkdirSync(tmp, { recursive: true });
+  const out = path.join(tmp, "v2_imagedeck.pptx");
+  writeFileSync(out, bytes);
+  const report = execFileSync("python3",
+    [path.join(path.dirname(BASE), "tests", "verify_pptx.py"), out, "--no-table"],
+    { encoding: "utf8" });
+  assert(report.startsWith("OK"), report);
+});
+
 run("weighted recompute: weighted %, Kish effective base, weighted mean (known answers)", () => {
   // 4 respondents, weights [3,1,1,1].
   //   Q1 single Yes/No, answers [0,0,1,1]: Yes Σw = 3+1 = 4, No = 1+1 = 2,

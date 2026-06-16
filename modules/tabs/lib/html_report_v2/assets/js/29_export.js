@@ -53,41 +53,48 @@
 
   /* ---------------- Tier A: PNG ---------------- */
 
-  /** Assemble a card SVG: title, meta, optional chart, optional SVG table. */
-  exporter.cardSvg = function (model, note, opts) {
-    opts = opts || {};
+  /** Generic card SVG: title, meta line, optional chart SVG, optional SVG table
+   *  matrix. Backs cardSvg (questions) and the image-deck cards for every other
+   *  item kind (exhibit / heatmap / composite / divider). */
+  exporter.cardSvgRaw = function (title, metaText, chartSvg, matrix) {
     var W = 1100, PAD = 24, innerW = W - PAD * 2;
     var brand = TR.charts.brandOf();
     var parts = [], y = PAD + 14;
-    wrapText(model.code + " — " + model.title, 80).forEach(function (line) {
+    wrapText(title, 80).forEach(function (line) {
       parts.push(S.text(PAD, y, line, { "font-size": 17, "font-weight": 700, fill: "#1c2333" }));
       y += 22;
     });
-    var meta = [TR.AGG.project.name, TR.AGG.project.wave,
-      model.source === "computed" ? "COMPUTED · filtered audience" : "published values",
-      note || ""].filter(Boolean).join(" · ");
-    parts.push(S.text(PAD, y, TR.charts.clip(meta, 130),
+    parts.push(S.text(PAD, y, TR.charts.clip(metaText || "", 130),
       { "font-size": 11, fill: "#6b7280" }));
     y += 16;
-    if (opts.chartSvg) {
-      var vb = opts.chartSvg.match(/viewBox="0 0 ([0-9.]+) ([0-9.]+)"/);
+    if (chartSvg) {
+      var vb = chartSvg.match(/viewBox="0 0 ([0-9.]+) ([0-9.]+)"/);
       if (vb) {
         var chartH = parseFloat(vb[2]) / parseFloat(vb[1]) * innerW;
-        parts.push(opts.chartSvg.replace('width="100%"',
-          'x="' + PAD + '" y="' + y + '" width="' + innerW +
-          '" height="' + chartH + '"'));
+        parts.push(chartSvg.replace('width="100%"',
+          'x="' + PAD + '" y="' + y + '" width="' + innerW + '" height="' + chartH + '"'));
         y += chartH + 12;
       }
     }
-    if (opts.includeTable !== false) {
-      var table = svgTable(TR.render.matrix(model), PAD, y, innerW, brand);
+    if (matrix) {
+      var table = svgTable(matrix, PAD, y, innerW, brand);
       parts.push(table.body);
       y += table.height;
     }
     y += PAD;
     var frame = S.el("rect", { x: 0, y: 0, width: W, height: y, fill: "#ffffff" }) +
       S.el("rect", { x: 0, y: 0, width: W, height: 5, fill: brand });
-    return S.root(W, y, model.code, frame + parts.join(""));
+    return S.root(W, y, "card", frame + parts.join(""));
+  };
+
+  /** Question card SVG (title, meta, optional chart, optional table). */
+  exporter.cardSvg = function (model, note, opts) {
+    opts = opts || {};
+    var meta = [TR.AGG.project.name, TR.AGG.project.wave,
+      model.source === "computed" ? "COMPUTED · filtered audience" : "published values",
+      note || ""].filter(Boolean).join(" · ");
+    var matrix = opts.includeTable !== false ? TR.render.matrix(model) : null;
+    return exporter.cardSvgRaw(model.code + " — " + model.title, meta, opts.chartSvg, matrix);
   };
 
   function wrapText(text, maxChars) {
@@ -358,6 +365,26 @@
       '<a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>' +
       content + "</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>";
   }
+
+  /**
+   * Slide that is a single full-bleed PNG image (the pixel-perfect card render),
+   * fitted to the slide preserving aspect ratio. png = {bytes, w, h} (raster
+   * pixels). Pairs with TR.pptx.package's image-media support.
+   */
+  exporter.imageSlide = function (png) {
+    var availW = SLIDE_W - MARGIN * 2, availH = SLIDE_H - MARGIN * 2;
+    var ar = (png.w && png.h) ? png.w / png.h : availW / availH;
+    var w = availW, h = availW / ar;
+    if (h > availH) { h = availH; w = availH * ar; }
+    var x = (SLIDE_W - w) / 2, y = (SLIDE_H - h) / 2;
+    var pic = '<p:pic><p:nvPicPr><p:cNvPr id="2" name="Card"/>' +
+      '<p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>' +
+      '<p:blipFill><a:blip r:embed="rId2"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>' +
+      '<p:spPr><a:xfrm><a:off x="' + inch(x) + '" y="' + inch(y) + '"/>' +
+      '<a:ext cx="' + inch(w) + '" cy="' + inch(h) + '"/></a:xfrm>' +
+      '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>';
+    return { xml: wrapSlide(pic), charts: [], images: [{ bytes: png.bytes }] };
+  };
 
   /* ---------- NATIVE PowerPoint chart objects ----------
      A real c:chartSpace part + an embedded Excel workbook, so the chart is
@@ -863,6 +890,63 @@
     document.body.removeChild(link);
     URL.revokeObjectURL(link.href);
     TR.shell.toast("Native PowerPoint downloaded — fully editable");
+  };
+
+  /** SVG string -> {bytes, w, h} PNG at `scale`. Browser only (canvas). */
+  exporter.svgToPng = function (svgString, scale) {
+    return new Promise(function (resolve, reject) {
+      var vb = svgString.match(/viewBox="0 0 ([0-9.]+) ([0-9.]+)"/);
+      var w = vb ? parseFloat(vb[1]) : 1100, h = vb ? parseFloat(vb[2]) : 700;
+      var img = new Image();
+      img.onload = function () {
+        var canvas = document.createElement("canvas");
+        canvas.width = Math.round(w * scale);
+        canvas.height = Math.round(h * scale);
+        var ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(function (blob) {
+          if (!blob) { reject(new Error("rasterise failed")); return; }
+          blob.arrayBuffer().then(function (buf) {
+            resolve({ bytes: new Uint8Array(buf), w: canvas.width, h: canvas.height });
+          });
+        }, "image/png");
+      };
+      img.onerror = function () { reject(new Error("SVG load failed")); };
+      img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgString);
+    });
+  };
+
+  /**
+   * Image deck: each card SVG becomes a pixel-perfect full-slide PNG (the
+   * exact on-screen render), not editable. Browser only (canvas). cards = SVG
+   * strings, one per slide.
+   */
+  exporter.downloadImageDeck = function (cards, filename) {
+    cards = (cards || []).filter(Boolean);
+    if (!cards.length) { TR.shell.toast("Nothing to export"); return; }
+    TR.shell.toast("Rendering " + cards.length + " image slide(s)…");
+    Promise.all(cards.map(function (svg) { return exporter.svgToPng(svg, 2); }))
+      .then(function (pngs) {
+        var slides = [exporter.titleSlide(cards.length)].concat(
+          pngs.map(function (png) { return exporter.imageSlide(png); }));
+        var bytes = TR.pptx.package(slides, { project: TR.AGG.project });
+        var blob = new Blob([bytes], { type:
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation" });
+        var link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+        TR.shell.toast("Image PowerPoint downloaded — pixel-perfect");
+      })
+      .catch(function (e) {
+        if (global.console) console.error("[TurasV2] image deck failed:", e);
+        TR.shell.toast("Image export failed — see console");
+      });
   };
 
 })(typeof window !== "undefined" ? window : globalThis);

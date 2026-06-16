@@ -74,7 +74,7 @@ def check_chart_workbooks(archive, names, errors):
                 f"{sorted(sheet_names)} — Edit Data would #REF! the chart")
 
 
-def validate(path):
+def validate(path, require_table=True):
     errors = []
     try:
         archive = zipfile.ZipFile(path)
@@ -111,13 +111,15 @@ def validate(path):
             if slide.find(f"{P_NS}cSld/{P_NS}spTree") is None:
                 errors.append(f"PKG_SLIDE_EMPTY: {slide_name} has no shape tree")
 
-        # criterion 6: at least one slide must carry a native (editable) table
-        has_table = any(
-            ET.fromstring(archive.read(n)).iter(f"{A_NS}tbl") and
-            list(ET.fromstring(archive.read(n)).iter(f"{A_NS}tbl"))
-            for n in slide_parts)
-        if not has_table:
-            errors.append("PKG_NO_NATIVE_TABLE: no a:tbl found in any slide")
+        # criterion 6: at least one slide must carry a native (editable) table.
+        # Skipped for image decks (--no-table), which are intentionally all PNGs.
+        if require_table:
+            has_table = any(
+                ET.fromstring(archive.read(n)).iter(f"{A_NS}tbl") and
+                list(ET.fromstring(archive.read(n)).iter(f"{A_NS}tbl"))
+                for n in slide_parts)
+            if not has_table:
+                errors.append("PKG_NO_NATIVE_TABLE: no a:tbl found in any slide")
 
     check_chart_workbooks(archive, names, errors)
 
@@ -125,10 +127,12 @@ def validate(path):
 
 
 def main():
-    if len(sys.argv) != 2:
-        print("usage: verify_pptx.py <file.pptx>")
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    require_table = "--no-table" not in sys.argv
+    if len(args) != 1:
+        print("usage: verify_pptx.py <file.pptx> [--no-table]")
         return 1
-    errors = validate(sys.argv[1])
+    errors = validate(args[0], require_table=require_table)
     if errors:
         for error in errors:
             print(f"FAIL {error}")
