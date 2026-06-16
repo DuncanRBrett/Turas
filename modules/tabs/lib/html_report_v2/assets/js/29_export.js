@@ -353,20 +353,40 @@
     'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" ' +
     'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
 
-  function chartAxes(catPos, valPos, fmtCode) {
+  function chartAxes(catPos, valPos, fmtCode, hideVal) {
     return '<c:catAx><c:axId val="111111111"/><c:scaling>' +
       '<c:orientation val="minMax"/></c:scaling><c:delete val="0"/>' +
       '<c:axPos val="' + catPos + '"/><c:crossAx val="222222222"/></c:catAx>' +
       '<c:valAx><c:axId val="222222222"/><c:scaling>' +
-      '<c:orientation val="minMax"/></c:scaling><c:delete val="0"/>' +
-      '<c:axPos val="' + valPos + '"/><c:majorGridlines/>' +
+      '<c:orientation val="minMax"/></c:scaling><c:delete val="' +
+      (hideVal ? "1" : "0") + '"/>' +
+      '<c:axPos val="' + valPos + '"/>' +
       '<c:numFmt formatCode="' + (fmtCode || "0&quot;%&quot;") +
       '" sourceLinked="0"/>' +
       '<c:crossAx val="111111111"/></c:valAx>';
   }
 
+  /** Value data labels (the "48%" on each bar/segment). pos = "outEnd" for
+   *  clustered bar/column, "ctr" for percent-stacked. colour is the label ink
+   *  (dark outside a bar, white centred on a coloured segment). */
+  function dataLabels(pos, colour) {
+    return '<c:dLbls><c:numFmt formatCode="0&quot;%&quot;" sourceLinked="0"/>' +
+      '<c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr>' +
+      '<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1000" b="1">' +
+      '<a:solidFill><a:srgbClr val="' + (colour || "1C2333") + '"/></a:solidFill>' +
+      '<a:latin typeface="Arial"/></a:defRPr></a:pPr><a:endParaRPr lang="en-US"/></a:p></c:txPr>' +
+      '<c:dLblPos val="' + pos + '"/>' +
+      '<c:showLegendKey val="0"/><c:showVal val="1"/><c:showCatName val="0"/>' +
+      '<c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbls>';
+  }
+
   function chartSeries(model, rows, cols, type) {
     var palette = TR.render.palette();
+    // Single-series bar/column and pie colour by CATEGORY (the semantic palette
+    // — negative = red, positive = green), matching the on-screen pins. Multiple
+    // cuts keep one colour per series so the columns stay comparable.
+    var catCol = (type === "pie" || (cols.length === 1 && type !== "dot"))
+      ? TR.render.categoryColours(rows) : null;
     var catPts = rows.map(function (r, i) {
       return '<c:pt idx="' + i + '"><c:v>' + esc(r.label) + "</c:v></c:pt>";
     }).join("");
@@ -383,14 +403,11 @@
           (v === null || v === undefined ? "" : Math.round(v * 10) / 10) +
           "</c:v></c:pt>";
       }).join("");
-      var pieColours = "";
-      if (type === "pie") {
-        pieColours = rows.map(function (_, i) {
-          var pc = palette[i % palette.length].replace("#", "").toUpperCase();
-          return '<c:dPt><c:idx val="' + i + '"/><c:bubble3D val="0"/>' +
-            '<c:spPr><a:solidFill><a:srgbClr val="' + pc + '"/></a:solidFill></c:spPr></c:dPt>';
-        }).join("");
-      }
+      var dPts = catCol ? rows.map(function (_, i) {
+        var pc = catCol[i].replace("#", "").toUpperCase();
+        return '<c:dPt><c:idx val="' + i + '"/><c:bubble3D val="0"/>' +
+          '<c:spPr><a:solidFill><a:srgbClr val="' + pc + '"/></a:solidFill></c:spPr></c:dPt>';
+      }).join("") : "";
       var lineStyle = type === "dot"
         ? '<c:spPr><a:ln><a:noFill/></a:ln></c:spPr>' +
           '<c:marker><c:symbol val="circle"/><c:size val="7"/>' +
@@ -400,7 +417,7 @@
         '<c:tx><c:strRef><c:f>Sheet1!$' + letter + '$1</c:f><c:strCache>' +
         '<c:ptCount val="1"/><c:pt idx="0"><c:v>' + esc(col ? col.label : "Series") +
         "</c:v></c:pt></c:strCache></c:strRef></c:tx>" +
-        lineStyle + pieColours + catRef +
+        lineStyle + dPts + catRef +
         '<c:val><c:numRef><c:f>Sheet1!$' + letter + "$2:$" + letter + "$" +
         (rows.length + 1) + '</c:f><c:numCache><c:formatCode>General</c:formatCode>' +
         '<c:ptCount val="' + rows.length + '"/>' + valPts +
@@ -415,12 +432,12 @@
    * the on-screen render.stackedChart so the PPTX matches the report/PNG.
    */
   function chartSeriesStacked(model, rows, cols) {
-    // Colour the stacked segments with the SAME sequential brand ramp the
-    // on-screen render.stackedChart uses, so the PPTX matches the report/PNG.
-    var brand = TR.charts.brandOf();
+    // Colour the stacked segments with the SAME semantic palette the on-screen
+    // render.stackedChart uses (negative = red, positive = green), so the PPTX
+    // matches the pins.
+    var catCol = TR.render.categoryColours(rows);
     var rampColour = function (i) {
-      return S.shade(brand, 0.16 + 0.84 * (i / Math.max(rows.length - 1, 1)))
-        .replace("#", "").toUpperCase();
+      return catCol[i].replace("#", "").toUpperCase();
     };
     var catPts = cols.map(function (ci, i) {
       var c = model.columns[ci];
@@ -465,19 +482,27 @@
     var plot, axesXml = "";
     if (type === "column") {
       plot = '<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/>' +
-        '<c:varyColors val="0"/>' + series +
+        '<c:varyColors val="0"/>' + series + dataLabels("outEnd") +
         '<c:axId val="111111111"/><c:axId val="222222222"/></c:barChart>';
       axesXml = chartAxes("b", "l");
     } else if (type === "stacked") {
       plot = '<c:barChart><c:barDir val="bar"/><c:grouping val="percentStacked"/>' +
-        '<c:varyColors val="0"/>' + series + '<c:overlap val="100"/>' +
+        '<c:varyColors val="0"/>' + series + dataLabels("ctr", "FFFFFF") +
+        '<c:overlap val="100"/>' +
         '<c:axId val="111111111"/><c:axId val="222222222"/></c:barChart>';
-      axesXml = chartAxes("l", "b");
+      // Percent-stacked normalises to fractions, so the literal-% value axis is
+      // meaningless (and the pin shows none) — hide it; the segment labels carry
+      // the %s.
+      axesXml = chartAxes("l", "b", null, true);
     } else if (type === "pie") {
+      // Labels OUTSIDE the pie with leader lines so they read on any slice
+      // colour, formatted as %.
       plot = '<c:pieChart><c:varyColors val="1"/>' + series +
-        '<c:dLbls><c:showLegendKey val="0"/><c:showVal val="1"/>' +
+        '<c:dLbls><c:numFmt formatCode="0&quot;%&quot;" sourceLinked="0"/>' +
+        '<c:dLblPos val="outEnd"/>' +
+        '<c:showLegendKey val="0"/><c:showVal val="1"/>' +
         '<c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/>' +
-        '<c:showBubbleSize val="0"/></c:dLbls></c:pieChart>';
+        '<c:showBubbleSize val="0"/><c:showLeaderLines val="1"/></c:dLbls></c:pieChart>';
     } else if (type === "dot") {
       plot = '<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>' +
         series + '<c:marker val="1"/>' +
@@ -485,7 +510,7 @@
       axesXml = chartAxes("b", "l");
     } else {
       plot = '<c:barChart><c:barDir val="bar"/><c:grouping val="clustered"/>' +
-        '<c:varyColors val="0"/>' + series +
+        '<c:varyColors val="0"/>' + series + dataLabels("outEnd") +
         '<c:axId val="111111111"/><c:axId val="222222222"/></c:barChart>';
       axesXml = chartAxes("l", "b");
     }
@@ -495,6 +520,11 @@
       ((cols.length > 1 || type === "pie" || type === "stacked")
         ? '<c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend>' : "") +
       '<c:plotVisOnly val="1"/></c:chart>' +
+      // Default chart font — clean Arial in the report ink so axis/legend text
+      // matches the on-screen look.
+      '<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1000">' +
+      '<a:solidFill><a:srgbClr val="3B4252"/></a:solidFill>' +
+      '<a:latin typeface="Arial"/></a:defRPr></a:pPr><a:endParaRPr lang="en-US"/></a:p></c:txPr>' +
       '<c:externalData r:id="rId1"><c:autoUpdate val="0"/></c:externalData></c:chartSpace>';
     // Embedded workbook must mirror the series layout so "Edit Data" resolves:
     // stacked is transposed (columns down col A, one segment-series per column).
@@ -581,6 +611,11 @@
       (rows.length > 1
         ? '<c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend>' : "") +
       '<c:plotVisOnly val="1"/></c:chart>' +
+      // Default chart font — clean Arial in the report ink so axis/legend text
+      // matches the on-screen look.
+      '<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1000">' +
+      '<a:solidFill><a:srgbClr val="3B4252"/></a:solidFill>' +
+      '<a:latin typeface="Arial"/></a:defRPr></a:pPr><a:endParaRPr lang="en-US"/></a:p></c:txPr>' +
       '<c:externalData r:id="rId1"><c:autoUpdate val="0"/></c:externalData></c:chartSpace>';
     var workbookRows = [[""].concat(rows.map(function (r) { return r.label; }))]
       .concat(years.map(function (y, i) {

@@ -235,6 +235,34 @@ run("Visualise header keeps the full question (wraps, no mid-word ellipsis)", ()
   assert(title.indexOf("…") === -1, "no ellipsis truncation");
 });
 
+run("native PPTX charts colour categories with the semantic palette + clean styling", () => {
+  // Regression: native charts coloured from the series palette (navy bar /
+  // brand-accent pie). They now use the same semantic per-category colours as
+  // the pins, drop gridlines, and carry % data labels.
+  const pal = { negative: "#b85450", mod_negative: "#d4918e", neutral: "#c9a96e",
+    mod_positive: "#7daa8c", positive: "#4a7c6f", dk_na: "#d1cdc7", other: "#c5c0b8" };
+  const savedProj = TR.AGG.project;
+  try {
+    TR.AGG.project = Object.assign({}, savedProj, { chart_palette: pal });
+    var model = { code: "Q1", title: "Rate it", chartKind: "detail",
+      columns: [{ label: "Total", letter: "", base: 60, low: false }],
+      rows: [
+        { kind: "category", label: "Poor", cells: [{ pct: 20, n: 12, mean: null, sig: "" }] },
+        { kind: "category", label: "Excellent", cells: [{ pct: 80, n: 48, mean: null, sig: "" }] }
+      ] };
+    var bar = TR.exporter.buildChart(model, "bar", [0]);
+    assert(bar.xml.indexOf("B85450") !== -1, "Poor bar -> negative (red) palette colour");
+    assert(bar.xml.indexOf("4A7C6F") !== -1, "Excellent bar -> positive (green) palette colour");
+    assert(bar.xml.indexOf("<c:dLbls>") !== -1, "bar carries % data labels");
+    assert(bar.xml.indexOf("majorGridlines") === -1, "gridlines removed");
+    var pie = TR.exporter.buildChart(model, "pie", [0]);
+    assert(pie.xml.indexOf("B85450") !== -1 && pie.xml.indexOf("4A7C6F") !== -1,
+      "pie slices use the semantic palette");
+  } finally {
+    TR.AGG.project = savedProj;
+  }
+});
+
 run("weighted recompute: weighted %, Kish effective base, weighted mean (known answers)", () => {
   // 4 respondents, weights [3,1,1,1].
   //   Q1 single Yes/No, answers [0,0,1,1]: Yes Σw = 3+1 = 4, No = 1+1 = 2,
