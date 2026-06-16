@@ -39,7 +39,8 @@ sn <- paste("Segment", seq_len(cr$k))
 pr <- create_full_segment_profile(data = td$data, clusters = cr$clusters,
         clustering_vars = td$clustering_vars, profile_vars = cfg$profile_vars)
 gq <- tryCatch(identify_golden_questions(data = num, clusters = cr$clusters,
-        segment_names = sn, n_top = 5, n_trees = 200), error = function(e) NULL)
+        segment_names = sn, n_top = length(td$clustering_vars), n_trees = 200),
+        error = function(e) NULL)   # all questions -> full short-form screener
 
 results <- list(mode = "final", cluster_result = cr, validation_metrics = vm,
                 profile_result = pr, segment_names = sn, golden_questions = gq,

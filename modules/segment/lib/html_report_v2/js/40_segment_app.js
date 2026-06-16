@@ -258,45 +258,95 @@
   // -------------------------------------------------------------------------
   seg.golden = function (host) {
     var g = TR.AGG && TR.AGG.golden;
-    var intro = '<h2 style="font-size:20px;font-weight:500;margin:8px 0 4px">Golden questions</h2>';
     if (!g || !g.questions || !g.questions.length) {
-      host.innerHTML = '<section style="padding:8px 0 24px">' + intro +
+      host.innerHTML = '<section style="padding:8px 0 24px">' +
+        '<h2 style="font-size:20px;font-weight:500;margin:8px 0 4px">Golden questions</h2>' +
         '<p style="color:var(--muted)">Golden questions were not computed for this solution.</p></section>';
       return;
     }
-    var pct = function (x) { return (x == null || isNaN(x)) ? "–" : Math.round(x * 100) + "%"; };
     var qs = g.questions.slice().sort(function (a, b) { return (a.rank || 0) - (b.rank || 0); });
-    var headline = (g.overall_accuracy != null) ? Math.round(g.overall_accuracy * 100) : null;
-    var firstCum = (qs[0] && qs[0].cumulative_accuracy != null)
-      ? Math.round(qs[0].cumulative_accuracy * 100) : null;
+    var incr = seg.goldenIncrements(qs);
+    var sel = qs.map(function () { return true; });
 
-    var rows = qs.map(function (q) {
-      var cum = q.cumulative_accuracy;
-      var w = (cum != null) ? Math.max(2, Math.round(cum * 100)) : 0;
-      return '<div style="display:grid;grid-template-columns:24px minmax(150px,1fr) 1fr 118px;' +
-        'align-items:center;gap:10px;margin:5px 0">' +
-        '<span style="display:inline-flex;width:22px;height:22px;border-radius:6px;background:var(--soft);' +
-        'color:var(--ink);align-items:center;justify-content:center;font-size:12px;font-weight:500">' + q.rank + "</span>" +
-        '<div style="font-size:13px">' + fmt.escapeHtml(q.title || q.code) + "</div>" +
-        '<div style="background:var(--soft);border-radius:5px;overflow:hidden">' +
-        '<div style="background:var(--brand);height:16px;width:' + w + '%"></div></div>' +
-        '<div style="font-size:12px;color:var(--muted);text-align:right">' + pct(cum) + " cumulative</div></div>";
+    function refreshStat() {
+      var el = host.querySelector("[data-estimate]");
+      if (!el) return;
+      var nSel = sel.filter(Boolean).length;
+      var est = seg.goldenEstimate(incr, sel, g.overall_accuracy);
+      el.innerHTML = 'Using <strong>' + nSel + ' of ' + qs.length + '</strong> questions &middot; ' +
+        'estimated accuracy <strong>' + Math.round(est * 100) + '%</strong>';
+    }
+    host.innerHTML = seg.goldenHtml(g, qs, incr, sel);
+    host.querySelectorAll("[data-gq]").forEach(function (cb) {
+      cb.addEventListener("change", function () {
+        sel[parseInt(cb.getAttribute("data-gq"), 10)] = cb.checked;
+        refreshStat();   // update the live stat only; checkbox state persists in `sel`
+      });
+    });
+  };
+
+  // Per-question accuracy increment (cumulative[i] − cumulative[i−1]); the first
+  // is the single-question accuracy. Pure + exposed for the node gate.
+  seg.goldenIncrements = function (qs) {
+    return qs.map(function (q, i) {
+      var c = q.cumulative_accuracy, p = i > 0 ? qs[i - 1].cumulative_accuracy : 0;
+      return (c != null && p != null) ? (c - p) : null;
+    });
+  };
+  // Estimated accuracy for a selected subset = sum of its increments (exact for
+  // a top-N prefix; an approximation otherwise), capped at the full-model OOB.
+  seg.goldenEstimate = function (incr, sel, overall) {
+    var s = 0;
+    for (var i = 0; i < incr.length; i++) if (sel[i] && incr[i] != null) s += incr[i];
+    return (overall != null) ? Math.min(s, overall) : s;
+  };
+  seg.goldenHtml = function (g, qs, incr, sel) {
+    var P = function (x) { return (x == null || isNaN(x)) ? "–" : Math.round(x * 100) + "%"; };
+    var overall = g.overall_accuracy, oob = (overall != null) ? Math.round((1 - overall) * 100) : null;
+    var est = seg.goldenEstimate(incr, sel, overall), nSel = sel.filter(Boolean).length;
+
+    var trs = qs.map(function (q, i) {
+      var gain = (i > 0 && incr[i] != null)
+        ? ' <span style="color:' + (incr[i] >= 0 ? "var(--green)" : "var(--red)") + '">(' +
+          (incr[i] >= 0 ? "+" : "−") + Math.abs(incr[i] * 100).toFixed(1) + " pp)</span>" : "";
+      return '<tr><td style="padding:6px 8px;border-bottom:1px solid var(--line)">' +
+        '<input type="checkbox" data-gq="' + i + '"' + (sel[i] ? " checked" : "") + "></td>" +
+        '<td style="padding:6px 8px;border-bottom:1px solid var(--line);color:var(--muted)">' + q.rank + "</td>" +
+        '<td style="padding:6px 10px;border-bottom:1px solid var(--line)">' + fmt.escapeHtml(q.title || q.code) + "</td>" +
+        '<td style="padding:6px 10px;border-bottom:1px solid var(--line);text-align:right;color:var(--muted)">' +
+        (q.importance_pct != null ? Math.round(q.importance_pct) + "%" : "–") + "</td>" +
+        '<td style="padding:6px 10px;border-bottom:1px solid var(--line);text-align:right">' +
+        P(q.cumulative_accuracy) + gain + "</td></tr>";
     }).join("");
 
     var perSeg = (g.per_segment && g.per_segment.length)
-      ? '<div style="margin-top:14px;font-size:12.5px;color:var(--muted)">Per-segment hit rate: ' +
-        g.per_segment.map(function (s) { return fmt.escapeHtml(s.label) + " " + pct(s.accuracy); }).join(" · ") + "</div>"
+      ? '<div style="margin-top:12px;font-size:12.5px;color:var(--muted)">Per-segment hit rate: ' +
+        g.per_segment.map(function (s) { return fmt.escapeHtml(s.label) + " " + P(s.accuracy); }).join(" · ") + "</div>"
       : "";
 
-    host.innerHTML =
-      '<section style="padding:8px 0 24px">' + intro +
-      '<p style="color:var(--muted);margin:0 0 14px;max-width:64ch;line-height:1.6">The smallest set of ' +
-      'questions that can place a respondent into the right segment (random-forest typing model). ' +
-      (headline != null ? '<strong style="color:var(--ink)">Just these ' + qs.length + ' questions classify ' +
-        headline + '% of respondents correctly</strong>' +
-        (firstCum != null ? '; the single strongest question already reaches ' + firstCum + '%.' : '.') : '') + "</p>" +
-      '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin:0 0 6px">' +
-      'Question · cumulative accuracy as it is added</div>' + rows + perSeg + "</section>";
+    return '<section style="padding:8px 0 24px">' +
+      '<h2 style="font-size:20px;font-weight:500;margin:8px 0 4px">Golden questions</h2>' +
+      '<p style="color:var(--muted);margin:0 0 12px;max-width:64ch;line-height:1.6">The survey items that best ' +
+      'predict which segment a respondent belongs to (random-forest typing model). Tick questions off to find the ' +
+      'smallest short-form screener that still types people accurately. These differ from the Importance tab: ' +
+      'importance (ANOVA) tells you what <em>defines</em> the segments; golden questions tell you what ' +
+      '<em>identifies</em> them — a strong differentiator can be a weaker standalone predictor when its signal ' +
+      'overlaps with correlated questions.</p>' +
+      '<div style="background:var(--soft);border-radius:8px;padding:12px 14px;margin:0 0 14px">' +
+      (overall != null ? '<div style="font-size:13px"><strong style="color:var(--ink)">Random-forest accuracy: ' +
+        Math.round(overall * 100) + "%</strong> using all " + qs.length + " questions" +
+        (oob != null ? " (OOB error " + oob + "%)" : "") + ".</div>" : "") +
+      '<div data-estimate style="font-size:13px;margin-top:4px">Using <strong>' + nSel + " of " + qs.length +
+      "</strong> questions &middot; estimated accuracy <strong>" + Math.round(est * 100) + "%</strong></div></div>" +
+      '<div style="overflow:auto"><table style="border-collapse:collapse;font-size:13px;width:100%"><thead><tr>' +
+      '<th style="padding:7px 8px;border-bottom:2px solid var(--line)"></th>' +
+      '<th style="padding:7px 8px;border-bottom:2px solid var(--line);text-align:left;color:var(--faint);font-weight:500">#</th>' +
+      '<th style="padding:7px 10px;border-bottom:2px solid var(--line);text-align:left;font-weight:500">Question</th>' +
+      '<th style="padding:7px 10px;border-bottom:2px solid var(--line);text-align:right;font-weight:500">Importance</th>' +
+      '<th style="padding:7px 10px;border-bottom:2px solid var(--line);text-align:right;font-weight:500">Accuracy added</th>' +
+      "</tr></thead><tbody>" + trs + "</tbody></table></div>" + perSeg +
+      '<p style="font-size:11.5px;color:var(--faint);margin-top:10px;max-width:64ch">Estimated accuracy assumes ' +
+      "questions are added in rank order; a custom subset is an approximation — confirm a final screener on fresh data.</p></section>";
   };
 
   // -------------------------------------------------------------------------
