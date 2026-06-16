@@ -68,6 +68,8 @@ h1, h2, h3 { line-height: 1.25; letter-spacing: -.2px; }
 label.fpick-q { display: block; cursor: pointer; }
 .pinmenu .pm-sep { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 9px; }
 .ex-chart + .ex-chart { margin-top: 6px; }
+.ex-scorecard { margin: 4px 0 12px; }
+.ex-scorecard svg { width: 100%; height: auto; display: block; }
 .fval { display: block; padding: 6px 9px; border-radius: 7px; cursor: pointer; font-size: 12.5px; }
 .fval:hover { background: var(--soft); }
 .fval input { accent-color: var(--brand); margin-right: 7px; }

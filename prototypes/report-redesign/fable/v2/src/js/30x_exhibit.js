@@ -6,8 +6,11 @@
  * PPTX slide with one NATIVE chart object per panel (rels rId2+k).
  *
  * Single-question exhibits chart the real view model; multi-question
- * exhibits chart each question's HEADLINE tracked metric (Index/NPS mean
- * first, then top NET, then NET POSITIVE) as one series/bar per question.
+ * exhibits scorecard each question's HEADLINE tracked metric (Index/NPS mean
+ * first, then top NET, then NET POSITIVE) — one row per metric.
+ *
+ * SIZE-EXCEPTION: one cohesive exhibit engine (data + 3 render targets +
+ * composite scorecard); splitting would scatter the shared model helpers.
  */
 (function (global) {
   "use strict";
@@ -110,6 +113,103 @@
   function curOf(row) {
     return row.kind === "mean" ? row.cells[0].mean : row.cells[0].pct;
   }
+
+  /* ---------- composite scorecard ----------
+   * A multi-metric exhibit renders as a scorecard (one row per metric: short
+   * name, trend sparkline, latest value RAG-coloured, wave delta) instead of
+   * overlapping trend lines with a colliding full-text legend. */
+
+  function scFmt(v, isMean) {
+    if (v === null || v === undefined) return "–";
+    return isMean ? (Math.round(v * 10) / 10).toFixed(1) : Math.round(v) + "%";
+  }
+  function ragOf(v, q, isMean) {
+    if (v === null || v === undefined) return "#9aa1b1";
+    if (q && q.gauge_green != null && q.gauge_amber != null) {
+      if (v >= q.gauge_green) return "#1b6e53";
+      if (v >= q.gauge_amber) return "#a8842c";
+      return "#b3372f";
+    }
+    var max = (q && q.scale_max) || (isMean ? 10 : 100);
+    var pct = v / max * 100;
+    return pct >= 75 ? "#1b6e53" : pct >= 50 ? "#a8842c" : "#b3372f";
+  }
+
+  exhibit.scorecardRows = function (item, models) {
+    return seriesPseudoRows(item, models).map(function (r) {
+      var m = r._metric;
+      var vals = r.waves.map(function (w) { return w.value; });
+      var latest = vals.length ? vals[vals.length - 1] : null;
+      var prev = vals.length > 1 ? vals[vals.length - 2] : null;
+      var delta = (prev == null || latest == null) ? null
+        : (r.isMean ? Math.round((latest - prev) * 10) / 10 : Math.round(latest - prev));
+      return { code: m.code, name: m.title, metricLabel: m.label, isMean: r.isMean,
+        vals: vals, latest: latest, delta: delta,
+        up: delta !== null && delta >= 0, rag: ragOf(latest, m.q, r.isMean) };
+    });
+  };
+
+  /** A composite = an exhibit spanning 2+ DISTINCT questions; it scorecards.
+   *  A single question across several segments is NOT a composite — it keeps the
+   *  multi-segment trend chart (the segments share one question name). */
+  exhibit.isComposite = function (item, models) {
+    var rows = exhibit.scorecardRows(item, models);
+    if (rows.length < 2) return false;
+    var codes = {};
+    rows.forEach(function (r) { codes[r.code] = 1; });
+    return Object.keys(codes).length >= 2;
+  };
+
+  /** Scorecard as one SVG (used inline on-screen AND rasterised into the image
+   *  deck), so the two are pixel-identical. width defaults to the report width. */
+  exhibit.scorecardSvg = function (item, models, width) {
+    var rows = exhibit.scorecardRows(item, models);
+    if (!rows.length) return "";
+    // Two-line rows: the (long) question name owns line 1 with the value to its
+    // right; the code, sparkline and delta sit on line 2 — so names never
+    // collide with the sparkline however long they run.
+    var S = TR.svg, W = width || 660, rowH = 50, padX = 6;
+    var H = rows.length * rowH + 6;
+    var sparkX = W * 0.36, sparkW = W * 0.24, rightX = W - padX;
+    var all = [];
+    rows.forEach(function (r) { r.vals.forEach(function (v) { if (v != null) all.push(v); }); });
+    var lo = all.length ? Math.min.apply(null, all) : 0;
+    var hi = all.length ? Math.max.apply(null, all) : 1;
+    var pad = Math.max((hi - lo) * 0.25, 0.4); lo -= pad; hi += pad;
+    if (hi <= lo) hi = lo + 1;
+    var parts = [];
+    rows.forEach(function (r, ri) {
+      var y0 = ri * rowH + 3;
+      if (ri) parts.push(S.el("line", { x1: padX, y1: y0, x2: W - padX, y2: y0, stroke: "#e5e7ef" }));
+      parts.push(S.text(padX, y0 + 19, TR.charts.clip(r.name, 62),
+        { "font-size": 14, "font-weight": 600, fill: "#1c2333" }));
+      parts.push(S.text(rightX, y0 + 20, scFmt(r.latest, r.isMean),
+        { "font-size": 21, "font-weight": 700, fill: r.rag, "text-anchor": "end" }));
+      parts.push(S.text(padX, y0 + 40, r.code + " · " + r.metricLabel,
+        { "font-size": 11, fill: "#9aa1b1" }));
+      var n = r.vals.length, sp = [];
+      r.vals.forEach(function (v, i) {
+        if (v == null) return;
+        sp.push([sparkX + i * (sparkW / Math.max(n - 1, 1)),
+          y0 + 27 + (1 - (v - lo) / (hi - lo)) * 16]);
+      });
+      if (sp.length >= 2) {
+        parts.push(S.el("path", { d: sp.map(function (p, i) {
+          return (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); }).join(" "),
+          fill: "none", stroke: "#323367", "stroke-width": 2,
+          "stroke-linecap": "round", "stroke-linejoin": "round" }));
+        var last = sp[sp.length - 1];
+        parts.push(S.el("circle", { cx: last[0].toFixed(1), cy: last[1].toFixed(1), r: 2.8, fill: "#323367" }));
+      }
+      if (r.delta !== null && Math.abs(r.delta) >= 0.05) {
+        parts.push(S.text(rightX, y0 + 42,
+          (r.up ? "▲" : "▼") + Math.abs(r.delta).toFixed(r.isMean ? 1 : 0),
+          { "font-size": 12.5, "font-weight": 700,
+            fill: r.up ? "#1b6e53" : "#b3372f", "text-anchor": "end" }));
+      }
+    });
+    return S.root(W, H, "scorecard", parts.join(""));
+  };
 
   function shortLabel(model, row) {
     // question TEXT first — codes are meaningless on a chart; generous
@@ -289,6 +389,18 @@
     if (!models.length) return "";
     var flags = item.flags || {};
     var out = [];
+    // A composite (2+ metrics) is one scorecard — it carries the latest value
+    // (was the dist chart) AND the trajectory (was the trend lines) per metric,
+    // so it replaces both, with the detailed table underneath.
+    if (exhibit.isComposite(item, models)) {
+      if (flags.dist || flags.trend) {
+        out.push('<div class="ex-scorecard">' + exhibit.scorecardSvg(item, models, 660) + "</div>");
+      }
+      if (flags.table) {
+        out.push('<div class="si-table">' + tableHtml(exhibit.matrix(item, models)) + "</div>");
+      }
+      return out.join("");
+    }
     if (flags.dist) {
       var dist = exhibit.distModel(item, models);
       var type = item.distType === "line" ? "column" : (item.distType || "column");
@@ -329,6 +441,12 @@
 
   exhibit.contextLine = function (item, models) {
     if (isSeriesItem(item)) {
+      // A composite names its metrics in the scorecard, so the meta line stays
+      // short rather than repeating every (long) series label.
+      if (exhibit.isComposite(item, models)) {
+        return exhibit.scorecardRows(item, models).length + " metrics · published wave history" +
+          (item.ci ? " · " + TR.conf.methodNote(seriesIntervalKind(item, models)) + " bands" : "");
+      }
       var labels = (seriesList(item, models) || []).map(function (e) {
         return e.label;
       });
@@ -351,6 +469,18 @@
     var flags = item.flags || {};
     var charts = [];
     var scaleNote = "";
+    // Composite: the editable deck shows the editable wave table (no overlapping
+    // trend chart). The polished scorecard is in the image deck; here the table
+    // IS the metric×wave data. Always include it.
+    if (exhibit.isComposite(item, models)) {
+      return TR.exporter.exhibitSlide({
+        title: exhibit.titleFor(item, models),
+        meta: exhibit.contextLine(item, models),
+        charts: [],
+        matrix: exhibit.matrix(item, models),
+        note: (flags.insight !== false && item.note) ? item.note : ""
+      });
+    }
     if (flags.dist) {
       var type = item.distType === "line" ? "column" : (item.distType || "column");
       var dist = exhibit.distModel(item, models);

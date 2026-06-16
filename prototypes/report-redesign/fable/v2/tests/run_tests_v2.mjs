@@ -343,6 +343,35 @@ run("export matrix carries the wave delta (export tables render it)", () => {
     "native table renders a green/red delta run");
 });
 
+run("composite exhibit (2+ questions) scorecards instead of overlapping trend lines", () => {
+  const qs = TR.AGG.questions.filter((q) => q.type === "scale" &&
+    q.rows.some((r) => r.kind === "mean")).slice(0, 3);
+  const banner = TR.AGG.banner_groups[0].id;
+  const series = qs.map((q) => {
+    const m = TR.model.forQuestion(q.code, banner, []);
+    return { code: q.code, ri: m.rows.findIndex((r) => r.kind === "mean"), label: "Mean", seg: null };
+  });
+  const len = TR.story2.items().length;
+  try {
+    TR.story2.pinTrackingView({ title: "3 metrics", ci: false, qs: qs.map((q) => q.code),
+      series: series, annotations: [], note: "" }, { trend: true, table: true });
+    const item = TR.story2.items()[TR.story2.items().length - 1];
+    const models = TR.exhibit.models(item);
+    assert(TR.exhibit.isComposite(item, models), "3 distinct questions -> composite");
+    var rows = TR.exhibit.scorecardRows(item, models);
+    assert(rows.length === 3 && rows.every((r) => r.code && Array.isArray(r.vals) && r.latest != null),
+      "a scorecard row per metric, with values");
+    var html = TR.exhibit.panelsHtml(item);
+    assert(html.indexOf("ex-scorecard") !== -1, "composite panel uses the scorecard");
+    assert(html.indexOf("ex-chart") === -1, "no overlapping trend-line chart in a composite");
+    var slide = TR.exhibit.slide(item);
+    assert(slide.charts.length === 0 && slide.xml.indexOf("<a:tbl>") !== -1,
+      "editable composite is the wave table, no native charts");
+  } finally {
+    TR.story2.items().length = len;
+  }
+});
+
 run("weighted recompute: weighted %, Kish effective base, weighted mean (known answers)", () => {
   // 4 respondents, weights [3,1,1,1].
   //   Q1 single Yes/No, answers [0,0,1,1]: Yes Σw = 3+1 = 4, No = 1+1 = 2,

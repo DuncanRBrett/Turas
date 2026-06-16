@@ -530,8 +530,12 @@
       if (!models.length) return null;
       var ef = item.flags || {};
       var chartSvg = null;
-      if (ef.trend !== false) chartSvg = TR.render.trendChart(TR.exhibit.trendModel(item, models));
-      else if (ef.dist) chartSvg = TR.render.chartBy(item.distType === "line"
+      if (TR.exhibit.isComposite(item, models)) {
+        // composite -> one scorecard (replaces both dist and trend)
+        if (ef.dist || ef.trend) chartSvg = TR.exhibit.scorecardSvg(item, models, 660);
+      } else if (ef.trend !== false) {
+        chartSvg = TR.render.trendChart(TR.exhibit.trendModel(item, models));
+      } else if (ef.dist) chartSvg = TR.render.chartBy(item.distType === "line"
         ? "column" : (item.distType || "column"),
         TR.exhibit.distModel(item, models), item.chartCols || [0]);
       return TR.exporter.cardSvgRaw(TR.exhibit.titleFor(item, models),
