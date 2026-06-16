@@ -55,6 +55,14 @@
 
   /* ---------------- pin creators ---------------- */
 
+  // The first banner group's id, or "" (the Total column) on a Total-only
+  // report. banner_groups[0].id thrown unguarded — pinning a tracking view or a
+  // composite exhibit on a no-banner survey (e.g. CCS) crashed and nothing
+  // pinned.
+  function firstBanner() {
+    return TR.AGG.banner_groups.length ? TR.AGG.banner_groups[0].id : "";
+  }
+
   story2.pinCurrent = function (flags) {
     var s = TR.d2.state;
     var chartState = TR.cards2.chartState();
@@ -108,7 +116,7 @@
       series: JSON.parse(JSON.stringify(spec.series)),
       annotations: JSON.parse(JSON.stringify(spec.annotations || [])),
       ci: !!spec.ci,
-      banner: TR.AGG.banner_groups[0].id, filters: [],
+      banner: firstBanner(), filters: [],
       flags: { dist: !!flags.dist, trend: !!flags.trend,
         table: !!flags.table, insight: flags.insight !== false },
       distType: "column", note: spec.note || "" });
@@ -120,7 +128,7 @@
   /** Composite exhibit: any tracked questions, each via its headline metric. */
   story2.addExhibit = function () {
     var tracked = TR.AGG.questions.filter(function (q) {
-      var m = TR.model.forQuestion(q.code, TR.AGG.banner_groups[0].id, []);
+      var m = TR.model.forQuestion(q.code, firstBanner(), []);
       return m && m.prevWave && TR.exhibit.headlineRow(m);
     });
     var holder = document.getElementById("story-picker");
@@ -198,7 +206,7 @@
       b.addEventListener("click", function () {
         load().push({ kind: "composite", category: b.getAttribute("data-cat"),
           banner: TR.d2.state.banner.indexOf("custom:") === 0
-            ? TR.AGG.banner_groups[0].id : TR.d2.state.banner,
+            ? firstBanner() : TR.d2.state.banner,
           filters: JSON.parse(JSON.stringify(TR.d2.state.filters)), note: "" });
         persist();
         holder.hidden = true;

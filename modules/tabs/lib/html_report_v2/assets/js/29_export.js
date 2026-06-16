@@ -294,9 +294,19 @@
     var rowH = Math.round(inch(Math.min(0.3, box.h / (matrix.body.length + 1))));
     var grid = '<a:gridCol w="' + inch(labelW) + '"/>';
     for (var i = 1; i < nCols; i++) grid += '<a:gridCol w="' + inch(colW) + '"/>';
+    // Explicit borders + fills so the formatting survives in PowerPoint, which
+    // (unlike LibreOffice) drops cell fills when the table carries no style id —
+    // see the "No Style, No Grid" tableStyleId below. Stat rows (Index / NPS /
+    // NET) get a gold left edge, mirroring the report's accent rule.
+    var BORDER = "D8DCEA", line = function (side, w, clr) {
+      return '<a:ln' + side + ' w="' + w + '"><a:solidFill><a:srgbClr val="' +
+        clr + '"/></a:solidFill></a:ln' + side + ">";
+    };
     var cell = function (text, o) {
       return "<a:tc><a:txBody><a:bodyPr/><a:lstStyle/>" + para(text, o) +
         '</a:txBody><a:tcPr marL="27432" marR="27432" marT="9144" marB="9144" anchor="ctr">' +
+        (o.accentLeft ? line("L", 28575, "CC9900") : line("L", 6350, BORDER)) +
+        line("R", 6350, BORDER) + line("T", 6350, BORDER) + line("B", 6350, BORDER) +
         '<a:solidFill><a:srgbClr val="' + o.fill + '"/></a:solidFill></a:tcPr></a:tc>';
     };
     var rows = ['<a:tr h="' + rowH + '">' + matrix.head.map(function (h, i) {
@@ -308,7 +318,8 @@
       rows.push('<a:tr h="' + rowH + '">' + row.cells.map(function (text, i) {
         return cell(text, { size: fontSize, bold: row.kind === "stat",
           italic: row.kind === "base", colour: row.kind === "base" ? GREY : INK,
-          fill: fill, align: i === 0 ? "l" : "ctr" });
+          fill: fill, align: i === 0 ? "l" : "ctr",
+          accentLeft: row.kind === "stat" && i === 0 });
       }).join("") + "</a:tr>");
     });
     return '<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="' + id +
@@ -316,7 +327,12 @@
       '<p:xfrm><a:off x="' + inch(box.x) + '" y="' + inch(box.y) + '"/>' +
       '<a:ext cx="' + inch(box.w) + '" cy="' + inch(box.h) + '"/></p:xfrm>' +
       '<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table">' +
-      '<a:tbl><a:tblPr firstRow="1"/><a:tblGrid>' + grid + "</a:tblGrid>" +
+      // "No Style, No Grid" — PowerPoint then applies no theme table style and
+      // renders exactly the cell fills/borders above (without a style id it
+      // drops them and shows a blank default).
+      '<a:tbl><a:tblPr firstRow="1">' +
+      '<a:tableStyleId>{2D5ABB26-0587-4C30-8999-92F81FD0307C}</a:tableStyleId>' +
+      '</a:tblPr><a:tblGrid>' + grid + "</a:tblGrid>" +
       rows.join("") + "</a:tbl></a:graphicData></a:graphic></p:graphicFrame>";
   }
 

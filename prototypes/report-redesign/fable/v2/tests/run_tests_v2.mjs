@@ -263,6 +263,46 @@ run("native PPTX charts colour categories with the semantic palette + clean styl
   }
 });
 
+run("PPTX table keeps the report formatting (style id, brand header, accent stat row)", () => {
+  // Regression: with no tableStyleId PowerPoint dropped the cell fills and
+  // showed a blank default table.
+  const m = TR.model.forQuestion("Q008", TR.AGG.banner_groups[0].id, []);
+  const slide = TR.exporter.slideForModel(m, "", { chart: false, table: true, insight: false });
+  assert(slide.xml.indexOf("2D5ABB26-0587-4C30-8999-92F81FD0307C") !== -1,
+    "No-Style-No-Grid table style id present so PowerPoint honours the fills");
+  assert(slide.xml.indexOf(TR.charts.brandOf().replace("#", "").toUpperCase()) !== -1,
+    "brand-coloured header fill present");
+  assert(slide.xml.indexOf("CC9900") !== -1, "stat-row gold accent edge present");
+});
+
+run("tracking view pins on a Total-only report (no banner_groups)", () => {
+  // Regression: pinTrackingView (and the composite-exhibit builder) read
+  // banner_groups[0].id unguarded, so on a no-banner survey (e.g. CCS) the Pin
+  // click threw and nothing pinned at all.
+  const saved = { agg: TR.AGG, micro: TR.MICRO, prev: TR.PREV, idx: TR.d2._qIndex,
+    len: TR.story2.items().length };
+  try {
+    TR.AGG = { schema_version: 2,
+      project: { name: "T", wave: "W25", low_base_threshold: 30, tracking: { enabled: true } },
+      columns: [{ key: "TOTAL::Total", group: "total", label: "Total", letter: "" }],
+      banner_groups: [], categories: ["c"],
+      questions: [{ code: "Q1", title: "Q1", category: "c", type: "scale",
+        bases: [{ n: 60, low: false }],
+        rows: [{ kind: "mean", label: "Mean", pct: [7.6], n: [null], sig: [""] }] }] };
+    TR.MICRO = null; TR.PREV = null; TR.d2._qIndex = null;
+    TR.story2.pinTrackingView({ title: "Q1 trend", ci: false, qs: ["Q1"],
+      series: [{ code: "Q1", ri: 0, label: "Mean", seg: null }], annotations: [], note: "" },
+      { trend: true, insight: true });
+    var item = TR.story2.items()[TR.story2.items().length - 1];
+    assert(item && item.kind === "exhibit", "tracking view pinned as an exhibit item");
+    assert(item.banner === "", "no-banner report resolves to the Total banner");
+    assert(TR.exhibit.slide(item) !== null, "the pinned exhibit produces an export slide");
+  } finally {
+    TR.story2.items().length = saved.len;
+    TR.AGG = saved.agg; TR.MICRO = saved.micro; TR.PREV = saved.prev; TR.d2._qIndex = saved.idx;
+  }
+});
+
 run("weighted recompute: weighted %, Kish effective base, weighted mean (known answers)", () => {
   // 4 respondents, weights [3,1,1,1].
   //   Q1 single Yes/No, answers [0,0,1,1]: Yes Σw = 3+1 = 4, No = 1+1 = 2,
