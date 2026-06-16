@@ -359,10 +359,16 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
         }
       }
       kind <- if (cl == "net") "net" else "category"
+      # Box-category rows (e.g. "Good (9 - 10)", "Top 2 Box") carry a real
+      # Frequency in the source, so the "Counts" toggle shows n= just like the
+      # classic report. Only a true "NET POSITIVE" row is a percentage-point
+      # difference, not a count — it keeps a null n, matching the renderer's
+      # computed path which also nulls that row's n.
+      is_net_diff <- kind == "net" && grepl("^NET POSITIVE", lbl, ignore.case = TRUE)
       rows[[length(rows) + 1]] <- list(
         kind = kind, label = lbl,
         pct = as.list(pr),
-        n   = if (kind == "net") null_vec() else as.list(vals_for(lbl, "Frequency")),
+        n   = if (is_net_diff) null_vec() else as.list(vals_for(lbl, "Frequency")),
         sig = if (stats$has_sig) as.list(sig_for(lbl)) else empty_sig())
     }
   }

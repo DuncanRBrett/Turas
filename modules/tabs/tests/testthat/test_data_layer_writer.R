@@ -156,6 +156,38 @@ make_dl_q_numeric <- function() {
   )
 }
 
+# Rating whose box-category rows carry a real Frequency (as the live crosstab
+# does), plus a NET POSITIVE difference row. Exercises the "Counts" toggle: box
+# rows must emit n; the NET POSITIVE row (a pp gap, not a count) must not — even
+# though this fixture deliberately gives it a Frequency to prove the guard fires.
+make_dl_q_boxcounts <- function() {
+  list(
+    question_code = "Q4", question_text = "Rate the reliever",
+    question_type = "Rating", category = "Service",
+    table = data.frame(
+      RowLabel  = c("Poor (1 - 5)", "Poor (1 - 5)",
+                    "Good (9 - 10)", "Good (9 - 10)",
+                    "NET POSITIVE (Good - Poor)", "NET POSITIVE (Good - Poor)",
+                    "Mean"),
+      RowType   = c("Frequency", "Column %",
+                    "Frequency", "Column %",
+                    "Frequency", "Column %",
+                    "Average"),
+      RowSource = c("boxcategory", "boxcategory",
+                    "boxcategory", "boxcategory",
+                    "net_positive", "net_positive",
+                    "summary"),
+      "TOTAL::Total"   = c("12", "20.0", "48", "80.0", "99", "60.0", "7.6"),
+      "Gender::Male"   = c("6", "20.0", "24", "80.0", "99", "60.0", "7.7"),
+      "Gender::Female" = c("6", "20.0", "24", "80.0", "99", "60.0", "7.5"),
+      check.names = FALSE, stringsAsFactors = FALSE),
+    bases = list(
+      "TOTAL::Total"   = list(unweighted = 60, weighted = 60, effective = 60),
+      "Gender::Male"   = list(unweighted = 30, weighted = 30, effective = 30),
+      "Gender::Female" = list(unweighted = 30, weighted = 30, effective = 30))
+  )
+}
+
 make_dl_results <- function() list(Q1 = make_dl_q_single(), Q2 = make_dl_q_scale())
 
 make_dl_config <- function(...) {
@@ -443,6 +475,26 @@ test_that("numeric questions are kept off the index dashboard (type + null scale
   # It DOES still carry a Mean row — i.e. the old "any mean row" dashboard
   # filter would have wrongly included it; the type gate is what now excludes it.
   expect_true(any(vapply(q$rows, function(r) identical(r$kind, "mean"), logical(1))))
+})
+
+test_that("box-category rows carry counts; NET POSITIVE rows do not (Counts toggle)", {
+  dl <- build_data_layer(list(Q4 = make_dl_q_boxcounts()), make_dl_banner_info(),
+                         make_dl_config())
+  q <- Filter(function(q) q$code == "Q4", dl$questions)[[1]]
+  by_label <- function(lab) Filter(function(r) r$label == lab, q$rows)[[1]]
+
+  # Box categories are "net" kind but carry their real Frequency so the renderer's
+  # "Counts" toggle shows n= (the classic-report behaviour Duncan expects).
+  good <- by_label("Good (9 - 10)")
+  expect_equal(good$kind, "net")
+  expect_equal(good$n[[1]], 48)
+  expect_equal(by_label("Poor (1 - 5)")$n[[1]], 12)
+
+  # A NET POSITIVE row is a percentage-point difference, not a count — n stays
+  # null even though this fixture planted a Frequency on it.
+  np <- by_label("NET POSITIVE (Good - Poor)")
+  expect_equal(np$kind, "net")
+  expect_true(is.na(np$n[[1]]))
 })
 
 # ==============================================================================
