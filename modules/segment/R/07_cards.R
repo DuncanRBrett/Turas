@@ -158,13 +158,16 @@ generate_headline <- function(stats, question_labels) {
   top_vars <- stats$defining_vars[1:min(2, length(stats$defining_vars))]
   diffs <- stats$diffs[top_vars]
 
-  # Determine sentiment
-  avg_mean <- mean(stats$means)
-  overall_avg <- mean(stats$overall_means)
+  # Determine sentiment. na.rm: a clustering variable can be all-NA within a
+  # segment, which previously made avg_mean NA and crashed the `if` ("missing
+  # value where TRUE/FALSE needed"), silently dropping the whole cards section.
+  avg_mean <- mean(stats$means, na.rm = TRUE)
+  overall_avg <- mean(stats$overall_means, na.rm = TRUE)
+  finite_pair <- is.finite(avg_mean) && is.finite(overall_avg)
 
-  if (avg_mean > overall_avg + 1) {
+  if (finite_pair && avg_mean > overall_avg + 1) {
     sentiment <- "High-satisfaction"
-  } else if (avg_mean < overall_avg - 1) {
+  } else if (finite_pair && avg_mean < overall_avg - 1) {
     sentiment <- "Low-satisfaction"
   } else {
     sentiment <- "Mixed-satisfaction"
@@ -173,7 +176,7 @@ generate_headline <- function(stats, question_labels) {
   # Build headline
   if (length(top_vars) > 0) {
     primary_trait <- top_vars[1]
-    trait_direction <- if (diffs[primary_trait] > 0) "high" else "low"
+    trait_direction <- if (isTRUE(diffs[primary_trait] > 0)) "high" else "low"
 
     # Get label for trait
     trait_name <- if (!is.null(question_labels) && primary_trait %in% names(question_labels)) {

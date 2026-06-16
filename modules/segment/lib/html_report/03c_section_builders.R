@@ -1912,7 +1912,7 @@ build_seg_about_section <- function(config, html_data) {
     html_data$k %||% 0,
     html_data$n_observations %||% 0,
     length(html_data$variable_importance$variable %||% character(0)),
-    html_data$diagnostics$silhouette_avg %||% 0
+    html_data$diagnostics$avg_silhouette %||% 0
   )
 
   htmltools::tags$div(
