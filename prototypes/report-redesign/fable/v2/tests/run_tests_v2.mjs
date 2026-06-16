@@ -201,7 +201,7 @@ run("heatmap differentiates magnitude (73% clearly darker than 3%)", () => {
       { kind: "category", label: "High", cells: [{ pct: 73, n: 44, mean: null, sig: "" }] },
       { kind: "category", label: "Low",  cells: [{ pct: 3,  n: 2,  mean: null, sig: "" }] }
     ] };
-  var html = TR.render.tableHtml(model, { heatmap: true });
+  var html = TR.render.tableHtml(model, { heatmap: "heat" });
   var alphas = [];
   html.replace(/rgba\(\d+,\d+,\d+,([0-9.]+)\)/g, function (_, a) { alphas.push(parseFloat(a)); return _; });
   assert(alphas.length === 2, "two heated category cells, got " + alphas.length);
@@ -388,6 +388,23 @@ run("dashboard cards carry a value-vs-scale gauge bar and a wave sparkline", () 
   } finally {
     TR.d2.state.banner = savedBanner;
   }
+});
+
+run("table magnitude modes: bars (default) / heat tint / off", () => {
+  var model = { columns: [{ label: "Total", letter: "", base: 60, low: false }],
+    rows: [{ kind: "category", label: "High", cells: [{ pct: 73, n: 44, mean: null, sig: "" }] }] };
+  var bars = TR.render.tableHtml(model, { heatmap: "bars" });
+  assert(bars.indexOf('class="dbf"') !== -1 && bars.indexOf("width:73%") !== -1,
+    "bars mode renders a 73% data bar");
+  assert(bars.indexOf("rgba(") === -1, "bars mode has no background tint");
+  var heat = TR.render.tableHtml(model, { heatmap: "heat" });
+  assert(heat.indexOf("rgba(") !== -1 && heat.indexOf('class="dbf"') === -1,
+    "heat mode tints the cell, no bar");
+  var off = TR.render.tableHtml(model, { heatmap: "off" });
+  assert(off.indexOf("rgba(") === -1 && off.indexOf('class="dbf"') === -1,
+    "off mode shows neither");
+  assert(TR.render.tableHtml(model, { heatmap: true }).indexOf('class="dbf"') !== -1,
+    "older pins (heatmap:true) fall back to the bars default");
 });
 
 run("weighted recompute: weighted %, Kish effective base, weighted mean (known answers)", () => {

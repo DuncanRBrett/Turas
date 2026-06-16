@@ -187,7 +187,10 @@
         (row.indexDesc ? '<div class="idxd">' + fmt.escapeHtml(row.indexDesc) + "</div>" : "") +
         "</td>");
       row.cells.forEach(function (cell, i) {
-        var style = opts.heatmap
+        // magnitude mode: "bars" (default) | "heat" (background tint) | "off".
+        // true (older pins) -> bars; the heat tint only when explicitly "heat".
+        var mag = opts.heatmap === true ? "bars" : (opts.heatmap || "off");
+        var style = mag === "heat"
           ? heat(row.kind === "mean" ? cell.mean : cell.pct, 100) : "";
         var body;
         if (row.kind === "mean") {
@@ -211,6 +214,11 @@
         if (opts.showCounts && row.kind !== "mean") {
           body += '<div class="fq">' + (cell.n === null || cell.n === undefined
             ? "" : "n=" + fmt.base(cell.n)) + "</div>";
+        }
+        // magnitude data bar under category % cells (doesn't obscure the text)
+        if (mag === "bars" && row.kind !== "mean" && cell.pct !== null && cell.pct !== undefined) {
+          body += '<div class="dbar"><div class="dbf" style="width:' +
+            Math.max(0, Math.min(cell.pct, 100)).toFixed(0) + '%"></div></div>';
         }
         out.push('<td style="' + style + '">' + body + "</td>");
       });

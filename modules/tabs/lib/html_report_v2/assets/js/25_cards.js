@@ -149,7 +149,9 @@
     };
     document.getElementById("controls").innerHTML =
       '<button data-act="toggleside" title="Show/hide the question list">⟨⟩ Question list</button>' +
-      toggle("heatmap", "Heatmap") +
+      '<button data-act="magcycle" class="magcyc" title="Cell magnitude — bars / heatmap / off">' +
+      "Magnitude: " + ({ bars: "Bars", heat: "Heat", off: "Off" }[s.heatmap] || "Bars") +
+      "</button>" +
       toggle("showChart", "Chart") +
       toggle("showCounts", "Counts") +
       toggle("showIntervals", "Intervals",
@@ -613,6 +615,12 @@
       var model = cards2.activeModel();
       if (action === "toggleside") {
         document.getElementById("xtab").classList.toggle("noside");
+      }
+      if (action === "magcycle") {
+        var nxtMag = { bars: "heat", heat: "off", off: "bars" };
+        TR.d2.state.heatmap = nxtMag[TR.d2.state.heatmap] || "bars";
+        renderControls();
+        cards2.renderActive();
       }
       if (action === "columns") {
         var menu = document.getElementById("colmenu");
