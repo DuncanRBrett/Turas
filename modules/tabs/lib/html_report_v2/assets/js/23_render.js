@@ -241,6 +241,16 @@
     });
     var body = [{ kind: "base", cells: baseCells }];
     var round1 = function (v) { return Math.round(v * 10) / 10; };
+    // The wave-change chip for a row (▼0.1), as structured data the export
+    // tables can colour; Excel/TSV ignore it. Tiny non-mean moves are dropped,
+    // mirroring the on-screen deltaChip.
+    var deltaInfo = function (row) {
+      var d = row.delta;
+      if (!d || d.diff === null || d.diff === undefined) return null;
+      if (!d.isMean && Math.abs(d.diff) < 1) return null;
+      var size = d.isMean ? Math.abs(d.diff).toFixed(1) : Math.abs(d.diff).toFixed(0);
+      return { text: (d.diff >= 0 ? "▲" : "▼") + size, up: d.diff >= 0, sig: !!d.sig };
+    };
     model.rows.forEach(function (row) {
       if (opts.categoriesOnly && row.kind !== "category") return;
       var cells = [row.label];
@@ -253,7 +263,7 @@
       });
       body.push({
         kind: row.kind === "mean" ? "stat" : row.kind === "net" ? "stat" : "row",
-        cells: cells
+        cells: cells, delta: deltaInfo(row)
       });
     });
     return { head: head, body: body };

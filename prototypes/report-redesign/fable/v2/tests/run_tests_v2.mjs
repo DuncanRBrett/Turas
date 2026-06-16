@@ -328,6 +328,21 @@ run("PPTX image deck: PNG slides pack into a structurally valid deck (python)", 
   assert(report.startsWith("OK"), report);
 });
 
+run("export matrix carries the wave delta (export tables render it)", () => {
+  // The PPTX tables (image svgTable + editable tableFrame) colour the ▼/▲ chip
+  // from this — it must survive into the matrix the exports consume.
+  const m = TR.model.forQuestion("Q008", TR.AGG.banner_groups[0].id, []);
+  const mat = TR.render.matrix(m);
+  var d = mat.body.find((r) => r.delta && r.delta.text);
+  assert(d, "at least one row carries a delta chip");
+  assert(typeof d.delta.up === "boolean" && /[▲▼]/.test(d.delta.text),
+    "delta has a direction + arrow");
+  // editable table emits the delta as a second coloured run
+  const slide = TR.exporter.slideForModel(m, "", { chart: false, table: true, insight: false });
+  assert(slide.xml.indexOf("1B6E53") !== -1 || slide.xml.indexOf("B3372F") !== -1,
+    "native table renders a green/red delta run");
+});
+
 run("weighted recompute: weighted %, Kish effective base, weighted mean (known answers)", () => {
   // 4 respondents, weights [3,1,1,1].
   //   Q1 single Yes/No, answers [0,0,1,1]: Yes Σw = 3+1 = 4, No = 1+1 = 2,

@@ -110,34 +110,44 @@
 
   function svgTable(matrix, x, y, width, brand) {
     var nCols = matrix.head.length;
-    var labelW = Math.round(width * 0.26);
+    var labelW = Math.round(width * 0.30);
     var colW = (width - labelW) / Math.max(nCols - 1, 1);
-    var rowH = 19, headH = 24;
+    var rowH = 27, headH = 32;
+    var accent = TR.charts.accentOf();
     var parts = [], rowY = y;
     var cellX = function (i) {
-      return i === 0 ? x + 6 : x + labelW + (i - 1) * colW + colW / 2;
+      return i === 0 ? x + 12 : x + labelW + (i - 1) * colW + colW / 2;
     };
-    parts.push(S.el("rect", { x: x, y: rowY, width: width, height: headH, fill: brand, rx: 3 }));
+    parts.push(S.el("rect", { x: x, y: rowY, width: width, height: headH, fill: brand, rx: 4 }));
     matrix.head.forEach(function (h, i) {
-      parts.push(S.text(cellX(i), rowY + 16, TR.charts.clip(h, i === 0 ? 34 : 13),
-        { "text-anchor": i === 0 ? "start" : "middle", "font-size": 10,
+      parts.push(S.text(cellX(i), rowY + 21, TR.charts.clip(h, i === 0 ? 42 : 16),
+        { "text-anchor": i === 0 ? "start" : "middle", "font-size": 13,
           "font-weight": 700, fill: "#ffffff" }));
     });
     rowY += headH;
     matrix.body.forEach(function (row, r) {
-      var fill = row.kind === "stat" ? "#f3f4f8" : (r % 2 ? "#fafbfe" : "#ffffff");
+      var stat = row.kind === "stat";
+      var fill = stat ? "#f3f4f8" : (r % 2 ? "#fafbfe" : "#ffffff");
       parts.push(S.el("rect", { x: x, y: rowY, width: width, height: rowH, fill: fill }));
+      // gold accent edge on stat rows (Index / NPS / NET), mirroring the report
+      if (stat) parts.push(S.el("rect", { x: x, y: rowY, width: 4, height: rowH, fill: accent }));
       row.cells.forEach(function (cell, i) {
-        parts.push(S.text(cellX(i), rowY + 13.5, TR.charts.clip(cell, i === 0 ? 38 : 12),
-          { "text-anchor": i === 0 ? "start" : "middle", "font-size": 10,
-            "font-weight": row.kind === "stat" ? 700 : 400,
+        parts.push(S.text(cellX(i), rowY + 18, TR.charts.clip(cell, i === 0 ? 46 : 16),
+          { "text-anchor": i === 0 ? "start" : "middle", "font-size": 12,
+            "font-weight": stat ? 700 : 400,
             "font-style": row.kind === "base" ? "italic" : null,
             fill: row.kind === "base" ? "#6b7280" : "#1c2333" }));
       });
+      // wave-change chip (▼0.1) on the Total column, coloured by direction
+      if (row.delta && nCols >= 2) {
+        parts.push(S.text(cellX(1) + Math.min(colW * 0.30, 30), rowY + 18, row.delta.text,
+          { "text-anchor": "start", "font-size": 9.5, "font-weight": 700,
+            fill: row.delta.up ? "#1b6e53" : "#b3372f" }));
+      }
       rowY += rowH;
     });
     parts.push(S.el("rect", { x: x, y: y, width: width, height: rowY - y,
-      fill: "none", stroke: "#e5e7ef" }));
+      fill: "none", stroke: "#d8dcea" }));
     return { body: parts.join(""), height: rowY - y };
   }
 
@@ -175,12 +185,17 @@
   function inch(v) { return Math.round(v * EMU); }
 
   function para(text, o) {
-    if (!text) return "<a:p/>";
-    return "<a:p><a:pPr" + (o.align ? ' algn="' + o.align + '"' : "") + "/>" +
-      '<a:r><a:rPr lang="en-US" dirty="0" sz="' + Math.round(o.size * 100) + '"' +
-      (o.bold ? ' b="1"' : "") + (o.italic ? ' i="1"' : "") + ">" +
-      '<a:solidFill><a:srgbClr val="' + (o.colour || INK) + '"/></a:solidFill>' +
-      "</a:rPr><a:t>" + esc(text) + "</a:t></a:r></a:p>";
+    if (!text && !o.delta) return "<a:p/>";
+    var run = function (t, colour, bold) {
+      return '<a:r><a:rPr lang="en-US" dirty="0" sz="' + Math.round(o.size * 100) + '"' +
+        (bold ? ' b="1"' : "") + (o.italic ? ' i="1"' : "") + ">" +
+        '<a:solidFill><a:srgbClr val="' + colour + '"/></a:solidFill>' +
+        "</a:rPr><a:t>" + esc(t) + "</a:t></a:r>";
+    };
+    var runs = text ? run(text, o.colour || INK, o.bold) : "";
+    // optional wave-change chip as a second coloured run (▼0.1)
+    if (o.delta) runs += run("  " + o.delta.text, o.delta.up ? "1B6E53" : "B3372F", true);
+    return "<a:p><a:pPr" + (o.align ? ' algn="' + o.align + '"' : "") + "/>" + runs + "</a:p>";
   }
 
   function textBox(id, box, paras) {
@@ -326,7 +341,8 @@
         return cell(text, { size: fontSize, bold: row.kind === "stat",
           italic: row.kind === "base", colour: row.kind === "base" ? GREY : INK,
           fill: fill, align: i === 0 ? "l" : "ctr",
-          accentLeft: row.kind === "stat" && i === 0 });
+          accentLeft: row.kind === "stat" && i === 0,
+          delta: (i === 1 && row.delta) ? row.delta : null });
       }).join("") + "</a:tr>");
     });
     return '<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="' + id +
@@ -730,7 +746,7 @@
         Math.max(3, Math.floor(blockH / 0.28) - 1));
       content += tableFrame(next(), { x: MARGIN, y: top, w: contentW,
         h: Math.min(blockH, (matrix.body.length + 1) * 0.28) }, matrix, brand,
-        matrix.head.length > 8 ? 8.5 : 10);
+        matrix.head.length > 8 ? 9.5 : 11);
     }
     if (hasNote) {
       var noteY = SLIDE_H - 0.25 - noteH;
@@ -851,7 +867,7 @@
         [para(metaLine || "", { size: 10.5, colour: GREY })]) +
       tableFrame(next(), { x: MARGIN, y: 1.35, w: SLIDE_W - MARGIN * 2,
         h: Math.min(5.7, (matrix.body.length + 1) * 0.32) }, matrix, brand,
-        matrix.head.length > 8 ? 8.5 : 10));
+        matrix.head.length > 8 ? 9.5 : 11));
   };
 
   exporter.titleSlide = function (itemCount) {
