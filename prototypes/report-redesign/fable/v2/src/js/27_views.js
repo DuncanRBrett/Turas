@@ -148,16 +148,27 @@
         var row = meanRow(models[q.code]);
         var value = row ? row.cells[0].mean : null;
         var delta = row && row.delta ? row.delta : null;
+        var max = scoreMax(q), gc = gaugeColour(value, max, q);
+        // gauge bar = value vs scale max; sparkline = the wave trajectory (only
+        // when wave history is attached — non-tracking reports just show the bar)
+        var hasVal = value !== null && value !== undefined && max > 0;
+        var barPct = hasVal ? Math.max(0, Math.min(value / max, 1)) * 100 : 0;
+        var pts = row ? TR.render.wavePoints(row) : null;
+        var spark = (pts && pts.length > 1) ? TR.render.sparkline(pts, true, { w: 212, h: 28 }) : "";
         html.push('<button class="gauge" data-goq="' + q.code + '" title="' +
           fmt.escapeHtml(q.title) +
           (row ? intervalTip(row.cells[0], models[q.code].columns[0].base) : "") +
-          '" style="--gc:' +
-          gaugeColour(value, scoreMax(q), q) + '">' +
-          '<span class="gv">' + (value === null ? "–" : value.toFixed(1)) + "</span>" +
+          '" style="--gc:' + gc + '">' +
+          '<span class="gq">' + q.code + "</span>" +
+          '<span class="gv">' + (value === null ? "–" : value.toFixed(1)) +
+          (hasVal ? '<span class="gsc">/' + max + "</span>" : "") +
           (delta ? '<span class="gd ' + (delta.diff >= 0 ? "up" : "down") + '">' +
             (delta.diff >= 0 ? "▲" : "▼") + Math.abs(delta.diff).toFixed(1) + "</span>" : "") +
-          '<span class="gt">' + fmt.escapeHtml(TR.charts.clip(q.title, 64)) + "</span>" +
-          '<span class="gq">' + q.code + "</span></button>");
+          "</span>" +
+          (hasVal ? '<span class="gbar"><span class="gbf" style="width:' +
+            barPct.toFixed(0) + '%"></span></span>' : "") +
+          (spark ? '<span class="gspark">' + spark + "</span>" : "") +
+          '<span class="gt">' + fmt.escapeHtml(TR.charts.clip(q.title, 64)) + "</span></button>");
       });
       html.push("</div></div>");
     });

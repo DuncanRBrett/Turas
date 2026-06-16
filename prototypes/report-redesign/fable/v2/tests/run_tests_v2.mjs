@@ -372,6 +372,24 @@ run("composite exhibit (2+ questions) scorecards instead of overlapping trend li
   }
 });
 
+run("dashboard cards carry a value-vs-scale gauge bar and a wave sparkline", () => {
+  const savedBanner = TR.d2.state.banner;
+  let cap = "";
+  const host = { set innerHTML(v) { cap = v; }, get innerHTML() { return cap; },
+    querySelectorAll() { return { forEach() {} }; }, querySelector() { return null; } };
+  try {
+    TR.d2.state.banner = TR.AGG.banner_groups[0].id;
+    TR.views.dashboard(host);
+    var cards = (cap.match(/class="gauge"/g) || []).length;
+    var bars = (cap.match(/class="gbar"/g) || []).length;
+    var sparks = (cap.match(/class="gspark"/g) || []).length;
+    assert(cards > 0 && bars === cards, "every gauge card has a gauge bar (" + bars + "/" + cards + ")");
+    assert(sparks > 0, "tracked cards carry a wave sparkline (" + sparks + ")");
+  } finally {
+    TR.d2.state.banner = savedBanner;
+  }
+});
+
 run("weighted recompute: weighted %, Kish effective base, weighted mean (known answers)", () => {
   // 4 respondents, weights [3,1,1,1].
   //   Q1 single Yes/No, answers [0,0,1,1]: Yes Σw = 3+1 = 4, No = 1+1 = 2,

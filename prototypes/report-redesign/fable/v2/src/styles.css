@@ -175,8 +175,13 @@ table.ct { border-collapse: collapse; width: 100%; font-size: 12px; }
 .gauge .gd { font-size: 11px; font-weight: 700; margin-left: 7px; }
 .gauge .gd.up { color: var(--green); }
 .gauge .gd.down { color: var(--red); }
-.gauge .gt { display: block; font-size: 11.5px; color: var(--ink); margin-top: 3px; }
+.gauge .gt { display: block; font-size: 11.5px; color: var(--ink); margin-top: 8px; }
 .gauge .gq { position: absolute; top: 10px; right: 12px; font-size: 10px; font-weight: 700; color: var(--faint); }
+.gauge .gsc { font-size: 12px; font-weight: 600; color: var(--faint); margin-left: 2px; }
+.gauge .gbar { display: block; height: 6px; background: var(--soft); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+.gauge .gbf { display: block; height: 100%; background: var(--gc); border-radius: 3px; }
+.gauge .gspark { display: block; margin-top: 8px; line-height: 0; }
+.gauge .gspark svg { width: 100%; height: auto; display: block; }
 .gl { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
 .gl.g { background: #e8f0eb; color: var(--green); }
 .gl.a { background: #fdf3df; color: #8a6d1f; }
