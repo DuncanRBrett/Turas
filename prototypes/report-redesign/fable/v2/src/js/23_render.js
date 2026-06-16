@@ -110,9 +110,12 @@
   /** Heatmap tint: brand colour with alpha scaled by value. */
   function heat(value, max) {
     if (value === null || value === undefined || !(max > 0)) return "";
-    // Subtle tint only: a strong wash (the old 0.42 ceiling) buried the % and
-    // especially the grey n= counts. 0.18 keeps the gradient legible over text.
-    var alpha = Math.max(0, Math.min(value / max, 1)) * 0.18;
+    // Tint scales with the ABSOLUTE value (max is 100 for % cells), so 73%
+    // reads clearly darker than 3%. (Per-row normalisation made every cell in a
+    // single-column table its own row max -> identical shade.) The spread does
+    // the differentiating, so a moderate 0.45 ceiling keeps the darkened n=
+    // count legible on the heaviest cells.
+    var alpha = Math.max(0, Math.min(value / max, 1)) * 0.45;
     var brand = TR.charts.brandOf().replace("#", "");
     var r = parseInt(brand.substr(0, 2), 16), g = parseInt(brand.substr(2, 2), 16),
         b = parseInt(brand.substr(4, 2), 16);
@@ -137,14 +140,6 @@
   /** Crosstab table from a view model. */
   render.tableHtml = function (model, opts) {
     opts = opts || {};
-    var maxByRow = model.rows.map(function (r) {
-      if (r.kind === "mean") return 100;
-      var max = 0;
-      r.cells.forEach(function (c) {
-        if (c.pct !== null && c.pct > max) max = c.pct;
-      });
-      return max;
-    });
     var sort = model.sorted || null;
     var out = ['<table class="ct"><thead><tr><th class="lab">Response</th>'];
     model.columns.forEach(function (col, i) {
@@ -193,8 +188,7 @@
         "</td>");
       row.cells.forEach(function (cell, i) {
         var style = opts.heatmap
-          ? heat(row.kind === "mean" ? cell.mean : cell.pct,
-              row.kind === "mean" ? 100 : Math.max(maxByRow[ri], 1)) : "";
+          ? heat(row.kind === "mean" ? cell.mean : cell.pct, 100) : "";
         var body;
         if (row.kind === "mean") {
           body = '<span class="mv">' + fmtMean(cell.mean) + "</span>";

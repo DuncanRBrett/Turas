@@ -193,6 +193,22 @@ run("charts fall back to brand shades when no palette is configured", () => {
   }
 });
 
+run("heatmap differentiates magnitude (73% clearly darker than 3%)", () => {
+  // Regression: per-row normalisation made every cell in a single-column table
+  // its own row max -> identical shade. Tint now scales with the absolute %.
+  var model = { columns: [{ label: "Total", letter: "", base: 60, low: false }],
+    rows: [
+      { kind: "category", label: "High", cells: [{ pct: 73, n: 44, mean: null, sig: "" }] },
+      { kind: "category", label: "Low",  cells: [{ pct: 3,  n: 2,  mean: null, sig: "" }] }
+    ] };
+  var html = TR.render.tableHtml(model, { heatmap: true });
+  var alphas = [];
+  html.replace(/rgba\(\d+,\d+,\d+,([0-9.]+)\)/g, function (_, a) { alphas.push(parseFloat(a)); return _; });
+  assert(alphas.length === 2, "two heated category cells, got " + alphas.length);
+  assert(alphas[0] > alphas[1] + 0.2,
+    "73% tint must read clearly darker than 3% (alphas " + alphas.join(", ") + ")");
+});
+
 run("weighted recompute: weighted %, Kish effective base, weighted mean (known answers)", () => {
   // 4 respondents, weights [3,1,1,1].
   //   Q1 single Yes/No, answers [0,0,1,1]: Yes Σw = 3+1 = 4, No = 1+1 = 2,
