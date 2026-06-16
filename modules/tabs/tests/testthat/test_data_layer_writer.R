@@ -497,6 +497,20 @@ test_that("box-category rows carry counts; NET POSITIVE rows do not (Counts togg
   expect_true(is.na(np$n[[1]]))
 })
 
+test_that("project carries the configured chart palette + series colours", {
+  skip_if_not(exists("get_palette_colours", mode = "function"))
+  cfg <- make_dl_config(chart_palette_preset = "warm", chart_bar_colour = "#112233",
+                        chart_series_colour_1 = "#445566", chart_series_colour_2 = "Optional")
+  p <- build_data_layer(make_dl_results(), make_dl_banner_info(), cfg)$project
+  # The resolved warm preset travels so the renderer can colour categories
+  # semantically (negative = red, positive = green) like the classic report.
+  expect_equal(p$chart_palette$negative, "#b85450")
+  expect_equal(p$chart_palette$positive, "#4a7c6f")
+  expect_equal(p$chart_bar_colour, "#112233")
+  # Only well-formed hex series colours travel; the "Optional" placeholder drops.
+  expect_equal(p$chart_series, list("#445566"))
+})
+
 # ==============================================================================
 # 4. write_data_layer — on-disk JSON honours the renderer contract
 # ==============================================================================

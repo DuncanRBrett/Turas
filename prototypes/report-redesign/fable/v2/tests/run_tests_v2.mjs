@@ -156,6 +156,43 @@ run("pinning a table carries the Counts toggle (showCounts round-trips into the 
   }
 });
 
+run("chart colours follow the configured semantic palette", () => {
+  // The data layer carries the resolved preset; categories colour semantically
+  // (negative=red, positive=green) like the classic report — not a navy ramp.
+  const pal = { negative: "#b85450", mod_negative: "#d4918e", neutral: "#c9a96e",
+    mod_positive: "#7daa8c", positive: "#4a7c6f", dk_na: "#d1cdc7", other: "#c5c0b8" };
+  const savedProj = TR.AGG.project;
+  try {
+    TR.AGG.project = Object.assign({}, savedProj, { chart_palette: pal });
+    assert(TR.charts.semanticColour("Poor", 0, 3) === pal.negative, "Poor -> negative");
+    assert(TR.charts.semanticColour("Good", 1, 3) === pal.mod_positive, "Good -> mod_positive");
+    assert(TR.charts.semanticColour("Promoter", 2, 3) === pal.positive, "Promoter -> positive");
+    assert(TR.charts.semanticColour("Don't know", 2, 3) === pal.dk_na, "DK -> dk_na");
+    // unknown ordinal label -> negative->positive gradient (valid hex)
+    assert(/^#[0-9a-f]{6}$/i.test(TR.charts.semanticColour("Box 9 - 10", 2, 3)),
+      "gradient fallback returns a hex colour");
+    var cols = TR.render.categoryColours([{ label: "Poor" }, { label: "Good" }]);
+    assert(cols[0] === pal.negative, "categoryColours maps Poor -> negative");
+  } finally {
+    TR.AGG.project = savedProj;
+  }
+});
+
+run("charts fall back to brand shades when no palette is configured", () => {
+  // Older islands / the SACAP prototype carry no chart_palette -> the charts
+  // must keep their brand-shade ramp (golden parity depends on this).
+  const savedProj = TR.AGG.project;
+  try {
+    var p = Object.assign({}, savedProj); delete p.chart_palette; TR.AGG.project = p;
+    assert(TR.charts.semanticColour("Poor", 0, 3) === null,
+      "no palette -> null so the caller falls back");
+    var cols = TR.render.categoryColours([{ label: "Poor" }, { label: "Good" }]);
+    assert(/^#[0-9a-f]{6}$/i.test(cols[0]), "fallback returns a brand-shade hex");
+  } finally {
+    TR.AGG.project = savedProj;
+  }
+});
+
 run("weighted recompute: weighted %, Kish effective base, weighted mean (known answers)", () => {
   // 4 respondents, weights [3,1,1,1].
   //   Q1 single Yes/No, answers [0,0,1,1]: Yes Σw = 3+1 = 4, No = 1+1 = 2,

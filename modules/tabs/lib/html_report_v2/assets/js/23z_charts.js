@@ -63,6 +63,9 @@
     if (!data.rows.length) return "";
     var W = 660, plotH = 170, padT = 16, padB = 58, padL = 10;
     var palette = render.palette();
+    // Single series: colour columns by category (semantic); multi-column keeps
+    // one colour per cut so the series stay distinguishable.
+    var catColours = cols.length === 1 ? render.categoryColours(data.rows) : null;
     var slot = (W - padL * 2) / data.rows.length;
     var barW = Math.min((slot - 8) / cols.length, 34);
     var body = [];
@@ -77,7 +80,7 @@
         var h = v === null ? 0 : Math.max(v, 0) / data.axisMax * plotH;
         body.push(S.el("rect", { x: cx - groupW / 2 + k * barW,
           y: padT + plotH - h, width: barW - 2, height: h,
-          fill: palette[k % palette.length], rx: 3 }));
+          fill: catColours ? catColours[i] : palette[k % palette.length], rx: 3 }));
         if (cols.length === 1 || v >= data.axisMax * 0.12) {
           body.push(S.text(cx - groupW / 2 + k * barW + (barW - 2) / 2,
             padT + plotH - h - 4, fmtPct(v),
@@ -121,10 +124,7 @@
     if (!data.rows.length) return "";
     var W = 660, LABEL = 150, VAL = 10, rowH = 26, gap = 10, callH = 18;
     var plotW = W - LABEL - VAL;
-    var brand = TR.charts.brandOf();
-    var ramp = data.rows.map(function (_, i) {
-      return S.shade(brand, 0.16 + 0.84 * (i / Math.max(data.rows.length - 1, 1)));
-    });
+    var ramp = render.categoryColours(data.rows);
     var body = [], y = 10;
     cols.forEach(function (ci) {
       var col = model.columns[ci];
@@ -179,9 +179,8 @@
     var data = render.chartRows(model);
     if (!data.rows.length) return "";
     var W = 660, H = 230, cx = 170, cy = H / 2, R = 88, r0 = 46;
-    var brand = TR.charts.brandOf();
-    var palette = render.palette().concat(
-      data.rows.map(function (_, i) { return S.shade(brand, 0.2 + (i % 5) * 0.16); }));
+    // Pie slices are categories — colour them semantically (warm palette).
+    var palette = render.categoryColours(data.rows);
     // negative values cannot be a share of a whole — floor at 0 so a
     // negative NPS headline cannot draw a backwards arc
     var sliceOf = function (r) {

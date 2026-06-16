@@ -141,6 +141,29 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
   client_logo <- encode_logo_data_uri(config_obj$client_logo_path)
   if (!is.null(client_logo)) proj$client_logo <- client_logo
 
+  # Chart colours — mirror the classic report's configured palette so v2 charts
+  # follow the colour scheme instead of a flat brand ramp. The resolved 7-colour
+  # palette (chart_palette_preset + any per-sentiment overrides) lets the
+  # renderer colour categories semantically (negative -> red, positive -> green);
+  # chart_series carries configured banner-series colours for multi-column
+  # charts; chart_bar_colour is the single-series bar default. get_palette_colours
+  # (the classic chart builder) is sourced alongside the writer — guard so the
+  # writer still works without it (the renderer then keeps its brand-shade
+  # fallback). Only well-formed hex values are carried so template placeholder
+  # text (e.g. "Optional") never reaches the renderer.
+  is_hex <- function(x) !blank(x) && grepl("^#?[0-9A-Fa-f]{6}$", trimws(as.character(x)))
+  if (exists("get_palette_colours", mode = "function")) {
+    preset <- as.character(config_obj$chart_palette_preset %||% "warm")
+    pal <- tryCatch(get_palette_colours(preset, overrides = config_obj),
+                    error = function(e) NULL)
+    if (!is.null(pal) && length(pal) > 0) proj$chart_palette <- pal
+  }
+  series <- Filter(is_hex, lapply(1:8, function(i) config_obj[[paste0("chart_series_colour_", i)]]))
+  if (length(series) > 0) proj$chart_series <- lapply(series, function(v) trimws(as.character(v)))
+  if (is_hex(config_obj$chart_bar_colour)) {
+    proj$chart_bar_colour <- trimws(as.character(config_obj$chart_bar_colour))
+  }
+
   # Report metadata — pre-fills the v2 Report tab's Background & method,
   # Executive summary and (read-only) About from the config's Comments sheet
   # and closing section, mirroring the classic report. Background/exec stay
