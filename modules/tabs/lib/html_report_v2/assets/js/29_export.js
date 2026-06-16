@@ -369,12 +369,17 @@
     'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" ' +
     'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
 
-  function chartAxes(catPos, valPos, fmtCode, hideVal) {
+  function chartAxes(catPos, valPos, fmtCode, hideVal, valMin, valMax) {
     return '<c:catAx><c:axId val="111111111"/><c:scaling>' +
       '<c:orientation val="minMax"/></c:scaling><c:delete val="0"/>' +
       '<c:axPos val="' + catPos + '"/><c:crossAx val="222222222"/></c:catAx>' +
       '<c:valAx><c:axId val="222222222"/><c:scaling>' +
-      '<c:orientation val="minMax"/></c:scaling><c:delete val="' +
+      '<c:orientation val="minMax"/>' +
+      // Fixed scale (e.g. 0-10 for means) so the PPTX matches the pin and small
+      // movements aren't exaggerated by auto-scaling.
+      (valMax != null ? '<c:max val="' + valMax + '"/>' : "") +
+      (valMin != null ? '<c:min val="' + valMin + '"/>' : "") +
+      '</c:scaling><c:delete val="' +
       (hideVal ? "1" : "0") + '"/>' +
       '<c:axPos val="' + valPos + '"/>' +
       '<c:numFmt formatCode="' + (fmtCode || "0&quot;%&quot;") +
@@ -591,8 +596,12 @@
         return byYear[y] === undefined ? null : Math.round(byYear[y] * 10) / 10;
       });
     };
+    // Wave label ("Wave 22 - Oct 2024"), not the raw year key, to match the pin.
+    var wl = function (y) {
+      return (TR.trk && TR.trk.yLabel) ? TR.trk.yLabel(y) : String(y);
+    };
     var catPts = years.map(function (y, i) {
-      return '<c:pt idx="' + i + '"><c:v>' + y + "</c:v></c:pt>";
+      return '<c:pt idx="' + i + '"><c:v>' + esc(wl(y)) + "</c:v></c:pt>";
     }).join("");
     var catRef = '<c:cat><c:strRef><c:f>Sheet1!$A$2:$A$' + (years.length + 1) +
       '</c:f><c:strCache><c:ptCount val="' + years.length + '"/>' + catPts +
@@ -618,12 +627,29 @@
         "</c:numCache></c:numRef></c:val></c:ser>";
     }).join("");
     var pctOnly = rows.every(function (r) { return r.kind !== "mean"; });
+    var allMean = rows.every(function (r) { return r.kind === "mean"; });
+    // Fixed value axis matching the pin: 0 (or the negative floor for NPS) to a
+    // nice max, with means anchored to at least 10 — so auto-scaling never
+    // exaggerates a small wave-on-wave move.
+    var lo = 0, hi = 0;
+    rows.forEach(function (r) {
+      TR.render.wavePoints(r).forEach(function (p) {
+        if (p.value === null || p.value === undefined) return;
+        if (p.value < lo) lo = p.value;
+        if (p.value > hi) hi = p.value;
+      });
+    });
+    var meanScale = allMean && hi <= 10;
+    var axisMax = meanScale ? Math.max(S.niceMax(hi), 10) : S.niceMax(hi);
+    var axisMin = lo < 0 ? -S.niceMax(-lo) : 0;
+    if (axisMax <= axisMin) axisMax = axisMin + 1;
     var xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
       "<c:chartSpace " + C_NS + "><c:chart><c:plotArea><c:layout/>" +
       '<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>' +
       series + '<c:marker val="1"/>' +
       '<c:axId val="111111111"/><c:axId val="222222222"/></c:lineChart>' +
-      chartAxes("b", "l", pctOnly ? null : "General") + "</c:plotArea>" +
+      chartAxes("b", "l", pctOnly ? null : "General", false, axisMin, axisMax) +
+      "</c:plotArea>" +
       (rows.length > 1
         ? '<c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend>' : "") +
       '<c:plotVisOnly val="1"/></c:chart>' +
@@ -635,7 +661,7 @@
       '<c:externalData r:id="rId1"><c:autoUpdate val="0"/></c:externalData></c:chartSpace>';
     var workbookRows = [[""].concat(rows.map(function (r) { return r.label; }))]
       .concat(years.map(function (y, i) {
-        return [y].concat(rows.map(function (r) {
+        return [wl(y)].concat(rows.map(function (r) {
           var v = pointsOf(r)[i];
           return v === null ? "" : v;
         }));

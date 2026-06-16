@@ -619,14 +619,19 @@ run("means significance: Welch on distribution-derived SDs", () => {
   assert(idxRow.delta.sig === false, "Q010 Index -0.9 must NOT flag");
 });
 
-run("native trend chart: year categories + one series per metric", () => {
+run("native trend chart: wave-label categories, fixed axis, one series per metric", () => {
   const m = TR.model.forQuestion("Q017", TR.AGG.banner_groups[0].id, []);
   m.chartKind = "summary";
   const chart = TR.exporter.buildTrendChart(m);
   const sers = (chart.xml.match(/<c:ser>/g) || []).length;
   assert(sers >= 3 && sers <= 6, "series count " + sers);
-  assert(chart.xml.includes("<c:v>2018</c:v>") && chart.xml.includes("<c:v>2025</c:v>"),
-    "categories span 2018 to the current wave");
+  // X categories are the wave labels (yLabel), not the raw year keys — matches
+  // the pin (e.g. "Annual 2018", not "2018").
+  assert(chart.xml.includes("Annual 2018"), "categories use wave labels");
+  assert(!chart.xml.includes("<c:v>2018</c:v>"), "raw year key not used as a category");
+  // Y axis is a fixed 0-to-max scale (matches the pin), not auto-scaled.
+  assert(/<c:max val="[\d.]+"\/>/.test(chart.xml) && chart.xml.includes('<c:min val="0"/>'),
+    "value axis carries an explicit 0-to-max scale");
   assert(chart.workbook && chart.workbook.length > 500, "embedded workbook present");
 });
 
