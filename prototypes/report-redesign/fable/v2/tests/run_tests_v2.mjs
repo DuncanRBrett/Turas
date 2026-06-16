@@ -209,6 +209,21 @@ run("heatmap differentiates magnitude (73% clearly darker than 3%)", () => {
     "73% tint must read clearly darker than 3% (alphas " + alphas.join(", ") + ")");
 });
 
+run("tracking keeps the full current-wave name (date not truncated)", () => {
+  // Regression: the current wave showed "Wave 25" while history showed
+  // "Wave 22 - Oct 2024" — a /wave \d+/ extract dropped the configured date.
+  const savedW = TR.AGG.project.wave;
+  try {
+    TR.AGG.project.wave = "Wave 25 - May 2026";
+    assert(TR.trk.currentWaveLabel() === "Wave 25 - May 2026",
+      "current wave label must keep the date, got: " + TR.trk.currentWaveLabel());
+    TR.AGG.project.wave = "";   // no configured name -> sensible fallback, never blank
+    assert(TR.trk.currentWaveLabel().length > 0, "empty wave still yields a label");
+  } finally {
+    TR.AGG.project.wave = savedW;
+  }
+});
+
 run("weighted recompute: weighted %, Kish effective base, weighted mean (known answers)", () => {
   // 4 respondents, weights [3,1,1,1].
   //   Q1 single Yes/No, answers [0,0,1,1]: Yes Σw = 3+1 = 4, No = 1+1 = 2,

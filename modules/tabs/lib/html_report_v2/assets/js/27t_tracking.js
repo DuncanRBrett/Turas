@@ -56,9 +56,11 @@
    * wave's own name. Built once from the history waves + the current wave. */
   var yLabelMap = null;
   trk.currentWaveLabel = function () {
-    var w = (TR.AGG.project && TR.AGG.project.wave) || "";
-    var m = /wave\s*\d+/i.exec(w);
-    if (m) return m[0].replace(/\s+/g, " ");
+    // Use the full configured wave name (e.g. "Wave 25 - May 2026") so the
+    // current wave matches the history labels ("Wave 22 - Oct 2024"). Previously
+    // a /wave \d+/ extract dropped the date, truncating only the current wave.
+    var w = ((TR.AGG.project && TR.AGG.project.wave) || "").trim();
+    if (w) return w;
     var cy = TR.render.currentYear();
     return cy != null ? String(cy) : "Current";
   };
