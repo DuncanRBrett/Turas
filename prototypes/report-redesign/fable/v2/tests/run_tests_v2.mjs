@@ -617,6 +617,85 @@ run("derived-metric question (no microdata) reports 'not recomputable', not a 0 
   }
 });
 
+run("Differences view: findings compare the group with THE REST, reconciling to overall", () => {
+  // Each card's headline baseline is "everyone except this group" (recomputed
+  // weighted-safely from microdata), with the whole-sample 'overall' kept in
+  // brackets. The rest must be a real complement (not an echo of overall), the
+  // gap is measured against it, and — since overall is the weighted average of
+  // the group and the rest — overall sits between them and the vs-rest gap is
+  // at least as wide as vs-overall.
+  const banner = TR.AGG.banner_groups[0].id;
+  const findings = TR.views._collectFindings(banner);
+  assert(findings.length > 0, "SACAP produces differences findings");
+  const withRest = findings.filter((f) => f.rest !== null && f.rest !== undefined);
+  assert(withRest.length > 0, "findings carry a recomputed rest %");
+  assert(withRest.some((f) => Math.abs(f.rest - f.overall) > 0.01),
+    "the rest is the complement, not a copy of overall");
+  withRest.forEach((f) => {
+    assert(typeof f.overall === "number", "overall carried for the bracket");
+    assert(Math.abs(f.gap - (f.value - f.rest)) < 1e-9, "gap is measured vs the rest");
+    const lo = Math.min(f.value, f.rest) - 1.5, hi = Math.max(f.value, f.rest) + 1.5;
+    assert(f.overall >= lo && f.overall <= hi,
+      "overall " + f.overall + " between group " + f.value + " and rest " + f.rest);
+    assert(Math.abs(f.value - f.rest) >= Math.abs(f.value - f.overall) - 1.5,
+      "vs-rest gap is at least as wide as vs-overall");
+  });
+  // the rendered sentence reads "of the rest" and brackets the overall figure
+  const line = TR.views._diffLineHtml(withRest.find((f) => !f.isMean));
+  assert(/of the rest/.test(line), "headline reads 'of the rest'");
+  assert(/% overall\)/.test(line), "overall carried in brackets");
+});
+
+run("Differences view: surfaces significant MEAN / index / NPS standouts (recomputed)", () => {
+  // The published tables carry no significance for mean-kind rows, so the diffs
+  // view recomputes per-column means + a Welch t-test of each group vs THE REST
+  // from microdata. It is bidirectional — a group significantly above OR below
+  // the rest is a finding, in the metric's OWN units (no %/pp). Fixture: 3 groups
+  // on one mean; A high (ahead of the rest), B and C low (behind the rest).
+  const agg = { schema_version: 2,
+    project: { name: "B", low_base_threshold: 5, alpha: 0.05, tracking: { enabled: false } },
+    columns: [{ key: "T::Total", group: "total", label: "Total", letter: "" },
+              { key: "G::A", group: "G", label: "A", letter: "A" },
+              { key: "G::B", group: "G", label: "B", letter: "B" },
+              { key: "G::C", group: "G", label: "C", letter: "C" }],
+    banner_groups: [{ id: "G", name: "G" }], categories: ["c"],
+    questions: [{ code: "QM", title: "Satisfaction", category: "c", type: "scale",
+      bases: [{ n: 90, low: false }, { n: 30, low: false }, { n: 30, low: false }, { n: 30, low: false }],
+      rows: [{ kind: "mean", label: "Mean", pct: [6.2, 9.5, 4.5, 4.5], n: [null, null, null, null], sig: ["", "", "", ""] }] }] };
+  const saved = { agg: TR.AGG, micro: TR.MICRO, prev: TR.PREV, idx: TR.d2._qIndex };
+  try {
+    TR.AGG = agg; TR.PREV = null; TR.d2._qIndex = null;
+    // group A high (~9.5), B and C low (~4.5); column index per respondent.
+    const sc = [], bv = [];
+    for (let i = 0; i < 30; i++) { sc.push(i % 2 ? 9 : 10); bv.push(1); }  // A
+    for (let i = 0; i < 30; i++) { sc.push(i % 2 ? 4 : 5); bv.push(2); }   // B
+    for (let i = 0; i < 30; i++) { sc.push(i % 2 ? 4 : 5); bv.push(3); }   // C
+    TR.MICRO = { n: 90, answers: { QM: sc.map(() => null) }, banner_vars: { G: bv },
+      weights: sc.map(() => 1), scores: { QM: sc } };
+    const findings = TR.views._collectFindings("G");
+    const a = findings.find((f) => f.isMean && f.column === "A");
+    assert(a, "group A surfaces as a MEAN finding");
+    assert(a.direction === "ahead", "A is ahead of the rest (got " + a.direction + ")");
+    assert(Math.abs(a.value - 9.5) < 0.2, "value is the recomputed mean ~9.5 (got " + a.value + ")");
+    assert(Math.abs(a.rest - 4.5) < 0.2, "rest is the other groups' mean ~4.5 (got " + a.rest + ")");
+    assert(a.overall > a.rest && a.overall < a.value, "overall sits between rest and group");
+    assert(Math.abs(a.gap - (a.value - a.rest)) < 1e-9, "gap is group - rest, in points");
+    // bidirectional: B sits BELOW the rest (A+C) and must surface as 'behind'.
+    const b = findings.find((f) => f.isMean && f.column === "B");
+    assert(b && b.direction === "behind", "B surfaces as 'behind the rest'");
+    assert(b.gap < 0 && b.value < b.rest, "behind finding has a negative gap");
+    const line = TR.views._diffLineHtml(a);
+    assert(/Mean 9\.5/.test(line), "sentence names the metric + value in its own units");
+    const sentence = (line.match(/<div class="df-sentence">([\s\S]*?)<\/div>/) || [])[1] || "";
+    assert(sentence && !/%/.test(sentence), "no percent signs in a mean finding's sentence");
+    assert(/of the rest/.test(line) && /overall\)/.test(line), "vs the rest, overall bracketed");
+    assert(/ahead of the rest/.test(line), "A's verdict reads 'ahead of the rest'");
+    assert(/behind the rest/.test(TR.views._diffLineHtml(b)), "B's verdict reads 'behind the rest'");
+  } finally {
+    TR.AGG = saved.agg; TR.MICRO = saved.micro; TR.PREV = saved.prev; TR.d2._qIndex = saved.idx;
+  }
+});
+
 run("stacked chart export is transposed (segments=series, columns=bars)", () => {
   // Regression: the PPTX stacked export reused the bar layout (rows as
   // categories, one series per column), so each option rendered as its own
