@@ -86,6 +86,35 @@ run("no-banner (Total-only) report validates and renders without crashing", () =
   }
 });
 
+run("dashboard excludes numeric questions (open counts are not rated touchpoints)", () => {
+  // A Numeric open-count (type "numeric", e.g. "hours lost") carries a Mean row
+  // but has NO scale maximum, so the index dashboard must skip it — only
+  // scale / nps questions with a mean row are rated touchpoints. Regression for
+  // numeric questions being colour-banded as a % of a 10-point scale.
+  const agg = { schema_version: 2,
+    project: { name: "N", low_base_threshold: 30, tracking: { enabled: false } },
+    columns: [{ key: "TOTAL::Total", group: "total", label: "Total", letter: "" }],
+    banner_groups: [], categories: ["c"],
+    questions: [
+      { code: "QR", title: "Rate quality", category: "c", type: "scale",
+        scale_max: 10, bases: [{ n: 60, low: false }],
+        rows: [{ kind: "mean", label: "Mean", pct: [7.4], n: [null], sig: [""] }] },
+      { code: "QN", title: "Hours lost", category: "c", type: "numeric",
+        bases: [{ n: 60, low: false }],
+        rows: [{ kind: "mean", label: "Mean", pct: [9], n: [null], sig: [""] },
+               { kind: "mean", label: "Standard Deviation", pct: [2], n: [null], sig: [""] }] }
+    ] };
+  const saved = { agg: TR.AGG, idx: TR.d2._qIndex };
+  try {
+    TR.AGG = agg; TR.d2._qIndex = null;
+    const codes = TR.views._indexQuestions().map((q) => q.code);
+    assert(codes.indexOf("QR") !== -1, "rated scale question must be on the dashboard");
+    assert(codes.indexOf("QN") === -1, "numeric question must be excluded from the dashboard");
+  } finally {
+    TR.AGG = saved.agg; TR.d2._qIndex = saved.idx;
+  }
+});
+
 run("weighted recompute: weighted %, Kish effective base, weighted mean (known answers)", () => {
   // 4 respondents, weights [3,1,1,1].
   //   Q1 single Yes/No, answers [0,0,1,1]: Yes Σw = 3+1 = 4, No = 1+1 = 2,

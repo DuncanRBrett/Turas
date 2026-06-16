@@ -133,6 +133,29 @@ make_dl_q_scale <- function() {
   )
 }
 
+# Numeric open-count: a Mean (Average) + Standard Deviation summary, no
+# category / NET rows. Mirrors numeric_processor's output — RowType "Average"
+# sets metric_type, so without the type gate this would wrongly receive a
+# scale_max and land on the index dashboard alongside genuine ratings.
+make_dl_q_numeric <- function() {
+  list(
+    question_code = "Q3", question_text = "How many hours did you lose?",
+    question_type = "Numeric", category = "Service",
+    table = data.frame(
+      RowLabel  = c("Mean", "Standard Deviation"),
+      RowType   = c("Average", "StdDev"),
+      RowSource = c("summary", "summary"),
+      "TOTAL::Total"   = c("9.0", "2.1"),
+      "Gender::Male"   = c("8.5", "2.0"),
+      "Gender::Female" = c("9.4", "2.2"),
+      check.names = FALSE, stringsAsFactors = FALSE),
+    bases = list(
+      "TOTAL::Total"   = list(unweighted = 100, weighted = 100, effective = 100),
+      "Gender::Male"   = list(unweighted = 50,  weighted = 50,  effective = 50),
+      "Gender::Female" = list(unweighted = 50,  weighted = 50,  effective = 50))
+  )
+}
+
 make_dl_results <- function() list(Q1 = make_dl_q_single(), Q2 = make_dl_q_scale())
 
 make_dl_config <- function(...) {
@@ -388,7 +411,9 @@ test_that("question type mapping covers the tabs vocabulary", {
   expect_equal(map_question_type("Single_Choice"), "single")
   expect_equal(map_question_type("Multi_Mention"), "multi")
   expect_equal(map_question_type("Likert"), "scale")
-  expect_equal(map_question_type("Numeric"), "scale")
+  # Numeric open-counts are NOT ratings: they map to their own "numeric" type so
+  # the v2 index dashboard can exclude them (they have no scale maximum).
+  expect_equal(map_question_type("Numeric"), "numeric")
   expect_equal(map_question_type("NPS"), "nps")
   expect_equal(map_question_type("Ranking"), "single")
   expect_equal(map_question_type(NULL), "single")
@@ -401,6 +426,23 @@ test_that("scale_max is emitted from the configured scale (dashboard colouring)"
   expect_equal(q2$scale_max, 10)
   q1 <- Filter(function(q) q$code == "Q1", dl$questions)[[1]]   # no summary row
   expect_true(is.na(q1$scale_max))   # -> null in JSON; renderer falls back
+})
+
+test_that("numeric questions are kept off the index dashboard (type + null scale_max)", {
+  cfg <- make_dl_config(dashboard_scale_mean = 10)
+  dl <- build_data_layer(list(Q3 = make_dl_q_numeric()), make_dl_banner_info(), cfg)
+  q <- Filter(function(q) q$code == "Q3", dl$questions)[[1]]
+
+  # Mapped to its own type, not "scale" — the renderer's indexQuestions() filter
+  # keys on this to skip it.
+  expect_equal(q$type, "numeric")
+  # No scale maximum: an open count has no "% of scale" reading. NA -> null.
+  expect_true(is.na(q$scale_max))
+  expect_true(is.na(q$gauge_green))
+  expect_true(is.na(q$gauge_amber))
+  # It DOES still carry a Mean row — i.e. the old "any mean row" dashboard
+  # filter would have wrongly included it; the type gate is what now excludes it.
+  expect_true(any(vapply(q$rows, function(r) identical(r$kind, "mean"), logical(1))))
 })
 
 # ==============================================================================

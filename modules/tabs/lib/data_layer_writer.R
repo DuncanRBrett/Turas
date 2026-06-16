@@ -26,7 +26,10 @@ if (!exists("%||%", mode = "function")) {
 #' Map a tabs Variable_Type to a v2 renderer question type
 #'
 #' @param vt Character, the tabs question/Variable type
-#' @return One of "single" | "multi" | "scale" | "nps"
+#' @return One of "single" | "multi" | "scale" | "nps" | "numeric". Numeric
+#'   open-counts map to "numeric" (not "scale") so the v2 index dashboard can
+#'   tell a rated touchpoint apart from an unbounded count — only scale/nps
+#'   questions are colour-banded against a scale maximum.
 #' @export
 map_question_type <- function(vt) {
   switch(as.character(vt %||% ""),
@@ -36,7 +39,7 @@ map_question_type <- function(vt) {
     "Multi_Response"  = "multi",
     "Rating"          = "scale",
     "Likert"          = "scale",
-    "Numeric"         = "scale",
+    "Numeric"         = "numeric",
     "NPS"             = "nps",
     "Ranking"         = "single",
     "single"
@@ -377,6 +380,8 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   cat_val <- if (is.null(cat_val) || length(cat_val) == 0 || is.na(cat_val[1])) ""
              else as.character(cat_val[1])
 
+  q_type_v2 <- map_question_type(q_result$question_type)
+
   # Scale maximum for the dashboard gauge/heatmap ("% of each scale's
   # maximum"). Without it the renderer assumes 100, so a 0-10 mean reads as
   # ~7% and every card shows weak/red. Sourced from the project's configured
@@ -385,10 +390,16 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   # scale_max feeds the gauge/heatmap normalisation; gauge_green/gauge_amber
   # are the project's configured colour thresholds (raw values, e.g. >=7
   # green / >=5 amber) so the v2 dashboard colours match the classic report.
+  #
+  # Only rated touchpoints (scale / nps) get a scale_max. A Numeric open-count
+  # (e.g. "how many hours did you lose?") carries a Mean row but has no scale
+  # maximum, so colour-banding it as a "% of 10" is meaningless and direction-
+  # blind (9 hours lost would read strong/green). Leaving these NA also makes
+  # the renderer's indexQuestions() filter exclude them from the dashboard.
   scale_max <- NA_real_
   gauge_green <- NA_real_
   gauge_amber <- NA_real_
-  if (!is.na(metric_type)) {
+  if (!is.na(metric_type) && q_type_v2 %in% c("scale", "nps")) {
     if (metric_type == "Index") {
       scale_max   <- as.numeric(config_obj$dashboard_scale_index %||% 10)
       gauge_green <- as.numeric(config_obj$dashboard_green_index %||% 7)
@@ -415,7 +426,7 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
     code        = as.character(q_result$question_code %||% ""),
     title       = as.character(q_result$question_text %||% ""),
     category    = cat_val,
-    type        = map_question_type(q_result$question_type),
+    type        = q_type_v2,
     bases       = bases,
     rows        = rows,
     scale_max   = scale_max,
