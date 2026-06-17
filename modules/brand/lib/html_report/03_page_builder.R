@@ -484,9 +484,10 @@ build_br_subtab_nav <- function(flat_tabs, cat_id) {
                 function(i) btn(flat_tabs[[i]], keys[i] == active_key, FALSE),
                 character(1L))
   if (length(apx_idx) > 0L) {
+    # Appendix ("detail") tabs follow the primary tabs directly — no divider
+    # and no label. A CSS gap before the first appendix tab (adjacency rule in
+    # build_brand_page) sets them apart, and they render muted.
     out <- c(out,
-      '<span class="br-subtab-sep" aria-hidden="true"></span>',
-      '<span class="br-subtab-grouplabel">Detail</span>',
       vapply(apx_idx, function(i) btn(flat_tabs[[i]], FALSE, TRUE),
              character(1L)))
   }
@@ -1282,17 +1283,12 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
 }
 .br-subtab-btn.active { color: %s; border-bottom-color: %s; }
 .br-subtab-btn:hover { color: #64748b; }
-/* Three-level IA: a faint "Detail" divider separates the primary
-   "category story" tabs from the on-demand appendix tabs, which are
-   rendered slightly muted. See build_br_subtab_nav(). */
-.br-subtab-sep {
-  align-self: center; flex: 0 0 auto;
-  width: 1px; height: 18px; background: #e2e8f0; margin: 0 4px 0 12px;
-}
-.br-subtab-grouplabel {
-  align-self: center; flex: 0 0 auto; white-space: nowrap;
-  font-size: 10px; font-weight: 600; text-transform: uppercase;
-  letter-spacing: 0.5px; color: #cbd5e1; padding: 0 10px 0 0;
+/* Three-level IA: the on-demand "detail" sub-tabs follow the primary
+   "category story" tabs after a gap and render muted — no divider, no label.
+   The gap lands on the first appendix tab via the adjacency selector (an
+   appendix button immediately preceded by a primary button). */
+.br-subtab-btn:not(.br-subtab-btn--appendix) + .br-subtab-btn--appendix {
+  margin-left: 28px;
 }
 .br-subtab-btn--appendix:not(.active) { color: #cbd5e1; }
 .br-subpanel { display: none; }

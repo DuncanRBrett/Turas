@@ -59,32 +59,32 @@ test_that(".BR_PRIMARY_SUBTABS is the expected primary set", {
 })
 
 # --- core tiering behaviour --------------------------------------------------
-test_that("primary tabs render first, in taxonomy order, before the Detail divider", {
+test_that("primary tabs render first (taxonomy order), appendix tabs follow; no divider/label", {
   out <- build_br_subtab_nav(full_tabs(), "bak")
 
-  sep <- pos(out, 'class="br-subtab-sep"')
-  expect_true(sep > 0)                       # divider is present
-  expect_true(grepl("br-subtab-grouplabel", out))
+  # Chosen treatment: subtle gap, no divider and no "Detail" label. Also no
+  # stray <span> — the CSS gap relies on the first appendix button being
+  # element-adjacent to the last primary button.
+  expect_false(grepl("br-subtab-sep", out))
+  expect_false(grepl("br-subtab-grouplabel", out))
+  expect_false(grepl(">Detail<", out))
+  expect_false(grepl("<span", out, fixed = TRUE))
 
-  # Every primary tab sits before the divider...
-  for (k in .BR_PRIMARY_SUBTABS) {
-    expect_true(pos(out, sprintf('data-subtab="%s"', k)) < sep,
-                info = paste("primary before divider:", k))
-  }
-  # ...and primary tabs appear in .BR_PRIMARY_SUBTABS order (MA Metrics, which
-  # was 6th in the input, is promoted to 2nd).
-  expect_true(pos(out, 'data-subtab="fn-funnel"') <
-              pos(out, 'data-subtab="ma-metrics"'))
-  expect_true(pos(out, 'data-subtab="ma-metrics"') <
-              pos(out, 'data-subtab="rep"'))
-  expect_true(pos(out, 'data-subtab="rep"') <
-              pos(out, 'data-subtab="wom"'))
+  # Primary tabs appear in .BR_PRIMARY_SUBTABS order (MA Metrics, which was
+  # 6th in the input, is promoted to 2nd).
+  p_funnel  <- pos(out, 'data-subtab="fn-funnel"')
+  p_metrics <- pos(out, 'data-subtab="ma-metrics"')
+  p_rep     <- pos(out, 'data-subtab="rep"')
+  p_wom     <- pos(out, 'data-subtab="wom"')
+  expect_true(p_funnel < p_metrics)
+  expect_true(p_metrics < p_rep)
+  expect_true(p_rep < p_wom)
 
-  # Appendix tabs sit after the divider.
+  # Every appendix tab comes after the last primary tab (Word of Mouth).
   for (k in c("fn-relationship", "ma-attributes", "ma-ceps", "ma-advantage",
               "branded_reach", "demographics", "adhoc", "audience_lens")) {
-    expect_true(pos(out, sprintf('data-subtab="%s"', k)) > sep,
-                info = paste("appendix after divider:", k))
+    expect_true(pos(out, sprintf('data-subtab="%s"', k)) > p_wom,
+                info = paste("appendix after last primary:", k))
   }
 })
 
