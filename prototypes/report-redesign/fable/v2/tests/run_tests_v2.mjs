@@ -1277,6 +1277,26 @@ run("PPTX tables that cannot fit say so instead of truncating silently", () => {
     "no note when nothing was dropped");
 });
 
+run("confidence labels: sampling_method normalisation + Convenience alias", () => {
+  // Probability designs speak "Confidence Interval"; everything else softens to
+  // "Stability Interval". Convenience and Self_Selected are synonyms, and an
+  // unrecognised value falls back to the cautious framing.
+  const L = (m) => TR.conf.labels(m);
+  assert(L("Random").is_probability === true &&
+    L("Random").interval_name === "Confidence Interval", "Random is a probability design (CI)");
+  ["Stratified", "Cluster", "Census"].forEach((m) =>
+    assert(L(m).is_probability === true, m + " is a probability design"));
+  ["Quota", "Online_Panel", "Self_Selected", "Convenience", "Not_Specified"].forEach((m) =>
+    assert(L(m).is_probability === false &&
+      L(m).interval_name === "Stability Interval", m + " softens to a stability interval"));
+  assert(L("Convenience").sampling_method_normalised === "convenience" &&
+    L("Self_Selected").sampling_method_normalised === "convenience",
+    "Convenience and Self_Selected normalise to the same key");
+  assert(L("Online_Panel").sampling_method_normalised === "panel", "Online_Panel -> panel");
+  assert(L("nonsense").sampling_method_normalised === "not_specified",
+    "an unrecognised value falls back to not_specified");
+});
+
 run("confidence: explainer + sampling vocabulary ship in the artifact", () => {
   // the callout is built live from the report's own data
   const callout = TR.conf.calloutHtml();

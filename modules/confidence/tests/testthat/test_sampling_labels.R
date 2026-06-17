@@ -28,7 +28,7 @@ test_that("get_sampling_labels returns standard labels for probability designs",
 })
 
 test_that("get_sampling_labels returns softened labels for non-probability designs", {
-  for (method in c("Quota", "Online_Panel", "Self_Selected", "Not_Specified")) {
+  for (method in c("Quota", "Online_Panel", "Self_Selected", "Convenience", "Not_Specified")) {
     labels <- get_sampling_labels(method)
     expect_false(labels$is_probability, info = paste("method:", method))
     expect_equal(labels$interval_name, "Stability Interval", info = method)
@@ -52,6 +52,7 @@ test_that("get_sampling_labels maps config values to correct spec keys", {
   expect_equal(get_sampling_labels("Quota")$sampling_method_normalised, "quota")
   expect_equal(get_sampling_labels("Online_Panel")$sampling_method_normalised, "panel")
   expect_equal(get_sampling_labels("Self_Selected")$sampling_method_normalised, "convenience")
+  expect_equal(get_sampling_labels("Convenience")$sampling_method_normalised, "convenience")
   expect_equal(get_sampling_labels("Not_Specified")$sampling_method_normalised, "not_specified")
 })
 

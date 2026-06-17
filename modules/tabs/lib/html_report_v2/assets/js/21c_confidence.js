@@ -6,8 +6,8 @@
  * Terminology mirrors modules/confidence/R/sampling_labels.R verbatim:
  * probability designs (Random/Stratified/Cluster/Census) speak standard
  * statistics ("Confidence Interval", "CI", "Margin of Error", "MOE");
- * non-probability designs (Quota/Online_Panel/Self_Selected/Not_Specified)
- * get honest softened language ("Stability Interval", "SI", "Precision
+ * non-probability designs (Quota/Online_Panel/Self_Selected (Convenience)/
+ * Not_Specified) get honest softened language ("Stability Interval", "SI", "Precision
  * Estimate", "PE"). The report's design is project.sampling_method.
  *
  * Intervals: calculate_proportion_ci_wilson() from 04_proportions.R,
@@ -38,11 +38,13 @@
 
   /* ---------------- sampling-method-aware labels ---------------- */
 
-  // config value -> spec key (the switch in get_sampling_labels())
+  // config value -> spec key (the switch in get_sampling_labels()).
+  // Convenience and Self_Selected are synonyms -> the same softened framing.
   var METHOD_KEYS = {
     Random: "random", Stratified: "stratified", Cluster: "cluster",
     Census: "census", Quota: "quota", Online_Panel: "panel",
-    Self_Selected: "convenience", Not_Specified: "not_specified"
+    Self_Selected: "convenience", Convenience: "convenience",
+    Not_Specified: "not_specified"
   };
   var PROBABILITY_KEYS = ["random", "stratified", "cluster", "census"];
 
@@ -66,7 +68,7 @@
    * configured sampling_method). NULL / empty / unrecognised values fall
    * back to the cautious non-probability framing, exactly as the R does.
    * @param {string} [method] - Random | Stratified | Cluster | Census |
-   *   Quota | Online_Panel | Self_Selected | Not_Specified
+   *   Quota | Online_Panel | Self_Selected | Convenience | Not_Specified
    * @returns {object} labels — see STANDARD_LABELS/SOFTENED_LABELS keys
    *   plus sampling_method_normalised.
    */

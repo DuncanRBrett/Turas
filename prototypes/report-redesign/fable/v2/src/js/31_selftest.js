@@ -181,6 +181,11 @@
         eq(panel.interval_abbrev, "SI", "Online_Panel -> SI");
         eq(panel.moe_abbrev, "PE", "Online_Panel -> PE");
         eq(panel.is_probability, false, "panel is non-probability");
+        var conv = TR.conf.labels("Convenience");
+        eq(conv.interval_abbrev, "SI", "Convenience -> SI");
+        eq(conv.sampling_method_normalised, "convenience", "Convenience -> convenience key");
+        eq(TR.conf.labels("Self_Selected").sampling_method_normalised, "convenience",
+          "Self_Selected -> convenience (synonym of Convenience)");
         eq(TR.conf.labels("Not_Specified").interval_abbrev, "SI",
           "Not_Specified -> SI (cautious default)");
         eq(TR.conf.labels("garbage").interval_abbrev, "SI",

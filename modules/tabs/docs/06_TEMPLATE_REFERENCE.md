@@ -815,7 +815,7 @@ Full reference: [11_DATA_CENTRIC_REPORT_V2.md](11_DATA_CENTRIC_REPORT_V2.md).
 | Setting | Description | Values | Default |
 |----|----|----|----|
 | `html_report_v2` | Also build the interactive v2 report (`*_report_v2.html`) | TRUE / FALSE | FALSE |
-| `sampling_method` | Sample design — drives honest CI vocabulary (probability → CI/MOE; else stability/PE) | Not_Specified / Random / Stratified / Cluster / Census / Convenience / Quota | Not_Specified |
+| `sampling_method` | Sample design — drives honest CI vocabulary. Probability designs (Random / Stratified / Cluster / Census) → CI/MOE; everything else → stability/PE | Not_Specified / Random / Stratified / Cluster / Census / Quota / Online_Panel / Convenience | Not_Specified |
 | `wave` | Wave label (v2 header + tracking trend label) | Text, e.g. `Wave 25 - May 2026` | (none) |
 | `html_report_v2_tracking` | Add a Tracking tab built from per-wave microdata. Needs `html_report_v2=TRUE` + a `waves_source` | TRUE / FALSE | FALSE |
 | `waves_source` | Folder holding prior waves' `*_wave.json` contributions | Folder path | (none) |

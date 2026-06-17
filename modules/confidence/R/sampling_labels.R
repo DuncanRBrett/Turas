@@ -6,8 +6,8 @@
 # Maps the Sampling_Method config value to a set of presentation labels.
 # Probability designs (Random, Stratified, Cluster, Census) get standard
 # statistical language ("Confidence Interval", "CI", "MOE").
-# Non-probability designs (Quota, Online_Panel, Self_Selected, Not_Specified)
-# get softened language ("Stability Interval", "SI", "Precision Estimate").
+# Non-probability designs (Quota, Online_Panel, Self_Selected / Convenience,
+# Not_Specified) get softened language ("Stability Interval", "SI", "PE").
 #
 # Called by both the HTML report pipeline and the Excel output pipeline
 # so that terminology is consistent across all outputs.
@@ -29,8 +29,8 @@
 #' what the intervals actually measure.
 #'
 #' @param sampling_method Character. One of: Random, Stratified, Cluster,
-#'   Quota, Online_Panel, Self_Selected, Census, Not_Specified.
-#'   NULL, NA, or empty string treated as "Not_Specified".
+#'   Census, Quota, Online_Panel, Self_Selected (a.k.a. Convenience),
+#'   Not_Specified. NULL, NA, or empty string treated as "Not_Specified".
 #'
 #' @return A named list with fields:
 #'   \item{sampling_method_normalised}{Lowercase spec key (e.g. "panel", "random")}
@@ -83,6 +83,7 @@ get_sampling_labels <- function(sampling_method = "Not_Specified") {
     "Quota"         = "quota",
     "Online_Panel"  = "panel",
     "Self_Selected" = "convenience",
+    "Convenience"   = "convenience",  # synonym of Self_Selected
     "Not_Specified" = "not_specified",
     "not_specified"  # fallback: unrecognised values default to cautious framing
   )
