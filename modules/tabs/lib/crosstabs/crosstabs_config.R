@@ -303,7 +303,11 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     closing_notes = get_config_value(config, "closing_notes", NULL),
 
     # V10.9.0 AI Insights (optional, default FALSE)
-    enable_ai_insights = safe_logical(get_config_value(config, "enable_ai_insights", FALSE))
+    enable_ai_insights = safe_logical(get_config_value(config, "enable_ai_insights", FALSE)),
+
+    # AI model selection — friendly label ("Sonnet 4.6"/"Opus 4.8") or an exact
+    # model ID. Resolved in the AI layer; blank uses the sidecar/default model.
+    ai_model = get_config_value(config, "ai_model", NULL)
   )
 }
 
@@ -635,7 +639,7 @@ load_crosstabs_config <- function(config_file) {
     "ranking_completeness_threshold_pct", "ranking_gap_threshold_pct", "ranking_tie_threshold_pct",
     "ranking_min_base",
     # AI Insights
-    "enable_ai_insights",
+    "enable_ai_insights", "ai_model",
     # File path settings (loaded separately but may appear in Settings sheet)
     "data_file", "structure_file", "output_file", "output_filename",
     "output_format", "output_folder", "output_subfolder"

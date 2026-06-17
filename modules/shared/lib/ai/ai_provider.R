@@ -51,6 +51,14 @@ AI_PROVIDER_REGISTRY <- list(
 # --- Rate Limiting ------------------------------------------------------------
 AI_RATE_LIMIT_SECONDS <- 0.5
 
+# --- Model Display Names ------------------------------------------------------
+# Human-friendly names for known model IDs, used in the client-facing
+# methodology note. Unknown IDs fall back to the raw model string.
+AI_MODEL_DISPLAY_NAMES <- list(
+  "claude-sonnet-4-6" = "Claude Sonnet 4.6",
+  "claude-opus-4-8"   = "Claude Opus 4.8"
+)
+
 
 #' Create an ellmer Chat object for the configured provider
 #'
@@ -62,7 +70,7 @@ AI_RATE_LIMIT_SECONDS <- 0.5
 #'   Expected fields:
 #'   \describe{
 #'     \item{provider}{Character. One of "anthropic", "openai", "google", "ollama".}
-#'     \item{model}{Character. Model identifier (e.g., "claude-sonnet-4-20250514").}
+#'     \item{model}{Character. Model identifier (e.g., "claude-sonnet-4-6").}
 #'     \item{api_key_env}{Character. Environment variable name holding the API key.}
 #'     \item{ollama_model}{Character. Ollama model name (used when provider = "ollama").}
 #'     \item{ollama_url}{Character. Ollama endpoint URL (default: "http://localhost:11434").}
@@ -72,7 +80,7 @@ AI_RATE_LIMIT_SECONDS <- 0.5
 #'
 #' @examples
 #' \dontrun{
-#'   config <- list(provider = "anthropic", model = "claude-sonnet-4-20250514",
+#'   config <- list(provider = "anthropic", model = "claude-sonnet-4-6",
 #'                  api_key_env = "ANTHROPIC_API_KEY")
 #'   chat <- create_ai_chat(config)
 #' }
@@ -198,8 +206,9 @@ call_insight_model <- function(prompt, schema, ai_config) {
 
 #' Generate a human-readable model display name
 #'
-#' Produces a string like "Claude Sonnet 4 (Anthropic)" for use in
-#' methodology notes and report attribution.
+#' Produces a string like "Claude Sonnet 4.6 (Anthropic)" for use in
+#' methodology notes and report attribution. Known model IDs are given a
+#' friendly name; unrecognised IDs are shown verbatim.
 #'
 #' @param ai_config List with provider and model fields.
 #'
@@ -207,9 +216,9 @@ call_insight_model <- function(prompt, schema, ai_config) {
 #'
 #' @examples
 #' \dontrun{
-#'   config <- list(provider = "anthropic", model = "claude-sonnet-4-20250514")
+#'   config <- list(provider = "anthropic", model = "claude-sonnet-4-6")
 #'   get_model_display_name(config)
-#'   # "claude-sonnet-4-20250514 (Anthropic)"
+#'   # "Claude Sonnet 4.6 (Anthropic)"
 #' }
 get_model_display_name <- function(ai_config) {
   provider <- ai_config$provider %||% "anthropic"
@@ -226,6 +235,10 @@ get_model_display_name <- function(ai_config) {
   if (provider == "ollama" && !is.null(ai_config$ollama_model)) {
     model <- ai_config$ollama_model
   }
+
+  # Prettify known model IDs for the client-facing methodology note.
+  pretty <- AI_MODEL_DISPLAY_NAMES[[model]]
+  if (!is.null(pretty)) model <- pretty
 
   sprintf("%s (%s)", model, label)
 }

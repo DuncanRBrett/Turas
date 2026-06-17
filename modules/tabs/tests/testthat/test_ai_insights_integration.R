@@ -304,6 +304,47 @@ test_that("cached callouts are preserved when data hash matches", {
   expect_true(q1_callout$pinned)
 })
 
+test_that("changing ai_model invalidates cached callouts so they regenerate", {
+  all_results <- make_integration_all_results()
+  banner_info <- make_integration_banner_info()
+  config_obj  <- make_integration_config_obj()
+  # Select a different model than the sidecar's stored model.
+  config_obj$ai_model <- "Opus 4.8"
+
+  tmp_path <- tempfile(fileext = "_ai_insights.json")
+  on.exit(unlink(tmp_path))
+
+  # Pre-populate sidecar with a cached callout whose hash matches the data.
+  q_data <- extract_question_data(all_results[["Q1"]], banner_info)
+  data_hash <- compute_data_hash(q_data)
+
+  sidecar <- make_integration_sidecar(enabled = TRUE)  # model = claude-sonnet-4-20250514
+  sidecar$questions$Q1 <- list(
+    ai_callout = list(
+      has_insight      = TRUE,
+      narrative        = "Pre-cached insight about Q1.",
+      confidence       = "high",
+      data_limitations = "",
+      pinned           = TRUE,
+      verified         = TRUE,
+      data_hash        = data_hash
+    )
+  )
+  write_test_sidecar(sidecar, tmp_path)
+
+  Sys.unsetenv("NONEXISTENT_INTEGRATION_KEY")
+
+  suppressWarnings({
+    result <- generate_all_insights(all_results, banner_info, config_obj, tmp_path)
+  })
+
+  # The config model is authoritative — it overrides the sidecar's old model.
+  expect_equal(result$ai_config$model, "claude-opus-4-8")
+  # The cached hash is dropped, so this was treated as a cache miss (regeneration
+  # attempted) rather than a silent reuse of the Sonnet-written callout.
+  expect_null(result$callouts$Q1$ai_callout$data_hash)
+})
+
 # ==============================================================================
 # TESTS: Idempotency
 # ==============================================================================
@@ -408,4 +449,57 @@ test_that("result includes model_display_name", {
   })
 
   expect_equal(result$model_display_name, "claude-sonnet-4-20250514 (Anthropic)")
+})
+
+test_that("config ai_model overrides the sidecar model and persists", {
+  all_results <- make_integration_all_results()
+  banner_info <- make_integration_banner_info()
+  config_obj  <- make_integration_config_obj()
+  config_obj$ai_model <- "Opus 4.8"  # friendly label, differs from sidecar
+
+  tmp_path <- tempfile(fileext = "_ai_insights.json")
+  on.exit(unlink(tmp_path))
+
+  sidecar <- make_integration_sidecar(enabled = TRUE)
+  sidecar$config$generate_per_question <- FALSE  # no API calls needed
+  write_test_sidecar(sidecar, tmp_path)
+
+  suppressWarnings({
+    result <- generate_all_insights(all_results, banner_info, config_obj, tmp_path)
+  })
+
+  # Friendly label resolved to the model ID and prettified for the note.
+  expect_equal(result$ai_config$model, "claude-opus-4-8")
+  expect_equal(result$model_display_name, "Claude Opus 4.8 (Anthropic)")
+
+  # The override is written back to the sidecar (authoritative for next run).
+  saved <- jsonlite::fromJSON(
+    paste(readLines(tmp_path, warn = FALSE), collapse = "\n"),
+    simplifyVector = FALSE
+  )
+  expect_equal(saved$config$model, "claude-opus-4-8")
+})
+
+test_that("blank ai_model leaves the sidecar's own model untouched", {
+  all_results <- make_integration_all_results()
+  banner_info <- make_integration_banner_info()
+  config_obj  <- make_integration_config_obj()
+  config_obj$ai_model <- ""  # advanced workflow: drive model from sidecar
+
+  tmp_path <- tempfile(fileext = "_ai_insights.json")
+  on.exit(unlink(tmp_path))
+
+  sidecar <- make_integration_sidecar(enabled = TRUE)
+  sidecar$config$model <- "gpt-4.1"
+  sidecar$config$provider <- "openai"
+  sidecar$config$generate_per_question <- FALSE
+  write_test_sidecar(sidecar, tmp_path)
+
+  suppressWarnings({
+    result <- generate_all_insights(all_results, banner_info, config_obj, tmp_path)
+  })
+
+  # No override — the hand-edited provider/model are respected.
+  expect_equal(result$ai_config$model, "gpt-4.1")
+  expect_equal(result$model_display_name, "gpt-4.1 (OpenAI)")
 })

@@ -840,12 +840,21 @@ Full reference: [11_DATA_CENTRIC_REPORT_V2.md](11_DATA_CENTRIC_REPORT_V2.md).
 | Setting | Description | Values | Default |
 |----|----|----|----|
 | `enable_ai_insights` | Enable AI-generated insight callouts in the HTML report | TRUE / FALSE | FALSE |
+| `ai_model` | Which model writes the insights | `Sonnet 4.6`, `Opus 4.8`, or an exact model ID | Sonnet 4.6 |
 
 When enabled, Turas generates AI-assisted observational callouts for
-each question using a large language model (default: Claude Sonnet 4 via
-Anthropic API). A JSON sidecar file is auto-created alongside your
-config Excel with default settings. Callouts are cached — re-runs with
-unchanged data make no API calls.
+each question using a large language model. Pick the model with
+`ai_model`: **Sonnet 4.6** (faster, lower cost) or **Opus 4.8** (highest
+quality). You can also type any exact model ID (e.g. `claude-sonnet-4-6`)
+to adopt a newer model without waiting for a template update — unknown
+values pass straight through to the API. Leave `ai_model` blank to drive
+the model from the JSON sidecar instead (needed when switching to a
+non-Anthropic provider such as OpenAI or a local Ollama model).
+
+A JSON sidecar file is auto-created alongside your config Excel with
+default settings. Callouts are cached — re-runs with unchanged data make
+no API calls. Changing `ai_model` to a different model regenerates the
+callouts so they are written by the newly selected model.
 
 **Requirements:** An API key must be set in the R environment
 (`ANTHROPIC_API_KEY` by default). The `ellmer` package must be

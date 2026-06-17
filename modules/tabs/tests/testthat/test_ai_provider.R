@@ -241,6 +241,24 @@ test_that("handles NULL provider and model with defaults", {
   expect_equal(name, "unknown-model (Anthropic)")
 })
 
+test_that("prettifies known current model IDs for the methodology note", {
+  expect_equal(
+    get_model_display_name(list(provider = "anthropic", model = "claude-sonnet-4-6")),
+    "Claude Sonnet 4.6 (Anthropic)"
+  )
+  expect_equal(
+    get_model_display_name(list(provider = "anthropic", model = "claude-opus-4-8")),
+    "Claude Opus 4.8 (Anthropic)"
+  )
+})
+
+test_that("leaves unknown model IDs as the raw string", {
+  expect_equal(
+    get_model_display_name(list(provider = "anthropic", model = "claude-sonnet-4-20250514")),
+    "claude-sonnet-4-20250514 (Anthropic)"
+  )
+})
+
 # ==============================================================================
 # TESTS: AI_RATE_LIMIT_SECONDS
 # ==============================================================================

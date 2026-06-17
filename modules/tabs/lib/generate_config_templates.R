@@ -573,7 +573,17 @@ generate_crosstab_config_template <- function(output_path,
                "Leave FALSE if you do not have an API key or do not need AI commentary."
              ),
              valid_values_text = "TRUE or FALSE",
-             dropdown = c("FALSE", "TRUE"))
+             dropdown = c("FALSE", "TRUE")),
+        list(name = "ai_model", default = "Sonnet 4.6", required = FALSE,
+             description = paste0(
+               "Which AI model writes the insights (only used when enable_ai_insights = TRUE). ",
+               "Choose 'Sonnet 4.6' (faster, lower cost) or 'Opus 4.8' (highest quality). ",
+               "Advanced: type any exact model ID (e.g. claude-sonnet-4-6) to use a newer ",
+               "model without waiting for a template update. Leave blank to drive the model ",
+               "from the AI sidecar file instead (needed when switching to a non-Anthropic provider)."
+             ),
+             valid_values_text = "Sonnet 4.6, Opus 4.8, or an exact model ID",
+             dropdown = c("Sonnet 4.6", "Opus 4.8"))
       )
     ),
 

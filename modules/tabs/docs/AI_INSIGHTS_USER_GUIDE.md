@@ -13,11 +13,36 @@ Two complementary voices, honestly labelled:
 | **Executive summary (reviewed)** | AI-drafted, researcher-edited | No (model named in methodology note) | Standard styling |
 | **Executive summary (unreviewed)** | AI-generated, no review | Yes | Grey background |
 
+## Choosing the model (easiest path)
+
+You do **not** need to touch any JSON to pick the model. In the Settings sheet of
+your crosstab config:
+
+| Setting | Value |
+|---------|-------|
+| `enable_ai_insights` | `TRUE` |
+| `ai_model` | `Sonnet 4.6` (default) or `Opus 4.8` |
+
+- **Sonnet 4.6** — faster and lower cost; the sensible default.
+- **Opus 4.8** — highest quality analytical reasoning; use for flagship reports.
+- **Any exact model ID** (e.g. `claude-sonnet-4-6`) — typed verbatim, so you can
+  adopt a newer Anthropic model the moment it ships, without a code update.
+- **Blank** — hands control to the JSON sidecar (see *Provider switching* below);
+  needed only for non-Anthropic providers.
+
+`ai_model` is authoritative: switch it and re-run, and the callouts regenerate so
+they are written by the model you chose. The model used is named in the
+methodology note in the About tab, so clients see exactly which model produced the
+commentary.
+
 ## Quick start
 
-### 1. Create the AI sidecar file
+### 1. Create the AI sidecar file (optional)
 
-Create a JSON file alongside your config Excel. If your config is `Demo_CX_Crosstabs.xlsx`, create `Demo_CX_Crosstabs_ai_insights.json`:
+The sidecar is **auto-created** the first time you run with `enable_ai_insights = TRUE`,
+seeded with the model from your `ai_model` setting. You only need to create it by
+hand to change advanced options or switch providers. If your config is
+`Demo_CX_Crosstabs.xlsx`, the sidecar is `Demo_CX_Crosstabs_ai_insights.json`:
 
 ```json
 {
@@ -25,7 +50,7 @@ Create a JSON file alongside your config Excel. If your config is `Demo_CX_Cross
   "config": {
     "enabled": true,
     "provider": "anthropic",
-    "model": "claude-sonnet-4-20250514",
+    "model": "claude-sonnet-4-6",
     "temperature": 0.3,
     "max_tokens": 1500,
     "verify_callouts": true,
@@ -75,10 +100,13 @@ AI insights generate automatically during HTML report generation when the sideca
 
 ### Provider switching
 
+For Anthropic models, just set `ai_model` in the config (`Sonnet 4.6` / `Opus 4.8`).
+To switch **provider**, leave `ai_model` blank and edit the sidecar:
+
 ```json
-// Claude (default)
+// Claude (default — or just set ai_model in the config)
 "provider": "anthropic",
-"model": "claude-sonnet-4-20250514",
+"model": "claude-sonnet-4-6",
 "api_key_env": "ANTHROPIC_API_KEY"
 
 // OpenAI

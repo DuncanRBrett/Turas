@@ -63,11 +63,39 @@ generate_all_insights <- function(all_results, banner_info, config_obj,
     return(NULL)
   }
 
+  # Apply the model chosen in the crosstab config (authoritative when set).
+  # A blank ai_model means "respect the sidecar's own model", which preserves
+  # the advanced workflow of hand-editing the sidecar to use another provider.
+  # When the selected model differs from the sidecar's stored model the user
+  # has deliberately switched, so cached insights are invalidated to regenerate
+  # with the new model.
+  model_changed    <- FALSE
+  configured_model <- resolve_ai_model_alias(config_obj$ai_model %||% "")
+  if (nzchar(configured_model) &&
+      !identical(ai_config$model %||% "", configured_model)) {
+    cat(sprintf("    Model selection changed: %s -> %s (cached insights will regenerate)\n",
+                ai_config$model %||% "(none)", configured_model))
+    ai_config$model      <- configured_model
+    sidecar$config$model <- configured_model
+    model_changed        <- TRUE
+  }
+
   model_name <- get_model_display_name(ai_config)
   cat(sprintf("    Provider: %s\n", model_name))
 
   study_context <- extract_study_context(all_results, banner_info, config_obj)
   callouts <- sidecar$questions %||% list()
+
+  # If the model changed, drop cached data hashes so every callout regenerates
+  # with the newly selected model (researcher edits/suppressions are kept).
+  if (model_changed) {
+    callouts <- lapply(callouts, function(entry) {
+      if (!is.null(entry) && !is.null(entry$ai_callout)) {
+        entry$ai_callout$data_hash <- NULL
+      }
+      entry
+    })
+  }
   generated_count <- 0L
   cached_count    <- 0L
   failed_count    <- 0L
@@ -192,6 +220,10 @@ generate_all_insights <- function(all_results, banner_info, config_obj,
 
   # === Executive summary ===
   exec_summary <- sidecar$executive_summary
+  # Force regeneration if the model was deliberately switched.
+  if (model_changed && !is.null(exec_summary)) {
+    exec_summary$data_hash <- NULL
+  }
   if (isTRUE(ai_config$generate_exec_summary)) {
     # Build question data for hash check and potential generation
     all_q_data <- lapply(all_results, function(q) {

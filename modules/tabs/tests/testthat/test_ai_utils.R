@@ -329,7 +329,7 @@ test_that("creates a valid sidecar template with defaults", {
   expect_true(nzchar(sidecar$generated_at))
   expect_true(sidecar$config$enabled)
   expect_equal(sidecar$config$provider, "anthropic")
-  expect_equal(sidecar$config$model, "claude-sonnet-4-20250514")
+  expect_equal(sidecar$config$model, "claude-sonnet-4-6")
   expect_equal(sidecar$config$temperature, 0.3)
   expect_equal(sidecar$config$max_tokens, 1500L)
   expect_true(sidecar$config$verify_callouts)
@@ -368,4 +368,48 @@ test_that("default sidecar round-trips through JSON", {
   expect_equal(loaded$config$provider, "anthropic")
   expect_equal(loaded$config$temperature, 0.3)
   expect_true(loaded$config$enabled)
+})
+
+test_that("create_default_sidecar accepts an explicit model override", {
+  sidecar <- create_default_sidecar(model = "claude-opus-4-8")
+  expect_equal(sidecar$config$model, "claude-opus-4-8")
+})
+
+# ==============================================================================
+# TESTS: resolve_ai_model_alias
+# ==============================================================================
+
+context("resolve_ai_model_alias")
+
+test_that("maps friendly Sonnet labels to the current model ID", {
+  expect_equal(resolve_ai_model_alias("Sonnet 4.6"), "claude-sonnet-4-6")
+  expect_equal(resolve_ai_model_alias("sonnet"), "claude-sonnet-4-6")
+  expect_equal(resolve_ai_model_alias("CLAUDE SONNET 4.6"), "claude-sonnet-4-6")
+})
+
+test_that("maps friendly Opus labels to the current model ID", {
+  expect_equal(resolve_ai_model_alias("Opus 4.8"), "claude-opus-4-8")
+  expect_equal(resolve_ai_model_alias("opus"), "claude-opus-4-8")
+})
+
+test_that("passes an exact model ID through unchanged", {
+  expect_equal(resolve_ai_model_alias("claude-sonnet-4-6"), "claude-sonnet-4-6")
+  expect_equal(resolve_ai_model_alias("gpt-4.1"), "gpt-4.1")
+  expect_equal(resolve_ai_model_alias("some-future-model-9"), "some-future-model-9")
+})
+
+test_that("treats blank, NA, NULL and literal 'NA' as no selection", {
+  expect_equal(resolve_ai_model_alias(""), "")
+  expect_equal(resolve_ai_model_alias("   "), "")
+  expect_equal(resolve_ai_model_alias(NA), "")
+  expect_equal(resolve_ai_model_alias(NULL), "")
+  expect_equal(resolve_ai_model_alias("NA"), "")  # config loader stringifies empties
+})
+
+test_that("trims surrounding whitespace before matching", {
+  expect_equal(resolve_ai_model_alias("  Opus 4.8  "), "claude-opus-4-8")
+})
+
+test_that("TABS_AI_MODEL_DEFAULT is the current Sonnet ID", {
+  expect_equal(TABS_AI_MODEL_DEFAULT, "claude-sonnet-4-6")
 })

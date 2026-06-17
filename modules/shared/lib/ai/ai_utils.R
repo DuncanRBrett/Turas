@@ -164,17 +164,65 @@ estimate_tokens <- function(payload) {
 }
 
 
+# --- AI Model Selection -------------------------------------------------------
+# Friendly model labels map to current Anthropic model IDs. This lets the
+# crosstab config offer a simple dropdown ("Sonnet 4.6" / "Opus 4.8") while
+# still allowing any exact model ID to be typed for newer models — those pass
+# through unchanged, so no code change is needed to adopt a new model.
+
+# Default Anthropic model used when none is specified (fresh sidecars).
+TABS_AI_MODEL_DEFAULT <- "claude-sonnet-4-6"
+
+# Friendly-label -> model-ID aliases (keys are lower-cased for matching).
+AI_MODEL_ALIASES <- list(
+  "sonnet"            = "claude-sonnet-4-6",
+  "sonnet 4.6"        = "claude-sonnet-4-6",
+  "claude sonnet 4.6" = "claude-sonnet-4-6",
+  "opus"              = "claude-opus-4-8",
+  "opus 4.8"          = "claude-opus-4-8",
+  "claude opus 4.8"   = "claude-opus-4-8"
+)
+
+
+#' Resolve an AI model selection to a concrete model ID
+#'
+#' Accepts a friendly label ("Sonnet 4.6", "Opus 4.8"), an exact model ID
+#' (e.g. "claude-sonnet-4-6", "gpt-4.1"), or a blank/NA value. Friendly labels
+#' are mapped to their current model ID; exact IDs pass through unchanged so new
+#' models can be adopted without a code change. A blank/NA/"NA" value returns ""
+#' (meaning "no selection" — the caller should fall back to the sidecar's own
+#' model or the default). This preserves the advanced workflow of hand-editing
+#' the sidecar to use another provider while leaving the config field blank.
+#'
+#' @param value Character or NULL. The raw config value.
+#'
+#' @return Character. A concrete model ID, or "" if no selection was made.
+#'
+#' @examples
+#' resolve_ai_model_alias("Opus 4.8")        # "claude-opus-4-8"
+#' resolve_ai_model_alias("claude-sonnet-4-6") # "claude-sonnet-4-6" (passthrough)
+#' resolve_ai_model_alias("")                 # "" (no selection)
+resolve_ai_model_alias <- function(value) {
+  if (is.null(value) || (length(value) == 1 && is.na(value))) return("")
+  v <- trimws(as.character(value)[1])
+  if (!nzchar(v) || identical(toupper(v), "NA")) return("")
+  alias <- AI_MODEL_ALIASES[[tolower(v)]]
+  if (!is.null(alias)) return(alias)
+  v
+}
+
+
 #' Create a default AI sidecar template
 #'
 #' Generates a new sidecar structure with default configuration.
 #' Used when no sidecar exists and the user wants to enable AI insights.
 #'
 #' @param provider Character. Default provider (default: "anthropic").
-#' @param model Character. Default model identifier.
+#' @param model Character. Default model identifier (default: current Sonnet).
 #'
 #' @return List. A sidecar template ready for customisation and writing.
 create_default_sidecar <- function(provider = "anthropic",
-                                   model = "claude-sonnet-4-20250514") {
+                                   model = TABS_AI_MODEL_DEFAULT) {
   list(
     version      = AI_SIDECAR_VERSION,
     generated_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%S"),

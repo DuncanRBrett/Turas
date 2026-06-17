@@ -1452,20 +1452,45 @@ Step 5:  Write HTML file
 
 ### Choosing and Switching AI Models
 
-The AI model is configured in the JSON sidecar file. The default is Claude Sonnet 4 (Anthropic).
+There are two ways to choose the model, in priority order:
+
+1. **`ai_model` in the Settings sheet (recommended).** Set it to `Sonnet 4.6`
+   (default — faster, lower cost) or `Opus 4.8` (highest quality). You can also
+   type any exact model ID (e.g. `claude-sonnet-4-6`) to adopt a newer Anthropic
+   model without waiting for a code change — unknown values pass straight through
+   to the API. The config value is authoritative: on each run it is written into
+   the sidecar, and if it differs from the model that produced the cached
+   callouts, those callouts regenerate so the report is written by the selected
+   model.
+2. **The JSON sidecar `config` block (advanced).** Leave `ai_model` **blank** in
+   the Settings sheet to hand off full control to the sidecar. This is how you
+   switch to a non-Anthropic provider (OpenAI, Google, local Ollama), since those
+   need a matching `provider` and `api_key_env` that the simple `ai_model` field
+   does not set.
+
+Friendly labels resolve as follows (case-insensitive); anything else is treated
+as a literal model ID:
+
+| `ai_model` value | Resolves to |
+|------------------|-------------|
+| `Sonnet 4.6` / `sonnet` | `claude-sonnet-4-6` |
+| `Opus 4.8` / `opus` | `claude-opus-4-8` |
+| `claude-sonnet-4-6` (or any exact ID) | used verbatim |
+| *(blank)* | sidecar's own `model` (default `claude-sonnet-4-6`) |
 
 #### Supported Providers
 
-| Provider | Sidecar `provider` | Sidecar `model` | API Key Env Var | Notes |
+| Provider | Sidecar `provider` | Example `model` | API Key Env Var | Notes |
 |----------|-------------------|-----------------|-----------------|-------|
-| **Anthropic** | `"anthropic"` | `"claude-sonnet-4-20250514"` | `ANTHROPIC_API_KEY` | Default. Best quality for research insight. |
-| **OpenAI** | `"openai"` | `"gpt-4.1"` | `OPENAI_API_KEY` | Good alternative. |
-| **Google** | `"google"` | `"gemini-2.5-pro"` | `GOOGLE_API_KEY` | Google Gemini models. |
+| **Anthropic** | `"anthropic"` | `"claude-sonnet-4-6"` / `"claude-opus-4-8"` | `ANTHROPIC_API_KEY` | Default. Selectable via `ai_model`. |
+| **OpenAI** | `"openai"` | `"gpt-4.1"` | `OPENAI_API_KEY` | Leave `ai_model` blank; set in sidecar. |
+| **Google** | `"google"` | `"gemini-2.5-pro"` | `GOOGLE_API_KEY` | Leave `ai_model` blank; set in sidecar. |
 | **Ollama** | `"ollama"` | `"gemma4:31b"` | (none needed) | Local models. No data leaves your machine. |
 
-#### How to Switch Models
+#### How to Switch Providers (advanced)
 
-Edit the `config` section of the JSON sidecar file:
+To use a non-Anthropic provider, leave `ai_model` blank in the Settings sheet and
+edit the `config` section of the JSON sidecar file:
 
 ```json
 {
@@ -1487,14 +1512,17 @@ Then delete the `questions` entries and `executive_summary` to force regeneratio
 }
 ```
 
+(When you switch Anthropic models via `ai_model`, this clearing happens
+automatically — you only need it for manual provider edits.)
+
 #### Choosing a Model
 
 | Consideration | Recommendation |
 |---------------|----------------|
-| **Best quality** | Claude Sonnet 4 or GPT-4.1 — best at structured output and following analytical guardrails |
+| **Best quality** | Claude Opus 4.8 (`ai_model = Opus 4.8`) — strongest analytical reasoning and guardrail adherence |
+| **Best balance** | Claude Sonnet 4.6 (`ai_model = Sonnet 4.6`, default) — fast, lower cost, high quality |
 | **Lowest cost** | Ollama with local model — free, but lower quality on complex analysis |
 | **Data privacy** | Ollama — no data leaves your machine. Important for sensitive client data |
-| **Speed** | Claude Haiku or GPT-4.1-mini — faster but less nuanced observations |
 | **White-label** | Match the model to the client's preferences or compliance requirements |
 
 The model name is automatically displayed in the methodology note in the About tab, so clients see exactly which model was used.

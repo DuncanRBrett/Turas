@@ -403,10 +403,21 @@ generate_html_report <- function(all_results, banner_info, config_obj, output_pa
       })
 
       if (ai_sourced) {
+        # Resolve the model chosen in the crosstab config. Blank = leave the
+        # sidecar's own model untouched (preserves advanced provider switching).
+        config_obj$ai_model <- resolve_ai_model_alias(config_obj$ai_model)
+        if (nzchar(config_obj$ai_model)) {
+          cat(sprintf("    AI model (from config): %s\n", config_obj$ai_model))
+        }
+
         # Auto-create sidecar with defaults if it doesn't exist
         if (!file.exists(ai_sidecar_path)) {
           cat("    Creating AI insights sidecar with default settings...\n")
-          default_sidecar <- create_default_sidecar()
+          default_sidecar <- if (nzchar(config_obj$ai_model)) {
+            create_default_sidecar(model = config_obj$ai_model)
+          } else {
+            create_default_sidecar()
+          }
           write_ai_sidecar_to_path(default_sidecar, ai_sidecar_path)
         }
 
