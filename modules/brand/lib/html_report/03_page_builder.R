@@ -427,6 +427,73 @@ build_br_summary_panel <- function(results, config) {
 }
 
 
+# Sub-tabs that make up the "category story" an analyst presents (Level 2 of
+# the three-level IA). Every other sub-tab is demoted to the on-demand
+# "Detail" appendix (Level 3). Single source of truth — edit this vector to
+# re-tier the per-category sub-tab nav. The order here is also the display
+# order of the primary tabs. See docs/PHASE1_CLARITY_IMPLEMENTATION_PLAN.md.
+.BR_PRIMARY_SUBTABS <- c("fn-funnel", "ma-metrics", "rep", "wom")
+
+
+#' Render the per-category sub-tab nav, tiered into primary + appendix
+#'
+#' Primary "category story" tabs (see \code{.BR_PRIMARY_SUBTABS}) are emitted
+#' first, in that vector's order, followed by a muted "Detail" divider and the
+#' remaining tabs (the on-demand appendix) in their original order. Every
+#' button keeps the class and \code{data-*} attributes the JS switcher
+#' (\code{switchCategorySubtab}) relies on, so switching behaviour is
+#' unchanged — only grouping, order, and emphasis change.
+#'
+#' Load-state safety: tiering only engages when the active-on-load tab
+#' (\code{flat_tabs[[1]]}, always "fn-funnel" when a Brand Funnel is derived)
+#' is itself a primary tab. Otherwise the original flat order is rendered
+#' unchanged, so the sub-panel shown on first paint is never altered.
+#'
+#' @param flat_tabs List of tab specs, each a list with elements key, label,
+#'   subpanel, internal_tab. Order as built by build_br_category_panel().
+#' @param cat_id Character. Category id used as the data-group value.
+#' @return Character. The .br-subtab-nav HTML, or "" when flat_tabs is empty.
+#' @keywords internal
+build_br_subtab_nav <- function(flat_tabs, cat_id) {
+  n <- length(flat_tabs)
+  if (n == 0L) return("")
+  keys <- vapply(flat_tabs, function(t) t$key, character(1L))
+  active_key <- keys[1L]
+
+  btn <- function(t, is_active, is_appendix) sprintf(
+    '<button class="br-subtab-btn%s%s" data-group="%s" data-subtab="%s" data-subpanel="%s" data-internal-tab="%s" onclick="switchCategorySubtab(this)">%s</button>',
+    if (isTRUE(is_active)) " active" else "",
+    if (isTRUE(is_appendix)) " br-subtab-btn--appendix" else "",
+    cat_id, t$key, t$subpanel, t$internal_tab, t$label)
+
+  # No tiering when the on-load tab is not itself primary (e.g. a category
+  # with no derived funnel) — preserve the original order + active sub-panel.
+  if (!(active_key %in% .BR_PRIMARY_SUBTABS)) {
+    btns <- vapply(seq_len(n), function(i) btn(flat_tabs[[i]], i == 1L, FALSE),
+                   character(1L))
+    return(sprintf('<div class="br-subtab-nav">%s</div>',
+                   paste(btns, collapse = "\n")))
+  }
+
+  is_prim  <- keys %in% .BR_PRIMARY_SUBTABS
+  prim_idx <- which(is_prim)
+  prim_idx <- prim_idx[order(match(keys[prim_idx], .BR_PRIMARY_SUBTABS))]
+  apx_idx  <- which(!is_prim)   # appendix tabs keep their original order
+
+  out <- vapply(prim_idx,
+                function(i) btn(flat_tabs[[i]], keys[i] == active_key, FALSE),
+                character(1L))
+  if (length(apx_idx) > 0L) {
+    out <- c(out,
+      '<span class="br-subtab-sep" aria-hidden="true"></span>',
+      '<span class="br-subtab-grouplabel">Detail</span>',
+      vapply(apx_idx, function(i) btn(flat_tabs[[i]], FALSE, TRUE),
+             character(1L)))
+  }
+  sprintf('<div class="br-subtab-nav">%s</div>', paste(out, collapse = "\n"))
+}
+
+
 #' Build a category panel with 2-layer flat sub-tabs
 #'
 #' Each element's internal sections (Funnel/Relationship, Attributes/CEPs/Metrics)
@@ -557,18 +624,11 @@ build_br_category_panel <- function(cat_name, cat_results, charts, tables,
     )
   }
 
-  # Sub-tab navigation bar
+  # Sub-tab navigation bar — primary "category story" tabs first, then a
+  # muted "Detail" divider introducing the on-demand appendix tabs. See
+  # build_br_subtab_nav() + .BR_PRIMARY_SUBTABS for the tiering contract.
   if (length(flat_tabs) > 0) {
-    subtab_btns <- vapply(seq_along(flat_tabs), function(i) {
-      tab <- flat_tabs[[i]]
-      active_cls <- if (i == 1) " active" else ""
-      sprintf(
-        '<button class="br-subtab-btn%s" data-group="%s" data-subtab="%s" data-subpanel="%s" data-internal-tab="%s" onclick="switchCategorySubtab(this)">%s</button>',
-        active_cls, cat_id, tab$key, tab$subpanel, tab$internal_tab, tab$label
-      )
-    }, character(1))
-    parts <- c(parts, sprintf('<div class="br-subtab-nav">%s</div>',
-                              paste(subtab_btns, collapse = "\n")))
+    parts <- c(parts, build_br_subtab_nav(flat_tabs, cat_id))
   }
 
   # One sub-panel per element. Active sub-panel = the one containing the first tab.
@@ -1222,6 +1282,19 @@ body { background: #f8f7f5; margin: 0; padding: 0; }
 }
 .br-subtab-btn.active { color: %s; border-bottom-color: %s; }
 .br-subtab-btn:hover { color: #64748b; }
+/* Three-level IA: a faint "Detail" divider separates the primary
+   "category story" tabs from the on-demand appendix tabs, which are
+   rendered slightly muted. See build_br_subtab_nav(). */
+.br-subtab-sep {
+  align-self: center; flex: 0 0 auto;
+  width: 1px; height: 18px; background: #e2e8f0; margin: 0 4px 0 12px;
+}
+.br-subtab-grouplabel {
+  align-self: center; flex: 0 0 auto; white-space: nowrap;
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.5px; color: #cbd5e1; padding: 0 10px 0 0;
+}
+.br-subtab-btn--appendix:not(.active) { color: #cbd5e1; }
 .br-subpanel { display: none; }
 .br-subpanel.active { display: block; }
 .br-section { margin-bottom: 24px; }
