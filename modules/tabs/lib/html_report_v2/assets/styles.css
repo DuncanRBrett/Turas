@@ -63,6 +63,7 @@ h1, h2, h3 { line-height: 1.25; letter-spacing: -.2px; }
 .fpick-q.hidden { display: none; }
 .fpick-q .qc { color: var(--brand); font-weight: 700; font-size: 11px; }
 .fpick-vals { max-height: 300px; overflow: auto; margin-bottom: 8px; }
+.fpick-empty { color: var(--muted); font-size: 12.5px; padding: 8px 2px 12px; }
 .fpick-foot { display: flex; gap: 14px; align-items: center; margin-top: 10px; font-size: 12.5px; }
 .fpick-foot label { cursor: pointer; }
 label.fpick-q { display: block; cursor: pointer; }

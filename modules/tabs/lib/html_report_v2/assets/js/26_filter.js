@@ -97,11 +97,20 @@
     var netLabels = Object.keys(q.net_members || {}).map(function (k) {
       return q.rows[parseInt(k, 10)].label;
     });
+    // hidden-scale questions (NPS / satisfaction with only boxes shown)
+    // decompose into box groupings, not shown category rows
     if (!netLabels.length) {
-      applyCustomBanner(code, "cat", holder);
-      return;
+      netLabels = TR.d2.boxRows(q).map(function (br) { return br.label; });
     }
     var catCount = TR.d2.catRows(q).length;
+    if (!netLabels.length && !catCount) {
+      TR.shell.toast("This question can't be used as a banner");
+      holder.hidden = true;
+      return;
+    }
+    // only one mode is meaningful — apply it without the extra choice
+    if (!netLabels.length) { applyCustomBanner(code, "cat", holder); return; }
+    if (!catCount) { applyCustomBanner(code, "net", holder); return; }
     holder.innerHTML = '<div class="fpick"><div class="fpick-head">' +
       fmt.escapeHtml(q.code + " — column headers") +
       '<button data-close aria-label="Close">✕</button></div>' +
@@ -127,9 +136,10 @@
   }
 
   /**
-   * Value picker. Offers category rows AND decomposable NET rows (a net is
-   * applied by expanding to its member categories), so analysts can filter
-   * by the groupings they actually think in ("Online campus", "Top-2 box").
+   * Value picker. Offers category rows, decomposable NET rows (applied by
+   * expanding to their member categories) AND box groupings for hidden-scale
+   * questions (applied by matching per-respondent box membership) — so an
+   * analyst can filter by "Top-2 box", "Promoter" or "Very Satisfied" alike.
    */
   function pickValues(code, holder) {
     var q = TR.d2.questionByCode(code);
@@ -141,24 +151,35 @@
         options.push({ value: "n" + ri, label: r.label, net: true });
       }
     });
-    holder.innerHTML = '<div class="fpick"><div class="fpick-head">' +
-      fmt.escapeHtml(q.code + " — " + TR.charts.clip(q.title, 70)) +
-      '<button data-close aria-label="Close">✕</button></div>' +
-      '<div class="fpick-vals">' + options.map(function (opt) {
+    // hidden-scale groupings filter on box membership (no shown categories)
+    TR.d2.boxRows(q).forEach(function (br) {
+      options.push({ value: "b" + br.index, label: br.label, net: true });
+    });
+    var body = options.length
+      ? '<div class="fpick-vals">' + options.map(function (opt) {
         return '<label class="fval"><input type="checkbox" value="' + opt.value +
           '"> ' + fmt.escapeHtml(opt.label) +
           (opt.net ? ' <span class="kindtag">net</span>' : "") + "</label>";
       }).join("") + "</div>" +
-      '<button class="primary wide" data-apply>Apply filter</button></div>';
+        '<button class="primary wide" data-apply>Apply filter</button>'
+      : '<p class="fpick-empty">No filterable values — this is a derived or ' +
+        "ranking metric.</p>";
+    holder.innerHTML = '<div class="fpick"><div class="fpick-head">' +
+      fmt.escapeHtml(q.code + " — " + TR.charts.clip(q.title, 70)) +
+      '<button data-close aria-label="Close">✕</button></div>' + body + "</div>";
     holder.querySelector("[data-close]").addEventListener("click", function () {
       holder.hidden = true;
     });
-    holder.querySelector("[data-apply]").addEventListener("click", function () {
-      var rows = {};
+    var applyBtn = holder.querySelector("[data-apply]");
+    if (applyBtn) applyBtn.addEventListener("click", function () {
+      var rows = {}, box = false;
       Array.prototype.forEach.call(holder.querySelectorAll("input:checked"),
         function (el) {
           var v = el.value;
-          if (v[0] === "c") {
+          if (v.charAt(0) === "c") {
+            rows[parseInt(v.slice(1), 10)] = true;
+          } else if (v.charAt(0) === "b") {
+            box = true;
             rows[parseInt(v.slice(1), 10)] = true;
           } else {
             (q.net_members[v.slice(1)] || []).forEach(function (ri) {
@@ -168,7 +189,9 @@
         });
       var rowList = Object.keys(rows).map(Number);
       if (!rowList.length) { TR.shell.toast("Pick at least one value"); return; }
-      TR.d2.state.filters.push({ q: code, rows: rowList });
+      var filter = { q: code, rows: rowList };
+      if (box) filter.box = true;
+      TR.d2.state.filters.push(filter);
       holder.hidden = true;
       filterBar.render();
       TR.shell.route();

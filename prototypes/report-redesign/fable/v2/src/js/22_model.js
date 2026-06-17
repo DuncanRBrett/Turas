@@ -347,7 +347,7 @@
       viewModel = computedModel(q, bannerId, filters, opts.dual);
     } else {
       viewModel = publishedModel(q,
-        custom ? TR.AGG.banner_groups[0].id : bannerId, opts.dual);
+        custom ? TR.d2.firstBanner() : bannerId, opts.dual);
     }
     viewModel.code = q.code;
     viewModel.title = q.title;

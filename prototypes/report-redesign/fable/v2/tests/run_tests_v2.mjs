@@ -778,6 +778,92 @@ run("Crosstabs panel: 'Select all' bulk-sets table/chart columns and rows", () =
   }
 });
 
+run("Box filter + box custom-banner work from per-respondent box membership", () => {
+  // Hidden-scale question (NPS-style): only boxes are published — no category
+  // rows, no net_members. boxes = [0,1,2,0,1,2] so each box has exactly 2
+  // respondents. The box NETs must back both a filter and a custom banner.
+  const agg = { schema_version: 2,
+    project: { name: "B", low_base_threshold: 1, alpha: 0.05, tracking: { enabled: false } },
+    columns: [{ key: "TOTAL::Total", group: "total", label: "Total", letter: "" }],
+    banner_groups: [], categories: ["c"],
+    questions: [{ code: "QB", title: "NPS", category: "c", type: "scale",
+      bases: [{ n: 6, low: false }], net_diffs: { "3": { plus: 2, minus: 0 } },
+      rows: [{ kind: "net", label: "Low", pct: [33], n: [2], sig: [""] },
+             { kind: "net", label: "Mid", pct: [33], n: [2], sig: [""] },
+             { kind: "net", label: "High", pct: [33], n: [2], sig: [""] },
+             { kind: "net", label: "NET POSITIVE (High - Low)", pct: [0], n: [null], sig: [""] },
+             { kind: "mean", label: "Mean", pct: [5], n: [null], sig: [""] }] }] };
+  const saved = { agg: TR.AGG, micro: TR.MICRO, prev: TR.PREV, idx: TR.d2._qIndex };
+  try {
+    TR.AGG = agg; TR.PREV = null; TR.d2._qIndex = null;
+    TR.MICRO = { n: 6, answers: { QB: [null, null, null, null, null, null] },
+      banner_vars: {}, weights: [1, 1, 1, 1, 1, 1], boxes: { QB: [0, 1, 2, 0, 1, 2] } };
+    const br = TR.d2.boxRows(TR.d2.questionByCode("QB"));
+    assert(br.map((b) => b.label).join(",") === "Low,Mid,High",
+      "boxRows = the 3 box NETs, not the diff / mean (" + br.map((b) => b.label) + ")");
+    const mask = TR.stats.mask([{ q: "QB", rows: [2], box: true }]);
+    assert(TR.stats.maskCount(mask) === 2, "box filter (High) matches 2 respondents");
+    const spec = TR.stats.columnsFor("custom:QB:net");
+    assert(spec.columns.map((c) => c.label).join("|") === "Total|Low|Mid|High",
+      "box banner columns = Total + the 3 boxes");
+    const counts = spec.columns.map((c) => c.member ? c.member.reduce((a, b) => a + b, 0) : 6);
+    assert(counts.join(",") === "6,2,2,2", "each box column has 2 members (got " + counts + ")");
+    const m = TR.model.forQuestion("QB", null, [{ q: "QB", rows: [2], box: true }]);
+    assert(m.source === "computed" && m.columns[0].base === 2,
+      "box-filtered base = 2 promoters (got " + m.columns[0].base + ")");
+  } finally {
+    TR.AGG = saved.agg; TR.MICRO = saved.micro; TR.PREV = saved.prev; TR.d2._qIndex = saved.idx;
+  }
+});
+
+run("Box filters round-trip through the URL hash", () => {
+  const saved = { f: TR.d2.state.filters, agg: TR.AGG, micro: TR.MICRO, idx: TR.d2._qIndex };
+  try {
+    TR.AGG = { questions: [{ code: "QB", rows: [{ kind: "net", label: "Low" },
+      { kind: "net", label: "High" }] }], columns: [], banner_groups: [] };
+    TR.MICRO = { boxes: { QB: [0, 1] } };
+    TR.d2._qIndex = null;
+    TR.d2.state.filters = [{ q: "QB", box: true, rows: [1] }];
+    const hash = TR.d2.encodeHash();
+    assert(/filter=QB:b1/.test(hash), "box filter encodes with a 'b' marker (" + hash + ")");
+    TR.d2.state.filters = [];
+    TR.d2.decodeHash(hash);
+    assert(TR.d2.state.filters.length === 1 && TR.d2.state.filters[0].box === true &&
+      TR.d2.state.filters[0].rows[0] === 1, "box flag + rows survive the round-trip");
+  } finally {
+    TR.d2.state.filters = saved.f; TR.AGG = saved.agg;
+    TR.MICRO = saved.micro; TR.d2._qIndex = saved.idx;
+  }
+});
+
+run("Total-only study: custom box banner works; no empty-banner deref", () => {
+  // CCS-style report with no banner groups. firstBanner() is "", the custom box
+  // banner still yields columns, and the differences view (which reduces a
+  // custom banner to firstBanner) returns no findings without throwing.
+  const agg = { schema_version: 2,
+    project: { name: "B", low_base_threshold: 1, alpha: 0.05, tracking: { enabled: false } },
+    columns: [{ key: "TOTAL::Total", group: "total", label: "Total", letter: "" }],
+    banner_groups: [], categories: ["c"],
+    questions: [{ code: "QB", title: "NPS", category: "c", type: "scale",
+      bases: [{ n: 4, low: false }],
+      rows: [{ kind: "net", label: "Low", pct: [50], n: [2], sig: [""] },
+             { kind: "net", label: "High", pct: [50], n: [2], sig: [""] }] }] };
+  const saved = { agg: TR.AGG, micro: TR.MICRO, prev: TR.PREV, idx: TR.d2._qIndex };
+  try {
+    TR.AGG = agg; TR.PREV = null; TR.d2._qIndex = null;
+    TR.MICRO = { n: 4, answers: { QB: [null, null, null, null] }, banner_vars: {},
+      weights: [1, 1, 1, 1], boxes: { QB: [0, 1, 0, 1] } };
+    assert(TR.d2.firstBanner() === "", "firstBanner() is empty for a Total-only study");
+    const m = TR.model.forQuestion("QB", "custom:QB:net", []);
+    assert(m && m.columns.length === 3, "custom box banner = Total + 2 box columns");
+    assert(m.columns[1].base === 2 && m.columns[2].base === 2, "box columns recompute their bases");
+    const f = TR.views._collectFindings(TR.d2.firstBanner());
+    assert(Array.isArray(f) && f.length === 0, "Total-only differences = no findings, no crash");
+  } finally {
+    TR.AGG = saved.agg; TR.MICRO = saved.micro; TR.PREV = saved.prev; TR.d2._qIndex = saved.idx;
+  }
+});
+
 run("stacked chart export is transposed (segments=series, columns=bars)", () => {
   // Regression: the PPTX stacked export reused the bar layout (rows as
   // categories, one series per column), so each option rendered as its own

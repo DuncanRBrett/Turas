@@ -46,12 +46,17 @@
     (filters || []).forEach(function (f) {
       var answers = TR.MICRO.answers[f.q];
       var banner = TR.MICRO.banner_vars[f.q];
+      var boxes = f.box && TR.MICRO.boxes ? TR.MICRO.boxes[f.q] : null;
       var wanted = {};
       f.rows.forEach(function (ri) { wanted[ri] = true; });
       for (var r = 0; r < n; r++) {
         if (!mask[r]) continue;
         var hit = false;
-        if (answers) {
+        if (boxes) {
+          // hidden-scale box filter: match per-respondent box membership
+          var b = boxes[r];
+          hit = b !== null && b !== undefined && !!wanted[b];
+        } else if (answers) {
           var a = answers[r];
           if (Array.isArray(a)) {
             for (var j = 0; j < a.length; j++) {
@@ -99,6 +104,16 @@
     return member;
   }
 
+  /** Membership array for a box-category row index, from per-respondent boxes.
+   *  Box index equals the row index (mirrors stats.boxCounts / d2.boxRows). */
+  function boxMemberArray(boxes, n, boxRi) {
+    var member = new Uint8Array(n);
+    for (var r = 0; r < n; r++) {
+      if (boxes[r] === boxRi) member[r] = 1;
+    }
+    return member;
+  }
+
   stats.columnsFor = function (banner) {
     var n = TR.MICRO.n;
     var columns = [{ label: "Total", letter: "", member: null }];
@@ -118,16 +133,26 @@
         }).forEach(function (ri) {
           defs.push({ label: q.rows[ri].label, members: q.net_members[String(ri)] });
         });
+        // hidden-scale questions publish only boxes (no shown categories to
+        // decompose into) — make each box NET row a column via box membership.
+        if (!defs.length) {
+          TR.d2.boxRows(q).forEach(function (br) {
+            defs.push({ label: br.label, boxRi: br.index });
+          });
+        }
       }
       if (!defs.length) {
         TR.d2.catRows(q).forEach(function (cat) {
           defs.push({ label: cat.label, members: [cat.index] });
         });
       }
+      var boxes = TR.MICRO.boxes && TR.MICRO.boxes[code];
       defs.forEach(function (def) {
         columns.push({ label: def.label,
           letter: String.fromCharCode(65 + (letterAt++ % 26)),
-          member: memberArray(answers, n, def.members) });
+          member: def.boxRi !== undefined
+            ? boxMemberArray(boxes, n, def.boxRi)
+            : memberArray(answers, n, def.members) });
       });
       return { columns: columns, custom: true, source: q, mode: mode };
     }

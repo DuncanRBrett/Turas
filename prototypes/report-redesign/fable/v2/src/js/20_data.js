@@ -148,6 +148,14 @@
     return out;
   };
 
+  /** First built-in banner id, or "" for a Total-only report (no banner
+   *  groups). Used wherever a custom / heat banner falls back to a real one so
+   *  Total-only studies never dereference an empty banner_groups list. */
+  d2.firstBanner = function () {
+    return (TR.AGG.banner_groups && TR.AGG.banner_groups.length)
+      ? TR.AGG.banner_groups[0].id : "";
+  };
+
   /** Ordered categories with their question codes. */
   d2.categories = function () {
     var seen = {}, order = [];
@@ -166,6 +174,25 @@
     var out = [];
     q.rows.forEach(function (r, i) {
       if (r.kind === "category") out.push({ index: i, label: r.label });
+    });
+    return out;
+  };
+
+  /** Box-category NET rows of a hidden-scale question — groupings that exist
+   *  only as per-respondent box membership (TR.MICRO.boxes), with no shown
+   *  category rows to decompose into. These back box filters and the box
+   *  custom-banner. The box index equals the row index (mirrors the box
+   *  recompute in netRow / stats.boxCounts). Empty when the question has no box
+   *  membership, or its NETs decompose into shown categories (net_members). */
+  d2.boxRows = function (q) {
+    if (!TR.MICRO || !TR.MICRO.boxes || !TR.MICRO.boxes[q.code]) return [];
+    var out = [];
+    q.rows.forEach(function (r, ri) {
+      var isDiff = !!(q.net_diffs && q.net_diffs[String(ri)]);
+      var hasMembers = !!(q.net_members && q.net_members[String(ri)]);
+      if (r.kind === "net" && !isDiff && !hasMembers) {
+        out.push({ index: ri, label: r.label });
+      }
     });
     return out;
   };
@@ -190,7 +217,7 @@
     if (s.heatmap !== "bars") parts.push("heat=" + s.heatmap);
     if (s.filters.length) {
       parts.push("filter=" + s.filters.map(function (f) {
-        return f.q + ":" + f.rows.join(",");
+        return f.q + ":" + (f.box ? "b" : "") + f.rows.join(",");
       }).join("|"));
     }
     return "#" + parts.join("&");
@@ -212,16 +239,26 @@
       if (k === "filter") {
         s.filters = v.split("|").map(function (part) {
           var bits = part.split(":");
-          return { q: bits[0], rows: (bits[1] || "").split(",")
-            .map(Number).filter(function (x) { return !isNaN(x); }) };
+          var spec = bits[1] || "", box = spec.charAt(0) === "b";
+          return { q: bits[0], box: box,
+            rows: (box ? spec.slice(1) : spec).split(",")
+              .map(Number).filter(function (x) { return !isNaN(x); }) };
         }).filter(function (f) {
           if (!f.q || !f.rows.length) return false;
-          // a typo'd or crafted hash must not silently zero every base:
-          // the question must exist and every row index must be one of
-          // its category rows (boot decodes after the islands parse)
+          // a typo'd or crafted hash must not silently zero every base: the
+          // question must exist and every row index must be a real filterable
+          // value — a category row, or a box NET row for box filters (boot
+          // decodes after the islands parse).
           if (!TR.AGG) return true;
           var q = d2.questionByCode(f.q);
-          return !!q && f.rows.every(function (ri) {
+          if (!q) return false;
+          if (f.box) {
+            return !!(TR.MICRO && TR.MICRO.boxes && TR.MICRO.boxes[f.q]) &&
+              f.rows.every(function (ri) {
+                return q.rows[ri] && q.rows[ri].kind === "net";
+              });
+          }
+          return f.rows.every(function (ri) {
             return q.rows[ri] && q.rows[ri].kind === "category";
           });
         });
