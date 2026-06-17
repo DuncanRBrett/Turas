@@ -864,6 +864,41 @@ run("Total-only study: custom box banner works; no empty-banner deref", () => {
   }
 });
 
+run("Differences view: drops tautological standouts (answer exclusive to a group)", () => {
+  // The S03 Plant case: each centre is 100% "its own plant" vs 0% of the rest —
+  // a defining trait, not a discovered difference. A categorical finding whose
+  // rest rounds to 0% (or 100%) is suppressed; a normal one (rest 20%) stays.
+  const agg = { schema_version: 2,
+    project: { name: "B", low_base_threshold: 1, alpha: 0.05, tracking: { enabled: false } },
+    columns: [{ key: "T::Total", group: "total", label: "Total", letter: "" },
+              { key: "G::A", group: "G", label: "A", letter: "A" },
+              { key: "G::B", group: "G", label: "B", letter: "B" },
+              { key: "G::C", group: "G", label: "C", letter: "C" }],
+    banner_groups: [{ id: "G", name: "G" }], categories: ["c"],
+    questions: [{ code: "QX", title: "Plant", category: "c", type: "single",
+      bases: [{ n: 60, low: false }, { n: 20, low: false }, { n: 20, low: false }, { n: 20, low: false }],
+      rows: [{ kind: "category", label: "Excl", pct: [17, 50, 0, 0], n: [10, 10, 0, 0], sig: ["", "BC", "", ""] },
+             { kind: "category", label: "Shared", pct: [30, 50, 20, 20], n: [18, 10, 4, 4], sig: ["", "BC", "", ""] },
+             { kind: "category", label: "Other", pct: [53, 0, 80, 80], n: [32, 0, 16, 16], sig: ["", "", "", ""] }] }] };
+  const saved = { agg: TR.AGG, micro: TR.MICRO, prev: TR.PREV, idx: TR.d2._qIndex };
+  try {
+    TR.AGG = agg; TR.PREV = null; TR.d2._qIndex = null;
+    const ans = [], bv = [], w = [];
+    for (let i = 0; i < 20; i++) { ans.push(i < 10 ? 0 : 1); bv.push(1); w.push(1); } // A: 10 Excl, 10 Shared
+    for (let i = 0; i < 20; i++) { ans.push(i < 4 ? 1 : 2); bv.push(2); w.push(1); }  // B: 4 Shared, 16 Other
+    for (let i = 0; i < 20; i++) { ans.push(i < 4 ? 1 : 2); bv.push(3); w.push(1); }  // C: 4 Shared, 16 Other
+    TR.MICRO = { n: 60, answers: { QX: ans }, banner_vars: { G: bv }, weights: w };
+    const f = TR.views._collectFindings("G");
+    assert(!f.some((x) => x.label === "Excl"),
+      "exclusive answer (rest 0%) is suppressed as definitional");
+    const shared = f.find((x) => x.label === "Shared");
+    assert(shared, "a normal answer (rest 20%) survives");
+    assert(Math.round(shared.rest) === 20, "kept finding has rest 20% (got " + shared.rest + ")");
+  } finally {
+    TR.AGG = saved.agg; TR.MICRO = saved.micro; TR.PREV = saved.prev; TR.d2._qIndex = saved.idx;
+  }
+});
+
 run("stacked chart export is transposed (segments=series, columns=bars)", () => {
   // Regression: the PPTX stacked export reused the bar layout (rows as
   // categories, one series per column), so each option rendered as its own

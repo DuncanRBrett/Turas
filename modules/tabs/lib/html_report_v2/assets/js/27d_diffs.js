@@ -154,6 +154,11 @@
           if (cell.pct === null || overall === null) return;
           var rest = restPct(q, ri, spec ? spec.columns[i].member : null, mask,
             cell, row.cells[0], model.columns[i].base, model.columns[0].base);
+          // An answer no one outside the group gives (rest 0%) — or that
+          // everyone but this group gives (rest 100%) — is a defining trait of
+          // the group, not a discovered difference (e.g. a plant that exists
+          // only in its own region). Drop these tautological standouts.
+          if (rest !== null && (Math.round(rest) === 0 || Math.round(rest) === 100)) return;
           var baseline = rest === null ? overall : rest;
           var letters = is95 ? solid : solid + soft80;
           findings.push({ code: q.code, title: q.title, category: q.category,

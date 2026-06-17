@@ -131,6 +131,11 @@
     else if (d2.state.tab === "findings") TR.views.findings(host);
     else if (d2.state.tab === "story") TR.story2.renderTab(host);
     else TR.report.renderTab(host);
+    // The audience filter recomputes from this wave's microdata; prior waves
+    // are pre-aggregated, so a filter can't apply on Tracking. Hide the bar
+    // there rather than offer a control that does nothing.
+    var fb = document.getElementById("filterbar");
+    if (fb) fb.hidden = d2.state.tab === "moved";
     d2.pushHash();
   };
 
