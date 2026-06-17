@@ -509,6 +509,12 @@ run("Tracking Summary: 'Nearly significant' cards render in dual mode (subproces
   assert(res.status === 0, "tracking render failed:\n" + res.stdout);
 });
 
+run("AI insights: read-only callouts / exec summary / methodology render (subprocess)", () => {
+  const res = spawnSync("node", [path.join(BASE, "tests", "ai_render.mjs")],
+    { encoding: "utf8" });
+  assert(res.status === 0, "AI insights render failed:\n" + res.stdout);
+});
+
 run("box-category NETs recompute from per-respondent box membership", () => {
   // A hidden-scale rating that publishes only its boxes: rows Low(0) / High(1) /
   // NET POSITIVE(2) / Mean(3). boxes [0,1,0,1,null] -> Low 2/4=50%, High 50%,

@@ -102,6 +102,9 @@
         fmt.escapeHtml(secVal) + "</textarea></div>");
     });
 
+    // AI-assisted key findings (read-only, labelled) — shown only when present.
+    html.push(TR.ai.execSummaryHtml());
+
     html.push('<div class="card"><h3>Added slides</h3><p>Import exhibits from outside ' +
       "this study — e.g. qual-phase slides exported as images (in PowerPoint: " +
       "right-click a slide → Save as Picture), or plain text blocks.</p>" +
@@ -156,7 +159,7 @@
           "tables (Campus crosses exact; other banners mean |error| " +
           (ok.mean_abs_err_pp !== undefined ? ok.mean_abs_err_pp.toFixed(1) : "≈2") +
           "pp on healthy bases). A production build embeds real anonymised data."
-        : "") + "</p>";
+        : "") + "</p>" + TR.ai.methodologyHtml();
   }
 
   function wire(host) {

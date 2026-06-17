@@ -502,6 +502,95 @@ build_dl_comments <- function(config_obj) {
 }
 
 
+#' Human-readable AI model attribution for the methodology note
+#'
+#' Mirrors get_model_display_name() in modules/shared/lib/ai/ai_provider.R, kept
+#' inline so the data layer carries no dependency on the AI modules being
+#' sourced. Known model IDs get a friendly name; others show verbatim.
+#'
+#' @param cfg The AI sidecar's `config` list (model + provider)
+#' @return Character display string, e.g. "Claude Sonnet 4.6 (Anthropic)"
+#' @keywords internal
+.dl_ai_model_display <- function(cfg) {
+  model    <- cfg$model %||% "AI model"
+  provider <- cfg$provider %||% "anthropic"
+  pretty <- list(
+    "claude-sonnet-4-6" = "Claude Sonnet 4.6",
+    "claude-opus-4-8"   = "Claude Opus 4.8"
+  )[[model]]
+  if (!is.null(pretty)) model <- pretty
+  label <- list(
+    anthropic = "Anthropic", openai = "OpenAI",
+    google = "Google", ollama = "Ollama (local)"
+  )[[provider]] %||% provider
+  sprintf("%s (%s)", model, label)
+}
+
+
+#' Per-question AI insights from the AI sidecar (file I/O)
+#'
+#' Reads the AI insights JSON sidecar that the classic HTML report generates
+#' (\code{<config>_ai_insights.json}) and shapes it for the v2 data layer: the
+#' per-question callouts the model flagged as noteworthy, the executive summary,
+#' and a human-readable model attribution. Returns NULL when AI insights are
+#' disabled, the sidecar is absent/unreadable, or nothing noteworthy exists — so
+#' the \code{ai} key is omitted and AI-free reports stay byte-identical.
+#'
+#' This helper performs file I/O and therefore lives OUTSIDE the pure
+#' build_data_layer(); callers read it once and pass the result via \code{ai}.
+#'
+#' @param config_obj Configuration object (needs enable_ai_insights +
+#'   config_file_path)
+#' @return A list \code{{model, callouts, execSummary}} or NULL
+#' @keywords internal
+build_dl_ai <- function(config_obj) {
+  if (!isTRUE(config_obj$enable_ai_insights)) return(NULL)
+  cfp <- config_obj$config_file_path %||% ""
+  if (!nzchar(cfp)) return(NULL)
+  sidecar_path <- paste0(tools::file_path_sans_ext(cfp), "_ai_insights.json")
+  if (!file.exists(sidecar_path)) return(NULL)
+
+  sc <- tryCatch(
+    jsonlite::fromJSON(paste(readLines(sidecar_path, warn = FALSE), collapse = "\n"),
+                       simplifyVector = FALSE),
+    error = function(e) NULL)
+  if (is.null(sc) || !isTRUE(sc$config$enabled)) return(NULL)
+
+  blank <- function(x) {
+    v <- trimws(as.character(x %||% ""))
+    !nzchar(v) || identical(v, "NA")
+  }
+
+  # Per-question callouts — only those the model flagged as noteworthy.
+  callouts <- list()
+  qs <- sc$questions %||% list()
+  for (code in names(qs)) {
+    co <- qs[[code]]$ai_callout
+    if (is.null(co) || !isTRUE(co$has_insight) || blank(co$narrative)) next
+    conf  <- co$confidence %||% "high"
+    entry <- list(text = trimws(as.character(co$narrative)), confidence = conf)
+    if (!blank(co$data_limitations) && conf %in% c("medium", "low")) {
+      entry$caveat <- trimws(as.character(co$data_limitations))
+    }
+    callouts[[code]] <- entry
+  }
+
+  # Executive summary (carry the verified flag so the renderer can label drafts).
+  exec <- NULL
+  es <- sc$executive_summary
+  if (!is.null(es) && !blank(es$narrative)) {
+    exec <- list(text = trimws(as.character(es$narrative)), verified = isTRUE(es$verified))
+  }
+
+  if (length(callouts) == 0L && is.null(exec)) return(NULL)
+
+  out <- list(model = .dl_ai_model_display(sc$config))
+  if (length(callouts) > 0L) out$callouts <- callouts
+  if (!is.null(exec)) out$execSummary <- exec
+  out
+}
+
+
 #' Build the complete data-agg structure (pure — no file I/O)
 #'
 #' @param all_results List of question results
@@ -511,10 +600,13 @@ build_dl_comments <- function(config_obj) {
 #'   scale/NPS questions carry index_scores for live mean recompute
 #' @param tracking_enabled Logical; sets project.tracking.enabled (the Tracking
 #'   tab also requires a prior-wave island to actually appear)
+#' @param ai Optional AI insights structure from build_dl_ai() (callouts +
+#'   executive summary + model attribution). NULL omits the \code{ai} key.
 #' @return A list mirroring the data-agg JSON shape
 #' @export
 build_data_layer <- function(all_results, banner_info, config_obj,
-                             survey_structure = NULL, tracking_enabled = FALSE) {
+                             survey_structure = NULL, tracking_enabled = FALSE,
+                             ai = NULL) {
   project <- build_dl_project(config_obj, tracking_enabled = tracking_enabled)
   low_base <- project$low_base_threshold
 
@@ -539,6 +631,10 @@ build_data_layer <- function(all_results, banner_info, config_obj,
   # insight boxes. Omitted entirely when none are configured.
   comments <- build_dl_comments(config_obj)
   if (!is.null(comments)) dl$comments <- comments
+
+  # AI callouts + executive summary (read from the AI sidecar by the caller and
+  # passed in). Omitted entirely when AI insights are off or nothing surfaced.
+  if (!is.null(ai)) dl$ai <- ai
   dl
 }
 
@@ -604,7 +700,8 @@ write_data_layer <- function(all_results, banner_info, config_obj,
   }
 
   data_layer <- tryCatch(
-    build_data_layer(all_results, banner_info, config_obj, survey_structure),
+    build_data_layer(all_results, banner_info, config_obj, survey_structure,
+                     ai = build_dl_ai(config_obj)),
     error = function(e) e)
   if (inherits(data_layer, "error")) {
     return(refuse("DATA_LAYER_BUILD_FAILED", conditionMessage(data_layer),

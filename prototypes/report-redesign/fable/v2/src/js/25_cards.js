@@ -418,6 +418,9 @@
       html += TR.render.waveStripHtml(model);
     }
 
+    // Read-only AI callout (labelled, distinct from the analyst note below).
+    html += TR.ai.calloutHtml(model.code);
+
     var bannerName = TR.d2.bannerDescription().replace("Banner: ", "");
     html += '<div class="insight"><div class="insight-head">Analyst insight · ' +
       fmt.escapeHtml(TR.charts.clip(bannerName, 30)) +

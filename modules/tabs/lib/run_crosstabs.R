@@ -693,7 +693,8 @@ if (.html_report_v2_on) {
       dl <- build_data_layer(analysis_result$all_results,
                              analysis_result$banner_info,
                              config_result$config_obj,
-                             data_result$survey_structure)
+                             data_result$survey_structure,
+                             ai = build_dl_ai(config_result$config_obj))
 
       # Anonymised microdata island (per-respondent indices + weights) so the
       # live filter bar + "+ Custom…" banner light up and recompute weighted

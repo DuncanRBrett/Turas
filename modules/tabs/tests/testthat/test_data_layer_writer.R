@@ -571,3 +571,83 @@ test_that("build_config_object recognises the v2 settings", {
   expect_equal(cfg2$sampling_method, "Random")
   expect_equal(cfg2$wave, "2026")
 })
+
+# ==============================================================================
+# AI insights (build_dl_ai + dl$ai)
+# ==============================================================================
+
+context("data_layer_writer: AI insights")
+
+# Write a synthetic AI sidecar next to a temp config path and return the config.
+write_ai_sidecar_fixture <- function(cfg_path, sidecar) {
+  path <- paste0(tools::file_path_sans_ext(cfg_path), "_ai_insights.json")
+  writeLines(jsonlite::toJSON(sidecar, auto_unbox = TRUE, pretty = TRUE, null = "null"),
+             path)
+  path
+}
+
+make_ai_sidecar <- function(enabled = TRUE, exec_verified = FALSE) {
+  list(
+    config = list(enabled = enabled, provider = "anthropic", model = "claude-opus-4-8"),
+    questions = list(
+      Q1 = list(ai_callout = list(has_insight = TRUE,
+                                  narrative = "Two-thirds reported no lost hours.",
+                                  confidence = "high", data_limitations = "")),
+      Q2 = list(ai_callout = list(has_insight = FALSE, narrative = "", confidence = "low")),
+      Q3 = list(ai_callout = list(has_insight = TRUE, narrative = "Small-base signal.",
+                                  confidence = "low", data_limitations = "n=12 base"))),
+    executive_summary = list(narrative = "Finding one.\n\nFinding two.",
+                             verified = exec_verified))
+}
+
+test_that(".dl_ai_model_display prettifies known IDs and passes others through", {
+  expect_equal(.dl_ai_model_display(list(model = "claude-sonnet-4-6", provider = "anthropic")),
+               "Claude Sonnet 4.6 (Anthropic)")
+  expect_equal(.dl_ai_model_display(list(model = "claude-opus-4-8", provider = "anthropic")),
+               "Claude Opus 4.8 (Anthropic)")
+  expect_equal(.dl_ai_model_display(list(model = "gpt-4.1", provider = "openai")),
+               "gpt-4.1 (OpenAI)")
+})
+
+test_that("build_dl_ai surfaces only noteworthy callouts + the exec summary", {
+  cfg_path <- tempfile(fileext = ".xlsx")
+  side_path <- write_ai_sidecar_fixture(cfg_path, make_ai_sidecar())
+  on.exit(unlink(side_path))
+
+  ai <- build_dl_ai(list(enable_ai_insights = TRUE, config_file_path = cfg_path))
+  expect_false(is.null(ai))
+  expect_equal(ai$model, "Claude Opus 4.8 (Anthropic)")
+  expect_equal(sort(names(ai$callouts)), c("Q1", "Q3"))     # Q2 has_insight FALSE → dropped
+  expect_equal(ai$callouts$Q1$text, "Two-thirds reported no lost hours.")
+  expect_null(ai$callouts$Q1$caveat)                        # high confidence → no caveat
+  expect_equal(ai$callouts$Q3$caveat, "n=12 base")          # low confidence → caveat kept
+  expect_false(ai$execSummary$verified)
+  expect_match(ai$execSummary$text, "Finding one")
+})
+
+test_that("build_dl_ai returns NULL when disabled, sidecar missing, or sidecar disabled", {
+  cfg_path <- tempfile(fileext = ".xlsx")
+  side_path <- write_ai_sidecar_fixture(cfg_path, make_ai_sidecar(enabled = TRUE))
+  on.exit(unlink(side_path))
+
+  expect_null(build_dl_ai(list(enable_ai_insights = FALSE, config_file_path = cfg_path)))
+  expect_null(build_dl_ai(list(enable_ai_insights = TRUE, config_file_path = tempfile())))
+
+  disabled_path <- write_ai_sidecar_fixture(tempfile(fileext = ".xlsx"),
+                                            make_ai_sidecar(enabled = FALSE))
+  on.exit(unlink(disabled_path), add = TRUE)
+  expect_null(build_dl_ai(list(enable_ai_insights = TRUE,
+                               config_file_path = sub("_ai_insights\\.json$", ".xlsx", disabled_path))))
+})
+
+test_that("dl$ai is attached when ai is supplied and omitted otherwise", {
+  ai <- list(model = "Claude Opus 4.8 (Anthropic)",
+             callouts = list(Q1 = list(text = "x", confidence = "high")))
+  dl_with <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+                              make_dl_config(), ai = ai)
+  expect_equal(dl_with$ai$model, "Claude Opus 4.8 (Anthropic)")
+  expect_equal(dl_with$ai$callouts$Q1$text, "x")
+
+  dl_without <- build_data_layer(make_dl_results(), make_dl_banner_info(), make_dl_config())
+  expect_false("ai" %in% names(dl_without))                 # AI-free reports unchanged
+})

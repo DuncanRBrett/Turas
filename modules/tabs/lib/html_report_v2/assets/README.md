@@ -6,9 +6,10 @@ Bundled at run time by `../build_report_v2.R` into a single self-contained
 
 ## Contents
 
-- `js/` — 29 modules: the 5 shared engine modules (`00_namespace`, `01_format`,
-  `03_svg`, `13_zip`, `14_pptx_parts`) load first, then the 24 v2 modules
-  (`20_*`–`32_*`). `bundle_report_v2_js()` enforces that order.
+- `js/` — 30 modules: the 5 shared engine modules (`00_namespace`, `01_format`,
+  `03_svg`, `13_zip`, `14_pptx_parts`) load first, then the 25 v2 modules
+  (`20_*`–`32_*`, including `28a_ai` for read-only AI insights).
+  `bundle_report_v2_js()` enforces that order.
 - `styles.css` — the report stylesheet.
 - `template.html` — the shell with the `{{TITLE}}`, `{{CSS}}`, `{{JS}}` and the
   four data-island tokens (`{{DATA_AGG}}`, `{{DATA_MICRO}}`, `{{DATA_PREV}}`,
