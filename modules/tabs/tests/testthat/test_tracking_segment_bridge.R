@@ -36,6 +36,7 @@ make_seg <- function(text, mtype, w1, w2, field = "mean") {
   wr <- function(v, n) {
     x <- list(n_unweighted = n, available = TRUE)
     x[[field]] <- v
+    if (identical(field, "mean")) x$sd <- 1.5   # tracker supplies SD for means
     x
   }
   list(metric_type = mtype, question_text = text,
@@ -94,6 +95,8 @@ test_that("Total + per-segment means and bases carried (W1, Q1)", {
   expect_equal(q$seg_stats[["gauteng"]]$mean, 7.2)
   expect_equal(q$bases[["western cape"]], 85)
   expect_equal(q$bases[["gauteng"]], 75)
+  expect_equal(q$stats$sd, 1.5)                       # mean SD carried for the Welch test
+  expect_equal(q$seg_stats[["western cape"]]$sd, 1.5)
 })
 
 test_that("NPS question carries nps under stats/seg_stats (W2, Q2)", {
@@ -101,6 +104,7 @@ test_that("NPS question carries nps under stats/seg_stats (W2, Q2)", {
   expect_equal(q2$stats$nps, 35)
   expect_equal(q2$seg_stats[["gauteng"]]$nps, 42)
   expect_equal(q2$match_key, "recommend")
+  expect_null(q2$stats$sd)                            # NPS carries no SD
 })
 
 test_that("segments list uses normalised column-label keys + group", {
@@ -117,7 +121,7 @@ test_that("question carries exactly the locked island fields", {
 
 test_that("serialises stats/seg_stats/bases as JSON objects, not arrays", {
   j <- as.character(jsonlite::toJSON(res[[1]]$questions[[1]], auto_unbox = TRUE))
-  expect_match(j, '"stats":\\{"mean":7\\}')
+  expect_match(j, '"stats":\\{"mean":7')             # object, mean auto-unboxed (sd follows)
   expect_match(j, '"seg_stats":\\{')
   expect_match(j, '"bases":\\{')
 })

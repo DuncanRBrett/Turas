@@ -465,6 +465,47 @@ run("per-segment prior-wave PROPORTIONS flow through the wave API", () => {
   }
 });
 
+run("per-segment mean trend carries a stored SD so significance can be tested", () => {
+  // Phase 2 (significance): a stored seg_stats[seg].sd lets the renderer's Welch
+  // test flag a wave-on-wave move on adequate base, without the distribution.
+  const saved = { agg: TR.AGG, prev: TR.PREV, micro: TR.MICRO, idx: TR.d2._qIndex };
+  try {
+    TR.AGG = { schema_version: 2,
+      project: { name: "Seg", low_base_threshold: 30, tracking: { enabled: true } },
+      columns: [
+        { key: "TOTAL::Total", group: "total", label: "Total", letter: "" },
+        { key: "REGION::WC", group: "Region", label: "Western Cape", letter: "a" }],
+      banner_groups: [{ id: "Region", name: "Region" }], categories: ["c"],
+      questions: [{ code: "Q1", title: "Overall satisfaction", category: "c", type: "scale",
+        bases: [{ n: 200, low: false }, { n: 100, low: false }],
+        rows: [{ kind: "mean", label: "Mean", pct: [7.0, 7.0], n: [null, null], sig: ["", ""] }] }] };
+    TR.MICRO = null; TR.d2._qIndex = null;
+    const wq = (wcMean, base) => ({
+      match_key: "overall satisfaction", title: "Overall satisfaction", base: base,
+      stats: { mean: wcMean, sd: 1.0 }, seg_stats: { "western cape": { mean: wcMean, sd: 1.0 } },
+      bases: { "western cape": base } });
+    const segs = [{ norm: "western cape" }];
+    TR.PREV = { waves: [
+      { wave: "W1", year: 2024, segments: segs, questions: [wq(6.0, 100)] },
+      { wave: "W2", year: 2025, segments: segs, questions: [wq(7.5, 100)] }] };
+    TR.waves.reset();
+    const q = TR.AGG.questions[0], row = q.rows[0];
+    const wc = TR.waves.series(q, row, 0, "western cape");
+    assert(wc.length === 2 && wc[0].sd === 1.0 && wc[1].sd === 1.0,
+      "series carries the stored segment SD");
+    const cells = TR.waves.cellsFor(wc, false, "95");
+    assert(cells[1].sig_prev === true,
+      "a large WC mean move (6.0->7.5, sd 1.0, n 100) flags significant");
+    TR.PREV.waves[1].questions[0] = wq(6.05, 100);
+    TR.waves.reset();
+    const trivial = TR.waves.cellsFor(TR.waves.series(q, row, 0, "western cape"), false, "95");
+    assert(trivial[1].sig_prev === false, "a trivial move (6.0->6.05) is not significant");
+  } finally {
+    TR.AGG = saved.agg; TR.PREV = saved.prev; TR.MICRO = saved.micro; TR.d2._qIndex = saved.idx;
+    TR.waves.reset();
+  }
+});
+
 run("PPTX image deck: PNG slides pack into a structurally valid deck (python)", () => {
   // The "download as PNGs" path renders each card to a PNG and packs it as a
   // full-slide image. Validates imageSlide + the packer's media-part support.

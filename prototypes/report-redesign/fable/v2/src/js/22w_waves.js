@@ -285,6 +285,11 @@
    *  exactly from that wave's published category distribution. */
   waves.sdAtWave = function (q, row, waveQ, seg) {
     if (!seg && waveQ.scores) return sdOfScores(waveQ.scores, waveQ.weights);  // microdata
+    // Computed-totals history: a stored SD (Total waveQ.stats.sd or per-segment
+    // seg_stats[seg].sd, supplied by the tracker) lets the Welch test run without
+    // a published distribution. Absent (e.g. SACAP) -> fall back to the dist.
+    var st = seg ? (waveQ.seg_stats || {})[seg] : waveQ.stats;
+    if (st && st.sd !== undefined && st.sd !== null) return st.sd;
     var scores = waves.scoreMap(q, row);
     if (!scores) return null;
     var pairs = [];

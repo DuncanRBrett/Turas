@@ -115,21 +115,33 @@ tracker_segment_contributions <- function(trend_results, segments_meta, waves_me
 
       q <- NULL
       if (mtype %in% mean_kinds) {
-        # mean-kind: one value per segment under stats / seg_stats
+        # mean-kind: one value per segment under stats / seg_stats. Means also
+        # carry the SD (NPS has none) so the renderer's Welch test can run on
+        # the trend without the published distribution.
         stat_field <- if (identical(mtype, "nps")) "nps" else "mean"
-        tv <- num_or_null(if (identical(stat_field, "nps")) tot_wr$nps else tot_wr$mean)
-        if (is.null(tv)) next
+        is_mean <- identical(stat_field, "mean")
+        mk_stat <- function(wr) {
+          v <- num_or_null(if (is_mean) wr$mean else wr$nps)
+          if (is.null(v)) return(NULL)
+          s <- .tsb_stat(stat_field, v)
+          if (is_mean) {
+            sd <- num_or_null(wr$sd)
+            if (!is.null(sd)) s$sd <- sd
+          }
+          s
+        }
+        tot_stat <- mk_stat(tot_wr)
+        if (is.null(tot_stat)) next
         seg_stats <- list(); bases <- list()
         for (bk in breakouts) {
           swr <- wr_of(q_segs[[bk$seg_name]]); if (is.null(swr)) next
-          sv <- num_or_null(if (identical(stat_field, "nps")) swr$nps else swr$mean)
-          if (is.null(sv)) next
-          seg_stats[[bk$key]] <- .tsb_stat(stat_field, sv)
+          ss <- mk_stat(swr); if (is.null(ss)) next
+          seg_stats[[bk$key]] <- ss
           bases[[bk$key]] <- base_of(swr)
           seg_present[[bk$key]] <- list(norm = bk$key, label = bk$label, group = bk$group)
         }
         q <- list(match_key = tracking_norm(title), title = title,
-                  base = base_of(tot_wr), stats = .tsb_stat(stat_field, tv),
+                  base = base_of(tot_wr), stats = tot_stat,
                   seg_stats = seg_stats, bases = bases)
 
       } else if (identical(mtype, "proportions")) {
