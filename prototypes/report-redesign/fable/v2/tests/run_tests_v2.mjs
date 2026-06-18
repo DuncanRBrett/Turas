@@ -371,6 +371,55 @@ run("audience filter suppresses wave deltas/trend (prior waves are full-sample t
     "filtered model carries no wave deltas or trend series");
 });
 
+run("per-segment prior-wave trends: published segment values flow through the wave API", () => {
+  // Phase 1a (segment wave trends): the renderer already reads per-segment hooks
+  // (seg_stats / bases) but the writer never populated them. This locks the
+  // island schema and proves waves.series(q,row,ri,seg) returns the published
+  // per-segment values + bases for prior waves (Total stays seg = null).
+  const saved = { agg: TR.AGG, prev: TR.PREV, micro: TR.MICRO, idx: TR.d2._qIndex };
+  try {
+    TR.AGG = { schema_version: 2,
+      project: { name: "Seg", low_base_threshold: 30, tracking: { enabled: true } },
+      columns: [
+        { key: "TOTAL::Total", group: "total", label: "Total", letter: "" },
+        { key: "REGION::WC", group: "Region", label: "Western Cape", letter: "a" },
+        { key: "REGION::GP", group: "Region", label: "Gauteng", letter: "b" }],
+      banner_groups: [{ id: "Region", name: "Region" }], categories: ["c"],
+      questions: [{ code: "Q1", title: "Overall satisfaction", category: "c", type: "scale",
+        bases: [{ n: 200, low: false }, { n: 90, low: false }, { n: 80, low: false }],
+        rows: [{ kind: "mean", label: "Mean", pct: [7.6, 7.4, 7.8],
+          n: [null, null, null], sig: ["", "", ""] }] }] };
+    TR.MICRO = null; TR.d2._qIndex = null;
+    // a prior-wave question payload carrying Total + per-segment means and bases
+    const wq = (mean, wc, gp, base, wcN, gpN) => ({
+      match_key: "overall satisfaction", title: "Overall satisfaction", base: base,
+      stats: { mean: mean },
+      seg_stats: { "western cape": { mean: wc }, "gauteng": { mean: gp } },
+      bases: { "western cape": wcN, "gauteng": gpN }, rows: {} });
+    const segs = [{ norm: "western cape" }, { norm: "gauteng" }];
+    TR.PREV = { waves: [
+      { wave: "W1", year: 2024, segments: segs, questions: [wq(7.0, 6.8, 7.2, 180, 85, 75)] },
+      { wave: "W2", year: 2025, segments: segs, questions: [wq(7.3, 7.1, 7.5, 190, 88, 78)] }] };
+    TR.waves.reset();
+    const q = TR.AGG.questions[0], row = q.rows[0];
+    const segNorms = TR.waves.segments().map((s) => s.norm);
+    assert(segNorms.includes("western cape") && segNorms.includes("gauteng"),
+      "Region categories recognised as tracked segments: " + segNorms.join(","));
+    const tot = TR.waves.series(q, row, 0, null);
+    assert(tot.length === 2 && tot[0].value === 7.0 && tot[1].value === 7.3 && tot[1].base === 190,
+      "Total series uses the published totals + total bases");
+    const wc = TR.waves.series(q, row, 0, "western cape");
+    assert(wc.length === 2 && wc[0].value === 6.8 && wc[1].value === 7.1,
+      "Western Cape series uses the published segment means");
+    assert(wc[0].base === 85 && wc[1].base === 88, "Western Cape series uses the segment bases");
+    const gp = TR.waves.series(q, row, 0, "gauteng");
+    assert(gp[1].value === 7.5 && gp[1].base === 78, "Gauteng series is distinct from Western Cape");
+  } finally {
+    TR.AGG = saved.agg; TR.PREV = saved.prev; TR.MICRO = saved.micro; TR.d2._qIndex = saved.idx;
+    TR.waves.reset();
+  }
+});
+
 run("PPTX image deck: PNG slides pack into a structurally valid deck (python)", () => {
   // The "download as PNGs" path renders each card to a PNG and packs it as a
   // full-slide image. Validates imageSlide + the packer's media-part support.

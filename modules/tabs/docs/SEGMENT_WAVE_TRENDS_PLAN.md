@@ -159,10 +159,16 @@ channel both "Online").
 - **Size budget:** per-segment pre-aggregates are compact, but many waves × dimensions × options
   add up — watch the `< 2 MB` artifact gate.
 
-## 10. Open questions for Duncan
+## 10. Decisions (resolved 2026-06-18)
 
-1. CCPB historical respondent files carry **centre + channel**? (Phase 0 gate.)
-2. **Independent** dimensions (Total | by dept | by campus), not the full crossing — confirm.
-3. Tracking-tab segment trends first (Phase 1), or also Crosstabs per-column deltas early (Phase 3)?
-4. Segment keying: ship with unique-label discipline (Option A) then harden to `group::label`
-   (Option B)?
+- **History = computed per-segment totals, NOT raw microdata.** Prior waves carry the published
+  Total + per-dimension values, so the trend always equals what was reported. Raw data is retained
+  upstream in the tracker's wave files — any new breakdown is a tracker re-run + re-emit, not an
+  embedded-microdata change. The current wave stays live from the tabs microdata.
+- **Independent dimensions** (Total | by dept | by campus), not the full crossing.
+- **Tracking-tab segment trends first** (Phase 1); Crosstabs per-column deltas in Phase 3.
+- **Segment keying** is an implementation detail (handled in code): guard against same-named
+  categories across dimensions; ship with label keys + a collision warning, harden to
+  `group::label` if needed. No config burden on the analyst.
+- Focus is **build-going-forward**; CCPB backfill (Phase 4) is feasible since the tracker reads
+  per-respondent wave files, contingent on those files carrying centre + channel.
