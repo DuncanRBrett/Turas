@@ -172,3 +172,30 @@ channel both "Online").
   `group::label` if needed. No config burden on the analyst.
 - Focus is **build-going-forward**; CCPB backfill (Phase 4) is feasible since the tracker reads
   per-respondent wave files, contingent on those files carrying centre + channel.
+
+## 11. Progress (2026-06-18) — branch `feature/tabs-v2-segment-wave-trends`
+
+**Done + tested (no real data needed; synthetic fixtures):**
+- **Phase 0** — tracker output shapes verified against the code; island schema locked.
+- **Phase 1a** — JS consumer validated: `waves.series(q,row,ri,seg)` reads `seg_stats`/`bases`;
+  `waves.segments()` matches segments to banner columns. JS gate.
+- **Phase 1b** — `tracker_segment_contributions()` (`lib/tracking_segment_bridge.R`) serialises the
+  tracker's per-segment output → island prior-wave shape (means + NPS, values + bases). Output
+  assembles via `build_tracking_island()` + `serialize_tracking_island()` into valid island JSON.
+- **Phase 2 proportions** — bridge branches on metric type; proportions → `rows[norm].pct` (Total)
+  + `.seg[segKey]`. Renderer already reads it (no JS change).
+- **Phase 2 significance (means)** — bridge carries SD on `stats`/`seg_stats`; `sdAtWave` reads a
+  stored SD so the Welch test runs per-segment without the distribution. Existing reports unaffected.
+- Gates: R bridge **46/0** (`tests/testthat/test_tracking_segment_bridge.R`); JS **79/0**
+  (`prototypes/.../run_tests_v2.mjs`). Prototype ↔ production `22w_waves.js` byte-identical.
+
+**Remaining (needs a real tracker run / render verification — Duncan):**
+- **Integration wiring:** run the tracker for a study → feed `tracker_segment_contributions()`
+  output as `build_tracking_island()` prior_contributions (the current wave stays the live tabs
+  contribution). Add `tracking_segment_bridge.R` to the tabs loader.
+- **Tracking-tab current-wave segment point** from the live tabs model (so it always matches
+  Crosstabs) — small JS + visual check via `launch_turas`.
+- **Phase 3** — Crosstabs/Dashboard per-column deltas + segment-aware filter (refines the
+  suppression fix).
+- **Phase 4** — CCPB backfill (needs the historical respondent files with centre + channel).
+- Possible refinement: carry `eff_n` for exact weighted significance (currently `n_unweighted`).
