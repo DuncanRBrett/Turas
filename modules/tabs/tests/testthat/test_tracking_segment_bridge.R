@@ -156,6 +156,21 @@ test_that("proportion rows round-trip as JSON objects with a nested seg object",
   expect_match(j, '"seg":\\{"western cape"')
 })
 
+test_that("Total-only tracker (no breakout segments) still emits valid Total contributions", {
+  total_only <- list(Total = list(is_total = TRUE))     # config with no Banner breakouts
+  out <- tracker_segment_contributions(trend_results, total_only, waves_meta)
+  expect_equal(length(out), 2)
+  expect_equal(length(out[[1]]$segments), 0)            # no segment list
+  q <- out[[1]]$questions[[1]]                          # Q1 mean
+  expect_equal(q$stats$mean, 7.0)
+  expect_equal(q$base, 180)
+  expect_equal(length(q$seg_stats), 0)                  # no per-segment block
+  expect_equal(length(q$bases), 0)
+  island <- build_tracking_island(
+    list(wave = "W3", year = 2026, current = TRUE, segments = list(), questions = list()), out)
+  expect_true(jsonlite::validate(serialize_tracking_island(island)))
+})
+
 test_that("bridge output assembles + serialises into a valid tracking island", {
   # the current wave stays a live tabs Total contribution (scores), as today;
   # the bridge supplies the per-segment PRIOR waves.

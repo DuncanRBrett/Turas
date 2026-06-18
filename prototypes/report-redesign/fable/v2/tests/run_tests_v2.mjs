@@ -506,6 +506,38 @@ run("per-segment mean trend carries a stored SD so significance can be tested", 
   }
 });
 
+run("Total-only island degrades gracefully — Total trends, no segments", () => {
+  // Robustness: a tracker with no segment breakouts (computed Total only, no
+  // seg_stats/segments). Total trends from stats.mean; segment queries are empty.
+  const saved = { agg: TR.AGG, prev: TR.PREV, micro: TR.MICRO, idx: TR.d2._qIndex };
+  try {
+    TR.AGG = { schema_version: 2,
+      project: { name: "T", low_base_threshold: 30, tracking: { enabled: true } },
+      columns: [{ key: "TOTAL::Total", group: "total", label: "Total", letter: "" }],
+      banner_groups: [], categories: ["c"],
+      questions: [{ code: "Q1", title: "Overall satisfaction", category: "c", type: "scale",
+        bases: [{ n: 200, low: false }],
+        rows: [{ kind: "mean", label: "Mean", pct: [7.0], n: [null], sig: [""] }] }] };
+    TR.MICRO = null; TR.d2._qIndex = null;
+    const wq = (mean, base) => ({ match_key: "overall satisfaction",
+      title: "Overall satisfaction", base: base, stats: { mean: mean } });
+    TR.PREV = { waves: [
+      { wave: "W1", year: 2024, segments: [], questions: [wq(7.0, 180)] },
+      { wave: "W2", year: 2025, segments: [], questions: [wq(7.3, 190)] }] };
+    TR.waves.reset();
+    const q = TR.AGG.questions[0], row = q.rows[0];
+    assert(TR.waves.segments().length === 0, "no segments offered when none are published");
+    const tot = TR.waves.series(q, row, 0, null);
+    assert(tot.length === 2 && tot[1].value === 7.3 && tot[1].base === 190,
+      "Total trend works from stats.mean even with no per-respondent scores");
+    const none = TR.waves.series(q, row, 0, "western cape");
+    assert(none.length === 0, "a segment query on a Total-only island yields nothing (no crash)");
+  } finally {
+    TR.AGG = saved.agg; TR.PREV = saved.prev; TR.MICRO = saved.micro; TR.d2._qIndex = saved.idx;
+    TR.waves.reset();
+  }
+});
+
 run("PPTX image deck: PNG slides pack into a structurally valid deck (python)", () => {
   // The "download as PNGs" path renders each card to a PNG and packs it as a
   // full-slide image. Validates imageSlide + the packer's media-part support.
