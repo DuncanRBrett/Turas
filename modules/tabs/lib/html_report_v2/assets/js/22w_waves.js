@@ -421,6 +421,15 @@
    * when it differs) to a view model, plus prevWave / history metadata.
    */
   waves.attachDeltas = function (q, viewModel) {
+    // Prior waves are published full-sample Totals (no microdata to filter), so
+    // under an audience filter a wave delta compares filtered-now against
+    // unfiltered-prior — misleading. Render the filtered view as untracked; the
+    // filter bar explains the trend is hidden.
+    if (viewModel.filtered) {
+      viewModel.history = [];
+      viewModel.prevWave = null;
+      return viewModel;
+    }
     var history = waves.history(q);
     viewModel.history = history.map(function (h) {
       return { wave: h.wave, year: h.year, base: h.base };

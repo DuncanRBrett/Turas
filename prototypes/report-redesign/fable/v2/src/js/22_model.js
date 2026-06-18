@@ -354,6 +354,11 @@
     viewModel.type = q.type;
     viewModel.category = q.category;
     viewModel.lowBaseThreshold = lowThreshold();
+    // An audience filter makes the current wave a subgroup, but prior waves are
+    // published full-sample Totals with no microdata to filter — so a wave-on-
+    // wave delta would compare filtered-now against unfiltered-prior. Flag the
+    // model so attachDeltas suppresses the (misleading) trend under a filter.
+    viewModel.filtered = !!(filters && filters.length > 0) && TR.d2.hasMicrodata();
     TR.waves.attachDeltas(q, viewModel);
     if (opts.intervals) attachIntervals(viewModel, q);
     var hidden = opts.hiddenCols !== undefined

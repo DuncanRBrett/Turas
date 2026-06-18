@@ -349,6 +349,28 @@ run("Total-only survey offers a Total banner tab so a custom banner can be clear
   }
 });
 
+run("audience filter suppresses wave deltas/trend (prior waves are full-sample totals)", () => {
+  // Regression: prior waves are published full-sample Totals with no microdata
+  // to filter, so under an audience filter a wave delta compared filtered-now
+  // against unfiltered-prior — misleading. A filtered model must read untracked.
+  const banner = TR.AGG.banner_groups[0].id;
+  const tracked = TR.AGG.questions.find((x) => {
+    const m = TR.model.forQuestion(x.code, banner, []);
+    return m && m.prevWave && m.rows.some((r) => r.delta && r.waves);
+  });
+  assert(tracked, "fixture has a tracked question with deltas + trend");
+  const plain = TR.model.forQuestion(tracked.code, banner, []);
+  assert(plain.prevWave && plain.rows.some((r) => r.delta && r.waves),
+    "unfiltered tracked model keeps its wave deltas + trend");
+  const fq = TR.AGG.questions.find((x) => TR.d2.catRows(x).length >= 1);
+  const filtered = TR.model.forQuestion(tracked.code, banner,
+    [{ q: fq.code, rows: [TR.d2.catRows(fq)[0].index] }]);
+  assert(filtered.filtered === true, "filtered model is flagged");
+  assert(filtered.prevWave === null, "filtered model reads as untracked (no prevWave)");
+  assert(filtered.rows.every((r) => !r.delta && !r.waves),
+    "filtered model carries no wave deltas or trend series");
+});
+
 run("PPTX image deck: PNG slides pack into a structurally valid deck (python)", () => {
   // The "download as PNGs" path renders each card to a PNG and packs it as a
   // full-slide image. Validates imageSlide + the packer's media-part support.

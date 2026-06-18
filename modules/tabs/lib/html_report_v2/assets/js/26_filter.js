@@ -31,7 +31,10 @@
       (s.filters.length
         ? '<button class="fb-clear" data-fact="clear">Clear</button>' +
           '<span class="fb-n">n=' + fmt.base(n) + " of " + fmt.base(TR.MICRO.n) +
-          ' · live recompute · <em>synthetic microdata</em></span>'
+          ' · live recompute · <em>synthetic microdata</em>' +
+          (TR.d2.tracking().enabled
+            ? ' · wave trends hidden while filtered (prior waves are full-sample totals)'
+            : "") + "</span>"
         : '<span class="fb-n">everyone (n=' + fmt.base(TR.MICRO.n) +
           ") · add a filter and every table, delta and dashboard recomputes live</span>") +
       "</div><div id='fpicker' hidden></div>";
