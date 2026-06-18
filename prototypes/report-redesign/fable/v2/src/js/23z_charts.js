@@ -20,6 +20,9 @@
   function fmtPct(v) {
     return v === null || v === undefined ? "–" : Math.round(v) + "%";
   }
+  function fmtMean(v) {
+    return v === null || v === undefined ? "–" : Number(v).toFixed(1);
+  }
 
   /**
    * Repel 1-D label positions so neighbours never overlap: forward sweep
@@ -61,6 +64,7 @@
   render.columnChart = function (model, cols) {
     var data = render.chartRows(model);
     if (!data.rows.length) return "";
+    var meanScale = model.valueKind === "mean";   // ratings, not percentages
     var W = 660, plotH = 170, padT = 16, padB = 58, padL = 10;
     var palette = render.palette();
     // Single series: colour columns by category (semantic); multi-column keeps
@@ -83,7 +87,7 @@
           fill: catColours ? catColours[i] : palette[k % palette.length], rx: 3 }));
         if (cols.length === 1 || v >= data.axisMax * 0.12) {
           body.push(S.text(cx - groupW / 2 + k * barW + (barW - 2) / 2,
-            padT + plotH - h - 4, fmtPct(v),
+            padT + plotH - h - 4, meanScale ? fmtMean(v) : fmtPct(v),
             { "text-anchor": "middle", "font-size": 9.5,
               "font-weight": 600, fill: "#1c2333" }));
         }

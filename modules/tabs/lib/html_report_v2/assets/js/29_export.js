@@ -434,8 +434,9 @@
   /** Value data labels (the "48%" on each bar/segment). pos = "outEnd" for
    *  clustered bar/column, "ctr" for percent-stacked. colour is the label ink
    *  (dark outside a bar, white centred on a coloured segment). */
-  function dataLabels(pos, colour) {
-    return '<c:dLbls><c:numFmt formatCode="0&quot;%&quot;" sourceLinked="0"/>' +
+  function dataLabels(pos, colour, fmtCode) {
+    return '<c:dLbls><c:numFmt formatCode="' + (fmtCode || "0&quot;%&quot;") +
+      '" sourceLinked="0"/>' +
       '<c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr>' +
       '<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1000" b="1">' +
       '<a:solidFill><a:srgbClr val="' + (colour || "1C2333") + '"/></a:solidFill>' +
@@ -538,18 +539,24 @@
    * packager, honouring chart type, row kind (detail/NETs) and columns.
    */
   exporter.buildChart = function (model, type, cols) {
-    var rows = TR.render.chartRows(model).rows;
+    var cr = TR.render.chartRows(model);
+    var rows = cr.rows;
     if (!rows.length || !cols.length) return null;
     if (type === "pie") cols = [cols[0]];
     var series = type === "stacked"
       ? chartSeriesStacked(model, rows, cols)
       : chartSeries(model, rows, cols, type);
+    // A composite of 0–10 means charts RATINGS: one-decimal labels on a fixed
+    // 0–max axis, not the default "0%" percentage format.
+    var meanScale = model.valueKind === "mean";
+    var lblFmt = meanScale ? "0.0" : null;
     var plot, axesXml = "";
     if (type === "column") {
       plot = '<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/>' +
-        '<c:varyColors val="0"/>' + series + dataLabels("outEnd") +
+        '<c:varyColors val="0"/>' + series + dataLabels("outEnd", null, lblFmt) +
         '<c:axId val="111111111"/><c:axId val="222222222"/></c:barChart>';
-      axesXml = chartAxes("b", "l");
+      axesXml = chartAxes("b", "l", meanScale ? "General" : null, false,
+        meanScale ? 0 : null, meanScale ? cr.axisMax : null);
     } else if (type === "stacked") {
       plot = '<c:barChart><c:barDir val="bar"/><c:grouping val="percentStacked"/>' +
         '<c:varyColors val="0"/>' + series + dataLabels("ctr", "FFFFFF") +

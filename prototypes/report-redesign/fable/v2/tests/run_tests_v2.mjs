@@ -1191,6 +1191,37 @@ run("composite exhibit: one scale per chart, everything in the table", () => {
     "PPTX meta carries the scale note");
 });
 
+run("composite this-wave chart renders 0-10 mean ratings as ratings, not %", () => {
+  // Regression: the multi-question composite dist chart pushed each headline
+  // mean into a category/pct cell, so 0-10 mean ratings (e.g. CCS) charted as
+  // "8%" on a % scale. The mean family must read as ratings (7.6, 0-10 axis).
+  const mk = (code, title, mean) => ({ code: code, title: title, rows: [
+    { kind: "mean", label: "Mean", delta: null,
+      waves: [{ year: 2024, value: mean - 0.2 }],
+      cells: [{ mean: mean, pct: null, n: null, sig: "" }] }] });
+  const models = [mk("Q1", "Overall satisfaction", 7.6), mk("Q2", "Relationship", 8.1)];
+  const item = { kind: "exhibit", qs: ["Q1", "Q2"], banner: "", filters: [],
+    flags: { dist: true }, distType: "column", note: "" };
+  const dist = TR.exhibit.distModel(item, models);
+  assert(dist.valueKind === "mean", "an all-mean composite flags valueKind=mean");
+  assert(dist.rows.length === 2, "both 0-10 means share one chart");
+  const svg = TR.render.columnChart(dist, [0]);
+  assert(/>7\.6</.test(svg), "the column label shows the rating 7.6, got: " +
+    (svg.match(/>[\d.]+%?</g) || []).join(","));
+  assert(!/>[\d.]+%</.test(svg), "no percentage labels on a rating chart");
+  const chart = TR.exporter.buildChart(dist, "column", [0]);
+  assert(chart && chart.xml.indexOf("0&quot;%&quot;") === -1,
+    "native PPTX chart drops the forced % number format");
+  // a non-mean composite (NPS) keeps the percentage path untouched
+  const np = (code, pct, wv) => ({ code: code, title: code, rows: [
+    { kind: "net", label: "NPS", diff: false, delta: null,
+      waves: [{ year: 2024, value: wv }], cells: [{ pct: pct, mean: null, n: null, sig: "" }] }] });
+  const npsDist = TR.exhibit.distModel(
+    { kind: "exhibit", qs: ["N1", "N2"], banner: "", filters: [], flags: { dist: true } },
+    [np("N1", 33, 30), np("N2", 41, 40)]);
+  assert(npsDist.valueKind === "pct", "a non-mean composite stays on the % path");
+});
+
 run("per-row chart selection: unticked rows leave the chart only", () => {
   const m = TR.model.forQuestion("Q008", TR.AGG.banner_groups[0].id, []);
   m.chartKind = "detail";

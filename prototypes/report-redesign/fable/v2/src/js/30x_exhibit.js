@@ -277,8 +277,14 @@
     var compSplit = dominantScale(entries,
       function (e) { return waveMax(e.row.waves, curOf(e.row)); },
       function (e) { return e.row.kind === "mean"; });
+    // When the charted family is all means (e.g. a set of 0–10 rating
+    // questions), the bars are RATINGS, not percentages — flag it so the SVG
+    // and native-PPTX renderers label them "7.6" on a rating axis, not "8%".
+    var keptMean = compSplit.keep.length > 0 &&
+      compSplit.keep.every(function (e) { return e.row.kind === "mean"; });
     return { code: "COMPOSITE", title: "This wave", source: "published",
       chartKind: "detail", lowBaseThreshold: 30,
+      valueKind: keptMean ? "mean" : "pct",
       columns: [{ label: "Total", letter: "", base: null, low: false }],
       rows: compSplit.keep.map(function (e) {
         return { kind: "category", label: shortLabel(e.m, e.row),
