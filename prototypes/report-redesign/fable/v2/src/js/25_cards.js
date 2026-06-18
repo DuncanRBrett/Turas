@@ -328,6 +328,13 @@
       return '<button class="btab' + (s.banner === g.id ? " on" : "") +
         '" data-banner="' + g.id + '">' + fmt.escapeHtml(g.name) + "</button>";
     });
+    // Total-only survey (no preset banners): expose an explicit "Total" tab so a
+    // custom banner can always be switched off — otherwise the custom tab is the
+    // only one and there is no way back to the Total column (e.g. CCS).
+    if (!TR.AGG.banner_groups.length) {
+      out.unshift('<button class="btab' + (s.banner === "" ? " on" : "") +
+        '" data-banner="">Total</button>');
+    }
     if (s.banner && s.banner.indexOf("custom:") === 0) {
       var q = TR.d2.questionByCode(s.banner.split(":")[1]);
       out.push('<button class="btab on custom" data-banner="' + s.banner + '">⚒ ' +
@@ -339,6 +346,7 @@
     }
     return '<div class="btabs" role="group" aria-label="Banner">' + out.join("") + "</div>";
   }
+  cards2._bannerTabsHtml = bannerTabsHtml;   // exposed for the node gate
 
   cards2.renderActive = function () {
     var s = TR.d2.state;

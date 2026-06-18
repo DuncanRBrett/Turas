@@ -303,6 +303,52 @@ run("tracking view pins on a Total-only report (no banner_groups)", () => {
   }
 });
 
+run("composite-exhibit builder resolves a custom banner without crashing (CCS)", () => {
+  // Regression: addExhibit recorded TR.AGG.banner_groups[0].id unguarded, so on
+  // a Total-only survey (e.g. CCS) with a custom banner active, "Add exhibit"
+  // threw and nothing pinned. pinBanner() must resolve safely in every case.
+  const savedAgg = TR.AGG, savedBanner = TR.d2.state.banner;
+  try {
+    TR.AGG = { banner_groups: [] };           // no preset banners (CCS)
+    TR.d2.state.banner = "custom:Q1:net";     // the stuck custom-banner state
+    assert(TR.story2._pinBanner() === "",
+      "custom banner resolves to the Total column on a no-banner survey");
+    TR.AGG = { banner_groups: [{ id: "REGION", name: "Region" }] };
+    assert(TR.story2._pinBanner() === "REGION",
+      "custom banner resolves to the first preset when one exists");
+    TR.d2.state.banner = "REGION";
+    assert(TR.story2._pinBanner() === "REGION", "a concrete banner passes through");
+  } finally {
+    TR.AGG = savedAgg; TR.d2.state.banner = savedBanner;
+  }
+});
+
+run("Total-only survey offers a Total banner tab so a custom banner can be cleared", () => {
+  // Regression: with no preset banner_groups, a custom banner left no other tab
+  // to click, so it could never be switched off (CCS). A "Total" tab restores
+  // the Total column; surveys that already have presets don't get an extra one.
+  const savedAgg = TR.AGG, savedBanner = TR.d2.state.banner, savedIdx = TR.d2._qIndex;
+  try {
+    TR.AGG = { banner_groups: [],
+      questions: [{ code: "Q1", title: "Q1", category: "c", rows: [] }] };
+    TR.d2._qIndex = null;
+    TR.d2.state.banner = "";
+    assert(/data-banner=""/.test(TR.cards2._bannerTabsHtml()),
+      "no-banner survey shows a Total tab");
+    TR.d2.state.banner = "custom:Q1:net";
+    const custom = TR.cards2._bannerTabsHtml();
+    assert(/data-banner=""/.test(custom) && /class="btab on custom"/.test(custom),
+      "with a custom banner active, both the Total tab and the custom tab show");
+    TR.AGG = { banner_groups: [{ id: "REGION", name: "Region" }], questions: [] };
+    TR.d2._qIndex = null;
+    TR.d2.state.banner = "REGION";
+    assert(!/data-banner=""/.test(TR.cards2._bannerTabsHtml()),
+      "surveys with preset banners do not get an extra Total tab");
+  } finally {
+    TR.AGG = savedAgg; TR.d2.state.banner = savedBanner; TR.d2._qIndex = savedIdx;
+  }
+});
+
 run("PPTX image deck: PNG slides pack into a structurally valid deck (python)", () => {
   // The "download as PNGs" path renders each card to a PNG and packs it as a
   // full-slide image. Validates imageSlide + the packer's media-part support.
