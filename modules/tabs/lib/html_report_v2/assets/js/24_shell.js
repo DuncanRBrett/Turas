@@ -92,8 +92,6 @@
       "<div><h1>" + fmt.escapeHtml(p.name) + "</h1>" +
       '<div class="hdr-sub">' + subBits.join(" &middot; ") + "</div></div></div>" +
       '<div class="hdr-meta">' + clientLogo +
-      '<span class="wavechip">' + fmt.escapeHtml(p.wave || "") + "</span>" +
-      waveHistoryChip() +
       '<button class="savecopy" data-savecopy title="Save a single .html copy with your ' +
       'insights, story and report sections embedded — ready to send">💾 Save copy</button>' +
       "</div></div>" +
@@ -107,15 +105,6 @@
       '<div id="tabhost" class="tabhost"></div>' +
       '<div id="toast" role="status" aria-live="polite"></div>' +
       '<div id="present-overlay" hidden></div>';
-  }
-
-  /** Header chip summarising the tracked wave history ("" when none). */
-  function waveHistoryChip() {
-    var waves = TR.d2.tracking().waves;
-    if (!waves.length) return "";
-    var span = waves.length === 1 ? String(waves[0].year)
-      : waves[0].year + "–" + waves[waves.length - 1].year;
-    return '<span class="wavechip prev">history ' + fmt.escapeHtml(span) + "</span>";
   }
 
   /** Route current state.tab into the tab host. */
