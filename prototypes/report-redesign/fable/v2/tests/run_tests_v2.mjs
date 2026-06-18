@@ -420,6 +420,51 @@ run("per-segment prior-wave trends: published segment values flow through the wa
   }
 });
 
+run("per-segment prior-wave PROPORTIONS flow through the wave API", () => {
+  // Phase 2 (proportions): a category/proportion row trends per segment off the
+  // published-distribution path rows[norm(label)].pct (Total) / .seg[segKey].
+  const saved = { agg: TR.AGG, prev: TR.PREV, micro: TR.MICRO, idx: TR.d2._qIndex };
+  try {
+    TR.AGG = { schema_version: 2,
+      project: { name: "Seg", low_base_threshold: 30, tracking: { enabled: true } },
+      columns: [
+        { key: "TOTAL::Total", group: "total", label: "Total", letter: "" },
+        { key: "REGION::WC", group: "Region", label: "Western Cape", letter: "a" },
+        { key: "REGION::GP", group: "Region", label: "Gauteng", letter: "b" }],
+      banner_groups: [{ id: "Region", name: "Region" }], categories: ["c"],
+      questions: [{ code: "Q1", title: "Channel used", category: "c", type: "single",
+        bases: [{ n: 200, low: false }, { n: 90, low: false }, { n: 80, low: false }],
+        rows: [{ kind: "category", label: "Online", pct: [40, 50, 35] },
+          { kind: "category", label: "In-store", pct: [60, 50, 65] }] }] };
+    TR.MICRO = null; TR.d2._qIndex = null;
+    const wq = (onTot, onWC, onGP, base, wcN, gpN) => ({
+      match_key: "channel used", title: "Channel used", base: base,
+      bases: { "western cape": wcN, "gauteng": gpN },
+      rows: {
+        "online": { pct: onTot, n: Math.round(onTot / 100 * base),
+          seg: { "western cape": onWC, "gauteng": onGP } },
+        "instore": { pct: 100 - onTot,
+          seg: { "western cape": 100 - onWC, "gauteng": 100 - onGP } } } });
+    const segs = [{ norm: "western cape" }, { norm: "gauteng" }];
+    TR.PREV = { waves: [
+      { wave: "W1", year: 2024, segments: segs, questions: [wq(40, 50, 35, 180, 85, 75)] },
+      { wave: "W2", year: 2025, segments: segs, questions: [wq(45, 55, 38, 190, 88, 78)] }] };
+    TR.waves.reset();
+    const q = TR.AGG.questions[0], online = q.rows[0];
+    const tot = TR.waves.series(q, online, 0, null);
+    assert(tot.length === 2 && tot[0].value === 40 && tot[1].value === 45 && tot[1].base === 190,
+      "Total 'Online' proportion trends from rows[].pct + total base");
+    const wc = TR.waves.series(q, online, 0, "western cape");
+    assert(wc[0].value === 50 && wc[1].value === 55 && wc[0].base === 85,
+      "Western Cape 'Online' proportion trends from rows[].seg + segment base");
+    const gp = TR.waves.series(q, online, 0, "gauteng");
+    assert(gp[1].value === 38 && gp[1].base === 78, "Gauteng proportion series is distinct");
+  } finally {
+    TR.AGG = saved.agg; TR.PREV = saved.prev; TR.MICRO = saved.micro; TR.d2._qIndex = saved.idx;
+    TR.waves.reset();
+  }
+});
+
 run("PPTX image deck: PNG slides pack into a structurally valid deck (python)", () => {
   // The "download as PNGs" path renders each card to a PNG and packs it as a
   // full-slide image. Validates imageSlide + the packer's media-part support.

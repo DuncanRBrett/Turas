@@ -42,6 +42,12 @@ make_seg <- function(text, mtype, w1, w2, field = "mean") {
        wave_results = list(W1 = wr(w1[[1]], w1[[2]]), W2 = wr(w2[[1]], w2[[2]])))
 }
 
+make_prop_seg <- function(text, w1, w2) {
+  wr <- function(props, n) list(proportions = props, n_unweighted = n, available = TRUE)
+  list(metric_type = "proportions", question_text = text,
+       wave_results = list(W1 = wr(w1$props, w1$n), W2 = wr(w2$props, w2$n)))
+}
+
 trend_results <- list(
   Q1 = list(
     "Total"               = make_seg("Overall satisfaction", "mean", list(7.0, 180), list(7.3, 190)),
@@ -50,7 +56,17 @@ trend_results <- list(
   Q2 = list(
     "Total"               = make_seg("Recommend", "nps", list(30, 180), list(35, 190), field = "nps"),
     "Region_Western Cape" = make_seg("Recommend", "nps", list(25, 85),  list(28, 88),  field = "nps"),
-    "Region_Gauteng"      = make_seg("Recommend", "nps", list(36, 75),  list(42, 78),  field = "nps")))
+    "Region_Gauteng"      = make_seg("Recommend", "nps", list(36, 75),  list(42, 78),  field = "nps")),
+  Q3 = list(
+    "Total"               = make_prop_seg("Channel used",
+      list(props = c("Online" = 40, "In-store" = 60), n = 180),
+      list(props = c("Online" = 45, "In-store" = 55), n = 190)),
+    "Region_Western Cape" = make_prop_seg("Channel used",
+      list(props = c("Online" = 50, "In-store" = 50), n = 85),
+      list(props = c("Online" = 55, "In-store" = 45), n = 88)),
+    "Region_Gauteng"      = make_prop_seg("Channel used",
+      list(props = c("Online" = 35, "In-store" = 65), n = 75),
+      list(props = c("Online" = 38, "In-store" = 62), n = 78))))
 
 segments_meta <- list(
   "Total"               = list(is_total = TRUE),
@@ -109,4 +125,29 @@ test_that("serialises stats/seg_stats/bases as JSON objects, not arrays", {
 test_that("degenerate input yields an empty contribution list", {
   expect_equal(length(tracker_segment_contributions(list(), segments_meta, waves_meta)), 0)
   expect_equal(length(tracker_segment_contributions(trend_results, segments_meta, list())), 0)
+})
+
+test_that("proportions question emits published-distribution rows (Total + per-segment)", {
+  q3 <- res[[1]]$questions[[3]]                       # Q3, W1
+  expect_equal(q3$match_key, "channel used")
+  expect_null(q3$stats)                               # proportions carry rows, not stats
+  expect_setequal(names(q3), c("match_key", "title", "base", "rows", "bases"))
+  expect_equal(q3$rows[["online"]]$pct, 40)
+  expect_equal(q3$rows[["instore"]]$pct, 60)          # tracking_norm("In-store") == "instore"
+  expect_equal(q3$rows[["online"]]$n, round(40 / 100 * 180))
+  expect_equal(q3$rows[["online"]]$seg[["western cape"]], 50)
+  expect_equal(q3$rows[["online"]]$seg[["gauteng"]], 35)
+  expect_equal(q3$bases[["western cape"]], 85)
+})
+
+test_that("proportion segment values are distinct in W2", {
+  q3 <- res[[2]]$questions[[3]]
+  expect_equal(q3$rows[["online"]]$pct, 45)
+  expect_equal(q3$rows[["online"]]$seg[["western cape"]], 55)
+})
+
+test_that("proportion rows round-trip as JSON objects with a nested seg object", {
+  j <- as.character(jsonlite::toJSON(res[[1]]$questions[[3]], auto_unbox = TRUE))
+  expect_match(j, '"rows":\\{')
+  expect_match(j, '"seg":\\{"western cape"')
 })

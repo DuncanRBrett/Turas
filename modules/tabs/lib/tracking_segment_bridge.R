@@ -23,9 +23,10 @@
 # DECISION (docs/SEGMENT_WAVE_TRENDS_PLAN.md): history = computed per-segment
 # totals, NOT raw microdata; the current wave stays live from the tabs run.
 #
-# SCOPE (Phase 1b): mean-kind metrics (mean / NPS) — values + bases. Per-segment
-# significance (carry sd / the published distribution) and proportion / NET rows
-# are Phase 2. Depends on tracking_norm() + %||% (tracking_island.R).
+# SCOPE: mean-kind metrics (mean / NPS) -> values + bases; proportions ->
+# published-distribution rows (Total + per-segment %, so rowValue lights up).
+# Per-segment SIGNIFICANCE for means (carry sd) and multi_mention / NET-diff rows
+# are later phases. Depends on tracking_norm() + %||% (tracking_island.R).
 # ==============================================================================
 
 if (!exists("%||%", mode = "function")) {
@@ -88,47 +89,88 @@ tracker_segment_contributions <- function(trend_results, segments_meta, waves_me
     seg_present <- list()
     questions <- list()
 
+    # This wave's raw calculator output for a segment (NULL when absent).
+    wr_of <- function(res) {
+      if (is.null(res)) return(NULL)
+      wr <- res$wave_results[[wave_id]]
+      if (is.null(wr) || !isTRUE(wr$available)) return(NULL)
+      wr
+    }
+    base_of <- function(wr) {
+      b <- wr$n_unweighted %||% NA
+      if (length(b) == 1 && is.na(b)) NA else as.numeric(b)
+    }
+    num_or_null <- function(v) {
+      if (is.null(v) || (length(v) == 1 && is.na(v))) NULL else as.numeric(v)
+    }
+
     for (q_code in names(trend_results)) {
       q_segs <- trend_results[[q_code]]
       total_res <- q_segs[["Total"]]
       if (is.null(total_res)) next
       mtype <- total_res$metric_type %||% "mean"
-      if (!(mtype %in% mean_kinds)) next                 # Phase 1b: mean-kind only
-      stat_field <- if (identical(mtype, "nps")) "nps" else "mean"
       title <- as.character(total_res$question_text %||% q_code)
+      tot_wr <- wr_of(total_res)
+      if (is.null(tot_wr)) next                          # question absent this wave
 
-      value_at <- function(res) {
-        wr <- res$wave_results[[wave_id]]
-        if (is.null(wr) || !isTRUE(wr$available)) return(NULL)
-        v <- if (identical(stat_field, "nps")) wr$nps else wr$mean
-        if (is.null(v) || (length(v) == 1 && is.na(v))) return(NULL)
-        base <- wr$n_unweighted %||% NA
-        list(value = as.numeric(v),
-             base = if (length(base) == 1 && is.na(base)) NA else as.numeric(base))
+      q <- NULL
+      if (mtype %in% mean_kinds) {
+        # mean-kind: one value per segment under stats / seg_stats
+        stat_field <- if (identical(mtype, "nps")) "nps" else "mean"
+        tv <- num_or_null(if (identical(stat_field, "nps")) tot_wr$nps else tot_wr$mean)
+        if (is.null(tv)) next
+        seg_stats <- list(); bases <- list()
+        for (bk in breakouts) {
+          swr <- wr_of(q_segs[[bk$seg_name]]); if (is.null(swr)) next
+          sv <- num_or_null(if (identical(stat_field, "nps")) swr$nps else swr$mean)
+          if (is.null(sv)) next
+          seg_stats[[bk$key]] <- .tsb_stat(stat_field, sv)
+          bases[[bk$key]] <- base_of(swr)
+          seg_present[[bk$key]] <- list(norm = bk$key, label = bk$label, group = bk$group)
+        }
+        q <- list(match_key = tracking_norm(title), title = title,
+                  base = base_of(tot_wr), stats = .tsb_stat(stat_field, tv),
+                  seg_stats = seg_stats, bases = bases)
+
+      } else if (identical(mtype, "proportions")) {
+        # proportions: one published-distribution row per option, Total pct +
+        # per-segment pct (rowValue reads rows[norm(label)].pct / .seg[segKey]).
+        tot_props <- tot_wr$proportions
+        if (is.null(tot_props) || length(tot_props) == 0) next
+        tbase <- base_of(tot_wr)
+        opts <- names(tot_props)
+        rows <- list()
+        for (opt in opts) {
+          pct <- num_or_null(tot_props[[opt]]); if (is.null(pct)) next
+          rows[[tracking_norm(opt)]] <- list(
+            pct = pct,
+            n   = if (is.na(tbase)) NULL else round(pct / 100 * tbase),
+            seg = list())
+        }
+        if (length(rows) == 0) next
+        bases <- list()
+        for (bk in breakouts) {
+          swr <- wr_of(q_segs[[bk$seg_name]]); if (is.null(swr)) next
+          bases[[bk$key]] <- base_of(swr)
+          sprops <- swr$proportions
+          if (!is.null(sprops)) {
+            for (opt in opts) {
+              key <- tracking_norm(opt)
+              if (is.null(rows[[key]])) next
+              sp <- num_or_null(sprops[[opt]])
+              if (!is.null(sp)) rows[[key]]$seg[[bk$key]] <- sp
+            }
+          }
+          seg_present[[bk$key]] <- list(norm = bk$key, label = bk$label, group = bk$group)
+        }
+        q <- list(match_key = tracking_norm(title), title = title,
+                  base = tbase, rows = rows, bases = bases)
+
+      } else {
+        next                                             # multi_mention etc. — later phase
       }
 
-      tot <- value_at(total_res)
-      if (is.null(tot)) next                             # question absent this wave
-
-      seg_stats <- list()
-      bases <- list()
-      for (bk in breakouts) {
-        sres <- q_segs[[bk$seg_name]]
-        if (is.null(sres)) next
-        sv <- value_at(sres)
-        if (is.null(sv)) next
-        seg_stats[[bk$key]] <- .tsb_stat(stat_field, sv$value)
-        bases[[bk$key]] <- sv$base
-        seg_present[[bk$key]] <- list(norm = bk$key, label = bk$label, group = bk$group)
-      }
-
-      questions[[length(questions) + 1]] <- list(
-        match_key = tracking_norm(title),
-        title     = title,
-        base      = tot$base,
-        stats     = .tsb_stat(stat_field, tot$value),
-        seg_stats = seg_stats,
-        bases     = bases)
+      questions[[length(questions) + 1]] <- q
     }
 
     if (length(questions) == 0) next
