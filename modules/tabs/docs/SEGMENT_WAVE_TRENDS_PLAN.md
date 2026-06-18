@@ -199,3 +199,33 @@ channel both "Online").
   suppression fix).
 - **Phase 4** — CCPB backfill (needs the historical respondent files with centre + channel).
 - Possible refinement: carry `eff_n` for exact weighted significance (currently `n_unweighted`).
+
+## 12. SACS worked example — data path VERIFIED on real data (2026-06-18)
+
+Source: `OneDrive/DB Files/TurasProjects/SACAP/SACS/SACS-{2023,2024,2025}` (read-only).
+Three years, one per-respondent `*_data.xlsx` each; no tracker/mapping config existed.
+
+**Mapping (confirmed from the Survey_Structure + data):**
+- **Engagement battery** = the 12 Gallup-style Likert items ("I know what is expected of me…" →
+  "…opportunities to learn and grow"), 1–5 scale. Renumbered across years (2023 Q01–Q12; 2024/25
+  Q05–Q16) but **identical wording → auto-matches by `tracking_norm(title)`**. Plus **overall
+  satisfaction** ("Taking everything into account how satisfied…", 2023 Q21 / 2024 Q26 / 2025 Q28).
+- **Segments**: Campus (2023 Q24 / 2024-25 Q02), Department (Q25 / Q03), Tenure (Q26 / Q04).
+  Campus + Tenure category labels are **identical across all 3 years** (clean trends); **Department
+  was restructured** (labels differ → partial cross-year matching, gaps — handled gracefully).
+- **Excluded**: the values items (Integrity/Excellence/…) — reworded 2023→2024 ("I do what's
+  right" → "SACAP demonstrates…"), so not comparable; and they're "values", not "engagement".
+
+**Verified (scratch driver, /tmp, nothing written to OneDrive):** real data → the tracker's
+`calculate_weighted_mean` → `trend_results` → `tracker_segment_contributions()` →
+`build_tracking_island()` → `serialize_tracking_island()`. Island: 3 waves, valid JSON, 71 KB,
+13 items × 36 segments. Sample: overall satisfaction Total 4.08 → 3.83 → 3.90; by tenure
+"<1 year" 4.3→4.45 vs "3–5 years" 3.88→3.69. Per-segment bases small (campus n≈8–62) → low base.
+
+**Remaining for a real SACS report (production wiring):**
+1. Drive the real `calculate_trends_with_banners()` (a SACS tracker config: waves 2023–25, tracked
+   = engagement battery + satisfaction, banner = Campus/Department/Tenure with wave-specific column
+   mapping) instead of the scratch calculator loop — same numbers, the agreed single-source engine.
+2. Emit the island into the **SACS-2025** tabs v2 report (2025 = the live current wave; priors
+   2023–24 from the bridge) + the Tracking-tab current-wave segment point.
+3. Duncan regenerates via `launch_turas` and eyeballs.
