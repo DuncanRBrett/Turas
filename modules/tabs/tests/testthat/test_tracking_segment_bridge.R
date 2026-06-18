@@ -155,3 +155,24 @@ test_that("proportion rows round-trip as JSON objects with a nested seg object",
   expect_match(j, '"rows":\\{')
   expect_match(j, '"seg":\\{"western cape"')
 })
+
+test_that("bridge output assembles + serialises into a valid tracking island", {
+  # the current wave stays a live tabs Total contribution (scores), as today;
+  # the bridge supplies the per-segment PRIOR waves.
+  current <- list(wave = "Wave 3", year = 2026, current = TRUE, segments = list(),
+                  questions = list(list(match_key = "overall satisfaction",
+                    title = "Overall satisfaction", base = 200,
+                    scores = as.list(c(7, 8, 7, 6, 8)))))
+  island <- build_tracking_island(current, res)
+  expect_equal(island$schema_version, 1L)
+  expect_equal(length(island$waves), 3)                       # 2 priors + current
+  years <- vapply(island$waves, function(w) as.numeric(w$year), numeric(1))
+  expect_equal(years, sort(years))                            # ordered oldest-first
+  expect_true(island$waves[[length(island$waves)]]$current)   # current wave last
+
+  j <- serialize_tracking_island(island)
+  expect_true(jsonlite::validate(j))
+  expect_match(j, '"seg_stats":\\{"western cape"')            # per-segment means survive
+  expect_match(j, '"segments":\\[')                           # segment list is an array
+  expect_match(j, '"rows":\\{"online"')                       # proportion rows survive
+})
