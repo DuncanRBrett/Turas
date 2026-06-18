@@ -222,10 +222,24 @@ Three years, one per-respondent `*_data.xlsx` each; no tracker/mapping config ex
 13 items × 36 segments. Sample: overall satisfaction Total 4.08 → 3.83 → 3.90; by tenure
 "<1 year" 4.3→4.45 vs "3–5 years" 3.88→3.69. Per-segment bases small (campus n≈8–62) → low base.
 
-**Remaining for a real SACS report (production wiring):**
-1. Drive the real `calculate_trends_with_banners()` (a SACS tracker config: waves 2023–25, tracked
-   = engagement battery + satisfaction, banner = Campus/Department/Tenure with wave-specific column
-   mapping) instead of the scratch calculator loop — same numbers, the agreed single-source engine.
-2. Emit the island into the **SACS-2025** tabs v2 report (2025 = the live current wave; priors
-   2023–24 from the bridge) + the Tracking-tab current-wave segment point.
-3. Duncan regenerates via `launch_turas` and eyeballs.
+**Production wiring — BUILT + verified (2026-06-18):**
+- `compute_segment_trends()` + `write_segment_wave_sidecars()`
+  (`lib/tracking_segment_compute.R`) orchestrate the tracker's calculators over
+  Total + each banner value per wave and write per-wave segment **sidecars**. The
+  EXISTING `run_crosstabs` pipeline reads them (`read_wave_contributions` →
+  `build_tracking_island`) with **no pipeline change**; the Tracking tab already
+  reads current-wave segment points from the live banner model
+  (`trk.currentFor`), so **no JS change**. Verified on real SACS (parity with the
+  proof; sidecars round-trip through the reader; 24 campus/dept/tenure segments).
+- Example: `modules/tabs/examples/sacs_segment_backfill.R` writes the 2023/24
+  prior sidecars.
+
+**To see it in the SACS-2025 report (Duncan, via launch_turas):**
+1. `Rscript modules/tabs/examples/sacs_segment_backfill.R` → sidecars in `<OUT_DIR>`.
+2. SACS-2025_Crosstab_Config — Settings: `html_report_v2` + `html_report_v2_tracking`
+   = TRUE, `waves_source = <OUT_DIR>`; Selection: make Q02 (Campus) / Q03
+   (Department) / Q04 (Tenure) banners so the live 2025 model carries those columns.
+3. `launch_turas` → build SACS-2025 → Tracking tab → "Segments for question".
+
+**Follow-up (build-going-forward):** have the current wave's `wave_contribution`
+also emit its own segment sidecar, so 2026+ is automatic (no backfill step).

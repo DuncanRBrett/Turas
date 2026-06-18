@@ -89,3 +89,29 @@ test_that("compute -> bridge -> island carries per-segment values", {
   ch_q <- Filter(function(q) q$match_key == "channel used", priors[[1]]$questions)[[1]]
   expect_equal(ch_q$rows[["online"]]$seg[["cape town"]], 100)   # both CT 2024 rows are Online
 })
+
+test_that("write_segment_wave_sidecars round-trips through the existing pipeline reader", {
+  td <- file.path(tempdir(), "seg_sidecars_test")
+  unlink(td, recursive = TRUE)
+  paths <- write_segment_wave_sidecars(
+    waves, metrics, segment_dims, td,
+    wave_labels = list("2024" = "SACS 2024", "2025" = "SACS 2025"),
+    wave_years  = list("2024" = 2024, "2025" = 2025))
+  expect_equal(length(paths), 2)
+  expect_true(all(file.exists(paths)))
+
+  # the UNCHANGED pipeline reader + assembler pick them up
+  priors <- read_wave_contributions(td)
+  expect_equal(length(priors), 2)
+  expect_false(is.null(priors[[1]]$questions))
+  expect_false(is.null(priors[[1]]$segments))
+
+  current <- list(wave = "SACS 2026", year = 2026, current = TRUE, segments = list(),
+                  questions = list(list(match_key = "x", title = "x", base = 1, scores = list(1))))
+  island <- build_tracking_island(current, priors)
+  expect_equal(length(island$waves), 3)
+  j <- serialize_tracking_island(island)
+  expect_true(jsonlite::validate(j))
+  expect_match(j, '"seg_stats"')                # per-segment data survives the round-trip
+  unlink(td, recursive = TRUE)
+})

@@ -124,3 +124,39 @@ compute_segment_trends <- function(waves, metrics, segment_dims, weight_col = NU
   segments_meta <- lapply(segments_meta, function(s) { s$.cols <- NULL; s })
   list(trend_results = trend_results, segments_meta = segments_meta)
 }
+
+#' Backfill per-wave segment-trend sidecars for the v2 island
+#'
+#' Writes one `<wave>_wave.json` per wave carrying computed per-segment totals,
+#' into a `waves_source` directory. A normal v2 tabs build (run_crosstabs with
+#' `html_report_v2_tracking = TRUE` and `waves_source` pointed here) then reads
+#' them via `read_wave_contributions()` and assembles a segment-aware island —
+#' NO pipeline change. Reuses compute_segment_trends() + the bridge +
+#' write_wave_contribution() (so the current wave stays the live tabs run).
+#'
+#' @param waves,metrics,segment_dims,weight_col As `compute_segment_trends()`.
+#' @param out_dir Destination directory (created if absent).
+#' @param wave_labels,wave_years Optional lists keyed by wave id (display label /
+#'   numeric order key); default to the id and `as.numeric(id)`.
+#' @return Character vector of sidecar paths written (invisibly).
+#' @export
+write_segment_wave_sidecars <- function(waves, metrics, segment_dims, out_dir,
+                                        weight_col = NULL, wave_labels = NULL,
+                                        wave_years = NULL) {
+  if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+  ct <- compute_segment_trends(waves, metrics, segment_dims, weight_col)
+  wave_ids <- vapply(waves, function(w) as.character(w$id), character(1))
+  waves_meta <- lapply(wave_ids, function(id) list(
+    id = id,
+    label = wave_labels[[id]] %||% id,
+    year = wave_years[[id]] %||% suppressWarnings(as.numeric(id))))
+  contribs <- tracker_segment_contributions(ct$trend_results, ct$segments_meta, waves_meta)
+  paths <- character(0)
+  for (cw in contribs) {
+    fid <- gsub("[^A-Za-z0-9]+", "_", as.character(cw$wave))
+    p <- file.path(out_dir, paste0(fid, "_wave.json"))
+    write_wave_contribution(cw, p)
+    paths <- c(paths, p)
+  }
+  invisible(paths)
+}
