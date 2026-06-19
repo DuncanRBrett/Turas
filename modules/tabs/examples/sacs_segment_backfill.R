@@ -26,7 +26,7 @@
 suppressMessages(library(openxlsx))
 
 SACS_BASE <- "/Users/duncan/Library/CloudStorage/OneDrive-Personal/DB Files/TurasProjects/SACAP/SACS"
-OUT_DIR   <- Sys.getenv("SACS_SEG_OUT", file.path(Sys.getenv("HOME"), "sacs_segment_waves"))  # waves_source
+OUT_DIR   <- Sys.getenv("SACS_SEG_OUT", file.path(SACS_BASE, "SACS-2025", "wave_history"))  # waves_source (in-project)
 TURAS     <- Sys.getenv("TURAS_HOME", "/Users/duncan/Dev/Turas")
 
 source(file.path(TURAS, "modules/tracker/lib/statistical_core.R"))
