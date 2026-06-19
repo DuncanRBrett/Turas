@@ -1165,6 +1165,39 @@ run("stacked chart export is transposed (segments=series, columns=bars)", () => 
     "stacked segments must use the brand ramp, not the accent palette");
 });
 
+run("Index (mean) chart mode plots the mean row as a rating, not a distribution", () => {
+  const q = TR.AGG.questions.filter((x) => x.type === "scale")
+    .find((x) => x.rows.some((r) => r.kind === "mean")) || TR.AGG.questions[0];
+  const m = TR.model.forQuestion(q.code, TR.AGG.banner_groups[0].id, []);
+  assert(TR.render.hasMeanRow(m), "a scale question should expose a chartable mean row");
+
+  // the distribution path never sources the mean row
+  assert(TR.render.chartRows(m).rows.every((r) => r.kind !== "mean"),
+    "the distribution chart must not source the mean row");
+
+  // mean mode: the mean row becomes the chart source, rating carried in the pct slot
+  m.chartKind = "mean"; m.valueKind = "mean";
+  const data = TR.render.chartRows(m);
+  assert(data.rows.length >= 1 && data.rows[0].kind === "mean", "mean mode sources the mean row");
+  const srcMean = m.rows.find((r) => r.kind === "mean").cells[0].mean;
+  assert(data.rows[0].cells[0].pct === srcMean,
+    "the rating is exposed in the chartable slot (" + data.rows[0].cells[0].pct + " vs " + srcMean + ")");
+
+  // renders as a rating column chart: the bar is labelled e.g. "4.1", never "4%"
+  const svg = TR.render.columnChart(m, [0]);
+  assert(svg && svg.indexOf(Number(srcMean).toFixed(1)) !== -1, "the bar is labelled with the rating");
+  assert(svg.indexOf(Math.round(srcMean) + "%") === -1, "a mean bar must not be labelled a percentage");
+
+  // stacked / pie are percentage charts — a mean plot always coerces to columns
+  assert(TR.render.chartBy("stacked", m, [0]) === svg,
+    "a mean plot renders as a column chart even when stacked is selected");
+
+  // a question with no mean row exposes no mean plot (the dropdown won't offer it)
+  const noMean = { code: "X", rows: [{ kind: "category", label: "A", cells: [{ pct: 50 }] }] };
+  assert(!TR.render.hasMeanRow(noMean) && TR.render.meanChartRows(noMean).rows.length === 0,
+    "no mean row -> no mean chart");
+});
+
 run("golden parity suite passes (subprocess)", () => {
   const res = spawnSync("node", [path.join(BASE, "tests", "golden_parity.mjs")],
     { encoding: "utf8" });

@@ -61,6 +61,7 @@
     var model = TR.model.forQuestion(s.activeQ, s.banner, s.filters, opts);
     if (model) {
       model.chartKind = cards2.resolveChartKind(model);
+      model.valueKind = model.chartKind === "mean" ? "mean" : "pct";
       model.hiddenChartRows = s.hiddenChartRows[s.activeQ] || [];
     }
     return applySigMode(model);
@@ -99,6 +100,8 @@
       return hasNets && (model.type === "scale" || model.type === "nps")
         ? "summary" : "detail";
     }
+    // an explicit "Index (mean)" choice needs a mean row, else fall to detail
+    if (kind === "mean") return TR.render.hasMeanRow(model) ? "mean" : "detail";
     if (!hasNets && (kind === "summary" || kind === "both")) return "detail";
     return kind;
   };
@@ -300,6 +303,11 @@
       "row-chart", rowChartChecked, rowChartTotal);
     var kind = cards2.resolveChartKind(chartModel);
     var hasNets = TR.render.hasNetRows(chartModel);
+    var hasMean = TR.render.hasMeanRow(chartModel);
+    var kindOpt = function (val, label) {
+      return '<option value="' + val + '"' + (kind === val ? " selected" : "") +
+        ">" + label + "</option>";
+    };
     menu.innerHTML =
       '<div class="cm-sect">Columns</div>' +
       '<div class="cm-head"><span>Column</span><span>Table</span>' +
@@ -309,13 +317,14 @@
       "<div class='cm-body'>" + rowAll + rows + "</div>" +
       '<div class="cm-sect">Chart plots</div>' +
       '<select data-chartkindsel class="wide"' +
-      (hasNets ? "" : ' disabled title="This question has no NET rows — detail only"') +
-      '><option value="detail"' + (kind === "detail" ? " selected" : "") +
-      ">Detail categories</option>" +
-      '<option value="summary"' + (kind === "summary" ? " selected" : "") +
-      ">Groupings (NETs)</option>" +
-      '<option value="both"' + (kind === "both" ? " selected" : "") +
-      ">Both</option></select>" +
+      (hasNets || hasMean ? "" :
+        ' disabled title="This question has only detail categories to plot"') +
+      ">" +
+      kindOpt("detail", "Detail categories") +
+      (hasNets ? kindOpt("summary", "Groupings (NETs)") : "") +
+      (hasNets ? kindOpt("both", "Both") : "") +
+      (hasMean ? kindOpt("mean", "Index (mean)") : "") +
+      "</select>" +
       '<button class="primary wide" data-act="columns-done">Done</button>';
     menu.querySelectorAll("[data-cmall][data-mixed='1']").forEach(function (cb) {
       cb.indeterminate = true;   // header reflects a mixed selection
@@ -407,7 +416,8 @@
         cards2.chartCols(chartModel).length + " column" +
         (cards2.chartCols(chartModel).length === 1 ? "" : "s") + " · " +
         (kind === "summary" ? "groupings" : kind === "both" ? "detail + groupings"
-          : "detail rows") + " — change under Rows &amp; columns…</span></div>" +
+          : kind === "mean" ? "index (mean)" : "detail rows") +
+        " — change under Rows &amp; columns…</span></div>" +
         '<div class="chart">' + safeChart(chartModel) + "</div>";
     }
     if (model.hiddenCount || model.hiddenRowCount) {

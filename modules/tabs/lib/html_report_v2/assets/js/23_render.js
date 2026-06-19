@@ -329,6 +329,7 @@
    * exists so the chart is never silently empty.
    */
   render.chartRows = function (model) {
+    if (model.chartKind === "mean") return render.meanChartRows(model);
     var pick = function (kinds) {
       return model.rows.filter(function (r) {
         return kinds.indexOf(r.kind) !== -1 && !r.diff &&
@@ -353,6 +354,38 @@
       r.cells.forEach(function (c) { if (c.pct > max) max = c.pct; });
     });
     return { rows: rows, axisMax: S.niceMax(max) };
+  };
+
+  /**
+   * Chart source rows for the "Index (mean)" plot: the question's mean / Index
+   * row(s), with the rating exposed in the chartable `pct` slot so the renderer
+   * (columnChart, meanScale) scales + labels them as RATINGS, not percentages.
+   * Honours per-row unticks and takes its axis from the data, like the
+   * distribution path.
+   */
+  render.meanChartRows = function (model) {
+    var has = function (c) { return c.mean !== null && c.mean !== undefined; };
+    var rows = model.rows.filter(function (r) {
+      return r.kind === "mean" && r.cells.some(has);
+    }).map(function (r) {
+      return { kind: r.kind, label: r.label, cells: r.cells.map(function (c) {
+        return { pct: has(c) ? c.mean : null, n: c.n, sig: c.sig || "" };
+      }) };
+    });
+    var hidden = model.hiddenChartRows || [];
+    if (hidden.length) rows = rows.filter(function (r) { return hidden.indexOf(r.label) === -1; });
+    var max = 0;
+    rows.forEach(function (r) { r.cells.forEach(function (c) { if (c.pct > max) max = c.pct; }); });
+    return { rows: rows, axisMax: S.niceMax(max) };
+  };
+
+  /** True when the question has a chartable mean (Index) row. */
+  render.hasMeanRow = function (model) {
+    return model.rows.some(function (r) {
+      return r.kind === "mean" && r.cells.some(function (c) {
+        return c.mean !== null && c.mean !== undefined;
+      });
+    });
   };
 
   /** True when a model actually has chartable NET rows. */
