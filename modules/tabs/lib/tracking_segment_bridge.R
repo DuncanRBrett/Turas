@@ -110,6 +110,11 @@ tracker_segment_contributions <- function(trend_results, segments_meta, waves_me
       if (is.null(total_res)) next
       mtype <- total_res$metric_type %||% "mean"
       title <- as.character(total_res$question_text %||% q_code)
+      # match_key links current<->prior. With a Question_Mapping the current wave
+      # keys by the canonical QuestionCode (tracking_metrics); without one it keys
+      # by the normalised title. Honour an explicit `key` (the canonical code) so
+      # the sidecars align with whichever the live wave used.
+      mkey <- tracking_norm(total_res$key %||% title)
       tot_wr <- wr_of(total_res)
       if (is.null(tot_wr)) next                          # question absent this wave
 
@@ -144,7 +149,7 @@ tracker_segment_contributions <- function(trend_results, segments_meta, waves_me
           bases[[bk$key]] <- base_of(swr)
           seg_present[[bk$key]] <- list(norm = bk$key, label = bk$label, group = bk$group)
         }
-        q <- list(match_key = tracking_norm(title), title = title,
+        q <- list(match_key = mkey, title = title,
                   base = base_of(tot_wr), stats = tot_stat,
                   seg_stats = seg_stats, bases = bases)
 
@@ -179,7 +184,7 @@ tracker_segment_contributions <- function(trend_results, segments_meta, waves_me
           }
           seg_present[[bk$key]] <- list(norm = bk$key, label = bk$label, group = bk$group)
         }
-        q <- list(match_key = tracking_norm(title), title = title,
+        q <- list(match_key = mkey, title = title,
                   base = tbase, rows = rows, bases = bases)
 
       } else {

@@ -91,6 +91,16 @@ test_that("compute -> bridge -> island carries per-segment values", {
   expect_equal(ch_q$rows[["online"]]$seg[["cape town"]], 100)   # both CT 2024 rows are Online
 })
 
+test_that("a canonical `key` overrides the title for match_key (Question_Mapping path)", {
+  m <- list(code = "X", key = "ENG01", type = "mean",
+            title = "I know what is expected of me at work",
+            cols = list("2024" = "Q1", "2025" = "Q5"))
+  ct2 <- compute_segment_trends(waves, list(m), segment_dims)
+  pri <- tracker_segment_contributions(ct2$trend_results, ct2$segments_meta,
+                                       list(list(id = "2024", label = "W24", year = 2024)))
+  expect_equal(pri[[1]]$questions[[1]]$match_key, "eng01")   # norm(key), not norm(title)
+})
+
 test_that("write_segment_wave_sidecars round-trips through the existing pipeline reader", {
   td <- file.path(tempdir(), "seg_sidecars_test")
   unlink(td, recursive = TRUE)

@@ -247,3 +247,25 @@ Three years, one per-respondent `*_data.xlsx` each; no tracker/mapping config ex
 
 **Follow-up (build-going-forward):** have the current wave's `wave_contribution`
 also emit its own segment sidecar, so 2026+ is automatic (no backfill step).
+
+## 13. Question_Mapping is the canonical, generic mechanism (2026-06-19)
+
+Title-match (no mapping) links prior↔current only when wording is byte-identical
+across waves — fragile. The **Question_Mapping** is the robust, generic path,
+now wired both ends:
+- The live wave keys metrics by the **canonical `QuestionCode`** when a
+  `question_mapping` is configured (`tracking_metrics` + `detect_wave_column`).
+- The bridge/backfill now match it: `compute_segment_trends` carries an explicit
+  `key`; the bridge sets `match_key = tracking_norm(key || title)`. So sidecars
+  key by the canonical code too → the link survives **renumbering AND rewording**.
+- `sacs_segment_backfill.R` is now **mapping-driven + generic**: reads a
+  Question_Mapping workbook — `QuestionMap` (canonical code → per-wave column +
+  TrackingSpecs) and `Banners` (Total/Campus/Department/Tenure → per-wave column)
+  — plus the prior data, and emits canonical-keyed sidecars. Latest `Wave*` col =
+  live wave; earlier = priors.
+
+**SACS worked example:** `SACS-2025_Question_Mapping.xlsx` (13 metrics ×
+Wave2023/24/25; banners Campus/Department/Tenure). Config Settings:
+`question_mapping = …/SACS-2025_Question_Mapping.xlsx`. Verified: live wave
+(key `eng01`, col Q05) links to canonical sidecars; Index 4.58/4.56, satisfaction
+4.08/3.83. (The mapping workbook + config live in OneDrive, not the repo.)

@@ -1,73 +1,75 @@
 # ==============================================================================
-# WORKED EXAMPLE — SACS engagement, segment wave-trends backfill
+# Question_Mapping-driven segment wave-trend backfill (generic; SACS worked example)
 # ==============================================================================
-# Generates the PRIOR-wave segment sidecars (2023 + 2024) that make the
-# SACS-2025 v2 tabs report show engagement trends by Total / Campus / Department
-# / Tenure. The current wave (2025) stays the live tabs run.
+# Reads a Question_Mapping workbook and the prior waves' data, then writes one
+# `<wave>_wave.json` segment sidecar per prior wave into a `waves_source` folder.
+# A v2 tabs build (html_report_v2_tracking + waves_source + the same
+# question_mapping in Settings) then assembles a segment-aware island — and the
+# sidecars key by the CANONICAL QuestionCode, matching how the live wave keys
+# when a mapping is configured (so the link survives renumbering / rewording).
 #
-# HOW TO USE (you run this, then launch_turas — nothing here touches a report):
-#   1. Edit SACS_BASE / OUT_DIR below if needed.
-#   2. Rscript modules/tabs/examples/sacs_segment_backfill.R
-#      -> writes <OUT_DIR>/SACS_2023_wave.json + SACS_2024_wave.json
-#   3. In SACS-2025_Crosstab_Config.xlsx:
-#        - Settings: html_report_v2 = TRUE, html_report_v2_tracking = TRUE,
-#                    waves_source = <OUT_DIR>
-#        - Selection: make Q02 (Campus), Q03 (Department), Q04 (Tenure) BANNERS
-#          so the live 2025 model carries those columns (the current-wave segment
-#          points are read from them; priors come from the sidecars).
-#   4. launch_turas() -> build the SACS-2025 crosstab -> open the v2 report ->
-#      Tracking tab -> "Segments for question".
+# Question_Mapping workbook (SACS-2025_Question_Mapping.xlsx):
+#   QuestionMap sheet: QuestionCode | QuestionText | TrackingSpecs | Wave<YYYY>…
+#                      (canonical code -> that wave's data column; TrackingSpecs
+#                       "nps" -> NPS, else mean)
+#   Banners sheet:     BreakLabel | Wave<YYYY>…   (Total + each banner dimension;
+#                      Total has blank wave columns = all respondents)
+# The LATEST Wave column is the live/current wave (built by run_crosstabs); all
+# earlier Wave columns are priors backfilled here.
 #
-# Engagement battery wording is identical across years, so metrics match by text
-# despite renumbering (2023 Q01-12 -> 2024/25 Q05-16). Campus + Tenure labels are
-# stable across years (clean trends); Department was restructured (partial).
+# Run (you, then re-run the report):
+#   Rscript modules/tabs/examples/sacs_segment_backfill.R
+#   (override paths with SACS_PROJECT / SACS_QMAP / SACS_SEG_OUT)
 # ==============================================================================
 
 suppressMessages(library(openxlsx))
 
-SACS_BASE <- "/Users/duncan/Library/CloudStorage/OneDrive-Personal/DB Files/TurasProjects/SACAP/SACS"
-OUT_DIR   <- Sys.getenv("SACS_SEG_OUT", file.path(SACS_BASE, "SACS-2025", "wave_history"))  # waves_source (in-project)
-TURAS     <- Sys.getenv("TURAS_HOME", "/Users/duncan/Dev/Turas")
+PROJECT <- Sys.getenv("SACS_PROJECT",
+  "/Users/duncan/Library/CloudStorage/OneDrive-Personal/DB Files/TurasProjects/SACAP/SACS/SACS-2025")
+QMAP    <- Sys.getenv("SACS_QMAP", file.path(PROJECT, "SACS-2025_Question_Mapping.xlsx"))
+OUT_DIR <- Sys.getenv("SACS_SEG_OUT", file.path(PROJECT, "wave_history"))
+TURAS   <- Sys.getenv("TURAS_HOME", "/Users/duncan/Dev/Turas")
+
+# Per-study data-file locator: SACS keeps each wave at ../SACS-<year>/03_Data/.
+data_path <- function(year)
+  file.path(dirname(PROJECT), sprintf("SACS-%s", year), "03_Data", sprintf("SACS-%s_data.xlsx", year))
 
 source(file.path(TURAS, "modules/tracker/lib/statistical_core.R"))
 source(file.path(TURAS, "modules/tabs/lib/tracking_island.R"))
 source(file.path(TURAS, "modules/tabs/lib/tracking_segment_compute.R"))
 source(file.path(TURAS, "modules/tabs/lib/tracking_segment_bridge.R"))
-norm <- tracking_norm
 
-# --- prior waves only (2025 is the live current wave) -------------------------
-wavedef <- list(
-  list(id = "2023", label = "SACS 2023", year = 2023, camp = "Q24", dept = "Q25", ten = "Q26"),
-  list(id = "2024", label = "SACS 2024", year = 2024, camp = "Q02", dept = "Q03", ten = "Q04"))
+qm <- load_question_mapping(QMAP)
+if (is.null(qm)) stop("Could not read QuestionMap sheet from: ", QMAP)
+banners <- tryCatch(read.xlsx(QMAP, sheet = "Banners"), error = function(e) NULL)
 
-load_wave <- function(w) {
-  dir <- file.path(SACS_BASE, sprintf("SACS-%s", w$id))
-  d <- read.xlsx(file.path(dir, "03_Data", sprintf("SACS-%s_data.xlsx", w$id)), sheet = 1)
-  q <- read.xlsx(file.path(dir, sprintf("SACS-%s_Survey_Structure.xlsx", w$id)), sheet = "Questions")
-  list(id = w$id, data = d, w = w,
-       inv = setNames(as.character(q$QuestionCode), vapply(q$QuestionText, norm, "")))
-}
-WL <- lapply(wavedef, load_wave); names(WL) <- vapply(wavedef, function(w) w$id, "")
+wave_cols <- sort(grep("^Wave", names(qm), value = TRUE))   # Wave2023, Wave2024, Wave2025
+prior_cols <- utils::head(wave_cols, -1)                    # all but the latest (= live wave)
+years <- sub("^Wave", "", prior_cols)
+cat("Mapping:", nrow(qm), "metrics |", length(prior_cols), "prior waves:", paste(years, collapse = ", "),
+    "| live wave:", sub("^Wave", "", utils::tail(wave_cols, 1)), "\n")
 
-# canonical tracked metrics from the 2025 structure: engagement Q05-Q16 + Q28
-q25 <- read.xlsx(file.path(SACS_BASE, "SACS-2025", "SACS-2025_Survey_Structure.xlsx"), sheet = "Questions")
-t25 <- setNames(as.character(q25$QuestionText), as.character(q25$QuestionCode))
-metrics <- lapply(c(sprintf("Q%02d", 5:16), "Q28"), function(cd) {
-  key <- norm(t25[[cd]])
-  list(code = paste0("M_", cd), title = t25[[cd]], type = "mean",
-       cols = setNames(lapply(WL, function(x) x$inv[[key]]), names(WL)))
-})
-seg_dim <- function(label, field)
-  list(label = label, cols = setNames(lapply(WL, function(x) x$w[[field]]), names(WL)))
-segment_dims <- list(seg_dim("Campus", "camp"), seg_dim("Department", "dept"), seg_dim("Tenure", "ten"))
+waves <- lapply(seq_along(prior_cols), function(i)
+  list(id = years[i], data = read.xlsx(data_path(years[i]), sheet = 1)))
 
-waves <- lapply(WL, function(x) list(id = x$id, data = x$data))
+per_wave <- function(row) setNames(lapply(prior_cols, function(c) as.character(row[[c]])), years)
+metrics <- lapply(seq_len(nrow(qm)), function(i) list(
+  code  = as.character(qm$QuestionCode[i]),
+  key   = as.character(qm$QuestionCode[i]),                 # canonical key (matches the live wave)
+  title = as.character(qm$QuestionText[i]),
+  type  = if (grepl("nps", tolower(qm$TrackingSpecs[i] %||% ""))) "nps" else "mean",
+  cols  = per_wave(qm[i, ])))
+
+seg_rows <- if (is.null(banners)) integer(0) else which(tolower(trimws(banners$BreakLabel)) != "total")
+segment_dims <- lapply(seg_rows, function(i) list(
+  label = as.character(banners$BreakLabel[i]), cols = per_wave(banners[i, ])))
+
 paths <- write_segment_wave_sidecars(
   waves, metrics, segment_dims, OUT_DIR,
-  wave_labels = setNames(lapply(wavedef, function(w) w$label), names(WL)),
-  wave_years  = setNames(lapply(wavedef, function(w) w$year),  names(WL)))
+  wave_labels = setNames(lapply(years, function(y) paste("SACS", y)), years),
+  wave_years  = setNames(lapply(years, as.numeric), years))
 
 cat("Wrote", length(paths), "segment sidecars to:", OUT_DIR, "\n")
 for (p in paths) cat("  -", basename(p), "\n")
-cat("\nNext: set waves_source =", OUT_DIR, "in SACS-2025_Crosstab_Config (Settings),\n")
-cat("make Q02/Q03/Q04 banners (Selection), enable html_report_v2_tracking, then launch_turas.\n")
+cat("\nNext: ensure the Crosstab_Config Settings has waves_source =", OUT_DIR, "\n")
+cat("and question_mapping =", QMAP, "(so the live wave keys by canonical code too), then launch_turas.\n")

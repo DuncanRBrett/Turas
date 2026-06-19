@@ -114,7 +114,8 @@ compute_segment_trends <- function(waves, metrics, segment_dims, weight_col = NU
         if (!is.null(res)) wr[[wid]] <- res
       }
       if (length(wr)) {
-        qsegs[[sn]] <- list(metric_type = mtype, question_text = m$title, wave_results = wr)
+        qsegs[[sn]] <- list(metric_type = mtype, question_text = m$title,
+                            key = m$key %||% m$title, wave_results = wr)
       }
     }
     if (length(qsegs)) trend_results[[m$code]] <- qsegs
