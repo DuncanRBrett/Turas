@@ -91,6 +91,26 @@ test_that("compute -> bridge -> island carries per-segment values", {
   expect_equal(ch_q$rows[["online"]]$seg[["cape town"]], 100)   # both CT 2024 rows are Online
 })
 
+test_that("composite metric: value is the per-respondent mean of its source items", {
+  cw <- list(list(id = "2024", data = data.frame(
+    A = c(4, 5, 3, 5), B = c(5, 5, 4, 4),
+    Camp = c("CT", "CT", "DBN", "DBN"), stringsAsFactors = FALSE)))
+  cm <- list(list(code = "IDX", title = "Engagement", type = "mean",
+                  sources = list("2024" = c("A", "B"))))      # composite, no $cols
+  cd <- list(list(label = "Campus", cols = list("2024" = "Camp")))
+  cc <- compute_segment_trends(cw, cm, cd)
+  # per-respondent composite = rowMeans(A,B): 4.5, 5, 3.5, 4.5
+  expect_equal(cc$trend_results$IDX$Total$wave_results[["2024"]]$mean, mean(c(4.5, 5, 3.5, 4.5)))
+  expect_equal(cc$trend_results$IDX[["Campus_CT"]]$wave_results[["2024"]]$mean, mean(c(4.5, 5)))
+  expect_equal(cc$trend_results$IDX[["Campus_DBN"]]$wave_results[["2024"]]$mean, mean(c(3.5, 4.5)))
+  # a composite carries no canonical key -> it links by its data-layer TITLE,
+  # which is the renderer's aggKeys fallback for a non-emitted composite.
+  pri <- tracker_segment_contributions(cc$trend_results, cc$segments_meta,
+                                       list(list(id = "2024", label = "W24", year = 2024)))
+  cq <- Filter(function(q) q$match_key == "engagement", pri[[1]]$questions)[[1]]
+  expect_equal(cq$stats$index, mean(c(4.5, 5, 3.5, 4.5)))     # composite exposed as index
+})
+
 test_that("a canonical `key` overrides the title for match_key (Question_Mapping path)", {
   m <- list(code = "X", key = "ENG01", type = "mean",
             title = "I know what is expected of me at work",

@@ -30,6 +30,28 @@ if (!exists("%||%", mode = "function")) {
   trimws(toupper(as.character(x))) == trimws(toupper(as.character(value)))
 }
 
+# The metric's per-respondent value vector for one wave.
+#   * single-column metric -> `m$cols[[wid]]`.
+#   * composite / index     -> `m$sources[[wid]]` (>=1 source columns) resolved to
+#     the per-respondent mean of those columns (na.rm — a partial composite uses
+#     the items the respondent answered), exactly how the data-layer composite
+#     (mean of its items) is computed.
+# Returns NULL when the metric is absent this wave (its column(s) missing).
+.tsc_metric_vector <- function(m, wid, d) {
+  if (!is.null(m$sources)) {
+    scols <- m$sources[[wid]]
+    scols <- scols[!is.na(scols) & nzchar(scols) & scols %in% names(d)]
+    if (length(scols) == 0) return(NULL)
+    mat <- vapply(scols, function(cn) suppressWarnings(as.numeric(d[[cn]])),
+                  numeric(nrow(d)))
+    if (is.null(dim(mat))) mat <- matrix(mat, ncol = 1)
+    return(suppressWarnings(rowMeans(mat, na.rm = TRUE)))   # all-NA row -> NaN (filtered downstream)
+  }
+  mcol <- m$cols[[wid]]
+  if (is.null(mcol) || !(mcol %in% names(d))) return(NULL)
+  d[[mcol]]
+}
+
 # One wave_result (the tracker calculator output + available=TRUE), or NULL.
 .tsc_wave_result <- function(type, vals, weights) {
   if (identical(type, "proportions")) {
@@ -59,6 +81,9 @@ if (!exists("%||%", mode = "function")) {
 #'   `list(code = <stable id>, title = <canonical question text>,
 #'         type = "mean" | "nps" | "proportions",
 #'         cols = list(<wave id> = <data column name in that wave>))`.
+#'   A composite/index metric instead carries
+#'   `sources = list(<wave id> = c(<source columns>))` (the metric value is the
+#'   per-respondent mean of those columns) and no `cols`.
 #' @param segment_dims List of banner dimensions, each
 #'   `list(label = <e.g. "Campus">, cols = list(<wave id> = <column>))`.
 #' @param weight_col Optional weight column name (used when present in a wave;
@@ -98,8 +123,11 @@ compute_segment_trends <- function(waves, metrics, segment_dims, weight_col = NU
       wr <- list()
       for (wid in wave_ids) {
         d <- wdata[[wid]]
-        mcol <- m$cols[[wid]]
-        if (is.null(mcol) || !(mcol %in% names(d))) next            # metric absent this wave
+        # The metric's per-respondent value vector this wave: a single data
+        # column, or — for a composite/index — the row-mean of several source
+        # columns (an engagement index = mean of its 12 items).
+        metric_vec <- .tsc_metric_vector(m, wid, d)
+        if (is.null(metric_vec)) next                               # metric absent this wave
         rows <- rep(TRUE, nrow(d))
         if (!isTRUE(seg$is_total)) {
           scol <- seg$.cols[[wid]]
@@ -110,7 +138,7 @@ compute_segment_trends <- function(waves, metrics, segment_dims, weight_col = NU
         w <- if (!is.null(weight_col) && weight_col %in% names(d)) {
           as.numeric(d[[weight_col]][rows])
         } else rep(1, sum(rows))
-        res <- .tsc_wave_result(mtype, d[[mcol]][rows], w)
+        res <- .tsc_wave_result(mtype, metric_vec[rows], w)
         if (!is.null(res)) wr[[wid]] <- res
       }
       if (length(wr)) {

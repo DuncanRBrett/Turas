@@ -269,3 +269,30 @@ Wave2023/24/25; banners Campus/Department/Tenure). Config Settings:
 `question_mapping = …/SACS-2025_Question_Mapping.xlsx`. Verified: live wave
 (key `eng01`, col Q05) links to canonical sidecars; Index 4.58/4.56, satisfaction
 4.08/3.83. (The mapping workbook + config live in OneDrive, not the repo.)
+
+## 14. Composite / index metrics (2026-06-19)
+
+Composites (e.g. `Q_Engage` = mean of the 12 engagement items) are **not raw
+data columns** and — unlike items — carry **no per-respondent micro score**, so
+the live wave never emits them; they fall back to the renderer's title key
+(`aggKeys[code] = norm(q.title)`, `22w_waves.js`). They therefore track via a
+distinct mapping convention:
+
+- **QuestionMap `SourceQuestions` column** — a comma-list of source `QuestionCode`s
+  (`ENG01,…,ENG12`). The backfill resolves each to that wave's column (via the
+  item rows' `Wave*` map) and `compute_segment_trends` computes the metric as the
+  **per-respondent row-mean** of those columns (`.tsc_metric_vector`; na.rm — a
+  partial composite uses the items answered), exactly as the data-layer composite.
+- **Keyed by title, not code** — the composite row's `QuestionText` must equal the
+  **data-layer composite title** (SACS: `Engagement`); the backfill sets `key =
+  NULL` so the sidecar `match_key = norm(QuestionText)`, matching the live wave's
+  title fallback. `Wave*` cells stay blank (it is not a data column).
+- Current point comes from the data-layer composite cell (`currentFor` fallback);
+  priors from the computed sidecars; the "Engagement"-labelled mean row reads
+  `stats.index` (the bridge exposes mean as index too).
+
+**Verified on real SACS:** the `Q_Engage` row computes Index **4.305 (2023) /
+4.163 (2024)** by Total + Campus/Department/Tenure — matching the deck's
+4.31 / 4.16 trend (2025 live = 4.08). To add `Q_Value` similarly: map the values
+items, then add a `Q_Value` composite row (`QuestionText = Values`); note values
+were reworded for 2023, so it is comparable 2024+ only.
