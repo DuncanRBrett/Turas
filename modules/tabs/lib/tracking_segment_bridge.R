@@ -125,6 +125,10 @@ tracker_segment_contributions <- function(trend_results, segments_meta, waves_me
           if (is.null(v)) return(NULL)
           s <- .tsb_stat(stat_field, v)
           if (is_mean) {
+            # The data-layer mean row may be labelled "Index" (rating index) or
+            # "Mean"; the renderer reads stats.index for the former and stats.mean
+            # for the latter. Carry both (same value) so either label resolves.
+            s$index <- v
             sd <- num_or_null(wr$sd)
             if (!is.null(sd)) s$sd <- sd
           }

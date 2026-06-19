@@ -84,6 +84,7 @@ test_that("compute -> bridge -> island carries per-segment values", {
   eng_q <- Filter(function(q) q$match_key == tracking_norm(metrics[[1]]$title),
                   priors[[1]]$questions)[[1]]
   expect_equal(eng_q$stats$mean, mean(c(4, 5, 5, 3, 5, 5, 4)))
+  expect_equal(eng_q$stats$index, mean(c(4, 5, 5, 3, 5, 5, 4)))   # mean also exposed as index
   expect_equal(eng_q$seg_stats[["cape town"]]$mean, 4.5)
   expect_equal(eng_q$bases[["cape town"]], 4)
   ch_q <- Filter(function(q) q$match_key == "channel used", priors[[1]]$questions)[[1]]

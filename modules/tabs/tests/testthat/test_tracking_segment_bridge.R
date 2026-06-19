@@ -97,6 +97,8 @@ test_that("Total + per-segment means and bases carried (W1, Q1)", {
   expect_equal(q$bases[["gauteng"]], 75)
   expect_equal(q$stats$sd, 1.5)                       # mean SD carried for the Welch test
   expect_equal(q$seg_stats[["western cape"]]$sd, 1.5)
+  expect_equal(q$stats$index, 7.0)                    # also exposed as index ("Index"-labelled rows)
+  expect_equal(q$seg_stats[["western cape"]]$index, 6.8)
 })
 
 test_that("NPS question carries nps under stats/seg_stats (W2, Q2)", {
