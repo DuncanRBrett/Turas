@@ -50,19 +50,43 @@ nps_bucket_score <- function(v) {
 }
 
 
-#' Derive net_diffs (NET POSITIVE = top box - bottom box) from data-layer rows
+#' Mean OptionValue per BoxCategory — the favourability score
 #'
-#' Mirrors the processor's identify_top_bottom_categories: the bottom box is the
-#' first box-category NET row, the top box is the last non-DK box NET row, and a
-#' "NET POSITIVE (...)" row is their difference. Keyed by the NET POSITIVE row's
-#' zero-based index; values are the plus/minus box row indices the renderer's
-#' net_diff path reads. Derived by ORDER (not by parsing the label), so box names
-#' that themselves contain dashes (e.g. "Good (9 - 10)") are handled safely.
+#' The score the Index uses (OptionValue), aggregated to each box. Lets NET
+#' POSITIVE order its boxes by favourability rather than display position, so the
+#' favourable box is "top" whether the scale is shown best-first or worst-first.
+#'
+#' @param opt_df Option rows for ONE question (needs BoxCategory + OptionValue)
+#' @return Named numeric BoxCategory -> mean OptionValue (NA when a box has no
+#'   numeric value), or NULL when there is nothing to score by.
+#' @export
+box_category_scores <- function(opt_df) {
+  if (is.null(opt_df) || !all(c("BoxCategory", "OptionValue") %in% names(opt_df))) return(NULL)
+  cats <- unique(opt_df$BoxCategory)
+  cats <- cats[!is.na(cats) & nzchar(trimws(as.character(cats)))]
+  if (length(cats) == 0) return(NULL)
+  vapply(cats, function(cat) {
+    vals <- suppressWarnings(as.numeric(opt_df$OptionValue[
+      !is.na(opt_df$BoxCategory) & opt_df$BoxCategory == cat]))
+    if (all(is.na(vals))) NA_real_ else mean(vals, na.rm = TRUE)
+  }, numeric(1))
+}
+
+#' Derive net_diffs (NET POSITIVE = favourable box - unfavourable box) from rows
+#'
+#' Keyed by the NET POSITIVE row's zero-based index; values are the plus/minus
+#' box row indices the renderer's net_diff path reads. When `box_scores`
+#' (BoxCategory -> mean OptionValue) is supplied, the favourable box (highest
+#' score) is "plus" and the unfavourable (lowest) is "minus", so the difference
+#' is correct regardless of display direction. Without scores it falls back to
+#' ROW order (first box = minus, last non-DK box = plus), the historical
+#' behaviour — derived by order, never by parsing the (dash-containing) label.
 #'
 #' @param rows The built rows[] list of a data-layer question
+#' @param box_scores Optional BoxCategory -> score (from box_category_scores)
 #' @return Named list "<npIndex>" -> list(plus, minus), or NULL
 #' @export
-derive_net_diffs <- function(rows) {
+derive_net_diffs <- function(rows, box_scores = NULL) {
   net_idx <- which(vapply(rows, function(r) identical(r$kind, "net"), logical(1)))
   if (length(net_idx) < 3) return(NULL)
   is_np <- vapply(net_idx, function(i) grepl("^NET POSITIVE", rows[[i]]$label, ignore.case = TRUE),
@@ -76,10 +100,26 @@ derive_net_diffs <- function(rows) {
   }, logical(1))
   non_dk <- box_rows[!is_dk]
   if (length(non_dk) == 0) return(NULL)
-  bottom <- box_rows[1] - 1L                    # first box (zero-based)
-  top <- non_dk[length(non_dk)] - 1L            # last non-DK box (zero-based)
+
+  # Prefer SCORE order (favourable box = highest OptionValue), so NET POSITIVE is
+  # favourable - unfavourable whether the scale is displayed best-first or
+  # worst-first. Fall back to ROW order when scores are unavailable.
+  bottom <- top <- NA_integer_
+  if (!is.null(box_scores) && length(non_dk) >= 2) {
+    sc <- suppressWarnings(as.numeric(box_scores[
+      vapply(non_dk, function(i) as.character(rows[[i]]$label), character(1))]))
+    if (sum(!is.na(sc)) >= 2) {
+      top <- non_dk[which.max(sc)]                # favourable
+      bottom <- non_dk[which.min(sc)]             # unfavourable
+    }
+  }
+  if (is.na(top) || is.na(bottom)) {              # historical row-order fallback
+    bottom <- box_rows[1]
+    top <- non_dk[length(non_dk)]
+  }
+
   diffs <- list()
-  for (i in np) diffs[[as.character(i - 1L)]] <- list(plus = top, minus = bottom)
+  for (i in np) diffs[[as.character(i - 1L)]] <- list(plus = top - 1L, minus = bottom - 1L)
   diffs
 }
 
@@ -129,4 +169,24 @@ derive_index_scores <- function(q_result, survey_structure) {
     if (!is.na(sc) && nzchar(lbl)) scores[[lbl]] <- sc
   }
   if (length(scores) == 0) NULL else scores
+}
+
+#' Box-category scores for a question (NET POSITIVE direction)
+#'
+#' Resolves the question's options from the structure (as derive_index_scores
+#' does) and returns their per-box mean OptionValue, so the data layer can hand
+#' derive_net_diffs the favourability order. NULL when no structure/options.
+#'
+#' @param q_result One question result (needs $question_code)
+#' @param survey_structure Loaded structure (needs $options)
+#' @return Named BoxCategory -> mean OptionValue, or NULL
+#' @export
+derive_box_scores <- function(q_result, survey_structure) {
+  if (is.null(survey_structure) || is.null(survey_structure$options)) return(NULL)
+  code <- as.character(q_result$question_code %||% "")
+  if (!nzchar(code)) return(NULL)
+  opt <- survey_structure$options
+  qopt <- opt[!is.na(opt$QuestionCode) & opt$QuestionCode == code, , drop = FALSE]
+  if (nrow(qopt) == 0) return(NULL)
+  box_category_scores(qopt)
 }

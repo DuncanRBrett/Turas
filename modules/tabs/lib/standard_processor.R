@@ -874,7 +874,19 @@ get_sorted_boxcategories <- function(question_options) {
     return(NULL)
   }
 
-  # Get DisplayOrder for each category
+  # Order boxes by their SCORE (mean OptionValue) ascending, so the unfavourable
+  # box is "bottom" and the favourable box is "top" — making NET POSITIVE the
+  # favourable box minus the unfavourable one regardless of whether the scale is
+  # displayed best-first or worst-first. This mirrors the Index, which scores by
+  # OptionValue. Unscored boxes (e.g. DK/NA) sort last and are excluded from the
+  # top by identify_top_bottom_categories.
+  cat_score <- box_category_scores(question_options)
+  if (!is.null(cat_score) && sum(!is.na(cat_score)) >= 2) {
+    cat_score <- cat_score[as.character(box_categories)]   # align to box_categories
+    return(box_categories[order(cat_score, na.last = TRUE)])
+  }
+
+  # Fallback: no usable OptionValue — order by DisplayOrder (legacy behaviour).
   cat_order <- sapply(box_categories, function(cat) {
     opts <- question_options[question_options$BoxCategory == cat, ]
     if (nrow(opts) > 0 && "DisplayOrder" %in% names(opts)) {

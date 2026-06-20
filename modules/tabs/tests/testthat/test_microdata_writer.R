@@ -321,3 +321,27 @@ test_that("derive_net_diffs returns NULL without a NET POSITIVE row", {
                list(kind = "mean", label = "Mean"))
   expect_null(derive_net_diffs(rows))
 })
+
+test_that("derive_net_diffs orders by SCORE (favourable box = plus) when given box_scores", {
+  # Best-first display: "Agree" appears before "Disagree" but is the favourable
+  # (higher-score) box. plus must be Agree, minus Disagree — i.e. Agree - Disagree
+  # — regardless of the display order (SACS Q05 regression).
+  rows <- list(
+    list(kind = "net", label = "Agree"),       # 0 (favourable, displayed first)
+    list(kind = "net", label = "Disagree"),    # 1 (unfavourable)
+    list(kind = "net", label = "NET POSITIVE (Agree - Disagree)"))  # 2
+  expect_equal(derive_net_diffs(rows, c(Agree = 4.5, Disagree = 1.5)),
+               list("2" = list(plus = 0, minus = 1)))
+  # without scores it falls back to row order (last non-DK box = plus) — unchanged
+  expect_equal(derive_net_diffs(rows), list("2" = list(plus = 1, minus = 0)))
+})
+
+test_that("box_category_scores averages OptionValue per box", {
+  qo <- data.frame(
+    OptionValue = c(5, 4, 2, 1),
+    BoxCategory = c("Agree", "Agree", "Disagree", "Disagree"),
+    stringsAsFactors = FALSE)
+  s <- box_category_scores(qo)
+  expect_equal(unname(s[["Agree"]]), 4.5)
+  expect_equal(unname(s[["Disagree"]]), 1.5)
+})
