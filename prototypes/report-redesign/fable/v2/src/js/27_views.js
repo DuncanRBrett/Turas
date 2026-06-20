@@ -44,15 +44,19 @@
   }
 
   function indexQuestions() {
-    // A rated touchpoint is a scale / nps question with a summary mean. Numeric
-    // open-counts (type "numeric", e.g. "hours lost") also carry a mean row but
-    // have no scale maximum, so colour-banding them as "% of scale" is
-    // meaningless and direction-blind — exclude them from the index dashboard.
+    // A rated touchpoint carries a summary mean and sits on a known scale:
+    // scale / nps questions, PLUS composite indices (e.g. Q_Engage / Q_Value)
+    // which map to type "single" but carry a scale_max. Numeric open-counts
+    // (type "numeric", e.g. "hours lost") also have a mean but no scale maximum,
+    // so colour-banding them as "% of scale" is meaningless — excluded.
     return TR.AGG.questions.filter(function (q) {
-      return (q.type === "scale" || q.type === "nps") &&
-        q.rows.some(function (r) { return r.kind === "mean"; });
+      if (!q.rows.some(function (r) { return r.kind === "mean"; })) return false;
+      if (q.type === "scale" || q.type === "nps") return true;
+      return q.type !== "numeric" &&
+        typeof q.scale_max === "number" && isFinite(q.scale_max) && q.scale_max > 0;
     });
   }
+  views.indexQuestions = indexQuestions;   // exposed for the gate test
 
   function modelFor(code, banner) {
     // intervals ride along for the gauge + heatmap tooltips (additive)

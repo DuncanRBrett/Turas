@@ -1226,6 +1226,25 @@ run("Index (mean) chart mode plots the mean row as a rating, not a distribution"
     "no mean row -> no mean chart");
 });
 
+run("dashboard indexQuestions includes scale + composite, excludes numeric/single-choice", () => {
+  const saved = TR.AGG.questions;
+  TR.AGG.questions = [
+    { code: "S1", type: "scale",   scale_max: 5,    rows: [{ kind: "mean" }] },
+    { code: "N1", type: "numeric", scale_max: null, rows: [{ kind: "mean" }] },
+    { code: "C1", type: "single",  scale_max: 5,    rows: [{ kind: "mean" }] },   // composite index
+    { code: "SC", type: "single",                   rows: [{ kind: "category" }] } // plain single-choice
+  ];
+  try {
+    const codes = TR.views.indexQuestions().map((q) => q.code);
+    assert(codes.includes("S1"), "scale touchpoint included");
+    assert(codes.includes("C1"), "composite index (single + scale_max + mean) included");
+    assert(!codes.includes("N1"), "numeric open-count excluded (no scale_max)");
+    assert(!codes.includes("SC"), "plain single-choice excluded (no mean row)");
+  } finally {
+    TR.AGG.questions = saved;
+  }
+});
+
 run("golden parity suite passes (subprocess)", () => {
   const res = spawnSync("node", [path.join(BASE, "tests", "golden_parity.mjs")],
     { encoding: "utf8" });

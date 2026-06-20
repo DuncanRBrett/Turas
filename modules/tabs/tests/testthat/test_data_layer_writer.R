@@ -188,6 +188,29 @@ make_dl_q_boxcounts <- function() {
   )
 }
 
+# Composite index (Q_Engage / Q_Value style): question_type "Composite", a single
+# Index row, RowSource "composite". Maps to type "single" but must receive the
+# index scale_max + thresholds so it appears + colours on the dashboard like the
+# rated items it summarises.
+make_dl_q_composite <- function() {
+  list(
+    question_code = "Q_Engage", question_text = "Engagement",
+    question_type = "Composite", category = "Overall ratings",
+    table = data.frame(
+      RowLabel  = c("Engagement"),
+      RowType   = c("Index"),
+      RowSource = c("composite"),
+      "TOTAL::Total"   = c("4.1"),
+      "Gender::Male"   = c("4.2"),
+      "Gender::Female" = c("4.0"),
+      check.names = FALSE, stringsAsFactors = FALSE),
+    bases = list(
+      "TOTAL::Total"   = list(unweighted = 100, weighted = 100, effective = 100),
+      "Gender::Male"   = list(unweighted = 50,  weighted = 50,  effective = 50),
+      "Gender::Female" = list(unweighted = 50,  weighted = 50,  effective = 50))
+  )
+}
+
 make_dl_results <- function() list(Q1 = make_dl_q_single(), Q2 = make_dl_q_scale())
 
 make_dl_config <- function(...) {
@@ -458,6 +481,19 @@ test_that("scale_max is emitted from the configured scale (dashboard colouring)"
   expect_equal(q2$scale_max, 10)
   q1 <- Filter(function(q) q$code == "Q1", dl$questions)[[1]]   # no summary row
   expect_true(is.na(q1$scale_max))   # -> null in JSON; renderer falls back
+})
+
+test_that("a Composite index lands on the dashboard (scale_max + thresholds, type single)", {
+  cfg <- make_dl_config(dashboard_scale_index = 5, dashboard_green_index = 4,
+                        dashboard_amber_index = 3)
+  dl <- build_data_layer(list(QE = make_dl_q_composite()), make_dl_banner_info(), cfg)
+  q <- Filter(function(q) q$code == "Q_Engage", dl$questions)[[1]]
+  expect_equal(q$type, "single")     # composites map to "single"...
+  expect_equal(q$scale_max, 5)       # ...but still get the index scale (was NA -> off dashboard)
+  expect_equal(q$gauge_green, 4)
+  expect_equal(q$gauge_amber, 3)
+  # carries the mean row the renderer's indexQuestions() also requires
+  expect_true(any(vapply(q$rows, function(r) identical(r$kind, "mean"), logical(1))))
 })
 
 test_that("numeric questions are kept off the index dashboard (type + null scale_max)", {
