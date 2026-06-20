@@ -232,6 +232,12 @@
     if (!menu) return;
     var chartModel = cards2.chartModel();
     if (!chartModel) { menu.innerHTML = ""; return; }
+    // Preserve scroll across the rebuild: the panel and each cm-body (the
+    // Columns / Rows lists) scroll independently, so ticking a checkbox must not
+    // jump the user back to the top of the list they were scrolled into.
+    var keepPanelTop = menu.scrollTop;
+    var keepBodyTops = Array.prototype.map.call(
+      menu.querySelectorAll(".cm-body"), function (b) { return b.scrollTop; });
     var s = TR.d2.state;
     var hidden = TR.d2.hiddenFor(s.banner);
     var hiddenRows = s.hiddenRows[s.activeQ] || [];
@@ -329,6 +335,11 @@
     menu.querySelectorAll("[data-cmall][data-mixed='1']").forEach(function (cb) {
       cb.indeterminate = true;   // header reflects a mixed selection
     });
+    // Restore the captured scroll onto the freshly-built nodes — the Columns and
+    // Rows bodies rebuild in the same order, so index alignment holds.
+    menu.scrollTop = keepPanelTop;
+    var newBodies = menu.querySelectorAll(".cm-body");
+    keepBodyTops.forEach(function (top, i) { if (newBodies[i]) newBodies[i].scrollTop = top; });
   }
 
   function bannerTabsHtml() {
