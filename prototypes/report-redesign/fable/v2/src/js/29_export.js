@@ -581,10 +581,13 @@
         '<c:axId val="111111111"/><c:axId val="222222222"/></c:lineChart>';
       axesXml = chartAxes("b", "l");
     } else {
+      // horizontal bar: a mean plot labels one-decimal ratings on a fixed 0–max
+      // value axis (mirrors the column branch), not the default "0%".
       plot = '<c:barChart><c:barDir val="bar"/><c:grouping val="clustered"/>' +
-        '<c:varyColors val="0"/>' + series + dataLabels("outEnd") +
+        '<c:varyColors val="0"/>' + series + dataLabels("outEnd", null, lblFmt) +
         '<c:axId val="111111111"/><c:axId val="222222222"/></c:barChart>';
-      axesXml = chartAxes("l", "b");
+      axesXml = chartAxes("l", "b", meanScale ? "General" : null, false,
+        meanScale ? 0 : null, meanScale ? cr.axisMax : null);
     }
     var xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
       "<c:chartSpace " + C_NS + "><c:chart><c:plotArea><c:layout/>" +

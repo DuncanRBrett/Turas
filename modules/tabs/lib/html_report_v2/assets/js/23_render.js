@@ -414,6 +414,7 @@
     if (!Array.isArray(cols)) cols = [cols || 0];
     var data = render.chartRows(model);
     if (!data.rows.length) return "";
+    var meanScale = model.valueKind === "mean";   // ratings, not percentages
     var W = 660, LABEL = 210, VAL = 64;
     var barH = cols.length > 1 ? 13 : 20;
     var groupGap = 9;
@@ -446,14 +447,15 @@
         body.push(S.el("rect", { x: LABEL, y: barY, width: w, height: barH,
           fill: catColours ? catColours[ri] : palette[k % palette.length], rx: 3 }));
         body.push(S.text(LABEL + w + 6, barY + barH * 0.78,
-          fmtPct(v) + (cols.length === 1 && cell && cell.sig ? " ▲" + cell.sig : ""),
+          (meanScale ? fmtMean(v) : fmtPct(v)) +
+          (cols.length === 1 && cell && cell.sig ? " ▲" + cell.sig : ""),
           { "font-size": cols.length > 1 ? 10 : 11.5, "font-weight": 600,
             fill: "#1c2333" }));
         barY += barH + 2;
       });
       y += rowH + groupGap;
     });
-    var note = "0–" + data.axisMax + "% scale";
+    var note = "0–" + data.axisMax + (meanScale ? " rating scale" : "% scale");
     if (cols.length === 1 && model.columns[cols[0]]) {
       note += " · " + model.columns[cols[0]].label;
     }

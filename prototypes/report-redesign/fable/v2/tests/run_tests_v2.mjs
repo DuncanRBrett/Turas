@@ -1183,14 +1183,26 @@ run("Index (mean) chart mode plots the mean row as a rating, not a distribution"
   assert(data.rows[0].cells[0].pct === srcMean,
     "the rating is exposed in the chartable slot (" + data.rows[0].cells[0].pct + " vs " + srcMean + ")");
 
-  // renders as a rating column chart: the bar is labelled e.g. "4.1", never "4%"
-  const svg = TR.render.columnChart(m, [0]);
-  assert(svg && svg.indexOf(Number(srcMean).toFixed(1)) !== -1, "the bar is labelled with the rating");
-  assert(svg.indexOf(Math.round(srcMean) + "%") === -1, "a mean bar must not be labelled a percentage");
+  // both value charts label the rating (e.g. "4.1"), never the percentage ("4%")
+  const rating = Number(srcMean).toFixed(1), asPct = Math.round(srcMean) + "%";
+  const barSvg = TR.render.barChart(m, [0]), colSvg = TR.render.columnChart(m, [0]);
+  assert(barSvg.indexOf(rating) !== -1 && barSvg.indexOf(asPct) === -1,
+    "the horizontal bar is labelled with the rating, not a percentage");
+  assert(colSvg.indexOf(rating) !== -1 && colSvg.indexOf(asPct) === -1,
+    "the column is labelled with the rating, not a percentage");
 
-  // stacked / pie are percentage charts — a mean plot always coerces to columns
-  assert(TR.render.chartBy("stacked", m, [0]) === svg,
-    "a mean plot renders as a column chart even when stacked is selected");
+  // bar + column are honoured for a mean; stacked / pie / dot / line fall back
+  // to the (default) bar chart — never a percentage chart
+  assert(TR.render.chartBy("bar", m, [0]) === barSvg, "a mean plot honours the bar chart");
+  assert(TR.render.chartBy("column", m, [0]) === colSvg, "a mean plot honours the column chart");
+  assert(TR.render.chartBy("stacked", m, [0]) === barSvg,
+    "a mean plot falls back to the bar chart when a percentage type is selected");
+
+  // native PPTX export of a mean bar labels ratings (0.0) on a fixed axis, not "0%"
+  const pptxBar = TR.exporter.buildChart(m, "bar", [0]);
+  assert(pptxBar.xml.indexOf('formatCode="0.0"') !== -1, "PPTX mean bar uses one-decimal rating labels");
+  assert(pptxBar.xml.indexOf('formatCode="0&quot;%&quot;"') === -1, "PPTX mean bar must not carry a % format");
+  assert(/<c:max val="/.test(pptxBar.xml), "PPTX mean bar fixes the rating axis max");
 
   // a question with no mean row exposes no mean plot (the dropdown won't offer it)
   const noMean = { code: "X", rows: [{ kind: "category", label: "A", cells: [{ pct: 50 }] }] };

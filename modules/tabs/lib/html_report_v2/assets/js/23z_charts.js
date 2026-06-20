@@ -52,10 +52,11 @@
   /** Dispatcher used by cards, story and exports. */
   render.chartBy = function (type, model, cols) {
     if (!Array.isArray(cols)) cols = [cols || 0];
-    // The "Index (mean)" plot is a rating series — only the column chart scales
-    // + labels ratings (meanScale); stacked / pie / horizontal bars assume
-    // 0–100% shares, so a mean plot always renders as columns.
-    if (model.valueKind === "mean") type = "column";
+    // The "Index (mean)" plot is a rating series — the horizontal bar and the
+    // column chart both scale + label ratings (meanScale); stacked / pie / dot /
+    // line assume 0–100% shares, so a mean plot in one of those falls back to
+    // the (default) bar chart.
+    if (model.valueKind === "mean" && type !== "column" && type !== "bar") type = "bar";
     if (type === "column") return render.columnChart(model, cols);
     if (type === "stacked") return render.stackedChart(model, cols);
     if (type === "pie") return render.pieChart(model, cols[0] || 0);
