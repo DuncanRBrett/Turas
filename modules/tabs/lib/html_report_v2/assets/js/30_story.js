@@ -63,6 +63,16 @@
     return TR.AGG.banner_groups.length ? TR.AGG.banner_groups[0].id : "";
   }
 
+  // The banner to record on a pinned story item. A custom banner is a live
+  // "cross anything by anything" spec that a pinned exhibit can't recompute, so
+  // it resolves to the first banner — or "" (Total) on a Total-only survey.
+  // (addExhibit read banner_groups[0].id unguarded here and crashed on CCS.)
+  function pinBanner() {
+    return TR.d2.state.banner.indexOf("custom:") === 0
+      ? firstBanner() : TR.d2.state.banner;
+  }
+  story2._pinBanner = pinBanner;   // exposed for the node gate
+
   story2.pinCurrent = function (flags) {
     var s = TR.d2.state;
     var chartState = TR.cards2.chartState();
@@ -156,8 +166,7 @@
         });
       if (!qs.length) { TR.shell.toast("Pick at least one question"); return; }
       load().push({ kind: "exhibit", qs: qs,
-        banner: TR.d2.state.banner.indexOf("custom:") === 0
-          ? TR.AGG.banner_groups[0].id : TR.d2.state.banner,
+        banner: pinBanner(),
         filters: JSON.parse(JSON.stringify(TR.d2.state.filters)),
         flags: { dist: holder.querySelector("#ex-dist").checked,
           trend: holder.querySelector("#ex-trend").checked,
@@ -205,8 +214,7 @@
     holder.querySelectorAll("[data-cat]").forEach(function (b) {
       b.addEventListener("click", function () {
         load().push({ kind: "composite", category: b.getAttribute("data-cat"),
-          banner: TR.d2.state.banner.indexOf("custom:") === 0
-            ? firstBanner() : TR.d2.state.banner,
+          banner: pinBanner(),
           filters: JSON.parse(JSON.stringify(TR.d2.state.filters)), note: "" });
         persist();
         holder.hidden = true;

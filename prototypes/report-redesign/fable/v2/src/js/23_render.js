@@ -329,6 +329,7 @@
    * exists so the chart is never silently empty.
    */
   render.chartRows = function (model) {
+    if (model.chartKind === "mean") return render.meanChartRows(model);
     var pick = function (kinds) {
       return model.rows.filter(function (r) {
         return kinds.indexOf(r.kind) !== -1 && !r.diff &&
@@ -355,6 +356,62 @@
     return { rows: rows, axisMax: S.niceMax(max) };
   };
 
+  /**
+   * Chart source rows for the "Index (mean)" plot: the question's mean / Index
+   * row(s), with the rating exposed in the chartable `pct` slot so the renderer
+   * (columnChart, meanScale) scales + labels them as RATINGS, not percentages.
+   * Honours per-row unticks and takes its axis from the data, like the
+   * distribution path.
+   */
+  render.meanChartRows = function (model) {
+    var has = function (c) { return c.mean !== null && c.mean !== undefined; };
+    var rows = model.rows.filter(function (r) {
+      return r.kind === "mean" && r.cells.some(has);
+    }).map(function (r) {
+      return { kind: r.kind, label: r.label, cells: r.cells.map(function (c) {
+        return { pct: has(c) ? c.mean : null, n: c.n, sig: c.sig || "" };
+      }) };
+    });
+    var hidden = model.hiddenChartRows || [];
+    if (hidden.length) rows = rows.filter(function (r) { return hidden.indexOf(r.label) === -1; });
+    var max = 0;
+    rows.forEach(function (r) { r.cells.forEach(function (c) { if (c.pct > max) max = c.pct; }); });
+    return { rows: rows, axisMax: S.niceMax(max) };
+  };
+
+  /** True when the question has a chartable mean (Index) row. */
+  render.hasMeanRow = function (model) {
+    return model.rows.some(function (r) {
+      return r.kind === "mean" && r.cells.some(function (c) {
+        return c.mean !== null && c.mean !== undefined;
+      });
+    });
+  };
+
+  /**
+   * Transpose a mean ("Index") plot so each charted column becomes its own
+   * labelled bar (its mean) — the column identity then reads off the axis next
+   * to the bar, instead of from a legend. Returns {model, cols} unchanged for
+   * any non-mean plot, or when the Index row is unticked (nothing to chart), so
+   * distribution charts and the empty case are untouched.
+   */
+  render.asMeanByColumn = function (model, cols) {
+    if (!Array.isArray(cols)) cols = [cols || 0];
+    if (model.valueKind !== "mean") return { model: model, cols: cols };
+    var data = render.meanChartRows(model);
+    if (!data.rows.length) return { model: model, cols: cols };
+    var src = data.rows[0];                       // the Index row; cells[ci].pct = its mean
+    var rows = cols.map(function (ci) {
+      var c = src.cells[ci] || {};
+      return { kind: "category",
+        label: model.columns[ci] ? model.columns[ci].label : "?",
+        cells: [{ pct: (c.pct === null || c.pct === undefined) ? null : c.pct, n: null, sig: "" }] };
+    });
+    return { model: { code: model.code, valueKind: "mean",
+      columns: [{ label: src.label, letter: "", base: null, low: false }],
+      rows: rows }, cols: [0] };
+  };
+
   /** True when a model actually has chartable NET rows. */
   render.hasNetRows = function (model) {
     return model.rows.some(function (r) {
@@ -379,8 +436,10 @@
    */
   render.barChart = function (model, cols) {
     if (!Array.isArray(cols)) cols = [cols || 0];
+    var mb = render.asMeanByColumn(model, cols); model = mb.model; cols = mb.cols;
     var data = render.chartRows(model);
     if (!data.rows.length) return "";
+    var meanScale = model.valueKind === "mean";   // ratings, not percentages
     var W = 660, LABEL = 210, VAL = 64;
     var barH = cols.length > 1 ? 13 : 20;
     var groupGap = 9;
@@ -413,14 +472,15 @@
         body.push(S.el("rect", { x: LABEL, y: barY, width: w, height: barH,
           fill: catColours ? catColours[ri] : palette[k % palette.length], rx: 3 }));
         body.push(S.text(LABEL + w + 6, barY + barH * 0.78,
-          fmtPct(v) + (cols.length === 1 && cell && cell.sig ? " ▲" + cell.sig : ""),
+          (meanScale ? fmtMean(v) : fmtPct(v)) +
+          (cols.length === 1 && cell && cell.sig ? " ▲" + cell.sig : ""),
           { "font-size": cols.length > 1 ? 10 : 11.5, "font-weight": 600,
             fill: "#1c2333" }));
         barY += barH + 2;
       });
       y += rowH + groupGap;
     });
-    var note = "0–" + data.axisMax + "% scale";
+    var note = "0–" + data.axisMax + (meanScale ? " rating scale" : "% scale");
     if (cols.length === 1 && model.columns[cols[0]]) {
       note += " · " + model.columns[cols[0]].label;
     }

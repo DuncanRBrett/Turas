@@ -612,8 +612,17 @@ workbook_result <- create_crosstabs_workbook(
 )
 
 # ==============================================================================
-# STEP 4b: GENERATE HTML REPORT (if enabled)
+# STEP 4b: GENERATE THE CLASSIC HTML REPORT (opt-in)
 # ==============================================================================
+# The interactive report (Step 4d) is the default output. The CLASSIC HTML
+# report is opt-in: when the GUI ran it sets TURAS_HTML_REPORT_CLASSIC, which
+# overrides the config's html_report; non-GUI / config-driven runs keep the
+# config value. (The Excel workbook is always written, above.)
+
+.classic_flag <- get0("TURAS_HTML_REPORT_CLASSIC", ifnotfound = NA)
+if (!(length(.classic_flag) == 1 && is.na(.classic_flag))) {
+  config_result$config_obj$html_report <- isTRUE(.classic_flag)
+}
 
 if (isTRUE(config_result$config_obj$html_report)) {
   html_output_path <- sub("\\.xlsx$", ".html", config_result$output_path)
@@ -649,17 +658,18 @@ if (isTRUE(config_result$config_obj$html_report)) {
 }
 
 # ==============================================================================
-# STEP 4d: DATA-CENTRIC REPORT v2 (if enabled)
+# STEP 4d: THE INTERACTIVE REPORT (default output)
 # ==============================================================================
-# Additive: emits a *_data.json island AND a self-contained *_report_v2.html
-# (renderer + data inlined) alongside the existing outputs. The classic
-# Excel/HTML writers run above and are byte-identical whether this is on or
-# off — this block only ever WRITES NEW FILES, never modifies the classic.
+# Emits a *_data.json island AND a self-contained *_report.html (renderer + data
+# inlined) alongside the Excel. This is the default deliverable; the classic
+# Excel/HTML writers above are byte-identical whether this runs or not — this
+# block only ever WRITES NEW FILES, never modifies the classic outputs.
 
-# Enabled by the config Settings sheet (html_report_v2) OR the GUI checkbox
-# (TURAS_HTML_REPORT_V2, set by run_tabs_gui in this process).
+# Enabled by the config Settings sheet (html_report_v2) OR the GUI (which builds
+# it by default — TURAS_HTML_REPORT_V2, set by run_tabs_gui in this process).
 .html_report_v2_on <- isTRUE(config_result$config_obj$html_report_v2) ||
   isTRUE(get0("TURAS_HTML_REPORT_V2", ifnotfound = FALSE))
+config_result$config_obj$html_report_v2 <- .html_report_v2_on   # reflect actual decision in the run summary
 
 if (.html_report_v2_on) {
   v2_out <- config_result$output_path
@@ -736,7 +746,7 @@ if (.html_report_v2_on) {
 
       dl$project$tracking$enabled <- tracking_on   # show the Tracking tab iff built
       write_html_report_v2(serialize_data_layer(dl), config_result$config_obj,
-                           sub("\\.xlsx$", "_report_v2.html", v2_out),
+                           sub("\\.xlsx$", "_report.html", v2_out),
                            prev_json = prev_json,
                            micro_json = serialize_microdata(micro))
     }, error = function(e) {
@@ -838,7 +848,8 @@ generate_tabs_stats_pack <- function(config_result, data_result,
     "Alpha (p-value threshold)"  = if (sig_enabled) sprintf("%.3f", alpha_val) else "—",
     "Minimum Base Size"          = as.character(min_base_val),
     "Bonferroni Correction"      = if (sig_enabled && isTRUE(config_obj$bonferroni_correction)) "Applied" else "Not applied",
-    "HTML Report"                = if (isTRUE(config_obj$html_report)) "Generated" else "Not requested",
+    "Interactive Report"         = if (isTRUE(config_obj$html_report_v2)) "Generated" else "Not requested",
+    "Classic HTML Report"        = if (isTRUE(config_obj$html_report)) "Generated" else "Not requested",
     "AI Insights"                = if (isTRUE(config_obj$ai_insights)) "Enabled" else "Disabled",
     "TRS Status"                 = run_result$status %||% "PASS",
     "TRS Events"                 = trs_summary

@@ -24,7 +24,7 @@
     showSummary: true,      // NET + index rows visible
     sigMode: "95",          // significance display: off | 95 | dual (95+80)
     chartType: "bar",
-    chartKind: "auto",      // chart rows: auto | detail | summary (NETs)
+    chartKind: "auto",      // chart rows: auto | detail | summary (NETs) | mean (Index)
     chartColLabels: ["Total"],  // chart columns by label (multi-select)
     colMenuOpen: false,     // columns panel visibility survives re-renders
     movedScope: null,       // "key" | "all" (null = use project config)

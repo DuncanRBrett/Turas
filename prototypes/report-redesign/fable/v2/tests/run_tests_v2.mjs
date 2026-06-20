@@ -303,6 +303,241 @@ run("tracking view pins on a Total-only report (no banner_groups)", () => {
   }
 });
 
+run("composite-exhibit builder resolves a custom banner without crashing (CCS)", () => {
+  // Regression: addExhibit recorded TR.AGG.banner_groups[0].id unguarded, so on
+  // a Total-only survey (e.g. CCS) with a custom banner active, "Add exhibit"
+  // threw and nothing pinned. pinBanner() must resolve safely in every case.
+  const savedAgg = TR.AGG, savedBanner = TR.d2.state.banner;
+  try {
+    TR.AGG = { banner_groups: [] };           // no preset banners (CCS)
+    TR.d2.state.banner = "custom:Q1:net";     // the stuck custom-banner state
+    assert(TR.story2._pinBanner() === "",
+      "custom banner resolves to the Total column on a no-banner survey");
+    TR.AGG = { banner_groups: [{ id: "REGION", name: "Region" }] };
+    assert(TR.story2._pinBanner() === "REGION",
+      "custom banner resolves to the first preset when one exists");
+    TR.d2.state.banner = "REGION";
+    assert(TR.story2._pinBanner() === "REGION", "a concrete banner passes through");
+  } finally {
+    TR.AGG = savedAgg; TR.d2.state.banner = savedBanner;
+  }
+});
+
+run("Total-only survey offers a Total banner tab so a custom banner can be cleared", () => {
+  // Regression: with no preset banner_groups, a custom banner left no other tab
+  // to click, so it could never be switched off (CCS). A "Total" tab restores
+  // the Total column; surveys that already have presets don't get an extra one.
+  const savedAgg = TR.AGG, savedBanner = TR.d2.state.banner, savedIdx = TR.d2._qIndex;
+  try {
+    TR.AGG = { banner_groups: [],
+      questions: [{ code: "Q1", title: "Q1", category: "c", rows: [] }] };
+    TR.d2._qIndex = null;
+    TR.d2.state.banner = "";
+    assert(/data-banner=""/.test(TR.cards2._bannerTabsHtml()),
+      "no-banner survey shows a Total tab");
+    TR.d2.state.banner = "custom:Q1:net";
+    const custom = TR.cards2._bannerTabsHtml();
+    assert(/data-banner=""/.test(custom) && /class="btab on custom"/.test(custom),
+      "with a custom banner active, both the Total tab and the custom tab show");
+    TR.AGG = { banner_groups: [{ id: "REGION", name: "Region" }], questions: [] };
+    TR.d2._qIndex = null;
+    TR.d2.state.banner = "REGION";
+    assert(!/data-banner=""/.test(TR.cards2._bannerTabsHtml()),
+      "surveys with preset banners do not get an extra Total tab");
+  } finally {
+    TR.AGG = savedAgg; TR.d2.state.banner = savedBanner; TR.d2._qIndex = savedIdx;
+  }
+});
+
+run("audience filter suppresses wave deltas/trend (prior waves are full-sample totals)", () => {
+  // Regression: prior waves are published full-sample Totals with no microdata
+  // to filter, so under an audience filter a wave delta compared filtered-now
+  // against unfiltered-prior — misleading. A filtered model must read untracked.
+  const banner = TR.AGG.banner_groups[0].id;
+  const tracked = TR.AGG.questions.find((x) => {
+    const m = TR.model.forQuestion(x.code, banner, []);
+    return m && m.prevWave && m.rows.some((r) => r.delta && r.waves);
+  });
+  assert(tracked, "fixture has a tracked question with deltas + trend");
+  const plain = TR.model.forQuestion(tracked.code, banner, []);
+  assert(plain.prevWave && plain.rows.some((r) => r.delta && r.waves),
+    "unfiltered tracked model keeps its wave deltas + trend");
+  const fq = TR.AGG.questions.find((x) => TR.d2.catRows(x).length >= 1);
+  const filtered = TR.model.forQuestion(tracked.code, banner,
+    [{ q: fq.code, rows: [TR.d2.catRows(fq)[0].index] }]);
+  assert(filtered.filtered === true, "filtered model is flagged");
+  assert(filtered.prevWave === null, "filtered model reads as untracked (no prevWave)");
+  assert(filtered.rows.every((r) => !r.delta && !r.waves),
+    "filtered model carries no wave deltas or trend series");
+});
+
+run("per-segment prior-wave trends: published segment values flow through the wave API", () => {
+  // Phase 1a (segment wave trends): the renderer already reads per-segment hooks
+  // (seg_stats / bases) but the writer never populated them. This locks the
+  // island schema and proves waves.series(q,row,ri,seg) returns the published
+  // per-segment values + bases for prior waves (Total stays seg = null).
+  const saved = { agg: TR.AGG, prev: TR.PREV, micro: TR.MICRO, idx: TR.d2._qIndex };
+  try {
+    TR.AGG = { schema_version: 2,
+      project: { name: "Seg", low_base_threshold: 30, tracking: { enabled: true } },
+      columns: [
+        { key: "TOTAL::Total", group: "total", label: "Total", letter: "" },
+        { key: "REGION::WC", group: "Region", label: "Western Cape", letter: "a" },
+        { key: "REGION::GP", group: "Region", label: "Gauteng", letter: "b" }],
+      banner_groups: [{ id: "Region", name: "Region" }], categories: ["c"],
+      questions: [{ code: "Q1", title: "Overall satisfaction", category: "c", type: "scale",
+        bases: [{ n: 200, low: false }, { n: 90, low: false }, { n: 80, low: false }],
+        rows: [{ kind: "mean", label: "Mean", pct: [7.6, 7.4, 7.8],
+          n: [null, null, null], sig: ["", "", ""] }] }] };
+    TR.MICRO = null; TR.d2._qIndex = null;
+    // a prior-wave question payload carrying Total + per-segment means and bases
+    const wq = (mean, wc, gp, base, wcN, gpN) => ({
+      match_key: "overall satisfaction", title: "Overall satisfaction", base: base,
+      stats: { mean: mean },
+      seg_stats: { "western cape": { mean: wc }, "gauteng": { mean: gp } },
+      bases: { "western cape": wcN, "gauteng": gpN }, rows: {} });
+    const segs = [{ norm: "western cape" }, { norm: "gauteng" }];
+    TR.PREV = { waves: [
+      { wave: "W1", year: 2024, segments: segs, questions: [wq(7.0, 6.8, 7.2, 180, 85, 75)] },
+      { wave: "W2", year: 2025, segments: segs, questions: [wq(7.3, 7.1, 7.5, 190, 88, 78)] }] };
+    TR.waves.reset();
+    const q = TR.AGG.questions[0], row = q.rows[0];
+    const segNorms = TR.waves.segments().map((s) => s.norm);
+    assert(segNorms.includes("western cape") && segNorms.includes("gauteng"),
+      "Region categories recognised as tracked segments: " + segNorms.join(","));
+    const tot = TR.waves.series(q, row, 0, null);
+    assert(tot.length === 2 && tot[0].value === 7.0 && tot[1].value === 7.3 && tot[1].base === 190,
+      "Total series uses the published totals + total bases");
+    const wc = TR.waves.series(q, row, 0, "western cape");
+    assert(wc.length === 2 && wc[0].value === 6.8 && wc[1].value === 7.1,
+      "Western Cape series uses the published segment means");
+    assert(wc[0].base === 85 && wc[1].base === 88, "Western Cape series uses the segment bases");
+    const gp = TR.waves.series(q, row, 0, "gauteng");
+    assert(gp[1].value === 7.5 && gp[1].base === 78, "Gauteng series is distinct from Western Cape");
+  } finally {
+    TR.AGG = saved.agg; TR.PREV = saved.prev; TR.MICRO = saved.micro; TR.d2._qIndex = saved.idx;
+    TR.waves.reset();
+  }
+});
+
+run("per-segment prior-wave PROPORTIONS flow through the wave API", () => {
+  // Phase 2 (proportions): a category/proportion row trends per segment off the
+  // published-distribution path rows[norm(label)].pct (Total) / .seg[segKey].
+  const saved = { agg: TR.AGG, prev: TR.PREV, micro: TR.MICRO, idx: TR.d2._qIndex };
+  try {
+    TR.AGG = { schema_version: 2,
+      project: { name: "Seg", low_base_threshold: 30, tracking: { enabled: true } },
+      columns: [
+        { key: "TOTAL::Total", group: "total", label: "Total", letter: "" },
+        { key: "REGION::WC", group: "Region", label: "Western Cape", letter: "a" },
+        { key: "REGION::GP", group: "Region", label: "Gauteng", letter: "b" }],
+      banner_groups: [{ id: "Region", name: "Region" }], categories: ["c"],
+      questions: [{ code: "Q1", title: "Channel used", category: "c", type: "single",
+        bases: [{ n: 200, low: false }, { n: 90, low: false }, { n: 80, low: false }],
+        rows: [{ kind: "category", label: "Online", pct: [40, 50, 35] },
+          { kind: "category", label: "In-store", pct: [60, 50, 65] }] }] };
+    TR.MICRO = null; TR.d2._qIndex = null;
+    const wq = (onTot, onWC, onGP, base, wcN, gpN) => ({
+      match_key: "channel used", title: "Channel used", base: base,
+      bases: { "western cape": wcN, "gauteng": gpN },
+      rows: {
+        "online": { pct: onTot, n: Math.round(onTot / 100 * base),
+          seg: { "western cape": onWC, "gauteng": onGP } },
+        "instore": { pct: 100 - onTot,
+          seg: { "western cape": 100 - onWC, "gauteng": 100 - onGP } } } });
+    const segs = [{ norm: "western cape" }, { norm: "gauteng" }];
+    TR.PREV = { waves: [
+      { wave: "W1", year: 2024, segments: segs, questions: [wq(40, 50, 35, 180, 85, 75)] },
+      { wave: "W2", year: 2025, segments: segs, questions: [wq(45, 55, 38, 190, 88, 78)] }] };
+    TR.waves.reset();
+    const q = TR.AGG.questions[0], online = q.rows[0];
+    const tot = TR.waves.series(q, online, 0, null);
+    assert(tot.length === 2 && tot[0].value === 40 && tot[1].value === 45 && tot[1].base === 190,
+      "Total 'Online' proportion trends from rows[].pct + total base");
+    const wc = TR.waves.series(q, online, 0, "western cape");
+    assert(wc[0].value === 50 && wc[1].value === 55 && wc[0].base === 85,
+      "Western Cape 'Online' proportion trends from rows[].seg + segment base");
+    const gp = TR.waves.series(q, online, 0, "gauteng");
+    assert(gp[1].value === 38 && gp[1].base === 78, "Gauteng proportion series is distinct");
+  } finally {
+    TR.AGG = saved.agg; TR.PREV = saved.prev; TR.MICRO = saved.micro; TR.d2._qIndex = saved.idx;
+    TR.waves.reset();
+  }
+});
+
+run("per-segment mean trend carries a stored SD so significance can be tested", () => {
+  // Phase 2 (significance): a stored seg_stats[seg].sd lets the renderer's Welch
+  // test flag a wave-on-wave move on adequate base, without the distribution.
+  const saved = { agg: TR.AGG, prev: TR.PREV, micro: TR.MICRO, idx: TR.d2._qIndex };
+  try {
+    TR.AGG = { schema_version: 2,
+      project: { name: "Seg", low_base_threshold: 30, tracking: { enabled: true } },
+      columns: [
+        { key: "TOTAL::Total", group: "total", label: "Total", letter: "" },
+        { key: "REGION::WC", group: "Region", label: "Western Cape", letter: "a" }],
+      banner_groups: [{ id: "Region", name: "Region" }], categories: ["c"],
+      questions: [{ code: "Q1", title: "Overall satisfaction", category: "c", type: "scale",
+        bases: [{ n: 200, low: false }, { n: 100, low: false }],
+        rows: [{ kind: "mean", label: "Mean", pct: [7.0, 7.0], n: [null, null], sig: ["", ""] }] }] };
+    TR.MICRO = null; TR.d2._qIndex = null;
+    const wq = (wcMean, base) => ({
+      match_key: "overall satisfaction", title: "Overall satisfaction", base: base,
+      stats: { mean: wcMean, sd: 1.0 }, seg_stats: { "western cape": { mean: wcMean, sd: 1.0 } },
+      bases: { "western cape": base } });
+    const segs = [{ norm: "western cape" }];
+    TR.PREV = { waves: [
+      { wave: "W1", year: 2024, segments: segs, questions: [wq(6.0, 100)] },
+      { wave: "W2", year: 2025, segments: segs, questions: [wq(7.5, 100)] }] };
+    TR.waves.reset();
+    const q = TR.AGG.questions[0], row = q.rows[0];
+    const wc = TR.waves.series(q, row, 0, "western cape");
+    assert(wc.length === 2 && wc[0].sd === 1.0 && wc[1].sd === 1.0,
+      "series carries the stored segment SD");
+    const cells = TR.waves.cellsFor(wc, false, "95");
+    assert(cells[1].sig_prev === true,
+      "a large WC mean move (6.0->7.5, sd 1.0, n 100) flags significant");
+    TR.PREV.waves[1].questions[0] = wq(6.05, 100);
+    TR.waves.reset();
+    const trivial = TR.waves.cellsFor(TR.waves.series(q, row, 0, "western cape"), false, "95");
+    assert(trivial[1].sig_prev === false, "a trivial move (6.0->6.05) is not significant");
+  } finally {
+    TR.AGG = saved.agg; TR.PREV = saved.prev; TR.MICRO = saved.micro; TR.d2._qIndex = saved.idx;
+    TR.waves.reset();
+  }
+});
+
+run("Total-only island degrades gracefully — Total trends, no segments", () => {
+  // Robustness: a tracker with no segment breakouts (computed Total only, no
+  // seg_stats/segments). Total trends from stats.mean; segment queries are empty.
+  const saved = { agg: TR.AGG, prev: TR.PREV, micro: TR.MICRO, idx: TR.d2._qIndex };
+  try {
+    TR.AGG = { schema_version: 2,
+      project: { name: "T", low_base_threshold: 30, tracking: { enabled: true } },
+      columns: [{ key: "TOTAL::Total", group: "total", label: "Total", letter: "" }],
+      banner_groups: [], categories: ["c"],
+      questions: [{ code: "Q1", title: "Overall satisfaction", category: "c", type: "scale",
+        bases: [{ n: 200, low: false }],
+        rows: [{ kind: "mean", label: "Mean", pct: [7.0], n: [null], sig: [""] }] }] };
+    TR.MICRO = null; TR.d2._qIndex = null;
+    const wq = (mean, base) => ({ match_key: "overall satisfaction",
+      title: "Overall satisfaction", base: base, stats: { mean: mean } });
+    TR.PREV = { waves: [
+      { wave: "W1", year: 2024, segments: [], questions: [wq(7.0, 180)] },
+      { wave: "W2", year: 2025, segments: [], questions: [wq(7.3, 190)] }] };
+    TR.waves.reset();
+    const q = TR.AGG.questions[0], row = q.rows[0];
+    assert(TR.waves.segments().length === 0, "no segments offered when none are published");
+    const tot = TR.waves.series(q, row, 0, null);
+    assert(tot.length === 2 && tot[1].value === 7.3 && tot[1].base === 190,
+      "Total trend works from stats.mean even with no per-respondent scores");
+    const none = TR.waves.series(q, row, 0, "western cape");
+    assert(none.length === 0, "a segment query on a Total-only island yields nothing (no crash)");
+  } finally {
+    TR.AGG = saved.agg; TR.PREV = saved.prev; TR.MICRO = saved.micro; TR.d2._qIndex = saved.idx;
+    TR.waves.reset();
+  }
+});
+
 run("PPTX image deck: PNG slides pack into a structurally valid deck (python)", () => {
   // The "download as PNGs" path renders each card to a PNG and packs it as a
   // full-slide image. Validates imageSlide + the packer's media-part support.
@@ -930,6 +1165,67 @@ run("stacked chart export is transposed (segments=series, columns=bars)", () => 
     "stacked segments must use the brand ramp, not the accent palette");
 });
 
+run("Index (mean) chart mode plots the mean row as a rating, not a distribution", () => {
+  const q = TR.AGG.questions.filter((x) => x.type === "scale")
+    .find((x) => x.rows.some((r) => r.kind === "mean")) || TR.AGG.questions[0];
+  const m = TR.model.forQuestion(q.code, TR.AGG.banner_groups[0].id, []);
+  assert(TR.render.hasMeanRow(m), "a scale question should expose a chartable mean row");
+
+  // the distribution path never sources the mean row
+  assert(TR.render.chartRows(m).rows.every((r) => r.kind !== "mean"),
+    "the distribution chart must not source the mean row");
+
+  // mean mode: the mean row becomes the chart source, rating carried in the pct slot
+  m.chartKind = "mean"; m.valueKind = "mean";
+  const data = TR.render.chartRows(m);
+  assert(data.rows.length >= 1 && data.rows[0].kind === "mean", "mean mode sources the mean row");
+  const srcMean = m.rows.find((r) => r.kind === "mean").cells[0].mean;
+  assert(data.rows[0].cells[0].pct === srcMean,
+    "the rating is exposed in the chartable slot (" + data.rows[0].cells[0].pct + " vs " + srcMean + ")");
+
+  // both value charts label the rating (e.g. "4.1"), never the percentage ("4%")
+  const rating = Number(srcMean).toFixed(1), asPct = Math.round(srcMean) + "%";
+  const barSvg = TR.render.barChart(m, [0]), colSvg = TR.render.columnChart(m, [0]);
+  assert(barSvg.indexOf(rating) !== -1 && barSvg.indexOf(asPct) === -1,
+    "the horizontal bar is labelled with the rating, not a percentage");
+  assert(colSvg.indexOf(rating) !== -1 && colSvg.indexOf(asPct) === -1,
+    "the column is labelled with the rating, not a percentage");
+
+  // "Index by column": each charted column transposes into its own labelled bar
+  // (its mean) — a single series, so the column name reads off the axis next to
+  // the bar, not from a legend.
+  const meanRow = m.rows.find((r) => r.kind === "mean");
+  const tr = TR.render.asMeanByColumn(m, [0, 1]);
+  assert(tr.cols.length === 1, "a transposed mean plot is a single series (no legend)");
+  assert(tr.model.rows.length === 2, "one bar per charted column");
+  assert(tr.model.rows[0].label === m.columns[0].label &&
+         tr.model.rows[1].label === m.columns[1].label,
+    "each bar is labelled with its column name");
+  assert(tr.model.rows[1].cells[0].pct === meanRow.cells[1].mean,
+    "each bar's value is that column's mean");
+  const distM = TR.model.forQuestion(q.code, TR.AGG.banner_groups[0].id, []);
+  assert(TR.render.asMeanByColumn(distM, [0, 1]).model === distM,
+    "a distribution plot is never transposed (passes through unchanged)");
+
+  // bar + column are honoured for a mean; stacked / pie / dot / line fall back
+  // to the (default) bar chart — never a percentage chart
+  assert(TR.render.chartBy("bar", m, [0]) === barSvg, "a mean plot honours the bar chart");
+  assert(TR.render.chartBy("column", m, [0]) === colSvg, "a mean plot honours the column chart");
+  assert(TR.render.chartBy("stacked", m, [0]) === barSvg,
+    "a mean plot falls back to the bar chart when a percentage type is selected");
+
+  // native PPTX export of a mean bar labels ratings (0.0) on a fixed axis, not "0%"
+  const pptxBar = TR.exporter.buildChart(m, "bar", [0]);
+  assert(pptxBar.xml.indexOf('formatCode="0.0"') !== -1, "PPTX mean bar uses one-decimal rating labels");
+  assert(pptxBar.xml.indexOf('formatCode="0&quot;%&quot;"') === -1, "PPTX mean bar must not carry a % format");
+  assert(/<c:max val="/.test(pptxBar.xml), "PPTX mean bar fixes the rating axis max");
+
+  // a question with no mean row exposes no mean plot (the dropdown won't offer it)
+  const noMean = { code: "X", rows: [{ kind: "category", label: "A", cells: [{ pct: 50 }] }] };
+  assert(!TR.render.hasMeanRow(noMean) && TR.render.meanChartRows(noMean).rows.length === 0,
+    "no mean row -> no mean chart");
+});
+
 run("golden parity suite passes (subprocess)", () => {
   const res = spawnSync("node", [path.join(BASE, "tests", "golden_parity.mjs")],
     { encoding: "utf8" });
@@ -1143,6 +1439,37 @@ run("composite exhibit: one scale per chart, everything in the table", () => {
   const slide = TR.exhibit.slide(item);
   assert(slide.xml.includes("different scale, table only"),
     "PPTX meta carries the scale note");
+});
+
+run("composite this-wave chart renders 0-10 mean ratings as ratings, not %", () => {
+  // Regression: the multi-question composite dist chart pushed each headline
+  // mean into a category/pct cell, so 0-10 mean ratings (e.g. CCS) charted as
+  // "8%" on a % scale. The mean family must read as ratings (7.6, 0-10 axis).
+  const mk = (code, title, mean) => ({ code: code, title: title, rows: [
+    { kind: "mean", label: "Mean", delta: null,
+      waves: [{ year: 2024, value: mean - 0.2 }],
+      cells: [{ mean: mean, pct: null, n: null, sig: "" }] }] });
+  const models = [mk("Q1", "Overall satisfaction", 7.6), mk("Q2", "Relationship", 8.1)];
+  const item = { kind: "exhibit", qs: ["Q1", "Q2"], banner: "", filters: [],
+    flags: { dist: true }, distType: "column", note: "" };
+  const dist = TR.exhibit.distModel(item, models);
+  assert(dist.valueKind === "mean", "an all-mean composite flags valueKind=mean");
+  assert(dist.rows.length === 2, "both 0-10 means share one chart");
+  const svg = TR.render.columnChart(dist, [0]);
+  assert(/>7\.6</.test(svg), "the column label shows the rating 7.6, got: " +
+    (svg.match(/>[\d.]+%?</g) || []).join(","));
+  assert(!/>[\d.]+%</.test(svg), "no percentage labels on a rating chart");
+  const chart = TR.exporter.buildChart(dist, "column", [0]);
+  assert(chart && chart.xml.indexOf("0&quot;%&quot;") === -1,
+    "native PPTX chart drops the forced % number format");
+  // a non-mean composite (NPS) keeps the percentage path untouched
+  const np = (code, pct, wv) => ({ code: code, title: code, rows: [
+    { kind: "net", label: "NPS", diff: false, delta: null,
+      waves: [{ year: 2024, value: wv }], cells: [{ pct: pct, mean: null, n: null, sig: "" }] }] });
+  const npsDist = TR.exhibit.distModel(
+    { kind: "exhibit", qs: ["N1", "N2"], banner: "", filters: [], flags: { dist: true } },
+    [np("N1", 33, 30), np("N2", 41, 40)]);
+  assert(npsDist.valueKind === "pct", "a non-mean composite stays on the % path");
 });
 
 run("per-row chart selection: unticked rows leave the chart only", () => {

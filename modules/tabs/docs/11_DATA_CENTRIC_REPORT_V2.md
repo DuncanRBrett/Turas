@@ -184,8 +184,9 @@ GUI tick-box for option 2):
 | `researcher_logo_path` / `client_logo_path` | *(blank)* | Logos embedded (base64) into the v2 header. |
 | `sampling_method` | `Not_Specified` | Drives honest CI vocabulary (probability → CI/MOE; otherwise stability/PE). |
 
-Outputs land next to the Excel file: `<project>_report_v2.html`,
-`<project>_data.json`, and (tracking on) `<project>_wave.json`.
+Outputs land next to the Excel file: `<project>_report.html` (the interactive
+report — built by default from the GUI), `<project>_data.json`, and (tracking
+on) `<project>_wave.json`.
 
 ### Forward path for trackers
 

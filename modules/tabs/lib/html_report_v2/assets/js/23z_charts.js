@@ -20,6 +20,9 @@
   function fmtPct(v) {
     return v === null || v === undefined ? "–" : Math.round(v) + "%";
   }
+  function fmtMean(v) {
+    return v === null || v === undefined ? "–" : Number(v).toFixed(1);
+  }
 
   /**
    * Repel 1-D label positions so neighbours never overlap: forward sweep
@@ -49,6 +52,11 @@
   /** Dispatcher used by cards, story and exports. */
   render.chartBy = function (type, model, cols) {
     if (!Array.isArray(cols)) cols = [cols || 0];
+    // The "Index (mean)" plot is a rating series — the horizontal bar and the
+    // column chart both scale + label ratings (meanScale); stacked / pie / dot /
+    // line assume 0–100% shares, so a mean plot in one of those falls back to
+    // the (default) bar chart.
+    if (model.valueKind === "mean" && type !== "column" && type !== "bar") type = "bar";
     if (type === "column") return render.columnChart(model, cols);
     if (type === "stacked") return render.stackedChart(model, cols);
     if (type === "pie") return render.pieChart(model, cols[0] || 0);
@@ -59,8 +67,11 @@
 
   /** Vertical grouped columns: rows on the x axis, one column per series. */
   render.columnChart = function (model, cols) {
+    if (!Array.isArray(cols)) cols = [cols || 0];
+    var mb = render.asMeanByColumn(model, cols); model = mb.model; cols = mb.cols;
     var data = render.chartRows(model);
     if (!data.rows.length) return "";
+    var meanScale = model.valueKind === "mean";   // ratings, not percentages
     var W = 660, plotH = 170, padT = 16, padB = 58, padL = 10;
     var palette = render.palette();
     // Single series: colour columns by category (semantic); multi-column keeps
@@ -83,7 +94,7 @@
           fill: catColours ? catColours[i] : palette[k % palette.length], rx: 3 }));
         if (cols.length === 1 || v >= data.axisMax * 0.12) {
           body.push(S.text(cx - groupW / 2 + k * barW + (barW - 2) / 2,
-            padT + plotH - h - 4, fmtPct(v),
+            padT + plotH - h - 4, meanScale ? fmtMean(v) : fmtPct(v),
             { "text-anchor": "middle", "font-size": 9.5,
               "font-weight": 600, fill: "#1c2333" }));
         }

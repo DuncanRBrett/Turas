@@ -61,6 +61,7 @@
     var model = TR.model.forQuestion(s.activeQ, s.banner, s.filters, opts);
     if (model) {
       model.chartKind = cards2.resolveChartKind(model);
+      model.valueKind = model.chartKind === "mean" ? "mean" : "pct";
       model.hiddenChartRows = s.hiddenChartRows[s.activeQ] || [];
     }
     return applySigMode(model);
@@ -99,6 +100,8 @@
       return hasNets && (model.type === "scale" || model.type === "nps")
         ? "summary" : "detail";
     }
+    // an explicit "Index (mean)" choice needs a mean row, else fall to detail
+    if (kind === "mean") return TR.render.hasMeanRow(model) ? "mean" : "detail";
     if (!hasNets && (kind === "summary" || kind === "both")) return "detail";
     return kind;
   };
@@ -229,6 +232,12 @@
     if (!menu) return;
     var chartModel = cards2.chartModel();
     if (!chartModel) { menu.innerHTML = ""; return; }
+    // Preserve scroll across the rebuild: the panel and each cm-body (the
+    // Columns / Rows lists) scroll independently, so ticking a checkbox must not
+    // jump the user back to the top of the list they were scrolled into.
+    var keepPanelTop = menu.scrollTop;
+    var keepBodyTops = Array.prototype.map.call(
+      menu.querySelectorAll(".cm-body"), function (b) { return b.scrollTop; });
     var s = TR.d2.state;
     var hidden = TR.d2.hiddenFor(s.banner);
     var hiddenRows = s.hiddenRows[s.activeQ] || [];
@@ -300,6 +309,11 @@
       "row-chart", rowChartChecked, rowChartTotal);
     var kind = cards2.resolveChartKind(chartModel);
     var hasNets = TR.render.hasNetRows(chartModel);
+    var hasMean = TR.render.hasMeanRow(chartModel);
+    var kindOpt = function (val, label) {
+      return '<option value="' + val + '"' + (kind === val ? " selected" : "") +
+        ">" + label + "</option>";
+    };
     menu.innerHTML =
       '<div class="cm-sect">Columns</div>' +
       '<div class="cm-head"><span>Column</span><span>Table</span>' +
@@ -309,17 +323,23 @@
       "<div class='cm-body'>" + rowAll + rows + "</div>" +
       '<div class="cm-sect">Chart plots</div>' +
       '<select data-chartkindsel class="wide"' +
-      (hasNets ? "" : ' disabled title="This question has no NET rows — detail only"') +
-      '><option value="detail"' + (kind === "detail" ? " selected" : "") +
-      ">Detail categories</option>" +
-      '<option value="summary"' + (kind === "summary" ? " selected" : "") +
-      ">Groupings (NETs)</option>" +
-      '<option value="both"' + (kind === "both" ? " selected" : "") +
-      ">Both</option></select>" +
+      (hasNets || hasMean ? "" :
+        ' disabled title="This question has only detail categories to plot"') +
+      ">" +
+      kindOpt("detail", "Detail categories") +
+      (hasNets ? kindOpt("summary", "Groupings (NETs)") : "") +
+      (hasNets ? kindOpt("both", "Both") : "") +
+      (hasMean ? kindOpt("mean", "Index (mean)") : "") +
+      "</select>" +
       '<button class="primary wide" data-act="columns-done">Done</button>';
     menu.querySelectorAll("[data-cmall][data-mixed='1']").forEach(function (cb) {
       cb.indeterminate = true;   // header reflects a mixed selection
     });
+    // Restore the captured scroll onto the freshly-built nodes — the Columns and
+    // Rows bodies rebuild in the same order, so index alignment holds.
+    menu.scrollTop = keepPanelTop;
+    var newBodies = menu.querySelectorAll(".cm-body");
+    keepBodyTops.forEach(function (top, i) { if (newBodies[i]) newBodies[i].scrollTop = top; });
   }
 
   function bannerTabsHtml() {
@@ -328,6 +348,13 @@
       return '<button class="btab' + (s.banner === g.id ? " on" : "") +
         '" data-banner="' + g.id + '">' + fmt.escapeHtml(g.name) + "</button>";
     });
+    // Total-only survey (no preset banners): expose an explicit "Total" tab so a
+    // custom banner can always be switched off — otherwise the custom tab is the
+    // only one and there is no way back to the Total column (e.g. CCS).
+    if (!TR.AGG.banner_groups.length) {
+      out.unshift('<button class="btab' + (s.banner === "" ? " on" : "") +
+        '" data-banner="">Total</button>');
+    }
     if (s.banner && s.banner.indexOf("custom:") === 0) {
       var q = TR.d2.questionByCode(s.banner.split(":")[1]);
       out.push('<button class="btab on custom" data-banner="' + s.banner + '">⚒ ' +
@@ -339,6 +366,7 @@
     }
     return '<div class="btabs" role="group" aria-label="Banner">' + out.join("") + "</div>";
   }
+  cards2._bannerTabsHtml = bannerTabsHtml;   // exposed for the node gate
 
   cards2.renderActive = function () {
     var s = TR.d2.state;
@@ -399,7 +427,8 @@
         cards2.chartCols(chartModel).length + " column" +
         (cards2.chartCols(chartModel).length === 1 ? "" : "s") + " · " +
         (kind === "summary" ? "groupings" : kind === "both" ? "detail + groupings"
-          : "detail rows") + " — change under Rows &amp; columns…</span></div>" +
+          : kind === "mean" ? "index (mean)" : "detail rows") +
+        " — change under Rows &amp; columns…</span></div>" +
         '<div class="chart">' + safeChart(chartModel) + "</div>";
     }
     if (model.hiddenCount || model.hiddenRowCount) {
@@ -769,6 +798,7 @@
       if (e.target.hasAttribute && e.target.hasAttribute("data-chartkindsel")) {
         TR.d2.state.chartKind = e.target.value;
         cards2.renderActive();
+        buildColumnsPanel();   // chartable rows changed — refresh the row checkboxes
         return;
       }
       if (e.target.hasAttribute && e.target.hasAttribute("data-sigmode")) {

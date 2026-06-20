@@ -107,6 +107,7 @@ eval(parse(text = .rc_lines[.rc_start[1]:.rc_next]), envir = globalenv())
 rm(.rc_lines, .rc_start, .rc_end, .rc_next)
 
 # Source the module under test
+source(file.path(turas_root, "modules/tabs/lib/score_utils.R"))   # box_category_scores (NET POSITIVE order)
 source(file.path(turas_root, "modules/tabs/lib/standard_processor.R"))
 source(file.path(turas_root, "modules/tabs/lib/question_dispatcher.R"))
 
@@ -681,6 +682,34 @@ test_that("calculates net positive from box categories", {
       }
     }
   }
+})
+
+test_that("box ordering follows SCORE so NET POSITIVE is favourable - unfavourable", {
+  # Real SACS Q05 shape: the score lives in OptionText (NO OptionValue column),
+  # the scale is displayed best-first (Strongly Agree, DisplayOrder 1) but scored
+  # 5..1. The favourable box must be "top" even though it is displayed first.
+  qo <- data.frame(
+    OptionText   = c("5", "4", "3", "2", "1"),
+    DisplayText  = c("Strongly Agree", "Somewhat Agree", "Neutral", "Somewhat Disagree", "Strongly Disagree"),
+    DisplayOrder = c(1, 2, 3, 4, 5),
+    BoxCategory  = c("Agree", "Agree", "Neutral", "Disagree", "Disagree"),
+    stringsAsFactors = FALSE
+  )
+  expect_equal(unname(box_category_scores(qo)[c("Agree", "Disagree")]), c(4.5, 1.5))
+  ordered <- get_sorted_boxcategories(qo)
+  expect_equal(ordered, c("Disagree", "Neutral", "Agree"))   # ascending score
+  tb <- identify_top_bottom_categories(ordered)
+  expect_equal(tb$top, "Agree")                               # favourable (highest score)
+  expect_equal(tb$bottom, "Disagree")                         # unfavourable (lowest score)
+})
+
+test_that("box ordering falls back to DisplayOrder when no OptionValue", {
+  qo <- data.frame(
+    DisplayOrder = c(1, 2, 3, 4),
+    BoxCategory  = c("Low", "Low", "High", "High"),
+    stringsAsFactors = FALSE
+  )
+  expect_equal(get_sorted_boxcategories(qo), c("Low", "High"))
 })
 
 
