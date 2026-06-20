@@ -336,12 +336,22 @@ test_that("derive_net_diffs orders by SCORE (favourable box = plus) when given b
   expect_equal(derive_net_diffs(rows), list("2" = list(plus = 1, minus = 0)))
 })
 
-test_that("box_category_scores averages OptionValue per box", {
-  qo <- data.frame(
+test_that("box_category_scores averages the option score (OptionText or OptionValue) per box", {
+  # Real SACS shape: the score is in OptionText, with no OptionValue column.
+  qo_text <- data.frame(
+    OptionText  = c("5", "4", "2", "1"),
+    BoxCategory = c("Agree", "Agree", "Disagree", "Disagree"),
+    stringsAsFactors = FALSE)
+  s1 <- box_category_scores(qo_text)
+  expect_equal(unname(s1[["Agree"]]), 4.5)
+  expect_equal(unname(s1[["Disagree"]]), 1.5)
+  # OptionValue takes precedence when it is present.
+  qo_val <- data.frame(
+    OptionText  = c("x", "x", "x", "x"),
     OptionValue = c(5, 4, 2, 1),
     BoxCategory = c("Agree", "Agree", "Disagree", "Disagree"),
     stringsAsFactors = FALSE)
-  s <- box_category_scores(qo)
-  expect_equal(unname(s[["Agree"]]), 4.5)
-  expect_equal(unname(s[["Disagree"]]), 1.5)
+  s2 <- box_category_scores(qo_val)
+  expect_equal(unname(s2[["Agree"]]), 4.5)
+  expect_equal(unname(s2[["Disagree"]]), 1.5)
 })

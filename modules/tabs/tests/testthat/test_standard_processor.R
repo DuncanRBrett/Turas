@@ -685,21 +685,22 @@ test_that("calculates net positive from box categories", {
 })
 
 test_that("box ordering follows SCORE so NET POSITIVE is favourable - unfavourable", {
-  # Best-first display (Strongly Agree shown first, DisplayOrder 1) but scored
-  # 5..1 (Strongly Agree = 5) — the SACS Q05 shape. The favourable box must be
-  # "top" even though it is displayed first.
+  # Real SACS Q05 shape: the score lives in OptionText (NO OptionValue column),
+  # the scale is displayed best-first (Strongly Agree, DisplayOrder 1) but scored
+  # 5..1. The favourable box must be "top" even though it is displayed first.
   qo <- data.frame(
-    OptionText   = c("Strongly Agree", "Somewhat Agree", "Neutral", "Somewhat Disagree", "Strongly Disagree"),
-    OptionValue  = c(5, 4, 3, 2, 1),
+    OptionText   = c("5", "4", "3", "2", "1"),
+    DisplayText  = c("Strongly Agree", "Somewhat Agree", "Neutral", "Somewhat Disagree", "Strongly Disagree"),
     DisplayOrder = c(1, 2, 3, 4, 5),
-    BoxCategory  = c("Agree", "Agree", "", "Disagree", "Disagree"),
+    BoxCategory  = c("Agree", "Agree", "Neutral", "Disagree", "Disagree"),
     stringsAsFactors = FALSE
   )
+  expect_equal(unname(box_category_scores(qo)[c("Agree", "Disagree")]), c(4.5, 1.5))
   ordered <- get_sorted_boxcategories(qo)
-  expect_equal(ordered, c("Disagree", "Agree"))      # ascending score: unfavourable first
+  expect_equal(ordered, c("Disagree", "Neutral", "Agree"))   # ascending score
   tb <- identify_top_bottom_categories(ordered)
-  expect_equal(tb$top, "Agree")                       # favourable box is "top"
-  expect_equal(tb$bottom, "Disagree")
+  expect_equal(tb$top, "Agree")                               # favourable (highest score)
+  expect_equal(tb$bottom, "Disagree")                         # unfavourable (lowest score)
 })
 
 test_that("box ordering falls back to DisplayOrder when no OptionValue", {

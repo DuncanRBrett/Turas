@@ -50,24 +50,30 @@ nps_bucket_score <- function(v) {
 }
 
 
-#' Mean OptionValue per BoxCategory — the favourability score
+#' Mean option score per BoxCategory — the favourability score
 #'
-#' The score the Index uses (OptionValue), aggregated to each box. Lets NET
+#' Each box's mean option score, using the SAME signal as the Index
+#' (`option_numeric_value`: OptionValue when present, else OptionText). Lets NET
 #' POSITIVE order its boxes by favourability rather than display position, so the
 #' favourable box is "top" whether the scale is shown best-first or worst-first.
 #'
-#' @param opt_df Option rows for ONE question (needs BoxCategory + OptionValue)
-#' @return Named numeric BoxCategory -> mean OptionValue (NA when a box has no
+#' @param opt_df Option rows for ONE question (needs BoxCategory + a numeric
+#'   OptionValue or OptionText)
+#' @return Named numeric BoxCategory -> mean option score (NA when a box has no
 #'   numeric value), or NULL when there is nothing to score by.
 #' @export
 box_category_scores <- function(opt_df) {
-  if (is.null(opt_df) || !all(c("BoxCategory", "OptionValue") %in% names(opt_df))) return(NULL)
+  if (is.null(opt_df) || !("BoxCategory" %in% names(opt_df))) return(NULL)
   cats <- unique(opt_df$BoxCategory)
   cats <- cats[!is.na(cats) & nzchar(trimws(as.character(cats)))]
   if (length(cats) == 0) return(NULL)
   vapply(cats, function(cat) {
-    vals <- suppressWarnings(as.numeric(opt_df$OptionValue[
-      !is.na(opt_df$BoxCategory) & opt_df$BoxCategory == cat]))
+    sub <- opt_df[!is.na(opt_df$BoxCategory) & opt_df$BoxCategory == cat, , drop = FALSE]
+    if (nrow(sub) == 0) return(NA_real_)
+    vals <- vapply(seq_len(nrow(sub)), function(i) {
+      v <- suppressWarnings(option_numeric_value(sub[i, , drop = FALSE]))
+      if (length(v) == 1) as.numeric(v) else NA_real_   # no OptionValue/OptionText -> NA
+    }, numeric(1))
     if (all(is.na(vals))) NA_real_ else mean(vals, na.rm = TRUE)
   }, numeric(1))
 }
