@@ -798,6 +798,7 @@
       if (e.target.hasAttribute && e.target.hasAttribute("data-chartkindsel")) {
         TR.d2.state.chartKind = e.target.value;
         cards2.renderActive();
+        buildColumnsPanel();   // chartable rows changed — refresh the row checkboxes
         return;
       }
       if (e.target.hasAttribute && e.target.hasAttribute("data-sigmode")) {
