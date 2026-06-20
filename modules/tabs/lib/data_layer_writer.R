@@ -428,6 +428,7 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
   scale_max <- NA_real_
   gauge_green <- NA_real_
   gauge_amber <- NA_real_
+  is_composite <- identical(as.character(q_result$question_type %||% ""), "Composite")
   if (!is.na(metric_type) && q_type_v2 %in% c("scale", "nps")) {
     if (metric_type == "Index") {
       scale_max   <- as.numeric(config_obj$dashboard_scale_index %||% 10)
@@ -440,6 +441,14 @@ build_dl_question <- function(q_result, banner_info, config_obj, low_base,
       gauge_green <- as.numeric(config_obj$dashboard_green_mean %||% 7)
       gauge_amber <- as.numeric(config_obj$dashboard_amber_mean %||% 5)
     }
+  } else if (is_composite) {
+    # A composite index (e.g. Q_Engage / Q_Value) is the mean of rated items, so
+    # it sits on the project's rating scale — but it maps to type "single" and so
+    # skips the block above. Give it the index scale_max + thresholds so it
+    # appears AND colours on the dashboard like the touchpoints it summarises.
+    scale_max   <- as.numeric(config_obj$dashboard_scale_index %||% config_obj$dashboard_scale_mean %||% 10)
+    gauge_green <- as.numeric(config_obj$dashboard_green_index %||% config_obj$dashboard_green_mean %||% 7)
+    gauge_amber <- as.numeric(config_obj$dashboard_amber_index %||% config_obj$dashboard_amber_mean %||% 5)
   }
 
   # index_scores (display label -> numeric score) lets the renderer recompute
