@@ -1191,6 +1191,22 @@ run("Index (mean) chart mode plots the mean row as a rating, not a distribution"
   assert(colSvg.indexOf(rating) !== -1 && colSvg.indexOf(asPct) === -1,
     "the column is labelled with the rating, not a percentage");
 
+  // "Index by column": each charted column transposes into its own labelled bar
+  // (its mean) — a single series, so the column name reads off the axis next to
+  // the bar, not from a legend.
+  const meanRow = m.rows.find((r) => r.kind === "mean");
+  const tr = TR.render.asMeanByColumn(m, [0, 1]);
+  assert(tr.cols.length === 1, "a transposed mean plot is a single series (no legend)");
+  assert(tr.model.rows.length === 2, "one bar per charted column");
+  assert(tr.model.rows[0].label === m.columns[0].label &&
+         tr.model.rows[1].label === m.columns[1].label,
+    "each bar is labelled with its column name");
+  assert(tr.model.rows[1].cells[0].pct === meanRow.cells[1].mean,
+    "each bar's value is that column's mean");
+  const distM = TR.model.forQuestion(q.code, TR.AGG.banner_groups[0].id, []);
+  assert(TR.render.asMeanByColumn(distM, [0, 1]).model === distM,
+    "a distribution plot is never transposed (passes through unchanged)");
+
   // bar + column are honoured for a mean; stacked / pie / dot / line fall back
   // to the (default) bar chart — never a percentage chart
   assert(TR.render.chartBy("bar", m, [0]) === barSvg, "a mean plot honours the bar chart");

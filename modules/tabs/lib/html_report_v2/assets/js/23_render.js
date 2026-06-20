@@ -388,6 +388,30 @@
     });
   };
 
+  /**
+   * Transpose a mean ("Index") plot so each charted column becomes its own
+   * labelled bar (its mean) — the column identity then reads off the axis next
+   * to the bar, instead of from a legend. Returns {model, cols} unchanged for
+   * any non-mean plot, or when the Index row is unticked (nothing to chart), so
+   * distribution charts and the empty case are untouched.
+   */
+  render.asMeanByColumn = function (model, cols) {
+    if (!Array.isArray(cols)) cols = [cols || 0];
+    if (model.valueKind !== "mean") return { model: model, cols: cols };
+    var data = render.meanChartRows(model);
+    if (!data.rows.length) return { model: model, cols: cols };
+    var src = data.rows[0];                       // the Index row; cells[ci].pct = its mean
+    var rows = cols.map(function (ci) {
+      var c = src.cells[ci] || {};
+      return { kind: "category",
+        label: model.columns[ci] ? model.columns[ci].label : "?",
+        cells: [{ pct: (c.pct === null || c.pct === undefined) ? null : c.pct, n: null, sig: "" }] };
+    });
+    return { model: { code: model.code, valueKind: "mean",
+      columns: [{ label: src.label, letter: "", base: null, low: false }],
+      rows: rows }, cols: [0] };
+  };
+
   /** True when a model actually has chartable NET rows. */
   render.hasNetRows = function (model) {
     return model.rows.some(function (r) {
@@ -412,6 +436,7 @@
    */
   render.barChart = function (model, cols) {
     if (!Array.isArray(cols)) cols = [cols || 0];
+    var mb = render.asMeanByColumn(model, cols); model = mb.model; cols = mb.cols;
     var data = render.chartRows(model);
     if (!data.rows.length) return "";
     var meanScale = model.valueKind === "mean";   // ratings, not percentages

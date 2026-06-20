@@ -67,6 +67,8 @@
 
   /** Vertical grouped columns: rows on the x axis, one column per series. */
   render.columnChart = function (model, cols) {
+    if (!Array.isArray(cols)) cols = [cols || 0];
+    var mb = render.asMeanByColumn(model, cols); model = mb.model; cols = mb.cols;
     var data = render.chartRows(model);
     if (!data.rows.length) return "";
     var meanScale = model.valueKind === "mean";   // ratings, not percentages

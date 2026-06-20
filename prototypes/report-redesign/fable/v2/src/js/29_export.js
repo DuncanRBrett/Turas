@@ -539,6 +539,11 @@
    * packager, honouring chart type, row kind (detail/NETs) and columns.
    */
   exporter.buildChart = function (model, type, cols) {
+    // A mean ("Index") plot renders as a clustered bar/column with each charted
+    // column as its own labelled bar — mirrors the on-screen chart (coerce a
+    // percentage type to bar, then transpose columns -> labelled bars).
+    if (model.valueKind === "mean" && type !== "column" && type !== "bar") type = "bar";
+    var mb = TR.render.asMeanByColumn(model, cols); model = mb.model; cols = mb.cols;
     var cr = TR.render.chartRows(model);
     var rows = cr.rows;
     if (!rows.length || !cols.length) return null;
