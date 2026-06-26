@@ -187,5 +187,32 @@ try {
   TR.AGG = saved.agg; TR.MICRO = saved.micro; TR.d2._qIndex = saved.idx;
 }
 
+/* ---------------- 5. "How sure" callout matches the table ---------------- */
+// The worked example must quote the FPC-corrected range (same as the table),
+// not the raw-base one, and read as an illustration ("a NN%") not a pointer.
+TR.AGG._hasPop = undefined;
+delete TR.AGG.columns[0].population;
+// fmt.base separates thousands with a space, so allow spaces/commas in the base.
+const reRange = /For example, a (\d+)% based on ([\d\s, ]+?) answers would sit between (\d+)% and (\d+)%/;
+const callRaw = TR.conf.calloutHtml();
+const exRaw = callRaw.match(reRange);
+ok(!!exRaw, "callout shows a worked example as 'For example, a NN%'");
+ok(!/this \d+% would likely/.test(callRaw), "the ambiguous 'this NN%' wording is gone");
+ok(/if we ran the survey again/.test(callRaw), "no population -> 're-run' framing");
+
+const exBase = Number((exRaw[2] || "").replace(/[^\d]/g, ""));
+TR.AGG.columns[0].population = Math.round(exBase / 0.7);   // ~70% coverage
+TR.AGG._hasPop = undefined;
+const callFpc = TR.conf.calloutHtml();
+const exFpc = callFpc.match(reRange);
+ok(!!exFpc && Number(exFpc[1]) === Number(exRaw[1]),
+  "same worked example selected with population set (selection is base/%-driven)");
+ok(/for the group as a whole/.test(callFpc),
+  "population -> 'whole group' framing (not 're-run')");
+ok((Number(exFpc[4]) - Number(exFpc[3])) < (Number(exRaw[4]) - Number(exRaw[3])),
+  "worked-example range narrows with FPC — consistent with the table");
+delete TR.AGG.columns[0].population;
+TR.AGG._hasPop = undefined;
+
 console.log(`\nFPC: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

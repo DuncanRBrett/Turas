@@ -1661,7 +1661,7 @@ run("confidence: explainer + sampling vocabulary ship in the artifact", () => {
   assert(callout.includes("How sure can I be of these numbers"),
     "callout headline missing");
   // fmt.base uses a narrow no-break space as the thousands separator
-  assert(/Based on \d[\d,\s  ]* answers, this \d+% would likely land between/
+  assert(/For example, a \d+% based on \d[\d,\s  ]* answers would sit between/
     .test(callout), "worked example not computed from the data");
   assert(/has only \d[\d,\s  ]* respondents/.test(callout),
     "small-group example not computed from the data");

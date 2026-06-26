@@ -237,6 +237,10 @@
    */
   function workedExample() {
     var best = null;
+    // When the Total universe is known, the table's Total intervals are
+    // FPC-corrected — so the worked example must use the same effective base,
+    // otherwise the callout quotes a wider range than the table shows.
+    var totalN = TR.AGG.columns && TR.AGG.columns[0] && TR.AGG.columns[0].population;
     (TR.AGG.questions || []).forEach(function (q) {
       var base = q.bases && q.bases[0] && q.bases[0].n;
       if (!base || base < EXAMPLE_MIN_BASE) return;
@@ -248,8 +252,9 @@
         if (best && (base < best.n || (base === best.n && pct <= best.pct))) {
           return;
         }
-        var w = conf.wilsonPct(pct, base);
-        if (w) best = { pct: pct, n: base, lo: w.lo, hi: w.hi };
+        var ciBase = (totalN > 1) ? conf.fpcBase(base, base, totalN) : base;
+        var w = conf.wilsonPct(pct, ciBase);
+        if (w) best = { pct: pct, n: base, lo: w.lo, hi: w.hi, fpc: totalN > 1 };
       });
     });
     return best;
@@ -272,7 +277,8 @@
     TR.d2.groupCols(groups[0].id).forEach(function (ci) {
       var b = q.bases && q.bases[ci] && q.bases[ci].n;
       if (b && (!smallest || b < smallest.n)) {
-        smallest = { label: TR.AGG.columns[ci].label, n: b };
+        smallest = { label: TR.AGG.columns[ci].label, n: b,
+          population: TR.AGG.columns[ci].population };
       }
     });
     return smallest;
@@ -330,17 +336,26 @@
     var fmt = TR.fmt;
     var bullets = [];
     if (ex) {
+      // "a NN%" (not "this NN%") so it reads as a worked example, not a pointer
+      // at one cell. Tail matches the inference: FPC ranges describe the whole
+      // group; uncorrected ranges describe a re-run.
+      var tail = ex.fpc
+        ? "% for the group as a whole.</li>"
+        : "% if we ran the survey again.</li>";
       bullets.push("<li><strong>Every number comes from a sample.</strong> " +
-        "Based on " + fmt.base(ex.n) + " answers, this " +
-        Math.round(ex.pct) + "% would likely land between " +
-        Math.round(ex.lo) + "% and " + Math.round(ex.hi) +
-        "% if we ran the survey again.</li>");
+        "For example, a " + Math.round(ex.pct) + "% based on " +
+        fmt.base(ex.n) + " answers would sit between " + Math.round(ex.lo) +
+        "% and " + Math.round(ex.hi) + tail);
     }
     if (small) {
+      // FPC-consistent ±pp when the group's universe is known (matches the
+      // table's corrected margin rather than the raw-base one).
+      var sBase = (small.population > 1)
+        ? conf.fpcBase(small.n, small.n, small.population) : small.n;
       bullets.push("<li><strong>Small groups swing more.</strong> " +
         fmt.escapeHtml(small.label) + " has only " + fmt.base(small.n) +
         " respondents, so its numbers can move by about ±" +
-        conf.maxMoePct(small.n).toFixed(0) +
+        conf.maxMoePct(sBase).toFixed(0) +
         "pp — treat them as indicative.</li>");
     }
     bullets.push("<li><strong>“Significant”</strong> means a difference too " +
