@@ -133,6 +133,19 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
     sig_note           = build_sig_note(alpha, sm),
     tracking           = list(enabled = isTRUE(tracking_enabled), default_scope = "all")
   )
+  # Total universe size (finite population correction). Carried only when a
+  # usable value is configured; the renderer derives the overall response /
+  # coverage rate from it (TR.MICRO.n / population_size) and corrects the Total
+  # column's intervals. Omitted -> no correction (byte-identical to today).
+  pop_size <- suppressWarnings(as.numeric(config_obj$population_size))
+  if (length(pop_size) == 1L && !is.na(pop_size) && pop_size > 1) {
+    proj$population_size <- pop_size
+  }
+  # Weighted designs carry a design effect the published data layer doesn't
+  # expose per column, so the report's FPC re-letters significance only when
+  # unweighted. Carried for the renderer to gate that (intervals are FPC'd
+  # regardless). Omitted when FALSE -> unweighted reports unchanged.
+  if (isTRUE(config_obj$apply_weighting)) proj$weighted <- TRUE
   # Inline researcher / client logos as data URIs when configured; omit (the
   # renderer shows the brand dot) otherwise. researcher_logo_path falls back to
   # the legacy single logo_path, mirroring the classic report.
@@ -188,20 +201,78 @@ build_dl_project <- function(config_obj, tracking_enabled = FALSE) {
 }
 
 
+#' Resolve a banner column's known population from the Population frame
+#'
+#' Matches a column's subgroup label (and, when given, its banner) against the
+#' optional Population sheet. A banner-scoped row wins over an unscoped one; the
+#' match is case-insensitive on trimmed labels. Returns NULL when no usable
+#' population is found, so callers omit the field entirely (no correction).
+#'
+#' @param col_label The column's display label (e.g. "Masters")
+#' @param banner_label The column's banner question label, or NA
+#' @param frame The population frame (data.frame banner/group/population) or NULL
+#' @return Numeric population (> 1) or NULL
+#' @keywords internal
+.resolve_column_population <- function(col_label, banner_label, frame) {
+  if (is.null(frame) || nrow(frame) == 0 || is.null(col_label) || is.na(col_label)) {
+    return(NULL)
+  }
+  norm <- function(x) tolower(trimws(as.character(x)))
+  same_group <- norm(frame$group) == norm(col_label)
+  if (!any(same_group)) return(NULL)
+  cand <- frame[same_group, , drop = FALSE]
+  # Prefer a row whose Banner matches this column's banner label; otherwise an
+  # unscoped (blank-Banner) row.
+  if (!is.null(banner_label) && !is.na(banner_label)) {
+    scoped <- !is.na(cand$banner) & norm(cand$banner) == norm(banner_label)
+    if (any(scoped)) return(cand$population[which(scoped)[1]])
+  }
+  unscoped <- is.na(cand$banner)
+  if (any(unscoped)) return(cand$population[which(unscoped)[1]])
+  # A scoped row for a different banner only — not a match for this column.
+  NULL
+}
+
 #' Build the columns[] array of the data layer
 #'
 #' One entry per banner column (Total first), in banner_info$internal_keys
 #' order — the order every row.pct/n/sig array is indexed by.
 #'
 #' @param banner_info Banner structure from create_banner_structure()
-#' @return A list of {key, group, label, letter}
+#' @param config_obj Optional config object; when it carries a population_size
+#'   and/or Population frame, each column gains a \code{population} field (the
+#'   known universe N) used for the finite population correction. Omitted when
+#'   no population is configured for that column -> no correction.
+#' @return A list of {key, group, label, letter[, population]}
 #' @export
-build_dl_columns <- function(banner_info) {
+build_dl_columns <- function(banner_info, config_obj = NULL) {
   keys    <- banner_info$internal_keys
   letters <- banner_info$letters
   k2d     <- banner_info$key_to_display
   c2b     <- banner_info$column_to_banner
-  lapply(seq_along(keys), function(i) {
+
+  # Population inputs (all optional). Build a banner_code -> human label map so a
+  # column can be matched to the Population sheet's Banner column.
+  frame    <- config_obj$population_frame
+  pop_size <- suppressWarnings(as.numeric(config_obj$population_size))
+  pop_size <- if (length(pop_size) == 1L && !is.na(pop_size) && pop_size > 1) pop_size else NULL
+  banner_label_by_code <- list()
+  if (!is.null(frame)) {
+    groups <- tryCatch(build_banner_groups(banner_info), error = function(e) NULL)
+    if (!is.null(groups)) {
+      for (lbl in names(groups)) {
+        code <- groups[[lbl]]$banner_code
+        if (!is.null(code)) banner_label_by_code[[as.character(code)]] <- lbl
+      }
+    }
+  }
+
+  # Collect each non-total column's (banner label, subgroup label) so we can
+  # report any Population row that matched no column (a typo / stale label) —
+  # otherwise an unmatched group silently gets a standard interval.
+  col_idents <- list()
+
+  cols <- lapply(seq_along(keys), function(i) {
     key <- keys[i]
     grp_code <- if (!is.null(c2b) && key %in% names(c2b)) unname(c2b[[key]]) else NA_character_
     is_total <- identical(key, "TOTAL::Total") || identical(grp_code, "TOTAL")
@@ -212,9 +283,66 @@ build_dl_columns <- function(banner_info) {
       l <- letters[i]
       if (!is.na(l) && l != "-") letter <- as.character(l)
     }
-    list(key = as.character(key), group = as.character(group),
-         label = as.character(label), letter = letter)
+    entry <- list(key = as.character(key), group = as.character(group),
+                  label = as.character(label), letter = letter)
+    banner_label <- if (!is_total && !is.na(grp_code)) {
+      banner_label_by_code[[as.character(grp_code)]]
+    } else {
+      NULL
+    }
+    if (!is_total) {
+      col_idents[[length(col_idents) + 1]] <<- list(
+        label = label,
+        banner = if (is.null(banner_label)) NA_character_ else banner_label)
+    }
+    # Attach the known population N: the study total for the Total column, the
+    # frame match for a banner subgroup. Carried only when found.
+    pop <- if (is_total) pop_size else .resolve_column_population(label, banner_label, frame)
+    if (!is.null(pop) && is.finite(pop) && pop > 1) entry$population <- as.numeric(pop)
+    entry
   })
+
+  .warn_unmatched_population(frame, col_idents)
+  cols
+}
+
+
+#' Console diagnostic for Population rows that matched no report column
+#'
+#' Turas runs in Shiny, so a silently-ignored population (typo / stale label)
+#' must be visible in the console. Reports how many subgroup rows matched and
+#' names any that did not, so the analyst can fix the spelling. No-op when no
+#' Population frame is configured.
+#'
+#' @param frame Population frame (banner/group/population) or NULL
+#' @param col_idents List of {label, banner} for the non-total columns
+#' @keywords internal
+.warn_unmatched_population <- function(frame, col_idents) {
+  if (is.null(frame) || nrow(frame) == 0 || length(col_idents) == 0) return(invisible(NULL))
+  norm <- function(x) tolower(trimws(as.character(x)))
+  col_lab <- vapply(col_idents, function(c) norm(c$label), character(1))
+  col_ban <- vapply(col_idents, function(c) norm(c$banner), character(1))
+  matched <- logical(nrow(frame))
+  for (r in seq_len(nrow(frame))) {
+    g <- norm(frame$group[r])
+    b <- frame$banner[r]
+    hit <- col_lab == g
+    if (!is.na(b) && nzchar(trimws(b))) hit <- hit & (col_ban == norm(b))
+    matched[r] <- any(hit)
+  }
+  n_ok <- sum(matched)
+  cat(sprintf("  [INFO] Population: matched %d of %d subgroup row(s) to report columns.\n",
+              n_ok, nrow(frame)))
+  if (any(!matched)) {
+    cat("  [WARNING] These Population rows matched NO report column (check spelling",
+        "against the banner labels — they keep a standard interval):\n")
+    for (r in which(!matched)) {
+      ban <- frame$banner[r]
+      tag <- if (!is.na(ban) && nzchar(trimws(ban))) sprintf(" [Banner: %s]", ban) else ""
+      cat(sprintf("    - \"%s\"%s\n", frame$group[r], tag))
+    }
+  }
+  invisible(NULL)
 }
 
 
@@ -632,7 +760,7 @@ build_data_layer <- function(all_results, banner_info, config_obj,
   dl <- list(
     schema_version = 2L,
     project        = project,
-    columns        = build_dl_columns(banner_info),
+    columns        = build_dl_columns(banner_info, config_obj),
     banner_groups  = build_dl_banner_groups(banner_info),
     categories     = build_dl_categories(all_results),
     questions      = questions

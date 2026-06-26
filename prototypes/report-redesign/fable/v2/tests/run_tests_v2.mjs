@@ -738,6 +738,12 @@ run("Tracking dual-significance: soft (80%) flagging in dual mode (subprocess)",
   assert(res.status === 0, "soft-sig flagging failed:\n" + res.stdout);
 });
 
+run("Finite population correction: kernel + model + reversibility (subprocess)", () => {
+  const res = spawnSync("node", [path.join(BASE, "tests", "fpc.mjs")],
+    { encoding: "utf8" });
+  assert(res.status === 0, "FPC gate failed:\n" + res.stdout);
+});
+
 run("Tracking Summary: 'Nearly significant' cards render in dual mode (subprocess)", () => {
   const res = spawnSync("node", [path.join(BASE, "tests", "tracking_render.mjs")],
     { encoding: "utf8" });

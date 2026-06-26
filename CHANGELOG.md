@@ -5,6 +5,26 @@ All notable changes to TURAS are documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Tabs: Finite population correction (FPC)** — for census / full-invite
+  studies (e.g. staff or student surveys) where the universe is small and only
+  part of it responds. A new `population_size` setting (study total) and an
+  optional `Population` sheet (per-banner-subgroup universe sizes) let the v2
+  interactive report size its statistics on what was actually sampled: the
+  effective base becomes `n·(N-1)/(N-n)`, so confidence intervals **narrow as a
+  group's coverage rises** (reaching zero for a full census), significance is
+  tested on that corrected base, and a small base that is most of a known group
+  is no longer flagged "unstable" (the low-base flag is coverage-aware, showing
+  `xx% of N`). Significance and intervals stay consistent because population
+  reports' default view is recomputed through the microdata path (badged
+  `PUBLISHED · FPC`); FPC is suppressed under a live filter / custom banner,
+  where the sub-population's universe is unknown. The design note names the
+  response rate and flags non-response as the residual, uncorrectable
+  uncertainty. Fully additive: with no population configured, every report is
+  byte-identical. Canonical helpers (`calculate_fpc_factor`, `apply_fpc`) live
+  in the confidence module and are ported verbatim to the report's JS. See
+  `modules/tabs/docs/FINITE_POPULATION_CORRECTION_PLAN.md`. New tests: confidence
+  known-answers, data-layer emission, JS gate (`tests/fpc.mjs`), template
+  round-trip.
 - **Tabs: Allocation question type** — new `Variable_Type = "Allocation"` for
   constant-sum / budget-allocation survey questions (Alchemer `CONT_SUM`).
   Produces mean allocation per option cross-tabbed by banner, with optional

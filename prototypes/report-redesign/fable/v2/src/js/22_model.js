@@ -36,12 +36,27 @@
     var cols = [0].concat(TR.d2.groupCols(bannerId));
     var threshold = lowThreshold();
     var columns = cols.map(function (ci) {
-      return {
+      var base = q.bases[ci] ? q.bases[ci].n : null;
+      var entry = {
         label: TR.AGG.columns[ci].label,
         letter: ci === 0 ? "" : TR.AGG.columns[ci].letter,
-        base: q.bases[ci] ? q.bases[ci].n : null,
+        base: base,
         low: q.bases[ci] ? !!q.bases[ci].low : false
       };
+      // Finite population correction: when a universe N is known for the column,
+      // carry it so intervals narrow (attachIntervals reads ciBase) and the
+      // low-base flag becomes coverage-aware. Omitted entirely otherwise, so a
+      // report with no population is byte-identical. (The published path keeps
+      // R's significance letters; FPC reaches significance via the computed
+      // path, which model.forQuestion routes population reports through.)
+      var N = TR.AGG.columns[ci].population;
+      if (N > 1 && base != null) {
+        entry.population = N;
+        entry.coverage = TR.conf.coverage(base, N);
+        entry.ciBase = TR.conf.fpcBase(base, base, N);
+        entry.low = entry.ciBase < threshold;
+      }
+      return entry;
     });
     var letters = columns.map(function (c) { return c.letter; });
     var rows = q.rows.map(function (r, qri) {
@@ -264,20 +279,81 @@
             }
           });
           var sd = TR.waves.sdFromPairs(pairs);
-          var base = viewModel.columns[ci] ? viewModel.columns[ci].base : null;
-          var bounds = sd === null ? null : TR.conf.meanCI(cell.mean, sd, base);
+          var col = viewModel.columns[ci];
+          var base = col ? col.base : null;
+          // ciBase carries the finite-population-corrected effective base when a
+          // universe is known (Infinity for a full census -> zero-width); else
+          // it is the plain base, so non-population reports are unchanged.
+          var ciBase = (col && col.ciBase != null) ? col.ciBase : base;
+          var bounds = sd === null ? null : TR.conf.meanCI(cell.mean, sd, ciBase);
           if (bounds) cell.ci = bounds;
         });
         return;
       }
       row.cells.forEach(function (cell, ci) {
         if (cell.pct === null || cell.pct === undefined) return;
-        var base = viewModel.columns[ci] ? viewModel.columns[ci].base : null;
+        var col = viewModel.columns[ci];
+        var base = col ? col.base : null;
         if (!base) return;
+        var ciBase = (col.ciBase != null) ? col.ciBase : base;
         var p = cell.n !== null && cell.n !== undefined
           ? cell.n / base : cell.pct / 100;
-        var w = TR.conf.wilson(Math.min(Math.max(p, 0), 1), base);
+        var w = TR.conf.wilson(Math.min(Math.max(p, 0), 1), ciBase);
         if (w) cell.ci = { lo: w.lower * 100, hi: w.upper * 100 };
+      });
+    });
+  }
+
+  /**
+   * Re-letter significance on the FPC-corrected effective base, in the DEFAULT
+   * (published) view of a population report. Works ENTIRELY from the published
+   * figures already in the model — the shown % and the column's ciBase — so the
+   * reported numbers never move; only which differences earn a letter changes.
+   * (Microdata is deliberately not used here: a column's published base and its
+   * microdata count can differ, and the published figures are the report of
+   * record.) Proportions recompute from the shown %; means derive their SD the
+   * same way attachIntervals does (TR.waves.scoreMap + sdFromPairs — the one
+   * shared SD source). Columns with no known universe keep ciBase === base, so
+   * their letters are unchanged. Unweighted designs only (gated by the caller);
+   * a weighted base's design effect is not in the published layer.
+   */
+  function applyFpcSignificance(viewModel, q, dual) {
+    var threshold = viewModel.lowBaseThreshold;
+    var letters = viewModel.columns.map(function (c) { return c.letter; });
+    var sizeAt = function (ci) {
+      var c = viewModel.columns[ci];
+      return (c && c.ciBase != null) ? c.ciBase : (c ? c.base : null);
+    };
+    viewModel.rows.forEach(function (row) {
+      if (row.diff) return;                       // differences carry no test
+      if (row.kind === "mean") {
+        if (isStdDevRow(row.label)) return;
+        var scores = TR.waves.scoreMap(q, row);
+        if (!scores) return;
+        var cells = row.cells.map(function (cell, ci) {
+          var pairs = [];
+          Object.keys(scores).forEach(function (ri) {
+            var cc = viewModel.rows[ri] && viewModel.rows[ri].cells[ci];
+            if (cc && cc.pct !== null && cc.pct !== undefined) {
+              pairs.push({ p: cc.pct, s: scores[ri] });
+            }
+          });
+          return { mean: cell.mean, sd: TR.waves.sdFromPairs(pairs), k: sizeAt(ci) };
+        });
+        var msig = TR.stats.sigLetters(cells, letters, threshold, true, dual);
+        row.cells.forEach(function (cell, ci) {
+          if (cell.mean !== null && cell.mean !== undefined) cell.sig = msig[ci];
+        });
+        return;
+      }
+      var pcells = row.cells.map(function (cell, ci) {
+        var base = sizeAt(ci);
+        var p = (cell.pct === null || cell.pct === undefined) ? null : cell.pct / 100;
+        return { x: p === null ? 0 : p * base, base: base };
+      });
+      var psig = TR.stats.sigLetters(pcells, letters, threshold, false, dual);
+      row.cells.forEach(function (cell, ci) {
+        if (cell.pct !== null && cell.pct !== undefined) cell.sig = psig[ci];
       });
     });
   }
@@ -341,7 +417,8 @@
     var q = TR.d2.questionByCode(code);
     if (!q) return null;
     var custom = bannerId && bannerId.indexOf("custom:") === 0;
-    var needCompute = custom || (filters && filters.length > 0);
+    var filtered = filters && filters.length > 0;
+    var needCompute = custom || filtered;
     var viewModel;
     if (needCompute && TR.d2.hasMicrodata()) {
       viewModel = computedModel(q, bannerId, filters, opts.dual);
@@ -349,6 +426,15 @@
       viewModel = publishedModel(q,
         custom ? TR.d2.firstBanner() : bannerId, opts.dual);
     }
+    // Finite population correction applies to the DEFAULT (published) view of a
+    // population report — never under a filter / custom banner, where a
+    // sub-population's universe is unknown. The published numbers stay verbatim;
+    // FPC narrows the intervals (attachIntervals reads each column's ciBase) and
+    // re-letters significance from the FPC-corrected base (unweighted designs —
+    // a weighted base's design effect isn't in the published layer; weighted
+    // reports still get the narrower intervals).
+    var weighted = !!(TR.AGG.project && TR.AGG.project.weighted);
+    viewModel.fpcDefault = !custom && !filtered && TR.conf.reportHasPopulation();
     viewModel.code = q.code;
     viewModel.title = q.title;
     viewModel.type = q.type;
@@ -360,6 +446,11 @@
     // model so attachDeltas suppresses the (misleading) trend under a filter.
     viewModel.filtered = !!(filters && filters.length > 0) && TR.d2.hasMicrodata();
     TR.waves.attachDeltas(q, viewModel);
+    // Re-letter significance on the FPC base before hiding/sorting (per-cell, so
+    // it survives both). Unweighted population reports only.
+    if (viewModel.fpcDefault && !weighted) {
+      applyFpcSignificance(viewModel, q, opts.dual);
+    }
     if (opts.intervals) attachIntervals(viewModel, q);
     var hidden = opts.hiddenCols !== undefined
       ? opts.hiddenCols : TR.d2.hiddenFor(bannerId);

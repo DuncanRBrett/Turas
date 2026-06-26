@@ -380,12 +380,20 @@
         fmt.escapeHtml("Derived ranking / score with no per-respondent data — it " +
           "can't be recomputed for a filtered or custom-banner subset, so no " +
           "figures are shown for this view.") + '">n/a under filter</span>'
-      : model.source === "computed"
-        ? '<span class="badge-computed" title="' +
-          fmt.escapeHtml("Recomputed live from microdata. " +
-            (TR.d2.filterDescription() || "")) + '">COMPUTED · n=' +
-          fmt.base(model.columns[0].base) + "</span>"
-        : '<span class="badge-published" title="Published 2025 value, verbatim">PUBLISHED</span>';
+      : model.fpcDefault
+        // Population report default view: published figures verbatim, with a
+        // finite population correction narrowing the intervals and feeding the
+        // significance / low-base flags. Not a filtered recompute.
+        ? '<span class="badge-published" title="' +
+          fmt.escapeHtml("Published value with a finite population correction: " +
+            "intervals and significance reflect how much of each group's known " +
+            "universe responded.") + '">PUBLISHED · FPC</span>'
+        : model.source === "computed"
+          ? '<span class="badge-computed" title="' +
+            fmt.escapeHtml("Recomputed live from microdata. " +
+              (TR.d2.filterDescription() || "")) + '">COMPUTED · n=' +
+            fmt.base(model.columns[0].base) + "</span>"
+          : '<span class="badge-published" title="Published 2025 value, verbatim">PUBLISHED</span>';
     var prevBadge = model.prevWave
       ? '<span class="badge-prev" title="' + model.history.length +
         " prior wave" + (model.history.length > 1 ? "s" : "") + " · latest " +

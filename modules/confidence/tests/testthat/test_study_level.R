@@ -276,3 +276,60 @@ test_that("DEFF and effective_n are consistent: n_eff ≈ n / DEFF", {
   expected_n_eff <- valid_n / deff
   expect_true(abs(n_eff - expected_n_eff) < 2)
 })
+
+# ==============================================================================
+# FINITE POPULATION CORRECTION (FPC)
+# ==============================================================================
+
+test_that("calculate_fpc_factor: known-answer values", {
+  # FPC = sqrt((N - n) / (N - 1))
+  expect_equal(calculate_fpc_factor(20, 27), sqrt(7 / 26), tolerance = 1e-9)
+  expect_equal(calculate_fpc_factor(167, 556), sqrt(389 / 555), tolerance = 1e-9)
+  expect_equal(calculate_fpc_factor(50, 100), sqrt(50 / 99), tolerance = 1e-9)
+})
+
+test_that("calculate_fpc_factor: full census returns 0 (zero sampling error)", {
+  expect_equal(calculate_fpc_factor(27, 27), 0)
+  expect_equal(calculate_fpc_factor(30, 27), 0) # rounding over-coverage clamps
+})
+
+test_that("calculate_fpc_factor: no usable population returns 1 (no correction)", {
+  expect_equal(calculate_fpc_factor(50, NA), 1)
+  expect_equal(calculate_fpc_factor(50, NULL), 1)
+  expect_equal(calculate_fpc_factor(50, 1), 1)
+  expect_equal(calculate_fpc_factor(50, 0), 1)
+  expect_equal(calculate_fpc_factor(50, Inf), 1)
+})
+
+test_that("calculate_fpc_factor: invalid n returns 1 (no correction)", {
+  expect_equal(calculate_fpc_factor(0, 100), 1)
+  expect_equal(calculate_fpc_factor(NA, 100), 1)
+  expect_equal(calculate_fpc_factor(-5, 100), 1)
+})
+
+test_that("apply_fpc: inflates effective base by (N-1)/(N-n)", {
+  # n=20, N=27 -> 20 * 26 / 7 = 74.2857...
+  expect_equal(apply_fpc(20, 20, 27), 20 * 26 / 7, tolerance = 1e-9)
+  # weighted: Kish n_eff=18 but actual count 20 of 27
+  expect_equal(apply_fpc(18, 20, 27), 18 * 26 / 7, tolerance = 1e-9)
+})
+
+test_that("apply_fpc: full census returns Inf (zero-width interval)", {
+  expect_equal(apply_fpc(27, 27, 27), Inf)
+  expect_equal(apply_fpc(30, 30, 27), Inf)
+})
+
+test_that("apply_fpc: no usable population returns n_eff unchanged", {
+  expect_equal(apply_fpc(50, 50, NA), 50)
+  expect_equal(apply_fpc(50, 50, NULL), 50)
+  expect_equal(apply_fpc(50, 50, 1), 50)
+  expect_equal(apply_fpc(50, 0, 100), 50) # invalid count -> unchanged
+})
+
+test_that("apply_fpc: consistent with calculate_fpc_factor on the SE", {
+  # SE scales by FPC; effective base scales by 1/FPC^2. Check the identity
+  # n_eff_fpc = n / FPC^2 for the unweighted case.
+  n <- 40; N <- 120
+  fpc <- calculate_fpc_factor(n, N)
+  expect_equal(apply_fpc(n, n, N), n / (fpc^2), tolerance = 1e-9)
+})

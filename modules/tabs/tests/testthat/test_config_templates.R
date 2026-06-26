@@ -51,6 +51,15 @@ if (file.exists(shared_styles)) source(shared_styles)
 # Source the template generator
 source(file.path(tabs_root, "lib", "generate_config_templates.R"))
 
+# Also source the config loader (and its table-sheet helper) so the optional
+# Population sheet can be round-tripped back through load_population_sheet().
+# Guarded — a missing dependency must not break the template tests.
+for (dep in c(file.path("lib", "data_loader.R"),
+              file.path("lib", "crosstabs", "crosstabs_config.R"))) {
+  p <- file.path(tabs_root, dep)
+  if (file.exists(p)) try(source(p), silent = TRUE)
+}
+
 
 # ==============================================================================
 # TESTS: generate_crosstab_config_template()
@@ -78,6 +87,22 @@ test_that("crosstab config template contains expected sheets", {
   expect_true("Selection" %in% sheets)
   expect_true("Comments" %in% sheets)
   expect_true("AddedSlides" %in% sheets)
+  expect_true("Population" %in% sheets)
+})
+
+test_that("crosstab config template Population sheet round-trips through the loader", {
+  skip_if_not(exists("load_population_sheet", mode = "function"))
+  tmp <- tempfile(fileext = ".xlsx")
+  on.exit(unlink(tmp), add = TRUE)
+
+  generate_crosstab_config_template(tmp)
+  frame <- load_population_sheet(tmp)
+
+  # The template ships two worked examples (Masters/Honours by Year).
+  expect_false(is.null(frame))
+  expect_true(all(c("banner", "group", "population") %in% names(frame)))
+  expect_true("Masters" %in% frame$group)
+  expect_true(all(frame$population > 1))
 })
 
 test_that("crosstab config Settings sheet has expected structure", {

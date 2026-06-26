@@ -243,6 +243,15 @@ build_config_object <- function(config, default_alpha = .DEFAULT_ALPHA,
     # (probability designs speak CI/MOE; non-probability designs speak the
     # softened SI/PE). Cautious default: Not_Specified -> SI/PE.
     sampling_method = get_config_value(config, "sampling_method", "Not_Specified"),
+    # Total universe size for a census / full-invite design — drives the finite
+    # population correction (FPC) on the Total column and the report's overall
+    # response/coverage rate. Per-subgroup populations live in the optional
+    # Population sheet. Blank/absent -> no correction (byte-identical to today).
+    population_size = {
+      raw <- get_config_value(config, "population_size", NULL)
+      n <- suppressWarnings(as.numeric(raw))
+      if (is.null(raw) || length(n) != 1L || is.na(n) || n <= 1) NULL else n
+    },
     # Optional wave label shown in the v2 report header (e.g. "Annual 2025").
     wave = get_config_value(config, "wave", ""),
 
@@ -415,6 +424,76 @@ load_comments_sheet <- function(config_file) {
     comments
   }, error = function(e) {
     cat(sprintf("  [WARNING] Could not read Comments sheet: %s\n", e$message))
+    NULL
+  })
+}
+
+
+# ==============================================================================
+# POPULATION SHEET LOADER (finite population correction)
+# ==============================================================================
+
+#' Load Optional Population Sheet from Config Excel
+#'
+#' Reads a "Population" sheet from the config workbook if it exists. Each row
+#' gives the known universe size for one banner subgroup, enabling the finite
+#' population correction (FPC) per column in the v2 report.
+#'
+#' Expected columns: \code{Group} (the subgroup/column label as shown in the
+#' report) and \code{Population} (integer N). An optional \code{Banner} column
+#' scopes the row to one banner question (blank = match the \code{Group} label
+#' across any banner). Absent sheet / blank values -> no correction.
+#'
+#' @param config_file Character, path to config Excel file
+#' @return Data frame with columns banner (chr, NA when unscoped), group (chr),
+#'   population (numeric); or NULL when the sheet is absent or has no valid rows.
+#' @keywords internal
+load_population_sheet <- function(config_file) {
+  tryCatch({
+    sheets <- openxlsx::getSheetNames(config_file)
+    if (!"Population" %in% sheets) return(NULL)
+
+    required_cols <- c("Group", "Population")
+    df <- tryCatch(
+      .read_table_sheet(config_file, "Population", required_cols),
+      error = function(e) NULL
+    )
+    if (is.null(df) || nrow(df) == 0) return(NULL)
+
+    if (!all(required_cols %in% names(df))) {
+      cat("  [INFO] Population sheet found but missing Group/Population columns - skipped\n")
+      return(NULL)
+    }
+
+    has_banner <- "Banner" %in% names(df)
+    pop_num <- suppressWarnings(as.numeric(df$Population))
+
+    # Keep only rows with a non-blank Group and a usable population (> 1).
+    keep <- !is.na(df$Group) & nzchar(trimws(df$Group)) &
+            !is.na(pop_num) & pop_num > 1
+    df <- df[keep, , drop = FALSE]
+    pop_num <- pop_num[keep]
+    if (nrow(df) == 0) return(NULL)
+
+    banner <- if (has_banner) {
+      b <- trimws(as.character(df$Banner))
+      b[is.na(df$Banner) | !nzchar(b)] <- NA_character_
+      b
+    } else {
+      rep(NA_character_, nrow(df))
+    }
+
+    frame <- data.frame(
+      banner     = banner,
+      group      = trimws(as.character(df$Group)),
+      population = pop_num,
+      stringsAsFactors = FALSE
+    )
+    cat(sprintf("  [INFO] Loaded %d subgroup population(s) from Population sheet\n",
+                nrow(frame)))
+    frame
+  }, error = function(e) {
+    cat(sprintf("  [WARNING] Could not read Population sheet: %s\n", e$message))
     NULL
   })
 }
@@ -614,7 +693,8 @@ load_crosstabs_config <- function(config_file) {
     "generate_stats_pack",
     # HTML report
     "html_report", "html_report_v2", "html_report_v2_tracking",
-    "waves_source", "question_mapping", "wave_order", "sampling_method", "wave",
+    "waves_source", "question_mapping", "wave_order", "sampling_method",
+    "population_size", "wave",
     "brand_colour", "accent_colour", "project_title", "project_name",
     "company_name", "client_name",
     "researcher_logo_path", "client_logo_path", "logo_path",
@@ -665,6 +745,10 @@ load_crosstabs_config <- function(config_file) {
 
   # Load optional AddedSlides sheet (V10.8.0, renamed from Qualitative)
   config_obj$qualitative_slides <- load_qualitative_sheet(config_file)
+
+  # Load optional Population sheet (finite population correction) — per-subgroup
+  # universe sizes; the study total lives in the population_size setting.
+  config_obj$population_frame <- load_population_sheet(config_file)
 
   # Resolve logo paths against project root so HTML report gets absolute paths
   # Helper: resolve a single logo path, trying multiple candidate locations

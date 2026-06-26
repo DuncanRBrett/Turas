@@ -494,6 +494,13 @@ generate_crosstab_config_template <- function(output_path,
              valid_values_text = "Not_Specified, Random, Stratified, Cluster, Census, Quota, Online_Panel, Convenience",
              dropdown = c("Not_Specified", "Random", "Stratified", "Cluster",
                           "Census", "Quota", "Online_Panel", "Convenience")),
+        list(name = "population_size", default = "", required = FALSE,
+             description = paste0("Total universe size for a census / full-invite study (e.g. all staff or ",
+               "students invited). Enables the finite population correction in the v2 report: intervals ",
+               "narrow as coverage of the universe rises, and a small base that is most of a known group ",
+               "is no longer flagged unstable. Per-group sizes go in the optional Population sheet. Blank ",
+               "= no correction (intervals behave as an infinite-population sample)."),
+             valid_values_text = "Whole number greater than 1, or leave blank"),
         list(name = "wave", default = "", required = FALSE,
              description = "Wave label shown in the v2 report header and used as the tracking trend label (e.g. Wave 25 - May 2026).",
              valid_values_text = "Free text, or leave blank"),
@@ -768,6 +775,31 @@ generate_crosstab_config_template <- function(output_path,
                     subtitle = "Add custom narrative slides to the HTML report. Supports markdown formatting.",
                     example_rows = slides_examples,
                     num_blank_rows = 20)
+
+  # --- SHEET 6: Population (optional — finite population correction) ---
+  population_cols <- list(
+    list(name = "Group", width = 34, required = TRUE,
+         description = "Banner column / subgroup label EXACTLY as it appears in the report (e.g. Masters, Honours, Cape Town)."),
+    list(name = "Population", width = 16, required = TRUE,
+         description = "Total number of people in that group's universe (e.g. the cohort enrolment). Whole number greater than 1.",
+         integer_range = c(2, 10000000)),
+    list(name = "Banner", width = 24, required = FALSE,
+         description = "Optional: the banner question this group belongs to (e.g. Year). Leave blank to match the Group label across any banner.")
+  )
+
+  population_examples <- list(
+    list(Group = "Masters", Population = 27, Banner = "Year"),
+    list(Group = "Honours", Population = 41, Banner = "Year")
+  )
+
+  write_table_sheet(wb, "Population", population_cols,
+                    title = "Known Group Sizes (Finite Population Correction)",
+                    subtitle = paste0("OPTIONAL. For a census / full-invite study, give each banner column's ",
+                      "universe size so its intervals and significance reflect how much of the group ",
+                      "responded. The study total goes in the population_size setting. Leave the whole ",
+                      "sheet blank for no correction."),
+                    example_rows = population_examples,
+                    num_blank_rows = 30)
 
   # Save
   saveWorkbook(wb, output_path, overwrite = TRUE)

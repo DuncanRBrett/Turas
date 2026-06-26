@@ -165,6 +165,59 @@
     return Z95_EXACT * Math.sqrt(0.25 / n) * 100;
   };
 
+  /* ---------------- finite population correction (FPC) ---------------- */
+
+  /**
+   * Effective-base multiplier for a base of nActual respondents drawn from a
+   * known finite population N: (N-1)/(N-nActual). Verbatim port of
+   * apply_fpc()/calculate_fpc_factor() in 03_study_level.R.
+   *  - >= 1 (narrows the interval / strengthens the test);
+   *  - Infinity at full census (nActual >= N) -> zero-width interval;
+   *  - 1 when no usable population is known -> unconfigured reports unchanged.
+   */
+  conf.fpcMul = function (nActual, N) {
+    if (!(N > 1) || !(nActual > 0)) return 1;
+    if (nActual >= N) return Infinity;
+    return (N - 1) / (N - nActual);
+  };
+
+  /** FPC-adjusted effective base: feed straight into wilson/meanCI/z-tests.
+   *  nEff is the actual count (unweighted) or the Kish n_eff (weighted). */
+  conf.fpcBase = function (nEff, nActual, N) {
+    var mul = conf.fpcMul(nActual, N);
+    return mul === Infinity ? Infinity : nEff * mul;
+  };
+
+  /** Sampled fraction of the universe, clamped to [0,1] (null when unknown). */
+  conf.coverage = function (nActual, N) {
+    if (!(N > 1) || !(nActual > 0)) return null;
+    return Math.min(nActual / N, 1);
+  };
+
+  /** Does this report carry any configured population (a per-column universe
+   *  or the study total)? Gates the whole FPC path; cached on TR.AGG. */
+  conf.reportHasPopulation = function () {
+    var agg = TR.AGG;
+    if (!agg) return false;
+    if (agg._hasPop !== undefined) return agg._hasPop;
+    var any = !!(agg.project && agg.project.population_size > 1);
+    (agg.columns || []).forEach(function (c) {
+      if (c && c.population > 1) any = true;
+    });
+    agg._hasPop = any;
+    return any;
+  };
+
+  /** Overall response/coverage rate from the study total (TR.MICRO.n / N), or
+   *  null when no total universe is configured. Shown in the design note. */
+  conf.responseRate = function () {
+    var agg = TR.AGG;
+    var N = agg && agg.project && agg.project.population_size;
+    var n = TR.MICRO && TR.MICRO.n;
+    if (!(N > 1) || !(n > 0)) return null;
+    return { n: n, N: N, rate: Math.min(n / N, 1) };
+  };
+
   /** Display range: "81–87" for percentages, "7.2–7.6" for means. */
   conf.fmtRange = function (lo, hi, isMean) {
     if (lo === null || lo === undefined || hi === null || hi === undefined) {
@@ -225,24 +278,44 @@
     return smallest;
   }
 
+  /**
+   * Census / finite-population caveat appended to the design sentence when a
+   * population is configured: name the coverage, say the intervals are FPC'd,
+   * and flag non-response as the residual (uncorrectable) uncertainty so a
+   * narrow interval never reads as certainty. "" when no population is set.
+   */
+  function fpcNote() {
+    if (!conf.reportHasPopulation()) return "";
+    var rr = conf.responseRate();
+    var lead = rr
+      ? " This was a near-census: about " + Math.round(rr.rate * 100) +
+        "% of the " + TR.fmt.base(rr.N) + "-strong universe responded, so "
+      : " Known group sizes were supplied, so ";
+    return lead + "ranges include a <strong>finite population correction</strong> " +
+      "— they narrow as coverage of a group rises, reaching zero for a full " +
+      "census. The remaining uncertainty is mainly <strong>non-response</strong>: " +
+      "the people who did not answer may differ from those who did, and no " +
+      "interval can correct for that.";
+  }
+
   /** One honest sentence about the sampling design (labels port). */
   function designSentence(labels) {
     if (!labels.is_probability) {
       return "Responses were not drawn by formal random sampling, so ranges " +
         "are <strong>stability intervals (" + labels.interval_abbrev +
         ")</strong> — how much a number would wobble — not formal " +
-        "confidence intervals.";
+        "confidence intervals." + fpcNote();
     }
     if (labels.sampling_method_normalised === "cluster") {
       // CLUSTER_WARNING_HTML pattern: clustering is not adjusted for
       return "Probability (cluster) sample: ranges are 95% confidence " +
         "intervals, but respondents cluster, so true uncertainty can be " +
         "larger — treat near-" + labels.precision_term +
-        " differences with caution.";
+        " differences with caution." + fpcNote();
     }
     return "This survey used probability sampling, so ranges are formal " +
       "95% <strong>confidence intervals (" + labels.interval_abbrev +
-      ")</strong>.";
+      ")</strong>." + fpcNote();
   }
 
   /**

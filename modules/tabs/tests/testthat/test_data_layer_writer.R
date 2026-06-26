@@ -255,6 +255,98 @@ test_that("banner_groups and categories are derived from the data", {
   expect_setequal(unlist(dl$categories), c("Awareness", "Satisfaction"))
 })
 
+# ------------------------------------------------------------------------------
+# Finite population correction: per-column population emission
+# ------------------------------------------------------------------------------
+
+test_that("no population configured -> columns carry no population field", {
+  cols <- build_data_layer(make_dl_results(), make_dl_banner_info(), make_dl_config())$columns
+  expect_true(all(vapply(cols, function(c) is.null(c$population), logical(1))))
+})
+
+test_that("Total takes population_size; subgroups take the frame match", {
+  frame <- data.frame(
+    banner = c(NA, NA), group = c("Male", "Female"),
+    population = c(120, 80), stringsAsFactors = FALSE)
+  cfg <- make_dl_config(population_size = 300, population_frame = frame)
+  cols <- build_data_layer(make_dl_results(), make_dl_banner_info(), cfg)$columns
+  expect_equal(cols[[1]]$population, 300)   # Total <- population_size
+  expect_equal(cols[[2]]$population, 120)   # Male
+  expect_equal(cols[[3]]$population, 80)    # Female
+})
+
+test_that("an unmatched subgroup is left uncorrected (no population field)", {
+  frame <- data.frame(
+    banner = NA, group = "Male", population = 120, stringsAsFactors = FALSE)
+  cfg <- make_dl_config(population_frame = frame)   # no population_size
+  cols <- build_data_layer(make_dl_results(), make_dl_banner_info(), cfg)$columns
+  expect_null(cols[[1]]$population)          # Total: no population_size
+  expect_equal(cols[[2]]$population, 120)    # Male matched
+  expect_null(cols[[3]]$population)          # Female unmatched
+})
+
+test_that("an unmatched Population row is reported on the console (no silent skip)", {
+  frame <- data.frame(banner = c(NA, NA), group = c("Male", "Typo Group"),
+                      population = c(120, 50), stringsAsFactors = FALSE)
+  cfg <- make_dl_config(population_frame = frame)
+  cols <- NULL
+  out <- capture.output(
+    cols <- build_data_layer(make_dl_results(), make_dl_banner_info(), cfg)$columns
+  )
+  joined <- paste(out, collapse = "\n")
+  expect_match(joined, "matched 1 of 2")          # one of two rows matched
+  expect_match(joined, "Typo Group")              # the unmatched row is named
+  expect_equal(cols[[2]]$population, 120)          # Male still corrected
+  expect_null(cols[[3]]$population)                # Female left standard
+})
+
+test_that("a fully-matched Population frame reports no unmatched rows", {
+  frame <- data.frame(banner = c(NA, NA), group = c("Male", "Female"),
+                      population = c(120, 80), stringsAsFactors = FALSE)
+  cfg <- make_dl_config(population_frame = frame)
+  out <- capture.output(
+    build_data_layer(make_dl_results(), make_dl_banner_info(), cfg)
+  )
+  joined <- paste(out, collapse = "\n")
+  expect_match(joined, "matched 2 of 2")
+  expect_false(grepl("matched NO report column", joined))
+})
+
+test_that(".resolve_column_population: unscoped, case-insensitive match", {
+  frame <- data.frame(banner = NA_character_, group = "Masters",
+                      population = 27, stringsAsFactors = FALSE)
+  expect_equal(.resolve_column_population("masters", NA, frame), 27)
+  expect_null(.resolve_column_population("Honours", NA, frame))
+  expect_null(.resolve_column_population("Masters", NA, NULL))
+})
+
+test_that(".resolve_column_population: a banner-scoped row beats an unscoped one", {
+  frame <- data.frame(
+    banner = c("Study level", NA), group = c("Masters", "Masters"),
+    population = c(27, 999), stringsAsFactors = FALSE)
+  expect_equal(.resolve_column_population("Masters", "Study level", frame), 27)
+  # falls back to the unscoped row when the banner doesn't match
+  expect_equal(.resolve_column_population("Masters", "Other banner", frame), 999)
+})
+
+test_that(".resolve_column_population: a scoped-only row doesn't match a different banner", {
+  frame <- data.frame(banner = "Study level", group = "Masters",
+                      population = 27, stringsAsFactors = FALSE)
+  expect_null(.resolve_column_population("Masters", "Campus", frame))
+})
+
+test_that("project carries population_size only when usably configured", {
+  p0 <- build_data_layer(make_dl_results(), make_dl_banner_info(), make_dl_config())$project
+  expect_null(p0$population_size)
+  p1 <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+                         make_dl_config(population_size = 500))$project
+  expect_equal(p1$population_size, 500)
+  # degenerate values (<= 1) are rejected
+  p2 <- build_data_layer(make_dl_results(), make_dl_banner_info(),
+                         make_dl_config(population_size = 1))$project
+  expect_null(p2$population_size)
+})
+
 # ==============================================================================
 # 2. project block
 # ==============================================================================

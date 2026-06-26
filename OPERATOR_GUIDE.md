@@ -79,6 +79,47 @@ Add optional identity information to the config Settings sheet under the **STUDY
 
 ---
 
+## Finite Population Correction (Census Surveys)
+
+For a **census / full-invite** study — you tried to reach a whole, known, finite group (all staff, an entire student body) rather than sampling from a large frame — the tabs **v2 interactive report** can apply a finite population correction (FPC). It sizes the statistics on what was actually reached: confidence intervals **narrow as a group's coverage of its universe rises** (reaching zero for a full census), significance is tested on that corrected base, and a small base that is most of its known group is no longer flagged "unstable" (it shows `xx% of N` instead). The reported percentages and means never change — only the intervals and the significance flags.
+
+> FPC corrects **sampling** error only. It does nothing about **non-response bias** — whether the people who did not answer differ from those who did. The report's design note states the response rate and this caveat; you should still check whether low-response groups look different before leaning on group-level findings.
+
+### Configuring it
+
+Two pieces in the **crosstab config** (`Crosstab_Config_Template.xlsx`):
+
+| Where | What |
+|-------|------|
+| **Settings sheet** | `population_size` = the total universe (e.g. everyone invited). Drives the Total column and the overall response rate shown in the report. |
+| **Population sheet** (optional) | One row per banner subgroup: `Group` (the column label exactly as it appears in the report), `Population` (that group's universe N), and an optional `Banner` (the banner question — leave blank unless the same label appears under two banners). Enter only `N`; the responded count is measured from the data. |
+
+Set `sampling_method = Census` as well, so the report speaks "confidence interval" rather than the softened "stability interval".
+
+**Example** (Settings `population_size = 220`, plus the Population sheet):
+
+| Group | Population |
+|-------|-----------|
+| Head Office | 85 |
+| Durban Campus | 13 |
+| Academic (general) | 62 |
+| Marketing | 8 |
+
+### When to use it vs standard CI
+
+| Use FPC | Use standard CI (leave it off) |
+|---------|-------------------------------|
+| A census / full-invite of a **known, finite** group, and you are describing **that** group | You sampled from a large or open frame (panel, big customer base) |
+| You know the universe size `N` for the groups you report | You don't know `N`, or you're generalising **beyond** the people you enumerated |
+| Coverage is meaningful (roughly >10–15% of the universe) | Coverage is tiny (<10%) — FPC barely moves anything |
+
+### Safe by design
+
+- **No population configured** → the report behaves exactly as before (standard intervals). FPC is purely additive.
+- **Incomplete data** → groups with a known `N` are corrected; groups without keep a standard interval. Any `Population` row that matches **no** report column (a typo or stale label) is reported on the console (`matched X of Y subgroup rows…` plus the offending labels), so nothing is silently skipped.
+
+---
+
 ## Typical Workflow
 
 1. **Prepare data** — Clean survey data in Excel/CSV format
