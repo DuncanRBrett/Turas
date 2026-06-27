@@ -12,6 +12,7 @@
   /** Tab list; Tracking only appears when a prior wave is configured. */
   function tabList() {
     var tabs = [
+      ["takeout", "Executive takeout"],
       ["dashboard", "Dashboard"],
       ["crosstabs", "Crosstabs"],
       ["findings", "Differences"]
@@ -114,17 +115,18 @@
       btn.setAttribute("aria-selected",
         String(btn.getAttribute("data-tab") === d2.state.tab));
     });
-    if (d2.state.tab === "crosstabs") TR.cards2.renderTab(host);
+    if (d2.state.tab === "takeout") TR.takeout.render(host);
+    else if (d2.state.tab === "crosstabs") TR.cards2.renderTab(host);
     else if (d2.state.tab === "dashboard") TR.views.dashboard(host);
     else if (d2.state.tab === "moved") TR.views.whatMoved(host);
     else if (d2.state.tab === "findings") TR.views.findings(host);
     else if (d2.state.tab === "story") TR.story2.renderTab(host);
     else TR.report.renderTab(host);
     // The audience filter recomputes from this wave's microdata; prior waves
-    // are pre-aggregated, so a filter can't apply on Tracking. Hide the bar
-    // there rather than offer a control that does nothing.
+    // are pre-aggregated, so a filter can't apply on Tracking. The Executive
+    // Takeout summarises the published view, so it hides the bar too.
     var fb = document.getElementById("filterbar");
-    if (fb) fb.hidden = d2.state.tab === "moved";
+    if (fb) fb.hidden = d2.state.tab === "moved" || d2.state.tab === "takeout";
     d2.pushHash();
   };
 

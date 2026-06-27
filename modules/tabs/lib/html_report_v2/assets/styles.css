@@ -517,3 +517,110 @@ table.ws td.sparkcell { padding: 1px 8px; }
 /* question list: wrap to two lines (tooltip carries the full text) */
 .qlink { align-items: flex-start; }
 .qlink .qt { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35; }
+
+/* ============================================================================
+ * Executive Takeout — the one-page argument (Read) and the sequence (Present).
+ * Posture colours are AA-contrast on white and always paired with a glyph and a
+ * text label, so colour is never the sole signal. Editorial serif for the voice.
+ * ==========================================================================*/
+:root {
+  --tko-protect: #176e51;     /* strong — green  */
+  --tko-act:     #9a5410;     /* exposed — amber */
+  --tko-watch:   #245a94;     /* moving — blue   */
+  --tko-decide:  #5b4296;     /* fork — violet   */
+  --tko-serif: Georgia, "Times New Roman", "Iowan Old Style", serif;
+}
+.tko-page { gap: 18px; }
+.tko-glyph { width: 1em; height: 1em; vertical-align: -0.13em; }
+
+/* header: view toggle + edit hint */
+.tko-head { display: flex; align-items: center; gap: 14px; }
+.tko-viewtoggle { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; background: var(--card); overflow: hidden; }
+.tko-vbtn { border: none; background: none; font: 600 12.5px var(--font); color: var(--muted); padding: 7px 18px; cursor: pointer; }
+.tko-vbtn[aria-checked="true"] { background: var(--brand); color: #fff; }
+.tko-vbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tko-head-actions { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.tko-reset { border: 1px solid var(--line); background: var(--card); color: var(--muted); font: 600 12px var(--font); padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+.tko-reset:hover { border-color: var(--brand); color: var(--brand); }
+.tko-edithint { font-size: 11.5px; color: var(--faint); display: inline-flex; align-items: center; gap: 5px; }
+
+/* apex band */
+.tko-apex { background: linear-gradient(180deg, #fbfbfd, var(--card)); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 26px 30px; }
+.tko-kicker { font-size: 11px; letter-spacing: .04em; color: var(--faint); margin-bottom: 14px; }
+.tko-apex-main { display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap; }
+.tko-apex-answer { flex: 1.7; min-width: 300px; }
+.tko-eyebrow { font-size: 10.5px; text-transform: uppercase; letter-spacing: .09em; color: var(--faint); margin-bottom: 9px; }
+.tko-answer { font-family: var(--tko-serif); font-size: 25px; line-height: 1.34; color: var(--ink); }
+.tko-apex-metrics { flex: 1; min-width: 220px; display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; }
+.tko-kpi { background: var(--soft); border-radius: 12px; padding: 13px 15px; }
+.tko-kpi-label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.tko-kpi-val { font-size: 30px; font-weight: 800; color: var(--ink); line-height: 1; }
+.tko-kpi-band { font-size: 11px; font-weight: 700; margin-top: 7px; text-transform: capitalize; }
+.tko-band-strong { color: var(--tko-protect); } .tko-band-moderate { color: var(--tko-act); } .tko-band-weak { color: var(--red); } .tko-band-na { color: var(--faint); }
+.tko-reliability { display: flex; align-items: center; gap: 8px; margin-top: 18px; padding-top: 15px; border-top: 1px solid var(--line); font: 11.5px var(--font); color: var(--muted); }
+
+/* posture lanes */
+.tko-lanes { display: flex; flex-direction: column; gap: 22px; }
+.tko-lane-head { display: flex; align-items: center; gap: 10px; margin-bottom: 11px; }
+.tko-lane-head h3 { font-size: 15px; margin: 0; }
+.tko-lane-dot { display: inline-flex; }
+.tko-on-protect { color: var(--tko-protect); } .tko-on-act { color: var(--tko-act); } .tko-on-watch { color: var(--tko-watch); } .tko-on-decide { color: var(--tko-decide); }
+.tko-verb { font-size: 12.5px; color: var(--muted); }
+.tko-count { margin-left: auto; font-size: 12px; color: var(--faint); background: var(--soft); border-radius: 999px; padding: 1px 9px; }
+.tko-lane-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 14px; }
+
+/* finding card */
+.tko-card { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 15px 17px; }
+.tko-edge-protect { border-left-color: var(--tko-protect); } .tko-edge-act { border-left-color: var(--tko-act); } .tko-edge-watch { border-left-color: var(--tko-watch); } .tko-edge-decide { border-left-color: var(--tko-decide); }
+.tko-claim { font-size: 15px; font-weight: 600; color: var(--ink); line-height: 1.35; }
+.tko-metric { margin: 9px 0 8px; display: flex; align-items: baseline; gap: 8px; }
+.tko-big { font-size: 21px; font-weight: 800; color: var(--ink); }
+.tko-mlabel { font-size: 12px; color: var(--muted); }
+.tko-gap { margin-left: auto; font-size: 12.5px; font-weight: 700; }
+.tko-gap.tko-protect { color: var(--tko-protect); } .tko-gap.tko-act { color: var(--tko-act); } .tko-gap.tko-watch { color: var(--tko-watch); } .tko-gap.tko-decide { color: var(--tko-decide); }
+.tko-bars { max-width: none; margin: 4px 0 2px; }
+.tko-bars .dfb-bar.tko-protect { background: var(--tko-protect); } .tko-bars .dfb-bar.tko-act { background: var(--tko-act); } .tko-bars .dfb-bar.tko-watch { background: var(--tko-watch); } .tko-bars .dfb-bar.tko-decide { background: var(--tko-decide); }
+.tko-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 9px 0; }
+.tko-chip { font-size: 10.5px; font-weight: 600; color: var(--muted); background: var(--soft); border-radius: 5px; padding: 2px 7px; font-family: var(--font); }
+.tko-lowbase { color: #8a5a00; background: #fdf3e2; }
+.tko-soft { color: var(--tko-watch); background: #eaf1f9; }
+.tko-delta.up { color: var(--tko-protect); background: #e7f4ee; } .tko-delta.down { color: var(--red); background: #fbeceb; }
+.tko-sowhat { font-family: var(--tko-serif); font-style: italic; font-size: 13px; color: var(--muted); line-height: 1.5; }
+.tko-card-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 11px; }
+.tko-card-foot .linklike { font-size: 12px; font-weight: 600; }
+.tko-veto { border: none; background: none; color: var(--faint); font: 11.5px var(--font); cursor: pointer; padding: 2px 4px; }
+.tko-veto:hover { color: var(--red); text-decoration: underline; }
+.tko-prov { font-family: var(--font); font-size: 11px; color: var(--faint); line-height: 1.6; }
+.tko-empty { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; color: var(--muted); font-size: 13.5px; }
+
+/* inline editing — looks like text until you touch it */
+.tko-ed { border-radius: 6px; padding: 2px 5px; margin: 0 -5px; cursor: text; transition: background .12s; }
+.tko-ed:hover { background: var(--soft); }
+.tko-ed:focus { background: #fff; outline: 2px solid var(--accent); outline-offset: 0; }
+.tko-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* Present view — one big idea per screen */
+.tko-deck { display: flex; flex-direction: column; gap: 16px; }
+.tko-slide { background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 44px 48px; min-height: 64vh; display: flex; flex-direction: column; justify-content: center; scroll-snap-align: start; scroll-margin-top: 12px; }
+.tko-slide-cover { border-left: 5px solid var(--brand); }
+.tko-slide-finding.tko-edge-protect { border-left: 5px solid var(--tko-protect); } .tko-slide-finding.tko-edge-act { border-left: 5px solid var(--tko-act); } .tko-slide-finding.tko-edge-watch { border-left: 5px solid var(--tko-watch); } .tko-slide-finding.tko-edge-decide { border-left: 5px solid var(--tko-decide); }
+.tko-slide-kicker { font-family: var(--font); font-size: 11px; letter-spacing: .05em; color: var(--faint); margin-bottom: 22px; }
+.tko-cover-nums { display: flex; gap: 56px; flex-wrap: wrap; }
+.tko-hero { font-size: clamp(3.4rem, 11vw, 6rem); font-weight: 800; line-height: .9; color: var(--ink); font-variant-numeric: tabular-nums; }
+.tko-cover-lab { font-size: 13px; color: var(--muted); margin-top: 10px; }
+.tko-cover-foot { font-size: 13px; color: var(--faint); margin-top: 30px; }
+.tko-slide-pill { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; font-size: 12px; font-weight: 700; padding: 4px 11px; border-radius: 999px; background: var(--soft); margin-bottom: 18px; }
+.tko-slide-hero { font-size: clamp(3.4rem, 13vw, 6.5rem); font-weight: 800; line-height: .85; color: var(--ink); font-variant-numeric: tabular-nums; }
+.tko-claim-lg { font-size: clamp(18px, 3vw, 22px); line-height: 1.32; color: var(--ink); margin: 18px 0 0; max-width: 34ch; }
+.tko-slide-visual { margin: 20px 0; max-width: 460px; }
+.tko-sowhat-lg { font-size: 15px; margin-top: 4px; }
+.tko-slide-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 22px; }
+.tko-slide-fine { min-height: 40vh; }
+.tko-view-present { scroll-snap-type: y proximity; }
+
+@media print {
+  .tko-head, .tko-veto, .tko-edithint, .tko-reset { display: none !important; }
+  .tko-slide { min-height: auto; page-break-inside: avoid; box-shadow: none; }
+  .tko-card, .tko-apex { box-shadow: none; }
+  .tko-ed:hover, .tko-ed:focus { background: none; outline: none; }
+}

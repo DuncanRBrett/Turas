@@ -234,6 +234,31 @@
           rows: [{ kind: "category", label: "r", cells: [{ pct: null, n: null, sig: "" }] }],
           lowBaseThreshold: 30 }, { heatmap: true });
         eq(html.indexOf("<table") === 0, true, "table renders");
+      } },
+      { name: "executive takeout builds and stays capped on live data", fn: function () {
+        var t = TR.takeout.compute();
+        eq(t.postures.length, 4, "four posture lanes");
+        eq(t.promotedCount <= 7, true, "page capped at <=7, got " + t.promotedCount);
+        eq(t.candidateCount >= t.promotedCount, true, "promoted is a subset of candidates");
+        t.postures.forEach(function (p) {
+          var cap = TR.takeout.POSTURES.filter(function (x) { return x.id === p.id; })[0].cap;
+          eq(p.items.length <= cap, true, p.id + " within its cap (" + cap + ")");
+          p.items.forEach(function (f) {
+            eq(typeof f.id === "string" && f.id.indexOf("|") > 0, true, "finding has a stable id");
+          });
+        });
+      } },
+      { name: "takeout renders both views; editable text is escaped", fn: function () {
+        var t = TR.takeout.compute();
+        var read = TR.takeout.readView.html(t, { lowThreshold: 30 });
+        var present = TR.takeout.presentView.html(t, { lowThreshold: 30 });
+        eq(read.indexOf("tko-apex") !== -1, true, "read view has the apex band");
+        eq(present.indexOf("tko-slide") !== -1, true, "present view has slides");
+        // a hostile edit must never reach the DOM as live HTML (XSS guard)
+        var hostile = TR.takeout.ui.editable("x", "claim",
+          '<img src=x onerror=alert(1)>', "tko-claim", "label");
+        eq(hostile.indexOf("<img src=x") === -1, true, "raw tag never emitted");
+        eq(hostile.indexOf("&lt;img") !== -1, true, "shown escaped instead");
       } }
     ];
   };

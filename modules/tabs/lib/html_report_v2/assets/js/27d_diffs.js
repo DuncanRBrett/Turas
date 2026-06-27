@@ -112,7 +112,7 @@
         direction: gap >= 0 ? "ahead" : "behind",
         value: means[i].mean, rest: rm.mean, overall: means[0].mean,
         gap: gap, decimals: decimals, scaleMin: scaleMin, scaleMax: scaleMax,
-        beaten: [],
+        beaten: [], base: means[i].k,   // column base — carried for the Executive Takeout
         score: (az / TR.stats.Z95) * Math.abs(gap) / range * 100 });
     });
     return out;
@@ -168,6 +168,7 @@
             beaten: letters.split("").map(function (l) {
               return labelByLetter[l.toUpperCase()] || l;
             }),
+            base: model.columns[i].base,   // column base — carried for the Executive Takeout
             score: letters.length * Math.abs(cell.pct - baseline) });
         });
       });
